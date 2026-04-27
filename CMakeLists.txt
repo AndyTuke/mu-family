@@ -1,0 +1,45 @@
+cmake_minimum_required(VERSION 3.22)
+project(mu-clid VERSION 1.0.0)
+
+add_subdirectory($ENV{JUCE_PATH} JUCE)
+
+juce_add_plugin(mu-clid
+    COMPANY_NAME "Transwarp Development Project"
+    BUNDLE_ID "com.transwarp.mu-clid"
+    PLUGIN_MANUFACTURER_CODE TDP1
+    PLUGIN_CODE MCld
+    FORMATS VST3 Standalone
+    PRODUCT_NAME "mu-Clid"
+    IS_SYNTH FALSE
+    NEEDS_MIDI_INPUT FALSE
+    NEEDS_MIDI_OUTPUT FALSE
+    IS_MIDI_EFFECT FALSE
+    EDITOR_WANTS_KEYBOARD_FOCUS FALSE
+)
+
+target_sources(mu-clid
+    PRIVATE
+        Source/PluginProcessor.cpp
+        Source/PluginEditor.cpp
+)
+
+target_compile_definitions(mu-clid
+    PUBLIC
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_VST3_CAN_REPLACE_VST2=0
+        JUCE_USE_MP3AUDIOFORMAT=1
+)
+
+target_link_libraries(mu-clid
+    PRIVATE
+        juce::juce_audio_utils
+        juce::juce_dsp
+        juce::juce_gui_basics
+        juce::juce_gui_extra
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
