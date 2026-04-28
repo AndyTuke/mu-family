@@ -1,6 +1,10 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "Sequencer/SequencerEngine.h"
+#include "Audio/VoiceEngine.h"
+
+#include <array>
 
 //==============================================================================
 // PluginProcessor
@@ -35,6 +39,27 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
+    void toggleInternalPlay() { internalPlaying = !internalPlaying; if (!internalPlaying) internalBeatPos = 0.0; }
+    bool isInternalPlaying()  const { return internalPlaying; }
+
+    void    addRhythm    (const Rhythm& r) { sequencer.addRhythm(r); }
+    void    removeRhythm (int index)       { sequencer.removeRhythm(index); }
+    Rhythm& getRhythm    (int index)       { return sequencer.getRhythm(index); }
+    int     getNumRhythms() const          { return sequencer.getNumRhythms(); }
+    void    updatePattern (int index)      { sequencer.updatePattern(index); }
+
+    void loadSampleForRhythm(int rhythmIndex, const juce::File& file);
+
+    SequencerEngine sequencer;
+    std::array<VoiceEngine, SequencerEngine::MaxRhythms> voiceEngines;
+
 private:
+    // Internal transport — used in standalone when no DAW playhead is available.
+    bool   internalPlaying     = false;
+    double internalBeatPos     = 0.0;
+    double internalBpm         = 120.0;
+    double currentSampleRate   = 44100.0;
+
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

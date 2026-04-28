@@ -20,5 +20,11 @@ public:
 private:
     PluginProcessor& processorRef;
 
+    // Temporary controls — remove when TransportBar and RhythmPanel are implemented.
+    juce::TextButton playButton   { "Play" };
+    juce::TextButton loadButton   { "Load Sample" };
+
+    std::unique_ptr<juce::FileChooser> fileChooser;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };

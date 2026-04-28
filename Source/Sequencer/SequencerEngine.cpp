@@ -41,17 +41,10 @@ void SequencerEngine::updatePattern(int index)
 }
 
 //==============================================================================
-int SequencerEngine::processBlock(juce::AudioPlayHead* playHead)
+int SequencerEngine::processBlock(double beatPosition)
 {
-    if (playHead == nullptr || numRhythms == 0)
+    if (numRhythms == 0)
         return 0;
-
-    auto posInfo = playHead->getPosition();
-    if (!posInfo.hasValue()) return 0;
-    if (!posInfo->getIsPlaying()) return 0;
-
-    auto ppq = posInfo->getPpqPosition();
-    if (!ppq.hasValue()) return 0;
 
     int firedMask = 0;
 
@@ -62,8 +55,7 @@ int SequencerEngine::processBlock(juce::AudioPlayHead* playHead)
 
         int patLen = static_cast<int>(pattern.size());
 
-        // Global step index from DAW beat position.
-        auto globalStep = static_cast<int>(*ppq / StepLengthBeats);
+        auto globalStep = static_cast<int>(beatPosition / StepLengthBeats);
         int stepIndex   = globalStep % patLen;
 
         if (stepIndex != lastStepIndex[r])

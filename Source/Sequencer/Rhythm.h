@@ -1,8 +1,12 @@
 #pragma once
 
 #include "HitGenerator.h"
+#include "ControlSequence.h"
+#include "../Modulation/ModulationMatrix.h"
+
 #include <optional>
 #include <string>
+#include <vector>
 
 enum class Logic { OR, AND, XOR, AOnly, BOnly };
 
@@ -15,6 +19,10 @@ public:
     std::string         name        = "Rhythm";
     int                 colourIndex = 0;     // index into the 30-colour palette
     std::optional<int>  resetSteps;          // nullopt = INF (free-running)
+
+    static constexpr int MaxControlSequences = 8;
+    std::vector<ControlSequence> controlSequences;
+    ModulationMatrix             modulationMatrix;
 
     // Returns the combined hit pattern for one full cycle.
     // Length is resetSteps if set, otherwise the LCM of A and B step counts.

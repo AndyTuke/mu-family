@@ -32,8 +32,8 @@ std::vector<bool> Rhythm::getCombinedPattern() const
             case Logic::OR:    combined[i] = a || b;  break;
             case Logic::AND:   combined[i] = a && b;  break;
             case Logic::XOR:   combined[i] = a != b;  break;
-            case Logic::AOnly: combined[i] = a;        break;
-            case Logic::BOnly: combined[i] = b;        break;
+            case Logic::AOnly: combined[i] = a && !b;  break;
+            case Logic::BOnly: combined[i] = b && !a;  break;
         }
     }
     return combined;

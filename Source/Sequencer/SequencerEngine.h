@@ -22,8 +22,9 @@ public:
     void updatePattern(int index);
 
     // Call from processBlock on the audio thread.
+    // beatPosition is the current song position in beats (ppq).
     // Returns a bitmask of rhythms that fired a hit this block (bit 0 = rhythm 0, etc.).
-    int processBlock(juce::AudioPlayHead* playHead);
+    int processBlock(double beatPosition);
 
 private:
     std::array<Rhythm,            MaxRhythms> rhythms;

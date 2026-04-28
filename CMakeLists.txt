@@ -25,6 +25,10 @@ target_sources(mu-clid
         Source/Sequencer/HitGenerator.cpp
         Source/Sequencer/Rhythm.cpp
         Source/Sequencer/SequencerEngine.cpp
+        Source/Sequencer/ControlSequence.cpp
+        Source/Audio/SamplePlayer.cpp
+        Source/Audio/VoiceEngine.cpp
+        Source/Modulation/ModulationMatrix.cpp
 )
 
 target_compile_definitions(mu-clid
@@ -47,3 +51,11 @@ target_link_libraries(mu-clid
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
 )
+
+# Increment build_number.txt and regenerate Source/BuildNumber.h before every build.
+add_custom_target(increment_build_number ALL
+    COMMAND ${CMAKE_COMMAND} -P "${CMAKE_SOURCE_DIR}/cmake/IncrementBuildNumber.cmake"
+    COMMENT "Incrementing build number"
+    VERBATIM
+)
+add_dependencies(mu-clid increment_build_number)
