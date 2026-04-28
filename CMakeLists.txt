@@ -21,6 +21,10 @@ target_sources(mu-clid
     PRIVATE
         Source/PluginProcessor.cpp
         Source/PluginEditor.cpp
+        Source/Sequencer/EuclideanGenerator.cpp
+        Source/Sequencer/HitGenerator.cpp
+        Source/Sequencer/Rhythm.cpp
+        Source/Sequencer/SequencerEngine.cpp
 )
 
 target_compile_definitions(mu-clid
