@@ -29,6 +29,16 @@ target_sources(mu-clid
         Source/Audio/SamplePlayer.cpp
         Source/Audio/VoiceEngine.cpp
         Source/Modulation/ModulationMatrix.cpp
+        Source/UI/Components/MuClidLookAndFeel.cpp
+        Source/UI/Components/KnobWithLabel.cpp
+        Source/UI/Components/SegmentControl.cpp
+        Source/UI/Components/NudgeInput.cpp
+        Source/UI/Components/TimeSelector.cpp
+        Source/UI/Components/DropdownSelect.cpp
+        Source/UI/Components/StepEditor.cpp
+        Source/UI/Components/LFOEditor.cpp
+        Source/UI/Components/AddButton.cpp
+        Source/UI/Components/StatusBar.cpp
 )
 
 target_compile_definitions(mu-clid
