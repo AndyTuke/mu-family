@@ -40,6 +40,7 @@ target_sources(mu-clid
         Source/UI/Components/LFOEditor.cpp
         Source/UI/Components/AddButton.cpp
         Source/UI/Components/StatusBar.cpp
+        Source/UI/TransportBar.cpp
         Source/UI/RhythmCircle.cpp
         Source/UI/SidebarItem.cpp
         Source/UI/RhythmSidebar.cpp

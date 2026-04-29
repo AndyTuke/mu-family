@@ -40,8 +40,10 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
-    void toggleInternalPlay() { internalPlaying = !internalPlaying; if (!internalPlaying) internalBeatPos = 0.0; }
-    bool isInternalPlaying()  const { return internalPlaying; }
+    void   toggleInternalPlay()        { internalPlaying = !internalPlaying; if (!internalPlaying) internalBeatPos = 0.0; }
+    bool   isInternalPlaying()   const { return internalPlaying; }
+    void   setInternalBpm(double bpm)  { internalBpm = juce::jlimit(20.0, 300.0, bpm); }
+    double getInternalBpm()      const { return internalBpm; }
 
     void    addRhythm    (const Rhythm& r) { sequencer.addRhythm(r); }
     void    removeRhythm (int index)       { sequencer.removeRhythm(index); }

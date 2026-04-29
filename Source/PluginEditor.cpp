@@ -2,10 +2,11 @@
 
 PluginEditor::PluginEditor(PluginProcessor& p)
     : AudioProcessorEditor(&p), processorRef(p),
-      sidebar(p), rhythmPanel(p)
+      transportBar(p), sidebar(p), rhythmPanel(p)
 {
     setLookAndFeel(&lookAndFeel);
 
+    addAndMakeVisible(transportBar);
     addAndMakeVisible(sidebar);
     addAndMakeVisible(rhythmPanel);
     addAndMakeVisible(statusBar);
@@ -48,7 +49,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     rhythmPanel.setRhythm(0);
     sidebar.setSelectedIndex(0);
 
-    setSize(780, 580);
+    setSize(1170, 870);
+    setResizeLimits(780, 580, 2400, 1600);
 }
 
 PluginEditor::~PluginEditor()
@@ -63,12 +65,15 @@ void PluginEditor::paint(juce::Graphics& g)
 
 void PluginEditor::resized()
 {
-    const int w       = getWidth();
-    const int h       = getHeight();
-    const int statusH = 20;
+    const int w          = getWidth();
+    const int h          = getHeight();
+    const int statusH    = 20;
+    const int transportH = 36;
+    const int contentH   = h - transportH - statusH;
 
-    sidebar.setBounds(0, 0, RhythmSidebar::kWidth, h - statusH);
-    rhythmPanel.setBounds(RhythmSidebar::kWidth, 0,
-                          w - RhythmSidebar::kWidth, h - statusH);
+    transportBar.setBounds(0, 0, w, transportH);
+    sidebar.setBounds(0, transportH, RhythmSidebar::kWidth, contentH);
+    rhythmPanel.setBounds(RhythmSidebar::kWidth, transportH,
+                          w - RhythmSidebar::kWidth, contentH);
     statusBar.setBounds(0, h - statusH, w, statusH);
 }

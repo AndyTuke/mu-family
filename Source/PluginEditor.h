@@ -2,6 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "PluginProcessor.h"
+#include "UI/TransportBar.h"
 #include "UI/RhythmSidebar.h"
 #include "UI/RhythmPanel.h"
 #include "UI/Components/StatusBar.h"
@@ -21,6 +22,7 @@ private:
 
     MuClidLookAndFeel lookAndFeel;
 
+    TransportBar  transportBar;
     RhythmSidebar sidebar;
     RhythmPanel   rhythmPanel;
     StatusBar     statusBar;
