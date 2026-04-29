@@ -6,7 +6,7 @@
 #include "../Sequencer/Rhythm.h"
 
 // Euclidean controls for one rhythm.
-// Layout (top→bottom): Euclid A (2 knob rows) | 20px logic pills | Euclid B (2 knob rows)
+// Layout (top→bottom): Euclid A (single row, 8 controls) | 24px logic pills | Euclid B (single row)
 // Modifies Rhythm data directly; fires onPatternChanged after each mutation.
 class EuclideanPanel : public juce::Component
 {
@@ -25,38 +25,34 @@ private:
     using Id = MuClidLookAndFeel::ColourIds;
 
     // ── Euclid A ─────────────────────────────────────────────────────────────
-    // Row 1
-    KnobWithLabel stepsA      { "STEPS", Id::knobEuclidean };
-    KnobWithLabel hitsA       { "HITS",  Id::knobEuclidean };
-    KnobWithLabel rotA        { "ROT",   Id::knobEuclidean };
-    KnobWithLabel prePadA     { "PRE",   Id::knobPadding   };
-    // Row 2
-    KnobWithLabel postPadA    { "POST",  Id::knobPadding   };
-    KnobWithLabel insertStA   { "I.ST",  Id::knobInsertPad };
-    KnobWithLabel insertLenA  { "I.LEN", Id::knobInsertPad };
-    SegmentControl insertModeA { {"PAD","MUTE"}, SegmentControl::ActiveStyle::Warning };
+    KnobWithLabel stepsA      { "Steps",         Id::knobEuclidean };
+    KnobWithLabel hitsA       { "Hits",          Id::knobEuclidean };
+    KnobWithLabel rotA        { "Rotate",        Id::knobEuclidean };
+    KnobWithLabel prePadA     { "Pre Pad",       Id::knobPadding   };
+    KnobWithLabel postPadA    { "Post Pad",      Id::knobPadding   };
+    KnobWithLabel insertStA   { "Insert Start",  Id::knobInsertPad };
+    KnobWithLabel insertLenA  { "Insert Length", Id::knobInsertPad };
+    SegmentControl insertModeA { {"Pad","Mute"}, SegmentControl::ActiveStyle::Warning };
 
     // ── Logic ─────────────────────────────────────────────────────────────────
-    SegmentControl logicCtrl { {"OR","AND","XOR","A","B"},
+    SegmentControl logicCtrl { {"OR","AND","XOR","A Only","B Only"},
                                SegmentControl::ActiveStyle::General,
                                SegmentControl::DrawStyle::Pills };
 
     // ── Euclid B ─────────────────────────────────────────────────────────────
-    // Row 1
-    KnobWithLabel stepsB      { "STEPS", Id::knobEuclidean };
-    KnobWithLabel hitsB       { "HITS",  Id::knobEuclidean };
-    KnobWithLabel rotB        { "ROT",   Id::knobEuclidean };
-    KnobWithLabel prePadB     { "PRE",   Id::knobPadding   };
-    // Row 2
-    KnobWithLabel postPadB    { "POST",  Id::knobPadding   };
-    KnobWithLabel insertStB   { "I.ST",  Id::knobInsertPad };
-    KnobWithLabel insertLenB  { "I.LEN", Id::knobInsertPad };
-    SegmentControl insertModeB { {"PAD","MUTE"}, SegmentControl::ActiveStyle::Warning };
+    KnobWithLabel stepsB      { "Steps",         Id::knobEuclidean };
+    KnobWithLabel hitsB       { "Hits",          Id::knobEuclidean };
+    KnobWithLabel rotB        { "Rotate",        Id::knobEuclidean };
+    KnobWithLabel prePadB     { "Pre Pad",       Id::knobPadding   };
+    KnobWithLabel postPadB    { "Post Pad",      Id::knobPadding   };
+    KnobWithLabel insertStB   { "Insert Start",  Id::knobInsertPad };
+    KnobWithLabel insertLenB  { "Insert Length", Id::knobInsertPad };
+    SegmentControl insertModeB { {"Pad","Mute"}, SegmentControl::ActiveStyle::Warning };
 
     Rhythm* rhythm = nullptr;
 
-    static constexpr int kLogicH = 20;
-    static constexpr int kMaxRowH = 50;
+    static constexpr int kLogicH  = 24;
+    static constexpr int kMaxRowH = 90;
 
     void wireCallbacks();
     void loadFromRhythm();

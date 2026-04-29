@@ -186,49 +186,40 @@ void EuclideanPanel::resized()
     const int w = getWidth();
     const int h = getHeight();
 
-    // 4 knob rows + 20px logic bar. Cap row height for compact feel.
-    const int rowH = juce::jmin(kMaxRowH, (h - kLogicH) / 4);
-    const int colW = w / 4;
+    // Space is divided for 3 rows (A, B, C) + logic bar; C is not yet wired.
+    const int rowH = juce::jmin(kMaxRowH, (h - kLogicH) / 3);
+    const int colW = w / 8;  // 8 controls per row
 
-    // ── Euclid A Row 1 ───────────────────────────────────────────────────────
+    // ── Euclid A (single row) ────────────────────────────────────────────────
     int y = 0;
-    stepsA.setBounds(0,      y, colW,          rowH);
-    hitsA.setBounds (colW,   y, colW,          rowH);
-    rotA.setBounds  (colW*2, y, colW,          rowH);
-    prePadA.setBounds(colW*3,y, w - colW * 3,  rowH);
-
-    // ── Euclid A Row 2 ───────────────────────────────────────────────────────
-    y += rowH;
-    postPadA.setBounds(0,      y, colW,         rowH);
-    insertStA.setBounds(colW,  y, colW,         rowH);
-    insertLenA.setBounds(colW*2,y,colW,         rowH);
-    // InsertMode toggle centred vertically in its cell
+    stepsA.setBounds    (colW * 0, y, colW,         rowH);
+    hitsA.setBounds     (colW * 1, y, colW,         rowH);
+    rotA.setBounds      (colW * 2, y, colW,         rowH);
+    prePadA.setBounds   (colW * 3, y, colW,         rowH);
+    postPadA.setBounds  (colW * 4, y, colW,         rowH);
+    insertStA.setBounds (colW * 5, y, colW,         rowH);
+    insertLenA.setBounds(colW * 6, y, colW,         rowH);
     {
-        const int modeH = juce::jmin(22, rowH - 8);
-        const int modeY = y + (rowH - modeH) / 2;
-        insertModeA.setBounds(colW * 3, modeY, w - colW * 3, modeH);
+        const int modeH = juce::jmin(24, rowH - 8);
+        insertModeA.setBounds(colW * 7, y + (rowH - modeH) / 2, w - colW * 7, modeH);
     }
 
     // ── Logic bar ─────────────────────────────────────────────────────────────
     y += rowH;
     logicCtrl.setBounds(0, y, w, kLogicH);
 
-    // ── Euclid B Row 1 ───────────────────────────────────────────────────────
+    // ── Euclid B (single row) ────────────────────────────────────────────────
     y += kLogicH;
-    stepsB.setBounds(0,      y, colW,          rowH);
-    hitsB.setBounds (colW,   y, colW,          rowH);
-    rotB.setBounds  (colW*2, y, colW,          rowH);
-    prePadB.setBounds(colW*3,y, w - colW * 3,  rowH);
-
-    // ── Euclid B Row 2 ───────────────────────────────────────────────────────
-    y += rowH;
-    postPadB.setBounds(0,      y, colW,         rowH);
-    insertStB.setBounds(colW,  y, colW,         rowH);
-    insertLenB.setBounds(colW*2,y,colW,         rowH);
+    stepsB.setBounds    (colW * 0, y, colW,         rowH);
+    hitsB.setBounds     (colW * 1, y, colW,         rowH);
+    rotB.setBounds      (colW * 2, y, colW,         rowH);
+    prePadB.setBounds   (colW * 3, y, colW,         rowH);
+    postPadB.setBounds  (colW * 4, y, colW,         rowH);
+    insertStB.setBounds (colW * 5, y, colW,         rowH);
+    insertLenB.setBounds(colW * 6, y, colW,         rowH);
     {
-        const int modeH = juce::jmin(22, rowH - 8);
-        const int modeY = y + (rowH - modeH) / 2;
-        insertModeB.setBounds(colW * 3, modeY, w - colW * 3, modeH);
+        const int modeH = juce::jmin(24, rowH - 8);
+        insertModeB.setBounds(colW * 7, y + (rowH - modeH) / 2, w - colW * 7, modeH);
     }
 }
 
@@ -236,12 +227,9 @@ void EuclideanPanel::paint(juce::Graphics& g)
 {
     using Id = MuClidLookAndFeel::ColourIds;
 
-    const int rowH  = juce::jmin(kMaxRowH, (getHeight() - kLogicH) / 4);
-    const int aLabelY = 0;
-    const int bLabelY = rowH * 2 + kLogicH;
-
+    const int rowH = juce::jmin(kMaxRowH, (getHeight() - kLogicH) / 3);
     g.setFont(juce::Font(8.0f));
     g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
-    g.drawText("A", 0, aLabelY, 10, rowH, juce::Justification::centredTop, false);
-    g.drawText("B", 0, bLabelY, 10, rowH, juce::Justification::centredTop, false);
+    g.drawText("A", 0, 0,                10, rowH, juce::Justification::centredTop, false);
+    g.drawText("B", 0, rowH + kLogicH,   10, rowH, juce::Justification::centredTop, false);
 }
