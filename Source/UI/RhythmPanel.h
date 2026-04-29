@@ -3,11 +3,12 @@
 #include "RhythmCircle.h"
 #include "EuclideanPanel.h"
 #include "VoiceSection.h"
+#include "ModulatorPanel.h"
 #include "Components/MuClidLookAndFeel.h"
 #include "../PluginProcessor.h"
 
 // Full rhythm editor panel. Layout (top to bottom):
-//   Header bar (name + colour) | Sample bar | [RhythmCircle | EuclideanPanel] | VoiceSection | ModulatorPanel (stub)
+//   Header bar | Sample bar | [RhythmCircle | EuclideanPanel] | VoiceSection | ModulatorPanel
 class RhythmPanel : public juce::Component,
                     public juce::FileDragAndDropTarget
 {
@@ -24,7 +25,6 @@ public:
     void resized() override;
     void mouseDown(const juce::MouseEvent&) override;
 
-    // FileDragAndDropTarget
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
 
@@ -32,17 +32,18 @@ private:
     PluginProcessor& proc;
     int currentRhythmIndex = -1;
 
-    RhythmCircle   circle;
-    EuclideanPanel euclidPanel;
-    VoiceSection   voiceSection;
+    RhythmCircle    circle;
+    EuclideanPanel  euclidPanel;
+    VoiceSection    voiceSection;
+    ModulatorPanel  modulatorPanel;
 
     std::unique_ptr<juce::FileChooser> fileChooser;
 
     static constexpr int kHeaderH     = 28;
     static constexpr int kSampleBarH  = 22;
-    static constexpr int kCircleW     = 200;
-    static constexpr int kTopH        = 220;
-    static constexpr int kVoiceH      = 64;
+    static constexpr int kCircleW     = 300;
+    static constexpr int kTopH        = 300;
+    static constexpr int kVoiceH      = 80;
 
     void loadSample();
     void refreshCircle();

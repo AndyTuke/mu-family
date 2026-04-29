@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Sequencer/SequencerEngine.h"
 #include "Audio/VoiceEngine.h"
+#include "Audio/MidiOutputEngine.h"
 
 #include <array>
 
@@ -27,7 +28,7 @@ public:
 
     const juce::String getName() const override;
     bool acceptsMidi() const override;
-    bool producesMidi() const override;
+    bool producesMidi() const override { return true; }
     double getTailLengthSeconds() const override;
 
     int getNumPrograms() override;
@@ -51,7 +52,8 @@ public:
     void loadSampleForRhythm(int rhythmIndex, const juce::File& file);
 
     SequencerEngine sequencer;
-    std::array<VoiceEngine, SequencerEngine::MaxRhythms> voiceEngines;
+    std::array<VoiceEngine,      SequencerEngine::MaxRhythms> voiceEngines;
+    std::array<MidiOutputEngine, SequencerEngine::MaxRhythms> midiEngines;
 
 private:
     // Internal transport — used in standalone when no DAW playhead is available.

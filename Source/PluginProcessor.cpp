@@ -19,7 +19,6 @@ PluginProcessor::~PluginProcessor() {}
 //==============================================================================
 const juce::String PluginProcessor::getName() const { return "mu-Clid"; }
 bool PluginProcessor::acceptsMidi() const { return false; }
-bool PluginProcessor::producesMidi() const { return false; }
 double PluginProcessor::getTailLengthSeconds() const { return 0.0; }
 
 int PluginProcessor::getNumPrograms() { return 1; }
@@ -34,6 +33,8 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     currentSampleRate = sampleRate;
     for (auto& ve : voiceEngines)
         ve.prepareToPlay(sampleRate, samplesPerBlock);
+    for (auto& me : midiEngines)
+        me.prepare(sampleRate, samplesPerBlock);
 }
 
 void PluginProcessor::releaseResources() {}
@@ -42,7 +43,6 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                                    juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
-    juce::ignoreUnused(midiMessages);
     buffer.clear();
 
     // Resolve beat position from DAW playhead, falling back to internal transport.
@@ -76,6 +76,10 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
     for (int r = 0; r < sequencer.getNumRhythms(); ++r)
         voiceEngines[r].process(buffer, buffer.getNumSamples());
+
+    // Flush pending MIDI note-offs each block (trigger is wired in Stage 10 per MIDI mode flag)
+    for (int r = 0; r < sequencer.getNumRhythms(); ++r)
+        midiEngines[r].processBlock(midiMessages, buffer.getNumSamples());
 }
 
 //==============================================================================

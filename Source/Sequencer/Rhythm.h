@@ -13,6 +13,15 @@ enum class Logic { OR, AND, XOR, AOnly, BOnly };
 class Rhythm
 {
 public:
+    static constexpr int MaxControlSequences = 8;
+
+    Rhythm()
+    {
+        controlSequences.resize(MaxControlSequences);
+        for (int i = 0; i < MaxControlSequences; ++i)
+            controlSequences[i].id = "cs" + std::to_string(i);
+    }
+
     HitGenerator        genA;
     HitGenerator        genB;
     Logic               logic       = Logic::OR;
@@ -20,7 +29,6 @@ public:
     int                 colourIndex = 0;     // index into the 30-colour palette
     std::optional<int>  resetSteps;          // nullopt = INF (free-running)
 
-    static constexpr int MaxControlSequences = 8;
     std::vector<ControlSequence> controlSequences;
     ModulationMatrix             modulationMatrix;
 

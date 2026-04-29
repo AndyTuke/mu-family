@@ -12,7 +12,7 @@ juce_add_plugin(mu-clid
     PRODUCT_NAME "mu-Clid"
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT FALSE
-    NEEDS_MIDI_OUTPUT FALSE
+    NEEDS_MIDI_OUTPUT TRUE
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
 )
@@ -28,6 +28,7 @@ target_sources(mu-clid
         Source/Sequencer/ControlSequence.cpp
         Source/Audio/SamplePlayer.cpp
         Source/Audio/VoiceEngine.cpp
+        Source/Audio/MidiOutputEngine.cpp
         Source/Modulation/ModulationMatrix.cpp
         Source/UI/Components/MuClidLookAndFeel.cpp
         Source/UI/Components/KnobWithLabel.cpp
@@ -44,6 +45,9 @@ target_sources(mu-clid
         Source/UI/RhythmSidebar.cpp
         Source/UI/EuclideanPanel.cpp
         Source/UI/VoiceSection.cpp
+        Source/UI/ModulatorEditor.cpp
+        Source/UI/ModMatrixPanel.cpp
+        Source/UI/ModulatorPanel.cpp
         Source/UI/RhythmPanel.cpp
 )
 
