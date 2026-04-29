@@ -2,12 +2,11 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "PluginProcessor.h"
+#include "UI/RhythmSidebar.h"
+#include "UI/RhythmPanel.h"
+#include "UI/Components/StatusBar.h"
+#include "UI/Components/MuClidLookAndFeel.h"
 
-//==============================================================================
-// PluginEditor
-// The main UI component. JUCE creates this when the plugin window opens.
-// All UI components are added as children here.
-//==============================================================================
 class PluginEditor : public juce::AudioProcessorEditor
 {
 public:
@@ -20,11 +19,11 @@ public:
 private:
     PluginProcessor& processorRef;
 
-    // Temporary controls — remove when TransportBar and RhythmPanel are implemented.
-    juce::TextButton playButton   { "Play" };
-    juce::TextButton loadButton   { "Load Sample" };
+    MuClidLookAndFeel lookAndFeel;
 
-    std::unique_ptr<juce::FileChooser> fileChooser;
+    RhythmSidebar sidebar;
+    RhythmPanel   rhythmPanel;
+    StatusBar     statusBar;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };

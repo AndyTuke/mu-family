@@ -7,6 +7,7 @@ class KnobWithLabel : public juce::Component
 {
 public:
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
+    std::function<void(double value)> onValueChanged;
 
     KnobWithLabel(const juce::String& label,
                   MuClidLookAndFeel::ColourIds categoryColour = MuClidLookAndFeel::knobEuclidean);
@@ -19,6 +20,7 @@ public:
 
     void resized() override;
     void paint(juce::Graphics& g) override;
+    void mouseEnter(const juce::MouseEvent& e) override;
 
 private:
     juce::Slider slider;

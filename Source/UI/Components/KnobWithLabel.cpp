@@ -16,8 +16,11 @@ KnobWithLabel::KnobWithLabel(const juce::String& label,
     {
         if (onStatusUpdate)
             onStatusUpdate(labelText, slider.getTextFromValue(slider.getValue()));
+        if (onValueChanged)
+            onValueChanged(slider.getValue());
     };
 
+    slider.addMouseListener(this, false);
     addAndMakeVisible(slider);
 }
 
@@ -40,6 +43,12 @@ void KnobWithLabel::resized()
 {
     const int labelH = 14;
     slider.setBounds(0, 0, getWidth(), getHeight() - labelH);
+}
+
+void KnobWithLabel::mouseEnter(const juce::MouseEvent&)
+{
+    if (onStatusUpdate)
+        onStatusUpdate(labelText, slider.getTextFromValue(slider.getValue()));
 }
 
 void KnobWithLabel::paint(juce::Graphics& g)

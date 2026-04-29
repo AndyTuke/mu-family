@@ -2,24 +2,32 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Design document
+## Design documents
 
-Full design specification (architecture, UI, DSP, feature list): [docs/design.md](docs/design.md)
+The full design is split into focused sub-documents. **Read only the relevant one** rather than the monolithic design.md.
 
-Read it on demand when working on a specific subsystem. Key decisions are distilled below.
+| Sub-doc | When to read |
+|---|---|
+| [docs/design-sequencer.md](docs/design-sequencer.md) | Euclidean params, DAW sync, control sequence params, modulation signal flow |
+| [docs/design-voice.md](docs/design-voice.md) | Voice chain, ADSR, filter, interpolation quality, sample handling, SoundTouch |
+| [docs/design-fx.md](docs/design-fx.md) | FX algorithms, delay, reverb, intra-FX routing, FXSlotBase interface |
+| [docs/design-ui.md](docs/design-ui.md) | All UI panel layouts, control behaviours, RhythmCircle, EuclideanPanel, Mixer, Transport |
+| [docs/design-presets.md](docs/design-presets.md) | APVTS wiring plan, preset storage, save/restore, current pre-APVTS state |
+| [docs/design-future.md](docs/design-future.md) | Unscheduled future ideas — read to avoid closing off options during current stages |
+| [docs/design.md](docs/design.md) | Full original spec — only read if the sub-docs don't cover it |
 
 ---
 
 ## Project overview
 
-**μ-Clid** is a JUCE/C++ Euclidean rhythm sequencer and sample trigger plugin (VST3 + CLAP + Standalone) by Transwarp Development Project. Up to 8 simultaneous polyrhythmic rhythm slots, each with two euclidean hit generators, sample playback, voice chain (ADSR + filter), up to 8 drawable LFO/step modulators, and a shared FX chain (Effect/Delay/Reverb) with mixer.
+**μ-Clid** is a JUCE/C++ Euclidean rhythm sequencer and sample trigger plugin (VST3 + Standalone) by Transwarp Development Project. Up to 8 polyrhythmic rhythm slots, each with two euclidean hit generators, sample playback, voice chain (ADSR + filter), up to 8 drawable LFO/step modulators, and a shared FX chain (Effect/Delay/Reverb) with mixer.
 
 ## Prerequisites
 
 JUCE is not vendored. Set `JUCE_PATH` to a local JUCE checkout before configuring:
 
 ```powershell
-$env:JUCE_PATH = "C:\path\to\JUCE"
+$env:JUCE_PATH = "D:\JUCE"
 ```
 
 ## Build commands
@@ -32,44 +40,78 @@ cmake --build build --config Release        # Release build
 
 Artefacts land in `build/mu-clid_artefacts/Debug/` or `.../Release/`.
 
-## Planned source layout
+## Current implementation status
+
+| Stage | Status | Key files |
+|---|---|---|
+| 1 | ✅ Done | EuclideanGenerator, HitGenerator, Rhythm |
+| 2 | ✅ Done | SequencerEngine, PluginProcessor |
+| 3 | ✅ Done | SamplePlayer, VoiceEngine |
+| 4 | ✅ Done | ControlSequence, ModulationMatrix |
+| 5 | ✅ Done | All UI/Components/, MuClidLookAndFeel, StepEditor, LFOEditor |
+| 6 | ✅ Done | RhythmCircle, SidebarItem, RhythmSidebar, EuclideanPanel, VoiceSection, RhythmPanel |
+| 7 | ⬜ Next | ModulatorPanel, ModMatrixPanel, MidiOutputEngine |
+| 8 | ⬜ | All FX/ files, FXChain, FXRow, oversampling wrappers |
+| 9 | ⬜ | MixerEngine, MixerOverlay, MixerChannel, VUMeter |
+| 10 | ⬜ | TransportBar, PresetBrowser, SaveDialog, SettingsOverlay, AboutPanel, APVTS wiring |
+| 11 | ⬜ | Polish, animations, ring arc animations |
+
+## Source layout (actual, as built)
 
 ```
 Source/
-├── PluginProcessor.h/.cpp
-├── PluginEditor.h/.cpp
-├── Sequencer/          EuclideanGenerator, HitGenerator, ControlSequence, Rhythm, SequencerEngine
-├── Audio/              SamplePlayer, TimeStretcherBase, SoundTouchStretcher, VoiceEngine, MixerEngine
-├── FX/                 FXSlotBase, FXAlgorithmDef, EffectFX, DelayFX, ReverbFX, FXChain
-├── Modulation/         ModulationMatrix, ModulationAssignment
+├── PluginProcessor.h/.cpp       — audio processor, owns sequencer + voice engines
+├── PluginEditor.h/.cpp          — root editor: sidebar + rhythmPanel + statusBar
+├── Sequencer/                   — EuclideanGenerator, HitGenerator, ControlSequence, Rhythm, SequencerEngine
+├── Audio/                       — SamplePlayer, VoiceEngine (TimeStretcherBase stub)
+├── Modulation/                  — ModulationMatrix, ModulationAssignment
 └── UI/
-    ├── Components/     MuClidLookAndFeel, KnobWithLabel, SegmentControl, NudgeInput,
-    │                   TimeSelector, StepEditor, LFOEditor, PresetBrowser, StatusBar, ...
-    ├── RhythmCircle, RhythmPanel, RhythmSidebar, SidebarItem
-    ├── EuclideanPanel, ModulatorPanel, ModMatrixPanel
-    ├── MixerOverlay, MixerChannel, VUMeter, FXRow
-    └── TransportBar, SettingsOverlay, AboutPanel
-Tests/
-    EuclideanGeneratorTests.cpp, HitGeneratorTests.cpp, ControlSequenceTests.cpp, ModulationMatrixTests.cpp
+    ├── Components/              — MuClidLookAndFeel, KnobWithLabel, SegmentControl, NudgeInput,
+    │                              TimeSelector, DropdownSelect, StepEditor, LFOEditor, AddButton, StatusBar
+    ├── RhythmCircle.h/.cpp      — concentric ring display, 30Hz timer, pulse animation
+    ├── SidebarItem.h/.cpp       — one sidebar entry with mini RhythmCircle
+    ├── RhythmSidebar.h/.cpp     — scrollable left sidebar (82px)
+    ├── EuclideanPanel.h/.cpp    — Steps/Hits/Rot/Pre/Post knobs for A and B, logic selector
+    ├── VoiceSection.h/.cpp      — amp ADSR, filter, filter ADSR, output mode (compact row)
+    └── RhythmPanel.h/.cpp       — header + sample bar + circle + euclidean + voice + mod placeholder
 ```
 
 ## Critical architectural rules
 
-These are load-bearing decisions — do not deviate without good reason:
-
-- **Everything in APVTS** — if it's not in the ValueTree it won't save. Each rhythm lives in its own subtree for per-rhythm preset save/load.
+- **Everything in APVTS** — if it's not in the ValueTree it won't save. Each rhythm in its own subtree. *(APVTS wiring is Stage 10 — UI currently binds directly to Rhythm data as a temporary measure.)*
 - **Audio thread never allocates** — all allocation in `prepareToPlay`, never in `processBlock`.
-- **ModulationMatrix is the single reader** — the audio engine reads only from ModulationMatrix, never directly from APVTS or ControlSequence.
+- **ModulationMatrix is the single reader** — audio engine reads only from ModulationMatrix, never directly from APVTS or ControlSequence.
 - **Rhythms are fully self-contained** — ControlSequences may only target parameters within their own rhythm. No cross-rhythm modulation. Global FX parameters are not valid modulation destinations.
 - **ControlSequence lengths are independent** — never couple loop lengths or rates to rhythm step counts.
 - **FXSlotBase interface for all FX** — enables VST3 plugin hosting in v3 without refactoring.
 - **TimeStretcherBase wraps SoundTouch** — enables RubberBand swap in v2 without refactoring.
 - **Atomic pointer for rhythm hot-swap from day one** — required for v2 live swap feature.
 - **RhythmSidebar item order supports variable ordering from day one** — required for v2 drag-to-reorder.
-- **All colours and sizes in MuClidLookAndFeel only** — no hardcoded values in component drawing code. Define the full `ColourIds` enum in `MuClidLookAndFeel.h` before writing any component drawing code.
+- **All colours and sizes in MuClidLookAndFeel only** — no hardcoded values in component drawing code.
 - **All UI uses the shared component library** — never build a one-off version of a standard control.
 - **ModulationMatrix processes in dependency order** — detects and rejects circular dependencies at assignment creation time.
 - **SoundTouch ships as a DLL** (not statically linked) — required for LGPL compliance.
+
+## Key patterns discovered during implementation
+
+### KnobWithLabel callbacks
+`KnobWithLabel` has **two** separate callbacks:
+- `onStatusUpdate(name, valueString)` — called automatically from the internal `slider.onValueChange` for status bar display
+- `onValueChanged(double)` — also called from the same `slider.onValueChange` lambda; use this for data mutation in panels like `EuclideanPanel`
+
+Never override `getSlider().onValueChange` directly — it replaces both callbacks. Always use `onValueChanged` for data binding.
+
+### Pre-APVTS data binding
+Until Stage 10, panels mutate `Rhythm` data directly (e.g. `rhythm->genA.steps = (int)v`). After mutation, call `proc.updatePattern(index)` to refresh the cached pattern in `SequencerEngine`. This is intentional and correct for now.
+
+### PluginProcessor default rhythm
+`PluginProcessor` constructor always creates one default rhythm (16 steps, 4 hits). Never add a rhythm unconditionally in `PluginEditor` — check `getNumRhythms() == 0` first (the sidebar constructor calls `refreshItems()` which also reads the existing rhythm).
+
+### RhythmCircle sizing
+All ring radii are computed proportionally from `min(width, height) / 2 - margin`. Ring A outer = maxR, width = `maxR * 0.20`. Ring B starts at `ring_A_inner - gap`. Same for ring C (dashed). This makes the circle look correct at both the large (200px) panel size and the small (sidebar ~50px) size.
+
+### juce::Font deprecation warnings
+All `juce::Font(float)` constructor calls produce C4996 warnings in this JUCE version. These are acceptable deprecation-only warnings — do not fix them during feature stages. Defer to Stage 11 polish (`FontOptions`-based constructor is the replacement).
 
 ## Key interfaces
 
@@ -92,22 +134,6 @@ class TimeStretcherBase {
 };
 ```
 
-## Build stages (implementation order)
-
-| Stage | What | Key files |
-|---|---|---|
-| 1 | Euclidean logic | EuclideanGenerator, HitGenerator, Rhythm |
-| 2 | DAW sync + step triggering | SequencerEngine, PluginProcessor |
-| 3 | Sample playback | SamplePlayer, TimeStretcherBase, SoundTouchStretcher, VoiceEngine |
-| 4 | Control sequences + modulation | ControlSequence, ModulationMatrix |
-| 5 | UI component library | All UI/Components/, MuClidLookAndFeel, StepEditor, LFOEditor |
-| 6 | Sidebar + rhythm panel | RhythmSidebar, RhythmPanel, RhythmCircle, EuclideanPanel, VoiceSection |
-| 7 | Modulator panel + matrix | ModulatorPanel, ModMatrixPanel, MidiOutputEngine |
-| 8 | FX chain | All FX/ files, FXChain, FXRow, oversampling wrappers |
-| 9 | Mixer overlay + VU meters | MixerEngine, MixerOverlay, MixerChannel, VUMeter |
-| 10 | Transport, presets, settings | TransportBar, PresetBrowser, SaveDialog, SettingsOverlay, AboutPanel |
-| 11 | Polish | StatusBar, animations, ring arc animations |
-
 ## Third-party libraries
 
 | Library | Purpose | Notes |
@@ -118,22 +144,6 @@ class TimeStretcherBase {
 | FVerb | Plate reverb (alternative) | Header-only |
 | RubberBand | Time stretching (v2) | Wrapped behind `TimeStretcherBase` — no refactor needed when upgrading |
 
-## Window sizing
+## UI values
 
-```cpp
-setResizeLimits(780, 580, 2400, 1600);
-```
-
-All UI elements scale proportionally. No hardcoded pixel values except in `MuClidLookAndFeel`.
-
-## Knob colour coding (from MuClidLookAndFeel)
-
-| Category | Hex | Used for |
-|---|---|---|
-| Euclidean | `#7F77DD` purple | Steps, hits, rotate, pitch |
-| Padding / filter | `#1D9E75` teal | Pre/post pad, cutoff, resonance, delay params |
-| Insert pad / modulation | `#D4537E` pink | Insert start/length, modulator controls |
-| Level / amplitude / accent | `#EF9F27` amber | Amplitude ADSR, accent, Euclid C controls |
-| FX sends | `#D85A30` coral | Effect/delay/reverb sends, intra-FX routing |
-| Reverb params | `#378ADD` blue | Size, diffusion, damp, pre-delay |
-| Pan | `#888780` grey | Pan |
+Knob colour coding, ring colour coding, window sizing, and all layout constants are in [docs/design-ui.md](docs/design-ui.md).

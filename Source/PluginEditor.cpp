@@ -1,56 +1,74 @@
 #include "PluginEditor.h"
-#include "BuildNumber.h"
 
-//==============================================================================
 PluginEditor::PluginEditor(PluginProcessor& p)
-    : AudioProcessorEditor(&p), processorRef(p)
+    : AudioProcessorEditor(&p), processorRef(p),
+      sidebar(p), rhythmPanel(p)
 {
-    playButton.onClick = [this]
-    {
-        processorRef.toggleInternalPlay();
-        playButton.setButtonText(processorRef.isInternalPlaying() ? "Stop" : "Play");
-    };
-    addAndMakeVisible(playButton);
+    setLookAndFeel(&lookAndFeel);
 
-    loadButton.onClick = [this]
-    {
-        fileChooser = std::make_unique<juce::FileChooser>(
-            "Load Sample",
-            juce::File::getSpecialLocation(juce::File::userMusicDirectory),
-            "*.wav;*.aiff;*.aif;*.mp3;*.flac");
+    addAndMakeVisible(sidebar);
+    addAndMakeVisible(rhythmPanel);
+    addAndMakeVisible(statusBar);
 
-        fileChooser->launchAsync(
-            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-            [this](const juce::FileChooser& fc)
-            {
-                auto result = fc.getResult();
-                if (result.existsAsFile())
-                    processorRef.loadSampleForRhythm(0, result);
-            });
+    sidebar.onRhythmSelected = [this](int idx)
+    {
+        rhythmPanel.setRhythm(idx);
     };
-    addAndMakeVisible(loadButton);
+
+    sidebar.onAddRhythm = [this]
+    {
+        if (processorRef.getNumRhythms() >= SequencerEngine::MaxRhythms) return;
+        Rhythm r;
+        r.name        = "Rhythm " + std::to_string(processorRef.getNumRhythms() + 1);
+        r.colourIndex = processorRef.getNumRhythms() % 30;
+        processorRef.addRhythm(r);
+        sidebar.refreshItems();
+        const int newIdx = processorRef.getNumRhythms() - 1;
+        sidebar.setSelectedIndex(newIdx);
+        rhythmPanel.setRhythm(newIdx);
+    };
+
+    rhythmPanel.onStatusUpdate = [this](const juce::String& name,
+                                        const juce::String& val,
+                                        juce::Colour col)
+    {
+        statusBar.showParam(name, val, col);
+    };
+
+    // Ensure at least one rhythm exists on startup
+    if (processorRef.getNumRhythms() == 0)
+    {
+        Rhythm r;
+        r.name        = "Rhythm 1";
+        r.colourIndex = 0;
+        processorRef.addRhythm(r);
+        sidebar.refreshItems();
+    }
+
+    rhythmPanel.setRhythm(0);
+    sidebar.setSelectedIndex(0);
 
     setSize(780, 580);
 }
 
-PluginEditor::~PluginEditor() {}
+PluginEditor::~PluginEditor()
+{
+    setLookAndFeel(nullptr);
+}
 
 void PluginEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xff1c1c1b));
-    g.setColour(juce::Colours::white);
-    g.setFont(20.0f);
-    g.drawText("mu-Clid", getLocalBounds(), juce::Justification::centred, true);
-
-    g.setFont(13.0f);
-    g.setColour(juce::Colour(0xff888780));
-    g.drawText("Beta " + juce::String(BUILD_NUMBER),
-               juce::Rectangle<int>(0, getHeight() / 2 + 18, getWidth(), 20),
-               juce::Justification::centred, true);
+    g.fillAll(MuClidLookAndFeel::colour(MuClidLookAndFeel::windowBackground));
 }
 
 void PluginEditor::resized()
 {
-    playButton.setBounds(getWidth() / 2 - 110, getHeight() / 2 - 20, 100, 40);
-    loadButton.setBounds(getWidth() / 2 +  10, getHeight() / 2 - 20, 100, 40);
+    const int w       = getWidth();
+    const int h       = getHeight();
+    const int statusH = 20;
+
+    sidebar.setBounds(0, 0, RhythmSidebar::kWidth, h - statusH);
+    rhythmPanel.setBounds(RhythmSidebar::kWidth, 0,
+                          w - RhythmSidebar::kWidth, h - statusH);
+    statusBar.setBounds(0, h - statusH, w, statusH);
 }

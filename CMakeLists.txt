@@ -39,6 +39,12 @@ target_sources(mu-clid
         Source/UI/Components/LFOEditor.cpp
         Source/UI/Components/AddButton.cpp
         Source/UI/Components/StatusBar.cpp
+        Source/UI/RhythmCircle.cpp
+        Source/UI/SidebarItem.cpp
+        Source/UI/RhythmSidebar.cpp
+        Source/UI/EuclideanPanel.cpp
+        Source/UI/VoiceSection.cpp
+        Source/UI/RhythmPanel.cpp
 )
 
 target_compile_definitions(mu-clid
