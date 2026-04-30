@@ -4,6 +4,7 @@
 #include "Sequencer/SequencerEngine.h"
 #include "Audio/VoiceEngine.h"
 #include "Audio/MidiOutputEngine.h"
+#include "FX/FXChain.h"
 
 #include <array>
 
@@ -56,6 +57,7 @@ public:
     SequencerEngine sequencer;
     std::array<VoiceEngine,      SequencerEngine::MaxRhythms> voiceEngines;
     std::array<MidiOutputEngine, SequencerEngine::MaxRhythms> midiEngines;
+    FXChain fxChain;
 
 private:
     // Internal transport — used in standalone when no DAW playhead is available.

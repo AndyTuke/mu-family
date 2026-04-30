@@ -42,7 +42,7 @@ void RhythmPanel::refreshCircle()
 {
     if (currentRhythmIndex < 0 || currentRhythmIndex >= proc.getNumRhythms()) return;
     const Rhythm& r = proc.getRhythm(currentRhythmIndex);
-    circle.setPatterns(r.genA.getPattern(), r.genB.getPattern());
+    circle.setPatterns(r.genA.getStepTypes(), r.genB.getStepTypes(), r.genC.getStepTypes());
 }
 
 juce::Colour RhythmPanel::currentColour() const
@@ -158,7 +158,8 @@ void RhythmPanel::paint(juce::Graphics& g)
                (float)w, (float)(sampleY + kSampleBarH), 0.5f);
 
     // Voice section separator
-    const int voiceY = kHeaderH + kSampleBarH + kTopH;
+    const int topY   = kHeaderH + kSampleBarH;
+    const int voiceY = topY + topH;
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawLine(0.0f, (float)voiceY, (float)w, (float)voiceY, 0.5f);
 
@@ -168,20 +169,27 @@ void RhythmPanel::paint(juce::Graphics& g)
     g.drawLine(0.0f, (float)modY, (float)w, (float)modY, 0.5f);
 
     // Circle / EuclideanPanel divider
-    const int topY = kHeaderH + kSampleBarH;
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawLine((float)kCircleW, (float)topY,
-               (float)kCircleW, (float)(topY + kTopH), 0.5f);
+    g.drawLine((float)circleW, (float)topY,
+               (float)circleW, (float)(topY + topH), 0.5f);
 }
 
 void RhythmPanel::resized()
 {
-    const int topY  = kHeaderH + kSampleBarH;
-    const int modY  = topY + kTopH + kVoiceH;
-    const int modH  = getHeight() - modY;
+    const int w        = getWidth();
+    const int h        = getHeight();
+    const int contentH = h - kHeaderH - kSampleBarH - kVoiceH;
 
-    circle.setBounds(0, topY, kCircleW, kTopH);
-    euclidPanel.setBounds(kCircleW, topY, getWidth() - kCircleW, kTopH);
-    voiceSection.setBounds(0, topY + kTopH, getWidth(), kVoiceH);
-    modulatorPanel.setBounds(0, modY, getWidth(), juce::jmax(0, modH));
+    // Top section: 55% of content height; circle is square, capped at 33% of panel width.
+    // This keeps sizing proportional across the full 780–2400 × 580–1600 resize range.
+    topH    = juce::jmax(80,  (int)(contentH * 0.55f));
+    circleW = juce::jmin(topH, (int)(w * 0.33f));
+
+    const int topY = kHeaderH + kSampleBarH;
+    const int modY = topY + topH + kVoiceH;
+
+    circle.setBounds(0, topY, circleW, topH);
+    euclidPanel.setBounds(circleW, topY, w - circleW, topH);
+    voiceSection.setBounds(0, topY + topH, w, kVoiceH);
+    modulatorPanel.setBounds(0, modY, w, juce::jmax(0, h - modY));
 }

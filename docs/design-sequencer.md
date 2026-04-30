@@ -14,13 +14,15 @@
 | Insert mode | Mute / Pad | Mute = hits distributed but silenced. Pad = gap excluded from distribution. |
 | Mute | On/Off | Exclude layer from combined result |
 
-**Logic** (how A and B combine): OR, AND, XOR, A only, B only. Applied globally between the two generators, shown between Euclid panels.
+**Logic** (how A and B combine): OR, AND, XOR, A and Not B, B and Not A. Applied globally between the two generators, shown between Euclid panels. In code the `Logic` enum uses `AOnly` (= A and Not B) and `BOnly` (= B and Not A).
+
+**Pattern computation order** (within one HitGenerator): euclidean distribution → rotate → insert padding → pre/post padding. Rotate is applied to the active (non-padded) steps only, before insert padding is inserted.
 
 **Reset steps**: 1–256 or INF (`std::nullopt`). After N steps both generators reset to step 0, re-aligning the polyrhythm. INF = free-running. Display cycle uses LCM of A and B step counts when INF (capped at 256 for display).
 
 ## Euclid C — Accent Layer
 
-Third independent euclidean layer dedicated to accents. No logic relationship with A/B. Only fires an accent when it coincides with an A+B hit (firing on a non-hit step has no effect). Not yet in data model (v1 deferred — `Rhythm.h` has genA and genB only, genC to be added).
+Third independent euclidean layer dedicated to accents. No logic relationship with A/B. Only fires an accent when it coincides with an A+B hit (firing on a non-hit step has no effect). **Already in data model** — `Rhythm.h` has `genA`, `genB`, and `genC` as `HitGenerator` members (Steps/Hits/Rotate only; no padding or insert controls on genC).
 
 | Parameter | Range | Notes |
 |---|---|---|
@@ -35,6 +37,7 @@ Third independent euclidean layer dedicated to accents. No logic relationship wi
 ## DAW Position Sync
 
 - Step position = `(host_ppq / step_length_beats) % step_count`
+- `step_length_beats = 0.25` (one 1/16th note) — global constant in `SequencerEngine::StepLengthBeats`
 - Uses global song timeline from DAW (not clip-relative)
 - Formula recalculates from absolute position every block — handles tempo automation
 - Scrubbing: position updates silently, no triggers
@@ -58,6 +61,10 @@ Third independent euclidean layer dedicated to accents. No logic relationship wi
 
 **Curve interaction:** Click on line to add node. Right-click node to remove. ALT-click segment to add bezier handle (stored as offset from segment midpoint). Drag handle to bend segment.
 
+**Control sequence defaults:** `loopNoteValue = Quarter`, `loopMultiplier = 4` (= 1 bar). `stepNoteValue = Quarter`, `stepMultiplier = 1`. `mode = Stepped`, `polarity = Bipolar`.
+
+**Capacities:** `Rhythm::MaxControlSequences = 8`. `ModulationMatrix::MaxAssignments = 64`.
+
 ## Modulation Signal Flow
 
 ```
@@ -74,3 +81,9 @@ Processing order in ModulationMatrix:
 
 Circular dependencies detected and rejected at assignment creation time.
 Meta-modulation (targeting another assignment's depth) is architecturally supported — UI for it is v2.
+
+**Modulation source ID format:**
+- ControlSequence output: `"cs{n}_output"` where n = 0–7
+- Meta-modulation depth: `"assign_{id}_depth"` where id = the target assignment's stable ID
+
+These string IDs are used as keys in `ModulationMatrix::process()` and must match exactly across all callers.

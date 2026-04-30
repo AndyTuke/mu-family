@@ -53,8 +53,12 @@ void VoiceSection::resized()
     const int divW   = 6;
     const int knobW  = (w - nDivs * divW - modeW - divW) / nKnobs;
 
+    // Cap knob height at 75px (80% of 90px Euclid cell) so all non-euclid knobs are the same size
+    const int knobH = juce::jmin(h, 75);
+    const int knobY = (h - knobH) / 2;
+
     int x = 0;
-    auto place = [&](juce::Component& c, int cw) { c.setBounds(x, 0, cw, h); x += cw; };
+    auto place = [&](juce::Component& c, int cw) { c.setBounds(x, knobY, cw, knobH); x += cw; };
     auto gap   = [&]() { x += divW; };
 
     place(ampAttack,   knobW); place(ampDecay,  knobW);

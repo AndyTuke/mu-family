@@ -16,13 +16,15 @@ public:
 
         // ── Knob category colours ─────────────────────────────────────────
         knobEuclidean           = 0x10000010,  // #7F77DD  purple: steps, hits, rotate, pitch
-        knobPadding             = 0x10000011,  // #1D9E75  teal:   pre/post pad, cutoff, resonance, delay params
+        knobPadding             = 0x10000011,  // #1D9E75  teal:   legacy alias (use knobPostPad)
         knobInsertPad           = 0x10000012,  // #D4537E  pink:   insert start/length, modulator controls
         knobLevel               = 0x10000013,  // #EF9F27  amber:  amp ADSR, accent, Euclid C controls
         knobFxSend              = 0x10000014,  // #D85A30  coral:  effect/delay/reverb sends, intra-FX routing
         knobReverb              = 0x10000015,  // #378ADD  blue:   reverb size, diffusion, damp, pre-delay
         knobPan                 = 0x10000016,  // #888780  grey:   pan
         knobModulation          = 0x10000017,  // #D4537E  pink:   (alias – same as knobInsertPad)
+        knobPrePad              = 0x10000018,  // #2BB5C5  cyan-teal: pre pad
+        knobPostPad             = 0x10000019,  // #1D9E75  teal:      post pad, filter cutoff/res, filter env
 
         // ── Ring colours (RhythmCircle) ──────────────────────────────────
         ringEuclidA             = 0x10000020,  // #7F77DD  purple, always outermost
@@ -33,6 +35,9 @@ public:
         ringModC                = 0x10000025,  // #D4537E  pink
         ringModD                = 0x10000026,  // #378ADD  blue
         ringInactive            = 0x10000027,  // #333332  unfired step dot
+        ringPrePad              = 0x10000028,  // #2BB5C5  cyan-teal: pre-padded steps
+        ringPostPad             = 0x10000029,  // #1D9E75  teal:      post-padded steps
+        ringInsertPad           = 0x1000002A,  // #D4537E  pink:      insert-padded steps
 
         // ── Segment control states ────────────────────────────────────────
         segmentActiveBg         = 0x10000030,  // #3C3489  general active background

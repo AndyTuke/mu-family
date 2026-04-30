@@ -20,22 +20,22 @@ private:
     using Id = MuClidLookAndFeel::ColourIds;
 
     // Amp envelope (amber)
-    KnobWithLabel ampAttack  { "ATK", Id::knobLevel };
-    KnobWithLabel ampDecay   { "DEC", Id::knobLevel };
-    KnobWithLabel ampSustain { "SUS", Id::knobLevel };
-    KnobWithLabel ampRelease { "REL", Id::knobLevel };
+    KnobWithLabel ampAttack  { "Attack",  Id::knobLevel   };
+    KnobWithLabel ampDecay   { "Decay",   Id::knobLevel   };
+    KnobWithLabel ampSustain { "Sustain", Id::knobLevel   };
+    KnobWithLabel ampRelease { "Release", Id::knobLevel   };
 
     // Filter (teal)
-    KnobWithLabel filterCutoff { "CUT", Id::knobPadding };
-    KnobWithLabel filterRes    { "RES", Id::knobPadding };
+    KnobWithLabel filterCutoff { "Cutoff",    Id::knobPostPad };
+    KnobWithLabel filterRes    { "Resonance", Id::knobPostPad };
 
     // Filter envelope (teal)
-    KnobWithLabel fEnvAttack { "ATK", Id::knobPadding };
-    KnobWithLabel fEnvDecay  { "DEC", Id::knobPadding };
-    KnobWithLabel fEnvDepth  { "DEP", Id::knobPadding };
+    KnobWithLabel fEnvAttack { "Attack", Id::knobPostPad };
+    KnobWithLabel fEnvDecay  { "Decay",  Id::knobPostPad };
+    KnobWithLabel fEnvDepth  { "Depth",  Id::knobPostPad };
 
     // Output mode
-    SegmentControl outputMode { {"SMPL", "MIDI"} };
+    SegmentControl outputMode { {"Sample", "MIDI"} };
 
     void wireStatusCallbacks();
 };

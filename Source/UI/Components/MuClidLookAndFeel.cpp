@@ -20,6 +20,8 @@ juce::Colour MuClidLookAndFeel::colour(ColourIds id) noexcept
         case knobReverb:              return juce::Colour(0xff378ADD);
         case knobPan:                 return juce::Colour(0xff888780);
         case knobModulation:          return juce::Colour(0xffD4537E);
+        case knobPrePad:              return juce::Colour(0xff2BB5C5);
+        case knobPostPad:             return juce::Colour(0xff1D9E75);
         // Rings
         case ringEuclidA:             return juce::Colour(0xff7F77DD);
         case ringEuclidB:             return juce::Colour(0xffD85A30);
@@ -29,6 +31,9 @@ juce::Colour MuClidLookAndFeel::colour(ColourIds id) noexcept
         case ringModC:                return juce::Colour(0xffD4537E);
         case ringModD:                return juce::Colour(0xff378ADD);
         case ringInactive:            return juce::Colour(0xff333332);
+        case ringPrePad:              return juce::Colour(0xff2BB5C5);
+        case ringPostPad:             return juce::Colour(0xff1D9E75);
+        case ringInsertPad:           return juce::Colour(0xffD4537E);
         // Segment control
         case segmentActiveBg:         return juce::Colour(0xff3C3489);
         case segmentActiveBorder:     return juce::Colour(0xff7F77DD);

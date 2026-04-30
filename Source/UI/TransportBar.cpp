@@ -1,5 +1,8 @@
 #include "TransportBar.h"
 
+static const juce::String kPlay  = juce::String(juce::CharPointer_UTF8("\xe2\x96\xb6"));
+static const juce::String kStop  = juce::String(juce::CharPointer_UTF8("\xe2\x96\xa0"));
+
 TransportBar::TransportBar(PluginProcessor& p)
     : proc(p),
       isStandalone(p.wrapperType == juce::AudioProcessor::wrapperType_Standalone)
@@ -36,9 +39,9 @@ void TransportBar::timerCallback()
 void TransportBar::refreshPlayBtn()
 {
     if (isStandalone)
-        playBtn.setButtonText(proc.isInternalPlaying() ? "Stop" : "Play");
+        playBtn.setButtonText(proc.isInternalPlaying() ? kStop : kPlay);
     else
-        playBtn.setButtonText("DAW");
+        playBtn.setButtonText(kPlay);
 }
 
 void TransportBar::paint(juce::Graphics& g)
@@ -52,20 +55,13 @@ void TransportBar::paint(juce::Graphics& g)
     g.setFont(juce::Font(14.0f));
     g.drawText("mu-Clid", 8, 0, 80, getHeight(), juce::Justification::centredLeft, false);
 
-    if (isStandalone)
+    if (!isStandalone)
     {
-        // "BPM" label to the left of the nudge input
-        g.setColour(MuClidLookAndFeel::colour(Id::labelText));
-        g.setFont(juce::Font(10.0f));
-        const int bpmLabelX = 8 + 80 + 8 + 64 + 8;
-        g.drawText("BPM", bpmLabelX, 0, 32, getHeight(), juce::Justification::centredLeft, false);
-    }
-    else
-    {
+        // Centred "Syncing to DAW" indicator for plugin mode
         g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
         g.setFont(juce::Font(11.0f));
-        g.drawText("Syncing to DAW", 8 + 80 + 8 + 64 + 8, 0, 160, getHeight(),
-                   juce::Justification::centredLeft, false);
+        g.drawText("Syncing to DAW", 0, 0, getWidth(), getHeight(),
+                   juce::Justification::centred, false);
     }
 
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
@@ -74,18 +70,19 @@ void TransportBar::paint(juce::Graphics& g)
 
 void TransportBar::resized()
 {
-    const int h   = getHeight();
-    const int pad = 4;
+    const int h    = getHeight();
+    const int btnW = 28;
+    const int btnH = 28;
+    const int bpmW = 120;
+    const int gap  = 8;
 
-    // Play/Stop button sits after the logo area
-    const int logoW = 88;
-    const int btnW  = 64;
-    playBtn.setBounds(logoW + 8, (h - 24) / 2, btnW, 24);
+    // Centre the button (and BPM input if standalone) in the bar
+    const int groupW = isStandalone ? (btnW + gap + bpmW) : btnW;
+    const int startX = (getWidth() - groupW) / 2;
+    const int btnY   = (h - btnH) / 2;
+
+    playBtn.setBounds(startX, btnY, btnW, btnH);
 
     if (isStandalone)
-    {
-        // NudgeInput after the BPM label (32px label + 8px gap)
-        const int bpmX = logoW + 8 + btnW + 8 + 32 + 4;
-        bpmInput.setBounds(bpmX, pad, 120, h - pad * 2);
-    }
+        bpmInput.setBounds(startX + btnW + gap, (h - 28) / 2, bpmW, 28);
 }

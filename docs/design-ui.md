@@ -70,7 +70,7 @@ Header bar        28px  — 4px colour accent strip | colour dot | rhythm name
 Sample bar        22px  — placeholder text or filename. Drag+drop target. "..." browse icon right.
 [RhythmCircle 300px | EuclideanPanel rest]  300px
 VoiceSection      80px
-ModulatorPanel    rest of height  (placeholder until Stage 7)
+ModulatorPanel    rest of height  (implemented Stage 7)
 ```
 
 ### Header Bar

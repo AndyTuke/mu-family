@@ -35,10 +35,14 @@ All parameters must be in APVTS. Suggested ID format:
 
 Parameter IDs are strings in ModulationMatrix — this is what makes new sources/destinations automatic without refactoring.
 
-## Current State (Stage 6 — pre-APVTS)
+## Current State (Stage 8 — pre-APVTS)
 
 APVTS is not yet wired. UI currently reads/writes `Rhythm` data directly. This is intentional — APVTS wiring is Stage 10. Until then:
 - State does not save between DAW sessions
 - Automation does not work
 - The direct data binding (e.g. `rhythm->genA.steps = (int)v`) is the correct pattern for now
 - Stage 10 will replace direct reads/writes with APVTS parameter attachments
+
+**FX state:** `EffectSlot`, `DelaySlot`, and `ReverbSlot` each implement `getStateInformation()` / `setStateInformation()` stubs. FX parameter state does not persist until Stage 10 wires these into the plugin's `getStateInformation()` / `setStateInformation()` calls.
+
+**MIDI mode flag:** `VoiceEngine` / `MidiOutputEngine` MIDI mode selection is not yet wired to UI. The trigger call from `processBlock` to `MidiOutputEngine` is present but gated — MIDI output is inactive until Stage 10 enables the routing per rhythm.

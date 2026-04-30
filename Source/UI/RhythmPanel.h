@@ -39,11 +39,14 @@ private:
 
     std::unique_ptr<juce::FileChooser> fileChooser;
 
-    static constexpr int kHeaderH     = 28;
-    static constexpr int kSampleBarH  = 22;
-    static constexpr int kCircleW     = 300;
-    static constexpr int kTopH        = 300;
-    static constexpr int kVoiceH      = 80;
+    // Fixed chrome heights
+    static constexpr int kHeaderH    = 28;
+    static constexpr int kSampleBarH = 22;
+    static constexpr int kVoiceH     = 80;
+
+    // Computed proportionally in resized(), used in both resized() and paint()
+    int circleW = 300;
+    int topH    = 300;
 
     void loadSample();
     void refreshCircle();

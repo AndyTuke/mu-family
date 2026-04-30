@@ -50,6 +50,11 @@ target_sources(mu-clid
         Source/UI/ModMatrixPanel.cpp
         Source/UI/ModulatorPanel.cpp
         Source/UI/RhythmPanel.cpp
+        Source/FX/EffectSlot.cpp
+        Source/FX/DelaySlot.cpp
+        Source/FX/ReverbSlot.cpp
+        Source/FX/FXChain.cpp
+        Source/UI/FXRow.cpp
 )
 
 target_compile_definitions(mu-clid

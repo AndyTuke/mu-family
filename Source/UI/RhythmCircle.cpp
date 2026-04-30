@@ -10,9 +10,9 @@ RhythmCircle::~RhythmCircle()
     stopTimer();
 }
 
-void RhythmCircle::setPatterns(const std::vector<bool>& patA,
-                                const std::vector<bool>& patB,
-                                const std::vector<bool>& patC)
+void RhythmCircle::setPatterns(const std::vector<StepType>& patA,
+                                const std::vector<StepType>& patB,
+                                const std::vector<StepType>& patC)
 {
     patternA = patA;
     patternB = patB;
@@ -47,8 +47,27 @@ void RhythmCircle::timerCallback()
     if (dirty) repaint();
 }
 
+juce::Colour RhythmCircle::stepColour(StepType t, juce::Colour hitColour,
+                                       bool isCurrent, float pulseAlpha)
+{
+    using Id = MuClidLookAndFeel::ColourIds;
+    juce::Colour base;
+    switch (t)
+    {
+        case StepType::Hit:       base = hitColour; break;
+        case StepType::PrePad:    base = MuClidLookAndFeel::colour(Id::ringPrePad).withAlpha(0.5f); break;
+        case StepType::PostPad:   base = MuClidLookAndFeel::colour(Id::ringPostPad).withAlpha(0.5f); break;
+        case StepType::InsertPad: base = MuClidLookAndFeel::colour(Id::ringInsertPad).withAlpha(0.5f); break;
+        default:                  base = hitColour.withAlpha(0.18f); break;
+    }
+    if (isCurrent) base = base.brighter(0.5f);
+    if (pulseAlpha > 0.0f && t == StepType::Hit)
+        base = base.interpolatedWith(juce::Colours::white, pulseAlpha * 0.35f);
+    return base;
+}
+
 void RhythmCircle::drawRing(juce::Graphics& g,
-                              const std::vector<bool>& pattern,
+                              const std::vector<StepType>& pattern,
                               float cx, float cy,
                               float outerR, float innerR,
                               juce::Colour hitColour,
@@ -69,13 +88,9 @@ void RhythmCircle::drawRing(juce::Graphics& g,
     {
         const float a0 = startOff + (float)i * stepAng;
         const float a1 = a0 + arcAng;
-        const bool isHit     = pattern[i];
         const bool isCurrent = (i == currentStep);
 
-        juce::Colour c = isHit ? hitColour : hitColour.withAlpha(0.18f);
-        if (isCurrent) c = c.brighter(0.5f);
-        if (pulseAlpha > 0.0f && isHit)
-            c = c.interpolatedWith(juce::Colours::white, pulseAlpha * 0.35f);
+        juce::Colour c = stepColour(pattern[i], hitColour, isCurrent, pulseAlpha);
 
         g.setColour(c);
 
@@ -111,7 +126,7 @@ void RhythmCircle::paint(juce::Graphics& g)
 
     if (maxR < 8.0f) return;
 
-    const float ringW   = juce::jmax(5.0f, maxR * 0.20f);
+    const float ringW   = juce::jmax(4.0f, maxR * 0.16f);
     const float ringGap = juce::jmax(2.0f, maxR * 0.05f);
 
     // Ring A — outermost, purple
@@ -123,7 +138,6 @@ void RhythmCircle::paint(juce::Graphics& g)
                  currentStepA, pulseAlphaA);
     else
     {
-        // Empty ring placeholder
         g.setColour(MuClidLookAndFeel::colour(Id::ringEuclidA).withAlpha(0.12f));
         juce::Path ring;
         ring.addCentredArc(cx, cy, aOuter, aOuter, 0.0f, 0.0f, juce::MathConstants<float>::twoPi, true);
@@ -135,6 +149,8 @@ void RhythmCircle::paint(juce::Graphics& g)
     // Ring B — coral
     const float bOuter = aInner - ringGap;
     const float bInner = bOuter - ringW;
+    float innerLimit = (patternB.empty() ? aInner : bInner) - ringGap;
+
     if (bInner > 0.0f)
     {
         if (!patternB.empty())
@@ -158,13 +174,15 @@ void RhythmCircle::paint(juce::Graphics& g)
         const float cOuter = bInner - ringGap;
         const float cInner = cOuter - ringW;
         if (cInner > 0.0f)
+        {
             drawRing(g, patternC, cx, cy, cOuter, cInner,
                      MuClidLookAndFeel::colour(Id::ringEuclidC),
-                     -1, 0.0f, true);
+                     -1, 0.0f);
+            innerLimit = cInner - ringGap;
+        }
     }
 
     // Centre fill — panel bg colour to punch a hole in any underlapping arcs
-    const float innerLimit = (patternB.empty() ? aInner : bInner) - ringGap;
     if (innerLimit > 4.0f)
     {
         g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));

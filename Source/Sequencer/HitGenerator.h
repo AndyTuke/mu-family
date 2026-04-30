@@ -4,6 +4,9 @@
 
 enum class InsertMode { Pad, Mute };
 
+// Per-step type for the ring display, distinguishing hits from pad types.
+enum class StepType : uint8_t { Empty = 0, Hit = 1, PrePad = 2, PostPad = 3, InsertPad = 4 };
+
 class HitGenerator
 {
 public:
@@ -19,4 +22,7 @@ public:
 
     // Returns the final bool pattern after euclidean distribution, rotation, padding, and mute.
     std::vector<bool> getPattern() const;
+
+    // Same as getPattern() but annotates each step with its type (hit, empty, pre/post/insert pad).
+    std::vector<StepType> getStepTypes() const;
 };

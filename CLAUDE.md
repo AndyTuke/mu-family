@@ -50,9 +50,9 @@ Artefacts land in `build/mu-clid_artefacts/Debug/` or `.../Release/`.
 | 4 | ✅ Done | ControlSequence, ModulationMatrix |
 | 5 | ✅ Done | All UI/Components/, MuClidLookAndFeel, StepEditor, LFOEditor |
 | 6 | ✅ Done | RhythmCircle, SidebarItem, RhythmSidebar, EuclideanPanel, VoiceSection, RhythmPanel |
-| 7 | ⬜ Next | ModulatorPanel, ModMatrixPanel, MidiOutputEngine |
-| 8 | ⬜ | All FX/ files, FXChain, FXRow, oversampling wrappers |
-| 9 | ⬜ | MixerEngine, MixerOverlay, MixerChannel, VUMeter |
+| 7 | ✅ Done | ModulatorPanel, ModulatorEditor, ModMatrixPanel, MidiOutputEngine |
+| 8 | ✅ Done | FXSlotBase, FXAlgorithmDef, OversampledProcessor, 8 EffectAlgorithms, EffectSlot, DelaySlot, ReverbSlot, FXChain, FXRow |
+| 9 | ⬜ Next | MixerEngine, MixerOverlay, MixerChannel, VUMeter |
 | 10 | ⬜ | TransportBar, PresetBrowser, SaveDialog, SettingsOverlay, AboutPanel, APVTS wiring |
 | 11 | ⬜ | Polish, animations, ring arc animations |
 
@@ -60,20 +60,35 @@ Artefacts land in `build/mu-clid_artefacts/Debug/` or `.../Release/`.
 
 ```
 Source/
-├── PluginProcessor.h/.cpp       — audio processor, owns sequencer + voice engines
+├── PluginProcessor.h/.cpp       — audio processor, owns sequencer + voice engines + fxChain
 ├── PluginEditor.h/.cpp          — root editor: sidebar + rhythmPanel + statusBar
 ├── Sequencer/                   — EuclideanGenerator, HitGenerator, ControlSequence, Rhythm, SequencerEngine
 ├── Audio/                       — SamplePlayer, VoiceEngine (TimeStretcherBase stub)
 ├── Modulation/                  — ModulationMatrix, ModulationAssignment
+├── FX/
+│   ├── FXSlotBase.h             — abstract interface for all FX slots
+│   ├── FXAlgorithmDef.h         — algorithm metadata + FXAlgorithmRegistry
+│   ├── OversampledProcessor.h   — RAII wrapper around juce::dsp::Oversampling
+│   ├── EffectSlot.h/.cpp        — insert FX slot: hosts one of 8 algorithms, insert blending
+│   ├── DelaySlot.h/.cpp         — insert delay: sync/free, feedback, spread, dirt
+│   ├── ReverbSlot.h/.cpp        — send reverb: 4 algorithms, pre-delay, pure send
+│   ├── FXChain.h/.cpp           — sequences Effect→Delay→Reverb, intra-FX routing API
+│   └── Effects/                 — 8 header-only algorithm classes (all extend EffectAlgorithmBase)
+│       SoftClipEffect, HardClipEffect, FoldbackEffect, BitcrushEffect,
+│       LadderFilterEffect, ChorusEffect, PhaserEffect, CombFilterEffect
 └── UI/
     ├── Components/              — MuClidLookAndFeel, KnobWithLabel, SegmentControl, NudgeInput,
     │                              TimeSelector, DropdownSelect, StepEditor, LFOEditor, AddButton, StatusBar
+    ├── FXRow.h/.cpp             — one FX row for mixer overlay (on/off, algo dropdown, param knobs)
     ├── RhythmCircle.h/.cpp      — concentric ring display, 30Hz timer, pulse animation
     ├── SidebarItem.h/.cpp       — one sidebar entry with mini RhythmCircle
     ├── RhythmSidebar.h/.cpp     — scrollable left sidebar (82px)
     ├── EuclideanPanel.h/.cpp    — Steps/Hits/Rot/Pre/Post knobs for A and B, logic selector
     ├── VoiceSection.h/.cpp      — amp ADSR, filter, filter ADSR, output mode (compact row)
-    └── RhythmPanel.h/.cpp       — header + sample bar + circle + euclidean + voice + mod placeholder
+    ├── RhythmPanel.h/.cpp       — header + sample bar + circle + euclidean + voice + modulator
+    ├── ModulatorEditor.h/.cpp   — one modulator: mode/input header, LFO/step editor, timing, assignment list
+    ├── ModMatrixPanel.h/.cpp    — all assignments overview table (matrix tab)
+    └── ModulatorPanel.h/.cpp    — tab bar (Mod A–H + Matrix) + content area
 ```
 
 ## Critical architectural rules

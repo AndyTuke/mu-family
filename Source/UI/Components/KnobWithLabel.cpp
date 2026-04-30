@@ -14,6 +14,7 @@ KnobWithLabel::KnobWithLabel(const juce::String& label,
 
     slider.onValueChange = [this]
     {
+        repaint();  // refresh value text in dead zone
         if (onStatusUpdate)
             onStatusUpdate(labelText, slider.getTextFromValue(slider.getValue()));
         if (onValueChanged)
@@ -54,9 +55,23 @@ void KnobWithLabel::mouseEnter(const juce::MouseEvent&)
 void KnobWithLabel::paint(juce::Graphics& g)
 {
     const int labelH = 14;
+
+    // Label below knob
     g.setFont(juce::Font(10.0f));
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::labelText));
     g.drawText(labelText,
                juce::Rectangle<int>(0, getHeight() - labelH, getWidth(), labelH),
+               juce::Justification::centred, true);
+
+    // Value text in the dead zone (5–7 o'clock gap at the bottom of the arc)
+    const float sliderH = (float)(getHeight() - labelH);
+    const float radius  = juce::jmin((float)getWidth(), sliderH) * 0.5f - 2.0f;
+    const float cy      = sliderH * 0.5f;
+    const int   valueY  = (int)(cy + radius * 0.75f) - 5;
+
+    g.setFont(juce::Font(8.0f));
+    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::valueText));
+    g.drawText(slider.getTextFromValue(slider.getValue()),
+               0, valueY, getWidth(), 11,
                juce::Justification::centred, true);
 }

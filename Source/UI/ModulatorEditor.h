@@ -38,7 +38,7 @@ class ModulatorEditor : public juce::Component
 public:
     ModulatorEditor();
 
-    void setData(ControlSequence* cs, ModulationMatrix* matrix, juce::Colour modColour);
+    void setData(ControlSequence* cs, ModulationMatrix* matrix, juce::Colour modColour, int index);
 
     std::function<void()> onChange;
 
@@ -46,12 +46,13 @@ public:
     void paint(juce::Graphics& g) override;
 
 private:
-    ControlSequence*  cs     = nullptr;
-    ModulationMatrix* matrix = nullptr;
+    ControlSequence*  cs       = nullptr;
+    ModulationMatrix* matrix   = nullptr;
     juce::Colour      modColour;
+    int               modIndex = 0;
 
-    SegmentControl modeCtrl     { {"Smooth","Stepped"} };
-    SegmentControl polarityCtrl { {"Bipolar","Unipolar"} };
+    SegmentControl modeCtrl  { {"Smooth","Stepped"} };
+    SegmentControl inputCtrl { {"Internal","CC"} };
     LFOEditor      lfoEditor;
     StepEditor     stepEditor;
     TimeSelector   loopNoteSelector;

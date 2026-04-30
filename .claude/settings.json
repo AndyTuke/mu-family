@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmake --build build --config Debug)",
+      "Bash(git -C d:/Dev/mu-clid status)",
+      "Bash(git -C d:/Dev/mu-clid log --oneline -3)",
+      "Bash(git -C d:/Dev/mu-clid diff Source/Sequencer/Rhythm.cpp Source/Sequencer/SequencerEngine.cpp Source/Sequencer/SequencerEngine.h)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git -C d:/Dev/mu-clid log --oneline)",
+      "Bash(git -C d:/Dev/mu-clid diff --stat HEAD)",
+      "Bash(git -C d:/Dev/mu-clid log --oneline -5)",
+      "Bash(git -C d:/Dev/mu-clid add Source/UI/ CMakeLists.txt)",
+      "Bash(git -C d:/Dev/mu-clid commit -m ' *)"
+    ]
+  }
+}

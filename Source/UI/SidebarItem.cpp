@@ -10,8 +10,9 @@ void SidebarItem::setRhythm(const Rhythm* r, juce::Colour colour)
 {
     rhythm = r;
     rhythmColour = colour;
-    miniCircle.setPatterns(r ? r->genA.getPattern() : std::vector<bool>{},
-                           r ? r->genB.getPattern() : std::vector<bool>{});
+    miniCircle.setPatterns(r ? r->genA.getStepTypes() : std::vector<StepType>{},
+                           r ? r->genB.getStepTypes() : std::vector<StepType>{},
+                           r ? r->genC.getStepTypes() : std::vector<StepType>{});
     repaint();
 }
 

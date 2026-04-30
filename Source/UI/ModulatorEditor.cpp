@@ -42,7 +42,7 @@ void ModulatorEditor::AssignmentRow::resized()
 ModulatorEditor::ModulatorEditor()
 {
     addAndMakeVisible(modeCtrl);
-    addAndMakeVisible(polarityCtrl);
+    addAndMakeVisible(inputCtrl);
     addAndMakeVisible(lfoEditor);
     addAndMakeVisible(stepEditor);
     addAndMakeVisible(loopNoteSelector);
@@ -56,11 +56,12 @@ ModulatorEditor::ModulatorEditor()
 }
 
 void ModulatorEditor::setData(ControlSequence* cs_, ModulationMatrix* matrix_,
-                               juce::Colour colour)
+                               juce::Colour colour, int index)
 {
     cs        = cs_;
     matrix    = matrix_;
     modColour = colour;
+    modIndex  = index;
     stepEditor.setBarColour(modColour);
     loadFromCS();
     rebuildRows();
@@ -74,7 +75,7 @@ void ModulatorEditor::loadFromCS()
 
     const bool smooth = (cs->mode == ControlSequence::Mode::Smooth);
     modeCtrl.setSelectedIndex(smooth ? 0 : 1);
-    polarityCtrl.setSelectedIndex(cs->polarity == ControlSequence::Polarity::Bipolar ? 0 : 1);
+    inputCtrl.setSelectedIndex(cs->inputSource == ControlSequence::InputSource::MIDI_CC ? 1 : 0);
     lfoEditor.setVisible(smooth);
     stepEditor.setVisible(!smooth);
     stepNoteSelector.setVisible(!smooth);
@@ -126,11 +127,11 @@ void ModulatorEditor::wireHeader()
         if (onChange) onChange();
     };
 
-    polarityCtrl.onChange = [this](int idx)
+    inputCtrl.onChange = [this](int idx)
     {
         if (!cs) return;
-        cs->polarity = (idx == 0) ? ControlSequence::Polarity::Bipolar
-                                  : ControlSequence::Polarity::Unipolar;
+        cs->inputSource = (idx == 0) ? ControlSequence::InputSource::Internal
+                                     : ControlSequence::InputSource::MIDI_CC;
         if (onChange) onChange();
     };
 }
@@ -262,8 +263,9 @@ void ModulatorEditor::resized()
     const int w = getWidth();
     int y = 0;
 
-    modeCtrl.setBounds(0, y, w / 2, kHeaderH);
-    polarityCtrl.setBounds(w / 2, y, w - w / 2, kHeaderH);
+    const int nameW = 76;
+    modeCtrl.setBounds(nameW, y, (w - nameW) / 2, kHeaderH);
+    inputCtrl.setBounds(nameW + (w - nameW) / 2, y, w - nameW - (w - nameW) / 2, kHeaderH);
     y += kHeaderH;
 
     lfoEditor.setBounds(0, y, w, kEditorH);
@@ -296,6 +298,15 @@ void ModulatorEditor::paint(juce::Graphics& g)
 {
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
     g.fillAll();
+
+    // Header: colour dot + modulator name
+    const float dotY = (kHeaderH - 8) * 0.5f;
+    g.setColour(modColour);
+    g.fillEllipse(8.0f, dotY, 8.0f, 8.0f);
+    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::headingText));
+    g.setFont(juce::Font(11.0f));
+    g.drawText("Mod " + juce::String::charToString(char('A' + modIndex)),
+               20, 0, 54, kHeaderH, juce::Justification::centredLeft, false);
 
     if (!cs || cs->mode != ControlSequence::Mode::Stepped) return;
 
