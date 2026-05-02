@@ -54,7 +54,7 @@ public:
     void setParam(const juce::String& id, float value) override
     {
         if      (id == "bits")   bits     = value;
-        else if (id == "rate")   rate     = value;
+        else if (id == "rate")   rate     = value / 100.0f;
         else if (id == "output") outputDb = value;
         else if (id == "tone")   { toneCutoff = value; updateToneFilter(); }
     }

@@ -75,6 +75,58 @@ void ReverbSlot::process(juce::AudioBuffer<float>& buffer)
     }
 }
 
+void ReverbSlot::processReturn(juce::AudioBuffer<float>& buffer)
+{
+    if (!enabled) return;
+
+    const int numCh      = buffer.getNumChannels();
+    const int numSamples = buffer.getNumSamples();
+
+    const int preDelaySamples = juce::jlimit(0, MaxPreDelaySamples - 1,
+        static_cast<int>(preDelay * sr / 1000.0));
+
+    juce::AudioBuffer<float> reverbInput(2, numSamples);
+    reverbInput.clear();
+
+    auto* srcL = (numCh > 0) ? buffer.getReadPointer(0) : nullptr;
+    auto* srcR = (numCh > 1) ? buffer.getReadPointer(1) : srcL;
+    auto* rvL  = reverbInput.getWritePointer(0);
+    auto* rvR  = reverbInput.getWritePointer(1);
+
+    for (int i = 0; i < numSamples; ++i)
+    {
+        preDelayBufL[preDelayWrite] = (srcL != nullptr) ? srcL[i] : 0.0f;
+        preDelayBufR[preDelayWrite] = (srcR != nullptr) ? srcR[i] : 0.0f;
+
+        const int readPos = (preDelayWrite - preDelaySamples + MaxPreDelaySamples) % MaxPreDelaySamples;
+        rvL[i] = preDelayBufL[readPos];
+        rvR[i] = preDelayBufR[readPos];
+
+        preDelayWrite = (preDelayWrite + 1) % MaxPreDelaySamples;
+    }
+
+    if (dirt > 0.001f)
+    {
+        const float gain = 1.0f + dirt * 4.0f;
+        for (int i = 0; i < numSamples; ++i)
+        {
+            rvL[i] = std::tanh(rvL[i] * gain) / gain;
+            rvR[i] = std::tanh(rvR[i] * gain) / gain;
+        }
+    }
+
+    reverb.processStereo(rvL, rvR, numSamples);
+
+    // Overwrite buffer with wet-only output (dry send is already in the main mix).
+    for (int ch = 0; ch < numCh; ++ch)
+    {
+        auto* out = buffer.getWritePointer(ch);
+        auto* wet = reverbInput.getReadPointer(ch);
+        for (int i = 0; i < numSamples; ++i)
+            out[i] = wet[i] * level;
+    }
+}
+
 void ReverbSlot::setAlgorithm(int index)
 {
     algorithmIndex = juce::jlimit(0, 3, index);

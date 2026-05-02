@@ -36,6 +36,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     for (auto& me : midiEngines)
         me.prepare(sampleRate, samplesPerBlock);
     fxChain.prepare(sampleRate, samplesPerBlock);
+    mixerEngine.prepare(sampleRate, samplesPerBlock);
 }
 
 void PluginProcessor::releaseResources() {}
@@ -75,12 +76,9 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 voiceEngines[r].trigger();
     }
 
-    for (int r = 0; r < sequencer.getNumRhythms(); ++r)
-        voiceEngines[r].process(buffer, buffer.getNumSamples());
-
-    // Global FX chain (Effect → Delay → Reverb)
     fxChain.setHostBpm(internalBpm);
-    fxChain.process(buffer);
+    mixerEngine.processBlock(buffer, sequencer.getNumRhythms(),
+                             voiceEngines, fxChain, buffer.getNumSamples());
 
     // Flush pending MIDI note-offs each block (trigger is wired in Stage 10 per MIDI mode flag)
     for (int r = 0; r < sequencer.getNumRhythms(); ++r)

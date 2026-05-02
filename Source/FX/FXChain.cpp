@@ -36,6 +36,16 @@ void FXChain::process(juce::AudioBuffer<float>& buffer)
     reverb.process(buffer);
 }
 
+void FXChain::processSends(juce::AudioBuffer<float>& effectSend,
+                           juce::AudioBuffer<float>& delaySend,
+                           juce::AudioBuffer<float>& reverbSend,
+                           bool doEffect, bool doDelay, bool doReverb)
+{
+    if (doEffect) effect.processReturn(effectSend);
+    if (doDelay)  delay.processReturn(delaySend);
+    if (doReverb) reverb.processReturn(reverbSend);
+}
+
 void FXChain::setHostBpm(double bpm)
 {
     delay.setHostBpm(bpm);

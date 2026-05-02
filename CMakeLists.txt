@@ -55,6 +55,11 @@ target_sources(mu-clid
         Source/FX/ReverbSlot.cpp
         Source/FX/FXChain.cpp
         Source/UI/FXRow.cpp
+        Source/UI/DelayRow.cpp
+        Source/Audio/MixerEngine.cpp
+        Source/UI/Components/VUMeter.cpp
+        Source/UI/MixerChannel.cpp
+        Source/UI/MixerOverlay.cpp
 )
 
 target_compile_definitions(mu-clid

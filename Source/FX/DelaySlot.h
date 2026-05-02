@@ -25,13 +25,18 @@ public:
     void setEnabled(bool e) { enabled = e; }
     void setSend(float v)   { sendAmount = juce::jlimit(0.0f, 1.0f, v); }
 
+    // Send-bus processing: runs delay with no dry/wet blend (wet-only output).
+    void processReturn(juce::AudioBuffer<float>&);
+
     // Free mode
     void setDelayMs(float ms);
 
     // Sync mode: denominator of note value (1=whole, 2=half, 4=quarter, 8=eighth, etc.)
-    // dotted and triplet modify the time.
+    // dotted and triplet modify the time.  count multiplies the resulting duration.
     void setTimeDivision(int denominator, bool dotted, bool triplet);
     void setTimeMode(TimeMode m) { timeMode = m; updateDelayFromMode(); }
+    void setTimeCount(int count);
+    TimeMode getTimeMode() const { return timeMode; }
 
     void setFeedback(float fb)  { feedback = juce::jlimit(0.0f, 0.98f, fb); }
     void setSpread(float s)     { spread   = juce::jlimit(0.0f, 1.0f, s); }
@@ -58,6 +63,7 @@ private:
     int      syncDenominator = 4;
     bool     syncDotted      = false;
     bool     syncTriplet     = false;
+    int      syncCount        = 1;
 
     float targetDelayL = 0.0f;   // in samples
     float targetDelayR = 0.0f;

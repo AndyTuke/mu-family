@@ -258,58 +258,100 @@ void EuclideanPanel::resized()
     const int w = getWidth();
     const int h = getHeight();
 
-    const int rowH = juce::jmin(kMaxRowH, (h - kLogicH) / 3);
-    const int colW = w / 8;  // 8 controls per row
+    const int rowH = (h - kLogicH) / 3;
+    const int mP   = 4;  // inner padding gap between minor panel border and controls
 
-    // M/I switch height — sits at the bottom of column 7, under the knob graphic
-    const int modeH = juce::jmin(20, rowH / 3);
+    // Euclid cols (Steps/Hits/Rot) are 10% narrower than the pad/insert cols
+    const int colW = w / 7;
+    const int eW   = (int)(colW * 0.9f);          // euclid column width
+    const int pW   = (w - eW * 3) / 4;            // pad/insert column width
+    const int padX = eW * 3;                       // x-start of Pre/Post Pad minor panel
+    const int insX = padX + pW * 2;               // x-start of Insert Pad minor panel
 
-    // ── Euclid A (single row) ────────────────────────────────────────────────
+    // Insert knobs occupy the upper portion; switch sits below
+    const int knobH  = rowH - kSwitchH - 2;
+    const int switchW = juce::jmin(40, pW);
+    const int switchX = insX + (pW * 2 - switchW) / 2;
+
+    // ── Euclid A ─────────────────────────────────────────────────────────────
     int y = 0;
-    stepsA.setBounds    (colW * 0, y, colW,         rowH);
-    hitsA.setBounds     (colW * 1, y, colW,         rowH);
-    rotA.setBounds      (colW * 2, y, colW,         rowH);
-    prePadA.setBounds   (colW * 3, y, colW,         rowH);
-    postPadA.setBounds  (colW * 4, y, colW,         rowH);
-    insertStA.setBounds (colW * 5, y, colW,         rowH);
-    insertLenA.setBounds(colW * 6, y, colW,         rowH);
-    insertModeA.setBounds(colW * 7, y + rowH - modeH, w - colW * 7, modeH);
+    stepsA.setBounds    (0,           y,      eW,      rowH);
+    hitsA.setBounds     (eW,          y,      eW,      rowH);
+    rotA.setBounds      (eW * 2,      y,      eW,      rowH);
+    prePadA.setBounds   (padX + mP,   y + mP, pW,      rowH - mP * 2);
+    postPadA.setBounds  (padX + pW,   y + mP, pW - mP, rowH - mP * 2);
+    insertStA.setBounds (insX + mP,   y + mP, pW,      knobH - mP);
+    insertLenA.setBounds(insX + pW,   y + mP, pW - mP, knobH - mP);
+    insertModeA.setBounds(switchX,    y + knobH + 2, switchW, kSwitchH);
 
     // ── Logic bar ─────────────────────────────────────────────────────────────
     y += rowH;
-    logicCtrl.setBounds(0, y, w, kLogicH);
+    logicCtrl.setBounds(mP, y + 1, w - mP * 2, kLogicH - 2);
 
-    // ── Euclid B (single row) ────────────────────────────────────────────────
+    // ── Euclid B ─────────────────────────────────────────────────────────────
     y += kLogicH;
-    stepsB.setBounds    (colW * 0, y, colW,         rowH);
-    hitsB.setBounds     (colW * 1, y, colW,         rowH);
-    rotB.setBounds      (colW * 2, y, colW,         rowH);
-    prePadB.setBounds   (colW * 3, y, colW,         rowH);
-    postPadB.setBounds  (colW * 4, y, colW,         rowH);
-    insertStB.setBounds (colW * 5, y, colW,         rowH);
-    insertLenB.setBounds(colW * 6, y, colW,         rowH);
-    insertModeB.setBounds(colW * 7, y + rowH - modeH, w - colW * 7, modeH);
+    stepsB.setBounds    (0,           y,      eW,      rowH);
+    hitsB.setBounds     (eW,          y,      eW,      rowH);
+    rotB.setBounds      (eW * 2,      y,      eW,      rowH);
+    prePadB.setBounds   (padX + mP,   y + mP, pW,      rowH - mP * 2);
+    postPadB.setBounds  (padX + pW,   y + mP, pW - mP, rowH - mP * 2);
+    insertStB.setBounds (insX + mP,   y + mP, pW,      knobH - mP);
+    insertLenB.setBounds(insX + pW,   y + mP, pW - mP, knobH - mP);
+    insertModeB.setBounds(switchX,    y + knobH + 2, switchW, kSwitchH);
 
-    // ── Euclid C / Accent (single row, same 8 controls) ──────────────────────
+    // ── Euclid C / Accent ────────────────────────────────────────────────────
     y += rowH;
-    stepsC.setBounds    (colW * 0, y, colW,         rowH);
-    hitsC.setBounds     (colW * 1, y, colW,         rowH);
-    rotC.setBounds      (colW * 2, y, colW,         rowH);
-    prePadC.setBounds   (colW * 3, y, colW,         rowH);
-    postPadC.setBounds  (colW * 4, y, colW,         rowH);
-    insertStC.setBounds (colW * 5, y, colW,         rowH);
-    insertLenC.setBounds(colW * 6, y, colW,         rowH);
-    insertModeC.setBounds(colW * 7, y + rowH - modeH, w - colW * 7, modeH);
+    stepsC.setBounds    (0,           y,      eW,      rowH);
+    hitsC.setBounds     (eW,          y,      eW,      rowH);
+    rotC.setBounds      (eW * 2,      y,      eW,      rowH);
+    prePadC.setBounds   (padX + mP,   y + mP, pW,      rowH - mP * 2);
+    postPadC.setBounds  (padX + pW,   y + mP, pW - mP, rowH - mP * 2);
+    insertStC.setBounds (insX + mP,   y + mP, pW,      knobH - mP);
+    insertLenC.setBounds(insX + pW,   y + mP, pW - mP, knobH - mP);
+    insertModeC.setBounds(switchX,    y + knobH + 2, switchW, kSwitchH);
+}
+
+void EuclideanPanel::setRhythmColour(juce::Colour c)
+{
+    rhythmColour = c;
+    repaint();
 }
 
 void EuclideanPanel::paint(juce::Graphics& g)
 {
     using Id = MuClidLookAndFeel::ColourIds;
 
-    const int rowH = juce::jmin(kMaxRowH, (getHeight() - kLogicH) / 3);
+    const int w    = getWidth();
+    const int h    = getHeight();
+    const int rowH = (h - kLogicH) / 3;
+
+    // Row-label letters
     g.setFont(juce::Font(8.0f));
     g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
     g.drawText("A", 0, 0,                    10, rowH, juce::Justification::centredTop, false);
     g.drawText("B", 0, rowH + kLogicH,       10, rowH, juce::Justification::centredTop, false);
     g.drawText("C", 0, 2 * rowH + kLogicH,   10, rowH, juce::Justification::centredTop, false);
+
+    if (rhythmColour == juce::Colours::transparentBlack)
+        return;
+
+    const juce::Colour minorCol = rhythmColour.withAlpha(0.5f);
+    g.setColour(minorCol);
+
+    const int colW = w / 7;
+    const int eW   = (int)(colW * 0.9f);
+    const int pW   = (w - eW * 3) / 4;
+    const int padX = eW * 3;
+    const int insX = padX + pW * 2;
+
+    // Minor panel outlines — Pre & Post Pad and Insert Pad per row
+    const int rowOffsets[3] = { 0, rowH + kLogicH, 2 * rowH + kLogicH };
+    for (int rowY : rowOffsets)
+    {
+        g.drawRoundedRectangle((float)padX, (float)rowY, (float)(pW * 2),   (float)rowH, 4.0f, 1.0f);
+        g.drawRoundedRectangle((float)insX, (float)rowY, (float)(w - insX), (float)rowH, 4.0f, 1.0f);
+    }
+
+    // Minor panel outline — Logic bar
+    g.drawRoundedRectangle(0.0f, (float)rowH, (float)w, (float)kLogicH, 4.0f, 1.0f);
 }

@@ -31,7 +31,7 @@ public:
         {
             auto* data = block.getChannelPointer(ch);
             for (size_t i = 0; i < block.getNumSamples(); ++i)
-                data[i] = fold(data[i] * driveGain, numFolds) * outGain;
+                data[i] = fold(data[i] * driveGain, numFolds) / driveGain * outGain;
         }
 
         toneFilter.process(juce::dsp::ProcessContextReplacing<float>(block));
@@ -39,7 +39,7 @@ public:
 
     void setParam(const juce::String& id, float value) override
     {
-        if      (id == "drive")  drive    = value;
+        if      (id == "drive")  drive    = value / 100.0f;
         else if (id == "folds")  folds    = value;
         else if (id == "output") outputDb = value;
         else if (id == "tone")   { toneCutoff = value; updateToneFilter(); }

@@ -138,16 +138,31 @@ void NudgeInput::showEditor()
     addAndMakeVisible(editor);
     editor->grabKeyboardFocus();
 
-    editor->onReturnKey = [this, editor]
+    // Shared flag prevents double-deletion when onReturnKey triggers onFocusLost synchronously.
+    // callAsync defers delete until the callback stack has fully unwound.
+    auto dismissed = std::make_shared<bool>(false);
+
+    editor->onReturnKey = [this, editor, dismissed]
     {
+        if (*dismissed) return;
+        *dismissed = true;
         int v = editor->getText().getIntValue();
         removeChildComponent(editor);
-        delete editor;
+        juce::MessageManager::callAsync([editor] { delete editor; });
         setValue(v, true);
     };
-    editor->onFocusLost = [this, editor]
+    editor->onFocusLost = [this, editor, dismissed]
     {
+        if (*dismissed) return;
+        *dismissed = true;
         removeChildComponent(editor);
-        delete editor;
+        juce::MessageManager::callAsync([editor] { delete editor; });
+    };
+    editor->onEscapeKey = [this, editor, dismissed]
+    {
+        if (*dismissed) return;
+        *dismissed = true;
+        removeChildComponent(editor);
+        juce::MessageManager::callAsync([editor] { delete editor; });
     };
 }

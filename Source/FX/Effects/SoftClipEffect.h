@@ -30,7 +30,7 @@ public:
         {
             auto* data = block.getChannelPointer(ch);
             for (size_t i = 0; i < block.getNumSamples(); ++i)
-                data[i] = std::tanh(data[i] * driveGain) * outGain;
+                data[i] = std::tanh(data[i] * driveGain) / driveGain * outGain;
         }
 
         toneFilter.process(juce::dsp::ProcessContextReplacing<float>(block));
@@ -38,7 +38,7 @@ public:
 
     void setParam(const juce::String& id, float value) override
     {
-        if      (id == "drive")  drive     = value;
+        if      (id == "drive")  drive     = value / 100.0f;
         else if (id == "output") outputDb  = value;
         else if (id == "tone")   { toneCutoff = value; updateToneFilter(); }
     }

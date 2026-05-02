@@ -10,6 +10,8 @@ public:
     explicit TransportBar(PluginProcessor& proc);
     ~TransportBar() override;
 
+    std::function<void()> onMixerToggle;
+
     void paint(juce::Graphics& g) override;
     void resized() override;
 
@@ -18,6 +20,7 @@ private:
     const bool isStandalone;
 
     juce::TextButton playBtn;
+    juce::TextButton mixerBtn { "Mixer" };
     NudgeInput       bpmInput { "BPM", 20, 300, 120 };
 
     void timerCallback() override;

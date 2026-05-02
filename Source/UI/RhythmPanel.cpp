@@ -32,6 +32,7 @@ void RhythmPanel::setRhythm(int index)
     if (index >= 0 && index < proc.getNumRhythms())
     {
         euclidPanel.setRhythm(&proc.getRhythm(index));
+        euclidPanel.setRhythmColour(currentColour());
         modulatorPanel.setRhythm(&proc.getRhythm(index));
         refreshCircle();
     }
@@ -74,6 +75,7 @@ void RhythmPanel::filesDropped(const juce::StringArray& files, int, int)
         juce::File file(f);
         if (file.existsAsFile() && currentRhythmIndex >= 0)
         {
+            loadedSampleNames[currentRhythmIndex] = file.getFileNameWithoutExtension();
             proc.loadSampleForRhythm(currentRhythmIndex, file);
             repaint();
             return;
@@ -83,10 +85,12 @@ void RhythmPanel::filesDropped(const juce::StringArray& files, int, int)
 
 void RhythmPanel::loadSample()
 {
+    const juce::File startDir = lastBrowseDir.isDirectory()
+                                    ? lastBrowseDir
+                                    : juce::File::getSpecialLocation(juce::File::userMusicDirectory);
+
     fileChooser = std::make_unique<juce::FileChooser>(
-        "Load Sample",
-        juce::File::getSpecialLocation(juce::File::userMusicDirectory),
-        "*.wav;*.aiff;*.aif;*.mp3;*.flac");
+        "Load Sample", startDir, "*.wav;*.aiff;*.aif;*.mp3;*.flac");
 
     fileChooser->launchAsync(
         juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
@@ -94,7 +98,12 @@ void RhythmPanel::loadSample()
         {
             auto result = fc.getResult();
             if (result.existsAsFile() && currentRhythmIndex >= 0)
+            {
+                lastBrowseDir = result.getParentDirectory();
+                loadedSampleNames[currentRhythmIndex] = result.getFileNameWithoutExtension();
                 proc.loadSampleForRhythm(currentRhythmIndex, result);
+                repaint();
+            }
         });
 }
 
@@ -137,41 +146,44 @@ void RhythmPanel::paint(juce::Graphics& g)
                    juce::Justification::centredLeft, true);
     }
 
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawLine(0.0f, (float)kHeaderH, (float)w, (float)kHeaderH, 0.5f);
+    // Sample bar — content inset from panel outline
+    {
+        const auto inner = sampleRect.reduced(3);
+        g.setColour(MuClidLookAndFeel::colour(Id::sampleBarBackground));
+        g.fillRect(inner);
 
-    // Sample bar
-    const int sampleY = kHeaderH;
-    g.setColour(MuClidLookAndFeel::colour(Id::sampleBarBackground));
-    g.fillRect(0, sampleY, w, kSampleBarH);
-    g.setColour(MuClidLookAndFeel::colour(Id::sampleBarNoSample));
-    g.setFont(juce::Font(10.0f).italicised());
-    g.drawText("drop sample here or click to browse",
-               8, sampleY, w - 32, kSampleBarH,
-               juce::Justification::centredLeft, true);
-    g.setColour(MuClidLookAndFeel::colour(Id::labelText));
-    g.setFont(juce::Font(11.0f));
-    g.drawText("...", w - 28, sampleY, 24, kSampleBarH,
-               juce::Justification::centred, false);
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawLine(0.0f, (float)(sampleY + kSampleBarH),
-               (float)w, (float)(sampleY + kSampleBarH), 0.5f);
+        auto it = loadedSampleNames.find(currentRhythmIndex);
+        if (it != loadedSampleNames.end())
+        {
+            g.setColour(MuClidLookAndFeel::colour(Id::labelText));
+            g.setFont(juce::Font(10.0f));
+            g.drawText(it->second,
+                       inner.getX() + 5, inner.getY(), inner.getWidth() - 28, inner.getHeight(),
+                       juce::Justification::centredLeft, true);
+        }
+        else
+        {
+            g.setColour(MuClidLookAndFeel::colour(Id::sampleBarNoSample));
+            g.setFont(juce::Font(10.0f).italicised());
+            g.drawText("drop sample here or click to browse",
+                       inner.getX() + 5, inner.getY(), inner.getWidth() - 28, inner.getHeight(),
+                       juce::Justification::centredLeft, true);
+        }
 
-    // Voice section separator
-    const int topY   = kHeaderH + kSampleBarH;
-    const int voiceY = topY + topH;
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawLine(0.0f, (float)voiceY, (float)w, (float)voiceY, 0.5f);
+        g.setColour(MuClidLookAndFeel::colour(Id::labelText));
+        g.setFont(juce::Font(11.0f));
+        g.drawText("...", inner.getRight() - 24, inner.getY(), 24, inner.getHeight(),
+                   juce::Justification::centred, false);
+    }
 
-    // Modulator panel separator
-    const int modY = voiceY + kVoiceH;
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawLine(0.0f, (float)modY, (float)w, (float)modY, 0.5f);
-
-    // Circle / EuclideanPanel divider
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawLine((float)circleW, (float)topY,
-               (float)circleW, (float)(topY + topH), 0.5f);
+    // Major panel outlines — 2px in rhythm colour, rounded corners.
+    // Each rect is inset by 1px so adjacent panels have a consistent 2px gap.
+    g.setColour(col);
+    g.drawRoundedRectangle(sampleRect.reduced(2).toFloat(), 6.0f, 2.0f);
+    g.drawRoundedRectangle(circleRect.reduced(2).toFloat(), 6.0f, 2.0f);
+    g.drawRoundedRectangle(euclidRect.reduced(2).toFloat(), 6.0f, 2.0f);
+    g.drawRoundedRectangle(voiceRect.reduced(2).toFloat(),  6.0f, 2.0f);
+    g.drawRoundedRectangle(modRect.reduced(2).toFloat(),    6.0f, 2.0f);
 }
 
 void RhythmPanel::resized()
@@ -188,8 +200,14 @@ void RhythmPanel::resized()
     const int topY = kHeaderH + kSampleBarH;
     const int modY = topY + topH + kVoiceH;
 
-    circle.setBounds(0, topY, circleW, topH);
-    euclidPanel.setBounds(circleW, topY, w - circleW, topH);
-    voiceSection.setBounds(0, topY + topH, w, kVoiceH);
-    modulatorPanel.setBounds(0, modY, w, juce::jmax(0, h - modY));
+    sampleRect = { 0,       kHeaderH,    w,           kSampleBarH             };
+    circleRect = { 0,       topY,        circleW,     topH                    };
+    euclidRect = { circleW, topY,        w - circleW, topH                    };
+    voiceRect  = { 0,       topY + topH, w,           kVoiceH                 };
+    modRect    = { 0,       modY,        w,           juce::jmax(0, h - modY) };
+
+    circle.setBounds        (circleRect.reduced(kPanelPad + 1));
+    euclidPanel.setBounds   (euclidRect.reduced(kPanelPad + 1));
+    voiceSection.setBounds  (voiceRect.reduced(kPanelPad + 1));
+    modulatorPanel.setBounds(modRect.reduced(kPanelPad + 1));
 }

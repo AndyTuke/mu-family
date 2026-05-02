@@ -18,11 +18,15 @@ public:
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
     std::function<void()> onPatternChanged;
 
+    void setRhythmColour(juce::Colour c);
+
     void resized() override;
     void paint(juce::Graphics&) override;
 
 private:
     using Id = MuClidLookAndFeel::ColourIds;
+
+    juce::Colour rhythmColour { juce::Colours::transparentBlack };
 
     // ── Euclid A ─────────────────────────────────────────────────────────────
     KnobWithLabel stepsA      { "Steps",         Id::knobEuclidean };
@@ -61,8 +65,8 @@ private:
 
     Rhythm* rhythm = nullptr;
 
-    static constexpr int kLogicH  = 24;
-    static constexpr int kMaxRowH = 90;
+    static constexpr int kLogicH   = 24;
+    static constexpr int kSwitchH  = 14;
 
     void wireCallbacks();
     void loadFromRhythm();

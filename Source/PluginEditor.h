@@ -5,6 +5,7 @@
 #include "UI/TransportBar.h"
 #include "UI/RhythmSidebar.h"
 #include "UI/RhythmPanel.h"
+#include "UI/MixerOverlay.h"
 #include "UI/Components/StatusBar.h"
 #include "UI/Components/MuClidLookAndFeel.h"
 
@@ -25,7 +26,11 @@ private:
     TransportBar  transportBar;
     RhythmSidebar sidebar;
     RhythmPanel   rhythmPanel;
+    MixerOverlay  mixerOverlay;
     StatusBar     statusBar;
+
+    bool mixerVisible = false;
+    void showMixer(bool show);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };

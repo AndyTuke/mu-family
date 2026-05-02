@@ -38,7 +38,7 @@ public:
 
     void setParam(const juce::String& id, float value) override
     {
-        if      (id == "drive")     drive       = value;
+        if      (id == "drive")     drive       = value / 100.0f;
         else if (id == "threshold") thresholdDb = value;
         else if (id == "output")    outputDb    = value;
         else if (id == "tone")      { toneCutoff = value; updateToneFilter(); }
@@ -54,7 +54,7 @@ private:
 
     float drive       = 0.5f;
     float thresholdDb = -6.0f;
-    float outputDb    = 0.0f;
+    float outputDb    = -12.0f;
     float toneCutoff  = 8000.0f;
     double sr         = 44100.0;
 

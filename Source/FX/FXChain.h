@@ -15,6 +15,12 @@ public:
     void prepare(double sampleRate, int blockSize);
     void process(juce::AudioBuffer<float>&);
 
+    // Per-send-bus processing for the mixer.  Each enabled bus is processed wet-only.
+    void processSends(juce::AudioBuffer<float>& effectSend,
+                      juce::AudioBuffer<float>& delaySend,
+                      juce::AudioBuffer<float>& reverbSend,
+                      bool doEffect, bool doDelay, bool doReverb);
+
     void setHostBpm(double bpm);
 
     EffectSlot& effectSlot() { return effect; }

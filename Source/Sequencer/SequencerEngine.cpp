@@ -37,7 +37,8 @@ Rhythm& SequencerEngine::getRhythm(int index)
 void SequencerEngine::updatePattern(int index)
 {
     cachedPatterns[index] = rhythms[index].getCombinedPattern();
-    lastStepIndex[index]  = -1; // force re-evaluation next block
+    patternUpdated[index] = true;
+    // lastStepIndex preserved — processBlock will absorb the current step without firing
 }
 
 //==============================================================================
@@ -58,7 +59,12 @@ int SequencerEngine::processBlock(double beatPosition)
         auto globalStep = static_cast<int>(beatPosition / StepLengthBeats);
         int stepIndex   = globalStep % patLen;
 
-        if (stepIndex != lastStepIndex[r])
+        if (patternUpdated[r])
+        {
+            patternUpdated[r] = false;
+            lastStepIndex[r]  = stepIndex;  // absorb current step — don't fire
+        }
+        else if (stepIndex != lastStepIndex[r])
         {
             lastStepIndex[r] = stepIndex;
             if (pattern[stepIndex])

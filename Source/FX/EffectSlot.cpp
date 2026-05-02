@@ -87,6 +87,15 @@ void EffectSlot::setSend(float amount)
     sendAmount = juce::jlimit(0.0f, 1.0f, amount);
 }
 
+void EffectSlot::processReturn(juce::AudioBuffer<float>& buffer)
+{
+    if (!enabled || !algorithm) return;
+    oversampler->process(buffer, [this](juce::dsp::AudioBlock<float>& block)
+    {
+        algorithm->processInner(block);
+    });
+}
+
 std::unique_ptr<EffectAlgorithmBase> EffectSlot::makeAlgorithm(int index)
 {
     switch (index)

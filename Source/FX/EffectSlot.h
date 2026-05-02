@@ -38,6 +38,9 @@ public:
     void setParam(const juce::String& id, float value);
     void setSend(float sendAmount);  // 0.0 = dry, 1.0 = full wet
 
+    // Send-bus processing: applies algorithm with no dry/wet blend (wet-only output).
+    void processReturn(juce::AudioBuffer<float>&);
+
     bool isEnabled() const  { return enabled; }
     void setEnabled(bool e) { enabled = e; }
 

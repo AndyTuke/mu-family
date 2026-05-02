@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Build workflow
+
+After every build, read `ToDo.md` and action it:
+- **Bugs** — fix every listed bug immediately, without asking.
+- **Features** — for each item, ask the user whether to include it before touching any code.
+
 ## Design documents
 
 The full design is split into focused sub-documents. **Read only the relevant one** rather than the monolithic design.md.
@@ -11,7 +17,8 @@ The full design is split into focused sub-documents. **Read only the relevant on
 | [docs/design-sequencer.md](docs/design-sequencer.md) | Euclidean params, DAW sync, control sequence params, modulation signal flow |
 | [docs/design-voice.md](docs/design-voice.md) | Voice chain, ADSR, filter, interpolation quality, sample handling, SoundTouch |
 | [docs/design-fx.md](docs/design-fx.md) | FX algorithms, delay, reverb, intra-FX routing, FXSlotBase interface |
-| [docs/design-ui.md](docs/design-ui.md) | All UI panel layouts, control behaviours, RhythmCircle, EuclideanPanel, Mixer, Transport |
+| [docs/design-ui-family.md](docs/design-ui-family.md) | **Shared design system** — colour tokens, typography, control sizes, interaction patterns, shared module plan. Read this before any UI work. |
+| [docs/design-ui.md](docs/design-ui.md) | μ-Clid specific panel layouts — RhythmCircle, EuclideanPanel, Mixer, Transport. Defers to design-ui-family.md for colours/sizes. |
 | [docs/design-presets.md](docs/design-presets.md) | APVTS wiring plan, preset storage, save/restore, current pre-APVTS state |
 | [docs/design-future.md](docs/design-future.md) | Unscheduled future ideas — read to avoid closing off options during current stages |
 | [docs/design.md](docs/design.md) | Full original spec — only read if the sub-docs don't cover it |
@@ -58,38 +65,7 @@ Artefacts land in `build/mu-clid_artefacts/Debug/` or `.../Release/`.
 
 ## Source layout (actual, as built)
 
-```
-Source/
-├── PluginProcessor.h/.cpp       — audio processor, owns sequencer + voice engines + fxChain
-├── PluginEditor.h/.cpp          — root editor: sidebar + rhythmPanel + statusBar
-├── Sequencer/                   — EuclideanGenerator, HitGenerator, ControlSequence, Rhythm, SequencerEngine
-├── Audio/                       — SamplePlayer, VoiceEngine (TimeStretcherBase stub)
-├── Modulation/                  — ModulationMatrix, ModulationAssignment
-├── FX/
-│   ├── FXSlotBase.h             — abstract interface for all FX slots
-│   ├── FXAlgorithmDef.h         — algorithm metadata + FXAlgorithmRegistry
-│   ├── OversampledProcessor.h   — RAII wrapper around juce::dsp::Oversampling
-│   ├── EffectSlot.h/.cpp        — insert FX slot: hosts one of 8 algorithms, insert blending
-│   ├── DelaySlot.h/.cpp         — insert delay: sync/free, feedback, spread, dirt
-│   ├── ReverbSlot.h/.cpp        — send reverb: 4 algorithms, pre-delay, pure send
-│   ├── FXChain.h/.cpp           — sequences Effect→Delay→Reverb, intra-FX routing API
-│   └── Effects/                 — 8 header-only algorithm classes (all extend EffectAlgorithmBase)
-│       SoftClipEffect, HardClipEffect, FoldbackEffect, BitcrushEffect,
-│       LadderFilterEffect, ChorusEffect, PhaserEffect, CombFilterEffect
-└── UI/
-    ├── Components/              — MuClidLookAndFeel, KnobWithLabel, SegmentControl, NudgeInput,
-    │                              TimeSelector, DropdownSelect, StepEditor, LFOEditor, AddButton, StatusBar
-    ├── FXRow.h/.cpp             — one FX row for mixer overlay (on/off, algo dropdown, param knobs)
-    ├── RhythmCircle.h/.cpp      — concentric ring display, 30Hz timer, pulse animation
-    ├── SidebarItem.h/.cpp       — one sidebar entry with mini RhythmCircle
-    ├── RhythmSidebar.h/.cpp     — scrollable left sidebar (82px)
-    ├── EuclideanPanel.h/.cpp    — Steps/Hits/Rot/Pre/Post knobs for A and B, logic selector
-    ├── VoiceSection.h/.cpp      — amp ADSR, filter, filter ADSR, output mode (compact row)
-    ├── RhythmPanel.h/.cpp       — header + sample bar + circle + euclidean + voice + modulator
-    ├── ModulatorEditor.h/.cpp   — one modulator: mode/input header, LFO/step editor, timing, assignment list
-    ├── ModMatrixPanel.h/.cpp    — all assignments overview table (matrix tab)
-    └── ModulatorPanel.h/.cpp    — tab bar (Mod A–H + Matrix) + content area
-```
+`Source/` top-level: `PluginProcessor`, `PluginEditor`, `Sequencer/`, `Audio/`, `Modulation/`, `FX/` (slots + `Effects/`), `UI/` (panels + `Components/`). Use Glob/Explore to navigate — the tree is derivable from the filesystem.
 
 ## Critical architectural rules
 
@@ -127,27 +103,6 @@ All ring radii are computed proportionally from `min(width, height) / 2 - margin
 
 ### juce::Font deprecation warnings
 All `juce::Font(float)` constructor calls produce C4996 warnings in this JUCE version. These are acceptable deprecation-only warnings — do not fix them during feature stages. Defer to Stage 11 polish (`FontOptions`-based constructor is the replacement).
-
-## Key interfaces
-
-```cpp
-class FXSlotBase {
-    virtual void prepare(double sampleRate, int blockSize) = 0;
-    virtual void process(juce::AudioBuffer<float>&) = 0;
-    virtual juce::String getName() = 0;
-    virtual juce::String getCategory() = 0;
-    virtual juce::Component* createEditor() = 0;
-    virtual void getStateInformation(juce::MemoryBlock&) = 0;
-    virtual void setStateInformation(const void*, int) = 0;
-};
-
-class TimeStretcherBase {
-    virtual void prepare(double sampleRate, int blockSize) = 0;
-    virtual void setTimeRatio(float ratio) = 0;
-    virtual void setPitchRatio(float ratio) = 0;
-    virtual void process(juce::AudioBuffer<float>&) = 0;
-};
-```
 
 ## Third-party libraries
 

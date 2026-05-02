@@ -127,6 +127,25 @@ void FXRow::rebuildKnobs(int algorithmIndex)
         knob->setValue(param.defaultVal, juce::dontSendNotification);
         knob->getSlider().setName(param.id);
 
+        if (param.units == "Hz")
+        {
+            knob->getSlider().textFromValueFunction = [](double v) -> juce::String {
+                if (v < 1000.0)  return juce::String((int)v) + " Hz";
+                if (v < 10000.0) return juce::String(v / 1000.0, 2) + " kHz";
+                return juce::String(v / 1000.0, 1) + " kHz";
+            };
+            knob->getSlider().valueFromTextFunction = [](const juce::String& t) -> double {
+                const juce::String s = t.trim().toLowerCase();
+                if (s.containsIgnoreCase("khz"))
+                    return s.getDoubleValue() * 1000.0;
+                return s.getDoubleValue();
+            };
+        }
+        else
+        {
+            knob->getSlider().setNumDecimalPlacesToDisplay(0);
+        }
+
         knob->onStatusUpdate = [this](const juce::String& n, const juce::String& v)
         {
             if (onStatusUpdate) onStatusUpdate(n, v);

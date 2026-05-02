@@ -78,10 +78,10 @@ public:
     void setParam(const juce::String& id, float value) override
     {
         if      (id == "rate")   rate   = value;
-        else if (id == "depth")  depth  = value;
+        else if (id == "depth")  depth  = value / 100.0f;
         else if (id == "voices") voices = value;
-        else if (id == "spread") spread = value;
-        else if (id == "mix")    mix    = value;
+        else if (id == "spread") spread = value / 100.0f;
+        else if (id == "mix")    mix    = value / 100.0f;
     }
 
 private:

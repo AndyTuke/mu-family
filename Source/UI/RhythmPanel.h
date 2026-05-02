@@ -1,5 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <map>
 #include "RhythmCircle.h"
 #include "EuclideanPanel.h"
 #include "VoiceSection.h"
@@ -38,15 +39,19 @@ private:
     ModulatorPanel  modulatorPanel;
 
     std::unique_ptr<juce::FileChooser> fileChooser;
+    std::map<int, juce::String> loadedSampleNames;
+    juce::File lastBrowseDir;
 
     // Fixed chrome heights
     static constexpr int kHeaderH    = 28;
     static constexpr int kSampleBarH = 22;
     static constexpr int kVoiceH     = 80;
+    static constexpr int kPanelPad   = 6;
 
-    // Computed proportionally in resized(), used in both resized() and paint()
+    // Computed in resized(), used in both resized() and paint()
     int circleW = 300;
     int topH    = 300;
+    juce::Rectangle<int> sampleRect, circleRect, euclidRect, voiceRect, modRect;
 
     void loadSample();
     void refreshCircle();

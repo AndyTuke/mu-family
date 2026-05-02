@@ -1,0 +1,64 @@
+#pragma once
+#include <juce_audio_basics/juce_audio_basics.h>
+#include <array>
+
+class VoiceEngine;
+class FXChain;
+
+// Per-channel gain, pan, mute, solo, FX sends, and VU metering.
+// processBlock replaces the raw voice-accumulation loop in PluginProcessor.
+class MixerEngine
+{
+public:
+    static constexpr int MaxChannels = 8;
+
+    struct ChannelState
+    {
+        float level      = 0.75f;   // 0–1 linear fader
+        float pan        = 0.0f;    // -1 (L) … +1 (R)
+        float sendEffect = 0.0f;
+        float sendDelay  = 0.0f;
+        float sendReverb = 0.0f;
+        bool  mute       = false;
+        bool  solo       = false;
+    };
+
+    struct ReturnState
+    {
+        float level = 0.75f;
+        float pan   = 0.0f;
+        bool  mute  = false;
+        bool  solo  = false;
+    };
+
+    std::array<ChannelState, MaxChannels> channels;
+    std::array<ReturnState,  3>           returns;   // 0=effect, 1=delay, 2=reverb
+    float masterLevel = 0.75f;
+    float masterPan   = 0.0f;
+
+    // Peak levels written from the audio thread, read by the UI at 30 Hz.
+    juce::Atomic<float> channelPeaks[MaxChannels];
+    juce::Atomic<float> returnPeaks[3];
+    juce::Atomic<float> masterPeak;
+
+    MixerEngine();
+
+    void prepare(double sampleRate, int blockSize);
+
+    // Clears output, accumulates per-channel audio with mixing applied, then runs fxChain.
+    void processBlock(juce::AudioBuffer<float>&             output,
+                      int                                   numActiveRhythms,
+                      std::array<VoiceEngine, MaxChannels>& voices,
+                      FXChain&                              fxChain,
+                      int                                   numSamples);
+
+private:
+    juce::AudioBuffer<float> channelBufs[MaxChannels];
+    juce::AudioBuffer<float> effectSendBuf, delaySendBuf, reverbSendBuf;
+
+    bool         hasSolo(int numActive) const;
+    static float peakOf(const juce::AudioBuffer<float>& buf, int numSamples);
+    static bool  hasSignal(const juce::AudioBuffer<float>& buf, int numSamples);
+    static void  applyPanGain(juce::AudioBuffer<float>& buf,
+                              float level, float pan, int numSamples);
+};

@@ -29,6 +29,9 @@ public:
     void setEnabled(bool e)    { enabled = e; }
     void setLevel(float v)     { level  = juce::jlimit(0.0f, 1.0f, v); }
 
+    // Send-bus processing: overwrites buffer with wet-only reverb output.
+    void processReturn(juce::AudioBuffer<float>&);
+
     void setAlgorithm(int index);
     int  getAlgorithmIndex() const { return algorithmIndex; }
 

@@ -62,9 +62,9 @@ public:
     void setParam(const juce::String& id, float value) override
     {
         if      (id == "freq")     { freq        = value; updateDelaySamples(); }
-        else if (id == "feedback") feedbackAmt   = value;
+        else if (id == "feedback") feedbackAmt   = value / 100.0f;
         else if (id == "output")   outputDb      = value;
-        else if (id == "mix")      mix           = value;
+        else if (id == "mix")      mix           = value / 100.0f;
     }
 
 private:

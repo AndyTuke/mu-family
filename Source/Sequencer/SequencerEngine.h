@@ -30,5 +30,6 @@ private:
     std::array<Rhythm,            MaxRhythms> rhythms;
     std::array<std::vector<bool>, MaxRhythms> cachedPatterns;
     std::array<int,               MaxRhythms> lastStepIndex;
+    std::array<bool,              MaxRhythms> patternUpdated{};
     int numRhythms = 0;
 };

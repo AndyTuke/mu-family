@@ -27,8 +27,8 @@ public:
     void setParam(const juce::String& id, float value) override
     {
         if      (id == "cutoff")    { cutoff    = value; filter.setCutoffFrequencyHz(cutoff); }
-        else if (id == "resonance") { resonance = value; filter.setResonance(resonance); }
-        else if (id == "drive")     { drive     = value; filter.setDrive(1.0f + drive * 10.0f); }
+        else if (id == "resonance") { resonance = value / 100.0f; filter.setResonance(resonance); }
+        else if (id == "drive")     { drive     = value / 100.0f; filter.setDrive(1.0f + drive * 3.0f); }
         else if (id == "mode")
         {
             mode = static_cast<int>(value);
@@ -48,7 +48,7 @@ private:
     {
         filter.setCutoffFrequencyHz(cutoff);
         filter.setResonance(resonance);
-        filter.setDrive(1.0f + drive * 10.0f);
+        filter.setDrive(1.0f + drive * 3.0f);
         filter.setMode(juce::dsp::LadderFilterMode::LPF24);
     }
 
@@ -56,7 +56,7 @@ private:
 
     float cutoff    = 2000.0f;
     float resonance = 0.3f;
-    float drive     = 0.0f;
+    float drive     = 0.0f;  // 0 = no drive (setDrive receives 1.0 = clean)
     int   mode      = 0;
 
     juce::dsp::LadderFilter<float> filter;

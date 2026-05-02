@@ -15,6 +15,10 @@ TransportBar::TransportBar(PluginProcessor& p)
     playBtn.setEnabled(isStandalone);
     addAndMakeVisible(playBtn);
 
+    mixerBtn.setClickingTogglesState(true);
+    mixerBtn.onClick = [this] { if (onMixerToggle) onMixerToggle(); };
+    addAndMakeVisible(mixerBtn);
+
     if (isStandalone)
     {
         bpmInput.setValue((int)proc.getInternalBpm());
@@ -76,13 +80,17 @@ void TransportBar::resized()
     const int bpmW = 120;
     const int gap  = 8;
 
-    // Centre the button (and BPM input if standalone) in the bar
-    const int groupW = isStandalone ? (btnW + gap + bpmW) : btnW;
-    const int startX = (getWidth() - groupW) / 2;
-    const int btnY   = (h - btnH) / 2;
+    // Centre the play button (and BPM input if standalone) in the bar.
+    // Mixer button is right-aligned.
+    const int groupW  = isStandalone ? (btnW + gap + bpmW) : btnW;
+    const int startX  = (getWidth() - groupW) / 2;
+    const int btnY    = (h - btnH) / 2;
 
     playBtn.setBounds(startX, btnY, btnW, btnH);
 
     if (isStandalone)
         bpmInput.setBounds(startX + btnW + gap, (h - 28) / 2, bpmW, 28);
+
+    const int mixerW = 52;
+    mixerBtn.setBounds(getWidth() - mixerW - 6, btnY, mixerW, btnH);
 }

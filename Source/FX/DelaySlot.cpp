@@ -79,6 +79,51 @@ void DelaySlot::process(juce::AudioBuffer<float>& buffer)
     }
 }
 
+void DelaySlot::processReturn(juce::AudioBuffer<float>& buffer)
+{
+    if (!enabled) return;
+
+    const int numCh      = buffer.getNumChannels();
+    const int numSamples = buffer.getNumSamples();
+
+    auto* outL = (numCh > 0) ? buffer.getWritePointer(0) : nullptr;
+    auto* outR = (numCh > 1) ? buffer.getWritePointer(1) : outL;
+
+    const int delL = juce::jlimit(1, MaxDelaySamples - 1, static_cast<int>(targetDelayL));
+    const int delR = juce::jlimit(1, MaxDelaySamples - 1, static_cast<int>(targetDelayR));
+
+    for (int i = 0; i < numSamples; ++i)
+    {
+        const float inL = (outL != nullptr) ? outL[i] : 0.0f;
+        const float inR = (outR != nullptr) ? outR[i] : 0.0f;
+
+        const int readPL = (writePosL - delL + MaxDelaySamples) % MaxDelaySamples;
+        const int readPR = (writePosR - delR + MaxDelaySamples) % MaxDelaySamples;
+
+        const float delayedL = bufL[readPL];
+        const float delayedR = bufR[readPR];
+
+        feedL = processDirt(delayedL * feedback);
+        feedR = processDirt(delayedR * feedback);
+
+        bufL[writePosL] = inL + feedL;
+        bufR[writePosR] = inR + feedR;
+
+        writePosL = (writePosL + 1) % MaxDelaySamples;
+        writePosR = (writePosR + 1) % MaxDelaySamples;
+
+        if (outL != nullptr) outL[i] = delayedL;
+        if (outR != nullptr) outR[i] = delayedR;
+    }
+}
+
+void DelaySlot::setTimeCount(int count)
+{
+    syncCount = juce::jmax(1, count);
+    if (timeMode == TimeMode::Sync)
+        updateDelayFromMode();
+}
+
 void DelaySlot::setDelayMs(float ms)
 {
     delayMs = juce::jlimit(1.0f, 4000.0f, ms);
@@ -110,6 +155,7 @@ void DelaySlot::updateDelayFromMode()
         double noteMs = beatMs * 4.0 / syncDenominator;
         if (syncDotted)   noteMs *= 1.5;
         if (syncTriplet)  noteMs *= 2.0 / 3.0;
+        noteMs *= syncCount;
         ms = static_cast<float>(noteMs);
     }
 

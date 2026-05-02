@@ -2,17 +2,25 @@
 
 PluginEditor::PluginEditor(PluginProcessor& p)
     : AudioProcessorEditor(&p), processorRef(p),
-      transportBar(p), sidebar(p), rhythmPanel(p)
+      transportBar(p), sidebar(p), rhythmPanel(p),
+      mixerOverlay(p, p.mixerEngine)
 {
     setLookAndFeel(&lookAndFeel);
 
     addAndMakeVisible(transportBar);
     addAndMakeVisible(sidebar);
     addAndMakeVisible(rhythmPanel);
+    addChildComponent(mixerOverlay);   // hidden until mixer button pressed
     addAndMakeVisible(statusBar);
+
+    transportBar.onMixerToggle = [this]
+    {
+        showMixer(!mixerVisible);
+    };
 
     sidebar.onRhythmSelected = [this](int idx)
     {
+        if (mixerVisible) showMixer(false);
         rhythmPanel.setRhythm(idx);
     };
 
@@ -58,6 +66,18 @@ PluginEditor::~PluginEditor()
     setLookAndFeel(nullptr);
 }
 
+void PluginEditor::showMixer(bool show)
+{
+    mixerVisible = show;
+    rhythmPanel .setVisible(!show);
+    mixerOverlay.setVisible( show);
+    if (show)
+    {
+        mixerOverlay.refresh();
+        mixerOverlay.setBounds(rhythmPanel.getBounds());
+    }
+}
+
 void PluginEditor::paint(juce::Graphics& g)
 {
     g.fillAll(MuClidLookAndFeel::colour(MuClidLookAndFeel::windowBackground));
@@ -71,9 +91,12 @@ void PluginEditor::resized()
     const int transportH = 36;
     const int contentH   = h - transportH - statusH;
 
+    const juce::Rectangle<int> mainArea { RhythmSidebar::kWidth, transportH,
+                                          w - RhythmSidebar::kWidth, contentH };
+
     transportBar.setBounds(0, 0, w, transportH);
     sidebar.setBounds(0, transportH, RhythmSidebar::kWidth, contentH);
-    rhythmPanel.setBounds(RhythmSidebar::kWidth, transportH,
-                          w - RhythmSidebar::kWidth, contentH);
+    rhythmPanel .setBounds(mainArea);
+    mixerOverlay.setBounds(mainArea);
     statusBar.setBounds(0, h - statusH, w, statusH);
 }
