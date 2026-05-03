@@ -59,8 +59,9 @@ Fixed vertical stacking with precise constants:
 kHeaderH    = 28;   // header bar
 kSampleBarH = 22;   // sample file bar
 kCircleW    = 300;  // RhythmCircle width (left of top section)
-kTopH       = 300;  // RhythmCircle + EuclideanPanel height
-kVoiceH     = 80;   // VoiceSection height
+kTopH       = 300;  // RhythmCircle + EuclideanPanel height (proportional in practice)
+kVoiceH     = 144;  // VoiceSection height (expanded in Stage 9.5 to hold Pitch + Filter + Amp)
+kPanelPad   = 6;    // inset applied to each panel region
 // ModulatorPanel: remaining height (h - kHeaderH - kSampleBarH - kTopH - kVoiceH)
 ```
 
@@ -68,8 +69,8 @@ Layout:
 ```
 Header bar        28px  — 4px colour accent strip | colour dot | rhythm name
 Sample bar        22px  — placeholder text or filename. Drag+drop target. "..." browse icon right.
-[RhythmCircle 300px | EuclideanPanel rest]  300px
-VoiceSection      80px
+[RhythmCircle 300px | EuclideanPanel rest]  ~55% of content height (proportional)
+VoiceSection      144px
 ModulatorPanel    rest of height  (implemented Stage 7)
 ```
 
@@ -179,19 +180,47 @@ The existing `knobPadding` ColourId (teal) is superseded by `knobPrePad` and `kn
 
 ### VoiceSection
 
-Single compact horizontal row, 80px tall. Four groups separated by 6px dividers drawn in `paint()`.
+Four-column panel, 144px tall. Three 6px dividers separate the columns. A 14px label row names each column; the remaining height splits into two equal rows (config row + envelope row) with a 4px gap.
 
 ```
-Amp ADSR (4 knobs) | div | Filter (2 knobs) | div | Filter Env (3 knobs) | div | Output Mode (52px toggle)
-knobW = (w - 3*6 - 52 - 6) / 9
+kW  = (w - 3 * divW) / 18   // 18 equal knob-widths across the full panel width
+                              // 5 Pitch | div | 5 Filter | div | 4 Amp | div | 4 Drive
+```
+
+**Column layout:**
+
+```
+PITCH (5 kW)               FILTER (5 kW)                AMP (4 kW)           DRIVE (4 kW)
+────────────────────────   ──────────────────────────   ──────────────────   ──────────────────
+Row 1 (config):            Row 1 (config):              Row 1 (config):      Row 1 (config):
+  Octave | Semi | Fine       Type(1) | Cutoff(2) | Res    Level              Char | Drive | Output | Tone
+Row 2 (envelope):          Row 2 (envelope):            Row 2 (envelope):    Row 2:
+  Atk|Dec|Sus|Rel|Depth      Atk|Dec|Sus|Rel|Depth        Atk|Dec|Sus|Rel     (empty — Drive has no ADSR)
 ```
 
 **All knob labels use full words — no abbreviations.**
 
-1. **Amp envelope** (amber, `knobLevel`): Attack, Decay, Sustain, Release. Ranges: Attack/Decay 0.001–5s, Sustain 0–1, Release 0.001–10s. *(Stage 10: + Reset/Legato toggle)*
-2. **Filter** (teal, `knobPostPad`): Cutoff 20–20000Hz, Resonance 0–1. *(Stage 10: + LP/HP/BP/N type selector)*
-3. **Filter envelope** (teal, `knobPostPad`): Attack 0.001–5s, Decay 0.001–5s, Depth 0–1. *(Stage 10: + Sustain, Release, Legato toggle)*
-4. **Output mode**: Sample/MIDI toggle, 52px wide, centred vertically at `(h-28)/2`. *(Stage 10: + FX send knobs — effect, delay, reverb)*
+**Pitch** (purple, `knobEuclidean`):
+- Config: Octave −4..+4 (step 1), Semitones −12..+12 (step 1), Fine −100..+100 cents (step 0.1)
+- Envelope: Attack 0.001–5s, Decay 0.001–5s, Sustain 0–1, Release 0.001–10s, Depth 0–24 semitones
+
+**Filter** (teal, `knobPostPad`):
+- Config: Type selector (`DropdownSelect`: LP/HP/BP, 1 kW), Cutoff 20–20000Hz (2 kW), Resonance 0–0.99 (2 kW)
+- Envelope: Attack 0.001–5s, Decay 0.001–5s, Sustain 0–1, Release 0.001–10s, Depth 0–48 semitones of cutoff sweep
+
+**Amp** (amber, `knobLevel`):
+- Config: Level 0–2
+- Envelope: Attack 0.001–5s, Decay 0.001–5s, Sustain 0–1, Release 0.001–10s
+
+*(Stage 10: + FX send knobs on Amp config row — Effect, Delay, Reverb)*
+
+**Drive** (`knobInsertPad` pink — same colour family as the insert pad to signal it is a per-voice insert effect):
+- Config row: Character (`DropdownSelect`: Soft/Hard/Fold/Bit), Drive 0–100%, Output −24–0 dB, Tone 20–20kHz
+- No envelope row (Drive has no ADSR). Row 2 is blank — drawn as empty space so the section border still frames correctly.
+- Drive = 0% passes audio through unity regardless of character selection.
+- Character switch is message-thread only (same constraint as `EffectSlot::setAlgorithm`).
+
+**Sample/MIDI mode** was previously in the Amp config row. It has moved to a `DropdownSelect` in the RhythmPanel header bar (right-aligned, 80px wide) so it is visible at all times without occupying voice section space.
 
 ### ModulatorPanel (Stage 7)
 
@@ -201,31 +230,37 @@ Tabs: Mod A – Mod H, Matrix. Inactive tabs dimmed.
 - Header: modulator name, colour dot, smooth/stepped toggle, internal/CC toggle
 - LFO curve editor (smooth) or step bar graph (stepped) — fills central area
 - Vertical playhead line showing current loop position
-- Loop length row: TimeSelector + multiplier NudgeInput + result display
-- Stepped mode: additional step length row + step count display
+- Loop length row: `[Loop label] [DropdownSelect: 1/1/2/1/4/1/8/1/16/1/32 + T/. variants] [NudgeInput multiplier]`
+- Stepped mode: additional step length row with same DropdownSelect layout + step count readout
 - Target list: destination dropdown + bipolar depth bar per assignment
 - Add target button at bottom
 
+Note: `TimeSelector` (the old horizontal button-group widget) is no longer used for modulator timing. All timing rows use `DropdownSelect` with a small identifying label ("Loop" / "Step").
+
 **Matrix tab:** Full table of all active assignments across all modulators. Columns: source (name + dot), destination (param name), depth (bipolar bar + value). Remove button per row. Add assignment button at bottom. Meta-modulation destinations shown with full path.
 
-## Mixer Overlay (Stage 9)
+## Mixer Overlay (Stage 9 / 9.6)
 
-Replaces rhythm panel when mixer button active. Sidebar stays visible. Clicking a sidebar item while mixer is open switches back to rhythm panel.
+Replaces rhythm panel when mixer button active. Sidebar stays visible. Transport "Mixer" button relabels to "Sequencer" when active (fixed width so layout doesn't shift).
 
 **Channel strip layout (top→bottom):**
-- Colour dot (rhythm) or coloured indicator (FX returns)
-- Channel name
-- Send rotaries (rhythm: eff/dly/rev; Effect return: →dly/→rev; Delay return: →rev; Reverb: none)
-- Pan rotary
-- Fader (vertical) + VUMeter side by side, touching with no gap
+- 3px colour bar (rhythm colour for rhythm channels, return colour for FX channels)
+- Channel name (dimmed for inactive slots)
+- Send rotaries (rhythm: Eff/Dly/Rev; Effect return: →Dly/→Rev; Delay return: →Rev; Reverb: none)
+- Pan rotary (no value display)
+- Fader (vertical) + VUMeter side by side — fader start Y is identical across all channel types so all faders align
 - Level readout in dB below fader
-- Mute and Solo buttons side by side
+- Mute and Solo buttons side by side (not on Master)
 
-**Channel order (left→right):** Rhythm channels (matching sidebar order) | divider | Effect return | Delay return | Reverb return | divider | Master (slightly wider, includes Internal/External routing toggle)
+**Always 8 rhythm channels shown.** Inactive slots (no rhythm assigned) display a grey colour bar, name "-", and a translucent dark overlay on all controls below the name. Peaks remain 0; no clicks or artefacts from binding to inactive engine slots.
 
-**FX rows (below channel strips):** Three fixed rows: Effect, Delay, Reverb. Each: on/off toggle, name, algorithm dropdown, parameter knobs. Horizontally scrollable per row if needed.
+**Channel order (left→right):** 8 rhythm channels | divider | Effect return | Delay return | Reverb return | divider | Master (slightly wider)
 
-No placeholder columns for inactive rhythm slots. Maximum 12 columns (8 rhythms + 3 FX returns + master) fits without scrolling.
+**FX rows (below channel strips):** Three fixed rows (Effect, Delay, Reverb), each in its own rounded bordered sub-panel with a 6px gap between panels. Each row: on/off toggle, name label, algorithm dropdown, parameter knobs.
+
+**Intra-FX routing (pending F2):** Effect return channel will show send knobs to Delay and Reverb returns. Delay return channel will show a send knob to Reverb return. FXChain.processSends() applies these sequentially.
+
+**Echo mode (pending F7):** When Effect algo = Echo, a full DelayRow appears between the Effect and Delay FX rows, showing identical controls to the Delay unit.
 
 ## Settings Overlay (Stage 10)
 
@@ -249,7 +284,8 @@ Opened by clicking μ-CLID logo. Contains: large logo, version badge, company na
 - **Knob hover**: fires `onStatusUpdate` immediately on `mouseEnter` — status bar updates without clicking
 - All knob interactions report to StatusBar — no tooltips anywhere in the UI
 - **StatusBar**: 20px, shows last interacted control name + value + rhythm colour tag, never clears automatically
-- **TimeSelector**: note buttons (1, 1/2, 1/4, 1/8, 1/16, 1/32) + triplet/dotted toggles, mutually exclusive
+- **TimeSelector**: legacy button-group widget — still exists in `Components/` but is no longer used in active panels. Timing rows use `DropdownSelect` instead.
+- **DropdownSelect timing**: 18 items covering 1, 1/2, 1/4, 1/8, 1/16, 1/32 × {none, T, .}. Item id = index+1. Identified by a small "Loop" or "Step" label to the left.
 - **NudgeInput**: ▲/▼ arrows + step size buttons (1, 5, 10) + direct text entry on double-click
 - **StepEditor**: drag bar up/down. All bars same teal colour regardless of sign. Centre = zero. +100 = top.
 - **LFOEditor**: click to add point, drag to move, right-click to remove, ALT-click segment for bezier handle
@@ -287,3 +323,76 @@ Note: `knobPadding` (old combined teal) is replaced by `knobPrePad` and `knobPos
 | Insert-padded steps | `ringInsertPad` | `#D4537E` pink | Matches `knobInsertPad` |
 | Mod A | `ringModA` | `#1D9E75` teal | |
 | Mod B–D | `ringModB/C/D` | amber/pink/blue | |
+
+---
+
+## Stage 11 — Animations and Polish
+
+All animations run on the message thread via `juce::Timer`. Audio-thread values are read via atomics. Animations must never block the message thread — use linear or ease-out curves that finish within their window even if a timer tick is missed.
+
+### Ring rotation (RhythmCircle)
+
+During playback, all rings rotate continuously so the **current step is always at 12 o'clock**.
+
+- Timer: 30Hz
+- Angle = `(currentStep + subStepFraction) / totalSteps * 2π` — subStepFraction interpolates within a beat using the host/internal beat position fractional part
+- At 120BPM, one 1/16 step lasts ~125ms → 3-4 timer ticks per step → smooth visually
+- Ring A, B, C all rotate by the same angle (they share the same step count base; ring C accent is pinned relative to A)
+- Draw: all arc segments are offset by `-angle - π/2` (subtract π/2 to put step 0 at the top)
+- When stopped: rings snap to step 0 position with a 150ms ease-out deceleration
+
+### Hit pulse (ring arc)
+
+On every hit detected (audio thread sets a `juce::Atomic<bool>` flag per rhythm per step):
+
+- An expanding semi-transparent filled arc radiates outward from the hit-step arc position
+- Arc starts at ring outer radius, expands to `outerRadius + 14px` over 150ms
+- Alpha: 0.7 → 0 with ease-out curve
+- Colour: rhythm colour (same as sidebar accent)
+- Multiple hits may overlap (pool of up to 4 simultaneous pulse objects per ring)
+- Centre hub: fills with rhythm colour, alpha 0.5 → 0 over 300ms
+
+### Sidebar item pulse
+
+On hit:
+- Entire `SidebarItem` background flashes with rhythm colour, alpha 0.4 → 0 over 200ms
+- Ease-out (quadratic), not linear — snappy leading edge, smooth tail
+- The RhythmCircle inside the sidebar item already benefits from the ring rotation/pulse above
+
+### VU meter ballistics
+
+- Attack: 5ms RMS window (approximately instant for short transients)
+- Release: 300ms fall-off — `-0.05 dB/timer tick at 30Hz ≈ -1.5 dB/frame at normal levels`
+- Peak hold: green peak tick held for 2.5 seconds, then decays at −0.1 dB/tick
+- Clip indicator (red): lights at 0dBFS, held for 3 seconds, manual clear via click
+- VU meter draws at 30Hz timer in MixerChannel paint
+
+### Modulator playhead
+
+- Smooth scrolling vertical line in LFOEditor and StepEditor
+- Position = `(beatPosition / loopLengthInBeats) mod 1.0`
+- Drawn in white at 50% alpha, 1px wide
+- Updates at 30Hz — interpolates between timer ticks using sub-tick beat fraction
+
+### Panel transitions (mixer ↔ rhythm panel)
+
+- When switching: outgoing component fades to alpha 0 over 80ms, incoming fades from 0 to 1 over 80ms
+- Implemented via `juce::ComponentAnimator` — no custom alpha painting required
+- Do not animate bounds; only alpha
+- Skip animation if the switch is triggered during playback with latency concerns (i.e., just swap instantly if the message thread is busy)
+
+### Sidebar add/remove
+
+- Add rhythm: new `SidebarItem` slides in from below — starts at `y + itemH`, animates to correct y over 120ms
+- Remove rhythm: item fades to alpha 0 over 80ms, then items below animate upward to fill the gap (80ms)
+- Use `juce::ComponentAnimator::animateComponent()` for both
+
+### Algorithm change in FX rows
+
+- When algo dropdown changes: param knobs cross-fade — old labels/ranges fade out at alpha 0→1 over 80ms as new params slide in
+- Implemented by re-calling `FXRow::setSelectedAlgorithm()` and letting the row rebuild; no custom animation required if the rebuild is fast enough
+- If needed: `juce::ComponentAnimator` fade on the entire row content area
+
+### Font modernisation (Stage 11 only)
+
+Replace all `juce::Font(float size)` constructor calls with `juce::Font(juce::FontOptions{}.withHeight(size))` to eliminate C4996 deprecation warnings. Do this as a single sweep; do not mix old and new constructors.

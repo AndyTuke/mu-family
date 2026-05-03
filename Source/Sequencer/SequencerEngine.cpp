@@ -31,6 +31,7 @@ void SequencerEngine::removeRhythm(int index)
 
 Rhythm& SequencerEngine::getRhythm(int index)
 {
+    jassert(index >= 0 && index < MaxRhythms);
     return rhythms[index];
 }
 
@@ -49,15 +50,16 @@ int SequencerEngine::processBlock(double beatPosition)
 
     int firedMask = 0;
 
+    const auto globalStep    = static_cast<int>(beatPosition / StepLengthBeats);
+    const int  effectiveStep = (masterLoopSteps > 0) ? (globalStep % masterLoopSteps) : globalStep;
+
     for (int r = 0; r < numRhythms; ++r)
     {
         const auto& pattern = cachedPatterns[r];
         if (pattern.empty()) continue;
 
-        int patLen = static_cast<int>(pattern.size());
-
-        auto globalStep = static_cast<int>(beatPosition / StepLengthBeats);
-        int stepIndex   = globalStep % patLen;
+        const int patLen  = static_cast<int>(pattern.size());
+        int stepIndex     = effectiveStep % patLen;
 
         if (patternUpdated[r])
         {

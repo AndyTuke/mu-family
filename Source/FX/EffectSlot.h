@@ -3,21 +3,18 @@
 #include "FXSlotBase.h"
 #include "FXAlgorithmDef.h"
 #include "OversampledProcessor.h"
+#include "DelaySlot.h"
 #include "Effects/EffectAlgorithmBase.h"
-#include "Effects/SoftClipEffect.h"
-#include "Effects/HardClipEffect.h"
-#include "Effects/FoldbackEffect.h"
-#include "Effects/BitcrushEffect.h"
-#include "Effects/LadderFilterEffect.h"
 #include "Effects/ChorusEffect.h"
+#include "Effects/FlangerEffect.h"
 #include "Effects/PhaserEffect.h"
-#include "Effects/CombFilterEffect.h"
+#include "Effects/EchoEffect.h"
 
 #include <memory>
 
-// Hosts one of the 8 effect algorithms with insert-style wet/dry blending.
-// Insert blend: 0–50% → blend wet in (full dry always present).
-//               50–100% → fade dry out (full wet always present).
+// Hosts one of the 4 effect algorithms (Chorus, Flanger, Phaser, Echo).
+// When algo = kEchoAlgoIndex (3), processing is delegated to an embedded DelaySlot
+// so Echo mode has identical capabilities to the dedicated Delay unit.
 class EffectSlot : public FXSlotBase
 {
 public:
@@ -27,18 +24,17 @@ public:
     void process(juce::AudioBuffer<float>&) override;
 
     juce::String getName()     override { return "Effect"; }
-    juce::String getCategory() override { return "Insert"; }
+    juce::String getCategory() override { return "Send"; }
     juce::Component* createEditor() override { return nullptr; }
     void getStateInformation(juce::MemoryBlock&) override {}
     void setStateInformation(const void*, int) override {}
 
-    void setAlgorithm(int index);   // 0–7
+    void setAlgorithm(int index);   // 0–3
     int  getAlgorithmIndex() const { return algorithmIndex; }
 
     void setParam(const juce::String& id, float value);
-    void setSend(float sendAmount);  // 0.0 = dry, 1.0 = full wet
 
-    // Send-bus processing: applies algorithm with no dry/wet blend (wet-only output).
+    // Send-bus entry point — runs algorithm on the buffer (wet-only, no internal dry blend).
     void processReturn(juce::AudioBuffer<float>&);
 
     bool isEnabled() const  { return enabled; }
@@ -46,15 +42,19 @@ public:
 
     static std::vector<FXAlgorithmDef> allDefs() { return FXAlgorithmRegistry::effectAlgorithms(); }
 
+    static constexpr int kEchoAlgoIndex = 3;
+
+    // Access the embedded DelaySlot used when algo == kEchoAlgoIndex.
+    DelaySlot& getEchoDelay() { return echoDelay; }
+
 private:
     std::unique_ptr<EffectAlgorithmBase> makeAlgorithm(int index);
 
     std::unique_ptr<EffectAlgorithmBase> algorithm;
     std::unique_ptr<OversampledProcessor> oversampler;
-    juce::AudioBuffer<float> dryBuffer;
+    DelaySlot echoDelay;
 
     int    algorithmIndex = 0;
-    float  sendAmount     = 1.0f;
     bool   enabled        = true;
     double currentRate    = 44100.0;
     int    currentBlock   = 512;

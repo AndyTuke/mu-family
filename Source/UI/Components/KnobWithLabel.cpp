@@ -40,6 +40,12 @@ double KnobWithLabel::getValue() const
     return slider.getValue();
 }
 
+void KnobWithLabel::setLabel(const juce::String& newLabel)
+{
+    labelText = newLabel;
+    repaint();
+}
+
 void KnobWithLabel::resized()
 {
     const int labelH = 14;

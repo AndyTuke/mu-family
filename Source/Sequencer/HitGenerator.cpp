@@ -8,9 +8,11 @@ std::vector<bool> HitGenerator::getPattern() const
     if (mute)
         return std::vector<bool>(steps, false);
 
-    int paddedOut  = prePad + postPad;
-    int clampedInsert = (insertMode == InsertMode::Pad) ? insertLength : 0;
-    int activeSteps = std::max(steps - paddedOut - clampedInsert, 0);
+    // Pad mode reserves steps from the euclidean distribution; Mute mode does not.
+    const int preReserve  = (prePadMode  == InsertMode::Pad) ? prePad  : 0;
+    const int postReserve = (postPadMode == InsertMode::Pad) ? postPad : 0;
+    const int clampedInsert = (insertMode == InsertMode::Pad) ? insertLength : 0;
+    int activeSteps = std::max(steps - preReserve - postReserve - clampedInsert, 0);
 
     auto pattern = EuclideanGenerator::generate(activeSteps, hits);
 
@@ -26,20 +28,41 @@ std::vector<bool> HitGenerator::getPattern() const
 
         if (insertMode == InsertMode::Pad)
         {
-            // Gap excluded from distribution — insert silent steps into the pattern.
             pattern.insert(pattern.begin() + clampedStart, insertLength, false);
         }
         else
         {
-            // Mute mode — hits distributed through the zone but silenced.
             int zoneEnd = std::min(clampedStart + insertLength, activeSteps);
             for (int i = clampedStart; i < zoneEnd; ++i)
                 pattern[i] = false;
         }
     }
 
-    pattern.insert(pattern.begin(), prePad, false);
-    pattern.insert(pattern.end(),   postPad, false);
+    // Pre-pad: Pad mode inserts silent steps (extends pattern); Mute mode silences the
+    // first prePad hits that euclidean placed in that zone.
+    if (prePadMode == InsertMode::Pad)
+    {
+        pattern.insert(pattern.begin(), prePad, false);
+    }
+    else
+    {
+        const int zone = std::min(prePad, (int)pattern.size());
+        for (int i = 0; i < zone; ++i)
+            pattern[i] = false;
+    }
+
+    // Post-pad: same distinction.
+    if (postPadMode == InsertMode::Pad)
+    {
+        pattern.insert(pattern.end(), postPad, false);
+    }
+    else
+    {
+        const int zone  = std::min(postPad, (int)pattern.size());
+        const int start = (int)pattern.size() - zone;
+        for (int i = start; i < (int)pattern.size(); ++i)
+            pattern[i] = false;
+    }
 
     return pattern;
 }
@@ -49,9 +72,10 @@ std::vector<StepType> HitGenerator::getStepTypes() const
     if (mute)
         return std::vector<StepType>(steps, StepType::Empty);
 
-    int paddedOut     = prePad + postPad;
-    int clampedInsert = (insertMode == InsertMode::Pad) ? insertLength : 0;
-    int activeSteps   = std::max(steps - paddedOut - clampedInsert, 0);
+    const int preReserve  = (prePadMode  == InsertMode::Pad) ? prePad  : 0;
+    const int postReserve = (postPadMode == InsertMode::Pad) ? postPad : 0;
+    const int clampedInsert = (insertMode == InsertMode::Pad) ? insertLength : 0;
+    int activeSteps = std::max(steps - preReserve - postReserve - clampedInsert, 0);
 
     auto boolPat = EuclideanGenerator::generate(activeSteps, hits);
 
@@ -64,10 +88,11 @@ std::vector<StepType> HitGenerator::getStepTypes() const
     std::vector<StepType> result;
     result.reserve(steps);
 
-    // Pre-pad
-    result.insert(result.end(), prePad, StepType::PrePad);
+    // Pre-pad in Pad mode: explicit silent steps before the active zone.
+    if (prePadMode == InsertMode::Pad)
+        result.insert(result.end(), prePad, StepType::PrePad);
 
-    // Active steps with optional insert
+    // Active steps (with insert zone if applicable).
     if (insertLength > 0 && insertMode == InsertMode::Pad)
     {
         int clampedStart = std::clamp(insertStart, 0, activeSteps);
@@ -91,8 +116,25 @@ std::vector<StepType> HitGenerator::getStepTypes() const
             result.push_back(b ? StepType::Hit : StepType::Empty);
     }
 
-    // Post-pad
-    result.insert(result.end(), postPad, StepType::PostPad);
+    // Post-pad in Pad mode: explicit silent steps after the active zone.
+    if (postPadMode == InsertMode::Pad)
+        result.insert(result.end(), postPad, StepType::PostPad);
+
+    // Mute mode pre/post: the hits in those zones are already silenced in getPattern();
+    // overwrite the step types so the ring shows the pad colour for those positions.
+    if (prePadMode == InsertMode::Mute && prePad > 0)
+    {
+        const int zone = std::min(prePad, (int)result.size());
+        for (int i = 0; i < zone; ++i)
+            result[i] = StepType::PrePad;
+    }
+    if (postPadMode == InsertMode::Mute && postPad > 0)
+    {
+        const int zone  = std::min(postPad, (int)result.size());
+        const int start = (int)result.size() - zone;
+        for (int i = start; i < (int)result.size(); ++i)
+            result[i] = StepType::PostPad;
+    }
 
     return result;
 }

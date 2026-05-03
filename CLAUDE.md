@@ -58,10 +58,12 @@ Artefacts land in `build/mu-clid_artefacts/Debug/` or `.../Release/`.
 | 5 | ✅ Done | All UI/Components/, MuClidLookAndFeel, StepEditor, LFOEditor |
 | 6 | ✅ Done | RhythmCircle, SidebarItem, RhythmSidebar, EuclideanPanel, VoiceSection, RhythmPanel |
 | 7 | ✅ Done | ModulatorPanel, ModulatorEditor, ModMatrixPanel, MidiOutputEngine |
-| 8 | ✅ Done | FXSlotBase, FXAlgorithmDef, OversampledProcessor, 8 EffectAlgorithms, EffectSlot, DelaySlot, ReverbSlot, FXChain, FXRow |
-| 9 | ⬜ Next | MixerEngine, MixerOverlay, MixerChannel, VUMeter |
-| 10 | ⬜ | TransportBar, PresetBrowser, SaveDialog, SettingsOverlay, AboutPanel, APVTS wiring |
-| 11 | ⬜ | Polish, animations, ring arc animations |
+| 8 | ✅ Done | FXSlotBase, FXAlgorithmDef, OversampledProcessor, 8 EffectAlgorithms, EffectSlot, DelaySlot, ReverbSlot, FXChain, FXRow, DelayRow |
+| 9 | ✅ Done | MixerEngine, MixerOverlay, MixerChannel, VUMeter |
+| 9.5 | ✅ Done | VoiceParams, VoiceEngine (Amp/Filter/Pitch ADSR + filter chain), VoiceSection redesign |
+| 9.6 | ✅ Done | Drive section in VoiceSection; Mixer: always 8 channels/grey inactive, FX sub-panel borders, fader height consistency, pan no-value; Delay spread/dirt 0-100; Mixer button "Sequencer" label; ADSR/filter-res 0-100 display; Mod timing as DropdownSelect with labels |
+| 10 | ✅ Done | TransportBar, AboutPanel, PresetBrowser, SaveDialog, SettingsOverlay, rhythm rename/delete, EFX→Delay/Reverb sends, Echo=Delay algorithm, master loop length, APVTS wiring (getState/setState, preset save/load) |
+| 11 | ⬜ Next | Animations + polish — see [design-ui.md Stage 11 section](docs/design-ui.md) |
 
 ## Source layout (actual, as built)
 

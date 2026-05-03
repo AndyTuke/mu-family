@@ -19,6 +19,9 @@ public:
     // Rebuild channel strips to match the current rhythm count.
     void refresh();
 
+    // Reload all FX-row and mixer-channel UI from current APVTS values.
+    void loadFromAPVTS();
+
     void resized() override;
     void paint(juce::Graphics&) override;
 
@@ -34,15 +37,19 @@ private:
     MixerChannel masterChannel { MixerChannel::Type::Master,       "Master",  juce::Colours::white    };
 
     FXRow    effectRow;
+    DelayRow echoRow;    // shown when effectRow algo == Echo
     DelayRow delayRow;
     FXRow    reverbRow;
 
-    static constexpr int kFXRowH   = 52;
+    static constexpr int kFXRowH  = 82;
+    static constexpr int kFXGap   = 6;    // gap between FX sub-panels
+    static constexpr int kFXAreaH = kFXRowH * 3 + kFXGap * 2;  // 3-row base (no echo)
     static constexpr int kDivW     = 4;
-    static constexpr int kChanW    = 80;
+    static constexpr int kChanW    = 64;
     static constexpr int kMasterW  = 96;
 
     void buildRhythmChannels();
     void wireReturns();
     void wireFXRows();
+    void updateEffectSendLabels();
 };

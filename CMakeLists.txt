@@ -60,6 +60,10 @@ target_sources(mu-clid
         Source/UI/Components/VUMeter.cpp
         Source/UI/MixerChannel.cpp
         Source/UI/MixerOverlay.cpp
+        Source/UI/AboutPanel.cpp
+        Source/UI/SaveDialog.cpp
+        Source/UI/PresetBrowser.cpp
+        Source/UI/SettingsOverlay.cpp
 )
 
 target_compile_definitions(mu-clid

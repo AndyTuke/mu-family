@@ -72,11 +72,15 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&             output,
 
         buf.clear();
         voices[r].process(buf, numSamples);
-        channelPeaks[r].set(peakOf(buf, numSamples));
 
-        if (ch.mute || (anySolo && !ch.solo)) continue;
+        if (ch.mute || (anySolo && !ch.solo))
+        {
+            channelPeaks[r].set(0.0f);
+            continue;
+        }
 
         applyPanGain(buf, ch.level, ch.pan, numSamples);
+        channelPeaks[r].set(peakOf(buf, numSamples));
 
         for (int c = 0; c < numOutCh; ++c)
             output.addFrom(c, 0, buf, c, 0, numSamples);

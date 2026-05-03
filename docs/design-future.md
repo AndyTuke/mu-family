@@ -5,7 +5,20 @@ When implementing current stages, ensure architectural decisions do not foreclos
 
 ---
 
-## Ideas
+## Pending Stage 10 work (scheduled, not yet implemented)
+
+These features are confirmed and must be done before Stage 11:
+
+- **F4: Rhythm renaming** — click name in RhythmPanel header to edit inline; name propagates to sidebar item and mixer channel label
+- **F5: Reset + Delete buttons** — in RhythmPanel header; both show "Are you sure?" `AlertWindow` before acting; Delete shifts sidebar selection to previous rhythm
+- **F2: EFX→Delay+Reverb and Delay→Reverb sends** — `FXChain::processSends()` applies `effToDelay`/`effToReverb`/`delToReverb` sequentially; Effect return channel shows two send knobs; Delay return shows one
+- **F7: Echo = full Delay algorithm** — when Effect slot algo = Echo, embed a `DelaySlot echoDelay` in `EffectSlot` and show a full `DelayRow echoRow` in MixerOverlay between Effect and Delay rows; add `echo_*` APVTS params
+- **F14: Master loop length** — `SequencerEngine` adds a `masterLoopSteps` counter (16–256); all sequences reset to step 0 on the boundary; `TransportBar` shows a `NudgeInput` for loop length
+- **APVTS wiring** — full Stage 10 work: all rhythm params, FX params, mixer params bound through APVTS so presets save/restore correctly
+
+---
+
+## Unscheduled Ideas
 
 Ability to add additional Euclid sequences with more complex logic
 

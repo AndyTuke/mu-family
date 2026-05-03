@@ -64,23 +64,23 @@ void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,
     if (assignments.empty())
         return;
 
-    // Build source value table: CS outputs + assignment depth values.
-    std::unordered_map<std::string, float> sourceValues;
-    sourceValues.reserve(sequences.size() + assignments.size());
+    // Reuse workMap to avoid per-call heap allocation on the audio thread.
+    workMap.clear();
+    if (workMap.bucket_count() < sequences.size() + assignments.size() + 4)
+        workMap.reserve(sequences.size() + assignments.size() + 16);
 
     for (const auto& cs : sequences)
-        sourceValues[cs.id + "_output"] = cs.evaluate(songBeatPos);
+        workMap[cs.id + "_output"] = cs.evaluate(songBeatPos);
 
     for (const auto& a : assignments)
-        sourceValues["assign_" + a.id + "_depth"] = a.depth;
+        workMap["assign_" + a.id + "_depth"] = a.depth;
 
-    // Apply in dependency order.
     for (int idx : getSortedOrder())
     {
         const auto& a = assignments[idx];
 
-        auto srcIt = sourceValues.find(a.sourceId);
-        if (srcIt == sourceValues.end())
+        auto srcIt = workMap.find(a.sourceId);
+        if (srcIt == workMap.end())
             continue;
 
         auto dstIt = paramValues.find(a.destinationId);

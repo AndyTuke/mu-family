@@ -49,6 +49,10 @@ public:
 private:
     std::vector<ModulationAssignment> assignments;
 
+    // Pre-allocated work map reused each process() call to avoid heap allocation
+    // on the audio thread.  process() is audio-thread-only, so this is safe.
+    mutable std::unordered_map<std::string, float> workMap;
+
     // Returns assignment indices in topological processing order.
     std::vector<int> getSortedOrder() const;
 

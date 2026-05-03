@@ -46,6 +46,6 @@ private:
     static constexpr int kToggleW   = 36;
     static constexpr int kNameW     = 60;
     static constexpr int kDropdownW = 120;
-    static constexpr int kKnobW     = 64;
+    static constexpr int kKnobW     = 72;
     static constexpr int kPadding   = 4;
 };

@@ -1,6 +1,54 @@
 #include "ModulatorEditor.h"
 
 //==============================================================================
+// Note value lookup table for timing dropdowns (id = index + 1)
+namespace {
+struct NoteEntry { NoteValue nv; NoteMod mod; const char* label; };
+static constexpr NoteEntry kNoteEntries[] = {
+    { NoteValue::Whole,        NoteMod::None,    "1"     },
+    { NoteValue::Half,         NoteMod::None,    "1/2"   },
+    { NoteValue::Quarter,      NoteMod::None,    "1/4"   },
+    { NoteValue::Eighth,       NoteMod::None,    "1/8"   },
+    { NoteValue::Sixteenth,    NoteMod::None,    "1/16"  },
+    { NoteValue::ThirtySecond, NoteMod::None,    "1/32"  },
+    { NoteValue::Whole,        NoteMod::Triplet, "1T"    },
+    { NoteValue::Half,         NoteMod::Triplet, "1/2T"  },
+    { NoteValue::Quarter,      NoteMod::Triplet, "1/4T"  },
+    { NoteValue::Eighth,       NoteMod::Triplet, "1/8T"  },
+    { NoteValue::Sixteenth,    NoteMod::Triplet, "1/16T" },
+    { NoteValue::ThirtySecond, NoteMod::Triplet, "1/32T" },
+    { NoteValue::Whole,        NoteMod::Dotted,  "1."    },
+    { NoteValue::Half,         NoteMod::Dotted,  "1/2."  },
+    { NoteValue::Quarter,      NoteMod::Dotted,  "1/4."  },
+    { NoteValue::Eighth,       NoteMod::Dotted,  "1/8."  },
+    { NoteValue::Sixteenth,    NoteMod::Dotted,  "1/16." },
+    { NoteValue::ThirtySecond, NoteMod::Dotted,  "1/32." },
+};
+static constexpr int kNoteEntryCount = (int)(sizeof(kNoteEntries) / sizeof(kNoteEntries[0]));
+
+static int noteToId(NoteValue nv, NoteMod mod)
+{
+    for (int i = 0; i < kNoteEntryCount; ++i)
+        if (kNoteEntries[i].nv == nv && kNoteEntries[i].mod == mod)
+            return i + 1;
+    return 3; // fallback: 1/4
+}
+
+static void idToNote(int id, NoteValue& nv, NoteMod& mod)
+{
+    int i = id - 1;
+    if (i >= 0 && i < kNoteEntryCount) { nv = kNoteEntries[i].nv; mod = kNoteEntries[i].mod; }
+    else                               { nv = NoteValue::Quarter;  mod = NoteMod::None;       }
+}
+
+static void populateNoteDropdown(DropdownSelect& dd)
+{
+    for (int i = 0; i < kNoteEntryCount; ++i)
+        dd.addItem(kNoteEntries[i].label, i + 1);
+}
+} // namespace
+
+//==============================================================================
 ModulatorEditor::AssignmentRow::AssignmentRow(const std::string& assignId)
     : id(assignId)
 {
@@ -45,10 +93,32 @@ ModulatorEditor::ModulatorEditor()
     addAndMakeVisible(inputCtrl);
     addAndMakeVisible(lfoEditor);
     addAndMakeVisible(stepEditor);
-    addAndMakeVisible(loopNoteSelector);
+
+    // Loop timing row
+    loopLabel.setText("Loop", juce::dontSendNotification);
+    loopLabel.setFont(juce::Font(10.0f));
+    loopLabel.setJustificationType(juce::Justification::centredRight);
+    loopLabel.setColour(juce::Label::textColourId,
+                        MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
+    populateNoteDropdown(loopDropdown);
+    addAndMakeVisible(loopLabel);
+    addAndMakeVisible(loopDropdown);
     addAndMakeVisible(loopMult);
-    addAndMakeVisible(stepNoteSelector);
+
+    // Step timing row (Stepped mode only)
+    stepLabel.setText("Step", juce::dontSendNotification);
+    stepLabel.setFont(juce::Font(10.0f));
+    stepLabel.setJustificationType(juce::Justification::centredRight);
+    stepLabel.setColour(juce::Label::textColourId,
+                        MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
+    populateNoteDropdown(stepDropdown);
+    addAndMakeVisible(stepLabel);
+    addAndMakeVisible(stepDropdown);
     addAndMakeVisible(stepMult);
+    stepLabel.setVisible(false);
+    stepDropdown.setVisible(false);
+    stepMult.setVisible(false);
+
     addAndMakeVisible(addBtn);
 
     wireHeader();
@@ -56,17 +126,33 @@ ModulatorEditor::ModulatorEditor()
 }
 
 void ModulatorEditor::setData(ControlSequence* cs_, ModulationMatrix* matrix_,
-                               juce::Colour colour, int index)
+                               juce::Colour colour, int index,
+                               std::atomic<bool>* lock)
 {
-    cs        = cs_;
-    matrix    = matrix_;
-    modColour = colour;
-    modIndex  = index;
+    cs             = cs_;
+    matrix         = matrix_;
+    rhythmModLock  = lock;
+    modColour      = colour;
+    modIndex       = index;
     stepEditor.setBarColour(modColour);
     loadFromCS();
     rebuildRows();
     resized();
     repaint();
+}
+
+void ModulatorEditor::lockMod()
+{
+    if (!rhythmModLock) return;
+    bool expected = false;
+    while (!rhythmModLock->compare_exchange_weak(expected, true, std::memory_order_acquire))
+        expected = false;
+}
+
+void ModulatorEditor::unlockMod()
+{
+    if (rhythmModLock)
+        rhythmModLock->store(false, std::memory_order_release);
 }
 
 void ModulatorEditor::loadFromCS()
@@ -78,7 +164,8 @@ void ModulatorEditor::loadFromCS()
     inputCtrl.setSelectedIndex(cs->inputSource == ControlSequence::InputSource::MIDI_CC ? 1 : 0);
     lfoEditor.setVisible(smooth);
     stepEditor.setVisible(!smooth);
-    stepNoteSelector.setVisible(!smooth);
+    stepLabel.setVisible(!smooth);
+    stepDropdown.setVisible(!smooth);
     stepMult.setVisible(!smooth);
 
     if (smooth)
@@ -95,9 +182,9 @@ void ModulatorEditor::loadFromCS()
         syncStepValues();
     }
 
-    loopNoteSelector.setSelection(cs->loopNoteValue, cs->loopNoteMod);
+    loopDropdown.setSelectedId(noteToId(cs->loopNoteValue, cs->loopNoteMod));
     loopMult.setValue(cs->loopMultiplier);
-    stepNoteSelector.setSelection(cs->stepNoteValue, cs->stepNoteMod);
+    stepDropdown.setSelectedId(noteToId(cs->stepNoteValue, cs->stepNoteMod));
     stepMult.setValue(cs->stepMultiplier);
 }
 
@@ -115,11 +202,14 @@ void ModulatorEditor::wireHeader()
     modeCtrl.onChange = [this](int idx)
     {
         if (!cs) return;
+        lockMod();
         cs->mode = (idx == 0) ? ControlSequence::Mode::Smooth : ControlSequence::Mode::Stepped;
+        unlockMod();
         const bool smooth = (cs->mode == ControlSequence::Mode::Smooth);
         lfoEditor.setVisible(smooth);
         stepEditor.setVisible(!smooth);
-        stepNoteSelector.setVisible(!smooth);
+        stepLabel.setVisible(!smooth);
+        stepDropdown.setVisible(!smooth);
         stepMult.setVisible(!smooth);
         if (!smooth) syncStepValues();
         else loadFromCS();
@@ -130,45 +220,59 @@ void ModulatorEditor::wireHeader()
     inputCtrl.onChange = [this](int idx)
     {
         if (!cs) return;
+        lockMod();
         cs->inputSource = (idx == 0) ? ControlSequence::InputSource::Internal
                                      : ControlSequence::InputSource::MIDI_CC;
+        unlockMod();
         if (onChange) onChange();
     };
 }
 
 void ModulatorEditor::wireTiming()
 {
-    loopNoteSelector.onChange = [this](NoteValue nv, NoteMod mod)
+    loopDropdown.onChange = [this](int id)
     {
         if (!cs) return;
+        NoteValue nv; NoteMod mod;
+        idToNote(id, nv, mod);
+        lockMod();
         cs->loopNoteValue = nv;
         cs->loopNoteMod   = mod;
         if (cs->mode == ControlSequence::Mode::Stepped) syncStepValues();
+        unlockMod();
         repaint();
         if (onChange) onChange();
     };
     loopMult.onChange = [this](int v)
     {
         if (!cs) return;
+        lockMod();
         cs->loopMultiplier = v;
         if (cs->mode == ControlSequence::Mode::Stepped) syncStepValues();
+        unlockMod();
         repaint();
         if (onChange) onChange();
     };
-    stepNoteSelector.onChange = [this](NoteValue nv, NoteMod mod)
+    stepDropdown.onChange = [this](int id)
     {
         if (!cs) return;
+        NoteValue nv; NoteMod mod;
+        idToNote(id, nv, mod);
+        lockMod();
         cs->stepNoteValue = nv;
         cs->stepNoteMod   = mod;
         syncStepValues();
+        unlockMod();
         repaint();
         if (onChange) onChange();
     };
     stepMult.onChange = [this](int v)
     {
         if (!cs) return;
+        lockMod();
         cs->stepMultiplier = v;
         syncStepValues();
+        unlockMod();
         repaint();
         if (onChange) onChange();
     };
@@ -176,13 +280,17 @@ void ModulatorEditor::wireTiming()
     lfoEditor.onChange = [this](const std::vector<ControlSequence::CurvePoint>& pts)
     {
         if (!cs) return;
+        lockMod();
         cs->curvePoints = pts;
+        unlockMod();
         if (onChange) onChange();
     };
     stepEditor.onStepChanged = [this](int idx, float val)
     {
         if (!cs || idx < 0 || idx >= (int)cs->stepValues.size()) return;
+        lockMod();
         cs->stepValues[idx] = val;
+        unlockMod();
         if (onChange) onChange();
     };
 
@@ -197,7 +305,9 @@ void ModulatorEditor::addTarget()
     a.sourceId      = cs->id + "_output";
     a.destinationId = ModDest::ids[0].toStdString();
     a.depth         = 0.0f;
+    lockMod();
     matrix->addAssignment(a);
+    unlockMod();
     rebuildRows();
     resized();
     repaint();
@@ -227,7 +337,10 @@ void ModulatorEditor::rebuildRows()
         const std::string rowId = a.id;
         row->onRemove = [this, rowId]
         {
-            if (matrix) matrix->removeAssignment(rowId);
+            if (!matrix) return;
+            lockMod();
+            matrix->removeAssignment(rowId);
+            unlockMod();
             rebuildRows();
             resized();
             repaint();
@@ -237,6 +350,7 @@ void ModulatorEditor::rebuildRows()
         {
             if (!matrix) return;
             float d = 0.0f;
+            lockMod();
             for (const auto& a2 : matrix->getAssignments())
                 if (a2.id == rowId) { d = a2.depth; break; }
             matrix->removeAssignment(rowId);
@@ -246,11 +360,15 @@ void ModulatorEditor::rebuildRows()
             na.destinationId = dest;
             na.depth         = d;
             matrix->addAssignment(na);
+            unlockMod();
             if (onChange) onChange();
         };
         row->onDepthChange = [this, rowId](float d)
         {
-            if (matrix) matrix->setDepth(rowId, d);
+            if (!matrix) return;
+            lockMod();
+            matrix->setDepth(rowId, d);
+            unlockMod();
             if (onChange) onChange();
         };
 
@@ -272,14 +390,19 @@ void ModulatorEditor::resized()
     stepEditor.setBounds(0, y, w, kEditorH);
     y += kEditorH;
 
+    const int labelW = 36;
     const int nudgeW = 80;
-    loopNoteSelector.setBounds(0, y, w - nudgeW, kTimingH);
+    const int dropW  = w - labelW - 2 - nudgeW;
+
+    loopLabel.setBounds(0, y, labelW, kTimingH);
+    loopDropdown.setBounds(labelW + 2, y, dropW, kTimingH);
     loopMult.setBounds(w - nudgeW, y, nudgeW, kTimingH);
     y += kTimingH;
 
-    if (stepNoteSelector.isVisible())
+    if (stepDropdown.isVisible())
     {
-        stepNoteSelector.setBounds(0, y, w - nudgeW, kTimingH);
+        stepLabel.setBounds(0, y, labelW, kTimingH);
+        stepDropdown.setBounds(labelW + 2, y, dropW, kTimingH);
         stepMult.setBounds(w - nudgeW, y, nudgeW, kTimingH);
         y += kTimingH;
     }

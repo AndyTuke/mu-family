@@ -94,11 +94,11 @@ DelayRow::DelayRow()
     };
     addAndMakeVisible(feedbackKnob);
 
-    spreadKnob.setRange(0.0, 1.0, 0.01);
+    spreadKnob.setRange(0.0, 100.0, 0.1);
     spreadKnob.setValue(0.0, juce::dontSendNotification);
     spreadKnob.onValueChanged = [this](double v)
     {
-        if (onSpreadChanged) onSpreadChanged(static_cast<float>(v));
+        if (onSpreadChanged) onSpreadChanged(static_cast<float>(v) / 100.0f);
     };
     spreadKnob.onStatusUpdate = [this](const juce::String& n, const juce::String& v)
     {
@@ -106,11 +106,11 @@ DelayRow::DelayRow()
     };
     addAndMakeVisible(spreadKnob);
 
-    dirtKnob.setRange(0.0, 1.0, 0.01);
+    dirtKnob.setRange(0.0, 100.0, 0.1);
     dirtKnob.setValue(0.0, juce::dontSendNotification);
     dirtKnob.onValueChanged = [this](double v)
     {
-        if (onDirtChanged) onDirtChanged(static_cast<float>(v));
+        if (onDirtChanged) onDirtChanged(static_cast<float>(v) / 100.0f);
     };
     dirtKnob.onStatusUpdate = [this](const juce::String& n, const juce::String& v)
     {
@@ -151,8 +151,8 @@ void DelayRow::setSyncParams(int denominator, bool dotted, bool triplet, int cou
 }
 
 void DelayRow::setFeedback(float v) { feedbackKnob.setValue(v * 100.0, juce::dontSendNotification); }
-void DelayRow::setSpread(float v)   { spreadKnob.setValue(v, juce::dontSendNotification); }
-void DelayRow::setDirt(float v)     { dirtKnob.setValue(v, juce::dontSendNotification); }
+void DelayRow::setSpread(float v)   { spreadKnob.setValue(v * 100.0, juce::dontSendNotification); }
+void DelayRow::setDirt(float v)     { dirtKnob.setValue(v * 100.0, juce::dontSendNotification); }
 
 void DelayRow::updateModeVisibility()
 {

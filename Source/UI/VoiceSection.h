@@ -2,14 +2,19 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Components/KnobWithLabel.h"
 #include "Components/SegmentControl.h"
+#include "Components/DropdownSelect.h"
 #include "Components/MuClidLookAndFeel.h"
 
-// Compact single-row voice controls: amp envelope, filter, filter envelope, output mode.
-// All in one horizontal strip. Does not connect to audio engine yet (Stage 10 wires APVTS).
+class PluginProcessor;
+
+// Four-column two-row voice chain panel: Pitch | Filter | Amp | Drive.
+// Row 1: config controls.  Row 2: ADSR envelope (Drive has no ADSR — row 2 is blank).
 class VoiceSection : public juce::Component
 {
 public:
-    VoiceSection();
+    explicit VoiceSection(PluginProcessor& p);
+
+    void setRhythm(int rhythmIndex);
 
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
 
@@ -19,23 +24,43 @@ public:
 private:
     using Id = MuClidLookAndFeel::ColourIds;
 
-    // Amp envelope (amber)
-    KnobWithLabel ampAttack  { "Attack",  Id::knobLevel   };
-    KnobWithLabel ampDecay   { "Decay",   Id::knobLevel   };
-    KnobWithLabel ampSustain { "Sustain", Id::knobLevel   };
-    KnobWithLabel ampRelease { "Release", Id::knobLevel   };
+    PluginProcessor& proc;
+    int rhythmIndex = -1;
 
-    // Filter (teal)
-    KnobWithLabel filterCutoff { "Cutoff",    Id::knobPostPad };
-    KnobWithLabel filterRes    { "Resonance", Id::knobPostPad };
+    // ─── PITCH ──────────────────────────────────────────────────────────
+    KnobWithLabel pitchOctave  { "Octave",  Id::knobEuclidean };
+    KnobWithLabel pitchSemi    { "Semi",    Id::knobEuclidean };
+    KnobWithLabel pitchFine    { "Fine",    Id::knobEuclidean };
+    KnobWithLabel pitchAtk     { "Attack",  Id::knobEuclidean };
+    KnobWithLabel pitchDec     { "Decay",   Id::knobEuclidean };
+    KnobWithLabel pitchSus     { "Sustain", Id::knobEuclidean };
+    KnobWithLabel pitchRel     { "Release", Id::knobEuclidean };
+    KnobWithLabel pitchDepth   { "Depth",   Id::knobEuclidean };
 
-    // Filter envelope (teal)
-    KnobWithLabel fEnvAttack { "Attack", Id::knobPostPad };
-    KnobWithLabel fEnvDecay  { "Decay",  Id::knobPostPad };
-    KnobWithLabel fEnvDepth  { "Depth",  Id::knobPostPad };
+    // ─── FILTER ─────────────────────────────────────────────────────────
+    DropdownSelect  filterType;
+    KnobWithLabel  filterCutoff { "Cutoff",  Id::knobPostPad  };
+    KnobWithLabel  filterRes    { "Res",     Id::knobPostPad  };
+    KnobWithLabel  filterAtk    { "Attack",  Id::knobPostPad  };
+    KnobWithLabel  filterDec    { "Decay",   Id::knobPostPad  };
+    KnobWithLabel  filterSus    { "Sustain", Id::knobPostPad  };
+    KnobWithLabel  filterRel    { "Release", Id::knobPostPad  };
+    KnobWithLabel  filterDepth  { "Depth",   Id::knobPostPad  };
 
-    // Output mode
-    SegmentControl outputMode { {"Sample", "MIDI"} };
+    // ─── AMP ────────────────────────────────────────────────────────────
+    KnobWithLabel  ampLevel    { "Level",   Id::knobLevel    };
+    KnobWithLabel  ampAtk      { "Attack",  Id::knobLevel    };
+    KnobWithLabel  ampDec      { "Decay",   Id::knobLevel    };
+    KnobWithLabel  ampSus      { "Sustain", Id::knobLevel    };
+    KnobWithLabel  ampRel      { "Release", Id::knobLevel    };
 
-    void wireStatusCallbacks();
+    // ─── DRIVE ──────────────────────────────────────────────────────────
+    DropdownSelect driveChar;
+    KnobWithLabel  driveDrive  { "Drive",  Id::knobInsertPad };
+    KnobWithLabel  driveOutput { "Output", Id::knobInsertPad };
+    KnobWithLabel  driveTone   { "Tone",   Id::knobInsertPad };
+
+    void apvtsSet(const char* suffix, float v);
+    void wireCallbacks();
+    void loadFromRhythm();
 };

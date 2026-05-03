@@ -35,24 +35,32 @@ UI placement: routing knobs in FX return channel strip in mixer, above pan.
 
 ## Effect Unit Algorithms (v1)
 
+All distortion algorithms (Soft Clip, Hard Clip, Foldback, Bitcrush) and filter algorithms
+(Ladder Filter, Comb Filter) have been moved out of the shared Effect slot. Per-rhythm Drive
+is now part of the voice chain — see design-voice.md.
+
+The Effect slot hosts modulation and time-based algorithms only:
+
 | Algorithm | Category | DSP Approach | Key Parameters | Oversampling |
 |---|---|---|---|---|
-| Soft clip | Distortion | `std::tanh` waveshaper + IIR tone LP | Drive, output, tone | Optional (1x in v1) |
-| Hard clip | Distortion | `juce::jlimit` clamp + IIR tone LP | Drive, threshold, output, tone | Required — 4x |
-| Foldback | Distortion | Triangular fold math + IIR tone LP | Drive, folds, output, tone | Required — 4x |
-| Bitcrush | Distortion | Fixed-point quantise + rate decimator + IIR tone LP | Bits, rate, output, tone | Required — 2x |
-| Ladder filter | Filter | `juce::dsp::LadderFilter` | Cutoff, resonance, drive, mode (LP/HP/BP) | Drive path — 2x |
 | Chorus | Modulation | Manual delay buffer + per-voice sine LFO | Rate, depth, voices (2–4), spread, mix | None |
+| Flanger | Modulation | Short delay line (0.5–10ms) + sine LFO + feedback | Rate, depth, feedback, mix | None |
 | Phaser | Modulation | First-order allpass chain + sine LFO + feedback | Rate, depth, stages (up to 12), feedback, mix | None |
-| Comb filter | Filter | Feedback delay line | Freq, feedback, output, mix | None |
+| Echo | Time | Stereo delay line, no sync, ping-pong spread | Time, feedback, spread, mix | None |
 
-**Tone parameter (distortion effects):** v1 implements tone as a `juce::dsp::IIR::Filter` (ProcessorDuplicator) low-pass filter after the waveshaper, driven by a single cutoff frequency. The full LP/HP/BP/peak multi-mode selector is a v2 enhancement.
+**Chorus** — multi-voice: 2–4 delay taps each with their own LFO phase offset, panned across the stereo field by spread. Depth controls LFO modulation amount (± delay time). Mix is wet/dry blend.
+
+**Flanger** — single delay line modulated into very short times (0.5–10ms). Feedback creates the characteristic notch comb. Feedback is bipolar: positive flanges, negative produces a softer phasing character. Mix is wet/dry blend.
+
+**Phaser** — all-pass chain (2–12 stages in pairs). LFO sweeps the all-pass hinge frequency. Feedback controls resonance intensity. Mix is wet/dry blend.
+
+**Echo** — simple stereo echo without BPM sync (use the dedicated Delay slot for sync'd delay). R delay = L delay × (1 + spread × 0.1) for stereo widening via ping-pong feel. Feedback controls decay. Mix is wet/dry blend. Intended for short slapback and room-simulation echoes.
 
 **Algorithm switch thread safety:** `EffectSlot::setAlgorithm()` calls `prepare()` internally. It must be called from the **message thread only** — calling it from the audio thread during playback is not safe. Full audio-thread-safe hot-swap (via atomic pointer exchange) is deferred to Stage 10 APVTS wiring.
 
-**Oversampling:** Implemented via `OversampledProcessor`, which wraps `juce::dsp::Oversampling<float>` with FIR equiripple half-band antialiasing filter. Factor 1 = bypass (no allocation). Factor 2 = one stage (2x). Factor 4 = two stages (4x). The algorithm's `prepareInner()` and `processInner()` receive the already-upsampled block and the oversampled rate.
+**No oversampling required:** All four Effect algorithms are linear or operate on delay-line modulation; there is no nonlinear waveshaping that generates out-of-band harmonics.
 
-## Delay Parameters
+## Delay Parameters (dedicated Delay slot — unchanged)
 
 | Section | Parameters |
 |---|---|
@@ -88,4 +96,16 @@ Reverb has **no mix knob** — it is always a pure send. Shimmer removed from v1
 
 Stores: algorithm ID, name, category, params (array of `FXParamDef`: id, name, min, max, default, units), and `oversamplingFactor`. Drives both the UI (FXRow populates knobs from `params`) and the DSP (EffectSlot selects oversampling factor from def). A static `FXAlgorithmRegistry` provides the canonical ordered lists for both effect algorithms and reverb algorithms.
 
+The oversampling field is retained in the struct for forward compatibility; all current Effect algorithms set it to 1 (bypass).
+
 **Intra-FX routing (Stage 8 API):** `FXChain` exposes `setEffectToDelaySend()`, `setEffectToReverbSend()`, `setDelayToReverbSend()`. These are wired to Mixer channel strip send knobs in Stage 9. The values default to 0.0 — signal flows in series only until Stage 9.
+
+## Effect Algorithm Files (current)
+
+Distortion and filter effect files (`SoftClipEffect`, `HardClipEffect`, `FoldbackEffect`,
+`BitcrushEffect`, `LadderFilterEffect`, `CombFilterEffect`) remain on disk but are no longer
+registered in `FXAlgorithmRegistry::effectAlgorithms()` and are not instantiated. They may be
+deleted in Stage 11 cleanup.
+
+New file to create: `Source/FX/Effects/FlangerEffect.h` — same interface as ChorusEffect.
+New file to create: `Source/FX/Effects/EchoEffect.h` — simple stereo delay, no sync logic.

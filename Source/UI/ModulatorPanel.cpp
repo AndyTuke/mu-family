@@ -44,7 +44,7 @@ void ModulatorPanel::setRhythm(Rhythm* r)
 
     for (int i = 0; i < kNumMods; ++i)
     {
-        editors[i].setData(&r->controlSequences[i], &r->modulationMatrix, modColour(i), i);
+        editors[i].setData(&r->controlSequences[i], &r->modulationMatrix, modColour(i), i, &r->modLock);
         editors[i].onChange = [this] { if (onChange) onChange(); };
     }
     matrixPanel.setRhythm(r);

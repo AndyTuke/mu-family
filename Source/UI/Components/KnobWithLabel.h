@@ -17,6 +17,7 @@ public:
     void setRange(double min, double max, double step = 0.0);
     void setValue(double v, juce::NotificationType n = juce::dontSendNotification);
     double getValue() const;
+    void setLabel(const juce::String& newLabel);
 
     void resized() override;
     void paint(juce::Graphics& g) override;

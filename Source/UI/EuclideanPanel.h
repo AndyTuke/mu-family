@@ -3,17 +3,17 @@
 #include "Components/KnobWithLabel.h"
 #include "Components/SegmentControl.h"
 #include "Components/MuClidLookAndFeel.h"
-#include "../Sequencer/Rhythm.h"
+
+class PluginProcessor;
 
 // Euclidean controls for one rhythm.
-// Layout (top→bottom): Euclid A (single row, 8 controls) | 24px logic pills | Euclid B (single row, 8 controls) | Euclid C accent (single row, 8 controls)
-// Modifies Rhythm data directly; fires onPatternChanged after each mutation.
+// Routes all mutations through APVTS; fires onPatternChanged for UI refresh only.
 class EuclideanPanel : public juce::Component
 {
 public:
-    EuclideanPanel();
+    explicit EuclideanPanel(PluginProcessor& p);
 
-    void setRhythm(Rhythm* r);
+    void setRhythm(int rhythmIndex);
 
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
     std::function<void()> onPatternChanged;
@@ -26,17 +26,22 @@ public:
 private:
     using Id = MuClidLookAndFeel::ColourIds;
 
+    PluginProcessor& proc;
+    int rhythmIndex = -1;
+
     juce::Colour rhythmColour { juce::Colours::transparentBlack };
 
     // ── Euclid A ─────────────────────────────────────────────────────────────
     KnobWithLabel stepsA      { "Steps",         Id::knobEuclidean };
     KnobWithLabel hitsA       { "Hits",          Id::knobEuclidean };
     KnobWithLabel rotA        { "Rotate",        Id::knobEuclidean };
-    KnobWithLabel prePadA     { "Pre Pad",       Id::knobPrePad    };
-    KnobWithLabel postPadA    { "Post Pad",      Id::knobPostPad   };
-    KnobWithLabel insertStA   { "Insert Start",  Id::knobInsertPad };
-    KnobWithLabel insertLenA  { "Insert Length", Id::knobInsertPad };
-    SegmentControl insertModeA { {"I","M"}, SegmentControl::ActiveStyle::Warning };
+    KnobWithLabel prePadA      { "Pre Pad",       Id::knobPrePad    };
+    KnobWithLabel postPadA     { "Post Pad",      Id::knobPostPad   };
+    SegmentControl prePadModeA  { {"I","M"}, SegmentControl::ActiveStyle::Warning };
+    SegmentControl postPadModeA { {"I","M"}, SegmentControl::ActiveStyle::Warning };
+    KnobWithLabel insertStA    { "Insert Start",  Id::knobInsertPad };
+    KnobWithLabel insertLenA   { "Insert Length", Id::knobInsertPad };
+    SegmentControl insertModeA  { {"I","M"}, SegmentControl::ActiveStyle::Warning };
 
     // ── Logic ─────────────────────────────────────────────────────────────────
     SegmentControl logicCtrl { {"OR","AND","XOR","A Only","B Only"},
@@ -47,27 +52,32 @@ private:
     KnobWithLabel stepsB      { "Steps",         Id::knobEuclidean };
     KnobWithLabel hitsB       { "Hits",          Id::knobEuclidean };
     KnobWithLabel rotB        { "Rotate",        Id::knobEuclidean };
-    KnobWithLabel prePadB     { "Pre Pad",       Id::knobPrePad    };
-    KnobWithLabel postPadB    { "Post Pad",      Id::knobPostPad   };
-    KnobWithLabel insertStB   { "Insert Start",  Id::knobInsertPad };
-    KnobWithLabel insertLenB  { "Insert Length", Id::knobInsertPad };
-    SegmentControl insertModeB { {"I","M"}, SegmentControl::ActiveStyle::Warning };
+    KnobWithLabel prePadB      { "Pre Pad",       Id::knobPrePad    };
+    KnobWithLabel postPadB     { "Post Pad",      Id::knobPostPad   };
+    SegmentControl prePadModeB  { {"I","M"}, SegmentControl::ActiveStyle::Warning };
+    SegmentControl postPadModeB { {"I","M"}, SegmentControl::ActiveStyle::Warning };
+    KnobWithLabel insertStB    { "Insert Start",  Id::knobInsertPad };
+    KnobWithLabel insertLenB   { "Insert Length", Id::knobInsertPad };
+    SegmentControl insertModeB  { {"I","M"}, SegmentControl::ActiveStyle::Warning };
 
-    // ── Euclid C (Accent) — same controls as A and B ──────────────────────────
+    // ── Euclid C (Accent) ────────────────────────────────────────────────────
     KnobWithLabel stepsC      { "Steps",         Id::knobLevel     };
     KnobWithLabel hitsC       { "Hits",          Id::knobLevel     };
     KnobWithLabel rotC        { "Rotate",        Id::knobLevel     };
-    KnobWithLabel prePadC     { "Pre Pad",       Id::knobPrePad    };
-    KnobWithLabel postPadC    { "Post Pad",      Id::knobPostPad   };
-    KnobWithLabel insertStC   { "Insert Start",  Id::knobInsertPad };
-    KnobWithLabel insertLenC  { "Insert Length", Id::knobInsertPad };
-    SegmentControl insertModeC { {"I","M"}, SegmentControl::ActiveStyle::Warning };
+    KnobWithLabel prePadC      { "Pre Pad",       Id::knobPrePad    };
+    KnobWithLabel postPadC     { "Post Pad",      Id::knobPostPad   };
+    SegmentControl prePadModeC  { {"I","M"}, SegmentControl::ActiveStyle::Warning };
+    SegmentControl postPadModeC { {"I","M"}, SegmentControl::ActiveStyle::Warning };
+    KnobWithLabel insertStC    { "Insert Start",  Id::knobInsertPad };
+    KnobWithLabel insertLenC   { "Insert Length", Id::knobInsertPad };
+    SegmentControl insertModeC  { {"I","M"}, SegmentControl::ActiveStyle::Warning };
 
-    Rhythm* rhythm = nullptr;
+    static constexpr int kLogicH  = 24;
+    static constexpr int kSwitchH = 14;
+    static constexpr int kOuter   = 4;
+    static constexpr int kLabelH  = 10;
 
-    static constexpr int kLogicH   = 24;
-    static constexpr int kSwitchH  = 14;
-
+    void apvtsSet(const char* suffix, float v);
     void wireCallbacks();
     void loadFromRhythm();
     void updateRangesA(int steps);

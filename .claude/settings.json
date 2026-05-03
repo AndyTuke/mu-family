@@ -13,5 +13,18 @@
       "Bash(git -C d:/Dev/mu-clid add Source/UI/ CMakeLists.txt)",
       "Bash(git -C d:/Dev/mu-clid commit -m ' *)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/post_build_todo.py"
+          }
+        ]
+      }
+    ]
   }
 }

@@ -12,7 +12,7 @@ public:
 
     PhaserEffect()
     {
-        def = FXAlgorithmRegistry::effectAlgorithms()[6];
+        def = FXAlgorithmRegistry::effectAlgorithms()[2];
     }
 
     const FXAlgorithmDef& getDef() const override { return def; }

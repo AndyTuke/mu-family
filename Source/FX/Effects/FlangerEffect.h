@@ -1,0 +1,103 @@
+#pragma once
+
+#include "EffectAlgorithmBase.h"
+#include <cmath>
+#include <vector>
+
+// Stereo flanger: single modulated delay line (0.5–10ms) with feedback.
+// Bipolar feedback: positive = flanging character, negative = inverted comb.
+class FlangerEffect : public EffectAlgorithmBase
+{
+public:
+    static constexpr int MaxDelaySamples = 2048;   // ~46ms at 44.1kHz, plenty for 10ms
+
+    FlangerEffect()
+    {
+        def = FXAlgorithmRegistry::effectAlgorithms()[1];
+    }
+
+    const FXAlgorithmDef& getDef() const override { return def; }
+
+    void prepareInner(double sampleRate, int /*blockSize*/) override
+    {
+        sr = sampleRate;
+        bufL.assign(MaxDelaySamples, 0.0f);
+        bufR.assign(MaxDelaySamples, 0.0f);
+        writePos = 0;
+        lfoPhase = 0.0f;
+        feedL = feedR = 0.0f;
+    }
+
+    void processInner(juce::dsp::AudioBlock<float>& block) override
+    {
+        const float lfoInc   = static_cast<float>(rate / sr);
+        // Centre of range = 5.25ms, depth sweeps ±4.75ms → [0.5ms, 10ms]
+        const float baseSamp = static_cast<float>(5.25 * 0.001 * sr);
+        const float depSamp  = static_cast<float>(4.75 * 0.001 * sr * depth);
+        const float wet      = mix;
+        const float dry      = 1.0f - mix;
+        const float fb       = feedback;   // already scaled to ±0.95 in setParam
+
+        const size_t numSamples  = block.getNumSamples();
+        const size_t numChannels = block.getNumChannels();
+
+        auto* dataL = (numChannels > 0) ? block.getChannelPointer(0) : nullptr;
+        auto* dataR = (numChannels > 1) ? block.getChannelPointer(1) : dataL;
+
+        for (size_t i = 0; i < numSamples; ++i)
+        {
+            const float lfoVal = std::sin(lfoPhase * juce::MathConstants<float>::twoPi);
+            const float delayS = juce::jmax(1.0f, baseSamp + lfoVal * depSamp);
+
+            const float inL = dataL ? dataL[i] : 0.0f;
+            const float inR = dataR ? dataR[i] : 0.0f;
+
+            bufL[writePos] = inL + feedL * fb;
+            bufR[writePos] = inR + feedR * fb;
+
+            const float wetL = readDelay(bufL, writePos, delayS);
+            const float wetR = readDelay(bufR, writePos, delayS);
+            feedL = wetL;
+            feedR = wetR;
+
+            if (dataL) dataL[i] = dry * inL + wet * wetL;
+            if (dataR) dataR[i] = dry * inR + wet * wetR;
+
+            writePos = (writePos + 1) % MaxDelaySamples;
+            lfoPhase += lfoInc;
+            if (lfoPhase >= 1.0f) lfoPhase -= 1.0f;
+        }
+    }
+
+    void setParam(const juce::String& id, float value) override
+    {
+        if      (id == "rate")     rate     = value;
+        else if (id == "depth")    depth    = value / 100.0f;
+        else if (id == "feedback") feedback = (value / 100.0f) * 0.95f;   // cap to prevent runaway
+        else if (id == "mix")      mix      = value / 100.0f;
+    }
+
+private:
+    static float readDelay(const std::vector<float>& buf, int writeP, float delaySamples)
+    {
+        const int bufSize = static_cast<int>(buf.size());
+        const int d       = static_cast<int>(delaySamples);
+        const float alpha = delaySamples - static_cast<float>(d);
+        const int r0      = (writeP - d + bufSize) % bufSize;
+        const int r1      = (r0 - 1 + bufSize) % bufSize;
+        return buf[r0] * (1.0f - alpha) + buf[r1] * alpha;
+    }
+
+    FXAlgorithmDef def;
+    double sr       = 44100.0;
+    float rate      = 0.5f;
+    float depth     = 0.5f;
+    float feedback  = 0.0f;
+    float mix       = 0.5f;
+
+    std::vector<float> bufL, bufR;
+    int   writePos  = 0;
+    float lfoPhase  = 0.0f;
+    float feedL     = 0.0f;
+    float feedR     = 0.0f;
+};

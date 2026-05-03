@@ -4,6 +4,7 @@ SidebarItem::SidebarItem(int index)
     : rhythmIndex(index)
 {
     addAndMakeVisible(miniCircle);
+    miniCircle.setInterceptsMouseClicks(false, false);
 }
 
 void SidebarItem::setRhythm(const Rhythm* r, juce::Colour colour)

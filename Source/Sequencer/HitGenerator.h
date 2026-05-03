@@ -17,6 +17,8 @@ public:
     int        postPad      = 0;
     int        insertStart  = 0;
     int        insertLength = 0;
+    InsertMode prePadMode   = InsertMode::Pad;
+    InsertMode postPadMode  = InsertMode::Pad;
     InsertMode insertMode   = InsertMode::Pad;
     bool       mute         = false;
 

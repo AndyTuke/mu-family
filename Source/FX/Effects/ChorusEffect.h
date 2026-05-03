@@ -12,7 +12,7 @@ public:
 
     ChorusEffect()
     {
-        def = FXAlgorithmRegistry::effectAlgorithms()[5];
+        def = FXAlgorithmRegistry::effectAlgorithms()[0];
     }
 
     const FXAlgorithmDef& getDef() const override { return def; }

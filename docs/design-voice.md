@@ -3,7 +3,7 @@
 ## Per-Rhythm Voice Chain
 
 ```
-SamplePlayer → Amplitude ADSR → ResonantFilter → Filter ADSR → Sidechain gain reduction → Channel fader → FX sends → Internal mixer sum
+SamplePlayer → Pitch ADSR → ResonantFilter → Filter ADSR → Drive → Amplitude ADSR → Channel fader → FX sends → Internal mixer sum
 ```
 
 MIDI mode bypasses the voice chain entirely. Hit event → MidiOutputEngine → MIDI note on/off (user-definable note, fixed velocity or from Euclid C).
@@ -17,9 +17,52 @@ MIDI mode bypasses the voice chain entirely. Hit event → MidiOutputEngine → 
 | Sample playback | Mode (one shot/loop), quality (lo-fi/linear/clean), stretch mode | 4-voice polyphonic pool with round-robin steal. Intent is monophonic character: new hit claims the first idle voice, or steals the oldest via round-robin when all 4 are busy. Always plays from beginning. |
 | Voice cut | Overlap fade 1–10ms (default 2ms, user-configurable in Settings) | Outgoing fades out, incoming starts immediately. Prevents clicks. Independent of ADSR. Not yet implemented — current `VoiceEngine` triggers voices directly with no overlap fade; add in Stage 11 polish. |
 | Loop settings | Tempo (musical/free), length (TimeSelector + triplet/dotted), fit (pitch/stretch) | Loop mode only. Musical uses TimeSelector. Free uses ms. |
-| Amplitude ADSR | Attack, decay, sustain, release, retrigger mode (Reset/Legato) | Reset: retriggers from zero. Legato: retriggers from current level. Default Reset. |
+| Pitch ADSR | Attack, decay, sustain, release, depth, retrigger mode (Reset/Legato) | Depth in semitones above base pitch. |
 | Resonant filter | Type (LP/HP/BP/notch), cutoff, resonance | `juce::dsp::StateVariableTPTFilter` |
 | Filter ADSR | Attack, decay, sustain, release, depth, retrigger mode | Depth controls sweep above base cutoff. Default Reset. |
+| Drive | Character (Soft/Hard/Fold/Bit), drive amount, output trim, tone filter | Placed after filter, before amp. See Drive section below. |
+| Amplitude ADSR | Attack, decay, sustain, release, retrigger mode (Reset/Legato) | Reset: retriggers from zero. Legato: retriggers from current level. Default Reset. |
+
+## Drive Stage
+
+Each rhythm has a dedicated drive insert placed between the filter and the amp envelope. Drive is
+always in the signal path but defaults to unity (drive = 0%, output = 0 dB, no tone cut).
+
+**Parameters:**
+
+| Parameter | Range | Default | Notes |
+|---|---|---|---|
+| Character | Soft / Hard / Fold / Bit | Soft | Algorithm selector; see below |
+| Drive | 0–100% | 0% | 0% = unity through all characters |
+| Output | −24–0 dB | 0 dB | Post-drive level trim to compensate for loudness increase |
+| Tone | 20–20000 Hz | 20000 Hz | First-order IIR low-pass on the driven signal; at 20kHz = flat |
+
+**Character algorithms** (same DSP as the removed shared Effect algorithms):
+
+| Character | Algorithm | Oversampling |
+|---|---|---|
+| Soft | `std::tanh` waveshaper | 1× (bypass) |
+| Hard | `juce::jlimit` clamp | 4× |
+| Fold | Triangular foldback | 4× |
+| Bit | Fixed-point quantise + rate decimator | 2× |
+
+Oversampling applies to the waveshaping only; the drive stage is otherwise inline at the voice's
+native sample rate. Each active voice runs its own `OversampledProcessor` instance. Because there
+are at most 4 concurrent voices per rhythm and at most 8 rhythms, the maximum simultaneous
+oversamplers is 32 — acceptable at 2× or 4×.
+
+**Implementation:** Add a `DriveStage` class in `Source/Audio/` that wraps `OversampledProcessor`
+and switches algorithm on character change (message-thread only, same constraint as
+`EffectSlot::setAlgorithm`). `VoiceEngine` holds one `DriveStage` per voice slot and routes
+audio through it after the filter ADSR.
+
+**APVTS params per rhythm (suffix):**
+```
+driveChar   — int  0=Soft, 1=Hard, 2=Fold, 3=Bit
+driveDrive  — float 0–100
+driveOutput — float -24–0 dB
+driveTone   — float 20–20000 Hz
+```
 
 ## Interpolation Quality
 

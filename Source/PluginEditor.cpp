@@ -3,25 +3,59 @@
 PluginEditor::PluginEditor(PluginProcessor& p)
     : AudioProcessorEditor(&p), processorRef(p),
       transportBar(p), sidebar(p), rhythmPanel(p),
-      mixerOverlay(p, p.mixerEngine)
+      mixerOverlay(p, p.mixerEngine),
+      settingsOverlay(p)
 {
     setLookAndFeel(&lookAndFeel);
 
     addAndMakeVisible(transportBar);
     addAndMakeVisible(sidebar);
     addAndMakeVisible(rhythmPanel);
-    addChildComponent(mixerOverlay);   // hidden until mixer button pressed
+    addChildComponent(mixerOverlay);
+    addChildComponent(aboutPanel);
+    addChildComponent(saveDialog);
+    addChildComponent(presetBrowser);
+    addChildComponent(settingsOverlay);
     addAndMakeVisible(statusBar);
 
-    transportBar.onMixerToggle = [this]
+    // ── TransportBar callbacks ────────────────────────────────────────────────
+    transportBar.onMixerToggle = [this] { showMixer(!mixerVisible); };
+
+    transportBar.onLogoClicked = [this] { showAbout(true); };
+
+    transportBar.onAddRhythm = [this]
     {
-        showMixer(!mixerVisible);
+        if (processorRef.getNumRhythms() >= SequencerEngine::MaxRhythms) return;
+        Rhythm r;
+        r.name        = "Rhythm " + std::to_string(processorRef.getNumRhythms() + 1);
+        r.colourIndex = processorRef.getNumRhythms() % 30;
+        processorRef.addRhythm(r);
+        sidebar.refreshItems();
+        const int newIdx = processorRef.getNumRhythms() - 1;
+        sidebar.setSelectedIndex(newIdx);
+        rhythmPanel.setRhythm(newIdx);
+        if (mixerVisible) mixerOverlay.refresh();
     };
 
+    transportBar.onPresetSelected = [this](const juce::File& f)
+    {
+        processorRef.loadPreset(f);
+        sidebar.refreshItems();
+        rhythmPanel.setRhythm(0);
+        sidebar.setSelectedIndex(0);
+        if (mixerVisible) { mixerOverlay.refresh(); mixerOverlay.loadFromAPVTS(); }
+    };
+
+    transportBar.onSavePreset = [this] { showSaveDialog(true); };
+
+    transportBar.onSettingsToggle = [this] { showSettings(!settingsVisible); };
+
+    // ── Sidebar callbacks ─────────────────────────────────────────────────────
     sidebar.onRhythmSelected = [this](int idx)
     {
-        if (mixerVisible) showMixer(false);
+        hideAllOverlays();
         rhythmPanel.setRhythm(idx);
+        rhythmPanel.setVisible(true);
     };
 
     sidebar.onAddRhythm = [this]
@@ -35,8 +69,10 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         const int newIdx = processorRef.getNumRhythms() - 1;
         sidebar.setSelectedIndex(newIdx);
         rhythmPanel.setRhythm(newIdx);
+        if (mixerVisible) mixerOverlay.refresh();
     };
 
+    // ── RhythmPanel status ────────────────────────────────────────────────────
     rhythmPanel.onStatusUpdate = [this](const juce::String& name,
                                         const juce::String& val,
                                         juce::Colour col)
@@ -44,7 +80,51 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         statusBar.showParam(name, val, col);
     };
 
-    // Ensure at least one rhythm exists on startup
+    rhythmPanel.onRhythmRenamed = [this]
+    {
+        sidebar.refreshItems();
+        if (mixerVisible) mixerOverlay.refresh();
+    };
+
+    rhythmPanel.onRhythmDeleted = [this](int idx)
+    {
+        processorRef.removeRhythm(idx);
+        const int newIdx = juce::jmax(0, juce::jmin(idx, processorRef.getNumRhythms() - 1));
+        sidebar.refreshItems();
+        sidebar.setSelectedIndex(newIdx);
+        rhythmPanel.setRhythm(newIdx);
+        if (mixerVisible) mixerOverlay.refresh();
+    };
+
+    // ── About panel ───────────────────────────────────────────────────────────
+    aboutPanel.onDismiss = [this] { showAbout(false); };
+
+    // ── Save dialog ───────────────────────────────────────────────────────────
+    saveDialog.onSave = [this](const juce::String& name,
+                               const juce::String& desc,
+                               const juce::String& category)
+    {
+        processorRef.savePreset(name, desc, category);
+        transportBar.refreshPresets();
+        showSaveDialog(false);
+    };
+    saveDialog.onCancel = [this] { showSaveDialog(false); };
+
+    // ── Preset browser ────────────────────────────────────────────────────────
+    presetBrowser.onLoadPreset = [this](const juce::File& f)
+    {
+        processorRef.loadPreset(f);
+        sidebar.refreshItems();
+        rhythmPanel.setRhythm(0);
+        sidebar.setSelectedIndex(0);
+        if (mixerVisible) { mixerOverlay.refresh(); mixerOverlay.loadFromAPVTS(); }
+    };
+    presetBrowser.onClose = [this] { showPresetBrowser(false); };
+
+    // ── Settings overlay ──────────────────────────────────────────────────────
+    settingsOverlay.onClose = [this] { showSettings(false); };
+
+    // ── Startup ───────────────────────────────────────────────────────────────
     if (processorRef.getNumRhythms() == 0)
     {
         Rhythm r;
@@ -66,11 +146,30 @@ PluginEditor::~PluginEditor()
     setLookAndFeel(nullptr);
 }
 
+//==============================================================================
+void PluginEditor::hideAllOverlays()
+{
+    mixerVisible    = false;
+    aboutVisible    = false;
+    saveVisible     = false;
+    browserVisible  = false;
+    settingsVisible = false;
+
+    mixerOverlay  .setVisible(false);
+    aboutPanel    .setVisible(false);
+    saveDialog    .setVisible(false);
+    presetBrowser .setVisible(false);
+    settingsOverlay.setVisible(false);
+    rhythmPanel   .setVisible(true);
+}
+
 void PluginEditor::showMixer(bool show)
 {
+    if (show) hideAllOverlays();
     mixerVisible = show;
     rhythmPanel .setVisible(!show);
     mixerOverlay.setVisible( show);
+    transportBar.setMixerActive(show);
     if (show)
     {
         mixerOverlay.refresh();
@@ -78,6 +177,56 @@ void PluginEditor::showMixer(bool show)
     }
 }
 
+void PluginEditor::showAbout(bool show)
+{
+    aboutVisible = show;
+    aboutPanel.setVisible(show);
+    aboutPanel.toFront(false);
+}
+
+void PluginEditor::showSaveDialog(bool show)
+{
+    saveVisible = show;
+    saveDialog.setVisible(show);
+    saveDialog.toFront(false);
+}
+
+void PluginEditor::showPresetBrowser(bool show)
+{
+    if (show)
+    {
+        hideAllOverlays();
+        presetBrowser.refresh(processorRef.getPresetsDir());
+        browserVisible = true;
+        rhythmPanel.setVisible(false);
+        presetBrowser.setVisible(true);
+    }
+    else
+    {
+        browserVisible = false;
+        presetBrowser.setVisible(false);
+        rhythmPanel.setVisible(!mixerVisible);
+    }
+}
+
+void PluginEditor::showSettings(bool show)
+{
+    if (show)
+    {
+        hideAllOverlays();
+        settingsVisible = true;
+        rhythmPanel.setVisible(false);
+        settingsOverlay.setVisible(true);
+    }
+    else
+    {
+        settingsVisible = false;
+        settingsOverlay.setVisible(false);
+        rhythmPanel.setVisible(!mixerVisible);
+    }
+}
+
+//==============================================================================
 void PluginEditor::paint(juce::Graphics& g)
 {
     g.fillAll(MuClidLookAndFeel::colour(MuClidLookAndFeel::windowBackground));
@@ -96,7 +245,15 @@ void PluginEditor::resized()
 
     transportBar.setBounds(0, 0, w, transportH);
     sidebar.setBounds(0, transportH, RhythmSidebar::kWidth, contentH);
-    rhythmPanel .setBounds(mainArea);
-    mixerOverlay.setBounds(mainArea);
+
+    rhythmPanel    .setBounds(mainArea);
+    mixerOverlay   .setBounds(mainArea);
+    presetBrowser  .setBounds(mainArea);
+    settingsOverlay.setBounds(mainArea);
+
+    // Modal overlays span the full editor area
+    aboutPanel .setBounds(getLocalBounds());
+    saveDialog .setBounds(getLocalBounds());
+
     statusBar.setBounds(0, h - statusH, w, statusH);
 }

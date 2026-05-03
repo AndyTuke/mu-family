@@ -5,6 +5,7 @@
 #include "EuclideanPanel.h"
 #include "VoiceSection.h"
 #include "ModulatorPanel.h"
+#include "Components/DropdownSelect.h"
 #include "Components/MuClidLookAndFeel.h"
 #include "../PluginProcessor.h"
 
@@ -22,6 +23,9 @@ public:
                        const juce::String& value,
                        juce::Colour rhythmColour)> onStatusUpdate;
 
+    std::function<void()>    onRhythmRenamed;
+    std::function<void(int)> onRhythmDeleted;
+
     void paint(juce::Graphics&) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent&) override;
@@ -37,23 +41,36 @@ private:
     EuclideanPanel  euclidPanel;
     VoiceSection    voiceSection;
     ModulatorPanel  modulatorPanel;
+    DropdownSelect  midiModeDropdown;
+
+    juce::TextEditor nameEditor;
+    juce::TextButton resetBtn  { juce::String::charToString(0x21BA) }; // ↺
+    juce::TextButton deleteBtn { juce::String::charToString(0x2715) }; // ✕
+    bool editingName = false;
 
     std::unique_ptr<juce::FileChooser> fileChooser;
     std::map<int, juce::String> loadedSampleNames;
     juce::File lastBrowseDir;
 
-    // Fixed chrome heights
-    static constexpr int kHeaderH    = 28;
-    static constexpr int kSampleBarH = 22;
-    static constexpr int kVoiceH     = 80;
-    static constexpr int kPanelPad   = 6;
+    // Fixed chrome heights/widths
+    static constexpr int kHeaderH       = 28;
+    static constexpr int kSampleBarH    = 22;
+    static constexpr int kVoiceH        = 144;
+    static constexpr int kPanelPad      = 6;
+    static constexpr int kModeSelectorW = 80;
+    static constexpr int kIconBtnW      = 22;
 
     // Computed in resized(), used in both resized() and paint()
     int circleW = 300;
     int topH    = 300;
     juce::Rectangle<int> sampleRect, circleRect, euclidRect, voiceRect, modRect;
+    juce::Rectangle<int> nameRect;   // header name hit-area
 
     void loadSample();
     void refreshCircle();
     juce::Colour currentColour() const;
+    void startEditingName();
+    void finishEditingName(bool save);
+    void confirmReset();
+    void confirmDelete();
 };

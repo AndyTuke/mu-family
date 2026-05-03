@@ -1,7 +1,7 @@
 #pragma once
+#include <atomic>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Components/SegmentControl.h"
-#include "Components/TimeSelector.h"
 #include "Components/NudgeInput.h"
 #include "Components/LFOEditor.h"
 #include "Components/StepEditor.h"
@@ -38,7 +38,10 @@ class ModulatorEditor : public juce::Component
 public:
     ModulatorEditor();
 
-    void setData(ControlSequence* cs, ModulationMatrix* matrix, juce::Colour modColour, int index);
+    // modLock must be the Rhythm::modLock for the owning rhythm.
+    // All mutations to cs/matrix are performed under this lock.
+    void setData(ControlSequence* cs, ModulationMatrix* matrix, juce::Colour modColour, int index,
+                 std::atomic<bool>* modLock = nullptr);
 
     std::function<void()> onChange;
 
@@ -46,18 +49,26 @@ public:
     void paint(juce::Graphics& g) override;
 
 private:
-    ControlSequence*  cs       = nullptr;
-    ModulationMatrix* matrix   = nullptr;
-    juce::Colour      modColour;
-    int               modIndex = 0;
+    ControlSequence*   cs       = nullptr;
+    ModulationMatrix*  matrix   = nullptr;
+    std::atomic<bool>* rhythmModLock = nullptr;
+    juce::Colour       modColour;
+    int                modIndex = 0;
+
+    // Acquire Rhythm::modLock (spin). Call before any mutation of cs or matrix.
+    void lockMod();
+    // Release Rhythm::modLock.
+    void unlockMod();
 
     SegmentControl modeCtrl  { {"Smooth","Stepped"} };
     SegmentControl inputCtrl { {"Internal","CC"} };
     LFOEditor      lfoEditor;
     StepEditor     stepEditor;
-    TimeSelector   loopNoteSelector;
+    DropdownSelect loopDropdown;
+    juce::Label    loopLabel;
     NudgeInput     loopMult { "Loop", 1, 16, 4 };
-    TimeSelector   stepNoteSelector;
+    DropdownSelect stepDropdown;
+    juce::Label    stepLabel;
     NudgeInput     stepMult { "Step", 1, 16, 1 };
 
     struct AssignmentRow : public juce::Component

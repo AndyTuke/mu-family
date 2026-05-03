@@ -63,7 +63,7 @@ private:
     bool isEnabled = true;
 
     static constexpr int kToggleW   = 36;
-    static constexpr int kNameW     = 52;
+    static constexpr int kNameW     = 60;
     static constexpr int kDropdownW = 120;  // same as FXRow algorithm dropdowns
     static constexpr int kModifierW = 80;
     static constexpr int kCountW    = 60;
