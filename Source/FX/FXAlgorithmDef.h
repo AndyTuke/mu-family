@@ -26,13 +26,14 @@ struct FXAlgorithmDef
 };
 
 // Registry of all EffectSlot algorithms, in display order.
+// Methods return const& to static locals — safe to call at any frequency with no allocation.
 struct FXAlgorithmRegistry
 {
-    static std::vector<FXAlgorithmDef> effectAlgorithms()
+    static const std::vector<FXAlgorithmDef>& effectAlgorithms()
     {
         // Index 0: Chorus, 1: Flanger, 2: Phaser, 3: Echo
         // Distortion algorithms moved to per-rhythm Drive stage in the voice chain.
-        return {
+        static const std::vector<FXAlgorithmDef> s_defs = {
             { "chorus", "Chorus", "Modulation", {
                 { "rate",   "Rate",   0.1f, 8.0f, 1.0f, "Hz" },
                 { "depth",  "Depth",  0.0f, 100.0f, 50.0f, "%" },
@@ -60,23 +61,27 @@ struct FXAlgorithmRegistry
                 { "mix",      "Mix",      0.0f, 100.0f, 50.0f, "%" },
             }, 1 },
         };
+        return s_defs;
     }
 
-    static std::vector<FXAlgorithmDef> reverbAlgorithms()
+    static const std::vector<FXAlgorithmDef>& reverbAlgorithms()
     {
-        std::vector<FXParamDef> commonParams = {
-            { "size",      "Size",      0.0f, 1.0f, 0.5f, "" },
-            { "predelay",  "Pre-delay", 0.0f, 100.0f, 10.0f, "ms" },
-            { "diffusion", "Diffusion", 0.0f, 1.0f, 0.7f, "" },
-            { "damp",      "Damp",      0.0f, 1.0f, 0.4f, "" },
-            { "mod",       "Mod",       0.0f, 1.0f, 0.2f, "" },
-            { "dirt",      "Dirt",      0.0f, 1.0f, 0.0f, "" },
-        };
-        return {
-            { "room",   "Room",   "Reverb", commonParams, 1 },
-            { "hall",   "Hall",   "Reverb", commonParams, 1 },
-            { "plate",  "Plate",  "Reverb", commonParams, 1 },
-            { "spring", "Spring", "Reverb", commonParams, 1 },
-        };
+        static const std::vector<FXAlgorithmDef> s_defs = [] {
+            const std::vector<FXParamDef> commonParams = {
+                { "size",      "Size",      0.0f, 1.0f, 0.5f, "" },
+                { "predelay",  "Pre-delay", 0.0f, 100.0f, 10.0f, "ms" },
+                { "diffusion", "Diffusion", 0.0f, 1.0f, 0.7f, "" },
+                { "damp",      "Damp",      0.0f, 1.0f, 0.4f, "" },
+                { "mod",       "Mod",       0.0f, 1.0f, 0.2f, "" },
+                { "dirt",      "Dirt",      0.0f, 1.0f, 0.0f, "" },
+            };
+            return std::vector<FXAlgorithmDef> {
+                { "room",   "Room",   "Reverb", commonParams, 1 },
+                { "hall",   "Hall",   "Reverb", commonParams, 1 },
+                { "plate",  "Plate",  "Reverb", commonParams, 1 },
+                { "spring", "Spring", "Reverb", commonParams, 1 },
+            };
+        }();
+        return s_defs;
     }
 };

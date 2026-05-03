@@ -150,8 +150,6 @@ void RhythmPanel::paint(juce::Graphics& g)
 {
     using Id = MuClidLookAndFeel::ColourIds;
 
-    const int w = getWidth();
-
     g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
     g.fillAll();
 

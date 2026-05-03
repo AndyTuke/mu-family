@@ -53,6 +53,14 @@ private:
     // on the audio thread.  process() is audio-thread-only, so this is safe.
     mutable std::unordered_map<std::string, float> workMap;
 
+    // Cached on the message thread (under modLock) every time assignments change.
+    // Read on the audio thread inside process() — protected by the same modLock.
+    std::vector<int>         cachedSortOrder;      // topological indices into assignments
+    std::vector<std::string> cachedDepthKeys;       // "assign_" + a.id + "_depth" per assignment
+
+    // Rebuilds cachedSortOrder and cachedDepthKeys. Call after any mutation to assignments.
+    void rebuildCache();
+
     // Returns assignment indices in topological processing order.
     std::vector<int> getSortedOrder() const;
 

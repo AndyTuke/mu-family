@@ -457,7 +457,7 @@ void PluginProcessor::syncFXParam(const juce::String& id, float v)
     else if (id.startsWith("eff_p"))
     {
         int idx = id.substring(5).getIntValue();
-        const auto algos = FXAlgorithmRegistry::effectAlgorithms();
+        const auto& algos = FXAlgorithmRegistry::effectAlgorithms();
         int ai = eff.getAlgorithmIndex();
         if (ai < (int)algos.size() && idx < (int)algos[ai].params.size())
         {

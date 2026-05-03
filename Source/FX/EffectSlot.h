@@ -40,7 +40,7 @@ public:
     bool isEnabled() const  { return enabled; }
     void setEnabled(bool e) { enabled = e; }
 
-    static std::vector<FXAlgorithmDef> allDefs() { return FXAlgorithmRegistry::effectAlgorithms(); }
+    static const std::vector<FXAlgorithmDef>& allDefs() { return FXAlgorithmRegistry::effectAlgorithms(); }
 
     static constexpr int kEchoAlgoIndex = 3;
 

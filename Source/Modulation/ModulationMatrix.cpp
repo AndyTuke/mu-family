@@ -1,6 +1,7 @@
 #include "ModulationMatrix.h"
 
 #include <algorithm>
+#include <cstring>
 #include <queue>
 #include <unordered_set>
 
@@ -13,14 +14,14 @@ static constexpr auto kMetaSuffix = "_depth";
 
 bool ModulationMatrix::isMetaSource(const std::string& src, std::string& outDepId)
 {
-    const std::size_t prefixLen = std::string(kMetaPrefix).size();
-    const std::size_t suffixLen = std::string(kMetaSuffix).size();
+    const std::size_t prefixLen = std::strlen(kMetaPrefix);
+    const std::size_t suffixLen = std::strlen(kMetaSuffix);
 
     if (src.size() <= prefixLen + suffixLen)
         return false;
-    if (src.substr(0, prefixLen) != kMetaPrefix)
+    if (src.compare(0, prefixLen, kMetaPrefix) != 0)
         return false;
-    if (src.substr(src.size() - suffixLen) != kMetaSuffix)
+    if (src.compare(src.size() - suffixLen, suffixLen, kMetaSuffix) != 0)
         return false;
 
     outDepId = src.substr(prefixLen, src.size() - prefixLen - suffixLen);
@@ -40,6 +41,7 @@ bool ModulationMatrix::addAssignment(const ModulationAssignment& a)
         return false;
 
     assignments.push_back(a);
+    rebuildCache();
     return true;
 }
 
@@ -49,12 +51,28 @@ void ModulationMatrix::removeAssignment(const std::string& id)
         std::remove_if(assignments.begin(), assignments.end(),
             [&id](const ModulationAssignment& a) { return a.id == id; }),
         assignments.end());
+    rebuildCache();
 }
 
 void ModulationMatrix::setDepth(const std::string& id, float depth)
 {
     for (auto& a : assignments)
         if (a.id == id) { a.depth = depth; return; }
+}
+
+void ModulationMatrix::rebuildCache()
+{
+    cachedSortOrder = getSortedOrder();
+
+    const std::size_t n = assignments.size();
+    cachedDepthKeys.resize(n);
+    for (std::size_t i = 0; i < n; ++i)
+        cachedDepthKeys[i] = std::string(kMetaPrefix) + assignments[i].id + kMetaSuffix;
+
+    // Pre-size workMap so process() never rehashes (8 CS + n assignments + headroom).
+    const std::size_t needed = 8 + n + 4;
+    if (workMap.bucket_count() < needed)
+        workMap.reserve(needed + 16);
 }
 
 void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,
@@ -64,18 +82,18 @@ void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,
     if (assignments.empty())
         return;
 
-    // Reuse workMap to avoid per-call heap allocation on the audio thread.
+    // workMap is pre-sized in rebuildCache(); no reserve needed here.
     workMap.clear();
-    if (workMap.bucket_count() < sequences.size() + assignments.size() + 4)
-        workMap.reserve(sequences.size() + assignments.size() + 16);
 
+    // CS output keys are short ("cs0_output" = 10 chars) and fit in SSO on all platforms.
     for (const auto& cs : sequences)
         workMap[cs.id + "_output"] = cs.evaluate(songBeatPos);
 
-    for (const auto& a : assignments)
-        workMap["assign_" + a.id + "_depth"] = a.depth;
+    // Use pre-computed keys to avoid heap allocation for long UUID-based assignment IDs.
+    for (std::size_t i = 0; i < assignments.size(); ++i)
+        workMap[cachedDepthKeys[i]] = assignments[i].depth;
 
-    for (int idx : getSortedOrder())
+    for (int idx : cachedSortOrder)
     {
         const auto& a = assignments[idx];
 
