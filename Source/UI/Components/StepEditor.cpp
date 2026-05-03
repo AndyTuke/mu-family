@@ -23,6 +23,12 @@ void StepEditor::setBarColour(juce::Colour c)
     repaint();
 }
 
+void StepEditor::setPlayheadPhase(float phase)
+{
+    playheadPhase = phase;
+    repaint();
+}
+
 int StepEditor::hitStepIndex(int x) const
 {
     if (steps.empty()) return -1;
@@ -82,6 +88,11 @@ void StepEditor::paint(juce::Graphics& g)
     // Centre zero line
     g.setColour(MuClidLookAndFeel::colour(Id::stepEditorZeroLine));
     g.drawHorizontalLine((int)centY, 0.0f, (float)getWidth());
+
+    // Playhead
+    const float phX = playheadPhase * (float)getWidth();
+    g.setColour(juce::Colours::white.withAlpha(0.5f));
+    g.drawVerticalLine((int)phX, 0.0f, h);
 }
 
 void StepEditor::mouseDown(const juce::MouseEvent& e)

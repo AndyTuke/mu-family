@@ -313,7 +313,7 @@ void EuclideanPanel::paint(juce::Graphics& g)
     const int rowOffsets[3] = { kOuter, kOuter + rowH + kLogicH, kOuter + 2 * rowH + kLogicH };
     const char* rowLabels[3] = { "Euclid A", "Euclid B", "Accent" };
 
-    g.setFont(juce::Font(9.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
     g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
     for (int i = 0; i < 3; ++i)
         g.drawText(rowLabels[i], kOuter, rowOffsets[i], innerW, kLabelH, juce::Justification::centredLeft, false);

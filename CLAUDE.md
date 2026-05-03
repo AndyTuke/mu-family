@@ -63,7 +63,7 @@ Artefacts land in `build/mu-clid_artefacts/Debug/` or `.../Release/`.
 | 9.5 | ✅ Done | VoiceParams, VoiceEngine (Amp/Filter/Pitch ADSR + filter chain), VoiceSection redesign |
 | 9.6 | ✅ Done | Drive section in VoiceSection; Mixer: always 8 channels/grey inactive, FX sub-panel borders, fader height consistency, pan no-value; Delay spread/dirt 0-100; Mixer button "Sequencer" label; ADSR/filter-res 0-100 display; Mod timing as DropdownSelect with labels |
 | 10 | ✅ Done | TransportBar, AboutPanel, PresetBrowser, SaveDialog, SettingsOverlay, rhythm rename/delete, EFX→Delay/Reverb sends, Echo=Delay algorithm, master loop length, APVTS wiring (getState/setState, preset save/load) |
-| 11 | ⬜ Next | Animations + polish — see [design-ui.md Stage 11 section](docs/design-ui.md) |
+| 11 | ✅ Done | Ring rotation + hit arc pulses (RhythmCircle), sidebar flash (SidebarItem), VU ballistics, panel fade transitions, sidebar add/remove animations, modulator playhead (LFOEditor/StepEditor), font modernisation |
 
 ## Source layout (actual, as built)
 

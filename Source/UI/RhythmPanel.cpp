@@ -3,6 +3,7 @@
 RhythmPanel::RhythmPanel(PluginProcessor& p)
     : proc(p), euclidPanel(p), voiceSection(p)
 {
+    startTimerHz(30);
     addAndMakeVisible(circle);
     addAndMakeVisible(euclidPanel);
     addAndMakeVisible(voiceSection);
@@ -13,7 +14,7 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     midiModeDropdown.setSelectedId(1, false);
     addAndMakeVisible(midiModeDropdown);
 
-    nameEditor.setFont(juce::Font(13.0f));
+    nameEditor.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
     nameEditor.setJustification(juce::Justification::centredLeft);
     nameEditor.onReturnKey = [this] { finishEditingName(true);  };
     nameEditor.onEscapeKey = [this] { finishEditingName(false); };
@@ -70,6 +71,10 @@ void RhythmPanel::refreshCircle()
     if (currentRhythmIndex < 0 || currentRhythmIndex >= proc.getNumRhythms()) return;
     const Rhythm& r = proc.getRhythm(currentRhythmIndex);
     circle.setPatterns(r.genA.getStepTypes(), r.genB.getStepTypes(), r.genC.getStepTypes());
+    circle.setPlayState(&proc.rhythmPlayState[currentRhythmIndex],
+                        &proc.beatFraction,
+                        &proc.sequencerPlaying,
+                        currentColour());
 }
 
 juce::Colour RhythmPanel::currentColour() const
@@ -164,14 +169,14 @@ void RhythmPanel::paint(juce::Graphics& g)
         if (!editingName)
         {
             g.setColour(MuClidLookAndFeel::colour(Id::headingText));
-            g.setFont(juce::Font(13.0f));
+            g.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
             g.drawText(juce::String(r.name), nameRect, juce::Justification::centredLeft, true);
         }
     }
     else
     {
         g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
-        g.setFont(juce::Font(13.0f));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
         g.drawText("No Rhythm", nameRect, juce::Justification::centredLeft, true);
     }
 
@@ -185,7 +190,7 @@ void RhythmPanel::paint(juce::Graphics& g)
         if (it != loadedSampleNames.end())
         {
             g.setColour(MuClidLookAndFeel::colour(Id::labelText));
-            g.setFont(juce::Font(10.0f));
+            g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
             g.drawText(it->second,
                        inner.getX() + 5, inner.getY(), inner.getWidth() - 28, inner.getHeight(),
                        juce::Justification::centredLeft, true);
@@ -193,14 +198,14 @@ void RhythmPanel::paint(juce::Graphics& g)
         else
         {
             g.setColour(MuClidLookAndFeel::colour(Id::sampleBarNoSample));
-            g.setFont(juce::Font(10.0f).italicised());
+            g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f).withStyle("Italic")));
             g.drawText("drop sample here or click to browse",
                        inner.getX() + 5, inner.getY(), inner.getWidth() - 28, inner.getHeight(),
                        juce::Justification::centredLeft, true);
         }
 
         g.setColour(MuClidLookAndFeel::colour(Id::labelText));
-        g.setFont(juce::Font(11.0f));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
         g.drawText("...", inner.getRight() - 24, inner.getY(), 24, inner.getHeight(),
                    juce::Justification::centred, false);
     }
@@ -334,4 +339,9 @@ void RhythmPanel::confirmDelete()
                     safeThis->onRhythmDeleted(idx);
         }),
         true);
+}
+
+void RhythmPanel::timerCallback()
+{
+    modulatorPanel.setPlayheadBeat(proc.lastBeatPos.get());
 }

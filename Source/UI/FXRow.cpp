@@ -98,7 +98,7 @@ void FXRow::paint(juce::Graphics& g)
 
     // Slot name label
     const int nameX = kPadding + kToggleW + kPadding;
-    g.setFont(juce::Font(11.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::labelText));
     g.drawText(slotName, nameX, 0, kNameW, getHeight(), juce::Justification::centredLeft);
 

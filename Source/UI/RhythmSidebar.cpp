@@ -14,6 +14,8 @@ RhythmSidebar::RhythmSidebar(PluginProcessor& p)
 
 void RhythmSidebar::refreshItems()
 {
+    const int prevCount = (int)items.size();
+
     for (auto& item : items)
         itemContainer.removeChildComponent(item.get());
     items.clear();
@@ -26,6 +28,7 @@ void RhythmSidebar::refreshItems()
         juce::Colour col = MuClidLookAndFeel::rhythmPalette[r.colourIndex % 30];
         item->setRhythm(&r, col);
         item->setSelected(i == selectedIndex);
+        item->setPlayState(&proc.rhythmPlayState[i], &proc.beatFraction, &proc.sequencerPlaying);
         item->onSelected = [this](int idx)
         {
             setSelectedIndex(idx);
@@ -37,6 +40,35 @@ void RhythmSidebar::refreshItems()
 
     itemContainer.setSize(kWidth, (int)items.size() * kItemH);
     resized();
+
+    // If a new item was added, animate it sliding in from below
+    if (n > prevCount && n > 0)
+        layoutItems(true, n - 1);
+}
+
+void RhythmSidebar::layoutItems(bool animate, int newItemIndex)
+{
+    const int w = itemContainer.getWidth();
+    for (int i = 0; i < (int)items.size(); i++)
+    {
+        const juce::Rectangle<int> target(0, i * kItemH, w, kItemH);
+        if (animate && i == newItemIndex)
+        {
+            // Start below, animate to correct position
+            items[i]->setAlpha(0.0f);
+            items[i]->setBounds(0, (i + 1) * kItemH, w, kItemH);
+            items[i]->setAlpha(1.0f);
+            animator.animateComponent(items[i].get(), target, 1.0f, 120, false, 0.0, 1.0);
+        }
+        else if (animate)
+        {
+            animator.animateComponent(items[i].get(), target, 1.0f, 80, false, 1.0, 1.0);
+        }
+        else
+        {
+            items[i]->setBounds(target);
+        }
+    }
 }
 
 void RhythmSidebar::setSelectedIndex(int i)

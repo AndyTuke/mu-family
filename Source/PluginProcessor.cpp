@@ -276,12 +276,27 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
     const int numRhythms = sequencer.getNumRhythms();
 
+    sequencerPlaying.set(playing);
+    lastBeatPos.set(beatPos);
+
     if (playing)
     {
         const int firedMask = sequencer.processBlock(beatPos);
         for (int r = 0; r < numRhythms; ++r)
             if (firedMask & (1 << r))
                 voiceEngines[r].trigger();
+
+        // Update UI play-state atomics.
+        const float frac = static_cast<float>(
+            std::fmod(beatPos / SequencerEngine::StepLengthBeats, 1.0));
+        beatFraction.set(frac);
+        for (int r = 0; r < numRhythms; ++r)
+        {
+            rhythmPlayState[r].currentStep  .set(sequencer.getLastStepIndex(r));
+            rhythmPlayState[r].patternLength.set(sequencer.getPatternLength(r));
+            if (firedMask & (1 << r))
+                rhythmPlayState[r].hitFired.set(true);
+        }
     }
 
     // Apply modulation: compute per-rhythm modulated VoiceParams from the modulation matrix.

@@ -60,7 +60,7 @@ void SegmentControl::paint(juce::Graphics& g)
             g.drawRoundedRectangle(pill.reduced(0.5f), radius, 1.0f);
 
             g.setColour(active ? activeBorder : MuClidLookAndFeel::colour(Id::segmentInactiveText));
-            g.setFont(juce::Font(fontSize));
+            g.setFont(juce::Font(juce::FontOptions{}.withHeight(fontSize)));
             g.drawText(options[i], pill.toNearestInt(), juce::Justification::centred, true);
         }
     }
@@ -95,7 +95,7 @@ void SegmentControl::paint(juce::Graphics& g)
             g.setColour(active ? activeBorder : MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
             if (i > 0) g.drawVerticalLine((int)(i * segW), 0, h);
 
-            g.setFont(juce::Font(11.0f));
+            g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
             g.setColour(active ? activeBorder : MuClidLookAndFeel::colour(Id::segmentInactiveText));
             g.drawText(options[i], seg.toNearestInt(), juce::Justification::centred, true);
         }

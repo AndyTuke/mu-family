@@ -12,7 +12,8 @@
 // Full rhythm editor panel. Layout (top to bottom):
 //   Header bar | Sample bar | [RhythmCircle | EuclideanPanel] | VoiceSection | ModulatorPanel
 class RhythmPanel : public juce::Component,
-                    public juce::FileDragAndDropTarget
+                    public juce::FileDragAndDropTarget,
+                    private juce::Timer
 {
 public:
     explicit RhythmPanel(PluginProcessor& p);
@@ -73,4 +74,5 @@ private:
     void finishEditingName(bool save);
     void confirmReset();
     void confirmDelete();
+    void timerCallback() override;
 };

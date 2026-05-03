@@ -15,6 +15,9 @@ public:
 
     void setRhythm(Rhythm* r);
 
+    // Drive the modulator playhead from the current song beat position.
+    void setPlayheadBeat(double beat);
+
     std::function<void()> onChange;
 
     void resized() override;

@@ -17,6 +17,9 @@ public:
     void setStepCount(int count);
     void setBarColour(juce::Colour c);
 
+    // playhead: 0.0 = start, 1.0 = end of loop
+    void setPlayheadPhase(float phase);
+
     void paint(juce::Graphics& g) override;
     void mouseDown(const juce::MouseEvent& e) override;
     void mouseDrag(const juce::MouseEvent& e) override;
@@ -24,6 +27,7 @@ public:
 private:
     std::vector<float> steps;
     juce::Colour barColour { MuClidLookAndFeel::colour(MuClidLookAndFeel::stepEditorBar) };
+    float playheadPhase = 0.0f;
 
     int hitStepIndex(int x) const;
     float yToValue(int y) const;

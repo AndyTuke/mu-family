@@ -3,17 +3,23 @@
 #include "RhythmCircle.h"
 #include "Components/MuClidLookAndFeel.h"
 #include "../Sequencer/Rhythm.h"
+#include "../PluginProcessor.h"
 
 // One entry in the RhythmSidebar. Shows a small RhythmCircle, colour dot, and rhythm name.
-// Right-edge tab line when selected. onSelected fires on click.
-class SidebarItem : public juce::Component
+// Right-edge tab line when selected. Background flashes with rhythm colour on hit.
+class SidebarItem : public juce::Component, private juce::Timer
 {
 public:
     explicit SidebarItem(int index);
 
     void setRhythm(const Rhythm* r, juce::Colour colour);
     void setSelected(bool s);
-    void pulse();
+
+    // Connect to PluginProcessor play-state for animations.
+    // state is non-const because RhythmCircle clears hitFired on read.
+    void setPlayState(PluginProcessor::RhythmPlayState* state,
+                      const juce::Atomic<float>*         beatFrac,
+                      const juce::Atomic<bool>*           playing);
 
     std::function<void(int)> onSelected;
 
@@ -27,5 +33,10 @@ private:
     juce::Colour  rhythmColour { juce::Colours::transparentBlack };
     bool          selected = false;
 
+    PluginProcessor::RhythmPlayState* playState = nullptr;
+    float pulseAlpha = 0.0f;
+
     RhythmCircle miniCircle;
+
+    void timerCallback() override;
 };

@@ -96,7 +96,7 @@ ModulatorEditor::ModulatorEditor()
 
     // Loop timing row
     loopLabel.setText("Loop", juce::dontSendNotification);
-    loopLabel.setFont(juce::Font(10.0f));
+    loopLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     loopLabel.setJustificationType(juce::Justification::centredRight);
     loopLabel.setColour(juce::Label::textColourId,
                         MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
@@ -107,7 +107,7 @@ ModulatorEditor::ModulatorEditor()
 
     // Step timing row (Stepped mode only)
     stepLabel.setText("Step", juce::dontSendNotification);
-    stepLabel.setFont(juce::Font(10.0f));
+    stepLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     stepLabel.setJustificationType(juce::Justification::centredRight);
     stepLabel.setColour(juce::Label::textColourId,
                         MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
@@ -123,6 +123,15 @@ ModulatorEditor::ModulatorEditor()
 
     wireHeader();
     wireTiming();
+}
+
+void ModulatorEditor::setPlayheadBeat(double beat)
+{
+    if (!cs) return;
+    const double loopBeats = cs->getLoopLengthBeats() > 0.0 ? cs->getLoopLengthBeats() : 1.0;
+    const float phase     = static_cast<float>(std::fmod(beat / (double)loopBeats, 1.0));
+    lfoEditor .setPlayheadPhase(phase);
+    stepEditor.setPlayheadPhase(phase);
 }
 
 void ModulatorEditor::setData(ControlSequence* cs_, ModulationMatrix* matrix_,
@@ -427,14 +436,14 @@ void ModulatorEditor::paint(juce::Graphics& g)
     g.setColour(modColour);
     g.fillEllipse(8.0f, dotY, 8.0f, 8.0f);
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::headingText));
-    g.setFont(juce::Font(11.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
     g.drawText("Mod " + juce::String::charToString(char('A' + modIndex)),
                20, 0, 54, kHeaderH, juce::Justification::centredLeft, false);
 
     if (!cs || cs->mode != ControlSequence::Mode::Stepped) return;
 
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
-    g.setFont(juce::Font(9.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
     const int infoY = kHeaderH + kEditorH + kTimingH + kTimingH - 12;
     g.drawText(juce::String(cs->getStepCount()) + " steps",
                getWidth() - 60, infoY, 58, 12,

@@ -24,12 +24,12 @@ TransportBar::TransportBar(PluginProcessor& p)
     }
 
     posLabel.setJustificationType(juce::Justification::centred);
-    posLabel.setFont(juce::Font(11.0f));
+    posLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
     posLabel.setText("1.1.1", juce::dontSendNotification);
     addAndMakeVisible(posLabel);
 
     rhythmCountLabel.setJustificationType(juce::Justification::centred);
-    rhythmCountLabel.setFont(juce::Font(11.0f));
+    rhythmCountLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
     addAndMakeVisible(rhythmCountLabel);
 
     loopDropdown.addItem("Loop Off", 1);
@@ -190,7 +190,7 @@ void TransportBar::paint(juce::Graphics& g)
     g.fillAll();
 
     g.setColour(MuClidLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(14.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(14.0f)));
     g.drawText("mu-Clid", 8, 0, kLogoW - 8, getHeight(),
                juce::Justification::centredLeft, false);
 

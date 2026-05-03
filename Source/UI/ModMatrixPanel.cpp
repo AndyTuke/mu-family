@@ -7,7 +7,7 @@ ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex)
     sourceLabel.setText("Mod " + juce::String(char('A' + csIndex)), juce::dontSendNotification);
     sourceLabel.setColour(juce::Label::textColourId,
                           MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
-    sourceLabel.setFont(juce::Font(10.0f));
+    sourceLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
 
     for (int i = 0; i < ModDest::ids.size(); ++i)
         destCombo.addItem(ModDest::labels[i], i + 1);
@@ -163,7 +163,7 @@ void ModMatrixPanel::paint(juce::Graphics& g)
     g.fillAll();
 
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
-    g.setFont(juce::Font(10.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     g.drawText("SOURCE",      0,   0, 46,  kHeaderH, juce::Justification::centredLeft, false);
     g.drawText("DESTINATION", 48,  0, 200, kHeaderH, juce::Justification::centredLeft, false);
     g.drawText("DEPTH",       getWidth() - 22 - 120 - 4, 0, 120,
@@ -171,7 +171,7 @@ void ModMatrixPanel::paint(juce::Graphics& g)
 
     if (matrixRows.empty())
     {
-        g.setFont(juce::Font(11.0f));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
         g.drawText("No assignments — use the Mod tabs or Add Assignment below",
                    0, kHeaderH + 8, getWidth(), 20,
                    juce::Justification::centred, false);

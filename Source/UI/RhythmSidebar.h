@@ -31,9 +31,12 @@ private:
     juce::Component itemContainer;
     std::vector<std::unique_ptr<SidebarItem>> items;
     AddButton addButton { "Rhythm" };
+    juce::ComponentAnimator animator;
 
     int selectedIndex = 0;
 
     static constexpr int kItemH   = 80;
     static constexpr int kAddBtnH = 34;
+
+    void layoutItems(bool animate, int newItemIndex = -1);
 };

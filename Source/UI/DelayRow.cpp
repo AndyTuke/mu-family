@@ -213,7 +213,7 @@ void DelayRow::paint(juce::Graphics& g)
                static_cast<float>(getWidth()), static_cast<float>(getHeight() - 1), 0.5f);
 
     const int nameX = kPad + kToggleW + kPad;
-    g.setFont(juce::Font(11.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::labelText));
     g.drawText("Delay", nameX, 0, kNameW, getHeight(), juce::Justification::centredLeft);
 

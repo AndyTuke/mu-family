@@ -28,7 +28,7 @@ void AddButton::paint(juce::Graphics& g)
     g.strokePath(border, stroke);
 
     g.setColour(MuClidLookAndFeel::colour(Id::addButtonText));
-    g.setFont(juce::Font(11.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
     g.drawText("+ " + labelText, getLocalBounds(), juce::Justification::centred, true);
 }
 

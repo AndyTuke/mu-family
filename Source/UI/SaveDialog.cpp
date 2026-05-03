@@ -3,11 +3,11 @@
 SaveDialog::SaveDialog()
 {
     nameEditor.setTextToShowWhenEmpty("Preset name", juce::Colours::grey);
-    nameEditor.setFont(juce::Font(13.0f));
+    nameEditor.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
     addAndMakeVisible(nameEditor);
 
     descEditor.setTextToShowWhenEmpty("Description (optional)", juce::Colours::grey);
-    descEditor.setFont(juce::Font(11.0f));
+    descEditor.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
     addAndMakeVisible(descEditor);
 
     addAndMakeVisible(categoryControl);
@@ -93,7 +93,7 @@ void SaveDialog::paint(juce::Graphics& g)
     g.drawRoundedRectangle((float)cardX, (float)cardY, (float)kCardW, (float)kCardH, 8.0f, 1.0f);
 
     g.setColour(MuClidLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(14.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(14.0f)));
     g.drawText("Save Preset", cardX + 24, cardY + 24 - 20, kCardW - 48, 20,
                juce::Justification::centredLeft, false);
 }

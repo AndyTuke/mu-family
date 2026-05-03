@@ -66,6 +66,18 @@ public:
     FXChain     fxChain;
     MixerEngine mixerEngine;
 
+    // Play-state atomics: written by audio thread, read by UI at 30 Hz.
+    struct RhythmPlayState
+    {
+        juce::Atomic<int>  currentStep   { 0 };
+        juce::Atomic<int>  patternLength { 1 };
+        juce::Atomic<bool> hitFired      { false }; // set by audio thread, cleared by UI on read
+    };
+    std::array<RhythmPlayState, SequencerEngine::MaxRhythms> rhythmPlayState;
+    juce::Atomic<float>  beatFraction     { 0.0f }; // fractional position within the current 1/16 step
+    juce::Atomic<bool>   sequencerPlaying { false };
+    juce::Atomic<double> lastBeatPos      { 0.0 };  // most recent beat position (for UI playhead)
+
 private:
     bool apvtsLoading = false;
 

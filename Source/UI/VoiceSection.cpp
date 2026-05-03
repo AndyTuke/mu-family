@@ -253,7 +253,7 @@ void VoiceSection::paint(juce::Graphics& g)
     g.drawLine(div3X, h * 0.05f, div3X, h * 0.95f, 0.5f);
 
     g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
-    g.setFont(juce::Font(10.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     g.drawText("PITCH",  0,                      0, 5 * kW, labelH, juce::Justification::centred, false);
     g.drawText("FILTER", 5 * kW + divW,          0, 5 * kW, labelH, juce::Justification::centred, false);
     g.drawText("AMP",    10 * kW + 2 * divW,     0, 4 * kW, labelH, juce::Justification::centred, false);

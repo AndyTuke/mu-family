@@ -51,7 +51,7 @@ void SettingsOverlay::paint(juce::Graphics& g)
     g.fillAll();
 
     g.setColour(MuClidLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(14.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(14.0f)));
     g.drawText("Settings", kPad, 0, 200, kHeaderH, juce::Justification::centredLeft, false);
 
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
@@ -61,7 +61,7 @@ void SettingsOverlay::paint(juce::Graphics& g)
     const int w = getWidth();
     int y = kHeaderH + kPad + (isStandalone ? 2 : 1) * (kRowH + kPad);
     g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
-    g.setFont(juce::Font(10.0f).italicised());
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f).withStyle("Italic")));
     const juce::String placeholders[] = {
         "Hit pulse style  (Stage 11)",
         "Interpolation quality  (Stage 11)",

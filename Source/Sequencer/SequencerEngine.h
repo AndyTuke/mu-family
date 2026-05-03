@@ -24,6 +24,10 @@ public:
     // Direct numRhythms setter — used during state loading to pre-expand the active count.
     void setNumRhythms(int n) { numRhythms = juce::jlimit(0, MaxRhythms, n); }
 
+    // UI read-only accessors (safe to call from message thread after processBlock).
+    int getLastStepIndex(int r) const { return lastStepIndex[r]; }
+    int getPatternLength (int r) const { return static_cast<int>(cachedPatterns[r].size()); }
+
     // Master loop length (0 = free-running, >0 = all rhythms reset to step 0 at this boundary).
     void setMasterLoopSteps(int steps) { masterLoopSteps = juce::jlimit(0, 256, steps); }
     int  getMasterLoopSteps() const    { return masterLoopSteps; }

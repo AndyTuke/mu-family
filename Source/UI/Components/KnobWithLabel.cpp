@@ -63,7 +63,7 @@ void KnobWithLabel::paint(juce::Graphics& g)
     const int labelH = 14;
 
     // Label below knob
-    g.setFont(juce::Font(10.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::labelText));
     g.drawText(labelText,
                juce::Rectangle<int>(0, getHeight() - labelH, getWidth(), labelH),
@@ -75,7 +75,7 @@ void KnobWithLabel::paint(juce::Graphics& g)
     const float cy      = sliderH * 0.5f;
     const int   valueY  = (int)(cy + radius * 0.75f) - 5;
 
-    g.setFont(juce::Font(8.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(8.0f)));
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::valueText));
     g.drawText(slider.getTextFromValue(slider.getValue()),
                0, valueY, getWidth(), 11,

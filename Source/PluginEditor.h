@@ -43,6 +43,11 @@ private:
     bool browserVisible  = false;
     bool settingsVisible = false;
 
+    juce::ComponentAnimator animator;
+
+    // Fade from→to over durationMs using ComponentAnimator.
+    void fadeSwitch(juce::Component* outgoing, juce::Component* incoming, int durationMs = 80);
+
     void showMixer(bool show);
     void showAbout(bool show);
     void showSaveDialog(bool show);

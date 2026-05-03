@@ -48,7 +48,7 @@ void TimeSelector::paint(juce::Graphics& g)
         g.drawRoundedRectangle(b.toFloat().reduced(0.5f), 2.0f, 1.0f);
         g.setColour(active ? MuClidLookAndFeel::colour(Id::segmentActiveBorder)
                            : MuClidLookAndFeel::colour(Id::segmentInactiveText));
-        g.setFont(juce::Font(10.0f));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
         g.drawText(txt, b, juce::Justification::centred, false);
     };
 

@@ -34,7 +34,7 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
     }
 
     dbLabel.setJustificationType(juce::Justification::centred);
-    dbLabel.setFont(juce::Font(9.0f));
+    dbLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
     addAndMakeVisible(dbLabel);
 
     if (hasMuteSolo())
@@ -300,7 +300,7 @@ void MixerChannel::paint(juce::Graphics& g)
 
     g.setColour(active ? MuClidLookAndFeel::colour(MuClidLookAndFeel::headingText)
                        : MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
-    g.setFont(juce::Font(10.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     g.drawText(channelName, 0, kColourBarH, w, kNameH,
                juce::Justification::centred, true);
 

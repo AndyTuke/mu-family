@@ -37,6 +37,12 @@ void ModulatorPanel::showTab(int idx)
     matrixPanel.setVisible(idx == kNumMods);
 }
 
+void ModulatorPanel::setPlayheadBeat(double beat)
+{
+    if (activeTab < kNumMods)
+        editors[activeTab].setPlayheadBeat(beat);
+}
+
 void ModulatorPanel::setRhythm(Rhythm* r)
 {
     rhythm = r;

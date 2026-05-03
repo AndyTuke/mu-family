@@ -149,6 +149,16 @@ PluginEditor::~PluginEditor()
 //==============================================================================
 void PluginEditor::hideAllOverlays()
 {
+    // Cancel any in-progress fade animations before forcing visibility states
+    animator.cancelAnimation(&rhythmPanel,    true);
+    animator.cancelAnimation(&mixerOverlay,   true);
+    animator.cancelAnimation(&presetBrowser,  true);
+    animator.cancelAnimation(&settingsOverlay, true);
+    rhythmPanel    .setAlpha(1.0f);
+    mixerOverlay   .setAlpha(1.0f);
+    presetBrowser  .setAlpha(1.0f);
+    settingsOverlay.setAlpha(1.0f);
+
     mixerVisible    = false;
     aboutVisible    = false;
     saveVisible     = false;
@@ -163,17 +173,40 @@ void PluginEditor::hideAllOverlays()
     rhythmPanel   .setVisible(true);
 }
 
+void PluginEditor::fadeSwitch(juce::Component* outgoing, juce::Component* incoming, int durationMs)
+{
+    if (incoming)
+    {
+        incoming->setAlpha(0.0f);
+        incoming->setVisible(true);
+    }
+    if (outgoing)
+        animator.animateComponent(outgoing, outgoing->getBounds(), 0.0f, durationMs, false, 1.0, 1.0);
+    if (incoming)
+        animator.animateComponent(incoming, incoming->getBounds(), 1.0f, durationMs, false, 1.0, 1.0);
+
+    // Hide outgoing after animation completes via a delayed lambda
+    if (outgoing)
+    {
+        juce::Component* out = outgoing;
+        juce::Timer::callAfterDelay(durationMs + 10, [out] { out->setVisible(false); out->setAlpha(1.0f); });
+    }
+}
+
 void PluginEditor::showMixer(bool show)
 {
     if (show) hideAllOverlays();
     mixerVisible = show;
-    rhythmPanel .setVisible(!show);
-    mixerOverlay.setVisible( show);
     transportBar.setMixerActive(show);
     if (show)
     {
         mixerOverlay.refresh();
         mixerOverlay.setBounds(rhythmPanel.getBounds());
+        fadeSwitch(&rhythmPanel, &mixerOverlay);
+    }
+    else
+    {
+        fadeSwitch(&mixerOverlay, &rhythmPanel);
     }
 }
 

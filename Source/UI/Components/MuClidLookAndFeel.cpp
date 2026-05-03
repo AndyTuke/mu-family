@@ -196,7 +196,7 @@ void MuClidLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& butt
 {
     bool on = button.getToggleState();
     g.setColour(on ? colour(segmentActiveBorder) : colour(segmentInactiveText));
-    g.setFont(juce::Font(12.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(12.0f)));
     g.drawText(button.getButtonText(), button.getLocalBounds(),
                juce::Justification::centred, true);
 }
@@ -227,7 +227,7 @@ void MuClidLookAndFeel::drawComboBox(juce::Graphics& g, int w, int h, bool /*isD
 void MuClidLookAndFeel::positionComboBoxText(juce::ComboBox& box, juce::Label& label)
 {
     label.setBounds(6, 0, box.getWidth() - 24, box.getHeight());
-    label.setFont(juce::Font(12.0f));
+    label.setFont(juce::Font(juce::FontOptions{}.withHeight(12.0f)));
 }
 
 void MuClidLookAndFeel::drawLabel(juce::Graphics& g, juce::Label& label)

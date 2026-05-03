@@ -32,7 +32,7 @@ void StatusBar::paint(juce::Graphics& g)
         textX += kTagWidth + 4;
     }
 
-    g.setFont(juce::Font(11.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
 
     // Param name
     g.setColour(MuClidLookAndFeel::colour(Id::statusBarText));

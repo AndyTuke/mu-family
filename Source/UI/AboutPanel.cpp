@@ -54,12 +54,12 @@ void AboutPanel::paint(juce::Graphics& g)
 
     // Title
     g.setColour(MuClidLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(28.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(28.0f)));
     g.drawText(juce::String(juce::CharPointer_UTF8("\xce\xbc")) + "-Clid",
                tx, ty, kCardW - 48, 36, juce::Justification::centredLeft, false);
     ty += 40;
 
-    g.setFont(juce::Font(11.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
     g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
     g.drawText("v0.0.0." + juce::String(BUILD_NUMBER), tx, ty, kCardW - 48, 18,
                juce::Justification::centredLeft, false);
@@ -71,7 +71,7 @@ void AboutPanel::paint(juce::Graphics& g)
 
     // Credits
     g.setColour(MuClidLookAndFeel::colour(Id::labelText));
-    g.setFont(juce::Font(10.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     const juce::String credits[] = {
         "JUCE — Proprietary (JUCE 7 license)",
         "SoundTouch — LGPL 2.1 (ships as DLL)",

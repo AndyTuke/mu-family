@@ -45,6 +45,10 @@ public:
 
     std::function<void()> onChange;
 
+    // Drive the playhead: pass the current song beat position.
+    // Phase is computed as fmod(beat / loopBeats, 1.0).
+    void setPlayheadBeat(double beat);
+
     void resized() override;
     void paint(juce::Graphics& g) override;
 

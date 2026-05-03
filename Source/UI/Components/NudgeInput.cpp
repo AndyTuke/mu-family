@@ -48,12 +48,12 @@ void NudgeInput::paint(juce::Graphics& g)
     g.drawRoundedRectangle(displayBounds.toFloat().reduced(0.5f), 3.0f, 1.0f);
 
     g.setColour(MuClidLookAndFeel::colour(Id::valueText));
-    g.setFont(juce::Font(13.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
     g.drawText(juce::String(currentValue), displayBounds, juce::Justification::centred, false);
 
     // Label below display
     g.setColour(MuClidLookAndFeel::colour(Id::labelText));
-    g.setFont(juce::Font(9.0f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
 
     // Up/down arrows
     auto drawArrow = [&](juce::Rectangle<int> bounds, bool up)
@@ -91,7 +91,7 @@ void NudgeInput::paint(juce::Graphics& g)
         g.drawRect(b, 1);
         g.setColour(active ? MuClidLookAndFeel::colour(Id::segmentActiveBorder)
                            : MuClidLookAndFeel::colour(Id::segmentInactiveText));
-        g.setFont(juce::Font(9.0f));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
         g.drawText(txt, b, juce::Justification::centred, false);
     };
     drawStep(step1Bounds,  "1",  stepSize == 1);
