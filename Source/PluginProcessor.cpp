@@ -294,6 +294,10 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         {
             rhythmPlayState[r].currentStep  .set(sequencer.getLastStepIndex(r));
             rhythmPlayState[r].patternLength.set(sequencer.getPatternLength(r));
+            const Rhythm& rhy = sequencer.getRhythm(r);
+            rhythmPlayState[r].stepsA.set(juce::jmax(1, rhy.genA.steps));
+            rhythmPlayState[r].stepsB.set(juce::jmax(1, rhy.genB.steps));
+            rhythmPlayState[r].stepsC.set(juce::jmax(1, rhy.genC.steps));
             if (firedMask & (1 << r))
                 rhythmPlayState[r].hitFired.set(true);
         }

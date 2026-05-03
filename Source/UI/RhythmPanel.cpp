@@ -343,5 +343,6 @@ void RhythmPanel::confirmDelete()
 
 void RhythmPanel::timerCallback()
 {
-    modulatorPanel.setPlayheadBeat(proc.lastBeatPos.get());
+    if (proc.sequencerPlaying.get())
+        modulatorPanel.setPlayheadBeat(proc.lastBeatPos.get());
 }

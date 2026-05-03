@@ -33,12 +33,13 @@ void RhythmCircle::setPlayState(PluginProcessor::RhythmPlayState*  state,
 }
 
 //==============================================================================
-void RhythmCircle::triggerHitPulse(int step, int patLen)
+void RhythmCircle::triggerHitPulse(int combinedStep, int stepsA)
 {
-    if (patLen <= 0) return;
+    if (stepsA <= 0) return;
+    const int ringAStep = combinedStep % stepsA;
     auto& p    = arcPulses[nextPulse % kMaxPulses];
-    p.stepFrac = (float)step / (float)patLen;
-    p.arcWidth = juce::MathConstants<float>::twoPi / (float)patLen;
+    p.stepFrac = (float)ringAStep / (float)stepsA;
+    p.arcWidth = juce::MathConstants<float>::twoPi / (float)stepsA;
     p.alpha    = 0.7f;
     p.expand   = 0.0f;
     p.active   = true;
@@ -57,24 +58,30 @@ void RhythmCircle::timerCallback()
 
         if (playing)
         {
-            const int   step   = playState->currentStep  .get();
-            const int   patLen = playState->patternLength .get();
-            const float frac   = beatFracAtom->get();
+            const int   step  = playState->currentStep.get();
+            const float frac  = beatFracAtom->get();
+            const int   sA    = juce::jmax(1, playState->stepsA.get());
+            const int   sB    = juce::jmax(1, playState->stepsB.get());
+            const int   sC    = juce::jmax(1, playState->stepsC.get());
+            const float twoPi = juce::MathConstants<float>::twoPi;
 
-            if (patLen > 0)
-                rotationAngle = ((float)step + frac) / (float)patLen
-                                * juce::MathConstants<float>::twoPi;
+            // Each ring rotates at its own speed: one full turn per sX steps.
+            rotAngleA = ((float)(step % sA) + frac) / (float)sA * twoPi;
+            rotAngleB = ((float)(step % sB) + frac) / (float)sB * twoPi;
+            rotAngleC = ((float)(step % sC) + frac) / (float)sC * twoPi;
 
             if (playState->hitFired.get())
             {
                 playState->hitFired.set(false);
-                triggerHitPulse(step, patLen);
+                triggerHitPulse(step, sA);
             }
 
-            snapFromAngle = rotationAngle;
-            snapProgress  = 1.0f;
-            wasPlaying    = true;
-            dirty         = true;
+            snapFromA    = rotAngleA;
+            snapFromB    = rotAngleB;
+            snapFromC    = rotAngleC;
+            snapProgress = 1.0f;
+            wasPlaying   = true;
+            dirty        = true;
         }
         else if (wasPlaying)
         {
@@ -87,10 +94,11 @@ void RhythmCircle::timerCallback()
     if (!wasPlaying && snapProgress < 1.0f)
     {
         snapProgress = juce::jmin(1.0f, snapProgress + (1.0f / (0.15f * 30.0f)));
-        const float t     = snapProgress;
-        const float ease  = t * (2.0f - t);
-        rotationAngle     = snapFromAngle * (1.0f - ease);
-        dirty             = true;
+        const float ease = snapProgress * (2.0f - snapProgress);
+        rotAngleA = snapFromA * (1.0f - ease);
+        rotAngleB = snapFromB * (1.0f - ease);
+        rotAngleC = snapFromC * (1.0f - ease);
+        dirty     = true;
     }
 
     // ── Advance arc pulses ───────────────────────────────────────────────────
@@ -192,8 +200,11 @@ void RhythmCircle::paint(juce::Graphics& g)
     const float ringW   = juce::jmax(4.0f, maxR * 0.16f);
     const float ringGap = juce::jmax(2.0f, maxR * 0.05f);
 
-    const int   curStep = playState ? playState->currentStep.get() : 0;
-    const float rotOff  = rotationAngle;
+    // Per-ring current steps (combine step modulo each ring's own length).
+    const int combinedStep = playState ? playState->currentStep.get() : 0;
+    const int sA = playState ? juce::jmax(1, playState->stepsA.get()) : 1;
+    const int sB = playState ? juce::jmax(1, playState->stepsB.get()) : 1;
+    // Ring C always passes -1 for currentStep (never highlighted), so sC not needed here.
 
     // ── Ring A — purple ──────────────────────────────────────────────────────
     const float aOuter = maxR;
@@ -201,7 +212,7 @@ void RhythmCircle::paint(juce::Graphics& g)
     if (!patternA.empty())
     {
         drawRing(g, patternA, cx, cy, aOuter, aInner,
-                 MuClidLookAndFeel::colour(Id::ringEuclidA), curStep, rotOff);
+                 MuClidLookAndFeel::colour(Id::ringEuclidA), combinedStep % sA, rotAngleA);
     }
     else
     {
@@ -223,7 +234,7 @@ void RhythmCircle::paint(juce::Graphics& g)
         if (!patternB.empty())
         {
             drawRing(g, patternB, cx, cy, bOuter, bInner,
-                     MuClidLookAndFeel::colour(Id::ringEuclidB), curStep, rotOff);
+                     MuClidLookAndFeel::colour(Id::ringEuclidB), combinedStep % sB, rotAngleB);
         }
         else
         {
@@ -244,12 +255,12 @@ void RhythmCircle::paint(juce::Graphics& g)
         if (cInner > 0.0f)
         {
             drawRing(g, patternC, cx, cy, cOuter, cInner,
-                     MuClidLookAndFeel::colour(Id::ringEuclidC), -1, rotOff, true);
+                     MuClidLookAndFeel::colour(Id::ringEuclidC), -1, rotAngleC, true);
             innerLimit = cInner - ringGap;
         }
     }
 
-    // ── Expanding arc pulses ─────────────────────────────────────────────────
+    // ── Expanding arc pulses (expand outward from Ring A, rotate with Ring A) ─
     for (const auto& p : arcPulses)
     {
         if (!p.active || p.alpha <= 0.0f) continue;
@@ -258,7 +269,7 @@ void RhythmCircle::paint(juce::Graphics& g)
         const float pulseOuter = aOuter + expandPx;
 
         const float twoPi  = juce::MathConstants<float>::twoPi;
-        const float startA = -juce::MathConstants<float>::halfPi - rotOff
+        const float startA = -juce::MathConstants<float>::halfPi - rotAngleA
                              + p.stepFrac * twoPi - p.arcWidth * 0.5f;
         const float endA   = startA + p.arcWidth;
 

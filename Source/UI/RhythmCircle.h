@@ -38,11 +38,11 @@ private:
     const juce::Atomic<bool>*               isPlayingAtom = nullptr;
     juce::Colour                            rhythmColour;
 
-    // Rotation
-    float rotationAngle = 0.0f;
-    float snapFromAngle = 0.0f;
-    float snapProgress  = 1.0f;  // 1.0 = snap complete
-    bool  wasPlaying    = false;
+    // Per-ring rotation (each ring has its own step count so its own speed)
+    float rotAngleA = 0.0f, rotAngleB = 0.0f, rotAngleC = 0.0f;
+    float snapFromA = 0.0f, snapFromB = 0.0f, snapFromC = 0.0f;
+    float snapProgress = 1.0f;  // 1.0 = snap complete; shared since all rings stop together
+    bool  wasPlaying   = false;
 
     // Expanding arc pulse pool
     struct ArcPulse
@@ -58,7 +58,7 @@ private:
     int   nextPulse    = 0;
     float hubAlpha     = 0.0f;
 
-    void triggerHitPulse(int step, int patLen);
+    void triggerHitPulse(int combinedStep, int stepsA);
 
     void drawRing(juce::Graphics& g,
                   const std::vector<StepType>& pattern,

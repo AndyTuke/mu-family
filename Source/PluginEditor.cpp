@@ -185,11 +185,19 @@ void PluginEditor::fadeSwitch(juce::Component* outgoing, juce::Component* incomi
     if (incoming)
         animator.animateComponent(incoming, incoming->getBounds(), 1.0f, durationMs, false, 1.0, 1.0);
 
-    // Hide outgoing after animation completes via a delayed lambda
+    // Hide outgoing after animation completes. SafePointer guards against the
+    // editor (and therefore outgoing) being destroyed mid-animation.
     if (outgoing)
     {
-        juce::Component* out = outgoing;
-        juce::Timer::callAfterDelay(durationMs + 10, [out] { out->setVisible(false); out->setAlpha(1.0f); });
+        juce::Component::SafePointer<juce::Component> safeOut(outgoing);
+        juce::Timer::callAfterDelay(durationMs + 10, [safeOut]
+        {
+            if (auto* out = safeOut.getComponent())
+            {
+                out->setVisible(false);
+                out->setAlpha(1.0f);
+            }
+        });
     }
 }
 

@@ -20,6 +20,10 @@ void VUMeter::timerCallback()
     const float incoming = getLevel ? getLevel() : 0.0f;
     const float inDb     = linToDB(incoming);
 
+    const float prevDisplay = displayDb;
+    const float prevPeak    = peakDb;
+    const bool  prevClip    = clipLit;
+
     // Attack: instant if louder
     displayDb = (inDb >= displayDb) ? inDb
                                     : juce::jmax(kFloor, displayDb + kReleasePerTick);
@@ -51,7 +55,9 @@ void VUMeter::timerCallback()
         if (clipHold == 0) clipLit = false;
     }
 
-    repaint();
+    // Skip repaint when fully idle (silent and steady) — saves 30Hz redraws per meter.
+    if (displayDb != prevDisplay || peakDb != prevPeak || clipLit != prevClip)
+        repaint();
 }
 
 void VUMeter::mouseDown(const juce::MouseEvent&)

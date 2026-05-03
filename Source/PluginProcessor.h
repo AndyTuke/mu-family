@@ -71,6 +71,9 @@ public:
     {
         juce::Atomic<int>  currentStep   { 0 };
         juce::Atomic<int>  patternLength { 1 };
+        juce::Atomic<int>  stepsA        { 1 }; // individual ring step counts for per-ring rotation
+        juce::Atomic<int>  stepsB        { 1 };
+        juce::Atomic<int>  stepsC        { 1 };
         juce::Atomic<bool> hitFired      { false }; // set by audio thread, cleared by UI on read
     };
     std::array<RhythmPlayState, SequencerEngine::MaxRhythms> rhythmPlayState;

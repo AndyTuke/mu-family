@@ -41,8 +41,9 @@ void RhythmSidebar::refreshItems()
     itemContainer.setSize(kWidth, (int)items.size() * kItemH);
     resized();
 
-    // If a new item was added, animate it sliding in from below
-    if (n > prevCount && n > 0)
+    // If the user added a rhythm (prevCount > 0 rules out initial construction),
+    // animate the new item sliding in from below.
+    if (n > prevCount && prevCount > 0)
         layoutItems(true, n - 1);
 }
 
@@ -54,10 +55,9 @@ void RhythmSidebar::layoutItems(bool animate, int newItemIndex)
         const juce::Rectangle<int> target(0, i * kItemH, w, kItemH);
         if (animate && i == newItemIndex)
         {
-            // Start below, animate to correct position
+            // Start below and transparent, fade + slide into the correct position
             items[i]->setAlpha(0.0f);
             items[i]->setBounds(0, (i + 1) * kItemH, w, kItemH);
-            items[i]->setAlpha(1.0f);
             animator.animateComponent(items[i].get(), target, 1.0f, 120, false, 0.0, 1.0);
         }
         else if (animate)

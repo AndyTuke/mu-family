@@ -128,10 +128,13 @@ ModulatorEditor::ModulatorEditor()
 void ModulatorEditor::setPlayheadBeat(double beat)
 {
     if (!cs) return;
-    const double loopBeats = cs->getLoopLengthBeats() > 0.0 ? cs->getLoopLengthBeats() : 1.0;
-    const float phase     = static_cast<float>(std::fmod(beat / (double)loopBeats, 1.0));
-    lfoEditor .setPlayheadPhase(phase);
-    stepEditor.setPlayheadPhase(phase);
+    const double loopBeatsRaw = cs->getLoopLengthBeats();
+    const double loopBeats    = loopBeatsRaw > 0.0 ? loopBeatsRaw : 1.0;
+    const float  phase        = static_cast<float>(std::fmod(beat / loopBeats, 1.0));
+    if (cs->mode == ControlSequence::Mode::Smooth)
+        lfoEditor.setPlayheadPhase(phase);
+    else
+        stepEditor.setPlayheadPhase(phase);
 }
 
 void ModulatorEditor::setData(ControlSequence* cs_, ModulationMatrix* matrix_,

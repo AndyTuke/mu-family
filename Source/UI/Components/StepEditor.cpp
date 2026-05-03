@@ -1,4 +1,5 @@
 #include "StepEditor.h"
+#include <cmath>
 
 StepEditor::StepEditor()
 {
@@ -25,6 +26,7 @@ void StepEditor::setBarColour(juce::Colour c)
 
 void StepEditor::setPlayheadPhase(float phase)
 {
+    if (std::abs(phase - playheadPhase) < 1.0f / juce::jmax(1, getWidth())) return;
     playheadPhase = phase;
     repaint();
 }
