@@ -1,0 +1,42 @@
+# μ-Clid — Development History
+
+Completed build stages with dates derived from git history.
+
+---
+
+| Stage | Date | Description | Key Files | Issues Closed | Build |
+|---|---|---|---|---|---|
+| Init | 2026-04-27 | Initial project setup — empty JUCE plugin builds successfully | CMakeLists.txt, PluginProcessor, PluginEditor | — | — |
+| 1 & 2 | 2026-04-28 | Euclidean sequencer engine — EuclideanGenerator, HitGenerator, Rhythm, SequencerEngine, PluginProcessor | `Sequencer/EuclideanGenerator`, `HitGenerator`, `Rhythm`, `SequencerEngine` | — | — |
+| 3 | 2026-04-28 | Sample playback engine + sequencer fixes — SamplePlayer, VoiceEngine skeleton, sequencer clock | `Audio/SamplePlayer`, `Audio/VoiceEngine` | — | — |
+| 4 | 2026-04-28 | ControlSequence and ModulationMatrix (pure logic, no UI) | `Sequencer/ControlSequence`, `Modulation/ModulationMatrix` | — | — |
+| 5 | 2026-04-28 | UI component library — MuClidLookAndFeel, KnobWithLabel, SegmentControl, NudgeInput, TimeSelector, DropdownSelect, StepEditor, LFOEditor, AddButton, StatusBar | `UI/Components/` | — | — |
+| 6 | 2026-04-29 | UI panel layer + design doc reorganisation — RhythmCircle, SidebarItem, RhythmSidebar, EuclideanPanel, VoiceSection, RhythmPanel | `UI/RhythmCircle`, `UI/EuclideanPanel`, `UI/VoiceSection`, `UI/RhythmPanel` | — | — |
+| 7 | 2026-04-29 | ModulatorPanel, ModMatrixPanel, MidiOutputEngine | `UI/ModulatorPanel`, `UI/ModMatrixPanel`, `Audio/MidiOutputEngine` | — | — |
+| 7.5 | 2026-04-29 | TransportBar with play/stop and BPM for standalone mode | `UI/TransportBar` | — | — |
+| 8 | 2026-04-30 | FX chain — FXSlotBase, OversampledProcessor, 8 EffectAlgorithms, EffectSlot, DelaySlot, ReverbSlot, FXChain, FXRow UI, DelayRow UI | `FX/`, `UI/FXRow`, `UI/DelayRow` | — | — |
+| 9 | 2026-05-02 | MixerEngine, MixerOverlay, MixerChannel, VUMeter; bug fixes #1–7; 5 UI feature improvements; shared design system | `Audio/MixerEngine`, `UI/MixerChannel`, `UI/MixerOverlay`, `UI/Components/VUMeter` | #1–#7 | — |
+| 9.5 | 2026-05-02 | VoiceParams, full VoiceEngine redesign (Amp/Filter/Pitch ADSR + filter chain), VoiceSection redesign into 4-column layout | `Audio/VoiceParams`, `Audio/VoiceEngine`, `UI/VoiceSection` | — | — |
+| 9.6 | 2026-05-02 | Drive section in VoiceSection; Mixer always-8-channels with greyed inactive; FX sub-panel borders; fader height consistency; pan no-value display; Delay spread/dirt 0–100; Mixer button "Sequencer" label; ADSR/filter-res 0–100 display; Mod timing as DropdownSelect with labels | Various UI files | — | — |
+| 10 | 2026-05-03 | TransportBar complete, AboutPanel, PresetBrowser, SaveDialog, SettingsOverlay; rhythm rename/delete with confirmation; EFX→Delay/Reverb sends; Echo=Delay algorithm; master loop length; APVTS wiring (getState/setState, preset save/load) | `UI/AboutPanel`, `UI/PresetBrowser`, `UI/SaveDialog`, `UI/SettingsOverlay` | — | — |
+| 11 | 2026-05-03 | Ring rotation + hit arc pulses (RhythmCircle); sidebar flash on hit (SidebarItem); VU ballistics redesign; panel fade transitions; sidebar add/remove animations; modulator playhead (LFOEditor/StepEditor); font modernisation (FontOptions) | `UI/RhythmCircle`, `UI/SidebarItem`, `UI/Components/VUMeter`, `UI/ModulatorEditor` | #8–#11, #13, #18, #19 | — |
+| Post-11 | 2026-05-03 | Optimisations: ModulationMatrix sort order cache, static FXAlgorithmDef registries; per-ring rotation speed fixes; sidebar blank-on-load fix | Various | — | — |
+| 12 | 2026-05-04 | Fixes & cleanup — rhythm rename propagation fix; full label de-abbreviation (knob labels, segment mode labels, delay modifiers, status bar strings); dead TimeSelector removal; loop/sync dropdown design verified | `UI/RhythmPanel`, `UI/EuclideanPanel.h`, `UI/VoiceSection`, `UI/DelayRow`, `UI/Components/TimeSelector` (deleted) | #12, #15, #16, #20, #21 | 103 |
+| 13 | 2026-05-04 | UI completions — Amp FX send knobs (Effect/Delay/Reverb) added to Voice Amp config row; intra-FX APVTS wiring verified end-to-end; Settings Overlay audited; signalsmith `windows.h` shadow bug fixed by removing premature includes (re-added in Stage 15 as SYSTEM) | `UI/VoiceSection`, `CMakeLists.txt` | #17, #22, #23 | 103 |
+| 14 | 2026-05-04 | Euclid C accent system — `BlockResult` struct replaces bare `int` return from `SequencerEngine::processBlock`; Ring C pattern cached separately in `cachedCPatterns`; coincidence detection sets `accentMask` bit when Ring C fires on the same global step as an A+B hit; `VoiceEngine::trigger(bool isAccented)` stores `accentGain = decibelsToGain(accentDb)` and applies it as a post-ADSR level multiplier; `accentDb` added to `VoiceParams` and registered as an APVTS param per-rhythm; Accent knob added to VoiceSection Amp config row; VoiceSection layout expanded from 18 to 19 columns (Amp 4→5 cols) | `Audio/VoiceParams`, `Audio/VoiceEngine`, `Sequencer/SequencerEngine`, `PluginProcessor`, `UI/VoiceSection` | #14 | 104 |
+| 15 | 2026-05-04 | Signalsmith FDN reverb — replaced `juce::Reverb` (Freeverb) with `signalsmith::basics::ReverbFloat` (Hadamard FDN with per-line modulation); pimpl pattern keeps Signalsmith headers out of ReverbSlot.h; include paths added as `SYSTEM PRIVATE` to avoid `signalsmith-dsp/windows.h` shadowing Windows SDK; wet work buffers pre-allocated in `prepare()` (no audio-thread allocation); Room/Hall/Plate/Spring presets retuned; `rt20` decay param set per-algorithm; user `size/damp/diffusion/mod` params mapped to `roomMs/highDampRate/early/detune` | `Source/FX/ReverbSlot.h`, `Source/FX/ReverbSlot.cpp`, `CMakeLists.txt` | #24 | 105 |
+| 16 | 2026-05-04 | DSP quality pass — Delay: Hermite cubic interpolation replaces integer read pointer, 50ms one-pole LP smoothing on delay time (avoids clicks on BPM/LFO changes), `smoothCoeff = exp(-1/(0.05*sr))` computed in `prepare()`; Flanger: through-zero implementation — both dry and wet paths read from delay buffer at `baseSamp` and `baseSamp±lfoVal*baseSamp*depth` respectively, sweep can cross centre so comb passes through unity; Phaser: frequency-correct LFO mapping — notch sweeps 200–4000 Hz logarithmically, coefficient derived via bilinear transform `a=(1-tan(πf/sr))/(1+tan(πf/sr))` replacing the old linear coefficient sweep; TransportBar loop dropdown widened 68→100px; ModulatorEditor timing row dropdowns fixed to 110px and left-aligned | `Source/FX/DelaySlot.cpp`, `Source/FX/Effects/FlangerEffect.h`, `Source/FX/Effects/PhaserEffect.h`, `Source/UI/TransportBar.h`, `Source/UI/ModulatorEditor.cpp` | #25, #26, #27, #34, #35 | 109 |
+
+---
+
+## Issue History
+
+Issues resolved during development — see [Issues.md](../Issues.md) for the full table.
+
+Issues #1–#11 were raised and resolved during Stages 9–11. Issues #13 and #18 were resolved as design decisions on 2026-05-04 (no code change required — Euclid C intentionally inherits the full A/B padding parameter set).
+
+Issues #12, #15, #16, #20 were fixed in Stage 12. Issue #21 was resolved as a design decision — the loop dropdown correctly controls master loop length; Host Sync mode is a separate future feature. All Stage 12 + 13 changes reached first successful build at build 103 (builds 94–102 were failed attempts blocked by signalsmith-dsp's `windows.h` shadowing the Windows SDK header).
+
+Issue #17 was fixed in Stage 13 — three FX send knobs added to VoiceSection Amp config row, wired to the same `ch{i}_sendEff/Dly/Rev` APVTS params used by MixerChannel strips. Issues #22 and #23 were verified/audited with no code changes needed.
+
+Issue #14 was fixed in Stage 14 — full accent signal path implemented. Note: Advance Mode and Accent Velocity (originally listed in the stage description) were descoped from v1 per issue #19 (design resolved in Stage 11).

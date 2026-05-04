@@ -31,9 +31,10 @@ public:
     void processInner(juce::dsp::AudioBlock<float>& block) override
     {
         const float lfoInc   = static_cast<float>(rate / sr);
-        // Centre of range = 5.25ms, depth sweeps ±4.75ms → [0.5ms, 10ms]
+        // Centre = 5.25ms; depth sweeps ±baseSamp so the wet path can cross
+        // the dry delay (through-zero), eliminating the comb at lfoVal=0.
         const float baseSamp = static_cast<float>(5.25 * 0.001 * sr);
-        const float depSamp  = static_cast<float>(4.75 * 0.001 * sr * depth);
+        const float depSamp  = baseSamp * depth;
         const float wet      = mix;
         const float dry      = 1.0f - mix;
         const float fb       = feedback;   // already scaled to ±0.95 in setParam
@@ -46,8 +47,8 @@ public:
 
         for (size_t i = 0; i < numSamples; ++i)
         {
-            const float lfoVal = std::sin(lfoPhase * juce::MathConstants<float>::twoPi);
-            const float delayS = juce::jmax(1.0f, baseSamp + lfoVal * depSamp);
+            const float lfoVal    = std::sin(lfoPhase * juce::MathConstants<float>::twoPi);
+            const float wetDelayS = juce::jmax(1.0f, baseSamp + lfoVal * depSamp);
 
             const float inL = dataL ? dataL[i] : 0.0f;
             const float inR = dataR ? dataR[i] : 0.0f;
@@ -55,13 +56,17 @@ public:
             bufL[writePos] = inL + feedL * fb;
             bufR[writePos] = inR + feedR * fb;
 
-            const float wetL = readDelay(bufL, writePos, delayS);
-            const float wetR = readDelay(bufR, writePos, delayS);
+            // Dry reads fixed base delay; wet reads LFO-swept delay.
+            // Both come from the delay buffer so the comb passes through zero.
+            const float dryL = readDelay(bufL, writePos, baseSamp);
+            const float dryR = readDelay(bufR, writePos, baseSamp);
+            const float wetL = readDelay(bufL, writePos, wetDelayS);
+            const float wetR = readDelay(bufR, writePos, wetDelayS);
             feedL = wetL;
             feedR = wetR;
 
-            if (dataL) dataL[i] = dry * inL + wet * wetL;
-            if (dataR) dataR[i] = dry * inR + wet * wetR;
+            if (dataL) dataL[i] = dry * dryL + wet * wetL;
+            if (dataR) dataR[i] = dry * dryR + wet * wetR;
 
             writePos = (writePos + 1) % MaxDelaySamples;
             lfoPhase += lfoInc;

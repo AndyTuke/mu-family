@@ -7,6 +7,32 @@ DelaySlot::DelaySlot()
     bufR.assign(MaxDelaySamples, 0.0f);
 }
 
+// Hermite cubic interpolation for fractional delay reads.
+static float hermiteDelay(const std::vector<float>& buf, int writePos, float delaySamples)
+{
+    const int   bufSize = static_cast<int>(buf.size());
+    const float d       = juce::jlimit(2.0f, static_cast<float>(bufSize - 2), delaySamples);
+    const int   di      = static_cast<int>(d);
+    const float frac    = d - static_cast<float>(di);
+
+    const int r0  = (writePos - di     + bufSize) % bufSize;  // x[0]
+    const int rm1 = (writePos - di + 1 + bufSize) % bufSize;  // x[-1] (one newer)
+    const int r1  = (writePos - di - 1 + bufSize) % bufSize;  // x[1]  (one older)
+    const int r2  = (writePos - di - 2 + bufSize) % bufSize;  // x[2]  (two older)
+
+    const float xm1 = buf[rm1];
+    const float x0  = buf[r0];
+    const float x1  = buf[r1];
+    const float x2  = buf[r2];
+
+    const float c0 = x0;
+    const float c1 = 0.5f * (x1 - xm1);
+    const float c2 = xm1 - 2.5f * x0 + 2.0f * x1 - 0.5f * x2;
+    const float c3 = 0.5f * (x2 - xm1) + 1.5f * (x0 - x1);
+
+    return ((c3 * frac + c2) * frac + c1) * frac + c0;
+}
+
 void DelaySlot::prepare(double sampleRate, int blockSize)
 {
     sr = sampleRate;
@@ -15,7 +41,13 @@ void DelaySlot::prepare(double sampleRate, int blockSize)
     writePosL = writePosR = 0;
     feedL = feedR = 0.0f;
     dryBuffer.setSize(2, blockSize);
+
+    // 50 ms exponential smoothing to glide on delay time changes
+    smoothCoeff = (float)std::exp(-1.0 / (0.050 * sampleRate));
+
     updateDelayFromMode();
+    smoothedDelayL = targetDelayL;
+    smoothedDelayR = targetDelayR;
 }
 
 void DelaySlot::process(juce::AudioBuffer<float>& buffer)
@@ -30,19 +62,16 @@ void DelaySlot::process(juce::AudioBuffer<float>& buffer)
     auto* outL = (numCh > 0) ? buffer.getWritePointer(0) : nullptr;
     auto* outR = (numCh > 1) ? buffer.getWritePointer(1) : outL;
 
-    const int delL = juce::jlimit(1, MaxDelaySamples - 1, static_cast<int>(targetDelayL));
-    const int delR = juce::jlimit(1, MaxDelaySamples - 1, static_cast<int>(targetDelayR));
-
     for (int i = 0; i < numSamples; ++i)
     {
         const float inL = (outL != nullptr) ? outL[i] : 0.0f;
         const float inR = (outR != nullptr) ? outR[i] : 0.0f;
 
-        const int readPL = (writePosL - delL + MaxDelaySamples) % MaxDelaySamples;
-        const int readPR = (writePosR - delR + MaxDelaySamples) % MaxDelaySamples;
+        smoothedDelayL = smoothCoeff * smoothedDelayL + (1.0f - smoothCoeff) * targetDelayL;
+        smoothedDelayR = smoothCoeff * smoothedDelayR + (1.0f - smoothCoeff) * targetDelayR;
 
-        const float delayedL = bufL[readPL];
-        const float delayedR = bufR[readPR];
+        const float delayedL = hermiteDelay(bufL, writePosL, smoothedDelayL);
+        const float delayedR = hermiteDelay(bufR, writePosR, smoothedDelayR);
 
         feedL = processDirt(delayedL * feedback);
         feedR = processDirt(delayedR * feedback);
@@ -89,19 +118,16 @@ void DelaySlot::processReturn(juce::AudioBuffer<float>& buffer)
     auto* outL = (numCh > 0) ? buffer.getWritePointer(0) : nullptr;
     auto* outR = (numCh > 1) ? buffer.getWritePointer(1) : outL;
 
-    const int delL = juce::jlimit(1, MaxDelaySamples - 1, static_cast<int>(targetDelayL));
-    const int delR = juce::jlimit(1, MaxDelaySamples - 1, static_cast<int>(targetDelayR));
-
     for (int i = 0; i < numSamples; ++i)
     {
         const float inL = (outL != nullptr) ? outL[i] : 0.0f;
         const float inR = (outR != nullptr) ? outR[i] : 0.0f;
 
-        const int readPL = (writePosL - delL + MaxDelaySamples) % MaxDelaySamples;
-        const int readPR = (writePosR - delR + MaxDelaySamples) % MaxDelaySamples;
+        smoothedDelayL = smoothCoeff * smoothedDelayL + (1.0f - smoothCoeff) * targetDelayL;
+        smoothedDelayR = smoothCoeff * smoothedDelayR + (1.0f - smoothCoeff) * targetDelayR;
 
-        const float delayedL = bufL[readPL];
-        const float delayedR = bufR[readPR];
+        const float delayedL = hermiteDelay(bufL, writePosL, smoothedDelayL);
+        const float delayedR = hermiteDelay(bufR, writePosR, smoothedDelayR);
 
         feedL = processDirt(delayedL * feedback);
         feedR = processDirt(delayedR * feedback);
@@ -149,9 +175,7 @@ void DelaySlot::updateDelayFromMode()
     }
     else
     {
-        // Beat duration in ms at current BPM
         const double beatMs = 60000.0 / hostBpm;
-        // One beat = 1 quarter note, so a whole note = 4 beats
         double noteMs = beatMs * 4.0 / syncDenominator;
         if (syncDotted)   noteMs *= 1.5;
         if (syncTriplet)  noteMs *= 2.0 / 3.0;
@@ -160,7 +184,7 @@ void DelaySlot::updateDelayFromMode()
     }
 
     const float sampL = static_cast<float>(ms * sr / 1000.0);
-    const float sampR = sampL * (1.0f + spread * 0.1f);  // small R offset for stereo width
+    const float sampR = sampL * (1.0f + spread * 0.1f);
     setDelaySamplesLR(sampL, sampR);
 }
 
@@ -173,8 +197,7 @@ void DelaySlot::setDelaySamplesLR(float sampL, float sampR)
 float DelaySlot::processDirt(float x) const
 {
     if (dirt < 0.001f) return x;
-    // Soft saturation scaled by dirt amount
-    const float gain  = 1.0f + dirt * 8.0f;
-    const float sat   = std::tanh(x * gain) / gain;
+    const float gain = 1.0f + dirt * 8.0f;
+    const float sat  = std::tanh(x * gain) / gain;
     return x + (sat - x) * dirt;
 }

@@ -404,18 +404,19 @@ void ModulatorEditor::resized()
 
     const int labelW = 36;
     const int nudgeW = 80;
-    const int dropW  = w - labelW - 2 - nudgeW;
+    const int dropW  = 110;
+    const int nudgeX = labelW + 2 + dropW + 4;
 
     loopLabel.setBounds(0, y, labelW, kTimingH);
     loopDropdown.setBounds(labelW + 2, y, dropW, kTimingH);
-    loopMult.setBounds(w - nudgeW, y, nudgeW, kTimingH);
+    loopMult.setBounds(nudgeX, y, nudgeW, kTimingH);
     y += kTimingH;
 
     if (stepDropdown.isVisible())
     {
         stepLabel.setBounds(0, y, labelW, kTimingH);
         stepDropdown.setBounds(labelW + 2, y, dropW, kTimingH);
-        stepMult.setBounds(w - nudgeW, y, nudgeW, kTimingH);
+        stepMult.setBounds(nudgeX, y, nudgeW, kTimingH);
         y += kTimingH;
     }
 

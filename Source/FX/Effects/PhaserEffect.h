@@ -34,6 +34,12 @@ public:
         const float dry       = 1.0f - mix;
         const float fb        = feedback * 0.99f;
 
+        // Precompute constants for frequency-correct bilinear-transform coefficient.
+        // Notch sweeps logarithmically from fMin to fMax as LFO goes -1 to +1.
+        static constexpr float fMin = 200.0f, fMax = 4000.0f;
+        const float logRange  = std::log(fMax / fMin);
+        const float piOverSr  = juce::MathConstants<float>::pi / static_cast<float>(sr);
+
         const size_t numSamples  = block.getNumSamples();
         const size_t numChannels = block.getNumChannels();
 
@@ -42,9 +48,12 @@ public:
 
         for (size_t i = 0; i < numSamples; ++i)
         {
-            const float lfoVal = std::sin(lfoPhase * juce::MathConstants<float>::twoPi);
-            // Sweep allpass coefficient between 0.1 and 0.9
-            const float coeff = 0.5f + 0.4f * lfoVal * depth;
+            const float lfoVal  = std::sin(lfoPhase * juce::MathConstants<float>::twoPi);
+            // Map LFO to a logarithmic frequency sweep, then convert to allpass coeff.
+            const float lfoNorm = 0.5f + 0.5f * lfoVal * depth;   // 0..1
+            const float freq    = fMin * std::exp(lfoNorm * logRange);
+            const float t       = std::tan(piOverSr * freq);
+            const float coeff   = (1.0f - t) / (1.0f + t);
 
             const float inL = (dataL != nullptr) ? dataL[i] : 0.0f;
             const float inR = (dataR != nullptr) ? dataR[i] : 0.0f;

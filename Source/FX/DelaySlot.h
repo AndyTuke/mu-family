@@ -65,8 +65,11 @@ private:
     bool     syncTriplet     = false;
     int      syncCount        = 1;
 
-    float targetDelayL = 0.0f;   // in samples
-    float targetDelayR = 0.0f;
+    float targetDelayL   = 0.0f;  // in samples (target)
+    float targetDelayR   = 0.0f;
+    float smoothedDelayL = 0.0f;  // exponentially smoothed toward target (50ms glide)
+    float smoothedDelayR = 0.0f;
+    float smoothCoeff    = 1.0f;  // per-block smoothing coefficient
 
     std::vector<float> bufL, bufR;
     int writePosL = 0, writePosR = 0;

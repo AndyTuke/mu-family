@@ -46,7 +46,7 @@ private:
     static constexpr int kBpmW      = 120;
     static constexpr int kPosW      = 80;
     static constexpr int kRhCountW  = 36;
-    static constexpr int kLoopW     = 68;
+    static constexpr int kLoopW     = 100;
     static constexpr int kAddW      = 28;
     static constexpr int kPresetW   = 140;
     static constexpr int kSaveW     = 44;

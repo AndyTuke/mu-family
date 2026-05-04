@@ -4,9 +4,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build workflow
 
-After every build, read `ToDo.md` and action it:
-- **Bugs** — fix every listed bug immediately, without asking.
-- **Features** — for each item, ask the user whether to include it before touching any code.
+After every build, read `Issues.md` and fix open (unchecked) issues immediately, without asking, up to a miximum of 5 issues. Prioritise issues that are related to the current stage
+
+New feature ideas live in `docs/design-future.md` under **Unscheduled Ideas**. Ask the user before implementing any of them.
+Update the stages as they up worked on, move to development history when done
+
+## Git commit messages
+
+Every commit message must include:
+1. **Stage(s)** — which development stage(s) are included in this commit (e.g. `Stage 12`, `Stages 12–13`)
+2. **Issues closed** — list each issue number and its one-line description (e.g. `Closes #12: rhythm rename propagation`)
+3. **Full version** — the version string in the form `v1.0.<build>` using the current value from `build_number.txt` (e.g. `v1.0.103`)
+
+Example commit message format:
+```
+Stage 13: UI completions — Amp FX sends, intra-FX wiring verified, Settings Overlay audit
+
+Closes #17: Amp FX send knobs (Effect/Delay/Reverb) added to Voice Amp row
+Closes #22: Intra-FX APVTS wiring verified end-to-end
+Closes #23: Settings Overlay audited against design spec
+
+Version: v1.0.103
+```
 
 ## Design documents
 
@@ -47,23 +66,20 @@ cmake --build build --config Release        # Release build
 
 Artefacts land in `build/mu-clid_artefacts/Debug/` or `.../Release/`.
 
-## Current implementation status
+## Development history
 
-| Stage | Status | Key files |
-|---|---|---|
-| 1 | ✅ Done | EuclideanGenerator, HitGenerator, Rhythm |
-| 2 | ✅ Done | SequencerEngine, PluginProcessor |
-| 3 | ✅ Done | SamplePlayer, VoiceEngine |
-| 4 | ✅ Done | ControlSequence, ModulationMatrix |
-| 5 | ✅ Done | All UI/Components/, MuClidLookAndFeel, StepEditor, LFOEditor |
-| 6 | ✅ Done | RhythmCircle, SidebarItem, RhythmSidebar, EuclideanPanel, VoiceSection, RhythmPanel |
-| 7 | ✅ Done | ModulatorPanel, ModulatorEditor, ModMatrixPanel, MidiOutputEngine |
-| 8 | ✅ Done | FXSlotBase, FXAlgorithmDef, OversampledProcessor, 8 EffectAlgorithms, EffectSlot, DelaySlot, ReverbSlot, FXChain, FXRow, DelayRow |
-| 9 | ✅ Done | MixerEngine, MixerOverlay, MixerChannel, VUMeter |
-| 9.5 | ✅ Done | VoiceParams, VoiceEngine (Amp/Filter/Pitch ADSR + filter chain), VoiceSection redesign |
-| 9.6 | ✅ Done | Drive section in VoiceSection; Mixer: always 8 channels/grey inactive, FX sub-panel borders, fader height consistency, pan no-value; Delay spread/dirt 0-100; Mixer button "Sequencer" label; ADSR/filter-res 0-100 display; Mod timing as DropdownSelect with labels |
-| 10 | ✅ Done | TransportBar, AboutPanel, PresetBrowser, SaveDialog, SettingsOverlay, rhythm rename/delete, EFX→Delay/Reverb sends, Echo=Delay algorithm, master loop length, APVTS wiring (getState/setState, preset save/load) |
-| 11 | ✅ Done | Ring rotation + hit arc pulses (RhythmCircle), sidebar flash (SidebarItem), VU ballistics, panel fade transitions, sidebar add/remove animations, modulator playhead (LFOEditor/StepEditor), font modernisation |
+Stages 1–16 are complete. See [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) for the full stage-by-stage log with dates. When a stage is completed, it should be moved to the DevelopmentHistory.md file.
+
+## Upcoming stages
+
+All work below resolves open issues from [Issues.md](Issues.md). Issues are referenced by number.
+
+| Stage | Status | Scope | Issues |
+|---|---|---|---|
+| 15 | ✅ Complete | **Signalsmith Reverb** — replaced `juce::Reverb` with Signalsmith FDN reverb (pimpl, SYSTEM PRIVATE includes, pre-allocated wet buffers, Room/Hall/Plate/Spring presets retuned) | #24 |
+| 16 | ✅ Complete | **Delay + modulation FX quality** — Delay: Hermite cubic interpolation + 50 ms parameter smoothing; Flanger: through-zero implementation; Phaser: frequency-correct LFO→coefficient mapping; TransportBar loop dropdown widened; modulator timing dropdowns fixed | #25, #26, #27, #34, #35 |
+| 17 | 🔲 Planned | **Voice chain + bitcrusher quality** — Chorus: Hermite interpolation + per-voice LFO rate detuning; Drive: ADAA waveshaping; Bitcrusher: pre-filter anti-aliasing + TPDF dither | #28, #29, #30 |
+
 
 ## Source layout (actual, as built)
 
