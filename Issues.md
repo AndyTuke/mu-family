@@ -15,7 +15,7 @@
 | 9 | Accent ring (Ring C) steps are drawn as lots of lines instead of filled blocks | ✅ Fixed | 82 |
 | 10 | High-pass filter produces no sound when resonance is set to 0 | ✅ Fixed | ≤81 |
 | 11 | VU meters are very slow to respond | ✅ Fixed | 82 |
-| 12 | Rhythm rename does not propagate — name updates in panel header but not sidebar item or control bar; switching rhythms shows stale name in header | ✅ Fixed | 103 |
+| 12 | Rhythm rename does not propagate — name updates in panel header but not sidebar item or control bar; switching rhythms shows stale name in header | ✅ Fixed | 113 |
 | 13 | Euclid C padding/insert controls — design updated; C intentionally shares the full A/B parameter set | ✅ Design resolved | 82 |
 | 14 | Accent system not implemented — Ring C coincidence detection missing in SequencerEngine; `isAccented` flag not passed to VoiceEngine; Accent knob (0–+12 dB) not present in VoiceSection Amp config row; `accentDb` APVTS param not wired | ✅ Fixed | 104 |
 | 15 | Label abbreviations violate "full words everywhere" design principle — `"Res"` → `"Resonance"`, `"Semi"` → `"Semitone"`, segment modes `"I"/"M"` → `"Ignore"/"Mute"` / `"Pad"/"Mute"`, Delay modifiers `"Str"/"Dot"/"Tri"` → `"Straight"/"Dotted"/"Triplet"` | ✅ Fixed | 103 |
@@ -41,8 +41,8 @@
 | 40 | Drive algorithm labels static — "Drive / Output / Tone" labels on the Drive controls do not update when the algorithm changes; Bitcrusher should show "Bits / Rate / Tone" | ✅ Fixed | 110 |
 | 41 | Drive section layout — algorithm dropdown on row 1 alongside controls; controls should be on row 2 with the dropdown spanning the full section width on row 1 | ✅ Fixed | 110 |
 | 42 | Pre/Post pad mode toggles mislabelled — "Ignore" label should match the insert section convention and read "Pad" instead | ✅ Fixed | 110 |
-| 31 | Mixer page FX knob sizing — Reverb row knobs are larger than Effect and Delay row knobs; all three rows must use the same knob size and be vertically aligned with each other | 🔴 Open | — |
-| 32 | Mixer page FX section panel — the three effect rows (Effect/Echo, Delay, Reverb) should sit inside a dedicated container panel, with each row inside its own sub-panel | 🔴 Open | — |
+| 31 | Mixer page FX knob sizing — Reverb row knobs are larger than Effect and Delay row knobs; all three rows must use the same knob size and be vertically aligned with each other | ✅ Fixed | 113 |
+| 32 | Mixer page FX section panel — the three effect rows (Effect/Echo, Delay, Reverb) should sit inside a dedicated container panel, with each row inside its own sub-panel | ✅ Fixed | 113 |
 | 33 | Sequencer page Pitch/Filter envelope depth — the Depth knob currently sits in the envelope (bottom) row; move it to the config (top) row for both Pitch and Filter columns so the envelope row only contains ADSR | ✅ Fixed | 110 |
 | 34 | Sequencer page master loop dropdown too narrow — the TransportBar loop/length dropdown clips its text; it should be wide enough to always display the full selected option without truncation | ✅ Fixed | 109 |
 | 35 | Sequencer page modulation section dropdowns too wide — the Step and Loop dropdowns in the modulator timing row are over-sized; shrink to fit their content and left-align all controls on that row | ✅ Fixed | 109 |

@@ -53,6 +53,11 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
 
 void RhythmPanel::setRhythm(int index)
 {
+    // Commit any in-progress name edit before switching rhythms so the name
+    // is saved even if the focus-lost event hasn't fired yet.
+    if (editingName)
+        finishEditingName(true);
+
     currentRhythmIndex = index;
     if (index >= 0 && index < proc.getNumRhythms())
     {
@@ -262,6 +267,7 @@ void RhythmPanel::startEditingName()
 {
     if (currentRhythmIndex < 0 || currentRhythmIndex >= proc.getNumRhythms()) return;
     editingName = true;
+    editingNameIndex = currentRhythmIndex;
     nameEditor.setText(juce::String(proc.getRhythm(currentRhythmIndex).name), false);
     nameEditor.setVisible(true);
     nameEditor.grabKeyboardFocus();
@@ -274,12 +280,12 @@ void RhythmPanel::finishEditingName(bool save)
     if (!editingName) return;
     editingName = false;
     nameEditor.setVisible(false);
-    if (save && currentRhythmIndex >= 0 && currentRhythmIndex < proc.getNumRhythms())
+    if (save && editingNameIndex >= 0 && editingNameIndex < proc.getNumRhythms())
     {
         auto newName = nameEditor.getText().trim();
         if (newName.isEmpty())
-            newName = "Rhythm " + juce::String(currentRhythmIndex + 1);
-        proc.getRhythm(currentRhythmIndex).name = newName.toStdString();
+            newName = "Rhythm " + juce::String(editingNameIndex + 1);
+        proc.getRhythm(editingNameIndex).name = newName.toStdString();
         if (onRhythmRenamed) onRhythmRenamed();
     }
     repaint();

@@ -75,7 +75,8 @@ void MixerOverlay::wireFXRows()
             p->setValueNotifyingHost(p->convertTo0to1((float)idx));
         updateEffectSendLabels();
         const bool isEcho = (idx == EffectSlot::kEchoAlgoIndex);
-        echoRow.setVisible(isEcho);
+        effectRow.setVisible(!isEcho);
+        echoRow  .setVisible(isEcho);
         resized();
     };
     effectRow.onParamChanged = [this, &eff](const juce::String& id, float v) {
@@ -237,8 +238,12 @@ void MixerOverlay::wireFXRows()
             p->setValueNotifyingHost(p->convertTo0to1(v));
     };
 
-    // Set initial echo row visibility based on current algorithm.
-    echoRow.setVisible(eff.getAlgorithmIndex() == EffectSlot::kEchoAlgoIndex);
+    // Set initial row visibility based on current algorithm.
+    {
+        const bool isEcho = (eff.getAlgorithmIndex() == EffectSlot::kEchoAlgoIndex);
+        effectRow.setVisible(!isEcho);
+        echoRow  .setVisible(isEcho);
+    }
 
     // Set initial send labels on rhythm channels to match the current algorithm.
     updateEffectSendLabels();
@@ -300,7 +305,8 @@ void MixerOverlay::loadFromAPVTS()
     // Echo row visibility and state
     {
         const bool isEcho = (eff.getAlgorithmIndex() == EffectSlot::kEchoAlgoIndex);
-        echoRow.setVisible(isEcho);
+        effectRow.setVisible(!isEcho);
+        echoRow  .setVisible(isEcho);
         if (isEcho)
         {
             echoRow.setEnabled(*apvts.getRawParameterValue("echo_en") > 0.5f,
@@ -393,9 +399,7 @@ void MixerOverlay::resized()
 {
     const int w = getWidth();
     const int h = getHeight();
-    const bool echoVisible = echoRow.isVisible();
-    const int fxAreaH = echoVisible ? kFXRowH * 4 + kFXGap * 3 : kFXAreaH;
-    const int stripH  = juce::jmax(200, h - fxAreaH);
+    const int stripH  = juce::jmax(200, h - kFXAreaH);
 
     // Channel strips: 8 rhythms | divider | returns (3) | divider | master
     int x = 0;
@@ -413,12 +417,13 @@ void MixerOverlay::resized()
     x += kDivW;
     masterChannel.setBounds(x, 0, kMasterW, stripH);
 
-    // FX rows below, with gaps between sub-panels
-    int fy = stripH;
-    effectRow.setBounds(0, fy, w, kFXRowH);  fy += kFXRowH + kFXGap;
-    if (echoVisible) { echoRow.setBounds(0, fy, w, kFXRowH); fy += kFXRowH + kFXGap; }
-    delayRow .setBounds(0, fy, w, kFXRowH);  fy += kFXRowH + kFXGap;
-    reverbRow.setBounds(0, fy, w, kFXRowH);
+    // FX rows inset within the outer container panel.
+    // Echo replaces Effect at the same position — only one is visible at a time.
+    int fy = stripH + kFXPad;
+    effectRow.setBounds(kFXPad, fy, w - kFXPad * 2, kFXRowH);
+    echoRow  .setBounds(kFXPad, fy, w - kFXPad * 2, kFXRowH);  fy += kFXRowH + kFXGap;
+    delayRow .setBounds(kFXPad, fy, w - kFXPad * 2, kFXRowH);  fy += kFXRowH + kFXGap;
+    reverbRow.setBounds(kFXPad, fy, w - kFXPad * 2, kFXRowH);
 }
 
 void MixerOverlay::paint(juce::Graphics& g)
@@ -436,18 +441,32 @@ void MixerOverlay::paint(juce::Graphics& g)
     divX += kDivW + kChanW * 3;
     g.fillRect(divX, 0, kDivW, stripH);
 
-    // FX sub-panel borders
-    const juce::Colour borderCol = MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder);
-    const juce::Colour fillCol   = MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground)
-                                       .brighter(0.06f);
-    const bool echoVis = echoRow.isVisible();
-    const int numPanels = echoVis ? 4 : 3;
-    int fy = stripH;
+    // FX section: outer container panel + three inner row sub-panels
+    const juce::Colour borderCol   = MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder);
+    const juce::Colour outerFill   = MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground)
+                                         .darker(0.15f);
+    const juce::Colour rowFill     = MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground)
+                                         .brighter(0.06f);
+
+    // Outer container
+    {
+        juce::Rectangle<float> outer { 0.5f, (float)stripH + 0.5f,
+                                       (float)getWidth() - 1.0f, (float)kFXAreaH - 1.0f };
+        g.setColour(outerFill);
+        g.fillRoundedRectangle(outer, 6.0f);
+        g.setColour(borderCol);
+        g.drawRoundedRectangle(outer, 6.0f, 1.5f);
+    }
+
+    // Inner row sub-panels (inset by kFXPad on all sides)
+    const int numPanels = 3;
+    int fy = stripH + kFXPad;
     for (int i = 0; i < numPanels; ++i)
     {
-        juce::Rectangle<float> panel { 0.5f, (float)fy + 0.5f,
-                                       (float)getWidth() - 1.0f, (float)kFXRowH - 1.0f };
-        g.setColour(fillCol);
+        juce::Rectangle<float> panel { (float)kFXPad + 0.5f, (float)fy + 0.5f,
+                                       (float)(getWidth() - kFXPad * 2) - 1.0f,
+                                       (float)kFXRowH - 1.0f };
+        g.setColour(rowFill);
         g.fillRoundedRectangle(panel, 4.0f);
         g.setColour(borderCol);
         g.drawRoundedRectangle(panel, 4.0f, 1.0f);

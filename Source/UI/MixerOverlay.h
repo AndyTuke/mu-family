@@ -43,7 +43,8 @@ private:
 
     static constexpr int kFXRowH  = 82;
     static constexpr int kFXGap   = 6;    // gap between FX sub-panels
-    static constexpr int kFXAreaH = kFXRowH * 3 + kFXGap * 2;  // 3-row base (no echo)
+    static constexpr int kFXPad   = 6;    // outer container panel padding (top/bottom and left/right)
+    static constexpr int kFXAreaH = kFXRowH * 3 + kFXGap * 2 + kFXPad * 2;  // total FX area including outer padding
     static constexpr int kDivW     = 4;
     static constexpr int kChanW    = 64;
     static constexpr int kMasterW  = 96;

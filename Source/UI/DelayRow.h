@@ -48,8 +48,8 @@ private:
     DropdownSelect modeDropdown;
 
     // Sync mode controls
-    SegmentControl modifierSegment { { "Str", "Dot", "Tri" } };
-    KnobWithLabel  countKnob { "Count", LafId::knobFxSend };
+    SegmentControl modifierSegment { { "Straight", "Dotted", "Triplet" } };
+    KnobWithLabel  multipleKnob { "Multiple", LafId::knobFxSend };
 
     // Free mode control
     KnobWithLabel msKnob { "Time", LafId::knobFxSend };
@@ -65,9 +65,7 @@ private:
     static constexpr int kToggleW   = 36;
     static constexpr int kNameW     = 60;
     static constexpr int kDropdownW = 120;  // same as FXRow algorithm dropdowns
-    static constexpr int kModifierW = 80;
-    static constexpr int kCountW    = 60;
-    static constexpr int kMsW       = 64;
-    static constexpr int kKnobW     = 64;
+    static constexpr int kMsW       = 72;   // matches FXRow::kKnobW
+    static constexpr int kKnobW     = 72;   // matches FXRow::kKnobW
     static constexpr int kPad       = 4;
 };
