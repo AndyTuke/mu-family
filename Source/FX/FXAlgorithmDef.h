@@ -42,7 +42,7 @@ struct FXAlgorithmRegistry
                 { "mix",    "Mix",    0.0f, 100.0f, 50.0f, "%" },
             }, 1 },
             { "flanger", "Flanger", "Modulation", {
-                { "rate",     "Rate",     0.1f, 8.0f, 0.5f, "Hz" },
+                { "rate",     "Rate",     0.01f, 20.0f, 0.5f, "Hz" },
                 { "depth",    "Depth",    0.0f, 100.0f, 50.0f, "%" },
                 { "feedback", "Feedback", -100.0f, 100.0f, 0.0f, "%" },
                 { "mix",      "Mix",      0.0f, 100.0f, 50.0f, "%" },

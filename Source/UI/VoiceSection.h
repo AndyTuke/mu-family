@@ -29,7 +29,7 @@ private:
 
     // ─── PITCH ──────────────────────────────────────────────────────────
     KnobWithLabel pitchOctave  { "Octave",  Id::knobEuclidean };
-    KnobWithLabel pitchSemi    { "Semi",    Id::knobEuclidean };
+    KnobWithLabel pitchSemi    { "Semitone", Id::knobEuclidean };
     KnobWithLabel pitchFine    { "Fine",    Id::knobEuclidean };
     KnobWithLabel pitchAtk     { "Attack",  Id::knobEuclidean };
     KnobWithLabel pitchDec     { "Decay",   Id::knobEuclidean };
@@ -40,7 +40,7 @@ private:
     // ─── FILTER ─────────────────────────────────────────────────────────
     DropdownSelect  filterType;
     KnobWithLabel  filterCutoff { "Cutoff",  Id::knobPostPad  };
-    KnobWithLabel  filterRes    { "Res",     Id::knobPostPad  };
+    KnobWithLabel  filterRes    { "Resonance", Id::knobPostPad  };
     KnobWithLabel  filterAtk    { "Attack",  Id::knobPostPad  };
     KnobWithLabel  filterDec    { "Decay",   Id::knobPostPad  };
     KnobWithLabel  filterSus    { "Sustain", Id::knobPostPad  };
@@ -49,6 +49,10 @@ private:
 
     // ─── AMP ────────────────────────────────────────────────────────────
     KnobWithLabel  ampLevel    { "Level",   Id::knobLevel    };
+    KnobWithLabel  ampSendEff  { "Effect",  Id::knobFxSend   };
+    KnobWithLabel  ampSendDly  { "Delay",   Id::knobFxSend   };
+    KnobWithLabel  ampSendRev  { "Reverb",  Id::knobFxSend   };
+    KnobWithLabel  ampAccent   { "Accent",  Id::knobLevel    };
     KnobWithLabel  ampAtk      { "Attack",  Id::knobLevel    };
     KnobWithLabel  ampDec      { "Decay",   Id::knobLevel    };
     KnobWithLabel  ampSus      { "Sustain", Id::knobLevel    };
@@ -63,4 +67,5 @@ private:
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();
     void loadFromRhythm();
+    void updateDriveLabels();
 };

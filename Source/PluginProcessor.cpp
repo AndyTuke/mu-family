@@ -86,7 +86,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addF(p+"aEnvAtk", n+"A Env Atk",  0.0f, 100.0f,  0.0f);
         addF(p+"aEnvDec", n+"A Env Dec",  0.0f, 100.0f,  3.0f);
         addF(p+"aEnvSus", n+"A Env Sus",  0.0f, 100.0f, 80.0f);
-        addF(p+"aEnvRel", n+"A Env Rel",  0.0f, 100.0f,  5.0f);
+        addF(p+"aEnvRel",   n+"A Env Rel",  0.0f, 100.0f,  5.0f);
+        addF(p+"accentDb",  n+"Accent",     0.0f,  12.0f,  0.0f);
         // Drive
         addI(p+"drvChar", n+"Drive Char",   0,   3,      0);
         addF(p+"drvDrv",  n+"Drive",        0.0f, 100.0f, 0.0f);
@@ -154,7 +155,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     {
         const juce::String c = "ch" + juce::String(i) + "_";
         const juce::String n = "Ch" + juce::String(i + 1) + " ";
-        addF(c+"lvl",     n+"Level",      0.0f, 1.0f,  0.75f);
+        addF(c+"lvl",     n+"Level",      0.0f, 1.0f,  0.5f);
         addF(c+"pan",     n+"Pan",       -1.0f, 1.0f,  0.0f);
         addB(c+"mute",    n+"Mute",      false);
         addB(c+"solo",    n+"Solo",      false);
@@ -201,7 +202,8 @@ PluginProcessor::PluginProcessor()
     modParamValues.reserve(16);
     for (const char* key : { "amp.attack", "amp.decay", "amp.sustain", "amp.release",
                               "filter.cutoff", "filter.resonance",
-                              "fenv.attack", "fenv.decay", "fenv.depth" })
+                              "fenv.attack", "fenv.decay", "fenv.depth",
+                              "pitch.semitones", "drive.amount" })
         modParamValues[key] = 0.0f;
 
     // Add default rhythm (16 steps, 4 hits) and sync its state to APVTS.
@@ -281,10 +283,10 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
     if (playing)
     {
-        const int firedMask = sequencer.processBlock(beatPos);
+        const auto blockResult = sequencer.processBlock(beatPos);
         for (int r = 0; r < numRhythms; ++r)
-            if (firedMask & (1 << r))
-                voiceEngines[r].trigger();
+            if (blockResult.firedMask & (1 << r))
+                voiceEngines[r].trigger(blockResult.accentMask & (1 << r));
 
         // Update UI play-state atomics.
         const float frac = static_cast<float>(
@@ -298,7 +300,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             rhythmPlayState[r].stepsA.set(juce::jmax(1, rhy.genA.steps));
             rhythmPlayState[r].stepsB.set(juce::jmax(1, rhy.genB.steps));
             rhythmPlayState[r].stepsC.set(juce::jmax(1, rhy.genC.steps));
-            if (firedMask & (1 << r))
+            if (blockResult.firedMask & (1 << r))
                 rhythmPlayState[r].hitFired.set(true);
         }
     }
@@ -325,6 +327,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParamValues["fenv.attack"]      = modParams.filterEnvAtk * 10.0f;
                 modParamValues["fenv.decay"]       = modParams.filterEnvDec * 10.0f;
                 modParamValues["fenv.depth"]       = modParams.filterEnvDepth;
+                modParamValues["pitch.semitones"]  = 0.0f;
+                modParamValues["drive.amount"]     = modParams.driveDrive;
 
                 rhythm.modulationMatrix.process(rhythm.controlSequences, beatPos, modParamValues);
 
@@ -340,6 +344,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParams.filterEnvAtk   = juce::jmax(0.001f, modParamValues["fenv.attack"]      / 10.0f);
                 modParams.filterEnvDec   = juce::jmax(0.001f, modParamValues["fenv.decay"]       / 10.0f);
                 modParams.filterEnvDepth = juce::jlimit(0.0f, 48.0f, modParamValues["fenv.depth"]);
+                modParams.pitchMod       = juce::jlimit(-24.0f, 24.0f, modParamValues["pitch.semitones"]);
+                modParams.driveDrive     = juce::jlimit(0.0f, 100.0f, modParamValues["drive.amount"]);
             }
         }
 
@@ -450,6 +456,7 @@ void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float 
     else if (suffix == "aEnvDec")   { r.voiceParams.ampEnvDec      = adsrTime(v); voiceDirty = true; }
     else if (suffix == "aEnvSus")   { r.voiceParams.ampEnvSus      = adsrSus(v);  voiceDirty = true; }
     else if (suffix == "aEnvRel")   { r.voiceParams.ampEnvRel      = adsrTime(v); voiceDirty = true; }
+    else if (suffix == "accentDb")  { r.voiceParams.accentDb        = v;           voiceDirty = true; }
     // Drive
     else if (suffix == "drvChar")   { r.voiceParams.driveChar      = juce::jlimit(0, 3, (int)v); voiceDirty = true; }
     else if (suffix == "drvDrv")    { r.voiceParams.driveDrive     = v;            voiceDirty = true; }
@@ -648,6 +655,7 @@ void PluginProcessor::pushRhythmToAPVTS(int ri)
     set(px+"aEnvDec",   vp.ampEnvDec  * 10.0f);
     set(px+"aEnvSus",   vp.ampEnvSus  * 100.0f);
     set(px+"aEnvRel",   vp.ampEnvRel  * 10.0f);
+    set(px+"accentDb",  vp.accentDb);
     set(px+"drvChar",   (float)vp.driveChar);
     set(px+"drvDrv",    vp.driveDrive);
     set(px+"drvOut",    vp.driveOutput);

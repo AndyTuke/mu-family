@@ -67,11 +67,21 @@ void SidebarItem::paint(juce::Graphics& g)
         selected ? Id::sidebarItemSelected : Id::sidebarItemBackground));
     g.fillRect(0, 0, w, h);
 
-    // Background hit pulse (drawn over base bg, under everything else)
+    // Expanding pulse ring centred on miniCircle — fades and grows on hit.
     if (pulseAlpha > 0.0f)
     {
-        g.setColour(rhythmColour.withAlpha(pulseAlpha));
-        g.fillRect(0, 0, w, h);
+        const float progress = 1.0f - (pulseAlpha / 0.4f);   // 0 = just fired, 1 = faded
+        const float cx = w * 0.5f;
+        const float cy = miniCircle.getY() + miniCircle.getHeight() * 0.5f;
+        const float maxR = static_cast<float>(std::min(miniCircle.getWidth(),
+                                                        miniCircle.getHeight())) * 0.55f;
+        const float r = progress * maxR;
+        const float a = pulseAlpha / 0.4f;  // 1.0 at peak, 0.0 when done
+        if (r >= 1.0f)
+        {
+            g.setColour(rhythmColour.withAlpha(a * 0.9f));
+            g.drawEllipse(cx - r, cy - r, r * 2.0f, r * 2.0f, 2.0f);
+        }
     }
 
     // Right-edge tab line when selected

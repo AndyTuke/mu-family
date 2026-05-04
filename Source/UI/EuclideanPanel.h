@@ -37,11 +37,11 @@ private:
     KnobWithLabel rotA        { "Rotate",        Id::knobEuclidean };
     KnobWithLabel prePadA      { "Pre Pad",       Id::knobPrePad    };
     KnobWithLabel postPadA     { "Post Pad",      Id::knobPostPad   };
-    SegmentControl prePadModeA  { {"I","M"}, SegmentControl::ActiveStyle::Warning };
-    SegmentControl postPadModeA { {"I","M"}, SegmentControl::ActiveStyle::Warning };
+    SegmentControl prePadModeA  { {"Pad","Mute"}, SegmentControl::ActiveStyle::Warning };
+    SegmentControl postPadModeA { {"Pad","Mute"}, SegmentControl::ActiveStyle::Warning };
     KnobWithLabel insertStA    { "Insert Start",  Id::knobInsertPad };
     KnobWithLabel insertLenA   { "Insert Length", Id::knobInsertPad };
-    SegmentControl insertModeA  { {"I","M"}, SegmentControl::ActiveStyle::Warning };
+    SegmentControl insertModeA  { {"Pad","Mute"}, SegmentControl::ActiveStyle::Warning };
 
     // ── Logic ─────────────────────────────────────────────────────────────────
     SegmentControl logicCtrl { {"OR","AND","XOR","A Only","B Only"},
@@ -54,11 +54,11 @@ private:
     KnobWithLabel rotB        { "Rotate",        Id::knobEuclidean };
     KnobWithLabel prePadB      { "Pre Pad",       Id::knobPrePad    };
     KnobWithLabel postPadB     { "Post Pad",      Id::knobPostPad   };
-    SegmentControl prePadModeB  { {"I","M"}, SegmentControl::ActiveStyle::Warning };
-    SegmentControl postPadModeB { {"I","M"}, SegmentControl::ActiveStyle::Warning };
+    SegmentControl prePadModeB  { {"Pad","Mute"}, SegmentControl::ActiveStyle::Warning };
+    SegmentControl postPadModeB { {"Pad","Mute"}, SegmentControl::ActiveStyle::Warning };
     KnobWithLabel insertStB    { "Insert Start",  Id::knobInsertPad };
     KnobWithLabel insertLenB   { "Insert Length", Id::knobInsertPad };
-    SegmentControl insertModeB  { {"I","M"}, SegmentControl::ActiveStyle::Warning };
+    SegmentControl insertModeB  { {"Pad","Mute"}, SegmentControl::ActiveStyle::Warning };
 
     // ── Euclid C (Accent) ────────────────────────────────────────────────────
     KnobWithLabel stepsC      { "Steps",         Id::knobLevel     };
@@ -66,11 +66,11 @@ private:
     KnobWithLabel rotC        { "Rotate",        Id::knobLevel     };
     KnobWithLabel prePadC      { "Pre Pad",       Id::knobPrePad    };
     KnobWithLabel postPadC     { "Post Pad",      Id::knobPostPad   };
-    SegmentControl prePadModeC  { {"I","M"}, SegmentControl::ActiveStyle::Warning };
-    SegmentControl postPadModeC { {"I","M"}, SegmentControl::ActiveStyle::Warning };
+    SegmentControl prePadModeC  { {"Pad","Mute"}, SegmentControl::ActiveStyle::Warning };
+    SegmentControl postPadModeC { {"Pad","Mute"}, SegmentControl::ActiveStyle::Warning };
     KnobWithLabel insertStC    { "Insert Start",  Id::knobInsertPad };
     KnobWithLabel insertLenC   { "Insert Length", Id::knobInsertPad };
-    SegmentControl insertModeC  { {"I","M"}, SegmentControl::ActiveStyle::Warning };
+    SegmentControl insertModeC  { {"Pad","Mute"}, SegmentControl::ActiveStyle::Warning };
 
     static constexpr int kLogicH  = 24;
     static constexpr int kSwitchH = 14;

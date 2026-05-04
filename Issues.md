@@ -35,8 +35,14 @@
 | 29 | Drive/Waveshaper: implement ADAA (Antiderivative Anti-Aliasing) — current `tanh` aliases without oversampling; ADAA formula: `(ln(cosh(x[n])) - ln(cosh(x[n-1]))) / (x[n] - x[n-1])` gives 8–16× equivalent at near-zero CPU cost | 🔴 Open | — |
 | 30 | Bitcrusher: add pre-filter anti-aliasing and TPDF dither — add LP at new Nyquist before sample-hold, add triangular dither `x + (r1-r2)*lsb` before quantisation | 🔴 Open | — |
 | 36 | Mixer VU meters read pre-fader — master, Effect, Delay, and Reverb return VUs captured before their respective gain stages so faders had no effect on the meters; inactive channel peaks not cleared when rhythms removed | ✅ Fixed | 108 |
+| 37 | Flanger rate range too narrow — 0.1 Hz minimum still produces noticeable modulation; 8 Hz maximum is not fast enough for jet-flange effect | ✅ Fixed | 110 |
+| 38 | Mixer channel level defaults too high — default channel level 0.75 (−2.5 dB) causes loud samples to peak near the top of the VU meter at rest; default lowered to 0.5 (−6 dB) | ✅ Fixed | 110 |
+| 39 | Sidebar item flashes entire background on hit — should show a small expanding pulse ring centred on the miniCircle instead of a full background colour flood | ✅ Fixed | 110 |
+| 40 | Drive algorithm labels static — "Drive / Output / Tone" labels on the Drive controls do not update when the algorithm changes; Bitcrusher should show "Bits / Rate / Tone" | ✅ Fixed | 110 |
+| 41 | Drive section layout — algorithm dropdown on row 1 alongside controls; controls should be on row 2 with the dropdown spanning the full section width on row 1 | ✅ Fixed | 110 |
+| 42 | Pre/Post pad mode toggles mislabelled — "Ignore" label should match the insert section convention and read "Pad" instead | ✅ Fixed | 110 |
 | 31 | Mixer page FX knob sizing — Reverb row knobs are larger than Effect and Delay row knobs; all three rows must use the same knob size and be vertically aligned with each other | 🔴 Open | — |
 | 32 | Mixer page FX section panel — the three effect rows (Effect/Echo, Delay, Reverb) should sit inside a dedicated container panel, with each row inside its own sub-panel | 🔴 Open | — |
-| 33 | Sequencer page Pitch/Filter envelope depth — the Depth knob currently sits in the envelope (bottom) row; move it to the config (top) row for both Pitch and Filter columns so the envelope row only contains ADSR | 🔴 Open | — |
+| 33 | Sequencer page Pitch/Filter envelope depth — the Depth knob currently sits in the envelope (bottom) row; move it to the config (top) row for both Pitch and Filter columns so the envelope row only contains ADSR | ✅ Fixed | 110 |
 | 34 | Sequencer page master loop dropdown too narrow — the TransportBar loop/length dropdown clips its text; it should be wide enough to always display the full selected option without truncation | ✅ Fixed | 109 |
 | 35 | Sequencer page modulation section dropdowns too wide — the Step and Loop dropdowns in the modulator timing row are over-sized; shrink to fit their content and left-align all controls on that row | ✅ Fixed | 109 |
