@@ -21,6 +21,8 @@ void VoiceEngine::prepareToPlay(double sampleRate, int blockSize)
     }
 
     tempBuffer.setSize(2, blockSize, false, true, false);
+    toneFiltState[0] = toneFiltState[1] = 0.0f;
+    prevDriveX[0]   = prevDriveX[1]   = 0.0f;
 
     ampEnv.setSampleRate(sampleRate);
     filterEnv.setSampleRate(sampleRate);
@@ -57,9 +59,11 @@ void VoiceEngine::loadFile(const juce::File& file)
     }
 }
 
-void VoiceEngine::trigger()
+void VoiceEngine::trigger(bool isAccented)
 {
     applyPendingParams();
+
+    accentGain = isAccented ? juce::Decibels::decibelsToGain(activeParams.accentDb) : 1.0f;
 
     bool claimed = false;
     for (auto& v : voices)
@@ -90,7 +94,8 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
 
     float semitones = static_cast<float>(activeParams.pitchOctave) * 12.0f
                     + static_cast<float>(activeParams.pitchSemitones)
-                    + activeParams.pitchFine / 100.0f;
+                    + activeParams.pitchFine / 100.0f
+                    + activeParams.pitchMod;
 
     float pitchEnvVal = 0.0f;
     for (int i = 0; i < ns; ++i)
@@ -124,8 +129,96 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     juce::dsp::ProcessContextReplacing<float> ctx(block);
     filter.process(ctx);
 
+    // ── Drive stage ──────────────────────────────────────────────────────────
+    if (activeParams.driveDrive > 0.01f)
+    {
+        const float preGain = std::pow(10.0f, activeParams.driveDrive / 100.0f * 2.0f);
+        const float outGain = std::pow(10.0f, activeParams.driveOutput / 20.0f);
+
+        // ADAA antiderivatives — guard against cosh overflow for large inputs.
+        auto ad1Tanh = [](float x) -> float {
+            const float ax = std::abs(x);
+            return ax > 12.0f ? ax - 0.6931472f : std::log(std::cosh(x));
+        };
+        auto ad1Clip = [](float x) -> float {
+            if (x >  1.0f) return x - 0.5f;
+            if (x < -1.0f) return -x - 0.5f;
+            return x * x * 0.5f;
+        };
+
+        for (int ch = 0; ch < nCh; ++ch)
+        {
+            auto* data  = tempBuffer.getWritePointer(ch);
+            float xPrev = prevDriveX[ch < 2 ? ch : 0];
+
+            for (int i = 0; i < ns; ++i)
+            {
+                const float x  = data[i] * preGain;
+                const float dx = x - xPrev;
+                float y;
+
+                switch (activeParams.driveChar)
+                {
+                    case 1: // Hard clip — ADAA
+                        if (std::abs(dx) < 1e-4f)
+                            y = juce::jlimit(-1.0f, 1.0f, 0.5f * (x + xPrev));
+                        else
+                            y = (ad1Clip(x) - ad1Clip(xPrev)) / dx;
+                        break;
+                    case 2: // Triangular foldback — direct (ADAA for foldback is complex)
+                        {
+                            float fx = juce::jlimit(-4.0f, 4.0f, x);
+                            while (fx > 1.0f || fx < -1.0f)
+                            {
+                                if (fx > 1.0f)  fx = 2.0f - fx;
+                                if (fx < -1.0f) fx = -2.0f - fx;
+                            }
+                            y = fx;
+                        }
+                        break;
+                    case 3: // Bit crush — direct
+                        {
+                            const float bits = juce::jmax(2.0f, 16.0f - activeParams.driveDrive / 100.0f * 12.0f);
+                            const float q    = std::pow(2.0f, bits - 1.0f);
+                            y = std::round(x * q) / q;
+                        }
+                        break;
+                    default: // Soft (tanh) — ADAA
+                        if (std::abs(dx) < 1e-4f)
+                            y = std::tanh(0.5f * (x + xPrev));
+                        else
+                            y = (ad1Tanh(x) - ad1Tanh(xPrev)) / dx;
+                        break;
+                }
+
+                data[i] = y * outGain;
+                xPrev   = x;
+            }
+
+            prevDriveX[ch < 2 ? ch : 0] = xPrev;
+        }
+    }
+
+    // ── Tone filter (first-order IIR LP after drive) ─────────────────────────
+    if (activeParams.driveTone < 19000.0f && currentSampleRate > 0.0)
+    {
+        const float a = std::exp(-juce::MathConstants<float>::twoPi
+                                 * activeParams.driveTone / static_cast<float>(currentSampleRate));
+        for (int ch = 0; ch < nCh; ++ch)
+        {
+            auto* data = tempBuffer.getWritePointer(ch);
+            float state = toneFiltState[ch];
+            for (int i = 0; i < ns; ++i)
+            {
+                state   = (1.0f - a) * data[i] + a * state;
+                data[i] = state;
+            }
+            toneFiltState[ch] = state;
+        }
+    }
+
     for (int ch = 0; ch < nCh; ++ch)
-        output.addFrom(ch, 0, tempBuffer, ch, 0, ns, activeParams.ampLevel);
+        output.addFrom(ch, 0, tempBuffer, ch, 0, ns, activeParams.ampLevel * accentGain);
 }
 
 bool VoiceEngine::hasSample() const
@@ -184,5 +277,5 @@ void VoiceEngine::syncFilter()
         default: filter.setType(T::lowpass);  break;
     }
     filter.setCutoffFrequency(activeParams.filterCutoff);
-    filter.setResonance(activeParams.filterRes);
+    filter.setResonance(juce::jmax(0.01f, activeParams.filterRes));
 }

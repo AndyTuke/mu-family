@@ -31,9 +31,9 @@
 | 25 | Delay: add fractional interpolation and smooth delay time changes — current integer read pointer produces clicks/artefacts on BPM change or LFO modulation; Hermite cubic interpolation + 50ms parameter smoothing required | ✅ Fixed | 109 |
 | 26 | Flanger: implement through-zero flanging — current min delay is 0.5ms so the zero-crossing never occurs; fix: delay dry signal by `baseSamp`, sweep wet path from 0 to `2*baseSamp` | ✅ Fixed | 109 |
 | 27 | Phaser: fix LFO-to-allpass-coefficient mapping — current linear sweep clusters notches at high frequencies; correct mapping: convert LFO → Hz, then `a = (1 - tan(π*f/sr)) / (1 + tan(π*f/sr))` | ✅ Fixed | 109 |
-| 28 | Chorus: upgrade from linear to Hermite cubic interpolation, add per-voice LFO rate detuning (±0.5–2%) for organic evolution vs. fixed-period modulation | 🔴 Open | — |
-| 29 | Drive/Waveshaper: implement ADAA (Antiderivative Anti-Aliasing) — current `tanh` aliases without oversampling; ADAA formula: `(ln(cosh(x[n])) - ln(cosh(x[n-1]))) / (x[n] - x[n-1])` gives 8–16× equivalent at near-zero CPU cost | 🔴 Open | — |
-| 30 | Bitcrusher: add pre-filter anti-aliasing and TPDF dither — add LP at new Nyquist before sample-hold, add triangular dither `x + (r1-r2)*lsb` before quantisation | 🔴 Open | — |
+| 28 | Chorus: upgrade from linear to Hermite cubic interpolation, add per-voice LFO rate detuning (±0.5–2%) for organic evolution vs. fixed-period modulation | ✅ Fixed | 112 |
+| 29 | Drive/Waveshaper: implement ADAA (Antiderivative Anti-Aliasing) — current `tanh` aliases without oversampling; ADAA formula: `(ln(cosh(x[n])) - ln(cosh(x[n-1]))) / (x[n] - x[n-1])` gives 8–16× equivalent at near-zero CPU cost | ✅ Fixed | 112 |
+| 30 | Bitcrusher: add pre-filter anti-aliasing and TPDF dither — add LP at new Nyquist before sample-hold, add triangular dither `x + (r1-r2)*lsb` before quantisation | ✅ Fixed | 112 |
 | 36 | Mixer VU meters read pre-fader — master, Effect, Delay, and Reverb return VUs captured before their respective gain stages so faders had no effect on the meters; inactive channel peaks not cleared when rhythms removed | ✅ Fixed | 108 |
 | 37 | Flanger rate range too narrow — 0.1 Hz minimum still produces noticeable modulation; 8 Hz maximum is not fast enough for jet-flange effect | ✅ Fixed | 110 |
 | 38 | Mixer channel level defaults too high — default channel level 0.75 (−2.5 dB) causes loud samples to peak near the top of the VU meter at rest; default lowered to 0.5 (−6 dB) | ✅ Fixed | 110 |

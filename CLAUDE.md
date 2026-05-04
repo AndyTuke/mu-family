@@ -68,7 +68,7 @@ Artefacts land in `build/mu-clid_artefacts/Debug/` or `.../Release/`.
 
 ## Development history
 
-Stages 1–16 are complete. See [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) for the full stage-by-stage log with dates. When a stage is completed, it should be moved to the DevelopmentHistory.md file.
+Stages 1–17 are complete. See [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) for the full stage-by-stage log with dates. When a stage is completed, it should be moved to the DevelopmentHistory.md file.
 
 ## Upcoming stages
 
@@ -78,7 +78,7 @@ All work below resolves open issues from [Issues.md](Issues.md). Issues are refe
 |---|---|---|---|
 | 15 | ✅ Complete | **Signalsmith Reverb** — replaced `juce::Reverb` with Signalsmith FDN reverb (pimpl, SYSTEM PRIVATE includes, pre-allocated wet buffers, Room/Hall/Plate/Spring presets retuned) | #24 |
 | 16 | ✅ Complete | **Delay + modulation FX quality** — Delay: Hermite cubic interpolation + 50 ms parameter smoothing; Flanger: through-zero implementation; Phaser: frequency-correct LFO→coefficient mapping; TransportBar loop dropdown widened; modulator timing dropdowns fixed | #25, #26, #27, #34, #35 |
-| 17 | 🔲 Planned | **Voice chain + bitcrusher quality** — Chorus: Hermite interpolation + per-voice LFO rate detuning; Drive: ADAA waveshaping; Bitcrusher: pre-filter anti-aliasing + TPDF dither | #28, #29, #30 |
+| 17 | ✅ Complete | **Voice chain + bitcrusher quality** — Chorus: Hermite interpolation + per-voice LFO rate detuning; Drive: ADAA waveshaping; Bitcrusher: pre-filter anti-aliasing + TPDF dither | #28, #29, #30 |
 
 
 ## Source layout (actual, as built)

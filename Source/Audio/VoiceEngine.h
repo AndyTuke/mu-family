@@ -20,7 +20,7 @@ public:
 
     void prepareToPlay(double sampleRate, int blockSize);
     void loadFile(const juce::File& file);
-    void trigger();
+    void trigger(bool isAccented = false);
     void process(juce::AudioBuffer<float>& output, int numSamples);
     bool hasSample() const;
 
@@ -52,10 +52,14 @@ private:
     juce::ADSR  filterEnv;
     juce::ADSR  pitchEnv;
     juce::dsp::StateVariableTPTFilter<float> filter;
+    float                    toneFiltState[2] = { 0.0f, 0.0f };
     juce::AudioBuffer<float> tempBuffer;
 
     // Thread-safe param handoff: message thread writes pendingParams under pendingLock
     // and sets paramsDirty; audio thread picks up changes in applyPendingParams().
+    float             accentGain    = 1.0f;  // set on trigger(), applied in process()
+    float             prevDriveX[2] = {};    // pre-gain input from last sample, per channel (ADAA)
+
     VoiceParams       pendingParams;
     juce::SpinLock    pendingLock;
     std::atomic<bool> paramsDirty { false };

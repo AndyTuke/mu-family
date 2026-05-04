@@ -32,7 +32,6 @@ public:
     void processInner(juce::dsp::AudioBlock<float>& block) override
     {
         const int   numVoices = juce::jlimit(2, MaxVoices, static_cast<int>(voices));
-        const float lfoInc    = static_cast<float>(rate / sr);
         const float depthSamp = static_cast<float>(depth * 0.02 * sr);
         const float baseSamp  = static_cast<float>(0.03 * sr);  // 30ms base delay
         const float wet       = mix;
@@ -60,10 +59,14 @@ public:
                 const float delaySL = baseSamp + lfoVal * depthSamp;
                 const float delaySR = baseSamp + lfoVal * depthSamp * spreadV;
 
-                wetL += readDelayLine(delayL[v], writePos[v], delaySL);
-                wetR += readDelayLine(delayR[v], writePos[v], delaySR);
+                wetL += hermiteDelay(delayL[v], writePos[v], delaySL);
+                wetR += hermiteDelay(delayR[v], writePos[v], delaySR);
 
-                phase[v] += lfoInc;
+                // Per-voice LFO detuning: evenly spread ±1.5% from base rate
+                // so all voices average to the user-set rate.
+                const float t      = numVoices > 1 ? (float)v / (numVoices - 1) : 0.5f;
+                const float detune = 1.0f + (t - 0.5f) * 0.03f;
+                phase[v] += static_cast<float>(rate * detune / sr);
                 if (phase[v] >= 1.0f) phase[v] -= 1.0f;
 
                 writePos[v] = (writePos[v] + 1) % MaxDelaySamples;
@@ -85,14 +88,27 @@ public:
     }
 
 private:
-    static float readDelayLine(const std::vector<float>& buf, int writeP, float delaySamples)
+    // 4-point Catmull-Rom Hermite interpolation for smooth chorus modulation.
+    static float hermiteDelay(const std::vector<float>& buf, int writeP, float delaySamples)
     {
         const int bufSize = static_cast<int>(buf.size());
-        const int frac    = static_cast<int>(delaySamples);
-        const float alpha = delaySamples - frac;
-        const int readP0  = (writeP - frac + bufSize) % bufSize;
-        const int readP1  = (readP0 - 1 + bufSize) % bufSize;
-        return buf[readP0] * (1.0f - alpha) + buf[readP1] * alpha;
+        delaySamples = juce::jmax(2.0f, delaySamples);
+        const int n   = static_cast<int>(delaySamples);
+        const float t = delaySamples - n;
+
+        auto rd = [&](int offset) -> float {
+            return buf[(writeP - offset + bufSize) % bufSize];
+        };
+
+        const float xm1 = rd(n - 1);
+        const float x0  = rd(n);
+        const float x1  = rd(n + 1);
+        const float x2  = rd(n + 2);
+
+        const float a = -0.5f * xm1 + 1.5f * x0 - 1.5f * x1 + 0.5f * x2;
+        const float b =         xm1 - 2.5f * x0 + 2.0f * x1 - 0.5f * x2;
+        const float c = -0.5f * xm1              + 0.5f * x1;
+        return ((a * t + b) * t + c) * t + x0;
     }
 
     FXAlgorithmDef def;
