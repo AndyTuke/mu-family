@@ -68,7 +68,7 @@ Artefacts land in `build/mu-clid_artefacts/Debug/` or `.../Release/`.
 
 ## Development history
 
-Stages 1–17 are complete. See [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) for the full stage-by-stage log with dates. When a stage is completed, it should be moved to the DevelopmentHistory.md file.
+Stages 1–20 are complete. See [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) for the full stage-by-stage log with dates. When a stage is completed, it should be moved to the DevelopmentHistory.md file.
 
 ## Upcoming stages
 
@@ -76,9 +76,8 @@ All work below resolves open issues from [Issues.md](Issues.md). Issues are refe
 
 | Stage | Status | Scope | Issues |
 |---|---|---|---|
-| 15 | ✅ Complete | **Signalsmith Reverb** — replaced `juce::Reverb` with Signalsmith FDN reverb (pimpl, SYSTEM PRIVATE includes, pre-allocated wet buffers, Room/Hall/Plate/Spring presets retuned) | #24 |
-| 16 | ✅ Complete | **Delay + modulation FX quality** — Delay: Hermite cubic interpolation + 50 ms parameter smoothing; Flanger: through-zero implementation; Phaser: frequency-correct LFO→coefficient mapping; TransportBar loop dropdown widened; modulator timing dropdowns fixed | #25, #26, #27, #34, #35 |
-| 17 | ✅ Complete | **Voice chain + bitcrusher quality** — Chorus: Hermite interpolation + per-voice LFO rate detuning; Drive: ADAA waveshaping; Bitcrusher: pre-filter anti-aliasing + TPDF dither | #28, #29, #30 |
+| 21 | Pending | **Meter mode toggle (polish)** — Peak / VU / K-12 / K-14 modes per [K-system convention](https://www.kvraudio.com/forum/viewtopic.php?t=359651). "Peak" = current behaviour (0 dBFS = top), "VU" = Stage 18 calibration, K-12/K-14 for mastering workflows. Optional stereo correlation meter alongside master. | (polish) |
+| 22 | ✅ Done | **Preset system** — content folder at `%USERPROFILE%\Documents\TDP\muClid` (Presets / Rhythms / Samples); path user-configurable in Settings overlay via `PropertiesFile`. Preset extension `.mu`, rhythm preset `.muRhyth`. SaveDialog "Embed samples" checkbox (base64 into XML); load falls back to Samples folder. `_default.mu` loaded silently on startup; `_default.muRhyth` applied when a new rhythm is added. | #67 #68 #69 #70 |
 
 
 ## Source layout (actual, as built)
