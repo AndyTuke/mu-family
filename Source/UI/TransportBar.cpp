@@ -32,7 +32,12 @@ TransportBar::TransportBar(PluginProcessor& p)
     rhythmCountLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
     addAndMakeVisible(rhythmCountLabel);
 
-    loopDropdown.addItem("Loop Off", 1);
+    loopLabel.setText("Loop:", juce::dontSendNotification);
+    loopLabel.setJustificationType(juce::Justification::centredRight);
+    loopLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    addAndMakeVisible(loopLabel);
+
+    loopDropdown.addItem(juce::String::charToString(0x221E), 1); // ∞ = pattern reset length disabled
     for (int i = 1; i <= 16; ++i)
         loopDropdown.addItem(juce::String(i * 16) + " steps", i + 1);
     loopDropdown.setSelectedId(1, false); // default: off
@@ -155,7 +160,7 @@ void TransportBar::populatePresetDropdown()
     auto dir = proc.getPresetsDir();
     if (dir.isDirectory())
     {
-        for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*.muclid"))
+        for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*.mu"))
         {
             presetFiles.push_back(f);
             presetDropdown.addItem(f.getFileNameWithoutExtension(), (int)presetFiles.size());
@@ -204,44 +209,40 @@ void TransportBar::resized()
     const int btnH = 28;
     const int btnY = (h - btnH) / 2;
 
-    // Left: play + BPM (standalone only)
-    int leftGroupW = kPlayW + (isStandalone ? kGap + kBpmW : 0);
+    // Left group: Logo | Play | BPM | Loop label | Loop dropdown | Position
     int leftX = kLogoW + kGap;
-
     playBtn.setBounds(leftX, btnY, kPlayW, btnH);
-    if (isStandalone)
-        bpmInput.setBounds(leftX + kPlayW + kGap, (h - 28) / 2, kBpmW, 28);
+    leftX += kPlayW + kGap;
 
-    // Right: mixer button, anchored to right edge
+    if (isStandalone)
+    {
+        bpmInput.setBounds(leftX, (h - 28) / 2, kBpmW, 28);
+        leftX += kBpmW + kGap;
+    }
+
+    loopLabel.setBounds(leftX, btnY, kLoopLabelW, btnH);
+    leftX += kLoopLabelW + 2;
+    loopDropdown.setBounds(leftX, btnY, kLoopW, btnH);
+    leftX += kLoopW + kGap;
+
+    posLabel.setBounds(leftX, btnY, kPosW, btnH);
+
+    // Right group (right to left): Mixer | Gear | Save | Preset | +Rhythm | RhythmCount
     int rightEdge = getWidth() - kGap;
     mixerBtn.setBounds(rightEdge - kMixerW, btnY, kMixerW, btnH);
     rightEdge -= kMixerW + kGap;
 
-    // Gear button
     gearBtn.setBounds(rightEdge - kGearW, btnY, kGearW, btnH);
     rightEdge -= kGearW + kGap;
 
-    // Save button
     saveBtn.setBounds(rightEdge - kSaveW, btnY, kSaveW, btnH);
     rightEdge -= kSaveW + kGap;
 
-    // Preset dropdown
     presetDropdown.setBounds(rightEdge - kPresetW, btnY, kPresetW, btnH);
     rightEdge -= kPresetW + kGap;
 
-    // +Rhythm button
     addRhythmBtn.setBounds(rightEdge - kAddW, btnY, kAddW, btnH);
     rightEdge -= kAddW + kGap;
 
-    // Rhythm count label
     rhythmCountLabel.setBounds(rightEdge - kRhCountW, btnY, kRhCountW, btnH);
-    rightEdge -= kRhCountW + kGap;
-
-    // Master loop length
-    loopDropdown.setBounds(rightEdge - kLoopW, btnY, kLoopW, btnH);
-    rightEdge -= kLoopW + kGap;
-
-    // Position label — to the right of the play/BPM group
-    int posX = leftX + leftGroupW + kGap;
-    posLabel.setBounds(posX, btnY, kPosW, btnH);
 }

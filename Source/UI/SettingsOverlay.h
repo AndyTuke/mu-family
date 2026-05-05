@@ -12,6 +12,7 @@ class SettingsOverlay : public juce::Component
 {
 public:
     std::function<void()> onClose;
+    std::function<void()> onContentDirChanged;
 
     explicit SettingsOverlay(PluginProcessor& proc);
 
@@ -29,6 +30,14 @@ private:
 
     // Active: master volume knob (reads/writes from APVTS)
     KnobWithLabel masterVolKnob { "Master Vol", MuClidLookAndFeel::knobLevel };
+
+    // Content folder configuration
+    juce::Label      contentFolderLabel;
+    juce::TextButton browseContentFolderBtn { "Browse..." };
+    juce::TextButton resetContentFolderBtn  { "Default" };
+    std::unique_ptr<juce::FileChooser> fileChooser;
+
+    void updateFolderLabel();
 
     static constexpr int kHeaderH = 36;
     static constexpr int kPad     = 12;

@@ -82,17 +82,20 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addF(p+"fEnvRel", n+"F Env Rel",  0.0f, 100.0f,  3.0f);
         addF(p+"fEnvDep", n+"F Env Dep",  0.0f,  48.0f,  0.0f);
         // Amp
-        addF(p+"ampLvl",  n+"Amp Level",  0.0f,   2.0f,  1.0f);
+        addF(p+"ampLvl",  n+"Amp Level",  0.0f,   2.0f,  0.5f);  // Stage 19: −6 dB default
         addF(p+"aEnvAtk", n+"A Env Atk",  0.0f, 100.0f,  0.0f);
         addF(p+"aEnvDec", n+"A Env Dec",  0.0f, 100.0f,  3.0f);
         addF(p+"aEnvSus", n+"A Env Sus",  0.0f, 100.0f, 80.0f);
         addF(p+"aEnvRel",   n+"A Env Rel",  0.0f, 100.0f,  5.0f);
         addF(p+"accentDb",  n+"Accent",     0.0f,  12.0f,  0.0f);
         // Drive
-        addI(p+"drvChar", n+"Drive Char",   0,   3,      0);
-        addF(p+"drvDrv",  n+"Drive",        0.0f, 100.0f, 0.0f);
-        addF(p+"drvOut",  n+"Drive Out",  -24.0f,   0.0f, 0.0f);
-        addF(p+"drvTon",  n+"Drive Tone",  20.0f, 20000.0f, 20000.0f);
+        addI(p+"drvChar", n+"Drive Char",   0,      4,      0);  // 0=None,1=Soft,2=Hard,3=Fold,4=Bitcrusher
+        addF(p+"drvDrv",  n+"Drive",        0.0f, 100.0f,    0.0f);  // Soft/Hard/Fold drive amount
+        addF(p+"drvOut",  n+"Drive Out",  -24.0f,    0.0f,   0.0f);  // Soft/Hard/Fold output level
+        addF(p+"drvBits", n+"Bits",         1.0f,  16.0f,   16.0f);  // Bitcrusher bit depth
+        addF(p+"drvRate", n+"Drive Rate",  100.0f, 48000.0f, 48000.0f);  // Bitcrusher sample rate
+        addF(p+"drvDit",  n+"Dither",       0.0f, 100.0f,    0.0f);  // Bitcrusher dither amount
+        addF(p+"drvTon",  n+"Drive Tone",  20.0f, 20000.0f, 20000.0f);  // Shared LPF
         // Misc
         addB(p+"midiMode", n+"MIDI Mode", false);
     }
@@ -189,6 +192,18 @@ PluginProcessor::PluginProcessor()
           .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       apvts(*this, nullptr, "MuClidState", createParameterLayout())
 {
+    // Initialise ApplicationProperties (needed by getContentDir/getPresetsDir).
+    {
+        juce::PropertiesFile::Options opts;
+        opts.applicationName     = "muClid";
+        opts.filenameSuffix      = "xml";
+        opts.folderName          = "TDP";
+        opts.osxLibrarySubFolder = "Application Support";
+        auto settingsFile = opts.getDefaultFile();
+        settingsFile.getParentDirectory().createDirectory();
+        appSettings = std::make_unique<juce::PropertiesFile>(settingsFile, opts);
+    }
+
     // Register listener for every parameter.
     for (auto* param : getParameters())
         if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
@@ -199,16 +214,18 @@ PluginProcessor::PluginProcessor()
         loadedSamplePaths.add(juce::String());
 
     // Pre-populate modulation param map so lookups never allocate on the audio thread.
-    modParamValues.reserve(16);
+    modParamValues.reserve(20);
     for (const char* key : { "amp.attack", "amp.decay", "amp.sustain", "amp.release",
                               "filter.cutoff", "filter.resonance",
                               "fenv.attack", "fenv.decay", "fenv.depth",
-                              "pitch.semitones", "drive.amount" })
+                              "pitch.semitones",
+                              "insert.drive", "insert.output",
+                              "insert.bits", "insert.rate", "insert.dither", "insert.lpf" })
         modParamValues[key] = 0.0f;
 
     // Add default rhythm (16 steps, 4 hits) and sync its state to APVTS.
     Rhythm defaultRhythm;
-    defaultRhythm.name       = "Rhythm 1";
+    defaultRhythm.name       = "<unnamed>";
     defaultRhythm.genA.steps = 16;
     defaultRhythm.genA.hits  = 4;
     sequencer.addRhythm(defaultRhythm);
@@ -216,6 +233,10 @@ PluginProcessor::PluginProcessor()
     apvtsLoading = true;
     pushRhythmToAPVTS(0);
     apvtsLoading = false;
+
+    // Ensure user content folders exist and load the default preset if present.
+    ensureContentFoldersExist();
+    loadDefaultPreset();
 }
 
 PluginProcessor::~PluginProcessor()
@@ -301,7 +322,10 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             rhythmPlayState[r].stepsB.set(juce::jmax(1, rhy.genB.steps));
             rhythmPlayState[r].stepsC.set(juce::jmax(1, rhy.genC.steps));
             if (blockResult.firedMask & (1 << r))
+            {
                 rhythmPlayState[r].hitFired.set(true);
+                rhythmPlayState[r].hitCount.set(rhythmPlayState[r].hitCount.get() + 1); // Issue #43: monotonic counter for race-free UI hit detection
+            }
         }
     }
 
@@ -328,7 +352,12 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParamValues["fenv.decay"]       = modParams.filterEnvDec * 10.0f;
                 modParamValues["fenv.depth"]       = modParams.filterEnvDepth;
                 modParamValues["pitch.semitones"]  = 0.0f;
-                modParamValues["drive.amount"]     = modParams.driveDrive;
+                modParamValues["insert.drive"]     = modParams.driveDrive;
+                modParamValues["insert.output"]    = modParams.driveOutput;
+                modParamValues["insert.bits"]      = modParams.drvBits;
+                modParamValues["insert.rate"]      = modParams.driveRate;
+                modParamValues["insert.dither"]    = modParams.drvDither;
+                modParamValues["insert.lpf"]       = modParams.driveTone;
 
                 rhythm.modulationMatrix.process(rhythm.controlSequences, beatPos, modParamValues);
 
@@ -345,7 +374,12 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParams.filterEnvDec   = juce::jmax(0.001f, modParamValues["fenv.decay"]       / 10.0f);
                 modParams.filterEnvDepth = juce::jlimit(0.0f, 48.0f, modParamValues["fenv.depth"]);
                 modParams.pitchMod       = juce::jlimit(-24.0f, 24.0f, modParamValues["pitch.semitones"]);
-                modParams.driveDrive     = juce::jlimit(0.0f, 100.0f, modParamValues["drive.amount"]);
+                modParams.driveDrive     = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.drive"]);
+                modParams.driveOutput    = juce::jlimit(-24.0f,  0.0f,    modParamValues["insert.output"]);
+                modParams.drvBits        = juce::jlimit(1.0f,   16.0f,    modParamValues["insert.bits"]);
+                modParams.driveRate      = juce::jlimit(100.0f, 48000.0f, modParamValues["insert.rate"]);
+                modParams.drvDither      = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.dither"]);
+                modParams.driveTone      = juce::jlimit(20.0f, 20000.0f,  modParamValues["insert.lpf"]);
             }
         }
 
@@ -458,10 +492,13 @@ void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float 
     else if (suffix == "aEnvRel")   { r.voiceParams.ampEnvRel      = adsrTime(v); voiceDirty = true; }
     else if (suffix == "accentDb")  { r.voiceParams.accentDb        = v;           voiceDirty = true; }
     // Drive
-    else if (suffix == "drvChar")   { r.voiceParams.driveChar      = juce::jlimit(0, 3, (int)v); voiceDirty = true; }
-    else if (suffix == "drvDrv")    { r.voiceParams.driveDrive     = v;            voiceDirty = true; }
-    else if (suffix == "drvOut")    { r.voiceParams.driveOutput    = v;            voiceDirty = true; }
-    else if (suffix == "drvTon")    { r.voiceParams.driveTone      = v;            voiceDirty = true; }
+    else if (suffix == "drvChar")   { r.voiceParams.driveChar  = juce::jlimit(0, 4, (int)v); voiceDirty = true; }
+    else if (suffix == "drvDrv")    { r.voiceParams.driveDrive = v;  voiceDirty = true; }
+    else if (suffix == "drvOut")    { r.voiceParams.driveOutput= v;  voiceDirty = true; }
+    else if (suffix == "drvBits")   { r.voiceParams.drvBits    = v;  voiceDirty = true; }
+    else if (suffix == "drvRate")   { r.voiceParams.driveRate  = v;  voiceDirty = true; }
+    else if (suffix == "drvDit")    { r.voiceParams.drvDither  = v;  voiceDirty = true; }
+    else if (suffix == "drvTon")    { r.voiceParams.driveTone  = v;  voiceDirty = true; }
     // Misc
     else if (suffix == "midiMode")  { r.midiMode = v > 0.5f; }
 
@@ -659,6 +696,9 @@ void PluginProcessor::pushRhythmToAPVTS(int ri)
     set(px+"drvChar",   (float)vp.driveChar);
     set(px+"drvDrv",    vp.driveDrive);
     set(px+"drvOut",    vp.driveOutput);
+    set(px+"drvBits",   vp.drvBits);
+    set(px+"drvRate",   vp.driveRate);
+    set(px+"drvDit",    vp.drvDither);
     set(px+"drvTon",    vp.driveTone);
     set(px+"midiMode",  r.midiMode ? 1.0f : 0.0f);
 }
@@ -685,10 +725,140 @@ void PluginProcessor::loadSampleForRhythm(int rhythmIndex, const juce::File& fil
 }
 
 //==============================================================================
-juce::File PluginProcessor::getPresetsDir() const
+juce::File PluginProcessor::getContentDir() const
 {
+    if (appSettings != nullptr)
+    {
+        const juce::String stored = appSettings->getValue("contentDir");
+        if (stored.isNotEmpty())
+            return juce::File(stored);
+    }
     return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
-               .getChildFile("mu-clid").getChildFile("Presets");
+               .getChildFile("TDP").getChildFile("muClid");
+}
+
+juce::File PluginProcessor::getPresetsDir() const { return getContentDir().getChildFile("Presets"); }
+juce::File PluginProcessor::getRhythmsDir() const { return getContentDir().getChildFile("Rhythms"); }
+juce::File PluginProcessor::getSamplesDir() const { return getContentDir().getChildFile("Samples"); }
+
+void PluginProcessor::setContentDir(const juce::File& dir)
+{
+    if (appSettings != nullptr)
+    {
+        appSettings->setValue("contentDir", dir.getFullPathName());
+        appSettings->saveIfNeeded();
+    }
+    ensureContentFoldersExist();
+}
+
+void PluginProcessor::ensureContentFoldersExist()
+{
+    getPresetsDir().createDirectory();
+    getRhythmsDir().createDirectory();
+    getSamplesDir().createDirectory();
+}
+
+//==============================================================================
+// All per-rhythm APVTS parameter suffixes (used for rhythm preset save/load).
+static const char* const kRhythmSuffixes[] = {
+    "stepsA","hitsA","rotA","prePadA","postPadA","insStA","insLenA","insModeA","prePadModeA","postPadModeA",
+    "stepsB","hitsB","rotB","prePadB","postPadB","insStB","insLenB","insModeB","prePadModeB","postPadModeB",
+    "stepsC","hitsC","rotC","prePadC","postPadC","insStC","insLenC","insModeC","prePadModeC","postPadModeC",
+    "logic",
+    "pitchOct","pitchSemi","pitchFine","pEnvAtk","pEnvDec","pEnvSus","pEnvRel","pEnvDep",
+    "fltType","fltCut","fltRes","fEnvAtk","fEnvDec","fEnvSus","fEnvRel","fEnvDep",
+    "ampLvl","aEnvAtk","aEnvDec","aEnvSus","aEnvRel","accentDb",
+    "drvChar","drvDrv","drvOut","drvBits","drvRate","drvDit","drvTon",
+    "midiMode",
+    nullptr
+};
+
+void PluginProcessor::saveRhythmPreset(int rhythmIdx, const juce::String& name,
+                                        const juce::String& category)
+{
+    if (rhythmIdx < 0 || rhythmIdx >= sequencer.getNumRhythms()) return;
+
+    juce::ValueTree state("MuClidRhythm");
+    state.setProperty("presetName",     name,     nullptr);
+    state.setProperty("presetCategory", category, nullptr);
+
+    const Rhythm& r = sequencer.getRhythm(rhythmIdx);
+    state.setProperty("r0_name",   juce::String(r.name),          nullptr);
+    state.setProperty("r0_colour", r.colourIndex,                  nullptr);
+    state.setProperty("r0_sample", loadedSamplePaths[rhythmIdx],   nullptr);
+
+    const juce::String srcPrefix = "r" + juce::String(rhythmIdx) + "_";
+    for (int i = 0; kRhythmSuffixes[i] != nullptr; ++i)
+    {
+        if (auto* param = apvts.getParameter(srcPrefix + kRhythmSuffixes[i]))
+            state.setProperty("r0_" + juce::String(kRhythmSuffixes[i]),
+                               param->getValue(), nullptr);
+    }
+
+    auto dir = getRhythmsDir();
+    dir.createDirectory();
+    juce::String safe = name.replaceCharacters("\\/:|*?<>\"", "_________");
+    if (safe.isEmpty()) safe = "Rhythm";
+    dir.getChildFile(safe + ".muRhyth").replaceWithText(state.toXmlString());
+}
+
+bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
+{
+    if (!file.existsAsFile()) return false;
+    auto xml = juce::parseXML(file);
+    if (!xml) return false;
+    auto state = juce::ValueTree::fromXml(*xml);
+    if (!state.isValid()) return false;
+
+    const juce::String dstPrefix = "r" + juce::String(targetIdx) + "_";
+    for (int i = 0; kRhythmSuffixes[i] != nullptr; ++i)
+    {
+        juce::Identifier propId { "r0_" + juce::String(kRhythmSuffixes[i]) };
+        if (state.hasProperty(propId))
+        {
+            if (auto* param = apvts.getParameter(dstPrefix + kRhythmSuffixes[i]))
+                param->setValueNotifyingHost((float)state.getProperty(propId));
+        }
+    }
+
+    Rhythm& r = sequencer.getRhythm(targetIdx);
+    auto nameVal = state.getProperty("r0_name");
+    if (nameVal.isString() && nameVal.toString().isNotEmpty())
+        r.name = nameVal.toString().toStdString();
+    r.colourIndex = (int)state.getProperty("r0_colour", r.colourIndex);
+
+    juce::String samplePath = state.getProperty("r0_sample").toString();
+    if (samplePath.isNotEmpty())
+    {
+        juce::File f(samplePath);
+        if (f.existsAsFile())
+        {
+            voiceEngines[targetIdx].loadFile(f);
+            loadedSamplePaths.set(targetIdx, f.getFullPathName());
+        }
+        else
+        {
+            juce::File fallback = getSamplesDir().getChildFile(juce::File(samplePath).getFileName());
+            if (fallback.existsAsFile())
+            {
+                voiceEngines[targetIdx].loadFile(fallback);
+                loadedSamplePaths.set(targetIdx, fallback.getFullPathName());
+            }
+        }
+    }
+    return true;
+}
+
+bool PluginProcessor::applyDefaultRhythm(int rhythmIndex)
+{
+    return applyRhythmPreset(getRhythmsDir().getChildFile("_default.muRhyth"), rhythmIndex);
+}
+
+void PluginProcessor::loadDefaultPreset()
+{
+    juce::File f = getPresetsDir().getChildFile("_default.mu");
+    if (f.existsAsFile())
+        loadPreset(f);
 }
 
 //==============================================================================
@@ -739,12 +909,47 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
         voiceEngines[i].setParams(r.voiceParams);
 
         juce::String samplePath = state.getProperty("r" + juce::String(i) + "_sample").toString();
+        juce::String sampleData = state.getProperty("r" + juce::String(i) + "_sampleData").toString();
+        juce::String sampleName = state.getProperty("r" + juce::String(i) + "_sampleName").toString();
+
         loadedSamplePaths.set(i, samplePath);
-        if (samplePath.isNotEmpty())
+
+        if (sampleData.isNotEmpty() && sampleName.isNotEmpty())
+        {
+            juce::MemoryBlock mb;
+            {
+                juce::MemoryOutputStream mos(mb, false);
+                juce::Base64::convertFromBase64(mos, sampleData);
+            }
+            if (mb.getSize() > 0)
+            {
+                juce::File tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                                         .getChildFile("muClid_samples");
+                tempDir.createDirectory();
+                juce::File tempFile = tempDir.getChildFile(sampleName);
+                if (tempFile.replaceWithData(mb.getData(), mb.getSize()))
+                {
+                    voiceEngines[i].loadFile(tempFile);
+                    loadedSamplePaths.set(i, tempFile.getFullPathName());
+                }
+            }
+        }
+        else if (samplePath.isNotEmpty())
         {
             juce::File f(samplePath);
             if (f.existsAsFile())
+            {
                 voiceEngines[i].loadFile(f);
+            }
+            else
+            {
+                juce::File fallback = getSamplesDir().getChildFile(juce::File(samplePath).getFileName());
+                if (fallback.existsAsFile())
+                {
+                    voiceEngines[i].loadFile(fallback);
+                    loadedSamplePaths.set(i, fallback.getFullPathName());
+                }
+            }
         }
     }
 }
@@ -762,20 +967,41 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 //==============================================================================
 void PluginProcessor::savePreset(const juce::String& name,
                                  const juce::String& description,
-                                 const juce::String& category)
+                                 const juce::String& category,
+                                 bool embedSamples)
 {
+    const int n = sequencer.getNumRhythms();
     auto state = apvts.copyState();
-    populateStateTree(state, sequencer.getNumRhythms(), sequencer, loadedSamplePaths);
+    populateStateTree(state, n, sequencer, loadedSamplePaths);
     state.setProperty("presetName",        name,        nullptr);
     state.setProperty("presetDescription", description, nullptr);
     state.setProperty("presetCategory",    category,    nullptr);
+
+    if (embedSamples)
+    {
+        for (int i = 0; i < n; ++i)
+        {
+            const juce::String path = loadedSamplePaths[i];
+            if (path.isEmpty()) continue;
+            juce::File f(path);
+            if (!f.existsAsFile()) continue;
+            juce::MemoryBlock mb;
+            if (f.loadFileAsData(mb) && mb.getSize() > 0)
+            {
+                state.setProperty("r" + juce::String(i) + "_sampleData",
+                                   juce::Base64::toBase64(mb.getData(), mb.getSize()), nullptr);
+                state.setProperty("r" + juce::String(i) + "_sampleName",
+                                   f.getFileName(), nullptr);
+            }
+        }
+    }
 
     auto dir = getPresetsDir();
     dir.createDirectory();
 
     juce::String safeName = name.replaceCharacters("\\/:|*?<>\"", "_________");
     if (safeName.isEmpty()) safeName = "Preset";
-    dir.getChildFile(safeName + ".muclid").replaceWithText(state.toXmlString());
+    dir.getChildFile(safeName + ".mu").replaceWithText(state.toXmlString());
 }
 
 void PluginProcessor::loadPreset(const juce::File& file)

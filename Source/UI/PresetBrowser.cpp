@@ -7,6 +7,7 @@ PresetBrowser::PresetBrowser()
     addAndMakeVisible(searchBox);
 
     categoryFilter.onChange = [this](int) { applyFilter(); };
+    categoryFilter.addItem("All", 1);
     addAndMakeVisible(categoryFilter);
 
     listBox.setModel(this);
@@ -28,7 +29,7 @@ void PresetBrowser::refresh(const juce::File& dir)
 
     if (dir.isDirectory())
     {
-        for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*.muclid"))
+        for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*.mu"))
         {
             PresetInfo info;
             info.file = f;
@@ -48,6 +49,19 @@ void PresetBrowser::refresh(const juce::File& dir)
                   [](const PresetInfo& a, const PresetInfo& b) { return a.name < b.name; });
     }
 
+    // Build sorted list of unique categories, then repopulate the filter dropdown.
+    knownCategories.clear();
+    for (const auto& p : allPresets)
+        if (p.category.isNotEmpty() && p.category != "All" && !knownCategories.contains(p.category))
+            knownCategories.add(p.category);
+    knownCategories.sort(false);
+
+    categoryFilter.clear();
+    categoryFilter.addItem("All", 1);
+    for (int i = 0; i < knownCategories.size(); ++i)
+        categoryFilter.addItem(knownCategories[i], i + 2);
+    categoryFilter.setSelectedId(1, false);
+
     selectedRow = -1;
     applyFilter();
 }
@@ -55,15 +69,16 @@ void PresetBrowser::refresh(const juce::File& dir)
 void PresetBrowser::applyFilter()
 {
     filteredIndices.clear();
-    const juce::String query    = searchBox.getText().trim().toLowerCase();
-    const int          catIdx   = categoryFilter.getSelectedIndex();
-    const juce::String catNames[] = { "All", "Techno", "Perc", "Ambient", "Experimental" };
-    const juce::String filterCat = catIdx == 0 ? juce::String() : catNames[catIdx];
+    const juce::String query     = searchBox.getText().trim().toLowerCase();
+    const int          catId     = categoryFilter.getSelectedId();
+    // ID 1 = "All", ID 2+ = knownCategories[id-2]
+    const juce::String filterCat = (catId >= 2 && catId - 2 < knownCategories.size())
+                                   ? knownCategories[catId - 2] : juce::String();
 
     for (int i = 0; i < (int)allPresets.size(); ++i)
     {
         const auto& p = allPresets[i];
-        if (!filterCat.isEmpty() && p.category != filterCat) continue;
+        if (filterCat.isNotEmpty() && p.category != filterCat) continue;
         if (query.isNotEmpty() && !p.name.toLowerCase().contains(query)) continue;
         filteredIndices.push_back(i);
     }

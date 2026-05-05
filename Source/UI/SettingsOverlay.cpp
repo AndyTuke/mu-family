@@ -23,6 +23,44 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
             p->setValueNotifyingHost(p->convertTo0to1((float)v));
     };
     addAndMakeVisible(masterVolKnob);
+
+    contentFolderLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    contentFolderLabel.setJustificationType(juce::Justification::centredLeft);
+    addAndMakeVisible(contentFolderLabel);
+    updateFolderLabel();
+
+    browseContentFolderBtn.onClick = [this]
+    {
+        fileChooser = std::make_unique<juce::FileChooser>(
+            "Choose content folder...", proc.getContentDir());
+        fileChooser->launchAsync(
+            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+            [this](const juce::FileChooser& fc)
+            {
+                auto result = fc.getResult();
+                if (result.isDirectory())
+                {
+                    proc.setContentDir(result);
+                    updateFolderLabel();
+                    if (onContentDirChanged) onContentDirChanged();
+                }
+            });
+    };
+    addAndMakeVisible(browseContentFolderBtn);
+
+    resetContentFolderBtn.onClick = [this]
+    {
+        proc.setContentDir(juce::File());  // empty = revert to default
+        updateFolderLabel();
+        if (onContentDirChanged) onContentDirChanged();
+    };
+    addAndMakeVisible(resetContentFolderBtn);
+}
+
+void SettingsOverlay::updateFolderLabel()
+{
+    contentFolderLabel.setText(proc.getContentDir().getFullPathName(),
+                               juce::dontSendNotification);
 }
 
 void SettingsOverlay::resized()
@@ -41,6 +79,14 @@ void SettingsOverlay::resized()
     }
 
     masterVolKnob.setBounds(kPad, y, ctrlW, kRowH);
+    y += kRowH + kPad * 2;
+
+    // Content folder row
+    const int btnW  = 70;
+    const int labelW = w - kPad * 2 - btnW * 2 - kPad * 2;
+    contentFolderLabel      .setBounds(kPad, y, labelW, 20);
+    browseContentFolderBtn  .setBounds(kPad + labelW + kPad, y - 2, btnW, 24);
+    resetContentFolderBtn   .setBounds(kPad + labelW + kPad + btnW + kPad, y - 2, btnW, 24);
 }
 
 void SettingsOverlay::paint(juce::Graphics& g)
@@ -57,21 +103,11 @@ void SettingsOverlay::paint(juce::Graphics& g)
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawLine(0.0f, (float)kHeaderH, (float)getWidth(), (float)kHeaderH, 0.5f);
 
-    // Placeholder items (visual only, greyed out)
-    const int w = getWidth();
-    int y = kHeaderH + kPad + (isStandalone ? 2 : 1) * (kRowH + kPad);
-    g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f).withStyle("Italic")));
-    const juce::String placeholders[] = {
-        "Hit pulse style  (Stage 11)",
-        "Interpolation quality  (Stage 11)",
-        "Oversampling quality  (Stage 11)",
-        "Default overlap fade  (Stage 11)",
-        "Restore factory presets  (Stage 11)",
-    };
-    for (auto& s : placeholders)
-    {
-        g.drawText(s, kPad, y, w - kPad * 2, 20, juce::Justification::centredLeft, false);
-        y += 24;
-    }
+    // Content folder section heading
+    const int ctrlH = kRowH * (isStandalone ? 2 : 1) + kPad * (isStandalone ? 2 : 1);
+    const int folderY = kHeaderH + kPad + ctrlH + kPad;
+    g.setColour(MuClidLookAndFeel::colour(Id::labelText));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
+    g.drawText("Content Folder", kPad, folderY - 14, 200, 12,
+               juce::Justification::centredLeft, false);
 }

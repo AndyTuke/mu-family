@@ -27,11 +27,12 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     {
         if (processorRef.getNumRhythms() >= SequencerEngine::MaxRhythms) return;
         Rhythm r;
-        r.name        = "Rhythm " + std::to_string(processorRef.getNumRhythms() + 1);
+        r.name        = "<unnamed>";
         r.colourIndex = processorRef.getNumRhythms() % 30;
         processorRef.addRhythm(r);
-        sidebar.refreshItems();
         const int newIdx = processorRef.getNumRhythms() - 1;
+        processorRef.applyDefaultRhythm(newIdx);
+        sidebar.refreshItems();
         sidebar.setSelectedIndex(newIdx);
         rhythmPanel.setRhythm(newIdx);
         if (mixerVisible) mixerOverlay.refresh();
@@ -62,11 +63,12 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     {
         if (processorRef.getNumRhythms() >= SequencerEngine::MaxRhythms) return;
         Rhythm r;
-        r.name        = "Rhythm " + std::to_string(processorRef.getNumRhythms() + 1);
+        r.name        = "<unnamed>";
         r.colourIndex = processorRef.getNumRhythms() % 30;
         processorRef.addRhythm(r);
-        sidebar.refreshItems();
         const int newIdx = processorRef.getNumRhythms() - 1;
+        processorRef.applyDefaultRhythm(newIdx);
+        sidebar.refreshItems();
         sidebar.setSelectedIndex(newIdx);
         rhythmPanel.setRhythm(newIdx);
         if (mixerVisible) mixerOverlay.refresh();
@@ -82,7 +84,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     rhythmPanel.onRhythmRenamed = [this]
     {
-        sidebar.refreshItems();
+        sidebar.repaintItems();
         if (mixerVisible) mixerOverlay.refresh();
     };
 
@@ -102,9 +104,10 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // ── Save dialog ───────────────────────────────────────────────────────────
     saveDialog.onSave = [this](const juce::String& name,
                                const juce::String& desc,
-                               const juce::String& category)
+                               const juce::String& category,
+                               bool embedSamples)
     {
-        processorRef.savePreset(name, desc, category);
+        processorRef.savePreset(name, desc, category, embedSamples);
         transportBar.refreshPresets();
         showSaveDialog(false);
     };
@@ -123,12 +126,13 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     // ── Settings overlay ──────────────────────────────────────────────────────
     settingsOverlay.onClose = [this] { showSettings(false); };
+    settingsOverlay.onContentDirChanged = [this] { transportBar.refreshPresets(); };
 
     // ── Startup ───────────────────────────────────────────────────────────────
     if (processorRef.getNumRhythms() == 0)
     {
         Rhythm r;
-        r.name        = "Rhythm 1";
+        r.name        = "<unnamed>";
         r.colourIndex = 0;
         processorRef.addRhythm(r);
         sidebar.refreshItems();
@@ -228,6 +232,11 @@ void PluginEditor::showAbout(bool show)
 void PluginEditor::showSaveDialog(bool show)
 {
     saveVisible = show;
+    if (show)
+    {
+        presetBrowser.refresh(processorRef.getPresetsDir());
+        saveDialog.setKnownCategories(presetBrowser.getCategories());
+    }
     saveDialog.setVisible(show);
     saveDialog.toFront(false);
 }

@@ -56,9 +56,20 @@ public:
 
     void loadSampleForRhythm(int rhythmIndex, const juce::File& file);
 
+    juce::File getContentDir() const;
     juce::File getPresetsDir() const;
-    void savePreset(const juce::String& name, const juce::String& description, const juce::String& category);
+    juce::File getRhythmsDir() const;
+    juce::File getSamplesDir() const;
+    void setContentDir(const juce::File& dir);
+    void ensureContentFoldersExist();
+
+    void savePreset(const juce::String& name, const juce::String& description,
+                    const juce::String& category, bool embedSamples = false);
     void loadPreset(const juce::File& file);
+    void saveRhythmPreset(int rhythmIndex, const juce::String& name, const juce::String& category);
+    bool applyRhythmPreset(const juce::File& file, int rhythmIndex);
+    bool applyDefaultRhythm(int rhythmIndex);
+    void loadDefaultPreset();
 
     SequencerEngine sequencer;
     std::array<VoiceEngine,      SequencerEngine::MaxRhythms> voiceEngines;
@@ -74,7 +85,8 @@ public:
         juce::Atomic<int>  stepsA        { 1 }; // individual ring step counts for per-ring rotation
         juce::Atomic<int>  stepsB        { 1 };
         juce::Atomic<int>  stepsC        { 1 };
-        juce::Atomic<bool> hitFired      { false }; // set by audio thread, cleared by UI on read
+        juce::Atomic<bool> hitFired      { false }; // legacy: kept for backward compat; new code uses hitCount
+        juce::Atomic<int>  hitCount      { 0 };     // monotonic counter — audio thread increments per hit, UI tracks lastSeen (Issue #43: avoids one-shot-flag race between RhythmCircle + SidebarItem)
     };
     std::array<RhythmPlayState, SequencerEngine::MaxRhythms> rhythmPlayState;
     juce::Atomic<float>  beatFraction     { 0.0f }; // fractional position within the current 1/16 step
@@ -82,6 +94,8 @@ public:
     juce::Atomic<double> lastBeatPos      { 0.0 };  // most recent beat position (for UI playhead)
 
 private:
+    std::unique_ptr<juce::PropertiesFile> appSettings;
+
     bool apvtsLoading = false;
 
     // Pre-allocated modulation parameter map — reused every block to avoid audio-thread allocation.
