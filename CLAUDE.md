@@ -34,7 +34,7 @@ The full design is split into focused sub-documents. **Read only the relevant on
 | Sub-doc | When to read |
 |---|---|
 | [docs/design-sequencer.md](docs/design-sequencer.md) | Euclidean params, DAW sync, control sequence params, modulation signal flow |
-| [docs/design-voice.md](docs/design-voice.md) | Voice chain, ADSR, filter, interpolation quality, sample handling, SoundTouch |
+| [docs/design-voice.md](docs/design-voice.md) | Voice chain, ADSR, filter, interpolation quality, sample handling, time stretching (TimeStretcherBase) |
 | [docs/design-fx.md](docs/design-fx.md) | FX algorithms, delay, reverb, intra-FX routing, FXSlotBase interface |
 | [docs/design-ui-family.md](docs/design-ui-family.md) | **Shared design system** — colour tokens, typography, control sizes, interaction patterns, shared module plan. Read this before any UI work. |
 | [docs/design-ui.md](docs/design-ui.md) | μ-Clid specific panel layouts — RhythmCircle, EuclideanPanel, Mixer, Transport. Defers to design-ui-family.md for colours/sizes. |
@@ -91,13 +91,13 @@ All work below resolves open issues from [Issues.md](Issues.md). Issues are refe
 - **Rhythms are fully self-contained** — ControlSequences may only target parameters within their own rhythm. No cross-rhythm modulation. Global FX parameters are not valid modulation destinations.
 - **ControlSequence lengths are independent** — never couple loop lengths or rates to rhythm step counts.
 - **FXSlotBase interface for all FX** — enables VST3 plugin hosting in v3 without refactoring.
-- **TimeStretcherBase wraps SoundTouch** — enables RubberBand swap in v2 without refactoring.
+- **TimeStretcherBase wraps the time-stretch engine** — currently a stub; SoundTouch (v1) or RubberBand (v2) slots in without refactoring.
 - **Atomic pointer for rhythm hot-swap from day one** — required for v2 live swap feature.
 - **RhythmSidebar item order supports variable ordering from day one** — required for v2 drag-to-reorder.
 - **All colours and sizes in MuClidLookAndFeel only** — no hardcoded values in component drawing code.
 - **All UI uses the shared component library** — never build a one-off version of a standard control.
 - **ModulationMatrix processes in dependency order** — detects and rejects circular dependencies at assignment creation time.
-- **SoundTouch ships as a DLL** (not statically linked) — required for LGPL compliance.
+- **Time-stretch DLL (SoundTouch/RubberBand) ships separately** — required for LGPL/GPL compliance when implemented.
 
 ## Key patterns discovered during implementation
 
@@ -125,10 +125,11 @@ All `juce::Font(float)` constructor calls produce C4996 warnings in this JUCE ve
 | Library | Purpose | Notes |
 |---|---|---|
 | JUCE | Core framework | Via `JUCE_PATH` env var |
-| SoundTouch | Time stretching (v1) | LGPL — ship as DLL |
 | Signalsmith Reverb | Room/hall/plate reverb | MIT, header-only |
-| FVerb | Plate reverb (alternative) | Header-only |
-| RubberBand | Time stretching (v2) | Wrapped behind `TimeStretcherBase` — no refactor needed when upgrading |
+| Monocypher | License key crypto | BSD-2-Clause, compiled in |
+| clap-juce-extensions | CLAP format support | MIT, compiled in |
+| SoundTouch | Time stretching (v1, planned) | LGPL — will ship as DLL when implemented |
+| RubberBand | Time stretching (v2, planned) | Wrapped behind `TimeStretcherBase` — no refactor needed when upgrading |
 
 ## UI values
 
