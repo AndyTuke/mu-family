@@ -47,6 +47,21 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
         if (onContentDirChanged) onContentDirChanged();
     };
     addAndMakeVisible(resetContentFolderBtn);
+
+    swapModeLabel.setText("Hot-swap timing:", juce::dontSendNotification);
+    swapModeLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    swapModeLabel.setJustificationType(juce::Justification::centredRight);
+    addAndMakeVisible(swapModeLabel);
+
+    swapModeDropdown.addItem("On master loop", 1);
+    swapModeDropdown.addItem("On rhythm loop", 2);
+    swapModeDropdown.setSelectedId((int)proc.getSwapMode() + 1, false);
+    swapModeDropdown.onChange = [this](int id)
+    {
+        proc.setSwapMode(id == 2 ? PluginProcessor::SwapMode::OnRhythmLoop
+                                 : PluginProcessor::SwapMode::OnMasterLoop);
+    };
+    addAndMakeVisible(swapModeDropdown);
 }
 
 void SettingsOverlay::updateFolderLabel()
@@ -66,6 +81,13 @@ void SettingsOverlay::resized()
 
     masterVolKnob.setBounds(kPad, y, ctrlW, kRowH);
     y += kRowH + kPad * 2;
+
+    // Hot-swap timing row
+    const int swapLabelW = 120;
+    const int swapDropW  = 140;
+    swapModeLabel   .setBounds(kPad, y + 2, swapLabelW, 20);
+    swapModeDropdown.setBounds(kPad + swapLabelW + 8, y, swapDropW, 24);
+    y += 24 + kPad;
 
     // Content folder row
     const int btnW  = 70;
@@ -89,10 +111,15 @@ void SettingsOverlay::paint(juce::Graphics& g)
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawLine(0.0f, (float)kHeaderH, (float)getWidth(), (float)kHeaderH, 0.5f);
 
-    // Content folder section heading
-    const int folderY = kHeaderH + kPad + kRowH + kPad * 2;
+    // Hot-swap timing section heading
+    const int swapY = kHeaderH + kPad + kRowH + kPad * 2;
     g.setColour(MuClidLookAndFeel::colour(Id::labelText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
+    g.drawText("Hot-swap", kPad, swapY - 14, 200, 12,
+               juce::Justification::centredLeft, false);
+
+    // Content folder section heading
+    const int folderY = swapY + 24 + kPad;
     g.drawText("Content Folder", kPad, folderY - 14, 200, 12,
                juce::Justification::centredLeft, false);
 }

@@ -10,6 +10,7 @@ RhythmSidebar::RhythmSidebar(PluginProcessor& p)
 
     addButton.onClick = [this] { if (onAddRhythm) onAddRhythm(); };
     refreshItems();
+    startTimerHz(5); // poll pending swap states for all items
 }
 
 void RhythmSidebar::refreshItems()
@@ -34,6 +35,10 @@ void RhythmSidebar::refreshItems()
             setSelectedIndex(idx);
             if (onRhythmSelected) onRhythmSelected(idx);
         };
+        item->onDragStart = [this](int idx, const juce::MouseEvent& e) { onItemDragStart(idx, e); };
+        item->onDragMove  = [this](int idx, const juce::MouseEvent& e) { onItemDragMove (idx, e); };
+        item->onDragEnd   = [this](int idx, const juce::MouseEvent& e) { onItemDragEnd  (idx, e); };
+        item->onCancelPendingSwap = [this](int idx) { proc.cancelStagedSwap(idx); };
         itemContainer.addAndMakeVisible(item.get());
         items.push_back(std::move(item));
     }
@@ -97,6 +102,136 @@ void RhythmSidebar::paint(juce::Graphics& g)
     g.drawLine((float)(getWidth() - 1), 0.0f, (float)(getWidth() - 1), (float)getHeight(), 1.0f);
 }
 
+void RhythmSidebar::paintOverChildren(juce::Graphics& g)
+{
+    if (dragPhase != DragPhase::Dragging) return;
+
+    // Convert itemContainer-local coords to sidebar-local coords (viewport accounts for scroll).
+    const int viewX = viewport.getX();
+    const int viewY = viewport.getY();
+    const int scrollY = viewport.getViewPositionY();
+
+    if (dragTargetIndex >= 0)
+    {
+        const int lineY = viewY + dragTargetIndex * kItemH - scrollY;
+        if (lineY >= viewY - 1 && lineY <= viewY + viewport.getHeight())
+        {
+            g.setColour(juce::Colours::white);
+            g.fillRect(viewX + 2, lineY - 1, viewport.getWidth() - 4, 2);
+        }
+    }
+
+    if (dragGhostImage.isValid())
+    {
+        const int gx = viewX + dragGhostBounds.getX();
+        const int gy = viewY + dragGhostBounds.getY() - scrollY;
+        g.setOpacity(0.75f);
+        g.drawImageAt(dragGhostImage, gx, gy);
+        g.setOpacity(1.0f);
+    }
+}
+
+void RhythmSidebar::onItemDragStart(int sourceIndex, const juce::MouseEvent& e)
+{
+    if (sourceIndex < 0 || sourceIndex >= (int)items.size()) return;
+
+    dragPhase = DragPhase::Dragging;
+    dragSourceIndex = sourceIndex;
+    dragTargetIndex = sourceIndex;
+
+    auto* src = items[(size_t)sourceIndex].get();
+    dragGhostImage = src->createComponentSnapshot(src->getLocalBounds());
+
+    const auto containerPt = itemContainer.getLocalPoint(src, e.getPosition());
+    dragGhostBounds = src->getBounds().withY(containerPt.getY() - src->getHeight() / 2);
+
+    repaint();
+}
+
+void RhythmSidebar::onItemDragMove(int sourceIndex, const juce::MouseEvent& e)
+{
+    if (dragPhase != DragPhase::Dragging) return;
+
+    auto* src = (sourceIndex >= 0 && sourceIndex < (int)items.size())
+                ? items[(size_t)sourceIndex].get() : nullptr;
+    if (!src) return;
+
+    const auto containerPt = itemContainer.getLocalPoint(src, e.getPosition());
+    dragGhostBounds = dragGhostBounds.withY(containerPt.getY() - src->getHeight() / 2);
+    dragTargetIndex = computeTargetIndex(containerPt.getY());
+    repaint();
+}
+
+void RhythmSidebar::onItemDragEnd(int sourceIndex, const juce::MouseEvent&)
+{
+    if (dragPhase != DragPhase::Dragging) { cancelDrag(); return; }
+
+    if (dragTargetIndex >= 0
+        && dragTargetIndex < (int)items.size()
+        && dragTargetIndex != sourceIndex)
+    {
+        commitDrag();
+    }
+    else
+    {
+        cancelDrag();
+    }
+}
+
+int RhythmSidebar::computeTargetIndex(int containerLocalY) const
+{
+    if (items.empty()) return 0;
+    return juce::jlimit(0, (int)items.size() - 1, containerLocalY / kItemH);
+}
+
+void RhythmSidebar::commitDrag()
+{
+    const int src = dragSourceIndex;
+    const int dst = dragTargetIndex;
+    const int prevSelected = selectedIndex;
+
+    int newSelected = prevSelected;
+
+    if (src < dst)
+    {
+        for (int i = src; i < dst; ++i)
+        {
+            proc.swapRhythms(i, i + 1);
+            if (newSelected == i)          newSelected = i + 1;
+            else if (newSelected == i + 1) newSelected = i;
+        }
+    }
+    else if (src > dst)
+    {
+        for (int i = src; i > dst; --i)
+        {
+            proc.swapRhythms(i - 1, i);
+            if (newSelected == i)          newSelected = i - 1;
+            else if (newSelected == i - 1) newSelected = i;
+        }
+    }
+
+    dragPhase = DragPhase::Idle;
+    dragSourceIndex = -1;
+    dragTargetIndex = -1;
+    dragGhostImage = juce::Image();
+
+    refreshItems();
+    setSelectedIndex(newSelected);
+
+    if (onRhythmsReordered) onRhythmsReordered(newSelected);
+    repaint();
+}
+
+void RhythmSidebar::cancelDrag()
+{
+    dragPhase = DragPhase::Idle;
+    dragSourceIndex = -1;
+    dragTargetIndex = -1;
+    dragGhostImage = juce::Image();
+    repaint();
+}
+
 void RhythmSidebar::resized()
 {
     const int w = getWidth();
@@ -109,4 +244,10 @@ void RhythmSidebar::resized()
 
     for (int i = 0; i < (int)items.size(); i++)
         items[i]->setBounds(0, i * kItemH, w, kItemH);
+}
+
+void RhythmSidebar::timerCallback()
+{
+    for (int i = 0; i < (int)items.size(); ++i)
+        items[i]->setPendingSwap(proc.hasPendingSwap(i));
 }

@@ -24,6 +24,15 @@ void SidebarItem::setSelected(bool s)
     repaint();
 }
 
+void SidebarItem::setPendingSwap(bool p)
+{
+    if (pendingSwap != p)
+    {
+        pendingSwap = p;
+        repaint();
+    }
+}
+
 void SidebarItem::setPlayState(PluginProcessor::RhythmPlayState* state,
                                 const juce::Atomic<float>*         beatFrac,
                                 const juce::Atomic<bool>*           playing)
@@ -113,12 +122,71 @@ void SidebarItem::paint(juce::Graphics& g)
         g.drawText(name, 14, nameY, w - 18, nameRowH, juce::Justification::centredLeft, true);
     }
 
+    // Pending hot-swap badge: orange pill in top-right with "SWP" text.
+    // Clicking it (see mouseDown) cancels the staged swap.
+    if (pendingSwap)
+    {
+        constexpr int badgeH = 13;
+        constexpr int badgeW = 28;
+        const int badgeX = w - badgeW - 3;
+        const int badgeY = 3;
+        g.setColour(juce::Colours::orange.withAlpha(0.85f));
+        g.fillRoundedRectangle((float)badgeX, (float)badgeY, (float)badgeW, (float)badgeH, 3.0f);
+        g.setColour(juce::Colours::black);
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(8.0f)));
+        g.drawText("SWP", badgeX, badgeY, badgeW, badgeH, juce::Justification::centred, false);
+    }
+
     // Bottom separator
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawLine(4.0f, (float)(h - 1), (float)(w - 4), (float)(h - 1), 0.5f);
 }
 
-void SidebarItem::mouseDown(const juce::MouseEvent&)
+void SidebarItem::mouseDown(const juce::MouseEvent& e)
 {
-    if (onSelected) onSelected(rhythmIndex);
+    // Cancel staged swap if the pending badge was clicked.
+    if (pendingSwap)
+    {
+        constexpr int badgeH = 13;
+        constexpr int badgeW = 28;
+        const int badgeX = getWidth() - badgeW - 3;
+        const juce::Rectangle<int> badgeRect { badgeX, 3, badgeW, badgeH };
+        if (badgeRect.contains(e.getPosition()))
+        {
+            if (onCancelPendingSwap) onCancelPendingSwap(rhythmIndex);
+            return;
+        }
+    }
+    mouseDownPos = e.getPosition();
+    isDragging = false;
+}
+
+void SidebarItem::mouseDrag(const juce::MouseEvent& e)
+{
+    constexpr int kDragThresholdPx = 4;
+    if (!isDragging)
+    {
+        if (e.getPosition().getDistanceFrom(mouseDownPos) >= kDragThresholdPx)
+        {
+            isDragging = true;
+            if (onDragStart) onDragStart(rhythmIndex, e);
+        }
+    }
+    else
+    {
+        if (onDragMove) onDragMove(rhythmIndex, e);
+    }
+}
+
+void SidebarItem::mouseUp(const juce::MouseEvent& e)
+{
+    if (isDragging)
+    {
+        if (onDragEnd) onDragEnd(rhythmIndex, e);
+        isDragging = false;
+    }
+    else
+    {
+        if (onSelected) onSelected(rhythmIndex);
+    }
 }

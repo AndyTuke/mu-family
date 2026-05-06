@@ -21,10 +21,18 @@ public:
                       const juce::Atomic<float>*         beatFrac,
                       const juce::Atomic<bool>*           playing);
 
+    void setPendingSwap(bool p);
+
     std::function<void(int)> onSelected;
+    std::function<void(int)> onCancelPendingSwap;
+    std::function<void(int, juce::MouseEvent const&)> onDragStart;
+    std::function<void(int, juce::MouseEvent const&)> onDragMove;
+    std::function<void(int, juce::MouseEvent const&)> onDragEnd;
 
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
+    void mouseDrag(const juce::MouseEvent&) override;
+    void mouseUp  (const juce::MouseEvent&) override;
     void resized() override;
 
 private:
@@ -33,9 +41,13 @@ private:
     juce::Colour  rhythmColour { juce::Colours::transparentBlack };
     bool          selected = false;
 
+    juce::Point<int> mouseDownPos;
+    bool             isDragging = false;
+
     PluginProcessor::RhythmPlayState* playState = nullptr;
     float pulseAlpha   = 0.0f;
     int   lastHitCount = 0;  // Issue #43: edge-detect against playState->hitCount
+    bool  pendingSwap  = false;
 
     RhythmCircle miniCircle;
 

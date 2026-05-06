@@ -5,6 +5,10 @@
 SequencerEngine::SequencerEngine()
 {
     lastStepIndex.fill(-1);
+    rhythms.reserve(MaxRhythms);
+    cachedPatterns.reserve(MaxRhythms);
+    cachedCPatterns.reserve(MaxRhythms);
+    patternUpdated.reserve(MaxRhythms);
 }
 
 //==============================================================================
@@ -85,6 +89,32 @@ void SequencerEngine::setNumRhythms(int n)
     }
 }
 
+void SequencerEngine::swapRhythmSlots(int i, int j)
+{
+    if (i == j) return;
+    const int n = (int)rhythms.size();
+    if (i < 0 || j < 0 || i >= n || j >= n) return;
+
+    bool expected = false;
+    while (!patternLock.compare_exchange_weak(expected, true, std::memory_order_acquire))
+        expected = false;
+
+    std::swap(rhythms[i],         rhythms[j]);
+    std::swap(cachedPatterns[i],  cachedPatterns[j]);
+    std::swap(cachedCPatterns[i], cachedCPatterns[j]);
+    std::swap(safePatterns[i],    safePatterns[j]);
+    std::swap(safeCPatterns[i],   safeCPatterns[j]);
+
+    bool tmp = patternUpdated[i];
+    patternUpdated[i] = patternUpdated[j];
+    patternUpdated[j] = tmp;
+
+    lastStepIndex[i] = -1;
+    lastStepIndex[j] = -1;
+
+    patternLock.store(false, std::memory_order_release);
+}
+
 void SequencerEngine::updatePattern(int index)
 {
     bool expected = false;
@@ -111,6 +141,11 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
     const auto globalStep    = static_cast<int>(beatPosition / StepLengthBeats);
     const int  effectiveStep = (masterLoopSteps > 0) ? (globalStep % masterLoopSteps) : globalStep;
     masterLoopCurrentStep.store(masterLoopSteps > 0 ? effectiveStep : 0, std::memory_order_relaxed);
+
+    // Detect master loop wrap: effectiveStep decreased relative to the previous block.
+    if (masterLoopSteps > 0 && lastEffectiveStep >= 0 && effectiveStep < lastEffectiveStep)
+        result.masterLoopWrapped = true;
+    lastEffectiveStep = effectiveStep;
 
     // Non-blocking snapshot: copy any updated patterns into the audio-thread-safe buffers.
     // If patternLock is held by the message thread, skip this block's snapshot — safePatterns
@@ -145,6 +180,10 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
 
         if (stepIndex != lastStepIndex[r])
         {
+            // Detect rhythm loop wrap: step wrapped back to 0 from a non-zero position.
+            if (stepIndex == 0 && lastStepIndex[r] > 0)
+                result.rhythmLoopWrapMask |= (1 << r);
+
             lastStepIndex[r] = stepIndex;
             if (pattern[stepIndex])
             {

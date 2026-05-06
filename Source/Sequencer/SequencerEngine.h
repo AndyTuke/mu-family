@@ -6,8 +6,10 @@
 
 struct BlockResult
 {
-    int firedMask  = 0;  // bit N set = rhythm N fired a hit this block
-    int accentMask = 0;  // bit N set = that hit was accented (Ring C coincidence)
+    int  firedMask          = 0;  // bit N set = rhythm N fired a hit this block
+    int  accentMask         = 0;  // bit N set = that hit was accented (Ring C coincidence)
+    int  rhythmLoopWrapMask = 0;  // bit N set = rhythm N's step index wrapped to 0 this block
+    bool masterLoopWrapped  = false; // master loop counter reset this block
 };
 
 class SequencerEngine : public juce::ChangeBroadcaster
@@ -29,6 +31,9 @@ public:
 
     // Resize all rhythm vectors to n — used during state loading to pre-expand or trim.
     void setNumRhythms(int n);
+
+    // Swap two rhythm slots atomically with respect to the audio thread.
+    void swapRhythmSlots(int i, int j);
 
     // UI read-only accessors (safe to call from message thread after processBlock).
     int getLastStepIndex(int r) const { return lastStepIndex[r]; }
@@ -67,4 +72,5 @@ private:
     std::vector<bool> patternUpdated;
     int masterLoopSteps = 0;
     std::atomic<int> masterLoopCurrentStep { 0 };
+    int lastEffectiveStep = -1;  // previous block's effectiveStep, for master-loop wrap detection
 };

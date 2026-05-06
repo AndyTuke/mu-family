@@ -45,10 +45,12 @@ private:
     DropdownSelect  midiModeDropdown;
 
     juce::Label      nameLabel;
-    juce::TextButton resetBtn  { juce::String::charToString(0x21BA) }; // ↺
-    juce::TextButton deleteBtn { juce::String::charToString(0x2715) }; // ✕
+    juce::TextButton resetBtn      { juce::String::charToString(0x21BA) }; // ↺
+    juce::TextButton deleteBtn     { juce::String::charToString(0x2715) }; // ✕
+    juce::TextButton loadPresetBtn { "R.Pst" };
 
     std::unique_ptr<juce::FileChooser> fileChooser;
+    std::unique_ptr<juce::FileChooser> rhythmPresetChooser;
     std::map<int, juce::String> loadedSampleNames;
     juce::File lastBrowseDir;
 
@@ -57,8 +59,9 @@ private:
     static constexpr int kSampleBarH    = 22;
     static constexpr int kVoiceH        = 144;
     static constexpr int kPanelPad      = 6;
-    static constexpr int kModeSelectorW = 80;
-    static constexpr int kIconBtnW      = 22;
+    static constexpr int kModeSelectorW  = 80;
+    static constexpr int kIconBtnW       = 22;
+    static constexpr int kPresetBtnW     = 40;
 
     // Computed in resized(), used in both resized() and paint()
     int circleW = 300;
@@ -67,6 +70,7 @@ private:
     juce::Rectangle<int> nameRect;   // header name hit-area
 
     void loadSample();
+    void loadRhythmPreset();
     void refreshCircle();
     juce::Colour currentColour() const;
     void commitNameFromLabel();

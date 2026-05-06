@@ -29,8 +29,10 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
 
     resetBtn.onClick  = [this] { confirmReset();  };
     deleteBtn.onClick = [this] { confirmDelete(); };
+    loadPresetBtn.onClick = [this] { loadRhythmPreset(); };
     addAndMakeVisible(resetBtn);
     addAndMakeVisible(deleteBtn);
+    addAndMakeVisible(loadPresetBtn);
 
     midiModeDropdown.onChange = [this](int id)
     {
@@ -159,6 +161,36 @@ void RhythmPanel::loadSample()
         });
 }
 
+void RhythmPanel::loadRhythmPreset()
+{
+    if (currentRhythmIndex < 0) return;
+
+    const juce::File startDir = proc.getRhythmsDir().isDirectory()
+                                    ? proc.getRhythmsDir()
+                                    : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
+
+    rhythmPresetChooser = std::make_unique<juce::FileChooser>(
+        "Load Rhythm Preset", startDir, "*.muRhyth");
+
+    rhythmPresetChooser->launchAsync(
+        juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+        [this](const juce::FileChooser& fc)
+        {
+            auto result = fc.getResult();
+            if (!result.existsAsFile() || currentRhythmIndex < 0) return;
+
+            // stageRhythmPreset applies immediately if not playing, or stages for hot-swap.
+            proc.stageRhythmPreset(currentRhythmIndex, result);
+
+            // Refresh UI immediately (for the non-playing case or to pick up name/colour).
+            if (!proc.sequencerPlaying.get())
+            {
+                setRhythm(currentRhythmIndex);
+                repaint();
+            }
+        });
+}
+
 void RhythmPanel::mouseDown(const juce::MouseEvent& e)
 {
     // Name editing is handled by nameLabel (a child component); we no longer need
@@ -254,10 +286,11 @@ void RhythmPanel::resized()
     const int btnY = (kHeaderH - 20) / 2;
     midiModeDropdown.setBounds(w - kModeSelectorW - 4, btnY, kModeSelectorW, 20);
     const int rightEdge = w - kModeSelectorW - 4 - 6;
-    deleteBtn.setBounds(rightEdge - kIconBtnW,               btnY, kIconBtnW, 20);
-    resetBtn .setBounds(rightEdge - kIconBtnW * 2 - 4,       btnY, kIconBtnW, 20);
-    const int nameX = 26;
-    const int nameEnd = rightEdge - kIconBtnW * 2 - 4 - 6;
+    deleteBtn    .setBounds(rightEdge - kIconBtnW,                              btnY, kIconBtnW,   20);
+    resetBtn     .setBounds(rightEdge - kIconBtnW * 2 - 4,                     btnY, kIconBtnW,   20);
+    loadPresetBtn.setBounds(rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW - 4,   btnY, kPresetBtnW, 20);
+    const int nameX   = 26;
+    const int nameEnd = rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW - 4 - 6;
     nameRect = { nameX, 0, nameEnd - nameX, kHeaderH };
     nameLabel.setBounds(nameRect.reduced(4, 2));
 

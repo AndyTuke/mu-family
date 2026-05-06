@@ -13,9 +13,13 @@
 #include <unordered_map>
 
 class PluginProcessor : public juce::AudioProcessor,
-                        private juce::AudioProcessorValueTreeState::Listener
+                        private juce::AudioProcessorValueTreeState::Listener,
+                        private juce::AsyncUpdater
 {
 public:
+    // Controls when a staged rhythm preset is committed to the live slot.
+    enum class SwapMode { OnMasterLoop = 0, OnRhythmLoop = 1 };
+
     // apvts must be the first data member — initialized first, destroyed last.
     juce::AudioProcessorValueTreeState apvts;
     juce::StringArray                  loadedSamplePaths;  // [MaxRhythms]
@@ -52,11 +56,20 @@ public:
 
     void    addRhythm    (const Rhythm& r);
     void    removeRhythm (int index);
+    bool    swapRhythms  (int i, int j);
     Rhythm& getRhythm    (int index)       { return sequencer.getRhythm(index); }
     int     getNumRhythms() const          { return sequencer.getNumRhythms(); }
     void    updatePattern (int index)      { sequencer.updatePattern(index); }
 
     void loadSampleForRhythm(int rhythmIndex, const juce::File& file);
+
+    // Hot-swap staging: stages a rhythm preset for atomic commit at the next loop boundary.
+    // If the sequencer is not playing, applies the preset immediately instead.
+    void stageRhythmPreset (int rhythmIndex, const juce::File& presetFile);
+    void cancelStagedSwap  (int rhythmIndex);
+    bool hasPendingSwap    (int rhythmIndex) const;
+    void setSwapMode(SwapMode m) { swapModeAtomic.store((int)m, std::memory_order_relaxed); }
+    SwapMode getSwapMode() const { return static_cast<SwapMode>(swapModeAtomic.load(std::memory_order_relaxed)); }
 
     juce::File getContentDir() const;
     juce::File getPresetsDir() const;
@@ -104,6 +117,27 @@ public:
     juce::Atomic<double> lastBeatPos      { 0.0 };  // most recent beat position (for UI playhead)
 
 private:
+    // Hot-swap state: message thread writes pendingRhythm/pendingVoice, then sets isReady.
+    // Audio thread detects a loop boundary, sets boundaryReached, triggers handleAsyncUpdate.
+    // handleAsyncUpdate runs on message thread and performs the actual swap.
+    struct PendingRhythmSwap
+    {
+        Rhythm                       pendingRhythm;
+        juce::String                 pendingSamplePath;
+        std::unique_ptr<VoiceEngine> pendingVoice;
+        std::atomic<bool> isReady         { false }; // set by message thread after staging
+        std::atomic<bool> boundaryReached { false }; // set by audio thread at loop boundary
+
+        PendingRhythmSwap() = default;
+        PendingRhythmSwap(const PendingRhythmSwap&) = delete;
+        PendingRhythmSwap& operator=(const PendingRhythmSwap&) = delete;
+    };
+
+    std::array<PendingRhythmSwap, SequencerEngine::MaxRhythms> pendingSwaps;
+    std::atomic<int> swapModeAtomic { 0 }; // 0 = OnMasterLoop, 1 = OnRhythmLoop
+
+    void handleAsyncUpdate() override;
+
     std::unique_ptr<juce::PropertiesFile> appSettings;
 
     bool apvtsLoading = false;
@@ -117,6 +151,9 @@ private:
     void syncFXParam(const juce::String& id, float v);
     void syncMixerParam(const juce::String& id, float v);
     void pushRhythmToAPVTS(int ri);
+    void pushMixerChannelToAPVTS(int idx);
+    void swapAPVTSForRhythms(int i, int j);
+    void resetPlayState(int idx);
     void restoreStateFromTree(const juce::ValueTree& state);
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

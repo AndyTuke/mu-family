@@ -246,6 +246,7 @@ PluginProcessor::PluginProcessor()
 
 PluginProcessor::~PluginProcessor()
 {
+    cancelPendingUpdate();
     for (auto* param : getParameters())
         if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
             apvts.removeParameterListener(p->getParameterID(), this);
@@ -316,6 +317,27 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         for (int r = 0; r < numRhythms; ++r)
             if ((blockResult.firedMask & (1 << r)) && voiceEngines[r])
                 voiceEngines[r]->trigger(blockResult.accentMask & (1 << r));
+
+        // Hot-swap: check if any staged rhythm preset should be committed at this boundary.
+        const int mode = swapModeAtomic.load(std::memory_order_relaxed);
+        bool needAsync = false;
+        for (int r = 0; r < numRhythms; ++r)
+        {
+            auto& sw = pendingSwaps[r];
+            if (sw.isReady.load(std::memory_order_acquire)
+                && !sw.boundaryReached.load(std::memory_order_relaxed))
+            {
+                const bool wrap = (mode == 0) ? blockResult.masterLoopWrapped
+                                              : ((blockResult.rhythmLoopWrapMask & (1 << r)) != 0);
+                if (wrap)
+                {
+                    sw.boundaryReached.store(true, std::memory_order_release);
+                    needAsync = true;
+                }
+            }
+        }
+        if (needAsync)
+            triggerAsyncUpdate();
 
         // Update UI play-state atomics.
         const float frac = static_cast<float>(
@@ -448,24 +470,36 @@ static inline float adsrTime(float v) { return juce::jmax(0.001f, v * 0.03f); }
 // Convert 0–100 UI scale → 0–1 amplitude for ADSR Sustain.
 static inline float adsrSus(float v)  { return juce::jlimit(0.0f, 1.0f, v / 100.0f); }
 
-void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float v)
+//==============================================================================
+// All per-rhythm APVTS parameter suffixes (used for rhythm preset save/load).
+static const char* const kRhythmSuffixes[] = {
+    "stepsA","hitsA","rotA","prePadA","postPadA","insStA","insLenA","insModeA","prePadModeA","postPadModeA",
+    "stepsB","hitsB","rotB","prePadB","postPadB","insStB","insLenB","insModeB","prePadModeB","postPadModeB",
+    "stepsC","hitsC","rotC","prePadC","postPadC","insStC","insLenC","insModeC","prePadModeC","postPadModeC",
+    "logic",
+    "pitchOct","pitchSemi","pitchFine","pEnvAtk","pEnvDec","pEnvSus","pEnvRel","pEnvDep",
+    "fltType","fltCut","fltRes","fEnvAtk","fEnvDec","fEnvSus","fEnvRel","fEnvDep",
+    "ampLvl","aEnvAtk","aEnvDec","aEnvSus","aEnvRel","accentDb",
+    "drvChar","drvDrv","drvOut","drvBits","drvRate","drvDit","drvTon",
+    "midiMode",
+    nullptr
+};
+
+// Applies a rhythm parameter suffix + display-scale value to a Rhythm struct.
+// Returns patternDirty (true) or voiceDirty (false) via the out-params.
+// Called from syncRhythmParam and stageRhythmPreset.
+static void applyRhythmSuffix(const juce::String& suffix, float v, Rhythm& r,
+                               bool& patternDirty, bool& voiceDirty)
 {
-    if (ri < 0 || ri >= SequencerEngine::MaxRhythms) return;
-    if (ri >= sequencer.getNumRhythms()) return;
-
-    Rhythm& r = sequencer.getRhythm(ri);
-    bool patternDirty = false;
-    bool voiceDirty   = false;
-
     auto applyHitGen = [&](HitGenerator& gen, const juce::String& s, float val)
     {
-        if      (s == "steps")   { gen.steps        = juce::jlimit(1, 64, (int)val); patternDirty = true; }
-        else if (s == "hits")    { gen.hits          = juce::jlimit(0, 64, (int)val); patternDirty = true; }
-        else if (s == "rot")     { gen.rotate        = (int)val;                      patternDirty = true; }
-        else if (s == "prePad")  { gen.prePad        = juce::jlimit(0, 12, (int)val); patternDirty = true; }
-        else if (s == "postPad") { gen.postPad       = juce::jlimit(0, 12, (int)val); patternDirty = true; }
-        else if (s == "insSt")   { gen.insertStart   = juce::jlimit(0, 63, (int)val); patternDirty = true; }
-        else if (s == "insLen")  { gen.insertLength  = juce::jlimit(0,  8, (int)val); patternDirty = true; }
+        if      (s == "steps")       { gen.steps        = juce::jlimit(1, 64, (int)val); patternDirty = true; }
+        else if (s == "hits")        { gen.hits          = juce::jlimit(0, 64, (int)val); patternDirty = true; }
+        else if (s == "rot")         { gen.rotate        = (int)val;                      patternDirty = true; }
+        else if (s == "prePad")      { gen.prePad        = juce::jlimit(0, 12, (int)val); patternDirty = true; }
+        else if (s == "postPad")     { gen.postPad       = juce::jlimit(0, 12, (int)val); patternDirty = true; }
+        else if (s == "insSt")       { gen.insertStart   = juce::jlimit(0, 63, (int)val); patternDirty = true; }
+        else if (s == "insLen")      { gen.insertLength  = juce::jlimit(0,  8, (int)val); patternDirty = true; }
         else if (s == "insMode")     { gen.insertMode   = val > 0.5f ? InsertMode::Mute : InsertMode::Pad; patternDirty = true; }
         else if (s == "prePadMode")  { gen.prePadMode   = val > 0.5f ? InsertMode::Mute : InsertMode::Pad; patternDirty = true; }
         else if (s == "postPadMode") { gen.postPadMode  = val > 0.5f ? InsertMode::Mute : InsertMode::Pad; patternDirty = true; }
@@ -475,7 +509,6 @@ void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float 
     else if (suffix.endsWith("B")) applyHitGen(r.genB, suffix.dropLastCharacters(1), v);
     else if (suffix.endsWith("C")) applyHitGen(r.genC, suffix.dropLastCharacters(1), v);
     else if (suffix == "logic")     { r.logic = static_cast<Logic>(juce::jlimit(0, 4, (int)v)); patternDirty = true; }
-    // Pitch
     else if (suffix == "pitchOct")  { r.voiceParams.pitchOctave    = juce::jlimit(-4, 4, (int)v);   voiceDirty = true; }
     else if (suffix == "pitchSemi") { r.voiceParams.pitchSemitones = juce::jlimit(-12, 12, (int)v); voiceDirty = true; }
     else if (suffix == "pitchFine") { r.voiceParams.pitchFine      = v;  voiceDirty = true; }
@@ -484,7 +517,6 @@ void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float 
     else if (suffix == "pEnvSus")   { r.voiceParams.pitchEnvSus    = adsrSus(v);  voiceDirty = true; }
     else if (suffix == "pEnvRel")   { r.voiceParams.pitchEnvRel    = adsrTime(v); voiceDirty = true; }
     else if (suffix == "pEnvDep")   { r.voiceParams.pitchEnvDepth  = v;            voiceDirty = true; }
-    // Filter
     else if (suffix == "fltType")   { r.voiceParams.filterType     = juce::jlimit(0, 9, (int)v); voiceDirty = true; }
     else if (suffix == "fltCut")    { r.voiceParams.filterCutoff   = v;            voiceDirty = true; }
     else if (suffix == "fltRes")    { r.voiceParams.filterRes      = v;            voiceDirty = true; }
@@ -493,14 +525,12 @@ void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float 
     else if (suffix == "fEnvSus")   { r.voiceParams.filterEnvSus   = adsrSus(v);  voiceDirty = true; }
     else if (suffix == "fEnvRel")   { r.voiceParams.filterEnvRel   = adsrTime(v); voiceDirty = true; }
     else if (suffix == "fEnvDep")   { r.voiceParams.filterEnvDepth = v;            voiceDirty = true; }
-    // Amp
     else if (suffix == "ampLvl")    { r.voiceParams.ampLevel       = v;            voiceDirty = true; }
     else if (suffix == "aEnvAtk")   { r.voiceParams.ampEnvAtk      = adsrTime(v); voiceDirty = true; }
     else if (suffix == "aEnvDec")   { r.voiceParams.ampEnvDec      = adsrTime(v); voiceDirty = true; }
     else if (suffix == "aEnvSus")   { r.voiceParams.ampEnvSus      = adsrSus(v);  voiceDirty = true; }
     else if (suffix == "aEnvRel")   { r.voiceParams.ampEnvRel = adsrTime(v); r.voiceParams.ampRelToEnd = (v >= 100.0f); voiceDirty = true; }
     else if (suffix == "accentDb")  { r.voiceParams.accentDb        = v;           voiceDirty = true; }
-    // Drive
     else if (suffix == "drvChar")   { r.voiceParams.driveChar  = juce::jlimit(0, 4, (int)v); voiceDirty = true; }
     else if (suffix == "drvDrv")    { r.voiceParams.driveDrive = v;  voiceDirty = true; }
     else if (suffix == "drvOut")    { r.voiceParams.driveOutput= v;  voiceDirty = true; }
@@ -508,8 +538,18 @@ void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float 
     else if (suffix == "drvRate")   { r.voiceParams.driveRate  = v;  voiceDirty = true; }
     else if (suffix == "drvDit")    { r.voiceParams.drvDither  = v;  voiceDirty = true; }
     else if (suffix == "drvTon")    { r.voiceParams.driveTone  = v;  voiceDirty = true; }
-    // Misc
     else if (suffix == "midiMode")  { r.midiMode = v > 0.5f; }
+}
+
+void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float v)
+{
+    if (ri < 0 || ri >= SequencerEngine::MaxRhythms) return;
+    if (ri >= sequencer.getNumRhythms()) return;
+
+    Rhythm& r = sequencer.getRhythm(ri);
+    bool patternDirty = false;
+    bool voiceDirty   = false;
+    applyRhythmSuffix(suffix, v, r, patternDirty, voiceDirty);
 
     if (!apvtsLoading)
     {
@@ -729,15 +769,85 @@ void PluginProcessor::addRhythm(const Rhythm& r)
     apvtsLoading = false;
 }
 
+void PluginProcessor::resetPlayState(int idx)
+{
+    if (idx < 0 || idx >= SequencerEngine::MaxRhythms) return;
+    auto& s = rhythmPlayState[idx];
+    s.currentStep  .set(0);
+    s.patternLength.set(1);
+    s.stepsA       .set(1);
+    s.stepsB       .set(1);
+    s.stepsC       .set(1);
+    s.hitFired     .set(false);
+    s.hitCount     .set(0);
+}
+
+void PluginProcessor::pushMixerChannelToAPVTS(int idx)
+{
+    if (idx < 0 || idx >= SequencerEngine::MaxRhythms) return;
+    const auto& ch = mixerEngine.channels[idx];
+    const juce::String px = "ch" + juce::String(idx) + "_";
+
+    auto set = [this](const juce::String& id, float v)
+    {
+        if (auto* p = apvts.getParameter(id))
+            p->setValueNotifyingHost(p->convertTo0to1(v));
+    };
+
+    set(px+"lvl",     ch.level);
+    set(px+"pan",     ch.pan);
+    set(px+"mute",    ch.mute ? 1.0f : 0.0f);
+    set(px+"solo",    ch.solo ? 1.0f : 0.0f);
+    set(px+"sendEff", ch.sendEffect);
+    set(px+"sendDly", ch.sendDelay);
+    set(px+"sendRev", ch.sendReverb);
+}
+
+void PluginProcessor::swapAPVTSForRhythms(int i, int j)
+{
+    apvtsLoading = true;
+    pushRhythmToAPVTS(i);
+    pushRhythmToAPVTS(j);
+    pushMixerChannelToAPVTS(i);
+    pushMixerChannelToAPVTS(j);
+    apvtsLoading = false;
+}
+
+bool PluginProcessor::swapRhythms(int i, int j)
+{
+    const int n = numActiveRhythms.load(std::memory_order_acquire);
+    if (i < 0 || j < 0 || i >= n || j >= n || i == j) return false;
+
+    suspendProcessing(true);
+
+    sequencer.swapRhythmSlots(i, j);
+    std::swap(voiceEngines[i], voiceEngines[j]);
+    std::swap(midiEngines[i],  midiEngines[j]);
+    resetPlayState(i);
+    resetPlayState(j);
+
+    juce::String tmp = loadedSamplePaths[i];
+    loadedSamplePaths.set(i, loadedSamplePaths[j]);
+    loadedSamplePaths.set(j, tmp);
+
+    std::swap(mixerEngine.channels[i], mixerEngine.channels[j]);
+
+    suspendProcessing(false);
+
+    swapAPVTSForRhythms(i, j);
+    return true;
+}
+
 void PluginProcessor::removeRhythm(int index)
 {
     if (index < 0 || index >= sequencer.getNumRhythms()) return;
     const int newN = sequencer.getNumRhythms() - 1;
-    // Decrement BEFORE any structural change so the audio thread won't access
-    // the slot being removed on its next block.
+
+    // suspendProcessing ensures no in-progress processBlock holds a stale
+    // numActiveRhythms snapshot and reads rhythms[r] while we erase and shift.
+    suspendProcessing(true);
     numActiveRhythms.store(newN, std::memory_order_release);
     sequencer.removeRhythm(index);
-    // Shift remaining voice/midi engines to fill the gap.
     for (int i = index; i < newN; ++i)
     {
         voiceEngines[i] = std::move(voiceEngines[i + 1]);
@@ -745,6 +855,7 @@ void PluginProcessor::removeRhythm(int index)
     }
     voiceEngines[newN].reset();
     midiEngines[newN] = MidiOutputEngine{};
+    suspendProcessing(false);
 }
 
 //==============================================================================
@@ -753,6 +864,137 @@ void PluginProcessor::loadSampleForRhythm(int rhythmIndex, const juce::File& fil
     if (rhythmIndex < 0 || rhythmIndex >= numActiveRhythms.load(std::memory_order_acquire)) return;
     voiceEngines[rhythmIndex]->loadFile(file);
     loadedSamplePaths.set(rhythmIndex, file.getFullPathName());
+}
+
+//==============================================================================
+// Hot-swap: stage a rhythm preset for atomic commit at the next loop boundary.
+// If not playing, applies the preset immediately via applyRhythmPreset.
+void PluginProcessor::stageRhythmPreset(int rhythmIndex, const juce::File& file)
+{
+    if (rhythmIndex < 0 || rhythmIndex >= sequencer.getNumRhythms()) return;
+
+    if (!sequencerPlaying.get())
+    {
+        applyRhythmPreset(file, rhythmIndex);
+        return;
+    }
+
+    if (!file.existsAsFile()) return;
+    auto xml = juce::parseXML(file);
+    if (!xml) return;
+    auto state = juce::ValueTree::fromXml(*xml);
+    if (!state.isValid()) return;
+
+    auto& sw = pendingSwaps[rhythmIndex];
+
+    // Cancel any existing staged swap before overwriting.
+    sw.isReady.store(false, std::memory_order_release);
+    sw.boundaryReached.store(false, std::memory_order_relaxed);
+    sw.pendingVoice.reset();
+
+    // Start from the current rhythm and apply the preset on top (matching applyRhythmPreset).
+    Rhythm newRhythm = sequencer.getRhythm(rhythmIndex);
+    const juce::String paramPrefix = "r" + juce::String(rhythmIndex) + "_";
+
+    for (int i = 0; kRhythmSuffixes[i] != nullptr; ++i)
+    {
+        const juce::String suffix = kRhythmSuffixes[i];
+        juce::Identifier propId { "r0_" + suffix };
+        if (state.hasProperty(propId))
+        {
+            const float normVal = (float)state.getProperty(propId);
+            if (auto* param = apvts.getParameter(paramPrefix + suffix))
+            {
+                const float actualVal = param->convertFrom0to1(normVal);
+                bool pd = false, vd = false;
+                applyRhythmSuffix(suffix, actualVal, newRhythm, pd, vd);
+            }
+        }
+    }
+
+    // Name and colour.
+    auto nameVal = state.getProperty("r0_name");
+    if (nameVal.isString() && nameVal.toString().isNotEmpty())
+        newRhythm.name = nameVal.toString().toStdString();
+    newRhythm.colourIndex = (int)state.getProperty("r0_colour", newRhythm.colourIndex);
+
+    // Prepare the pending voice engine.
+    auto newVoice = std::make_unique<VoiceEngine>();
+    newVoice->prepareToPlay(currentSampleRate, currentBlockSize);
+
+    juce::String samplePath;
+    juce::String storedPath = state.getProperty("r0_sample").toString();
+    if (storedPath.isNotEmpty())
+    {
+        juce::File sf(storedPath);
+        if (sf.existsAsFile())
+        {
+            newVoice->loadFile(sf);
+            samplePath = sf.getFullPathName();
+        }
+        else
+        {
+            juce::File fallback = getSamplesDir().getChildFile(juce::File(storedPath).getFileName());
+            if (fallback.existsAsFile())
+            {
+                newVoice->loadFile(fallback);
+                samplePath = fallback.getFullPathName();
+            }
+        }
+    }
+
+    // Commit the staged data; set isReady last (release barrier).
+    sw.pendingRhythm     = std::move(newRhythm);
+    sw.pendingSamplePath = samplePath;
+    sw.pendingVoice      = std::move(newVoice);
+    sw.boundaryReached.store(false, std::memory_order_relaxed);
+    sw.isReady.store(true, std::memory_order_release);
+}
+
+void PluginProcessor::cancelStagedSwap(int rhythmIndex)
+{
+    if (rhythmIndex < 0 || rhythmIndex >= SequencerEngine::MaxRhythms) return;
+    auto& sw = pendingSwaps[rhythmIndex];
+    sw.isReady.store(false, std::memory_order_release);
+    sw.boundaryReached.store(false, std::memory_order_relaxed);
+    sw.pendingVoice.reset();
+}
+
+bool PluginProcessor::hasPendingSwap(int rhythmIndex) const
+{
+    if (rhythmIndex < 0 || rhythmIndex >= SequencerEngine::MaxRhythms) return false;
+    return pendingSwaps[rhythmIndex].isReady.load(std::memory_order_relaxed);
+}
+
+// Called on the message thread when the audio thread signals a boundary was reached.
+void PluginProcessor::handleAsyncUpdate()
+{
+    const int n = numActiveRhythms.load(std::memory_order_acquire);
+    for (int r = 0; r < n; ++r)
+    {
+        auto& sw = pendingSwaps[r];
+        if (!sw.boundaryReached.load(std::memory_order_acquire)) continue;
+        // isReady may have been cleared by cancelStagedSwap between the audio thread
+        // setting boundaryReached and this handler running — skip if so.
+        if (!sw.isReady.load(std::memory_order_relaxed))
+        {
+            sw.boundaryReached.store(false, std::memory_order_relaxed);
+            continue;
+        }
+
+        suspendProcessing(true);
+        voiceEngines[r] = std::move(sw.pendingVoice);
+        sequencer.getRhythm(r) = sw.pendingRhythm;
+        loadedSamplePaths.set(r, sw.pendingSamplePath);
+        sequencer.updatePattern(r);
+        sw.isReady.store(false, std::memory_order_relaxed);
+        sw.boundaryReached.store(false, std::memory_order_relaxed);
+        suspendProcessing(false);
+
+        apvtsLoading = true;
+        pushRhythmToAPVTS(r);
+        apvtsLoading = false;
+    }
 }
 
 //==============================================================================
@@ -788,21 +1030,6 @@ void PluginProcessor::ensureContentFoldersExist()
     getRhythmsDir().createDirectory();
     getSamplesDir().createDirectory();
 }
-
-//==============================================================================
-// All per-rhythm APVTS parameter suffixes (used for rhythm preset save/load).
-static const char* const kRhythmSuffixes[] = {
-    "stepsA","hitsA","rotA","prePadA","postPadA","insStA","insLenA","insModeA","prePadModeA","postPadModeA",
-    "stepsB","hitsB","rotB","prePadB","postPadB","insStB","insLenB","insModeB","prePadModeB","postPadModeB",
-    "stepsC","hitsC","rotC","prePadC","postPadC","insStC","insLenC","insModeC","prePadModeC","postPadModeC",
-    "logic",
-    "pitchOct","pitchSemi","pitchFine","pEnvAtk","pEnvDec","pEnvSus","pEnvRel","pEnvDep",
-    "fltType","fltCut","fltRes","fEnvAtk","fEnvDec","fEnvSus","fEnvRel","fEnvDep",
-    "ampLvl","aEnvAtk","aEnvDec","aEnvSus","aEnvRel","accentDb",
-    "drvChar","drvDrv","drvOut","drvBits","drvRate","drvDit","drvTon",
-    "midiMode",
-    nullptr
-};
 
 void PluginProcessor::saveRhythmPreset(int rhythmIdx, const juce::String& name,
                                         const juce::String& category)
@@ -1118,6 +1345,7 @@ void PluginProcessor::loadPreset(const juce::File& file)
             numActiveRhythms.store(n, std::memory_order_release);
         }
 
+        apvtsLoading = true;
         for (int i = 0; i < n; ++i)
         {
             auto rTree = root.getChild(i);
@@ -1184,6 +1412,7 @@ void PluginProcessor::loadPreset(const juce::File& file)
             sequencer.updatePattern(i);
             voiceEngines[i]->setParams(r.voiceParams);
         }
+        apvtsLoading = false;
     }
     else
     {

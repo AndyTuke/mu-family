@@ -105,29 +105,38 @@ add_custom_target(increment_build_number ALL
 )
 add_dependencies(mu-clid increment_build_number)
 
-# Installer — run manually after a Release build: cmake --build build --target mu-clid_installer --config Release
+# Installer — built automatically as part of every Release build.
+# Reads build_number.txt at build time (after increment) so the filename is always correct.
 # Requires Inno Setup 6 at its default install location.
-file(READ "${CMAKE_SOURCE_DIR}/build_number.txt" MUCLID_BUILD_NUMBER)
-string(STRIP "${MUCLID_BUILD_NUMBER}" MUCLID_BUILD_NUMBER)
 find_program(ISCC_EXE ISCC
     PATHS "C:/Program Files (x86)/Inno Setup 6"
     NO_DEFAULT_PATH)
 set(MUCLID_INSTALLER_DIST "D:/Andy Tuke/Music - Music Software/TDP/Windows/Installer")
 if(ISCC_EXE)
-    add_custom_target(mu-clid_installer
-        COMMAND "${ISCC_EXE}"
-                "/DBuildNum=${MUCLID_BUILD_NUMBER}"
-                "${CMAKE_SOURCE_DIR}/installer/mu-Clid.iss"
-        COMMAND "${CMAKE_COMMAND}" -E copy
-                "${CMAKE_SOURCE_DIR}/build/installer/mu-Clid-Setup-v1.0.${MUCLID_BUILD_NUMBER}.exe"
-                "${MUCLID_INSTALLER_DIST}/mu-Clid-Setup-v1.0.${MUCLID_BUILD_NUMBER}.exe"
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/installer"
-        COMMENT "Building mu-Clid installer (build ${MUCLID_BUILD_NUMBER}) and copying to OneDrive"
+    add_custom_target(mu-clid_installer ALL
+        COMMAND "${CMAKE_COMMAND}"
+                "-DISCC_EXE=${ISCC_EXE}"
+                "-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
+                "-DDIST_DIR=${MUCLID_INSTALLER_DIST}"
+                "-DCMAKE_COMMAND=${CMAKE_COMMAND}"
+                -P "${CMAKE_SOURCE_DIR}/cmake/BuildInstaller.cmake"
+        COMMENT "Building mu-Clid installer"
         VERBATIM
     )
+    add_dependencies(mu-clid_installer mu-clid)
 else()
     message(STATUS "Inno Setup not found — mu-clid_installer target unavailable")
 endif()
+
+# Copy Standalone exe to OneDrive after every build.
+set(MUCLID_STANDALONE_DIST "D:/Andy Tuke/Music - Music Software/TDP")
+add_custom_command(TARGET mu-clid_Standalone POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy
+        "$<TARGET_FILE:mu-clid_Standalone>"
+        "${MUCLID_STANDALONE_DIST}/mu-Clid.exe"
+    COMMENT "Copying Standalone to OneDrive"
+    VERBATIM
+)
 
 clap_juce_extensions_plugin(TARGET mu-clid
     CLAP_ID "com.transwarp.mu-clid"

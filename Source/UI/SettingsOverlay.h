@@ -3,6 +3,7 @@
 #include "Components/MuClidLookAndFeel.h"
 #include "Components/NudgeInput.h"
 #include "Components/KnobWithLabel.h"
+#include "Components/DropdownSelect.h"
 
 class PluginProcessor;
 
@@ -26,6 +27,10 @@ private:
 
     // Active: master volume knob (reads/writes from APVTS)
     KnobWithLabel masterVolKnob { "Master Vol", MuClidLookAndFeel::knobLevel };
+
+    // Hot-swap timing
+    juce::Label    swapModeLabel;
+    DropdownSelect swapModeDropdown;
 
     // Content folder configuration
     juce::Label      contentFolderLabel;
