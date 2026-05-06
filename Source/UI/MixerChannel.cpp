@@ -44,6 +44,30 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
         addAndMakeVisible(muteBtn);
         addAndMakeVisible(soloBtn);
     }
+
+    if (hasSidechain())
+    {
+        scSourceBox.addItem(juce::String::charToString(0x2014), 1); // "—"
+        scSourceBox.setSelectedId(1, juce::dontSendNotification);
+        addAndMakeVisible(scSourceBox);
+
+        auto noVal = [](double) { return juce::String(); };
+
+        scAmount.setRange(0.0, 100.0, 1.0);
+        scAmount.setValue(0.0);
+        scAmount.getSlider().textFromValueFunction = noVal;
+        addAndMakeVisible(scAmount);
+
+        scAttack.setRange(1.0, 500.0, 1.0);
+        scAttack.setValue(5.0);
+        scAttack.getSlider().textFromValueFunction = noVal;
+        addAndMakeVisible(scAttack);
+
+        scRelease.setRange(10.0, 2000.0, 1.0);
+        scRelease.setValue(100.0);
+        scRelease.getSlider().textFromValueFunction = noVal;
+        addAndMakeVisible(scRelease);
+    }
 }
 
 //==============================================================================
@@ -90,6 +114,28 @@ void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, juce::Atomic<flo
             if (auto* p = proc->apvts.getParameter(prefix + "solo"))
                 p->setValueNotifyingHost(soloBtn.getToggleState() ? 1.0f : 0.0f);
         };
+        // Sidechain controls write through APVTS
+        if (hasSidechain())
+        {
+            scSourceBox.onChange = [proc, prefix, this] {
+                int id = scSourceBox.getSelectedId();   // 1=none, 2-9=ch0-ch7
+                int apvtsVal = (id <= 1) ? 0 : (id - 1);
+                if (auto* p = proc->apvts.getParameter(prefix + "scSrc"))
+                    p->setValueNotifyingHost(p->convertTo0to1((float)apvtsVal));
+            };
+            scAmount.onValueChanged = [proc, prefix](double v) {
+                if (auto* p = proc->apvts.getParameter(prefix + "scAmt"))
+                    p->setValueNotifyingHost(p->convertTo0to1((float)v / 100.0f));
+            };
+            scAttack.onValueChanged = [proc, prefix](double v) {
+                if (auto* p = proc->apvts.getParameter(prefix + "scAtk"))
+                    p->setValueNotifyingHost(p->convertTo0to1((float)v));
+            };
+            scRelease.onValueChanged = [proc, prefix](double v) {
+                if (auto* p = proc->apvts.getParameter(prefix + "scRel"))
+                    p->setValueNotifyingHost(p->convertTo0to1((float)v));
+            };
+        }
     }
     else
     {
@@ -103,6 +149,16 @@ void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, juce::Atomic<flo
         sendReverb.onValueChanged = [&state](double v) { state.sendReverb = (float)v; };
         muteBtn.onClick = [&state, this] { state.mute = muteBtn.getToggleState(); };
         soloBtn.onClick = [&state, this] { state.solo = soloBtn.getToggleState(); };
+        if (hasSidechain())
+        {
+            scSourceBox.onChange    = [&state, this] {
+                int id = scSourceBox.getSelectedId();
+                state.sidechainSource = (id <= 1) ? -1 : (id - 2);
+            };
+            scAmount.onValueChanged  = [&state](double v) { state.sidechainAmount   = (float)v / 100.0f; };
+            scAttack.onValueChanged  = [&state](double v) { state.sidechainAttackMs  = (float)v; };
+            scRelease.onValueChanged = [&state](double v) { state.sidechainReleaseMs = (float)v; };
+        }
     }
 
     vuMeter.getLevel = [&peak] { return peak.get(); };
@@ -209,6 +265,27 @@ void MixerChannel::bindReturnSends(juce::AudioProcessorValueTreeState& apvts,
 }
 
 //==============================================================================
+void MixerChannel::setSidechainSources(int ownIdx, const juce::StringArray& names)
+{
+    if (!hasSidechain()) return;
+    const int prevId = scSourceBox.getSelectedId();
+    scSourceBox.clear(juce::dontSendNotification);
+    scSourceBox.addItem(juce::String::charToString(0x2014), 1);  // "—"
+    for (int i = 0; i < names.size(); ++i)
+    {
+        if (i == ownIdx) continue;
+        const juce::String label = names[i].isEmpty() ? ("Ch " + juce::String(i + 1))
+                                                      : names[i];
+        scSourceBox.addItem(label, i + 2);  // ID = channel index + 2
+    }
+    // Restore previous selection if still valid, else default to none
+    if (prevId > 1 && scSourceBox.indexOfItemId(prevId) >= 0)
+        scSourceBox.setSelectedId(prevId, juce::dontSendNotification);
+    else
+        scSourceBox.setSelectedId(1, juce::dontSendNotification);
+}
+
+//==============================================================================
 void MixerChannel::loadFromAPVTS(juce::AudioProcessorValueTreeState& apvts,
                                   const juce::String& prefix)
 {
@@ -236,6 +313,20 @@ void MixerChannel::loadFromAPVTS(juce::AudioProcessorValueTreeState& apvts,
         if (auto* p = apvts.getRawParameterValue(prefix + "solo"))
             soloBtn.setToggleState(*p > 0.5f, juce::dontSendNotification);
     }
+    if (hasSidechain())
+    {
+        if (auto* p = apvts.getRawParameterValue(prefix + "scSrc"))
+        {
+            int apvtsVal = juce::roundToInt((float)*p);
+            scSourceBox.setSelectedId(apvtsVal + 1, juce::dontSendNotification);
+        }
+        if (auto* p = apvts.getRawParameterValue(prefix + "scAmt"))
+            scAmount.setValue(*p * 100.0, juce::dontSendNotification);
+        if (auto* p = apvts.getRawParameterValue(prefix + "scAtk"))
+            scAttack.setValue(*p, juce::dontSendNotification);
+        if (auto* p = apvts.getRawParameterValue(prefix + "scRel"))
+            scRelease.setValue(*p, juce::dontSendNotification);
+    }
 }
 
 //==============================================================================
@@ -253,20 +344,31 @@ void MixerChannel::resized()
     const int w      = getWidth();
     const int h      = getHeight();
     const int topY   = kColourBarH + kNameH;
-    const int faderY = topY + kTopAreaH;
+    const int scH    = hasSidechain() ? kSidechainH : 0;
+    const int sendY  = topY + scH;
+    const int faderY = sendY + kTopAreaH;
 
-    // Send slots at fixed positions; hide slots that don't apply to this channel type.
-    // Pan is always at topY + kSendH*3 so all faders start at the same Y.
+    // Sidechain section — Rhythm channels only
+    if (hasSidechain())
+    {
+        scSourceBox.setBounds(0, topY, w, kScSrcH);
+        scAmount   .setBounds(0, topY + kScSrcH, w, kScAmtH);
+        const int hw = w / 2;
+        scAttack .setBounds(0,  topY + kScSrcH + kScAmtH, hw,     kScEnvH);
+        scRelease.setBounds(hw, topY + kScSrcH + kScAmtH, w - hw, kScEnvH);
+    }
+
+    // Send slots; hide those that don't apply to this channel type.
     sendEffect.setVisible(channelType == Type::Rhythm);
     sendDelay .setVisible(channelType == Type::Rhythm || channelType == Type::EffectReturn);
     sendReverb.setVisible(channelType == Type::Rhythm || channelType == Type::EffectReturn
                           || channelType == Type::DelayReturn);
 
-    sendEffect.setBounds(0, topY,            w, kSendH);
-    sendDelay .setBounds(0, topY + kSendH,   w, kSendH);
-    sendReverb.setBounds(0, topY + kSendH*2, w, kSendH);
+    sendEffect.setBounds(0, sendY,            w, kSendH);
+    sendDelay .setBounds(0, sendY + kSendH,   w, kSendH);
+    sendReverb.setBounds(0, sendY + kSendH*2, w, kSendH);
 
-    panKnob.setBounds(0, topY + kSendH * 3, w, kPanH);
+    panKnob.setBounds(0, sendY + kSendH * 3, w, kPanH);
 
     // Fader fills from below top area to just above mute/solo.
     const int muteY  = hasMuteSolo() ? h - kButtonH : h;
@@ -306,6 +408,19 @@ void MixerChannel::paint(juce::Graphics& g)
 
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder));
     g.drawLine((float)(w - 1), 0.0f, (float)(w - 1), (float)h, 0.5f);
+
+    // Sidechain section header — thin separator + "SC" label
+    if (hasSidechain())
+    {
+        const int scTop = kColourBarH + kNameH;
+        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder)
+                        .withAlpha(0.6f));
+        g.fillRect(0, scTop, w, 1);
+        g.fillRect(0, scTop + kSidechainH, w, 1);
+        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(8.0f)));
+        g.drawText("SC", w - 14, scTop + 1, 12, 10, juce::Justification::centredRight, false);
+    }
 
     // Inactive channels get a translucent overlay to indicate no rhythm is assigned.
     if (!active)

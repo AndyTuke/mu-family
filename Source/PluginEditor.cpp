@@ -43,9 +43,23 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // ── Sidebar callbacks ─────────────────────────────────────────────────────
     sidebar.onRhythmSelected = [this](int idx)
     {
-        hideAllOverlays();
         rhythmPanel.setRhythm(idx);
-        rhythmPanel.setVisible(true);
+        if (!mixerVisible)
+        {
+            hideAllOverlays();
+            rhythmPanel.setVisible(true);
+        }
+    };
+
+    sidebar.onRhythmsReordered = [this](int newSelected)
+    {
+        sidebar.setSelectedIndex(newSelected);
+        rhythmPanel.setRhythm(newSelected);
+        if (mixerVisible)
+        {
+            mixerOverlay.refresh();
+            mixerOverlay.loadFromAPVTS();
+        }
     };
 
     sidebar.onAddRhythm = [this]
@@ -178,6 +192,7 @@ void PluginEditor::hideAllOverlays()
     settingsOverlay.setAlpha(1.0f);
 
     mixerVisible    = false;
+    transportBar.setMixerActive(false);
     aboutVisible    = false;
     saveVisible     = false;
     browserVisible  = false;

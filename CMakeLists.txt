@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
 project(mu-clid VERSION 1.0.0)
 
+# Embed the VC++ runtime so the plugin runs without the Redistributable.
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
 add_subdirectory($ENV{JUCE_PATH} JUCE)
 add_subdirectory(ThirdParty/clap-juce-extensions)
 
@@ -16,6 +19,8 @@ juce_add_plugin(mu-clid
     NEEDS_MIDI_OUTPUT TRUE
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
+    ICON_BIG   "${CMAKE_SOURCE_DIR}/resources/Icon.png"
+    ICON_SMALL "${CMAKE_SOURCE_DIR}/resources/Icon.png"
 )
 
 
@@ -128,13 +133,18 @@ else()
     message(STATUS "Inno Setup not found — mu-clid_installer target unavailable")
 endif()
 
-# Copy Standalone exe to OneDrive after every build.
-set(MUCLID_STANDALONE_DIST "D:/Andy Tuke/Music - Music Software/TDP")
+# Deploy Release artifacts (VST3 + CLAP + Standalone) to OneDrive after every build.
+# Skips silently for Debug builds — see cmake/DeployRelease.cmake.
+set(MUCLID_WIN_DIST "D:/Andy Tuke/Music - Music Software/TDP/Windows")
 add_custom_command(TARGET mu-clid_Standalone POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E copy
-        "$<TARGET_FILE:mu-clid_Standalone>"
-        "${MUCLID_STANDALONE_DIST}/mu-Clid.exe"
-    COMMENT "Copying Standalone to OneDrive"
+    COMMAND "${CMAKE_COMMAND}"
+            "-DCONFIG=$<CONFIG>"
+            "-DSTANDALONE=$<TARGET_FILE:mu-clid_Standalone>"
+            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid_artefacts/$<CONFIG>/VST3/mu-Clid.vst3"
+            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid_artefacts/$<CONFIG>/CLAP/mu-Clid.clap"
+            "-DDIST_WIN=${MUCLID_WIN_DIST}"
+            -P "${CMAKE_SOURCE_DIR}/cmake/DeployRelease.cmake"
+    COMMENT "Deploying Release artifacts to OneDrive"
     VERBATIM
 )
 

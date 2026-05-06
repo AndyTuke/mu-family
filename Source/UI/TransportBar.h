@@ -57,6 +57,7 @@ private:
     static constexpr int kGap       = 6;
 
     std::vector<juce::File> presetFiles;
+    int lastRhythmCount = -1;
 
     void timerCallback() override;
     void refreshPlayBtn();

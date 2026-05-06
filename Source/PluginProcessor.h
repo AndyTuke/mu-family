@@ -63,6 +63,13 @@ public:
 
     void loadSampleForRhythm(int rhythmIndex, const juce::File& file);
 
+    juce::String getSampleName(int rhythmIndex) const
+    {
+        if (rhythmIndex < 0 || rhythmIndex >= loadedSamplePaths.size()) return {};
+        const auto& path = loadedSamplePaths[rhythmIndex];
+        return path.isEmpty() ? juce::String() : juce::File(path).getFileName();
+    }
+
     // Hot-swap staging: stages a rhythm preset for atomic commit at the next loop boundary.
     // If the sequencer is not playing, applies the preset immediately instead.
     void stageRhythmPreset (int rhythmIndex, const juce::File& presetFile);
@@ -86,6 +93,7 @@ public:
                     const juce::String& category, bool embedSamples = false);
     void loadPreset(const juce::File& file);
     void saveRhythmPreset(int rhythmIndex, const juce::String& name, const juce::String& category);
+    void saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFile);
     bool applyRhythmPreset(const juce::File& file, int rhythmIndex);
     bool applyDefaultRhythm(int rhythmIndex);
     void loadDefaultPreset();

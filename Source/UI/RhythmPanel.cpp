@@ -27,12 +27,14 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     nameLabel.onTextChange = [this] { commitNameFromLabel(); };
     addAndMakeVisible(nameLabel);
 
-    resetBtn.onClick  = [this] { confirmReset();  };
-    deleteBtn.onClick = [this] { confirmDelete(); };
-    loadPresetBtn.onClick = [this] { loadRhythmPreset(); };
+    resetBtn.onClick      = [this] { confirmReset();       };
+    deleteBtn.onClick     = [this] { confirmDelete();      };
+    loadRhythmBtn.onClick = [this] { loadRhythmPreset();  };
+    saveRhythmBtn.onClick = [this] { saveRhythmPreset();  };
     addAndMakeVisible(resetBtn);
     addAndMakeVisible(deleteBtn);
-    addAndMakeVisible(loadPresetBtn);
+    addAndMakeVisible(loadRhythmBtn);
+    addAndMakeVisible(saveRhythmBtn);
 
     midiModeDropdown.onChange = [this](int id)
     {
@@ -129,7 +131,6 @@ void RhythmPanel::filesDropped(const juce::StringArray& files, int, int)
         juce::File file(f);
         if (file.existsAsFile() && currentRhythmIndex >= 0)
         {
-            loadedSampleNames[currentRhythmIndex] = file.getFileNameWithoutExtension();
             proc.loadSampleForRhythm(currentRhythmIndex, file);
             repaint();
             return;
@@ -154,7 +155,6 @@ void RhythmPanel::loadSample()
             if (result.existsAsFile() && currentRhythmIndex >= 0)
             {
                 lastBrowseDir = result.getParentDirectory();
-                loadedSampleNames[currentRhythmIndex] = result.getFileNameWithoutExtension();
                 proc.loadSampleForRhythm(currentRhythmIndex, result);
                 repaint();
             }
@@ -169,14 +169,14 @@ void RhythmPanel::loadRhythmPreset()
                                     ? proc.getRhythmsDir()
                                     : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
 
-    rhythmPresetChooser = std::make_unique<juce::FileChooser>(
+    rhythmLoadChooser = std::make_unique<juce::FileChooser>(
         "Load Rhythm Preset", startDir, "*.muRhyth");
 
-    rhythmPresetChooser->launchAsync(
+    rhythmLoadChooser->launchAsync(
         juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
         [this](const juce::FileChooser& fc)
         {
-            auto result = fc.getResult();
+            const auto result = fc.getResult();
             if (!result.existsAsFile() || currentRhythmIndex < 0) return;
 
             // stageRhythmPreset applies immediately if not playing, or stages for hot-swap.
@@ -188,6 +188,32 @@ void RhythmPanel::loadRhythmPreset()
                 setRhythm(currentRhythmIndex);
                 repaint();
             }
+        });
+}
+
+void RhythmPanel::saveRhythmPreset()
+{
+    if (currentRhythmIndex < 0) return;
+
+    const juce::String defaultName =
+        juce::String(proc.getRhythm(currentRhythmIndex).name).replaceCharacters("\\/:|*?<>\"", "_");
+
+    const juce::File startDir = proc.getRhythmsDir().isDirectory()
+                                    ? proc.getRhythmsDir()
+                                    : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
+
+    rhythmSaveChooser = std::make_unique<juce::FileChooser>(
+        "Save Rhythm Preset", startDir.getChildFile(defaultName), "*.muRhyth");
+
+    rhythmSaveChooser->launchAsync(
+        juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles,
+        [this](const juce::FileChooser& fc)
+        {
+            auto result = fc.getResult();
+            if (result == juce::File{} || currentRhythmIndex < 0) return;
+            if (result.getFileExtension().toLowerCase() != ".murhyth")
+                result = result.withFileExtension(".muRhyth");
+            proc.saveRhythmPresetToFile(currentRhythmIndex, result);
         });
 }
 
@@ -225,12 +251,12 @@ void RhythmPanel::paint(juce::Graphics& g)
         g.setColour(MuClidLookAndFeel::colour(Id::sampleBarBackground));
         g.fillRect(inner);
 
-        auto it = loadedSampleNames.find(currentRhythmIndex);
-        if (it != loadedSampleNames.end())
+        const juce::String sampleName = proc.getSampleName(currentRhythmIndex);
+        if (sampleName.isNotEmpty())
         {
             g.setColour(MuClidLookAndFeel::colour(Id::labelText));
             g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
-            g.drawText(it->second,
+            g.drawText(sampleName,
                        inner.getX() + 5, inner.getY(), inner.getWidth() - 28, inner.getHeight(),
                        juce::Justification::centredLeft, true);
         }
@@ -286,11 +312,12 @@ void RhythmPanel::resized()
     const int btnY = (kHeaderH - 20) / 2;
     midiModeDropdown.setBounds(w - kModeSelectorW - 4, btnY, kModeSelectorW, 20);
     const int rightEdge = w - kModeSelectorW - 4 - 6;
-    deleteBtn    .setBounds(rightEdge - kIconBtnW,                              btnY, kIconBtnW,   20);
-    resetBtn     .setBounds(rightEdge - kIconBtnW * 2 - 4,                     btnY, kIconBtnW,   20);
-    loadPresetBtn.setBounds(rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW - 4,   btnY, kPresetBtnW, 20);
+    deleteBtn    .setBounds(rightEdge - kIconBtnW,                                           btnY, kIconBtnW,   20);
+    resetBtn     .setBounds(rightEdge - kIconBtnW * 2 - 4,                                  btnY, kIconBtnW,   20);
+    saveRhythmBtn.setBounds(rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW - 4,               btnY, kPresetBtnW, 20);
+    loadRhythmBtn.setBounds(rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW * 2 - 4 - 2,       btnY, kPresetBtnW, 20);
     const int nameX   = 26;
-    const int nameEnd = rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW - 4 - 6;
+    const int nameEnd = rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW * 2 - 4 - 2 - 6;
     nameRect = { nameX, 0, nameEnd - nameX, kHeaderH };
     nameLabel.setBounds(nameRect.reduced(4, 2));
 

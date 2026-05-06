@@ -89,6 +89,7 @@ void ModulatorEditor::AssignmentRow::resized()
 ModulatorEditor::ModulatorEditor()
 {
     addAndMakeVisible(modeCtrl);
+    addAndMakeVisible(polarityCtrl);
     addAndMakeVisible(inputCtrl);
     addAndMakeVisible(lfoEditor);
     addAndMakeVisible(stepEditor);
@@ -183,6 +184,7 @@ void ModulatorEditor::loadFromCS()
 
     const bool smooth = (cs->mode == ControlSequence::Mode::Smooth);
     modeCtrl.setSelectedIndex(smooth ? 0 : 1);
+    polarityCtrl.setSelectedIndex(cs->polarity == ControlSequence::Polarity::Unipolar ? 0 : 1);
     inputCtrl.setSelectedIndex(cs->inputSource == ControlSequence::InputSource::MIDI_CC ? 1 : 0);
     lfoEditor.setVisible(smooth);
     stepEditor.setVisible(!smooth);
@@ -236,6 +238,16 @@ void ModulatorEditor::wireHeader()
         if (!smooth) syncStepValues();
         else loadFromCS();
         resized();
+        if (onChange) onChange();
+    };
+
+    polarityCtrl.onChange = [this](int idx)
+    {
+        if (!cs) return;
+        lockMod();
+        cs->polarity = (idx == 0) ? ControlSequence::Polarity::Unipolar
+                                  : ControlSequence::Polarity::Bipolar;
+        unlockMod();
         if (onChange) onChange();
     };
 
@@ -404,8 +416,10 @@ void ModulatorEditor::resized()
     int y = 0;
 
     const int nameW = 76;
-    modeCtrl.setBounds(nameW, y, (w - nameW) / 2, kHeaderH);
-    inputCtrl.setBounds(nameW + (w - nameW) / 2, y, w - nameW - (w - nameW) / 2, kHeaderH);
+    const int ctrlW = (w - nameW) / 3;
+    modeCtrl    .setBounds(nameW,              y, ctrlW,                    kHeaderH);
+    polarityCtrl.setBounds(nameW + ctrlW,      y, ctrlW,                    kHeaderH);
+    inputCtrl   .setBounds(nameW + 2 * ctrlW,  y, w - nameW - 2 * ctrlW,   kHeaderH);
     y += kHeaderH;
 
     lfoEditor.setBounds(0, y, w, kEditorH);

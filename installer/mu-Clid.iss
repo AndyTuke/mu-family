@@ -34,6 +34,7 @@ OutputBaseFilename=mu-Clid-Setup-v{#MyAppVersion}
 ArchitecturesInstallIn64BitMode=x64
 ArchitecturesAllowed=x64
 
+SetupIconFile=..\resources\Icon256.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern

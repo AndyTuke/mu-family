@@ -1,6 +1,5 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include <map>
 #include "RhythmCircle.h"
 #include "EuclideanPanel.h"
 #include "VoiceSection.h"
@@ -45,13 +44,14 @@ private:
     DropdownSelect  midiModeDropdown;
 
     juce::Label      nameLabel;
-    juce::TextButton resetBtn      { juce::String::charToString(0x21BA) }; // ↺
-    juce::TextButton deleteBtn     { juce::String::charToString(0x2715) }; // ✕
-    juce::TextButton loadPresetBtn { "R.Pst" };
+    juce::TextButton resetBtn     { juce::String::charToString(0x21BA) }; // ↺
+    juce::TextButton deleteBtn    { juce::String::charToString(0x2715) }; // ✕
+    juce::TextButton loadRhythmBtn { "Load" };
+    juce::TextButton saveRhythmBtn { "Save" };
 
     std::unique_ptr<juce::FileChooser> fileChooser;
-    std::unique_ptr<juce::FileChooser> rhythmPresetChooser;
-    std::map<int, juce::String> loadedSampleNames;
+    std::unique_ptr<juce::FileChooser> rhythmLoadChooser;
+    std::unique_ptr<juce::FileChooser> rhythmSaveChooser;
     juce::File lastBrowseDir;
 
     // Fixed chrome heights/widths
@@ -61,7 +61,7 @@ private:
     static constexpr int kPanelPad      = 6;
     static constexpr int kModeSelectorW  = 80;
     static constexpr int kIconBtnW       = 22;
-    static constexpr int kPresetBtnW     = 40;
+    static constexpr int kPresetBtnW     = 38;
 
     // Computed in resized(), used in both resized() and paint()
     int circleW = 300;
@@ -71,6 +71,7 @@ private:
 
     void loadSample();
     void loadRhythmPreset();
+    void saveRhythmPreset();
     void refreshCircle();
     juce::Colour currentColour() const;
     void commitNameFromLabel();

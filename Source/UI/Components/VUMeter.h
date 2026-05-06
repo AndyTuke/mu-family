@@ -2,45 +2,57 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 
-// Vertical peak-level bar calibrated to the K-system / VU convention:
-//   Top of visible scale  =   0 dBFS audio (clipping point)
-//   "0 VU" reference mark = −18 dBFS audio (industry standard per AES, EBU)
-//   Floor                 = −60 dBFS audio
-// Colour zones: green below 0 VU, yellow 0 VU → −6 dBFS, red above −6 dBFS.
-// Clip LED latches at ≥ 0 dBFS, holds 3 s, click to clear.
+// Vertical level meter with selectable mode (Peak / VU / K-12 / K-14).
+//
+// Peak  — instant attack, −45 dB/s release, peak-hold tick. 0 dBFS at top,
+//         colour zones relative to −18 dBFS (0 VU) and −6 dBFS.
+// VU    — 300 ms symmetric IIR ballistics. Same scale/zones as Peak.
+// K-12  — 300 ms IIR. Green→yellow at −12 dBFS (0 K), yellow→red at −8 dBFS.
+// K-14  — 300 ms IIR. Green→yellow at −14 dBFS (0 K), yellow→red at −10 dBFS.
 //
 // Set getLevel to a callback returning 0–1 linear amplitude (peak per block).
+// Click to clear the latched clip indicator.
 class VUMeter : public juce::Component, private juce::Timer
 {
 public:
+    enum class MeterMode { Peak, VU, K12, K14 };
+
     std::function<float()> getLevel;
 
     VUMeter();
     ~VUMeter() override;
 
+    void setMode(MeterMode m) { mode = m; }
+    MeterMode getMode() const noexcept { return mode; }
+
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
 
 private:
-    // Scale calibration (all dBFS).
-    static constexpr float kFloorDb        = -60.0f;   // bottom of visible bar
-    static constexpr float kZeroVuDb       = -18.0f;   // 0 VU reference mark (also green→yellow boundary)
-    static constexpr float kRedThreshDb    =  -6.0f;   // yellow→red boundary
-    static constexpr float kClipDb         =   0.0f;   // clip LED latches at this level
+    static constexpr float kFloorDb        = -60.0f;
+    static constexpr float kClipDb         =   0.0f;
 
-    // Ballistics
-    static constexpr float kReleasePerTick =  -1.5f;   // dB/tick at 30Hz ≈ -45dB/s
-    static constexpr float kPeakDecayTick  =  -0.3f;   // dB/tick at 30Hz
-    static constexpr int   kPeakHoldFrames =   20;     // ~0.67 s at 30Hz
-    static constexpr int   kClipHoldFrames =   90;     // 3.0 s at 30Hz
+    // Peak-mode ballistics
+    static constexpr float kReleasePerTick =  -1.5f;   // dB/tick @ 30 Hz ≈ −45 dB/s
+    static constexpr float kPeakDecayTick  =  -0.3f;
+    static constexpr int   kPeakHoldFrames =   20;      // ~0.67 s
+    static constexpr int   kClipHoldFrames =   90;      // 3.0 s
 
-    float displayDb  = kFloorDb;
-    float peakDb     = kFloorDb;
-    int   peakHold   = 0;
-    bool  clipLit    = false;
-    int   clipHold   = 0;
+    // VU / K-mode ballistics: symmetric IIR, τ = 300 ms @ 30 Hz
+    // α = exp(−1 / (0.3 × 30)) ≈ 0.895
+    static constexpr float kVuAlpha = 0.895f;
 
-    // dBFS → 0..1 for bar height (kFloorDb..0 dBFS mapped linearly).
+    MeterMode mode     = MeterMode::Peak;
+    float displayDb    = kFloorDb;
+    float peakDb       = kFloorDb;
+    int   peakHold     = 0;
+    bool  clipLit      = false;
+    int   clipHold     = 0;
+
+    // Mode-dependent colour zone boundaries
+    float refDb() const noexcept;  // green→yellow + reference mark
+    float redDb() const noexcept;  // yellow→red
+
     static float dbToNorm(float db) noexcept;
     static float linToDb(float lin) noexcept;
 

@@ -67,7 +67,11 @@ void FXChain::processSends(juce::AudioBuffer<float>& effectSend,
             reverbSend.addFrom(ch, 0, delaySend, ch, 0, nSamples, delToReverb);
     }
 
-    if (doReverb) reverb.processReturn(reverbSend);
+    // Run reverb if channels sent directly, OR if intra-FX routing added signal this block.
+    const bool reverbNeeded = doReverb
+        || (doDelay  && delToReverb > 0.001f)
+        || (doEffect && effToReverb > 0.001f);
+    if (reverbNeeded) reverb.processReturn(reverbSend);
 }
 
 void FXChain::setHostBpm(double bpm)

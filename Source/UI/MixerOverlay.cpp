@@ -19,6 +19,12 @@ MixerOverlay::MixerOverlay(PluginProcessor& p, MixerEngine& m)
     addChildComponent(echoRow);   // hidden by default; shown when effect algo == Echo
     addAndMakeVisible(delayRow);
     addAndMakeVisible(reverbRow);
+
+    addAndMakeVisible(meterModeCtrl);
+    meterModeCtrl.onChange = [this](int idx)
+    {
+        propagateMeterMode(static_cast<VUMeter::MeterMode>(idx));
+    };
 }
 
 void MixerOverlay::buildRhythmChannels()
@@ -42,6 +48,17 @@ void MixerOverlay::buildRhythmChannels()
         addAndMakeVisible(*ch);
         rhythmChannels.push_back(std::move(ch));
     }
+    refreshSidechainSources();
+}
+
+void MixerOverlay::refreshSidechainSources()
+{
+    juce::StringArray names;
+    const int numActive = proc.getNumRhythms();
+    for (int r = 0; r < MixerEngine::MaxChannels; ++r)
+        names.add((r < numActive) ? juce::String(proc.getRhythm(r).name) : juce::String());
+    for (int r = 0; r < (int)rhythmChannels.size(); ++r)
+        rhythmChannels[r]->setSidechainSources(r, names);
 }
 
 void MixerOverlay::wireReturns()
@@ -397,37 +414,50 @@ void MixerOverlay::updateEffectSendLabels()
     juce::String name = (ai < (int)algos.size()) ? algos[ai].name : "Effect";
     for (auto& ch : rhythmChannels)
         ch->setEffectSendLabel(name);
+    effectReturn.setChannelName(name);
 }
 
 void MixerOverlay::resized()
 {
-    const int w = getWidth();
-    const int h = getHeight();
-    const int stripH  = juce::jmax(200, h - kFXAreaH);
+    const int w      = getWidth();
+    const int h      = getHeight();
+    const int stripH = juce::jmax(200, h - kFXAreaH - kHeaderH);
 
-    // Channel strips: 8 rhythms | divider | returns (3) | divider | master
+    // Meter mode selector — right-aligned in the header strip
+    constexpr int kModeW = 176;
+    meterModeCtrl.setBounds(w - kModeW - 4, (kHeaderH - 18) / 2, kModeW, 18);
+
+    // Channel strips start below the header
     int x = 0;
     for (auto& ch : rhythmChannels)
     {
-        ch->setBounds(x, 0, kChanW, stripH);
+        ch->setBounds(x, kHeaderH, kChanW, stripH);
         x += kChanW;
     }
 
     x += kDivW;
-    effectReturn .setBounds(x, 0, kChanW, stripH);  x += kChanW;
-    delayReturn  .setBounds(x, 0, kChanW, stripH);  x += kChanW;
-    reverbReturn .setBounds(x, 0, kChanW, stripH);  x += kChanW;
+    effectReturn .setBounds(x, kHeaderH, kChanW, stripH);  x += kChanW;
+    delayReturn  .setBounds(x, kHeaderH, kChanW, stripH);  x += kChanW;
+    reverbReturn .setBounds(x, kHeaderH, kChanW, stripH);  x += kChanW;
 
     x += kDivW;
-    masterChannel.setBounds(x, 0, kMasterW, stripH);
+    masterChannel.setBounds(x, kHeaderH, kMasterW, stripH);
 
-    // FX rows inset within the outer container panel.
-    // Echo replaces Effect at the same position — only one is visible at a time.
-    int fy = stripH + kFXPad;
+    // FX rows below the channel strips
+    int fy = kHeaderH + stripH + kFXPad;
     effectRow.setBounds(kFXPad, fy, w - kFXPad * 2, kFXRowH);
     echoRow  .setBounds(kFXPad, fy, w - kFXPad * 2, kFXRowH);  fy += kFXRowH + kFXGap;
     delayRow .setBounds(kFXPad, fy, w - kFXPad * 2, kFXRowH);  fy += kFXRowH + kFXGap;
     reverbRow.setBounds(kFXPad, fy, w - kFXPad * 2, kFXRowH);
+}
+
+void MixerOverlay::propagateMeterMode(VUMeter::MeterMode m)
+{
+    for (auto& ch : rhythmChannels) ch->setMeterMode(m);
+    effectReturn .setMeterMode(m);
+    delayReturn  .setMeterMode(m);
+    reverbReturn .setMeterMode(m);
+    masterChannel.setMeterMode(m);
 }
 
 void MixerOverlay::paint(juce::Graphics& g)
@@ -435,15 +465,19 @@ void MixerOverlay::paint(juce::Graphics& g)
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
     g.fillAll();
 
+    // Header separator line
+    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder));
+    g.fillRect(0, kHeaderH - 1, getWidth(), 1);
+
     // Dividers between rhythm channels and returns, and before master
-    const int stripH = juce::jmax(200, getHeight() - kFXAreaH);
+    const int stripH = juce::jmax(200, getHeight() - kFXAreaH - kHeaderH);
     int divX = MixerEngine::MaxChannels * kChanW;
 
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder));
-    g.fillRect(divX, 0, kDivW, stripH);
+    g.fillRect(divX, kHeaderH, kDivW, stripH);
 
     divX += kDivW + kChanW * 3;
-    g.fillRect(divX, 0, kDivW, stripH);
+    g.fillRect(divX, kHeaderH, kDivW, stripH);
 
     // FX section: outer container panel + three inner row sub-panels
     const juce::Colour borderCol   = MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder);
@@ -454,7 +488,7 @@ void MixerOverlay::paint(juce::Graphics& g)
 
     // Outer container
     {
-        juce::Rectangle<float> outer { 0.5f, (float)stripH + 0.5f,
+        juce::Rectangle<float> outer { 0.5f, (float)(kHeaderH + stripH) + 0.5f,
                                        (float)getWidth() - 1.0f, (float)kFXAreaH - 1.0f };
         g.setColour(outerFill);
         g.fillRoundedRectangle(outer, 6.0f);
@@ -464,7 +498,7 @@ void MixerOverlay::paint(juce::Graphics& g)
 
     // Inner row sub-panels (inset by kFXPad on all sides)
     const int numPanels = 3;
-    int fy = stripH + kFXPad;
+    int fy = kHeaderH + stripH + kFXPad;
     for (int i = 0; i < numPanels; ++i)
     {
         juce::Rectangle<float> panel { (float)kFXPad + 0.5f, (float)fy + 0.5f,

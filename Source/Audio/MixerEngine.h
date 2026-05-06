@@ -31,6 +31,11 @@ public:
         float sendReverb = 0.0f;
         bool  mute       = false;
         bool  solo       = false;
+        // Sidechain ducking
+        int   sidechainSource   = -1;     // -1 = off, 0-7 = source channel index
+        float sidechainAmount   = 0.0f;   // 0-1 ducking depth
+        float sidechainAttackMs  =   5.0f;
+        float sidechainReleaseMs = 100.0f;
     };
 
     struct ReturnState
@@ -55,6 +60,7 @@ public:
 
     void prepare(double sampleRate, int blockSize);
 
+
     // Clears output, accumulates per-channel audio with mixing applied, then runs fxChain.
     void processBlock(juce::AudioBuffer<float>&   output,
                       int                         numActiveRhythms,
@@ -63,6 +69,9 @@ public:
                       int                         numSamples);
 
 private:
+    double sampleRate = 44100.0;
+    float  scEnv[MaxChannels] {};    // per-channel sidechain envelope state
+
     juce::AudioBuffer<float> channelBufs[MaxChannels];
     juce::AudioBuffer<float> effectSendBuf, delaySendBuf, reverbSendBuf;
 

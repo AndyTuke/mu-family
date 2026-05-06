@@ -3,6 +3,7 @@
 #include "MixerChannel.h"
 #include "FXRow.h"
 #include "DelayRow.h"
+#include "Components/SegmentControl.h"
 #include "../PluginProcessor.h"
 #include "../Audio/MixerEngine.h"
 #include <vector>
@@ -41,16 +42,22 @@ private:
     DelayRow delayRow;
     FXRow    reverbRow;
 
+    static constexpr int kHeaderH  = 22;   // thin strip above channel strips for meter mode selector
     static constexpr int kFXRowH  = 82;
-    static constexpr int kFXGap   = 6;    // gap between FX sub-panels
-    static constexpr int kFXPad   = 6;    // outer container panel padding (top/bottom and left/right)
-    static constexpr int kFXAreaH = kFXRowH * 3 + kFXGap * 2 + kFXPad * 2;  // total FX area including outer padding
+    static constexpr int kFXGap   = 6;
+    static constexpr int kFXPad   = 6;
+    static constexpr int kFXAreaH = kFXRowH * 3 + kFXGap * 2 + kFXPad * 2;
     static constexpr int kDivW     = 4;
     static constexpr int kChanW    = 64;
     static constexpr int kMasterW  = 96;
+
+    SegmentControl meterModeCtrl { {"Peak", "VU", "K-12", "K-14"} };
+
+    void propagateMeterMode(VUMeter::MeterMode m);
 
     void buildRhythmChannels();
     void wireReturns();
     void wireFXRows();
     void updateEffectSendLabels();
+    void refreshSidechainSources();
 };

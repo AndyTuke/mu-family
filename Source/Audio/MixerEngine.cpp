@@ -1,6 +1,7 @@
 #include "MixerEngine.h"
 #include "VoiceEngine.h"
 #include "../FX/FXChain.h"
+#include <cmath>
 
 MixerEngine::MixerEngine()
 {
@@ -9,8 +10,10 @@ MixerEngine::MixerEngine()
     masterPeak.set(0.0f);
 }
 
-void MixerEngine::prepare(double /*sampleRate*/, int blockSize)
+void MixerEngine::prepare(double sr, int blockSize)
 {
+    sampleRate = sr;
+    for (auto& e : scEnv) e = 0.0f;
     for (auto& buf : channelBufs)
         buf.setSize(2, blockSize, false, true, true);
     effectSendBuf.setSize(2, blockSize, false, true, true);
@@ -69,13 +72,55 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     for (int r = numActiveRhythms; r < MaxChannels; ++r)
         channelPeaks[r].set(0.0f);
 
+    // Phase 1: process all voices into their channel buffers and apply headroom trim.
+    // We defer pan/gain/mix until Phase 3 so Phase 2 can apply sidechain first.
+    for (int r = 0; r < numActiveRhythms; ++r)
+    {
+        auto& buf = channelBufs[r];
+        buf.clear();
+        voices[r]->process(buf, numSamples);
+        buf.applyGain(kHeadroomTrim);
+    }
+
+    // Phase 2: apply sidechain ducking per channel.
+    for (int r = 0; r < numActiveRhythms; ++r)
+    {
+        const auto& ch  = channels[r];
+        const int   src = ch.sidechainSource;
+        if (src < 0 || src >= numActiveRhythms || src == r) continue;
+        if (ch.sidechainAmount <= 0.0f) continue;
+
+        const float sr_f = (float)sampleRate;
+        const float atk  = (ch.sidechainAttackMs  > 0.0f)
+                         ? std::exp(-1.0f / (ch.sidechainAttackMs  * 0.001f * sr_f)) : 0.0f;
+        const float rel  = (ch.sidechainReleaseMs > 0.0f)
+                         ? std::exp(-1.0f / (ch.sidechainReleaseMs * 0.001f * sr_f)) : 0.0f;
+
+        const float* srcL = channelBufs[src].getReadPointer(0);
+        const float* srcR = channelBufs[src].getNumChannels() > 1
+                          ? channelBufs[src].getReadPointer(1) : srcL;
+        float* tgtL = channelBufs[r].getWritePointer(0);
+        float* tgtR = channelBufs[r].getNumChannels() > 1
+                    ? channelBufs[r].getWritePointer(1) : nullptr;
+
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const float srcLvl = juce::jmax(std::abs(srcL[i]), std::abs(srcR[i]));
+            scEnv[r] = (srcLvl > scEnv[r])
+                     ? atk * scEnv[r] + (1.0f - atk) * srcLvl
+                     : rel * scEnv[r] + (1.0f - rel) * srcLvl;
+
+            const float gain = 1.0f - ch.sidechainAmount * scEnv[r];
+            tgtL[i] *= gain;
+            if (tgtR) tgtR[i] *= gain;
+        }
+    }
+
+    // Phase 3: pan/gain, mix to output, FX sends, peak capture.
     for (int r = 0; r < numActiveRhythms; ++r)
     {
         const auto& ch  = channels[r];
         auto&       buf = channelBufs[r];
-
-        buf.clear();
-        voices[r]->process(buf, numSamples);
 
         if (ch.mute || (anySolo && !ch.solo))
         {
@@ -83,17 +128,12 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
             continue;
         }
 
-        // Stage 20: −6 dB pre-fader headroom trim — applied before fader/pan so
-        // post-fader peaks, FX sends, and master sum all benefit from the attenuation.
-        buf.applyGain(kHeadroomTrim);
-
         applyPanGain(buf, ch.level, ch.pan, numSamples);
         channelPeaks[r].set(peakOf(buf, numSamples));
 
         for (int c = 0; c < numOutCh; ++c)
             output.addFrom(c, 0, buf, c, 0, numSamples);
 
-        // Route post-fader channel audio into per-FX send buses.
         if (ch.sendEffect > 0.0f)
             for (int c = 0; c < numOutCh; ++c)
                 effectSendBuf.addFrom(c, 0, buf, c, 0, numSamples, ch.sendEffect);
@@ -141,7 +181,9 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     }
     else { returnPeaks[1].set(0.0f); }
 
-    if (doReverb)
+    // Re-check after processSends: intra-FX routing (delay→reverb, effect→reverb) may have
+    // added signal to reverbSendBuf even when no channels had a direct reverb send.
+    if (hasSignal(reverbSendBuf, numSamples))
     {
         applyPanGain(reverbSendBuf, returns[2].level, returns[2].pan, numSamples);
         if (!returns[2].mute)

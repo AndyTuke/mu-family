@@ -165,6 +165,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addF(c+"sendEff", n+"Send Eff",  0.0f, 1.0f,  0.0f);
         addF(c+"sendDly", n+"Send Dly",  0.0f, 1.0f,  0.0f);
         addF(c+"sendRev", n+"Send Rev",  0.0f, 1.0f,  0.0f);
+        // Sidechain
+        addI(c+"scSrc",   n+"SC Src",    0, 8,     0);  // 0=off, 1-8=ch1-ch8
+        addF(c+"scAmt",   n+"SC Amount", 0.0f, 1.0f, 0.0f);
+        addF(c+"scAtk",   n+"SC Attack", 1.0f, 500.0f, 5.0f);
+        addF(c+"scRel",   n+"SC Release",10.0f, 2000.0f, 100.0f);
     }
 
     // ── Return channel strips (4 × 3 = 12) ───────────────────────────────────
@@ -385,7 +390,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParamValues["insert.drive"]     = modParams.driveDrive;
                 modParamValues["insert.output"]    = modParams.driveOutput;
                 modParamValues["insert.bits"]      = modParams.drvBits;
-                modParamValues["insert.rate"]      = (modParams.driveRate - 100.0f) / (48000.0f - 100.0f) * 100.0f;
+                modParamValues["insert.rate"]      = (std::log(modParams.driveRate) - std::log(100.0f)) / (std::log(48000.0f) - std::log(100.0f)) * 100.0f;
                 modParamValues["insert.dither"]    = modParams.drvDither;
                 modParamValues["insert.lpf"]       = modParams.driveTone;
 
@@ -407,7 +412,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParams.driveDrive     = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.drive"]);
                 modParams.driveOutput    = juce::jlimit(-24.0f,  0.0f,    modParamValues["insert.output"]);
                 modParams.drvBits        = juce::jlimit(1.0f,   16.0f,    modParamValues["insert.bits"]);
-                modParams.driveRate      = 100.0f + juce::jlimit(0.0f, 100.0f, modParamValues["insert.rate"]) / 100.0f * (48000.0f - 100.0f);
+                modParams.driveRate      = std::exp(std::log(100.0f) + juce::jlimit(0.0f, 100.0f, modParamValues["insert.rate"]) / 100.0f * (std::log(48000.0f) - std::log(100.0f)));
                 modParams.drvDither      = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.dither"]);
                 modParams.driveTone      = juce::jlimit(20.0f, 20000.0f,  modParamValues["insert.lpf"]);
             }
@@ -639,6 +644,10 @@ void PluginProcessor::syncMixerParam(const juce::String& id, float v)
             else if (param == "sendEff") ch.sendEffect = v;
             else if (param == "sendDly") ch.sendDelay  = v;
             else if (param == "sendRev") ch.sendReverb = v;
+            else if (param == "scSrc")   ch.sidechainSource   = juce::roundToInt(v) - 1;
+            else if (param == "scAmt")   ch.sidechainAmount   = v;
+            else if (param == "scAtk")   ch.sidechainAttackMs  = v;
+            else if (param == "scRel")   ch.sidechainReleaseMs = v;
         }
         return;
     }
@@ -1058,6 +1067,28 @@ void PluginProcessor::saveRhythmPreset(int rhythmIdx, const juce::String& name,
     juce::String safe = name.replaceCharacters("\\/:|*?<>\"", "_________");
     if (safe.isEmpty()) safe = "Rhythm";
     dir.getChildFile(safe + ".muRhyth").replaceWithText(state.toXmlString());
+}
+
+void PluginProcessor::saveRhythmPresetToFile(int rhythmIdx, const juce::File& destFile)
+{
+    if (rhythmIdx < 0 || rhythmIdx >= sequencer.getNumRhythms()) return;
+
+    juce::ValueTree state("MuClidRhythm");
+    state.setProperty("presetName",     destFile.getFileNameWithoutExtension(), nullptr);
+    state.setProperty("presetCategory", "",                                     nullptr);
+
+    const Rhythm& r = sequencer.getRhythm(rhythmIdx);
+    state.setProperty("r0_name",   juce::String(r.name),        nullptr);
+    state.setProperty("r0_colour", r.colourIndex,                nullptr);
+    state.setProperty("r0_sample", loadedSamplePaths[rhythmIdx], nullptr);
+
+    const juce::String srcPrefix = "r" + juce::String(rhythmIdx) + "_";
+    for (int i = 0; kRhythmSuffixes[i] != nullptr; ++i)
+        if (auto* param = apvts.getParameter(srcPrefix + kRhythmSuffixes[i]))
+            state.setProperty("r0_" + juce::String(kRhythmSuffixes[i]),
+                               param->getValue(), nullptr);
+
+    destFile.replaceWithText(state.toXmlString());
 }
 
 bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)

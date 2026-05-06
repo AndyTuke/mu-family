@@ -74,9 +74,10 @@ void AboutPanel::paint(juce::Graphics& g)
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     const juce::String credits[] = {
         juce::String(juce::CharPointer_UTF8("JUCE \xe2\x80\x94 Proprietary (JUCE 7 license)")),
-        juce::String(juce::CharPointer_UTF8("SoundTouch \xe2\x80\x94 LGPL 2.1 (ships as DLL)")),
         juce::String(juce::CharPointer_UTF8("Signalsmith Reverb \xe2\x80\x94 MIT")),
-        juce::String(juce::CharPointer_UTF8("Bjorklund algorithm \xe2\x80\x94 public domain")),
+        juce::String(juce::CharPointer_UTF8("Monocypher \xe2\x80\x94 BSD-2-Clause")),
+        juce::String(juce::CharPointer_UTF8("clap-juce-extensions \xe2\x80\x94 MIT")),
+        juce::String(juce::CharPointer_UTF8("Bj\xc3\xb6rklund algorithm \xe2\x80\x94 public domain")),
     };
     for (auto& line : credits)
     {

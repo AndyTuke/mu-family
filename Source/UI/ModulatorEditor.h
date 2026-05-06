@@ -105,8 +105,9 @@ private:
     // Release Rhythm::modLock.
     void unlockMod();
 
-    SegmentControl modeCtrl  { {"Smooth","Stepped"} };
-    SegmentControl inputCtrl { {"Internal","CC"} };
+    SegmentControl modeCtrl    { {"Smooth","Stepped"} };
+    SegmentControl polarityCtrl{ {"Uni","Bi"} };
+    SegmentControl inputCtrl   { {"Internal","CC"} };
     LFOEditor      lfoEditor;
     StepEditor     stepEditor;
     DropdownSelect loopDropdown;

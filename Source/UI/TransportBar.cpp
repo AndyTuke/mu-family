@@ -163,7 +163,9 @@ void TransportBar::updatePositionLabel()
 
 void TransportBar::updateRhythmCount()
 {
-    int n = proc.getNumRhythms();
+    const int n = proc.getNumRhythms();
+    if (n == lastRhythmCount) return;
+    lastRhythmCount = n;
     rhythmCountLabel.setText(juce::String(n) + "/" + juce::String(SequencerEngine::MaxRhythms),
                              juce::dontSendNotification);
 }

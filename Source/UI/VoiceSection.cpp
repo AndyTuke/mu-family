@@ -353,6 +353,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
 
             driveOutput.setLabel("Rate");
             driveOutput.setRange(100.0, 48000.0, 1.0);
+            driveOutput.getSlider().setSkewFactorFromMidPoint(2190.0); // log feel: geometric mean of range
             driveOutput.getSlider().textFromValueFunction = fmtHz;
             driveOutput.getSlider().valueFromTextFunction = parseHz;
             if (p) driveOutput.setValue(p->driveRate, juce::dontSendNotification);

@@ -9,7 +9,8 @@
 class PluginProcessor;
 
 // One vertical channel strip.
-// Layout (top→bottom): colour bar | name | [sends] | pan | fader+VU | dB | [mute/solo]
+// Layout (top→bottom): colour bar | name | [sidechain section] | [sends] | pan | fader+VU | dB | [mute/solo]
+// Sidechain section only visible on Rhythm channels.
 class MixerChannel : public juce::Component
 {
 public:
@@ -26,17 +27,22 @@ public:
                     PluginProcessor* proc = nullptr);
 
     // Wire intra-FX send knobs for EffectReturn / DelayReturn.
-    // dlySendParam / revSendParam are APVTS IDs; pass empty to skip that send.
     void bindReturnSends(juce::AudioProcessorValueTreeState& apvts,
                          const juce::String& dlySendParam,
                          const juce::String& revSendParam);
+
+    // Populate the sidechain source dropdown with other active channel names.
+    // ownChannelIndex is excluded from the list. Call whenever rhythm count/names change.
+    void setSidechainSources(int ownChannelIndex, const juce::StringArray& channelNames);
 
     // Reload UI from APVTS after external state change (e.g. preset load).
     void loadFromAPVTS(juce::AudioProcessorValueTreeState& apvts,
                        const juce::String& prefix);
 
     void setEffectSendLabel(const juce::String& name);
+    void setChannelName(const juce::String& n) { channelName = n; repaint(); }
     void setActive(bool a) { active = a; repaint(); }
+    void setMeterMode(VUMeter::MeterMode m) { vuMeter.setMode(m); }
 
     void resized() override;
     void paint(juce::Graphics&) override;
@@ -60,19 +66,31 @@ private:
     juce::TextButton  muteBtn { "M" };
     juce::TextButton  soloBtn { "S" };
 
+    // Sidechain controls (Rhythm channels only)
+    juce::ComboBox    scSourceBox;
+    KnobWithLabel     scAmount  { "Amt", Id::knobFxSend };
+    KnobWithLabel     scAttack  { "/",   Id::knobFxSend };
+    KnobWithLabel     scRelease { "\\",  Id::knobFxSend };
+
     bool hasSends()    const { return channelType == Type::Rhythm
                                        || channelType == Type::EffectReturn
                                        || channelType == Type::DelayReturn; }
     bool hasMuteSolo() const { return channelType != Type::Master; }
+    bool hasSidechain() const { return channelType == Type::Rhythm; }
 
     void updateDbLabel(float level);
 
     static constexpr int kColourBarH = 3;
     static constexpr int kNameH      = 22;
-    static constexpr int kSendH      = 52;
+    static constexpr int kSendH      = 44;   // 15% smaller than original 52
     static constexpr int kPanH       = 52;
     static constexpr int kTopAreaH   = kSendH * 3 + kPanH;  // fixed for all channel types
     static constexpr int kDbH        = 14;
     static constexpr int kButtonH    = 22;
     static constexpr int kVUW        = 10;
+    // Sidechain section heights (Rhythm only)
+    static constexpr int kScSrcH     = 20;
+    static constexpr int kScAmtH     = 44;
+    static constexpr int kScEnvH     = 40;
+    static constexpr int kSidechainH = kScSrcH + kScAmtH + kScEnvH;  // 104px
 };
