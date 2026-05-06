@@ -1,6 +1,6 @@
 #pragma once
 #include <juce_audio_basics/juce_audio_basics.h>
-#include <array>
+#include <memory>
 
 class VoiceEngine;
 class FXChain;
@@ -56,11 +56,11 @@ public:
     void prepare(double sampleRate, int blockSize);
 
     // Clears output, accumulates per-channel audio with mixing applied, then runs fxChain.
-    void processBlock(juce::AudioBuffer<float>&             output,
-                      int                                   numActiveRhythms,
-                      std::array<VoiceEngine, MaxChannels>& voices,
-                      FXChain&                              fxChain,
-                      int                                   numSamples);
+    void processBlock(juce::AudioBuffer<float>&   output,
+                      int                         numActiveRhythms,
+                      std::unique_ptr<VoiceEngine>* voices,
+                      FXChain&                    fxChain,
+                      int                         numSamples);
 
 private:
     juce::AudioBuffer<float> channelBufs[MaxChannels];

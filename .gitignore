@@ -29,3 +29,7 @@ Desktop.ini
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
+
+# License signing — private key must never be committed
+tools/private.key
+tools/private.pem

@@ -51,11 +51,11 @@ void MixerEngine::applyPanGain(juce::AudioBuffer<float>& buf,
     if (buf.getNumChannels() > 1) buf.applyGain(1, 0, numSamples, gR);
 }
 
-void MixerEngine::processBlock(juce::AudioBuffer<float>&             output,
-                                int                                   numActiveRhythms,
-                                std::array<VoiceEngine, MaxChannels>& voices,
-                                FXChain&                              fxChain,
-                                int                                   numSamples)
+void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
+                                int                          numActiveRhythms,
+                                std::unique_ptr<VoiceEngine>* voices,
+                                FXChain&                     fxChain,
+                                int                          numSamples)
 {
     output.clear();
     effectSendBuf.clear();
@@ -75,7 +75,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&             output,
         auto&       buf = channelBufs[r];
 
         buf.clear();
-        voices[r].process(buf, numSamples);
+        voices[r]->process(buf, numSamples);
 
         if (ch.mute || (anySolo && !ch.solo))
         {

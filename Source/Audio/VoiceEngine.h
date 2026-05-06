@@ -63,6 +63,7 @@ private:
     float             prevDriveX[2]    = {};    // per-channel ADAA input state
     float             bitRateCounter[2] = {};   // Bitcrusher: sample count since last hold update
     float             bitRateHeld[2]    = {};   // Bitcrusher: quantised held sample value
+    juce::Random      rng;                      // per-instance RNG — avoids getSystemRandom() mutex on audio thread
 
     VoiceParams       pendingParams;
     juce::SpinLock    pendingLock;

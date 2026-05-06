@@ -19,6 +19,7 @@ public:
 
     void refreshPresets();
     void setMixerActive(bool active);
+    void setSaveEnabled(bool enabled);
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -35,6 +36,7 @@ private:
     juce::Label      rhythmCountLabel;
     juce::Label      loopLabel;
     DropdownSelect   loopDropdown;
+    juce::Label      loopStepLabel;
     DropdownSelect   presetDropdown;
     juce::TextButton saveBtn  { "Save" };
     juce::TextButton gearBtn;
@@ -45,8 +47,9 @@ private:
     static constexpr int kBpmW      = 120;
     static constexpr int kPosW      = 80;
     static constexpr int kRhCountW  = 36;
-    static constexpr int kLoopLabelW = 36;
-    static constexpr int kLoopW      = 100;
+    static constexpr int kLoopLabelW    = 36;
+    static constexpr int kLoopW         = 100;
+    static constexpr int kLoopStepW     = 56;
     static constexpr int kPresetW   = 140;
     static constexpr int kSaveW     = 44;
     static constexpr int kGearW     = 28;

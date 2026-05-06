@@ -10,41 +10,79 @@ SequencerEngine::SequencerEngine()
 //==============================================================================
 void SequencerEngine::addRhythm(const Rhythm& r)
 {
-    if (numRhythms >= MaxRhythms) return;
-    rhythms[numRhythms] = r;
-    updatePattern(numRhythms);
-    ++numRhythms;
+    if ((int)rhythms.size() >= MaxRhythms) return;
+    rhythms.push_back(r);
+    cachedPatterns.emplace_back();
+    cachedCPatterns.emplace_back();
+    patternUpdated.push_back(false);
+    // safePatterns/safeCPatterns/lastStepIndex are fixed arrays — slot already exists.
+    updatePattern((int)rhythms.size() - 1);
 }
 
 void SequencerEngine::removeRhythm(int index)
 {
-    if (index < 0 || index >= numRhythms) return;
+    if (index < 0 || index >= (int)rhythms.size()) return;
 
     bool expected = false;
     while (!patternLock.compare_exchange_weak(expected, true, std::memory_order_acquire))
         expected = false;
 
-    for (int i = index; i < numRhythms - 1; ++i)
+    rhythms.erase        (rhythms.begin()         + index);
+    cachedPatterns.erase (cachedPatterns.begin()  + index);
+    cachedCPatterns.erase(cachedCPatterns.begin() + index);
+    patternUpdated.erase (patternUpdated.begin()  + index);
+
+    // Fixed arrays: shift elements left to fill the gap, clear the vacated tail slot.
+    const int newN = (int)rhythms.size();
+    for (int i = index; i < newN; ++i)
     {
-        rhythms[i]          = rhythms[i + 1];
-        cachedPatterns[i]   = cachedPatterns[i + 1];
-        cachedCPatterns[i]  = cachedCPatterns[i + 1];
-        lastStepIndex[i]    = lastStepIndex[i + 1];
-        patternUpdated[i]   = true;  // audio thread will re-snapshot shifted slot
+        safePatterns[i]  = std::move(safePatterns[i + 1]);
+        safeCPatterns[i] = std::move(safeCPatterns[i + 1]);
+        lastStepIndex[i] = lastStepIndex[i + 1];
     }
-    --numRhythms;
-    lastStepIndex[numRhythms] = -1;
-    cachedPatterns[numRhythms].clear();
-    cachedCPatterns[numRhythms].clear();
-    patternUpdated[numRhythms] = false;
+    safePatterns[newN].clear();
+    safeCPatterns[newN].clear();
+    lastStepIndex[newN] = -1;
 
     patternLock.store(false, std::memory_order_release);
 }
 
 Rhythm& SequencerEngine::getRhythm(int index)
 {
-    jassert(index >= 0 && index < MaxRhythms);
+    jassert(index >= 0 && index < (int)rhythms.size());
     return rhythms[index];
+}
+
+void SequencerEngine::setNumRhythms(int n)
+{
+    n = juce::jlimit(0, MaxRhythms, n);
+    const int current = (int)rhythms.size();
+
+    if (n > current)
+    {
+        for (int i = current; i < n; ++i)
+        {
+            rhythms.emplace_back();
+            cachedPatterns.emplace_back();
+            cachedCPatterns.emplace_back();
+            patternUpdated.push_back(false);
+            // safePatterns/safeCPatterns/lastStepIndex: fixed arrays, slots already exist.
+        }
+    }
+    else if (n < current)
+    {
+        rhythms.resize(n);
+        cachedPatterns.resize(n);
+        cachedCPatterns.resize(n);
+        patternUpdated.resize(n);
+        // Clear the fixed array slots that are no longer active.
+        for (int i = n; i < current; ++i)
+        {
+            safePatterns[i].clear();
+            safeCPatterns[i].clear();
+            lastStepIndex[i] = -1;
+        }
+    }
 }
 
 void SequencerEngine::updatePattern(int index)
@@ -64,6 +102,7 @@ void SequencerEngine::updatePattern(int index)
 //==============================================================================
 BlockResult SequencerEngine::processBlock(double beatPosition)
 {
+    const int numRhythms = (int)rhythms.size();
     if (numRhythms == 0)
         return {};
 
@@ -71,6 +110,7 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
 
     const auto globalStep    = static_cast<int>(beatPosition / StepLengthBeats);
     const int  effectiveStep = (masterLoopSteps > 0) ? (globalStep % masterLoopSteps) : globalStep;
+    masterLoopCurrentStep.store(masterLoopSteps > 0 ? effectiveStep : 0, std::memory_order_relaxed);
 
     // Non-blocking snapshot: copy any updated patterns into the audio-thread-safe buffers.
     // If patternLock is held by the message thread, skip this block's snapshot — safePatterns

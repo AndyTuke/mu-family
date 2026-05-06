@@ -62,7 +62,7 @@ void ReverbSlot::process(juce::AudioBuffer<float>& buffer)
     if (!enabled) return;
 
     const int numCh      = buffer.getNumChannels();
-    const int numSamples = buffer.getNumSamples();
+    const int numSamples = juce::jmin(buffer.getNumSamples(), (int)wetL.size());
 
     runPreDelay(buffer, numSamples);
 
@@ -95,7 +95,7 @@ void ReverbSlot::processReturn(juce::AudioBuffer<float>& buffer)
     if (!enabled) return;
 
     const int numCh      = buffer.getNumChannels();
-    const int numSamples = buffer.getNumSamples();
+    const int numSamples = juce::jmin(buffer.getNumSamples(), (int)wetL.size());
 
     runPreDelay(buffer, numSamples);
 

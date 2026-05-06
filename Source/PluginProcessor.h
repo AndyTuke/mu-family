@@ -6,8 +6,10 @@
 #include "Audio/MidiOutputEngine.h"
 #include "FX/FXChain.h"
 #include "Audio/MixerEngine.h"
+#include "License/LicenseChecker.h"
 
-#include <array>
+#include <memory>
+#include <vector>
 #include <unordered_map>
 
 class PluginProcessor : public juce::AudioProcessor,
@@ -49,7 +51,7 @@ public:
     double getInternalBeatPos()  const { return internalBeatPos; }
 
     void    addRhythm    (const Rhythm& r);
-    void    removeRhythm (int index)       { sequencer.removeRhythm(index); }
+    void    removeRhythm (int index);
     Rhythm& getRhythm    (int index)       { return sequencer.getRhythm(index); }
     int     getNumRhythms() const          { return sequencer.getNumRhythms(); }
     void    updatePattern (int index)      { sequencer.updatePattern(index); }
@@ -63,6 +65,10 @@ public:
     void setContentDir(const juce::File& dir);
     void ensureContentFoldersExist();
 
+    // License — checked once at startup; result is immutable thereafter.
+    LicenseChecker::Info licenseInfo;
+    bool isLicensed() const { return kBetaBuild || licenseInfo.status == LicenseStatus::Licensed; }
+
     void savePreset(const juce::String& name, const juce::String& description,
                     const juce::String& category, bool embedSamples = false);
     void loadPreset(const juce::File& file);
@@ -72,8 +78,12 @@ public:
     void loadDefaultPreset();
 
     SequencerEngine sequencer;
-    std::array<VoiceEngine,      SequencerEngine::MaxRhythms> voiceEngines;
-    std::array<MidiOutputEngine, SequencerEngine::MaxRhythms> midiEngines;
+    // Fixed-size arrays so the audio thread never races with a vector reallocation
+    // caused by addRhythm/removeRhythm on the message thread.  numActiveRhythms is
+    // the authoritative count; processBlock reads it atomically once per block.
+    std::array<std::unique_ptr<VoiceEngine>, SequencerEngine::MaxRhythms> voiceEngines;
+    std::array<MidiOutputEngine,             SequencerEngine::MaxRhythms> midiEngines;
+    std::atomic<int> numActiveRhythms { 0 };
     FXChain     fxChain;
     MixerEngine mixerEngine;
 
@@ -115,6 +125,7 @@ private:
     double internalBeatPos   = 0.0;
     double internalBpm       = 120.0;
     double currentSampleRate = 44100.0;
+    int    currentBlockSize  = 512;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

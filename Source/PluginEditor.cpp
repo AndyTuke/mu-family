@@ -32,7 +32,11 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         if (mixerVisible) { mixerOverlay.refresh(); mixerOverlay.loadFromAPVTS(); }
     };
 
-    transportBar.onSavePreset = [this] { showSaveDialog(true); };
+    transportBar.onSavePreset = [this]
+    {
+        if (!processorRef.isLicensed()) return;
+        showSaveDialog(true);
+    };
 
     transportBar.onSettingsToggle = [this] { showSettings(!settingsVisible); };
 
@@ -46,6 +50,12 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     sidebar.onAddRhythm = [this]
     {
+        if (!processorRef.isLicensed() && processorRef.getNumRhythms() >= 2)
+        {
+            statusBar.showParam("Demo", "2-rhythm limit — purchase a license to unlock all 8",
+                                MuClidLookAndFeel::colour(MuClidLookAndFeel::knobLevel));
+            return;
+        }
         if (processorRef.getNumRhythms() >= SequencerEngine::MaxRhythms) return;
         Rhythm r;
         r.name        = "<unnamed>";
@@ -112,6 +122,25 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // ── Settings overlay ──────────────────────────────────────────────────────
     settingsOverlay.onClose = [this] { showSettings(false); };
     settingsOverlay.onContentDirChanged = [this] { transportBar.refreshPresets(); };
+
+    // ── Demo mode ─────────────────────────────────────────────────────────────
+    {
+        using Id = MuClidLookAndFeel::ColourIds;
+        const bool licensed = processorRef.isLicensed();
+
+        transportBar.setSaveEnabled(licensed);
+
+        demoBanner.setText("DEMO  \xe2\x80\x94  Max 2 rhythms  \xc2\xb7  Save disabled  \xe2\x80\x94  Purchase a license to unlock all features",
+                           juce::dontSendNotification);
+        demoBanner.setJustificationType(juce::Justification::centred);
+        demoBanner.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+        demoBanner.setColour(juce::Label::backgroundColourId,
+                             MuClidLookAndFeel::colour(Id::segmentWarningBg));
+        demoBanner.setColour(juce::Label::textColourId,
+                             MuClidLookAndFeel::colour(Id::segmentWarningBorder));
+        addChildComponent(demoBanner);
+        demoBanner.setVisible(!licensed);
+    }
 
     // ── Startup ───────────────────────────────────────────────────────────────
     if (processorRef.getNumRhythms() == 0)
@@ -273,7 +302,8 @@ void PluginEditor::resized()
     const int h          = getHeight();
     const int statusH    = 20;
     const int transportH = 36;
-    const int contentH   = h - transportH - statusH;
+    const int bannerH    = processorRef.isLicensed() ? 0 : kDemoBannerH;
+    const int contentH   = h - transportH - statusH - bannerH;
 
     const juce::Rectangle<int> mainArea { RhythmSidebar::kWidth, transportH,
                                           w - RhythmSidebar::kWidth, contentH };
@@ -289,6 +319,9 @@ void PluginEditor::resized()
     // Modal overlays span the full editor area
     aboutPanel .setBounds(getLocalBounds());
     saveDialog .setBounds(getLocalBounds());
+
+    if (bannerH > 0)
+        demoBanner.setBounds(0, h - statusH - bannerH, w, bannerH);
 
     statusBar.setBounds(0, h - statusH, w, statusH);
 }

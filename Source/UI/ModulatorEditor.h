@@ -137,7 +137,7 @@ private:
     AddButton addBtn { "Target" };
 
     static constexpr int kHeaderH = 28;
-    static constexpr int kEditorH = 140;
+    static constexpr int kEditorH = 100;
     static constexpr int kTimingH = 28;
     static constexpr int kRowH    = 26;
     static constexpr int kAddBtnH = 28;

@@ -46,8 +46,20 @@ TransportBar::TransportBar(PluginProcessor& p)
         const int paramVal = id - 1; // id=1→0 (off), id=2→1 (16 steps), ...
         if (auto* p = proc.apvts.getParameter("mstrLoop"))
             p->setValueNotifyingHost(p->convertTo0to1((float)paramVal));
+        loopStepLabel.setVisible(id != 1);
     };
     addAndMakeVisible(loopDropdown);
+
+    loopStepLabel.setJustificationType(juce::Justification::centredLeft);
+    loopStepLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    // Sync initial visibility with the current loop param.
+    {
+        const int paramVal = (int)proc.apvts.getRawParameterValue("mstrLoop")->load();
+        loopStepLabel.setVisible(paramVal > 0);
+        if (paramVal > 0)
+            loopDropdown.setSelectedId(paramVal + 1, false);
+    }
+    addAndMakeVisible(loopStepLabel);
 
     presetDropdown.onChange = [this](int id)
     {
@@ -88,6 +100,14 @@ void TransportBar::timerCallback()
     refreshPlayBtn();
     updatePositionLabel();
     updateRhythmCount();
+
+    if (loopStepLabel.isVisible())
+    {
+        const int steps   = proc.sequencer.getMasterLoopSteps();
+        const int current = proc.sequencer.getMasterLoopCurrentStep() + 1; // 1-based display
+        loopStepLabel.setText(juce::String(current) + " / " + juce::String(steps),
+                              juce::dontSendNotification);
+    }
 }
 
 void TransportBar::refreshPlayBtn()
@@ -177,6 +197,12 @@ void TransportBar::setMixerActive(bool active)
     mixerBtn.setButtonText(active ? "Sequencer" : "Mixer");
 }
 
+void TransportBar::setSaveEnabled(bool enabled)
+{
+    saveBtn.setEnabled(enabled);
+    saveBtn.setAlpha(enabled ? 1.0f : 0.35f);
+}
+
 void TransportBar::mouseDown(const juce::MouseEvent& e)
 {
     if (e.x < kLogoW && onLogoClicked)
@@ -190,13 +216,17 @@ void TransportBar::paint(juce::Graphics& g)
     g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
     g.fillAll();
 
+    // Bordered panel around transport controls (excluding the logo area).
+    const int panelX = kLogoW;
+    const int panelY = 4;
+    const int panelH = getHeight() - 8;
+    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+    g.drawRect(panelX, panelY, getWidth() - kLogoW - 4, panelH, 1);
+
     g.setColour(MuClidLookAndFeel::colour(Id::headingText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(14.0f)));
     g.drawText("mu-Clid", 8, 0, kLogoW - 8, getHeight(),
                juce::Justification::centredLeft, false);
-
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawLine(0.0f, (float)(getHeight() - 1), (float)getWidth(), (float)(getHeight() - 1), 0.5f);
 }
 
 void TransportBar::resized()
@@ -219,7 +249,9 @@ void TransportBar::resized()
     loopLabel.setBounds(leftX, btnY, kLoopLabelW, btnH);
     leftX += kLoopLabelW + 2;
     loopDropdown.setBounds(leftX, btnY, kLoopW, btnH);
-    leftX += kLoopW + kGap;
+    leftX += kLoopW + 2;
+    loopStepLabel.setBounds(leftX, btnY, kLoopStepW, btnH);
+    leftX += kLoopStepW + kGap;
 
     posLabel.setBounds(leftX, btnY, kPosW, btnH);
 

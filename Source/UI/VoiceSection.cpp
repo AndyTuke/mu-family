@@ -74,10 +74,10 @@ void VoiceSection::apvtsSet(const char* suffix, float v)
         p->setValueNotifyingHost(p->convertTo0to1(v));
 }
 
-// Converts 0-100 slider value to time string: 1-999 ms (integer) or 1.0-10.0 s (1 dp).
+// Converts 0-100 slider value to time string: 1-999 ms (integer) or 1.0-3.0 s (1 dp). Max = 3 s.
 static juce::String formatAdsrTime(double v)
 {
-    double ms = std::max(1.0, v * 100.0);
+    double ms = std::max(1.0, v * 30.0);
     if (ms < 1000.0)
         return juce::String((int)std::round(ms)) + " ms";
     return juce::String(ms / 1000.0, 1) + " s";
@@ -87,11 +87,11 @@ static double parseAdsrTime(const juce::String& s)
 {
     auto t = s.trim().toLowerCase();
     if (t.endsWith("ms"))
-        return t.dropLastCharacters(2).trim().getDoubleValue() / 100.0;
+        return t.dropLastCharacters(2).trim().getDoubleValue() / 30.0;
     if (t.endsWith("s"))
-        return t.dropLastCharacters(1).trim().getDoubleValue() * 10.0;
-    // Bare number: assume milliseconds (120 → 120 ms → slider value 1.2)
-    return t.getDoubleValue() / 100.0;
+        return t.dropLastCharacters(1).trim().getDoubleValue() * (100.0/3.0);
+    // Bare number: assume milliseconds (120 → 120 ms → slider value 4.0)
+    return t.getDoubleValue() / 30.0;
 }
 
 void VoiceSection::wireCallbacks()
@@ -99,11 +99,20 @@ void VoiceSection::wireCallbacks()
     // Envelope time/sustain display formatters
     for (auto* k : { &pitchAtk, &pitchDec, &pitchRel,
                      &filterAtk, &filterDec, &filterRel,
-                     &ampAtk, &ampDec, &ampRel })
+                     &ampAtk, &ampDec })
     {
         k->getSlider().textFromValueFunction = [](double v) { return formatAdsrTime(v); };
         k->getSlider().valueFromTextFunction = [](const juce::String& s) { return parseAdsrTime(s); };
     }
+    // Amp Release at max (100) means "play to natural end" — show "End" instead of "3.0 s".
+    ampRel.getSlider().textFromValueFunction = [](double v) -> juce::String {
+        if (v >= 100.0) return "End";
+        return formatAdsrTime(v);
+    };
+    ampRel.getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
+        if (s.trim().equalsIgnoreCase("end")) return 100.0;
+        return parseAdsrTime(s);
+    };
     for (auto* k : { &pitchSus, &filterSus, &ampSus })
     {
         k->getSlider().textFromValueFunction = [](double v) -> juce::String {
@@ -231,20 +240,20 @@ void VoiceSection::loadFromRhythm()
     pitchOctave .setValue(p.pitchOctave,         juce::dontSendNotification);
     pitchSemi   .setValue(p.pitchSemitones,      juce::dontSendNotification);
     pitchFine   .setValue(p.pitchFine,           juce::dontSendNotification);
-    // Reverse-convert seconds → 0–100 display scale.
-    pitchAtk    .setValue(p.pitchEnvAtk  * 10.0, juce::dontSendNotification);
-    pitchDec    .setValue(p.pitchEnvDec  * 10.0, juce::dontSendNotification);
-    pitchSus    .setValue(p.pitchEnvSus  * 100.0,juce::dontSendNotification);
-    pitchRel    .setValue(p.pitchEnvRel  * 10.0, juce::dontSendNotification);
+    // Reverse-convert seconds → 0–100 display scale (max 3 s → 100).
+    pitchAtk    .setValue(p.pitchEnvAtk  * (100.0/3.0), juce::dontSendNotification);
+    pitchDec    .setValue(p.pitchEnvDec  * (100.0/3.0), juce::dontSendNotification);
+    pitchSus    .setValue(p.pitchEnvSus  * 100.0,       juce::dontSendNotification);
+    pitchRel    .setValue(p.pitchEnvRel  * (100.0/3.0), juce::dontSendNotification);
     pitchDepth  .setValue(p.pitchEnvDepth,       juce::dontSendNotification);
 
     filterType.setSelectedId(p.filterType + 1, false);
     filterCutoff.setValue(p.filterCutoff,           juce::dontSendNotification);
     filterRes   .setValue(p.filterRes * 100.0,      juce::dontSendNotification);
-    filterAtk   .setValue(p.filterEnvAtk  * 10.0,  juce::dontSendNotification);
-    filterDec   .setValue(p.filterEnvDec  * 10.0,  juce::dontSendNotification);
-    filterSus   .setValue(p.filterEnvSus  * 100.0, juce::dontSendNotification);
-    filterRel   .setValue(p.filterEnvRel  * 10.0,  juce::dontSendNotification);
+    filterAtk   .setValue(p.filterEnvAtk  * (100.0/3.0), juce::dontSendNotification);
+    filterDec   .setValue(p.filterEnvDec  * (100.0/3.0), juce::dontSendNotification);
+    filterSus   .setValue(p.filterEnvSus  * 100.0,       juce::dontSendNotification);
+    filterRel   .setValue(p.filterEnvRel  * (100.0/3.0), juce::dontSendNotification);
     filterDepth .setValue(p.filterEnvDepth,         juce::dontSendNotification);
 
     ampLevel.setValue(p.ampLevel,               juce::dontSendNotification);
@@ -261,10 +270,10 @@ void VoiceSection::loadFromRhythm()
     }
 
     ampAccent.setValue(p.accentDb,               juce::dontSendNotification);
-    ampAtk  .setValue(p.ampEnvAtk  * 10.0,      juce::dontSendNotification);
-    ampDec  .setValue(p.ampEnvDec  * 10.0,      juce::dontSendNotification);
-    ampSus  .setValue(p.ampEnvSus  * 100.0,     juce::dontSendNotification);
-    ampRel  .setValue(p.ampEnvRel  * 10.0,      juce::dontSendNotification);
+    ampAtk  .setValue(p.ampEnvAtk  * (100.0/3.0), juce::dontSendNotification);
+    ampDec  .setValue(p.ampEnvDec  * (100.0/3.0), juce::dontSendNotification);
+    ampSus  .setValue(p.ampEnvSus  * 100.0,       juce::dontSendNotification);
+    ampRel  .setValue(p.ampRelToEnd ? 100.0 : p.ampEnvRel * (100.0/3.0), juce::dontSendNotification);
 
     driveChar.setSelectedId(p.driveChar + 1, false);
     configureInsertAlgorithm(p.driveChar);  // sets all insert knob ranges/labels/values/callbacks

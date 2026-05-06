@@ -59,7 +59,7 @@ void SettingsOverlay::resized()
 {
     const int w = getWidth();
 
-    closeBtn.setBounds(w - kPad - 60, kPad, 60, 28);
+    closeBtn.setBounds(w - kPad * 3 - 60, kPad, 60, 28);
 
     int y = kHeaderH + kPad;
     const int ctrlW = 120;

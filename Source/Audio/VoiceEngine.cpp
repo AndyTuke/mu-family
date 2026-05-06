@@ -113,7 +113,8 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     for (auto& v : voices)
         v.process(buffer, pitchRatio, tempBuffer, ns);
 
-    ampEnv.applyEnvelopeToBuffer(tempBuffer, 0, ns);
+    if (!activeParams.ampRelToEnd)
+        ampEnv.applyEnvelopeToBuffer(tempBuffer, 0, ns);
 
     // Filter envelope modulates cutoff (per-block approximation).
     float filterEnvVal = 0.0f;
@@ -217,8 +218,10 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
                                              (float)currentSampleRate * 0.49f);
 
             for (int ch = 0; ch < nCh; ++ch)
-            {
                 bitAaFilter[ch].prepare(aaCut, (float)currentSampleRate);
+
+            for (int ch = 0; ch < nCh; ++ch)
+            {
                 auto*  data = tempBuffer.getWritePointer(ch);
                 float& cnt  = bitRateCounter[ch < 2 ? ch : 0];
                 float& held = bitRateHeld   [ch < 2 ? ch : 0];
@@ -232,8 +235,8 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
                     if (cnt >= ratioF)
                     {
                         // TPDF dither: two uniform samples → triangular distribution
-                        const float r1 = juce::Random::getSystemRandom().nextFloat();
-                        const float r2 = juce::Random::getSystemRandom().nextFloat();
+                        const float r1 = rng.nextFloat();
+                        const float r2 = rng.nextFloat();
                         held = std::round((filtered + (r1 - r2) * dither) * q) / q;
                         cnt -= ratioF;  // carry fraction for accurate rate reduction
                     }
@@ -249,8 +252,10 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     if (activeParams.driveTone < 19000.0f && currentSampleRate > 0.0)
     {
         for (int ch = 0; ch < nCh; ++ch)
-        {
             toneFilter[ch].prepare(activeParams.driveTone, (float)currentSampleRate);
+
+        for (int ch = 0; ch < nCh; ++ch)
+        {
             auto* data = tempBuffer.getWritePointer(ch);
             for (int i = 0; i < ns; ++i)
                 data[i] = toneFilter[ch].process(data[i]);

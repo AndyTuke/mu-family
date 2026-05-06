@@ -36,6 +36,9 @@ private:
     PresetBrowser   presetBrowser;
     SettingsOverlay settingsOverlay;
     StatusBar       statusBar;
+    juce::Label     demoBanner;
+
+    static constexpr int kDemoBannerH = 20;
 
     bool mixerVisible    = false;
     bool aboutVisible    = false;

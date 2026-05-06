@@ -204,6 +204,9 @@ PluginProcessor::PluginProcessor()
         appSettings = std::make_unique<juce::PropertiesFile>(settingsFile, opts);
     }
 
+    // Check license file — must run after appSettings so getContentDir() works.
+    licenseInfo = LicenseChecker::check(getContentDir());
+
     // Register listener for every parameter.
     for (auto* param : getParameters())
         if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
@@ -229,6 +232,8 @@ PluginProcessor::PluginProcessor()
     defaultRhythm.genA.steps = 16;
     defaultRhythm.genA.hits  = 4;
     sequencer.addRhythm(defaultRhythm);
+    voiceEngines[0] = std::make_unique<VoiceEngine>();
+    numActiveRhythms.store(1, std::memory_order_release);
 
     apvtsLoading = true;
     pushRhythmToAPVTS(0);
@@ -261,10 +266,13 @@ void PluginProcessor::changeProgramName(int, const juce::String&) {}
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     currentSampleRate = sampleRate;
-    for (auto& ve : voiceEngines)
-        ve.prepareToPlay(sampleRate, samplesPerBlock);
-    for (auto& me : midiEngines)
-        me.prepare(sampleRate, samplesPerBlock);
+    currentBlockSize  = samplesPerBlock;
+    const int n = numActiveRhythms.load(std::memory_order_acquire);
+    for (int i = 0; i < n; ++i)
+    {
+        voiceEngines[i]->prepareToPlay(sampleRate, samplesPerBlock);
+        midiEngines[i].prepare(sampleRate, samplesPerBlock);
+    }
     fxChain.prepare(sampleRate, samplesPerBlock);
     mixerEngine.prepare(sampleRate, samplesPerBlock);
 }
@@ -297,7 +305,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         internalBeatPos += (buffer.getNumSamples() / currentSampleRate) * (internalBpm / 60.0);
     }
 
-    const int numRhythms = sequencer.getNumRhythms();
+    const int numRhythms = numActiveRhythms.load(std::memory_order_acquire);
 
     sequencerPlaying.set(playing);
     lastBeatPos.set(beatPos);
@@ -306,8 +314,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     {
         const auto blockResult = sequencer.processBlock(beatPos);
         for (int r = 0; r < numRhythms; ++r)
-            if (blockResult.firedMask & (1 << r))
-                voiceEngines[r].trigger(blockResult.accentMask & (1 << r));
+            if ((blockResult.firedMask & (1 << r)) && voiceEngines[r])
+                voiceEngines[r]->trigger(blockResult.accentMask & (1 << r));
 
         // Update UI play-state atomics.
         const float frac = static_cast<float>(
@@ -342,14 +350,14 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             if (rhythm.modLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
             {
                 // Fill param map with base values in 0–100 display scale.
-                modParamValues["amp.attack"]       = modParams.ampEnvAtk   * 10.0f;
-                modParamValues["amp.decay"]        = modParams.ampEnvDec   * 10.0f;
+                modParamValues["amp.attack"]       = modParams.ampEnvAtk   * (100.0f/3.0f);
+                modParamValues["amp.decay"]        = modParams.ampEnvDec   * (100.0f/3.0f);
                 modParamValues["amp.sustain"]      = modParams.ampEnvSus   * 100.0f;
-                modParamValues["amp.release"]      = modParams.ampEnvRel   * 10.0f;
+                modParamValues["amp.release"]      = modParams.ampEnvRel   * (100.0f/3.0f);
                 modParamValues["filter.cutoff"]    = modParams.filterCutoff;
                 modParamValues["filter.resonance"] = modParams.filterRes   * 100.0f;
-                modParamValues["fenv.attack"]      = modParams.filterEnvAtk * 10.0f;
-                modParamValues["fenv.decay"]       = modParams.filterEnvDec * 10.0f;
+                modParamValues["fenv.attack"]      = modParams.filterEnvAtk * (100.0f/3.0f);
+                modParamValues["fenv.decay"]       = modParams.filterEnvDec * (100.0f/3.0f);
                 modParamValues["fenv.depth"]       = modParams.filterEnvDepth;
                 modParamValues["pitch.semitones"]  = 0.0f;
                 modParamValues["insert.drive"]     = modParams.driveDrive;
@@ -364,14 +372,14 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 rhythm.modLock.store(false, std::memory_order_release);
 
                 // Write modulated values back, clamping to safe ranges.
-                modParams.ampEnvAtk      = juce::jmax(0.001f, modParamValues["amp.attack"]       / 10.0f);
-                modParams.ampEnvDec      = juce::jmax(0.001f, modParamValues["amp.decay"]        / 10.0f);
-                modParams.ampEnvSus      = juce::jlimit(0.0f, 1.0f, modParamValues["amp.sustain"]      / 100.0f);
-                modParams.ampEnvRel      = juce::jmax(0.001f, modParamValues["amp.release"]      / 10.0f);
+                modParams.ampEnvAtk      = juce::jmax(0.001f, modParamValues["amp.attack"]   * 0.03f);
+                modParams.ampEnvDec      = juce::jmax(0.001f, modParamValues["amp.decay"]    * 0.03f);
+                modParams.ampEnvSus      = juce::jlimit(0.0f, 1.0f, modParamValues["amp.sustain"] / 100.0f);
+                modParams.ampEnvRel      = juce::jmax(0.001f, modParamValues["amp.release"]  * 0.03f);
                 modParams.filterCutoff   = juce::jlimit(20.0f, 20000.0f, modParamValues["filter.cutoff"]);
                 modParams.filterRes      = juce::jlimit(0.0f, 0.99f, modParamValues["filter.resonance"] / 100.0f);
-                modParams.filterEnvAtk   = juce::jmax(0.001f, modParamValues["fenv.attack"]      / 10.0f);
-                modParams.filterEnvDec   = juce::jmax(0.001f, modParamValues["fenv.decay"]       / 10.0f);
+                modParams.filterEnvAtk   = juce::jmax(0.001f, modParamValues["fenv.attack"]  * 0.03f);
+                modParams.filterEnvDec   = juce::jmax(0.001f, modParamValues["fenv.decay"]   * 0.03f);
                 modParams.filterEnvDepth = juce::jlimit(0.0f, 48.0f, modParamValues["fenv.depth"]);
                 modParams.pitchMod       = juce::jlimit(-24.0f, 24.0f, modParamValues["pitch.semitones"]);
                 modParams.driveDrive     = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.drive"]);
@@ -383,12 +391,13 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             }
         }
 
-        voiceEngines[r].setActiveParams(modParams);
+        if (voiceEngines[r])
+            voiceEngines[r]->setActiveParams(modParams);
     }
 
     fxChain.setHostBpm(internalBpm);
     mixerEngine.processBlock(buffer, numRhythms,
-                             voiceEngines, fxChain, buffer.getNumSamples());
+                             voiceEngines.data(), fxChain, buffer.getNumSamples());
 
     for (int r = 0; r < numRhythms; ++r)
         midiEngines[r].processBlock(midiMessages, buffer.getNumSamples());
@@ -434,8 +443,8 @@ void PluginProcessor::parameterChanged(const juce::String& id, float v)
 }
 
 // Convert 0–100 UI scale → seconds for ADSR A/D/R knobs.
-// 0 → 0.001 s (1 ms), 100 → 10 s, linear.
-static inline float adsrTime(float v) { return juce::jmax(0.001f, v / 10.0f); }
+// 0 → 0.001 s (1 ms), 100 → 3 s, linear.
+static inline float adsrTime(float v) { return juce::jmax(0.001f, v * 0.03f); }
 // Convert 0–100 UI scale → 0–1 amplitude for ADSR Sustain.
 static inline float adsrSus(float v)  { return juce::jlimit(0.0f, 1.0f, v / 100.0f); }
 
@@ -489,7 +498,7 @@ void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float 
     else if (suffix == "aEnvAtk")   { r.voiceParams.ampEnvAtk      = adsrTime(v); voiceDirty = true; }
     else if (suffix == "aEnvDec")   { r.voiceParams.ampEnvDec      = adsrTime(v); voiceDirty = true; }
     else if (suffix == "aEnvSus")   { r.voiceParams.ampEnvSus      = adsrSus(v);  voiceDirty = true; }
-    else if (suffix == "aEnvRel")   { r.voiceParams.ampEnvRel      = adsrTime(v); voiceDirty = true; }
+    else if (suffix == "aEnvRel")   { r.voiceParams.ampEnvRel = adsrTime(v); r.voiceParams.ampRelToEnd = (v >= 100.0f); voiceDirty = true; }
     else if (suffix == "accentDb")  { r.voiceParams.accentDb        = v;           voiceDirty = true; }
     // Drive
     else if (suffix == "drvChar")   { r.voiceParams.driveChar  = juce::jlimit(0, 4, (int)v); voiceDirty = true; }
@@ -505,7 +514,7 @@ void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float 
     if (!apvtsLoading)
     {
         if (patternDirty) sequencer.updatePattern(ri);
-        if (voiceDirty)   voiceEngines[ri].setParams(r.voiceParams);
+        if (voiceDirty)   voiceEngines[ri]->setParams(r.voiceParams);
     }
 }
 
@@ -673,25 +682,25 @@ void PluginProcessor::pushRhythmToAPVTS(int ri)
     set(px+"pitchOct",  (float)vp.pitchOctave);
     set(px+"pitchSemi", (float)vp.pitchSemitones);
     set(px+"pitchFine", vp.pitchFine);
-    // ADSR stored in APVTS as 0–100: A/D/R * 10 (seconds→display), S * 100.
-    set(px+"pEnvAtk",   vp.pitchEnvAtk  * 10.0f);
-    set(px+"pEnvDec",   vp.pitchEnvDec  * 10.0f);
+    // ADSR stored in APVTS as 0–100: A/D/R * (100/3) (seconds→display), S * 100.
+    set(px+"pEnvAtk",   vp.pitchEnvAtk  * (100.0f/3.0f));
+    set(px+"pEnvDec",   vp.pitchEnvDec  * (100.0f/3.0f));
     set(px+"pEnvSus",   vp.pitchEnvSus  * 100.0f);
-    set(px+"pEnvRel",   vp.pitchEnvRel  * 10.0f);
+    set(px+"pEnvRel",   vp.pitchEnvRel  * (100.0f/3.0f));
     set(px+"pEnvDep",   vp.pitchEnvDepth);
     set(px+"fltType",   (float)vp.filterType);
     set(px+"fltCut",    vp.filterCutoff);
     set(px+"fltRes",    vp.filterRes);
-    set(px+"fEnvAtk",   vp.filterEnvAtk  * 10.0f);
-    set(px+"fEnvDec",   vp.filterEnvDec  * 10.0f);
+    set(px+"fEnvAtk",   vp.filterEnvAtk  * (100.0f/3.0f));
+    set(px+"fEnvDec",   vp.filterEnvDec  * (100.0f/3.0f));
     set(px+"fEnvSus",   vp.filterEnvSus  * 100.0f);
-    set(px+"fEnvRel",   vp.filterEnvRel  * 10.0f);
+    set(px+"fEnvRel",   vp.filterEnvRel  * (100.0f/3.0f));
     set(px+"fEnvDep",   vp.filterEnvDepth);
     set(px+"ampLvl",    vp.ampLevel);
-    set(px+"aEnvAtk",   vp.ampEnvAtk  * 10.0f);
-    set(px+"aEnvDec",   vp.ampEnvDec  * 10.0f);
+    set(px+"aEnvAtk",   vp.ampEnvAtk  * (100.0f/3.0f));
+    set(px+"aEnvDec",   vp.ampEnvDec  * (100.0f/3.0f));
     set(px+"aEnvSus",   vp.ampEnvSus  * 100.0f);
-    set(px+"aEnvRel",   vp.ampEnvRel  * 10.0f);
+    set(px+"aEnvRel",   vp.ampEnvRel  * (100.0f/3.0f));
     set(px+"accentDb",  vp.accentDb);
     set(px+"drvChar",   (float)vp.driveChar);
     set(px+"drvDrv",    vp.driveDrive);
@@ -709,6 +718,10 @@ void PluginProcessor::addRhythm(const Rhythm& r)
     int ri = sequencer.getNumRhythms();
     if (ri >= SequencerEngine::MaxRhythms) return;
     sequencer.addRhythm(r);
+    voiceEngines[ri] = std::make_unique<VoiceEngine>();
+    voiceEngines[ri]->prepareToPlay(currentSampleRate, currentBlockSize);
+    midiEngines[ri].prepare(currentSampleRate, currentBlockSize);
+    numActiveRhythms.store(sequencer.getNumRhythms(), std::memory_order_release);
     if (ri < loadedSamplePaths.size())
         loadedSamplePaths.set(ri, juce::String());
     apvtsLoading = true;
@@ -716,11 +729,29 @@ void PluginProcessor::addRhythm(const Rhythm& r)
     apvtsLoading = false;
 }
 
+void PluginProcessor::removeRhythm(int index)
+{
+    if (index < 0 || index >= sequencer.getNumRhythms()) return;
+    const int newN = sequencer.getNumRhythms() - 1;
+    // Decrement BEFORE any structural change so the audio thread won't access
+    // the slot being removed on its next block.
+    numActiveRhythms.store(newN, std::memory_order_release);
+    sequencer.removeRhythm(index);
+    // Shift remaining voice/midi engines to fill the gap.
+    for (int i = index; i < newN; ++i)
+    {
+        voiceEngines[i] = std::move(voiceEngines[i + 1]);
+        midiEngines[i]  = std::move(midiEngines[i + 1]);
+    }
+    voiceEngines[newN].reset();
+    midiEngines[newN] = MidiOutputEngine{};
+}
+
 //==============================================================================
 void PluginProcessor::loadSampleForRhythm(int rhythmIndex, const juce::File& file)
 {
-    if (rhythmIndex < 0 || rhythmIndex >= SequencerEngine::MaxRhythms) return;
-    voiceEngines[rhythmIndex].loadFile(file);
+    if (rhythmIndex < 0 || rhythmIndex >= numActiveRhythms.load(std::memory_order_acquire)) return;
+    voiceEngines[rhythmIndex]->loadFile(file);
     loadedSamplePaths.set(rhythmIndex, file.getFullPathName());
 }
 
@@ -833,7 +864,7 @@ bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
         juce::File f(samplePath);
         if (f.existsAsFile())
         {
-            voiceEngines[targetIdx].loadFile(f);
+            voiceEngines[targetIdx]->loadFile(f);
             loadedSamplePaths.set(targetIdx, f.getFullPathName());
         }
         else
@@ -841,7 +872,7 @@ bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
             juce::File fallback = getSamplesDir().getChildFile(juce::File(samplePath).getFileName());
             if (fallback.existsAsFile())
             {
-                voiceEngines[targetIdx].loadFile(fallback);
+                voiceEngines[targetIdx]->loadFile(fallback);
                 loadedSamplePaths.set(targetIdx, fallback.getFullPathName());
             }
         }
@@ -897,6 +928,35 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
     // Trim to actual active count.
     sequencer.setNumRhythms(n);
 
+    // Populate fixed voice/midi arrays to match n.
+    // Ordering matters: when shrinking, store the new (smaller) count BEFORE destroying
+    // excess slots so the audio thread can't access a slot being reset.  When expanding,
+    // create and prepare slots BEFORE incrementing the count so the audio thread never
+    // sees an uninitialised slot.
+    const int oldN = numActiveRhythms.load(std::memory_order_acquire);
+    if (n < oldN)
+    {
+        numActiveRhythms.store(n, std::memory_order_release);  // decrement first
+        for (int i = n; i < oldN; ++i)
+        {
+            voiceEngines[i].reset();
+            midiEngines[i] = MidiOutputEngine{};
+        }
+    }
+    else
+    {
+        for (int i = oldN; i < n; ++i)
+        {
+            voiceEngines[i] = std::make_unique<VoiceEngine>();
+            if (currentSampleRate > 0 && currentBlockSize > 0)
+            {
+                voiceEngines[i]->prepareToPlay(currentSampleRate, currentBlockSize);
+                midiEngines[i].prepare(currentSampleRate, currentBlockSize);
+            }
+        }
+        numActiveRhythms.store(n, std::memory_order_release);  // increment after slots ready
+    }
+
     // Restore non-APVTS properties and refresh engines.
     for (int i = 0; i < n; ++i)
     {
@@ -906,7 +966,7 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
         r.colourIndex = (int)state.getProperty("r" + juce::String(i) + "_colour", i % 30);
 
         sequencer.updatePattern(i);
-        voiceEngines[i].setParams(r.voiceParams);
+        voiceEngines[i]->setParams(r.voiceParams);
 
         juce::String samplePath = state.getProperty("r" + juce::String(i) + "_sample").toString();
         juce::String sampleData = state.getProperty("r" + juce::String(i) + "_sampleData").toString();
@@ -929,7 +989,7 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
                 juce::File tempFile = tempDir.getChildFile(sampleName);
                 if (tempFile.replaceWithData(mb.getData(), mb.getSize()))
                 {
-                    voiceEngines[i].loadFile(tempFile);
+                    voiceEngines[i]->loadFile(tempFile);
                     loadedSamplePaths.set(i, tempFile.getFullPathName());
                 }
             }
@@ -939,14 +999,14 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
             juce::File f(samplePath);
             if (f.existsAsFile())
             {
-                voiceEngines[i].loadFile(f);
+                voiceEngines[i]->loadFile(f);
             }
             else
             {
                 juce::File fallback = getSamplesDir().getChildFile(juce::File(samplePath).getFileName());
                 if (fallback.existsAsFile())
                 {
-                    voiceEngines[i].loadFile(fallback);
+                    voiceEngines[i]->loadFile(fallback);
                     loadedSamplePaths.set(i, fallback.getFullPathName());
                 }
             }
@@ -1034,6 +1094,30 @@ void PluginProcessor::loadPreset(const juce::File& file)
         const int n = juce::jlimit(1, SequencerEngine::MaxRhythms, root.getNumChildren());
         sequencer.setNumRhythms(n);
 
+        const int oldN2 = numActiveRhythms.load(std::memory_order_acquire);
+        if (n < oldN2)
+        {
+            numActiveRhythms.store(n, std::memory_order_release);
+            for (int i = n; i < oldN2; ++i)
+            {
+                voiceEngines[i].reset();
+                midiEngines[i] = MidiOutputEngine{};
+            }
+        }
+        else
+        {
+            for (int i = oldN2; i < n; ++i)
+            {
+                voiceEngines[i] = std::make_unique<VoiceEngine>();
+                if (currentSampleRate > 0 && currentBlockSize > 0)
+                {
+                    voiceEngines[i]->prepareToPlay(currentSampleRate, currentBlockSize);
+                    midiEngines[i].prepare(currentSampleRate, currentBlockSize);
+                }
+            }
+            numActiveRhythms.store(n, std::memory_order_release);
+        }
+
         for (int i = 0; i < n; ++i)
         {
             auto rTree = root.getChild(i);
@@ -1074,7 +1158,7 @@ void PluginProcessor::loadPreset(const juce::File& file)
                     juce::File tempFile = tempDir.getChildFile(sampleName);
                     if (tempFile.replaceWithData(mb.getData(), mb.getSize()))
                     {
-                        voiceEngines[i].loadFile(tempFile);
+                        voiceEngines[i]->loadFile(tempFile);
                         loadedSamplePaths.set(i, tempFile.getFullPathName());
                     }
                 }
@@ -1084,21 +1168,21 @@ void PluginProcessor::loadPreset(const juce::File& file)
                 juce::File f(samplePath);
                 if (f.existsAsFile())
                 {
-                    voiceEngines[i].loadFile(f);
+                    voiceEngines[i]->loadFile(f);
                 }
                 else
                 {
                     juce::File fallback = getSamplesDir().getChildFile(juce::File(samplePath).getFileName());
                     if (fallback.existsAsFile())
                     {
-                        voiceEngines[i].loadFile(fallback);
+                        voiceEngines[i]->loadFile(fallback);
                         loadedSamplePaths.set(i, fallback.getFullPathName());
                     }
                 }
             }
 
             sequencer.updatePattern(i);
-            voiceEngines[i].setParams(r.voiceParams);
+            voiceEngines[i]->setParams(r.voiceParams);
         }
     }
     else
