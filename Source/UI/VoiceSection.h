@@ -17,6 +17,7 @@ public:
     void setRhythm(int rhythmIndex);
 
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
+    std::function<void(int driveChar)> onInsertAlgorithmChanged;
 
     void resized() override;
     void paint(juce::Graphics&) override;
@@ -58,14 +59,15 @@ private:
     KnobWithLabel  ampSus      { "Sustain", Id::knobLevel    };
     KnobWithLabel  ampRel      { "Release", Id::knobLevel    };
 
-    // ─── DRIVE ──────────────────────────────────────────────────────────
+    // ─── INSERT ─────────────────────────────────────────────────────────
     DropdownSelect driveChar;
     KnobWithLabel  driveDrive  { "Drive",  Id::knobInsertPad };
     KnobWithLabel  driveOutput { "Output", Id::knobInsertPad };
-    KnobWithLabel  driveTone   { "Tone",   Id::knobInsertPad };
+    KnobWithLabel  driveDither { "Dither", Id::knobInsertPad };
+    KnobWithLabel  driveTone   { "LPF",    Id::knobInsertPad };
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();
     void loadFromRhythm();
-    void updateDriveLabels();
+    void configureInsertAlgorithm(int charId);  // sets labels/ranges/callbacks/values per algorithm
 };

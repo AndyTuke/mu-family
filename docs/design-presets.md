@@ -10,11 +10,43 @@
 - Factory demo patch: 2–3 rhythms with euclidean patterns, no samples loaded, sequencer runs but silent
 - New rhythm default: Euclid A with 0 hits, OR logic, no sample, fader at -6dB, no modulators active
 
+## Content Folder (Issues #67–#70)
+
+| Item | Default path (Windows) |
+|---|---|
+| Root | `%USERPROFILE%\Documents\TDP\muClid\` |
+| Full presets | `…\Presets\` |
+| Rhythm presets | `…\Rhythms\` |
+| User samples | `…\Samples\` |
+
+- All three paths are user-changeable in the Settings overlay and persisted in `juce::ApplicationProperties`
+- Folder is created on first launch if missing (no error if creation fails — just warn in log)
+
+## File Extensions
+
+| Type | Extension | Format |
+|---|---|---|
+| Full preset | `.mu` | JUCE ValueTree → XML |
+| Rhythm preset | `.muRhyth` | JUCE ValueTree → XML (single rhythm subtree) |
+
+## Sample Embedding
+
+- Save dialog shows a checkbox **"Embed samples"** (default: off)
+- When checked: each sample is base64-encoded and stored as a `<sample>` child in the XML
+- On load: embedded samples are extracted to a temp directory, then loaded normally
+- When unchecked: samples are stored as absolute paths with a fallback search in the user Samples folder
+
+## Default Preset / Rhythm
+
+- On plugin load: reads `Presets\_default.mu` — restores silently; if missing, creates an empty fresh state (no error)
+- On new rhythm added: reads `Rhythms\_default.muRhyth` — applies silently; if missing, creates a blank rhythm
+- Users can **File → Save as Default** to overwrite `_default.mu` / `_default.muRhyth`
+
 ## Preset Storage
 
-- Patch presets: JUCE ValueTree serialised to XML in user documents folder
-- Rhythm presets: same format, single rhythm subtree
-- Default preset: stored in `juce::ApplicationProperties` / `PropertiesFile` (global, not per-project)
+- Patch presets: JUCE ValueTree serialised to XML in user content folder (`.mu`)
+- Rhythm presets: same format, single rhythm subtree (`.muRhyth`)
+- Default preset: `_default.mu` / `_default.muRhyth` in the respective subfolders
 - Factory presets: shipped with plugin, stored in plugin resources, restorable from Settings
 
 ## Preset Browser (Stage 10)

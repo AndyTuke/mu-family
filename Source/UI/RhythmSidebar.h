@@ -15,6 +15,7 @@ public:
     explicit RhythmSidebar(PluginProcessor& p);
 
     void refreshItems();
+    void repaintItems();
     void setSelectedIndex(int i);
     int  getSelectedIndex() const noexcept { return selectedIndex; }
 

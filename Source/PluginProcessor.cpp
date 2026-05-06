@@ -355,7 +355,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParamValues["insert.drive"]     = modParams.driveDrive;
                 modParamValues["insert.output"]    = modParams.driveOutput;
                 modParamValues["insert.bits"]      = modParams.drvBits;
-                modParamValues["insert.rate"]      = modParams.driveRate;
+                modParamValues["insert.rate"]      = (modParams.driveRate - 100.0f) / (48000.0f - 100.0f) * 100.0f;
                 modParamValues["insert.dither"]    = modParams.drvDither;
                 modParamValues["insert.lpf"]       = modParams.driveTone;
 
@@ -377,7 +377,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParams.driveDrive     = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.drive"]);
                 modParams.driveOutput    = juce::jlimit(-24.0f,  0.0f,    modParamValues["insert.output"]);
                 modParams.drvBits        = juce::jlimit(1.0f,   16.0f,    modParamValues["insert.bits"]);
-                modParams.driveRate      = juce::jlimit(100.0f, 48000.0f, modParamValues["insert.rate"]);
+                modParams.driveRate      = 100.0f + juce::jlimit(0.0f, 100.0f, modParamValues["insert.rate"]) / 100.0f * (48000.0f - 100.0f);
                 modParams.drvDither      = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.dither"]);
                 modParams.driveTone      = juce::jlimit(20.0f, 20000.0f,  modParamValues["insert.lpf"]);
             }
@@ -856,7 +856,7 @@ bool PluginProcessor::applyDefaultRhythm(int rhythmIndex)
 
 void PluginProcessor::loadDefaultPreset()
 {
-    juce::File f = getPresetsDir().getChildFile("_default.mu");
+    juce::File f = getPresetsDir().getChildFile("_default.muclid");
     if (f.existsAsFile())
         loadPreset(f);
 }
@@ -971,29 +971,47 @@ void PluginProcessor::savePreset(const juce::String& name,
                                  bool embedSamples)
 {
     const int n = sequencer.getNumRhythms();
-    auto state = apvts.copyState();
-    populateStateTree(state, n, sequencer, loadedSamplePaths);
-    state.setProperty("presetName",        name,        nullptr);
-    state.setProperty("presetDescription", description, nullptr);
-    state.setProperty("presetCategory",    category,    nullptr);
 
-    if (embedSamples)
+    juce::ValueTree root("MuClidPreset");
+    root.setProperty("presetName",        name,        nullptr);
+    root.setProperty("presetDescription", description, nullptr);
+    root.setProperty("presetCategory",    category,    nullptr);
+
+    for (int i = 0; i < n; ++i)
     {
-        for (int i = 0; i < n; ++i)
+        const Rhythm& r = sequencer.getRhythm(i);
+        juce::ValueTree rTree("Rhythm");
+        rTree.setProperty("name",   juce::String(r.name), nullptr);
+        rTree.setProperty("colour", r.colourIndex,         nullptr);
+        rTree.setProperty("sample", loadedSamplePaths[i],  nullptr);
+
+        const juce::String srcPrefix = "r" + juce::String(i) + "_";
+        for (int j = 0; kRhythmSuffixes[j] != nullptr; ++j)
+        {
+            if (auto* param = apvts.getParameter(srcPrefix + kRhythmSuffixes[j]))
+                rTree.setProperty(kRhythmSuffixes[j], param->getValue(), nullptr);
+        }
+
+        if (embedSamples)
         {
             const juce::String path = loadedSamplePaths[i];
-            if (path.isEmpty()) continue;
-            juce::File f(path);
-            if (!f.existsAsFile()) continue;
-            juce::MemoryBlock mb;
-            if (f.loadFileAsData(mb) && mb.getSize() > 0)
+            if (path.isNotEmpty())
             {
-                state.setProperty("r" + juce::String(i) + "_sampleData",
-                                   juce::Base64::toBase64(mb.getData(), mb.getSize()), nullptr);
-                state.setProperty("r" + juce::String(i) + "_sampleName",
-                                   f.getFileName(), nullptr);
+                juce::File f(path);
+                if (f.existsAsFile())
+                {
+                    juce::MemoryBlock mb;
+                    if (f.loadFileAsData(mb) && mb.getSize() > 0)
+                    {
+                        rTree.setProperty("sampleData",
+                                           juce::Base64::toBase64(mb.getData(), mb.getSize()), nullptr);
+                        rTree.setProperty("sampleName", f.getFileName(), nullptr);
+                    }
+                }
             }
         }
+
+        root.addChild(rTree, -1, nullptr);
     }
 
     auto dir = getPresetsDir();
@@ -1001,16 +1019,91 @@ void PluginProcessor::savePreset(const juce::String& name,
 
     juce::String safeName = name.replaceCharacters("\\/:|*?<>\"", "_________");
     if (safeName.isEmpty()) safeName = "Preset";
-    dir.getChildFile(safeName + ".mu").replaceWithText(state.toXmlString());
+    dir.getChildFile(safeName + ".muclid").replaceWithText(root.toXmlString());
 }
 
 void PluginProcessor::loadPreset(const juce::File& file)
 {
-    if (auto xml = juce::parseXML(file))
+    auto xml = juce::parseXML(file);
+    if (!xml) return;
+    auto root = juce::ValueTree::fromXml(*xml);
+    if (!root.isValid()) return;
+
+    if (root.getType() == juce::Identifier("MuClidPreset"))
     {
-        auto state = juce::ValueTree::fromXml(*xml);
-        if (state.isValid())
-            restoreStateFromTree(state);
+        const int n = juce::jlimit(1, SequencerEngine::MaxRhythms, root.getNumChildren());
+        sequencer.setNumRhythms(n);
+
+        for (int i = 0; i < n; ++i)
+        {
+            auto rTree = root.getChild(i);
+            if (!rTree.isValid()) continue;
+
+            const juce::String dstPrefix = "r" + juce::String(i) + "_";
+            for (int j = 0; kRhythmSuffixes[j] != nullptr; ++j)
+            {
+                juce::Identifier propId { kRhythmSuffixes[j] };
+                if (rTree.hasProperty(propId))
+                    if (auto* param = apvts.getParameter(dstPrefix + kRhythmSuffixes[j]))
+                        param->setValueNotifyingHost((float)rTree.getProperty(propId));
+            }
+
+            Rhythm& r = sequencer.getRhythm(i);
+            auto nameVal = rTree.getProperty("name");
+            if (nameVal.isString() && nameVal.toString().isNotEmpty())
+                r.name = nameVal.toString().toStdString();
+            r.colourIndex = (int)rTree.getProperty("colour", r.colourIndex);
+
+            juce::String sampleData = rTree.getProperty("sampleData").toString();
+            juce::String sampleName = rTree.getProperty("sampleName").toString();
+            juce::String samplePath = rTree.getProperty("sample").toString();
+            loadedSamplePaths.set(i, samplePath);
+
+            if (sampleData.isNotEmpty() && sampleName.isNotEmpty())
+            {
+                juce::MemoryBlock mb;
+                {
+                    juce::MemoryOutputStream mos(mb, false);
+                    juce::Base64::convertFromBase64(mos, sampleData);
+                }
+                if (mb.getSize() > 0)
+                {
+                    juce::File tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                                             .getChildFile("muClid_samples");
+                    tempDir.createDirectory();
+                    juce::File tempFile = tempDir.getChildFile(sampleName);
+                    if (tempFile.replaceWithData(mb.getData(), mb.getSize()))
+                    {
+                        voiceEngines[i].loadFile(tempFile);
+                        loadedSamplePaths.set(i, tempFile.getFullPathName());
+                    }
+                }
+            }
+            else if (samplePath.isNotEmpty())
+            {
+                juce::File f(samplePath);
+                if (f.existsAsFile())
+                {
+                    voiceEngines[i].loadFile(f);
+                }
+                else
+                {
+                    juce::File fallback = getSamplesDir().getChildFile(juce::File(samplePath).getFileName());
+                    if (fallback.existsAsFile())
+                    {
+                        voiceEngines[i].loadFile(fallback);
+                        loadedSamplePaths.set(i, fallback.getFullPathName());
+                    }
+                }
+            }
+
+            sequencer.updatePattern(i);
+            voiceEngines[i].setParams(r.voiceParams);
+        }
+    }
+    else
+    {
+        restoreStateFromTree(root);
     }
 }
 

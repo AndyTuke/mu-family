@@ -27,4 +27,14 @@ public:
                 return p.defaultVal;
         return 0.0f;
     }
+
+    // Send-bus mode: when true, processInner outputs wet-only (no internal dry blend).
+    // Used by EffectSlot since it's wired into the mixer's send/return path; the dry
+    // signal is already in the main bus, so adding it back in via the algorithm's mix
+    // would double the dry component. Default false (for any future insert use).
+    void setSendMode(bool b) noexcept { sendMode = b; }
+    bool isSendMode() const noexcept   { return sendMode; }
+
+protected:
+    bool sendMode = false;
 };

@@ -28,6 +28,7 @@ void EffectSlot::setAlgorithm(int index)
 {
     algorithmIndex = juce::jlimit(0, 3, index);
     algorithm      = makeAlgorithm(algorithmIndex);
+    if (algorithm) algorithm->setSendMode(true); // Issue #44: Effect slot is wired into mixer's send/return — wet-only
 
     if (currentRate > 0.0)
     {

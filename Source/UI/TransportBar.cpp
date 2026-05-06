@@ -49,9 +49,6 @@ TransportBar::TransportBar(PluginProcessor& p)
     };
     addAndMakeVisible(loopDropdown);
 
-    addRhythmBtn.onClick = [this] { if (onAddRhythm) onAddRhythm(); };
-    addAndMakeVisible(addRhythmBtn);
-
     presetDropdown.onChange = [this](int id)
     {
         int idx = id - 1;
@@ -149,7 +146,6 @@ void TransportBar::updateRhythmCount()
     int n = proc.getNumRhythms();
     rhythmCountLabel.setText(juce::String(n) + "/" + juce::String(SequencerEngine::MaxRhythms),
                              juce::dontSendNotification);
-    addRhythmBtn.setEnabled(n < SequencerEngine::MaxRhythms);
 }
 
 void TransportBar::populatePresetDropdown()
@@ -160,7 +156,7 @@ void TransportBar::populatePresetDropdown()
     auto dir = proc.getPresetsDir();
     if (dir.isDirectory())
     {
-        for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*.mu"))
+        for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*.muclid"))
         {
             presetFiles.push_back(f);
             presetDropdown.addItem(f.getFileNameWithoutExtension(), (int)presetFiles.size());
@@ -240,9 +236,6 @@ void TransportBar::resized()
 
     presetDropdown.setBounds(rightEdge - kPresetW, btnY, kPresetW, btnH);
     rightEdge -= kPresetW + kGap;
-
-    addRhythmBtn.setBounds(rightEdge - kAddW, btnY, kAddW, btnH);
-    rightEdge -= kAddW + kGap;
 
     rhythmCountLabel.setBounds(rightEdge - kRhCountW, btnY, kRhCountW, btnH);
 }

@@ -2,18 +2,10 @@
 #include "../PluginProcessor.h"
 
 SettingsOverlay::SettingsOverlay(PluginProcessor& p)
-    : proc(p),
-      isStandalone(p.wrapperType == juce::AudioProcessor::wrapperType_Standalone)
+    : proc(p)
 {
     closeBtn.onClick = [this] { if (onClose) onClose(); };
     addAndMakeVisible(closeBtn);
-
-    if (isStandalone)
-    {
-        defaultBpmInput.setValue((int)proc.getInternalBpm());
-        defaultBpmInput.onChange = [this](int v) { proc.setInternalBpm((double)v); };
-        addAndMakeVisible(defaultBpmInput);
-    }
 
     masterVolKnob.setRange(0.0, 1.0, 0.001);
     if (auto* raw = proc.apvts.getRawParameterValue("mstr_lvl"))
@@ -72,12 +64,6 @@ void SettingsOverlay::resized()
     int y = kHeaderH + kPad;
     const int ctrlW = 120;
 
-    if (isStandalone)
-    {
-        defaultBpmInput.setBounds(kPad, y, ctrlW, kRowH);
-        y += kRowH + kPad;
-    }
-
     masterVolKnob.setBounds(kPad, y, ctrlW, kRowH);
     y += kRowH + kPad * 2;
 
@@ -104,8 +90,7 @@ void SettingsOverlay::paint(juce::Graphics& g)
     g.drawLine(0.0f, (float)kHeaderH, (float)getWidth(), (float)kHeaderH, 0.5f);
 
     // Content folder section heading
-    const int ctrlH = kRowH * (isStandalone ? 2 : 1) + kPad * (isStandalone ? 2 : 1);
-    const int folderY = kHeaderH + kPad + ctrlH + kPad;
+    const int folderY = kHeaderH + kPad + kRowH + kPad * 2;
     g.setColour(MuClidLookAndFeel::colour(Id::labelText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     g.drawText("Content Folder", kPad, folderY - 14, 200, 12,

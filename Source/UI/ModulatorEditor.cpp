@@ -49,11 +49,10 @@ static void populateNoteDropdown(DropdownSelect& dd)
 } // namespace
 
 //==============================================================================
-ModulatorEditor::AssignmentRow::AssignmentRow(const std::string& assignId)
+ModulatorEditor::AssignmentRow::AssignmentRow(const std::string& assignId, int driveChar)
     : id(assignId)
 {
-    for (int i = 0; i < ModDest::ids.size(); ++i)
-        destCombo.addItem(ModDest::labels[i], i + 1);
+    ModDest::populate(destCombo, driveChar);
 
     depthSlider.setSliderStyle(juce::Slider::LinearHorizontal);
     depthSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 44, 18);
@@ -119,6 +118,9 @@ ModulatorEditor::ModulatorEditor()
     stepDropdown.setVisible(false);
     stepMult.setVisible(false);
 
+    rowsViewport.setViewedComponent(&rowsBox, false);
+    rowsViewport.setScrollBarsShown(true, false);
+    addAndMakeVisible(rowsViewport);
     addAndMakeVisible(addBtn);
 
     wireHeader();
@@ -148,6 +150,14 @@ void ModulatorEditor::setData(ControlSequence* cs_, ModulationMatrix* matrix_,
     modIndex       = index;
     stepEditor.setBarColour(modColour);
     loadFromCS();
+    rebuildRows();
+    resized();
+    repaint();
+}
+
+void ModulatorEditor::setInsertAlgorithm(int driveChar)
+{
+    currentDriveChar = driveChar;
     rebuildRows();
     resized();
     repaint();
@@ -328,7 +338,7 @@ void ModulatorEditor::addTarget()
 
 void ModulatorEditor::rebuildRows()
 {
-    for (auto& row : rows) removeChildComponent(row.get());
+    for (auto& row : rows) rowsBox.removeChildComponent(row.get());
     rows.clear();
     if (!cs || !matrix) return;
 
@@ -337,8 +347,8 @@ void ModulatorEditor::rebuildRows()
     {
         if (a.sourceId != sourceKey.toStdString()) continue;
 
-        auto row = std::make_unique<AssignmentRow>(a.id);
-        addAndMakeVisible(*row);
+        auto row = std::make_unique<AssignmentRow>(a.id, currentDriveChar);
+        rowsBox.addAndMakeVisible(*row);
 
         for (int i = 0; i < ModDest::ids.size(); ++i)
             if (ModDest::ids[i].toStdString() == a.destinationId)
@@ -421,13 +431,18 @@ void ModulatorEditor::resized()
     }
 
     y += 4;
+    const int viewportH = juce::jmax(0, getHeight() - y - kAddBtnH - 2);
+    rowsViewport.setBounds(0, y, w, viewportH);
+    const int contentH = juce::jmax(viewportH, (int)rows.size() * (kRowH + 2));
+    rowsBox.setSize(w, contentH);
+    int ry = 0;
     for (auto& row : rows)
     {
-        row->setBounds(0, y, w, kRowH);
-        y += kRowH + 2;
+        row->setBounds(0, ry, w, kRowH);
+        ry += kRowH + 2;
     }
 
-    addBtn.setBounds(0, y, w, kAddBtnH);
+    addBtn.setBounds(0, getHeight() - kAddBtnH, w, kAddBtnH);
 }
 
 void ModulatorEditor::paint(juce::Graphics& g)

@@ -5,6 +5,7 @@
 #include <juce_dsp/juce_dsp.h>
 #include "SamplePlayer.h"
 #include "VoiceParams.h"
+#include "AudioFilters.h"
 
 #include <array>
 #include <atomic>
@@ -52,13 +53,16 @@ private:
     juce::ADSR  filterEnv;
     juce::ADSR  pitchEnv;
     juce::dsp::StateVariableTPTFilter<float> filter;
-    float                    toneFiltState[2] = { 0.0f, 0.0f };
+    OnePoleLP                toneFilter[2];       // 1-pole LP after drive
+    OnePoleLP                bitAaFilter[2];     // Bitcrusher: anti-alias LP before sample-hold
     juce::AudioBuffer<float> tempBuffer;
 
     // Thread-safe param handoff: message thread writes pendingParams under pendingLock
     // and sets paramsDirty; audio thread picks up changes in applyPendingParams().
-    float             accentGain    = 1.0f;  // set on trigger(), applied in process()
-    float             prevDriveX[2] = {};    // pre-gain input from last sample, per channel (ADAA)
+    float             accentGain       = 1.0f;
+    float             prevDriveX[2]    = {};    // per-channel ADAA input state
+    float             bitRateCounter[2] = {};   // Bitcrusher: sample count since last hold update
+    float             bitRateHeld[2]    = {};   // Bitcrusher: quantised held sample value
 
     VoiceParams       pendingParams;
     juce::SpinLock    pendingLock;

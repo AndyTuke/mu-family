@@ -12,6 +12,16 @@ class MixerEngine
 public:
     static constexpr int MaxChannels = 8;
 
+    // Stage 20: fixed −6 dB pre-fader trim on every channel input. Absorbs the
+    // worst-case +18 dB of summing across 8 simultaneous correlated voices and
+    // leaves the master with healthy headroom even on hot, normalised samples.
+    // Trim is invisible to the user — it sits between the voice output and the
+    // (visible) channel fader, so all FX sends and post-fader peaks see the
+    // attenuated signal automatically. Chosen empirically: existing presets
+    // load 6 dB quieter, but a fresh project with a 0 dBFS sample now peaks
+    // around −14 dBFS at the master output (≈ +4 dB on the calibrated VU).
+    static constexpr float kHeadroomTrim = 0.5f;
+
     struct ChannelState
     {
         float level      = 0.75f;   // 0–1 linear fader

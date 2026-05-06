@@ -71,6 +71,14 @@ void RhythmSidebar::layoutItems(bool animate, int newItemIndex)
     }
 }
 
+void RhythmSidebar::repaintItems()
+{
+    for (auto& item : items)
+        item->repaint();
+    itemContainer.repaint();
+    repaint();
+}
+
 void RhythmSidebar::setSelectedIndex(int i)
 {
     selectedIndex = i;

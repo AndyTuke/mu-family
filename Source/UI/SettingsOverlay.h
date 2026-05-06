@@ -21,12 +21,8 @@ public:
 
 private:
     PluginProcessor& proc;
-    const bool isStandalone;
 
     juce::TextButton closeBtn { "Close" };
-
-    // Active: standalone BPM default
-    NudgeInput defaultBpmInput { "Default BPM", 20, 300, 120 };
 
     // Active: master volume knob (reads/writes from APVTS)
     KnobWithLabel masterVolKnob { "Master Vol", MuClidLookAndFeel::knobLevel };

@@ -44,10 +44,9 @@ private:
     ModulatorPanel  modulatorPanel;
     DropdownSelect  midiModeDropdown;
 
-    juce::TextEditor nameEditor;
+    juce::Label      nameLabel;
     juce::TextButton resetBtn  { juce::String::charToString(0x21BA) }; // ↺
     juce::TextButton deleteBtn { juce::String::charToString(0x2715) }; // ✕
-    bool editingName = false;
 
     std::unique_ptr<juce::FileChooser> fileChooser;
     std::map<int, juce::String> loadedSampleNames;
@@ -70,8 +69,7 @@ private:
     void loadSample();
     void refreshCircle();
     juce::Colour currentColour() const;
-    void startEditingName();
-    void finishEditingName(bool save);
+    void commitNameFromLabel();
     void confirmReset();
     void confirmDelete();
     void timerCallback() override;

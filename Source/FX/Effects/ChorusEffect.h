@@ -34,8 +34,8 @@ public:
         const int   numVoices = juce::jlimit(2, MaxVoices, static_cast<int>(voices));
         const float depthSamp = static_cast<float>(depth * 0.02 * sr);
         const float baseSamp  = static_cast<float>(0.03 * sr);  // 30ms base delay
-        const float wet       = mix;
-        const float dry       = 1.0f - mix;
+        const float wet       = sendMode ? 1.0f : mix;
+        const float dry       = sendMode ? 0.0f : 1.0f - mix;
 
         const size_t numSamples  = block.getNumSamples();
         const size_t numChannels = block.getNumChannels();

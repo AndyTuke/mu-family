@@ -18,7 +18,60 @@ These features are confirmed and must be done before Stage 11:
 
 ---
 
+## Completed features
+
+Features shipped during development — kept here for reference.
+
+- Mixer channel faders at 50% of original height
+- Sample file browser remembers and returns to last used file location
+- Filter frequency display: 0–999 Hz as integer Hz; 1–9.99 kHz as x.xx kHz; ≥10 kHz as x.x kHz
+- Delay row redesign: Sync toggle replaced with Free/1/32/1/16/1/8/1/4 dropdown; 3-position Straight/Dotted/Triplet rotary; Free mode hides note/modifier controls and shifts remaining controls left
+- Mixer channel strip send controls match standard knob size
+
+---
+
 ## Unscheduled Ideas
+
+### Preset & Rhythm File System
+
+**Preset format `.mu`** — full plugin state saved as a single file. Two save modes selected at save time:
+- **Link samples** — preset stores absolute or relative paths to sample files; preset file is small (XML/JSON state only); breaks if samples move.
+- **Embed samples** — preset is a single self-contained archive (e.g. ZIP-style container) holding the state + all referenced sample audio data. Larger but portable.
+
+**Rhythm format `.mur`** — single-rhythm export/import. Same embed/link option as `.mu`. Useful for sharing rhythm patches between projects without taking the whole preset.
+
+**Default file locations** — all configurable in the Settings overlay; defaults below assume Windows. macOS equivalent uses `~/Documents/TDP/mu-Clid/...`.
+- Presets: `<My Documents>\TDP\mu-Clid\Presets`
+- Rhythms: `<My Documents>\TDP\mu-Clid\Rhythms`
+- Samples: `<My Documents>\TDP\mu-Clid\Samples` (default browse location for sample loader)
+
+**Auto-loaded defaults**:
+- **`_default.mu`** in the preset folder — loaded on plugin instantiation. User can overwrite this from a Save dialog ("Save as default") to customise the startup state.
+- **`default.mur`** in the rhythm folder — used as the template when a new rhythm slot is added. User can overwrite this similarly.
+
+**Architecture notes**:
+- Existing `PluginProcessor::getStateInformation`/`setStateInformation` already serialises full state; the file format work is mostly serialisation framing + a sample-archive container.
+- `loadedSamplePaths` is a `juce::StringArray` indexed by rhythm; embed mode needs to inline the audio bytes into the archive and rewrite paths on load to point into a temp extraction (or stream from the archive).
+- For `.mu`/`.mur`, prefer JUCE's `ZipFile` + a manifest XML inside, so the format stays inspectable and trivially extensible. Each entry: `manifest.xml` + `samples/<id>.wav` (if embedded).
+- Settings overlay needs three new path fields with browse buttons; all paths created on first run if missing.
+
+### Demo / Distribution
+
+**Demo build** — limited-functionality binary for distribution:
+- Maximum 2 rhythms (vs 8 in full version)
+- Saving disabled (presets and rhythms) — Load is still allowed so users can audition shared patches
+- Built from the same source via a CMake option (`-DMU_CLID_DEMO=ON`) that defines a preprocessor flag; gates `addRhythm` past 2 and disables Save buttons in the UI
+- Splash watermark or About-panel "Demo" badge so users know which version they're on
+
+**Installer** — deployable installer for end users (Windows: NSIS or WiX; macOS: pkg). Installs:
+- VST3 to standard plugin folder (Windows: `Program Files\Common Files\VST3`; macOS: `/Library/Audio/Plug-Ins/VST3`)
+- Standalone executable to Program Files / Applications
+- SoundTouch DLL alongside the VST3 (LGPL ship-as-DLL requirement)
+- Creates default folders under `<My Documents>\TDP\mu-Clid\{Presets,Rhythms,Samples}` and seeds them with stock presets/rhythms (including `_default.mu` and `default.mur`)
+
+### Other ideas
+
+**Sidechain ducking** — every mixer channel (8 rhythm channels + Effect/Delay/Reverb returns + Master) gets a sidechain input selector and an amount knob. The selector chooses any other channel as the trigger source (e.g. channel 2 ducks from channel 1's signal). Amount controls how much the channel's output is attenuated when the sidechain source is active. This allows standard kick-ducking-bass patterns and more creative cross-rhythm gating. Architecture notes: MixerEngine already holds per-channel level values; sidechain detection (peak/RMS with fast attack, variable release) can run after individual channel processing and before the summing bus. Each channel needs a `sidechainSource` index (−1 = off, 0–10 = channel index) and `sidechainAmount` (0–1). No cross-rhythm modulation concern — this is post-voice mixing, not sequencer modulation.
 
 Ability to add additional Euclid sequences with more complex logic
 

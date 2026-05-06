@@ -58,7 +58,7 @@ public:
     HitGenerator        genB;
     HitGenerator        genC;  // accent pattern (full controls: steps/hits/rot + pads + insert)
     Logic               logic       = Logic::OR;
-    std::string         name        = "Rhythm";
+    std::string         name        = "<unnamed>";
     int                 colourIndex = 0;     // index into the 30-colour palette
     std::optional<int>  resetSteps;          // nullopt = INF (free-running)
 

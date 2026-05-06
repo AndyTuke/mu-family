@@ -28,8 +28,8 @@ public:
     {
         const float fb      = feedbackAmt * 0.99f;
         const float outGain = juce::Decibels::decibelsToGain(outputDb);
-        const float wet     = mix;
-        const float dry     = 1.0f - mix;
+        const float wet     = sendMode ? 1.0f : mix;
+        const float dry     = sendMode ? 0.0f : 1.0f - mix;
 
         const size_t numSamples  = block.getNumSamples();
         const size_t numChannels = block.getNumChannels();

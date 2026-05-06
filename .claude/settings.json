@@ -1,17 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cmake --build build --config Debug)",
-      "Bash(git -C d:/Dev/mu-clid status)",
-      "Bash(git -C d:/Dev/mu-clid log --oneline -3)",
-      "Bash(git -C d:/Dev/mu-clid diff Source/Sequencer/Rhythm.cpp Source/Sequencer/SequencerEngine.cpp Source/Sequencer/SequencerEngine.h)",
-      "Bash(git add *)",
-      "Bash(git commit -m ' *)",
-      "Bash(git -C d:/Dev/mu-clid log --oneline)",
-      "Bash(git -C d:/Dev/mu-clid diff --stat HEAD)",
-      "Bash(git -C d:/Dev/mu-clid log --oneline -5)",
-      "Bash(git -C d:/Dev/mu-clid add Source/UI/ CMakeLists.txt)",
-      "Bash(git -C d:/Dev/mu-clid commit -m ' *)"
+      "Bash",
+      "WebFetch",
+      "WebSearch",
+      "PowerShell"
     ]
   },
   "hooks": {
@@ -22,6 +15,13 @@
           {
             "type": "command",
             "command": "python .claude/hooks/post_build_todo.py"
+          },
+          {
+            "type": "command",
+            "shell": "powershell",
+            "if": "Bash(cmake --build *)",
+            "statusMessage": "Copying artifacts to OneDrive Windows folder...",
+            "command": "$data = $input | ConvertFrom-Json; if ($data.tool_response.exitCode -eq 0) { $dst = 'D:\\Andy Tuke\\Music - Music Software\\TDP\\Windows\\'; Copy-Item 'd:\\Dev\\mu-clid\\build\\mu-clid_artefacts\\Debug\\Standalone\\mu-Clid.exe' $dst -Force 2>$null; Copy-Item 'd:\\Dev\\mu-clid\\build\\mu-clid_artefacts\\Debug\\VST3\\mu-Clid.vst3' $dst -Recurse -Force 2>$null; Copy-Item 'd:\\Dev\\mu-clid\\build\\mu-clid_artefacts\\Debug\\CLAP\\mu-Clid.clap' $dst -Force 2>$null }"
           }
         ]
       }

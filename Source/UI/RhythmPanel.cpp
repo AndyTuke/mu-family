@@ -14,13 +14,18 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     midiModeDropdown.setSelectedId(1, false);
     addAndMakeVisible(midiModeDropdown);
 
-    nameEditor.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
-    nameEditor.setJustification(juce::Justification::centredLeft);
-    nameEditor.onReturnKey = [this] { finishEditingName(true);  };
-    nameEditor.onEscapeKey = [this] { finishEditingName(false); };
-    nameEditor.onFocusLost = [this] { finishEditingName(true);  };
-    nameEditor.setVisible(false);
-    addAndMakeVisible(nameEditor);
+    // juce::Label provides bulletproof inline editing: handles single-click to edit,
+    // Enter to commit, Escape to cancel, click-off to commit, focus management — all
+    // natively. Our previous TextEditor + onFocusLost setup was fragile because
+    // onFocusLost only fires when another component grabs keyboard focus, which most
+    // child components in this UI don't do.
+    nameLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
+    nameLabel.setJustificationType(juce::Justification::centredLeft);
+    nameLabel.setColour(juce::Label::textColourId,
+                        MuClidLookAndFeel::colour(MuClidLookAndFeel::ColourIds::headingText));
+    nameLabel.setEditable(true, true, false); // editOnSingleClick, editOnDoubleClick, lossOfFocusDiscardsChanges=false
+    nameLabel.onTextChange = [this] { commitNameFromLabel(); };
+    addAndMakeVisible(nameLabel);
 
     resetBtn.onClick  = [this] { confirmReset();  };
     deleteBtn.onClick = [this] { confirmDelete(); };
@@ -49,24 +54,35 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     {
         if (onStatusUpdate) onStatusUpdate(name, val, currentColour());
     };
+
+    voiceSection.onInsertAlgorithmChanged = [this](int charId)
+    {
+        modulatorPanel.setInsertAlgorithm(charId);
+    };
 }
 
 void RhythmPanel::setRhythm(int index)
 {
-    // Commit any in-progress name edit before switching rhythms so the name
-    // is saved even if the focus-lost event hasn't fired yet.
-    if (editingName)
-        finishEditingName(true);
+    // Commit any in-progress edit (Label::hideEditor with discardChanges=false saves
+    // current text and fires onTextChange synchronously, which writes the rename to
+    // the OLD currentRhythmIndex before we update it).
+    if (nameLabel.getCurrentTextEditor() != nullptr)
+        nameLabel.hideEditor(false);
 
     currentRhythmIndex = index;
     if (index >= 0 && index < proc.getNumRhythms())
     {
+        nameLabel.setText(juce::String(proc.getRhythm(index).name), juce::dontSendNotification);
         euclidPanel.setRhythm(index);
         euclidPanel.setRhythmColour(currentColour());
         voiceSection.setRhythm(index);
         modulatorPanel.setRhythm(&proc.getRhythm(index));
         midiModeDropdown.setSelectedId(proc.getRhythm(index).midiMode ? 2 : 1, false);
         refreshCircle();
+    }
+    else
+    {
+        nameLabel.setText("No Rhythm", juce::dontSendNotification);
     }
     repaint();
 }
@@ -145,12 +161,8 @@ void RhythmPanel::loadSample()
 
 void RhythmPanel::mouseDown(const juce::MouseEvent& e)
 {
-    if (nameRect.contains(e.getPosition()) && !editingName)
-    {
-        startEditingName();
-        return;
-    }
-
+    // Name editing is handled by nameLabel (a child component); we no longer need
+    // the manual nameRect hit-test here.
     const juce::Rectangle<int> sampleBar { 0, kHeaderH, getWidth(), kSampleBarH };
     if (sampleBar.contains(e.getPosition()))
         loadSample();
@@ -166,23 +178,13 @@ void RhythmPanel::paint(juce::Graphics& g)
     // Header
     juce::Colour col = currentColour();
 
+    // Header colour dot + rhythm-colour border around the name area.
+    // Name text itself is rendered by nameLabel (a child component).
     if (currentRhythmIndex >= 0 && currentRhythmIndex < proc.getNumRhythms())
     {
-        const Rhythm& r = proc.getRhythm(currentRhythmIndex);
         g.setColour(col);
         g.fillEllipse(10.0f, (kHeaderH - 10) * 0.5f, 10.0f, 10.0f);
-        if (!editingName)
-        {
-            g.setColour(MuClidLookAndFeel::colour(Id::headingText));
-            g.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
-            g.drawText(juce::String(r.name), nameRect, juce::Justification::centredLeft, true);
-        }
-    }
-    else
-    {
-        g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
-        g.drawText("No Rhythm", nameRect, juce::Justification::centredLeft, true);
+        g.drawRoundedRectangle(nameRect.toFloat().reduced(1.0f), 4.0f, 1.5f);
     }
 
     // Sample bar — content inset from panel outline
@@ -254,7 +256,7 @@ void RhythmPanel::resized()
     const int nameX = 26;
     const int nameEnd = rightEdge - kIconBtnW * 2 - 4 - 6;
     nameRect = { nameX, 0, nameEnd - nameX, kHeaderH };
-    nameEditor.setBounds(nameX, (kHeaderH - 22) / 2, nameEnd - nameX, 22);
+    nameLabel.setBounds(nameRect.reduced(4, 2));
 
     circle.setBounds        (circleRect.reduced(kPanelPad + 1));
     euclidPanel.setBounds   (euclidRect.reduced(kPanelPad + 1));
@@ -263,32 +265,21 @@ void RhythmPanel::resized()
 }
 
 //==============================================================================
-void RhythmPanel::startEditingName()
+// Called by juce::Label when the user finishes editing (Enter, click-off, etc.)
+// Writes the Label's text into the current rhythm and notifies listeners.
+void RhythmPanel::commitNameFromLabel()
 {
     if (currentRhythmIndex < 0 || currentRhythmIndex >= proc.getNumRhythms()) return;
-    editingName = true;
-    editingNameIndex = currentRhythmIndex;
-    nameEditor.setText(juce::String(proc.getRhythm(currentRhythmIndex).name), false);
-    nameEditor.setVisible(true);
-    nameEditor.grabKeyboardFocus();
-    nameEditor.selectAll();
-    repaint();
-}
 
-void RhythmPanel::finishEditingName(bool save)
-{
-    if (!editingName) return;
-    editingName = false;
-    nameEditor.setVisible(false);
-    if (save && editingNameIndex >= 0 && editingNameIndex < proc.getNumRhythms())
+    auto newName = nameLabel.getText().trim();
+    if (newName.isEmpty())
     {
-        auto newName = nameEditor.getText().trim();
-        if (newName.isEmpty())
-            newName = "Rhythm " + juce::String(editingNameIndex + 1);
-        proc.getRhythm(editingNameIndex).name = newName.toStdString();
-        if (onRhythmRenamed) onRhythmRenamed();
+        newName = "<unnamed>";
+        nameLabel.setText(newName, juce::dontSendNotification);
     }
-    repaint();
+
+    proc.getRhythm(currentRhythmIndex).name = newName.toStdString();
+    if (onRhythmRenamed) onRhythmRenamed();
 }
 
 void RhythmPanel::confirmReset()
@@ -313,9 +304,18 @@ void RhythmPanel::confirmReset()
                     auto& r = safeThis->proc.getRhythm(idx);
                     auto savedName   = r.name;
                     auto savedColour = r.colourIndex;
+
+                    // Acquire modLock so the audio thread can't read modulationMatrix /
+                    // controlSequences while operator= replaces them.
+                    bool expected = false;
+                    while (!r.modLock.compare_exchange_weak(expected, true,
+                                                            std::memory_order_acquire))
+                        expected = false;
                     r = Rhythm{};
                     r.name        = savedName;
                     r.colourIndex = savedColour;
+                    r.modLock.store(false, std::memory_order_release);
+
                     safeThis->proc.updatePattern(idx);
                     safeThis->setRhythm(idx);
                 }

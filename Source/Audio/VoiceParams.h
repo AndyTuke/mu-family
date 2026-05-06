@@ -23,15 +23,27 @@ struct VoiceParams
     float filterEnvDepth = 0.0f;     // semitones of cutoff sweep, 0..48
 
     // ─── Amp ─────────────────────────────────────────────────────────────
-    float ampLevel  = 1.0f;          // 0..2
+    float ampLevel  = 0.5f;          // 0..2  (Stage 19: −6 dB default for 6 dB headroom budget per voice)
     float ampEnvAtk = 0.005f;
     float ampEnvDec = 0.3f;
     float ampEnvSus = 0.8f;
     float ampEnvRel = 0.5f;
 
-    // ─── Drive (insert after filter, before amp) ──────────────────────────
-    int   driveChar   = 0;           // 0=Soft, 1=Hard, 2=Fold, 3=Bit
-    float driveDrive  = 0.0f;        // 0..100%  (0 = unity through all characters)
-    float driveOutput = 0.0f;        // -24..0 dB
-    float driveTone   = 20000.0f;    // 20..20000 Hz (LP after drive; 20kHz = flat)
+    // ─── Drive / Insert (after filter, before amp) ───────────────────────
+    int   driveChar   = 0;           // 0=None, 1=Soft, 2=Hard, 3=Fold, 4=Bitcrusher
+    // Soft / Hard / Fold params:
+    float driveDrive  = 0.0f;        // 0..100% input drive
+    float driveOutput = 0.0f;        // -24..0 dB output level
+    // Bitcrusher params:
+    float drvBits     = 16.0f;       // 1..16 bit depth
+    float driveRate   = 48000.0f;    // 100..48000 Hz target sample rate (48000 = no reduction)
+    float drvDither   = 0.0f;        // 0..100% TPDF dither amount
+    // Shared:
+    float driveTone   = 20000.0f;    // 20..20000 Hz (1-pole LP post-drive; 20kHz = flat)
+
+    // ─── Accent ──────────────────────────────────────────────────────────
+    float accentDb    = 0.0f;        // 0..12 dB boost applied to accented steps
+
+    // ─── Modulation scratchpad (audio thread only, not persisted) ────────
+    float pitchMod    = 0.0f;        // semitone offset added by modulators, -24..+24
 };

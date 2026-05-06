@@ -32,8 +32,8 @@ public:
                                         static_cast<int>(timeMs * 0.001 * sr));
         const int delayR = juce::jlimit(1, MaxDelaySamples - 1,
                                         static_cast<int>(timeMs * 0.001 * sr * (1.0f + spread * 0.1f)));
-        const float wet = mix;
-        const float dry = 1.0f - mix;
+        const float wet = sendMode ? 1.0f : mix;
+        const float dry = sendMode ? 0.0f : 1.0f - mix;
         const float fb  = feedback;
 
         const size_t numSamples  = block.getNumSamples();

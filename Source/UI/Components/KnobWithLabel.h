@@ -22,9 +22,14 @@ public:
     void resized() override;
     void paint(juce::Graphics& g) override;
     void mouseEnter(const juce::MouseEvent& e) override;
+    void mouseDoubleClick(const juce::MouseEvent& e) override;
 
 private:
     juce::Slider slider;
     juce::String labelText;
     MuClidLookAndFeel::ColourIds knobColour;
+
+    std::unique_ptr<juce::TextEditor> inlineEditor;
+
+    void showInlineEditor();
 };

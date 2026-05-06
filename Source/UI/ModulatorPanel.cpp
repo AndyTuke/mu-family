@@ -37,6 +37,13 @@ void ModulatorPanel::showTab(int idx)
     matrixPanel.setVisible(idx == kNumMods);
 }
 
+void ModulatorPanel::setInsertAlgorithm(int driveChar)
+{
+    for (auto& e : editors)
+        e.setInsertAlgorithm(driveChar);
+    matrixPanel.setInsertAlgorithm(driveChar);
+}
+
 void ModulatorPanel::setPlayheadBeat(double beat)
 {
     if (activeTab < kNumMods)

@@ -35,8 +35,8 @@ public:
         // the dry delay (through-zero), eliminating the comb at lfoVal=0.
         const float baseSamp = static_cast<float>(5.25 * 0.001 * sr);
         const float depSamp  = baseSamp * depth;
-        const float wet      = mix;
-        const float dry      = 1.0f - mix;
+        const float wet      = sendMode ? 1.0f : mix;
+        const float dry      = sendMode ? 0.0f : 1.0f - mix;
         const float fb       = feedback;   // already scaled to ±0.95 in setParam
 
         const size_t numSamples  = block.getNumSamples();

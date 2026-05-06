@@ -13,7 +13,6 @@ public:
 
     std::function<void()>                      onMixerToggle;
     std::function<void()>                      onLogoClicked;
-    std::function<void()>                      onAddRhythm;
     std::function<void(const juce::File&)>     onPresetSelected;
     std::function<void()>                      onSavePreset;
     std::function<void()>                      onSettingsToggle;
@@ -34,8 +33,8 @@ private:
 
     juce::Label      posLabel;
     juce::Label      rhythmCountLabel;
+    juce::Label      loopLabel;
     DropdownSelect   loopDropdown;
-    juce::TextButton addRhythmBtn { "+" };
     DropdownSelect   presetDropdown;
     juce::TextButton saveBtn  { "Save" };
     juce::TextButton gearBtn;
@@ -46,8 +45,8 @@ private:
     static constexpr int kBpmW      = 120;
     static constexpr int kPosW      = 80;
     static constexpr int kRhCountW  = 36;
-    static constexpr int kLoopW     = 100;
-    static constexpr int kAddW      = 28;
+    static constexpr int kLoopLabelW = 36;
+    static constexpr int kLoopW      = 100;
     static constexpr int kPresetW   = 140;
     static constexpr int kSaveW     = 44;
     static constexpr int kGearW     = 28;

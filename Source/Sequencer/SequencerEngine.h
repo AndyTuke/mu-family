@@ -4,6 +4,12 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <array>
 
+struct BlockResult
+{
+    int firedMask  = 0;  // bit N set = rhythm N fired a hit this block
+    int accentMask = 0;  // bit N set = that hit was accented (Ring C coincidence)
+};
+
 class SequencerEngine : public juce::ChangeBroadcaster
 {
 public:
@@ -26,7 +32,7 @@ public:
 
     // UI read-only accessors (safe to call from message thread after processBlock).
     int getLastStepIndex(int r) const { return lastStepIndex[r]; }
-    int getPatternLength (int r) const { return static_cast<int>(cachedPatterns[r].size()); }
+    int getPatternLength (int r) const { return static_cast<int>(safePatterns[r].size()); }
 
     // Master loop length (0 = free-running, >0 = all rhythms reset to step 0 at this boundary).
     void setMasterLoopSteps(int steps) { masterLoopSteps = juce::jlimit(0, 256, steps); }
@@ -34,12 +40,24 @@ public:
 
     // Call from processBlock on the audio thread.
     // beatPosition is the current song position in beats (ppq).
-    // Returns a bitmask of rhythms that fired a hit this block (bit 0 = rhythm 0, etc.).
-    int processBlock(double beatPosition);
+    BlockResult processBlock(double beatPosition);
 
 private:
     std::array<Rhythm,            MaxRhythms> rhythms;
+
+    // Message-thread authoritative copies. Written under patternLock.
     std::array<std::vector<bool>, MaxRhythms> cachedPatterns;
+    std::array<std::vector<bool>, MaxRhythms> cachedCPatterns;
+
+    // Audio-thread read buffers. Snapshotted from cached* under patternLock at the
+    // start of each processBlock(). Only the audio thread reads from these after snapshot.
+    std::array<std::vector<bool>, MaxRhythms> safePatterns;
+    std::array<std::vector<bool>, MaxRhythms> safeCPatterns;
+
+    // Guards cachedPatterns, cachedCPatterns, and patternUpdated.
+    // Message thread: spin-wait to acquire. Audio thread: try-lock only (non-blocking).
+    std::atomic<bool>            patternLock { false };
+
     std::array<int,               MaxRhythms> lastStepIndex;
     std::array<bool,              MaxRhythms> patternUpdated{};
     int numRhythms      = 0;

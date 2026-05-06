@@ -14,6 +14,7 @@ public:
     ModulatorPanel();
 
     void setRhythm(Rhythm* r);
+    void setInsertAlgorithm(int driveChar);
 
     // Drive the modulator playhead from the current song beat position.
     void setPlayheadBeat(double beat);

@@ -21,7 +21,26 @@ MIDI mode bypasses the voice chain entirely. Hit event → MidiOutputEngine → 
 | Resonant filter | Type (LP/HP/BP/notch), cutoff, resonance | `juce::dsp::StateVariableTPTFilter` |
 | Filter ADSR | Attack, decay, sustain, release, depth, retrigger mode | Depth controls sweep above base cutoff. Default Reset. |
 | Drive | Character (Soft/Hard/Fold/Bit), drive amount, output trim, tone filter | Placed after filter, before amp. See Drive section below. |
-| Amplitude ADSR | Attack, decay, sustain, release, retrigger mode (Reset/Legato) | Reset: retriggers from zero. Legato: retriggers from current level. Default Reset. |
+| Amplitude ADSR | Attack, decay, sustain, release, retrigger mode (Reset/Legato), accent | Reset: retriggers from zero. Legato: retriggers from current level. Default Reset. Accent boost applied when step is accented (see below). |
+
+## Accent
+
+A step is **accented** when the Ring C (Euclid C) pattern fires a hit on the same step as a Ring A+B hit. The accent flag is passed from `SequencerEngine` to `VoiceEngine` alongside the normal hit event.
+
+**Accent boost parameter:**
+
+| Parameter | Range | Default | Notes |
+|---|---|---|---|
+| Accent | 0–+12 dB | 0 dB | Additional gain applied to accented steps only |
+
+**Signal path:** The accent boost is applied as a scalar gain multiplier at the start of the Amplitude ADSR stage — before the ADSR envelope shape is applied. This means the accent raises the peak level of the voice without altering the envelope shape. A 0 dB accent = unity (no change). +6 dB = approximately double the loudness of non-accented steps.
+
+**Implementation:** `VoiceEngine::triggerVoice()` receives an `isAccented` bool. When true, the amplitude gain for that voice is multiplied by `juce::Decibels::decibelsToGain(accentDb)` before the ADSR processes.
+
+**APVTS param per rhythm:**
+```
+accentDb  — float  0–12 dB, default 0
+```
 
 ## Drive Stage
 

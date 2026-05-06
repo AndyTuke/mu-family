@@ -34,7 +34,8 @@ private:
     bool          selected = false;
 
     PluginProcessor::RhythmPlayState* playState = nullptr;
-    float pulseAlpha = 0.0f;
+    float pulseAlpha   = 0.0f;
+    int   lastHitCount = 0;  // Issue #43: edge-detect against playState->hitCount
 
     RhythmCircle miniCircle;
 

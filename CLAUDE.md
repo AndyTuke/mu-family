@@ -77,7 +77,7 @@ All work below resolves open issues from [Issues.md](Issues.md). Issues are refe
 | Stage | Status | Scope | Issues |
 |---|---|---|---|
 | 21 | Pending | **Meter mode toggle (polish)** — Peak / VU / K-12 / K-14 modes per [K-system convention](https://www.kvraudio.com/forum/viewtopic.php?t=359651). "Peak" = current behaviour (0 dBFS = top), "VU" = Stage 18 calibration, K-12/K-14 for mastering workflows. Optional stereo correlation meter alongside master. | (polish) |
-| 22 | ✅ Done | **Preset system** — content folder at `%USERPROFILE%\Documents\TDP\muClid` (Presets / Rhythms / Samples); path user-configurable in Settings overlay via `PropertiesFile`. Preset extension `.mu`, rhythm preset `.muRhyth`. SaveDialog "Embed samples" checkbox (base64 into XML); load falls back to Samples folder. `_default.mu` loaded silently on startup; `_default.muRhyth` applied when a new rhythm is added. | #67 #68 #69 #70 |
+| 22 | ✅ Done | **Preset system** — content folder at `%USERPROFILE%\Documents\TDP\muClid` (Presets / Rhythms / Samples); path user-configurable in Settings overlay via `PropertiesFile`. Preset extension `.muclid` (changed from `.mu` in #87), rhythm preset `.muRhyth`. SaveDialog "Embed samples" checkbox (base64 into XML); load falls back to Samples folder. `_default.muclid` loaded silently on startup; `_default.muRhyth` applied when a new rhythm is added. Preset file structure is a container of 1–8 `Rhythm` subtrees (#88); legacy flat format still loads via fallback. | #67 #68 #69 #70 #87 #88 |
 
 
 ## Source layout (actual, as built)

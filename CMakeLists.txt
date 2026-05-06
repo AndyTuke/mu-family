@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 project(mu-clid VERSION 1.0.0)
 
 add_subdirectory($ENV{JUCE_PATH} JUCE)
+add_subdirectory(ThirdParty/clap-juce-extensions)
 
 juce_add_plugin(mu-clid
     COMPANY_NAME "Transwarp Development Project"
@@ -16,6 +17,7 @@ juce_add_plugin(mu-clid
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
 )
+
 
 target_sources(mu-clid
     PRIVATE
@@ -34,7 +36,6 @@ target_sources(mu-clid
         Source/UI/Components/KnobWithLabel.cpp
         Source/UI/Components/SegmentControl.cpp
         Source/UI/Components/NudgeInput.cpp
-        Source/UI/Components/TimeSelector.cpp
         Source/UI/Components/DropdownSelect.cpp
         Source/UI/Components/StepEditor.cpp
         Source/UI/Components/LFOEditor.cpp
@@ -66,6 +67,12 @@ target_sources(mu-clid
         Source/UI/SettingsOverlay.cpp
 )
 
+target_include_directories(mu-clid
+    SYSTEM PRIVATE
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+)
+
 target_compile_definitions(mu-clid
     PUBLIC
         JUCE_WEB_BROWSER=0
@@ -94,3 +101,7 @@ add_custom_target(increment_build_number ALL
     VERBATIM
 )
 add_dependencies(mu-clid increment_build_number)
+
+clap_juce_extensions_plugin(TARGET mu-clid
+    CLAP_ID "com.transwarp.mu-clid"
+    CLAP_FEATURES instrument sampler drum-machine)

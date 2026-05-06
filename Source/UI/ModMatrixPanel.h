@@ -13,6 +13,7 @@ public:
     ModMatrixPanel();
 
     void setRhythm(Rhythm* r);
+    void setInsertAlgorithm(int driveChar);
     void refresh();
 
     std::function<void()> onChange;
@@ -35,12 +36,13 @@ private:
         std::function<void(const std::string& dest)>  onDestChange;
         std::function<void(float depth)>              onDepthChange;
 
-        MatrixRow(const ModulationAssignment& a, int csIndex);
+        MatrixRow(const ModulationAssignment& a, int csIndex, int driveChar);
         void resized() override;
     };
 
     std::vector<std::unique_ptr<MatrixRow>> matrixRows;
     AddButton addBtn { "Assignment" };
+    int currentDriveChar = 0;
 
     static constexpr int kHeaderH = 20;
     static constexpr int kRowH    = 26;

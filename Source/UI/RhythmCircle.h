@@ -20,7 +20,7 @@ public:
                      const std::vector<StepType>& patC = {});
 
     // Connect to PluginProcessor play-state atomics for self-driven animation.
-    // state is non-const because the UI clears hitFired after reading.
+    // state is non-const so we can update lastHitCount tracking (Issue #43).
     void setPlayState(PluginProcessor::RhythmPlayState*  state,
                       const juce::Atomic<float>*          beatFrac,
                       const juce::Atomic<bool>*            playing,
@@ -57,6 +57,7 @@ private:
     std::array<ArcPulse, kMaxPulses> arcPulses;
     int   nextPulse    = 0;
     float hubAlpha     = 0.0f;
+    int   lastHitCount = 0;  // Issue #43: edge-detect against playState->hitCount
 
     void triggerHitPulse(int combinedStep, int stepsA);
 
@@ -66,8 +67,7 @@ private:
                   float outerR, float innerR,
                   juce::Colour hitClr,
                   int currentStep,
-                  float rotOff,
-                  bool dashed = false) const;
+                  float rotOff) const;
 
     static juce::Colour stepColour(StepType t, juce::Colour hitClr, bool isCurrent);
 };

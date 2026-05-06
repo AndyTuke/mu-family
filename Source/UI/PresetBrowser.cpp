@@ -29,7 +29,7 @@ void PresetBrowser::refresh(const juce::File& dir)
 
     if (dir.isDirectory())
     {
-        for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*.mu"))
+        for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*.muclid"))
         {
             PresetInfo info;
             info.file = f;

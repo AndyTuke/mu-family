@@ -60,14 +60,14 @@ DelayRow::DelayRow()
     modifierSegment.onChange = [this](int) { fireSyncParams(); };
     addAndMakeVisible(modifierSegment);
 
-    countKnob.setRange(1.0, 8.0, 1.0);
-    countKnob.setValue(1.0, juce::dontSendNotification);
-    countKnob.onValueChanged = [this](double) { fireSyncParams(); };
-    countKnob.onStatusUpdate = [this](const juce::String& n, const juce::String& v)
+    multipleKnob.setRange(1.0, 8.0, 1.0);
+    multipleKnob.setValue(1.0, juce::dontSendNotification);
+    multipleKnob.onValueChanged = [this](double) { fireSyncParams(); };
+    multipleKnob.onStatusUpdate = [this](const juce::String& n, const juce::String& v)
     {
         if (onStatusUpdate) onStatusUpdate(n, v);
     };
-    addAndMakeVisible(countKnob);
+    addAndMakeVisible(multipleKnob);
 
     msKnob.setRange(1.0, 4000.0, 1.0);
     msKnob.setValue(250.0, juce::dontSendNotification);
@@ -147,7 +147,7 @@ void DelayRow::setSyncParams(int denominator, bool dotted, bool triplet, int cou
 {
     modeDropdown.setSelectedId(denomToDropdownId(denominator), false);
     modifierSegment.setSelectedIndex(dotted ? 1 : triplet ? 2 : 0, false);
-    countKnob.setValue(static_cast<double>(count), juce::dontSendNotification);
+    multipleKnob.setValue(static_cast<double>(count), juce::dontSendNotification);
 }
 
 void DelayRow::setFeedback(float v) { feedbackKnob.setValue(v * 100.0, juce::dontSendNotification); }
@@ -157,7 +157,7 @@ void DelayRow::setDirt(float v)     { dirtKnob.setValue(v * 100.0, juce::dontSen
 void DelayRow::updateModeVisibility()
 {
     modifierSegment.setVisible(syncMode);
-    countKnob      .setVisible(syncMode);
+    multipleKnob      .setVisible(syncMode);
     msKnob         .setVisible(!syncMode);
     resized();
     repaint();
@@ -171,7 +171,7 @@ void DelayRow::fireSyncParams()
     const int mod         = modifierSegment.getSelectedIndex();
     const bool dotted     = (mod == 1);
     const bool triplet    = (mod == 2);
-    const int count       = juce::jmax(1, static_cast<int>(countKnob.getValue()));
+    const int count       = juce::jmax(1, static_cast<int>(multipleKnob.getValue()));
     onSyncParamChanged(denominator, dotted, triplet, count);
 }
 
@@ -184,16 +184,21 @@ void DelayRow::resized()
     x += kToggleW + kPad;
     x += kNameW + kPad;  // name label is drawn, not a component
 
-    modeDropdown.setBounds(x, (h - 24) / 2, kDropdownW, 24);
-    x += kDropdownW + kPad;
-
     if (syncMode)
     {
-        modifierSegment.setBounds(x, (h - 24) / 2, kModifierW, 24);  x += kModifierW + kPad;
-        countKnob      .setBounds(x, 0,             kCountW,    h);   x += kCountW    + kPad;
+        // Dropdown and modifier stacked vertically in the same column
+        const int colH = 24 + kPad + 24;
+        const int colY = (h - colH) / 2;
+        modeDropdown   .setBounds(x, colY,              kDropdownW, 24);
+        modifierSegment.setBounds(x, colY + 24 + kPad,  kDropdownW, 24);
+        x += kDropdownW + kPad;
+        multipleKnob   .setBounds(x, 0, kKnobW, h);
+        x += kKnobW + kPad;
     }
     else
     {
+        modeDropdown.setBounds(x, (h - 24) / 2, kDropdownW, 24);
+        x += kDropdownW + kPad;
         msKnob.setBounds(x, 0, kMsW, h);
         x += kMsW + kPad;
     }

@@ -88,7 +88,79 @@ The Effect slot hosts modulation and time-based algorithms only:
 
 Reverb has **no mix knob** — it is always a pure send. Shimmer removed from v1 (requires pitch shifting in feedback loop — v2 feature).
 
-**Current implementation (Stage 8):** All four reverb algorithms use `juce::Reverb` (Freeverb) as a placeholder. Algorithm selection applies parameter presets that bias size/damp/diffusion/pre-delay for different characters. Replace with Signalsmith Reverb (MIT, header-only) in a future stage — `ReverbSlot` is self-contained and the swap requires only changes inside that class.
+**Current implementation (Stage 8):** All four reverb algorithms use `juce::Reverb` (Freeverb) as a placeholder. Algorithm selection applies parameter presets that bias size/damp/diffusion/pre-delay for different characters. Replace with Signalsmith Reverb (MIT, header-only) in Stage 15 — `ReverbSlot` is self-contained and the swap requires only changes inside that class.
+
+### Stage 15: Signalsmith Reverb Integration Plan
+
+**Library acquisition (manual step required):**
+The reverb is in the `signalsmith-audio/basics` repo — **not** `signalsmith-audio/dsp`.
+
+```
+git clone https://github.com/Signalsmith-Audio/basics.git ThirdParty/signalsmith-basics
+```
+
+Headers needed (both required):
+- `include/signalsmith-basics/reverb.h` — the reverb effect
+- `include/stfx/stfx-library.h` — the LibraryEffect wrapper (reverb.h depends on it)
+
+The repo also contains `chorus.h` and `freq-shifter.h` — candidates for future effect upgrades (Stage 17+).
+
+**CMakeLists.txt change** — add before `target_sources`:
+```cmake
+target_include_directories(mu-clid PRIVATE ThirdParty/signalsmith-basics/include)
+```
+
+**Include in ReverbSlot.h:**
+```cpp
+#include "signalsmith-basics/reverb.h"
+```
+
+**Class to use:** `ReverbFloat` (= `stfx::LibraryEffect<float, ReverbSTFX>`)
+
+**Real API (verified from source):**
+
+```cpp
+// Member — replace juce::Reverb in ReverbSlot
+ReverbFloat ssReverb;
+
+// prepare() — configure for current sample rate and block size
+ssReverb.configure(sampleRate, maxBlockSize, 2 /*channels*/);
+
+// process() — inputs/outputs use [channel][sample] indexing
+// Wrap juce::AudioBuffer<float> with a thin adaptor:
+struct JuceBufferAdaptor {
+    juce::AudioBuffer<float>& buf;
+    float* operator[](int ch) { return buf.getWritePointer(ch); }
+};
+JuceBufferAdaptor io { buffer };
+ssReverb.process(io, io, numSamples);
+
+// reset() — clears internal buffers
+ssReverb.reset();
+```
+
+Parameters are public members assigned directly. They fade to the new value over ~20ms internally — no manual smoothing needed in ReverbSlot.
+
+**Parameter names and algorithm presets:**
+
+| Member | Range | Room | Hall | Plate | Spring |
+|---|---|---|---|---|---|
+| `ssReverb.roomMs` | 10–200 | 80 | 180 | 50 | 120 |
+| `ssReverb.rt20` | 0.01–30 s | 1.2 | 3.5 | 2.0 | 1.8 |
+| `ssReverb.early` | 0–2.5 | 1.0 | 1.2 | 1.8 | 0.6 |
+| `ssReverb.detune` | 0–50 | 5 | 15 | 8 | 20 |
+| `ssReverb.highCutHz` | 1000–20000 | 6000 | 5000 | 8000 | 3500 |
+| `ssReverb.highDampRate` | 1–10 | 3 | 4 | 2 | 6 |
+| `ssReverb.wet` | 0–1 | 1.0 | 1.0 | 1.0 | 1.0 |
+| `ssReverb.dry` | 0–1 | 0.0 | 0.0 | 0.0 | 0.0 |
+
+The UI params (Size, Decay, Diffusion, Damp, Mod) map to `roomMs`, `rt20`, `early`, `highCutHz`/`highDampRate`, and `detune` respectively.
+
+The existing `dirt` (tanh pre-saturation) and pre-delay buffer in `ReverbSlot` sit before the Signalsmith call — keep both as-is.
+
+Spring character: add a 4-stage first-order allpass dispersion chain (poles at 200/400/800/1600 Hz) before the reverb input to simulate frequency-dependent propagation speed of a physical spring coil.
+
+**Reference:** Geraint Luff's walkthrough: `signalsmith-audio.co.uk/writing/2021/lets-write-a-reverb/`
 
 **Pre-delay buffer:** `ReverbSlot` pre-allocates ~100ms of pre-delay buffer (`MaxPreDelaySamples = 192000 / 10`). Pre-delay is applied before the reverb algorithm. Dirt (mild `tanh` saturation) is applied before the reverb for warmth.
 

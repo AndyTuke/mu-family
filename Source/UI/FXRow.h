@@ -26,6 +26,10 @@ public:
     void setSelectedAlgorithm(int index, juce::NotificationType n = juce::dontSendNotification);
     void setParamValue(const juce::String& id, float value);
 
+    // Hide a parameter from the UI (e.g. "mix" when this row drives a send/return slot).
+    // Call before setSelectedAlgorithm() / when the row is first wired up.
+    void hideParameter(const juce::String& id);
+
     void resized() override;
     void paint(juce::Graphics& g) override;
 
@@ -42,6 +46,7 @@ private:
 
     int currentAlgorithm = 0;
     bool isEnabled       = true;
+    juce::StringArray hiddenParamIds;
 
     static constexpr int kToggleW   = 36;
     static constexpr int kNameW     = 60;

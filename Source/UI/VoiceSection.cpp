@@ -9,7 +9,7 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
                      &filterAtk, &filterDec, &filterSus, &filterRel, &filterDepth,
                      &ampLevel, &ampSendEff, &ampSendDly, &ampSendRev, &ampAccent,
                      &ampAtk, &ampDec, &ampSus, &ampRel,
-                     &driveDrive, &driveOutput, &driveTone })
+                     &driveDrive, &driveOutput, &driveDither, &driveTone })
         addAndMakeVisible(k);
 
     // Filter type dropdown — IDs are 1-based; filterType index = selectedId - 1.
@@ -19,11 +19,12 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     filterType.setSelectedId(1, false);
     addAndMakeVisible(filterType);
 
-    // Drive character dropdown
-    driveChar.addItem("Soft", 1);
-    driveChar.addItem("Hard", 2);
-    driveChar.addItem("Fold", 3);
-    driveChar.addItem("Bit",  4);
+    // Drive character dropdown — id=1 maps to driveChar=0 (None), id=5 maps to driveChar=4 (Bit)
+    driveChar.addItem("None", 1);
+    driveChar.addItem("Soft", 2);
+    driveChar.addItem("Hard", 3);
+    driveChar.addItem("Fold", 4);
+    driveChar.addItem("Bitcrusher", 5);
     driveChar.setSelectedId(1, false);
     addAndMakeVisible(driveChar);
 
@@ -46,7 +47,7 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     filterRel   .setRange(0.0,  100.0,  0.1);   filterRel  .setValue(3.0);
     filterDepth .setRange(0.0,   48.0,  0.1);   filterDepth.setValue(0.0);
 
-    ampLevel  .setRange(0.0, 2.0,   0.01);  ampLevel  .setValue(1.0);
+    ampLevel  .setRange(0.0, 2.0,   0.01);  ampLevel  .setValue(0.5);  // Stage 19: −6 dB default
     ampSendEff.setRange(0.0, 1.0,  0.01);  ampSendEff.setValue(0.0);
     ampSendDly.setRange(0.0, 1.0,  0.01);  ampSendDly.setValue(0.0);
     ampSendRev.setRange(0.0, 1.0,  0.01);  ampSendRev.setValue(0.0);
@@ -56,9 +57,11 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     ampSus  .setRange(0.0, 100.0, 0.1);    ampSus .setValue(80.0);
     ampRel  .setRange(0.0, 100.0, 0.1);    ampRel .setValue(5.0);
 
-    driveDrive .setRange(0.0,    100.0, 0.1);   driveDrive .setValue(0.0);
-    driveOutput.setRange(-24.0,    0.0, 0.1);   driveOutput.setValue(0.0);
-    driveTone  .setRange(20.0,  20000.0, 1.0);  driveTone  .setValue(20000.0);
+    // Insert knob ranges set dynamically by configureInsertAlgorithm(); defaults for Soft/Hard/Fold.
+    driveDrive .setRange(0.0,   100.0, 0.1);   driveDrive .setValue(0.0);
+    driveOutput.setRange(-24.0,   0.0, 0.1);   driveOutput.setValue(0.0);
+    driveDither.setRange(0.0,   100.0, 0.1);   driveDither.setValue(0.0);
+    driveTone  .setRange(20.0, 20000.0, 1.0);  driveTone  .setValue(20000.0);
 
     wireCallbacks();
 }
@@ -71,8 +74,58 @@ void VoiceSection::apvtsSet(const char* suffix, float v)
         p->setValueNotifyingHost(p->convertTo0to1(v));
 }
 
+// Converts 0-100 slider value to time string: 1-999 ms (integer) or 1.0-10.0 s (1 dp).
+static juce::String formatAdsrTime(double v)
+{
+    double ms = std::max(1.0, v * 100.0);
+    if (ms < 1000.0)
+        return juce::String((int)std::round(ms)) + " ms";
+    return juce::String(ms / 1000.0, 1) + " s";
+}
+
+static double parseAdsrTime(const juce::String& s)
+{
+    auto t = s.trim().toLowerCase();
+    if (t.endsWith("ms"))
+        return t.dropLastCharacters(2).trim().getDoubleValue() / 100.0;
+    if (t.endsWith("s"))
+        return t.dropLastCharacters(1).trim().getDoubleValue() * 10.0;
+    // Bare number: assume milliseconds (120 → 120 ms → slider value 1.2)
+    return t.getDoubleValue() / 100.0;
+}
+
 void VoiceSection::wireCallbacks()
 {
+    // Envelope time/sustain display formatters
+    for (auto* k : { &pitchAtk, &pitchDec, &pitchRel,
+                     &filterAtk, &filterDec, &filterRel,
+                     &ampAtk, &ampDec, &ampRel })
+    {
+        k->getSlider().textFromValueFunction = [](double v) { return formatAdsrTime(v); };
+        k->getSlider().valueFromTextFunction = [](const juce::String& s) { return parseAdsrTime(s); };
+    }
+    for (auto* k : { &pitchSus, &filterSus, &ampSus })
+    {
+        k->getSlider().textFromValueFunction = [](double v) -> juce::String {
+            return juce::String((int)std::round(v)) + "%";
+        };
+        k->getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
+            return s.trim().dropLastCharacters(s.endsWith("%") ? 1 : 0).trim().getDoubleValue();
+        };
+    }
+
+    // Filter cutoff Hz/kHz display
+    filterCutoff.getSlider().textFromValueFunction = [](double v) -> juce::String {
+        if (v < 1000.0) return juce::String((int)std::round(v)) + " Hz";
+        return juce::String(v / 1000.0, 1) + " kHz";
+    };
+    filterCutoff.getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
+        auto t = s.trim().toLowerCase();
+        if (t.endsWith("khz")) return t.dropLastCharacters(3).trim().getDoubleValue() * 1000.0;
+        if (t.endsWith("hz"))  return t.dropLastCharacters(2).trim().getDoubleValue();
+        return t.getDoubleValue();
+    };
+
     // Status bar forwarding
     struct { KnobWithLabel* k; const char* name; } entries[] = {
         { &pitchOctave,  "Pitch Octave"            }, { &pitchSemi,    "Pitch Semitone"          },
@@ -87,14 +140,19 @@ void VoiceSection::wireCallbacks()
         { &ampSendRev,   "Amp Send Reverb"          }, { &ampAccent,    "Amp Accent"               },
         { &ampAtk,       "Amp Attack"               }, { &ampDec,       "Amp Decay"               },
         { &ampSus,       "Amp Sustain"              }, { &ampRel,       "Amp Release"             },
-        { &driveDrive,   "Drive"                    }, { &driveOutput,  "Drive Output"            },
-        { &driveTone,    "Drive Tone"               },
     };
     for (auto& e : entries)
     {
         juce::String n(e.name);
         e.k->onStatusUpdate = [this, n](const juce::String&, const juce::String& val) {
             if (onStatusUpdate) onStatusUpdate(n, val);
+        };
+    }
+    // Insert knobs: use their current label as the status bar name (changes per algorithm)
+    for (auto* k : { &driveDrive, &driveOutput, &driveDither, &driveTone })
+    {
+        k->onStatusUpdate = [this, k](const juce::String& label, const juce::String& val) {
+            if (onStatusUpdate) onStatusUpdate("Insert " + label, val);
         };
     }
 
@@ -150,11 +208,12 @@ void VoiceSection::wireCallbacks()
     ampSus.onValueChanged = [this](double v) { apvtsSet("aEnvSus", (float)v); };
     ampRel.onValueChanged = [this](double v) { apvtsSet("aEnvRel", (float)v); };
 
-    // Drive — char is 0-based index; dropdown IDs are 1-based.
-    driveChar  .onChange       = [this](int id) { apvtsSet("drvChar", (float)(id - 1)); updateDriveLabels(); };
-    driveDrive .onValueChanged = [this](double v) { apvtsSet("drvDrv", (float)v); };
-    driveOutput.onValueChanged = [this](double v) { apvtsSet("drvOut", (float)v); };
-    driveTone  .onValueChanged = [this](double v) { apvtsSet("drvTon", (float)v); };
+    // Insert algorithm — char is 0-based index; dropdown IDs are 1-based.
+    // All insert knob callbacks are set in configureInsertAlgorithm().
+    driveChar.onChange = [this](int id) {
+        apvtsSet("drvChar", (float)(id - 1));
+        configureInsertAlgorithm(id - 1);
+    };
 }
 
 void VoiceSection::setRhythm(int ri)
@@ -207,20 +266,123 @@ void VoiceSection::loadFromRhythm()
     ampSus  .setValue(p.ampEnvSus  * 100.0,     juce::dontSendNotification);
     ampRel  .setValue(p.ampEnvRel  * 10.0,      juce::dontSendNotification);
 
-    driveChar  .setSelectedId(p.driveChar + 1,       false);
-    driveDrive .setValue(p.driveDrive,               juce::dontSendNotification);
-    driveOutput.setValue(p.driveOutput,              juce::dontSendNotification);
-    driveTone  .setValue(p.driveTone,                juce::dontSendNotification);
-    updateDriveLabels();
+    driveChar.setSelectedId(p.driveChar + 1, false);
+    configureInsertAlgorithm(p.driveChar);  // sets all insert knob ranges/labels/values/callbacks
 }
 
-void VoiceSection::updateDriveLabels()
+static juce::String fmtHz(double v)
 {
-    // Bitcrusher uses different parameter names; all others share the generic set.
-    const bool isBit = (driveChar.getSelectedId() == 4);
-    driveDrive .setLabel(isBit ? "Bits"   : "Drive");
-    driveOutput.setLabel(isBit ? "Rate"   : "Output");
-    driveTone  .setLabel("Tone");
+    return v < 1000.0 ? juce::String((int)std::round(v)) + " Hz"
+                      : juce::String(v / 1000.0, 1) + " kHz";
+}
+static double parseHz(const juce::String& s)
+{
+    auto t = s.trim().toLowerCase();
+    if (t.endsWith("khz")) return t.dropLastCharacters(3).trim().getDoubleValue() * 1000.0;
+    if (t.endsWith("hz"))  return t.dropLastCharacters(2).trim().getDoubleValue();
+    return t.getDoubleValue();
+}
+
+void VoiceSection::configureInsertAlgorithm(int charId)
+{
+    // Null all insert callbacks first — prevents spurious APVTS writes during range changes.
+    for (auto* k : { &driveDrive, &driveOutput, &driveDither, &driveTone })
+        k->onValueChanged = nullptr;
+
+    const VoiceParams* p = (rhythmIndex >= 0 && rhythmIndex < proc.getNumRhythms())
+                           ? &proc.getRhythm(rhythmIndex).voiceParams : nullptr;
+
+    switch (charId)
+    {
+        case 0:  // ── None — hide all insert knobs ──────────────────────────
+            driveDrive .setVisible(false);
+            driveOutput.setVisible(false);
+            driveDither.setVisible(false);
+            driveTone  .setVisible(false);
+            break;
+
+        case 1: case 2: case 3:  // ── Soft / Hard / Fold ──────────────────
+            driveDrive.setLabel("Drive");
+            driveDrive.setRange(0.0, 100.0, 0.1);
+            driveDrive.getSlider().textFromValueFunction = nullptr;
+            driveDrive.getSlider().valueFromTextFunction = nullptr;
+            if (p) driveDrive.setValue(p->driveDrive, juce::dontSendNotification);
+            driveDrive.setVisible(true);
+
+            driveOutput.setLabel("Output");
+            driveOutput.setRange(-24.0, 0.0, 0.1);
+            driveOutput.getSlider().textFromValueFunction = nullptr;
+            driveOutput.getSlider().valueFromTextFunction = nullptr;
+            if (p) driveOutput.setValue(p->driveOutput, juce::dontSendNotification);
+            driveOutput.setVisible(true);
+
+            driveDither.setVisible(false);
+
+            driveTone.setLabel("LPF");
+            driveTone.setRange(20.0, 20000.0, 1.0);
+            driveTone.getSlider().textFromValueFunction = fmtHz;
+            driveTone.getSlider().valueFromTextFunction = parseHz;
+            if (p) driveTone.setValue(p->driveTone, juce::dontSendNotification);
+            driveTone.setVisible(true);
+
+            driveDrive .onValueChanged = [this](double v) { apvtsSet("drvDrv", (float)v); };
+            driveOutput.onValueChanged = [this](double v) { apvtsSet("drvOut", (float)v); };
+            driveTone  .onValueChanged = [this](double v) { apvtsSet("drvTon", (float)v); };
+            break;
+
+        case 4:  // ── Bitcrusher ───────────────────────────────────────────
+            driveDrive.setLabel("Bits");
+            driveDrive.setRange(1.0, 16.0, 1.0);
+            driveDrive.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String((int)v) + " bits";
+            };
+            driveDrive.getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
+                return juce::jlimit(1.0, 16.0, s.retainCharacters("0123456789").getDoubleValue());
+            };
+            if (p) driveDrive.setValue(p->drvBits, juce::dontSendNotification);
+            driveDrive.setVisible(true);
+
+            driveOutput.setLabel("Rate");
+            driveOutput.setRange(100.0, 48000.0, 1.0);
+            driveOutput.getSlider().textFromValueFunction = fmtHz;
+            driveOutput.getSlider().valueFromTextFunction = parseHz;
+            if (p) driveOutput.setValue(p->driveRate, juce::dontSendNotification);
+            driveOutput.setVisible(true);
+
+            driveDither.setLabel("Dither");
+            driveDither.setRange(0.0, 100.0, 0.1);
+            driveDither.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String((int)std::round(v)) + "%";
+            };
+            driveDither.getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
+                return s.retainCharacters("0123456789.").getDoubleValue();
+            };
+            if (p) driveDither.setValue(p->drvDither, juce::dontSendNotification);
+            driveDither.setVisible(true);
+
+            driveTone.setLabel("LPF");
+            driveTone.setRange(20.0, 20000.0, 1.0);
+            driveTone.getSlider().textFromValueFunction = fmtHz;
+            driveTone.getSlider().valueFromTextFunction = parseHz;
+            if (p) driveTone.setValue(p->driveTone, juce::dontSendNotification);
+            driveTone.setVisible(true);
+
+            driveDrive .onValueChanged = [this](double v) { apvtsSet("drvBits", (float)v); };
+            driveOutput.onValueChanged = [this](double v) { apvtsSet("drvRate", (float)v); };
+            driveDither.onValueChanged = [this](double v) { apvtsSet("drvDit",  (float)v); };
+            driveTone  .onValueChanged = [this](double v) { apvtsSet("drvTon",  (float)v); };
+            break;
+
+        default: break;
+    }
+
+    // Refresh display text and reposition knobs
+    for (auto* k : { &driveDrive, &driveOutput, &driveDither, &driveTone })
+    { k->getSlider().updateText(); k->repaint(); }
+
+    resized();
+
+    if (onInsertAlgorithmChanged) onInsertAlgorithmChanged(charId);
 }
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
@@ -279,12 +441,22 @@ void VoiceSection::resized()
     ampSus.setBounds(ampX + 2 * kW, row2Y, kW, rowH);
     ampRel.setBounds(ampX + 3 * kW, row2Y, kW, rowH);
 
-    // ─── Drive ───────────────────────────────────────────────────────────
-    // Algorithm dropdown spans the full section on row 1; controls on row 2.
-    driveChar  .setBounds(driveX, row1Y + rowH / 4, 4 * kW, rowH / 2);
+    // ─── Insert ──────────────────────────────────────────────────────────
+    // Dropdown on row 1; knob layout depends on algorithm (Bitcrusher uses all 4 slots).
+    driveChar.setBounds(driveX, row1Y + rowH / 4, 4 * kW, rowH / 2);
+    const bool isBit = (driveChar.getSelectedId() == 5);
     driveDrive .setBounds(driveX + 0 * kW, row2Y, kW, rowH);
     driveOutput.setBounds(driveX + 1 * kW, row2Y, kW, rowH);
-    driveTone  .setBounds(driveX + 2 * kW, row2Y, kW, rowH);
+    if (isBit)
+    {
+        driveDither.setBounds(driveX + 2 * kW, row2Y, kW, rowH);
+        driveTone  .setBounds(driveX + 3 * kW, row2Y, kW, rowH);
+    }
+    else
+    {
+        driveTone  .setBounds(driveX + 2 * kW, row2Y, kW, rowH);
+        driveDither.setBounds(driveX + 3 * kW, row2Y, kW, rowH);  // hidden, off-screen position
+    }
 }
 
 void VoiceSection::paint(juce::Graphics& g)
@@ -310,5 +482,5 @@ void VoiceSection::paint(juce::Graphics& g)
     g.drawText("PITCH",  0,                      0, 5 * kW, labelH, juce::Justification::centred, false);
     g.drawText("FILTER", 5 * kW + divW,          0, 5 * kW, labelH, juce::Justification::centred, false);
     g.drawText("AMP",    10 * kW + 2 * divW,     0, 5 * kW, labelH, juce::Justification::centred, false);
-    g.drawText("DRIVE",  15 * kW + 3 * divW,     0, 4 * kW, labelH, juce::Justification::centred, false);
+    g.drawText("INSERT", 15 * kW + 3 * divW,     0, 4 * kW, labelH, juce::Justification::centred, false);
 }

@@ -1,7 +1,7 @@
 #include "ModMatrixPanel.h"
 
 //==============================================================================
-ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex)
+ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex, int driveChar)
     : assignId(a.id)
 {
     sourceLabel.setText("Mod " + juce::String(char('A' + csIndex)), juce::dontSendNotification);
@@ -9,8 +9,7 @@ ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex)
                           MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
     sourceLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
 
-    for (int i = 0; i < ModDest::ids.size(); ++i)
-        destCombo.addItem(ModDest::labels[i], i + 1);
+    ModDest::populate(destCombo, driveChar);
     for (int i = 0; i < ModDest::ids.size(); ++i)
         if (ModDest::ids[i].toStdString() == a.destinationId)
             { destCombo.setSelectedId(i + 1); break; }
@@ -85,6 +84,14 @@ void ModMatrixPanel::setRhythm(Rhythm* r)
     repaint();
 }
 
+void ModMatrixPanel::setInsertAlgorithm(int driveChar)
+{
+    currentDriveChar = driveChar;
+    rebuildRows();
+    resized();
+    repaint();
+}
+
 void ModMatrixPanel::refresh()
 {
     rebuildRows();
@@ -108,7 +115,7 @@ void ModMatrixPanel::rebuildRows()
     for (const auto& a : rhythm->modulationMatrix.getAssignments())
     {
         const int csIdx = csIndexFromSourceId(a.sourceId);
-        auto row = std::make_unique<MatrixRow>(a, csIdx);
+        auto row = std::make_unique<MatrixRow>(a, csIdx, currentDriveChar);
         addAndMakeVisible(*row);
 
         const std::string rowId    = a.id;

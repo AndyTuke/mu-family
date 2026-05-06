@@ -70,9 +70,13 @@ void RhythmCircle::timerCallback()
             rotAngleB = ((float)(step % sB) + frac) / (float)sB * twoPi;
             rotAngleC = ((float)(step % sC) + frac) / (float)sC * twoPi;
 
-            if (playState->hitFired.get())
+            // Issue #43: edge-detect via monotonic counter so multiple readers
+            // (this circle + sidebar mini-circles + sidebar pulse) can all observe
+            // the same hit without racing each other on a shared one-shot flag.
+            const int currentHitCount = playState->hitCount.get();
+            if (currentHitCount != lastHitCount)
             {
-                playState->hitFired.set(false);
+                lastHitCount = currentHitCount;
                 triggerHitPulse(step, sA);
             }
 
@@ -146,17 +150,16 @@ void RhythmCircle::drawRing(juce::Graphics& g,
                               float outerR, float innerR,
                               juce::Colour hitClr,
                               int currentStep,
-                              float rotOff,
-                              bool dashed) const
+                              float rotOff) const
 {
     const int N = (int)pattern.size();
     if (N == 0 || outerR <= innerR || innerR < 0.0f) return;
 
-    const float twoPi   = juce::MathConstants<float>::twoPi;
+    const float twoPi    = juce::MathConstants<float>::twoPi;
     const float startOff = -juce::MathConstants<float>::halfPi - rotOff;
-    const float stepAng = twoPi / (float)N;
-    const float gapAng  = juce::jmin(0.05f, stepAng * 0.15f);
-    const float arcAng  = stepAng - gapAng;
+    const float stepAng  = twoPi / (float)N;
+    const float gapAng   = juce::jmin(0.05f, stepAng * 0.15f);
+    const float arcAng   = stepAng - gapAng;
 
     for (int i = 0; i < N; i++)
     {
@@ -165,26 +168,20 @@ void RhythmCircle::drawRing(juce::Graphics& g,
         const bool isCur = (i == currentStep);
         g.setColour(stepColour(pattern[i], hitClr, isCur));
 
-        if (dashed)
-        {
-            const float midR  = (outerR + innerR) * 0.5f;
-            const float halfW = (outerR - innerR) * 0.5f;
-            juce::Path arc;
-            arc.addCentredArc(cx, cy, midR, midR, 0.0f, a0, a1, true);
-            float dashes[] = { 3.0f, 2.0f };
-            juce::Path dashedPath;
-            juce::PathStrokeType(halfW * 2.0f).createDashedStroke(dashedPath, arc, dashes, 2);
-            g.fillPath(dashedPath);
-        }
-        else
-        {
-            juce::Path seg;
-            seg.addCentredArc(cx, cy, outerR, outerR, 0.0f, a0, a1, true);
-            seg.addCentredArc(cx, cy, innerR, innerR, 0.0f, a1, a0, false);
-            seg.closeSubPath();
-            g.fillPath(seg);
-        }
+        juce::Path seg;
+        seg.addCentredArc(cx, cy, outerR, outerR, 0.0f, a0, a1, true);
+        seg.addCentredArc(cx, cy, innerR, innerR, 0.0f, a1, a0, false);
+        seg.closeSubPath();
+        g.fillPath(seg);
     }
+
+    // Loop-point divider: radial line at the boundary between step N-1 and step 0.
+    using Id = MuClidLookAndFeel::ColourIds;
+    const float loopCos = std::cos(startOff);
+    const float loopSin = std::sin(startOff);
+    g.setColour(MuClidLookAndFeel::colour(Id::panelBackground).brighter(0.6f).withAlpha(0.85f));
+    g.drawLine(cx + innerR * loopCos, cy + innerR * loopSin,
+               cx + outerR * loopCos, cy + outerR * loopSin, 1.5f);
 }
 
 void RhythmCircle::paint(juce::Graphics& g)
@@ -209,10 +206,12 @@ void RhythmCircle::paint(juce::Graphics& g)
     // ── Ring A — purple ──────────────────────────────────────────────────────
     const float aOuter = maxR;
     const float aInner = aOuter - ringW;
+    // Use pattern size for modulo — avoids a race between pattern update and stepsA atomic.
+    const int stepA = patternA.empty() ? 0 : combinedStep % (int)patternA.size();
     if (!patternA.empty())
     {
         drawRing(g, patternA, cx, cy, aOuter, aInner,
-                 MuClidLookAndFeel::colour(Id::ringEuclidA), combinedStep % sA, rotAngleA);
+                 MuClidLookAndFeel::colour(Id::ringEuclidA), stepA, rotAngleA);
     }
     else
     {
@@ -229,12 +228,13 @@ void RhythmCircle::paint(juce::Graphics& g)
     const float bInner = bOuter - ringW;
     float innerLimit   = (patternB.empty() ? aInner : bInner) - ringGap;
 
+    const int stepB = patternB.empty() ? 0 : combinedStep % (int)patternB.size();
     if (bInner > 0.0f)
     {
         if (!patternB.empty())
         {
             drawRing(g, patternB, cx, cy, bOuter, bInner,
-                     MuClidLookAndFeel::colour(Id::ringEuclidB), combinedStep % sB, rotAngleB);
+                     MuClidLookAndFeel::colour(Id::ringEuclidB), stepB, rotAngleB);
         }
         else
         {
@@ -255,7 +255,7 @@ void RhythmCircle::paint(juce::Graphics& g)
         if (cInner > 0.0f)
         {
             drawRing(g, patternC, cx, cy, cOuter, cInner,
-                     MuClidLookAndFeel::colour(Id::ringEuclidC), -1, rotAngleC, true);
+                     MuClidLookAndFeel::colour(Id::ringEuclidC), -1, rotAngleC);
             innerLimit = cInner - ringGap;
         }
     }

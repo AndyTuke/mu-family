@@ -13,22 +13,60 @@
 #include "../Modulation/ModulationAssignment.h"
 
 // Pre-APVTS modulation destination list. Replaced by APVTS parameter IDs in Stage 10.
+// Item IDs in dropdowns are always 1-based indices into the full ids array so that
+// assignments remain valid when the insert algorithm changes.
 namespace ModDest
 {
     inline const juce::StringArray ids {
-        "amp.attack",    "amp.decay",    "amp.sustain",   "amp.release",
-        "filter.cutoff", "filter.resonance",
-        "fenv.attack",   "fenv.decay",   "fenv.depth",
-        "euclid.a.hits", "euclid.a.rotate",
-        "euclid.b.hits", "euclid.b.rotate"
+        "amp.attack",        "amp.decay",       "amp.sustain",    "amp.release",
+        "filter.cutoff",     "filter.resonance",
+        "fenv.attack",       "fenv.decay",      "fenv.depth",
+        "pitch.semitones",
+        "insert.drive",      "insert.output",                      // Soft/Hard/Fold
+        "insert.bits",       "insert.rate",     "insert.dither",  // Bitcrusher
+        "insert.lpf",                                              // all insert algorithms
+        "euclid.a.hits",     "euclid.a.rotate",
+        "euclid.b.hits",     "euclid.b.rotate"
     };
     inline const juce::StringArray labels {
-        "Amp Attack",       "Amp Decay",       "Amp Sustain",      "Amp Release",
-        "Filter Cutoff",    "Filter Resonance",
-        "Filter Env Attack","Filter Env Decay", "Filter Env Depth",
-        "Euclid A Hits",    "Euclid A Rotate",
-        "Euclid B Hits",    "Euclid B Rotate"
+        "Amp Attack",        "Amp Decay",         "Amp Sustain",       "Amp Release",
+        "Filter Cutoff",     "Filter Resonance",
+        "Filter Env Attack", "Filter Env Decay",  "Filter Env Depth",
+        "Pitch",
+        "Insert Drive",      "Insert Output",
+        "Insert Bits",       "Insert Rate",       "Insert Dither",
+        "Insert LPF",
+        "Euclid A Hits",     "Euclid A Rotate",
+        "Euclid B Hits",     "Euclid B Rotate"
     };
+
+    // Populate dd with only the destinations relevant for driveChar (0=None,1=Soft,2=Hard,3=Fold,4=Bit).
+    // Uses stable 1-based indices so saved assignments survive algorithm changes.
+    inline void populate(DropdownSelect& dd, int driveChar)
+    {
+        // Always-visible: amp, filter, pitch (indices 0–9)
+        for (int i = 0; i < 10; ++i)
+            dd.addItem(labels[i], i + 1);
+        // Insert-specific
+        switch (driveChar)
+        {
+            case 1: case 2: case 3:  // Soft / Hard / Fold
+                dd.addItem(labels[10], 11);  // insert.drive
+                dd.addItem(labels[11], 12);  // insert.output
+                dd.addItem(labels[15], 16);  // insert.lpf
+                break;
+            case 4:  // Bitcrusher
+                dd.addItem(labels[12], 13);  // insert.bits
+                dd.addItem(labels[13], 14);  // insert.rate
+                dd.addItem(labels[14], 15);  // insert.dither
+                dd.addItem(labels[15], 16);  // insert.lpf
+                break;
+            default: break;  // None — no insert params
+        }
+        // Euclid (indices 16–19)
+        for (int i = 16; i < 20; ++i)
+            dd.addItem(labels[i], i + 1);
+    }
 }
 
 // Editor panel for one ControlSequence.
@@ -44,6 +82,9 @@ public:
                  std::atomic<bool>* modLock = nullptr);
 
     std::function<void()> onChange;
+
+    // Update the insert algorithm filter so only relevant destinations appear in rows.
+    void setInsertAlgorithm(int driveChar);
 
     // Drive the playhead: pass the current song beat position.
     // Phase is computed as fmod(beat / loopBeats, 1.0).
@@ -86,11 +127,13 @@ private:
         std::function<void(const std::string& dest)>  onDestChange;
         std::function<void(float depth)>              onDepthChange;
 
-        explicit AssignmentRow(const std::string& assignId);
+        AssignmentRow(const std::string& assignId, int driveChar);
         void resized() override;
     };
 
     std::vector<std::unique_ptr<AssignmentRow>> rows;
+    juce::Component rowsBox;
+    juce::Viewport  rowsViewport;
     AddButton addBtn { "Target" };
 
     static constexpr int kHeaderH = 28;
@@ -98,6 +141,8 @@ private:
     static constexpr int kTimingH = 28;
     static constexpr int kRowH    = 26;
     static constexpr int kAddBtnH = 28;
+
+    int currentDriveChar = 0;
 
     void wireHeader();
     void wireTiming();

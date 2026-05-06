@@ -65,6 +65,10 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&             output,
     const bool anySolo  = hasSolo(numActiveRhythms);
     const int  numOutCh = output.getNumChannels();
 
+    // Clear peaks for channels that have no rhythm this block so their VUs go silent.
+    for (int r = numActiveRhythms; r < MaxChannels; ++r)
+        channelPeaks[r].set(0.0f);
+
     for (int r = 0; r < numActiveRhythms; ++r)
     {
         const auto& ch  = channels[r];
@@ -78,6 +82,10 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&             output,
             channelPeaks[r].set(0.0f);
             continue;
         }
+
+        // Stage 20: −6 dB pre-fader headroom trim — applied before fader/pan so
+        // post-fader peaks, FX sends, and master sum all benefit from the attenuation.
+        buf.applyGain(kHeadroomTrim);
 
         applyPanGain(buf, ch.level, ch.pan, numSamples);
         channelPeaks[r].set(peakOf(buf, numSamples));
@@ -105,31 +113,48 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&             output,
     fxChain.processSends(effectSendBuf, delaySendBuf, reverbSendBuf,
                          doEffect, true, doReverb);
 
-    // Capture return peaks then mix FX returns into the main output.
-    returnPeaks[0].set(peakOf(effectSendBuf, numSamples));
-    returnPeaks[1].set(peakOf(delaySendBuf,  numSamples));
-    returnPeaks[2].set(peakOf(reverbSendBuf, numSamples));
-
-    if (doEffect && !returns[0].mute)
+    // Mix FX returns into main output; capture return peaks post-fader so VU reflects the fader.
+    if (doEffect)
     {
         applyPanGain(effectSendBuf, returns[0].level, returns[0].pan, numSamples);
-        for (int c = 0; c < numOutCh; ++c)
-            output.addFrom(c, 0, effectSendBuf, c, 0, numSamples);
+        if (!returns[0].mute)
+        {
+            returnPeaks[0].set(peakOf(effectSendBuf, numSamples));
+            for (int c = 0; c < numOutCh; ++c)
+                output.addFrom(c, 0, effectSendBuf, c, 0, numSamples);
+        }
+        else { returnPeaks[0].set(0.0f); }
     }
-    const bool hasDelayOut = returnPeaks[1].get() > 1e-9f;
-    if (hasDelayOut && !returns[1].mute)
+    else { returnPeaks[0].set(0.0f); }
+
+    const float rawDelayPeak = peakOf(delaySendBuf, numSamples);
+    if (rawDelayPeak > 1e-9f)
     {
         applyPanGain(delaySendBuf, returns[1].level, returns[1].pan, numSamples);
-        for (int c = 0; c < numOutCh; ++c)
-            output.addFrom(c, 0, delaySendBuf, c, 0, numSamples);
+        if (!returns[1].mute)
+        {
+            returnPeaks[1].set(peakOf(delaySendBuf, numSamples));
+            for (int c = 0; c < numOutCh; ++c)
+                output.addFrom(c, 0, delaySendBuf, c, 0, numSamples);
+        }
+        else { returnPeaks[1].set(0.0f); }
     }
-    if (doReverb && !returns[2].mute)
+    else { returnPeaks[1].set(0.0f); }
+
+    if (doReverb)
     {
         applyPanGain(reverbSendBuf, returns[2].level, returns[2].pan, numSamples);
-        for (int c = 0; c < numOutCh; ++c)
-            output.addFrom(c, 0, reverbSendBuf, c, 0, numSamples);
+        if (!returns[2].mute)
+        {
+            returnPeaks[2].set(peakOf(reverbSendBuf, numSamples));
+            for (int c = 0; c < numOutCh; ++c)
+                output.addFrom(c, 0, reverbSendBuf, c, 0, numSamples);
+        }
+        else { returnPeaks[2].set(0.0f); }
     }
+    else { returnPeaks[2].set(0.0f); }
 
-    masterPeak.set(peakOf(output, numSamples));
+    // Apply master gain first, then capture peak so master VU reflects the master fader.
     applyPanGain(output, masterLevel, masterPan, numSamples);
+    masterPeak.set(peakOf(output, numSamples));
 }

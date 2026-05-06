@@ -34,10 +34,18 @@ void SidebarItem::setPlayState(PluginProcessor::RhythmPlayState* state,
 
 void SidebarItem::timerCallback()
 {
-    // Detect hit — read the flag here before RhythmCircle clears it.
-    // Both read in the same timer window; the race is benign (animation only).
-    if (playState && playState->hitFired.get())
-        pulseAlpha = 0.4f;
+    // Issue #43: edge-detect via monotonic counter. Previous code read a one-shot
+    // bool flag that the big RhythmCircle cleared in its own timer, so whichever
+    // of the two timers fired second saw `false` and the sidebar pulse never fired.
+    if (playState)
+    {
+        const int currentHitCount = playState->hitCount.get();
+        if (currentHitCount != lastHitCount)
+        {
+            lastHitCount = currentHitCount;
+            pulseAlpha   = 0.4f;
+        }
+    }
 
     if (pulseAlpha > 0.0f)
     {

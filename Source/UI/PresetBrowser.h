@@ -1,7 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Components/MuClidLookAndFeel.h"
-#include "Components/SegmentControl.h"
+#include "Components/DropdownSelect.h"
 #include <vector>
 
 // Panel overlay listing saved presets.  Replaces main area when visible.
@@ -16,6 +16,9 @@ public:
 
     // Rescan presets folder.
     void refresh(const juce::File& presetsDir);
+
+    // Returns unique non-"All" categories found in the last refresh().
+    juce::StringArray getCategories() const { return knownCategories; }
 
     void resized() override;
     void paint(juce::Graphics& g) override;
@@ -39,7 +42,7 @@ private:
     void loadSelectedPreset();
 
     juce::TextEditor  searchBox;
-    SegmentControl    categoryFilter { { "All", "Techno", "Perc", "Ambient", "Xpmt" } };
+    DropdownSelect    categoryFilter;
     juce::ListBox     listBox;
     juce::TextButton  loadBtn   { "Load" };
     juce::TextButton  closeBtn  { "Close" };
@@ -47,6 +50,7 @@ private:
     std::vector<PresetInfo> allPresets;
     std::vector<int>        filteredIndices;
     juce::File              presetsDir;
+    juce::StringArray       knownCategories;
     int                     selectedRow = -1;
 
     static constexpr int kTopBarH  = 40;

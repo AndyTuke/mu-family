@@ -64,6 +64,14 @@ void FXRow::setParamValue(const juce::String& id, float value)
     }
 }
 
+void FXRow::hideParameter(const juce::String& id)
+{
+    if (! hiddenParamIds.contains(id))
+        hiddenParamIds.add(id);
+    rebuildKnobs(currentAlgorithm);
+    resized();
+}
+
 void FXRow::resized()
 {
     const int h = getHeight();
@@ -122,6 +130,7 @@ void FXRow::rebuildKnobs(int algorithmIndex)
     const auto& def = algorithmDefs[algorithmIndex];
     for (auto& param : def.params)
     {
+        if (hiddenParamIds.contains(param.id)) continue; // e.g. "mix" hidden in send/return rows
         auto knob = std::make_unique<KnobWithLabel>(param.name, knobColour);
         knob->setRange(param.minVal, param.maxVal);
         knob->setValue(param.defaultVal, juce::dontSendNotification);

@@ -22,17 +22,21 @@
 
 ## Euclid C — Accent Layer
 
-Third independent euclidean layer dedicated to accents. No logic relationship with A/B. Only fires an accent when it coincides with an A+B hit (firing on a non-hit step has no effect). **Already in data model** — `Rhythm.h` has `genA`, `genB`, and `genC` as `HitGenerator` members (Steps/Hits/Rotate only; no padding or insert controls on genC).
+Third independent euclidean layer dedicated to accents. No logic relationship with A/B. Only fires an accent when it coincides with an A+B hit (firing on a non-hit step has no effect). Has the same full parameter set as A and B (Steps/Hits/Rotate + all padding/insert controls). **Already in data model** — `Rhythm.h` has `genA`, `genB`, and `genC` as `HitGenerator` members.
 
 | Parameter | Range | Notes |
 |---|---|---|
 | Steps | 1–32 | |
 | Hits | 0–steps | |
 | Rotate | 0–steps-1 | |
-| Advance mode | Steps / Hits | Steps: advances on every step. Hits: advances only when A+B fires. |
-| Accent level | 0 to +12dB | Level boost on coincident hits |
-| Accent velocity | 0–127 | MIDI velocity for accented hits in MIDI mode |
-| Mute | On/Off | |
+| Pre pad | 0–12 | Same semantics as A/B |
+| Post pad | 0–12 | Same semantics as A/B |
+| Insert start | 0–steps-1 | Same semantics as A/B |
+| Insert length | 0–8 | Same semantics as A/B |
+| Insert mode | Mute / Pad | Same semantics as A/B |
+| Mute | On/Off | Exclude from combined result |
+
+**Accent detection:** A step is accented when Ring C fires a hit on the same step as a Ring A+B combined hit. The `isAccented` flag is passed from `SequencerEngine` to `VoiceEngine` with each trigger event. The accent boost amount is a per-rhythm parameter in `VoiceParams` (`accentDb`, 0–12 dB), controlled by the Accent knob in the VoiceSection Amp panel. See design-voice.md for the full accent signal path.
 
 ## DAW Position Sync
 

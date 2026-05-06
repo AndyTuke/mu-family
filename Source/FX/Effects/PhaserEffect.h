@@ -30,8 +30,8 @@ public:
     {
         const int   numStages = juce::jlimit(2, MaxStages, (static_cast<int>(stages) / 2) * 2);
         const float lfoInc    = static_cast<float>(rate / sr);
-        const float wet       = mix;
-        const float dry       = 1.0f - mix;
+        const float wet       = sendMode ? 1.0f : mix;
+        const float dry       = sendMode ? 0.0f : 1.0f - mix;
         const float fb        = feedback * 0.99f;
 
         // Precompute constants for frequency-correct bilinear-transform coefficient.

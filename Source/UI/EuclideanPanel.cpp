@@ -261,9 +261,10 @@ void EuclideanPanel::resized()
     const int insX = padX + pW * 2;
 
     const int knobH    = ctrlH - kSwitchH - 2;
-    const int insSw    = juce::jmin(40, pW);
+    // Issue #48: widen Pad/Mute toggles 40→56 so the full text fits.
+    const int insSw    = juce::jmin(56, pW);
     const int insSwX   = insX + (pW * 2 - insSw) / 2;
-    const int padSw    = juce::jmin(40, pW - mP);
+    const int padSw    = juce::jmin(56, pW - mP);
     const int preSw_x  = padX + mP + (pW - mP - padSw) / 2;
     const int postSw_x = padX + pW + (pW - mP - padSw) / 2;
 

@@ -23,21 +23,6 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     transportBar.onLogoClicked = [this] { showAbout(true); };
 
-    transportBar.onAddRhythm = [this]
-    {
-        if (processorRef.getNumRhythms() >= SequencerEngine::MaxRhythms) return;
-        Rhythm r;
-        r.name        = "<unnamed>";
-        r.colourIndex = processorRef.getNumRhythms() % 30;
-        processorRef.addRhythm(r);
-        const int newIdx = processorRef.getNumRhythms() - 1;
-        processorRef.applyDefaultRhythm(newIdx);
-        sidebar.refreshItems();
-        sidebar.setSelectedIndex(newIdx);
-        rhythmPanel.setRhythm(newIdx);
-        if (mixerVisible) mixerOverlay.refresh();
-    };
-
     transportBar.onPresetSelected = [this](const juce::File& f)
     {
         processorRef.loadPreset(f);

@@ -16,10 +16,11 @@ std::vector<bool> HitGenerator::getPattern() const
 
     auto pattern = EuclideanGenerator::generate(activeSteps, hits);
 
-    if (rotate > 0 && activeSteps > 0)
+    if (rotate != 0 && activeSteps > 0)
     {
-        int r = rotate % activeSteps;
-        std::rotate(pattern.begin(), pattern.begin() + r, pattern.end());
+        int r = ((rotate % activeSteps) + activeSteps) % activeSteps;
+        if (r > 0)
+            std::rotate(pattern.begin(), pattern.begin() + r, pattern.end());
     }
 
     if (insertLength > 0)
@@ -79,10 +80,11 @@ std::vector<StepType> HitGenerator::getStepTypes() const
 
     auto boolPat = EuclideanGenerator::generate(activeSteps, hits);
 
-    if (rotate > 0 && activeSteps > 0)
+    if (rotate != 0 && activeSteps > 0)
     {
-        int r = rotate % activeSteps;
-        std::rotate(boolPat.begin(), boolPat.begin() + r, boolPat.end());
+        int r = ((rotate % activeSteps) + activeSteps) % activeSteps;
+        if (r > 0)
+            std::rotate(boolPat.begin(), boolPat.begin() + r, boolPat.end());
     }
 
     std::vector<StepType> result;

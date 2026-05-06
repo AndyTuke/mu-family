@@ -2,19 +2,17 @@
 
 #include "FXSlotBase.h"
 #include "FXAlgorithmDef.h"
-#include <juce_dsp/juce_dsp.h>
 #include <vector>
 
-// Send-style reverb slot. Dry signal is unaffected — wet reverb is added on top.
-// Currently implemented with juce::dsp::Reverb (Freeverb). Algorithm parameter
-// presets differentiate Room / Hall / Plate / Spring character.
-// Replace with Signalsmith Reverb (MIT, header-only) in a future stage.
+// Send-style reverb slot using Signalsmith FDN reverb (MIT, header-only).
+// Dry signal is unaffected — wet reverb is added on top.
 class ReverbSlot : public FXSlotBase
 {
 public:
     enum class Algorithm { Room = 0, Hall, Plate, Spring };
 
     ReverbSlot();
+    ~ReverbSlot();
 
     void prepare(double sampleRate, int blockSize) override;
     void process(juce::AudioBuffer<float>&) override;
@@ -42,6 +40,7 @@ public:
 private:
     void applyAlgorithmPreset();
     void updateReverb();
+    void runPreDelay(const juce::AudioBuffer<float>& src, int numSamples);
 
     bool  enabled        = true;
     float level          = 1.0f;
@@ -53,14 +52,19 @@ private:
     float damp      = 0.4f;
     float mod       = 0.2f;
     float dirt      = 0.0f;
+    float rt20      = 1.0f;   // decay time to -20dB (set per algorithm)
 
     double sr = 44100.0;
-
-    juce::Reverb reverb;
-    juce::Reverb::Parameters reverbParams;
 
     // Pre-delay buffer
     static constexpr int MaxPreDelaySamples = 192000 / 10;  // ~100ms at 192kHz
     std::vector<float> preDelayBufL, preDelayBufR;
     int preDelayWrite = 0;
+
+    // Wet work buffers (allocated in prepare, never in process)
+    std::vector<float> wetL, wetR;
+
+    // Signalsmith FDN reverb — included in the .cpp to keep windows.h out of this header
+    struct ReverbImpl;
+    std::unique_ptr<ReverbImpl> impl;
 };

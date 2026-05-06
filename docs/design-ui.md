@@ -209,10 +209,12 @@ Row 2 (envelope):          Row 2 (envelope):            Row 2 (envelope):    Row
 - Envelope: Attack 0.001–5s, Decay 0.001–5s, Sustain 0–1, Release 0.001–10s, Depth 0–48 semitones of cutoff sweep
 
 **Amp** (amber, `knobLevel`):
-- Config: Level 0–2
+- Config: Level 0–2, Accent 0–+12 dB
 - Envelope: Attack 0.001–5s, Decay 0.001–5s, Sustain 0–1, Release 0.001–10s
 
-*(Stage 10: + FX send knobs on Amp config row — Effect, Delay, Reverb)*
+**Accent** — when a step is accented (Ring C fires coincident with a Ring A+B hit), the amplitude of that step is boosted by this amount above the base Level. 0 dB = no accent effect. Amber (`knobLevel`), sits immediately right of Level in the config row.
+
+*(Stage 13: + FX send knobs on Amp config row — Effect, Delay, Reverb; will require Amp column to expand to 5 kW, adjusting the 18-unit grid)*
 
 **Drive** (`knobInsertPad` pink — same colour family as the insert pad to signal it is a per-voice insert effect):
 - Config row: Character (`DropdownSelect`: Soft/Hard/Fold/Bit), Drive 0–100%, Output −24–0 dB, Tone 20–20kHz
