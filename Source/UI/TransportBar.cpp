@@ -87,7 +87,7 @@ TransportBar::TransportBar(PluginProcessor& p)
     populatePresetDropdown();
     refreshPlayBtn();
     updateRhythmCount();
-    startTimerHz(10);
+    startTimerHz(30);
 }
 
 TransportBar::~TransportBar()
