@@ -64,7 +64,7 @@ The Effect slot hosts modulation and time-based algorithms only:
 
 | Section | Parameters |
 |---|---|
-| Time — sync mode | TimeSelector (1, 1/2, 1/4, 1/8, 1/16, 1/32 + triplet/dotted) + ms display at current BPM |
+| Time — sync mode | DropdownSelect (1, 1/2, 1/4, 1/8, 1/16, 1/32 + triplet/dotted) + ms display at current BPM |
 | Time — free mode | ms with NudgeInput (step sizes 1, 5, 10ms) |
 | Repeats | Feedback, spread, dirt (saturation on feedback path) |
 | Intra-FX | Delay→Reverb send knob on Delay return channel in mixer |
@@ -88,7 +88,7 @@ The Effect slot hosts modulation and time-based algorithms only:
 
 Reverb has **no mix knob** — it is always a pure send. Shimmer removed from v1 (requires pitch shifting in feedback loop — v2 feature).
 
-**Current implementation (Stage 8):** All four reverb algorithms use `juce::Reverb` (Freeverb) as a placeholder. Algorithm selection applies parameter presets that bias size/damp/diffusion/pre-delay for different characters. Replace with Signalsmith Reverb (MIT, header-only) in Stage 15 — `ReverbSlot` is self-contained and the swap requires only changes inside that class.
+**Current implementation (Stage 15+):** All four reverb algorithms use the Signalsmith FDN reverb (integrated Stage 15). Algorithm selection applies parameter presets that bias `roomMs`/`rt20`/`early`/damping for different characters.
 
 ### Stage 15: Signalsmith Reverb Integration Plan
 
@@ -179,5 +179,5 @@ Distortion and filter effect files (`SoftClipEffect`, `HardClipEffect`, `Foldbac
 registered in `FXAlgorithmRegistry::effectAlgorithms()` and are not instantiated. They may be
 deleted in Stage 11 cleanup.
 
-New file to create: `Source/FX/Effects/FlangerEffect.h` — same interface as ChorusEffect.
-New file to create: `Source/FX/Effects/EchoEffect.h` — simple stereo delay, no sync logic.
+`Source/FX/Effects/FlangerEffect.h` — implemented; same interface as ChorusEffect.
+`Source/FX/Effects/EchoEffect.h` — implemented; simple stereo delay, no sync logic.

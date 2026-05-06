@@ -26,7 +26,7 @@
 
 | Type | Extension | Format |
 |---|---|---|
-| Full preset | `.mu` | JUCE ValueTree → XML |
+| Full preset | `.muclid` | JUCE ValueTree → XML |
 | Rhythm preset | `.muRhyth` | JUCE ValueTree → XML (single rhythm subtree) |
 
 ## Sample Embedding
@@ -38,15 +38,15 @@
 
 ## Default Preset / Rhythm
 
-- On plugin load: reads `Presets\_default.mu` — restores silently; if missing, creates an empty fresh state (no error)
+- On plugin load: reads `Presets\_default.muclid` — restores silently; if missing, creates an empty fresh state (no error)
 - On new rhythm added: reads `Rhythms\_default.muRhyth` — applies silently; if missing, creates a blank rhythm
-- Users can **File → Save as Default** to overwrite `_default.mu` / `_default.muRhyth`
+- Users can **File → Save as Default** to overwrite `_default.muclid` / `_default.muRhyth`
 
 ## Preset Storage
 
-- Patch presets: JUCE ValueTree serialised to XML in user content folder (`.mu`)
+- Patch presets: JUCE ValueTree serialised to XML in user content folder (`.muclid`)
 - Rhythm presets: same format, single rhythm subtree (`.muRhyth`)
-- Default preset: `_default.mu` / `_default.muRhyth` in the respective subfolders
+- Default preset: `_default.muclid` / `_default.muRhyth` in the respective subfolders
 - Factory presets: shipped with plugin, stored in plugin resources, restorable from Settings
 
 ## Preset Browser (Stage 10)
@@ -59,22 +59,14 @@
 
 ## APVTS Parameter Naming
 
-All parameters must be in APVTS. Suggested ID format:
-- Rhythm parameters: `rhythm_{index}_{param}` e.g. `rhythm_0_stepsA`, `rhythm_0_hitsA`
+All parameters must be in APVTS. Actual ID format:
+- Rhythm parameters: `r{N}_{param}` e.g. `r0_stepsA`, `r0_hitsA`
 - FX parameters: `fx_effect_{param}`, `fx_delay_{param}`, `fx_reverb_{param}`
 - Mixer parameters: `mixer_rhythm_{index}_{param}`, `mixer_master_{param}`
-- Modulation: `rhythm_{index}_mod_{mod_index}_{param}`
+- Modulation: `r{N}_mod_{mod_index}_{param}`
 
 Parameter IDs are strings in ModulationMatrix — this is what makes new sources/destinations automatic without refactoring.
 
-## Current State (Stage 8 — pre-APVTS)
+## Current State (Stage 10+ — APVTS wired)
 
-APVTS is not yet wired. UI currently reads/writes `Rhythm` data directly. This is intentional — APVTS wiring is Stage 10. Until then:
-- State does not save between DAW sessions
-- Automation does not work
-- The direct data binding (e.g. `rhythm->genA.steps = (int)v`) is the correct pattern for now
-- Stage 10 will replace direct reads/writes with APVTS parameter attachments
-
-**FX state:** `EffectSlot`, `DelaySlot`, and `ReverbSlot` each implement `getStateInformation()` / `setStateInformation()` stubs. FX parameter state does not persist until Stage 10 wires these into the plugin's `getStateInformation()` / `setStateInformation()` calls.
-
-**MIDI mode flag:** `VoiceEngine` / `MidiOutputEngine` MIDI mode selection is not yet wired to UI. The trigger call from `processBlock` to `MidiOutputEngine` is present but gated — MIDI output is inactive until Stage 10 enables the routing per rhythm.
+All parameters are wired through APVTS (completed Stage 10). State saves and restores correctly between DAW sessions, and automation is supported. All UI panels use APVTS parameter attachments rather than direct `Rhythm` data writes.

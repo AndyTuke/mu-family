@@ -85,7 +85,7 @@ All work below resolves open issues from [Issues.md](Issues.md). Issues are refe
 
 ## Critical architectural rules
 
-- **Everything in APVTS** — if it's not in the ValueTree it won't save. Each rhythm in its own subtree. *(APVTS wiring is Stage 10 — UI currently binds directly to Rhythm data as a temporary measure.)*
+- **Everything in APVTS** — if it's not in the ValueTree it won't save. Each rhythm in its own subtree. All parameters are wired through APVTS.
 - **Audio thread never allocates** — all allocation in `prepareToPlay`, never in `processBlock`.
 - **ModulationMatrix is the single reader** — audio engine reads only from ModulationMatrix, never directly from APVTS or ControlSequence.
 - **Rhythms are fully self-contained** — ControlSequences may only target parameters within their own rhythm. No cross-rhythm modulation. Global FX parameters are not valid modulation destinations.

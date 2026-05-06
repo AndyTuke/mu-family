@@ -23,7 +23,7 @@ sidebar(0, 0, 82, h-20) | rhythmPanel(82, 0, w-82, h-20) | statusBar(0, h-20, w,
 
 ## Transport Bar (Stage 10)
 
-Left→right: μ-CLID logo (click=About), play/stop, BPM, position (bar.beat), sync pill, rhythm count (n/8), preset selector, save, mixer button, + rhythm button, gear icon.
+Left→right: μ-CLID logo (click=About), play/stop, BPM, position (bar.beat), sync pill, rhythm count (n/8), preset selector, save, mixer button, gear icon.
 
 | Element | Plugin mode | Standalone mode |
 |---|---|---|
@@ -31,7 +31,6 @@ Left→right: μ-CLID logo (click=About), play/stop, BPM, position (bar.beat), s
 | BPM | Read-only from host | Editable (nudge + tap tempo) |
 | Position | Read-only from host | Resets on stop |
 | Mixer button | Opens mixer overlay (replaces rhythm panel) | Same |
-| + Rhythm | Disabled at 8 rhythms | Disabled at 8 rhythms |
 
 ## Rhythm Sidebar (82px fixed, always visible)
 
@@ -47,7 +46,7 @@ kAddBtnH = 34;   // add button at bottom
 - Hit pulse: sidebar item circle pulses with rhythm colour on each hit
 - Add rhythm button at bottom: dashed border, "+" prefix, always visible, disabled at 8 rhythms
 - Scrollable via `juce::Viewport` if more items than fit (unlikely with max 8)
-- Drag-to-reorder: v2 feature. `RhythmSidebar` must support variable item order from day one.
+- Drag-to-reorder: fully implemented. `RhythmSidebar` supports variable item order.
 - Deleted rhythm: item removed immediately, no placeholders
 - Right border line drawn in `paint()` to visually separate from main panel
 
@@ -190,12 +189,14 @@ kW  = (w - 3 * divW) / 18   // 18 equal knob-widths across the full panel width
 **Column layout:**
 
 ```
-PITCH (5 kW)               FILTER (5 kW)                AMP (4 kW)           DRIVE (4 kW)
+PITCH (5 kW)               FILTER (5 kW)                AMP (4 kW)           INSERT (4 kW)
 ────────────────────────   ──────────────────────────   ──────────────────   ──────────────────
 Row 1 (config):            Row 1 (config):              Row 1 (config):      Row 1 (config):
-  Octave | Semi | Fine       Type(1) | Cutoff(2) | Res    Level              Char | Drive | Output | Tone
-Row 2 (envelope):          Row 2 (envelope):            Row 2 (envelope):    Row 2:
-  Atk|Dec|Sus|Rel|Depth      Atk|Dec|Sus|Rel|Depth        Atk|Dec|Sus|Rel     (empty — Drive has no ADSR)
+  Octave | Semi | Fine       Type(1) | Cutoff(2) | Res    Level              Character (full-width dropdown)
+Row 2 (envelope):          Row 2 (envelope):            Row 2 (envelope):    Row 2 (config):
+  Atk|Dec|Sus|Rel|Depth      Atk|Dec|Sus|Rel|Depth        Atk|Dec|Sus|Rel     Drive | Output (or Rate in Bitcrusher mode) | LPF
+                                                                             Row 3:
+                                                                               (empty — Insert has no ADSR)
 ```
 
 **All knob labels use full words — no abbreviations.**
@@ -216,10 +217,11 @@ Row 2 (envelope):          Row 2 (envelope):            Row 2 (envelope):    Row
 
 *(Stage 13: + FX send knobs on Amp config row — Effect, Delay, Reverb; will require Amp column to expand to 5 kW, adjusting the 18-unit grid)*
 
-**Drive** (`knobInsertPad` pink — same colour family as the insert pad to signal it is a per-voice insert effect):
-- Config row: Character (`DropdownSelect`: Soft/Hard/Fold/Bit), Drive 0–100%, Output −24–0 dB, Tone 20–20kHz
-- No envelope row (Drive has no ADSR). Row 2 is blank — drawn as empty space so the section border still frames correctly.
-- Drive = 0% passes audio through unity regardless of character selection.
+**INSERT** (`knobInsertPad` pink — same colour family as the insert pad to signal it is a per-voice insert effect):
+- Config row 1: Character (`DropdownSelect`: None/Soft/Hard/Fold/Bitcrusher) — full-width row
+- Config row 2: Drive 0–100%, Output −24–0 dB (or Rate in Bitcrusher mode), LPF 20–20kHz
+- No envelope row (Insert has no ADSR). Bottom row is blank — drawn as empty space so the section border still frames correctly.
+- Character = None passes audio through unity.
 - Character switch is message-thread only (same constraint as `EffectSlot::setAlgorithm`).
 
 **Sample/MIDI mode** was previously in the Amp config row. It has moved to a `DropdownSelect` in the RhythmPanel header bar (right-aligned, 80px wide) so it is visible at all times without occupying voice section space.
@@ -260,7 +262,7 @@ Replaces rhythm panel when mixer button active. Sidebar stays visible. Transport
 
 **FX rows (below channel strips):** Three fixed rows (Effect, Delay, Reverb), each in its own rounded bordered sub-panel with a 6px gap between panels. Each row: on/off toggle, name label, algorithm dropdown, parameter knobs.
 
-**Intra-FX routing (pending F2):** Effect return channel will show send knobs to Delay and Reverb returns. Delay return channel will show a send knob to Reverb return. FXChain.processSends() applies these sequentially.
+**Intra-FX routing:** Effect return channel shows send knobs to Delay and Reverb returns. Delay return channel shows a send knob to Reverb return. FXChain.processSends() applies these sequentially. Implemented.
 
 **Echo mode (pending F7):** When Effect algo = Echo, a full DelayRow appears between the Effect and Delay FX rows, showing identical controls to the Delay unit.
 
@@ -273,11 +275,12 @@ Single scrollable page, sections:
 - **Voice**: default overlap fade length (1–10ms, default 2ms)
 - **Gain**: default fader (-12 to 0dB, default -6dB), default master volume
 - **Presets**: default preset, restore factory presets
-- **Standalone**: audio device, default BPM
+- **Standalone**: audio device
+- **General**: master volume, hot-swap timing (`On master loop` / `On rhythm loop`), content folder path
 
 ## About Panel (Stage 10)
 
-Opened by clicking μ-CLID logo. Contains: large logo, version badge, company name, links (website/manual/changelog). Credits: JUCE, SoundTouch, Signalsmith Reverb, Bjorklund algorithm. Easter egg: frickin lasers (v4 roadmap).
+Opened by clicking μ-CLID logo. Contains: large logo, version badge, company name, links (website/manual/changelog). Credits: JUCE, Signalsmith Reverb (MIT, header-only), Monocypher (BSD-2-Clause), clap-juce-extensions (MIT), Bjorklund algorithm. Easter egg: frickin lasers (v4 roadmap).
 
 ## Standard Control Behaviours
 
@@ -357,7 +360,7 @@ On every hit detected (audio thread sets a `juce::Atomic<bool>` flag per rhythm 
 ### Sidebar item pulse
 
 On hit:
-- Entire `SidebarItem` background flashes with rhythm colour, alpha 0.4 → 0 over 200ms
+- An expanding pulse ring radiates outward within the `SidebarItem`, rhythm colour, alpha 0.4 → 0 over 200ms
 - Ease-out (quadratic), not linear — snappy leading edge, smooth tail
 - The RhythmCircle inside the sidebar item already benefits from the ring rotation/pulse above
 

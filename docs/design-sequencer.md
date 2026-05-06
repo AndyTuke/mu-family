@@ -4,7 +4,7 @@
 
 | Parameter | Range | Notes |
 |---|---|---|
-| Steps | 1–32 | Total steps including all padding |
+| Steps | 1–64 | Total steps including all padding |
 | Hits | 0–steps | Euclidean distribution |
 | Rotate | 0–steps-1 | Offset applied after distribution |
 | Pre pad | 0–12 | Empty steps forced at start |
@@ -26,7 +26,7 @@ Third independent euclidean layer dedicated to accents. No logic relationship wi
 
 | Parameter | Range | Notes |
 |---|---|---|
-| Steps | 1–32 | |
+| Steps | 1–64 | |
 | Hits | 0–steps | |
 | Rotate | 0–steps-1 | |
 | Pre pad | 0–12 | Same semantics as A/B |
@@ -56,7 +56,7 @@ Third independent euclidean layer dedicated to accents. No logic relationship wi
 |---|---|---|
 | Mode | Smooth / Stepped | Smooth = drawable LFO curve. Stepped = bar graph. |
 | Polarity | Unipolar / Bipolar | Unipolar: 0 to +100. Bipolar: -100 to +100. Switching to unipolar preserves negative values in memory (non-destructive). |
-| Loop length note value | 1/1, 1/2, 1/4, 1/8, 1/16, 1/32 + triplet/dotted | Uses TimeSelector component |
+| Loop length note value | 1/1, 1/2, 1/4, 1/8, 1/16, 1/32 + triplet/dotted | Uses `DropdownSelect` component |
 | Loop length multiplier | 1–16 | Multiplied by note value |
 | Step length note value | same | Stepped mode only |
 | Step length multiplier | 1–16 | Step count = loop length / step length (auto-calculated) |
