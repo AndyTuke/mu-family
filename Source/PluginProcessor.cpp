@@ -193,7 +193,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     addI("mstrLoop",  "Master Loop",  0, 16, 0);   // 0=free, 1-16 → 16-256 steps
 
 #if MUCLID_LITE_BUILD
-    addI("lite_midiNote", "MIDI Note", 0, 127, 36);
+    addI("lite_midiNote",   "MIDI Note", 0, 127, 36);
+    addF("lite_accentAmt",  "Accent",    0.0f, 100.0f, 0.0f);
 #endif
 
     return layout;
@@ -382,14 +383,36 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     if (playing)
     {
         const auto blockResult = sequencer.processBlock(beatPos);
-        for (int r = 0; r < numRhythms; ++r)
         {
-            if (blockResult.firedMask & (1 << r))
+            const int   midiNote  = (int)apvts.getRawParameterValue("lite_midiNote")->load();
+            const float accentAmt = apvts.getRawParameterValue("lite_accentAmt")->load();
+
+            // Bottom half (0–50): accented ramps 100→127, non-accented stays 100.
+            // Top half  (50–100): accented stays 127, non-accented ramps 100→75.
+            float accentedVel, normalVel;
+            if (accentAmt <= 50.0f)
             {
-                const int midiNote = (int)apvts.getRawParameterValue("lite_midiNote")->load();
-                midiEngines[r].trigger(midiMessages, 0, midiNote, 1, 1.0f);
-                rhythmPlayState[r].hitFired.set(true);
-                rhythmPlayState[r].hitCount.set(rhythmPlayState[r].hitCount.get() + 1);
+                const float t = accentAmt / 50.0f;
+                accentedVel = (100.0f + t * 27.0f) / 127.0f;
+                normalVel   =  100.0f               / 127.0f;
+            }
+            else
+            {
+                const float t = (accentAmt - 50.0f) / 50.0f;
+                accentedVel = 1.0f;
+                normalVel   = (100.0f - t * 25.0f)  / 127.0f;
+            }
+
+            for (int r = 0; r < numRhythms; ++r)
+            {
+                if (blockResult.firedMask & (1 << r))
+                {
+                    const bool  isAccented = (blockResult.accentMask & (1 << r)) != 0;
+                    midiEngines[r].trigger(midiMessages, 0, midiNote, 1,
+                                           isAccented ? accentedVel : normalVel);
+                    rhythmPlayState[r].hitFired.set(true);
+                    rhythmPlayState[r].hitCount.set(rhythmPlayState[r].hitCount.get() + 1);
+                }
             }
         }
         const float frac = static_cast<float>(

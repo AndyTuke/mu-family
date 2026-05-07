@@ -8,6 +8,7 @@
 #include "UI/Components/StatusBar.h"
 #include "UI/Components/MuClidLookAndFeel.h"
 #include "UI/Components/DropdownSelect.h"
+#include "UI/Components/KnobWithLabel.h"
 #include "UI/AboutPanel.h"
 
 // Simplified editor for the mu-Clid Lite MIDI-effect build.
@@ -33,11 +34,12 @@ private:
     AboutPanel     aboutPanel;
     DropdownSelect noteSelector;
     juce::Label    noteSelectorLabel;
+    KnobWithLabel  accentKnob { "Accent", MuClidLookAndFeel::knobLevel };
 
     static constexpr int kTransportH  = 40;
     static constexpr int kStatusH     = 22;
     static constexpr int kCircleSize  = 300;
-    static constexpr int kNoteRowH    = 30;
+    static constexpr int kControlsH   = 60;
 
     void refreshCircle();
     static juce::String midiNoteName(int note);

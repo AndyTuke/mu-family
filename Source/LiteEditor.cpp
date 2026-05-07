@@ -51,6 +51,23 @@ LiteEditor::LiteEditor(PluginProcessor& p)
     addAndMakeVisible(noteSelector);
     addAndMakeVisible(noteSelectorLabel);
 
+    // Accent velocity knob — wired to lite_accentAmt APVTS parameter.
+    accentKnob.setRange(0.0, 100.0, 1.0);
+    {
+        const float initAmt = proc.apvts.getRawParameterValue("lite_accentAmt")->load();
+        accentKnob.setValue(initAmt, juce::dontSendNotification);
+    }
+    accentKnob.onValueChanged = [this](double v)
+    {
+        if (auto* p = proc.apvts.getParameter("lite_accentAmt"))
+            p->setValueNotifyingHost(p->convertTo0to1((float)v));
+    };
+    accentKnob.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
+    {
+        statusBar.showParam(name, val);
+    };
+    addAndMakeVisible(accentKnob);
+
     euclidPanel.onPatternChanged = [this]() { refreshCircle(); };
     euclidPanel.onStatusUpdate   = [this](const juce::String& name, const juce::String& value)
     {
@@ -79,11 +96,13 @@ void LiteEditor::resized()
     const int circleSize = juce::jmin(area.getHeight(), kCircleSize);
     rhythmCircle.setBounds(area.removeFromLeft(circleSize)
                                .withSizeKeepingCentre(circleSize, circleSize));
-    // Note selector row at the bottom of the right panel.
-    auto noteRow = area.removeFromBottom(kNoteRowH);
+    // Controls row at the bottom of the right panel: note selector + accent knob.
+    auto controlsRow = area.removeFromBottom(kControlsH);
+    auto accentArea  = controlsRow.removeFromRight(70);
+    accentKnob.setBounds(accentArea.reduced(2, 2));
     const int labelW = 70;
-    noteSelectorLabel.setBounds(noteRow.removeFromLeft(labelW).reduced(2, 4));
-    noteSelector.setBounds(noteRow.reduced(2, 4));
+    noteSelectorLabel.setBounds(controlsRow.removeFromLeft(labelW).withSizeKeepingCentre(labelW, 22));
+    noteSelector.setBounds(controlsRow.withSizeKeepingCentre(controlsRow.getWidth(), 24));
 
     euclidPanel.setBounds(area);
 
