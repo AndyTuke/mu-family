@@ -1,0 +1,51 @@
+#pragma once
+#include <juce_gui_basics/juce_gui_basics.h>
+#include <functional>
+#include <cmath>
+
+// Narrow inverted bar showing sidechain gain reduction.
+// Fills top→down: empty = no GR, full = maximum ducking.
+// Driven by a getGR callback returning 0–1 linear GR depth.
+class GRMeter : public juce::Component, private juce::Timer
+{
+public:
+    std::function<float()> getGR;
+
+    GRMeter()  { startTimerHz(30); }
+    ~GRMeter() override { stopTimer(); }
+
+    void paint(juce::Graphics& g) override
+    {
+        const float w = (float)getWidth();
+        const float h = (float)getHeight();
+
+        g.setColour(juce::Colour(0xff111111));
+        g.fillRoundedRectangle(0.0f, 0.0f, w, h, 2.0f);
+
+        if (displayGR > 0.005f)
+        {
+            g.setColour(juce::Colour(0xaa7799cc));  // soft blue-grey, semi-transparent
+            g.fillRect(0.0f, 0.0f, w, displayGR * h);
+        }
+
+        g.setColour(juce::Colours::black.withAlpha(0.5f));
+        g.drawRoundedRectangle(0.0f, 0.0f, w, h, 2.0f, 1.0f);
+    }
+
+private:
+    float displayGR = 0.0f;
+    // Fast attack (~1 frame), ~220 ms release at 30 Hz
+    static constexpr float kRelease = 0.85f;
+
+    void timerCallback() override
+    {
+        const float incoming = getGR ? getGR() : 0.0f;
+        const float prev = displayGR;
+        displayGR = (incoming > displayGR)
+                  ? incoming
+                  : kRelease * displayGR + (1.0f - kRelease) * incoming;
+        displayGR = juce::jlimit(0.0f, 1.0f, displayGR);
+        if (std::abs(displayGR - prev) > 0.001f)
+            repaint();
+    }
+};

@@ -48,6 +48,7 @@ private:
     static constexpr int kFXPad   = 6;
     static constexpr int kFXAreaH = kFXRowH * 3 + kFXGap * 2 + kFXPad * 2;
     static constexpr int kDivW     = 4;
+    static constexpr int kChanGap  = 3;
     static constexpr int kChanW    = 64;
     static constexpr int kMasterW  = 96;
 

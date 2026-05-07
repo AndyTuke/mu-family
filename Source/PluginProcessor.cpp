@@ -1,5 +1,9 @@
 #include "PluginProcessor.h"
+#if MUCLID_LITE_BUILD
+#include "LiteEditor.h"
+#else
 #include "PluginEditor.h"
+#endif
 #include "Sequencer/Rhythm.h"
 #include "FX/FXAlgorithmDef.h"
 
@@ -82,22 +86,20 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addF(p+"fEnvRel", n+"F Env Rel",  0.0f, 100.0f,  3.0f);
         addF(p+"fEnvDep", n+"F Env Dep",  0.0f,  48.0f,  0.0f);
         // Amp
-        addF(p+"ampLvl",  n+"Amp Level",  0.0f,   2.0f,  0.5f);  // Stage 19: −6 dB default
+        addF(p+"ampLvl",  n+"Amp Level",  0.0f,   2.0f,  1.0f);  // Issue #121: 0 dB default
         addF(p+"aEnvAtk", n+"A Env Atk",  0.0f, 100.0f,  0.0f);
         addF(p+"aEnvDec", n+"A Env Dec",  0.0f, 100.0f,  3.0f);
         addF(p+"aEnvSus", n+"A Env Sus",  0.0f, 100.0f, 80.0f);
         addF(p+"aEnvRel",   n+"A Env Rel",  0.0f, 100.0f,  5.0f);
         addF(p+"accentDb",  n+"Accent",     0.0f,  12.0f,  0.0f);
         // Drive
-        addI(p+"drvChar", n+"Drive Char",   0,      4,      0);  // 0=None,1=Soft,2=Hard,3=Fold,4=Bitcrusher
+        addI(p+"drvChar", n+"Drive Char",   0,      5,      0);  // 0=None,1=Soft,2=Hard,3=Fold,4=Bitcrusher,5=Clipper
         addF(p+"drvDrv",  n+"Drive",        0.0f, 100.0f,    0.0f);  // Soft/Hard/Fold drive amount
         addF(p+"drvOut",  n+"Drive Out",  -24.0f,    0.0f,   0.0f);  // Soft/Hard/Fold output level
         addF(p+"drvBits", n+"Bits",         1.0f,  16.0f,   16.0f);  // Bitcrusher bit depth
         addF(p+"drvRate", n+"Drive Rate",  100.0f, 48000.0f, 48000.0f);  // Bitcrusher sample rate
         addF(p+"drvDit",  n+"Dither",       0.0f, 100.0f,    0.0f);  // Bitcrusher dither amount
         addF(p+"drvTon",  n+"Drive Tone",  20.0f, 20000.0f, 20000.0f);  // Shared LPF
-        // Misc
-        addB(p+"midiMode", n+"MIDI Mode", false);
     }
 
     // ── Effect slot (8 params) ────────────────────────────────────────────────
@@ -137,9 +139,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     addF("rev_dirt", "Reverb Dirt",   0.0f,   1.0f,  0.0f);
 
     // ── Intra-FX routing (3 params) ───────────────────────────────────────────
-    addF("eff2dly", "Effect→Delay",  0.0f, 1.0f, 0.0f);
-    addF("eff2rev", "Effect→Reverb", 0.0f, 1.0f, 0.0f);
-    addF("dly2rev", "Delay→Reverb",  0.0f, 1.0f, 0.0f);
+    addF("eff2dly", juce::String::fromUTF8(u8"Effect→Delay"),  0.0f, 1.0f, 0.0f);
+    addF("eff2rev", juce::String::fromUTF8(u8"Effect→Reverb"), 0.0f, 1.0f, 0.0f);
+    addF("dly2rev", juce::String::fromUTF8(u8"Delay→Reverb"),  0.0f, 1.0f, 0.0f);
 
     // ── Echo (embedded in EFX slot when algo=Echo) ────────────────────────────
     addB("echo_en",        "Echo Enable",      true);
@@ -158,7 +160,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     {
         const juce::String c = "ch" + juce::String(i) + "_";
         const juce::String n = "Ch" + juce::String(i + 1) + " ";
-        addF(c+"lvl",     n+"Level",      0.0f, 1.0f,  0.5f);
+        addF(c+"lvl",     n+"Level",      0.0f, 1.0f,  1.0f);  // Issue #121: 0 dB default
         addF(c+"pan",     n+"Pan",       -1.0f, 1.0f,  0.0f);
         addB(c+"mute",    n+"Mute",      false);
         addB(c+"solo",    n+"Solo",      false);
@@ -170,6 +172,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addF(c+"scAmt",   n+"SC Amount", 0.0f, 1.0f, 0.0f);
         addF(c+"scAtk",   n+"SC Attack", 1.0f, 500.0f, 5.0f);
         addF(c+"scRel",   n+"SC Release",10.0f, 2000.0f, 100.0f);
+        // Multi-bus output routing: 0 = Master mix, 1..8 = direct out to Bus 1..8.
+        addI(c+"outBus",  n+"Output Bus",0, 8,     0);
     }
 
     // ── Return channel strips (4 × 3 = 12) ───────────────────────────────────
@@ -184,19 +188,41 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     }
 
     // ── Master (2 params) ─────────────────────────────────────────────────────
-    addF("mstr_lvl",  "Master Level", 0.0f, 1.0f,  0.75f);
+    addF("mstr_lvl",  "Master Level", 0.0f, 1.0f,  1.0f);   // Issue #121: 0 dB default
     addF("mstr_pan",  "Master Pan",  -1.0f, 1.0f,  0.0f);
     addI("mstrLoop",  "Master Loop",  0, 16, 0);   // 0=free, 1-16 → 16-256 steps
+
+#if MUCLID_LITE_BUILD
+    addI("lite_midiNote", "MIDI Note", 0, 127, 36);
+#endif
 
     return layout;
 }
 
 //==============================================================================
+// Declare 10 stereo output buses: Master (always enabled), Out 1..8 + FX Returns
+// (disabled by default so a fresh project loads with just one stereo output, matching
+// pre-multi-bus behaviour). Hosts that support it can enable the extra buses.
 PluginProcessor::PluginProcessor()
+#if MUCLID_LITE_BUILD
+    : AudioProcessor(BusesProperties()),
+#else
     : AudioProcessor(BusesProperties()
-          .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+          .withOutput("Master",     juce::AudioChannelSet::stereo(), true)
+          .withOutput("Out 1",      juce::AudioChannelSet::stereo(), false)
+          .withOutput("Out 2",      juce::AudioChannelSet::stereo(), false)
+          .withOutput("Out 3",      juce::AudioChannelSet::stereo(), false)
+          .withOutput("Out 4",      juce::AudioChannelSet::stereo(), false)
+          .withOutput("Out 5",      juce::AudioChannelSet::stereo(), false)
+          .withOutput("Out 6",      juce::AudioChannelSet::stereo(), false)
+          .withOutput("Out 7",      juce::AudioChannelSet::stereo(), false)
+          .withOutput("Out 8",      juce::AudioChannelSet::stereo(), false)
+          .withOutput("FX Returns", juce::AudioChannelSet::stereo(), false)),
+#endif
       apvts(*this, nullptr, "MuClidState", createParameterLayout())
 {
+    previewFormatManager.registerBasicFormats();
+
     // Initialise ApplicationProperties (needed by getContentDir/getPresetsDir).
     {
         juce::PropertiesFile::Options opts;
@@ -208,6 +234,19 @@ PluginProcessor::PluginProcessor()
         settingsFile.getParentDirectory().createDirectory();
         appSettings = std::make_unique<juce::PropertiesFile>(settingsFile, opts);
     }
+
+    // Load MIDI sync settings.
+    midiSyncEnabled .store(appSettings->getBoolValue("midiSyncEnabled",  false),
+                           std::memory_order_relaxed);
+    midiSyncMessages.store(appSettings->getIntValue ("midiSyncMessages", 2),
+                           std::memory_order_relaxed);
+
+    // Load MIDI program-change preset map (lives in its own JSON file).
+    midiPresetMap.load();
+
+    // Multi-bus output toggle (DAW). Default: on.
+    multiBusEnabled.store(appSettings->getBoolValue("multiBusEnabled", true),
+                          std::memory_order_relaxed);
 
     // Check license file — must run after appSettings so getContentDir() works.
     licenseInfo = LicenseChecker::check(getContentDir());
@@ -237,16 +276,20 @@ PluginProcessor::PluginProcessor()
     defaultRhythm.genA.steps = 16;
     defaultRhythm.genA.hits  = 4;
     sequencer.addRhythm(defaultRhythm);
+#if !MUCLID_LITE_BUILD
     voiceEngines[0] = std::make_unique<VoiceEngine>();
+#endif
     numActiveRhythms.store(1, std::memory_order_release);
 
     apvtsLoading = true;
     pushRhythmToAPVTS(0);
     apvtsLoading = false;
 
+#if !MUCLID_LITE_BUILD
     // Ensure user content folders exist and load the default preset if present.
     ensureContentFoldersExist();
     loadDefaultPreset();
+#endif
 }
 
 PluginProcessor::~PluginProcessor()
@@ -258,8 +301,14 @@ PluginProcessor::~PluginProcessor()
 }
 
 //==============================================================================
-const juce::String PluginProcessor::getName() const { return "mu-Clid"; }
-bool PluginProcessor::acceptsMidi() const { return false; }
+const juce::String PluginProcessor::getName() const
+{
+#if MUCLID_LITE_BUILD
+    return "mu-Clid Lite";
+#else
+    return "mu-Clid";
+#endif
+}
 double PluginProcessor::getTailLengthSeconds() const { return 0.0; }
 
 int PluginProcessor::getNumPrograms() { return 1; }
@@ -276,20 +325,173 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     const int n = numActiveRhythms.load(std::memory_order_acquire);
     for (int i = 0; i < n; ++i)
     {
+#if !MUCLID_LITE_BUILD
         voiceEngines[i]->prepareToPlay(sampleRate, samplesPerBlock);
+#endif
         midiEngines[i].prepare(sampleRate, samplesPerBlock);
     }
+#if !MUCLID_LITE_BUILD
     fxChain.prepare(sampleRate, samplesPerBlock);
     mixerEngine.prepare(sampleRate, samplesPerBlock);
+    previewTransport.prepareToPlay(samplesPerBlock, sampleRate);
+    previewScratchBuffer.setSize(2, samplesPerBlock, false, true, true);
+#endif
 }
 
-void PluginProcessor::releaseResources() {}
+void PluginProcessor::releaseResources()
+{
+    previewTransport.releaseResources();
+}
 
 void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                                    juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
+
+#if MUCLID_LITE_BUILD
+    {
+    // Lite mode: MIDI-only sequencing, no audio processing.
+    double beatPos = 0.0;
+    bool   playing = false;
+
+    if (auto* ph = getPlayHead())
+    {
+        if (auto pos = ph->getPosition())
+        {
+            playing = pos->getIsPlaying();
+            if (auto ppq = pos->getPpqPosition())
+                beatPos = *ppq;
+        }
+    }
+    if (!playing && internalPlaying)
+    {
+        playing = true;
+        beatPos = internalBeatPos;
+        const int ns = juce::jmax(1, buffer.getNumSamples());
+        internalBeatPos += (ns / currentSampleRate) * (internalBpm / 60.0);
+    }
+
+    sequencerPlaying.set(playing);
+    lastBeatPos.set(beatPos);
+
+    const juce::ScopedTryLock rLock(rhythmsLock);
+    if (!rLock.isLocked()) return;
+    const int numRhythms = numActiveRhythms.load(std::memory_order_acquire);
+
+    if (playing)
+    {
+        const auto blockResult = sequencer.processBlock(beatPos);
+        for (int r = 0; r < numRhythms; ++r)
+        {
+            if (blockResult.firedMask & (1 << r))
+            {
+                const int midiNote = (int)apvts.getRawParameterValue("lite_midiNote")->load();
+                midiEngines[r].trigger(midiMessages, 0, midiNote, 1, 1.0f);
+                rhythmPlayState[r].hitFired.set(true);
+                rhythmPlayState[r].hitCount.set(rhythmPlayState[r].hitCount.get() + 1);
+            }
+        }
+        const float frac = static_cast<float>(
+            std::fmod(beatPos / SequencerEngine::StepLengthBeats, 1.0));
+        beatFraction.set(frac);
+        for (int r = 0; r < numRhythms; ++r)
+        {
+            rhythmPlayState[r].currentStep  .set(sequencer.getLastStepIndex(r));
+            rhythmPlayState[r].patternLength.set(sequencer.getPatternLength(r));
+            const Rhythm& rhy = sequencer.getRhythm(r);
+            rhythmPlayState[r].stepsA.set(juce::jmax(1, rhy.genA.steps));
+            rhythmPlayState[r].stepsB.set(juce::jmax(1, rhy.genB.steps));
+            rhythmPlayState[r].stepsC.set(juce::jmax(1, rhy.genC.steps));
+        }
+    }
+    for (int r = 0; r < numRhythms; ++r)
+        midiEngines[r].processBlock(midiMessages, juce::jmax(1, buffer.getNumSamples()));
+    } // end MUCLID_LITE_BUILD scope
+    return;
+#endif
+
+    // MIDI clock sync: scan system real-time messages before beat-pos determination.
+    double midiClockBlockBeatPos = 0.0;
+    if (midiSyncEnabled.load(std::memory_order_relaxed) && wrapperType == wrapperType_Standalone)
+    {
+        const bool doTick      = (midiSyncMessages.load(std::memory_order_relaxed) != 1);
+        const bool doTransport = (midiSyncMessages.load(std::memory_order_relaxed) != 0);
+        const int  numSamples  = buffer.getNumSamples();
+        midiClockBlockBeatPos  = midiClockBeatPos;  // start-of-block position
+        int prevTickSo = 0;
+
+        for (const auto& msgRef : midiMessages)
+        {
+            const auto& m = msgRef.getMessage();
+            if (m.getRawDataSize() != 1) continue;
+            const juce::uint8 b  = m.getRawData()[0];
+            const int   so = msgRef.samplePosition;
+
+            if (doTransport)
+            {
+                if (b == 0xFA)
+                {
+                    midiClockBeatPos = 0.0;  midiClockBlockBeatPos = 0.0;
+                    midiClockRingCount = 0;  midiClockSamplesSinceLastTick = 0;
+                    prevTickSo = 0;
+                    midiClockIsPlaying.set(true);
+                }
+                else if (b == 0xFB) { midiClockIsPlaying.set(true); }
+                else if (b == 0xFC) { midiClockIsPlaying.set(false); }
+            }
+
+            if (doTick && b == 0xF8)
+            {
+                const int interval = midiClockSamplesSinceLastTick + (so - prevTickSo);
+                if (midiClockRingCount > 0 && interval > 10)
+                {
+                    midiClockTickIntervals[midiClockRingHead] = interval;
+                    midiClockRingHead = (midiClockRingHead + 1) % 24;
+                    if (midiClockRingCount < 24) ++midiClockRingCount;
+                    double sum = 0.0;
+                    for (int i = 0; i < midiClockRingCount; ++i) sum += midiClockTickIntervals[i];
+                    midiClockBpmEst.set(juce::jlimit(20.0, 300.0,
+                        60.0 * currentSampleRate / ((sum / midiClockRingCount) * 24.0)));
+                }
+                else if (midiClockRingCount == 0) { ++midiClockRingCount; }
+                midiClockSamplesSinceLastTick = 0;
+                prevTickSo = so;
+                midiClockBeatPos += 1.0 / 24.0;
+            }
+        }
+        midiClockSamplesSinceLastTick += numSamples - prevTickSo;
+        midiClockBeatPosUI.store(midiClockBeatPos, std::memory_order_relaxed);
+    }
+
+    // MIDI program change → rhythm preset (channel N → slot N-1, program = preset index).
+    // Audio thread enqueues into a lock-free FIFO; handleAsyncUpdate drains on the message
+    // thread and calls stageRhythmPreset (which can do file I/O).
+    {
+        const uint8_t chMask = midiPresetMap.getChannelMask();
+        if (chMask != 0)
+        {
+            bool needPC = false;
+            for (const auto& msgRef : midiMessages)
+            {
+                const auto& m = msgRef.getMessage();
+                if (! m.isProgramChange()) continue;
+                const int ch = m.getChannel();      // 1-based, 1..16
+                if (ch < 1 || ch > 8) continue;
+                if (! (chMask & (1 << (ch - 1)))) continue;
+                int start1, size1, start2, size2;
+                pcFifo.prepareToWrite(1, start1, size1, start2, size2);
+                if (size1 + size2 > 0)
+                {
+                    const int dst = (size1 > 0) ? start1 : start2;
+                    pcQueue[(size_t) dst] = { ch - 1, m.getProgramChangeNumber() };
+                    pcFifo.finishedWrite(1);
+                    needPC = true;
+                }
+            }
+            if (needPC) triggerAsyncUpdate();
+        }
+    }
 
     double beatPos = 0.0;
     bool   playing = false;
@@ -304,17 +506,34 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         }
     }
 
-    if (!playing && internalPlaying)
+    if (!playing && midiSyncEnabled.load(std::memory_order_relaxed)
+                 && wrapperType == wrapperType_Standalone
+                 && (midiClockIsPlaying.get() || internalPlaying))
+    {
+        playing = true;
+        beatPos = midiClockBlockBeatPos;
+    }
+    else if (!playing && internalPlaying)
     {
         playing  = true;
         beatPos  = internalBeatPos;
         internalBeatPos += (buffer.getNumSamples() / currentSampleRate) * (internalBpm / 60.0);
     }
 
-    const int numRhythms = numActiveRhythms.load(std::memory_order_acquire);
-
     sequencerPlaying.set(playing);
     lastBeatPos.set(beatPos);
+
+    const juce::ScopedTryLock rLock(rhythmsLock);
+    if (!rLock.isLocked())
+    {
+        buffer.clear();
+        return;
+    }
+
+    // Must read numActiveRhythms AFTER acquiring rhythmsLock — otherwise the snapshot
+    // can be stale relative to the vector state and `sequencer.getRhythm(r)` indexes
+    // out of bounds (MSVC _ITERATOR_DEBUG_LEVEL → abort()).
+    const int numRhythms = numActiveRhythms.load(std::memory_order_acquire);
 
     if (playing)
     {
@@ -398,6 +617,27 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
                 rhythm.modLock.store(false, std::memory_order_release);
 
+                // Snapshot pre-normalised values for the UI live-arc indicator (#133).
+                {
+                    auto& snap = modSnapshot[r];
+                    auto sn = [](float v, float mn, float mx) { return juce::jlimit(0.0f, 1.0f, (v - mn) / (mx - mn)); };
+                    snap[kSnapAmpAtk]      .set(sn(modParamValues["amp.attack"],       0.0f,    100.0f));
+                    snap[kSnapAmpDec]      .set(sn(modParamValues["amp.decay"],        0.0f,    100.0f));
+                    snap[kSnapAmpSus]      .set(sn(modParamValues["amp.sustain"],      0.0f,    100.0f));
+                    snap[kSnapAmpRel]      .set(sn(modParamValues["amp.release"],      0.0f,    100.0f));
+                    snap[kSnapFilterCutoff].set(sn(modParamValues["filter.cutoff"],    20.0f, 20000.0f));
+                    snap[kSnapFilterRes]   .set(sn(modParamValues["filter.resonance"], 0.0f,    100.0f));
+                    snap[kSnapFenvAtk]     .set(sn(modParamValues["fenv.attack"],      0.0f,    100.0f));
+                    snap[kSnapFenvDec]     .set(sn(modParamValues["fenv.decay"],       0.0f,    100.0f));
+                    snap[kSnapFenvDepth]   .set(sn(modParamValues["fenv.depth"],       0.0f,     48.0f));
+                    snap[kSnapPitchSemi]   .set(sn(modParamValues["pitch.semitones"], -12.0f,    12.0f));
+                    snap[kSnapInsDrive]    .set(sn(modParamValues["insert.drive"],     0.0f,    100.0f));
+                    snap[kSnapInsOutput]   .set(sn(modParamValues["insert.output"],   -24.0f,    0.0f));
+                    snap[kSnapInsBits]     .set(sn(modParamValues["insert.bits"],      1.0f,     16.0f));
+                    snap[kSnapInsDither]   .set(sn(modParamValues["insert.dither"],    0.0f,    100.0f));
+                    snap[kSnapInsLpf]      .set(sn(modParamValues["insert.lpf"],      20.0f, 20000.0f));
+                }
+
                 // Write modulated values back, clamping to safe ranges.
                 modParams.ampEnvAtk      = juce::jmax(0.001f, modParamValues["amp.attack"]   * 0.03f);
                 modParams.ampEnvDec      = juce::jmax(0.001f, modParamValues["amp.decay"]    * 0.03f);
@@ -423,8 +663,50 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     }
 
     fxChain.setHostBpm(internalBpm);
-    mixerEngine.processBlock(buffer, numRhythms,
-                             voiceEngines.data(), fxChain, buffer.getNumSamples());
+
+    // Gather the host's output bus buffers. Buses we declared in BusesProperties may
+    // be disabled in the host's chosen layout — skip those (the channel routes silently).
+    auto masterBus = getBusBuffer(buffer, false, kMasterBusIndex);
+
+    std::array<juce::AudioBuffer<float>, 8> directBufs;
+    std::array<juce::AudioBuffer<float>*, 8> directPtrs {};
+    for (int i = 0; i < 8; ++i)
+    {
+        const int busIdx = kFirstDirectOutBus + i;
+        if (busIdx < getBusCount(false))
+            if (auto* bus = getBus(false, busIdx))
+                if (bus->isEnabled())
+                {
+                    directBufs[(size_t) i] = getBusBuffer(buffer, false, busIdx);
+                    directPtrs[(size_t) i] = &directBufs[(size_t) i];
+                }
+    }
+
+    juce::AudioBuffer<float>  fxRetBuf;
+    juce::AudioBuffer<float>* fxRetPtr = nullptr;
+    if (kFXReturnsBusIndex < getBusCount(false))
+        if (auto* bus = getBus(false, kFXReturnsBusIndex))
+            if (bus->isEnabled())
+            {
+                fxRetBuf = getBusBuffer(buffer, false, kFXReturnsBusIndex);
+                fxRetPtr = &fxRetBuf;
+            }
+
+    mixerEngine.processBlock(masterBus, numRhythms,
+                             voiceEngines.data(), fxChain, buffer.getNumSamples(),
+                             &directPtrs, fxRetPtr);
+
+    // Mix sample preview (for file browser audition) directly into the master output.
+    if (previewTransport.isPlaying())
+    {
+        const int ns = buffer.getNumSamples();
+        previewScratchBuffer.clear(0, 0, ns);
+        previewScratchBuffer.clear(1, 0, ns);
+        previewTransport.getNextAudioBlock({ &previewScratchBuffer, 0, ns });
+        for (int ch = 0; ch < masterBus.getNumChannels(); ++ch)
+            masterBus.addFrom(ch, 0, previewScratchBuffer,
+                              ch % previewScratchBuffer.getNumChannels(), 0, ns, 0.7f);
+    }
 
     for (int r = 0; r < numRhythms; ++r)
         midiEngines[r].processBlock(midiMessages, buffer.getNumSamples());
@@ -435,7 +717,11 @@ bool PluginProcessor::hasEditor() const { return true; }
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()
 {
+#if MUCLID_LITE_BUILD
+    return new LiteEditor(*this);
+#else
     return new PluginEditor(*this);
+#endif
 }
 
 //==============================================================================
@@ -486,7 +772,30 @@ static const char* const kRhythmSuffixes[] = {
     "fltType","fltCut","fltRes","fEnvAtk","fEnvDec","fEnvSus","fEnvRel","fEnvDep",
     "ampLvl","aEnvAtk","aEnvDec","aEnvSus","aEnvRel","accentDb",
     "drvChar","drvDrv","drvOut","drvBits","drvRate","drvDit","drvTon",
-    "midiMode",
+    nullptr
+};
+
+// Per-channel mixer APVTS parameter suffixes (prefix: "ch{i}_").
+// Saved in rhythm presets so sends/sidechain travel with the rhythm.
+static const char* const kChannelSuffixes[] = {
+    "lvl","pan","mute","solo","sendEff","sendDly","sendRev",
+    "scSrc","scAmt","scAtk","scRel","outBus",
+    nullptr
+};
+
+// Global APVTS parameter IDs written to the GlobalState child of .muclid presets.
+static const char* const kGlobalParams[] = {
+    "eff_algo","eff_en","eff_send","eff_p0","eff_p1","eff_p2","eff_p3","eff_p4",
+    "dly_en","dly_mode","dly_ms","dly_syncDenom","dly_syncDot","dly_syncTrip",
+    "dly_count","dly_fb","dly_spread","dly_dirt","dly_send",
+    "rev_algo","rev_en","rev_lvl","rev_size","rev_pre","rev_diff","rev_damp","rev_mod","rev_dirt",
+    "eff2dly","eff2rev","dly2rev",
+    "echo_en","echo_mode","echo_ms","echo_syncDenom","echo_syncDot","echo_syncTrip",
+    "echo_count","echo_fb","echo_spread","echo_dirt",
+    "ret_eff_lvl","ret_eff_pan","ret_eff_mute","ret_eff_solo",
+    "ret_dly_lvl","ret_dly_pan","ret_dly_mute","ret_dly_solo",
+    "ret_rev_lvl","ret_rev_pan","ret_rev_mute","ret_rev_solo",
+    "mstr_lvl","mstr_pan","mstrLoop",
     nullptr
 };
 
@@ -543,7 +852,6 @@ static void applyRhythmSuffix(const juce::String& suffix, float v, Rhythm& r,
     else if (suffix == "drvRate")   { r.voiceParams.driveRate  = v;  voiceDirty = true; }
     else if (suffix == "drvDit")    { r.voiceParams.drvDither  = v;  voiceDirty = true; }
     else if (suffix == "drvTon")    { r.voiceParams.driveTone  = v;  voiceDirty = true; }
-    else if (suffix == "midiMode")  { r.midiMode = v > 0.5f; }
 }
 
 void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float v)
@@ -559,7 +867,7 @@ void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float 
     if (!apvtsLoading)
     {
         if (patternDirty) sequencer.updatePattern(ri);
-        if (voiceDirty)   voiceEngines[ri]->setParams(r.voiceParams);
+        if (voiceDirty && voiceEngines[ri]) voiceEngines[ri]->setParams(r.voiceParams);
     }
 }
 
@@ -648,6 +956,7 @@ void PluginProcessor::syncMixerParam(const juce::String& id, float v)
             else if (param == "scAmt")   ch.sidechainAmount   = v;
             else if (param == "scAtk")   ch.sidechainAttackMs  = v;
             else if (param == "scRel")   ch.sidechainReleaseMs = v;
+            else if (param == "outBus")  ch.outputBus         = juce::jlimit(0, 8, juce::roundToInt(v));
         }
         return;
     }
@@ -758,7 +1067,6 @@ void PluginProcessor::pushRhythmToAPVTS(int ri)
     set(px+"drvRate",   vp.driveRate);
     set(px+"drvDit",    vp.drvDither);
     set(px+"drvTon",    vp.driveTone);
-    set(px+"midiMode",  r.midiMode ? 1.0f : 0.0f);
 }
 
 //==============================================================================
@@ -766,11 +1074,14 @@ void PluginProcessor::addRhythm(const Rhythm& r)
 {
     int ri = sequencer.getNumRhythms();
     if (ri >= SequencerEngine::MaxRhythms) return;
-    sequencer.addRhythm(r);
     voiceEngines[ri] = std::make_unique<VoiceEngine>();
     voiceEngines[ri]->prepareToPlay(currentSampleRate, currentBlockSize);
     midiEngines[ri].prepare(currentSampleRate, currentBlockSize);
-    numActiveRhythms.store(sequencer.getNumRhythms(), std::memory_order_release);
+    {
+        const juce::ScopedLock sl(rhythmsLock);
+        sequencer.addRhythm(r);
+        numActiveRhythms.store(sequencer.getNumRhythms(), std::memory_order_release);
+    }
     if (ri < loadedSamplePaths.size())
         loadedSamplePaths.set(ri, juce::String());
     apvtsLoading = true;
@@ -855,16 +1166,75 @@ void PluginProcessor::removeRhythm(int index)
     // suspendProcessing ensures no in-progress processBlock holds a stale
     // numActiveRhythms snapshot and reads rhythms[r] while we erase and shift.
     suspendProcessing(true);
-    numActiveRhythms.store(newN, std::memory_order_release);
-    sequencer.removeRhythm(index);
-    for (int i = index; i < newN; ++i)
     {
-        voiceEngines[i] = std::move(voiceEngines[i + 1]);
-        midiEngines[i]  = std::move(midiEngines[i + 1]);
+        const juce::ScopedLock sl(rhythmsLock);
+        numActiveRhythms.store(newN, std::memory_order_release);
+        sequencer.removeRhythm(index);
+        for (int i = index; i < newN; ++i)
+        {
+            voiceEngines[i] = std::move(voiceEngines[i + 1]);
+            midiEngines[i]  = std::move(midiEngines[i + 1]);
+            mixerEngine.channels[i] = mixerEngine.channels[i + 1];
+        }
+        voiceEngines[newN].reset();
+        midiEngines[newN] = MidiOutputEngine{};
+        mixerEngine.channels[newN] = MixerEngine::ChannelState{};
     }
-    voiceEngines[newN].reset();
-    midiEngines[newN] = MidiOutputEngine{};
     suspendProcessing(false);
+}
+
+//==============================================================================
+void PluginProcessor::setMidiSyncEnabled(bool on)
+{
+    midiSyncEnabled.store(on, std::memory_order_relaxed);
+    if (!on) midiClockIsPlaying.set(false);
+    appSettings->setValue("midiSyncEnabled", on);
+    appSettings->saveIfNeeded();
+}
+
+void PluginProcessor::setMidiSyncMessages(int mode)
+{
+    midiSyncMessages.store(juce::jlimit(0, 2, mode), std::memory_order_relaxed);
+    appSettings->setValue("midiSyncMessages", mode);
+    appSettings->saveIfNeeded();
+}
+
+void PluginProcessor::setMultiBusEnabled(bool on)
+{
+    multiBusEnabled.store(on, std::memory_order_relaxed);
+    appSettings->setValue("multiBusEnabled", on);
+    appSettings->saveIfNeeded();
+}
+
+bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+{
+#if MUCLID_LITE_BUILD
+    // MIDI effect: no audio buses.
+    return layouts.getMainInputChannelSet()  == juce::AudioChannelSet::disabled()
+        && layouts.getMainOutputChannelSet() == juce::AudioChannelSet::disabled();
+#else
+    const auto& outs = layouts.outputBuses;
+    if (outs.size() < 1 || outs.size() > kTotalBuses)
+        return false;
+
+    // Multi-bus disabled: only allow a single stereo output.
+    if (! multiBusEnabled.load(std::memory_order_relaxed) && outs.size() > 1)
+        return false;
+
+    // Each declared bus must be either stereo or disabled.
+    for (int i = 0; i < outs.size(); ++i)
+    {
+        const auto& set = outs.getReference(i);
+        if (set != juce::AudioChannelSet::stereo() && set != juce::AudioChannelSet::disabled())
+            return false;
+    }
+
+    // Master bus (0) must be active — disabling it would leave nowhere for the master mix.
+    if (outs.getReference(0) == juce::AudioChannelSet::disabled())
+        return false;
+
+    return true;
+#endif
 }
 
 //==============================================================================
@@ -873,6 +1243,27 @@ void PluginProcessor::loadSampleForRhythm(int rhythmIndex, const juce::File& fil
     if (rhythmIndex < 0 || rhythmIndex >= numActiveRhythms.load(std::memory_order_acquire)) return;
     voiceEngines[rhythmIndex]->loadFile(file);
     loadedSamplePaths.set(rhythmIndex, file.getFullPathName());
+}
+
+void PluginProcessor::startSamplePreview(const juce::File& file)
+{
+    if (!file.existsAsFile()) return;
+    auto* reader = previewFormatManager.createReaderFor(file);
+    if (!reader) return;
+    previewTransport.stop();
+    previewTransport.setSource(nullptr);
+    previewSource = std::make_unique<juce::AudioFormatReaderSource>(reader, true);
+    previewTransport.setSource(previewSource.get(), 0, nullptr,
+                               reader->sampleRate, reader->numChannels);
+    previewTransport.setPosition(0.0);
+    previewTransport.start();
+}
+
+void PluginProcessor::stopSamplePreview()
+{
+    previewTransport.stop();
+    previewTransport.setSource(nullptr);
+    previewSource.reset();
 }
 
 //==============================================================================
@@ -975,7 +1366,8 @@ bool PluginProcessor::hasPendingSwap(int rhythmIndex) const
     return pendingSwaps[rhythmIndex].isReady.load(std::memory_order_relaxed);
 }
 
-// Called on the message thread when the audio thread signals a boundary was reached.
+// Called on the message thread when the audio thread signals a boundary was reached
+// or a MIDI program change was queued.
 void PluginProcessor::handleAsyncUpdate()
 {
     const int n = numActiveRhythms.load(std::memory_order_acquire);
@@ -1003,6 +1395,29 @@ void PluginProcessor::handleAsyncUpdate()
         apvtsLoading = true;
         pushRhythmToAPVTS(r);
         apvtsLoading = false;
+    }
+
+    // Drain MIDI program-change queue. Each event stages a rhythm preset; the existing
+    // stageRhythmPreset path handles loop-boundary timing or applies immediately if stopped.
+    {
+        const int ready = pcFifo.getNumReady();
+        if (ready > 0)
+        {
+            int start1, size1, start2, size2;
+            pcFifo.prepareToRead(ready, start1, size1, start2, size2);
+            const int activeRhythms = numActiveRhythms.load(std::memory_order_acquire);
+            auto handle = [this, activeRhythms](const ProgramChangeEvent& ev)
+            {
+                if (ev.slot < 0 || ev.slot >= activeRhythms) return;
+                if (! midiPresetMap.hasPreset(ev.presetIndex))   return;
+                const juce::File f { midiPresetMap.getPresetPath(ev.presetIndex) };
+                if (f.existsAsFile())
+                    stageRhythmPreset(ev.slot, f);
+            };
+            for (int i = 0; i < size1; ++i) handle(pcQueue[(size_t)(start1 + i)]);
+            for (int i = 0; i < size2; ++i) handle(pcQueue[(size_t)(start2 + i)]);
+            pcFifo.finishedRead(ready);
+        }
     }
 }
 
@@ -1056,11 +1471,13 @@ void PluginProcessor::saveRhythmPreset(int rhythmIdx, const juce::String& name,
 
     const juce::String srcPrefix = "r" + juce::String(rhythmIdx) + "_";
     for (int i = 0; kRhythmSuffixes[i] != nullptr; ++i)
-    {
         if (auto* param = apvts.getParameter(srcPrefix + kRhythmSuffixes[i]))
-            state.setProperty("r0_" + juce::String(kRhythmSuffixes[i]),
-                               param->getValue(), nullptr);
-    }
+            state.setProperty("r0_" + juce::String(kRhythmSuffixes[i]), param->getValue(), nullptr);
+
+    const juce::String chPrefix = "ch" + juce::String(rhythmIdx) + "_";
+    for (int i = 0; kChannelSuffixes[i] != nullptr; ++i)
+        if (auto* param = apvts.getParameter(chPrefix + kChannelSuffixes[i]))
+            state.setProperty("ch_" + juce::String(kChannelSuffixes[i]), param->getValue(), nullptr);
 
     auto dir = getRhythmsDir();
     dir.createDirectory();
@@ -1085,8 +1502,12 @@ void PluginProcessor::saveRhythmPresetToFile(int rhythmIdx, const juce::File& de
     const juce::String srcPrefix = "r" + juce::String(rhythmIdx) + "_";
     for (int i = 0; kRhythmSuffixes[i] != nullptr; ++i)
         if (auto* param = apvts.getParameter(srcPrefix + kRhythmSuffixes[i]))
-            state.setProperty("r0_" + juce::String(kRhythmSuffixes[i]),
-                               param->getValue(), nullptr);
+            state.setProperty("r0_" + juce::String(kRhythmSuffixes[i]), param->getValue(), nullptr);
+
+    const juce::String chPrefix2 = "ch" + juce::String(rhythmIdx) + "_";
+    for (int i = 0; kChannelSuffixes[i] != nullptr; ++i)
+        if (auto* param = apvts.getParameter(chPrefix2 + kChannelSuffixes[i]))
+            state.setProperty("ch_" + juce::String(kChannelSuffixes[i]), param->getValue(), nullptr);
 
     destFile.replaceWithText(state.toXmlString());
 }
@@ -1104,10 +1525,17 @@ bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
     {
         juce::Identifier propId { "r0_" + juce::String(kRhythmSuffixes[i]) };
         if (state.hasProperty(propId))
-        {
             if (auto* param = apvts.getParameter(dstPrefix + kRhythmSuffixes[i]))
                 param->setValueNotifyingHost((float)state.getProperty(propId));
-        }
+    }
+
+    const juce::String dstChPrefix = "ch" + juce::String(targetIdx) + "_";
+    for (int i = 0; kChannelSuffixes[i] != nullptr; ++i)
+    {
+        juce::Identifier propId { "ch_" + juce::String(kChannelSuffixes[i]) };
+        if (state.hasProperty(propId))
+            if (auto* param = apvts.getParameter(dstChPrefix + kChannelSuffixes[i]))
+                param->setValueNotifyingHost((float)state.getProperty(propId));
     }
 
     Rhythm& r = sequencer.getRhythm(targetIdx);
@@ -1305,10 +1733,13 @@ void PluginProcessor::savePreset(const juce::String& name,
 
         const juce::String srcPrefix = "r" + juce::String(i) + "_";
         for (int j = 0; kRhythmSuffixes[j] != nullptr; ++j)
-        {
             if (auto* param = apvts.getParameter(srcPrefix + kRhythmSuffixes[j]))
                 rTree.setProperty(kRhythmSuffixes[j], param->getValue(), nullptr);
-        }
+
+        const juce::String chSrcPrefix = "ch" + juce::String(i) + "_";
+        for (int j = 0; kChannelSuffixes[j] != nullptr; ++j)
+            if (auto* param = apvts.getParameter(chSrcPrefix + kChannelSuffixes[j]))
+                rTree.setProperty("ch_" + juce::String(kChannelSuffixes[j]), param->getValue(), nullptr);
 
         if (embedSamples)
         {
@@ -1332,6 +1763,13 @@ void PluginProcessor::savePreset(const juce::String& name,
         root.addChild(rTree, -1, nullptr);
     }
 
+    // Save global FX/mixer state so a preset fully restores the session.
+    juce::ValueTree globalTree("GlobalState");
+    for (int i = 0; kGlobalParams[i] != nullptr; ++i)
+        if (auto* param = apvts.getParameter(kGlobalParams[i]))
+            globalTree.setProperty(kGlobalParams[i], param->getValue(), nullptr);
+    root.addChild(globalTree, -1, nullptr);
+
     auto dir = getPresetsDir();
     dir.createDirectory();
 
@@ -1349,7 +1787,12 @@ void PluginProcessor::loadPreset(const juce::File& file)
 
     if (root.getType() == juce::Identifier("MuClidPreset"))
     {
-        const int n = juce::jlimit(1, SequencerEngine::MaxRhythms, root.getNumChildren());
+        // Count only Rhythm-type children; GlobalState child was added in #123.
+        int n = 0;
+        for (int ci = 0; ci < root.getNumChildren(); ++ci)
+            if (root.getChild(ci).getType() == juce::Identifier("Rhythm"))
+                ++n;
+        n = juce::jlimit(1, SequencerEngine::MaxRhythms, n);
         sequencer.setNumRhythms(n);
 
         const int oldN2 = numActiveRhythms.load(std::memory_order_acquire);
@@ -1377,10 +1820,12 @@ void PluginProcessor::loadPreset(const juce::File& file)
         }
 
         apvtsLoading = true;
-        for (int i = 0; i < n; ++i)
+        int rhythmIdx = 0;
+        for (int ci = 0; ci < root.getNumChildren() && rhythmIdx < n; ++ci)
         {
-            auto rTree = root.getChild(i);
-            if (!rTree.isValid()) continue;
+            auto rTree = root.getChild(ci);
+            if (rTree.getType() != juce::Identifier("Rhythm")) continue;
+            const int i = rhythmIdx++;
 
             const juce::String dstPrefix = "r" + juce::String(i) + "_";
             for (int j = 0; kRhythmSuffixes[j] != nullptr; ++j)
@@ -1389,6 +1834,15 @@ void PluginProcessor::loadPreset(const juce::File& file)
                 if (rTree.hasProperty(propId))
                     if (auto* param = apvts.getParameter(dstPrefix + kRhythmSuffixes[j]))
                         param->setValueNotifyingHost((float)rTree.getProperty(propId));
+            }
+
+            const juce::String dstChPrefix = "ch" + juce::String(i) + "_";
+            for (int j = 0; kChannelSuffixes[j] != nullptr; ++j)
+            {
+                juce::Identifier chPropId { "ch_" + juce::String(kChannelSuffixes[j]) };
+                if (rTree.hasProperty(chPropId))
+                    if (auto* param = apvts.getParameter(dstChPrefix + kChannelSuffixes[j]))
+                        param->setValueNotifyingHost((float)rTree.getProperty(chPropId));
             }
 
             Rhythm& r = sequencer.getRhythm(i);
@@ -1442,6 +1896,21 @@ void PluginProcessor::loadPreset(const juce::File& file)
 
             sequencer.updatePattern(i);
             voiceEngines[i]->setParams(r.voiceParams);
+        }
+
+        // Restore global FX/mixer state if present (added in #123; older files omit this).
+        for (int ci = 0; ci < root.getNumChildren(); ++ci)
+        {
+            auto child = root.getChild(ci);
+            if (child.getType() != juce::Identifier("GlobalState")) continue;
+            for (int gi = 0; kGlobalParams[gi] != nullptr; ++gi)
+            {
+                juce::Identifier propId { kGlobalParams[gi] };
+                if (child.hasProperty(propId))
+                    if (auto* param = apvts.getParameter(kGlobalParams[gi]))
+                        param->setValueNotifyingHost((float)child.getProperty(propId));
+            }
+            break;
         }
         apvtsLoading = false;
     }

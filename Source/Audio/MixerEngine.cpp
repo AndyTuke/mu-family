@@ -8,6 +8,7 @@ MixerEngine::MixerEngine()
     for (auto& p : channelPeaks) p.set(0.0f);
     for (auto& p : returnPeaks)  p.set(0.0f);
     masterPeak.set(0.0f);
+    for (auto& g : sidechainGR)  g.set(0.0f);
 }
 
 void MixerEngine::prepare(double sr, int blockSize)
@@ -58,7 +59,9 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                                 int                          numActiveRhythms,
                                 std::unique_ptr<VoiceEngine>* voices,
                                 FXChain&                     fxChain,
-                                int                          numSamples)
+                                int                          numSamples,
+                                std::array<juce::AudioBuffer<float>*, 8>* directOuts,
+                                juce::AudioBuffer<float>*    fxReturnsOut)
 {
     output.clear();
     effectSendBuf.clear();
@@ -78,11 +81,14 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     {
         auto& buf = channelBufs[r];
         buf.clear();
-        voices[r]->process(buf, numSamples);
+        if (voices[r]) voices[r]->process(buf, numSamples);
         buf.applyGain(kHeadroomTrim);
     }
 
     // Phase 2: apply sidechain ducking per channel.
+    for (int r = 0; r < numActiveRhythms; ++r)
+        sidechainGR[r].set(0.0f);
+
     for (int r = 0; r < numActiveRhythms; ++r)
     {
         const auto& ch  = channels[r];
@@ -103,20 +109,31 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         float* tgtR = channelBufs[r].getNumChannels() > 1
                     ? channelBufs[r].getWritePointer(1) : nullptr;
 
+        // Threshold-triggered: envelope attacks to 1.0 when source exceeds noise floor,
+        // releases to 0 when silent. Raw amplitude following produced negligible gain
+        // reduction for typical samples (−18 dBFS kick → <1 dB duck at 100% amount).
+        constexpr float kScThreshold = 0.001f; // ≈ −60 dBFS post-trim
+        const bool sourceActive = !channels[src].mute && !(anySolo && !channels[src].solo);
+        float peakGR = 0.0f;
         for (int i = 0; i < numSamples; ++i)
         {
-            const float srcLvl = juce::jmax(std::abs(srcL[i]), std::abs(srcR[i]));
-            scEnv[r] = (srcLvl > scEnv[r])
-                     ? atk * scEnv[r] + (1.0f - atk) * srcLvl
-                     : rel * scEnv[r] + (1.0f - rel) * srcLvl;
+            const float srcLvl = sourceActive
+                               ? juce::jmax(std::abs(srcL[i]), std::abs(srcR[i]))
+                               : 0.0f;
+            const float target = (srcLvl > kScThreshold) ? 1.0f : 0.0f;
+            scEnv[r] = (target > scEnv[r])
+                     ? atk * scEnv[r] + (1.0f - atk) * target
+                     : rel * scEnv[r] + (1.0f - rel) * target;
 
             const float gain = 1.0f - ch.sidechainAmount * scEnv[r];
+            peakGR = juce::jmax(peakGR, ch.sidechainAmount * scEnv[r]);
             tgtL[i] *= gain;
             if (tgtR) tgtR[i] *= gain;
         }
+        sidechainGR[r].set(peakGR);
     }
 
-    // Phase 3: pan/gain, mix to output, FX sends, peak capture.
+    // Phase 3: pan/gain, route to output bus, FX sends, peak capture.
     for (int r = 0; r < numActiveRhythms; ++r)
     {
         const auto& ch  = channels[r];
@@ -131,18 +148,36 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         applyPanGain(buf, ch.level, ch.pan, numSamples);
         channelPeaks[r].set(peakOf(buf, numSamples));
 
-        for (int c = 0; c < numOutCh; ++c)
-            output.addFrom(c, 0, buf, c, 0, numSamples);
+        const int bus = ch.outputBus;  // 0 = master, 1..8 = direct out
+        if (bus == 0)
+        {
+            // Master mix — also feeds FX sends.
+            for (int c = 0; c < numOutCh; ++c)
+                output.addFrom(c, 0, buf, c, 0, numSamples);
 
-        if (ch.sendEffect > 0.0f)
-            for (int c = 0; c < numOutCh; ++c)
-                effectSendBuf.addFrom(c, 0, buf, c, 0, numSamples, ch.sendEffect);
-        if (ch.sendDelay > 0.0f)
-            for (int c = 0; c < numOutCh; ++c)
-                delaySendBuf.addFrom(c, 0, buf, c, 0, numSamples, ch.sendDelay);
-        if (ch.sendReverb > 0.0f)
-            for (int c = 0; c < numOutCh; ++c)
-                reverbSendBuf.addFrom(c, 0, buf, c, 0, numSamples, ch.sendReverb);
+            if (ch.sendEffect > 0.0f)
+                for (int c = 0; c < numOutCh; ++c)
+                    effectSendBuf.addFrom(c, 0, buf, c, 0, numSamples, ch.sendEffect);
+            if (ch.sendDelay > 0.0f)
+                for (int c = 0; c < numOutCh; ++c)
+                    delaySendBuf.addFrom(c, 0, buf, c, 0, numSamples, ch.sendDelay);
+            if (ch.sendReverb > 0.0f)
+                for (int c = 0; c < numOutCh; ++c)
+                    reverbSendBuf.addFrom(c, 0, buf, c, 0, numSamples, ch.sendReverb);
+        }
+        else
+        {
+            // Direct out — bypass master mix and FX sends. If the requested bus isn't
+            // active in the current host layout, fall through silently (channel is muted).
+            const int idx = bus - 1;
+            if (directOuts != nullptr && (*directOuts)[(size_t) idx] != nullptr)
+            {
+                auto* outBuf = (*directOuts)[(size_t) idx];
+                const int dstChans = juce::jmin(outBuf->getNumChannels(), buf.getNumChannels());
+                for (int c = 0; c < dstChans; ++c)
+                    outBuf->addFrom(c, 0, buf, c, 0, numSamples);
+            }
+        }
     }
 
     const bool doEffect = hasSignal(effectSendBuf, numSamples);
@@ -154,6 +189,15 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                          doEffect, true, doReverb);
 
     // Mix FX returns into main output; capture return peaks post-fader so VU reflects the fader.
+    // If fxReturnsOut is provided (bus 9), each post-fader FX return is also added there.
+    auto fanOutToFxReturns = [&](const juce::AudioBuffer<float>& src)
+    {
+        if (fxReturnsOut == nullptr) return;
+        const int dstChans = juce::jmin(fxReturnsOut->getNumChannels(), src.getNumChannels());
+        for (int c = 0; c < dstChans; ++c)
+            fxReturnsOut->addFrom(c, 0, src, c, 0, numSamples);
+    };
+
     if (doEffect)
     {
         applyPanGain(effectSendBuf, returns[0].level, returns[0].pan, numSamples);
@@ -162,6 +206,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
             returnPeaks[0].set(peakOf(effectSendBuf, numSamples));
             for (int c = 0; c < numOutCh; ++c)
                 output.addFrom(c, 0, effectSendBuf, c, 0, numSamples);
+            fanOutToFxReturns(effectSendBuf);
         }
         else { returnPeaks[0].set(0.0f); }
     }
@@ -176,6 +221,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
             returnPeaks[1].set(peakOf(delaySendBuf, numSamples));
             for (int c = 0; c < numOutCh; ++c)
                 output.addFrom(c, 0, delaySendBuf, c, 0, numSamples);
+            fanOutToFxReturns(delaySendBuf);
         }
         else { returnPeaks[1].set(0.0f); }
     }
@@ -191,6 +237,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
             returnPeaks[2].set(peakOf(reverbSendBuf, numSamples));
             for (int c = 0; c < numOutCh; ++c)
                 output.addFrom(c, 0, reverbSendBuf, c, 0, numSamples);
+            fanOutToFxReturns(reverbSendBuf);
         }
         else { returnPeaks[2].set(0.0f); }
     }

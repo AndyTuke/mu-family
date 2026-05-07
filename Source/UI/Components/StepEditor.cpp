@@ -14,6 +14,7 @@ void StepEditor::setSteps(const std::vector<float>& values)
 
 void StepEditor::setStepCount(int count)
 {
+    if (count < 1 || count > 4096) { jassertfalse; return; }
     steps.resize((size_t)count, 0.0f);
     repaint();
 }

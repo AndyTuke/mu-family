@@ -20,6 +20,9 @@ public:
 
     void setRhythmColour(juce::Colour c);
 
+    // Issue #133: tag hits/rotate knobs with modulation indicator rings.
+    void refreshModulatedIndicators();
+
     void resized() override;
     void paint(juce::Graphics&) override;
 

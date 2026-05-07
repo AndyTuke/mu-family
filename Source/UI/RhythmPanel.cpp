@@ -1,5 +1,80 @@
 #include "RhythmPanel.h"
 
+//==============================================================================
+// Custom file browser used for sample loading so the user can audition files
+// before committing to a slot. Shows inside a DialogWindow (modal).
+class SampleBrowserContent : public juce::Component,
+                              public juce::FileBrowserListener
+{
+public:
+    SampleBrowserContent(PluginProcessor& proc,
+                         const juce::File& startDir,
+                         std::function<void(const juce::File&)> onChosen)
+        : proc(proc), onChosen(std::move(onChosen)),
+          fileFilter("*.wav;*.aiff;*.aif;*.mp3;*.flac", {}, "Audio files"),
+          browser(juce::FileBrowserComponent::openMode |
+                  juce::FileBrowserComponent::canSelectFiles,
+                  startDir, &fileFilter, nullptr)
+    {
+        addAndMakeVisible(browser);
+        addAndMakeVisible(loadBtn);
+        addAndMakeVisible(cancelBtn);
+        browser.addListener(this);
+
+        loadBtn.onClick = [this]
+        {
+            const auto f = browser.getSelectedFile(0);
+            if (f.existsAsFile()) commit(f);
+        };
+        cancelBtn.onClick = [this]
+        {
+            this->proc.stopSamplePreview();
+            if (auto* dw = findParentComponentOfClass<juce::DialogWindow>())
+                dw->exitModalState(0);
+        };
+
+        setSize(560, 440);
+    }
+
+    ~SampleBrowserContent() override { proc.stopSamplePreview(); }
+
+    void resized() override
+    {
+        auto area = getLocalBounds().reduced(8);
+        auto btnRow = area.removeFromBottom(32).reduced(0, 4);
+        cancelBtn.setBounds(btnRow.removeFromRight(80));
+        btnRow.removeFromRight(8);
+        loadBtn.setBounds(btnRow.removeFromRight(80));
+        browser.setBounds(area.reduced(0, 4));
+    }
+
+    // FileBrowserListener — auto-preview on selection change
+    void selectionChanged() override
+    {
+        const auto f = browser.getSelectedFile(0);
+        if (f.existsAsFile())
+            proc.startSamplePreview(f);
+    }
+    void fileClicked(const juce::File&, const juce::MouseEvent&) override {}
+    void fileDoubleClicked(const juce::File& f) override { commit(f); }
+    void browserRootChanged(const juce::File&) override {}
+
+private:
+    PluginProcessor& proc;
+    std::function<void(const juce::File&)> onChosen;
+    juce::WildcardFileFilter fileFilter;
+    juce::FileBrowserComponent browser;
+    juce::TextButton loadBtn { "Load" }, cancelBtn { "Cancel" };
+
+    void commit(const juce::File& f)
+    {
+        proc.stopSamplePreview();
+        onChosen(f);
+        if (auto* dw = findParentComponentOfClass<juce::DialogWindow>())
+            dw->exitModalState(1);
+    }
+};
+
 RhythmPanel::RhythmPanel(PluginProcessor& p)
     : proc(p), euclidPanel(p), voiceSection(p)
 {
@@ -8,11 +83,6 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     addAndMakeVisible(euclidPanel);
     addAndMakeVisible(voiceSection);
     addAndMakeVisible(modulatorPanel);
-
-    midiModeDropdown.addItem("Sample", 1);
-    midiModeDropdown.addItem("MIDI",   2);
-    midiModeDropdown.setSelectedId(1, false);
-    addAndMakeVisible(midiModeDropdown);
 
     // juce::Label provides bulletproof inline editing: handles single-click to edit,
     // Enter to commit, Escape to cancel, click-off to commit, focus management — all
@@ -35,14 +105,6 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     addAndMakeVisible(deleteBtn);
     addAndMakeVisible(loadRhythmBtn);
     addAndMakeVisible(saveRhythmBtn);
-
-    midiModeDropdown.onChange = [this](int id)
-    {
-        if (currentRhythmIndex < 0) return;
-        const auto paramId = "r" + juce::String(currentRhythmIndex) + "_midiMode";
-        if (auto* p = proc.apvts.getParameter(paramId))
-            p->setValueNotifyingHost(id == 2 ? 1.0f : 0.0f);
-    };
 
     euclidPanel.onPatternChanged = [this]
     {
@@ -79,14 +141,21 @@ void RhythmPanel::setRhythm(int index)
         nameLabel.setText(juce::String(proc.getRhythm(index).name), juce::dontSendNotification);
         euclidPanel.setRhythm(index);
         euclidPanel.setRhythmColour(currentColour());
-        voiceSection.setRhythm(index);
+        // modulatorPanel must be re-pointed BEFORE voiceSection — voiceSection.setRhythm
+        // triggers onInsertAlgorithmChanged → modulatorPanel.setInsertAlgorithm →
+        // ModulatorEditor::rebuildRows(), which reads cs->id. If cs still points at a
+        // just-destroyed Rhythm (e.g. after delete-last), cs->id is garbage and string
+        // concat throws std::bad_alloc.
         modulatorPanel.setRhythm(&proc.getRhythm(index));
-        midiModeDropdown.setSelectedId(proc.getRhythm(index).midiMode ? 2 : 1, false);
+        voiceSection.setRhythm(index);
         refreshCircle();
     }
     else
     {
         nameLabel.setText("No Rhythm", juce::dontSendNotification);
+        // Null out all child-panel rhythm pointers so they don't dereference stale memory
+        // if a vector erase invalidated the previous rhythm before re-binding.
+        modulatorPanel.setRhythm(nullptr);
     }
     repaint();
 }
@@ -140,25 +209,32 @@ void RhythmPanel::filesDropped(const juce::StringArray& files, int, int)
 
 void RhythmPanel::loadSample()
 {
+    if (currentRhythmIndex < 0) return;
+
     const juce::File startDir = lastBrowseDir.isDirectory()
                                     ? lastBrowseDir
-                                    : juce::File::getSpecialLocation(juce::File::userMusicDirectory);
+                                    : (proc.getSamplesDir().isDirectory()
+                                           ? proc.getSamplesDir()
+                                           : juce::File::getSpecialLocation(juce::File::userMusicDirectory));
 
-    fileChooser = std::make_unique<juce::FileChooser>(
-        "Load Sample", startDir, "*.wav;*.aiff;*.aif;*.mp3;*.flac");
+    juce::Component::SafePointer<RhythmPanel> safeThis(this);
+    const int rhythmIdx = currentRhythmIndex;
 
-    fileChooser->launchAsync(
-        juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-        [this](const juce::FileChooser& fc)
+    juce::DialogWindow::LaunchOptions opts;
+    opts.content.setOwned(new SampleBrowserContent(
+        proc, startDir,
+        [safeThis, rhythmIdx](const juce::File& f)
         {
-            auto result = fc.getResult();
-            if (result.existsAsFile() && currentRhythmIndex >= 0)
-            {
-                lastBrowseDir = result.getParentDirectory();
-                proc.loadSampleForRhythm(currentRhythmIndex, result);
-                repaint();
-            }
-        });
+            if (safeThis == nullptr) return;
+            safeThis->lastBrowseDir = f.getParentDirectory();
+            safeThis->proc.loadSampleForRhythm(rhythmIdx, f);
+            safeThis->repaint();
+        }));
+    opts.dialogTitle          = "Load Sample";
+    opts.dialogBackgroundColour = juce::Colour(0xff1a1a1a);
+    opts.useNativeTitleBar    = false;
+    opts.resizable            = true;
+    opts.launchAsync();
 }
 
 void RhythmPanel::loadRhythmPreset()
@@ -310,8 +386,7 @@ void RhythmPanel::resized()
 
     // Header right-side controls (right to left)
     const int btnY = (kHeaderH - 20) / 2;
-    midiModeDropdown.setBounds(w - kModeSelectorW - 4, btnY, kModeSelectorW, 20);
-    const int rightEdge = w - kModeSelectorW - 4 - 6;
+    const int rightEdge = w - 4;
     deleteBtn    .setBounds(rightEdge - kIconBtnW,                                           btnY, kIconBtnW,   20);
     resetBtn     .setBounds(rightEdge - kIconBtnW * 2 - 4,                                  btnY, kIconBtnW,   20);
     saveRhythmBtn.setBounds(rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW - 4,               btnY, kPresetBtnW, 20);
@@ -414,4 +489,6 @@ void RhythmPanel::timerCallback()
 {
     if (proc.sequencerPlaying.get())
         modulatorPanel.setPlayheadBeat(proc.lastBeatPos.get());
+    voiceSection.refreshModulatedIndicators();
+    euclidPanel.refreshModulatedIndicators();
 }

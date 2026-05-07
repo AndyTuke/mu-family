@@ -11,6 +11,8 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
     fader.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     addAndMakeVisible(fader);
     addAndMakeVisible(vuMeter);
+    if (hasSidechain())
+        addAndMakeVisible(grMeter);
 
     panKnob.setRange(-1.0, 1.0, 0.01);
     panKnob.setValue(0.0);
@@ -47,6 +49,12 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
 
     if (hasSidechain())
     {
+        outBusBox.addItem("M", 1);                 // 0 -> Master
+        for (int i = 1; i <= 8; ++i)
+            outBusBox.addItem(juce::String(i), i + 1);  // i -> Out i
+        outBusBox.setSelectedId(1, juce::dontSendNotification);
+        addAndMakeVisible(outBusBox);
+
         scSourceBox.addItem(juce::String::charToString(0x2014), 1); // "—"
         scSourceBox.setSelectedId(1, juce::dontSendNotification);
         addAndMakeVisible(scSourceBox);
@@ -59,11 +67,13 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
         addAndMakeVisible(scAmount);
 
         scAttack.setRange(1.0, 500.0, 1.0);
+        scAttack.getSlider().setSkewFactorFromMidPoint(22.0);
         scAttack.setValue(5.0);
         scAttack.getSlider().textFromValueFunction = noVal;
         addAndMakeVisible(scAttack);
 
         scRelease.setRange(10.0, 2000.0, 1.0);
+        scRelease.getSlider().setSkewFactorFromMidPoint(141.0);
         scRelease.setValue(100.0);
         scRelease.getSlider().textFromValueFunction = noVal;
         addAndMakeVisible(scRelease);
@@ -72,7 +82,8 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
 
 //==============================================================================
 void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, juce::Atomic<float>& peak,
-                               PluginProcessor* proc, const juce::String& prefix)
+                               PluginProcessor* proc, const juce::String& prefix,
+                               juce::Atomic<float>* grAtomic)
 {
     fader.setValue(state.level, juce::dontSendNotification);
     panKnob.setValue(state.pan, juce::dontSendNotification);
@@ -117,6 +128,13 @@ void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, juce::Atomic<flo
         // Sidechain controls write through APVTS
         if (hasSidechain())
         {
+            outBusBox.setSelectedId(state.outputBus + 1, juce::dontSendNotification);
+            outBusBox.onChange = [proc, prefix, this] {
+                const int id = outBusBox.getSelectedId();   // 1 = Master, 2..9 = Out 1..8
+                if (auto* p = proc->apvts.getParameter(prefix + "outBus"))
+                    p->setValueNotifyingHost(p->convertTo0to1((float)(id - 1)));
+            };
+
             scSourceBox.onChange = [proc, prefix, this] {
                 int id = scSourceBox.getSelectedId();   // 1=none, 2-9=ch0-ch7
                 int apvtsVal = (id <= 1) ? 0 : (id - 1);
@@ -151,6 +169,11 @@ void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, juce::Atomic<flo
         soloBtn.onClick = [&state, this] { state.solo = soloBtn.getToggleState(); };
         if (hasSidechain())
         {
+            outBusBox.setSelectedId(state.outputBus + 1, juce::dontSendNotification);
+            outBusBox.onChange    = [&state, this] {
+                state.outputBus = juce::jlimit(0, 8, outBusBox.getSelectedId() - 1);
+            };
+
             scSourceBox.onChange    = [&state, this] {
                 int id = scSourceBox.getSelectedId();
                 state.sidechainSource = (id <= 1) ? -1 : (id - 2);
@@ -162,6 +185,8 @@ void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, juce::Atomic<flo
     }
 
     vuMeter.getLevel = [&peak] { return peak.get(); };
+    if (grAtomic)
+        grMeter.getGR = [grAtomic] { return grAtomic->get(); };
     updateDbLabel(state.level);
 }
 
@@ -315,6 +340,9 @@ void MixerChannel::loadFromAPVTS(juce::AudioProcessorValueTreeState& apvts,
     }
     if (hasSidechain())
     {
+        if (auto* p = apvts.getRawParameterValue(prefix + "outBus"))
+            outBusBox.setSelectedId(juce::jlimit(0, 8, juce::roundToInt((float) *p)) + 1,
+                                    juce::dontSendNotification);
         if (auto* p = apvts.getRawParameterValue(prefix + "scSrc"))
         {
             int apvtsVal = juce::roundToInt((float)*p);
@@ -341,12 +369,18 @@ void MixerChannel::updateDbLabel(float level)
 
 void MixerChannel::resized()
 {
-    const int w      = getWidth();
-    const int h      = getHeight();
-    const int topY   = kColourBarH + kNameH;
-    const int scH    = hasSidechain() ? kSidechainH : 0;
-    const int sendY  = topY + scH;
-    const int faderY = sendY + kTopAreaH;
+    const int w        = getWidth();
+    const int h        = getHeight();
+    const int outBusY  = kColourBarH + kNameH;
+    const int outBusH  = hasSidechain() ? kOutBusH : 0;
+    const int topY     = outBusY + outBusH;
+    const int scH      = hasSidechain() ? kSidechainH : 0;
+    const int sendY    = topY + scH;
+    const int faderY   = sendY + kTopAreaH;
+
+    // Out dropdown — Rhythm channels only.
+    if (hasSidechain())
+        outBusBox.setBounds(0, outBusY, w, kOutBusH);
 
     // Sidechain section — Rhythm channels only
     if (hasSidechain())
@@ -375,8 +409,11 @@ void MixerChannel::resized()
     const int dbY    = muteY - kDbH;
     const int faderH = juce::jmax(40, dbY - faderY - 2);
 
-    fader.setBounds  (0,        faderY, w - kVUW, faderH);
-    vuMeter.setBounds(w - kVUW, faderY, kVUW,     faderH);
+    const int grW = hasSidechain() ? kGRW : 0;
+    fader.setBounds  (0,                faderY, w - kVUW - grW, faderH);
+    if (hasSidechain())
+        grMeter.setBounds(w - kVUW - grW, faderY, grW,          faderH);
+    vuMeter.setBounds(w - kVUW,         faderY, kVUW,           faderH);
     dbLabel.setBounds(0, dbY, w, kDbH);
 
     if (hasMuteSolo())

@@ -1,12 +1,14 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_audio_utils/juce_audio_utils.h>
 #include "Sequencer/SequencerEngine.h"
 #include "Audio/VoiceEngine.h"
 #include "Audio/MidiOutputEngine.h"
 #include "FX/FXChain.h"
 #include "Audio/MixerEngine.h"
 #include "License/LicenseChecker.h"
+#include "MidiPresetMap.h"
 
 #include <memory>
 #include <vector>
@@ -30,13 +32,25 @@ public:
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;
 
     const juce::String getName() const override;
-    bool acceptsMidi() const override;
+    // True for both DAW and standalone:
+    //   - Standalone: MIDI clock sync (#126).
+    //   - DAW (VST3/CLAP): program-change → preset hot-swap (#127).
+    bool acceptsMidi() const override { return true; }
     bool producesMidi() const override { return true; }
+    bool isMidiEffect() const override
+    {
+#if MUCLID_LITE_BUILD
+        return true;
+#else
+        return false;
+#endif
+    }
     double getTailLengthSeconds() const override;
 
     int getNumPrograms() override;
@@ -52,7 +66,30 @@ public:
     bool   isInternalPlaying()   const { return internalPlaying; }
     void   setInternalBpm(double bpm)  { internalBpm = juce::jlimit(20.0, 300.0, bpm); }
     double getInternalBpm()      const { return internalBpm; }
-    double getInternalBeatPos()  const { return internalBeatPos; }
+    double getInternalBeatPos()  const
+    {
+        if (midiSyncEnabled.load(std::memory_order_relaxed) && midiClockIsPlaying.get())
+            return midiClockBeatPosUI.load(std::memory_order_relaxed);
+        return internalBeatPos;
+    }
+
+    // Multi-bus output (DAW only). Toggle is read at host scan-time; toggling at runtime
+    // requires the host to rescan/reload the plugin to pick up the new bus configuration.
+    void   setMultiBusEnabled(bool on);
+    bool   getMultiBusEnabled() const { return multiBusEnabled.load(std::memory_order_relaxed); }
+
+    static constexpr int kMasterBusIndex   = 0;
+    static constexpr int kFirstDirectOutBus = 1;   // Out 1 = bus 1 ... Out 8 = bus 8
+    static constexpr int kFXReturnsBusIndex = 9;
+    static constexpr int kTotalBuses        = 10;
+
+    // MIDI clock sync (standalone only).
+    void   setMidiSyncEnabled(bool on);
+    bool   getMidiSyncEnabled()  const { return midiSyncEnabled.load(std::memory_order_relaxed); }
+    void   setMidiSyncMessages(int mode);
+    int    getMidiSyncMessages() const { return midiSyncMessages.load(std::memory_order_relaxed); }
+    bool   isMidiClockPlaying()  const { return midiClockIsPlaying.get(); }
+    double getMidiClockBpm()     const { return midiClockBpmEst.get(); }
 
     void    addRhythm    (const Rhythm& r);
     void    removeRhythm (int index);
@@ -62,6 +99,11 @@ public:
     void    updatePattern (int index)      { sequencer.updatePattern(index); }
 
     void loadSampleForRhythm(int rhythmIndex, const juce::File& file);
+
+    // Sample preview — plays a file through the master output without assigning it.
+    // Safe to call from the message thread at any time.
+    void startSamplePreview(const juce::File& file);
+    void stopSamplePreview();
 
     juce::String getSampleName(int rhythmIndex) const
     {
@@ -124,6 +166,24 @@ public:
     juce::Atomic<bool>   sequencerPlaying { false };
     juce::Atomic<double> lastBeatPos      { 0.0 };  // most recent beat position (for UI playhead)
 
+    // Issue #133: per-destination modulated-value snapshot for the live-arc indicator.
+    // Written by the audio thread after ModulationMatrix::process(); read by VoiceSection at 30 Hz.
+    // Values are pre-normalized 0..1 to the knob's display range.
+    enum ModSnapIdx : int {
+        kSnapAmpAtk = 0, kSnapAmpDec, kSnapAmpSus, kSnapAmpRel,
+        kSnapFilterCutoff, kSnapFilterRes,
+        kSnapFenvAtk, kSnapFenvDec, kSnapFenvDepth,
+        kSnapPitchSemi,
+        kSnapInsDrive, kSnapInsOutput, kSnapInsBits, kSnapInsDither, kSnapInsLpf,
+        kSnapCount
+    };
+    std::array<juce::Atomic<float>, kSnapCount> modSnapshot[SequencerEngine::MaxRhythms];
+
+    // 128-entry MIDI program-change → .muRhyth preset path map. Public so the UI panel
+    // can read/write directly. All mutation is message-thread-only; audio thread reads
+    // only the channel mask atomic for gating.
+    MidiPresetMap midiPresetMap;
+
 private:
     // Hot-swap state: message thread writes pendingRhythm/pendingVoice, then sets isReady.
     // Audio thread detects a loop boundary, sets boundaryReached, triggers handleAsyncUpdate.
@@ -144,11 +204,40 @@ private:
     std::array<PendingRhythmSwap, SequencerEngine::MaxRhythms> pendingSwaps;
     std::atomic<int> swapModeAtomic { 0 }; // 0 = OnMasterLoop, 1 = OnRhythmLoop
 
+    // MIDI program-change queue: audio thread enqueues on incoming program-change,
+    // handleAsyncUpdate (message thread) drains and calls stageRhythmPreset.
+    struct ProgramChangeEvent { int slot; int presetIndex; };
+    static constexpr int kPCFifoSize = 32;
+    juce::AbstractFifo                              pcFifo { kPCFifoSize };
+    std::array<ProgramChangeEvent, kPCFifoSize>     pcQueue {};
+
     void handleAsyncUpdate() override;
 
     std::unique_ptr<juce::PropertiesFile> appSettings;
 
     bool apvtsLoading = false;
+
+    // suspendProcessing() sets a flag but does NOT block until the current
+    // processBlock callback finishes. rhythmsLock provides the missing barrier.
+    juce::CriticalSection rhythmsLock;
+
+    // Multi-bus output (DAW). Read by isBusesLayoutSupported at host scan-time;
+    // persisted to appSettings so it survives across plugin instances.
+    std::atomic<bool> multiBusEnabled { true };
+
+    // MIDI clock sync state (standalone only).
+    // Atomics are written by either thread; plain members are audio-thread only.
+    std::atomic<bool> midiSyncEnabled  { false };
+    std::atomic<int>  midiSyncMessages { 2 };         // 0=clock, 1=transport, 2=both
+    juce::Atomic<bool>   midiClockIsPlaying  { false };
+    juce::Atomic<double> midiClockBpmEst     { 120.0 };
+    std::atomic<double>  midiClockBeatPosUI  { 0.0 };  // written by audio thread, read by UI
+    // Audio-thread-only:
+    double midiClockBeatPos              = 0.0;
+    int    midiClockSamplesSinceLastTick = 0;
+    std::array<int, 24> midiClockTickIntervals {};
+    int    midiClockRingHead             = 0;
+    int    midiClockRingCount            = 0;
 
     // Pre-allocated modulation parameter map — reused every block to avoid audio-thread allocation.
     // Keys match ModDest::ids.  Values are initialised in constructor and updated each block.
@@ -165,6 +254,12 @@ private:
     void restoreStateFromTree(const juce::ValueTree& state);
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
+    // Sample preview (for file browser audition — routes through master output).
+    juce::AudioFormatManager previewFormatManager;
+    juce::AudioTransportSource previewTransport;
+    std::unique_ptr<juce::AudioFormatReaderSource> previewSource;
+    juce::AudioBuffer<float> previewScratchBuffer;
 
     bool   internalPlaying   = false;
     double internalBeatPos   = 0.0;

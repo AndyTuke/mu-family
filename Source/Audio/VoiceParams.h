@@ -23,7 +23,7 @@ struct VoiceParams
     float filterEnvDepth = 0.0f;     // semitones of cutoff sweep, 0..48
 
     // ─── Amp ─────────────────────────────────────────────────────────────
-    float ampLevel    = 0.5f;        // 0..2  (Stage 19: −6 dB default for 6 dB headroom budget per voice)
+    float ampLevel    = 1.0f;        // 0..2  (Issue #121: 0 dB default — kHeadroomTrim alone provides summing safety)
     float ampEnvAtk   = 0.005f;
     float ampEnvDec   = 0.3f;
     float ampEnvSus   = 0.8f;
@@ -31,7 +31,7 @@ struct VoiceParams
     bool  ampRelToEnd = false;       // true when Release is at max (100): amp envelope bypassed, sample plays to natural end
 
     // ─── Drive / Insert (after filter, before amp) ───────────────────────
-    int   driveChar   = 0;           // 0=None, 1=Soft, 2=Hard, 3=Fold, 4=Bitcrusher
+    int   driveChar   = 0;           // 0=None, 1=Soft, 2=Hard, 3=Fold, 4=Bitcrusher, 5=Clipper
     // Soft / Hard / Fold params:
     float driveDrive  = 0.0f;        // 0..100% input drive
     float driveOutput = 0.0f;        // -24..0 dB output level

@@ -19,8 +19,16 @@ public:
     double getValue() const;
     void setLabel(const juce::String& newLabel);
 
+    // Issue #133: modulation indicator. setIsModulated draws a static tinted ring
+    // around the knob whenever any modulation assignment targets this destination.
+    // setModulatedNorm (0..1) additionally draws an animated secondary arc tracking
+    // the live modulated value; pass NaN to disable.
+    void setIsModulated(bool b);
+    void setModulatedNorm(float norm01);
+
     void resized() override;
     void paint(juce::Graphics& g) override;
+    void paintOverChildren(juce::Graphics& g) override;
     void mouseEnter(const juce::MouseEvent& e) override;
     void mouseDoubleClick(const juce::MouseEvent& e) override;
 
@@ -28,6 +36,9 @@ private:
     juce::Slider slider;
     juce::String labelText;
     MuClidLookAndFeel::ColourIds knobColour;
+
+    bool  isModulated   = false;
+    float modulatedNorm = std::numeric_limits<float>::quiet_NaN();
 
     std::unique_ptr<juce::TextEditor> inlineEditor;
 

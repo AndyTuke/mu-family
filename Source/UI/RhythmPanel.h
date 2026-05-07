@@ -41,7 +41,6 @@ private:
     EuclideanPanel  euclidPanel;
     VoiceSection    voiceSection;
     ModulatorPanel  modulatorPanel;
-    DropdownSelect  midiModeDropdown;
 
     juce::Label      nameLabel;
     juce::TextButton resetBtn     { juce::String::charToString(0x21BA) }; // ↺

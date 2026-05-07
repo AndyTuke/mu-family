@@ -16,6 +16,11 @@ public:
 
     void setRhythm(int rhythmIndex);
 
+    // Issue #133: refresh the modulated-knob ring indicators based on the current
+    // ModulationMatrix assignments for the active rhythm. Cheap; safe to call from
+    // RhythmPanel's 30 Hz timer.
+    void refreshModulatedIndicators();
+
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
     std::function<void(int driveChar)> onInsertAlgorithmChanged;
 

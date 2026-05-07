@@ -12,6 +12,24 @@
 static constexpr auto kMetaPrefix = "assign_";
 static constexpr auto kMetaSuffix = "_depth";
 
+// Per-destination full-swing magnitude in the same units as paramValues. At depth=100%
+// and CS output = 100% the destination is offset by ±this value. Defaults to 100 for
+// destinations that already operate on a 0-100 display scale (amp/filter ADSR, etc.).
+static float depthScaleFor(const std::string& destId)
+{
+    // Hz-domain destinations: ±8 kHz sweep at full depth (audible across the range).
+    if (destId == "filter.cutoff" || destId == "insert.lpf") return 8000.0f;
+    // Semitones / dB / bits — match the destination's natural full range.
+    if (destId == "pitch.semitones") return 12.0f;   // ±12 semitones = ±1 octave (per #132 spec)
+    if (destId == "fenv.depth")      return 48.0f;   // 0..48 semitones (full range)
+    if (destId == "insert.output")   return 24.0f;   // -24..0 dB (full range)
+    if (destId == "insert.bits")     return 16.0f;   // 1..16 bits (full range)
+    // Pattern destinations.
+    if (destId == "euclid.a.hits"   || destId == "euclid.b.hits"
+     || destId == "euclid.a.rotate" || destId == "euclid.b.rotate") return 16.0f;
+    return 100.0f;  // 0-100 display-scale default
+}
+
 bool ModulationMatrix::isMetaSource(const std::string& src, std::string& outDepId)
 {
     const std::size_t prefixLen = std::strlen(kMetaPrefix);
@@ -103,7 +121,13 @@ void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,
 
         auto dstIt = paramValues.find(a.destinationId);
         if (dstIt != paramValues.end())
-            dstIt->second += srcIt->second * (a.depth / 100.0f);
+        {
+            // srcIt->second ∈ [-100..+100], a.depth ∈ [-100..+100].
+            // Scale by the destination's full-swing magnitude so depth=100% × src=100%
+            // produces a musically meaningful sweep regardless of the param's units.
+            const float scale = depthScaleFor(a.destinationId);
+            dstIt->second += srcIt->second * a.depth * scale * 0.0001f;
+        }
     }
 }
 

@@ -10,10 +10,12 @@
 #include "UI/SaveDialog.h"
 #include "UI/PresetBrowser.h"
 #include "UI/SettingsOverlay.h"
+#include "UI/MidiPresetsPanel.h"
 #include "UI/Components/StatusBar.h"
 #include "UI/Components/MuClidLookAndFeel.h"
 
-class PluginEditor : public juce::AudioProcessorEditor
+class PluginEditor : public juce::AudioProcessorEditor,
+                     public juce::KeyListener
 {
 public:
     explicit PluginEditor(PluginProcessor&);
@@ -21,6 +23,12 @@ public:
 
     void paint(juce::Graphics&) override;
     void resized() override;
+
+    // juce::KeyListener — receives key events in standalone mode.
+    bool keyPressed(const juce::KeyPress& key, juce::Component* originator) override;
+    bool keyStateChanged(bool isKeyDown, juce::Component* originator) override;
+
+    void parentHierarchyChanged() override;
 
 private:
     PluginProcessor& processorRef;
@@ -35,16 +43,18 @@ private:
     SaveDialog      saveDialog;
     PresetBrowser   presetBrowser;
     SettingsOverlay settingsOverlay;
+    MidiPresetsPanel midiPresetsPanel;
     StatusBar       statusBar;
     juce::Label     demoBanner;
 
     static constexpr int kDemoBannerH = 20;
 
-    bool mixerVisible    = false;
-    bool aboutVisible    = false;
-    bool saveVisible     = false;
-    bool browserVisible  = false;
-    bool settingsVisible = false;
+    bool mixerVisible        = false;
+    bool aboutVisible        = false;
+    bool saveVisible         = false;
+    bool browserVisible      = false;
+    bool settingsVisible     = false;
+    bool midiPresetsVisible  = false;
 
     juce::ComponentAnimator animator;
 
@@ -56,8 +66,14 @@ private:
     void showSaveDialog(bool show);
     void showPresetBrowser(bool show);
     void showSettings(bool show);
+    void showMidiPresets(bool show);
 
     void hideAllOverlays();
+
+    bool isStandalone    = false;
+    bool needsFocusGrab  = false;
+    juce::KeyPress keybindPlayStop { juce::KeyPress::spaceKey };
+    void loadKeybindings();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };

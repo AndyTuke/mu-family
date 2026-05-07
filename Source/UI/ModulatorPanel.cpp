@@ -53,7 +53,15 @@ void ModulatorPanel::setPlayheadBeat(double beat)
 void ModulatorPanel::setRhythm(Rhythm* r)
 {
     rhythm = r;
-    if (!r) return;
+    if (!r)
+    {
+        // Clear stale pointers in the editors and matrix panel — otherwise their
+        // ControlSequence*/ModulationMatrix* still point inside a destroyed Rhythm.
+        for (int i = 0; i < kNumMods; ++i)
+            editors[i].setData(nullptr, nullptr, modColour(i), i, nullptr);
+        matrixPanel.setRhythm(nullptr);
+        return;
+    }
 
     for (int i = 0; i < kNumMods; ++i)
     {

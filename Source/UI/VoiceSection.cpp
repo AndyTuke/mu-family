@@ -25,6 +25,7 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     driveChar.addItem("Hard", 3);
     driveChar.addItem("Fold", 4);
     driveChar.addItem("Bitcrusher", 5);
+    driveChar.addItem("Clipper", 6);
     driveChar.setSelectedId(1, false);
     addAndMakeVisible(driveChar);
 
@@ -229,6 +230,61 @@ void VoiceSection::setRhythm(int ri)
 {
     rhythmIndex = ri;
     loadFromRhythm();
+    refreshModulatedIndicators();
+}
+
+void VoiceSection::refreshModulatedIndicators()
+{
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
+    const auto& assigns = proc.getRhythm(rhythmIndex).modulationMatrix.getAssignments();
+
+    // Build a quick lookup of which destination IDs are currently assigned.
+    auto isAssigned = [&assigns](const char* destId) -> bool
+    {
+        const std::string s = destId;
+        for (const auto& a : assigns)
+            if (a.destinationId == s) return true;
+        return false;
+    };
+
+    pitchSemi   .setIsModulated(isAssigned("pitch.semitones"));
+    filterCutoff.setIsModulated(isAssigned("filter.cutoff"));
+    filterRes   .setIsModulated(isAssigned("filter.resonance"));
+    filterAtk   .setIsModulated(isAssigned("fenv.attack"));
+    filterDec   .setIsModulated(isAssigned("fenv.decay"));
+    filterDepth .setIsModulated(isAssigned("fenv.depth"));
+    ampAtk      .setIsModulated(isAssigned("amp.attack"));
+    ampDec      .setIsModulated(isAssigned("amp.decay"));
+    ampSus      .setIsModulated(isAssigned("amp.sustain"));
+    ampRel      .setIsModulated(isAssigned("amp.release"));
+    // Insert knobs map differently per algorithm; tag both possible meanings.
+    driveDrive  .setIsModulated(isAssigned("insert.drive") || isAssigned("insert.bits"));
+    driveOutput .setIsModulated(isAssigned("insert.output") || isAssigned("insert.rate"));
+    driveDither .setIsModulated(isAssigned("insert.dither"));
+    driveTone   .setIsModulated(isAssigned("insert.lpf"));
+
+    // Live-arc: read atomic snapshot written by audio thread (#133).
+    const auto& snap = proc.modSnapshot[rhythmIndex];
+    auto sn  = [&](int i) { return snap[i].get(); };
+    const float kNaN = std::numeric_limits<float>::quiet_NaN();
+    auto arc = [&](bool assigned, int idx) -> float { return assigned ? sn(idx) : kNaN; };
+
+    using P = PluginProcessor;
+    pitchSemi   .setModulatedNorm(arc(isAssigned("pitch.semitones"),  P::kSnapPitchSemi));
+    filterCutoff.setModulatedNorm(arc(isAssigned("filter.cutoff"),    P::kSnapFilterCutoff));
+    filterRes   .setModulatedNorm(arc(isAssigned("filter.resonance"), P::kSnapFilterRes));
+    filterAtk   .setModulatedNorm(arc(isAssigned("fenv.attack"),      P::kSnapFenvAtk));
+    filterDec   .setModulatedNorm(arc(isAssigned("fenv.decay"),       P::kSnapFenvDec));
+    filterDepth .setModulatedNorm(arc(isAssigned("fenv.depth"),       P::kSnapFenvDepth));
+    ampAtk      .setModulatedNorm(arc(isAssigned("amp.attack"),       P::kSnapAmpAtk));
+    ampDec      .setModulatedNorm(arc(isAssigned("amp.decay"),        P::kSnapAmpDec));
+    ampSus      .setModulatedNorm(arc(isAssigned("amp.sustain"),      P::kSnapAmpSus));
+    ampRel      .setModulatedNorm(arc(isAssigned("amp.release"),      P::kSnapAmpRel));
+    driveDrive  .setModulatedNorm(isAssigned("insert.drive") ? sn(P::kSnapInsDrive)
+                                : isAssigned("insert.bits")  ? sn(P::kSnapInsBits) : kNaN);
+    driveOutput .setModulatedNorm(arc(isAssigned("insert.output"),    P::kSnapInsOutput));
+    driveDither .setModulatedNorm(arc(isAssigned("insert.dither"),    P::kSnapInsDither));
+    driveTone   .setModulatedNorm(arc(isAssigned("insert.lpf"),       P::kSnapInsLpf));
 }
 
 void VoiceSection::loadFromRhythm()
@@ -381,6 +437,38 @@ void VoiceSection::configureInsertAlgorithm(int charId)
             driveOutput.onValueChanged = [this](double v) { apvtsSet("drvRate", (float)v); };
             driveDither.onValueChanged = [this](double v) { apvtsSet("drvDit",  (float)v); };
             driveTone  .onValueChanged = [this](double v) { apvtsSet("drvTon",  (float)v); };
+            break;
+
+        case 5:  // ── Clipper — threshold + output, post-LPF ──────────────────
+            driveDrive.setLabel("Threshold");
+            driveDrive.setRange(0.0, 100.0, 0.1);
+            driveDrive.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                // Display as "ceiling %" — at 100 the clipper is open, at 0 fully clamped.
+                return juce::String((int)std::round(v)) + "%";
+            };
+            driveDrive.getSlider().valueFromTextFunction = nullptr;
+            if (p) driveDrive.setValue(p->driveDrive, juce::dontSendNotification);
+            driveDrive.setVisible(true);
+
+            driveOutput.setLabel("Output");
+            driveOutput.setRange(-24.0, 0.0, 0.1);
+            driveOutput.getSlider().textFromValueFunction = nullptr;
+            driveOutput.getSlider().valueFromTextFunction = nullptr;
+            if (p) driveOutput.setValue(p->driveOutput, juce::dontSendNotification);
+            driveOutput.setVisible(true);
+
+            driveDither.setVisible(false);
+
+            driveTone.setLabel("LPF");
+            driveTone.setRange(20.0, 20000.0, 1.0);
+            driveTone.getSlider().textFromValueFunction = fmtHz;
+            driveTone.getSlider().valueFromTextFunction = parseHz;
+            if (p) driveTone.setValue(p->driveTone, juce::dontSendNotification);
+            driveTone.setVisible(true);
+
+            driveDrive .onValueChanged = [this](double v) { apvtsSet("drvDrv", (float)v); };
+            driveOutput.onValueChanged = [this](double v) { apvtsSet("drvOut", (float)v); };
+            driveTone  .onValueChanged = [this](double v) { apvtsSet("drvTon", (float)v); };
             break;
 
         default: break;

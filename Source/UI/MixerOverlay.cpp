@@ -43,7 +43,8 @@ void MixerOverlay::buildRhythmChannels()
         juce::String name = hasRhythm ? juce::String(proc.getRhythm(r).name) : "-";
         auto ch = std::make_unique<MixerChannel>(MixerChannel::Type::Rhythm, name, col);
         const juce::String prefix = "ch" + juce::String(r) + "_";
-        ch->bindRhythm(mixer.channels[r], mixer.channelPeaks[r], &proc, prefix);
+        ch->bindRhythm(mixer.channels[r], mixer.channelPeaks[r], &proc, prefix,
+                       &mixer.sidechainGR[r]);
         if (!hasRhythm) ch->setActive(false);
         addAndMakeVisible(*ch);
         rhythmChannels.push_back(std::move(ch));
@@ -429,10 +430,10 @@ void MixerOverlay::resized()
 
     // Channel strips start below the header
     int x = 0;
-    for (auto& ch : rhythmChannels)
+    for (int i = 0; i < (int)rhythmChannels.size(); ++i)
     {
-        ch->setBounds(x, kHeaderH, kChanW, stripH);
-        x += kChanW;
+        rhythmChannels[i]->setBounds(x, kHeaderH, kChanW, stripH);
+        x += kChanW + (i + 1 < (int)rhythmChannels.size() ? kChanGap : 0);
     }
 
     x += kDivW;
@@ -471,7 +472,7 @@ void MixerOverlay::paint(juce::Graphics& g)
 
     // Dividers between rhythm channels and returns, and before master
     const int stripH = juce::jmax(200, getHeight() - kFXAreaH - kHeaderH);
-    int divX = MixerEngine::MaxChannels * kChanW;
+    int divX = MixerEngine::MaxChannels * kChanW + (MixerEngine::MaxChannels - 1) * kChanGap;
 
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder));
     g.fillRect(divX, kHeaderH, kDivW, stripH);

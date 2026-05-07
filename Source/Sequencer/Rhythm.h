@@ -30,7 +30,7 @@ public:
         : genA(other.genA), genB(other.genB), genC(other.genC),
           logic(other.logic), name(other.name), colourIndex(other.colourIndex),
           resetSteps(other.resetSteps), voiceParams(other.voiceParams),
-          midiMode(other.midiMode), controlSequences(other.controlSequences),
+          controlSequences(other.controlSequences),
           modulationMatrix(other.modulationMatrix)
     {}
 
@@ -46,7 +46,6 @@ public:
             colourIndex      = other.colourIndex;
             resetSteps       = other.resetSteps;
             voiceParams      = other.voiceParams;
-            midiMode         = other.midiMode;
             controlSequences = other.controlSequences;
             modulationMatrix = other.modulationMatrix;
             // modLock is intentionally not copied — target lock stays in its current state.
@@ -63,7 +62,6 @@ public:
     std::optional<int>  resetSteps;          // nullopt = INF (free-running)
 
     VoiceParams voiceParams;
-    bool        midiMode    = false;
 
     std::vector<ControlSequence> controlSequences;
     ModulationMatrix             modulationMatrix;

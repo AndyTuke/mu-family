@@ -46,6 +46,22 @@ void KnobWithLabel::setLabel(const juce::String& newLabel)
     repaint();
 }
 
+void KnobWithLabel::setIsModulated(bool b)
+{
+    if (isModulated != b) { isModulated = b; repaint(); }
+}
+
+void KnobWithLabel::setModulatedNorm(float norm01)
+{
+    if (! std::isnan(norm01))
+        norm01 = juce::jlimit(0.0f, 1.0f, norm01);
+    if (modulatedNorm != norm01 && ! (std::isnan(modulatedNorm) && std::isnan(norm01)))
+    {
+        modulatedNorm = norm01;
+        repaint();
+    }
+}
+
 void KnobWithLabel::resized()
 {
     const int labelH = 14;
@@ -146,4 +162,38 @@ void KnobWithLabel::paint(juce::Graphics& g)
     g.drawText(slider.getTextFromValue(slider.getValue()),
                0, valueY, getWidth(), 11,
                juce::Justification::centred, true);
+}
+
+void KnobWithLabel::paintOverChildren(juce::Graphics& g)
+{
+    // Issue #133: modulation indicator. Drawn over the slider so it overlays the arc.
+    if (! isModulated && std::isnan(modulatedNorm)) return;
+
+    const auto sb = slider.getBounds().toFloat();
+    const float cx = sb.getCentreX();
+    const float cy = sb.getCentreY();
+    const float radius = juce::jmin(sb.getWidth(), sb.getHeight()) * 0.5f - 2.0f;
+    constexpr float startAngle = juce::MathConstants<float>::pi * 1.25f;  // matches juce::Slider rotary defaults
+    constexpr float endAngle   = juce::MathConstants<float>::pi * 2.75f;
+
+    const auto modCol = juce::Colour(0xff89e0ff);  // soft cyan tint
+
+    // Static "this knob is modulated" outer ring.
+    if (isModulated)
+    {
+        g.setColour(modCol.withAlpha(0.55f));
+        g.drawEllipse(cx - radius - 2.0f, cy - radius - 2.0f,
+                      (radius + 2.0f) * 2.0f, (radius + 2.0f) * 2.0f, 1.2f);
+    }
+
+    // Live arc tracking the modulated value.
+    if (! std::isnan(modulatedNorm))
+    {
+        const float angle = startAngle + modulatedNorm * (endAngle - startAngle);
+        juce::Path arc;
+        arc.addCentredArc(cx, cy, radius + 4.0f, radius + 4.0f, 0.0f, startAngle, angle, true);
+        g.setColour(modCol.withAlpha(0.85f));
+        g.strokePath(arc, juce::PathStrokeType(1.5f, juce::PathStrokeType::curved,
+                                                     juce::PathStrokeType::rounded));
+    }
 }

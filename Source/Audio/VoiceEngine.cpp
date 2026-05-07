@@ -245,6 +245,20 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
             }
             break;
         }
+        case 5: // ── Clipper — hard-clip at threshold + post-output gain ─────
+        {
+            // driveDrive 0..100 → threshold % of full-scale (linear).
+            // driveOutput -24..0 dB → post-clipper output gain.
+            const float thresh  = juce::jlimit(0.001f, 1.0f, activeParams.driveDrive / 100.0f);
+            const float outGain = std::pow(10.0f, activeParams.driveOutput / 20.0f);
+            for (int ch = 0; ch < nCh; ++ch)
+            {
+                auto* data = tempBuffer.getWritePointer(ch);
+                for (int i = 0; i < ns; ++i)
+                    data[i] = juce::jlimit(-thresh, thresh, data[i]) * outGain;
+            }
+            break;
+        }
         default: break;  // 0 = None — bypass
     }
 

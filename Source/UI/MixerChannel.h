@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Components/KnobWithLabel.h"
 #include "Components/VUMeter.h"
+#include "Components/GRMeter.h"
 #include "Components/MuClidLookAndFeel.h"
 #include "../Audio/MixerEngine.h"
 
@@ -18,9 +19,10 @@ public:
 
     MixerChannel(Type type, const juce::String& name, juce::Colour colour);
 
-    // Bind to engine state + VU peak. Pass proc+prefix to route mutations through APVTS.
+    // Bind to engine state + VU peak + optional GR atomic. Pass proc+prefix to route mutations through APVTS.
     void bindRhythm(MixerEngine::ChannelState& state, juce::Atomic<float>& peak,
-                    PluginProcessor* proc = nullptr, const juce::String& apvtsPrefix = {});
+                    PluginProcessor* proc = nullptr, const juce::String& apvtsPrefix = {},
+                    juce::Atomic<float>* grAtomic = nullptr);
     void bindReturn(MixerEngine::ReturnState& state, juce::Atomic<float>& peak,
                     PluginProcessor* proc = nullptr, const juce::String& apvtsPrefix = {});
     void bindMaster(MixerEngine& engine,
@@ -62,9 +64,13 @@ private:
 
     juce::Slider      fader;
     VUMeter           vuMeter;
+    GRMeter           grMeter;
     juce::Label       dbLabel;
     juce::TextButton  muteBtn { "M" };
     juce::TextButton  soloBtn { "S" };
+
+    // Output bus dropdown (Rhythm channels only): M = Master, 1..8 = direct out.
+    juce::ComboBox    outBusBox;
 
     // Sidechain controls (Rhythm channels only)
     juce::ComboBox    scSourceBox;
@@ -82,12 +88,14 @@ private:
 
     static constexpr int kColourBarH = 3;
     static constexpr int kNameH      = 22;
+    static constexpr int kOutBusH    = 18;   // Out dropdown row (Rhythm channels only)
     static constexpr int kSendH      = 44;   // 15% smaller than original 52
     static constexpr int kPanH       = 52;
     static constexpr int kTopAreaH   = kSendH * 3 + kPanH;  // fixed for all channel types
     static constexpr int kDbH        = 14;
     static constexpr int kButtonH    = 22;
     static constexpr int kVUW        = 10;
+    static constexpr int kGRW        = 6;   // GR meter width (Rhythm channels only)
     // Sidechain section heights (Rhythm only)
     static constexpr int kScSrcH     = 20;
     static constexpr int kScAmtH     = 44;

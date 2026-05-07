@@ -4,7 +4,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     : AudioProcessorEditor(&p), processorRef(p),
       transportBar(p), sidebar(p), rhythmPanel(p),
       mixerOverlay(p, p.mixerEngine),
-      settingsOverlay(p)
+      settingsOverlay(p),
+      midiPresetsPanel(p)
 {
     setLookAndFeel(&lookAndFeel);
 
@@ -16,6 +17,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     addChildComponent(saveDialog);
     addChildComponent(presetBrowser);
     addChildComponent(settingsOverlay);
+    addChildComponent(midiPresetsPanel);
     addAndMakeVisible(statusBar);
 
     // ── TransportBar callbacks ────────────────────────────────────────────────
@@ -66,7 +68,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     {
         if (!processorRef.isLicensed() && processorRef.getNumRhythms() >= 2)
         {
-            statusBar.showParam("Demo", "2-rhythm limit — purchase a license to unlock all 8",
+            statusBar.showParam("Demo", juce::String::fromUTF8(u8"2-rhythm limit — purchase a license to unlock all 8"),
                                 MuClidLookAndFeel::colour(MuClidLookAndFeel::knobLevel));
             return;
         }
@@ -136,6 +138,17 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // ── Settings overlay ──────────────────────────────────────────────────────
     settingsOverlay.onClose = [this] { showSettings(false); };
     settingsOverlay.onContentDirChanged = [this] { transportBar.refreshPresets(); };
+    settingsOverlay.onMidiPresetsClicked = [this]
+    {
+        showSettings(false);
+        showMidiPresets(true);
+    };
+
+    midiPresetsPanel.onClose = [this]
+    {
+        showMidiPresets(false);
+        showSettings(true);
+    };
 
     // ── Demo mode ─────────────────────────────────────────────────────────────
     {
@@ -171,11 +184,78 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     setSize(1170, 870);
     setResizeLimits(780, 580, 2400, 1600);
+
+    isStandalone = processorRef.wrapperType == juce::AudioProcessor::wrapperType_Standalone;
+    loadKeybindings();
+    if (isStandalone)
+    {
+        setWantsKeyboardFocus(true);
+        addKeyListener(this);
+        needsFocusGrab = true;
+    }
 }
 
 PluginEditor::~PluginEditor()
 {
+    if (isStandalone)
+        removeKeyListener(this);
     setLookAndFeel(nullptr);
+}
+
+//==============================================================================
+bool PluginEditor::keyPressed(const juce::KeyPress& key, juce::Component*)
+{
+    // Don't intercept when a text editor or button has focus — they handle keys themselves,
+    // and the global listener fires before the focused component so we'd double-fire.
+    auto* focused = juce::Component::getCurrentlyFocusedComponent();
+    if (dynamic_cast<juce::TextEditor*>(focused)) return false;
+    if (dynamic_cast<juce::Button*>(focused))     return false;
+
+    if (key == keybindPlayStop)
+    {
+        processorRef.toggleInternalPlay();
+        return true;
+    }
+    return false;
+}
+
+bool PluginEditor::keyStateChanged(bool, juce::Component*) { return false; }
+
+void PluginEditor::parentHierarchyChanged()
+{
+    // Grab focus once on first show so Space works from launch without needing a mouse click.
+    if (needsFocusGrab && isShowing())
+    {
+        needsFocusGrab = false;
+        grabKeyboardFocus();
+    }
+}
+
+void PluginEditor::loadKeybindings()
+{
+    const juce::File bindingsFile = processorRef.getContentDir().getChildFile("keybindings.json");
+
+    if (!bindingsFile.existsAsFile())
+    {
+        bindingsFile.replaceWithText("{\n  \"play_stop\": \"space\"\n}\n");
+        return;  // defaults already set in member initialiser
+    }
+
+    const auto json = juce::JSON::parse(bindingsFile.loadFileAsString());
+    if (auto* obj = json.getDynamicObject())
+    {
+        auto parseKey = [](const juce::String& s) -> juce::KeyPress
+        {
+            if (s.equalsIgnoreCase("space"))   return juce::KeyPress(juce::KeyPress::spaceKey);
+            if (s.equalsIgnoreCase("return"))  return juce::KeyPress(juce::KeyPress::returnKey);
+            if (s.equalsIgnoreCase("escape"))  return juce::KeyPress(juce::KeyPress::escapeKey);
+            if (s.length() == 1)               return juce::KeyPress((int)s[0]);
+            return {};
+        };
+
+        if (obj->hasProperty("play_stop"))
+            keybindPlayStop = parseKey(obj->getProperty("play_stop").toString());
+    }
 }
 
 //==============================================================================
@@ -186,24 +266,28 @@ void PluginEditor::hideAllOverlays()
     animator.cancelAnimation(&mixerOverlay,   true);
     animator.cancelAnimation(&presetBrowser,  true);
     animator.cancelAnimation(&settingsOverlay, true);
-    rhythmPanel    .setAlpha(1.0f);
-    mixerOverlay   .setAlpha(1.0f);
-    presetBrowser  .setAlpha(1.0f);
-    settingsOverlay.setAlpha(1.0f);
+    animator.cancelAnimation(&midiPresetsPanel, true);
+    rhythmPanel     .setAlpha(1.0f);
+    mixerOverlay    .setAlpha(1.0f);
+    presetBrowser   .setAlpha(1.0f);
+    settingsOverlay .setAlpha(1.0f);
+    midiPresetsPanel.setAlpha(1.0f);
 
-    mixerVisible    = false;
+    mixerVisible       = false;
     transportBar.setMixerActive(false);
-    aboutVisible    = false;
-    saveVisible     = false;
-    browserVisible  = false;
-    settingsVisible = false;
+    aboutVisible       = false;
+    saveVisible        = false;
+    browserVisible     = false;
+    settingsVisible    = false;
+    midiPresetsVisible = false;
 
-    mixerOverlay  .setVisible(false);
-    aboutPanel    .setVisible(false);
-    saveDialog    .setVisible(false);
-    presetBrowser .setVisible(false);
-    settingsOverlay.setVisible(false);
-    rhythmPanel   .setVisible(true);
+    mixerOverlay    .setVisible(false);
+    aboutPanel      .setVisible(false);
+    saveDialog      .setVisible(false);
+    presetBrowser   .setVisible(false);
+    settingsOverlay .setVisible(false);
+    midiPresetsPanel.setVisible(false);
+    rhythmPanel     .setVisible(true);
 }
 
 void PluginEditor::fadeSwitch(juce::Component* outgoing, juce::Component* incoming, int durationMs)
@@ -305,6 +389,23 @@ void PluginEditor::showSettings(bool show)
     }
 }
 
+void PluginEditor::showMidiPresets(bool show)
+{
+    if (show)
+    {
+        hideAllOverlays();
+        midiPresetsVisible = true;
+        rhythmPanel.setVisible(false);
+        midiPresetsPanel.setVisible(true);
+    }
+    else
+    {
+        midiPresetsVisible = false;
+        midiPresetsPanel.setVisible(false);
+        rhythmPanel.setVisible(!mixerVisible);
+    }
+}
+
 //==============================================================================
 void PluginEditor::paint(juce::Graphics& g)
 {
@@ -326,10 +427,11 @@ void PluginEditor::resized()
     transportBar.setBounds(0, 0, w, transportH);
     sidebar.setBounds(0, transportH, RhythmSidebar::kWidth, contentH);
 
-    rhythmPanel    .setBounds(mainArea);
-    mixerOverlay   .setBounds(mainArea);
-    presetBrowser  .setBounds(mainArea);
-    settingsOverlay.setBounds(mainArea);
+    rhythmPanel     .setBounds(mainArea);
+    mixerOverlay    .setBounds(mainArea);
+    presetBrowser   .setBounds(mainArea);
+    settingsOverlay .setBounds(mainArea);
+    midiPresetsPanel.setBounds(mainArea);
 
     // Modal overlays span the full editor area
     aboutPanel .setBounds(getLocalBounds());

@@ -90,7 +90,6 @@ ModulatorEditor::ModulatorEditor()
 {
     addAndMakeVisible(modeCtrl);
     addAndMakeVisible(polarityCtrl);
-    addAndMakeVisible(inputCtrl);
     addAndMakeVisible(lfoEditor);
     addAndMakeVisible(stepEditor);
 
@@ -185,7 +184,6 @@ void ModulatorEditor::loadFromCS()
     const bool smooth = (cs->mode == ControlSequence::Mode::Smooth);
     modeCtrl.setSelectedIndex(smooth ? 0 : 1);
     polarityCtrl.setSelectedIndex(cs->polarity == ControlSequence::Polarity::Unipolar ? 0 : 1);
-    inputCtrl.setSelectedIndex(cs->inputSource == ControlSequence::InputSource::MIDI_CC ? 1 : 0);
     lfoEditor.setVisible(smooth);
     stepEditor.setVisible(!smooth);
     stepLabel.setVisible(!smooth);
@@ -215,10 +213,19 @@ void ModulatorEditor::loadFromCS()
 void ModulatorEditor::syncStepValues()
 {
     if (!cs) return;
-    const int count = cs->getStepCount();
-    cs->stepValues.resize(count, 0.0f);
+    const int rawCount = cs->getStepCount();
+    // Sanity-bound the count: anything beyond a few thousand indicates a corrupt
+    // ControlSequence pointer (e.g. dangling after a Rhythm vector erase).
+    if (rawCount < 1 || rawCount > 4096)
+    {
+        DBG("ModulatorEditor::syncStepValues: garbage step count " << rawCount
+            << " -- cs likely dangles. Skipping.");
+        jassertfalse;
+        return;
+    }
+    cs->stepValues.resize((size_t)rawCount, 0.0f);
     stepEditor.setSteps(cs->stepValues);
-    stepEditor.setStepCount(count);
+    stepEditor.setStepCount(rawCount);
 }
 
 void ModulatorEditor::wireHeader()
@@ -251,15 +258,6 @@ void ModulatorEditor::wireHeader()
         if (onChange) onChange();
     };
 
-    inputCtrl.onChange = [this](int idx)
-    {
-        if (!cs) return;
-        lockMod();
-        cs->inputSource = (idx == 0) ? ControlSequence::InputSource::Internal
-                                     : ControlSequence::InputSource::MIDI_CC;
-        unlockMod();
-        if (onChange) onChange();
-    };
 }
 
 void ModulatorEditor::wireTiming()
@@ -416,10 +414,9 @@ void ModulatorEditor::resized()
     int y = 0;
 
     const int nameW = 76;
-    const int ctrlW = (w - nameW) / 3;
-    modeCtrl    .setBounds(nameW,              y, ctrlW,                    kHeaderH);
-    polarityCtrl.setBounds(nameW + ctrlW,      y, ctrlW,                    kHeaderH);
-    inputCtrl   .setBounds(nameW + 2 * ctrlW,  y, w - nameW - 2 * ctrlW,   kHeaderH);
+    const int ctrlW = (w - nameW) / 2;
+    modeCtrl    .setBounds(nameW,              y, ctrlW,                kHeaderH);
+    polarityCtrl.setBounds(nameW + ctrlW,      y, w - nameW - ctrlW,    kHeaderH);
     y += kHeaderH;
 
     lfoEditor.setBounds(0, y, w, kEditorH);

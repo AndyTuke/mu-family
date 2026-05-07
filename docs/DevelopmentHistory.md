@@ -44,7 +44,7 @@ Completed build stages with dates derived from git history.
 
 ## Issue History
 
-Issues resolved during development — see [Issues.md](../Issues.md) for the full table.
+Issues resolved during development — see [backlog.md](../backlog.md) for the full table.
 
 Issues #1–#11 were raised and resolved during Stages 9–11. Issues #13 and #18 were resolved as design decisions on 2026-05-04 (no code change required — Euclid C intentionally inherits the full A/B padding parameter set).
 

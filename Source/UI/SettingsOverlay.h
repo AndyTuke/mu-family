@@ -14,6 +14,7 @@ class SettingsOverlay : public juce::Component
 public:
     std::function<void()> onClose;
     std::function<void()> onContentDirChanged;
+    std::function<void()> onMidiPresetsClicked;
 
     explicit SettingsOverlay(PluginProcessor& proc);
 
@@ -22,6 +23,7 @@ public:
 
 private:
     PluginProcessor& proc;
+    const bool isStandalone;
 
     juce::TextButton closeBtn { "Close" };
 
@@ -32,6 +34,18 @@ private:
     juce::Label    swapModeLabel;
     DropdownSelect swapModeDropdown;
 
+    // MIDI sync (standalone only)
+    juce::Label    clockSourceLabel;
+    DropdownSelect clockSourceDropdown;
+    juce::Label    midiMessagesLabel;
+    DropdownSelect midiMessagesDropdown;
+
+    // MIDI program-change preset assignments (button opens MidiPresetsPanel overlay).
+    juce::TextButton midiPresetsBtn { "MIDI Presets..." };
+
+    // Multi-bus output toggle (DAW only). Requires host rescan to take effect.
+    juce::ToggleButton multiBusToggle { "Multi-bus output" };
+
     // Content folder configuration
     juce::Label      contentFolderLabel;
     juce::TextButton browseContentFolderBtn { "Browse..." };
@@ -39,6 +53,7 @@ private:
     std::unique_ptr<juce::FileChooser> fileChooser;
 
     void updateFolderLabel();
+    void updateMidiSyncVisibility();
 
     static constexpr int kHeaderH = 36;
     static constexpr int kPad     = 12;

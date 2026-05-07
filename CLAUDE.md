@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build workflow
 
-After every build, read `Issues.md` and fix open (unchecked) issues immediately, without asking, up to a miximum of 5 issues. Prioritise issues that are related to the current stage
+After every build, read `backlog.md` and fix open (unchecked) issues immediately, without asking, up to a miximum of 5 issues. Prioritise issues that are related to the current stage
 
 New feature ideas live in `docs/design-future.md` under **Unscheduled Ideas**. Ask the user before implementing any of them.
 Update the stages as they up worked on, move to development history when done
@@ -72,7 +72,7 @@ Stages 1–24 are complete. See [docs/DevelopmentHistory.md](docs/DevelopmentHis
 
 ## Upcoming stages
 
-All work below resolves open issues from [Issues.md](Issues.md). Issues are referenced by number.
+All work below resolves open issues from [backlog.md](backlog.md). Issues are referenced by number.
 
 | Stage | Status | Scope | Issues |
 |---|---|---|---|

@@ -28,9 +28,11 @@ TransportBar::TransportBar(PluginProcessor& p)
     posLabel.setText("1.1.1", juce::dontSendNotification);
     addAndMakeVisible(posLabel);
 
+#if !MUCLID_LITE_BUILD
     rhythmCountLabel.setJustificationType(juce::Justification::centred);
     rhythmCountLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
     addAndMakeVisible(rhythmCountLabel);
+#endif
 
     loopLabel.setText("Loop:", juce::dontSendNotification);
     loopLabel.setJustificationType(juce::Justification::centredRight);
@@ -61,13 +63,13 @@ TransportBar::TransportBar(PluginProcessor& p)
     }
     addAndMakeVisible(loopStepLabel);
 
+#if !MUCLID_LITE_BUILD
     presetDropdown.onChange = [this](int id)
     {
         int idx = id - 1;
         if (idx >= 0 && idx < (int)presetFiles.size())
         {
             if (onPresetSelected) onPresetSelected(presetFiles[idx]);
-            // Reset selection so the same preset can be reloaded again.
             presetDropdown.setSelectedId(0, false);
         }
     };
@@ -76,17 +78,22 @@ TransportBar::TransportBar(PluginProcessor& p)
     saveBtn.onClick = [this] { if (onSavePreset) onSavePreset(); };
     addAndMakeVisible(saveBtn);
 
+    mixerBtn.setClickingTogglesState(true);
+    mixerBtn.onClick = [this] { if (onMixerToggle) onMixerToggle(); };
+    addAndMakeVisible(mixerBtn);
+#endif
+
     gearBtn.setButtonText(kGear);
     gearBtn.onClick = [this] { if (onSettingsToggle) onSettingsToggle(); };
     addAndMakeVisible(gearBtn);
 
-    mixerBtn.setClickingTogglesState(true);
-    mixerBtn.onClick = [this] { if (onMixerToggle) onMixerToggle(); };
-    addAndMakeVisible(mixerBtn);
-
+#if !MUCLID_LITE_BUILD
     populatePresetDropdown();
+#endif
     refreshPlayBtn();
+#if !MUCLID_LITE_BUILD
     updateRhythmCount();
+#endif
     startTimerHz(30);
 }
 
@@ -99,12 +106,25 @@ void TransportBar::timerCallback()
 {
     refreshPlayBtn();
     updatePositionLabel();
+#if !MUCLID_LITE_BUILD
     updateRhythmCount();
+#endif
+
+    if (isStandalone)
+    {
+        const bool midiClockBpm = proc.getMidiSyncEnabled() && proc.getMidiSyncMessages() != 1;
+        if (midiClockBpm)
+            bpmInput.setValue((int)std::round(proc.getMidiClockBpm()));
+        bpmInput.setEnabled(!midiClockBpm);
+
+        const bool midiTransport = proc.getMidiSyncEnabled() && proc.getMidiSyncMessages() != 0;
+        playBtn.setEnabled(!midiTransport);
+    }
 
     if (loopStepLabel.isVisible())
     {
         const int steps   = proc.sequencer.getMasterLoopSteps();
-        const int current = proc.sequencer.getMasterLoopCurrentStep() + 1; // 1-based display
+        const int current = proc.sequencer.getMasterLoopCurrentStep() + 1;
         loopStepLabel.setText(juce::String(current) + " / " + juce::String(steps),
                               juce::dontSendNotification);
     }
@@ -113,9 +133,14 @@ void TransportBar::timerCallback()
 void TransportBar::refreshPlayBtn()
 {
     if (isStandalone)
-        playBtn.setButtonText(proc.isInternalPlaying() ? kStop : kPlay);
+    {
+        const bool playing = proc.isInternalPlaying() || proc.isMidiClockPlaying();
+        playBtn.setButtonText(playing ? kStop : kPlay);
+    }
     else
+    {
         playBtn.setButtonText(kPlay);
+    }
 }
 
 void TransportBar::updatePositionLabel()
@@ -257,7 +282,10 @@ void TransportBar::resized()
 
     posLabel.setBounds(leftX, btnY, kPosW, btnH);
 
-    // Right group (right to left): Mixer | Gear | Save | Preset | +Rhythm | RhythmCount
+    // Right group (right to left): Mixer | Gear | Save | Preset | RhythmCount
+#if MUCLID_LITE_BUILD
+    gearBtn.setBounds(getWidth() - kGap - kGearW, btnY, kGearW, btnH);
+#else
     int rightEdge = getWidth() - kGap;
     mixerBtn.setBounds(rightEdge - kMixerW, btnY, kMixerW, btnH);
     rightEdge -= kMixerW + kGap;
@@ -272,4 +300,5 @@ void TransportBar::resized()
     rightEdge -= kPresetW + kGap;
 
     rhythmCountLabel.setBounds(rightEdge - kRhCountW, btnY, kRhCountW, btnH);
+#endif
 }

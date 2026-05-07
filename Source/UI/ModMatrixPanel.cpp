@@ -179,7 +179,7 @@ void ModMatrixPanel::paint(juce::Graphics& g)
     if (matrixRows.empty())
     {
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-        g.drawText("No assignments — use the Mod tabs or Add Assignment below",
+        g.drawText(juce::String::fromUTF8(u8"No assignments — use the Mod tabs or Add Assignment below"),
                    0, kHeaderH + 8, getWidth(), 20,
                    juce::Justification::centred, false);
     }

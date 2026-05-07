@@ -243,6 +243,25 @@ void EuclideanPanel::setRhythmColour(juce::Colour c)
     repaint();
 }
 
+void EuclideanPanel::refreshModulatedIndicators()
+{
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
+    const auto& assigns = proc.getRhythm(rhythmIndex).modulationMatrix.getAssignments();
+
+    auto isAssigned = [&assigns](const char* destId) -> bool
+    {
+        const std::string s = destId;
+        for (const auto& a : assigns)
+            if (a.destinationId == s) return true;
+        return false;
+    };
+
+    hitsA.setIsModulated(isAssigned("euclid.a.hits"));
+    rotA .setIsModulated(isAssigned("euclid.a.rotate"));
+    hitsB.setIsModulated(isAssigned("euclid.b.hits"));
+    rotB .setIsModulated(isAssigned("euclid.b.rotate"));
+}
+
 void EuclideanPanel::resized()
 {
     const int w      = getWidth();

@@ -40,7 +40,8 @@ namespace ModDest
         "Euclid B Hits",     "Euclid B Rotate"
     };
 
-    // Populate dd with only the destinations relevant for driveChar (0=None,1=Soft,2=Hard,3=Fold,4=Bit).
+    // Populate dd with only the destinations relevant for driveChar
+    // (0=None,1=Soft,2=Hard,3=Fold,4=Bit,5=Clipper).
     // Uses stable 1-based indices so saved assignments survive algorithm changes.
     inline void populate(DropdownSelect& dd, int driveChar)
     {
@@ -51,6 +52,7 @@ namespace ModDest
         switch (driveChar)
         {
             case 1: case 2: case 3:  // Soft / Hard / Fold
+            case 5:                  // Clipper — same drive/output/lpf knob mapping
                 dd.addItem(labels[10], 11);  // insert.drive
                 dd.addItem(labels[11], 12);  // insert.output
                 dd.addItem(labels[15], 16);  // insert.lpf
@@ -107,7 +109,7 @@ private:
 
     SegmentControl modeCtrl    { {"Smooth","Stepped"} };
     SegmentControl polarityCtrl{ {"Uni","Bi"} };
-    SegmentControl inputCtrl   { {"Internal","CC"} };
+    // (Was Internal/CC SegmentControl — removed in #136 along with MIDI output plans.)
     LFOEditor      lfoEditor;
     StepEditor     stepEditor;
     DropdownSelect loopDropdown;
