@@ -506,14 +506,16 @@ void MixerChannel::resized()
     faderPaneBounds = { 1, faderY - 2, stripW - 2, h - faderY + 1 };
 
     // ── Insert panel (Master channel, right of strip) ─────────────────────────
+    // Knobs stacked vertically so each gets the full panel width and maximum height.
     if (hasInsert())
     {
-        const int ipX = stripW;
-        insCharBox.setBounds(ipX,          nameBottom,              insW,            kInsCharH);
-        const int kw = insW / 3;
-        insDrive .setBounds(ipX,           nameBottom + kInsCharH,  kw,              kInsKnobH);
-        insOutput.setBounds(ipX + kw,      nameBottom + kInsCharH,  kw,              kInsKnobH);
-        insTone  .setBounds(ipX + 2 * kw,  nameBottom + kInsCharH,  insW - 2 * kw,   kInsKnobH);
+        const int ipX    = stripW;
+        const int availH = h - nameBottom - kInsCharH;
+        const int knobH  = juce::jmin(80, availH / 3);
+        insCharBox.setBounds(ipX, nameBottom,                       insW, kInsCharH);
+        insDrive  .setBounds(ipX, nameBottom + kInsCharH,           insW, knobH);
+        insOutput .setBounds(ipX, nameBottom + kInsCharH + knobH,   insW, knobH);
+        insTone   .setBounds(ipX, nameBottom + kInsCharH + knobH*2, insW, knobH);
     }
 }
 
