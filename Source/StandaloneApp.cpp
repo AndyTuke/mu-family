@@ -26,9 +26,9 @@ public:
             .withIconType (juce::MessageBoxIconType::QuestionIcon)
             .withTitle ("Close mu-Clid?")
             .withMessage ("Are you sure you want to close?")
-            .withButton ("Cancel")
+            .withButton ("OK")
             .withButton ("Save")
-            .withButton ("OK");
+            .withButton ("Cancel");
 
         juce::Component::SafePointer<MuClidWindow> safeThis (this);
         juce::AlertWindow::showAsync (opts, [safeThis] (int result)
@@ -36,16 +36,16 @@ public:
             if (safeThis == nullptr) return;
             safeThis->dialogOpen = false;
 
-            if (result == 2) // Save: save plugin state then close
+            if (result == 1) // OK: close without explicit save
+            {
+                juce::JUCEApplicationBase::quit();
+            }
+            else if (result == 2) // Save: save plugin state then close
             {
                 safeThis->pluginHolder->savePluginState();
                 juce::JUCEApplicationBase::quit();
             }
-            else if (result == 3) // OK: close without explicit save
-            {
-                juce::JUCEApplicationBase::quit();
-            }
-            // result == 1 (Cancel) or 0 (dismissed): do nothing
+            // result == 0 (Cancel / Escape / dismissed): do nothing
         });
     }
 
