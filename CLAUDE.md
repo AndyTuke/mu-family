@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 After every build, read `backlog.md` and fix open (unchecked) issues immediately, without asking, up to a miximum of 5 issues. Prioritise issues that are related to the current stage
 
+After every response, if any issues in `backlog.md` have been changed status or new issues have been added, update `backlog.md` immediately to reflect the current state.
+
 New feature ideas live in `docs/design-future.md` under **Unscheduled Ideas**. Ask the user before implementing any of them.
 Update the stages as they up worked on, move to development history when done
 
@@ -68,7 +70,7 @@ Artefacts land in `build/mu-clid_artefacts/Debug/` or `.../Release/`.
 
 ## Development history
 
-Stages 1–24 are complete. See [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) for the full stage-by-stage log with dates. When a stage is completed, it should be moved to the DevelopmentHistory.md file.
+Stages 1–25 are complete. See [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) for the full stage-by-stage log with dates. When a stage is completed, it should be moved to the DevelopmentHistory.md file.
 
 ## Upcoming stages
 
@@ -77,7 +79,7 @@ All work below resolves open issues from [backlog.md](backlog.md). Issues are re
 | Stage | Status | Scope | Issues |
 |---|---|---|---|
 | 24 | ✅ Done | **Sidechain ducking per mixer channel** — each rhythm channel strip gets (top→bottom): compact input selector (dropdown: None + other channel names), Amount knob (0–100 % ducking depth), and two half-width knobs labeled "/" (attack) and "\" (release). Sidechain DSP in `MixerEngine`: per-channel envelope follower driven by the source channel's post-fader audio; gain reduction = `amount × env` applied multiplicatively. New fields in `ChannelState`: `sidechainSource` (int, −1 = off), `sidechainAmount`, `sidechainAttackMs`, `sidechainReleaseMs`. | #115 #116 #117 |
-| 25 | Pending | **Chorus effect** — add Chorus as a new Effect slot algorithm using the Signalsmith-dsp chorus (already in the project as a transitive dependency). Parameters: Rate (Hz), Depth (ms), Mix (wet/dry). Stereo spread built in. Wire through `FXSlotBase` / `EffectSlot` as a new algorithm entry alongside Distortion/Flanger/Echo. APVTS params: `eff_choRate`, `eff_choDep`, `eff_choMix`. | — |
+| 25 | ✅ Done | **Chorus effect** — implemented as `ChorusEffect` (algorithm 0 in `EffectSlot`). Custom multi-voice delay-line chorus: 2–4 voices, 4-point Catmull-Rom Hermite interpolation, 30 ms base delay, per-voice LFO rate detuning ±1.5% (evenly spread so all voices average to the user rate, eliminating fixed-period comb artefacts), stereo spread via per-odd-voice delay asymmetry. Parameters: Rate (Hz), Depth (%), Voices, Spread (%), Mix (%). Wired through `FXSlotBase` / `EffectSlot` / `FXAlgorithmDef`; params stored via the shared `eff_p0..p4` APVTS system (consistent with Flanger, Phaser, Echo — dedicated per-algorithm params were superseded by the generic system). Implemented across Stage 8 (initial) and Stage 17 (Hermite + detuning quality pass). | — |
 | 26 | Pending | **Multimode filter on voice channel** — replace the current one-pole LPF tone filter with a State Variable Filter (SVF) giving LP / HP / BP / Notch modes. Use Martin Vicanek's TPT-SVF design (free, paper + code at vicanek.de). Voice chain: add a Mode dropdown (LP/HP/BP/Notch) and a Resonance knob alongside the existing Cutoff. APVTS params: `r{N}_filterMode` (0–3), `r{N}_filterRes` (0–1). Modulation target: `filterRes` joins `filterCutoff` as a valid destination in ModulationMatrix. | — |
 | 27 | Pending | **Ring modulator effect** — add Ring Modulator as a new Effect slot algorithm. Single-file implementation: multiply the input signal sample-by-sample by a sine wave at a user-set carrier frequency. Parameters: Frequency (10–5000 Hz, log scale), Mix (wet/dry). Creates metallic/clangorous tones from percussive samples. APVTS params: `eff_rmFreq`, `eff_rmMix`. | — |
 | 28 | Pending | **Tape saturation effect** — add Tape Saturation as a new Effect slot algorithm. Use Chowdhury DSP's open-source tape model (MIT) or a simplified version: input gain → soft-knee saturation curve → high-frequency roll-off → output trim. Parameters: Drive (0–100%), Bias (tonal shift), Tone (post-saturation LPF cutoff), Mix. Adds warmth and subtle compression rather than hard clipping. APVTS params: `eff_tapeDrive`, `eff_tapeBias`, `eff_tapeTone`, `eff_tapeMix`. | — |
