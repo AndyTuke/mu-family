@@ -27,10 +27,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     };
 
     // ── Per-rhythm parameters (47 × 8 = 376) ─────────────────────────────────
+    // Rhythms 0..kAutomatedRhythms-1 use full "Rhythm N " names so DAW automation
+    // lanes show them clearly. Remaining rhythms use short "RN " names.
     for (int i = 0; i < SequencerEngine::MaxRhythms; ++i)
     {
         const juce::String p = "r" + juce::String(i) + "_";
-        const juce::String n = "R" + juce::String(i + 1) + " ";
+        const juce::String n = (i < kAutomatedRhythms)
+                                   ? "Rhythm " + juce::String(i + 1) + " "
+                                   : "R"       + juce::String(i + 1) + " ";
 
         // HitGen A
         addI(p+"stepsA",   n+"Steps A",   1, 64, 8);
@@ -156,11 +160,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     addF("echo_spread",    "Echo Spread",      0.0f, 1.0f, 0.0f);
     addF("echo_dirt",      "Echo Dirt",        0.0f, 1.0f, 0.0f);
 
-    // ── Rhythm channel strips (7 × 8 = 56) ───────────────────────────────────
+    // ── Rhythm channel strips (11 × 8 = 88) ──────────────────────────────────
     for (int i = 0; i < SequencerEngine::MaxRhythms; ++i)
     {
         const juce::String c = "ch" + juce::String(i) + "_";
-        const juce::String n = "Ch" + juce::String(i + 1) + " ";
+        const juce::String n = (i < kAutomatedRhythms)
+                                   ? "Rhythm " + juce::String(i + 1) + " Ch "
+                                   : "Ch"      + juce::String(i + 1) + " ";
         addF(c+"lvl",     n+"Level",      0.0f, 1.0f,  1.0f);  // Issue #121: 0 dB default
         addF(c+"pan",     n+"Pan",       -1.0f, 1.0f,  0.0f);
         addB(c+"mute",    n+"Mute",      false);
@@ -188,10 +194,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addB(q+"solo", nm+"Solo",  false);
     }
 
-    // ── Master (2 params) ─────────────────────────────────────────────────────
-    addF("mstr_lvl",  "Master Level", 0.0f, 1.0f,  1.0f);   // Issue #121: 0 dB default
-    addF("mstr_pan",  "Master Pan",  -1.0f, 1.0f,  0.0f);
-    addI("mstrLoop",  "Master Loop",  0, 16, 0);   // 0=free, 1-16 → 16-256 steps
+    // ── Master (2 params + 8 insert params) ──────────────────────────────────
+    addF("mstr_lvl",    "Master Level",     0.0f,    1.0f,     1.0f);   // Issue #121: 0 dB default
+    addF("mstr_pan",    "Master Pan",      -1.0f,    1.0f,     0.0f);
+    addI("mstrLoop",    "Master Loop",      0,       16,       0);      // 0=free, 1-16 → 16-256 steps
+    // Master insert effect (#124): same algorithm set as per-rhythm voice INSERT.
+    addI("mst_insChar", "Mst Insert Char",  0,        8,       0);      // 0=None … 8=Limiter
+    addF("mst_insDrv",  "Mst Insert Drive", 0.0f,  100.0f,     0.0f);
+    addF("mst_insOut",  "Mst Insert Out", -24.0f,    0.0f,     0.0f);
+    addF("mst_insBits", "Mst Insert Bits",  1.0f,   16.0f,    16.0f);
+    addF("mst_insRate", "Mst Insert Rate", 100.0f, 48000.0f, 48000.0f);
+    addF("mst_insDit",  "Mst Insert Dit",   0.0f,  100.0f,     0.0f);
+    addF("mst_insTon",  "Mst Insert Tone", 20.0f, 20000.0f, 20000.0f);
+    addF("mst_insMid",  "Mst Insert Mid", -18.0f,   18.0f,     0.0f);  // EQ mid gain
 
 #if MUCLID_LITE_BUILD
     addI("lite_midiNote",   "MIDI Note", 0, 127, 36);
@@ -773,7 +788,7 @@ void PluginProcessor::parameterChanged(const juce::String& id, float v)
         return;
     }
     // Mixer params
-    if (id.startsWith("ch") || id.startsWith("ret_") || id.startsWith("mstr_"))
+    if (id.startsWith("ch") || id.startsWith("ret_") || id.startsWith("mstr_") || id.startsWith("mst_ins"))
     {
         syncMixerParam(id, v);
         return;
@@ -827,6 +842,7 @@ static const char* const kGlobalParams[] = {
     "ret_dly_lvl","ret_dly_pan","ret_dly_mute","ret_dly_solo",
     "ret_rev_lvl","ret_rev_pan","ret_rev_mute","ret_rev_solo",
     "mstr_lvl","mstr_pan","mstrLoop",
+    "mst_insChar","mst_insDrv","mst_insOut","mst_insBits","mst_insRate","mst_insDit","mst_insTon","mst_insMid",
     nullptr
 };
 
@@ -1015,6 +1031,14 @@ void PluginProcessor::syncMixerParam(const juce::String& id, float v)
 
     if      (id == "mstr_lvl") mixerEngine.masterLevel = v;
     else if (id == "mstr_pan") mixerEngine.masterPan   = v;
+    else if (id == "mst_insChar") mixerEngine.masterInsertParams.driveChar  = juce::jlimit(0, 8, (int)v);
+    else if (id == "mst_insDrv")  mixerEngine.masterInsertParams.driveDrive = v;
+    else if (id == "mst_insOut")  mixerEngine.masterInsertParams.driveOutput= v;
+    else if (id == "mst_insBits") mixerEngine.masterInsertParams.drvBits    = v;
+    else if (id == "mst_insRate") mixerEngine.masterInsertParams.driveRate  = v;
+    else if (id == "mst_insDit")  mixerEngine.masterInsertParams.drvDither  = v;
+    else if (id == "mst_insTon")  mixerEngine.masterInsertParams.driveTone  = v;
+    else if (id == "mst_insMid")  mixerEngine.masterInsertParams.eqMidGain  = v;
 }
 
 //==============================================================================

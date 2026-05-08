@@ -83,6 +83,11 @@ public:
     static constexpr int kFXReturnsBusIndex = 9;
     static constexpr int kTotalBuses        = 10;
 
+    // Rhythms 1..kAutomatedRhythms get full "Rhythm N" names in the APVTS parameter
+    // layout so DAW automation lanes show them clearly. Remaining rhythms use short
+    // "RN" names. Raise this constant (up to MaxRhythms) to expose more rhythms.
+    static constexpr int kAutomatedRhythms  = 3;
+
     // MIDI clock sync (standalone only).
     void   setMidiSyncEnabled(bool on);
     bool   getMidiSyncEnabled()  const { return midiSyncEnabled.load(std::memory_order_relaxed); }
