@@ -186,12 +186,19 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
                       (radius + 2.0f) * 2.0f, (radius + 2.0f) * 2.0f, 1.2f);
     }
 
-    // Live arc tracking the modulated value.
+    // Live arc tracking the modulated value — originates at the knob's current set position
+    // and sweeps clockwise (positive mod) or anti-clockwise (negative mod) from that point.
     if (! std::isnan(modulatedNorm))
     {
-        const float angle = startAngle + modulatedNorm * (endAngle - startAngle);
+        const double range = slider.getMaximum() - slider.getMinimum();
+        const float setNorm = (range > 0.0)
+            ? juce::jlimit(0.0f, 1.0f, (float)((slider.getValue() - slider.getMinimum()) / range))
+            : 0.0f;
+        const float baseAngle = startAngle + setNorm      * (endAngle - startAngle);
+        const float modAngle  = startAngle + modulatedNorm * (endAngle - startAngle);
         juce::Path arc;
-        arc.addCentredArc(cx, cy, radius + 4.0f, radius + 4.0f, 0.0f, startAngle, angle, true);
+        arc.addCentredArc(cx, cy, radius + 4.0f, radius + 4.0f, 0.0f,
+                          juce::jmin(baseAngle, modAngle), juce::jmax(baseAngle, modAngle), true);
         g.setColour(modCol.withAlpha(0.85f));
         g.strokePath(arc, juce::PathStrokeType(1.5f, juce::PathStrokeType::curved,
                                                      juce::PathStrokeType::rounded));

@@ -135,7 +135,7 @@ public:
                     const juce::String& category, bool embedSamples = false);
     void loadPreset(const juce::File& file);
     void saveRhythmPreset(int rhythmIndex, const juce::String& name, const juce::String& category);
-    void saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFile);
+    void saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFile, bool embedSample = false);
     bool applyRhythmPreset(const juce::File& file, int rhythmIndex);
     bool applyDefaultRhythm(int rhythmIndex);
     void loadDefaultPreset();
@@ -174,6 +174,8 @@ public:
         kSnapFilterCutoff, kSnapFilterRes,
         kSnapFenvAtk, kSnapFenvDec, kSnapFenvDepth,
         kSnapPitchSemi,
+        kSnapPitchOct,   // #142: pitch octave live arc
+        kSnapPitchFine,  // #142: pitch fine live arc
         kSnapInsDrive, kSnapInsOutput, kSnapInsBits, kSnapInsDither, kSnapInsLpf,
         kSnapCount
     };

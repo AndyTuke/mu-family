@@ -21,12 +21,15 @@ static float depthScaleFor(const std::string& destId)
     if (destId == "filter.cutoff" || destId == "insert.lpf") return 8000.0f;
     // Semitones / dB / bits — match the destination's natural full range.
     if (destId == "pitch.semitones") return 12.0f;   // ±12 semitones = ±1 octave (per #132 spec)
+    if (destId == "pitch.octave")    return 4.0f;    // ±4 octaves (#142)
+    if (destId == "pitch.fine")      return 100.0f;  // ±100 cents (#142)
     if (destId == "fenv.depth")      return 48.0f;   // 0..48 semitones (full range)
     if (destId == "insert.output")   return 24.0f;   // -24..0 dB (full range)
     if (destId == "insert.bits")     return 16.0f;   // 1..16 bits (full range)
     // Pattern destinations.
     if (destId == "euclid.a.hits"   || destId == "euclid.b.hits"
-     || destId == "euclid.a.rotate" || destId == "euclid.b.rotate") return 16.0f;
+     || destId == "euclid.a.rotate" || destId == "euclid.b.rotate"
+     || destId == "euclid.c.hits"   || destId == "euclid.c.rotate") return 16.0f;
     return 100.0f;  // 0-100 display-scale default
 }
 

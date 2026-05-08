@@ -26,6 +26,9 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     driveChar.addItem("Fold", 4);
     driveChar.addItem("Bitcrusher", 5);
     driveChar.addItem("Clipper", 6);
+    driveChar.addItem("3-Band EQ", 7);
+    driveChar.addItem("Compressor", 8);
+    driveChar.addItem("Limiter", 9);
     driveChar.setSelectedId(1, false);
     addAndMakeVisible(driveChar);
 
@@ -247,7 +250,9 @@ void VoiceSection::refreshModulatedIndicators()
         return false;
     };
 
+    pitchOctave .setIsModulated(isAssigned("pitch.octave"));
     pitchSemi   .setIsModulated(isAssigned("pitch.semitones"));
+    pitchFine   .setIsModulated(isAssigned("pitch.fine"));
     filterCutoff.setIsModulated(isAssigned("filter.cutoff"));
     filterRes   .setIsModulated(isAssigned("filter.resonance"));
     filterAtk   .setIsModulated(isAssigned("fenv.attack"));
@@ -270,7 +275,9 @@ void VoiceSection::refreshModulatedIndicators()
     auto arc = [&](bool assigned, int idx) -> float { return assigned ? sn(idx) : kNaN; };
 
     using P = PluginProcessor;
+    pitchOctave .setModulatedNorm(arc(isAssigned("pitch.octave"),     P::kSnapPitchOct));
     pitchSemi   .setModulatedNorm(arc(isAssigned("pitch.semitones"),  P::kSnapPitchSemi));
+    pitchFine   .setModulatedNorm(arc(isAssigned("pitch.fine"),       P::kSnapPitchFine));
     filterCutoff.setModulatedNorm(arc(isAssigned("filter.cutoff"),    P::kSnapFilterCutoff));
     filterRes   .setModulatedNorm(arc(isAssigned("filter.resonance"), P::kSnapFilterRes));
     filterAtk   .setModulatedNorm(arc(isAssigned("fenv.attack"),      P::kSnapFenvAtk));
@@ -471,6 +478,115 @@ void VoiceSection::configureInsertAlgorithm(int charId)
             driveTone  .onValueChanged = [this](double v) { apvtsSet("drvTon", (float)v); };
             break;
 
+        case 6:  // ── 3-Band EQ: Low shelf / Mid peak / High shelf ──────────
+        {
+            auto dbFmt = [](double v) -> juce::String {
+                return (v >= 0.0 ? "+" : "") + juce::String(v, 1) + " dB";
+            };
+            auto dbParse = [](const juce::String& s) -> double {
+                return s.retainCharacters("0123456789.-+").getDoubleValue();
+            };
+
+            driveDrive.setLabel("Low");
+            driveDrive.setRange(-18.0, 18.0, 0.1);
+            driveDrive.getSlider().textFromValueFunction = dbFmt;
+            driveDrive.getSlider().valueFromTextFunction = dbParse;
+            // driveDrive stores low gain as 0..100 (50 = 0 dB): load back
+            if (p) driveDrive.setValue(p->driveDrive / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
+            else   driveDrive.setValue(0.0, juce::dontSendNotification);
+            driveDrive.setVisible(true);
+
+            driveOutput.setLabel("High");
+            driveOutput.setRange(-18.0, 18.0, 0.1);
+            driveOutput.getSlider().textFromValueFunction = dbFmt;
+            driveOutput.getSlider().valueFromTextFunction = dbParse;
+            // high gain stored in drvDither (0..100): load back
+            if (p) driveOutput.setValue(p->drvDither / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
+            else   driveOutput.setValue(0.0, juce::dontSendNotification);
+            driveOutput.setVisible(true);
+
+            driveDither.setLabel("Mid");
+            driveDither.setRange(-18.0, 18.0, 0.1);
+            driveDither.getSlider().textFromValueFunction = dbFmt;
+            driveDither.getSlider().valueFromTextFunction = dbParse;
+            if (p) driveDither.setValue(p->eqMidGain, juce::dontSendNotification);
+            else   driveDither.setValue(0.0, juce::dontSendNotification);
+            driveDither.setVisible(true);
+
+            driveTone.setLabel("Mid Hz");
+            driveTone.getSlider().setSkewFactor(1.0);  // reset any log skew from Compressor mode
+            driveTone.setRange(200.0, 8000.0, 1.0);
+            driveTone.getSlider().textFromValueFunction = fmtHz;
+            driveTone.getSlider().valueFromTextFunction = parseHz;
+            if (p) driveTone.setValue(juce::jlimit(200.0, 8000.0, (double)p->driveTone), juce::dontSendNotification);
+            else   driveTone.setValue(1000.0, juce::dontSendNotification);
+            driveTone.setVisible(true);
+
+            // Low gain -18..18 → stored as 0..100 in drvDrv
+            driveDrive .onValueChanged = [this](double v) { apvtsSet("drvDrv", (float)((v + 18.0) / 36.0 * 100.0)); };
+            // High gain -18..18 → stored as 0..100 in drvDit (reused slot)
+            driveOutput.onValueChanged = [this](double v) { apvtsSet("drvDit", (float)((v + 18.0) / 36.0 * 100.0)); };
+            // Mid gain → direct eqMidGain param
+            driveDither.onValueChanged = [this](double v) { apvtsSet("eqMidGain", (float)v); };
+            // Mid frequency → drvTon
+            driveTone  .onValueChanged = [this](double v) { apvtsSet("drvTon", (float)v); };
+            break;
+        }
+
+        case 7: case 8:  // ── Compressor / Limiter ──────────────────────────
+        {
+            driveDrive.setLabel(charId == 8 ? "Ceiling" : "Threshold");
+            driveDrive.setRange(0.0, 100.0, 0.1);
+            driveDrive.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return "-" + juce::String((int)std::round(v * 0.4)) + " dB";
+            };
+            driveDrive.getSlider().valueFromTextFunction = nullptr;
+            if (p) driveDrive.setValue(p->driveDrive, juce::dontSendNotification);
+            else   driveDrive.setValue(50.0, juce::dontSendNotification);
+            driveDrive.setVisible(true);
+
+            driveOutput.setLabel("Output");
+            driveOutput.setRange(-24.0, 0.0, 0.1);
+            driveOutput.getSlider().textFromValueFunction = nullptr;
+            driveOutput.getSlider().valueFromTextFunction = nullptr;
+            if (p) driveOutput.setValue(p->driveOutput, juce::dontSendNotification);
+            else   driveOutput.setValue(0.0, juce::dontSendNotification);
+            driveOutput.setVisible(true);
+
+            driveDither.setLabel("Attack");
+            driveDither.setRange(0.0, 100.0, 0.1);
+            driveDither.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String((int)std::round(v * 2.0)) + " ms";
+            };
+            driveDither.getSlider().valueFromTextFunction = nullptr;
+            if (p) driveDither.setValue(p->drvDither, juce::dontSendNotification);
+            else   driveDither.setValue(5.0, juce::dontSendNotification);
+            driveDither.setVisible(true);
+
+            driveTone.setLabel("Release");
+            driveTone.setRange(20.0, 2000.0, 1.0);
+            driveTone.getSlider().setSkewFactorFromMidPoint(200.0);
+            driveTone.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return v < 1000.0 ? juce::String((int)v) + " ms"
+                                  : juce::String(v / 1000.0, 2) + " s";
+            };
+            driveTone.getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
+                auto t = s.trim().toLowerCase();
+                if (t.endsWith("ms")) return t.dropLastCharacters(2).trim().getDoubleValue();
+                if (t.endsWith("s"))  return t.dropLastCharacters(1).trim().getDoubleValue() * 1000.0;
+                return t.getDoubleValue();
+            };
+            if (p) driveTone.setValue(juce::jlimit(20.0, 2000.0, (double)p->driveTone), juce::dontSendNotification);
+            else   driveTone.setValue(100.0, juce::dontSendNotification);
+            driveTone.setVisible(true);
+
+            driveDrive .onValueChanged = [this](double v) { apvtsSet("drvDrv", (float)v); };
+            driveOutput.onValueChanged = [this](double v) { apvtsSet("drvOut", (float)v); };
+            driveDither.onValueChanged = [this](double v) { apvtsSet("drvDit", (float)v); };
+            driveTone  .onValueChanged = [this](double v) { apvtsSet("drvTon", (float)v); };
+            break;
+        }
+
         default: break;
     }
 
@@ -542,10 +658,12 @@ void VoiceSection::resized()
     // ─── Insert ──────────────────────────────────────────────────────────
     // Dropdown on row 1; knob layout depends on algorithm (Bitcrusher uses all 4 slots).
     driveChar.setBounds(driveX, row1Y + rowH / 4, 4 * kW, rowH / 2);
-    const bool isBit = (driveChar.getSelectedId() == 5);
+    // Bitcrusher (id=5), EQ (id=7), Compressor (id=8), Limiter (id=9) all use all 4 knob slots.
+    const int selId = driveChar.getSelectedId();
+    const bool showFour = (selId == 5 || selId >= 7);
     driveDrive .setBounds(driveX + 0 * kW, row2Y, kW, rowH);
     driveOutput.setBounds(driveX + 1 * kW, row2Y, kW, rowH);
-    if (isBit)
+    if (showFour)
     {
         driveDither.setBounds(driveX + 2 * kW, row2Y, kW, rowH);
         driveTone  .setBounds(driveX + 3 * kW, row2Y, kW, rowH);

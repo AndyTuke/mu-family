@@ -31,7 +31,7 @@ struct VoiceParams
     bool  ampRelToEnd = false;       // true when Release is at max (100): amp envelope bypassed, sample plays to natural end
 
     // ─── Drive / Insert (after filter, before amp) ───────────────────────
-    int   driveChar   = 0;           // 0=None, 1=Soft, 2=Hard, 3=Fold, 4=Bitcrusher, 5=Clipper
+    int   driveChar   = 0;           // 0=None,1=Soft,2=Hard,3=Fold,4=Bitcrusher,5=Clipper,6=EQ,7=Compressor,8=Limiter
     // Soft / Hard / Fold params:
     float driveDrive  = 0.0f;        // 0..100% input drive
     float driveOutput = 0.0f;        // -24..0 dB output level
@@ -40,7 +40,9 @@ struct VoiceParams
     float driveRate   = 48000.0f;    // 100..48000 Hz target sample rate (48000 = no reduction)
     float drvDither   = 0.0f;        // 0..100% TPDF dither amount
     // Shared:
-    float driveTone   = 20000.0f;    // 20..20000 Hz (1-pole LP post-drive; 20kHz = flat)
+    float driveTone   = 20000.0f;    // 20..20000 Hz (1-pole LP post-drive; 20kHz = flat; also EQ mid freq / comp release ms)
+    // EQ params (driveChar=6): low shelf and high shelf gains stored as 0..100 in driveDrive/drvDither fields
+    float eqMidGain   = 0.0f;        // EQ mid peak gain, -18..+18 dB (#129)
 
     // ─── Accent ──────────────────────────────────────────────────────────
     float accentDb    = 0.0f;        // 0..12 dB boost applied to accented steps

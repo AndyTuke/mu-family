@@ -93,13 +93,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addF(p+"aEnvRel",   n+"A Env Rel",  0.0f, 100.0f,  5.0f);
         addF(p+"accentDb",  n+"Accent",     0.0f,  12.0f,  0.0f);
         // Drive
-        addI(p+"drvChar", n+"Drive Char",   0,      5,      0);  // 0=None,1=Soft,2=Hard,3=Fold,4=Bitcrusher,5=Clipper
-        addF(p+"drvDrv",  n+"Drive",        0.0f, 100.0f,    0.0f);  // Soft/Hard/Fold drive amount
-        addF(p+"drvOut",  n+"Drive Out",  -24.0f,    0.0f,   0.0f);  // Soft/Hard/Fold output level
-        addF(p+"drvBits", n+"Bits",         1.0f,  16.0f,   16.0f);  // Bitcrusher bit depth
-        addF(p+"drvRate", n+"Drive Rate",  100.0f, 48000.0f, 48000.0f);  // Bitcrusher sample rate
-        addF(p+"drvDit",  n+"Dither",       0.0f, 100.0f,    0.0f);  // Bitcrusher dither amount
-        addF(p+"drvTon",  n+"Drive Tone",  20.0f, 20000.0f, 20000.0f);  // Shared LPF
+        addI(p+"drvChar",    n+"Drive Char",   0,      8,      0);  // 0=None,1=Soft,2=Hard,3=Fold,4=Bitcrusher,5=Clipper,6=EQ,7=Compressor,8=Limiter
+        addF(p+"drvDrv",     n+"Drive",        0.0f, 100.0f,    0.0f);  // Soft/Hard/Fold drive amount
+        addF(p+"drvOut",     n+"Drive Out",  -24.0f,    0.0f,   0.0f);  // Soft/Hard/Fold output level
+        addF(p+"drvBits",    n+"Bits",         1.0f,  16.0f,   16.0f);  // Bitcrusher bit depth
+        addF(p+"drvRate",    n+"Drive Rate",  100.0f, 48000.0f, 48000.0f);  // Bitcrusher sample rate
+        addF(p+"drvDit",     n+"Dither",       0.0f, 100.0f,    0.0f);  // Bitcrusher dither amount
+        addF(p+"drvTon",     n+"Drive Tone",  20.0f, 20000.0f, 20000.0f);  // Shared LPF
+        addF(p+"eqMidGain",  n+"EQ Mid Gain",-18.0f,  18.0f,   0.0f);  // EQ mid-band gain (#129)
     }
 
     // ── Effect slot (8 params) ────────────────────────────────────────────────
@@ -262,11 +263,11 @@ PluginProcessor::PluginProcessor()
         loadedSamplePaths.add(juce::String());
 
     // Pre-populate modulation param map so lookups never allocate on the audio thread.
-    modParamValues.reserve(20);
+    modParamValues.reserve(24);
     for (const char* key : { "amp.attack", "amp.decay", "amp.sustain", "amp.release",
                               "filter.cutoff", "filter.resonance",
                               "fenv.attack", "fenv.decay", "fenv.depth",
-                              "pitch.semitones",
+                              "pitch.semitones", "pitch.octave", "pitch.fine",  // #142
                               "insert.drive", "insert.output",
                               "insert.bits", "insert.rate", "insert.dither", "insert.lpf" })
         modParamValues[key] = 0.0f;
@@ -629,6 +630,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParamValues["fenv.decay"]       = modParams.filterEnvDec * (100.0f/3.0f);
                 modParamValues["fenv.depth"]       = modParams.filterEnvDepth;
                 modParamValues["pitch.semitones"]  = 0.0f;
+                modParamValues["pitch.octave"]     = 0.0f;
+                modParamValues["pitch.fine"]       = 0.0f;
                 modParamValues["insert.drive"]     = modParams.driveDrive;
                 modParamValues["insert.output"]    = modParams.driveOutput;
                 modParamValues["insert.bits"]      = modParams.drvBits;
@@ -654,6 +657,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                     snap[kSnapFenvDec]     .set(sn(modParamValues["fenv.decay"],       0.0f,    100.0f));
                     snap[kSnapFenvDepth]   .set(sn(modParamValues["fenv.depth"],       0.0f,     48.0f));
                     snap[kSnapPitchSemi]   .set(sn(modParamValues["pitch.semitones"], -12.0f,    12.0f));
+                    snap[kSnapPitchOct]    .set(sn(modParamValues["pitch.octave"],    -4.0f,      4.0f));
+                    snap[kSnapPitchFine]   .set(sn(modParamValues["pitch.fine"],    -100.0f,   100.0f));
                     snap[kSnapInsDrive]    .set(sn(modParamValues["insert.drive"],     0.0f,    100.0f));
                     snap[kSnapInsOutput]   .set(sn(modParamValues["insert.output"],   -24.0f,    0.0f));
                     snap[kSnapInsBits]     .set(sn(modParamValues["insert.bits"],      1.0f,     16.0f));
@@ -671,7 +676,10 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParams.filterEnvAtk   = juce::jmax(0.001f, modParamValues["fenv.attack"]  * 0.03f);
                 modParams.filterEnvDec   = juce::jmax(0.001f, modParamValues["fenv.decay"]   * 0.03f);
                 modParams.filterEnvDepth = juce::jlimit(0.0f, 48.0f, modParamValues["fenv.depth"]);
-                modParams.pitchMod       = juce::jlimit(-24.0f, 24.0f, modParamValues["pitch.semitones"]);
+                modParams.pitchMod       = juce::jlimit(-24.0f, 24.0f,
+                                               modParamValues["pitch.semitones"]
+                                             + modParamValues["pitch.octave"] * 12.0f
+                                             + modParamValues["pitch.fine"]   / 100.0f);
                 modParams.driveDrive     = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.drive"]);
                 modParams.driveOutput    = juce::jlimit(-24.0f,  0.0f,    modParamValues["insert.output"]);
                 modParams.drvBits        = juce::jlimit(1.0f,   16.0f,    modParamValues["insert.bits"]);
@@ -794,7 +802,7 @@ static const char* const kRhythmSuffixes[] = {
     "pitchOct","pitchSemi","pitchFine","pEnvAtk","pEnvDec","pEnvSus","pEnvRel","pEnvDep",
     "fltType","fltCut","fltRes","fEnvAtk","fEnvDec","fEnvSus","fEnvRel","fEnvDep",
     "ampLvl","aEnvAtk","aEnvDec","aEnvSus","aEnvRel","accentDb",
-    "drvChar","drvDrv","drvOut","drvBits","drvRate","drvDit","drvTon",
+    "drvChar","drvDrv","drvOut","drvBits","drvRate","drvDit","drvTon","eqMidGain",
     nullptr
 };
 
@@ -868,13 +876,14 @@ static void applyRhythmSuffix(const juce::String& suffix, float v, Rhythm& r,
     else if (suffix == "aEnvSus")   { r.voiceParams.ampEnvSus      = adsrSus(v);  voiceDirty = true; }
     else if (suffix == "aEnvRel")   { r.voiceParams.ampEnvRel = adsrTime(v); r.voiceParams.ampRelToEnd = (v >= 100.0f); voiceDirty = true; }
     else if (suffix == "accentDb")  { r.voiceParams.accentDb        = v;           voiceDirty = true; }
-    else if (suffix == "drvChar")   { r.voiceParams.driveChar  = juce::jlimit(0, 4, (int)v); voiceDirty = true; }
-    else if (suffix == "drvDrv")    { r.voiceParams.driveDrive = v;  voiceDirty = true; }
-    else if (suffix == "drvOut")    { r.voiceParams.driveOutput= v;  voiceDirty = true; }
-    else if (suffix == "drvBits")   { r.voiceParams.drvBits    = v;  voiceDirty = true; }
-    else if (suffix == "drvRate")   { r.voiceParams.driveRate  = v;  voiceDirty = true; }
-    else if (suffix == "drvDit")    { r.voiceParams.drvDither  = v;  voiceDirty = true; }
-    else if (suffix == "drvTon")    { r.voiceParams.driveTone  = v;  voiceDirty = true; }
+    else if (suffix == "drvChar")    { r.voiceParams.driveChar  = juce::jlimit(0, 8, (int)v); voiceDirty = true; }
+    else if (suffix == "drvDrv")     { r.voiceParams.driveDrive = v;  voiceDirty = true; }
+    else if (suffix == "drvOut")     { r.voiceParams.driveOutput= v;  voiceDirty = true; }
+    else if (suffix == "drvBits")    { r.voiceParams.drvBits    = v;  voiceDirty = true; }
+    else if (suffix == "drvRate")    { r.voiceParams.driveRate  = v;  voiceDirty = true; }
+    else if (suffix == "drvDit")     { r.voiceParams.drvDither  = v;  voiceDirty = true; }
+    else if (suffix == "drvTon")     { r.voiceParams.driveTone  = v;  voiceDirty = true; }
+    else if (suffix == "eqMidGain")  { r.voiceParams.eqMidGain  = v;  voiceDirty = true; }
 }
 
 void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float v)
@@ -1090,6 +1099,7 @@ void PluginProcessor::pushRhythmToAPVTS(int ri)
     set(px+"drvRate",   vp.driveRate);
     set(px+"drvDit",    vp.drvDither);
     set(px+"drvTon",    vp.driveTone);
+    set(px+"eqMidGain", vp.eqMidGain);
 }
 
 //==============================================================================
@@ -1509,7 +1519,8 @@ void PluginProcessor::saveRhythmPreset(int rhythmIdx, const juce::String& name,
     dir.getChildFile(safe + ".muRhyth").replaceWithText(state.toXmlString());
 }
 
-void PluginProcessor::saveRhythmPresetToFile(int rhythmIdx, const juce::File& destFile)
+void PluginProcessor::saveRhythmPresetToFile(int rhythmIdx, const juce::File& destFile,
+                                             bool embedSample)
 {
     if (rhythmIdx < 0 || rhythmIdx >= sequencer.getNumRhythms()) return;
 
@@ -1531,6 +1542,25 @@ void PluginProcessor::saveRhythmPresetToFile(int rhythmIdx, const juce::File& de
     for (int i = 0; kChannelSuffixes[i] != nullptr; ++i)
         if (auto* param = apvts.getParameter(chPrefix2 + kChannelSuffixes[i]))
             state.setProperty("ch_" + juce::String(kChannelSuffixes[i]), param->getValue(), nullptr);
+
+    if (embedSample)
+    {
+        const juce::String path = loadedSamplePaths[rhythmIdx];
+        if (path.isNotEmpty())
+        {
+            juce::File f(path);
+            if (f.existsAsFile())
+            {
+                juce::MemoryBlock mb;
+                if (f.loadFileAsData(mb) && mb.getSize() > 0)
+                {
+                    state.setProperty("sampleData",
+                                      juce::Base64::toBase64(mb.getData(), mb.getSize()), nullptr);
+                    state.setProperty("sampleName", f.getFileName(), nullptr);
+                }
+            }
+        }
+    }
 
     destFile.replaceWithText(state.toXmlString());
 }
@@ -1567,22 +1597,42 @@ bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
         r.name = nameVal.toString().toStdString();
     r.colourIndex = (int)state.getProperty("r0_colour", r.colourIndex);
 
-    juce::String samplePath = state.getProperty("r0_sample").toString();
-    if (samplePath.isNotEmpty())
+    // Embedded sample takes priority over path-based load (mirrors full-preset logic).
+    juce::String encodedData = state.getProperty("sampleData").toString();
+    if (encodedData.isNotEmpty())
     {
-        juce::File f(samplePath);
-        if (f.existsAsFile())
+        juce::MemoryOutputStream mos;
+        if (juce::Base64::convertFromBase64(mos, encodedData) && mos.getDataSize() > 0)
         {
-            voiceEngines[targetIdx]->loadFile(f);
-            loadedSamplePaths.set(targetIdx, f.getFullPathName());
-        }
-        else
-        {
-            juce::File fallback = getSamplesDir().getChildFile(juce::File(samplePath).getFileName());
-            if (fallback.existsAsFile())
+            juce::String sampleName = state.getProperty("sampleName", "embedded").toString();
+            juce::File tmp = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                                 .getChildFile("muclid_" + sampleName);
+            if (tmp.replaceWithData(mos.getData(), mos.getDataSize()))
             {
-                voiceEngines[targetIdx]->loadFile(fallback);
-                loadedSamplePaths.set(targetIdx, fallback.getFullPathName());
+                voiceEngines[targetIdx]->loadFile(tmp);
+                loadedSamplePaths.set(targetIdx, tmp.getFullPathName());
+            }
+        }
+    }
+    else
+    {
+        juce::String samplePath = state.getProperty("r0_sample").toString();
+        if (samplePath.isNotEmpty())
+        {
+            juce::File f(samplePath);
+            if (f.existsAsFile())
+            {
+                voiceEngines[targetIdx]->loadFile(f);
+                loadedSamplePaths.set(targetIdx, f.getFullPathName());
+            }
+            else
+            {
+                juce::File fallback = getSamplesDir().getChildFile(juce::File(samplePath).getFileName());
+                if (fallback.existsAsFile())
+                {
+                    voiceEngines[targetIdx]->loadFile(fallback);
+                    loadedSamplePaths.set(targetIdx, fallback.getFullPathName());
+                }
             }
         }
     }

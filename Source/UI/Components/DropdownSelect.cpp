@@ -12,6 +12,11 @@ void DropdownSelect::addItem(const juce::String& text, int id)
     combo.addItem(text, id);
 }
 
+void DropdownSelect::addSectionHeading(const juce::String& text)
+{
+    combo.addSectionHeading(text);
+}
+
 void DropdownSelect::setSelectedId(int id, bool notify)
 {
     combo.setSelectedId(id, notify ? juce::sendNotification : juce::dontSendNotification);

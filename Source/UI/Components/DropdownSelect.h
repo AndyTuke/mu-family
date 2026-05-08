@@ -11,6 +11,7 @@ public:
     DropdownSelect();
 
     void addItem(const juce::String& text, int id);
+    void addSectionHeading(const juce::String& text);
     void setSelectedId(int id, bool notify = false);
     int  getSelectedId() const;
     void clear();

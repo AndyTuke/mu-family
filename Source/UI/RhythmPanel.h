@@ -8,6 +8,31 @@
 #include "Components/MuClidLookAndFeel.h"
 #include "../PluginProcessor.h"
 
+// Lightweight modal card for saving a rhythm preset: name + embed-samples toggle.
+class RhythmSaveDialog : public juce::Component
+{
+public:
+    std::function<void(const juce::String& name, bool embed)> onSave;
+    std::function<void()> onCancel;
+
+    void setDefaultName(const juce::String& n) { nameEditor.setText(n, false); }
+
+    RhythmSaveDialog();
+    void paint(juce::Graphics&) override;
+    void resized() override;
+    void mouseDown(const juce::MouseEvent&) override;
+    void visibilityChanged() override;
+
+private:
+    juce::TextEditor   nameEditor;
+    juce::ToggleButton embedToggle { "Embed sample in file" };
+    juce::TextButton   saveBtn   { "Save" };
+    juce::TextButton   cancelBtn { "Cancel" };
+
+    static constexpr int kCardW = 320;
+    static constexpr int kCardH = 160;
+};
+
 // Full rhythm editor panel. Layout (top to bottom):
 //   Header bar | Sample bar | [RhythmCircle | EuclideanPanel] | VoiceSection | ModulatorPanel
 class RhythmPanel : public juce::Component,
@@ -50,8 +75,8 @@ private:
 
     std::unique_ptr<juce::FileChooser> fileChooser;
     std::unique_ptr<juce::FileChooser> rhythmLoadChooser;
-    std::unique_ptr<juce::FileChooser> rhythmSaveChooser;
     juce::File lastBrowseDir;
+    RhythmSaveDialog rhythmSaveDialog;
 
     // Fixed chrome heights/widths
     static constexpr int kHeaderH       = 28;

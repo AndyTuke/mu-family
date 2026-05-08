@@ -75,6 +75,86 @@ private:
     }
 };
 
+//==============================================================================
+// RhythmSaveDialog implementation
+
+RhythmSaveDialog::RhythmSaveDialog()
+{
+    nameEditor.setTextToShowWhenEmpty("Preset name", juce::Colours::grey);
+    nameEditor.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
+    addAndMakeVisible(nameEditor);
+
+    addAndMakeVisible(embedToggle);
+
+    saveBtn.onClick = [this]
+    {
+        const auto name = nameEditor.getText().trim();
+        if (name.isEmpty()) return;
+        if (onSave) onSave(name, embedToggle.getToggleState());
+    };
+    cancelBtn.onClick = [this] { if (onCancel) onCancel(); };
+    addAndMakeVisible(saveBtn);
+    addAndMakeVisible(cancelBtn);
+}
+
+void RhythmSaveDialog::visibilityChanged()
+{
+    if (isVisible())
+    {
+        embedToggle.setToggleState(false, juce::dontSendNotification);
+        nameEditor.grabKeyboardFocus();
+    }
+}
+
+void RhythmSaveDialog::mouseDown(const juce::MouseEvent& e)
+{
+    const int cardX = (getWidth()  - kCardW) / 2;
+    const int cardY = (getHeight() - kCardH) / 2;
+    const juce::Rectangle<int> card { cardX, cardY, kCardW, kCardH };
+    if (!card.contains(e.getPosition()))
+        if (onCancel) onCancel();
+}
+
+void RhythmSaveDialog::resized()
+{
+    const int cardX = (getWidth()  - kCardW) / 2;
+    const int cardY = (getHeight() - kCardH) / 2;
+    const int pad   = 20;
+    const int fieldW = kCardW - pad * 2;
+
+    int y = cardY + 40;
+    nameEditor  .setBounds(cardX + pad, y, fieldW, 28);  y += 36;
+    embedToggle .setBounds(cardX + pad, y, fieldW, 24);  y += 34;
+
+    const int btnW = 80;
+    const int btnY = cardY + kCardH - 36;
+    cancelBtn.setBounds(cardX + pad,            btnY, btnW, 26);
+    saveBtn  .setBounds(cardX + kCardW - pad - btnW, btnY, btnW, 26);
+}
+
+void RhythmSaveDialog::paint(juce::Graphics& g)
+{
+    using Id = MuClidLookAndFeel::ColourIds;
+
+    g.setColour(juce::Colour(0xe6000000));
+    g.fillAll();
+
+    const int cardX = (getWidth()  - kCardW) / 2;
+    const int cardY = (getHeight() - kCardH) / 2;
+
+    g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
+    g.fillRoundedRectangle((float)cardX, (float)cardY, (float)kCardW, (float)kCardH, 8.0f);
+
+    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+    g.drawRoundedRectangle((float)cardX, (float)cardY, (float)kCardW, (float)kCardH, 8.0f, 1.0f);
+
+    g.setColour(MuClidLookAndFeel::colour(Id::headingText));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(14.0f)));
+    g.drawText("Save Rhythm Preset", cardX + 20, cardY + 12, kCardW - 40, 20,
+               juce::Justification::centredLeft, false);
+}
+
+//==============================================================================
 RhythmPanel::RhythmPanel(PluginProcessor& p)
     : proc(p), euclidPanel(p), voiceSection(p)
 {
@@ -105,6 +185,23 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     addAndMakeVisible(deleteBtn);
     addAndMakeVisible(loadRhythmBtn);
     addAndMakeVisible(saveRhythmBtn);
+
+    addAndMakeVisible(rhythmSaveDialog);
+    rhythmSaveDialog.setVisible(false);
+    rhythmSaveDialog.onCancel = [this] { rhythmSaveDialog.setVisible(false); };
+    rhythmSaveDialog.onSave   = [this](const juce::String& name, bool embed)
+    {
+        if (currentRhythmIndex < 0) return;
+
+        juce::String safeName = name.replaceCharacters("\\/:|*?<>\"", "_");
+        juce::File destDir    = proc.getRhythmsDir().isDirectory()
+                                    ? proc.getRhythmsDir()
+                                    : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
+        juce::File destFile   = destDir.getChildFile(safeName).withFileExtension(".muRhyth");
+
+        proc.saveRhythmPresetToFile(currentRhythmIndex, destFile, embed);
+        rhythmSaveDialog.setVisible(false);
+    };
 
     euclidPanel.onPatternChanged = [this]
     {
@@ -274,23 +371,9 @@ void RhythmPanel::saveRhythmPreset()
     const juce::String defaultName =
         juce::String(proc.getRhythm(currentRhythmIndex).name).replaceCharacters("\\/:|*?<>\"", "_");
 
-    const juce::File startDir = proc.getRhythmsDir().isDirectory()
-                                    ? proc.getRhythmsDir()
-                                    : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
-
-    rhythmSaveChooser = std::make_unique<juce::FileChooser>(
-        "Save Rhythm Preset", startDir.getChildFile(defaultName), "*.muRhyth");
-
-    rhythmSaveChooser->launchAsync(
-        juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles,
-        [this](const juce::FileChooser& fc)
-        {
-            auto result = fc.getResult();
-            if (result == juce::File{} || currentRhythmIndex < 0) return;
-            if (result.getFileExtension().toLowerCase() != ".murhyth")
-                result = result.withFileExtension(".muRhyth");
-            proc.saveRhythmPresetToFile(currentRhythmIndex, result);
-        });
+    rhythmSaveDialog.setDefaultName(defaultName);
+    rhythmSaveDialog.setVisible(true);
+    rhythmSaveDialog.toFront(true);
 }
 
 void RhythmPanel::mouseDown(const juce::MouseEvent& e)
@@ -400,6 +483,7 @@ void RhythmPanel::resized()
     euclidPanel.setBounds   (euclidRect.reduced(kPanelPad + 1));
     voiceSection.setBounds  (voiceRect.reduced(kPanelPad + 1));
     modulatorPanel.setBounds(modRect.reduced(kPanelPad + 1));
+    rhythmSaveDialog.setBounds(getLocalBounds());
 }
 
 //==============================================================================

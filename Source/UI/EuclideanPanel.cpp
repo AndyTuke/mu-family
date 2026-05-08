@@ -260,6 +260,8 @@ void EuclideanPanel::refreshModulatedIndicators()
     rotA .setIsModulated(isAssigned("euclid.a.rotate"));
     hitsB.setIsModulated(isAssigned("euclid.b.hits"));
     rotB .setIsModulated(isAssigned("euclid.b.rotate"));
+    hitsC.setIsModulated(isAssigned("euclid.c.hits"));
+    rotC .setIsModulated(isAssigned("euclid.c.rotate"));
 }
 
 void EuclideanPanel::resized()

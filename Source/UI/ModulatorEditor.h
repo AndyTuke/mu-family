@@ -15,59 +15,104 @@
 // Pre-APVTS modulation destination list. Replaced by APVTS parameter IDs in Stage 10.
 // Item IDs in dropdowns are always 1-based indices into the full ids array so that
 // assignments remain valid when the insert algorithm changes.
+// New destinations are appended to the end so existing saved assignment IDs are preserved.
 namespace ModDest
 {
     inline const juce::StringArray ids {
+        // ── Amp (0–3) ──────────────────────────────────────────────────────────
         "amp.attack",        "amp.decay",       "amp.sustain",    "amp.release",
+        // ── Filter (4–8) ───────────────────────────────────────────────────────
         "filter.cutoff",     "filter.resonance",
         "fenv.attack",       "fenv.decay",      "fenv.depth",
+        // ── Pitch (9) — semitone kept at index 9 for backward compat ──────────
         "pitch.semitones",
+        // ── Insert (10–15) ────────────────────────────────────────────────────
         "insert.drive",      "insert.output",                      // Soft/Hard/Fold
         "insert.bits",       "insert.rate",     "insert.dither",  // Bitcrusher
         "insert.lpf",                                              // all insert algorithms
+        // ── Euclid A/B (16–19) ────────────────────────────────────────────────
         "euclid.a.hits",     "euclid.a.rotate",
-        "euclid.b.hits",     "euclid.b.rotate"
+        "euclid.b.hits",     "euclid.b.rotate",
+        // ── Pitch octave + fine (20–21, appended to preserve IDs) ────────────
+        "pitch.octave",      "pitch.fine",
+        // ── Euclid C (22–23) ─────────────────────────────────────────────────
+        "euclid.c.hits",     "euclid.c.rotate"
     };
     inline const juce::StringArray labels {
         "Amp Attack",        "Amp Decay",         "Amp Sustain",       "Amp Release",
         "Filter Cutoff",     "Filter Resonance",
         "Filter Env Attack", "Filter Env Decay",  "Filter Env Depth",
-        "Pitch",
+        "Pitch Semitone",
         "Insert Drive",      "Insert Output",
         "Insert Bits",       "Insert Rate",       "Insert Dither",
         "Insert LPF",
         "Euclid A Hits",     "Euclid A Rotate",
-        "Euclid B Hits",     "Euclid B Rotate"
+        "Euclid B Hits",     "Euclid B Rotate",
+        "Pitch Octave",      "Pitch Fine",
+        "Euclid C Hits",     "Euclid C Rotate"
     };
 
-    // Populate dd with only the destinations relevant for driveChar
-    // (0=None,1=Soft,2=Hard,3=Fold,4=Bit,5=Clipper).
+    // Populate dd with destinations grouped by section, showing only insert destinations
+    // relevant for driveChar (0=None,1=Soft,2=Hard,3=Fold,4=Bit,5=Clipper,6=EQ,7=Comp,8=Lim).
     // Uses stable 1-based indices so saved assignments survive algorithm changes.
     inline void populate(DropdownSelect& dd, int driveChar)
     {
-        // Always-visible: amp, filter, pitch (indices 0–9)
-        for (int i = 0; i < 10; ++i)
-            dd.addItem(labels[i], i + 1);
-        // Insert-specific
+        // ── Euclid A ──────────────────────────────────────────────────────────
+        dd.addSectionHeading("Euclid A");
+        dd.addItem("Hits",   17);  // euclid.a.hits
+        dd.addItem("Rotate", 18);  // euclid.a.rotate
+
+        // ── Euclid B ──────────────────────────────────────────────────────────
+        dd.addSectionHeading("Euclid B");
+        dd.addItem("Hits",   19);  // euclid.b.hits
+        dd.addItem("Rotate", 20);  // euclid.b.rotate
+
+        // ── Euclid C ──────────────────────────────────────────────────────────
+        dd.addSectionHeading("Euclid C");
+        dd.addItem("Hits",   23);  // euclid.c.hits
+        dd.addItem("Rotate", 24);  // euclid.c.rotate
+
+        // ── Pitch ─────────────────────────────────────────────────────────────
+        dd.addSectionHeading("Pitch");
+        dd.addItem("Octave",   21);  // pitch.octave
+        dd.addItem("Semitone", 10);  // pitch.semitones
+        dd.addItem("Fine",     22);  // pitch.fine
+
+        // ── Filter ────────────────────────────────────────────────────────────
+        dd.addSectionHeading("Filter");
+        dd.addItem("Cutoff",    5);  // filter.cutoff
+        dd.addItem("Resonance", 6);  // filter.resonance
+        dd.addItem("Env Attack",  7);  // fenv.attack
+        dd.addItem("Env Decay",   8);  // fenv.decay
+        dd.addItem("Env Depth",   9);  // fenv.depth
+
+        // ── Amp ───────────────────────────────────────────────────────────────
+        dd.addSectionHeading("Amp");
+        dd.addItem("Attack",  1);  // amp.attack
+        dd.addItem("Decay",   2);  // amp.decay
+        dd.addItem("Sustain", 3);  // amp.sustain
+        dd.addItem("Release", 4);  // amp.release
+
+        // ── Insert ────────────────────────────────────────────────────────────
         switch (driveChar)
         {
             case 1: case 2: case 3:  // Soft / Hard / Fold
             case 5:                  // Clipper — same drive/output/lpf knob mapping
-                dd.addItem(labels[10], 11);  // insert.drive
-                dd.addItem(labels[11], 12);  // insert.output
-                dd.addItem(labels[15], 16);  // insert.lpf
+                dd.addSectionHeading("Insert");
+                dd.addItem("Drive",  11);  // insert.drive
+                dd.addItem("Output", 12);  // insert.output
+                dd.addItem("LPF",    16);  // insert.lpf
                 break;
             case 4:  // Bitcrusher
-                dd.addItem(labels[12], 13);  // insert.bits
-                dd.addItem(labels[13], 14);  // insert.rate
-                dd.addItem(labels[14], 15);  // insert.dither
-                dd.addItem(labels[15], 16);  // insert.lpf
+                dd.addSectionHeading("Insert");
+                dd.addItem("Bits",   13);  // insert.bits
+                dd.addItem("Rate",   14);  // insert.rate
+                dd.addItem("Dither", 15);  // insert.dither
+                dd.addItem("LPF",    16);  // insert.lpf
                 break;
-            default: break;  // None — no insert params
+            case 6: case 7: case 8:  // EQ / Compressor / Limiter — no mod destinations yet
+            default: break;          // None — no insert params
         }
-        // Euclid (indices 16–19)
-        for (int i = 16; i < 20; ++i)
-            dd.addItem(labels[i], i + 1);
     }
 }
 

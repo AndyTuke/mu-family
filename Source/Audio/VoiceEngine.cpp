@@ -33,6 +33,12 @@ void VoiceEngine::prepareToPlay(double sampleRate, int blockSize)
 
     filter.prepare({ sampleRate, static_cast<uint32_t>(blockSize), 2 });
     syncFilter();
+
+    const juce::dsp::ProcessSpec spec { sampleRate, static_cast<uint32_t>(blockSize), 2 };
+    eqLow.prepare(spec);
+    eqMid.prepare(spec);
+    eqHigh.prepare(spec);
+    compEnvelope[0] = compEnvelope[1] = 0.0f;
 }
 
 void VoiceEngine::loadFile(const juce::File& file)
@@ -259,11 +265,77 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
             }
             break;
         }
+        case 6: // ── 3-Band EQ: low shelf / mid peak / high shelf ─────────
+        {
+            using Coeffs = juce::dsp::IIR::Coefficients<float>;
+            const float sr          = (float)currentSampleRate;
+            const float curDriveDrv = activeParams.driveDrive;
+            const float curDrvDit   = activeParams.drvDither;
+            const float curMidGain  = activeParams.eqMidGain;
+            const float curMidFreq  = juce::jlimit(20.0f, 20000.0f, activeParams.driveTone);
+
+            // Only recompute when params actually change — avoids per-block heap allocation
+            // from IIR::Coefficients::makeXxx() which creates a new ReferenceCountedObject.
+            if (curDriveDrv != eqLastDriveDrive || curDrvDit  != eqLastDrvDither
+             || curMidGain  != eqLastMidGain    || curMidFreq != eqLastDriveTone)
+            {
+                const float lowG  = juce::Decibels::decibelsToGain(curDriveDrv / 100.0f * 36.0f - 18.0f);
+                const float highG = juce::Decibels::decibelsToGain(curDrvDit   / 100.0f * 36.0f - 18.0f);
+                const float midG  = juce::Decibels::decibelsToGain(curMidGain);
+
+                *eqLow .state = *Coeffs::makeLowShelf  (sr, 200.0f,    0.7f, lowG);
+                *eqMid .state = *Coeffs::makePeakFilter(sr, curMidFreq, 1.0f, midG);
+                *eqHigh.state = *Coeffs::makeHighShelf  (sr, 8000.0f,   0.7f, highG);
+
+                eqLastDriveDrive = curDriveDrv;
+                eqLastDrvDither  = curDrvDit;
+                eqLastMidGain    = curMidGain;
+                eqLastDriveTone  = curMidFreq;
+            }
+
+            eqLow .process(ctx);
+            eqMid .process(ctx);
+            eqHigh.process(ctx);
+            break;
+        }
+        case 7: case 8: // ── Compressor / Limiter ──────────────────────────────
+        {
+            const float sr        = (float)currentSampleRate;
+            const float threshLin = juce::Decibels::decibelsToGain(-(activeParams.driveDrive / 100.0f) * 40.0f);
+            const float outGain   = juce::Decibels::decibelsToGain(activeParams.driveOutput);
+            const float attackMs  = juce::jmax(0.1f, activeParams.drvDither * 2.0f);   // 0..100 → 0..200 ms
+            const float relMs     = juce::jmax(1.0f,  activeParams.driveTone);          // stored directly as ms
+            const float ratio     = (activeParams.driveChar == 8) ? 100.0f : 4.0f;
+            const float attCoeff  = std::exp(-2.2f / (attackMs  * 0.001f * sr));
+            const float relCoeff  = std::exp(-2.2f / (relMs     * 0.001f * sr));
+
+            for (int ch = 0; ch < nCh; ++ch)
+            {
+                auto*  data = tempBuffer.getWritePointer(ch);
+                float& env  = compEnvelope[ch < 2 ? ch : 0];
+                for (int i = 0; i < ns; ++i)
+                {
+                    const float level = std::abs(data[i]);
+                    env = level > env ? attCoeff * env + (1.0f - attCoeff) * level
+                                      : relCoeff * env + (1.0f - relCoeff) * level;
+
+                    float gainDb = 0.0f;
+                    if (env > threshLin && threshLin > 1e-8f)
+                    {
+                        const float overDb = 20.0f * std::log10(env / threshLin);
+                        gainDb = -overDb * (1.0f - 1.0f / ratio);
+                    }
+                    data[i] *= juce::Decibels::decibelsToGain(gainDb) * outGain;
+                }
+            }
+            break;
+        }
         default: break;  // 0 = None — bypass
     }
 
-    // ── Tone filter (1-pole LP after drive, always active when driveTone < 20kHz) ──
-    if (activeParams.driveTone < 19000.0f && currentSampleRate > 0.0)
+    // ── Tone filter (1-pole LP after drive, only for algorithms where driveTone = LP freq) ──
+    // For EQ (6), Compressor (7), Limiter (8): driveTone stores mid freq / release ms, not an LPF.
+    if (activeParams.driveChar < 6 && activeParams.driveTone < 19000.0f && currentSampleRate > 0.0)
     {
         for (int ch = 0; ch < nCh; ++ch)
             toneFilter[ch].prepare(activeParams.driveTone, (float)currentSampleRate);
