@@ -442,7 +442,7 @@ void MixerOverlay::resized()
     reverbReturn .setBounds(x, kHeaderH, kChanW, stripH);  x += kChanW;
 
     x += kDivW;
-    masterChannel.setBounds(x, kHeaderH, kMasterW, stripH);
+    masterChannel.setBounds(x, kHeaderH, kMasterW + MixerChannel::kInsertPanelW, stripH);
 
     // FX rows below the channel strips
     int fy = kHeaderH + stripH + kFXPad;

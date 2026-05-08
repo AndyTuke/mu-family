@@ -10,12 +10,16 @@
 class PluginProcessor;
 
 // One vertical channel strip.
-// Layout (top→bottom): colour bar | name | [sidechain section] | [sends] | pan | fader+VU | dB | [mute/solo]
-// Sidechain section only visible on Rhythm channels.
+// Layout (top→bottom): colour bar | name | [sidechain] | sends+pan | fader+VU+GR | [outBus] | dB | [mute/solo]
+// Master channel: strip occupies left (getWidth()-kInsertPanelW) pixels; insert panel on the right.
 class MixerChannel : public juce::Component
 {
 public:
     enum class Type { Rhythm, EffectReturn, DelayReturn, ReverbReturn, Master };
+
+    // Width of the insert panel drawn to the right of the Master strip.
+    // MixerOverlay adds this to kMasterW when sizing masterChannel.
+    static constexpr int kInsertPanelW = 96;
 
     MixerChannel(Type type, const juce::String& name, juce::Colour colour);
 
@@ -78,11 +82,21 @@ private:
     KnobWithLabel     scAttack  { "/",   Id::knobFxSend };
     KnobWithLabel     scRelease { "\\",  Id::knobFxSend };
 
+    // Insert controls (Master channel only) — compact 3-knob strip
+    juce::ComboBox    insCharBox;
+    KnobWithLabel     insDrive  { "Drive",  Id::knobInsertPad };
+    KnobWithLabel     insOutput { "Output", Id::knobInsertPad };
+    KnobWithLabel     insTone   { "Tone",   Id::knobInsertPad };
+
+    // Configure knob labels/ranges/callbacks for the selected algorithm.
+    void configureInsertAlgorithm(int charId, PluginProcessor* proc);
+
     bool hasSends()    const { return channelType == Type::Rhythm
                                        || channelType == Type::EffectReturn
                                        || channelType == Type::DelayReturn; }
     bool hasMuteSolo() const { return channelType != Type::Master; }
     bool hasSidechain() const { return channelType == Type::Rhythm; }
+    bool hasInsert()    const { return channelType == Type::Master; }
 
     void updateDbLabel(float level);
 
@@ -95,10 +109,20 @@ private:
     static constexpr int kDbH        = 14;
     static constexpr int kButtonH    = 22;
     static constexpr int kVUW        = 10;
-    static constexpr int kGRW        = 6;   // GR meter width (Rhythm channels only)
+    static constexpr int kGRW        = 8;   // GR meter width (Rhythm channels only)
     // Sidechain section heights (Rhythm only)
     static constexpr int kScSrcH     = 20;
     static constexpr int kScAmtH     = 44;
     static constexpr int kScEnvH     = 40;
     static constexpr int kSidechainH = kScSrcH + kScAmtH + kScEnvH;  // 104px
+
+    // Insert section (Master channel only)
+    static constexpr int kInsCharH  = 20;
+    static constexpr int kInsKnobH  = 44;
+    static constexpr int kInsertH   = kInsCharH + kInsKnobH;          // 64px
+
+    // Section pane bounds — computed in resized(), drawn as rounded rects in paint().
+    juce::Rectangle<int> sidechainPaneBounds;
+    juce::Rectangle<int> sendsPaneBounds;
+    juce::Rectangle<int> faderPaneBounds;
 };

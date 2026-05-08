@@ -50,7 +50,7 @@ private:
     static constexpr int kDivW     = 4;
     static constexpr int kChanGap  = 3;
     static constexpr int kChanW    = 64;
-    static constexpr int kMasterW  = 96;
+    static constexpr int kMasterW  = 80;  // strip only; component is kMasterW + MixerChannel::kInsertPanelW
 
     SegmentControl meterModeCtrl { {"Peak", "VU", "K-12", "K-14"} };
 
