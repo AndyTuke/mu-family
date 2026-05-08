@@ -6,7 +6,7 @@
 
 | # | Description | Status | Fixed Build |
 |---|---|---|---|
-| 167 | No warning prompt when closing stand-alone app v1.0.269 ([GH#1](https://github.com/AndyTuke/mu-clid/issues/1)) | 🔴 Open | — |
+| 167 | Standalone close warning ([GH#1](https://github.com/AndyTuke/mu-clid/issues/1)) — when closing the standalone app (window X button) while a pattern is playing or unsaved changes exist, the app closes immediately with no confirmation prompt. Add a confirmation dialog that warns if: (a) transport is currently playing, or (b) the current preset state differs from the last saved preset. Implement via `JUCEApplication::systemRequestedQuit()` override returning false + showing an `AlertWindow`. Standalone-only — plugin formats do not manage their own process exit. Reported against v1.0.269 by beta tester cjfuoco. | 🔴 Open | — |
 
 ## 🟡 On Hold
 
