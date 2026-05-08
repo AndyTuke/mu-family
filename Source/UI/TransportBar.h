@@ -42,17 +42,21 @@ private:
     juce::TextButton mixerBtn { "Mixer" };
 
     static constexpr int kLogoW      = 88;
-    static constexpr int kPlayW      = 28;
-    static constexpr int kBpmW       = 120;
-    static constexpr int kPosW       = 80;
+    static constexpr int kPlayW      = 36;   // wider for clarity
+    static constexpr int kBpmW       = 72;   // inline "BPM" label + value + arrows
+    static constexpr int kPosW       = 56;
     static constexpr int kLoopLabelW = 36;
     static constexpr int kLoopW      = 100;
     static constexpr int kLoopStepW  = 56;
-    static constexpr int kPresetW    = 200;
+    static constexpr int kPresetW    = 240;  // wider preset dropdown
     static constexpr int kSaveW      = 44;
     static constexpr int kGearW      = 28;
     static constexpr int kMixerW     = 80;
     static constexpr int kGap        = 6;
+
+    // Sub-pane bounds — computed in resized(), used in paint().
+    juce::Rectangle<int> transportPaneBounds;
+    juce::Rectangle<int> loopPaneBounds;
 
     std::vector<juce::File> presetFiles;
 

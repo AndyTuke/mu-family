@@ -6,6 +6,7 @@
 #include "SamplePlayer.h"
 #include "VoiceParams.h"
 #include "AudioFilters.h"
+#include "InsertProcessor.h"
 
 #include <array>
 #include <atomic>
@@ -53,29 +54,11 @@ private:
     juce::ADSR  filterEnv;
     juce::ADSR  pitchEnv;
     juce::dsp::StateVariableTPTFilter<float> filter;
-    OnePoleLP                toneFilter[2];       // 1-pole LP after drive
-    OnePoleLP                bitAaFilter[2];     // Bitcrusher: anti-alias LP before sample-hold
     juce::AudioBuffer<float> tempBuffer;
+    juce::AudioBuffer<float> notchBuffer;  // pre-filter dry copy for notch = dry - BP
+    InsertProcessor insertProc;
 
-    // EQ (#129): three biquad bands — low shelf / mid peak / high shelf
-    using EqFilter = juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>,
-                                                     juce::dsp::IIR::Coefficients<float>>;
-    EqFilter eqLow, eqMid, eqHigh;
-    // Cached EQ params: coefficients are only recomputed when these change,
-    // avoiding per-block heap allocation from IIR::Coefficients::makeXxx().
-    float eqLastDriveDrive = -1.0f, eqLastDrvDither = -1.0f;
-    float eqLastMidGain    = -999.0f, eqLastDriveTone = -1.0f;
-
-    // Compressor / Limiter (#130): peak-follower envelope + gain reduction
-    float compEnvelope[2] = {};
-
-    // Thread-safe param handoff: message thread writes pendingParams under pendingLock
-    // and sets paramsDirty; audio thread picks up changes in applyPendingParams().
-    float             accentGain       = 1.0f;
-    float             prevDriveX[2]    = {};    // per-channel ADAA input state
-    float             bitRateCounter[2] = {};   // Bitcrusher: sample count since last hold update
-    float             bitRateHeld[2]    = {};   // Bitcrusher: quantised held sample value
-    juce::Random      rng;                      // per-instance RNG — avoids getSystemRandom() mutex on audio thread
+    float             accentGain = 1.0f;
 
     VoiceParams       pendingParams;
     juce::SpinLock    pendingLock;

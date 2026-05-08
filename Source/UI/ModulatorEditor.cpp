@@ -96,26 +96,28 @@ ModulatorEditor::ModulatorEditor()
     addAndMakeVisible(lfoEditor);
     addAndMakeVisible(stepEditor);
 
-    // Loop timing row (#155: label renamed to "Loop Unit:", NudgeInput label "Length")
-    loopLabel.setText("Loop Unit:", juce::dontSendNotification);
+    // Loop timing row
+    loopLabel.setText("Loop", juce::dontSendNotification);
     loopLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     loopLabel.setJustificationType(juce::Justification::centredRight);
     loopLabel.setColour(juce::Label::textColourId,
                         MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
     populateNoteDropdown(loopDropdown);
     loopMult.setShowStepButtons(false);
+    loopMult.setLabelInline(true);
     addAndMakeVisible(loopLabel);
     addAndMakeVisible(loopDropdown);
     addAndMakeVisible(loopMult);
 
-    // Step timing row — Stepped mode only (#155: label renamed to "Step Unit:")
-    stepLabel.setText("Step Unit:", juce::dontSendNotification);
+    // Step timing row — Stepped mode only
+    stepLabel.setText("Step", juce::dontSendNotification);
     stepLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     stepLabel.setJustificationType(juce::Justification::centredRight);
     stepLabel.setColour(juce::Label::textColourId,
                         MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
     populateNoteDropdown(stepDropdown);
     stepMult.setShowStepButtons(false);
+    stepMult.setLabelInline(true);
     addAndMakeVisible(stepLabel);
     addAndMakeVisible(stepDropdown);
     addAndMakeVisible(stepMult);
@@ -423,9 +425,12 @@ void ModulatorEditor::resized()
     const int w = getWidth();
     int y = 0;
 
-    // Header: colour dot + name (painted) | mode dropdown (#157)
-    const int nameW = 76;
-    modeDropdown.setBounds(nameW, y, w - nameW, kHeaderH);
+    // Header: [dot+name painted] | [mode dropdown] | [Uni/Bi polarity]
+    const int nameW  = 76;
+    const int modeW  = 90;
+    const int polW   = 52;
+    modeDropdown.setBounds(nameW, y, modeW, kHeaderH);
+    polarityCtrl.setBounds(nameW + modeW + 4, y, polW, kHeaderH);
     y += kHeaderH;
 
     // LFO / Step editor
@@ -433,23 +438,21 @@ void ModulatorEditor::resized()
     stepEditor.setBounds(0, y, w, kEditorH);
     y += kEditorH;
 
-    // Polarity toggle below editor (#156), left-aligned, compact
-    const int polW  = 70;
-    const int labelW = 58;
-    const int nudgeW = 60;
-    const int dropW  = w - polW - labelW - nudgeW - 8;
+    // Timing rows — both start at x=0, no polarity offset.
+    const int labelW = 36;   // "Loop" / "Step"
+    const int dropW  = 65;   // fits longest note-value label "1/32T"
+    const int nudgeW = 52;   // "× 4" inline label + value + arrows
 
-    polarityCtrl.setBounds(0, y, polW, kTimingH);
-    loopLabel.setBounds(polW + 2, y, labelW, kTimingH);
-    loopDropdown.setBounds(polW + 2 + labelW, y, dropW, kTimingH);
-    loopMult.setBounds(w - nudgeW, y, nudgeW, kTimingH);
+    loopLabel.setBounds(0, y, labelW, kTimingH);
+    loopDropdown.setBounds(labelW + 2, y, dropW, kTimingH);
+    loopMult.setBounds(labelW + 2 + dropW + 4, y, nudgeW, kTimingH);
     y += kTimingH;
 
     if (stepDropdown.isVisible())
     {
-        stepLabel.setBounds(polW + 2, y, labelW, kTimingH);
-        stepDropdown.setBounds(polW + 2 + labelW, y, dropW, kTimingH);
-        stepMult.setBounds(w - nudgeW, y, nudgeW, kTimingH);
+        stepLabel.setBounds(0, y, labelW, kTimingH);
+        stepDropdown.setBounds(labelW + 2, y, dropW, kTimingH);
+        stepMult.setBounds(labelW + 2 + dropW + 4, y, nudgeW, kTimingH);
         y += kTimingH;
     }
 
@@ -484,7 +487,7 @@ void ModulatorEditor::paint(juce::Graphics& g)
 
     if (!cs || cs->mode != ControlSequence::Mode::Stepped) return;
 
-    // Step count info drawn at right of the second timing row
+    // Step count info drawn at right of the second timing row (step row, below loop row)
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
     const int infoY = kHeaderH + kEditorH + kTimingH * 2 - 12;

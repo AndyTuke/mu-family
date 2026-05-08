@@ -35,6 +35,7 @@ target_sources(mu-clid
         Source/Sequencer/SequencerEngine.cpp
         Source/Sequencer/ControlSequence.cpp
         Source/Audio/SamplePlayer.cpp
+        Source/Audio/InsertProcessor.cpp
         Source/Audio/VoiceEngine.cpp
         Source/Audio/MidiOutputEngine.cpp
         Source/Modulation/ModulationMatrix.cpp
@@ -182,6 +183,7 @@ target_sources(mu-clid-lite
         Source/Sequencer/SequencerEngine.cpp
         Source/Sequencer/ControlSequence.cpp
         Source/Audio/SamplePlayer.cpp
+        Source/Audio/InsertProcessor.cpp
         Source/Audio/VoiceEngine.cpp
         Source/Audio/MidiOutputEngine.cpp
         Source/Audio/MixerEngine.cpp

@@ -20,6 +20,7 @@ void MixerEngine::prepare(double sr, int blockSize)
     effectSendBuf.setSize(2, blockSize, false, true, true);
     delaySendBuf .setSize(2, blockSize, false, true, true);
     reverbSendBuf.setSize(2, blockSize, false, true, true);
+    masterInsert.prepare(sr, blockSize);
 }
 
 bool MixerEngine::hasSolo(int numActive) const
@@ -246,4 +247,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     // Apply master gain first, then capture peak so master VU reflects the master fader.
     applyPanGain(output, masterLevel, masterPan, numSamples);
     masterPeak.set(peakOf(output, numSamples));
+
+    // Master insert — post-fader, post-metering, so the VU always shows pre-insert level.
+    masterInsert.process(output, numSamples, output.getNumChannels(), masterInsertParams);
 }

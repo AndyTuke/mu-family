@@ -1,6 +1,8 @@
 #pragma once
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <memory>
+#include "InsertProcessor.h"
+#include "VoiceParams.h"
 
 class VoiceEngine;
 class FXChain;
@@ -53,6 +55,10 @@ public:
     std::array<ReturnState,  3>           returns;   // 0=effect, 1=delay, 2=reverb
     float masterLevel = 1.0f;       // Issue #121: 0 dB default (was 0.75 = -2.5 dB)
     float masterPan   = 0.0f;
+
+    // Master insert effect — applied post-fader on the master output bus.
+    VoiceParams      masterInsertParams;
+    InsertProcessor  masterInsert;
 
     // Peak levels written from the audio thread, read by the UI at 30 Hz.
     juce::Atomic<float> channelPeaks[MaxChannels];

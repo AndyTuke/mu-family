@@ -171,10 +171,10 @@ private:
     StepEditor     stepEditor;
     DropdownSelect loopDropdown;
     juce::Label    loopLabel;
-    NudgeInput     loopMult { "Length", 1, 16, 4 };  // "Length" label (#155)
+    NudgeInput     loopMult { "\xc3\x97", 1, 16, 4 };  // "×" inline multiplier label
     DropdownSelect stepDropdown;
     juce::Label    stepLabel;
-    NudgeInput     stepMult { "Length", 1, 16, 1 };  // "Length" label (#155)
+    NudgeInput     stepMult { "\xc3\x97", 1, 16, 1 };  // "×" inline multiplier label
 
     struct AssignmentRow : public juce::Component
     {

@@ -21,11 +21,8 @@ void VoiceEngine::prepareToPlay(double sampleRate, int blockSize)
     }
 
     tempBuffer.setSize(2, blockSize, false, true, false);
-    toneFilter[0].reset();  toneFilter[1].reset();
-    bitAaFilter[0].reset(); bitAaFilter[1].reset();
-    prevDriveX[0]    = prevDriveX[1]    = 0.0f;
-    bitRateCounter[0] = bitRateCounter[1] = 0.0f;
-    bitRateHeld[0]    = bitRateHeld[1]    = 0.0f;
+    notchBuffer.setSize(2, blockSize, false, true, false);
+    insertProc.prepare(sampleRate, blockSize);
 
     ampEnv.setSampleRate(sampleRate);
     filterEnv.setSampleRate(sampleRate);
@@ -33,12 +30,6 @@ void VoiceEngine::prepareToPlay(double sampleRate, int blockSize)
 
     filter.prepare({ sampleRate, static_cast<uint32_t>(blockSize), 2 });
     syncFilter();
-
-    const juce::dsp::ProcessSpec spec { sampleRate, static_cast<uint32_t>(blockSize), 2 };
-    eqLow.prepare(spec);
-    eqMid.prepare(spec);
-    eqHigh.prepare(spec);
-    compEnvelope[0] = compEnvelope[1] = 0.0f;
 }
 
 void VoiceEngine::loadFile(const juce::File& file)
@@ -132,6 +123,14 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     modCutoff = juce::jlimit(20.0f, 20000.0f, modCutoff);
     filter.setCutoffFrequency(modCutoff);
 
+    const bool isNotch = (activeParams.filterType == 3);
+    if (isNotch)
+    {
+        // Save dry signal — notch = dry − bandpass; notchBuffer holds pre-filter copy.
+        for (int ch = 0; ch < nCh; ++ch)
+            notchBuffer.copyFrom(ch, 0, tempBuffer, ch, 0, ns);
+    }
+
     juce::dsp::AudioBlock<float> block(tempBuffer.getArrayOfWritePointers(),
                                        static_cast<size_t>(nCh),
                                        static_cast<size_t>(0),
@@ -139,214 +138,16 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     juce::dsp::ProcessContextReplacing<float> ctx(block);
     filter.process(ctx);
 
-    // ── Insert effects (self-contained per algorithm) ────────────────────────
-    switch (activeParams.driveChar)
-    {
-        case 1: // ── Soft clip — tanh ADAA ────────────────────────────────────
-        {
-            const float preGain = std::pow(10.0f, activeParams.driveDrive / 100.0f * 2.0f);
-            const float outGain = std::pow(10.0f, activeParams.driveOutput / 20.0f) / preGain;
-            auto ad1Tanh = [](float x) -> float {
-                return std::abs(x) > 12.0f ? std::abs(x) - 0.6931472f : std::log(std::cosh(x));
-            };
-            for (int ch = 0; ch < nCh; ++ch)
-            {
-                auto*  data  = tempBuffer.getWritePointer(ch);
-                float  xPrev = prevDriveX[ch < 2 ? ch : 0];
-                for (int i = 0; i < ns; ++i)
-                {
-                    const float x  = data[i] * preGain;
-                    const float dx = x - xPrev;
-                    float y = std::abs(dx) < 1e-4f ? std::tanh(0.5f * (x + xPrev))
-                                                   : (ad1Tanh(x) - ad1Tanh(xPrev)) / dx;
-                    data[i] = y * outGain;
-                    xPrev   = x;
-                }
-                prevDriveX[ch < 2 ? ch : 0] = xPrev;
-            }
-            break;
-        }
-        case 2: // ── Hard clip — ADAA ─────────────────────────────────────────
-        {
-            const float preGain = std::pow(10.0f, activeParams.driveDrive / 100.0f * 2.0f);
-            const float outGain = std::pow(10.0f, activeParams.driveOutput / 20.0f) / preGain;
-            auto ad1Clip = [](float x) -> float {
-                if (x >  1.0f) return x - 0.5f;
-                if (x < -1.0f) return -x - 0.5f;
-                return x * x * 0.5f;
-            };
-            for (int ch = 0; ch < nCh; ++ch)
-            {
-                auto*  data  = tempBuffer.getWritePointer(ch);
-                float  xPrev = prevDriveX[ch < 2 ? ch : 0];
-                for (int i = 0; i < ns; ++i)
-                {
-                    const float x  = data[i] * preGain;
-                    const float dx = x - xPrev;
-                    float y = std::abs(dx) < 1e-4f
-                                  ? juce::jlimit(-1.0f, 1.0f, 0.5f * (x + xPrev))
-                                  : (ad1Clip(x) - ad1Clip(xPrev)) / dx;
-                    data[i] = y * outGain;
-                    xPrev   = x;
-                }
-                prevDriveX[ch < 2 ? ch : 0] = xPrev;
-            }
-            break;
-        }
-        case 3: // ── Triangular foldback ──────────────────────────────────────
-        {
-            const float preGain = std::pow(10.0f, activeParams.driveDrive / 100.0f * 2.0f);
-            const float outGain = std::pow(10.0f, activeParams.driveOutput / 20.0f) / preGain;
-            for (int ch = 0; ch < nCh; ++ch)
-            {
-                auto* data = tempBuffer.getWritePointer(ch);
-                for (int i = 0; i < ns; ++i)
-                {
-                    float fx = juce::jlimit(-4.0f, 4.0f, data[i] * preGain);
-                    while (fx > 1.0f || fx < -1.0f)
-                    {
-                        if (fx >  1.0f) fx =  2.0f - fx;
-                        if (fx < -1.0f) fx = -2.0f - fx;
-                    }
-                    data[i] = fx * outGain;
-                }
-            }
-            break;
-        }
-        case 4: // ── Bitcrusher: bit depth + sample rate + TPDF dither ────────
-        {
-            const float bits    = juce::jlimit(1.0f, 16.0f, activeParams.drvBits);
-            const float q       = std::pow(2.0f, bits - 1.0f);
-            const float ratioF  = juce::jmax(1.0f,
-                (float)(currentSampleRate / (double)juce::jmax(100.0f, activeParams.driveRate)));
-            const float dither  = activeParams.drvDither / 100.0f * (0.5f / q);
-            const float aaCut   = juce::jmin(activeParams.driveRate * 0.45f,
-                                             (float)currentSampleRate * 0.49f);
-
-            for (int ch = 0; ch < nCh; ++ch)
-                bitAaFilter[ch].prepare(aaCut, (float)currentSampleRate);
-
-            for (int ch = 0; ch < nCh; ++ch)
-            {
-                auto*  data = tempBuffer.getWritePointer(ch);
-                float& cnt  = bitRateCounter[ch < 2 ? ch : 0];
-                float& held = bitRateHeld   [ch < 2 ? ch : 0];
-
-                for (int i = 0; i < ns; ++i)
-                {
-                    // Anti-alias before sample-hold (only meaningful when reducing rate)
-                    const float filtered = ratioF > 1.0f ? bitAaFilter[ch].process(data[i])
-                                                         : data[i];
-                    cnt += 1.0f;
-                    if (cnt >= ratioF)
-                    {
-                        // TPDF dither: two uniform samples → triangular distribution
-                        const float r1 = rng.nextFloat();
-                        const float r2 = rng.nextFloat();
-                        held = std::round((filtered + (r1 - r2) * dither) * q) / q;
-                        cnt -= ratioF;  // carry fraction for accurate rate reduction
-                    }
-                    data[i] = held;
-                }
-            }
-            break;
-        }
-        case 5: // ── Clipper — hard-clip at threshold + post-output gain ─────
-        {
-            // driveDrive 0..100 → threshold % of full-scale (linear).
-            // driveOutput -24..0 dB → post-clipper output gain.
-            const float thresh  = juce::jlimit(0.001f, 1.0f, activeParams.driveDrive / 100.0f);
-            const float outGain = std::pow(10.0f, activeParams.driveOutput / 20.0f);
-            for (int ch = 0; ch < nCh; ++ch)
-            {
-                auto* data = tempBuffer.getWritePointer(ch);
-                for (int i = 0; i < ns; ++i)
-                    data[i] = juce::jlimit(-thresh, thresh, data[i]) * outGain;
-            }
-            break;
-        }
-        case 6: // ── 3-Band EQ: low shelf / mid peak / high shelf ─────────
-        {
-            using Coeffs = juce::dsp::IIR::Coefficients<float>;
-            const float sr          = (float)currentSampleRate;
-            const float curDriveDrv = activeParams.driveDrive;
-            const float curDrvDit   = activeParams.drvDither;
-            const float curMidGain  = activeParams.eqMidGain;
-            const float curMidFreq  = juce::jlimit(20.0f, 20000.0f, activeParams.driveTone);
-
-            // Only recompute when params actually change — avoids per-block heap allocation
-            // from IIR::Coefficients::makeXxx() which creates a new ReferenceCountedObject.
-            if (curDriveDrv != eqLastDriveDrive || curDrvDit  != eqLastDrvDither
-             || curMidGain  != eqLastMidGain    || curMidFreq != eqLastDriveTone)
-            {
-                const float lowG  = juce::Decibels::decibelsToGain(curDriveDrv / 100.0f * 36.0f - 18.0f);
-                const float highG = juce::Decibels::decibelsToGain(curDrvDit   / 100.0f * 36.0f - 18.0f);
-                const float midG  = juce::Decibels::decibelsToGain(curMidGain);
-
-                *eqLow .state = *Coeffs::makeLowShelf  (sr, 200.0f,    0.7f, lowG);
-                *eqMid .state = *Coeffs::makePeakFilter(sr, curMidFreq, 1.0f, midG);
-                *eqHigh.state = *Coeffs::makeHighShelf  (sr, 8000.0f,   0.7f, highG);
-
-                eqLastDriveDrive = curDriveDrv;
-                eqLastDrvDither  = curDrvDit;
-                eqLastMidGain    = curMidGain;
-                eqLastDriveTone  = curMidFreq;
-            }
-
-            eqLow .process(ctx);
-            eqMid .process(ctx);
-            eqHigh.process(ctx);
-            break;
-        }
-        case 7: case 8: // ── Compressor / Limiter ──────────────────────────────
-        {
-            const float sr        = (float)currentSampleRate;
-            const float threshLin = juce::Decibels::decibelsToGain(-(activeParams.driveDrive / 100.0f) * 40.0f);
-            const float outGain   = juce::Decibels::decibelsToGain(activeParams.driveOutput);
-            const float attackMs  = juce::jmax(0.1f, activeParams.drvDither * 2.0f);   // 0..100 → 0..200 ms
-            const float relMs     = juce::jmax(1.0f,  activeParams.driveTone);          // stored directly as ms
-            const float ratio     = (activeParams.driveChar == 8) ? 100.0f : 4.0f;
-            const float attCoeff  = std::exp(-2.2f / (attackMs  * 0.001f * sr));
-            const float relCoeff  = std::exp(-2.2f / (relMs     * 0.001f * sr));
-
-            for (int ch = 0; ch < nCh; ++ch)
-            {
-                auto*  data = tempBuffer.getWritePointer(ch);
-                float& env  = compEnvelope[ch < 2 ? ch : 0];
-                for (int i = 0; i < ns; ++i)
-                {
-                    const float level = std::abs(data[i]);
-                    env = level > env ? attCoeff * env + (1.0f - attCoeff) * level
-                                      : relCoeff * env + (1.0f - relCoeff) * level;
-
-                    float gainDb = 0.0f;
-                    if (env > threshLin && threshLin > 1e-8f)
-                    {
-                        const float overDb = 20.0f * std::log10(env / threshLin);
-                        gainDb = -overDb * (1.0f - 1.0f / ratio);
-                    }
-                    data[i] *= juce::Decibels::decibelsToGain(gainDb) * outGain;
-                }
-            }
-            break;
-        }
-        default: break;  // 0 = None — bypass
-    }
-
-    // ── Tone filter (1-pole LP after drive, only for algorithms where driveTone = LP freq) ──
-    // For EQ (6), Compressor (7), Limiter (8): driveTone stores mid freq / release ms, not an LPF.
-    if (activeParams.driveChar < 6 && activeParams.driveTone < 19000.0f && currentSampleRate > 0.0)
+    if (isNotch)
     {
         for (int ch = 0; ch < nCh; ++ch)
-            toneFilter[ch].prepare(activeParams.driveTone, (float)currentSampleRate);
-
-        for (int ch = 0; ch < nCh; ++ch)
-        {
-            auto* data = tempBuffer.getWritePointer(ch);
             for (int i = 0; i < ns; ++i)
-                data[i] = toneFilter[ch].process(data[i]);
-        }
+                tempBuffer.setSample(ch, i,
+                    notchBuffer.getSample(ch, i) - tempBuffer.getSample(ch, i));
     }
+
+    // ── Insert effects (delegated to InsertProcessor) ────────────────────────
+    insertProc.process(tempBuffer, ns, nCh, activeParams);
 
     for (int ch = 0; ch < nCh; ++ch)
         output.addFrom(ch, 0, tempBuffer, ch, 0, ns, activeParams.ampLevel * accentGain);
@@ -405,6 +206,7 @@ void VoiceEngine::syncFilter()
     {
         case 1:  filter.setType(T::highpass); break;
         case 2:  filter.setType(T::bandpass); break;
+        case 3:  filter.setType(T::bandpass); break;  // notch uses BP internally (dry-BP in process)
         default: filter.setType(T::lowpass);  break;
     }
     filter.setCutoffFrequency(activeParams.filterCutoff);

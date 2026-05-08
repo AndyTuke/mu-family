@@ -86,6 +86,11 @@ RhythmSaveDialog::RhythmSaveDialog()
 
     addAndMakeVisible(embedToggle);
 
+    statusLabel.setJustificationType(juce::Justification::centred);
+    statusLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    statusLabel.setColour(juce::Label::textColourId, juce::Colour(0xffff9933));
+    addAndMakeVisible(statusLabel);
+
     saveBtn.onClick = [this]
     {
         const auto name = nameEditor.getText().trim();
@@ -97,10 +102,19 @@ RhythmSaveDialog::RhythmSaveDialog()
     addAndMakeVisible(cancelBtn);
 }
 
+void RhythmSaveDialog::markFileExists()
+{
+    pendingOverwrite = true;
+    statusLabel.setText("File exists \xe2\x80\x94 Save again to overwrite",
+                        juce::dontSendNotification);
+}
+
 void RhythmSaveDialog::visibilityChanged()
 {
     if (isVisible())
     {
+        pendingOverwrite = false;
+        statusLabel.setText({}, juce::dontSendNotification);
         embedToggle.setToggleState(false, juce::dontSendNotification);
         nameEditor.grabKeyboardFocus();
     }
@@ -124,7 +138,8 @@ void RhythmSaveDialog::resized()
 
     int y = cardY + 40;
     nameEditor  .setBounds(cardX + pad, y, fieldW, 28);  y += 36;
-    embedToggle .setBounds(cardX + pad, y, fieldW, 24);  y += 34;
+    embedToggle .setBounds(cardX + pad, y, fieldW, 24);  y += 30;
+    statusLabel .setBounds(cardX + pad, y, fieldW, 18);
 
     const int btnW = 80;
     const int btnY = cardY + kCardH - 36;
@@ -198,6 +213,12 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
                                     ? proc.getRhythmsDir()
                                     : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
         juce::File destFile   = destDir.getChildFile(safeName).withFileExtension(".muRhyth");
+
+        if (destFile.existsAsFile() && !rhythmSaveDialog.isPendingOverwrite())
+        {
+            rhythmSaveDialog.markFileExists();
+            return;
+        }
 
         proc.saveRhythmPresetToFile(currentRhythmIndex, destFile, embed);
         rhythmSaveDialog.setVisible(false);

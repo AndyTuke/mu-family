@@ -21,6 +21,7 @@ TransportBar::TransportBar(PluginProcessor& p)
         bpmInput.setValue((int)proc.getInternalBpm());
         bpmInput.onChange = [this](int v) { proc.setInternalBpm((double)v); };
         bpmInput.setShowStepButtons(false);
+        bpmInput.setLabelInline(true);
         addAndMakeVisible(bpmInput);
     }
 
@@ -122,14 +123,28 @@ void TransportBar::timerCallback()
 
 void TransportBar::refreshPlayBtn()
 {
+    using Id = MuClidLookAndFeel::ColourIds;
     if (isStandalone)
     {
         const bool playing = proc.isInternalPlaying() || proc.isMidiClockPlaying();
         playBtn.setButtonText(playing ? kStop : kPlay);
+        if (playing)
+        {
+            playBtn.setColour(juce::TextButton::buttonColourId,  juce::Colour(0xff5c1a1a));
+            playBtn.setColour(juce::TextButton::textColourOffId, juce::Colour(0xffeeeeee));
+        }
+        else
+        {
+            playBtn.setColour(juce::TextButton::buttonColourId,  juce::Colour(0xff1a4a26));
+            playBtn.setColour(juce::TextButton::textColourOffId, juce::Colour(0xffeeeeee));
+        }
     }
     else
     {
         playBtn.setButtonText(kPlay);
+        playBtn.setColour(juce::TextButton::buttonColourId,
+                          MuClidLookAndFeel::colour(Id::segmentInactiveBg));
+        playBtn.setColour(juce::TextButton::textColourOffId, juce::Colour(0xff666666));
     }
 }
 
@@ -223,12 +238,13 @@ void TransportBar::paint(juce::Graphics& g)
     g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
     g.fillAll();
 
-    // Bordered panel around transport controls (excluding the logo area).
-    const int panelX = kLogoW;
-    const int panelY = 4;
-    const int panelH = getHeight() - 8;
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawRect(panelX, panelY, getWidth() - kLogoW - 4, panelH, 1);
+    // Two sub-pane borders: transport (play+bpm+pos) and loop (loop dropdown+counter).
+    const juce::Colour borderCol = MuClidLookAndFeel::colour(Id::segmentInactiveBorder);
+    g.setColour(borderCol);
+    if (!transportPaneBounds.isEmpty())
+        g.drawRoundedRectangle(transportPaneBounds.toFloat(), 3.0f, 1.0f);
+    if (!loopPaneBounds.isEmpty())
+        g.drawRoundedRectangle(loopPaneBounds.toFloat(), 3.0f, 1.0f);
 
     g.setColour(MuClidLookAndFeel::colour(Id::headingText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(14.0f)));
@@ -238,31 +254,48 @@ void TransportBar::paint(juce::Graphics& g)
 
 void TransportBar::resized()
 {
-    const int h    = getHeight();
-    const int btnH = 28;
-    const int btnY = (h - btnH) / 2;
+    const int h      = getHeight();
+    const int inset  = 2;   // pane border vertical inset
+    const int pad    = 3;   // item vertical padding within pane
+    const int itemY  = pad;
+    const int itemH  = h - 2 * pad;
+    const int posH   = 14;  // position label height (text only)
+    const int posY   = (h - posH) / 2;
+    const int btnH   = itemH;
+    const int btnY   = itemY;
 
-    // Left group: Logo | Play | BPM | Loop label | Loop dropdown | Position
-    int leftX = kLogoW + kGap;
-    playBtn.setBounds(leftX, btnY, kPlayW, btnH);
-    leftX += kPlayW + kGap;
+    // ── Transport sub-pane: [play] [bpm] [pos] ────────────────────────────
+    const int tpOuterX = kLogoW + kGap;
+    int x = tpOuterX + 5;   // 5 px inner left padding
+
+    playBtn.setBounds(x, btnY, kPlayW, btnH);
+    x += kPlayW + kGap;
 
     if (isStandalone)
     {
-        bpmInput.setBounds(leftX, (h - 28) / 2, kBpmW, 28);
-        leftX += kBpmW + kGap;
+        bpmInput.setBounds(x, itemY, kBpmW, itemH);
+        x += kBpmW + kGap;
     }
 
-    loopLabel.setBounds(leftX, btnY, kLoopLabelW, btnH);
-    leftX += kLoopLabelW + 2;
-    loopDropdown.setBounds(leftX, btnY, kLoopW, btnH);
-    leftX += kLoopW + 2;
-    loopStepLabel.setBounds(leftX, btnY, kLoopStepW, btnH);
-    leftX += kLoopStepW + kGap;
+    posLabel.setBounds(x, posY, kPosW, posH);
+    x += kPosW + 5;   // 5 px inner right padding
 
-    posLabel.setBounds(leftX, btnY, kPosW, btnH);
+    transportPaneBounds = { tpOuterX, inset, x - tpOuterX, h - 2 * inset };
 
-    // Right group (right to left): Mixer | Gear | Save | Preset
+    // ── Loop sub-pane: [Loop:] [dropdown] [step counter] ──────────────────
+    const int lpOuterX = transportPaneBounds.getRight() + kGap;
+    x = lpOuterX + 5;  // 5 px inner left padding
+
+    loopLabel.setBounds(x, btnY, kLoopLabelW, btnH);
+    x += kLoopLabelW + 2;
+    loopDropdown.setBounds(x, btnY, kLoopW, btnH);
+    x += kLoopW + 2;
+    loopStepLabel.setBounds(x, btnY, kLoopStepW, btnH);
+    x += kLoopStepW + 5;  // 5 px inner right padding
+
+    loopPaneBounds = { lpOuterX, inset, x - lpOuterX, h - 2 * inset };
+
+    // ── Right group (right to left): Mixer | Gear | Save | Preset ─────────
 #if MUCLID_LITE_BUILD
     gearBtn.setBounds(getWidth() - kGap - kGearW, btnY, kGearW, btnH);
 #else
@@ -276,6 +309,7 @@ void TransportBar::resized()
     saveBtn.setBounds(rightEdge - kSaveW, btnY, kSaveW, btnH);
     rightEdge -= kSaveW + kGap;
 
-    presetDropdown.setBounds(rightEdge - kPresetW, btnY, kPresetW, btnH);
+    const int presetLeft = loopPaneBounds.getRight() + kGap;
+    presetDropdown.setBounds(presetLeft, btnY, rightEdge - presetLeft, btnH);
 #endif
 }

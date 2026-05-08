@@ -24,7 +24,8 @@ void NudgeInput::resized()
     const int w = getWidth(), h = getHeight();
     const int arrowW = 16;
     const int stepH  = showStepBtns ? 14 : 0;
-    const int lblH   = (!showStepBtns && !label.isEmpty()) ? 12 : 0;
+    // Inline mode: label drawn inside display row — no vertical label space needed.
+    const int lblH   = (!showStepBtns && !label.isEmpty() && !labelInline) ? 12 : 0;
     const int dispH  = h - stepH - lblH;
 
     upArrowBounds   = { w - arrowW, 0,       arrowW, dispH / 2 };
@@ -51,9 +52,25 @@ void NudgeInput::paint(juce::Graphics& g)
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawRoundedRectangle(displayBounds.toFloat().reduced(0.5f), 3.0f, 1.0f);
 
-    g.setColour(MuClidLookAndFeel::colour(Id::valueText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
-    g.drawText(juce::String(currentValue), displayBounds, juce::Justification::centred, false);
+    if (labelInline && !label.isEmpty() && !showStepBtns)
+    {
+        // Label on the left, value on the right — both inside the display area.
+        const int inlineLblW = 26;
+        const auto lblArea = displayBounds.withWidth(inlineLblW);
+        const auto valArea = displayBounds.withTrimmedLeft(inlineLblW);
+        g.setColour(MuClidLookAndFeel::colour(Id::labelText));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
+        g.drawText(label, lblArea, juce::Justification::centred, false);
+        g.setColour(MuClidLookAndFeel::colour(Id::valueText));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
+        g.drawText(juce::String(currentValue), valArea, juce::Justification::centred, false);
+    }
+    else
+    {
+        g.setColour(MuClidLookAndFeel::colour(Id::valueText));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
+        g.drawText(juce::String(currentValue), displayBounds, juce::Justification::centred, false);
+    }
 
     // Label below display
     g.setColour(MuClidLookAndFeel::colour(Id::labelText));
@@ -85,8 +102,8 @@ void NudgeInput::paint(juce::Graphics& g)
     drawArrow(upArrowBounds, true);
     drawArrow(downArrowBounds, false);
 
-    // Label drawn below the display when step buttons are hidden
-    if (!label.isEmpty() && !showStepBtns && labelBounds.getHeight() > 0)
+    // Label drawn below the display when step buttons are hidden and not in inline mode
+    if (!label.isEmpty() && !showStepBtns && !labelInline && labelBounds.getHeight() > 0)
     {
         g.setColour(MuClidLookAndFeel::colour(Id::labelText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));

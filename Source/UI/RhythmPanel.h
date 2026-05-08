@@ -17,6 +17,11 @@ public:
 
     void setDefaultName(const juce::String& n) { nameEditor.setText(n, false); }
 
+    // Called by the owner when the target file already exists; shows a warning and arms
+    // the overwrite flag so the next Save press proceeds unconditionally (#148).
+    void markFileExists();
+    bool isPendingOverwrite() const noexcept { return pendingOverwrite; }
+
     RhythmSaveDialog();
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -26,11 +31,13 @@ public:
 private:
     juce::TextEditor   nameEditor;
     juce::ToggleButton embedToggle { "Embed sample in file" };
+    juce::Label        statusLabel;
     juce::TextButton   saveBtn   { "Save" };
     juce::TextButton   cancelBtn { "Cancel" };
+    bool               pendingOverwrite = false;
 
     static constexpr int kCardW = 320;
-    static constexpr int kCardH = 160;
+    static constexpr int kCardH = 180;  // taller to accommodate status label
 };
 
 // Full rhythm editor panel. Layout (top to bottom):
