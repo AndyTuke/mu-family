@@ -31,8 +31,8 @@ struct VoiceParams
     bool  ampRelToEnd = false;       // true when Release is at max (100): amp envelope bypassed, sample plays to natural end
 
     // ─── Drive / Insert (after filter, before amp) ───────────────────────
-    int   driveChar   = 0;           // 0=None,1=Soft,2=Hard,3=Fold,4=Bitcrusher,5=Clipper,6=EQ,7=Compressor,8=Limiter,9=RingMod,10=TapeSat
-    // Soft / Hard / Fold params:
+    int   driveChar   = 0;           // 0=None,1=SoftClip,2=HardClip,3=Fold,4=Bitcrusher,5=Clipper,6=EQ,7=Compressor,8=Limiter,9=RingMod,10=TapeSat
+    // Soft Clip / Hard Clip / Fold params:
     float driveDrive  = 0.0f;        // 0..100% input drive
     float driveOutput = 0.0f;        // -24..0 dB output level
     // Bitcrusher params:

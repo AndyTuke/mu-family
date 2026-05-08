@@ -82,15 +82,15 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
     if (hasInsert())
     {
         insCharBox.addItem("None",       1);
-        insCharBox.addItem("Soft",       2);
-        insCharBox.addItem("Hard",       3);
-        insCharBox.addItem("Fold",       4);
+        insCharBox.addItem("3-Band EQ",  7);
         insCharBox.addItem("Bitcrusher", 5);
         insCharBox.addItem("Clipper",    6);
-        insCharBox.addItem("3-Band EQ",  7);
         insCharBox.addItem("Compressor", 8);
+        insCharBox.addItem("Fold",       4);
+        insCharBox.addItem("Hard Clip",  3);
         insCharBox.addItem("Limiter",    9);
         insCharBox.addItem("Ring Mod",  10);
+        insCharBox.addItem("Soft Clip",  2);
         insCharBox.addItem("Tape Sat",  11);
         insCharBox.setSelectedId(1, juce::dontSendNotification);
         addAndMakeVisible(insCharBox);
@@ -508,18 +508,26 @@ void MixerChannel::resized()
     faderPaneBounds = { 1, faderY - 2, stripW - 2, h - faderY + 1 };
 
     // ── Insert panel (Master channel, right of strip) ─────────────────────────
-    // Knobs stacked vertically with padding from panel edges.
+    // Knobs stacked vertically — only visible knobs are placed; height scales up to 80px.
     if (hasInsert())
     {
         const int pad    = 4;
         const int ipX    = stripW + pad;
         const int ipW    = insW - 2 * pad;
-        const int availH = h - nameBottom - kInsCharH - 2 * pad;
-        const int knobH  = juce::jmin(40, availH / 3);
-        insCharBox.setBounds(ipX, nameBottom + pad,                       ipW, kInsCharH);
-        insDrive  .setBounds(ipX, nameBottom + pad + kInsCharH,           ipW, knobH);
-        insOutput .setBounds(ipX, nameBottom + pad + kInsCharH + knobH,   ipW, knobH);
-        insTone   .setBounds(ipX, nameBottom + pad + kInsCharH + knobH*2, ipW, knobH);
+        const int topY   = nameBottom + pad;
+        const int availH = h - topY - kInsCharH - pad;
+
+        const int numVis = (insDrive.isVisible()  ? 1 : 0)
+                         + (insOutput.isVisible() ? 1 : 0)
+                         + (insTone.isVisible()   ? 1 : 0);
+        const int knobH  = (numVis > 0) ? juce::jmin(80, availH / numVis) : 0;
+
+        insCharBox.setBounds(ipX, topY, ipW, kInsCharH);
+
+        int ky = topY + kInsCharH;
+        if (insDrive.isVisible())  { insDrive .setBounds(ipX, ky, ipW, knobH); ky += knobH; }
+        if (insOutput.isVisible()) { insOutput.setBounds(ipX, ky, ipW, knobH); ky += knobH; }
+        if (insTone.isVisible())   { insTone  .setBounds(ipX, ky, ipW, knobH); }
     }
 }
 
@@ -550,7 +558,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
             if (proc) setParam("mst_insChar", 0);
             break;
 
-        case 1: case 2: case 3: // Soft / Hard / Fold
+        case 1: case 2: case 3: // Soft Clip / Hard Clip / Fold
         case 5:                  // Clipper — same Drive/Output/LPF layout
             insDrive .setLabel(charId == 5 ? "Threshold" : "Drive");
             insDrive .setRange(0.0, 100.0, 0.1);

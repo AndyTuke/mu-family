@@ -21,17 +21,17 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     filterType.setSelectedId(1, false);
     addAndMakeVisible(filterType);
 
-    // Drive character dropdown — id=1 maps to driveChar=0 (None), id=5 maps to driveChar=4 (Bit)
-    driveChar.addItem("None", 1);
-    driveChar.addItem("Soft", 2);
-    driveChar.addItem("Hard", 3);
-    driveChar.addItem("Fold", 4);
+    // Drive character dropdown — item IDs = driveChar+1; alphabetical order after None.
+    driveChar.addItem("None",       1);
+    driveChar.addItem("3-Band EQ",  7);
     driveChar.addItem("Bitcrusher", 5);
-    driveChar.addItem("Clipper", 6);
-    driveChar.addItem("3-Band EQ", 7);
+    driveChar.addItem("Clipper",    6);
     driveChar.addItem("Compressor", 8);
+    driveChar.addItem("Fold",       4);
+    driveChar.addItem("Hard Clip",  3);
     driveChar.addItem("Limiter",    9);
     driveChar.addItem("Ring Mod",  10);
+    driveChar.addItem("Soft Clip",  2);
     driveChar.addItem("Tape Sat",  11);
     driveChar.setSelectedId(1, false);
     addAndMakeVisible(driveChar);
@@ -395,7 +395,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
             driveTone  .setVisible(false);
             break;
 
-        case 1: case 2: case 3:  // ── Soft / Hard / Fold ──────────────────
+        case 1: case 2: case 3:  // ── Soft Clip / Hard Clip / Fold ─────────
             driveDrive.setLabel("Drive");
             driveDrive.setRange(0.0, 100.0, 0.1);
             driveDrive.getSlider().textFromValueFunction = nullptr;

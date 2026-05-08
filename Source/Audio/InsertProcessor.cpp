@@ -39,7 +39,7 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh, co
 {
     switch (p.driveChar)
     {
-        case 1: // ── Soft clip — tanh ADAA ────────────────────────────────────
+        case 1: // ── Soft Clip — tanh ADAA ────────────────────────────────────
         {
             const float preGain = std::pow(10.0f, p.driveDrive / 100.0f * 2.0f);
             const float outGain = std::pow(10.0f, p.driveOutput / 20.0f) / preGain;
@@ -63,7 +63,7 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh, co
             }
             break;
         }
-        case 2: // ── Hard clip — ADAA ─────────────────────────────────────────
+        case 2: // ── Hard Clip — ADAA ─────────────────────────────────────────
         {
             const float preGain = std::pow(10.0f, p.driveDrive / 100.0f * 2.0f);
             const float outGain = std::pow(10.0f, p.driveOutput / 20.0f) / preGain;

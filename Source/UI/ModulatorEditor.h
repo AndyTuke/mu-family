@@ -97,19 +97,19 @@ namespace ModDest
         // Group heading reflects the active algorithm name so the user can see at a glance
         // which insert controls are exposed as modulation targets.
         static const char* kInsertNames[] = {
-            nullptr,       // 0 = None
-            "Soft",        // 1
-            "Hard",        // 2
-            "Fold",        // 3
-            "Bitcrusher",  // 4
-            "Clipper",     // 5
-            "3-Band EQ",   // 6
-            "Compressor",  // 7
-            "Limiter",     // 8
+            nullptr,        // 0 = None
+            "Soft Clip",    // 1
+            "Hard Clip",    // 2
+            "Fold",         // 3
+            "Bitcrusher",   // 4
+            "Clipper",      // 5
+            "3-Band EQ",    // 6
+            "Compressor",   // 7
+            "Limiter",      // 8
         };
         switch (driveChar)
         {
-            case 1: case 2: case 3:  // Soft / Hard / Fold
+            case 1: case 2: case 3:  // Soft Clip / Hard Clip / Fold
             case 5:                  // Clipper — same drive/output/lpf knob mapping
                 dd.addSectionHeading(kInsertNames[driveChar]);
                 dd.addItem("Drive",  11);  // insert.drive
