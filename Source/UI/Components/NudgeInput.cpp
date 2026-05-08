@@ -23,18 +23,22 @@ void NudgeInput::resized()
 {
     const int w = getWidth(), h = getHeight();
     const int arrowW = 16;
-    const int stepH  = 14;
-    const int dispH  = h - stepH;
+    const int stepH  = showStepBtns ? 14 : 0;
+    const int lblH   = (!showStepBtns && !label.isEmpty()) ? 12 : 0;
+    const int dispH  = h - stepH - lblH;
 
     upArrowBounds   = { w - arrowW, 0,       arrowW, dispH / 2 };
     downArrowBounds = { w - arrowW, dispH/2, arrowW, dispH / 2 };
     displayBounds   = { 0, 0, w - arrowW, dispH };
+    labelBounds     = { 0, dispH, w - arrowW, lblH };
 
-    // Step buttons below display
-    const int btnW = (w - arrowW) / 3;
-    step1Bounds  = { 0,      dispH, btnW,     stepH };
-    step5Bounds  = { btnW,   dispH, btnW,     stepH };
-    step10Bounds = { btnW*2, dispH, w-arrowW - btnW*2, stepH };
+    if (showStepBtns)
+    {
+        const int btnW = (w - arrowW) / 3;
+        step1Bounds  = { 0,      dispH, btnW,     stepH };
+        step5Bounds  = { btnW,   dispH, btnW,     stepH };
+        step10Bounds = { btnW*2, dispH, w-arrowW - btnW*2, stepH };
+    }
 }
 
 void NudgeInput::paint(juce::Graphics& g)
@@ -81,32 +85,45 @@ void NudgeInput::paint(juce::Graphics& g)
     drawArrow(upArrowBounds, true);
     drawArrow(downArrowBounds, false);
 
-    // Step buttons
-    auto drawStep = [&](juce::Rectangle<int> b, const juce::String& txt, bool active)
+    // Label drawn below the display when step buttons are hidden
+    if (!label.isEmpty() && !showStepBtns && labelBounds.getHeight() > 0)
     {
-        g.setColour(active ? MuClidLookAndFeel::colour(Id::segmentActiveBg)
-                           : MuClidLookAndFeel::colour(Id::segmentInactiveBg));
-        g.fillRect(b);
-        g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-        g.drawRect(b, 1);
-        g.setColour(active ? MuClidLookAndFeel::colour(Id::segmentActiveBorder)
-                           : MuClidLookAndFeel::colour(Id::segmentInactiveText));
+        g.setColour(MuClidLookAndFeel::colour(Id::labelText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
-        g.drawText(txt, b, juce::Justification::centred, false);
-    };
-    drawStep(step1Bounds,  "1",  stepSize == 1);
-    drawStep(step5Bounds,  "5",  stepSize == 5);
-    drawStep(step10Bounds, "10", stepSize == 10);
+        g.drawText(label, labelBounds, juce::Justification::centred, false);
+    }
+
+    if (showStepBtns)
+    {
+        auto drawStep = [&](juce::Rectangle<int> b, const juce::String& txt, bool active)
+        {
+            g.setColour(active ? MuClidLookAndFeel::colour(Id::segmentActiveBg)
+                               : MuClidLookAndFeel::colour(Id::segmentInactiveBg));
+            g.fillRect(b);
+            g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+            g.drawRect(b, 1);
+            g.setColour(active ? MuClidLookAndFeel::colour(Id::segmentActiveBorder)
+                               : MuClidLookAndFeel::colour(Id::segmentInactiveText));
+            g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
+            g.drawText(txt, b, juce::Justification::centred, false);
+        };
+        drawStep(step1Bounds,  "1",  stepSize == 1);
+        drawStep(step5Bounds,  "5",  stepSize == 5);
+        drawStep(step10Bounds, "10", stepSize == 10);
+    }
 }
 
 NudgeInput::HitZone NudgeInput::getZone(juce::Point<int> p) const
 {
-    if (upArrowBounds.contains(p))    return HitZone::Up;
-    if (downArrowBounds.contains(p))  return HitZone::Down;
-    if (step1Bounds.contains(p))      return HitZone::Step1;
-    if (step5Bounds.contains(p))      return HitZone::Step5;
-    if (step10Bounds.contains(p))     return HitZone::Step10;
-    if (displayBounds.contains(p))    return HitZone::Display;
+    if (upArrowBounds.contains(p))   return HitZone::Up;
+    if (downArrowBounds.contains(p)) return HitZone::Down;
+    if (showStepBtns)
+    {
+        if (step1Bounds.contains(p))  return HitZone::Step1;
+        if (step5Bounds.contains(p))  return HitZone::Step5;
+        if (step10Bounds.contains(p)) return HitZone::Step10;
+    }
+    if (displayBounds.contains(p))   return HitZone::Display;
     return HitZone::None;
 }
 

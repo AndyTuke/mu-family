@@ -15,6 +15,7 @@ public:
     void setSelectedId(int id, bool notify = false);
     int  getSelectedId() const;
     void clear();
+    void setPlaceholderText(const juce::String& text);
 
     void resized() override;
 

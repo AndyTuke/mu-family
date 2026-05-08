@@ -94,17 +94,30 @@ namespace ModDest
         dd.addItem("Release", 4);  // amp.release
 
         // ── Insert ────────────────────────────────────────────────────────────
+        // Group heading reflects the active algorithm name so the user can see at a glance
+        // which insert controls are exposed as modulation targets.
+        static const char* kInsertNames[] = {
+            nullptr,       // 0 = None
+            "Soft",        // 1
+            "Hard",        // 2
+            "Fold",        // 3
+            "Bitcrusher",  // 4
+            "Clipper",     // 5
+            "3-Band EQ",   // 6
+            "Compressor",  // 7
+            "Limiter",     // 8
+        };
         switch (driveChar)
         {
             case 1: case 2: case 3:  // Soft / Hard / Fold
             case 5:                  // Clipper — same drive/output/lpf knob mapping
-                dd.addSectionHeading("Insert");
+                dd.addSectionHeading(kInsertNames[driveChar]);
                 dd.addItem("Drive",  11);  // insert.drive
                 dd.addItem("Output", 12);  // insert.output
                 dd.addItem("LPF",    16);  // insert.lpf
                 break;
             case 4:  // Bitcrusher
-                dd.addSectionHeading("Insert");
+                dd.addSectionHeading("Bitcrusher");
                 dd.addItem("Bits",   13);  // insert.bits
                 dd.addItem("Rate",   14);  // insert.rate
                 dd.addItem("Dither", 15);  // insert.dither
@@ -152,17 +165,16 @@ private:
     // Release Rhythm::modLock.
     void unlockMod();
 
-    SegmentControl modeCtrl    { {"Smooth","Stepped"} };
-    SegmentControl polarityCtrl{ {"Uni","Bi"} };
-    // (Was Internal/CC SegmentControl — removed in #136 along with MIDI output plans.)
+    DropdownSelect modeDropdown;    // Smooth / Stepped (#157)
+    SegmentControl polarityCtrl{ {"Uni","Bi"} };  // moved below editor (#156)
     LFOEditor      lfoEditor;
     StepEditor     stepEditor;
     DropdownSelect loopDropdown;
     juce::Label    loopLabel;
-    NudgeInput     loopMult { "Loop", 1, 16, 4 };
+    NudgeInput     loopMult { "Length", 1, 16, 4 };  // "Length" label (#155)
     DropdownSelect stepDropdown;
     juce::Label    stepLabel;
-    NudgeInput     stepMult { "Step", 1, 16, 1 };
+    NudgeInput     stepMult { "Length", 1, 16, 1 };  // "Length" label (#155)
 
     struct AssignmentRow : public juce::Component
     {

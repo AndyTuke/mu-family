@@ -32,6 +32,12 @@ void DropdownSelect::clear()
     combo.clear(juce::dontSendNotification);
 }
 
+void DropdownSelect::setPlaceholderText(const juce::String& text)
+{
+    combo.setTextWhenNothingSelected(text);
+    combo.setTextWhenNoChoicesAvailable(text);
+}
+
 void DropdownSelect::resized()
 {
     combo.setBounds(getLocalBounds());

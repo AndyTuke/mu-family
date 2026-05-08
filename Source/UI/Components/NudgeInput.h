@@ -13,6 +13,9 @@ public:
 
     void setValue(int v, bool notify = false);
     int  getValue() const noexcept { return currentValue; }
+    // When false: hides step-size (1/5/10) buttons; if the label string is non-empty,
+    // it is drawn in the space below the value display instead.
+    void setShowStepButtons(bool show) { showStepBtns = show; resized(); repaint(); }
 
     void resized() override;
     void paint(juce::Graphics& g) override;
@@ -22,7 +25,8 @@ public:
 private:
     juce::String label;
     int minVal, maxVal, currentValue;
-    int stepSize = 1;
+    int stepSize   = 1;
+    bool showStepBtns = true;
 
     enum class HitZone { None, Up, Down, Step1, Step5, Step10, Display };
     HitZone getZone(juce::Point<int> p) const;
@@ -31,5 +35,5 @@ private:
 
     juce::Rectangle<int> upArrowBounds, downArrowBounds;
     juce::Rectangle<int> step1Bounds, step5Bounds, step10Bounds;
-    juce::Rectangle<int> displayBounds;
+    juce::Rectangle<int> displayBounds, labelBounds;
 };

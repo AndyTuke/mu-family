@@ -20,6 +20,7 @@ TransportBar::TransportBar(PluginProcessor& p)
     {
         bpmInput.setValue((int)proc.getInternalBpm());
         bpmInput.onChange = [this](int v) { proc.setInternalBpm((double)v); };
+        bpmInput.setShowStepButtons(false);
         addAndMakeVisible(bpmInput);
     }
 
@@ -27,12 +28,6 @@ TransportBar::TransportBar(PluginProcessor& p)
     posLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
     posLabel.setText("1.1.1", juce::dontSendNotification);
     addAndMakeVisible(posLabel);
-
-#if !MUCLID_LITE_BUILD
-    rhythmCountLabel.setJustificationType(juce::Justification::centred);
-    rhythmCountLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-    addAndMakeVisible(rhythmCountLabel);
-#endif
 
     loopLabel.setText("Loop:", juce::dontSendNotification);
     loopLabel.setJustificationType(juce::Justification::centredRight);
@@ -64,6 +59,7 @@ TransportBar::TransportBar(PluginProcessor& p)
     addAndMakeVisible(loopStepLabel);
 
 #if !MUCLID_LITE_BUILD
+    presetDropdown.setPlaceholderText("<unnamed preset>");
     presetDropdown.onChange = [this](int id)
     {
         int idx = id - 1;
@@ -91,9 +87,6 @@ TransportBar::TransportBar(PluginProcessor& p)
     populatePresetDropdown();
 #endif
     refreshPlayBtn();
-#if !MUCLID_LITE_BUILD
-    updateRhythmCount();
-#endif
     startTimerHz(30);
 }
 
@@ -106,9 +99,6 @@ void TransportBar::timerCallback()
 {
     refreshPlayBtn();
     updatePositionLabel();
-#if !MUCLID_LITE_BUILD
-    updateRhythmCount();
-#endif
 
     if (isStandalone)
     {
@@ -186,15 +176,6 @@ void TransportBar::updatePositionLabel()
                      juce::dontSendNotification);
 }
 
-void TransportBar::updateRhythmCount()
-{
-    const int n = proc.getNumRhythms();
-    if (n == lastRhythmCount) return;
-    lastRhythmCount = n;
-    rhythmCountLabel.setText(juce::String(n) + "/" + juce::String(SequencerEngine::MaxRhythms),
-                             juce::dontSendNotification);
-}
-
 void TransportBar::populatePresetDropdown()
 {
     presetFiles.clear();
@@ -210,8 +191,7 @@ void TransportBar::populatePresetDropdown()
         }
     }
 
-    if (presetFiles.empty())
-        presetDropdown.addItem("No presets", 9999);
+    // No items means no presets; placeholder text handles the empty-state display.
 }
 
 void TransportBar::refreshPresets()
@@ -282,7 +262,7 @@ void TransportBar::resized()
 
     posLabel.setBounds(leftX, btnY, kPosW, btnH);
 
-    // Right group (right to left): Mixer | Gear | Save | Preset | RhythmCount
+    // Right group (right to left): Mixer | Gear | Save | Preset
 #if MUCLID_LITE_BUILD
     gearBtn.setBounds(getWidth() - kGap - kGearW, btnY, kGearW, btnH);
 #else
@@ -297,8 +277,5 @@ void TransportBar::resized()
     rightEdge -= kSaveW + kGap;
 
     presetDropdown.setBounds(rightEdge - kPresetW, btnY, kPresetW, btnH);
-    rightEdge -= kPresetW + kGap;
-
-    rhythmCountLabel.setBounds(rightEdge - kRhCountW, btnY, kRhCountW, btnH);
 #endif
 }

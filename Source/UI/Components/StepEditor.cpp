@@ -42,8 +42,9 @@ int StepEditor::hitStepIndex(int x) const
 
 float StepEditor::yToValue(int y) const
 {
-    // Centre of component = 0, top = +100, bottom = -100
-    const float norm = 1.0f - (float)y / (float)getHeight(); // 0..1, 0=bottom
+    const float norm = 1.0f - (float)y / (float)getHeight(); // 0=bottom, 1=top
+    if (unipolar)
+        return juce::jlimit(0.0f, 100.0f, norm * 100.0f);
     return juce::jlimit(-100.0f, 100.0f, (norm - 0.5f) * 200.0f);
 }
 
@@ -69,7 +70,6 @@ void StepEditor::paint(juce::Graphics& g)
 
     const float barW  = (float)getWidth() / n;
     const float h     = (float)getHeight();
-    const float centY = h * 0.5f;
 
     // Grid dividers
     g.setColour(MuClidLookAndFeel::colour(Id::stepEditorGridLine));
@@ -77,20 +77,39 @@ void StepEditor::paint(juce::Graphics& g)
         g.drawVerticalLine((int)(i * barW), 0, h);
 
     // Bars
-    for (int i = 0; i < n; ++i)
+    if (unipolar)
     {
-        const float v      = steps[(size_t)i]; // -100..+100
-        const float norm   = v / 200.0f;       // -0.5..+0.5
-        const float barH   = std::abs(norm) * h;
-        const float barTop = (norm >= 0.0f) ? centY - barH : centY;
-
-        g.setColour(barColour.withAlpha(0.85f));
-        g.fillRect(i * barW + 1.0f, barTop, barW - 2.0f, barH);
+        for (int i = 0; i < n; ++i)
+        {
+            const float v    = juce::jmax(0.0f, steps[(size_t)i]); // clamp to 0..100
+            const float barH = (v / 100.0f) * h;
+            g.setColour(barColour.withAlpha(0.85f));
+            g.fillRect(i * barW + 1.0f, h - barH, barW - 2.0f, barH);
+        }
+    }
+    else
+    {
+        const float centY = h * 0.5f;
+        for (int i = 0; i < n; ++i)
+        {
+            const float v      = steps[(size_t)i]; // -100..+100
+            const float norm   = v / 200.0f;       // -0.5..+0.5
+            const float barH   = std::abs(norm) * h;
+            const float barTop = (norm >= 0.0f) ? centY - barH : centY;
+            g.setColour(barColour.withAlpha(0.85f));
+            g.fillRect(i * barW + 1.0f, barTop, barW - 2.0f, barH);
+        }
+        // Centre zero line (bipolar only)
+        g.setColour(MuClidLookAndFeel::colour(Id::stepEditorZeroLine));
+        g.drawHorizontalLine((int)(h * 0.5f), 0.0f, (float)getWidth());
     }
 
-    // Centre zero line
-    g.setColour(MuClidLookAndFeel::colour(Id::stepEditorZeroLine));
-    g.drawHorizontalLine((int)centY, 0.0f, (float)getWidth());
+    // Bottom zero line (unipolar) or centre zero line (already drawn for bipolar above)
+    if (unipolar)
+    {
+        g.setColour(MuClidLookAndFeel::colour(Id::stepEditorZeroLine));
+        g.drawHorizontalLine((int)(h - 1), 0.0f, (float)getWidth());
+    }
 
     // Playhead
     const float phX = playheadPhase * (float)getWidth();

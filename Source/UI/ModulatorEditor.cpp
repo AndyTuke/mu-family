@@ -88,29 +88,34 @@ void ModulatorEditor::AssignmentRow::resized()
 //==============================================================================
 ModulatorEditor::ModulatorEditor()
 {
-    addAndMakeVisible(modeCtrl);
-    addAndMakeVisible(polarityCtrl);
+    // Mode dropdown replaces SegmentControl (#157)
+    modeDropdown.addItem("Smooth",  1);
+    modeDropdown.addItem("Stepped", 2);
+    addAndMakeVisible(modeDropdown);
+    addAndMakeVisible(polarityCtrl);  // placed below editor (#156)
     addAndMakeVisible(lfoEditor);
     addAndMakeVisible(stepEditor);
 
-    // Loop timing row
-    loopLabel.setText("Loop", juce::dontSendNotification);
+    // Loop timing row (#155: label renamed to "Loop Unit:", NudgeInput label "Length")
+    loopLabel.setText("Loop Unit:", juce::dontSendNotification);
     loopLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     loopLabel.setJustificationType(juce::Justification::centredRight);
     loopLabel.setColour(juce::Label::textColourId,
                         MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
     populateNoteDropdown(loopDropdown);
+    loopMult.setShowStepButtons(false);
     addAndMakeVisible(loopLabel);
     addAndMakeVisible(loopDropdown);
     addAndMakeVisible(loopMult);
 
-    // Step timing row (Stepped mode only)
-    stepLabel.setText("Step", juce::dontSendNotification);
+    // Step timing row — Stepped mode only (#155: label renamed to "Step Unit:")
+    stepLabel.setText("Step Unit:", juce::dontSendNotification);
     stepLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     stepLabel.setJustificationType(juce::Justification::centredRight);
     stepLabel.setColour(juce::Label::textColourId,
                         MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
     populateNoteDropdown(stepDropdown);
+    stepMult.setShowStepButtons(false);
     addAndMakeVisible(stepLabel);
     addAndMakeVisible(stepDropdown);
     addAndMakeVisible(stepMult);
@@ -181,9 +186,12 @@ void ModulatorEditor::loadFromCS()
 {
     if (!cs) return;
 
-    const bool smooth = (cs->mode == ControlSequence::Mode::Smooth);
-    modeCtrl.setSelectedIndex(smooth ? 0 : 1);
-    polarityCtrl.setSelectedIndex(cs->polarity == ControlSequence::Polarity::Unipolar ? 0 : 1);
+    const bool smooth   = (cs->mode == ControlSequence::Mode::Smooth);
+    const bool unipolar = (cs->polarity == ControlSequence::Polarity::Unipolar);
+    modeDropdown.setSelectedId(smooth ? 1 : 2);
+    polarityCtrl.setSelectedIndex(unipolar ? 0 : 1);
+    lfoEditor.setUnipolar(unipolar);
+    stepEditor.setUnipolar(unipolar);
     lfoEditor.setVisible(smooth);
     stepEditor.setVisible(!smooth);
     stepLabel.setVisible(!smooth);
@@ -230,11 +238,11 @@ void ModulatorEditor::syncStepValues()
 
 void ModulatorEditor::wireHeader()
 {
-    modeCtrl.onChange = [this](int idx)
+    modeDropdown.onChange = [this](int id)
     {
         if (!cs) return;
         lockMod();
-        cs->mode = (idx == 0) ? ControlSequence::Mode::Smooth : ControlSequence::Mode::Stepped;
+        cs->mode = (id == 1) ? ControlSequence::Mode::Smooth : ControlSequence::Mode::Stepped;
         unlockMod();
         const bool smooth = (cs->mode == ControlSequence::Mode::Smooth);
         lfoEditor.setVisible(smooth);
@@ -251,13 +259,15 @@ void ModulatorEditor::wireHeader()
     polarityCtrl.onChange = [this](int idx)
     {
         if (!cs) return;
+        const bool unipolar = (idx == 0);
         lockMod();
-        cs->polarity = (idx == 0) ? ControlSequence::Polarity::Unipolar
-                                  : ControlSequence::Polarity::Bipolar;
+        cs->polarity = unipolar ? ControlSequence::Polarity::Unipolar
+                                : ControlSequence::Polarity::Bipolar;
         unlockMod();
+        lfoEditor.setUnipolar(unipolar);
+        stepEditor.setUnipolar(unipolar);
         if (onChange) onChange();
     };
-
 }
 
 void ModulatorEditor::wireTiming()
@@ -413,31 +423,33 @@ void ModulatorEditor::resized()
     const int w = getWidth();
     int y = 0;
 
+    // Header: colour dot + name (painted) | mode dropdown (#157)
     const int nameW = 76;
-    const int ctrlW = (w - nameW) / 2;
-    modeCtrl    .setBounds(nameW,              y, ctrlW,                kHeaderH);
-    polarityCtrl.setBounds(nameW + ctrlW,      y, w - nameW - ctrlW,    kHeaderH);
+    modeDropdown.setBounds(nameW, y, w - nameW, kHeaderH);
     y += kHeaderH;
 
+    // LFO / Step editor
     lfoEditor.setBounds(0, y, w, kEditorH);
     stepEditor.setBounds(0, y, w, kEditorH);
     y += kEditorH;
 
-    const int labelW = 36;
-    const int nudgeW = 80;
-    const int dropW  = 110;
-    const int nudgeX = labelW + 2 + dropW + 4;
+    // Polarity toggle below editor (#156), left-aligned, compact
+    const int polW  = 70;
+    const int labelW = 58;
+    const int nudgeW = 60;
+    const int dropW  = w - polW - labelW - nudgeW - 8;
 
-    loopLabel.setBounds(0, y, labelW, kTimingH);
-    loopDropdown.setBounds(labelW + 2, y, dropW, kTimingH);
-    loopMult.setBounds(nudgeX, y, nudgeW, kTimingH);
+    polarityCtrl.setBounds(0, y, polW, kTimingH);
+    loopLabel.setBounds(polW + 2, y, labelW, kTimingH);
+    loopDropdown.setBounds(polW + 2 + labelW, y, dropW, kTimingH);
+    loopMult.setBounds(w - nudgeW, y, nudgeW, kTimingH);
     y += kTimingH;
 
     if (stepDropdown.isVisible())
     {
-        stepLabel.setBounds(0, y, labelW, kTimingH);
-        stepDropdown.setBounds(labelW + 2, y, dropW, kTimingH);
-        stepMult.setBounds(nudgeX, y, nudgeW, kTimingH);
+        stepLabel.setBounds(polW + 2, y, labelW, kTimingH);
+        stepDropdown.setBounds(polW + 2 + labelW, y, dropW, kTimingH);
+        stepMult.setBounds(w - nudgeW, y, nudgeW, kTimingH);
         y += kTimingH;
     }
 
@@ -472,9 +484,10 @@ void ModulatorEditor::paint(juce::Graphics& g)
 
     if (!cs || cs->mode != ControlSequence::Mode::Stepped) return;
 
+    // Step count info drawn at right of the second timing row
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
-    const int infoY = kHeaderH + kEditorH + kTimingH + kTimingH - 12;
+    const int infoY = kHeaderH + kEditorH + kTimingH * 2 - 12;
     g.drawText(juce::String(cs->getStepCount()) + " steps",
                getWidth() - 60, infoY, 58, 12,
                juce::Justification::centredRight, false);

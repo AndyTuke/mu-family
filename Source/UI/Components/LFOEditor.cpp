@@ -24,15 +24,21 @@ void LFOEditor::setPlayheadPhase(float phase)
 
 juce::Point<float> LFOEditor::toScreen(float x, float y) const
 {
-    // x: 0..1 -> 0..width, y: -100..+100 -> height..0 (top=+100)
-    return { x * getWidth(), (1.0f - (y + 100.0f) / 200.0f) * getHeight() };
+    const float h = (float)getHeight();
+    const float screenY = unipolar
+        ? (1.0f - y / 100.0f) * h                        // 0→bottom, 100→top
+        : (1.0f - (y + 100.0f) / 200.0f) * h;            // -100→bottom, +100→top
+    return { x * (float)getWidth(), screenY };
 }
 
 juce::Point<float> LFOEditor::fromScreen(float sx, float sy) const
 {
-    float x = sx / getWidth();
-    float y = (1.0f - sy / getHeight()) * 200.0f - 100.0f;
-    return { juce::jlimit(0.0f, 1.0f, x), juce::jlimit(-100.0f, 100.0f, y) };
+    const float h = (float)getHeight();
+    float x = sx / (float)getWidth();
+    float y = unipolar
+        ? juce::jlimit(0.0f,    100.0f, (1.0f - sy / h) * 100.0f)
+        : juce::jlimit(-100.0f, 100.0f, (1.0f - sy / h) * 200.0f - 100.0f);
+    return { juce::jlimit(0.0f, 1.0f, x), y };
 }
 
 int LFOEditor::hitTest(juce::Point<float> screen) const
@@ -69,19 +75,19 @@ void LFOEditor::paint(juce::Graphics& g)
     g.setColour(MuClidLookAndFeel::colour(Id::lfoEditorBackground));
     g.fillAll();
 
-    // Zero line
-    auto zero = toScreen(0.0f, 0.0f);
+    // Zero/baseline line
+    const float zeroY = unipolar ? (float)getHeight() : toScreen(0.0f, 0.0f).y;
     g.setColour(MuClidLookAndFeel::colour(Id::lfoEditorZeroLine));
-    g.drawHorizontalLine((int)zero.y, 0.0f, (float)getWidth());
+    g.drawHorizontalLine((int)zeroY, 0.0f, (float)getWidth());
 
     if (points.size() >= 2)
     {
         auto curve = buildCurvePath();
 
-        // Fill under curve
+        // Fill under curve (from curve to zero/baseline)
         juce::Path fill = curve;
-        fill.lineTo((float)getWidth(), zero.y);
-        fill.lineTo(0.0f, zero.y);
+        fill.lineTo((float)getWidth(), zeroY);
+        fill.lineTo(0.0f, zeroY);
         fill.closeSubPath();
         g.setColour(MuClidLookAndFeel::colour(Id::lfoEditorCurveFill));
         g.fillPath(fill);

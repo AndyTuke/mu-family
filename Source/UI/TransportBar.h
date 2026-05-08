@@ -33,7 +33,6 @@ private:
     NudgeInput       bpmInput { "BPM", 20, 300, 120 };
 
     juce::Label      posLabel;
-    juce::Label      rhythmCountLabel;
     juce::Label      loopLabel;
     DropdownSelect   loopDropdown;
     juce::Label      loopStepLabel;
@@ -42,26 +41,23 @@ private:
     juce::TextButton gearBtn;
     juce::TextButton mixerBtn { "Mixer" };
 
-    static constexpr int kLogoW     = 88;
-    static constexpr int kPlayW     = 28;
-    static constexpr int kBpmW      = 120;
-    static constexpr int kPosW      = 80;
-    static constexpr int kRhCountW  = 36;
-    static constexpr int kLoopLabelW    = 36;
-    static constexpr int kLoopW         = 100;
-    static constexpr int kLoopStepW     = 56;
-    static constexpr int kPresetW   = 140;
-    static constexpr int kSaveW     = 44;
-    static constexpr int kGearW     = 28;
-    static constexpr int kMixerW    = 80;
-    static constexpr int kGap       = 6;
+    static constexpr int kLogoW      = 88;
+    static constexpr int kPlayW      = 28;
+    static constexpr int kBpmW       = 120;
+    static constexpr int kPosW       = 80;
+    static constexpr int kLoopLabelW = 36;
+    static constexpr int kLoopW      = 100;
+    static constexpr int kLoopStepW  = 56;
+    static constexpr int kPresetW    = 200;
+    static constexpr int kSaveW      = 44;
+    static constexpr int kGearW      = 28;
+    static constexpr int kMixerW     = 80;
+    static constexpr int kGap        = 6;
 
     std::vector<juce::File> presetFiles;
-    int lastRhythmCount = -1;
 
     void timerCallback() override;
     void refreshPlayBtn();
     void updatePositionLabel();
-    void updateRhythmCount();
     void populatePresetDropdown();
 };
