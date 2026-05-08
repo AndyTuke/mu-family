@@ -105,6 +105,10 @@ target_link_libraries(mu-clid
         juce::juce_recommended_warning_flags
 )
 
+# Standalone-only: custom app class with close confirmation dialog (#167).
+target_compile_definitions(mu-clid_Standalone PRIVATE JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
+target_sources(mu-clid_Standalone PRIVATE Source/StandaloneApp.cpp)
+
 # Increment build_number.txt and regenerate Source/BuildNumber.h before every build.
 add_custom_target(increment_build_number ALL
     COMMAND ${CMAKE_COMMAND} -P "${CMAKE_SOURCE_DIR}/cmake/IncrementBuildNumber.cmake"
