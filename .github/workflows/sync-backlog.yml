@@ -1,0 +1,27 @@
+name: Sync issues to backlog
+on:
+  issues:
+    types: [opened, edited, closed, reopened, labeled, unlabeled]
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Update backlog.md to reflect the current open issues in this repo.
+
+            Steps:
+            1. Run `gh issue list --state open --limit 200 --json number,title,labels,assignees,createdAt,url` to fetch issues.
+            2. Read backlog.md if it exists; preserve anything outside the auto-generated section.
+            3. Replace (or create) the section between <!-- BACKLOG:START --> and <!-- BACKLOG:END --> with a list of open issues, grouped by label (bugs, features, chores, other). Each item should link to the issue.
+            4. If backlog.md doesn't exist, create it with a short intro and that section.
+            5. Commit to a branch called `chore/sync-backlog` and open a PR titled "Sync backlog from issues". If the PR already exists, just push to update it.
