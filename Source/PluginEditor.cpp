@@ -182,6 +182,11 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     rhythmPanel.setRhythm(0);
     sidebar.setSelectedIndex(0);
 
+    // Sync mixer UI from APVTS — in standalone, state is restored before the editor
+    // is created, so without this call the scSourceBox and other controls would show
+    // defaults rather than the restored values, causing visible GR with no source shown.
+    mixerOverlay.loadFromAPVTS();
+
     setSize(1170, 870);
     setResizeLimits(780, 580, 2400, 1600);
 
