@@ -97,7 +97,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addF(p+"aEnvRel",   n+"A Env Rel",  0.0f, 100.0f,  5.0f);
         addF(p+"accentDb",  n+"Accent",     0.0f,  12.0f,  0.0f);
         // Drive
-        addI(p+"drvChar",    n+"Drive Char",   0,      8,      0);  // 0=None,1=Soft,2=Hard,3=Fold,4=Bitcrusher,5=Clipper,6=EQ,7=Compressor,8=Limiter
+        addI(p+"drvChar",    n+"Drive Char",   0,     10,      0);  // 0=None … 10=TapeSat
         addF(p+"drvDrv",     n+"Drive",        0.0f, 100.0f,    0.0f);  // Soft/Hard/Fold drive amount
         addF(p+"drvOut",     n+"Drive Out",  -24.0f,    0.0f,   0.0f);  // Soft/Hard/Fold output level
         addF(p+"drvBits",    n+"Bits",         1.0f,  16.0f,   16.0f);  // Bitcrusher bit depth
@@ -199,7 +199,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     addF("mstr_pan",    "Master Pan",      -1.0f,    1.0f,     0.0f);
     addI("mstrLoop",    "Master Loop",      0,       16,       0);      // 0=free, 1-16 → 16-256 steps
     // Master insert effect (#124): same algorithm set as per-rhythm voice INSERT.
-    addI("mst_insChar", "Mst Insert Char",  0,        8,       0);      // 0=None … 8=Limiter
+    addI("mst_insChar", "Mst Insert Char",  0,       10,       0);      // 0=None … 10=TapeSat
     addF("mst_insDrv",  "Mst Insert Drive", 0.0f,  100.0f,     0.0f);
     addF("mst_insOut",  "Mst Insert Out", -24.0f,    0.0f,     0.0f);
     addF("mst_insBits", "Mst Insert Bits",  1.0f,   16.0f,    16.0f);
@@ -892,7 +892,7 @@ static void applyRhythmSuffix(const juce::String& suffix, float v, Rhythm& r,
     else if (suffix == "aEnvSus")   { r.voiceParams.ampEnvSus      = adsrSus(v);  voiceDirty = true; }
     else if (suffix == "aEnvRel")   { r.voiceParams.ampEnvRel = adsrTime(v); r.voiceParams.ampRelToEnd = (v >= 100.0f); voiceDirty = true; }
     else if (suffix == "accentDb")  { r.voiceParams.accentDb        = v;           voiceDirty = true; }
-    else if (suffix == "drvChar")    { r.voiceParams.driveChar  = juce::jlimit(0, 8, (int)v); voiceDirty = true; }
+    else if (suffix == "drvChar")    { r.voiceParams.driveChar  = juce::jlimit(0, 10, (int)v); voiceDirty = true; }
     else if (suffix == "drvDrv")     { r.voiceParams.driveDrive = v;  voiceDirty = true; }
     else if (suffix == "drvOut")     { r.voiceParams.driveOutput= v;  voiceDirty = true; }
     else if (suffix == "drvBits")    { r.voiceParams.drvBits    = v;  voiceDirty = true; }
@@ -1031,7 +1031,7 @@ void PluginProcessor::syncMixerParam(const juce::String& id, float v)
 
     if      (id == "mstr_lvl") mixerEngine.masterLevel = v;
     else if (id == "mstr_pan") mixerEngine.masterPan   = v;
-    else if (id == "mst_insChar") mixerEngine.masterInsertParams.driveChar  = juce::jlimit(0, 8, (int)v);
+    else if (id == "mst_insChar") mixerEngine.masterInsertParams.driveChar  = juce::jlimit(0, 10, (int)v);
     else if (id == "mst_insDrv")  mixerEngine.masterInsertParams.driveDrive = v;
     else if (id == "mst_insOut")  mixerEngine.masterInsertParams.driveOutput= v;
     else if (id == "mst_insBits") mixerEngine.masterInsertParams.drvBits    = v;

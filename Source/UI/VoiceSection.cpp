@@ -13,9 +13,11 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
         addAndMakeVisible(k);
 
     // Filter type dropdown — IDs are 1-based; filterType index = selectedId - 1.
-    filterType.addItem("LP", 1);
-    filterType.addItem("HP", 2);
-    filterType.addItem("BP", 3);
+    // LP/HP/BP use StateVariableTPTFilter directly; Notch = dry − bandpass (#160).
+    filterType.addItem("LP",    1);
+    filterType.addItem("HP",    2);
+    filterType.addItem("BP",    3);
+    filterType.addItem("Notch", 4);
     filterType.setSelectedId(1, false);
     addAndMakeVisible(filterType);
 
@@ -28,7 +30,9 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     driveChar.addItem("Clipper", 6);
     driveChar.addItem("3-Band EQ", 7);
     driveChar.addItem("Compressor", 8);
-    driveChar.addItem("Limiter", 9);
+    driveChar.addItem("Limiter",    9);
+    driveChar.addItem("Ring Mod",  10);
+    driveChar.addItem("Tape Sat",  11);
     driveChar.setSelectedId(1, false);
     addAndMakeVisible(driveChar);
 
@@ -224,8 +228,26 @@ void VoiceSection::wireCallbacks()
     // Insert algorithm — char is 0-based index; dropdown IDs are 1-based.
     // All insert knob callbacks are set in configureInsertAlgorithm().
     driveChar.onChange = [this](int id) {
-        apvtsSet("drvChar", (float)(id - 1));
-        configureInsertAlgorithm(id - 1);
+        const int newChar = id - 1;
+        // Reset params that change meaning across algorithms to prevent jarring transitions (#147).
+        // Check current algorithm BEFORE writing drvChar so we can detect the EQ→other direction.
+        const int oldChar = (rhythmIndex >= 0 && rhythmIndex < proc.getNumRhythms())
+                            ? proc.getRhythm(rhythmIndex).voiceParams.driveChar : -1;
+        if (newChar == 6)
+        {
+            // Entering EQ: force 0 dB neutral on all bands (drvDrv/drvDit stored as 50/100=0 dB).
+            apvtsSet("drvDrv",    50.0f);
+            apvtsSet("drvDit",    50.0f);
+            apvtsSet("eqMidGain", 0.0f);
+        }
+        else if (oldChar == 6)
+        {
+            // Leaving EQ: reset shared params to neutral drive defaults.
+            apvtsSet("drvDrv", 50.0f);
+            apvtsSet("drvDit", 50.0f);
+        }
+        apvtsSet("drvChar", (float)newChar);
+        configureInsertAlgorithm(newChar);
     };
 }
 
@@ -587,6 +609,67 @@ void VoiceSection::configureInsertAlgorithm(int charId)
             break;
         }
 
+        case 9:  // ── Ring Modulator — Mix + Freq ───────────────────────────
+            driveDrive.setLabel("Mix");
+            driveDrive.setRange(0.0, 100.0, 0.1);
+            driveDrive.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String((int)std::round(v)) + "%";
+            };
+            driveDrive.getSlider().valueFromTextFunction = nullptr;
+            if (p) driveDrive.setValue(p->driveDrive, juce::dontSendNotification);
+            else   driveDrive.setValue(50.0, juce::dontSendNotification);
+            driveDrive.setVisible(true);
+
+            driveOutput.setVisible(false);
+            driveDither.setVisible(false);
+
+            driveTone.setLabel("Freq");
+            driveTone.getSlider().setSkewFactorFromMidPoint(223.6);
+            driveTone.setRange(10.0, 5000.0, 1.0);
+            driveTone.getSlider().textFromValueFunction = fmtHz;
+            driveTone.getSlider().valueFromTextFunction = parseHz;
+            if (p) driveTone.setValue(juce::jlimit(10.0, 5000.0, (double)p->driveTone), juce::dontSendNotification);
+            else   driveTone.setValue(440.0, juce::dontSendNotification);
+            driveTone.setVisible(true);
+
+            driveDrive.onValueChanged = [this](double v) { apvtsSet("drvDrv", (float)v); };
+            driveTone .onValueChanged = [this](double v) { apvtsSet("drvTon", (float)v); };
+            break;
+
+        case 10:  // ── Tape Saturation — Drive / Output / Tone ─────────────
+            driveDrive.setLabel("Drive");
+            driveDrive.setRange(0.0, 100.0, 0.1);
+            driveDrive.getSlider().textFromValueFunction = nullptr;
+            driveDrive.getSlider().valueFromTextFunction = nullptr;
+            if (p) driveDrive.setValue(p->driveDrive, juce::dontSendNotification);
+            else   driveDrive.setValue(0.0, juce::dontSendNotification);
+            driveDrive.setVisible(true);
+
+            driveOutput.setLabel("Output");
+            driveOutput.setRange(-24.0, 0.0, 0.1);
+            driveOutput.getSlider().textFromValueFunction = nullptr;
+            driveOutput.getSlider().valueFromTextFunction = nullptr;
+            if (p) driveOutput.setValue(p->driveOutput, juce::dontSendNotification);
+            else   driveOutput.setValue(0.0, juce::dontSendNotification);
+            driveOutput.setVisible(true);
+
+            driveDither.setVisible(false);
+
+            driveTone.setLabel("Tone");
+            driveTone.getSlider().setSkewFactor(1.0);
+            driveTone.getSlider().setSkewFactorFromMidPoint(2000.0);
+            driveTone.setRange(200.0, 20000.0, 1.0);
+            driveTone.getSlider().textFromValueFunction = fmtHz;
+            driveTone.getSlider().valueFromTextFunction = parseHz;
+            if (p) driveTone.setValue(juce::jlimit(200.0, 20000.0, (double)p->driveTone), juce::dontSendNotification);
+            else   driveTone.setValue(10000.0, juce::dontSendNotification);
+            driveTone.setVisible(true);
+
+            driveDrive .onValueChanged = [this](double v) { apvtsSet("drvDrv", (float)v); };
+            driveOutput.onValueChanged = [this](double v) { apvtsSet("drvOut", (float)v); };
+            driveTone  .onValueChanged = [this](double v) { apvtsSet("drvTon", (float)v); };
+            break;
+
         default: break;
     }
 
@@ -658,9 +741,10 @@ void VoiceSection::resized()
     // ─── Insert ──────────────────────────────────────────────────────────
     // Dropdown on row 1; knob layout depends on algorithm (Bitcrusher uses all 4 slots).
     driveChar.setBounds(driveX, row1Y + rowH / 4, 4 * kW, rowH / 2);
-    // Bitcrusher (id=5), EQ (id=7), Compressor (id=8), Limiter (id=9) all use all 4 knob slots.
+    // Bitcrusher (id=5), EQ (id=7), Compressor (id=8), Limiter (id=9) use 4 knob slots.
+    // Ring Mod (id=10) and Tape Sat (id=11) use 2 and 3 slots respectively.
     const int selId = driveChar.getSelectedId();
-    const bool showFour = (selId == 5 || selId >= 7);
+    const bool showFour = (selId == 5 || (selId >= 7 && selId <= 9));
     driveDrive .setBounds(driveX + 0 * kW, row2Y, kW, rowH);
     driveOutput.setBounds(driveX + 1 * kW, row2Y, kW, rowH);
     if (showFour)

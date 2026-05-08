@@ -90,6 +90,8 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
         insCharBox.addItem("3-Band EQ",  7);
         insCharBox.addItem("Compressor", 8);
         insCharBox.addItem("Limiter",    9);
+        insCharBox.addItem("Ring Mod",  10);
+        insCharBox.addItem("Tape Sat",  11);
         insCharBox.setSelectedId(1, juce::dontSendNotification);
         addAndMakeVisible(insCharBox);
 
@@ -363,7 +365,7 @@ void MixerChannel::loadFromAPVTS(juce::AudioProcessorValueTreeState& apvts,
 
         if (auto* p = apvts.getRawParameterValue("mst_insChar"))
         {
-            const int charId = juce::jlimit(0, 8, juce::roundToInt((float)*p));
+            const int charId = juce::jlimit(0, 10, juce::roundToInt((float)*p));
             insCharBox.setSelectedId(charId + 1, juce::dontSendNotification);
             configureInsertAlgorithm(charId, nullptr);
         }
@@ -506,16 +508,18 @@ void MixerChannel::resized()
     faderPaneBounds = { 1, faderY - 2, stripW - 2, h - faderY + 1 };
 
     // ── Insert panel (Master channel, right of strip) ─────────────────────────
-    // Knobs stacked vertically so each gets the full panel width and maximum height.
+    // Knobs stacked vertically with padding from panel edges.
     if (hasInsert())
     {
-        const int ipX    = stripW;
-        const int availH = h - nameBottom - kInsCharH;
-        const int knobH  = juce::jmin(80, availH / 3);
-        insCharBox.setBounds(ipX, nameBottom,                       insW, kInsCharH);
-        insDrive  .setBounds(ipX, nameBottom + kInsCharH,           insW, knobH);
-        insOutput .setBounds(ipX, nameBottom + kInsCharH + knobH,   insW, knobH);
-        insTone   .setBounds(ipX, nameBottom + kInsCharH + knobH*2, insW, knobH);
+        const int pad    = 4;
+        const int ipX    = stripW + pad;
+        const int ipW    = insW - 2 * pad;
+        const int availH = h - nameBottom - kInsCharH - 2 * pad;
+        const int knobH  = juce::jmin(40, availH / 3);
+        insCharBox.setBounds(ipX, nameBottom + pad,                       ipW, kInsCharH);
+        insDrive  .setBounds(ipX, nameBottom + pad + kInsCharH,           ipW, knobH);
+        insOutput .setBounds(ipX, nameBottom + pad + kInsCharH + knobH,   ipW, knobH);
+        insTone   .setBounds(ipX, nameBottom + pad + kInsCharH + knobH*2, ipW, knobH);
     }
 }
 
@@ -669,6 +673,61 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
             insOutput.onValueChanged = [setParam](double v) { setParam("mst_insOut", v); };
             insTone  .onValueChanged = [setParam](double v) { setParam("mst_insTon", v); };
             if (proc) setParam("mst_insChar", charId);
+            break;
+
+        case 9: // Ring Modulator — Mix + Freq
+            insDrive.setLabel("Mix");
+            insDrive.setRange(0.0, 100.0, 0.1);
+            insDrive.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String((int)std::round(v)) + "%";
+            };
+            insDrive.setValue(ip.driveDrive, juce::dontSendNotification);
+            insDrive.setVisible(true);
+
+            insOutput.setVisible(false);
+
+            insTone.setLabel("Freq");
+            insTone.setRange(10.0, 5000.0, 1.0);
+            insTone.getSlider().setSkewFactorFromMidPoint(223.6);  // log feel
+            insTone.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return v >= 1000.0 ? juce::String(v / 1000.0, 2) + "kHz"
+                                   : juce::String((int)v) + "Hz";
+            };
+            insTone.setValue(juce::jlimit(10.0, 5000.0, (double)ip.driveTone), juce::dontSendNotification);
+            insTone.setVisible(true);
+
+            insDrive .onValueChanged = [setParam](double v) { setParam("mst_insDrv", v); };
+            insTone  .onValueChanged = [setParam](double v) { setParam("mst_insTon", v); };
+            if (proc) setParam("mst_insChar", 9);
+            break;
+
+        case 10: // Tape Saturation — Drive / Output / Tone
+            insDrive.setLabel("Drive");
+            insDrive.setRange(0.0, 100.0, 0.1);
+            insDrive.getSlider().textFromValueFunction = nullptr;
+            insDrive.setValue(ip.driveDrive, juce::dontSendNotification);
+            insDrive.setVisible(true);
+
+            insOutput.setLabel("Output");
+            insOutput.setRange(-24.0, 0.0, 0.1);
+            insOutput.getSlider().textFromValueFunction = nullptr;
+            insOutput.setValue(ip.driveOutput, juce::dontSendNotification);
+            insOutput.setVisible(true);
+
+            insTone.setLabel("Tone");
+            insTone.setRange(200.0, 20000.0, 1.0);
+            insTone.getSlider().setSkewFactorFromMidPoint(2000.0);
+            insTone.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return v >= 1000.0 ? juce::String(v / 1000.0, 2) + "kHz"
+                                   : juce::String((int)v) + "Hz";
+            };
+            insTone.setValue(juce::jlimit(200.0, 20000.0, (double)ip.driveTone), juce::dontSendNotification);
+            insTone.setVisible(true);
+
+            insDrive .onValueChanged = [setParam](double v) { setParam("mst_insDrv", v); };
+            insOutput.onValueChanged = [setParam](double v) { setParam("mst_insOut", v); };
+            insTone  .onValueChanged = [setParam](double v) { setParam("mst_insTon", v); };
+            if (proc) setParam("mst_insChar", 10);
             break;
 
         default: break;
