@@ -6,6 +6,7 @@
 
 | # | Description | Status | Fixed Build |
 |---|---|---|---|
+| 167 | No warning prompt when closing stand-alone app v1.0.269 ([GH#1](https://github.com/AndyTuke/mu-clid/issues/1)) | 🔴 Open | — |
 
 ## 🟡 On Hold
 
