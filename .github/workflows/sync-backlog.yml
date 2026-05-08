@@ -1,7 +1,7 @@
 name: Sync issues to backlog
 on:
   issues:
-    types: [opened, edited, closed, reopened, labeled, unlabeled]
+    types: [opened]
   workflow_dispatch:
 
 jobs:
@@ -11,17 +11,27 @@ jobs:
       contents: write
       issues: read
       pull-requests: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
-            Update backlog.md to reflect the current open issues in this repo.
+            Update backlog.md by adding new GitHub issues as rows in the "Open" table. Follow these steps exactly.
 
-            Steps:
-            1. Run `gh issue list --state open --limit 200 --json number,title,labels,assignees,createdAt,url` to fetch issues.
-            2. Read backlog.md if it exists; preserve anything outside the auto-generated section.
-            3. Replace (or create) the section between <!-- BACKLOG:START --> and <!-- BACKLOG:END --> with a list of open issues, grouped by label (bugs, features, chores, other). Each item should link to the issue.
-            4. If backlog.md doesn't exist, create it with a short intro and that section.
-            5. Commit to a branch called `chore/sync-backlog` and open a PR titled "Sync backlog from issues". If the PR already exists, just push to update it.
+            1. Run `gh issue list --state open --limit 200 --json number,title,url` to fetch all open GitHub issues.
+            2. Read backlog.md.
+            3. Scan all rows across the Open, On Hold, and Fixed tables. For any row whose Description contains a reference like `[GH#N]`, record N — those GitHub issues are already imported and must be skipped.
+            4. Find the highest number used in the `#` column across all three tables. Call this MAX.
+            5. For each GitHub issue NOT in the already-imported list:
+               - MAX = MAX + 1
+               - Append a new row to the bottom of the Open table with:
+                 - `#` column: MAX
+                 - `Description`: the GitHub issue title, followed by ` ([GH#N](url))` where N is the GitHub issue number and url is the issue URL
+                 - `Status`: `🔴 Open`
+                 - `Fixed Build`: `—`
+            6. Do NOT modify the On Hold or Fixed tables.
+            7. Do NOT modify any existing rows in the Open table.
+            8. If no new issues needed adding, exit without making any changes and do not open a PR.
+            9. If changes were made, commit to a branch called `chore/sync-backlog` and open a PR titled "Sync backlog from issues" with a brief body listing which issues were added. If a PR on that branch already exists, push to update it instead of creating a new one.
