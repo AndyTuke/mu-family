@@ -19,6 +19,7 @@ public:
     std::function<void()> onPatternChanged;
 
     void setRhythmColour(juce::Colour c);
+    void loadFromRhythm();
 
     // Issue #133: tag hits/rotate knobs with modulation indicator rings.
     void refreshModulatedIndicators();
@@ -82,7 +83,6 @@ private:
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();
-    void loadFromRhythm();
     void updateRangesA(int steps);
     void updateRangesB(int steps);
     void updateRangesC(int steps);

@@ -12,12 +12,23 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
                      &driveDrive, &driveOutput, &driveDither, &driveTone })
         addAndMakeVisible(k);
 
-    // Filter type dropdown — IDs are 1-based; filterType index = selectedId - 1.
-    // LP/HP/BP use StateVariableTPTFilter directly; Notch = dry − bandpass (#160).
-    filterType.addItem("LP",    1);
-    filterType.addItem("HP",    2);
-    filterType.addItem("BP",    3);
-    filterType.addItem("Notch", 4);
+    // Filter type dropdown — item ID = filterType + 1; selectedId - 1 = filterType value.
+    // Types 0-3,9: SVF. Types 4-6,10: LadderFilter. 7: 1-pole LP. 11: 1-pole HP. 8: Comb. 12-14: Biquad EQ.
+    filterType.addItem("LP 6",    8);   // type 7
+    filterType.addItem("LP 12",   1);   // type 0
+    filterType.addItem("LP 24",   5);   // type 4
+    filterType.addItem("BP 12",   3);   // type 2
+    filterType.addItem("BP 24",   7);   // type 6
+    filterType.addItem("HP 6",    12);  // type 11
+    filterType.addItem("HP 12",   2);   // type 1
+    filterType.addItem("HP 24",   6);   // type 5
+    filterType.addItem("Notch",   4);   // type 3
+    filterType.addItem("Notch 24",11);  // type 10
+    filterType.addItem("AP 12",   10);  // type 9
+    filterType.addItem("Comb",    9);   // type 8
+    filterType.addItem("Peak",    13);  // type 12
+    filterType.addItem("Lo Shf",  14);  // type 13
+    filterType.addItem("Hi Shf",  15);  // type 14
     filterType.setSelectedId(1, false);
     addAndMakeVisible(filterType);
 

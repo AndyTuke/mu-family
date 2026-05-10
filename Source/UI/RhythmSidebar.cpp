@@ -248,6 +248,11 @@ void RhythmSidebar::resized()
 
 void RhythmSidebar::timerCallback()
 {
+    // Re-sync if rhythm count changed after construction (e.g. host calls
+    // setStateInformation() after the editor is already open).
+    if (proc.getNumRhythms() != (int)items.size())
+        refreshItems();
+
     for (int i = 0; i < (int)items.size(); ++i)
         items[i]->setPendingSwap(proc.hasPendingSwap(i));
 }

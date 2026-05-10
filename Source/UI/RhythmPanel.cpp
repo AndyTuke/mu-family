@@ -1,5 +1,29 @@
 #include "RhythmPanel.h"
 
+// Euclidean panel params — all use r{ri}_ prefix.
+static const char* const kEuclidSuffixes[] = {
+    "stepsA", "hitsA", "rotA", "prePadA", "postPadA", "insStA", "insLenA",
+    "prePadModeA", "postPadModeA", "insModeA",
+    "stepsB", "hitsB", "rotB", "prePadB", "postPadB", "insStB", "insLenB",
+    "prePadModeB", "postPadModeB", "insModeB",
+    "stepsC", "hitsC", "rotC", "prePadC", "postPadC", "insStC", "insLenC",
+    "prePadModeC", "postPadModeC", "insModeC",
+    "logic"
+};
+// Voice panel params — all use r{ri}_ prefix.
+static const char* const kVoiceSuffixes[] = {
+    "pitchOct", "pitchSemi", "pitchFine",
+    "pEnvAtk", "pEnvDec", "pEnvSus", "pEnvRel", "pEnvDep",
+    "fltType", "fltCut", "fltRes",
+    "fEnvAtk", "fEnvDec", "fEnvSus", "fEnvRel", "fEnvDep",
+    "ampLvl", "accentDb",
+    "aEnvAtk", "aEnvDec", "aEnvSus", "aEnvRel",
+    "drvChar", "drvDrv", "drvOut", "drvDit", "drvTon", "eqMidGain", "drvBits", "drvRate"
+};
+
+// Send knob params — use ch{ri}_ prefix (shared with mixer channel strip).
+static const char* const kSendSuffixes[] = { "sendEff", "sendDly", "sendRev" };
+
 //==============================================================================
 // Custom file browser used for sample loading so the user can audition files
 // before committing to a slot. Shows inside a DialogWindow (modal).
@@ -245,6 +269,56 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     };
 }
 
+RhythmPanel::~RhythmPanel()
+{
+    stopTimer();
+    deregisterRhythmListeners(currentRhythmIndex);
+}
+
+void RhythmPanel::registerRhythmListeners(int ri)
+{
+    if (ri < 0) return;
+    const auto rPfx  = "r"  + juce::String(ri) + "_";
+    const auto chPfx = "ch" + juce::String(ri) + "_";
+    for (auto* s : kEuclidSuffixes)
+        proc.apvts.addParameterListener(rPfx + s, this);
+    for (auto* s : kVoiceSuffixes)
+        proc.apvts.addParameterListener(rPfx + s, this);
+    for (auto* s : kSendSuffixes)
+        proc.apvts.addParameterListener(chPfx + s, this);
+}
+
+void RhythmPanel::deregisterRhythmListeners(int ri)
+{
+    if (ri < 0) return;
+    const auto rPfx  = "r"  + juce::String(ri) + "_";
+    const auto chPfx = "ch" + juce::String(ri) + "_";
+    for (auto* s : kEuclidSuffixes)
+        proc.apvts.removeParameterListener(rPfx + s, this);
+    for (auto* s : kVoiceSuffixes)
+        proc.apvts.removeParameterListener(rPfx + s, this);
+    for (auto* s : kSendSuffixes)
+        proc.apvts.removeParameterListener(chPfx + s, this);
+}
+
+void RhythmPanel::parameterChanged(const juce::String& parameterID, float /*newValue*/)
+{
+    const auto suffix = parameterID.fromFirstOccurrenceOf("_", false, false);
+    bool isEuclid = false;
+    for (auto* s : kEuclidSuffixes)
+        if (suffix == s) { isEuclid = true; break; }
+
+    if (isEuclid)
+    {
+        euclidPanel.loadFromRhythm();
+        refreshCircle();
+    }
+    else
+    {
+        voiceSection.loadFromRhythm();
+    }
+}
+
 void RhythmPanel::setRhythm(int index)
 {
     // Commit any in-progress edit (Label::hideEditor with discardChanges=false saves
@@ -253,7 +327,9 @@ void RhythmPanel::setRhythm(int index)
     if (nameLabel.getCurrentTextEditor() != nullptr)
         nameLabel.hideEditor(false);
 
+    deregisterRhythmListeners(currentRhythmIndex);
     currentRhythmIndex = index;
+    registerRhythmListeners(currentRhythmIndex);
     if (index >= 0 && index < proc.getNumRhythms())
     {
         nameLabel.setText(juce::String(proc.getRhythm(index).name), juce::dontSendNotification);

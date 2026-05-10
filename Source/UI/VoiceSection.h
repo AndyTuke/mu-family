@@ -24,6 +24,8 @@ public:
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
     std::function<void(int driveChar)> onInsertAlgorithmChanged;
 
+    void loadFromRhythm();
+
     void resized() override;
     void paint(juce::Graphics&) override;
 
@@ -73,6 +75,5 @@ private:
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();
-    void loadFromRhythm();
     void configureInsertAlgorithm(int charId);  // sets labels/ranges/callbacks/values per algorithm
 };

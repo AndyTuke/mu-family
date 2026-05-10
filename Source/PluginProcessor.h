@@ -136,6 +136,11 @@ public:
     LicenseChecker::Info licenseInfo;
     bool isLicensed() const { return kBetaBuild || licenseInfo.status == LicenseStatus::Licensed; }
 
+    // Set by PluginEditor (standalone only): shows the SaveDialog then calls the quit callback on
+    // completion, or drops it if the user cancels. Allows the close-confirmation dialog to trigger
+    // a proper "Save As" flow before quitting rather than a raw state dump.
+    std::function<void(std::function<void()>)> onSaveAndQuit;
+
     void savePreset(const juce::String& name, const juce::String& description,
                     const juce::String& category, bool embedSamples = false);
     void loadPreset(const juce::File& file);

@@ -38,12 +38,25 @@ public:
 
             if (result == 1) // OK: close without explicit save
             {
-                juce::JUCEApplicationBase::quit();
+                juce::JUCEApplication::getInstance()->quit();
             }
-            else if (result == 2) // Save: save plugin state then close
+            else if (result == 2) // Save: open Save dialog, quit on completion
             {
-                safeThis->pluginHolder->savePluginState();
-                juce::JUCEApplicationBase::quit();
+                auto* proc = safeThis->pluginHolder
+                    ? dynamic_cast<PluginProcessor*>(safeThis->pluginHolder->processor.get())
+                    : nullptr;
+                if (proc && proc->onSaveAndQuit)
+                {
+                    proc->onSaveAndQuit([]
+                    {
+                        juce::JUCEApplication::getInstance()->quit();
+                    });
+                }
+                else
+                {
+                    safeThis->pluginHolder->savePluginState();
+                    juce::JUCEApplication::getInstance()->quit();
+                }
             }
             // result == 0 (Cancel / Escape / dismissed): do nothing
         });

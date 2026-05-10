@@ -12,10 +12,13 @@
 // Full mixer view: rhythm channel strips | Effect/Delay/Reverb returns | Master
 // + three FX rows (Effect, Delay, Reverb) below the strips.
 // Replaces the RhythmPanel in the editor when the mixer button is toggled.
-class MixerOverlay : public juce::Component
+class MixerOverlay : public juce::Component,
+                     public juce::AudioProcessorValueTreeState::Listener,
+                     private juce::Timer
 {
 public:
     explicit MixerOverlay(PluginProcessor& proc, MixerEngine& mixer);
+    ~MixerOverlay() override;
 
     // Rebuild channel strips to match the current rhythm count.
     void refresh();
@@ -61,4 +64,11 @@ private:
     void wireFXRows();
     void updateEffectSendLabels();
     void refreshSidechainSources();
+
+    // juce::AudioProcessorValueTreeState::Listener — sets dirty flag for deferred reload.
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+    void visibilityChanged() override;
+    void timerCallback() override;
+
+    bool apvtsDirty = false;
 };

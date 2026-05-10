@@ -64,25 +64,24 @@ $env:JUCE_PATH = "D:\JUCE"
 cmake -B build                              # Configure (once, or after CMakeLists changes)
 cmake --build build --config Debug          # Debug build
 cmake --build build --config Release        # Release build
+cmake --build build --config Debug && cmake --build build --config Release  # Full build (both)
 ```
 
 Artefacts land in `build/mu-clid_artefacts/Debug/` or `.../Release/`.
+Always build Release when producing tester builds — the CMake post-build hook automatically deploys the VST3, CLAP, and Standalone to the OneDrive tester folder (`MUCLID_WIN_DIST` in CMakeLists.txt). Debug builds skip the deploy step.
 
 ## Development history
 
-Stages 1–28 are complete. See [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) for the full stage-by-stage log with dates. When a stage is completed, it should be moved to the DevelopmentHistory.md file.
+Stages 1–31 are complete. See [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) for the full stage-by-stage log with dates. When a stage is completed, it should be moved to the DevelopmentHistory.md file.
 
 ## Upcoming stages
 
 All work below resolves open issues from [backlog.md](backlog.md). Issues are referenced by number.
+The backlog in `backlog.md` must always be grouped: Open → On Hold → Fixed. Within each group, items must be ordered by issue number descending (highest first). Every backlog update must preserve this ordering.
+All code changes must be logged as backlog entries to maintain a complete development history.
 
 | Stage | Status | Scope | Issues |
 |---|---|---|---|
-| 24 | ✅ Done | **Sidechain ducking per mixer channel** — each rhythm channel strip gets (top→bottom): compact input selector (dropdown: None + other channel names), Amount knob (0–100 % ducking depth), and two half-width knobs labeled "/" (attack) and "\" (release). Sidechain DSP in `MixerEngine`: per-channel envelope follower driven by the source channel's post-fader audio; gain reduction = `amount × env` applied multiplicatively. New fields in `ChannelState`: `sidechainSource` (int, −1 = off), `sidechainAmount`, `sidechainAttackMs`, `sidechainReleaseMs`. | #115 #116 #117 |
-| 25 | ✅ Done | **Chorus effect** — implemented as `ChorusEffect` (algorithm 0 in `EffectSlot`). Custom multi-voice delay-line chorus: 2–4 voices, 4-point Catmull-Rom Hermite interpolation, 30 ms base delay, per-voice LFO rate detuning ±1.5% (evenly spread so all voices average to the user rate, eliminating fixed-period comb artefacts), stereo spread via per-odd-voice delay asymmetry. Parameters: Rate (Hz), Depth (%), Voices, Spread (%), Mix (%). Wired through `FXSlotBase` / `EffectSlot` / `FXAlgorithmDef`; params stored via the shared `eff_p0..p4` APVTS system (consistent with Flanger, Phaser, Echo — dedicated per-algorithm params were superseded by the generic system). Implemented across Stage 8 (initial) and Stage 17 (Hermite + detuning quality pass). | — |
-| 26 | ✅ Done | **Multimode filter on voice channel** — `juce::dsp::StateVariableTPTFilter` already replaced the one-pole tone filter. LP / HP / BP / Notch modes fully implemented: LP/HP/BP route directly through the TPT-SVF; Notch = dry − bandpass (using `notchBuffer` pre-filter copy). Resonance knob (`filterRes`, 0–100%) and type dropdown (LP/HP/BP/Notch) wired in `VoiceSection`. APVTS: `fltType` (0–9) and `fltRes` (0–0.99). Modulation target `filter.resonance` registered in `ModDest` and driven by `ModulationMatrix`. Notch mode added in issue #160 (build 254). | — |
-| 27 | ✅ Done | **Ring modulator INSERT** — driveChar=9 in `InsertProcessor`. DSP: per-sample multiply by `sin(phase)` carrier at user frequency with wet/dry blend (`data[i] *= (1 - mix + carrier * mix)`). Per-channel `ringPhase[2]` state accumulates phase increment `2π·freq/sr` each sample, wrapping at 2π. Parameters reuse existing APVTS: `drvDrv` → Mix (0–100%), `drvTon` → Freq (10–5000 Hz, log-scaled). Both VoiceSection and MixerChannel master insert support driveChar=9. APVTS `drvChar` range extended 0–8 → 0–10. Tone post-filter already bypassed for driveChar≥6. | #165 |
-| 28 | ✅ Done | **Tape Saturation INSERT** — driveChar=10 in `InsertProcessor`. DSP: pre-gain (1–10×) → `tanh` soft saturation → DC block (HP at ~20 Hz, `y = sat − dcIn + r·dcOut`) → 1-pole LP tone filter → output gain. Per-channel `dcBlockIn[2]` / `dcBlockOut[2]` state added; reuses `toneFilter[2]` for the LP. Parameters reuse existing APVTS: `drvDrv` → Drive (0–100%), `drvTon` → Tone (200–20000 Hz), `drvOut` → Output (−24..0 dB). Available on both per-rhythm and master inserts. | #166 |
 
 
 ## Source layout (actual, as built)

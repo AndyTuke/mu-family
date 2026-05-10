@@ -72,6 +72,7 @@ private:
 
     bool isStandalone    = false;
     bool needsFocusGrab  = false;
+    std::function<void()> pendingQuitCallback;
     juce::KeyPress keybindPlayStop { juce::KeyPress::spaceKey };
     void loadKeybindings();
 

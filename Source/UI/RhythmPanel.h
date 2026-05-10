@@ -44,10 +44,12 @@ private:
 //   Header bar | Sample bar | [RhythmCircle | EuclideanPanel] | VoiceSection | ModulatorPanel
 class RhythmPanel : public juce::Component,
                     public juce::FileDragAndDropTarget,
+                    public juce::AudioProcessorValueTreeState::Listener,
                     private juce::Timer
 {
 public:
     explicit RhythmPanel(PluginProcessor& p);
+    ~RhythmPanel() override;
 
     void setRhythm(int index);
 
@@ -109,4 +111,9 @@ private:
     void confirmReset();
     void confirmDelete();
     void timerCallback() override;
+
+    // juce::AudioProcessorValueTreeState::Listener — syncs knobs + circle on DAW automation
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+    void registerRhythmListeners(int ri);
+    void deregisterRhythmListeners(int ri);
 };

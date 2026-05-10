@@ -2,10 +2,9 @@
 
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_audio_basics/juce_audio_basics.h>
-#include <juce_dsp/juce_dsp.h>
 #include "SamplePlayer.h"
 #include "VoiceParams.h"
-#include "AudioFilters.h"
+#include "MultiModeFilter.h"
 #include "InsertProcessor.h"
 
 #include <array>
@@ -53,9 +52,8 @@ private:
     juce::ADSR  ampEnv;
     juce::ADSR  filterEnv;
     juce::ADSR  pitchEnv;
-    juce::dsp::StateVariableTPTFilter<float> filter;
+    MultiModeFilter voiceFilter;             // owns SVF / Ladder / 1-pole / biquad / comb state
     juce::AudioBuffer<float> tempBuffer;
-    juce::AudioBuffer<float> notchBuffer;  // pre-filter dry copy for notch = dry - BP
     InsertProcessor insertProc;
 
     float             accentGain = 1.0f;

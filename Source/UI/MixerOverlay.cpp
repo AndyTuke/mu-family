@@ -25,6 +25,44 @@ MixerOverlay::MixerOverlay(PluginProcessor& p, MixerEngine& m)
     {
         propagateMeterMode(static_cast<VUMeter::MeterMode>(idx));
     };
+
+    // Register for every APVTS parameter so automation syncs the mixer UI.
+    for (auto* param : proc.getParameters())
+        if (auto* pid = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
+            proc.apvts.addParameterListener(pid->getParameterID(), this);
+
+    startTimerHz(30);
+}
+
+MixerOverlay::~MixerOverlay()
+{
+    stopTimer();
+    for (auto* param : proc.getParameters())
+        if (auto* pid = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
+            proc.apvts.removeParameterListener(pid->getParameterID(), this);
+}
+
+void MixerOverlay::parameterChanged(const juce::String& /*parameterID*/, float /*newValue*/)
+{
+    apvtsDirty = true;
+}
+
+void MixerOverlay::visibilityChanged()
+{
+    if (isVisible() && apvtsDirty)
+    {
+        loadFromAPVTS();
+        apvtsDirty = false;
+    }
+}
+
+void MixerOverlay::timerCallback()
+{
+    if (apvtsDirty && isVisible())
+    {
+        loadFromAPVTS();
+        apvtsDirty = false;
+    }
 }
 
 void MixerOverlay::buildRhythmChannels()

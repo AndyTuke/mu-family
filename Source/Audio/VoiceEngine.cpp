@@ -21,14 +21,14 @@ void VoiceEngine::prepareToPlay(double sampleRate, int blockSize)
     }
 
     tempBuffer.setSize(2, blockSize, false, true, false);
-    notchBuffer.setSize(2, blockSize, false, true, false);
     insertProc.prepare(sampleRate, blockSize);
 
     ampEnv.setSampleRate(sampleRate);
     filterEnv.setSampleRate(sampleRate);
     pitchEnv.setSampleRate(sampleRate);
 
-    filter.prepare({ sampleRate, static_cast<uint32_t>(blockSize), 2 });
+    voiceFilter.prepare(sampleRate, blockSize, 2);
+
     syncFilter();
 }
 
@@ -121,30 +121,9 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     float modCutoff = activeParams.filterCutoff
                     * std::pow(2.0f, filterEnvVal * activeParams.filterEnvDepth / 12.0f);
     modCutoff = juce::jlimit(20.0f, 20000.0f, modCutoff);
-    filter.setCutoffFrequency(modCutoff);
 
-    const bool isNotch = (activeParams.filterType == 3);
-    if (isNotch)
-    {
-        // Save dry signal — notch = dry − bandpass; notchBuffer holds pre-filter copy.
-        for (int ch = 0; ch < nCh; ++ch)
-            notchBuffer.copyFrom(ch, 0, tempBuffer, ch, 0, ns);
-    }
-
-    juce::dsp::AudioBlock<float> block(tempBuffer.getArrayOfWritePointers(),
-                                       static_cast<size_t>(nCh),
-                                       static_cast<size_t>(0),
-                                       static_cast<size_t>(ns));
-    juce::dsp::ProcessContextReplacing<float> ctx(block);
-    filter.process(ctx);
-
-    if (isNotch)
-    {
-        for (int ch = 0; ch < nCh; ++ch)
-            for (int i = 0; i < ns; ++i)
-                tempBuffer.setSample(ch, i,
-                    notchBuffer.getSample(ch, i) - tempBuffer.getSample(ch, i));
-    }
+    voiceFilter.setCutoff(modCutoff);
+    voiceFilter.process(tempBuffer, ns, nCh);
 
     // ── Insert effects (delegated to InsertProcessor) ────────────────────────
     insertProc.process(tempBuffer, ns, nCh, activeParams);
@@ -201,14 +180,7 @@ void VoiceEngine::syncEnvelopes()
 
 void VoiceEngine::syncFilter()
 {
-    using T = juce::dsp::StateVariableTPTFilterType;
-    switch (activeParams.filterType)
-    {
-        case 1:  filter.setType(T::highpass); break;
-        case 2:  filter.setType(T::bandpass); break;
-        case 3:  filter.setType(T::bandpass); break;  // notch uses BP internally (dry-BP in process)
-        default: filter.setType(T::lowpass);  break;
-    }
-    filter.setCutoffFrequency(activeParams.filterCutoff);
-    filter.setResonance(juce::jmax(0.01f, activeParams.filterRes));
+    voiceFilter.setType(activeParams.filterType);
+    voiceFilter.setCutoff(activeParams.filterCutoff);
+    voiceFilter.setResonance(activeParams.filterRes);
 }

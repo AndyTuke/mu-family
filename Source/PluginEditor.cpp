@@ -40,6 +40,12 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         showSaveDialog(true);
     };
 
+    processorRef.onSaveAndQuit = [this](std::function<void()> quitCallback)
+    {
+        pendingQuitCallback = std::move(quitCallback);
+        showSaveDialog(true);
+    };
+
     transportBar.onSettingsToggle = [this] { showSettings(!settingsVisible); };
 
     // ── Sidebar callbacks ─────────────────────────────────────────────────────
@@ -121,8 +127,18 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         processorRef.savePreset(name, desc, category, embedSamples);
         transportBar.refreshPresets();
         showSaveDialog(false);
+        if (pendingQuitCallback)
+        {
+            auto cb = std::move(pendingQuitCallback);
+            pendingQuitCallback = nullptr;
+            cb();
+        }
     };
-    saveDialog.onCancel = [this] { showSaveDialog(false); };
+    saveDialog.onCancel = [this]
+    {
+        pendingQuitCallback = nullptr;
+        showSaveDialog(false);
+    };
 
     // ── Preset browser ────────────────────────────────────────────────────────
     presetBrowser.onLoadPreset = [this](const juce::File& f)

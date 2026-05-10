@@ -81,8 +81,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addF(p+"pEnvRel",   n+"P Env Rel",  0.0f, 100.0f,  1.0f);
         addF(p+"pEnvDep",   n+"P Env Dep",  0.0f,  24.0f,  0.0f);
         // Filter
-        addI(p+"fltType", n+"Filter Type", 0, 9, 0);  // up to 10 types for future expansion
-        addF(p+"fltCut",  n+"Filter Cut",  20.0f, 20000.0f, 8000.0f);
+        addI(p+"fltType", n+"Filter Type", 0, 14, 0);  // 0-14: LP12/HP12/BP12/Notch/LP24/HP24/BP24/LP6/Comb/AP12/Notch24/HP6/Peak/LoShf/HiShf
+        layout.add(std::make_unique<juce::AudioParameterFloat>(
+            p+"fltCut", n+"Filter Cut",
+            juce::NormalisableRange<float>(20.0f, 20000.0f), 8000.0f,
+            juce::AudioParameterFloatAttributes().withStringFromValueFunction(
+                [](float v, int) -> juce::String {
+                    if (v < 1000.0f) return juce::String(v, 1) + " Hz";
+                    return juce::String(v / 1000.0f, 1) + " kHz";
+                })));
         addF(p+"fltRes",  n+"Filter Res",   0.0f,    0.99f,    0.2f);
         addF(p+"fEnvAtk", n+"F Env Atk",  0.0f, 100.0f,  1.0f);
         addF(p+"fEnvDec", n+"F Env Dec",  0.0f, 100.0f,  3.0f);
@@ -878,7 +885,7 @@ static void applyRhythmSuffix(const juce::String& suffix, float v, Rhythm& r,
     else if (suffix == "pEnvSus")   { r.voiceParams.pitchEnvSus    = adsrSus(v);  voiceDirty = true; }
     else if (suffix == "pEnvRel")   { r.voiceParams.pitchEnvRel    = adsrTime(v); voiceDirty = true; }
     else if (suffix == "pEnvDep")   { r.voiceParams.pitchEnvDepth  = v;            voiceDirty = true; }
-    else if (suffix == "fltType")   { r.voiceParams.filterType     = juce::jlimit(0, 9, (int)v); voiceDirty = true; }
+    else if (suffix == "fltType")   { r.voiceParams.filterType     = juce::jlimit(0, 14, (int)v); voiceDirty = true; }
     else if (suffix == "fltCut")    { r.voiceParams.filterCutoff   = v;            voiceDirty = true; }
     else if (suffix == "fltRes")    { r.voiceParams.filterRes      = v;            voiceDirty = true; }
     else if (suffix == "fEnvAtk")   { r.voiceParams.filterEnvAtk   = adsrTime(v); voiceDirty = true; }

@@ -14,7 +14,7 @@ juce_add_plugin(mu-clid
     PLUGIN_CODE MCld
     FORMATS VST3 Standalone
     PRODUCT_NAME "mu-Clid"
-    IS_SYNTH FALSE
+    IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT TRUE
     IS_MIDI_EFFECT FALSE
@@ -36,6 +36,7 @@ target_sources(mu-clid
         Source/Sequencer/ControlSequence.cpp
         Source/Audio/SamplePlayer.cpp
         Source/Audio/InsertProcessor.cpp
+        Source/Audio/MultiModeFilter.cpp
         Source/Audio/VoiceEngine.cpp
         Source/Audio/MidiOutputEngine.cpp
         Source/Modulation/ModulationMatrix.cpp
@@ -109,9 +110,9 @@ target_link_libraries(mu-clid
 target_compile_definitions(mu-clid_Standalone PRIVATE JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
 target_sources(mu-clid_Standalone PRIVATE Source/StandaloneApp.cpp)
 
-# Increment build_number.txt and regenerate Source/BuildNumber.h before every build.
+# Increment build_number.txt only on Debug; Release reads the same value so both configs share a number.
 add_custom_target(increment_build_number ALL
-    COMMAND ${CMAKE_COMMAND} -P "${CMAKE_SOURCE_DIR}/cmake/IncrementBuildNumber.cmake"
+    COMMAND ${CMAKE_COMMAND} -DBUILD_CONFIG=$<CONFIG> -P "${CMAKE_SOURCE_DIR}/cmake/IncrementBuildNumber.cmake"
     COMMENT "Incrementing build number"
     VERBATIM
 )
@@ -188,6 +189,7 @@ target_sources(mu-clid-lite
         Source/Sequencer/ControlSequence.cpp
         Source/Audio/SamplePlayer.cpp
         Source/Audio/InsertProcessor.cpp
+        Source/Audio/MultiModeFilter.cpp
         Source/Audio/VoiceEngine.cpp
         Source/Audio/MidiOutputEngine.cpp
         Source/Audio/MixerEngine.cpp
