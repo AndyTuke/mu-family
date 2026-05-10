@@ -374,7 +374,6 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     buffer.clear();
 
 #if MUCLID_LITE_BUILD
-    {
     // Lite mode: MIDI-only sequencing, no audio processing.
     double beatPos = 0.0;
     bool   playing = false;
@@ -453,9 +452,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     }
     for (int r = 0; r < numRhythms; ++r)
         midiEngines[r].processBlock(midiMessages, juce::jmax(1, buffer.getNumSamples()));
-    } // end MUCLID_LITE_BUILD scope
-    return;
-#endif
+#else
 
     // MIDI clock sync: scan system real-time messages before beat-pos determination.
     double midiClockBlockBeatPos = 0.0;
@@ -763,6 +760,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
     for (int r = 0; r < numRhythms; ++r)
         midiEngines[r].processBlock(midiMessages, buffer.getNumSamples());
+#endif
 }
 
 //==============================================================================

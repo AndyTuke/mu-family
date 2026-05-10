@@ -16,12 +16,24 @@ function P($t)   { $sel.Style = $doc.Styles("Normal");      $sel.TypeText($t); $
 function Br()    { $sel.InsertBreak(7) }   # wdPageBreak
 function Bullet($t) { $sel.Style = $doc.Styles("List Bullet"); $sel.TypeText($t); $sel.TypeParagraph() }
 
+# Screenshot placeholder — italic, centred, distinct so screenshots can be
+# located via Find ("[Screenshot:") and replaced by the artwork at release time.
+function Pic($caption) {
+    $sel.Style = $doc.Styles("Normal")
+    $sel.ParagraphFormat.Alignment = 1   # wdAlignParagraphCenter
+    $sel.Font.Italic = $true
+    $sel.TypeText("[Screenshot: $caption]")
+    $sel.Font.Italic = $false
+    $sel.ParagraphFormat.Alignment = 0   # wdAlignParagraphLeft
+    $sel.TypeParagraph()
+}
+
 # ── Title page ──────────────────────────────────────────────────────────────
 $sel.Style = $doc.Styles("Title")
 $sel.TypeText("mu-Clid")
 $sel.TypeParagraph()
 $sel.Style = $doc.Styles("Subtitle")
-$sel.TypeText("Euclidean Rhythm Sequencer")
+$sel.TypeText("Polyrhythmic Euclidean Sequencer")
 $sel.TypeParagraph()
 $sel.Style = $doc.Styles("Normal")
 $sel.TypeText("User Manual")
@@ -32,264 +44,320 @@ Br
 
 # ── 1. Introduction ──────────────────────────────────────────────────────────
 H1 "1. Introduction"
-P "mu-Clid is a polyrhythmic Euclidean rhythm sequencer and sample trigger plugin by Transwarp Development Project, available as a VST3 plug-in, CLAP plug-in, and standalone application for Windows."
-P "mu-Clid lets you build up to eight simultaneous rhythm tracks. Each track is driven by up to three independent Euclidean generators (Ring A, Ring B, and Ring C). Each rhythm triggers a sample through a voice chain including pitch control, a resonant filter, amplitude envelope, and a per-voice drive insert. Eight LFO/step modulators per rhythm allow deep modulation of any voice parameter. A shared FX chain provides a modulation or time effect, a BPM-synchronised delay, and a reverb, all mixed through a full channel-strip mixer."
+P "mu-Clid is a polyrhythmic Euclidean rhythm sequencer and sample trigger plugin from Transwarp Development Project. It runs as a VST3 plug-in, a CLAP plug-in, and a standalone application."
+P "mu-Clid lets you build up to eight simultaneous rhythm tracks. Each track is driven by up to three independent Euclidean generators (Ring A, Ring B, and Ring C) and triggers a sample through a complete voice chain — pitch control, multi-mode resonant filter, amplitude envelope, and a per-voice insert effect. Each rhythm has eight LFO or step modulators that can drive any voice parameter. A shared FX chain provides a modulation effect, a tempo-synchronised delay, and a reverb, all routed through an eight-channel mixer with sidechain ducking and per-channel master inserts."
 
 H2 "Who Is This For?"
-P "mu-Clid is designed for producers and sound designers who work with rhythmic textures, polyrhythmic patterns, and generative percussion. It is equally at home in a full DAW session or as a standalone performance instrument."
+P "mu-Clid is for producers and sound designers who work with rhythmic textures, polyrhythmic patterns, and generative percussion. It is equally at home in a full DAW session — fully automatable, multi-bus capable, and synchronised to host transport — or as a standalone instrument for live performance and sketching, with optional external MIDI clock sync."
 
-# ── 2. Installation ──────────────────────────────────────────────────────────
-H1 "2. Installation"
+Pic "Full plugin window with sidebar, rhythm panel, transport bar, and status bar visible."
+
+# ── 2. What is Euclidean Sequencing? ─────────────────────────────────────────
+H1 "2. What is Euclidean Sequencing?"
+P "Euclidean rhythms come from a 2004 paper by Godfried Toussaint, who noticed that an algorithm Euclid wrote down 2,300 years ago for finding the greatest common divisor of two numbers also produces patterns that look strikingly like the rhythms of the world's traditional music."
+P "The idea is simple: given a number of steps and a smaller number of hits, distribute the hits as evenly as possible across the steps. With 16 steps and 4 hits you get a hit every fourth step — a classic four-on-the-floor pattern. With 8 steps and 3 hits the hits cannot divide evenly, so the algorithm spaces them as nearly evenly as it can: hit, rest, rest, hit, rest, rest, hit, rest. That is the Cuban tresillo."
+P "Many traditional rhythms turn out to be Euclidean. The Cuban son clave, the Brazilian bossa nova, West African bell patterns, Bulgarian folk meters, and Persian aksak rhythms can all be described by a (steps, hits) pair. This is why even random Euclidean patterns tend to feel musical — the algorithm produces the same kind of even-but-not-uniform spacing that human musicians have arrived at across centuries of tradition."
+P "mu-Clid pushes the idea further by giving each rhythm three independent Euclidean generators and combining them with logical operators — OR for layered patterns, AND for sparse coincidences, XOR for interlocking rhythms. Add to this rotation (shifting the same pattern to start on a different step), padding (forcing silence at the beginning, end, or middle of the bar), and an accent layer (Ring C), and a few simple controls give you access to a vast range of grooves."
+
+Pic "Diagram: 16 steps with 5 hits distributed evenly, illustrating Bjorklund's algorithm."
+
+# ── 3. Installation ──────────────────────────────────────────────────────────
+H1 "3. Installation"
 H2 "Plug-in Files"
-P "mu-Clid ships with three formats:"
+P "mu-Clid ships in three formats:"
 Bullet "VST3  —  copy mu-Clid.vst3 to %ProgramFiles%\Common Files\VST3\"
 Bullet "CLAP  —  copy mu-Clid.clap to %ProgramFiles%\Common Files\CLAP\"
 Bullet "Standalone  —  run mu-Clid.exe from any location"
 
 H2 "Content Folder"
-P "On first launch mu-Clid creates a content folder at:"
-P "    %USERPROFILE%\Documents\TDP\muClid\"
-P "Inside this folder there are three sub-folders:"
-Bullet "Presets\   —  full preset files (.muclid)"
-Bullet "Rhythms\   —  single-rhythm preset files (.muRhyth)"
-Bullet "Samples\   —  reference location for sample files"
-P "You can change the content folder path in the Settings overlay at any time."
+P "On first launch mu-Clid creates a content folder at %USERPROFILE%\Documents\TDP\muClid\ with three sub-folders: Presets (full preset files, .muclid), Rhythms (single-rhythm preset files, .muRhyth), and Samples (default browse location for samples). You can change the content folder path in the Settings overlay at any time."
 
 H2 "Default Presets"
 P "If a file named _default.muclid exists in your Presets folder it is loaded silently on startup. If _default.muRhyth exists in your Rhythms folder it is applied whenever you add a new rhythm. Save over either file to create a personal default."
 
-# ── 3. Interface Overview ─────────────────────────────────────────────────────
-H1 "3. Interface Overview"
+# ── 4. Interface Overview ─────────────────────────────────────────────────────
+H1 "4. Interface Overview"
 P "The mu-Clid window is divided into four regions:"
-Bullet "Transport Bar  (top, 36 px)  —  playback, BPM, presets, and global controls"
-Bullet "Rhythm Sidebar  (left, 82 px)  —  rhythm slots and add/remove controls"
-Bullet "Main Panel  (remaining area)  —  the selected rhythm or the Mixer Overlay"
-Bullet "Status Bar  (bottom, 20 px)  —  live readout of the last touched control"
-P "The default window size is 1170 x 870 pixels. It can be resized between 780 x 580 (minimum) and 2400 x 1600 (maximum). All elements scale proportionally."
+Bullet "Transport Bar (top) — playback, BPM, presets, and global controls"
+Bullet "Rhythm Sidebar (left) — one item per active rhythm, plus an Add button"
+Bullet "Main Panel (centre) — the selected rhythm, or the Mixer when toggled"
+Bullet "Status Bar (bottom) — live readout of the last touched control"
+P "The window is resizable and all elements scale proportionally."
 
-# ── 4. Transport Bar ──────────────────────────────────────────────────────────
-H1 "4. Transport Bar"
+Pic "Annotated full-window view showing the four main regions."
+
+# ── 5. Transport Bar ──────────────────────────────────────────────────────────
+H1 "5. Transport Bar"
 P "Controls from left to right:"
 Bullet "mu-CLID logo  —  click to open the About panel"
-Bullet "Play / Stop  —  in DAW mode reflects the host transport; in standalone drives the internal clock"
-Bullet "BPM display  —  read-only in DAW mode; drag or double-click to edit in standalone mode; tap the label rapidly to tap-tempo"
-Bullet "Position  —  bar and beat (e.g. 3.2). Read-only in DAW mode; resets on stop in standalone."
-Bullet "Sync pill  —  indicates whether playback is locked to the host timeline or free-running"
-Bullet "Rhythm count  —  active rhythms out of maximum (e.g. 3/8)"
-Bullet "Master Loop dropdown  —  sets how many steps the entire pattern runs before looping. Choices range from 16 steps to 512 steps, or infinity (free-running, shown as an infinity symbol)."
-Bullet "Preset dropdown  —  select a saved preset to load instantly"
-Bullet "Save button  —  opens the Save Preset dialog"
-Bullet "Mixer button  —  toggles the Mixer Overlay. Button label changes to 'Sequencer' when the mixer is active."
-Bullet "Settings (gear) icon  —  opens the Settings overlay"
+Bullet "Play / Stop  —  in DAW mode reflects the host transport; in standalone drives the internal clock. Green when stopped, red when playing."
+Bullet "BPM display  —  read-only in DAW mode; drag or click to edit in standalone mode."
+Bullet "Position  —  bar and beat readout (e.g. 3.2)."
+Bullet "Master Loop dropdown  —  how many steps the entire pattern runs before looping. Choices range from 16 steps to 512 steps, or infinity (free-running)."
+Bullet "Preset dropdown  —  shows the current preset name; click to load another."
+Bullet "Save button  —  opens the Save Preset dialog."
+Bullet "Mixer button  —  toggles the Mixer view. The label changes to Sequencer when the mixer is active."
+Bullet "Settings (gear) icon  —  opens the Settings overlay."
 
-# ── 5. Rhythm Sidebar ─────────────────────────────────────────────────────────
-H1 "5. Rhythm Sidebar"
+Pic "Transport Bar — full width view showing all controls."
+
+# ── 6. Rhythm Sidebar ─────────────────────────────────────────────────────────
+H1 "6. Rhythm Sidebar"
 P "The sidebar shows one item per active rhythm. Each item displays a miniature Rhythm Circle, the rhythm name, and its colour dot. Click an item to select it and display it in the main panel."
-P "The selected item shows a vertical accent bar in the rhythm colour on its right edge, connecting it visually to the main panel."
-P "When a rhythm fires a hit, its sidebar item pulses with the rhythm colour."
-P "The dashed Add button at the bottom of the sidebar creates a new rhythm slot (maximum 8). The button is disabled when 8 rhythms are active."
-P "To delete a rhythm, use the Delete button (X) in the Rhythm Panel header. A confirmation popup appears before the rhythm is removed."
+P "The selected item shows a vertical accent bar in the rhythm colour on its right edge, connecting it visually to the main panel. When a rhythm fires a hit, its sidebar item briefly pulses with the rhythm colour."
+P "The Add button at the bottom of the sidebar creates a new rhythm slot (maximum eight). The button is disabled when eight rhythms are active. To delete a rhythm, use the Delete button in the Rhythm Panel header — a confirmation popup appears before the rhythm is removed."
+P "Rhythms can be reordered by dragging items up or down within the sidebar. A pending hot-swap is shown by an orange SWP badge on the sidebar item; click the badge to cancel the swap."
 
-# ── 6. Rhythm Panel ───────────────────────────────────────────────────────────
-H1 "6. Rhythm Panel"
-P "The Rhythm Panel is the main editing surface for the selected rhythm, divided into five sections from top to bottom."
+Pic "Rhythm Sidebar with three rhythms loaded, one selected."
 
-H2 "Header Bar"
-P "Shows a coloured accent strip, the rhythm name (double-click to rename), and action buttons (mute, solo, delete). A colour dot on the left shows the assigned rhythm colour."
+# ── 7. Rhythm Panel ───────────────────────────────────────────────────────────
+H1 "7. Rhythm Panel"
+P "The Rhythm Panel is the main editing surface for the selected rhythm. It is divided into five sections from top to bottom: Header, Sample Bar, Rhythm Circle and Euclidean Panel, Voice Section, and Modulator Panel."
+
+H2 "Header"
+P "Shows the rhythm name (double-click to rename), Mute and Solo buttons, and a Delete button. A coloured accent strip on the left identifies the rhythm."
 
 H2 "Sample Bar"
-P "Drag a sample file onto this bar or click it to browse. Supported formats: WAV, AIFF, MP3, FLAC. Once loaded the filename is shown. A missing-sample warning appears in amber. Click the '...' icon to locate a replacement."
+P "Drag a sample file onto this bar or click it to browse. Supported formats: WAV, AIFF, MP3, FLAC. Once loaded the filename is shown. A missing-sample warning appears in amber; click the locator icon to find a replacement."
 
-H2 "Rhythm Circle and Euclidean Panel"
-P "The upper section splits width between the circular step display (left) and the Euclidean parameter panel (right). See Chapters 7 and 8."
+Pic "Rhythm Panel — full layout from header down to modulator tabs."
 
-H2 "Voice Section"
-P "A fixed-height strip with four columns: Pitch, Filter, Amp, and Insert. See Chapter 9."
-
-H2 "Modulator Panel"
-P "Fills the remaining height. Contains tabs for up to eight modulators and a Matrix tab. See Chapter 10."
-
-# ── 7. Rhythm Circle ──────────────────────────────────────────────────────────
-H1 "7. Rhythm Circle"
-P "The Rhythm Circle shows concentric rings, one per generator or modulator. Rings are drawn outside-in in this order:"
-Bullet "Ring A (outermost)  —  purple. Primary Euclidean generator."
-Bullet "Ring B  —  coral. Secondary Euclidean generator."
-Bullet "Ring C  —  amber dashed outline. Accent layer."
-Bullet "Modulator rings  —  colour-coded by assignment."
+# ── 8. Rhythm Circle ──────────────────────────────────────────────────────────
+H1 "8. Rhythm Circle"
+P "The Rhythm Circle shows concentric rings, one per generator. Rings are drawn outside-in:"
+Bullet "Ring A (outermost) — purple. Primary Euclidean generator."
+Bullet "Ring B — coral. Secondary Euclidean generator."
+Bullet "Ring C — amber dashed outline. Accent layer."
 P "During playback the rings rotate so the current step is always at the 12 o'clock position. Step 1 is at the top when the transport is at bar 1, beat 1."
 
 H2 "Step Colours"
-Bullet "Filled in ring colour  —  a hit step"
-Bullet "Dim outline  —  an empty step"
-Bullet "Cyan-teal fill  —  a pre-padded step (forced silence before the pattern)"
-Bullet "Teal fill  —  a post-padded step (forced silence after the pattern)"
-Bullet "Pink fill  —  an insert-padded step (silence within the pattern)"
+Bullet "Filled in ring colour — a hit step"
+Bullet "Dim outline — an empty step"
+Bullet "Cyan-teal fill — a pre-padded step (forced silence before the pattern)"
+Bullet "Teal fill — a post-padded step (forced silence after the pattern)"
+Bullet "Pink fill — an insert-padded step (silence within the pattern)"
 P "On each hit a radial pulse expands from the step arc position and the centre hub briefly flashes in the rhythm colour."
 
-# ── 8. Euclidean Panel ────────────────────────────────────────────────────────
-H1 "8. Euclidean Panel"
-P "The Euclidean Panel sits to the right of the Rhythm Circle with three rows of knobs (A, B, C) and a Logic bar between A and B."
+Pic "Rhythm Circle showing all three rings with a mix of hit, empty, and padded steps."
+
+# ── 9. Euclidean Panel ────────────────────────────────────────────────────────
+H1 "9. Euclidean Panel"
+P "The Euclidean Panel sits to the right of the Rhythm Circle. It has three rows of knobs (A, B, C) and a Logic bar between rows A and B."
 
 H2 "Euclid A and Euclid B"
 P "Both rows share identical controls:"
-Bullet "Steps (1-64)  —  total number of steps including all padding"
-Bullet "Hits (0-Steps)  —  hits distributed using the Euclidean (Bjorklund) algorithm"
-Bullet "Rotate  —  shifts the pattern left or right"
-Bullet "Pre Pad (0-12)  —  empty steps forced before the pattern"
-Bullet "Post Pad (0-12)  —  empty steps forced after the pattern"
-Bullet "Insert Start  —  start position of the insert zone within the pattern"
-Bullet "Insert Length (0-8)  —  number of steps in the insert zone"
-Bullet "Insert Mode  —  Pad (steps excluded from hit distribution) or Mute (hits distributed but silenced)"
-P "Ranges update dynamically: when Steps changes, the Hits, Rotate, and Insert Start ranges clamp to match."
+Bullet "Steps (1 to 64) — total number of steps including all padding"
+Bullet "Hits (0 to Steps) — hits distributed using Bjorklund's algorithm"
+Bullet "Rotate — shifts the pattern left or right"
+Bullet "Pre Pad (0 to 12) — empty steps forced at the start of the pattern"
+Bullet "Post Pad (0 to 12) — empty steps forced at the end of the pattern"
+Bullet "Insert Start — start position of the insert zone within the pattern"
+Bullet "Insert Length (0 to 8) — number of steps in the insert zone"
+Bullet "Insert Mode — Pad (steps excluded from hit distribution) or Mute (hits distributed but silenced in the insert zone)"
+P "Ranges update dynamically: when Steps changes, Hits, Rotate, and Insert Start clamp to fit."
 
 H2 "Logic Bar"
 P "Five-pill selector between rows A and B. Sets how the two patterns combine:"
-Bullet "OR  —  fires if either A or B fires"
-Bullet "AND  —  fires only when both A and B fire simultaneously"
-Bullet "XOR  —  fires when exactly one of A or B fires"
-Bullet "A Only  —  only A fires; B is ignored"
-Bullet "B Only  —  only B fires; A is ignored"
+Bullet "OR — fires if either A or B fires"
+Bullet "AND — fires only when both A and B fire on the same step"
+Bullet "XOR — fires when exactly one of A or B fires"
+Bullet "A Only — only A fires; B is ignored"
+Bullet "B Only — only B fires; A is ignored"
 
 H2 "Euclid C — Accent Layer"
-P "Three knobs: Steps, Hits, Rotate. No logic relationship with A or B. When Ring C fires a hit on the same step as a combined A+B hit, that step is accented. The accent gain boost (in dB) is set by the Accent knob in the Amp column of the Voice Section."
+P "Three knobs: Steps, Hits, Rotate. C has no logic relationship with A or B. When Ring C fires a hit on the same step as a combined A+B hit, that step is accented. The accent gain (in dB) is set by the Accent knob in the Amp column of the Voice Section."
 
-# ── 9. Voice Section ──────────────────────────────────────────────────────────
-H1 "9. Voice Section"
-P "A fixed-height strip below the Rhythm Circle with four columns: Pitch, Filter, Amp, and Insert. Each column has a configuration row (top) and an envelope row (bottom)."
+Pic "Euclidean Panel with all three rows visible and the Logic bar set to OR."
+
+# ── 10. Voice Section ─────────────────────────────────────────────────────────
+H1 "10. Voice Section"
+P "The Voice Section is a strip below the Rhythm Circle with four columns: Pitch, Filter, Amp, and Insert. Each column has a configuration row at the top and an envelope row below."
 
 H2 "Pitch (purple)"
-P "Config row: Octave (-4 to +4), Semitone (-12 to +12), Fine (-100 to +100 cents)."
-P "Envelope row: Attack, Decay, Sustain, Release, and Depth (0-24 semitones). The envelope sweeps the pitch upward from the base pitch by the Depth amount."
+P "Configuration: Octave (-4 to +4), Semitone (-12 to +12), Fine (-100 to +100 cents)."
+P "Envelope: Attack, Decay, Sustain, Release, and Depth (up to 24 semitones). The envelope adds to the base pitch by the Depth amount."
 
 H2 "Filter (teal)"
-P "Config row: Type (Low Pass / High Pass / Band Pass), Cutoff (20 Hz to 20 kHz), Resonance (0-0.99)."
-P "Envelope row: Attack, Decay, Sustain, Release, and Depth (0-48 semitones of cutoff sweep)."
+P "Configuration: Type, Cutoff (20 Hz to 20 kHz), Resonance (0 to 0.99)."
+P "Available filter types:"
+Bullet "LP 6 / LP 12 / LP 24 — low-pass at 6, 12, or 24 dB per octave"
+Bullet "HP 6 / HP 12 / HP 24 — high-pass at 6, 12, or 24 dB per octave"
+Bullet "BP 12 / BP 24 — band-pass at 12 or 24 dB per octave"
+Bullet "Notch / Notch 24 — band-rejection (the 24 dB version is sharper)"
+Bullet "AP 12 — second-order all-pass (phase shift, no level change)"
+Bullet "Comb — feedback comb with resonant peaks at multiples of cutoff"
+Bullet "Peak / Lo Shf / Hi Shf — parametric EQ-style boosts (+12 dB)"
+P "Envelope: Attack, Decay, Sustain, Release, and Depth (up to 48 semitones of cutoff sweep)."
 
 H2 "Amp (amber)"
-P "Config row: Level (0-2 linear), Accent (0 to +12 dB extra gain on accented steps), and send knobs (Effect, Delay, Reverb)."
-P "Envelope row: Attack, Decay, Sustain, Release. Shapes the output volume of every hit."
+P "Configuration: Level (0 to 2 linear), Accent (0 to +12 dB extra gain on accented steps), and three FX send knobs (Effect, Delay, Reverb)."
+P "Envelope: Attack, Decay, Sustain, Release. Shapes the output volume of every hit."
 
 H2 "Insert (pink)"
-P "A per-voice character insert placed after the filter and before the amp envelope."
-P "Character dropdown:"
-Bullet "None  —  bypass with no CPU cost"
-Bullet "Soft  —  tanh waveshaping (warm saturation)"
-Bullet "Hard  —  hard clipping (aggressive distortion)"
-Bullet "Fold  —  triangular foldback (metallic harmonics)"
-Bullet "Bitcrusher  —  sample-rate and bit-depth reduction"
-P "Additional controls: Drive (0-100%), Output (-24 to 0 dB level trim), LPF (one-pole low-pass on driven signal)."
-P "In Bitcrusher mode the second knob shows Bits (1-16 bit depth) and the third shows Rate (100 Hz to 48 kHz target sample rate)."
-P "Setting Drive to 0% passes audio through unchanged regardless of Character."
+P "A per-voice character insert placed after the filter and before the amp envelope. Available algorithms (alphabetical in the dropdown after None):"
+Bullet "None — bypass with no CPU cost"
+Bullet "3-Band EQ — low shelf, mid peak, high shelf"
+Bullet "Bitcrusher — sample-rate and bit-depth reduction with anti-aliasing and dither"
+Bullet "Clipper — soft or hard clipping at adjustable threshold"
+Bullet "Compressor — feed-forward dynamics (4:1 ratio)"
+Bullet "Fold — triangular foldback (metallic harmonics)"
+Bullet "Hard Clip — hard clipping (aggressive distortion)"
+Bullet "Limiter — brick-wall limiting (100:1 ratio)"
+Bullet "Ring Mod — sine-wave ring modulation"
+Bullet "Soft Clip — tanh waveshaping (warm saturation)"
+Bullet "Tape Sat — tanh saturation with DC block and tone shaping"
+P "Three controls (Drive, Output, Tone) re-label themselves to match the algorithm — for example in Bitcrusher mode they become Drive, Bits, and Rate."
 
 H2 "Knob Interaction"
-P "Drag up to increase, drag down to decrease. Double-click to type an exact value. Hover over any knob to see its name and value in the Status Bar."
+P "Drag up to increase, drag down to decrease. Double-click to type an exact value. Hover over any knob to see its name and current value in the Status Bar. A cyan ring around a knob indicates it is being modulated; an animated arc shows the live modulated value."
 
-# ── 10. Modulator Panel ───────────────────────────────────────────────────────
-H1 "10. Modulator Panel"
-P "The Modulator Panel fills the lower portion of the Rhythm Panel. Each rhythm has eight independent modulators (Mod A through Mod H) and a Matrix tab."
+Pic "Voice Section showing all four columns with envelope rows visible."
+
+# ── 11. Modulator Panel ───────────────────────────────────────────────────────
+H1 "11. Modulator Panel"
+P "The Modulator Panel fills the lower portion of the Rhythm Panel. Each rhythm has eight independent modulators (Mod A through Mod H) plus a Matrix tab."
 
 H2 "Modulator Tabs"
 P "Each modulator has:"
-Bullet "Smooth / Stepped mode toggle"
-Bullet "Loop Length — note value and multiplier (e.g. 1/4 x 4 = one bar)"
-Bullet "Curve editor (smooth) or bar graph (stepped)"
-Bullet "A scrolling playhead line showing current loop position"
-Bullet "Target list — one row per assignment with a destination dropdown and bipolar depth bar"
+Bullet "Mode toggle: Smooth (continuous LFO curve) or Stepped (bar graph)"
+Bullet "Polarity toggle: Unipolar (0 to +1) or Bipolar (-1 to +1)"
+Bullet "Loop length: a note-value dropdown plus an integer multiplier (e.g. 1/4 x 4 = one bar)"
+Bullet "Curve editor (smooth) or step editor (stepped)"
+Bullet "A scrolling playhead line showing the current loop position"
+Bullet "A target list with one row per assignment — each row has a destination dropdown and a bipolar depth bar"
 Bullet "Add Destination button"
-P "In smooth mode: click on the curve to add nodes, drag to move, right-click to remove, ALT-click a segment to add a bezier handle."
-P "In stepped mode: drag bars up or down. Step Length sets the duration of each bar."
+P "In Smooth mode: click on the curve to add a node, drag to move, right-click to remove, ALT-click a segment to add a bezier handle. In Stepped mode: drag bars up or down. Step Length sets the duration of each bar."
 
 H2 "Matrix Tab"
-P "Shows all active modulation assignments for the current rhythm. Each row shows the source modulator, the destination parameter, and a bipolar depth bar. Remove or add assignments here."
-P "Modulation targets are per-rhythm only. Global FX parameters cannot be modulated."
+P "Lists every active modulation assignment for the current rhythm. Each row shows the source modulator, the destination parameter (grouped by Voice section), and a bipolar depth bar. Add or remove assignments here for an overview view."
+P "Modulation targets are per-rhythm only — a modulator in one rhythm cannot affect another rhythm. Global FX parameters cannot be modulated."
 
-# ── 11. Mixer ─────────────────────────────────────────────────────────────────
-H1 "11. Mixer"
-P "Click the Mixer button in the Transport Bar to open the Mixer Overlay. The sidebar remains visible."
+Pic "Modulator Panel with the Smooth-mode curve editor visible and three destination targets assigned."
+
+# ── 12. Mixer ─────────────────────────────────────────────────────────────────
+H1 "12. Mixer"
+P "Click the Mixer button in the Transport Bar to open the Mixer view. The sidebar remains visible."
 
 H2 "Channel Strips"
-P "The mixer always shows 8 rhythm channels, even if fewer rhythms are active. Inactive channels are dimmed. Channel order left to right:"
-Bullet "Rhythm 1-8"
-Bullet "Divider"
+P "The mixer always shows eight rhythm channels, even when fewer rhythms are active — inactive channels are dimmed. Channel order from left to right:"
+Bullet "Rhythm 1 to Rhythm 8"
 Bullet "Effect Return, Delay Return, Reverb Return"
-Bullet "Divider"
-Bullet "Master (slightly wider)"
-P "Each strip contains (top to bottom): 3 px colour bar, channel name, send rotaries, pan knob, vertical fader + VU meter, level readout, Mute and Solo buttons."
+Bullet "Master (slightly wider, with a Master Insert panel attached)"
+P "Each rhythm strip contains, from top to bottom: a coloured header, the channel name, a sidechain section (source dropdown, Amount, Attack, Release), three FX send rotaries (Effect, Delay, Reverb), an output bus selector, a pan knob, a vertical fader with VU meter and gain-reduction meter, a level readout, and Mute and Solo buttons."
+
+H2 "Sidechain Ducking"
+P "Each rhythm channel can duck from any other channel. The source dropdown selects the trigger channel, Amount sets the depth (0 to 100 percent), and Attack and Release shape the envelope follower. When a channel is being ducked, a downward-filling gain-reduction meter appears next to its main VU meter."
 
 H2 "FX Send Behaviour"
-P "For Effect and Delay sends on rhythm channels:"
-Bullet "0-50%: dry stays at 100%; wet blends from 0 to 100%"
-Bullet "50-100%: wet stays at 100%; dry fades from 100% to 0%"
-P "Reverb is always a pure send: increasing the Reverb send does not reduce the dry signal."
+P "Effect and Delay sends on rhythm channels use a parallel-blend curve: at 0 to 50 percent the dry signal stays at 100 percent and the wet rises from 0 to 100 percent; at 50 to 100 percent the wet stays at 100 percent and the dry fades from 100 to 0 percent. Reverb is always a pure send — increasing the Reverb send does not reduce the dry signal."
+
+H2 "Master Insert"
+P "A compact insert panel attached to the Master strip provides the same eleven algorithms available on the per-rhythm voice insert (None, Soft Clip, Hard Clip, Fold, Bitcrusher, Clipper, 3-Band EQ, Compressor, Limiter, Ring Mod, Tape Sat). The Master Insert is placed post-master-fader and runs once on the summed output."
 
 H2 "FX Rows"
-P "Three bordered panels below the channel strips for Effect, Delay, and Reverb. Each has an on/off toggle, an algorithm dropdown, and parameter knobs."
+P "Three bordered panels below the channel strips for Effect, Delay, and Reverb. Each has an on/off toggle, an algorithm dropdown, and parameter knobs. See Chapter 13."
 
-# ── 12. Effects ───────────────────────────────────────────────────────────────
-H1 "12. Effects"
+H2 "Multi-Bus Output (DAW)"
+P "When running as a VST3 or CLAP plugin, mu-Clid exposes up to ten stereo output buses: Master, eight Direct Outs, and FX Returns. Each rhythm channel has an output bus selector — channels routed to a Direct Out bypass the master mix and FX sends, going straight to their bus post-fader. The multi-bus feature can be toggled in the Settings overlay; turning it off forces the host to a single stereo bus on next reload."
+
+Pic "Mixer view with all eight rhythm channels, three FX returns, and the master strip visible."
+
+# ── 13. Effects ───────────────────────────────────────────────────────────────
+H1 "13. Effects"
+
 H2 "Effect Slot"
 P "Hosts one of four algorithms:"
-Bullet "Chorus  —  Rate, Depth, Voices (2-4), Spread, Mix"
-Bullet "Flanger  —  Rate, Depth, Feedback (bipolar), Mix"
-Bullet "Phaser  —  Rate, Depth, Stages (up to 12), Feedback, Mix"
-Bullet "Echo  —  Time, Feedback, Spread, Mix  (no BPM sync; use Delay for sync)"
+Bullet "Chorus — Rate, Depth, Voices (2 to 4), Spread, Mix. Catmull-Rom Hermite-interpolated multi-voice chorus with per-voice rate detuning."
+Bullet "Flanger — Rate, Depth, Feedback (bipolar), Mix. Through-zero flanger so the sweep can pass through unity."
+Bullet "Phaser — Rate, Depth, Stages (up to 12), Feedback, Mix. Notches sweep logarithmically from 200 Hz to 4 kHz."
+Bullet "Echo — Time, Feedback, Spread, Mix. Free-time delay (use the Delay slot for tempo sync)."
 
 H2 "Delay Slot"
 P "Tempo-synchronised stereo delay:"
-Bullet "Time  —  note value selector or milliseconds (free mode)"
-Bullet "Feedback  —  number of repeats"
-Bullet "Spread  —  slightly longer right channel delay for stereo widening"
-Bullet "Dirt  —  soft saturation on the feedback path for tape-degraded character"
+Bullet "Time — note value selector (1/32 through 1/4) with Straight, Dotted, or Triplet modifier; or free-mode in milliseconds"
+Bullet "Feedback — number of repeats"
+Bullet "Spread — slightly different left and right channel times for stereo widening"
+Bullet "Dirt — soft saturation on the feedback path for tape-degraded character"
+P "Hermite cubic interpolation on the read pointer prevents zipper noise when the delay time changes (BPM nudges, LFO automation)."
 
 H2 "Reverb Slot"
-P "Algorithmic reverb with four characters: Room, Hall, Plate, Spring. Controls: Size, Pre-delay, Diffusion, Damp, Mod, Dirt. Reverb is always a pure send effect — there is no Mix knob."
+P "A Hadamard FDN reverb (Signalsmith-DSP) with four characters:"
+Bullet "Room — short, intimate"
+Bullet "Hall — long, diffuse"
+Bullet "Plate — bright, dense"
+Bullet "Spring — bouncy, modulated"
+P "Controls: Size, Pre-delay, Diffusion, Damp, Mod, Dirt. Reverb is always a pure send — there is no Mix knob."
 
-# ── 13. Presets ───────────────────────────────────────────────────────────────
-H1 "13. Presets"
+Pic "Effect, Delay, and Reverb FX rows side by side in the Mixer view."
+
+# ── 14. Presets ───────────────────────────────────────────────────────────────
+H1 "14. Presets"
+
 H2 "Saving a Preset"
-P "Click Save in the Transport Bar to open the save dialog. Enter a name, optional description, and category. Tick 'Embed samples' to include all loaded sample audio as base64 data inside the preset file, making it fully self-contained. Click Save to write a .muclid file to your Presets folder."
+P "Click Save in the Transport Bar to open the save dialog. Enter a name, optional description, and category. Tick Embed Samples to include all loaded sample audio as base64 data inside the preset file, making it fully self-contained. Click Save to write a .muclid file to your Presets folder."
 
 H2 "Loading a Preset"
-P "Select a preset from the dropdown in the Transport Bar. All rhythms, voice parameters, and sample references are restored immediately. If a sample cannot be found at its original path, mu-Clid searches the Samples folder in your content directory as a fallback."
+P "Select a preset from the dropdown in the Transport Bar. All rhythms, voice parameters, and sample references are restored immediately. If a sample cannot be found at its original path, mu-Clid searches the Samples folder in your content directory as a fallback. The preset dropdown shows <unnamed preset> when no preset is currently loaded."
 
-H2 "Preset File Format"
-P ".muclid files are XML files containing a MuClidPreset root element with one Rhythm child element per active rhythm. Each Rhythm element stores all voice parameters, Euclidean settings, name, colour index, and sample path. Samples embedded at save time are stored as base64 within their Rhythm element."
+H2 "Hot-swap During Playback"
+P "Loading a single-rhythm .muRhyth file while playback is running stages the swap until the next loop boundary, so the change happens in time. The Settings overlay lets you choose between On Master Loop and On Rhythm Loop timing. A pending swap is shown by an orange SWP badge on the affected rhythm in the sidebar — click the badge to cancel."
 
 H2 "Rhythm Presets"
-P ".muRhyth files are single-rhythm presets stored in the Rhythms folder. They follow the same internal structure as a single rhythm within a .muclid file. Save a rhythm preset to reuse a particular pattern and voice combination across multiple full presets."
+P ".muRhyth files are single-rhythm presets stored in the Rhythms folder. They can be saved with embedded samples and loaded into any rhythm slot. Save a rhythm preset to reuse a particular pattern and voice combination across multiple full presets."
 
-# ── 14. Settings ──────────────────────────────────────────────────────────────
-H1 "14. Settings"
-P "Click the gear icon in the Transport Bar to open the Settings overlay. Sections:"
-Bullet "Visual  —  hit pulse style, ring expansion size, sidebar and centre hub pulse, step dot size"
-Bullet "Sequencer  —  host sync behaviour, display of milliseconds alongside musical divisions"
-Bullet "Performance  —  interpolation quality (Lo-fi / Linear / Clean), oversampling quality"
-Bullet "Voice  —  overlap fade length for voice transitions (1-10 ms, default 2 ms)"
-Bullet "Gain  —  default fader level and default master volume"
-Bullet "Presets  —  default preset path, restore factory presets, change content folder"
-Bullet "Standalone  —  audio device selection"
+H2 "Preset File Format"
+P ".muclid and .muRhyth files are XML, with a MuClidPreset (or single Rhythm) root element. They can be inspected and edited with any text editor. Embedded sample audio is stored as base64 within the relevant Rhythm element."
 
-# ── 15. Tips ──────────────────────────────────────────────────────────────────
-H1 "15. Tips and Workflow"
-Bullet "Polyrhythm: Set Ring A to 16 steps / 4 hits and Ring B to 12 steps / 3 hits with Logic set to OR for a 16-against-12 polyrhythm that locks every 48 steps."
-Bullet "Accents with Ring C: Give Ring C a different step count to A/B and set a few hits. The Accent knob in the Amp column adds a dB boost whenever Ring C coincides with an A+B hit."
-Bullet "Groove with Pre Pad: Use Pre Pad on Ring A to push the whole pattern slightly later in the bar, similar to adding swing."
-Bullet "Self-contained sharing: Tick 'Embed samples' when saving a preset to share with collaborators who may not have your sample library."
-Bullet "Status Bar: Hover over any knob to see its name and current value without clicking. The Status Bar never clears automatically."
-Bullet "Default content: Save a preset as _default.muclid to have it load automatically every session."
+# ── 15. MIDI ──────────────────────────────────────────────────────────────────
+H1 "15. MIDI Integration"
 
-# ── 16. Technical Specifications ──────────────────────────────────────────────
-H1 "16. Technical Specifications"
+H2 "MIDI Clock Sync (Standalone)"
+P "When running as a standalone application, mu-Clid can lock to an external MIDI clock source. Open Settings and set Clock Source to MIDI In, choose which messages to honour (Clock only, Start/Stop/Continue, or Both), and select the MIDI input device. With external sync active the BPM display becomes read-only and shows the estimated tempo derived from incoming clock ticks."
+
+H2 "MIDI Program Change to Preset (DAW)"
+P "When running as a VST3 or CLAP plugin, incoming program change messages on MIDI channels 1 to 8 can load .muRhyth presets into rhythm slots 1 to 8 (channel N maps to slot N). The preset list is configured in the MIDI Presets panel — accessed from Settings — and stored as a JSON file alongside the plugin state. Hot-swap timing follows the swap-mode setting."
+
+# ── 16. Settings ──────────────────────────────────────────────────────────────
+H1 "16. Settings"
+P "Click the gear icon in the Transport Bar to open the Settings overlay. Sections include:"
+Bullet "Visual — hit pulse style, ring expansion size, sidebar and centre hub pulse, step dot size"
+Bullet "Sequencer — host sync behaviour, hot-swap timing"
+Bullet "Performance — interpolation quality (Lo-fi / Linear / Clean), oversampling quality"
+Bullet "Voice — overlap fade length for voice transitions"
+Bullet "Gain — default channel and master fader levels"
+Bullet "Presets — content folder location, default preset"
+Bullet "MIDI — clock source and message filtering (standalone), MIDI Presets panel (DAW)"
+Bullet "Multi-bus — enable or disable multi-bus output (DAW); host rescan required after toggling"
+Bullet "Standalone — audio device selection"
+
+Pic "Settings overlay open over the main window."
+
+# ── 17. Tips and Workflow ─────────────────────────────────────────────────────
+H1 "17. Tips and Workflow"
+Bullet "Polyrhythm: Set Ring A to 16 steps / 4 hits and Ring B to 12 steps / 3 hits with Logic set to OR — a 16-against-12 polyrhythm that locks every 48 steps."
+Bullet "Accents with Ring C: Give Ring C a different step count to A and B and set a few hits. The Accent knob in the Amp column adds a dB boost whenever Ring C coincides with an A+B hit."
+Bullet "Groove via Pre Pad: Use Pre Pad on Ring A to push the whole pattern slightly later in the bar, similar to adding swing."
+Bullet "Sidechain pumping: Set rhythm 2's sidechain source to rhythm 1, dial Amount to 60-80%, and use a fast attack with a slow release for classic kick-ducks-bass."
+Bullet "Self-contained sharing: Tick Embed Samples when saving to share a preset with collaborators who may not have your sample library."
+Bullet "Default content: Save a preset as _default.muclid to have it load every session. Save a rhythm as _default.muRhyth to use it as the template for every new rhythm slot."
+Bullet "Status Bar: Hover over any knob to see its name and current value without clicking — the Status Bar never clears automatically."
+Bullet "DAW automation: Every per-rhythm parameter is exposed to the host with human-readable names. Recorded automation moves the on-screen knobs in real time."
+
+# ── 18. Technical Specifications ──────────────────────────────────────────────
+H1 "18. Technical Specifications"
 Bullet "Formats: VST3, CLAP, Standalone (Windows)"
 Bullet "Rhythms: up to 8 simultaneous slots"
-Bullet "Steps per generator: 1-64"
+Bullet "Steps per generator: 1 to 64"
 Bullet "Voices per rhythm: 4-voice polyphonic pool with round-robin steal"
+Bullet "Filter types: 15 (LP / HP / BP at 6, 12, and 24 dB per octave; Notch 12/24; AP 12; Comb; Peak; Lo Shelf; Hi Shelf)"
+Bullet "Insert effects: 11 (Soft Clip, Hard Clip, Fold, Bitcrusher, Clipper, 3-Band EQ, Compressor, Limiter, Ring Mod, Tape Sat, plus None)"
 Bullet "Modulators per rhythm: 8 (smooth LFO or stepped)"
 Bullet "Modulation assignments: up to 64 per rhythm"
+Bullet "Output buses (DAW): up to 10 stereo (Master + 8 Direct Outs + FX Returns)"
 Bullet "Supported sample formats: WAV, AIFF, MP3, FLAC"
 Bullet "Preset format: .muclid (XML)"
 Bullet "Rhythm preset format: .muRhyth (XML)"
-Bullet "Third-party libraries: JUCE, SoundTouch (LGPL, DLL), Signalsmith Reverb (MIT)"
+Bullet "Third-party libraries: JUCE, Signalsmith Reverb (MIT), Monocypher (BSD-2-Clause), clap-juce-extensions (MIT)"
 
 # ── Save ──────────────────────────────────────────────────────────────────────
 $outPath = "d:\Dev\mu-clid\docs\mu-Clid User Manual.docx"

@@ -197,11 +197,9 @@ void RhythmCircle::paint(juce::Graphics& g)
     const float ringW   = juce::jmax(4.0f, maxR * 0.16f);
     const float ringGap = juce::jmax(2.0f, maxR * 0.05f);
 
-    // Per-ring current steps (combine step modulo each ring's own length).
+    // Per-ring current step is derived from pattern size below to avoid a race
+    // between the pattern update and the stepsA/stepsB atomics.
     const int combinedStep = playState ? playState->currentStep.get() : 0;
-    const int sA = playState ? juce::jmax(1, playState->stepsA.get()) : 1;
-    const int sB = playState ? juce::jmax(1, playState->stepsB.get()) : 1;
-    // Ring C always passes -1 for currentStep (never highlighted), so sC not needed here.
 
     // ── Ring A — purple ──────────────────────────────────────────────────────
     const float aOuter = maxR;

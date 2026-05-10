@@ -122,9 +122,6 @@ Until Stage 10, panels mutate `Rhythm` data directly (e.g. `rhythm->genA.steps =
 ### RhythmCircle sizing
 All ring radii are computed proportionally from `min(width, height) / 2 - margin`. Ring A outer = maxR, width = `maxR * 0.20`. Ring B starts at `ring_A_inner - gap`. Same for ring C (dashed). This makes the circle look correct at both the large (200px) panel size and the small (sidebar ~50px) size.
 
-### juce::Font deprecation warnings
-All `juce::Font(float)` constructor calls produce C4996 warnings in this JUCE version. These are acceptable deprecation-only warnings — do not fix them during feature stages. Defer to Stage 11 polish (`FontOptions`-based constructor is the replacement).
-
 ## Third-party libraries
 
 | Library | Purpose | Notes |

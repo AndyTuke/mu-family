@@ -203,7 +203,7 @@ void MuClidLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& butt
 
 void MuClidLookAndFeel::drawComboBox(juce::Graphics& g, int w, int h, bool /*isDown*/,
                                       int /*bx*/, int /*by*/, int /*bw*/, int /*bh*/,
-                                      juce::ComboBox& box)
+                                      juce::ComboBox& /*box*/)
 {
     auto bounds = juce::Rectangle<float>(0, 0, (float)w, (float)h).reduced(0.5f);
     g.setColour(colour(segmentInactiveBg));
