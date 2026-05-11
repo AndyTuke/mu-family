@@ -1,4 +1,22 @@
 #include "ModMatrixPanel.h"
+#include <thread>
+
+// #236: spin-lock helpers around any ModulationMatrix mutation. Mirrors the pattern
+// used by ModulatorEditor::lockMod/unlockMod — without this, addAssignment /
+// removeAssignment / setDepth race with the audio thread iterating the
+// assignments vector inside ModulationMatrix::process().
+namespace
+{
+    inline void lockMods(Rhythm& r)
+    {
+        while (r.modLock.exchange(true, std::memory_order_acquire))
+            std::this_thread::yield();
+    }
+    inline void unlockMods(Rhythm& r) noexcept
+    {
+        r.modLock.store(false, std::memory_order_release);
+    }
+}
 
 //==============================================================================
 ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex, int driveChar)
@@ -67,7 +85,9 @@ ModMatrixPanel::ModMatrixPanel()
             a.sourceId      = "cs" + std::to_string(csIdx) + "_output";
             a.destinationId = ModDest::ids[0].toStdString();
             a.depth         = 0.0f;
+            lockMods(*rhythm);
             rhythm->modulationMatrix.addAssignment(a);
+            unlockMods(*rhythm);
             rebuildRows();
             resized();
             repaint();
@@ -123,13 +143,16 @@ void ModMatrixPanel::rebuildRows()
 
         row->onRemove = [this, rowId]
         {
+            lockMods(*rhythm);
             rhythm->modulationMatrix.removeAssignment(rowId);
+            unlockMods(*rhythm);
             rebuildRows(); resized(); repaint();
             if (onChange) onChange();
         };
         row->onDestChange = [this, rowId, sourceId](const std::string& dest)
         {
             float d = 0.0f;
+            lockMods(*rhythm);
             for (const auto& a2 : rhythm->modulationMatrix.getAssignments())
                 if (a2.id == rowId) { d = a2.depth; break; }
             rhythm->modulationMatrix.removeAssignment(rowId);
@@ -139,12 +162,15 @@ void ModMatrixPanel::rebuildRows()
             na.destinationId = dest;
             na.depth         = d;
             rhythm->modulationMatrix.addAssignment(na);
+            unlockMods(*rhythm);
             rebuildRows(); resized(); repaint();
             if (onChange) onChange();
         };
         row->onDepthChange = [this, rowId](float d)
         {
+            lockMods(*rhythm);
             rhythm->modulationMatrix.setDepth(rowId, d);
+            unlockMods(*rhythm);
             if (onChange) onChange();
         };
 

@@ -1237,35 +1237,42 @@ bool PluginProcessor::swapRhythms(int i, int j)
     const int n = numActiveRhythms.load(std::memory_order_acquire);
     if (i < 0 || j < 0 || i >= n || j >= n || i == j) return false;
 
+    // #235: suspendProcessing only sets a flag — it does NOT block the in-flight
+    // processBlock callback (see PluginProcessor.h:266). Take rhythmsLock to
+    // serialise with the audio thread, the same way removeRhythm and
+    // handleAsyncUpdate do. The audio thread's ScopedTryLock in processBlock will
+    // bail (silent block) while we hold the lock — clean atomic swap.
     suspendProcessing(true);
-
-    sequencer.swapRhythmSlots(i, j);
-    std::swap(voiceEngines[i], voiceEngines[j]);
-    std::swap(midiEngines[i],  midiEngines[j]);
-    resetPlayState(i);
-    resetPlayState(j);
-
-    juce::String tmp = loadedSamplePaths[i];
-    loadedSamplePaths.set(i, loadedSamplePaths[j]);
-    loadedSamplePaths.set(j, tmp);
-
-    // Re-translate sidechain source indices BEFORE the channel swap, so any
-    // channel referring to the swapped slots keeps pointing at the same logical
-    // rhythm after the swap.
-    for (int c = 0; c < n; ++c)
     {
-        auto& src = mixerEngine.channels[c].sidechainSource;
-        if      (src == i) src = j;
-        else if (src == j) src = i;
+        const juce::ScopedLock sl(rhythmsLock);
+
+        sequencer.swapRhythmSlots(i, j);
+        std::swap(voiceEngines[i], voiceEngines[j]);
+        std::swap(midiEngines[i],  midiEngines[j]);
+        resetPlayState(i);
+        resetPlayState(j);
+
+        juce::String tmp = loadedSamplePaths[i];
+        loadedSamplePaths.set(i, loadedSamplePaths[j]);
+        loadedSamplePaths.set(j, tmp);
+
+        // Re-translate sidechain source indices BEFORE the channel swap, so any
+        // channel referring to the swapped slots keeps pointing at the same logical
+        // rhythm after the swap.
+        for (int c = 0; c < n; ++c)
+        {
+            auto& src = mixerEngine.channels[c].sidechainSource;
+            if      (src == i) src = j;
+            else if (src == j) src = i;
+        }
+
+        std::swap(mixerEngine.channels[i], mixerEngine.channels[j]);
+
+        // Reset envelope follower state on both moved slots so the previous tenant's
+        // ducking envelope doesn't bleed into the freshly arrived rhythm.
+        mixerEngine.resetSidechainEnv(i);
+        mixerEngine.resetSidechainEnv(j);
     }
-
-    std::swap(mixerEngine.channels[i], mixerEngine.channels[j]);
-
-    // Reset envelope follower state on both moved slots so the previous tenant's
-    // ducking envelope doesn't bleed into the freshly arrived rhythm.
-    mixerEngine.resetSidechainEnv(i);
-    mixerEngine.resetSidechainEnv(j);
-
     suspendProcessing(false);
 
     swapAPVTSForRhythms(i, j);

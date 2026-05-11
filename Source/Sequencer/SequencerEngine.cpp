@@ -149,7 +149,11 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
 
     BlockResult result;
 
-    const auto globalStep    = static_cast<int>(beatPosition / StepLengthBeats);
+    // #233: clamp negative beat positions to zero. Hosts can emit negative ppq
+    // during pre-roll or REW-past-zero; without this, `globalStep` is negative,
+    // `effectiveStep` stays negative even after the modulo (signed-int %), and
+    // `pattern[stepIndex]` then indexes OOB → undefined behaviour.
+    const auto globalStep    = std::max(0, static_cast<int>(beatPosition / StepLengthBeats));
     const int  effectiveStep = (masterLoopSteps > 0) ? (globalStep % masterLoopSteps) : globalStep;
     masterLoopCurrentStep.store(masterLoopSteps > 0 ? effectiveStep : 0, std::memory_order_relaxed);
 
@@ -190,30 +194,57 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
         const auto& pattern = safePatterns[r];
         if (pattern.empty()) continue;
 
-        const int patLen  = static_cast<int>(pattern.size());
-        int stepIndex     = effectiveStep % patLen;
+        const int patLen    = static_cast<int>(pattern.size());
+        const int stepIndex = effectiveStep % patLen;
+        const int prevStep  = lastStepIndex[r];
 
-        if (stepIndex != lastStepIndex[r])
+        if (stepIndex == prevStep) continue;   // no advance this block
+
+        const auto& cPat = safeCPatterns[r];
+        const int   cLen = static_cast<int>(cPat.size());
+
+        // #232: walk every step crossed between prevStep (exclusive) and stepIndex
+        // (inclusive), so a block that spans multiple steps doesn't drop hits.
+        // Common case (1 step advance) still runs the loop body once.
+        // firedMask stays one bit per rhythm per block — multiple hits inside a
+        // single block collapse to one fire; accentMask reflects the last hit.
+        if (prevStep < 0)
         {
-            // Detect rhythm loop wrap: step wrapped back to 0 from a non-zero position.
-            if (stepIndex == 0 && lastStepIndex[r] > 0)
-                result.rhythmLoopWrapMask |= (1 << r);
-
-            lastStepIndex[r] = stepIndex;
+            // First call: just check the current step. No back-walk possible.
             if (pattern[stepIndex])
             {
                 result.firedMask |= (1 << r);
+                if (cLen > 0 && cPat[stepIndex % cLen])
+                    result.accentMask |= (1 << r);
+            }
+        }
+        else
+        {
+            // Modular forward distance, capped at patLen so an extreme jump
+            // doesn't loop forever.
+            int distance = (stepIndex - prevStep + patLen) % patLen;
+            if (distance == 0) distance = patLen;   // full wrap
+            distance = std::min(distance, patLen);
 
-                // Check Ring C coincidence for accent detection.
-                const auto& cPat = safeCPatterns[r];
-                if (!cPat.empty())
+            for (int k = 1; k <= distance; ++k)
+            {
+                const int s = (prevStep + k) % patLen;
+
+                if (s == 0)
+                    result.rhythmLoopWrapMask |= (1 << r);
+
+                if (pattern[s])
                 {
-                    const int cStep = effectiveStep % static_cast<int>(cPat.size());
-                    if (cPat[cStep])
+                    result.firedMask |= (1 << r);
+                    if (cLen > 0 && cPat[s % cLen])
                         result.accentMask |= (1 << r);
+                    else
+                        result.accentMask &= ~(1 << r);
                 }
             }
         }
+
+        lastStepIndex[r] = stepIndex;
     }
 
     return result;
