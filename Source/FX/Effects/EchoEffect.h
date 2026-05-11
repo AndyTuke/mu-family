@@ -28,10 +28,13 @@ public:
 
     void processInner(juce::dsp::AudioBlock<float>& block) override
     {
-        const int delayL = juce::jlimit(1, MaxDelaySamples - 1,
-                                        static_cast<int>(timeMs * 0.001 * sr));
-        const int delayR = juce::jlimit(1, MaxDelaySamples - 1,
-                                        static_cast<int>(timeMs * 0.001 * sr * (1.0f + spread * 0.1f)));
+        // Fractional sample delay so automating `time` produces smooth sweeps
+        // instead of zipper artifacts. Range floored at 2 samples for Hermite
+        // safety (the interpolator reads xm1/x0/x1/x2 around the integer base).
+        const float delaySamplesL = juce::jlimit(2.0f, (float)(MaxDelaySamples - 2),
+                                                 timeMs * 0.001f * (float)sr);
+        const float delaySamplesR = juce::jlimit(2.0f, (float)(MaxDelaySamples - 2),
+                                                 timeMs * 0.001f * (float)sr * (1.0f + spread * 0.1f));
         const float wet = sendMode ? 1.0f : mix;
         const float dry = sendMode ? 0.0f : 1.0f - mix;
         const float fb  = feedback;
@@ -47,11 +50,8 @@ public:
             const float inL = dataL ? dataL[i] : 0.0f;
             const float inR = dataR ? dataR[i] : 0.0f;
 
-            const int rL = (writePos - delayL + MaxDelaySamples) % MaxDelaySamples;
-            const int rR = (writePos - delayR + MaxDelaySamples) % MaxDelaySamples;
-
-            const float echoL = bufL[rL];
-            const float echoR = bufR[rR];
+            const float echoL = hermiteDelay(bufL, writePos, delaySamplesL);
+            const float echoR = hermiteDelay(bufR, writePos, delaySamplesR);
 
             bufL[writePos] = inL + echoL * fb;
             bufR[writePos] = inR + echoR * fb;
@@ -72,6 +72,34 @@ public:
     }
 
 private:
+    // 4-point Catmull-Rom Hermite interpolation. Matches the form used in
+    // DelaySlot::hermiteDelay and ChorusEffect: xm1 = one sample newer than the
+    // integer base, x0 = base, x1/x2 = older.
+    static float hermiteDelay(const std::vector<float>& buf, int writeP, float delaySamples)
+    {
+        const int   bufSize = static_cast<int>(buf.size());
+        const float d       = juce::jlimit(2.0f, (float)(bufSize - 2), delaySamples);
+        const int   di      = static_cast<int>(d);
+        const float frac    = d - (float)di;
+
+        const int r0  = (writeP - di     + bufSize) % bufSize;
+        const int rm1 = (writeP - di + 1 + bufSize) % bufSize;
+        const int r1  = (writeP - di - 1 + bufSize) % bufSize;
+        const int r2  = (writeP - di - 2 + bufSize) % bufSize;
+
+        const float xm1 = buf[rm1];
+        const float x0  = buf[r0];
+        const float x1  = buf[r1];
+        const float x2  = buf[r2];
+
+        const float c0 = x0;
+        const float c1 = 0.5f * (x1 - xm1);
+        const float c2 = xm1 - 2.5f * x0 + 2.0f * x1 - 0.5f * x2;
+        const float c3 = 0.5f * (x2 - xm1) + 1.5f * (x0 - x1);
+
+        return ((c3 * frac + c2) * frac + c1) * frac + c0;
+    }
+
     FXAlgorithmDef def;
     double sr      = 44100.0;
     float timeMs   = 250.0f;

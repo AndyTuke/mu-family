@@ -161,7 +161,11 @@ void FXRow::rebuildKnobs(int algorithmIndex)
         }
         else
         {
-            knob->getSlider().setNumDecimalPlacesToDisplay(0);
+            // Pick precision from the parameter range: 0–1 knobs (size, diffusion,
+            // damp, mod, dirt) collapse to "0"/"1" if forced to 0 decimals.
+            const float range = param.maxVal - param.minVal;
+            const int decimals = (range <= 1.0f) ? 2 : (range < 10.0f ? 1 : 0);
+            knob->getSlider().setNumDecimalPlacesToDisplay(decimals);
         }
 
         knob->onStatusUpdate = [this](const juce::String& n, const juce::String& v)

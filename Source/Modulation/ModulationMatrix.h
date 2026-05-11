@@ -38,6 +38,9 @@ public:
     // Updates the depth of an existing assignment. No-op if not found.
     void setDepth(const std::string& id, float depth);
 
+    // #224: Updates the curve (-100..+100 bipolar bend) of an existing assignment. No-op if not found.
+    void setCurve(const std::string& id, float curve);
+
     const std::vector<ModulationAssignment>& getAssignments() const { return assignments; }
 
     // Evaluates all ControlSequences at songBeatPos, then applies every assignment

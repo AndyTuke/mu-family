@@ -1,6 +1,7 @@
 #pragma once
 
 #include "EffectAlgorithmBase.h"
+#include "SinLUT.h"
 #include <cmath>
 #include <vector>
 
@@ -47,7 +48,7 @@ public:
 
         for (size_t i = 0; i < numSamples; ++i)
         {
-            const float lfoVal    = std::sin(lfoPhase * juce::MathConstants<float>::twoPi);
+            const float lfoVal    = SinLUT::valueForPhase(lfoPhase);
             const float wetDelayS = juce::jmax(1.0f, baseSamp + lfoVal * depSamp);
 
             const float inL = dataL ? dataL[i] : 0.0f;

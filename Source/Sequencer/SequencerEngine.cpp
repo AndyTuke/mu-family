@@ -9,6 +9,19 @@ SequencerEngine::SequencerEngine()
     cachedPatterns.reserve(MaxRhythms);
     cachedCPatterns.reserve(MaxRhythms);
     patternUpdated.reserve(MaxRhythms);
+
+    // #234: pre-size every safePatterns / safeCPatterns slot to the worst-case
+    // step count (256 — matches the resetSteps cap and the LCM clamp inside
+    // getCombinedPattern). Audio-thread copy-assignment from cachedPatterns later
+    // is then guaranteed not to allocate, because the destination already has
+    // enough capacity. assign() (used in processBlock) overwrites contents in
+    // place when capacity is sufficient — the audio-thread no-alloc rule holds.
+    static constexpr size_t kMaxStepCount = 256;
+    for (int i = 0; i < MaxRhythms; ++i)
+    {
+        safePatterns [i].reserve(kMaxStepCount);
+        safeCPatterns[i].reserve(kMaxStepCount);
+    }
 }
 
 //==============================================================================
@@ -105,12 +118,12 @@ void SequencerEngine::swapRhythmSlots(int i, int j)
     std::swap(safePatterns[i],    safePatterns[j]);
     std::swap(safeCPatterns[i],   safeCPatterns[j]);
 
-    bool tmp = patternUpdated[i];
-    patternUpdated[i] = patternUpdated[j];
-    patternUpdated[j] = tmp;
-
-    lastStepIndex[i] = -1;
-    lastStepIndex[j] = -1;
+    // #228: instead of leaving lastStepIndex at -1 (which causes the next processBlock
+    // to fire the first hit retroactively), mark patternUpdated so the snapshot path
+    // in processBlock absorbs the current step into lastStepIndex without firing.
+    // Matches the semantics of updatePattern() — no spurious retroactive triggers.
+    patternUpdated[i] = true;
+    patternUpdated[j] = true;
 
     patternLock.store(false, std::memory_order_release);
 }
@@ -138,7 +151,11 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
 
     BlockResult result;
 
-    const auto globalStep    = static_cast<int>(beatPosition / StepLengthBeats);
+    // #233: clamp negative beat positions to zero. Hosts can emit negative ppq
+    // during pre-roll or REW-past-zero; without this, `globalStep` is negative,
+    // `effectiveStep` stays negative even after the modulo (signed-int %), and
+    // `pattern[stepIndex]` then indexes OOB → undefined behaviour.
+    const auto globalStep    = std::max(0, static_cast<int>(beatPosition / StepLengthBeats));
     const int  effectiveStep = (masterLoopSteps > 0) ? (globalStep % masterLoopSteps) : globalStep;
     masterLoopCurrentStep.store(masterLoopSteps > 0 ? effectiveStep : 0, std::memory_order_relaxed);
 
@@ -158,8 +175,11 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
             {
                 if (patternUpdated[r])
                 {
-                    safePatterns[r]   = cachedPatterns[r];
-                    safeCPatterns[r]  = cachedCPatterns[r];
+                    // #234: assign() reuses existing storage when capacity is sufficient.
+                    // safePatterns slots are reserve(256)'d in the ctor, so even a fresh
+                    // 64-step pattern slotting in over an empty slot writes in place.
+                    safePatterns[r].assign(cachedPatterns[r].begin(),  cachedPatterns[r].end());
+                    safeCPatterns[r].assign(cachedCPatterns[r].begin(), cachedCPatterns[r].end());
                     patternUpdated[r] = false;
                     // Absorb the current step so we don't retroactively fire a hit.
                     if (!safePatterns[r].empty())
@@ -175,30 +195,57 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
         const auto& pattern = safePatterns[r];
         if (pattern.empty()) continue;
 
-        const int patLen  = static_cast<int>(pattern.size());
-        int stepIndex     = effectiveStep % patLen;
+        const int patLen      = static_cast<int>(pattern.size());
+        const int stepIndex   = effectiveStep % patLen;
+        const int prevStep    = lastStepIndex[r];
 
-        if (stepIndex != lastStepIndex[r])
+        if (stepIndex == prevStep) continue;   // no advance this block
+
+        const auto& cPat   = safeCPatterns[r];
+        const int   cLen   = static_cast<int>(cPat.size());
+
+        // #232: walk every step crossed between prevStep (exclusive) and stepIndex
+        // (inclusive), so a block that spans multiple steps doesn't drop hits.
+        // firedMask stays one bit per rhythm — multiple hits inside a single block
+        // are reported as one fire; accentMask reflects the last hit's accent state.
+        if (prevStep < 0)
         {
-            // Detect rhythm loop wrap: step wrapped back to 0 from a non-zero position.
-            if (stepIndex == 0 && lastStepIndex[r] > 0)
-                result.rhythmLoopWrapMask |= (1 << r);
-
-            lastStepIndex[r] = stepIndex;
+            // First call: just check the current step. No back-walk possible.
             if (pattern[stepIndex])
             {
                 result.firedMask |= (1 << r);
+                if (cLen > 0 && cPat[stepIndex % cLen])
+                    result.accentMask |= (1 << r);
+            }
+        }
+        else
+        {
+            // Number of steps advanced this block. Modular forward distance,
+            // capped at patLen so an extreme jump doesn't loop forever.
+            int distance = (stepIndex - prevStep + patLen) % patLen;
+            if (distance == 0) distance = patLen;   // full wrap
+            distance = std::min(distance, patLen);
 
-                // Check Ring C coincidence for accent detection.
-                const auto& cPat = safeCPatterns[r];
-                if (!cPat.empty())
+            for (int k = 1; k <= distance; ++k)
+            {
+                const int s = (prevStep + k) % patLen;
+
+                // Rhythm-loop-wrap edge: we just stepped from patLen-1 onto 0.
+                if (s == 0)
+                    result.rhythmLoopWrapMask |= (1 << r);
+
+                if (pattern[s])
                 {
-                    const int cStep = effectiveStep % static_cast<int>(cPat.size());
-                    if (cPat[cStep])
+                    result.firedMask |= (1 << r);
+                    if (cLen > 0 && cPat[s % cLen])
                         result.accentMask |= (1 << r);
+                    else
+                        result.accentMask &= ~(1 << r);
                 }
             }
         }
+
+        lastStepIndex[r] = stepIndex;
     }
 
     return result;

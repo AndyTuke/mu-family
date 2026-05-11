@@ -101,7 +101,36 @@ float ControlSequence::evaluateSmooth(double phase) const
     if (segLen <= 0.0f)
         return p0.y * 100.0f;
 
-    // Linear interpolation; bezier evaluation is added in Stage 5 with the LFO editor.
     const float t = (x - p0.x) / segLen;
+
+    // #222: cubic Bézier when either endpoint carries a handle. Handle (handleX, handleY)
+    // is an offset from the segment midpoint in normalised (x, y) units, used to derive
+    // the two control points c1 = p0 + handle, c2 = p1 + handle. When neither endpoint
+    // has a handle the segment falls back to linear (handle = 0,0 → control points sit
+    // on the chord → degenerate to a line).
+    if (p0.hasBezierHandle || p1.hasBezierHandle)
+    {
+        const float mx = (p0.x + p1.x) * 0.5f;
+        const float my = (p0.y + p1.y) * 0.5f;
+        const float hx0 = p0.hasBezierHandle ? p0.handleX : 0.0f;
+        const float hy0 = p0.hasBezierHandle ? p0.handleY : 0.0f;
+        const float hx1 = p1.hasBezierHandle ? p1.handleX : 0.0f;
+        const float hy1 = p1.hasBezierHandle ? p1.handleY : 0.0f;
+
+        const float c1y = my + hy0;   // first control point's y (x is parameterised by t directly)
+        const float c2y = my + hy1;   // second control point's y
+        // Note: classical cubic Bézier moves in (x, y), but for a "curve over time" mod
+        // shape we only need the y value at the segment parameter t. Treating t as the
+        // x-progress along the chord gives the perceptual rise/fall the user is drawing.
+        (void)mx; (void)hx0; (void)hx1;  // x-side handles unused in this 1D parameterisation
+
+        const float one_t = 1.0f - t;
+        const float b = one_t*one_t*one_t       * p0.y
+                      + 3.0f * one_t*one_t * t  * c1y
+                      + 3.0f * one_t * t*t      * c2y
+                      + t*t*t                   * p1.y;
+        return b * 100.0f;
+    }
+
     return (p0.y + t * (p1.y - p0.y)) * 100.0f;
 }

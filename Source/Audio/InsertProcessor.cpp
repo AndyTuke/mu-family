@@ -20,6 +20,14 @@ void InsertProcessor::prepare(double sr, int blockSize)
     eqLow.prepare(spec);
     eqMid.prepare(spec);
     eqHigh.prepare(spec);
+
+    // Warm up each band's coefficient storage to flat (gain=1.0) so the first
+    // ArrayCoefficients::assign call inside process() doesn't have to grow the
+    // internal Array<float>. After this, subsequent updates reuse the storage.
+    using ArrayCoeffs = juce::dsp::IIR::ArrayCoefficients<float>;
+    *eqLow .state = ArrayCoeffs::makeLowShelf  (sr,  200.0f, 0.7f, 1.0f);
+    *eqMid .state = ArrayCoeffs::makePeakFilter(sr, 1000.0f, 1.0f, 1.0f);
+    *eqHigh.state = ArrayCoeffs::makeHighShelf (sr, 8000.0f, 0.7f, 1.0f);
 }
 
 void InsertProcessor::reset()
@@ -41,7 +49,12 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh, co
     {
         case 1: // ── Soft Clip — tanh ADAA ────────────────────────────────────
         {
-            const float preGain = std::pow(10.0f, p.driveDrive / 100.0f * 2.0f);
+            // Drive curve: pow(10, drive/100 * 1.2) gives 0..+24 dB pre-gain at
+            // drive 0..100. The previous +40 dB ceiling pushed everything into
+            // saturation in the upper half of the knob with no audible change;
+            // +24 dB keeps the full sweep musically useful per Faust libs /
+            // Jatin Chowdhury references. Tape Sat uses its own 0..+20 dB curve.
+            const float preGain = std::pow(10.0f, p.driveDrive / 100.0f * 1.2f);
             const float outGain = std::pow(10.0f, p.driveOutput / 20.0f) / preGain;
             auto ad1Tanh = [](float x) -> float {
                 return std::abs(x) > 12.0f ? std::abs(x) - 0.6931472f : std::log(std::cosh(x));
@@ -65,7 +78,7 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh, co
         }
         case 2: // ── Hard Clip — ADAA ─────────────────────────────────────────
         {
-            const float preGain = std::pow(10.0f, p.driveDrive / 100.0f * 2.0f);
+            const float preGain = std::pow(10.0f, p.driveDrive / 100.0f * 1.2f);  // 0..+24 dB
             const float outGain = std::pow(10.0f, p.driveOutput / 20.0f) / preGain;
             auto ad1Clip = [](float x) -> float {
                 if (x >  1.0f) return x - 0.5f;
@@ -92,7 +105,7 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh, co
         }
         case 3: // ── Triangular foldback ──────────────────────────────────────
         {
-            const float preGain = std::pow(10.0f, p.driveDrive / 100.0f * 2.0f);
+            const float preGain = std::pow(10.0f, p.driveDrive / 100.0f * 1.2f);  // 0..+24 dB
             const float outGain = std::pow(10.0f, p.driveOutput / 20.0f) / preGain;
             for (int ch = 0; ch < nCh; ++ch)
             {
@@ -117,11 +130,20 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh, co
             const float ratioF  = juce::jmax(1.0f,
                 (float)(currentSampleRate / (double)juce::jmax(100.0f, p.driveRate)));
             const float dither  = p.drvDither / 100.0f * (0.5f / q);
-            const float aaCut   = juce::jmin(p.driveRate * 0.45f,
+
+            // Anti-alias filter: when on, cutoff floors at 2 kHz so the audible
+            // band survives even at extreme rate reduction (driveRate→100 Hz used
+            // to cut at 45 Hz and kill the signal). When off, the bitcrusher
+            // produces raw aliasing — the classic gritty/glitchy character that
+            // many lo-fi bitcrushers (Kilohearts Bitcrush, Tritik Krush) expose
+            // explicitly. Defaults to on.
+            const bool  aaOn    = p.drvAa;
+            const float aaCut   = juce::jmin(juce::jmax(2000.0f, p.driveRate * 0.45f),
                                              (float)currentSampleRate * 0.49f);
 
-            for (int ch = 0; ch < nCh; ++ch)
-                bitAaFilter[ch].prepare(aaCut, (float)currentSampleRate);
+            if (aaOn)
+                for (int ch = 0; ch < nCh; ++ch)
+                    bitAaFilter[ch].prepare(aaCut, (float)currentSampleRate);
 
             for (int ch = 0; ch < nCh; ++ch)
             {
@@ -131,8 +153,9 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh, co
 
                 for (int i = 0; i < ns; ++i)
                 {
-                    const float filtered = ratioF > 1.0f ? bitAaFilter[ch].process(data[i])
-                                                         : data[i];
+                    const float filtered = (aaOn && ratioF > 1.0f)
+                                            ? bitAaFilter[ch].process(data[i])
+                                            : data[i];
                     cnt += 1.0f;
                     if (cnt >= ratioF)
                     {
@@ -160,7 +183,11 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh, co
         }
         case 6: // ── 3-Band EQ: low shelf / mid peak / high shelf ─────────
         {
-            using Coeffs = juce::dsp::IIR::Coefficients<float>;
+            // ArrayCoefficients returns a std::array<float, 6> on the stack;
+            // assigning it to *eqLow.state goes through Coefficients::operator=
+            // which writes into the existing Array<float> storage rather than
+            // calling `new Coefficients(...)` like the Ptr-returning helpers do.
+            using ArrayCoeffs = juce::dsp::IIR::ArrayCoefficients<float>;
             const float sr          = (float)currentSampleRate;
             const float curDriveDrv = p.driveDrive;
             const float curDrvDit   = p.drvDither;
@@ -174,9 +201,14 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh, co
                 const float highG = juce::Decibels::decibelsToGain(curDrvDit   / 100.0f * 36.0f - 18.0f);
                 const float midG  = juce::Decibels::decibelsToGain(curMidGain);
 
-                *eqLow .state = *Coeffs::makeLowShelf  (sr, 200.0f,    0.7f, lowG);
-                *eqMid .state = *Coeffs::makePeakFilter(sr, curMidFreq, 1.0f, midG);
-                *eqHigh.state = *Coeffs::makeHighShelf  (sr, 8000.0f,   0.7f, highG);
+                // Shelf corner frequencies are intentionally fixed (low @ 200 Hz,
+                // high @ 8 kHz). The 3-Band EQ is a "character EQ" — three controls
+                // already (low gain / mid freq+gain / high gain) — so exposing
+                // shelf-frequency knobs would push this past the 3-knob insert UI
+                // slot. Mid frequency stays sweepable via `driveTone`.
+                *eqLow .state = ArrayCoeffs::makeLowShelf  (sr,  200.0f,     0.7f, lowG);
+                *eqMid .state = ArrayCoeffs::makePeakFilter(sr,  curMidFreq, 1.0f, midG);
+                *eqHigh.state = ArrayCoeffs::makeHighShelf (sr, 8000.0f,     0.7f, highG);
 
                 eqLastDriveDrive = curDriveDrv;
                 eqLastDrvDither  = curDrvDit;
@@ -276,8 +308,10 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh, co
     }
 
     // Tone filter (1-pole LP after drive, only for algorithms where driveTone = LP cutoff freq).
+    // Skip when driveChar == 0 (None / bypass) so dialling driveTone for a previous
+    // algorithm and then switching back to None doesn't silently dull the dry signal.
     // EQ (6), Compressor (7), Limiter (8) repurpose driveTone for other meanings.
-    if (p.driveChar < 6 && p.driveTone < 19000.0f && currentSampleRate > 0.0)
+    if (p.driveChar >= 1 && p.driveChar < 6 && p.driveTone < 19000.0f && currentSampleRate > 0.0)
     {
         for (int ch = 0; ch < nCh; ++ch)
             toneFilter[ch].prepare(p.driveTone, (float)currentSampleRate);

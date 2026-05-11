@@ -70,6 +70,7 @@ public:
 private:
     PluginProcessor& proc;
     int currentRhythmIndex = -1;
+    int lastSwapEpoch      = 0;   // refresh nameLabel after a hot-swap (name not in APVTS)
 
     RhythmCircle    circle;
     EuclideanPanel  euclidPanel;

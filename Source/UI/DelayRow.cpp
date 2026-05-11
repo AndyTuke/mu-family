@@ -118,6 +118,18 @@ DelayRow::DelayRow()
     };
     addAndMakeVisible(dirtKnob);
 
+    dampKnob.setRange(0.0, 100.0, 0.1);
+    dampKnob.setValue(0.0, juce::dontSendNotification);
+    dampKnob.onValueChanged = [this](double v)
+    {
+        if (onDampChanged) onDampChanged(static_cast<float>(v) / 100.0f);
+    };
+    dampKnob.onStatusUpdate = [this](const juce::String& n, const juce::String& v)
+    {
+        if (onStatusUpdate) onStatusUpdate(n, v);
+    };
+    addAndMakeVisible(dampKnob);
+
     updateModeVisibility();
 }
 
@@ -153,6 +165,7 @@ void DelayRow::setSyncParams(int denominator, bool dotted, bool triplet, int cou
 void DelayRow::setFeedback(float v) { feedbackKnob.setValue(v * 100.0, juce::dontSendNotification); }
 void DelayRow::setSpread(float v)   { spreadKnob.setValue(v * 100.0, juce::dontSendNotification); }
 void DelayRow::setDirt(float v)     { dirtKnob.setValue(v * 100.0, juce::dontSendNotification); }
+void DelayRow::setDamp(float v)     { dampKnob.setValue(v * 100.0, juce::dontSendNotification); }
 
 void DelayRow::updateModeVisibility()
 {
@@ -206,6 +219,7 @@ void DelayRow::resized()
     feedbackKnob.setBounds(x,              0, kKnobW, h);
     spreadKnob  .setBounds(x + kKnobW,     0, kKnobW, h);
     dirtKnob    .setBounds(x + kKnobW * 2, 0, kKnobW, h);
+    dampKnob    .setBounds(x + kKnobW * 3, 0, kKnobW, h);
 }
 
 void DelayRow::paint(juce::Graphics& g)

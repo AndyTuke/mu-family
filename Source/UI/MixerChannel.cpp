@@ -6,8 +6,9 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
     : channelType(t), channelName(name), channelColour(col)
 {
     fader.setSliderStyle(juce::Slider::LinearVertical);
-    fader.setRange(0.0, 1.0, 0.001);
-    fader.setValue(0.75, juce::dontSendNotification);
+    fader.setRange(0.0, (double) MixerEngine::kFaderMax, 0.001);
+    fader.setSkewFactor((double) MixerEngine::kFaderSkew);
+    fader.setValue(1.0, juce::dontSendNotification);  // 0 dB default
     fader.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     addAndMakeVisible(fader);
     addAndMakeVisible(vuMeter);
@@ -39,19 +40,23 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
     dbLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
     addAndMakeVisible(dbLabel);
 
-    if (hasMuteSolo())
+    if (hasMute())
     {
         muteBtn.setClickingTogglesState(true);
-        soloBtn.setClickingTogglesState(true);
         addAndMakeVisible(muteBtn);
+    }
+    if (hasSolo())
+    {
+        soloBtn.setClickingTogglesState(true);
         addAndMakeVisible(soloBtn);
     }
 
     if (hasSidechain())
     {
-        outBusBox.addItem("M", 1);                 // 0 -> Master
+        // #238: descriptive labels — "Main" + "Out 1" … "Out 8".
+        outBusBox.addItem("Main", 1);              // 0 -> Master
         for (int i = 1; i <= 8; ++i)
-            outBusBox.addItem(juce::String(i), i + 1);  // i -> Out i
+            outBusBox.addItem("Out " + juce::String(i), i + 1);
         outBusBox.setSelectedId(1, juce::dontSendNotification);
         addAndMakeVisible(outBusBox);
 
@@ -97,8 +102,9 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
 
         auto noVal = [](double) { return juce::String(); };
         insDrive .setRange(0.0, 100.0, 0.1);   insDrive .setValue(0.0);
-        insOutput.setRange(-24.0, 0.0, 0.1);   insOutput.setValue(0.0);
+        insOutput.setRange(-12.0, 24.0, 0.1);  insOutput.setValue(0.0);
         insTone  .setRange(20.0, 20000.0, 1.0); insTone  .setValue(20000.0);
+        insTone  .getSlider().setSkewFactorFromMidPoint(640.0);  // #216: log feel default for full-range modes
         insDrive .getSlider().textFromValueFunction = noVal;
         insOutput.getSlider().textFromValueFunction = noVal;
         insTone  .getSlider().textFromValueFunction = noVal;
@@ -224,7 +230,7 @@ void MixerChannel::bindReturn(MixerEngine::ReturnState& state, juce::Atomic<floa
     fader.setValue(state.level, juce::dontSendNotification);
     panKnob.setValue(state.pan, juce::dontSendNotification);
     muteBtn.setToggleState(state.mute, juce::dontSendNotification);
-    soloBtn.setToggleState(state.solo, juce::dontSendNotification);
+    // Solo intentionally not bound for return channels — see ReturnState in MixerEngine.h.
 
     if (proc)
     {
@@ -242,10 +248,6 @@ void MixerChannel::bindReturn(MixerEngine::ReturnState& state, juce::Atomic<floa
             if (auto* p = proc->apvts.getParameter(prefix + "mute"))
                 p->setValueNotifyingHost(muteBtn.getToggleState() ? 1.0f : 0.0f);
         };
-        soloBtn.onClick = [proc, prefix, this] {
-            if (auto* p = proc->apvts.getParameter(prefix + "solo"))
-                p->setValueNotifyingHost(soloBtn.getToggleState() ? 1.0f : 0.0f);
-        };
     }
     else
     {
@@ -255,7 +257,6 @@ void MixerChannel::bindReturn(MixerEngine::ReturnState& state, juce::Atomic<floa
         };
         panKnob.onValueChanged = [&state](double v) { state.pan  = (float)v; };
         muteBtn.onClick = [&state, this] { state.mute = muteBtn.getToggleState(); };
-        soloBtn.onClick = [&state, this] { state.solo = soloBtn.getToggleState(); };
     }
 
     vuMeter.getLevel = [&peak] { return peak.get(); };
@@ -389,10 +390,13 @@ void MixerChannel::loadFromAPVTS(juce::AudioProcessorValueTreeState& apvts,
         if (auto* p = apvts.getRawParameterValue(prefix + "sendRev"))
             sendReverb.setValue(*p, juce::dontSendNotification);
     }
-    if (hasMuteSolo())
+    if (hasMute())
     {
         if (auto* p = apvts.getRawParameterValue(prefix + "mute"))
             muteBtn.setToggleState(*p > 0.5f, juce::dontSendNotification);
+    }
+    if (hasSolo())
+    {
         if (auto* p = apvts.getRawParameterValue(prefix + "solo"))
             soloBtn.setToggleState(*p > 0.5f, juce::dontSendNotification);
     }
@@ -419,10 +423,14 @@ void MixerChannel::loadFromAPVTS(juce::AudioProcessorValueTreeState& apvts,
 void MixerChannel::updateDbLabel(float level)
 {
     if (level <= 0.0f)
+    {
         dbLabel.setText("-inf", juce::dontSendNotification);
-    else
-        dbLabel.setText(juce::String(20.0f * std::log10(level), 1) + "dB",
-                        juce::dontSendNotification);
+        return;
+    }
+    const float db = 20.0f * std::log10(level);
+    juce::String text = juce::String(db, 1) + "dB";
+    if (db > 0.0f) text = "+" + text;
+    dbLabel.setText(text, juce::dontSendNotification);
 }
 
 void MixerChannel::resized()
@@ -480,7 +488,7 @@ void MixerChannel::resized()
     }
 
     // ── Fader + VU + GR ───────────────────────────────────────────────────────
-    const int muteY   = hasMuteSolo() ? h - kButtonH : h;
+    const int muteY   = hasMute() ? h - kButtonH : h;
     const int dbY     = muteY - kDbH;
     // outBus sits just above the dB label on Rhythm channels.
     const int busY    = hasSidechain() ? dbY - kOutBusH : dbY;
@@ -498,11 +506,20 @@ void MixerChannel::resized()
 
     dbLabel.setBounds(0, dbY, stripW, kDbH);
 
-    if (hasMuteSolo())
+    if (hasMute())
     {
-        const int hw = stripW / 2;
-        muteBtn.setBounds(0,  muteY, hw,          kButtonH);
-        soloBtn.setBounds(hw, muteY, stripW - hw, kButtonH);
+        if (hasSolo())
+        {
+            // Mute + solo split the button row 50/50 (rhythm channels).
+            const int hw = stripW / 2;
+            muteBtn.setBounds(0,  muteY, hw,          kButtonH);
+            soloBtn.setBounds(hw, muteY, stripW - hw, kButtonH);
+        }
+        else
+        {
+            // FX returns: mute spans the full strip width.
+            muteBtn.setBounds(0, muteY, stripW, kButtonH);
+        }
     }
 
     faderPaneBounds = { 1, faderY - 2, stripW - 2, h - faderY + 1 };
@@ -567,13 +584,14 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
             insDrive .setVisible(true);
 
             insOutput.setLabel("Output");
-            insOutput.setRange(-24.0, 0.0, 0.1);
+            insOutput.setRange(-12.0, 24.0, 0.1);
             insOutput.getSlider().textFromValueFunction = nullptr;
             insOutput.setValue(ip.driveOutput, juce::dontSendNotification);
             insOutput.setVisible(true);
 
             insTone  .setLabel("LPF");
             insTone  .setRange(20.0, 20000.0, 1.0);
+            insTone  .getSlider().setSkewFactorFromMidPoint(640.0);  // #216
             insTone  .getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return v >= 1000.0 ? juce::String(v / 1000.0, 2) + "kHz"
                                    : juce::String((int)v) + "Hz";
@@ -662,7 +680,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
             insDrive .setVisible(true);
 
             insOutput.setLabel("Output");
-            insOutput.setRange(-24.0, 0.0, 0.1);
+            insOutput.setRange(-12.0, 24.0, 0.1);
             insOutput.getSlider().textFromValueFunction = nullptr;
             insOutput.setValue(ip.driveOutput, juce::dontSendNotification);
             insOutput.setVisible(true);
@@ -717,7 +735,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
             insDrive.setVisible(true);
 
             insOutput.setLabel("Output");
-            insOutput.setRange(-24.0, 0.0, 0.1);
+            insOutput.setRange(-12.0, 24.0, 0.1);
             insOutput.getSlider().textFromValueFunction = nullptr;
             insOutput.setValue(ip.driveOutput, juce::dontSendNotification);
             insOutput.setVisible(true);

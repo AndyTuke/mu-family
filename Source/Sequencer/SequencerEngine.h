@@ -40,8 +40,19 @@ public:
     int getPatternLength (int r) const { return static_cast<int>(safePatterns[r].size()); }
 
     // Master loop length (0 = free-running, >0 = all rhythms reset to step 0 at this boundary).
-    void setMasterLoopSteps(int steps) { masterLoopSteps = juce::jlimit(0, 256, steps); }
+    void setMasterLoopSteps(int steps)
+    {
+        masterLoopSteps = juce::jlimit(0, 256, steps);
+        // #231: reset the wrap detector so a loop-length change mid-playback can't
+        // emit a false `masterLoopWrapped` event from stale `lastEffectiveStep`
+        // (which previously gated hot-swap commits → premature staged swap).
+        lastEffectiveStep = -1;
+    }
     int  getMasterLoopSteps() const    { return masterLoopSteps; }
+
+    // #231: call from PluginProcessor::processBlock on a transport stop→start edge
+    // so the next block doesn't see a false wrap from a pre-stop `lastEffectiveStep`.
+    void resetWrapDetector() { lastEffectiveStep = -1; }
 
     // Current step within the master loop (0-based). 0 when loop is free-running.
     // Written by the audio thread each block; safe to read from the message thread at 10 Hz.

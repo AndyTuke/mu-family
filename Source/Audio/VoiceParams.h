@@ -11,16 +11,19 @@ struct VoiceParams
     float pitchEnvSus    = 0.0f;
     float pitchEnvRel    = 0.1f;
     float pitchEnvDepth  = 0.0f;     // semitones swept at envelope peak, 0..24
+    bool  pitchEnvLegato = false;    // #221: false=Reset (default), true=Legato (continue from current level)
 
     // ─── Filter ──────────────────────────────────────────────────────────
     int   filterType     = 0;        // 0=LP12, 1=HP12, 2=BP12, 3=Notch, 4=LP24, 5=HP24, 6=BP24, 7=LP6, 8=Comb+, 9=AP12, 10=Notch24, 11=HP6, 12=Peak, 13=LoShf, 14=HiShf, 15=Comb-
     float filterCutoff   = 8000.0f;  // Hz
-    float filterRes      = 0.2f;     // 0..0.99
+    float filterRes      = 0.2f;     // 0..0.99 — knee at 0.8 (see MultiModeFilter::mapResonanceForType)
+    float filterGainDb   = 0.0f;     // -18..+18 dB — only used by Peak/LoShf/HiShf types (12/13/14)
     float filterEnvAtk   = 0.01f;
     float filterEnvDec   = 0.3f;
     float filterEnvSus   = 0.0f;
     float filterEnvRel   = 0.3f;
-    float filterEnvDepth = 0.0f;     // semitones of cutoff sweep, 0..48
+    float filterEnvDepth = 0.0f;     // semitones of cutoff sweep, -48..+48 (bipolar)
+    bool  filterEnvLegato = false;   // #221: false=Reset (default), true=Legato
 
     // ─── Amp ─────────────────────────────────────────────────────────────
     float ampLevel    = 1.0f;        // 0..2  (Issue #121: 0 dB default — kHeadroomTrim alone provides summing safety)
@@ -29,6 +32,7 @@ struct VoiceParams
     float ampEnvSus   = 0.8f;
     float ampEnvRel   = 0.5f;
     bool  ampRelToEnd = false;       // true when Release is at max (100): amp envelope bypassed, sample plays to natural end
+    bool  ampEnvLegato = false;      // #221: false=Reset (default), true=Legato
 
     // ─── Drive / Insert (after filter, before amp) ───────────────────────
     int   driveChar   = 0;           // 0=None,1=SoftClip,2=HardClip,3=Fold,4=Bitcrusher,5=Clipper,6=EQ,7=Compressor,8=Limiter,9=RingMod,10=TapeSat
@@ -39,6 +43,7 @@ struct VoiceParams
     float drvBits     = 16.0f;       // 1..16 bit depth
     float driveRate   = 48000.0f;    // 100..48000 Hz target sample rate (48000 = no reduction)
     float drvDither   = 0.0f;        // 0..100% TPDF dither amount
+    bool  drvAa       = true;        // true: anti-alias LP active (with 2 kHz floor) before downsample; false: raw aliasing
     // Shared:
     float driveTone   = 20000.0f;    // 20..20000 Hz (1-pole LP post-drive; 20kHz = flat; also EQ mid freq / comp release ms)
     // EQ params (driveChar=6): low shelf and high shelf gains stored as 0..100 in driveDrive/drvDither fields

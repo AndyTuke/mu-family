@@ -47,6 +47,7 @@ public:
 
     void setEffectSendLabel(const juce::String& name);
     void setChannelName(const juce::String& n) { channelName = n; repaint(); }
+    void setChannelColour(juce::Colour c) { channelColour = c; repaint(); }
     void setActive(bool a) { active = a; repaint(); }
     void setMeterMode(VUMeter::MeterMode m) { vuMeter.setMode(m); }
 
@@ -94,7 +95,9 @@ private:
     bool hasSends()    const { return channelType == Type::Rhythm
                                        || channelType == Type::EffectReturn
                                        || channelType == Type::DelayReturn; }
-    bool hasMuteSolo() const { return channelType != Type::Master; }
+    bool hasMute()      const { return channelType != Type::Master; }
+    // Solo is rhythm-only — see ReturnState in MixerEngine.h for rationale.
+    bool hasSolo()      const { return channelType == Type::Rhythm; }
     bool hasSidechain() const { return channelType == Type::Rhythm; }
     bool hasInsert()    const { return channelType == Type::Master; }
 

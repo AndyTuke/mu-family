@@ -39,10 +39,13 @@ public:
     void prepare(double sampleRate, int blockSize, int numChannels);
     void reset();
 
-    // Set filter type by integer code (matches APVTS values 0..14).
+    // Set filter type by integer code (matches APVTS values 0..15).
     void setType(int typeCode) noexcept     { typeCodeValue = typeCode; }
     void setCutoff(float hz) noexcept       { cutoffHz = hz; }
     void setResonance(float r) noexcept     { resonance = r; }
+    // Filter gain in dB. Only used by Peak (12) / LowShelf (13) / HighShelf (14) modes.
+    // Other types ignore this. Range -18..+18 dB; 0 = flat (peak/shelf has no effect).
+    void setGainDb(float gainDb) noexcept   { gainDbValue = gainDb; }
 
     // Apply the configured filter in-place to the buffer (first numChannels channels,
     // numSamples samples). Allocation-free.
@@ -53,17 +56,37 @@ private:
     int    typeCodeValue     = 0;
     float  cutoffHz          = 1000.0f;
     float  resonance         = 0.1f;
+    float  gainDbValue       = 0.0f;
+
+    // Per-sample cutoff smoother. Block-rate cutoff updates produce audible
+    // staircase artifacts during fast envelope sweeps (e.g. 10 ms attacks);
+    // SmoothedValue<Multiplicative> ramps geometrically inside each block so
+    // the SVF/Ladder coefficient updates trace a smooth log-frequency curve.
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative> smoothedCutoff;
 
     juce::dsp::StateVariableTPTFilter<float> svf;
     juce::dsp::LadderFilter<float>           ladder;
     OnePoleLP    lp6[MaxChannels];
     OnePoleHP    hp6[MaxChannels];
     BiquadFilter eq [MaxChannels];
+    // DC blocker on the comb feedback path — without it, DC bias on the input
+    // accumulates through the feedback loop (1 / (1 - g) gain at g→1) and can
+    // drift the buffer toward clipping on long sustains. 15 Hz HP, below the
+    // lowest reachable comb fundamental (~20 Hz at minimum cutoff).
+    OnePoleHP    combDcBlocker[MaxChannels];
 
     std::vector<float> combBuffer[MaxChannels];
     int                combWritePos[MaxChannels] = { 0, 0 };
 
     juce::AudioBuffer<float> notchScratch;
+
+    // Coefficient-cache state for the biquad path (types 9, 12–14). The biquad
+    // setX helpers each call pow/cos/sin/sqrt — re-running them every block
+    // wastes cycles when cutoff/res/type/gain haven't changed.
+    float eqLastCutoff = -1.0f;
+    float eqLastRes    = -1.0f;
+    float eqLastGain   = -999.0f;
+    int   eqLastType   = -1;
 
     void configureForCurrentType();
 

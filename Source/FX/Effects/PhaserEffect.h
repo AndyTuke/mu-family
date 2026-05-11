@@ -1,6 +1,7 @@
 #pragma once
 
 #include "EffectAlgorithmBase.h"
+#include "SinLUT.h"
 #include <cmath>
 #include <array>
 
@@ -48,7 +49,7 @@ public:
 
         for (size_t i = 0; i < numSamples; ++i)
         {
-            const float lfoVal  = std::sin(lfoPhase * juce::MathConstants<float>::twoPi);
+            const float lfoVal  = SinLUT::valueForPhase(lfoPhase);
             // Map LFO to a logarithmic frequency sweep, then convert to allpass coeff.
             const float lfoNorm = 0.5f + 0.5f * lfoVal * depth;   // 0..1
             const float freq    = fMin * std::exp(lfoNorm * logRange);

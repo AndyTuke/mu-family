@@ -1,6 +1,7 @@
 #pragma once
 
 #include "EffectAlgorithmBase.h"
+#include "SinLUT.h"
 #include <cmath>
 
 // Stereo chorus: multiple delay lines modulated by LFOs at slightly different rates.
@@ -54,10 +55,18 @@ public:
                 delayL[v][writePos[v]] = inL;
                 delayR[v][writePos[v]] = inR;
 
-                const float lfoVal  = std::sin(phase[v] * juce::MathConstants<float>::twoPi);
-                const float spreadV = (v % 2 == 0) ? 1.0f : (1.0f + spread * 0.5f);
-                const float delaySL = baseSamp + lfoVal * depthSamp;
-                const float delaySR = baseSamp + lfoVal * depthSamp * spreadV;
+                const float lfoVal  = SinLUT::valueForPhase(phase[v]);
+                // Symmetric per-voice L/R spread: position each voice in stereo
+                // by giving it equal-and-opposite modulation depth on L vs R,
+                // scaled by its index across the voice count. At spread=0 the
+                // voices are mono-summing; at spread=1 the two extremes have
+                // fully phase-inverted modulation. Independent of `voices` so
+                // 2/3/4-voice configurations all behave consistently.
+                const float pan     = (numVoices > 1) ? (float)v / (float)(numVoices - 1) - 0.5f
+                                                       : 0.0f;       // -0.5..+0.5
+                const float vSpread = spread * pan * 2.0f;            // -spread..+spread
+                const float delaySL = baseSamp + lfoVal * depthSamp * (1.0f - vSpread);
+                const float delaySR = baseSamp + lfoVal * depthSamp * (1.0f + vSpread);
 
                 wetL += hermiteDelay(delayL[v], writePos[v], delaySL);
                 wetR += hermiteDelay(delayR[v], writePos[v], delaySR);

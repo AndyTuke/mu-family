@@ -219,21 +219,21 @@ void EuclideanPanel::loadFromRhythm()
 void EuclideanPanel::updateRangesA(int steps)
 {
     hitsA.setRange(0, steps, 1);
-    rotA.setRange(-(steps / 2), steps / 2, 1);
+    rotA.setRange(0, juce::jmax(0, steps - 1), 1);   // #226: full 0..steps-1 per design-sequencer.md
     insertStA.setRange(0, juce::jmax(0, steps - 1), 1);
 }
 
 void EuclideanPanel::updateRangesB(int steps)
 {
     hitsB.setRange(0, steps, 1);
-    rotB.setRange(-(steps / 2), steps / 2, 1);
+    rotB.setRange(0, juce::jmax(0, steps - 1), 1);   // #226
     insertStB.setRange(0, juce::jmax(0, steps - 1), 1);
 }
 
 void EuclideanPanel::updateRangesC(int steps)
 {
     hitsC.setRange(0, steps, 1);
-    rotC.setRange(-(steps / 2), steps / 2, 1);
+    rotC.setRange(0, juce::jmax(0, steps - 1), 1);   // #226
     insertStC.setRange(0, juce::jmax(0, steps - 1), 1);
 }
 

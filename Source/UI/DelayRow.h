@@ -21,6 +21,7 @@ public:
     std::function<void(float)>  onFeedbackChanged;
     std::function<void(float)>  onSpreadChanged;
     std::function<void(float)>  onDirtChanged;
+    std::function<void(float)>  onDampChanged;
     std::function<void(const juce::String&, const juce::String&)> onStatusUpdate;
 
     DelayRow();
@@ -32,6 +33,7 @@ public:
     void setFeedback(float v);
     void setSpread(float v);
     void setDirt(float v);
+    void setDamp(float v);
 
     void resized() override;
     void paint(juce::Graphics&) override;
@@ -58,6 +60,7 @@ private:
     KnobWithLabel feedbackKnob { "Feedback", LafId::knobFxSend };
     KnobWithLabel spreadKnob   { "Spread",   LafId::knobFxSend };
     KnobWithLabel dirtKnob     { "Dirt",     LafId::knobFxSend };
+    KnobWithLabel dampKnob     { "Damp",     LafId::knobFxSend };
 
     bool syncMode  = false;
     bool isEnabled = true;

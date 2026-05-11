@@ -33,32 +33,37 @@ struct FXAlgorithmRegistry
     {
         // Index 0: Chorus, 1: Flanger, 2: Phaser, 3: Echo
         // Distortion algorithms moved to per-rhythm Drive stage in the voice chain.
+        // `mix` is omitted from all four defs: EffectSlot always runs in send mode
+        // (per Issue #44) so the algorithm's wet/dry blend is short-circuited to
+        // 100% wet. The `eff_p*` APVTS slot that previously stored the mix value
+        // is left unused for each algorithm — legacy presets ignore the stored
+        // value harmlessly.
         static const std::vector<FXAlgorithmDef> s_defs = {
             { "chorus", "Chorus", "Modulation", {
                 { "rate",   "Rate",   0.1f, 8.0f, 1.0f, "Hz" },
                 { "depth",  "Depth",  0.0f, 100.0f, 50.0f, "%" },
                 { "voices", "Voices", 2.0f, 4.0f, 2.0f, "" },
                 { "spread", "Spread", 0.0f, 100.0f, 50.0f, "%" },
-                { "mix",    "Mix",    0.0f, 100.0f, 50.0f, "%" },
             }, 1 },
             { "flanger", "Flanger", "Modulation", {
                 { "rate",     "Rate",     0.01f, 20.0f, 0.5f, "Hz" },
                 { "depth",    "Depth",    0.0f, 100.0f, 50.0f, "%" },
                 { "feedback", "Feedback", -100.0f, 100.0f, 0.0f, "%" },
-                { "mix",      "Mix",      0.0f, 100.0f, 50.0f, "%" },
             }, 1 },
             { "phaser", "Phaser", "Modulation", {
                 { "rate",     "Rate",     0.1f, 8.0f, 0.5f, "Hz" },
                 { "depth",    "Depth",    0.0f, 100.0f, 50.0f, "%" },
                 { "stages",   "Stages",   2.0f, 12.0f, 6.0f, "" },
-                { "feedback", "Feedback", 0.0f, 100.0f, 50.0f, "%" },
-                { "mix",      "Mix",      0.0f, 100.0f, 50.0f, "%" },
+                // Bipolar feedback: positive emphasises odd notches (classic phaser
+                // character); negative inverts the notch pattern for a more hollow
+                // tone. Matches the Flanger feedback range and parity with most
+                // pro phaser plugins. PhaserEffect clamps internally to ±0.99 for stability.
+                { "feedback", "Feedback", -100.0f, 100.0f, 50.0f, "%" },
             }, 1 },
             { "echo", "Echo", "Time", {
                 { "time",     "Time",     1.0f, 500.0f, 250.0f, "ms" },
                 { "feedback", "Feedback", 0.0f, 100.0f, 30.0f, "%" },
                 { "spread",   "Spread",   0.0f, 100.0f, 0.0f, "%" },
-                { "mix",      "Mix",      0.0f, 100.0f, 50.0f, "%" },
             }, 1 },
         };
         return s_defs;

@@ -9,10 +9,13 @@ class SamplePlayer
 {
 public:
     void trigger();
+    // Sample-accurate variant (#220): per-sample playback ratios. Used by VoiceEngine
+    // when pitch envelope and/or pitch modulation are present so the ratio updates
+    // every sample instead of block-rate stair-stepping.
     void process(const juce::AudioBuffer<float>& source,
-                 double                          playbackRatio,
+                 const double*                    ratios,
                  juce::AudioBuffer<float>&        output,
-                 int                             numSamples);
+                 int                              numSamples);
     bool isActive() const;
 
 private:
