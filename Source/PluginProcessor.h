@@ -204,9 +204,11 @@ public:
         kSnapFilterCutoff, kSnapFilterRes,
         kSnapFenvAtk, kSnapFenvDec, kSnapFenvDepth,
         kSnapPitchSemi,
-        kSnapPitchOct,   // #142: pitch octave live arc
-        kSnapPitchFine,  // #142: pitch fine live arc
+        kSnapPitchOct,   // DEPRECATED #218 — kept for index stability
+        kSnapPitchFine,  // DEPRECATED #218 — kept for index stability
         kSnapInsDrive, kSnapInsOutput, kSnapInsBits, kSnapInsDither, kSnapInsLpf,
+        // #223 additions
+        kSnapPitchEnvDep, kSnapAmpLvl, kSnapAccent,
         kSnapCount
     };
     std::array<juce::Atomic<float>, kSnapCount> modSnapshot[SequencerEngine::MaxRhythms];

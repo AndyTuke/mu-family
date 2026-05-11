@@ -284,9 +284,10 @@ void VoiceSection::refreshModulatedIndicators()
         return false;
     };
 
-    pitchOctave .setIsModulated(isAssigned("pitch.octave"));
+    // #218: single Pitch destination — live arc shown only on the Semi knob.
+    pitchOctave .setIsModulated(false);
     pitchSemi   .setIsModulated(isAssigned("pitch.semitones"));
-    pitchFine   .setIsModulated(isAssigned("pitch.fine"));
+    pitchFine   .setIsModulated(false);
     filterCutoff.setIsModulated(isAssigned("filter.cutoff"));
     filterRes   .setIsModulated(isAssigned("filter.resonance"));
     filterAtk   .setIsModulated(isAssigned("fenv.attack"));
@@ -296,6 +297,10 @@ void VoiceSection::refreshModulatedIndicators()
     ampDec      .setIsModulated(isAssigned("amp.decay"));
     ampSus      .setIsModulated(isAssigned("amp.sustain"));
     ampRel      .setIsModulated(isAssigned("amp.release"));
+    // #223 new destinations
+    pitchDepth  .setIsModulated(isAssigned("pitch.envDepth"));
+    ampLevel    .setIsModulated(isAssigned("amp.level"));
+    ampAccent   .setIsModulated(isAssigned("accentDb"));
     // Insert knobs map differently per algorithm; tag both possible meanings.
     driveDrive  .setIsModulated(isAssigned("insert.drive") || isAssigned("insert.bits"));
     driveOutput .setIsModulated(isAssigned("insert.output") || isAssigned("insert.rate"));
@@ -309,9 +314,10 @@ void VoiceSection::refreshModulatedIndicators()
     auto arc = [&](bool assigned, int idx) -> float { return assigned ? sn(idx) : kNaN; };
 
     using P = PluginProcessor;
-    pitchOctave .setModulatedNorm(arc(isAssigned("pitch.octave"),     P::kSnapPitchOct));
+    // #218: pitch.octave / pitch.fine no longer modulatable; only the Semi knob shows live arc.
+    pitchOctave .setModulatedNorm(kNaN);
     pitchSemi   .setModulatedNorm(arc(isAssigned("pitch.semitones"),  P::kSnapPitchSemi));
-    pitchFine   .setModulatedNorm(arc(isAssigned("pitch.fine"),       P::kSnapPitchFine));
+    pitchFine   .setModulatedNorm(kNaN);
     filterCutoff.setModulatedNorm(arc(isAssigned("filter.cutoff"),    P::kSnapFilterCutoff));
     filterRes   .setModulatedNorm(arc(isAssigned("filter.resonance"), P::kSnapFilterRes));
     filterAtk   .setModulatedNorm(arc(isAssigned("fenv.attack"),      P::kSnapFenvAtk));
@@ -326,6 +332,10 @@ void VoiceSection::refreshModulatedIndicators()
     driveOutput .setModulatedNorm(arc(isAssigned("insert.output"),    P::kSnapInsOutput));
     driveDither .setModulatedNorm(arc(isAssigned("insert.dither"),    P::kSnapInsDither));
     driveTone   .setModulatedNorm(arc(isAssigned("insert.lpf"),       P::kSnapInsLpf));
+    // #223 new destinations
+    pitchDepth  .setModulatedNorm(arc(isAssigned("pitch.envDepth"),   P::kSnapPitchEnvDep));
+    ampLevel    .setModulatedNorm(arc(isAssigned("amp.level"),        P::kSnapAmpLvl));
+    ampAccent   .setModulatedNorm(arc(isAssigned("accentDb"),         P::kSnapAccent));
 }
 
 void VoiceSection::loadFromRhythm()

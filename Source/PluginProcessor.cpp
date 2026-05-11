@@ -285,13 +285,18 @@ PluginProcessor::PluginProcessor()
         loadedSamplePaths.add(juce::String());
 
     // Pre-populate modulation param map so lookups never allocate on the audio thread.
+    // #218: pitch.octave / pitch.fine removed from the populated set so legacy preset
+    // assignments targeting them resolve to "destination not found" at apply time
+    // (paramValues.find returns end() → assignment silently no-ops).
     modParamValues.reserve(24);
     for (const char* key : { "amp.attack", "amp.decay", "amp.sustain", "amp.release",
                               "filter.cutoff", "filter.resonance",
                               "fenv.attack", "fenv.decay", "fenv.depth",
-                              "pitch.semitones", "pitch.octave", "pitch.fine",  // #142
+                              "pitch.semitones",
                               "insert.drive", "insert.output",
-                              "insert.bits", "insert.rate", "insert.dither", "insert.lpf" })
+                              "insert.bits", "insert.rate", "insert.dither", "insert.lpf",
+                              // #223 additions
+                              "pitch.envDepth", "amp.level", "accentDb" })
         modParamValues[key] = 0.0f;
 
     // Add default rhythm (16 steps, 4 hits) and sync its state to APVTS.
@@ -660,15 +665,20 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParamValues["fenv.attack"]      = modParams.filterEnvAtk * (100.0f/3.0f);
                 modParamValues["fenv.decay"]       = modParams.filterEnvDec * (100.0f/3.0f);
                 modParamValues["fenv.depth"]       = modParams.filterEnvDepth;
+                // #218: collapsed pitch destinations to single "pitch.semitones" (±24 st full swing).
+                // pitch.octave / pitch.fine no longer in the value map — legacy preset assignments
+                // targeting them silently no-op at apply time.
                 modParamValues["pitch.semitones"]  = 0.0f;
-                modParamValues["pitch.octave"]     = 0.0f;
-                modParamValues["pitch.fine"]       = 0.0f;
                 modParamValues["insert.drive"]     = modParams.driveDrive;
                 modParamValues["insert.output"]    = modParams.driveOutput;
                 modParamValues["insert.bits"]      = modParams.drvBits;
                 modParamValues["insert.rate"]      = (std::log(modParams.driveRate) - std::log(100.0f)) / (std::log(48000.0f) - std::log(100.0f)) * 100.0f;
                 modParamValues["insert.dither"]    = modParams.drvDither;
                 modParamValues["insert.lpf"]       = modParams.driveTone;
+                // #223 new destinations
+                modParamValues["pitch.envDepth"]   = modParams.pitchEnvDepth;
+                modParamValues["amp.level"]        = modParams.ampLevel;
+                modParamValues["accentDb"]         = modParams.accentDb;
 
                 rhythm.modulationMatrix.process(rhythm.controlSequences, beatPos, modParamValues);
 
@@ -687,14 +697,19 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                     snap[kSnapFenvAtk]     .set(sn(modParamValues["fenv.attack"],      0.0f,    100.0f));
                     snap[kSnapFenvDec]     .set(sn(modParamValues["fenv.decay"],       0.0f,    100.0f));
                     snap[kSnapFenvDepth]   .set(sn(modParamValues["fenv.depth"],       0.0f,     48.0f));
-                    snap[kSnapPitchSemi]   .set(sn(modParamValues["pitch.semitones"], -12.0f,    12.0f));
-                    snap[kSnapPitchOct]    .set(sn(modParamValues["pitch.octave"],    -4.0f,      4.0f));
-                    snap[kSnapPitchFine]   .set(sn(modParamValues["pitch.fine"],    -100.0f,   100.0f));
+                    // #218: single Pitch destination, ±24 st full swing.
+                    snap[kSnapPitchSemi]   .set(sn(modParamValues["pitch.semitones"], -24.0f,    24.0f));
+                    snap[kSnapPitchOct]    .set(0.0f);   // deprecated by #218 — no longer modulatable
+                    snap[kSnapPitchFine]   .set(0.0f);   // deprecated by #218 — no longer modulatable
                     snap[kSnapInsDrive]    .set(sn(modParamValues["insert.drive"],     0.0f,    100.0f));
                     snap[kSnapInsOutput]   .set(sn(modParamValues["insert.output"],   -24.0f,    0.0f));
                     snap[kSnapInsBits]     .set(sn(modParamValues["insert.bits"],      1.0f,     16.0f));
                     snap[kSnapInsDither]   .set(sn(modParamValues["insert.dither"],    0.0f,    100.0f));
                     snap[kSnapInsLpf]      .set(sn(modParamValues["insert.lpf"],      20.0f, 20000.0f));
+                    // #223 new destinations
+                    snap[kSnapPitchEnvDep] .set(sn(modParamValues["pitch.envDepth"],   0.0f,    24.0f));
+                    snap[kSnapAmpLvl]      .set(sn(modParamValues["amp.level"],        0.0f,     2.0f));
+                    snap[kSnapAccent]      .set(sn(modParamValues["accentDb"],         0.0f,    12.0f));
                 }
 
                 // Write modulated values back, clamping to safe ranges.
@@ -707,16 +722,19 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParams.filterEnvAtk   = juce::jmax(0.001f, modParamValues["fenv.attack"]  * 0.03f);
                 modParams.filterEnvDec   = juce::jmax(0.001f, modParamValues["fenv.decay"]   * 0.03f);
                 modParams.filterEnvDepth = juce::jlimit(0.0f, 48.0f, modParamValues["fenv.depth"]);
+                // #218: single pitch destination, no more octave×12 + fine/100 stacking.
                 modParams.pitchMod       = juce::jlimit(-24.0f, 24.0f,
-                                               modParamValues["pitch.semitones"]
-                                             + modParamValues["pitch.octave"] * 12.0f
-                                             + modParamValues["pitch.fine"]   / 100.0f);
+                                                         modParamValues["pitch.semitones"]);
                 modParams.driveDrive     = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.drive"]);
                 modParams.driveOutput    = juce::jlimit(-24.0f,  0.0f,    modParamValues["insert.output"]);
                 modParams.drvBits        = juce::jlimit(1.0f,   16.0f,    modParamValues["insert.bits"]);
                 modParams.driveRate      = std::exp(std::log(100.0f) + juce::jlimit(0.0f, 100.0f, modParamValues["insert.rate"]) / 100.0f * (std::log(48000.0f) - std::log(100.0f)));
                 modParams.drvDither      = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.dither"]);
                 modParams.driveTone      = juce::jlimit(20.0f, 20000.0f,  modParamValues["insert.lpf"]);
+                // #223 new destinations write-back
+                modParams.pitchEnvDepth  = juce::jlimit(0.0f,   24.0f,    modParamValues["pitch.envDepth"]);
+                modParams.ampLevel       = juce::jlimit(0.0f,    2.0f,    modParamValues["amp.level"]);
+                modParams.accentDb       = juce::jlimit(0.0f,   12.0f,    modParamValues["accentDb"]);
             }
         }
 

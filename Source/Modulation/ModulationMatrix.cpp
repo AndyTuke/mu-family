@@ -20,10 +20,13 @@ static float depthScaleFor(const std::string& destId)
     // Hz-domain destinations: ±8 kHz sweep at full depth (audible across the range).
     if (destId == "filter.cutoff" || destId == "insert.lpf") return 8000.0f;
     // Semitones / dB / bits — match the destination's natural full range.
-    if (destId == "pitch.semitones") return 12.0f;   // ±12 semitones = ±1 octave (per #132 spec)
-    if (destId == "pitch.octave")    return 4.0f;    // ±4 octaves (#142)
-    if (destId == "pitch.fine")      return 100.0f;  // ±100 cents (#142)
+    if (destId == "pitch.semitones") return 24.0f;   // ±24 semitones = ±2 oct full swing (#218 collapse)
+    // pitch.octave / pitch.fine deprecated by #218 — destinations removed from UI; legacy
+    // assignments fall through silently because paramValues no longer holds these keys.
     if (destId == "fenv.depth")      return 48.0f;   // 0..48 semitones (full range)
+    if (destId == "pitch.envDepth")  return 24.0f;   // 0..24 semitones (#223)
+    if (destId == "amp.level")       return 2.0f;    // 0..2 gain = -inf..+6 dB (#223)
+    if (destId == "accentDb")        return 12.0f;   // 0..12 dB (#223)
     if (destId == "insert.output")   return 24.0f;   // -24..0 dB (full range)
     if (destId == "insert.bits")     return 16.0f;   // 1..16 bits (full range)
     // Pattern destinations.
