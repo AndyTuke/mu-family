@@ -9,6 +9,17 @@ SequencerEngine::SequencerEngine()
     cachedPatterns.reserve(MaxRhythms);
     cachedCPatterns.reserve(MaxRhythms);
     patternUpdated.reserve(MaxRhythms);
+
+    // #234: pre-size every safePatterns / safeCPatterns slot to the worst-case
+    // step count (256 — matches the resetSteps cap and getCombinedPattern's LCM
+    // clamp). Audio-thread `assign()` from cachedPatterns later is then guaranteed
+    // not to allocate, because the destination already has enough capacity.
+    static constexpr size_t kMaxStepCount = 256;
+    for (int i = 0; i < MaxRhythms; ++i)
+    {
+        safePatterns [i].reserve(kMaxStepCount);
+        safeCPatterns[i].reserve(kMaxStepCount);
+    }
 }
 
 //==============================================================================
@@ -105,12 +116,12 @@ void SequencerEngine::swapRhythmSlots(int i, int j)
     std::swap(safePatterns[i],    safePatterns[j]);
     std::swap(safeCPatterns[i],   safeCPatterns[j]);
 
-    bool tmp = patternUpdated[i];
-    patternUpdated[i] = patternUpdated[j];
-    patternUpdated[j] = tmp;
-
-    lastStepIndex[i] = -1;
-    lastStepIndex[j] = -1;
+    // #228: instead of leaving lastStepIndex at -1 (which fires the first new-pattern
+    // hit retroactively), mark patternUpdated so the next processBlock runs through
+    // the standard snapshot/absorb path which sets lastStepIndex[r] = effectiveStep
+    // % size — matches updatePattern's semantics, no retroactive trigger.
+    patternUpdated[i] = true;
+    patternUpdated[j] = true;
 
     patternLock.store(false, std::memory_order_release);
 }
@@ -158,8 +169,12 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
             {
                 if (patternUpdated[r])
                 {
-                    safePatterns[r]   = cachedPatterns[r];
-                    safeCPatterns[r]  = cachedCPatterns[r];
+                    // #234: assign() reuses existing storage when capacity is sufficient.
+                    // safePatterns slots are reserve(256)'d in the ctor, so even a fresh
+                    // pattern slotting in over an empty slot writes in place — no alloc
+                    // on the audio thread.
+                    safePatterns[r].assign(cachedPatterns[r].begin(),  cachedPatterns[r].end());
+                    safeCPatterns[r].assign(cachedCPatterns[r].begin(), cachedCPatterns[r].end());
                     patternUpdated[r] = false;
                     // Absorb the current step so we don't retroactively fire a hit.
                     if (!safePatterns[r].empty())

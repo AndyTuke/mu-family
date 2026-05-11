@@ -62,15 +62,23 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
-    void   toggleInternalPlay()        { internalPlaying = !internalPlaying; if (!internalPlaying) internalBeatPos = 0.0; }
-    bool   isInternalPlaying()   const { return internalPlaying; }
+    // #230: internalPlaying / internalBeatPos are touched by both audio (write) and
+    // message thread (read + clear). std::atomic<> with relaxed ordering — no other
+    // memory is published through them, so relaxed is sufficient.
+    void   toggleInternalPlay()
+    {
+        const bool nowPlaying = !internalPlaying.load(std::memory_order_relaxed);
+        internalPlaying.store(nowPlaying, std::memory_order_relaxed);
+        if (!nowPlaying) internalBeatPos.store(0.0, std::memory_order_relaxed);
+    }
+    bool   isInternalPlaying()   const { return internalPlaying.load(std::memory_order_relaxed); }
     void   setInternalBpm(double bpm)  { internalBpm = juce::jlimit(20.0, 300.0, bpm); }
     double getInternalBpm()      const { return internalBpm; }
     double getInternalBeatPos()  const
     {
         if (midiSyncEnabled.load(std::memory_order_relaxed) && midiClockIsPlaying.get())
             return midiClockBeatPosUI.load(std::memory_order_relaxed);
-        return internalBeatPos;
+        return internalBeatPos.load(std::memory_order_relaxed);
     }
 
     // Multi-bus output (DAW only). Toggle is read at host scan-time; toggling at runtime
@@ -285,9 +293,10 @@ private:
     std::unique_ptr<juce::AudioFormatReaderSource> previewSource;
     juce::AudioBuffer<float> previewScratchBuffer;
 
-    bool   internalPlaying   = false;
-    double internalBeatPos   = 0.0;
-    double internalBpm       = 120.0;
+    // #230: atomic for safe cross-thread access (audio writes, UI reads + clears).
+    std::atomic<bool>   internalPlaying   { false };
+    std::atomic<double> internalBeatPos   { 0.0 };
+    double              internalBpm       = 120.0;   // message-thread only
     double currentSampleRate = 44100.0;
     int    currentBlockSize  = 512;
 

@@ -387,12 +387,14 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 beatPos = *ppq;
         }
     }
-    if (!playing && internalPlaying)
+    if (!playing && internalPlaying.load(std::memory_order_relaxed))
     {
         playing = true;
-        beatPos = internalBeatPos;
+        const double pos = internalBeatPos.load(std::memory_order_relaxed);
+        beatPos = pos;
         const int ns = juce::jmax(1, buffer.getNumSamples());
-        internalBeatPos += (ns / currentSampleRate) * (internalBpm / 60.0);
+        internalBeatPos.store(pos + (ns / currentSampleRate) * (internalBpm / 60.0),
+                              std::memory_order_relaxed);
     }
 
     sequencerPlaying.set(playing);
@@ -551,18 +553,28 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
     if (!playing && midiSyncEnabled.load(std::memory_order_relaxed)
                  && wrapperType == wrapperType_Standalone
-                 && (midiClockIsPlaying.get() || internalPlaying))
+                 && (midiClockIsPlaying.get() || internalPlaying.load(std::memory_order_relaxed)))
     {
         playing = true;
         beatPos = midiClockBlockBeatPos;
     }
-    else if (!playing && internalPlaying)
+    else if (!playing && internalPlaying.load(std::memory_order_relaxed))
     {
         playing  = true;
-        beatPos  = internalBeatPos;
-        internalBeatPos += (buffer.getNumSamples() / currentSampleRate) * (internalBpm / 60.0);
+        const double pos = internalBeatPos.load(std::memory_order_relaxed);
+        beatPos  = pos;
+        internalBeatPos.store(pos + (buffer.getNumSamples() / currentSampleRate) * (internalBpm / 60.0),
+                              std::memory_order_relaxed);
     }
 
+    // #231: detect transport stop→start edge and reset the sequencer's wrap detector
+    // so the first block after restart can't emit a false masterLoopWrapped from
+    // a stale lastEffectiveStep.
+    {
+        const bool wasPlaying = sequencerPlaying.get();
+        if (playing && !wasPlaying)
+            sequencer.resetWrapDetector();
+    }
     sequencerPlaying.set(playing);
     lastBeatPos.set(beatPos);
 
