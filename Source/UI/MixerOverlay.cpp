@@ -26,14 +26,10 @@ MixerOverlay::MixerOverlay(PluginProcessor& p, MixerEngine& m)
         propagateMeterMode(static_cast<VUMeter::MeterMode>(idx));
     };
 
-    // Register only for parameters the mixer UI actually reflects (channel
-    // strips, return strips, master, master insert, and the three FX rows).
-    // Listening to every APVTS parameter caused a full mixer reload on every
-    // unrelated rhythm/voice tweak — 88+ slider rewrites per knob turn.
+    // Register for every APVTS parameter so automation syncs the mixer UI.
     for (auto* param : proc.getParameters())
         if (auto* pid = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
-            if (isMixerParam(pid->getParameterID()))
-                proc.apvts.addParameterListener(pid->getParameterID(), this);
+            proc.apvts.addParameterListener(pid->getParameterID(), this);
 
     startTimerHz(30);
 }
@@ -43,22 +39,7 @@ MixerOverlay::~MixerOverlay()
     stopTimer();
     for (auto* param : proc.getParameters())
         if (auto* pid = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
-            if (isMixerParam(pid->getParameterID()))
-                proc.apvts.removeParameterListener(pid->getParameterID(), this);
-}
-
-bool MixerOverlay::isMixerParam(const juce::String& id)
-{
-    return id.startsWith("ch")      // ch0_..ch7_ rhythm strips
-        || id.startsWith("ret_")    // ret_eff_, ret_dly_, ret_rev_
-        || id.startsWith("mstr_")   // master fader + pan
-        || id.startsWith("mst_ins") // master insert algorithm + params
-        || id.startsWith("eff_")    // effect FX row + algo params
-        || id.startsWith("dly_")    // delay FX row
-        || id.startsWith("rev_")    // reverb FX row
-        || id.startsWith("echo_")   // echo (embedded in effect slot)
-        || id.startsWith("eff2")    // intra-FX sends
-        || id.startsWith("dly2");
+            proc.apvts.removeParameterListener(pid->getParameterID(), this);
 }
 
 void MixerOverlay::parameterChanged(const juce::String& /*parameterID*/, float /*newValue*/)
@@ -81,30 +62,6 @@ void MixerOverlay::timerCallback()
     {
         loadFromAPVTS();
         apvtsDirty = false;
-    }
-
-    // After a hot-swap, refresh each rhythm channel's name and colour bar.
-    // These fields aren't APVTS-backed so the routine listener-driven refresh
-    // path doesn't pick them up — the swap epoch counter on the processor is
-    // the lightweight signal that handleAsyncUpdate has just rewritten a slot.
-    const int currentEpoch = proc.rhythmSwapEpoch.load(std::memory_order_acquire);
-    if (currentEpoch != lastSwapEpoch)
-    {
-        lastSwapEpoch = currentEpoch;
-        const auto& palette = MuClidLookAndFeel::rhythmPalette;
-        const int numActive = proc.getNumRhythms();
-        for (int r = 0; r < (int)rhythmChannels.size(); ++r)
-        {
-            const bool hasRhythm = r < numActive;
-            const juce::String name = hasRhythm ? juce::String(proc.getRhythm(r).name) : juce::String("-");
-            const juce::Colour col  = hasRhythm
-                                        ? palette[proc.getRhythm(r).colourIndex % 30]
-                                        : juce::Colour(0xff404040);
-            rhythmChannels[r]->setChannelName(name);
-            rhythmChannels[r]->setChannelColour(col);
-        }
-        // Sidechain-source dropdowns list rhythms by name — refresh those too.
-        refreshSidechainSources();
     }
 }
 
@@ -165,8 +122,6 @@ void MixerOverlay::wireFXRows()
     // Issue #44: Effect is a send/return path — the dry signal already lives in the
     // main bus, so the algorithm's wet/dry mix knob would double the dry component.
     // Hide the mix knob; EffectSlot forces the algorithm into sendMode (wet-only).
-    // `mix` was removed from all four send-style algorithm defs in #211 — kept
-    // here defensively in case it returns in a future def revision.
     effectRow.hideParameter("mix");
     effectRow.setEnabled(eff.isEnabled());
     effectRow.setSelectedAlgorithm(eff.getAlgorithmIndex());
@@ -263,10 +218,6 @@ void MixerOverlay::wireFXRows()
         if (auto* p = proc.apvts.getParameter("dly_dirt"))
             p->setValueNotifyingHost(p->convertTo0to1(v));
     };
-    delayRow.onDampChanged = [this](float v) {
-        if (auto* p = proc.apvts.getParameter("dly_damp"))
-            p->setValueNotifyingHost(p->convertTo0to1(v));
-    };
 
     // ── Reverb row ───────────────────────────────────────────────────────────
     reverbRow.setEnabled(rev.isEnabled());
@@ -344,10 +295,6 @@ void MixerOverlay::wireFXRows()
     };
     echoRow.onDirtChanged     = [this](float v) {
         if (auto* p = proc.apvts.getParameter("echo_dirt"))
-            p->setValueNotifyingHost(p->convertTo0to1(v));
-    };
-    echoRow.onDampChanged     = [this](float v) {
-        if (auto* p = proc.apvts.getParameter("echo_damp"))
             p->setValueNotifyingHost(p->convertTo0to1(v));
     };
 
@@ -442,7 +389,6 @@ void MixerOverlay::loadFromAPVTS()
             echoRow.setFeedback(*apvts.getRawParameterValue("echo_fb"));
             echoRow.setSpread  (*apvts.getRawParameterValue("echo_spread"));
             echoRow.setDirt    (*apvts.getRawParameterValue("echo_dirt"));
-            echoRow.setDamp    (*apvts.getRawParameterValue("echo_damp"));
         }
         resized();
     }
@@ -469,7 +415,6 @@ void MixerOverlay::loadFromAPVTS()
         delayRow.setFeedback(*apvts.getRawParameterValue("dly_fb"));
         delayRow.setSpread  (*apvts.getRawParameterValue("dly_spread"));
         delayRow.setDirt    (*apvts.getRawParameterValue("dly_dirt"));
-        delayRow.setDamp    (*apvts.getRawParameterValue("dly_damp"));
     }
 
     // Reverb row

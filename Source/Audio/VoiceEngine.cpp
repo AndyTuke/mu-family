@@ -29,11 +29,6 @@ void VoiceEngine::prepareToPlay(double sampleRate, int blockSize)
 
     voiceFilter.prepare(sampleRate, blockSize, 2);
 
-    // #220 / #219
-    pitchRatioBuffer.assign(static_cast<size_t>(juce::jmax(1, blockSize)), 1.0);
-    smoothedPitchMod.reset(sampleRate, 0.005);
-    smoothedPitchMod.setCurrentAndTargetValue(activeParams.pitchMod);
-
     syncFilter();
 }
 
@@ -81,14 +76,9 @@ void VoiceEngine::trigger(bool isAccented)
         nextVoice = (nextVoice + 1) % MaxVoices;
     }
 
-    // #221: Reset (default) clears envelope to zero before noteOn; Legato continues
-    // from the current level so rapid retriggers don't click.
-    if (!activeParams.ampEnvLegato)    ampEnv.reset();
-    ampEnv.noteOn();
-    if (!activeParams.filterEnvLegato) filterEnv.reset();
-    filterEnv.noteOn();
-    if (!activeParams.pitchEnvLegato)  pitchEnv.reset();
-    pitchEnv.noteOn();
+    ampEnv.reset();    ampEnv.noteOn();
+    filterEnv.reset(); filterEnv.noteOn();
+    pitchEnv.reset();  pitchEnv.noteOn();
 }
 
 void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
@@ -102,40 +92,28 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     // Guard against hosts that call process() with more samples than prepareToPlay() promised.
     const int ns = juce::jmin(numSamples, tempBuffer.getNumSamples());
 
-    // #220: per-sample pitch ratio. Static pitch and base playback ratio fold into a
-    // constant; pitch envelope + smoothed pitchMod produce the per-sample exponent.
-    const float baseSemitones = static_cast<float>(activeParams.pitchOctave) * 12.0f
-                              + static_cast<float>(activeParams.pitchSemitones)
-                              + activeParams.pitchFine / 100.0f;
-    const float pitchDepth = activeParams.pitchEnvDepth;
+    float semitones = static_cast<float>(activeParams.pitchOctave) * 12.0f
+                    + static_cast<float>(activeParams.pitchSemitones)
+                    + activeParams.pitchFine / 100.0f
+                    + activeParams.pitchMod;
 
-    smoothedPitchMod.setTargetValue(activeParams.pitchMod);
+    float pitchEnvVal = 0.0f;
+    for (int i = 0; i < ns; ++i)
+        pitchEnvVal = pitchEnv.getNextSample();
 
-    if (static_cast<int>(pitchRatioBuffer.size()) < ns)
-        pitchRatioBuffer.assign(static_cast<size_t>(ns), 1.0);
-
-    for (int s = 0; s < ns; ++s)
-    {
-        const float envVal   = pitchEnv.getNextSample();
-        const float modVal   = smoothedPitchMod.getNextValue();
-        const float semitone = baseSemitones + modVal + envVal * pitchDepth;
-        pitchRatioBuffer[static_cast<size_t>(s)] = playbackRatio * std::pow(2.0, semitone / 12.0);
-    }
+    double pitchRatio = playbackRatio
+                      * std::pow(2.0, (semitones + pitchEnvVal * activeParams.pitchEnvDepth) / 12.0);
 
     const int nCh = juce::jmin(output.getNumChannels(), tempBuffer.getNumChannels());
     tempBuffer.clear();
 
     for (auto& v : voices)
-        v.process(buffer, pitchRatioBuffer.data(), tempBuffer, ns);
+        v.process(buffer, pitchRatio, tempBuffer, ns);
 
     if (!activeParams.ampRelToEnd)
         ampEnv.applyEnvelopeToBuffer(tempBuffer, 0, ns);
 
-    // Filter envelope modulates cutoff. Envelope is evaluated sample-by-sample for
-    // accuracy; the *last* sample's value is fed to MultiModeFilter::setCutoff, which
-    // internally ramps with a 5 ms smoothedCutoff (#215) to remove block-rate steps.
-    // Fully sample-accurate filter cutoff would need a MultiModeFilter API rework —
-    // deferred (#220 partial).
+    // Filter envelope modulates cutoff (per-block approximation).
     float filterEnvVal = 0.0f;
     for (int i = 0; i < ns; ++i)
         filterEnvVal = filterEnv.getNextSample();
@@ -164,13 +142,6 @@ void VoiceEngine::clearSample()
     juce::ScopedWriteLock sl(bufferLock);
     buffer.setSize(0, 0);
     sampleLoaded = false;
-}
-
-bool VoiceEngine::isProducingSound() const
-{
-    for (auto& v : voices)
-        if (v.isActive()) return true;
-    return false;
 }
 
 void VoiceEngine::setParams(const VoiceParams& p)
@@ -219,5 +190,4 @@ void VoiceEngine::syncFilter()
     voiceFilter.setType(activeParams.filterType);
     voiceFilter.setCutoff(activeParams.filterCutoff);
     voiceFilter.setResonance(activeParams.filterRes);
-    voiceFilter.setGainDb(activeParams.filterGainDb);
 }

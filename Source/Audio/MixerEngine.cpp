@@ -49,13 +49,9 @@ bool MixerEngine::hasSignal(const juce::AudioBuffer<float>& buf, int numSamples)
 void MixerEngine::applyPanGain(juce::AudioBuffer<float>& buf,
                                 float level, float pan, int numSamples)
 {
-    // −3 dB equal-power (sin/cos) pan law. At pan = 0 both channels are
-    // attenuated by ≈0.707× (−3 dB) so a mono source sums to roughly the
-    // same perceived loudness as when panned hard left or right. Linear
-    // ("balance") pan would make centred mono sources sound +3 dB louder.
-    const float t  = (pan + 1.0f) * 0.5f * juce::MathConstants<float>::halfPi;
-    const float gL = level * std::cos(t);
-    const float gR = level * std::sin(t);
+    // Linear pan law: left attenuates as pan moves right, and vice versa.
+    const float gL = level * (1.0f - juce::jmax(0.0f,  pan));
+    const float gR = level * (1.0f + juce::jmin(0.0f,  pan));
     if (buf.getNumChannels() > 0) buf.applyGain(0, 0, numSamples, gL);
     if (buf.getNumChannels() > 1) buf.applyGain(1, 0, numSamples, gR);
 }
@@ -63,7 +59,6 @@ void MixerEngine::applyPanGain(juce::AudioBuffer<float>& buf,
 void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                                 int                          numActiveRhythms,
                                 std::unique_ptr<VoiceEngine>* voices,
-                                std::unique_ptr<VoiceEngine>* tailVoices,
                                 FXChain&                     fxChain,
                                 int                          numSamples,
                                 std::array<juce::AudioBuffer<float>*, 8>* directOuts,
@@ -87,15 +82,12 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     }
 
     // Phase 1: process all voices into their channel buffers and apply headroom trim.
-    // Tail voices (if present) are summed into the same channel buffer additively
-    // so they share the channel's fader/pan/sends/sidechain with the active voice.
     // We defer pan/gain/mix until Phase 3 so Phase 2 can apply sidechain first.
     for (int r = 0; r < numActiveRhythms; ++r)
     {
         auto& buf = channelBufs[r];
         buf.clear();
-        if (voices[r])                          voices[r]    ->process(buf, numSamples);
-        if (tailVoices != nullptr && tailVoices[r]) tailVoices[r]->process(buf, numSamples);
+        if (voices[r]) voices[r]->process(buf, numSamples);
         buf.applyGain(kHeadroomTrim);
     }
 

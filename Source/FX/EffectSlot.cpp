@@ -10,6 +10,9 @@ void EffectSlot::prepare(double sampleRate, int blockSize)
     currentRate  = sampleRate;
     currentBlock = blockSize;
 
+    oversampler = std::make_unique<OversampledProcessor>(1);
+    oversampler->prepare(sampleRate, blockSize);
+
     if (algorithm)
         algorithm->prepareInner(sampleRate, blockSize);
 
@@ -28,7 +31,11 @@ void EffectSlot::setAlgorithm(int index)
     if (algorithm) algorithm->setSendMode(true); // Issue #44: Effect slot is wired into mixer's send/return — wet-only
 
     if (currentRate > 0.0)
+    {
+        oversampler = std::make_unique<OversampledProcessor>(1);
+        oversampler->prepare(currentRate, currentBlock);
         algorithm->prepareInner(currentRate, currentBlock);
+    }
 }
 
 void EffectSlot::setParam(const juce::String& id, float value)
@@ -46,8 +53,10 @@ void EffectSlot::processReturn(juce::AudioBuffer<float>& buffer)
         return;
     }
     if (!algorithm) return;
-    juce::dsp::AudioBlock<float> block(buffer);
-    algorithm->processInner(block);
+    oversampler->process(buffer, [this](juce::dsp::AudioBlock<float>& block)
+    {
+        algorithm->processInner(block);
+    });
 }
 
 std::unique_ptr<EffectAlgorithmBase> EffectSlot::makeAlgorithm(int index)

@@ -19,17 +19,10 @@ public:
     // leaves the master with healthy headroom even on hot, normalised samples.
     // Trim is invisible to the user — it sits between the voice output and the
     // (visible) channel fader, so all FX sends and post-fader peaks see the
-    // attenuated signal automatically.
+    // attenuated signal automatically. Chosen empirically: existing presets
+    // load 6 dB quieter, but a fresh project with a 0 dBFS sample now peaks
+    // around −14 dBFS at the master output (≈ +4 dB on the calibrated VU).
     static constexpr float kHeadroomTrim = 0.5f;
-
-    // DAW-style fader: faders accept up to +6 dB of boost (value 2.0) above
-    // unity (value 1.0). The skew places 0 dB at ≈75% of slider travel, so
-    // the bottom three-quarters covers −∞..0 dB and the top quarter is +0..+6 dB.
-    // Match this between APVTS NormalisableRange.skew and the UI Slider's
-    // setSkewFactor so host automation lanes and the UI fader stay aligned.
-    // skew = log(0.5) / log(0.75) ≈ 2.4094
-    static constexpr float kFaderMax  = 2.0f;
-    static constexpr float kFaderSkew = 2.4094f;
 
     struct ChannelState
     {
@@ -52,12 +45,10 @@ public:
 
     struct ReturnState
     {
-        float level = 1.0f;       // Issue #121: 0 dB default (was 0.75 = −2.5 dB)
+        float level = 0.75f;
         float pan   = 0.0f;
         bool  mute  = false;
-        // FX-return solo is intentionally absent: soloing FX returns has unclear
-        // semantics (do you mute the dry channels feeding the return? leave them?)
-        // so the mixer only exposes solo on rhythm channels.
+        bool  solo  = false;
     };
 
     std::array<ChannelState, MaxChannels> channels;
@@ -86,15 +77,9 @@ public:
     // channel r's outputBus == N+1 (i.e. the channel is routed to "Out N+1" instead of
     // the master mix). Channels routed to direct outs skip FX sends and the master fader.
     // fxReturnsOut (if non-null) receives a copy of the post-fader FX return mix.
-    // `voices` is the array of active per-rhythm VoiceEngines.
-    // `tailVoices` (optional) parallel array of decaying old voices carried
-    // across a hot-swap; each non-null tail is summed into the same channel
-    // buffer as its active sibling so both share the channel's fader, pan,
-    // sends, sidechain etc. — see #196.
     void processBlock(juce::AudioBuffer<float>&   output,
                       int                         numActiveRhythms,
                       std::unique_ptr<VoiceEngine>* voices,
-                      std::unique_ptr<VoiceEngine>* tailVoices,
                       FXChain&                    fxChain,
                       int                         numSamples,
                       std::array<juce::AudioBuffer<float>*, 8>* directOuts = nullptr,

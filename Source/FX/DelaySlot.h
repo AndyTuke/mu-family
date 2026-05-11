@@ -23,6 +23,7 @@ public:
 
     bool isEnabled() const  { return enabled; }
     void setEnabled(bool e) { enabled = e; }
+    void setSend(float v)   { sendAmount = juce::jlimit(0.0f, 1.0f, v); }
 
     // Send-bus processing: runs delay with no dry/wet blend (wet-only output).
     void processReturn(juce::AudioBuffer<float>&);
@@ -40,27 +41,20 @@ public:
     void setFeedback(float fb)  { feedback = juce::jlimit(0.0f, 0.98f, fb); }
     void setSpread(float s)     { spread   = juce::jlimit(0.0f, 1.0f, s); }
     void setDirt(float d)       { dirt     = juce::jlimit(0.0f, 1.0f, d); }
-    // 0 = no damping (filter wide open at ~20 kHz, current default);
-    // 1 = maximum damping (cutoff at ~800 Hz, tape-style HF roll-off on repeats).
-    void setDamp(float d)       { damp     = juce::jlimit(0.0f, 1.0f, d); updateDampCoeff(); }
     void setHostBpm(double bpm) { hostBpm  = bpm; if (timeMode == TimeMode::Sync) updateDelayFromMode(); }
 
 private:
     void updateDelayFromMode();
     void setDelaySamplesLR(float sampL, float sampR);
     float processDirt(float x) const;
-    void  updateDampCoeff();
 
     static constexpr int MaxDelaySamples = 4 * 192000;  // 4s at 192kHz
 
     bool   enabled    = true;
+    float  sendAmount = 1.0f;
     float  feedback   = 0.45f;
     float  spread     = 0.0f;
     float  dirt       = 0.0f;
-    float  damp       = 0.0f;
-    float  dampCoeff  = 0.0f;     // 1-pole LP smoothing factor in [0, ~0.95]
-    float  dampStateL = 0.0f;
-    float  dampStateR = 0.0f;
     double sr         = 44100.0;
     double hostBpm    = 120.0;
 
@@ -80,4 +74,6 @@ private:
     std::vector<float> bufL, bufR;
     int writePosL = 0, writePosR = 0;
     float feedL = 0.0f, feedR = 0.0f;  // feedback state
+
+    juce::AudioBuffer<float> dryBuffer;
 };

@@ -684,19 +684,4 @@ void RhythmPanel::timerCallback()
         modulatorPanel.setPlayheadBeat(proc.lastBeatPos.get());
     voiceSection.refreshModulatedIndicators();
     euclidPanel.refreshModulatedIndicators();
-
-    // Refresh the rhythm name after a hot-swap if we're viewing the swapped slot.
-    // The Rhythm name isn't APVTS-backed so the listener-driven param refresh
-    // path doesn't carry it across — pick it up from the swap epoch counter.
-    const int currentEpoch = proc.rhythmSwapEpoch.load(std::memory_order_acquire);
-    if (currentEpoch != lastSwapEpoch)
-    {
-        lastSwapEpoch = currentEpoch;
-        if (currentRhythmIndex >= 0 && currentRhythmIndex < proc.getNumRhythms())
-        {
-            nameLabel.setText(juce::String(proc.getRhythm(currentRhythmIndex).name),
-                              juce::dontSendNotification);
-            repaint();
-        }
-    }
 }

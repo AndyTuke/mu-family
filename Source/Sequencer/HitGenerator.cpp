@@ -106,12 +106,10 @@ std::vector<StepType> HitGenerator::getStepTypes() const
     }
     else if (insertLength > 0 && insertMode == InsertMode::Mute)
     {
-        // #227: muted insert zone shows as InsertPad so the ring visually distinguishes
-        // it from genuine empty steps — matches the Pad-mode visual identity.
         int clampedStart = std::clamp(insertStart, 0, activeSteps);
         int zoneEnd = std::min(clampedStart + insertLength, activeSteps);
         for (int i = 0; i < activeSteps; ++i)
-            result.push_back((i >= clampedStart && i < zoneEnd) ? StepType::InsertPad
+            result.push_back((i >= clampedStart && i < zoneEnd) ? StepType::Empty
                                                                  : (boolPat[i] ? StepType::Hit : StepType::Empty));
     }
     else

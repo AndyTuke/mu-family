@@ -59,21 +59,9 @@ ModulatorEditor::AssignmentRow::AssignmentRow(const std::string& assignId, int d
     depthSlider.setRange(-100.0, 100.0, 0.1);
     depthSlider.setValue(0.0, juce::dontSendNotification);
 
-    // #224 curve knob: rotary, bipolar with detent at 0. Compact textbox to fit row width.
-    curveSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    curveSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 34, 18);
-    curveSlider.setRange(-100.0, 100.0, 0.1);
-    curveSlider.setValue(0.0, juce::dontSendNotification);
-    curveSlider.setDoubleClickReturnValue(true, 0.0);
-    curveSlider.setTooltip("Curve: log .. linear .. exp (#224)");
-
     depthSlider.onValueChange = [this]
     {
         if (onDepthChange) onDepthChange((float)depthSlider.getValue());
-    };
-    curveSlider.onValueChange = [this]
-    {
-        if (onCurveChange) onCurveChange((float)curveSlider.getValue());
     };
     destCombo.onChange = [this](int id_)
     {
@@ -84,19 +72,17 @@ ModulatorEditor::AssignmentRow::AssignmentRow(const std::string& assignId, int d
 
     addAndMakeVisible(destCombo);
     addAndMakeVisible(depthSlider);
-    addAndMakeVisible(curveSlider);
     addAndMakeVisible(removeBtn);
 }
 
 void ModulatorEditor::AssignmentRow::resized()
 {
     const int w = getWidth(), h = getHeight();
-    const int removeW = 22, curveW = 70, depthW = 130;
-    const int destW = w - depthW - curveW - removeW - 6;
-    destCombo  .setBounds(0,                    0, destW,  h);
-    depthSlider.setBounds(destW + 2,            0, depthW, h);
-    curveSlider.setBounds(destW + 2 + depthW + 2, 0, curveW, h);
-    removeBtn  .setBounds(w - removeW, (h - 18) / 2, removeW, 18);
+    const int removeW = 22, depthW = 130;
+    const int destW = w - depthW - removeW - 4;
+    destCombo.setBounds(0, 0, destW, h);
+    depthSlider.setBounds(destW + 2, 0, depthW, h);
+    removeBtn.setBounds(w - removeW, (h - 18) / 2, removeW, 18);
 }
 
 //==============================================================================
@@ -170,12 +156,7 @@ void ModulatorEditor::setData(ControlSequence* cs_, ModulationMatrix* matrix_,
     modColour      = colour;
     modIndex       = index;
     stepEditor.setBarColour(modColour);
-    // #229: loadFromCS() can `push_back` to cs->curvePoints (seeding default points)
-    // and `resize` cs->stepValues — both can race with the audio thread's
-    // `cs->evaluate()` if we don't hold modLock during the mutation.
-    lockMod();
     loadFromCS();
-    unlockMod();
     rebuildRows();
     resized();
     repaint();
@@ -396,7 +377,6 @@ void ModulatorEditor::rebuildRows()
                 { row->destCombo.setSelectedId(i + 1); break; }
 
         row->depthSlider.setValue(a.depth, juce::dontSendNotification);
-        row->curveSlider.setValue(a.curve, juce::dontSendNotification);   // #224
 
         const std::string rowId = a.id;
         row->onRemove = [this, rowId]
@@ -414,17 +394,15 @@ void ModulatorEditor::rebuildRows()
         {
             if (!matrix) return;
             float d = 0.0f;
-            float c = 0.0f;
             lockMod();
             for (const auto& a2 : matrix->getAssignments())
-                if (a2.id == rowId) { d = a2.depth; c = a2.curve; break; }
+                if (a2.id == rowId) { d = a2.depth; break; }
             matrix->removeAssignment(rowId);
             ModulationAssignment na;
             na.id            = rowId;
             na.sourceId      = cs->id + "_output";
             na.destinationId = dest;
             na.depth         = d;
-            na.curve         = c;   // #224 preserve curve through dest change
             matrix->addAssignment(na);
             unlockMod();
             if (onChange) onChange();
@@ -434,14 +412,6 @@ void ModulatorEditor::rebuildRows()
             if (!matrix) return;
             lockMod();
             matrix->setDepth(rowId, d);
-            unlockMod();
-            if (onChange) onChange();
-        };
-        row->onCurveChange = [this, rowId](float c)   // #224
-        {
-            if (!matrix) return;
-            lockMod();
-            matrix->setCurve(rowId, c);
             unlockMod();
             if (onChange) onChange();
         };

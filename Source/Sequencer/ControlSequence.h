@@ -18,14 +18,8 @@ public:
         float x = 0.0f;          // normalised loop position 0..1
         float y = 0.0f;          // normalised output -1..1
         bool  hasBezierHandle = false;
-        // #225: handleX retained in the struct for forward-compat (and persisted by
-        // #237's modulator save path) but the evaluator (#222) is intentionally 1-D
-        // in y-over-chord — a true 2-D cubic complicates the playhead-vs-time
-        // mapping and is not free. handleX is ignored by `evaluateSmooth` until/unless
-        // we upgrade to a 2-D evaluator. Document this for anyone authoring presets
-        // externally so they don't expect horizontal handle effects.
-        float handleX = 0.0f;    // (currently unused — see note above)
-        float handleY = 0.0f;    // offset from segment midpoint, used by evaluator
+        float handleX = 0.0f;    // offset from segment midpoint
+        float handleY = 0.0f;
     };
 
     std::string id;              // stable ID used as modulation source key, e.g. "cs0"

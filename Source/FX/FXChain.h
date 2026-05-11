@@ -13,6 +13,7 @@ public:
     FXChain();
 
     void prepare(double sampleRate, int blockSize);
+    void process(juce::AudioBuffer<float>&);
 
     // Per-send-bus processing for the mixer.  Each enabled bus is processed wet-only.
     void processSends(juce::AudioBuffer<float>& effectSend,
@@ -39,4 +40,7 @@ private:
     float effToDelay  = 0.0f;
     float effToReverb = 0.0f;
     float delToReverb = 0.0f;
+
+    // Scratch buffers for intra-FX routing (allocated in prepare()).
+    juce::AudioBuffer<float> scratchBuf;
 };

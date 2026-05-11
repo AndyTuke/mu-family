@@ -174,14 +174,10 @@ The oversampling field is retained in the struct for forward compatibility; all 
 
 ## Effect Algorithm Files (current)
 
-Distortion and filter algorithms now live in `Source/Audio/InsertProcessor.cpp` (used by both
-the per-rhythm voice INSERT slot and the master INSERT slot). The Effect *send* slot only hosts
-modulation/time algorithms.
+Distortion and filter effect files (`SoftClipEffect`, `HardClipEffect`, `FoldbackEffect`,
+`BitcrushEffect`, `LadderFilterEffect`, `CombFilterEffect`) remain on disk but are no longer
+registered in `FXAlgorithmRegistry::effectAlgorithms()` and are not instantiated. They may be
+deleted in Stage 11 cleanup.
 
-Registered in `FXAlgorithmRegistry::effectAlgorithms()`:
-- `Source/FX/Effects/ChorusEffect.h` — multi-voice modulated delay.
-- `Source/FX/Effects/FlangerEffect.h` — single modulated delay with feedback, through-zero capable.
-- `Source/FX/Effects/PhaserEffect.h` — allpass chain modulated by an LFO.
-- `Source/FX/Effects/EchoEffect.h` — simple stereo delay (free time). When `eff_algo == Echo`
-  the EffectSlot delegates to its embedded DelaySlot for full sync/spread/dirt capability;
-  the EchoEffect class itself is currently dormant for that path.
+`Source/FX/Effects/FlangerEffect.h` — implemented; same interface as ChorusEffect.
+`Source/FX/Effects/EchoEffect.h` — implemented; simple stereo delay, no sync logic.

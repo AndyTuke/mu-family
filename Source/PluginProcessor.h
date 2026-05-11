@@ -62,24 +62,15 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
-    // #230: internalPlaying / internalBeatPos are touched by both audio (write) and
-    // message thread (read + clear). std::atomic<> with relaxed ordering — no other
-    // memory is published through them, and on x64 aligned 8-byte loads are atomic
-    // anyway, so this just makes the racing read/write well-defined per C++ memory model.
-    void   toggleInternalPlay()
-    {
-        const bool nowPlaying = !internalPlaying.load(std::memory_order_relaxed);
-        internalPlaying.store(nowPlaying, std::memory_order_relaxed);
-        if (!nowPlaying) internalBeatPos.store(0.0, std::memory_order_relaxed);
-    }
-    bool   isInternalPlaying()   const { return internalPlaying.load(std::memory_order_relaxed); }
+    void   toggleInternalPlay()        { internalPlaying = !internalPlaying; if (!internalPlaying) internalBeatPos = 0.0; }
+    bool   isInternalPlaying()   const { return internalPlaying; }
     void   setInternalBpm(double bpm)  { internalBpm = juce::jlimit(20.0, 300.0, bpm); }
     double getInternalBpm()      const { return internalBpm; }
     double getInternalBeatPos()  const
     {
         if (midiSyncEnabled.load(std::memory_order_relaxed) && midiClockIsPlaying.get())
             return midiClockBeatPosUI.load(std::memory_order_relaxed);
-        return internalBeatPos.load(std::memory_order_relaxed);
+        return internalBeatPos;
     }
 
     // Multi-bus output (DAW only). Toggle is read at host scan-time; toggling at runtime
@@ -176,15 +167,6 @@ public:
     // caused by addRhythm/removeRhythm on the message thread.  numActiveRhythms is
     // the authoritative count; processBlock reads it atomically once per block.
     std::array<std::unique_ptr<VoiceEngine>, SequencerEngine::MaxRhythms> voiceEngines;
-    // Optional decaying old-voice carried for one transition after a hot-swap.
-    // The active voice receives new triggers; the tail just plays out whatever
-    // was in flight and is destroyed once it produces no more sound. Both feed
-    // the same mixer channel (additive sum in MixerEngine::processBlock).
-    std::array<std::unique_ptr<VoiceEngine>, SequencerEngine::MaxRhythms> tailVoices;
-    // Per-slot atomic flag: audio thread sets when the tail voice has gone
-    // silent. handleAsyncUpdate consumes the flag under rhythmsLock and frees
-    // the unique_ptr safely on the message thread.
-    std::array<std::atomic<bool>, SequencerEngine::MaxRhythms>            tailReaperPending {};
     std::array<MidiOutputEngine,             SequencerEngine::MaxRhythms> midiEngines;
     std::atomic<int> numActiveRhythms { 0 };
     FXChain     fxChain;
@@ -214,11 +196,9 @@ public:
         kSnapFilterCutoff, kSnapFilterRes,
         kSnapFenvAtk, kSnapFenvDec, kSnapFenvDepth,
         kSnapPitchSemi,
-        kSnapPitchOct,   // DEPRECATED #218 — kept for index stability
-        kSnapPitchFine,  // DEPRECATED #218 — kept for index stability
+        kSnapPitchOct,   // #142: pitch octave live arc
+        kSnapPitchFine,  // #142: pitch fine live arc
         kSnapInsDrive, kSnapInsOutput, kSnapInsBits, kSnapInsDither, kSnapInsLpf,
-        // #223 additions
-        kSnapPitchEnvDep, kSnapAmpLvl, kSnapAccent,
         kSnapCount
     };
     std::array<juce::Atomic<float>, kSnapCount> modSnapshot[SequencerEngine::MaxRhythms];
@@ -247,16 +227,6 @@ private:
 
     std::array<PendingRhythmSwap, SequencerEngine::MaxRhythms> pendingSwaps;
     std::atomic<int> swapModeAtomic { 0 }; // 0 = OnMasterLoop, 1 = OnRhythmLoop
-
-public:
-    // Monotonic counter incremented every time handleAsyncUpdate completes a
-    // hot-swap. UI components (RhythmSidebar, MixerOverlay) poll this from their
-    // timer and refresh their cached name/colour/pattern visuals when it changes
-    // — because rhythm name/colour are not APVTS-backed and don't appear in the
-    // routine APVTS listener refresh path.
-    std::atomic<int> rhythmSwapEpoch { 0 };
-
-private:
 
     // MIDI program-change queue: audio thread enqueues on incoming program-change,
     // handleAsyncUpdate (message thread) drains and calls stageRhythmPreset.
@@ -315,10 +285,9 @@ private:
     std::unique_ptr<juce::AudioFormatReaderSource> previewSource;
     juce::AudioBuffer<float> previewScratchBuffer;
 
-    // #230: atomic for safe cross-thread access (audio writes, UI reads + clears).
-    std::atomic<bool>   internalPlaying   { false };
-    std::atomic<double> internalBeatPos   { 0.0 };
-    double              internalBpm       = 120.0;   // message-thread-only
+    bool   internalPlaying   = false;
+    double internalBeatPos   = 0.0;
+    double internalBpm       = 120.0;
     double currentSampleRate = 44100.0;
     int    currentBlockSize  = 512;
 

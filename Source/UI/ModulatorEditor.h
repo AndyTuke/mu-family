@@ -33,26 +33,23 @@ namespace ModDest
         // ── Euclid A/B (16–19) ────────────────────────────────────────────────
         "euclid.a.hits",     "euclid.a.rotate",
         "euclid.b.hits",     "euclid.b.rotate",
-        // ── Pitch octave + fine (20–21, deprecated by #218 — kept for index stability) ──
+        // ── Pitch octave + fine (20–21, appended to preserve IDs) ────────────
         "pitch.octave",      "pitch.fine",
         // ── Euclid C (22–23) ─────────────────────────────────────────────────
-        "euclid.c.hits",     "euclid.c.rotate",
-        // ── #223 additions (24–26, appended to preserve preceding IDs) ──────
-        "pitch.envDepth",    "amp.level",      "accentDb"
+        "euclid.c.hits",     "euclid.c.rotate"
     };
     inline const juce::StringArray labels {
         "Amp Attack",        "Amp Decay",         "Amp Sustain",       "Amp Release",
         "Filter Cutoff",     "Filter Resonance",
         "Filter Env Attack", "Filter Env Decay",  "Filter Env Depth",
-        "Pitch",
+        "Pitch Semitone",
         "Insert Drive",      "Insert Output",
         "Insert Bits",       "Insert Rate",       "Insert Dither",
         "Insert LPF",
         "Euclid A Hits",     "Euclid A Rotate",
         "Euclid B Hits",     "Euclid B Rotate",
         "Pitch Octave",      "Pitch Fine",
-        "Euclid C Hits",     "Euclid C Rotate",
-        "Pitch Env Depth",   "Amp Level",         "Accent"
+        "Euclid C Hits",     "Euclid C Rotate"
     };
 
     // Populate dd with destinations grouped by section, showing only insert destinations
@@ -76,12 +73,10 @@ namespace ModDest
         dd.addItem("Rotate", 24);  // euclid.c.rotate
 
         // ── Pitch ─────────────────────────────────────────────────────────────
-        // #218: collapsed to single Pitch destination (±24 st full swing). Octave/Fine
-        // removed from the dropdown; legacy assignments to pitch.octave / pitch.fine
-        // load OK but silently no-op because paramValues no longer holds those keys.
         dd.addSectionHeading("Pitch");
-        dd.addItem("Pitch",    10);  // pitch.semitones (relabelled "Pitch" per #218)
-        dd.addItem("Env Depth", 25); // pitch.envDepth (#223)
+        dd.addItem("Octave",   21);  // pitch.octave
+        dd.addItem("Semitone", 10);  // pitch.semitones
+        dd.addItem("Fine",     22);  // pitch.fine
 
         // ── Filter ────────────────────────────────────────────────────────────
         dd.addSectionHeading("Filter");
@@ -93,12 +88,10 @@ namespace ModDest
 
         // ── Amp ───────────────────────────────────────────────────────────────
         dd.addSectionHeading("Amp");
-        dd.addItem("Level",   26); // amp.level (#223)
         dd.addItem("Attack",  1);  // amp.attack
         dd.addItem("Decay",   2);  // amp.decay
         dd.addItem("Sustain", 3);  // amp.sustain
         dd.addItem("Release", 4);  // amp.release
-        dd.addItem("Accent",  27); // accentDb (#223)
 
         // ── Insert ────────────────────────────────────────────────────────────
         // Group heading reflects the active algorithm name so the user can see at a glance
@@ -178,27 +171,21 @@ private:
     StepEditor     stepEditor;
     DropdownSelect loopDropdown;
     juce::Label    loopLabel;
-    // #239: explicit fromUTF8 so the "×" glyph decodes correctly. The previous
-    // implicit char* → juce::String conversion was rendering as garbled Latin-1
-    // pairs ("Ä□" / "Ã □") on some font + JUCE build combinations.
-    NudgeInput     loopMult { juce::String::fromUTF8("\xc3\x97"), 1, 16, 4 };
+    NudgeInput     loopMult { "\xc3\x97", 1, 16, 4 };  // "×" inline multiplier label
     DropdownSelect stepDropdown;
     juce::Label    stepLabel;
-    NudgeInput     stepMult { juce::String::fromUTF8("\xc3\x97"), 1, 16, 1 };
+    NudgeInput     stepMult { "\xc3\x97", 1, 16, 1 };  // "×" inline multiplier label
 
     struct AssignmentRow : public juce::Component
     {
         DropdownSelect   destCombo;
         juce::Slider     depthSlider;
-        // #224 Bitwig-style bipolar curve knob: -100..+100 = log..linear..exp
-        juce::Slider     curveSlider;
         juce::TextButton removeBtn { "x" };
         std::string      id;
 
         std::function<void()>                         onRemove;
         std::function<void(const std::string& dest)>  onDestChange;
         std::function<void(float depth)>              onDepthChange;
-        std::function<void(float curve)>              onCurveChange;
 
         AssignmentRow(const std::string& assignId, int driveChar);
         void resized() override;

@@ -64,7 +64,6 @@ private:
     void wireFXRows();
     void updateEffectSendLabels();
     void refreshSidechainSources();
-    static bool isMixerParam(const juce::String& id);
 
     // juce::AudioProcessorValueTreeState::Listener — sets dirty flag for deferred reload.
     void parameterChanged(const juce::String& parameterID, float newValue) override;
@@ -72,5 +71,4 @@ private:
     void timerCallback() override;
 
     bool apvtsDirty = false;
-    int  lastSwapEpoch = 0;   // tracked in timer; refresh name+colour on change
 };

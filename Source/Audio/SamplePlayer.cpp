@@ -13,9 +13,9 @@ bool SamplePlayer::isActive() const
 }
 
 void SamplePlayer::process(const juce::AudioBuffer<float>& source,
-                           const double*                    ratios,
+                           double                          playbackRatio,
                            juce::AudioBuffer<float>&        output,
-                           int                              numSamples)
+                           int                             numSamples)
 {
     if (triggered.exchange(false))
         playPos = 0.0;
@@ -47,6 +47,6 @@ void SamplePlayer::process(const juce::AudioBuffer<float>& source,
             output.addSample(ch, s, smp);
         }
 
-        playPos += ratios[s];
+        playPos += playbackRatio;
     }
 }

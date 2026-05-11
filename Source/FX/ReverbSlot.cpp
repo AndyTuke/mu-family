@@ -59,9 +59,35 @@ void ReverbSlot::runPreDelay(const juce::AudioBuffer<float>& src, int numSamples
 
 void ReverbSlot::process(juce::AudioBuffer<float>& buffer)
 {
-    // Insert-style path is no longer wired up by FXChain — the mixer uses
-    // processReturn (send-bus, wet-only). Forwarded for FXSlotBase contract.
-    processReturn(buffer);
+    if (!enabled) return;
+
+    const int numCh      = buffer.getNumChannels();
+    const int numSamples = juce::jmin(buffer.getNumSamples(), (int)wetL.size());
+
+    runPreDelay(buffer, numSamples);
+
+    if (dirt > 0.001f)
+    {
+        const float gain = 1.0f + dirt * 4.0f;
+        for (int i = 0; i < numSamples; ++i)
+        {
+            wetL[i] = std::tanh(wetL[i] * gain) / gain;
+            wetR[i] = std::tanh(wetR[i] * gain) / gain;
+        }
+    }
+
+    float* ins[2]  = { wetL.data(), wetR.data() };
+    float* outs[2] = { wetL.data(), wetR.data() };
+    impl->reverb.process(ins, outs, (size_t)numSamples);
+
+    // Add wet reverb to output (send-style — dry signal is unaffected).
+    for (int ch = 0; ch < numCh; ++ch)
+    {
+        auto* out = buffer.getWritePointer(ch);
+        const auto* wet = (ch == 0) ? wetL.data() : wetR.data();
+        for (int i = 0; i < numSamples; ++i)
+            out[i] += wet[i] * level;
+    }
 }
 
 void ReverbSlot::processReturn(juce::AudioBuffer<float>& buffer)
@@ -73,28 +99,19 @@ void ReverbSlot::processReturn(juce::AudioBuffer<float>& buffer)
 
     runPreDelay(buffer, numSamples);
 
-    // Optional pre-FDN saturation — feeds the network with already-distorted
-    // signal so the room itself sounds dirty.
-    auto applyDirt = [&]()
+    if (dirt > 0.001f)
     {
-        if (dirt <= 0.001f) return;
         const float gain = 1.0f + dirt * 4.0f;
         for (int i = 0; i < numSamples; ++i)
         {
             wetL[i] = std::tanh(wetL[i] * gain) / gain;
             wetR[i] = std::tanh(wetR[i] * gain) / gain;
         }
-    };
-
-    if (!dirtPost) applyDirt();
+    }
 
     float* ins[2]  = { wetL.data(), wetR.data() };
     float* outs[2] = { wetL.data(), wetR.data() };
     impl->reverb.process(ins, outs, (size_t)numSamples);
-
-    // Post-FDN saturation — colours the wet reverb tail itself. The industry-
-    // convention "vintage" position; selected by `rev_dirtPost` toggle.
-    if (dirtPost) applyDirt();
 
     // Overwrite buffer with wet-only output (dry send is already in the main mix).
     for (int ch = 0; ch < numCh; ++ch)
@@ -102,7 +119,7 @@ void ReverbSlot::processReturn(juce::AudioBuffer<float>& buffer)
         auto* out = buffer.getWritePointer(ch);
         const auto* wet = (ch == 0) ? wetL.data() : wetR.data();
         for (int i = 0; i < numSamples; ++i)
-            out[i] = wet[i];
+            out[i] = wet[i] * level;
     }
 }
 
@@ -115,18 +132,13 @@ void ReverbSlot::setAlgorithm(int index)
 
 void ReverbSlot::setParam(const juce::String& id, float value)
 {
-    // Only the FDN-affecting fields trigger an updateReverb() — predelay and dirt
-    // live entirely in the slot's own process loops (predelay buffer read, tanh
-    // saturation), so they don't touch impl->reverb's configuration and don't
-    // need the per-tweak rebuild.
-    bool needsFdnUpdate = true;
     if      (id == "size")      size      = value;
-    else if (id == "predelay") { preDelay = value; needsFdnUpdate = false; }
+    else if (id == "predelay")  preDelay  = value;
     else if (id == "diffusion") diffusion = value;
     else if (id == "damp")      damp      = value;
     else if (id == "mod")       mod       = value;
-    else if (id == "dirt")     { dirt     = value; needsFdnUpdate = false; }
-    if (needsFdnUpdate) updateReverb();
+    else if (id == "dirt")      dirt      = value;
+    updateReverb();
 }
 
 void ReverbSlot::applyAlgorithmPreset()

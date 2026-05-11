@@ -37,7 +37,6 @@ private:
     juce::ComponentAnimator animator;
 
     int selectedIndex = 0;
-    int lastSwapEpoch = 0; // last seen value of proc.rhythmSwapEpoch — refresh on change
 
     static constexpr int kItemH          = 80;
     static constexpr int kAddBtnH        = 34;

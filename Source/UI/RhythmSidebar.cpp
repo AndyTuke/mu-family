@@ -253,22 +253,6 @@ void RhythmSidebar::timerCallback()
     if (proc.getNumRhythms() != (int)items.size())
         refreshItems();
 
-    // Refresh mini-circle patterns and colour after a hot-swap. The Rhythm at
-    // each slot was overwritten in place by handleAsyncUpdate but SidebarItem
-    // caches the patterns from setRhythm() — so the mini-circle would otherwise
-    // keep drawing the previous rhythm's pattern.
-    const int currentEpoch = proc.rhythmSwapEpoch.load(std::memory_order_acquire);
-    if (currentEpoch != lastSwapEpoch)
-    {
-        lastSwapEpoch = currentEpoch;
-        for (int i = 0; i < (int)items.size() && i < proc.getNumRhythms(); ++i)
-        {
-            const Rhythm& r = proc.getRhythm(i);
-            const juce::Colour col = MuClidLookAndFeel::rhythmPalette[r.colourIndex % 30];
-            items[i]->setRhythm(&r, col);
-        }
-    }
-
     for (int i = 0; i < (int)items.size(); ++i)
         items[i]->setPendingSwap(proc.hasPendingSwap(i));
 }

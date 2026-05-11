@@ -40,23 +40,72 @@ void DelaySlot::prepare(double sampleRate, int blockSize)
     bufR.assign(MaxDelaySamples, 0.0f);
     writePosL = writePosR = 0;
     feedL = feedR = 0.0f;
-    dampStateL = dampStateR = 0.0f;
-    juce::ignoreUnused(blockSize);
+    dryBuffer.setSize(2, blockSize);
 
     // 50 ms exponential smoothing to glide on delay time changes
     smoothCoeff = (float)std::exp(-1.0 / (0.050 * sampleRate));
 
     updateDelayFromMode();
-    updateDampCoeff();
     smoothedDelayL = targetDelayL;
     smoothedDelayR = targetDelayR;
 }
 
 void DelaySlot::process(juce::AudioBuffer<float>& buffer)
 {
-    // Insert-style path is no longer wired up by FXChain — mixer uses
-    // processReturn (send-bus, wet-only). Forwarded for FXSlotBase contract.
-    processReturn(buffer);
+    if (!enabled) return;
+
+    dryBuffer.makeCopyOf(buffer, true);
+
+    const int numCh      = buffer.getNumChannels();
+    const int numSamples = buffer.getNumSamples();
+
+    auto* outL = (numCh > 0) ? buffer.getWritePointer(0) : nullptr;
+    auto* outR = (numCh > 1) ? buffer.getWritePointer(1) : outL;
+
+    for (int i = 0; i < numSamples; ++i)
+    {
+        const float inL = (outL != nullptr) ? outL[i] : 0.0f;
+        const float inR = (outR != nullptr) ? outR[i] : 0.0f;
+
+        smoothedDelayL = smoothCoeff * smoothedDelayL + (1.0f - smoothCoeff) * targetDelayL;
+        smoothedDelayR = smoothCoeff * smoothedDelayR + (1.0f - smoothCoeff) * targetDelayR;
+
+        const float delayedL = hermiteDelay(bufL, writePosL, smoothedDelayL);
+        const float delayedR = hermiteDelay(bufR, writePosR, smoothedDelayR);
+
+        feedL = processDirt(delayedL * feedback);
+        feedR = processDirt(delayedR * feedback);
+
+        bufL[writePosL] = inL + feedL;
+        bufR[writePosR] = inR + feedR;
+
+        writePosL = (writePosL + 1) % MaxDelaySamples;
+        writePosR = (writePosR + 1) % MaxDelaySamples;
+
+        if (outL != nullptr) outL[i] = delayedL;
+        if (outR != nullptr) outR[i] = delayedR;
+    }
+
+    // Insert-style blending (same curve as EffectSlot)
+    float dryGain, wetGain;
+    if (sendAmount <= 0.5f)
+    {
+        dryGain = 1.0f;
+        wetGain = sendAmount * 2.0f;
+    }
+    else
+    {
+        dryGain = 1.0f - (sendAmount - 0.5f) * 2.0f;
+        wetGain = 1.0f;
+    }
+
+    for (int ch = 0; ch < numCh; ++ch)
+    {
+        auto* wet = buffer.getWritePointer(ch);
+        auto* dry = dryBuffer.getReadPointer(ch);
+        for (int i = 0; i < numSamples; ++i)
+            wet[i] = dry[i] * dryGain + wet[i] * wetGain;
+    }
 }
 
 void DelaySlot::processReturn(juce::AudioBuffer<float>& buffer)
@@ -77,25 +126,11 @@ void DelaySlot::processReturn(juce::AudioBuffer<float>& buffer)
         smoothedDelayL = smoothCoeff * smoothedDelayL + (1.0f - smoothCoeff) * targetDelayL;
         smoothedDelayR = smoothCoeff * smoothedDelayR + (1.0f - smoothCoeff) * targetDelayR;
 
-        float delayedL = hermiteDelay(bufL, writePosL, smoothedDelayL);
-        float delayedR = hermiteDelay(bufR, writePosR, smoothedDelayR);
+        const float delayedL = hermiteDelay(bufL, writePosL, smoothedDelayL);
+        const float delayedR = hermiteDelay(bufR, writePosR, smoothedDelayR);
 
-        // Damping LP in the feedback path — only the recirculated signal is
-        // filtered, so the first echo retains its full brightness and each
-        // successive repeat dulls progressively (tape-style HF decay).
-        if (damp > 0.001f)
-        {
-            dampStateL = (1.0f - dampCoeff) * delayedL + dampCoeff * dampStateL;
-            dampStateR = (1.0f - dampCoeff) * delayedR + dampCoeff * dampStateR;
-        }
-        else
-        {
-            dampStateL = delayedL;
-            dampStateR = delayedR;
-        }
-
-        feedL = processDirt(dampStateL * feedback);
-        feedR = processDirt(dampStateR * feedback);
+        feedL = processDirt(delayedL * feedback);
+        feedR = processDirt(delayedR * feedback);
 
         bufL[writePosL] = inL + feedL;
         bufR[writePosR] = inR + feedR;
@@ -165,16 +200,4 @@ float DelaySlot::processDirt(float x) const
     const float gain = 1.0f + dirt * 8.0f;
     const float sat  = std::tanh(x * gain) / gain;
     return x + (sat - x) * dirt;
-}
-
-void DelaySlot::updateDampCoeff()
-{
-    // Map damp [0, 1] to 1-pole LP cutoff [20 kHz, 800 Hz] geometrically.
-    // Coefficient form: y[n] = (1 - a)·x[n] + a·y[n-1], a = exp(-2π·fc/sr).
-    // At damp = 0 the filter is essentially flat (a → 0); at damp = 1 the
-    // feedback path rolls off above ~800 Hz, giving the tape-style HF decay.
-    const float fcMax = 20000.0f;
-    const float fcMin =   800.0f;
-    const float fc    = fcMax * std::pow(fcMin / fcMax, damp);
-    dampCoeff = std::exp(-juce::MathConstants<float>::twoPi * fc / (float)sr);
 }
