@@ -508,7 +508,19 @@ void RhythmPanel::paint(juce::Graphics& g)
         g.fillRect(inner);
 
         const juce::String sampleName = proc.getSampleName(currentRhythmIndex);
-        if (sampleName.isNotEmpty())
+        const bool         missing    = proc.isSampleMissing(currentRhythmIndex);
+        if (missing)
+        {
+            // Linked sample referenced by a preset could not be found at its recorded
+            // path nor in the user Samples folder. Show the filename in amber with a
+            // "missing — click to find" hint so the user knows what to look for.
+            g.setColour(juce::Colour(0xffe69500)); // amber warning
+            g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
+            g.drawText("Missing: " + sampleName + "  —  click to find",
+                       inner.getX() + 5, inner.getY(), inner.getWidth() - 28, inner.getHeight(),
+                       juce::Justification::centredLeft, true);
+        }
+        else if (sampleName.isNotEmpty())
         {
             g.setColour(MuClidLookAndFeel::colour(Id::labelText));
             g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));

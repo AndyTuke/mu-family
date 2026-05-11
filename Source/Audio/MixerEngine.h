@@ -85,6 +85,15 @@ public:
                       std::array<juce::AudioBuffer<float>*, 8>* directOuts = nullptr,
                       juce::AudioBuffer<float>*    fxReturnsOut = nullptr);
 
+    // Reset the sidechain envelope follower state for one channel slot. Called
+    // by PluginProcessor::swapRhythms so the previous tenant's ducking envelope
+    // does not bleed into the freshly arrived rhythm.
+    void resetSidechainEnv(int channelIndex) noexcept
+    {
+        if (channelIndex >= 0 && channelIndex < MaxChannels)
+            scEnv[channelIndex] = 0.0f;
+    }
+
 private:
     double sampleRate = 44100.0;
     float  scEnv[MaxChannels] {};    // per-channel sidechain envelope state

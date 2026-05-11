@@ -25,7 +25,8 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     filterType.addItem("Notch",   4);   // type 3
     filterType.addItem("Notch 24",11);  // type 10
     filterType.addItem("AP 12",   10);  // type 9
-    filterType.addItem("Comb",    9);   // type 8
+    filterType.addItem("Comb +",  9);   // type 8
+    filterType.addItem("Comb -",  16);  // type 15
     filterType.addItem("Peak",    13);  // type 12
     filterType.addItem("Lo Shf",  14);  // type 13
     filterType.addItem("Hi Shf",  15);  // type 14

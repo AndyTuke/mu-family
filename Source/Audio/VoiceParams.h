@@ -13,7 +13,7 @@ struct VoiceParams
     float pitchEnvDepth  = 0.0f;     // semitones swept at envelope peak, 0..24
 
     // ─── Filter ──────────────────────────────────────────────────────────
-    int   filterType     = 0;        // 0=LP12, 1=HP12, 2=BP12, 3=Notch, 4=LP24, 5=HP24, 6=BP24, 7=LP6, 8=Comb, 9=AP12, 10=Notch24, 11=HP6, 12=Peak, 13=LoShf, 14=HiShf
+    int   filterType     = 0;        // 0=LP12, 1=HP12, 2=BP12, 3=Notch, 4=LP24, 5=HP24, 6=BP24, 7=LP6, 8=Comb+, 9=AP12, 10=Notch24, 11=HP6, 12=Peak, 13=LoShf, 14=HiShf, 15=Comb-
     float filterCutoff   = 8000.0f;  // Hz
     float filterRes      = 0.2f;     // 0..0.99
     float filterEnvAtk   = 0.01f;

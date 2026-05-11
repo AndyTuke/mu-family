@@ -137,6 +137,13 @@ bool VoiceEngine::hasSample() const
     return sampleLoaded;
 }
 
+void VoiceEngine::clearSample()
+{
+    juce::ScopedWriteLock sl(bufferLock);
+    buffer.setSize(0, 0);
+    sampleLoaded = false;
+}
+
 void VoiceEngine::setParams(const VoiceParams& p)
 {
     {

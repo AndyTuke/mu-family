@@ -73,8 +73,13 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     const int  numOutCh = output.getNumChannels();
 
     // Clear peaks for channels that have no rhythm this block so their VUs go silent.
+    // Same for sidechainGR so a removed rhythm cannot leave a ghost reading on the
+    // inactive slot's GR meter.
     for (int r = numActiveRhythms; r < MaxChannels; ++r)
+    {
         channelPeaks[r].set(0.0f);
+        sidechainGR  [r].set(0.0f);
+    }
 
     // Phase 1: process all voices into their channel buffers and apply headroom trim.
     // We defer pan/gain/mix until Phase 3 so Phase 2 can apply sidechain first.

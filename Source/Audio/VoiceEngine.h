@@ -21,6 +21,7 @@ public:
 
     void prepareToPlay(double sampleRate, int blockSize);
     void loadFile(const juce::File& file);
+    void clearSample();
     void trigger(bool isAccented = false);
     void process(juce::AudioBuffer<float>& output, int numSamples);
     bool hasSample() const;

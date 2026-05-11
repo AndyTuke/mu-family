@@ -117,6 +117,18 @@ public:
         return path.isEmpty() ? juce::String() : juce::File(path).getFileName();
     }
 
+    // True when the rhythm has a sample path recorded but the voice engine couldn't
+    // load it (e.g. preset was saved with a linked sample whose file was later moved
+    // or deleted). The RhythmPanel sample bar uses this to show a "missing — click
+    // to find" affordance instead of silently leaving the slot empty.
+    bool isSampleMissing(int rhythmIndex) const
+    {
+        if (rhythmIndex < 0 || rhythmIndex >= loadedSamplePaths.size()) return false;
+        if (loadedSamplePaths[rhythmIndex].isEmpty()) return false;
+        if (rhythmIndex >= (int)voiceEngines.size() || !voiceEngines[rhythmIndex]) return true;
+        return !voiceEngines[rhythmIndex]->hasSample();
+    }
+
     // Hot-swap staging: stages a rhythm preset for atomic commit at the next loop boundary.
     // If the sequencer is not playing, applies the preset immediately instead.
     void stageRhythmPreset (int rhythmIndex, const juce::File& presetFile);

@@ -41,7 +41,16 @@ void FXRow::setEnabled(bool enabled, juce::NotificationType n)
 
 void FXRow::setSelectedAlgorithm(int index, juce::NotificationType n)
 {
-    currentAlgorithm = juce::jlimit(0, (int)algorithmDefs.size() - 1, index);
+    const int clamped = juce::jlimit(0, (int)algorithmDefs.size() - 1, index);
+
+    // No-op when the algorithm hasn't actually changed. Critical: this method is
+    // called from MixerOverlay::loadFromAPVTS on every APVTS change, and the old
+    // unconditional rebuildKnobs() destroyed the slider the user was actively
+    // dragging — the user's first turn would register, then the rebuild would
+    // kill mouse capture and the rest of the drag went nowhere.
+    if (clamped == currentAlgorithm) return;
+
+    currentAlgorithm = clamped;
     algorithmDropdown.setSelectedId(currentAlgorithm + 1, false);
     rebuildKnobs(currentAlgorithm);
 

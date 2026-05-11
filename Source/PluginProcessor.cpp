@@ -81,7 +81,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addF(p+"pEnvRel",   n+"P Env Rel",  0.0f, 100.0f,  1.0f);
         addF(p+"pEnvDep",   n+"P Env Dep",  0.0f,  24.0f,  0.0f);
         // Filter
-        addI(p+"fltType", n+"Filter Type", 0, 14, 0);  // 0-14: LP12/HP12/BP12/Notch/LP24/HP24/BP24/LP6/Comb/AP12/Notch24/HP6/Peak/LoShf/HiShf
+        addI(p+"fltType", n+"Filter Type", 0, 15, 0);  // 0-15: LP12/HP12/BP12/Notch/LP24/HP24/BP24/LP6/Comb+/AP12/Notch24/HP6/Peak/LoShf/HiShf/Comb-
         layout.add(std::make_unique<juce::AudioParameterFloat>(
             p+"fltCut", n+"Filter Cut",
             juce::NormalisableRange<float>(20.0f, 20000.0f), 8000.0f,
@@ -712,7 +712,20 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             voiceEngines[r]->setActiveParams(modParams);
     }
 
-    fxChain.setHostBpm(internalBpm);
+    // Effective BPM for tempo-synced FX (Delay, Echo): host playhead takes priority
+    // in DAW mode, MIDI clock estimate when locked in standalone, otherwise the
+    // internal transport. Previously this always used internalBpm, so DAW-hosted
+    // sessions saw the delay always tempo-synced to 120 regardless of host tempo.
+    double effectiveBpm = internalBpm;
+    if (auto* ph = getPlayHead())
+        if (auto pos = ph->getPosition())
+            if (auto hostBpm = pos->getBpm())
+                effectiveBpm = *hostBpm;
+    if (midiSyncEnabled.load(std::memory_order_relaxed)
+        && wrapperType == wrapperType_Standalone
+        && midiClockIsPlaying.get())
+        effectiveBpm = midiClockBpmEst.get();
+    fxChain.setHostBpm(effectiveBpm);
 
     // Gather the host's output bus buffers. Buses we declared in BusesProperties may
     // be disabled in the host's chosen layout — skip those (the channel routes silently).
@@ -883,7 +896,7 @@ static void applyRhythmSuffix(const juce::String& suffix, float v, Rhythm& r,
     else if (suffix == "pEnvSus")   { r.voiceParams.pitchEnvSus    = adsrSus(v);  voiceDirty = true; }
     else if (suffix == "pEnvRel")   { r.voiceParams.pitchEnvRel    = adsrTime(v); voiceDirty = true; }
     else if (suffix == "pEnvDep")   { r.voiceParams.pitchEnvDepth  = v;            voiceDirty = true; }
-    else if (suffix == "fltType")   { r.voiceParams.filterType     = juce::jlimit(0, 14, (int)v); voiceDirty = true; }
+    else if (suffix == "fltType")   { r.voiceParams.filterType     = juce::jlimit(0, 15, (int)v); voiceDirty = true; }
     else if (suffix == "fltCut")    { r.voiceParams.filterCutoff   = v;            voiceDirty = true; }
     else if (suffix == "fltRes")    { r.voiceParams.filterRes      = v;            voiceDirty = true; }
     else if (suffix == "fEnvAtk")   { r.voiceParams.filterEnvAtk   = adsrTime(v); voiceDirty = true; }
@@ -1183,6 +1196,14 @@ void PluginProcessor::pushMixerChannelToAPVTS(int idx)
     set(px+"sendEff", ch.sendEffect);
     set(px+"sendDly", ch.sendDelay);
     set(px+"sendRev", ch.sendReverb);
+    // Sidechain + bus routing: previously missing here, so after a sidebar reorder
+    // the in-memory swap was correct but APVTS still held the old slot's values,
+    // and the APVTS->engine listener would overwrite the engine back to stale state.
+    set(px+"scSrc",   (float)(ch.sidechainSource + 1));  // engine -1..7 → APVTS 0..8
+    set(px+"scAmt",   ch.sidechainAmount);
+    set(px+"scAtk",   ch.sidechainAttackMs);
+    set(px+"scRel",   ch.sidechainReleaseMs);
+    set(px+"outBus",  (float)ch.outputBus);
 }
 
 void PluginProcessor::swapAPVTSForRhythms(int i, int j)
@@ -1190,8 +1211,12 @@ void PluginProcessor::swapAPVTSForRhythms(int i, int j)
     apvtsLoading = true;
     pushRhythmToAPVTS(i);
     pushRhythmToAPVTS(j);
-    pushMixerChannelToAPVTS(i);
-    pushMixerChannelToAPVTS(j);
+    // Push every active channel: not just i and j, because sidechain source
+    // indices on OTHER channels may have been re-translated by the swap
+    // (any channel pointing at i now points at j, and vice versa).
+    const int n = numActiveRhythms.load(std::memory_order_acquire);
+    for (int c = 0; c < n; ++c)
+        pushMixerChannelToAPVTS(c);
     apvtsLoading = false;
 }
 
@@ -1212,7 +1237,22 @@ bool PluginProcessor::swapRhythms(int i, int j)
     loadedSamplePaths.set(i, loadedSamplePaths[j]);
     loadedSamplePaths.set(j, tmp);
 
+    // Re-translate sidechain source indices BEFORE the channel swap, so any
+    // channel referring to the swapped slots keeps pointing at the same logical
+    // rhythm after the swap.
+    for (int c = 0; c < n; ++c)
+    {
+        auto& src = mixerEngine.channels[c].sidechainSource;
+        if      (src == i) src = j;
+        else if (src == j) src = i;
+    }
+
     std::swap(mixerEngine.channels[i], mixerEngine.channels[j]);
+
+    // Reset envelope follower state on both moved slots so the previous tenant's
+    // ducking envelope doesn't bleed into the freshly arrived rhythm.
+    mixerEngine.resetSidechainEnv(i);
+    mixerEngine.resetSidechainEnv(j);
 
     suspendProcessing(false);
 
@@ -1562,15 +1602,13 @@ void PluginProcessor::saveRhythmPresetToFile(int rhythmIdx, const juce::File& de
     state.setProperty("r0_colour", r.colourIndex,                nullptr);
     state.setProperty("r0_sample", loadedSamplePaths[rhythmIdx], nullptr);
 
+    // Rhythm presets store ONLY sequencer-page state (Euclidean params, voice chain,
+    // envelopes, insert effect). Mixer-page state (channel level/pan/sends/sidechain/
+    // output bus) intentionally stays with the slot, not with the rhythm.
     const juce::String srcPrefix = "r" + juce::String(rhythmIdx) + "_";
     for (int i = 0; kRhythmSuffixes[i] != nullptr; ++i)
         if (auto* param = apvts.getParameter(srcPrefix + kRhythmSuffixes[i]))
             state.setProperty("r0_" + juce::String(kRhythmSuffixes[i]), param->getValue(), nullptr);
-
-    const juce::String chPrefix2 = "ch" + juce::String(rhythmIdx) + "_";
-    for (int i = 0; kChannelSuffixes[i] != nullptr; ++i)
-        if (auto* param = apvts.getParameter(chPrefix2 + kChannelSuffixes[i]))
-            state.setProperty("ch_" + juce::String(kChannelSuffixes[i]), param->getValue(), nullptr);
 
     if (embedSample)
     {
@@ -1602,21 +1640,15 @@ bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
     auto state = juce::ValueTree::fromXml(*xml);
     if (!state.isValid()) return false;
 
+    // Load only sequencer-page state — mixer settings stay attached to the slot.
+    // Older rhythm preset files may include "ch_*" properties; those are simply
+    // ignored on load (no read here) so legacy files load cleanly with the new policy.
     const juce::String dstPrefix = "r" + juce::String(targetIdx) + "_";
     for (int i = 0; kRhythmSuffixes[i] != nullptr; ++i)
     {
         juce::Identifier propId { "r0_" + juce::String(kRhythmSuffixes[i]) };
         if (state.hasProperty(propId))
             if (auto* param = apvts.getParameter(dstPrefix + kRhythmSuffixes[i]))
-                param->setValueNotifyingHost((float)state.getProperty(propId));
-    }
-
-    const juce::String dstChPrefix = "ch" + juce::String(targetIdx) + "_";
-    for (int i = 0; kChannelSuffixes[i] != nullptr; ++i)
-    {
-        juce::Identifier propId { "ch_" + juce::String(kChannelSuffixes[i]) };
-        if (state.hasProperty(propId))
-            if (auto* param = apvts.getParameter(dstChPrefix + kChannelSuffixes[i]))
                 param->setValueNotifyingHost((float)state.getProperty(propId));
     }
 
@@ -1662,7 +1694,20 @@ bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
                     voiceEngines[targetIdx]->loadFile(fallback);
                     loadedSamplePaths.set(targetIdx, fallback.getFullPathName());
                 }
+                else
+                {
+                    // Linked sample missing — drop any previously loaded sample and
+                    // keep the recorded path so the RhythmPanel can show a "missing"
+                    // indicator and offer a relocate-to-find browse action.
+                    voiceEngines[targetIdx]->clearSample();
+                    loadedSamplePaths.set(targetIdx, samplePath);
+                }
             }
+        }
+        else
+        {
+            voiceEngines[targetIdx]->clearSample();
+            loadedSamplePaths.set(targetIdx, juce::String());
         }
     }
     return true;
@@ -1905,6 +1950,14 @@ void PluginProcessor::loadPreset(const juce::File& file)
             {
                 voiceEngines[i].reset();
                 midiEngines[i] = MidiOutputEngine{};
+                // Wipe mixer channel state and sample-path memory so the now-inactive
+                // slot does not retain stale fader/sidechain/sample data from the
+                // pre-load session. Without this, opening the mixer after loading a
+                // smaller preset would still show the previous tenant's settings on
+                // the dimmed slots.
+                mixerEngine.channels[i] = MixerEngine::ChannelState{};
+                if (i < loadedSamplePaths.size())
+                    loadedSamplePaths.set(i, juce::String());
             }
         }
         else
@@ -1993,7 +2046,20 @@ void PluginProcessor::loadPreset(const juce::File& file)
                         voiceEngines[i]->loadFile(fallback);
                         loadedSamplePaths.set(i, fallback.getFullPathName());
                     }
+                    else
+                    {
+                        // Linked sample not found — clear any previously loaded sample
+                        // on this slot so the RhythmPanel shows the missing indicator
+                        // consistently and the user can click to relocate.
+                        voiceEngines[i]->clearSample();
+                        // loadedSamplePaths already set to samplePath above (line ~1999)
+                    }
                 }
+            }
+            else
+            {
+                // Preset rhythm has no sample at all — wipe any stale sample on this slot.
+                voiceEngines[i]->clearSample();
             }
 
             sequencer.updatePattern(i);

@@ -151,10 +151,12 @@ void MultiModeFilter::process(juce::AudioBuffer<float>& buffer, int numSamples, 
                 data[i] = eq[ch].process(data[i]);
         }
     }
-    else if (fType == 8) // Feedback comb — resonant peaks at multiples of cutoff
+    else if (fType == 8 || fType == 15) // Feedback comb — positive (8) or negative (15) feedback
     {
+        // Comb+ (type 8): y[n] = x[n] + g·y[n-D] → peaks at f0, 2f0, 3f0… (f0 = sr/D)
+        // Comb- (type 15): y[n] = x[n] − g·y[n-D] → peaks at f0/2, 3f0/2, 5f0/2… (Karplus-Strong feel)
         const float delayF = static_cast<float>(currentSampleRate) / juce::jmax(20.0f, cutoffHz);
-        const float g      = resonance; // 0..0.99 feedback gain
+        const float g      = (fType == 8) ? resonance : -resonance;
         for (int ch = 0; ch < nCh; ++ch)
         {
             auto&     buf     = combBuffer[ch];
