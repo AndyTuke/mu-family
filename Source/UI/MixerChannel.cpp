@@ -49,9 +49,10 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
 
     if (hasSidechain())
     {
-        outBusBox.addItem("M", 1);                 // 0 -> Master
+        // #238: descriptive labels — "Main" + "Out 1" … "Out 8".
+        outBusBox.addItem("Main", 1);              // 0 -> Master
         for (int i = 1; i <= 8; ++i)
-            outBusBox.addItem(juce::String(i), i + 1);  // i -> Out i
+            outBusBox.addItem("Out " + juce::String(i), i + 1);
         outBusBox.setSelectedId(1, juce::dontSendNotification);
         addAndMakeVisible(outBusBox);
 

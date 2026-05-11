@@ -171,10 +171,12 @@ private:
     StepEditor     stepEditor;
     DropdownSelect loopDropdown;
     juce::Label    loopLabel;
-    NudgeInput     loopMult { "\xc3\x97", 1, 16, 4 };  // "×" inline multiplier label
+    // #239: explicit fromUTF8 so the "×" glyph decodes correctly. The implicit
+    // char* → juce::String conversion was rendering as garbled Latin-1 pairs.
+    NudgeInput     loopMult { juce::String::fromUTF8("\xc3\x97"), 1, 16, 4 };
     DropdownSelect stepDropdown;
     juce::Label    stepLabel;
-    NudgeInput     stepMult { "\xc3\x97", 1, 16, 1 };  // "×" inline multiplier label
+    NudgeInput     stepMult { juce::String::fromUTF8("\xc3\x97"), 1, 16, 1 };   // #239
 
     struct AssignmentRow : public juce::Component
     {

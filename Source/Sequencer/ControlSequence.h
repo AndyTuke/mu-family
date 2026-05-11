@@ -18,8 +18,12 @@ public:
         float x = 0.0f;          // normalised loop position 0..1
         float y = 0.0f;          // normalised output -1..1
         bool  hasBezierHandle = false;
-        float handleX = 0.0f;    // offset from segment midpoint
-        float handleY = 0.0f;
+        // #225: handleX is currently unused by evaluateSmooth (the evaluator is 1-D
+        // in y-over-chord). Kept in the struct for forward-compat with a future 2-D
+        // cubic evaluator. Anyone authoring presets externally should not expect
+        // horizontal-handle effects.
+        float handleX = 0.0f;
+        float handleY = 0.0f;    // offset from segment midpoint
     };
 
     std::string id;              // stable ID used as modulation source key, e.g. "cs0"

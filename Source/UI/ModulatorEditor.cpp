@@ -156,7 +156,12 @@ void ModulatorEditor::setData(ControlSequence* cs_, ModulationMatrix* matrix_,
     modColour      = colour;
     modIndex       = index;
     stepEditor.setBarColour(modColour);
+    // #229: loadFromCS() can `push_back` to cs->curvePoints (seeding default points)
+    // and `resize` cs->stepValues — both can race with the audio thread's
+    // `cs->evaluate()` if we don't hold modLock during the mutation.
+    lockMod();
     loadFromCS();
+    unlockMod();
     rebuildRows();
     resized();
     repaint();
