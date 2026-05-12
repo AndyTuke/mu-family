@@ -89,7 +89,16 @@ private:
     KnobWithLabel     insTone   { "Tone",   Id::knobInsertPad };
 
     // Configure knob labels/ranges/callbacks for the selected algorithm.
+    // proc is used only to decide whether to write `mst_insChar` back to APVTS
+    // (non-null = write, null = skip — used when called from loadFromAPVTS to
+    // avoid feedback loops). The knob `onValueChanged` lambdas always use
+    // `masterInsertProc` (the proc captured by bindMaster) so they keep
+    // working after a reload — #243.
     void configureInsertAlgorithm(int charId, PluginProcessor* proc);
+
+    // Captured by bindMaster so configureInsertAlgorithm's knob callbacks can
+    // write to APVTS even when re-invoked from loadFromAPVTS with proc=nullptr.
+    PluginProcessor* masterInsertProc = nullptr;
 
     bool hasSends()    const { return channelType == Type::Rhythm
                                        || channelType == Type::EffectReturn

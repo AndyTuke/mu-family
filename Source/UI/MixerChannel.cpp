@@ -266,6 +266,7 @@ void MixerChannel::bindReturn(MixerEngine::ReturnState& state, juce::Atomic<floa
 
 void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
 {
+    masterInsertProc = proc;   // #243 — keep knob lambdas alive across loadFromAPVTS rebinds
     fader.setValue(engine.masterLevel, juce::dontSendNotification);
     panKnob.setValue(engine.masterPan, juce::dontSendNotification);
 
@@ -542,14 +543,19 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
     insOutput.onValueChanged = nullptr;
     insTone  .onValueChanged = nullptr;
 
-    auto setParam = [proc](const juce::String& id, double v)
+    // #243: the lambda must keep working after this method is re-invoked from
+    // loadFromAPVTS with proc=nullptr (the dropdown char value comes from APVTS,
+    // so we don't want to write back — but the knob callbacks still need a live
+    // proc handle for the user to actually drive the engine).
+    PluginProcessor* const knobProc = masterInsertProc;
+    auto setParam = [knobProc](const juce::String& id, double v)
     {
-        if (!proc) return;
-        if (auto* p = proc->apvts.getParameter(id))
+        if (!knobProc) return;
+        if (auto* p = knobProc->apvts.getParameter(id))
             p->setValueNotifyingHost(p->convertTo0to1((float)v));
     };
 
-    const VoiceParams& ip = proc ? proc->mixerEngine.masterInsertParams : VoiceParams{};
+    const VoiceParams& ip = masterInsertProc ? masterInsertProc->mixerEngine.masterInsertParams : VoiceParams{};
 
     switch (charId)
     {
