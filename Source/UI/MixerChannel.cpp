@@ -681,6 +681,13 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
                 return (v >= 0.0 ? "+" : "") + juce::String(v, 1) + " dB";
             };
 
+            // Reset any log skew left over from prior algorithms (Compressor's
+            // Release on insTone, Bitcrusher's Rate on insOutput, etc.) so the
+            // ±18 dB EQ knobs centre visually at 0 dB.
+            insDrive .getSlider().setSkewFactor(1.0);
+            insOutput.getSlider().setSkewFactor(1.0);
+            insTone  .getSlider().setSkewFactor(1.0);
+
             insDrive .setLabel("Low");
             insDrive .setRange(-18.0, 18.0, 0.1);
             insDrive .getSlider().textFromValueFunction = dbFmt;
