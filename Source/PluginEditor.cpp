@@ -32,6 +32,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         rhythmPanel.setRhythm(0);
         sidebar.setSelectedIndex(0);
         if (mixerVisible) { mixerOverlay.refresh(); mixerOverlay.loadFromAPVTS(); }
+        transportBar.setLoadedPreset(f);
     };
 
     transportBar.onSavePreset = [this]
@@ -126,6 +127,11 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     {
         processorRef.savePreset(name, desc, category, embedSamples);
         transportBar.refreshPresets();
+        // #241: select the just-saved preset in the dropdown so the user sees
+        // its name immediately. Mirror savePreset's filename sanitisation.
+        juce::String safeName = name.replaceCharacters("\\/:|*?<>\"", "_________");
+        if (safeName.isEmpty()) safeName = "Preset";
+        transportBar.setLoadedPreset(processorRef.getPresetsDir().getChildFile(safeName + ".muclid"));
         showSaveDialog(false);
         if (pendingQuitCallback)
         {
@@ -148,6 +154,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         rhythmPanel.setRhythm(0);
         sidebar.setSelectedIndex(0);
         if (mixerVisible) { mixerOverlay.refresh(); mixerOverlay.loadFromAPVTS(); }
+        transportBar.setLoadedPreset(f);
     };
     presetBrowser.onClose = [this] { showPresetBrowser(false); };
 

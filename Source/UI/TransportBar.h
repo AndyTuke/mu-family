@@ -18,6 +18,9 @@ public:
     std::function<void()>                      onSettingsToggle;
 
     void refreshPresets();
+    // #241: keep dropdown displaying the loaded preset's name. Pass an invalid
+    // File to revert to the "<unnamed preset>" placeholder.
+    void setLoadedPreset(const juce::File& file);
     void setMixerActive(bool active);
     void setSaveEnabled(bool enabled);
 
