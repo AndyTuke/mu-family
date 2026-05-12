@@ -73,10 +73,12 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     ampSendDly.setRange(0.0, 1.0,  0.01);  ampSendDly.setValue(0.0);
     ampSendRev.setRange(0.0, 1.0,  0.01);  ampSendRev.setValue(0.0);
     ampAccent .setRange(0.0, 12.0, 0.1);   ampAccent .setValue(0.0);
-    ampAtk    .setRange(0.0, 100.0, 0.1);  ampAtk    .setValue(0.0);
-    ampDec  .setRange(0.0, 100.0, 0.1);    ampDec .setValue(3.0);
-    ampSus  .setRange(0.0, 100.0, 0.1);    ampSus .setValue(80.0);
-    ampRel  .setRange(0.0, 100.0, 0.1);    ampRel .setValue(5.0);
+    // #217a: amp A/D/R now in seconds (0..10) with skew 0.3 so 100–200 ms sits at
+    // knob centre. Sustain stays 0..100 %.
+    ampAtk    .setRange(0.0, 10.0,  0.001); ampAtk .setValue(0.005); ampAtk.getSlider().setSkewFactor(0.3);
+    ampDec    .setRange(0.0, 10.0,  0.001); ampDec .setValue(0.3);   ampDec.getSlider().setSkewFactor(0.3);
+    ampSus    .setRange(0.0, 100.0, 0.1);   ampSus .setValue(80.0);
+    ampRel    .setRange(0.0, 10.0,  0.001); ampRel .setValue(0.5);   ampRel.getSlider().setSkewFactor(0.3);
 
     // Insert knob ranges set dynamically by configureInsertAlgorithm(); defaults for Soft/Hard/Fold.
     driveDrive .setRange(0.0,   100.0, 0.1);   driveDrive .setValue(0.0);
@@ -96,7 +98,8 @@ void VoiceSection::apvtsSet(const char* suffix, float v)
         p->setValueNotifyingHost(p->convertTo0to1(v));
 }
 
-// Converts 0-100 slider value to time string: 1-999 ms (integer) or 1.0-3.0 s (1 dp). Max = 3 s.
+// Legacy ADSR (0-100 slider, max 3 s). Used by pitch + filter envelopes until
+// they're migrated by #217b/c.
 static juce::String formatAdsrTime(double v)
 {
     double ms = std::max(1.0, v * 30.0);
@@ -116,24 +119,49 @@ static double parseAdsrTime(const juce::String& s)
     return t.getDoubleValue() / 30.0;
 }
 
+// #217a: seconds-domain formatter for the amp envelope. Slider value IS seconds (0..10).
+static juce::String formatAdsrTimeSec(double v)
+{
+    double ms = std::max(1.0, v * 1000.0);
+    if (ms < 1000.0)
+        return juce::String((int)std::round(ms)) + " ms";
+    return juce::String(ms / 1000.0, 2) + " s";
+}
+
+static double parseAdsrTimeSec(const juce::String& s)
+{
+    auto t = s.trim().toLowerCase();
+    if (t.endsWith("ms"))
+        return t.dropLastCharacters(2).trim().getDoubleValue() / 1000.0;
+    if (t.endsWith("s"))
+        return t.dropLastCharacters(1).trim().getDoubleValue();
+    // Bare number: assume milliseconds (120 → 0.120 s)
+    return t.getDoubleValue() / 1000.0;
+}
+
 void VoiceSection::wireCallbacks()
 {
-    // Envelope time/sustain display formatters
+    // Envelope time/sustain display formatters — pitch & filter still on legacy 0..100.
     for (auto* k : { &pitchAtk, &pitchDec, &pitchRel,
-                     &filterAtk, &filterDec, &filterRel,
-                     &ampAtk, &ampDec })
+                     &filterAtk, &filterDec, &filterRel })
     {
         k->getSlider().textFromValueFunction = [](double v) { return formatAdsrTime(v); };
         k->getSlider().valueFromTextFunction = [](const juce::String& s) { return parseAdsrTime(s); };
     }
-    // Amp Release at max (100) means "play to natural end" — show "End" instead of "3.0 s".
+    // #217a: amp envelope sliders take seconds directly.
+    for (auto* k : { &ampAtk, &ampDec })
+    {
+        k->getSlider().textFromValueFunction = [](double v) { return formatAdsrTimeSec(v); };
+        k->getSlider().valueFromTextFunction = [](const juce::String& s) { return parseAdsrTimeSec(s); };
+    }
+    // #217a: Amp Release at max (10 s) means "play to natural end".
     ampRel.getSlider().textFromValueFunction = [](double v) -> juce::String {
-        if (v >= 100.0) return "End";
-        return formatAdsrTime(v);
+        if (v >= 10.0) return "End";
+        return formatAdsrTimeSec(v);
     };
     ampRel.getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
-        if (s.trim().equalsIgnoreCase("end")) return 100.0;
-        return parseAdsrTime(s);
+        if (s.trim().equalsIgnoreCase("end")) return 10.0;
+        return parseAdsrTimeSec(s);
     };
     for (auto* k : { &pitchSus, &filterSus, &ampSus })
     {
@@ -379,10 +407,11 @@ void VoiceSection::loadFromRhythm()
     }
 
     ampAccent.setValue(p.accentDb,               juce::dontSendNotification);
-    ampAtk  .setValue(p.ampEnvAtk  * (100.0/3.0), juce::dontSendNotification);
-    ampDec  .setValue(p.ampEnvDec  * (100.0/3.0), juce::dontSendNotification);
-    ampSus  .setValue(p.ampEnvSus  * 100.0,       juce::dontSendNotification);
-    ampRel  .setValue(p.ampRelToEnd ? 100.0 : p.ampEnvRel * (100.0/3.0), juce::dontSendNotification);
+    // #217a: amp slider value IS seconds now (no conversion); Sustain stays 0..100 %.
+    ampAtk  .setValue(p.ampEnvAtk,                                  juce::dontSendNotification);
+    ampDec  .setValue(p.ampEnvDec,                                  juce::dontSendNotification);
+    ampSus  .setValue(p.ampEnvSus  * 100.0,                         juce::dontSendNotification);
+    ampRel  .setValue(p.ampRelToEnd ? 10.0 : p.ampEnvRel,            juce::dontSendNotification);
 
     driveChar.setSelectedId(p.driveChar + 1, false);
     configureInsertAlgorithm(p.driveChar);  // sets all insert knob ranges/labels/values/callbacks

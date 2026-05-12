@@ -34,6 +34,25 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         layout.add(std::make_unique<juce::AudioParameterInt>(id, name, mn, mx, def));
     };
 
+    // #217: ADSR time params in 0..10 seconds with 0.3 skew. Skew 0.3 puts
+    // ~100–200 ms at slider centre so the drum-snap region (1–30 ms) gets
+    // generous resolution in the lower third, while pad/ambient values
+    // (1–10 s) sit comfortably at the top. Stored value is in seconds
+    // directly so host automation lanes show "0.150 s" / "2.5 s" instead
+    // of the legacy meaningless 0–100. Format string mirrors the slider's
+    // "X ms" below 1 s / "X.XX s" above. Rolled out per envelope to keep
+    // each step independently revertable (a → amp, then filter, then pitch).
+    auto addAdsrT = [&](const juce::String& id, const juce::String& name, float def)
+    {
+        layout.add(std::make_unique<juce::AudioParameterFloat>(
+            id, name, juce::NormalisableRange<float>(0.0f, 10.0f, 0.0f, 0.3f), def,
+            juce::AudioParameterFloatAttributes().withStringFromValueFunction(
+                [](float v, int) -> juce::String {
+                    if (v >= 1.0f) return juce::String(v, 2) + " s";
+                    return juce::String((int)std::round(v * 1000.0f)) + " ms";
+                })));
+    };
+
     // ── Per-rhythm parameters (47 × 8 = 376) ─────────────────────────────────
     // Rhythms 0..kAutomatedRhythms-1 use full "Rhythm N " names so DAW automation
     // lanes show them clearly. Remaining rhythms use short "RN " names.
@@ -111,10 +130,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addB(p+"fEnvLeg", n+"F Env Legato", false);   // #221
         // Amp
         addF(p+"ampLvl",  n+"Amp Level",  0.0f,   2.0f,  1.0f);  // Issue #121: 0 dB default
-        addF(p+"aEnvAtk", n+"A Env Atk",  0.0f, 100.0f,  0.0f);
-        addF(p+"aEnvDec", n+"A Env Dec",  0.0f, 100.0f,  3.0f);
-        addF(p+"aEnvSus", n+"A Env Sus",  0.0f, 100.0f, 80.0f);
-        addF(p+"aEnvRel",   n+"A Env Rel",  0.0f, 100.0f,  5.0f);
+        addAdsrT(p+"aEnvAtk", n+"A Env Atk", 0.005f);   // #217a — seconds
+        addAdsrT(p+"aEnvDec", n+"A Env Dec", 0.3f);
+        addF(p+"aEnvSus", n+"A Env Sus",  0.0f, 100.0f, 80.0f);   // sustain stays 0..100 %
+        addAdsrT(p+"aEnvRel", n+"A Env Rel", 0.5f);
         addB(p+"aEnvLeg",   n+"A Env Legato", false);   // #221
         addF(p+"accentDb",  n+"Accent",     0.0f,  12.0f,  0.0f);
         // Drive
@@ -957,10 +976,10 @@ static void applyRhythmSuffix(const juce::String& suffix, float v, Rhythm& r,
     else if (suffix == "fEnvDep")   { r.voiceParams.filterEnvDepth = v;            voiceDirty = true; }
     else if (suffix == "fEnvLeg")   { r.voiceParams.filterEnvLegato = (v > 0.5f);  voiceDirty = true; }   // #221
     else if (suffix == "ampLvl")    { r.voiceParams.ampLevel       = v;            voiceDirty = true; }
-    else if (suffix == "aEnvAtk")   { r.voiceParams.ampEnvAtk      = adsrTime(v); voiceDirty = true; }
-    else if (suffix == "aEnvDec")   { r.voiceParams.ampEnvDec      = adsrTime(v); voiceDirty = true; }
+    else if (suffix == "aEnvAtk")   { r.voiceParams.ampEnvAtk      = juce::jmax(0.001f, v); voiceDirty = true; }   // #217a seconds
+    else if (suffix == "aEnvDec")   { r.voiceParams.ampEnvDec      = juce::jmax(0.001f, v); voiceDirty = true; }   // #217a seconds
     else if (suffix == "aEnvSus")   { r.voiceParams.ampEnvSus      = adsrSus(v);  voiceDirty = true; }
-    else if (suffix == "aEnvRel")   { r.voiceParams.ampEnvRel = adsrTime(v); r.voiceParams.ampRelToEnd = (v >= 100.0f); voiceDirty = true; }
+    else if (suffix == "aEnvRel")   { r.voiceParams.ampEnvRel = juce::jmax(0.001f, v); r.voiceParams.ampRelToEnd = (v >= 10.0f); voiceDirty = true; }   // #217a seconds + End at new max
     else if (suffix == "aEnvLeg")   { r.voiceParams.ampEnvLegato = (v > 0.5f);     voiceDirty = true; }   // #221
     else if (suffix == "accentDb")  { r.voiceParams.accentDb        = v;           voiceDirty = true; }
     else if (suffix == "drvChar")    { r.voiceParams.driveChar  = juce::jlimit(0, 10, (int)v); voiceDirty = true; }
@@ -1184,10 +1203,12 @@ void PluginProcessor::pushRhythmToAPVTS(int ri)
     set(px+"fEnvDep",   vp.filterEnvDepth);
     set(px+"fEnvLeg",   vp.filterEnvLegato ? 1.0f : 0.0f);   // #221
     set(px+"ampLvl",    vp.ampLevel);
-    set(px+"aEnvAtk",   vp.ampEnvAtk  * (100.0f/3.0f));
-    set(px+"aEnvDec",   vp.ampEnvDec  * (100.0f/3.0f));
+    set(px+"aEnvAtk",   vp.ampEnvAtk);   // #217a seconds
+    set(px+"aEnvDec",   vp.ampEnvDec);   // #217a seconds
     set(px+"aEnvSus",   vp.ampEnvSus  * 100.0f);
-    set(px+"aEnvRel",   vp.ampEnvRel  * (100.0f/3.0f));
+    // #217a: ampRel writes 10 (new max) when ampRelToEnd is on so the >=10 check in
+    // applyRhythmSuffix triggers; otherwise writes the seconds value directly.
+    set(px+"aEnvRel",   vp.ampRelToEnd ? 10.0f : vp.ampEnvRel);
     set(px+"aEnvLeg",   vp.ampEnvLegato ? 1.0f : 0.0f);   // #221
     set(px+"accentDb",  vp.accentDb);
     set(px+"drvChar",   (float)vp.driveChar);
