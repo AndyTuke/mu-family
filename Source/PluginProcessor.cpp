@@ -15,6 +15,12 @@ static juce::ValueTree serialiseModulators(const Rhythm& r);
 static void            deserialiseModulators(const juce::ValueTree& mods, Rhythm& r);
 static void            clearModulators(Rhythm& r);
 
+// #217d: host-state format version. Bump whenever the on-disk schema changes
+// in a way that requires migration on load.
+//   v0 / v1 : legacy (pre-#217a) — ADSR A/D/R stored as 0..100 (×0.03 → seconds)
+//   v2      : current (#217a/b/c) — ADSR A/D/R stored as 0..10 (seconds direct)
+static constexpr int kCurrentStateFormatVersion = 2;
+
 //==============================================================================
 juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout()
 {
@@ -2029,6 +2035,7 @@ static void clearModulators(Rhythm& r)
 static void populateStateTree(juce::ValueTree& state, int numRhythms,
                               SequencerEngine& seq, const juce::StringArray& samplePaths)
 {
+    state.setProperty("formatVersion", kCurrentStateFormatVersion, nullptr);   // #217d
     state.setProperty("numRhythms", numRhythms, nullptr);
     for (int i = 0; i < numRhythms; ++i)
     {
@@ -2051,6 +2058,53 @@ void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
     juce::MemoryOutputStream(destData, true).writeString(state.toXmlString());
 }
 
+// #217d: in-place migration of pre-#217 host state. APVTS stores parameter
+// values as <PARAM id="..." value="..."/> children of the root tree. For
+// legacy state (formatVersion absent or < 2), the ADSR A/D/R values lived in
+// 0..100; the new schema stores them in 0..10 seconds directly. Migration:
+// multiply by 0.03 (the old display→seconds factor), clamp to the new max,
+// and preserve the End-mode sentinel on aEnvRel (old slider max 100 → new
+// slider max 10 means "play to natural sample end").
+static void migrateLegacyHostState(juce::ValueTree& state)
+{
+    const int version = (int)state.getProperty("formatVersion", 0);
+    if (version >= kCurrentStateFormatVersion) return;
+
+    auto isAdsrTimeSuffix = [](const juce::String& suffix) -> bool {
+        return suffix == "aEnvAtk" || suffix == "aEnvDec" || suffix == "aEnvRel"
+            || suffix == "fEnvAtk" || suffix == "fEnvDec" || suffix == "fEnvRel"
+            || suffix == "pEnvAtk" || suffix == "pEnvDec" || suffix == "pEnvRel";
+    };
+
+    const juce::Identifier paramType   ("PARAM");
+    const juce::Identifier idProperty  ("id");
+    const juce::Identifier valProperty ("value");
+
+    for (int i = 0; i < state.getNumChildren(); ++i)
+    {
+        auto child = state.getChild(i);
+        if (child.getType() != paramType) continue;
+
+        const juce::String id = child.getProperty(idProperty).toString();
+        // Match r{0-7}_<suffix>
+        if (id.length() < 4 || id[0] != 'r' || id[1] < '0' || id[1] > '7' || id[2] != '_')
+            continue;
+
+        const juce::String suffix = id.substring(3);
+        if (!isAdsrTimeSuffix(suffix)) continue;
+
+        const float oldVal = (float)child.getProperty(valProperty, 0.0);
+        float newVal = juce::jlimit(0.0f, 10.0f, oldVal * 0.03f);
+
+        // aEnvRel End-mode sentinel: old max (100) → new max (10).
+        if (suffix == "aEnvRel" && oldVal >= 100.0f) newVal = 10.0f;
+
+        child.setProperty(valProperty, newVal, nullptr);
+    }
+
+    state.setProperty("formatVersion", kCurrentStateFormatVersion, nullptr);
+}
+
 void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
 {
     int n = juce::jlimit(1, SequencerEngine::MaxRhythms,
@@ -2059,8 +2113,13 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
     // Expand to MaxRhythms so parameterChanged can write to all 8 rhythm slots.
     sequencer.setNumRhythms(SequencerEngine::MaxRhythms);
 
+    // #217d: migrate legacy state in-place before pushing it into APVTS so the
+    // new 0..10 s ADSR ranges don't clamp old 0..100 values to absurd attacks.
+    juce::ValueTree migrated = state.createCopy();
+    migrateLegacyHostState(migrated);
+
     apvtsLoading = true;
-    apvts.replaceState(state);
+    apvts.replaceState(migrated);
     apvtsLoading = false;
 
     // Trim to actual active count.
