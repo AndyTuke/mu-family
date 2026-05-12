@@ -9,6 +9,7 @@
 
 #include <array>
 #include <atomic>
+#include <vector>
 
 // Per-rhythm voice chain: SamplePlayer pool → Amp ADSR → Filter + Filter ADSR → level trim.
 // Pitch ratio is derived from VoiceParams (octave/semitones/fine) plus a pitch envelope.
@@ -56,6 +57,14 @@ private:
     MultiModeFilter voiceFilter;             // owns SVF / Ladder / 1-pole / biquad / comb state
     juce::AudioBuffer<float> tempBuffer;
     InsertProcessor insertProc;
+
+    // #220: per-sample pitch ratio buffer feeding SamplePlayer. Filled each block
+    // from the pitch envelope (sample-accurate) + base semitones + smoothed pitchMod.
+    // Reserved to blockSize in prepareToPlay so no audio-thread alloc.
+    std::vector<double> pitchRatioBuffer;
+    // #219: 5 ms linear ramp on pitchMod between block targets. Read per-sample
+    // inside the pitchRatioBuffer fill loop so fast mod doesn't zipper.
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedPitchMod;
 
     float             accentGain = 1.0f;
 

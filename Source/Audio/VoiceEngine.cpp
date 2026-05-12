@@ -29,6 +29,14 @@ void VoiceEngine::prepareToPlay(double sampleRate, int blockSize)
 
     voiceFilter.prepare(sampleRate, blockSize, 2);
 
+    // #220 / #219: per-sample pitch ratio buffer + 5 ms ramp on pitchMod.
+    // Pre-fill ratios with playbackRatio so SamplePlayer always receives a
+    // valid positive ratio even if process() is called before the first
+    // setActiveParams() — defensive against any host-init ordering quirk.
+    pitchRatioBuffer.assign(static_cast<size_t>(juce::jmax(1, blockSize)), playbackRatio);
+    smoothedPitchMod.reset(sampleRate, 0.005);
+    smoothedPitchMod.setCurrentAndTargetValue(activeParams.pitchMod);
+
     syncFilter();
 }
 
@@ -97,23 +105,35 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     // Guard against hosts that call process() with more samples than prepareToPlay() promised.
     const int ns = juce::jmin(numSamples, tempBuffer.getNumSamples());
 
-    float semitones = static_cast<float>(activeParams.pitchOctave) * 12.0f
-                    + static_cast<float>(activeParams.pitchSemitones)
-                    + activeParams.pitchFine / 100.0f
-                    + activeParams.pitchMod;
+    // #220 / #219: per-sample pitch ratio. Static pitch and base playback ratio fold
+    // into a constant; pitch envelope (sample-accurate read) + smoothed pitchMod
+    // produce the per-sample exponent. Defensive: if pitchRatioBuffer is somehow
+    // smaller than ns (host called process before prepareToPlay matched the block
+    // size — rare but possible), grow it via assign() filled with playbackRatio so
+    // SamplePlayer always sees a valid positive ratio.
+    const float baseSemitones = static_cast<float>(activeParams.pitchOctave) * 12.0f
+                              + static_cast<float>(activeParams.pitchSemitones)
+                              + activeParams.pitchFine / 100.0f;
+    const float pitchDepth = activeParams.pitchEnvDepth;
 
-    float pitchEnvVal = 0.0f;
-    for (int i = 0; i < ns; ++i)
-        pitchEnvVal = pitchEnv.getNextSample();
+    smoothedPitchMod.setTargetValue(activeParams.pitchMod);
 
-    double pitchRatio = playbackRatio
-                      * std::pow(2.0, (semitones + pitchEnvVal * activeParams.pitchEnvDepth) / 12.0);
+    if (static_cast<int>(pitchRatioBuffer.size()) < ns)
+        pitchRatioBuffer.assign(static_cast<size_t>(ns), playbackRatio);
+
+    for (int s = 0; s < ns; ++s)
+    {
+        const float envVal   = pitchEnv.getNextSample();
+        const float modVal   = smoothedPitchMod.getNextValue();
+        const float semitone = baseSemitones + modVal + envVal * pitchDepth;
+        pitchRatioBuffer[static_cast<size_t>(s)] = playbackRatio * std::pow(2.0, semitone / 12.0);
+    }
 
     const int nCh = juce::jmin(output.getNumChannels(), tempBuffer.getNumChannels());
     tempBuffer.clear();
 
     for (auto& v : voices)
-        v.process(buffer, pitchRatio, tempBuffer, ns);
+        v.process(buffer, pitchRatioBuffer.data(), tempBuffer, ns);
 
     if (!activeParams.ampRelToEnd)
         ampEnv.applyEnvelopeToBuffer(tempBuffer, 0, ns);
