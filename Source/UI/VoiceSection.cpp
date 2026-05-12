@@ -53,10 +53,11 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     pitchSemi  .setRange(-12.0, 12.0,   1.0);   pitchSemi  .setValue(0.0);
     pitchFine  .setRange(-100.0,100.0,  0.1);   pitchFine  .setValue(0.0);
     // ADSR: 0–100 display scale. 0→1 ms, 100→3 s (A/D/R); 0–100% (S). Mapping in adsrTime/adsrSus.
-    pitchAtk   .setRange(0.0, 100.0, 0.1);   pitchAtk  .setValue(0.0);
-    pitchDec   .setRange(0.0, 100.0, 0.1);   pitchDec  .setValue(1.0);
-    pitchSus   .setRange(0.0, 100.0, 0.1);   pitchSus  .setValue(0.0);
-    pitchRel   .setRange(0.0, 100.0, 0.1);   pitchRel  .setValue(1.0);
+    // #217c: pitch A/D/R in seconds (0..10) with skew 0.3 — matches amp + filter envelopes.
+    pitchAtk   .setRange(0.0, 10.0, 0.001);  pitchAtk.setValue(0.0);   pitchAtk.getSlider().setSkewFactor(0.3);
+    pitchDec   .setRange(0.0, 10.0, 0.001);  pitchDec.setValue(0.03);  pitchDec.getSlider().setSkewFactor(0.3);
+    pitchSus   .setRange(0.0, 100.0, 0.1);   pitchSus.setValue(0.0);
+    pitchRel   .setRange(0.0, 10.0, 0.001);  pitchRel.setValue(0.03);  pitchRel.getSlider().setSkewFactor(0.3);
     pitchDepth .setRange(0.0,  24.0, 0.1);   pitchDepth.setValue(0.0);
 
     filterCutoff.setRange(20.0, 20000.0, 1.0);  filterCutoff.setValue(8000.0);
@@ -142,14 +143,12 @@ static double parseAdsrTimeSec(const juce::String& s)
 
 void VoiceSection::wireCallbacks()
 {
-    // Envelope time/sustain display formatters — pitch still on legacy 0..100.
-    for (auto* k : { &pitchAtk, &pitchDec, &pitchRel })
-    {
-        k->getSlider().textFromValueFunction = [](double v) { return formatAdsrTime(v); };
-        k->getSlider().valueFromTextFunction = [](const juce::String& s) { return parseAdsrTime(s); };
-    }
-    // #217a (amp) + #217b (filter): sliders take seconds directly.
-    for (auto* k : { &ampAtk, &ampDec, &filterAtk, &filterDec, &filterRel })
+    // #217a (amp) + #217b (filter) + #217c (pitch): all ADSR time sliders take
+    // seconds directly. Legacy formatAdsrTime / parseAdsrTime helpers are now
+    // unused but kept in the file for one release in case any other slider is
+    // discovered still depending on them; remove on the next pass.
+    for (auto* k : { &ampAtk, &ampDec, &filterAtk, &filterDec, &filterRel,
+                     &pitchAtk, &pitchDec, &pitchRel })
     {
         k->getSlider().textFromValueFunction = [](double v) { return formatAdsrTimeSec(v); };
         k->getSlider().valueFromTextFunction = [](const juce::String& s) { return parseAdsrTimeSec(s); };
@@ -377,11 +376,11 @@ void VoiceSection::loadFromRhythm()
     pitchOctave .setValue(p.pitchOctave,         juce::dontSendNotification);
     pitchSemi   .setValue(p.pitchSemitones,      juce::dontSendNotification);
     pitchFine   .setValue(p.pitchFine,           juce::dontSendNotification);
-    // Reverse-convert seconds → 0–100 display scale (max 3 s → 100).
-    pitchAtk    .setValue(p.pitchEnvAtk  * (100.0/3.0), juce::dontSendNotification);
-    pitchDec    .setValue(p.pitchEnvDec  * (100.0/3.0), juce::dontSendNotification);
-    pitchSus    .setValue(p.pitchEnvSus  * 100.0,       juce::dontSendNotification);
-    pitchRel    .setValue(p.pitchEnvRel  * (100.0/3.0), juce::dontSendNotification);
+    // #217c: pitch envelope times now in seconds directly.
+    pitchAtk    .setValue(p.pitchEnvAtk,         juce::dontSendNotification);
+    pitchDec    .setValue(p.pitchEnvDec,         juce::dontSendNotification);
+    pitchSus    .setValue(p.pitchEnvSus * 100.0, juce::dontSendNotification);
+    pitchRel    .setValue(p.pitchEnvRel,         juce::dontSendNotification);
     pitchDepth  .setValue(p.pitchEnvDepth,       juce::dontSendNotification);
 
     filterType.setSelectedId(p.filterType + 1, false);

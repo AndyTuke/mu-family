@@ -102,10 +102,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addI(p+"pitchOct",  n+"Pitch Oct",  -4,   4,  0);
         addI(p+"pitchSemi", n+"Pitch Semi", -12,  12,  0);
         addF(p+"pitchFine", n+"Pitch Fine", -100.0f, 100.0f, 0.0f);
-        addF(p+"pEnvAtk",   n+"P Env Atk",  0.0f, 100.0f,  0.0f);
-        addF(p+"pEnvDec",   n+"P Env Dec",  0.0f, 100.0f,  1.0f);
-        addF(p+"pEnvSus",   n+"P Env Sus",  0.0f, 100.0f,  0.0f);
-        addF(p+"pEnvRel",   n+"P Env Rel",  0.0f, 100.0f,  1.0f);
+        addAdsrT(p+"pEnvAtk", n+"P Env Atk", 0.0f);    // #217c — seconds (≈ legacy 0.0 × 0.03)
+        addAdsrT(p+"pEnvDec", n+"P Env Dec", 0.03f);   //         (≈ legacy 1.0 × 0.03)
+        addF     (p+"pEnvSus", n+"P Env Sus", 0.0f, 100.0f, 0.0f);   // sustain stays 0..100 %
+        addAdsrT(p+"pEnvRel", n+"P Env Rel", 0.03f);   //         (≈ legacy 1.0 × 0.03)
         addF(p+"pEnvDep",   n+"P Env Dep",  0.0f,  24.0f,  0.0f);
         addB(p+"pEnvLeg",   n+"P Env Legato", false);   // #221
         // Filter
@@ -960,10 +960,11 @@ static void applyRhythmSuffix(const juce::String& suffix, float v, Rhythm& r,
     else if (suffix == "pitchOct")  { r.voiceParams.pitchOctave    = juce::jlimit(-4, 4, (int)v);   voiceDirty = true; }
     else if (suffix == "pitchSemi") { r.voiceParams.pitchSemitones = juce::jlimit(-12, 12, (int)v); voiceDirty = true; }
     else if (suffix == "pitchFine") { r.voiceParams.pitchFine      = v;  voiceDirty = true; }
-    else if (suffix == "pEnvAtk")   { r.voiceParams.pitchEnvAtk    = adsrTime(v); voiceDirty = true; }
-    else if (suffix == "pEnvDec")   { r.voiceParams.pitchEnvDec    = adsrTime(v); voiceDirty = true; }
+    // #217c — pEnvAtk/Dec/Rel now stored in seconds directly (0..10 s, skew 0.3).
+    else if (suffix == "pEnvAtk")   { r.voiceParams.pitchEnvAtk    = juce::jmax(0.001f, v); voiceDirty = true; }
+    else if (suffix == "pEnvDec")   { r.voiceParams.pitchEnvDec    = juce::jmax(0.001f, v); voiceDirty = true; }
     else if (suffix == "pEnvSus")   { r.voiceParams.pitchEnvSus    = adsrSus(v);  voiceDirty = true; }
-    else if (suffix == "pEnvRel")   { r.voiceParams.pitchEnvRel    = adsrTime(v); voiceDirty = true; }
+    else if (suffix == "pEnvRel")   { r.voiceParams.pitchEnvRel    = juce::jmax(0.001f, v); voiceDirty = true; }   // #217c seconds
     else if (suffix == "pEnvDep")   { r.voiceParams.pitchEnvDepth  = v;            voiceDirty = true; }
     else if (suffix == "pEnvLeg")   { r.voiceParams.pitchEnvLegato = (v > 0.5f);   voiceDirty = true; }   // #221
     else if (suffix == "fltType")   { r.voiceParams.filterType     = juce::jlimit(0, 15, (int)v); voiceDirty = true; }
@@ -1221,11 +1222,11 @@ void PluginProcessor::pushRhythmToAPVTS(int ri)
     set(px+"pitchOct",  (float)vp.pitchOctave);
     set(px+"pitchSemi", (float)vp.pitchSemitones);
     set(px+"pitchFine", vp.pitchFine);
-    // ADSR stored in APVTS as 0–100: A/D/R * (100/3) (seconds→display), S * 100.
-    set(px+"pEnvAtk",   vp.pitchEnvAtk  * (100.0f/3.0f));
-    set(px+"pEnvDec",   vp.pitchEnvDec  * (100.0f/3.0f));
+    // #217c — pEnv times now stored in seconds (0..10 s); sustain stays 0..100 %.
+    set(px+"pEnvAtk",   vp.pitchEnvAtk);
+    set(px+"pEnvDec",   vp.pitchEnvDec);
     set(px+"pEnvSus",   vp.pitchEnvSus  * 100.0f);
-    set(px+"pEnvRel",   vp.pitchEnvRel  * (100.0f/3.0f));
+    set(px+"pEnvRel",   vp.pitchEnvRel);
     set(px+"pEnvDep",   vp.pitchEnvDepth);
     set(px+"pEnvLeg",   vp.pitchEnvLegato ? 1.0f : 0.0f);   // #221
     set(px+"fltType",   (float)vp.filterType);
