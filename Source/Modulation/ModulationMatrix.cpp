@@ -18,8 +18,11 @@ static constexpr auto kMetaSuffix = "_depth";
 // destinations that already operate on a 0-100 display scale (amp/filter ADSR, etc.).
 static float depthScaleFor(const std::string& destId)
 {
-    // Hz-domain destinations: ±8 kHz sweep at full depth (audible across the range).
-    if (destId == "filter.cutoff" || destId == "insert.lpf") return 8000.0f;
+    // #216 #4: Hz-domain destinations now apply multiplicatively in semitones
+    // (see isLogHzDest + the apply branch below). Full-swing scale is 48 semis
+    // = ±4 octaves, matching filterEnvDepth — keeps the same depth sweeping
+    // the same number of octaves whether the base cutoff is 100 Hz or 10 kHz.
+    if (destId == "filter.cutoff" || destId == "insert.lpf") return 48.0f;
     // Semitones / dB / bits — match the destination's natural full range.
     if (destId == "pitch.semitones") return 24.0f;   // ±24 semitones = ±2 oct full swing (#218 collapse)
     // pitch.octave / pitch.fine deprecated by #218 — destinations removed from UI; legacy
@@ -35,6 +38,15 @@ static float depthScaleFor(const std::string& destId)
      || destId == "euclid.a.rotate" || destId == "euclid.b.rotate"
      || destId == "euclid.c.hits"   || destId == "euclid.c.rotate") return 16.0f;
     return 100.0f;  // 0-100 display-scale default
+}
+
+// #216 #4: true for Hz-domain destinations where modulation must be multiplicative-in-
+// octaves rather than additive-in-Hz (so a fixed depth sweeps the same octave range
+// whether the base cutoff is 100 Hz or 10 kHz). Matches the filterEnvDepth model in
+// VoiceEngine: `cutoff * 2^(semis/12)`.
+static bool isLogHzDest(const std::string& destId)
+{
+    return destId == "filter.cutoff" || destId == "insert.lpf";
 }
 
 bool ModulationMatrix::isMetaSource(const std::string& src, std::string& outDepId)
@@ -152,7 +164,13 @@ void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,
             // Scale by the destination's full-swing magnitude so depth=100% × src=100%
             // produces a musically meaningful sweep regardless of the param's units.
             const float scale = depthScaleFor(a.destinationId);
-            dstIt->second += srcVal * a.depth * scale * 0.0001f;
+            const float amount = srcVal * a.depth * scale * 0.0001f;
+            if (isLogHzDest(a.destinationId))
+                // #216 #4: multiplicative in semitones — keeps a fixed depth sweeping
+                // the same number of octaves regardless of base cutoff.
+                dstIt->second *= std::pow(2.0f, amount / 12.0f);
+            else
+                dstIt->second += amount;
         }
     }
 }

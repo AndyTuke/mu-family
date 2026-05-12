@@ -83,9 +83,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addB(p+"pEnvLeg",   n+"P Env Legato", false);   // #221
         // Filter
         addI(p+"fltType", n+"Filter Type", 0, 15, 0);  // 0-15: LP12/HP12/BP12/Notch/LP24/HP24/BP24/LP6/Comb+/AP12/Notch24/HP6/Peak/LoShf/HiShf/Comb-
+        // #216: log-skewed range. Skew 0.25 puts ~1.3 kHz at slider centre and
+        // gives the sub-bass / midrange the resolution they need. Without this,
+        // 20–200 Hz lived in ~1% of knob travel.
         layout.add(std::make_unique<juce::AudioParameterFloat>(
             p+"fltCut", n+"Filter Cut",
-            juce::NormalisableRange<float>(20.0f, 20000.0f), 8000.0f,
+            juce::NormalisableRange<float>(20.0f, 20000.0f, 0.0f, 0.25f), 8000.0f,
             juce::AudioParameterFloatAttributes().withStringFromValueFunction(
                 [](float v, int) -> juce::String {
                     if (v < 1000.0f) return juce::String(v, 1) + " Hz";
@@ -691,11 +694,17 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 {
                     auto& snap = modSnapshot[r];
                     auto sn = [](float v, float mn, float mx) { return juce::jlimit(0.0f, 1.0f, (v - mn) / (mx - mn)); };
+                    // #216: Hz destinations use log normalisation to match the slider's log skew,
+                    // so the live-arc dot tracks the visible knob position.
+                    auto snLogHz = [](float v) {
+                        return juce::jlimit(0.0f, 1.0f,
+                            std::log(juce::jmax(20.0f, v) / 20.0f) / std::log(1000.0f));  // log(20000/20)
+                    };
                     snap[kSnapAmpAtk]      .set(sn(modParamValues["amp.attack"],       0.0f,    100.0f));
                     snap[kSnapAmpDec]      .set(sn(modParamValues["amp.decay"],        0.0f,    100.0f));
                     snap[kSnapAmpSus]      .set(sn(modParamValues["amp.sustain"],      0.0f,    100.0f));
                     snap[kSnapAmpRel]      .set(sn(modParamValues["amp.release"],      0.0f,    100.0f));
-                    snap[kSnapFilterCutoff].set(sn(modParamValues["filter.cutoff"],    20.0f, 20000.0f));
+                    snap[kSnapFilterCutoff].set(snLogHz(modParamValues["filter.cutoff"]));
                     snap[kSnapFilterRes]   .set(sn(modParamValues["filter.resonance"], 0.0f,    100.0f));
                     snap[kSnapFenvAtk]     .set(sn(modParamValues["fenv.attack"],      0.0f,    100.0f));
                     snap[kSnapFenvDec]     .set(sn(modParamValues["fenv.decay"],       0.0f,    100.0f));
@@ -708,7 +717,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                     snap[kSnapInsOutput]   .set(sn(modParamValues["insert.output"],   -24.0f,    0.0f));
                     snap[kSnapInsBits]     .set(sn(modParamValues["insert.bits"],      1.0f,     16.0f));
                     snap[kSnapInsDither]   .set(sn(modParamValues["insert.dither"],    0.0f,    100.0f));
-                    snap[kSnapInsLpf]      .set(sn(modParamValues["insert.lpf"],      20.0f, 20000.0f));
+                    snap[kSnapInsLpf]      .set(snLogHz(modParamValues["insert.lpf"]));   // #216 log
                     // #223 new destinations
                     snap[kSnapPitchEnvDep] .set(sn(modParamValues["pitch.envDepth"],   0.0f,    24.0f));
                     snap[kSnapAmpLvl]      .set(sn(modParamValues["amp.level"],        0.0f,     2.0f));

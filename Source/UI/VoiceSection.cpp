@@ -52,7 +52,7 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     pitchOctave.setRange(-4.0,   4.0,   1.0);   pitchOctave.setValue(0.0);
     pitchSemi  .setRange(-12.0, 12.0,   1.0);   pitchSemi  .setValue(0.0);
     pitchFine  .setRange(-100.0,100.0,  0.1);   pitchFine  .setValue(0.0);
-    // ADSR: 0–100 display scale. 0→1 ms, 100→10 s (A/D/R); 0–100% (S).
+    // ADSR: 0–100 display scale. 0→1 ms, 100→3 s (A/D/R); 0–100% (S). Mapping in adsrTime/adsrSus.
     pitchAtk   .setRange(0.0, 100.0, 0.1);   pitchAtk  .setValue(0.0);
     pitchDec   .setRange(0.0, 100.0, 0.1);   pitchDec  .setValue(1.0);
     pitchSus   .setRange(0.0, 100.0, 0.1);   pitchSus  .setValue(0.0);
@@ -60,6 +60,7 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     pitchDepth .setRange(0.0,  24.0, 0.1);   pitchDepth.setValue(0.0);
 
     filterCutoff.setRange(20.0, 20000.0, 1.0);  filterCutoff.setValue(8000.0);
+    filterCutoff.getSlider().setSkewFactorFromMidPoint(640.0);   // #216: log feel — geo mean of 20..20000
     filterRes   .setRange(0.0,  100.0,  0.1);   filterRes   .setValue(20.0);
     filterAtk   .setRange(0.0,  100.0,  0.1);   filterAtk  .setValue(1.0);
     filterDec   .setRange(0.0,  100.0,  0.1);   filterDec  .setValue(3.0);
@@ -82,6 +83,7 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     driveOutput.setRange(-24.0,   0.0, 0.1);   driveOutput.setValue(0.0);
     driveDither.setRange(0.0,   100.0, 0.1);   driveDither.setValue(0.0);
     driveTone  .setRange(20.0, 20000.0, 1.0);  driveTone  .setValue(20000.0);
+    driveTone  .getSlider().setSkewFactorFromMidPoint(640.0);   // #216: log feel default for full-range modes
 
     wireCallbacks();
 }
@@ -436,6 +438,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
 
             driveTone.setLabel("LPF");
             driveTone.setRange(20.0, 20000.0, 1.0);
+            driveTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #216
             driveTone.getSlider().textFromValueFunction = fmtHz;
             driveTone.getSlider().valueFromTextFunction = parseHz;
             if (p) driveTone.setValue(p->driveTone, juce::dontSendNotification);
@@ -479,6 +482,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
 
             driveTone.setLabel("LPF");
             driveTone.setRange(20.0, 20000.0, 1.0);
+            driveTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #216
             driveTone.getSlider().textFromValueFunction = fmtHz;
             driveTone.getSlider().valueFromTextFunction = parseHz;
             if (p) driveTone.setValue(p->driveTone, juce::dontSendNotification);
@@ -512,6 +516,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
 
             driveTone.setLabel("LPF");
             driveTone.setRange(20.0, 20000.0, 1.0);
+            driveTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #216
             driveTone.getSlider().textFromValueFunction = fmtHz;
             driveTone.getSlider().valueFromTextFunction = parseHz;
             if (p) driveTone.setValue(p->driveTone, juce::dontSendNotification);
