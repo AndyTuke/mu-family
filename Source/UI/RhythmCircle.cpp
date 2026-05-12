@@ -40,11 +40,13 @@ void RhythmCircle::triggerHitPulse(int combinedStep, int stepsA)
     auto& p    = arcPulses[nextPulse % kMaxPulses];
     p.stepFrac = (float)ringAStep / (float)stepsA;
     p.arcWidth = juce::MathConstants<float>::twoPi / (float)stepsA;
-    p.alpha    = 0.7f;
+    // #252: brighter flash on hit — was 0.7 alpha, now 1.0 so the playhead
+    // pulse is unmistakable.
+    p.alpha    = 1.0f;
     p.expand   = 0.0f;
     p.active   = true;
     ++nextPulse;
-    hubAlpha = 0.5f;
+    hubAlpha = 0.8f;   // #252: also brighter hub flash (was 0.5)
 }
 
 void RhythmCircle::timerCallback()
@@ -112,7 +114,7 @@ void RhythmCircle::timerCallback()
         if (!p.active) continue;
         p.expand = juce::jmin(1.0f, p.expand + (1.0f / kPulseSteps));
         const float t = p.expand;
-        p.alpha = 0.7f * (1.0f - t * (2.0f - t));
+        p.alpha = 1.0f * (1.0f - t * (2.0f - t));   // #252: max alpha 1.0 (was 0.7)
         if (p.alpha <= 0.0f) p.active = false;
         dirty = true;
     }
@@ -156,7 +158,13 @@ void RhythmCircle::drawRing(juce::Graphics& g,
     if (N == 0 || outerR <= innerR || innerR < 0.0f) return;
 
     const float twoPi    = juce::MathConstants<float>::twoPi;
-    const float startOff = -juce::MathConstants<float>::halfPi - rotOff;
+    // #252: JUCE's addCentredArc measures angles from 12 o'clock (top) and
+    // increases clockwise (radians: 0 = top, π/2 = right, π = bottom, -π/2 =
+    // left). Previously this used `-halfPi - rotOff`, which intended "start at
+    // 12 o'clock" using standard math conventions but in JUCE's arc convention
+    // placed step 0 at 9 o'clock — so hits visually fired at 9 o'clock instead
+    // of 12. Drop the −halfPi offset so step 0 sits at the top when rotOff=0.
+    const float startOff = -rotOff;
     const float stepAng  = twoPi / (float)N;
     const float gapAng   = juce::jmin(0.05f, stepAng * 0.15f);
     const float arcAng   = stepAng - gapAng;
@@ -176,12 +184,16 @@ void RhythmCircle::drawRing(juce::Graphics& g,
     }
 
     // Loop-point divider: radial line at the boundary between step N-1 and step 0.
+    // #252: use the same addCentredArc convention as the segments above —
+    // x = cx + r·sin(angle), y = cy − r·cos(angle) — instead of cos/sin
+    // standard-math (which left the divider at 12 o'clock while segments
+    // started at 9). Now divider and segments share the same anchor.
     using Id = MuClidLookAndFeel::ColourIds;
-    const float loopCos = std::cos(startOff);
     const float loopSin = std::sin(startOff);
+    const float loopCos = std::cos(startOff);
     g.setColour(MuClidLookAndFeel::colour(Id::panelBackground).brighter(0.6f).withAlpha(0.85f));
-    g.drawLine(cx + innerR * loopCos, cy + innerR * loopSin,
-               cx + outerR * loopCos, cy + outerR * loopSin, 1.5f);
+    g.drawLine(cx + innerR * loopSin, cy - innerR * loopCos,
+               cx + outerR * loopSin, cy - outerR * loopCos, 1.5f);
 }
 
 void RhythmCircle::paint(juce::Graphics& g)
@@ -267,8 +279,9 @@ void RhythmCircle::paint(juce::Graphics& g)
         const float pulseOuter = aOuter + expandPx;
 
         const float twoPi  = juce::MathConstants<float>::twoPi;
-        const float startA = -juce::MathConstants<float>::halfPi - rotAngleA
-                             + p.stepFrac * twoPi - p.arcWidth * 0.5f;
+        // #252: drop the −halfPi offset so the pulse aligns with 12 o'clock —
+        // mirrors the same fix in drawRing's startOff.
+        const float startA = -rotAngleA + p.stepFrac * twoPi - p.arcWidth * 0.5f;
         const float endA   = startA + p.arcWidth;
 
         g.setColour(rhythmColour.withAlpha(p.alpha));

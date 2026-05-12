@@ -56,6 +56,24 @@ void SidebarItem::timerCallback()
         }
     }
 
+    // #252: re-read the rhythm's pattern every tick so edits in the main
+    // EuclideanPanel (hits / rotation / steps / insert / pad) propagate to
+    // the sidebar mini-circle. setRhythm is only called at construction /
+    // reassign, so without this poll the sidebar shows a stale snapshot.
+    if (rhythm)
+    {
+        auto patA = rhythm->genA.getStepTypes();
+        auto patB = rhythm->genB.getStepTypes();
+        auto patC = rhythm->genC.getStepTypes();
+        if (patA != cachedPatA || patB != cachedPatB || patC != cachedPatC)
+        {
+            cachedPatA = std::move(patA);
+            cachedPatB = std::move(patB);
+            cachedPatC = std::move(patC);
+            miniCircle.setPatterns(cachedPatA, cachedPatB, cachedPatC);
+        }
+    }
+
     if (pulseAlpha > 0.0f)
     {
         // Quadratic ease-out decay over ~200ms (6 ticks at 30Hz)

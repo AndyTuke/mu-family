@@ -51,5 +51,9 @@ private:
 
     RhythmCircle miniCircle;
 
+    // #252: cached pattern snapshot so timerCallback only re-pushes to the
+    // mini-circle on actual content change (avoids 30 Hz repaint storms).
+    std::vector<StepType> cachedPatA, cachedPatB, cachedPatC;
+
     void timerCallback() override;
 };
