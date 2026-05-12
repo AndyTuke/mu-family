@@ -282,6 +282,12 @@ private:
     void syncFXParam(const juce::String& id, float v);
     void syncMixerParam(const juce::String& id, float v);
     void pushRhythmToAPVTS(int ri);
+    // Force-applies all APVTS r{i}_ params back into Rhythm fields, bypassing
+    // JUCE's unchanged-value parameterChanged-skip. Required after sequencer
+    // shrink/grow cycles (preset A → B → A) where Rhythm objects are destroyed
+    // and recreated with default fields but APVTS values stay the same — no
+    // listener fires, so r.voiceParams / r.genA.hits never repopulate.
+    void forceSyncRhythmFromAPVTS(int ri);
     void pushMixerChannelToAPVTS(int idx);
     void swapAPVTSForRhythms(int i, int j);
     void resetPlayState(int idx);

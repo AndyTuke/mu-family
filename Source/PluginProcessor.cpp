@@ -1009,6 +1009,33 @@ void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float 
     }
 }
 
+// Force-sync a rhythm's full Rhythm struct (HitGenerator state + voiceParams) from
+// current APVTS values, regardless of whether parameterChanged would fire. Needed
+// after preset reload paths where APVTS values land back on the same numbers they
+// held before (e.g. preset A → B → A): JUCE skips listener callbacks on unchanged
+// values, so a freshly-constructed Rhythm object at a regrown slot would never get
+// its data populated and would play with default `hits=0` patterns (silent) and
+// default voice params.
+void PluginProcessor::forceSyncRhythmFromAPVTS(int ri)
+{
+    if (ri < 0 || ri >= SequencerEngine::MaxRhythms) return;
+    if (ri >= sequencer.getNumRhythms()) return;
+
+    Rhythm& r = sequencer.getRhythm(ri);
+    const juce::String prefix = "r" + juce::String(ri) + "_";
+
+    bool patternDirty = false;
+    bool voiceDirty   = false;
+    for (int j = 0; kRhythmSuffixes[j] != nullptr; ++j)
+    {
+        if (auto* raw = apvts.getRawParameterValue(prefix + kRhythmSuffixes[j]))
+            applyRhythmSuffix(kRhythmSuffixes[j], raw->load(), r, patternDirty, voiceDirty);
+    }
+
+    if (patternDirty) sequencer.updatePattern(ri);
+    if (voiceEngines[ri]) voiceEngines[ri]->setParams(r.voiceParams);
+}
+
 void PluginProcessor::syncFXParam(const juce::String& id, float v)
 {
     auto& eff = fxChain.effectSlot();
@@ -1809,6 +1836,12 @@ bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
             loadedSamplePaths.set(targetIdx, juce::String());
         }
     }
+
+    // #240: force-sync APVTS → Rhythm so freshly-defaulted slots (after a
+    // shrink/grow cycle) get their fields repopulated even when JUCE skips
+    // the parameterChanged listener because incoming values match the
+    // already-stored APVTS values.
+    forceSyncRhythmFromAPVTS(targetIdx);
     return true;
 }
 
@@ -2075,8 +2108,11 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
                                           "Rhythm " + juce::String(i + 1)).toString().toStdString();
         r.colourIndex = (int)state.getProperty("r" + juce::String(i) + "_colour", i % 30);
 
-        sequencer.updatePattern(i);
-        voiceEngines[i]->setParams(r.voiceParams);
+        // #240: force-sync APVTS → Rhythm so shrink/grow cycles (preset A → B → A)
+        // repopulate freshly-defaulted Rhythm fields even when JUCE skips listener
+        // callbacks because the APVTS values didn't change. Internally calls
+        // updatePattern + voiceEngines[i]->setParams.
+        forceSyncRhythmFromAPVTS(i);
 
         juce::String samplePath = state.getProperty("r" + juce::String(i) + "_sample").toString();
         juce::String sampleData = state.getProperty("r" + juce::String(i) + "_sampleData").toString();
@@ -2353,8 +2389,13 @@ void PluginProcessor::loadPreset(const juce::File& file)
                 voiceEngines[i]->clearSample();
             }
 
-            sequencer.updatePattern(i);
-            voiceEngines[i]->setParams(r.voiceParams);
+            // #240: force-sync APVTS → Rhythm so a preset that re-loads identical
+            // values into a freshly-recreated slot (preset A → B → A pattern)
+            // still populates r.voiceParams / r.genA.hits. JUCE skips listener
+            // callbacks when setValueNotifyingHost is called with an unchanged
+            // value, so parameterChanged → syncRhythmParam never fires.
+            // Internally calls updatePattern + voiceEngines[i]->setParams.
+            forceSyncRhythmFromAPVTS(i);
         }
 
         // Restore global FX/mixer state if present (added in #123; older files omit this).
