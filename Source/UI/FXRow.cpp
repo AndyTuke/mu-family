@@ -159,6 +159,40 @@ void FXRow::rebuildKnobs(int algorithmIndex)
                 return s.getDoubleValue();
             };
         }
+        else if (param.units == "%")
+        {
+            knob->getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String((int)std::round(v)) + " %";
+            };
+            knob->getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
+                return s.retainCharacters("-0123456789.").getDoubleValue();
+            };
+        }
+        else if (param.units == "ms")
+        {
+            knob->getSlider().textFromValueFunction = [](double v) -> juce::String {
+                if (v < 1000.0) return juce::String((int)std::round(v)) + " ms";
+                return juce::String(v / 1000.0, 2) + " s";
+            };
+            knob->getSlider().valueFromTextFunction = [](const juce::String& t) -> double {
+                const juce::String s = t.trim().toLowerCase();
+                if (s.endsWith("s") && !s.endsWith("ms"))
+                    return s.dropLastCharacters(1).getDoubleValue() * 1000.0;
+                return s.retainCharacters("-0123456789.").getDoubleValue();
+            };
+        }
+        else if (param.minVal == 0.0f && param.maxVal == 1.0f)
+        {
+            // #247: unitless 0..1 params (reverb Size, Diffusion, Damp, Mod, Dirt)
+            // displayed as 0..100 % so users see what they're adjusting.
+            knob->getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String((int)std::round(v * 100.0)) + " %";
+            };
+            knob->getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
+                return juce::jlimit(0.0, 1.0,
+                    s.retainCharacters("-0123456789.").getDoubleValue() / 100.0);
+            };
+        }
         else
         {
             knob->getSlider().setNumDecimalPlacesToDisplay(0);

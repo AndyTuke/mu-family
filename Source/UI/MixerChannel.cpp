@@ -302,7 +302,36 @@ void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
         insCharBox.setSelectedId(ip.driveChar + 1, juce::dontSendNotification);
         configureInsertAlgorithm(ip.driveChar, proc);
 
-        insCharBox.onChange = [this, proc](){ configureInsertAlgorithm(insCharBox.getSelectedId() - 1, proc); };
+        insCharBox.onChange = [this, proc]()
+        {
+            const int newChar = insCharBox.getSelectedId() - 1;
+            // #244b: align knob rest positions when crossing into/out of EQ
+            // mode — mirrors the per-rhythm fix from #147. EQ stores Low/High
+            // as 0..100 (50=0dB) so 50 = neutral; distortion algos use 0..100
+            // as drive amount where 0 = no drive. Without this, switching
+            // from Soft Clip (drvDrv=0) to EQ would show Low at -18 dB.
+            if (proc)
+            {
+                const int oldChar = proc->mixerEngine.masterInsertParams.driveChar;
+                auto set = [proc](const juce::String& id, float v)
+                {
+                    if (auto* p = proc->apvts.getParameter(id))
+                        p->setValueNotifyingHost(p->convertTo0to1(v));
+                };
+                if (newChar == 6 && oldChar != 6)
+                {
+                    set("mst_insDrv", 50.0f);   // Low → 0 dB
+                    set("mst_insDit", 50.0f);   // High → 0 dB
+                    set("mst_insMid",  0.0f);   // Mid → 0 dB (already direct)
+                }
+                else if (oldChar == 6 && newChar != 6)
+                {
+                    set("mst_insDrv", 0.0f);    // back to "no drive" for distortion modes
+                    set("mst_insDit", 0.0f);
+                }
+            }
+            configureInsertAlgorithm(newChar, proc);
+        };
     }
 }
 
@@ -570,7 +599,24 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
         case 5:                  // Clipper — same Drive/Output/LPF layout
             insDrive .setLabel(charId == 5 ? "Threshold" : "Drive");
             insDrive .setRange(0.0, 100.0, 0.1);
-            insDrive .getSlider().textFromValueFunction = nullptr;
+            // #245: cases 1/2/3 display 0..100 as 0..40 dB input gain (matches
+            // InsertProcessor's `preGain = pow(10, drvDrv/100 * 2)`). Clipper's
+            // Threshold (case 5) uses a different formula and keeps raw display
+            // for now (covered by a follow-up).
+            if (charId != 5)
+            {
+                insDrive .getSlider().textFromValueFunction = [](double v) -> juce::String {
+                    return juce::String(v * 0.4, 1) + " dB";
+                };
+                insDrive .getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
+                    return juce::jlimit(0.0, 100.0, s.retainCharacters("-0123456789.").getDoubleValue() * 2.5);
+                };
+            }
+            else
+            {
+                insDrive .getSlider().textFromValueFunction = nullptr;
+                insDrive .getSlider().valueFromTextFunction = nullptr;
+            }
             insDrive .setValue(ip.driveDrive, juce::dontSendNotification);
             insDrive .setVisible(true);
 
@@ -629,7 +675,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
             if (proc) setParam("mst_insChar", 4);
             break;
 
-        case 6: // 3-Band EQ — Low / High / Mid
+        case 6: // 3-Band EQ — Low / Mid / High (#244a — Mid in middle slot)
         {
             auto dbFmt = [](double v) -> juce::String {
                 return (v >= 0.0 ? "+" : "") + juce::String(v, 1) + " dB";
@@ -641,22 +687,22 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
             insDrive .setValue(ip.driveDrive / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
             insDrive .setVisible(true);
 
-            insOutput.setLabel("High");
+            insOutput.setLabel("Mid");
             insOutput.setRange(-18.0, 18.0, 0.1);
             insOutput.getSlider().textFromValueFunction = dbFmt;
-            insOutput.setValue(ip.drvDither / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
+            insOutput.setValue(ip.eqMidGain, juce::dontSendNotification);
             insOutput.setVisible(true);
 
-            insTone  .setLabel("Mid");
+            insTone  .setLabel("High");
             insTone  .setRange(-18.0, 18.0, 0.1);
             insTone  .getSlider().textFromValueFunction = dbFmt;
-            insTone  .setValue(ip.eqMidGain, juce::dontSendNotification);
+            insTone  .setValue(ip.drvDither / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
             insTone  .setVisible(true);
 
             // Low/high gains stored as 0-100 (50=0 dB), mid direct
             insDrive .onValueChanged = [setParam](double v) { setParam("mst_insDrv", (v + 18.0) / 36.0 * 100.0); };
-            insOutput.onValueChanged = [setParam](double v) { setParam("mst_insDit", (v + 18.0) / 36.0 * 100.0); };
-            insTone  .onValueChanged = [setParam](double v) { setParam("mst_insMid", v); };
+            insOutput.onValueChanged = [setParam](double v) { setParam("mst_insMid", v); };
+            insTone  .onValueChanged = [setParam](double v) { setParam("mst_insDit", (v + 18.0) / 36.0 * 100.0); };
             if (proc) setParam("mst_insChar", 6);
             break;
         }

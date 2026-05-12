@@ -451,8 +451,14 @@ void VoiceSection::configureInsertAlgorithm(int charId)
         case 1: case 2: case 3:  // ── Soft Clip / Hard Clip / Fold ─────────
             driveDrive.setLabel("Drive");
             driveDrive.setRange(0.0, 100.0, 0.1);
-            driveDrive.getSlider().textFromValueFunction = nullptr;
-            driveDrive.getSlider().valueFromTextFunction = nullptr;
+            // #245: display 0..100 as 0..40 dB input gain (`preGain = pow(10, drvDrv/100 * 2)`).
+            // APVTS storage stays 0..100 — no preset-compat break, formatter only.
+            driveDrive.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String(v * 0.4, 1) + " dB";
+            };
+            driveDrive.getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
+                return juce::jlimit(0.0, 100.0, s.retainCharacters("-0123456789.").getDoubleValue() * 2.5);
+            };
             if (p) driveDrive.setValue(p->driveDrive, juce::dontSendNotification);
             driveDrive.setVisible(true);
 
