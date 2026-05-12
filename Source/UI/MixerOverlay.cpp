@@ -131,7 +131,7 @@ void MixerOverlay::wireFXRows()
             p->setValueNotifyingHost(e ? 1.0f : 0.0f);
     };
     effectRow.onAlgorithmChanged = [this](int idx) {
-        // #242: force-sync the engine BEFORE writing APVTS. If APVTS already
+        // #242b: force-sync the engine BEFORE writing APVTS. If APVTS already
         // holds the same value (e.g. state restore left it at idx while the
         // engine sat at default 0), setValueNotifyingHost skips the listener,
         // so syncFXParam never fires and the engine stays stale.
@@ -351,7 +351,7 @@ void MixerOverlay::loadFromAPVTS()
     // Effect row
     effectRow.setEnabled(*apvts.getRawParameterValue("eff_en") > 0.5f,
                          juce::dontSendNotification);
-    // #242: read algo from APVTS, not engine — APVTS is the source of truth.
+    // #242b: read algo from APVTS, not engine — APVTS is the source of truth.
     // If the engine somehow lags (e.g. state-restore listener skip), we still
     // show the user the value the host actually has stored.
     const int effAlgoFromApvts = juce::jlimit(0,

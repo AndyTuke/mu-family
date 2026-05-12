@@ -18,7 +18,7 @@ static constexpr auto kMetaSuffix = "_depth";
 // destinations that already operate on a 0-100 display scale (amp/filter ADSR, etc.).
 static float depthScaleFor(const std::string& destId)
 {
-    // #216 #4: Hz-domain destinations now apply multiplicatively in semitones
+    // #216d: Hz-domain destinations now apply multiplicatively in semitones
     // (see isLogHzDest + the apply branch below). Full-swing scale is 48 semis
     // = ±4 octaves, matching filterEnvDepth — keeps the same depth sweeping
     // the same number of octaves whether the base cutoff is 100 Hz or 10 kHz.
@@ -40,7 +40,7 @@ static float depthScaleFor(const std::string& destId)
     return 100.0f;  // 0-100 display-scale default
 }
 
-// #216 #4: true for Hz-domain destinations where modulation must be multiplicative-in-
+// #216d: true for Hz-domain destinations where modulation must be multiplicative-in-
 // octaves rather than additive-in-Hz (so a fixed depth sweeps the same octave range
 // whether the base cutoff is 100 Hz or 10 kHz). Matches the filterEnvDepth model in
 // VoiceEngine: `cutoff * 2^(semis/12)`.
@@ -166,7 +166,7 @@ void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,
             const float scale = depthScaleFor(a.destinationId);
             const float amount = srcVal * a.depth * scale * 0.0001f;
             if (isLogHzDest(a.destinationId))
-                // #216 #4: multiplicative in semitones — keeps a fixed depth sweeping
+                // #216d: multiplicative in semitones — keeps a fixed depth sweeping
                 // the same number of octaves regardless of base cutoff.
                 dstIt->second *= std::pow(2.0f, amount / 12.0f);
             else

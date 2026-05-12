@@ -61,7 +61,7 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     pitchDepth .setRange(0.0,  24.0, 0.1);   pitchDepth.setValue(0.0);
 
     filterCutoff.setRange(20.0, 20000.0, 1.0);  filterCutoff.setValue(8000.0);
-    filterCutoff.getSlider().setSkewFactorFromMidPoint(640.0);   // #216: log feel — geo mean of 20..20000
+    filterCutoff.getSlider().setSkewFactorFromMidPoint(640.0);   // #216a: log feel — geo mean of 20..20000
     filterRes   .setRange(0.0,  100.0,  0.1);   filterRes   .setValue(20.0);
     // #217b: filter A/D/R in seconds (0..10) with skew 0.3 — matches amp envelope.
     filterAtk   .setRange(0.0,  10.0, 0.001);  filterAtk.setValue(0.03);  filterAtk.getSlider().setSkewFactor(0.3);
@@ -87,7 +87,7 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     driveOutput.setRange(-24.0,   0.0, 0.1);   driveOutput.setValue(0.0);
     driveDither.setRange(0.0,   100.0, 0.1);   driveDither.setValue(0.0);
     driveTone  .setRange(20.0, 20000.0, 1.0);  driveTone  .setValue(20000.0);
-    driveTone  .getSlider().setSkewFactorFromMidPoint(640.0);   // #216: log feel default for full-range modes
+    driveTone  .getSlider().setSkewFactorFromMidPoint(640.0);   // #216b: log feel default for full-range modes
 
     wireCallbacks();
 }
@@ -467,7 +467,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
 
             driveTone.setLabel("LPF");
             driveTone.setRange(20.0, 20000.0, 1.0);
-            driveTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #216
+            driveTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #216b
             driveTone.getSlider().textFromValueFunction = fmtHz;
             driveTone.getSlider().valueFromTextFunction = parseHz;
             if (p) driveTone.setValue(p->driveTone, juce::dontSendNotification);
@@ -511,7 +511,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
 
             driveTone.setLabel("LPF");
             driveTone.setRange(20.0, 20000.0, 1.0);
-            driveTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #216
+            driveTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #216b
             driveTone.getSlider().textFromValueFunction = fmtHz;
             driveTone.getSlider().valueFromTextFunction = parseHz;
             if (p) driveTone.setValue(p->driveTone, juce::dontSendNotification);
@@ -545,7 +545,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
 
             driveTone.setLabel("LPF");
             driveTone.setRange(20.0, 20000.0, 1.0);
-            driveTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #216
+            driveTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #216b
             driveTone.getSlider().textFromValueFunction = fmtHz;
             driveTone.getSlider().valueFromTextFunction = parseHz;
             if (p) driveTone.setValue(p->driveTone, juce::dontSendNotification);

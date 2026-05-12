@@ -100,7 +100,7 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
         insDrive .setRange(0.0, 100.0, 0.1);   insDrive .setValue(0.0);
         insOutput.setRange(-24.0, 0.0, 0.1);   insOutput.setValue(0.0);
         insTone  .setRange(20.0, 20000.0, 1.0); insTone  .setValue(20000.0);
-        insTone  .getSlider().setSkewFactorFromMidPoint(640.0);   // #216: log feel default for full-range modes
+        insTone  .getSlider().setSkewFactorFromMidPoint(640.0);   // #216b: log feel default for full-range modes
         insDrive .getSlider().textFromValueFunction = noVal;
         insOutput.getSlider().textFromValueFunction = noVal;
         insTone  .getSlider().textFromValueFunction = noVal;
@@ -582,7 +582,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
 
             insTone  .setLabel("LPF");
             insTone  .setRange(20.0, 20000.0, 1.0);
-            insTone  .getSlider().setSkewFactorFromMidPoint(640.0);   // #216
+            insTone  .getSlider().setSkewFactorFromMidPoint(640.0);   // #216b
             insTone  .getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return v >= 1000.0 ? juce::String(v / 1000.0, 2) + "kHz"
                                    : juce::String((int)v) + "Hz";

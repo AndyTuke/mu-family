@@ -116,7 +116,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addB(p+"pEnvLeg",   n+"P Env Legato", false);   // #221
         // Filter
         addI(p+"fltType", n+"Filter Type", 0, 15, 0);  // 0-15: LP12/HP12/BP12/Notch/LP24/HP24/BP24/LP6/Comb+/AP12/Notch24/HP6/Peak/LoShf/HiShf/Comb-
-        // #216: log-skewed range. Skew 0.25 puts ~1.3 kHz at slider centre and
+        // #216a: log-skewed range. Skew 0.25 puts ~1.3 kHz at slider centre and
         // gives the sub-bass / midrange the resolution they need. Without this,
         // 20–200 Hz lived in ~1% of knob travel.
         layout.add(std::make_unique<juce::AudioParameterFloat>(
@@ -727,7 +727,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 {
                     auto& snap = modSnapshot[r];
                     auto sn = [](float v, float mn, float mx) { return juce::jlimit(0.0f, 1.0f, (v - mn) / (mx - mn)); };
-                    // #216: Hz destinations use log normalisation to match the slider's log skew,
+                    // #216a: Hz destinations use log normalisation to match the slider's log skew,
                     // so the live-arc dot tracks the visible knob position.
                     auto snLogHz = [](float v) {
                         return juce::jlimit(0.0f, 1.0f,
@@ -750,7 +750,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                     snap[kSnapInsOutput]   .set(sn(modParamValues["insert.output"],   -24.0f,    0.0f));
                     snap[kSnapInsBits]     .set(sn(modParamValues["insert.bits"],      1.0f,     16.0f));
                     snap[kSnapInsDither]   .set(sn(modParamValues["insert.dither"],    0.0f,    100.0f));
-                    snap[kSnapInsLpf]      .set(snLogHz(modParamValues["insert.lpf"]));   // #216 log
+                    snap[kSnapInsLpf]      .set(snLogHz(modParamValues["insert.lpf"]));   // #216a log
                     // #223 new destinations
                     snap[kSnapPitchEnvDep] .set(sn(modParamValues["pitch.envDepth"],   0.0f,    24.0f));
                     snap[kSnapAmpLvl]      .set(sn(modParamValues["amp.level"],        0.0f,     2.0f));
@@ -1050,13 +1050,13 @@ void PluginProcessor::syncFXParam(const juce::String& id, float v)
     auto& dly = fxChain.delaySlot();
     auto& rev = fxChain.reverbSlot();
 
-    // #242: do NOT guard on apvtsLoading — that left the engine at the default
+    // #242a: do NOT guard on apvtsLoading — that left the engine at the default
     // algorithm (0=Chorus) when state restore loaded eff_algo=N, because nothing
     // re-synced the engine after the load completed. Then the user trying to
-    // change the algorithm via the dropdown triggered the #240-style listener-
-    // skip-on-unchanged-value bug (APVTS already at N, no notification, engine
-    // stuck at 0), and the next loadFromAPVTS read engine state and snapped the
-    // FXRow back to Chorus. setAlgorithm is cheap (one make_unique + prepare).
+    // change the algorithm via the dropdown triggered the #242b listener-skip-
+    // on-unchanged-value bug (APVTS already at N, no notification, engine stuck
+    // at 0), and the next loadFromAPVTS read engine state and snapped the FXRow
+    // back to Chorus. setAlgorithm is cheap (one make_unique + prepare).
     if      (id == "eff_algo") { eff.setAlgorithm((int)v); }
     else if (id == "eff_en")   { eff.setEnabled(v > 0.5f); }
     else if (id.startsWith("eff_p"))
@@ -1086,7 +1086,7 @@ void PluginProcessor::syncFXParam(const juce::String& id, float v)
     else if (id == "dly_spread") { dly.setSpread(v); }
     else if (id == "dly_dirt")   { dly.setDirt(v); }
     else if (id == "dly_send")   { dly.setSend(v); }
-    else if (id == "rev_algo")   { rev.setAlgorithm((int)v); }   // #242 — see eff_algo
+    else if (id == "rev_algo")   { rev.setAlgorithm((int)v); }   // #242a — see eff_algo
     else if (id == "rev_en")     { rev.setEnabled(v > 0.5f); }
     else if (id == "rev_lvl")    { rev.setLevel(v); }
     else if (id == "rev_size")   { rev.setParam("size",      v); }
