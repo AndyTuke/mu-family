@@ -37,9 +37,21 @@ ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex,
     depthSlider.setRange(-100.0, 100.0, 0.1);
     depthSlider.setValue(a.depth, juce::dontSendNotification);
 
+    // #224 bipolar curve knob (-100..+100, detent at 0)
+    curveSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    curveSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 34, 18);
+    curveSlider.setRange(-100.0, 100.0, 0.1);
+    curveSlider.setValue(a.curve, juce::dontSendNotification);
+    curveSlider.setDoubleClickReturnValue(true, 0.0);
+    curveSlider.setTooltip("Curve: log .. linear .. exp (#224)");
+
     depthSlider.onValueChange = [this]
     {
         if (onDepthChange) onDepthChange((float)depthSlider.getValue());
+    };
+    curveSlider.onValueChange = [this]
+    {
+        if (onCurveChange) onCurveChange((float)curveSlider.getValue());
     };
     destCombo.onChange = [this](int id_)
     {
@@ -51,18 +63,20 @@ ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex,
     addAndMakeVisible(sourceLabel);
     addAndMakeVisible(destCombo);
     addAndMakeVisible(depthSlider);
+    addAndMakeVisible(curveSlider);
     addAndMakeVisible(removeBtn);
 }
 
 void ModMatrixPanel::MatrixRow::resized()
 {
     const int w = getWidth(), h = getHeight();
-    const int removeW = 22, depthW = 120, srcW = 46;
-    const int destW = w - srcW - depthW - removeW - 6;
-    sourceLabel.setBounds(0, 0, srcW, h);
-    destCombo.setBounds(srcW + 2, 0, destW, h);
-    depthSlider.setBounds(srcW + 2 + destW + 2, 0, depthW, h);
-    removeBtn.setBounds(w - removeW, (h - 18) / 2, removeW, 18);
+    const int removeW = 22, curveW = 70, depthW = 120, srcW = 46;
+    const int destW = w - srcW - depthW - curveW - removeW - 8;
+    sourceLabel.setBounds(0,                                          0, srcW,  h);
+    destCombo  .setBounds(srcW + 2,                                   0, destW, h);
+    depthSlider.setBounds(srcW + 2 + destW + 2,                       0, depthW, h);
+    curveSlider.setBounds(srcW + 2 + destW + 2 + depthW + 2,          0, curveW, h);
+    removeBtn  .setBounds(w - removeW, (h - 18) / 2, removeW, 18);
 }
 
 //==============================================================================
@@ -152,15 +166,17 @@ void ModMatrixPanel::rebuildRows()
         row->onDestChange = [this, rowId, sourceId](const std::string& dest)
         {
             float d = 0.0f;
+            float c = 0.0f;
             lockMods(*rhythm);
             for (const auto& a2 : rhythm->modulationMatrix.getAssignments())
-                if (a2.id == rowId) { d = a2.depth; break; }
+                if (a2.id == rowId) { d = a2.depth; c = a2.curve; break; }
             rhythm->modulationMatrix.removeAssignment(rowId);
             ModulationAssignment na;
             na.id            = rowId;
             na.sourceId      = sourceId;
             na.destinationId = dest;
             na.depth         = d;
+            na.curve         = c;   // #224
             rhythm->modulationMatrix.addAssignment(na);
             unlockMods(*rhythm);
             rebuildRows(); resized(); repaint();
@@ -170,6 +186,13 @@ void ModMatrixPanel::rebuildRows()
         {
             lockMods(*rhythm);
             rhythm->modulationMatrix.setDepth(rowId, d);
+            unlockMods(*rhythm);
+            if (onChange) onChange();
+        };
+        row->onCurveChange = [this, rowId](float c)   // #224
+        {
+            lockMods(*rhythm);
+            rhythm->modulationMatrix.setCurve(rowId, c);
             unlockMods(*rhythm);
             if (onChange) onChange();
         };

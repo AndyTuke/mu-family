@@ -189,12 +189,15 @@ private:
     {
         DropdownSelect   destCombo;
         juce::Slider     depthSlider;
+        // #224 Bitwig-style bipolar curve knob: -100..+100 = log..linear..exp
+        juce::Slider     curveSlider;
         juce::TextButton removeBtn { "x" };
         std::string      id;
 
         std::function<void()>                         onRemove;
         std::function<void(const std::string& dest)>  onDestChange;
         std::function<void(float depth)>              onDepthChange;
+        std::function<void(float curve)>              onCurveChange;
 
         AssignmentRow(const std::string& assignId, int driveChar);
         void resized() override;

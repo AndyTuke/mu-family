@@ -76,9 +76,14 @@ void VoiceEngine::trigger(bool isAccented)
         nextVoice = (nextVoice + 1) % MaxVoices;
     }
 
-    ampEnv.reset();    ampEnv.noteOn();
-    filterEnv.reset(); filterEnv.noteOn();
-    pitchEnv.reset();  pitchEnv.noteOn();
+    // #221: Reset (default) clears envelope to zero before noteOn; Legato continues
+    // from the current level so rapid retriggers don't click on pad/melodic material.
+    if (!activeParams.ampEnvLegato)    ampEnv.reset();
+    ampEnv.noteOn();
+    if (!activeParams.filterEnvLegato) filterEnv.reset();
+    filterEnv.noteOn();
+    if (!activeParams.pitchEnvLegato)  pitchEnv.reset();
+    pitchEnv.noteOn();
 }
 
 void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)

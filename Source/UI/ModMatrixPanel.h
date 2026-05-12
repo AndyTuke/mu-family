@@ -29,12 +29,14 @@ private:
         juce::Label      sourceLabel;
         DropdownSelect   destCombo;
         juce::Slider     depthSlider;
+        juce::Slider     curveSlider;   // #224
         juce::TextButton removeBtn { "x" };
         std::string      assignId;
 
         std::function<void()>                         onRemove;
         std::function<void(const std::string& dest)>  onDestChange;
         std::function<void(float depth)>              onDepthChange;
+        std::function<void(float curve)>              onCurveChange;   // #224
 
         MatrixRow(const ModulationAssignment& a, int csIndex, int driveChar);
         void resized() override;

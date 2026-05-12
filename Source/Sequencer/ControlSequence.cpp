@@ -101,7 +101,28 @@ float ControlSequence::evaluateSmooth(double phase) const
     if (segLen <= 0.0f)
         return p0.y * 100.0f;
 
-    // Linear interpolation; bezier evaluation is added in Stage 5 with the LFO editor.
     const float t = (x - p0.x) / segLen;
+
+    // #222: cubic Bézier when either endpoint carries a handle. handleY is an
+    // offset from the segment midpoint in normalised y units, used to derive the
+    // two control points y-values c1y = midY + handleY0 and c2y = midY + handleY1.
+    // Per #225, handleX is intentionally ignored (the evaluator parameterises t
+    // as chord progress, not the cubic x-axis — keeps playhead-vs-time mapping
+    // simple). When neither endpoint has a handle the result degenerates to
+    // linear interpolation via the Bézier formula with zero offsets.
+    if (p0.hasBezierHandle || p1.hasBezierHandle)
+    {
+        const float midY = (p0.y + p1.y) * 0.5f;
+        const float c1y  = midY + (p0.hasBezierHandle ? p0.handleY : 0.0f);
+        const float c2y  = midY + (p1.hasBezierHandle ? p1.handleY : 0.0f);
+
+        const float one_t = 1.0f - t;
+        const float b = one_t * one_t * one_t           * p0.y
+                      + 3.0f * one_t * one_t * t        * c1y
+                      + 3.0f * one_t * t * t            * c2y
+                      + t * t * t                       * p1.y;
+        return b * 100.0f;
+    }
+
     return (p0.y + t * (p1.y - p0.y)) * 100.0f;
 }

@@ -1,6 +1,7 @@
 #include "ModulationMatrix.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <queue>
 #include <unordered_set>
@@ -84,6 +85,12 @@ void ModulationMatrix::setDepth(const std::string& id, float depth)
         if (a.id == id) { a.depth = depth; return; }
 }
 
+void ModulationMatrix::setCurve(const std::string& id, float curve)
+{
+    for (auto& a : assignments)
+        if (a.id == id) { a.curve = curve; return; }
+}
+
 void ModulationMatrix::rebuildCache()
 {
     cachedSortOrder = getSortedOrder();
@@ -129,10 +136,23 @@ void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,
         if (dstIt != paramValues.end())
         {
             // srcIt->second ∈ [-100..+100], a.depth ∈ [-100..+100].
+            // #224 Bitwig-style curve: k = 2^(curve/100), so curve=0 → k=1 (linear),
+            // curve=+100 → k=2 (square, exp-like), curve=-100 → k=0.5 (square-root,
+            // log-like). Sign-preserving so bipolar sources stay bipolar. Skipped
+            // when curve == 0 (the common case) so the per-step cost is one
+            // float compare for assignments that don't use the curve.
+            float srcVal = srcIt->second;
+            if (a.curve != 0.0f)
+            {
+                const float k        = std::pow(2.0f, a.curve / 100.0f);
+                const float mag      = std::abs(srcVal) / 100.0f;
+                const float bent     = std::pow(mag, k);
+                srcVal = (srcVal < 0.0f ? -bent : bent) * 100.0f;
+            }
             // Scale by the destination's full-swing magnitude so depth=100% × src=100%
             // produces a musically meaningful sweep regardless of the param's units.
             const float scale = depthScaleFor(a.destinationId);
-            dstIt->second += srcIt->second * a.depth * scale * 0.0001f;
+            dstIt->second += srcVal * a.depth * scale * 0.0001f;
         }
     }
 }

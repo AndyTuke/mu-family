@@ -80,6 +80,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addF(p+"pEnvSus",   n+"P Env Sus",  0.0f, 100.0f,  0.0f);
         addF(p+"pEnvRel",   n+"P Env Rel",  0.0f, 100.0f,  1.0f);
         addF(p+"pEnvDep",   n+"P Env Dep",  0.0f,  24.0f,  0.0f);
+        addB(p+"pEnvLeg",   n+"P Env Legato", false);   // #221
         // Filter
         addI(p+"fltType", n+"Filter Type", 0, 15, 0);  // 0-15: LP12/HP12/BP12/Notch/LP24/HP24/BP24/LP6/Comb+/AP12/Notch24/HP6/Peak/LoShf/HiShf/Comb-
         layout.add(std::make_unique<juce::AudioParameterFloat>(
@@ -96,12 +97,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addF(p+"fEnvSus", n+"F Env Sus",  0.0f, 100.0f,  0.0f);
         addF(p+"fEnvRel", n+"F Env Rel",  0.0f, 100.0f,  3.0f);
         addF(p+"fEnvDep", n+"F Env Dep",  0.0f,  48.0f,  0.0f);
+        addB(p+"fEnvLeg", n+"F Env Legato", false);   // #221
         // Amp
         addF(p+"ampLvl",  n+"Amp Level",  0.0f,   2.0f,  1.0f);  // Issue #121: 0 dB default
         addF(p+"aEnvAtk", n+"A Env Atk",  0.0f, 100.0f,  0.0f);
         addF(p+"aEnvDec", n+"A Env Dec",  0.0f, 100.0f,  3.0f);
         addF(p+"aEnvSus", n+"A Env Sus",  0.0f, 100.0f, 80.0f);
         addF(p+"aEnvRel",   n+"A Env Rel",  0.0f, 100.0f,  5.0f);
+        addB(p+"aEnvLeg",   n+"A Env Legato", false);   // #221
         addF(p+"accentDb",  n+"Accent",     0.0f,  12.0f,  0.0f);
         // Drive
         addI(p+"drvChar",    n+"Drive Char",   0,     10,      0);  // 0=None … 10=TapeSat
@@ -862,9 +865,9 @@ static const char* const kRhythmSuffixes[] = {
     "stepsB","hitsB","rotB","prePadB","postPadB","insStB","insLenB","insModeB","prePadModeB","postPadModeB",
     "stepsC","hitsC","rotC","prePadC","postPadC","insStC","insLenC","insModeC","prePadModeC","postPadModeC",
     "logic",
-    "pitchOct","pitchSemi","pitchFine","pEnvAtk","pEnvDec","pEnvSus","pEnvRel","pEnvDep",
-    "fltType","fltCut","fltRes","fEnvAtk","fEnvDec","fEnvSus","fEnvRel","fEnvDep",
-    "ampLvl","aEnvAtk","aEnvDec","aEnvSus","aEnvRel","accentDb",
+    "pitchOct","pitchSemi","pitchFine","pEnvAtk","pEnvDec","pEnvSus","pEnvRel","pEnvDep","pEnvLeg",
+    "fltType","fltCut","fltRes","fEnvAtk","fEnvDec","fEnvSus","fEnvRel","fEnvDep","fEnvLeg",
+    "ampLvl","aEnvAtk","aEnvDec","aEnvSus","aEnvRel","aEnvLeg","accentDb",
     "drvChar","drvDrv","drvOut","drvBits","drvRate","drvDit","drvTon","eqMidGain",
     nullptr
 };
@@ -926,6 +929,7 @@ static void applyRhythmSuffix(const juce::String& suffix, float v, Rhythm& r,
     else if (suffix == "pEnvSus")   { r.voiceParams.pitchEnvSus    = adsrSus(v);  voiceDirty = true; }
     else if (suffix == "pEnvRel")   { r.voiceParams.pitchEnvRel    = adsrTime(v); voiceDirty = true; }
     else if (suffix == "pEnvDep")   { r.voiceParams.pitchEnvDepth  = v;            voiceDirty = true; }
+    else if (suffix == "pEnvLeg")   { r.voiceParams.pitchEnvLegato = (v > 0.5f);   voiceDirty = true; }   // #221
     else if (suffix == "fltType")   { r.voiceParams.filterType     = juce::jlimit(0, 15, (int)v); voiceDirty = true; }
     else if (suffix == "fltCut")    { r.voiceParams.filterCutoff   = v;            voiceDirty = true; }
     else if (suffix == "fltRes")    { r.voiceParams.filterRes      = v;            voiceDirty = true; }
@@ -934,11 +938,13 @@ static void applyRhythmSuffix(const juce::String& suffix, float v, Rhythm& r,
     else if (suffix == "fEnvSus")   { r.voiceParams.filterEnvSus   = adsrSus(v);  voiceDirty = true; }
     else if (suffix == "fEnvRel")   { r.voiceParams.filterEnvRel   = adsrTime(v); voiceDirty = true; }
     else if (suffix == "fEnvDep")   { r.voiceParams.filterEnvDepth = v;            voiceDirty = true; }
+    else if (suffix == "fEnvLeg")   { r.voiceParams.filterEnvLegato = (v > 0.5f);  voiceDirty = true; }   // #221
     else if (suffix == "ampLvl")    { r.voiceParams.ampLevel       = v;            voiceDirty = true; }
     else if (suffix == "aEnvAtk")   { r.voiceParams.ampEnvAtk      = adsrTime(v); voiceDirty = true; }
     else if (suffix == "aEnvDec")   { r.voiceParams.ampEnvDec      = adsrTime(v); voiceDirty = true; }
     else if (suffix == "aEnvSus")   { r.voiceParams.ampEnvSus      = adsrSus(v);  voiceDirty = true; }
     else if (suffix == "aEnvRel")   { r.voiceParams.ampEnvRel = adsrTime(v); r.voiceParams.ampRelToEnd = (v >= 100.0f); voiceDirty = true; }
+    else if (suffix == "aEnvLeg")   { r.voiceParams.ampEnvLegato = (v > 0.5f);     voiceDirty = true; }   // #221
     else if (suffix == "accentDb")  { r.voiceParams.accentDb        = v;           voiceDirty = true; }
     else if (suffix == "drvChar")    { r.voiceParams.driveChar  = juce::jlimit(0, 10, (int)v); voiceDirty = true; }
     else if (suffix == "drvDrv")     { r.voiceParams.driveDrive = v;  voiceDirty = true; }
@@ -1150,6 +1156,7 @@ void PluginProcessor::pushRhythmToAPVTS(int ri)
     set(px+"pEnvSus",   vp.pitchEnvSus  * 100.0f);
     set(px+"pEnvRel",   vp.pitchEnvRel  * (100.0f/3.0f));
     set(px+"pEnvDep",   vp.pitchEnvDepth);
+    set(px+"pEnvLeg",   vp.pitchEnvLegato ? 1.0f : 0.0f);   // #221
     set(px+"fltType",   (float)vp.filterType);
     set(px+"fltCut",    vp.filterCutoff);
     set(px+"fltRes",    vp.filterRes);
@@ -1158,11 +1165,13 @@ void PluginProcessor::pushRhythmToAPVTS(int ri)
     set(px+"fEnvSus",   vp.filterEnvSus  * 100.0f);
     set(px+"fEnvRel",   vp.filterEnvRel  * (100.0f/3.0f));
     set(px+"fEnvDep",   vp.filterEnvDepth);
+    set(px+"fEnvLeg",   vp.filterEnvLegato ? 1.0f : 0.0f);   // #221
     set(px+"ampLvl",    vp.ampLevel);
     set(px+"aEnvAtk",   vp.ampEnvAtk  * (100.0f/3.0f));
     set(px+"aEnvDec",   vp.ampEnvDec  * (100.0f/3.0f));
     set(px+"aEnvSus",   vp.ampEnvSus  * 100.0f);
     set(px+"aEnvRel",   vp.ampEnvRel  * (100.0f/3.0f));
+    set(px+"aEnvLeg",   vp.ampEnvLegato ? 1.0f : 0.0f);   // #221
     set(px+"accentDb",  vp.accentDb);
     set(px+"drvChar",   (float)vp.driveChar);
     set(px+"drvDrv",    vp.driveDrive);
