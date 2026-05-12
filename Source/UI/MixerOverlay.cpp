@@ -131,6 +131,11 @@ void MixerOverlay::wireFXRows()
             p->setValueNotifyingHost(e ? 1.0f : 0.0f);
     };
     effectRow.onAlgorithmChanged = [this](int idx) {
+        // #242: force-sync the engine BEFORE writing APVTS. If APVTS already
+        // holds the same value (e.g. state restore left it at idx while the
+        // engine sat at default 0), setValueNotifyingHost skips the listener,
+        // so syncFXParam never fires and the engine stays stale.
+        proc.fxChain.effectSlot().setAlgorithm(idx);
         if (auto* p = proc.apvts.getParameter("eff_algo"))
             p->setValueNotifyingHost(p->convertTo0to1((float)idx));
         updateEffectSendLabels();
@@ -346,7 +351,15 @@ void MixerOverlay::loadFromAPVTS()
     // Effect row
     effectRow.setEnabled(*apvts.getRawParameterValue("eff_en") > 0.5f,
                          juce::dontSendNotification);
-    effectRow.setSelectedAlgorithm(eff.getAlgorithmIndex(), juce::dontSendNotification);
+    // #242: read algo from APVTS, not engine — APVTS is the source of truth.
+    // If the engine somehow lags (e.g. state-restore listener skip), we still
+    // show the user the value the host actually has stored.
+    const int effAlgoFromApvts = juce::jlimit(0,
+        (int)FXAlgorithmRegistry::effectAlgorithms().size() - 1,
+        (int)*apvts.getRawParameterValue("eff_algo"));
+    if (eff.getAlgorithmIndex() != effAlgoFromApvts)
+        eff.setAlgorithm(effAlgoFromApvts);   // defensive resync
+    effectRow.setSelectedAlgorithm(effAlgoFromApvts, juce::dontSendNotification);
     {
         const auto& algos = FXAlgorithmRegistry::effectAlgorithms();
         int ai = eff.getAlgorithmIndex();

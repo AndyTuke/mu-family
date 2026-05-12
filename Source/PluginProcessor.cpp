@@ -1043,7 +1043,14 @@ void PluginProcessor::syncFXParam(const juce::String& id, float v)
     auto& dly = fxChain.delaySlot();
     auto& rev = fxChain.reverbSlot();
 
-    if      (id == "eff_algo") { if (!apvtsLoading) eff.setAlgorithm((int)v); }
+    // #242: do NOT guard on apvtsLoading — that left the engine at the default
+    // algorithm (0=Chorus) when state restore loaded eff_algo=N, because nothing
+    // re-synced the engine after the load completed. Then the user trying to
+    // change the algorithm via the dropdown triggered the #240-style listener-
+    // skip-on-unchanged-value bug (APVTS already at N, no notification, engine
+    // stuck at 0), and the next loadFromAPVTS read engine state and snapped the
+    // FXRow back to Chorus. setAlgorithm is cheap (one make_unique + prepare).
+    if      (id == "eff_algo") { eff.setAlgorithm((int)v); }
     else if (id == "eff_en")   { eff.setEnabled(v > 0.5f); }
     else if (id.startsWith("eff_p"))
     {
@@ -1072,7 +1079,7 @@ void PluginProcessor::syncFXParam(const juce::String& id, float v)
     else if (id == "dly_spread") { dly.setSpread(v); }
     else if (id == "dly_dirt")   { dly.setDirt(v); }
     else if (id == "dly_send")   { dly.setSend(v); }
-    else if (id == "rev_algo")   { if (!apvtsLoading) rev.setAlgorithm((int)v); }
+    else if (id == "rev_algo")   { rev.setAlgorithm((int)v); }   // #242 — see eff_algo
     else if (id == "rev_en")     { rev.setEnabled(v > 0.5f); }
     else if (id == "rev_lvl")    { rev.setLevel(v); }
     else if (id == "rev_size")   { rev.setParam("size",      v); }
