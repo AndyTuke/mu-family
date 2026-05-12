@@ -201,7 +201,15 @@ void TransportBar::populatePresetDropdown()
     auto dir = proc.getPresetsDir();
     if (dir.isDirectory())
     {
-        for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*.muclid"))
+        // #251: sort presets alphabetically by display name (filename without
+        // extension), case-insensitive. JUCE's findChildFiles order is
+        // filesystem-dependent (alphabetical on NTFS, mtime on others), so an
+        // explicit sort makes the dropdown predictable across machines.
+        auto files = dir.findChildFiles(juce::File::findFiles, false, "*.muclid");
+        std::sort(files.begin(), files.end(), [](const juce::File& a, const juce::File& b) {
+            return a.getFileNameWithoutExtension().compareIgnoreCase(b.getFileNameWithoutExtension()) < 0;
+        });
+        for (const auto& f : files)
         {
             presetFiles.push_back(f);
             presetDropdown.addItem(f.getFileNameWithoutExtension(), (int)presetFiles.size());

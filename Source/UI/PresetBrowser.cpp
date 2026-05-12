@@ -46,7 +46,9 @@ void PresetBrowser::refresh(const juce::File& dir)
         }
 
         std::sort(allPresets.begin(), allPresets.end(),
-                  [](const PresetInfo& a, const PresetInfo& b) { return a.name < b.name; });
+                  [](const PresetInfo& a, const PresetInfo& b) {
+                      return a.name.compareIgnoreCase(b.name) < 0;   // #251
+                  });
     }
 
     // Build sorted list of unique categories, then repopulate the filter dropdown.

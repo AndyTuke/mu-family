@@ -2231,6 +2231,21 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
 
 void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
+    // #250: in standalone, the user's saved `_default.muclid` is authoritative
+    // on every launch — JUCE's auto-saved "filterState" should NOT override it.
+    // The host (DAW) path still needs setStateInformation to restore project
+    // state, so this override only fires when running standalone.
+    if (wrapperType == wrapperType_Standalone)
+    {
+        const juce::File defaultPreset = getPresetsDir().getChildFile("_default.muclid");
+        if (defaultPreset.existsAsFile())
+        {
+            loadPreset(defaultPreset);
+            return;
+        }
+        // No default preset saved — fall through to JUCE's auto-restore.
+    }
+
     if (auto xml = juce::parseXML(juce::String::fromUTF8((const char*)data, sizeInBytes)))
     {
         auto state = juce::ValueTree::fromXml(*xml);
