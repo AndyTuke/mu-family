@@ -7,6 +7,14 @@
 #include "Sequencer/Rhythm.h"
 #include "FX/FXAlgorithmDef.h"
 
+#include <thread>   // #237: std::this_thread::yield in modulator deserialise lock-spin
+
+// #237: forward declarations so save/load paths defined earlier in this file
+// can reference the modulator serialise helpers defined later.
+static juce::ValueTree serialiseModulators(const Rhythm& r);
+static void            deserialiseModulators(const juce::ValueTree& mods, Rhythm& r);
+static void            clearModulators(Rhythm& r);
+
 //==============================================================================
 juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout()
 {
@@ -1665,6 +1673,9 @@ void PluginProcessor::saveRhythmPresetToFile(int rhythmIdx, const juce::File& de
         if (auto* param = apvts.getParameter(srcPrefix + kRhythmSuffixes[i]))
             state.setProperty("r0_" + juce::String(kRhythmSuffixes[i]), param->getValue(), nullptr);
 
+    // #237: serialise modulators (ControlSequences + ModulationMatrix assignments).
+    state.addChild(serialiseModulators(sequencer.getRhythm(rhythmIdx)), -1, nullptr);
+
     if (embedSample)
     {
         const juce::String path = loadedSamplePaths[rhythmIdx];
@@ -1712,6 +1723,18 @@ bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
     if (nameVal.isString() && nameVal.toString().isNotEmpty())
         r.name = nameVal.toString().toStdString();
     r.colourIndex = (int)state.getProperty("r0_colour", r.colourIndex);
+
+    // #237: restore modulators if the preset carries a Modulators child.
+    // Legacy .muRhyth (no Modulators) is left alone — the rhythm keeps its
+    // existing in-memory CS state instead of being wiped. This is the
+    // intentional opposite of clear-then-load for the host-state path: when
+    // a user loads a rhythm preset that pre-dates #237, we don't want their
+    // freshly-authored modulators getting destroyed.
+    if (auto mods = state.getChildWithName("Modulators"); mods.isValid())
+    {
+        clearModulators(r);
+        deserialiseModulators(mods, r);
+    }
 
     // Embedded sample takes priority over path-based load (mirrors full-preset logic).
     juce::String encodedData = state.getProperty("sampleData").toString();
@@ -1781,6 +1804,164 @@ void PluginProcessor::loadDefaultPreset()
 }
 
 //==============================================================================
+// #237 — Modulator state serialisation.
+// Captures everything not APVTS-backed: per-rhythm ControlSequences
+// (mode/polarity/loop+step timing/stepValues/curvePoints with Bézier handles)
+// and ModulationMatrix assignments (id/source/dest/depth/curve).
+//
+// Schema (one Modulators child per rhythm, identified by rhythmIdx property):
+//   <Modulators rhythmIdx="0">
+//     <Seq id="cs0" mode="0" polarity="0"
+//          loopNV="2" loopMod="0" loopMult="4"
+//          stepNV="2" stepMod="0" stepMult="1">
+//       <Step v="42.5"/>
+//       <Point x="0.0" y="0.5" bez="0" hx="0.0" hy="0.0"/>
+//     </Seq>
+//     <Asgn id="..." src="cs0_output" dest="filter.cutoff" depth="50" curve="0"/>
+//   </Modulators>
+//
+// Idempotent: a tree without a Modulators child leaves the rhythm's existing
+// in-memory defaults untouched (legacy preset compat).
+static juce::ValueTree serialiseModulators(const Rhythm& r)
+{
+    juce::ValueTree mods("Modulators");
+
+    for (const auto& cs : r.controlSequences)
+    {
+        juce::ValueTree seq("Seq");
+        seq.setProperty("id",       juce::String(cs.id),               nullptr);
+        seq.setProperty("mode",     (int)cs.mode,                       nullptr);
+        seq.setProperty("polarity", (int)cs.polarity,                   nullptr);
+        seq.setProperty("loopNV",   (int)cs.loopNoteValue,              nullptr);
+        seq.setProperty("loopMod",  (int)cs.loopNoteMod,                nullptr);
+        seq.setProperty("loopMult", cs.loopMultiplier,                  nullptr);
+        seq.setProperty("stepNV",   (int)cs.stepNoteValue,              nullptr);
+        seq.setProperty("stepMod",  (int)cs.stepNoteMod,                nullptr);
+        seq.setProperty("stepMult", cs.stepMultiplier,                  nullptr);
+
+        for (const auto v : cs.stepValues)
+        {
+            juce::ValueTree st("Step");
+            st.setProperty("v", v, nullptr);
+            seq.addChild(st, -1, nullptr);
+        }
+        for (const auto& pt : cs.curvePoints)
+        {
+            juce::ValueTree p("Point");
+            p.setProperty("x",   pt.x,                          nullptr);
+            p.setProperty("y",   pt.y,                          nullptr);
+            p.setProperty("bez", pt.hasBezierHandle ? 1 : 0,    nullptr);
+            p.setProperty("hx",  pt.handleX,                    nullptr);
+            p.setProperty("hy",  pt.handleY,                    nullptr);
+            seq.addChild(p, -1, nullptr);
+        }
+
+        mods.addChild(seq, -1, nullptr);
+    }
+
+    for (const auto& a : r.modulationMatrix.getAssignments())
+    {
+        juce::ValueTree asgn("Asgn");
+        asgn.setProperty("id",    juce::String(a.id),            nullptr);
+        asgn.setProperty("src",   juce::String(a.sourceId),      nullptr);
+        asgn.setProperty("dest",  juce::String(a.destinationId), nullptr);
+        asgn.setProperty("depth", a.depth,                       nullptr);
+        asgn.setProperty("curve", a.curve,                       nullptr);
+        mods.addChild(asgn, -1, nullptr);
+    }
+
+    return mods;
+}
+
+static void deserialiseModulators(const juce::ValueTree& mods, Rhythm& r)
+{
+    if (!mods.isValid() || mods.getType() != juce::Identifier("Modulators"))
+        return;
+
+    // Spin on the rhythm's modLock so the audio thread can't be inside
+    // ModulationMatrix::process() / ControlSequence::evaluate() while we
+    // overwrite the vectors. Mirrors ModulatorEditor's lock pattern.
+    while (r.modLock.exchange(true, std::memory_order_acquire))
+        std::this_thread::yield();
+
+    for (int ci = 0; ci < mods.getNumChildren(); ++ci)
+    {
+        auto node = mods.getChild(ci);
+
+        if (node.getType() == juce::Identifier("Seq"))
+        {
+            const juce::String id = node.getProperty("id").toString();
+            // Find matching CS by id (csN). The vector is pre-sized to
+            // MaxControlSequences in Rhythm's ctor so we patch in place.
+            for (auto& cs : r.controlSequences)
+            {
+                if (juce::String(cs.id) != id) continue;
+                cs.mode           = (ControlSequence::Mode)    (int)node.getProperty("mode",     (int)cs.mode);
+                cs.polarity       = (ControlSequence::Polarity)(int)node.getProperty("polarity", (int)cs.polarity);
+                cs.loopNoteValue  = (NoteValue)                (int)node.getProperty("loopNV",   (int)cs.loopNoteValue);
+                cs.loopNoteMod    = (NoteMod)                  (int)node.getProperty("loopMod",  (int)cs.loopNoteMod);
+                cs.loopMultiplier =                            (int)node.getProperty("loopMult", cs.loopMultiplier);
+                cs.stepNoteValue  = (NoteValue)                (int)node.getProperty("stepNV",   (int)cs.stepNoteValue);
+                cs.stepNoteMod    = (NoteMod)                  (int)node.getProperty("stepMod",  (int)cs.stepNoteMod);
+                cs.stepMultiplier =                            (int)node.getProperty("stepMult", cs.stepMultiplier);
+
+                cs.stepValues.clear();
+                cs.curvePoints.clear();
+                for (int j = 0; j < node.getNumChildren(); ++j)
+                {
+                    auto child = node.getChild(j);
+                    if (child.getType() == juce::Identifier("Step"))
+                    {
+                        cs.stepValues.push_back((float)(double)child.getProperty("v", 0.0));
+                    }
+                    else if (child.getType() == juce::Identifier("Point"))
+                    {
+                        ControlSequence::CurvePoint pt;
+                        pt.x                = (float)(double)child.getProperty("x", 0.0);
+                        pt.y                = (float)(double)child.getProperty("y", 0.0);
+                        pt.hasBezierHandle  = (int)child.getProperty("bez", 0) != 0;
+                        pt.handleX          = (float)(double)child.getProperty("hx", 0.0);
+                        pt.handleY          = (float)(double)child.getProperty("hy", 0.0);
+                        cs.curvePoints.push_back(pt);
+                    }
+                }
+                break;
+            }
+        }
+        else if (node.getType() == juce::Identifier("Asgn"))
+        {
+            ModulationAssignment a;
+            a.id            = node.getProperty("id").toString().toStdString();
+            a.sourceId      = node.getProperty("src").toString().toStdString();
+            a.destinationId = node.getProperty("dest").toString().toStdString();
+            a.depth         = (float)(double)node.getProperty("depth", 0.0);
+            a.curve         = (float)(double)node.getProperty("curve", 0.0);
+            r.modulationMatrix.addAssignment(a);
+        }
+    }
+
+    r.modLock.store(false, std::memory_order_release);
+}
+
+// Clears CS step/curve data + assignments before each deserialise so successive
+// preset loads don't accumulate state. Only called from the preset-load paths.
+static void clearModulators(Rhythm& r)
+{
+    while (r.modLock.exchange(true, std::memory_order_acquire))
+        std::this_thread::yield();
+
+    while (!r.modulationMatrix.getAssignments().empty())
+        r.modulationMatrix.removeAssignment(r.modulationMatrix.getAssignments().front().id);
+
+    for (auto& cs : r.controlSequences)
+    {
+        cs.stepValues.clear();
+        cs.curvePoints.clear();
+    }
+
+    r.modLock.store(false, std::memory_order_release);
+}
+
 static void populateStateTree(juce::ValueTree& state, int numRhythms,
                               SequencerEngine& seq, const juce::StringArray& samplePaths)
 {
@@ -1791,6 +1972,11 @@ static void populateStateTree(juce::ValueTree& state, int numRhythms,
         state.setProperty("r" + juce::String(i) + "_name",   juce::String(r.name),   nullptr);
         state.setProperty("r" + juce::String(i) + "_colour", r.colourIndex,           nullptr);
         state.setProperty("r" + juce::String(i) + "_sample", samplePaths[i],          nullptr);
+
+        // #237: per-rhythm modulator state as a child of the APVTS state tree.
+        auto mods = serialiseModulators(r);
+        mods.setProperty("rhythmIdx", i, nullptr);
+        state.addChild(mods, -1, nullptr);
     }
 }
 
@@ -1815,6 +2001,21 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
 
     // Trim to actual active count.
     sequencer.setNumRhythms(n);
+
+    // #237: restore per-rhythm modulator state from the Modulators children.
+    // Each child carries a rhythmIdx property so we apply to the right slot
+    // regardless of child ordering. Legacy state (no Modulators children)
+    // leaves rhythm defaults in place — clean degradation.
+    for (int ci = 0; ci < state.getNumChildren(); ++ci)
+    {
+        auto child = state.getChild(ci);
+        if (child.getType() != juce::Identifier("Modulators")) continue;
+        const int ri = (int)child.getProperty("rhythmIdx", -1);
+        if (ri < 0 || ri >= n) continue;
+        Rhythm& target = sequencer.getRhythm(ri);
+        clearModulators(target);
+        deserialiseModulators(child, target);
+    }
 
     // Populate fixed voice/midi arrays to match n.
     // Ordering matters: when shrinking, store the new (smaller) count BEFORE destroying
@@ -1943,6 +2144,9 @@ void PluginProcessor::savePreset(const juce::String& name,
             if (auto* param = apvts.getParameter(chSrcPrefix + kChannelSuffixes[j]))
                 rTree.setProperty("ch_" + juce::String(kChannelSuffixes[j]), param->getValue(), nullptr);
 
+        // #237: serialise modulators per rhythm.
+        rTree.addChild(serialiseModulators(r), -1, nullptr);
+
         if (embedSamples)
         {
             const juce::String path = loadedSamplePaths[i];
@@ -2056,6 +2260,17 @@ void PluginProcessor::loadPreset(const juce::File& file)
             }
 
             Rhythm& r = sequencer.getRhythm(i);
+
+            // #237: restore modulators if the preset carries a Modulators child.
+            // Same opt-in behaviour as applyRhythmPreset — legacy .muclid files
+            // (no Modulators child per rhythm) leave the rhythm's existing
+            // in-memory state in place, avoiding accidental destruction.
+            if (auto rMods = rTree.getChildWithName("Modulators"); rMods.isValid())
+            {
+                clearModulators(r);
+                deserialiseModulators(rMods, r);
+            }
+
             auto nameVal = rTree.getProperty("name");
             if (nameVal.isString() && nameVal.toString().isNotEmpty())
                 r.name = nameVal.toString().toStdString();
