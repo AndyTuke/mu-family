@@ -62,10 +62,11 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     filterCutoff.setRange(20.0, 20000.0, 1.0);  filterCutoff.setValue(8000.0);
     filterCutoff.getSlider().setSkewFactorFromMidPoint(640.0);   // #216: log feel — geo mean of 20..20000
     filterRes   .setRange(0.0,  100.0,  0.1);   filterRes   .setValue(20.0);
-    filterAtk   .setRange(0.0,  100.0,  0.1);   filterAtk  .setValue(1.0);
-    filterDec   .setRange(0.0,  100.0,  0.1);   filterDec  .setValue(3.0);
-    filterSus   .setRange(0.0,  100.0,  0.1);   filterSus  .setValue(0.0);
-    filterRel   .setRange(0.0,  100.0,  0.1);   filterRel  .setValue(3.0);
+    // #217b: filter A/D/R in seconds (0..10) with skew 0.3 — matches amp envelope.
+    filterAtk   .setRange(0.0,  10.0, 0.001);  filterAtk.setValue(0.03);  filterAtk.getSlider().setSkewFactor(0.3);
+    filterDec   .setRange(0.0,  10.0, 0.001);  filterDec.setValue(0.09);  filterDec.getSlider().setSkewFactor(0.3);
+    filterSus   .setRange(0.0, 100.0, 0.1);    filterSus.setValue(0.0);
+    filterRel   .setRange(0.0,  10.0, 0.001);  filterRel.setValue(0.09);  filterRel.getSlider().setSkewFactor(0.3);
     filterDepth .setRange(0.0,   48.0,  0.1);   filterDepth.setValue(0.0);
 
     ampLevel  .setRange(0.0, 2.0,   0.01);  ampLevel  .setValue(0.5);  // Stage 19: −6 dB default
@@ -141,15 +142,14 @@ static double parseAdsrTimeSec(const juce::String& s)
 
 void VoiceSection::wireCallbacks()
 {
-    // Envelope time/sustain display formatters — pitch & filter still on legacy 0..100.
-    for (auto* k : { &pitchAtk, &pitchDec, &pitchRel,
-                     &filterAtk, &filterDec, &filterRel })
+    // Envelope time/sustain display formatters — pitch still on legacy 0..100.
+    for (auto* k : { &pitchAtk, &pitchDec, &pitchRel })
     {
         k->getSlider().textFromValueFunction = [](double v) { return formatAdsrTime(v); };
         k->getSlider().valueFromTextFunction = [](const juce::String& s) { return parseAdsrTime(s); };
     }
-    // #217a: amp envelope sliders take seconds directly.
-    for (auto* k : { &ampAtk, &ampDec })
+    // #217a (amp) + #217b (filter): sliders take seconds directly.
+    for (auto* k : { &ampAtk, &ampDec, &filterAtk, &filterDec, &filterRel })
     {
         k->getSlider().textFromValueFunction = [](double v) { return formatAdsrTimeSec(v); };
         k->getSlider().valueFromTextFunction = [](const juce::String& s) { return parseAdsrTimeSec(s); };
@@ -387,10 +387,11 @@ void VoiceSection::loadFromRhythm()
     filterType.setSelectedId(p.filterType + 1, false);
     filterCutoff.setValue(p.filterCutoff,           juce::dontSendNotification);
     filterRes   .setValue(p.filterRes * 100.0,      juce::dontSendNotification);
-    filterAtk   .setValue(p.filterEnvAtk  * (100.0/3.0), juce::dontSendNotification);
-    filterDec   .setValue(p.filterEnvDec  * (100.0/3.0), juce::dontSendNotification);
-    filterSus   .setValue(p.filterEnvSus  * 100.0,       juce::dontSendNotification);
-    filterRel   .setValue(p.filterEnvRel  * (100.0/3.0), juce::dontSendNotification);
+    // #217b: filter envelope times now in seconds directly.
+    filterAtk   .setValue(p.filterEnvAtk,         juce::dontSendNotification);
+    filterDec   .setValue(p.filterEnvDec,         juce::dontSendNotification);
+    filterSus   .setValue(p.filterEnvSus  * 100.0, juce::dontSendNotification);
+    filterRel   .setValue(p.filterEnvRel,         juce::dontSendNotification);
     filterDepth .setValue(p.filterEnvDepth,         juce::dontSendNotification);
 
     ampLevel.setValue(p.ampLevel,               juce::dontSendNotification);
