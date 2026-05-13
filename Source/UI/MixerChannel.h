@@ -82,6 +82,17 @@ private:
     KnobWithLabel     scAttack  { "/",   Id::knobFxSend };
     KnobWithLabel     scRelease { "\\",  Id::knobFxSend };
 
+    // Per-algorithm state snapshots for the master insert — enables A/B-ing between algorithms
+    // without losing settings. Indexed by driveChar (0..10). snapshotValid[i] is false until the
+    // user has visited algorithm i at least once; until then kInsertDefaults[i] is used instead.
+    struct InsertAlgoSnapshot {
+        float driveDrive = 0.0f, driveOutput = 0.0f, drvDither = 0.0f;
+        float driveTone = 20000.0f, eqMidGain = 0.0f, drvBits = 16.0f, driveRate = 48000.0f;
+    };
+    static const InsertAlgoSnapshot kInsertDefaults[11];
+    InsertAlgoSnapshot insertSnapshots[11];
+    bool               insertSnapshotValid[11] = {};
+
     // Insert controls (Master channel only) — 4-knob strip (insExtra only shown in EQ mode)
     juce::ComboBox    insCharBox;
     KnobWithLabel     insDrive  { "Drive",  Id::knobInsertPad };
@@ -113,18 +124,15 @@ private:
     static constexpr int kColourBarH = 3;
     static constexpr int kNameH      = 22;
     static constexpr int kOutBusH    = 18;   // Out dropdown row (Rhythm channels only)
-    static constexpr int kSendH      = 44;   // 15% smaller than original 52
-    static constexpr int kPanH       = 52;
-    static constexpr int kTopAreaH   = kSendH * 3 + kPanH;  // fixed for all channel types
     static constexpr int kDbH        = 14;
     static constexpr int kButtonH    = 22;
     static constexpr int kVUW        = 10;
     static constexpr int kGRW        = 8;   // GR meter width (Rhythm channels only)
-    // Sidechain section heights (Rhythm only)
+    // Sidechain minimum heights — proportional values are computed in resized().
     static constexpr int kScSrcH     = 20;
     static constexpr int kScAmtH     = 44;
     static constexpr int kScEnvH     = 40;
-    static constexpr int kSidechainH = kScSrcH + kScAmtH + kScEnvH;  // 104px
+    static constexpr int kSidechainH = kScSrcH + kScAmtH + kScEnvH;  // 104px minimum
 
     // Insert section (Master channel only)
     static constexpr int kInsCharH  = 20;

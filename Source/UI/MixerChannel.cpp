@@ -2,6 +2,22 @@
 #include "../PluginProcessor.h"
 #include <cmath>
 
+// First-visit defaults for each insert algorithm.  Fields map to VoiceParams members:
+// driveDrive | driveOutput | drvDither | driveTone | eqMidGain | drvBits | driveRate
+const MixerChannel::InsertAlgoSnapshot MixerChannel::kInsertDefaults[11] = {
+    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 0  None
+    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 1  Soft Clip  (0% drive = transparent)
+    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 2  Hard Clip
+    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 3  Fold
+    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 4  Bitcrusher (16-bit, 48 kHz, flat)
+    { 100.0f, 0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 5  Clipper    (100% = full range, no clipping)
+    { 50.0f,  0.0f, 50.0f,  1000.0f,  0.0f, 16.0f, 48000.0f },  // 6  EQ         (0 dB all bands, 1 kHz mid)
+    { 30.0f,  0.0f, 0.0f,    200.0f,  0.0f, 16.0f, 48000.0f },  // 7  Compressor (−12 dB thresh, 200 ms release)
+    { 30.0f,  0.0f, 0.0f,    200.0f,  0.0f, 16.0f, 48000.0f },  // 8  Limiter    (−12 dB ceiling, 200 ms)
+    { 50.0f,  0.0f, 0.0f,    440.0f,  0.0f, 16.0f, 48000.0f },  // 9  Ring Mod   (50% mix, 440 Hz)
+    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 10 Tape Sat  (0% drive = transparent)
+};
+
 MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
     : channelType(t), channelName(name), channelColour(col)
 {
@@ -313,11 +329,6 @@ void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
         insCharBox.onChange = [this, proc]()
         {
             const int newChar = insCharBox.getSelectedId() - 1;
-            // #244b: align knob rest positions when crossing into/out of EQ
-            // mode — mirrors the per-rhythm fix from #147. EQ stores Low/High
-            // as 0..100 (50=0dB) so 50 = neutral; distortion algos use 0..100
-            // as drive amount where 0 = no drive. Without this, switching
-            // from Soft Clip (drvDrv=0) to EQ would show Low at -18 dB.
             if (proc)
             {
                 const int oldChar = proc->mixerEngine.masterInsertParams.driveChar;
@@ -326,18 +337,33 @@ void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
                     if (auto* p = proc->apvts.getParameter(id))
                         p->setValueNotifyingHost(p->convertTo0to1(v));
                 };
-                if (newChar == 6 && oldChar != 6)
+
+                // Save the outgoing algorithm's current params into its snapshot.
+                if (oldChar >= 0 && oldChar <= 10)
                 {
-                    set("mst_insDrv", 50.0f);    // Low → 0 dB
-                    set("mst_insDit", 50.0f);    // High → 0 dB
-                    set("mst_insMid",  0.0f);    // Mid gain → 0 dB (already direct)
-                    set("mst_insTon", 1000.0f);  // #248: Mid Hz → 1 kHz default
+                    const auto& ip      = proc->mixerEngine.masterInsertParams;
+                    auto&       snap    = insertSnapshots[oldChar];
+                    snap.driveDrive     = ip.driveDrive;
+                    snap.driveOutput    = ip.driveOutput;
+                    snap.drvDither      = ip.drvDither;
+                    snap.driveTone      = ip.driveTone;
+                    snap.eqMidGain      = ip.eqMidGain;
+                    snap.drvBits        = ip.drvBits;
+                    snap.driveRate      = ip.driveRate;
+                    insertSnapshotValid[oldChar] = true;
                 }
-                else if (oldChar == 6 && newChar != 6)
-                {
-                    set("mst_insDrv", 0.0f);    // back to "no drive" for distortion modes
-                    set("mst_insDit", 0.0f);
-                }
+
+                // Restore the incoming algorithm from its saved snapshot, or first-visit defaults.
+                const InsertAlgoSnapshot& snap = insertSnapshotValid[newChar]
+                                                 ? insertSnapshots[newChar]
+                                                 : kInsertDefaults[newChar];
+                set("mst_insDrv",  snap.driveDrive);
+                set("mst_insOut",  snap.driveOutput);
+                set("mst_insDit",  snap.drvDither);
+                set("mst_insTon",  snap.driveTone);
+                set("mst_insMid",  snap.eqMidGain);
+                set("mst_insBits", snap.drvBits);
+                set("mst_insRate", snap.driveRate);
             }
             configureInsertAlgorithm(newChar, proc);
         };
@@ -477,44 +503,53 @@ void MixerChannel::resized()
 
     const int nameBottom = kColourBarH + kNameH;   // y=25
 
-    // ── Sidechain section (Rhythm channels, directly below name) ─────────────
-    const int scH  = hasSidechain() ? kSidechainH : 0;
+    // ── Sidechain section (Rhythm): ~20% of strip height, min = kSidechainH ──
+    const int scH = hasSidechain()
+        ? juce::jmax(kSidechainH, juce::roundToInt(h * 0.20f))
+        : 0;
     if (hasSidechain())
     {
-        scSourceBox.setBounds(0, nameBottom,                           stripW, kScSrcH);
-        scAmount   .setBounds(0, nameBottom + kScSrcH,                 stripW, kScAmtH);
-        const int hw = stripW / 2;
-        scAttack .setBounds(0,  nameBottom + kScSrcH + kScAmtH, hw,          kScEnvH);
-        scRelease.setBounds(hw, nameBottom + kScSrcH + kScAmtH, stripW - hw, kScEnvH);
+        const int scRemain  = scH - kScSrcH;
+        const int scAmtH_l  = juce::jmax(kScAmtH, juce::roundToInt(scRemain * 0.55f));
+        const int scEnvH_l  = scH - kScSrcH - scAmtH_l;
 
-        sidechainPaneBounds = { 1, nameBottom + 1, stripW - 2, kSidechainH - 2 };
+        scSourceBox.setBounds(0, nameBottom, stripW, kScSrcH);
+        scAmount   .setBounds(0, nameBottom + kScSrcH, stripW, scAmtH_l);
+        const int hw = stripW / 2;
+        scAttack .setBounds(0,  nameBottom + kScSrcH + scAmtH_l, hw,          scEnvH_l);
+        scRelease.setBounds(hw, nameBottom + kScSrcH + scAmtH_l, stripW - hw, scEnvH_l);
+
+        sidechainPaneBounds = { 1, nameBottom + 1, stripW - 2, scH - 2 };
     }
     else
     {
         sidechainPaneBounds = {};
     }
 
-    // ── Sends + pan ───────────────────────────────────────────────────────────
+    // ── Sends + pan: ~35% of strip height ────────────────────────────────────
     const int sendY  = nameBottom + scH;
-    const int faderY = sendY + kTopAreaH;
+    const int spH    = juce::jmax(4 * 36, juce::roundToInt(h * 0.35f));
+    const int sendH  = spH / 4;
+    const int panH   = spH - 3 * sendH;
+    const int faderY = sendY + spH;
 
     sendEffect.setVisible(channelType == Type::Rhythm);
     sendDelay .setVisible(channelType == Type::Rhythm || channelType == Type::EffectReturn);
     sendReverb.setVisible(channelType == Type::Rhythm || channelType == Type::EffectReturn
                           || channelType == Type::DelayReturn);
 
-    sendEffect.setBounds(0, sendY,              stripW, kSendH);
-    sendDelay .setBounds(0, sendY + kSendH,     stripW, kSendH);
-    sendReverb.setBounds(0, sendY + kSendH * 2, stripW, kSendH);
-    panKnob   .setBounds(0, sendY + kSendH * 3, stripW, kPanH);
+    sendEffect.setBounds(0, sendY,             stripW, sendH);
+    sendDelay .setBounds(0, sendY + sendH,     stripW, sendH);
+    sendReverb.setBounds(0, sendY + sendH * 2, stripW, sendH);
+    panKnob   .setBounds(0, sendY + sendH * 3, stripW, panH);
 
     // Sends pane: from first visible send to end of pan.
     {
         const int firstOff = (channelType == Type::Rhythm)      ? 0
-                           : (channelType == Type::EffectReturn) ? kSendH
-                           : (channelType == Type::DelayReturn)  ? kSendH * 2
-                           : kSendH * 3;  // ReverbReturn / Master: pan only
-        const int paneH = kTopAreaH - firstOff;
+                           : (channelType == Type::EffectReturn) ? sendH
+                           : (channelType == Type::DelayReturn)  ? sendH * 2
+                           : sendH * 3;  // ReverbReturn / Master: pan only
+        const int paneH = spH - firstOff;
         sendsPaneBounds = (paneH > 0) ? juce::Rectangle<int>{ 1, sendY + firstOff + 1,
                                                                stripW - 2, paneH - 2 }
                                       : juce::Rectangle<int>{};
@@ -549,8 +584,6 @@ void MixerChannel::resized()
     faderPaneBounds = { 1, faderY - 2, stripW - 2, h - faderY + 1 };
 
     // ── Insert panel (Master channel, right of strip) ─────────────────────────
-    // Dropdown full-width; knobs in a 2-column flow grid (row-major, left→right).
-    // Odd last knob spans full width so nothing sits alone on the right.
     if (hasInsert())
     {
         const int pad  = 4;
@@ -561,25 +594,39 @@ void MixerChannel::resized()
         insCharBox.setBounds(ipX, topY, ipW, kInsCharH);
         const int ky = topY + kInsCharH + 2;
 
-        KnobWithLabel* vis[4];
-        int nVis = 0;
-        KnobWithLabel* const knobs[] = { &insDrive, &insOutput, &insTone, &insExtra };
-        for (auto* k : knobs)
-            if (k->isVisible()) vis[nVis++] = k;
-
-        if (nVis > 0)
+        // EQ mode: single column, top→bottom: High, Mid Gain, Mid Hz, Low.
+        if (insCharBox.getSelectedId() == 7)
         {
-            const int nRows  = (nVis + 1) / 2;
             const int availH = h - ky - pad;
-            const int rowH   = juce::jmin(60, availH / nRows);
-            const int halfW  = ipW / 2;
+            const int rowH   = juce::jmin(60, availH / 4);
+            KnobWithLabel* const eqOrder[] = { &insTone, &insOutput, &insExtra, &insDrive };
+            for (int i = 0; i < 4; ++i)
+                eqOrder[i]->setBounds(ipX, ky + i * rowH, ipW, rowH);
+        }
+        else
+        {
+            // 2-column flow grid for all other algorithms.
+            // Odd last knob spans full width so nothing sits alone on the right.
+            KnobWithLabel* vis[4];
+            int nVis = 0;
+            KnobWithLabel* const knobs[] = { &insDrive, &insOutput, &insTone, &insExtra };
+            for (auto* k : knobs)
+                if (k->isVisible()) vis[nVis++] = k;
 
-            for (int i = 0; i < nVis; ++i)
+            if (nVis > 0)
             {
-                const bool isLastOdd = (i == nVis - 1) && (nVis % 2 == 1);
-                const int kw = isLastOdd ? ipW : halfW;
-                const int kx = ipX + (i % 2) * halfW;
-                vis[i]->setBounds(kx, ky + (i / 2) * rowH, kw, rowH);
+                const int nRows  = (nVis + 1) / 2;
+                const int availH = h - ky - pad;
+                const int rowH   = juce::jmin(60, availH / nRows);
+                const int halfW  = ipW / 2;
+
+                for (int i = 0; i < nVis; ++i)
+                {
+                    const bool isLastOdd = (i == nVis - 1) && (nVis % 2 == 1);
+                    const int kw = isLastOdd ? ipW : halfW;
+                    const int kx = ipX + (i % 2) * halfW;
+                    vis[i]->setBounds(kx, ky + (i / 2) * rowH, kw, rowH);
+                }
             }
         }
     }
@@ -763,7 +810,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
             insDrive .setVisible(true);
 
             insOutput.setLabel("Output");
-            insOutput.setRange(-24.0, 0.0, 0.1);
+            insOutput.setRange(-24.0, 24.0, 0.1);
             insOutput.getSlider().textFromValueFunction = nullptr;
             insOutput.setValue(ip.driveOutput, juce::dontSendNotification);
             insOutput.setVisible(true);

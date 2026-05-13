@@ -66,6 +66,15 @@ private:
     KnobWithLabel  ampSus      { "Sustain", Id::knobLevel    };
     KnobWithLabel  ampRel      { "Release", Id::knobLevel    };
 
+    // Per-algorithm snapshots for A/B-ing — reset when switching to a new rhythm.
+    struct InsertAlgoSnapshot {
+        float driveDrive = 0.0f, driveOutput = 0.0f, drvDither = 0.0f;
+        float driveTone = 20000.0f, eqMidGain = 0.0f, drvBits = 16.0f, driveRate = 48000.0f;
+    };
+    static const InsertAlgoSnapshot kInsertDefaults[11];
+    InsertAlgoSnapshot insertSnapshots[11];
+    bool               insertSnapshotValid[11] = {};
+
     // ─── INSERT ─────────────────────────────────────────────────────────
     DropdownSelect driveChar;
     KnobWithLabel  driveDrive  { "Drive",  Id::knobInsertPad };

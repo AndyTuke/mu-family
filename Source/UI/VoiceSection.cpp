@@ -1,6 +1,20 @@
 #include "VoiceSection.h"
 #include "../PluginProcessor.h"
 
+const VoiceSection::InsertAlgoSnapshot VoiceSection::kInsertDefaults[11] = {
+    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 0  None
+    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 1  Soft Clip  (0% drive = transparent)
+    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 2  Hard Clip
+    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 3  Fold
+    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 4  Bitcrusher (16-bit, 48 kHz, flat)
+    { 100.0f, 0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 5  Clipper    (100% = full range)
+    { 50.0f,  0.0f, 50.0f,  1000.0f,  0.0f, 16.0f, 48000.0f },  // 6  EQ         (0 dB all bands, 1 kHz mid)
+    { 30.0f,  0.0f, 5.0f,   200.0f,   0.0f, 16.0f, 48000.0f },  // 7  Compressor (−12 dB, 10 ms atk, 200 ms rel)
+    { 30.0f,  0.0f, 5.0f,   200.0f,   0.0f, 16.0f, 48000.0f },  // 8  Limiter    (−12 dB, 10 ms atk, 200 ms)
+    { 50.0f,  0.0f, 0.0f,    440.0f,  0.0f, 16.0f, 48000.0f },  // 9  Ring Mod   (50% mix, 440 Hz)
+    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 10 Tape Sat  (0% drive = transparent)
+};
+
 VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
 {
     for (auto* k : { &pitchOctave, &pitchSemi, &pitchFine,
@@ -270,24 +284,36 @@ void VoiceSection::wireCallbacks()
     // All insert knob callbacks are set in configureInsertAlgorithm().
     driveChar.onChange = [this](int id) {
         const int newChar = id - 1;
-        // Reset params that change meaning across algorithms to prevent jarring transitions (#147).
-        // Check current algorithm BEFORE writing drvChar so we can detect the EQ→other direction.
         const int oldChar = (rhythmIndex >= 0 && rhythmIndex < proc.getNumRhythms())
                             ? proc.getRhythm(rhythmIndex).voiceParams.driveChar : -1;
-        if (newChar == 6)
+
+        // Save the outgoing algorithm's current params into its snapshot.
+        if (oldChar >= 0 && oldChar <= 10 && rhythmIndex >= 0 && rhythmIndex < proc.getNumRhythms())
         {
-            // Entering EQ: force 0 dB neutral on all bands (drvDrv/drvDit stored as 50/100=0 dB).
-            apvtsSet("drvDrv",    50.0f);
-            apvtsSet("drvDit",    50.0f);
-            apvtsSet("eqMidGain", 0.0f);
+            const auto& p           = proc.getRhythm(rhythmIndex).voiceParams;
+            auto&       snap        = insertSnapshots[oldChar];
+            snap.driveDrive         = p.driveDrive;
+            snap.driveOutput        = p.driveOutput;
+            snap.drvDither          = p.drvDither;
+            snap.driveTone          = p.driveTone;
+            snap.eqMidGain          = p.eqMidGain;
+            snap.drvBits            = p.drvBits;
+            snap.driveRate          = p.driveRate;
+            insertSnapshotValid[oldChar] = true;
         }
-        else if (oldChar == 6)
-        {
-            // Leaving EQ: reset shared params to neutral drive defaults.
-            apvtsSet("drvDrv", 50.0f);
-            apvtsSet("drvDit", 50.0f);
-        }
-        apvtsSet("drvChar", (float)newChar);
+
+        // Restore the incoming algorithm from its saved snapshot, or first-visit defaults.
+        const InsertAlgoSnapshot& snap = insertSnapshotValid[newChar]
+                                        ? insertSnapshots[newChar]
+                                        : kInsertDefaults[newChar];
+        apvtsSet("drvDrv",    snap.driveDrive);
+        apvtsSet("drvOut",    snap.driveOutput);
+        apvtsSet("drvDit",    snap.drvDither);
+        apvtsSet("drvTon",    snap.driveTone);
+        apvtsSet("eqMidGain", snap.eqMidGain);
+        apvtsSet("drvBits",   snap.drvBits);
+        apvtsSet("drvRate",   snap.driveRate);
+        apvtsSet("drvChar",   (float)newChar);
         configureInsertAlgorithm(newChar);
     };
 }
@@ -295,6 +321,7 @@ void VoiceSection::wireCallbacks()
 void VoiceSection::setRhythm(int ri)
 {
     rhythmIndex = ri;
+    std::fill(std::begin(insertSnapshotValid), std::end(insertSnapshotValid), false);
     loadFromRhythm();
     refreshModulatedIndicators();
 }
@@ -631,7 +658,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
             driveDrive.setVisible(true);
 
             driveOutput.setLabel("Output");
-            driveOutput.setRange(-24.0, 0.0, 0.1);
+            driveOutput.setRange(-24.0, 24.0, 0.1);
             driveOutput.getSlider().textFromValueFunction = nullptr;
             driveOutput.getSlider().valueFromTextFunction = nullptr;
             if (p) driveOutput.setValue(p->driveOutput, juce::dontSendNotification);
