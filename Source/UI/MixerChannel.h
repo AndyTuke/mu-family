@@ -19,7 +19,7 @@ public:
 
     // Width of the insert panel drawn to the right of the Master strip.
     // MixerOverlay adds this to kMasterW when sizing masterChannel.
-    static constexpr int kInsertPanelW = 96;
+    static constexpr int kInsertPanelW = 64;
 
     MixerChannel(Type type, const juce::String& name, juce::Colour colour);
 

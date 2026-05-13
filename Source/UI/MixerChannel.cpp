@@ -562,7 +562,7 @@ void MixerChannel::resized()
                          + (insOutput.isVisible() ? 1 : 0)
                          + (insTone.isVisible()   ? 1 : 0)
                          + (insExtra.isVisible()  ? 1 : 0);
-        const int knobH  = (numVis > 0) ? juce::jmin(80, availH / numVis) : 0;
+        const int knobH  = (numVis > 0) ? juce::jmin(52, availH / numVis) : 0;
 
         insCharBox.setBounds(ipX, topY, ipW, kInsCharH);
 
