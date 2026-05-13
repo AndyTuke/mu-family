@@ -43,12 +43,19 @@ private:
     };
 
     std::vector<std::unique_ptr<MatrixRow>> matrixRows;
-    AddButton addBtn { "Assignment" };
-    int currentDriveChar = 0;
+    AddButton        addBtn { "Assignment" };
+    juce::TextButton matPrevBtn { juce::String::charToString(0x25B2) }; // ▲
+    juce::TextButton matNextBtn { juce::String::charToString(0x25BC) }; // ▼
+    juce::Label      matPageLabel;
+    int              matPage = 0;
+    int              currentDriveChar = 0;
 
     static constexpr int kHeaderH = 20;
     static constexpr int kRowH    = 26;
     static constexpr int kAddBtnH = 28;
+    static constexpr int kPagerH  = 20;
 
+    int  rowsPerPage() const;
+    void updateMatPager();
     void rebuildRows();
 };

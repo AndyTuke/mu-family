@@ -140,8 +140,19 @@ ModulatorEditor::ModulatorEditor()
     stepMult.setVisible(false);
 
     rowsViewport.setViewedComponent(&rowsBox, false);
-    rowsViewport.setScrollBarsShown(true, false);
+    rowsViewport.setScrollBarsShown(false, false);
     addAndMakeVisible(rowsViewport);
+
+    rowPageLabel.setJustificationType(juce::Justification::centred);
+    rowPageLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
+    rowPageLabel.setColour(juce::Label::textColourId,
+                           MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
+    addAndMakeVisible(rowPrevBtn);
+    addAndMakeVisible(rowNextBtn);
+    addAndMakeVisible(rowPageLabel);
+    rowPrevBtn.onClick = [this] { scrollRowPage(-1); };
+    rowNextBtn.onClick = [this] { scrollRowPage(+1); };
+
     addAndMakeVisible(addBtn);
 
     wireHeader();
@@ -377,10 +388,50 @@ void ModulatorEditor::addTarget()
     if (onChange) onChange();
 }
 
+void ModulatorEditor::updateRowPager()
+{
+    const int total = (int)rows.size();
+    const int viewH = rowsViewport.getHeight();
+    const int rpp   = juce::jmax(1, viewH / (kRowH + 2));
+    const bool multi = total > rpp;
+
+    rowPrevBtn  .setVisible(multi);
+    rowNextBtn  .setVisible(multi);
+    rowPageLabel.setVisible(total > 0);
+
+    if (total == 0) return;
+
+    if (multi)
+    {
+        const int curTop = viewH > 0 ? (rowsViewport.getViewPositionY() / (kRowH + 2)) : 0;
+        const int shown  = juce::jmin(rpp, total - curTop);
+        rowPrevBtn.setEnabled(curTop > 0);
+        rowNextBtn.setEnabled(curTop + rpp < total);
+        rowPageLabel.setText(juce::String(curTop + 1) + " \xe2\x80\x93 " +
+                             juce::String(curTop + shown) + " / " + juce::String(total),
+                             juce::dontSendNotification);
+    }
+    else
+    {
+        rowPageLabel.setText(juce::String(total) + (total == 1 ? " target" : " targets"),
+                             juce::dontSendNotification);
+    }
+}
+
+void ModulatorEditor::scrollRowPage(int delta)
+{
+    const int curY = rowsViewport.getViewPositionY();
+    const int newY = juce::jmax(0, curY + delta * (kRowH + 2));
+    rowsViewport.setViewPosition(0, newY);
+    updateRowPager();
+    repaint();
+}
+
 void ModulatorEditor::rebuildRows()
 {
     for (auto& row : rows) rowsBox.removeChildComponent(row.get());
     rows.clear();
+    rowsViewport.setViewPosition(0, 0);
     if (!cs || !matrix) return;
 
     const juce::String sourceKey = cs->id + "_output";
@@ -455,53 +506,55 @@ void ModulatorEditor::rebuildRows()
 
 void ModulatorEditor::resized()
 {
-    const int w = getWidth();
-    int y = 0;
+    const int w = getWidth(), h = getHeight();
 
-    // Header: [dot+name painted] | [mode dropdown] | [Uni/Bi polarity]
-    const int nameW  = 76;
-    const int modeW  = 90;
-    const int polW   = 52;
-    modeDropdown.setBounds(nameW, y, modeW, kHeaderH);
-    polarityCtrl.setBounds(nameW + modeW + 4, y, polW, kHeaderH);
-    y += kHeaderH;
+    // ── Single header row: [● Mod X painted] [mode] [polarity] [Loop dd mult] [Step dd mult] ──
+    const int nameW  = 68;
+    const int modeW  = 78;
+    const int polW   = 44;
+    const int lbW    = 30;   // "Loop" / "Step" label
+    const int ddW    = 58;   // note-value dropdown (fits "1/32T")
+    const int nmW    = 46;   // nudge "× N"
 
-    // LFO / Step editor
-    lfoEditor.setBounds(0, y, w, kEditorH);
-    stepEditor.setBounds(0, y, w, kEditorH);
-    y += kEditorH;
-
-    // Timing rows — both start at x=0, no polarity offset.
-    const int labelW = 36;   // "Loop" / "Step"
-    const int dropW  = 65;   // fits longest note-value label "1/32T"
-    const int nudgeW = 52;   // "× 4" inline label + value + arrows
-
-    loopLabel.setBounds(0, y, labelW, kTimingH);
-    loopDropdown.setBounds(labelW + 2, y, dropW, kTimingH);
-    loopMult.setBounds(labelW + 2 + dropW + 4, y, nudgeW, kTimingH);
-    y += kTimingH;
+    int x = nameW;
+    modeDropdown.setBounds(x, 0, modeW, kHeaderH); x += modeW + 4;
+    polarityCtrl.setBounds(x, 0, polW,  kHeaderH); x += polW + 8;
+    loopLabel   .setBounds(x, 0, lbW,   kHeaderH); x += lbW + 2;
+    loopDropdown.setBounds(x, 0, ddW,   kHeaderH); x += ddW + 2;
+    loopMult    .setBounds(x, 0, nmW,   kHeaderH); x += nmW + 8;
 
     if (stepDropdown.isVisible())
     {
-        stepLabel.setBounds(0, y, labelW, kTimingH);
-        stepDropdown.setBounds(labelW + 2, y, dropW, kTimingH);
-        stepMult.setBounds(labelW + 2 + dropW + 4, y, nudgeW, kTimingH);
-        y += kTimingH;
+        stepLabel   .setBounds(x, 0, lbW, kHeaderH); x += lbW + 2;
+        stepDropdown.setBounds(x, 0, ddW, kHeaderH); x += ddW + 2;
+        stepMult    .setBounds(x, 0, nmW, kHeaderH);
     }
 
-    y += 4;
-    const int viewportH = juce::jmax(0, getHeight() - y - kAddBtnH - 2);
-    rowsViewport.setBounds(0, y, w, viewportH);
-    const int contentH = juce::jmax(viewportH, (int)rows.size() * (kRowH + 2));
+    // ── LFO / Step editor ──────────────────────────────────────────────────────
+    lfoEditor .setBounds(0, kHeaderH, w, kEditorH);
+    stepEditor.setBounds(0, kHeaderH, w, kEditorH);
+
+    // ── Assignment rows viewport ───────────────────────────────────────────────
+    const int editorBottom = kHeaderH + kEditorH + 4;
+    const int viewH = juce::jmax(0, h - editorBottom - kPagerH - kAddBtnH - 4);
+    rowsViewport.setBounds(0, editorBottom, w, viewH);
+
+    const int contentH = juce::jmax(viewH, (int)rows.size() * (kRowH + 2));
     rowsBox.setSize(w, contentH);
     int ry = 0;
-    for (auto& row : rows)
-    {
-        row->setBounds(0, ry, w, kRowH);
-        ry += kRowH + 2;
-    }
+    for (auto& row : rows) { row->setBounds(0, ry, w, kRowH); ry += kRowH + 2; }
 
-    addBtn.setBounds(0, getHeight() - kAddBtnH, w, kAddBtnH);
+    // ── Pager row ─────────────────────────────────────────────────────────────
+    const int pagerY = editorBottom + viewH + 2;
+    const int btnW   = 20;
+    rowPrevBtn  .setBounds(0,          pagerY, btnW, kPagerH);
+    rowPageLabel.setBounds(btnW + 2,   pagerY, w - btnW * 2 - 4, kPagerH);
+    rowNextBtn  .setBounds(w - btnW,   pagerY, btnW, kPagerH);
+
+    // ── Add button ─────────────────────────────────────────────────────────────
+    addBtn.setBounds(0, h - kAddBtnH, w, kAddBtnH);
+
+    updateRowPager();
 }
 
 void ModulatorEditor::paint(juce::Graphics& g)
@@ -518,13 +571,13 @@ void ModulatorEditor::paint(juce::Graphics& g)
     g.drawText("Mod " + juce::String::charToString(char('A' + modIndex)),
                20, 0, 54, kHeaderH, juce::Justification::centredLeft, false);
 
-    if (!cs || cs->mode != ControlSequence::Mode::Stepped) return;
-
-    // Step count info drawn at right of the second timing row (step row, below loop row)
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
-    const int infoY = kHeaderH + kEditorH + kTimingH * 2 - 12;
-    g.drawText(juce::String(cs->getStepCount()) + " steps",
-               getWidth() - 60, infoY, 58, 12,
-               juce::Justification::centredRight, false);
+    // Step count drawn at far right of header row (Stepped mode only)
+    if (cs && cs->mode == ControlSequence::Mode::Stepped)
+    {
+        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
+        g.drawText(juce::String(cs->getStepCount()) + " steps",
+                   getWidth() - 58, 0, 56, kHeaderH,
+                   juce::Justification::centredRight, false);
+    }
 }

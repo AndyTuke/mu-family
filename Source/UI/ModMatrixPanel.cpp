@@ -22,7 +22,7 @@ namespace
 ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex, int driveChar)
     : assignId(a.id)
 {
-    sourceLabel.setText("Mod " + juce::String(char('A' + csIndex)), juce::dontSendNotification);
+    sourceLabel.setText("Mod " + juce::String::charToString('A' + csIndex), juce::dontSendNotification);
     sourceLabel.setColour(juce::Label::textColourId,
                           MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
     sourceLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
@@ -83,12 +83,22 @@ void ModMatrixPanel::MatrixRow::resized()
 ModMatrixPanel::ModMatrixPanel()
 {
     addAndMakeVisible(addBtn);
+    addAndMakeVisible(matPrevBtn);
+    addAndMakeVisible(matNextBtn);
+    matPageLabel.setJustificationType(juce::Justification::centred);
+    matPageLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
+    matPageLabel.setColour(juce::Label::textColourId,
+                           MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
+    addAndMakeVisible(matPageLabel);
+    matPrevBtn.onClick = [this] { matPage = juce::jmax(0, matPage - 1); updateMatPager(); resized(); repaint(); };
+    matNextBtn.onClick = [this] { matPage++; updateMatPager(); resized(); repaint(); };
+
     addBtn.onClick = [this]
     {
         if (!rhythm) return;
         juce::PopupMenu menu;
         for (int i = 0; i < Rhythm::MaxControlSequences; ++i)
-            menu.addItem(i + 1, "Mod " + juce::String(char('A' + i)));
+            menu.addItem(i + 1, "Mod " + juce::String::charToString('A' + i));
         menu.showMenuAsync(juce::PopupMenu::Options{}, [this](int result)
         {
             if (result < 1 || !rhythm) return;
@@ -140,10 +150,45 @@ static int csIndexFromSourceId(const std::string& sourceId)
     return 0;
 }
 
+int ModMatrixPanel::rowsPerPage() const
+{
+    const int avail = juce::jmax(0, getHeight() - kHeaderH - kPagerH - kAddBtnH - 8);
+    return juce::jmax(1, avail / (kRowH + 2));
+}
+
+void ModMatrixPanel::updateMatPager()
+{
+    const int total = (int)matrixRows.size();
+    const int rpp   = rowsPerPage();
+    const int pages = juce::jmax(1, (total + rpp - 1) / rpp);
+    matPage = juce::jlimit(0, pages - 1, matPage);
+
+    const bool multi = total > rpp;
+    matPrevBtn .setVisible(multi);
+    matNextBtn .setVisible(multi);
+    matPageLabel.setVisible(total > 0);
+
+    if (total == 0) return;
+
+    if (multi)
+    {
+        matPrevBtn.setEnabled(matPage > 0);
+        matNextBtn.setEnabled(matPage < pages - 1);
+        matPageLabel.setText(juce::String(matPage + 1) + " / " + juce::String(pages),
+                             juce::dontSendNotification);
+    }
+    else
+    {
+        matPageLabel.setText(juce::String(total) + (total == 1 ? " assignment" : " assignments"),
+                             juce::dontSendNotification);
+    }
+}
+
 void ModMatrixPanel::rebuildRows()
 {
     for (auto& row : matrixRows) removeChildComponent(row.get());
     matrixRows.clear();
+    matPage = 0;
     if (!rhythm) return;
 
     for (const auto& a : rhythm->modulationMatrix.getAssignments())
@@ -209,18 +254,35 @@ void ModMatrixPanel::rebuildRows()
 
         matrixRows.push_back(std::move(row));
     }
+    updateMatPager();
 }
 
 void ModMatrixPanel::resized()
 {
-    const int w = getWidth();
-    int y = kHeaderH;
-    for (auto& row : matrixRows)
+    const int w   = getWidth();
+    const int h   = getHeight();
+    const int rpp = rowsPerPage();
+
+    // Pager row sits just below the header
+    const int pagerY = kHeaderH;
+    const int btnW   = 20;
+    matPrevBtn .setBounds(w - btnW * 2 - 4, pagerY, btnW, kPagerH);
+    matNextBtn .setBounds(w - btnW,          pagerY, btnW, kPagerH);
+    matPageLabel.setBounds(w - 120,          pagerY, 120 - btnW * 2 - 6, kPagerH);
+
+    // Rows: show only current page
+    const int rowsStart = kHeaderH + kPagerH + 2;
+    const int startIdx  = matPage * rpp;
+    int y = rowsStart;
+    for (int i = 0; i < (int)matrixRows.size(); ++i)
     {
-        row->setBounds(0, y, w, kRowH);
-        y += kRowH + 2;
+        const bool vis = (i >= startIdx && i < startIdx + rpp);
+        matrixRows[i]->setVisible(vis);
+        if (vis) { matrixRows[i]->setBounds(0, y, w, kRowH); y += kRowH + 2; }
     }
-    addBtn.setBounds(0, y + 4, w, kAddBtnH);
+
+    // Empty-state hint text lands at rowsStart + 8, add button at bottom
+    addBtn.setBounds(0, h - kAddBtnH, w, kAddBtnH);
 }
 
 void ModMatrixPanel::paint(juce::Graphics& g)
@@ -238,8 +300,9 @@ void ModMatrixPanel::paint(juce::Graphics& g)
     if (matrixRows.empty())
     {
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-        g.drawText(juce::String::fromUTF8(u8"No assignments — use the Mod tabs or Add Assignment below"),
-                   0, kHeaderH + 8, getWidth(), 20,
+        // rowsStart = kHeaderH + kPagerH + 2; draw hint below that with enough clearance
+        g.drawText(juce::String::fromUTF8("No assignments \xe2\x80\x94 use the Mod tabs or Add Assignment below"),
+                   0, kHeaderH + kPagerH + 8, getWidth(), 20,
                    juce::Justification::centred, false);
     }
 }

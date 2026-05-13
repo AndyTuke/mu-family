@@ -206,13 +206,17 @@ private:
     std::vector<std::unique_ptr<AssignmentRow>> rows;
     juce::Component rowsBox;
     juce::Viewport  rowsViewport;
+    juce::TextButton rowPrevBtn { juce::String::charToString(0x25B2) }; // ▲
+    juce::TextButton rowNextBtn { juce::String::charToString(0x25BC) }; // ▼
+    juce::Label      rowPageLabel;
     AddButton addBtn { "Target" };
 
     static constexpr int kHeaderH = 28;
-    static constexpr int kEditorH = 100;
-    static constexpr int kTimingH = 28;
+    static constexpr int kEditorH = 150;  // increased from 100; timing controls moved to header row
+    static constexpr int kTimingH = 28;   // kept for step-count info
     static constexpr int kRowH    = 26;
     static constexpr int kAddBtnH = 28;
+    static constexpr int kPagerH  = 20;
 
     int currentDriveChar = 0;
 
@@ -222,4 +226,6 @@ private:
     void addTarget();
     void loadFromCS();
     void syncStepValues();
+    void updateRowPager();
+    void scrollRowPage(int delta);
 };

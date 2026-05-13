@@ -35,6 +35,8 @@ void ModulatorPanel::showTab(int idx)
     for (int i = 0; i < kNumMods; ++i)
         editors[i].setVisible(idx == i);
     matrixPanel.setVisible(idx == kNumMods);
+    if (idx == kNumMods)
+        matrixPanel.refresh();
 }
 
 void ModulatorPanel::setInsertAlgorithm(int driveChar)
