@@ -72,7 +72,7 @@ Always build Release when producing tester builds — the CMake post-build hook 
 
 ## Development history
 
-Stages 1–31 are complete. See [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) for the full stage-by-stage log with dates. When a stage is completed, it should be moved to the DevelopmentHistory.md file.
+Stages 1–33 are complete. See [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) for the full stage-by-stage log with dates. When a stage is completed, it should be moved to the DevelopmentHistory.md file.
 
 ## Upcoming stages
 
@@ -82,8 +82,7 @@ All code changes must be logged as backlog entries to maintain a complete develo
 
 | Stage | Status | Scope | Issues |
 |---|---|---|---|
-| 32 | 🔴 Open | **Mixer Responsive Layout** — horizontal channel-width scaling with window width; vertical send/pan/fader proportionality within each strip; FX area height proportional to window; FX row knob widths fill available space. Design: see [docs/design-ui.md](docs/design-ui.md) Mixer section. | #255, #256, #257 |
-| 33 | 🔴 Open | **Plugin Family Architecture (mu-core)** — CMake `mu-core` STATIC library extracting shared audio/FX/modulation/UI; `Rhythm` → `VoiceSlot` base generalisation; `ProcessorBase` shared processor skeleton; `MuClidLookAndFeel` → `MuLookAndFeel` rename. Enables mu-tant and future μ-family plugins to share the voice/modulation/mixer stack without code duplication. Design: [docs/design-plugin-family.md](docs/design-plugin-family.md). | #258, #259, #260, #261 |
+| — | — | No upcoming stages planned | — |
 
 
 ## Source layout (actual, as built)
@@ -101,7 +100,7 @@ All code changes must be logged as backlog entries to maintain a complete develo
 - **TimeStretcherBase wraps the time-stretch engine** — currently a stub; SoundTouch (v1) or RubberBand (v2) slots in without refactoring.
 - **Atomic pointer for rhythm hot-swap from day one** — required for v2 live swap feature.
 - **RhythmSidebar item order supports variable ordering from day one** — required for v2 drag-to-reorder.
-- **All colours and sizes in MuClidLookAndFeel only** — no hardcoded values in component drawing code.
+- **All colours and sizes in MuLookAndFeel only** — no hardcoded values in component drawing code.
 - **All UI uses the shared component library** — never build a one-off version of a standard control.
 - **ModulationMatrix processes in dependency order** — detects and rejects circular dependencies at assignment creation time.
 - **Time-stretch DLL (SoundTouch/RubberBand) ships separately** — required for LGPL/GPL compliance when implemented.

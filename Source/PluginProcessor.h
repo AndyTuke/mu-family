@@ -1,7 +1,7 @@
 #pragma once
 
-#include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_utils/juce_audio_utils.h>
+#include "ProcessorBase.h"
 #include "Sequencer/SequencerEngine.h"
 #include "Audio/VoiceEngine.h"
 #include "Audio/MidiOutputEngine.h"
@@ -14,7 +14,7 @@
 #include <vector>
 #include <unordered_map>
 
-class PluginProcessor : public juce::AudioProcessor,
+class PluginProcessor : public ProcessorBase,
                         private juce::AudioProcessorValueTreeState::Listener,
                         private juce::AsyncUpdater
 {
@@ -177,8 +177,7 @@ public:
     std::array<std::unique_ptr<VoiceEngine>, SequencerEngine::MaxRhythms> voiceEngines;
     std::array<MidiOutputEngine,             SequencerEngine::MaxRhythms> midiEngines;
     std::atomic<int> numActiveRhythms { 0 };
-    FXChain     fxChain;
-    MixerEngine mixerEngine;
+    // fxChain and mixerEngine are inherited from ProcessorBase.
 
     // Play-state atomics: written by audio thread, read by UI at 30 Hz.
     struct RhythmPlayState

@@ -7,6 +7,54 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_subdirectory($ENV{JUCE_PATH} JUCE)
 add_subdirectory(ThirdParty/clap-juce-extensions)
 
+# ── mu-core: shared audio/FX/modulation/UI source set ───────────────────────
+# An INTERFACE library that propagates shared source files to consuming plugin
+# targets. Sources compile in each consuming target's context (where JUCE modules
+# are fully initialised by juce_add_plugin), avoiding the need for a separate
+# STATIC library that would require duplicating JUCE's module setup.
+# Future mu-tant adds: target_link_libraries(mu-tant PRIVATE mu-core)
+add_library(mu-core INTERFACE)
+
+target_sources(mu-core INTERFACE
+    # Modulation
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Modulation/ModulationMatrix.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Sequencer/ControlSequence.cpp"
+    # Audio
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/VoiceEngine.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/InsertProcessor.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/MultiModeFilter.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/SamplePlayer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/MixerEngine.cpp"
+    # FX
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/FX/EffectSlot.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/FX/DelaySlot.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/FX/ReverbSlot.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/FX/FXChain.cpp"
+    # UI — shared components
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/MuLookAndFeel.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/KnobWithLabel.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/SegmentControl.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/NudgeInput.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/DropdownSelect.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/StepEditor.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/LFOEditor.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/AddButton.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/StatusBar.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/VUMeter.cpp"
+    # UI — shared mixer/FX panels
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/FXRow.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/DelayRow.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/MixerChannel.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/MixerOverlay.cpp"
+    # ProcessorBase
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/ProcessorBase.cpp"
+)
+
+target_include_directories(mu-core INTERFACE
+    "${CMAKE_SOURCE_DIR}/Source"
+)
+
+# ── mu-Clid — main plugin ────────────────────────────────────────────────────
 juce_add_plugin(mu-clid
     COMPANY_NAME "Transwarp Development Project"
     BUNDLE_ID "com.transwarp.mu-clid"
@@ -33,22 +81,7 @@ target_sources(mu-clid
         Source/Sequencer/HitGenerator.cpp
         Source/Sequencer/Rhythm.cpp
         Source/Sequencer/SequencerEngine.cpp
-        Source/Sequencer/ControlSequence.cpp
-        Source/Audio/SamplePlayer.cpp
-        Source/Audio/InsertProcessor.cpp
-        Source/Audio/MultiModeFilter.cpp
-        Source/Audio/VoiceEngine.cpp
         Source/Audio/MidiOutputEngine.cpp
-        Source/Modulation/ModulationMatrix.cpp
-        Source/UI/Components/MuClidLookAndFeel.cpp
-        Source/UI/Components/KnobWithLabel.cpp
-        Source/UI/Components/SegmentControl.cpp
-        Source/UI/Components/NudgeInput.cpp
-        Source/UI/Components/DropdownSelect.cpp
-        Source/UI/Components/StepEditor.cpp
-        Source/UI/Components/LFOEditor.cpp
-        Source/UI/Components/AddButton.cpp
-        Source/UI/Components/StatusBar.cpp
         Source/UI/TransportBar.cpp
         Source/UI/RhythmCircle.cpp
         Source/UI/SidebarItem.cpp
@@ -59,16 +92,6 @@ target_sources(mu-clid
         Source/UI/ModMatrixPanel.cpp
         Source/UI/ModulatorPanel.cpp
         Source/UI/RhythmPanel.cpp
-        Source/FX/EffectSlot.cpp
-        Source/FX/DelaySlot.cpp
-        Source/FX/ReverbSlot.cpp
-        Source/FX/FXChain.cpp
-        Source/UI/FXRow.cpp
-        Source/UI/DelayRow.cpp
-        Source/Audio/MixerEngine.cpp
-        Source/UI/Components/VUMeter.cpp
-        Source/UI/MixerChannel.cpp
-        Source/UI/MixerOverlay.cpp
         Source/UI/AboutPanel.cpp
         Source/UI/SaveDialog.cpp
         Source/UI/PresetBrowser.cpp
@@ -95,6 +118,7 @@ target_compile_definitions(mu-clid
 
 target_link_libraries(mu-clid
     PRIVATE
+        mu-core
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_basics
@@ -186,27 +210,7 @@ target_sources(mu-clid-lite
         Source/Sequencer/HitGenerator.cpp
         Source/Sequencer/Rhythm.cpp
         Source/Sequencer/SequencerEngine.cpp
-        Source/Sequencer/ControlSequence.cpp
-        Source/Audio/SamplePlayer.cpp
-        Source/Audio/InsertProcessor.cpp
-        Source/Audio/MultiModeFilter.cpp
-        Source/Audio/VoiceEngine.cpp
         Source/Audio/MidiOutputEngine.cpp
-        Source/Audio/MixerEngine.cpp
-        Source/Modulation/ModulationMatrix.cpp
-        Source/FX/EffectSlot.cpp
-        Source/FX/DelaySlot.cpp
-        Source/FX/ReverbSlot.cpp
-        Source/FX/FXChain.cpp
-        Source/UI/Components/MuClidLookAndFeel.cpp
-        Source/UI/Components/KnobWithLabel.cpp
-        Source/UI/Components/SegmentControl.cpp
-        Source/UI/Components/NudgeInput.cpp
-        Source/UI/Components/DropdownSelect.cpp
-        Source/UI/Components/StepEditor.cpp
-        Source/UI/Components/LFOEditor.cpp
-        Source/UI/Components/AddButton.cpp
-        Source/UI/Components/StatusBar.cpp
         Source/UI/TransportBar.cpp
         Source/UI/RhythmCircle.cpp
         Source/UI/EuclideanPanel.cpp
@@ -233,6 +237,7 @@ target_compile_definitions(mu-clid-lite
 
 target_link_libraries(mu-clid-lite
     PRIVATE
+        mu-core
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_basics

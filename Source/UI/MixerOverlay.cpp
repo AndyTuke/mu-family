@@ -471,9 +471,25 @@ void MixerOverlay::updateEffectSendLabels()
 
 void MixerOverlay::resized()
 {
-    const int w      = getWidth();
-    const int h      = getHeight();
-    const int stripH = juce::jmax(200, h - kFXAreaH - kHeaderH);
+    const int w = getWidth();
+    const int h = getHeight();
+
+    // #257: FX area height proportional to window height; row height derived from it.
+    const int fxAreaH = juce::jmax(220, juce::roundToInt(h * 0.32f));
+    const int fxRowH  = (fxAreaH - kFXGap * 2 - kFXPad * 2) / 3;
+    const int stripH  = juce::jmax(200, h - fxAreaH - kHeaderH);
+
+    // #255: channel widths proportional to window width.
+    // 8 rhythm + 3 returns share available space; master fills any remainder.
+    const int masterTotalW = kMasterW + MixerChannel::kInsertPanelW;
+    const int nChans = MixerEngine::MaxChannels + 3;
+    const int chanW  = juce::jmax(44, (w - 2 * kDivW - masterTotalW
+                                       - (MixerEngine::MaxChannels - 1) * kChanGap) / nChans);
+
+    lastFXAreaH = fxAreaH;
+    lastFXRowH  = fxRowH;
+    lastStripH  = stripH;
+    lastChanW   = chanW;
 
     // Meter mode selector — right-aligned in the header strip
     constexpr int kModeW = 176;
@@ -483,24 +499,28 @@ void MixerOverlay::resized()
     int x = 0;
     for (int i = 0; i < (int)rhythmChannels.size(); ++i)
     {
-        rhythmChannels[i]->setBounds(x, kHeaderH, kChanW, stripH);
-        x += kChanW + (i + 1 < (int)rhythmChannels.size() ? kChanGap : 0);
+        rhythmChannels[i]->setBounds(x, kHeaderH, chanW, stripH);
+        x += chanW + (i + 1 < (int)rhythmChannels.size() ? kChanGap : 0);
     }
 
+    lastDivX1 = x;
     x += kDivW;
-    effectReturn .setBounds(x, kHeaderH, kChanW, stripH);  x += kChanW;
-    delayReturn  .setBounds(x, kHeaderH, kChanW, stripH);  x += kChanW;
-    reverbReturn .setBounds(x, kHeaderH, kChanW, stripH);  x += kChanW;
+    effectReturn .setBounds(x, kHeaderH, chanW, stripH);  x += chanW;
+    delayReturn  .setBounds(x, kHeaderH, chanW, stripH);  x += chanW;
+    reverbReturn .setBounds(x, kHeaderH, chanW, stripH);  x += chanW;
 
+    lastDivX2 = x;
     x += kDivW;
-    masterChannel.setBounds(x, kHeaderH, kMasterW + MixerChannel::kInsertPanelW, stripH);
+    // Master strip fills any remaining horizontal space.
+    const int masterActualW = juce::jmax(masterTotalW, w - x);
+    masterChannel.setBounds(x, kHeaderH, masterActualW, stripH);
 
     // FX rows below the channel strips
     int fy = kHeaderH + stripH + kFXPad;
-    effectRow.setBounds(kFXPad, fy, w - kFXPad * 2, kFXRowH);
-    echoRow  .setBounds(kFXPad, fy, w - kFXPad * 2, kFXRowH);  fy += kFXRowH + kFXGap;
-    delayRow .setBounds(kFXPad, fy, w - kFXPad * 2, kFXRowH);  fy += kFXRowH + kFXGap;
-    reverbRow.setBounds(kFXPad, fy, w - kFXPad * 2, kFXRowH);
+    effectRow.setBounds(kFXPad, fy, w - kFXPad * 2, fxRowH);
+    echoRow  .setBounds(kFXPad, fy, w - kFXPad * 2, fxRowH);  fy += fxRowH + kFXGap;
+    delayRow .setBounds(kFXPad, fy, w - kFXPad * 2, fxRowH);  fy += fxRowH + kFXGap;
+    reverbRow.setBounds(kFXPad, fy, w - kFXPad * 2, fxRowH);
 }
 
 void MixerOverlay::propagateMeterMode(VUMeter::MeterMode m)
@@ -522,26 +542,21 @@ void MixerOverlay::paint(juce::Graphics& g)
     g.fillRect(0, kHeaderH - 1, getWidth(), 1);
 
     // Dividers between rhythm channels and returns, and before master
-    const int stripH = juce::jmax(200, getHeight() - kFXAreaH - kHeaderH);
-    int divX = MixerEngine::MaxChannels * kChanW + (MixerEngine::MaxChannels - 1) * kChanGap;
-
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder));
-    g.fillRect(divX, kHeaderH, kDivW, stripH);
-
-    divX += kDivW + kChanW * 3;
-    g.fillRect(divX, kHeaderH, kDivW, stripH);
+    g.fillRect(lastDivX1, kHeaderH, kDivW, lastStripH);
+    g.fillRect(lastDivX2, kHeaderH, kDivW, lastStripH);
 
     // FX section: outer container panel + three inner row sub-panels
-    const juce::Colour borderCol   = MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder);
-    const juce::Colour outerFill   = MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground)
-                                         .darker(0.15f);
-    const juce::Colour rowFill     = MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground)
-                                         .brighter(0.06f);
+    const juce::Colour borderCol = MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder);
+    const juce::Colour outerFill = MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground)
+                                       .darker(0.15f);
+    const juce::Colour rowFill   = MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground)
+                                       .brighter(0.06f);
 
     // Outer container
     {
-        juce::Rectangle<float> outer { 0.5f, (float)(kHeaderH + stripH) + 0.5f,
-                                       (float)getWidth() - 1.0f, (float)kFXAreaH - 1.0f };
+        juce::Rectangle<float> outer { 0.5f, (float)(kHeaderH + lastStripH) + 0.5f,
+                                       (float)getWidth() - 1.0f, (float)lastFXAreaH - 1.0f };
         g.setColour(outerFill);
         g.fillRoundedRectangle(outer, 6.0f);
         g.setColour(borderCol);
@@ -549,17 +564,16 @@ void MixerOverlay::paint(juce::Graphics& g)
     }
 
     // Inner row sub-panels (inset by kFXPad on all sides)
-    const int numPanels = 3;
-    int fy = kHeaderH + stripH + kFXPad;
-    for (int i = 0; i < numPanels; ++i)
+    int fy = kHeaderH + lastStripH + kFXPad;
+    for (int i = 0; i < 3; ++i)
     {
         juce::Rectangle<float> panel { (float)kFXPad + 0.5f, (float)fy + 0.5f,
                                        (float)(getWidth() - kFXPad * 2) - 1.0f,
-                                       (float)kFXRowH - 1.0f };
+                                       (float)lastFXRowH - 1.0f };
         g.setColour(rowFill);
         g.fillRoundedRectangle(panel, 4.0f);
         g.setColour(borderCol);
         g.drawRoundedRectangle(panel, 4.0f, 1.0f);
-        fy += kFXRowH + kFXGap;
+        fy += lastFXRowH + kFXGap;
     }
 }

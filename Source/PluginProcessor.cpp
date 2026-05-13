@@ -145,7 +145,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         // Drive
         addI(p+"drvChar",    n+"Drive Char",   0,     10,      0);  // 0=None … 10=TapeSat
         addF(p+"drvDrv",     n+"Drive",        0.0f, 100.0f,    0.0f);  // Soft/Hard/Fold drive amount
-        addF(p+"drvOut",     n+"Drive Out",  -24.0f,    0.0f,   0.0f);  // Soft/Hard/Fold output level
+        addF(p+"drvOut",     n+"Drive Out",  -24.0f,   24.0f,   0.0f);  // insert output / makeup gain
         addF(p+"drvBits",    n+"Bits",         1.0f,  16.0f,   16.0f);  // Bitcrusher bit depth
         addF(p+"drvRate",    n+"Drive Rate",  100.0f, 48000.0f, 48000.0f);  // Bitcrusher sample rate
         addF(p+"drvDit",     n+"Dither",       0.0f, 100.0f,    0.0f);  // Bitcrusher dither amount
@@ -247,7 +247,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     // Master insert effect (#124): same algorithm set as per-rhythm voice INSERT.
     addI("mst_insChar", "Mst Insert Char",  0,       10,       0);      // 0=None … 10=TapeSat
     addF("mst_insDrv",  "Mst Insert Drive", 0.0f,  100.0f,     0.0f);
-    addF("mst_insOut",  "Mst Insert Out", -24.0f,    0.0f,     0.0f);
+    addF("mst_insOut",  "Mst Insert Out", -24.0f,   24.0f,     0.0f);
     addF("mst_insBits", "Mst Insert Bits",  1.0f,   16.0f,    16.0f);
     addF("mst_insRate", "Mst Insert Rate", 100.0f, 48000.0f, 48000.0f);
     addF("mst_insDit",  "Mst Insert Dit",   0.0f,  100.0f,     0.0f);
@@ -268,9 +268,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
 // pre-multi-bus behaviour). Hosts that support it can enable the extra buses.
 PluginProcessor::PluginProcessor()
 #if MUCLID_LITE_BUILD
-    : AudioProcessor(BusesProperties()),
+    : ProcessorBase(BusesProperties()),
 #else
-    : AudioProcessor(BusesProperties()
+    : ProcessorBase(BusesProperties()
           .withOutput("Master",     juce::AudioChannelSet::stereo(), true)
           .withOutput("Out 1",      juce::AudioChannelSet::stereo(), false)
           .withOutput("Out 2",      juce::AudioChannelSet::stereo(), false)
@@ -771,7 +771,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParams.pitchMod       = juce::jlimit(-24.0f, 24.0f,
                                                          modParamValues["pitch.semitones"]);
                 modParams.driveDrive     = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.drive"]);
-                modParams.driveOutput    = juce::jlimit(-24.0f,  0.0f,    modParamValues["insert.output"]);
+                modParams.driveOutput    = juce::jlimit(-24.0f, 24.0f,    modParamValues["insert.output"]);
                 modParams.drvBits        = juce::jlimit(1.0f,   16.0f,    modParamValues["insert.bits"]);
                 modParams.driveRate      = std::exp(std::log(100.0f) + juce::jlimit(0.0f, 100.0f, modParamValues["insert.rate"]) / 100.0f * (std::log(48000.0f) - std::log(100.0f)));
                 modParams.drvDither      = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.dither"]);
@@ -800,8 +800,6 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         && wrapperType == wrapperType_Standalone
         && midiClockIsPlaying.get())
         effectiveBpm = midiClockBpmEst.get();
-    fxChain.setHostBpm(effectiveBpm);
-
     // Gather the host's output bus buffers. Buses we declared in BusesProperties may
     // be disabled in the host's chosen layout — skip those (the channel routes silently).
     auto masterBus = getBusBuffer(buffer, false, kMasterBusIndex);
@@ -830,9 +828,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 fxRetPtr = &fxRetBuf;
             }
 
-    mixerEngine.processBlock(masterBus, numRhythms,
-                             voiceEngines.data(), fxChain, buffer.getNumSamples(),
-                             &directPtrs, fxRetPtr);
+    processCoreBlock(masterBus, voiceEngines.data(), numRhythms,
+                     buffer.getNumSamples(), effectiveBpm, &directPtrs, fxRetPtr);
 
     // Mix sample preview (for file browser audition) directly into the master output.
     if (previewTransport.isPlaying())
