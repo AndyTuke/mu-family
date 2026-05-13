@@ -549,28 +549,39 @@ void MixerChannel::resized()
     faderPaneBounds = { 1, faderY - 2, stripW - 2, h - faderY + 1 };
 
     // ── Insert panel (Master channel, right of strip) ─────────────────────────
-    // Knobs stacked vertically — only visible knobs are placed; height scales up to 80px.
+    // Dropdown full-width; knobs in a 2-column flow grid (row-major, left→right).
+    // Odd last knob spans full width so nothing sits alone on the right.
     if (hasInsert())
     {
-        const int pad    = 4;
-        const int ipX    = stripW + pad;
-        const int ipW    = insW - 2 * pad;
-        const int topY   = nameBottom + pad;
-        const int availH = h - topY - kInsCharH - pad;
-
-        const int numVis = (insDrive.isVisible()  ? 1 : 0)
-                         + (insOutput.isVisible() ? 1 : 0)
-                         + (insTone.isVisible()   ? 1 : 0)
-                         + (insExtra.isVisible()  ? 1 : 0);
-        const int knobH  = (numVis > 0) ? juce::jmin(52, availH / numVis) : 0;
+        const int pad  = 4;
+        const int ipX  = stripW + pad;
+        const int ipW  = insW - 2 * pad;
+        const int topY = nameBottom + pad;
 
         insCharBox.setBounds(ipX, topY, ipW, kInsCharH);
+        const int ky = topY + kInsCharH + 2;
 
-        int ky = topY + kInsCharH;
-        if (insDrive.isVisible())  { insDrive .setBounds(ipX, ky, ipW, knobH); ky += knobH; }
-        if (insOutput.isVisible()) { insOutput.setBounds(ipX, ky, ipW, knobH); ky += knobH; }
-        if (insTone.isVisible())   { insTone  .setBounds(ipX, ky, ipW, knobH); ky += knobH; }
-        if (insExtra.isVisible())  { insExtra .setBounds(ipX, ky, ipW, knobH); }
+        KnobWithLabel* vis[4];
+        int nVis = 0;
+        KnobWithLabel* const knobs[] = { &insDrive, &insOutput, &insTone, &insExtra };
+        for (auto* k : knobs)
+            if (k->isVisible()) vis[nVis++] = k;
+
+        if (nVis > 0)
+        {
+            const int nRows  = (nVis + 1) / 2;
+            const int availH = h - ky - pad;
+            const int rowH   = juce::jmin(60, availH / nRows);
+            const int halfW  = ipW / 2;
+
+            for (int i = 0; i < nVis; ++i)
+            {
+                const bool isLastOdd = (i == nVis - 1) && (nVis % 2 == 1);
+                const int kw = isLastOdd ? ipW : halfW;
+                const int kx = ipX + (i % 2) * halfW;
+                vis[i]->setBounds(kx, ky + (i / 2) * rowH, kw, rowH);
+            }
+        }
     }
 }
 
