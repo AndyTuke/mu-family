@@ -107,6 +107,14 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
         addAndMakeVisible(insDrive);
         addAndMakeVisible(insOutput);
         addAndMakeVisible(insTone);
+
+        // #248: 4th knob — EQ mid frequency, only visible in EQ mode
+        insExtra.setRange(200.0, 8000.0, 1.0);
+        insExtra.getSlider().setSkewFactorFromMidPoint(1000.0);
+        insExtra.setValue(1000.0);
+        insExtra.getSlider().textFromValueFunction = noVal;
+        insExtra.setVisible(false);
+        addAndMakeVisible(insExtra);
     }
 }
 
@@ -320,9 +328,10 @@ void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
                 };
                 if (newChar == 6 && oldChar != 6)
                 {
-                    set("mst_insDrv", 50.0f);   // Low → 0 dB
-                    set("mst_insDit", 50.0f);   // High → 0 dB
-                    set("mst_insMid",  0.0f);   // Mid → 0 dB (already direct)
+                    set("mst_insDrv", 50.0f);    // Low → 0 dB
+                    set("mst_insDit", 50.0f);    // High → 0 dB
+                    set("mst_insMid",  0.0f);    // Mid gain → 0 dB (already direct)
+                    set("mst_insTon", 1000.0f);  // #248: Mid Hz → 1 kHz default
                 }
                 else if (oldChar == 6 && newChar != 6)
                 {
@@ -551,7 +560,8 @@ void MixerChannel::resized()
 
         const int numVis = (insDrive.isVisible()  ? 1 : 0)
                          + (insOutput.isVisible() ? 1 : 0)
-                         + (insTone.isVisible()   ? 1 : 0);
+                         + (insTone.isVisible()   ? 1 : 0)
+                         + (insExtra.isVisible()  ? 1 : 0);
         const int knobH  = (numVis > 0) ? juce::jmin(80, availH / numVis) : 0;
 
         insCharBox.setBounds(ipX, topY, ipW, kInsCharH);
@@ -559,7 +569,8 @@ void MixerChannel::resized()
         int ky = topY + kInsCharH;
         if (insDrive.isVisible())  { insDrive .setBounds(ipX, ky, ipW, knobH); ky += knobH; }
         if (insOutput.isVisible()) { insOutput.setBounds(ipX, ky, ipW, knobH); ky += knobH; }
-        if (insTone.isVisible())   { insTone  .setBounds(ipX, ky, ipW, knobH); }
+        if (insTone.isVisible())   { insTone  .setBounds(ipX, ky, ipW, knobH); ky += knobH; }
+        if (insExtra.isVisible())  { insExtra .setBounds(ipX, ky, ipW, knobH); }
     }
 }
 
@@ -571,6 +582,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
     insDrive .onValueChanged = nullptr;
     insOutput.onValueChanged = nullptr;
     insTone  .onValueChanged = nullptr;
+    insExtra .onValueChanged = nullptr;
 
     // #243: the lambda must keep working after this method is re-invoked from
     // loadFromAPVTS with proc=nullptr (the dropdown char value comes from APVTS,
@@ -592,6 +604,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
             insDrive .setVisible(false);
             insOutput.setVisible(false);
             insTone  .setVisible(false);
+            insExtra .setVisible(false);
             if (proc) setParam("mst_insChar", 0);
             break;
 
@@ -636,6 +649,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
             insTone  .setValue(ip.driveTone, juce::dontSendNotification);
             insTone  .setVisible(true);
 
+            insExtra .setVisible(false);
             insDrive .onValueChanged = [setParam](double v) { setParam("mst_insDrv", v); };
             insOutput.onValueChanged = [setParam](double v) { setParam("mst_insOut", v); };
             insTone  .onValueChanged = [setParam](double v) { setParam("mst_insTon", v); };
@@ -669,21 +683,25 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
             insTone  .setValue(ip.drvDither, juce::dontSendNotification);
             insTone  .setVisible(true);
 
+            insExtra .setVisible(false);
             insDrive .onValueChanged = [setParam](double v) { setParam("mst_insBits", v); };
             insOutput.onValueChanged = [setParam](double v) { setParam("mst_insRate", v); };
             insTone  .onValueChanged = [setParam](double v) { setParam("mst_insDit",  v); };
             if (proc) setParam("mst_insChar", 4);
             break;
 
-        case 6: // 3-Band EQ — Low / Mid / High (#244a — Mid in middle slot)
+        case 6: // 3-Band EQ — Low / Mid gain / Mid Hz / High (#248: 4 knobs)
         {
             auto dbFmt = [](double v) -> juce::String {
                 return (v >= 0.0 ? "+" : "") + juce::String(v, 1) + " dB";
             };
+            auto hzFmt = [](double v) -> juce::String {
+                return v >= 1000.0 ? juce::String(v / 1000.0, 2) + "kHz"
+                                   : juce::String((int)v) + "Hz";
+            };
 
-            // Reset any log skew left over from prior algorithms (Compressor's
-            // Release on insTone, Bitcrusher's Rate on insOutput, etc.) so the
-            // ±18 dB EQ knobs centre visually at 0 dB.
+            // Reset any log skew left over from prior algorithms so the ±18 dB
+            // EQ knobs centre visually at 0 dB.
             insDrive .getSlider().setSkewFactor(1.0);
             insOutput.getSlider().setSkewFactor(1.0);
             insTone  .getSlider().setSkewFactor(1.0);
@@ -706,10 +724,19 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
             insTone  .setValue(ip.drvDither / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
             insTone  .setVisible(true);
 
-            // Low/high gains stored as 0-100 (50=0 dB), mid direct
+            // #248: 4th knob — mid band centre frequency (mst_insTon, same field as per-rhythm drvTon)
+            insExtra .setLabel("Mid Hz");
+            insExtra .setRange(200.0, 8000.0, 1.0);
+            insExtra .getSlider().setSkewFactorFromMidPoint(1000.0);
+            insExtra .getSlider().textFromValueFunction = hzFmt;
+            insExtra .setValue(juce::jlimit(200.0, 8000.0, (double)ip.driveTone), juce::dontSendNotification);
+            insExtra .setVisible(true);
+
+            // Low/high gains stored as 0-100 (50=0 dB); mid gain and mid Hz are direct
             insDrive .onValueChanged = [setParam](double v) { setParam("mst_insDrv", (v + 18.0) / 36.0 * 100.0); };
             insOutput.onValueChanged = [setParam](double v) { setParam("mst_insMid", v); };
             insTone  .onValueChanged = [setParam](double v) { setParam("mst_insDit", (v + 18.0) / 36.0 * 100.0); };
+            insExtra .onValueChanged = [setParam](double v) { setParam("mst_insTon", v); };
             if (proc) setParam("mst_insChar", 6);
             break;
         }
@@ -739,6 +766,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
             insTone  .setValue(juce::jlimit(20.0, 2000.0, (double)ip.driveTone), juce::dontSendNotification);
             insTone  .setVisible(true);
 
+            insExtra .setVisible(false);
             insDrive .onValueChanged = [setParam](double v) { setParam("mst_insDrv", v); };
             insOutput.onValueChanged = [setParam](double v) { setParam("mst_insOut", v); };
             insTone  .onValueChanged = [setParam](double v) { setParam("mst_insTon", v); };
@@ -766,6 +794,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
             insTone.setValue(juce::jlimit(10.0, 5000.0, (double)ip.driveTone), juce::dontSendNotification);
             insTone.setVisible(true);
 
+            insExtra .setVisible(false);
             insDrive .onValueChanged = [setParam](double v) { setParam("mst_insDrv", v); };
             insTone  .onValueChanged = [setParam](double v) { setParam("mst_insTon", v); };
             if (proc) setParam("mst_insChar", 9);
@@ -794,6 +823,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
             insTone.setValue(juce::jlimit(200.0, 20000.0, (double)ip.driveTone), juce::dontSendNotification);
             insTone.setVisible(true);
 
+            insExtra .setVisible(false);
             insDrive .onValueChanged = [setParam](double v) { setParam("mst_insDrv", v); };
             insOutput.onValueChanged = [setParam](double v) { setParam("mst_insOut", v); };
             insTone  .onValueChanged = [setParam](double v) { setParam("mst_insTon", v); };
@@ -803,7 +833,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
         default: break;
     }
 
-    for (auto* k : { &insDrive, &insOutput, &insTone })
+    for (auto* k : { &insDrive, &insOutput, &insTone, &insExtra })
     { k->getSlider().updateText(); k->repaint(); }
 
     resized();

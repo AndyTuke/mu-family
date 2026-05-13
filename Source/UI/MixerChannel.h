@@ -82,11 +82,12 @@ private:
     KnobWithLabel     scAttack  { "/",   Id::knobFxSend };
     KnobWithLabel     scRelease { "\\",  Id::knobFxSend };
 
-    // Insert controls (Master channel only) — compact 3-knob strip
+    // Insert controls (Master channel only) — 4-knob strip (insExtra only shown in EQ mode)
     juce::ComboBox    insCharBox;
     KnobWithLabel     insDrive  { "Drive",  Id::knobInsertPad };
     KnobWithLabel     insOutput { "Output", Id::knobInsertPad };
     KnobWithLabel     insTone   { "Tone",   Id::knobInsertPad };
+    KnobWithLabel     insExtra  { "Mid Hz", Id::knobInsertPad };  // #248: EQ mid frequency
 
     // Configure knob labels/ranges/callbacks for the selected algorithm.
     // proc is used only to decide whether to write `mst_insChar` back to APVTS
