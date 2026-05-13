@@ -65,7 +65,8 @@ void KnobWithLabel::setModulatedNorm(float norm01)
 void KnobWithLabel::resized()
 {
     const int labelH = 14;
-    slider.setBounds(0, 0, getWidth(), getHeight() - labelH);
+    const int topPad = 4;  // room for modulation ring/arc drawn above the slider circle
+    slider.setBounds(0, topPad, getWidth(), getHeight() - labelH - topPad);
 }
 
 void KnobWithLabel::mouseDoubleClick(const juce::MouseEvent&)
@@ -75,10 +76,11 @@ void KnobWithLabel::mouseDoubleClick(const juce::MouseEvent&)
 
 void KnobWithLabel::showInlineEditor()
 {
-    const int labelH  = 14;
-    const float sliderH = (float)(getHeight() - labelH);
+    const int   labelH  = 14;
+    const int   topPad  = 4;
+    const float sliderH = (float)(getHeight() - labelH - topPad);
     const float radius  = juce::jmin((float)getWidth(), sliderH) * 0.5f - 2.0f;
-    const float cy      = sliderH * 0.5f;
+    const float cy      = (float)topPad + sliderH * 0.5f;
     const int   valueY  = (int)(cy + radius * 0.75f) - 5;
 
     inlineEditor = std::make_unique<juce::TextEditor>();
@@ -152,9 +154,10 @@ void KnobWithLabel::paint(juce::Graphics& g)
                juce::Justification::centred, true);
 
     // Value text in the dead zone (5–7 o'clock gap at the bottom of the arc)
-    const float sliderH = (float)(getHeight() - labelH);
+    const int   topPad  = 4;
+    const float sliderH = (float)(getHeight() - labelH - topPad);
     const float radius  = juce::jmin((float)getWidth(), sliderH) * 0.5f - 2.0f;
-    const float cy      = sliderH * 0.5f;
+    const float cy      = (float)topPad + sliderH * 0.5f;
     const int   valueY  = (int)(cy + radius * 0.75f) - 5;
 
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(8.0f)));

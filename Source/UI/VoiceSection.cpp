@@ -364,10 +364,15 @@ void VoiceSection::refreshModulatedIndicators()
     driveTone   .setIsModulated(isAssigned("insert.lpf"));
 
     // Live-arc: read atomic snapshot written by audio thread (#133).
-    const auto& snap = proc.modSnapshot[rhythmIndex];
+    // Only draw arcs while playing — when stopped the snapshot holds the last played
+    // position, which would show a misleading permanent blue indicator.
+    const auto& snap    = proc.modSnapshot[rhythmIndex];
     auto sn  = [&](int i) { return snap[i].get(); };
-    const float kNaN = std::numeric_limits<float>::quiet_NaN();
-    auto arc = [&](bool assigned, int idx) -> float { return assigned ? sn(idx) : kNaN; };
+    const float kNaN    = std::numeric_limits<float>::quiet_NaN();
+    const bool  playing = proc.sequencerPlaying.get();
+    auto arc = [&](bool assigned, int idx) -> float {
+        return (assigned && playing) ? sn(idx) : kNaN;
+    };
 
     using P = PluginProcessor;
     // #218: pitch.octave / pitch.fine no longer modulatable; only the Semi knob shows live arc.
