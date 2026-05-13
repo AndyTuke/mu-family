@@ -116,6 +116,7 @@ public:
 
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
+    void setPresetDropLeft(int x) noexcept { rhythmDropLeft = x; }
 
 private:
     PluginProcessor& proc;
@@ -137,16 +138,17 @@ private:
     RhythmSaveDialog    rhythmSaveDialog;
 
     std::vector<juce::File> rhythmPresetFiles;
+    juce::File              loadedRhythmPresetFile;
+    int                     rhythmDropLeft = 0;  // set by PluginEditor after transport bar layout
 
     // Fixed chrome heights/widths
-    static constexpr int kHeaderH       = 28;
-    static constexpr int kSampleBarH    = 22;
-    static constexpr int kVoiceH        = 144;
-    static constexpr int kPanelPad      = 6;
-    static constexpr int kModeSelectorW  = 80;
-    static constexpr int kIconBtnW       = 22;
-    static constexpr int kPresetBtnW     = 38;
-    static constexpr int kRhythmDropW    = 130;
+    static constexpr int kHeaderH      = 28;
+    static constexpr int kSampleBarH   = 22;
+    static constexpr int kVoiceH       = 144;
+    static constexpr int kPanelPad     = 6;
+    static constexpr int kModeSelectorW = 80;
+    static constexpr int kIconBtnW     = 22;
+    static constexpr int kPresetBtnW   = 38;
 
     // Computed in resized(), used in both resized() and paint()
     int circleW = 300;

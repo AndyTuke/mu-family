@@ -324,7 +324,7 @@ RhythmSaveDialog::RhythmSaveDialog()
 void RhythmSaveDialog::markFileExists()
 {
     pendingOverwrite = true;
-    statusLabel.setText("File exists \xe2\x80\x94 Save again to overwrite",
+    statusLabel.setText(juce::String::fromUTF8("File exists \xe2\x80\x94 Save again to overwrite"),
                         juce::dontSendNotification);
 }
 
@@ -418,17 +418,28 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     addAndMakeVisible(deleteBtn);
     addAndMakeVisible(saveRhythmBtn);
 
-    rhythmPresetDropdown.setPlaceholderText("rhythm preset\xe2\x80\xa6");
+    rhythmPresetDropdown.setPlaceholderText(juce::String::fromUTF8("rhythm preset\xe2\x80\xa6"));
     rhythmPresetDropdown.onChange = [this](int id)
     {
-        int idx = id - 1;
+        const int idx = id - 1;
         if (idx >= 0 && idx < (int)rhythmPresetFiles.size() && currentRhythmIndex >= 0)
         {
-            proc.stageRhythmPreset(currentRhythmIndex, rhythmPresetFiles[idx]);
+            const juce::File presetFile = rhythmPresetFiles[idx];
+            proc.stageRhythmPreset(currentRhythmIndex, presetFile);
+            loadedRhythmPresetFile = presetFile;
             if (!proc.sequencerPlaying.get())
             {
-                setRhythm(currentRhythmIndex);
+                setRhythm(currentRhythmIndex);   // refreshes rhythmPresetFiles, clears dropdown
                 repaint();
+                // Re-select the just-loaded preset (refreshRhythmPresets cleared the selection).
+                for (int i = 0; i < (int)rhythmPresetFiles.size(); ++i)
+                {
+                    if (rhythmPresetFiles[i].getFullPathName() == presetFile.getFullPathName())
+                    {
+                        rhythmPresetDropdown.setSelectedId(i + 1, juce::dontSendNotification);
+                        break;
+                    }
+                }
             }
         }
     };
@@ -468,8 +479,17 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
         }
 
         proc.saveRhythmPresetToFile(currentRhythmIndex, destFile, embed);
+        loadedRhythmPresetFile = destFile;
         rhythmSaveDialog.setVisible(false);
         refreshRhythmPresets();
+        for (int i = 0; i < (int)rhythmPresetFiles.size(); ++i)
+        {
+            if (rhythmPresetFiles[i].getFullPathName() == destFile.getFullPathName())
+            {
+                rhythmPresetDropdown.setSelectedId(i + 1, juce::dontSendNotification);
+                break;
+            }
+        }
     };
 
     euclidPanel.onPatternChanged = [this]
@@ -551,6 +571,8 @@ void RhythmPanel::setRhythm(int index)
     if (nameLabel.getCurrentTextEditor() != nullptr)
         nameLabel.hideEditor(false);
 
+    if (currentRhythmIndex != index)
+        loadedRhythmPresetFile = {};
     deregisterRhythmListeners(currentRhythmIndex);
     currentRhythmIndex = index;
     registerRhythmListeners(currentRhythmIndex);
@@ -682,6 +704,50 @@ void RhythmPanel::saveRhythmPreset()
 {
     if (currentRhythmIndex < 0) return;
 
+    if (loadedRhythmPresetFile.existsAsFile())
+    {
+        // A preset is already loaded — confirm before overwriting.
+        const juce::String fileName = loadedRhythmPresetFile.getFileNameWithoutExtension();
+        const juce::File   destFile = loadedRhythmPresetFile;
+        const int          ri       = currentRhythmIndex;
+        juce::Component::SafePointer<RhythmPanel> safeThis(this);
+
+        auto* w = new juce::AlertWindow("Overwrite Preset",
+                                        "Overwrite \"" + fileName + "\"?",
+                                        juce::AlertWindow::QuestionIcon);
+        w->addButton("Overwrite", 1, juce::KeyPress(juce::KeyPress::returnKey));
+        w->addButton("Save As\xe2\x80\xa6", 2);
+        w->addButton("Cancel",    0, juce::KeyPress(juce::KeyPress::escapeKey));
+        w->enterModalState(true,
+            juce::ModalCallbackFunction::create([safeThis, destFile, ri](int result)
+            {
+                if (!safeThis) return;
+                if (result == 1)
+                {
+                    safeThis->proc.saveRhythmPresetToFile(ri, destFile, false);
+                    safeThis->refreshRhythmPresets();
+                    // Re-select after refresh.
+                    for (int i = 0; i < (int)safeThis->rhythmPresetFiles.size(); ++i)
+                    {
+                        if (safeThis->rhythmPresetFiles[i].getFullPathName() == destFile.getFullPathName())
+                        {
+                            safeThis->rhythmPresetDropdown.setSelectedId(i + 1, juce::dontSendNotification);
+                            break;
+                        }
+                    }
+                }
+                else if (result == 2)
+                {
+                    // User chose Save As from the confirm dialog.
+                    safeThis->loadedRhythmPresetFile = {};
+                    safeThis->saveRhythmPreset();
+                }
+            }),
+            true);
+        return;
+    }
+
+    // No preset loaded — show the Save As dialog.
     const juce::String defaultName =
         juce::String(proc.getRhythm(currentRhythmIndex).name).replaceCharacters("\\/:|*?<>\"", "_");
 
@@ -793,17 +859,22 @@ void RhythmPanel::resized()
     voiceRect  = { 0,       topY + topH, w,           kVoiceH                 };
     modRect    = { 0,       modY,        w,           juce::jmax(0, h - modY) };
 
-    // Header right-side controls (right to left)
-    const int btnY = (kHeaderH - 20) / 2;
+    // Header right-side controls (right to left).
+    // rhythmDropLeft is set by PluginEditor after TransportBar layout so the
+    // dropdown's left edge aligns with (and is indented 10 px from) the main
+    // preset dropdown directly above. Falls back to a minimum if not yet set.
+    const int btnY     = (kHeaderH - 20) / 2;
     const int rightEdge = w - 4;
-    deleteBtn           .setBounds(rightEdge - kIconBtnW,                                           btnY, kIconBtnW,    20);
-    resetBtn            .setBounds(rightEdge - kIconBtnW * 2 - 4,                                  btnY, kIconBtnW,    20);
-    saveRhythmBtn       .setBounds(rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW - 4,               btnY, kPresetBtnW,  20);
-    rhythmPresetDropdown.setBounds(rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW - 4 - kRhythmDropW - 4,
-                                                                                                   btnY, kRhythmDropW, 20);
+    const int dropRight = rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW - 4;
+    const int dropLeft  = (rhythmDropLeft > 0 && rhythmDropLeft < dropRight - 80)
+                              ? rhythmDropLeft : juce::jmax(26, dropRight - 200);
+    deleteBtn           .setBounds(rightEdge - kIconBtnW,           btnY, kIconBtnW,   20);
+    resetBtn            .setBounds(rightEdge - kIconBtnW * 2 - 4,  btnY, kIconBtnW,   20);
+    saveRhythmBtn       .setBounds(dropRight  - kPresetBtnW,        btnY, kPresetBtnW, 20);
+    rhythmPresetDropdown.setBounds(dropLeft,                        btnY, dropRight - kPresetBtnW - 4 - dropLeft, 20);
     const int nameX   = 26;
-    const int nameEnd = rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW - 4 - kRhythmDropW - 4 - 6;
-    nameRect = { nameX, 0, nameEnd - nameX, kHeaderH };
+    const int nameEnd = dropLeft - 6;
+    nameRect = { nameX, 0, juce::jmax(0, nameEnd - nameX), kHeaderH };
     nameLabel.setBounds(nameRect.reduced(4, 2));
 
     circle.setBounds        (circleRect.reduced(kPanelPad + 1));

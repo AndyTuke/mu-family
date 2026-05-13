@@ -251,6 +251,8 @@ void TransportBar::setMixerActive(bool active)
     mixerBtn.setButtonText(active ? "Sequencer" : "Mixer");
 }
 
+int TransportBar::getPresetDropdownLeft() const noexcept { return presetDropdown.getX(); }
+
 void TransportBar::setSaveEnabled(bool enabled)
 {
     saveBtn.setEnabled(enabled);

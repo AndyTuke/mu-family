@@ -455,6 +455,10 @@ void PluginEditor::resized()
     transportBar.setBounds(0, 0, w, transportH);
     sidebar.setBounds(0, transportH, RhythmSidebar::kWidth, contentH);
 
+    // Align the rhythm preset dropdown's left edge with the main preset dropdown
+    // above it (+ 10 px indent to show visual hierarchy). Computed after the
+    // TransportBar has laid out so presetDropdown.getX() is valid.
+    rhythmPanel.setPresetDropLeft(transportBar.getPresetDropdownLeft() - RhythmSidebar::kWidth + 10);
     rhythmPanel     .setBounds(mainArea);
     mixerOverlay    .setBounds(mainArea);
     presetBrowser   .setBounds(mainArea);
