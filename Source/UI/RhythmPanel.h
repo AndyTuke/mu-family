@@ -8,6 +8,56 @@
 #include "Components/MuClidLookAndFeel.h"
 #include "../PluginProcessor.h"
 
+// Inline overlay listing .muRhyth files from the rhythms folder.
+// Appears as a modal card over the RhythmPanel area.  Call setAccentColour()
+// with the current rhythm colour before making it visible.
+class RhythmPresetBrowser : public juce::Component,
+                            public juce::ListBoxModel
+{
+public:
+    std::function<void(const juce::File&)> onLoad;
+    std::function<void()>                  onClose;
+
+    void setAccentColour(juce::Colour c);
+    void refresh(const juce::File& rhythmsDir);
+
+    RhythmPresetBrowser();
+
+    // ListBoxModel
+    int  getNumRows() override;
+    void paintListBoxItem(int row, juce::Graphics& g, int w, int h, bool sel) override;
+    void listBoxItemClicked(int row, const juce::MouseEvent& e) override;
+    void listBoxItemDoubleClicked(int row, const juce::MouseEvent&) override;
+
+    void paint(juce::Graphics& g) override;
+    void resized() override;
+    void mouseDown(const juce::MouseEvent& e) override;
+
+private:
+    void applyFilter();
+    void loadSelected();
+    juce::Rectangle<int> cardBounds() const;
+
+    juce::TextEditor searchBox;
+    juce::ListBox    listBox;
+    juce::TextButton loadBtn   { "Load" };
+    juce::TextButton cancelBtn { "Cancel" };
+
+    juce::File              dir;
+    std::vector<juce::File> files;
+    std::vector<int>        filtered;
+    int                     selectedRow = -1;
+    juce::Colour            accent { 0xff44cc88 };
+
+    static constexpr int kCardW   = 340;
+    static constexpr int kCardH   = 400;
+    static constexpr int kHeaderH = 36;
+    static constexpr int kSearchH = 32;
+    static constexpr int kBotH    = 44;
+    static constexpr int kPad     = 8;
+};
+
+//==============================================================================
 // Lightweight modal card for saving a rhythm preset: name + embed-samples toggle.
 class RhythmSaveDialog : public juce::Component
 {
@@ -83,9 +133,9 @@ private:
     juce::TextButton saveRhythmBtn { "Save" };
 
     std::unique_ptr<juce::FileChooser> fileChooser;
-    std::unique_ptr<juce::FileChooser> rhythmLoadChooser;
     juce::File lastBrowseDir;
-    RhythmSaveDialog rhythmSaveDialog;
+    RhythmPresetBrowser rhythmBrowser;
+    RhythmSaveDialog    rhythmSaveDialog;
 
     // Fixed chrome heights/widths
     static constexpr int kHeaderH       = 28;

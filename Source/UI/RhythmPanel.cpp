@@ -100,6 +100,201 @@ private:
 };
 
 //==============================================================================
+// RhythmPresetBrowser implementation
+
+RhythmPresetBrowser::RhythmPresetBrowser()
+{
+    searchBox.setTextToShowWhenEmpty("Search...", juce::Colours::grey);
+    searchBox.onTextChange = [this] { applyFilter(); };
+    addAndMakeVisible(searchBox);
+
+    listBox.setModel(this);
+    listBox.setRowHeight(26);
+    listBox.setColour(juce::ListBox::backgroundColourId,
+                      MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
+    addAndMakeVisible(listBox);
+
+    loadBtn.onClick   = [this] { loadSelected(); };
+    cancelBtn.onClick = [this] { if (onClose) onClose(); };
+    addAndMakeVisible(loadBtn);
+    addAndMakeVisible(cancelBtn);
+}
+
+void RhythmPresetBrowser::setAccentColour(juce::Colour c)
+{
+    accent = c;
+    repaint();
+}
+
+void RhythmPresetBrowser::refresh(const juce::File& rhythmsDir)
+{
+    dir = rhythmsDir;
+    files.clear();
+    if (dir.isDirectory())
+    {
+        for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*.muRhyth"))
+            files.push_back(f);
+        std::sort(files.begin(), files.end(),
+                  [](const juce::File& a, const juce::File& b) {
+                      return a.getFileNameWithoutExtension()
+                              .compareIgnoreCase(b.getFileNameWithoutExtension()) < 0;
+                  });
+    }
+    selectedRow = -1;
+    applyFilter();
+}
+
+void RhythmPresetBrowser::applyFilter()
+{
+    filtered.clear();
+    const auto q = searchBox.getText().trim().toLowerCase();
+    for (int i = 0; i < (int)files.size(); ++i)
+    {
+        if (q.isNotEmpty() && !files[i].getFileNameWithoutExtension().toLowerCase().contains(q))
+            continue;
+        filtered.push_back(i);
+    }
+    selectedRow = -1;
+    listBox.updateContent();
+    listBox.repaint();
+}
+
+void RhythmPresetBrowser::loadSelected()
+{
+    if (selectedRow < 0 || selectedRow >= (int)filtered.size()) return;
+    const auto& f = files[filtered[selectedRow]];
+    if (onLoad) onLoad(f);
+    if (onClose) onClose();
+}
+
+juce::Rectangle<int> RhythmPresetBrowser::cardBounds() const
+{
+    // Centre the card, but clamp so it always fits inside the component.
+    const int w = getWidth();
+    const int h = getHeight();
+    const int cw = juce::jmin(kCardW, w - 16);
+    const int ch = juce::jmin(kCardH, h - 16);
+    return { (w - cw) / 2, (h - ch) / 2, cw, ch };
+}
+
+// ── ListBoxModel ──────────────────────────────────────────────────────────────
+
+int RhythmPresetBrowser::getNumRows() { return (int)filtered.size(); }
+
+void RhythmPresetBrowser::paintListBoxItem(int row, juce::Graphics& g, int w, int h, bool sel)
+{
+    using Id = MuClidLookAndFeel::ColourIds;
+    if (sel)
+    {
+        g.setColour(accent.withAlpha(0.25f));
+        g.fillRect(0, 0, w, h);
+        g.setColour(accent.withAlpha(0.6f));
+        g.fillRect(0, 0, 3, h);
+    }
+    if (row >= (int)filtered.size()) return;
+    const auto name = files[filtered[row]].getFileNameWithoutExtension();
+    g.setColour(MuClidLookAndFeel::colour(sel ? Id::headingText : Id::labelText));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(12.0f)));
+    g.drawText(name, 10, 0, w - 14, h, juce::Justification::centredLeft, true);
+
+    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+    g.drawLine(8.0f, (float)(h - 1), (float)w, (float)(h - 1), 0.5f);
+}
+
+void RhythmPresetBrowser::listBoxItemClicked(int row, const juce::MouseEvent& e)
+{
+    selectedRow = row;
+    listBox.repaint();
+    if (e.mods.isRightButtonDown())
+    {
+        juce::PopupMenu menu;
+        menu.addItem(1, "Load");
+        menu.addItem(2, "Delete");
+        menu.showMenuAsync(juce::PopupMenu::Options{}, [this, row](int result)
+        {
+            if (result == 1) { selectedRow = row; loadSelected(); }
+            else if (result == 2 && row < (int)filtered.size())
+            {
+                files[filtered[row]].deleteFile();
+                refresh(dir);
+            }
+        });
+    }
+}
+
+void RhythmPresetBrowser::listBoxItemDoubleClicked(int row, const juce::MouseEvent&)
+{
+    selectedRow = row;
+    loadSelected();
+}
+
+// ── Paint / Layout ────────────────────────────────────────────────────────────
+
+void RhythmPresetBrowser::paint(juce::Graphics& g)
+{
+    // Dim background
+    g.setColour(juce::Colour(0xcc000000));
+    g.fillAll();
+
+    const auto card = cardBounds();
+    const float r   = 8.0f;
+
+    // Card body
+    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
+    g.fillRoundedRectangle(card.toFloat(), r);
+
+    // Rhythm-coloured header band
+    g.setColour(accent.withAlpha(0.85f));
+    g.fillRoundedRectangle(card.toFloat(), r);
+    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
+    g.fillRect(card.getX(), card.getY() + kHeaderH, card.getWidth(), card.getHeight() - kHeaderH);
+
+    // Card border in rhythm colour
+    g.setColour(accent);
+    g.drawRoundedRectangle(card.toFloat().reduced(0.5f), r, 1.5f);
+
+    // Header label
+    g.setColour(juce::Colours::black.withAlpha(0.85f));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
+    g.drawText("Rhythm Presets", card.getX() + kPad, card.getY(),
+               card.getWidth() - kPad * 2, kHeaderH,
+               juce::Justification::centredLeft, false);
+
+    // Divider below search row
+    const int divY = card.getY() + kHeaderH + kSearchH;
+    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder));
+    g.drawLine((float)card.getX(), (float)divY, (float)card.getRight(), (float)divY, 0.5f);
+}
+
+void RhythmPresetBrowser::resized()
+{
+    const auto card = cardBounds();
+    const int  cx   = card.getX();
+    const int  cy   = card.getY();
+    const int  cw   = card.getWidth();
+    const int  ch   = card.getHeight();
+
+    searchBox.setBounds(cx + kPad, cy + kHeaderH + (kSearchH - 22) / 2,
+                        cw - kPad * 2, 22);
+
+    const int listY = cy + kHeaderH + kSearchH;
+    const int listH = ch - kHeaderH - kSearchH - kBotH;
+    listBox.setBounds(cx, listY, cw, listH);
+
+    const int btnY  = cy + ch - kBotH + (kBotH - 24) / 2;
+    const int btnW  = 80;
+    cancelBtn.setBounds(cx + kPad,                   btnY, btnW, 24);
+    loadBtn  .setBounds(cx + cw - kPad - btnW,       btnY, btnW, 24);
+}
+
+void RhythmPresetBrowser::mouseDown(const juce::MouseEvent& e)
+{
+    // Click outside the card → cancel.
+    if (!cardBounds().contains(e.getPosition()))
+        if (onClose) onClose();
+}
+
+//==============================================================================
 // RhythmSaveDialog implementation
 
 RhythmSaveDialog::RhythmSaveDialog()
@@ -224,6 +419,20 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     addAndMakeVisible(deleteBtn);
     addAndMakeVisible(loadRhythmBtn);
     addAndMakeVisible(saveRhythmBtn);
+
+    addAndMakeVisible(rhythmBrowser);
+    rhythmBrowser.setVisible(false);
+    rhythmBrowser.onLoad = [this](const juce::File& f)
+    {
+        if (currentRhythmIndex < 0) return;
+        proc.stageRhythmPreset(currentRhythmIndex, f);
+        if (!proc.sequencerPlaying.get())
+        {
+            setRhythm(currentRhythmIndex);
+            repaint();
+        }
+    };
+    rhythmBrowser.onClose = [this] { rhythmBrowser.setVisible(false); };
 
     addAndMakeVisible(rhythmSaveDialog);
     rhythmSaveDialog.setVisible(false);
@@ -435,30 +644,14 @@ void RhythmPanel::loadRhythmPreset()
 {
     if (currentRhythmIndex < 0) return;
 
-    const juce::File startDir = proc.getRhythmsDir().isDirectory()
-                                    ? proc.getRhythmsDir()
-                                    : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
+    const juce::File rhythmsDir = proc.getRhythmsDir().isDirectory()
+                                      ? proc.getRhythmsDir()
+                                      : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
 
-    rhythmLoadChooser = std::make_unique<juce::FileChooser>(
-        "Load Rhythm Preset", startDir, "*.muRhyth");
-
-    rhythmLoadChooser->launchAsync(
-        juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-        [this](const juce::FileChooser& fc)
-        {
-            const auto result = fc.getResult();
-            if (!result.existsAsFile() || currentRhythmIndex < 0) return;
-
-            // stageRhythmPreset applies immediately if not playing, or stages for hot-swap.
-            proc.stageRhythmPreset(currentRhythmIndex, result);
-
-            // Refresh UI immediately (for the non-playing case or to pick up name/colour).
-            if (!proc.sequencerPlaying.get())
-            {
-                setRhythm(currentRhythmIndex);
-                repaint();
-            }
-        });
+    rhythmBrowser.setAccentColour(currentColour());
+    rhythmBrowser.refresh(rhythmsDir);
+    rhythmBrowser.setVisible(true);
+    rhythmBrowser.toFront(true);
 }
 
 void RhythmPanel::saveRhythmPreset()
@@ -592,6 +785,7 @@ void RhythmPanel::resized()
     euclidPanel.setBounds   (euclidRect.reduced(kPanelPad + 1));
     voiceSection.setBounds  (voiceRect.reduced(kPanelPad + 1));
     modulatorPanel.setBounds(modRect.reduced(kPanelPad + 1));
+    rhythmBrowser   .setBounds(getLocalBounds());
     rhythmSaveDialog.setBounds(getLocalBounds());
 }
 
