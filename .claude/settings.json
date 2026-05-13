@@ -8,6 +8,20 @@
     ]
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "if": "Bash(cmake --build *)",
+            "statusMessage": "Enforcing full Debug + Release build...",
+            "command": "$j = $input | ConvertFrom-Json; $c = $j.tool_input.command; $hD = $c -match '--config\\s+Debug'; $hR = $c -match '--config\\s+Release'; if ($hD -xor $hR) { $null = $c -match 'cmake\\s+--build\\s+(\\S+)'; $p = $matches[1]; @{hookSpecificOutput=@{hookEventName='PreToolUse';updatedInput=@{command=\"cmake --build $p --config Debug && cmake --build $p --config Release\"}}} | ConvertTo-Json -Compress }"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Bash",

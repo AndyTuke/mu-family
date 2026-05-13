@@ -183,6 +183,7 @@ public:
     struct RhythmPlayState
     {
         juce::Atomic<int>  currentStep   { 0 };
+        juce::Atomic<int>  currentStepC  { 0 }; // effectiveStep % stepsC — independent of combined-pattern length
         juce::Atomic<int>  patternLength { 1 };
         juce::Atomic<int>  stepsA        { 1 }; // individual ring step counts for per-ring rotation
         juce::Atomic<int>  stepsB        { 1 };

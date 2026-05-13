@@ -489,6 +489,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         for (int r = 0; r < numRhythms; ++r)
         {
             rhythmPlayState[r].currentStep  .set(sequencer.getLastStepIndex(r));
+            rhythmPlayState[r].currentStepC .set(sequencer.getLastAccentStepIndex(r));
             rhythmPlayState[r].patternLength.set(sequencer.getPatternLength(r));
             const Rhythm& rhy = sequencer.getRhythm(r);
             rhythmPlayState[r].stepsA.set(juce::jmax(1, rhy.genA.steps));
@@ -669,6 +670,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         for (int r = 0; r < numRhythms; ++r)
         {
             rhythmPlayState[r].currentStep  .set(sequencer.getLastStepIndex(r));
+            rhythmPlayState[r].currentStepC .set(sequencer.getLastAccentStepIndex(r));
             rhythmPlayState[r].patternLength.set(sequencer.getPatternLength(r));
             const Rhythm& rhy = sequencer.getRhythm(r);
             rhythmPlayState[r].stepsA.set(juce::jmax(1, rhy.genA.steps));

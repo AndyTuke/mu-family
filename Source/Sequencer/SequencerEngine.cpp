@@ -5,6 +5,7 @@
 SequencerEngine::SequencerEngine()
 {
     lastStepIndex.fill(-1);
+    lastAccentStepIndex.fill(0);
     rhythms.reserve(MaxRhythms);
     cachedPatterns.reserve(MaxRhythms);
     cachedCPatterns.reserve(MaxRhythms);
@@ -51,13 +52,15 @@ void SequencerEngine::removeRhythm(int index)
     const int newN = (int)rhythms.size();
     for (int i = index; i < newN; ++i)
     {
-        safePatterns[i]  = std::move(safePatterns[i + 1]);
-        safeCPatterns[i] = std::move(safeCPatterns[i + 1]);
-        lastStepIndex[i] = lastStepIndex[i + 1];
+        safePatterns[i]        = std::move(safePatterns[i + 1]);
+        safeCPatterns[i]       = std::move(safeCPatterns[i + 1]);
+        lastStepIndex[i]       = lastStepIndex[i + 1];
+        lastAccentStepIndex[i] = lastAccentStepIndex[i + 1];
     }
     safePatterns[newN].clear();
     safeCPatterns[newN].clear();
-    lastStepIndex[newN] = -1;
+    lastStepIndex[newN]       = -1;
+    lastAccentStepIndex[newN] = 0;
 
     patternLock.store(false, std::memory_order_release);
 }
@@ -95,7 +98,8 @@ void SequencerEngine::setNumRhythms(int n)
         {
             safePatterns[i].clear();
             safeCPatterns[i].clear();
-            lastStepIndex[i] = -1;
+            lastStepIndex[i]       = -1;
+            lastAccentStepIndex[i] = 0;
         }
     }
 }
@@ -183,6 +187,8 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                     // Absorb the current step so we don't retroactively fire a hit.
                     if (!safePatterns[r].empty())
                         lastStepIndex[r] = effectiveStep % (int)safePatterns[r].size();
+                    lastAccentStepIndex[r] = safeCPatterns[r].empty() ? 0
+                                           : effectiveStep % (int)safeCPatterns[r].size();
                 }
             }
             patternLock.store(false, std::memory_order_release);
@@ -244,7 +250,8 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
             }
         }
 
-        lastStepIndex[r] = stepIndex;
+        lastStepIndex[r]       = stepIndex;
+        lastAccentStepIndex[r] = (cLen > 0) ? (effectiveStep % cLen) : 0;
     }
 
     return result;

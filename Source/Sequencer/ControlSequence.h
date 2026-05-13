@@ -33,11 +33,11 @@ public:
     InputSource inputSource = InputSource::Internal;
     int         midiCCNumber = 0;
 
-    NoteValue loopNoteValue  = NoteValue::Quarter;
+    NoteValue loopNoteValue  = NoteValue::Whole;
     NoteMod   loopNoteMod    = NoteMod::None;
-    int       loopMultiplier = 4;           // 4 quarter notes = 1 bar default
+    int       loopMultiplier = 1;           // 1 whole note = 1 bar default
 
-    NoteValue stepNoteValue  = NoteValue::Quarter;  // stepped mode only
+    NoteValue stepNoteValue  = NoteValue::Sixteenth;  // stepped mode only
     NoteMod   stepNoteMod    = NoteMod::None;
     int       stepMultiplier = 1;
 

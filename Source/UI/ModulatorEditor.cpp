@@ -91,12 +91,20 @@ ModulatorEditor::AssignmentRow::AssignmentRow(const std::string& assignId, int d
 void ModulatorEditor::AssignmentRow::resized()
 {
     const int w = getWidth(), h = getHeight();
-    const int removeW = 22, curveW = 70, depthW = 130;
-    const int destW = w - depthW - curveW - removeW - 6;
-    destCombo  .setBounds(0,                            0, destW,  h);
-    depthSlider.setBounds(destW + 2,                    0, depthW, h);
-    curveSlider.setBounds(destW + 2 + depthW + 2,       0, curveW, h);
+    const int numW = 20, removeW = 22, curveW = 70, depthW = 130;
+    const int destW = w - numW - depthW - curveW - removeW - 8;
+    destCombo  .setBounds(numW + 2,                              0, destW,  h);
+    depthSlider.setBounds(numW + 2 + destW + 2,                  0, depthW, h);
+    curveSlider.setBounds(numW + 2 + destW + 2 + depthW + 2,     0, curveW, h);
     removeBtn  .setBounds(w - removeW, (h - 18) / 2, removeW, 18);
+}
+
+void ModulatorEditor::AssignmentRow::paint(juce::Graphics& g)
+{
+    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
+    g.drawText(juce::String(rowNumber) + ".",
+               2, 0, 18, getHeight(), juce::Justification::centred, false);
 }
 
 //==============================================================================
@@ -440,6 +448,7 @@ void ModulatorEditor::rebuildRows()
         if (a.sourceId != sourceKey.toStdString()) continue;
 
         auto row = std::make_unique<AssignmentRow>(a.id, currentDriveChar);
+        row->rowNumber = (int)rows.size() + 1;
         rowsBox.addAndMakeVisible(*row);
 
         for (int i = 0; i < ModDest::ids.size(); ++i)

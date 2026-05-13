@@ -55,7 +55,7 @@ void NudgeInput::paint(juce::Graphics& g)
     if (labelInline && !label.isEmpty() && !showStepBtns)
     {
         // Label on the left, value on the right — both inside the display area.
-        const int inlineLblW = 26;
+        const int inlineLblW = 14;
         const auto lblArea = displayBounds.withWidth(inlineLblW);
         const auto valArea = displayBounds.withTrimmedLeft(inlineLblW);
         g.setColour(MuClidLookAndFeel::colour(Id::labelText));

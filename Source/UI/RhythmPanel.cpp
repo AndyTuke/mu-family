@@ -843,9 +843,9 @@ void RhythmPanel::resized()
     const int contentH = h - kHeaderH - kSampleBarH - kVoiceH;
 
     // Top section: 55% of content height; circle is square, capped at 33% of panel width.
-    // Cap topH so the modulator panel always gets at least minModH pixels:
-    // tab(28) + header(28) + editor(100) + 2×timing(56) + gap(4) + addBtn(28) + reduce(14) = 258.
-    const int minModH = 258;
+    // Cap topH so the modulator panel always gets at least minModH pixels.
+    // tab(28) + header(28) + editor(150) + 4 + pager(20) + 4 + addBtn(28) + 2 rows(56) + reduce(14) = 332.
+    const int minModH = 332;
     const int avail   = juce::jmax(80, contentH - minModH);
     topH    = juce::jlimit(80, avail, (int)(contentH * 0.55f));
     circleW = juce::jmin(topH, (int)(w * 0.33f));

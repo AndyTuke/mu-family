@@ -36,8 +36,9 @@ public:
     void swapRhythmSlots(int i, int j);
 
     // UI read-only accessors (safe to call from message thread after processBlock).
-    int getLastStepIndex(int r) const { return lastStepIndex[r]; }
-    int getPatternLength (int r) const { return static_cast<int>(safePatterns[r].size()); }
+    int getLastStepIndex       (int r) const { return lastStepIndex[r]; }
+    int getLastAccentStepIndex (int r) const { return lastAccentStepIndex[r]; }
+    int getPatternLength       (int r) const { return static_cast<int>(safePatterns[r].size()); }
 
     // Master loop length (0 = free-running, >0 = all rhythms reset to step 0 at this boundary).
     void setMasterLoopSteps(int steps)
@@ -81,6 +82,7 @@ private:
     std::atomic<bool>            patternLock { false };
 
     std::array<int, MaxRhythms> lastStepIndex;
+    std::array<int, MaxRhythms> lastAccentStepIndex;
     std::vector<bool> patternUpdated;
     int masterLoopSteps = 0;
     std::atomic<int> masterLoopCurrentStep { 0 };

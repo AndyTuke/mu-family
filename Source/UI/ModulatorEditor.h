@@ -180,7 +180,7 @@ private:
     juce::Label    loopLabel;
     // #239: explicit fromUTF8 so the "×" glyph decodes correctly. The implicit
     // char* → juce::String conversion was rendering as garbled Latin-1 pairs.
-    NudgeInput     loopMult { juce::String::fromUTF8("\xc3\x97"), 1, 16, 4 };
+    NudgeInput     loopMult { juce::String::fromUTF8("\xc3\x97"), 1, 16, 1 };
     DropdownSelect stepDropdown;
     juce::Label    stepLabel;
     NudgeInput     stepMult { juce::String::fromUTF8("\xc3\x97"), 1, 16, 1 };   // #239
@@ -199,8 +199,11 @@ private:
         std::function<void(float depth)>              onDepthChange;
         std::function<void(float curve)>              onCurveChange;
 
+        int rowNumber = 0;
+
         AssignmentRow(const std::string& assignId, int driveChar);
         void resized() override;
+        void paint(juce::Graphics& g) override;
     };
 
     std::vector<std::unique_ptr<AssignmentRow>> rows;

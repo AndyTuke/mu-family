@@ -61,6 +61,7 @@ void RhythmCircle::timerCallback()
         if (playing)
         {
             const int   step  = playState->currentStep.get();
+            const int   stepC = playState->currentStepC.get();
             const float frac  = beatFracAtom->get();
             const int   sA    = juce::jmax(1, playState->stepsA.get());
             const int   sB    = juce::jmax(1, playState->stepsB.get());
@@ -68,9 +69,11 @@ void RhythmCircle::timerCallback()
             const float twoPi = juce::MathConstants<float>::twoPi;
 
             // Each ring rotates at its own speed: one full turn per sX steps.
+            // Ring C uses its own independent step counter so its rotation is not
+            // disrupted by the combined-pattern (A+B) wrap boundary.
             rotAngleA = ((float)(step % sA) + frac) / (float)sA * twoPi;
             rotAngleB = ((float)(step % sB) + frac) / (float)sB * twoPi;
-            rotAngleC = ((float)(step % sC) + frac) / (float)sC * twoPi;
+            rotAngleC = ((float)stepC        + frac) / (float)sC * twoPi;
 
             // Issue #43: edge-detect via monotonic counter so multiple readers
             // (this circle + sidebar mini-circles + sidebar pulse) can all observe

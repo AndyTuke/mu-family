@@ -340,36 +340,35 @@ void VoiceSection::refreshModulatedIndicators()
         return false;
     };
 
-    // #218: single Pitch destination — live arc shown only on the Semi knob.
-    pitchOctave .setIsModulated(false);
-    pitchSemi   .setIsModulated(isAssigned("pitch.semitones"));
-    pitchFine   .setIsModulated(false);
-    filterCutoff.setIsModulated(isAssigned("filter.cutoff"));
-    filterRes   .setIsModulated(isAssigned("filter.resonance"));
-    filterAtk   .setIsModulated(isAssigned("fenv.attack"));
-    filterDec   .setIsModulated(isAssigned("fenv.decay"));
-    filterDepth .setIsModulated(isAssigned("fenv.depth"));
-    ampAtk      .setIsModulated(isAssigned("amp.attack"));
-    ampDec      .setIsModulated(isAssigned("amp.decay"));
-    ampSus      .setIsModulated(isAssigned("amp.sustain"));
-    ampRel      .setIsModulated(isAssigned("amp.release"));
-    // #223 new destinations
-    pitchDepth  .setIsModulated(isAssigned("pitch.envDepth"));
-    ampLevel    .setIsModulated(isAssigned("amp.level"));
-    ampAccent   .setIsModulated(isAssigned("accentDb"));
-    // Insert knobs map differently per algorithm; tag both possible meanings.
-    driveDrive  .setIsModulated(isAssigned("insert.drive") || isAssigned("insert.bits"));
-    driveOutput .setIsModulated(isAssigned("insert.output") || isAssigned("insert.rate"));
-    driveDither .setIsModulated(isAssigned("insert.dither"));
-    driveTone   .setIsModulated(isAssigned("insert.lpf"));
-
-    // Live-arc: read atomic snapshot written by audio thread (#133).
-    // Only draw arcs while playing — when stopped the snapshot holds the last played
-    // position, which would show a misleading permanent blue indicator.
+    // Only show mod indicators (ring + live arc) while playing — when stopped the
+    // snapshot holds the last played position, which would be a misleading permanent indicator.
     const auto& snap    = proc.modSnapshot[rhythmIndex];
     auto sn  = [&](int i) { return snap[i].get(); };
     const float kNaN    = std::numeric_limits<float>::quiet_NaN();
     const bool  playing = proc.sequencerPlaying.get();
+
+    // #218: single Pitch destination — ring shown only on the Semi knob.
+    pitchOctave .setIsModulated(false);
+    pitchSemi   .setIsModulated(playing && isAssigned("pitch.semitones"));
+    pitchFine   .setIsModulated(false);
+    filterCutoff.setIsModulated(playing && isAssigned("filter.cutoff"));
+    filterRes   .setIsModulated(playing && isAssigned("filter.resonance"));
+    filterAtk   .setIsModulated(playing && isAssigned("fenv.attack"));
+    filterDec   .setIsModulated(playing && isAssigned("fenv.decay"));
+    filterDepth .setIsModulated(playing && isAssigned("fenv.depth"));
+    ampAtk      .setIsModulated(playing && isAssigned("amp.attack"));
+    ampDec      .setIsModulated(playing && isAssigned("amp.decay"));
+    ampSus      .setIsModulated(playing && isAssigned("amp.sustain"));
+    ampRel      .setIsModulated(playing && isAssigned("amp.release"));
+    // #223 new destinations
+    pitchDepth  .setIsModulated(playing && isAssigned("pitch.envDepth"));
+    ampLevel    .setIsModulated(playing && isAssigned("amp.level"));
+    ampAccent   .setIsModulated(playing && isAssigned("accentDb"));
+    // Insert knobs map differently per algorithm; tag both possible meanings.
+    driveDrive  .setIsModulated(playing && (isAssigned("insert.drive") || isAssigned("insert.bits")));
+    driveOutput .setIsModulated(playing && (isAssigned("insert.output") || isAssigned("insert.rate")));
+    driveDither .setIsModulated(playing && isAssigned("insert.dither"));
+    driveTone   .setIsModulated(playing && isAssigned("insert.lpf"));
     auto arc = [&](bool assigned, int idx) -> float {
         return (assigned && playing) ? sn(idx) : kNaN;
     };
@@ -388,8 +387,9 @@ void VoiceSection::refreshModulatedIndicators()
     ampDec      .setModulatedNorm(arc(isAssigned("amp.decay"),        P::kSnapAmpDec));
     ampSus      .setModulatedNorm(arc(isAssigned("amp.sustain"),      P::kSnapAmpSus));
     ampRel      .setModulatedNorm(arc(isAssigned("amp.release"),      P::kSnapAmpRel));
-    driveDrive  .setModulatedNorm(isAssigned("insert.drive") ? sn(P::kSnapInsDrive)
-                                : isAssigned("insert.bits")  ? sn(P::kSnapInsBits) : kNaN);
+    driveDrive  .setModulatedNorm(playing ? (isAssigned("insert.drive") ? sn(P::kSnapInsDrive)
+                                          : isAssigned("insert.bits")  ? sn(P::kSnapInsBits) : kNaN)
+                                         : kNaN);
     driveOutput .setModulatedNorm(arc(isAssigned("insert.output"),    P::kSnapInsOutput));
     driveDither .setModulatedNorm(arc(isAssigned("insert.dither"),    P::kSnapInsDither));
     driveTone   .setModulatedNorm(arc(isAssigned("insert.lpf"),       P::kSnapInsLpf));
@@ -818,16 +818,16 @@ void VoiceSection::resized()
     pitchRel.setBounds(pitchX + 3 * kW, row2Y, kW, rowH);
 
     // ─── Filter ──────────────────────────────────────────────────────────
-    // Dropdown half-height centred; Cutoff, Res, Depth on cols 1–3.
-    filterType  .setBounds(filterX + 0 * kW, row1Y + rowH / 4, kW, rowH / 2);
-    filterCutoff.setBounds(filterX + 1 * kW, row1Y, kW, rowH);
-    filterRes   .setBounds(filterX + 2 * kW, row1Y, kW, rowH);
-    filterDepth .setBounds(filterX + 3 * kW, row1Y, kW, rowH);  // depth on config row
+    // Dropdown spans 2 cols so labels like "Notch 24" fit; knobs shift right by 1.
+    filterType  .setBounds(filterX + 0 * kW, row1Y + rowH / 4, 2 * kW, rowH / 2);
+    filterCutoff.setBounds(filterX + 2 * kW, row1Y, kW, rowH);
+    filterRes   .setBounds(filterX + 3 * kW, row1Y, kW, rowH);
+    filterDepth .setBounds(filterX + 4 * kW, row1Y, kW, rowH);
 
-    filterAtk.setBounds(filterX + 0 * kW, row2Y, kW, rowH);
-    filterDec.setBounds(filterX + 1 * kW, row2Y, kW, rowH);
-    filterSus.setBounds(filterX + 2 * kW, row2Y, kW, rowH);
-    filterRel.setBounds(filterX + 3 * kW, row2Y, kW, rowH);
+    filterAtk.setBounds(filterX + 1 * kW, row2Y, kW, rowH);
+    filterDec.setBounds(filterX + 2 * kW, row2Y, kW, rowH);
+    filterSus.setBounds(filterX + 3 * kW, row2Y, kW, rowH);
+    filterRel.setBounds(filterX + 4 * kW, row2Y, kW, rowH);
 
     // ─── Amp ─────────────────────────────────────────────────────────────
     ampLevel  .setBounds(ampX + 0 * kW, row1Y, kW, rowH);
