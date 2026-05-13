@@ -129,13 +129,14 @@ private:
     juce::Label      nameLabel;
     juce::TextButton resetBtn     { juce::String::charToString(0x21BA) }; // ↺
     juce::TextButton deleteBtn    { juce::String::charToString(0x2715) }; // ✕
-    juce::TextButton loadRhythmBtn { "Load" };
+    DropdownSelect   rhythmPresetDropdown;
     juce::TextButton saveRhythmBtn { "Save" };
 
-    std::unique_ptr<juce::FileChooser> fileChooser;
     juce::File lastBrowseDir;
     RhythmPresetBrowser rhythmBrowser;
     RhythmSaveDialog    rhythmSaveDialog;
+
+    std::vector<juce::File> rhythmPresetFiles;
 
     // Fixed chrome heights/widths
     static constexpr int kHeaderH       = 28;
@@ -145,6 +146,7 @@ private:
     static constexpr int kModeSelectorW  = 80;
     static constexpr int kIconBtnW       = 22;
     static constexpr int kPresetBtnW     = 38;
+    static constexpr int kRhythmDropW    = 130;
 
     // Computed in resized(), used in both resized() and paint()
     int circleW = 300;
@@ -153,7 +155,7 @@ private:
     juce::Rectangle<int> nameRect;   // header name hit-area
 
     void loadSample();
-    void loadRhythmPreset();
+    void refreshRhythmPresets();
     void saveRhythmPreset();
     void refreshCircle();
     juce::Colour currentColour() const;

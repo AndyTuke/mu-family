@@ -13,6 +13,36 @@
 static constexpr auto kMetaPrefix = "assign_";
 static constexpr auto kMetaSuffix = "_depth";
 
+// ── Modulation destination reference table ────────────────────────────────────
+// Formula: amount = srcVal [-100,+100] * depth [-100,+100] * scale * 0.0001
+// At depth=100%, srcVal=100%: amount = scale. Scale = max useful additive offset
+// in the units stored in modParamValues. Log-Hz destinations (filter.cutoff, insert.lpf)
+// are multiplicative (semitone offset); all others are additive.
+//
+//  Destination         paramValues units   Range           Scale   Notes
+//  ──────────────────  ──────────────────  ──────────────  ──────  ─────────────────────────────
+//  amp.attack          display 0-100       0..100          100     full-range additive
+//  amp.decay           display 0-100       0..100          100     full-range additive
+//  amp.sustain         display 0-100       0..100          100     full-range additive
+//  amp.release         display 0-100       0..100          100     full-range additive
+//  amp.level           gain 0-2            0..2            2       0=silent, 2=double (#223)
+//  accentDb            dB 0-12             0..12           12      (#223)
+//  filter.cutoff       Hz (log-mult)       20..20000 Hz    48      ±4 octaves (#216d)
+//  filter.resonance    display 0-100       0..100          100     full-range additive
+//  fenv.attack         display 0-100       0..100          100     full-range additive
+//  fenv.decay          display 0-100       0..100          100     full-range additive
+//  fenv.depth          semitones 0-48      0..48           48      full-range additive
+//  pitch.semitones     semitones 0 base    ±24 st          24      ±2 octaves (#218)
+//  pitch.envDepth      semitones 0-24      0..24           24      (#223)
+//  insert.drive        display 0-100       0..100          100     full-range additive
+//  insert.output       dB -24..0           -24..0 dB       24      full-range additive
+//  insert.bits         actual bits 1-16    1..16 bits      1       ±1 bit at full depth (#266)
+//  insert.rate         log-norm 0-100      0..100          100     full-range additive (log space)
+//  insert.dither       display 0-100       0..100          100     full-range additive
+//  insert.lpf          Hz (log-mult)       20..20000 Hz    48      ±4 octaves (#216d)
+//  euclid.*.hits       steps 0-16          0..16           16      full-range additive
+//  euclid.*.rotate     steps 0-16          0..16           16      full-range additive
+
 // Per-destination full-swing magnitude in the same units as paramValues. At depth=100%
 // and CS output = 100% the destination is offset by ±this value. Defaults to 100 for
 // destinations that already operate on a 0-100 display scale (amp/filter ADSR, etc.).
@@ -32,7 +62,7 @@ static float depthScaleFor(const std::string& destId)
     if (destId == "amp.level")       return 2.0f;    // 0..2 gain = -inf..+6 dB (#223)
     if (destId == "accentDb")        return 12.0f;   // 0..12 dB (#223)
     if (destId == "insert.output")   return 24.0f;   // -24..0 dB (full range)
-    if (destId == "insert.bits")     return 16.0f;   // 1..16 bits (full range)
+    if (destId == "insert.bits")     return 1.0f;    // 1..16 bits; ±1 bit at full depth (#266)
     // Pattern destinations.
     if (destId == "euclid.a.hits"   || destId == "euclid.b.hits"
      || destId == "euclid.a.rotate" || destId == "euclid.b.rotate"

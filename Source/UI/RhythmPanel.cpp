@@ -411,14 +411,28 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     nameLabel.onTextChange = [this] { commitNameFromLabel(); };
     addAndMakeVisible(nameLabel);
 
-    resetBtn.onClick      = [this] { confirmReset();       };
-    deleteBtn.onClick     = [this] { confirmDelete();      };
-    loadRhythmBtn.onClick = [this] { loadRhythmPreset();  };
-    saveRhythmBtn.onClick = [this] { saveRhythmPreset();  };
+    resetBtn.onClick      = [this] { confirmReset();  };
+    deleteBtn.onClick     = [this] { confirmDelete(); };
+    saveRhythmBtn.onClick = [this] { saveRhythmPreset(); };
     addAndMakeVisible(resetBtn);
     addAndMakeVisible(deleteBtn);
-    addAndMakeVisible(loadRhythmBtn);
     addAndMakeVisible(saveRhythmBtn);
+
+    rhythmPresetDropdown.setPlaceholderText("rhythm preset\xe2\x80\xa6");
+    rhythmPresetDropdown.onChange = [this](int id)
+    {
+        int idx = id - 1;
+        if (idx >= 0 && idx < (int)rhythmPresetFiles.size() && currentRhythmIndex >= 0)
+        {
+            proc.stageRhythmPreset(currentRhythmIndex, rhythmPresetFiles[idx]);
+            if (!proc.sequencerPlaying.get())
+            {
+                setRhythm(currentRhythmIndex);
+                repaint();
+            }
+        }
+    };
+    addAndMakeVisible(rhythmPresetDropdown);
 
     addAndMakeVisible(rhythmBrowser);
     rhythmBrowser.setVisible(false);
@@ -455,6 +469,7 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
 
         proc.saveRhythmPresetToFile(currentRhythmIndex, destFile, embed);
         rhythmSaveDialog.setVisible(false);
+        refreshRhythmPresets();
     };
 
     euclidPanel.onPatternChanged = [this]
@@ -542,6 +557,7 @@ void RhythmPanel::setRhythm(int index)
     if (index >= 0 && index < proc.getNumRhythms())
     {
         nameLabel.setText(juce::String(proc.getRhythm(index).name), juce::dontSendNotification);
+        refreshRhythmPresets();
         euclidPanel.setRhythm(index);
         euclidPanel.setRhythmColour(currentColour());
         // modulatorPanel must be re-pointed BEFORE voiceSection — voiceSection.setRhythm
@@ -640,18 +656,26 @@ void RhythmPanel::loadSample()
     opts.launchAsync();
 }
 
-void RhythmPanel::loadRhythmPreset()
+void RhythmPanel::refreshRhythmPresets()
 {
-    if (currentRhythmIndex < 0) return;
+    rhythmPresetFiles.clear();
+    rhythmPresetDropdown.clear();
 
     const juce::File rhythmsDir = proc.getRhythmsDir().isDirectory()
                                       ? proc.getRhythmsDir()
-                                      : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
-
-    rhythmBrowser.setAccentColour(currentColour());
-    rhythmBrowser.refresh(rhythmsDir);
-    rhythmBrowser.setVisible(true);
-    rhythmBrowser.toFront(true);
+                                      : juce::File();
+    if (rhythmsDir.isDirectory())
+    {
+        auto files = rhythmsDir.findChildFiles(juce::File::findFiles, false, "*.muRhyth");
+        std::sort(files.begin(), files.end(), [](const juce::File& a, const juce::File& b) {
+            return a.getFileNameWithoutExtension().compareIgnoreCase(b.getFileNameWithoutExtension()) < 0;
+        });
+        for (const auto& f : files)
+        {
+            rhythmPresetFiles.push_back(f);
+            rhythmPresetDropdown.addItem(f.getFileNameWithoutExtension(), (int)rhythmPresetFiles.size());
+        }
+    }
 }
 
 void RhythmPanel::saveRhythmPreset()
@@ -772,12 +796,13 @@ void RhythmPanel::resized()
     // Header right-side controls (right to left)
     const int btnY = (kHeaderH - 20) / 2;
     const int rightEdge = w - 4;
-    deleteBtn    .setBounds(rightEdge - kIconBtnW,                                           btnY, kIconBtnW,   20);
-    resetBtn     .setBounds(rightEdge - kIconBtnW * 2 - 4,                                  btnY, kIconBtnW,   20);
-    saveRhythmBtn.setBounds(rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW - 4,               btnY, kPresetBtnW, 20);
-    loadRhythmBtn.setBounds(rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW * 2 - 4 - 2,       btnY, kPresetBtnW, 20);
+    deleteBtn           .setBounds(rightEdge - kIconBtnW,                                           btnY, kIconBtnW,    20);
+    resetBtn            .setBounds(rightEdge - kIconBtnW * 2 - 4,                                  btnY, kIconBtnW,    20);
+    saveRhythmBtn       .setBounds(rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW - 4,               btnY, kPresetBtnW,  20);
+    rhythmPresetDropdown.setBounds(rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW - 4 - kRhythmDropW - 4,
+                                                                                                   btnY, kRhythmDropW, 20);
     const int nameX   = 26;
-    const int nameEnd = rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW * 2 - 4 - 2 - 6;
+    const int nameEnd = rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW - 4 - kRhythmDropW - 4 - 6;
     nameRect = { nameX, 0, nameEnd - nameX, kHeaderH };
     nameLabel.setBounds(nameRect.reduced(4, 2));
 
