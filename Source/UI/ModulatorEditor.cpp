@@ -405,10 +405,13 @@ void ModulatorEditor::rebuildRows()
             lockMod();
             matrix->removeAssignment(rowId);
             unlockMod();
-            rebuildRows();
-            resized();
-            repaint();
             if (onChange) onChange();
+            juce::Component::SafePointer<ModulatorEditor> safe(this);
+            juce::MessageManager::callAsync([safe]
+            {
+                if (auto* p = safe.getComponent())
+                    { p->rebuildRows(); p->resized(); p->repaint(); }
+            });
         };
         row->onDestChange = [this, rowId](const std::string& dest)
         {

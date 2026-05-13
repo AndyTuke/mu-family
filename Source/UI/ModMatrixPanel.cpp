@@ -160,8 +160,13 @@ void ModMatrixPanel::rebuildRows()
             lockMods(*rhythm);
             rhythm->modulationMatrix.removeAssignment(rowId);
             unlockMods(*rhythm);
-            rebuildRows(); resized(); repaint();
             if (onChange) onChange();
+            juce::Component::SafePointer<ModMatrixPanel> safe(this);
+            juce::MessageManager::callAsync([safe]
+            {
+                if (auto* p = safe.getComponent())
+                    { p->rebuildRows(); p->resized(); p->repaint(); }
+            });
         };
         row->onDestChange = [this, rowId, sourceId](const std::string& dest)
         {
@@ -179,8 +184,13 @@ void ModMatrixPanel::rebuildRows()
             na.curve         = c;   // #224
             rhythm->modulationMatrix.addAssignment(na);
             unlockMods(*rhythm);
-            rebuildRows(); resized(); repaint();
             if (onChange) onChange();
+            juce::Component::SafePointer<ModMatrixPanel> safe(this);
+            juce::MessageManager::callAsync([safe]
+            {
+                if (auto* p = safe.getComponent())
+                    { p->rebuildRows(); p->resized(); p->repaint(); }
+            });
         };
         row->onDepthChange = [this, rowId](float d)
         {
