@@ -37,6 +37,8 @@ void InsertProcessor::reset()
 
 void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh, const VoiceParams& p)
 {
+    grReduction.set(0.0f);  // reset; comp/limiter case overwrites with actual GR
+
     switch (p.driveChar)
     {
         case 1: // ── Soft Clip — tanh ADAA ────────────────────────────────────
@@ -206,6 +208,7 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh, co
             const float attCoeff  = std::exp(-2.2f / (attackMs * 0.001f * sr));
             const float relCoeff  = std::exp(-2.2f / (relMs    * 0.001f * sr));
 
+            float peakGainDb = 0.0f;  // 0 or negative; used for grReduction
             for (int ch = 0; ch < nCh; ++ch)
             {
                 auto*  data = buf.getWritePointer(ch);
@@ -222,9 +225,12 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh, co
                         const float overDb = 20.0f * std::log10(env / threshLin);
                         gainDb = -overDb * (1.0f - 1.0f / ratio);
                     }
+                    if (gainDb < peakGainDb) peakGainDb = gainDb;
                     data[i] *= juce::Decibels::decibelsToGain(gainDb) * outGain;
                 }
             }
+            // Normalise to 0..1 (1 ≡ 24 dB GR) for the UI meter.
+            grReduction.set(juce::jlimit(0.0f, 1.0f, -peakGainDb / 24.0f));
             break;
         }
         case 9: // ── Ring Modulator: multiply by sine carrier ─────────────────

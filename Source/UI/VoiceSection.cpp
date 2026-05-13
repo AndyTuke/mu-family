@@ -435,6 +435,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
     // Null all insert callbacks first — prevents spurious APVTS writes during range changes.
     for (auto* k : { &driveDrive, &driveOutput, &driveDither, &driveTone })
         k->onValueChanged = nullptr;
+    driveOutput.setGRSource(nullptr);  // #246: cleared here; comp/limiter cases re-set below
 
     const VoiceParams* p = (rhythmIndex >= 0 && rhythmIndex < proc.getNumRhythms())
                            ? &proc.getRhythm(rhythmIndex).voiceParams : nullptr;
@@ -668,6 +669,14 @@ void VoiceSection::configureInsertAlgorithm(int charId)
             driveOutput.onValueChanged = [this](double v) { apvtsSet("drvOut", (float)v); };
             driveDither.onValueChanged = [this](double v) { apvtsSet("drvDit", (float)v); };
             driveTone  .onValueChanged = [this](double v) { apvtsSet("drvTon", (float)v); };
+
+            // #246: GR meter on the Output knob
+            {
+                auto* ve = (rhythmIndex >= 0 && rhythmIndex < proc.getNumRhythms()
+                            && proc.voiceEngines[rhythmIndex])
+                           ? proc.voiceEngines[rhythmIndex].get() : nullptr;
+                driveOutput.setGRSource(ve ? &ve->insertProc.grReduction : nullptr);
+            }
             break;
         }
 

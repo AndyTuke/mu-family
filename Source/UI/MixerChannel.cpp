@@ -583,6 +583,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
     insOutput.onValueChanged = nullptr;
     insTone  .onValueChanged = nullptr;
     insExtra .onValueChanged = nullptr;
+    insOutput.setGRSource(nullptr);  // #246: cleared here; comp/limiter cases re-set below
 
     // #243: the lambda must keep working after this method is re-invoked from
     // loadFromAPVTS with proc=nullptr (the dropdown char value comes from APVTS,
@@ -770,6 +771,10 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
             insDrive .onValueChanged = [setParam](double v) { setParam("mst_insDrv", v); };
             insOutput.onValueChanged = [setParam](double v) { setParam("mst_insOut", v); };
             insTone  .onValueChanged = [setParam](double v) { setParam("mst_insTon", v); };
+            // #246: GR meter on the Output knob
+            insOutput.setGRSource(masterInsertProc
+                                  ? &masterInsertProc->mixerEngine.masterInsert.grReduction
+                                  : nullptr);
             if (proc) setParam("mst_insChar", charId);
             break;
 

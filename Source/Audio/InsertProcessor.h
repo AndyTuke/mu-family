@@ -16,6 +16,11 @@ public:
     // Apply insert effect (driveChar switch + post-drive tone filter) in-place.
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh, const VoiceParams& p);
 
+    // Peak gain-reduction for the current block, 0..1 (1 ≡ 24 dB).
+    // Written by the audio thread inside process(); read by the UI at 30 Hz.
+    // Non-zero only during Compressor (7) / Limiter (8) modes.
+    juce::Atomic<float> grReduction { 0.0f };
+
 private:
     double currentSampleRate = 44100.0;
 

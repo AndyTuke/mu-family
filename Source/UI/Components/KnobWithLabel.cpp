@@ -164,10 +164,33 @@ void KnobWithLabel::paint(juce::Graphics& g)
                juce::Justification::centred, true);
 }
 
+void KnobWithLabel::setGRSource(const juce::Atomic<float>* gr)
+{
+    grSource  = gr;
+    grDisplay = 0.0f;
+    if (gr) startTimerHz(30);
+    else    stopTimer();
+    repaint();
+}
+
+void KnobWithLabel::timerCallback()
+{
+    const float incoming = grSource ? grSource->get() : 0.0f;
+    const float prev     = grDisplay;
+    grDisplay = (incoming > grDisplay)
+              ? incoming
+              : kGRRelease * grDisplay + (1.0f - kGRRelease) * incoming;
+    grDisplay = juce::jlimit(0.0f, 1.0f, grDisplay);
+    const bool wasVisible = prev      > 0.005f;
+    const bool nowVisible = grDisplay > 0.005f;
+    if (wasVisible != nowVisible || std::abs(grDisplay - prev) > 0.001f)
+        repaint();
+}
+
 void KnobWithLabel::paintOverChildren(juce::Graphics& g)
 {
-    // Issue #133: modulation indicator. Drawn over the slider so it overlays the arc.
-    if (! isModulated && std::isnan(modulatedNorm)) return;
+    // Issue #133: modulation indicator + #246: GR arc.
+    if (! isModulated && std::isnan(modulatedNorm) && grDisplay <= 0.005f) return;
 
     const auto sb = slider.getBounds().toFloat();
     const float cx = sb.getCentreX();
@@ -202,5 +225,18 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
         g.setColour(modCol.withAlpha(0.85f));
         g.strokePath(arc, juce::PathStrokeType(1.5f, juce::PathStrokeType::curved,
                                                      juce::PathStrokeType::rounded));
+    }
+
+    // #246: GR arc — orange arc sweeping from the max end (5 o'clock) backward
+    // proportional to current gain reduction. 1.0 = 24 dB GR = full arc.
+    if (grDisplay > 0.005f)
+    {
+        const float grArcStart = endAngle - grDisplay * (endAngle - startAngle);
+        juce::Path grArc;
+        grArc.addCentredArc(cx, cy, radius + 4.0f, radius + 4.0f, 0.0f,
+                            grArcStart, endAngle, true);
+        g.setColour(juce::Colour(0xffff6633).withAlpha(0.85f));
+        g.strokePath(grArc, juce::PathStrokeType(2.5f, juce::PathStrokeType::curved,
+                                                       juce::PathStrokeType::rounded));
     }
 }

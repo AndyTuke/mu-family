@@ -56,7 +56,10 @@ private:
     juce::ADSR  pitchEnv;
     MultiModeFilter voiceFilter;             // owns SVF / Ladder / 1-pole / biquad / comb state
     juce::AudioBuffer<float> tempBuffer;
-    InsertProcessor insertProc;
+
+public:
+    InsertProcessor insertProc;  // #246: exposed so VoiceSection can read grReduction for the GR meter
+private:
 
     // #220: per-sample pitch ratio buffer feeding SamplePlayer. Filled each block
     // from the pitch envelope (sample-accurate) + base semitones + smoothed pitchMod.
