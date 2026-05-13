@@ -82,6 +82,8 @@ All code changes must be logged as backlog entries to maintain a complete develo
 
 | Stage | Status | Scope | Issues |
 |---|---|---|---|
+| 32 | 🔴 Open | **Mixer Responsive Layout** — horizontal channel-width scaling with window width; vertical send/pan/fader proportionality within each strip; FX area height proportional to window; FX row knob widths fill available space. Design: see [docs/design-ui.md](docs/design-ui.md) Mixer section. | #255, #256, #257 |
+| 33 | 🔴 Open | **Plugin Family Architecture (mu-core)** — CMake `mu-core` STATIC library extracting shared audio/FX/modulation/UI; `Rhythm` → `VoiceSlot` base generalisation; `ProcessorBase` shared processor skeleton; `MuClidLookAndFeel` → `MuLookAndFeel` rename. Enables mu-tant and future μ-family plugins to share the voice/modulation/mixer stack without code duplication. Design: [docs/design-plugin-family.md](docs/design-plugin-family.md). | #258, #259, #260, #261 |
 
 
 ## Source layout (actual, as built)
