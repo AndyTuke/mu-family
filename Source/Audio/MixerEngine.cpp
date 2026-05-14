@@ -5,22 +5,25 @@
 
 MixerEngine::MixerEngine()
 {
-    for (auto& p : channelPeaks) p.set(0.0f);
-    for (auto& p : returnPeaks)  p.set(0.0f);
+    for (auto& p : channelPeaks)       p.set(0.0f);
+    for (auto& p : returnPeaks)        p.set(0.0f);
     masterPeak.set(0.0f);
-    for (auto& g : sidechainGR)  g.set(0.0f);
+    for (auto& g : sidechainGR)        g.set(0.0f);
+    for (auto& g : returnSidechainGR)  g.set(0.0f);
 }
 
 void MixerEngine::prepare(double sr, int blockSize)
 {
     sampleRate = sr;
-    for (auto& e : scEnv) e = 0.0f;
+    for (auto& e : scEnv)    e = 0.0f;
+    for (auto& e : scRetEnv) e = 0.0f;
     for (auto& buf : channelBufs)
         buf.setSize(2, blockSize, false, true, true);
     effectSendBuf.setSize(2, blockSize, false, true, true);
     delaySendBuf .setSize(2, blockSize, false, true, true);
     reverbSendBuf.setSize(2, blockSize, false, true, true);
     masterInsert.prepare(sr, blockSize);
+    masterInsert2.prepare(sr, blockSize);
 }
 
 bool MixerEngine::hasSolo(int numActive) const
@@ -204,10 +207,62 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
             fxReturnsOut->addFrom(c, 0, src, c, 0, numSamples);
     };
 
-    if (doEffect)
+    // Apply sidechain ducking to FX return channels (triggered by rhythm channel audio).
+    for (int ri = 0; ri < 3; ++ri)
+    {
+        const auto& ret = returns[ri];
+        const int src = ret.sidechainSource;
+        if (src < 0 || src >= numActiveRhythms || ret.sidechainAmount <= 0.0f)
+        {
+            returnSidechainGR[ri].set(0.0f);
+            continue;
+        }
+
+        const float sr_f = (float)sampleRate;
+        const float atk  = (ret.sidechainAttackMs > 0.0f)
+                         ? std::exp(-1.0f / (ret.sidechainAttackMs  * 0.001f * sr_f)) : 0.0f;
+        const float rel  = (ret.sidechainReleaseMs > 0.0f)
+                         ? std::exp(-1.0f / (ret.sidechainReleaseMs * 0.001f * sr_f)) : 0.0f;
+
+        auto& retBuf = (ri == 0) ? effectSendBuf
+                     : (ri == 1) ? delaySendBuf
+                                 : reverbSendBuf;
+
+        const float* srcL = channelBufs[src].getReadPointer(0);
+        const float* srcR = channelBufs[src].getNumChannels() > 1
+                          ? channelBufs[src].getReadPointer(1) : srcL;
+        float* tgtL = retBuf.getWritePointer(0);
+        float* tgtR = retBuf.getNumChannels() > 1 ? retBuf.getWritePointer(1) : nullptr;
+
+        constexpr float kScThreshold = 0.001f;
+        const bool sourceActive = !channels[src].mute && !(anySolo && !channels[src].solo);
+        float peakGR = 0.0f;
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const float srcLvl = sourceActive
+                               ? juce::jmax(std::abs(srcL[i]), std::abs(srcR[i]))
+                               : 0.0f;
+            const float target = (srcLvl > kScThreshold) ? 1.0f : 0.0f;
+            scRetEnv[ri] = (target > scRetEnv[ri])
+                         ? atk * scRetEnv[ri] + (1.0f - atk) * target
+                         : rel * scRetEnv[ri] + (1.0f - rel) * target;
+            const float gain = 1.0f - ret.sidechainAmount * scRetEnv[ri];
+            peakGR = juce::jmax(peakGR, ret.sidechainAmount * scRetEnv[ri]);
+            tgtL[i] *= gain;
+            if (tgtR) tgtR[i] *= gain;
+        }
+        returnSidechainGR[ri].set(peakGR);
+    }
+
+    const bool anyReturnSolo = returns[0].solo || returns[1].solo || returns[2].solo;
+
+    // Re-check after processSends: echo feedback may have produced output even with no
+    // channel send signal this block, so we cannot use the pre-processing doEffect flag.
+    const float rawEffPeak = peakOf(effectSendBuf, numSamples);
+    if (rawEffPeak > 1e-9f)
     {
         applyPanGain(effectSendBuf, returns[0].level, returns[0].pan, numSamples);
-        if (!returns[0].mute)
+        if (!returns[0].mute && !(anyReturnSolo && !returns[0].solo))
         {
             returnPeaks[0].set(peakOf(effectSendBuf, numSamples));
             for (int c = 0; c < numOutCh; ++c)
@@ -222,7 +277,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     if (rawDelayPeak > 1e-9f)
     {
         applyPanGain(delaySendBuf, returns[1].level, returns[1].pan, numSamples);
-        if (!returns[1].mute)
+        if (!returns[1].mute && !(anyReturnSolo && !returns[1].solo))
         {
             returnPeaks[1].set(peakOf(delaySendBuf, numSamples));
             for (int c = 0; c < numOutCh; ++c)
@@ -238,7 +293,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     if (hasSignal(reverbSendBuf, numSamples))
     {
         applyPanGain(reverbSendBuf, returns[2].level, returns[2].pan, numSamples);
-        if (!returns[2].mute)
+        if (!returns[2].mute && !(anyReturnSolo && !returns[2].solo))
         {
             returnPeaks[2].set(peakOf(reverbSendBuf, numSamples));
             for (int c = 0; c < numOutCh; ++c)
@@ -253,6 +308,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     applyPanGain(output, masterLevel, masterPan, numSamples);
     masterPeak.set(peakOf(output, numSamples));
 
-    // Master insert — post-fader, post-metering, so the VU always shows pre-insert level.
+    // Master inserts — post-fader, post-metering, chained Insert 1 → Insert 2.
     masterInsert.process(output, numSamples, output.getNumChannels(), masterInsertParams);
+    masterInsert2.process(output, numSamples, output.getNumChannels(), masterInsertParams2);
 }

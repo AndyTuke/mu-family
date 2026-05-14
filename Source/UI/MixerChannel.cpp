@@ -27,7 +27,7 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
     fader.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     addAndMakeVisible(fader);
     addAndMakeVisible(vuMeter);
-    if (hasSidechain())
+    if (hasSidechainControls())
         addAndMakeVisible(grMeter);
 
     panKnob.setRange(-1.0, 1.0, 0.01);
@@ -63,7 +63,7 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
         addAndMakeVisible(soloBtn);
     }
 
-    if (hasSidechain())
+    if (hasOutputBus())
     {
         // #238: descriptive labels — "Main" + "Out 1" … "Out 8".
         outBusBox.addItem("Main", 1);              // 0 -> Master
@@ -71,7 +71,10 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
             outBusBox.addItem("Out " + juce::String(i), i + 1);
         outBusBox.setSelectedId(1, juce::dontSendNotification);
         addAndMakeVisible(outBusBox);
+    }
 
+    if (hasSidechainControls())
+    {
         scSourceBox.addItem(juce::String::charToString(0x2014), 1); // "—"
         scSourceBox.setSelectedId(1, juce::dontSendNotification);
         addAndMakeVisible(scSourceBox);
@@ -98,39 +101,57 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
 
     if (hasInsert())
     {
-        insCharBox.addItem("None",       1);
-        insCharBox.addItem("3-Band EQ",  7);
-        insCharBox.addItem("Bitcrusher", 5);
-        insCharBox.addItem("Clipper",    6);
-        insCharBox.addItem("Compressor", 8);
-        insCharBox.addItem("Fold",       4);
-        insCharBox.addItem("Hard Clip",  3);
-        insCharBox.addItem("Limiter",    9);
-        insCharBox.addItem("Ring Mod",  10);
-        insCharBox.addItem("Soft Clip",  2);
-        insCharBox.addItem("Tape Sat",  11);
-        insCharBox.setSelectedId(1, juce::dontSendNotification);
+        auto addInsertCombo = [](juce::ComboBox& box) {
+            box.addItem("None",       1);
+            box.addItem("3-Band EQ",  7);
+            box.addItem("Bitcrusher", 5);
+            box.addItem("Clipper",    6);
+            box.addItem("Compressor", 8);
+            box.addItem("Fold",       4);
+            box.addItem("Hard Clip",  3);
+            box.addItem("Limiter",    9);
+            box.addItem("Ring Mod",  10);
+            box.addItem("Soft Clip",  2);
+            box.addItem("Tape Sat",  11);
+            box.setSelectedId(1, juce::dontSendNotification);
+        };
+        addInsertCombo(insCharBox);
+        addInsertCombo(insCharBox2);
         addAndMakeVisible(insCharBox);
+        addAndMakeVisible(insCharBox2);
 
         auto noVal = [](double) { return juce::String(); };
-        insDrive .setRange(0.0, 100.0, 0.1);   insDrive .setValue(0.0);
-        insOutput.setRange(-24.0, 0.0, 0.1);   insOutput.setValue(0.0);
-        insTone  .setRange(20.0, 20000.0, 1.0); insTone  .setValue(20000.0);
-        insTone  .getSlider().setSkewFactorFromMidPoint(640.0);   // #216b: log feel default for full-range modes
-        insDrive .getSlider().textFromValueFunction = noVal;
-        insOutput.getSlider().textFromValueFunction = noVal;
-        insTone  .getSlider().textFromValueFunction = noVal;
-        addAndMakeVisible(insDrive);
-        addAndMakeVisible(insOutput);
-        addAndMakeVisible(insTone);
-
-        // #248: 4th knob — EQ mid frequency, only visible in EQ mode
-        insExtra.setRange(200.0, 8000.0, 1.0);
-        insExtra.getSlider().setSkewFactorFromMidPoint(1000.0);
-        insExtra.setValue(1000.0);
-        insExtra.getSlider().textFromValueFunction = noVal;
-        insExtra.setVisible(false);
-        addAndMakeVisible(insExtra);
+        for (auto* k : { &insDrive, &insDrive2 })
+        {
+            k->setRange(0.0, 100.0, 0.1);
+            k->setValue(0.0);
+            k->getSlider().textFromValueFunction = noVal;
+            addAndMakeVisible(*k);
+        }
+        for (auto* k : { &insOutput, &insOutput2 })
+        {
+            k->setRange(-24.0, 0.0, 0.1);
+            k->setValue(0.0);
+            k->getSlider().textFromValueFunction = noVal;
+            addAndMakeVisible(*k);
+        }
+        for (auto* k : { &insTone, &insTone2 })
+        {
+            k->setRange(20.0, 20000.0, 1.0);
+            k->setValue(20000.0);
+            k->getSlider().setSkewFactorFromMidPoint(640.0);   // #289
+            k->getSlider().textFromValueFunction = noVal;
+            addAndMakeVisible(*k);
+        }
+        for (auto* k : { &insExtra, &insExtra2 })
+        {
+            k->setRange(200.0, 8000.0, 1.0);
+            k->getSlider().setSkewFactorFromMidPoint(1000.0);
+            k->setValue(1000.0);
+            k->getSlider().textFromValueFunction = noVal;
+            k->setVisible(false);
+            addAndMakeVisible(*k);
+        }
     }
 }
 
@@ -179,8 +200,7 @@ void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, juce::Atomic<flo
             if (auto* p = proc->apvts.getParameter(prefix + "solo"))
                 p->setValueNotifyingHost(soloBtn.getToggleState() ? 1.0f : 0.0f);
         };
-        // Sidechain controls write through APVTS
-        if (hasSidechain())
+        if (hasOutputBus())
         {
             outBusBox.setSelectedId(state.outputBus + 1, juce::dontSendNotification);
             outBusBox.onChange = [proc, prefix, this] {
@@ -188,7 +208,10 @@ void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, juce::Atomic<flo
                 if (auto* p = proc->apvts.getParameter(prefix + "outBus"))
                     p->setValueNotifyingHost(p->convertTo0to1((float)(id - 1)));
             };
-
+        }
+        // Sidechain controls write through APVTS
+        if (hasSidechainControls())
+        {
             scSourceBox.onChange = [proc, prefix, this] {
                 int id = scSourceBox.getSelectedId();   // 1=none, 2-9=ch0-ch7
                 int apvtsVal = (id <= 1) ? 0 : (id - 1);
@@ -221,13 +244,15 @@ void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, juce::Atomic<flo
         sendReverb.onValueChanged = [&state](double v) { state.sendReverb = (float)v; };
         muteBtn.onClick = [&state, this] { state.mute = muteBtn.getToggleState(); };
         soloBtn.onClick = [&state, this] { state.solo = soloBtn.getToggleState(); };
-        if (hasSidechain())
+        if (hasOutputBus())
         {
             outBusBox.setSelectedId(state.outputBus + 1, juce::dontSendNotification);
-            outBusBox.onChange    = [&state, this] {
+            outBusBox.onChange = [&state, this] {
                 state.outputBus = juce::jlimit(0, 8, outBusBox.getSelectedId() - 1);
             };
-
+        }
+        if (hasSidechainControls())
+        {
             scSourceBox.onChange    = [&state, this] {
                 int id = scSourceBox.getSelectedId();
                 state.sidechainSource = (id <= 1) ? -1 : (id - 2);
@@ -245,12 +270,20 @@ void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, juce::Atomic<flo
 }
 
 void MixerChannel::bindReturn(MixerEngine::ReturnState& state, juce::Atomic<float>& peak,
-                               PluginProcessor* proc, const juce::String& prefix)
+                               PluginProcessor* proc, const juce::String& prefix,
+                               juce::Atomic<float>* grAtomic)
 {
     fader.setValue(state.level, juce::dontSendNotification);
     panKnob.setValue(state.pan, juce::dontSendNotification);
     muteBtn.setToggleState(state.mute, juce::dontSendNotification);
     soloBtn.setToggleState(state.solo, juce::dontSendNotification);
+
+    if (hasSidechainControls())
+    {
+        scAmount.setValue(state.sidechainAmount * 100.0, juce::dontSendNotification);
+        scAttack.setValue(state.sidechainAttackMs,       juce::dontSendNotification);
+        scRelease.setValue(state.sidechainReleaseMs,     juce::dontSendNotification);
+    }
 
     if (proc)
     {
@@ -272,6 +305,27 @@ void MixerChannel::bindReturn(MixerEngine::ReturnState& state, juce::Atomic<floa
             if (auto* p = proc->apvts.getParameter(prefix + "solo"))
                 p->setValueNotifyingHost(soloBtn.getToggleState() ? 1.0f : 0.0f);
         };
+        if (hasSidechainControls())
+        {
+            scSourceBox.onChange = [proc, prefix, this] {
+                int id = scSourceBox.getSelectedId();   // 1=none, 2-9=ch0-ch7
+                int apvtsVal = (id <= 1) ? 0 : (id - 1);
+                if (auto* p = proc->apvts.getParameter(prefix + "scSrc"))
+                    p->setValueNotifyingHost(p->convertTo0to1((float)apvtsVal));
+            };
+            scAmount.onValueChanged = [proc, prefix](double v) {
+                if (auto* p = proc->apvts.getParameter(prefix + "scAmt"))
+                    p->setValueNotifyingHost(p->convertTo0to1((float)v / 100.0f));
+            };
+            scAttack.onValueChanged = [proc, prefix](double v) {
+                if (auto* p = proc->apvts.getParameter(prefix + "scAtk"))
+                    p->setValueNotifyingHost(p->convertTo0to1((float)v));
+            };
+            scRelease.onValueChanged = [proc, prefix](double v) {
+                if (auto* p = proc->apvts.getParameter(prefix + "scRel"))
+                    p->setValueNotifyingHost(p->convertTo0to1((float)v));
+            };
+        }
     }
     else
     {
@@ -282,9 +336,21 @@ void MixerChannel::bindReturn(MixerEngine::ReturnState& state, juce::Atomic<floa
         panKnob.onValueChanged = [&state](double v) { state.pan  = (float)v; };
         muteBtn.onClick = [&state, this] { state.mute = muteBtn.getToggleState(); };
         soloBtn.onClick = [&state, this] { state.solo = soloBtn.getToggleState(); };
+        if (hasSidechainControls())
+        {
+            scSourceBox.onChange    = [&state, this] {
+                int id = scSourceBox.getSelectedId();
+                state.sidechainSource = (id <= 1) ? -1 : (id - 2);
+            };
+            scAmount.onValueChanged  = [&state](double v) { state.sidechainAmount   = (float)v / 100.0f; };
+            scAttack.onValueChanged  = [&state](double v) { state.sidechainAttackMs  = (float)v; };
+            scRelease.onValueChanged = [&state](double v) { state.sidechainReleaseMs = (float)v; };
+        }
     }
 
     vuMeter.getLevel = [&peak] { return peak.get(); };
+    if (grAtomic)
+        grMeter.getGR = [grAtomic] { return grAtomic->get(); };
     updateDbLabel(state.level);
 }
 
@@ -321,52 +387,70 @@ void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
 
     if (hasInsert())
     {
-        // Restore UI from engine state
-        const auto& ip = engine.masterInsertParams;
-        insCharBox.setSelectedId(ip.driveChar + 1, juce::dontSendNotification);
-        configureInsertAlgorithm(ip.driveChar, proc);
-
-        insCharBox.onChange = [this, proc]()
+        auto wireInsertSlot = [this, &engine, proc](int slot)
         {
-            const int newChar = insCharBox.getSelectedId() - 1;
-            if (proc)
+            const VoiceParams& ip = slot == 0 ? engine.masterInsertParams
+                                              : engine.masterInsertParams2;
+            juce::ComboBox& charBox = slot == 0 ? insCharBox : insCharBox2;
+            InsertAlgoSnapshot* snaps      = slot == 0 ? insertSnapshots  : insertSnapshots2;
+            bool*               snapValid  = slot == 0 ? insertSnapshotValid : insertSnapshotValid2;
+            const juce::String  pDrv  = slot == 0 ? "mst_insDrv"  : "mst_ins2Drv";
+            const juce::String  pOut  = slot == 0 ? "mst_insOut"   : "mst_ins2Out";
+            const juce::String  pDit  = slot == 0 ? "mst_insDit"   : "mst_ins2Dit";
+            const juce::String  pTon  = slot == 0 ? "mst_insTon"   : "mst_ins2Ton";
+            const juce::String  pMid  = slot == 0 ? "mst_insMid"   : "mst_ins2Mid";
+            const juce::String  pBit  = slot == 0 ? "mst_insBits"  : "mst_ins2Bits";
+            const juce::String  pRte  = slot == 0 ? "mst_insRate"  : "mst_ins2Rate";
+
+            charBox.setSelectedId(ip.driveChar + 1, juce::dontSendNotification);
+            configureInsertAlgorithm(ip.driveChar, slot, proc);
+
+            charBox.onChange = [this, proc, slot, snaps, snapValid,
+                                pDrv, pOut, pDit, pTon, pMid, pBit, pRte]()
             {
-                const int oldChar = proc->mixerEngine.masterInsertParams.driveChar;
-                auto set = [proc](const juce::String& id, float v)
+                juce::ComboBox& cb = slot == 0 ? insCharBox : insCharBox2;
+                const int newChar = cb.getSelectedId() - 1;
+                if (proc)
                 {
-                    if (auto* p = proc->apvts.getParameter(id))
-                        p->setValueNotifyingHost(p->convertTo0to1(v));
-                };
+                    const VoiceParams& cur = slot == 0 ? proc->mixerEngine.masterInsertParams
+                                                       : proc->mixerEngine.masterInsertParams2;
+                    const int oldChar = cur.driveChar;
+                    auto set = [proc](const juce::String& id, float v)
+                    {
+                        if (auto* p = proc->apvts.getParameter(id))
+                            p->setValueNotifyingHost(p->convertTo0to1(v));
+                    };
 
-                // Save the outgoing algorithm's current params into its snapshot.
-                if (oldChar >= 0 && oldChar <= 10)
-                {
-                    const auto& ip      = proc->mixerEngine.masterInsertParams;
-                    auto&       snap    = insertSnapshots[oldChar];
-                    snap.driveDrive     = ip.driveDrive;
-                    snap.driveOutput    = ip.driveOutput;
-                    snap.drvDither      = ip.drvDither;
-                    snap.driveTone      = ip.driveTone;
-                    snap.eqMidGain      = ip.eqMidGain;
-                    snap.drvBits        = ip.drvBits;
-                    snap.driveRate      = ip.driveRate;
-                    insertSnapshotValid[oldChar] = true;
+                    if (oldChar >= 0 && oldChar <= 10)
+                    {
+                        auto& snap       = snaps[oldChar];
+                        snap.driveDrive  = cur.driveDrive;
+                        snap.driveOutput = cur.driveOutput;
+                        snap.drvDither   = cur.drvDither;
+                        snap.driveTone   = cur.driveTone;
+                        snap.eqMidGain   = cur.eqMidGain;
+                        snap.drvBits     = cur.drvBits;
+                        snap.driveRate   = cur.driveRate;
+                        snapValid[oldChar] = true;
+                    }
+
+                    const InsertAlgoSnapshot& snap = snapValid[newChar]
+                                                     ? snaps[newChar]
+                                                     : kInsertDefaults[newChar];
+                    set(pDrv, snap.driveDrive);
+                    set(pOut, snap.driveOutput);
+                    set(pDit, snap.drvDither);
+                    set(pTon, snap.driveTone);
+                    set(pMid, snap.eqMidGain);
+                    set(pBit, snap.drvBits);
+                    set(pRte, snap.driveRate);
                 }
-
-                // Restore the incoming algorithm from its saved snapshot, or first-visit defaults.
-                const InsertAlgoSnapshot& snap = insertSnapshotValid[newChar]
-                                                 ? insertSnapshots[newChar]
-                                                 : kInsertDefaults[newChar];
-                set("mst_insDrv",  snap.driveDrive);
-                set("mst_insOut",  snap.driveOutput);
-                set("mst_insDit",  snap.drvDither);
-                set("mst_insTon",  snap.driveTone);
-                set("mst_insMid",  snap.eqMidGain);
-                set("mst_insBits", snap.drvBits);
-                set("mst_insRate", snap.driveRate);
-            }
-            configureInsertAlgorithm(newChar, proc);
+                configureInsertAlgorithm(newChar, slot, proc);
+            };
         };
+
+        wireInsertSlot(0);
+        wireInsertSlot(1);
     }
 }
 
@@ -397,7 +481,7 @@ void MixerChannel::bindReturnSends(juce::AudioProcessorValueTreeState& apvts,
 //==============================================================================
 void MixerChannel::setSidechainSources(int ownIdx, const juce::StringArray& names)
 {
-    if (!hasSidechain()) return;
+    if (!hasSidechainControls()) return;
     const int prevId = scSourceBox.getSelectedId();
     scSourceBox.clear(juce::dontSendNotification);
     scSourceBox.addItem(juce::String::charToString(0x2014), 1);  // "—"
@@ -434,7 +518,13 @@ void MixerChannel::loadFromAPVTS(juce::AudioProcessorValueTreeState& apvts,
         {
             const int charId = juce::jlimit(0, 10, juce::roundToInt((float)*p));
             insCharBox.setSelectedId(charId + 1, juce::dontSendNotification);
-            configureInsertAlgorithm(charId, nullptr);
+            configureInsertAlgorithm(charId, 0, nullptr);
+        }
+        if (auto* p = apvts.getRawParameterValue("mst_ins2Char"))
+        {
+            const int charId = juce::jlimit(0, 10, juce::roundToInt((float)*p));
+            insCharBox2.setSelectedId(charId + 1, juce::dontSendNotification);
+            configureInsertAlgorithm(charId, 1, nullptr);
         }
         return;
     }
@@ -463,11 +553,14 @@ void MixerChannel::loadFromAPVTS(juce::AudioProcessorValueTreeState& apvts,
         if (auto* p = apvts.getRawParameterValue(prefix + "solo"))
             soloBtn.setToggleState(*p > 0.5f, juce::dontSendNotification);
     }
-    if (hasSidechain())
+    if (hasOutputBus())
     {
         if (auto* p = apvts.getRawParameterValue(prefix + "outBus"))
             outBusBox.setSelectedId(juce::jlimit(0, 8, juce::roundToInt((float) *p)) + 1,
                                     juce::dontSendNotification);
+    }
+    if (hasSidechainControls())
+    {
         if (auto* p = apvts.getRawParameterValue(prefix + "scSrc"))
         {
             int apvtsVal = juce::roundToInt((float)*p);
@@ -503,11 +596,11 @@ void MixerChannel::resized()
 
     const int nameBottom = kColourBarH + kNameH;   // y=25
 
-    // ── Sidechain section (Rhythm): ~20% of strip height, min = kSidechainH ──
-    const int scH = hasSidechain()
+    // ── Sidechain section (Rhythm + Returns): ~20% of strip height, min = kSidechainH ──
+    const int scH = hasSidechainControls()
         ? juce::jmax(kSidechainH, juce::roundToInt(h * 0.20f))
         : 0;
-    if (hasSidechain())
+    if (hasSidechainControls())
     {
         const int scRemain  = scH - kScSrcH;
         const int scAmtH_l  = juce::jmax(kScAmtH, juce::roundToInt(scRemain * 0.55f));
@@ -533,10 +626,9 @@ void MixerChannel::resized()
     const int panH   = spH - 3 * sendH;
     const int faderY = sendY + spH;
 
-    sendEffect.setVisible(channelType == Type::Rhythm);
-    sendDelay .setVisible(channelType == Type::Rhythm || channelType == Type::EffectReturn);
-    sendReverb.setVisible(channelType == Type::Rhythm || channelType == Type::EffectReturn
-                          || channelType == Type::DelayReturn);
+    sendEffect.setVisible(hasSends() && channelType == Type::Rhythm);
+    sendDelay .setVisible(hasSends() && channelType != Type::ReverbReturn);
+    sendReverb.setVisible(hasSends());
 
     sendEffect.setBounds(0, sendY,             stripW, sendH);
     sendDelay .setBounds(0, sendY + sendH,     stripW, sendH);
@@ -559,17 +651,17 @@ void MixerChannel::resized()
     const int muteY   = hasMuteSolo() ? h - kButtonH : h;
     const int dbY     = muteY - kDbH;
     // outBus sits just above the dB label on Rhythm channels.
-    const int busY    = hasSidechain() ? dbY - kOutBusH : dbY;
-    const int faderEnd = hasSidechain() ? busY - 2 : dbY - 2;
+    const int busY    = hasOutputBus() ? dbY - kOutBusH : dbY;
+    const int faderEnd = hasOutputBus() ? busY - 2 : dbY - 2;
     const int faderH  = juce::jmax(40, faderEnd - faderY);
 
-    const int grW = hasSidechain() ? kGRW : 0;
+    const int grW = hasSidechainControls() ? kGRW : 0;
     fader.setBounds  (0,                        faderY, stripW - kVUW - grW, faderH);
-    if (hasSidechain())
+    if (hasSidechainControls())
         grMeter.setBounds(stripW - kVUW - grW,  faderY, grW,                 faderH);
     vuMeter.setBounds(stripW - kVUW,            faderY, kVUW,                faderH);
 
-    if (hasSidechain())
+    if (hasOutputBus())
         outBusBox.setBounds(0, busY, stripW, kOutBusH);
 
     dbLabel.setBounds(0, dbY, stripW, kDbH);
@@ -583,71 +675,97 @@ void MixerChannel::resized()
 
     faderPaneBounds = { 1, faderY - 2, stripW - 2, h - faderY + 1 };
 
-    // ── Insert panel (Master channel, right of strip) ─────────────────────────
+    // ── Insert panels (Master channel, right of strip) — two slots stacked top/bottom ─
     if (hasInsert())
     {
-        const int pad  = 4;
-        const int ipX  = stripW + pad;
-        const int ipW  = insW - 2 * pad;
-        const int topY = nameBottom + pad;
+        const int pad    = 4;
+        const int ipX    = stripW + pad;
+        const int ipW    = insW - 2 * pad;
+        const int insTop = nameBottom;
+        const int insH   = h - insTop - pad;
+        const int halfH  = insH / 2;
+        insertMidY = insTop + halfH;
 
-        insCharBox.setBounds(ipX, topY, ipW, kInsCharH);
-        const int ky = topY + kInsCharH + 2;
+        // Both slots reserve kNameH for their own label, giving equal knob space.
+        const int slot1CharY = insTop + kNameH + pad;
+        const int slot2CharY = insertMidY + kNameH + pad;
 
-        // EQ mode: single column, top→bottom: High, Mid Gain, Mid Hz, Low.
-        if (insCharBox.getSelectedId() == 7)
+        auto layoutSlot = [&](int charBoxY, int endY,
+                               juce::ComboBox& charBox,
+                               KnobWithLabel& drv, KnobWithLabel& out,
+                               KnobWithLabel& ton, KnobWithLabel& ext)
         {
-            const int availH = h - ky - pad;
-            const int rowH   = juce::jmin(60, availH / 4);
-            KnobWithLabel* const eqOrder[] = { &insTone, &insOutput, &insExtra, &insDrive };
-            for (int i = 0; i < 4; ++i)
-                eqOrder[i]->setBounds(ipX, ky + i * rowH, ipW, rowH);
-        }
-        else
-        {
-            // 2-column flow grid for all other algorithms.
-            // Odd last knob spans full width so nothing sits alone on the right.
-            KnobWithLabel* vis[4];
-            int nVis = 0;
-            KnobWithLabel* const knobs[] = { &insDrive, &insOutput, &insTone, &insExtra };
-            for (auto* k : knobs)
-                if (k->isVisible()) vis[nVis++] = k;
+            charBox.setBounds(ipX, charBoxY, ipW, kInsCharH);
+            const int ky      = charBoxY + kInsCharH + 2;
+            const int availH  = endY - ky - 2;
 
-            if (nVis > 0)
+            if (charBox.getSelectedId() == 7) // EQ: single column High/Mid/MidHz/Low
             {
-                const int nRows  = (nVis + 1) / 2;
-                const int availH = h - ky - pad;
-                const int rowH   = juce::jmin(60, availH / nRows);
-                const int halfW  = ipW / 2;
+                const int rowH = juce::jmin(60, availH / 4);
+                KnobWithLabel* const eqOrder[] = { &ton, &out, &ext, &drv };
+                for (int i = 0; i < 4; ++i)
+                    eqOrder[i]->setBounds(ipX, ky + i * rowH, ipW, rowH);
+            }
+            else
+            {
+                KnobWithLabel* vis[4];
+                int nVis = 0;
+                KnobWithLabel* const knobs[] = { &drv, &out, &ton, &ext };
+                for (auto* k : knobs)
+                    if (k->isVisible()) vis[nVis++] = k;
 
-                for (int i = 0; i < nVis; ++i)
+                if (nVis > 0)
                 {
-                    const bool isLastOdd = (i == nVis - 1) && (nVis % 2 == 1);
-                    const int kw = isLastOdd ? ipW : halfW;
-                    const int kx = ipX + (i % 2) * halfW;
-                    vis[i]->setBounds(kx, ky + (i / 2) * rowH, kw, rowH);
+                    const int nRows = (nVis + 1) / 2;
+                    const int rowH  = juce::jmin(60, availH / nRows);
+                    const int halfW = ipW / 2;
+
+                    for (int i = 0; i < nVis; ++i)
+                    {
+                        const bool isLastOdd = (i == nVis - 1) && (nVis % 2 == 1);
+                        const int kw = isLastOdd ? ipW : halfW;
+                        const int kx = ipX + (i % 2) * halfW;
+                        vis[i]->setBounds(kx, ky + (i / 2) * rowH, kw, rowH);
+                    }
                 }
             }
-        }
+        };
+
+        layoutSlot(slot1CharY, insertMidY,  insCharBox,  insDrive,  insOutput,  insTone,  insExtra);
+        layoutSlot(slot2CharY, h - pad,     insCharBox2, insDrive2, insOutput2, insTone2, insExtra2);
     }
 }
 
-void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
+void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcessor* proc)
 {
     if (!hasInsert()) return;
 
+    KnobWithLabel& drive  = slot == 0 ? insDrive  : insDrive2;
+    KnobWithLabel& output = slot == 0 ? insOutput : insOutput2;
+    KnobWithLabel& tone   = slot == 0 ? insTone   : insTone2;
+    KnobWithLabel& extra  = slot == 0 ? insExtra  : insExtra2;
+
     // Null callbacks first — prevents spurious APVTS writes during range changes.
-    insDrive .onValueChanged = nullptr;
-    insOutput.onValueChanged = nullptr;
-    insTone  .onValueChanged = nullptr;
-    insExtra .onValueChanged = nullptr;
-    insOutput.setGRSource(nullptr);  // #246: cleared here; comp/limiter cases re-set below
+    drive .onValueChanged = nullptr;
+    output.onValueChanged = nullptr;
+    tone  .onValueChanged = nullptr;
+    extra .onValueChanged = nullptr;
+    output.setGRSource(nullptr);  // #246: cleared here; comp/limiter cases re-set below
 
     // #243: the lambda must keep working after this method is re-invoked from
     // loadFromAPVTS with proc=nullptr (the dropdown char value comes from APVTS,
     // so we don't want to write back — but the knob callbacks still need a live
     // proc handle for the user to actually drive the engine).
     PluginProcessor* const knobProc = masterInsertProc;
+    const juce::String pDrv  = slot == 0 ? "mst_insDrv"  : "mst_ins2Drv";
+    const juce::String pOut  = slot == 0 ? "mst_insOut"   : "mst_ins2Out";
+    const juce::String pDit  = slot == 0 ? "mst_insDit"   : "mst_ins2Dit";
+    const juce::String pTon  = slot == 0 ? "mst_insTon"   : "mst_ins2Ton";
+    const juce::String pMid  = slot == 0 ? "mst_insMid"   : "mst_ins2Mid";
+    const juce::String pBit  = slot == 0 ? "mst_insBits"  : "mst_ins2Bits";
+    const juce::String pRte  = slot == 0 ? "mst_insRate"  : "mst_ins2Rate";
+    const juce::String pChar = slot == 0 ? "mst_insChar"  : "mst_ins2Char";
+
     auto setParam = [knobProc](const juce::String& id, double v)
     {
         if (!knobProc) return;
@@ -655,98 +773,97 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
             p->setValueNotifyingHost(p->convertTo0to1((float)v));
     };
 
-    const VoiceParams& ip = masterInsertProc ? masterInsertProc->mixerEngine.masterInsertParams : VoiceParams{};
+    const VoiceParams& ip = masterInsertProc
+        ? (slot == 0 ? masterInsertProc->mixerEngine.masterInsertParams
+                     : masterInsertProc->mixerEngine.masterInsertParams2)
+        : VoiceParams{};
 
     switch (charId)
     {
         case 0: // None — hide all knobs
-            insDrive .setVisible(false);
-            insOutput.setVisible(false);
-            insTone  .setVisible(false);
-            insExtra .setVisible(false);
-            if (proc) setParam("mst_insChar", 0);
+            drive .setVisible(false);
+            output.setVisible(false);
+            tone  .setVisible(false);
+            extra .setVisible(false);
+            if (proc) setParam(pChar, 0);
             break;
 
         case 1: case 2: case 3: // Soft Clip / Hard Clip / Fold
         case 5:                  // Clipper — same Drive/Output/LPF layout
-            insDrive .setLabel(charId == 5 ? "Threshold" : "Drive");
-            insDrive .setRange(0.0, 100.0, 0.1);
-            // #245: cases 1/2/3 display 0..100 as 0..40 dB input gain (matches
-            // InsertProcessor's `preGain = pow(10, drvDrv/100 * 2)`). Clipper's
-            // Threshold (case 5) uses a different formula and keeps raw display
-            // for now (covered by a follow-up).
+            drive .setLabel(charId == 5 ? "Threshold" : "Drive");
+            drive .setRange(0.0, 100.0, 0.1);
             if (charId != 5)
             {
-                insDrive .getSlider().textFromValueFunction = [](double v) -> juce::String {
+                drive .getSlider().textFromValueFunction = [](double v) -> juce::String {
                     return juce::String(v * 0.4, 1) + " dB";
                 };
-                insDrive .getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
+                drive .getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
                     return juce::jlimit(0.0, 100.0, s.retainCharacters("-0123456789.").getDoubleValue() * 2.5);
                 };
             }
             else
             {
-                insDrive .getSlider().textFromValueFunction = nullptr;
-                insDrive .getSlider().valueFromTextFunction = nullptr;
+                drive .getSlider().textFromValueFunction = nullptr;
+                drive .getSlider().valueFromTextFunction = nullptr;
             }
-            insDrive .setValue(ip.driveDrive, juce::dontSendNotification);
-            insDrive .setVisible(true);
+            drive .setValue(ip.driveDrive, juce::dontSendNotification);
+            drive .setVisible(true);
 
-            insOutput.setLabel("Output");
-            insOutput.setRange(-24.0, 0.0, 0.1);
-            insOutput.getSlider().textFromValueFunction = nullptr;
-            insOutput.setValue(ip.driveOutput, juce::dontSendNotification);
-            insOutput.setVisible(true);
+            output.setLabel("Output");
+            output.setRange(-24.0, 0.0, 0.1);
+            output.getSlider().textFromValueFunction = nullptr;
+            output.setValue(ip.driveOutput, juce::dontSendNotification);
+            output.setVisible(true);
 
-            insTone  .setLabel("LPF");
-            insTone  .setRange(20.0, 20000.0, 1.0);
-            insTone  .getSlider().setSkewFactorFromMidPoint(640.0);   // #216b
-            insTone  .getSlider().textFromValueFunction = [](double v) -> juce::String {
+            tone  .setLabel("LPF");
+            tone  .setRange(20.0, 20000.0, 1.0);
+            tone  .getSlider().setSkewFactorFromMidPoint(640.0);   // #289
+            tone  .getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return v >= 1000.0 ? juce::String(v / 1000.0, 2) + "kHz"
                                    : juce::String((int)v) + "Hz";
             };
-            insTone  .setValue(ip.driveTone, juce::dontSendNotification);
-            insTone  .setVisible(true);
+            tone  .setValue(ip.driveTone, juce::dontSendNotification);
+            tone  .setVisible(true);
 
-            insExtra .setVisible(false);
-            insDrive .onValueChanged = [setParam](double v) { setParam("mst_insDrv", v); };
-            insOutput.onValueChanged = [setParam](double v) { setParam("mst_insOut", v); };
-            insTone  .onValueChanged = [setParam](double v) { setParam("mst_insTon", v); };
-            if (proc) setParam("mst_insChar", charId);
+            extra .setVisible(false);
+            drive .onValueChanged = [setParam, pDrv](double v) { setParam(pDrv, v); };
+            output.onValueChanged = [setParam, pOut](double v) { setParam(pOut, v); };
+            tone  .onValueChanged = [setParam, pTon](double v) { setParam(pTon, v); };
+            if (proc) setParam(pChar, charId);
             break;
 
         case 4: // Bitcrusher — Bits / Rate / Dither
-            insDrive .setLabel("Bits");
-            insDrive .setRange(1.0, 16.0, 1.0);
-            insDrive .getSlider().textFromValueFunction = [](double v) -> juce::String {
+            drive .setLabel("Bits");
+            drive .setRange(1.0, 16.0, 1.0);
+            drive .getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return juce::String((int)v) + " bits";
             };
-            insDrive .setValue(ip.drvBits, juce::dontSendNotification);
-            insDrive .setVisible(true);
+            drive .setValue(ip.drvBits, juce::dontSendNotification);
+            drive .setVisible(true);
 
-            insOutput.setLabel("Rate");
-            insOutput.setRange(100.0, 48000.0, 1.0);
-            insOutput.getSlider().setSkewFactorFromMidPoint(2190.0);
-            insOutput.getSlider().textFromValueFunction = [](double v) -> juce::String {
+            output.setLabel("Rate");
+            output.setRange(100.0, 48000.0, 1.0);
+            output.getSlider().setSkewFactorFromMidPoint(2190.0);
+            output.getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return v >= 1000.0 ? juce::String(v / 1000.0, 2) + "kHz"
                                    : juce::String((int)v) + "Hz";
             };
-            insOutput.setValue(ip.driveRate, juce::dontSendNotification);
-            insOutput.setVisible(true);
+            output.setValue(ip.driveRate, juce::dontSendNotification);
+            output.setVisible(true);
 
-            insTone  .setLabel("Dither");
-            insTone  .setRange(0.0, 100.0, 0.1);
-            insTone  .getSlider().textFromValueFunction = [](double v) -> juce::String {
+            tone  .setLabel("Dither");
+            tone  .setRange(0.0, 100.0, 0.1);
+            tone  .getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return juce::String((int)std::round(v)) + "%";
             };
-            insTone  .setValue(ip.drvDither, juce::dontSendNotification);
-            insTone  .setVisible(true);
+            tone  .setValue(ip.drvDither, juce::dontSendNotification);
+            tone  .setVisible(true);
 
-            insExtra .setVisible(false);
-            insDrive .onValueChanged = [setParam](double v) { setParam("mst_insBits", v); };
-            insOutput.onValueChanged = [setParam](double v) { setParam("mst_insRate", v); };
-            insTone  .onValueChanged = [setParam](double v) { setParam("mst_insDit",  v); };
-            if (proc) setParam("mst_insChar", 4);
+            extra .setVisible(false);
+            drive .onValueChanged = [setParam, pBit](double v) { setParam(pBit, v); };
+            output.onValueChanged = [setParam, pRte](double v) { setParam(pRte, v); };
+            tone  .onValueChanged = [setParam, pDit](double v) { setParam(pDit, v); };
+            if (proc) setParam(pChar, 4);
             break;
 
         case 6: // 3-Band EQ — Low / Mid gain / Mid Hz / High (#248: 4 knobs)
@@ -759,144 +876,141 @@ void MixerChannel::configureInsertAlgorithm(int charId, PluginProcessor* proc)
                                    : juce::String((int)v) + "Hz";
             };
 
-            // Reset any log skew left over from prior algorithms so the ±18 dB
-            // EQ knobs centre visually at 0 dB.
-            insDrive .getSlider().setSkewFactor(1.0);
-            insOutput.getSlider().setSkewFactor(1.0);
-            insTone  .getSlider().setSkewFactor(1.0);
+            drive .getSlider().setSkewFactor(1.0);
+            output.getSlider().setSkewFactor(1.0);
+            tone  .getSlider().setSkewFactor(1.0);
 
-            insDrive .setLabel("Low");
-            insDrive .setRange(-18.0, 18.0, 0.1);
-            insDrive .getSlider().textFromValueFunction = dbFmt;
-            insDrive .setValue(ip.driveDrive / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
-            insDrive .setVisible(true);
+            drive .setLabel("Low");
+            drive .setRange(-18.0, 18.0, 0.1);
+            drive .getSlider().textFromValueFunction = dbFmt;
+            drive .setValue(ip.driveDrive / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
+            drive .setVisible(true);
 
-            insOutput.setLabel("Mid");
-            insOutput.setRange(-18.0, 18.0, 0.1);
-            insOutput.getSlider().textFromValueFunction = dbFmt;
-            insOutput.setValue(ip.eqMidGain, juce::dontSendNotification);
-            insOutput.setVisible(true);
+            output.setLabel("Mid");
+            output.setRange(-18.0, 18.0, 0.1);
+            output.getSlider().textFromValueFunction = dbFmt;
+            output.setValue(ip.eqMidGain, juce::dontSendNotification);
+            output.setVisible(true);
 
-            insTone  .setLabel("High");
-            insTone  .setRange(-18.0, 18.0, 0.1);
-            insTone  .getSlider().textFromValueFunction = dbFmt;
-            insTone  .setValue(ip.drvDither / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
-            insTone  .setVisible(true);
+            tone  .setLabel("High");
+            tone  .setRange(-18.0, 18.0, 0.1);
+            tone  .getSlider().textFromValueFunction = dbFmt;
+            tone  .setValue(ip.drvDither / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
+            tone  .setVisible(true);
 
-            // #248: 4th knob — mid band centre frequency (mst_insTon, same field as per-rhythm drvTon)
-            insExtra .setLabel("Mid Hz");
-            insExtra .setRange(200.0, 8000.0, 1.0);
-            insExtra .getSlider().setSkewFactorFromMidPoint(1000.0);
-            insExtra .getSlider().textFromValueFunction = hzFmt;
-            insExtra .setValue(juce::jlimit(200.0, 8000.0, (double)ip.driveTone), juce::dontSendNotification);
-            insExtra .setVisible(true);
+            extra .setLabel("Mid Hz");
+            extra .setRange(200.0, 8000.0, 1.0);
+            extra .getSlider().setSkewFactorFromMidPoint(1000.0);
+            extra .getSlider().textFromValueFunction = hzFmt;
+            extra .setValue(juce::jlimit(200.0, 8000.0, (double)ip.driveTone), juce::dontSendNotification);
+            extra .setVisible(true);
 
-            // Low/high gains stored as 0-100 (50=0 dB); mid gain and mid Hz are direct
-            insDrive .onValueChanged = [setParam](double v) { setParam("mst_insDrv", (v + 18.0) / 36.0 * 100.0); };
-            insOutput.onValueChanged = [setParam](double v) { setParam("mst_insMid", v); };
-            insTone  .onValueChanged = [setParam](double v) { setParam("mst_insDit", (v + 18.0) / 36.0 * 100.0); };
-            insExtra .onValueChanged = [setParam](double v) { setParam("mst_insTon", v); };
-            if (proc) setParam("mst_insChar", 6);
+            drive .onValueChanged = [setParam, pDrv](double v) { setParam(pDrv, (v + 18.0) / 36.0 * 100.0); };
+            output.onValueChanged = [setParam, pMid](double v) { setParam(pMid, v); };
+            tone  .onValueChanged = [setParam, pDit](double v) { setParam(pDit, (v + 18.0) / 36.0 * 100.0); };
+            extra .onValueChanged = [setParam, pTon](double v) { setParam(pTon, v); };
+            if (proc) setParam(pChar, 6);
             break;
         }
 
         case 7: case 8: // Compressor / Limiter — Threshold / Output / Release
-            insDrive .setLabel(charId == 8 ? "Ceiling" : "Threshold");
-            insDrive .setRange(0.0, 100.0, 0.1);
-            insDrive .getSlider().textFromValueFunction = [](double v) -> juce::String {
+            drive .setLabel(charId == 8 ? "Ceiling" : "Threshold");
+            drive .setRange(0.0, 100.0, 0.1);
+            drive .getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return "-" + juce::String((int)std::round(v * 0.4)) + " dB";
             };
-            insDrive .setValue(ip.driveDrive, juce::dontSendNotification);
-            insDrive .setVisible(true);
+            drive .setValue(ip.driveDrive, juce::dontSendNotification);
+            drive .setVisible(true);
 
-            insOutput.setLabel("Output");
-            insOutput.setRange(-24.0, 24.0, 0.1);
-            insOutput.getSlider().textFromValueFunction = nullptr;
-            insOutput.setValue(ip.driveOutput, juce::dontSendNotification);
-            insOutput.setVisible(true);
+            output.setLabel("Output");
+            output.setRange(-24.0, 24.0, 0.1);
+            output.getSlider().textFromValueFunction = nullptr;
+            output.setValue(ip.driveOutput, juce::dontSendNotification);
+            output.setVisible(true);
 
-            insTone  .setLabel("Release");
-            insTone  .setRange(20.0, 2000.0, 1.0);
-            insTone  .getSlider().setSkewFactorFromMidPoint(200.0);
-            insTone  .getSlider().textFromValueFunction = [](double v) -> juce::String {
+            tone  .setLabel("Release");
+            tone  .setRange(20.0, 2000.0, 1.0);
+            tone  .getSlider().setSkewFactorFromMidPoint(200.0);
+            tone  .getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return v < 1000.0 ? juce::String((int)v) + " ms"
                                   : juce::String(v / 1000.0, 2) + " s";
             };
-            insTone  .setValue(juce::jlimit(20.0, 2000.0, (double)ip.driveTone), juce::dontSendNotification);
-            insTone  .setVisible(true);
+            tone  .setValue(juce::jlimit(20.0, 2000.0, (double)ip.driveTone), juce::dontSendNotification);
+            tone  .setVisible(true);
 
-            insExtra .setVisible(false);
-            insDrive .onValueChanged = [setParam](double v) { setParam("mst_insDrv", v); };
-            insOutput.onValueChanged = [setParam](double v) { setParam("mst_insOut", v); };
-            insTone  .onValueChanged = [setParam](double v) { setParam("mst_insTon", v); };
+            extra .setVisible(false);
+            drive .onValueChanged = [setParam, pDrv](double v) { setParam(pDrv, v); };
+            output.onValueChanged = [setParam, pOut](double v) { setParam(pOut, v); };
+            tone  .onValueChanged = [setParam, pTon](double v) { setParam(pTon, v); };
             // #246: GR meter on the Output knob
-            insOutput.setGRSource(masterInsertProc
-                                  ? &masterInsertProc->mixerEngine.masterInsert.grReduction
-                                  : nullptr);
-            if (proc) setParam("mst_insChar", charId);
+            output.setGRSource(masterInsertProc
+                ? (slot == 0 ? &masterInsertProc->mixerEngine.masterInsert.grReduction
+                             : &masterInsertProc->mixerEngine.masterInsert2.grReduction)
+                : nullptr);
+            if (proc) setParam(pChar, charId);
             break;
 
         case 9: // Ring Modulator — Mix + Freq
-            insDrive.setLabel("Mix");
-            insDrive.setRange(0.0, 100.0, 0.1);
-            insDrive.getSlider().textFromValueFunction = [](double v) -> juce::String {
+            drive.setLabel("Mix");
+            drive.setRange(0.0, 100.0, 0.1);
+            drive.getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return juce::String((int)std::round(v)) + "%";
             };
-            insDrive.setValue(ip.driveDrive, juce::dontSendNotification);
-            insDrive.setVisible(true);
+            drive.setValue(ip.driveDrive, juce::dontSendNotification);
+            drive.setVisible(true);
 
-            insOutput.setVisible(false);
+            output.setVisible(false);
 
-            insTone.setLabel("Freq");
-            insTone.setRange(10.0, 5000.0, 1.0);
-            insTone.getSlider().setSkewFactorFromMidPoint(223.6);  // log feel
-            insTone.getSlider().textFromValueFunction = [](double v) -> juce::String {
+            tone.setLabel("Freq");
+            tone.setRange(10.0, 5000.0, 1.0);
+            tone.getSlider().setSkewFactorFromMidPoint(223.6);  // log feel
+            tone.getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return v >= 1000.0 ? juce::String(v / 1000.0, 2) + "kHz"
                                    : juce::String((int)v) + "Hz";
             };
-            insTone.setValue(juce::jlimit(10.0, 5000.0, (double)ip.driveTone), juce::dontSendNotification);
-            insTone.setVisible(true);
+            tone.setValue(juce::jlimit(10.0, 5000.0, (double)ip.driveTone), juce::dontSendNotification);
+            tone.setVisible(true);
 
-            insExtra .setVisible(false);
-            insDrive .onValueChanged = [setParam](double v) { setParam("mst_insDrv", v); };
-            insTone  .onValueChanged = [setParam](double v) { setParam("mst_insTon", v); };
-            if (proc) setParam("mst_insChar", 9);
+            extra.setVisible(false);
+            drive.onValueChanged = [setParam, pDrv](double v) { setParam(pDrv, v); };
+            tone .onValueChanged = [setParam, pTon](double v) { setParam(pTon, v); };
+            if (proc) setParam(pChar, 9);
             break;
 
         case 10: // Tape Saturation — Drive / Output / Tone
-            insDrive.setLabel("Drive");
-            insDrive.setRange(0.0, 100.0, 0.1);
-            insDrive.getSlider().textFromValueFunction = nullptr;
-            insDrive.setValue(ip.driveDrive, juce::dontSendNotification);
-            insDrive.setVisible(true);
+            drive.setLabel("Drive");
+            drive.setRange(0.0, 100.0, 0.1);
+            drive.getSlider().textFromValueFunction = nullptr;
+            drive.setValue(ip.driveDrive, juce::dontSendNotification);
+            drive.setVisible(true);
 
-            insOutput.setLabel("Output");
-            insOutput.setRange(-24.0, 0.0, 0.1);
-            insOutput.getSlider().textFromValueFunction = nullptr;
-            insOutput.setValue(ip.driveOutput, juce::dontSendNotification);
-            insOutput.setVisible(true);
+            output.setLabel("Output");
+            output.setRange(-24.0, 0.0, 0.1);
+            output.getSlider().textFromValueFunction = nullptr;
+            output.setValue(ip.driveOutput, juce::dontSendNotification);
+            output.setVisible(true);
 
-            insTone.setLabel("Tone");
-            insTone.setRange(200.0, 20000.0, 1.0);
-            insTone.getSlider().setSkewFactorFromMidPoint(2000.0);
-            insTone.getSlider().textFromValueFunction = [](double v) -> juce::String {
+            tone.setLabel("Tone");
+            tone.setRange(200.0, 20000.0, 1.0);
+            tone.getSlider().setSkewFactorFromMidPoint(2000.0);
+            tone.getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return v >= 1000.0 ? juce::String(v / 1000.0, 2) + "kHz"
                                    : juce::String((int)v) + "Hz";
             };
-            insTone.setValue(juce::jlimit(200.0, 20000.0, (double)ip.driveTone), juce::dontSendNotification);
-            insTone.setVisible(true);
+            tone.setValue(juce::jlimit(200.0, 20000.0, (double)ip.driveTone), juce::dontSendNotification);
+            tone.setVisible(true);
 
-            insExtra .setVisible(false);
-            insDrive .onValueChanged = [setParam](double v) { setParam("mst_insDrv", v); };
-            insOutput.onValueChanged = [setParam](double v) { setParam("mst_insOut", v); };
-            insTone  .onValueChanged = [setParam](double v) { setParam("mst_insTon", v); };
-            if (proc) setParam("mst_insChar", 10);
+            extra.setVisible(false);
+            drive .onValueChanged = [setParam, pDrv](double v) { setParam(pDrv, v); };
+            output.onValueChanged = [setParam, pOut](double v) { setParam(pOut, v); };
+            tone  .onValueChanged = [setParam, pTon](double v) { setParam(pTon, v); };
+            if (proc) setParam(pChar, 10);
             break;
 
         default: break;
     }
 
-    for (auto* k : { &insDrive, &insOutput, &insTone, &insExtra })
+    for (auto* k : { &drive, &output, &tone, &extra })
     { k->getSlider().updateText(); k->repaint(); }
 
     resized();
@@ -942,12 +1056,9 @@ void MixerChannel::paint(juce::Graphics& g)
     // Section labels (tiny, top-right of each pane)
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(8.0f)));
     g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
-    if (!sidechainPaneBounds.isEmpty())
+    if (!sidechainPaneBounds.isEmpty() && hasOutputBus())  // "SC" tag only on rhythm strips (others have no output bus label)
         g.drawText("SC", sidechainPaneBounds.getRight() - 14, sidechainPaneBounds.getY() + 1,
                    12, 10, juce::Justification::centredRight, false);
-    if (!sendsPaneBounds.isEmpty())
-        g.drawText("SND", sendsPaneBounds.getRight() - 18, sendsPaneBounds.getY() + 1,
-                   16, 10, juce::Justification::centredRight, false);
 
     // ── Insert panel (Master: right portion) ─────────────────────────────────
     if (hasInsert())
@@ -960,12 +1071,25 @@ void MixerChannel::paint(juce::Graphics& g)
         g.setColour(channelColour);
         g.fillRect(stripW, 0, kInsertPanelW, kColourBarH);
 
-        // "INS" label in insert panel header
-        g.setColour(active ? MuClidLookAndFeel::colour(Id::headingText)
-                           : MuClidLookAndFeel::colour(Id::mutedText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
-        g.drawText("Insert", stripW, kColourBarH, kInsertPanelW, kNameH,
+        // "Main Insert 1/2" labels sit inside each half; shared name row is clear.
+        const juce::Colour labelCol = active ? MuClidLookAndFeel::colour(Id::headingText)
+                                             : MuClidLookAndFeel::colour(Id::mutedText);
+        const int insTop = kColourBarH + kNameH;  // start of insert content area
+        g.setColour(labelCol);
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+        g.drawText("Main Insert 1", stripW, insTop, kInsertPanelW, kNameH,
                    juce::Justification::centred, false);
+        if (insertMidY > 0)
+        {
+            // Horizontal divider between the two insert slots
+            g.setColour(borderCol.withAlpha(0.5f));
+            g.drawLine((float)stripW, (float)insertMidY,
+                       (float)(stripW + kInsertPanelW), (float)insertMidY, 1.0f);
+            // "Main Insert 2" label at the top of slot 2
+            g.setColour(labelCol);
+            g.drawText("Main Insert 2", stripW, insertMidY, kInsertPanelW, kNameH,
+                       juce::Justification::centred, false);
+        }
     }
 
     // Inactive overlay
