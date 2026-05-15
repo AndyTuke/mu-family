@@ -808,27 +808,32 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                     snap[kSnapPitchEnvDep] .set(sn(modParamValues["pitch.envDepth"],   0.0f,    24.0f));
                     snap[kSnapAmpLvl]      .set(sn(modParamValues["amp.level"],        0.0f,     2.0f));
                     snap[kSnapAccent]      .set(sn(modParamValues["accentDb"],         0.0f,    12.0f));
-                    // #336 Stage C: euclid pattern destinations. Normalised against each
-                    // destination's full range so the arc indicator on the matching knob
-                    // matches what the audio engine actually applies.
-                    snap[kSnapEucAHits]    .set(sn(modParamValues["euclid.a.hits"],    0.0f,    64.0f));
-                    snap[kSnapEucARotate]  .set(sn(modParamValues["euclid.a.rotate"],  0.0f,    63.0f));
-                    snap[kSnapEucAPrePad]  .set(sn(modParamValues["euclid.a.prePad"],  0.0f,    12.0f));
-                    snap[kSnapEucAPostPad] .set(sn(modParamValues["euclid.a.postPad"], 0.0f,    12.0f));
-                    snap[kSnapEucAInsSt]   .set(sn(modParamValues["euclid.a.insSt"],   0.0f,    63.0f));
-                    snap[kSnapEucAInsLen]  .set(sn(modParamValues["euclid.a.insLen"],  0.0f,     8.0f));
-                    snap[kSnapEucBHits]    .set(sn(modParamValues["euclid.b.hits"],    0.0f,    64.0f));
-                    snap[kSnapEucBRotate]  .set(sn(modParamValues["euclid.b.rotate"],  0.0f,    63.0f));
-                    snap[kSnapEucBPrePad]  .set(sn(modParamValues["euclid.b.prePad"],  0.0f,    12.0f));
-                    snap[kSnapEucBPostPad] .set(sn(modParamValues["euclid.b.postPad"], 0.0f,    12.0f));
-                    snap[kSnapEucBInsSt]   .set(sn(modParamValues["euclid.b.insSt"],   0.0f,    63.0f));
-                    snap[kSnapEucBInsLen]  .set(sn(modParamValues["euclid.b.insLen"],  0.0f,     8.0f));
-                    snap[kSnapEucCHits]    .set(sn(modParamValues["euclid.c.hits"],    0.0f,    64.0f));
-                    snap[kSnapEucCRotate]  .set(sn(modParamValues["euclid.c.rotate"],  0.0f,    63.0f));
-                    snap[kSnapEucCPrePad]  .set(sn(modParamValues["euclid.c.prePad"],  0.0f,    12.0f));
-                    snap[kSnapEucCPostPad] .set(sn(modParamValues["euclid.c.postPad"], 0.0f,    12.0f));
-                    snap[kSnapEucCInsSt]   .set(sn(modParamValues["euclid.c.insSt"],   0.0f,    63.0f));
-                    snap[kSnapEucCInsLen]  .set(sn(modParamValues["euclid.c.insLen"],  0.0f,     8.0f));
+                    // #336 Stage C: euclid pattern destinations. hits/rotate/insSt are
+                    // normalised against the UI slider's *current* range (which is per-
+                    // rhythm: hits=0..steps, rotate/insSt=0..steps-1) so the live arc on
+                    // the knob renders in the correct direction. prePad/postPad/insLen
+                    // have fixed slider ranges so use the constant values.
+                    const int stepsA = juce::jmax(1, rhythm.genA.steps);
+                    const int stepsB = juce::jmax(1, rhythm.genB.steps);
+                    const int stepsC = juce::jmax(1, rhythm.genC.steps);
+                    snap[kSnapEucAHits]    .set(sn(modParamValues["euclid.a.hits"],    0.0f, (float) stepsA));
+                    snap[kSnapEucARotate]  .set(sn(modParamValues["euclid.a.rotate"],  0.0f, (float) juce::jmax(1, stepsA - 1)));
+                    snap[kSnapEucAPrePad]  .set(sn(modParamValues["euclid.a.prePad"],  0.0f, 12.0f));
+                    snap[kSnapEucAPostPad] .set(sn(modParamValues["euclid.a.postPad"], 0.0f, 12.0f));
+                    snap[kSnapEucAInsSt]   .set(sn(modParamValues["euclid.a.insSt"],   0.0f, (float) juce::jmax(1, stepsA - 1)));
+                    snap[kSnapEucAInsLen]  .set(sn(modParamValues["euclid.a.insLen"],  0.0f,  8.0f));
+                    snap[kSnapEucBHits]    .set(sn(modParamValues["euclid.b.hits"],    0.0f, (float) stepsB));
+                    snap[kSnapEucBRotate]  .set(sn(modParamValues["euclid.b.rotate"],  0.0f, (float) juce::jmax(1, stepsB - 1)));
+                    snap[kSnapEucBPrePad]  .set(sn(modParamValues["euclid.b.prePad"],  0.0f, 12.0f));
+                    snap[kSnapEucBPostPad] .set(sn(modParamValues["euclid.b.postPad"], 0.0f, 12.0f));
+                    snap[kSnapEucBInsSt]   .set(sn(modParamValues["euclid.b.insSt"],   0.0f, (float) juce::jmax(1, stepsB - 1)));
+                    snap[kSnapEucBInsLen]  .set(sn(modParamValues["euclid.b.insLen"],  0.0f,  8.0f));
+                    snap[kSnapEucCHits]    .set(sn(modParamValues["euclid.c.hits"],    0.0f, (float) stepsC));
+                    snap[kSnapEucCRotate]  .set(sn(modParamValues["euclid.c.rotate"],  0.0f, (float) juce::jmax(1, stepsC - 1)));
+                    snap[kSnapEucCPrePad]  .set(sn(modParamValues["euclid.c.prePad"],  0.0f, 12.0f));
+                    snap[kSnapEucCPostPad] .set(sn(modParamValues["euclid.c.postPad"], 0.0f, 12.0f));
+                    snap[kSnapEucCInsSt]   .set(sn(modParamValues["euclid.c.insSt"],   0.0f, (float) juce::jmax(1, stepsC - 1)));
+                    snap[kSnapEucCInsLen]  .set(sn(modParamValues["euclid.c.insLen"],  0.0f,  8.0f));
                 }
 
                 // Write modulated values back, clamping to safe ranges.
