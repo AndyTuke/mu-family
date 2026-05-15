@@ -7,6 +7,10 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_subdirectory($ENV{JUCE_PATH} JUCE)
 add_subdirectory(ThirdParty/clap-juce-extensions)
 
+juce_add_binary_data(mu-clid-resources
+    SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/mu-clid.png"
+)
+
 # ── mu-core: shared audio/FX/modulation/UI source set ───────────────────────
 # An INTERFACE library that propagates shared source files to consuming plugin
 # targets. Sources compile in each consuming target's context (where JUCE modules
@@ -119,6 +123,7 @@ target_compile_definitions(mu-clid
 target_link_libraries(mu-clid
     PRIVATE
         mu-core
+        mu-clid-resources
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_basics
@@ -134,7 +139,7 @@ target_link_libraries(mu-clid
 target_compile_definitions(mu-clid_Standalone PRIVATE JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
 target_sources(mu-clid_Standalone PRIVATE Source/StandaloneApp.cpp)
 
-# Increment build_number.txt only on Debug; Release reads the same value so both configs share a number.
+# Increment build_number.txt only on Release; Debug reads the same value so both configs share a number.
 add_custom_target(increment_build_number ALL
     COMMAND ${CMAKE_COMMAND} -DBUILD_CONFIG=$<CONFIG> -P "${CMAKE_SOURCE_DIR}/cmake/IncrementBuildNumber.cmake"
     COMMENT "Incrementing build number"
@@ -160,7 +165,12 @@ if(ISCC_EXE)
         COMMENT "Building mu-Clid installer"
         VERBATIM
     )
-    add_dependencies(mu-clid_installer mu-clid)
+    # #349 follow-up: depend on the actual format outputs, not just the shared-code
+    # target. `mu-clid` is the JUCE shared lib; the installer needs the artifact
+    # files produced by `mu-clid_VST3`, `mu-clid_CLAP`, and `mu-clid_Standalone`.
+    # Without listing them explicitly, MSBuild can run the installer in parallel
+    # with the Standalone build and fail because `mu-Clid.exe` doesn't exist yet.
+    add_dependencies(mu-clid_installer mu-clid mu-clid_VST3 mu-clid_CLAP mu-clid_Standalone)
 else()
     message(STATUS "Inno Setup not found — mu-clid_installer target unavailable")
 endif()
@@ -238,6 +248,7 @@ target_compile_definitions(mu-clid-lite
 target_link_libraries(mu-clid-lite
     PRIVATE
         mu-core
+        mu-clid-resources
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_basics
@@ -263,7 +274,9 @@ if(ISCC_EXE)
         COMMENT "Building mu-Clid Lite installer"
         VERBATIM
     )
-    add_dependencies(mu-clid-lite_installer mu-clid-lite)
+    # #349 follow-up: depend on the format outputs explicitly (see comment above on
+    # mu-clid_installer). Lite ships only VST3 + CLAP — no Standalone target.
+    add_dependencies(mu-clid-lite_installer mu-clid-lite mu-clid-lite_VST3 mu-clid-lite_CLAP)
 endif()
 
 clap_juce_extensions_plugin(TARGET mu-clid-lite
