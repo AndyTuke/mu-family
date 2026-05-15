@@ -72,8 +72,12 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     delaySendBuf .clear();
     reverbSendBuf.clear();
 
-    const bool anySolo  = hasSolo(numActiveRhythms);
-    const int  numOutCh = output.getNumChannels();
+    const bool anySolo       = hasSolo(numActiveRhythms);
+    // #337 follow-up: when a return is soloed, the user wants to hear ONLY that wet
+    // signal — the rhythm channels' dry passthrough to master must also be muted, but
+    // their FX sends must still run so the soloed return has something to render.
+    const bool anyReturnSolo = returns[0].solo || returns[1].solo || returns[2].solo;
+    const int  numOutCh      = output.getNumChannels();
 
     // Clear peaks for channels that have no rhythm this block so their VUs go silent.
     // Same for sidechainGR so a removed rhythm cannot leave a ghost reading on the
@@ -148,7 +152,13 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         const auto& ch  = channels[r];
         auto&       buf = channelBufs[r];
 
-        if (ch.mute || (anySolo && !ch.solo))
+        // hardMute: rhythm is fully silent — no master output, no FX sends.
+        // skipMaster: dry passthrough to master suppressed (because a return is soloed),
+        // but FX sends still run so the soloed return has source material to render.
+        const bool hardMute   = ch.mute || (anySolo && !ch.solo);
+        const bool skipMaster = hardMute || anyReturnSolo;
+
+        if (hardMute)
         {
             channelPeaks[r].set(0.0f);
             continue;
@@ -160,9 +170,10 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         const int bus = ch.outputBus;  // 0 = master, 1..8 = direct out
         if (bus == 0)
         {
-            // Master mix — also feeds FX sends.
-            for (int c = 0; c < numOutCh; ++c)
-                output.addFrom(c, 0, buf, c, 0, numSamples);
+            // Master mix — also feeds FX sends. skipMaster suppresses just the dry add.
+            if (!skipMaster)
+                for (int c = 0; c < numOutCh; ++c)
+                    output.addFrom(c, 0, buf, c, 0, numSamples);
 
             if (ch.sendEffect > 0.0f)
                 for (int c = 0; c < numOutCh; ++c)
@@ -253,8 +264,6 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         }
         returnSidechainGR[ri].set(peakGR);
     }
-
-    const bool anyReturnSolo = returns[0].solo || returns[1].solo || returns[2].solo;
 
     // Re-check after processSends: echo feedback may have produced output even with no
     // channel send signal this block, so we cannot use the pre-processing doEffect flag.

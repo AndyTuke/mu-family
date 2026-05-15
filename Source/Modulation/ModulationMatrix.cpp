@@ -27,50 +27,64 @@ static constexpr auto kMetaSuffix = "_depth";
 //  amp.release         display 0-100       0..100          100     full-range additive
 //  amp.level           gain 0-2            0..2            2       0=silent, 2=double (#223)
 //  accentDb            dB 0-12             0..12           12      (#223)
-//  filter.cutoff       Hz (log-mult)       20..20000 Hz    48      ±4 octaves (#216d)
+//  filter.cutoff       Hz (log-mult)       20..20000 Hz    12      ±1 octave (#291, reduced from 48)
 //  filter.resonance    display 0-100       0..100          100     full-range additive
 //  fenv.attack         display 0-100       0..100          100     full-range additive
 //  fenv.decay          display 0-100       0..100          100     full-range additive
 //  fenv.depth          semitones 0-48      0..48           48      full-range additive
-//  pitch.semitones     semitones 0 base    ±24 st          24      ±2 octaves (#218)
+//  pitch.semitones     semitones 0 base    ±12 st          12      ±1 octave
+//  pitch.octave        semitones 0 base    ±36 st          36      ±3 octaves
 //  pitch.envDepth      semitones 0-24      0..24           24      (#223)
 //  insert.drive        display 0-100       0..100          100     full-range additive
 //  insert.output       dB -24..0           -24..0 dB       24      full-range additive
 //  insert.bits         actual bits 1-16    1..16 bits      1       ±1 bit at full depth (#266)
 //  insert.rate         log-norm 0-100      0..100          100     full-range additive (log space)
 //  insert.dither       display 0-100       0..100          100     full-range additive
-//  insert.lpf          Hz (log-mult)       20..20000 Hz    48      ±4 octaves (#216d)
-//  euclid.*.hits       steps 0-16          0..16           16      full-range additive
-//  euclid.*.rotate     steps 0-16          0..16           16      full-range additive
+//  insert.lpf          Hz (log-mult)       20..20000 Hz    48      ±4 octaves (#291)
+//  euclid.*.hits       steps 0-64          0..64           16      ±16 steps (~25% of max)
+//  euclid.*.rotate     steps 0-63          0..63           16      ±16 steps
+//  euclid.*.prePad     steps 0-12          0..12           12      full pre-pad range
+//  euclid.*.postPad    steps 0-12          0..12           12      full post-pad range
+//  euclid.*.insSt      steps 0-63          0..63           16      ±16 positions
+//  euclid.*.insLen     steps 0-8           0..8             8      full insert-len range
 
 // Per-destination full-swing magnitude in the same units as paramValues. At depth=100%
 // and CS output = 100% the destination is offset by ±this value. Defaults to 100 for
 // destinations that already operate on a 0-100 display scale (amp/filter ADSR, etc.).
 static float depthScaleFor(const std::string& destId)
 {
-    // #216d: Hz-domain destinations now apply multiplicatively in semitones
-    // (see isLogHzDest + the apply branch below). Full-swing scale is 48 semis
-    // = ±4 octaves, matching filterEnvDepth — keeps the same depth sweeping
-    // the same number of octaves whether the base cutoff is 100 Hz or 10 kHz.
-    if (destId == "filter.cutoff" || destId == "insert.lpf") return 48.0f;
+    // #291: Hz-domain destinations apply multiplicatively in semitones (see isLogHzDest).
+    // Scale reduced 48→12 (±1 octave at full depth) so that small LFO amounts give
+    // subtle movement — at 48 even depth=5 caused >2 semitones which is too wide for
+    // narrow-band filters (notch). depth=5→0.6 semi, depth=25→3 semi, depth=100→12 semi.
+    if (destId == "filter.cutoff" || destId == "insert.lpf") return 12.0f;
     // Semitones / dB / bits — match the destination's natural full range.
-    if (destId == "pitch.semitones") return 24.0f;   // ±24 semitones = ±2 oct full swing (#218 collapse)
-    // pitch.octave / pitch.fine deprecated by #218 — destinations removed from UI; legacy
-    // assignments fall through silently because paramValues no longer holds these keys.
+    if (destId == "pitch.semitones") return 12.0f;   // ±12 semitones full swing
+    if (destId == "pitch.octave")    return 36.0f;   // ±3 octaves = ±36 semitones full swing
+    // pitch.fine deprecated by #218 — removed from UI; legacy assignments no-op.
     if (destId == "fenv.depth")      return 48.0f;   // 0..48 semitones (full range)
     if (destId == "pitch.envDepth")  return 24.0f;   // 0..24 semitones (#223)
     if (destId == "amp.level")       return 2.0f;    // 0..2 gain = -inf..+6 dB (#223)
     if (destId == "accentDb")        return 12.0f;   // 0..12 dB (#223)
     if (destId == "insert.output")   return 24.0f;   // -24..0 dB (full range)
     if (destId == "insert.bits")     return 1.0f;    // 1..16 bits; ±1 bit at full depth (#266)
-    // Pattern destinations.
-    if (destId == "euclid.a.hits"   || destId == "euclid.b.hits"
-     || destId == "euclid.a.rotate" || destId == "euclid.b.rotate"
-     || destId == "euclid.c.hits"   || destId == "euclid.c.rotate") return 16.0f;
+    // Pattern destinations — hits/rotate. Halved from 16→8 (~half of typical 16-step
+    // pattern at full depth) so user-facing depth control feels less saturated.
+    if (destId == "euclid.a.hits"   || destId == "euclid.b.hits"   || destId == "euclid.c.hits"
+     || destId == "euclid.a.rotate" || destId == "euclid.b.rotate" || destId == "euclid.c.rotate")
+        return 8.0f;   // ±8 steps at full depth
+    // Pattern destinations — pad knobs. Halved 12→6 / 8→4 for the same reason.
+    if (destId == "euclid.a.prePad"  || destId == "euclid.b.prePad"  || destId == "euclid.c.prePad"
+     || destId == "euclid.a.postPad" || destId == "euclid.b.postPad" || destId == "euclid.c.postPad")
+        return 6.0f;   // ±6 steps at full depth (half of 12-step pad range)
+    if (destId == "euclid.a.insLen"  || destId == "euclid.b.insLen"  || destId == "euclid.c.insLen")
+        return 4.0f;   // ±4 steps at full depth (half of 8-step insert range)
+    if (destId == "euclid.a.insSt"   || destId == "euclid.b.insSt"   || destId == "euclid.c.insSt")
+        return 8.0f;   // ±8 positions at full depth (half of original 16)
     return 100.0f;  // 0-100 display-scale default
 }
 
-// #216d: true for Hz-domain destinations where modulation must be multiplicative-in-
+// #291: true for Hz-domain destinations where modulation must be multiplicative-in-
 // octaves rather than additive-in-Hz (so a fixed depth sweeps the same octave range
 // whether the base cutoff is 100 Hz or 10 kHz). Matches the filterEnvDepth model in
 // VoiceEngine: `cutoff * 2^(semis/12)`.
@@ -196,7 +210,7 @@ void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,
             const float scale = depthScaleFor(a.destinationId);
             const float amount = srcVal * a.depth * scale * 0.0001f;
             if (isLogHzDest(a.destinationId))
-                // #216d: multiplicative in semitones — keeps a fixed depth sweeping
+                // #291: multiplicative in semitones — keeps a fixed depth sweeping
                 // the same number of octaves regardless of base cutoff.
                 dstIt->second *= std::pow(2.0f, amount / 12.0f);
             else
