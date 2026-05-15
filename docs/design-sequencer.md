@@ -65,7 +65,7 @@ Third independent euclidean layer dedicated to accents. No logic relationship wi
 
 **Curve interaction:** Click on line to add node. Right-click node to remove. ALT-click segment to add bezier handle (stored as offset from segment midpoint). Drag handle to bend segment.
 
-**Control sequence defaults:** `loopNoteValue = Quarter`, `loopMultiplier = 4` (= 1 bar). `stepNoteValue = Quarter`, `stepMultiplier = 1`. `mode = Stepped`, `polarity = Bipolar`.
+**Control sequence defaults:** `loopNoteValue = Whole`, `loopMultiplier = 1` (= 1 bar, displays "1 × 1"). `stepNoteValue = Sixteenth`, `stepMultiplier = 1`. `mode = Stepped`, `polarity = Bipolar`.
 
 **Capacities:** `Rhythm::MaxControlSequences = 8`. `ModulationMatrix::MaxAssignments = 64`.
 

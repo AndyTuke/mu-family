@@ -67,7 +67,7 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     pitchSemi  .setRange(-12.0, 12.0,   1.0);   pitchSemi  .setValue(0.0);
     pitchFine  .setRange(-100.0,100.0,  0.1);   pitchFine  .setValue(0.0);
     // ADSR: 0–100 display scale. 0→1 ms, 100→3 s (A/D/R); 0–100% (S). Mapping in adsrTime/adsrSus.
-    // #217c: pitch A/D/R in seconds (0..10) with skew 0.3 — matches amp + filter envelopes.
+    // #287: pitch A/D/R in seconds (0..10) with skew 0.3 — matches amp + filter envelopes.
     pitchAtk   .setRange(0.0, 10.0, 0.001);  pitchAtk.setValue(0.0);   pitchAtk.getSlider().setSkewFactor(0.3);
     pitchDec   .setRange(0.0, 10.0, 0.001);  pitchDec.setValue(0.03);  pitchDec.getSlider().setSkewFactor(0.3);
     pitchSus   .setRange(0.0, 100.0, 0.1);   pitchSus.setValue(0.0);
@@ -75,9 +75,9 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     pitchDepth .setRange(0.0,  24.0, 0.1);   pitchDepth.setValue(0.0);
 
     filterCutoff.setRange(20.0, 20000.0, 1.0);  filterCutoff.setValue(8000.0);
-    filterCutoff.getSlider().setSkewFactorFromMidPoint(640.0);   // #216a: log feel — geo mean of 20..20000
+    filterCutoff.getSlider().setSkewFactorFromMidPoint(640.0);   // #216: log feel — geo mean of 20..20000
     filterRes   .setRange(0.0,  100.0,  0.1);   filterRes   .setValue(20.0);
-    // #217b: filter A/D/R in seconds (0..10) with skew 0.3 — matches amp envelope.
+    // #286: filter A/D/R in seconds (0..10) with skew 0.3 — matches amp envelope.
     filterAtk   .setRange(0.0,  10.0, 0.001);  filterAtk.setValue(0.03);  filterAtk.getSlider().setSkewFactor(0.3);
     filterDec   .setRange(0.0,  10.0, 0.001);  filterDec.setValue(0.09);  filterDec.getSlider().setSkewFactor(0.3);
     filterSus   .setRange(0.0, 100.0, 0.1);    filterSus.setValue(0.0);
@@ -89,7 +89,7 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     ampSendDly.setRange(0.0, 1.0,  0.01);  ampSendDly.setValue(0.0);
     ampSendRev.setRange(0.0, 1.0,  0.01);  ampSendRev.setValue(0.0);
     ampAccent .setRange(0.0, 12.0, 0.1);   ampAccent .setValue(0.0);
-    // #217a: amp A/D/R now in seconds (0..10) with skew 0.3 so 100–200 ms sits at
+    // #217: amp A/D/R now in seconds (0..10) with skew 0.3 so 100–200 ms sits at
     // knob centre. Sustain stays 0..100 %.
     ampAtk    .setRange(0.0, 10.0,  0.001); ampAtk .setValue(0.005); ampAtk.getSlider().setSkewFactor(0.3);
     ampDec    .setRange(0.0, 10.0,  0.001); ampDec .setValue(0.3);   ampDec.getSlider().setSkewFactor(0.3);
@@ -101,7 +101,7 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     driveOutput.setRange(-24.0,   0.0, 0.1);   driveOutput.setValue(0.0);
     driveDither.setRange(0.0,   100.0, 0.1);   driveDither.setValue(0.0);
     driveTone  .setRange(20.0, 20000.0, 1.0);  driveTone  .setValue(20000.0);
-    driveTone  .getSlider().setSkewFactorFromMidPoint(640.0);   // #216b: log feel default for full-range modes
+    driveTone  .getSlider().setSkewFactorFromMidPoint(640.0);   // #289: log feel default for full-range modes
 
     wireCallbacks();
 }
@@ -115,7 +115,7 @@ void VoiceSection::apvtsSet(const char* suffix, float v)
 }
 
 // Legacy ADSR (0-100 slider, max 3 s). Used by pitch + filter envelopes until
-// they're migrated by #217b/c.
+// they're migrated by #286/#287.
 static juce::String formatAdsrTime(double v)
 {
     double ms = std::max(1.0, v * 30.0);
@@ -135,7 +135,7 @@ static double parseAdsrTime(const juce::String& s)
     return t.getDoubleValue() / 30.0;
 }
 
-// #217a: seconds-domain formatter for the amp envelope. Slider value IS seconds (0..10).
+// #217: seconds-domain formatter for the amp envelope. Slider value IS seconds (0..10).
 static juce::String formatAdsrTimeSec(double v)
 {
     double ms = std::max(1.0, v * 1000.0);
@@ -157,7 +157,7 @@ static double parseAdsrTimeSec(const juce::String& s)
 
 void VoiceSection::wireCallbacks()
 {
-    // #217a (amp) + #217b (filter) + #217c (pitch): all ADSR time sliders take
+    // #217 (amp) + #286 (filter) + #287 (pitch): all ADSR time sliders take
     // seconds directly. Legacy formatAdsrTime / parseAdsrTime helpers are now
     // unused but kept in the file for one release in case any other slider is
     // discovered still depending on them; remove on the next pass.
@@ -167,7 +167,7 @@ void VoiceSection::wireCallbacks()
         k->getSlider().textFromValueFunction = [](double v) { return formatAdsrTimeSec(v); };
         k->getSlider().valueFromTextFunction = [](const juce::String& s) { return parseAdsrTimeSec(s); };
     }
-    // #217a: Amp Release at max (10 s) means "play to natural end".
+    // #217: Amp Release at max (10 s) means "play to natural end".
     ampRel.getSlider().textFromValueFunction = [](double v) -> juce::String {
         if (v >= 10.0) return "End";
         return formatAdsrTimeSec(v);
@@ -334,9 +334,8 @@ void VoiceSection::refreshModulatedIndicators()
     // Build a quick lookup of which destination IDs are currently assigned.
     auto isAssigned = [&assigns](const char* destId) -> bool
     {
-        const std::string s = destId;
         for (const auto& a : assigns)
-            if (a.destinationId == s) return true;
+            if (a.destinationId == destId) return true;
         return false;
     };
 
@@ -408,7 +407,7 @@ void VoiceSection::loadFromRhythm()
     pitchOctave .setValue(p.pitchOctave,         juce::dontSendNotification);
     pitchSemi   .setValue(p.pitchSemitones,      juce::dontSendNotification);
     pitchFine   .setValue(p.pitchFine,           juce::dontSendNotification);
-    // #217c: pitch envelope times now in seconds directly.
+    // #287: pitch envelope times now in seconds directly.
     pitchAtk    .setValue(p.pitchEnvAtk,         juce::dontSendNotification);
     pitchDec    .setValue(p.pitchEnvDec,         juce::dontSendNotification);
     pitchSus    .setValue(p.pitchEnvSus * 100.0, juce::dontSendNotification);
@@ -418,7 +417,7 @@ void VoiceSection::loadFromRhythm()
     filterType.setSelectedId(p.filterType + 1, false);
     filterCutoff.setValue(p.filterCutoff,           juce::dontSendNotification);
     filterRes   .setValue(p.filterRes * 100.0,      juce::dontSendNotification);
-    // #217b: filter envelope times now in seconds directly.
+    // #286: filter envelope times now in seconds directly.
     filterAtk   .setValue(p.filterEnvAtk,         juce::dontSendNotification);
     filterDec   .setValue(p.filterEnvDec,         juce::dontSendNotification);
     filterSus   .setValue(p.filterEnvSus  * 100.0, juce::dontSendNotification);
@@ -439,7 +438,7 @@ void VoiceSection::loadFromRhythm()
     }
 
     ampAccent.setValue(p.accentDb,               juce::dontSendNotification);
-    // #217a: amp slider value IS seconds now (no conversion); Sustain stays 0..100 %.
+    // #217: amp slider value IS seconds now (no conversion); Sustain stays 0..100 %.
     ampAtk  .setValue(p.ampEnvAtk,                                  juce::dontSendNotification);
     ampDec  .setValue(p.ampEnvDec,                                  juce::dontSendNotification);
     ampSus  .setValue(p.ampEnvSus  * 100.0,                         juce::dontSendNotification);
@@ -506,7 +505,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
 
             driveTone.setLabel("LPF");
             driveTone.setRange(20.0, 20000.0, 1.0);
-            driveTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #216b
+            driveTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #289
             driveTone.getSlider().textFromValueFunction = fmtHz;
             driveTone.getSlider().valueFromTextFunction = parseHz;
             if (p) driveTone.setValue(p->driveTone, juce::dontSendNotification);
@@ -550,7 +549,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
 
             driveTone.setLabel("LPF");
             driveTone.setRange(20.0, 20000.0, 1.0);
-            driveTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #216b
+            driveTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #289
             driveTone.getSlider().textFromValueFunction = fmtHz;
             driveTone.getSlider().valueFromTextFunction = parseHz;
             if (p) driveTone.setValue(p->driveTone, juce::dontSendNotification);
@@ -584,7 +583,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
 
             driveTone.setLabel("LPF");
             driveTone.setRange(20.0, 20000.0, 1.0);
-            driveTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #216b
+            driveTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #289
             driveTone.getSlider().textFromValueFunction = fmtHz;
             driveTone.getSlider().valueFromTextFunction = parseHz;
             if (p) driveTone.setValue(p->driveTone, juce::dontSendNotification);

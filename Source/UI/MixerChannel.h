@@ -18,7 +18,7 @@ public:
     enum class Type { Rhythm, EffectReturn, DelayReturn, ReverbReturn, Master };
 
     // Width of the insert panel drawn to the right of the Master strip.
-    // MixerOverlay adds this to kMasterW when sizing masterChannel.
+    // Both inserts share this width, stacked vertically (top = INS 1, bottom = INS 2).
     static constexpr int kInsertPanelW = 130;
 
     MixerChannel(Type type, const juce::String& name, juce::Colour colour);
@@ -28,7 +28,8 @@ public:
                     PluginProcessor* proc = nullptr, const juce::String& apvtsPrefix = {},
                     juce::Atomic<float>* grAtomic = nullptr);
     void bindReturn(MixerEngine::ReturnState& state, juce::Atomic<float>& peak,
-                    PluginProcessor* proc = nullptr, const juce::String& apvtsPrefix = {});
+                    PluginProcessor* proc = nullptr, const juce::String& apvtsPrefix = {},
+                    juce::Atomic<float>* grAtomic = nullptr);
     void bindMaster(MixerEngine& engine,
                     PluginProcessor* proc = nullptr);
 
@@ -37,9 +38,15 @@ public:
                          const juce::String& dlySendParam,
                          const juce::String& revSendParam);
 
-    // Populate the sidechain source dropdown with other active channel names.
-    // ownChannelIndex is excluded from the list. Call whenever rhythm count/names change.
+    // Populate the sidechain source dropdown with rhythm channel names.
+    // ownChannelIndex is excluded (pass -1 for return channels to include all rhythm channels).
     void setSidechainSources(int ownChannelIndex, const juce::StringArray& channelNames);
+
+    // Public getters for section bounds — used by MixerOverlay to align the row-label panel.
+    juce::Rectangle<int> getSidechainPaneBounds() const { return sidechainPaneBounds; }
+    juce::Rectangle<int> getSendsPaneBounds()     const { return sendsPaneBounds;     }
+    juce::Rectangle<int> getFaderPaneBounds()     const { return faderPaneBounds;     }
+    juce::Rectangle<int> getOutBusBounds()        const { return outBusBox.getBounds(); }
 
     // Reload UI from APVTS after external state change (e.g. preset load).
     void loadFromAPVTS(juce::AudioProcessorValueTreeState& apvts,
@@ -82,9 +89,8 @@ private:
     KnobWithLabel     scAttack  { "/",   Id::knobFxSend };
     KnobWithLabel     scRelease { "\\",  Id::knobFxSend };
 
-    // Per-algorithm state snapshots for the master insert — enables A/B-ing between algorithms
-    // without losing settings. Indexed by driveChar (0..10). snapshotValid[i] is false until the
-    // user has visited algorithm i at least once; until then kInsertDefaults[i] is used instead.
+    // Per-algorithm state snapshots for master inserts — enables A/B-ing between algorithms.
+    // Indexed by driveChar (0..10); snapshotValid[i] is false until first visit.
     struct InsertAlgoSnapshot {
         float driveDrive = 0.0f, driveOutput = 0.0f, drvDither = 0.0f;
         float driveTone = 20000.0f, eqMidGain = 0.0f, drvBits = 16.0f, driveRate = 48000.0f;
@@ -92,32 +98,42 @@ private:
     static const InsertAlgoSnapshot kInsertDefaults[11];
     InsertAlgoSnapshot insertSnapshots[11];
     bool               insertSnapshotValid[11] = {};
+    InsertAlgoSnapshot insertSnapshots2[11];
+    bool               insertSnapshotValid2[11] = {};
 
-    // Insert controls (Master channel only) — 4-knob strip (insExtra only shown in EQ mode)
+    // Insert controls (Master channel only) — two slots stacked vertically.
+    // insExtra / insExtra2 only visible in EQ mode.
     juce::ComboBox    insCharBox;
     KnobWithLabel     insDrive  { "Drive",  Id::knobInsertPad };
     KnobWithLabel     insOutput { "Output", Id::knobInsertPad };
     KnobWithLabel     insTone   { "Tone",   Id::knobInsertPad };
-    KnobWithLabel     insExtra  { "Mid Hz", Id::knobInsertPad };  // #248: EQ mid frequency
+    KnobWithLabel     insExtra  { "Mid Hz", Id::knobInsertPad };
 
-    // Configure knob labels/ranges/callbacks for the selected algorithm.
-    // proc is used only to decide whether to write `mst_insChar` back to APVTS
-    // (non-null = write, null = skip — used when called from loadFromAPVTS to
-    // avoid feedback loops). The knob `onValueChanged` lambdas always use
-    // `masterInsertProc` (the proc captured by bindMaster) so they keep
-    // working after a reload — #243.
-    void configureInsertAlgorithm(int charId, PluginProcessor* proc);
+    juce::ComboBox    insCharBox2;
+    KnobWithLabel     insDrive2  { "Drive",  Id::knobInsertPad };
+    KnobWithLabel     insOutput2 { "Output", Id::knobInsertPad };
+    KnobWithLabel     insTone2   { "Tone",   Id::knobInsertPad };
+    KnobWithLabel     insExtra2  { "Mid Hz", Id::knobInsertPad };
+
+    // Configure knob labels/ranges/callbacks for the selected algorithm on one insert slot.
+    // slot=0 → first insert (mst_ins*), slot=1 → second insert (mst_ins2*).
+    // proc non-null = write char param to APVTS; null = skip (called from loadFromAPVTS).
+    void configureInsertAlgorithm(int charId, int slot, PluginProcessor* proc);
 
     // Captured by bindMaster so configureInsertAlgorithm's knob callbacks can
     // write to APVTS even when re-invoked from loadFromAPVTS with proc=nullptr.
     PluginProcessor* masterInsertProc = nullptr;
 
-    bool hasSends()    const { return channelType == Type::Rhythm
-                                       || channelType == Type::EffectReturn
-                                       || channelType == Type::DelayReturn; }
-    bool hasMuteSolo() const { return channelType != Type::Master; }
-    bool hasSidechain() const { return channelType == Type::Rhythm; }
-    bool hasInsert()    const { return channelType == Type::Master; }
+    bool hasSends()            const { return channelType == Type::Rhythm
+                                             || channelType == Type::EffectReturn
+                                             || channelType == Type::DelayReturn; }
+    bool hasMuteSolo()         const { return channelType != Type::Master; }
+    bool hasSidechainControls() const { return channelType == Type::Rhythm
+                                             || channelType == Type::EffectReturn
+                                             || channelType == Type::DelayReturn
+                                             || channelType == Type::ReverbReturn; }
+    bool hasOutputBus()        const { return channelType == Type::Rhythm; }
+    bool hasInsert()           const { return channelType == Type::Master; }
 
     void updateDbLabel(float level);
 
@@ -143,4 +159,7 @@ private:
     juce::Rectangle<int> sidechainPaneBounds;
     juce::Rectangle<int> sendsPaneBounds;
     juce::Rectangle<int> faderPaneBounds;
+
+    // Y coordinate of the horizontal divider between INS 1 and INS 2 (Master only).
+    int insertMidY = 0;
 };

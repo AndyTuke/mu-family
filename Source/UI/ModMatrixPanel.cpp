@@ -28,8 +28,8 @@ ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex,
     sourceLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
 
     ModDest::populate(destCombo, driveChar);
-    for (int i = 0; i < ModDest::ids.size(); ++i)
-        if (ModDest::ids[i].toStdString() == a.destinationId)
+    for (int i = 0; i < ModDest::kTableSize; ++i)
+        if (ModDest::kTable[i].id == a.destinationId)
             { destCombo.setSelectedId(i + 1); break; }
 
     depthSlider.setSliderStyle(juce::Slider::LinearHorizontal);
@@ -55,8 +55,8 @@ ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex,
     };
     destCombo.onChange = [this](int id_)
     {
-        if (id_ >= 1 && id_ <= ModDest::ids.size() && onDestChange)
-            onDestChange(ModDest::ids[id_ - 1].toStdString());
+        if (id_ >= 1 && id_ <= ModDest::kTableSize && onDestChange)
+            onDestChange(ModDest::kTable[id_ - 1].id);
     };
     removeBtn.onClick = [this] { if (onRemove) onRemove(); };
 
@@ -107,7 +107,7 @@ ModMatrixPanel::ModMatrixPanel()
             a.id            = "cs" + std::to_string(csIdx) + "_assign_" +
                               juce::Uuid().toString().toStdString();
             a.sourceId      = "cs" + std::to_string(csIdx) + "_output";
-            a.destinationId = ModDest::ids[0].toStdString();
+            a.destinationId = ModDest::kTable[0].id;
             a.depth         = 0.0f;
             lockMods(*rhythm);
             rhythm->modulationMatrix.addAssignment(a);

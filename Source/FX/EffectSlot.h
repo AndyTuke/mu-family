@@ -47,6 +47,12 @@ public:
     // Access the embedded DelaySlot used when algo == kEchoAlgoIndex.
     DelaySlot& getEchoDelay() { return echoDelay; }
 
+    // True when the feedback loop must run every block regardless of input signal.
+    bool needsContinuousProcessing() const
+    {
+        return algorithmIndex == kEchoAlgoIndex && enabled && echoDelay.isEnabled();
+    }
+
 private:
     std::unique_ptr<EffectAlgorithmBase> makeAlgorithm(int index);
 

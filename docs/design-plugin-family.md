@@ -17,11 +17,11 @@ The code must be structured so these shared components live in a single `mu-core
 
 ---
 
-## Current state (pre-Stage 33)
+## Architecture as of Stage 33
 
-All source files are compiled directly into the `mu-clid` plugin target. `mu-clid-lite` recompiles the same files from scratch — there is no shared library. The modulation stack (`ModulationMatrix`, `ControlSequence`) lives inside the `Rhythm` struct, tightly coupling it to the Euclidean rhythm concept.
+Stage 33 introduced the `mu-core` INTERFACE library, `VoiceSlot` base struct, `ProcessorBase`, and the `MuLookAndFeel` rename. See "Stage 33 (complete)" section below for details.
 
-### What is already well-decoupled
+### Shared (mu-core) components
 
 | Component | File(s) | Status |
 |---|---|---|
@@ -34,23 +34,23 @@ All source files are compiled directly into the `mu-clid` plugin target. `mu-cli
 | All UI components | `UI/Components/` | ✅ No audio coupling |
 | `MixerChannel`, `MixerOverlay`, `FXRow` | `UI/` | ✅ Driven by `MixerEngine` state; no sequencer knowledge |
 
-### What is mu-clid-specific
+### mu-clid-specific components
 
 | Component | Why specific |
 |---|---|
 | `SequencerEngine` | Euclidean pattern generation, rhythm slot management |
-| `Rhythm` struct | Contains `HitGenerator genA/B/C` (Euclidean); also hosts modulation (to be extracted) |
+| `Rhythm : VoiceSlot` | Adds `HitGenerator genA/B/C` (Euclidean) on top of the shared `VoiceSlot` base |
 | `HitGenerator` | Euclidean algorithm |
 | `EuclideanPanel`, `RhythmPanel`, `RhythmCircle`, `RhythmSidebar` | Euclidean UI |
-| `ModMatrixPanel`, `ModulatorEditor` | Currently reference Rhythm directly — become shared once #259 lands |
+| `ModMatrixPanel`, `ModulatorEditor` | Take `VoiceSlot&` — shared once mu-tant targets them |
 
 ---
 
-## Stage 33 changes
+## Stage 33 (complete — build 368)
 
-### #258 — `mu-core` CMake STATIC library
+### #258 — `mu-core` CMake INTERFACE library
 
-Create a `juce_add_library(mu-core STATIC ...)` target in `CMakeLists.txt`. Move the shared source files into it. Both `mu-clid` and `mu-clid-lite` (and future mu-tant) call `target_link_libraries(... mu-core)`.
+`add_library(mu-core INTERFACE)` in `CMakeLists.txt` propagates shared source files via `target_sources(mu-core INTERFACE ...)`. Both `mu-clid` and `mu-clid-lite` call `target_link_libraries(... mu-core)`. INTERFACE chosen over STATIC because JUCE's CMake module-initialisation macros are propagated only via `juce_add_plugin`'s INTERFACE targets — a STATIC library that doesn't link them would fail with "No global header file was included!".
 
 **Shared (mu-core):**
 ```
@@ -62,7 +62,7 @@ Source/Audio/MultiModeFilter.{h,cpp}
 Source/Audio/SamplePlayer.{h,cpp}
 Source/FX/**
 Source/Modulation/**
-Source/UI/Components/**
+Source/UI/Components/**   (includes MuLookAndFeel.h/.cpp)
 Source/UI/FXRow.{h,cpp}
 Source/UI/MixerChannel.{h,cpp}
 Source/UI/MixerOverlay.{h,cpp}
@@ -71,85 +71,65 @@ Source/UI/MixerOverlay.{h,cpp}
 **mu-clid only:**
 ```
 Source/Sequencer/SequencerEngine.{h,cpp}
-Source/Sequencer/Rhythm.{h,cpp}          ← until #259 splits this
+Source/Sequencer/VoiceSlot.h              ← base struct for shared voice data
+Source/Sequencer/Rhythm.{h,cpp}
 Source/Sequencer/HitGenerator.{h,cpp}
 Source/UI/EuclideanPanel.{h,cpp}
 Source/UI/RhythmPanel.{h,cpp}
 Source/UI/RhythmCircle.{h,cpp}
 Source/UI/RhythmSidebar.{h,cpp}
-Source/UI/ModMatrixPanel.{h,cpp}         ← until #259 confirms they're generic
+Source/UI/ModMatrixPanel.{h,cpp}
 Source/UI/ModulatorEditor.{h,cpp}
 Source/PluginProcessor.{h,cpp}
 Source/PluginEditor.{h,cpp}
 ```
 
-### #259 — `VoiceSlot` base struct (generalise `Rhythm`)
+### #259 — `VoiceSlot` base struct (done)
 
-Extract non-Euclidean members from `Rhythm` into a `VoiceSlot` base:
+Non-Euclidean members extracted from `Rhythm` into `Source/Sequencer/VoiceSlot.h`. Explicit copy constructor and assignment operator provided because `std::atomic<bool>` is non-copyable:
 
 ```cpp
-// Sequencer/VoiceSlot.h  (goes into mu-core)
+// Sequencer/VoiceSlot.h
 struct VoiceSlot {
+    static constexpr int MaxControlSequences = 8;
     VoiceParams                   voiceParams;
     std::vector<ControlSequence>  controlSequences;
     ModulationMatrix              modulationMatrix;
-    juce::SpinLock                modLock;
-    bool                          mute   = false;
+    mutable std::atomic<bool>     modLock { false };  // audio thread try-locks; message thread spins
     juce::String                  name;
-    juce::String                  colour;
+    int                           colourIndex = 0;
+    // explicit copy ctor/assignment defined (atomic members are non-copyable)
 };
 
-// Sequencer/Rhythm.h  (stays mu-clid only)
+// Sequencer/Rhythm.h
 struct Rhythm : public VoiceSlot {
     HitGenerator genA, genB, genC;
+    // ...
 };
 ```
 
-After this change:
-- `SequencerEngine` stores `std::vector<Rhythm>`
-- mu-tant's engine stores `std::vector<VoiceSlot>` (or a derived type with its own trigger data)
-- `ModMatrixPanel` and `ModulatorEditor` can be templated / updated to take `VoiceSlot&` — making them shared too
+`SequencerEngine` stores `std::vector<Rhythm>`. mu-tant's engine will store `std::vector<VoiceSlot>` or a derived type.
 
-### #260 — `ProcessorBase` shared skeleton
+### #260 — `ProcessorBase` shared skeleton (done)
 
-A base class (or mixin) that handles the per-block work common to all μ plugins:
+`Source/ProcessorBase.{h,cpp}` — `PluginProcessor` now inherits `ProcessorBase` instead of `AudioProcessor` directly. `ProcessorBase` owns `fxChain` and `mixerEngine` (both `public`) and provides `processCoreBlock()` which calls `fxChain.setHostBpm()` then `mixerEngine.processBlock()`. mu-tant's future processor will extend the same base.
 
-```cpp
-// mu-core ProcessorBase
-class ProcessorBase : public juce::AudioProcessor {
-protected:
-    FXChain     fxChain;
-    MixerEngine mixerEngine;
+### #261 — `MuClidLookAndFeel` → `MuLookAndFeel` (done)
 
-    // Called from derived processBlock — applies modulation and mixes voices.
-    // Derived class provides: active voice engines, active VoiceSlots, numSamples.
-    void processCoreBlock(juce::AudioBuffer<float>& buffer,
-                          std::unique_ptr<VoiceEngine>* voices,
-                          VoiceSlot** slots,
-                          int numSlots,
-                          int numSamples,
-                          double beatPosition);
-};
-```
-
-`PluginProcessor` (mu-clid) calls `processCoreBlock` from its own `processBlock` after the Euclidean sequencer has fired triggers.
-mu-tant's processor calls the same after its own trigger engine fires.
-
-### #261 — `MuClidLookAndFeel` → `MuLookAndFeel`
-
-Rename the class and move it into `mu-core`. Add a backward-compat typedef in mu-clid:
+`Source/UI/Components/MuLookAndFeel.{h,cpp}` holds the renamed class. `MuClidLookAndFeel.h` is a backward-compat shim:
 
 ```cpp
-using MuClidLookAndFeel = MuLookAndFeel;  // in mu-clid only
+#include "MuLookAndFeel.h"
+using MuClidLookAndFeel = MuLookAndFeel;
 ```
 
-All colour tokens, control sizes, and paint helpers stay identical. Update all `#include "MuClidLookAndFeel.h"` sites.
+All 58 existing `#include "MuClidLookAndFeel.h"` sites compile unchanged via the shim. `CMakeLists.txt` compiles `MuLookAndFeel.cpp` via `mu-core`.
 
 ---
 
 ## mu-tant plugin structure (Stage 34+)
 
-Once Stage 33 is complete, a new `mu-tant/` plugin directory can be created. It will:
+A new `mu-tant/` plugin directory can be created. It will:
 
 1. Have its own `CMakeLists.txt` that adds a JUCE plugin target and links `mu-core`
 2. Provide its own `PluginProcessor` (extending `ProcessorBase`)

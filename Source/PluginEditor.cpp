@@ -41,6 +41,23 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         showSaveDialog(true);
     };
 
+    transportBar.onNewPreset = [this]
+    {
+        const juce::File defaultFile = processorRef.getPresetsDir().getChildFile("_default.muclid");
+        if (!defaultFile.existsAsFile())
+        {
+            statusBar.showParam("New", "No default preset saved — use Save \xe2\x86\x92 Save as Default first",
+                                MuClidLookAndFeel::colour(MuClidLookAndFeel::knobLevel));
+            return;
+        }
+        processorRef.loadPreset(defaultFile);
+        sidebar.refreshItems();
+        rhythmPanel.setRhythm(0);
+        sidebar.setSelectedIndex(0);
+        if (mixerVisible) { mixerOverlay.refresh(); mixerOverlay.loadFromAPVTS(); }
+        transportBar.setLoadedPreset({});
+    };
+
     processorRef.onSaveAndQuit = [this](std::function<void()> quitCallback)
     {
         pendingQuitCallback = std::move(quitCallback);
@@ -125,20 +142,36 @@ PluginEditor::PluginEditor(PluginProcessor& p)
                                const juce::String& category,
                                bool embedSamples)
     {
-        processorRef.savePreset(name, desc, category, embedSamples);
-        transportBar.refreshPresets();
-        // #241: select the just-saved preset in the dropdown so the user sees
-        // its name immediately. Mirror savePreset's filename sanitisation.
+        // "Save as Default" — overwrite _default unconditionally.
+        if (saveDialog.isSaveAsDefault())
+        {
+            doSavePreset("_default", desc, category, embedSamples);
+            return;
+        }
+
         juce::String safeName = name.replaceCharacters("\\/:|*?<>\"", "_________");
         if (safeName.isEmpty()) safeName = "Preset";
-        transportBar.setLoadedPreset(processorRef.getPresetsDir().getChildFile(safeName + ".muclid"));
-        showSaveDialog(false);
-        if (pendingQuitCallback)
+        const juce::File destFile = processorRef.getPresetsDir().getChildFile(safeName + ".muclid");
+
+        if (destFile.existsAsFile())
         {
-            auto cb = std::move(pendingQuitCallback);
-            pendingQuitCallback = nullptr;
-            cb();
+            juce::Component::SafePointer<PluginEditor> safeThis(this);
+            auto* w = new juce::AlertWindow("Overwrite Preset",
+                                            "Overwrite \"" + name + "\"?",
+                                            juce::AlertWindow::QuestionIcon);
+            w->addButton("Overwrite", 1, juce::KeyPress(juce::KeyPress::returnKey));
+            w->addButton("Cancel",    0, juce::KeyPress(juce::KeyPress::escapeKey));
+            w->enterModalState(true,
+                juce::ModalCallbackFunction::create(
+                    [safeThis, n = name, d = desc, c = category, e = embedSamples](int result)
+                    {
+                        if (safeThis && result == 1)
+                            safeThis->doSavePreset(n, d, c, e);
+                    }),
+                true);
+            return;
         }
+        doSavePreset(name, desc, category, embedSamples);
     };
     saveDialog.onCancel = [this]
     {
@@ -376,10 +409,50 @@ void PluginEditor::showSaveDialog(bool show)
     if (show)
     {
         presetBrowser.refresh(processorRef.getPresetsDir());
-        saveDialog.setKnownCategories(presetBrowser.getCategories());
+        // Merge categories from both browsers + the shared categories.txt
+        juce::StringArray merged = presetBrowser.getCategories();
+        for (const auto& c : processorRef.loadCategoryList())
+            if (!merged.contains(c, false)) merged.add(c);
+        for (const auto& c : rhythmPanel.getKnownCategories())
+            if (!merged.contains(c, false)) merged.add(c);
+        merged.sort(false);
+        saveDialog.setKnownCategories(merged);
+        rhythmPanel.setKnownCategories(merged);
+
+        // Pre-fill name, category, and embed from the currently loaded preset.
+        const juce::File loaded = transportBar.getLoadedPresetFile();
+        if (loaded.existsAsFile())
+        {
+            saveDialog.setDefaultName(loaded.getFileNameWithoutExtension());
+            if (auto xml = juce::parseXML(loaded))
+            {
+                auto state = juce::ValueTree::fromXml(*xml);
+                saveDialog.setDefaultCategory(state.getProperty("presetCategory",    "").toString());
+                saveDialog.setDefaultEmbed   ((int)state.getProperty("presetEmbedSamples", 0) != 0);
+            }
+        }
     }
     saveDialog.setVisible(show);
     saveDialog.toFront(false);
+}
+
+void PluginEditor::doSavePreset(const juce::String& name, const juce::String& desc,
+                                const juce::String& category, bool embedSamples)
+{
+    processorRef.savePreset(name, desc, category, embedSamples);
+    processorRef.ensureCategoryInList(category);
+    rhythmPanel.setKnownCategories(processorRef.loadCategoryList());
+    transportBar.refreshPresets();
+    juce::String safeName = name.replaceCharacters("\\/:|*?<>\"", "_________");
+    if (safeName.isEmpty()) safeName = "Preset";
+    transportBar.setLoadedPreset(processorRef.getPresetsDir().getChildFile(safeName + ".muclid"));
+    showSaveDialog(false);
+    if (pendingQuitCallback)
+    {
+        auto cb = std::move(pendingQuitCallback);
+        pendingQuitCallback = nullptr;
+        cb();
+    }
 }
 
 void PluginEditor::showPresetBrowser(bool show)

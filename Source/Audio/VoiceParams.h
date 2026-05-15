@@ -51,5 +51,5 @@ struct VoiceParams
     float accentDb    = 0.0f;        // 0..12 dB boost applied to accented steps
 
     // ─── Modulation scratchpad (audio thread only, not persisted) ────────
-    float pitchMod    = 0.0f;        // semitone offset added by modulators, -24..+24
+    float pitchMod    = 0.0f;        // semitone offset added by modulators, -48..+48
 };

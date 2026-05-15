@@ -77,8 +77,8 @@ ModulatorEditor::AssignmentRow::AssignmentRow(const std::string& assignId, int d
     };
     destCombo.onChange = [this](int id_)
     {
-        if (id_ >= 1 && id_ <= ModDest::ids.size() && onDestChange)
-            onDestChange(ModDest::ids[id_ - 1].toStdString());
+        if (id_ >= 1 && id_ <= ModDest::kTableSize && onDestChange)
+            onDestChange(ModDest::kTable[id_ - 1].id);
     };
     removeBtn.onClick = [this] { if (onRemove) onRemove(); };
 
@@ -292,6 +292,7 @@ void ModulatorEditor::wireHeader()
         stepMult.setVisible(!smooth);
         if (!smooth) syncStepValues();
         else loadFromCS();
+        updateStepQuantization();
         resized();
         if (onChange) onChange();
     };
@@ -306,6 +307,7 @@ void ModulatorEditor::wireHeader()
         unlockMod();
         lfoEditor.setUnipolar(unipolar);
         stepEditor.setUnipolar(unipolar);
+        updateStepQuantization();
         if (onChange) onChange();
     };
 }
@@ -385,7 +387,7 @@ void ModulatorEditor::addTarget()
     ModulationAssignment a;
     a.id            = cs->id + "_assign_" + juce::Uuid().toString().toStdString();
     a.sourceId      = cs->id + "_output";
-    a.destinationId = ModDest::ids[0].toStdString();
+    a.destinationId = ModDest::kTable[0].id;
     a.depth         = 0.0f;
     lockMod();
     matrix->addAssignment(a);
@@ -435,6 +437,31 @@ void ModulatorEditor::scrollRowPage(int delta)
     repaint();
 }
 
+void ModulatorEditor::updateStepQuantization()
+{
+    // In stepped mode, snap the step editor to 7 discrete levels when any assignment
+    // targets pitch.octave (bipolar = -3..+3, i.e. 7 values; unipolar = 0..+3, 4 values).
+    if (!cs || cs->mode != ControlSequence::Mode::Stepped)
+    {
+        stepEditor.setQuantization(0);
+        return;
+    }
+    const bool bipolar = (cs->polarity == ControlSequence::Polarity::Bipolar);
+    for (const auto& row : rows)
+    {
+        const int id = row->destCombo.getSelectedId();
+        if (id >= 1 && id <= ModDest::kTableSize)
+        {
+            if (std::string(ModDest::kTable[id - 1].id) == "pitch.octave")
+            {
+                stepEditor.setQuantization(bipolar ? 7 : 4);
+                return;
+            }
+        }
+    }
+    stepEditor.setQuantization(0);
+}
+
 void ModulatorEditor::rebuildRows()
 {
     for (auto& row : rows) rowsBox.removeChildComponent(row.get());
@@ -451,8 +478,8 @@ void ModulatorEditor::rebuildRows()
         row->rowNumber = (int)rows.size() + 1;
         rowsBox.addAndMakeVisible(*row);
 
-        for (int i = 0; i < ModDest::ids.size(); ++i)
-            if (ModDest::ids[i].toStdString() == a.destinationId)
+        for (int i = 0; i < ModDest::kTableSize; ++i)
+            if (ModDest::kTable[i].id == a.destinationId)
                 { row->destCombo.setSelectedId(i + 1); break; }
 
         row->depthSlider.setValue(a.depth, juce::dontSendNotification);
@@ -490,6 +517,7 @@ void ModulatorEditor::rebuildRows()
             na.curve         = c;   // #224: preserve curve through dest change
             matrix->addAssignment(na);
             unlockMod();
+            updateStepQuantization();
             if (onChange) onChange();
         };
         row->onDepthChange = [this, rowId](float d)
@@ -511,6 +539,7 @@ void ModulatorEditor::rebuildRows()
 
         rows.push_back(std::move(row));
     }
+    updateStepQuantization();
 }
 
 void ModulatorEditor::resized()

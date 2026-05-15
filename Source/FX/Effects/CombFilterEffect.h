@@ -2,6 +2,7 @@
 
 #include "EffectAlgorithmBase.h"
 #include <vector>
+#include <cmath>
 
 class CombFilterEffect : public EffectAlgorithmBase
 {
@@ -21,7 +22,12 @@ public:
         bufL.assign(MaxDelaySamples, 0.0f);
         bufR.assign(MaxDelaySamples, 0.0f);
         writePosL = writePosR = 0;
-        updateDelaySamples();
+
+        // 20 ms glide on delay-length changes eliminates clicks when sweeping cutoff.
+        smoothCoeff = (float)std::exp(-1.0 / (0.020 * sampleRate));
+
+        updateDelayTarget();
+        smoothedDelayL = smoothedDelayR = targetDelaySamples;
     }
 
     void processInner(juce::dsp::AudioBlock<float>& block) override
@@ -42,11 +48,13 @@ public:
             const float inL = (dataL != nullptr) ? dataL[i] : 0.0f;
             const float inR = (dataR != nullptr) ? dataR[i] : 0.0f;
 
-            const int readPosL = (writePosL - delaySamples + MaxDelaySamples) % MaxDelaySamples;
-            const int readPosR = (writePosR - delaySamples + MaxDelaySamples) % MaxDelaySamples;
+            // Smooth delay length each sample to avoid discontinuities when freq changes.
+            smoothedDelayL = smoothCoeff * smoothedDelayL + (1.0f - smoothCoeff) * targetDelaySamples;
+            smoothedDelayR = smoothedDelayL;  // mono delay length, same for both channels
 
-            const float combL = bufL[readPosL];
-            const float combR = bufR[readPosR];
+            // Linear interpolation for fractional delay read.
+            const float combL = readInterp(bufL, writePosL, smoothedDelayL);
+            const float combR = readInterp(bufR, writePosR, smoothedDelayR);
 
             bufL[writePosL] = inL + combL * fb;
             bufR[writePosR] = inR + combR * fb;
@@ -61,26 +69,41 @@ public:
 
     void setParam(const juce::String& id, float value) override
     {
-        if      (id == "freq")     { freq        = value; updateDelaySamples(); }
-        else if (id == "feedback") feedbackAmt   = value / 100.0f;
-        else if (id == "output")   outputDb      = value;
-        else if (id == "mix")      mix           = value / 100.0f;
+        if      (id == "freq")     { freq = value; updateDelayTarget(); }
+        else if (id == "feedback") feedbackAmt = value / 100.0f;
+        else if (id == "output")   outputDb    = value;
+        else if (id == "mix")      mix         = value / 100.0f;
     }
 
 private:
-    void updateDelaySamples()
+    static float readInterp(const std::vector<float>& buf, int writePos, float delaySamples)
     {
-        delaySamples = juce::jlimit(1, MaxDelaySamples, static_cast<int>(sr / freq));
+        const float d    = juce::jlimit(1.0f, (float)(MaxDelaySamples - 1), delaySamples);
+        const int   di   = (int)d;
+        const float frac = d - (float)di;
+        const int   r0   = (writePos - di     + MaxDelaySamples) % MaxDelaySamples;
+        const int   r1   = (writePos - di - 1 + MaxDelaySamples) % MaxDelaySamples;
+        return buf[r0] * (1.0f - frac) + buf[r1] * frac;
+    }
+
+    void updateDelayTarget()
+    {
+        targetDelaySamples = juce::jlimit(1.0f, (float)MaxDelaySamples,
+                                          (float)(sr / (double)freq));
     }
 
     FXAlgorithmDef def;
 
-    float  freq        = 500.0f;
-    float  feedbackAmt = 0.5f;
-    float  outputDb    = 0.0f;
-    float  mix         = 0.5f;
-    double sr          = 44100.0;
-    int    delaySamples = 88;
+    float  freq           = 500.0f;
+    float  feedbackAmt    = 0.5f;
+    float  outputDb       = 0.0f;
+    float  mix            = 0.5f;
+    double sr             = 44100.0;
+
+    float targetDelaySamples = 88.0f;
+    float smoothedDelayL     = 88.0f;
+    float smoothedDelayR     = 88.0f;
+    float smoothCoeff        = 0.9f;
 
     std::vector<float> bufL, bufR;
     int writePosL = 0, writePosR = 0;

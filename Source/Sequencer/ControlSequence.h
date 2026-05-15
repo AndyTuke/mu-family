@@ -11,7 +11,7 @@ class ControlSequence
 public:
     enum class Mode        { Smooth, Stepped };
     enum class Polarity    { Unipolar, Bipolar };
-    enum class InputSource { Internal };  // MIDI_CC removed in #136b
+    enum class InputSource { Internal };  // MIDI_CC removed in #308
 
     struct CurvePoint
     {

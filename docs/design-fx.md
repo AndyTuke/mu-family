@@ -56,7 +56,7 @@ The Effect slot hosts modulation and time-based algorithms only:
 
 **Echo** — simple stereo echo without BPM sync (use the dedicated Delay slot for sync'd delay). R delay = L delay × (1 + spread × 0.1) for stereo widening via ping-pong feel. Feedback controls decay. Mix is wet/dry blend. Intended for short slapback and room-simulation echoes.
 
-**Algorithm switch thread safety:** `EffectSlot::setAlgorithm()` calls `prepare()` internally. It must be called from the **message thread only** — calling it from the audio thread during playback is not safe. Full audio-thread-safe hot-swap (via atomic pointer exchange) is deferred to Stage 10 APVTS wiring.
+**Algorithm switch thread safety:** `EffectSlot::setAlgorithm()` calls `prepare()` internally. It must be called from the **message thread only** — calling it from the audio thread during playback is not safe.
 
 **No oversampling required:** All four Effect algorithms are linear or operate on delay-line modulation; there is no nonlinear waveshaping that generates out-of-band harmonics.
 
@@ -81,88 +81,22 @@ The Effect slot hosts modulation and time-based algorithms only:
 
 | Algorithm | Library | Character | Parameters |
 |---|---|---|---|
-| Room | Signalsmith (planned) | Tight natural space | Size, pre-delay, diffusion, damp, mod, dirt |
-| Hall | Signalsmith (planned) | Long lush decay | Size, pre-delay, diffusion, damp, mod, dirt |
-| Plate | Signalsmith (planned) | Dense metallic | Size, pre-delay, diffusion, damp, mod, dirt |
-| Spring | Signalsmith (planned) | Lo-fi mechanical | Size, pre-delay, diffusion, damp, mod, dirt |
+| Room | Signalsmith FDN | Tight natural space | Size, pre-delay, diffusion, damp, mod, dirt |
+| Hall | Signalsmith FDN | Long lush decay | Size, pre-delay, diffusion, damp, mod, dirt |
+| Plate | Signalsmith FDN | Dense metallic | Size, pre-delay, diffusion, damp, mod, dirt |
+| Spring | Signalsmith FDN | Lo-fi mechanical | Size, pre-delay, diffusion, damp, mod, dirt |
 
 Reverb has **no mix knob** — it is always a pure send. Shimmer removed from v1 (requires pitch shifting in feedback loop — v2 feature).
 
 **Current implementation (Stage 15+):** All four reverb algorithms use the Signalsmith FDN reverb (integrated Stage 15). Algorithm selection applies parameter presets that bias `roomMs`/`rt20`/`early`/damping for different characters.
 
-### Stage 15: Signalsmith Reverb Integration Plan
+### Stage 15: Signalsmith Reverb (complete)
 
-**Library acquisition (manual step required):**
-The reverb is in the `signalsmith-audio/basics` repo — **not** `signalsmith-audio/dsp`.
+Integrated the Signalsmith FDN reverb (`signalsmith-audio/basics`) as a pimpl in `ReverbSlot`. Headers in `ThirdParty/signalsmith-basics/include/` added as `SYSTEM PRIVATE` in `CMakeLists.txt` to avoid `signalsmith-dsp/windows.h` shadowing the Windows SDK.
 
-```
-git clone https://github.com/Signalsmith-Audio/basics.git ThirdParty/signalsmith-basics
-```
+**Implementation:** `signalsmith::basics::ReverbFloat` wrapped behind a pimpl to keep Signalsmith headers out of `ReverbSlot.h`. Pre-delay buffer and `dirt` (tanh saturation) remain before the reverb call. Algorithm presets bias `roomMs`/`rt20`/`early`/`detune`/`highCutHz`/`highDampRate` for each character. UI params (Size, Decay, Diffusion, Damp, Mod) map to those member fields.
 
-Headers needed (both required):
-- `include/signalsmith-basics/reverb.h` — the reverb effect
-- `include/stfx/stfx-library.h` — the LibraryEffect wrapper (reverb.h depends on it)
-
-The repo also contains `chorus.h` and `freq-shifter.h` — candidates for future effect upgrades (Stage 17+).
-
-**CMakeLists.txt change** — add before `target_sources`:
-```cmake
-target_include_directories(mu-clid PRIVATE ThirdParty/signalsmith-basics/include)
-```
-
-**Include in ReverbSlot.h:**
-```cpp
-#include "signalsmith-basics/reverb.h"
-```
-
-**Class to use:** `ReverbFloat` (= `stfx::LibraryEffect<float, ReverbSTFX>`)
-
-**Real API (verified from source):**
-
-```cpp
-// Member — replace juce::Reverb in ReverbSlot
-ReverbFloat ssReverb;
-
-// prepare() — configure for current sample rate and block size
-ssReverb.configure(sampleRate, maxBlockSize, 2 /*channels*/);
-
-// process() — inputs/outputs use [channel][sample] indexing
-// Wrap juce::AudioBuffer<float> with a thin adaptor:
-struct JuceBufferAdaptor {
-    juce::AudioBuffer<float>& buf;
-    float* operator[](int ch) { return buf.getWritePointer(ch); }
-};
-JuceBufferAdaptor io { buffer };
-ssReverb.process(io, io, numSamples);
-
-// reset() — clears internal buffers
-ssReverb.reset();
-```
-
-Parameters are public members assigned directly. They fade to the new value over ~20ms internally — no manual smoothing needed in ReverbSlot.
-
-**Parameter names and algorithm presets:**
-
-| Member | Range | Room | Hall | Plate | Spring |
-|---|---|---|---|---|---|
-| `ssReverb.roomMs` | 10–200 | 80 | 180 | 50 | 120 |
-| `ssReverb.rt20` | 0.01–30 s | 1.2 | 3.5 | 2.0 | 1.8 |
-| `ssReverb.early` | 0–2.5 | 1.0 | 1.2 | 1.8 | 0.6 |
-| `ssReverb.detune` | 0–50 | 5 | 15 | 8 | 20 |
-| `ssReverb.highCutHz` | 1000–20000 | 6000 | 5000 | 8000 | 3500 |
-| `ssReverb.highDampRate` | 1–10 | 3 | 4 | 2 | 6 |
-| `ssReverb.wet` | 0–1 | 1.0 | 1.0 | 1.0 | 1.0 |
-| `ssReverb.dry` | 0–1 | 0.0 | 0.0 | 0.0 | 0.0 |
-
-The UI params (Size, Decay, Diffusion, Damp, Mod) map to `roomMs`, `rt20`, `early`, `highCutHz`/`highDampRate`, and `detune` respectively.
-
-The existing `dirt` (tanh pre-saturation) and pre-delay buffer in `ReverbSlot` sit before the Signalsmith call — keep both as-is.
-
-Spring character: add a 4-stage first-order allpass dispersion chain (poles at 200/400/800/1600 Hz) before the reverb input to simulate frequency-dependent propagation speed of a physical spring coil.
-
-**Reference:** Geraint Luff's walkthrough: `signalsmith-audio.co.uk/writing/2021/lets-write-a-reverb/`
-
-**Pre-delay buffer:** `ReverbSlot` pre-allocates ~100ms of pre-delay buffer (`MaxPreDelaySamples = 192000 / 10`). Pre-delay is applied before the reverb algorithm. Dirt (mild `tanh` saturation) is applied before the reverb for warmth.
+**Pre-delay buffer:** ~100ms pre-allocated (`MaxPreDelaySamples = 192000 / 10`), applied before the reverb. Wet scratch buffers also pre-allocated in `prepare()` — no audio-thread allocation.
 
 ## FXAlgorithmDef Data Class
 
@@ -170,14 +104,16 @@ Stores: algorithm ID, name, category, params (array of `FXParamDef`: id, name, m
 
 The oversampling field is retained in the struct for forward compatibility; all current Effect algorithms set it to 1 (bypass).
 
-**Intra-FX routing (Stage 8 API):** `FXChain` exposes `setEffectToDelaySend()`, `setEffectToReverbSend()`, `setDelayToReverbSend()`. These are wired to Mixer channel strip send knobs in Stage 9. The values default to 0.0 — signal flows in series only until Stage 9.
+**Intra-FX routing:** `FXChain` exposes `setEffectToDelaySend()`, `setEffectToReverbSend()`, `setDelayToReverbSend()`. Wired to Mixer return-channel send knobs. Default 0.0 — no routing unless explicitly set.
 
 ## Effect Algorithm Files (current)
 
 Distortion and filter effect files (`SoftClipEffect`, `HardClipEffect`, `FoldbackEffect`,
 `BitcrushEffect`, `LadderFilterEffect`, `CombFilterEffect`) remain on disk but are no longer
-registered in `FXAlgorithmRegistry::effectAlgorithms()` and are not instantiated. They may be
-deleted in Stage 11 cleanup.
+registered in `FXAlgorithmRegistry::effectAlgorithms()` and are not instantiated — these
+algorithms live in `InsertProcessor` for the voice insert slot instead.
 
-`Source/FX/Effects/FlangerEffect.h` — implemented; same interface as ChorusEffect.
-`Source/FX/Effects/EchoEffect.h` — implemented; simple stereo delay, no sync logic.
+`Source/FX/Effects/FlangerEffect.h` — registered and active in the Effect slot.
+`Source/FX/Effects/PhaserEffect.h` — registered and active in the Effect slot.
+`Source/FX/Effects/ChorusEffect.h` — registered and active in the Effect slot.
+`Source/FX/Effects/EchoEffect.h` — registered and active (Echo = Delay algorithm in Effect slot).

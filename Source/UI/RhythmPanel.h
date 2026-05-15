@@ -8,69 +8,24 @@
 #include "Components/MuClidLookAndFeel.h"
 #include "../PluginProcessor.h"
 
-// Inline overlay listing .muRhyth files from the rhythms folder.
-// Appears as a modal card over the RhythmPanel area.  Call setAccentColour()
-// with the current rhythm colour before making it visible.
-class RhythmPresetBrowser : public juce::Component,
-                            public juce::ListBoxModel
-{
-public:
-    std::function<void(const juce::File&)> onLoad;
-    std::function<void()>                  onClose;
-
-    void setAccentColour(juce::Colour c);
-    void refresh(const juce::File& rhythmsDir);
-
-    RhythmPresetBrowser();
-
-    // ListBoxModel
-    int  getNumRows() override;
-    void paintListBoxItem(int row, juce::Graphics& g, int w, int h, bool sel) override;
-    void listBoxItemClicked(int row, const juce::MouseEvent& e) override;
-    void listBoxItemDoubleClicked(int row, const juce::MouseEvent&) override;
-
-    void paint(juce::Graphics& g) override;
-    void resized() override;
-    void mouseDown(const juce::MouseEvent& e) override;
-
-private:
-    void applyFilter();
-    void loadSelected();
-    juce::Rectangle<int> cardBounds() const;
-
-    juce::TextEditor searchBox;
-    juce::ListBox    listBox;
-    juce::TextButton loadBtn   { "Load" };
-    juce::TextButton cancelBtn { "Cancel" };
-
-    juce::File              dir;
-    std::vector<juce::File> files;
-    std::vector<int>        filtered;
-    int                     selectedRow = -1;
-    juce::Colour            accent { 0xff44cc88 };
-
-    static constexpr int kCardW   = 340;
-    static constexpr int kCardH   = 400;
-    static constexpr int kHeaderH = 36;
-    static constexpr int kSearchH = 32;
-    static constexpr int kBotH    = 44;
-    static constexpr int kPad     = 8;
-};
-
 //==============================================================================
-// Lightweight modal card for saving a rhythm preset: name + embed-samples toggle.
+// Lightweight modal card for saving a rhythm preset: name + category + embed-samples toggle.
 class RhythmSaveDialog : public juce::Component
 {
 public:
-    std::function<void(const juce::String& name, bool embed)> onSave;
+    std::function<void(const juce::String& name,
+                       const juce::String& desc,
+                       const juce::String& category,
+                       bool embed)> onSave;
     std::function<void()> onCancel;
 
     void setDefaultName(const juce::String& n) { nameEditor.setText(n, false); }
-
-    // Called by the owner when the target file already exists; shows a warning and arms
-    // the overwrite flag so the next Save press proceeds unconditionally (#148).
-    void markFileExists();
-    bool isPendingOverwrite() const noexcept { return pendingOverwrite; }
+    void setDefaultDescription(const juce::String& d) { pendingDefaultDesc = d; }
+    void setDefaultCategory(const juce::String& cat) { pendingDefaultCategory = cat; }
+    void setDefaultEmbed(bool embed) { pendingDefaultEmbed = embed; }
+    void setKnownCategories(const juce::StringArray& cats);
+    juce::String resolveCategory() const;
+    bool isSaveAsDefault() const { return saveAsDefaultToggle.getToggleState(); }
 
     RhythmSaveDialog();
     void paint(juce::Graphics&) override;
@@ -80,14 +35,22 @@ public:
 
 private:
     juce::TextEditor   nameEditor;
-    juce::ToggleButton embedToggle { "Embed sample in file" };
-    juce::Label        statusLabel;
+    juce::TextEditor   descEditor;
+    DropdownSelect     categoryDropdown;
+    juce::TextEditor   newCategoryEditor;
+    juce::ToggleButton embedToggle        { "Embed sample in file" };
+    juce::ToggleButton saveAsDefaultToggle { "Save as Default" };
     juce::TextButton   saveBtn   { "Save" };
     juce::TextButton   cancelBtn { "Cancel" };
-    bool               pendingOverwrite = false;
+    juce::StringArray  knownCategories;
+    juce::String       pendingDefaultCategory;
+    juce::String       pendingDefaultDesc;
+    bool               pendingDefaultEmbed = false;
+
+    void updateDefaultModeState();
 
     static constexpr int kCardW = 320;
-    static constexpr int kCardH = 180;  // taller to accommodate status label
+    static constexpr int kCardH = 240;
 };
 
 // Full rhythm editor panel. Layout (top to bottom):
@@ -102,6 +65,10 @@ public:
     ~RhythmPanel() override;
 
     void setRhythm(int index);
+
+    // Propagates merged category list from PluginEditor to the save dialog + browser.
+    void setKnownCategories(const juce::StringArray& cats);
+    juce::StringArray getKnownCategories() const { return knownRhythmCategories; }
 
     std::function<void(const juce::String& name,
                        const juce::String& value,
@@ -128,17 +95,16 @@ private:
     ModulatorPanel  modulatorPanel;
 
     juce::Label      nameLabel;
-    juce::TextButton resetBtn     { juce::String::charToString(0x21BA) }; // ↺
-    juce::TextButton deleteBtn    { juce::String::charToString(0x2715) }; // ✕
+    juce::TextButton resetBtn        { juce::String::charToString(0x21BA) }; // ↺
+    juce::TextButton deleteBtn       { juce::String::charToString(0x2715) }; // ✕
     DropdownSelect   rhythmPresetDropdown;
-    juce::TextButton saveRhythmBtn { "Save" };
-
+    juce::TextButton saveRhythmBtn   { "Save" };
     juce::File lastBrowseDir;
-    RhythmPresetBrowser rhythmBrowser;
     RhythmSaveDialog    rhythmSaveDialog;
 
     std::vector<juce::File> rhythmPresetFiles;
     juce::File              loadedRhythmPresetFile;
+    juce::StringArray       knownRhythmCategories;
     int                     rhythmDropLeft = 0;  // set by PluginEditor after transport bar layout
 
     // Fixed chrome heights/widths

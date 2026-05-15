@@ -51,11 +51,18 @@ void PresetBrowser::refresh(const juce::File& dir)
                   });
     }
 
-    // Build sorted list of unique categories, then repopulate the filter dropdown.
+    // Build sorted list of unique categories from preset metadata + categories.txt.
     knownCategories.clear();
     for (const auto& p : allPresets)
         if (p.category.isNotEmpty() && p.category != "All" && !knownCategories.contains(p.category))
             knownCategories.add(p.category);
+    {
+        juce::StringArray fromFile;
+        dir.getChildFile("categories.txt").readLines(fromFile);
+        for (const auto& c : fromFile)
+            if (c.isNotEmpty() && c != "All" && !knownCategories.contains(c, false))
+                knownCategories.add(c);
+    }
     knownCategories.sort(false);
 
     categoryFilter.clear();

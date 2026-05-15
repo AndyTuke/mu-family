@@ -74,6 +74,9 @@ TransportBar::TransportBar(PluginProcessor& p)
     };
     addAndMakeVisible(presetDropdown);
 
+    newBtn.onClick  = [this] { if (onNewPreset)  onNewPreset();  };
+    addAndMakeVisible(newBtn);
+
     saveBtn.onClick = [this] { if (onSavePreset) onSavePreset(); };
     addAndMakeVisible(saveBtn);
 
@@ -199,24 +202,54 @@ void TransportBar::populatePresetDropdown()
     presetDropdown.clear();
 
     auto dir = proc.getPresetsDir();
-    if (dir.isDirectory())
+    if (!dir.isDirectory()) return;
+
+    struct Entry { juce::File file; juce::String name, category; };
+    std::vector<Entry> entries;
+
+    for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*.muclid"))
     {
-        // #251: sort presets alphabetically by display name (filename without
-        // extension), case-insensitive. JUCE's findChildFiles order is
-        // filesystem-dependent (alphabetical on NTFS, mtime on others), so an
-        // explicit sort makes the dropdown predictable across machines.
-        auto files = dir.findChildFiles(juce::File::findFiles, false, "*.muclid");
-        std::sort(files.begin(), files.end(), [](const juce::File& a, const juce::File& b) {
-            return a.getFileNameWithoutExtension().compareIgnoreCase(b.getFileNameWithoutExtension()) < 0;
-        });
-        for (const auto& f : files)
+        if (f.getFileNameWithoutExtension().equalsIgnoreCase("_default")) continue;
+        Entry e { f, f.getFileNameWithoutExtension(), "Uncategorised" };
+        if (auto xml = juce::parseXML(f))
         {
-            presetFiles.push_back(f);
-            presetDropdown.addItem(f.getFileNameWithoutExtension(), (int)presetFiles.size());
+            auto state = juce::ValueTree::fromXml(*xml);
+            juce::String cat = state.getProperty("presetCategory", "").toString();
+            if (cat.isNotEmpty() && cat != "All" && cat != "Uncategorised")
+                e.category = cat;
         }
+        entries.push_back(std::move(e));
     }
 
-    // No items means no presets; placeholder text handles the empty-state display.
+    // Sort: named categories alphabetically, "Uncategorised" last, name within category.
+    std::sort(entries.begin(), entries.end(), [](const Entry& a, const Entry& b) {
+        const bool aU = (a.category == "Uncategorised");
+        const bool bU = (b.category == "Uncategorised");
+        if (aU != bU) return bU;  // uncategorised goes last
+        const int cc = a.category.compareIgnoreCase(b.category);
+        return cc != 0 ? cc < 0 : a.name.compareIgnoreCase(b.name) < 0;
+    });
+
+    // Determine whether there are multiple distinct categories.
+    bool multiCat = false;
+    if (!entries.empty())
+    {
+        const auto& first = entries.front().category;
+        for (const auto& e : entries)
+            if (e.category.compareIgnoreCase(first) != 0) { multiCat = true; break; }
+    }
+
+    juce::String currentCat;
+    for (const auto& e : entries)
+    {
+        if (multiCat && e.category != currentCat)
+        {
+            currentCat = e.category;
+            presetDropdown.addSectionHeading(currentCat);
+        }
+        presetFiles.push_back(e.file);
+        presetDropdown.addItem(e.name, (int)presetFiles.size());
+    }
 }
 
 void TransportBar::refreshPresets()
@@ -244,6 +277,15 @@ void TransportBar::setLoadedPreset(const juce::File& file)
         }
     }
     presetDropdown.setSelectedId(0, juce::dontSendNotification);
+}
+
+juce::File TransportBar::getLoadedPresetFile() const
+{
+    const int id = presetDropdown.getSelectedId();
+    const int idx = id - 1;
+    if (idx >= 0 && idx < (int)presetFiles.size())
+        return presetFiles[idx];
+    return {};
 }
 
 void TransportBar::setMixerActive(bool active)
@@ -342,6 +384,9 @@ void TransportBar::resized()
 
     saveBtn.setBounds(rightEdge - kSaveW, btnY, kSaveW, btnH);
     rightEdge -= kSaveW + kGap;
+
+    newBtn.setBounds(rightEdge - kNewW, btnY, kNewW, btnH);
+    rightEdge -= kNewW + kGap;
 
     const int presetLeft = loopPaneBounds.getRight() + kGap;
     presetDropdown.setBounds(presetLeft, btnY, rightEdge - presetLeft, btnH);

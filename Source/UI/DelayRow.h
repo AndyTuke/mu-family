@@ -26,6 +26,11 @@ public:
     DelayRow();
 
     void setEnabled(bool e, juce::NotificationType n = juce::dontSendNotification);
+
+    // When false, hides the On button and name label so the row can be positioned
+    // immediately after another row's header (used for echoRow in Echo mode).
+    void setShowHeader(bool show);
+
     void setSyncMode(bool sync);
     void setFreeMs(float ms);
     void setSyncParams(int denominator, bool dotted, bool triplet, int count);
@@ -59,8 +64,9 @@ private:
     KnobWithLabel spreadKnob   { "Spread",   LafId::knobFxSend };
     KnobWithLabel dirtKnob     { "Dirt",     LafId::knobFxSend };
 
-    bool syncMode  = false;
-    bool isEnabled = true;
+    bool syncMode   = false;
+    bool isEnabled  = true;
+    bool showHeader = true;
 
     static constexpr int kToggleW   = 36;
     static constexpr int kNameW     = 60;

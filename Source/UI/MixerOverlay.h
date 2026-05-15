@@ -45,12 +45,13 @@ private:
     DelayRow delayRow;
     FXRow    reverbRow;
 
-    static constexpr int kHeaderH  = 22;   // thin strip above channel strips for meter mode selector
-    static constexpr int kFXGap   = 6;
-    static constexpr int kFXPad   = 6;
-    static constexpr int kDivW     = 4;
-    static constexpr int kChanGap  = 3;
-    static constexpr int kMasterW  = 80;  // strip only; component is kMasterW + MixerChannel::kInsertPanelW
+    static constexpr int kHeaderH    = 22;  // thin strip above channel strips for meter mode selector
+    static constexpr int kFXGap     = 6;
+    static constexpr int kFXPad     = 6;
+    static constexpr int kDivW      = 4;
+    static constexpr int kChanGap   = 3;
+    static constexpr int kMasterW   = 80;  // strip only; component is kMasterW + MixerChannel::kInsertPanelW
+    static constexpr int kLabelPanelW = 38; // narrow panel left of channels with section row labels
 
     // Cached layout values updated each resized() call — read by paint().
     int lastChanW   = 64;

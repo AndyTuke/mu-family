@@ -15,12 +15,15 @@ public:
     std::function<void()>                      onLogoClicked;
     std::function<void(const juce::File&)>     onPresetSelected;
     std::function<void()>                      onSavePreset;
+    std::function<void()>                      onNewPreset;
     std::function<void()>                      onSettingsToggle;
 
     void refreshPresets();
     // #241: keep dropdown displaying the loaded preset's name. Pass an invalid
     // File to revert to the "<unnamed preset>" placeholder.
     void setLoadedPreset(const juce::File& file);
+    // Returns the currently loaded preset file, or an invalid File if none selected.
+    juce::File getLoadedPresetFile() const;
     // Left x of the preset dropdown in TransportBar's own coordinate space
     // (equals editor x since TransportBar is always at x=0).
     int getPresetDropdownLeft() const noexcept;
@@ -43,6 +46,7 @@ private:
     DropdownSelect   loopDropdown;
     juce::Label      loopStepLabel;
     DropdownSelect   presetDropdown;
+    juce::TextButton newBtn   { "New" };
     juce::TextButton saveBtn  { "Save" };
     juce::TextButton gearBtn;
     juce::TextButton mixerBtn { "Mixer" };
@@ -55,6 +59,7 @@ private:
     static constexpr int kLoopW      = 100;
     static constexpr int kLoopStepW  = 56;
     static constexpr int kPresetW    = 240;  // wider preset dropdown
+    static constexpr int kNewW       = 36;
     static constexpr int kSaveW      = 44;
     static constexpr int kGearW      = 28;
     static constexpr int kMixerW     = 80;

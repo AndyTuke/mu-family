@@ -81,6 +81,15 @@ void FXRow::hideParameter(const juce::String& id)
     resized();
 }
 
+void FXRow::setKnobsVisible(bool visible)
+{
+    knobsVisible = visible;
+    for (auto& k : knobs)
+        k->setVisible(visible);
+    resized();
+    repaint();
+}
+
 void FXRow::resized()
 {
     const int h = getHeight();
@@ -95,10 +104,13 @@ void FXRow::resized()
     algorithmDropdown.setBounds(x, (h - 24) / 2, kDropdownW, 24);
     x += kDropdownW + kPadding;
 
-    for (auto& k : knobs)
+    if (knobsVisible)
     {
-        k->setBounds(x, 0, kKnobW, h);
-        x += kKnobW;
+        for (auto& k : knobs)
+        {
+            k->setBounds(x, 0, kKnobW, h);
+            x += kKnobW;
+        }
     }
 }
 

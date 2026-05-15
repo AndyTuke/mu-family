@@ -6,21 +6,17 @@
 SamplePlayer → Pitch ADSR → ResonantFilter → Filter ADSR → Drive → Amplitude ADSR → Channel fader → FX sends → Internal mixer sum
 ```
 
-MIDI mode bypasses the voice chain entirely. Hit event → MidiOutputEngine → MIDI note on/off (user-definable note, fixed velocity or from Euclid C).
-
-**MidiOutputEngine defaults (Stage 8):** note = 36 (C2), channel = 1, note duration = 20ms fixed. Note duration is currently not tempo-linked; it will become configurable (or tied to step length) in Stage 10 when MIDI mode is fully wired. The trigger call from `processBlock` is gated by the MIDI mode flag, which defaults to sample mode — so MidiOutputEngine produces no output until Stage 10 wiring.
-
 ## Voice Chain Stages
 
 | Stage | Parameters | Notes |
 |---|---|---|
 | Sample playback | Mode (one shot/loop), quality (lo-fi/linear/clean), stretch mode | 4-voice polyphonic pool with round-robin steal. Intent is monophonic character: new hit claims the first idle voice, or steals the oldest via round-robin when all 4 are busy. Always plays from beginning. |
-| Voice cut | Overlap fade 1–10ms (default 2ms, user-configurable in Settings) | Outgoing fades out, incoming starts immediately. Prevents clicks. Independent of ADSR. Not yet implemented — current `VoiceEngine` triggers voices directly with no overlap fade; add in Stage 11 polish. |
+| Voice cut | Overlap fade 1–10ms (default 2ms, user-configurable in Settings) | Outgoing fades out, incoming starts immediately. Prevents clicks. Independent of ADSR. **Not yet implemented** — `VoiceEngine` triggers voices directly with no overlap fade. |
 | Loop settings | Tempo (musical/free), length (DropdownSelect + triplet/dotted), fit (pitch/stretch) | Loop mode only. Musical uses DropdownSelect. Free uses ms. |
 | Pitch ADSR | Attack, decay, sustain, release, depth, retrigger mode (Reset/Legato) | Depth in semitones above base pitch. |
-| Resonant filter | Type (LP/HP/BP/notch), cutoff, resonance | `juce::dsp::StateVariableTPTFilter` |
+| Resonant filter | Type (16 modes: LP 6 / LP 12 / LP 24 / BP 12 / BP 24 / HP 6 / HP 12 / HP 24 / Notch / Notch 24 / AP 12 / Comb+ / Comb− / Peak / Lo Shelf / Hi Shelf), cutoff, resonance | SVF (types 0–3), LadderFilter (types 4–6), OnePoleLP/HP (types 7/11), feedback comb (type 8), biquad (types 9/12–14), and mirrored Notch/Comb variants |
 | Filter ADSR | Attack, decay, sustain, release, depth, retrigger mode | Depth controls sweep above base cutoff. Default Reset. |
-| Drive | Character (Soft/Hard/Fold/Bit), drive amount, output trim, tone filter | Placed after filter, before amp. See Drive section below. |
+| Insert | Character (11 algorithms: None / Soft Clip / Hard Clip / Fold / Bitcrusher / Clipper / 3-Band EQ / Compressor / Limiter / Ring Mod / Tape Sat), drive amount, output trim, tone filter | Placed after filter, before amp. `InsertProcessor` handles all algorithms inline at native sample rate. |
 | Amplitude ADSR | Attack, decay, sustain, release, retrigger mode (Reset/Legato), accent | Reset: retriggers from zero. Legato: retriggers from current level. Default Reset. Accent boost applied when step is accented (see below). |
 
 ## Accent
@@ -42,46 +38,45 @@ A step is **accented** when the Ring C (Euclid C) pattern fires a hit on the sam
 accentDb  — float  0–12 dB, default 0
 ```
 
-## Drive Stage
+## Insert Stage
 
-Each rhythm has a dedicated drive insert placed between the filter and the amp envelope. Drive is
-always in the signal path but defaults to unity (drive = 0%, output = 0 dB, no tone cut).
+Each rhythm has a dedicated insert effect slot placed between the filter and the amp envelope. The insert defaults to None (unity bypass). Implemented in `Source/Audio/InsertProcessor.{h,cpp}`, called from `VoiceEngine::process()` at native sample rate (no oversampling).
 
 **Parameters:**
 
 | Parameter | Range | Default | Notes |
 |---|---|---|---|
-| Character | None / Soft / Hard / Fold / Bitcrusher | None | Algorithm selector; see below |
-| Drive | 0–100% | 0% | 0% = unity through all characters |
-| Output | −24–0 dB | 0 dB | Post-drive level trim to compensate for loudness increase |
-| Tone | 20–20000 Hz | 20000 Hz | First-order IIR low-pass on the driven signal; at 20kHz = flat |
+| Character | None / Soft Clip / Hard Clip / Fold / Bitcrusher / Clipper / 3-Band EQ / Compressor / Limiter / Ring Mod / Tape Sat | None | Algorithm selector |
+| Drive | 0–100% | 0% | Pre-gain / threshold / mix depending on algorithm |
+| Output | −24–+24 dB | 0 dB | Post-process level trim (Comp/Limiter use +24 dB for makeup) |
+| Tone | 20–20000 Hz | 20000 Hz | 1-pole IIR LP on output; also acts as Mid Hz in EQ mode |
+| Rate | 100–48000 Hz | 48000 Hz | Bitcrusher sample-rate reduction |
+| Dither | 0–100 | 0 | Bitcrusher TPDF dither / EQ High-shelf gain |
 
-**Character algorithms** (same DSP as the removed shared Effect algorithms):
+**Algorithms (driveChar index):**
 
-| Character | Algorithm | Oversampling |
+| # | Name | Key DSP |
 |---|---|---|
-| None | Bypass (unity) | 1× (bypass) |
-| Soft | `std::tanh` waveshaper | 1× (bypass) |
-| Hard | `juce::jlimit` clamp | 4× |
-| Fold | Triangular foldback | 4× |
-| Bitcrusher | Fixed-point quantise + rate decimator | 2× |
-
-Oversampling applies to the waveshaping only; the drive stage is otherwise inline at the voice's
-native sample rate. Each active voice runs its own `OversampledProcessor` instance. Because there
-are at most 4 concurrent voices per rhythm and at most 8 rhythms, the maximum simultaneous
-oversamplers is 32 — acceptable at 2× or 4×.
-
-**Implementation:** Add a `DriveStage` class in `Source/Audio/` that wraps `OversampledProcessor`
-and switches algorithm on character change (message-thread only, same constraint as
-`EffectSlot::setAlgorithm`). `VoiceEngine` holds one `DriveStage` per voice slot and routes
-audio through it after the filter ADSR.
+| 0 | None | Bypass |
+| 1 | Soft Clip | `tanh` waveshaper with ADAA (`ln(cosh(x))` antiderivative), cosh overflow guard |
+| 2 | Hard Clip | Brickwall clamp with ADAA (`x²/2` / `|x|−0.5` antiderivative) |
+| 3 | Fold | Triangular foldback (direct — ADAA impractical) |
+| 4 | Bitcrusher | 1-pole LP pre-filter → hold-and-sample decimation → TPDF dither → fixed-point quantise |
+| 5 | Clipper | Brickwall threshold clamp — Drive = ceiling fraction (0–1); no ADAA |
+| 6 | 3-Band EQ | Three biquad IIR filters: Low shelf (fixed 200 Hz), Mid peak (sweepable, Tone Hz), High shelf (fixed 8 kHz); Drive/Dither/Output = Low/High/Mid gain ±18 dB |
+| 7 | Compressor | Feed-forward peak detector; ratio 4:1; Drive = threshold (0 → −40 dB) |
+| 8 | Limiter | Same as Compressor with ratio 100:1 |
+| 9 | Ring Mod | `x *= (1 − mix + sin(phase) × mix)`; Tone = carrier frequency (10–5000 Hz) |
+| 10 | Tape Sat | Pre-gain → `tanh` → DC block (HP@20 Hz) → 1-pole LP Tone filter → output trim |
 
 **APVTS params per rhythm (suffix):**
 ```
-driveChar   — int  0=None, 1=Soft, 2=Hard, 3=Fold, 4=Bitcrusher
-driveDrive  — float 0–100
-drvOut      — float -24–0 dB
-driveTone   — float 20–20000 Hz
+drvChar   — int    0–10 (algorithm index)
+drvDrv    — float  0–100 (drive / threshold / mix)
+drvOut    — float  −24–+24 dB (output / makeup gain)
+drvTon    — float  20–20000 Hz (tone LPF / mid EQ freq / ring-mod freq)
+drvRate   — float  100–48000 Hz (bitcrusher sample rate)
+drvDit    — float  0–100 (dither / EQ high-shelf gain)
 ```
 
 ## Interpolation Quality
@@ -92,7 +87,7 @@ driveTone   — float 20–20000 Hz
 | Linear | Linear interpolation | Slight smoothing, still characterful |
 | Clean | Cubic interpolation | Smooth, professional quality |
 
-**Implementation status:** Interpolation quality selection is not yet implemented. `SamplePlayer` currently uses nearest-neighbour (integer truncation of `playPos`). Quality selector wiring is Stage 10. All three modes will share the same `SamplePlayer::process()` path via a quality enum parameter.
+**Implementation status:** Interpolation quality selection is **not yet implemented**. `SamplePlayer` currently uses nearest-neighbour (integer truncation of `playPos`). All three modes will share the same `SamplePlayer::process()` path via a quality enum parameter when implemented.
 
 ## Sample File Handling
 

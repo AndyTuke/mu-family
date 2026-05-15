@@ -19,13 +19,11 @@ This document is the authoritative reference for the visual and interaction lang
 
 ## 2. Shared LookAndFeel
 
-The shared class is **`MuLookAndFeel`** (in `mu-shared`). It lives in `mu-shared/UI/MuLookAndFeel.h/.cpp`.
+The shared class is **`MuLookAndFeel`**, located at `Source/UI/Components/MuLookAndFeel.{h,cpp}` and compiled into `mu-core`. `MuClidLookAndFeel.h` is a backward-compat shim (`using MuClidLookAndFeel = MuLookAndFeel`) — all existing include sites work unchanged.
 
 Plugin-specific subclasses are allowed only for:
 - Overriding a small number of colour tokens with a plugin-specific accent
 - Adding plugin-specific `ColourIds` in a non-overlapping ID range
-
-`MuClidLookAndFeel` is the current implementation and the source of truth until `mu-shared` is extracted. When extracting: rename the class, keep all existing IDs, leave the ID values unchanged so any serialised state remains valid.
 
 ### ID ranges
 
@@ -143,9 +141,7 @@ JUCE font. No external typeface dependency.
 | `StatusBar` | full width | 20px | Bottom chrome |
 | `TransportBar` | full width | 36px | Top chrome |
 | Mixer fader cap | — | 200px max | `kFaderMaxH`; minimum 40px |
-| Mixer send knob | channel width | 52px | Same height as pan — `kSendH = kPanH = 52` |
-| Mixer channel strip | 80px | dynamic | `kChanW = 80`; master `kMasterW = 96` |
-| FX row | full width | 52px | `kFXRowH = 52` |
+| Mixer channel strip / sends / FX rows | proportional | proportional | Sizes are computed from the available `MixerOverlay` bounds in `resized()` rather than fixed pixel constants (Stage 32). Send knob height tracks pan knob height; channel widths scale to fit 8 rhythm + 3 return + master within the strip area. |
 
 ### Padding
 
@@ -275,7 +271,7 @@ The following modules are candidates for extraction into a shared library once a
 
 | Module | Contents | Status in mu-clid |
 |---|---|---|
-| `mu_ui` | `MuLookAndFeel`, all `UI/Components/` (KnobWithLabel, DropdownSelect, SegmentControl, NudgeInput, TimeSelector, AddButton, VUMeter, StatusBar, StepEditor, LFOEditor) | In `Source/UI/Components/` |
+| `mu_ui` | `MuLookAndFeel`, all `UI/Components/` (KnobWithLabel, DropdownSelect, SegmentControl, NudgeInput, AddButton, VUMeter, StatusBar, StepEditor, LFOEditor) | In `Source/UI/Components/` |
 | `mu_fx` | `FXSlotBase`, `FXAlgorithmDef`, `EffectSlot`, `DelaySlot`, `ReverbSlot`, `FXChain`, all 8 effect algorithms, `OversampledProcessor` | In `Source/FX/` |
 | `mu_modulation` | `ControlSequence`, `ModulationMatrix`, modulator editors | In `Source/Modulation/` |
 | `mu_voice` | `VoiceEngine`, `SamplePlayer`, `VoiceChain`, `TimeStretcherBase` | In `Source/Audio/` (voice-related) |

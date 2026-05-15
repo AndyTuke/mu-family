@@ -49,6 +49,11 @@ public:
         float pan   = 0.0f;
         bool  mute  = false;
         bool  solo  = false;
+        // Sidechain ducking (source = rhythm channel index, -1 = off)
+        int   sidechainSource   = -1;
+        float sidechainAmount   = 0.0f;
+        float sidechainAttackMs  =   5.0f;
+        float sidechainReleaseMs = 100.0f;
     };
 
     std::array<ChannelState, MaxChannels> channels;
@@ -56,9 +61,11 @@ public:
     float masterLevel = 1.0f;       // Issue #121: 0 dB default (was 0.75 = -2.5 dB)
     float masterPan   = 0.0f;
 
-    // Master insert effect — applied post-fader on the master output bus.
+    // Master insert effects — Insert 1 → Insert 2 → master output.
     VoiceParams      masterInsertParams;
     InsertProcessor  masterInsert;
+    VoiceParams      masterInsertParams2;
+    InsertProcessor  masterInsert2;
 
     // Peak levels written from the audio thread, read by the UI at 30 Hz.
     juce::Atomic<float> channelPeaks[MaxChannels];
@@ -66,6 +73,8 @@ public:
     juce::Atomic<float> masterPeak;
     // Per-channel peak gain-reduction (0 = no duck, 1 = full duck), written each block.
     juce::Atomic<float> sidechainGR[MaxChannels];
+    // Per-return peak gain-reduction for sidechain ducking.
+    juce::Atomic<float> returnSidechainGR[3];
 
     MixerEngine();
 
@@ -96,7 +105,8 @@ public:
 
 private:
     double sampleRate = 44100.0;
-    float  scEnv[MaxChannels] {};    // per-channel sidechain envelope state
+    float  scEnv[MaxChannels] {};     // per-channel sidechain envelope state
+    float  scRetEnv[3] {};            // per-return sidechain envelope state
 
     juce::AudioBuffer<float> channelBufs[MaxChannels];
     juce::AudioBuffer<float> effectSendBuf, delaySendBuf, reverbSendBuf;

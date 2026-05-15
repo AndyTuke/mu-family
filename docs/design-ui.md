@@ -16,14 +16,9 @@ setSize(1170, 870);                           // default opening size (~50% larg
 setResizeLimits(780, 580, 2400, 1600);
 ```
 
-Current editor (pre-Stage 10, no TransportBar):
-```
-sidebar(0, 0, 82, h-20) | rhythmPanel(82, 0, w-82, h-20) | statusBar(0, h-20, w, 20)
-```
+## Transport Bar
 
-## Transport Bar (Stage 10)
-
-Left→right: μ-CLID logo (click=About), play/stop, BPM, position (bar.beat), sync pill, rhythm count (n/8), preset selector, save, mixer button, gear icon.
+Left→right: μ-CLID logo (click=About), play/stop, BPM, position (bar.beat), loop dropdown, preset selector (fills available width), save, mixer button, gear icon.
 
 | Element | Plugin mode | Standalone mode |
 |---|---|---|
@@ -140,7 +135,7 @@ kMaxRowH = 90;    // row height cap
 **Euclid A — single row** (8 controls):
 1. Steps `1–64` — purple (`knobEuclidean`)
 2. Hits `0–steps` — purple (`knobEuclidean`)
-3. Rotate `-(steps/2) to +(steps/2)` — purple (`knobEuclidean`)
+3. Rotate `0–(steps-1)` — purple (`knobEuclidean`)
 4. Pre Pad `0–12` — cyan-teal (`knobPrePad`)
 5. Post Pad `0–12` — teal (`knobPostPad`)
 6. Insert Start `0–(steps-1)` — pink (`knobInsertPad`)
@@ -156,7 +151,7 @@ kMaxRowH = 90;    // row height cap
 **Euclid C (Accent) — single row** (3 controls):
 - Steps `1–64` — amber (`knobLevel`)
 - Hits `0–steps` — amber (`knobLevel`)
-- Rotate `-(steps/2) to +(steps/2)` — amber (`knobLevel`)
+- Rotate `0–(steps-1)` — amber (`knobLevel`)
 - No padding or insert controls — accent shapes hit emphasis, not timing
 
 The accent pattern marks which hits are accented (higher velocity / emphasis). Steps where A or B coincide with a C hit are treated as accented. The C ring displays as dashed amber between ring B and the mod rings.
@@ -175,7 +170,7 @@ Three pad types each have a distinct colour used consistently across knobs and r
 | Post Pad | `knobPostPad` | `ringPostPad` | `#1D9E75` teal | Silence after pattern |
 | Insert | `knobInsertPad` | `ringInsertPad` | `#D4537E` pink | Silence within pattern |
 
-The existing `knobPadding` ColourId (teal) is superseded by `knobPrePad` and `knobPostPad` — remove `knobPadding` when implementing this change to MuClidLookAndFeel.
+The existing `knobPadding` ColourId is retained as a legacy alias for `knobPostPad` in `MuLookAndFeel.h` (`0x10000011`). It can be removed once all callsites migrate.
 
 ### VoiceSection
 
@@ -183,20 +178,18 @@ Four-column panel, 144px tall. Three 6px dividers separate the columns. A 14px l
 
 ```
 kW  = (w - 3 * divW) / 18   // 18 equal knob-widths across the full panel width
-                              // 5 Pitch | div | 5 Filter | div | 4 Amp | div | 4 Drive
+                              // 5 Pitch | div | 5 Filter | div | 4 Amp | div | 4 Insert
 ```
 
 **Column layout:**
 
 ```
-PITCH (5 kW)               FILTER (5 kW)                AMP (4 kW)           INSERT (4 kW)
+PITCH (5 kW)               FILTER (5 kW)                AMP (5 kW)           INSERT (4 kW)
 ────────────────────────   ──────────────────────────   ──────────────────   ──────────────────
 Row 1 (config):            Row 1 (config):              Row 1 (config):      Row 1 (config):
-  Octave | Semi | Fine       Type(1) | Cutoff(2) | Res    Level              Character (full-width dropdown)
+  Octave | Semi | Fine       Type(2) | Cutoff | Res       Level | SendEff | SendDly | SendRev | Accent   Character (full-width dropdown)
 Row 2 (envelope):          Row 2 (envelope):            Row 2 (envelope):    Row 2 (config):
   Atk|Dec|Sus|Rel|Depth      Atk|Dec|Sus|Rel|Depth        Atk|Dec|Sus|Rel     Drive | Output (or Rate in Bitcrusher mode) | LPF
-                                                                             Row 3:
-                                                                               (empty — Insert has no ADSR)
 ```
 
 **All knob labels use full words — no abbreviations.**
@@ -206,8 +199,8 @@ Row 2 (envelope):          Row 2 (envelope):            Row 2 (envelope):    Row
 - Envelope: Attack 0.001–5s, Decay 0.001–5s, Sustain 0–1, Release 0.001–10s, Depth 0–24 semitones
 
 **Filter** (teal, `knobPostPad`):
-- Config: Type selector (`DropdownSelect`: LP/HP/BP, 1 kW), Cutoff 20–20000Hz (2 kW), Resonance 0–0.99 (2 kW)
-- Envelope: Attack 0.001–5s, Decay 0.001–5s, Sustain 0–1, Release 0.001–10s, Depth 0–48 semitones of cutoff sweep
+- Config: Type selector (`DropdownSelect`, 1 kW — 16 modes: LP 6 / LP 12 / LP 24 / BP 12 / BP 24 / HP 6 / HP 12 / HP 24 / Notch / Notch 24 / AP 12 / Comb + / Comb − / Peak / Lo Shf / Hi Shf), Cutoff 20–20000Hz (2 kW), Resonance 0–0.99 (2 kW)
+- Envelope: Attack 0.001–5s, Decay 0.001–5s, Sustain 0–1, Release 0.001–10s, Depth 0–12 semitones of cutoff sweep (#334)
 
 **Amp** (amber, `knobLevel`):
 - Config: Level 0–2, Accent 0–+12 dB
@@ -218,8 +211,8 @@ Row 2 (envelope):          Row 2 (envelope):            Row 2 (envelope):    Row
 *(Stage 13: + FX send knobs on Amp config row — Effect, Delay, Reverb; will require Amp column to expand to 5 kW, adjusting the 18-unit grid)*
 
 **INSERT** (`knobInsertPad` pink — same colour family as the insert pad to signal it is a per-voice insert effect):
-- Config row 1: Character (`DropdownSelect`: None/Soft/Hard/Fold/Bitcrusher) — full-width row
-- Config row 2: Drive 0–100%, Output −24–0 dB (or Rate in Bitcrusher mode), LPF 20–20kHz
+- Config row 1: Character (`DropdownSelect`, full-width) — 11 algorithms, alphabetised in the dropdown: None / 3-Band EQ / Bitcrusher / Clipper / Compressor / Fold / Hard Clip / Limiter / Ring Mod / Soft Clip / Tape Sat.
+- Config row 2: 4 knobs whose labels, ranges and meaning are reconfigured per-algorithm by `configureInsertAlgorithm()` (e.g. Drive / Output / Dither / LPF for Soft Clip; Bits / Rate / Dither / LPF for Bitcrusher; Threshold / Ratio / Attack / Release for Compressor, etc.). Per-algorithm knob snapshots are cached in `insertSnapshots[11]` so switching algorithms restores the user's last values for that algorithm.
 - No envelope row (Insert has no ADSR). Bottom row is blank — drawn as empty space so the section border still frames correctly.
 - Character = None passes audio through unity.
 - Character switch is message-thread only (same constraint as `EffectSlot::setAlgorithm`).
@@ -239,7 +232,7 @@ Tabs: Mod A – Mod H, Matrix. Inactive tabs dimmed.
 - Target list: destination dropdown + bipolar depth bar per assignment
 - Add target button at bottom
 
-Note: `TimeSelector` (the old horizontal button-group widget) is no longer used for modulator timing. All timing rows use `DropdownSelect` with a small identifying label ("Loop" / "Step").
+All modulator timing rows use `DropdownSelect` with a small identifying label ("Loop" / "Step").
 
 **Matrix tab:** Full table of all active assignments across all modulators. Columns: source (name + dot), destination (param name), depth (bipolar bar + value). Remove button per row. Add assignment button at bottom. Meta-modulation destinations shown with full path.
 
@@ -289,7 +282,6 @@ Opened by clicking μ-CLID logo. Contains: large logo, version badge, company na
 - **Knob hover**: fires `onStatusUpdate` immediately on `mouseEnter` — status bar updates without clicking
 - All knob interactions report to StatusBar — no tooltips anywhere in the UI
 - **StatusBar**: 20px, shows last interacted control name + value + rhythm colour tag, never clears automatically
-- **TimeSelector**: legacy button-group widget — still exists in `Components/` but is no longer used in active panels. Timing rows use `DropdownSelect` instead.
 - **DropdownSelect timing**: 18 items covering 1, 1/2, 1/4, 1/8, 1/16, 1/32 × {none, T, .}. Item id = index+1. Identified by a small "Loop" or "Step" label to the left.
 - **NudgeInput**: ▲/▼ arrows + step size buttons (1, 5, 10) + direct text entry on double-click
 - **StepEditor**: drag bar up/down. All bars same teal colour regardless of sign. Centre = zero. +100 = top.

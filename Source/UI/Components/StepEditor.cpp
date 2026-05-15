@@ -43,9 +43,21 @@ int StepEditor::hitStepIndex(int x) const
 float StepEditor::yToValue(int y) const
 {
     const float norm = 1.0f - (float)y / (float)getHeight(); // 0=bottom, 1=top
+    float v;
     if (unipolar)
-        return juce::jlimit(0.0f, 100.0f, norm * 100.0f);
-    return juce::jlimit(-100.0f, 100.0f, (norm - 0.5f) * 200.0f);
+        v = juce::jlimit(0.0f, 100.0f, norm * 100.0f);
+    else
+        v = juce::jlimit(-100.0f, 100.0f, (norm - 0.5f) * 200.0f);
+
+    if (quantizeLevels > 1)
+    {
+        const float lo   = unipolar ? 0.0f : -100.0f;
+        const float hi   = 100.0f;
+        const float step = (hi - lo) / (float)(quantizeLevels - 1);
+        v = lo + step * std::round((v - lo) / step);
+        v = juce::jlimit(lo, hi, v);
+    }
+    return v;
 }
 
 void StepEditor::applyAt(int x, int y)

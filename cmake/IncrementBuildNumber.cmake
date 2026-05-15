@@ -7,8 +7,8 @@ set(HEADER_FILE  "${ROOT_DIR}/Source/BuildNumber.h")
 file(READ "${COUNTER_FILE}" BUILD_NUMBER)
 string(STRIP "${BUILD_NUMBER}" BUILD_NUMBER)
 
-# Only Debug increments the counter; Release reuses the same number so a full build stays in sync.
-if(NOT BUILD_CONFIG STREQUAL "Release")
+# Only Release increments the counter; Debug reuses the same number so a full build stays in sync.
+if(BUILD_CONFIG STREQUAL "Release")
     math(EXPR BUILD_NUMBER "${BUILD_NUMBER} + 1")
     file(WRITE "${COUNTER_FILE}" "${BUILD_NUMBER}")
 endif()

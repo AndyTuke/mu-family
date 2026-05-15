@@ -30,8 +30,16 @@ public:
     // Call before setSelectedAlgorithm() / when the row is first wired up.
     void hideParameter(const juce::String& id);
 
+    // Show/hide the parameter knobs while keeping the On button + name + dropdown visible.
+    // Used when Echo mode is active so the algo dropdown remains accessible.
+    void setKnobsVisible(bool visible);
+
     void resized() override;
     void paint(juce::Graphics& g) override;
+
+    // Width of the fixed header area (On + name + dropdown) = 4+36+4+60+4+120+4 = 232.
+    // Used by MixerOverlay to position echoRow after the header when Echo mode is active.
+    static constexpr int kHeaderWidth = 232;
 
 private:
     void rebuildKnobs(int algorithmIndex);
@@ -44,8 +52,9 @@ private:
     DropdownSelect               algorithmDropdown;
     std::vector<std::unique_ptr<KnobWithLabel>> knobs;
 
-    int currentAlgorithm = 0;
-    bool isEnabled       = true;
+    int  currentAlgorithm = 0;
+    bool isEnabled        = true;
+    bool knobsVisible     = true;
     juce::StringArray hiddenParamIds;
 
     static constexpr int kToggleW   = 36;

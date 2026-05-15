@@ -98,17 +98,24 @@ void MixerOverlay::refreshSidechainSources()
         names.add((r < numActive) ? juce::String(proc.getRhythm(r).name) : juce::String());
     for (int r = 0; r < (int)rhythmChannels.size(); ++r)
         rhythmChannels[r]->setSidechainSources(r, names);
+    // Return channels can sidechain from any rhythm channel (no self-exclusion, pass -1).
+    effectReturn .setSidechainSources(-1, names);
+    delayReturn  .setSidechainSources(-1, names);
+    reverbReturn .setSidechainSources(-1, names);
 }
 
 void MixerOverlay::wireReturns()
 {
-    effectReturn.bindReturn(mixer.returns[0], mixer.returnPeaks[0], &proc, "ret_eff_");
+    effectReturn.bindReturn(mixer.returns[0], mixer.returnPeaks[0], &proc, "ret_eff_",
+                            &mixer.returnSidechainGR[0]);
     effectReturn.bindReturnSends(proc.apvts, "eff2dly", "eff2rev");
 
-    delayReturn .bindReturn(mixer.returns[1], mixer.returnPeaks[1], &proc, "ret_dly_");
+    delayReturn .bindReturn(mixer.returns[1], mixer.returnPeaks[1], &proc, "ret_dly_",
+                            &mixer.returnSidechainGR[1]);
     delayReturn .bindReturnSends(proc.apvts, "", "dly2rev");
 
-    reverbReturn.bindReturn(mixer.returns[2], mixer.returnPeaks[2], &proc, "ret_rev_");
+    reverbReturn.bindReturn(mixer.returns[2], mixer.returnPeaks[2], &proc, "ret_rev_",
+                            &mixer.returnSidechainGR[2]);
     masterChannel.bindMaster(mixer, &proc);
 }
 
@@ -129,9 +136,14 @@ void MixerOverlay::wireFXRows()
     effectRow.onEnabledChanged = [this](bool e) {
         if (auto* p = proc.apvts.getParameter("eff_en"))
             p->setValueNotifyingHost(e ? 1.0f : 0.0f);
+        // When Echo is the active algo, the effectRow On button is the sole visible
+        // enable control — keep echo_en in sync so the echo path follows it.
+        if (proc.fxChain.effectSlot().getAlgorithmIndex() == EffectSlot::kEchoAlgoIndex)
+            if (auto* p = proc.apvts.getParameter("echo_en"))
+                p->setValueNotifyingHost(e ? 1.0f : 0.0f);
     };
     effectRow.onAlgorithmChanged = [this](int idx) {
-        // #242b: force-sync the engine BEFORE writing APVTS. If APVTS already
+        // #285: force-sync the engine BEFORE writing APVTS. If APVTS already
         // holds the same value (e.g. state restore left it at idx while the
         // engine sat at default 0), setValueNotifyingHost skips the listener,
         // so syncFXParam never fires and the engine stays stale.
@@ -140,8 +152,18 @@ void MixerOverlay::wireFXRows()
             p->setValueNotifyingHost(p->convertTo0to1((float)idx));
         updateEffectSendLabels();
         const bool isEcho = (idx == EffectSlot::kEchoAlgoIndex);
-        effectRow.setVisible(!isEcho);
-        echoRow  .setVisible(isEcho);
+        // Keep effectRow visible so the algo dropdown is always accessible.
+        // When Echo is active, hide its knobs (irrelevant) and show echoRow in the
+        // knobs area. When switching TO echo, sync echo_en to eff_en so the single
+        // visible On button (effectRow's) controls the echo path.
+        effectRow.setKnobsVisible(!isEcho);
+        if (isEcho)
+        {
+            float effEn = *proc.apvts.getRawParameterValue("eff_en");
+            if (auto* p = proc.apvts.getParameter("echo_en"))
+                p->setValueNotifyingHost(effEn);
+        }
+        echoRow.setVisible(isEcho);
         resized();
     };
     effectRow.onParamChanged = [this, &eff](const juce::String& id, float v) {
@@ -306,8 +328,9 @@ void MixerOverlay::wireFXRows()
     // Set initial row visibility based on current algorithm.
     {
         const bool isEcho = (eff.getAlgorithmIndex() == EffectSlot::kEchoAlgoIndex);
-        effectRow.setVisible(!isEcho);
+        effectRow.setKnobsVisible(!isEcho);
         echoRow  .setVisible(isEcho);
+        echoRow  .setShowHeader(false);  // echoRow has no header; effectRow's header is always visible
     }
 
     // Set initial send labels on rhythm channels to match the current algorithm.
@@ -343,6 +366,7 @@ void MixerOverlay::loadFromAPVTS()
     delayReturn  .loadFromAPVTS(apvts, "ret_dly_");
     reverbReturn .loadFromAPVTS(apvts, "ret_rev_");
     masterChannel.loadFromAPVTS(apvts, "mstr_");
+    refreshSidechainSources();
 
     // FX rows: reload enable states, algo selection, and param values.
     auto& eff = proc.fxChain.effectSlot();
@@ -351,7 +375,7 @@ void MixerOverlay::loadFromAPVTS()
     // Effect row
     effectRow.setEnabled(*apvts.getRawParameterValue("eff_en") > 0.5f,
                          juce::dontSendNotification);
-    // #242b: read algo from APVTS, not engine — APVTS is the source of truth.
+    // #285: read algo from APVTS, not engine — APVTS is the source of truth.
     // If the engine somehow lags (e.g. state-restore listener skip), we still
     // show the user the value the host actually has stored.
     const int effAlgoFromApvts = juce::jlimit(0,
@@ -378,7 +402,7 @@ void MixerOverlay::loadFromAPVTS()
     // Echo row visibility and state
     {
         const bool isEcho = (eff.getAlgorithmIndex() == EffectSlot::kEchoAlgoIndex);
-        effectRow.setVisible(!isEcho);
+        effectRow.setKnobsVisible(!isEcho);
         echoRow  .setVisible(isEcho);
         if (isEcho)
         {
@@ -483,7 +507,7 @@ void MixerOverlay::resized()
     // 8 rhythm + 3 returns share available space; master fills any remainder.
     const int masterTotalW = kMasterW + MixerChannel::kInsertPanelW;
     const int nChans = MixerEngine::MaxChannels + 3;
-    const int chanW  = juce::jmax(44, (w - 2 * kDivW - masterTotalW
+    const int chanW  = juce::jmax(44, (w - kLabelPanelW - 2 * kDivW - masterTotalW
                                        - (MixerEngine::MaxChannels - 1) * kChanGap) / nChans);
 
     lastFXAreaH = fxAreaH;
@@ -495,8 +519,8 @@ void MixerOverlay::resized()
     constexpr int kModeW = 176;
     meterModeCtrl.setBounds(w - kModeW - 4, (kHeaderH - 18) / 2, kModeW, 18);
 
-    // Channel strips start below the header
-    int x = 0;
+    // Channel strips start below the header, offset right to leave room for the label panel.
+    int x = kLabelPanelW;
     for (int i = 0; i < (int)rhythmChannels.size(); ++i)
     {
         rhythmChannels[i]->setBounds(x, kHeaderH, chanW, stripH);
@@ -518,7 +542,11 @@ void MixerOverlay::resized()
     // FX rows below the channel strips
     int fy = kHeaderH + stripH + kFXPad;
     effectRow.setBounds(kFXPad, fy, w - kFXPad * 2, fxRowH);
-    echoRow  .setBounds(kFXPad, fy, w - kFXPad * 2, fxRowH);  fy += fxRowH + kFXGap;
+    // echoRow occupies the knobs portion of the effectRow row (after the header area)
+    // so the effectRow algo dropdown stays visible for switching effect types.
+    echoRow.setBounds(kFXPad + FXRow::kHeaderWidth, fy,
+                      juce::jmax(0, w - kFXPad * 2 - FXRow::kHeaderWidth), fxRowH);
+    fy += fxRowH + kFXGap;
     delayRow .setBounds(kFXPad, fy, w - kFXPad * 2, fxRowH);  fy += fxRowH + kFXGap;
     reverbRow.setBounds(kFXPad, fy, w - kFXPad * 2, fxRowH);
 }
@@ -540,6 +568,67 @@ void MixerOverlay::paint(juce::Graphics& g)
     // Header separator line
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder));
     g.fillRect(0, kHeaderH - 1, getWidth(), 1);
+
+    // ── Row label panel (left of channel strips, labels aligned with strip sections) ─
+    if (!rhythmChannels.empty())
+    {
+        auto* refCh = rhythmChannels[0].get();
+        const int lx  = 0;
+        const int lw  = kLabelPanelW;
+        const int chY = kHeaderH;  // channels start at kHeaderH in MixerOverlay space
+
+        // Slightly darker background for the label panel
+        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground).darker(0.25f));
+        g.fillRect(lx, chY, lw, lastStripH);
+
+        // Right-edge separator
+        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder));
+        g.fillRect(lw - 1, chY, 1, lastStripH);
+
+        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+
+        // Draw a label rotated 90° CCW, centred in 'bounds' (component-space rect).
+        auto drawVLabel = [&](const juce::String& text, juce::Rectangle<int> bounds)
+        {
+            if (bounds.isEmpty() || bounds.getHeight() < 14) return;
+            const juce::Rectangle<int> r { lx, chY + bounds.getY(), lw, bounds.getHeight() };
+            const float cx = (float)r.getCentreX();
+            const float cy = (float)r.getCentreY();
+            g.saveState();
+            g.addTransform(juce::AffineTransform::rotation(
+                -juce::MathConstants<float>::halfPi, cx, cy));
+            g.drawFittedText(text,
+                (int)(cx - r.getHeight() * 0.5f), (int)(cy - r.getWidth() * 0.5f),
+                r.getHeight(), r.getWidth(),
+                juce::Justification::centred, 1, 0.75f);
+            g.restoreState();
+        };
+
+        drawVLabel("Side Chain", refCh->getSidechainPaneBounds());
+        drawVLabel("Sends",      refCh->getSendsPaneBounds());
+        drawVLabel("Levels",     refCh->getFaderPaneBounds());
+        if (!refCh->getOutBusBounds().isEmpty())
+            drawVLabel("Output", refCh->getOutBusBounds());
+
+        // Horizontal section-separator lines spanning the full channel area.
+        const juce::Colour sepCol = MuClidLookAndFeel::colour(
+            MuClidLookAndFeel::segmentInactiveBorder).withAlpha(0.35f);
+        g.setColour(sepCol);
+        const int lineX1 = lw;
+        const int lineX2 = getWidth();
+        auto drawHLine = [&](juce::Rectangle<int> bounds)
+        {
+            if (bounds.isEmpty()) return;
+            const int lineY = chY + bounds.getY();
+            g.drawLine((float)lineX1, (float)lineY, (float)lineX2, (float)lineY, 1.0f);
+        };
+        drawHLine(refCh->getSidechainPaneBounds());
+        drawHLine(refCh->getSendsPaneBounds());
+        drawHLine(refCh->getFaderPaneBounds());
+        if (!refCh->getOutBusBounds().isEmpty())
+            drawHLine(refCh->getOutBusBounds());
+    }
 
     // Dividers between rhythm channels and returns, and before master
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder));

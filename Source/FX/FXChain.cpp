@@ -39,11 +39,12 @@ void FXChain::process(juce::AudioBuffer<float>& buffer)
 void FXChain::processSends(juce::AudioBuffer<float>& effectSend,
                            juce::AudioBuffer<float>& delaySend,
                            juce::AudioBuffer<float>& reverbSend,
-                           bool doEffect, bool doDelay, bool doReverb)
+                           bool doEffect, bool doDelay, bool /*doReverb*/)
 {
     // Sequential processing with intra-FX routing.
 
-    if (doEffect) effect.processReturn(effectSend);
+    // Echo needs continuous processing (feedback loop), like the dedicated delay slot.
+    if (doEffect || effect.needsContinuousProcessing()) effect.processReturn(effectSend);
 
     // Route effect output into the delay and reverb send buses.
     if (doEffect)
@@ -67,11 +68,9 @@ void FXChain::processSends(juce::AudioBuffer<float>& effectSend,
             reverbSend.addFrom(ch, 0, delaySend, ch, 0, nSamples, delToReverb);
     }
 
-    // Run reverb if channels sent directly, OR if intra-FX routing added signal this block.
-    const bool reverbNeeded = doReverb
-        || (doDelay  && delToReverb > 0.001f)
-        || (doEffect && effToReverb > 0.001f);
-    if (reverbNeeded) reverb.processReturn(reverbSend);
+    // Reverb must run every block so the Signalsmith FDN tail can decay freely between
+    // hits — same reason delay and echo are unconditional. ReverbSlot checks !enabled itself.
+    reverb.processReturn(reverbSend);
 }
 
 void FXChain::setHostBpm(double bpm)

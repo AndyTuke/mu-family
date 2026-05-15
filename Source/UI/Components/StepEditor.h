@@ -20,6 +20,10 @@ public:
     // Bipolar: bars from centre (0 baseline), values -100..+100 (default).
     void setUnipolar(bool u) { unipolar = u; repaint(); }
 
+    // Quantize dragged values to N evenly-spaced levels spanning the active range.
+    // levels=0 (default) → continuous. levels=7 → 7 snap points (useful for pitch.octave).
+    void setQuantization(int levels) { quantizeLevels = levels; }
+
     // playhead: 0.0 = start, 1.0 = end of loop
     void setPlayheadPhase(float phase);
 
@@ -32,6 +36,7 @@ private:
     juce::Colour barColour { MuClidLookAndFeel::colour(MuClidLookAndFeel::stepEditorBar) };
     float playheadPhase = 0.0f;
     bool  unipolar      = false;
+    int   quantizeLevels = 0;
 
     int hitStepIndex(int x) const;
     float yToValue(int y) const;

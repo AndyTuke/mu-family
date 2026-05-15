@@ -38,6 +38,7 @@ The full design is split into focused sub-documents. **Read only the relevant on
 | [docs/design-sequencer.md](docs/design-sequencer.md) | Euclidean params, DAW sync, control sequence params, modulation signal flow |
 | [docs/design-voice.md](docs/design-voice.md) | Voice chain, ADSR, filter, interpolation quality, sample handling, time stretching (TimeStretcherBase) |
 | [docs/design-fx.md](docs/design-fx.md) | FX algorithms, delay, reverb, intra-FX routing, FXSlotBase interface |
+| [docs/design-plugin-family.md](docs/design-plugin-family.md) | **Shared plugin architecture** — `mu-core`, `ProcessorBase`, `VoiceSlot`, family conventions. Read before structural / cross-plugin work. |
 | [docs/design-ui-family.md](docs/design-ui-family.md) | **Shared design system** — colour tokens, typography, control sizes, interaction patterns, shared module plan. Read this before any UI work. |
 | [docs/design-ui.md](docs/design-ui.md) | μ-Clid specific panel layouts — RhythmCircle, EuclideanPanel, Mixer, Transport. Defers to design-ui-family.md for colours/sizes. |
 | [docs/design-presets.md](docs/design-presets.md) | APVTS wiring plan, preset storage, save/restore, current pre-APVTS state |
@@ -114,8 +115,8 @@ All code changes must be logged as backlog entries to maintain a complete develo
 
 Never override `getSlider().onValueChange` directly — it replaces both callbacks. Always use `onValueChanged` for data binding.
 
-### Pre-APVTS data binding
-Until Stage 10, panels mutate `Rhythm` data directly (e.g. `rhythm->genA.steps = (int)v`). After mutation, call `proc.updatePattern(index)` to refresh the cached pattern in `SequencerEngine`. This is intentional and correct for now.
+### Pre-APVTS data binding (historical)
+Before Stage 10, panels mutated `Rhythm` data directly (e.g. `rhythm->genA.steps = (int)v`) and called `proc.updatePattern(index)` to refresh the cached pattern. All parameters are now wired through APVTS.
 
 ### PluginProcessor default rhythm
 `PluginProcessor` constructor always creates one default rhythm (16 steps, 4 hits). Never add a rhythm unconditionally in `PluginEditor` — check `getNumRhythms() == 0` first (the sidebar constructor calls `refreshItems()` which also reads the existing rhythm).

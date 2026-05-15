@@ -64,6 +64,8 @@ private:
     void showMixer(bool show);
     void showAbout(bool show);
     void showSaveDialog(bool show);
+    void doSavePreset(const juce::String& name, const juce::String& desc,
+                      const juce::String& category, bool embedSamples);
     void showPresetBrowser(bool show);
     void showSettings(bool show);
     void showMidiPresets(bool show);

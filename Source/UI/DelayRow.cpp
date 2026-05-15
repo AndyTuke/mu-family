@@ -150,6 +150,14 @@ void DelayRow::setSyncParams(int denominator, bool dotted, bool triplet, int cou
     multipleKnob.setValue(static_cast<double>(count), juce::dontSendNotification);
 }
 
+void DelayRow::setShowHeader(bool show)
+{
+    showHeader = show;
+    enableButton.setVisible(show);
+    resized();
+    repaint();
+}
+
 void DelayRow::setFeedback(float v) { feedbackKnob.setValue(v * 100.0, juce::dontSendNotification); }
 void DelayRow::setSpread(float v)   { spreadKnob.setValue(v * 100.0, juce::dontSendNotification); }
 void DelayRow::setDirt(float v)     { dirtKnob.setValue(v * 100.0, juce::dontSendNotification); }
@@ -180,9 +188,12 @@ void DelayRow::resized()
     const int h = getHeight();
     int x = kPad;
 
-    enableButton.setBounds(x, (h - 22) / 2, kToggleW, 22);
-    x += kToggleW + kPad;
-    x += kNameW + kPad;  // name label is drawn, not a component
+    if (showHeader)
+    {
+        enableButton.setBounds(x, (h - 22) / 2, kToggleW, 22);
+        x += kToggleW + kPad;
+        x += kNameW + kPad;  // name label is drawn, not a component
+    }
 
     if (syncMode)
     {
@@ -217,10 +228,13 @@ void DelayRow::paint(juce::Graphics& g)
     g.drawLine(0.0f, static_cast<float>(getHeight() - 1),
                static_cast<float>(getWidth()), static_cast<float>(getHeight() - 1), 0.5f);
 
-    const int nameX = kPad + kToggleW + kPad;
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::labelText));
-    g.drawText("Delay", nameX, 0, kNameW, getHeight(), juce::Justification::centredLeft);
+    if (showHeader)
+    {
+        const int nameX = kPad + kToggleW + kPad;
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::labelText));
+        g.drawText("Delay", nameX, 0, kNameW, getHeight(), juce::Justification::centredLeft);
+    }
 
     if (!isEnabled)
     {
