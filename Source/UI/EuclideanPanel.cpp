@@ -1,5 +1,6 @@
 #include "EuclideanPanel.h"
 #include "../PluginProcessor.h"
+#include <limits>
 
 EuclideanPanel::EuclideanPanel(PluginProcessor& p) : proc(p)
 {
@@ -256,12 +257,58 @@ void EuclideanPanel::refreshModulatedIndicators()
         return false;
     };
 
-    hitsA.setIsModulated(isAssigned("euclid.a.hits"));
-    rotA .setIsModulated(isAssigned("euclid.a.rotate"));
-    hitsB.setIsModulated(isAssigned("euclid.b.hits"));
-    rotB .setIsModulated(isAssigned("euclid.b.rotate"));
-    hitsC.setIsModulated(isAssigned("euclid.c.hits"));
-    rotC .setIsModulated(isAssigned("euclid.c.rotate"));
+    // Only show ring + live arc while playing — when stopped the snapshot holds the
+    // last played position, which would read as a permanent misleading indicator.
+    const bool playing = proc.sequencerPlaying.get();
+
+    hitsA    .setIsModulated(playing && isAssigned("euclid.a.hits"));
+    rotA     .setIsModulated(playing && isAssigned("euclid.a.rotate"));
+    prePadA  .setIsModulated(playing && isAssigned("euclid.a.prePad"));
+    postPadA .setIsModulated(playing && isAssigned("euclid.a.postPad"));
+    insertStA.setIsModulated(playing && isAssigned("euclid.a.insSt"));
+    insertLenA.setIsModulated(playing && isAssigned("euclid.a.insLen"));
+
+    hitsB    .setIsModulated(playing && isAssigned("euclid.b.hits"));
+    rotB     .setIsModulated(playing && isAssigned("euclid.b.rotate"));
+    prePadB  .setIsModulated(playing && isAssigned("euclid.b.prePad"));
+    postPadB .setIsModulated(playing && isAssigned("euclid.b.postPad"));
+    insertStB.setIsModulated(playing && isAssigned("euclid.b.insSt"));
+    insertLenB.setIsModulated(playing && isAssigned("euclid.b.insLen"));
+
+    hitsC    .setIsModulated(playing && isAssigned("euclid.c.hits"));
+    rotC     .setIsModulated(playing && isAssigned("euclid.c.rotate"));
+    prePadC  .setIsModulated(playing && isAssigned("euclid.c.prePad"));
+    postPadC .setIsModulated(playing && isAssigned("euclid.c.postPad"));
+    insertStC.setIsModulated(playing && isAssigned("euclid.c.insSt"));
+    insertLenC.setIsModulated(playing && isAssigned("euclid.c.insLen"));
+
+    // #336 Stage C: live-arc indicator values from the modulation snapshot.
+    const auto& snap = proc.modSnapshot[rhythmIndex];
+    auto sn  = [&](int i) { return snap[i].get(); };
+    const float kNaN = std::numeric_limits<float>::quiet_NaN();
+    auto arc = [&](bool assigned, int idx) { return (assigned && playing) ? sn(idx) : kNaN; };
+
+    using P = PluginProcessor;
+    hitsA     .setModulatedNorm(arc(isAssigned("euclid.a.hits"),    P::kSnapEucAHits));
+    rotA      .setModulatedNorm(arc(isAssigned("euclid.a.rotate"),  P::kSnapEucARotate));
+    prePadA   .setModulatedNorm(arc(isAssigned("euclid.a.prePad"),  P::kSnapEucAPrePad));
+    postPadA  .setModulatedNorm(arc(isAssigned("euclid.a.postPad"), P::kSnapEucAPostPad));
+    insertStA .setModulatedNorm(arc(isAssigned("euclid.a.insSt"),   P::kSnapEucAInsSt));
+    insertLenA.setModulatedNorm(arc(isAssigned("euclid.a.insLen"),  P::kSnapEucAInsLen));
+
+    hitsB     .setModulatedNorm(arc(isAssigned("euclid.b.hits"),    P::kSnapEucBHits));
+    rotB      .setModulatedNorm(arc(isAssigned("euclid.b.rotate"),  P::kSnapEucBRotate));
+    prePadB   .setModulatedNorm(arc(isAssigned("euclid.b.prePad"),  P::kSnapEucBPrePad));
+    postPadB  .setModulatedNorm(arc(isAssigned("euclid.b.postPad"), P::kSnapEucBPostPad));
+    insertStB .setModulatedNorm(arc(isAssigned("euclid.b.insSt"),   P::kSnapEucBInsSt));
+    insertLenB.setModulatedNorm(arc(isAssigned("euclid.b.insLen"),  P::kSnapEucBInsLen));
+
+    hitsC     .setModulatedNorm(arc(isAssigned("euclid.c.hits"),    P::kSnapEucCHits));
+    rotC      .setModulatedNorm(arc(isAssigned("euclid.c.rotate"),  P::kSnapEucCRotate));
+    prePadC   .setModulatedNorm(arc(isAssigned("euclid.c.prePad"),  P::kSnapEucCPrePad));
+    postPadC  .setModulatedNorm(arc(isAssigned("euclid.c.postPad"), P::kSnapEucCPostPad));
+    insertStC .setModulatedNorm(arc(isAssigned("euclid.c.insSt"),   P::kSnapEucCInsSt));
+    insertLenC.setModulatedNorm(arc(isAssigned("euclid.c.insLen"),  P::kSnapEucCInsLen));
 }
 
 void EuclideanPanel::resized()

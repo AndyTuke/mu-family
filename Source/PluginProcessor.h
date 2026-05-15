@@ -165,7 +165,14 @@ public:
                     const juce::String& category, bool embedSamples = false);
     void loadPreset(const juce::File& file);
     void saveRhythmPreset(int rhythmIndex, const juce::String& name, const juce::String& category);
-    void saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFile, bool embedSample = false);
+    void saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFile,
+                                bool embedSample = false, const juce::String& category = {},
+                                const juce::String& description = {});
+
+    // Shared preset category list — stored as one-per-line in presetsDir/categories.txt.
+    // loadCategoryList() merges that file with categories discovered from existing preset files.
+    juce::StringArray loadCategoryList() const;
+    void              ensureCategoryInList(const juce::String& cat);
     bool applyRhythmPreset(const juce::File& file, int rhythmIndex);
     bool applyDefaultRhythm(int rhythmIndex);
     void loadDefaultPreset();
@@ -209,6 +216,10 @@ public:
         kSnapInsDrive, kSnapInsOutput, kSnapInsBits, kSnapInsDither, kSnapInsLpf,
         // #223 additions
         kSnapPitchEnvDep, kSnapAmpLvl, kSnapAccent,
+        // #336 Stage C: euclid pattern destinations (hits/rotate/prePad/postPad/insSt/insLen × A/B/C).
+        kSnapEucAHits,  kSnapEucARotate, kSnapEucAPrePad, kSnapEucAPostPad, kSnapEucAInsSt, kSnapEucAInsLen,
+        kSnapEucBHits,  kSnapEucBRotate, kSnapEucBPrePad, kSnapEucBPostPad, kSnapEucBInsSt, kSnapEucBInsLen,
+        kSnapEucCHits,  kSnapEucCRotate, kSnapEucCPrePad, kSnapEucCPostPad, kSnapEucCInsSt, kSnapEucCInsLen,
         kSnapCount
     };
     std::array<juce::Atomic<float>, kSnapCount> modSnapshot[SequencerEngine::MaxRhythms];
@@ -276,6 +287,16 @@ private:
     // Pre-allocated modulation parameter map — reused every block to avoid audio-thread allocation.
     // Keys match ModDest::ids.  Values are initialised in constructor and updated each block.
     std::unordered_map<std::string, float> modParamValues;
+
+    // #336: per-rhythm modulated euclid pattern overrides — written by the audio thread
+    // after ModulationMatrix::process(). Used by the audio-thread pattern recompute path
+    // (Stage B) and the UI live-arc indicator (Stage C). Values are integer-rounded so
+    // change-detection skips no-op recomputes. Struct definitions live in Rhythm.h /
+    // HitGenerator.h so Sequencer-layer code can reuse them.
+    std::array<EuclidOverrides, SequencerEngine::MaxRhythms> lastEuclidOverrides;
+    // Previous block's overrides per rhythm — Stage B compares against this to skip
+    // pattern recomputes when nothing crossed an integer boundary.
+    std::array<EuclidOverrides, SequencerEngine::MaxRhythms> prevEuclidOverrides;
 
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void syncRhythmParam(int ri, const juce::String& suffix, float v);

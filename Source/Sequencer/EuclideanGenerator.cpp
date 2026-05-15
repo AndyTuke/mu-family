@@ -4,12 +4,19 @@
 
 std::vector<bool> EuclideanGenerator::generate(int steps, int hits)
 {
+    std::vector<bool> pattern;
+    generate(steps, hits, pattern);
+    return pattern;
+}
+
+void EuclideanGenerator::generate(int steps, int hits, std::vector<bool>& out)
+{
     steps = std::max(steps, 1);
     hits  = std::clamp(hits, 0, steps);
 
-    std::vector<bool> pattern(steps, false);
+    out.assign((size_t)steps, false);
     if (hits == 0)
-        return pattern;
+        return;
 
     int error = steps - 1;
     for (int i = 0; i < steps; ++i)
@@ -18,8 +25,7 @@ std::vector<bool> EuclideanGenerator::generate(int steps, int hits)
         if (error >= steps)
         {
             error -= steps;
-            pattern[i] = true;
+            out[(size_t)i] = true;
         }
     }
-    return pattern;
 }

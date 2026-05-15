@@ -68,6 +68,84 @@ std::vector<bool> HitGenerator::getPattern() const
     return pattern;
 }
 
+void HitGenerator::getPattern(const EuclidGenOverrides& ov,
+                              std::vector<bool>& out,
+                              std::vector<bool>& scratch) const
+{
+    // #336 Stage B: non-allocating equivalent of getPattern() using `ov` in place
+    // of the matching member fields. Final pattern length is always `steps` (verified:
+    // preReserve + activeSteps + clampedInsert + postReserve = steps in every mode
+    // combination — Pad reserves come out of `steps`; Mute reserves zero in place).
+
+    if (steps <= 0)
+    {
+        out.clear();
+        return;
+    }
+
+    if (mute)
+    {
+        out.assign((size_t) steps, false);
+        return;
+    }
+
+    const int preReserve    = (prePadMode  == InsertMode::Pad) ? ov.prePad       : 0;
+    const int postReserve   = (postPadMode == InsertMode::Pad) ? ov.postPad      : 0;
+    const int clampedInsert = (insertMode  == InsertMode::Pad) ? ov.insertLength : 0;
+    const int activeSteps   = std::max(steps - preReserve - postReserve - clampedInsert, 0);
+
+    EuclideanGenerator::generate(activeSteps, ov.hits, scratch);
+
+    if (ov.rotate != 0 && activeSteps > 0)
+    {
+        const int r = ((ov.rotate % activeSteps) + activeSteps) % activeSteps;
+        if (r > 0)
+            std::rotate(scratch.begin(), scratch.begin() + r, scratch.end());
+    }
+
+    // Mute-mode insert zone: zero the active region before copy-out.
+    if (insertMode == InsertMode::Mute && ov.insertLength > 0 && activeSteps > 0)
+    {
+        const int cs = std::clamp(ov.insertStart, 0, activeSteps);
+        const int ze = std::min(cs + ov.insertLength, activeSteps);
+        for (int i = cs; i < ze; ++i)
+            scratch[(size_t) i] = false;
+    }
+
+    out.assign((size_t) steps, false);
+
+    int outIdx = preReserve;
+    if (insertMode == InsertMode::Pad && ov.insertLength > 0 && activeSteps > 0)
+    {
+        const int clampedStart = std::clamp(ov.insertStart, 0, activeSteps);
+        for (int i = 0; i < clampedStart && outIdx < steps; ++i, ++outIdx)
+            out[(size_t) outIdx] = scratch[(size_t) i];
+        outIdx += ov.insertLength;  // skip insert zone (already false)
+        for (int i = clampedStart; i < activeSteps && outIdx < steps; ++i, ++outIdx)
+            out[(size_t) outIdx] = scratch[(size_t) i];
+    }
+    else
+    {
+        for (int i = 0; i < activeSteps && outIdx < steps; ++i, ++outIdx)
+            out[(size_t) outIdx] = scratch[(size_t) i];
+    }
+
+    // Mute pre/post-pad: zero the leading/trailing run of the final pattern.
+    if (prePadMode == InsertMode::Mute && ov.prePad > 0)
+    {
+        const int zone = std::min(ov.prePad, steps);
+        for (int i = 0; i < zone; ++i)
+            out[(size_t) i] = false;
+    }
+    if (postPadMode == InsertMode::Mute && ov.postPad > 0)
+    {
+        const int zone  = std::min(ov.postPad, steps);
+        const int start = steps - zone;
+        for (int i = start; i < steps; ++i)
+            out[(size_t) i] = false;
+    }
+}
+
 std::vector<StepType> HitGenerator::getStepTypes() const
 {
     if (mute)

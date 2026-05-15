@@ -7,6 +7,15 @@
 
 enum class Logic { OR, AND, XOR, AOnly, BOnly };
 
+// #336: per-rhythm bundle of modulated euclid overrides for genA / genB / genC.
+struct EuclidOverrides
+{
+    EuclidGenOverrides a, b, c;
+    bool operator==(const EuclidOverrides& o) const noexcept
+    { return a == o.a && b == o.b && c == o.c; }
+    bool operator!=(const EuclidOverrides& o) const noexcept { return !(*this == o); }
+};
+
 class Rhythm : public VoiceSlot
 {
 public:
@@ -43,4 +52,14 @@ public:
     // Returns the combined hit pattern for one full cycle.
     // Length is resetSteps if set, otherwise the LCM of A and B step counts.
     std::vector<bool> getCombinedPattern() const;
+
+    // #336 Stage B: non-allocating override-aware variant. Writes combined pattern
+    // into `out`, using three scratches (genA pattern, genB pattern, plus internal
+    // euclidean scratch shared by the HitGenerator overload). All buffers must be
+    // pre-reserved to capacity ≥ 256 for fully allocation-free operation.
+    void getCombinedPattern(const EuclidOverrides& ov,
+                            std::vector<bool>& out,
+                            std::vector<bool>& patA,
+                            std::vector<bool>& patB,
+                            std::vector<bool>& euclidScratch) const;
 };

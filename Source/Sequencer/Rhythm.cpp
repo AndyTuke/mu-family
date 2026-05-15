@@ -38,3 +38,47 @@ std::vector<bool> Rhythm::getCombinedPattern() const
     }
     return combined;
 }
+
+void Rhythm::getCombinedPattern(const EuclidOverrides& ov,
+                                std::vector<bool>& out,
+                                std::vector<bool>& patA,
+                                std::vector<bool>& patB,
+                                std::vector<bool>& euclidScratch) const
+{
+    // #336 Stage B: matches the allocating overload above but writes into pre-reserved
+    // buffers. patA / patB / euclidScratch / out must each have capacity ≥ 256 so
+    // assign() never reallocates on the audio thread.
+    genA.getPattern(ov.a, patA, euclidScratch);
+    genB.getPattern(ov.b, patB, euclidScratch);
+
+    const int lenA = static_cast<int>(patA.size());
+    const int lenB = static_cast<int>(patB.size());
+
+    if (lenA == 0 && lenB == 0)
+    {
+        out.clear();
+        return;
+    }
+    if (lenA == 0) { out.assign(patB.begin(), patB.end()); return; }
+    if (lenB == 0) { out.assign(patA.begin(), patA.end()); return; }
+
+    const int len = resetSteps.has_value()
+                      ? std::max(*resetSteps, 1)
+                      : std::min(std::lcm(lenA, lenB), 256);
+
+    out.assign((size_t) len, false);
+    for (int i = 0; i < len; ++i)
+    {
+        const bool a = patA[(size_t) (i % lenA)];
+        const bool b = patB[(size_t) (i % lenB)];
+
+        switch (logic)
+        {
+            case Logic::OR:    out[(size_t) i] = a || b;  break;
+            case Logic::AND:   out[(size_t) i] = a && b;  break;
+            case Logic::XOR:   out[(size_t) i] = a != b;  break;
+            case Logic::AOnly: out[(size_t) i] = a && !b; break;
+            case Logic::BOnly: out[(size_t) i] = b && !a; break;
+        }
+    }
+}

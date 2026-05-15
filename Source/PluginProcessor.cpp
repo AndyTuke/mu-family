@@ -15,10 +15,10 @@ static juce::ValueTree serialiseModulators(const Rhythm& r);
 static void            deserialiseModulators(const juce::ValueTree& mods, Rhythm& r);
 static void            clearModulators(Rhythm& r);
 
-// #217d: host-state format version. Bump whenever the on-disk schema changes
+// #288: host-state format version. Bump whenever the on-disk schema changes
 // in a way that requires migration on load.
-//   v0 / v1 : legacy (pre-#217a) — ADSR A/D/R stored as 0..100 (×0.03 → seconds)
-//   v2      : current (#217a/b/c) — ADSR A/D/R stored as 0..10 (seconds direct)
+//   v0 / v1 : legacy (pre-#217) — ADSR A/D/R stored as 0..100 (×0.03 → seconds)
+//   v2      : current (#217/#286/#287) — ADSR A/D/R stored as 0..10 (seconds direct)
 static constexpr int kCurrentStateFormatVersion = 2;
 
 //==============================================================================
@@ -108,7 +108,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addI(p+"pitchOct",  n+"Pitch Oct",  -4,   4,  0);
         addI(p+"pitchSemi", n+"Pitch Semi", -12,  12,  0);
         addF(p+"pitchFine", n+"Pitch Fine", -100.0f, 100.0f, 0.0f);
-        addAdsrT(p+"pEnvAtk", n+"P Env Atk", 0.0f);    // #217c — seconds (≈ legacy 0.0 × 0.03)
+        addAdsrT(p+"pEnvAtk", n+"P Env Atk", 0.0f);    // #287 — seconds (≈ legacy 0.0 × 0.03)
         addAdsrT(p+"pEnvDec", n+"P Env Dec", 0.03f);   //         (≈ legacy 1.0 × 0.03)
         addF     (p+"pEnvSus", n+"P Env Sus", 0.0f, 100.0f, 0.0f);   // sustain stays 0..100 %
         addAdsrT(p+"pEnvRel", n+"P Env Rel", 0.03f);   //         (≈ legacy 1.0 × 0.03)
@@ -116,7 +116,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addB(p+"pEnvLeg",   n+"P Env Legato", false);   // #221
         // Filter
         addI(p+"fltType", n+"Filter Type", 0, 15, 0);  // 0-15: LP12/HP12/BP12/Notch/LP24/HP24/BP24/LP6/Comb+/AP12/Notch24/HP6/Peak/LoShf/HiShf/Comb-
-        // #216a: log-skewed range. Skew 0.25 puts ~1.3 kHz at slider centre and
+        // #216: log-skewed range. Skew 0.25 puts ~1.3 kHz at slider centre and
         // gives the sub-bass / midrange the resolution they need. Without this,
         // 20–200 Hz lived in ~1% of knob travel.
         layout.add(std::make_unique<juce::AudioParameterFloat>(
@@ -128,7 +128,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
                     return juce::String(v / 1000.0f, 1) + " kHz";
                 })));
         addF(p+"fltRes",  n+"Filter Res",   0.0f,    0.99f,    0.2f);
-        addAdsrT(p+"fEnvAtk", n+"F Env Atk", 0.03f);   // #217b — seconds (≈ legacy 1.0 × 0.03)
+        addAdsrT(p+"fEnvAtk", n+"F Env Atk", 0.03f);   // #286 — seconds (≈ legacy 1.0 × 0.03)
         addAdsrT(p+"fEnvDec", n+"F Env Dec", 0.09f);   //         (≈ legacy 3.0 × 0.03)
         addF     (p+"fEnvSus", n+"F Env Sus",  0.0f, 100.0f,  0.0f);   // sustain stays 0..100 %
         addAdsrT(p+"fEnvRel", n+"F Env Rel", 0.09f);   //         (≈ legacy 3.0 × 0.03)
@@ -136,7 +136,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addB(p+"fEnvLeg", n+"F Env Legato", false);   // #221
         // Amp
         addF(p+"ampLvl",  n+"Amp Level",  0.0f,   2.0f,  1.0f);  // Issue #121: 0 dB default
-        addAdsrT(p+"aEnvAtk", n+"A Env Atk", 0.005f);   // #217a — seconds
+        addAdsrT(p+"aEnvAtk", n+"A Env Atk", 0.005f);   // #217 — seconds
         addAdsrT(p+"aEnvDec", n+"A Env Dec", 0.3f);
         addF(p+"aEnvSus", n+"A Env Sus",  0.0f, 100.0f, 80.0f);   // sustain stays 0..100 %
         addAdsrT(p+"aEnvRel", n+"A Env Rel", 0.5f);
@@ -229,15 +229,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addI(c+"outBus",  n+"Output Bus",0, 8,     0);
     }
 
-    // ── Return channel strips (4 × 3 = 12) ───────────────────────────────────
+    // ── Return channel strips (8 × 3 = 24) ───────────────────────────────────
     for (const char* ret : { "eff", "dly", "rev" })
     {
         const juce::String q = juce::String("ret_") + ret + "_";
         const juce::String nm = juce::String("Ret ") + ret + " ";
-        addF(q+"lvl",  nm+"Level",  0.0f, 1.0f, 0.75f);
-        addF(q+"pan",  nm+"Pan",   -1.0f, 1.0f, 0.0f);
-        addB(q+"mute", nm+"Mute",  false);
-        addB(q+"solo", nm+"Solo",  false);
+        addF(q+"lvl",   nm+"Level",    0.0f,    1.0f,    0.75f);
+        addF(q+"pan",   nm+"Pan",     -1.0f,    1.0f,    0.0f);
+        addB(q+"mute",  nm+"Mute",    false);
+        addB(q+"solo",  nm+"Solo",    false);
+        addI(q+"scSrc", nm+"SC Src",  0,        8,       0);      // 0=off, 1-8=ch0-ch7
+        addF(q+"scAmt", nm+"SC Amt",  0.0f,     1.0f,    0.0f);
+        addF(q+"scAtk", nm+"SC Atk",  1.0f,   500.0f,    5.0f);
+        addF(q+"scRel", nm+"SC Rel",  10.0f, 2000.0f,  100.0f);
     }
 
     // ── Master (2 params + 8 insert params) ──────────────────────────────────
@@ -253,6 +257,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     addF("mst_insDit",  "Mst Insert Dit",   0.0f,  100.0f,     0.0f);
     addF("mst_insTon",  "Mst Insert Tone", 20.0f, 20000.0f, 20000.0f);
     addF("mst_insMid",  "Mst Insert Mid", -18.0f,   18.0f,     0.0f);  // EQ mid gain
+    // Master insert 2 (#283): chained after insert 1.
+    addI("mst_ins2Char","Mst Insert2 Char", 0,       10,       0);
+    addF("mst_ins2Drv", "Mst Insert2 Drive",0.0f,  100.0f,     0.0f);
+    addF("mst_ins2Out", "Mst Insert2 Out",-24.0f,   24.0f,     0.0f);
+    addF("mst_ins2Bits","Mst Insert2 Bits", 1.0f,   16.0f,    16.0f);
+    addF("mst_ins2Rate","Mst Insert2 Rate",100.0f,48000.0f, 48000.0f);
+    addF("mst_ins2Dit", "Mst Insert2 Dit",  0.0f,  100.0f,     0.0f);
+    addF("mst_ins2Ton", "Mst Insert2 Tone",20.0f, 20000.0f, 20000.0f);
+    addF("mst_ins2Mid", "Mst Insert2 Mid",-18.0f,   18.0f,     0.0f);
 
 #if MUCLID_LITE_BUILD
     addI("lite_midiNote",   "MIDI Note", 0, 127, 36);
@@ -324,18 +337,26 @@ PluginProcessor::PluginProcessor()
         loadedSamplePaths.add(juce::String());
 
     // Pre-populate modulation param map so lookups never allocate on the audio thread.
-    // #218: pitch.octave / pitch.fine removed from the populated set so legacy preset
-    // assignments targeting them resolve to "destination not found" at apply time
-    // (paramValues.find returns end() → assignment silently no-ops).
-    modParamValues.reserve(24);
+    // pitch.fine deprecated by #218 — not in the map; legacy assignments silently no-op.
+    modParamValues.reserve(44);
     for (const char* key : { "amp.attack", "amp.decay", "amp.sustain", "amp.release",
                               "filter.cutoff", "filter.resonance",
                               "fenv.attack", "fenv.decay", "fenv.depth",
-                              "pitch.semitones",
+                              "pitch.semitones", "pitch.octave",
                               "insert.drive", "insert.output",
                               "insert.bits", "insert.rate", "insert.dither", "insert.lpf",
                               // #223 additions
-                              "pitch.envDepth", "amp.level", "accentDb" })
+                              "pitch.envDepth", "amp.level", "accentDb",
+                              // #336: euclid pattern destinations (Stage A wiring)
+                              "euclid.a.hits", "euclid.a.rotate",
+                              "euclid.a.prePad", "euclid.a.postPad",
+                              "euclid.a.insSt", "euclid.a.insLen",
+                              "euclid.b.hits", "euclid.b.rotate",
+                              "euclid.b.prePad", "euclid.b.postPad",
+                              "euclid.b.insSt", "euclid.b.insLen",
+                              "euclid.c.hits", "euclid.c.rotate",
+                              "euclid.c.prePad", "euclid.c.postPad",
+                              "euclid.c.insSt", "euclid.c.insLen" })
         modParamValues[key] = 0.0f;
 
     // Add default rhythm (16 steps, 4 hits) and sync its state to APVTS.
@@ -691,6 +712,13 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         Rhythm& rhythm = sequencer.getRhythm(r);
         VoiceParams modParams = rhythm.voiceParams;
 
+        // #336 Stage A: lastEuclidOverrides[r] is updated only inside the modLock-acquired
+        // branch below (post-matrix.process write-back). Rhythms with no assignments keep
+        // their default-zero overrides — equal to prevEuclidOverrides — so change-detection
+        // is a no-op and the existing snapshot-from-cached path handles their pattern.
+        // Rhythms whose modLock acquire fails this block also keep lastEuclid stable, so a
+        // contended lock never causes a visible pattern-revert-to-base glitch.
+
         if (!rhythm.modulationMatrix.getAssignments().empty())
         {
             bool expected = false;
@@ -706,10 +734,10 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParamValues["fenv.attack"]      = modParams.filterEnvAtk * (100.0f/3.0f);
                 modParamValues["fenv.decay"]       = modParams.filterEnvDec * (100.0f/3.0f);
                 modParamValues["fenv.depth"]       = modParams.filterEnvDepth;
-                // #218: collapsed pitch destinations to single "pitch.semitones" (±24 st full swing).
-                // pitch.octave / pitch.fine no longer in the value map — legacy preset assignments
-                // targeting them silently no-op at apply time.
+                // pitch.octave and pitch.semitones both start at 0; summed at write-back → pitchMod.
+                // pitch.fine is deprecated (#218) — not in map, legacy assignments silently no-op.
                 modParamValues["pitch.semitones"]  = 0.0f;
+                modParamValues["pitch.octave"]     = 0.0f;
                 modParamValues["insert.drive"]     = modParams.driveDrive;
                 modParamValues["insert.output"]    = modParams.driveOutput;
                 modParamValues["insert.bits"]      = modParams.drvBits;
@@ -720,6 +748,25 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParamValues["pitch.envDepth"]   = modParams.pitchEnvDepth;
                 modParamValues["amp.level"]        = modParams.ampLevel;
                 modParamValues["accentDb"]         = modParams.accentDb;
+                // #336 Stage A: seed euclid pattern destinations with base gen values.
+                modParamValues["euclid.a.hits"]    = (float) rhythm.genA.hits;
+                modParamValues["euclid.a.rotate"]  = (float) rhythm.genA.rotate;
+                modParamValues["euclid.a.prePad"]  = (float) rhythm.genA.prePad;
+                modParamValues["euclid.a.postPad"] = (float) rhythm.genA.postPad;
+                modParamValues["euclid.a.insSt"]   = (float) rhythm.genA.insertStart;
+                modParamValues["euclid.a.insLen"]  = (float) rhythm.genA.insertLength;
+                modParamValues["euclid.b.hits"]    = (float) rhythm.genB.hits;
+                modParamValues["euclid.b.rotate"]  = (float) rhythm.genB.rotate;
+                modParamValues["euclid.b.prePad"]  = (float) rhythm.genB.prePad;
+                modParamValues["euclid.b.postPad"] = (float) rhythm.genB.postPad;
+                modParamValues["euclid.b.insSt"]   = (float) rhythm.genB.insertStart;
+                modParamValues["euclid.b.insLen"]  = (float) rhythm.genB.insertLength;
+                modParamValues["euclid.c.hits"]    = (float) rhythm.genC.hits;
+                modParamValues["euclid.c.rotate"]  = (float) rhythm.genC.rotate;
+                modParamValues["euclid.c.prePad"]  = (float) rhythm.genC.prePad;
+                modParamValues["euclid.c.postPad"] = (float) rhythm.genC.postPad;
+                modParamValues["euclid.c.insSt"]   = (float) rhythm.genC.insertStart;
+                modParamValues["euclid.c.insLen"]  = (float) rhythm.genC.insertLength;
 
                 rhythm.modulationMatrix.process(rhythm.controlSequences, beatPos, modParamValues);
 
@@ -729,7 +776,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 {
                     auto& snap = modSnapshot[r];
                     auto sn = [](float v, float mn, float mx) { return juce::jlimit(0.0f, 1.0f, (v - mn) / (mx - mn)); };
-                    // #216a: Hz destinations use log normalisation to match the slider's log skew,
+                    // #216: Hz destinations use log normalisation to match the slider's log skew,
                     // so the live-arc dot tracks the visible knob position.
                     auto snLogHz = [](float v) {
                         return juce::jlimit(0.0f, 1.0f,
@@ -744,19 +791,39 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                     snap[kSnapFenvAtk]     .set(sn(modParamValues["fenv.attack"],      0.0f,    100.0f));
                     snap[kSnapFenvDec]     .set(sn(modParamValues["fenv.decay"],       0.0f,    100.0f));
                     snap[kSnapFenvDepth]   .set(sn(modParamValues["fenv.depth"],       0.0f,     48.0f));
-                    // #218: single Pitch destination, ±24 st full swing.
-                    snap[kSnapPitchSemi]   .set(sn(modParamValues["pitch.semitones"], -24.0f,    24.0f));
-                    snap[kSnapPitchOct]    .set(0.0f);   // deprecated by #218 — no longer modulatable
-                    snap[kSnapPitchFine]   .set(0.0f);   // deprecated by #218 — no longer modulatable
+                    snap[kSnapPitchSemi]   .set(sn(modParamValues["pitch.semitones"], -12.0f,    12.0f));
+                    snap[kSnapPitchOct]    .set(sn(modParamValues["pitch.octave"],    -36.0f,    36.0f));
+                    snap[kSnapPitchFine]   .set(0.0f);   // deprecated by #218
                     snap[kSnapInsDrive]    .set(sn(modParamValues["insert.drive"],     0.0f,    100.0f));
                     snap[kSnapInsOutput]   .set(sn(modParamValues["insert.output"],   -24.0f,    0.0f));
                     snap[kSnapInsBits]     .set(sn(modParamValues["insert.bits"],      1.0f,     16.0f));
                     snap[kSnapInsDither]   .set(sn(modParamValues["insert.dither"],    0.0f,    100.0f));
-                    snap[kSnapInsLpf]      .set(snLogHz(modParamValues["insert.lpf"]));   // #216a log
+                    snap[kSnapInsLpf]      .set(snLogHz(modParamValues["insert.lpf"]));   // #216 log
                     // #223 new destinations
                     snap[kSnapPitchEnvDep] .set(sn(modParamValues["pitch.envDepth"],   0.0f,    24.0f));
                     snap[kSnapAmpLvl]      .set(sn(modParamValues["amp.level"],        0.0f,     2.0f));
                     snap[kSnapAccent]      .set(sn(modParamValues["accentDb"],         0.0f,    12.0f));
+                    // #336 Stage C: euclid pattern destinations. Normalised against each
+                    // destination's full range so the arc indicator on the matching knob
+                    // matches what the audio engine actually applies.
+                    snap[kSnapEucAHits]    .set(sn(modParamValues["euclid.a.hits"],    0.0f,    64.0f));
+                    snap[kSnapEucARotate]  .set(sn(modParamValues["euclid.a.rotate"],  0.0f,    63.0f));
+                    snap[kSnapEucAPrePad]  .set(sn(modParamValues["euclid.a.prePad"],  0.0f,    12.0f));
+                    snap[kSnapEucAPostPad] .set(sn(modParamValues["euclid.a.postPad"], 0.0f,    12.0f));
+                    snap[kSnapEucAInsSt]   .set(sn(modParamValues["euclid.a.insSt"],   0.0f,    63.0f));
+                    snap[kSnapEucAInsLen]  .set(sn(modParamValues["euclid.a.insLen"],  0.0f,     8.0f));
+                    snap[kSnapEucBHits]    .set(sn(modParamValues["euclid.b.hits"],    0.0f,    64.0f));
+                    snap[kSnapEucBRotate]  .set(sn(modParamValues["euclid.b.rotate"],  0.0f,    63.0f));
+                    snap[kSnapEucBPrePad]  .set(sn(modParamValues["euclid.b.prePad"],  0.0f,    12.0f));
+                    snap[kSnapEucBPostPad] .set(sn(modParamValues["euclid.b.postPad"], 0.0f,    12.0f));
+                    snap[kSnapEucBInsSt]   .set(sn(modParamValues["euclid.b.insSt"],   0.0f,    63.0f));
+                    snap[kSnapEucBInsLen]  .set(sn(modParamValues["euclid.b.insLen"],  0.0f,     8.0f));
+                    snap[kSnapEucCHits]    .set(sn(modParamValues["euclid.c.hits"],    0.0f,    64.0f));
+                    snap[kSnapEucCRotate]  .set(sn(modParamValues["euclid.c.rotate"],  0.0f,    63.0f));
+                    snap[kSnapEucCPrePad]  .set(sn(modParamValues["euclid.c.prePad"],  0.0f,    12.0f));
+                    snap[kSnapEucCPostPad] .set(sn(modParamValues["euclid.c.postPad"], 0.0f,    12.0f));
+                    snap[kSnapEucCInsSt]   .set(sn(modParamValues["euclid.c.insSt"],   0.0f,    63.0f));
+                    snap[kSnapEucCInsLen]  .set(sn(modParamValues["euclid.c.insLen"],  0.0f,     8.0f));
                 }
 
                 // Write modulated values back, clamping to safe ranges.
@@ -770,8 +837,9 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParams.filterEnvDec   = juce::jmax(0.001f, modParamValues["fenv.decay"]   * 0.03f);
                 modParams.filterEnvDepth = juce::jlimit(0.0f, 48.0f, modParamValues["fenv.depth"]);
                 // #218: single pitch destination, no more octave×12 + fine/100 stacking.
-                modParams.pitchMod       = juce::jlimit(-24.0f, 24.0f,
-                                                         modParamValues["pitch.semitones"]);
+                modParams.pitchMod       = juce::jlimit(-48.0f, 48.0f,
+                                                         modParamValues["pitch.octave"]
+                                                       + modParamValues["pitch.semitones"]);
                 modParams.driveDrive     = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.drive"]);
                 modParams.driveOutput    = juce::jlimit(-24.0f, 24.0f,    modParamValues["insert.output"]);
                 modParams.drvBits        = juce::jlimit(1.0f,   16.0f,    modParamValues["insert.bits"]);
@@ -782,7 +850,44 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParams.pitchEnvDepth  = juce::jlimit(0.0f,   24.0f,    modParamValues["pitch.envDepth"]);
                 modParams.ampLevel       = juce::jlimit(0.0f,    2.0f,    modParamValues["amp.level"]);
                 modParams.accentDb       = juce::jlimit(0.0f,   12.0f,    modParamValues["accentDb"]);
+
+                // #336 Stage A: write modulated euclid values back to the per-rhythm
+                // overrides snapshot. Integer-rounded so Stage B change-detection skips
+                // sub-step LFO jitter. Clamps applied per the destination ranges in
+                // ModDest::kTable (hits/rotate: 0..steps; pad: 0..12 / 0..63 / 0..8).
+                auto modI = [&](const char* key) {
+                    return juce::roundToInt(modParamValues[key]);
+                };
+                lastEuclidOverrides[r].a.hits         = juce::jlimit(0, 64, modI("euclid.a.hits"));
+                lastEuclidOverrides[r].a.rotate       = juce::jlimit(0, 63, modI("euclid.a.rotate"));
+                lastEuclidOverrides[r].a.prePad       = juce::jlimit(0, 12, modI("euclid.a.prePad"));
+                lastEuclidOverrides[r].a.postPad      = juce::jlimit(0, 12, modI("euclid.a.postPad"));
+                lastEuclidOverrides[r].a.insertStart  = juce::jlimit(0, 63, modI("euclid.a.insSt"));
+                lastEuclidOverrides[r].a.insertLength = juce::jlimit(0,  8, modI("euclid.a.insLen"));
+                lastEuclidOverrides[r].b.hits         = juce::jlimit(0, 64, modI("euclid.b.hits"));
+                lastEuclidOverrides[r].b.rotate       = juce::jlimit(0, 63, modI("euclid.b.rotate"));
+                lastEuclidOverrides[r].b.prePad       = juce::jlimit(0, 12, modI("euclid.b.prePad"));
+                lastEuclidOverrides[r].b.postPad      = juce::jlimit(0, 12, modI("euclid.b.postPad"));
+                lastEuclidOverrides[r].b.insertStart  = juce::jlimit(0, 63, modI("euclid.b.insSt"));
+                lastEuclidOverrides[r].b.insertLength = juce::jlimit(0,  8, modI("euclid.b.insLen"));
+                lastEuclidOverrides[r].c.hits         = juce::jlimit(0, 64, modI("euclid.c.hits"));
+                lastEuclidOverrides[r].c.rotate       = juce::jlimit(0, 63, modI("euclid.c.rotate"));
+                lastEuclidOverrides[r].c.prePad       = juce::jlimit(0, 12, modI("euclid.c.prePad"));
+                lastEuclidOverrides[r].c.postPad      = juce::jlimit(0, 12, modI("euclid.c.postPad"));
+                lastEuclidOverrides[r].c.insertStart  = juce::jlimit(0, 63, modI("euclid.c.insSt"));
+                lastEuclidOverrides[r].c.insertLength = juce::jlimit(0,  8, modI("euclid.c.insLen"));
             }
+        }
+
+        // #336 Stage B: trigger pattern recompute when integer-rounded overrides changed
+        // since last block. Skips recompute on every block where modulation is sub-step
+        // (typical case for a slow LFO). tryUpdatePatternFromModulation is non-blocking —
+        // a missed try-lock just defers to the next block; prevEuclidOverrides only
+        // advances when the recompute actually applied so the change-detection retries.
+        if (lastEuclidOverrides[r] != prevEuclidOverrides[r])
+        {
+            if (sequencer.tryUpdatePatternFromModulation(r, lastEuclidOverrides[r]))
+                prevEuclidOverrides[r] = lastEuclidOverrides[r];
         }
 
         if (voiceEngines[r])
@@ -931,10 +1036,14 @@ static const char* const kGlobalParams[] = {
     "echo_en","echo_mode","echo_ms","echo_syncDenom","echo_syncDot","echo_syncTrip",
     "echo_count","echo_fb","echo_spread","echo_dirt",
     "ret_eff_lvl","ret_eff_pan","ret_eff_mute","ret_eff_solo",
+    "ret_eff_scSrc","ret_eff_scAmt","ret_eff_scAtk","ret_eff_scRel",
     "ret_dly_lvl","ret_dly_pan","ret_dly_mute","ret_dly_solo",
+    "ret_dly_scSrc","ret_dly_scAmt","ret_dly_scAtk","ret_dly_scRel",
     "ret_rev_lvl","ret_rev_pan","ret_rev_mute","ret_rev_solo",
+    "ret_rev_scSrc","ret_rev_scAmt","ret_rev_scAtk","ret_rev_scRel",
     "mstr_lvl","mstr_pan","mstrLoop",
     "mst_insChar","mst_insDrv","mst_insOut","mst_insBits","mst_insRate","mst_insDit","mst_insTon","mst_insMid",
+    "mst_ins2Char","mst_ins2Drv","mst_ins2Out","mst_ins2Bits","mst_ins2Rate","mst_ins2Dit","mst_ins2Ton","mst_ins2Mid",
     nullptr
 };
 
@@ -965,17 +1074,17 @@ static void applyRhythmSuffix(const juce::String& suffix, float v, Rhythm& r,
     else if (suffix == "pitchOct")  { r.voiceParams.pitchOctave    = juce::jlimit(-4, 4, (int)v);   voiceDirty = true; }
     else if (suffix == "pitchSemi") { r.voiceParams.pitchSemitones = juce::jlimit(-12, 12, (int)v); voiceDirty = true; }
     else if (suffix == "pitchFine") { r.voiceParams.pitchFine      = v;  voiceDirty = true; }
-    // #217c — pEnvAtk/Dec/Rel now stored in seconds directly (0..10 s, skew 0.3).
+    // #287 — pEnvAtk/Dec/Rel now stored in seconds directly (0..10 s, skew 0.3).
     else if (suffix == "pEnvAtk")   { r.voiceParams.pitchEnvAtk    = juce::jmax(0.001f, v); voiceDirty = true; }
     else if (suffix == "pEnvDec")   { r.voiceParams.pitchEnvDec    = juce::jmax(0.001f, v); voiceDirty = true; }
     else if (suffix == "pEnvSus")   { r.voiceParams.pitchEnvSus    = adsrSus(v);  voiceDirty = true; }
-    else if (suffix == "pEnvRel")   { r.voiceParams.pitchEnvRel    = juce::jmax(0.001f, v); voiceDirty = true; }   // #217c seconds
+    else if (suffix == "pEnvRel")   { r.voiceParams.pitchEnvRel    = juce::jmax(0.001f, v); voiceDirty = true; }   // #287 seconds
     else if (suffix == "pEnvDep")   { r.voiceParams.pitchEnvDepth  = v;            voiceDirty = true; }
     else if (suffix == "pEnvLeg")   { r.voiceParams.pitchEnvLegato = (v > 0.5f);   voiceDirty = true; }   // #221
     else if (suffix == "fltType")   { r.voiceParams.filterType     = juce::jlimit(0, 15, (int)v); voiceDirty = true; }
     else if (suffix == "fltCut")    { r.voiceParams.filterCutoff   = v;            voiceDirty = true; }
     else if (suffix == "fltRes")    { r.voiceParams.filterRes      = v;            voiceDirty = true; }
-    // #217b — fEnvAtk/Dec/Rel now stored in seconds directly (0..10 s, skew 0.3).
+    // #286 — fEnvAtk/Dec/Rel now stored in seconds directly (0..10 s, skew 0.3).
     else if (suffix == "fEnvAtk")   { r.voiceParams.filterEnvAtk   = juce::jmax(0.001f, v); voiceDirty = true; }
     else if (suffix == "fEnvDec")   { r.voiceParams.filterEnvDec   = juce::jmax(0.001f, v); voiceDirty = true; }
     else if (suffix == "fEnvSus")   { r.voiceParams.filterEnvSus   = adsrSus(v);            voiceDirty = true; }
@@ -983,10 +1092,10 @@ static void applyRhythmSuffix(const juce::String& suffix, float v, Rhythm& r,
     else if (suffix == "fEnvDep")   { r.voiceParams.filterEnvDepth = v;            voiceDirty = true; }
     else if (suffix == "fEnvLeg")   { r.voiceParams.filterEnvLegato = (v > 0.5f);  voiceDirty = true; }   // #221
     else if (suffix == "ampLvl")    { r.voiceParams.ampLevel       = v;            voiceDirty = true; }
-    else if (suffix == "aEnvAtk")   { r.voiceParams.ampEnvAtk      = juce::jmax(0.001f, v); voiceDirty = true; }   // #217a seconds
-    else if (suffix == "aEnvDec")   { r.voiceParams.ampEnvDec      = juce::jmax(0.001f, v); voiceDirty = true; }   // #217a seconds
+    else if (suffix == "aEnvAtk")   { r.voiceParams.ampEnvAtk      = juce::jmax(0.001f, v); voiceDirty = true; }   // #217 seconds
+    else if (suffix == "aEnvDec")   { r.voiceParams.ampEnvDec      = juce::jmax(0.001f, v); voiceDirty = true; }   // #217 seconds
     else if (suffix == "aEnvSus")   { r.voiceParams.ampEnvSus      = adsrSus(v);  voiceDirty = true; }
-    else if (suffix == "aEnvRel")   { r.voiceParams.ampEnvRel = juce::jmax(0.001f, v); r.voiceParams.ampRelToEnd = (v >= 10.0f); voiceDirty = true; }   // #217a seconds + End at new max
+    else if (suffix == "aEnvRel")   { r.voiceParams.ampEnvRel = juce::jmax(0.001f, v); r.voiceParams.ampRelToEnd = (v >= 10.0f); voiceDirty = true; }   // #217 seconds + End at new max
     else if (suffix == "aEnvLeg")   { r.voiceParams.ampEnvLegato = (v > 0.5f);     voiceDirty = true; }   // #221
     else if (suffix == "accentDb")  { r.voiceParams.accentDb        = v;           voiceDirty = true; }
     else if (suffix == "drvChar")    { r.voiceParams.driveChar  = juce::jlimit(0, 10, (int)v); voiceDirty = true; }
@@ -1049,10 +1158,10 @@ void PluginProcessor::syncFXParam(const juce::String& id, float v)
     auto& dly = fxChain.delaySlot();
     auto& rev = fxChain.reverbSlot();
 
-    // #242a: do NOT guard on apvtsLoading — that left the engine at the default
+    // #242: do NOT guard on apvtsLoading — that left the engine at the default
     // algorithm (0=Chorus) when state restore loaded eff_algo=N, because nothing
     // re-synced the engine after the load completed. Then the user trying to
-    // change the algorithm via the dropdown triggered the #242b listener-skip-
+    // change the algorithm via the dropdown triggered the #285 listener-skip-
     // on-unchanged-value bug (APVTS already at N, no notification, engine stuck
     // at 0), and the next loadFromAPVTS read engine state and snapped the FXRow
     // back to Chorus. setAlgorithm is cheap (one make_unique + prepare).
@@ -1085,7 +1194,7 @@ void PluginProcessor::syncFXParam(const juce::String& id, float v)
     else if (id == "dly_spread") { dly.setSpread(v); }
     else if (id == "dly_dirt")   { dly.setDirt(v); }
     else if (id == "dly_send")   { dly.setSend(v); }
-    else if (id == "rev_algo")   { rev.setAlgorithm((int)v); }   // #242a — see eff_algo
+    else if (id == "rev_algo")   { rev.setAlgorithm((int)v); }   // #242 — see eff_algo
     else if (id == "rev_en")     { rev.setEnabled(v > 0.5f); }
     else if (id == "rev_lvl")    { rev.setLevel(v); }
     else if (id == "rev_size")   { rev.setParam("size",      v); }
@@ -1152,24 +1261,36 @@ void PluginProcessor::syncMixerParam(const juce::String& id, float v)
         if (retIdx >= 0)
         {
             auto& ret = mixerEngine.returns[retIdx];
-            if      (rest == "lvl")  ret.level = v;
-            else if (rest == "pan")  ret.pan   = v;
-            else if (rest == "mute") ret.mute  = v > 0.5f;
-            else if (rest == "solo") ret.solo  = v > 0.5f;
+            if      (rest == "lvl")   ret.level             = v;
+            else if (rest == "pan")   ret.pan               = v;
+            else if (rest == "mute")  ret.mute              = v > 0.5f;
+            else if (rest == "solo")  ret.solo              = v > 0.5f;
+            else if (rest == "scSrc") ret.sidechainSource   = juce::jlimit(0, 8, (int)v) - 1; // 0→-1 (off), 1-8→0-7
+            else if (rest == "scAmt") ret.sidechainAmount   = juce::jlimit(0.0f, 1.0f, v);
+            else if (rest == "scAtk") ret.sidechainAttackMs  = v;
+            else if (rest == "scRel") ret.sidechainReleaseMs = v;
         }
         return;
     }
 
     if      (id == "mstr_lvl") mixerEngine.masterLevel = v;
     else if (id == "mstr_pan") mixerEngine.masterPan   = v;
-    else if (id == "mst_insChar") mixerEngine.masterInsertParams.driveChar  = juce::jlimit(0, 10, (int)v);
-    else if (id == "mst_insDrv")  mixerEngine.masterInsertParams.driveDrive = v;
-    else if (id == "mst_insOut")  mixerEngine.masterInsertParams.driveOutput= v;
-    else if (id == "mst_insBits") mixerEngine.masterInsertParams.drvBits    = v;
-    else if (id == "mst_insRate") mixerEngine.masterInsertParams.driveRate  = v;
-    else if (id == "mst_insDit")  mixerEngine.masterInsertParams.drvDither  = v;
-    else if (id == "mst_insTon")  mixerEngine.masterInsertParams.driveTone  = v;
-    else if (id == "mst_insMid")  mixerEngine.masterInsertParams.eqMidGain  = v;
+    else if (id == "mst_insChar")  mixerEngine.masterInsertParams.driveChar  = juce::jlimit(0, 10, (int)v);
+    else if (id == "mst_insDrv")   mixerEngine.masterInsertParams.driveDrive = v;
+    else if (id == "mst_insOut")   mixerEngine.masterInsertParams.driveOutput= v;
+    else if (id == "mst_insBits")  mixerEngine.masterInsertParams.drvBits    = v;
+    else if (id == "mst_insRate")  mixerEngine.masterInsertParams.driveRate  = v;
+    else if (id == "mst_insDit")   mixerEngine.masterInsertParams.drvDither  = v;
+    else if (id == "mst_insTon")   mixerEngine.masterInsertParams.driveTone  = v;
+    else if (id == "mst_insMid")   mixerEngine.masterInsertParams.eqMidGain  = v;
+    else if (id == "mst_ins2Char") mixerEngine.masterInsertParams2.driveChar  = juce::jlimit(0, 10, (int)v);
+    else if (id == "mst_ins2Drv")  mixerEngine.masterInsertParams2.driveDrive = v;
+    else if (id == "mst_ins2Out")  mixerEngine.masterInsertParams2.driveOutput= v;
+    else if (id == "mst_ins2Bits") mixerEngine.masterInsertParams2.drvBits    = v;
+    else if (id == "mst_ins2Rate") mixerEngine.masterInsertParams2.driveRate  = v;
+    else if (id == "mst_ins2Dit")  mixerEngine.masterInsertParams2.drvDither  = v;
+    else if (id == "mst_ins2Ton")  mixerEngine.masterInsertParams2.driveTone  = v;
+    else if (id == "mst_ins2Mid")  mixerEngine.masterInsertParams2.eqMidGain  = v;
 }
 
 //==============================================================================
@@ -1227,7 +1348,7 @@ void PluginProcessor::pushRhythmToAPVTS(int ri)
     set(px+"pitchOct",  (float)vp.pitchOctave);
     set(px+"pitchSemi", (float)vp.pitchSemitones);
     set(px+"pitchFine", vp.pitchFine);
-    // #217c — pEnv times now stored in seconds (0..10 s); sustain stays 0..100 %.
+    // #287 — pEnv times now stored in seconds (0..10 s); sustain stays 0..100 %.
     set(px+"pEnvAtk",   vp.pitchEnvAtk);
     set(px+"pEnvDec",   vp.pitchEnvDec);
     set(px+"pEnvSus",   vp.pitchEnvSus  * 100.0f);
@@ -1237,7 +1358,7 @@ void PluginProcessor::pushRhythmToAPVTS(int ri)
     set(px+"fltType",   (float)vp.filterType);
     set(px+"fltCut",    vp.filterCutoff);
     set(px+"fltRes",    vp.filterRes);
-    // #217b — fEnv times now stored in seconds (0..10 s).
+    // #286 — fEnv times now stored in seconds (0..10 s).
     set(px+"fEnvAtk",   vp.filterEnvAtk);
     set(px+"fEnvDec",   vp.filterEnvDec);
     set(px+"fEnvSus",   vp.filterEnvSus  * 100.0f);
@@ -1245,10 +1366,10 @@ void PluginProcessor::pushRhythmToAPVTS(int ri)
     set(px+"fEnvDep",   vp.filterEnvDepth);
     set(px+"fEnvLeg",   vp.filterEnvLegato ? 1.0f : 0.0f);   // #221
     set(px+"ampLvl",    vp.ampLevel);
-    set(px+"aEnvAtk",   vp.ampEnvAtk);   // #217a seconds
-    set(px+"aEnvDec",   vp.ampEnvDec);   // #217a seconds
+    set(px+"aEnvAtk",   vp.ampEnvAtk);   // #217 seconds
+    set(px+"aEnvDec",   vp.ampEnvDec);   // #217 seconds
     set(px+"aEnvSus",   vp.ampEnvSus  * 100.0f);
-    // #217a: ampRel writes 10 (new max) when ampRelToEnd is on so the >=10 check in
+    // #217: ampRel writes 10 (new max) when ampRelToEnd is on so the >=10 check in
     // applyRhythmSuffix triggers; otherwise writes the seconds value directly.
     set(px+"aEnvRel",   vp.ampRelToEnd ? 10.0f : vp.ampEnvRel);
     set(px+"aEnvLeg",   vp.ampEnvLegato ? 1.0f : 0.0f);   // #221
@@ -1714,14 +1835,55 @@ void PluginProcessor::saveRhythmPreset(int rhythmIdx, const juce::String& name,
     dir.getChildFile(safe + ".muRhyth").replaceWithText(state.toXmlString());
 }
 
+juce::StringArray PluginProcessor::loadCategoryList() const
+{
+    juce::StringArray cats;
+    getPresetsDir().getChildFile("categories.txt").readLines(cats);
+    // Also scan .muclid and .muRhyth files for categories not yet in the list.
+    auto scan = [&](const juce::File& dir, const juce::String& ext) {
+        for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*." + ext))
+        {
+            if (auto xml = juce::parseXML(f))
+            {
+                auto s = juce::ValueTree::fromXml(*xml);
+                juce::String cat = s.getProperty("presetCategory", "").toString();
+                if (cat.isNotEmpty() && cat != "All" && !cats.contains(cat, false))
+                    cats.add(cat);
+            }
+        }
+    };
+    scan(getPresetsDir(), "muclid");
+    scan(getRhythmsDir(), "muRhyth");
+    cats.removeDuplicates(false);
+    cats.removeEmptyStrings();
+    cats.sort(false);
+    return cats;
+}
+
+void PluginProcessor::ensureCategoryInList(const juce::String& cat)
+{
+    if (cat.isEmpty() || cat == "All" || cat == "Uncategorised") return;
+    auto cats = loadCategoryList();
+    if (!cats.contains(cat, false))
+    {
+        cats.add(cat);
+        cats.sort(false);
+        getPresetsDir().getChildFile("categories.txt")
+                       .replaceWithText(cats.joinIntoString("\n"));
+    }
+}
+
 void PluginProcessor::saveRhythmPresetToFile(int rhythmIdx, const juce::File& destFile,
-                                             bool embedSample)
+                                             bool embedSample, const juce::String& category,
+                                             const juce::String& description)
 {
     if (rhythmIdx < 0 || rhythmIdx >= sequencer.getNumRhythms()) return;
 
     juce::ValueTree state("MuClidRhythm");
-    state.setProperty("presetName",     destFile.getFileNameWithoutExtension(), nullptr);
-    state.setProperty("presetCategory", "",                                     nullptr);
+    state.setProperty("presetName",         destFile.getFileNameWithoutExtension(), nullptr);
+    state.setProperty("presetCategory",     category,                               nullptr);
+    state.setProperty("presetDescription",  description,                            nullptr);
+    state.setProperty("presetEmbedSamples", embedSample ? 1 : 0,                   nullptr);
 
     const Rhythm& r = sequencer.getRhythm(rhythmIdx);
     state.setProperty("r0_name",   juce::String(r.name),        nullptr);
@@ -2034,7 +2196,7 @@ static void clearModulators(Rhythm& r)
 static void populateStateTree(juce::ValueTree& state, int numRhythms,
                               SequencerEngine& seq, const juce::StringArray& samplePaths)
 {
-    state.setProperty("formatVersion", kCurrentStateFormatVersion, nullptr);   // #217d
+    state.setProperty("formatVersion", kCurrentStateFormatVersion, nullptr);   // #288
     state.setProperty("numRhythms", numRhythms, nullptr);
     for (int i = 0; i < numRhythms; ++i)
     {
@@ -2057,7 +2219,7 @@ void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
     juce::MemoryOutputStream(destData, true).writeString(state.toXmlString());
 }
 
-// #217d: in-place migration of pre-#217 host state. APVTS stores parameter
+// #288: in-place migration of pre-#217 host state. APVTS stores parameter
 // values as <PARAM id="..." value="..."/> children of the root tree. For
 // legacy state (formatVersion absent or < 2), the ADSR A/D/R values lived in
 // 0..100; the new schema stores them in 0..10 seconds directly. Migration:
@@ -2112,7 +2274,7 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
     // Expand to MaxRhythms so parameterChanged can write to all 8 rhythm slots.
     sequencer.setNumRhythms(SequencerEngine::MaxRhythms);
 
-    // #217d: migrate legacy state in-place before pushing it into APVTS so the
+    // #288: migrate legacy state in-place before pushing it into APVTS so the
     // new 0..10 s ADSR ranges don't clamp old 0..100 values to absurd attacks.
     juce::ValueTree migrated = state.createCopy();
     migrateLegacyHostState(migrated);
@@ -2262,8 +2424,9 @@ void PluginProcessor::savePreset(const juce::String& name,
     const int n = sequencer.getNumRhythms();
 
     juce::ValueTree root("MuClidPreset");
-    root.setProperty("presetName",        name,        nullptr);
-    root.setProperty("presetDescription", description, nullptr);
+    root.setProperty("presetName",         name,                 nullptr);
+    root.setProperty("presetDescription",  description,          nullptr);
+    root.setProperty("presetEmbedSamples", embedSamples ? 1 : 0, nullptr);
     root.setProperty("presetCategory",    category,    nullptr);
 
     for (int i = 0; i < n; ++i)

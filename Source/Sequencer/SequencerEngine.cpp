@@ -21,6 +21,12 @@ SequencerEngine::SequencerEngine()
         safePatterns [i].reserve(kMaxStepCount);
         safeCPatterns[i].reserve(kMaxStepCount);
     }
+
+    // #336 Stage B: scratch buffers for audio-thread pattern recompute.
+    scratchPatA   .reserve(kMaxStepCount);
+    scratchPatB   .reserve(kMaxStepCount);
+    scratchEuclid .reserve(kMaxStepCount);
+    scratchEuclidC.reserve(kMaxStepCount);
 }
 
 //==============================================================================
@@ -142,6 +148,36 @@ void SequencerEngine::updatePattern(int index)
     // lastStepIndex preserved — processBlock will absorb the current step without firing
 
     patternLock.store(false, std::memory_order_release);
+}
+
+bool SequencerEngine::tryUpdatePatternFromModulation(int index, const EuclidOverrides& ov)
+{
+    // #336 Stage B: audio-thread pattern recompute. Writes directly into safePatterns/
+    // safeCPatterns (already reserved to 256 in ctor) — bypasses cachedPatterns so a
+    // concurrent message-thread updatePattern() that move-assigns into cached cannot
+    // clobber the modulated pattern this block. The next snapshot pass (after a real
+    // knob change sets patternUpdated[index]=true) will overwrite safePatterns with the
+    // freshly-cached base, and the next modulation tick will re-modulate from there.
+    if (index < 0 || index >= (int) rhythms.size()) return false;
+
+    bool expected = false;
+    if (!patternLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+        return false;   // message thread holds the lock — retry next block
+
+    const Rhythm& rhy = rhythms[index];
+    rhy.getCombinedPattern(ov, safePatterns[index], scratchPatA, scratchPatB, scratchEuclid);
+    rhy.genC.getPattern(ov.c, safeCPatterns[index], scratchEuclidC);
+
+    // Re-clamp lastStepIndex / lastAccentStepIndex against the new pattern lengths so
+    // pattern-shrink modulation can't leave an out-of-range pointer that crashes the
+    // next step-walk.
+    const int newLen  = (int) safePatterns[index].size();
+    const int newCLen = (int) safeCPatterns[index].size();
+    if (newLen  > 0 && lastStepIndex[index]       >= newLen)  lastStepIndex[index]       %= newLen;
+    if (newCLen > 0 && lastAccentStepIndex[index] >= newCLen) lastAccentStepIndex[index] %= newCLen;
+
+    patternLock.store(false, std::memory_order_release);
+    return true;
 }
 
 //==============================================================================

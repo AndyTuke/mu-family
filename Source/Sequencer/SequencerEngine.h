@@ -29,6 +29,12 @@ public:
     // Call after changing any rhythm parameter to refresh its cached pattern.
     void updatePattern(int index);
 
+    // #336 Stage B: audio-thread-safe pattern recompute using modulated euclid overrides.
+    // Non-allocating (all buffers pre-reserved in ctor). Uses try-lock on patternLock —
+    // returns false if the message thread holds the lock; caller is expected to retry
+    // on the next block (the override values are sticky in PluginProcessor).
+    bool tryUpdatePatternFromModulation(int index, const EuclidOverrides& ov);
+
     // Resize all rhythm vectors to n — used during state loading to pre-expand or trim.
     void setNumRhythms(int n);
 
@@ -87,4 +93,8 @@ private:
     int masterLoopSteps = 0;
     std::atomic<int> masterLoopCurrentStep { 0 };
     int lastEffectiveStep = -1;  // previous block's effectiveStep, for master-loop wrap detection
+
+    // #336 Stage B: audio-thread scratch buffers for tryUpdatePatternFromModulation.
+    // Pre-reserved to 256 in ctor so the non-allocating pattern overloads never alloc.
+    std::vector<bool> scratchPatA, scratchPatB, scratchEuclid, scratchEuclidC;
 };
