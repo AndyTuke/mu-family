@@ -712,14 +712,15 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         Rhythm& rhythm = sequencer.getRhythm(r);
         VoiceParams modParams = rhythm.voiceParams;
 
-        // #336 Stage A: lastEuclidOverrides[r] is updated only inside the modLock-acquired
-        // branch below (post-matrix.process write-back). Rhythms with no assignments keep
-        // their default-zero overrides — equal to prevEuclidOverrides — so change-detection
-        // is a no-op and the existing snapshot-from-cached path handles their pattern.
-        // Rhythms whose modLock acquire fails this block also keep lastEuclid stable, so a
-        // contended lock never causes a visible pattern-revert-to-base glitch.
-
-        if (!rhythm.modulationMatrix.getAssignments().empty())
+        // #336 / #345: the modulation pass runs every block (not gated on a non-empty
+        // matrix). ModulationMatrix::process() returns immediately when assignments is
+        // empty, so the cost is just the per-block param-map seed (~40 hash writes).
+        // Why this gate was removed: when the user removes the LAST euclid assignment,
+        // a gated pass would skip the write-back of lastEuclidOverrides[r], leaving it
+        // at the previous modulated values; Stage B's change-detection then never fires
+        // and the safe pattern stays modulated forever. Always running the seed + write-
+        // back ensures lastEuclidOverrides re-converges to base values one block after
+        // removal, and Stage B recomputes the pattern back to base.
         {
             bool expected = false;
             if (rhythm.modLock.compare_exchange_strong(expected, true, std::memory_order_acquire))

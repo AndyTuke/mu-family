@@ -2,6 +2,9 @@
 
 SaveDialog::SaveDialog()
 {
+    logoImage = juce::ImageCache::getFromMemory(BinaryData::muclid_png,
+                                                BinaryData::muclid_pngSize);
+
     nameEditor.setTextToShowWhenEmpty("Preset name", juce::Colours::grey);
     nameEditor.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
     addAndMakeVisible(nameEditor);
@@ -27,10 +30,16 @@ SaveDialog::SaveDialog()
 
     addAndMakeVisible(embedSamplesToggle);
 
+    saveAsDefaultToggle.onClick = [this] { updateDefaultModeState(); };
+    addAndMakeVisible(saveAsDefaultToggle);
+
     saveBtn.onClick = [this]
     {
+        // #344: in Save-as-Default mode the filename is hard-coded to _default.muclid,
+        // so the name field is disabled (see updateDefaultModeState) and empty by
+        // design. Don't gate the click on a non-empty name in that mode.
         const auto name = nameEditor.getText().trim();
-        if (name.isEmpty()) return;
+        if (!isSaveAsDefault() && name.isEmpty()) return;
         if (onSave)
             onSave(name, descEditor.getText().trim(), resolveCategory(),
                    embedSamplesToggle.getToggleState());
@@ -75,14 +84,48 @@ void SaveDialog::visibilityChanged()
 {
     if (isVisible())
     {
-        nameEditor.clear();
+        if (pendingDefaultName.isNotEmpty())
+        {
+            nameEditor.setText(pendingDefaultName, false);
+            nameEditor.selectAll();
+            pendingDefaultName.clear();
+        }
+        else
+        {
+            nameEditor.clear();
+        }
         descEditor.clear();
         categoryDropdown.setSelectedId(1, false);
+        if (pendingDefaultCategory.isNotEmpty())
+        {
+            for (int i = 0; i < knownCategories.size(); ++i)
+            {
+                if (knownCategories[i].equalsIgnoreCase(pendingDefaultCategory))
+                {
+                    categoryDropdown.setSelectedId(i + 2, false);
+                    break;
+                }
+            }
+            pendingDefaultCategory.clear();
+        }
         newCategoryEditor.setVisible(false);
         newCategoryEditor.clear();
-        embedSamplesToggle.setToggleState(false, juce::dontSendNotification);
+        embedSamplesToggle.setToggleState(pendingDefaultEmbed, juce::dontSendNotification);
+        pendingDefaultEmbed = false;
+        saveAsDefaultToggle.setToggleState(false, juce::dontSendNotification);
+        updateDefaultModeState();
         nameEditor.grabKeyboardFocus();
     }
+}
+
+void SaveDialog::updateDefaultModeState()
+{
+    const bool isDefault = saveAsDefaultToggle.getToggleState();
+    nameEditor        .setEnabled(!isDefault);
+    descEditor        .setEnabled(!isDefault);
+    categoryDropdown  .setEnabled(!isDefault);
+    newCategoryEditor .setEnabled(!isDefault);
+    resized();
 }
 
 void SaveDialog::mouseDown(const juce::MouseEvent& e)
@@ -104,26 +147,29 @@ void SaveDialog::resized()
     const int cardX = (w - kCardW) / 2;
     const int cardY = (h - kCardH) / 2;
 
-    int y = cardY + 44;  // leave room for title
+    int y = cardY + 116;  // leave room for 96px logo + padding
     const int fieldW = kCardW - 48;
     const int fieldX = cardX + 24;
+
+    const bool isDefault = saveAsDefaultToggle.getToggleState();
 
     nameEditor    .setBounds(fieldX, y, fieldW, 28);  y += 36;
     descEditor    .setBounds(fieldX, y, fieldW, 28);  y += 36;
     categoryDropdown.setBounds(fieldX, y, fieldW, 28); y += 34;
 
-    if (newCategoryEditor.isVisible())
+    if (newCategoryEditor.isVisible() && !isDefault)
     {
         newCategoryEditor.setBounds(fieldX, y, fieldW, 24);
         y += 30;
     }
 
-    embedSamplesToggle.setBounds(fieldX, y, fieldW, 24);
+    embedSamplesToggle .setBounds(fieldX, y, fieldW / 2, 24);
+    saveAsDefaultToggle.setBounds(fieldX + fieldW / 2, y, fieldW / 2, 24);
 
     const int btnW = 80;
     const int btnY = cardY + kCardH - 44;
-    cancelBtn.setBounds(fieldX,              btnY, btnW, 28);
-    saveBtn  .setBounds(fieldX + fieldW - btnW, btnY, btnW, 28);
+    cancelBtn.setBounds(fieldX,                   btnY, btnW, 28);
+    saveBtn  .setBounds(fieldX + fieldW - btnW,   btnY, btnW, 28);
 }
 
 void SaveDialog::paint(juce::Graphics& g)
@@ -144,8 +190,14 @@ void SaveDialog::paint(juce::Graphics& g)
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawRoundedRectangle((float)cardX, (float)cardY, (float)kCardW, (float)kCardH, 8.0f, 1.0f);
 
+    // Logo on the right side of the header, title on the left
+    if (logoImage.isValid())
+    {
+        g.drawImage(logoImage, cardX + 16, cardY + 12, 96, 96,
+                    0, 0, logoImage.getWidth(), logoImage.getHeight());
+    }
     g.setColour(MuClidLookAndFeel::colour(Id::headingText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(14.0f)));
-    g.drawText("Save Preset", cardX + 24, cardY + 14, kCardW - 48, 20,
+    g.drawText("Save Preset", cardX + 120, cardY + 40, kCardW - 136, 20,
                juce::Justification::centredLeft, false);
 }
