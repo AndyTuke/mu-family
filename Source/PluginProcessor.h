@@ -297,6 +297,12 @@ private:
     // Previous block's overrides per rhythm — Stage B compares against this to skip
     // pattern recomputes when nothing crossed an integer boundary.
     std::array<EuclidOverrides, SequencerEngine::MaxRhythms> prevEuclidOverrides;
+    // #345: tracks whether the rhythm's modulation matrix had any assignments LAST block.
+    // The modulation pass is gated on (matrix non-empty || transition-to-empty), so we
+    // skip the seed + matrix.process + write-back work for never-modulated rhythms but
+    // still run one final reset pass after assignment removal to flush lastEuclidOverrides
+    // back to base values, which Stage B then picks up via change-detection.
+    std::array<bool, SequencerEngine::MaxRhythms> prevMatrixHadAssignments {};
 
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void syncRhythmParam(int ri, const juce::String& suffix, float v);

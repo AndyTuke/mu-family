@@ -712,15 +712,19 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         Rhythm& rhythm = sequencer.getRhythm(r);
         VoiceParams modParams = rhythm.voiceParams;
 
-        // #336 / #345: the modulation pass runs every block (not gated on a non-empty
-        // matrix). ModulationMatrix::process() returns immediately when assignments is
-        // empty, so the cost is just the per-block param-map seed (~40 hash writes).
-        // Why this gate was removed: when the user removes the LAST euclid assignment,
-        // a gated pass would skip the write-back of lastEuclidOverrides[r], leaving it
-        // at the previous modulated values; Stage B's change-detection then never fires
-        // and the safe pattern stays modulated forever. Always running the seed + write-
-        // back ensures lastEuclidOverrides re-converges to base values one block after
-        // removal, and Stage B recomputes the pattern back to base.
+        // #345 / #336: gate the modulation pass on "matrix has assignments now, OR had
+        // assignments last block". The first half is the normal case. The second half
+        // runs one final pass on the block AFTER assignment removal so the write-back
+        // re-seeds lastEuclidOverrides[r] to base values; Stage B's change-detection
+        // then recomputes the safe pattern back to base. Without that transition pass,
+        // a never-modulated rhythm pays no per-block cost, but a rhythm whose last
+        // assignment was just removed would leave lastEuclidOverrides stuck on the old
+        // modulated values, freezing the pattern.
+        const bool matrixHasAssignments = !rhythm.modulationMatrix.getAssignments().empty();
+        const bool runModulationPass    = matrixHasAssignments || prevMatrixHadAssignments[r];
+        prevMatrixHadAssignments[r]     = matrixHasAssignments;
+
+        if (runModulationPass)
         {
             bool expected = false;
             if (rhythm.modLock.compare_exchange_strong(expected, true, std::memory_order_acquire))

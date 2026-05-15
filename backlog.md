@@ -6,6 +6,7 @@
 
 | # | Description | Status | Fixed Build |
 |---|---|---|---|
+| 346 | Runtime-verify #345 fix — code-level fix shipped in v1.0.425, but the actual behaviour ("remove the last euclid mod assignment mid-play → pattern snaps back to base within ~1 block") has not been observed in a DAW or standalone session. Test plan: (1) start playback with rhythm A=16 steps, 4 hits, (2) assign CS0 → euclid.a.hits at depth=100, confirm hit count audibly sweeps, (3) remove the assignment via the modulator panel, (4) confirm the rhythm returns to 4 hits within one buffer (~11 ms at 44.1k/512). | 🔴 Open | — |
 | 280 | First-play audio delay — standalone plays for ~500 ms before any sound is heard on the very first play after launch. Circle animation starts immediately; audio lags. Root cause not yet identified — could be audio driver warmup, OS buffer fill, or JUCE standalone audio-device initialisation latency. | 🔴 Open | — |
 
 ## 🟡 On Hold
