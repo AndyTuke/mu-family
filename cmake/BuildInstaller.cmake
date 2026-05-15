@@ -13,6 +13,14 @@ if(NOT result EQUAL 0)
     message(FATAL_ERROR "Inno Setup failed with exit code ${result}")
 endif()
 
+# Highlander: there can be only one. Sweep any pre-existing
+# mu-Clid-Setup-v*.exe from DIST_DIR before placing the new one,
+# so testers always see exactly one installer (the latest build).
+file(GLOB previous_installers "${DIST_DIR}/mu-Clid-Setup-v*.exe")
+foreach(stale ${previous_installers})
+    file(REMOVE "${stale}")
+endforeach()
+
 execute_process(
     COMMAND "${CMAKE_COMMAND}" -E copy
         "${SOURCE_DIR}/build/installer/mu-Clid-Setup-v1.0.${BUILD_NUM}.exe"
