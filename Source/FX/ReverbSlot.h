@@ -2,6 +2,7 @@
 
 #include "FXSlotBase.h"
 #include "FXAlgorithmDef.h"
+#include <atomic>
 #include <vector>
 
 // Send-style reverb slot using Signalsmith FDN reverb (MIT, header-only).
@@ -23,9 +24,9 @@ public:
     void getStateInformation(juce::MemoryBlock&) override {}
     void setStateInformation(const void*, int) override {}
 
-    bool isEnabled() const     { return enabled; }
-    void setEnabled(bool e)    { enabled = e; }
-    void setLevel(float v)     { level  = juce::jlimit(0.0f, 1.0f, v); }
+    bool isEnabled() const     { return enabled.load(std::memory_order_relaxed); }
+    void setEnabled(bool e)    { enabled.store(e, std::memory_order_relaxed); }
+    void setLevel(float v)     { level.store(juce::jlimit(0.0f, 1.0f, v), std::memory_order_relaxed); }
 
     // Send-bus processing: overwrites buffer with wet-only reverb output.
     void processReturn(juce::AudioBuffer<float>&);
@@ -40,19 +41,24 @@ public:
 private:
     void applyAlgorithmPreset();
     void updateReverb();
+    // #358: copy any pending param snapshot into the Signalsmith reverb's public
+    // fields. Audio thread only — call at the top of processReturn before reverb.process.
+    void applyPendingReverbParams();
     void runPreDelay(const juce::AudioBuffer<float>& src, int numSamples);
 
-    bool  enabled        = true;
-    float level          = 1.0f;
-    int   algorithmIndex = 0;
+    // #358: fields read on the audio thread are atomic to avoid torn reads when
+    // setEnabled / setLevel / setParam writes from the message thread.
+    std::atomic<bool>  enabled  { true };
+    std::atomic<float> level    { 1.0f };
+    int                algorithmIndex = 0;
 
-    float size      = 0.5f;
-    float preDelay  = 10.0f;
-    float diffusion = 0.7f;
-    float damp      = 0.4f;
-    float mod       = 0.2f;
-    float dirt      = 0.0f;
-    float rt20      = 1.0f;   // decay time to -20dB (set per algorithm)
+    float              size      = 0.5f;
+    std::atomic<float> preDelay  { 10.0f };   // read by runPreDelay (audio thread)
+    float              diffusion = 0.7f;
+    float              damp      = 0.4f;
+    float              mod       = 0.2f;
+    std::atomic<float> dirt      { 0.0f };    // read by processReturn (audio thread)
+    float              rt20      = 1.0f;      // decay time to -20dB (set per algorithm)
 
     double sr = 44100.0;
 
