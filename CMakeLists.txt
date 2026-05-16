@@ -84,6 +84,8 @@ juce_add_plugin(mu-clid
 target_sources(mu-clid
     PRIVATE
         Source/PluginProcessor.cpp
+        Source/PluginProcessor_APVTS.cpp
+        Source/PluginProcessor_Preset.cpp
         Source/PluginEditor.cpp
         Source/MidiPresetMap.cpp
         Source/Sequencer/EuclideanGenerator.cpp
@@ -219,6 +221,8 @@ juce_add_plugin(mu-clid-lite
 target_sources(mu-clid-lite
     PRIVATE
         Source/PluginProcessor.cpp
+        Source/PluginProcessor_APVTS.cpp
+        Source/PluginProcessor_Preset.cpp
         Source/LiteEditor.cpp
         Source/MidiPresetMap.cpp
         Source/Sequencer/EuclideanGenerator.cpp
