@@ -2,6 +2,29 @@
 #include "../FX/FXAlgorithmDef.h"
 #include "../FX/EffectSlot.h"
 
+// #352: only subscribe to APVTS IDs that actually affect the mixer view.
+// Previously this class registered as a listener for *every* parameter in the
+// tree (hundreds across all rhythms / voices / mods) and set apvtsDirty on any
+// change — each loadFromAPVTS then rebuilt every channel strip. Risk: feedback
+// storm via the universal listener every time a rhythm knob moved.
+static bool isMixerRelevantParam(const juce::String& id) noexcept
+{
+    // Rhythm channel strips: ch0_*, ch1_*, … ch7_*
+    if (id.startsWith("ch") && id.length() > 2 && juce::CharacterFunctions::isDigit(id[2]))
+        return true;
+    // Return channels: ret_eff_*, ret_dly_*, ret_rev_*
+    if (id.startsWith("ret_eff_") || id.startsWith("ret_dly_") || id.startsWith("ret_rev_"))
+        return true;
+    // Master strip + inserts: mstr_*, mst_ins*
+    if (id.startsWith("mstr_") || id.startsWith("mst_ins"))
+        return true;
+    // FX algorithm + per-algo params (effectRow, delayRow, reverbRow) + Echo mode.
+    if (id.startsWith("eff_") || id.startsWith("dly_") || id.startsWith("rev_")
+     || id.startsWith("echo_"))
+        return true;
+    return false;
+}
+
 MixerOverlay::MixerOverlay(PluginProcessor& p, MixerEngine& m)
     : proc(p), mixer(m),
       effectRow("Effect", FXAlgorithmRegistry::effectAlgorithms(), MuClidLookAndFeel::knobFxSend),
@@ -26,10 +49,12 @@ MixerOverlay::MixerOverlay(PluginProcessor& p, MixerEngine& m)
         propagateMeterMode(static_cast<VUMeter::MeterMode>(idx));
     };
 
-    // Register for every APVTS parameter so automation syncs the mixer UI.
+    // #352: subscribe only to mixer-relevant IDs (see isMixerRelevantParam above).
+    // Rhythm/euclid/voice/mod params no longer trigger spurious mixer reloads.
     for (auto* param : proc.getParameters())
         if (auto* pid = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
-            proc.apvts.addParameterListener(pid->getParameterID(), this);
+            if (isMixerRelevantParam(pid->getParameterID()))
+                proc.apvts.addParameterListener(pid->getParameterID(), this);
 
     startTimerHz(30);
 }
@@ -39,7 +64,8 @@ MixerOverlay::~MixerOverlay()
     stopTimer();
     for (auto* param : proc.getParameters())
         if (auto* pid = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
-            proc.apvts.removeParameterListener(pid->getParameterID(), this);
+            if (isMixerRelevantParam(pid->getParameterID()))
+                proc.apvts.removeParameterListener(pid->getParameterID(), this);
 }
 
 void MixerOverlay::parameterChanged(const juce::String& /*parameterID*/, float /*newValue*/)
