@@ -21,6 +21,11 @@ public:
     void setRhythmColour(juce::Colour c);
     void loadFromRhythm();
 
+    // #353: refresh a single control identified by its APVTS suffix (e.g. "stepsB",
+    // "hitsA", "logic", "prePadModeC"). Used by RhythmPanel::parameterChanged to
+    // avoid rewriting all 31 knobs/segments on every single parameter change.
+    void refreshSuffix(const juce::String& suffix);
+
     // Issue #133: tag hits/rotate knobs with modulation indicator rings.
     void refreshModulatedIndicators();
 

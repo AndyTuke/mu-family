@@ -900,7 +900,11 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 prevEuclidOverrides[r] = lastEuclidOverrides[r];
         }
 
-        if (voiceEngines[r])
+        // #357: only override activeParams when the modulation pass actually ran. For an
+        // unmodulated rhythm modParams ≡ rhythm.voiceParams ≡ activeParams (already kept in
+        // sync by VoiceEngine::applyPendingParams' dirty-flag path), so the call would be
+        // pure waste — re-syncing ADSR + filter every block for no change.
+        if (runModulationPass && voiceEngines[r])
             voiceEngines[r]->setActiveParams(modParams);
     }
 

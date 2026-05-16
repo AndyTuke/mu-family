@@ -15,6 +15,7 @@ KnobWithLabel::KnobWithLabel(const juce::String& label,
     slider.onValueChange = [this]
     {
         repaint();  // refresh value text in dead zone
+        if (settingRange) return;   // #360/#382: suppress callbacks from setRange clip
         if (onStatusUpdate)
             onStatusUpdate(labelText, slider.getTextFromValue(slider.getValue()));
         if (onValueChanged)
@@ -27,7 +28,16 @@ KnobWithLabel::KnobWithLabel(const juce::String& label,
 
 void KnobWithLabel::setRange(double min, double max, double step)
 {
+    // #360/#382: JUCE's Slider::setRange clips the current value to the new range
+    // and fires onValueChange even when the caller would have wanted dontSendNotification.
+    // Programmatic range refreshes (EuclideanPanel::updateRangesA/B/C) would otherwise
+    // cascade through APVTS into repeated updatePattern() calls; the sequencer's
+    // "absorb current step" snapshot logic then drops audible hits while the user
+    // drags the steps knob. Suppress the callback here — the owning panel reloads
+    // its values from the canonical APVTS state right after.
+    settingRange = true;
     slider.setRange(min, max, step);
+    settingRange = false;
 }
 
 void KnobWithLabel::setValue(double v, juce::NotificationType n)

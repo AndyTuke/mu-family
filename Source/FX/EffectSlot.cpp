@@ -21,6 +21,8 @@ void EffectSlot::prepare(double sampleRate, int blockSize)
 
 void EffectSlot::process(juce::AudioBuffer<float>& buffer)
 {
+    // FXSlotBase contract — mu-clid uses send/return architecture, so the in-place
+    // process() form just forwards to processReturn(). Retained for v3 plugin hosting.
     processReturn(buffer);
 }
 

@@ -26,6 +26,11 @@ public:
 
     void loadFromRhythm();
 
+    // #353: refresh a single control identified by its APVTS suffix (rhythm-prefixed
+    // suffixes like "pitchOct", "fltCut", or send suffixes like "sendEff"). Used by
+    // RhythmPanel::parameterChanged to avoid rewriting all 28+ knobs on every change.
+    void refreshSuffix(const juce::String& suffix);
+
     void resized() override;
     void paint(juce::Graphics&) override;
 

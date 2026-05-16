@@ -45,6 +45,11 @@ private:
     bool  isModulated   = false;
     float modulatedNorm = std::numeric_limits<float>::quiet_NaN();
 
+    // #360/#382: when true, suppress onValueChanged dispatch from the slider's
+    // onValueChange lambda. Set transiently inside setRange so JUCE's setRange
+    // value-clip cannot cascade into a spurious APVTS write.
+    bool  settingRange  = false;
+
     const juce::Atomic<float>* grSource  = nullptr;
     float                      grDisplay = 0.0f;
     static constexpr float     kGRRelease = 0.85f;

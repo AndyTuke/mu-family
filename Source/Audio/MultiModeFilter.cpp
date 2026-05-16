@@ -12,6 +12,11 @@ void MultiModeFilter::prepare(double sampleRate, int blockSize, int numChannels)
 
     notchScratch.setSize(MaxChannels, blockSize, false, true, false);
 
+    // #368: force coefficient recompute on next process() call.
+    lastCutoffHz  = -1.0f;
+    lastResonance = -1.0f;
+    lastTypeCode  = -1;
+
     // Comb max delay = sr / 20 Hz + a few guard samples; cleared on prepare.
     const int maxCombSamples = static_cast<int>(sampleRate / 20.0) + 4;
     for (int ch = 0; ch < MaxChannels; ++ch)
@@ -70,6 +75,16 @@ void MultiModeFilter::process(juce::AudioBuffer<float>& buffer, int numSamples, 
 
     const int fType = typeCodeValue;
 
+    // #368: skip per-channel coefficient recompute when cutoff/resonance/type unchanged.
+    // SVF / Ladder paths intentionally call setCutoff every block — JUCE smooths internally
+    // and the ops are O(1). Only the 1-pole and biquad branches benefit.
+    const bool coeffsDirty = (cutoffHz  != lastCutoffHz)
+                          || (resonance != lastResonance)
+                          || (fType     != lastTypeCode);
+    lastCutoffHz  = cutoffHz;
+    lastResonance = resonance;
+    lastTypeCode  = fType;
+
     juce::dsp::AudioBlock<float> block(buffer.getArrayOfWritePointers(),
                                        static_cast<size_t>(nCh),
                                        static_cast<size_t>(0),
@@ -119,7 +134,7 @@ void MultiModeFilter::process(juce::AudioBuffer<float>& buffer, int numSamples, 
         const float sr = static_cast<float>(currentSampleRate);
         for (int ch = 0; ch < nCh; ++ch)
         {
-            lp6[ch].prepare(cutoffHz, sr);
+            if (coeffsDirty) lp6[ch].prepare(cutoffHz, sr);
             auto* data = buffer.getWritePointer(ch);
             for (int i = 0; i < ns; ++i)
                 data[i] = lp6[ch].process(data[i]);
@@ -130,7 +145,7 @@ void MultiModeFilter::process(juce::AudioBuffer<float>& buffer, int numSamples, 
         const float sr = static_cast<float>(currentSampleRate);
         for (int ch = 0; ch < nCh; ++ch)
         {
-            hp6[ch].prepare(cutoffHz, sr);
+            if (coeffsDirty) hp6[ch].prepare(cutoffHz, sr);
             auto* data = buffer.getWritePointer(ch);
             for (int i = 0; i < ns; ++i)
                 data[i] = hp6[ch].process(data[i]);
@@ -142,10 +157,13 @@ void MultiModeFilter::process(juce::AudioBuffer<float>& buffer, int numSamples, 
         const float q  = 0.1f + resonance * 9.9f; // 0..0.99 → 0.1..9.9
         for (int ch = 0; ch < nCh; ++ch)
         {
-            if      (fType == 9)  eq[ch].setAllPass  (cutoffHz, q, sr);
-            else if (fType == 12) eq[ch].setPeak     (cutoffHz, q, 12.0f, sr);
-            else if (fType == 13) eq[ch].setLowShelf (cutoffHz, q, 12.0f, sr);
-            else                  eq[ch].setHighShelf(cutoffHz, q, 12.0f, sr);
+            if (coeffsDirty)
+            {
+                if      (fType == 9)  eq[ch].setAllPass  (cutoffHz, q, sr);
+                else if (fType == 12) eq[ch].setPeak     (cutoffHz, q, 12.0f, sr);
+                else if (fType == 13) eq[ch].setLowShelf (cutoffHz, q, 12.0f, sr);
+                else                  eq[ch].setHighShelf(cutoffHz, q, 12.0f, sr);
+            }
             auto* data = buffer.getWritePointer(ch);
             for (int i = 0; i < ns; ++i)
                 data[i] = eq[ch].process(data[i]);

@@ -461,20 +461,38 @@ void RhythmPanel::deregisterRhythmListeners(int ri)
 
 void RhythmPanel::parameterChanged(const juce::String& parameterID, float /*newValue*/)
 {
-    const auto suffix = parameterID.fromFirstOccurrenceOf("_", false, false);
-    bool isEuclid = false;
-    for (auto* s : kEuclidSuffixes)
-        if (suffix == s) { isEuclid = true; break; }
+    // #354: JUCE invokes parameterChanged on whatever thread called setValueNotifyingHost.
+    // Some DAWs run host automation on the audio thread — and the refresh below mutates
+    // juce::Slider state (not audio-thread-safe). Marshal to the message thread.
+    // #353: refresh only the single control matching `suffix`, not the whole panel
+    // (was 21 euclid knobs + 9 segments OR 28+ voice knobs per parameter change).
+    juce::Component::SafePointer<RhythmPanel> safeThis(this);
+    const juce::String suffix = parameterID.fromFirstOccurrenceOf("_", false, false);
 
-    if (isEuclid)
+    auto refresh = [safeThis, suffix]
     {
-        euclidPanel.loadFromRhythm();
-        refreshCircle();
-    }
+        if (auto* self = safeThis.getComponent())
+        {
+            bool isEuclid = false;
+            for (auto* s : kEuclidSuffixes)
+                if (suffix == s) { isEuclid = true; break; }
+
+            if (isEuclid)
+            {
+                self->euclidPanel.refreshSuffix(suffix);
+                self->refreshCircle();
+            }
+            else
+            {
+                self->voiceSection.refreshSuffix(suffix);
+            }
+        }
+    };
+
+    if (juce::MessageManager::getInstance()->isThisTheMessageThread())
+        refresh();
     else
-    {
-        voiceSection.loadFromRhythm();
-    }
+        juce::MessageManager::callAsync(std::move(refresh));
 }
 
 void RhythmPanel::setRhythm(int index)

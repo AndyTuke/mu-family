@@ -114,27 +114,6 @@ void VoiceSection::apvtsSet(const char* suffix, float v)
         p->setValueNotifyingHost(p->convertTo0to1(v));
 }
 
-// Legacy ADSR (0-100 slider, max 3 s). Used by pitch + filter envelopes until
-// they're migrated by #286/#287.
-static juce::String formatAdsrTime(double v)
-{
-    double ms = std::max(1.0, v * 30.0);
-    if (ms < 1000.0)
-        return juce::String((int)std::round(ms)) + " ms";
-    return juce::String(ms / 1000.0, 1) + " s";
-}
-
-static double parseAdsrTime(const juce::String& s)
-{
-    auto t = s.trim().toLowerCase();
-    if (t.endsWith("ms"))
-        return t.dropLastCharacters(2).trim().getDoubleValue() / 30.0;
-    if (t.endsWith("s"))
-        return t.dropLastCharacters(1).trim().getDoubleValue() * (100.0/3.0);
-    // Bare number: assume milliseconds (120 → 120 ms → slider value 4.0)
-    return t.getDoubleValue() / 30.0;
-}
-
 // #217: seconds-domain formatter for the amp envelope. Slider value IS seconds (0..10).
 static juce::String formatAdsrTimeSec(double v)
 {
@@ -157,10 +136,7 @@ static double parseAdsrTimeSec(const juce::String& s)
 
 void VoiceSection::wireCallbacks()
 {
-    // #217 (amp) + #286 (filter) + #287 (pitch): all ADSR time sliders take
-    // seconds directly. Legacy formatAdsrTime / parseAdsrTime helpers are now
-    // unused but kept in the file for one release in case any other slider is
-    // discovered still depending on them; remove on the next pass.
+    // #217 (amp) + #286 (filter) + #287 (pitch): all ADSR time sliders take seconds directly.
     for (auto* k : { &ampAtk, &ampDec, &filterAtk, &filterDec, &filterRel,
                      &pitchAtk, &pitchDec, &pitchRel })
     {
@@ -446,6 +422,61 @@ void VoiceSection::loadFromRhythm()
 
     driveChar.setSelectedId(p.driveChar + 1, false);
     configureInsertAlgorithm(p.driveChar);  // sets all insert knob ranges/labels/values/callbacks
+}
+
+void VoiceSection::refreshSuffix(const juce::String& suffix)
+{
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
+    const auto& p = proc.getRhythm(rhythmIndex).voiceParams;
+    constexpr auto dn = juce::dontSendNotification;
+
+    // ── Pitch
+    if      (suffix == "pitchOct")   pitchOctave.setValue(p.pitchOctave,    dn);
+    else if (suffix == "pitchSemi")  pitchSemi  .setValue(p.pitchSemitones, dn);
+    else if (suffix == "pitchFine")  pitchFine  .setValue(p.pitchFine,      dn);
+    else if (suffix == "pEnvAtk")    pitchAtk   .setValue(p.pitchEnvAtk,    dn);
+    else if (suffix == "pEnvDec")    pitchDec   .setValue(p.pitchEnvDec,    dn);
+    else if (suffix == "pEnvSus")    pitchSus   .setValue(p.pitchEnvSus * 100.0, dn);
+    else if (suffix == "pEnvRel")    pitchRel   .setValue(p.pitchEnvRel,    dn);
+    else if (suffix == "pEnvDep")    pitchDepth .setValue(p.pitchEnvDepth,  dn);
+    // ── Filter
+    else if (suffix == "fltType")    filterType.setSelectedId(p.filterType + 1, false);
+    else if (suffix == "fltCut")     filterCutoff.setValue(p.filterCutoff,        dn);
+    else if (suffix == "fltRes")     filterRes   .setValue(p.filterRes * 100.0,   dn);
+    else if (suffix == "fEnvAtk")    filterAtk   .setValue(p.filterEnvAtk,        dn);
+    else if (suffix == "fEnvDec")    filterDec   .setValue(p.filterEnvDec,        dn);
+    else if (suffix == "fEnvSus")    filterSus   .setValue(p.filterEnvSus * 100.0, dn);
+    else if (suffix == "fEnvRel")    filterRel   .setValue(p.filterEnvRel,        dn);
+    else if (suffix == "fEnvDep")    filterDepth .setValue(p.filterEnvDepth,      dn);
+    // ── Amp
+    else if (suffix == "ampLvl")     ampLevel .setValue(p.ampLevel,                              dn);
+    else if (suffix == "accentDb")   ampAccent.setValue(p.accentDb,                              dn);
+    else if (suffix == "aEnvAtk")    ampAtk   .setValue(p.ampEnvAtk,                             dn);
+    else if (suffix == "aEnvDec")    ampDec   .setValue(p.ampEnvDec,                             dn);
+    else if (suffix == "aEnvSus")    ampSus   .setValue(p.ampEnvSus * 100.0,                     dn);
+    else if (suffix == "aEnvRel")    ampRel   .setValue(p.ampRelToEnd ? 10.0 : p.ampEnvRel,      dn);
+    // ── Sends (ch{ri}_ prefix)
+    else if (suffix == "sendEff" || suffix == "sendDly" || suffix == "sendRev")
+    {
+        const auto chPfx = "ch" + juce::String(rhythmIndex) + "_";
+        if (auto* raw = proc.apvts.getRawParameterValue(chPfx + suffix))
+        {
+            if      (suffix == "sendEff") ampSendEff.setValue(*raw, dn);
+            else if (suffix == "sendDly") ampSendDly.setValue(*raw, dn);
+            else                          ampSendRev.setValue(*raw, dn);
+        }
+    }
+    // ── Insert: algorithm change rebuilds the whole insert column. Per-knob updates
+    // (drive/output/dither/tone/bits/rate/eqMidGain) re-run configureInsertAlgorithm
+    // which restores all four knob values from the snapshot for the current algorithm —
+    // cheaper than a full loadFromRhythm and correct because the layout depends on driveChar.
+    else if (suffix == "drvChar"
+          || suffix == "drvDrv" || suffix == "drvOut" || suffix == "drvDit" || suffix == "drvTon"
+          || suffix == "drvBits" || suffix == "drvRate" || suffix == "eqMidGain")
+    {
+        if (suffix == "drvChar") driveChar.setSelectedId(p.driveChar + 1, false);
+        configureInsertAlgorithm(p.driveChar);
+    }
 }
 
 static juce::String fmtHz(double v)

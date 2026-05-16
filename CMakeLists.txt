@@ -19,6 +19,9 @@ juce_add_binary_data(mu-clid-resources
 # Future mu-tant adds: target_link_libraries(mu-tant PRIVATE mu-core)
 add_library(mu-core INTERFACE)
 
+# Pin C++ standard explicitly so a future JUCE bump cannot silently change it.
+target_compile_features(mu-core INTERFACE cxx_std_17)
+
 target_sources(mu-core INTERFACE
     # Modulation
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Modulation/ModulationMatrix.cpp"

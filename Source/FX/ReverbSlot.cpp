@@ -59,35 +59,9 @@ void ReverbSlot::runPreDelay(const juce::AudioBuffer<float>& src, int numSamples
 
 void ReverbSlot::process(juce::AudioBuffer<float>& buffer)
 {
-    if (!enabled) return;
-
-    const int numCh      = buffer.getNumChannels();
-    const int numSamples = juce::jmin(buffer.getNumSamples(), (int)wetL.size());
-
-    runPreDelay(buffer, numSamples);
-
-    if (dirt > 0.001f)
-    {
-        const float gain = 1.0f + dirt * 4.0f;
-        for (int i = 0; i < numSamples; ++i)
-        {
-            wetL[i] = std::tanh(wetL[i] * gain) / gain;
-            wetR[i] = std::tanh(wetR[i] * gain) / gain;
-        }
-    }
-
-    float* ins[2]  = { wetL.data(), wetR.data() };
-    float* outs[2] = { wetL.data(), wetR.data() };
-    impl->reverb.process(ins, outs, (size_t)numSamples);
-
-    // Add wet reverb to output (send-style — dry signal is unaffected).
-    for (int ch = 0; ch < numCh; ++ch)
-    {
-        auto* out = buffer.getWritePointer(ch);
-        const auto* wet = (ch == 0) ? wetL.data() : wetR.data();
-        for (int i = 0; i < numSamples; ++i)
-            out[i] += wet[i] * level;
-    }
+    // FXSlotBase contract — mu-clid uses send/return architecture, so the in-place
+    // process() form just forwards to processReturn(). Retained for v3 plugin hosting.
+    processReturn(buffer);
 }
 
 void ReverbSlot::processReturn(juce::AudioBuffer<float>& buffer)

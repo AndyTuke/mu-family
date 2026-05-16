@@ -33,14 +33,13 @@ static float hermiteDelay(const std::vector<float>& buf, int writePos, float del
     return ((c3 * frac + c2) * frac + c1) * frac + c0;
 }
 
-void DelaySlot::prepare(double sampleRate, int blockSize)
+void DelaySlot::prepare(double sampleRate, int /*blockSize*/)
 {
     sr = sampleRate;
     bufL.assign(MaxDelaySamples, 0.0f);
     bufR.assign(MaxDelaySamples, 0.0f);
     writePosL = writePosR = 0;
     feedL = feedR = 0.0f;
-    dryBuffer.setSize(2, blockSize);
 
     // 50 ms exponential smoothing to glide on delay time changes
     smoothCoeff = (float)std::exp(-1.0 / (0.050 * sampleRate));
@@ -52,60 +51,9 @@ void DelaySlot::prepare(double sampleRate, int blockSize)
 
 void DelaySlot::process(juce::AudioBuffer<float>& buffer)
 {
-    if (!enabled) return;
-
-    dryBuffer.makeCopyOf(buffer, true);
-
-    const int numCh      = buffer.getNumChannels();
-    const int numSamples = buffer.getNumSamples();
-
-    auto* outL = (numCh > 0) ? buffer.getWritePointer(0) : nullptr;
-    auto* outR = (numCh > 1) ? buffer.getWritePointer(1) : outL;
-
-    for (int i = 0; i < numSamples; ++i)
-    {
-        const float inL = (outL != nullptr) ? outL[i] : 0.0f;
-        const float inR = (outR != nullptr) ? outR[i] : 0.0f;
-
-        smoothedDelayL = smoothCoeff * smoothedDelayL + (1.0f - smoothCoeff) * targetDelayL;
-        smoothedDelayR = smoothCoeff * smoothedDelayR + (1.0f - smoothCoeff) * targetDelayR;
-
-        const float delayedL = hermiteDelay(bufL, writePosL, smoothedDelayL);
-        const float delayedR = hermiteDelay(bufR, writePosR, smoothedDelayR);
-
-        feedL = processDirt(delayedL * feedback);
-        feedR = processDirt(delayedR * feedback);
-
-        bufL[writePosL] = inL + feedL;
-        bufR[writePosR] = inR + feedR;
-
-        writePosL = (writePosL + 1) % MaxDelaySamples;
-        writePosR = (writePosR + 1) % MaxDelaySamples;
-
-        if (outL != nullptr) outL[i] = delayedL;
-        if (outR != nullptr) outR[i] = delayedR;
-    }
-
-    // Insert-style blending (same curve as EffectSlot)
-    float dryGain, wetGain;
-    if (sendAmount <= 0.5f)
-    {
-        dryGain = 1.0f;
-        wetGain = sendAmount * 2.0f;
-    }
-    else
-    {
-        dryGain = 1.0f - (sendAmount - 0.5f) * 2.0f;
-        wetGain = 1.0f;
-    }
-
-    for (int ch = 0; ch < numCh; ++ch)
-    {
-        auto* wet = buffer.getWritePointer(ch);
-        auto* dry = dryBuffer.getReadPointer(ch);
-        for (int i = 0; i < numSamples; ++i)
-            wet[i] = dry[i] * dryGain + wet[i] * wetGain;
-    }
+    // FXSlotBase contract — mu-clid uses send/return architecture, so the in-place
+    // process() form just forwards to processReturn(). Retained for v3 plugin hosting.
+    processReturn(buffer);
 }
 
 void DelaySlot::processReturn(juce::AudioBuffer<float>& buffer)

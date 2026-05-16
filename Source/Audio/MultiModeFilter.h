@@ -65,6 +65,14 @@ private:
 
     juce::AudioBuffer<float> notchScratch;
 
+    // #368: change-detection for per-channel coefficient recompute. The expensive
+    // paths (LP6 / HP6 one-pole `exp`, AP12 / Peak / LoShelf / HiShelf biquad
+    // cos/sin/pow) re-derive coefficients every block per channel even when cutoff
+    // and resonance haven't moved. Reset in prepare() so first process() recomputes.
+    float lastCutoffHz  = -1.0f;
+    float lastResonance = -1.0f;
+    int   lastTypeCode  = -1;
+
     void configureForCurrentType();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MultiModeFilter)

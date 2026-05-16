@@ -217,6 +217,58 @@ void EuclideanPanel::loadFromRhythm()
         if (r.logic == logics[i]) { logicCtrl.setSelectedIndex(i); break; }
 }
 
+void EuclideanPanel::refreshSuffix(const juce::String& suffix)
+{
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
+    const Rhythm& r = proc.getRhythm(rhythmIndex);
+
+    auto setMode = [](SegmentControl& sc, InsertMode m) {
+        sc.setSelectedIndex(m == InsertMode::Mute ? 1 : 0);
+    };
+
+    // ── Ring A
+    if      (suffix == "stepsA")        { stepsA.setValue(r.genA.steps); updateRangesA(r.genA.steps); }
+    else if (suffix == "hitsA")           hitsA.setValue(r.genA.hits);
+    else if (suffix == "rotA")            rotA.setValue(r.genA.rotate);
+    else if (suffix == "prePadA")         prePadA.setValue(r.genA.prePad);
+    else if (suffix == "postPadA")        postPadA.setValue(r.genA.postPad);
+    else if (suffix == "insStA")          insertStA.setValue(r.genA.insertStart);
+    else if (suffix == "insLenA")         insertLenA.setValue(r.genA.insertLength);
+    else if (suffix == "prePadModeA")     setMode(prePadModeA, r.genA.prePadMode);
+    else if (suffix == "postPadModeA")    setMode(postPadModeA, r.genA.postPadMode);
+    else if (suffix == "insModeA")        setMode(insertModeA, r.genA.insertMode);
+    // ── Ring B
+    else if (suffix == "stepsB")        { stepsB.setValue(r.genB.steps); updateRangesB(r.genB.steps); }
+    else if (suffix == "hitsB")           hitsB.setValue(r.genB.hits);
+    else if (suffix == "rotB")            rotB.setValue(r.genB.rotate);
+    else if (suffix == "prePadB")         prePadB.setValue(r.genB.prePad);
+    else if (suffix == "postPadB")        postPadB.setValue(r.genB.postPad);
+    else if (suffix == "insStB")          insertStB.setValue(r.genB.insertStart);
+    else if (suffix == "insLenB")         insertLenB.setValue(r.genB.insertLength);
+    else if (suffix == "prePadModeB")     setMode(prePadModeB, r.genB.prePadMode);
+    else if (suffix == "postPadModeB")    setMode(postPadModeB, r.genB.postPadMode);
+    else if (suffix == "insModeB")        setMode(insertModeB, r.genB.insertMode);
+    // ── Ring C (Accent)
+    else if (suffix == "stepsC")        { stepsC.setValue(r.genC.steps); updateRangesC(r.genC.steps); }
+    else if (suffix == "hitsC")           hitsC.setValue(r.genC.hits);
+    else if (suffix == "rotC")            rotC.setValue(r.genC.rotate);
+    else if (suffix == "prePadC")         prePadC.setValue(r.genC.prePad);
+    else if (suffix == "postPadC")        postPadC.setValue(r.genC.postPad);
+    else if (suffix == "insStC")          insertStC.setValue(r.genC.insertStart);
+    else if (suffix == "insLenC")         insertLenC.setValue(r.genC.insertLength);
+    else if (suffix == "prePadModeC")     setMode(prePadModeC, r.genC.prePadMode);
+    else if (suffix == "postPadModeC")    setMode(postPadModeC, r.genC.postPadMode);
+    else if (suffix == "insModeC")        setMode(insertModeC, r.genC.insertMode);
+    // ── Logic
+    else if (suffix == "logic")
+    {
+        static const Logic logics[] = { Logic::OR, Logic::AND, Logic::XOR,
+                                        Logic::AOnly, Logic::BOnly };
+        for (int i = 0; i < 5; i++)
+            if (r.logic == logics[i]) { logicCtrl.setSelectedIndex(i); break; }
+    }
+}
+
 void EuclideanPanel::updateRangesA(int steps)
 {
     hitsA.setRange(0, steps, 1);

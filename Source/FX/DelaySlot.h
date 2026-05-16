@@ -74,6 +74,4 @@ private:
     std::vector<float> bufL, bufR;
     int writePosL = 0, writePosR = 0;
     float feedL = 0.0f, feedR = 0.0f;  // feedback state
-
-    juce::AudioBuffer<float> dryBuffer;
 };

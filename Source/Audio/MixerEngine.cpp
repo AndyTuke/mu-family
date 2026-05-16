@@ -267,8 +267,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
 
     // Re-check after processSends: echo feedback may have produced output even with no
     // channel send signal this block, so we cannot use the pre-processing doEffect flag.
-    const float rawEffPeak = peakOf(effectSendBuf, numSamples);
-    if (rawEffPeak > 1e-9f)
+    if (hasSignal(effectSendBuf, numSamples))
     {
         applyPanGain(effectSendBuf, returns[0].level, returns[0].pan, numSamples);
         if (!returns[0].mute && !(anyReturnSolo && !returns[0].solo))
@@ -282,8 +281,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     }
     else { returnPeaks[0].set(0.0f); }
 
-    const float rawDelayPeak = peakOf(delaySendBuf, numSamples);
-    if (rawDelayPeak > 1e-9f)
+    if (hasSignal(delaySendBuf, numSamples))
     {
         applyPanGain(delaySendBuf, returns[1].level, returns[1].pan, numSamples);
         if (!returns[1].mute && !(anyReturnSolo && !returns[1].solo))
