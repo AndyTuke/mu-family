@@ -7,6 +7,7 @@
 #include "Components/StepEditor.h"
 #include "Components/DropdownSelect.h"
 #include "Components/AddButton.h"
+#include "Components/BipolarSliderRow.h"
 #include "Components/MuClidLookAndFeel.h"
 #include "../Sequencer/ControlSequence.h"
 #include "../Modulation/ModulationMatrix.h"
@@ -205,9 +206,8 @@ private:
     struct AssignmentRow : public juce::Component
     {
         DropdownSelect   destCombo;
-        juce::Slider     depthSlider;
-        // #224 Bitwig-style bipolar curve knob: -100..+100 = log..linear..exp
-        juce::Slider     curveSlider;
+        // #372: shared depth + curve pair (was two raw juce::Sliders set up inline).
+        BipolarSliderRow bipolarPair;
         juce::TextButton removeBtn { "x" };
         std::string      id;
 

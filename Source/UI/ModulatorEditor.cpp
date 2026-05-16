@@ -54,27 +54,10 @@ ModulatorEditor::AssignmentRow::AssignmentRow(const std::string& assignId, int d
 {
     ModDest::populate(destCombo, driveChar);
 
-    depthSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    depthSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 44, 18);
-    depthSlider.setRange(-100.0, 100.0, 0.1);
-    depthSlider.setValue(0.0, juce::dontSendNotification);
+    // #372: shared BipolarSliderRow replaces inline depth + curve juce::Slider setup.
+    bipolarPair.onDepthChange = [this](float v) { if (onDepthChange) onDepthChange(v); };
+    bipolarPair.onCurveChange = [this](float v) { if (onCurveChange) onCurveChange(v); };
 
-    // #224 curve knob: rotary, bipolar with detent at 0.
-    curveSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    curveSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 34, 18);
-    curveSlider.setRange(-100.0, 100.0, 0.1);
-    curveSlider.setValue(0.0, juce::dontSendNotification);
-    curveSlider.setDoubleClickReturnValue(true, 0.0);
-    curveSlider.setTooltip("Curve: log .. linear .. exp (#224)");
-
-    depthSlider.onValueChange = [this]
-    {
-        if (onDepthChange) onDepthChange((float)depthSlider.getValue());
-    };
-    curveSlider.onValueChange = [this]
-    {
-        if (onCurveChange) onCurveChange((float)curveSlider.getValue());
-    };
     destCombo.onChange = [this](int id_)
     {
         if (id_ >= 1 && id_ <= ModDest::kTableSize && onDestChange)
@@ -83,19 +66,18 @@ ModulatorEditor::AssignmentRow::AssignmentRow(const std::string& assignId, int d
     removeBtn.onClick = [this] { if (onRemove) onRemove(); };
 
     addAndMakeVisible(destCombo);
-    addAndMakeVisible(depthSlider);
-    addAndMakeVisible(curveSlider);
+    addAndMakeVisible(bipolarPair);
     addAndMakeVisible(removeBtn);
 }
 
 void ModulatorEditor::AssignmentRow::resized()
 {
     const int w = getWidth(), h = getHeight();
-    const int numW = 20, removeW = 22, curveW = 70, depthW = 130;
-    const int destW = w - numW - depthW - curveW - removeW - 8;
+    const int numW = 20, removeW = 22;
+    const int pairW = BipolarSliderRow::kDepthWidth + 2 + BipolarSliderRow::kCurveWidth;
+    const int destW = w - numW - pairW - removeW - 8;
     destCombo  .setBounds(numW + 2,                              0, destW,  h);
-    depthSlider.setBounds(numW + 2 + destW + 2,                  0, depthW, h);
-    curveSlider.setBounds(numW + 2 + destW + 2 + depthW + 2,     0, curveW, h);
+    bipolarPair.setBounds(numW + 2 + destW + 2,                  0, pairW,  h);
     removeBtn  .setBounds(w - removeW, (h - 18) / 2, removeW, 18);
 }
 
@@ -482,8 +464,8 @@ void ModulatorEditor::rebuildRows()
             if (ModDest::kTable[i].id == a.destinationId)
                 { row->destCombo.setSelectedId(i + 1); break; }
 
-        row->depthSlider.setValue(a.depth, juce::dontSendNotification);
-        row->curveSlider.setValue(a.curve, juce::dontSendNotification);   // #224
+        row->bipolarPair.setDepth(a.depth, juce::dontSendNotification);
+        row->bipolarPair.setCurve(a.curve, juce::dontSendNotification);   // #224
 
         const std::string rowId = a.id;
         row->onRemove = [this, rowId]

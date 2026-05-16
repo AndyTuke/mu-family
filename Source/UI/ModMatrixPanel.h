@@ -2,6 +2,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Components/DropdownSelect.h"
 #include "Components/AddButton.h"
+#include "Components/BipolarSliderRow.h"
 #include "Components/MuClidLookAndFeel.h"
 #include "ModulatorEditor.h"
 #include "../Sequencer/Rhythm.h"
@@ -28,8 +29,8 @@ private:
     {
         juce::Label      sourceLabel;
         DropdownSelect   destCombo;
-        juce::Slider     depthSlider;
-        juce::Slider     curveSlider;   // #224
+        // #372: shared depth + curve pair (was two raw juce::Sliders set up inline).
+        BipolarSliderRow bipolarPair;
         juce::TextButton removeBtn { "x" };
         std::string      assignId;
 

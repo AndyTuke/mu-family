@@ -40,6 +40,7 @@ target_sources(mu-core INTERFACE
     # UI — shared components
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/MuLookAndFeel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/MuTheme.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/BipolarSliderRow.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/KnobWithLabel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/SegmentControl.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/NudgeInput.cpp"

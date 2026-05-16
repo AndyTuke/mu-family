@@ -32,27 +32,12 @@ ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex,
         if (ModDest::kTable[i].id == a.destinationId)
             { destCombo.setSelectedId(i + 1); break; }
 
-    depthSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    depthSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 44, 18);
-    depthSlider.setRange(-100.0, 100.0, 0.1);
-    depthSlider.setValue(a.depth, juce::dontSendNotification);
+    // #372: shared BipolarSliderRow replaces inline depth + curve juce::Slider setup.
+    bipolarPair.setDepth(a.depth, juce::dontSendNotification);
+    bipolarPair.setCurve(a.curve, juce::dontSendNotification);
+    bipolarPair.onDepthChange = [this](float v) { if (onDepthChange) onDepthChange(v); };
+    bipolarPair.onCurveChange = [this](float v) { if (onCurveChange) onCurveChange(v); };
 
-    // #224 bipolar curve knob (-100..+100, detent at 0)
-    curveSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    curveSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 34, 18);
-    curveSlider.setRange(-100.0, 100.0, 0.1);
-    curveSlider.setValue(a.curve, juce::dontSendNotification);
-    curveSlider.setDoubleClickReturnValue(true, 0.0);
-    curveSlider.setTooltip("Curve: log .. linear .. exp (#224)");
-
-    depthSlider.onValueChange = [this]
-    {
-        if (onDepthChange) onDepthChange((float)depthSlider.getValue());
-    };
-    curveSlider.onValueChange = [this]
-    {
-        if (onCurveChange) onCurveChange((float)curveSlider.getValue());
-    };
     destCombo.onChange = [this](int id_)
     {
         if (id_ >= 1 && id_ <= ModDest::kTableSize && onDestChange)
@@ -62,20 +47,19 @@ ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex,
 
     addAndMakeVisible(sourceLabel);
     addAndMakeVisible(destCombo);
-    addAndMakeVisible(depthSlider);
-    addAndMakeVisible(curveSlider);
+    addAndMakeVisible(bipolarPair);
     addAndMakeVisible(removeBtn);
 }
 
 void ModMatrixPanel::MatrixRow::resized()
 {
     const int w = getWidth(), h = getHeight();
-    const int removeW = 22, curveW = 70, depthW = 120, srcW = 46;
-    const int destW = w - srcW - depthW - curveW - removeW - 8;
+    const int removeW = 22, srcW = 46;
+    const int pairW = BipolarSliderRow::kDepthWidth + 2 + BipolarSliderRow::kCurveWidth;
+    const int destW = w - srcW - pairW - removeW - 8;
     sourceLabel.setBounds(0,                                          0, srcW,  h);
     destCombo  .setBounds(srcW + 2,                                   0, destW, h);
-    depthSlider.setBounds(srcW + 2 + destW + 2,                       0, depthW, h);
-    curveSlider.setBounds(srcW + 2 + destW + 2 + depthW + 2,          0, curveW, h);
+    bipolarPair.setBounds(srcW + 2 + destW + 2,                       0, pairW, h);
     removeBtn  .setBounds(w - removeW, (h - 18) / 2, removeW, 18);
 }
 
