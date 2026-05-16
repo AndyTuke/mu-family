@@ -48,6 +48,33 @@ public:
     // Same as getPattern() but annotates each step with its type (hit, empty, pre/post/insert pad).
     std::vector<StepType> getStepTypes() const;
 
+    // #370: compact POD snapshot of every field that affects getPattern / getStepTypes
+    // output. UI consumers (SidebarItem, RhythmCircle) poll this on a timer to detect
+    // pattern changes without paying the cost of fetching + comparing the vector
+    // representation every tick.
+    struct Signature
+    {
+        int     steps, hits, rotate, prePad, postPad, insertStart, insertLength;
+        uint8_t prePadMode, postPadMode, insertMode;
+        bool    mute;
+
+        bool operator==(const Signature& o) const noexcept
+        {
+            return steps == o.steps && hits == o.hits && rotate == o.rotate
+                && prePad == o.prePad && postPad == o.postPad
+                && insertStart == o.insertStart && insertLength == o.insertLength
+                && prePadMode == o.prePadMode && postPadMode == o.postPadMode
+                && insertMode == o.insertMode && mute == o.mute;
+        }
+        bool operator!=(const Signature& o) const noexcept { return !(*this == o); }
+    };
+
+    Signature signature() const noexcept
+    {
+        return { steps, hits, rotate, prePad, postPad, insertStart, insertLength,
+                 (uint8_t) prePadMode, (uint8_t) postPadMode, (uint8_t) insertMode, mute };
+    }
+
     // #336 Stage B: non-allocating + override-aware variant. Writes the pattern into
     // `out`, using `scratch` for the euclidean working buffer. The `ov` argument
     // replaces hits/rotate/prePad/postPad/insertStart/insertLength on this generator

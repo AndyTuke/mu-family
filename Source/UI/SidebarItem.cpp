@@ -15,6 +15,18 @@ void SidebarItem::setRhythm(const Rhythm* r, juce::Colour colour)
     miniCircle.setPatterns(r ? r->genA.getStepTypes() : std::vector<StepType>{},
                            r ? r->genB.getStepTypes() : std::vector<StepType>{},
                            r ? r->genC.getStepTypes() : std::vector<StepType>{});
+    // #370: capture new rhythm's signature so the next timer tick doesn't see a spurious change.
+    if (r)
+    {
+        lastSigA = r->genA.signature();
+        lastSigB = r->genB.signature();
+        lastSigC = r->genC.signature();
+        lastSigValid = true;
+    }
+    else
+    {
+        lastSigValid = false;
+    }
     repaint();
 }
 
@@ -60,17 +72,20 @@ void SidebarItem::timerCallback()
     // EuclideanPanel (hits / rotation / steps / insert / pad) propagate to
     // the sidebar mini-circle. setRhythm is only called at construction /
     // reassign, so without this poll the sidebar shows a stale snapshot.
+    // #370: compare HitGenerator::Signature (POD, no alloc) instead of fetching
+    // + comparing full StepType vectors every tick — only fetch when something changed.
     if (rhythm)
     {
-        auto patA = rhythm->genA.getStepTypes();
-        auto patB = rhythm->genB.getStepTypes();
-        auto patC = rhythm->genC.getStepTypes();
-        if (patA != cachedPatA || patB != cachedPatB || patC != cachedPatC)
+        const auto sigA = rhythm->genA.signature();
+        const auto sigB = rhythm->genB.signature();
+        const auto sigC = rhythm->genC.signature();
+        if (!lastSigValid || sigA != lastSigA || sigB != lastSigB || sigC != lastSigC)
         {
-            cachedPatA = std::move(patA);
-            cachedPatB = std::move(patB);
-            cachedPatC = std::move(patC);
-            miniCircle.setPatterns(cachedPatA, cachedPatB, cachedPatC);
+            lastSigA = sigA; lastSigB = sigB; lastSigC = sigC;
+            lastSigValid = true;
+            miniCircle.setPatterns(rhythm->genA.getStepTypes(),
+                                   rhythm->genB.getStepTypes(),
+                                   rhythm->genC.getStepTypes());
         }
     }
 

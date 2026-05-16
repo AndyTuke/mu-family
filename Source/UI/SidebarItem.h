@@ -51,9 +51,11 @@ private:
 
     RhythmCircle miniCircle;
 
-    // #252: cached pattern snapshot so timerCallback only re-pushes to the
-    // mini-circle on actual content change (avoids 30 Hz repaint storms).
-    std::vector<StepType> cachedPatA, cachedPatB, cachedPatC;
+    // #370: poll a cheap POD signature instead of allocating + comparing three
+    // std::vector<StepType> snapshots every 30 Hz tick. Was ~720 vector allocs/sec
+    // across all sidebar slots just to detect change.
+    HitGenerator::Signature lastSigA {}, lastSigB {}, lastSigC {};
+    bool                    lastSigValid = false;
 
     void timerCallback() override;
 };
