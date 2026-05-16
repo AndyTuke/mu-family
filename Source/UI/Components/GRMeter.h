@@ -2,6 +2,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 #include <cmath>
+#include "MuLookAndFeel.h"
 
 // Narrow inverted bar showing sidechain gain reduction.
 // Fills top→down: empty = no GR, full = maximum ducking.
@@ -24,10 +25,10 @@ public:
         const float w = (float)getWidth();
         const float h = (float)getHeight();
 
-        g.setColour(juce::Colour(0xff111111));
+        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::indicatorGRMeterBg));
         g.fillRoundedRectangle(0.0f, 0.0f, w, h, 2.0f);
 
-        g.setColour(juce::Colour(0xaa7799cc));  // soft blue-grey, semi-transparent
+        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::indicatorGRMeterBar));
         g.fillRect(0.0f, 0.0f, w, displayGR * h);
 
         g.setColour(juce::Colours::black.withAlpha(0.5f));

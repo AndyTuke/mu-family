@@ -117,6 +117,19 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         statusBar.showParam(name, val, col);
     };
 
+    // #379: chrome controls (TransportBar bpm/loop, MixerChannel outBus/scSource)
+    // now also report to the global StatusBar.
+    transportBar.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
+    {
+        statusBar.showParam(name, val);
+    };
+    mixerOverlay.onStatusUpdate = [this](const juce::String& name,
+                                          const juce::String& val,
+                                          juce::Colour col)
+    {
+        statusBar.showParam(name, val, col);
+    };
+
     rhythmPanel.onRhythmRenamed = [this]
     {
         sidebar.repaintItems();

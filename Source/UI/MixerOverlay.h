@@ -20,6 +20,11 @@ public:
     explicit MixerOverlay(PluginProcessor& proc, MixerEngine& mixer);
     ~MixerOverlay() override;
 
+    // #379: status-bar forwarder — plugin editor wires this to the global StatusBar.
+    std::function<void(const juce::String& name,
+                       const juce::String& value,
+                       juce::Colour channelColour)> onStatusUpdate;
+
     // Rebuild channel strips to match the current rhythm count.
     void refresh();
 

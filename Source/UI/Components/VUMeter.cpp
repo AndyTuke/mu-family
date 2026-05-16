@@ -1,4 +1,5 @@
 #include "VUMeter.h"
+#include "MuLookAndFeel.h"
 #include <cmath>
 
 VUMeter::VUMeter()  { startTimerHz(30); }
@@ -85,7 +86,8 @@ void VUMeter::paint(juce::Graphics& g)
     const float w = (float)getWidth();
     const float h = (float)getHeight();
 
-    g.setColour(juce::Colour(0xff111111));
+    using Id = MuLookAndFeel::ColourIds;
+    g.setColour(MuLookAndFeel::colour(Id::vuMeterBackground));
     g.fillRoundedRectangle(0.0f, 0.0f, w, h, 2.0f);
 
     const float ref      = refDb();
@@ -102,7 +104,7 @@ void VUMeter::paint(juce::Graphics& g)
         const float greenTop = juce::jmax(barTopY, yellowY);
         if (greenTop < h)
         {
-            g.setColour(juce::Colour(0xff44cc44));
+            g.setColour(MuLookAndFeel::colour(Id::vuMeterGreen));
             g.fillRect(0.0f, greenTop, w, h - greenTop);
         }
 
@@ -112,7 +114,7 @@ void VUMeter::paint(juce::Graphics& g)
             const float ytop = juce::jmax(barTopY, redY);
             if (ytop < yellowY)
             {
-                g.setColour(juce::Colour(0xffffcc00));
+                g.setColour(MuLookAndFeel::colour(Id::vuMeterYellow));
                 g.fillRect(0.0f, ytop, w, yellowY - ytop);
             }
         }
@@ -120,7 +122,7 @@ void VUMeter::paint(juce::Graphics& g)
         // Red segment
         if (barTopY < redY)
         {
-            g.setColour(juce::Colour(0xffff3333));
+            g.setColour(MuLookAndFeel::colour(Id::vuMeterRed));
             g.fillRect(0.0f, barTopY, w, redY - barTopY);
         }
     }
@@ -134,7 +136,7 @@ void VUMeter::paint(juce::Graphics& g)
     {
         const float peakNorm = dbToNorm(peakDb);
         const int   peakY    = juce::jmax(0, (int)(h - peakNorm * h) - 1);
-        g.setColour(peakDb >= red ? juce::Colour(0xffff3333)
+        g.setColour(peakDb >= red ? MuLookAndFeel::colour(Id::vuMeterRed)
                                   : juce::Colours::white.withAlpha(0.85f));
         g.fillRect(0, peakY, (int)w, 1);
     }
@@ -142,7 +144,7 @@ void VUMeter::paint(juce::Graphics& g)
     // Clip strip
     if (clipLit)
     {
-        g.setColour(juce::Colour(0xffff0000));
+        g.setColour(MuLookAndFeel::colour(Id::vuMeterClipFlash));
         g.fillRect(0.0f, 0.0f, w, 3.0f);
     }
 

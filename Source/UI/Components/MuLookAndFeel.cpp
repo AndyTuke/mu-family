@@ -1,87 +1,114 @@
 #include "MuLookAndFeel.h"
+#include "MuTheme.h"
 
+// #366: every colour now lives in the MuTheme singleton (grouped by category for
+// the future Theme Editor). This switch just maps the legacy ColourIds tokens to
+// the corresponding Theme field, so every existing call site keeps working with
+// no change while a Theme Editor can edit values from one place.
 juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
 {
+    const auto& t = MuTheme::current();
     switch (id)
     {
         // Backgrounds
-        case windowBackground:        return juce::Colour(0xff1c1c1b);
-        case panelBackground:         return juce::Colour(0xff232322);
-        case sidebarBackground:       return juce::Colour(0xff1a1a19);
-        case sidebarItemBackground:   return juce::Colour(0xff252524);
-        case sidebarItemSelected:     return juce::Colour(0xff2d2d2b);
-        case overlayBackground:       return juce::Colour(0xff111110);
+        case windowBackground:        return t.backgrounds.window;
+        case panelBackground:         return t.backgrounds.panel;
+        case sidebarBackground:       return t.backgrounds.sidebar;
+        case sidebarItemBackground:   return t.backgrounds.sidebarItem;
+        case sidebarItemSelected:     return t.backgrounds.sidebarItemSelected;
+        case overlayBackground:       return t.backgrounds.overlay;
+        case backgroundDialog:        return t.backgrounds.dialog;
+        case backgroundModalDim:      return t.backgrounds.modalDim;
+        case backgroundFxRowDim:      return t.backgrounds.fxRowDim;
+        case backgroundMixerStripDim: return t.backgrounds.mixerStripDim;
         // Knob categories
-        case knobEuclidean:           return juce::Colour(0xff7F77DD);
-        case knobPadding:             return juce::Colour(0xff1D9E75);
-        case knobInsertPad:           return juce::Colour(0xffD4537E);
-        case knobLevel:               return juce::Colour(0xffEF9F27);
-        case knobFxSend:              return juce::Colour(0xffD85A30);
-        case knobReverb:              return juce::Colour(0xff378ADD);
-        case knobPan:                 return juce::Colour(0xff888780);
-        case knobModulation:          return juce::Colour(0xffD4537E);
-        case knobPrePad:              return juce::Colour(0xff2BB5C5);
-        case knobPostPad:             return juce::Colour(0xff1D9E75);
+        case knobEuclidean:           return t.knobs.euclidean;
+        case knobPadding:             return t.knobs.postPad;       // legacy alias
+        case knobInsertPad:           return t.knobs.insertPad;
+        case knobLevel:               return t.knobs.level;
+        case knobFxSend:              return t.knobs.fxSend;
+        case knobReverb:              return t.knobs.reverb;
+        case knobPan:                 return t.knobs.pan;
+        case knobModulation:          return t.knobs.modulation;
+        case knobPrePad:              return t.knobs.prePad;
+        case knobPostPad:             return t.knobs.postPad;
         // Rings
-        case ringEuclidA:             return juce::Colour(0xff7F77DD);
-        case ringEuclidB:             return juce::Colour(0xffD85A30);
-        case ringEuclidC:             return juce::Colour(0xffEF9F27);
-        case ringModA:                return juce::Colour(0xff1D9E75);
-        case ringModB:                return juce::Colour(0xffEF9F27);
-        case ringModC:                return juce::Colour(0xffD4537E);
-        case ringModD:                return juce::Colour(0xff378ADD);
-        case ringInactive:            return juce::Colour(0xff333332);
-        case ringPrePad:              return juce::Colour(0xff2BB5C5);
-        case ringPostPad:             return juce::Colour(0xff1D9E75);
-        case ringInsertPad:           return juce::Colour(0xffD4537E);
+        case ringEuclidA:             return t.rings.euclidA;
+        case ringEuclidB:             return t.rings.euclidB;
+        case ringEuclidC:             return t.rings.euclidC;
+        case ringModA:                return t.rings.modA;
+        case ringModB:                return t.rings.modB;
+        case ringModC:                return t.rings.modC;
+        case ringModD:                return t.rings.modD;
+        case ringInactive:            return t.rings.inactive;
+        case ringPrePad:              return t.rings.prePad;
+        case ringPostPad:             return t.rings.postPad;
+        case ringInsertPad:           return t.rings.insertPad;
         // Segment control
-        case segmentActiveBg:         return juce::Colour(0xff3C3489);
-        case segmentActiveBorder:     return juce::Colour(0xff7F77DD);
-        case segmentPositiveBg:       return juce::Colour(0xff085041);
-        case segmentPositiveBorder:   return juce::Colour(0xff1D9E75);
-        case segmentWarningBg:        return juce::Colour(0xff854F0B);
-        case segmentWarningBorder:    return juce::Colour(0xffEF9F27);
-        case segmentInactiveBg:       return juce::Colour(0xff2a2a2a);
-        case segmentInactiveBorder:   return juce::Colour(0xff444444);
-        case segmentInactiveText:     return juce::Colour(0xff888888);
+        case segmentActiveBg:         return t.segments.activeBg;
+        case segmentActiveBorder:     return t.segments.activeBorder;
+        case segmentPositiveBg:       return t.segments.positiveBg;
+        case segmentPositiveBorder:   return t.segments.positiveBorder;
+        case segmentWarningBg:        return t.segments.warningBg;
+        case segmentWarningBorder:    return t.segments.warningBorder;
+        case segmentInactiveBg:       return t.segments.inactiveBg;
+        case segmentInactiveBorder:   return t.segments.inactiveBorder;
+        case segmentInactiveText:     return t.segments.inactiveText;
         // StepEditor
-        case stepEditorBar:           return juce::Colour(0xff1D9E75);
-        case stepEditorZeroLine:      return juce::Colour(0xff555554);
-        case stepEditorBackground:    return juce::Colour(0xff1e1e1d);
-        case stepEditorGridLine:      return juce::Colour(0xff333332);
+        case stepEditorBar:           return t.stepEditor.bar;
+        case stepEditorZeroLine:      return t.stepEditor.zeroLine;
+        case stepEditorBackground:    return t.stepEditor.background;
+        case stepEditorGridLine:      return t.stepEditor.gridLine;
         // LFOEditor
-        case lfoEditorBackground:     return juce::Colour(0xff1e1e1d);
-        case lfoEditorCurve:          return juce::Colour(0xff1D9E75);
-        case lfoEditorCurveFill:      return juce::Colour(0x301D9E75);
-        case lfoEditorPoint:          return juce::Colour(0xffffffff);
-        case lfoEditorPointHover:     return juce::Colour(0xff7F77DD);
-        case lfoEditorHandle:         return juce::Colour(0xff888780);
-        case lfoEditorZeroLine:       return juce::Colour(0xff444444);
-        case lfoEditorPlayhead:       return juce::Colour(0xffD4537E);
-        // VU meter
-        case vuMeterLow:              return juce::Colour(0xff1D9E75);
-        case vuMeterMid:              return juce::Colour(0xffEF9F27);
-        case vuMeterClip:             return juce::Colour(0xffE24B4A);
-        case vuMeterPeakHold:         return juce::Colour(0xffffffff);
-        case vuMeterBackground:       return juce::Colour(0xff111110);
+        case lfoEditorBackground:     return t.lfoEditor.background;
+        case lfoEditorCurve:          return t.lfoEditor.curve;
+        case lfoEditorCurveFill:      return t.lfoEditor.curveFill;
+        case lfoEditorPoint:          return t.lfoEditor.point;
+        case lfoEditorPointHover:     return t.lfoEditor.pointHover;
+        case lfoEditorHandle:         return t.lfoEditor.handle;
+        case lfoEditorZeroLine:       return t.lfoEditor.zeroLine;
+        case lfoEditorPlayhead:       return t.lfoEditor.playhead;
+        // VU meter (legacy tokens kept for back-compat — map to closest Theme zone)
+        case vuMeterLow:              return t.vuMeter.green;
+        case vuMeterMid:              return t.vuMeter.yellow;
+        case vuMeterClip:             return t.vuMeter.red;
+        case vuMeterPeakHold:         return t.vuMeter.peakHold;
+        case vuMeterBackground:       return t.vuMeter.background;
+        case vuMeterGreen:            return t.vuMeter.green;
+        case vuMeterYellow:           return t.vuMeter.yellow;
+        case vuMeterRed:              return t.vuMeter.red;
+        case vuMeterClipFlash:        return t.vuMeter.clipFlash;
         // Sample bar
-        case sampleBarNoSample:       return juce::Colour(0xff444444);
-        case sampleBarLoaded:         return juce::Colour(0xff999999);
-        case sampleBarMissing:        return juce::Colour(0xffEF9F27);
-        case sampleBarBackground:     return juce::Colour(0xff1a1a19);
+        case sampleBarNoSample:       return t.sampleBar.noSample;
+        case sampleBarLoaded:         return t.sampleBar.loaded;
+        case sampleBarMissing:        return t.sampleBar.missing;
+        case sampleBarBackground:     return t.sampleBar.background;
+        case sampleBarMissingWarning: return t.sampleBar.missingWarning;
         // Status bar
-        case statusBarBackground:     return juce::Colour(0xff141413);
-        case statusBarText:           return juce::Colour(0xff888780);
-        case statusBarValue:          return juce::Colour(0xffcccccc);
+        case statusBarBackground:     return t.statusBar.background;
+        case statusBarText:           return t.statusBar.text;
+        case statusBarValue:          return t.statusBar.value;
         // General text
-        case labelText:               return juce::Colour(0xff888780);
-        case valueText:               return juce::Colour(0xffcccccc);
-        case headingText:             return juce::Colour(0xffe8e8e6);
-        case mutedText:               return juce::Colour(0xff555554);
+        case labelText:               return t.text.label;
+        case valueText:               return t.text.value;
+        case headingText:             return t.text.heading;
+        case mutedText:               return t.text.muted;
+        case textBright:              return t.text.bright;
+        case textDisabledButton:      return t.text.disabledButton;
         // Buttons
-        case addButtonBorder:         return juce::Colour(0xff555554);
-        case addButtonText:           return juce::Colour(0xff888780);
-        case addButtonHoverBg:        return juce::Colour(0xff2a2a28);
+        case addButtonBorder:         return t.buttons.addBorder;
+        case addButtonText:           return t.buttons.addText;
+        case addButtonHoverBg:        return t.buttons.addHoverBg;
+        // Transport tinted backgrounds
+        case transportWhileStoppedBg: return t.transport.whileStoppedBg;
+        case transportWhilePlayingBg: return t.transport.whilePlayingBg;
+        // Knob overlay indicators
+        case indicatorModulationTint: return t.indicators.modulationTint;
+        case indicatorGRTint:         return t.indicators.grTint;
+        case indicatorGRMeterBg:      return t.indicators.grMeterBg;
+        case indicatorGRMeterBar:     return t.indicators.grMeterBar;
+        // Mixer extras
+        case mixerInactiveNameBg:     return t.mixer.inactiveNameBg;
         // Sidebar tab line – runtime colour
         case sidebarTabLine:          return juce::Colours::transparentBlack;
         default:                      return juce::Colours::magenta;

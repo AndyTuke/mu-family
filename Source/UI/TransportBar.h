@@ -17,6 +17,9 @@ public:
     std::function<void()>                      onSavePreset;
     std::function<void()>                      onNewPreset;
     std::function<void()>                      onSettingsToggle;
+    // #379: status-bar coverage for chrome controls (bpmInput, loopDropdown).
+    // Plugin editor wires this to the global StatusBar; no rhythm-colour tag.
+    std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
 
     void refreshPresets();
     // #241: keep dropdown displaying the loaded preset's name. Pass an invalid

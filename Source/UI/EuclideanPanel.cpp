@@ -74,19 +74,27 @@ void EuclideanPanel::wireCallbacks()
         apvtsSet("insLenA", (float)v);  notify();
         if (onStatusUpdate) onStatusUpdate("Euclid A Insert Length", juce::String((int)v));
     };
-    prePadModeA.onChange = [this, notify](int idx) {
+    // #379: status-bar coverage for segment toggles — mode text matches dropdown.
+    auto padModeLabel = [](int idx) { return idx == 1 ? juce::String("Mute") : juce::String("Pad"); };
+    prePadModeA.onChange = [this, notify, padModeLabel](int idx) {
         apvtsSet("prePadModeA", idx == 1 ? 1.0f : 0.0f);  notify();
+        if (onStatusUpdate) onStatusUpdate("Euclid A Pre Pad Mode", padModeLabel(idx));
     };
-    postPadModeA.onChange = [this, notify](int idx) {
+    postPadModeA.onChange = [this, notify, padModeLabel](int idx) {
         apvtsSet("postPadModeA", idx == 1 ? 1.0f : 0.0f);  notify();
+        if (onStatusUpdate) onStatusUpdate("Euclid A Post Pad Mode", padModeLabel(idx));
     };
-    insertModeA.onChange = [this, notify](int idx) {
+    insertModeA.onChange = [this, notify, padModeLabel](int idx) {
         apvtsSet("insModeA", idx == 1 ? 1.0f : 0.0f);  notify();
+        if (onStatusUpdate) onStatusUpdate("Euclid A Insert Mode", padModeLabel(idx));
     };
 
     // ── Logic ─────────────────────────────────────────────────────────────────
+    static const char* const logicNames[] = { "OR", "AND", "XOR", "A Only", "B Only" };
     logicCtrl.onChange = [this, notify](int idx) {
         apvtsSet("logic", (float)idx);  notify();
+        if (onStatusUpdate && idx >= 0 && idx < 5)
+            onStatusUpdate("Logic", juce::String(logicNames[idx]));
     };
 
     // ── Euclid B ─────────────────────────────────────────────────────────────
@@ -119,14 +127,17 @@ void EuclideanPanel::wireCallbacks()
         apvtsSet("insLenB", (float)v);  notify();
         if (onStatusUpdate) onStatusUpdate("Euclid B Insert Length", juce::String((int)v));
     };
-    prePadModeB.onChange = [this, notify](int idx) {
+    prePadModeB.onChange = [this, notify, padModeLabel](int idx) {
         apvtsSet("prePadModeB", idx == 1 ? 1.0f : 0.0f);  notify();
+        if (onStatusUpdate) onStatusUpdate("Euclid B Pre Pad Mode", padModeLabel(idx));
     };
-    postPadModeB.onChange = [this, notify](int idx) {
+    postPadModeB.onChange = [this, notify, padModeLabel](int idx) {
         apvtsSet("postPadModeB", idx == 1 ? 1.0f : 0.0f);  notify();
+        if (onStatusUpdate) onStatusUpdate("Euclid B Post Pad Mode", padModeLabel(idx));
     };
-    insertModeB.onChange = [this, notify](int idx) {
+    insertModeB.onChange = [this, notify, padModeLabel](int idx) {
         apvtsSet("insModeB", idx == 1 ? 1.0f : 0.0f);  notify();
+        if (onStatusUpdate) onStatusUpdate("Euclid B Insert Mode", padModeLabel(idx));
     };
 
     // ── Euclid C (Accent) ─────────────────────────────────────────────────────
@@ -159,14 +170,17 @@ void EuclideanPanel::wireCallbacks()
         apvtsSet("insLenC", (float)v);  notify();
         if (onStatusUpdate) onStatusUpdate("Accent Insert Length", juce::String((int)v));
     };
-    prePadModeC.onChange = [this, notify](int idx) {
+    prePadModeC.onChange = [this, notify, padModeLabel](int idx) {
         apvtsSet("prePadModeC", idx == 1 ? 1.0f : 0.0f);  notify();
+        if (onStatusUpdate) onStatusUpdate("Accent Pre Pad Mode", padModeLabel(idx));
     };
-    postPadModeC.onChange = [this, notify](int idx) {
+    postPadModeC.onChange = [this, notify, padModeLabel](int idx) {
         apvtsSet("postPadModeC", idx == 1 ? 1.0f : 0.0f);  notify();
+        if (onStatusUpdate) onStatusUpdate("Accent Post Pad Mode", padModeLabel(idx));
     };
-    insertModeC.onChange = [this, notify](int idx) {
+    insertModeC.onChange = [this, notify, padModeLabel](int idx) {
         apvtsSet("insModeC", idx == 1 ? 1.0f : 0.0f);  notify();
+        if (onStatusUpdate) onStatusUpdate("Accent Insert Mode", padModeLabel(idx));
     };
 }
 

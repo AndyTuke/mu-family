@@ -17,6 +17,9 @@ public:
     void clear();
     void setPlaceholderText(const juce::String& text);
 
+    // Returns the currently displayed item text (or empty if nothing selected).
+    juce::String getText() const { return combo.getText(); }
+
     void resized() override;
 
 private:

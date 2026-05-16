@@ -238,7 +238,7 @@ void DelayRow::paint(juce::Graphics& g)
 
     if (!isEnabled)
     {
-        g.setColour(juce::Colour(0x60000000));
+        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::backgroundFxRowDim));
         g.fillRect(getLocalBounds());
     }
 }

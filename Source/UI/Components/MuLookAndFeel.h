@@ -97,6 +97,26 @@ public:
 
         // ── Sidebar tab line ─────────────────────────────────────────────
         sidebarTabLine          = 0x100000b0,  // matches rhythm colour, drawn at runtime
+
+        // ── #366: new tokens for the audit-flagged hardcoded colours ─────
+        backgroundDialog        = 0x100000c0,  // modal dialog cards
+        backgroundModalDim      = 0x100000c1,  // dim behind modal cards (semi-transparent)
+        backgroundFxRowDim      = 0x100000c2,  // FX/Delay row disabled overlay
+        backgroundMixerStripDim = 0x100000c3,  // inactive mixer-channel overlay
+        textBright              = 0x100000c4,  // transport-btn active text
+        textDisabledButton      = 0x100000c5,  // transport-btn disabled text
+        transportWhileStoppedBg = 0x100000c6,  // green (press to play)
+        transportWhilePlayingBg = 0x100000c7,  // red   (press to stop)
+        indicatorModulationTint = 0x100000c8,  // soft cyan modulation ring
+        indicatorGRTint         = 0x100000c9,  // orange GR arc
+        indicatorGRMeterBg      = 0x100000ca,  // GRMeter strip background
+        indicatorGRMeterBar     = 0x100000cb,  // GRMeter bar
+        vuMeterGreen            = 0x100000cc,  // VU safe zone
+        vuMeterYellow           = 0x100000cd,  // VU hot zone
+        vuMeterRed              = 0x100000ce,  // VU near-clip/clip
+        vuMeterClipFlash        = 0x100000cf,  // VU clip flash
+        sampleBarMissingWarning = 0x100000d0,  // RhythmPanel sample-missing tint
+        mixerInactiveNameBg     = 0x100000d1,  // inactive-rhythm name strip
     };
 
     MuLookAndFeel();

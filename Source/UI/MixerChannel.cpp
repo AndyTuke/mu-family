@@ -207,6 +207,7 @@ void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, juce::Atomic<flo
                 const int id = outBusBox.getSelectedId();   // 1 = Master, 2..9 = Out 1..8
                 if (auto* p = proc->apvts.getParameter(prefix + "outBus"))
                     p->setValueNotifyingHost(p->convertTo0to1((float)(id - 1)));
+                if (onStatusUpdate) onStatusUpdate(channelName + " Output", outBusBox.getText(), channelColour);
             };
         }
         // Sidechain controls write through APVTS
@@ -217,6 +218,7 @@ void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, juce::Atomic<flo
                 int apvtsVal = (id <= 1) ? 0 : (id - 1);
                 if (auto* p = proc->apvts.getParameter(prefix + "scSrc"))
                     p->setValueNotifyingHost(p->convertTo0to1((float)apvtsVal));
+                if (onStatusUpdate) onStatusUpdate(channelName + " Sidechain", scSourceBox.getText(), channelColour);
             };
             scAmount.onValueChanged = [proc, prefix](double v) {
                 if (auto* p = proc->apvts.getParameter(prefix + "scAmt"))
@@ -249,6 +251,7 @@ void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, juce::Atomic<flo
             outBusBox.setSelectedId(state.outputBus + 1, juce::dontSendNotification);
             outBusBox.onChange = [&state, this] {
                 state.outputBus = juce::jlimit(0, 8, outBusBox.getSelectedId() - 1);
+                if (onStatusUpdate) onStatusUpdate(channelName + " Output", outBusBox.getText(), channelColour);
             };
         }
         if (hasSidechainControls())
@@ -256,6 +259,7 @@ void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, juce::Atomic<flo
             scSourceBox.onChange    = [&state, this] {
                 int id = scSourceBox.getSelectedId();
                 state.sidechainSource = (id <= 1) ? -1 : (id - 2);
+                if (onStatusUpdate) onStatusUpdate(channelName + " Sidechain", scSourceBox.getText(), channelColour);
             };
             scAmount.onValueChanged  = [&state](double v) { state.sidechainAmount   = (float)v / 100.0f; };
             scAttack.onValueChanged  = [&state](double v) { state.sidechainAttackMs  = (float)v; };
@@ -312,6 +316,7 @@ void MixerChannel::bindReturn(MixerEngine::ReturnState& state, juce::Atomic<floa
                 int apvtsVal = (id <= 1) ? 0 : (id - 1);
                 if (auto* p = proc->apvts.getParameter(prefix + "scSrc"))
                     p->setValueNotifyingHost(p->convertTo0to1((float)apvtsVal));
+                if (onStatusUpdate) onStatusUpdate(channelName + " Sidechain", scSourceBox.getText(), channelColour);
             };
             scAmount.onValueChanged = [proc, prefix](double v) {
                 if (auto* p = proc->apvts.getParameter(prefix + "scAmt"))
@@ -341,6 +346,7 @@ void MixerChannel::bindReturn(MixerEngine::ReturnState& state, juce::Atomic<floa
             scSourceBox.onChange    = [&state, this] {
                 int id = scSourceBox.getSelectedId();
                 state.sidechainSource = (id <= 1) ? -1 : (id - 2);
+                if (onStatusUpdate) onStatusUpdate(channelName + " Sidechain", scSourceBox.getText(), channelColour);
             };
             scAmount.onValueChanged  = [&state](double v) { state.sidechainAmount   = (float)v / 100.0f; };
             scAttack.onValueChanged  = [&state](double v) { state.sidechainAttackMs  = (float)v; };
@@ -1095,7 +1101,7 @@ void MixerChannel::paint(juce::Graphics& g)
     // Inactive overlay
     if (!active)
     {
-        g.setColour(juce::Colour(0x88000000));
+        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::backgroundMixerStripDim));
         g.fillRect(0, kColourBarH + kNameH, w, h - kColourBarH - kNameH);
     }
 }

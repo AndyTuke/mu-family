@@ -134,7 +134,7 @@ void FXRow::paint(juce::Graphics& g)
     // Dim overlay when disabled
     if (!isEnabled)
     {
-        g.setColour(juce::Colour(0x60000000));
+        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::backgroundFxRowDim));
         g.fillRect(getLocalBounds());
     }
 }

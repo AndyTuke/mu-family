@@ -217,7 +217,11 @@ void VoiceSection::wireCallbacks()
     pitchDepth.onValueChanged = [this](double v) { apvtsSet("pEnvDep", (float)v); };
 
     // Filter config — DropdownSelect uses 1-based IDs; filterType index = selectedId - 1.
-    filterType.onChange = [this](int id) { apvtsSet("fltType", (float)(id - 1)); };
+    filterType.onChange = [this](int id) {
+        apvtsSet("fltType", (float)(id - 1));
+        // #379: status-bar feedback when filter type changes — show the dropdown item text.
+        if (onStatusUpdate) onStatusUpdate("Filter Type", filterType.getText());
+    };
     filterCutoff.onValueChanged = [this](double v) { apvtsSet("fltCut", (float)v); };
     filterRes   .onValueChanged = [this](double v) { apvtsSet("fltRes", (float)(v / 100.0)); };
 
@@ -291,6 +295,8 @@ void VoiceSection::wireCallbacks()
         apvtsSet("drvRate",   snap.driveRate);
         apvtsSet("drvChar",   (float)newChar);
         configureInsertAlgorithm(newChar);
+        // #379: status-bar feedback when Insert algorithm changes.
+        if (onStatusUpdate) onStatusUpdate("Insert Algorithm", driveChar.getText());
     };
 }
 

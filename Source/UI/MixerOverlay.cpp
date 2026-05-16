@@ -77,13 +77,17 @@ void MixerOverlay::buildRhythmChannels()
     {
         bool hasRhythm = r < numActive;
         juce::Colour col = hasRhythm ? palette[proc.getRhythm(r).colourIndex % 30]
-                                     : juce::Colour(0xff404040);
+                                     : MuClidLookAndFeel::colour(MuClidLookAndFeel::mixerInactiveNameBg);
         juce::String name = hasRhythm ? juce::String(proc.getRhythm(r).name) : "-";
         auto ch = std::make_unique<MixerChannel>(MixerChannel::Type::Rhythm, name, col);
         const juce::String prefix = "ch" + juce::String(r) + "_";
         ch->bindRhythm(mixer.channels[r], mixer.channelPeaks[r], &proc, prefix,
                        &mixer.sidechainGR[r]);
         if (!hasRhythm) ch->setActive(false);
+        // #379: forward status updates to the global StatusBar via PluginEditor.
+        ch->onStatusUpdate = [this](const juce::String& n, const juce::String& v, juce::Colour c) {
+            if (onStatusUpdate) onStatusUpdate(n, v, c);
+        };
         addAndMakeVisible(*ch);
         rhythmChannels.push_back(std::move(ch));
     }
@@ -117,6 +121,15 @@ void MixerOverlay::wireReturns()
     reverbReturn.bindReturn(mixer.returns[2], mixer.returnPeaks[2], &proc, "ret_rev_",
                             &mixer.returnSidechainGR[2]);
     masterChannel.bindMaster(mixer, &proc);
+
+    // #379: forward status updates from return channels to the StatusBar via PluginEditor.
+    auto forwardStatus = [this](const juce::String& n, const juce::String& v, juce::Colour c) {
+        if (onStatusUpdate) onStatusUpdate(n, v, c);
+    };
+    effectReturn .onStatusUpdate = forwardStatus;
+    delayReturn  .onStatusUpdate = forwardStatus;
+    reverbReturn .onStatusUpdate = forwardStatus;
+    masterChannel.onStatusUpdate = forwardStatus;
 }
 
 void MixerOverlay::wireFXRows()

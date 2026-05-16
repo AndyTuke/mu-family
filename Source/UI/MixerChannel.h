@@ -23,6 +23,12 @@ public:
 
     MixerChannel(Type type, const juce::String& name, juce::Colour colour);
 
+    // #379: status-bar coverage for outBus + scSource dropdowns. Colour is the
+    // channel's own colour (used as the status-bar rhythm tag for context).
+    std::function<void(const juce::String& name,
+                       const juce::String& value,
+                       juce::Colour channelColour)> onStatusUpdate;
+
     // Bind to engine state + VU peak + optional GR atomic. Pass proc+prefix to route mutations through APVTS.
     void bindRhythm(MixerEngine::ChannelState& state, juce::Atomic<float>& peak,
                     PluginProcessor* proc = nullptr, const juce::String& apvtsPrefix = {},

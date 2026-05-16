@@ -19,7 +19,10 @@ TransportBar::TransportBar(PluginProcessor& p)
     if (isStandalone)
     {
         bpmInput.setValue((int)proc.getInternalBpm());
-        bpmInput.onChange = [this](int v) { proc.setInternalBpm((double)v); };
+        bpmInput.onChange = [this](int v) {
+            proc.setInternalBpm((double)v);
+            if (onStatusUpdate) onStatusUpdate("BPM", juce::String(v));
+        };
         bpmInput.setShowStepButtons(false);
         bpmInput.setLabelInline(true);
         addAndMakeVisible(bpmInput);
@@ -45,6 +48,7 @@ TransportBar::TransportBar(PluginProcessor& p)
         if (auto* p = proc.apvts.getParameter("mstrLoop"))
             p->setValueNotifyingHost(p->convertTo0to1((float)paramVal));
         loopStepLabel.setVisible(id != 1);
+        if (onStatusUpdate) onStatusUpdate("Master Loop", loopDropdown.getText());
     };
     addAndMakeVisible(loopDropdown);
 
@@ -135,13 +139,13 @@ void TransportBar::refreshPlayBtn()
         playBtn.setButtonText(playing ? kStop : kPlay);
         if (playing)
         {
-            playBtn.setColour(juce::TextButton::buttonColourId,  juce::Colour(0xff5c1a1a));
-            playBtn.setColour(juce::TextButton::textColourOffId, juce::Colour(0xffeeeeee));
+            playBtn.setColour(juce::TextButton::buttonColourId,  MuClidLookAndFeel::colour(Id::transportWhilePlayingBg));
+            playBtn.setColour(juce::TextButton::textColourOffId, MuClidLookAndFeel::colour(Id::textBright));
         }
         else
         {
-            playBtn.setColour(juce::TextButton::buttonColourId,  juce::Colour(0xff1a4a26));
-            playBtn.setColour(juce::TextButton::textColourOffId, juce::Colour(0xffeeeeee));
+            playBtn.setColour(juce::TextButton::buttonColourId,  MuClidLookAndFeel::colour(Id::transportWhileStoppedBg));
+            playBtn.setColour(juce::TextButton::textColourOffId, MuClidLookAndFeel::colour(Id::textBright));
         }
     }
     else
@@ -149,7 +153,7 @@ void TransportBar::refreshPlayBtn()
         playBtn.setButtonText(kPlay);
         playBtn.setColour(juce::TextButton::buttonColourId,
                           MuClidLookAndFeel::colour(Id::segmentInactiveBg));
-        playBtn.setColour(juce::TextButton::textColourOffId, juce::Colour(0xff666666));
+        playBtn.setColour(juce::TextButton::textColourOffId, MuClidLookAndFeel::colour(Id::textDisabledButton));
     }
 }
 

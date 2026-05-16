@@ -257,7 +257,7 @@ void RhythmSaveDialog::paint(juce::Graphics& g)
 {
     using Id = MuClidLookAndFeel::ColourIds;
 
-    g.setColour(juce::Colour(0xe6000000));
+    g.setColour(MuClidLookAndFeel::colour(Id::backgroundModalDim));
     g.fillAll();
 
     const int cardX = (getWidth()  - kCardW) / 2;
@@ -604,7 +604,7 @@ void RhythmPanel::loadSample()
             safeThis->repaint();
         }));
     opts.dialogTitle          = "Load Sample";
-    opts.dialogBackgroundColour = juce::Colour(0xff1a1a1a);
+    opts.dialogBackgroundColour = MuClidLookAndFeel::colour(MuClidLookAndFeel::backgroundDialog);
     opts.useNativeTitleBar    = false;
     opts.resizable            = true;
     opts.launchAsync();
@@ -754,7 +754,7 @@ void RhythmPanel::paint(juce::Graphics& g)
             // Linked sample referenced by a preset could not be found at its recorded
             // path nor in the user Samples folder. Show the filename in amber with a
             // "missing — click to find" hint so the user knows what to look for.
-            g.setColour(juce::Colour(0xffe69500)); // amber warning
+            g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::sampleBarMissingWarning));
             g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
             g.drawText("Missing: " + sampleName + "  —  click to find",
                        inner.getX() + 5, inner.getY(), inner.getWidth() - 28, inner.getHeight(),

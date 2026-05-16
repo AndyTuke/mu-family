@@ -34,7 +34,7 @@ void AboutPanel::paint(juce::Graphics& g)
     using Id = MuClidLookAndFeel::ColourIds;
 
     // Dim background
-    g.setColour(juce::Colour(0xe6000000));
+    g.setColour(MuClidLookAndFeel::colour(Id::backgroundModalDim));
     g.fillAll();
 
     const int w = getWidth();

@@ -212,7 +212,7 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
     constexpr float startAngle = juce::MathConstants<float>::pi * 1.25f;  // matches juce::Slider rotary defaults
     constexpr float endAngle   = juce::MathConstants<float>::pi * 2.75f;
 
-    const auto modCol = juce::Colour(0xff89e0ff);  // soft cyan tint
+    const auto modCol = MuClidLookAndFeel::colour(MuClidLookAndFeel::indicatorModulationTint);
 
     // Static "this knob is modulated" outer ring.
     if (isModulated)
@@ -248,7 +248,7 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
         juce::Path grArc;
         grArc.addCentredArc(cx, cy, radius + 4.0f, radius + 4.0f, 0.0f,
                             grArcStart, endAngle, true);
-        g.setColour(juce::Colour(0xffff6633).withAlpha(0.85f));
+        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::indicatorGRTint).withAlpha(0.85f));
         g.strokePath(grArc, juce::PathStrokeType(2.5f, juce::PathStrokeType::curved,
                                                        juce::PathStrokeType::rounded));
     }
