@@ -176,27 +176,38 @@ void NudgeInput::showEditor()
     // callAsync defers delete until the callback stack has fully unwound.
     auto dismissed = std::make_shared<bool>(false);
 
-    editor->onReturnKey = [this, editor, dismissed]
+    // #359: SafePointer guards the lambdas against parent destruction between editor
+    // creation and dismissal — e.g. panel switches rhythm or preset reload tears down
+    // the parent while the editor still has focus. Without this, removeChildComponent
+    // / setValue UAF the dead NudgeInput.
+    juce::Component::SafePointer<NudgeInput> safeThis(this);
+
+    editor->onReturnKey = [safeThis, editor, dismissed]
     {
         if (*dismissed) return;
         *dismissed = true;
-        int v = editor->getText().getIntValue();
-        removeChildComponent(editor);
+        const int v = editor->getText().getIntValue();
+        if (auto* self = safeThis.getComponent())
+        {
+            self->removeChildComponent(editor);
+            self->setValue(v, true);
+        }
         juce::MessageManager::callAsync([editor] { delete editor; });
-        setValue(v, true);
     };
-    editor->onFocusLost = [this, editor, dismissed]
+    editor->onFocusLost = [safeThis, editor, dismissed]
     {
         if (*dismissed) return;
         *dismissed = true;
-        removeChildComponent(editor);
+        if (auto* self = safeThis.getComponent())
+            self->removeChildComponent(editor);
         juce::MessageManager::callAsync([editor] { delete editor; });
     };
-    editor->onEscapeKey = [this, editor, dismissed]
+    editor->onEscapeKey = [safeThis, editor, dismissed]
     {
         if (*dismissed) return;
         *dismissed = true;
-        removeChildComponent(editor);
+        if (auto* self = safeThis.getComponent())
+            self->removeChildComponent(editor);
         juce::MessageManager::callAsync([editor] { delete editor; });
     };
 }
