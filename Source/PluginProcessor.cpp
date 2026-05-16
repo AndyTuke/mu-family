@@ -398,7 +398,14 @@ const juce::String PluginProcessor::getName() const
     return "mu-Clid";
 #endif
 }
-double PluginProcessor::getTailLengthSeconds() const { return 0.0; }
+double PluginProcessor::getTailLengthSeconds() const
+{
+    // #367: cover worst-case wet tail so hosts don't crop the audio after transport stop.
+    // DelaySlot::MaxDelaySamples = 4 s at 192 kHz, and the largest reverb preset can decay
+    // for several seconds via Signalsmith's FDN. Fixed 10 s is conservative but safe and
+    // avoids coupling the plugin's tail-length contract to FX-internal state.
+    return 10.0;
+}
 
 int PluginProcessor::getNumPrograms() { return 1; }
 int PluginProcessor::getCurrentProgram() { return 0; }
