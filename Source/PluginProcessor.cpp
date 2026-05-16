@@ -1546,6 +1546,41 @@ void PluginProcessor::removeRhythm(int index)
     suspendProcessing(false);
 }
 
+void PluginProcessor::resetRhythm(int index)
+{
+    if (index < 0 || index >= sequencer.getNumRhythms()) return;
+
+    // #355: was a UI-thread spin on rhythm.modLock + concurrent vector destruction
+    // risk in ModulationMatrix::process. Now uses the same suspendProcessing +
+    // rhythmsLock pattern as removeRhythm — clean atomic swap, no UI freeze even
+    // if the audio thread is preempted while holding modLock.
+    suspendProcessing(true);
+    {
+        const juce::ScopedLock sl(rhythmsLock);
+        auto& r = sequencer.getRhythm(index);
+        auto savedName   = r.name;
+        auto savedColour = r.colourIndex;
+        r = Rhythm{};
+        r.name        = savedName;
+        r.colourIndex = savedColour;
+    }
+    suspendProcessing(false);
+
+    sequencer.updatePattern(index);
+}
+
+void PluginProcessor::renameRhythm(int index, const juce::String& newName)
+{
+    if (index < 0 || index >= sequencer.getNumRhythms()) return;
+
+    // #356: rhythmsLock serialises with the audio thread's ScopedTryLock in
+    // processBlock. No audio-thread reader of name today, but the lock matches the
+    // project's "message thread mutates Rhythm" convention and stays correct if a
+    // future audio-path consumer (e.g. MIDI program-change preset matcher) reads it.
+    const juce::ScopedLock sl(rhythmsLock);
+    sequencer.getRhythm(index).name = newName.toStdString();
+}
+
 //==============================================================================
 void PluginProcessor::setMidiSyncEnabled(bool on)
 {

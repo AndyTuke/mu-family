@@ -855,7 +855,9 @@ void RhythmPanel::commitNameFromLabel()
         nameLabel.setText(newName, juce::dontSendNotification);
     }
 
-    proc.getRhythm(currentRhythmIndex).name = newName.toStdString();
+    // #356: route through PluginProcessor::renameRhythm so the write happens under
+    // rhythmsLock instead of a raw message-thread mutation of the Rhythm struct.
+    proc.renameRhythm(currentRhythmIndex, newName);
     if (onRhythmRenamed) onRhythmRenamed();
 }
 
@@ -878,22 +880,9 @@ void RhythmPanel::confirmReset()
             {
                 if (idx >= 0 && idx < safeThis->proc.getNumRhythms())
                 {
-                    auto& r = safeThis->proc.getRhythm(idx);
-                    auto savedName   = r.name;
-                    auto savedColour = r.colourIndex;
-
-                    // Acquire modLock so the audio thread can't read modulationMatrix /
-                    // controlSequences while operator= replaces them.
-                    bool expected = false;
-                    while (!r.modLock.compare_exchange_weak(expected, true,
-                                                            std::memory_order_acquire))
-                        expected = false;
-                    r = Rhythm{};
-                    r.name        = savedName;
-                    r.colourIndex = savedColour;
-                    r.modLock.store(false, std::memory_order_release);
-
-                    safeThis->proc.updatePattern(idx);
+                    // #355: PluginProcessor::resetRhythm owns the concurrency dance
+                    // (suspendProcessing + rhythmsLock). No more UI-thread spin on modLock.
+                    safeThis->proc.resetRhythm(idx);
                     safeThis->setRhythm(idx);
                 }
             }

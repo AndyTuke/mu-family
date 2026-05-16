@@ -107,6 +107,14 @@ public:
     void    addRhythm    (const Rhythm& r);
     void    removeRhythm (int index);
     bool    swapRhythms  (int i, int j);
+    // #355: reset rhythm to defaults preserving name + colour. Uses suspendProcessing
+    // + rhythmsLock so the message thread doesn't spin on modLock while the audio
+    // thread holds it. Same concurrency pattern as removeRhythm / swapRhythmSlots.
+    void    resetRhythm  (int index);
+    // #356: rename rhythm under rhythmsLock — no audio-thread reads of name today,
+    // but the lock is the project's canonical "message thread mutates Rhythm" pattern
+    // and avoids the UI-thread modLock spin if a future MIDI/PC matcher reads name.
+    void    renameRhythm (int index, const juce::String& newName);
     Rhythm& getRhythm    (int index)       { return sequencer.getRhythm(index); }
     int     getNumRhythms() const          { return sequencer.getNumRhythms(); }
     void    updatePattern (int index)      { sequencer.updatePattern(index); }
