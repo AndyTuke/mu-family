@@ -61,13 +61,34 @@ private:
 
     void triggerHitPulse(int combinedStep, int stepsA);
 
+    // #371: per-ring unrotated-Path cache. paint() built ~192 fresh juce::Path objects per
+    // frame (3 rings × up to 64 steps × 2 arcs each). The geometry only changes when the
+    // ring's radii or step count changes; per-paint rotation is applied via AffineTransform
+    // at fillPath() time, so the cached Paths stay valid across frames.
+    struct RingCache
+    {
+        std::vector<juce::Path> stepPaths;
+        float cx = -1.0f, cy = -1.0f;
+        float outerR = -1.0f, innerR = -1.0f;
+        int   stepCount = -1;
+
+        bool matches(float cx_, float cy_, float outerR_, float innerR_, int N) const noexcept
+        {
+            return cx == cx_ && cy == cy_ && outerR == outerR_ && innerR == innerR_
+                && stepCount == N;
+        }
+        void rebuild(float cx_, float cy_, float outerR_, float innerR_, int N);
+    };
+    mutable std::array<RingCache, 3> ringCaches;
+
     void drawRing(juce::Graphics& g,
                   const std::vector<StepType>& pattern,
                   float cx, float cy,
                   float outerR, float innerR,
                   juce::Colour hitClr,
                   int currentStep,
-                  float rotOff) const;
+                  float rotOff,
+                  RingCache& cache) const;
 
     static juce::Colour stepColour(StepType t, juce::Colour hitClr, bool isCurrent);
 };

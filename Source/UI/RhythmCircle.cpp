@@ -149,42 +149,62 @@ juce::Colour RhythmCircle::stepColour(StepType t, juce::Colour hitClr, bool isCu
     return base;
 }
 
+void RhythmCircle::RingCache::rebuild(float cx_, float cy_, float outerR_, float innerR_, int N)
+{
+    stepPaths.clear();
+    stepPaths.reserve((size_t) N);
+
+    const float twoPi   = juce::MathConstants<float>::twoPi;
+    const float stepAng = twoPi / (float) N;
+    const float gapAng  = juce::jmin(0.05f, stepAng * 0.15f);
+    const float arcAng  = stepAng - gapAng;
+
+    for (int i = 0; i < N; ++i)
+    {
+        // Build geometry with NO rotation (step 0 anchored at 12 o'clock in JUCE arc
+        // convention). Per-paint rotation is applied via AffineTransform at fillPath.
+        const float a0 = (float) i * stepAng;
+        const float a1 = a0 + arcAng;
+        juce::Path seg;
+        seg.addCentredArc(cx_, cy_, outerR_, outerR_, 0.0f, a0, a1, true);
+        seg.addCentredArc(cx_, cy_, innerR_, innerR_, 0.0f, a1, a0, false);
+        seg.closeSubPath();
+        stepPaths.push_back(std::move(seg));
+    }
+
+    cx = cx_; cy = cy_; outerR = outerR_; innerR = innerR_; stepCount = N;
+}
+
 void RhythmCircle::drawRing(juce::Graphics& g,
                               const std::vector<StepType>& pattern,
                               float cx, float cy,
                               float outerR, float innerR,
                               juce::Colour hitClr,
                               int currentStep,
-                              float rotOff) const
+                              float rotOff,
+                              RingCache& cache) const
 {
     const int N = (int)pattern.size();
     if (N == 0 || outerR <= innerR || innerR < 0.0f) return;
 
-    const float twoPi    = juce::MathConstants<float>::twoPi;
+    if (!cache.matches(cx, cy, outerR, innerR, N))
+        cache.rebuild(cx, cy, outerR, innerR, N);
+
     // #252: JUCE's addCentredArc measures angles from 12 o'clock (top) and
     // increases clockwise (radians: 0 = top, π/2 = right, π = bottom, -π/2 =
-    // left). Previously this used `-halfPi - rotOff`, which intended "start at
-    // 12 o'clock" using standard math conventions but in JUCE's arc convention
-    // placed step 0 at 9 o'clock — so hits visually fired at 9 o'clock instead
-    // of 12. Drop the −halfPi offset so step 0 sits at the top when rotOff=0.
-    const float startOff = -rotOff;
-    const float stepAng  = twoPi / (float)N;
-    const float gapAng   = juce::jmin(0.05f, stepAng * 0.15f);
-    const float arcAng   = stepAng - gapAng;
+    // left). Cached paths anchor step 0 at 12 o'clock; rotate by `rotOff`
+    // (positive = clockwise on screen) so the playhead view matches the prior
+    // `startOff = -rotOff` math without rebuilding geometry every frame.
+    const auto transform = juce::AffineTransform::rotation(-rotOff, cx, cy);
 
-    for (int i = 0; i < N; i++)
+    for (int i = 0; i < N; ++i)
     {
-        const float a0   = startOff + (float)i * stepAng;
-        const float a1   = a0 + arcAng;
         const bool isCur = (i == currentStep);
         g.setColour(stepColour(pattern[i], hitClr, isCur));
-
-        juce::Path seg;
-        seg.addCentredArc(cx, cy, outerR, outerR, 0.0f, a0, a1, true);
-        seg.addCentredArc(cx, cy, innerR, innerR, 0.0f, a1, a0, false);
-        seg.closeSubPath();
-        g.fillPath(seg);
+        g.fillPath(cache.stepPaths[(size_t) i], transform);
     }
+
+    const float startOff = -rotOff;  // retained for the loop-point divider below
 
     // Loop-point divider: radial line at the boundary between step N-1 and step 0.
     // #252: use the same addCentredArc convention as the segments above —
@@ -224,7 +244,8 @@ void RhythmCircle::paint(juce::Graphics& g)
     if (!patternA.empty())
     {
         drawRing(g, patternA, cx, cy, aOuter, aInner,
-                 MuClidLookAndFeel::colour(Id::ringEuclidA), stepA, rotAngleA);
+                 MuClidLookAndFeel::colour(Id::ringEuclidA), stepA, rotAngleA,
+                 ringCaches[0]);
     }
     else
     {
@@ -247,7 +268,8 @@ void RhythmCircle::paint(juce::Graphics& g)
         if (!patternB.empty())
         {
             drawRing(g, patternB, cx, cy, bOuter, bInner,
-                     MuClidLookAndFeel::colour(Id::ringEuclidB), stepB, rotAngleB);
+                     MuClidLookAndFeel::colour(Id::ringEuclidB), stepB, rotAngleB,
+                     ringCaches[1]);
         }
         else
         {
@@ -268,7 +290,8 @@ void RhythmCircle::paint(juce::Graphics& g)
         if (cInner > 0.0f)
         {
             drawRing(g, patternC, cx, cy, cOuter, cInner,
-                     MuClidLookAndFeel::colour(Id::ringEuclidC), -1, rotAngleC);
+                     MuClidLookAndFeel::colour(Id::ringEuclidC), -1, rotAngleC,
+                     ringCaches[2]);
             innerLimit = cInner - ringGap;
         }
     }
