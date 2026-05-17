@@ -29,7 +29,7 @@ public:
     // GR meter overlay (compressor/limiter): set to audio-thread-written atomic;
     // knob polls at 30 Hz and draws an orange arc showing gain reduction (0..1,
     // where 1 ≡ 24 dB). Pass nullptr to disable.
-    void setGRSource(const juce::Atomic<float>* gr);
+    void setGRSource(const std::atomic<float>* gr);
 
     void resized() override;
     void paint(juce::Graphics& g) override;
@@ -50,7 +50,7 @@ private:
     // value-clip cannot cascade into a spurious APVTS write.
     bool  settingRange  = false;
 
-    const juce::Atomic<float>* grSource  = nullptr;
+    const std::atomic<float>* grSource  = nullptr;
     float                      grDisplay = 0.0f;
     static constexpr float     kGRRelease = 0.85f;
 

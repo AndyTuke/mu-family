@@ -76,7 +76,7 @@ public:
     double getInternalBpm()      const { return internalBpm; }
     double getInternalBeatPos()  const
     {
-        if (midiSyncEnabled.load(std::memory_order_relaxed) && midiClockIsPlaying.get())
+        if (midiSyncEnabled.load(std::memory_order_relaxed) && midiClockIsPlaying.load())
             return midiClockBeatPosUI.load(std::memory_order_relaxed);
         return internalBeatPos.load(std::memory_order_relaxed);
     }
@@ -101,8 +101,8 @@ public:
     bool   getMidiSyncEnabled()  const { return midiSyncEnabled.load(std::memory_order_relaxed); }
     void   setMidiSyncMessages(int mode);
     int    getMidiSyncMessages() const { return midiSyncMessages.load(std::memory_order_relaxed); }
-    bool   isMidiClockPlaying()  const { return midiClockIsPlaying.get(); }
-    double getMidiClockBpm()     const { return midiClockBpmEst.get(); }
+    bool   isMidiClockPlaying()  const { return midiClockIsPlaying.load(); }
+    double getMidiClockBpm()     const { return midiClockBpmEst.load(); }
 
     void    addRhythm    (const Rhythm& r);
     void    removeRhythm (int index);
@@ -150,6 +150,21 @@ public:
     void stageRhythmPreset (int rhythmIndex, const juce::File& presetFile);
     void cancelStagedSwap  (int rhythmIndex);
     bool hasPendingSwap    (int rhythmIndex) const;
+
+    // #386: fired (on the message thread, from handleAsyncUpdate) after a hot-swap
+    // commit finishes. The editor uses this to refresh non-APVTS UI state — name
+    // label, sample bar, colour-tinted bits — that pushRhythmToAPVTS doesn't cover
+    // because those fields aren't APVTS parameters. Editor MUST clear this in its
+    // destructor: the processor can outlive the editor (DAW close-window-keep-
+    // plugin), and a swap commit firing into a destroyed editor is a UAF.
+    std::function<void(int rhythmIndex)> onRhythmHotSwapCommitted;
+
+    // #406: fired when a preset / state-restore parse fails (parseXML returns null
+    // or the resulting tree is invalid). Editor surfaces via the status bar so the
+    // user sees feedback instead of a silent click. Same dtor-cleanup requirement
+    // as onRhythmHotSwapCommitted — clear in editor dtor to avoid UAF when the
+    // processor outlives the editor.
+    std::function<void(const juce::String& message)> onLoadError;
     void setSwapMode(SwapMode m) { swapModeAtomic.store((int)m, std::memory_order_relaxed); }
     SwapMode getSwapMode() const { return static_cast<SwapMode>(swapModeAtomic.load(std::memory_order_relaxed)); }
 
@@ -197,19 +212,18 @@ public:
     // Play-state atomics: written by audio thread, read by UI at 30 Hz.
     struct RhythmPlayState
     {
-        juce::Atomic<int>  currentStep   { 0 };
-        juce::Atomic<int>  currentStepC  { 0 }; // effectiveStep % stepsC — independent of combined-pattern length
-        juce::Atomic<int>  patternLength { 1 };
-        juce::Atomic<int>  stepsA        { 1 }; // individual ring step counts for per-ring rotation
-        juce::Atomic<int>  stepsB        { 1 };
-        juce::Atomic<int>  stepsC        { 1 };
-        juce::Atomic<bool> hitFired      { false }; // legacy: kept for backward compat; new code uses hitCount
-        juce::Atomic<int>  hitCount      { 0 };     // monotonic counter — audio thread increments per hit, UI tracks lastSeen (Issue #43: avoids one-shot-flag race between RhythmCircle + SidebarItem)
+        std::atomic<int>  currentStep   { 0 };
+        std::atomic<int>  currentStepC  { 0 }; // effectiveStep % stepsC — independent of combined-pattern length
+        std::atomic<int>  patternLength { 1 };
+        std::atomic<int>  stepsA        { 1 }; // individual ring step counts for per-ring rotation
+        std::atomic<int>  stepsB        { 1 };
+        std::atomic<int>  stepsC        { 1 };
+        std::atomic<int>  hitCount      { 0 };     // monotonic counter — audio thread increments per hit, UI tracks lastSeen (Issue #43: avoids one-shot-flag race between RhythmCircle + SidebarItem)
     };
     std::array<RhythmPlayState, SequencerEngine::MaxRhythms> rhythmPlayState;
-    juce::Atomic<float>  beatFraction     { 0.0f }; // fractional position within the current 1/16 step
-    juce::Atomic<bool>   sequencerPlaying { false };
-    juce::Atomic<double> lastBeatPos      { 0.0 };  // most recent beat position (for UI playhead)
+    std::atomic<float>  beatFraction     { 0.0f }; // fractional position within the current 1/16 step
+    std::atomic<bool>   sequencerPlaying { false };
+    std::atomic<double> lastBeatPos      { 0.0 };  // most recent beat position (for UI playhead)
 
     // Issue #133: per-destination modulated-value snapshot for the live-arc indicator.
     // Written by the audio thread after ModulationMatrix::process(); read by VoiceSection at 30 Hz.
@@ -230,7 +244,7 @@ public:
         kSnapEucCHits,  kSnapEucCRotate, kSnapEucCPrePad, kSnapEucCPostPad, kSnapEucCInsSt, kSnapEucCInsLen,
         kSnapCount
     };
-    std::array<juce::Atomic<float>, kSnapCount> modSnapshot[SequencerEngine::MaxRhythms];
+    std::array<std::atomic<float>, kSnapCount> modSnapshot[SequencerEngine::MaxRhythms];
 
     // 128-entry MIDI program-change → .muRhyth preset path map. Public so the UI panel
     // can read/write directly. All mutation is message-thread-only; audio thread reads
@@ -268,7 +282,22 @@ private:
 
     std::unique_ptr<juce::PropertiesFile> appSettings;
 
-    bool apvtsLoading = false;
+    // #391: now atomic — listeners can fire on the audio thread when a DAW runs
+    // host automation, so the cross-thread read in syncRhythmParam needs proper
+    // ordering. All set/clear pairs go through `mu_core::ScopedApvtsLoading` so
+    // an exception inside the bulk push can't latch the flag at true.
+    std::atomic<bool> apvtsLoading { false };
+
+public:
+    // #393: exposed so UI listeners can skip their per-param refresh during a
+    // bulk load (state restore, swap commit, swap-rhythms reorder). The
+    // bulk-load orchestrator handles the full UI refresh afterwards, so the
+    // per-param refresh during the bulk push is pure waste.
+    bool isApvtsLoading() const noexcept
+    {
+        return apvtsLoading.load(std::memory_order_acquire);
+    }
+private:
 
     // suspendProcessing() sets a flag but does NOT block until the current
     // processBlock callback finishes. rhythmsLock provides the missing barrier.
@@ -282,8 +311,8 @@ private:
     // Atomics are written by either thread; plain members are audio-thread only.
     std::atomic<bool> midiSyncEnabled  { false };
     std::atomic<int>  midiSyncMessages { 2 };         // 0=clock, 1=transport, 2=both
-    juce::Atomic<bool>   midiClockIsPlaying  { false };
-    juce::Atomic<double> midiClockBpmEst     { 120.0 };
+    std::atomic<bool>   midiClockIsPlaying  { false };
+    std::atomic<double> midiClockBpmEst     { 120.0 };
     std::atomic<double>  midiClockBeatPosUI  { 0.0 };  // written by audio thread, read by UI
     // Audio-thread-only:
     double midiClockBeatPos              = 0.0;
@@ -293,8 +322,14 @@ private:
     int    midiClockRingCount            = 0;
 
     // Pre-allocated modulation parameter map — reused every block to avoid audio-thread allocation.
-    // Keys match ModDest::ids.  Values are initialised in constructor and updated each block.
-    std::unordered_map<std::string, float> modParamValues;
+    // Keys match ModDest::ids. Values are initialised in constructor and updated each block.
+    // #403: keyed by `std::string_view` rather than `std::string`. All write/read sites use
+    // `const char*` string literals (`modParamValues["amp.attack"] = …`), which previously
+    // constructed a temp std::string per access (~30 × N rhythms × 690 blocks/sec on the
+    // audio thread). string_view of a literal is alloc-free; the literal's static storage
+    // guarantees the view stays valid for the lifetime of the map entry. ModulationMatrix's
+    // `find(a.destinationId)` still works because std::string converts implicitly.
+    std::unordered_map<std::string_view, float> modParamValues;
 
     // #336: per-rhythm modulated euclid pattern overrides — written by the audio thread
     // after ModulationMatrix::process(). Used by the audio-thread pattern recompute path

@@ -107,19 +107,21 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
 
     // #220 / #219: per-sample pitch ratio. Static pitch and base playback ratio fold
     // into a constant; pitch envelope (sample-accurate read) + smoothed pitchMod
-    // produce the per-sample exponent. Defensive: if pitchRatioBuffer is somehow
-    // smaller than ns (host called process before prepareToPlay matched the block
-    // size — rare but possible), grow it via assign() filled with playbackRatio so
-    // SamplePlayer always sees a valid positive ratio.
+    // produce the per-sample exponent.
+    // #404: the prior "defensive grow" `if (size < ns) assign(ns, ...)` was dead
+    // code (audio-thread alloc that could never fire): `ns` is already clamped to
+    // `tempBuffer.getNumSamples()` at the top of process() — which equals the
+    // blockSize that prepareToPlay assigned to BOTH tempBuffer AND pitchRatioBuffer.
+    // The two stay in lock-step because both are sized from the same blockSize
+    // argument. Removing the dead assign() also removes a Tier 2 audio-thread
+    // allocation hazard that would have fired if the surrounding clamp ever
+    // regressed.
     const float baseSemitones = static_cast<float>(activeParams.pitchOctave) * 12.0f
                               + static_cast<float>(activeParams.pitchSemitones)
                               + activeParams.pitchFine / 100.0f;
     const float pitchDepth = activeParams.pitchEnvDepth;
 
     smoothedPitchMod.setTargetValue(activeParams.pitchMod);
-
-    if (static_cast<int>(pitchRatioBuffer.size()) < ns)
-        pitchRatioBuffer.assign(static_cast<size_t>(ns), playbackRatio);
 
     for (int s = 0; s < ns; ++s)
     {

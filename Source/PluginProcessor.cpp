@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "PluginProcessor_Internal.h"
 #if MUCLID_LITE_BUILD
 #include "LiteEditor.h"
 #else
@@ -103,9 +104,10 @@ PluginProcessor::PluginProcessor()
 #endif
     numActiveRhythms.store(1, std::memory_order_release);
 
-    apvtsLoading = true;
-    pushRhythmToAPVTS(0);
-    apvtsLoading = false;
+    {
+        mu_core::ScopedApvtsLoading guard(apvtsLoading);
+        pushRhythmToAPVTS(0);
+    }
 
 #if !MUCLID_LITE_BUILD
     // Ensure user content folders exist and load the default preset if present.
@@ -202,8 +204,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                               std::memory_order_relaxed);
     }
 
-    sequencerPlaying.set(playing);
-    lastBeatPos.set(beatPos);
+    sequencerPlaying.store(playing);
+    lastBeatPos.store(beatPos);
 
     const juce::ScopedTryLock rLock(rhythmsLock);
     if (!rLock.isLocked()) return;
@@ -239,23 +241,22 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                     const bool  isAccented = (blockResult.accentMask & (1 << r)) != 0;
                     midiEngines[r].trigger(midiMessages, 0, midiNote, 1,
                                            isAccented ? accentedVel : normalVel);
-                    rhythmPlayState[r].hitFired.set(true);
-                    rhythmPlayState[r].hitCount.set(rhythmPlayState[r].hitCount.get() + 1);
+                    rhythmPlayState[r].hitCount.store(rhythmPlayState[r].hitCount.load() + 1);   // #412: hitFired (legacy) removed — UI uses hitCount
                 }
             }
         }
         const float frac = static_cast<float>(
             std::fmod(beatPos / SequencerEngine::StepLengthBeats, 1.0));
-        beatFraction.set(frac);
+        beatFraction.store(frac);
         for (int r = 0; r < numRhythms; ++r)
         {
-            rhythmPlayState[r].currentStep  .set(sequencer.getLastStepIndex(r));
-            rhythmPlayState[r].currentStepC .set(sequencer.getLastAccentStepIndex(r));
-            rhythmPlayState[r].patternLength.set(sequencer.getPatternLength(r));
+            rhythmPlayState[r].currentStep  .store(sequencer.getLastStepIndex(r));
+            rhythmPlayState[r].currentStepC .store(sequencer.getLastAccentStepIndex(r));
+            rhythmPlayState[r].patternLength.store(sequencer.getPatternLength(r));
             const Rhythm& rhy = sequencer.getRhythm(r);
-            rhythmPlayState[r].stepsA.set(juce::jmax(1, rhy.genA.steps));
-            rhythmPlayState[r].stepsB.set(juce::jmax(1, rhy.genB.steps));
-            rhythmPlayState[r].stepsC.set(juce::jmax(1, rhy.genC.steps));
+            rhythmPlayState[r].stepsA.store(juce::jmax(1, rhy.genA.steps));
+            rhythmPlayState[r].stepsB.store(juce::jmax(1, rhy.genB.steps));
+            rhythmPlayState[r].stepsC.store(juce::jmax(1, rhy.genC.steps));
         }
     }
     for (int r = 0; r < numRhythms; ++r)
@@ -286,10 +287,10 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                     midiClockBeatPos = 0.0;  midiClockBlockBeatPos = 0.0;
                     midiClockRingCount = 0;  midiClockSamplesSinceLastTick = 0;
                     prevTickSo = 0;
-                    midiClockIsPlaying.set(true);
+                    midiClockIsPlaying.store(true);
                 }
-                else if (b == 0xFB) { midiClockIsPlaying.set(true); }
-                else if (b == 0xFC) { midiClockIsPlaying.set(false); }
+                else if (b == 0xFB) { midiClockIsPlaying.store(true); }
+                else if (b == 0xFC) { midiClockIsPlaying.store(false); }
             }
 
             if (doTick && b == 0xF8)
@@ -302,7 +303,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                     if (midiClockRingCount < 24) ++midiClockRingCount;
                     double sum = 0.0;
                     for (int i = 0; i < midiClockRingCount; ++i) sum += midiClockTickIntervals[i];
-                    midiClockBpmEst.set(juce::jlimit(20.0, 300.0,
+                    midiClockBpmEst.store(juce::jlimit(20.0, 300.0,
                         60.0 * currentSampleRate / ((sum / midiClockRingCount) * 24.0)));
                 }
                 else if (midiClockRingCount == 0) { ++midiClockRingCount; }
@@ -359,7 +360,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
     if (!playing && midiSyncEnabled.load(std::memory_order_relaxed)
                  && wrapperType == wrapperType_Standalone
-                 && (midiClockIsPlaying.get() || internalPlaying.load(std::memory_order_relaxed)))
+                 && (midiClockIsPlaying.load() || internalPlaying.load(std::memory_order_relaxed)))
     {
         playing = true;
         beatPos = midiClockBlockBeatPos;
@@ -377,12 +378,12 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     // so the first block after restart can't emit a false masterLoopWrapped from
     // a stale lastEffectiveStep.
     {
-        const bool wasPlaying = sequencerPlaying.get();
+        const bool wasPlaying = sequencerPlaying.load();
         if (playing && !wasPlaying)
             sequencer.resetWrapDetector();
     }
-    sequencerPlaying.set(playing);
-    lastBeatPos.set(beatPos);
+    sequencerPlaying.store(playing);
+    lastBeatPos.store(beatPos);
 
     const juce::ScopedTryLock rLock(rhythmsLock);
     if (!rLock.isLocked())
@@ -427,20 +428,19 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         // Update UI play-state atomics.
         const float frac = static_cast<float>(
             std::fmod(beatPos / SequencerEngine::StepLengthBeats, 1.0));
-        beatFraction.set(frac);
+        beatFraction.store(frac);
         for (int r = 0; r < numRhythms; ++r)
         {
-            rhythmPlayState[r].currentStep  .set(sequencer.getLastStepIndex(r));
-            rhythmPlayState[r].currentStepC .set(sequencer.getLastAccentStepIndex(r));
-            rhythmPlayState[r].patternLength.set(sequencer.getPatternLength(r));
+            rhythmPlayState[r].currentStep  .store(sequencer.getLastStepIndex(r));
+            rhythmPlayState[r].currentStepC .store(sequencer.getLastAccentStepIndex(r));
+            rhythmPlayState[r].patternLength.store(sequencer.getPatternLength(r));
             const Rhythm& rhy = sequencer.getRhythm(r);
-            rhythmPlayState[r].stepsA.set(juce::jmax(1, rhy.genA.steps));
-            rhythmPlayState[r].stepsB.set(juce::jmax(1, rhy.genB.steps));
-            rhythmPlayState[r].stepsC.set(juce::jmax(1, rhy.genC.steps));
+            rhythmPlayState[r].stepsA.store(juce::jmax(1, rhy.genA.steps));
+            rhythmPlayState[r].stepsB.store(juce::jmax(1, rhy.genB.steps));
+            rhythmPlayState[r].stepsC.store(juce::jmax(1, rhy.genC.steps));
             if (blockResult.firedMask & (1 << r))
             {
-                rhythmPlayState[r].hitFired.set(true);
-                rhythmPlayState[r].hitCount.set(rhythmPlayState[r].hitCount.get() + 1); // Issue #43: monotonic counter for race-free UI hit detection
+                rhythmPlayState[r].hitCount.store(rhythmPlayState[r].hitCount.load() + 1); // Issue #43: monotonic counter for race-free UI hit detection (#412: hitFired legacy field removed)
             }
         }
     }
@@ -527,27 +527,27 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                         return juce::jlimit(0.0f, 1.0f,
                             std::log(juce::jmax(20.0f, v) / 20.0f) / std::log(1000.0f));  // log(20000/20)
                     };
-                    snap[kSnapAmpAtk]      .set(sn(modParamValues["amp.attack"],       0.0f,    100.0f));
-                    snap[kSnapAmpDec]      .set(sn(modParamValues["amp.decay"],        0.0f,    100.0f));
-                    snap[kSnapAmpSus]      .set(sn(modParamValues["amp.sustain"],      0.0f,    100.0f));
-                    snap[kSnapAmpRel]      .set(sn(modParamValues["amp.release"],      0.0f,    100.0f));
-                    snap[kSnapFilterCutoff].set(snLogHz(modParamValues["filter.cutoff"]));
-                    snap[kSnapFilterRes]   .set(sn(modParamValues["filter.resonance"], 0.0f,    100.0f));
-                    snap[kSnapFenvAtk]     .set(sn(modParamValues["fenv.attack"],      0.0f,    100.0f));
-                    snap[kSnapFenvDec]     .set(sn(modParamValues["fenv.decay"],       0.0f,    100.0f));
-                    snap[kSnapFenvDepth]   .set(sn(modParamValues["fenv.depth"],       0.0f,     48.0f));
-                    snap[kSnapPitchSemi]   .set(sn(modParamValues["pitch.semitones"], -12.0f,    12.0f));
-                    snap[kSnapPitchOct]    .set(sn(modParamValues["pitch.octave"],    -36.0f,    36.0f));
-                    snap[kSnapPitchFine]   .set(0.0f);   // deprecated by #218
-                    snap[kSnapInsDrive]    .set(sn(modParamValues["insert.drive"],     0.0f,    100.0f));
-                    snap[kSnapInsOutput]   .set(sn(modParamValues["insert.output"],   -24.0f,    0.0f));
-                    snap[kSnapInsBits]     .set(sn(modParamValues["insert.bits"],      1.0f,     16.0f));
-                    snap[kSnapInsDither]   .set(sn(modParamValues["insert.dither"],    0.0f,    100.0f));
-                    snap[kSnapInsLpf]      .set(snLogHz(modParamValues["insert.lpf"]));   // #216 log
+                    snap[kSnapAmpAtk]      .store(sn(modParamValues["amp.attack"],       0.0f,    100.0f));
+                    snap[kSnapAmpDec]      .store(sn(modParamValues["amp.decay"],        0.0f,    100.0f));
+                    snap[kSnapAmpSus]      .store(sn(modParamValues["amp.sustain"],      0.0f,    100.0f));
+                    snap[kSnapAmpRel]      .store(sn(modParamValues["amp.release"],      0.0f,    100.0f));
+                    snap[kSnapFilterCutoff].store(snLogHz(modParamValues["filter.cutoff"]));
+                    snap[kSnapFilterRes]   .store(sn(modParamValues["filter.resonance"], 0.0f,    100.0f));
+                    snap[kSnapFenvAtk]     .store(sn(modParamValues["fenv.attack"],      0.0f,    100.0f));
+                    snap[kSnapFenvDec]     .store(sn(modParamValues["fenv.decay"],       0.0f,    100.0f));
+                    snap[kSnapFenvDepth]   .store(sn(modParamValues["fenv.depth"],       0.0f,     48.0f));
+                    snap[kSnapPitchSemi]   .store(sn(modParamValues["pitch.semitones"], -12.0f,    12.0f));
+                    snap[kSnapPitchOct]    .store(sn(modParamValues["pitch.octave"],    -36.0f,    36.0f));
+                    snap[kSnapPitchFine]   .store(0.0f);   // deprecated by #218
+                    snap[kSnapInsDrive]    .store(sn(modParamValues["insert.drive"],     0.0f,    100.0f));
+                    snap[kSnapInsOutput]   .store(sn(modParamValues["insert.output"],   -24.0f,    0.0f));
+                    snap[kSnapInsBits]     .store(sn(modParamValues["insert.bits"],      1.0f,     16.0f));
+                    snap[kSnapInsDither]   .store(sn(modParamValues["insert.dither"],    0.0f,    100.0f));
+                    snap[kSnapInsLpf]      .store(snLogHz(modParamValues["insert.lpf"]));   // #216 log
                     // #223 new destinations
-                    snap[kSnapPitchEnvDep] .set(sn(modParamValues["pitch.envDepth"],   0.0f,    24.0f));
-                    snap[kSnapAmpLvl]      .set(sn(modParamValues["amp.level"],        0.0f,     2.0f));
-                    snap[kSnapAccent]      .set(sn(modParamValues["accentDb"],         0.0f,    12.0f));
+                    snap[kSnapPitchEnvDep] .store(sn(modParamValues["pitch.envDepth"],   0.0f,    24.0f));
+                    snap[kSnapAmpLvl]      .store(sn(modParamValues["amp.level"],        0.0f,     2.0f));
+                    snap[kSnapAccent]      .store(sn(modParamValues["accentDb"],         0.0f,    12.0f));
                     // #336 Stage C: euclid pattern destinations. hits/rotate/insSt are
                     // normalised against the UI slider's *current* range (which is per-
                     // rhythm: hits=0..steps, rotate/insSt=0..steps-1) so the live arc on
@@ -556,24 +556,24 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                     const int stepsA = juce::jmax(1, rhythm.genA.steps);
                     const int stepsB = juce::jmax(1, rhythm.genB.steps);
                     const int stepsC = juce::jmax(1, rhythm.genC.steps);
-                    snap[kSnapEucAHits]    .set(sn(modParamValues["euclid.a.hits"],    0.0f, (float) stepsA));
-                    snap[kSnapEucARotate]  .set(sn(modParamValues["euclid.a.rotate"],  0.0f, (float) juce::jmax(1, stepsA - 1)));
-                    snap[kSnapEucAPrePad]  .set(sn(modParamValues["euclid.a.prePad"],  0.0f, 12.0f));
-                    snap[kSnapEucAPostPad] .set(sn(modParamValues["euclid.a.postPad"], 0.0f, 12.0f));
-                    snap[kSnapEucAInsSt]   .set(sn(modParamValues["euclid.a.insSt"],   0.0f, (float) juce::jmax(1, stepsA - 1)));
-                    snap[kSnapEucAInsLen]  .set(sn(modParamValues["euclid.a.insLen"],  0.0f,  8.0f));
-                    snap[kSnapEucBHits]    .set(sn(modParamValues["euclid.b.hits"],    0.0f, (float) stepsB));
-                    snap[kSnapEucBRotate]  .set(sn(modParamValues["euclid.b.rotate"],  0.0f, (float) juce::jmax(1, stepsB - 1)));
-                    snap[kSnapEucBPrePad]  .set(sn(modParamValues["euclid.b.prePad"],  0.0f, 12.0f));
-                    snap[kSnapEucBPostPad] .set(sn(modParamValues["euclid.b.postPad"], 0.0f, 12.0f));
-                    snap[kSnapEucBInsSt]   .set(sn(modParamValues["euclid.b.insSt"],   0.0f, (float) juce::jmax(1, stepsB - 1)));
-                    snap[kSnapEucBInsLen]  .set(sn(modParamValues["euclid.b.insLen"],  0.0f,  8.0f));
-                    snap[kSnapEucCHits]    .set(sn(modParamValues["euclid.c.hits"],    0.0f, (float) stepsC));
-                    snap[kSnapEucCRotate]  .set(sn(modParamValues["euclid.c.rotate"],  0.0f, (float) juce::jmax(1, stepsC - 1)));
-                    snap[kSnapEucCPrePad]  .set(sn(modParamValues["euclid.c.prePad"],  0.0f, 12.0f));
-                    snap[kSnapEucCPostPad] .set(sn(modParamValues["euclid.c.postPad"], 0.0f, 12.0f));
-                    snap[kSnapEucCInsSt]   .set(sn(modParamValues["euclid.c.insSt"],   0.0f, (float) juce::jmax(1, stepsC - 1)));
-                    snap[kSnapEucCInsLen]  .set(sn(modParamValues["euclid.c.insLen"],  0.0f,  8.0f));
+                    snap[kSnapEucAHits]    .store(sn(modParamValues["euclid.a.hits"],    0.0f, (float) stepsA));
+                    snap[kSnapEucARotate]  .store(sn(modParamValues["euclid.a.rotate"],  0.0f, (float) juce::jmax(1, stepsA - 1)));
+                    snap[kSnapEucAPrePad]  .store(sn(modParamValues["euclid.a.prePad"],  0.0f, 12.0f));
+                    snap[kSnapEucAPostPad] .store(sn(modParamValues["euclid.a.postPad"], 0.0f, 12.0f));
+                    snap[kSnapEucAInsSt]   .store(sn(modParamValues["euclid.a.insSt"],   0.0f, (float) juce::jmax(1, stepsA - 1)));
+                    snap[kSnapEucAInsLen]  .store(sn(modParamValues["euclid.a.insLen"],  0.0f,  8.0f));
+                    snap[kSnapEucBHits]    .store(sn(modParamValues["euclid.b.hits"],    0.0f, (float) stepsB));
+                    snap[kSnapEucBRotate]  .store(sn(modParamValues["euclid.b.rotate"],  0.0f, (float) juce::jmax(1, stepsB - 1)));
+                    snap[kSnapEucBPrePad]  .store(sn(modParamValues["euclid.b.prePad"],  0.0f, 12.0f));
+                    snap[kSnapEucBPostPad] .store(sn(modParamValues["euclid.b.postPad"], 0.0f, 12.0f));
+                    snap[kSnapEucBInsSt]   .store(sn(modParamValues["euclid.b.insSt"],   0.0f, (float) juce::jmax(1, stepsB - 1)));
+                    snap[kSnapEucBInsLen]  .store(sn(modParamValues["euclid.b.insLen"],  0.0f,  8.0f));
+                    snap[kSnapEucCHits]    .store(sn(modParamValues["euclid.c.hits"],    0.0f, (float) stepsC));
+                    snap[kSnapEucCRotate]  .store(sn(modParamValues["euclid.c.rotate"],  0.0f, (float) juce::jmax(1, stepsC - 1)));
+                    snap[kSnapEucCPrePad]  .store(sn(modParamValues["euclid.c.prePad"],  0.0f, 12.0f));
+                    snap[kSnapEucCPostPad] .store(sn(modParamValues["euclid.c.postPad"], 0.0f, 12.0f));
+                    snap[kSnapEucCInsSt]   .store(sn(modParamValues["euclid.c.insSt"],   0.0f, (float) juce::jmax(1, stepsC - 1)));
+                    snap[kSnapEucCInsLen]  .store(sn(modParamValues["euclid.c.insLen"],  0.0f,  8.0f));
                 }
 
                 // Write modulated values back, clamping to safe ranges.
@@ -659,8 +659,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 effectiveBpm = *hostBpm;
     if (midiSyncEnabled.load(std::memory_order_relaxed)
         && wrapperType == wrapperType_Standalone
-        && midiClockIsPlaying.get())
-        effectiveBpm = midiClockBpmEst.get();
+        && midiClockIsPlaying.load())
+        effectiveBpm = midiClockBpmEst.load();
     // Gather the host's output bus buffers. Buses we declared in BusesProperties may
     // be disabled in the host's chosen layout — skip those (the channel routes silently).
     auto masterBus = getBusBuffer(buffer, false, kMasterBusIndex);
@@ -736,22 +736,22 @@ void PluginProcessor::addRhythm(const Rhythm& r)
     }
     if (ri < loadedSamplePaths.size())
         loadedSamplePaths.set(ri, juce::String());
-    apvtsLoading = true;
-    pushRhythmToAPVTS(ri);
-    apvtsLoading = false;
+    {
+        mu_core::ScopedApvtsLoading guard(apvtsLoading);
+        pushRhythmToAPVTS(ri);
+    }
 }
 
 void PluginProcessor::resetPlayState(int idx)
 {
     if (idx < 0 || idx >= SequencerEngine::MaxRhythms) return;
     auto& s = rhythmPlayState[idx];
-    s.currentStep  .set(0);
-    s.patternLength.set(1);
-    s.stepsA       .set(1);
-    s.stepsB       .set(1);
-    s.stepsC       .set(1);
-    s.hitFired     .set(false);
-    s.hitCount     .set(0);
+    s.currentStep  .store(0);
+    s.patternLength.store(1);
+    s.stepsA       .store(1);
+    s.stepsB       .store(1);
+    s.stepsC       .store(1);
+    s.hitCount     .store(0);
 }
 bool PluginProcessor::swapRhythms(int i, int j)
 {
@@ -864,7 +864,7 @@ void PluginProcessor::renameRhythm(int index, const juce::String& newName)
 void PluginProcessor::setMidiSyncEnabled(bool on)
 {
     midiSyncEnabled.store(on, std::memory_order_relaxed);
-    if (!on) midiClockIsPlaying.set(false);
+    if (!on) midiClockIsPlaying.store(false);
     appSettings->setValue("midiSyncEnabled", on);
     appSettings->saveIfNeeded();
 }
@@ -949,6 +949,17 @@ void PluginProcessor::stopSamplePreview()
 void PluginProcessor::handleAsyncUpdate()
 {
     const int n = numActiveRhythms.load(std::memory_order_acquire);
+
+    // #392: two-pass to suspend audio ONCE per call. The prior per-rhythm loop
+    // called suspendProcessing(true/false) up to 8 times — each suspend blocks
+    // the message thread until the in-flight audio block finishes, so a MIDI
+    // program-change burst hitting multiple slots could stall the message
+    // thread for ~80 ms and produce N audible dropouts. Pass 1 collects all
+    // ready slots; pass 2 swaps them under one suspend; pass 3 does the post-
+    // commit APVTS push + UI callback outside the suspend.
+    // Stack-allocated fixed-cap buffer (MaxRhythms = 8 — no heap alloc).
+    std::array<int, SequencerEngine::MaxRhythms> readyRhythms {};
+    int readyCount = 0;
     for (int r = 0; r < n; ++r)
     {
         auto& sw = pendingSwaps[r];
@@ -960,19 +971,48 @@ void PluginProcessor::handleAsyncUpdate()
             sw.boundaryReached.store(false, std::memory_order_relaxed);
             continue;
         }
+        readyRhythms[(size_t)readyCount++] = r;
+    }
 
+    if (readyCount > 0)
+    {
         suspendProcessing(true);
-        voiceEngines[r] = std::move(sw.pendingVoice);
-        sequencer.getRhythm(r) = sw.pendingRhythm;
-        loadedSamplePaths.set(r, sw.pendingSamplePath);
-        sequencer.updatePattern(r);
-        sw.isReady.store(false, std::memory_order_relaxed);
-        sw.boundaryReached.store(false, std::memory_order_relaxed);
+        for (int idx = 0; idx < readyCount; ++idx)
+        {
+            const int r = readyRhythms[(size_t)idx];
+            auto& sw = pendingSwaps[r];
+            voiceEngines[r] = std::move(sw.pendingVoice);
+            // #392: move-assign — Rhythm carries vectors of ControlSequences +
+            // ModulationMatrix assignments; the prior copy-assign deep-copied them
+            // all every commit, all under suspendProcessing (= audio paused).
+            sequencer.getRhythm(r) = std::move(sw.pendingRhythm);
+            loadedSamplePaths.set(r, sw.pendingSamplePath);
+            sequencer.updatePattern(r);
+            // #385: tell the snapshot pass to fire the new pattern's current step
+            // instead of absorbing it. The swap IS step-aligned (cued at the loop
+            // wrap), so absorbing — which exists to guard against retroactive
+            // triggers from mid-step knob changes — drops a hit that the user
+            // explicitly cued. Sentinel -1 takes the same skip-absorb path that
+            // #384 added for cold-start.
+            sequencer.resetStepTrackingForSwap(r);
+            sw.isReady.store(false, std::memory_order_relaxed);
+            sw.boundaryReached.store(false, std::memory_order_relaxed);
+        }
         suspendProcessing(false);
 
-        apvtsLoading = true;
-        pushRhythmToAPVTS(r);
-        apvtsLoading = false;
+        // Post-commit: APVTS push + editor refresh. ONE guard for the whole batch
+        // so every panel's parameterChanged sees apvtsLoading=true (#391/#393).
+        mu_core::ScopedApvtsLoading guard(apvtsLoading);
+        for (int idx = 0; idx < readyCount; ++idx)
+        {
+            const int r = readyRhythms[(size_t)idx];
+            pushRhythmToAPVTS(r);
+            // #386: notify the editor so it can refresh non-APVTS state (name label,
+            // sample bar, colour tint). pushRhythmToAPVTS covers parameter-backed
+            // fields via the APVTS listener path; this covers everything else.
+            if (onRhythmHotSwapCommitted)
+                onRhythmHotSwapCommitted(r);
+        }
     }
 
     // Drain MIDI program-change queue. Each event stages a rhythm preset; the existing

@@ -43,6 +43,7 @@ The full design is split into focused sub-documents. **Read only the relevant on
 | [docs/design-ui.md](docs/design-ui.md) | μ-Clid specific panel layouts — RhythmCircle, EuclideanPanel, Mixer, Transport. Defers to design-ui-family.md for colours/sizes. |
 | [docs/design-presets.md](docs/design-presets.md) | APVTS wiring plan, preset storage, save/restore, current pre-APVTS state |
 | [docs/design-future.md](docs/design-future.md) | Unscheduled future ideas — read to avoid closing off options during current stages |
+| [docs/design-seamless-hotswap.md](docs/design-seamless-hotswap.md) | **Stage 34 plan** — polyphonic voice-tail hot-swap. Step-by-step with test gates. Read before touching `handleAsyncUpdate` / `voiceEngines[]` lifecycle. |
 | [docs/design.md](docs/design.md) | Full original spec — only read if the sub-docs don't cover it |
 
 ---
@@ -83,7 +84,7 @@ All code changes must be logged as backlog entries to maintain a complete develo
 
 | Stage | Status | Scope | Issues |
 |---|---|---|---|
-| — | — | No upcoming stages planned | — |
+| 34 | 🔵 Planned | Seamless hot-swap with polyphonic voice tail. Old `VoiceEngine` keeps rendering its in-flight sample / envelope after swap, drains naturally, gets cleaned up off the audio thread. See [docs/design-seamless-hotswap.md](docs/design-seamless-hotswap.md) for the step-by-step plan with test gates. | — |
 
 
 ## Source layout (actual, as built)
@@ -99,7 +100,7 @@ All code changes must be logged as backlog entries to maintain a complete develo
 - **ControlSequence lengths are independent** — never couple loop lengths or rates to rhythm step counts.
 - **FXSlotBase interface for all FX** — enables VST3 plugin hosting in v3 without refactoring.
 - **TimeStretcherBase wraps the time-stretch engine** — currently a stub; SoundTouch (v1) or RubberBand (v2) slots in without refactoring.
-- **Atomic pointer for rhythm hot-swap from day one** — required for v2 live swap feature.
+- **Hot-swap uses `suspendProcessing` + `std::move`** — new `Rhythm` + `VoiceEngine` are staged on the message thread (`stageRhythmPreset`), committed atomically at the next loop boundary under a single suspend per `handleAsyncUpdate` call (#392 batches multi-rhythm bursts into one suspend). The "atomic pointer hot-swap" pattern (lock-free pointer exchange + message-thread cleanup queue for the old engine) is a v2 candidate if perceptible suspend-gap clicks become a complaint — current single-block silence gap (~1.33 ms at 48k/64) is short enough to be inaudible on percussive material, occasionally audible on sustained pads.
 - **RhythmSidebar item order supports variable ordering from day one** — required for v2 drag-to-reorder.
 - **All colours and sizes in MuLookAndFeel only** — no hardcoded values in component drawing code.
 - **All UI uses the shared component library** — never build a one-off version of a standard control.

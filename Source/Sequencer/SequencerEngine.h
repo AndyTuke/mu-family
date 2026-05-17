@@ -62,6 +62,20 @@ public:
     // pre-stop `lastEffectiveStep`.
     void resetWrapDetector() { lastEffectiveStep = -1; }
 
+    // #385: call from PluginProcessor::handleAsyncUpdate immediately after a hot-
+    // swap commit (under suspendProcessing, so the audio thread is paused — no
+    // synchronisation needed). Sentinel -1 tells processBlock's snapshot pass to
+    // skip the absorb-current-step behaviour for this rhythm, so the new pattern
+    // fires its first hit at the commit step instead of dropping it.
+    void resetStepTrackingForSwap(int r)
+    {
+        if (r >= 0 && r < MaxRhythms)
+        {
+            lastStepIndex[r]       = -1;
+            lastAccentStepIndex[r] = 0;
+        }
+    }
+
     // Current step within the master loop (0-based). 0 when loop is free-running.
     // Written by the audio thread each block; safe to read from the message thread at 10 Hz.
     int getMasterLoopCurrentStep() const { return masterLoopCurrentStep.load(std::memory_order_relaxed); }

@@ -325,7 +325,7 @@ void EuclideanPanel::refreshModulatedIndicators()
 
     // Only show ring + live arc while playing — when stopped the snapshot holds the
     // last played position, which would read as a permanent misleading indicator.
-    const bool playing = proc.sequencerPlaying.get();
+    const bool playing = proc.sequencerPlaying.load();
 
     hitsA    .setIsModulated(playing && isAssigned("euclid.a.hits"));
     rotA     .setIsModulated(playing && isAssigned("euclid.a.rotate"));
@@ -350,7 +350,7 @@ void EuclideanPanel::refreshModulatedIndicators()
 
     // #336 Stage C: live-arc indicator values from the modulation snapshot.
     const auto& snap = proc.modSnapshot[rhythmIndex];
-    auto sn  = [&](int i) { return snap[i].get(); };
+    auto sn  = [&](int i) { return snap[i].load(); };
     const float kNaN = std::numeric_limits<float>::quiet_NaN();
     auto arc = [&](bool assigned, int idx) { return (assigned && playing) ? sn(idx) : kNaN; };
 

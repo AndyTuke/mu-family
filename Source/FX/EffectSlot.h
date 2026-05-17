@@ -10,14 +10,24 @@
 #include "Effects/PhaserEffect.h"
 #include "Effects/EchoEffect.h"
 
+#include <array>
 #include <memory>
 
 // Hosts one of the 4 effect algorithms (Chorus, Flanger, Phaser, Echo).
 // When algo = kEchoAlgoIndex (3), processing is delegated to an embedded DelaySlot
 // so Echo mode has identical capabilities to the dedicated Delay unit.
+//
+// #402: all 4 algorithms are pre-allocated in the ctor and prepared together in
+// prepare(). setAlgorithm() flips an index — no heap allocation. This matters
+// because parameterChanged for `eff_algo` can fire on the audio thread when a
+// DAW automates the parameter; the previous make_unique-on-setAlgorithm path
+// was an audio-thread allocation.
 class EffectSlot : public FXSlotBase
 {
 public:
+    static constexpr int kNumAlgorithms = 4;
+    static constexpr int kEchoAlgoIndex = 3;
+
     EffectSlot();
 
     void prepare(double sampleRate, int blockSize) override;
@@ -29,7 +39,7 @@ public:
     void getStateInformation(juce::MemoryBlock&) override {}
     void setStateInformation(const void*, int) override {}
 
-    void setAlgorithm(int index);   // 0–3
+    void setAlgorithm(int index);   // 0–3 — allocation-free; just flips active index
     int  getAlgorithmIndex() const { return algorithmIndex; }
 
     void setParam(const juce::String& id, float value);
@@ -42,8 +52,6 @@ public:
 
     static const std::vector<FXAlgorithmDef>& allDefs() { return FXAlgorithmRegistry::effectAlgorithms(); }
 
-    static constexpr int kEchoAlgoIndex = 3;
-
     // Access the embedded DelaySlot used when algo == kEchoAlgoIndex.
     DelaySlot& getEchoDelay() { return echoDelay; }
 
@@ -54,9 +62,14 @@ public:
     }
 
 private:
-    std::unique_ptr<EffectAlgorithmBase> makeAlgorithm(int index);
+    // Pre-allocated in ctor — setAlgorithm() flips `algorithmIndex` into this array.
+    std::array<std::unique_ptr<EffectAlgorithmBase>, kNumAlgorithms> algorithms;
 
-    std::unique_ptr<EffectAlgorithmBase> algorithm;
+    EffectAlgorithmBase* currentAlgorithm() const
+    {
+        return algorithms[(size_t) algorithmIndex].get();
+    }
+
     std::unique_ptr<OversampledProcessor> oversampler;
     DelaySlot echoDelay;
 

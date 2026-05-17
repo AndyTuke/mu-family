@@ -22,8 +22,8 @@ void RhythmCircle::setPatterns(const std::vector<StepType>& patA,
 }
 
 void RhythmCircle::setPlayState(PluginProcessor::RhythmPlayState*  state,
-                                 const juce::Atomic<float>*          beatFrac,
-                                 const juce::Atomic<bool>*            playing,
+                                 const std::atomic<float>*          beatFrac,
+                                 const std::atomic<bool>*            playing,
                                  juce::Colour                         colour)
 {
     playState     = state;
@@ -56,16 +56,16 @@ void RhythmCircle::timerCallback()
     // ── Read play state ──────────────────────────────────────────────────────
     if (playState && beatFracAtom && isPlayingAtom)
     {
-        const bool playing = isPlayingAtom->get();
+        const bool playing = isPlayingAtom->load();
 
         if (playing)
         {
-            const int   step  = playState->currentStep.get();
-            const int   stepC = playState->currentStepC.get();
-            const float frac  = beatFracAtom->get();
-            const int   sA    = juce::jmax(1, playState->stepsA.get());
-            const int   sB    = juce::jmax(1, playState->stepsB.get());
-            const int   sC    = juce::jmax(1, playState->stepsC.get());
+            const int   step  = playState->currentStep.load();
+            const int   stepC = playState->currentStepC.load();
+            const float frac  = beatFracAtom->load();
+            const int   sA    = juce::jmax(1, playState->stepsA.load());
+            const int   sB    = juce::jmax(1, playState->stepsB.load());
+            const int   sC    = juce::jmax(1, playState->stepsC.load());
             const float twoPi = juce::MathConstants<float>::twoPi;
 
             // Each ring rotates at its own speed: one full turn per sX steps.
@@ -78,7 +78,7 @@ void RhythmCircle::timerCallback()
             // Issue #43: edge-detect via monotonic counter so multiple readers
             // (this circle + sidebar mini-circles + sidebar pulse) can all observe
             // the same hit without racing each other on a shared one-shot flag.
-            const int currentHitCount = playState->hitCount.get();
+            const int currentHitCount = playState->hitCount.load();
             if (currentHitCount != lastHitCount)
             {
                 lastHitCount = currentHitCount;
@@ -234,7 +234,7 @@ void RhythmCircle::paint(juce::Graphics& g)
 
     // Per-ring current step is derived from pattern size below to avoid a race
     // between the pattern update and the stepsA/stepsB atomics.
-    const int combinedStep = playState ? playState->currentStep.get() : 0;
+    const int combinedStep = playState ? playState->currentStep.load() : 0;
 
     // ── Ring A — purple ──────────────────────────────────────────────────────
     const float aOuter = maxR;

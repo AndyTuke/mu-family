@@ -324,9 +324,9 @@ void VoiceSection::refreshModulatedIndicators()
     // Only show mod indicators (ring + live arc) while playing — when stopped the
     // snapshot holds the last played position, which would be a misleading permanent indicator.
     const auto& snap    = proc.modSnapshot[rhythmIndex];
-    auto sn  = [&](int i) { return snap[i].get(); };
+    auto sn  = [&](int i) { return snap[i].load(); };
     const float kNaN    = std::numeric_limits<float>::quiet_NaN();
-    const bool  playing = proc.sequencerPlaying.get();
+    const bool  playing = proc.sequencerPlaying.load();
 
     // #218: single Pitch destination — ring shown only on the Semi knob.
     pitchOctave .setIsModulated(false);

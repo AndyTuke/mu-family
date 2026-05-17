@@ -54,6 +54,8 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/FXRow.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/DelayRow.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/MixerChannel.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/MixerChannel_Bindings.cpp"   # #408 partial TU
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/MixerChannel_Insert.cpp"     # #408 partial TU
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/MixerOverlay.cpp"
     # ProcessorBase
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/ProcessorBase.cpp"

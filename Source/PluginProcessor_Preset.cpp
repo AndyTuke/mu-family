@@ -33,17 +33,29 @@ void PluginProcessor::stageRhythmPreset(int rhythmIndex, const juce::File& file)
 {
     if (rhythmIndex < 0 || rhythmIndex >= sequencer.getNumRhythms()) return;
 
-    if (!sequencerPlaying.get())
+    if (!sequencerPlaying.load())
     {
         applyRhythmPreset(file, rhythmIndex);
         return;
     }
 
-    if (!file.existsAsFile()) return;
+    if (!file.existsAsFile())
+    {
+        if (onLoadError) onLoadError("File missing: " + file.getFileName());
+        return;
+    }
     auto xml = juce::parseXML(file);
-    if (!xml) return;
+    if (!xml)
+    {
+        if (onLoadError) onLoadError("Could not parse: " + file.getFileName());
+        return;
+    }
     auto state = juce::ValueTree::fromXml(*xml);
-    if (!state.isValid()) return;
+    if (!state.isValid())
+    {
+        if (onLoadError) onLoadError("Invalid preset: " + file.getFileName());
+        return;
+    }
 
     auto& sw = pendingSwaps[rhythmIndex];
 
@@ -78,9 +90,29 @@ void PluginProcessor::stageRhythmPreset(int rhythmIndex, const juce::File& file)
         newRhythm.name = nameVal.toString().toStdString();
     newRhythm.colourIndex = (int)state.getProperty("r0_colour", newRhythm.colourIndex);
 
-    // Prepare the pending voice engine.
+    // #389: deserialise modulators from the preset. Mirrors the applyRhythmPreset
+    // (stopped-state) path so hot-swap preset loads carry the preset's LFOs / step
+    // sequences / matrix assignments instead of inheriting the previous rhythm's.
+    // newRhythm is a local copy — no other thread holds its modLock, so the spin
+    // inside clearModulators / deserialiseModulators resolves on the first attempt.
+    // Legacy .muRhyth files with no Modulators child are left alone (same opt-in
+    // policy as applyRhythmPreset — see [Source/PluginProcessor_Preset.cpp:281-285]).
+    if (auto mods = state.getChildWithName("Modulators"); mods.isValid())
+    {
+        clearModulators(newRhythm);
+        deserialiseModulators(mods, newRhythm);
+    }
+
+    // Prepare the pending voice engine and prime it with the preset's VoiceParams.
+    // Without this, the swap commit (handleAsyncUpdate) hands the audio thread a
+    // fresh VoiceEngine whose default VoiceParams (filterType=0/LP12, driveChar=0,
+    // default ADSRs) get applied on the first process(); pushRhythmToAPVTS that
+    // follows the swap runs under apvtsLoading=true which intentionally skips the
+    // engine sync in syncRhythmParam. Result: hot-swapped rhythm plays with the
+    // previous rhythm's filter/drive sound until the user touches any knob.
     auto newVoice = std::make_unique<VoiceEngine>();
     newVoice->prepareToPlay(currentSampleRate, currentBlockSize);
+    newVoice->setParams(newRhythm.voiceParams);
 
     juce::String samplePath;
     juce::String storedPath = state.getProperty("r0_sample").toString();
@@ -248,11 +280,23 @@ void PluginProcessor::saveRhythmPresetToFile(int rhythmIdx, const juce::File& de
 
 bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
 {
-    if (!file.existsAsFile()) return false;
+    if (!file.existsAsFile())
+    {
+        if (onLoadError) onLoadError("File missing: " + file.getFileName());
+        return false;
+    }
     auto xml = juce::parseXML(file);
-    if (!xml) return false;
+    if (!xml)
+    {
+        if (onLoadError) onLoadError("Could not parse: " + file.getFileName());
+        return false;
+    }
     auto state = juce::ValueTree::fromXml(*xml);
-    if (!state.isValid()) return false;
+    if (!state.isValid())
+    {
+        if (onLoadError) onLoadError("Invalid preset: " + file.getFileName());
+        return false;
+    }
 
     // Load only sequencer-page state — mixer settings stay attached to the slot.
     // Older rhythm preset files may include "ch_*" properties; those are simply
@@ -347,7 +391,16 @@ bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
 
 bool PluginProcessor::applyDefaultRhythm(int rhythmIndex)
 {
-    return applyRhythmPreset(getRhythmsDir().getChildFile("_default.muRhyth"), rhythmIndex);
+    // #405: route via stageRhythmPreset so it respects play state — when playing,
+    // the swap is cued at the loop boundary like every other preset-load. The
+    // previous direct call to applyRhythmPreset glitched audio when used mid-play
+    // (sidebar "Add Rhythm" / per-rhythm reset paths). stageRhythmPreset takes
+    // the immediate-apply branch when stopped, so the stopped behaviour is
+    // unchanged.
+    const juce::File f = getRhythmsDir().getChildFile("_default.muRhyth");
+    if (!f.existsAsFile()) return false;
+    stageRhythmPreset(rhythmIndex, f);
+    return true;
 }
 
 void PluginProcessor::loadDefaultPreset()
@@ -602,9 +655,10 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
     juce::ValueTree migrated = state.createCopy();
     migrateLegacyHostState(migrated);
 
-    apvtsLoading = true;
-    apvts.replaceState(migrated);
-    apvtsLoading = false;
+    {
+        mu_core::ScopedApvtsLoading guard(apvtsLoading);
+        apvts.replaceState(migrated);
+    }
 
     // Trim to actual active count.
     sequencer.setNumRhythms(n);
@@ -735,6 +789,12 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
         auto state = juce::ValueTree::fromXml(*xml);
         if (state.isValid())
             restoreStateFromTree(state);
+        else if (onLoadError)
+            onLoadError("Host state restore failed: invalid tree");
+    }
+    else if (onLoadError)
+    {
+        onLoadError("Host state restore failed: could not parse XML");
     }
 }
 
@@ -813,9 +873,17 @@ void PluginProcessor::savePreset(const juce::String& name,
 void PluginProcessor::loadPreset(const juce::File& file)
 {
     auto xml = juce::parseXML(file);
-    if (!xml) return;
+    if (!xml)
+    {
+        if (onLoadError) onLoadError("Could not parse: " + file.getFileName());
+        return;
+    }
     auto root = juce::ValueTree::fromXml(*xml);
-    if (!root.isValid()) return;
+    if (!root.isValid())
+    {
+        if (onLoadError) onLoadError("Invalid preset: " + file.getFileName());
+        return;
+    }
 
     if (root.getType() == juce::Identifier("MuClidPreset"))
     {
@@ -859,7 +927,7 @@ void PluginProcessor::loadPreset(const juce::File& file)
             numActiveRhythms.store(n, std::memory_order_release);
         }
 
-        apvtsLoading = true;
+        mu_core::ScopedApvtsLoading guard(apvtsLoading);
         int rhythmIdx = 0;
         for (int ci = 0; ci < root.getNumChildren() && rhythmIdx < n; ++ci)
         {
@@ -981,7 +1049,7 @@ void PluginProcessor::loadPreset(const juce::File& file)
             }
             break;
         }
-        apvtsLoading = false;
+        // #391: ScopedApvtsLoading guard goes out of scope at the closing brace below.
     }
     else
     {

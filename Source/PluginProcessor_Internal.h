@@ -7,6 +7,7 @@
 
 #include <juce_core/juce_core.h>
 #include "Sequencer/Rhythm.h"
+#include "ScopedApvtsLoading.h"   // #409: lifted to mu-core — reuse from there.
 
 namespace mu_pp {
 

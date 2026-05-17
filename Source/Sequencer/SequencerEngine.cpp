@@ -220,11 +220,23 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                     safePatterns[r].assign(cachedPatterns[r].begin(),  cachedPatterns[r].end());
                     safeCPatterns[r].assign(cachedCPatterns[r].begin(), cachedCPatterns[r].end());
                     patternUpdated[r] = false;
-                    // Absorb the current step so we don't retroactively fire a hit.
-                    if (!safePatterns[r].empty())
+                    // Absorb the current step so we don't retroactively fire a hit —
+                    // EXCEPT when lastStepIndex == -1, which means "this is a step-
+                    // aligned (re)start, fire the current step." That sentinel is
+                    // set by:
+                    //   (a) the ctor's fill(-1) — cold start, never-played rhythm
+                    //       (#384 / #280: first hit lands in the first audio block
+                    //       instead of being delayed by one step).
+                    //   (b) PluginProcessor::handleAsyncUpdate's swap commit
+                    //       (#385: hot-swapped rhythm fires its first hit at the
+                    //       commit step instead of dropping it).
+                    // Mid-play knob changes leave lastStepIndex>=0 so they still
+                    // absorb, preventing retroactive triggers. lastAccentStepIndex
+                    // gates on the same sentinel for the same reason.
+                    if (!safePatterns[r].empty() && lastStepIndex[r] != -1)
                         lastStepIndex[r] = effectiveStep % (int)safePatterns[r].size();
-                    lastAccentStepIndex[r] = safeCPatterns[r].empty() ? 0
-                                           : effectiveStep % (int)safeCPatterns[r].size();
+                    if (!safeCPatterns[r].empty() && lastStepIndex[r] != -1)
+                        lastAccentStepIndex[r] = effectiveStep % (int)safeCPatterns[r].size();
                 }
             }
             patternLock.store(false, std::memory_order_release);

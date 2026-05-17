@@ -37,7 +37,7 @@ void InsertProcessor::reset()
 
 void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh, const VoiceParams& p)
 {
-    grReduction.set(0.0f);  // reset; comp/limiter case overwrites with actual GR
+    grReduction.store(0.0f);  // reset; comp/limiter case overwrites with actual GR
 
     switch (p.driveChar)
     {
@@ -230,7 +230,7 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh, co
                 }
             }
             // Normalise to 0..1 (1 ≡ 24 dB GR) for the UI meter.
-            grReduction.set(juce::jlimit(0.0f, 1.0f, -peakGainDb / 24.0f));
+            grReduction.store(juce::jlimit(0.0f, 1.0f, -peakGainDb / 24.0f));
             break;
         }
         case 9: // ── Ring Modulator: multiply by sine carrier ─────────────────

@@ -2,7 +2,16 @@
 
 EffectSlot::EffectSlot()
 {
-    setAlgorithm(0);
+    // #402: pre-allocate all algorithms up-front so setAlgorithm() never heap-allocates.
+    // Each is small (delay-line vectors, LFO state) — the combined footprint is bounded.
+    // All start in send-mode (the slot is wired into the mixer's send/return path —
+    // Issue #44). algorithmIndex stays at 0 (Chorus) until setAlgorithm flips it.
+    algorithms[0] = std::make_unique<ChorusEffect>();
+    algorithms[1] = std::make_unique<FlangerEffect>();
+    algorithms[2] = std::make_unique<PhaserEffect>();
+    algorithms[3] = std::make_unique<EchoEffect>();
+    for (auto& a : algorithms)
+        a->setSendMode(true);
 }
 
 void EffectSlot::prepare(double sampleRate, int blockSize)
@@ -13,8 +22,12 @@ void EffectSlot::prepare(double sampleRate, int blockSize)
     oversampler = std::make_unique<OversampledProcessor>(1);
     oversampler->prepare(sampleRate, blockSize);
 
-    if (algorithm)
-        algorithm->prepareInner(sampleRate, blockSize);
+    // #402: prepare every algorithm — they're all live, just inactive. Subsequent
+    // setAlgorithm calls do NOT re-prepare (would alloc); state from prior activation
+    // persists. The artifact of stale state on swap is a minor click compared to the
+    // audio-thread allocation it replaces.
+    for (auto& a : algorithms)
+        if (a) a->prepareInner(sampleRate, blockSize);
 
     echoDelay.prepare(sampleRate, blockSize);
 }
@@ -28,22 +41,15 @@ void EffectSlot::process(juce::AudioBuffer<float>& buffer)
 
 void EffectSlot::setAlgorithm(int index)
 {
-    algorithmIndex = juce::jlimit(0, 3, index);
-    algorithm      = makeAlgorithm(algorithmIndex);
-    if (algorithm) algorithm->setSendMode(true); // Issue #44: Effect slot is wired into mixer's send/return — wet-only
-
-    if (currentRate > 0.0)
-    {
-        oversampler = std::make_unique<OversampledProcessor>(1);
-        oversampler->prepare(currentRate, currentBlock);
-        algorithm->prepareInner(currentRate, currentBlock);
-    }
+    // #402: allocation-free — just flips the active index into the pre-allocated array.
+    // Safe to call from the audio thread (DAW host automation on `eff_algo`).
+    algorithmIndex = juce::jlimit(0, kNumAlgorithms - 1, index);
 }
 
 void EffectSlot::setParam(const juce::String& id, float value)
 {
-    if (algorithm)
-        algorithm->setParam(id, value);
+    if (auto* a = currentAlgorithm())
+        a->setParam(id, value);
 }
 
 void EffectSlot::processReturn(juce::AudioBuffer<float>& buffer)
@@ -54,21 +60,10 @@ void EffectSlot::processReturn(juce::AudioBuffer<float>& buffer)
         echoDelay.processReturn(buffer);
         return;
     }
-    if (!algorithm) return;
-    oversampler->process(buffer, [this](juce::dsp::AudioBlock<float>& block)
+    auto* algo = currentAlgorithm();
+    if (!algo) return;
+    oversampler->process(buffer, [algo](juce::dsp::AudioBlock<float>& block)
     {
-        algorithm->processInner(block);
+        algo->processInner(block);
     });
-}
-
-std::unique_ptr<EffectAlgorithmBase> EffectSlot::makeAlgorithm(int index)
-{
-    switch (index)
-    {
-        case 0: return std::make_unique<ChorusEffect>();
-        case 1: return std::make_unique<FlangerEffect>();
-        case 2: return std::make_unique<PhaserEffect>();
-        case 3: return std::make_unique<EchoEffect>();
-        default: return std::make_unique<ChorusEffect>();
-    }
 }

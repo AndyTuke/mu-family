@@ -308,7 +308,7 @@ void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float 
     bool voiceDirty   = false;
     applyRhythmSuffix(suffix, v, r, patternDirty, voiceDirty);
 
-    if (!apvtsLoading)
+    if (!apvtsLoading.load(std::memory_order_acquire))
     {
         if (patternDirty) sequencer.updatePattern(ri);
         if (voiceDirty && voiceEngines[ri]) voiceEngines[ri]->setParams(r.voiceParams);
@@ -605,7 +605,7 @@ void PluginProcessor::pushMixerChannelToAPVTS(int idx)
 
 void PluginProcessor::swapAPVTSForRhythms(int i, int j)
 {
-    apvtsLoading = true;
+    mu_core::ScopedApvtsLoading guard(apvtsLoading);
     pushRhythmToAPVTS(i);
     pushRhythmToAPVTS(j);
     // Push every active channel: not just i and j, because sidechain source
@@ -614,5 +614,4 @@ void PluginProcessor::swapAPVTSForRhythms(int i, int j)
     const int n = numActiveRhythms.load(std::memory_order_acquire);
     for (int c = 0; c < n; ++c)
         pushMixerChannelToAPVTS(c);
-    apvtsLoading = false;
 }

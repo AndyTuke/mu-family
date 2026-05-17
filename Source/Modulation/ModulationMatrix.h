@@ -45,9 +45,11 @@ public:
 
     // Evaluates all ControlSequences at songBeatPos, then applies every assignment
     // to paramValues. Values not present in paramValues are silently skipped.
+    // #403: paramValues is keyed by string_view (literals only). a.destinationId is
+    // std::string which converts implicitly for lookup.
     void process(const std::vector<ControlSequence>& sequences,
                  double songBeatPos,
-                 std::unordered_map<std::string, float>& paramValues) const;
+                 std::unordered_map<std::string_view, float>& paramValues) const;
 
 private:
     std::vector<ModulationAssignment> assignments;

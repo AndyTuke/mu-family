@@ -68,13 +68,13 @@ public:
     InsertProcessor  masterInsert2;
 
     // Peak levels written from the audio thread, read by the UI at 30 Hz.
-    juce::Atomic<float> channelPeaks[MaxChannels];
-    juce::Atomic<float> returnPeaks[3];
-    juce::Atomic<float> masterPeak;
+    std::atomic<float> channelPeaks[MaxChannels];
+    std::atomic<float> returnPeaks[3];
+    std::atomic<float> masterPeak;
     // Per-channel peak gain-reduction (0 = no duck, 1 = full duck), written each block.
-    juce::Atomic<float> sidechainGR[MaxChannels];
+    std::atomic<float> sidechainGR[MaxChannels];
     // Per-return peak gain-reduction for sidechain ducking.
-    juce::Atomic<float> returnSidechainGR[3];
+    std::atomic<float> returnSidechainGR[3];
 
     MixerEngine();
 

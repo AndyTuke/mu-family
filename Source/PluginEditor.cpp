@@ -28,10 +28,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     transportBar.onPresetSelected = [this](const juce::File& f)
     {
         processorRef.loadPreset(f);
-        sidebar.refreshItems();
-        rhythmPanel.setRhythm(0);
-        sidebar.setSelectedIndex(0);
-        if (mixerVisible) { mixerOverlay.refresh(); mixerOverlay.loadFromAPVTS(); }
+        selectRhythmAndRefresh(0, /*fullSidebarRefresh=*/true, MixerRefresh::FullReload);
         transportBar.setLoadedPreset(f);
     };
 
@@ -51,10 +48,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
             return;
         }
         processorRef.loadPreset(defaultFile);
-        sidebar.refreshItems();
-        rhythmPanel.setRhythm(0);
-        sidebar.setSelectedIndex(0);
-        if (mixerVisible) { mixerOverlay.refresh(); mixerOverlay.loadFromAPVTS(); }
+        selectRhythmAndRefresh(0, /*fullSidebarRefresh=*/true, MixerRefresh::FullReload);
         transportBar.setLoadedPreset({});
     };
 
@@ -79,13 +73,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     sidebar.onRhythmsReordered = [this](int newSelected)
     {
-        sidebar.setSelectedIndex(newSelected);
-        rhythmPanel.setRhythm(newSelected);
-        if (mixerVisible)
-        {
-            mixerOverlay.refresh();
-            mixerOverlay.loadFromAPVTS();
-        }
+        selectRhythmAndRefresh(newSelected, /*fullSidebarRefresh=*/false, MixerRefresh::FullReload);
     };
 
     sidebar.onAddRhythm = [this]
@@ -103,10 +91,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         processorRef.addRhythm(r);
         const int newIdx = processorRef.getNumRhythms() - 1;
         processorRef.applyDefaultRhythm(newIdx);
-        sidebar.refreshItems();
-        sidebar.setSelectedIndex(newIdx);
-        rhythmPanel.setRhythm(newIdx);
-        if (mixerVisible) mixerOverlay.refresh();
+        selectRhythmAndRefresh(newIdx, /*fullSidebarRefresh=*/true, MixerRefresh::RefreshOnly);
     };
 
     // ── RhythmPanel status ────────────────────────────────────────────────────
@@ -132,6 +117,28 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     rhythmPanel.onRhythmRenamed = [this]
     {
+        sidebar.repaintItems();
+        if (mixerVisible) mixerOverlay.refresh();
+    };
+
+    // #406: surface preset/state-load failures to the user. Without this they got
+    // silence when clicking a corrupted preset — looked like the click didn't
+    // register. Same colour as the other "operation result" status messages.
+    processorRef.onLoadError = [this](const juce::String& msg)
+    {
+        statusBar.showParam("Load failed", msg,
+                            MuClidLookAndFeel::colour(MuClidLookAndFeel::knobLevel));
+    };
+
+    // #386: hot-swap commit fired non-APVTS state changes that needed UI refresh —
+    // the rhythm name, sample bar, and colour tint live outside APVTS so the
+    // pushRhythmToAPVTS listener path doesn't propagate them. If the currently-
+    // displayed rhythm was the one swapped, re-call setRhythm so it re-binds
+    // every panel against the new Rhythm struct.
+    processorRef.onRhythmHotSwapCommitted = [this](int r)
+    {
+        if (r == rhythmPanel.getCurrentRhythmIndex())
+            rhythmPanel.setRhythm(r);
         sidebar.repaintItems();
         if (mixerVisible) mixerOverlay.refresh();
     };
@@ -257,7 +264,12 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     mixerOverlay.loadFromAPVTS();
 
     setSize(1170, 870);
-    setResizeLimits(780, 580, 2400, 1600);
+    // #388: min width = sidebar (82) + rhythm-panel content (circle + euclidean grid
+    // + voice knob row) ~ 940 → 1024 gives breathing room. Min height = transport (36)
+    // + status (20) + sample bar (32) + circle row (250) + voice (240) + modulator (80)
+    // ~ 660 → 720 gives a comfortable buffer. Below this the Mixer + Voice panels
+    // start overlapping their knob columns; the prior 780×580 floor cramped both.
+    setResizeLimits(1024, 720, 2400, 1600);
 
     isStandalone = processorRef.wrapperType == juce::AudioProcessor::wrapperType_Standalone;
     loadKeybindings();
@@ -269,8 +281,34 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     }
 }
 
+void PluginEditor::selectRhythmAndRefresh(int idx,
+                                          bool fullSidebarRefresh,
+                                          MixerRefresh mixerRefresh)
+{
+    if (fullSidebarRefresh)
+        sidebar.refreshItems();
+    sidebar.setSelectedIndex(idx);
+    rhythmPanel.setRhythm(idx);
+    if (mixerVisible)
+    {
+        if (mixerRefresh != MixerRefresh::Skip)
+            mixerOverlay.refresh();
+        if (mixerRefresh == MixerRefresh::FullReload)
+            mixerOverlay.loadFromAPVTS();
+    }
+}
+
 PluginEditor::~PluginEditor()
 {
+    // #386 / #394: clear every callback the processor holds before teardown — processor
+    // outlives the editor in DAW close-window-keep-plugin scenarios, and any deferred
+    // invocation (swap commit, save-and-quit prompt) firing into a destroyed editor is
+    // a UAF. The lambdas all capture raw `[this]`. Mirror this any time we add a new
+    // processorRef.on* callback below.
+    processorRef.onRhythmHotSwapCommitted = nullptr;
+    processorRef.onSaveAndQuit            = nullptr;
+    processorRef.onLoadError              = nullptr;   // #406
+
     if (isStandalone)
         removeKeyListener(this);
     setLookAndFeel(nullptr);

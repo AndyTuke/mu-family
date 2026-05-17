@@ -9,18 +9,46 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     addAndMakeVisible(closeBtn);
 
     masterVolKnob.setRange(0.0, 1.0, 0.001);
+    // #400: skew + dB readout to match the MixerChannel master fader's behaviour.
+    // The underlying APVTS scale is the same linear 0..1 in both places (see
+    // PluginProcessor_APVTS.cpp:240). MixerChannel's tall vertical fader reads OK
+    // linearly because the strip is long and labels show dB live (updateDbLabel,
+    // [Source/UI/MixerChannel.cpp:585](Source/UI/MixerChannel.cpp#L585)). A small
+    // rotary knob with raw 0..1 display compresses the useful -6..0 dB region
+    // into the top quarter of rotation, which feels unusable. Mid-point skew at
+    // 0.5 (= -6 dB) gives the same per-degree dB resolution as a fader, and the
+    // textFromValueFunction puts dB in the readout for parity with the mixer.
+    masterVolKnob.getSlider().setSkewFactorFromMidPoint(0.5);
+    masterVolKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
+        if (v <= 0.0) return "-inf dB";
+        return juce::String(20.0 * std::log10(v), 1) + " dB";
+    };
     if (auto* raw = proc.apvts.getRawParameterValue("mstr_lvl"))
         masterVolKnob.setValue(*raw, juce::dontSendNotification);
     masterVolKnob.onValueChanged = [this](double v) {
-        if (auto* p = proc.apvts.getParameter("mstr_lvl"))
-            p->setValueNotifyingHost(p->convertTo0to1((float)v));
+        // #390: inner `param` (was `p`) shadowed the outer captured-by-reference
+        // `proc` member name `p` from the ctor's param list — confusing on read.
+        if (auto* param = proc.apvts.getParameter("mstr_lvl"))
+            param->setValueNotifyingHost(param->convertTo0to1((float)v));
     };
     addAndMakeVisible(masterVolKnob);
 
-    swapModeLabel.setText("Hot-swap timing:", juce::dontSendNotification);
-    swapModeLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-    swapModeLabel.setJustificationType(juce::Justification::centredRight);
-    addAndMakeVisible(swapModeLabel);
+    // #397: identical 5-line label setup was repeated four times — extract a helper.
+    auto makeFieldLabel = [this](juce::Label& lbl, const juce::String& text,
+                                  juce::Colour textColour,
+                                  juce::Justification just)
+    {
+        lbl.setText(text, juce::dontSendNotification);
+        lbl.setFont(juce::Font(juce::FontOptions{}.withHeight(12.0f)));
+        lbl.setColour(juce::Label::textColourId, textColour);
+        lbl.setJustificationType(just);
+        addAndMakeVisible(lbl);
+    };
+
+    const juce::Colour labelCol   = MuClidLookAndFeel::colour(MuClidLookAndFeel::ColourIds::labelText);
+    const juce::Colour headingCol = MuClidLookAndFeel::colour(MuClidLookAndFeel::ColourIds::headingText);
+
+    makeFieldLabel(swapModeLabel, "Timing", labelCol, juce::Justification::centredRight);
 
     swapModeDropdown.addItem("On master loop", 1);
     swapModeDropdown.addItem("On rhythm loop", 2);
@@ -34,10 +62,7 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
 
     if (isStandalone)
     {
-        clockSourceLabel.setText("Clock source:", juce::dontSendNotification);
-        clockSourceLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-        clockSourceLabel.setJustificationType(juce::Justification::centredRight);
-        addAndMakeVisible(clockSourceLabel);
+        makeFieldLabel(clockSourceLabel, "Source", labelCol, juce::Justification::centredRight);
 
         clockSourceDropdown.addItem("Internal", 1);
         clockSourceDropdown.addItem("MIDI In",  2);
@@ -49,10 +74,7 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
         };
         addAndMakeVisible(clockSourceDropdown);
 
-        midiMessagesLabel.setText("MIDI messages:", juce::dontSendNotification);
-        midiMessagesLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-        midiMessagesLabel.setJustificationType(juce::Justification::centredRight);
-        addAndMakeVisible(midiMessagesLabel);
+        makeFieldLabel(midiMessagesLabel, "Messages", labelCol, juce::Justification::centredRight);
 
         midiMessagesDropdown.addItem("Clock only",  1);
         midiMessagesDropdown.addItem("Transport",   2);
@@ -67,9 +89,9 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
         updateMidiSyncVisibility();
     }
 
-    contentFolderLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-    contentFolderLabel.setJustificationType(juce::Justification::centredLeft);
-    addAndMakeVisible(contentFolderLabel);
+    // Content folder shows the path itself (set by updateFolderLabel) — heading colour
+    // because it's primary content not a secondary "Source:" / "Timing:" annotation.
+    makeFieldLabel(contentFolderLabel, juce::String(), headingCol, juce::Justification::centredLeft);
     updateFolderLabel();
 
     browseContentFolderBtn.onClick = [this]
@@ -123,55 +145,101 @@ void SettingsOverlay::updateFolderLabel()
                                juce::dontSendNotification);
 }
 
-void SettingsOverlay::resized()
+void SettingsOverlay::computeLayout()
 {
-    const int w       = getWidth();
-    const int labelW  = 110;
-    const int dropW   = 140;
-    const int rowH    = 24;
-
-    closeBtn.setBounds(w - kPad * 3 - 60, kPad, 60, 28);
+    const int w = getWidth();
+    layout.contentW = juce::jmin(kContentMaxW, w - kPad * 2);
+    layout.contentX = (w - layout.contentW) / 2;
 
     int y = kHeaderH + kPad;
 
-    masterVolKnob.setBounds(kPad, y, 120, kRowH);
-    y += kRowH + kPad * 2;
+    // Section: Audio
+    layout.audioHeader  = y;
+    y += kSectionHeadH;
+    layout.masterVolY   = y;
+    y += 64;                              // tall enough for the rotary knob + label
+    y += kSectionGap;
 
-    // Hot-swap timing row
-    swapModeLabel   .setBounds(kPad, y + 2, labelW, 20);
-    swapModeDropdown.setBounds(kPad + labelW + 8, y, dropW, rowH);
-    y += rowH + kPad;
+    // Section: Hot-swap
+    layout.swapHeader   = y;
+    y += kSectionHeadH;
+    layout.swapRowY     = y;
+    y += kRowH;
+    y += kSectionGap;
+
+    // Section: MIDI Clock (standalone only — collapsed entirely in DAW)
+    if (isStandalone)
+    {
+        layout.midiClockHeader   = y;
+        y += kSectionHeadH;
+        layout.clockSourceRowY   = y;
+        y += kRowH + kRowGap;
+        layout.midiMessagesRowY  = y;
+        y += kRowH;
+        y += kSectionGap;
+    }
+
+    // Section: MIDI Program Change
+    layout.midiPCHeader     = y;
+    y += kSectionHeadH;
+    layout.midiPresetsRowY  = y;
+    y += kRowH;
+    y += kSectionGap;
+
+    // Section: Output
+    layout.outputHeader     = y;
+    y += kSectionHeadH;
+    layout.multiBusRowY     = y;
+    y += kRowH;
+    y += kSectionGap;
+
+    // Section: Content Folder
+    layout.contentHeader        = y;
+    y += kSectionHeadH;
+    layout.contentPathRowY      = y;
+    y += kRowH + kRowGap;
+    layout.contentBtnsRowY      = y;
+}
+
+void SettingsOverlay::resized()
+{
+    computeLayout();
+
+    const int w = getWidth();
+    closeBtn.setBounds(w - kPad - kCloseBtnW, (kHeaderH - kCloseBtnH) / 2, kCloseBtnW, kCloseBtnH);
+
+    const int x      = layout.contentX;
+    const int cw     = layout.contentW;
+    const int labelX = x;
+    const int ctrlX  = x + kLabelW + kLabelCtrlGap;
+
+    // #399: Audio — Master Vol knob centred horizontally within the column. Previously
+    // anchored at column-left under a centred section header divider, which looked
+    // off-balance.
+    masterVolKnob.setBounds(x + (cw - kMasterVolW) / 2, layout.masterVolY,
+                            kMasterVolW, kMasterVolH);
+
+    swapModeLabel   .setBounds(labelX, layout.swapRowY, kLabelW, kRowH);
+    swapModeDropdown.setBounds(ctrlX,  layout.swapRowY, kControlW, kRowH);
 
     if (isStandalone)
     {
-        y += kPad;  // extra gap before MIDI Clock section
+        clockSourceLabel    .setBounds(labelX, layout.clockSourceRowY, kLabelW, kRowH);
+        clockSourceDropdown .setBounds(ctrlX,  layout.clockSourceRowY, kControlW, kRowH);
 
-        clockSourceLabel   .setBounds(kPad, y + 2, labelW, 20);
-        clockSourceDropdown.setBounds(kPad + labelW + 8, y, dropW, rowH);
-        y += rowH + kPad;
-
-        midiMessagesLabel   .setBounds(kPad, y + 2, labelW, 20);
-        midiMessagesDropdown.setBounds(kPad + labelW + 8, y, dropW, rowH);
-        y += rowH + kPad;
+        midiMessagesLabel   .setBounds(labelX, layout.midiMessagesRowY, kLabelW, kRowH);
+        midiMessagesDropdown.setBounds(ctrlX,  layout.midiMessagesRowY, kControlW, kRowH);
     }
 
-    // MIDI program-change presets button
-    y += kPad;
-    midiPresetsBtn.setBounds(kPad, y, 140, rowH);
-    y += rowH + kPad;
+    midiPresetsBtn.setBounds(ctrlX, layout.midiPresetsRowY, kControlW, kRowH);
 
-    // Multi-bus output toggle (next row)
-    multiBusToggle.setBounds(kPad, y, 220, rowH);
-    y += rowH + kPad + 12;  // extra room for the rescan-required note drawn in paint()
+    multiBusToggle.setBounds(ctrlX, layout.multiBusRowY, kControlW, kRowH);
 
-    y += kPad;  // extra gap before Content Folder section
-
-    // Content folder row
-    const int btnW   = 70;
-    const int fldW   = w - kPad * 2 - btnW * 2 - kPad * 2;
-    contentFolderLabel    .setBounds(kPad, y, fldW, 20);
-    browseContentFolderBtn.setBounds(kPad + fldW + kPad, y - 2, btnW, rowH);
-    resetContentFolderBtn .setBounds(kPad + fldW + kPad + btnW + kPad, y - 2, btnW, rowH);
+    contentFolderLabel.setBounds(x, layout.contentPathRowY, cw, kRowH);
+    resetContentFolderBtn .setBounds(x + cw - kFolderBtnW,
+                                     layout.contentBtnsRowY, kFolderBtnW, kRowH);
+    browseContentFolderBtn.setBounds(x + cw - kFolderBtnW * 2 - kFolderBtnGap,
+                                     layout.contentBtnsRowY, kFolderBtnW, kRowH);
 }
 
 void SettingsOverlay::paint(juce::Graphics& g)
@@ -181,40 +249,47 @@ void SettingsOverlay::paint(juce::Graphics& g)
     g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
     g.fillAll();
 
+    // Top "Settings" bar
     g.setColour(MuClidLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(14.0f)));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(15.0f)));
     g.drawText("Settings", kPad, 0, 200, kHeaderH, juce::Justification::centredLeft, false);
 
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawLine(0.0f, (float)kHeaderH, (float)getWidth(), (float)kHeaderH, 0.5f);
+    g.drawLine(0.0f, (float)kHeaderH, (float)getWidth(), (float)kHeaderH, 1.0f);
 
-    g.setColour(MuClidLookAndFeel::colour(Id::labelText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
+    const int x = layout.contentX;
+    const int w = layout.contentW;
 
-    // Section heading y values must mirror resized() layout.
-    int y = kHeaderH + kPad + kRowH + kPad * 2;
-    g.drawText("Hot-swap", kPad, y - 14, 200, 12, juce::Justification::centredLeft, false);
-    y += 24 + kPad;
-
-    if (isStandalone)
+    auto drawSectionHeader = [&](int headerY, const juce::String& title)
     {
-        y += kPad;
-        g.drawText("MIDI Clock", kPad, y - 14, 200, 12, juce::Justification::centredLeft, false);
-        y += 24 + kPad;   // clock source row
-        y += 24 + kPad;   // messages row (may be hidden, still reserve space)
-    }
+        g.setColour(MuClidLookAndFeel::colour(Id::headingText));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
+        g.drawText(title, x, headerY, w, 18, juce::Justification::centredLeft, false);
 
-    // MIDI program-change presets section
-    y += kPad;
-    g.drawText("MIDI Program Change", kPad, y - 14, 200, 12, juce::Justification::centredLeft, false);
-    y += 24 + kPad;
+        g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+        const float lineY = (float)(headerY + 20);
+        g.drawLine((float)x, lineY, (float)(x + w), lineY, 0.5f);
+    };
 
-    // Multi-bus output toggle row + small "rescan required" note.
-    g.drawText("(host rescan required after toggling)",
-               kPad + 230, y - 24 + 4, getWidth() - kPad - 230, 14,
-               juce::Justification::centredLeft, false);
-    y += 24 + kPad + 12;
+    auto drawHint = [&](int yCentre, const juce::String& text, int hintX, int hintW)
+    {
+        g.setColour(MuClidLookAndFeel::colour(Id::labelText));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+        g.drawText(text, hintX, yCentre - 7, hintW, 14,
+                   juce::Justification::centredLeft, false);
+    };
 
-    y += kPad;
-    g.drawText("Content Folder", kPad, y - 14, 200, 12, juce::Justification::centredLeft, false);
+    drawSectionHeader(layout.audioHeader,    "Audio");
+    drawSectionHeader(layout.swapHeader,     "Hot-swap");
+    if (isStandalone)
+        drawSectionHeader(layout.midiClockHeader, "MIDI Clock");
+    drawSectionHeader(layout.midiPCHeader,   "MIDI Program Change");
+    drawSectionHeader(layout.outputHeader,   "Output");
+    drawSectionHeader(layout.contentHeader,  "Content Folder");
+
+    // Rescan-required hint next to the multi-bus toggle.
+    const int hintX = layout.contentX + kLabelW + kLabelCtrlGap + kControlW + kLabelCtrlGap;
+    const int hintW = layout.contentX + layout.contentW - hintX;
+    drawHint(layout.multiBusRowY + kRowH / 2, "(host rescan required after toggling)",
+             hintX, hintW);
 }

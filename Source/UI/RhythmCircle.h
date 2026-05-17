@@ -22,8 +22,8 @@ public:
     // Connect to PluginProcessor play-state atomics for self-driven animation.
     // state is non-const so we can update lastHitCount tracking (Issue #43).
     void setPlayState(PluginProcessor::RhythmPlayState*  state,
-                      const juce::Atomic<float>*          beatFrac,
-                      const juce::Atomic<bool>*            playing,
+                      const std::atomic<float>*          beatFrac,
+                      const std::atomic<bool>*            playing,
                       juce::Colour                         colour);
 
     void paint(juce::Graphics&) override;
@@ -34,8 +34,8 @@ private:
 
     // Non-owning pointers to PluginProcessor atomics
     PluginProcessor::RhythmPlayState*       playState     = nullptr;
-    const juce::Atomic<float>*              beatFracAtom  = nullptr;
-    const juce::Atomic<bool>*               isPlayingAtom = nullptr;
+    const std::atomic<float>*              beatFracAtom  = nullptr;
+    const std::atomic<bool>*               isPlayingAtom = nullptr;
     juce::Colour                            rhythmColour;
 
     // Per-ring rotation (each ring has its own step count so its own speed)

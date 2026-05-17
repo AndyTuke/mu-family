@@ -72,6 +72,17 @@ private:
 
     void hideAllOverlays();
 
+    // #395: consolidates the "refresh chrome after a rhythm-set mutation" boilerplate
+    // that was repeated across 4 callbacks (preset load, new preset, sidebar reorder,
+    // add rhythm). Each had its own subtly-different combination of refreshItems /
+    // setSelectedIndex / setRhythm / mixerOverlay.refresh / mixerOverlay.loadFromAPVTS,
+    // and missing any one (especially the mixer reload) was a silent-stale-state bug
+    // waiting to happen.
+    enum class MixerRefresh { Skip, RefreshOnly, FullReload };
+    void selectRhythmAndRefresh(int idx,
+                                bool fullSidebarRefresh,
+                                MixerRefresh mixerRefresh);
+
     bool isStandalone    = false;
     bool needsFocusGrab  = false;
     std::function<void()> pendingQuitCallback;

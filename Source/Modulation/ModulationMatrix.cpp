@@ -164,7 +164,7 @@ void ModulationMatrix::rebuildCache()
 
 void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,
                                double songBeatPos,
-                               std::unordered_map<std::string, float>& paramValues) const
+                               std::unordered_map<std::string_view, float>& paramValues) const
 {
     if (assignments.empty())
         return;

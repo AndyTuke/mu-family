@@ -9,11 +9,11 @@ RhythmPanel or MixerOverlay  (remaining area)
 StatusBar        20px  (bottom, full width)
 ```
 
-Window: default 1170×870, min 780×580, max 2400×1600. All elements scale proportionally.
+Window: default 1170×870, min 1024×720, max 2400×1600. All elements scale proportionally.
 
 ```cpp
 setSize(1170, 870);                           // default opening size (~50% larger than initial prototype)
-setResizeLimits(780, 580, 2400, 1600);
+setResizeLimits(1024, 720, 2400, 1600);       // #388: prior 780×580 cramped Mixer + Voice panels
 ```
 
 ## Transport Bar

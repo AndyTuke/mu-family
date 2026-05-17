@@ -30,12 +30,12 @@ public:
                        juce::Colour channelColour)> onStatusUpdate;
 
     // Bind to engine state + VU peak + optional GR atomic. Pass proc+prefix to route mutations through APVTS.
-    void bindRhythm(MixerEngine::ChannelState& state, juce::Atomic<float>& peak,
+    void bindRhythm(MixerEngine::ChannelState& state, std::atomic<float>& peak,
                     PluginProcessor* proc = nullptr, const juce::String& apvtsPrefix = {},
-                    juce::Atomic<float>* grAtomic = nullptr);
-    void bindReturn(MixerEngine::ReturnState& state, juce::Atomic<float>& peak,
+                    std::atomic<float>* grAtomic = nullptr);
+    void bindReturn(MixerEngine::ReturnState& state, std::atomic<float>& peak,
                     PluginProcessor* proc = nullptr, const juce::String& apvtsPrefix = {},
-                    juce::Atomic<float>* grAtomic = nullptr);
+                    std::atomic<float>* grAtomic = nullptr);
     void bindMaster(MixerEngine& engine,
                     PluginProcessor* proc = nullptr);
 

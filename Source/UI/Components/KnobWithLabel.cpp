@@ -177,7 +177,7 @@ void KnobWithLabel::paint(juce::Graphics& g)
                juce::Justification::centred, true);
 }
 
-void KnobWithLabel::setGRSource(const juce::Atomic<float>* gr)
+void KnobWithLabel::setGRSource(const std::atomic<float>* gr)
 {
     grSource  = gr;
     grDisplay = 0.0f;
@@ -188,7 +188,7 @@ void KnobWithLabel::setGRSource(const juce::Atomic<float>* gr)
 
 void KnobWithLabel::timerCallback()
 {
-    const float incoming = grSource ? grSource->get() : 0.0f;
+    const float incoming = grSource ? grSource->load() : 0.0f;
     const float prev     = grDisplay;
     grDisplay = (incoming > grDisplay)
               ? incoming

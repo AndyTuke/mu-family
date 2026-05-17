@@ -1,5 +1,8 @@
 #include "RhythmPanel.h"
 
+#include <string_view>
+#include <unordered_set>
+
 // Euclidean panel params — all use r{ri}_ prefix.
 static const char* const kEuclidSuffixes[] = {
     "stepsA", "hitsA", "rotA", "prePadA", "postPadA", "insStA", "insLenA",
@@ -10,6 +13,25 @@ static const char* const kEuclidSuffixes[] = {
     "prePadModeC", "postPadModeC", "insModeC",
     "logic"
 };
+
+// #401: hash-set membership check for the 31-entry euclid suffix table. Was a
+// linear `for (auto* s : kEuclidSuffixes) if (suffix == s)` in three places —
+// the parameterChanged path runs on every host-automation event + every knob
+// drag tick, so O(N=31) compares per call became visible in profiles. The
+// register/deregister sites still iterate the table (they need the full list,
+// not just membership), so the const char* table stays.
+static bool isEuclidSuffix(const juce::String& suffix) noexcept
+{
+    static const auto kSet = []() {
+        std::unordered_set<std::string_view> out;
+        out.reserve(std::size(kEuclidSuffixes));
+        for (auto* p : kEuclidSuffixes) out.emplace(p);
+        return out;
+    }();
+    // toRawUTF8() points into the juce::String's storage (no copy) — string_view
+    // wraps it for the O(1) hash lookup. Suffixes are ASCII so UTF-8 ≡ char bytes.
+    return kSet.find(std::string_view(suffix.toRawUTF8())) != kSet.end();
+}
 // Voice panel params — all use r{ri}_ prefix.
 static const char* const kVoiceSuffixes[] = {
     "pitchOct", "pitchSemi", "pitchFine",
@@ -314,7 +336,7 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
             const juce::File presetFile = rhythmPresetFiles[idx];
             proc.stageRhythmPreset(currentRhythmIndex, presetFile);
             loadedRhythmPresetFile = presetFile;
-            if (!proc.sequencerPlaying.get())
+            if (!proc.sequencerPlaying.load())
             {
                 setRhythm(currentRhythmIndex);   // refreshes rhythmPresetFiles, clears dropdown
                 repaint();
@@ -466,6 +488,13 @@ void RhythmPanel::parameterChanged(const juce::String& parameterID, float /*newV
     // juce::Slider state (not audio-thread-safe). Marshal to the message thread.
     // #353: refresh only the single control matching `suffix`, not the whole panel
     // (was 21 euclid knobs + 9 segments OR 28+ voice knobs per parameter change).
+    // #393: skip during bulk APVTS loads (state restore, swap commit, swap-rhythms).
+    // The bulk-load orchestrator calls setRhythm() (full re-bind) afterwards, so the
+    // per-param refresh during the push is pure waste — and worse, the marshalled
+    // refreshes land AFTER setRhythm completes, re-running setValue on already-bound
+    // sliders. Net cost was ~30 redundant refreshSuffix calls per swap commit.
+    if (proc.isApvtsLoading()) return;
+
     juce::Component::SafePointer<RhythmPanel> safeThis(this);
     const juce::String suffix = parameterID.fromFirstOccurrenceOf("_", false, false);
 
@@ -473,11 +502,7 @@ void RhythmPanel::parameterChanged(const juce::String& parameterID, float /*newV
     {
         if (auto* self = safeThis.getComponent())
         {
-            bool isEuclid = false;
-            for (auto* s : kEuclidSuffixes)
-                if (suffix == s) { isEuclid = true; break; }
-
-            if (isEuclid)
+            if (isEuclidSuffix(suffix))
             {
                 self->euclidPanel.refreshSuffix(suffix);
                 self->refreshCircle();
@@ -915,8 +940,19 @@ void RhythmPanel::confirmDelete()
 
 void RhythmPanel::timerCallback()
 {
-    if (proc.sequencerPlaying.get())
-        modulatorPanel.setPlayheadBeat(proc.lastBeatPos.get());
+    // #407: gate the indicator refreshes on play state — when stopped, no
+    // modulators run, so values never change. The helpers iterate ~60 knobs
+    // each calling setIsModulated(false) which no-ops on unchanged state,
+    // but the iteration itself burned ~1800 method calls/sec for nothing.
+    // The play→stop edge still needs one final refresh pass so the cyan mod
+    // rings + live arcs visibly clear (they're gated on `playing` inside the
+    // refresh helpers — see EuclideanPanel.cpp:328 / VoiceSection.cpp:329).
+    const bool playing = proc.sequencerPlaying.load();
+    if (! playing && ! wasPlayingLastTick) return;
+
+    if (playing)
+        modulatorPanel.setPlayheadBeat(proc.lastBeatPos.load());
     voiceSection.refreshModulatedIndicators();
     euclidPanel.refreshModulatedIndicators();
+    wasPlayingLastTick = playing;
 }

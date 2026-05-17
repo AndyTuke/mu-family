@@ -46,8 +46,8 @@ void SidebarItem::setPendingSwap(bool p)
 }
 
 void SidebarItem::setPlayState(PluginProcessor::RhythmPlayState* state,
-                                const juce::Atomic<float>*         beatFrac,
-                                const juce::Atomic<bool>*           playing)
+                                const std::atomic<float>*         beatFrac,
+                                const std::atomic<bool>*           playing)
 {
     playState = state;
     miniCircle.setPlayState(state, beatFrac, playing, rhythmColour);
@@ -60,7 +60,7 @@ void SidebarItem::timerCallback()
     // of the two timers fired second saw `false` and the sidebar pulse never fired.
     if (playState)
     {
-        const int currentHitCount = playState->hitCount.get();
+        const int currentHitCount = playState->hitCount.load();
         if (currentHitCount != lastHitCount)
         {
             lastHitCount = currentHitCount;

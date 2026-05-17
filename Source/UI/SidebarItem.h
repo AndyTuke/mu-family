@@ -16,10 +16,10 @@ public:
     void setSelected(bool s);
 
     // Connect to PluginProcessor play-state for animations.
-    // state is non-const because RhythmCircle clears hitFired on read.
+    // state is non-const because RhythmCircle reads hitCount (monotonic counter, #43).
     void setPlayState(PluginProcessor::RhythmPlayState* state,
-                      const juce::Atomic<float>*         beatFrac,
-                      const juce::Atomic<bool>*           playing);
+                      const std::atomic<float>*         beatFrac,
+                      const std::atomic<bool>*           playing);
 
     void setPendingSwap(bool p);
 

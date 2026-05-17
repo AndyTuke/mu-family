@@ -65,6 +65,7 @@ public:
     ~RhythmPanel() override;
 
     void setRhythm(int index);
+    int  getCurrentRhythmIndex() const noexcept { return currentRhythmIndex; }
 
     // Propagates merged category list from PluginEditor to the save dialog + browser.
     void setKnownCategories(const juce::StringArray& cats);
@@ -88,6 +89,11 @@ public:
 private:
     PluginProcessor& proc;
     int currentRhythmIndex = -1;
+
+    // #407: edge-trigger so the play→stop transition still gets ONE final indicator
+    // refresh to clear the cyan mod rings + live arcs from the knobs. Without this,
+    // stopping the sequencer would freeze the rings in their last-played state.
+    bool wasPlayingLastTick = false;
 
     RhythmCircle    circle;
     EuclideanPanel  euclidPanel;
