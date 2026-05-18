@@ -44,6 +44,7 @@ The full design is split into focused sub-documents. **Read only the relevant on
 | [docs/design-presets.md](docs/design-presets.md) | APVTS wiring plan, preset storage, save/restore, current pre-APVTS state |
 | [docs/design-future.md](docs/design-future.md) | Unscheduled future ideas — read to avoid closing off options during current stages |
 | [docs/design-seamless-hotswap.md](docs/design-seamless-hotswap.md) | **Stage 34 plan** — polyphonic voice-tail hot-swap. Step-by-step with test gates. Read before touching `handleAsyncUpdate` / `voiceEngines[]` lifecycle. |
+| [docs/design-stage35-preset-format.md](docs/design-stage35-preset-format.md) | **Stage 35 plan** — robust preset format (rename `drv*`→`ins*`, de-normalise values, string algorithm names). Read before touching `saveRhythmPreset` / `loadPreset` / APVTS layout. |
 | [docs/design.md](docs/design.md) | Full original spec — only read if the sub-docs don't cover it |
 
 ---
@@ -85,6 +86,7 @@ All code changes must be logged as backlog entries to maintain a complete develo
 | Stage | Status | Scope | Issues |
 |---|---|---|---|
 | 34 | 🟢 In progress | Seamless hot-swap with polyphonic voice tail. Old `VoiceEngine` keeps rendering its in-flight sample / envelope after swap, drains naturally, gets cleaned up off the audio thread. See [docs/design-seamless-hotswap.md](docs/design-seamless-hotswap.md) for the step-by-step plan with test gates. Steps 1 + 2 + 3 landed in #413 / #414 / #415; #416 fixes a Step 3 issue where retired engines never drained (no noteOff anywhere) and their filter / insert state kept ringing into the channel buffer as an audible overlay on the new active rhythm. Step 4 (atomic-pointer swap for the active engine, eliminating the residual ~1.33 ms silence gap) is OPTIONAL — only worth doing if the residual artifact proves audible on listening tests. Awaiting user re-verification of Test 3.1 after #416, plus Tests 3.2–3.4. | #413, #414, #415 |
+| 35 | 🟡 Planned | Robust preset format. (1) Rename `drv*` APVTS IDs + `VoiceParams.drive*` members to `ins*` / `insert*` — they're no longer just "drive" algorithms (EQ, Comp, Limiter, RingMod, TapeSat, Karplus, Vocoder live there too). (2) De-normalise preset save format — write actual values (`r0_stepsA="16"`, `r0_fltCut="8000"`) instead of JUCE-normalised 0..1. (3) Save algorithm selectors (insert / filter / effect / reverb) as **string names** (`r0_insChar="Bitcrusher"`) via lookup tables so reordering / inserting / removing algorithms doesn't shift presets. Bumps `presetVersion` to 2; keeps the #430 v0/v1 compat path. Step-by-step plan in [docs/design-stage35-preset-format.md](docs/design-stage35-preset-format.md). | #431-#435 (to be allocated) |
 
 
 ## Source layout (actual, as built)
