@@ -1,4 +1,5 @@
 #include "RhythmPanel.h"
+#include "Components/SegmentControl.h"   // #418: sample-browser source toggle
 
 #include <string_view>
 #include <unordered_set>
@@ -65,7 +66,25 @@ public:
         addAndMakeVisible(browser);
         addAndMakeVisible(loadBtn);
         addAndMakeVisible(cancelBtn);
+        addAndMakeVisible(sourceToggle);   // #418
         browser.addListener(this);
+
+        // #418: source toggle — Library is the default landing folder (user's
+        // personal sample collection); Content gives one-click access to the
+        // factory / preset-bundled samples folder inside the My Documents
+        // content dir. Selected index reflects which folder we're currently
+        // browsing — keeps the toggle honest when the user navigates
+        // elsewhere via the browser, then jumps back via the toggle.
+        sourceToggle.setSelectedIndex(
+            startDir == this->proc.getSamplesDir() ? 1 : 0,
+            juce::dontSendNotification);
+        sourceToggle.onChange = [this](int idx)
+        {
+            const juce::File target = (idx == 1) ? this->proc.getSamplesDir()
+                                                 : this->proc.getPrimarySampleDir();
+            if (target.isDirectory())
+                browser.setRoot(target);
+        };
 
         loadBtn.onClick = [this]
         {
@@ -79,7 +98,7 @@ public:
                 dw->exitModalState(0);
         };
 
-        setSize(560, 440);
+        setSize(560, 470);   // #418: +30 px for the source-toggle row
     }
 
     ~SampleBrowserContent() override { proc.stopSamplePreview(); }
@@ -87,6 +106,11 @@ public:
     void resized() override
     {
         auto area = getLocalBounds().reduced(8);
+        // #418: top row hosts the Main Library / μ-Clid Content source toggle.
+        auto topRow = area.removeFromTop(26);
+        sourceToggle.setBounds(topRow.removeFromLeft(240));
+        area.removeFromTop(6);
+
         auto btnRow = area.removeFromBottom(32).reduced(0, 4);
         cancelBtn.setBounds(btnRow.removeFromRight(80));
         btnRow.removeFromRight(8);
@@ -111,6 +135,16 @@ private:
     juce::WildcardFileFilter fileFilter;
     juce::FileBrowserComponent browser;
     juce::TextButton loadBtn { "Load" }, cancelBtn { "Cancel" };
+    // #418: source toggle — flips the browser between the user's primary
+    // sample library (the default landing folder) and the Content/Samples
+    // folder where factory + preset-linked samples live. Labels match the
+    // user-facing branding: "μ-Clid Content" uses the Greek mu (U+03BC)
+    // prefix per the rest of the UI.
+    SegmentControl sourceToggle {
+        { juce::String("Main Library"),
+          juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid Content")) },
+        SegmentControl::ActiveStyle::General,
+        SegmentControl::DrawStyle::Pills };
 
     void commit(const juce::File& f)
     {
@@ -609,10 +643,17 @@ void RhythmPanel::loadSample()
 {
     if (currentRhythmIndex < 0) return;
 
+    // #418: default landing folder is the user's Primary Sample Library
+    // (configured in Settings; falls back to OS user Music dir if unset).
+    // The previous-session lastBrowseDir takes precedence so the user lands
+    // back where they were if they're working through a library subfolder.
+    // The Content/Samples folder is still one click away via the in-dialog
+    // Library/Content toggle.
+    const juce::File primaryLib = proc.getPrimarySampleDir();
     const juce::File startDir = lastBrowseDir.isDirectory()
                                     ? lastBrowseDir
-                                    : (proc.getSamplesDir().isDirectory()
-                                           ? proc.getSamplesDir()
+                                    : (primaryLib.isDirectory()
+                                           ? primaryLib
                                            : juce::File::getSpecialLocation(juce::File::userMusicDirectory));
 
     juce::Component::SafePointer<RhythmPanel> safeThis(this);

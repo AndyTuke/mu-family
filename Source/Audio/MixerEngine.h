@@ -1,11 +1,26 @@
 #pragma once
 #include <juce_audio_basics/juce_audio_basics.h>
+#include <atomic>
 #include <memory>
 #include "InsertProcessor.h"
 #include "VoiceParams.h"
 
 class VoiceEngine;
 class FXChain;
+
+// Stage 34 Step 2: descriptor for the optional retired-engine render path.
+// `engines` is a row-major MaxRhythms × perSlot matrix of unique_ptrs (passed as
+// a raw pointer to element [0][0] so we don't template MixerEngine on the array
+// shape). `cleanupFlags` is the parallel array of atomic flags — set by the
+// audio thread when the corresponding engine reports isFullyDrained(), polled +
+// cleared by the message thread under suspendProcessing for off-RT destruction.
+// perSlot == 0 (or engines == nullptr) skips the retired-render loop entirely.
+struct RetiredVoices
+{
+    std::unique_ptr<VoiceEngine>* engines      = nullptr;
+    std::atomic<bool>*            cleanupFlags = nullptr;
+    int                           perSlot      = 0;
+};
 
 // Per-channel gain, pan, mute, solo, FX sends, and VU metering.
 // processBlock replaces the raw voice-accumulation loop in PluginProcessor.
@@ -92,7 +107,8 @@ public:
                       FXChain&                    fxChain,
                       int                         numSamples,
                       std::array<juce::AudioBuffer<float>*, 8>* directOuts = nullptr,
-                      juce::AudioBuffer<float>*    fxReturnsOut = nullptr);
+                      juce::AudioBuffer<float>*    fxReturnsOut = nullptr,
+                      const RetiredVoices*        retired      = nullptr);
 
     // Reset the sidechain envelope follower state for one channel slot. Called
     // by PluginProcessor::swapRhythms so the previous tenant's ducking envelope

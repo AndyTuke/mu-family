@@ -4,11 +4,11 @@
 #include "FXAlgorithmDef.h"
 #include "OversampledProcessor.h"
 #include "DelaySlot.h"
-#include "Effects/EffectAlgorithmBase.h"
-#include "Effects/ChorusEffect.h"
-#include "Effects/FlangerEffect.h"
-#include "Effects/PhaserEffect.h"
-#include "Effects/EchoEffect.h"
+#include "Audio/Processing/SendFX/EffectAlgorithmBase.h"
+#include "Audio/Processing/SendFX/ChorusEffect.h"
+#include "Audio/Processing/SendFX/FlangerEffect.h"
+#include "Audio/Processing/SendFX/PhaserEffect.h"
+#include "Audio/Processing/SendFX/EchoEffect.h"
 
 #include <array>
 #include <memory>

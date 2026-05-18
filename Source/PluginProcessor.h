@@ -175,6 +175,13 @@ public:
     void setContentDir(const juce::File& dir);
     void ensureContentFoldersExist();
 
+    // #418: user-configurable personal sample library. Distinct from the
+    // content / My Documents folder (which hosts factory + preset-linked
+    // material). Default when unset = OS user Music dir. setPrimarySampleDir(
+    // juce::File{}) clears the override and reverts to that default.
+    juce::File getPrimarySampleDir() const;
+    void       setPrimarySampleDir(const juce::File& dir);
+
     // License — checked once at startup; result is immutable thereafter.
     LicenseChecker::Info licenseInfo;
     bool isLicensed() const { return kBetaBuild || licenseInfo.status == LicenseStatus::Licensed; }
@@ -208,6 +215,20 @@ public:
     std::array<MidiOutputEngine,             SequencerEngine::MaxRhythms> midiEngines;
     std::atomic<int> numActiveRhythms { 0 };
     // fxChain and mixerEngine are inherited from ProcessorBase.
+
+    // Stage 34: per-rhythm retired voice engines that continue rendering their
+    // in-flight sample / envelope tail after a hot-swap. Step 2 (this commit)
+    // wires the storage + render loop + cleanup-flag drain with nothing
+    // populating the slots, so behaviour is unchanged. Step 3 wires retire-on-
+    // swap, which is what actually populates these. When an engine reports
+    // isFullyDrained(), the audio thread store-releases retiredReadyForCleanup;
+    // the message thread (handleAsyncUpdate) polls + clears the flag under
+    // suspendProcessing and destroys the engine off the RT thread.
+    static constexpr int kMaxRetiredEngines = 4;
+    std::array<std::array<std::unique_ptr<VoiceEngine>, kMaxRetiredEngines>,
+               SequencerEngine::MaxRhythms> retiredVoiceEngines;
+    std::array<std::array<std::atomic<bool>, kMaxRetiredEngines>,
+               SequencerEngine::MaxRhythms> retiredReadyForCleanup;
 
     // Play-state atomics: written by audio thread, read by UI at 30 Hz.
     struct RhythmPlayState

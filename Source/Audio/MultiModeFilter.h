@@ -1,18 +1,18 @@
 #pragma once
 
 #include <juce_audio_basics/juce_audio_basics.h>
-#include <juce_dsp/juce_dsp.h>
-#include "AudioFilters.h"
+#include "Audio/Processing/Filters/FilterAlgorithmBase.h"
 
-#include <vector>
+#include <array>
+#include <memory>
 
-// Reusable multi-mode filter wrapping a SVF, JUCE LadderFilter, 1-pole IIRs,
-// biquads, and a feedback comb. Designed to drop into any plugin needing a
-// 16-type filter slot. Owns all DSP state and scratch buffers; the caller only
-// needs to supply sample rate, block size, channel count, and per-block params.
+// Reusable multi-mode filter wrapping 16 distinct algorithms. Designed to
+// drop into any plugin needing a flexible filter slot. Owns all DSP state
+// and scratch buffers; the caller only needs to supply sample rate, block
+// size, channel count, and per-block params.
 //
-// Filter type codes (kept identical to the legacy VoiceEngine int codes so the
-// APVTS choice parameter does not need remapping):
+// Filter type codes (kept identical to the legacy VoiceEngine int codes so
+// the APVTS choice parameter does not need remapping):
 //   0  LP12       (SVF lowpass)
 //   1  HP12       (SVF highpass)
 //   2  BP12       (SVF bandpass)
@@ -29,51 +29,39 @@
 //  13  LowShelf   (biquad low shelf, +12 dB)
 //  14  HighShelf  (biquad high shelf, +12 dB)
 //  15  Comb-      (feedback comb, negative feedback — peaks at f0/2, 3f0/2, 5f0/2…)
+//
+// #427: implementation refactored from a single 200-line switch in
+// MultiModeFilter.cpp into per-algorithm classes living in
+// Source/Audio/Processing/Filters/. MultiModeFilter is now a thin orchestrator
+// that pre-allocates one instance of each algorithm and dispatches via a
+// fixed-index table. Each algorithm owns its own DSP state. Public API is
+// unchanged so call sites (VoiceEngine, etc.) need no edits.
 class MultiModeFilter
 {
 public:
-    static constexpr int MaxChannels = 2;
+    static constexpr int MaxChannels   = 2;
+    static constexpr int kNumAlgorithms = 16;
 
-    MultiModeFilter() = default;
+    MultiModeFilter();
 
     void prepare(double sampleRate, int blockSize, int numChannels);
     void reset();
 
-    // Set filter type by integer code (matches APVTS values 0..14).
-    void setType(int typeCode) noexcept     { typeCodeValue = typeCode; }
+    // Set filter type by integer code (matches APVTS values 0..15).
+    void setType(int typeCode) noexcept     { typeCodeValue = juce::jlimit(0, kNumAlgorithms - 1, typeCode); }
     void setCutoff(float hz) noexcept       { cutoffHz = hz; }
     void setResonance(float r) noexcept     { resonance = r; }
 
-    // Apply the configured filter in-place to the buffer (first numChannels channels,
-    // numSamples samples). Allocation-free.
+    // Apply the configured filter in-place to the buffer (first numChannels
+    // channels, numSamples samples). Allocation-free.
     void process(juce::AudioBuffer<float>& buffer, int numSamples, int numChannels);
 
 private:
-    double currentSampleRate = 44100.0;
-    int    typeCodeValue     = 0;
-    float  cutoffHz          = 1000.0f;
-    float  resonance         = 0.1f;
+    int    typeCodeValue = 0;
+    float  cutoffHz      = 1000.0f;
+    float  resonance     = 0.1f;
 
-    juce::dsp::StateVariableTPTFilter<float> svf;
-    juce::dsp::LadderFilter<float>           ladder;
-    OnePoleLP    lp6[MaxChannels];
-    OnePoleHP    hp6[MaxChannels];
-    BiquadFilter eq [MaxChannels];
-
-    std::vector<float> combBuffer[MaxChannels];
-    int                combWritePos[MaxChannels] = { 0, 0 };
-
-    juce::AudioBuffer<float> notchScratch;
-
-    // #368: change-detection for per-channel coefficient recompute. The expensive
-    // paths (LP6 / HP6 one-pole `exp`, AP12 / Peak / LoShelf / HiShelf biquad
-    // cos/sin/pow) re-derive coefficients every block per channel even when cutoff
-    // and resonance haven't moved. Reset in prepare() so first process() recomputes.
-    float lastCutoffHz  = -1.0f;
-    float lastResonance = -1.0f;
-    int   lastTypeCode  = -1;
-
-    void configureForCurrentType();
+    std::array<std::unique_ptr<FilterAlgorithmBase>, kNumAlgorithms> algorithms;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MultiModeFilter)
 };

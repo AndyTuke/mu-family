@@ -10,7 +10,7 @@
 
 // First-visit defaults for each insert algorithm.  Fields map to VoiceParams members:
 // driveDrive | driveOutput | drvDither | driveTone | eqMidGain | drvBits | driveRate
-const MixerChannel::InsertAlgoSnapshot MixerChannel::kInsertDefaults[11] = {
+const MixerChannel::InsertAlgoSnapshot MixerChannel::kInsertDefaults[13] = {
     { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 0  None
     { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 1  Soft Clip  (0% drive = transparent)
     { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 2  Hard Clip
@@ -22,6 +22,9 @@ const MixerChannel::InsertAlgoSnapshot MixerChannel::kInsertDefaults[11] = {
     { 30.0f,  0.0f, 0.0f,    200.0f,  0.0f, 16.0f, 48000.0f },  // 8  Limiter    (−12 dB ceiling, 200 ms)
     { 50.0f,  0.0f, 0.0f,    440.0f,  0.0f, 16.0f, 48000.0f },  // 9  Ring Mod   (50% mix, 440 Hz)
     { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 10 Tape Sat  (0% drive = transparent)
+    // #422 / #423 — see VoiceSection.cpp for the same defaults
+    { 0.0f,   0.0f, 70.0f,  20000.0f, 0.0f,  1.0f, 48000.0f },  // 11 Karplus-Strong
+    { 0.0f, -20.0f,  3.0f,  20000.0f, 0.0f,  4.0f, 48000.0f },  // 12 Vocoder
 };
 
 void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcessor* proc)
@@ -294,6 +297,111 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             tone  .onValueChanged = [setParam, pTon](double v) { setParam(pTon, v); };
             if (proc) setParam(pChar, 10);
             break;
+
+        case 11:  // #422 ── Karplus-Strong — Note / Octave / Feedback / LPF ─
+        {
+            static const char* const kNoteNames[7] = { "C", "D", "E", "F", "G", "A", "B" };
+
+            drive.setLabel("Note");
+            drive.setRange(0.0, 6.0, 1.0);
+            drive.getSlider().setSkewFactor(1.0);
+            drive.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return kNoteNames[juce::jlimit(0, 6, (int) std::round(v))];
+            };
+            drive.setValue(juce::jlimit(0.0, 6.0, (double) ip.driveDrive), juce::dontSendNotification);
+            drive.setVisible(true);
+
+            output.setLabel("Octave");
+            // #429: range extended to 0..3.
+            output.setRange(0.0, 3.0, 1.0);
+            output.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String((int) std::round(v));
+            };
+            output.setValue(juce::jlimit(0.0, 3.0, (double) ip.drvBits), juce::dontSendNotification);
+            output.setVisible(true);
+
+            tone.setLabel("Feedback");
+            tone.setRange(0.0, 100.0, 0.1);
+            tone.getSlider().setSkewFactor(1.0);
+            tone.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String((int) std::round(v)) + "%";
+            };
+            tone.setValue(juce::jlimit(0.0, 100.0, (double) ip.drvDither), juce::dontSendNotification);
+            tone.setVisible(true);
+
+            // #428 follow-up: LPF cutoff on the feedback path — user can
+            // dial the brightness / damping. driveTone (20..20k) maps directly.
+            extra.setLabel("LPF");
+            extra.setRange(20.0, 20000.0, 1.0);
+            extra.getSlider().setSkewFactorFromMidPoint(640.0);
+            extra.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return v >= 1000.0 ? juce::String(v / 1000.0, 2) + "kHz"
+                                   : juce::String((int)v) + "Hz";
+            };
+            extra.setValue(juce::jlimit(20.0, 20000.0, (double) ip.driveTone), juce::dontSendNotification);
+            extra.setVisible(true);
+
+            drive .onValueChanged = [setParam, pDrv](double v) { setParam(pDrv, v); };
+            output.onValueChanged = [setParam, pBit](double v) { setParam(pBit, v); };
+            tone  .onValueChanged = [setParam, pDit](double v) { setParam(pDit, v); };
+            extra .onValueChanged = [setParam, pTon](double v) { setParam(pTon, v); };
+            if (proc) setParam(pChar, 11);
+            break;
+        }
+
+        case 12:  // #423 ── Vocoder — Wave / Unison / Octave / Note ────────
+        {
+            static const char* const kWaveNames[4] = { "Saw", "Square", "White", "Pink" };
+            static const char* const kNoteNames[7] = { "C", "D", "E", "F", "G", "A", "B" };
+            static const int kUnisonCounts[7] = { 1, 3, 5, 7, 9, 11, 13 };
+
+            drive.setLabel("Wave");
+            drive.setRange(0.0, 3.0, 1.0);
+            drive.getSlider().setSkewFactor(1.0);
+            drive.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return kWaveNames[juce::jlimit(0, 3, (int) std::round(v))];
+            };
+            drive.setValue(juce::jlimit(0.0, 3.0, (double) ip.driveDrive), juce::dontSendNotification);
+            drive.setVisible(true);
+
+            // #428: Unison now uses driveOutput field (range -24..0). UI knob
+            // value is 0..6; encode/decode via `±24` offset and /4 scale.
+            output.setLabel("Unison");
+            output.setRange(0.0, 6.0, 1.0);
+            output.getSlider().setSkewFactor(1.0);
+            output.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String(kUnisonCounts[juce::jlimit(0, 6, (int) std::round(v))]);
+            };
+            const double unisonKnob = juce::jlimit(0.0, 6.0,
+                                                  ((double) ip.driveOutput + 24.0) * 0.25);
+            output.setValue(unisonKnob, juce::dontSendNotification);
+            output.setVisible(true);
+
+            tone.setLabel("Octave");
+            tone.setRange(1.0, 5.0, 1.0);
+            tone.getSlider().setSkewFactor(1.0);
+            tone.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String((int) std::round(v));
+            };
+            tone.setValue(juce::jlimit(1.0, 5.0, (double) ip.drvDither), juce::dontSendNotification);
+            tone.setVisible(true);
+
+            extra.setLabel("Note");
+            extra.setRange(1.0, 7.0, 1.0);
+            extra.getSlider().setSkewFactor(1.0);
+            extra.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return kNoteNames[juce::jlimit(0, 6, (int) std::round(v) - 1)];
+            };
+            extra.setValue(juce::jlimit(1.0, 7.0, (double) ip.drvBits), juce::dontSendNotification);
+            extra.setVisible(true);
+
+            drive .onValueChanged = [setParam, pDrv](double v) { setParam(pDrv, v); };
+            output.onValueChanged = [setParam, pOut](double v) { setParam(pOut, v * 4.0 - 24.0); };
+            tone  .onValueChanged = [setParam, pDit](double v) { setParam(pDit, v); };
+            extra .onValueChanged = [setParam, pBit](double v) { setParam(pBit, v); };
+            if (proc) setParam(pChar, 12);
+            break;
+        }
 
         default: break;
     }

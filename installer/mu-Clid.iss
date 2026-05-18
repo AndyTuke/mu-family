@@ -1,15 +1,17 @@
-; mu-Clid Inno Setup installer script
+﻿; μ-Clid Inno Setup installer script
 ; Build with: iscc /DBuildNum=152 mu-Clid.iss
 ; Or via CMake: cmake --build build --target mu-clid_installer --config Release
+; NOTE: this .iss file must be saved as UTF-8 with BOM so Inno Setup
+; reads the Greek mu (μ) correctly in MyAppName / paths / output filename.
 
 #ifndef BuildNum
   #define BuildNum "0"
 #endif
 
-#define MyAppName      "mu-Clid"
+#define MyAppName      "μ-Clid"
 #define MyAppVersion   "1.0." + BuildNum
 #define MyAppPublisher "Transwarp Development Project"
-#define MyAppExeName   "mu-Clid.exe"
+#define MyAppExeName   "μ-Clid.exe"
 #define SourceDir      "..\build\mu-clid_artefacts\Release"
 #define ContentSrc     "..\content"
 #define DefaultContent "{userdocs}\TDP\muClid"
@@ -24,12 +26,12 @@ AppVerName={#MyAppName} {#MyAppVersion}
 VersionInfoVersion={#MyAppVersion}
 
 ; Standalone goes to a user-chosen location; plugins go to fixed system paths.
-DefaultDirName={autopf}\Transwarp Development Project\mu-Clid
+DefaultDirName={autopf}\Transwarp Development Project\μ-Clid
 DisableDirPage=no
 DirExistsWarning=no
 
 OutputDir=..\build\installer
-OutputBaseFilename=mu-Clid-Setup-v{#MyAppVersion}
+OutputBaseFilename=μ-Clid-Setup-v{#MyAppVersion}
 
 ArchitecturesInstallIn64BitMode=x64
 ArchitecturesAllowed=x64
@@ -58,13 +60,13 @@ Name: "standalone"; Description: "Standalone Application";                      
 
 [Files]
 ; VST3 — copy the entire .vst3 bundle folder recursively.
-Source: "{#SourceDir}\VST3\mu-Clid.vst3\*"; \
-    DestDir: "{commoncf64}\VST3\mu-Clid.vst3"; \
+Source: "{#SourceDir}\VST3\μ-Clid.vst3\*"; \
+    DestDir: "{commoncf64}\VST3\μ-Clid.vst3"; \
     Components: vst3; \
     Flags: recursesubdirs createallsubdirs ignoreversion
 
 ; CLAP — single binary.
-Source: "{#SourceDir}\CLAP\mu-Clid.clap"; \
+Source: "{#SourceDir}\CLAP\μ-Clid.clap"; \
     DestDir: "{commoncf64}\CLAP"; \
     Components: clap; \
     Flags: ignoreversion
@@ -123,8 +125,8 @@ begin
   ContentDirPage := CreateInputDirPage(
     wpSelectDir,
     'Content Folder',
-    'Where should mu-Clid store presets, rhythms, and samples?',
-    'Factory presets will be copied here. You can change this later in the mu-Clid Settings overlay.',
+    'Where should μ-Clid store presets, rhythms, and samples?',
+    'Factory presets will be copied here. You can change this later in the μ-Clid Settings overlay.',
     False,
     'Browse for content folder'
   );

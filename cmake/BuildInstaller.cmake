@@ -14,17 +14,22 @@ if(NOT result EQUAL 0)
 endif()
 
 # Highlander: there can be only one. Sweep any pre-existing
-# mu-Clid-Setup-v*.exe from DIST_DIR before placing the new one,
+# installer exes from DIST_DIR before placing the new one,
 # so testers always see exactly one installer (the latest build).
-file(GLOB previous_installers "${DIST_DIR}/mu-Clid-Setup-v*.exe")
+# Cover BOTH the old ASCII (mu-Clid-Setup-v*.exe) and new Unicode
+# (μ-Clid-Setup-v*.exe) names so a build after the rename still
+# cleans up stale older-name installers left in the deploy folder.
+file(GLOB previous_installers
+    "${DIST_DIR}/mu-Clid-Setup-v*.exe"
+    "${DIST_DIR}/μ-Clid-Setup-v*.exe")
 foreach(stale ${previous_installers})
     file(REMOVE "${stale}")
 endforeach()
 
 execute_process(
     COMMAND "${CMAKE_COMMAND}" -E copy
-        "${SOURCE_DIR}/build/installer/mu-Clid-Setup-v1.0.${BUILD_NUM}.exe"
-        "${DIST_DIR}/mu-Clid-Setup-v1.0.${BUILD_NUM}.exe"
+        "${SOURCE_DIR}/build/installer/μ-Clid-Setup-v1.0.${BUILD_NUM}.exe"
+        "${DIST_DIR}/μ-Clid-Setup-v1.0.${BUILD_NUM}.exe"
     RESULT_VARIABLE copy_result
 )
 if(NOT copy_result EQUAL 0)

@@ -52,7 +52,14 @@ private:
     KnobWithLabel insertLenA   { "Insert Length", Id::knobInsertPad };
     SegmentControl insertModeA  { {"Pad","Mute"}, SegmentControl::ActiveStyle::Warning };
 
-    // ── Logic ─────────────────────────────────────────────────────────────────
+    // ── Legato + Logic (#419) ────────────────────────────────────────────────
+    // Pattern legato sits FIRST on the same row as the logic pills, separated
+    // by a sub-panel gap. Visually communicates that legato is a per-rhythm
+    // sequencer modifier distinct from the per-step logic-combination choice
+    // but shares the same horizontal real-estate.
+    SegmentControl legatoCtrl { {"Trig","Leg"},
+                                SegmentControl::ActiveStyle::General,
+                                SegmentControl::DrawStyle::Pills };
     SegmentControl logicCtrl { {"OR","AND","XOR","A Only","B Only"},
                                SegmentControl::ActiveStyle::General,
                                SegmentControl::DrawStyle::Pills };
@@ -85,6 +92,10 @@ private:
     static constexpr int kSwitchH = 14;
     static constexpr int kOuter   = 4;
     static constexpr int kLabelH  = 10;
+    // #419: logic-row split — Legato pills (left) | gap | Logic pills (right).
+    static constexpr int kLogicMP    = 4;    // matches the local `mP` used in placeRow
+    static constexpr int kLegatoW    = 84;   // ~42 px per pill, two pills
+    static constexpr int kLogicGapW  = 8;    // sub-panel divider between Legato and Logic
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <juce_dsp/juce_dsp.h>
-#include "../FXAlgorithmDef.h"
+#include "FX/FXAlgorithmDef.h"
 
 // Abstract base for the 8 Effect slot algorithms.
 // Implementations receive the oversampled rate (already multiplied) in prepareInner().

@@ -1,7 +1,7 @@
 #include "VoiceSection.h"
 #include "../PluginProcessor.h"
 
-const VoiceSection::InsertAlgoSnapshot VoiceSection::kInsertDefaults[11] = {
+const VoiceSection::InsertAlgoSnapshot VoiceSection::kInsertDefaults[13] = {
     { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 0  None
     { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 1  Soft Clip  (0% drive = transparent)
     { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 2  Hard Clip
@@ -13,6 +13,12 @@ const VoiceSection::InsertAlgoSnapshot VoiceSection::kInsertDefaults[11] = {
     { 30.0f,  0.0f, 5.0f,   200.0f,   0.0f, 16.0f, 48000.0f },  // 8  Limiter    (−12 dB, 10 ms atk, 200 ms)
     { 50.0f,  0.0f, 0.0f,    440.0f,  0.0f, 16.0f, 48000.0f },  // 9  Ring Mod   (50% mix, 440 Hz)
     { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 10 Tape Sat  (0% drive = transparent)
+    // #422 Karplus-Strong: drvDrive=0→Note C, drvBits=1→Octave 1, drvDither=70→Feedback 70%,
+    // driveTone=20000→LP fully open (no extra damping — feedback alone shapes the decay).
+    { 0.0f,   0.0f, 70.0f,  20000.0f, 0.0f,  1.0f, 48000.0f },  // 11 Karplus-Strong
+    // #423 Vocoder: drvDrive=0 → Saw; drvBits=4 → Note F (idx 3);
+    // drvDither=3 → Octave 3; drvOut=-20 → Unison index 1 (3 voices).
+    { 0.0f, -20.0f,  3.0f,  20000.0f, 0.0f,  4.0f, 48000.0f },  // 12 Vocoder
 };
 
 VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
@@ -48,17 +54,19 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     addAndMakeVisible(filterType);
 
     // Drive character dropdown — item IDs = driveChar+1; alphabetical order after None.
-    driveChar.addItem("None",       1);
-    driveChar.addItem("3-Band EQ",  7);
-    driveChar.addItem("Bitcrusher", 5);
-    driveChar.addItem("Clipper",    6);
-    driveChar.addItem("Compressor", 8);
-    driveChar.addItem("Fold",       4);
-    driveChar.addItem("Hard Clip",  3);
-    driveChar.addItem("Limiter",    9);
-    driveChar.addItem("Ring Mod",  10);
-    driveChar.addItem("Soft Clip",  2);
-    driveChar.addItem("Tape Sat",  11);
+    driveChar.addItem("None",        1);
+    driveChar.addItem("3-Band EQ",   7);
+    driveChar.addItem("Bitcrusher",  5);
+    driveChar.addItem("Clipper",     6);
+    driveChar.addItem("Compressor",  8);
+    driveChar.addItem("Fold",        4);
+    driveChar.addItem("Hard Clip",   3);
+    driveChar.addItem("Karplus",    12);   // #422
+    driveChar.addItem("Limiter",     9);
+    driveChar.addItem("Ring Mod",   10);
+    driveChar.addItem("Soft Clip",   2);
+    driveChar.addItem("Tape Sat",   11);
+    driveChar.addItem("Vocoder",    13);   // #423
     driveChar.setSelectedId(1, false);
     addAndMakeVisible(driveChar);
 
@@ -808,6 +816,129 @@ void VoiceSection::configureInsertAlgorithm(int charId)
             driveOutput.onValueChanged = [this](double v) { apvtsSet("drvOut", (float)v); };
             driveTone  .onValueChanged = [this](double v) { apvtsSet("drvTon", (float)v); };
             break;
+
+        case 11:  // #422 ── Karplus-Strong — Note / Octave / Feedback / LPF ─
+        {
+            static const char* const kNoteNames[7] = { "C", "D", "E", "F", "G", "A", "B" };
+            auto noteFmt = [](double v) -> juce::String {
+                const int i = juce::jlimit(0, 6, (int) std::round(v));
+                return kNoteNames[i];
+            };
+
+            driveDrive.setLabel("Note");
+            driveDrive.setRange(0.0, 6.0, 1.0);
+            driveDrive.getSlider().setSkewFactor(1.0);
+            driveDrive.getSlider().textFromValueFunction = noteFmt;
+            driveDrive.getSlider().valueFromTextFunction = nullptr;
+            if (p) driveDrive.setValue(juce::jlimit(0.0, 6.0, (double) p->driveDrive), juce::dontSendNotification);
+            else   driveDrive.setValue(0.0, juce::dontSendNotification);
+            driveDrive.setVisible(true);
+
+            driveOutput.setLabel("Octave");
+            // #429: range extended to 0..3 (was 1..3). Octave 0 = SPN C1 = 32.7 Hz.
+            driveOutput.setRange(0.0, 3.0, 1.0);
+            driveOutput.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String((int) std::round(v));
+            };
+            driveOutput.getSlider().valueFromTextFunction = nullptr;
+            // Octave is stored in drvBits (not drvOut) — see KarplusStrongInsert.
+            if (p) driveOutput.setValue(juce::jlimit(0.0, 3.0, (double) p->drvBits), juce::dontSendNotification);
+            else   driveOutput.setValue(1.0, juce::dontSendNotification);
+            driveOutput.setVisible(true);
+
+            driveDither.setLabel("Feedback");
+            driveDither.setRange(0.0, 100.0, 0.1);
+            driveDither.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String((int) std::round(v)) + "%";
+            };
+            driveDither.getSlider().valueFromTextFunction = nullptr;
+            if (p) driveDither.setValue(p->drvDither, juce::dontSendNotification);
+            else   driveDither.setValue(70.0, juce::dontSendNotification);
+            driveDither.setVisible(true);
+
+            driveTone.setLabel("LPF");
+            driveTone.setRange(20.0, 20000.0, 1.0);
+            driveTone.getSlider().setSkewFactorFromMidPoint(640.0);   // log feel
+            driveTone.getSlider().textFromValueFunction = fmtHz;
+            driveTone.getSlider().valueFromTextFunction = parseHz;
+            if (p) driveTone.setValue(juce::jlimit(20.0, 20000.0, (double) p->driveTone), juce::dontSendNotification);
+            else   driveTone.setValue(20000.0, juce::dontSendNotification);
+            driveTone.setVisible(true);
+
+            driveDrive .onValueChanged = [this](double v) { apvtsSet("drvDrv",  (float)v); };
+            driveOutput.onValueChanged = [this](double v) { apvtsSet("drvBits", (float)v); };
+            driveDither.onValueChanged = [this](double v) { apvtsSet("drvDit",  (float)v); };
+            driveTone  .onValueChanged = [this](double v) { apvtsSet("drvTon",  (float)v); };
+            break;
+        }
+
+        case 12:  // #423 ── Vocoder — Wave / Note / Octave / Unison ────────
+        {
+            static const char* const kWaveNames[4] = { "Saw", "Square", "White", "Pink" };
+            static const char* const kNoteNames[7] = { "C", "D", "E", "F", "G", "A", "B" };
+            static const int kUnisonCounts[7] = { 1, 3, 5, 7, 9, 11, 13 };
+
+            driveDrive.setLabel("Wave");
+            driveDrive.setRange(0.0, 3.0, 1.0);
+            driveDrive.getSlider().setSkewFactor(1.0);
+            driveDrive.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return kWaveNames[juce::jlimit(0, 3, (int) std::round(v))];
+            };
+            driveDrive.getSlider().valueFromTextFunction = nullptr;
+            if (p) driveDrive.setValue(juce::jlimit(0.0, 3.0, (double) p->driveDrive), juce::dontSendNotification);
+            else   driveDrive.setValue(0.0, juce::dontSendNotification);
+            driveDrive.setVisible(true);
+
+            // #428: Unison moved from driveTone (20..20k range — would clamp
+            // small ints to 20 and produce a stuck 13-voice default) to
+            // driveOutput (-24..0 range). UI knob value is 0..6 (unison
+            // index); we encode to drvOut via `v * 4 - 24` on write and
+            // decode in VocoderInsert via `(drvOut + 24) / 4`.
+            driveOutput.setLabel("Unison");
+            driveOutput.setRange(0.0, 6.0, 1.0);
+            driveOutput.getSlider().setSkewFactor(1.0);
+            driveOutput.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String(kUnisonCounts[juce::jlimit(0, 6, (int) std::round(v))]);
+            };
+            driveOutput.getSlider().valueFromTextFunction = nullptr;
+            // Decode stored drvOut (-24..0) back to UI knob value (0..6).
+            const double unisonKnob = p ? juce::jlimit(0.0, 6.0,
+                                            ((double) p->driveOutput + 24.0) * 0.25)
+                                        : 1.0;
+            driveOutput.setValue(unisonKnob, juce::dontSendNotification);
+            driveOutput.setVisible(true);
+
+            driveDither.setLabel("Octave");
+            driveDither.setRange(1.0, 5.0, 1.0);
+            driveDither.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String((int) std::round(v));
+            };
+            driveDither.getSlider().valueFromTextFunction = nullptr;
+            if (p) driveDither.setValue(juce::jlimit(1.0, 5.0, (double) p->drvDither), juce::dontSendNotification);
+            else   driveDither.setValue(3.0, juce::dontSendNotification);
+            driveDither.setVisible(true);
+
+            // #428: re-use the driveTone knob slot for Note (the Karplus
+            // pattern would have used drvBits, but for Vocoder we already
+            // need drvBits for the +1 note offset). Show note letter via
+            // textFromValueFunction.
+            driveTone.setLabel("Note");
+            driveTone.getSlider().setSkewFactor(1.0);
+            driveTone.setRange(1.0, 7.0, 1.0);
+            driveTone.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return kNoteNames[juce::jlimit(0, 6, (int) std::round(v) - 1)];
+            };
+            driveTone.getSlider().valueFromTextFunction = nullptr;
+            if (p) driveTone.setValue(juce::jlimit(1.0, 7.0, (double) p->drvBits), juce::dontSendNotification);
+            else   driveTone.setValue(4.0, juce::dontSendNotification);
+            driveTone.setVisible(true);
+
+            driveDrive .onValueChanged = [this](double v) { apvtsSet("drvDrv",  (float)v); };
+            driveOutput.onValueChanged = [this](double v) { apvtsSet("drvOut",  (float)(v * 4.0 - 24.0)); };
+            driveDither.onValueChanged = [this](double v) { apvtsSet("drvDit",  (float)v); };
+            driveTone  .onValueChanged = [this](double v) { apvtsSet("drvBits", (float)v); };
+            break;
+        }
 
         default: break;
     }

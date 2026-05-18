@@ -15,4 +15,4 @@ if(NOT ISCC_RESULT EQUAL 0)
     message(FATAL_ERROR "Inno Setup failed with code ${ISCC_RESULT}")
 endif()
 
-message(STATUS "mu-Clid Lite installer built (build ${BUILD_NUM})")
+message(STATUS "μ-Clid Lite installer built (build ${BUILD_NUM})")

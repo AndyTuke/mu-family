@@ -96,6 +96,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addB(p+"postPadModeC",n+"PostPadMode C", false);
         // Logic
         addI(p+"logic", n+"Logic", 0, 4, 0);
+        addB(p+"patLeg", n+"Pattern Legato", false);   // #419
         // Pitch
         addI(p+"pitchOct",  n+"Pitch Oct",  -4,   4,  0);
         addI(p+"pitchSemi", n+"Pitch Semi", -12,  12,  0);
@@ -135,10 +136,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addB(p+"aEnvLeg",   n+"A Env Legato", false);   // #221
         addF(p+"accentDb",  n+"Accent",     0.0f,  12.0f,  0.0f);
         // Drive
-        addI(p+"drvChar",    n+"Drive Char",   0,     10,      0);  // 0=None … 10=TapeSat
+        addI(p+"drvChar",    n+"Drive Char",   0,     12,      0);  // 0=None … 10=TapeSat, 11=Karplus (#422), 12=Vocoder (#423)
         addF(p+"drvDrv",     n+"Drive",        0.0f, 100.0f,    0.0f);  // Soft/Hard/Fold drive amount
         addF(p+"drvOut",     n+"Drive Out",  -24.0f,   24.0f,   0.0f);  // insert output / makeup gain
-        addF(p+"drvBits",    n+"Bits",         1.0f,  16.0f,   16.0f);  // Bitcrusher bit depth
+        addF(p+"drvBits",    n+"Bits",         0.0f,  16.0f,   16.0f);  // Bitcrusher bit depth (#429: range extended to 0 so Karplus Octave 0 fits)
         addF(p+"drvRate",    n+"Drive Rate",  100.0f, 48000.0f, 48000.0f);  // Bitcrusher sample rate
         addF(p+"drvDit",     n+"Dither",       0.0f, 100.0f,    0.0f);  // Bitcrusher dither amount
         addF(p+"drvTon",     n+"Drive Tone",  20.0f, 20000.0f, 20000.0f);  // Shared LPF
@@ -241,19 +242,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     addF("mstr_pan",    "Master Pan",      -1.0f,    1.0f,     0.0f);
     addI("mstrLoop",    "Master Loop",      0,       16,       0);      // 0=free, 1-16 → 16-256 steps
     // Master insert effect (#124): same algorithm set as per-rhythm voice INSERT.
-    addI("mst_insChar", "Mst Insert Char",  0,       10,       0);      // 0=None … 10=TapeSat
+    addI("mst_insChar", "Mst Insert Char",  0,       12,       0);      // 0=None … 10=TapeSat, 11=Karplus, 12=Vocoder
     addF("mst_insDrv",  "Mst Insert Drive", 0.0f,  100.0f,     0.0f);
     addF("mst_insOut",  "Mst Insert Out", -24.0f,   24.0f,     0.0f);
-    addF("mst_insBits", "Mst Insert Bits",  1.0f,   16.0f,    16.0f);
+    addF("mst_insBits", "Mst Insert Bits",  0.0f,   16.0f,    16.0f);   // #429
     addF("mst_insRate", "Mst Insert Rate", 100.0f, 48000.0f, 48000.0f);
     addF("mst_insDit",  "Mst Insert Dit",   0.0f,  100.0f,     0.0f);
     addF("mst_insTon",  "Mst Insert Tone", 20.0f, 20000.0f, 20000.0f);
     addF("mst_insMid",  "Mst Insert Mid", -18.0f,   18.0f,     0.0f);  // EQ mid gain
     // Master insert 2 (#283): chained after insert 1.
-    addI("mst_ins2Char","Mst Insert2 Char", 0,       10,       0);
+    addI("mst_ins2Char","Mst Insert2 Char", 0,       12,       0);   // #422/#423
     addF("mst_ins2Drv", "Mst Insert2 Drive",0.0f,  100.0f,     0.0f);
     addF("mst_ins2Out", "Mst Insert2 Out",-24.0f,   24.0f,     0.0f);
-    addF("mst_ins2Bits","Mst Insert2 Bits", 1.0f,   16.0f,    16.0f);
+    addF("mst_ins2Bits","Mst Insert2 Bits", 0.0f,   16.0f,    16.0f);   // #429
     addF("mst_ins2Rate","Mst Insert2 Rate",100.0f,48000.0f, 48000.0f);
     addF("mst_ins2Dit", "Mst Insert2 Dit",  0.0f,  100.0f,     0.0f);
     addF("mst_ins2Ton", "Mst Insert2 Tone",20.0f, 20000.0f, 20000.0f);
@@ -465,7 +466,7 @@ void PluginProcessor::syncMixerParam(const juce::String& id, float v)
 
     if      (id == "mstr_lvl") mixerEngine.masterLevel = v;
     else if (id == "mstr_pan") mixerEngine.masterPan   = v;
-    else if (id == "mst_insChar")  mixerEngine.masterInsertParams.driveChar  = juce::jlimit(0, 10, (int)v);
+    else if (id == "mst_insChar")  mixerEngine.masterInsertParams.driveChar  = juce::jlimit(0, 12, (int)v);
     else if (id == "mst_insDrv")   mixerEngine.masterInsertParams.driveDrive = v;
     else if (id == "mst_insOut")   mixerEngine.masterInsertParams.driveOutput= v;
     else if (id == "mst_insBits")  mixerEngine.masterInsertParams.drvBits    = v;
@@ -473,7 +474,7 @@ void PluginProcessor::syncMixerParam(const juce::String& id, float v)
     else if (id == "mst_insDit")   mixerEngine.masterInsertParams.drvDither  = v;
     else if (id == "mst_insTon")   mixerEngine.masterInsertParams.driveTone  = v;
     else if (id == "mst_insMid")   mixerEngine.masterInsertParams.eqMidGain  = v;
-    else if (id == "mst_ins2Char") mixerEngine.masterInsertParams2.driveChar  = juce::jlimit(0, 10, (int)v);
+    else if (id == "mst_ins2Char") mixerEngine.masterInsertParams2.driveChar  = juce::jlimit(0, 12, (int)v);
     else if (id == "mst_ins2Drv")  mixerEngine.masterInsertParams2.driveDrive = v;
     else if (id == "mst_ins2Out")  mixerEngine.masterInsertParams2.driveOutput= v;
     else if (id == "mst_ins2Bits") mixerEngine.masterInsertParams2.drvBits    = v;
@@ -533,6 +534,7 @@ void PluginProcessor::pushRhythmToAPVTS(int ri)
     set(px+"postPadModeC",C.postPadMode == InsertMode::Mute ? 1.0f : 0.0f);
 
     set(px+"logic", (float)r.logic);
+    set(px+"patLeg", r.patternLegato ? 1.0f : 0.0f);   // #419
 
     const auto& vp = r.voiceParams;
     set(px+"pitchOct",  (float)vp.pitchOctave);

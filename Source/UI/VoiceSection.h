@@ -76,8 +76,8 @@ private:
         float driveDrive = 0.0f, driveOutput = 0.0f, drvDither = 0.0f;
         float driveTone = 20000.0f, eqMidGain = 0.0f, drvBits = 16.0f, driveRate = 48000.0f;
     };
-    static const InsertAlgoSnapshot kInsertDefaults[11];
-    InsertAlgoSnapshot insertSnapshots[11];
+    static const InsertAlgoSnapshot kInsertDefaults[13];   // #422/#423: + Karplus + Vocoder
+    InsertAlgoSnapshot insertSnapshots[13];
     bool               insertSnapshotValid[11] = {};
 
     // ─── INSERT ─────────────────────────────────────────────────────────

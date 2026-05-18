@@ -65,7 +65,8 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                                 FXChain&                     fxChain,
                                 int                          numSamples,
                                 std::array<juce::AudioBuffer<float>*, 8>* directOuts,
-                                juce::AudioBuffer<float>*    fxReturnsOut)
+                                juce::AudioBuffer<float>*    fxReturnsOut,
+                                const RetiredVoices*         retired)
 {
     output.clear();
     effectSendBuf.clear();
@@ -90,11 +91,38 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
 
     // Phase 1: process all voices into their channel buffers and apply headroom trim.
     // We defer pan/gain/mix until Phase 3 so Phase 2 can apply sidechain first.
+    const bool hasRetired = retired != nullptr
+                         && retired->engines != nullptr
+                         && retired->perSlot > 0;
     for (int r = 0; r < numActiveRhythms; ++r)
     {
         auto& buf = channelBufs[r];
         buf.clear();
         if (voices[r]) voices[r]->process(buf, numSamples);
+
+        // Stage 34 Step 2: retired engines (frozen post-swap tail-out) mix into the
+        // SAME channel buf so they ride the same channel fader / pan / sends /
+        // inserts as the active engine. Each is owned by the caller; when one
+        // reports isFullyDrained() the parallel cleanup flag is store-released
+        // for the message thread to move-out and destroy off the audio thread.
+        // In Step 2 every slot is null (Step 3 wires retire-on-swap), so the inner
+        // body never runs — the loop adds the cost of one null check per slot.
+        if (hasRetired)
+        {
+            const int K = retired->perSlot;
+            auto* slots = retired->engines      + r * K;
+            auto* flags = retired->cleanupFlags + r * K;
+            for (int i = 0; i < K; ++i)
+            {
+                if (auto& slot = slots[i])
+                {
+                    slot->process(buf, numSamples);
+                    if (slot->isFullyDrained())
+                        flags[i].store(true, std::memory_order_release);
+                }
+            }
+        }
+
         buf.applyGain(kHeadroomTrim);
     }
 

@@ -102,6 +102,15 @@ PluginProcessor::PluginProcessor()
 #if !MUCLID_LITE_BUILD
     voiceEngines[0] = std::make_unique<VoiceEngine>();
 #endif
+    // Stage 34 Step 2: C++17 std::atomic<bool> default ctor leaves the value
+    // indeterminate. Initialise every retired-cleanup flag to false so the
+    // audio thread + drain block never observe a spurious "ready" state on an
+    // empty slot. Unconditional (outside the LITE guard) so Lite's handle-
+    // AsyncUpdate path can't read an indeterminate atomic either. Retired
+    // slots stay null and flags stay false until Step 3 wires retire-on-swap.
+    for (auto& slotArr : retiredReadyForCleanup)
+        for (auto& flag : slotArr)
+            flag.store(false, std::memory_order_relaxed);
     numActiveRhythms.store(1, std::memory_order_release);
 
     {
@@ -127,10 +136,12 @@ PluginProcessor::~PluginProcessor()
 //==============================================================================
 const juce::String PluginProcessor::getName() const
 {
+    // UTF-8 Greek lowercase mu (μ, U+03BC) prefix — matches the AboutPanel
+    // logo and the user-facing branding everywhere else in the UI.
 #if MUCLID_LITE_BUILD
-    return "mu-Clid Lite";
+    return juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid Lite"));
 #else
-    return "mu-Clid";
+    return juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid"));
 #endif
 }
 double PluginProcessor::getTailLengthSeconds() const
@@ -162,6 +173,14 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
         midiEngines[i].prepare(sampleRate, samplesPerBlock);
     }
 #if !MUCLID_LITE_BUILD
+    // Stage 34: re-prepare any populated retired engines too so a mid-stream
+    // sample-rate or block-size change doesn't leave a tail-out engine
+    // operating on stale buffer sizing. No-op in Step 2 (all slots null).
+    for (auto& slotArr : retiredVoiceEngines)
+        for (auto& engine : slotArr)
+            if (engine)
+                engine->prepareToPlay(sampleRate, samplesPerBlock);
+
     fxChain.prepare(sampleRate, samplesPerBlock);
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     previewTransport.prepareToPlay(samplesPerBlock, sampleRate);
@@ -402,7 +421,15 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         const auto blockResult = sequencer.processBlock(beatPos);
         for (int r = 0; r < numRhythms; ++r)
             if ((blockResult.firedMask & (1 << r)) && voiceEngines[r])
-                voiceEngines[r]->trigger(blockResult.accentMask & (1 << r));
+            {
+                // #419: pattern-legato gating — tiedMask is always populated by
+                // the sequencer; the per-rhythm patternLegato flag decides
+                // whether to act on it. Untied / legato-off hits go through
+                // the standard retrigger path.
+                const bool tied = sequencer.getRhythm(r).patternLegato
+                               && (blockResult.tiedMask & (1 << r)) != 0;
+                voiceEngines[r]->trigger(blockResult.accentMask & (1 << r), tied);
+            }
 
         // Hot-swap: check if any staged rhythm preset should be committed at this boundary.
         const int mode = swapModeAtomic.load(std::memory_order_relaxed);
@@ -689,8 +716,21 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 fxRetPtr = &fxRetBuf;
             }
 
+    // Stage 34 Step 2: pass the retired-voice descriptor through. The 2D arrays
+    // (MaxRhythms × kMaxRetiredEngines) are stored contiguously row-major in
+    // std::array<std::array<...>>, so taking .data() of row 0 yields the start
+    // of the flat matrix that MixerEngine indexes as `[r * perSlot + i]`. In
+    // Step 2 every slot is null and every flag is false, so the inner body never
+    // runs — descriptor is wired so Step 3 just has to populate slots.
+    RetiredVoices retiredDesc {
+        retiredVoiceEngines[0].data(),
+        retiredReadyForCleanup[0].data(),
+        kMaxRetiredEngines
+    };
+
     processCoreBlock(masterBus, voiceEngines.data(), numRhythms,
-                     buffer.getNumSamples(), effectiveBpm, &directPtrs, fxRetPtr);
+                     buffer.getNumSamples(), effectiveBpm, &directPtrs, fxRetPtr,
+                     &retiredDesc);
 
     // Mix sample preview (for file browser audition) directly into the master output.
     if (previewTransport.isPlaying())
@@ -950,6 +990,45 @@ void PluginProcessor::handleAsyncUpdate()
 {
     const int n = numActiveRhythms.load(std::memory_order_acquire);
 
+    // Stage 34 Step 2: drain retired-engine cleanup flags. Audio thread store-
+    // releases the per-slot flag once VoiceEngine::isFullyDrained() returns
+    // true; the move-out below transfers ownership to a local that destructs
+    // off the RT thread. suspendProcessing fences the audio thread so it
+    // cannot be mid-process() on the engine when the unique_ptr is yanked
+    // (non-atomic raw-ptr access through std::unique_ptr would otherwise UAF).
+    // Empty-fast-path: a single non-suspending scan skips the suspend cost
+    // when no engines need cleanup, which is every block in Step 2 (no
+    // populator yet) and the steady state in Steps 3+.
+    bool anyCleanupNeeded = false;
+    for (auto& slotArr : retiredReadyForCleanup)
+    {
+        for (auto& flag : slotArr)
+            if (flag.load(std::memory_order_acquire)) { anyCleanupNeeded = true; break; }
+        if (anyCleanupNeeded) break;
+    }
+    if (anyCleanupNeeded)
+    {
+        std::array<std::unique_ptr<VoiceEngine>,
+                   SequencerEngine::MaxRhythms * kMaxRetiredEngines> orphans;
+        int orphanCount = 0;
+        suspendProcessing(true);
+        for (int r = 0; r < (int)retiredReadyForCleanup.size(); ++r)
+        {
+            for (int i = 0; i < kMaxRetiredEngines; ++i)
+            {
+                if (!retiredReadyForCleanup[(size_t)r][(size_t)i]
+                        .load(std::memory_order_acquire))
+                    continue;
+                orphans[(size_t)orphanCount++] =
+                    std::move(retiredVoiceEngines[(size_t)r][(size_t)i]);
+                retiredReadyForCleanup[(size_t)r][(size_t)i]
+                    .store(false, std::memory_order_release);
+            }
+        }
+        suspendProcessing(false);
+        // `orphans` destructs at scope exit — fully off the audio thread.
+    }
+
     // #392: two-pass to suspend audio ONCE per call. The prior per-rhythm loop
     // called suspendProcessing(true/false) up to 8 times — each suspend blocks
     // the message thread until the in-flight audio block finishes, so a MIDI
@@ -981,7 +1060,57 @@ void PluginProcessor::handleAsyncUpdate()
         {
             const int r = readyRhythms[(size_t)idx];
             auto& sw = pendingSwaps[r];
+
+            // Stage 34 Step 3: retire-then-swap instead of destroy-by-overwrite.
+            // The old engine's in-flight sample / amp envelope continues
+            // rendering from a retired slot (Step 2 wired the render loop), so
+            // sustained material — pads, long crashes, comb-decay — tails out
+            // naturally instead of getting cut to silence at the loop boundary.
+            // When the retired engine's voices finish and ampEnv goes idle,
+            // isFullyDrained() returns true; the audio thread store-releases
+            // the cleanup flag and the next handleAsyncUpdate destroys it off
+            // the RT thread (see the drain block above). Frozen state: no
+            // parameter writes / triggers / APVTS sync hit the retired engine
+            // — only the active `voiceEngines[r]` slot is updated downstream.
+            auto oldEngine = std::move(voiceEngines[r]);
             voiceEngines[r] = std::move(sw.pendingVoice);
+
+            if (oldEngine)
+            {
+                // Stage 34 Step 3 fix: prepare the engine for drain. Must
+                // happen BEFORE placement so the engine is already in its
+                // released / filter-reset state by the time the next audio
+                // block picks it up from the retired slot.
+                oldEngine->markRetired();
+
+                bool placed = false;
+                for (auto& slot : retiredVoiceEngines[(size_t)r])
+                {
+                    if (!slot)
+                    {
+                        slot = std::move(oldEngine);
+                        placed = true;
+                        break;
+                    }
+                }
+                if (!placed)
+                {
+                    // All kMaxRetiredEngines slots full — spam-swap back-pressure.
+                    // Force-cut the occupant of slot 0 (simplest "oldest" pick —
+                    // could track timestamps if a real complaint surfaces). The
+                    // displaced engine gets the pre-Stage-34 abrupt cut treatment
+                    // for this one swap; the system stays stable. We're under
+                    // suspendProcessing, so the destroy here is off the audio
+                    // thread by definition. Also reset the corresponding cleanup
+                    // flag in case the displaced engine had already signalled
+                    // ready (a stale `true` would cause the next drain to do a
+                    // wasted suspend-and-move on the freshly placed engine).
+                    retiredVoiceEngines[(size_t)r][0] = std::move(oldEngine);
+                    retiredReadyForCleanup[(size_t)r][0]
+                        .store(false, std::memory_order_release);
+                }
+            }
+
             // #392: move-assign — Rhythm carries vectors of ControlSequences +
             // ModulationMatrix assignments; the prior copy-assign deep-copied them
             // all every commit, all under suspendProcessing (= audio paused).
@@ -1064,6 +1193,34 @@ void PluginProcessor::setContentDir(const juce::File& dir)
         appSettings->saveIfNeeded();
     }
     ensureContentFoldersExist();
+}
+
+// #418: primary sample library — user's personal sample folder, distinct
+// from the My Documents content dir (which hosts factory / preset-linked
+// material). Default-unset returns the OS Music directory so the sample-load
+// dialog opens somewhere sensible even on first launch.
+juce::File PluginProcessor::getPrimarySampleDir() const
+{
+    if (appSettings != nullptr)
+    {
+        const juce::String stored = appSettings->getValue("primarySampleDir");
+        if (stored.isNotEmpty())
+            return juce::File(stored);
+    }
+    return juce::File::getSpecialLocation(juce::File::userMusicDirectory);
+}
+
+void PluginProcessor::setPrimarySampleDir(const juce::File& dir)
+{
+    if (appSettings != nullptr)
+    {
+        // Empty string clears the override → next getPrimarySampleDir() returns
+        // the default (user Music). Lets the SettingsOverlay "Default" button
+        // reuse the same setter.
+        appSettings->setValue("primarySampleDir",
+                              dir == juce::File{} ? juce::String{} : dir.getFullPathName());
+        appSettings->saveIfNeeded();
+    }
 }
 
 void PluginProcessor::ensureContentFoldersExist()

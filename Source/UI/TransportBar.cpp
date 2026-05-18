@@ -328,7 +328,8 @@ void TransportBar::paint(juce::Graphics& g)
 
     g.setColour(MuClidLookAndFeel::colour(Id::headingText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(14.0f)));
-    g.drawText("mu-Clid", 8, 0, kLogoW - 8, getHeight(),
+    g.drawText(juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid")),
+               8, 0, kLogoW - 8, getHeight(),
                juce::Justification::centredLeft, false);
 }
 

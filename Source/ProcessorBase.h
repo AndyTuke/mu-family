@@ -29,13 +29,16 @@ protected:
     // Sets the host BPM on the FX chain (tempo-synced FX) then calls
     // mixerEngine.processBlock(). Derived class calls this at the end of
     // processBlock() after triggers have fired and modulation has been applied.
+    // `retired` (Stage 34) forwards the polyphonic-tail descriptor through to
+    // the mixer's per-channel render phase — nullptr disables the feature.
     void processCoreBlock(juce::AudioBuffer<float>&                masterBus,
                           std::unique_ptr<VoiceEngine>*            voices,
                           int                                      numVoices,
                           int                                      numSamples,
                           double                                   effectiveBpm,
                           std::array<juce::AudioBuffer<float>*, 8>* directOuts  = nullptr,
-                          juce::AudioBuffer<float>*                fxReturnsOut = nullptr);
+                          juce::AudioBuffer<float>*                fxReturnsOut = nullptr,
+                          const RetiredVoices*                     retired      = nullptr);
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ProcessorBase)

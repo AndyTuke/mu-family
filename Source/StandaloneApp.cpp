@@ -24,7 +24,7 @@ public:
 
         auto opts = juce::MessageBoxOptions()
             .withIconType (juce::MessageBoxIconType::QuestionIcon)
-            .withTitle ("Close mu-Clid?")
+            .withTitle (juce::String(juce::CharPointer_UTF8("Close \xce\xbc-Clid?")))
             .withMessage ("Are you sure you want to close?")
             .withButton ("OK")
             .withButton ("Save")

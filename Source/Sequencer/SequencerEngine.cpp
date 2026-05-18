@@ -6,6 +6,7 @@ SequencerEngine::SequencerEngine()
 {
     lastStepIndex.fill(-1);
     lastAccentStepIndex.fill(0);
+    wasLastStepHit.fill(false);   // #419
     rhythms.reserve(MaxRhythms);
     cachedPatterns.reserve(MaxRhythms);
     cachedCPatterns.reserve(MaxRhythms);
@@ -62,11 +63,13 @@ void SequencerEngine::removeRhythm(int index)
         safeCPatterns[i]       = std::move(safeCPatterns[i + 1]);
         lastStepIndex[i]       = lastStepIndex[i + 1];
         lastAccentStepIndex[i] = lastAccentStepIndex[i + 1];
+        wasLastStepHit[i]      = wasLastStepHit[i + 1];   // #419
     }
     safePatterns[newN].clear();
     safeCPatterns[newN].clear();
     lastStepIndex[newN]       = -1;
     lastAccentStepIndex[newN] = 0;
+    wasLastStepHit[newN]      = false;   // #419
 
     patternLock.store(false, std::memory_order_release);
 }
@@ -106,6 +109,7 @@ void SequencerEngine::setNumRhythms(int n)
             safeCPatterns[i].clear();
             lastStepIndex[i]       = -1;
             lastAccentStepIndex[i] = 0;
+            wasLastStepHit[i]      = false;   // #419
         }
     }
 }
@@ -264,13 +268,16 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
         // single block collapse to one fire; accentMask reflects the last hit.
         if (prevStep < 0)
         {
-            // First call: just check the current step. No back-walk possible.
+            // First call: just check the current step. No back-walk possible —
+            // and no temporal predecessor to be tied to (#419), so tiedMask
+            // stays clear regardless of pattern[stepIndex-1].
             if (pattern[stepIndex])
             {
                 result.firedMask |= (1 << r);
                 if (cLen > 0 && cPat[stepIndex % cLen])
                     result.accentMask |= (1 << r);
             }
+            wasLastStepHit[r] = pattern[stepIndex];   // #419
         }
         else
         {
@@ -287,14 +294,28 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                 if (s == 0)
                     result.rhythmLoopWrapMask |= (1 << r);
 
-                if (pattern[s])
+                const bool isHit = pattern[s];
+                if (isHit)
                 {
                     result.firedMask |= (1 << r);
                     if (cLen > 0 && cPat[s % cLen])
                         result.accentMask |= (1 << r);
                     else
                         result.accentMask &= ~(1 << r);
+
+                    // #419: tied = the step we just walked across, immediately
+                    // before this hit, was also a hit. wasLastStepHit captures
+                    // the truth of the previous step within this walk (or from
+                    // a prior block's last walk). For multi-hit-in-one-block
+                    // edge cases, the last hit in the walk is what determines
+                    // the bit (matches firedMask's "one bit per rhythm per
+                    // block" semantics — accentMask follows the same rule).
+                    if (wasLastStepHit[r])
+                        result.tiedMask |= (1 << r);
+                    else
+                        result.tiedMask &= ~(1 << r);
                 }
+                wasLastStepHit[r] = isHit;   // #419: roll forward per-step
             }
         }
 

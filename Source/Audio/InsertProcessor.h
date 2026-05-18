@@ -1,19 +1,40 @@
 #pragma once
-#include <juce_dsp/juce_dsp.h>
+
+#include <juce_audio_basics/juce_audio_basics.h>
+#include <array>
+#include <memory>
+#include <atomic>
+#include <vector>
+
 #include "AudioFilters.h"
 #include "VoiceParams.h"
+#include "Audio/Processing/InsertFX/InsertAlgorithmBase.h"
 
 // Self-contained insert-effect processor used by both VoiceEngine (per-rhythm)
-// and MixerEngine (master bus). Owns all mutable DSP state; parameters are
-// passed in as a const VoiceParams& each block so there is no internal copy
-// to keep in sync.
+// and MixerEngine (master bus). Owns all DSP state; parameters are passed in
+// as a const VoiceParams& each block so there is no internal copy to keep in
+// sync.
+//
+// #425: refactored from a single ~600-line switch statement into a dispatch
+// table over driveChar → InsertAlgorithmBase*. Each driveChar code maps to a
+// concrete subclass living in Source/Audio/Processing/InsertFX/. All algorithms are pre-
+// allocated in the constructor so prepare() / param-change paths never heap-
+// allocate — matches the FX-rack pattern fixed under #402.
+//
+// Compressor (driveChar = 7) and Limiter (driveChar = 8) share a single
+// CompressorLimiterInsert instance: the dispatch table aliases both slots to
+// the same object so switching between them preserves the envelope-follower
+// state (bit-identical to the pre-refactor switch-case behaviour).
 class InsertProcessor
 {
 public:
+    InsertProcessor();
+
     void prepare(double sampleRate, int blockSize);
     void reset();
 
-    // Apply insert effect (driveChar switch + post-drive tone filter) in-place.
+    // Apply the selected insert effect (driveChar dispatch + post-drive tone
+    // filter for cases 0–5) in place.
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh, const VoiceParams& p);
 
     // Peak gain-reduction for the current block, 0..1 (1 ≡ 24 dB).
@@ -22,24 +43,24 @@ public:
     std::atomic<float> grReduction { 0.0f };
 
 private:
+    static constexpr int kNumAlgorithms = 13;   // #422/#423: + Karplus + Vocoder
+
+    // Ownership: 10 distinct algorithm instances (Comp + Lim share one). Held
+    // in a vector reserved at construction time so the raw pointers stored in
+    // `dispatch[]` below stay valid for the InsertProcessor's lifetime.
+    std::vector<std::unique_ptr<InsertAlgorithmBase>> owned;
+
+    // Dispatch: driveChar value (0..10) → pointer into `owned`. Indices 7 and
+    // 8 alias the same CompressorLimiterInsert instance.
+    std::array<InsertAlgorithmBase*, kNumAlgorithms> dispatch { };
+
     double currentSampleRate = 44100.0;
 
-    float     prevDriveX[2]     = {};
-    OnePoleLP bitAaFilter[2];
-    float     bitRateCounter[2] = {};
-    float     bitRateHeld[2]    = {};
-    juce::Random rng;
-    OnePoleLP toneFilter[2];
-    float     compEnvelope[2]   = {};
-    float     ringPhase[2]      = {};   // ring mod: per-channel carrier phase
-    float     dcBlockIn[2]      = {};   // tape sat: DC block input state
-    float     dcBlockOut[2]     = {};   // tape sat: DC block output state
-
-    using EqFilter = juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>,
-                                                     juce::dsp::IIR::Coefficients<float>>;
-    EqFilter eqLow, eqMid, eqHigh;
-    float eqLastDriveDrive = -1.0f;
-    float eqLastDrvDither  = -1.0f;
-    float eqLastMidGain    = -999.0f;
-    float eqLastDriveTone  = -1.0f;
+    // Post-drive tone filter — runs after the algorithm dispatch ONLY for
+    // driveChar < 6, where p.driveTone is interpreted as a 1-pole LP cutoff.
+    // EQ (6), Compressor/Limiter (7, 8), RingMod (9), TapeSat (10) repurpose
+    // driveTone for other meanings and skip this step. Lives here (not in any
+    // single algorithm) because it's a property of the drive-family, not of
+    // any one algorithm's DSP.
+    OnePoleLP postDriveTone[2];
 };

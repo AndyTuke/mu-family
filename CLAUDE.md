@@ -84,7 +84,7 @@ All code changes must be logged as backlog entries to maintain a complete develo
 
 | Stage | Status | Scope | Issues |
 |---|---|---|---|
-| 34 | 🔵 Planned | Seamless hot-swap with polyphonic voice tail. Old `VoiceEngine` keeps rendering its in-flight sample / envelope after swap, drains naturally, gets cleaned up off the audio thread. See [docs/design-seamless-hotswap.md](docs/design-seamless-hotswap.md) for the step-by-step plan with test gates. | — |
+| 34 | 🟢 In progress | Seamless hot-swap with polyphonic voice tail. Old `VoiceEngine` keeps rendering its in-flight sample / envelope after swap, drains naturally, gets cleaned up off the audio thread. See [docs/design-seamless-hotswap.md](docs/design-seamless-hotswap.md) for the step-by-step plan with test gates. Steps 1 + 2 + 3 landed in #413 / #414 / #415; #416 fixes a Step 3 issue where retired engines never drained (no noteOff anywhere) and their filter / insert state kept ringing into the channel buffer as an audible overlay on the new active rhythm. Step 4 (atomic-pointer swap for the active engine, eliminating the residual ~1.33 ms silence gap) is OPTIONAL — only worth doing if the residual artifact proves audible on listening tests. Awaiting user re-verification of Test 3.1 after #416, plus Tests 3.2–3.4. | #413, #414, #415 |
 
 
 ## Source layout (actual, as built)

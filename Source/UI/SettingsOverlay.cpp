@@ -121,6 +121,35 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     };
     addAndMakeVisible(resetContentFolderBtn);
 
+    // #418: Primary sample library — mirrors the content folder row pattern.
+    makeFieldLabel(sampleLibLabel, juce::String(), headingCol, juce::Justification::centredLeft);
+    updateSampleLibLabel();
+
+    browseSampleLibBtn.onClick = [this]
+    {
+        fileChooser = std::make_unique<juce::FileChooser>(
+            "Choose primary sample library...", proc.getPrimarySampleDir());
+        fileChooser->launchAsync(
+            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+            [this](const juce::FileChooser& fc)
+            {
+                auto result = fc.getResult();
+                if (result.isDirectory())
+                {
+                    proc.setPrimarySampleDir(result);
+                    updateSampleLibLabel();
+                }
+            });
+    };
+    addAndMakeVisible(browseSampleLibBtn);
+
+    resetSampleLibBtn.onClick = [this]
+    {
+        proc.setPrimarySampleDir(juce::File());   // clears override → OS Music dir
+        updateSampleLibLabel();
+    };
+    addAndMakeVisible(resetSampleLibBtn);
+
     midiPresetsBtn.onClick = [this] { if (onMidiPresetsClicked) onMidiPresetsClicked(); };
     addAndMakeVisible(midiPresetsBtn);
 
@@ -143,6 +172,12 @@ void SettingsOverlay::updateFolderLabel()
 {
     contentFolderLabel.setText(proc.getContentDir().getFullPathName(),
                                juce::dontSendNotification);
+}
+
+void SettingsOverlay::updateSampleLibLabel()   // #418
+{
+    sampleLibLabel.setText(proc.getPrimarySampleDir().getFullPathName(),
+                           juce::dontSendNotification);
 }
 
 void SettingsOverlay::computeLayout()
@@ -193,6 +228,16 @@ void SettingsOverlay::computeLayout()
     y += kRowH;
     y += kSectionGap;
 
+    // Section: Sample Library (#418) — user's personal sample folder, used as
+    // the default location for the sample-load dialog.
+    layout.sampleLibHeader     = y;
+    y += kSectionHeadH;
+    layout.sampleLibPathRowY   = y;
+    y += kRowH + kRowGap;
+    layout.sampleLibBtnsRowY   = y;
+    y += kRowH;
+    y += kSectionGap;
+
     // Section: Content Folder
     layout.contentHeader        = y;
     y += kSectionHeadH;
@@ -234,6 +279,13 @@ void SettingsOverlay::resized()
     midiPresetsBtn.setBounds(ctrlX, layout.midiPresetsRowY, kControlW, kRowH);
 
     multiBusToggle.setBounds(ctrlX, layout.multiBusRowY, kControlW, kRowH);
+
+    // #418: sample library row — same layout as Content Folder below.
+    sampleLibLabel.setBounds(x, layout.sampleLibPathRowY, cw, kRowH);
+    resetSampleLibBtn .setBounds(x + cw - kFolderBtnW,
+                                 layout.sampleLibBtnsRowY, kFolderBtnW, kRowH);
+    browseSampleLibBtn.setBounds(x + cw - kFolderBtnW * 2 - kFolderBtnGap,
+                                 layout.sampleLibBtnsRowY, kFolderBtnW, kRowH);
 
     contentFolderLabel.setBounds(x, layout.contentPathRowY, cw, kRowH);
     resetContentFolderBtn .setBounds(x + cw - kFolderBtnW,
@@ -285,6 +337,7 @@ void SettingsOverlay::paint(juce::Graphics& g)
         drawSectionHeader(layout.midiClockHeader, "MIDI Clock");
     drawSectionHeader(layout.midiPCHeader,   "MIDI Program Change");
     drawSectionHeader(layout.outputHeader,   "Output");
+    drawSectionHeader(layout.sampleLibHeader, "Sample Library");   // #418
     drawSectionHeader(layout.contentHeader,  "Content Folder");
 
     // Rescan-required hint next to the multi-bus toggle.

@@ -15,6 +15,9 @@ using mu_pp::kRhythmSuffixes;
 using mu_pp::kChannelSuffixes;
 using mu_pp::kGlobalParams;
 using mu_pp::applyRhythmSuffix;
+using mu_pp::migrateLegacyPresetNorm;
+using mu_pp::migrateLegacyGlobalNorm;
+using mu_pp::kCurrentPresetVersion;
 
 // Forward decls so the save/load paths defined earlier in this TU can reference
 // the modulator serialise helpers defined later.
@@ -68,13 +71,19 @@ void PluginProcessor::stageRhythmPreset(int rhythmIndex, const juce::File& file)
     Rhythm newRhythm = sequencer.getRhythm(rhythmIndex);
     const juce::String paramPrefix = "r" + juce::String(rhythmIndex) + "_";
 
+    // #430: rescale legacy normalized values when the preset file pre-dates the
+    // drvChar (0..10 → 0..12) and drvBits (1..16 → 0..16) range changes.
+    const bool isLegacy = ((int)state.getProperty("presetVersion", 0)) < kCurrentPresetVersion;
+
     for (int i = 0; kRhythmSuffixes[i] != nullptr; ++i)
     {
         const juce::String suffix = kRhythmSuffixes[i];
         juce::Identifier propId { "r0_" + suffix };
         if (state.hasProperty(propId))
         {
-            const float normVal = (float)state.getProperty(propId);
+            float normVal = (float)state.getProperty(propId);
+            if (isLegacy)
+                normVal = migrateLegacyPresetNorm(suffix, normVal);
             if (auto* param = apvts.getParameter(paramPrefix + suffix))
             {
                 const float actualVal = param->convertFrom0to1(normVal);
@@ -167,6 +176,7 @@ void PluginProcessor::saveRhythmPreset(int rhythmIdx, const juce::String& name,
     juce::ValueTree state("MuClidRhythm");
     state.setProperty("presetName",     name,     nullptr);
     state.setProperty("presetCategory", category, nullptr);
+    state.setProperty("presetVersion",  kCurrentPresetVersion, nullptr);   // #430
 
     const Rhythm& r = sequencer.getRhythm(rhythmIdx);
     state.setProperty("r0_name",   juce::String(r.name),          nullptr);
@@ -239,6 +249,7 @@ void PluginProcessor::saveRhythmPresetToFile(int rhythmIdx, const juce::File& de
     state.setProperty("presetCategory",     category,                               nullptr);
     state.setProperty("presetDescription",  description,                            nullptr);
     state.setProperty("presetEmbedSamples", embedSample ? 1 : 0,                   nullptr);
+    state.setProperty("presetVersion",      kCurrentPresetVersion,                  nullptr);   // #430
 
     const Rhythm& r = sequencer.getRhythm(rhythmIdx);
     state.setProperty("r0_name",   juce::String(r.name),        nullptr);
@@ -301,13 +312,21 @@ bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
     // Load only sequencer-page state — mixer settings stay attached to the slot.
     // Older rhythm preset files may include "ch_*" properties; those are simply
     // ignored on load (no read here) so legacy files load cleanly with the new policy.
+    // #430: rescale legacy normalized values for drvChar / drvBits.
+    const bool isLegacy = ((int)state.getProperty("presetVersion", 0)) < kCurrentPresetVersion;
     const juce::String dstPrefix = "r" + juce::String(targetIdx) + "_";
     for (int i = 0; kRhythmSuffixes[i] != nullptr; ++i)
     {
-        juce::Identifier propId { "r0_" + juce::String(kRhythmSuffixes[i]) };
+        const juce::String suffix = kRhythmSuffixes[i];
+        juce::Identifier propId { "r0_" + suffix };
         if (state.hasProperty(propId))
-            if (auto* param = apvts.getParameter(dstPrefix + kRhythmSuffixes[i]))
-                param->setValueNotifyingHost((float)state.getProperty(propId));
+            if (auto* param = apvts.getParameter(dstPrefix + suffix))
+            {
+                float normVal = (float)state.getProperty(propId);
+                if (isLegacy)
+                    normVal = migrateLegacyPresetNorm(suffix, normVal);
+                param->setValueNotifyingHost(normVal);
+            }
     }
 
     Rhythm& r = sequencer.getRhythm(targetIdx);
@@ -811,6 +830,7 @@ void PluginProcessor::savePreset(const juce::String& name,
     root.setProperty("presetDescription",  description,          nullptr);
     root.setProperty("presetEmbedSamples", embedSamples ? 1 : 0, nullptr);
     root.setProperty("presetCategory",    category,    nullptr);
+    root.setProperty("presetVersion",     kCurrentPresetVersion, nullptr);   // #430
 
     for (int i = 0; i < n; ++i)
     {
@@ -928,6 +948,10 @@ void PluginProcessor::loadPreset(const juce::File& file)
         }
 
         mu_core::ScopedApvtsLoading guard(apvtsLoading);
+
+        // #430: rescale legacy normalized values for drvChar / drvBits + master inserts.
+        const bool isLegacy = ((int)root.getProperty("presetVersion", 0)) < kCurrentPresetVersion;
+
         int rhythmIdx = 0;
         for (int ci = 0; ci < root.getNumChildren() && rhythmIdx < n; ++ci)
         {
@@ -938,10 +962,16 @@ void PluginProcessor::loadPreset(const juce::File& file)
             const juce::String dstPrefix = "r" + juce::String(i) + "_";
             for (int j = 0; kRhythmSuffixes[j] != nullptr; ++j)
             {
-                juce::Identifier propId { kRhythmSuffixes[j] };
+                const juce::String suffix = kRhythmSuffixes[j];
+                juce::Identifier propId { suffix };
                 if (rTree.hasProperty(propId))
-                    if (auto* param = apvts.getParameter(dstPrefix + kRhythmSuffixes[j]))
-                        param->setValueNotifyingHost((float)rTree.getProperty(propId));
+                    if (auto* param = apvts.getParameter(dstPrefix + suffix))
+                    {
+                        float normVal = (float)rTree.getProperty(propId);
+                        if (isLegacy)
+                            normVal = migrateLegacyPresetNorm(suffix, normVal);
+                        param->setValueNotifyingHost(normVal);
+                    }
             }
 
             const juce::String dstChPrefix = "ch" + juce::String(i) + "_";
@@ -1036,16 +1066,24 @@ void PluginProcessor::loadPreset(const juce::File& file)
         }
 
         // Restore global FX/mixer state if present (added in #123; older files omit this).
+        // #430: rescale legacy mst_insChar / mst_insBits (and ins2 equivalents) when
+        // presetVersion is missing.
         for (int ci = 0; ci < root.getNumChildren(); ++ci)
         {
             auto child = root.getChild(ci);
             if (child.getType() != juce::Identifier("GlobalState")) continue;
             for (int gi = 0; kGlobalParams[gi] != nullptr; ++gi)
             {
-                juce::Identifier propId { kGlobalParams[gi] };
+                const juce::String gid = kGlobalParams[gi];
+                juce::Identifier propId { gid };
                 if (child.hasProperty(propId))
-                    if (auto* param = apvts.getParameter(kGlobalParams[gi]))
-                        param->setValueNotifyingHost((float)child.getProperty(propId));
+                    if (auto* param = apvts.getParameter(gid))
+                    {
+                        float normVal = (float)child.getProperty(propId);
+                        if (isLegacy)
+                            normVal = migrateLegacyGlobalNorm(gid, normVal);
+                        param->setValueNotifyingHost(normVal);
+                    }
             }
             break;
         }

@@ -91,17 +91,19 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
     if (hasInsert())
     {
         auto addInsertCombo = [](juce::ComboBox& box) {
-            box.addItem("None",       1);
-            box.addItem("3-Band EQ",  7);
-            box.addItem("Bitcrusher", 5);
-            box.addItem("Clipper",    6);
-            box.addItem("Compressor", 8);
-            box.addItem("Fold",       4);
-            box.addItem("Hard Clip",  3);
-            box.addItem("Limiter",    9);
-            box.addItem("Ring Mod",  10);
-            box.addItem("Soft Clip",  2);
-            box.addItem("Tape Sat",  11);
+            box.addItem("None",        1);
+            box.addItem("3-Band EQ",   7);
+            box.addItem("Bitcrusher",  5);
+            box.addItem("Clipper",     6);
+            box.addItem("Compressor",  8);
+            box.addItem("Fold",        4);
+            box.addItem("Hard Clip",   3);
+            box.addItem("Karplus",    12);  // #422
+            box.addItem("Limiter",     9);
+            box.addItem("Ring Mod",   10);
+            box.addItem("Soft Clip",   2);
+            box.addItem("Tape Sat",   11);
+            box.addItem("Vocoder",    13);  // #423
             box.setSelectedId(1, juce::dontSendNotification);
         };
         addInsertCombo(insCharBox);
@@ -195,9 +197,11 @@ void MixerChannel::resized()
     const int panH   = spH - 3 * sendH;
     const int faderY = sendY + spH;
 
+    // A return channel cannot send to itself (would feedback-loop). #429.
     sendEffect.setVisible(hasSends() && channelType == Type::Rhythm);
-    sendDelay .setVisible(hasSends() && channelType != Type::ReverbReturn);
-    sendReverb.setVisible(hasSends());
+    sendDelay .setVisible(hasSends() && channelType != Type::DelayReturn
+                                     && channelType != Type::ReverbReturn);
+    sendReverb.setVisible(hasSends() && channelType != Type::ReverbReturn);
 
     sendEffect.setBounds(0, sendY,             stripW, sendH);
     sendDelay .setBounds(0, sendY + sendH,     stripW, sendH);

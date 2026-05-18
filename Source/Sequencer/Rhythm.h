@@ -26,7 +26,8 @@ public:
         : VoiceSlot(other),
           genA(other.genA), genB(other.genB), genC(other.genC),
           logic(other.logic),
-          resetSteps(other.resetSteps)
+          resetSteps(other.resetSteps),
+          patternLegato(other.patternLegato)
     {}
 
     Rhythm& operator=(const Rhythm& other)
@@ -34,11 +35,12 @@ public:
         if (this != &other)
         {
             VoiceSlot::operator=(other);
-            genA       = other.genA;
-            genB       = other.genB;
-            genC       = other.genC;
-            logic      = other.logic;
-            resetSteps = other.resetSteps;
+            genA          = other.genA;
+            genB          = other.genB;
+            genC          = other.genC;
+            logic         = other.logic;
+            resetSteps    = other.resetSteps;
+            patternLegato = other.patternLegato;
         }
         return *this;
     }
@@ -48,6 +50,11 @@ public:
     HitGenerator        genC;  // accent pattern (full controls: steps/hits/rot + pads + insert)
     Logic               logic       = Logic::OR;
     std::optional<int>  resetSteps;   // nullopt = INF (free-running)
+    // #419: pattern-aware legato. When true, the sequencer marks adjacent hits
+    // (pattern[s] && pattern[s-1]) as "tied"; tied steps retrigger the sample
+    // voice but skip the envelope noteOn so the envelope state continues
+    // uninterrupted across the contiguous run. See BlockResult::tiedMask.
+    bool                patternLegato = false;
 
     // Returns the combined hit pattern for one full cycle.
     // Length is resetSteps if set, otherwise the LCM of A and B step counts.

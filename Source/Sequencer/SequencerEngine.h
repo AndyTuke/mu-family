@@ -8,6 +8,13 @@ struct BlockResult
 {
     int  firedMask          = 0;  // bit N set = rhythm N fired a hit this block
     int  accentMask         = 0;  // bit N set = that hit was accented (Ring C coincidence)
+    int  tiedMask           = 0;  // #419: bit N set = rhythm N's hit this block is "tied"
+                                  // (the immediately preceding step was also a hit). Audio
+                                  // engine uses this when Rhythm::patternLegato is enabled
+                                  // to skip the envelope noteOn so contiguous hits don't
+                                  // restart the envelope. Always computed; the per-rhythm
+                                  // patternLegato flag gates the actual behaviour at the
+                                  // PluginProcessor trigger call.
     int  rhythmLoopWrapMask = 0;  // bit N set = rhythm N's step index wrapped to 0 this block
     bool masterLoopWrapped  = false; // master loop counter reset this block
 };
@@ -73,6 +80,9 @@ public:
         {
             lastStepIndex[r]       = -1;
             lastAccentStepIndex[r] = 0;
+            // #419: post-swap, the first hit of the new pattern must not be
+            // marked "tied" to whatever step the old pattern had under us.
+            wasLastStepHit[r] = false;
         }
     }
 
@@ -103,6 +113,12 @@ private:
 
     std::array<int, MaxRhythms> lastStepIndex;
     std::array<int, MaxRhythms> lastAccentStepIndex;
+    // #419: per-rhythm "was the most recent step we walked a hit?" — used to
+    // compute BlockResult::tiedMask on the next hit. Defaults to false; set
+    // to false in the constructor's `fill(...)` initialisation block and
+    // wherever lastStepIndex is reset to -1 (cold start, hot-swap commit,
+    // removeRhythm shift).
+    std::array<bool, MaxRhythms> wasLastStepHit { };
     std::vector<bool> patternUpdated;
     int masterLoopSteps = 0;
     std::atomic<int> masterLoopCurrentStep { 0 };
