@@ -15,15 +15,15 @@ EuclideanPanel::EuclideanPanel(PluginProcessor& p) : proc(p)
                      &prePadModeC, &postPadModeC, &insertModeC })
         addAndMakeVisible(s);
 
-    stepsA.setRange(1, 64, 1);      hitsA.setRange(0, 64, 1);   rotA.setRange(0, 63, 1);   // #226
+    stepsA.setRange(1, 64, 1);      hitsA.setRange(0, 64, 1);   rotA.setRange(0, 63, 1);
     prePadA.setRange(0, 12, 1);     postPadA.setRange(0, 12, 1);
     insertStA.setRange(0, 63, 1);   insertLenA.setRange(0, 8, 1);
 
-    stepsB.setRange(1, 64, 1);      hitsB.setRange(0, 64, 1);   rotB.setRange(0, 63, 1);   // #226
+    stepsB.setRange(1, 64, 1);      hitsB.setRange(0, 64, 1);   rotB.setRange(0, 63, 1);
     prePadB.setRange(0, 12, 1);     postPadB.setRange(0, 12, 1);
     insertStB.setRange(0, 63, 1);   insertLenB.setRange(0, 8, 1);
 
-    stepsC.setRange(1, 64, 1);      hitsC.setRange(0, 64, 1);   rotC.setRange(0, 63, 1);   // #226
+    stepsC.setRange(1, 64, 1);      hitsC.setRange(0, 64, 1);   rotC.setRange(0, 63, 1);
     prePadC.setRange(0, 12, 1);     postPadC.setRange(0, 12, 1);
     insertStC.setRange(0, 63, 1);   insertLenC.setRange(0, 8, 1);
 
@@ -74,7 +74,7 @@ void EuclideanPanel::wireCallbacks()
         apvtsSet("insLenA", (float)v);  notify();
         if (onStatusUpdate) onStatusUpdate("Euclid A Insert Length", juce::String((int)v));
     };
-    // #379: status-bar coverage for segment toggles — mode text matches dropdown.
+    // status-bar coverage for segment toggles — mode text matches dropdown.
     auto padModeLabel = [](int idx) { return idx == 1 ? juce::String("Mute") : juce::String("Pad"); };
     prePadModeA.onChange = [this, notify, padModeLabel](int idx) {
         apvtsSet("prePadModeA", idx == 1 ? 1.0f : 0.0f);  notify();
@@ -241,7 +241,7 @@ void EuclideanPanel::loadFromRhythm()
     for (int i = 0; i < 5; i++)
         if (r.logic == logics[i]) { logicCtrl.setSelectedIndex(i); break; }
 
-    legatoCtrl.setSelectedIndex(r.patternLegato ? 1 : 0);   // #419
+    legatoCtrl.setSelectedIndex(r.patternLegato ? 1 : 0);
 }
 
 void EuclideanPanel::refreshSuffix(const juce::String& suffix)
@@ -302,21 +302,21 @@ void EuclideanPanel::refreshSuffix(const juce::String& suffix)
 void EuclideanPanel::updateRangesA(int steps)
 {
     hitsA.setRange(0, steps, 1);
-    rotA.setRange(0, juce::jmax(0, steps - 1), 1);   // #226: full 0..steps-1 per design-sequencer.md
+    rotA.setRange(0, juce::jmax(0, steps - 1), 1);   // full 0..steps-1 per design-sequencer.md
     insertStA.setRange(0, juce::jmax(0, steps - 1), 1);
 }
 
 void EuclideanPanel::updateRangesB(int steps)
 {
     hitsB.setRange(0, steps, 1);
-    rotB.setRange(0, juce::jmax(0, steps - 1), 1);   // #226
+    rotB.setRange(0, juce::jmax(0, steps - 1), 1);
     insertStB.setRange(0, juce::jmax(0, steps - 1), 1);
 }
 
 void EuclideanPanel::updateRangesC(int steps)
 {
     hitsC.setRange(0, steps, 1);
-    rotC.setRange(0, juce::jmax(0, steps - 1), 1);   // #226
+    rotC.setRange(0, juce::jmax(0, steps - 1), 1);
     insertStC.setRange(0, juce::jmax(0, steps - 1), 1);
 }
 
@@ -364,33 +364,31 @@ void EuclideanPanel::refreshModulatedIndicators()
     insertStC.setIsModulated(playing && isAssigned("euclid.c.insSt"));
     insertLenC.setIsModulated(playing && isAssigned("euclid.c.insLen"));
 
-    // #336 Stage C: live-arc indicator values from the modulation snapshot.
-    const auto& snap = proc.modSnapshot[rhythmIndex];
-    auto sn  = [&](int i) { return snap[i].load(); };
+    // Stage C: live-arc indicator values from the modulation snapshot.
+    auto sn  = [&](int i) { return proc.getModSnapshot(rhythmIndex, i); };
     const float kNaN = std::numeric_limits<float>::quiet_NaN();
     auto arc = [&](bool assigned, int idx) { return (assigned && playing) ? sn(idx) : kNaN; };
 
-    using P = PluginProcessor;
-    hitsA     .setModulatedNorm(arc(isAssigned("euclid.a.hits"),    P::kSnapEucAHits));
-    rotA      .setModulatedNorm(arc(isAssigned("euclid.a.rotate"),  P::kSnapEucARotate));
-    prePadA   .setModulatedNorm(arc(isAssigned("euclid.a.prePad"),  P::kSnapEucAPrePad));
-    postPadA  .setModulatedNorm(arc(isAssigned("euclid.a.postPad"), P::kSnapEucAPostPad));
-    insertStA .setModulatedNorm(arc(isAssigned("euclid.a.insSt"),   P::kSnapEucAInsSt));
-    insertLenA.setModulatedNorm(arc(isAssigned("euclid.a.insLen"),  P::kSnapEucAInsLen));
+    hitsA     .setModulatedNorm(arc(isAssigned("euclid.a.hits"),    kSnapEucAHits));
+    rotA      .setModulatedNorm(arc(isAssigned("euclid.a.rotate"),  kSnapEucARotate));
+    prePadA   .setModulatedNorm(arc(isAssigned("euclid.a.prePad"),  kSnapEucAPrePad));
+    postPadA  .setModulatedNorm(arc(isAssigned("euclid.a.postPad"), kSnapEucAPostPad));
+    insertStA .setModulatedNorm(arc(isAssigned("euclid.a.insSt"),   kSnapEucAInsSt));
+    insertLenA.setModulatedNorm(arc(isAssigned("euclid.a.insLen"),  kSnapEucAInsLen));
 
-    hitsB     .setModulatedNorm(arc(isAssigned("euclid.b.hits"),    P::kSnapEucBHits));
-    rotB      .setModulatedNorm(arc(isAssigned("euclid.b.rotate"),  P::kSnapEucBRotate));
-    prePadB   .setModulatedNorm(arc(isAssigned("euclid.b.prePad"),  P::kSnapEucBPrePad));
-    postPadB  .setModulatedNorm(arc(isAssigned("euclid.b.postPad"), P::kSnapEucBPostPad));
-    insertStB .setModulatedNorm(arc(isAssigned("euclid.b.insSt"),   P::kSnapEucBInsSt));
-    insertLenB.setModulatedNorm(arc(isAssigned("euclid.b.insLen"),  P::kSnapEucBInsLen));
+    hitsB     .setModulatedNorm(arc(isAssigned("euclid.b.hits"),    kSnapEucBHits));
+    rotB      .setModulatedNorm(arc(isAssigned("euclid.b.rotate"),  kSnapEucBRotate));
+    prePadB   .setModulatedNorm(arc(isAssigned("euclid.b.prePad"),  kSnapEucBPrePad));
+    postPadB  .setModulatedNorm(arc(isAssigned("euclid.b.postPad"), kSnapEucBPostPad));
+    insertStB .setModulatedNorm(arc(isAssigned("euclid.b.insSt"),   kSnapEucBInsSt));
+    insertLenB.setModulatedNorm(arc(isAssigned("euclid.b.insLen"),  kSnapEucBInsLen));
 
-    hitsC     .setModulatedNorm(arc(isAssigned("euclid.c.hits"),    P::kSnapEucCHits));
-    rotC      .setModulatedNorm(arc(isAssigned("euclid.c.rotate"),  P::kSnapEucCRotate));
-    prePadC   .setModulatedNorm(arc(isAssigned("euclid.c.prePad"),  P::kSnapEucCPrePad));
-    postPadC  .setModulatedNorm(arc(isAssigned("euclid.c.postPad"), P::kSnapEucCPostPad));
-    insertStC .setModulatedNorm(arc(isAssigned("euclid.c.insSt"),   P::kSnapEucCInsSt));
-    insertLenC.setModulatedNorm(arc(isAssigned("euclid.c.insLen"),  P::kSnapEucCInsLen));
+    hitsC     .setModulatedNorm(arc(isAssigned("euclid.c.hits"),    kSnapEucCHits));
+    rotC      .setModulatedNorm(arc(isAssigned("euclid.c.rotate"),  kSnapEucCRotate));
+    prePadC   .setModulatedNorm(arc(isAssigned("euclid.c.prePad"),  kSnapEucCPrePad));
+    postPadC  .setModulatedNorm(arc(isAssigned("euclid.c.postPad"), kSnapEucCPostPad));
+    insertStC .setModulatedNorm(arc(isAssigned("euclid.c.insSt"),   kSnapEucCInsSt));
+    insertLenC.setModulatedNorm(arc(isAssigned("euclid.c.insLen"),  kSnapEucCInsLen));
 }
 
 void EuclideanPanel::resized()
@@ -442,7 +440,7 @@ void EuclideanPanel::resized()
     placeRow(y, stepsA, hitsA, rotA, prePadA, postPadA, prePadModeA, postPadModeA, insertStA, insertLenA, insertModeA);
 
     y += rowH;
-    // #419: split the logic row into [Legato] | gap | [Logic]. Layout
+    // split the logic row into [Legato] | gap | [Logic]. Layout
     // constants live in the header so paint() can mirror them exactly.
     {
         const int rowX     = kOuter + kLogicMP;
@@ -499,7 +497,7 @@ void EuclideanPanel::paint(juce::Graphics& g)
         g.drawRoundedRectangle((float)insX, (float)cy, (float)(w - kOuter - insX),  (float)ctrlH, 4.0f, 1.0f);
     }
 
-    // #419: logic row is split into a Legato sub-panel and a Logic sub-panel
+    // logic row is split into a Legato sub-panel and a Logic sub-panel
     // separated by a small visual gap. Outline rectangles bracket the pill
     // bounds with a one-mP margin on the outside (matches the spacing used
     // by the other knob clusters above/below).

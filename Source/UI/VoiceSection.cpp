@@ -1,7 +1,7 @@
 #include "VoiceSection.h"
 #include "../PluginProcessor.h"
 
-// #435: per-algorithm default table moved to UI/InsertAlgoDefaults.h
+// per-algorithm default table moved to UI/InsertAlgoDefaults.h
 // (mu_ui::kInsertAlgoDefaults). Both this page and MixerChannel_Insert.cpp
 // now share that single source of truth; previous local copies had drifted.
 
@@ -45,12 +45,12 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     insertAlgo.addItem("Compressor",  8);
     insertAlgo.addItem("Fold",        4);
     insertAlgo.addItem("Hard Clip",   3);
-    insertAlgo.addItem("Karplus",    12);   // #422
+    insertAlgo.addItem("Karplus",    12);
     insertAlgo.addItem("Limiter",     9);
     insertAlgo.addItem("Ring Mod",   10);
     insertAlgo.addItem("Soft Clip",   2);
     insertAlgo.addItem("Tape Sat",   11);
-    insertAlgo.addItem("Vocoder",    13);   // #423
+    insertAlgo.addItem("Vocoder",    13);
     insertAlgo.setSelectedId(1, false);
     addAndMakeVisible(insertAlgo);
 
@@ -59,7 +59,7 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     pitchSemi  .setRange(-12.0, 12.0,   1.0);   pitchSemi  .setValue(0.0);
     pitchFine  .setRange(-100.0,100.0,  0.1);   pitchFine  .setValue(0.0);
     // ADSR: 0–100 display scale. 0→1 ms, 100→3 s (A/D/R); 0–100% (S). Mapping in adsrTime/adsrSus.
-    // #287: pitch A/D/R in seconds (0..10) with skew 0.3 — matches amp + filter envelopes.
+    // pitch A/D/R in seconds (0..10) with skew 0.3 — matches amp + filter envelopes.
     pitchAtk   .setRange(0.0, 10.0, 0.001);  pitchAtk.setValue(0.0);   pitchAtk.getSlider().setSkewFactor(0.3);
     pitchDec   .setRange(0.0, 10.0, 0.001);  pitchDec.setValue(0.03);  pitchDec.getSlider().setSkewFactor(0.3);
     pitchSus   .setRange(0.0, 100.0, 0.1);   pitchSus.setValue(0.0);
@@ -67,9 +67,9 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     pitchDepth .setRange(0.0,  24.0, 0.1);   pitchDepth.setValue(0.0);
 
     filterCutoff.setRange(20.0, 20000.0, 1.0);  filterCutoff.setValue(8000.0);
-    filterCutoff.getSlider().setSkewFactorFromMidPoint(640.0);   // #216: log feel — geo mean of 20..20000
+    filterCutoff.getSlider().setSkewFactorFromMidPoint(640.0);   // log feel — geo mean of 20..20000
     filterRes   .setRange(0.0,  100.0,  0.1);   filterRes   .setValue(20.0);
-    // #286: filter A/D/R in seconds (0..10) with skew 0.3 — matches amp envelope.
+    // filter A/D/R in seconds (0..10) with skew 0.3 — matches amp envelope.
     filterAtk   .setRange(0.0,  10.0, 0.001);  filterAtk.setValue(0.03);  filterAtk.getSlider().setSkewFactor(0.3);
     filterDec   .setRange(0.0,  10.0, 0.001);  filterDec.setValue(0.09);  filterDec.getSlider().setSkewFactor(0.3);
     filterSus   .setRange(0.0, 100.0, 0.1);    filterSus.setValue(0.0);
@@ -81,7 +81,7 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     ampSendDly.setRange(0.0, 1.0,  0.01);  ampSendDly.setValue(0.0);
     ampSendRev.setRange(0.0, 1.0,  0.01);  ampSendRev.setValue(0.0);
     ampAccent .setRange(0.0, 12.0, 0.1);   ampAccent .setValue(0.0);
-    // #217: amp A/D/R now in seconds (0..10) with skew 0.3 so 100–200 ms sits at
+    // amp A/D/R now in seconds (0..10) with skew 0.3 so 100–200 ms sits at
     // knob centre. Sustain stays 0..100 %.
     ampAtk    .setRange(0.0, 10.0,  0.001); ampAtk .setValue(0.005); ampAtk.getSlider().setSkewFactor(0.3);
     ampDec    .setRange(0.0, 10.0,  0.001); ampDec .setValue(0.3);   ampDec.getSlider().setSkewFactor(0.3);
@@ -93,7 +93,7 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     insertOutput.setRange(-24.0,   0.0, 0.1);   insertOutput.setValue(0.0);
     insertDither.setRange(0.0,   100.0, 0.1);   insertDither.setValue(0.0);
     insertTone  .setRange(20.0, 20000.0, 1.0);  insertTone  .setValue(20000.0);
-    insertTone  .getSlider().setSkewFactorFromMidPoint(640.0);   // #289: log feel default for full-range modes
+    insertTone  .getSlider().setSkewFactorFromMidPoint(640.0);   // log feel default for full-range modes
 
     wireCallbacks();
 }
@@ -106,7 +106,7 @@ void VoiceSection::apvtsSet(const char* suffix, float v)
         p->setValueNotifyingHost(p->convertTo0to1(v));
 }
 
-// #217: seconds-domain formatter for the amp envelope. Slider value IS seconds (0..10).
+// seconds-domain formatter for the amp envelope. Slider value IS seconds (0..10).
 static juce::String formatAdsrTimeSec(double v)
 {
     double ms = std::max(1.0, v * 1000.0);
@@ -128,14 +128,14 @@ static double parseAdsrTimeSec(const juce::String& s)
 
 void VoiceSection::wireCallbacks()
 {
-    // #217 (amp) + #286 (filter) + #287 (pitch): all ADSR time sliders take seconds directly.
+    // (amp) + #286 (filter) + #287 (pitch): all ADSR time sliders take seconds directly.
     for (auto* k : { &ampAtk, &ampDec, &filterAtk, &filterDec, &filterRel,
                      &pitchAtk, &pitchDec, &pitchRel })
     {
         k->getSlider().textFromValueFunction = [](double v) { return formatAdsrTimeSec(v); };
         k->getSlider().valueFromTextFunction = [](const juce::String& s) { return parseAdsrTimeSec(s); };
     }
-    // #217: Amp Release at max (10 s) means "play to natural end".
+    // Amp Release at max (10 s) means "play to natural end".
     ampRel.getSlider().textFromValueFunction = [](double v) -> juce::String {
         if (v >= 10.0) return "End";
         return formatAdsrTimeSec(v);
@@ -211,7 +211,7 @@ void VoiceSection::wireCallbacks()
     // Filter config — DropdownSelect uses 1-based IDs; filterType index = selectedId - 1.
     filterType.onChange = [this](int id) {
         apvtsSet("fltType", (float)(id - 1));
-        // #379: status-bar feedback when filter type changes — show the dropdown item text.
+        // status-bar feedback when filter type changes — show the dropdown item text.
         if (onStatusUpdate) onStatusUpdate("Filter Type", filterType.getText());
     };
     filterCutoff.onValueChanged = [this](double v) { apvtsSet("fltCut", (float)v); };
@@ -275,7 +275,7 @@ void VoiceSection::wireCallbacks()
         }
 
         // Restore the incoming algorithm from its saved snapshot, or first-visit defaults.
-        // #435: defaults are now shared with MixerChannel_Insert via UI/InsertAlgoDefaults.h.
+        // defaults are now shared with MixerChannel_Insert via UI/InsertAlgoDefaults.h.
         const InsertAlgoSnapshot& snap = insertSnapshotValid[newChar]
                                         ? insertSnapshots[newChar]
                                         : mu_ui::kInsertAlgoDefaults[newChar];
@@ -288,7 +288,7 @@ void VoiceSection::wireCallbacks()
         apvtsSet("drvRate",   snap.insertRate);
         apvtsSet("drvChar",   (float)newChar);
         configureInsertAlgorithm(newChar);
-        // #379: status-bar feedback when Insert algorithm changes.
+        // status-bar feedback when Insert algorithm changes.
         if (onStatusUpdate) onStatusUpdate("Insert Algorithm", insertAlgo.getText());
     };
 }
@@ -316,12 +316,11 @@ void VoiceSection::refreshModulatedIndicators()
 
     // Only show mod indicators (ring + live arc) while playing — when stopped the
     // snapshot holds the last played position, which would be a misleading permanent indicator.
-    const auto& snap    = proc.modSnapshot[rhythmIndex];
-    auto sn  = [&](int i) { return snap[i].load(); };
+    auto sn = [&](int i) { return proc.getModSnapshot(rhythmIndex, i); };
     const float kNaN    = std::numeric_limits<float>::quiet_NaN();
     const bool  playing = proc.sequencerPlaying.load();
 
-    // #218: single Pitch destination — ring shown only on the Semi knob.
+    // single Pitch destination — ring shown only on the Semi knob.
     pitchOctave .setIsModulated(false);
     pitchSemi   .setIsModulated(playing && isAssigned("pitch.semitones"));
     pitchFine   .setIsModulated(false);
@@ -334,7 +333,7 @@ void VoiceSection::refreshModulatedIndicators()
     ampDec      .setIsModulated(playing && isAssigned("amp.decay"));
     ampSus      .setIsModulated(playing && isAssigned("amp.sustain"));
     ampRel      .setIsModulated(playing && isAssigned("amp.release"));
-    // #223 new destinations
+    // new destinations
     pitchDepth  .setIsModulated(playing && isAssigned("pitch.envDepth"));
     ampLevel    .setIsModulated(playing && isAssigned("amp.level"));
     ampAccent   .setIsModulated(playing && isAssigned("accentDb"));
@@ -347,30 +346,28 @@ void VoiceSection::refreshModulatedIndicators()
         return (assigned && playing) ? sn(idx) : kNaN;
     };
 
-    using P = PluginProcessor;
-    // #218: pitch.octave / pitch.fine no longer modulatable; only the Semi knob shows live arc.
+    // pitch.octave / pitch.fine no longer modulatable; only the Semi knob shows live arc.
     pitchOctave .setModulatedNorm(kNaN);
-    pitchSemi   .setModulatedNorm(arc(isAssigned("pitch.semitones"),  P::kSnapPitchSemi));
+    pitchSemi   .setModulatedNorm(arc(isAssigned("pitch.semitones"),  kSnapPitchSemi));
     pitchFine   .setModulatedNorm(kNaN);
-    filterCutoff.setModulatedNorm(arc(isAssigned("filter.cutoff"),    P::kSnapFilterCutoff));
-    filterRes   .setModulatedNorm(arc(isAssigned("filter.resonance"), P::kSnapFilterRes));
-    filterAtk   .setModulatedNorm(arc(isAssigned("fenv.attack"),      P::kSnapFenvAtk));
-    filterDec   .setModulatedNorm(arc(isAssigned("fenv.decay"),       P::kSnapFenvDec));
-    filterDepth .setModulatedNorm(arc(isAssigned("fenv.depth"),       P::kSnapFenvDepth));
-    ampAtk      .setModulatedNorm(arc(isAssigned("amp.attack"),       P::kSnapAmpAtk));
-    ampDec      .setModulatedNorm(arc(isAssigned("amp.decay"),        P::kSnapAmpDec));
-    ampSus      .setModulatedNorm(arc(isAssigned("amp.sustain"),      P::kSnapAmpSus));
-    ampRel      .setModulatedNorm(arc(isAssigned("amp.release"),      P::kSnapAmpRel));
-    insertDrive  .setModulatedNorm(playing ? (isAssigned("insert.drive") ? sn(P::kSnapInsDrive)
-                                          : isAssigned("insert.bits")  ? sn(P::kSnapInsBits) : kNaN)
+    filterCutoff.setModulatedNorm(arc(isAssigned("filter.cutoff"),    kSnapFilterCutoff));
+    filterRes   .setModulatedNorm(arc(isAssigned("filter.resonance"), kSnapFilterRes));
+    filterAtk   .setModulatedNorm(arc(isAssigned("fenv.attack"),      kSnapFenvAtk));
+    filterDec   .setModulatedNorm(arc(isAssigned("fenv.decay"),       kSnapFenvDec));
+    filterDepth .setModulatedNorm(arc(isAssigned("fenv.depth"),       kSnapFenvDepth));
+    ampAtk      .setModulatedNorm(arc(isAssigned("amp.attack"),       kSnapAmpAtk));
+    ampDec      .setModulatedNorm(arc(isAssigned("amp.decay"),        kSnapAmpDec));
+    ampSus      .setModulatedNorm(arc(isAssigned("amp.sustain"),      kSnapAmpSus));
+    ampRel      .setModulatedNorm(arc(isAssigned("amp.release"),      kSnapAmpRel));
+    insertDrive  .setModulatedNorm(playing ? (isAssigned("insert.drive") ? sn(kSnapInsDrive)
+                                          : isAssigned("insert.bits")  ? sn(kSnapInsBits) : kNaN)
                                          : kNaN);
-    insertOutput .setModulatedNorm(arc(isAssigned("insert.output"),    P::kSnapInsOutput));
-    insertDither .setModulatedNorm(arc(isAssigned("insert.dither"),    P::kSnapInsDither));
-    insertTone   .setModulatedNorm(arc(isAssigned("insert.lpf"),       P::kSnapInsLpf));
-    // #223 new destinations
-    pitchDepth  .setModulatedNorm(arc(isAssigned("pitch.envDepth"),   P::kSnapPitchEnvDep));
-    ampLevel    .setModulatedNorm(arc(isAssigned("amp.level"),        P::kSnapAmpLvl));
-    ampAccent   .setModulatedNorm(arc(isAssigned("accentDb"),         P::kSnapAccent));
+    insertOutput .setModulatedNorm(arc(isAssigned("insert.output"),    kSnapInsOutput));
+    insertDither .setModulatedNorm(arc(isAssigned("insert.dither"),    kSnapInsDither));
+    insertTone   .setModulatedNorm(arc(isAssigned("insert.lpf"),       kSnapInsLpf));
+    pitchDepth  .setModulatedNorm(arc(isAssigned("pitch.envDepth"),   kSnapPitchEnvDep));
+    ampLevel    .setModulatedNorm(arc(isAssigned("amp.level"),        kSnapAmpLvl));
+    ampAccent   .setModulatedNorm(arc(isAssigned("accentDb"),         kSnapAccent));
 }
 
 void VoiceSection::loadFromRhythm()
@@ -382,7 +379,7 @@ void VoiceSection::loadFromRhythm()
     pitchOctave .setValue(p.pitchOctave,         juce::dontSendNotification);
     pitchSemi   .setValue(p.pitchSemitones,      juce::dontSendNotification);
     pitchFine   .setValue(p.pitchFine,           juce::dontSendNotification);
-    // #287: pitch envelope times now in seconds directly.
+    // pitch envelope times now in seconds directly.
     pitchAtk    .setValue(p.pitchEnvAtk,         juce::dontSendNotification);
     pitchDec    .setValue(p.pitchEnvDec,         juce::dontSendNotification);
     pitchSus    .setValue(p.pitchEnvSus * 100.0, juce::dontSendNotification);
@@ -392,7 +389,7 @@ void VoiceSection::loadFromRhythm()
     filterType.setSelectedId(p.filterType + 1, false);
     filterCutoff.setValue(p.filterCutoff,           juce::dontSendNotification);
     filterRes   .setValue(p.filterRes * 100.0,      juce::dontSendNotification);
-    // #286: filter envelope times now in seconds directly.
+    // filter envelope times now in seconds directly.
     filterAtk   .setValue(p.filterEnvAtk,         juce::dontSendNotification);
     filterDec   .setValue(p.filterEnvDec,         juce::dontSendNotification);
     filterSus   .setValue(p.filterEnvSus  * 100.0, juce::dontSendNotification);
@@ -413,7 +410,7 @@ void VoiceSection::loadFromRhythm()
     }
 
     ampAccent.setValue(p.accentDb,               juce::dontSendNotification);
-    // #217: amp slider value IS seconds now (no conversion); Sustain stays 0..100 %.
+    // amp slider value IS seconds now (no conversion); Sustain stays 0..100 %.
     ampAtk  .setValue(p.ampEnvAtk,                                  juce::dontSendNotification);
     ampDec  .setValue(p.ampEnvDec,                                  juce::dontSendNotification);
     ampSus  .setValue(p.ampEnvSus  * 100.0,                         juce::dontSendNotification);
@@ -496,9 +493,9 @@ void VoiceSection::configureInsertAlgorithm(int charId)
     // Null all insert callbacks first — prevents spurious APVTS writes during range changes.
     for (auto* k : { &insertDrive, &insertOutput, &insertDither, &insertTone })
         k->onValueChanged = nullptr;
-    insertOutput.setGRSource(nullptr);  // #246: cleared here; comp/limiter cases re-set below
+    insertOutput.setGRSource(nullptr);  // cleared here; comp/limiter cases re-set below
 
-    // #423-followups: reset any grey-out applied by a previous Vocoder noise-carrier
+    // reset any grey-out applied by a previous Vocoder noise-carrier
     // configuration so the next algorithm doesn't inherit the disabled state.
     for (auto* k : { &insertDrive, &insertOutput, &insertDither, &insertTone })
     {
@@ -521,7 +518,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
         case 1: case 2: case 3:  // ── Soft Clip / Hard Clip / Fold ─────────
             insertDrive.setLabel("Drive");
             insertDrive.setRange(0.0, 100.0, 0.1);
-            // #245: display 0..100 as 0..40 dB input gain (`preGain = pow(10, drvDrv/100 * 2)`).
+            // display 0..100 as 0..40 dB input gain (`preGain = pow(10, drvDrv/100 * 2)`).
             // APVTS storage stays 0..100 — no preset-compat break, formatter only.
             insertDrive.getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return juce::String(v * 0.4, 1) + " dB";
@@ -543,7 +540,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
 
             insertTone.setLabel("LPF");
             insertTone.setRange(20.0, 20000.0, 1.0);
-            insertTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #289
+            insertTone.getSlider().setSkewFactorFromMidPoint(640.0);
             insertTone.getSlider().textFromValueFunction = fmtHz;
             insertTone.getSlider().valueFromTextFunction = parseHz;
             if (p) insertTone.setValue(p->insertTone, juce::dontSendNotification);
@@ -587,7 +584,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
 
             insertTone.setLabel("LPF");
             insertTone.setRange(20.0, 20000.0, 1.0);
-            insertTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #289
+            insertTone.getSlider().setSkewFactorFromMidPoint(640.0);
             insertTone.getSlider().textFromValueFunction = fmtHz;
             insertTone.getSlider().valueFromTextFunction = parseHz;
             if (p) insertTone.setValue(p->insertTone, juce::dontSendNotification);
@@ -621,7 +618,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
 
             insertTone.setLabel("LPF");
             insertTone.setRange(20.0, 20000.0, 1.0);
-            insertTone.getSlider().setSkewFactorFromMidPoint(640.0);   // #289
+            insertTone.getSlider().setSkewFactorFromMidPoint(640.0);
             insertTone.getSlider().textFromValueFunction = fmtHz;
             insertTone.getSlider().valueFromTextFunction = parseHz;
             if (p) insertTone.setValue(p->insertTone, juce::dontSendNotification);
@@ -739,7 +736,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
             insertDither.onValueChanged = [this](double v) { apvtsSet("drvDit", (float)v); };
             insertTone  .onValueChanged = [this](double v) { apvtsSet("drvTon", (float)v); };
 
-            // #246: GR meter on the Output knob
+            // GR meter on the Output knob
             {
                 auto* ve = (rhythmIndex >= 0 && rhythmIndex < proc.getNumRhythms()
                             && proc.voiceEngines[rhythmIndex])
@@ -810,7 +807,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
             insertTone  .onValueChanged = [this](double v) { apvtsSet("drvTon", (float)v); };
             break;
 
-        case 11:  // #422 ── Karplus-Strong — Note / Octave / Feedback / LPF ─
+        case 11:  // ── Karplus-Strong — Note / Octave / Feedback / LPF ─
         {
             static const char* const kNoteNames[7] = { "C", "D", "E", "F", "G", "A", "B" };
             auto noteFmt = [](double v) -> juce::String {
@@ -828,7 +825,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
             insertDrive.setVisible(true);
 
             insertOutput.setLabel("Octave");
-            // #429: range extended to 0..3 (was 1..3). Octave 0 = SPN C1 = 32.7 Hz.
+            // range extended to 0..3 (was 1..3). Octave 0 = SPN C1 = 32.7 Hz.
             insertOutput.setRange(0.0, 3.0, 1.0);
             insertOutput.getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return juce::String((int) std::round(v));
@@ -865,7 +862,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
             break;
         }
 
-        case 12:  // #423 ── Vocoder — Wave / Note / Octave / Unison ────────
+        case 12:  // ── Vocoder — Wave / Note / Octave / Unison ────────
         {
             static const char* const kWaveNames[4] = { "Saw", "Square", "White", "Pink" };
             static const char* const kNoteNames[7] = { "C", "D", "E", "F", "G", "A", "B" };
@@ -882,7 +879,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
             else   insertDrive.setValue(0.0, juce::dontSendNotification);
             insertDrive.setVisible(true);
 
-            // #428: Unison moved from insertTone (20..20k range — would clamp
+            // Unison moved from insertTone (20..20k range — would clamp
             // small ints to 20 and produce a stuck 13-voice default) to
             // insertOutput (-24..0 range). UI knob value is 0..6 (unison
             // index); we encode to drvOut via `v * 4 - 24` on write and
@@ -911,7 +908,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
             else   insertDither.setValue(3.0, juce::dontSendNotification);
             insertDither.setVisible(true);
 
-            // #428: re-use the insertTone knob slot for Note (the Karplus
+            // re-use the insertTone knob slot for Note (the Karplus
             // pattern would have used insertBits, but for Vocoder we already
             // need insertBits for the +1 note offset). Show note letter via
             // textFromValueFunction.
@@ -926,7 +923,7 @@ void VoiceSection::configureInsertAlgorithm(int charId)
             else   insertTone.setValue(4.0, juce::dontSendNotification);
             insertTone.setVisible(true);
 
-            // #423-followups: grey out Note / Octave / Unison when the carrier is
+            // grey out Note / Octave / Unison when the carrier is
             // White (2) or Pink (3) noise — the algorithm ignores those controls
             // (no fundamental to detune), so leaving them active was a usability
             // trap. Helper closure updates the enabled state from the current Wave

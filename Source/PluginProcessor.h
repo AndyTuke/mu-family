@@ -10,6 +10,7 @@
 #include "License/LicenseChecker.h"
 #include "MidiPresetMap.h"
 #include "MuLimits.h"
+#include "Modulation/ModulationSnapshot.h"
 
 #include <memory>
 #include <vector>
@@ -63,7 +64,7 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
-    // #230: internalPlaying / internalBeatPos are touched by both audio (write) and
+    // internalPlaying / internalBeatPos are touched by both audio (write) and
     // message thread (read + clear). std::atomic<> with relaxed ordering — no other
     // memory is published through them, so relaxed is sufficient.
     void   toggleInternalPlay()
@@ -105,11 +106,11 @@ public:
     void    addRhythm    (const Rhythm& r);
     void    removeRhythm (int index);
     bool    swapRhythms  (int i, int j);
-    // #355: reset rhythm to defaults preserving name + colour. Uses suspendProcessing
+    // reset rhythm to defaults preserving name + colour. Uses suspendProcessing
     // + rhythmsLock so the message thread doesn't spin on modLock while the audio
     // thread holds it. Same concurrency pattern as removeRhythm / swapRhythmSlots.
     void    resetRhythm  (int index);
-    // #356: rename rhythm under rhythmsLock — no audio-thread reads of name today,
+    // rename rhythm under rhythmsLock — no audio-thread reads of name today,
     // but the lock is the project's canonical "message thread mutates Rhythm" pattern
     // and avoids the UI-thread modLock spin if a future MIDI/PC matcher reads name.
     void    renameRhythm (int index, const juce::String& newName);
@@ -149,7 +150,7 @@ public:
     void cancelStagedSwap  (int rhythmIndex);
     bool hasPendingSwap    (int rhythmIndex) const;
 
-    // #386: fired (on the message thread, from handleAsyncUpdate) after a hot-swap
+    // fired (on the message thread, from handleAsyncUpdate) after a hot-swap
     // commit finishes. The editor uses this to refresh non-APVTS UI state — name
     // label, sample bar, colour-tinted bits — that pushRhythmToAPVTS doesn't cover
     // because those fields aren't APVTS parameters. Editor MUST clear this in its
@@ -157,7 +158,7 @@ public:
     // plugin), and a swap commit firing into a destroyed editor is a UAF.
     std::function<void(int rhythmIndex)> onRhythmHotSwapCommitted;
 
-    // #406: fired when a preset / state-restore parse fails (parseXML returns null
+    // fired when a preset / state-restore parse fails (parseXML returns null
     // or the resulting tree is invalid). Editor surfaces via the status bar so the
     // user sees feedback instead of a silent click. Same dtor-cleanup requirement
     // as onRhythmHotSwapCommitted — clear in editor dtor to avoid UAF when the
@@ -173,7 +174,7 @@ public:
     void setContentDir(const juce::File& dir);
     void ensureContentFoldersExist();
 
-    // #418: user-configurable personal sample library. Distinct from the
+    // user-configurable personal sample library. Distinct from the
     // content / My Documents folder (which hosts factory + preset-linked
     // material). Default when unset = OS user Music dir. setPrimarySampleDir(
     // juce::File{}) clears the override and reverts to that default.
@@ -243,26 +244,11 @@ public:
     std::atomic<bool>   sequencerPlaying { false };
     std::atomic<double> lastBeatPos      { 0.0 };  // most recent beat position (for UI playhead)
 
-    // Issue #133: per-destination modulated-value snapshot for the live-arc indicator.
-    // Written by the audio thread after ModulationMatrix::process(); read by VoiceSection at 30 Hz.
-    // Values are pre-normalized 0..1 to the knob's display range.
-    enum ModSnapIdx : int {
-        kSnapAmpAtk = 0, kSnapAmpDec, kSnapAmpSus, kSnapAmpRel,
-        kSnapFilterCutoff, kSnapFilterRes,
-        kSnapFenvAtk, kSnapFenvDec, kSnapFenvDepth,
-        kSnapPitchSemi,
-        kSnapPitchOct,   // DEPRECATED #218 — kept for index stability
-        kSnapPitchFine,  // DEPRECATED #218 — kept for index stability
-        kSnapInsDrive, kSnapInsOutput, kSnapInsBits, kSnapInsDither, kSnapInsLpf,
-        // #223 additions
-        kSnapPitchEnvDep, kSnapAmpLvl, kSnapAccent,
-        // #336 Stage C: euclid pattern destinations (hits/rotate/prePad/postPad/insSt/insLen × A/B/C).
-        kSnapEucAHits,  kSnapEucARotate, kSnapEucAPrePad, kSnapEucAPostPad, kSnapEucAInsSt, kSnapEucAInsLen,
-        kSnapEucBHits,  kSnapEucBRotate, kSnapEucBPrePad, kSnapEucBPostPad, kSnapEucBInsSt, kSnapEucBInsLen,
-        kSnapEucCHits,  kSnapEucCRotate, kSnapEucCPrePad, kSnapEucCPostPad, kSnapEucCInsSt, kSnapEucCInsLen,
-        kSnapCount
-    };
-    std::array<std::atomic<float>, kSnapCount> modSnapshot[SequencerEngine::MaxRhythms];
+    // Snapshot accessor for UI panels (see Modulation/ModulationSnapshot.h for index enum).
+    float getModSnapshot(int rhythmIdx, int snapIdx) const noexcept
+    {
+        return modSnapshot[rhythmIdx][snapIdx].load();
+    }
 
     // 128-entry MIDI program-change → .muRhyth preset path map. Public so the UI panel
     // can read/write directly. All mutation is message-thread-only; audio thread reads
@@ -270,6 +256,8 @@ public:
     MidiPresetMap midiPresetMap;
 
 private:
+    std::array<std::atomic<float>, kSnapCount> modSnapshot[SequencerEngine::MaxRhythms];
+
     // Hot-swap state: message thread writes pendingRhythm/pendingVoice, then sets isReady.
     // Audio thread detects a loop boundary, sets boundaryReached, triggers handleAsyncUpdate.
     // handleAsyncUpdate runs on message thread and performs the actual swap.
@@ -300,14 +288,14 @@ private:
 
     std::unique_ptr<juce::PropertiesFile> appSettings;
 
-    // #391: now atomic — listeners can fire on the audio thread when a DAW runs
+    // now atomic — listeners can fire on the audio thread when a DAW runs
     // host automation, so the cross-thread read in syncRhythmParam needs proper
     // ordering. All set/clear pairs go through `mu_core::ScopedApvtsLoading` so
     // an exception inside the bulk push can't latch the flag at true.
     std::atomic<bool> apvtsLoading { false };
 
 public:
-    // #393: exposed so UI listeners can skip their per-param refresh during a
+    // exposed so UI listeners can skip their per-param refresh during a
     // bulk load (state restore, swap commit, swap-rhythms reorder). The
     // bulk-load orchestrator handles the full UI refresh afterwards, so the
     // per-param refresh during the bulk push is pure waste.
@@ -341,7 +329,7 @@ private:
 
     // Pre-allocated modulation parameter map — reused every block to avoid audio-thread allocation.
     // Keys match ModDest::ids. Values are initialised in constructor and updated each block.
-    // #403: keyed by `std::string_view` rather than `std::string`. All write/read sites use
+    // keyed by `std::string_view` rather than `std::string`. All write/read sites use
     // `const char*` string literals (`modParamValues["amp.attack"] = …`), which previously
     // constructed a temp std::string per access (~30 × N rhythms × 690 blocks/sec on the
     // audio thread). string_view of a literal is alloc-free; the literal's static storage
@@ -349,7 +337,7 @@ private:
     // `find(a.destinationId)` still works because std::string converts implicitly.
     std::unordered_map<std::string_view, float> modParamValues;
 
-    // #336: per-rhythm modulated euclid pattern overrides — written by the audio thread
+    // per-rhythm modulated euclid pattern overrides — written by the audio thread
     // after ModulationMatrix::process(). Used by the audio-thread pattern recompute path
     // (Stage B) and the UI live-arc indicator (Stage C). Values are integer-rounded so
     // change-detection skips no-op recomputes. Struct definitions live in Rhythm.h /
@@ -358,7 +346,7 @@ private:
     // Previous block's overrides per rhythm — Stage B compares against this to skip
     // pattern recomputes when nothing crossed an integer boundary.
     std::array<EuclidOverrides, SequencerEngine::MaxRhythms> prevEuclidOverrides;
-    // #345: tracks whether the rhythm's modulation matrix had any assignments LAST block.
+    // tracks whether the rhythm's modulation matrix had any assignments LAST block.
     // The modulation pass is gated on (matrix non-empty || transition-to-empty), so we
     // skip the seed + matrix.process + write-back work for never-modulated rhythms but
     // still run one final reset pass after assignment removal to flush lastEuclidOverrides
@@ -389,7 +377,7 @@ private:
     std::unique_ptr<juce::AudioFormatReaderSource> previewSource;
     juce::AudioBuffer<float> previewScratchBuffer;
 
-    // #230: atomic for safe cross-thread access (audio writes, UI reads + clears).
+    // atomic for safe cross-thread access (audio writes, UI reads + clears).
     std::atomic<bool>   internalPlaying   { false };
     std::atomic<double> internalBeatPos   { 0.0 };
     double              internalBpm       = 120.0;   // message-thread only
