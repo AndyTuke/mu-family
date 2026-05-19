@@ -54,7 +54,7 @@ ModulatorEditor::AssignmentRow::AssignmentRow(const std::string& assignId, int d
 {
     ModDest::populate(destCombo, driveChar);
 
-    // #372: shared BipolarSliderRow replaces inline depth + curve juce::Slider setup.
+    // shared BipolarSliderRow replaces inline depth + curve juce::Slider setup.
     bipolarPair.onDepthChange = [this](float v) { if (onDepthChange) onDepthChange(v); };
     bipolarPair.onCurveChange = [this](float v) { if (onCurveChange) onCurveChange(v); };
 
@@ -171,7 +171,7 @@ void ModulatorEditor::setData(ControlSequence* cs_, ModulationMatrix* matrix_,
     modColour      = colour;
     modIndex       = index;
     stepEditor.setBarColour(modColour);
-    // #229: loadFromCS() can `push_back` to cs->curvePoints (seeding default points)
+    // loadFromCS() can `push_back` to cs->curvePoints (seeding default points)
     // and `resize` cs->stepValues — both can race with the audio thread's
     // `cs->evaluate()` if we don't hold modLock during the mutation.
     lockMod();
@@ -465,7 +465,7 @@ void ModulatorEditor::rebuildRows()
                 { row->destCombo.setSelectedId(i + 1); break; }
 
         row->bipolarPair.setDepth(a.depth, juce::dontSendNotification);
-        row->bipolarPair.setCurve(a.curve, juce::dontSendNotification);   // #224
+        row->bipolarPair.setCurve(a.curve, juce::dontSendNotification);
 
         const std::string rowId = a.id;
         row->onRemove = [this, rowId]
@@ -496,7 +496,7 @@ void ModulatorEditor::rebuildRows()
             na.sourceId      = cs->id + "_output";
             na.destinationId = dest;
             na.depth         = d;
-            na.curve         = c;   // #224: preserve curve through dest change
+            na.curve         = c;   // preserve curve through dest change
             matrix->addAssignment(na);
             unlockMod();
             updateStepQuantization();
@@ -510,7 +510,7 @@ void ModulatorEditor::rebuildRows()
             unlockMod();
             if (onChange) onChange();
         };
-        row->onCurveChange = [this, rowId](float c)   // #224
+        row->onCurveChange = [this, rowId](float c)
         {
             if (!matrix) return;
             lockMod();

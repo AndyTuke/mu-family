@@ -7,7 +7,7 @@
 
 enum class Logic { OR, AND, XOR, AOnly, BOnly };
 
-// #336: per-rhythm bundle of modulated euclid overrides for genA / genB / genC.
+// per-rhythm bundle of modulated euclid overrides for genA / genB / genC.
 struct EuclidOverrides
 {
     EuclidGenOverrides a, b, c;
@@ -50,7 +50,7 @@ public:
     HitGenerator        genC;  // accent pattern (full controls: steps/hits/rot + pads + insert)
     Logic               logic       = Logic::OR;
     std::optional<int>  resetSteps;   // nullopt = INF (free-running)
-    // #419: pattern-aware legato. When true, the sequencer marks adjacent hits
+    // pattern-aware legato. When true, the sequencer marks adjacent hits
     // (pattern[s] && pattern[s-1]) as "tied"; tied steps retrigger the sample
     // voice but skip the envelope noteOn so the envelope state continues
     // uninterrupted across the contiguous run. See BlockResult::tiedMask.
@@ -60,7 +60,7 @@ public:
     // Length is resetSteps if set, otherwise the LCM of A and B step counts.
     std::vector<bool> getCombinedPattern() const;
 
-    // #336 Stage B: non-allocating override-aware variant. Writes combined pattern
+    // Stage B: non-allocating override-aware variant. Writes combined pattern
     // into `out`, using three scratches (genA pattern, genB pattern, plus internal
     // euclidean scratch shared by the HitGenerator overload). All buffers must be
     // pre-reserved to capacity ≥ 256 for fully allocation-free operation.

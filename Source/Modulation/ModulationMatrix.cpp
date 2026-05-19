@@ -53,7 +53,7 @@ static constexpr auto kMetaSuffix = "_depth";
 // destinations that already operate on a 0-100 display scale (amp/filter ADSR, etc.).
 static float depthScaleFor(const std::string& destId)
 {
-    // #291: Hz-domain destinations apply multiplicatively in semitones (see isLogHzDest).
+    // Hz-domain destinations apply multiplicatively in semitones (see isLogHzDest).
     // Scale reduced 48→12 (±1 octave at full depth) so that small LFO amounts give
     // subtle movement — at 48 even depth=5 caused >2 semitones which is too wide for
     // narrow-band filters (notch). depth=5→0.6 semi, depth=25→3 semi, depth=100→12 semi.
@@ -68,7 +68,7 @@ static float depthScaleFor(const std::string& destId)
     if (destId == "accentDb")        return 12.0f;   // 0..12 dB (#223)
     if (destId == "insert.output")   return 24.0f;   // -24..0 dB (full range)
     if (destId == "insert.bits")     return 1.0f;    // 1..16 bits; ±1 bit at full depth (#266)
-    // #422/#423-followups: algorithm-specific insert destinations. Scale equals the
+    // algorithm-specific insert destinations. Scale equals the
     // full-swing range for the integer field so depth=100% × src=100% spans the
     // whole knob (e.g. ks.note covers all 7 chromatic notes).
     if (destId == "ks.note")         return 6.0f;    // Karplus note 0..6 (C..B)
@@ -92,7 +92,7 @@ static float depthScaleFor(const std::string& destId)
     return 100.0f;  // 0-100 display-scale default
 }
 
-// #291: true for Hz-domain destinations where modulation must be multiplicative-in-
+// true for Hz-domain destinations where modulation must be multiplicative-in-
 // octaves rather than additive-in-Hz (so a fixed depth sweeps the same octave range
 // whether the base cutoff is 100 Hz or 10 kHz). Matches the filterEnvDepth model in
 // VoiceEngine: `cutoff * 2^(semis/12)`.
@@ -200,7 +200,7 @@ void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,
         if (dstIt != paramValues.end())
         {
             // srcIt->second ∈ [-100..+100], a.depth ∈ [-100..+100].
-            // #224 Bitwig-style curve: k = 2^(curve/100), so curve=0 → k=1 (linear),
+            // Bitwig-style curve: k = 2^(curve/100), so curve=0 → k=1 (linear),
             // curve=+100 → k=2 (square, exp-like), curve=-100 → k=0.5 (square-root,
             // log-like). Sign-preserving so bipolar sources stay bipolar. Skipped
             // when curve == 0 (the common case) so the per-step cost is one
@@ -218,7 +218,7 @@ void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,
             const float scale = depthScaleFor(a.destinationId);
             const float amount = srcVal * a.depth * scale * 0.0001f;
             if (isLogHzDest(a.destinationId))
-                // #291: multiplicative in semitones — keeps a fixed depth sweeping
+                // multiplicative in semitones — keeps a fixed depth sweeping
                 // the same number of octaves regardless of base cutoff.
                 dstIt->second *= std::pow(2.0f, amount / 12.0f);
             else

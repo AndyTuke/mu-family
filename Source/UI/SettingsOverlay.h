@@ -52,7 +52,7 @@ private:
     juce::TextButton resetContentFolderBtn  { "Default" };
     std::unique_ptr<juce::FileChooser> fileChooser;
 
-    // #418: primary sample library — user's personal sample folder, opened
+    // primary sample library — user's personal sample folder, opened
     // by default in the sample-load dialog. Distinct from the content folder
     // above which hosts factory + preset-linked material.
     juce::Label      sampleLibLabel;
@@ -73,7 +73,6 @@ private:
         int midiClockHeader = 0, clockSourceRowY = 0, midiMessagesRowY = 0;
         int midiPCHeader = 0, midiPresetsRowY = 0;
         int outputHeader = 0, multiBusRowY = 0;
-        // #418
         int sampleLibHeader = 0, sampleLibPathRowY = 0, sampleLibBtnsRowY = 0;
         int contentHeader = 0, contentPathRowY = 0, contentBtnsRowY = 0;
     };

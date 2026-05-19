@@ -4,7 +4,7 @@
 #include "FXRow.h"
 #include "DelayRow.h"
 #include "Components/SegmentControl.h"
-#include "../PluginProcessor.h"
+#include "../Plugin/PluginProcessor.h"
 #include "../Audio/MixerEngine.h"
 #include <vector>
 #include <memory>
@@ -20,7 +20,7 @@ public:
     explicit MixerOverlay(PluginProcessor& proc, MixerEngine& mixer);
     ~MixerOverlay() override;
 
-    // #379: status-bar forwarder — plugin editor wires this to the global StatusBar.
+    // status-bar forwarder — plugin editor wires this to the global StatusBar.
     std::function<void(const juce::String& name,
                        const juce::String& value,
                        juce::Colour channelColour)> onStatusUpdate;

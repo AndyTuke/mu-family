@@ -3,7 +3,7 @@
 #include "RhythmCircle.h"
 #include "Components/MuClidLookAndFeel.h"
 #include "../Sequencer/Rhythm.h"
-#include "../PluginProcessor.h"
+#include "../Plugin/PluginProcessor.h"
 
 // One entry in the RhythmSidebar. Shows a small RhythmCircle, colour dot, and rhythm name.
 // Right-edge tab line when selected. Background flashes with rhythm colour on hit.
@@ -51,7 +51,7 @@ private:
 
     RhythmCircle miniCircle;
 
-    // #370: poll a cheap POD signature instead of allocating + comparing three
+    // poll a cheap POD signature instead of allocating + comparing three
     // std::vector<StepType> snapshots every 30 Hz tick. Was ~720 vector allocs/sec
     // across all sidebar slots just to detect change.
     HitGenerator::Signature lastSigA {}, lastSigB {}, lastSigC {};

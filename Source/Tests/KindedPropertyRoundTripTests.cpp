@@ -9,7 +9,7 @@
 
 #include <juce_core/juce_core.h>
 #include <juce_data_structures/juce_data_structures.h>
-#include "../PresetHelpers.h"
+#include "../Persistence/PresetHelpers.h"
 
 using mu_pp::ParamKind;
 using mu_pp::writeKindedProperty;

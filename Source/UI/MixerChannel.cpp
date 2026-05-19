@@ -1,10 +1,10 @@
-// #408: split into 3 partial-class TUs (this file + MixerChannel_Bindings.cpp +
+// split into 3 partial-class TUs (this file + MixerChannel_Bindings.cpp +
 // MixerChannel_Insert.cpp) — was 1107 lines, the largest file in the codebase.
 // This TU keeps the ctor, paint/resized layout code, and the small status helpers.
 // kInsertDefaults table moved to MixerChannel_Insert.cpp (its only consumer).
 
 #include "MixerChannel.h"
-#include "../PluginProcessor.h"
+#include "../Plugin/PluginProcessor.h"
 #include <cmath>
 
 MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
@@ -54,7 +54,7 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
 
     if (hasOutputBus())
     {
-        // #238: descriptive labels — "Main" + "Out 1" … "Out 8".
+        // descriptive labels — "Main" + "Out 1" … "Out 8".
         outBusBox.addItem("Main", 1);              // 0 -> Master
         for (int i = 1; i <= 8; ++i)
             outBusBox.addItem("Out " + juce::String(i), i + 1);
@@ -98,12 +98,12 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
             box.addItem("Compressor",  8);
             box.addItem("Fold",        4);
             box.addItem("Hard Clip",   3);
-            box.addItem("Karplus",    12);  // #422
+            box.addItem("Karplus",    12);
             box.addItem("Limiter",     9);
             box.addItem("Ring Mod",   10);
             box.addItem("Soft Clip",   2);
             box.addItem("Tape Sat",   11);
-            box.addItem("Vocoder",    13);  // #423
+            box.addItem("Vocoder",    13);
             box.setSelectedId(1, juce::dontSendNotification);
         };
         addInsertCombo(insCharBox);
@@ -130,7 +130,7 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
         {
             k->setRange(20.0, 20000.0, 1.0);
             k->setValue(20000.0);
-            k->getSlider().setSkewFactorFromMidPoint(640.0);   // #289
+            k->getSlider().setSkewFactorFromMidPoint(640.0);
             k->getSlider().textFromValueFunction = noVal;
             addAndMakeVisible(*k);
         }

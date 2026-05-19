@@ -1,5 +1,5 @@
 #include "MidiPresetsPanel.h"
-#include "../PluginProcessor.h"
+#include "../Plugin/PluginProcessor.h"
 
 MidiPresetsPanel::MidiPresetsPanel(PluginProcessor& p)
     : proc(p)
@@ -15,7 +15,7 @@ MidiPresetsPanel::MidiPresetsPanel(PluginProcessor& p)
                       MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
     addAndMakeVisible(listBox);
 
-    // #431: configure the in-app preset browser for rhythm presets.
+    // configure the in-app preset browser for rhythm presets.
     browser.setFileExtension("muRhyth");
     browser.onLoadPreset = [this](const juce::File& f)
     {
@@ -127,7 +127,7 @@ void MidiPresetsPanel::listBoxItemClicked(int row, const juce::MouseEvent& e)
 
 void MidiPresetsPanel::browseForRow(int row)
 {
-    // #431: show the in-app PresetBrowser overlay rather than a native FileChooser.
+    // show the in-app PresetBrowser overlay rather than a native FileChooser.
     // Categories + search + double-click-to-pick match the experience of the main
     // PresetBrowser shown for .muclid full presets.
     pendingBrowseRow = row;
@@ -161,7 +161,7 @@ void MidiPresetsPanel::resized()
     const int listY = chRowY + kChannelRowH + kHintH + kPad;
     listBox.setBounds(kPad, listY, w - kPad * 2, getHeight() - listY - kPad);
 
-    // #431: the browser overlay (when visible) covers the whole panel.
+    // the browser overlay (when visible) covers the whole panel.
     if (browser.isVisible())
         browser.setBounds(getLocalBounds());
 }

@@ -4,7 +4,7 @@
 #include "Components/SegmentControl.h"
 #include "Components/DropdownSelect.h"
 #include "Components/MuClidLookAndFeel.h"
-#include "InsertAlgoDefaults.h"   // #435
+#include "InsertAlgoDefaults.h"
 
 class PluginProcessor;
 
@@ -27,7 +27,7 @@ public:
 
     void loadFromRhythm();
 
-    // #353: refresh a single control identified by its APVTS suffix (rhythm-prefixed
+    // refresh a single control identified by its APVTS suffix (rhythm-prefixed
     // suffixes like "pitchOct", "fltCut", or send suffixes like "sendEff"). Used by
     // RhythmPanel::parameterChanged to avoid rewriting all 28+ knobs on every change.
     void refreshSuffix(const juce::String& suffix);
@@ -73,7 +73,7 @@ private:
     KnobWithLabel  ampRel      { "Release", Id::knobLevel    };
 
     // Per-algorithm snapshots for A/B-ing — reset when switching to a new rhythm.
-    // #435: struct + default table lifted to shared InsertAlgoDefaults.h (was
+    // struct + default table lifted to shared InsertAlgoDefaults.h (was
     // previously duplicated between VoiceSection.cpp and MixerChannel_Insert.cpp
     // and the two copies had drifted at indices 7 / 8). Kept as a using-alias so
     // existing references to VoiceSection::InsertAlgoSnapshot keep compiling.

@@ -1,4 +1,4 @@
-// #442 — apply/push lambda round-trip for every entry in kRhythmParamDefs.
+// apply/push lambda round-trip for every entry in kRhythmParamDefs.
 //
 // For each parameter, the test:
 //   1. Picks a representative test value in display-scale
@@ -17,7 +17,7 @@
 // proves the shared code is correct.
 
 #include <juce_core/juce_core.h>
-#include "../RhythmParamTable.h"
+#include "../Persistence/RhythmParamTable.h"
 
 class RhythmParamRoundTripTest : public juce::UnitTest
 {

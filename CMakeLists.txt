@@ -33,10 +33,10 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/SamplePlayer.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/MixerEngine.cpp"
     # FX
-    "${CMAKE_CURRENT_SOURCE_DIR}/Source/FX/EffectSlot.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Source/FX/DelaySlot.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Source/FX/ReverbSlot.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Source/FX/FXChain.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/FX/Slots/EffectSlot.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/FX/Slots/DelaySlot.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/FX/Slots/ReverbSlot.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Audio/FX/Slots/FXChain.cpp"
     # UI — shared components
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/MuLookAndFeel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/Components/MuTheme.cpp"
@@ -58,7 +58,7 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/MixerChannel_Insert.cpp"     # #408 partial TU
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/UI/MixerOverlay.cpp"
     # ProcessorBase
-    "${CMAKE_CURRENT_SOURCE_DIR}/Source/ProcessorBase.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/Plugin/ProcessorBase.cpp"
 )
 
 target_include_directories(mu-core INTERFACE
@@ -85,11 +85,11 @@ juce_add_plugin(mu-clid
 
 target_sources(mu-clid
     PRIVATE
-        Source/PluginProcessor.cpp
-        Source/PluginProcessor_APVTS.cpp
-        Source/PluginProcessor_Preset.cpp
-        Source/PluginEditor.cpp
-        Source/MidiPresetMap.cpp
+        Source/Plugin/PluginProcessor.cpp
+        Source/Plugin/PluginProcessor_APVTS.cpp
+        Source/Plugin/PluginProcessor_Preset.cpp
+        Source/Plugin/PluginEditor.cpp
+        Source/Persistence/MidiPresetMap.cpp
         Source/Sequencer/EuclideanGenerator.cpp
         Source/Sequencer/HitGenerator.cpp
         Source/Sequencer/Rhythm.cpp
@@ -146,7 +146,7 @@ target_link_libraries(mu-clid
 
 # Standalone-only: custom app class with close confirmation dialog (#167).
 target_compile_definitions(mu-clid_Standalone PRIVATE JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
-target_sources(mu-clid_Standalone PRIVATE Source/StandaloneApp.cpp)
+target_sources(mu-clid_Standalone PRIVATE Source/Plugin/StandaloneApp.cpp)
 
 # Increment build_number.txt only on Release; Debug reads the same value so both configs share a number.
 add_custom_target(increment_build_number ALL
@@ -222,11 +222,11 @@ juce_add_plugin(mu-clid-lite
 
 target_sources(mu-clid-lite
     PRIVATE
-        Source/PluginProcessor.cpp
-        Source/PluginProcessor_APVTS.cpp
-        Source/PluginProcessor_Preset.cpp
-        Source/LiteEditor.cpp
-        Source/MidiPresetMap.cpp
+        Source/Plugin/PluginProcessor.cpp
+        Source/Plugin/PluginProcessor_APVTS.cpp
+        Source/Plugin/PluginProcessor_Preset.cpp
+        Source/Plugin/LiteEditor.cpp
+        Source/Persistence/MidiPresetMap.cpp
         Source/Sequencer/EuclideanGenerator.cpp
         Source/Sequencer/HitGenerator.cpp
         Source/Sequencer/Rhythm.cpp

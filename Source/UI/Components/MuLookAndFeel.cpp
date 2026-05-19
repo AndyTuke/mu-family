@@ -1,7 +1,7 @@
 #include "MuLookAndFeel.h"
 #include "MuTheme.h"
 
-// #366: every colour now lives in the MuTheme singleton (grouped by category for
+// every colour now lives in the MuTheme singleton (grouped by category for
 // the future Theme Editor). This switch just maps the legacy ColourIds tokens to
 // the corresponding Theme field, so every existing call site keeps working with
 // no change while a Theme Editor can edit values from one place.

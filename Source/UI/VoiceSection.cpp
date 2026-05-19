@@ -1,5 +1,5 @@
 #include "VoiceSection.h"
-#include "../PluginProcessor.h"
+#include "../Plugin/PluginProcessor.h"
 
 // per-algorithm default table moved to UI/InsertAlgoDefaults.h
 // (mu_ui::kInsertAlgoDefaults). Both this page and MixerChannel_Insert.cpp

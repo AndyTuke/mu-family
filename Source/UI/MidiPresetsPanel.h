@@ -31,7 +31,7 @@ private:
     std::array<juce::ToggleButton, 8> channelToggles;
     juce::ListBox                     listBox;
 
-    // #431: in-app preset browser overlay shown when the user clicks Browse on
+    // in-app preset browser overlay shown when the user clicks Browse on
     // a row. Reuses PresetBrowser configured for .muRhyth instead of a raw
     // juce::FileChooser, so the user gets categories / search / preview.
     PresetBrowser                     browser;

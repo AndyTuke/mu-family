@@ -35,7 +35,7 @@ SaveDialog::SaveDialog()
 
     saveBtn.onClick = [this]
     {
-        // #344: in Save-as-Default mode the filename is hard-coded to _default.muclid,
+        // in Save-as-Default mode the filename is hard-coded to _default.muclid,
         // so the name field is disabled (see updateDefaultModeState) and empty by
         // design. Don't gate the click on a non-empty name in that mode.
         const auto name = nameEditor.getText().trim();

@@ -1,5 +1,5 @@
 #include "RhythmPanel.h"
-#include "Components/SegmentControl.h"   // #418: sample-browser source toggle
+#include "Components/SegmentControl.h"   // sample-browser source toggle
 
 #include <string_view>
 #include <unordered_set>
@@ -15,7 +15,7 @@ static const char* const kEuclidSuffixes[] = {
     "logic"
 };
 
-// #401: hash-set membership check for the 31-entry euclid suffix table. Was a
+// hash-set membership check for the 31-entry euclid suffix table. Was a
 // linear `for (auto* s : kEuclidSuffixes) if (suffix == s)` in three places —
 // the parameterChanged path runs on every host-automation event + every knob
 // drag tick, so O(N=31) compares per call became visible in profiles. The
@@ -66,10 +66,10 @@ public:
         addAndMakeVisible(browser);
         addAndMakeVisible(loadBtn);
         addAndMakeVisible(cancelBtn);
-        addAndMakeVisible(sourceToggle);   // #418
+        addAndMakeVisible(sourceToggle);
         browser.addListener(this);
 
-        // #418: source toggle — Library is the default landing folder (user's
+        // source toggle — Library is the default landing folder (user's
         // personal sample collection); Content gives one-click access to the
         // factory / preset-bundled samples folder inside the My Documents
         // content dir. Selected index reflects which folder we're currently
@@ -98,7 +98,7 @@ public:
                 dw->exitModalState(0);
         };
 
-        setSize(560, 470);   // #418: +30 px for the source-toggle row
+        setSize(560, 470);   // +30 px for the source-toggle row
     }
 
     ~SampleBrowserContent() override { proc.stopSamplePreview(); }
@@ -106,7 +106,7 @@ public:
     void resized() override
     {
         auto area = getLocalBounds().reduced(8);
-        // #418: top row hosts the Main Library / μ-Clid Content source toggle.
+        // top row hosts the Main Library / μ-Clid Content source toggle.
         auto topRow = area.removeFromTop(26);
         sourceToggle.setBounds(topRow.removeFromLeft(240));
         area.removeFromTop(6);
@@ -135,7 +135,7 @@ private:
     juce::WildcardFileFilter fileFilter;
     juce::FileBrowserComponent browser;
     juce::TextButton loadBtn { "Load" }, cancelBtn { "Cancel" };
-    // #418: source toggle — flips the browser between the user's primary
+    // source toggle — flips the browser between the user's primary
     // sample library (the default landing folder) and the Content/Samples
     // folder where factory + preset-linked samples live. Labels match the
     // user-facing branding: "μ-Clid Content" uses the Greek mu (U+03BC)
@@ -517,12 +517,12 @@ void RhythmPanel::deregisterRhythmListeners(int ri)
 
 void RhythmPanel::parameterChanged(const juce::String& parameterID, float /*newValue*/)
 {
-    // #354: JUCE invokes parameterChanged on whatever thread called setValueNotifyingHost.
+    // JUCE invokes parameterChanged on whatever thread called setValueNotifyingHost.
     // Some DAWs run host automation on the audio thread — and the refresh below mutates
     // juce::Slider state (not audio-thread-safe). Marshal to the message thread.
-    // #353: refresh only the single control matching `suffix`, not the whole panel
+    // refresh only the single control matching `suffix`, not the whole panel
     // (was 21 euclid knobs + 9 segments OR 28+ voice knobs per parameter change).
-    // #393: skip during bulk APVTS loads (state restore, swap commit, swap-rhythms).
+    // skip during bulk APVTS loads (state restore, swap commit, swap-rhythms).
     // The bulk-load orchestrator calls setRhythm() (full re-bind) afterwards, so the
     // per-param refresh during the push is pure waste — and worse, the marshalled
     // refreshes land AFTER setRhythm completes, re-running setValue on already-bound
@@ -643,7 +643,7 @@ void RhythmPanel::loadSample()
 {
     if (currentRhythmIndex < 0) return;
 
-    // #418: default landing folder is the user's Primary Sample Library
+    // default landing folder is the user's Primary Sample Library
     // (configured in Settings; falls back to OS user Music dir if unset).
     // The previous-session lastBrowseDir takes precedence so the user lands
     // back where they were if they're working through a library subfolder.
@@ -921,7 +921,7 @@ void RhythmPanel::commitNameFromLabel()
         nameLabel.setText(newName, juce::dontSendNotification);
     }
 
-    // #356: route through PluginProcessor::renameRhythm so the write happens under
+    // route through PluginProcessor::renameRhythm so the write happens under
     // rhythmsLock instead of a raw message-thread mutation of the Rhythm struct.
     proc.renameRhythm(currentRhythmIndex, newName);
     if (onRhythmRenamed) onRhythmRenamed();
@@ -946,7 +946,7 @@ void RhythmPanel::confirmReset()
             {
                 if (idx >= 0 && idx < safeThis->proc.getNumRhythms())
                 {
-                    // #355: PluginProcessor::resetRhythm owns the concurrency dance
+                    // PluginProcessor::resetRhythm owns the concurrency dance
                     // (suspendProcessing + rhythmsLock). No more UI-thread spin on modLock.
                     safeThis->proc.resetRhythm(idx);
                     safeThis->setRhythm(idx);
@@ -981,7 +981,7 @@ void RhythmPanel::confirmDelete()
 
 void RhythmPanel::timerCallback()
 {
-    // #407: gate the indicator refreshes on play state — when stopped, no
+    // gate the indicator refreshes on play state — when stopped, no
     // modulators run, so values never change. The helpers iterate ~60 knobs
     // each calling setIsModulated(false) which no-ops on unchanged state,
     // but the iteration itself burned ~1800 method calls/sec for nothing.

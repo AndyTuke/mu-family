@@ -15,7 +15,7 @@ void SidebarItem::setRhythm(const Rhythm* r, juce::Colour colour)
     miniCircle.setPatterns(r ? r->genA.getStepTypes() : std::vector<StepType>{},
                            r ? r->genB.getStepTypes() : std::vector<StepType>{},
                            r ? r->genC.getStepTypes() : std::vector<StepType>{});
-    // #370: capture new rhythm's signature so the next timer tick doesn't see a spurious change.
+    // capture new rhythm's signature so the next timer tick doesn't see a spurious change.
     if (r)
     {
         lastSigA = r->genA.signature();
@@ -68,11 +68,11 @@ void SidebarItem::timerCallback()
         }
     }
 
-    // #252: re-read the rhythm's pattern every tick so edits in the main
+    // re-read the rhythm's pattern every tick so edits in the main
     // EuclideanPanel (hits / rotation / steps / insert / pad) propagate to
     // the sidebar mini-circle. setRhythm is only called at construction /
     // reassign, so without this poll the sidebar shows a stale snapshot.
-    // #370: compare HitGenerator::Signature (POD, no alloc) instead of fetching
+    // compare HitGenerator::Signature (POD, no alloc) instead of fetching
     // + comparing full StepType vectors every tick — only fetch when something changed.
     if (rhythm)
     {

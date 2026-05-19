@@ -12,7 +12,7 @@
 #include <juce_core/juce_core.h>
 #include <juce_data_structures/juce_data_structures.h>
 #include "../Sequencer/Rhythm.h"
-#include "../ModulatorSerialise.h"
+#include "../Persistence/ModulatorSerialise.h"
 
 using mu_pp::serialiseModulators;
 using mu_pp::deserialiseModulators;

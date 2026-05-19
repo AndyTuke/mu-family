@@ -4,7 +4,7 @@
 
 void SamplePlayer::trigger(int fadeInSamples)
 {
-    // #419: store fade-in length before flipping `triggered`. The audio thread
+    // store fade-in length before flipping `triggered`. The audio thread
     // consumes both in process() — exchange on triggered acts as the release
     // barrier that publishes pendingFadeInSamples.
     pendingFadeInSamples.store(fadeInSamples, std::memory_order_relaxed);
@@ -24,7 +24,7 @@ void SamplePlayer::process(const juce::AudioBuffer<float>& source,
     if (triggered.exchange(false, std::memory_order_acquire))
     {
         playPos = 0.0;
-        // #419: latch the pending fade-in length into audio-thread-only state.
+        // latch the pending fade-in length into audio-thread-only state.
         // Reset both `remaining` and `total` so each new trigger starts at the
         // beginning of the ramp; a tied retrigger arriving mid-fade gets the
         // fresh fade length without inheriting the previous one's progress.
@@ -51,7 +51,7 @@ void SamplePlayer::process(const juce::AudioBuffer<float>& source,
         const int   i1   = std::min(i0 + 1, srcLen - 1);
         const float frac = static_cast<float>(playPos - i0);
 
-        // #419: linear fade-in ramp. When fadeInRemaining == 0 the multiplier
+        // linear fade-in ramp. When fadeInRemaining == 0 the multiplier
         // is 1.0 (no-op for the common, untied trigger path).
         float fadeGain = 1.0f;
         if (fadeInRemaining > 0)

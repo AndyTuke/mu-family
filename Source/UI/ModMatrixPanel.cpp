@@ -1,7 +1,7 @@
 #include "ModMatrixPanel.h"
 #include <thread>
 
-// #236: spin-lock helpers around any ModulationMatrix mutation. Mirrors the pattern
+// spin-lock helpers around any ModulationMatrix mutation. Mirrors the pattern
 // used by ModulatorEditor::lockMod/unlockMod — without this, addAssignment /
 // removeAssignment / setDepth race with the audio thread iterating the
 // assignments vector inside ModulationMatrix::process().
@@ -32,7 +32,7 @@ ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex,
         if (ModDest::kTable[i].id == a.destinationId)
             { destCombo.setSelectedId(i + 1); break; }
 
-    // #372: shared BipolarSliderRow replaces inline depth + curve juce::Slider setup.
+    // shared BipolarSliderRow replaces inline depth + curve juce::Slider setup.
     bipolarPair.setDepth(a.depth, juce::dontSendNotification);
     bipolarPair.setCurve(a.curve, juce::dontSendNotification);
     bipolarPair.onDepthChange = [this](float v) { if (onDepthChange) onDepthChange(v); };
@@ -210,7 +210,7 @@ void ModMatrixPanel::rebuildRows()
             na.sourceId      = sourceId;
             na.destinationId = dest;
             na.depth         = d;
-            na.curve         = c;   // #224
+            na.curve         = c;
             rhythm->modulationMatrix.addAssignment(na);
             unlockMods(*rhythm);
             if (onChange) onChange();
@@ -228,7 +228,7 @@ void ModMatrixPanel::rebuildRows()
             unlockMods(*rhythm);
             if (onChange) onChange();
         };
-        row->onCurveChange = [this, rowId](float c)   // #224
+        row->onCurveChange = [this, rowId](float c)
         {
             lockMods(*rhythm);
             rhythm->modulationMatrix.setCurve(rowId, c);

@@ -195,7 +195,7 @@ void FXRow::rebuildKnobs(int algorithmIndex)
         }
         else if (param.minVal == 0.0f && param.maxVal == 1.0f)
         {
-            // #247: unitless 0..1 params (reverb Size, Diffusion, Damp, Mod, Dirt)
+            // unitless 0..1 params (reverb Size, Diffusion, Damp, Mod, Dirt)
             // displayed as 0..100 % so users see what they're adjusting.
             knob->getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return juce::String((int)std::round(v * 100.0)) + " %";

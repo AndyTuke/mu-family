@@ -11,7 +11,7 @@ struct VoiceParams
     float pitchEnvSus    = 0.0f;
     float pitchEnvRel    = 0.1f;
     float pitchEnvDepth  = 0.0f;     // semitones swept at envelope peak, 0..24
-    bool  pitchEnvLegato = false;    // #221: false=Reset (default), true=Legato (continue from current level)
+    bool  pitchEnvLegato = false;    // false=Reset (default), true=Legato (continue from current level)
 
     // ─── Filter ──────────────────────────────────────────────────────────
     int   filterType     = 0;        // 0=LP12, 1=HP12, 2=BP12, 3=Notch, 4=LP24, 5=HP24, 6=BP24, 7=LP6, 8=Comb+, 9=AP12, 10=Notch24, 11=HP6, 12=Peak, 13=LoShf, 14=HiShf, 15=Comb-
@@ -22,7 +22,7 @@ struct VoiceParams
     float filterEnvSus   = 0.0f;
     float filterEnvRel   = 0.3f;
     float filterEnvDepth = 0.0f;     // semitones of cutoff sweep, 0..48
-    bool  filterEnvLegato = false;   // #221: false=Reset (default), true=Legato
+    bool  filterEnvLegato = false;   // false=Reset (default), true=Legato
 
     // ─── Amp ─────────────────────────────────────────────────────────────
     float ampLevel    = 1.0f;        // 0..2  (Issue #121: 0 dB default — kHeadroomTrim alone provides summing safety)
@@ -31,10 +31,10 @@ struct VoiceParams
     float ampEnvSus   = 0.8f;
     float ampEnvRel   = 0.5f;
     bool  ampRelToEnd = false;       // true when Release is at max (100): amp envelope bypassed, sample plays to natural end
-    bool  ampEnvLegato = false;      // #221: false=Reset (default), true=Legato
+    bool  ampEnvLegato = false;      // false=Reset (default), true=Legato
 
     // ─── Insert (after filter, before amp) ───────────────────────────────
-    // #452: renamed `drive*` / `drv*` C++ fields → `insert*` for clarity —
+    // renamed `drive*` / `drv*` C++ fields → `insert*` for clarity —
     // the algorithm dispatch table at this stage now covers EQ, Compressor,
     // Limiter, RingMod, TapeSat, Karplus, and Vocoder, which were never
     // "drive" algorithms. Only the in-memory field names change; APVTS IDs

@@ -1,11 +1,11 @@
-// #408: partial-class TU split from MixerChannel.cpp (which was 1107 lines and the
+// partial-class TU split from MixerChannel.cpp (which was 1107 lines and the
 // largest file in the codebase post-#365). Contains the four bind* methods plus the
 // related helpers that only run during binding (setSidechainSources, loadFromAPVTS).
 // Mirrors the #365 PluginProcessor split pattern — same class definition, methods
 // distributed across TUs. MixerChannel_Insert.cpp holds configureInsertAlgorithm.
 
 #include "MixerChannel.h"
-#include "../PluginProcessor.h"
+#include "../Plugin/PluginProcessor.h"
 void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, std::atomic<float>& peak,
                                PluginProcessor* proc, const juce::String& prefix,
                                std::atomic<float>* grAtomic)
@@ -212,7 +212,7 @@ void MixerChannel::bindReturn(MixerEngine::ReturnState& state, std::atomic<float
 
 void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
 {
-    masterInsertProc = proc;   // #243 — keep knob lambdas alive across loadFromAPVTS rebinds
+    masterInsertProc = proc;   // keep knob lambdas alive across loadFromAPVTS rebinds
     fader.setValue(engine.masterLevel, juce::dontSendNotification);
     panKnob.setValue(engine.masterPan, juce::dontSendNotification);
 
@@ -290,7 +290,7 @@ void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
                         snapValid[oldChar] = true;
                     }
 
-                    // #435: defaults shared with VoiceSection via UI/InsertAlgoDefaults.h.
+                    // defaults shared with VoiceSection via UI/InsertAlgoDefaults.h.
                     const InsertAlgoSnapshot& snap = snapValid[newChar]
                                                      ? snaps[newChar]
                                                      : mu_ui::kInsertAlgoDefaults[newChar];

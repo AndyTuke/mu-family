@@ -29,7 +29,7 @@ void VoiceEngine::prepareToPlay(double sampleRate, int blockSize)
 
     voiceFilter.prepare(sampleRate, blockSize, 2);
 
-    // #220 / #219: per-sample pitch ratio buffer + 5 ms ramp on pitchMod.
+    // per-sample pitch ratio buffer + 5 ms ramp on pitchMod.
     // Pre-fill ratios with playbackRatio so SamplePlayer always receives a
     // valid positive ratio even if process() is called before the first
     // setActiveParams() — defensive against any host-init ordering quirk.
@@ -73,7 +73,7 @@ void VoiceEngine::trigger(bool isAccented, bool tied)
 
     accentGain = isAccented ? juce::Decibels::decibelsToGain(activeParams.accentDb) : 1.0f;
 
-    // #419: tied (pattern-legato) triggers ask SamplePlayer for a short linear
+    // tied (pattern-legato) triggers ask SamplePlayer for a short linear
     // fade-in so the sample-voice restart against a running envelope tail
     // doesn't click. 64 samples ≈ 1.3 ms @ 48 kHz — inaudible as a fade, long
     // enough to bridge the sample[0] discontinuity. Untied triggers get 0
@@ -92,7 +92,7 @@ void VoiceEngine::trigger(bool isAccented, bool tied)
         nextVoice = (nextVoice + 1) % MaxVoices;
     }
 
-    // #419: tied hits skip the envelope retrigger entirely — env state carries
+    // tied hits skip the envelope retrigger entirely — env state carries
     // through across contiguous pattern hits, so a long decay can finally
     // breathe past the step length. The per-envelope #221 legato flags still
     // apply on UNtied hits (i.e. when the user transitions from rest → hit, or
@@ -100,7 +100,7 @@ void VoiceEngine::trigger(bool isAccented, bool tied)
     if (tied)
         return;
 
-    // #221: Reset (default) clears envelope to zero before noteOn; Legato continues
+    // Reset (default) clears envelope to zero before noteOn; Legato continues
     // from the current level so rapid retriggers don't click on pad/melodic material.
     if (!activeParams.ampEnvLegato)    ampEnv.reset();
     ampEnv.noteOn();
@@ -121,10 +121,10 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     // Guard against hosts that call process() with more samples than prepareToPlay() promised.
     const int ns = juce::jmin(numSamples, tempBuffer.getNumSamples());
 
-    // #220 / #219: per-sample pitch ratio. Static pitch and base playback ratio fold
+    // per-sample pitch ratio. Static pitch and base playback ratio fold
     // into a constant; pitch envelope (sample-accurate read) + smoothed pitchMod
     // produce the per-sample exponent.
-    // #404: the prior "defensive grow" `if (size < ns) assign(ns, ...)` was dead
+    // the prior "defensive grow" `if (size < ns) assign(ns, ...)` was dead
     // code (audio-thread alloc that could never fire): `ns` is already clamped to
     // `tempBuffer.getNumSamples()` at the top of process() — which equals the
     // blockSize that prepareToPlay assigned to BOTH tempBuffer AND pitchRatioBuffer.
@@ -153,7 +153,7 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     for (auto& v : voices)
         v.process(buffer, pitchRatioBuffer.data(), tempBuffer, ns);
 
-    // #417: always apply the amp envelope, regardless of ampRelToEnd. The prior
+    // always apply the amp envelope, regardless of ampRelToEnd. The prior
     // gate skipped applyEnvelopeToBuffer entirely when ampRelToEnd was true,
     // which made the user's sustain=0 + decay=4s setting produce no decay at all
     // — the sample played at full level forever. ampRelToEnd's intent is "let
@@ -196,7 +196,7 @@ void VoiceEngine::markRetired() noexcept
     // audio thread cannot be mid-process() on this engine, so direct state
     // mutation is safe.
 
-    // #417: amp envelope noteOff is gated on ampRelToEnd.
+    // amp envelope noteOff is gated on ampRelToEnd.
     //  - ampRelToEnd == false: noteOff so the env enters release; applyEnvelope-
     //    ToBuffer (always called now, see process()) fades the sample over the
     //    user's release time, then env reaches idle and the engine drains.
@@ -229,7 +229,7 @@ bool VoiceEngine::isFullyDrained() const noexcept
         if (v.isActive())
             return false;
 
-    // #417: ampRelToEnd retired engines never get noteOff'd (env stays at
+    // ampRelToEnd retired engines never get noteOff'd (env stays at
     // sustain level, sample plays through unscaled). isActive() therefore
     // never returns false for them. Voices-finished is the sole drain
     // criterion in that mode — at which point the engine produces silence
@@ -285,7 +285,7 @@ void VoiceEngine::applyPendingParams()
 
 void VoiceEngine::syncEnvelopes()
 {
-    // #420: apply the 1 ms floor at the JUCE ADSR boundary instead of in
+    // apply the 1 ms floor at the JUCE ADSR boundary instead of in
     // applyRhythmSuffix's data layer. JUCE's ADSR doesn't accept zero times,
     // but storing the floor inside voiceParams polluted UI reads — a knob
     // set to 0 round-tripped as 0.001 and visibly crept up on the next

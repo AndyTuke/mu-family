@@ -1,25 +1,25 @@
 #include "MultiModeFilter.h"
 
-#include "Audio/Processing/Filters/Lp12Filter.h"
-#include "Audio/Processing/Filters/Hp12Filter.h"
-#include "Audio/Processing/Filters/Bp12Filter.h"
-#include "Audio/Processing/Filters/Notch12Filter.h"
-#include "Audio/Processing/Filters/Lp24Filter.h"
-#include "Audio/Processing/Filters/Hp24Filter.h"
-#include "Audio/Processing/Filters/Bp24Filter.h"
-#include "Audio/Processing/Filters/Lp6Filter.h"
-#include "Audio/Processing/Filters/CombPlusFilter.h"
-#include "Audio/Processing/Filters/Ap12Filter.h"
-#include "Audio/Processing/Filters/Notch24Filter.h"
-#include "Audio/Processing/Filters/Hp6Filter.h"
-#include "Audio/Processing/Filters/PeakFilter.h"
-#include "Audio/Processing/Filters/LowShelfFilter.h"
-#include "Audio/Processing/Filters/HighShelfFilter.h"
-#include "Audio/Processing/Filters/CombMinusFilter.h"
+#include "Audio/Filters/Lp12Filter.h"
+#include "Audio/Filters/Hp12Filter.h"
+#include "Audio/Filters/Bp12Filter.h"
+#include "Audio/Filters/Notch12Filter.h"
+#include "Audio/Filters/Lp24Filter.h"
+#include "Audio/Filters/Hp24Filter.h"
+#include "Audio/Filters/Bp24Filter.h"
+#include "Audio/Filters/Lp6Filter.h"
+#include "Audio/Filters/CombPlusFilter.h"
+#include "Audio/Filters/Ap12Filter.h"
+#include "Audio/Filters/Notch24Filter.h"
+#include "Audio/Filters/Hp6Filter.h"
+#include "Audio/Filters/PeakFilter.h"
+#include "Audio/Filters/LowShelfFilter.h"
+#include "Audio/Filters/HighShelfFilter.h"
+#include "Audio/Filters/CombMinusFilter.h"
 
 MultiModeFilter::MultiModeFilter()
 {
-    // #427: pre-allocate every algorithm. Index = filter type code (matches the
+    // pre-allocate every algorithm. Index = filter type code (matches the
     // dropdown order: see the table in MultiModeFilter.h). Each algorithm owns
     // its own DSP state; switching `typeCodeValue` between blocks just changes
     // which one process() dispatches to.

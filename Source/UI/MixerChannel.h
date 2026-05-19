@@ -6,7 +6,7 @@
 #include "Components/GRMeter.h"
 #include "Components/MuClidLookAndFeel.h"
 #include "../Audio/MixerEngine.h"
-#include "InsertAlgoDefaults.h"   // #435
+#include "InsertAlgoDefaults.h"
 
 class PluginProcessor;
 
@@ -24,7 +24,7 @@ public:
 
     MixerChannel(Type type, const juce::String& name, juce::Colour colour);
 
-    // #379: status-bar coverage for outBus + scSource dropdowns. Colour is the
+    // status-bar coverage for outBus + scSource dropdowns. Colour is the
     // channel's own colour (used as the status-bar rhythm tag for context).
     std::function<void(const juce::String& name,
                        const juce::String& value,
@@ -98,7 +98,7 @@ private:
 
     // Per-algorithm state snapshots for master inserts — enables A/B-ing between algorithms.
     // Indexed by driveChar (0..12); snapshotValid[i] is false until first visit.
-    // #435: struct + default table lifted to shared InsertAlgoDefaults.h.
+    // struct + default table lifted to shared InsertAlgoDefaults.h.
     using InsertAlgoSnapshot = InsertAlgoDefaults;
     InsertAlgoSnapshot insertSnapshots[13];
     bool               insertSnapshotValid[13] = {};

@@ -21,7 +21,7 @@ public:
     void setRhythmColour(juce::Colour c);
     void loadFromRhythm();
 
-    // #353: refresh a single control identified by its APVTS suffix (e.g. "stepsB",
+    // refresh a single control identified by its APVTS suffix (e.g. "stepsB",
     // "hitsA", "logic", "prePadModeC"). Used by RhythmPanel::parameterChanged to
     // avoid rewriting all 31 knobs/segments on every single parameter change.
     void refreshSuffix(const juce::String& suffix);
@@ -92,7 +92,7 @@ private:
     static constexpr int kSwitchH = 14;
     static constexpr int kOuter   = 4;
     static constexpr int kLabelH  = 10;
-    // #419: logic-row split — Legato pills (left) | gap | Logic pills (right).
+    // logic-row split — Legato pills (left) | gap | Logic pills (right).
     static constexpr int kLogicMP    = 4;    // matches the local `mP` used in placeRow
     static constexpr int kLegatoW    = 84;   // ~42 px per pill, two pills
     static constexpr int kLogicGapW  = 8;    // sub-panel divider between Legato and Logic

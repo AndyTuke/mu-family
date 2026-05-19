@@ -1,4 +1,4 @@
-// #442 — preset round-trip + data-layer regression tests.
+// preset round-trip + data-layer regression tests.
 //
 // This is a console-app entry point that runs every juce::UnitTest subclass
 // registered in the same translation unit's link graph. Each test source file

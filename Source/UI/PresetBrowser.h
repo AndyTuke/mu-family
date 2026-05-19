@@ -14,7 +14,7 @@ public:
 
     PresetBrowser();
 
-    // #431: file extension to scan for. Defaults to "muclid" (full plugin presets);
+    // file extension to scan for. Defaults to "muclid" (full plugin presets);
     // set to "muRhyth" for rhythm-only presets when reusing this browser in the
     // MIDI program-change panel. Call BEFORE refresh().
     void setFileExtension(juce::StringRef extWithoutDot) { fileExtension = extWithoutDot; }
@@ -57,7 +57,7 @@ private:
     juce::File              presetsDir;
     juce::StringArray       knownCategories;
     int                     selectedRow = -1;
-    juce::String            fileExtension { "muclid" };   // #431
+    juce::String            fileExtension { "muclid" };
 
     static constexpr int kTopBarH  = 40;
     static constexpr int kBotBarH  = 40;

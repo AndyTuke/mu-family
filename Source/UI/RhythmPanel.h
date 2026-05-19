@@ -6,7 +6,7 @@
 #include "ModulatorPanel.h"
 #include "Components/DropdownSelect.h"
 #include "Components/MuClidLookAndFeel.h"
-#include "../PluginProcessor.h"
+#include "../Plugin/PluginProcessor.h"
 
 //==============================================================================
 // Lightweight modal card for saving a rhythm preset: name + category + embed-samples toggle.
@@ -90,7 +90,7 @@ private:
     PluginProcessor& proc;
     int currentRhythmIndex = -1;
 
-    // #407: edge-trigger so the play→stop transition still gets ONE final indicator
+    // edge-trigger so the play→stop transition still gets ONE final indicator
     // refresh to clear the cyan mod rings + live arcs from the knobs. Without this,
     // stopping the sequencer would freeze the rings in their last-played state.
     bool wasPlayingLastTick = false;

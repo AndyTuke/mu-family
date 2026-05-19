@@ -1,5 +1,5 @@
 #include "SettingsOverlay.h"
-#include "../PluginProcessor.h"
+#include "../Plugin/PluginProcessor.h"
 
 SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     : proc(p),
@@ -9,7 +9,7 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     addAndMakeVisible(closeBtn);
 
     masterVolKnob.setRange(0.0, 1.0, 0.001);
-    // #400: skew + dB readout to match the MixerChannel master fader's behaviour.
+    // skew + dB readout to match the MixerChannel master fader's behaviour.
     // The underlying APVTS scale is the same linear 0..1 in both places (see
     // PluginProcessor_APVTS.cpp:240). MixerChannel's tall vertical fader reads OK
     // linearly because the strip is long and labels show dB live (updateDbLabel,
@@ -26,14 +26,14 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     if (auto* raw = proc.apvts.getRawParameterValue("mstr_lvl"))
         masterVolKnob.setValue(*raw, juce::dontSendNotification);
     masterVolKnob.onValueChanged = [this](double v) {
-        // #390: inner `param` (was `p`) shadowed the outer captured-by-reference
+        // inner `param` (was `p`) shadowed the outer captured-by-reference
         // `proc` member name `p` from the ctor's param list — confusing on read.
         if (auto* param = proc.apvts.getParameter("mstr_lvl"))
             param->setValueNotifyingHost(param->convertTo0to1((float)v));
     };
     addAndMakeVisible(masterVolKnob);
 
-    // #397: identical 5-line label setup was repeated four times — extract a helper.
+    // identical 5-line label setup was repeated four times — extract a helper.
     auto makeFieldLabel = [this](juce::Label& lbl, const juce::String& text,
                                   juce::Colour textColour,
                                   juce::Justification just)
@@ -121,7 +121,7 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     };
     addAndMakeVisible(resetContentFolderBtn);
 
-    // #418: Primary sample library — mirrors the content folder row pattern.
+    // Primary sample library — mirrors the content folder row pattern.
     makeFieldLabel(sampleLibLabel, juce::String(), headingCol, juce::Justification::centredLeft);
     updateSampleLibLabel();
 
@@ -174,7 +174,7 @@ void SettingsOverlay::updateFolderLabel()
                                juce::dontSendNotification);
 }
 
-void SettingsOverlay::updateSampleLibLabel()   // #418
+void SettingsOverlay::updateSampleLibLabel()
 {
     sampleLibLabel.setText(proc.getPrimarySampleDir().getFullPathName(),
                            juce::dontSendNotification);
@@ -258,7 +258,7 @@ void SettingsOverlay::resized()
     const int labelX = x;
     const int ctrlX  = x + kLabelW + kLabelCtrlGap;
 
-    // #399: Audio — Master Vol knob centred horizontally within the column. Previously
+    // Audio — Master Vol knob centred horizontally within the column. Previously
     // anchored at column-left under a centred section header divider, which looked
     // off-balance.
     masterVolKnob.setBounds(x + (cw - kMasterVolW) / 2, layout.masterVolY,
@@ -280,7 +280,7 @@ void SettingsOverlay::resized()
 
     multiBusToggle.setBounds(ctrlX, layout.multiBusRowY, kControlW, kRowH);
 
-    // #418: sample library row — same layout as Content Folder below.
+    // sample library row — same layout as Content Folder below.
     sampleLibLabel.setBounds(x, layout.sampleLibPathRowY, cw, kRowH);
     resetSampleLibBtn .setBounds(x + cw - kFolderBtnW,
                                  layout.sampleLibBtnsRowY, kFolderBtnW, kRowH);
@@ -337,7 +337,7 @@ void SettingsOverlay::paint(juce::Graphics& g)
         drawSectionHeader(layout.midiClockHeader, "MIDI Clock");
     drawSectionHeader(layout.midiPCHeader,   "MIDI Program Change");
     drawSectionHeader(layout.outputHeader,   "Output");
-    drawSectionHeader(layout.sampleLibHeader, "Sample Library");   // #418
+    drawSectionHeader(layout.sampleLibHeader, "Sample Library");
     drawSectionHeader(layout.contentHeader,  "Content Folder");
 
     // Rescan-required hint next to the multi-bus toggle.

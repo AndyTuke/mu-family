@@ -8,7 +8,7 @@ BipolarSliderRow::BipolarSliderRow()
     depthSlider.setRange(-100.0, 100.0, 0.1);
     depthSlider.setValue(0.0, juce::dontSendNotification);
 
-    // #224 curve knob: rotary, bipolar with detent at 0.
+    // curve knob: rotary, bipolar with detent at 0.
     curveSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     curveSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 34, 18);
     curveSlider.setRange(-100.0, 100.0, 0.1);

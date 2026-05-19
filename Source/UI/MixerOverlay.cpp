@@ -1,8 +1,8 @@
 #include "MixerOverlay.h"
-#include "../FX/FXAlgorithmDef.h"
-#include "../FX/EffectSlot.h"
+#include "../Audio/FX/Slots/FXAlgorithmDef.h"
+#include "../Audio/FX/Slots/EffectSlot.h"
 
-// #352: only subscribe to APVTS IDs that actually affect the mixer view.
+// only subscribe to APVTS IDs that actually affect the mixer view.
 // Previously this class registered as a listener for *every* parameter in the
 // tree (hundreds across all rhythms / voices / mods) and set apvtsDirty on any
 // change — each loadFromAPVTS then rebuilt every channel strip. Risk: feedback
@@ -49,7 +49,7 @@ MixerOverlay::MixerOverlay(PluginProcessor& p, MixerEngine& m)
         propagateMeterMode(static_cast<VUMeter::MeterMode>(idx));
     };
 
-    // #352: subscribe only to mixer-relevant IDs (see isMixerRelevantParam above).
+    // subscribe only to mixer-relevant IDs (see isMixerRelevantParam above).
     // Rhythm/euclid/voice/mod params no longer trigger spurious mixer reloads.
     for (auto* param : proc.getParameters())
         if (auto* pid = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
@@ -110,7 +110,7 @@ void MixerOverlay::buildRhythmChannels()
         ch->bindRhythm(mixer.channels[r], mixer.channelPeaks[r], &proc, prefix,
                        &mixer.sidechainGR[r]);
         if (!hasRhythm) ch->setActive(false);
-        // #379: forward status updates to the global StatusBar via PluginEditor.
+        // forward status updates to the global StatusBar via PluginEditor.
         ch->onStatusUpdate = [this](const juce::String& n, const juce::String& v, juce::Colour c) {
             if (onStatusUpdate) onStatusUpdate(n, v, c);
         };
@@ -148,7 +148,7 @@ void MixerOverlay::wireReturns()
                             &mixer.returnSidechainGR[2]);
     masterChannel.bindMaster(mixer, &proc);
 
-    // #379: forward status updates from return channels to the StatusBar via PluginEditor.
+    // forward status updates from return channels to the StatusBar via PluginEditor.
     auto forwardStatus = [this](const juce::String& n, const juce::String& v, juce::Colour c) {
         if (onStatusUpdate) onStatusUpdate(n, v, c);
     };
@@ -182,7 +182,7 @@ void MixerOverlay::wireFXRows()
                 p->setValueNotifyingHost(e ? 1.0f : 0.0f);
     };
     effectRow.onAlgorithmChanged = [this](int idx) {
-        // #285: force-sync the engine BEFORE writing APVTS. If APVTS already
+        // force-sync the engine BEFORE writing APVTS. If APVTS already
         // holds the same value (e.g. state restore left it at idx while the
         // engine sat at default 0), setValueNotifyingHost skips the listener,
         // so syncFXParam never fires and the engine stays stale.
@@ -414,7 +414,7 @@ void MixerOverlay::loadFromAPVTS()
     // Effect row
     effectRow.setEnabled(*apvts.getRawParameterValue("eff_en") > 0.5f,
                          juce::dontSendNotification);
-    // #285: read algo from APVTS, not engine — APVTS is the source of truth.
+    // read algo from APVTS, not engine — APVTS is the source of truth.
     // If the engine somehow lags (e.g. state-restore listener skip), we still
     // show the user the value the host actually has stored.
     const int effAlgoFromApvts = juce::jlimit(0,
@@ -537,12 +537,12 @@ void MixerOverlay::resized()
     const int w = getWidth();
     const int h = getHeight();
 
-    // #257: FX area height proportional to window height; row height derived from it.
+    // FX area height proportional to window height; row height derived from it.
     const int fxAreaH = juce::jmax(220, juce::roundToInt(h * 0.32f));
     const int fxRowH  = (fxAreaH - kFXGap * 2 - kFXPad * 2) / 3;
     const int stripH  = juce::jmax(200, h - fxAreaH - kHeaderH);
 
-    // #255: channel widths proportional to window width.
+    // channel widths proportional to window width.
     // 8 rhythm + 3 returns share available space; master fills any remainder.
     const int masterTotalW = kMasterW + MixerChannel::kInsertPanelW;
     const int nChans = MixerEngine::MaxChannels + 3;

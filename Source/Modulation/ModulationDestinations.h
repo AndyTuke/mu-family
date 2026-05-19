@@ -4,7 +4,7 @@
 #include <cstring>
 #include <string>
 
-// #437: canonical modulation source / destination registry, lifted out of
+// canonical modulation source / destination registry, lifted out of
 // UI/ModulatorEditor.h so non-UI code (specifically the preset deserialiser
 // in PluginProcessor_Preset.cpp) can validate `<Asgn>` entries against the
 // same single source of truth that drives the destination dropdown.
@@ -80,8 +80,8 @@ namespace ModDest
         { "euclid.c.insSt",   "Euclid C Insert Start"  },
         { "euclid.c.insLen",  "Euclid C Insert Length" },
         // ── Algorithm-specific insert destinations (idx 39–43) ────────────────
-        // #422-followups (Karplus): idx 39, 40
-        // #423-followups (Vocoder): idx 41, 42, 43
+        // (Karplus): idx 39, 40
+        // (Vocoder): idx 41, 42, 43
         { "ks.note",          "Karplus Note"           },
         { "ks.octave",        "Karplus Octave"         },
         { "voc.note",         "Vocoder Note"           },
@@ -90,7 +90,7 @@ namespace ModDest
     };
     static constexpr int kTableSize = (int)(sizeof(kTable) / sizeof(kTable[0]));
 
-    // #437: validate that `destId` resolves to a known destination. Returns the
+    // validate that `destId` resolves to a known destination. Returns the
     // dropdown alias (for diagnostic messages) when found, nullptr otherwise.
     inline const char* aliasFor(const std::string& destId) noexcept
     {
@@ -104,7 +104,7 @@ namespace ModDest
         return aliasFor(destId) != nullptr;
     }
 
-    // #437: source-ID validator. Sources come in two shapes:
+    // source-ID validator. Sources come in two shapes:
     //   "csN_output" for N in 0..7  — a ControlSequence output
     //   "assign_{id}_depth"          — another assignment's depth (meta-modulation)
     // The {id} is dynamic per assignment so we can only validate the prefix/suffix.

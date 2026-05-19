@@ -24,7 +24,7 @@ public:
     void prepareToPlay(double sampleRate, int blockSize);
     void loadFile(const juce::File& file);
     void clearSample();
-    // #419: `tied` (pattern-legato) — when true, skip the envelope retrigger
+    // `tied` (pattern-legato) — when true, skip the envelope retrigger
     // entirely (env state continues uninterrupted across contiguous hits) and
     // ask SamplePlayer for a longer fade-in ramp so the sample-voice restart
     // doesn't click against the running envelope tail. The sample voice is
@@ -95,14 +95,14 @@ private:
     juce::AudioBuffer<float> tempBuffer;
 
 public:
-    InsertProcessor insertProc;  // #246: exposed so VoiceSection can read grReduction for the GR meter
+    InsertProcessor insertProc;  // exposed so VoiceSection can read grReduction for the GR meter
 private:
 
-    // #220: per-sample pitch ratio buffer feeding SamplePlayer. Filled each block
+    // per-sample pitch ratio buffer feeding SamplePlayer. Filled each block
     // from the pitch envelope (sample-accurate) + base semitones + smoothed pitchMod.
     // Reserved to blockSize in prepareToPlay so no audio-thread alloc.
     std::vector<double> pitchRatioBuffer;
-    // #219: 5 ms linear ramp on pitchMod between block targets. Read per-sample
+    // 5 ms linear ramp on pitchMod between block targets. Read per-sample
     // inside the pitchRatioBuffer fill loop so fast mod doesn't zipper.
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedPitchMod;
 

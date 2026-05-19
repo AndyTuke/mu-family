@@ -1,7 +1,7 @@
 #pragma once
 
 #include <juce_audio_basics/juce_audio_basics.h>
-#include "Audio/Processing/Filters/FilterAlgorithmBase.h"
+#include "Audio/Filters/FilterAlgorithmBase.h"
 
 #include <array>
 #include <memory>
@@ -30,7 +30,7 @@
 //  14  HighShelf  (biquad high shelf, +12 dB)
 //  15  Comb-      (feedback comb, negative feedback — peaks at f0/2, 3f0/2, 5f0/2…)
 //
-// #427: implementation refactored from a single 200-line switch in
+// implementation refactored from a single 200-line switch in
 // MultiModeFilter.cpp into per-algorithm classes living in
 // Source/Audio/Processing/Filters/. MultiModeFilter is now a thin orchestrator
 // that pre-allocates one instance of each algorithm and dispatches via a

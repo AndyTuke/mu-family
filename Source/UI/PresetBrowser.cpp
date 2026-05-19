@@ -29,7 +29,7 @@ void PresetBrowser::refresh(const juce::File& dir)
 
     if (dir.isDirectory())
     {
-        const juce::String pattern = "*." + fileExtension;   // #431
+        const juce::String pattern = "*." + fileExtension;
         for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, pattern))
         {
             PresetInfo info;
@@ -48,7 +48,7 @@ void PresetBrowser::refresh(const juce::File& dir)
 
         std::sort(allPresets.begin(), allPresets.end(),
                   [](const PresetInfo& a, const PresetInfo& b) {
-                      return a.name.compareIgnoreCase(b.name) < 0;   // #251
+                      return a.name.compareIgnoreCase(b.name) < 0;
                   });
     }
 

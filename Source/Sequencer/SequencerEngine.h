@@ -9,7 +9,7 @@ struct BlockResult
 {
     int  firedMask          = 0;  // bit N set = rhythm N fired a hit this block
     int  accentMask         = 0;  // bit N set = that hit was accented (Ring C coincidence)
-    int  tiedMask           = 0;  // #419: bit N set = rhythm N's hit this block is "tied"
+    int  tiedMask           = 0;  // bit N set = rhythm N's hit this block is "tied"
                                   // (the immediately preceding step was also a hit). Audio
                                   // engine uses this when Rhythm::patternLegato is enabled
                                   // to skip the envelope noteOn so contiguous hits don't
@@ -37,7 +37,7 @@ public:
     // Call after changing any rhythm parameter to refresh its cached pattern.
     void updatePattern(int index);
 
-    // #336 Stage B: audio-thread-safe pattern recompute using modulated euclid overrides.
+    // Stage B: audio-thread-safe pattern recompute using modulated euclid overrides.
     // Non-allocating (all buffers pre-reserved in ctor). Uses try-lock on patternLock —
     // returns false if the message thread holds the lock; caller is expected to retry
     // on the next block (the override values are sticky in PluginProcessor).
@@ -58,19 +58,19 @@ public:
     void setMasterLoopSteps(int steps)
     {
         masterLoopSteps = juce::jlimit(0, 256, steps);
-        // #231: reset the wrap detector so a loop-length change mid-playback can't
+        // reset the wrap detector so a loop-length change mid-playback can't
         // emit a false `masterLoopWrapped` event from stale `lastEffectiveStep`
         // (false wraps gate hot-swap commits → premature staged swap).
         lastEffectiveStep = -1;
     }
     int  getMasterLoopSteps() const    { return masterLoopSteps; }
 
-    // #231: call from PluginProcessor::processBlock on a transport stop→start edge
+    // call from PluginProcessor::processBlock on a transport stop→start edge
     // so the first block after restart doesn't see a false wrap from a stale
     // pre-stop `lastEffectiveStep`.
     void resetWrapDetector() { lastEffectiveStep = -1; }
 
-    // #385: call from PluginProcessor::handleAsyncUpdate immediately after a hot-
+    // call from PluginProcessor::handleAsyncUpdate immediately after a hot-
     // swap commit (under suspendProcessing, so the audio thread is paused — no
     // synchronisation needed). Sentinel -1 tells processBlock's snapshot pass to
     // skip the absorb-current-step behaviour for this rhythm, so the new pattern
@@ -81,7 +81,7 @@ public:
         {
             lastStepIndex[r]       = -1;
             lastAccentStepIndex[r] = 0;
-            // #419: post-swap, the first hit of the new pattern must not be
+            // post-swap, the first hit of the new pattern must not be
             // marked "tied" to whatever step the old pattern had under us.
             wasLastStepHit[r] = false;
         }
@@ -114,7 +114,7 @@ private:
 
     std::array<int, MaxRhythms> lastStepIndex;
     std::array<int, MaxRhythms> lastAccentStepIndex;
-    // #419: per-rhythm "was the most recent step we walked a hit?" — used to
+    // per-rhythm "was the most recent step we walked a hit?" — used to
     // compute BlockResult::tiedMask on the next hit. Defaults to false; set
     // to false in the constructor's `fill(...)` initialisation block and
     // wherever lastStepIndex is reset to -1 (cold start, hot-swap commit,
@@ -125,7 +125,7 @@ private:
     std::atomic<int> masterLoopCurrentStep { 0 };
     int lastEffectiveStep = -1;  // previous block's effectiveStep, for master-loop wrap detection
 
-    // #336 Stage B: audio-thread scratch buffers for tryUpdatePatternFromModulation.
+    // Stage B: audio-thread scratch buffers for tryUpdatePatternFromModulation.
     // Pre-reserved to 256 in ctor so the non-allocating pattern overloads never alloc.
     std::vector<bool> scratchPatA, scratchPatB, scratchEuclid, scratchEuclidC;
 };

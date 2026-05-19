@@ -8,7 +8,7 @@ enum class InsertMode { Pad, Mute };
 // Per-step type for the ring display, distinguishing hits from pad types.
 enum class StepType : uint8_t { Empty = 0, Hit = 1, PrePad = 2, PostPad = 3, InsertPad = 4 };
 
-// #336: per-generator modulated euclid pattern overrides. Replaces the matching
+// per-generator modulated euclid pattern overrides. Replaces the matching
 // HitGenerator fields during audio-thread pattern recompute. Step count, mute,
 // and pad-mode flags stay on the rhythm — only the integer position params here
 // participate in modulation.
@@ -48,7 +48,7 @@ public:
     // Same as getPattern() but annotates each step with its type (hit, empty, pre/post/insert pad).
     std::vector<StepType> getStepTypes() const;
 
-    // #370: compact POD snapshot of every field that affects getPattern / getStepTypes
+    // compact POD snapshot of every field that affects getPattern / getStepTypes
     // output. UI consumers (SidebarItem, RhythmCircle) poll this on a timer to detect
     // pattern changes without paying the cost of fetching + comparing the vector
     // representation every tick.
@@ -75,7 +75,7 @@ public:
                  (uint8_t) prePadMode, (uint8_t) postPadMode, (uint8_t) insertMode, mute };
     }
 
-    // #336 Stage B: non-allocating + override-aware variant. Writes the pattern into
+    // Stage B: non-allocating + override-aware variant. Writes the pattern into
     // `out`, using `scratch` for the euclidean working buffer. The `ov` argument
     // replaces hits/rotate/prePad/postPad/insertStart/insertLength on this generator
     // (member values untouched). `steps`, `mute`, and the three pad-mode flags stay on

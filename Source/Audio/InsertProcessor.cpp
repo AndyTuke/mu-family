@@ -1,21 +1,21 @@
 #include "InsertProcessor.h"
 
-#include "Audio/Processing/InsertFX/NoneInsert.h"
-#include "Audio/Processing/InsertFX/SoftClipInsert.h"
-#include "Audio/Processing/InsertFX/HardClipInsert.h"
-#include "Audio/Processing/InsertFX/FoldInsert.h"
-#include "Audio/Processing/InsertFX/BitcrusherInsert.h"
-#include "Audio/Processing/InsertFX/ClipperInsert.h"
-#include "Audio/Processing/InsertFX/EqInsert.h"
-#include "Audio/Processing/InsertFX/CompressorLimiterInsert.h"
-#include "Audio/Processing/InsertFX/RingModInsert.h"
-#include "Audio/Processing/InsertFX/TapeSatInsert.h"
-#include "Audio/Processing/InsertFX/KarplusStrongInsert.h"
-#include "Audio/Processing/InsertFX/VocoderInsert.h"
+#include "Audio/FX/Insert/NoneInsert.h"
+#include "Audio/FX/Insert/SoftClipInsert.h"
+#include "Audio/FX/Insert/HardClipInsert.h"
+#include "Audio/FX/Insert/FoldInsert.h"
+#include "Audio/FX/Insert/BitcrusherInsert.h"
+#include "Audio/FX/Insert/ClipperInsert.h"
+#include "Audio/FX/Insert/EqInsert.h"
+#include "Audio/FX/Insert/CompressorLimiterInsert.h"
+#include "Audio/FX/Insert/RingModInsert.h"
+#include "Audio/FX/Insert/TapeSatInsert.h"
+#include "Audio/FX/Insert/KarplusStrongInsert.h"
+#include "Audio/FX/Insert/VocoderInsert.h"
 
 InsertProcessor::InsertProcessor()
 {
-    // #425: pre-allocate every distinct algorithm up-front; the dispatch table
+    // pre-allocate every distinct algorithm up-front; the dispatch table
     // then points at these. owned is reserved so the raw pointers in dispatch
     // remain stable across the push_back calls (no reallocation).
     owned.reserve(kNumInsertAlgos);
@@ -34,7 +34,7 @@ InsertProcessor::InsertProcessor()
     dispatch[5]  = add(std::make_unique<ClipperInsert>());
     dispatch[6]  = add(std::make_unique<EqInsert>());
 
-    // #425: Compressor (7) + Limiter (8) share one CompressorLimiterInsert
+    // Compressor (7) + Limiter (8) share one CompressorLimiterInsert
     // instance. Matches the pre-refactor behaviour where both insertAlgo codes
     // operated on the same `compEnvelope[2]` state — switching between them
     // mid-bar carried the envelope across rather than resetting it, which is
@@ -46,7 +46,6 @@ InsertProcessor::InsertProcessor()
     dispatch[9]  = add(std::make_unique<RingModInsert>());
     dispatch[10] = add(std::make_unique<TapeSatInsert>());
 
-    // #422 / #423
     dispatch[11] = add(std::make_unique<KarplusStrongInsert>());
     dispatch[12] = add(std::make_unique<VocoderInsert>());
 }

@@ -3,7 +3,7 @@
 #include "SidebarItem.h"
 #include "Components/AddButton.h"
 #include "Components/MuClidLookAndFeel.h"
-#include "../PluginProcessor.h"
+#include "../Plugin/PluginProcessor.h"
 
 // Left sidebar (~82px). One SidebarItem per rhythm, scrollable if needed.
 // Add rhythm button at bottom. Variable ordering supported for future drag-to-reorder.

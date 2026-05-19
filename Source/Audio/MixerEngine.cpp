@@ -1,6 +1,6 @@
 #include "MixerEngine.h"
 #include "VoiceEngine.h"
-#include "../FX/FXChain.h"
+#include "Audio/FX/Slots/FXChain.h"
 #include <cmath>
 
 MixerEngine::MixerEngine()
@@ -74,7 +74,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     reverbSendBuf.clear();
 
     const bool anySolo       = hasSolo(numActiveRhythms);
-    // #337 follow-up: when a return is soloed, the user wants to hear ONLY that wet
+    // follow-up: when a return is soloed, the user wants to hear ONLY that wet
     // signal — the rhythm channels' dry passthrough to master must also be muted, but
     // their FX sends must still run so the soloed return has something to render.
     const bool anyReturnSolo = returns[0].solo || returns[1].solo || returns[2].solo;

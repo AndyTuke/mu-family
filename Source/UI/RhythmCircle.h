@@ -2,7 +2,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Components/MuClidLookAndFeel.h"
 #include "../Sequencer/HitGenerator.h"
-#include "../PluginProcessor.h"
+#include "../Plugin/PluginProcessor.h"
 #include <array>
 
 // Concentric ring display showing euclidean hit patterns.
@@ -61,7 +61,7 @@ private:
 
     void triggerHitPulse(int combinedStep, int stepsA);
 
-    // #371: per-ring unrotated-Path cache. paint() built ~192 fresh juce::Path objects per
+    // per-ring unrotated-Path cache. paint() built ~192 fresh juce::Path objects per
     // frame (3 rings × up to 64 steps × 2 arcs each). The geometry only changes when the
     // ring's radii or step count changes; per-paint rotation is applied via AffineTransform
     // at fillPath() time, so the cached Paths stay valid across frames.

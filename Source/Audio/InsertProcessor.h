@@ -8,7 +8,7 @@
 
 #include "AudioFilters.h"
 #include "VoiceParams.h"
-#include "Audio/Processing/InsertFX/InsertAlgorithmBase.h"
+#include "Audio/FX/Insert/InsertAlgorithmBase.h"
 
 // Self-contained insert-effect processor used by both VoiceEngine (per-rhythm)
 // and MixerEngine (master bus). Owns all DSP state; parameters are passed in

@@ -6,13 +6,13 @@ SequencerEngine::SequencerEngine()
 {
     lastStepIndex.fill(-1);
     lastAccentStepIndex.fill(0);
-    wasLastStepHit.fill(false);   // #419
+    wasLastStepHit.fill(false);
     rhythms.reserve(MaxRhythms);
     cachedPatterns.reserve(MaxRhythms);
     cachedCPatterns.reserve(MaxRhythms);
     patternUpdated.reserve(MaxRhythms);
 
-    // #234: pre-size every safePatterns / safeCPatterns slot to the worst-case
+    // pre-size every safePatterns / safeCPatterns slot to the worst-case
     // step count (256 — matches the resetSteps cap and getCombinedPattern's LCM
     // clamp). Audio-thread `assign()` from cachedPatterns later is then guaranteed
     // not to allocate, because the destination already has enough capacity.
@@ -23,7 +23,7 @@ SequencerEngine::SequencerEngine()
         safeCPatterns[i].reserve(kMaxStepCount);
     }
 
-    // #336 Stage B: scratch buffers for audio-thread pattern recompute.
+    // Stage B: scratch buffers for audio-thread pattern recompute.
     scratchPatA   .reserve(kMaxStepCount);
     scratchPatB   .reserve(kMaxStepCount);
     scratchEuclid .reserve(kMaxStepCount);
@@ -63,13 +63,13 @@ void SequencerEngine::removeRhythm(int index)
         safeCPatterns[i]       = std::move(safeCPatterns[i + 1]);
         lastStepIndex[i]       = lastStepIndex[i + 1];
         lastAccentStepIndex[i] = lastAccentStepIndex[i + 1];
-        wasLastStepHit[i]      = wasLastStepHit[i + 1];   // #419
+        wasLastStepHit[i]      = wasLastStepHit[i + 1];
     }
     safePatterns[newN].clear();
     safeCPatterns[newN].clear();
     lastStepIndex[newN]       = -1;
     lastAccentStepIndex[newN] = 0;
-    wasLastStepHit[newN]      = false;   // #419
+    wasLastStepHit[newN]      = false;
 
     patternLock.store(false, std::memory_order_release);
 }
@@ -109,7 +109,7 @@ void SequencerEngine::setNumRhythms(int n)
             safeCPatterns[i].clear();
             lastStepIndex[i]       = -1;
             lastAccentStepIndex[i] = 0;
-            wasLastStepHit[i]      = false;   // #419
+            wasLastStepHit[i]      = false;
         }
     }
 }
@@ -130,7 +130,7 @@ void SequencerEngine::swapRhythmSlots(int i, int j)
     std::swap(safePatterns[i],    safePatterns[j]);
     std::swap(safeCPatterns[i],   safeCPatterns[j]);
 
-    // #228: instead of leaving lastStepIndex at -1 (which fires the first new-pattern
+    // instead of leaving lastStepIndex at -1 (which fires the first new-pattern
     // hit retroactively), mark patternUpdated so the next processBlock runs through
     // the standard snapshot/absorb path which sets lastStepIndex[r] = effectiveStep
     // % size — matches updatePattern's semantics, no retroactive trigger.
@@ -156,7 +156,7 @@ void SequencerEngine::updatePattern(int index)
 
 bool SequencerEngine::tryUpdatePatternFromModulation(int index, const EuclidOverrides& ov)
 {
-    // #336 Stage B: audio-thread pattern recompute. Writes directly into safePatterns/
+    // Stage B: audio-thread pattern recompute. Writes directly into safePatterns/
     // safeCPatterns (already reserved to 256 in ctor) — bypasses cachedPatterns so a
     // concurrent message-thread updatePattern() that move-assigns into cached cannot
     // clobber the modulated pattern this block. The next snapshot pass (after a real
@@ -193,7 +193,7 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
 
     BlockResult result;
 
-    // #233: clamp negative beat positions to zero. Hosts can emit negative ppq
+    // clamp negative beat positions to zero. Hosts can emit negative ppq
     // during pre-roll or REW-past-zero; without this, `globalStep` is negative,
     // `effectiveStep` stays negative even after the modulo (signed-int %), and
     // `pattern[stepIndex]` then indexes OOB → undefined behaviour.
@@ -217,7 +217,7 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
             {
                 if (patternUpdated[r])
                 {
-                    // #234: assign() reuses existing storage when capacity is sufficient.
+                    // assign() reuses existing storage when capacity is sufficient.
                     // safePatterns slots are reserve(256)'d in the ctor, so even a fresh
                     // pattern slotting in over an empty slot writes in place — no alloc
                     // on the audio thread.
@@ -261,7 +261,7 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
         const auto& cPat = safeCPatterns[r];
         const int   cLen = static_cast<int>(cPat.size());
 
-        // #232: walk every step crossed between prevStep (exclusive) and stepIndex
+        // walk every step crossed between prevStep (exclusive) and stepIndex
         // (inclusive), so a block that spans multiple steps doesn't drop hits.
         // Common case (1 step advance) still runs the loop body once.
         // firedMask stays one bit per rhythm per block — multiple hits inside a
@@ -277,7 +277,7 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                 if (cLen > 0 && cPat[stepIndex % cLen])
                     result.accentMask |= (1 << r);
             }
-            wasLastStepHit[r] = pattern[stepIndex];   // #419
+            wasLastStepHit[r] = pattern[stepIndex];
         }
         else
         {
@@ -303,7 +303,7 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                     else
                         result.accentMask &= ~(1 << r);
 
-                    // #419: tied = the step we just walked across, immediately
+                    // tied = the step we just walked across, immediately
                     // before this hit, was also a hit. wasLastStepHit captures
                     // the truth of the previous step within this walk (or from
                     // a prior block's last walk). For multi-hit-in-one-block
@@ -315,7 +315,7 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                     else
                         result.tiedMask &= ~(1 << r);
                 }
-                wasLastStepHit[r] = isHit;   // #419: roll forward per-step
+                wasLastStepHit[r] = isHit;   // roll forward per-step
             }
         }
 

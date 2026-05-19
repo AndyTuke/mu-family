@@ -12,11 +12,11 @@
 #include "../Sequencer/ControlSequence.h"
 #include "../Modulation/ModulationMatrix.h"
 #include "../Modulation/ModulationAssignment.h"
-#include "../Modulation/ModulationDestinations.h"   // #437: kTable now lives here
+#include "../Modulation/ModulationDestinations.h"   // kTable now lives here
 
 namespace ModDest
 {
-    // #437: kTable + Dest struct moved to Source/Modulation/ModulationDestinations.h
+    // kTable + Dest struct moved to Source/Modulation/ModulationDestinations.h
     // so non-UI code (preset deserialiser) can validate assignments against the
     // same single source of truth. UI populate() helper stays here.
 
@@ -154,17 +154,17 @@ private:
     StepEditor     stepEditor;
     DropdownSelect loopDropdown;
     juce::Label    loopLabel;
-    // #239: explicit fromUTF8 so the "×" glyph decodes correctly. The implicit
+    // explicit fromUTF8 so the "×" glyph decodes correctly. The implicit
     // char* → juce::String conversion was rendering as garbled Latin-1 pairs.
     NudgeInput     loopMult { juce::String::fromUTF8("\xc3\x97"), 1, 16, 1 };
     DropdownSelect stepDropdown;
     juce::Label    stepLabel;
-    NudgeInput     stepMult { juce::String::fromUTF8("\xc3\x97"), 1, 16, 1 };   // #239
+    NudgeInput     stepMult { juce::String::fromUTF8("\xc3\x97"), 1, 16, 1 };
 
     struct AssignmentRow : public juce::Component
     {
         DropdownSelect   destCombo;
-        // #372: shared depth + curve pair (was two raw juce::Sliders set up inline).
+        // shared depth + curve pair (was two raw juce::Sliders set up inline).
         BipolarSliderRow bipolarPair;
         juce::TextButton removeBtn { "x" };
         std::string      id;

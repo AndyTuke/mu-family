@@ -1,7 +1,7 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "../FX/FXAlgorithmDef.h"
+#include "../Audio/FX/Slots/FXAlgorithmDef.h"
 #include "Components/MuClidLookAndFeel.h"
 #include "Components/KnobWithLabel.h"
 #include "Components/DropdownSelect.h"

@@ -9,8 +9,8 @@
 
 #include <juce_core/juce_core.h>
 #include <juce_data_structures/juce_data_structures.h>
-#include "../PresetHelpers.h"
-#include "../PluginProcessor_Internal.h"   // kGlobalParams
+#include "../Persistence/PresetHelpers.h"
+#include "../Plugin/PluginProcessor_Internal.h"   // kGlobalParams
 
 using mu_pp::ParamKind;
 using mu_pp::writeKindedProperty;

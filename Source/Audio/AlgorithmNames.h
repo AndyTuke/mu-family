@@ -96,7 +96,7 @@ inline const char* const kReverbAlgorithmNames[] = {
     nullptr
 };
 
-// #436: modulator enum names. ControlSequence's `Mode`, `Polarity`, and the
+// modulator enum names. ControlSequence's `Mode`, `Polarity`, and the
 // timing enums `NoteValue` / `NoteMod` live in Source/Sequencer/ControlSequence.h
 // and Source/Sequencer/Rhythm.h respectively. They're saved by serialiseModulators
 // as raw int indices — same drift hazard as the per-rhythm algorithm selectors

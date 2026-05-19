@@ -72,7 +72,7 @@ void HitGenerator::getPattern(const EuclidGenOverrides& ov,
                               std::vector<bool>& out,
                               std::vector<bool>& scratch) const
 {
-    // #336 Stage B: non-allocating equivalent of getPattern() using `ov` in place
+    // Stage B: non-allocating equivalent of getPattern() using `ov` in place
     // of the matching member fields. Final pattern length is always `steps` (verified:
     // preReserve + activeSteps + clampedInsert + postReserve = steps in every mode
     // combination — Pad reserves come out of `steps`; Mute reserves zero in place).
@@ -184,7 +184,7 @@ std::vector<StepType> HitGenerator::getStepTypes() const
     }
     else if (insertLength > 0 && insertMode == InsertMode::Mute)
     {
-        // #227: muted insert zone shows as InsertPad so the ring visually distinguishes
+        // muted insert zone shows as InsertPad so the ring visually distinguishes
         // it from genuine empty steps — matches the Pad-mode visual identity.
         int clampedStart = std::clamp(insertStart, 0, activeSteps);
         int zoneEnd = std::min(clampedStart + insertLength, activeSteps);

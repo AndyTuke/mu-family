@@ -1,6 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "../PluginProcessor.h"
+#include "../Plugin/PluginProcessor.h"
 #include "Components/NudgeInput.h"
 #include "Components/DropdownSelect.h"
 #include "Components/MuClidLookAndFeel.h"
@@ -17,12 +17,12 @@ public:
     std::function<void()>                      onSavePreset;
     std::function<void()>                      onNewPreset;
     std::function<void()>                      onSettingsToggle;
-    // #379: status-bar coverage for chrome controls (bpmInput, loopDropdown).
+    // status-bar coverage for chrome controls (bpmInput, loopDropdown).
     // Plugin editor wires this to the global StatusBar; no rhythm-colour tag.
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
 
     void refreshPresets();
-    // #241: keep dropdown displaying the loaded preset's name. Pass an invalid
+    // keep dropdown displaying the loaded preset's name. Pass an invalid
     // File to revert to the "<unnamed preset>" placeholder.
     void setLoadedPreset(const juce::File& file);
     // Returns the currently loaded preset file, or an invalid File if none selected.

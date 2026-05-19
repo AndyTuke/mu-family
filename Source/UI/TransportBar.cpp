@@ -70,7 +70,7 @@ TransportBar::TransportBar(PluginProcessor& p)
         int idx = id - 1;
         if (idx >= 0 && idx < (int)presetFiles.size())
         {
-            // #241: don't clear the selection — keep the loaded preset's name
+            // don't clear the selection — keep the loaded preset's name
             // visible so the user always sees what's currently loaded. The
             // editor's onPresetSelected does the actual load.
             if (onPresetSelected) onPresetSelected(presetFiles[idx]);
@@ -263,7 +263,7 @@ void TransportBar::refreshPresets()
 
 void TransportBar::setLoadedPreset(const juce::File& file)
 {
-    // #241: select the dropdown item whose stored File matches the loaded one
+    // select the dropdown item whose stored File matches the loaded one
     // (by full path) so the dropdown text reflects the active preset. An
     // invalid file or one not in the dropdown list reverts to the placeholder.
     if (!file.existsAsFile())

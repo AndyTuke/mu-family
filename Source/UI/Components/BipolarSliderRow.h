@@ -1,7 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 
-// #372: shared depth + curve slider pair used by ModulatorEditor::AssignmentRow and
+// shared depth + curve slider pair used by ModulatorEditor::AssignmentRow and
 // ModMatrixPanel::MatrixRow. Replaces the duplicated raw juce::Slider setup that
 // previously violated CLAUDE.md's "All UI uses the shared component library — never
 // build a one-off version of a standard control" rule. Both slider styles are

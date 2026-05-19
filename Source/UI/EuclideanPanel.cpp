@@ -1,5 +1,5 @@
 #include "EuclideanPanel.h"
-#include "../PluginProcessor.h"
+#include "../Plugin/PluginProcessor.h"
 #include <limits>
 
 EuclideanPanel::EuclideanPanel(PluginProcessor& p) : proc(p)

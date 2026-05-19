@@ -45,7 +45,7 @@ void Rhythm::getCombinedPattern(const EuclidOverrides& ov,
                                 std::vector<bool>& patB,
                                 std::vector<bool>& euclidScratch) const
 {
-    // #336 Stage B: matches the allocating overload above but writes into pre-reserved
+    // Stage B: matches the allocating overload above but writes into pre-reserved
     // buffers. patA / patB / euclidScratch / out must each have capacity ≥ 256 so
     // assign() never reallocates on the audio thread.
     genA.getPattern(ov.a, patA, euclidScratch);

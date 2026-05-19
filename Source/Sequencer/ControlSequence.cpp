@@ -103,7 +103,7 @@ float ControlSequence::evaluateSmooth(double phase) const
 
     const float t = (x - p0.x) / segLen;
 
-    // #222: cubic Bézier when either endpoint carries a handle. handleY is an
+    // cubic Bézier when either endpoint carries a handle. handleY is an
     // offset from the segment midpoint in normalised y units, used to derive the
     // two control points y-values c1y = midY + handleY0 and c2y = midY + handleY1.
     // Per #225, handleX is intentionally ignored (the evaluator parameterises t

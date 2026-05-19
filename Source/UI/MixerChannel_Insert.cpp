@@ -1,12 +1,12 @@
-// #408: partial-class TU split from MixerChannel.cpp. Contains the master-insert
+// partial-class TU split from MixerChannel.cpp. Contains the master-insert
 // algorithm configuration code — the 13-case switch over insert algorithms with
 // per-algorithm knob labels, ranges, formatters, and APVTS wiring (~280 lines).
 // See MixerChannel_Bindings.cpp header for the split rationale.
-// #435: per-algorithm default table moved to UI/InsertAlgoDefaults.h
+// per-algorithm default table moved to UI/InsertAlgoDefaults.h
 // (mu_ui::kInsertAlgoDefaults); shared with the per-rhythm VoiceSection page.
 
 #include "MixerChannel.h"
-#include "../PluginProcessor.h"
+#include "../Plugin/PluginProcessor.h"
 #include <cmath>
 
 void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcessor* proc)
@@ -23,9 +23,9 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
     output.onValueChanged = nullptr;
     tone  .onValueChanged = nullptr;
     extra .onValueChanged = nullptr;
-    output.setGRSource(nullptr);  // #246: cleared here; comp/limiter cases re-set below
+    output.setGRSource(nullptr);  // cleared here; comp/limiter cases re-set below
 
-    // #423-followups: reset any grey-out applied by a previous Vocoder noise-carrier
+    // reset any grey-out applied by a previous Vocoder noise-carrier
     // configuration so the next algorithm doesn't inherit the disabled state.
     for (auto* k : { &drive, &output, &tone, &extra })
     {
@@ -33,7 +33,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
         k->setAlpha(1.0f);
     }
 
-    // #243: the lambda must keep working after this method is re-invoked from
+    // the lambda must keep working after this method is re-invoked from
     // loadFromAPVTS with proc=nullptr (the dropdown char value comes from APVTS,
     // so we don't want to write back — but the knob callbacks still need a live
     // proc handle for the user to actually drive the engine).
@@ -98,7 +98,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
 
             tone  .setLabel("LPF");
             tone  .setRange(20.0, 20000.0, 1.0);
-            tone  .getSlider().setSkewFactorFromMidPoint(640.0);   // #289
+            tone  .getSlider().setSkewFactorFromMidPoint(640.0);
             tone  .getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return v >= 1000.0 ? juce::String(v / 1000.0, 2) + "kHz"
                                    : juce::String((int)v) + "Hz";
@@ -223,7 +223,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             drive .onValueChanged = [setParam, pDrv](double v) { setParam(pDrv, v); };
             output.onValueChanged = [setParam, pOut](double v) { setParam(pOut, v); };
             tone  .onValueChanged = [setParam, pTon](double v) { setParam(pTon, v); };
-            // #246: GR meter on the Output knob
+            // GR meter on the Output knob
             output.setGRSource(masterInsertProc
                 ? (slot == 0 ? &masterInsertProc->mixerEngine.masterInsert.grReduction
                              : &masterInsertProc->mixerEngine.masterInsert2.grReduction)
@@ -288,7 +288,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             if (proc) setParam(pChar, 10);
             break;
 
-        case 11:  // #422 ── Karplus-Strong — Note / Octave / Feedback / LPF ─
+        case 11:  // ── Karplus-Strong — Note / Octave / Feedback / LPF ─
         {
             static const char* const kNoteNames[7] = { "C", "D", "E", "F", "G", "A", "B" };
 
@@ -302,7 +302,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             drive.setVisible(true);
 
             output.setLabel("Octave");
-            // #429: range extended to 0..3.
+            // range extended to 0..3.
             output.setRange(0.0, 3.0, 1.0);
             output.getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return juce::String((int) std::round(v));
@@ -319,7 +319,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             tone.setValue(juce::jlimit(0.0, 100.0, (double) ip.insertDither), juce::dontSendNotification);
             tone.setVisible(true);
 
-            // #428 follow-up: LPF cutoff on the feedback path — user can
+            // follow-up: LPF cutoff on the feedback path — user can
             // dial the brightness / damping. insertTone (20..20k) maps directly.
             extra.setLabel("LPF");
             extra.setRange(20.0, 20000.0, 1.0);
@@ -339,7 +339,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             break;
         }
 
-        case 12:  // #423 ── Vocoder — Wave / Unison / Octave / Note ────────
+        case 12:  // ── Vocoder — Wave / Unison / Octave / Note ────────
         {
             static const char* const kWaveNames[4] = { "Saw", "Square", "White", "Pink" };
             static const char* const kNoteNames[7] = { "C", "D", "E", "F", "G", "A", "B" };
@@ -354,7 +354,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             drive.setValue(juce::jlimit(0.0, 3.0, (double) ip.insertDrive), juce::dontSendNotification);
             drive.setVisible(true);
 
-            // #428: Unison now uses insertOutput field (range -24..0). UI knob
+            // Unison now uses insertOutput field (range -24..0). UI knob
             // value is 0..6; encode/decode via `±24` offset and /4 scale.
             output.setLabel("Unison");
             output.setRange(0.0, 6.0, 1.0);
@@ -385,7 +385,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             extra.setValue(juce::jlimit(1.0, 7.0, (double) ip.insertBits), juce::dontSendNotification);
             extra.setVisible(true);
 
-            // #423-followups: grey out Unison / Octave / Note when carrier is
+            // grey out Unison / Octave / Note when carrier is
             // noise (waveshape 2 / 3) — algorithm ignores them. Capture `this`
             // and `slot` so the lambda can look up the right knob pair every
             // call (the local refs above only live until configure() returns).
