@@ -373,13 +373,13 @@ void MixerChannel::loadFromAPVTS(juce::AudioProcessorValueTreeState& apvts,
 
         if (auto* p = apvts.getRawParameterValue("mst_insChar"))
         {
-            const int charId = juce::jlimit(0, 10, juce::roundToInt((float)*p));
+            const int charId = juce::jlimit(0, InsertProcessor::kNumInsertAlgos - 1, juce::roundToInt((float)*p));
             insCharBox.setSelectedId(charId + 1, juce::dontSendNotification);
             configureInsertAlgorithm(charId, 0, nullptr);
         }
         if (auto* p = apvts.getRawParameterValue("mst_ins2Char"))
         {
-            const int charId = juce::jlimit(0, 10, juce::roundToInt((float)*p));
+            const int charId = juce::jlimit(0, InsertProcessor::kNumInsertAlgos - 1, juce::roundToInt((float)*p));
             insCharBox2.setSelectedId(charId + 1, juce::dontSendNotification);
             configureInsertAlgorithm(charId, 1, nullptr);
         }
