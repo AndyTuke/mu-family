@@ -100,10 +100,20 @@ inline float migrateLegacyGlobalNorm(const juce::String& id, float oldNorm) noex
     return oldNorm;
 }
 
-// Current preset-file schema version. Bumped whenever a parameter range change
-// would invalidate older preset files. Files without this property are treated
-// as v0 and run through migrateLegacyPresetNorm / migrateLegacyGlobalNorm.
-inline constexpr int kCurrentPresetVersion = 1;
+// Current preset-file schema version.
+//   v0 (no presetVersion):    legacy pre-#430. Normalised values, drvChar / drvBits
+//                              ranges pre-#422/#423 (0..10 / 1..16). Loader applies
+//                              migrateLegacyPresetNorm + migrateLegacyGlobalNorm.
+//   v1:                       normalised values, post-#422/#423 ranges. No value
+//                              shift needed; loader just feeds normalised back.
+//   v2 (Stage 35):            actual de-normalised values + string algorithm names.
+//                              `r0_stepsA="16"`, `r0_drvChar="Bitcrusher"`,
+//                              `r0_aEnvLeg="true"`. Range-widening + algorithm-
+//                              reordering safe.
+//
+// Bump whenever a parameter range / encoding change would invalidate older
+// preset files. Files without this property are treated as v0.
+inline constexpr int kCurrentPresetVersion = 2;
 
 // #434: now a table lookup. The body that used to live here is in
 // RhythmParamTable.h (one entry per suffix; apply + push lambdas co-located).

@@ -10,7 +10,9 @@
 #include "PluginProcessor.h"
 #include "PluginProcessor_Internal.h"
 #include "Modulation/ModulationDestinations.h"   // #437: ModDest::isValidSourceId / isValidDestinationId
+#include "Audio/AlgorithmNames.h"                // Stage 35: nameFromIndex / indexFromName
 #include <thread>   // #237: std::this_thread::yield in modulator deserialise lock-spin
+#include <limits>   // Stage 35: std::numeric_limits for NaN sentinel
 
 using mu_pp::kRhythmParamDefs;         // #434
 using mu_pp::kRhythmParamCount;        // #434
@@ -35,6 +37,107 @@ static void            clearModulators(Rhythm& r);
 //   v0 / v1 : legacy (pre-#217) — ADSR A/D/R stored as 0..100 (×0.03 → seconds)
 //   v2      : current (#217/#286/#287) — ADSR A/D/R stored as 0..10 (seconds direct)
 static constexpr int kCurrentStateFormatVersion = 2;
+
+// Stage 35: serialise / deserialise a per-rhythm parameter using the param's
+// ParamKind. v2 writes human-readable + range-stable values:
+//   ParamKind::Bool            → "true" / "false"
+//   ParamKind::Int             → integer property
+//   ParamKind::AlgorithmIndex  → stable algorithm name string (e.g. "Bitcrusher")
+//   ParamKind::Float           → actual de-normalised value
+//
+// v0/v1 paths stay normalised — see readParamPropertyAsActual below.
+static void writeParamPropertyV2(juce::ValueTree& tree,
+                                 const juce::String& propName,
+                                 const juce::RangedAudioParameter& param,
+                                 const mu_pp::RhythmParamDef& def)
+{
+    const float actual = param.convertFrom0to1(param.getValue());
+
+    switch (def.kind)
+    {
+        case mu_pp::ParamKind::Bool:
+            // var(bool) serialises as "0"/"1" in JUCE; we want grep-able
+            // "true"/"false" in the XML, so write as a string literal.
+            tree.setProperty(propName, actual >= 0.5f ? "true" : "false", nullptr);
+            break;
+        case mu_pp::ParamKind::Int:
+            tree.setProperty(propName, juce::roundToInt(actual), nullptr);
+            break;
+        case mu_pp::ParamKind::AlgorithmIndex:
+            if (def.algorithmNames != nullptr)
+            {
+                const int idx = juce::roundToInt(actual);
+                if (const char* name = mu_audio::nameFromIndex(def.algorithmNames, idx))
+                {
+                    tree.setProperty(propName, juce::String(name), nullptr);
+                    break;
+                }
+            }
+            // Unknown name (impossible if the table covers the param's full
+            // range, but defend against future regressions): fall back to
+            // writing the integer index. Old behaviour is preserved.
+            tree.setProperty(propName, juce::roundToInt(actual), nullptr);
+            break;
+        case mu_pp::ParamKind::Float:
+        default:
+            tree.setProperty(propName, actual, nullptr);
+            break;
+    }
+}
+
+// Read a property and return it as a display-scale actual value (NOT
+// normalised). Returns NaN if the property is absent. Branches on the file's
+// `presetVersion`:
+//   v0 (absent / 0):  read normalised, apply migrateLegacyPresetNorm, convert
+//                     to actual via param.convertFrom0to1.
+//   v1:               read normalised, convert to actual.
+//   v2:               read actual directly per ParamKind (parsing the string
+//                     name back to an index for AlgorithmIndex kinds).
+static float readParamPropertyAsActual(const juce::ValueTree& tree,
+                                        const juce::String& propName,
+                                        const juce::RangedAudioParameter& param,
+                                        const mu_pp::RhythmParamDef& def,
+                                        int presetVersion)
+{
+    if (! tree.hasProperty(propName))
+        return std::numeric_limits<float>::quiet_NaN();
+
+    if (presetVersion >= 2)
+    {
+        switch (def.kind)
+        {
+            case mu_pp::ParamKind::Bool:
+                // var(string "true") → bool true via toBool(); also accepts
+                // "1" / "yes" / "y" so legacy-style int 0/1 still works.
+                return (bool) tree.getProperty(propName) ? 1.0f : 0.0f;
+            case mu_pp::ParamKind::Int:
+                return (float) (int) tree.getProperty(propName);
+            case mu_pp::ParamKind::AlgorithmIndex:
+                if (def.algorithmNames != nullptr)
+                {
+                    const juce::String name = tree.getProperty(propName).toString();
+                    const int idx = mu_audio::indexFromName(def.algorithmNames, name);
+                    if (idx >= 0)
+                        return (float) idx;
+                    // Unknown algorithm name (renamed / removed since this preset
+                    // was saved). Fall through and treat the property as a numeric
+                    // index — works for legacy fallback writes (Bitcrusher → "4").
+                    return (float) (int) tree.getProperty(propName);
+                }
+                return (float) (int) tree.getProperty(propName);
+            case mu_pp::ParamKind::Float:
+            default:
+                return (float) (double) tree.getProperty(propName);
+        }
+    }
+
+    // v0 or v1: stored as normalised. v0 additionally needs the #430 legacy
+    // norm-shift migration for drvChar / drvBits range expansion.
+    float normVal = (float) (double) tree.getProperty(propName);
+    if (presetVersion < 1)
+        normVal = mu_pp::migrateLegacyPresetNorm(juce::String(def.suffix), normVal);
+    return param.convertFrom0to1(normVal);
+}
 
 // #439: detect a sample path that points into our embedded-sample decode temp
 // dir (%TEMP%/muClid_samples/). These paths come from loading a preset whose
@@ -113,24 +216,22 @@ void PluginProcessor::stageRhythmPreset(int rhythmIndex, const juce::File& file)
     Rhythm newRhythm = sequencer.getRhythm(rhythmIndex);
     const juce::String paramPrefix = "r" + juce::String(rhythmIndex) + "_";
 
-    // #430: rescale legacy normalized values when the preset file pre-dates the
-    // drvChar (0..10 → 0..12) and drvBits (1..16 → 0..16) range changes.
-    const bool isLegacy = ((int)state.getProperty("presetVersion", 0)) < kCurrentPresetVersion;
+    // Stage 35: branch on presetVersion. v2 reads actual values (and algorithm
+    // names for selectors); v0/v1 reads normalised, with v0 also running the
+    // #430 drvChar/drvBits legacy-norm migration.
+    const int presetVersion = (int) state.getProperty("presetVersion", 0);
 
     for (int i = 0; i < kRhythmParamCount; ++i)
     {
-        const juce::String suffix = kRhythmParamDefs[i].suffix;
-        juce::Identifier propId { "r0_" + suffix };
-        if (state.hasProperty(propId))
+        const auto& def = kRhythmParamDefs[i];
+        const juce::String propName = "r0_" + juce::String(def.suffix);
+        if (auto* param = apvts.getParameter(paramPrefix + def.suffix))
         {
-            float normVal = (float)state.getProperty(propId);
-            if (isLegacy)
-                normVal = migrateLegacyPresetNorm(suffix, normVal);
-            if (auto* param = apvts.getParameter(paramPrefix + suffix))
+            const float actualVal = readParamPropertyAsActual(state, propName, *param, def, presetVersion);
+            if (! std::isnan(actualVal))
             {
-                const float actualVal = param->convertFrom0to1(normVal);
                 bool pd = false, vd = false;
-                applyRhythmSuffix(suffix, actualVal, newRhythm, pd, vd);
+                applyRhythmSuffix(def.suffix, actualVal, newRhythm, pd, vd);
             }
         }
     }
@@ -308,10 +409,16 @@ void PluginProcessor::saveRhythmPresetToFile(int rhythmIdx, const juce::File& de
     // Rhythm presets store ONLY sequencer-page state (Euclidean params, voice chain,
     // envelopes, insert effect). Mixer-page state (channel level/pan/sends/sidechain/
     // output bus) intentionally stays with the slot, not with the rhythm.
+    // Stage 35: v2 writes actual values + algorithm-name strings via
+    // writeParamPropertyV2. Ints / bools / algorithm selectors get their
+    // natural representation in XML; floats get raw actual values.
     const juce::String srcPrefix = "r" + juce::String(rhythmIdx) + "_";
     for (int i = 0; i < kRhythmParamCount; ++i)
         if (auto* param = apvts.getParameter(srcPrefix + kRhythmParamDefs[i].suffix))
-            state.setProperty("r0_" + juce::String(kRhythmParamDefs[i].suffix), param->getValue(), nullptr);
+            writeParamPropertyV2(state,
+                                 "r0_" + juce::String(kRhythmParamDefs[i].suffix),
+                                 *param,
+                                 kRhythmParamDefs[i]);
 
     // #237: serialise modulators (ControlSequences + ModulationMatrix assignments).
     state.addChild(serialiseModulators(sequencer.getRhythm(rhythmIdx)), -1, nullptr);
@@ -361,21 +468,20 @@ bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
     // Load only sequencer-page state — mixer settings stay attached to the slot.
     // Older rhythm preset files may include "ch_*" properties; those are simply
     // ignored on load (no read here) so legacy files load cleanly with the new policy.
-    // #430: rescale legacy normalized values for drvChar / drvBits.
-    const bool isLegacy = ((int)state.getProperty("presetVersion", 0)) < kCurrentPresetVersion;
+    // Stage 35: branch on presetVersion. v2 reads actual values; v0/v1 reads
+    // normalised, with v0 running the #430 legacy-norm migration.
+    const int presetVersion = (int) state.getProperty("presetVersion", 0);
     const juce::String dstPrefix = "r" + juce::String(targetIdx) + "_";
     for (int i = 0; i < kRhythmParamCount; ++i)
     {
-        const juce::String suffix = kRhythmParamDefs[i].suffix;
-        juce::Identifier propId { "r0_" + suffix };
-        if (state.hasProperty(propId))
-            if (auto* param = apvts.getParameter(dstPrefix + suffix))
-            {
-                float normVal = (float)state.getProperty(propId);
-                if (isLegacy)
-                    normVal = migrateLegacyPresetNorm(suffix, normVal);
-                param->setValueNotifyingHost(normVal);
-            }
+        const auto& def = kRhythmParamDefs[i];
+        const juce::String propName = "r0_" + juce::String(def.suffix);
+        if (auto* param = apvts.getParameter(dstPrefix + def.suffix))
+        {
+            const float actualVal = readParamPropertyAsActual(state, propName, *param, def, presetVersion);
+            if (! std::isnan(actualVal))
+                param->setValueNotifyingHost(param->convertTo0to1(actualVal));
+        }
     }
 
     Rhythm& r = sequencer.getRhythm(targetIdx);
@@ -954,10 +1060,16 @@ void PluginProcessor::savePreset(const juce::String& name,
                               : loadedSamplePaths[i],
                           nullptr);
 
+        // Stage 35: v2 writes per the param's ParamKind — actual values for
+        // floats, ints, bools as "true"/"false", algorithm selectors as the
+        // stable name string.
         const juce::String srcPrefix = "r" + juce::String(i) + "_";
         for (int j = 0; j < kRhythmParamCount; ++j)
             if (auto* param = apvts.getParameter(srcPrefix + kRhythmParamDefs[j].suffix))
-                rTree.setProperty(kRhythmParamDefs[j].suffix, param->getValue(), nullptr);
+                writeParamPropertyV2(rTree,
+                                     juce::String(kRhythmParamDefs[j].suffix),
+                                     *param,
+                                     kRhythmParamDefs[j]);
 
         const juce::String chSrcPrefix = "ch" + juce::String(i) + "_";
         for (int j = 0; kChannelSuffixes[j] != nullptr; ++j)
@@ -990,10 +1102,15 @@ void PluginProcessor::savePreset(const juce::String& name,
     }
 
     // Save global FX/mixer state so a preset fully restores the session.
+    // Stage 35: v2 writes GlobalState as actual de-normalised values too. We
+    // don't currently emit algorithm-name strings for mst_insChar/eff_algo etc.
+    // (no parallel ParamKind table for the global side) — they're written as
+    // their integer index, which still survives range widening. A follow-up
+    // can add algorithm-name strings for the four global selectors.
     juce::ValueTree globalTree("GlobalState");
     for (int i = 0; kGlobalParams[i] != nullptr; ++i)
         if (auto* param = apvts.getParameter(kGlobalParams[i]))
-            globalTree.setProperty(kGlobalParams[i], param->getValue(), nullptr);
+            globalTree.setProperty(kGlobalParams[i], param->convertFrom0to1(param->getValue()), nullptr);
     root.addChild(globalTree, -1, nullptr);
 
     auto dir = getPresetsDir();
@@ -1063,8 +1180,9 @@ void PluginProcessor::loadPreset(const juce::File& file)
 
         mu_core::ScopedApvtsLoading guard(apvtsLoading);
 
-        // #430: rescale legacy normalized values for drvChar / drvBits + master inserts.
-        const bool isLegacy = ((int)root.getProperty("presetVersion", 0)) < kCurrentPresetVersion;
+        // Stage 35: branch on presetVersion for both per-rhythm and global-state.
+        const int presetVersion = (int) root.getProperty("presetVersion", 0);
+        const bool isLegacy = (presetVersion < 1);   // for #430 global-state migration
 
         int rhythmIdx = 0;
         for (int ci = 0; ci < root.getNumChildren() && rhythmIdx < n; ++ci)
@@ -1076,16 +1194,13 @@ void PluginProcessor::loadPreset(const juce::File& file)
             const juce::String dstPrefix = "r" + juce::String(i) + "_";
             for (int j = 0; j < kRhythmParamCount; ++j)
             {
-                const juce::String suffix = kRhythmParamDefs[j].suffix;
-                juce::Identifier propId { suffix };
-                if (rTree.hasProperty(propId))
-                    if (auto* param = apvts.getParameter(dstPrefix + suffix))
-                    {
-                        float normVal = (float)rTree.getProperty(propId);
-                        if (isLegacy)
-                            normVal = migrateLegacyPresetNorm(suffix, normVal);
-                        param->setValueNotifyingHost(normVal);
-                    }
+                const auto& def = kRhythmParamDefs[j];
+                if (auto* param = apvts.getParameter(dstPrefix + def.suffix))
+                {
+                    const float actualVal = readParamPropertyAsActual(rTree, juce::String(def.suffix), *param, def, presetVersion);
+                    if (! std::isnan(actualVal))
+                        param->setValueNotifyingHost(param->convertTo0to1(actualVal));
+                }
             }
 
             const juce::String dstChPrefix = "ch" + juce::String(i) + "_";
@@ -1189,8 +1304,8 @@ void PluginProcessor::loadPreset(const juce::File& file)
         }
 
         // Restore global FX/mixer state if present (added in #123; older files omit this).
-        // #430: rescale legacy mst_insChar / mst_insBits (and ins2 equivalents) when
-        // presetVersion is missing.
+        // Stage 35: v2 reads actual de-normalised values; v0/v1 reads normalised
+        // (with v0 running the #430 mst_insChar / mst_insBits migration).
         for (int ci = 0; ci < root.getNumChildren(); ++ci)
         {
             auto child = root.getChild(ci);
@@ -1202,10 +1317,18 @@ void PluginProcessor::loadPreset(const juce::File& file)
                 if (child.hasProperty(propId))
                     if (auto* param = apvts.getParameter(gid))
                     {
-                        float normVal = (float)child.getProperty(propId);
-                        if (isLegacy)
-                            normVal = migrateLegacyGlobalNorm(gid, normVal);
-                        param->setValueNotifyingHost(normVal);
+                        if (presetVersion >= 2)
+                        {
+                            const float actualVal = (float) (double) child.getProperty(propId);
+                            param->setValueNotifyingHost(param->convertTo0to1(actualVal));
+                        }
+                        else
+                        {
+                            float normVal = (float) child.getProperty(propId);
+                            if (isLegacy)
+                                normVal = migrateLegacyGlobalNorm(gid, normVal);
+                            param->setValueNotifyingHost(normVal);
+                        }
                     }
             }
             break;
