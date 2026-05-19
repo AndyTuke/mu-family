@@ -43,7 +43,7 @@ void EffectSlot::setAlgorithm(int index)
 {
     // #402: allocation-free — just flips the active index into the pre-allocated array.
     // Safe to call from the audio thread (DAW host automation on `eff_algo`).
-    algorithmIndex = juce::jlimit(0, kNumAlgorithms - 1, index);
+    algorithmIndex = juce::jlimit(0, kNumEffectAlgos - 1, index);
 }
 
 void EffectSlot::setParam(const juce::String& id, float value)

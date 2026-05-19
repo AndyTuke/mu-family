@@ -43,7 +43,7 @@ public:
     std::atomic<float> grReduction { 0.0f };
 
 private:
-    static constexpr int kNumAlgorithms = 13;   // #422/#423: + Karplus + Vocoder
+    static constexpr int kNumInsertAlgos = 13;   // #422/#423: + Karplus + Vocoder
 
     // Ownership: 10 distinct algorithm instances (Comp + Lim share one). Held
     // in a vector reserved at construction time so the raw pointers stored in
@@ -52,7 +52,7 @@ private:
 
     // Dispatch: insertAlgo value (0..10) → pointer into `owned`. Indices 7 and
     // 8 alias the same CompressorLimiterInsert instance.
-    std::array<InsertAlgorithmBase*, kNumAlgorithms> dispatch { };
+    std::array<InsertAlgorithmBase*, kNumInsertAlgos> dispatch { };
 
     double currentSampleRate = 44100.0;
 

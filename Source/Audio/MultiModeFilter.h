@@ -40,7 +40,7 @@ class MultiModeFilter
 {
 public:
     static constexpr int MaxChannels   = 2;
-    static constexpr int kNumAlgorithms = 16;
+    static constexpr int kNumFilterAlgos = 16;
 
     MultiModeFilter();
 
@@ -48,7 +48,7 @@ public:
     void reset();
 
     // Set filter type by integer code (matches APVTS values 0..15).
-    void setType(int typeCode) noexcept     { typeCodeValue = juce::jlimit(0, kNumAlgorithms - 1, typeCode); }
+    void setType(int typeCode) noexcept     { typeCodeValue = juce::jlimit(0, kNumFilterAlgos - 1, typeCode); }
     void setCutoff(float hz) noexcept       { cutoffHz = hz; }
     void setResonance(float r) noexcept     { resonance = r; }
 
@@ -61,7 +61,7 @@ private:
     float  cutoffHz      = 1000.0f;
     float  resonance     = 0.1f;
 
-    std::array<std::unique_ptr<FilterAlgorithmBase>, kNumAlgorithms> algorithms;
+    std::array<std::unique_ptr<FilterAlgorithmBase>, kNumFilterAlgos> algorithms;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MultiModeFilter)
 };

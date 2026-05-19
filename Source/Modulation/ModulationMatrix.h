@@ -2,6 +2,7 @@
 
 #include "ModulationAssignment.h"
 #include "../Sequencer/ControlSequence.h"
+#include "../MuLimits.h"
 
 #include <string>
 #include <unordered_map>
@@ -26,7 +27,7 @@
 class ModulationMatrix
 {
 public:
-    static constexpr int MaxAssignments = 64;
+    static constexpr int MaxAssignments = mu_limits::kMaxModulationAssignments;
 
     // Adds the assignment. Returns false if it would create a circular dependency
     // or if MaxAssignments is reached.

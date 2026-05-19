@@ -9,6 +9,7 @@
 #include "Audio/MixerEngine.h"
 #include "License/LicenseChecker.h"
 #include "MidiPresetMap.h"
+#include "MuLimits.h"
 
 #include <memory>
 #include <vector>
@@ -91,10 +92,7 @@ public:
     static constexpr int kFXReturnsBusIndex = 9;
     static constexpr int kTotalBuses        = 10;
 
-    // Rhythms 1..kAutomatedRhythms get full "Rhythm N" names in the APVTS parameter
-    // layout so DAW automation lanes show them clearly. Remaining rhythms use short
-    // "RN" names. Raise this constant (up to MaxRhythms) to expose more rhythms.
-    static constexpr int kAutomatedRhythms  = 3;
+    static constexpr int kAutomatedRhythms  = mu_limits::kMaxAutomatedRhythms;
 
     // MIDI clock sync (standalone only).
     void   setMidiSyncEnabled(bool on);
@@ -223,7 +221,7 @@ public:
     // isFullyDrained(), the audio thread store-releases retiredReadyForCleanup;
     // the message thread (handleAsyncUpdate) polls + clears the flag under
     // suspendProcessing and destroys the engine off the RT thread.
-    static constexpr int kMaxRetiredEngines = 4;
+    static constexpr int kMaxRetiredEngines = mu_limits::kMaxRetiredVoiceEngines;
     std::array<std::array<std::unique_ptr<VoiceEngine>, kMaxRetiredEngines>,
                SequencerEngine::MaxRhythms> retiredVoiceEngines;
     std::array<std::array<std::atomic<bool>, kMaxRetiredEngines>,
@@ -294,7 +292,7 @@ private:
     // MIDI program-change queue: audio thread enqueues on incoming program-change,
     // handleAsyncUpdate (message thread) drains and calls stageRhythmPreset.
     struct ProgramChangeEvent { int slot; int presetIndex; };
-    static constexpr int kPCFifoSize = 32;
+    static constexpr int kPCFifoSize = mu_limits::kProgramChangeFifoSize;
     juce::AbstractFifo                              pcFifo { kPCFifoSize };
     std::array<ProgramChangeEvent, kPCFifoSize>     pcQueue {};
 

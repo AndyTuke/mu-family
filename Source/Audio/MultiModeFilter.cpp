@@ -60,7 +60,7 @@ void MultiModeFilter::process(juce::AudioBuffer<float>& buffer,
     const int ns  = juce::jmin(numSamples, buffer.getNumSamples());
     if (ns <= 0 || nCh <= 0) return;
 
-    const int idx = juce::jlimit(0, kNumAlgorithms - 1, typeCodeValue);
+    const int idx = juce::jlimit(0, kNumFilterAlgos - 1, typeCodeValue);
     if (auto* algo = algorithms[(size_t) idx].get())
         algo->process(buffer, ns, nCh, cutoffHz, resonance);
 }

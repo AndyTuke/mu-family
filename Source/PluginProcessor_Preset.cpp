@@ -309,31 +309,64 @@ void PluginProcessor::stageRhythmPreset(int rhythmIndex, const juce::File& file)
     newVoice->setParams(newRhythm.voiceParams);
 
     juce::String samplePath;
-    juce::String storedPath = state.getProperty("r0_sample").toString();
-    if (storedPath.isNotEmpty())
+    // Embedded sample takes priority over path-based load — mirrors
+    // applyRhythmPreset's policy. Without this branch, hot-swapping a preset
+    // that was saved with embedSample=true (so r0_sample is empty by design,
+    // and the bytes live in <sampleData>) silently lands with no audio.
+    juce::String encodedData = state.getProperty("sampleData").toString();
+    if (encodedData.isNotEmpty())
     {
-        juce::File sf(storedPath);
-        if (sf.existsAsFile())
+        juce::MemoryOutputStream mos;
+        if (juce::Base64::convertFromBase64(mos, encodedData) && mos.getDataSize() > 0)
         {
-            newVoice->loadFile(sf);
-            samplePath = sf.getFullPathName();
-        }
-        else
-        {
-            juce::File fallback = getSamplesDir().getChildFile(juce::File(storedPath).getFileName());
-            if (fallback.existsAsFile())
+            juce::String sampleName = state.getProperty("sampleName", "embedded").toString();
+            juce::File tmp = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                                 .getChildFile("muclid_" + sampleName);
+            if (tmp.replaceWithData(mos.getData(), mos.getDataSize()))
             {
-                newVoice->loadFile(fallback);
-                samplePath = fallback.getFullPathName();
-                // #438: surface the relocation so the user notices when a
-                // same-basename file from the content samples dir got picked
-                // up instead of the original referenced path. Different files
-                // with the same basename are a real hazard — a "kick.wav" in
-                // the project samples dir might be a completely different
-                // recording than the one originally loaded into the preset.
-                if (onLoadError)
-                    onLoadError("Sample '" + juce::File(storedPath).getFileName()
-                                + "' not at original path, loaded from content folder instead.");
+                newVoice->loadFile(tmp);
+                samplePath = tmp.getFullPathName();
+            }
+        }
+    }
+    else
+    {
+        juce::String storedPath = state.getProperty("r0_sample").toString();
+        if (storedPath.isNotEmpty())
+        {
+            juce::File sf(storedPath);
+            if (sf.existsAsFile())
+            {
+                newVoice->loadFile(sf);
+                samplePath = sf.getFullPathName();
+            }
+            else
+            {
+                juce::File fallback = getSamplesDir().getChildFile(juce::File(storedPath).getFileName());
+                if (fallback.existsAsFile())
+                {
+                    newVoice->loadFile(fallback);
+                    samplePath = fallback.getFullPathName();
+                    // Surface the relocation so the user notices when a
+                    // same-basename file from the content samples dir got picked
+                    // up instead of the original referenced path. Different files
+                    // with the same basename are a real hazard — a "kick.wav" in
+                    // the project samples dir might be a completely different
+                    // recording than the one originally loaded into the preset.
+                    if (onLoadError)
+                        onLoadError("Sample '" + juce::File(storedPath).getFileName()
+                                    + "' not at original path, loaded from content folder instead.");
+                }
+                else
+                {
+                    // Linked sample missing — keep the recorded path so the
+                    // RhythmPanel "missing — click to find" affordance fires,
+                    // and warn so the silent-output case has a visible cause.
+                    samplePath = storedPath;
+                    if (onLoadError)
+                        onLoadError("Sample '" + juce::File(storedPath).getFileName()
+                                    + "' missing — rhythm loaded without audio.");
+                }
             }
         }
     }
@@ -1219,6 +1252,13 @@ void PluginProcessor::loadPreset(const juce::File& file)
 
     if (root.getType() == juce::Identifier("MuClidPreset"))
     {
+        // Reject legacy formats BEFORE mutating sequencer state. Otherwise a v0
+        // preset wipes the user's existing rhythms during the resize block below
+        // and only then reports the rejection — leaving the project in a
+        // half-loaded default state instead of the pre-load state.
+        if (! requireSupportedPresetVersion(root, file.getFileName(), onLoadError))
+            return;
+
         // Count only Rhythm-type children; GlobalState child was added in #123.
         int n = 0;
         for (int ci = 0; ci < root.getNumChildren(); ++ci)
@@ -1258,10 +1298,6 @@ void PluginProcessor::loadPreset(const juce::File& file)
             }
             numActiveRhythms.store(n, std::memory_order_release);
         }
-
-        // v2-only: legacy presets refused at the entry point.
-        if (! requireSupportedPresetVersion(root, file.getFileName(), onLoadError))
-            return;
 
         mu_core::ScopedApvtsLoading guard(apvtsLoading);
 

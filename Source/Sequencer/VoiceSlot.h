@@ -3,6 +3,7 @@
 #include "ControlSequence.h"
 #include "../Modulation/ModulationMatrix.h"
 #include "../Audio/VoiceParams.h"
+#include "../MuLimits.h"
 
 #include <atomic>
 #include <string>
@@ -13,7 +14,7 @@
 // Future mu-tant voice types extend it with their own trigger data.
 struct VoiceSlot
 {
-    static constexpr int MaxControlSequences = 8;
+    static constexpr int MaxControlSequences = mu_limits::kMaxControlSequences;
 
     VoiceSlot()
     {

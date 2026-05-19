@@ -5,6 +5,7 @@
 #include "ModulatorEditor.h"
 #include "ModMatrixPanel.h"
 #include "../Sequencer/Rhythm.h"
+#include "../MuLimits.h"
 
 // Container panel: tab bar (Mod A–H + Matrix) + content area.
 // Owns 8 ModulatorEditor instances (one per ControlSequence) and a ModMatrixPanel.
@@ -31,7 +32,8 @@ private:
                             SegmentControl::ActiveStyle::General,
                             SegmentControl::DrawStyle::Bar };
 
-    static constexpr int kNumMods = 8;
+    // Must equal Rhythm::MaxControlSequences — one tab per ControlSequence.
+    static constexpr int kNumMods = mu_limits::kMaxControlSequences;
     ModulatorEditor  editors[kNumMods];
     ModMatrixPanel   matrixPanel;
 

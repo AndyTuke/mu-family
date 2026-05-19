@@ -4,6 +4,7 @@
 #include <memory>
 #include "InsertProcessor.h"
 #include "VoiceParams.h"
+#include "../MuLimits.h"
 
 class VoiceEngine;
 class FXChain;
@@ -27,7 +28,8 @@ struct RetiredVoices
 class MixerEngine
 {
 public:
-    static constexpr int MaxChannels = 8;
+    // One mixer channel per rhythm slot — must equal mu_limits::kMaxRhythms.
+    static constexpr int MaxChannels = mu_limits::kMaxRhythms;
 
     // Stage 20: fixed −6 dB pre-fader trim on every channel input. Absorbs the
     // worst-case +18 dB of summing across 8 simultaneous correlated voices and

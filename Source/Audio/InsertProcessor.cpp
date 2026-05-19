@@ -18,7 +18,7 @@ InsertProcessor::InsertProcessor()
     // #425: pre-allocate every distinct algorithm up-front; the dispatch table
     // then points at these. owned is reserved so the raw pointers in dispatch
     // remain stable across the push_back calls (no reallocation).
-    owned.reserve(kNumAlgorithms);
+    owned.reserve(kNumInsertAlgos);
     auto add = [&](std::unique_ptr<InsertAlgorithmBase> a) -> InsertAlgorithmBase*
     {
         auto* raw = a.get();
@@ -71,7 +71,7 @@ void InsertProcessor::reset()
 void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh,
                               const VoiceParams& p)
 {
-    const int idx = juce::jlimit(0, kNumAlgorithms - 1, (int) p.insertAlgo);
+    const int idx = juce::jlimit(0, kNumInsertAlgos - 1, (int) p.insertAlgo);
 
     float gr = 0.0f;
     if (auto* algo = dispatch[(size_t) idx])

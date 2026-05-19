@@ -6,6 +6,7 @@
 #include "VoiceParams.h"
 #include "MultiModeFilter.h"
 #include "InsertProcessor.h"
+#include "../MuLimits.h"
 
 #include <array>
 #include <atomic>
@@ -16,7 +17,7 @@
 class VoiceEngine
 {
 public:
-    static constexpr int MaxVoices = 4;
+    static constexpr int MaxVoices = mu_limits::kMaxSamplerVoices;
 
     VoiceEngine();
 

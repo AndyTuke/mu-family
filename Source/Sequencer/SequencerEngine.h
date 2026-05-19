@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Rhythm.h"
+#include "../MuLimits.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <vector>
 
@@ -22,7 +23,7 @@ struct BlockResult
 class SequencerEngine : public juce::ChangeBroadcaster
 {
 public:
-    static constexpr int    MaxRhythms      = 8;
+    static constexpr int    MaxRhythms      = mu_limits::kMaxRhythms;
     static constexpr double StepLengthBeats = 0.25; // 1/16th note default
 
     SequencerEngine();

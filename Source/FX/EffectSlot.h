@@ -25,7 +25,7 @@
 class EffectSlot : public FXSlotBase
 {
 public:
-    static constexpr int kNumAlgorithms = 4;
+    static constexpr int kNumEffectAlgos = 4;
     static constexpr int kEchoAlgoIndex = 3;
 
     EffectSlot();
@@ -63,7 +63,7 @@ public:
 
 private:
     // Pre-allocated in ctor — setAlgorithm() flips `algorithmIndex` into this array.
-    std::array<std::unique_ptr<EffectAlgorithmBase>, kNumAlgorithms> algorithms;
+    std::array<std::unique_ptr<EffectAlgorithmBase>, kNumEffectAlgos> algorithms;
 
     EffectAlgorithmBase* currentAlgorithm() const
     {
