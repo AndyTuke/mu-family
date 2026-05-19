@@ -1,31 +1,13 @@
 // #408: partial-class TU split from MixerChannel.cpp. Contains the master-insert
-// algorithm configuration code — the 11-case switch over insert algorithms with
+// algorithm configuration code — the 13-case switch over insert algorithms with
 // per-algorithm knob labels, ranges, formatters, and APVTS wiring (~280 lines).
-// Also owns the kInsertDefaults table since it's only consumed here.
 // See MixerChannel_Bindings.cpp header for the split rationale.
+// #435: per-algorithm default table moved to UI/InsertAlgoDefaults.h
+// (mu_ui::kInsertAlgoDefaults); shared with the per-rhythm VoiceSection page.
 
 #include "MixerChannel.h"
 #include "../PluginProcessor.h"
 #include <cmath>
-
-// First-visit defaults for each insert algorithm.  Fields map to VoiceParams members:
-// driveDrive | driveOutput | drvDither | driveTone | eqMidGain | drvBits | driveRate
-const MixerChannel::InsertAlgoSnapshot MixerChannel::kInsertDefaults[13] = {
-    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 0  None
-    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 1  Soft Clip  (0% drive = transparent)
-    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 2  Hard Clip
-    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 3  Fold
-    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 4  Bitcrusher (16-bit, 48 kHz, flat)
-    { 100.0f, 0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 5  Clipper    (100% = full range, no clipping)
-    { 50.0f,  0.0f, 50.0f,  1000.0f,  0.0f, 16.0f, 48000.0f },  // 6  EQ         (0 dB all bands, 1 kHz mid)
-    { 30.0f,  0.0f, 0.0f,    200.0f,  0.0f, 16.0f, 48000.0f },  // 7  Compressor (−12 dB thresh, 200 ms release)
-    { 30.0f,  0.0f, 0.0f,    200.0f,  0.0f, 16.0f, 48000.0f },  // 8  Limiter    (−12 dB ceiling, 200 ms)
-    { 50.0f,  0.0f, 0.0f,    440.0f,  0.0f, 16.0f, 48000.0f },  // 9  Ring Mod   (50% mix, 440 Hz)
-    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 10 Tape Sat  (0% drive = transparent)
-    // #422 / #423 — see VoiceSection.cpp for the same defaults
-    { 0.0f,   0.0f, 70.0f,  20000.0f, 0.0f,  1.0f, 48000.0f },  // 11 Karplus-Strong
-    { 0.0f, -20.0f,  3.0f,  20000.0f, 0.0f,  4.0f, 48000.0f },  // 12 Vocoder
-};
 
 void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcessor* proc)
 {

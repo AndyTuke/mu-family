@@ -4,6 +4,7 @@
 #include "Components/SegmentControl.h"
 #include "Components/DropdownSelect.h"
 #include "Components/MuClidLookAndFeel.h"
+#include "InsertAlgoDefaults.h"   // #435
 
 class PluginProcessor;
 
@@ -72,11 +73,11 @@ private:
     KnobWithLabel  ampRel      { "Release", Id::knobLevel    };
 
     // Per-algorithm snapshots for A/B-ing — reset when switching to a new rhythm.
-    struct InsertAlgoSnapshot {
-        float driveDrive = 0.0f, driveOutput = 0.0f, drvDither = 0.0f;
-        float driveTone = 20000.0f, eqMidGain = 0.0f, drvBits = 16.0f, driveRate = 48000.0f;
-    };
-    static const InsertAlgoSnapshot kInsertDefaults[13];   // #422/#423: + Karplus + Vocoder
+    // #435: struct + default table lifted to shared InsertAlgoDefaults.h (was
+    // previously duplicated between VoiceSection.cpp and MixerChannel_Insert.cpp
+    // and the two copies had drifted at indices 7 / 8). Kept as a using-alias so
+    // existing references to VoiceSection::InsertAlgoSnapshot keep compiling.
+    using InsertAlgoSnapshot = InsertAlgoDefaults;
     InsertAlgoSnapshot insertSnapshots[13];
     bool               insertSnapshotValid[11] = {};
 

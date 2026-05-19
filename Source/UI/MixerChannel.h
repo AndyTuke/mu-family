@@ -6,6 +6,7 @@
 #include "Components/GRMeter.h"
 #include "Components/MuClidLookAndFeel.h"
 #include "../Audio/MixerEngine.h"
+#include "InsertAlgoDefaults.h"   // #435
 
 class PluginProcessor;
 
@@ -96,12 +97,9 @@ private:
     KnobWithLabel     scRelease { "\\",  Id::knobFxSend };
 
     // Per-algorithm state snapshots for master inserts — enables A/B-ing between algorithms.
-    // Indexed by driveChar (0..10); snapshotValid[i] is false until first visit.
-    struct InsertAlgoSnapshot {
-        float driveDrive = 0.0f, driveOutput = 0.0f, drvDither = 0.0f;
-        float driveTone = 20000.0f, eqMidGain = 0.0f, drvBits = 16.0f, driveRate = 48000.0f;
-    };
-    static const InsertAlgoSnapshot kInsertDefaults[13];   // #422/#423: + Karplus + Vocoder
+    // Indexed by driveChar (0..12); snapshotValid[i] is false until first visit.
+    // #435: struct + default table lifted to shared InsertAlgoDefaults.h.
+    using InsertAlgoSnapshot = InsertAlgoDefaults;
     InsertAlgoSnapshot insertSnapshots[13];
     bool               insertSnapshotValid[13] = {};
     InsertAlgoSnapshot insertSnapshots2[13];

@@ -1,25 +1,9 @@
 #include "VoiceSection.h"
 #include "../PluginProcessor.h"
 
-const VoiceSection::InsertAlgoSnapshot VoiceSection::kInsertDefaults[13] = {
-    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 0  None
-    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 1  Soft Clip  (0% drive = transparent)
-    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 2  Hard Clip
-    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 3  Fold
-    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 4  Bitcrusher (16-bit, 48 kHz, flat)
-    { 100.0f, 0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 5  Clipper    (100% = full range)
-    { 50.0f,  0.0f, 50.0f,  1000.0f,  0.0f, 16.0f, 48000.0f },  // 6  EQ         (0 dB all bands, 1 kHz mid)
-    { 30.0f,  0.0f, 5.0f,   200.0f,   0.0f, 16.0f, 48000.0f },  // 7  Compressor (−12 dB, 10 ms atk, 200 ms rel)
-    { 30.0f,  0.0f, 5.0f,   200.0f,   0.0f, 16.0f, 48000.0f },  // 8  Limiter    (−12 dB, 10 ms atk, 200 ms)
-    { 50.0f,  0.0f, 0.0f,    440.0f,  0.0f, 16.0f, 48000.0f },  // 9  Ring Mod   (50% mix, 440 Hz)
-    { 0.0f,   0.0f, 0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 10 Tape Sat  (0% drive = transparent)
-    // #422 Karplus-Strong: drvDrive=0→Note C, drvBits=1→Octave 1, drvDither=70→Feedback 70%,
-    // driveTone=20000→LP fully open (no extra damping — feedback alone shapes the decay).
-    { 0.0f,   0.0f, 70.0f,  20000.0f, 0.0f,  1.0f, 48000.0f },  // 11 Karplus-Strong
-    // #423 Vocoder: drvDrive=0 → Saw; drvBits=4 → Note F (idx 3);
-    // drvDither=3 → Octave 3; drvOut=-20 → Unison index 1 (3 voices).
-    { 0.0f, -20.0f,  3.0f,  20000.0f, 0.0f,  4.0f, 48000.0f },  // 12 Vocoder
-};
+// #435: per-algorithm default table moved to UI/InsertAlgoDefaults.h
+// (mu_ui::kInsertAlgoDefaults). Both this page and MixerChannel_Insert.cpp
+// now share that single source of truth; previous local copies had drifted.
 
 VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
 {
@@ -291,9 +275,10 @@ void VoiceSection::wireCallbacks()
         }
 
         // Restore the incoming algorithm from its saved snapshot, or first-visit defaults.
+        // #435: defaults are now shared with MixerChannel_Insert via UI/InsertAlgoDefaults.h.
         const InsertAlgoSnapshot& snap = insertSnapshotValid[newChar]
                                         ? insertSnapshots[newChar]
-                                        : kInsertDefaults[newChar];
+                                        : mu_ui::kInsertAlgoDefaults[newChar];
         apvtsSet("drvDrv",    snap.driveDrive);
         apvtsSet("drvOut",    snap.driveOutput);
         apvtsSet("drvDit",    snap.drvDither);

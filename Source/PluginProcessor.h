@@ -194,7 +194,6 @@ public:
     void savePreset(const juce::String& name, const juce::String& description,
                     const juce::String& category, bool embedSamples = false);
     void loadPreset(const juce::File& file);
-    void saveRhythmPreset(int rhythmIndex, const juce::String& name, const juce::String& category);
     void saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFile,
                                 bool embedSample = false, const juce::String& category = {},
                                 const juce::String& description = {});

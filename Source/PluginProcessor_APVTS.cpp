@@ -11,7 +11,8 @@
 #include "PluginProcessor_Internal.h"
 #include "FX/FXAlgorithmDef.h"
 
-using mu_pp::kRhythmSuffixes;
+using mu_pp::kRhythmParamDefs;         // #434
+using mu_pp::kRhythmParamCount;        // #434
 using mu_pp::applyRhythmSuffix;
 
 juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout()
@@ -333,10 +334,10 @@ void PluginProcessor::forceSyncRhythmFromAPVTS(int ri)
 
     bool patternDirty = false;
     bool voiceDirty   = false;
-    for (int j = 0; kRhythmSuffixes[j] != nullptr; ++j)
+    for (int j = 0; j < kRhythmParamCount; ++j)
     {
-        if (auto* raw = apvts.getRawParameterValue(prefix + kRhythmSuffixes[j]))
-            applyRhythmSuffix(kRhythmSuffixes[j], raw->load(), r, patternDirty, voiceDirty);
+        if (auto* raw = apvts.getRawParameterValue(prefix + kRhythmParamDefs[j].suffix))
+            applyRhythmSuffix(kRhythmParamDefs[j].suffix, raw->load(), r, patternDirty, voiceDirty);
     }
 
     if (patternDirty) sequencer.updatePattern(ri);
@@ -497,83 +498,16 @@ void PluginProcessor::pushRhythmToAPVTS(int ri)
             p->setValueNotifyingHost(p->convertTo0to1(v));
     };
 
-    auto& A = r.genA;
-    set(px+"stepsA",   (float)A.steps);
-    set(px+"hitsA",    (float)A.hits);
-    set(px+"rotA",     (float)A.rotate);
-    set(px+"prePadA",  (float)A.prePad);
-    set(px+"postPadA", (float)A.postPad);
-    set(px+"insStA",   (float)A.insertStart);
-    set(px+"insLenA",  (float)A.insertLength);
-    set(px+"insModeA",    A.insertMode  == InsertMode::Mute ? 1.0f : 0.0f);
-    set(px+"prePadModeA", A.prePadMode  == InsertMode::Mute ? 1.0f : 0.0f);
-    set(px+"postPadModeA",A.postPadMode == InsertMode::Mute ? 1.0f : 0.0f);
-
-    auto& B = r.genB;
-    set(px+"stepsB",   (float)B.steps);
-    set(px+"hitsB",    (float)B.hits);
-    set(px+"rotB",     (float)B.rotate);
-    set(px+"prePadB",  (float)B.prePad);
-    set(px+"postPadB", (float)B.postPad);
-    set(px+"insStB",   (float)B.insertStart);
-    set(px+"insLenB",  (float)B.insertLength);
-    set(px+"insModeB",    B.insertMode  == InsertMode::Mute ? 1.0f : 0.0f);
-    set(px+"prePadModeB", B.prePadMode  == InsertMode::Mute ? 1.0f : 0.0f);
-    set(px+"postPadModeB",B.postPadMode == InsertMode::Mute ? 1.0f : 0.0f);
-
-    auto& C = r.genC;
-    set(px+"stepsC",   (float)C.steps);
-    set(px+"hitsC",    (float)C.hits);
-    set(px+"rotC",     (float)C.rotate);
-    set(px+"prePadC",  (float)C.prePad);
-    set(px+"postPadC", (float)C.postPad);
-    set(px+"insStC",   (float)C.insertStart);
-    set(px+"insLenC",  (float)C.insertLength);
-    set(px+"insModeC",    C.insertMode  == InsertMode::Mute ? 1.0f : 0.0f);
-    set(px+"prePadModeC", C.prePadMode  == InsertMode::Mute ? 1.0f : 0.0f);
-    set(px+"postPadModeC",C.postPadMode == InsertMode::Mute ? 1.0f : 0.0f);
-
-    set(px+"logic", (float)r.logic);
-    set(px+"patLeg", r.patternLegato ? 1.0f : 0.0f);   // #419
-
-    const auto& vp = r.voiceParams;
-    set(px+"pitchOct",  (float)vp.pitchOctave);
-    set(px+"pitchSemi", (float)vp.pitchSemitones);
-    set(px+"pitchFine", vp.pitchFine);
-    // #287 — pEnv times now stored in seconds (0..10 s); sustain stays 0..100 %.
-    set(px+"pEnvAtk",   vp.pitchEnvAtk);
-    set(px+"pEnvDec",   vp.pitchEnvDec);
-    set(px+"pEnvSus",   vp.pitchEnvSus  * 100.0f);
-    set(px+"pEnvRel",   vp.pitchEnvRel);
-    set(px+"pEnvDep",   vp.pitchEnvDepth);
-    set(px+"pEnvLeg",   vp.pitchEnvLegato ? 1.0f : 0.0f);   // #221
-    set(px+"fltType",   (float)vp.filterType);
-    set(px+"fltCut",    vp.filterCutoff);
-    set(px+"fltRes",    vp.filterRes);
-    // #286 — fEnv times now stored in seconds (0..10 s).
-    set(px+"fEnvAtk",   vp.filterEnvAtk);
-    set(px+"fEnvDec",   vp.filterEnvDec);
-    set(px+"fEnvSus",   vp.filterEnvSus  * 100.0f);
-    set(px+"fEnvRel",   vp.filterEnvRel);
-    set(px+"fEnvDep",   vp.filterEnvDepth);
-    set(px+"fEnvLeg",   vp.filterEnvLegato ? 1.0f : 0.0f);   // #221
-    set(px+"ampLvl",    vp.ampLevel);
-    set(px+"aEnvAtk",   vp.ampEnvAtk);   // #217 seconds
-    set(px+"aEnvDec",   vp.ampEnvDec);   // #217 seconds
-    set(px+"aEnvSus",   vp.ampEnvSus  * 100.0f);
-    // #217: ampRel writes 10 (new max) when ampRelToEnd is on so the >=10 check in
-    // applyRhythmSuffix triggers; otherwise writes the seconds value directly.
-    set(px+"aEnvRel",   vp.ampRelToEnd ? 10.0f : vp.ampEnvRel);
-    set(px+"aEnvLeg",   vp.ampEnvLegato ? 1.0f : 0.0f);   // #221
-    set(px+"accentDb",  vp.accentDb);
-    set(px+"drvChar",   (float)vp.driveChar);
-    set(px+"drvDrv",    vp.driveDrive);
-    set(px+"drvOut",    vp.driveOutput);
-    set(px+"drvBits",   vp.drvBits);
-    set(px+"drvRate",   vp.driveRate);
-    set(px+"drvDit",    vp.drvDither);
-    set(px+"drvTon",    vp.driveTone);
-    set(px+"eqMidGain", vp.eqMidGain);
+    // #434: iterate the declarative param table instead of hand-listing every
+    // (id, value) pair. Each entry's `push` lambda reads the current value from
+    // the Rhythm — semantics match the prior code exactly (HitGen ints become
+    // floats; ADSR sustain scales 0..1 → 0..100; aEnvRel reflects the
+    // ampRelToEnd sentinel; bool fields write 0.0 / 1.0).
+    for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
+    {
+        const auto& def = mu_pp::kRhythmParamDefs[i];
+        set(px + def.suffix, def.push(r));
+    }
 }
 
 void PluginProcessor::pushMixerChannelToAPVTS(int idx)

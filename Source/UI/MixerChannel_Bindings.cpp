@@ -290,9 +290,10 @@ void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
                         snapValid[oldChar] = true;
                     }
 
+                    // #435: defaults shared with VoiceSection via UI/InsertAlgoDefaults.h.
                     const InsertAlgoSnapshot& snap = snapValid[newChar]
                                                      ? snaps[newChar]
-                                                     : kInsertDefaults[newChar];
+                                                     : mu_ui::kInsertAlgoDefaults[newChar];
                     set(pDrv, snap.driveDrive);
                     set(pOut, snap.driveOutput);
                     set(pDit, snap.drvDither);

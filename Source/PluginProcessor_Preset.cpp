@@ -11,7 +11,8 @@
 #include "PluginProcessor_Internal.h"
 #include <thread>   // #237: std::this_thread::yield in modulator deserialise lock-spin
 
-using mu_pp::kRhythmSuffixes;
+using mu_pp::kRhythmParamDefs;         // #434
+using mu_pp::kRhythmParamCount;        // #434
 using mu_pp::kChannelSuffixes;
 using mu_pp::kGlobalParams;
 using mu_pp::applyRhythmSuffix;
@@ -75,9 +76,9 @@ void PluginProcessor::stageRhythmPreset(int rhythmIndex, const juce::File& file)
     // drvChar (0..10 → 0..12) and drvBits (1..16 → 0..16) range changes.
     const bool isLegacy = ((int)state.getProperty("presetVersion", 0)) < kCurrentPresetVersion;
 
-    for (int i = 0; kRhythmSuffixes[i] != nullptr; ++i)
+    for (int i = 0; i < kRhythmParamCount; ++i)
     {
-        const juce::String suffix = kRhythmSuffixes[i];
+        const juce::String suffix = kRhythmParamDefs[i].suffix;
         juce::Identifier propId { "r0_" + suffix };
         if (state.hasProperty(propId))
         {
@@ -168,37 +169,13 @@ bool PluginProcessor::hasPendingSwap(int rhythmIndex) const
 }
 
 //==============================================================================
-void PluginProcessor::saveRhythmPreset(int rhythmIdx, const juce::String& name,
-                                        const juce::String& category)
-{
-    if (rhythmIdx < 0 || rhythmIdx >= sequencer.getNumRhythms()) return;
-
-    juce::ValueTree state("MuClidRhythm");
-    state.setProperty("presetName",     name,     nullptr);
-    state.setProperty("presetCategory", category, nullptr);
-    state.setProperty("presetVersion",  kCurrentPresetVersion, nullptr);   // #430
-
-    const Rhythm& r = sequencer.getRhythm(rhythmIdx);
-    state.setProperty("r0_name",   juce::String(r.name),          nullptr);
-    state.setProperty("r0_colour", r.colourIndex,                  nullptr);
-    state.setProperty("r0_sample", loadedSamplePaths[rhythmIdx],   nullptr);
-
-    const juce::String srcPrefix = "r" + juce::String(rhythmIdx) + "_";
-    for (int i = 0; kRhythmSuffixes[i] != nullptr; ++i)
-        if (auto* param = apvts.getParameter(srcPrefix + kRhythmSuffixes[i]))
-            state.setProperty("r0_" + juce::String(kRhythmSuffixes[i]), param->getValue(), nullptr);
-
-    const juce::String chPrefix = "ch" + juce::String(rhythmIdx) + "_";
-    for (int i = 0; kChannelSuffixes[i] != nullptr; ++i)
-        if (auto* param = apvts.getParameter(chPrefix + kChannelSuffixes[i]))
-            state.setProperty("ch_" + juce::String(kChannelSuffixes[i]), param->getValue(), nullptr);
-
-    auto dir = getRhythmsDir();
-    dir.createDirectory();
-    juce::String safe = name.replaceCharacters("\\/:|*?<>\"", "_________");
-    if (safe.isEmpty()) safe = "Rhythm";
-    dir.getChildFile(safe + ".muRhyth").replaceWithText(state.toXmlString());
-}
+// #433: PluginProcessor::saveRhythmPreset deleted — was dead code. The only call
+// site (RhythmPanel::saveRhythmPreset) routes through saveRhythmPresetToFile
+// instead, and the dead function had already drifted from its sibling (missing
+// the modulator-child write). Removing it also resolves #432: the ch_* mixer-
+// channel write that this function emitted was never read back by any load path
+// (mixer settings stay attached to the slot, not the rhythm preset), so deleting
+// the function removes the dead write at the same time.
 
 juce::StringArray PluginProcessor::loadCategoryList() const
 {
@@ -260,9 +237,9 @@ void PluginProcessor::saveRhythmPresetToFile(int rhythmIdx, const juce::File& de
     // envelopes, insert effect). Mixer-page state (channel level/pan/sends/sidechain/
     // output bus) intentionally stays with the slot, not with the rhythm.
     const juce::String srcPrefix = "r" + juce::String(rhythmIdx) + "_";
-    for (int i = 0; kRhythmSuffixes[i] != nullptr; ++i)
-        if (auto* param = apvts.getParameter(srcPrefix + kRhythmSuffixes[i]))
-            state.setProperty("r0_" + juce::String(kRhythmSuffixes[i]), param->getValue(), nullptr);
+    for (int i = 0; i < kRhythmParamCount; ++i)
+        if (auto* param = apvts.getParameter(srcPrefix + kRhythmParamDefs[i].suffix))
+            state.setProperty("r0_" + juce::String(kRhythmParamDefs[i].suffix), param->getValue(), nullptr);
 
     // #237: serialise modulators (ControlSequences + ModulationMatrix assignments).
     state.addChild(serialiseModulators(sequencer.getRhythm(rhythmIdx)), -1, nullptr);
@@ -315,9 +292,9 @@ bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
     // #430: rescale legacy normalized values for drvChar / drvBits.
     const bool isLegacy = ((int)state.getProperty("presetVersion", 0)) < kCurrentPresetVersion;
     const juce::String dstPrefix = "r" + juce::String(targetIdx) + "_";
-    for (int i = 0; kRhythmSuffixes[i] != nullptr; ++i)
+    for (int i = 0; i < kRhythmParamCount; ++i)
     {
-        const juce::String suffix = kRhythmSuffixes[i];
+        const juce::String suffix = kRhythmParamDefs[i].suffix;
         juce::Identifier propId { "r0_" + suffix };
         if (state.hasProperty(propId))
             if (auto* param = apvts.getParameter(dstPrefix + suffix))
@@ -841,9 +818,9 @@ void PluginProcessor::savePreset(const juce::String& name,
         rTree.setProperty("sample", loadedSamplePaths[i],  nullptr);
 
         const juce::String srcPrefix = "r" + juce::String(i) + "_";
-        for (int j = 0; kRhythmSuffixes[j] != nullptr; ++j)
-            if (auto* param = apvts.getParameter(srcPrefix + kRhythmSuffixes[j]))
-                rTree.setProperty(kRhythmSuffixes[j], param->getValue(), nullptr);
+        for (int j = 0; j < kRhythmParamCount; ++j)
+            if (auto* param = apvts.getParameter(srcPrefix + kRhythmParamDefs[j].suffix))
+                rTree.setProperty(kRhythmParamDefs[j].suffix, param->getValue(), nullptr);
 
         const juce::String chSrcPrefix = "ch" + juce::String(i) + "_";
         for (int j = 0; kChannelSuffixes[j] != nullptr; ++j)
@@ -960,9 +937,9 @@ void PluginProcessor::loadPreset(const juce::File& file)
             const int i = rhythmIdx++;
 
             const juce::String dstPrefix = "r" + juce::String(i) + "_";
-            for (int j = 0; kRhythmSuffixes[j] != nullptr; ++j)
+            for (int j = 0; j < kRhythmParamCount; ++j)
             {
-                const juce::String suffix = kRhythmSuffixes[j];
+                const juce::String suffix = kRhythmParamDefs[j].suffix;
                 juce::Identifier propId { suffix };
                 if (rTree.hasProperty(propId))
                     if (auto* param = apvts.getParameter(dstPrefix + suffix))
