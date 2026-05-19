@@ -1,11 +1,13 @@
 #include "RhythmPanel.h"
-#include "Components/SegmentControl.h"   // sample-browser source toggle
+#include "SampleBrowser.h"
 
 #include <string_view>
 #include <unordered_set>
 
+namespace {
+
 // Euclidean panel params — all use r{ri}_ prefix.
-static const char* const kEuclidSuffixes[] = {
+const char* const kEuclidSuffixes[] = {
     "stepsA", "hitsA", "rotA", "prePadA", "postPadA", "insStA", "insLenA",
     "prePadModeA", "postPadModeA", "insModeA",
     "stepsB", "hitsB", "rotB", "prePadB", "postPadB", "insStB", "insLenB",
@@ -21,7 +23,7 @@ static const char* const kEuclidSuffixes[] = {
 // drag tick, so O(N=31) compares per call became visible in profiles. The
 // register/deregister sites still iterate the table (they need the full list,
 // not just membership), so the const char* table stays.
-static bool isEuclidSuffix(const juce::String& suffix) noexcept
+bool isEuclidSuffix(const juce::String& suffix) noexcept
 {
     static const auto kSet = []() {
         std::unordered_set<std::string_view> out;
@@ -33,8 +35,9 @@ static bool isEuclidSuffix(const juce::String& suffix) noexcept
     // wraps it for the O(1) hash lookup. Suffixes are ASCII so UTF-8 ≡ char bytes.
     return kSet.find(std::string_view(suffix.toRawUTF8())) != kSet.end();
 }
+
 // Voice panel params — all use r{ri}_ prefix.
-static const char* const kVoiceSuffixes[] = {
+const char* const kVoiceSuffixes[] = {
     "pitchOct", "pitchSemi", "pitchFine",
     "pEnvAtk", "pEnvDec", "pEnvSus", "pEnvRel", "pEnvDep",
     "fltType", "fltCut", "fltRes",
@@ -45,115 +48,9 @@ static const char* const kVoiceSuffixes[] = {
 };
 
 // Send knob params — use ch{ri}_ prefix (shared with mixer channel strip).
-static const char* const kSendSuffixes[] = { "sendEff", "sendDly", "sendRev" };
+const char* const kSendSuffixes[] = { "sendEff", "sendDly", "sendRev" };
 
-//==============================================================================
-// Custom file browser used for sample loading so the user can audition files
-// before committing to a slot. Shows inside a DialogWindow (modal).
-class SampleBrowserContent : public juce::Component,
-                              public juce::FileBrowserListener
-{
-public:
-    SampleBrowserContent(PluginProcessor& proc,
-                         const juce::File& startDir,
-                         std::function<void(const juce::File&)> onChosen)
-        : proc(proc), onChosen(std::move(onChosen)),
-          fileFilter("*.wav;*.aiff;*.aif;*.mp3;*.flac", {}, "Audio files"),
-          browser(juce::FileBrowserComponent::openMode |
-                  juce::FileBrowserComponent::canSelectFiles,
-                  startDir, &fileFilter, nullptr)
-    {
-        addAndMakeVisible(browser);
-        addAndMakeVisible(loadBtn);
-        addAndMakeVisible(cancelBtn);
-        addAndMakeVisible(sourceToggle);
-        browser.addListener(this);
-
-        // source toggle — Library is the default landing folder (user's
-        // personal sample collection); Content gives one-click access to the
-        // factory / preset-bundled samples folder inside the My Documents
-        // content dir. Selected index reflects which folder we're currently
-        // browsing — keeps the toggle honest when the user navigates
-        // elsewhere via the browser, then jumps back via the toggle.
-        sourceToggle.setSelectedIndex(
-            startDir == this->proc.getSamplesDir() ? 1 : 0,
-            juce::dontSendNotification);
-        sourceToggle.onChange = [this](int idx)
-        {
-            const juce::File target = (idx == 1) ? this->proc.getSamplesDir()
-                                                 : this->proc.getPrimarySampleDir();
-            if (target.isDirectory())
-                browser.setRoot(target);
-        };
-
-        loadBtn.onClick = [this]
-        {
-            const auto f = browser.getSelectedFile(0);
-            if (f.existsAsFile()) commit(f);
-        };
-        cancelBtn.onClick = [this]
-        {
-            this->proc.stopSamplePreview();
-            if (auto* dw = findParentComponentOfClass<juce::DialogWindow>())
-                dw->exitModalState(0);
-        };
-
-        setSize(560, 470);   // +30 px for the source-toggle row
-    }
-
-    ~SampleBrowserContent() override { proc.stopSamplePreview(); }
-
-    void resized() override
-    {
-        auto area = getLocalBounds().reduced(8);
-        // top row hosts the Main Library / μ-Clid Content source toggle.
-        auto topRow = area.removeFromTop(26);
-        sourceToggle.setBounds(topRow.removeFromLeft(240));
-        area.removeFromTop(6);
-
-        auto btnRow = area.removeFromBottom(32).reduced(0, 4);
-        cancelBtn.setBounds(btnRow.removeFromRight(80));
-        btnRow.removeFromRight(8);
-        loadBtn.setBounds(btnRow.removeFromRight(80));
-        browser.setBounds(area.reduced(0, 4));
-    }
-
-    // FileBrowserListener — auto-preview on selection change
-    void selectionChanged() override
-    {
-        const auto f = browser.getSelectedFile(0);
-        if (f.existsAsFile())
-            proc.startSamplePreview(f);
-    }
-    void fileClicked(const juce::File&, const juce::MouseEvent&) override {}
-    void fileDoubleClicked(const juce::File& f) override { commit(f); }
-    void browserRootChanged(const juce::File&) override {}
-
-private:
-    PluginProcessor& proc;
-    std::function<void(const juce::File&)> onChosen;
-    juce::WildcardFileFilter fileFilter;
-    juce::FileBrowserComponent browser;
-    juce::TextButton loadBtn { "Load" }, cancelBtn { "Cancel" };
-    // source toggle — flips the browser between the user's primary
-    // sample library (the default landing folder) and the Content/Samples
-    // folder where factory + preset-linked samples live. Labels match the
-    // user-facing branding: "μ-Clid Content" uses the Greek mu (U+03BC)
-    // prefix per the rest of the UI.
-    SegmentControl sourceToggle {
-        { juce::String("Main Library"),
-          juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid Content")) },
-        SegmentControl::ActiveStyle::General,
-        SegmentControl::DrawStyle::Pills };
-
-    void commit(const juce::File& f)
-    {
-        proc.stopSamplePreview();
-        onChosen(f);
-        if (auto* dw = findParentComponentOfClass<juce::DialogWindow>())
-            dw->exitModalState(1);
-    }
-};
+} // namespace
 
 //==============================================================================
 // RhythmSaveDialog implementation

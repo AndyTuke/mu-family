@@ -107,6 +107,7 @@ target_sources(mu-clid
         Source/UI/RhythmPanel.cpp
         Source/UI/AboutPanel.cpp
         Source/UI/SaveDialog.cpp
+        Source/UI/SampleBrowser.cpp
         Source/UI/PresetBrowser.cpp
         Source/UI/SettingsOverlay.cpp
         Source/UI/MidiPresetsPanel.cpp
