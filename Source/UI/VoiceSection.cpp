@@ -51,6 +51,7 @@ VoiceSection::VoiceSection(PluginProcessor& p) : proc(p)
     insertAlgo.addItem("Soft Clip",   2);
     insertAlgo.addItem("Tape Sat",   11);
     insertAlgo.addItem("Vocoder",    13);
+    insertAlgo.addItem("Vocoder St", 14);
     insertAlgo.setSelectedId(1, false);
     addAndMakeVisible(insertAlgo);
 
@@ -946,6 +947,81 @@ void VoiceSection::configureInsertAlgorithm(int charId)
             {
                 apvtsSet("drvDrv", (float)v);
                 syncVocoderGreyOut();
+            };
+            insertOutput.onValueChanged = [this](double v) { apvtsSet("drvOut",  (float)(v * 4.0 - 24.0)); };
+            insertDither.onValueChanged = [this](double v) { apvtsSet("drvDit",  (float)v); };
+            insertTone  .onValueChanged = [this](double v) { apvtsSet("drvBits", (float)v); };
+            break;
+        }
+
+        case 13:  // ── Vocoder Stereo — same controls as Vocoder (12) ────
+        {
+            static const char* const kWaveNames[4] = { "Saw", "Square", "White", "Pink" };
+            static const char* const kNoteNames[7] = { "C", "D", "E", "F", "G", "A", "B" };
+            static const int kUnisonCounts[7] = { 1, 3, 5, 7, 9, 11, 13 };
+
+            insertDrive.setLabel("Wave");
+            insertDrive.setRange(0.0, 3.0, 1.0);
+            insertDrive.getSlider().setSkewFactor(1.0);
+            insertDrive.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return kWaveNames[juce::jlimit(0, 3, (int) std::round(v))];
+            };
+            insertDrive.getSlider().valueFromTextFunction = nullptr;
+            if (p) insertDrive.setValue(juce::jlimit(0.0, 3.0, (double) p->insertDrive), juce::dontSendNotification);
+            else   insertDrive.setValue(0.0, juce::dontSendNotification);
+            insertDrive.setVisible(true);
+
+            insertOutput.setLabel("Unison");
+            insertOutput.setRange(0.0, 6.0, 1.0);
+            insertOutput.getSlider().setSkewFactor(1.0);
+            insertOutput.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String(kUnisonCounts[juce::jlimit(0, 6, (int) std::round(v))]);
+            };
+            insertOutput.getSlider().valueFromTextFunction = nullptr;
+            const double unisonKnob = p ? juce::jlimit(0.0, 6.0,
+                                            ((double) p->insertOutput + 24.0) * 0.25)
+                                        : 1.0;
+            insertOutput.setValue(unisonKnob, juce::dontSendNotification);
+            insertOutput.setVisible(true);
+
+            insertDither.setLabel("Octave");
+            insertDither.setRange(1.0, 5.0, 1.0);
+            insertDither.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String((int) std::round(v));
+            };
+            insertDither.getSlider().valueFromTextFunction = nullptr;
+            if (p) insertDither.setValue(juce::jlimit(1.0, 5.0, (double) p->insertDither), juce::dontSendNotification);
+            else   insertDither.setValue(3.0, juce::dontSendNotification);
+            insertDither.setVisible(true);
+
+            insertTone.setLabel("Note");
+            insertTone.getSlider().setSkewFactor(1.0);
+            insertTone.setRange(1.0, 7.0, 1.0);
+            insertTone.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return kNoteNames[juce::jlimit(0, 6, (int) std::round(v) - 1)];
+            };
+            insertTone.getSlider().valueFromTextFunction = nullptr;
+            if (p) insertTone.setValue(juce::jlimit(1.0, 7.0, (double) p->insertBits), juce::dontSendNotification);
+            else   insertTone.setValue(4.0, juce::dontSendNotification);
+            insertTone.setVisible(true);
+
+            auto syncVocoderStGreyOut = [this]
+            {
+                const int wave = juce::jlimit(0, 3, (int) std::round(insertDrive.getValue()));
+                const bool pitched = (wave < 2);
+                insertDither.setEnabled(pitched);
+                insertOutput.setEnabled(pitched);
+                insertTone  .setEnabled(pitched);
+                insertDither.setAlpha(pitched ? 1.0f : 0.45f);
+                insertOutput.setAlpha(pitched ? 1.0f : 0.45f);
+                insertTone  .setAlpha(pitched ? 1.0f : 0.45f);
+            };
+            syncVocoderStGreyOut();
+
+            insertDrive .onValueChanged = [this, syncVocoderStGreyOut](double v)
+            {
+                apvtsSet("drvDrv", (float)v);
+                syncVocoderStGreyOut();
             };
             insertOutput.onValueChanged = [this](double v) { apvtsSet("drvOut",  (float)(v * 4.0 - 24.0)); };
             insertDither.onValueChanged = [this](double v) { apvtsSet("drvDit",  (float)v); };

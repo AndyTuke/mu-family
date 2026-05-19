@@ -42,7 +42,7 @@ public:
     // Non-zero only during Compressor (7) / Limiter (8) modes.
     std::atomic<float> grReduction { 0.0f };
 
-    static constexpr int kNumInsertAlgos = 13;   // + Karplus + Vocoder
+    static constexpr int kNumInsertAlgos = 14;   // + Karplus + Vocoder + VocoderSt
 
 private:
 

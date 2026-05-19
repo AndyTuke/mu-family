@@ -47,7 +47,8 @@ InsertProcessor::InsertProcessor()
     dispatch[10] = add(std::make_unique<TapeSatInsert>());
 
     dispatch[11] = add(std::make_unique<KarplusStrongInsert>());
-    dispatch[12] = add(std::make_unique<VocoderInsert>());
+    dispatch[12] = add(std::make_unique<VocoderInsert>(false));
+    dispatch[13] = add(std::make_unique<VocoderInsert>(true));
 }
 
 void InsertProcessor::prepare(double sampleRate, int blockSize)

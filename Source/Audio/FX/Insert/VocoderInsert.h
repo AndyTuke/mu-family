@@ -9,14 +9,22 @@
 // 20-band Vocoder. Imprints the input signal's spectral envelope onto
 // an internal carrier oscillator via band-by-band amplitude modulation.
 //
-// Signal flow (mono — input L+R are downmixed for analysis; output is the
-// same vocoded mono on both channels):
+// Mono mode (insertAlgo = 12): input L+R are downmixed for analysis; output
+// is the same vocoded mono on both channels.
 //   input → 20 analysis BPs → 20 envelope followers
 //   carrier (oscillator stack) → 20 synthesis BPs (same centre freqs)
 //   for each band: out += synth_band * env_band
 //   sum to output, replicate L+R
 //
-// Controls (insertAlgo = 12). All values stored as whole numbers in their
+// Stereo mode (insertAlgo = 13): separate per-channel analysis biquads and
+// envelope followers, producing independent L/R vocoded output. The carrier
+// and synthesis biquads are shared (same carrier signal processed per-band
+// once, then scaled independently for L and R by their respective envelopes).
+//   inputL → 20 analysis BPs L → 20 envelope followers L
+//   inputR → 20 analysis BPs R → 20 envelope followers R
+//   carrier → 20 synth BPs → outL = synthOut * envL, outR = synthOut * envR
+//
+// Controls (insertAlgo = 12 or 13). All values stored as whole numbers in their
 // respective APVTS fields — UI knobs step in integer increments:
 //   insertDrive (0..100):  Waveshape index — stored as 0..3 (0=Saw, 1=Square,
 //                         2=White Noise, 3=Pink Noise). UI shows the name.
@@ -44,6 +52,8 @@
 class VocoderInsert : public InsertAlgorithmBase
 {
 public:
+    explicit VocoderInsert(bool stereo = false) : stereo_(stereo) {}
+
     void prepare(double sampleRate, int /*blockSize*/) override
     {
         currentSampleRate = sampleRate;
@@ -66,6 +76,10 @@ public:
             analysisBp[b].reset();
             synthBp   [b].reset();
             envelope  [b] = 0.0f;
+            analysisBpL[b].reset();
+            analysisBpR[b].reset();
+            envelopeL  [b] = 0.0f;
+            envelopeR  [b] = 0.0f;
         }
         for (auto& ph : phases) ph = 0.0f;
         for (auto& s  : pinkState) s = 0.0f;
@@ -100,14 +114,13 @@ public:
                              || (unisonIdx != lastUnison);
         if (needRecalc)
         {
-            // Set up analysis + synth bandpass coeffs once per band.
-            // (Centre freqs are fixed at prepare time, so this isn't really
-            // about params — biquad reset on changes keeps coefs fresh.)
             const float sr = (float) currentSampleRate;
             for (int b = 0; b < kNumBands; ++b)
             {
-                analysisBp[b].setPeak(bandCentres[b], kBandQ, 0.0f, sr);
-                synthBp   [b].setPeak(bandCentres[b], kBandQ, 0.0f, sr);
+                analysisBp [b].setPeak(bandCentres[b], kBandQ, 0.0f, sr);
+                analysisBpL[b].setPeak(bandCentres[b], kBandQ, 0.0f, sr);
+                analysisBpR[b].setPeak(bandCentres[b], kBandQ, 0.0f, sr);
+                synthBp    [b].setPeak(bandCentres[b], kBandQ, 0.0f, sr);
             }
             lastNoteIdx = noteIdx;
             lastOctave  = octave;
@@ -154,25 +167,14 @@ public:
         const int nChClamped = juce::jmin(nCh, 2);
         for (int i = 0; i < ns; ++i)
         {
-            // Mono down-mix of input (L+R)/2 for analysis. Stereo voicing
-            // could come later; for now the vocoded output is mono-summed
-            // and broadcast to both channels.
-            float monoIn = 0.0f;
-            for (int ch = 0; ch < nChClamped; ++ch)
-                monoIn += buf.getReadPointer(ch)[i];
-            monoIn *= (nChClamped > 0) ? (1.0f / (float) nChClamped) : 0.0f;
-
-            // ── Generate carrier ────────────────────────────────────────
-            // per-voice gain envelopes ramp toward each voice's
-            // target (voiceGain[v] for active voices, 0 for v >= unisonN). Voices
-            // that just transitioned from inactive→active see the smoothed value
-            // climb from 0, producing an audible ~5 ms fade-in instead of a click.
+            // per-voice gain envelopes ramp toward each voice's target.
             for (int v = 0; v < kMaxUnisonVoices; ++v)
             {
                 const float target = (v < unisonN) ? voiceGain[v] : 0.0f;
                 voiceGainSmooth[v] += rampAlpha * (target - voiceGainSmooth[v]);
             }
 
+            // ── Generate carrier ────────────────────────────────────────
             float carrier = 0.0f;
             if (waveshape == 0)        // Saw
             {
@@ -214,23 +216,53 @@ public:
             }
 
             // ── 20-band vocode ─────────────────────────────────────────
-            float vocoded = 0.0f;
-            for (int b = 0; b < kNumBands; ++b)
+            if (stereo_)
             {
-                // Analysis: rectify the band-passed input, envelope-follow it.
-                const float analyzed = analysisBp[b].process(monoIn);
-                const float level    = std::abs(analyzed);
-                const float alpha    = level > envelope[b] ? aAtk : aRel;
-                envelope[b] += alpha * (level - envelope[b]);
+                // Stereo: separate L/R analysis, shared synthesis per band.
+                const float inL = (nChClamped > 0) ? buf.getReadPointer(0)[i] : 0.0f;
+                const float inR = (nChClamped > 1) ? buf.getReadPointer(1)[i] : inL;
+                float vocoL = 0.0f, vocoR = 0.0f;
+                for (int b = 0; b < kNumBands; ++b)
+                {
+                    const float anaL  = analysisBpL[b].process(inL);
+                    const float lvlL  = std::abs(anaL);
+                    const float alpL  = lvlL > envelopeL[b] ? aAtk : aRel;
+                    envelopeL[b] += alpL * (lvlL - envelopeL[b]);
 
-                // Synthesis: same band on the carrier, scaled by analysis envelope.
-                const float synthOut = synthBp[b].process(carrier);
-                vocoded += synthOut * envelope[b];
+                    const float anaR  = analysisBpR[b].process(inR);
+                    const float lvlR  = std::abs(anaR);
+                    const float alpR  = lvlR > envelopeR[b] ? aAtk : aRel;
+                    envelopeR[b] += alpR * (lvlR - envelopeR[b]);
+
+                    const float synthOut = synthBp[b].process(carrier);
+                    vocoL += synthOut * envelopeL[b];
+                    vocoR += synthOut * envelopeR[b];
+                }
+                if (nChClamped > 0) buf.getWritePointer(0)[i] = vocoL;
+                if (nChClamped > 1) buf.getWritePointer(1)[i] = vocoR;
             }
+            else
+            {
+                // Mono: (L+R)/2 downmix for analysis, broadcast to both channels.
+                float monoIn = 0.0f;
+                for (int ch = 0; ch < nChClamped; ++ch)
+                    monoIn += buf.getReadPointer(ch)[i];
+                monoIn *= (nChClamped > 0) ? (1.0f / (float) nChClamped) : 0.0f;
 
-            // Broadcast vocoded output to all input channels.
-            for (int ch = 0; ch < nChClamped; ++ch)
-                buf.getWritePointer(ch)[i] = vocoded;
+                float vocoded = 0.0f;
+                for (int b = 0; b < kNumBands; ++b)
+                {
+                    const float analyzed = analysisBp[b].process(monoIn);
+                    const float level    = std::abs(analyzed);
+                    const float alpha    = level > envelope[b] ? aAtk : aRel;
+                    envelope[b] += alpha * (level - envelope[b]);
+
+                    const float synthOut = synthBp[b].process(carrier);
+                    vocoded += synthOut * envelope[b];
+                }
+                for (int ch = 0; ch < nChClamped; ++ch)
+                    buf.getWritePointer(ch)[i] = vocoded;
+            }
         }
     }
 
@@ -251,12 +283,21 @@ private:
     // Detune spread D(N) in cents per Unison position.
     static constexpr float kUnisonSpreadCents [7] = { 0.0f, 8.0f, 16.0f, 24.0f, 32.0f, 40.0f, 50.0f };
 
+    bool stereo_ = false;
+
     double currentSampleRate = 44100.0;
 
-    std::array<float,       kNumBands> bandCentres { };
+    std::array<float,        kNumBands> bandCentres { };
+    // Mono analysis path.
     std::array<BiquadFilter, kNumBands> analysisBp;
-    std::array<BiquadFilter, kNumBands> synthBp;
     std::array<float,        kNumBands> envelope { };
+    // Stereo analysis path (stereo_ == true only).
+    std::array<BiquadFilter, kNumBands> analysisBpL;
+    std::array<BiquadFilter, kNumBands> analysisBpR;
+    std::array<float,        kNumBands> envelopeL { };
+    std::array<float,        kNumBands> envelopeR { };
+    // Shared synthesis path.
+    std::array<BiquadFilter, kNumBands> synthBp;
 
     // Carrier state.
     std::array<float, kMaxUnisonVoices> phases { };

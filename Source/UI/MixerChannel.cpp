@@ -104,6 +104,7 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
             box.addItem("Soft Clip",   2);
             box.addItem("Tape Sat",   11);
             box.addItem("Vocoder",    13);
+            box.addItem("Vocoder St", 14);
             box.setSelectedId(1, juce::dontSendNotification);
         };
         addInsertCombo(insCharBox);

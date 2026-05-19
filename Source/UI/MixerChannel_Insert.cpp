@@ -418,6 +418,79 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             break;
         }
 
+        case 13:  // ── Vocoder Stereo — same controls as Vocoder (12) ────
+        {
+            static const char* const kWaveNames[4] = { "Saw", "Square", "White", "Pink" };
+            static const char* const kNoteNames[7] = { "C", "D", "E", "F", "G", "A", "B" };
+            static const int kUnisonCounts[7] = { 1, 3, 5, 7, 9, 11, 13 };
+
+            drive.setLabel("Wave");
+            drive.setRange(0.0, 3.0, 1.0);
+            drive.getSlider().setSkewFactor(1.0);
+            drive.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return kWaveNames[juce::jlimit(0, 3, (int) std::round(v))];
+            };
+            drive.setValue(juce::jlimit(0.0, 3.0, (double) ip.insertDrive), juce::dontSendNotification);
+            drive.setVisible(true);
+
+            output.setLabel("Unison");
+            output.setRange(0.0, 6.0, 1.0);
+            output.getSlider().setSkewFactor(1.0);
+            output.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String(kUnisonCounts[juce::jlimit(0, 6, (int) std::round(v))]);
+            };
+            const double unisonKnob = juce::jlimit(0.0, 6.0,
+                                                  ((double) ip.insertOutput + 24.0) * 0.25);
+            output.setValue(unisonKnob, juce::dontSendNotification);
+            output.setVisible(true);
+
+            tone.setLabel("Octave");
+            tone.setRange(1.0, 5.0, 1.0);
+            tone.getSlider().setSkewFactor(1.0);
+            tone.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return juce::String((int) std::round(v));
+            };
+            tone.setValue(juce::jlimit(1.0, 5.0, (double) ip.insertDither), juce::dontSendNotification);
+            tone.setVisible(true);
+
+            extra.setLabel("Note");
+            extra.setRange(1.0, 7.0, 1.0);
+            extra.getSlider().setSkewFactor(1.0);
+            extra.getSlider().textFromValueFunction = [](double v) -> juce::String {
+                return kNoteNames[juce::jlimit(0, 6, (int) std::round(v) - 1)];
+            };
+            extra.setValue(juce::jlimit(1.0, 7.0, (double) ip.insertBits), juce::dontSendNotification);
+            extra.setVisible(true);
+
+            auto syncVocoderStGreyOut = [this, slot]
+            {
+                KnobWithLabel& d = slot == 0 ? insDrive  : insDrive2;
+                KnobWithLabel& o = slot == 0 ? insOutput : insOutput2;
+                KnobWithLabel& t = slot == 0 ? insTone   : insTone2;
+                KnobWithLabel& e = slot == 0 ? insExtra  : insExtra2;
+                const int wave = juce::jlimit(0, 3, (int) std::round(d.getValue()));
+                const bool pitched = (wave < 2);
+                o.setEnabled(pitched);
+                t.setEnabled(pitched);
+                e.setEnabled(pitched);
+                o.setAlpha(pitched ? 1.0f : 0.45f);
+                t.setAlpha(pitched ? 1.0f : 0.45f);
+                e.setAlpha(pitched ? 1.0f : 0.45f);
+            };
+            syncVocoderStGreyOut();
+
+            drive .onValueChanged = [setParam, pDrv, syncVocoderStGreyOut](double v)
+            {
+                setParam(pDrv, v);
+                syncVocoderStGreyOut();
+            };
+            output.onValueChanged = [setParam, pOut](double v) { setParam(pOut, v * 4.0 - 24.0); };
+            tone  .onValueChanged = [setParam, pDit](double v) { setParam(pDit, v); };
+            extra .onValueChanged = [setParam, pBit](double v) { setParam(pBit, v); };
+            if (proc) setParam(pChar, 13);
+            break;
+        }
+
         default: break;
     }
 
