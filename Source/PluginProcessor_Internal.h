@@ -132,65 +132,19 @@ inline constexpr int kGlobalParamDefCount = (int)(sizeof(kGlobalParamDefs) / siz
 // Applies a rhythm parameter suffix + display-scale value to a Rhythm struct.
 // Returns patternDirty (true) or voiceDirty (false) via the out-params.
 // Called from syncRhythmParam (APVTS TU) and stageRhythmPreset (Preset TU).
-// #430: legacy-preset migration for normalized parameter values.
-//
-// .muRhyth + .muclid preset files store param->getValue() (normalized 0..1).
-// On load, the same normalized value is fed back via setValueNotifyingHost(),
-// which JUCE re-interprets against the parameter's CURRENT range. When a range
-// is widened later (e.g. drvChar 0..10 → 0..12 in #422/#423; drvBits 1..16 →
-// 0..16 in #429), an old normalized value resolves to a different actual value.
-//
-// Symptom: a pre-#422 preset using TapeSat (drvChar=10, norm=1.0) loads as
-// Vocoder (drvChar=12 under the new range) and its drvDrv value (saved 0..100)
-// gets reinterpreted as Vocoder waveshape (0..3 clamped) → noise carrier.
-//
-// Fix: any preset lacking a `presetVersion` property is treated as legacy and
-// gets its normalized values rescaled here so the int/float resolves to the
-// SAME actual value under the new range.
-//
-// Returns the migrated normalized value. Pass through unchanged for suffixes
-// that aren't affected by a range change.
-inline float migrateLegacyPresetNorm(const juce::String& suffix, float oldNorm) noexcept
-{
-    // Per-rhythm: drvChar (was int 0..10, now 0..12).
-    //   v_old = round(oldNorm * 10), v_new = round(newNorm * 12)
-    //   To preserve v: newNorm = v / 12 = (oldNorm * 10) / 12
-    if (suffix == "drvChar")
-        return juce::jlimit(0.0f, 1.0f, oldNorm * (10.0f / 12.0f));
 
-    // Per-rhythm: drvBits (was float 1..16, now 0..16).
-    //   v_old = 1 + oldNorm * 15, v_new = newNorm * 16
-    //   To preserve v: newNorm = (1 + oldNorm * 15) / 16
-    if (suffix == "drvBits")
-        return juce::jlimit(0.0f, 1.0f, (1.0f + oldNorm * 15.0f) / 16.0f);
-
-    return oldNorm;
-}
-
-// Same migration for the .muclid GlobalState child's master-insert params
-// (kGlobalParams entries). Keyed on the full param ID, not a suffix.
-inline float migrateLegacyGlobalNorm(const juce::String& id, float oldNorm) noexcept
-{
-    if (id == "mst_insChar" || id == "mst_ins2Char")
-        return juce::jlimit(0.0f, 1.0f, oldNorm * (10.0f / 12.0f));
-    if (id == "mst_insBits" || id == "mst_ins2Bits")
-        return juce::jlimit(0.0f, 1.0f, (1.0f + oldNorm * 15.0f) / 16.0f);
-    return oldNorm;
-}
-
-// Current preset-file schema version.
-//   v0 (no presetVersion):    legacy pre-#430. Normalised values, drvChar / drvBits
-//                              ranges pre-#422/#423 (0..10 / 1..16). Loader applies
-//                              migrateLegacyPresetNorm + migrateLegacyGlobalNorm.
-//   v1:                       normalised values, post-#422/#423 ranges. No value
-//                              shift needed; loader just feeds normalised back.
-//   v2 (Stage 35):            actual de-normalised values + string algorithm names.
-//                              `r0_stepsA="16"`, `r0_drvChar="Bitcrusher"`,
-//                              `r0_aEnvLeg="true"`. Range-widening + algorithm-
-//                              reordering safe.
+// Current preset-file schema version. v2 (Stage 35) is the only format the
+// loader accepts: actual de-normalised values + string algorithm names
+// (`r0_stepsA="16"`, `r0_drvChar="Bitcrusher"`, `r0_aEnvLeg="true"`).
+//
+// Legacy formats (v0 / v1 — normalised values, pre-Stage-35) are REFUSED by
+// `requireSupportedPresetVersion` at the load entry point. Andy hand-converts
+// any old presets via the dev rather than carrying compat code forever.
 //
 // Bump whenever a parameter range / encoding change would invalidate older
-// preset files. Files without this property are treated as v0.
+// preset files. The previous compat helpers (`migrateLegacyPresetNorm`,
+// `migrateLegacyGlobalNorm`) and the v0/v1 reader branches were removed once
+// it became clear there were too few legacy presets to justify the maintenance.
 inline constexpr int kCurrentPresetVersion = 2;
 
 // #434: now a table lookup. The body that used to live here is in

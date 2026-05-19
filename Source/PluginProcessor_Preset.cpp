@@ -19,8 +19,6 @@ using mu_pp::kRhythmParamCount;        // #434
 using mu_pp::kChannelSuffixes;
 using mu_pp::kGlobalParams;
 using mu_pp::applyRhythmSuffix;
-using mu_pp::migrateLegacyPresetNorm;
-using mu_pp::migrateLegacyGlobalNorm;
 using mu_pp::kCurrentPresetVersion;
 
 // Forward decls so the save/load paths defined earlier in this TU can reference
@@ -97,12 +95,9 @@ static void writeParamPropertyV2(juce::ValueTree& tree,
     writeKindedProperty(tree, propName, actual, def.kind, def.algorithmNames);
 }
 
-// Stage 35: read `propName` from `tree` as an actual de-normalised float using
-// the supplied `ParamKind`. Returns NaN if the property is absent.
-//
-// v2-only — does not handle v0/v1 normalised reading (that's suffix-specific
-// because of the per-id #430 migration). Use readParamPropertyAsActual /
-// readGlobalPropertyAsActual below for the version-branching wrappers.
+// Read `propName` from `tree` as an actual de-normalised float using the
+// supplied `ParamKind`. Returns NaN if the property is absent. v2-only — see
+// requireSupportedPresetVersion for the file-level format check.
 static float readKindedPropertyAsActualV2(const juce::ValueTree& tree,
                                            const juce::String& propName,
                                            mu_pp::ParamKind kind,
@@ -135,50 +130,50 @@ static float readKindedPropertyAsActualV2(const juce::ValueTree& tree,
     }
 }
 
-// Per-rhythm read wrapper. Branches on the file's `presetVersion`:
-//   v0 (absent / 0):  read normalised, apply migrateLegacyPresetNorm, convert
-//                     to actual via param.convertFrom0to1.
-//   v1:               read normalised, convert to actual.
-//   v2:               read actual directly per ParamKind.
+// Per-rhythm read wrapper. v2-only: caller must have already verified
+// presetVersion via requireSupportedPresetVersion before reaching here.
+// `param` is unused but kept on the signature for symmetry with the global
+// reader and so future format changes can fall back to APVTS-range-aware
+// conversion without a signature churn.
 static float readParamPropertyAsActual(const juce::ValueTree& tree,
                                         const juce::String& propName,
-                                        const juce::RangedAudioParameter& param,
-                                        const mu_pp::RhythmParamDef& def,
-                                        int presetVersion)
+                                        const juce::RangedAudioParameter& /*param*/,
+                                        const mu_pp::RhythmParamDef& def)
 {
     if (! tree.hasProperty(propName))
         return std::numeric_limits<float>::quiet_NaN();
-
-    if (presetVersion >= 2)
-        return readKindedPropertyAsActualV2(tree, propName, def.kind, def.algorithmNames);
-
-    // v0 or v1: stored as normalised. v0 additionally needs the #430 legacy
-    // norm-shift migration for drvChar / drvBits range expansion.
-    float normVal = (float) (double) tree.getProperty(propName);
-    if (presetVersion < 1)
-        normVal = mu_pp::migrateLegacyPresetNorm(juce::String(def.suffix), normVal);
-    return param.convertFrom0to1(normVal);
+    return readKindedPropertyAsActualV2(tree, propName, def.kind, def.algorithmNames);
 }
 
-// #451: global-state read wrapper. Same branching shape as readParamPropertyAsActual
-// but uses migrateLegacyGlobalNorm for the v0 path (mst_insChar / mst_insBits
-// range-expansion migration) and the global param's `id` rather than a suffix.
+// Global-state read wrapper. v2-only (see readParamPropertyAsActual above).
 static float readGlobalPropertyAsActual(const juce::ValueTree& tree,
                                          const juce::String& propName,
-                                         const juce::RangedAudioParameter& param,
-                                         const mu_pp::GlobalParamDef& def,
-                                         int presetVersion)
+                                         const juce::RangedAudioParameter& /*param*/,
+                                         const mu_pp::GlobalParamDef& def)
 {
     if (! tree.hasProperty(propName))
         return std::numeric_limits<float>::quiet_NaN();
+    return readKindedPropertyAsActualV2(tree, propName, def.kind, def.algorithmNames);
+}
 
-    if (presetVersion >= 2)
-        return readKindedPropertyAsActualV2(tree, propName, def.kind, def.algorithmNames);
-
-    float normVal = (float) (double) tree.getProperty(propName);
-    if (presetVersion < 1)
-        normVal = mu_pp::migrateLegacyGlobalNorm(juce::String(def.id), normVal);
-    return param.convertFrom0to1(normVal);
+// Reject any preset file that doesn't declare presetVersion = kCurrentPresetVersion.
+// Returns true if the version is supported; false if the caller should bail.
+// On rejection, fires onLoadError with a clear message so the user knows the file
+// is in an obsolete format and needs to be re-saved (or hand-converted by Andy).
+static bool requireSupportedPresetVersion(const juce::ValueTree& tree,
+                                          const juce::String& fileName,
+                                          std::function<void(const juce::String&)>& onLoadError)
+{
+    const int v = (int) tree.getProperty("presetVersion", 0);
+    if (v == mu_pp::kCurrentPresetVersion)
+        return true;
+    if (onLoadError)
+    {
+        onLoadError("Preset '" + fileName + "' is in legacy format v" + juce::String(v)
+                    + " (current is v" + juce::String(mu_pp::kCurrentPresetVersion)
+                    + "). Legacy presets are not auto-migrated — paste the XML to the dev to upgrade.");
+    }
+    return false;
 }
 
 // #439: detect a sample path that points into our embedded-sample decode temp
@@ -258,10 +253,11 @@ void PluginProcessor::stageRhythmPreset(int rhythmIndex, const juce::File& file)
     Rhythm newRhythm = sequencer.getRhythm(rhythmIndex);
     const juce::String paramPrefix = "r" + juce::String(rhythmIndex) + "_";
 
-    // Stage 35: branch on presetVersion. v2 reads actual values (and algorithm
-    // names for selectors); v0/v1 reads normalised, with v0 also running the
-    // #430 drvChar/drvBits legacy-norm migration.
-    const int presetVersion = (int) state.getProperty("presetVersion", 0);
+    // Stage 35 / cleanup: only v2 presets are supported. Legacy (v0/v1) presets
+    // are refused at the entry point with a clear onLoadError; the user is
+    // expected to hand-upgrade them via the dev. Keeps the loader simple.
+    if (! requireSupportedPresetVersion(state, file.getFileName(), onLoadError))
+        return;
 
     for (int i = 0; i < kRhythmParamCount; ++i)
     {
@@ -269,7 +265,7 @@ void PluginProcessor::stageRhythmPreset(int rhythmIndex, const juce::File& file)
         const juce::String propName = "r0_" + juce::String(def.suffix);
         if (auto* param = apvts.getParameter(paramPrefix + def.suffix))
         {
-            const float actualVal = readParamPropertyAsActual(state, propName, *param, def, presetVersion);
+            const float actualVal = readParamPropertyAsActual(state, propName, *param, def);
             if (! std::isnan(actualVal))
             {
                 bool pd = false, vd = false;
@@ -434,7 +430,7 @@ void PluginProcessor::saveRhythmPresetToFile(int rhythmIdx, const juce::File& de
     state.setProperty("presetCategory",     category,                               nullptr);
     state.setProperty("presetDescription",  description,                            nullptr);
     state.setProperty("presetEmbedSamples", embedSample ? 1 : 0,                   nullptr);
-    state.setProperty("presetVersion",      kCurrentPresetVersion,                  nullptr);   // #430
+    state.setProperty("presetVersion",      kCurrentPresetVersion,                  nullptr);
 
     const Rhythm& r = sequencer.getRhythm(rhythmIdx);
     state.setProperty("r0_name",   juce::String(r.name),        nullptr);
@@ -510,9 +506,9 @@ bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
     // Load only sequencer-page state — mixer settings stay attached to the slot.
     // Older rhythm preset files may include "ch_*" properties; those are simply
     // ignored on load (no read here) so legacy files load cleanly with the new policy.
-    // Stage 35: branch on presetVersion. v2 reads actual values; v0/v1 reads
-    // normalised, with v0 running the #430 legacy-norm migration.
-    const int presetVersion = (int) state.getProperty("presetVersion", 0);
+    // v2-only: legacy presets refused at the entry point.
+    if (! requireSupportedPresetVersion(state, file.getFileName(), onLoadError))
+        return false;
     const juce::String dstPrefix = "r" + juce::String(targetIdx) + "_";
     for (int i = 0; i < kRhythmParamCount; ++i)
     {
@@ -520,7 +516,7 @@ bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
         const juce::String propName = "r0_" + juce::String(def.suffix);
         if (auto* param = apvts.getParameter(dstPrefix + def.suffix))
         {
-            const float actualVal = readParamPropertyAsActual(state, propName, *param, def, presetVersion);
+            const float actualVal = readParamPropertyAsActual(state, propName, *param, def);
             if (! std::isnan(actualVal))
                 param->setValueNotifyingHost(param->convertTo0to1(actualVal));
         }
@@ -1125,7 +1121,7 @@ void PluginProcessor::savePreset(const juce::String& name,
     root.setProperty("presetDescription",  description,          nullptr);
     root.setProperty("presetEmbedSamples", embedSamples ? 1 : 0, nullptr);
     root.setProperty("presetCategory",    category,    nullptr);
-    root.setProperty("presetVersion",     kCurrentPresetVersion, nullptr);   // #430
+    root.setProperty("presetVersion",     kCurrentPresetVersion, nullptr);
 
     for (int i = 0; i < n; ++i)
     {
@@ -1263,11 +1259,11 @@ void PluginProcessor::loadPreset(const juce::File& file)
             numActiveRhythms.store(n, std::memory_order_release);
         }
 
-        mu_core::ScopedApvtsLoading guard(apvtsLoading);
+        // v2-only: legacy presets refused at the entry point.
+        if (! requireSupportedPresetVersion(root, file.getFileName(), onLoadError))
+            return;
 
-        // Stage 35: branch on presetVersion for both per-rhythm and global-state.
-        // The readers handle the v0 → v1 → v2 migration ladder internally.
-        const int presetVersion = (int) root.getProperty("presetVersion", 0);
+        mu_core::ScopedApvtsLoading guard(apvtsLoading);
 
         int rhythmIdx = 0;
         for (int ci = 0; ci < root.getNumChildren() && rhythmIdx < n; ++ci)
@@ -1282,7 +1278,7 @@ void PluginProcessor::loadPreset(const juce::File& file)
                 const auto& def = kRhythmParamDefs[j];
                 if (auto* param = apvts.getParameter(dstPrefix + def.suffix))
                 {
-                    const float actualVal = readParamPropertyAsActual(rTree, juce::String(def.suffix), *param, def, presetVersion);
+                    const float actualVal = readParamPropertyAsActual(rTree, juce::String(def.suffix), *param, def);
                     if (! std::isnan(actualVal))
                         param->setValueNotifyingHost(param->convertTo0to1(actualVal));
                 }
@@ -1402,7 +1398,7 @@ void PluginProcessor::loadPreset(const juce::File& file)
                 if (auto* param = apvts.getParameter(def.id))
                 {
                     const float actualVal = readGlobalPropertyAsActual(child, juce::String(def.id),
-                                                                       *param, def, presetVersion);
+                                                                       *param, def);
                     if (! std::isnan(actualVal))
                         param->setValueNotifyingHost(param->convertTo0to1(actualVal));
                 }

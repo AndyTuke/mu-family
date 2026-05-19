@@ -17,24 +17,21 @@ hand-editable for power users.
 
 ## Versioning
 
-Both file types carry a `presetVersion` integer attribute on the root tree:
+Both file types carry a `presetVersion` integer attribute on the root tree.
+The current and **only** supported version is `2` — actual de-normalised
+values + stable algorithm name strings.
 
-| Version          | Format                                                                                       |
-|------------------|----------------------------------------------------------------------------------------------|
-| absent / 0       | Legacy pre-#430. Normalised (0..1) values; pre-#422 `drvChar` / `drvBits` ranges.            |
-| 1                | Post-#430. Normalised values, post-#422/#423 ranges (drvChar 0..12, drvBits 0..16).          |
-| 2 (current)      | Stage 35. De-normalised actual values + stable algorithm name strings.                       |
+Legacy versions (v0 / v1 — normalised values, pre-Stage-35) are **refused at
+the load entry point** by `requireSupportedPresetVersion` with an `onLoadError`
+message pointing the user at hand-conversion via the dev. The on-disk format
+is simple enough that converting an old preset by hand is a few minutes; the
+maintenance cost of carrying a multi-version compat ladder was higher than
+the user value, so the v0 / v1 reader branches and their migration helpers
+were removed.
 
-The save path always writes the current version. The load path reads any
-prior version via `readParamPropertyAsActual` in
-[PluginProcessor_Preset.cpp](../Source/PluginProcessor_Preset.cpp), which
-applies the appropriate migration on the fly:
-
-- v0 values get the legacy norm-shift migration (#430) before conversion.
-- v1 values pass through as-is.
-- v2 values are read directly per parameter `ParamKind`.
-
-Round-tripping any old file by loading then saving silently upgrades it to v2.
+The `presetVersion` attribute stays in saved files so future format changes
+have a clean way to reject older files (or, if we keep more presets at that
+point, to add a real migration ladder).
 
 ## `MuClidRhythm` schema
 
@@ -179,28 +176,23 @@ These are the invariants the format relies on for forward compatibility:
 5. **Modulation source / destination IDs are validated on load** (#437) —
    stale IDs report via `onLoadError` instead of dangling silently.
 
-## Stage 35 deliverables (status)
+## Stage 35 — done
 
-- ✅ Step 1: algorithm name tables — `Source/Audio/AlgorithmNames.h`.
-- ⏸ Step 2: rename `drv*` → `ins*` (APVTS IDs + VoiceParams fields) —
-  **deferred** as a follow-up. 549 references across 20 files; the win
-  is purely cosmetic and the risk of subtle breakage with no automated
-  test coverage outweighed the readability benefit. APVTS IDs and XML
-  schema keys stay as `drv*` / `drive*` / `drvBits`.
-- ✅ Step 3: de-normalised save format — `writeParamPropertyV2`.
-- ✅ Step 4: v2 load path — `readParamPropertyAsActual`, branches on
-  `presetVersion`.
-- ✅ Step 5: this document.
+All five steps shipped: algorithm name tables (Step 1), C++ field rename
+`drive*` → `insert*` (Step 2, #452), de-normalised save format (Step 3),
+v2-only load path (Step 4), this document (Step 5). Global-state algorithm
+names landed via #451. Modulator enum-name serialisation landed via #436.
+Legacy v0 / v1 reader code was removed when it became clear the maintenance
+cost outweighed the user value — hand-converted any pre-v2 presets via the
+dev. The `presetVersion` attribute stays in saved files so a future format
+break can either reject older files cleanly or re-add a migration ladder.
 
-## Follow-up work
+## Follow-up
 
-- **Field-name rename** (Step 2 deferred): rename `drive*` / `drv*` C++
-  fields to `insert*` for clarity. Out of scope until there's automated
-  preset round-trip test coverage to backstop the change.
-- **Global-state algorithm names**: write `mst_insChar` / `mst_ins2Char` /
-  `eff_algo` / `rev_algo` as algorithm name strings, parallel to the
-  per-rhythm side. Needs a `kGlobalParamDefs` table mirroring
-  `kRhythmParamDefs`.
-- **Round-trip test harness** (#442): save → load → save should produce
-  byte-equivalent output for every parameter. Would catch every #430-
-  class drift before it ships.
+- **Preset round-trip test harness** (#442 + sub-issues #453-#457): a save
+  → load → save cycle should produce byte-equivalent output for every
+  parameter. Sub-issues split out the remaining coverage:
+  - `#453` kGlobalParamDefs round-trip
+  - `#454` writeKindedProperty / readKindedPropertyAsActualV2 round-trip
+  - `#455` serialiseModulators / deserialiseModulators round-trip
+  - `#457` algorithm-name table size sanity
