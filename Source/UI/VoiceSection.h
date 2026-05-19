@@ -23,7 +23,7 @@ public:
     void refreshModulatedIndicators();
 
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
-    std::function<void(int driveChar)> onInsertAlgorithmChanged;
+    std::function<void(int insertAlgo)> onInsertAlgorithmChanged;
 
     void loadFromRhythm();
 
@@ -82,11 +82,11 @@ private:
     bool               insertSnapshotValid[11] = {};
 
     // ─── INSERT ─────────────────────────────────────────────────────────
-    DropdownSelect driveChar;
-    KnobWithLabel  driveDrive  { "Drive",  Id::knobInsertPad };
-    KnobWithLabel  driveOutput { "Output", Id::knobInsertPad };
-    KnobWithLabel  driveDither { "Dither", Id::knobInsertPad };
-    KnobWithLabel  driveTone   { "LPF",    Id::knobInsertPad };
+    DropdownSelect insertAlgo;
+    KnobWithLabel  insertDrive  { "Drive",  Id::knobInsertPad };
+    KnobWithLabel  insertOutput { "Output", Id::knobInsertPad };
+    KnobWithLabel  insertDither { "Dither", Id::knobInsertPad };
+    KnobWithLabel  insertTone   { "LPF",    Id::knobInsertPad };
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();

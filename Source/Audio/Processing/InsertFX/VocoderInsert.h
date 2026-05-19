@@ -16,18 +16,18 @@
 //   for each band: out += synth_band * env_band
 //   sum to output, replicate L+R
 //
-// Controls (driveChar = 12). All values stored as whole numbers in their
+// Controls (insertAlgo = 12). All values stored as whole numbers in their
 // respective APVTS fields — UI knobs step in integer increments:
-//   driveDrive (0..100):  Waveshape index — stored as 0..3 (0=Saw, 1=Square,
+//   insertDrive (0..100):  Waveshape index — stored as 0..3 (0=Saw, 1=Square,
 //                         2=White Noise, 3=Pink Noise). UI shows the name.
-//   drvBits    (1..16):   Note index +1 — stored as 1..7 (1=C, 2=D, … 7=B).
-//                         The +1 offset means drvBits's natural minimum (1)
+//   insertBits    (1..16):   Note index +1 — stored as 1..7 (1=C, 2=D, … 7=B).
+//                         The +1 offset means insertBits's natural minimum (1)
 //                         maps to a valid note instead of a sentinel.
-//   drvDither  (0..100):  Octave knob — stored as 1..5 (SPN octaves 2..6).
-//   driveOutput (-24..0): Unison index — stored as -24..0 mapping linearly
+//   insertDither  (0..100):  Octave knob — stored as 1..5 (SPN octaves 2..6).
+//   insertOutput (-24..0): Unison index — stored as -24..0 mapping linearly
 //                         to voice counts (1, 3, 5, 7, 9, 11, 13) via
 //                         `idx = (drvOut + 24) / 4`. This field's negative
-//                         range avoided a clash with driveTone (which has
+//                         range avoided a clash with insertTone (which has
 //                         a 20..20k clamp that would corrupt small-int
 //                         storage — see #428).
 //
@@ -79,11 +79,11 @@ public:
                  const VoiceParams& p, float& /*grOut*/) override
     {
         // ── Decode controls ─────────────────────────────────────────────
-        const int waveshape = juce::jlimit(0, 3, (int) std::round(p.driveDrive));
-        const int noteIdx   = juce::jlimit(0, 6, (int) std::round(p.drvBits - 1.0f));
-        const int octave    = juce::jlimit(1, 5, (int) std::round(p.drvDither));
-        // Unison stored in driveOutput (range -24..0). Linear map to 0..6.
-        const int unisonIdx = juce::jlimit(0, 6, (int) std::round((p.driveOutput + 24.0f) * 0.25f));
+        const int waveshape = juce::jlimit(0, 3, (int) std::round(p.insertDrive));
+        const int noteIdx   = juce::jlimit(0, 6, (int) std::round(p.insertBits - 1.0f));
+        const int octave    = juce::jlimit(1, 5, (int) std::round(p.insertDither));
+        // Unison stored in insertOutput (range -24..0). Linear map to 0..6.
+        const int unisonIdx = juce::jlimit(0, 6, (int) std::round((p.insertOutput + 24.0f) * 0.25f));
         const int unisonN   = kUnisonVoices[unisonIdx];
 
         const bool noiseCarrier = (waveshape >= 2);

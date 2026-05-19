@@ -4,7 +4,7 @@
 #include "Audio/AudioFilters.h"
 #include <cmath>
 
-// #425: driveChar = 10. Tape saturation — preGain → tanh → DC block → tone
+// #425: insertAlgo = 10. Tape saturation — preGain → tanh → DC block → tone
 // LP → output trim. The DC block sits between the non-linearity (which can
 // generate DC offset for asymmetric input) and the tone filter, so the LP
 // doesn't have to handle a slow drift.
@@ -27,9 +27,9 @@ public:
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
                  const VoiceParams& p, float& /*grOut*/) override
     {
-        const float preGain = 1.0f + (p.driveDrive / 100.0f) * 9.0f;   // 1..10×
-        const float outGain = std::pow(10.0f, p.driveOutput / 20.0f);
-        const float toneHz  = juce::jlimit(200.0f, 20000.0f, p.driveTone);
+        const float preGain = 1.0f + (p.insertDrive / 100.0f) * 9.0f;   // 1..10×
+        const float outGain = std::pow(10.0f, p.insertOutput / 20.0f);
+        const float toneHz  = juce::jlimit(200.0f, 20000.0f, p.insertTone);
         const float dcCoeff = 1.0f - (2.0f * juce::MathConstants<float>::pi * 20.0f
                                       / (float)currentSampleRate);
         for (int ch = 0; ch < nCh; ++ch)

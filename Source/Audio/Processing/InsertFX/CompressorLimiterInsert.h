@@ -3,9 +3,9 @@
 #include "InsertAlgorithmBase.h"
 #include <cmath>
 
-// #425: driveChar = 7 (Compressor) and 8 (Limiter). Same envelope-follower
+// #425: insertAlgo = 7 (Compressor) and 8 (Limiter). Same envelope-follower
 // algorithm; the only difference is the ratio (4:1 vs 100:1) which is selected
-// from p.driveChar at process time. Sharing one class avoids duplicating
+// from p.insertAlgo at process time. Sharing one class avoids duplicating
 // ~25 lines of identical code; storing one instance at both array indices 7
 // and 8 of InsertProcessor's dispatch table is fine because the instance reads
 // the ratio per-call from its parameters.
@@ -23,11 +23,11 @@ public:
                  const VoiceParams& p, float& grOut) override
     {
         const float sr        = (float)currentSampleRate;
-        const float threshLin = juce::Decibels::decibelsToGain(-(p.driveDrive / 100.0f) * 40.0f);
-        const float outGain   = juce::Decibels::decibelsToGain(p.driveOutput);
-        const float attackMs  = juce::jmax(0.1f, p.drvDither * 2.0f);
-        const float relMs     = juce::jmax(1.0f, p.driveTone);
-        const float ratio     = (p.driveChar == 8) ? 100.0f : 4.0f;
+        const float threshLin = juce::Decibels::decibelsToGain(-(p.insertDrive / 100.0f) * 40.0f);
+        const float outGain   = juce::Decibels::decibelsToGain(p.insertOutput);
+        const float attackMs  = juce::jmax(0.1f, p.insertDither * 2.0f);
+        const float relMs     = juce::jmax(1.0f, p.insertTone);
+        const float ratio     = (p.insertAlgo == 8) ? 100.0f : 4.0f;
         const float attCoeff  = std::exp(-2.2f / (attackMs * 0.001f * sr));
         const float relCoeff  = std::exp(-2.2f / (relMs    * 0.001f * sr));
 

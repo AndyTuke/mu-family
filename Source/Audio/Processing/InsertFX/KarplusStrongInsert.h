@@ -13,18 +13,18 @@
 // based on the feedback gain, with the low-pass progressively damping high
 // frequencies for the characteristic decaying-pluck tone.
 //
-// Controls (driveChar = 11):
-//   driveDrive (0..100):   Note index — stored as 0..6 (C, D, E, F, G, A, B).
+// Controls (insertAlgo = 11):
+//   insertDrive (0..100):   Note index — stored as 0..6 (C, D, E, F, G, A, B).
 //                          UI shows the note letter.
-//   drvBits    (1..16):    Octave knob — stored as 0..3 mapping to SPN octaves 1..4.
+//   insertBits    (1..16):    Octave knob — stored as 0..3 mapping to SPN octaves 1..4.
 //                          #429: added Octave 0 (= SPN C1 = 32.7 Hz) below the
 //                          original 1/2/3 — bottom of audible range.
-//   drvDither  (0..100):   Feedback — stored as 0..100, mapped internally to
+//   insertDither  (0..100):   Feedback — stored as 0..100, mapped internally to
 //                          loop gain 0.95..1.0. At 100% the loop self-sustains;
 //                          stability is maintained by the LP filter in the
 //                          feedback path (any LP cutoff < Nyquist guarantees
 //                          some energy loss per cycle).
-//   driveTone  (20..20k):  LP cutoff inside the feedback loop. Lower = darker
+//   insertTone  (20..20k):  LP cutoff inside the feedback loop. Lower = darker
 //                          / faster damping; higher = brighter / longer ring.
 //                          At 20 kHz effectively bypasses the LP (no damping).
 //
@@ -73,10 +73,10 @@ public:
                  const VoiceParams& p, float& /*grOut*/) override
     {
         // Decode controls from the repurposed param fields.
-        const int   noteIdx = juce::jlimit(0, 6, (int) std::round(p.driveDrive));
+        const int   noteIdx = juce::jlimit(0, 6, (int) std::round(p.insertDrive));
         // #429: octave range extended to 0..3 (was 1..3). Octave 0 = SPN 1.
-        const int   octave  = juce::jlimit(0, 3, (int) std::round(p.drvBits));
-        const float fbKnob  = juce::jlimit(0.0f, 1.0f, p.drvDither / 100.0f);
+        const int   octave  = juce::jlimit(0, 3, (int) std::round(p.insertBits));
+        const float fbKnob  = juce::jlimit(0.0f, 1.0f, p.insertDither / 100.0f);
         // Map 0..1 onto loop gain 0.95..1.0. At max the loop is mathematically
         // self-sustaining, but the LP filter in the feedback path always
         // removes some energy per cycle so the string can ring indefinitely
@@ -90,12 +90,12 @@ public:
         const float targetFreq = kLowestFreq * std::pow(2.0f, semitones / 12.0f);
         smoothedFreq.setTargetValue(targetFreq);
 
-        // LP cutoff in the feedback path — user-controlled via driveTone
+        // LP cutoff in the feedback path — user-controlled via insertTone
         // (range 20 Hz – 20 kHz). Lower cutoffs damp high frequencies faster
         // (darker / quicker decay); higher cutoffs let high partials through
         // (brighter / longer ring). At 20 kHz the LP is effectively bypassed,
         // letting the loop gain alone determine the decay envelope.
-        const float lpCutoff = juce::jlimit(20.0f, 20000.0f, p.driveTone);
+        const float lpCutoff = juce::jlimit(20.0f, 20000.0f, p.insertTone);
         const float lpAlpha  = 1.0f - std::exp(-2.0f * juce::MathConstants<float>::pi
                                                 * lpCutoff / (float) currentSampleRate);
 

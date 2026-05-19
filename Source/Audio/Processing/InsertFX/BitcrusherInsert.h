@@ -4,7 +4,7 @@
 #include "Audio/AudioFilters.h"
 #include <cmath>
 
-// #425: driveChar = 4. Bitcrusher — bit-depth quantisation + sample-rate
+// #425: insertAlgo = 4. Bitcrusher — bit-depth quantisation + sample-rate
 // reduction + TPDF dither. Anti-aliasing LP guards against fold-back from the
 // sample-rate decimation. Per-channel counters track the position within each
 // hold cell.
@@ -27,12 +27,12 @@ public:
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
                  const VoiceParams& p, float& /*grOut*/) override
     {
-        const float bits    = juce::jlimit(1.0f, 16.0f, p.drvBits);
+        const float bits    = juce::jlimit(1.0f, 16.0f, p.insertBits);
         const float q       = std::pow(2.0f, bits - 1.0f);
         const float ratioF  = juce::jmax(1.0f,
-            (float)(currentSampleRate / (double)juce::jmax(100.0f, p.driveRate)));
-        const float dither  = p.drvDither / 100.0f * (0.5f / q);
-        const float aaCut   = juce::jmin(p.driveRate * 0.45f,
+            (float)(currentSampleRate / (double)juce::jmax(100.0f, p.insertRate)));
+        const float dither  = p.insertDither / 100.0f * (0.5f / q);
+        const float aaCut   = juce::jmin(p.insertRate * 0.45f,
                                          (float)currentSampleRate * 0.49f);
 
         for (int ch = 0; ch < nCh; ++ch)

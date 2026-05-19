@@ -16,12 +16,12 @@
 // sync.
 //
 // #425: refactored from a single ~600-line switch statement into a dispatch
-// table over driveChar → InsertAlgorithmBase*. Each driveChar code maps to a
+// table over insertAlgo → InsertAlgorithmBase*. Each insertAlgo code maps to a
 // concrete subclass living in Source/Audio/Processing/InsertFX/. All algorithms are pre-
 // allocated in the constructor so prepare() / param-change paths never heap-
 // allocate — matches the FX-rack pattern fixed under #402.
 //
-// Compressor (driveChar = 7) and Limiter (driveChar = 8) share a single
+// Compressor (insertAlgo = 7) and Limiter (insertAlgo = 8) share a single
 // CompressorLimiterInsert instance: the dispatch table aliases both slots to
 // the same object so switching between them preserves the envelope-follower
 // state (bit-identical to the pre-refactor switch-case behaviour).
@@ -33,7 +33,7 @@ public:
     void prepare(double sampleRate, int blockSize);
     void reset();
 
-    // Apply the selected insert effect (driveChar dispatch + post-drive tone
+    // Apply the selected insert effect (insertAlgo dispatch + post-drive tone
     // filter for cases 0–5) in place.
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh, const VoiceParams& p);
 
@@ -50,16 +50,16 @@ private:
     // `dispatch[]` below stay valid for the InsertProcessor's lifetime.
     std::vector<std::unique_ptr<InsertAlgorithmBase>> owned;
 
-    // Dispatch: driveChar value (0..10) → pointer into `owned`. Indices 7 and
+    // Dispatch: insertAlgo value (0..10) → pointer into `owned`. Indices 7 and
     // 8 alias the same CompressorLimiterInsert instance.
     std::array<InsertAlgorithmBase*, kNumAlgorithms> dispatch { };
 
     double currentSampleRate = 44100.0;
 
     // Post-drive tone filter — runs after the algorithm dispatch ONLY for
-    // driveChar < 6, where p.driveTone is interpreted as a 1-pole LP cutoff.
+    // insertAlgo < 6, where p.insertTone is interpreted as a 1-pole LP cutoff.
     // EQ (6), Compressor/Limiter (7, 8), RingMod (9), TapeSat (10) repurpose
-    // driveTone for other meanings and skip this step. Lives here (not in any
+    // insertTone for other meanings and skip this step. Lives here (not in any
     // single algorithm) because it's a property of the drive-family, not of
     // any one algorithm's DSP.
     OnePoleLP postDriveTone[2];

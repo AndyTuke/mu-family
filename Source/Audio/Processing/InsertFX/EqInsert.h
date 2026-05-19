@@ -3,8 +3,8 @@
 #include "InsertAlgorithmBase.h"
 #include <juce_dsp/juce_dsp.h>
 
-// #425: driveChar = 6. Three-band EQ — low shelf @ 200 Hz, mid peak @
-// p.driveTone, high shelf @ 8 kHz. Coefficient computation is cached on the
+// #425: insertAlgo = 6. Three-band EQ — low shelf @ 200 Hz, mid peak @
+// p.insertTone, high shelf @ 8 kHz. Coefficient computation is cached on the
 // last-seen control values so unchanged params skip the cos/sin/pow calls.
 class EqInsert : public InsertAlgorithmBase
 {
@@ -35,10 +35,10 @@ public:
     {
         using Coeffs = juce::dsp::IIR::Coefficients<float>;
         const float sr          = (float)currentSampleRate;
-        const float curDriveDrv = p.driveDrive;
-        const float curDrvDit   = p.drvDither;
-        const float curMidGain  = p.eqMidGain;
-        const float curMidFreq  = juce::jlimit(20.0f, 20000.0f, p.driveTone);
+        const float curDriveDrv = p.insertDrive;
+        const float curDrvDit   = p.insertDither;
+        const float curMidGain  = p.insertEqMid;
+        const float curMidFreq  = juce::jlimit(20.0f, 20000.0f, p.insertTone);
 
         if (curDriveDrv != lastDriveDrive || curDrvDit  != lastDrvDither
          || curMidGain  != lastMidGain    || curMidFreq != lastDriveTone)

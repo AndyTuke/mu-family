@@ -258,8 +258,8 @@ void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
             const juce::String  pBit  = slot == 0 ? "mst_insBits"  : "mst_ins2Bits";
             const juce::String  pRte  = slot == 0 ? "mst_insRate"  : "mst_ins2Rate";
 
-            charBox.setSelectedId(ip.driveChar + 1, juce::dontSendNotification);
-            configureInsertAlgorithm(ip.driveChar, slot, proc);
+            charBox.setSelectedId(ip.insertAlgo + 1, juce::dontSendNotification);
+            configureInsertAlgorithm(ip.insertAlgo, slot, proc);
 
             charBox.onChange = [this, proc, slot, snaps, snapValid,
                                 pDrv, pOut, pDit, pTon, pMid, pBit, pRte]()
@@ -270,7 +270,7 @@ void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
                 {
                     const VoiceParams& cur = slot == 0 ? proc->mixerEngine.masterInsertParams
                                                        : proc->mixerEngine.masterInsertParams2;
-                    const int oldChar = cur.driveChar;
+                    const int oldChar = cur.insertAlgo;
                     auto set = [proc](const juce::String& id, float v)
                     {
                         if (auto* p = proc->apvts.getParameter(id))
@@ -280,13 +280,13 @@ void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
                     if (oldChar >= 0 && oldChar <= 10)
                     {
                         auto& snap       = snaps[oldChar];
-                        snap.driveDrive  = cur.driveDrive;
-                        snap.driveOutput = cur.driveOutput;
-                        snap.drvDither   = cur.drvDither;
-                        snap.driveTone   = cur.driveTone;
-                        snap.eqMidGain   = cur.eqMidGain;
-                        snap.drvBits     = cur.drvBits;
-                        snap.driveRate   = cur.driveRate;
+                        snap.insertDrive  = cur.insertDrive;
+                        snap.insertOutput = cur.insertOutput;
+                        snap.insertDither   = cur.insertDither;
+                        snap.insertTone   = cur.insertTone;
+                        snap.insertEqMid   = cur.insertEqMid;
+                        snap.insertBits     = cur.insertBits;
+                        snap.insertRate   = cur.insertRate;
                         snapValid[oldChar] = true;
                     }
 
@@ -294,13 +294,13 @@ void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
                     const InsertAlgoSnapshot& snap = snapValid[newChar]
                                                      ? snaps[newChar]
                                                      : mu_ui::kInsertAlgoDefaults[newChar];
-                    set(pDrv, snap.driveDrive);
-                    set(pOut, snap.driveOutput);
-                    set(pDit, snap.drvDither);
-                    set(pTon, snap.driveTone);
-                    set(pMid, snap.eqMidGain);
-                    set(pBit, snap.drvBits);
-                    set(pRte, snap.driveRate);
+                    set(pDrv, snap.insertDrive);
+                    set(pOut, snap.insertOutput);
+                    set(pDit, snap.insertDither);
+                    set(pTon, snap.insertTone);
+                    set(pMid, snap.insertEqMid);
+                    set(pBit, snap.insertBits);
+                    set(pRte, snap.insertRate);
                 }
                 configureInsertAlgorithm(newChar, slot, proc);
             };

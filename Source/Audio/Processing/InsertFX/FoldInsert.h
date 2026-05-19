@@ -3,7 +3,7 @@
 #include "InsertAlgorithmBase.h"
 #include <cmath>
 
-// #425: driveChar = 3. Triangular foldback distortion — wraps the signal
+// #425: insertAlgo = 3. Triangular foldback distortion — wraps the signal
 // back inside [-1, +1] by reflecting whenever |x| exceeds 1. Stateless.
 class FoldInsert : public InsertAlgorithmBase
 {
@@ -14,8 +14,8 @@ public:
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
                  const VoiceParams& p, float& /*grOut*/) override
     {
-        const float preGain = std::pow(10.0f, p.driveDrive / 100.0f * 2.0f);
-        const float outGain = std::pow(10.0f, p.driveOutput / 20.0f) / preGain;
+        const float preGain = std::pow(10.0f, p.insertDrive / 100.0f * 2.0f);
+        const float outGain = std::pow(10.0f, p.insertOutput / 20.0f) / preGain;
         for (int ch = 0; ch < nCh; ++ch)
         {
             auto* data = buf.getWritePointer(ch);

@@ -18,15 +18,18 @@
 // `using` aliases to this struct in their respective .h files so existing
 // external references continue to compile unchanged.
 
+// #452: field names renamed `drive*` / `drv*` → `insert*` in lockstep with
+// VoiceParams. Field ORDER preserved so the brace-init table below doesn't
+// shift element positions.
 struct InsertAlgoDefaults
 {
-    float driveDrive  = 0.0f;
-    float driveOutput = 0.0f;
-    float drvDither   = 0.0f;
-    float driveTone   = 20000.0f;
-    float eqMidGain   = 0.0f;
-    float drvBits     = 16.0f;
-    float driveRate   = 48000.0f;
+    float insertDrive  = 0.0f;
+    float insertOutput = 0.0f;
+    float insertDither = 0.0f;
+    float insertTone   = 20000.0f;
+    float insertEqMid  = 0.0f;
+    float insertBits   = 16.0f;
+    float insertRate   = 48000.0f;
 };
 
 namespace mu_ui {

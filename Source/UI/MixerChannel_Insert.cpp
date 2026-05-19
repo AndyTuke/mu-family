@@ -87,13 +87,13 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
                 drive .getSlider().textFromValueFunction = nullptr;
                 drive .getSlider().valueFromTextFunction = nullptr;
             }
-            drive .setValue(ip.driveDrive, juce::dontSendNotification);
+            drive .setValue(ip.insertDrive, juce::dontSendNotification);
             drive .setVisible(true);
 
             output.setLabel("Output");
             output.setRange(-24.0, 0.0, 0.1);
             output.getSlider().textFromValueFunction = nullptr;
-            output.setValue(ip.driveOutput, juce::dontSendNotification);
+            output.setValue(ip.insertOutput, juce::dontSendNotification);
             output.setVisible(true);
 
             tone  .setLabel("LPF");
@@ -103,7 +103,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
                 return v >= 1000.0 ? juce::String(v / 1000.0, 2) + "kHz"
                                    : juce::String((int)v) + "Hz";
             };
-            tone  .setValue(ip.driveTone, juce::dontSendNotification);
+            tone  .setValue(ip.insertTone, juce::dontSendNotification);
             tone  .setVisible(true);
 
             extra .setVisible(false);
@@ -119,7 +119,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             drive .getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return juce::String((int)v) + " bits";
             };
-            drive .setValue(ip.drvBits, juce::dontSendNotification);
+            drive .setValue(ip.insertBits, juce::dontSendNotification);
             drive .setVisible(true);
 
             output.setLabel("Rate");
@@ -129,7 +129,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
                 return v >= 1000.0 ? juce::String(v / 1000.0, 2) + "kHz"
                                    : juce::String((int)v) + "Hz";
             };
-            output.setValue(ip.driveRate, juce::dontSendNotification);
+            output.setValue(ip.insertRate, juce::dontSendNotification);
             output.setVisible(true);
 
             tone  .setLabel("Dither");
@@ -137,7 +137,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             tone  .getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return juce::String((int)std::round(v)) + "%";
             };
-            tone  .setValue(ip.drvDither, juce::dontSendNotification);
+            tone  .setValue(ip.insertDither, juce::dontSendNotification);
             tone  .setVisible(true);
 
             extra .setVisible(false);
@@ -164,26 +164,26 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             drive .setLabel("Low");
             drive .setRange(-18.0, 18.0, 0.1);
             drive .getSlider().textFromValueFunction = dbFmt;
-            drive .setValue(ip.driveDrive / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
+            drive .setValue(ip.insertDrive / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
             drive .setVisible(true);
 
             output.setLabel("Mid");
             output.setRange(-18.0, 18.0, 0.1);
             output.getSlider().textFromValueFunction = dbFmt;
-            output.setValue(ip.eqMidGain, juce::dontSendNotification);
+            output.setValue(ip.insertEqMid, juce::dontSendNotification);
             output.setVisible(true);
 
             tone  .setLabel("High");
             tone  .setRange(-18.0, 18.0, 0.1);
             tone  .getSlider().textFromValueFunction = dbFmt;
-            tone  .setValue(ip.drvDither / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
+            tone  .setValue(ip.insertDither / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
             tone  .setVisible(true);
 
             extra .setLabel("Mid Hz");
             extra .setRange(200.0, 8000.0, 1.0);
             extra .getSlider().setSkewFactorFromMidPoint(1000.0);
             extra .getSlider().textFromValueFunction = hzFmt;
-            extra .setValue(juce::jlimit(200.0, 8000.0, (double)ip.driveTone), juce::dontSendNotification);
+            extra .setValue(juce::jlimit(200.0, 8000.0, (double)ip.insertTone), juce::dontSendNotification);
             extra .setVisible(true);
 
             drive .onValueChanged = [setParam, pDrv](double v) { setParam(pDrv, (v + 18.0) / 36.0 * 100.0); };
@@ -200,13 +200,13 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             drive .getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return "-" + juce::String((int)std::round(v * 0.4)) + " dB";
             };
-            drive .setValue(ip.driveDrive, juce::dontSendNotification);
+            drive .setValue(ip.insertDrive, juce::dontSendNotification);
             drive .setVisible(true);
 
             output.setLabel("Output");
             output.setRange(-24.0, 24.0, 0.1);
             output.getSlider().textFromValueFunction = nullptr;
-            output.setValue(ip.driveOutput, juce::dontSendNotification);
+            output.setValue(ip.insertOutput, juce::dontSendNotification);
             output.setVisible(true);
 
             tone  .setLabel("Release");
@@ -216,7 +216,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
                 return v < 1000.0 ? juce::String((int)v) + " ms"
                                   : juce::String(v / 1000.0, 2) + " s";
             };
-            tone  .setValue(juce::jlimit(20.0, 2000.0, (double)ip.driveTone), juce::dontSendNotification);
+            tone  .setValue(juce::jlimit(20.0, 2000.0, (double)ip.insertTone), juce::dontSendNotification);
             tone  .setVisible(true);
 
             extra .setVisible(false);
@@ -237,7 +237,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             drive.getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return juce::String((int)std::round(v)) + "%";
             };
-            drive.setValue(ip.driveDrive, juce::dontSendNotification);
+            drive.setValue(ip.insertDrive, juce::dontSendNotification);
             drive.setVisible(true);
 
             output.setVisible(false);
@@ -249,7 +249,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
                 return v >= 1000.0 ? juce::String(v / 1000.0, 2) + "kHz"
                                    : juce::String((int)v) + "Hz";
             };
-            tone.setValue(juce::jlimit(10.0, 5000.0, (double)ip.driveTone), juce::dontSendNotification);
+            tone.setValue(juce::jlimit(10.0, 5000.0, (double)ip.insertTone), juce::dontSendNotification);
             tone.setVisible(true);
 
             extra.setVisible(false);
@@ -262,13 +262,13 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             drive.setLabel("Drive");
             drive.setRange(0.0, 100.0, 0.1);
             drive.getSlider().textFromValueFunction = nullptr;
-            drive.setValue(ip.driveDrive, juce::dontSendNotification);
+            drive.setValue(ip.insertDrive, juce::dontSendNotification);
             drive.setVisible(true);
 
             output.setLabel("Output");
             output.setRange(-24.0, 0.0, 0.1);
             output.getSlider().textFromValueFunction = nullptr;
-            output.setValue(ip.driveOutput, juce::dontSendNotification);
+            output.setValue(ip.insertOutput, juce::dontSendNotification);
             output.setVisible(true);
 
             tone.setLabel("Tone");
@@ -278,7 +278,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
                 return v >= 1000.0 ? juce::String(v / 1000.0, 2) + "kHz"
                                    : juce::String((int)v) + "Hz";
             };
-            tone.setValue(juce::jlimit(200.0, 20000.0, (double)ip.driveTone), juce::dontSendNotification);
+            tone.setValue(juce::jlimit(200.0, 20000.0, (double)ip.insertTone), juce::dontSendNotification);
             tone.setVisible(true);
 
             extra.setVisible(false);
@@ -298,7 +298,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             drive.getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return kNoteNames[juce::jlimit(0, 6, (int) std::round(v))];
             };
-            drive.setValue(juce::jlimit(0.0, 6.0, (double) ip.driveDrive), juce::dontSendNotification);
+            drive.setValue(juce::jlimit(0.0, 6.0, (double) ip.insertDrive), juce::dontSendNotification);
             drive.setVisible(true);
 
             output.setLabel("Octave");
@@ -307,7 +307,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             output.getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return juce::String((int) std::round(v));
             };
-            output.setValue(juce::jlimit(0.0, 3.0, (double) ip.drvBits), juce::dontSendNotification);
+            output.setValue(juce::jlimit(0.0, 3.0, (double) ip.insertBits), juce::dontSendNotification);
             output.setVisible(true);
 
             tone.setLabel("Feedback");
@@ -316,11 +316,11 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             tone.getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return juce::String((int) std::round(v)) + "%";
             };
-            tone.setValue(juce::jlimit(0.0, 100.0, (double) ip.drvDither), juce::dontSendNotification);
+            tone.setValue(juce::jlimit(0.0, 100.0, (double) ip.insertDither), juce::dontSendNotification);
             tone.setVisible(true);
 
             // #428 follow-up: LPF cutoff on the feedback path — user can
-            // dial the brightness / damping. driveTone (20..20k) maps directly.
+            // dial the brightness / damping. insertTone (20..20k) maps directly.
             extra.setLabel("LPF");
             extra.setRange(20.0, 20000.0, 1.0);
             extra.getSlider().setSkewFactorFromMidPoint(640.0);
@@ -328,7 +328,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
                 return v >= 1000.0 ? juce::String(v / 1000.0, 2) + "kHz"
                                    : juce::String((int)v) + "Hz";
             };
-            extra.setValue(juce::jlimit(20.0, 20000.0, (double) ip.driveTone), juce::dontSendNotification);
+            extra.setValue(juce::jlimit(20.0, 20000.0, (double) ip.insertTone), juce::dontSendNotification);
             extra.setVisible(true);
 
             drive .onValueChanged = [setParam, pDrv](double v) { setParam(pDrv, v); };
@@ -351,10 +351,10 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             drive.getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return kWaveNames[juce::jlimit(0, 3, (int) std::round(v))];
             };
-            drive.setValue(juce::jlimit(0.0, 3.0, (double) ip.driveDrive), juce::dontSendNotification);
+            drive.setValue(juce::jlimit(0.0, 3.0, (double) ip.insertDrive), juce::dontSendNotification);
             drive.setVisible(true);
 
-            // #428: Unison now uses driveOutput field (range -24..0). UI knob
+            // #428: Unison now uses insertOutput field (range -24..0). UI knob
             // value is 0..6; encode/decode via `±24` offset and /4 scale.
             output.setLabel("Unison");
             output.setRange(0.0, 6.0, 1.0);
@@ -363,7 +363,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
                 return juce::String(kUnisonCounts[juce::jlimit(0, 6, (int) std::round(v))]);
             };
             const double unisonKnob = juce::jlimit(0.0, 6.0,
-                                                  ((double) ip.driveOutput + 24.0) * 0.25);
+                                                  ((double) ip.insertOutput + 24.0) * 0.25);
             output.setValue(unisonKnob, juce::dontSendNotification);
             output.setVisible(true);
 
@@ -373,7 +373,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             tone.getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return juce::String((int) std::round(v));
             };
-            tone.setValue(juce::jlimit(1.0, 5.0, (double) ip.drvDither), juce::dontSendNotification);
+            tone.setValue(juce::jlimit(1.0, 5.0, (double) ip.insertDither), juce::dontSendNotification);
             tone.setVisible(true);
 
             extra.setLabel("Note");
@@ -382,7 +382,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             extra.getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return kNoteNames[juce::jlimit(0, 6, (int) std::round(v) - 1)];
             };
-            extra.setValue(juce::jlimit(1.0, 7.0, (double) ip.drvBits), juce::dontSendNotification);
+            extra.setValue(juce::jlimit(1.0, 7.0, (double) ip.insertBits), juce::dontSendNotification);
             extra.setVisible(true);
 
             // #423-followups: grey out Unison / Octave / Note when carrier is

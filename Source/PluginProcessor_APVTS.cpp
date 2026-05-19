@@ -467,22 +467,22 @@ void PluginProcessor::syncMixerParam(const juce::String& id, float v)
 
     if      (id == "mstr_lvl") mixerEngine.masterLevel = v;
     else if (id == "mstr_pan") mixerEngine.masterPan   = v;
-    else if (id == "mst_insChar")  mixerEngine.masterInsertParams.driveChar  = juce::jlimit(0, 12, (int)v);
-    else if (id == "mst_insDrv")   mixerEngine.masterInsertParams.driveDrive = v;
-    else if (id == "mst_insOut")   mixerEngine.masterInsertParams.driveOutput= v;
-    else if (id == "mst_insBits")  mixerEngine.masterInsertParams.drvBits    = v;
-    else if (id == "mst_insRate")  mixerEngine.masterInsertParams.driveRate  = v;
-    else if (id == "mst_insDit")   mixerEngine.masterInsertParams.drvDither  = v;
-    else if (id == "mst_insTon")   mixerEngine.masterInsertParams.driveTone  = v;
-    else if (id == "mst_insMid")   mixerEngine.masterInsertParams.eqMidGain  = v;
-    else if (id == "mst_ins2Char") mixerEngine.masterInsertParams2.driveChar  = juce::jlimit(0, 12, (int)v);
-    else if (id == "mst_ins2Drv")  mixerEngine.masterInsertParams2.driveDrive = v;
-    else if (id == "mst_ins2Out")  mixerEngine.masterInsertParams2.driveOutput= v;
-    else if (id == "mst_ins2Bits") mixerEngine.masterInsertParams2.drvBits    = v;
-    else if (id == "mst_ins2Rate") mixerEngine.masterInsertParams2.driveRate  = v;
-    else if (id == "mst_ins2Dit")  mixerEngine.masterInsertParams2.drvDither  = v;
-    else if (id == "mst_ins2Ton")  mixerEngine.masterInsertParams2.driveTone  = v;
-    else if (id == "mst_ins2Mid")  mixerEngine.masterInsertParams2.eqMidGain  = v;
+    else if (id == "mst_insChar")  mixerEngine.masterInsertParams.insertAlgo  = juce::jlimit(0, 12, (int)v);
+    else if (id == "mst_insDrv")   mixerEngine.masterInsertParams.insertDrive = v;
+    else if (id == "mst_insOut")   mixerEngine.masterInsertParams.insertOutput= v;
+    else if (id == "mst_insBits")  mixerEngine.masterInsertParams.insertBits    = v;
+    else if (id == "mst_insRate")  mixerEngine.masterInsertParams.insertRate  = v;
+    else if (id == "mst_insDit")   mixerEngine.masterInsertParams.insertDither  = v;
+    else if (id == "mst_insTon")   mixerEngine.masterInsertParams.insertTone  = v;
+    else if (id == "mst_insMid")   mixerEngine.masterInsertParams.insertEqMid  = v;
+    else if (id == "mst_ins2Char") mixerEngine.masterInsertParams2.insertAlgo  = juce::jlimit(0, 12, (int)v);
+    else if (id == "mst_ins2Drv")  mixerEngine.masterInsertParams2.insertDrive = v;
+    else if (id == "mst_ins2Out")  mixerEngine.masterInsertParams2.insertOutput= v;
+    else if (id == "mst_ins2Bits") mixerEngine.masterInsertParams2.insertBits    = v;
+    else if (id == "mst_ins2Rate") mixerEngine.masterInsertParams2.insertRate  = v;
+    else if (id == "mst_ins2Dit")  mixerEngine.masterInsertParams2.insertDither  = v;
+    else if (id == "mst_ins2Ton")  mixerEngine.masterInsertParams2.insertTone  = v;
+    else if (id == "mst_ins2Mid")  mixerEngine.masterInsertParams2.insertEqMid  = v;
 }
 
 //==============================================================================

@@ -515,28 +515,28 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 // pitch.fine is deprecated (#218) — not in map, legacy assignments silently no-op.
                 modParamValues["pitch.semitones"]  = 0.0f;
                 modParamValues["pitch.octave"]     = 0.0f;
-                modParamValues["insert.drive"]     = modParams.driveDrive;
-                modParamValues["insert.output"]    = modParams.driveOutput;
-                modParamValues["insert.bits"]      = modParams.drvBits;
-                modParamValues["insert.rate"]      = (std::log(modParams.driveRate) - std::log(100.0f)) / (std::log(48000.0f) - std::log(100.0f)) * 100.0f;
-                modParamValues["insert.dither"]    = modParams.drvDither;
-                modParamValues["insert.lpf"]       = modParams.driveTone;
+                modParamValues["insert.drive"]     = modParams.insertDrive;
+                modParamValues["insert.output"]    = modParams.insertOutput;
+                modParamValues["insert.bits"]      = modParams.insertBits;
+                modParamValues["insert.rate"]      = (std::log(modParams.insertRate) - std::log(100.0f)) / (std::log(48000.0f) - std::log(100.0f)) * 100.0f;
+                modParamValues["insert.dither"]    = modParams.insertDither;
+                modParamValues["insert.lpf"]       = modParams.insertTone;
                 // #422/#423-followups: algorithm-specific destination seeds, gated
-                // on driveChar so an inactive algorithm's seed stays 0 and the
+                // on insertAlgo so an inactive algorithm's seed stays 0 and the
                 // matrix has nothing to bias the write-back with. Karplus uses
-                // driveDrive=note, drvBits=octave. Vocoder uses drvBits=note+1,
-                // drvDither=octave, driveOutput=encoded unison.
-                const int dc = (int) modParams.driveChar;
+                // insertDrive=note, insertBits=octave. Vocoder uses insertBits=note+1,
+                // insertDither=octave, insertOutput=encoded unison.
+                const int dc = (int) modParams.insertAlgo;
                 if (dc == 11)   // Karplus
                 {
-                    modParamValues["ks.note"]   = modParams.driveDrive;     // 0..6
-                    modParamValues["ks.octave"] = modParams.drvBits;        // 0..3
+                    modParamValues["ks.note"]   = modParams.insertDrive;     // 0..6
+                    modParamValues["ks.octave"] = modParams.insertBits;        // 0..3
                 }
                 else if (dc == 12)   // Vocoder
                 {
-                    modParamValues["voc.note"]   = modParams.drvBits - 1.0f;             // 0..6
-                    modParamValues["voc.octave"] = modParams.drvDither;                  // 1..5
-                    modParamValues["voc.unison"] = (modParams.driveOutput + 24.0f) * 0.25f;   // 0..6
+                    modParamValues["voc.note"]   = modParams.insertBits - 1.0f;             // 0..6
+                    modParamValues["voc.octave"] = modParams.insertDither;                  // 1..5
+                    modParamValues["voc.unison"] = (modParams.insertOutput + 24.0f) * 0.25f;   // 0..6
                 }
                 // #223 new destinations
                 modParamValues["pitch.envDepth"]   = modParams.pitchEnvDepth;
@@ -639,28 +639,28 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParams.pitchMod       = juce::jlimit(-48.0f, 48.0f,
                                                          modParamValues["pitch.octave"]
                                                        + modParamValues["pitch.semitones"]);
-                modParams.driveDrive     = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.drive"]);
-                modParams.driveOutput    = juce::jlimit(-24.0f, 24.0f,    modParamValues["insert.output"]);
-                modParams.drvBits        = juce::jlimit(1.0f,   16.0f,    modParamValues["insert.bits"]);
-                modParams.driveRate      = std::exp(std::log(100.0f) + juce::jlimit(0.0f, 100.0f, modParamValues["insert.rate"]) / 100.0f * (std::log(48000.0f) - std::log(100.0f)));
-                modParams.drvDither      = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.dither"]);
-                modParams.driveTone      = juce::jlimit(20.0f, 20000.0f,  modParamValues["insert.lpf"]);
+                modParams.insertDrive     = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.drive"]);
+                modParams.insertOutput    = juce::jlimit(-24.0f, 24.0f,    modParamValues["insert.output"]);
+                modParams.insertBits        = juce::jlimit(1.0f,   16.0f,    modParamValues["insert.bits"]);
+                modParams.insertRate      = std::exp(std::log(100.0f) + juce::jlimit(0.0f, 100.0f, modParamValues["insert.rate"]) / 100.0f * (std::log(48000.0f) - std::log(100.0f)));
+                modParams.insertDither      = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.dither"]);
+                modParams.insertTone      = juce::jlimit(20.0f, 20000.0f,  modParamValues["insert.lpf"]);
                 // #422/#423-followups: algorithm-specific write-back. Overrides the
                 // generic insert.* write-backs above when the matching algorithm is
                 // active — clamps to the algorithm-facing range. For Vocoder note,
-                // converts back to drvBits storage (note+1). For Vocoder unison,
+                // converts back to insertBits storage (note+1). For Vocoder unison,
                 // converts the voice-index 0..6 back to the encoded -24..0.
                 if (dc == 11)   // Karplus
                 {
-                    modParams.driveDrive = juce::jlimit(0.0f, 6.0f, modParamValues["ks.note"]);
-                    modParams.drvBits    = juce::jlimit(0.0f, 3.0f, modParamValues["ks.octave"]);
+                    modParams.insertDrive = juce::jlimit(0.0f, 6.0f, modParamValues["ks.note"]);
+                    modParams.insertBits    = juce::jlimit(0.0f, 3.0f, modParamValues["ks.octave"]);
                 }
                 else if (dc == 12)   // Vocoder
                 {
-                    modParams.drvBits    = juce::jlimit(1.0f, 7.0f, modParamValues["voc.note"] + 1.0f);
-                    modParams.drvDither  = juce::jlimit(1.0f, 5.0f, modParamValues["voc.octave"]);
+                    modParams.insertBits    = juce::jlimit(1.0f, 7.0f, modParamValues["voc.note"] + 1.0f);
+                    modParams.insertDither  = juce::jlimit(1.0f, 5.0f, modParamValues["voc.octave"]);
                     const float vIdx     = juce::jlimit(0.0f, 6.0f, modParamValues["voc.unison"]);
-                    modParams.driveOutput = vIdx * 4.0f - 24.0f;   // 0→-24, 6→0
+                    modParams.insertOutput = vIdx * 4.0f - 24.0f;   // 0→-24, 6→0
                 }
                 // #223 new destinations write-back
                 modParams.pitchEnvDepth  = juce::jlimit(0.0f,   24.0f,    modParamValues["pitch.envDepth"]);

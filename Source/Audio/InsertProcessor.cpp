@@ -35,7 +35,7 @@ InsertProcessor::InsertProcessor()
     dispatch[6]  = add(std::make_unique<EqInsert>());
 
     // #425: Compressor (7) + Limiter (8) share one CompressorLimiterInsert
-    // instance. Matches the pre-refactor behaviour where both driveChar codes
+    // instance. Matches the pre-refactor behaviour where both insertAlgo codes
     // operated on the same `compEnvelope[2]` state — switching between them
     // mid-bar carried the envelope across rather than resetting it, which is
     // audibly less surprising than a fresh envelope at the moment of switch.
@@ -71,7 +71,7 @@ void InsertProcessor::reset()
 void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh,
                               const VoiceParams& p)
 {
-    const int idx = juce::jlimit(0, kNumAlgorithms - 1, (int) p.driveChar);
+    const int idx = juce::jlimit(0, kNumAlgorithms - 1, (int) p.insertAlgo);
 
     float gr = 0.0f;
     if (auto* algo = dispatch[(size_t) idx])
@@ -79,13 +79,13 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh,
     grReduction.store(gr);
 
     // Post-drive 1-pole LP tone filter — only for the drive-family algorithms
-    // (0..5) where p.driveTone is a cutoff. EQ (6) / Comp (7) / Limiter (8) /
-    // RingMod (9) / TapeSat (10) repurpose driveTone for other meanings and
+    // (0..5) where p.insertTone is a cutoff. EQ (6) / Comp (7) / Limiter (8) /
+    // RingMod (9) / TapeSat (10) repurpose insertTone for other meanings and
     // skip this step.
-    if (p.driveChar < 6 && p.driveTone < 19000.0f && currentSampleRate > 0.0)
+    if (p.insertAlgo < 6 && p.insertTone < 19000.0f && currentSampleRate > 0.0)
     {
         for (int ch = 0; ch < nCh; ++ch)
-            postDriveTone[ch].prepare(p.driveTone, (float) currentSampleRate);
+            postDriveTone[ch].prepare(p.insertTone, (float) currentSampleRate);
 
         for (int ch = 0; ch < nCh; ++ch)
         {
