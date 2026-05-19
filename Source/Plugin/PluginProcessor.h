@@ -254,6 +254,14 @@ public:
         return modSnapshot[rhythmIdx][snapIdx].load();
     }
 
+    // GR-meter pointer for the per-voice compressor/limiter insert UI knob.
+    // Returns nullptr when the rhythm index is out of range or the engine is null.
+    std::atomic<float>* getInsertGRReductionPtr(int ri)
+    {
+        if (ri < 0 || ri >= getNumRhythms() || !voiceEngines[(size_t)ri]) return nullptr;
+        return &voiceEngines[(size_t)ri]->insertProc.grReduction;
+    }
+
     // 128-entry MIDI program-change → .muRhyth preset path map. Public so the UI panel
     // can read/write directly. All mutation is message-thread-only; audio thread reads
     // only the channel mask atomic for gating.

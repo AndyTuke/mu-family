@@ -103,6 +103,10 @@ target_sources(mu-clid
         Source/UI/RhythmSidebar.cpp
         Source/UI/EuclideanPanel.cpp
         Source/UI/VoiceSection.cpp
+        Source/UI/Voice/PitchSubsection.cpp
+        Source/UI/Voice/FilterSubsection.cpp
+        Source/UI/Voice/AmpSubsection.cpp
+        Source/UI/Voice/InsertSubsection.cpp
         Source/UI/ModulatorEditor.cpp
         Source/UI/ModMatrixPanel.cpp
         Source/UI/ModulatorPanel.cpp
