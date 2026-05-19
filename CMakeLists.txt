@@ -317,3 +317,42 @@ add_custom_command(TARGET mu-clid-lite_CLAP POST_BUILD
     COMMENT "Deploying mu-Clid Lite CLAP to OneDrive (Debug skipped)"
     VERBATIM
 )
+
+# ── mu-clid-tests — data-layer regression tests (#442) ───────────────────────
+# Console executable that runs every juce::UnitTest defined in Source/Tests/.
+# Built on-demand only: `cmake --build build --target mu-clid-tests`.
+# Not part of the default ALL_BUILD, so day-to-day plugin development isn't
+# slowed by test compilation. Run the resulting exe — non-zero exit = failures.
+juce_add_console_app(mu-clid-tests
+    PRODUCT_NAME "mu-clid-tests"
+)
+
+target_sources(mu-clid-tests PRIVATE
+    Source/Tests/TestMain.cpp
+    Source/Tests/RhythmParamRoundTripTests.cpp
+)
+
+target_compile_features(mu-clid-tests PRIVATE cxx_std_17)
+
+target_include_directories(mu-clid-tests PRIVATE
+    "${CMAKE_SOURCE_DIR}/Source"
+)
+
+target_link_libraries(mu-clid-tests PRIVATE
+    juce::juce_core
+    juce::juce_data_structures
+    juce::juce_events
+    juce::juce_audio_basics
+    juce::juce_audio_processors
+    juce::juce_recommended_config_flags
+    juce::juce_recommended_lto_flags
+    juce::juce_recommended_warning_flags
+)
+
+target_compile_definitions(mu-clid-tests PRIVATE
+    JUCE_USE_CURL=0
+    JUCE_WEB_BROWSER=0
+)
+
+# Exclude from default build so the test target only builds when asked.
+set_target_properties(mu-clid-tests PROPERTIES EXCLUDE_FROM_ALL TRUE)
