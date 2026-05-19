@@ -13,6 +13,7 @@
 #include "Modulation/ModulationSnapshot.h"
 #include "SamplePreview.h"
 #include "MidiClockSync.h"
+#include "PresetIO.h"
 
 #include <memory>
 #include <vector>
@@ -63,8 +64,8 @@ public:
     const juce::String getProgramName(int index) override;
     void changeProgramName(int index, const juce::String& newName) override;
 
-    void getStateInformation(juce::MemoryBlock& destData) override;
-    void setStateInformation(const void* data, int sizeInBytes) override;
+    void getStateInformation(juce::MemoryBlock& d) override { presetIO.getStateInformation(d); }
+    void setStateInformation(const void* d, int s) override { presetIO.setStateInformation(d, s); }
 
     // internalPlaying / internalBeatPos are touched by both audio (write) and
     // message thread (read + clear). std::atomic<> with relaxed ordering — no other
@@ -148,9 +149,9 @@ public:
 
     // Hot-swap staging: stages a rhythm preset for atomic commit at the next loop boundary.
     // If the sequencer is not playing, applies the preset immediately instead.
-    void stageRhythmPreset (int rhythmIndex, const juce::File& presetFile);
-    void cancelStagedSwap  (int rhythmIndex);
-    bool hasPendingSwap    (int rhythmIndex) const;
+    void stageRhythmPreset(int ri, const juce::File& f)  { presetIO.stageRhythmPreset(ri, f); }
+    void cancelStagedSwap (int ri)                        { presetIO.cancelStagedSwap(ri); }
+    bool hasPendingSwap   (int ri) const                  { return presetIO.hasPendingSwap(ri); }
 
     // fired (on the message thread, from handleAsyncUpdate) after a hot-swap
     // commit finishes. The editor uses this to refresh non-APVTS UI state — name
@@ -192,20 +193,20 @@ public:
     // a proper "Save As" flow before quitting rather than a raw state dump.
     std::function<void(std::function<void()>)> onSaveAndQuit;
 
-    void savePreset(const juce::String& name, const juce::String& description,
-                    const juce::String& category, bool embedSamples = false);
-    void loadPreset(const juce::File& file);
-    void saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFile,
-                                bool embedSample = false, const juce::String& category = {},
-                                const juce::String& description = {});
+    void savePreset(const juce::String& n, const juce::String& d,
+                    const juce::String& c, bool e = false) { presetIO.savePreset(n, d, c, e); }
+    void loadPreset(const juce::File& f)  { presetIO.loadPreset(f); }
+    void saveRhythmPresetToFile(int ri, const juce::File& dest,
+                                bool emb = false, const juce::String& cat = {},
+                                const juce::String& desc = {})
+                                { presetIO.saveRhythmPresetToFile(ri, dest, emb, cat, desc); }
 
-    // Shared preset category list — stored as one-per-line in presetsDir/categories.txt.
-    // loadCategoryList() merges that file with categories discovered from existing preset files.
-    juce::StringArray loadCategoryList() const;
-    void              ensureCategoryInList(const juce::String& cat);
-    bool applyRhythmPreset(const juce::File& file, int rhythmIndex);
-    bool applyDefaultRhythm(int rhythmIndex);
-    void loadDefaultPreset();
+    // Shared preset category list.
+    juce::StringArray loadCategoryList() const   { return presetIO.loadCategoryList(); }
+    void ensureCategoryInList(const juce::String& c) { presetIO.ensureCategoryInList(c); }
+    bool applyRhythmPreset(const juce::File& f, int ri) { return presetIO.applyRhythmPreset(f, ri); }
+    bool applyDefaultRhythm(int ri)              { return presetIO.applyDefaultRhythm(ri); }
+    void loadDefaultPreset()                     { presetIO.loadDefaultPreset(); }
 
     SequencerEngine sequencer;
     // Fixed-size arrays so the audio thread never races with a vector reallocation
@@ -357,11 +358,14 @@ private:
     void pushMixerChannelToAPVTS(int idx);
     void swapAPVTSForRhythms(int i, int j);
     void resetPlayState(int idx);
-    void restoreStateFromTree(const juce::ValueTree& state);
+    void restoreStateFromTree(const juce::ValueTree& s) { presetIO.restoreStateFromTree(s); }
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
     SamplePreview samplePreview;
+    PresetIO      presetIO { *this };
+
+    friend class PresetIO;
 
     // atomic for safe cross-thread access (audio writes, UI reads + clears).
     std::atomic<bool>   internalPlaying   { false };
