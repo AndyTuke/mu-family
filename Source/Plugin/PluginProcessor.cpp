@@ -31,8 +31,6 @@ PluginProcessor::PluginProcessor()
 #endif
       apvts(*this, nullptr, "MuClidState", createParameterLayout())
 {
-    previewFormatManager.registerBasicFormats();
-
     // Initialise ApplicationProperties (needed by getContentDir/getPresetsDir).
     {
         juce::PropertiesFile::Options opts;
@@ -188,14 +186,13 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
     fxChain.prepare(sampleRate, samplesPerBlock);
     mixerEngine.prepare(sampleRate, samplesPerBlock);
-    previewTransport.prepareToPlay(samplesPerBlock, sampleRate);
-    previewScratchBuffer.setSize(2, samplesPerBlock, false, true, true);
+    samplePreview.prepare(samplesPerBlock, sampleRate);
 #endif
 }
 
 void PluginProcessor::releaseResources()
 {
-    previewTransport.releaseResources();
+    samplePreview.releaseResources();
 }
 
 void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
@@ -769,17 +766,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                      buffer.getNumSamples(), effectiveBpm, &directPtrs, fxRetPtr,
                      &retiredDesc);
 
-    // Mix sample preview (for file browser audition) directly into the master output.
-    if (previewTransport.isPlaying())
-    {
-        const int ns = buffer.getNumSamples();
-        previewScratchBuffer.clear(0, 0, ns);
-        previewScratchBuffer.clear(1, 0, ns);
-        previewTransport.getNextAudioBlock({ &previewScratchBuffer, 0, ns });
-        for (int ch = 0; ch < masterBus.getNumChannels(); ++ch)
-            masterBus.addFrom(ch, 0, previewScratchBuffer,
-                              ch % previewScratchBuffer.getNumChannels(), 0, ns, 0.7f);
-    }
+    samplePreview.mixInto(masterBus, buffer.getNumSamples());
 
     for (int r = 0; r < numRhythms; ++r)
         midiEngines[r].processBlock(midiMessages, buffer.getNumSamples());
@@ -999,26 +986,8 @@ void PluginProcessor::loadSampleForRhythm(int rhythmIndex, const juce::File& fil
     loadedSamplePaths.set(rhythmIndex, file.getFullPathName());
 }
 
-void PluginProcessor::startSamplePreview(const juce::File& file)
-{
-    if (!file.existsAsFile()) return;
-    auto* reader = previewFormatManager.createReaderFor(file);
-    if (!reader) return;
-    previewTransport.stop();
-    previewTransport.setSource(nullptr);
-    previewSource = std::make_unique<juce::AudioFormatReaderSource>(reader, true);
-    previewTransport.setSource(previewSource.get(), 0, nullptr,
-                               reader->sampleRate, reader->numChannels);
-    previewTransport.setPosition(0.0);
-    previewTransport.start();
-}
-
-void PluginProcessor::stopSamplePreview()
-{
-    previewTransport.stop();
-    previewTransport.setSource(nullptr);
-    previewSource.reset();
-}
+void PluginProcessor::startSamplePreview(const juce::File& file) { samplePreview.start(file); }
+void PluginProcessor::stopSamplePreview()                        { samplePreview.stop(); }
 
 //==============================================================================
 // Hot-swap: stage a rhythm preset for atomic commit at the next loop boundary.

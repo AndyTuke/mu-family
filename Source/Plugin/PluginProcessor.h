@@ -11,6 +11,7 @@
 #include "Persistence/MidiPresetMap.h"
 #include "MuLimits.h"
 #include "Modulation/ModulationSnapshot.h"
+#include "SamplePreview.h"
 
 #include <memory>
 #include <vector>
@@ -371,11 +372,7 @@ private:
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
-    // Sample preview (for file browser audition — routes through master output).
-    juce::AudioFormatManager previewFormatManager;
-    juce::AudioTransportSource previewTransport;
-    std::unique_ptr<juce::AudioFormatReaderSource> previewSource;
-    juce::AudioBuffer<float> previewScratchBuffer;
+    SamplePreview samplePreview;
 
     // atomic for safe cross-thread access (audio writes, UI reads + clears).
     std::atomic<bool>   internalPlaying   { false };

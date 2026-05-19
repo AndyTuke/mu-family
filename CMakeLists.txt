@@ -88,6 +88,7 @@ target_sources(mu-clid
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginProcessor_APVTS.cpp
         Source/Plugin/PluginProcessor_Preset.cpp
+        Source/Plugin/SamplePreview.cpp
         Source/Plugin/PluginEditor.cpp
         Source/Persistence/MidiPresetMap.cpp
         Source/Sequencer/EuclideanGenerator.cpp
@@ -226,6 +227,7 @@ target_sources(mu-clid-lite
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginProcessor_APVTS.cpp
         Source/Plugin/PluginProcessor_Preset.cpp
+        Source/Plugin/SamplePreview.cpp
         Source/Plugin/LiteEditor.cpp
         Source/Persistence/MidiPresetMap.cpp
         Source/Sequencer/EuclideanGenerator.cpp
