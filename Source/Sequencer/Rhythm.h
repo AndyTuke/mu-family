@@ -19,32 +19,6 @@ struct EuclidOverrides
 class Rhythm : public VoiceSlot
 {
 public:
-    Rhythm() : VoiceSlot() {}
-
-    // std::atomic<bool> in VoiceSlot is non-copyable — delegate to VoiceSlot's copy ops.
-    Rhythm(const Rhythm& other)
-        : VoiceSlot(other),
-          genA(other.genA), genB(other.genB), genC(other.genC),
-          logic(other.logic),
-          resetSteps(other.resetSteps),
-          patternLegato(other.patternLegato)
-    {}
-
-    Rhythm& operator=(const Rhythm& other)
-    {
-        if (this != &other)
-        {
-            VoiceSlot::operator=(other);
-            genA          = other.genA;
-            genB          = other.genB;
-            genC          = other.genC;
-            logic         = other.logic;
-            resetSteps    = other.resetSteps;
-            patternLegato = other.patternLegato;
-        }
-        return *this;
-    }
-
     HitGenerator        genA;
     HitGenerator        genB;
     HitGenerator        genC;  // accent pattern (full controls: steps/hits/rot + pads + insert)

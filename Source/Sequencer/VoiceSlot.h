@@ -9,6 +9,27 @@
 #include <string>
 #include <vector>
 
+// Spin-lock backed by std::atomic<bool> with copy-safe semantics.
+// Copies always produce a new, unlocked instance — the lock state is never
+// transferred, since each copy is an independent object.
+// Forwarding the atomic interface lets call sites use .exchange/.store/.compare_exchange_strong
+// directly; take the underlying atomic via .v when a std::atomic<bool>* is needed.
+struct CopyableSpinLock
+{
+    mutable std::atomic<bool> v { false };
+
+    CopyableSpinLock() = default;
+    CopyableSpinLock(const CopyableSpinLock&) noexcept {}
+    CopyableSpinLock& operator=(const CopyableSpinLock&) noexcept { return *this; }
+
+    bool exchange(bool val, std::memory_order mo) const noexcept
+        { return v.exchange(val, mo); }
+    void store(bool val, std::memory_order mo) const noexcept
+        { v.store(val, mo); }
+    bool compare_exchange_strong(bool& expected, bool desired, std::memory_order mo) const noexcept
+        { return v.compare_exchange_strong(expected, desired, mo); }
+};
+
 // Base struct shared by all mu-family voice slots.
 // Rhythm (mu-clid) extends this with Euclidean hit generators.
 // Future mu-tant voice types extend it with their own trigger data.
@@ -23,37 +44,13 @@ struct VoiceSlot
             controlSequences[i].id = "cs" + std::to_string(i);
     }
 
-    // std::atomic<bool> is non-copyable — provide explicit copy operations.
-    // The lock is not copied; copies always start unlocked.
-    VoiceSlot(const VoiceSlot& other)
-        : voiceParams(other.voiceParams),
-          controlSequences(other.controlSequences),
-          modulationMatrix(other.modulationMatrix),
-          name(other.name),
-          colourIndex(other.colourIndex)
-    {}
-
-    VoiceSlot& operator=(const VoiceSlot& other)
-    {
-        if (this != &other)
-        {
-            voiceParams      = other.voiceParams;
-            controlSequences = other.controlSequences;
-            modulationMatrix = other.modulationMatrix;
-            name             = other.name;
-            colourIndex      = other.colourIndex;
-            // modLock intentionally not copied — target stays in its current state.
-        }
-        return *this;
-    }
-
     VoiceParams                   voiceParams;
     std::vector<ControlSequence>  controlSequences;
     ModulationMatrix              modulationMatrix;
 
     // Spin-lock protecting modulationMatrix and controlSequences from concurrent
     // message-thread writes and audio-thread reads.
-    mutable std::atomic<bool> modLock { false };
+    mutable CopyableSpinLock modLock;
 
     std::string name        = "<unnamed>";
     int         colourIndex = 0;   // index into the 30-colour palette
