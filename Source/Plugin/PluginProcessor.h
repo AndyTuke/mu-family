@@ -14,6 +14,7 @@
 #include "SamplePreview.h"
 #include "MidiClockSync.h"
 #include "PresetIO.h"
+#include "HotSwapStager.h"
 
 #include <memory>
 #include <vector>
@@ -150,8 +151,8 @@ public:
     // Hot-swap staging: stages a rhythm preset for atomic commit at the next loop boundary.
     // If the sequencer is not playing, applies the preset immediately instead.
     void stageRhythmPreset(int ri, const juce::File& f)  { presetIO.stageRhythmPreset(ri, f); }
-    void cancelStagedSwap (int ri)                        { presetIO.cancelStagedSwap(ri); }
-    bool hasPendingSwap   (int ri) const                  { return presetIO.hasPendingSwap(ri); }
+    void cancelStagedSwap (int ri)                        { hotSwapStager.cancelStagedSwap(ri); }
+    bool hasPendingSwap   (int ri) const                  { return hotSwapStager.hasPendingSwap(ri); }
 
     // fired (on the message thread, from handleAsyncUpdate) after a hot-swap
     // commit finishes. The editor uses this to refresh non-APVTS UI state — name
@@ -261,24 +262,7 @@ public:
 private:
     std::array<std::atomic<float>, kSnapCount> modSnapshot[SequencerEngine::MaxRhythms];
 
-    // Hot-swap state: message thread writes pendingRhythm/pendingVoice, then sets isReady.
-    // Audio thread detects a loop boundary, sets boundaryReached, triggers handleAsyncUpdate.
-    // handleAsyncUpdate runs on message thread and performs the actual swap.
-    struct PendingRhythmSwap
-    {
-        Rhythm                       pendingRhythm;
-        juce::String                 pendingSamplePath;
-        std::unique_ptr<VoiceEngine> pendingVoice;
-        std::atomic<bool> isReady         { false }; // set by message thread after staging
-        std::atomic<bool> boundaryReached { false }; // set by audio thread at loop boundary
-
-        PendingRhythmSwap() = default;
-        PendingRhythmSwap(const PendingRhythmSwap&) = delete;
-        PendingRhythmSwap& operator=(const PendingRhythmSwap&) = delete;
-    };
-
-    std::array<PendingRhythmSwap, SequencerEngine::MaxRhythms> pendingSwaps;
-    std::atomic<int> swapModeAtomic { 0 }; // 0 = OnMasterLoop, 1 = OnRhythmLoop
+    std::atomic<int> swapModeAtomic { 0 }; // 0 = OnMasterLoop, 1 = OnRhythmLoop; read by HotSwapStager
 
     // MIDI program-change queue: audio thread enqueues on incoming program-change,
     // handleAsyncUpdate (message thread) drains and calls stageRhythmPreset.
@@ -362,10 +346,12 @@ private:
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
-    SamplePreview samplePreview;
-    PresetIO      presetIO { *this };
+    SamplePreview  samplePreview;
+    PresetIO       presetIO      { *this };
+    HotSwapStager  hotSwapStager { *this };
 
     friend class PresetIO;
+    friend class HotSwapStager;
 
     // atomic for safe cross-thread access (audio writes, UI reads + clears).
     std::atomic<bool>   internalPlaying   { false };

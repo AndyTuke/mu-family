@@ -165,12 +165,8 @@ void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file)
         return;
     }
 
-    auto& sw = proc_.pendingSwaps[rhythmIndex];
-
     // Cancel any existing staged swap before overwriting.
-    sw.isReady.store(false, std::memory_order_release);
-    sw.boundaryReached.store(false, std::memory_order_relaxed);
-    sw.pendingVoice.reset();
+    proc_.hotSwapStager.cancelPendingIfAny(rhythmIndex);
 
     // Start from the current rhythm and apply the preset on top (matching applyRhythmPreset).
     Rhythm newRhythm = proc_.sequencer.getRhythm(rhythmIndex);
@@ -294,27 +290,8 @@ void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file)
         }
     }
 
-    // Commit the staged data; set isReady last (release barrier).
-    sw.pendingRhythm     = std::move(newRhythm);
-    sw.pendingSamplePath = samplePath;
-    sw.pendingVoice      = std::move(newVoice);
-    sw.boundaryReached.store(false, std::memory_order_relaxed);
-    sw.isReady.store(true, std::memory_order_release);
-}
-
-void PresetIO::cancelStagedSwap(int rhythmIndex)
-{
-    if (rhythmIndex < 0 || rhythmIndex >= SequencerEngine::MaxRhythms) return;
-    auto& sw = proc_.pendingSwaps[rhythmIndex];
-    sw.isReady.store(false, std::memory_order_release);
-    sw.boundaryReached.store(false, std::memory_order_relaxed);
-    sw.pendingVoice.reset();
-}
-
-bool PresetIO::hasPendingSwap(int rhythmIndex) const
-{
-    if (rhythmIndex < 0 || rhythmIndex >= SequencerEngine::MaxRhythms) return false;
-    return proc_.pendingSwaps[rhythmIndex].isReady.load(std::memory_order_relaxed);
+    // Commit the staged data via HotSwapStager.
+    proc_.hotSwapStager.stage(rhythmIndex, std::move(newRhythm), std::move(newVoice), samplePath);
 }
 
 //==============================================================================

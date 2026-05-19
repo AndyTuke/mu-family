@@ -13,10 +13,8 @@ class PresetIO
 public:
     explicit PresetIO(PluginProcessor& proc) : proc_(proc) {}
 
-    // Hot-swap staging (pending move to HotSwapStager in #475).
+    // Hot-swap staging: loads a preset file and stages it via HotSwapStager.
     void stageRhythmPreset(int rhythmIndex, const juce::File& file);
-    void cancelStagedSwap(int rhythmIndex);
-    bool hasPendingSwap(int rhythmIndex) const;
 
     // Preset category list.
     juce::StringArray loadCategoryList() const;

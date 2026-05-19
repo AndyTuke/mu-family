@@ -385,24 +385,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             }
 
         // Hot-swap: check if any staged rhythm preset should be committed at this boundary.
-        const int mode = swapModeAtomic.load(std::memory_order_relaxed);
-        bool needAsync = false;
-        for (int r = 0; r < numRhythms; ++r)
-        {
-            auto& sw = pendingSwaps[r];
-            if (sw.isReady.load(std::memory_order_acquire)
-                && !sw.boundaryReached.load(std::memory_order_relaxed))
-            {
-                const bool wrap = (mode == 0) ? blockResult.masterLoopWrapped
-                                              : ((blockResult.rhythmLoopWrapMask & (1 << r)) != 0);
-                if (wrap)
-                {
-                    sw.boundaryReached.store(true, std::memory_order_release);
-                    needAsync = true;
-                }
-            }
-        }
-        if (needAsync)
+        if (hotSwapStager.checkBoundaries(numRhythms, blockResult.masterLoopWrapped,
+                                          blockResult.rhythmLoopWrapMask))
             triggerAsyncUpdate();
 
         // Update UI play-state atomics.
@@ -944,163 +928,10 @@ void PluginProcessor::stopSamplePreview()                        { samplePreview
 // or a MIDI program change was queued.
 void PluginProcessor::handleAsyncUpdate()
 {
-    const int n = numActiveRhythms.load(std::memory_order_acquire);
+    // Drain retired engines + commit pending swaps (both sides of the hot-swap lifecycle).
+    hotSwapStager.processSwaps();
 
-    // Stage 34 Step 2: drain retired-engine cleanup flags. Audio thread store-
-    // releases the per-slot flag once VoiceEngine::isFullyDrained() returns
-    // true; the move-out below transfers ownership to a local that destructs
-    // off the RT thread. suspendProcessing fences the audio thread so it
-    // cannot be mid-process() on the engine when the unique_ptr is yanked
-    // (non-atomic raw-ptr access through std::unique_ptr would otherwise UAF).
-    // Empty-fast-path: a single non-suspending scan skips the suspend cost
-    // when no engines need cleanup, which is every block in Step 2 (no
-    // populator yet) and the steady state in Steps 3+.
-    bool anyCleanupNeeded = false;
-    for (auto& slotArr : retiredReadyForCleanup)
-    {
-        for (auto& flag : slotArr)
-            if (flag.load(std::memory_order_acquire)) { anyCleanupNeeded = true; break; }
-        if (anyCleanupNeeded) break;
-    }
-    if (anyCleanupNeeded)
-    {
-        std::array<std::unique_ptr<VoiceEngine>,
-                   SequencerEngine::MaxRhythms * kMaxRetiredEngines> orphans;
-        int orphanCount = 0;
-        suspendProcessing(true);
-        for (int r = 0; r < (int)retiredReadyForCleanup.size(); ++r)
-        {
-            for (int i = 0; i < kMaxRetiredEngines; ++i)
-            {
-                if (!retiredReadyForCleanup[(size_t)r][(size_t)i]
-                        .load(std::memory_order_acquire))
-                    continue;
-                orphans[(size_t)orphanCount++] =
-                    std::move(retiredVoiceEngines[(size_t)r][(size_t)i]);
-                retiredReadyForCleanup[(size_t)r][(size_t)i]
-                    .store(false, std::memory_order_release);
-            }
-        }
-        suspendProcessing(false);
-        // `orphans` destructs at scope exit — fully off the audio thread.
-    }
-
-    // two-pass to suspend audio ONCE per call. The prior per-rhythm loop
-    // called suspendProcessing(true/false) up to 8 times — each suspend blocks
-    // the message thread until the in-flight audio block finishes, so a MIDI
-    // program-change burst hitting multiple slots could stall the message
-    // thread for ~80 ms and produce N audible dropouts. Pass 1 collects all
-    // ready slots; pass 2 swaps them under one suspend; pass 3 does the post-
-    // commit APVTS push + UI callback outside the suspend.
-    // Stack-allocated fixed-cap buffer (MaxRhythms = 8 — no heap alloc).
-    std::array<int, SequencerEngine::MaxRhythms> readyRhythms {};
-    int readyCount = 0;
-    for (int r = 0; r < n; ++r)
-    {
-        auto& sw = pendingSwaps[r];
-        if (!sw.boundaryReached.load(std::memory_order_acquire)) continue;
-        // isReady may have been cleared by cancelStagedSwap between the audio thread
-        // setting boundaryReached and this handler running — skip if so.
-        if (!sw.isReady.load(std::memory_order_relaxed))
-        {
-            sw.boundaryReached.store(false, std::memory_order_relaxed);
-            continue;
-        }
-        readyRhythms[(size_t)readyCount++] = r;
-    }
-
-    if (readyCount > 0)
-    {
-        suspendProcessing(true);
-        for (int idx = 0; idx < readyCount; ++idx)
-        {
-            const int r = readyRhythms[(size_t)idx];
-            auto& sw = pendingSwaps[r];
-
-            // Stage 34 Step 3: retire-then-swap instead of destroy-by-overwrite.
-            // The old engine's in-flight sample / amp envelope continues
-            // rendering from a retired slot (Step 2 wired the render loop), so
-            // sustained material — pads, long crashes, comb-decay — tails out
-            // naturally instead of getting cut to silence at the loop boundary.
-            // When the retired engine's voices finish and ampEnv goes idle,
-            // isFullyDrained() returns true; the audio thread store-releases
-            // the cleanup flag and the next handleAsyncUpdate destroys it off
-            // the RT thread (see the drain block above). Frozen state: no
-            // parameter writes / triggers / APVTS sync hit the retired engine
-            // — only the active `voiceEngines[r]` slot is updated downstream.
-            auto oldEngine = std::move(voiceEngines[r]);
-            voiceEngines[r] = std::move(sw.pendingVoice);
-
-            if (oldEngine)
-            {
-                // Stage 34 Step 3 fix: prepare the engine for drain. Must
-                // happen BEFORE placement so the engine is already in its
-                // released / filter-reset state by the time the next audio
-                // block picks it up from the retired slot.
-                oldEngine->markRetired();
-
-                bool placed = false;
-                for (auto& slot : retiredVoiceEngines[(size_t)r])
-                {
-                    if (!slot)
-                    {
-                        slot = std::move(oldEngine);
-                        placed = true;
-                        break;
-                    }
-                }
-                if (!placed)
-                {
-                    // All kMaxRetiredEngines slots full — spam-swap back-pressure.
-                    // Force-cut the occupant of slot 0 (simplest "oldest" pick —
-                    // could track timestamps if a real complaint surfaces). The
-                    // displaced engine gets the pre-Stage-34 abrupt cut treatment
-                    // for this one swap; the system stays stable. We're under
-                    // suspendProcessing, so the destroy here is off the audio
-                    // thread by definition. Also reset the corresponding cleanup
-                    // flag in case the displaced engine had already signalled
-                    // ready (a stale `true` would cause the next drain to do a
-                    // wasted suspend-and-move on the freshly placed engine).
-                    retiredVoiceEngines[(size_t)r][0] = std::move(oldEngine);
-                    retiredReadyForCleanup[(size_t)r][0]
-                        .store(false, std::memory_order_release);
-                }
-            }
-
-            // move-assign — Rhythm carries vectors of ControlSequences +
-            // ModulationMatrix assignments; the prior copy-assign deep-copied them
-            // all every commit, all under suspendProcessing (= audio paused).
-            sequencer.getRhythm(r) = std::move(sw.pendingRhythm);
-            loadedSamplePaths.set(r, sw.pendingSamplePath);
-            sequencer.updatePattern(r);
-            // tell the snapshot pass to fire the new pattern's current step
-            // instead of absorbing it. The swap IS step-aligned (cued at the loop
-            // wrap), so absorbing — which exists to guard against retroactive
-            // triggers from mid-step knob changes — drops a hit that the user
-            // explicitly cued. Sentinel -1 takes the same skip-absorb path that
-            // added for cold-start.
-            sequencer.resetStepTrackingForSwap(r);
-            sw.isReady.store(false, std::memory_order_relaxed);
-            sw.boundaryReached.store(false, std::memory_order_relaxed);
-        }
-        suspendProcessing(false);
-
-        // Post-commit: APVTS push + editor refresh. ONE guard for the whole batch
-        // so every panel's parameterChanged sees apvtsLoading=true (#391/#393).
-        mu_core::ScopedApvtsLoading guard(apvtsLoading);
-        for (int idx = 0; idx < readyCount; ++idx)
-        {
-            const int r = readyRhythms[(size_t)idx];
-            pushRhythmToAPVTS(r);
-            // notify the editor so it can refresh non-APVTS state (name label,
-            // sample bar, colour tint). pushRhythmToAPVTS covers parameter-backed
-            // fields via the APVTS listener path; this covers everything else.
-            if (onRhythmHotSwapCommitted)
-                onRhythmHotSwapCommitted(r);
-        }
-    }
-
-    // Drain MIDI program-change queue. Each event stages a rhythm preset; the existing
+    // Drain MIDI program-change queue. Each event stages a rhythm preset; the
     // stageRhythmPreset path handles loop-boundary timing or applies immediately if stopped.
     {
         const int ready = pcFifo.getNumReady();
