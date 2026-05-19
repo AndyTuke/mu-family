@@ -12,6 +12,7 @@
 #include "MuLimits.h"
 #include "Modulation/ModulationSnapshot.h"
 #include "SamplePreview.h"
+#include "MidiClockSync.h"
 
 #include <memory>
 #include <vector>
@@ -79,8 +80,8 @@ public:
     double getInternalBpm()      const { return internalBpm; }
     double getInternalBeatPos()  const
     {
-        if (midiSyncEnabled.load(std::memory_order_relaxed) && midiClockIsPlaying.load())
-            return midiClockBeatPosUI.load(std::memory_order_relaxed);
+        if (midiClockSync.isEnabled() && midiClockSync.isPlaying())
+            return midiClockSync.getBeatPosUI();
         return internalBeatPos.load(std::memory_order_relaxed);
     }
 
@@ -98,11 +99,11 @@ public:
 
     // MIDI clock sync (standalone only).
     void   setMidiSyncEnabled(bool on);
-    bool   getMidiSyncEnabled()  const { return midiSyncEnabled.load(std::memory_order_relaxed); }
+    bool   getMidiSyncEnabled()  const { return midiClockSync.isEnabled(); }
     void   setMidiSyncMessages(int mode);
-    int    getMidiSyncMessages() const { return midiSyncMessages.load(std::memory_order_relaxed); }
-    bool   isMidiClockPlaying()  const { return midiClockIsPlaying.load(); }
-    double getMidiClockBpm()     const { return midiClockBpmEst.load(); }
+    int    getMidiSyncMessages() const { return midiClockSync.getMessages(); }
+    bool   isMidiClockPlaying()  const { return midiClockSync.isPlaying(); }
+    double getMidiClockBpm()     const { return midiClockSync.getBpm(); }
 
     void    addRhythm    (const Rhythm& r);
     void    removeRhythm (int index);
@@ -314,19 +315,7 @@ private:
     // persisted to appSettings so it survives across plugin instances.
     std::atomic<bool> multiBusEnabled { true };
 
-    // MIDI clock sync state (standalone only).
-    // Atomics are written by either thread; plain members are audio-thread only.
-    std::atomic<bool> midiSyncEnabled  { false };
-    std::atomic<int>  midiSyncMessages { 2 };         // 0=clock, 1=transport, 2=both
-    std::atomic<bool>   midiClockIsPlaying  { false };
-    std::atomic<double> midiClockBpmEst     { 120.0 };
-    std::atomic<double>  midiClockBeatPosUI  { 0.0 };  // written by audio thread, read by UI
-    // Audio-thread-only:
-    double midiClockBeatPos              = 0.0;
-    int    midiClockSamplesSinceLastTick = 0;
-    std::array<int, 24> midiClockTickIntervals {};
-    int    midiClockRingHead             = 0;
-    int    midiClockRingCount            = 0;
+    MidiClockSync midiClockSync;
 
     // Pre-allocated modulation parameter map — reused every block to avoid audio-thread allocation.
     // Keys match ModDest::ids. Values are initialised in constructor and updated each block.

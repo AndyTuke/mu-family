@@ -44,10 +44,8 @@ PluginProcessor::PluginProcessor()
     }
 
     // Load MIDI sync settings.
-    midiSyncEnabled .store(appSettings->getBoolValue("midiSyncEnabled",  false),
-                           std::memory_order_relaxed);
-    midiSyncMessages.store(appSettings->getIntValue ("midiSyncMessages", 2),
-                           std::memory_order_relaxed);
+    midiClockSync.setEnabled (appSettings->getBoolValue("midiSyncEnabled",  false));
+    midiClockSync.setMessages(appSettings->getIntValue ("midiSyncMessages", 2));
 
     // Load MIDI program-change preset map (lives in its own JSON file).
     midiPresetMap.load();
@@ -285,57 +283,10 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 #else
 
     // MIDI clock sync: scan system real-time messages before beat-pos determination.
-    double midiClockBlockBeatPos = 0.0;
-    if (midiSyncEnabled.load(std::memory_order_relaxed) && wrapperType == wrapperType_Standalone)
-    {
-        const bool doTick      = (midiSyncMessages.load(std::memory_order_relaxed) != 1);
-        const bool doTransport = (midiSyncMessages.load(std::memory_order_relaxed) != 0);
-        const int  numSamples  = buffer.getNumSamples();
-        midiClockBlockBeatPos  = midiClockBeatPos;  // start-of-block position
-        int prevTickSo = 0;
-
-        for (const auto& msgRef : midiMessages)
-        {
-            const auto& m = msgRef.getMessage();
-            if (m.getRawDataSize() != 1) continue;
-            const juce::uint8 b  = m.getRawData()[0];
-            const int   so = msgRef.samplePosition;
-
-            if (doTransport)
-            {
-                if (b == 0xFA)
-                {
-                    midiClockBeatPos = 0.0;  midiClockBlockBeatPos = 0.0;
-                    midiClockRingCount = 0;  midiClockSamplesSinceLastTick = 0;
-                    prevTickSo = 0;
-                    midiClockIsPlaying.store(true);
-                }
-                else if (b == 0xFB) { midiClockIsPlaying.store(true); }
-                else if (b == 0xFC) { midiClockIsPlaying.store(false); }
-            }
-
-            if (doTick && b == 0xF8)
-            {
-                const int interval = midiClockSamplesSinceLastTick + (so - prevTickSo);
-                if (midiClockRingCount > 0 && interval > 10)
-                {
-                    midiClockTickIntervals[midiClockRingHead] = interval;
-                    midiClockRingHead = (midiClockRingHead + 1) % 24;
-                    if (midiClockRingCount < 24) ++midiClockRingCount;
-                    double sum = 0.0;
-                    for (int i = 0; i < midiClockRingCount; ++i) sum += midiClockTickIntervals[i];
-                    midiClockBpmEst.store(juce::jlimit(20.0, 300.0,
-                        60.0 * currentSampleRate / ((sum / midiClockRingCount) * 24.0)));
-                }
-                else if (midiClockRingCount == 0) { ++midiClockRingCount; }
-                midiClockSamplesSinceLastTick = 0;
-                prevTickSo = so;
-                midiClockBeatPos += 1.0 / 24.0;
-            }
-        }
-        midiClockSamplesSinceLastTick += numSamples - prevTickSo;
-        midiClockBeatPosUI.store(midiClockBeatPos, std::memory_order_relaxed);
-    }
+    const double midiClockBlockBeatPos =
+        (wrapperType == wrapperType_Standalone)
+            ? midiClockSync.process(midiMessages, buffer.getNumSamples(), currentSampleRate)
+            : 0.0;
 
     // MIDI program change → rhythm preset (channel N → slot N-1, program = preset index).
     // Audio thread enqueues into a lock-free FIFO; handleAsyncUpdate drains on the message
@@ -379,9 +330,9 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         }
     }
 
-    if (!playing && midiSyncEnabled.load(std::memory_order_relaxed)
+    if (!playing && midiClockSync.isEnabled()
                  && wrapperType == wrapperType_Standalone
-                 && (midiClockIsPlaying.load() || internalPlaying.load(std::memory_order_relaxed)))
+                 && (midiClockSync.isPlaying() || internalPlaying.load(std::memory_order_relaxed)))
     {
         playing = true;
         beatPos = midiClockBlockBeatPos;
@@ -718,10 +669,10 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         if (auto pos = ph->getPosition())
             if (auto hostBpm = pos->getBpm())
                 effectiveBpm = *hostBpm;
-    if (midiSyncEnabled.load(std::memory_order_relaxed)
+    if (midiClockSync.isEnabled()
         && wrapperType == wrapperType_Standalone
-        && midiClockIsPlaying.load())
-        effectiveBpm = midiClockBpmEst.load();
+        && midiClockSync.isPlaying())
+        effectiveBpm = midiClockSync.getBpm();
     // Gather the host's output bus buffers. Buses we declared in BusesProperties may
     // be disabled in the host's chosen layout — skip those (the channel routes silently).
     auto masterBus = getBusBuffer(buffer, false, kMasterBusIndex);
@@ -927,15 +878,14 @@ void PluginProcessor::renameRhythm(int index, const juce::String& newName)
 //==============================================================================
 void PluginProcessor::setMidiSyncEnabled(bool on)
 {
-    midiSyncEnabled.store(on, std::memory_order_relaxed);
-    if (!on) midiClockIsPlaying.store(false);
+    midiClockSync.setEnabled(on);
     appSettings->setValue("midiSyncEnabled", on);
     appSettings->saveIfNeeded();
 }
 
 void PluginProcessor::setMidiSyncMessages(int mode)
 {
-    midiSyncMessages.store(juce::jlimit(0, 2, mode), std::memory_order_relaxed);
+    midiClockSync.setMessages(mode);
     appSettings->setValue("midiSyncMessages", mode);
     appSettings->saveIfNeeded();
 }
