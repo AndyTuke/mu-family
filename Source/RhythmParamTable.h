@@ -25,6 +25,7 @@
 
 #include <juce_core/juce_core.h>
 #include "Sequencer/Rhythm.h"
+#include "Audio/AlgorithmNames.h"   // Stage 35: kInsertAlgorithmNames / kFilterTypeNames
 
 namespace mu_pp {
 
@@ -32,6 +33,18 @@ namespace mu_pp {
 // declared at the top of PluginProcessor_Internal.h; duplicated here so this
 // header is self-contained.
 inline float adsrSusLocal(float v) noexcept { return juce::jlimit(0.0f, 1.0f, v / 100.0f); }
+
+// Stage 35 Step 1: per-param type tag drives the v2 preset format. Apply / push
+// always operate in display-scale float — this just controls how the value is
+// serialised to / parsed from XML and (for AlgorithmIndex kinds) which name
+// table is used to map back and forth to a stable string ID.
+enum class ParamKind
+{
+    Float,            // generic continuous value; written as XML float
+    Int,              // integer; written as XML int (steps, pitch octave, etc.)
+    Bool,             // boolean; written as XML "true" / "false"
+    AlgorithmIndex,   // categorical; written as the stable name from algorithmNames
+};
 
 struct RhythmParamDef
 {
@@ -44,32 +57,39 @@ struct RhythmParamDef
     // pushRhythmToAPVTS to mirror the in-memory state to APVTS after a
     // hot-swap commit / preset load.
     float (*push)(const Rhythm& r);
+    // Stage 35: param type + algorithm name table (for AlgorithmIndex kinds).
+    // Default Float/nullptr keeps existing entries working until we backfill
+    // the right kind below.
+    ParamKind          kind            = ParamKind::Float;
+    const char* const* algorithmNames  = nullptr;
 };
 
 // Expand all nine HitGen suffixes for one letter (A / B / C). Suffixes:
 // stepsX, hitsX, rotX, prePadX, postPadX, insStX, insLenX, insModeX,
 // prePadModeX, postPadModeX. Insert / pad MODE bools encode Mute=1 / Pad=0.
+// Stage 35: kind tags drive the v2 preset format — integer counts become
+// `<r0_stepsA value="16"/>`, mode bools become `value="true"/"false"`.
 #define MU_HITGEN_ENTRIES(L)                                                                                                                                                       \
     { "steps" #L,       [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.steps        = juce::jlimit(1, 64, (int)v); pd = true; },                                                \
-                        [](const Rhythm& r) -> float { return (float) r.gen##L.steps; } },                                                                                          \
+                        [](const Rhythm& r) -> float { return (float) r.gen##L.steps; },        ParamKind::Int },                                                                   \
     { "hits"  #L,       [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.hits         = juce::jlimit(0, 64, (int)v); pd = true; },                                                \
-                        [](const Rhythm& r) -> float { return (float) r.gen##L.hits; } },                                                                                           \
+                        [](const Rhythm& r) -> float { return (float) r.gen##L.hits; },         ParamKind::Int },                                                                   \
     { "rot"   #L,       [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.rotate       = (int)v;                      pd = true; },                                                \
-                        [](const Rhythm& r) -> float { return (float) r.gen##L.rotate; } },                                                                                         \
+                        [](const Rhythm& r) -> float { return (float) r.gen##L.rotate; },       ParamKind::Int },                                                                   \
     { "prePad" #L,      [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.prePad       = juce::jlimit(0, 12, (int)v); pd = true; },                                                \
-                        [](const Rhythm& r) -> float { return (float) r.gen##L.prePad; } },                                                                                         \
+                        [](const Rhythm& r) -> float { return (float) r.gen##L.prePad; },       ParamKind::Int },                                                                   \
     { "postPad" #L,     [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.postPad      = juce::jlimit(0, 12, (int)v); pd = true; },                                                \
-                        [](const Rhythm& r) -> float { return (float) r.gen##L.postPad; } },                                                                                        \
+                        [](const Rhythm& r) -> float { return (float) r.gen##L.postPad; },      ParamKind::Int },                                                                   \
     { "insSt" #L,       [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.insertStart  = juce::jlimit(0, 63, (int)v); pd = true; },                                                \
-                        [](const Rhythm& r) -> float { return (float) r.gen##L.insertStart; } },                                                                                    \
+                        [](const Rhythm& r) -> float { return (float) r.gen##L.insertStart; },  ParamKind::Int },                                                                   \
     { "insLen" #L,      [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.insertLength = juce::jlimit(0,  8, (int)v); pd = true; },                                                \
-                        [](const Rhythm& r) -> float { return (float) r.gen##L.insertLength; } },                                                                                   \
+                        [](const Rhythm& r) -> float { return (float) r.gen##L.insertLength; }, ParamKind::Int },                                                                   \
     { "insMode" #L,     [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.insertMode   = v > 0.5f ? InsertMode::Mute : InsertMode::Pad; pd = true; },                              \
-                        [](const Rhythm& r) -> float { return r.gen##L.insertMode  == InsertMode::Mute ? 1.0f : 0.0f; } },                                                          \
+                        [](const Rhythm& r) -> float { return r.gen##L.insertMode  == InsertMode::Mute ? 1.0f : 0.0f; }, ParamKind::Bool },                                         \
     { "prePadMode" #L,  [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.prePadMode   = v > 0.5f ? InsertMode::Mute : InsertMode::Pad; pd = true; },                              \
-                        [](const Rhythm& r) -> float { return r.gen##L.prePadMode  == InsertMode::Mute ? 1.0f : 0.0f; } },                                                          \
+                        [](const Rhythm& r) -> float { return r.gen##L.prePadMode  == InsertMode::Mute ? 1.0f : 0.0f; }, ParamKind::Bool },                                         \
     { "postPadMode" #L, [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.postPadMode  = v > 0.5f ? InsertMode::Mute : InsertMode::Pad; pd = true; },                              \
-                        [](const Rhythm& r) -> float { return r.gen##L.postPadMode == InsertMode::Mute ? 1.0f : 0.0f; } }
+                        [](const Rhythm& r) -> float { return r.gen##L.postPadMode == InsertMode::Mute ? 1.0f : 0.0f; }, ParamKind::Bool }
 
 inline const RhythmParamDef kRhythmParamDefs[] = {
     // ── HitGen A / B / C ─────────────────────────────────────────────────────
@@ -79,16 +99,16 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
 
     // ── Rhythm-level (sequencer-side, not voiceParams) ───────────────────────
     { "logic",     [](float v, Rhythm& r, bool& pd, bool&)  { r.logic = static_cast<Logic>(juce::jlimit(0, 4, (int)v)); pd = true; },
-                   [](const Rhythm& r) -> float { return (float) r.logic; } },
+                   [](const Rhythm& r) -> float { return (float) r.logic; },                ParamKind::Int },
     // #419 patternLegato is sequencer-level — no engine sync needed.
     { "patLeg",    [](float v, Rhythm& r, bool&, bool&)     { r.patternLegato = (v > 0.5f); },
-                   [](const Rhythm& r) -> float { return r.patternLegato ? 1.0f : 0.0f; } },
+                   [](const Rhythm& r) -> float { return r.patternLegato ? 1.0f : 0.0f; },  ParamKind::Bool },
 
     // ── Pitch ────────────────────────────────────────────────────────────────
     { "pitchOct",  [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.pitchOctave    = juce::jlimit(-4,  4, (int)v); vd = true; },
-                   [](const Rhythm& r) -> float { return (float) r.voiceParams.pitchOctave; } },
+                   [](const Rhythm& r) -> float { return (float) r.voiceParams.pitchOctave; },    ParamKind::Int },
     { "pitchSemi", [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.pitchSemitones = juce::jlimit(-12, 12, (int)v); vd = true; },
-                   [](const Rhythm& r) -> float { return (float) r.voiceParams.pitchSemitones; } },
+                   [](const Rhythm& r) -> float { return (float) r.voiceParams.pitchSemitones; }, ParamKind::Int },
     { "pitchFine", [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.pitchFine      = v; vd = true; },
                    [](const Rhythm& r) -> float { return r.voiceParams.pitchFine; } },
 
@@ -109,11 +129,13 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
                    [](const Rhythm& r) -> float { return r.voiceParams.pitchEnvDepth; } },
     // #221 per-envelope legato (skip reset before noteOn so retriggers don't click).
     { "pEnvLeg",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.pitchEnvLegato = (v > 0.5f); vd = true; },
-                   [](const Rhythm& r) -> float { return r.voiceParams.pitchEnvLegato ? 1.0f : 0.0f; } },
+                   [](const Rhythm& r) -> float { return r.voiceParams.pitchEnvLegato ? 1.0f : 0.0f; },  ParamKind::Bool },
 
     // ── Filter + filter envelope ─────────────────────────────────────────────
+    // Stage 35: fltType is an algorithm selector → string name in v2 preset XML.
     { "fltType",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.filterType   = juce::jlimit(0, 15, (int)v); vd = true; },
-                   [](const Rhythm& r) -> float { return (float) r.voiceParams.filterType; } },
+                   [](const Rhythm& r) -> float { return (float) r.voiceParams.filterType; },
+                   ParamKind::AlgorithmIndex, mu_audio::kFilterTypeNames },
     { "fltCut",    [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.filterCutoff = v; vd = true; },
                    [](const Rhythm& r) -> float { return r.voiceParams.filterCutoff; } },
     { "fltRes",    [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.filterRes    = v; vd = true; },
@@ -130,7 +152,7 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
     { "fEnvDep",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.filterEnvDepth = v; vd = true; },
                    [](const Rhythm& r) -> float { return r.voiceParams.filterEnvDepth; } },
     { "fEnvLeg",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.filterEnvLegato = (v > 0.5f); vd = true; },
-                   [](const Rhythm& r) -> float { return r.voiceParams.filterEnvLegato ? 1.0f : 0.0f; } },
+                   [](const Rhythm& r) -> float { return r.voiceParams.filterEnvLegato ? 1.0f : 0.0f; },  ParamKind::Bool },
 
     // ── Amp + amp envelope ───────────────────────────────────────────────────
     { "ampLvl",    [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.ampLevel    = v; vd = true; },
@@ -147,13 +169,15 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
     { "aEnvRel",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.ampEnvRel = v; r.voiceParams.ampRelToEnd = (v >= 10.0f); vd = true; },
                    [](const Rhythm& r) -> float { return r.voiceParams.ampRelToEnd ? 10.0f : r.voiceParams.ampEnvRel; } },
     { "aEnvLeg",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.ampEnvLegato = (v > 0.5f); vd = true; },
-                   [](const Rhythm& r) -> float { return r.voiceParams.ampEnvLegato ? 1.0f : 0.0f; } },
+                   [](const Rhythm& r) -> float { return r.voiceParams.ampEnvLegato ? 1.0f : 0.0f; },  ParamKind::Bool },
     { "accentDb",  [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.accentDb = v; vd = true; },
                    [](const Rhythm& r) -> float { return r.voiceParams.accentDb; } },
 
     // ── Insert / drive (post-#422/#423 algorithm range 0..12) ────────────────
+    // Stage 35: drvChar is an algorithm selector → string name in v2 preset XML.
     { "drvChar",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.driveChar  = juce::jlimit(0, 12, (int)v); vd = true; },
-                   [](const Rhythm& r) -> float { return (float) r.voiceParams.driveChar; } },
+                   [](const Rhythm& r) -> float { return (float) r.voiceParams.driveChar; },
+                   ParamKind::AlgorithmIndex, mu_audio::kInsertAlgorithmNames },
     { "drvDrv",    [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.driveDrive  = v; vd = true; },
                    [](const Rhythm& r) -> float { return r.voiceParams.driveDrive; } },
     { "drvOut",    [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.driveOutput = v; vd = true; },
