@@ -73,6 +73,16 @@ namespace ModDest
         { "euclid.c.postPad", "Euclid C Post Pad"      },
         { "euclid.c.insSt",   "Euclid C Insert Start"  },
         { "euclid.c.insLen",  "Euclid C Insert Length" },
+        // ── Algorithm-specific insert destinations (idx 39–43) ───────────────
+        // #422-followups (Karplus): idx 39, 40
+        // #423-followups (Vocoder): idx 41, 42, 43
+        // Appended; never reorder — saved assignments reference these by ID anyway,
+        // but the dropdown indices must stay stable.
+        { "ks.note",          "Karplus Note"           },   // idx 39
+        { "ks.octave",        "Karplus Octave"         },   // idx 40
+        { "voc.note",         "Vocoder Note"           },   // idx 41
+        { "voc.octave",       "Vocoder Octave"         },   // idx 42
+        { "voc.unison",       "Vocoder Unison"         },   // idx 43
     };
     static constexpr int kTableSize = (int)(sizeof(kTable) / sizeof(kTable[0]));
 
@@ -149,7 +159,21 @@ namespace ModDest
                 item(12);  item(13);  item(14);  item(15);  // Bits, Rate, Dither, LPF
                 break;
             case 6: case 7: case 8:  // EQ / Compressor / Limiter — no mod destinations yet
-            default: break;          // None — no insert params
+                break;
+            case 11:  // Karplus (#422-followups)
+                dd.addSectionHeading("Karplus");
+                item(39);  // KS Note    (drives driveDrive 0..6)
+                item(40);  // KS Octave  (drives drvBits 0..3)
+                item(14);  // Insert Dither = Feedback knob (continuous 0..100%)
+                item(15);  // Insert LPF  = damping cutoff
+                break;
+            case 12:  // Vocoder (#423-followups)
+                dd.addSectionHeading("Vocoder");
+                item(41);  // Voc Note    (drives drvBits offset by +1)
+                item(42);  // Voc Octave  (drives drvDither 1..5)
+                item(43);  // Voc Unison  (drives encoded driveOutput)
+                break;
+            default: break;          // None / TapeSat / RingMod — no insert params yet
         }
     }
 }

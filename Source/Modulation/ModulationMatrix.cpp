@@ -68,6 +68,14 @@ static float depthScaleFor(const std::string& destId)
     if (destId == "accentDb")        return 12.0f;   // 0..12 dB (#223)
     if (destId == "insert.output")   return 24.0f;   // -24..0 dB (full range)
     if (destId == "insert.bits")     return 1.0f;    // 1..16 bits; ±1 bit at full depth (#266)
+    // #422/#423-followups: algorithm-specific insert destinations. Scale equals the
+    // full-swing range for the integer field so depth=100% × src=100% spans the
+    // whole knob (e.g. ks.note covers all 7 chromatic notes).
+    if (destId == "ks.note")         return 6.0f;    // Karplus note 0..6 (C..B)
+    if (destId == "ks.octave")       return 3.0f;    // Karplus octave 0..3
+    if (destId == "voc.note")        return 6.0f;    // Vocoder note 0..6 (C..B)
+    if (destId == "voc.octave")      return 4.0f;    // Vocoder octave 1..5 (range 4)
+    if (destId == "voc.unison")      return 6.0f;    // Vocoder unison index 0..6
     // Pattern destinations — hits/rotate. Halved from 16→8 (~half of typical 16-step
     // pattern at full depth) so user-facing depth control feels less saturated.
     if (destId == "euclid.a.hits"   || destId == "euclid.b.hits"   || destId == "euclid.c.hits"

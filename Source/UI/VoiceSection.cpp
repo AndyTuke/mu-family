@@ -513,6 +513,14 @@ void VoiceSection::configureInsertAlgorithm(int charId)
         k->onValueChanged = nullptr;
     driveOutput.setGRSource(nullptr);  // #246: cleared here; comp/limiter cases re-set below
 
+    // #423-followups: reset any grey-out applied by a previous Vocoder noise-carrier
+    // configuration so the next algorithm doesn't inherit the disabled state.
+    for (auto* k : { &driveDrive, &driveOutput, &driveDither, &driveTone })
+    {
+        k->setEnabled(true);
+        k->setAlpha(1.0f);
+    }
+
     const VoiceParams* p = (rhythmIndex >= 0 && rhythmIndex < proc.getNumRhythms())
                            ? &proc.getRhythm(rhythmIndex).voiceParams : nullptr;
 
@@ -933,7 +941,30 @@ void VoiceSection::configureInsertAlgorithm(int charId)
             else   driveTone.setValue(4.0, juce::dontSendNotification);
             driveTone.setVisible(true);
 
-            driveDrive .onValueChanged = [this](double v) { apvtsSet("drvDrv",  (float)v); };
+            // #423-followups: grey out Note / Octave / Unison when the carrier is
+            // White (2) or Pink (3) noise — the algorithm ignores those controls
+            // (no fundamental to detune), so leaving them active was a usability
+            // trap. Helper closure updates the enabled state from the current Wave
+            // value; called once now from the initial value and re-called from the
+            // Wave knob's onValueChanged below.
+            auto syncVocoderGreyOut = [this]
+            {
+                const int wave = juce::jlimit(0, 3, (int) std::round(driveDrive.getValue()));
+                const bool pitched = (wave < 2);
+                driveDither.setEnabled(pitched);
+                driveOutput.setEnabled(pitched);
+                driveTone  .setEnabled(pitched);
+                driveDither.setAlpha(pitched ? 1.0f : 0.45f);
+                driveOutput.setAlpha(pitched ? 1.0f : 0.45f);
+                driveTone  .setAlpha(pitched ? 1.0f : 0.45f);
+            };
+            syncVocoderGreyOut();
+
+            driveDrive .onValueChanged = [this, syncVocoderGreyOut](double v)
+            {
+                apvtsSet("drvDrv", (float)v);
+                syncVocoderGreyOut();
+            };
             driveOutput.onValueChanged = [this](double v) { apvtsSet("drvOut",  (float)(v * 4.0 - 24.0)); };
             driveDither.onValueChanged = [this](double v) { apvtsSet("drvDit",  (float)v); };
             driveTone  .onValueChanged = [this](double v) { apvtsSet("drvBits", (float)v); };

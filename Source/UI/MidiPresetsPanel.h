@@ -1,6 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Components/MuClidLookAndFeel.h"
+#include "PresetBrowser.h"
 
 class PluginProcessor;
 
@@ -30,7 +31,11 @@ private:
     std::array<juce::ToggleButton, 8> channelToggles;
     juce::ListBox                     listBox;
 
-    std::unique_ptr<juce::FileChooser> fileChooser;
+    // #431: in-app preset browser overlay shown when the user clicks Browse on
+    // a row. Reuses PresetBrowser configured for .muRhyth instead of a raw
+    // juce::FileChooser, so the user gets categories / search / preview.
+    PresetBrowser                     browser;
+    int                               pendingBrowseRow = -1;
 
     void wireChannelToggles();
     void browseForRow(int row);

@@ -69,6 +69,7 @@ public:
         }
         for (auto& ph : phases) ph = 0.0f;
         for (auto& s  : pinkState) s = 0.0f;
+        for (auto& g  : voiceGainSmooth) g = 0.0f;   // #423-followups
         lastNoteIdx = -1;
         lastOctave  = -1;
         lastUnison  = -1;
@@ -141,6 +142,14 @@ public:
         }
         const float gainNorm = (gainSum > 1e-6f) ? (1.0f / gainSum) : 1.0f;
 
+        // #423-followups: per-sample exponential ramp toward each voice's target
+        // gain. Newly-entered voices start at 0 (left over from when they were
+        // beyond the unison count) and ramp up to their target over ~5 ms,
+        // killing the audible "extra voices snap in at full volume" pop when
+        // the user turns the Unison knob up live. Pitched carriers only — the
+        // noise carrier path below ignores voiceGainSmooth (no per-voice mix).
+        const float rampAlpha = 1.0f - std::exp(-1.0f / (kEntryRampMs * 0.001f * sr));
+
         // ── Sample loop ─────────────────────────────────────────────────
         const int nChClamped = juce::jmin(nCh, 2);
         for (int i = 0; i < ns; ++i)
@@ -154,6 +163,16 @@ public:
             monoIn *= (nChClamped > 0) ? (1.0f / (float) nChClamped) : 0.0f;
 
             // ── Generate carrier ────────────────────────────────────────
+            // #423-followups: per-voice gain envelopes ramp toward each voice's
+            // target (voiceGain[v] for active voices, 0 for v >= unisonN). Voices
+            // that just transitioned from inactive→active see the smoothed value
+            // climb from 0, producing an audible ~5 ms fade-in instead of a click.
+            for (int v = 0; v < kMaxUnisonVoices; ++v)
+            {
+                const float target = (v < unisonN) ? voiceGain[v] : 0.0f;
+                voiceGainSmooth[v] += rampAlpha * (target - voiceGainSmooth[v]);
+            }
+
             float carrier = 0.0f;
             if (waveshape == 0)        // Saw
             {
@@ -161,7 +180,7 @@ public:
                 {
                     phases[v] += voiceInc[v];
                     if (phases[v] >= 1.0f) phases[v] -= 1.0f;
-                    carrier += voiceGain[v] * (2.0f * phases[v] - 1.0f);
+                    carrier += voiceGainSmooth[v] * (2.0f * phases[v] - 1.0f);
                 }
                 carrier *= gainNorm;
             }
@@ -171,7 +190,7 @@ public:
                 {
                     phases[v] += voiceInc[v];
                     if (phases[v] >= 1.0f) phases[v] -= 1.0f;
-                    carrier += voiceGain[v] * (phases[v] < 0.5f ? 1.0f : -1.0f);
+                    carrier += voiceGainSmooth[v] * (phases[v] < 0.5f ? 1.0f : -1.0f);
                 }
                 carrier *= gainNorm;
             }
@@ -224,6 +243,8 @@ private:
     static constexpr float kEnvReleaseMs     = 30.0f;
     static constexpr float kLowestFreq       = 32.7f;     // SPN C1 — #429 shift
     static constexpr int   kMaxUnisonVoices  = 13;
+    // #423-followups: per-voice gain ramp time for Unison-up entries.
+    static constexpr float kEntryRampMs      = 5.0f;
 
     // Voice counts per Unison knob position (#423 spec).
     static constexpr int   kUnisonVoices      [7] = { 1, 3, 5, 7, 9, 11, 13 };
@@ -239,6 +260,10 @@ private:
 
     // Carrier state.
     std::array<float, kMaxUnisonVoices> phases { };
+    // #423-followups: smoothed per-voice gain envelope. Tracks voiceGain[v] for
+    // active voices and 0 for v >= unisonN. New voices climb from 0 → target
+    // over ~5 ms (kEntryRampMs) so Unison-up doesn't pop.
+    std::array<float, kMaxUnisonVoices> voiceGainSmooth { };
     float                                pinkState[7] = { };
     juce::Random                         rng;
 

@@ -43,6 +43,14 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
     extra .onValueChanged = nullptr;
     output.setGRSource(nullptr);  // #246: cleared here; comp/limiter cases re-set below
 
+    // #423-followups: reset any grey-out applied by a previous Vocoder noise-carrier
+    // configuration so the next algorithm doesn't inherit the disabled state.
+    for (auto* k : { &drive, &output, &tone, &extra })
+    {
+        k->setEnabled(true);
+        k->setAlpha(1.0f);
+    }
+
     // #243: the lambda must keep working after this method is re-invoked from
     // loadFromAPVTS with proc=nullptr (the dropdown char value comes from APVTS,
     // so we don't want to write back — but the knob callbacks still need a live
@@ -395,7 +403,32 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             extra.setValue(juce::jlimit(1.0, 7.0, (double) ip.drvBits), juce::dontSendNotification);
             extra.setVisible(true);
 
-            drive .onValueChanged = [setParam, pDrv](double v) { setParam(pDrv, v); };
+            // #423-followups: grey out Unison / Octave / Note when carrier is
+            // noise (waveshape 2 / 3) — algorithm ignores them. Capture `this`
+            // and `slot` so the lambda can look up the right knob pair every
+            // call (the local refs above only live until configure() returns).
+            auto syncVocoderGreyOut = [this, slot]
+            {
+                KnobWithLabel& d = slot == 0 ? insDrive  : insDrive2;
+                KnobWithLabel& o = slot == 0 ? insOutput : insOutput2;
+                KnobWithLabel& t = slot == 0 ? insTone   : insTone2;
+                KnobWithLabel& e = slot == 0 ? insExtra  : insExtra2;
+                const int wave = juce::jlimit(0, 3, (int) std::round(d.getValue()));
+                const bool pitched = (wave < 2);
+                o.setEnabled(pitched);
+                t.setEnabled(pitched);
+                e.setEnabled(pitched);
+                o.setAlpha(pitched ? 1.0f : 0.45f);
+                t.setAlpha(pitched ? 1.0f : 0.45f);
+                e.setAlpha(pitched ? 1.0f : 0.45f);
+            };
+            syncVocoderGreyOut();
+
+            drive .onValueChanged = [setParam, pDrv, syncVocoderGreyOut](double v)
+            {
+                setParam(pDrv, v);
+                syncVocoderGreyOut();
+            };
             output.onValueChanged = [setParam, pOut](double v) { setParam(pOut, v * 4.0 - 24.0); };
             tone  .onValueChanged = [setParam, pDit](double v) { setParam(pDit, v); };
             extra .onValueChanged = [setParam, pBit](double v) { setParam(pBit, v); };

@@ -14,6 +14,24 @@ MidiPresetsPanel::MidiPresetsPanel(PluginProcessor& p)
     listBox.setColour(juce::ListBox::backgroundColourId,
                       MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
     addAndMakeVisible(listBox);
+
+    // #431: configure the in-app preset browser for rhythm presets.
+    browser.setFileExtension("muRhyth");
+    browser.onLoadPreset = [this](const juce::File& f)
+    {
+        if (pendingBrowseRow >= 0 && f.existsAsFile())
+        {
+            proc.midiPresetMap.setPresetPath(pendingBrowseRow, f);
+            listBox.repaintRow(pendingBrowseRow);
+        }
+        pendingBrowseRow = -1;
+    };
+    browser.onClose = [this]
+    {
+        browser.setVisible(false);
+        pendingBrowseRow = -1;
+    };
+    addChildComponent(browser);
 }
 
 void MidiPresetsPanel::wireChannelToggles()
@@ -109,23 +127,14 @@ void MidiPresetsPanel::listBoxItemClicked(int row, const juce::MouseEvent& e)
 
 void MidiPresetsPanel::browseForRow(int row)
 {
-    const auto startDir = proc.getRhythmsDir().isDirectory()
-                              ? proc.getRhythmsDir()
-                              : juce::File();
-    fileChooser = std::make_unique<juce::FileChooser>(
-        "Choose .muRhyth preset for program " + juce::String(row),
-        startDir, "*.muRhyth");
-    fileChooser->launchAsync(
-        juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-        [this, row](const juce::FileChooser& fc)
-        {
-            const auto f = fc.getResult();
-            if (f.existsAsFile())
-            {
-                proc.midiPresetMap.setPresetPath(row, f);
-                listBox.repaintRow(row);
-            }
-        });
+    // #431: show the in-app PresetBrowser overlay rather than a native FileChooser.
+    // Categories + search + double-click-to-pick match the experience of the main
+    // PresetBrowser shown for .muclid full presets.
+    pendingBrowseRow = row;
+    browser.refresh(proc.getRhythmsDir());
+    browser.setBounds(getLocalBounds());
+    browser.setVisible(true);
+    browser.toFront(true);
 }
 
 void MidiPresetsPanel::clearRow(int row)
@@ -151,6 +160,10 @@ void MidiPresetsPanel::resized()
     // ListBox fills the rest, leaving room for the hint text drawn in paint().
     const int listY = chRowY + kChannelRowH + kHintH + kPad;
     listBox.setBounds(kPad, listY, w - kPad * 2, getHeight() - listY - kPad);
+
+    // #431: the browser overlay (when visible) covers the whole panel.
+    if (browser.isVisible())
+        browser.setBounds(getLocalBounds());
 }
 
 void MidiPresetsPanel::paint(juce::Graphics& g)
