@@ -9,6 +9,7 @@
 
 #include "PluginProcessor.h"
 #include "PluginProcessor_Internal.h"
+#include "Modulation/ModulationDestinations.h"   // #437: ModDest::isValidSourceId / isValidDestinationId
 #include <thread>   // #237: std::this_thread::yield in modulator deserialise lock-spin
 
 using mu_pp::kRhythmParamDefs;         // #434
@@ -23,7 +24,10 @@ using mu_pp::kCurrentPresetVersion;
 // Forward decls so the save/load paths defined earlier in this TU can reference
 // the modulator serialise helpers defined later.
 static juce::ValueTree serialiseModulators(const Rhythm& r);
-static void            deserialiseModulators(const juce::ValueTree& mods, Rhythm& r);
+// #437: returns a list of rejected-assignment descriptions (empty on success).
+// Callers feed any non-empty list into onLoadError so the user sees what was
+// dropped rather than silently losing modulation routing.
+static juce::StringArray deserialiseModulators(const juce::ValueTree& mods, Rhythm& r);
 static void            clearModulators(Rhythm& r);
 
 // #288: host-state format version. Bump whenever the on-disk schema changes
@@ -31,6 +35,43 @@ static void            clearModulators(Rhythm& r);
 //   v0 / v1 : legacy (pre-#217) — ADSR A/D/R stored as 0..100 (×0.03 → seconds)
 //   v2      : current (#217/#286/#287) — ADSR A/D/R stored as 0..10 (seconds direct)
 static constexpr int kCurrentStateFormatVersion = 2;
+
+// #439: detect a sample path that points into our embedded-sample decode temp
+// dir (%TEMP%/muClid_samples/). These paths come from loading a preset whose
+// `sampleData` was base64-decoded into a temp file by the load path; they are
+// NOT durable references — the temp dir gets wiped between OS sessions, and
+// any subsequent .muRhyth / .muclid save that records the temp path as
+// `r0_sample` would silently break on next load. Used by the save flow below
+// to force-embed instead of writing the temp path.
+static bool isEmbeddedSampleTempPath(const juce::String& path)
+{
+    if (path.isEmpty()) return false;
+    const juce::File tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                                   .getChildFile("muClid_samples");
+    return tempDir.exists() && juce::File(path).isAChildOf(tempDir);
+}
+
+// #440: write `text` to `destFile` atomically. Goes via a sibling juce::TemporaryFile
+// so a power-loss / crash / antivirus interruption mid-write cannot corrupt the
+// destination — either the new bytes land in full or the original (if it existed)
+// stays intact. Wraps the previous `destFile.replaceWithText(text)` call sites.
+// Reports failures via onLoadError (best we can do — the disk is in trouble).
+static bool atomicReplaceWithText(const juce::File& destFile, const juce::String& text,
+                                  std::function<void(const juce::String&)>& onLoadError)
+{
+    juce::TemporaryFile tmp(destFile);
+    if (! tmp.getFile().replaceWithText(text))
+    {
+        if (onLoadError) onLoadError("Could not write temp file for: " + destFile.getFileName());
+        return false;
+    }
+    if (! tmp.overwriteTargetFileWithTemporary())
+    {
+        if (onLoadError) onLoadError("Could not rename temp file over: " + destFile.getFileName());
+        return false;
+    }
+    return true;
+}
 
 //==============================================================================
 void PluginProcessor::stageRhythmPreset(int rhythmIndex, const juce::File& file)
@@ -110,7 +151,11 @@ void PluginProcessor::stageRhythmPreset(int rhythmIndex, const juce::File& file)
     if (auto mods = state.getChildWithName("Modulators"); mods.isValid())
     {
         clearModulators(newRhythm);
-        deserialiseModulators(mods, newRhythm);
+        auto dropped = deserialiseModulators(mods, newRhythm);   // #437
+        if (! dropped.isEmpty() && onLoadError)
+            onLoadError("Dropped " + juce::String(dropped.size())
+                        + " modulator assignment(s) from " + file.getFileName()
+                        + ": " + dropped.joinIntoString("; "));
     }
 
     // Prepare the pending voice engine and prime it with the preset's VoiceParams.
@@ -141,6 +186,15 @@ void PluginProcessor::stageRhythmPreset(int rhythmIndex, const juce::File& file)
             {
                 newVoice->loadFile(fallback);
                 samplePath = fallback.getFullPathName();
+                // #438: surface the relocation so the user notices when a
+                // same-basename file from the content samples dir got picked
+                // up instead of the original referenced path. Different files
+                // with the same basename are a real hazard — a "kick.wav" in
+                // the project samples dir might be a completely different
+                // recording than the one originally loaded into the preset.
+                if (onLoadError)
+                    onLoadError("Sample '" + juce::File(storedPath).getFileName()
+                                + "' not at original path, loaded from content folder instead.");
             }
         }
     }
@@ -210,8 +264,8 @@ void PluginProcessor::ensureCategoryInList(const juce::String& cat)
     {
         cats.add(cat);
         cats.sort(false);
-        getPresetsDir().getChildFile("categories.txt")
-                       .replaceWithText(cats.joinIntoString("\n"));
+        atomicReplaceWithText(getPresetsDir().getChildFile("categories.txt"),
+                              cats.joinIntoString("\n"), onLoadError);
     }
 }
 
@@ -220,6 +274,17 @@ void PluginProcessor::saveRhythmPresetToFile(int rhythmIdx, const juce::File& de
                                              const juce::String& description)
 {
     if (rhythmIdx < 0 || rhythmIdx >= sequencer.getNumRhythms()) return;
+
+    // #439: if the current sample comes from an embedded-sample decode (path
+    // points into %TEMP%/muClid_samples/), force-embed so we never write the
+    // ephemeral temp path as `r0_sample`. The temp file would not survive an
+    // OS reboot, so any later load would lose the sample.
+    if (isEmbeddedSampleTempPath(loadedSamplePaths[rhythmIdx]) && ! embedSample)
+    {
+        embedSample = true;
+        if (onLoadError)
+            onLoadError("Sample originated from embedded data; saving with embed forced on.");
+    }
 
     juce::ValueTree state("MuClidRhythm");
     state.setProperty("presetName",         destFile.getFileNameWithoutExtension(), nullptr);
@@ -231,7 +296,14 @@ void PluginProcessor::saveRhythmPresetToFile(int rhythmIdx, const juce::File& de
     const Rhythm& r = sequencer.getRhythm(rhythmIdx);
     state.setProperty("r0_name",   juce::String(r.name),        nullptr);
     state.setProperty("r0_colour", r.colourIndex,                nullptr);
-    state.setProperty("r0_sample", loadedSamplePaths[rhythmIdx], nullptr);
+    // #439: if we force-embedded above, we'll still write the temp path here
+    // (the load path prefers `sampleData` when present and ignores `r0_sample`
+    // — so the embedded copy wins), but a cleaner XML drops the stale path.
+    state.setProperty("r0_sample",
+                      isEmbeddedSampleTempPath(loadedSamplePaths[rhythmIdx])
+                          ? juce::String()
+                          : loadedSamplePaths[rhythmIdx],
+                      nullptr);
 
     // Rhythm presets store ONLY sequencer-page state (Euclidean params, voice chain,
     // envelopes, insert effect). Mixer-page state (channel level/pan/sends/sidechain/
@@ -263,7 +335,7 @@ void PluginProcessor::saveRhythmPresetToFile(int rhythmIdx, const juce::File& de
         }
     }
 
-    destFile.replaceWithText(state.toXmlString());
+    atomicReplaceWithText(destFile, state.toXmlString(), onLoadError);
 }
 
 bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
@@ -321,7 +393,11 @@ bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
     if (auto mods = state.getChildWithName("Modulators"); mods.isValid())
     {
         clearModulators(r);
-        deserialiseModulators(mods, r);
+        auto dropped = deserialiseModulators(mods, r);   // #437
+        if (! dropped.isEmpty() && onLoadError)
+            onLoadError("Dropped " + juce::String(dropped.size())
+                        + " modulator assignment(s) from " + file.getFileName()
+                        + ": " + dropped.joinIntoString("; "));
     }
 
     // Embedded sample takes priority over path-based load (mirrors full-preset logic).
@@ -359,6 +435,12 @@ bool PluginProcessor::applyRhythmPreset(const juce::File& file, int targetIdx)
                 {
                     voiceEngines[targetIdx]->loadFile(fallback);
                     loadedSamplePaths.set(targetIdx, fallback.getFullPathName());
+                    // #438: warn — same-basename match in the content samples
+                    // dir is not a guarantee it's the SAME file the preset
+                    // originally referenced.
+                    if (onLoadError)
+                        onLoadError("Sample '" + juce::File(samplePath).getFileName()
+                                    + "' not at original path, loaded from content folder instead.");
                 }
                 else
                 {
@@ -476,10 +558,12 @@ static juce::ValueTree serialiseModulators(const Rhythm& r)
     return mods;
 }
 
-static void deserialiseModulators(const juce::ValueTree& mods, Rhythm& r)
+static juce::StringArray deserialiseModulators(const juce::ValueTree& mods, Rhythm& r)
 {
+    juce::StringArray dropped;   // #437
+
     if (!mods.isValid() || mods.getType() != juce::Identifier("Modulators"))
-        return;
+        return dropped;
 
     // Spin on the rhythm's modLock so the audio thread can't be inside
     // ModulationMatrix::process() / ControlSequence::evaluate() while we
@@ -539,11 +623,32 @@ static void deserialiseModulators(const juce::ValueTree& mods, Rhythm& r)
             a.destinationId = node.getProperty("dest").toString().toStdString();
             a.depth         = (float)(double)node.getProperty("depth", 0.0);
             a.curve         = (float)(double)node.getProperty("curve", 0.0);
-            r.modulationMatrix.addAssignment(a);
+
+            // #437: validate against the live source / destination registries
+            // BEFORE adding. An assignment with a stale destinationId (renamed
+            // / removed parameter) would otherwise be silently added, then
+            // silently no-op at process() time when the matrix can't find the
+            // key in paramValues — the user just notices "my LFO does nothing."
+            // Rejecting and reporting here gives them a chance to re-wire the
+            // assignment manually.
+            if (! ModDest::isValidSourceId(a.sourceId))
+            {
+                dropped.add("invalid source '" + juce::String(a.sourceId) + "'");
+                continue;
+            }
+            if (! ModDest::isValidDestinationId(a.destinationId))
+            {
+                dropped.add("invalid destination '" + juce::String(a.destinationId) + "'");
+                continue;
+            }
+
+            if (! r.modulationMatrix.addAssignment(a))
+                dropped.add("matrix rejected '" + juce::String(a.destinationId) + "' (cycle or full)");
         }
     }
 
     r.modLock.store(false, std::memory_order_release);
+    return dropped;
 }
 
 // Clears CS step/curve data + assignments before each deserialise so successive
@@ -671,7 +776,11 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
         if (ri < 0 || ri >= n) continue;
         Rhythm& target = sequencer.getRhythm(ri);
         clearModulators(target);
-        deserialiseModulators(child, target);
+        auto dropped = deserialiseModulators(child, target);   // #437
+        if (! dropped.isEmpty() && onLoadError)
+            onLoadError("Dropped " + juce::String(dropped.size())
+                        + " modulator assignment(s) on rhythm " + juce::String(ri + 1)
+                        + ": " + dropped.joinIntoString("; "));
     }
 
     // Populate fixed voice/midi arrays to match n.
@@ -757,6 +866,11 @@ void PluginProcessor::restoreStateFromTree(const juce::ValueTree& state)
                 {
                     voiceEngines[i]->loadFile(fallback);
                     loadedSamplePaths.set(i, fallback.getFullPathName());
+                    // #438: warn that we used a same-basename fallback.
+                    if (onLoadError)
+                        onLoadError("Sample '" + juce::File(samplePath).getFileName()
+                                    + "' not at original path, loaded from content folder instead (rhythm "
+                                    + juce::String(i + 1) + ").");
                 }
             }
         }
@@ -802,6 +916,23 @@ void PluginProcessor::savePreset(const juce::String& name,
 {
     const int n = sequencer.getNumRhythms();
 
+    // #439: if any rhythm's sample currently lives in our embedded-decode temp
+    // dir, force-embed the whole preset. The temp file is ephemeral; writing
+    // its path as `sample` would silently break the preset on next load.
+    if (! embedSamples)
+    {
+        for (int i = 0; i < n; ++i)
+        {
+            if (isEmbeddedSampleTempPath(loadedSamplePaths[i]))
+            {
+                embedSamples = true;
+                if (onLoadError)
+                    onLoadError("One or more samples originated from embedded data; saving with embed forced on.");
+                break;
+            }
+        }
+    }
+
     juce::ValueTree root("MuClidPreset");
     root.setProperty("presetName",         name,                 nullptr);
     root.setProperty("presetDescription",  description,          nullptr);
@@ -815,7 +946,13 @@ void PluginProcessor::savePreset(const juce::String& name,
         juce::ValueTree rTree("Rhythm");
         rTree.setProperty("name",   juce::String(r.name), nullptr);
         rTree.setProperty("colour", r.colourIndex,         nullptr);
-        rTree.setProperty("sample", loadedSamplePaths[i],  nullptr);
+        // #439: drop the temp-dir path; the embedded sampleData child below
+        // will carry the actual bytes.
+        rTree.setProperty("sample",
+                          isEmbeddedSampleTempPath(loadedSamplePaths[i])
+                              ? juce::String()
+                              : loadedSamplePaths[i],
+                          nullptr);
 
         const juce::String srcPrefix = "r" + juce::String(i) + "_";
         for (int j = 0; j < kRhythmParamCount; ++j)
@@ -864,7 +1001,7 @@ void PluginProcessor::savePreset(const juce::String& name,
 
     juce::String safeName = name.replaceCharacters("\\/:|*?<>\"", "_________");
     if (safeName.isEmpty()) safeName = "Preset";
-    dir.getChildFile(safeName + ".muclid").replaceWithText(root.toXmlString());
+    atomicReplaceWithText(dir.getChildFile(safeName + ".muclid"), root.toXmlString(), onLoadError);
 }
 
 void PluginProcessor::loadPreset(const juce::File& file)
@@ -969,7 +1106,11 @@ void PluginProcessor::loadPreset(const juce::File& file)
             if (auto rMods = rTree.getChildWithName("Modulators"); rMods.isValid())
             {
                 clearModulators(r);
-                deserialiseModulators(rMods, r);
+                auto dropped = deserialiseModulators(rMods, r);   // #437
+                if (! dropped.isEmpty() && onLoadError)
+                    onLoadError("Dropped " + juce::String(dropped.size())
+                                + " modulator assignment(s) on rhythm " + juce::String(i + 1)
+                                + ": " + dropped.joinIntoString("; "));
             }
 
             auto nameVal = rTree.getProperty("name");
@@ -1016,6 +1157,11 @@ void PluginProcessor::loadPreset(const juce::File& file)
                     {
                         voiceEngines[i]->loadFile(fallback);
                         loadedSamplePaths.set(i, fallback.getFullPathName());
+                        // #438: warn about the same-basename fallback.
+                        if (onLoadError)
+                            onLoadError("Sample '" + juce::File(samplePath).getFileName()
+                                        + "' not at original path, loaded from content folder instead (rhythm "
+                                        + juce::String(i + 1) + ").");
                     }
                     else
                     {

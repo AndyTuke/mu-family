@@ -12,79 +12,13 @@
 #include "../Sequencer/ControlSequence.h"
 #include "../Modulation/ModulationMatrix.h"
 #include "../Modulation/ModulationAssignment.h"
+#include "../Modulation/ModulationDestinations.h"   // #437: kTable now lives here
 
-// Modulation destination table. Each entry has a stable ID (used to persist assignments)
-// and an alias (friendly name shown in the dropdown).
-// Dropdown item IDs are always 1-based indices into the table so saved assignments remain
-// valid when the insert algorithm or other entries change.
-// New destinations are ALWAYS appended to the end to preserve preceding indices.
 namespace ModDest
 {
-    struct Dest { const char* id; const char* alias; };
-
-    inline const Dest kTable[] = {
-        // ── Amp (idx 0–3, DD IDs 1–4) ────────────────────────────────────────
-        { "amp.attack",       "Amp Attack"         },
-        { "amp.decay",        "Amp Decay"          },
-        { "amp.sustain",      "Amp Sustain"        },
-        { "amp.release",      "Amp Release"        },
-        // ── Filter (idx 4–8, DD IDs 5–9) ─────────────────────────────────────
-        { "filter.cutoff",    "Filter Cutoff"      },
-        { "filter.resonance", "Filter Resonance"   },
-        { "fenv.attack",      "Filter Env Attack"  },
-        { "fenv.decay",       "Filter Env Decay"   },
-        { "fenv.depth",       "Filter Env Depth"   },
-        // ── Pitch (idx 9, DD ID 10) ───────────────────────────────────────────
-        { "pitch.semitones",  "Pitch Semitones"    },
-        // ── Insert (idx 10–15, DD IDs 11–16) ─────────────────────────────────
-        { "insert.drive",     "Insert Drive"       },
-        { "insert.output",    "Insert Output"      },
-        { "insert.bits",      "Insert Bits"        },
-        { "insert.rate",      "Insert Rate"        },
-        { "insert.dither",    "Insert Dither"      },
-        { "insert.lpf",       "Insert LPF"         },
-        // ── Euclid A/B pattern (idx 16–19, DD IDs 17–20) ────────────────────
-        { "euclid.a.hits",    "Euclid A Hits"      },
-        { "euclid.a.rotate",  "Euclid A Rotate"    },
-        { "euclid.b.hits",    "Euclid B Hits"      },
-        { "euclid.b.rotate",  "Euclid B Rotate"    },
-        // ── Pitch octave (idx 20) + fine (idx 21, deprecated) ────────────────
-        { "pitch.octave",     "Pitch Octave"       },
-        { "pitch.fine",       "Pitch Fine"         },   // deprecated (#218)
-        // ── Euclid C pattern (idx 22–23, DD IDs 23–24) ───────────────────────
-        { "euclid.c.hits",    "Euclid C Hits"      },
-        { "euclid.c.rotate",  "Euclid C Rotate"    },
-        // ── #223 additions (idx 24–26, DD IDs 25–27) ─────────────────────────
-        { "pitch.envDepth",   "Pitch Env Depth"    },
-        { "amp.level",        "Amp Level"          },
-        { "accentDb",         "Accent"             },
-        // ── Euclid A pad knobs (idx 27–30, DD IDs 28–31) ─────────────────────
-        { "euclid.a.prePad",  "Euclid A Pre Pad"       },
-        { "euclid.a.postPad", "Euclid A Post Pad"      },
-        { "euclid.a.insSt",   "Euclid A Insert Start"  },
-        { "euclid.a.insLen",  "Euclid A Insert Length" },
-        // ── Euclid B pad knobs (idx 31–34, DD IDs 32–35) ─────────────────────
-        { "euclid.b.prePad",  "Euclid B Pre Pad"       },
-        { "euclid.b.postPad", "Euclid B Post Pad"      },
-        { "euclid.b.insSt",   "Euclid B Insert Start"  },
-        { "euclid.b.insLen",  "Euclid B Insert Length" },
-        // ── Euclid C pad knobs (idx 35–38, DD IDs 36–39) ─────────────────────
-        { "euclid.c.prePad",  "Euclid C Pre Pad"       },
-        { "euclid.c.postPad", "Euclid C Post Pad"      },
-        { "euclid.c.insSt",   "Euclid C Insert Start"  },
-        { "euclid.c.insLen",  "Euclid C Insert Length" },
-        // ── Algorithm-specific insert destinations (idx 39–43) ───────────────
-        // #422-followups (Karplus): idx 39, 40
-        // #423-followups (Vocoder): idx 41, 42, 43
-        // Appended; never reorder — saved assignments reference these by ID anyway,
-        // but the dropdown indices must stay stable.
-        { "ks.note",          "Karplus Note"           },   // idx 39
-        { "ks.octave",        "Karplus Octave"         },   // idx 40
-        { "voc.note",         "Vocoder Note"           },   // idx 41
-        { "voc.octave",       "Vocoder Octave"         },   // idx 42
-        { "voc.unison",       "Vocoder Unison"         },   // idx 43
-    };
-    static constexpr int kTableSize = (int)(sizeof(kTable) / sizeof(kTable[0]));
+    // #437: kTable + Dest struct moved to Source/Modulation/ModulationDestinations.h
+    // so non-UI code (preset deserialiser) can validate assignments against the
+    // same single source of truth. UI populate() helper stays here.
 
     // Populate dd with destinations grouped by section, showing only insert destinations
     // relevant for driveChar (0=None,1=SoftClip,2=HardClip,3=Fold,4=Bitcrusher,5=Clipper,
