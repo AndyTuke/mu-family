@@ -84,7 +84,20 @@ public:
         appProperties.setStorageParameters (options);
     }
 
-    const juce::String getApplicationName()    override { return juce::CharPointer_UTF8 (JucePlugin_Name); }
+    const juce::String getApplicationName()    override
+    {
+        // #446: the JucePlugin_Name macro is fed into MSVC via CMake `-D` defines
+        // and the μ (U+03BC, UTF-8 0xCE 0xBC) gets mangled to '?' somewhere in the
+        // command-line round-trip (stdout/cmd codepage mismatch — same mojibake
+        // observed in the Inno Setup console output, see #421). Hard-code the bytes
+        // for the user-visible title bar so it always renders correctly. Matches
+        // the pattern already used at line 27 for the "Close μ-Clid?" dialog.
+       #if MUCLID_LITE_BUILD
+        return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Clid Lite"));
+       #else
+        return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Clid"));
+       #endif
+    }
     const juce::String getApplicationVersion() override { return JucePlugin_VersionString; }
     bool moreThanOneInstanceAllowed()          override { return true; }
     void anotherInstanceStarted (const juce::String&) override {}
