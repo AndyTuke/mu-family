@@ -33,26 +33,19 @@ struct VoiceParams
     bool  ampRelToEnd = false;       // true when Release is at max (100): amp envelope bypassed, sample plays to natural end
     bool  ampEnvLegato = false;      // #221: false=Reset (default), true=Legato
 
-    // ─── Insert (after filter, before amp) ───────────────────────────────
-    // Stage 35: renamed `drive*` / `drv*` → `insert*` to match the insert-
-    // effect dispatch table (#425). Algorithms now include EQ, Compressor,
-    // Limiter, RingMod, TapeSat, Karplus, Vocoder — the old "drive" name
-    // pre-dated all of those. APVTS IDs and preset XML keys still use the
-    // `drv*` prefix for back-compat; only the in-memory C++ field names change.
-    // 0=None, 1=SoftClip, 2=HardClip, 3=Fold, 4=Bitcrusher, 5=Clipper, 6=EQ,
-    // 7=Compressor, 8=Limiter, 9=RingMod, 10=TapeSat, 11=Karplus, 12=Vocoder.
-    int   insertAlgo   = 0;
+    // ─── Drive / Insert (after filter, before amp) ───────────────────────
+    int   driveChar   = 0;           // 0=None,1=SoftClip,2=HardClip,3=Fold,4=Bitcrusher,5=Clipper,6=EQ,7=Compressor,8=Limiter,9=RingMod,10=TapeSat
     // Soft Clip / Hard Clip / Fold params:
-    float insertDrive  = 0.0f;        // 0..100% input drive
-    float insertOutput = 0.0f;        // -24..0 dB output level
+    float driveDrive  = 0.0f;        // 0..100% input drive
+    float driveOutput = 0.0f;        // -24..0 dB output level
     // Bitcrusher params:
-    float insertBits   = 16.0f;       // 1..16 bit depth
-    float insertRate   = 48000.0f;    // 100..48000 Hz target sample rate (48000 = no reduction)
-    float insertDither = 0.0f;        // 0..100% TPDF dither amount
+    float drvBits     = 16.0f;       // 1..16 bit depth
+    float driveRate   = 48000.0f;    // 100..48000 Hz target sample rate (48000 = no reduction)
+    float drvDither   = 0.0f;        // 0..100% TPDF dither amount
     // Shared:
-    float insertTone   = 20000.0f;    // 20..20000 Hz (1-pole LP post-drive; 20kHz = flat; also EQ mid freq / comp release ms)
-    // EQ params (insertAlgo=6): low shelf and high shelf gains stored as 0..100 in insertDrive/insertDither fields
-    float insertEqMid  = 0.0f;        // EQ mid peak gain, -18..+18 dB (#129)
+    float driveTone   = 20000.0f;    // 20..20000 Hz (1-pole LP post-drive; 20kHz = flat; also EQ mid freq / comp release ms)
+    // EQ params (driveChar=6): low shelf and high shelf gains stored as 0..100 in driveDrive/drvDither fields
+    float eqMidGain   = 0.0f;        // EQ mid peak gain, -18..+18 dB (#129)
 
     // ─── Accent ──────────────────────────────────────────────────────────
     float accentDb    = 0.0f;        // 0..12 dB boost applied to accented steps
