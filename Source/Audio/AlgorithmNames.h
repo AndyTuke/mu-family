@@ -71,6 +71,85 @@ inline const char* const kFilterTypeNames[] = {
     nullptr
 };
 
+// FX algorithm IDs mirror FXAlgorithmRegistry::effectAlgorithms()[i].id /
+// reverbAlgorithms()[i].id. Duplicated here so non-UI code (preset save /
+// load) can consume the names without including the heavier registry header.
+// MUST stay in lock-step with the registry — adding a new effect there
+// requires appending an entry here too.
+
+// eff_algo 0..3 (chorus/flanger/phaser/echo). Registry currently caps at 4
+// entries despite the APVTS range 0..7 (unused slots reserved for v2 plugins).
+inline const char* const kEffectAlgorithmNames[] = {
+    "chorus",       // 0
+    "flanger",      // 1
+    "phaser",       // 2
+    "echo",         // 3
+    nullptr
+};
+
+// rev_algo 0..3 (room/hall/plate/spring).
+inline const char* const kReverbAlgorithmNames[] = {
+    "room",         // 0
+    "hall",         // 1
+    "plate",        // 2
+    "spring",       // 3
+    nullptr
+};
+
+// #436: modulator enum names. ControlSequence's `Mode`, `Polarity`, and the
+// timing enums `NoteValue` / `NoteMod` live in Source/Sequencer/ControlSequence.h
+// and Source/Sequencer/Rhythm.h respectively. They're saved by serialiseModulators
+// as raw int indices — same drift hazard as the per-rhythm algorithm selectors
+// fixed in Stage 35 step 1, just in the modulator subtree. Name tables here
+// drive the v2-name-string serialisation; the deserialiser accepts either a
+// name string or an int (legacy compat).
+
+// ControlSequence::Mode { Smooth, Stepped }
+inline const char* const kModulatorModeNames[] = {
+    "Smooth",       // 0
+    "Stepped",      // 1
+    nullptr
+};
+
+// ControlSequence::Polarity { Unipolar, Bipolar }
+inline const char* const kModulatorPolarityNames[] = {
+    "Unipolar",     // 0
+    "Bipolar",      // 1
+    nullptr
+};
+
+// NoteValue { Whole, Half, Quarter, Eighth, Sixteenth, ThirtySecond }
+inline const char* const kNoteValueNames[] = {
+    "Whole",        // 0
+    "Half",         // 1
+    "Quarter",      // 2
+    "Eighth",       // 3
+    "Sixteenth",    // 4
+    "ThirtySecond", // 5
+    nullptr
+};
+
+// NoteMod { None, Triplet, Dotted }
+inline const char* const kNoteModNames[] = {
+    "None",         // 0
+    "Triplet",      // 1
+    "Dotted",       // 2
+    nullptr
+};
+
+// Logic { OR, AND, XOR, AOnly, BOnly } — used by `r.logic` per-rhythm.
+// Persisted via kRhythmParamDefs as an Int today; Stage 35 follow-up could
+// upgrade this entry to AlgorithmIndex pointing at the table below so
+// reordering Logic enumerators stays preset-safe.
+inline const char* const kLogicNames[] = {
+    "OR",           // 0
+    "AND",          // 1
+    "XOR",          // 2
+    "AOnly",        // 3
+    "BOnly",        // 4
+    nullptr
+};
+
 // Look up algorithm index for a given name. Returns -1 if not found.
 // Linear scan — called only from preset save/load paths (interactive), so the
 // O(N) cost is irrelevant.

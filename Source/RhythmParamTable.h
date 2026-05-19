@@ -98,8 +98,12 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
     MU_HITGEN_ENTRIES(C),
 
     // ── Rhythm-level (sequencer-side, not voiceParams) ───────────────────────
+    // #436: Logic is an algorithm-style enumerator (OR / AND / XOR / AOnly /
+    // BOnly) — write as the stable name string so reordering or inserting
+    // new logic modes doesn't shift saved presets.
     { "logic",     [](float v, Rhythm& r, bool& pd, bool&)  { r.logic = static_cast<Logic>(juce::jlimit(0, 4, (int)v)); pd = true; },
-                   [](const Rhythm& r) -> float { return (float) r.logic; },                ParamKind::Int },
+                   [](const Rhythm& r) -> float { return (float) r.logic; },
+                   ParamKind::AlgorithmIndex, mu_audio::kLogicNames },
     // #419 patternLegato is sequencer-level — no engine sync needed.
     { "patLeg",    [](float v, Rhythm& r, bool&, bool&)     { r.patternLegato = (v > 0.5f); },
                    [](const Rhythm& r) -> float { return r.patternLegato ? 1.0f : 0.0f; },  ParamKind::Bool },

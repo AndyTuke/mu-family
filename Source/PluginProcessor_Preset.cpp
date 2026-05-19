@@ -38,36 +38,37 @@ static void            clearModulators(Rhythm& r);
 //   v2      : current (#217/#286/#287) — ADSR A/D/R stored as 0..10 (seconds direct)
 static constexpr int kCurrentStateFormatVersion = 2;
 
-// Stage 35: serialise / deserialise a per-rhythm parameter using the param's
-// ParamKind. v2 writes human-readable + range-stable values:
+// Stage 35: write `actualValue` into `tree` based on the param's `ParamKind`.
+// v2 produces human-readable + range-stable values:
 //   ParamKind::Bool            → "true" / "false"
 //   ParamKind::Int             → integer property
 //   ParamKind::AlgorithmIndex  → stable algorithm name string (e.g. "Bitcrusher")
 //   ParamKind::Float           → actual de-normalised value
 //
-// v0/v1 paths stay normalised — see readParamPropertyAsActual below.
-static void writeParamPropertyV2(juce::ValueTree& tree,
-                                 const juce::String& propName,
-                                 const juce::RangedAudioParameter& param,
-                                 const mu_pp::RhythmParamDef& def)
+// Shared between per-rhythm save (kRhythmParamDefs) and global-state save
+// (kGlobalParamDefs, #451). v0/v1 paths stay normalised — see
+// readKindedPropertyAsActual below.
+static void writeKindedProperty(juce::ValueTree& tree,
+                                const juce::String& propName,
+                                float actualValue,
+                                mu_pp::ParamKind kind,
+                                const char* const* algorithmNames)
 {
-    const float actual = param.convertFrom0to1(param.getValue());
-
-    switch (def.kind)
+    switch (kind)
     {
         case mu_pp::ParamKind::Bool:
             // var(bool) serialises as "0"/"1" in JUCE; we want grep-able
             // "true"/"false" in the XML, so write as a string literal.
-            tree.setProperty(propName, actual >= 0.5f ? "true" : "false", nullptr);
+            tree.setProperty(propName, actualValue >= 0.5f ? "true" : "false", nullptr);
             break;
         case mu_pp::ParamKind::Int:
-            tree.setProperty(propName, juce::roundToInt(actual), nullptr);
+            tree.setProperty(propName, juce::roundToInt(actualValue), nullptr);
             break;
         case mu_pp::ParamKind::AlgorithmIndex:
-            if (def.algorithmNames != nullptr)
+            if (algorithmNames != nullptr)
             {
-                const int idx = juce::roundToInt(actual);
-                if (const char* name = mu_audio::nameFromIndex(def.algorithmNames, idx))
+                const int idx = juce::roundToInt(actualValue);
+                if (const char* name = mu_audio::nameFromIndex(algorithmNames, idx))
                 {
                     tree.setProperty(propName, juce::String(name), nullptr);
                     break;
@@ -76,23 +77,69 @@ static void writeParamPropertyV2(juce::ValueTree& tree,
             // Unknown name (impossible if the table covers the param's full
             // range, but defend against future regressions): fall back to
             // writing the integer index. Old behaviour is preserved.
-            tree.setProperty(propName, juce::roundToInt(actual), nullptr);
+            tree.setProperty(propName, juce::roundToInt(actualValue), nullptr);
             break;
         case mu_pp::ParamKind::Float:
         default:
-            tree.setProperty(propName, actual, nullptr);
+            tree.setProperty(propName, actualValue, nullptr);
             break;
     }
 }
 
-// Read a property and return it as a display-scale actual value (NOT
-// normalised). Returns NaN if the property is absent. Branches on the file's
-// `presetVersion`:
+// Convenience wrapper for the per-rhythm save path — pulls actual value out of
+// the APVTS param and delegates to writeKindedProperty.
+static void writeParamPropertyV2(juce::ValueTree& tree,
+                                 const juce::String& propName,
+                                 const juce::RangedAudioParameter& param,
+                                 const mu_pp::RhythmParamDef& def)
+{
+    const float actual = param.convertFrom0to1(param.getValue());
+    writeKindedProperty(tree, propName, actual, def.kind, def.algorithmNames);
+}
+
+// Stage 35: read `propName` from `tree` as an actual de-normalised float using
+// the supplied `ParamKind`. Returns NaN if the property is absent.
+//
+// v2-only — does not handle v0/v1 normalised reading (that's suffix-specific
+// because of the per-id #430 migration). Use readParamPropertyAsActual /
+// readGlobalPropertyAsActual below for the version-branching wrappers.
+static float readKindedPropertyAsActualV2(const juce::ValueTree& tree,
+                                           const juce::String& propName,
+                                           mu_pp::ParamKind kind,
+                                           const char* const* algorithmNames)
+{
+    switch (kind)
+    {
+        case mu_pp::ParamKind::Bool:
+            // var(string "true") → bool true via toBool(); also accepts
+            // "1" / "yes" / "y" so legacy-style int 0/1 still works.
+            return (bool) tree.getProperty(propName) ? 1.0f : 0.0f;
+        case mu_pp::ParamKind::Int:
+            return (float) (int) tree.getProperty(propName);
+        case mu_pp::ParamKind::AlgorithmIndex:
+            if (algorithmNames != nullptr)
+            {
+                const juce::String name = tree.getProperty(propName).toString();
+                const int idx = mu_audio::indexFromName(algorithmNames, name);
+                if (idx >= 0)
+                    return (float) idx;
+                // Unknown algorithm name (renamed / removed since this preset
+                // was saved). Fall through and treat the property as a numeric
+                // index — works for legacy fallback writes (Bitcrusher → "4").
+                return (float) (int) tree.getProperty(propName);
+            }
+            return (float) (int) tree.getProperty(propName);
+        case mu_pp::ParamKind::Float:
+        default:
+            return (float) (double) tree.getProperty(propName);
+    }
+}
+
+// Per-rhythm read wrapper. Branches on the file's `presetVersion`:
 //   v0 (absent / 0):  read normalised, apply migrateLegacyPresetNorm, convert
 //                     to actual via param.convertFrom0to1.
 //   v1:               read normalised, convert to actual.
-//   v2:               read actual directly per ParamKind (parsing the string
-//                     name back to an index for AlgorithmIndex kinds).
+//   v2:               read actual directly per ParamKind.
 static float readParamPropertyAsActual(const juce::ValueTree& tree,
                                         const juce::String& propName,
                                         const juce::RangedAudioParameter& param,
@@ -103,39 +150,34 @@ static float readParamPropertyAsActual(const juce::ValueTree& tree,
         return std::numeric_limits<float>::quiet_NaN();
 
     if (presetVersion >= 2)
-    {
-        switch (def.kind)
-        {
-            case mu_pp::ParamKind::Bool:
-                // var(string "true") → bool true via toBool(); also accepts
-                // "1" / "yes" / "y" so legacy-style int 0/1 still works.
-                return (bool) tree.getProperty(propName) ? 1.0f : 0.0f;
-            case mu_pp::ParamKind::Int:
-                return (float) (int) tree.getProperty(propName);
-            case mu_pp::ParamKind::AlgorithmIndex:
-                if (def.algorithmNames != nullptr)
-                {
-                    const juce::String name = tree.getProperty(propName).toString();
-                    const int idx = mu_audio::indexFromName(def.algorithmNames, name);
-                    if (idx >= 0)
-                        return (float) idx;
-                    // Unknown algorithm name (renamed / removed since this preset
-                    // was saved). Fall through and treat the property as a numeric
-                    // index — works for legacy fallback writes (Bitcrusher → "4").
-                    return (float) (int) tree.getProperty(propName);
-                }
-                return (float) (int) tree.getProperty(propName);
-            case mu_pp::ParamKind::Float:
-            default:
-                return (float) (double) tree.getProperty(propName);
-        }
-    }
+        return readKindedPropertyAsActualV2(tree, propName, def.kind, def.algorithmNames);
 
     // v0 or v1: stored as normalised. v0 additionally needs the #430 legacy
     // norm-shift migration for drvChar / drvBits range expansion.
     float normVal = (float) (double) tree.getProperty(propName);
     if (presetVersion < 1)
         normVal = mu_pp::migrateLegacyPresetNorm(juce::String(def.suffix), normVal);
+    return param.convertFrom0to1(normVal);
+}
+
+// #451: global-state read wrapper. Same branching shape as readParamPropertyAsActual
+// but uses migrateLegacyGlobalNorm for the v0 path (mst_insChar / mst_insBits
+// range-expansion migration) and the global param's `id` rather than a suffix.
+static float readGlobalPropertyAsActual(const juce::ValueTree& tree,
+                                         const juce::String& propName,
+                                         const juce::RangedAudioParameter& param,
+                                         const mu_pp::GlobalParamDef& def,
+                                         int presetVersion)
+{
+    if (! tree.hasProperty(propName))
+        return std::numeric_limits<float>::quiet_NaN();
+
+    if (presetVersion >= 2)
+        return readKindedPropertyAsActualV2(tree, propName, def.kind, def.algorithmNames);
+
+    float normVal = (float) (double) tree.getProperty(propName);
+    if (presetVersion < 1)
+        normVal = mu_pp::migrateLegacyGlobalNorm(juce::String(def.id), normVal);
     return param.convertFrom0to1(normVal);
 }
 
@@ -613,6 +655,17 @@ void PluginProcessor::loadDefaultPreset()
 //
 // Idempotent: a tree without a Modulators child leaves the rhythm's existing
 // in-memory defaults untouched (legacy preset compat).
+// #436: write an enum value as its stable name string (e.g. "Smooth", "Bipolar",
+// "Sixteenth") rather than as the raw underlying-int. Falls back to the integer
+// if the index is out of range — should never happen unless the enum got resized
+// without updating the name table.
+static juce::var enumName(const char* const* table, int idx)
+{
+    if (const char* n = mu_audio::nameFromIndex(table, idx))
+        return juce::var(juce::String(n));
+    return juce::var(idx);
+}
+
 static juce::ValueTree serialiseModulators(const Rhythm& r)
 {
     juce::ValueTree mods("Modulators");
@@ -620,15 +673,18 @@ static juce::ValueTree serialiseModulators(const Rhythm& r)
     for (const auto& cs : r.controlSequences)
     {
         juce::ValueTree seq("Seq");
-        seq.setProperty("id",       juce::String(cs.id),               nullptr);
-        seq.setProperty("mode",     (int)cs.mode,                       nullptr);
-        seq.setProperty("polarity", (int)cs.polarity,                   nullptr);
-        seq.setProperty("loopNV",   (int)cs.loopNoteValue,              nullptr);
-        seq.setProperty("loopMod",  (int)cs.loopNoteMod,                nullptr);
-        seq.setProperty("loopMult", cs.loopMultiplier,                  nullptr);
-        seq.setProperty("stepNV",   (int)cs.stepNoteValue,              nullptr);
-        seq.setProperty("stepMod",  (int)cs.stepNoteMod,                nullptr);
-        seq.setProperty("stepMult", cs.stepMultiplier,                  nullptr);
+        seq.setProperty("id",       juce::String(cs.id),                          nullptr);
+        // #436: enum properties now write their stable string name rather than
+        // the raw underlying int. Round-trip through deserialiseModulators below
+        // accepts either form for legacy compat — old presets keep working.
+        seq.setProperty("mode",     enumName(mu_audio::kModulatorModeNames,     (int)cs.mode),          nullptr);
+        seq.setProperty("polarity", enumName(mu_audio::kModulatorPolarityNames, (int)cs.polarity),      nullptr);
+        seq.setProperty("loopNV",   enumName(mu_audio::kNoteValueNames,         (int)cs.loopNoteValue), nullptr);
+        seq.setProperty("loopMod",  enumName(mu_audio::kNoteModNames,           (int)cs.loopNoteMod),   nullptr);
+        seq.setProperty("loopMult", cs.loopMultiplier,                                                  nullptr);
+        seq.setProperty("stepNV",   enumName(mu_audio::kNoteValueNames,         (int)cs.stepNoteValue), nullptr);
+        seq.setProperty("stepMod",  enumName(mu_audio::kNoteModNames,           (int)cs.stepNoteMod),   nullptr);
+        seq.setProperty("stepMult", cs.stepMultiplier,                                                  nullptr);
 
         for (const auto v : cs.stepValues)
         {
@@ -664,6 +720,28 @@ static juce::ValueTree serialiseModulators(const Rhythm& r)
     return mods;
 }
 
+// #436: read an enum property as `int` whether it was written as the legacy
+// integer index or the new stable name string. Looks up names in the supplied
+// table; falls back to `(int)prop` when the var is numeric (legacy) or when
+// the string isn't a known name (forward-compat with unknown values).
+static int readEnumIndex(const juce::ValueTree& tree, const juce::Identifier& propId,
+                          const char* const* nameTable, int defaultIdx)
+{
+    if (! tree.hasProperty(propId))
+        return defaultIdx;
+
+    const auto v = tree.getProperty(propId);
+    if (v.isString())
+    {
+        const int idx = mu_audio::indexFromName(nameTable, v.toString());
+        if (idx >= 0)
+            return idx;
+        // Unknown name — try to parse as a number anyway (string "3" from a
+        // hand-edited file, say) before giving up to the default.
+    }
+    return (int) v;
+}
+
 static juce::StringArray deserialiseModulators(const juce::ValueTree& mods, Rhythm& r)
 {
     juce::StringArray dropped;   // #437
@@ -689,13 +767,16 @@ static juce::StringArray deserialiseModulators(const juce::ValueTree& mods, Rhyt
             for (auto& cs : r.controlSequences)
             {
                 if (juce::String(cs.id) != id) continue;
-                cs.mode           = (ControlSequence::Mode)    (int)node.getProperty("mode",     (int)cs.mode);
-                cs.polarity       = (ControlSequence::Polarity)(int)node.getProperty("polarity", (int)cs.polarity);
-                cs.loopNoteValue  = (NoteValue)                (int)node.getProperty("loopNV",   (int)cs.loopNoteValue);
-                cs.loopNoteMod    = (NoteMod)                  (int)node.getProperty("loopMod",  (int)cs.loopNoteMod);
+                // #436: enum properties accept either the new name string
+                // ("Smooth", "Bipolar", "Sixteenth") or the legacy integer
+                // index. readEnumIndex handles both.
+                cs.mode           = (ControlSequence::Mode)     readEnumIndex(node, "mode",     mu_audio::kModulatorModeNames,     (int)cs.mode);
+                cs.polarity       = (ControlSequence::Polarity) readEnumIndex(node, "polarity", mu_audio::kModulatorPolarityNames, (int)cs.polarity);
+                cs.loopNoteValue  = (NoteValue)                 readEnumIndex(node, "loopNV",   mu_audio::kNoteValueNames,         (int)cs.loopNoteValue);
+                cs.loopNoteMod    = (NoteMod)                   readEnumIndex(node, "loopMod",  mu_audio::kNoteModNames,           (int)cs.loopNoteMod);
                 cs.loopMultiplier =                            (int)node.getProperty("loopMult", cs.loopMultiplier);
-                cs.stepNoteValue  = (NoteValue)                (int)node.getProperty("stepNV",   (int)cs.stepNoteValue);
-                cs.stepNoteMod    = (NoteMod)                  (int)node.getProperty("stepMod",  (int)cs.stepNoteMod);
+                cs.stepNoteValue  = (NoteValue)                 readEnumIndex(node, "stepNV",   mu_audio::kNoteValueNames,         (int)cs.stepNoteValue);
+                cs.stepNoteMod    = (NoteMod)                   readEnumIndex(node, "stepMod",  mu_audio::kNoteModNames,           (int)cs.stepNoteMod);
                 cs.stepMultiplier =                            (int)node.getProperty("stepMult", cs.stepMultiplier);
 
                 cs.stepValues.clear();
@@ -1102,15 +1183,19 @@ void PluginProcessor::savePreset(const juce::String& name,
     }
 
     // Save global FX/mixer state so a preset fully restores the session.
-    // Stage 35: v2 writes GlobalState as actual de-normalised values too. We
-    // don't currently emit algorithm-name strings for mst_insChar/eff_algo etc.
-    // (no parallel ParamKind table for the global side) — they're written as
-    // their integer index, which still survives range widening. A follow-up
-    // can add algorithm-name strings for the four global selectors.
+    // Stage 35 + #451: v2 writes GlobalState per the ParamKind in kGlobalParamDefs.
+    // eff_algo / rev_algo / mst_insChar / mst_ins2Char emit their stable algorithm
+    // name string; bool params emit "true"/"false"; the rest emit actual values.
     juce::ValueTree globalTree("GlobalState");
-    for (int i = 0; kGlobalParams[i] != nullptr; ++i)
-        if (auto* param = apvts.getParameter(kGlobalParams[i]))
-            globalTree.setProperty(kGlobalParams[i], param->convertFrom0to1(param->getValue()), nullptr);
+    for (int i = 0; i < mu_pp::kGlobalParamDefCount; ++i)
+    {
+        const auto& def = mu_pp::kGlobalParamDefs[i];
+        if (auto* param = apvts.getParameter(def.id))
+        {
+            const float actual = param->convertFrom0to1(param->getValue());
+            writeKindedProperty(globalTree, juce::String(def.id), actual, def.kind, def.algorithmNames);
+        }
+    }
     root.addChild(globalTree, -1, nullptr);
 
     auto dir = getPresetsDir();
@@ -1181,8 +1266,8 @@ void PluginProcessor::loadPreset(const juce::File& file)
         mu_core::ScopedApvtsLoading guard(apvtsLoading);
 
         // Stage 35: branch on presetVersion for both per-rhythm and global-state.
+        // The readers handle the v0 → v1 → v2 migration ladder internally.
         const int presetVersion = (int) root.getProperty("presetVersion", 0);
-        const bool isLegacy = (presetVersion < 1);   // for #430 global-state migration
 
         int rhythmIdx = 0;
         for (int ci = 0; ci < root.getNumChildren() && rhythmIdx < n; ++ci)
@@ -1304,32 +1389,23 @@ void PluginProcessor::loadPreset(const juce::File& file)
         }
 
         // Restore global FX/mixer state if present (added in #123; older files omit this).
-        // Stage 35: v2 reads actual de-normalised values; v0/v1 reads normalised
-        // (with v0 running the #430 mst_insChar / mst_insBits migration).
+        // Stage 35 + #451: iterate kGlobalParamDefs so algorithm-selector params
+        // (eff_algo / rev_algo / mst_insChar / mst_ins2Char) get name-string
+        // lookup in v2. v0/v1 paths stay normalised with #430 migration for v0.
         for (int ci = 0; ci < root.getNumChildren(); ++ci)
         {
             auto child = root.getChild(ci);
             if (child.getType() != juce::Identifier("GlobalState")) continue;
-            for (int gi = 0; kGlobalParams[gi] != nullptr; ++gi)
+            for (int gi = 0; gi < mu_pp::kGlobalParamDefCount; ++gi)
             {
-                const juce::String gid = kGlobalParams[gi];
-                juce::Identifier propId { gid };
-                if (child.hasProperty(propId))
-                    if (auto* param = apvts.getParameter(gid))
-                    {
-                        if (presetVersion >= 2)
-                        {
-                            const float actualVal = (float) (double) child.getProperty(propId);
-                            param->setValueNotifyingHost(param->convertTo0to1(actualVal));
-                        }
-                        else
-                        {
-                            float normVal = (float) child.getProperty(propId);
-                            if (isLegacy)
-                                normVal = migrateLegacyGlobalNorm(gid, normVal);
-                            param->setValueNotifyingHost(normVal);
-                        }
-                    }
+                const auto& def = mu_pp::kGlobalParamDefs[gi];
+                if (auto* param = apvts.getParameter(def.id))
+                {
+                    const float actualVal = readGlobalPropertyAsActual(child, juce::String(def.id),
+                                                                       *param, def, presetVersion);
+                    if (! std::isnan(actualVal))
+                        param->setValueNotifyingHost(param->convertTo0to1(actualVal));
+                }
             }
             break;
         }
