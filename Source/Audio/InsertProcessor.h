@@ -15,7 +15,7 @@
 // as a const VoiceParams& each block so there is no internal copy to keep in
 // sync.
 //
-// #425: refactored from a single ~600-line switch statement into a dispatch
+// refactored from a single ~600-line switch statement into a dispatch
 // table over insertAlgo → InsertAlgorithmBase*. Each insertAlgo code maps to a
 // concrete subclass living in Source/Audio/Processing/InsertFX/. All algorithms are pre-
 // allocated in the constructor so prepare() / param-change paths never heap-
@@ -42,8 +42,9 @@ public:
     // Non-zero only during Compressor (7) / Limiter (8) modes.
     std::atomic<float> grReduction { 0.0f };
 
+    static constexpr int kNumInsertAlgos = 13;   // + Karplus + Vocoder
+
 private:
-    static constexpr int kNumInsertAlgos = 13;   // #422/#423: + Karplus + Vocoder
 
     // Ownership: 10 distinct algorithm instances (Comp + Lim share one). Held
     // in a vector reserved at construction time so the raw pointers stored in

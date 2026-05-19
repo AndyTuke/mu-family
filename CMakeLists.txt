@@ -330,6 +330,12 @@ juce_add_console_app(mu-clid-tests
 target_sources(mu-clid-tests PRIVATE
     Source/Tests/TestMain.cpp
     Source/Tests/RhythmParamRoundTripTests.cpp
+    Source/Tests/KindedPropertyRoundTripTests.cpp
+    Source/Tests/GlobalParamDefsTests.cpp
+    Source/Tests/ModulatorSerialiseTests.cpp
+    Source/Tests/AlgorithmNameTableTests.cpp
+    Source/Modulation/ModulationMatrix.cpp
+    Source/Sequencer/ControlSequence.cpp
 )
 
 target_compile_features(mu-clid-tests PRIVATE cxx_std_17)

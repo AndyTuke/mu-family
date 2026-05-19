@@ -1,15 +1,16 @@
 #pragma once
 
-// #365: shared helpers used by the partial-class TUs that PluginProcessor.cpp was
+// shared helpers used by the partial-class TUs that PluginProcessor.cpp was
 // split into (PluginProcessor.cpp + PluginProcessor_APVTS.cpp + PluginProcessor_Preset.cpp).
 // All members are inline so each TU sees the same definition without an ODR violation.
 // Private to the PluginProcessor implementation — do not include from other code.
 
 #include <juce_core/juce_core.h>
 #include "Sequencer/Rhythm.h"
-#include "ScopedApvtsLoading.h"   // #409: lifted to mu-core — reuse from there.
-#include "RhythmParamTable.h"     // #434: declarative per-rhythm param def table.
-#include "Audio/AlgorithmNames.h" // #451: kEffectAlgorithmNames / kReverbAlgorithmNames / kInsertAlgorithmNames
+#include "ScopedApvtsLoading.h"   // lifted to mu-core — reuse from there.
+#include "RhythmParamTable.h"     // declarative per-rhythm param def table.
+#include "Audio/AlgorithmNames.h" // kEffectAlgorithmNames / kReverbAlgorithmNames / kInsertAlgorithmNames
+#include "PresetHelpers.h"        // writeKindedProperty, readKindedPropertyAsActualV2, GlobalParamDef, kGlobalParamDefs
 
 namespace mu_pp {
 
@@ -19,7 +20,7 @@ inline float adsrTime(float v) noexcept { return juce::jmax(0.001f, v * 0.03f); 
 // Convert 0–100 UI scale → 0–1 amplitude for ADSR Sustain.
 inline float adsrSus (float v) noexcept { return juce::jlimit(0.0f, 1.0f, v / 100.0f); }
 
-// #434: per-rhythm suffix list lives in kRhythmParamDefs (RhythmParamTable.h).
+// per-rhythm suffix list lives in kRhythmParamDefs (RhythmParamTable.h).
 // Iterate that directly instead of a parallel string array. Callers that need
 // to enumerate suffixes use a range-for / index loop over kRhythmParamDefs[i].suffix.
 
@@ -52,82 +53,8 @@ inline const char* const kGlobalParams[] = {
     nullptr
 };
 
-// #451: per-global-param kind tags + algorithm-name pointers, mirroring
-// `kRhythmParamDefs`. Global params don't have apply/push lambdas (they
-// flow directly through APVTS rather than via a Rhythm struct), so the
-// table is just (id, kind, algorithmNames). Only the four algorithm-selector
-// params need AlgorithmIndex; everything else gets the conservative Float
-// default (writes the actual de-normalised value, range-stable but not
-// reorder-safe).
-struct GlobalParamDef
-{
-    const char*        id;
-    ParamKind          kind            = ParamKind::Float;
-    const char* const* algorithmNames  = nullptr;
-};
-
-inline const GlobalParamDef kGlobalParamDefs[] = {
-    // ── Effect slot ──────────────────────────────────────────────────────
-    { "eff_algo",      ParamKind::AlgorithmIndex, mu_audio::kEffectAlgorithmNames },
-    { "eff_en",        ParamKind::Bool   },
-    { "eff_send" },     { "eff_p0" }, { "eff_p1" }, { "eff_p2" }, { "eff_p3" }, { "eff_p4" },
-    // ── Delay slot ───────────────────────────────────────────────────────
-    { "dly_en",        ParamKind::Bool   },
-    { "dly_mode",      ParamKind::Bool   },                    // sync vs free
-    { "dly_ms" },
-    { "dly_syncDenom", ParamKind::Int    },
-    { "dly_syncDot",   ParamKind::Bool   },
-    { "dly_syncTrip",  ParamKind::Bool   },
-    { "dly_count",     ParamKind::Int    },
-    { "dly_fb" }, { "dly_spread" }, { "dly_dirt" }, { "dly_send" },
-    // ── Reverb slot ──────────────────────────────────────────────────────
-    { "rev_algo",      ParamKind::AlgorithmIndex, mu_audio::kReverbAlgorithmNames },
-    { "rev_en",        ParamKind::Bool   },
-    { "rev_lvl" }, { "rev_size" }, { "rev_pre" }, { "rev_diff" },
-    { "rev_damp" }, { "rev_mod" }, { "rev_dirt" },
-    // ── Intra-FX routing ────────────────────────────────────────────────
-    { "eff2dly" }, { "eff2rev" }, { "dly2rev" },
-    // ── Echo ─────────────────────────────────────────────────────────────
-    { "echo_en",       ParamKind::Bool   },
-    { "echo_mode" },
-    { "echo_ms" },
-    { "echo_syncDenom",ParamKind::Int    },
-    { "echo_syncDot",  ParamKind::Bool   },
-    { "echo_syncTrip", ParamKind::Bool   },
-    { "echo_count",    ParamKind::Int    },
-    { "echo_fb" }, { "echo_spread" }, { "echo_dirt" },
-    // ── Effect return ───────────────────────────────────────────────────
-    { "ret_eff_lvl" }, { "ret_eff_pan" },
-    { "ret_eff_mute",  ParamKind::Bool   },
-    { "ret_eff_solo",  ParamKind::Bool   },
-    { "ret_eff_scSrc", ParamKind::Int    },
-    { "ret_eff_scAmt" }, { "ret_eff_scAtk" }, { "ret_eff_scRel" },
-    // ── Delay return ────────────────────────────────────────────────────
-    { "ret_dly_lvl" }, { "ret_dly_pan" },
-    { "ret_dly_mute",  ParamKind::Bool   },
-    { "ret_dly_solo",  ParamKind::Bool   },
-    { "ret_dly_scSrc", ParamKind::Int    },
-    { "ret_dly_scAmt" }, { "ret_dly_scAtk" }, { "ret_dly_scRel" },
-    // ── Reverb return ───────────────────────────────────────────────────
-    { "ret_rev_lvl" }, { "ret_rev_pan" },
-    { "ret_rev_mute",  ParamKind::Bool   },
-    { "ret_rev_solo",  ParamKind::Bool   },
-    { "ret_rev_scSrc", ParamKind::Int    },
-    { "ret_rev_scAmt" }, { "ret_rev_scAtk" }, { "ret_rev_scRel" },
-    // ── Master ──────────────────────────────────────────────────────────
-    { "mstr_lvl" }, { "mstr_pan" },
-    { "mstrLoop",      ParamKind::Int    },
-    // ── Master insert 1 ─────────────────────────────────────────────────
-    { "mst_insChar",   ParamKind::AlgorithmIndex, mu_audio::kInsertAlgorithmNames },
-    { "mst_insDrv" }, { "mst_insOut" }, { "mst_insBits" },
-    { "mst_insRate" }, { "mst_insDit" }, { "mst_insTon" }, { "mst_insMid" },
-    // ── Master insert 2 ─────────────────────────────────────────────────
-    { "mst_ins2Char",  ParamKind::AlgorithmIndex, mu_audio::kInsertAlgorithmNames },
-    { "mst_ins2Drv" }, { "mst_ins2Out" }, { "mst_ins2Bits" },
-    { "mst_ins2Rate" }, { "mst_ins2Dit" }, { "mst_ins2Ton" }, { "mst_ins2Mid" },
-};
-
-inline constexpr int kGlobalParamDefCount = (int)(sizeof(kGlobalParamDefs) / sizeof(kGlobalParamDefs[0]));
+// GlobalParamDef, kGlobalParamDefs, kGlobalParamDefCount moved to PresetHelpers.h
+// so the test suite can access them without the PluginProcessor include chain.
 
 // Applies a rhythm parameter suffix + display-scale value to a Rhythm struct.
 // Returns patternDirty (true) or voiceDirty (false) via the out-params.
@@ -147,7 +74,7 @@ inline constexpr int kGlobalParamDefCount = (int)(sizeof(kGlobalParamDefs) / siz
 // it became clear there were too few legacy presets to justify the maintenance.
 inline constexpr int kCurrentPresetVersion = 2;
 
-// #434: now a table lookup. The body that used to live here is in
+// now a table lookup. The body that used to live here is in
 // RhythmParamTable.h (one entry per suffix; apply + push lambdas co-located).
 inline void applyRhythmSuffix(const juce::String& suffix, float v, Rhythm& r,
                                bool& patternDirty, bool& voiceDirty)
