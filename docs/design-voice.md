@@ -16,7 +16,7 @@ SamplePlayer → Pitch ADSR → ResonantFilter → Filter ADSR → Drive → Amp
 | Pitch ADSR | Attack, decay, sustain, release, depth, retrigger mode (Reset/Legato) | Depth in semitones above base pitch. |
 | Resonant filter | Type (16 modes: LP 6 / LP 12 / LP 24 / BP 12 / BP 24 / HP 6 / HP 12 / HP 24 / Notch / Notch 24 / AP 12 / Comb+ / Comb− / Peak / Lo Shelf / Hi Shelf), cutoff, resonance | SVF (types 0–3), LadderFilter (types 4–6), OnePoleLP/HP (types 7/11), feedback comb (type 8), biquad (types 9/12–14), and mirrored Notch/Comb variants |
 | Filter ADSR | Attack, decay, sustain, release, depth, retrigger mode | Depth controls sweep above base cutoff. Default Reset. |
-| Insert | Character (11 algorithms: None / Soft Clip / Hard Clip / Fold / Bitcrusher / Clipper / 3-Band EQ / Compressor / Limiter / Ring Mod / Tape Sat), drive amount, output trim, tone filter | Placed after filter, before amp. `InsertProcessor` handles all algorithms inline at native sample rate. |
+| Insert | Character (14 algorithms: None / Soft Clip / Hard Clip / Fold / Bitcrusher / Clipper / 3-Band EQ / Compressor / Limiter / Ring Mod / Tape Sat / Karplus / Vocoder / Vocoder St), drive amount, output trim, tone filter | Placed after filter, before amp. `InsertProcessor` handles all algorithms inline at native sample rate. |
 | Amplitude ADSR | Attack, decay, sustain, release, retrigger mode (Reset/Legato), accent | Reset: retriggers from zero. Legato: retriggers from current level. Default Reset. Accent boost applied when step is accented (see below). |
 
 ## Accent

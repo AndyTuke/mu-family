@@ -51,12 +51,26 @@ private:
     // Pre: `n` already clamped to [1, MaxRhythms]. Post: numActiveRhythms == n.
     void resizeRhythmArrays(int n);
 
-    // Restore APVTS rhythm params + channel params for slot `i` from `rTree`.
-    void restoreRhythmParams(int i, const juce::ValueTree& rTree);
+    // Restore the APVTS rhythm-param block for slot `apvtsSlot` from `rTree`.
+    // `srcPropPrefix` is prepended to each property name when reading from the
+    // tree (e.g. "" for .muclid per-rhythm subtree, "r0_" for .muRhyth root).
+    void restoreRhythmAPVTSParams(int apvtsSlot, const juce::ValueTree& rTree,
+                                   const juce::String& srcPropPrefix);
 
-    // Restore embedded-sample bytes (preferred) or stored sample path for slot `i`.
-    // Fires onLoadError if the linked sample is missing.
-    void restoreRhythmSample(int i, const juce::ValueTree& rTree);
+    // Restore the channel-strip params for slot `apvtsSlot`. Only relevant for
+    // the .muclid format — legacy .muRhyth `ch_*` properties are intentionally
+    // ignored by applyRhythmPreset (see Mixer-state-stays-with-slot policy).
+    void restoreRhythmChannelParams(int apvtsSlot, const juce::ValueTree& rTree);
+
+    // Restore embedded-sample bytes (preferred) or stored sample path for slot.
+    // The three property-name args spell out exactly which keys to read so the
+    // helper can serve unprefixed .muclid subtrees, "r0_"-prefixed .muRhyth
+    // roots, and "r{i}_"-prefixed host-state roots from a single body. Fires
+    // onLoadError if the linked sample is missing.
+    void restoreRhythmSample(int slot, const juce::ValueTree& tree,
+                              const juce::String& samplePathProp,
+                              const juce::String& sampleDataProp,
+                              const juce::String& sampleNameProp);
 
     // Deserialise the optional <Modulators> child for slot `i`. No-op if absent
     // (legacy presets leave the rhythm's in-memory modulators intact).

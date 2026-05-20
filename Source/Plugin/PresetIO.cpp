@@ -457,112 +457,31 @@ bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIdx)
         if (proc_.onLoadError) proc_.onLoadError("Invalid preset: " + file.getFileName());
         return false;
     }
-
-    // Load only proc_.sequencer-page state — mixer settings stay attached to the slot.
-    // Older rhythm preset files may include "ch_*" properties; those are simply
-    // ignored on load (no read here) so legacy files load cleanly with the new policy.
     // v2-only: legacy presets refused at the entry point.
     if (! requireSupportedPresetVersion(state, file.getFileName(), proc_.onLoadError))
         return false;
-    const juce::String dstPrefix = "r" + juce::String(targetIdx) + "_";
-    for (int i = 0; i < kRhythmParamCount; ++i)
-    {
-        const auto& def = kRhythmParamDefs[i];
-        const juce::String propName = "r0_" + juce::String(def.suffix);
-        if (auto* param = proc_.apvts.getParameter(dstPrefix + def.suffix))
-        {
-            const float actualVal = readParamPropertyAsActual(state, propName, *param, def);
-            if (! std::isnan(actualVal))
-                param->setValueNotifyingHost(param->convertTo0to1(actualVal));
-        }
-    }
 
+    // Load only sequencer-page state — mixer settings stay attached to the slot.
+    // Older rhythm preset files may include "ch_*" properties; those are simply
+    // ignored (we don't call restoreRhythmChannelParams here).
+    restoreRhythmAPVTSParams (targetIdx, state, /*srcPropPrefix*/ "r0_");
+    restoreRhythmModulators  (targetIdx, state);
+
+    // Name + colour (not APVTS-backed).
     Rhythm& r = proc_.sequencer.getRhythm(targetIdx);
     auto nameVal = state.getProperty("r0_name");
     if (nameVal.isString() && nameVal.toString().isNotEmpty())
         r.name = nameVal.toString().toStdString();
     r.colourIndex = (int)state.getProperty("r0_colour", r.colourIndex);
 
-    // restore modulators if the preset carries a Modulators child.
-    // Legacy .muRhyth (no Modulators) is left alone — the rhythm keeps its
-    // existing in-memory CS state instead of being wiped. This is the
-    // intentional opposite of clear-then-load for the host-state path: when
-    // a user loads a rhythm preset that pre-dates #237, we don't want their
-    // freshly-authored modulators getting destroyed.
-    if (auto mods = state.getChildWithName("Modulators"); mods.isValid())
-    {
-        clearModulators(r);
-        auto dropped = deserialiseModulators(mods, r);
-        if (! dropped.isEmpty() && proc_.onLoadError)
-            proc_.onLoadError("Dropped " + juce::String(dropped.size())
-                        + " modulator assignment(s) from " + file.getFileName()
-                        + ": " + dropped.joinIntoString("; "));
-    }
+    // In .muRhyth the sample *path* is "r0_sample" but the embedded blob fields
+    // are unprefixed ("sampleData" / "sampleName").
+    restoreRhythmSample(targetIdx, state, "r0_sample", "sampleData", "sampleName");
 
-    // Embedded sample takes priority over path-based load (mirrors full-preset logic).
-    juce::String encodedData = state.getProperty("sampleData").toString();
-    if (encodedData.isNotEmpty())
-    {
-        juce::MemoryOutputStream mos;
-        if (juce::Base64::convertFromBase64(mos, encodedData) && mos.getDataSize() > 0)
-        {
-            juce::String sampleName = state.getProperty("sampleName", "embedded").toString();
-            juce::File tmp = juce::File::getSpecialLocation(juce::File::tempDirectory)
-                                 .getChildFile("muclid_" + sampleName);
-            if (tmp.replaceWithData(mos.getData(), mos.getDataSize()))
-            {
-                proc_.voiceEngines[targetIdx]->loadFile(tmp);
-                proc_.loadedSamplePaths.set(targetIdx, tmp.getFullPathName());
-            }
-        }
-    }
-    else
-    {
-        juce::String storedPath = state.getProperty("r0_sample").toString();
-        if (storedPath.isNotEmpty())
-        {
-            const juce::File samplesDir = proc_.getSamplesDir();
-            juce::File f = resolveSamplePath(storedPath, samplesDir);
-            if (f.existsAsFile())
-            {
-                proc_.voiceEngines[targetIdx]->loadFile(f);
-                proc_.loadedSamplePaths.set(targetIdx, f.getFullPathName());
-            }
-            else if (juce::File::isAbsolutePath(storedPath))
-            {
-                juce::File fallback = samplesDir.getChildFile(f.getFileName());
-                if (fallback.existsAsFile())
-                {
-                    proc_.voiceEngines[targetIdx]->loadFile(fallback);
-                    proc_.loadedSamplePaths.set(targetIdx, fallback.getFullPathName());
-                    if (proc_.onLoadError)
-                        proc_.onLoadError("Sample '" + f.getFileName()
-                                    + "' not at original path, loaded from content folder instead.");
-                }
-                else
-                {
-                    proc_.voiceEngines[targetIdx]->clearSample();
-                    proc_.loadedSamplePaths.set(targetIdx, storedPath);
-                }
-            }
-            else
-            {
-                // Relative path, not found in Samples folder.
-                proc_.voiceEngines[targetIdx]->clearSample();
-                proc_.loadedSamplePaths.set(targetIdx, f.getFullPathName());
-            }
-        }
-        else
-        {
-            proc_.voiceEngines[targetIdx]->clearSample();
-            proc_.loadedSamplePaths.set(targetIdx, juce::String());
-        }
-    }
-
-    // force-sync APVTS → Rhythm so freshly-defaulted slots (after a
-    // shrink/grow cycle) get their fields repopulated even when JUCE skips
-    // the parameterChanged listener because incoming values match the
-    // already-stored APVTS values.
+    // force-sync APVTS → Rhythm so freshly-defaulted slots (after a shrink/grow
+    // cycle) get their fields repopulated even when JUCE skips the
+    // parameterChanged listener because incoming values match the already-
+    // stored APVTS values.
     proc_.forceSyncRhythmFromAPVTS(targetIdx);
     return true;
 }
@@ -757,9 +676,11 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     for (int i = 0; i < n; ++i)
     {
         Rhythm& r = proc_.sequencer.getRhythm(i);
-        r.name        = state.getProperty("r" + juce::String(i) + "_name",
+        const juce::String slotPrefix = "r" + juce::String(i) + "_";
+
+        r.name        = state.getProperty(slotPrefix + "name",
                                           "Rhythm " + juce::String(i + 1)).toString().toStdString();
-        r.colourIndex = (int)state.getProperty("r" + juce::String(i) + "_colour", i % 30);
+        r.colourIndex = (int)state.getProperty(slotPrefix + "colour", i % 30);
 
         // force-sync APVTS → Rhythm so shrink/grow cycles (preset A → B → A)
         // repopulate freshly-defaulted Rhythm fields even when JUCE skips listener
@@ -767,54 +688,12 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
         // updatePattern + proc_.voiceEngines[i]->setParams.
         proc_.forceSyncRhythmFromAPVTS(i);
 
-        juce::String samplePath = state.getProperty("r" + juce::String(i) + "_sample").toString();
-        juce::String sampleData = state.getProperty("r" + juce::String(i) + "_sampleData").toString();
-        juce::String sampleName = state.getProperty("r" + juce::String(i) + "_sampleName").toString();
-
-        proc_.loadedSamplePaths.set(i, samplePath);
-
-        if (sampleData.isNotEmpty() && sampleName.isNotEmpty())
-        {
-            juce::MemoryBlock mb;
-            {
-                juce::MemoryOutputStream mos(mb, false);
-                juce::Base64::convertFromBase64(mos, sampleData);
-            }
-            if (mb.getSize() > 0)
-            {
-                juce::File tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory)
-                                         .getChildFile("muClid_samples");
-                tempDir.createDirectory();
-                juce::File tempFile = tempDir.getChildFile(sampleName);
-                if (tempFile.replaceWithData(mb.getData(), mb.getSize()))
-                {
-                    proc_.voiceEngines[i]->loadFile(tempFile);
-                    proc_.loadedSamplePaths.set(i, tempFile.getFullPathName());
-                }
-            }
-        }
-        else if (samplePath.isNotEmpty())
-        {
-            juce::File f = resolveSamplePath(samplePath, proc_.getSamplesDir());
-            if (f.existsAsFile())
-            {
-                proc_.voiceEngines[i]->loadFile(f);
-            }
-            else
-            {
-                juce::File fallback = proc_.getSamplesDir().getChildFile(juce::File(samplePath).getFileName());
-                if (fallback.existsAsFile())
-                {
-                    proc_.voiceEngines[i]->loadFile(fallback);
-                    proc_.loadedSamplePaths.set(i, fallback.getFullPathName());
-                    // warn that we used a same-basename fallback.
-                    if (proc_.onLoadError)
-                        proc_.onLoadError("Sample '" + juce::File(samplePath).getFileName()
-                                    + "' not at original path, loaded from content folder instead (rhythm "
-                                    + juce::String(i + 1) + ").");
-                }
-            }
-        }
+        // Host-state format prefixes every sample-related property with "r{i}_".
+        proc_.loadedSamplePaths.set(i, state.getProperty(slotPrefix + "sample").toString());
+        restoreRhythmSample(i, state,
+                             slotPrefix + "sample",
+                             slotPrefix + "sampleData",
+                             slotPrefix + "sampleName");
     }
 }
 
@@ -1001,21 +880,25 @@ void PresetIO::resizeRhythmArrays(int n)
     }
 }
 
-void PresetIO::restoreRhythmParams(int i, const juce::ValueTree& rTree)
+void PresetIO::restoreRhythmAPVTSParams(int apvtsSlot, const juce::ValueTree& rTree,
+                                         const juce::String& srcPropPrefix)
 {
-    const juce::String dstPrefix = "r" + juce::String(i) + "_";
+    const juce::String dstPrefix = "r" + juce::String(apvtsSlot) + "_";
     for (int j = 0; j < kRhythmParamCount; ++j)
     {
         const auto& def = kRhythmParamDefs[j];
         if (auto* param = proc_.apvts.getParameter(dstPrefix + def.suffix))
         {
-            const float actualVal = readParamPropertyAsActual(rTree, juce::String(def.suffix), *param, def);
+            const float actualVal = readParamPropertyAsActual(rTree, srcPropPrefix + def.suffix, *param, def);
             if (! std::isnan(actualVal))
                 param->setValueNotifyingHost(param->convertTo0to1(actualVal));
         }
     }
+}
 
-    const juce::String dstChPrefix = "ch" + juce::String(i) + "_";
+void PresetIO::restoreRhythmChannelParams(int apvtsSlot, const juce::ValueTree& rTree)
+{
+    const juce::String dstChPrefix = "ch" + juce::String(apvtsSlot) + "_";
     for (int j = 0; kChannelSuffixes[j] != nullptr; ++j)
     {
         juce::Identifier chPropId { "ch_" + juce::String(kChannelSuffixes[j]) };
@@ -1041,11 +924,14 @@ void PresetIO::restoreRhythmModulators(int i, const juce::ValueTree& rTree)
                     + ": " + dropped.joinIntoString("; "));
 }
 
-void PresetIO::restoreRhythmSample(int i, const juce::ValueTree& rTree)
+void PresetIO::restoreRhythmSample(int i, const juce::ValueTree& tree,
+                                    const juce::String& samplePathProp,
+                                    const juce::String& sampleDataProp,
+                                    const juce::String& sampleNameProp)
 {
-    const juce::String sampleData = rTree.getProperty("sampleData").toString();
-    const juce::String sampleName = rTree.getProperty("sampleName").toString();
-    const juce::String samplePath = rTree.getProperty("sample").toString();
+    const juce::String sampleData = tree.getProperty(juce::Identifier(sampleDataProp)).toString();
+    const juce::String sampleName = tree.getProperty(juce::Identifier(sampleNameProp)).toString();
+    const juce::String samplePath = tree.getProperty(juce::Identifier(samplePathProp)).toString();
 
     if (sampleData.isNotEmpty() && sampleName.isNotEmpty())
     {
@@ -1181,8 +1067,9 @@ void PresetIO::loadPreset(const juce::File& file)
         if (rTree.getType() != juce::Identifier("Rhythm")) continue;
         const int i = rhythmIdx++;
 
-        restoreRhythmParams(i, rTree);
-        restoreRhythmModulators(i, rTree);
+        restoreRhythmAPVTSParams  (i, rTree, /*srcPropPrefix*/ "");
+        restoreRhythmChannelParams(i, rTree);
+        restoreRhythmModulators   (i, rTree);
 
         // Name + colour (not APVTS-backed — sit on the Rhythm struct directly).
         Rhythm& r = proc_.sequencer.getRhythm(i);
@@ -1191,7 +1078,7 @@ void PresetIO::loadPreset(const juce::File& file)
             r.name = nameVal.toString().toStdString();
         r.colourIndex = (int)rTree.getProperty("colour", r.colourIndex);
 
-        restoreRhythmSample(i, rTree);
+        restoreRhythmSample(i, rTree, "sample", "sampleData", "sampleName");
 
         // force-sync APVTS → Rhythm so a preset that re-loads identical values
         // into a freshly-recreated slot (preset A → B → A pattern) still
