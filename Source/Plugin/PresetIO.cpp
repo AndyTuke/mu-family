@@ -960,6 +960,181 @@ void PresetIO::savePreset(const juce::String& name,
     atomicReplaceWithText(dir.getChildFile(safeName + ".muclid"), root.toXmlString(), proc_.onLoadError);
 }
 
+// ── PresetIO::loadPreset helpers ────────────────────────────────────────────
+//
+// loadPreset itself is a sequence of named steps; each step lives in one of the
+// helpers below. All run on the message thread under a single
+// mu_core::ScopedApvtsLoading guard scoped to the caller.
+
+void PresetIO::resizeRhythmArrays(int n)
+{
+    proc_.sequencer.setNumRhythms(n);
+
+    const int oldN = proc_.numActiveRhythms.load(std::memory_order_acquire);
+    if (n < oldN)
+    {
+        proc_.numActiveRhythms.store(n, std::memory_order_release);
+        for (int i = n; i < oldN; ++i)
+        {
+            proc_.voiceEngines[i].reset();
+            proc_.midiEngines[i] = MidiOutputEngine{};
+            // Wipe mixer channel state and sample-path memory so the now-inactive
+            // slot doesn't retain stale fader/sidechain/sample data from the
+            // pre-load session.
+            proc_.mixerEngine.channels[i] = MixerEngine::ChannelState{};
+            if (i < proc_.loadedSamplePaths.size())
+                proc_.loadedSamplePaths.set(i, juce::String());
+        }
+    }
+    else
+    {
+        for (int i = oldN; i < n; ++i)
+        {
+            proc_.voiceEngines[i] = std::make_unique<VoiceEngine>();
+            if (proc_.currentSampleRate > 0 && proc_.currentBlockSize > 0)
+            {
+                proc_.voiceEngines[i]->prepareToPlay(proc_.currentSampleRate, proc_.currentBlockSize);
+                proc_.midiEngines[i].prepare(proc_.currentSampleRate, proc_.currentBlockSize);
+            }
+        }
+        proc_.numActiveRhythms.store(n, std::memory_order_release);
+    }
+}
+
+void PresetIO::restoreRhythmParams(int i, const juce::ValueTree& rTree)
+{
+    const juce::String dstPrefix = "r" + juce::String(i) + "_";
+    for (int j = 0; j < kRhythmParamCount; ++j)
+    {
+        const auto& def = kRhythmParamDefs[j];
+        if (auto* param = proc_.apvts.getParameter(dstPrefix + def.suffix))
+        {
+            const float actualVal = readParamPropertyAsActual(rTree, juce::String(def.suffix), *param, def);
+            if (! std::isnan(actualVal))
+                param->setValueNotifyingHost(param->convertTo0to1(actualVal));
+        }
+    }
+
+    const juce::String dstChPrefix = "ch" + juce::String(i) + "_";
+    for (int j = 0; kChannelSuffixes[j] != nullptr; ++j)
+    {
+        juce::Identifier chPropId { "ch_" + juce::String(kChannelSuffixes[j]) };
+        if (rTree.hasProperty(chPropId))
+            if (auto* param = proc_.apvts.getParameter(dstChPrefix + kChannelSuffixes[j]))
+                param->setValueNotifyingHost((float)rTree.getProperty(chPropId));
+    }
+}
+
+void PresetIO::restoreRhythmModulators(int i, const juce::ValueTree& rTree)
+{
+    // Opt-in: legacy .muclid files (no Modulators child per rhythm) leave the
+    // rhythm's existing in-memory state in place — avoids accidental destruction.
+    auto rMods = rTree.getChildWithName("Modulators");
+    if (! rMods.isValid()) return;
+
+    Rhythm& r = proc_.sequencer.getRhythm(i);
+    clearModulators(r);
+    auto dropped = deserialiseModulators(rMods, r);
+    if (! dropped.isEmpty() && proc_.onLoadError)
+        proc_.onLoadError("Dropped " + juce::String(dropped.size())
+                    + " modulator assignment(s) on rhythm " + juce::String(i + 1)
+                    + ": " + dropped.joinIntoString("; "));
+}
+
+void PresetIO::restoreRhythmSample(int i, const juce::ValueTree& rTree)
+{
+    const juce::String sampleData = rTree.getProperty("sampleData").toString();
+    const juce::String sampleName = rTree.getProperty("sampleName").toString();
+    const juce::String samplePath = rTree.getProperty("sample").toString();
+
+    if (sampleData.isNotEmpty() && sampleName.isNotEmpty())
+    {
+        juce::MemoryBlock mb;
+        {
+            juce::MemoryOutputStream mos(mb, false);
+            juce::Base64::convertFromBase64(mos, sampleData);
+        }
+        if (mb.getSize() > 0)
+        {
+            juce::File tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                                     .getChildFile("muClid_samples");
+            tempDir.createDirectory();
+            juce::File tempFile = tempDir.getChildFile(sampleName);
+            if (tempFile.replaceWithData(mb.getData(), mb.getSize()))
+            {
+                proc_.voiceEngines[i]->loadFile(tempFile);
+                proc_.loadedSamplePaths.set(i, tempFile.getFullPathName());
+            }
+        }
+        return;
+    }
+
+    if (samplePath.isEmpty())
+    {
+        // Preset rhythm has no sample at all — wipe any stale sample on this slot.
+        proc_.voiceEngines[i]->clearSample();
+        proc_.loadedSamplePaths.set(i, juce::String());
+        return;
+    }
+
+    const juce::File samplesDir = proc_.getSamplesDir();
+    juce::File f = resolveSamplePath(samplePath, samplesDir);
+    if (f.existsAsFile())
+    {
+        proc_.voiceEngines[i]->loadFile(f);
+        proc_.loadedSamplePaths.set(i, f.getFullPathName());
+    }
+    else if (juce::File::isAbsolutePath(samplePath))
+    {
+        juce::File fallback = samplesDir.getChildFile(f.getFileName());
+        if (fallback.existsAsFile())
+        {
+            proc_.voiceEngines[i]->loadFile(fallback);
+            proc_.loadedSamplePaths.set(i, fallback.getFullPathName());
+            if (proc_.onLoadError)
+                proc_.onLoadError("Sample '" + f.getFileName()
+                            + "' not at original path, loaded from content folder instead (rhythm "
+                            + juce::String(i + 1) + ").");
+        }
+        else
+        {
+            proc_.voiceEngines[i]->clearSample();
+            proc_.loadedSamplePaths.set(i, samplePath);
+        }
+    }
+    else
+    {
+        // Relative path, not found in Samples folder.
+        proc_.voiceEngines[i]->clearSample();
+        proc_.loadedSamplePaths.set(i, f.getFullPathName());
+    }
+}
+
+void PresetIO::restoreGlobalState(const juce::ValueTree& root)
+{
+    // GlobalState child was added in #123; older files omit this and the loop
+    // simply does nothing. Stage 35 + #451: iterate kGlobalParamDefs so algorithm-
+    // selector params (eff_algo / rev_algo / mst_insChar / mst_ins2Char) use the
+    // name-string lookup path in v2.
+    for (int ci = 0; ci < root.getNumChildren(); ++ci)
+    {
+        auto child = root.getChild(ci);
+        if (child.getType() != juce::Identifier("GlobalState")) continue;
+        for (int gi = 0; gi < mu_pp::kGlobalParamDefCount; ++gi)
+        {
+            const auto& def = mu_pp::kGlobalParamDefs[gi];
+            if (auto* param = proc_.apvts.getParameter(def.id))
+            {
+                const float actualVal = readGlobalPropertyAsActual(child, juce::String(def.id),
+                                                                   *param, def);
+                if (! std::isnan(actualVal))
+                    param->setValueNotifyingHost(param->convertTo0to1(actualVal));
+            }
+        }
+        return;
+    }
+}
+
 void PresetIO::loadPreset(const juce::File& file)
 {
     auto xml = juce::parseXML(file);
@@ -975,205 +1150,58 @@ void PresetIO::loadPreset(const juce::File& file)
         return;
     }
 
-    if (root.getType() == juce::Identifier("MuClidPreset"))
-    {
-        // Reject legacy formats BEFORE mutating proc_.sequencer state. Otherwise a v0
-        // preset wipes the user's existing rhythms during the resize block below
-        // and only then reports the rejection — leaving the project in a
-        // half-loaded default state instead of the pre-load state.
-        if (! requireSupportedPresetVersion(root, file.getFileName(), proc_.onLoadError))
-            return;
-
-        // Count only Rhythm-type children; GlobalState child was added in #123.
-        int n = 0;
-        for (int ci = 0; ci < root.getNumChildren(); ++ci)
-            if (root.getChild(ci).getType() == juce::Identifier("Rhythm"))
-                ++n;
-        n = juce::jlimit(1, SequencerEngine::MaxRhythms, n);
-        proc_.sequencer.setNumRhythms(n);
-
-        const int oldN2 = proc_.numActiveRhythms.load(std::memory_order_acquire);
-        if (n < oldN2)
-        {
-            proc_.numActiveRhythms.store(n, std::memory_order_release);
-            for (int i = n; i < oldN2; ++i)
-            {
-                proc_.voiceEngines[i].reset();
-                proc_.midiEngines[i] = MidiOutputEngine{};
-                // Wipe mixer channel state and sample-path memory so the now-inactive
-                // slot does not retain stale fader/sidechain/sample data from the
-                // pre-load session. Without this, opening the mixer after loading a
-                // smaller preset would still show the previous tenant's settings on
-                // the dimmed slots.
-                proc_.mixerEngine.channels[i] = MixerEngine::ChannelState{};
-                if (i < proc_.loadedSamplePaths.size())
-                    proc_.loadedSamplePaths.set(i, juce::String());
-            }
-        }
-        else
-        {
-            for (int i = oldN2; i < n; ++i)
-            {
-                proc_.voiceEngines[i] = std::make_unique<VoiceEngine>();
-                if (proc_.currentSampleRate > 0 && proc_.currentBlockSize > 0)
-                {
-                    proc_.voiceEngines[i]->prepareToPlay(proc_.currentSampleRate, proc_.currentBlockSize);
-                    proc_.midiEngines[i].prepare(proc_.currentSampleRate, proc_.currentBlockSize);
-                }
-            }
-            proc_.numActiveRhythms.store(n, std::memory_order_release);
-        }
-
-        mu_core::ScopedApvtsLoading guard(proc_.apvtsLoading);
-
-        int rhythmIdx = 0;
-        for (int ci = 0; ci < root.getNumChildren() && rhythmIdx < n; ++ci)
-        {
-            auto rTree = root.getChild(ci);
-            if (rTree.getType() != juce::Identifier("Rhythm")) continue;
-            const int i = rhythmIdx++;
-
-            const juce::String dstPrefix = "r" + juce::String(i) + "_";
-            for (int j = 0; j < kRhythmParamCount; ++j)
-            {
-                const auto& def = kRhythmParamDefs[j];
-                if (auto* param = proc_.apvts.getParameter(dstPrefix + def.suffix))
-                {
-                    const float actualVal = readParamPropertyAsActual(rTree, juce::String(def.suffix), *param, def);
-                    if (! std::isnan(actualVal))
-                        param->setValueNotifyingHost(param->convertTo0to1(actualVal));
-                }
-            }
-
-            const juce::String dstChPrefix = "ch" + juce::String(i) + "_";
-            for (int j = 0; kChannelSuffixes[j] != nullptr; ++j)
-            {
-                juce::Identifier chPropId { "ch_" + juce::String(kChannelSuffixes[j]) };
-                if (rTree.hasProperty(chPropId))
-                    if (auto* param = proc_.apvts.getParameter(dstChPrefix + kChannelSuffixes[j]))
-                        param->setValueNotifyingHost((float)rTree.getProperty(chPropId));
-            }
-
-            Rhythm& r = proc_.sequencer.getRhythm(i);
-
-            // restore modulators if the preset carries a Modulators child.
-            // Same opt-in behaviour as applyRhythmPreset — legacy .muclid files
-            // (no Modulators child per rhythm) leave the rhythm's existing
-            // in-memory state in place, avoiding accidental destruction.
-            if (auto rMods = rTree.getChildWithName("Modulators"); rMods.isValid())
-            {
-                clearModulators(r);
-                auto dropped = deserialiseModulators(rMods, r);
-                if (! dropped.isEmpty() && proc_.onLoadError)
-                    proc_.onLoadError("Dropped " + juce::String(dropped.size())
-                                + " modulator assignment(s) on rhythm " + juce::String(i + 1)
-                                + ": " + dropped.joinIntoString("; "));
-            }
-
-            auto nameVal = rTree.getProperty("name");
-            if (nameVal.isString() && nameVal.toString().isNotEmpty())
-                r.name = nameVal.toString().toStdString();
-            r.colourIndex = (int)rTree.getProperty("colour", r.colourIndex);
-
-            juce::String sampleData = rTree.getProperty("sampleData").toString();
-            juce::String sampleName = rTree.getProperty("sampleName").toString();
-            juce::String samplePath = rTree.getProperty("sample").toString();
-
-            if (sampleData.isNotEmpty() && sampleName.isNotEmpty())
-            {
-                juce::MemoryBlock mb;
-                {
-                    juce::MemoryOutputStream mos(mb, false);
-                    juce::Base64::convertFromBase64(mos, sampleData);
-                }
-                if (mb.getSize() > 0)
-                {
-                    juce::File tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory)
-                                             .getChildFile("muClid_samples");
-                    tempDir.createDirectory();
-                    juce::File tempFile = tempDir.getChildFile(sampleName);
-                    if (tempFile.replaceWithData(mb.getData(), mb.getSize()))
-                    {
-                        proc_.voiceEngines[i]->loadFile(tempFile);
-                        proc_.loadedSamplePaths.set(i, tempFile.getFullPathName());
-                    }
-                }
-            }
-            else if (samplePath.isNotEmpty())
-            {
-                const juce::File samplesDir = proc_.getSamplesDir();
-                juce::File f = resolveSamplePath(samplePath, samplesDir);
-                if (f.existsAsFile())
-                {
-                    proc_.voiceEngines[i]->loadFile(f);
-                    proc_.loadedSamplePaths.set(i, f.getFullPathName());
-                }
-                else if (juce::File::isAbsolutePath(samplePath))
-                {
-                    juce::File fallback = samplesDir.getChildFile(f.getFileName());
-                    if (fallback.existsAsFile())
-                    {
-                        proc_.voiceEngines[i]->loadFile(fallback);
-                        proc_.loadedSamplePaths.set(i, fallback.getFullPathName());
-                        if (proc_.onLoadError)
-                            proc_.onLoadError("Sample '" + f.getFileName()
-                                        + "' not at original path, loaded from content folder instead (rhythm "
-                                        + juce::String(i + 1) + ").");
-                    }
-                    else
-                    {
-                        proc_.voiceEngines[i]->clearSample();
-                        proc_.loadedSamplePaths.set(i, samplePath);
-                    }
-                }
-                else
-                {
-                    // Relative path, not found in Samples folder.
-                    proc_.voiceEngines[i]->clearSample();
-                    proc_.loadedSamplePaths.set(i, f.getFullPathName());
-                }
-            }
-            else
-            {
-                // Preset rhythm has no sample at all — wipe any stale sample on this slot.
-                proc_.voiceEngines[i]->clearSample();
-                proc_.loadedSamplePaths.set(i, juce::String());
-            }
-
-            // force-sync APVTS → Rhythm so a preset that re-loads identical
-            // values into a freshly-recreated slot (preset A → B → A pattern)
-            // still populates r.voiceParams / r.genA.hits. JUCE skips listener
-            // callbacks when setValueNotifyingHost is called with an unchanged
-            // value, so parameterChanged → syncRhythmParam never fires.
-            // Internally calls updatePattern + proc_.voiceEngines[i]->setParams.
-            proc_.forceSyncRhythmFromAPVTS(i);
-        }
-
-        // Restore global FX/mixer state if present (added in #123; older files omit this).
-        // Stage 35 + #451: iterate kGlobalParamDefs so algorithm-selector params
-        // (eff_algo / rev_algo / mst_insChar / mst_ins2Char) get name-string
-        // lookup in v2. v0/v1 paths stay normalised with #430 migration for v0.
-        for (int ci = 0; ci < root.getNumChildren(); ++ci)
-        {
-            auto child = root.getChild(ci);
-            if (child.getType() != juce::Identifier("GlobalState")) continue;
-            for (int gi = 0; gi < mu_pp::kGlobalParamDefCount; ++gi)
-            {
-                const auto& def = mu_pp::kGlobalParamDefs[gi];
-                if (auto* param = proc_.apvts.getParameter(def.id))
-                {
-                    const float actualVal = readGlobalPropertyAsActual(child, juce::String(def.id),
-                                                                       *param, def);
-                    if (! std::isnan(actualVal))
-                        param->setValueNotifyingHost(param->convertTo0to1(actualVal));
-                }
-            }
-            break;
-        }
-        // ScopedApvtsLoading guard goes out of scope at the closing brace below.
-    }
-    else
+    if (root.getType() != juce::Identifier("MuClidPreset"))
     {
         restoreStateFromTree(root);
+        return;
     }
+
+    // Reject legacy formats BEFORE mutating proc_.sequencer state. Otherwise a v0
+    // preset wipes the user's existing rhythms during the resize block below and
+    // only then reports the rejection — leaving the project in a half-loaded
+    // default state instead of the pre-load state.
+    if (! requireSupportedPresetVersion(root, file.getFileName(), proc_.onLoadError))
+        return;
+
+    // Step 1: count Rhythm children and resize arrays.
+    int n = 0;
+    for (int ci = 0; ci < root.getNumChildren(); ++ci)
+        if (root.getChild(ci).getType() == juce::Identifier("Rhythm"))
+            ++n;
+    n = juce::jlimit(1, SequencerEngine::MaxRhythms, n);
+    resizeRhythmArrays(n);
+
+    // Step 2: under one APVTS-loading guard, restore each rhythm + globals.
+    mu_core::ScopedApvtsLoading guard(proc_.apvtsLoading);
+
+    int rhythmIdx = 0;
+    for (int ci = 0; ci < root.getNumChildren() && rhythmIdx < n; ++ci)
+    {
+        auto rTree = root.getChild(ci);
+        if (rTree.getType() != juce::Identifier("Rhythm")) continue;
+        const int i = rhythmIdx++;
+
+        restoreRhythmParams(i, rTree);
+        restoreRhythmModulators(i, rTree);
+
+        // Name + colour (not APVTS-backed — sit on the Rhythm struct directly).
+        Rhythm& r = proc_.sequencer.getRhythm(i);
+        auto nameVal = rTree.getProperty("name");
+        if (nameVal.isString() && nameVal.toString().isNotEmpty())
+            r.name = nameVal.toString().toStdString();
+        r.colourIndex = (int)rTree.getProperty("colour", r.colourIndex);
+
+        restoreRhythmSample(i, rTree);
+
+        // force-sync APVTS → Rhythm so a preset that re-loads identical values
+        // into a freshly-recreated slot (preset A → B → A pattern) still
+        // populates r.voiceParams / r.genA.hits. JUCE skips listener callbacks
+        // when setValueNotifyingHost is called with an unchanged value, so
+        // parameterChanged → syncRhythmParam never fires. Internally calls
+        // updatePattern + proc_.voiceEngines[i]->setParams.
+        proc_.forceSyncRhythmFromAPVTS(i);
+    }
+
+    restoreGlobalState(root);
+    // ScopedApvtsLoading guard goes out of scope at the closing brace.
 }

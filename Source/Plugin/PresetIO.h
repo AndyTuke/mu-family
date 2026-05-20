@@ -41,4 +41,27 @@ public:
 
 private:
     PluginProcessor& proc_;
+
+    // Helpers extracted from loadPreset / applyRhythmPreset / restoreStateFromTree
+    // so each top-level function reads as a sequence of named steps. All run on
+    // the message thread under a single mu_core::ScopedApvtsLoading guard managed
+    // by the caller.
+
+    // Resize the sequencer + voice/MIDI/mixer arrays to `n` active rhythms.
+    // Pre: `n` already clamped to [1, MaxRhythms]. Post: numActiveRhythms == n.
+    void resizeRhythmArrays(int n);
+
+    // Restore APVTS rhythm params + channel params for slot `i` from `rTree`.
+    void restoreRhythmParams(int i, const juce::ValueTree& rTree);
+
+    // Restore embedded-sample bytes (preferred) or stored sample path for slot `i`.
+    // Fires onLoadError if the linked sample is missing.
+    void restoreRhythmSample(int i, const juce::ValueTree& rTree);
+
+    // Deserialise the optional <Modulators> child for slot `i`. No-op if absent
+    // (legacy presets leave the rhythm's in-memory modulators intact).
+    void restoreRhythmModulators(int i, const juce::ValueTree& rTree);
+
+    // Restore the <GlobalState> child if present (mixer + FX algorithm params).
+    void restoreGlobalState(const juce::ValueTree& root);
 };
