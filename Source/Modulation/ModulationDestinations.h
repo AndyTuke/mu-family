@@ -54,9 +54,14 @@ namespace ModDest
         { "euclid.a.rotate",  "Euclid A Rotate"    },
         { "euclid.b.hits",    "Euclid B Hits"      },
         { "euclid.b.rotate",  "Euclid B Rotate"    },
-        // ── Pitch octave (idx 20) + fine (idx 21, deprecated) ─────────────────
+        // ── Pitch octave (idx 20) ─────────────────────────────────────────────
+        // idx 21 ("pitch.fine") was retired in #218 — the slot stays so subsequent
+        // kTable indices don't shift (UI dropdown IDs are 1-based table indices).
+        // The id below intentionally doesn't match any valid destination string,
+        // so `isValidDestinationId("pitch.fine")` returns false and legacy preset
+        // assignments are rejected at load.
         { "pitch.octave",     "Pitch Octave"       },
-        { "pitch.fine",       "Pitch Fine"         },   // deprecated (#218)
+        { "_reserved.pitch.fine", "(reserved)"     },   // formerly "pitch.fine" — #218
         // ── Euclid C pattern (idx 22–23) ──────────────────────────────────────
         { "euclid.c.hits",    "Euclid C Hits"      },
         { "euclid.c.rotate",  "Euclid C Rotate"    },

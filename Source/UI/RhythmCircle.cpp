@@ -1,9 +1,24 @@
 #include "RhythmCircle.h"
 
+namespace
+{
+    // Animation timing — all derived from a single timer Hz so the durations
+    // stay in real-time units if the timer rate is ever changed.
+    constexpr float kTimerHz       = 30.0f;
+    constexpr float kSnapEaseSec   = 0.15f;   // ease-out to 0 when transport stops
+    constexpr float kPulseLifeSec  = 0.15f;   // arc-pulse display lifetime per hit
+    constexpr float kHubDecaySec   = 0.30f;   // centre-hub flash fade
+
+    constexpr float kSnapStep      = 1.0f / (kSnapEaseSec  * kTimerHz);
+    constexpr float kPulseSteps    = kPulseLifeSec * kTimerHz;
+    constexpr float kHubAlphaStart = 0.8f;    // hub flash starting alpha
+    constexpr float kHubDecayStep  = kHubAlphaStart / (kHubDecaySec * kTimerHz);
+}
+
 RhythmCircle::RhythmCircle()
 {
     arcPulses.fill({});
-    startTimerHz(30);
+    startTimerHz((int) kTimerHz);
 }
 
 RhythmCircle::~RhythmCircle()
@@ -40,13 +55,12 @@ void RhythmCircle::triggerHitPulse(int combinedStep, int stepsA)
     auto& p    = arcPulses[nextPulse % kMaxPulses];
     p.stepFrac = (float)ringAStep / (float)stepsA;
     p.arcWidth = juce::MathConstants<float>::twoPi / (float)stepsA;
-    // brighter flash on hit — was 0.7 alpha, now 1.0 so the playhead
-    // pulse is unmistakable.
+    // Full alpha on the playhead pulse so it dominates against the static rings.
     p.alpha    = 1.0f;
     p.expand   = 0.0f;
     p.active   = true;
     ++nextPulse;
-    hubAlpha = 0.8f;   // also brighter hub flash (was 0.5)
+    hubAlpha = kHubAlphaStart;
 }
 
 void RhythmCircle::timerCallback()
@@ -102,7 +116,7 @@ void RhythmCircle::timerCallback()
     // ── Ease-out snap to 0 when stopped ─────────────────────────────────────
     if (!wasPlaying && snapProgress < 1.0f)
     {
-        snapProgress = juce::jmin(1.0f, snapProgress + (1.0f / (0.15f * 30.0f)));
+        snapProgress = juce::jmin(1.0f, snapProgress + kSnapStep);
         const float ease = snapProgress * (2.0f - snapProgress);
         rotAngleA = snapFromA * (1.0f - ease);
         rotAngleB = snapFromB * (1.0f - ease);
@@ -111,21 +125,20 @@ void RhythmCircle::timerCallback()
     }
 
     // ── Advance arc pulses ───────────────────────────────────────────────────
-    static constexpr float kPulseSteps = 0.15f * 30.0f; // 150ms at 30Hz
     for (auto& p : arcPulses)
     {
         if (!p.active) continue;
         p.expand = juce::jmin(1.0f, p.expand + (1.0f / kPulseSteps));
         const float t = p.expand;
-        p.alpha = 1.0f * (1.0f - t * (2.0f - t));   // max alpha 1.0 (was 0.7)
+        p.alpha = 1.0f - t * (2.0f - t);  // ease-out-quad fade
         if (p.alpha <= 0.0f) p.active = false;
         dirty = true;
     }
 
-    // ── Hub pulse decay (300ms at 30Hz) ──────────────────────────────────────
+    // ── Hub pulse decay ──────────────────────────────────────────────────────
     if (hubAlpha > 0.0f)
     {
-        hubAlpha = juce::jmax(0.0f, hubAlpha - (0.5f / (0.3f * 30.0f)));
+        hubAlpha = juce::jmax(0.0f, hubAlpha - kHubDecayStep);
         dirty = true;
     }
 

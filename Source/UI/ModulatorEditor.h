@@ -50,7 +50,6 @@ namespace ModDest
         // ── Pitch ─────────────────────────────────────────────────────────────
         // pitch.octave: ±3 octaves full swing (scale=36 semitones).
         // pitch.semitones: ±12 semitones full swing. Combined max ±48 st.
-        // pitch.fine deprecated (#218) — legacy assignments silently no-op.
         dd.addSectionHeading("Pitch");
         item(20);  // Pitch Octave (±3 oct)
         item(9);   // Pitch Semitones (±12 st)

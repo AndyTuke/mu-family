@@ -61,7 +61,6 @@ static float depthScaleFor(const std::string& destId)
     // Semitones / dB / bits — match the destination's natural full range.
     if (destId == "pitch.semitones") return 12.0f;   // ±12 semitones full swing
     if (destId == "pitch.octave")    return 36.0f;   // ±3 octaves = ±36 semitones full swing
-    // pitch.fine deprecated by #218 — removed from UI; legacy assignments no-op.
     if (destId == "fenv.depth")      return 48.0f;   // 0..48 semitones (full range)
     if (destId == "pitch.envDepth")  return 24.0f;   // 0..24 semitones (#223)
     if (destId == "amp.level")       return 2.0f;    // 0..2 gain = -inf..+6 dB (#223)

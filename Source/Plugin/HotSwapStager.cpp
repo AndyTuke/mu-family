@@ -34,7 +34,7 @@ void HotSwapStager::cancelStagedSwap(int rhythmIndex)
 bool HotSwapStager::hasPendingSwap(int rhythmIndex) const
 {
     if (rhythmIndex < 0 || rhythmIndex >= SequencerEngine::MaxRhythms) return false;
-    return pendingSwaps[(size_t)rhythmIndex].isReady.load(std::memory_order_relaxed);
+    return pendingSwaps[(size_t)rhythmIndex].isReady.load(std::memory_order_acquire);
 }
 
 //==============================================================================

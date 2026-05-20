@@ -1,7 +1,7 @@
 // split into 3 partial-class TUs (this file + MixerChannel_Bindings.cpp +
-// MixerChannel_Insert.cpp) — was 1107 lines, the largest file in the codebase.
-// This TU keeps the ctor, paint/resized layout code, and the small status helpers.
-// kInsertDefaults table moved to MixerChannel_Insert.cpp (its only consumer).
+// MixerChannel_Insert.cpp). This TU keeps the ctor, paint/resized layout code,
+// and the small status helpers. kInsertDefaults lives in MixerChannel_Insert.cpp
+// (its only consumer).
 
 #include "MixerChannel.h"
 #include "../Plugin/PluginProcessor.h"

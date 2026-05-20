@@ -1,8 +1,6 @@
-// partial-class TU split from MixerChannel.cpp (which was 1107 lines and the
-// largest file in the codebase post-#365). Contains the four bind* methods plus the
-// related helpers that only run during binding (setSidechainSources, loadFromAPVTS).
-// Mirrors the #365 PluginProcessor split pattern — same class definition, methods
-// distributed across TUs. MixerChannel_Insert.cpp holds configureInsertAlgorithm.
+// partial-class TU split from MixerChannel.cpp. Contains the four bind* methods
+// plus helpers that only run during binding (setSidechainSources, loadFromAPVTS).
+// MixerChannel_Insert.cpp holds configureInsertAlgorithm.
 
 #include "MixerChannel.h"
 #include "../Plugin/PluginProcessor.h"

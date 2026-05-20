@@ -67,7 +67,6 @@ PluginProcessor::PluginProcessor()
         loadedSamplePaths.add(juce::String());
 
     // Pre-populate modulation param map so lookups never allocate on the audio thread.
-    // pitch.fine deprecated by #218 — not in the map; legacy assignments silently no-op.
     modParamValues.reserve(50);
     for (const char* key : { "amp.attack", "amp.decay", "amp.sustain", "amp.release",
                               "filter.cutoff", "filter.resonance",
@@ -444,7 +443,6 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParamValues["fenv.decay"]       = modParams.filterEnvDec * (100.0f/3.0f);
                 modParamValues["fenv.depth"]       = modParams.filterEnvDepth;
                 // pitch.octave and pitch.semitones both start at 0; summed at write-back → pitchMod.
-                // pitch.fine is deprecated (#218) — not in map, legacy assignments silently no-op.
                 modParamValues["pitch.semitones"]  = 0.0f;
                 modParamValues["pitch.octave"]     = 0.0f;
                 modParamValues["insert.drive"]     = modParams.insertDrive;
