@@ -525,7 +525,7 @@ void InsertSubsection::configureInsertAlgorithm(int charId)
         case 12: case 13:
         {
             static const char* const kWaveNames[4] = { "Saw", "Square", "White", "Pink" };
-            static const char* const kNoteNames[7] = { "C", "D", "E", "F", "G", "A", "B" };
+            static const char* const kNoteNames[12] = { "C","C#","D","D#","E","F","F#","G","G#","A","A#","B" };
             static const int kUnisonCounts[7] = { 1, 3, 5, 7, 9, 11, 13 };
 
             insertDrive.setLabel("Wave");
@@ -566,13 +566,13 @@ void InsertSubsection::configureInsertAlgorithm(int charId)
 
             insertTone.setLabel("Note");
             insertTone.getSlider().setSkewFactor(1.0);
-            insertTone.setRange(1.0, 7.0, 1.0);
+            insertTone.setRange(1.0, 12.0, 1.0);
             insertTone.getSlider().textFromValueFunction = [](double v) -> juce::String {
-                return kNoteNames[juce::jlimit(0, 6, (int)std::round(v) - 1)];
+                return kNoteNames[juce::jlimit(0, 11, (int)std::round(v) - 1)];
             };
             insertTone.getSlider().valueFromTextFunction = nullptr;
-            if (p) insertTone.setValue(juce::jlimit(1.0, 7.0, (double)p->insertBits), juce::dontSendNotification);
-            else   insertTone.setValue(4.0, juce::dontSendNotification);
+            if (p) insertTone.setValue(juce::jlimit(1.0, 12.0, (double)p->insertBits), juce::dontSendNotification);
+            else   insertTone.setValue(1.0, juce::dontSendNotification);
             insertTone.setVisible(true);
 
             auto syncGreyOut = [this] {

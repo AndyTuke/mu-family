@@ -28,7 +28,7 @@
 // respective APVTS fields — UI knobs step in integer increments:
 //   insertDrive (0..100):  Waveshape index — stored as 0..3 (0=Saw, 1=Square,
 //                         2=White Noise, 3=Pink Noise). UI shows the name.
-//   insertBits    (1..16):   Note index +1 — stored as 1..7 (1=C, 2=D, … 7=B).
+//   insertBits    (1..16):   Note index +1 — stored as 1..12 (1=C, 2=C#, … 12=B).
 //                         The +1 offset means insertBits's natural minimum (1)
 //                         maps to a valid note instead of a sentinel.
 //   insertDither  (0..100):  Octave knob — stored as 1..5 (SPN octaves 2..6).
@@ -94,7 +94,7 @@ public:
     {
         // ── Decode controls ─────────────────────────────────────────────
         const int waveshape = juce::jlimit(0, 3, (int) std::round(p.insertDrive));
-        const int noteIdx   = juce::jlimit(0, 6, (int) std::round(p.insertBits - 1.0f));
+        const int noteIdx   = juce::jlimit(0, 11, (int) std::round(p.insertBits - 1.0f));
         const int octave    = juce::jlimit(1, 5, (int) std::round(p.insertDither));
         // Unison stored in insertOutput (range -24..0). Linear map to 0..6.
         const int unisonIdx = juce::jlimit(0, 6, (int) std::round((p.insertOutput + 24.0f) * 0.25f));
@@ -103,8 +103,7 @@ public:
         const bool noiseCarrier = (waveshape >= 2);
 
         // ── Carrier frequency (pitched carriers only) ──────────────────
-        static constexpr int kSemis[7] = { 0, 2, 4, 5, 7, 9, 11 };
-        const float semitones  = static_cast<float>(kSemis[noteIdx] + 12 * (octave - 1));
+        const float semitones  = static_cast<float>(noteIdx + 12 * (octave - 1));
         const float baseFreq   = kLowestFreq * std::pow(2.0f, semitones / 12.0f);
         const float detuneCents = kUnisonSpreadCents[unisonIdx];
 

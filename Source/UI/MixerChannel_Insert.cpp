@@ -338,7 +338,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
         case 12:  // ── Vocoder — Wave / Unison / Octave / Note ────────
         {
             static const char* const kWaveNames[4] = { "Saw", "Square", "White", "Pink" };
-            static const char* const kNoteNames[7] = { "C", "D", "E", "F", "G", "A", "B" };
+            static const char* const kNoteNames[12] = { "C","C#","D","D#","E","F","F#","G","G#","A","A#","B" };
             static const int kUnisonCounts[7] = { 1, 3, 5, 7, 9, 11, 13 };
 
             drive.setLabel("Wave");
@@ -373,12 +373,12 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             tone.setVisible(true);
 
             extra.setLabel("Note");
-            extra.setRange(1.0, 7.0, 1.0);
+            extra.setRange(1.0, 12.0, 1.0);
             extra.getSlider().setSkewFactor(1.0);
             extra.getSlider().textFromValueFunction = [](double v) -> juce::String {
-                return kNoteNames[juce::jlimit(0, 6, (int) std::round(v) - 1)];
+                return kNoteNames[juce::jlimit(0, 11, (int) std::round(v) - 1)];
             };
-            extra.setValue(juce::jlimit(1.0, 7.0, (double) ip.insertBits), juce::dontSendNotification);
+            extra.setValue(juce::jlimit(1.0, 12.0, (double) ip.insertBits), juce::dontSendNotification);
             extra.setVisible(true);
 
             // grey out Unison / Octave / Note when carrier is
@@ -417,7 +417,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
         case 13:  // ── Vocoder Stereo — same controls as Vocoder (12) ────
         {
             static const char* const kWaveNames[4] = { "Saw", "Square", "White", "Pink" };
-            static const char* const kNoteNames[7] = { "C", "D", "E", "F", "G", "A", "B" };
+            static const char* const kNoteNames[12] = { "C","C#","D","D#","E","F","F#","G","G#","A","A#","B" };
             static const int kUnisonCounts[7] = { 1, 3, 5, 7, 9, 11, 13 };
 
             drive.setLabel("Wave");
@@ -450,12 +450,12 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             tone.setVisible(true);
 
             extra.setLabel("Note");
-            extra.setRange(1.0, 7.0, 1.0);
+            extra.setRange(1.0, 12.0, 1.0);
             extra.getSlider().setSkewFactor(1.0);
             extra.getSlider().textFromValueFunction = [](double v) -> juce::String {
-                return kNoteNames[juce::jlimit(0, 6, (int) std::round(v) - 1)];
+                return kNoteNames[juce::jlimit(0, 11, (int) std::round(v) - 1)];
             };
-            extra.setValue(juce::jlimit(1.0, 7.0, (double) ip.insertBits), juce::dontSendNotification);
+            extra.setValue(juce::jlimit(1.0, 12.0, (double) ip.insertBits), juce::dontSendNotification);
             extra.setVisible(true);
 
             auto syncVocoderStGreyOut = [this, slot]
