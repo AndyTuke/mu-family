@@ -26,18 +26,22 @@ public:
         writePos = 0;
         lfoPhase = 0.0f;
         feedL = feedR = 0.0f;
+        // 15 ms ramps eliminate per-block step crackle on knob movement.
+        smoothedRate    .reset(sr, 0.015);  smoothedRate    .setCurrentAndTargetValue(rate);
+        smoothedDepth   .reset(sr, 0.015);  smoothedDepth   .setCurrentAndTargetValue(depth);
+        smoothedFeedback.reset(sr, 0.015);  smoothedFeedback.setCurrentAndTargetValue(feedback);
+        smoothedMix     .reset(sr, 0.015);  smoothedMix     .setCurrentAndTargetValue(mix);
     }
 
     void processInner(juce::dsp::AudioBlock<float>& block) override
     {
-        const float lfoInc   = static_cast<float>(rate / sr);
         // Centre = 5.25ms; depth sweeps ±baseSamp so the wet path can cross
         // the dry delay (through-zero), eliminating the comb at lfoVal=0.
         const float baseSamp = static_cast<float>(5.25 * 0.001 * sr);
-        const float depSamp  = baseSamp * depth;
-        const float wet      = sendMode ? 1.0f : mix;
-        const float dry      = sendMode ? 0.0f : 1.0f - mix;
-        const float fb       = feedback;   // already scaled to ±0.95 in setParam
+        smoothedRate    .setTargetValue(rate);
+        smoothedDepth   .setTargetValue(depth);
+        smoothedFeedback.setTargetValue(feedback);
+        smoothedMix     .setTargetValue(mix);
 
         const size_t numSamples  = block.getNumSamples();
         const size_t numChannels = block.getNumChannels();
@@ -47,6 +51,15 @@ public:
 
         for (size_t i = 0; i < numSamples; ++i)
         {
+            const float rateNow  = smoothedRate    .getNextValue();
+            const float depthNow = smoothedDepth   .getNextValue();
+            const float fb       = smoothedFeedback.getNextValue();  // already ±0.95-scaled in setParam
+            const float mixNow   = smoothedMix     .getNextValue();
+            const float wet      = sendMode ? 1.0f : mixNow;
+            const float dry      = sendMode ? 0.0f : 1.0f - mixNow;
+            const float lfoInc   = rateNow / static_cast<float>(sr);
+            const float depSamp  = baseSamp * depthNow;
+
             const float lfoVal    = std::sin(lfoPhase * juce::MathConstants<float>::twoPi);
             const float wetDelayS = juce::jmax(1.0f, baseSamp + lfoVal * depSamp);
 
@@ -105,4 +118,9 @@ private:
     float lfoPhase  = 0.0f;
     float feedL     = 0.0f;
     float feedR     = 0.0f;
+
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedRate;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedDepth;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedFeedback;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedMix;
 };

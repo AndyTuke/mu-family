@@ -24,15 +24,19 @@ public:
         for (auto& s : stateR) s = 0.0f;
         feedbackL = feedbackR = 0.0f;
         lfoPhase = 0.0f;
+        smoothedRate    .reset(sr, 0.015);  smoothedRate    .setCurrentAndTargetValue(rate);
+        smoothedDepth   .reset(sr, 0.015);  smoothedDepth   .setCurrentAndTargetValue(depth);
+        smoothedFeedback.reset(sr, 0.015);  smoothedFeedback.setCurrentAndTargetValue(feedback);
+        smoothedMix     .reset(sr, 0.015);  smoothedMix     .setCurrentAndTargetValue(mix);
     }
 
     void processInner(juce::dsp::AudioBlock<float>& block) override
     {
-        const int   numStages = juce::jlimit(2, MaxStages, (static_cast<int>(stages) / 2) * 2);
-        const float lfoInc    = static_cast<float>(rate / sr);
-        const float wet       = sendMode ? 1.0f : mix;
-        const float dry       = sendMode ? 0.0f : 1.0f - mix;
-        const float fb        = feedback * 0.99f;
+        const int numStages = juce::jlimit(2, MaxStages, (static_cast<int>(stages) / 2) * 2);
+        smoothedRate    .setTargetValue(rate);
+        smoothedDepth   .setTargetValue(depth);
+        smoothedFeedback.setTargetValue(feedback);
+        smoothedMix     .setTargetValue(mix);
 
         // Precompute constants for frequency-correct bilinear-transform coefficient.
         // Notch sweeps logarithmically from fMin to fMax as LFO goes -1 to +1.
@@ -48,9 +52,17 @@ public:
 
         for (size_t i = 0; i < numSamples; ++i)
         {
+            const float rateNow  = smoothedRate    .getNextValue();
+            const float depthNow = smoothedDepth   .getNextValue();
+            const float fb       = smoothedFeedback.getNextValue() * 0.99f;
+            const float mixNow   = smoothedMix     .getNextValue();
+            const float wet      = sendMode ? 1.0f : mixNow;
+            const float dry      = sendMode ? 0.0f : 1.0f - mixNow;
+            const float lfoInc   = rateNow / static_cast<float>(sr);
+
             const float lfoVal  = std::sin(lfoPhase * juce::MathConstants<float>::twoPi);
             // Map LFO to a logarithmic frequency sweep, then convert to allpass coeff.
-            const float lfoNorm = 0.5f + 0.5f * lfoVal * depth;   // 0..1
+            const float lfoNorm = 0.5f + 0.5f * lfoVal * depthNow;   // 0..1
             const float freq    = fMin * std::exp(lfoNorm * logRange);
             const float t       = std::tan(piOverSr * freq);
             const float coeff   = (1.0f - t) / (1.0f + t);
@@ -109,4 +121,9 @@ private:
     float feedbackL = 0.0f;
     float feedbackR = 0.0f;
     float lfoPhase  = 0.0f;
+
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedRate;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedDepth;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedFeedback;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedMix;
 };

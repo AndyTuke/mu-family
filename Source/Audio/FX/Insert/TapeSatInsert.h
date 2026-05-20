@@ -14,6 +14,8 @@ public:
     void prepare(double sampleRate, int) override
     {
         currentSampleRate = sampleRate;
+        smoothedPreGain.reset(sampleRate, 0.015);  smoothedPreGain.setCurrentAndTargetValue(1.0f);
+        smoothedOutGain.reset(sampleRate, 0.015);  smoothedOutGain.setCurrentAndTargetValue(1.0f);
         reset();
     }
     void reset() override
@@ -32,6 +34,11 @@ public:
         const float toneHz  = juce::jlimit(200.0f, 20000.0f, p.insertTone);
         const float dcCoeff = 1.0f - (2.0f * juce::MathConstants<float>::pi * 20.0f
                                       / (float)currentSampleRate);
+        smoothedPreGain.setTargetValue(preGain);
+        smoothedOutGain.setTargetValue(outGain);
+        // toneHz also jumps per block but the OnePoleLP doesn't expose a smoothed
+        // setter — leaving as-is; the audible artefact on tone-knob sweep is the
+        // filter coefficient step, much smaller than the gain step.
         for (int ch = 0; ch < nCh; ++ch)
             toneFilter[ch].prepare(toneHz, (float)currentSampleRate);
         for (int ch = 0; ch < nCh; ++ch)
@@ -41,11 +48,15 @@ public:
             float& dout = dcOut[ch < 2 ? ch : 0];
             for (int i = 0; i < ns; ++i)
             {
-                const float sat = std::tanh(data[i] * preGain);
+                const float pg = (ch == 0) ? smoothedPreGain.getNextValue()
+                                           : smoothedPreGain.getCurrentValue();
+                const float og = (ch == 0) ? smoothedOutGain.getNextValue()
+                                           : smoothedOutGain.getCurrentValue();
+                const float sat = std::tanh(data[i] * pg);
                 const float dc  = sat - di + dcCoeff * dout;
                 di   = sat;
                 dout = dc;
-                data[i] = toneFilter[ch].process(dc) * outGain;
+                data[i] = toneFilter[ch].process(dc) * og;
             }
         }
     }
@@ -55,4 +66,6 @@ private:
     OnePoleLP toneFilter[2];
     float     dcIn [2] = {};
     float     dcOut[2] = {};
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedPreGain;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedOutGain;
 };

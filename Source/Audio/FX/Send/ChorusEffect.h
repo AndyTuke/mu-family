@@ -27,15 +27,22 @@ public:
             writePos[v] = 0;
             phase[v]    = static_cast<float>(v) / MaxVoices;
         }
+        // 15 ms ramps on every continuous knob so block-to-block param steps
+        // do not produce clicks/crackle. Same pattern as #511/#512/#513/#514/#535.
+        smoothedDepth .reset(sr, 0.015);  smoothedDepth .setCurrentAndTargetValue(depth);
+        smoothedRate  .reset(sr, 0.015);  smoothedRate  .setCurrentAndTargetValue(rate);
+        smoothedMix   .reset(sr, 0.015);  smoothedMix   .setCurrentAndTargetValue(mix);
+        smoothedSpread.reset(sr, 0.015);  smoothedSpread.setCurrentAndTargetValue(spread);
     }
 
     void processInner(juce::dsp::AudioBlock<float>& block) override
     {
-        const int   numVoices = juce::jlimit(2, MaxVoices, static_cast<int>(voices));
-        const float depthSamp = static_cast<float>(depth * 0.02 * sr);
-        const float baseSamp  = static_cast<float>(0.03 * sr);  // 30ms base delay
-        const float wet       = sendMode ? 1.0f : mix;
-        const float dry       = sendMode ? 0.0f : 1.0f - mix;
+        const int    numVoices = juce::jlimit(2, MaxVoices, static_cast<int>(voices));
+        const float  baseSamp  = static_cast<float>(0.03 * sr);  // 30ms base delay
+        smoothedDepth .setTargetValue(depth);
+        smoothedRate  .setTargetValue(rate);
+        smoothedMix   .setTargetValue(mix);
+        smoothedSpread.setTargetValue(spread);
 
         const size_t numSamples  = block.getNumSamples();
         const size_t numChannels = block.getNumChannels();
@@ -45,6 +52,14 @@ public:
 
         for (size_t i = 0; i < numSamples; ++i)
         {
+            const float depthNow  = smoothedDepth .getNextValue();
+            const float rateNow   = smoothedRate  .getNextValue();
+            const float mixNow    = smoothedMix   .getNextValue();
+            const float spreadNow = smoothedSpread.getNextValue();
+            const float depthSamp = depthNow * 0.02f * static_cast<float>(sr);
+            const float wet       = sendMode ? 1.0f : mixNow;
+            const float dry       = sendMode ? 0.0f : 1.0f - mixNow;
+
             float wetL = 0.0f, wetR = 0.0f;
             const float inL = (dataL != nullptr) ? dataL[i] : 0.0f;
             const float inR = (dataR != nullptr) ? dataR[i] : 0.0f;
@@ -55,7 +70,7 @@ public:
                 delayR[v][writePos[v]] = inR;
 
                 const float lfoVal  = std::sin(phase[v] * juce::MathConstants<float>::twoPi);
-                const float spreadV = (v % 2 == 0) ? 1.0f : (1.0f + spread * 0.5f);
+                const float spreadV = (v % 2 == 0) ? 1.0f : (1.0f + spreadNow * 0.5f);
                 const float delaySL = baseSamp + lfoVal * depthSamp;
                 const float delaySR = baseSamp + lfoVal * depthSamp * spreadV;
 
@@ -66,7 +81,7 @@ public:
                 // so all voices average to the user-set rate.
                 const float t      = numVoices > 1 ? (float)v / (numVoices - 1) : 0.5f;
                 const float detune = 1.0f + (t - 0.5f) * 0.03f;
-                phase[v] += static_cast<float>(rate * detune / sr);
+                phase[v] += rateNow * detune / static_cast<float>(sr);
                 if (phase[v] >= 1.0f) phase[v] -= 1.0f;
 
                 writePos[v] = (writePos[v] + 1) % MaxDelaySamples;
@@ -124,4 +139,9 @@ private:
     std::vector<float> delayR[MaxVoices];
     int   writePos[MaxVoices] = {};
     float phase[MaxVoices]    = {};
+
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedDepth;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedRate;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedMix;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedSpread;
 };
