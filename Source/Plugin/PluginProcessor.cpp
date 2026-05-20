@@ -113,6 +113,13 @@ PluginProcessor::PluginProcessor()
             flag.store(false, std::memory_order_relaxed);
     numActiveRhythms.store(1, std::memory_order_release);
 
+#if MUCLID_LITE_BUILD
+    // Cache LITE-only APVTS atomic pointers so processBlock doesn't pay a per-block
+    // hash lookup + StringRef materialise for these two reads.
+    liteMidiNotePtr  = apvts.getRawParameterValue("lite_midiNote");
+    liteAccentAmtPtr = apvts.getRawParameterValue("lite_accentAmt");
+#endif
+
     {
         mu_core::ScopedApvtsLoading guard(apvtsLoading);
         pushRhythmToAPVTS(0);
@@ -233,8 +240,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     {
         const auto blockResult = sequencer.processBlock(beatPos);
         {
-            const int   midiNote  = (int)apvts.getRawParameterValue("lite_midiNote")->load();
-            const float accentAmt = apvts.getRawParameterValue("lite_accentAmt")->load();
+            const int   midiNote  = (int)liteMidiNotePtr->load();
+            const float accentAmt = liteAccentAmtPtr->load();
 
             // Bottom half (0–50): accented ramps 100→127, non-accented stays 100.
             // Top half  (50–100): accented stays 127, non-accented ramps 100→75.

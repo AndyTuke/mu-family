@@ -2,6 +2,13 @@
 #include "../Audio/FX/Slots/FXAlgorithmDef.h"
 #include "../Audio/FX/Slots/EffectSlot.h"
 
+// Precomputed param IDs for the 5 effect-slot params. Avoids the per-iteration
+// `kEffParamIds[i]` String allocation in the snapshot/restore loops
+// that fire whenever the effect algorithm is switched.
+static const juce::String kEffParamIds[5] = {
+    "eff_p0", "eff_p1", "eff_p2", "eff_p3", "eff_p4"
+};
+
 // only subscribe to APVTS IDs that actually affect the mixer view.
 // Previously this class registered as a listener for *every* parameter in the
 // tree (hundreds across all rhythms / voices / mods) and set apvtsDirty on any
@@ -194,7 +201,7 @@ void MixerOverlay::wireFXRows()
             float* pv[5] = { &snap.p0, &snap.p1, &snap.p2, &snap.p3, &snap.p4 };
             for (int i = 0; i < (int)oldParams.size() && i < 5; ++i)
             {
-                float norm = *proc.apvts.getRawParameterValue("eff_p" + juce::String(i));
+                float norm = *proc.apvts.getRawParameterValue(kEffParamIds[i]);
                 *pv[i] = oldParams[i].minVal + norm * (oldParams[i].maxVal - oldParams[i].minVal);
             }
             effSnapValid[oldIdx] = true;
@@ -222,7 +229,7 @@ void MixerOverlay::wireFXRows()
                 float norm = (pd.maxVal > pd.minVal)
                     ? juce::jlimit(0.0f, 1.0f, (vals[i] - pd.minVal) / (pd.maxVal - pd.minVal))
                     : 0.0f;
-                if (auto* p = proc.apvts.getParameter("eff_p" + juce::String(i)))
+                if (auto* p = proc.apvts.getParameter(kEffParamIds[i]))
                     p->setValueNotifyingHost(norm);
                 effectRow.setParamValue(pd.id, vals[i]);
             }
@@ -257,7 +264,7 @@ void MixerOverlay::wireFXRows()
                 float norm = (pd.maxVal > pd.minVal)
                              ? juce::jlimit(0.0f, 1.0f, (v - pd.minVal) / (pd.maxVal - pd.minVal))
                              : 0.0f;
-                if (auto* p = proc.apvts.getParameter("eff_p" + juce::String(i)))
+                if (auto* p = proc.apvts.getParameter(kEffParamIds[i]))
                     p->setValueNotifyingHost(norm);
                 return;
             }
@@ -273,7 +280,7 @@ void MixerOverlay::wireFXRows()
             const auto& params = algos[ai].params;
             for (int i = 0; i < (int)params.size() && i < 5; ++i)
             {
-                float norm = *proc.apvts.getRawParameterValue("eff_p" + juce::String(i));
+                float norm = *proc.apvts.getRawParameterValue(kEffParamIds[i]);
                 float actual = params[i].minVal + norm * (params[i].maxVal - params[i].minVal);
                 effectRow.setParamValue(params[i].id, actual);
             }
@@ -470,7 +477,7 @@ void MixerOverlay::loadFromAPVTS()
             const auto& params = algos[ai].params;
             for (int i = 0; i < (int)params.size() && i < 5; ++i)
             {
-                float norm = *apvts.getRawParameterValue("eff_p" + juce::String(i));
+                float norm = *apvts.getRawParameterValue(kEffParamIds[i]);
                 effectRow.setParamValue(params[i].id,
                     params[i].minVal + norm * (params[i].maxVal - params[i].minVal));
             }

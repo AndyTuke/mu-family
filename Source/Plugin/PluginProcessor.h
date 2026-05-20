@@ -368,5 +368,13 @@ private:
     double currentSampleRate = 44100.0;
     int    currentBlockSize  = 512;
 
+#if MUCLID_LITE_BUILD
+    // Cached APVTS atomic pointers for the LITE build's per-block reads.
+    // Resolved once at construction (after APVTS layout is registered) so
+    // processBlock doesn't pay a hash lookup + literal-string materialise per call.
+    std::atomic<float>* liteMidiNotePtr  = nullptr;
+    std::atomic<float>* liteAccentAmtPtr = nullptr;
+#endif
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };
