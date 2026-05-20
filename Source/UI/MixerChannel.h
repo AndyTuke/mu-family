@@ -97,13 +97,13 @@ private:
     KnobWithLabel     scRelease { "\\",  Id::knobFxSend };
 
     // Per-algorithm state snapshots for master inserts — enables A/B-ing between algorithms.
-    // Indexed by driveChar (0..12); snapshotValid[i] is false until first visit.
+    // Indexed by driveChar (0..13); snapshotValid[i] is false until first visit.
     // struct + default table lifted to shared InsertAlgoDefaults.h.
     using InsertAlgoSnapshot = InsertAlgoDefaults;
-    InsertAlgoSnapshot insertSnapshots[13];
-    bool               insertSnapshotValid[13] = {};
-    InsertAlgoSnapshot insertSnapshots2[13];
-    bool               insertSnapshotValid2[13] = {};
+    InsertAlgoSnapshot insertSnapshots[14];
+    bool               insertSnapshotValid[14] = {};
+    InsertAlgoSnapshot insertSnapshots2[14];
+    bool               insertSnapshotValid2[14] = {};
 
     // Insert controls (Master channel only) — two slots stacked vertically.
     // insExtra / insExtra2 only visible in EQ mode.

@@ -99,6 +99,7 @@ public:
         const float lpAlpha  = 1.0f - std::exp(-2.0f * juce::MathConstants<float>::pi
                                                 * lpCutoff / (float) currentSampleRate);
 
+        const float outGain  = std::pow(10.0f, p.insertOutput / 20.0f);
         const int nChClamped = juce::jmin(nCh, 2);
         for (int ch = 0; ch < nChClamped; ++ch)
         {
@@ -134,7 +135,7 @@ public:
                 // signal so the user hears the resonant body.
                 const float out = data[i] + loopGain * lp;
                 buffer[wPos] = out;
-                data[i]      = out;
+                data[i]      = out * outGain;
                 wPos = (wPos + 1) % bufSize;
             }
         }

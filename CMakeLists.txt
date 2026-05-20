@@ -343,8 +343,14 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/GlobalParamDefsTests.cpp
     Source/Tests/ModulatorSerialiseTests.cpp
     Source/Tests/AlgorithmNameTableTests.cpp
+    Source/Tests/HitGeneratorTests.cpp
+    Source/Tests/ModulationMatrixTests.cpp
+    Source/Tests/ApvtsLayoutTests.cpp
+    Source/Tests/InsertDSPSmokeTests.cpp
     Source/Modulation/ModulationMatrix.cpp
     Source/Sequencer/ControlSequence.cpp
+    Source/Sequencer/HitGenerator.cpp
+    Source/Sequencer/EuclideanGenerator.cpp
 )
 
 target_compile_features(mu-clid-tests PRIVATE cxx_std_17)

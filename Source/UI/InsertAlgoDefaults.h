@@ -39,7 +39,7 @@ namespace mu_ui {
 // per-voice and master-insert paths.
 //
 // Field order: driveDrive | driveOutput | drvDither | driveTone | eqMidGain | drvBits | driveRate
-inline const InsertAlgoDefaults kInsertAlgoDefaults[13] = {
+inline const InsertAlgoDefaults kInsertAlgoDefaults[14] = {
     { 0.0f,   0.0f,  0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 0  None
     { 0.0f,   0.0f,  0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 1  Soft Clip  (0% drive = transparent)
     { 0.0f,   0.0f,  0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 2  Hard Clip
@@ -62,6 +62,7 @@ inline const InsertAlgoDefaults kInsertAlgoDefaults[13] = {
     // Vocoder: drvDrive=0 → Saw; drvBits=4 → Note F (idx 3);
     // drvDither=3 → Octave 3; drvOut=-20 → Unison index 1 (3 voices).
     { 0.0f,  -20.0f, 3.0f,   20000.0f, 0.0f,  4.0f, 48000.0f },  // 12 Vocoder
+    { 0.0f,  -20.0f, 3.0f,   20000.0f, 0.0f,  4.0f, 48000.0f },  // 13 VocoderSt (same defaults as Vocoder)
 };
 
 } // namespace mu_ui

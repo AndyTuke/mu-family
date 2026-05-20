@@ -29,7 +29,7 @@ private:
     int rhythmIndex = -1;
 
     using InsertAlgoSnapshot = InsertAlgoDefaults;
-    InsertAlgoSnapshot insertSnapshots[13];
+    InsertAlgoSnapshot insertSnapshots[14];
     bool               insertSnapshotValid[11] = {};
 
     DropdownSelect insertAlgo;

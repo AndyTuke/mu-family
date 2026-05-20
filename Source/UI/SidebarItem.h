@@ -11,6 +11,7 @@ class SidebarItem : public juce::Component, private juce::Timer
 {
 public:
     explicit SidebarItem(int index);
+    ~SidebarItem() override { stopTimer(); }
 
     void setRhythm(const Rhythm* r, juce::Colour colour);
     void setSelected(bool s);

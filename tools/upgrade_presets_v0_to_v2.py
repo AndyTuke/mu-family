@@ -68,7 +68,7 @@ def migrate_drv_bits(norm):
 # ── Algorithm name tables (must match AlgorithmNames.h) ─────────────────────
 
 INSERT_NAMES  = ["None","SoftClip","HardClip","Fold","Bitcrusher","Clipper","EQ",
-                 "Compressor","Limiter","RingMod","TapeSat","Karplus","Vocoder"]
+                 "Compressor","Limiter","RingMod","TapeSat","Karplus","Vocoder","VocoderSt"]
 FILTER_NAMES  = ["LP12","HP12","BP12","Notch12","LP24","HP24","BP24","LP6",
                  "CombPlus","AP12","Notch24","HP6","Peak","LowShelf","HighShelf","CombMinus"]
 LOGIC_NAMES   = ["OR","AND","XOR","AOnly","BOnly"]
@@ -317,20 +317,70 @@ def upgrade_preset(path):
     return True
 
 
+# ── .muRhyth upgrade (MuClidRhythm root, r0_-prefixed rhythm attrs) ──────────
+
+def upgrade_rhythm_preset(path):
+    print(f"Reading {os.path.basename(path)} ...", end=' ')
+
+    tree = ET.parse(path)
+    root = tree.getroot()
+
+    if root.tag != 'MuClidRhythm':
+        print(f"SKIP (root tag is {root.tag!r})")
+        return False
+
+    version = int(root.get('presetVersion', '0'))
+    if version >= 2:
+        print(f"SKIP (already v{version})")
+        return False
+
+    new_attribs = {'presetVersion': '2'}
+    for k, v in root.attrib.items():
+        if k == 'presetVersion':
+            continue  # replaced by '2' above
+        if k.startswith('r0_'):
+            suffix = k[3:]
+            new_v, keep = convert_rhythm_attr(suffix, v)
+            if keep:
+                new_attribs[k] = new_v
+        else:
+            new_attribs[k] = v  # presetName, presetCategory, ch_* pass through unchanged
+
+    root.attrib.clear()
+    root.attrib.update(new_attribs)
+
+    backup = path + '.v0_backup'
+    shutil.copy2(path, backup)
+
+    ET.register_namespace('', '')
+    tree.write(path, encoding='unicode', xml_declaration=True)
+
+    print(f"UPGRADED (backup: {os.path.basename(backup)})")
+    return True
+
+
 if __name__ == '__main__':
     preset_dir = r"D:\OneDrive\Documents\TDP\muClid\Presets"
+    rhythm_dir = r"D:\OneDrive\Documents\TDP\muClid\Rhythms"
     if len(sys.argv) > 1:
         preset_dir = sys.argv[1]
-
-    files = [f for f in os.listdir(preset_dir) if f.endswith('.muclid')]
-    if not files:
-        print(f"No .muclid files found in {preset_dir}")
-        sys.exit(1)
+        rhythm_dir = sys.argv[1]
 
     upgraded = 0
-    for f in sorted(files):
-        path = os.path.join(preset_dir, f)
-        if upgrade_preset(path):
+
+    muclid_files = [f for f in os.listdir(preset_dir) if f.endswith('.muclid')]
+    for f in sorted(muclid_files):
+        if upgrade_preset(os.path.join(preset_dir, f)):
             upgraded += 1
 
-    print(f"\nDone: {upgraded}/{len(files)} files upgraded.")
+    murhyth_files = [f for f in os.listdir(rhythm_dir) if f.endswith('.muRhyth')]
+    for f in sorted(murhyth_files):
+        if upgrade_rhythm_preset(os.path.join(rhythm_dir, f)):
+            upgraded += 1
+
+    total = len(muclid_files) + len(murhyth_files)
+    if total == 0:
+        print("No .muclid or .muRhyth files found.")
+        sys.exit(1)
+
+    print(f"\nDone: {upgraded}/{total} files upgraded.")

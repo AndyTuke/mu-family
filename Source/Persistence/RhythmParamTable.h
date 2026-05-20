@@ -16,7 +16,7 @@
 // Each entry's value semantics match the prior hand-written code exactly:
 // integer suffixes round through `(int)v`, ADSR sustains scale 0..100 ↔ 0..1
 // via adsrSus(), `aEnvRel` retains its `>= 10.0f` end-mode sentinel,
-// the `drvChar` clamp respects the 0..12 range, etc.
+// the `drvChar` clamp derives from kInsertAlgorithmNames count, etc.
 //
 // Adding a new per-rhythm param now means: add one entry here + (separately)
 // add one line in createParameterLayout that mirrors the suffix + range.
@@ -177,9 +177,10 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
     { "accentDb",  [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.accentDb = v; vd = true; },
                    [](const Rhythm& r) -> float { return r.voiceParams.accentDb; } },
 
-    // ── Insert / drive (post-#422/#423 algorithm range 0..12) ────────────────
+    // ── Insert / drive ────────────────────────────────────────────────────────
     // Stage 35: drvChar is an algorithm selector → string name in v2 preset XML.
-    { "drvChar",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertAlgo  = juce::jlimit(0, 12, (int)v); vd = true; },
+    // Upper bound is derived from kInsertAlgorithmNames so it auto-tracks new entries.
+    { "drvChar",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertAlgo  = juce::jlimit(0, mu_audio::countNames(mu_audio::kInsertAlgorithmNames) - 1, (int)v); vd = true; },
                    [](const Rhythm& r) -> float { return (float) r.voiceParams.insertAlgo; },
                    ParamKind::AlgorithmIndex, mu_audio::kInsertAlgorithmNames },
     { "drvDrv",    [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertDrive  = v; vd = true; },

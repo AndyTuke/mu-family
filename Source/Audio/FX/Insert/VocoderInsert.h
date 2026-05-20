@@ -238,8 +238,8 @@ public:
                     vocoL += synthOut * envelopeL[b];
                     vocoR += synthOut * envelopeR[b];
                 }
-                if (nChClamped > 0) buf.getWritePointer(0)[i] = vocoL;
-                if (nChClamped > 1) buf.getWritePointer(1)[i] = vocoR;
+                if (nChClamped > 0) buf.getWritePointer(0)[i] = vocoL / (float)kNumBands;
+                if (nChClamped > 1) buf.getWritePointer(1)[i] = vocoR / (float)kNumBands;
             }
             else
             {
@@ -261,7 +261,7 @@ public:
                     vocoded += synthOut * envelope[b];
                 }
                 for (int ch = 0; ch < nChClamped; ++ch)
-                    buf.getWritePointer(ch)[i] = vocoded;
+                    buf.getWritePointer(ch)[i] = vocoded / (float)kNumBands;
             }
         }
     }

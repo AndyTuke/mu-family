@@ -13,6 +13,7 @@ public:
     static constexpr int kWidth = 82;
 
     explicit RhythmSidebar(PluginProcessor& p);
+    ~RhythmSidebar() override { stopTimer(); }
 
     void refreshItems();
     void repaintItems();

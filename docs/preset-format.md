@@ -77,7 +77,7 @@ is serialised:
 
 For `AlgorithmIndex` kinds the name tables live in
 [Source/Audio/AlgorithmNames.h](../Source/Audio/AlgorithmNames.h). The two
-tables there are `kInsertAlgorithmNames` (driveChar 0..12) and
+tables there are `kInsertAlgorithmNames` (driveChar 0..13) and
 `kFilterTypeNames` (filterType 0..15). Effect / Reverb algorithm IDs come
 from `FXAlgorithmRegistry` in
 [Source/FX/FXAlgorithmDef.h](../Source/FX/FXAlgorithmDef.h) but are not yet
@@ -106,7 +106,10 @@ The `<Modulators>` subtree contains:
 - `<Seq id="csN" ...>` — one per `ControlSequence`. Properties: `mode`,
   `polarity`, `loopNV` / `loopMod` / `loopMult` (loop timing), `stepNV` /
   `stepMod` / `stepMult` (step timing). Children: `<Step v="..."/>` for
-  step values, `<Point x="..." y="..."/>` for Bézier curve points.
+  step values, `<Point x="..." y="..."/>` for Bézier curve points. Curved
+  segments also carry `bez="1" hx="<float>" hy="<float>"` on the `<Point>`
+  where `hx`/`hy` are the Bézier handle offsets; absent when curve type is
+  Stepped (mode=1).
 - `<Asgn id="..." src="..." dest="..." depth="..." curve="..."/>` — one
   per modulation assignment. `src` is a CS output (`cs0_output`) or another
   assignment's depth (`assign_{id}_depth`); `dest` is a destination ID from
@@ -149,14 +152,17 @@ via `onLoadError` rather than silently no-op'd.
 
 Each `Rhythm` child can reference its sample two ways:
 
-- `sample="C:/path/to/file.wav"` — absolute path. Load tries the literal
-  path first, then falls back to `<contentDir>/Samples/<basename>` if the
-  literal is missing, with a `onLoadError` warning (#438) so the user can
-  notice mis-matched same-basename files.
+- `sample="filename.wav"` (relative) or `sample="C:/path/to/file.wav"` (absolute).
+  Load first tries resolving a relative name against `<contentDir>/Samples/`
+  silently. An absolute path is tried directly, then falls back to
+  `<contentDir>/Samples/<basename>` if the original path is missing, with an
+  `onLoadError` warning so the user can notice mis-matched same-basename files.
+  Shipped presets always use filename-only relative references.
 - `sampleData="<base64>" sampleName="file.wav"` — sample bytes embedded
   directly. Decoded to `%TEMP%/muClid_samples/<sampleName>` on load. The
   save path detects temp-dir paths and force-embeds (#439) so an ephemeral
-  decode never gets written back as a permanent reference.
+  decode never gets written back as a permanent reference. When `sampleData`
+  is present it always takes priority over `sample`.
 
 ## Stable contracts
 

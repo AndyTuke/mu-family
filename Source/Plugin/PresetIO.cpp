@@ -114,6 +114,30 @@ static bool isEmbeddedSampleTempPath(const juce::String& path)
     return tempDir.exists() && juce::File(path).isAChildOf(tempDir);
 }
 
+// Resolve a stored sample path to a juce::File to load. Relative paths
+// (no drive letter / leading separator) are resolved against samplesDir so
+// shipped presets with "kick.wav" find the file without a warning. Absolute
+// paths are returned as-is; the caller's fallback logic handles "not found".
+static juce::File resolveSamplePath(const juce::String& storedPath, const juce::File& samplesDir)
+{
+    if (storedPath.isEmpty()) return {};
+    if (!juce::File::isAbsolutePath(storedPath))
+        return samplesDir.getChildFile(storedPath);
+    return juce::File(storedPath);
+}
+
+// When the sample path is inside the Samples content folder, return a path
+// relative to that folder (e.g. "kicks/kick.wav") so presets are
+// machine-agnostic. Otherwise return absPath unchanged.
+static juce::String toRelativeSamplePath(const juce::String& absPath, const juce::File& samplesDir)
+{
+    if (absPath.isEmpty()) return absPath;
+    juce::File f(absPath);
+    if (f.isAChildOf(samplesDir))
+        return f.getRelativePathFrom(samplesDir);
+    return absPath;
+}
+
 // write `text` to `destFile` atomically. Goes via a sibling juce::TemporaryFile
 // so a power-loss / crash / antivirus interruption mid-write cannot corrupt the
 // destination — either the new bytes land in full or the original (if it existed)
@@ -253,39 +277,40 @@ void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file)
         juce::String storedPath = state.getProperty("r0_sample").toString();
         if (storedPath.isNotEmpty())
         {
-            juce::File sf(storedPath);
+            const juce::File samplesDir = proc_.getSamplesDir();
+            juce::File sf = resolveSamplePath(storedPath, samplesDir);
             if (sf.existsAsFile())
             {
                 newVoice->loadFile(sf);
                 samplePath = sf.getFullPathName();
             }
-            else
+            else if (juce::File::isAbsolutePath(storedPath))
             {
-                juce::File fallback = proc_.getSamplesDir().getChildFile(juce::File(storedPath).getFileName());
+                // Absolute path failed — try filename-only fallback in Samples folder.
+                juce::File fallback = samplesDir.getChildFile(sf.getFileName());
                 if (fallback.existsAsFile())
                 {
                     newVoice->loadFile(fallback);
                     samplePath = fallback.getFullPathName();
-                    // Surface the relocation so the user notices when a
-                    // same-basename file from the content samples dir got picked
-                    // up instead of the original referenced path. Different files
-                    // with the same basename are a real hazard — a "kick.wav" in
-                    // the project samples dir might be a completely different
-                    // recording than the one originally loaded into the preset.
                     if (proc_.onLoadError)
-                        proc_.onLoadError("Sample '" + juce::File(storedPath).getFileName()
+                        proc_.onLoadError("Sample '" + sf.getFileName()
                                     + "' not at original path, loaded from content folder instead.");
                 }
                 else
                 {
-                    // Linked sample missing — keep the recorded path so the
-                    // RhythmPanel "missing — click to find" affordance fires,
-                    // and warn so the silent-output case has a visible cause.
                     samplePath = storedPath;
                     if (proc_.onLoadError)
-                        proc_.onLoadError("Sample '" + juce::File(storedPath).getFileName()
+                        proc_.onLoadError("Sample '" + sf.getFileName()
                                     + "' missing — rhythm loaded without audio.");
                 }
+            }
+            else
+            {
+                // Relative path, not found in Samples folder.
+                samplePath = sf.getFullPathName();
+                if (proc_.onLoadError)
+                    proc_.onLoadError("Sample '" + sf.getFileName()
+                                + "' missing from content folder — rhythm loaded without audio.");
             }
         }
     }
@@ -368,13 +393,10 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIdx, const juce::File& destFile,
     const Rhythm& r = proc_.sequencer.getRhythm(rhythmIdx);
     state.setProperty("r0_name",   juce::String(r.name),        nullptr);
     state.setProperty("r0_colour", r.colourIndex,                nullptr);
-    // if we force-embedded above, we'll still write the temp path here
-    // (the load path prefers `sampleData` when present and ignores `r0_sample`
-    // — so the embedded copy wins), but a cleaner XML drops the stale path.
     state.setProperty("r0_sample",
-                      isEmbeddedSampleTempPath(proc_.loadedSamplePaths[rhythmIdx])
+                      embedSample
                           ? juce::String()
-                          : proc_.loadedSamplePaths[rhythmIdx],
+                          : toRelativeSamplePath(proc_.loadedSamplePaths[rhythmIdx], proc_.getSamplesDir()),
                       nullptr);
 
     // Rhythm presets store ONLY proc_.sequencer-page state (Euclidean params, voice chain,
@@ -496,37 +518,38 @@ bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIdx)
     }
     else
     {
-        juce::String samplePath = state.getProperty("r0_sample").toString();
-        if (samplePath.isNotEmpty())
+        juce::String storedPath = state.getProperty("r0_sample").toString();
+        if (storedPath.isNotEmpty())
         {
-            juce::File f(samplePath);
+            const juce::File samplesDir = proc_.getSamplesDir();
+            juce::File f = resolveSamplePath(storedPath, samplesDir);
             if (f.existsAsFile())
             {
                 proc_.voiceEngines[targetIdx]->loadFile(f);
                 proc_.loadedSamplePaths.set(targetIdx, f.getFullPathName());
             }
-            else
+            else if (juce::File::isAbsolutePath(storedPath))
             {
-                juce::File fallback = proc_.getSamplesDir().getChildFile(juce::File(samplePath).getFileName());
+                juce::File fallback = samplesDir.getChildFile(f.getFileName());
                 if (fallback.existsAsFile())
                 {
                     proc_.voiceEngines[targetIdx]->loadFile(fallback);
                     proc_.loadedSamplePaths.set(targetIdx, fallback.getFullPathName());
-                    // warn — same-basename match in the content samples
-                    // dir is not a guarantee it's the SAME file the preset
-                    // originally referenced.
                     if (proc_.onLoadError)
-                        proc_.onLoadError("Sample '" + juce::File(samplePath).getFileName()
+                        proc_.onLoadError("Sample '" + f.getFileName()
                                     + "' not at original path, loaded from content folder instead.");
                 }
                 else
                 {
-                    // Linked sample missing — drop any previously loaded sample and
-                    // keep the recorded path so the RhythmPanel can show a "missing"
-                    // indicator and offer a relocate-to-find browse action.
                     proc_.voiceEngines[targetIdx]->clearSample();
-                    proc_.loadedSamplePaths.set(targetIdx, samplePath);
+                    proc_.loadedSamplePaths.set(targetIdx, storedPath);
                 }
+            }
+            else
+            {
+                // Relative path, not found in Samples folder.
+                proc_.voiceEngines[targetIdx]->clearSample();
+                proc_.loadedSamplePaths.set(targetIdx, f.getFullPathName());
             }
         }
         else
@@ -772,7 +795,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
         }
         else if (samplePath.isNotEmpty())
         {
-            juce::File f(samplePath);
+            juce::File f = resolveSamplePath(samplePath, proc_.getSamplesDir());
             if (f.existsAsFile())
             {
                 proc_.voiceEngines[i]->loadFile(f);
@@ -869,7 +892,7 @@ void PresetIO::savePreset(const juce::String& name,
         rTree.setProperty("sample",
                           isEmbeddedSampleTempPath(proc_.loadedSamplePaths[i])
                               ? juce::String()
-                              : proc_.loadedSamplePaths[i],
+                              : toRelativeSamplePath(proc_.loadedSamplePaths[i], proc_.getSamplesDir()),
                           nullptr);
 
         // Stage 35: v2 writes per the param's ParamKind — actual values for
@@ -1055,7 +1078,6 @@ void PresetIO::loadPreset(const juce::File& file)
             juce::String sampleData = rTree.getProperty("sampleData").toString();
             juce::String sampleName = rTree.getProperty("sampleName").toString();
             juce::String samplePath = rTree.getProperty("sample").toString();
-            proc_.loadedSamplePaths.set(i, samplePath);
 
             if (sampleData.isNotEmpty() && sampleName.isNotEmpty())
             {
@@ -1079,38 +1101,43 @@ void PresetIO::loadPreset(const juce::File& file)
             }
             else if (samplePath.isNotEmpty())
             {
-                juce::File f(samplePath);
+                const juce::File samplesDir = proc_.getSamplesDir();
+                juce::File f = resolveSamplePath(samplePath, samplesDir);
                 if (f.existsAsFile())
                 {
                     proc_.voiceEngines[i]->loadFile(f);
+                    proc_.loadedSamplePaths.set(i, f.getFullPathName());
                 }
-                else
+                else if (juce::File::isAbsolutePath(samplePath))
                 {
-                    juce::File fallback = proc_.getSamplesDir().getChildFile(juce::File(samplePath).getFileName());
+                    juce::File fallback = samplesDir.getChildFile(f.getFileName());
                     if (fallback.existsAsFile())
                     {
                         proc_.voiceEngines[i]->loadFile(fallback);
                         proc_.loadedSamplePaths.set(i, fallback.getFullPathName());
-                        // warn about the same-basename fallback.
                         if (proc_.onLoadError)
-                            proc_.onLoadError("Sample '" + juce::File(samplePath).getFileName()
+                            proc_.onLoadError("Sample '" + f.getFileName()
                                         + "' not at original path, loaded from content folder instead (rhythm "
                                         + juce::String(i + 1) + ").");
                     }
                     else
                     {
-                        // Linked sample not found — clear any previously loaded sample
-                        // on this slot so the RhythmPanel shows the missing indicator
-                        // consistently and the user can click to relocate.
                         proc_.voiceEngines[i]->clearSample();
-                        // proc_.loadedSamplePaths already set to samplePath above (line ~1999)
+                        proc_.loadedSamplePaths.set(i, samplePath);
                     }
+                }
+                else
+                {
+                    // Relative path, not found in Samples folder.
+                    proc_.voiceEngines[i]->clearSample();
+                    proc_.loadedSamplePaths.set(i, f.getFullPathName());
                 }
             }
             else
             {
                 // Preset rhythm has no sample at all — wipe any stale sample on this slot.
                 proc_.voiceEngines[i]->clearSample();
+                proc_.loadedSamplePaths.set(i, juce::String());
             }
 
             // force-sync APVTS → Rhythm so a preset that re-loads identical

@@ -11,6 +11,7 @@ public:
 
     KnobWithLabel(const juce::String& label,
                   MuClidLookAndFeel::ColourIds categoryColour = MuClidLookAndFeel::knobEuclidean);
+    ~KnobWithLabel() override { stopTimer(); }
 
     juce::Slider& getSlider() noexcept { return slider; }
 
