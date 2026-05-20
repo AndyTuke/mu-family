@@ -107,6 +107,13 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
     // patternLegato is sequencer-level — no engine sync needed.
     { "patLeg",    [](float v, Rhythm& r, bool&, bool&)     { r.patternLegato = (v > 0.5f); },
                    [](const Rhythm& r) -> float { return r.patternLegato ? 1.0f : 0.0f; },  ParamKind::Bool },
+    // resetSteps: -1 → nullopt (free-running); 1..256 → fixed cycle length.
+    { "rstSt",     [](float v, Rhythm& r, bool& pd, bool&)  {
+                       const int n = (int)v;
+                       r.resetSteps = (n < 0) ? std::nullopt : std::optional<int>(juce::jlimit(1, 256, n));
+                       pd = true;
+                   },
+                   [](const Rhythm& r) -> float { return (float) r.resetSteps.value_or(-1); }, ParamKind::Int },
 
     // ── Pitch ────────────────────────────────────────────────────────────────
     { "pitchOct",  [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.pitchOctave    = juce::jlimit(-4,  4, (int)v); vd = true; },

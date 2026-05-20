@@ -96,8 +96,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addB(p+"prePadModeC", n+"PrePadMode C",  false);
         addB(p+"postPadModeC",n+"PostPadMode C", false);
         // Logic
-        addI(p+"logic", n+"Logic", 0, 4, 0);
+        addI(p+"logic",  n+"Logic",        0,   4,   0);
         addB(p+"patLeg", n+"Pattern Legato", false);
+        addI(p+"rstSt",  n+"Reset Steps", -1, 256, -1);  // -1 = free-running (nullopt)
         // Pitch
         addI(p+"pitchOct",  n+"Pitch Oct",  -4,   4,  0);
         addI(p+"pitchSemi", n+"Pitch Semi", -12,  12,  0);

@@ -53,7 +53,7 @@ Use Vocoder for mono material or when CPU is a concern; use VocoderSt for stereo
 
 **Fixed-length mode** (pattern legato / Reset Steps) locks the combined pattern to a specific step count. When the step counter reaches that count, both generators reset to step 0 simultaneously, creating a repeating phrase of a defined length. This is useful for building groove patterns that line up with bars.
 
-*Note: Fixed-length mode is currently set per-session and is not persisted in presets. See issue #481.*
+*Note: The Reset Steps value is persisted in presets via the `rstSt` APVTS parameter. A dedicated UI control for setting it from the sequencer panel is planned.*
 
 ---
 
