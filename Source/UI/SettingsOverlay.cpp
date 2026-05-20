@@ -96,18 +96,20 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
 
     browseContentFolderBtn.onClick = [this]
     {
+        juce::Component::SafePointer<SettingsOverlay> safe(this);
         fileChooser = std::make_unique<juce::FileChooser>(
             "Choose content folder...", proc.getContentDir());
         fileChooser->launchAsync(
             juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
-            [this](const juce::FileChooser& fc)
+            [safe](const juce::FileChooser& fc)
             {
+                if (!safe) return;
                 auto result = fc.getResult();
                 if (result.isDirectory())
                 {
-                    proc.setContentDir(result);
-                    updateFolderLabel();
-                    if (onContentDirChanged) onContentDirChanged();
+                    safe->proc.setContentDir(result);
+                    safe->updateFolderLabel();
+                    if (safe->onContentDirChanged) safe->onContentDirChanged();
                 }
             });
     };
@@ -127,17 +129,19 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
 
     browseSampleLibBtn.onClick = [this]
     {
+        juce::Component::SafePointer<SettingsOverlay> safe(this);
         fileChooser = std::make_unique<juce::FileChooser>(
             "Choose primary sample library...", proc.getPrimarySampleDir());
         fileChooser->launchAsync(
             juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
-            [this](const juce::FileChooser& fc)
+            [safe](const juce::FileChooser& fc)
             {
+                if (!safe) return;
                 auto result = fc.getResult();
                 if (result.isDirectory())
                 {
-                    proc.setPrimarySampleDir(result);
-                    updateSampleLibLabel();
+                    safe->proc.setPrimarySampleDir(result);
+                    safe->updateSampleLibLabel();
                 }
             });
     };

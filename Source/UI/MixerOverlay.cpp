@@ -182,6 +182,24 @@ void MixerOverlay::wireFXRows()
                 p->setValueNotifyingHost(e ? 1.0f : 0.0f);
     };
     effectRow.onAlgorithmChanged = [this](int idx) {
+        const auto& algos = FXAlgorithmRegistry::effectAlgorithms();
+
+        // Snapshot current algo params before switching so we can restore them if
+        // the user cycles back.
+        const int oldIdx = proc.fxChain.effectSlot().getAlgorithmIndex();
+        if (oldIdx >= 0 && oldIdx < (int)algos.size())
+        {
+            const auto& oldParams = algos[oldIdx].params;
+            auto& snap = effSnaps[oldIdx];
+            float* pv[5] = { &snap.p0, &snap.p1, &snap.p2, &snap.p3, &snap.p4 };
+            for (int i = 0; i < (int)oldParams.size() && i < 5; ++i)
+            {
+                float norm = *proc.apvts.getRawParameterValue("eff_p" + juce::String(i));
+                *pv[i] = oldParams[i].minVal + norm * (oldParams[i].maxVal - oldParams[i].minVal);
+            }
+            effSnapValid[oldIdx] = true;
+        }
+
         // force-sync the engine BEFORE writing APVTS. If APVTS already
         // holds the same value (e.g. state restore left it at idx while the
         // engine sat at default 0), setValueNotifyingHost skips the listener,
@@ -189,6 +207,27 @@ void MixerOverlay::wireFXRows()
         proc.fxChain.effectSlot().setAlgorithm(idx);
         if (auto* p = proc.apvts.getParameter("eff_algo"))
             p->setValueNotifyingHost(p->convertTo0to1((float)idx));
+
+        // Apply saved snapshot for this algo, or first-visit defaults.
+        if (idx >= 0 && idx < (int)algos.size())
+        {
+            const auto& newParams = algos[idx].params;
+            const EffectAlgoDefaults& src = (idx < 4 && effSnapValid[idx])
+                ? effSnaps[idx]
+                : mu_ui::kEffectAlgoDefaults[idx < 4 ? idx : 0];
+            const float vals[5] = { src.p0, src.p1, src.p2, src.p3, src.p4 };
+            for (int i = 0; i < (int)newParams.size() && i < 5; ++i)
+            {
+                const auto& pd = newParams[i];
+                float norm = (pd.maxVal > pd.minVal)
+                    ? juce::jlimit(0.0f, 1.0f, (vals[i] - pd.minVal) / (pd.maxVal - pd.minVal))
+                    : 0.0f;
+                if (auto* p = proc.apvts.getParameter("eff_p" + juce::String(i)))
+                    p->setValueNotifyingHost(norm);
+                effectRow.setParamValue(pd.id, vals[i]);
+            }
+        }
+
         updateEffectSendLabels();
         const bool isEcho = (idx == EffectSlot::kEchoAlgoIndex);
         // Keep effectRow visible so the algo dropdown is always accessible.

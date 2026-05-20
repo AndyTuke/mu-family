@@ -1,6 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "MixerChannel.h"
+#include "FXAlgoDefaults.h"
 #include "FXRow.h"
 #include "DelayRow.h"
 #include "Components/SegmentControl.h"
@@ -82,4 +83,9 @@ private:
     void timerCallback() override;
 
     bool apvtsDirty = false;
+
+    // Per-algorithm snapshots for the effect row (A/B-style recall on algo switch).
+    // Indexed by eff_algo (0..3). snapValid[i] is false until first departure from algo i.
+    EffectAlgoDefaults effSnaps[4];
+    bool               effSnapValid[4] = {};
 };
