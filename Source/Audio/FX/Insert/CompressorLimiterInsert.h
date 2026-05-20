@@ -15,10 +15,14 @@ public:
     void prepare(double sampleRate, int) override
     {
         currentSampleRate = sampleRate;
-        smoothedAtt.reset(sampleRate, 0.015);  // 15 ms — eliminates attack/release knob crackle
-        smoothedRel.reset(sampleRate, 0.015);
-        smoothedAtt.setCurrentAndTargetValue(1.0f);
-        smoothedRel.setCurrentAndTargetValue(1.0f);
+        smoothedAtt   .reset(sampleRate, 0.015);  // 15 ms — eliminates att/rel knob crackle (#514)
+        smoothedRel   .reset(sampleRate, 0.015);
+        smoothedThresh.reset(sampleRate, 0.015);  // 15 ms — eliminates threshold knob crackle (#535)
+        smoothedOut   .reset(sampleRate, 0.015);  // 15 ms — same pattern, applied to output gain
+        smoothedAtt   .setCurrentAndTargetValue(1.0f);
+        smoothedRel   .setCurrentAndTargetValue(1.0f);
+        smoothedThresh.setCurrentAndTargetValue(1.0f);
+        smoothedOut   .setCurrentAndTargetValue(1.0f);
         reset();
     }
     void reset() override { envelope[0] = envelope[1] = 0.0f; }
@@ -32,8 +36,10 @@ public:
         const float attackMs  = juce::jmax(0.1f, p.insertDither * 2.0f);
         const float relMs     = juce::jmax(1.0f, p.insertTone);
         const float ratio     = (p.insertAlgo == 8) ? 100.0f : 4.0f;
-        smoothedAtt.setTargetValue(std::exp(-2.2f / (attackMs * 0.001f * sr)));
-        smoothedRel.setTargetValue(std::exp(-2.2f / (relMs    * 0.001f * sr)));
+        smoothedAtt   .setTargetValue(std::exp(-2.2f / (attackMs * 0.001f * sr)));
+        smoothedRel   .setTargetValue(std::exp(-2.2f / (relMs    * 0.001f * sr)));
+        smoothedThresh.setTargetValue(threshLin);
+        smoothedOut   .setTargetValue(outGain);
 
         float peakGainDb = 0.0f;  // 0 or negative — fed back to UI meter via grOut
         for (int ch = 0; ch < nCh; ++ch)
@@ -43,23 +49,27 @@ public:
             for (int i = 0; i < ns; ++i)
             {
                 // ch0 advances the ramps; ch1 reads the latest values.
-                const float attCoeff = (ch == 0) ? smoothedAtt.getNextValue()
-                                                 : smoothedAtt.getCurrentValue();
-                const float relCoeff = (ch == 0) ? smoothedRel.getNextValue()
-                                                 : smoothedRel.getCurrentValue();
+                const float attCoeff = (ch == 0) ? smoothedAtt   .getNextValue()
+                                                 : smoothedAtt   .getCurrentValue();
+                const float relCoeff = (ch == 0) ? smoothedRel   .getNextValue()
+                                                 : smoothedRel   .getCurrentValue();
+                const float thr      = (ch == 0) ? smoothedThresh.getNextValue()
+                                                 : smoothedThresh.getCurrentValue();
+                const float og       = (ch == 0) ? smoothedOut   .getNextValue()
+                                                 : smoothedOut   .getCurrentValue();
 
                 const float level = std::abs(data[i]);
                 env = level > env ? attCoeff * env + (1.0f - attCoeff) * level
                                   : relCoeff * env + (1.0f - relCoeff) * level;
 
                 float gainDb = 0.0f;
-                if (env > threshLin && threshLin > 1e-8f)
+                if (env > thr && thr > 1e-8f)
                 {
-                    const float overDb = 20.0f * std::log10(env / threshLin);
+                    const float overDb = 20.0f * std::log10(env / thr);
                     gainDb = -overDb * (1.0f - 1.0f / ratio);
                 }
                 if (gainDb < peakGainDb) peakGainDb = gainDb;
-                data[i] *= juce::Decibels::decibelsToGain(gainDb) * outGain;
+                data[i] *= juce::Decibels::decibelsToGain(gainDb) * og;
             }
         }
         // Normalise to 0..1 (1 ≡ 24 dB GR) for the UI meter.
@@ -71,4 +81,6 @@ private:
     float  envelope[2] = {};
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedAtt;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedRel;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedThresh;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedOut;
 };
