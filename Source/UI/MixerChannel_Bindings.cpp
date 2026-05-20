@@ -82,6 +82,13 @@ void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, std::atomic<floa
                 if (auto* p = proc->apvts.getParameter(prefix + "scRel"))
                     p->setValueNotifyingHost(p->convertTo0to1((float)v));
             };
+            // Load current values so knobs reflect saved state on re-bind
+            if (auto* p = proc->apvts.getRawParameterValue(prefix + "scAmt"))
+                scAmount.setValue(*p * 100.0, juce::dontSendNotification);
+            if (auto* p = proc->apvts.getRawParameterValue(prefix + "scAtk"))
+                scAttack.setValue(*p, juce::dontSendNotification);
+            if (auto* p = proc->apvts.getRawParameterValue(prefix + "scRel"))
+                scRelease.setValue(*p, juce::dontSendNotification);
         }
     }
     else
@@ -114,6 +121,9 @@ void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, std::atomic<floa
             scAmount.onValueChanged  = [&state](double v) { state.sidechainAmount   = (float)v / 100.0f; };
             scAttack.onValueChanged  = [&state](double v) { state.sidechainAttackMs  = (float)v; };
             scRelease.onValueChanged = [&state](double v) { state.sidechainReleaseMs = (float)v; };
+            scAmount.setValue(state.sidechainAmount * 100.0, juce::dontSendNotification);
+            scAttack.setValue(state.sidechainAttackMs,       juce::dontSendNotification);
+            scRelease.setValue(state.sidechainReleaseMs,     juce::dontSendNotification);
         }
     }
 

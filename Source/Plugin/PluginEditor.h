@@ -15,7 +15,8 @@
 #include "UI/Components/MuClidLookAndFeel.h"
 
 class PluginEditor : public juce::AudioProcessorEditor,
-                     public juce::KeyListener
+                     public juce::KeyListener,
+                     private juce::ValueTree::Listener
 {
 public:
     explicit PluginEditor(PluginProcessor&);
@@ -69,6 +70,7 @@ private:
     void showPresetBrowser(bool show);
     void showSettings(bool show);
     void showMidiPresets(bool show);
+    void doNewPreset();
 
     void hideAllOverlays();
 
@@ -85,9 +87,15 @@ private:
 
     bool isStandalone    = false;
     bool needsFocusGrab  = false;
+    bool presetDirty     = false;
     std::function<void()> pendingQuitCallback;
     juce::KeyPress keybindPlayStop { juce::KeyPress::spaceKey };
     void loadKeybindings();
+
+    // juce::ValueTree::Listener — used to track preset dirty state.
+    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override { presetDirty = true; }
+    void valueTreeChildAdded    (juce::ValueTree&, juce::ValueTree&)          override { presetDirty = true; }
+    void valueTreeChildRemoved  (juce::ValueTree&, juce::ValueTree&, int)     override { presetDirty = true; }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };

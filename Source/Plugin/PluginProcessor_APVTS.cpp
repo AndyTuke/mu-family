@@ -102,7 +102,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         // Pitch
         addI(p+"pitchOct",  n+"Pitch Oct",  -4,   4,  0);
         addI(p+"pitchSemi", n+"Pitch Semi", -12,  12,  0);
-        addF(p+"pitchFine", n+"Pitch Fine", -100.0f, 100.0f, 0.0f);
+        addF(p+"pitchFine", n+"Pitch Fine", -99.0f, 99.0f, 0.0f);
         addAdsrT(p+"pEnvAtk", n+"P Env Atk", 0.0f);    // seconds (≈ legacy 0.0 × 0.03)
         addAdsrT(p+"pEnvDec", n+"P Env Dec", 0.03f);   //         (≈ legacy 1.0 × 0.03)
         addF     (p+"pEnvSus", n+"P Env Sus", 0.0f, 100.0f, 0.0f);   // sustain stays 0..100 %

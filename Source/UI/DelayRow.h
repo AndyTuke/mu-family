@@ -57,7 +57,7 @@ private:
     KnobWithLabel  multipleKnob { "Multiple", LafId::knobFxSend };
 
     // Free mode control
-    KnobWithLabel msKnob { "Time", LafId::knobFxSend };
+    KnobWithLabel msKnob { "Time (ms)", LafId::knobFxSend };
 
     // Always-visible params
     KnobWithLabel feedbackKnob { "Feedback", LafId::knobFxSend };

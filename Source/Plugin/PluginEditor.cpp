@@ -30,6 +30,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         processorRef.loadPreset(f);
         selectRhythmAndRefresh(0, /*fullSidebarRefresh=*/true, MixerRefresh::FullReload);
         transportBar.setLoadedPreset(f);
+        presetDirty = false;
     };
 
     transportBar.onSavePreset = [this]
@@ -40,16 +41,23 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     transportBar.onNewPreset = [this]
     {
-        const juce::File defaultFile = processorRef.getPresetsDir().getChildFile("_default.muclid");
-        if (!defaultFile.existsAsFile())
+        if (presetDirty)
         {
-            statusBar.showParam("New", "No default preset saved — use Save \xe2\x86\x92 Save as Default first",
-                                MuClidLookAndFeel::colour(MuClidLookAndFeel::knobLevel));
+            juce::Component::SafePointer<PluginEditor> safeThis(this);
+            auto* w = new juce::AlertWindow("New Preset",
+                                            "Discard unsaved changes?",
+                                            juce::MessageBoxIconType::QuestionIcon);
+            w->addButton("Discard", 1, juce::KeyPress(juce::KeyPress::returnKey));
+            w->addButton("Cancel",  0, juce::KeyPress(juce::KeyPress::escapeKey));
+            w->enterModalState(true,
+                juce::ModalCallbackFunction::create([safeThis](int result) {
+                    if (safeThis && result == 1)
+                        safeThis->doNewPreset();
+                }),
+                true);
             return;
         }
-        processorRef.loadPreset(defaultFile);
-        selectRhythmAndRefresh(0, /*fullSidebarRefresh=*/true, MixerRefresh::FullReload);
-        transportBar.setLoadedPreset({});
+        doNewPreset();
     };
 
     processorRef.onSaveAndQuit = [this](std::function<void()> quitCallback)
@@ -208,6 +216,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         sidebar.setSelectedIndex(0);
         if (mixerVisible) { mixerOverlay.refresh(); mixerOverlay.loadFromAPVTS(); }
         transportBar.setLoadedPreset(f);
+        presetDirty = false;
     };
     presetBrowser.onClose = [this] { showPresetBrowser(false); };
 
@@ -279,6 +288,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         addKeyListener(this);
         needsFocusGrab = true;
     }
+
+    processorRef.apvts.state.addListener(this);
+    presetDirty = false;
 }
 
 void PluginEditor::selectRhythmAndRefresh(int idx,
@@ -305,6 +317,7 @@ PluginEditor::~PluginEditor()
     // invocation (swap commit, save-and-quit prompt) firing into a destroyed editor is
     // a UAF. The lambdas all capture raw `[this]`. Mirror this any time we add a new
     // processorRef.on* callback below.
+    processorRef.apvts.state.removeListener(this);
     processorRef.onRhythmHotSwapCommitted = nullptr;
     processorRef.onSaveAndQuit            = nullptr;
     processorRef.onLoadError              = nullptr;
@@ -317,11 +330,11 @@ PluginEditor::~PluginEditor()
 //==============================================================================
 bool PluginEditor::keyPressed(const juce::KeyPress& key, juce::Component*)
 {
-    // Don't intercept when a text editor or button has focus — they handle keys themselves,
-    // and the global listener fires before the focused component so we'd double-fire.
+    // Don't intercept when a text editor has focus — it needs the key for input.
+    // Buttons are NOT excluded: returning true here prevents the focused button from
+    // also firing on space, which is the desired behaviour (space = Play/Stop only).
     auto* focused = juce::Component::getCurrentlyFocusedComponent();
     if (dynamic_cast<juce::TextEditor*>(focused)) return false;
-    if (dynamic_cast<juce::Button*>(focused))     return false;
 
     if (key == keybindPlayStop)
     {
@@ -497,6 +510,7 @@ void PluginEditor::doSavePreset(const juce::String& name, const juce::String& de
     juce::String safeName = name.replaceCharacters("\\/:|*?<>\"", "_________");
     if (safeName.isEmpty()) safeName = "Preset";
     transportBar.setLoadedPreset(processorRef.getPresetsDir().getChildFile(safeName + ".muclid"));
+    presetDirty = false;
     showSaveDialog(false);
     if (pendingQuitCallback)
     {
@@ -504,6 +518,21 @@ void PluginEditor::doSavePreset(const juce::String& name, const juce::String& de
         pendingQuitCallback = nullptr;
         cb();
     }
+}
+
+void PluginEditor::doNewPreset()
+{
+    const juce::File defaultFile = processorRef.getPresetsDir().getChildFile("_default.muclid");
+    if (!defaultFile.existsAsFile())
+    {
+        statusBar.showParam("New", "No default preset saved \xe2\x80\x94 use Save \xe2\x86\x92 Save as Default first",
+                            MuClidLookAndFeel::colour(MuClidLookAndFeel::knobLevel));
+        return;
+    }
+    processorRef.loadPreset(defaultFile);
+    selectRhythmAndRefresh(0, /*fullSidebarRefresh=*/true, MixerRefresh::FullReload);
+    transportBar.setLoadedPreset({});
+    presetDirty = false;
 }
 
 void PluginEditor::showPresetBrowser(bool show)

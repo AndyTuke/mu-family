@@ -62,6 +62,9 @@ DelayRow::DelayRow()
 
     multipleKnob.setRange(1.0, 8.0, 1.0);
     multipleKnob.setValue(1.0, juce::dontSendNotification);
+    multipleKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
+        return juce::String((int)std::round(v));
+    };
     multipleKnob.onValueChanged = [this](double) { fireSyncParams(); };
     multipleKnob.onStatusUpdate = [this](const juce::String& n, const juce::String& v)
     {
@@ -71,19 +74,24 @@ DelayRow::DelayRow()
 
     msKnob.setRange(1.0, 4000.0, 1.0);
     msKnob.setValue(250.0, juce::dontSendNotification);
-    msKnob.getSlider().setNumDecimalPlacesToDisplay(0);
+    msKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
+        return juce::String((int)std::round(v));
+    };
     msKnob.onValueChanged = [this](double v)
     {
         if (onFreeMsChanged) onFreeMsChanged(static_cast<float>(v));
     };
-    msKnob.onStatusUpdate = [this](const juce::String& n, const juce::String& v)
+    msKnob.onStatusUpdate = [this](const juce::String&, const juce::String&)
     {
-        if (onStatusUpdate) onStatusUpdate(n, v);
+        if (onStatusUpdate) onStatusUpdate("Time", juce::String((int)std::round(msKnob.getValue())) + " ms");
     };
     addAndMakeVisible(msKnob);
 
     feedbackKnob.setRange(0.0, 100.0, 1.0);
     feedbackKnob.setValue(40.0, juce::dontSendNotification);
+    feedbackKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
+        return juce::String((int)std::round(v));
+    };
     feedbackKnob.onValueChanged = [this](double v)
     {
         if (onFeedbackChanged) onFeedbackChanged(static_cast<float>(v) / 100.0f);
@@ -96,6 +104,9 @@ DelayRow::DelayRow()
 
     spreadKnob.setRange(0.0, 100.0, 0.1);
     spreadKnob.setValue(0.0, juce::dontSendNotification);
+    spreadKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
+        return juce::String((int)std::round(v));
+    };
     spreadKnob.onValueChanged = [this](double v)
     {
         if (onSpreadChanged) onSpreadChanged(static_cast<float>(v) / 100.0f);
@@ -108,6 +119,9 @@ DelayRow::DelayRow()
 
     dirtKnob.setRange(0.0, 100.0, 0.1);
     dirtKnob.setValue(0.0, juce::dontSendNotification);
+    dirtKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
+        return juce::String((int)std::round(v));
+    };
     dirtKnob.onValueChanged = [this](double v)
     {
         if (onDirtChanged) onDirtChanged(static_cast<float>(v) / 100.0f);

@@ -19,11 +19,10 @@
 //   insertBits    (1..16):    Octave knob — stored as 0..3 mapping to SPN octaves 1..4.
 //                          #429: added Octave 0 (= SPN C1 = 32.7 Hz) below the
 //                          original 1/2/3 — bottom of audible range.
-//   insertDither  (0..100):   Feedback — stored as 0..100, mapped internally to
-//                          loop gain 0.95..1.0. At 100% the loop self-sustains;
-//                          stability is maintained by the LP filter in the
-//                          feedback path (any LP cutoff < Nyquist guarantees
-//                          some energy loss per cycle).
+//   insertDither  (0..100):   Feedback — stored as 0..100, mapped internally via
+//                          cubic curve 1-(1-x)³ to loop gain 0..0.9999.
+//                          0% = passthrough; 25% ≈ 125ms pluck; 50% ≈ 500ms;
+//                          75% ≈ 4s sustain; 100% = near-infinite sustain.
 //   insertTone  (20..20k):  LP cutoff inside the feedback loop. Lower = darker
 //                          / faster damping; higher = brighter / longer ring.
 //                          At 20 kHz effectively bypasses the LP (no damping).
@@ -57,6 +56,8 @@ public:
         }
         smoothedFreq.reset(sampleRate, 0.015);   // 15 ms ramp
         smoothedFreq.setCurrentAndTargetValue(110.0f);  // arbitrary A2
+        smoothedGain.reset(sampleRate, 0.010);   // 10 ms ramp — eliminates knob crackle
+        smoothedGain.setCurrentAndTargetValue(0.0f);
     }
 
     void reset() override
@@ -73,20 +74,25 @@ public:
                  const VoiceParams& p, float& /*grOut*/) override
     {
         // Decode controls from the repurposed param fields.
-        const int   noteIdx = juce::jlimit(0, 6, (int) std::round(p.insertDrive));
+        const int   noteIdx = juce::jlimit(0, 11, (int) std::round(p.insertDrive));
         // octave range extended to 0..3 (was 1..3). Octave 0 = SPN 1.
         const int   octave  = juce::jlimit(0, 3, (int) std::round(p.insertBits));
         const float fbKnob  = juce::jlimit(0.0f, 1.0f, p.insertDither / 100.0f);
-        // Map 0..1 onto loop gain 0.95..1.0. At max the loop is mathematically
-        // self-sustaining, but the LP filter in the feedback path always
-        // removes some energy per cycle so the string can ring indefinitely
-        // without explosive growth. Below 0.95 the string dies in a few ms.
-        const float loopGain = 0.95f + fbKnob * 0.05f;
+        // Cubic curve: loopGain = 1 - (1 - fbKnob)^3, capped at 0.9999.
+        // Decay time scales as 1/log(loopGain), so a linear knob would compress
+        // almost all audible range into the top 20 %. The cubic curve spreads it:
+        //   0 %  → gain 0.000 → passthrough (no resonance)
+        //  25 %  → gain 0.578 → ~125 ms decay  (short pluck)
+        //  50 %  → gain 0.875 → ~500 ms decay  (clear pluck)
+        //  75 %  → gain 0.984 → ~4 s decay     (long sustain)
+        // 100 %  → gain 0.9999 → near-infinite sustain
+        const float inv      = 1.0f - fbKnob;
+        const float loopGain = juce::jmin(0.9999f, 1.0f - inv * inv * inv);
+        smoothedGain.setTargetValue(loopGain);
 
         // Pitch: SPN-anchored at C=32.7 Hz for Octave 0 (= SPN C1). Notes
         // ascend C→B chromatically (semi offsets 0/2/4/5/7/9/11 for C..B).
-        static constexpr int kSemis[7] = { 0, 2, 4, 5, 7, 9, 11 };
-        const float semitones = static_cast<float>(kSemis[noteIdx] + 12 * octave);
+        const float semitones = static_cast<float>(noteIdx + 12 * octave);
         const float targetFreq = kLowestFreq * std::pow(2.0f, semitones / 12.0f);
         smoothedFreq.setTargetValue(targetFreq);
 
@@ -131,9 +137,14 @@ public:
                 // that gives K-S its decaying-pluck timbre).
                 lp += lpAlpha * (delayed - lp);
 
+                // Per-sample smoothed gain — ch0 advances the ramp, ch1 reads the
+                // latest value. Eliminates crackle when the feedback knob moves.
+                const float curGain = (ch == 0) ? smoothedGain.getNextValue()
+                                                 : smoothedGain.getCurrentValue();
+
                 // Input excitation + filtered feedback. Output IS the loop
                 // signal so the user hears the resonant body.
-                const float out = data[i] + loopGain * lp;
+                const float out = data[i] + curGain * lp;
                 buffer[wPos] = out;
                 data[i]      = out * outGain;
                 wPos = (wPos + 1) % bufSize;
@@ -150,8 +161,9 @@ private:
     int                writePos[2] = { 0, 0 };
     float              lpState [2] = { 0.0f, 0.0f };
 
-    // Shared across channels — stereo content has the same target pitch.
+    // Shared across channels — stereo content has the same target pitch/gain.
     // Sample-accurate ramp (one tick per output sample on ch 0; ch 1 reads
-    // the current value).
+    // the current value — inaudible asymmetry).
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedFreq;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedGain;
 };

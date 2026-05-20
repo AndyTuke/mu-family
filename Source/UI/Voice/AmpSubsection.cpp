@@ -20,6 +20,16 @@ static double parseAdsrTimeSec(const juce::String& s)
         return t.dropLastCharacters(1).trim().getDoubleValue();
     return t.getDoubleValue() / 1000.0;
 }
+static juce::String adsrLabelStr(const juce::String& name, double v)
+{
+    return name + (v < 1.0 ? " (ms)" : " (s)");
+}
+static juce::String adsrValueStr(double v)
+{
+    double ms = std::max(1.0, v * 1000.0);
+    return (ms < 1000.0) ? juce::String((int)std::round(ms))
+                         : juce::String(ms / 1000.0, 2);
+}
 } // namespace
 
 AmpSubsection::AmpSubsection(PluginProcessor& p) : proc(p)
@@ -28,11 +38,11 @@ AmpSubsection::AmpSubsection(PluginProcessor& p) : proc(p)
                      &ampAtk, &ampDec, &ampSus, &ampRel })
         addAndMakeVisible(k);
 
-    ampLevel  .setRange(0.0, 2.0,   0.01);  ampLevel  .setValue(0.5);
-    ampSendEff.setRange(0.0, 1.0,  0.01);   ampSendEff.setValue(0.0);
-    ampSendDly.setRange(0.0, 1.0,  0.01);   ampSendDly.setValue(0.0);
-    ampSendRev.setRange(0.0, 1.0,  0.01);   ampSendRev.setValue(0.0);
-    ampAccent .setRange(0.0, 12.0, 0.1);    ampAccent .setValue(0.0);
+    ampLevel  .setRange(-60.0, 6.0,  0.1);  ampLevel  .setValue(0.0);
+    ampSendEff.setRange(0.0, 100.0, 1.0);   ampSendEff.setValue(0.0);
+    ampSendDly.setRange(0.0, 100.0, 1.0);   ampSendDly.setValue(0.0);
+    ampSendRev.setRange(0.0, 100.0, 1.0);   ampSendRev.setValue(0.0);
+    ampAccent .setRange(0.0, 100.0, 1.0);   ampAccent .setValue(0.0);
     ampAtk    .setRange(0.0, 10.0,  0.001); ampAtk .setValue(0.005); ampAtk.getSlider().setSkewFactor(0.3);
     ampDec    .setRange(0.0, 10.0,  0.001); ampDec .setValue(0.3);   ampDec.getSlider().setSkewFactor(0.3);
     ampSus    .setRange(0.0, 100.0, 0.1);   ampSus .setValue(80.0);
@@ -51,25 +61,42 @@ void AmpSubsection::apvtsSet(const char* suffix, float v)
 
 void AmpSubsection::wireCallbacks()
 {
+    ampLevel.getSlider().textFromValueFunction = [](double v) -> juce::String {
+        if (v <= -60.0) return "-inf";
+        return juce::String(v, 1);
+    };
+    ampLevel.getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
+        auto t = s.trim().toLowerCase();
+        if (t.startsWith("-inf")) return -60.0;
+        if (t.endsWith("db"))    return t.dropLastCharacters(2).trim().getDoubleValue();
+        return t.getDoubleValue();
+    };
+
     for (auto* k : { &ampAtk, &ampDec })
     {
-        k->getSlider().textFromValueFunction = [](double v) { return formatAdsrTimeSec(v); };
+        k->getSlider().textFromValueFunction = [](double v) { return adsrValueStr(v); };
         k->getSlider().valueFromTextFunction = [](const juce::String& s) { return parseAdsrTimeSec(s); };
     }
     ampRel.getSlider().textFromValueFunction = [](double v) -> juce::String {
         if (v >= 10.0) return "End";
-        return formatAdsrTimeSec(v);
+        return adsrValueStr(v);
     };
     ampRel.getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
         if (s.trim().equalsIgnoreCase("end")) return 10.0;
         return parseAdsrTimeSec(s);
     };
     ampSus.getSlider().textFromValueFunction = [](double v) -> juce::String {
-        return juce::String((int)std::round(v)) + "%";
+        return juce::String((int)std::round(v));
     };
     ampSus.getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
         return s.trim().dropLastCharacters(s.endsWith("%") ? 1 : 0).trim().getDoubleValue();
     };
+
+    // Set initial dynamic labels.
+    ampAtk.setLabel(adsrLabelStr("Attack",  ampAtk.getValue()));
+    ampDec.setLabel(adsrLabelStr("Decay",   ampDec.getValue()));
+    ampSus.setLabel("Sustain (%)");
+    ampRel.setLabel(ampRel.getValue() >= 10.0 ? "Release (s)" : adsrLabelStr("Release", ampRel.getValue()));
 
     struct { KnobWithLabel* k; const char* name; } entries[] = {
         { &ampLevel,   "Amp Level"   }, { &ampSendEff, "Amp Send Effect" },
@@ -86,27 +113,48 @@ void AmpSubsection::wireCallbacks()
         };
     }
 
-    ampLevel.onValueChanged = [this](double v) { apvtsSet("ampLvl",   (float)v); };
-    ampAccent.onValueChanged = [this](double v) { apvtsSet("accentDb", (float)v); };
-    ampAtk.onValueChanged    = [this](double v) { apvtsSet("aEnvAtk",  (float)v); };
-    ampDec.onValueChanged    = [this](double v) { apvtsSet("aEnvDec",  (float)v); };
+    // Per-knob status bar overrides: re-add unit since the value display no longer shows it.
+    ampLevel.onStatusUpdate = [this](const juce::String&, const juce::String&) {
+        const double v = ampLevel.getValue();
+        const juce::String fmt = v <= -60.0 ? "-inf dB" : juce::String(v, 1) + " dB";
+        if (onStatusUpdate) onStatusUpdate("Amp Level", fmt);
+    };
+    ampAtk.onStatusUpdate = [this](const juce::String&, const juce::String&) {
+        if (onStatusUpdate) onStatusUpdate("Amp Attack", formatAdsrTimeSec(ampAtk.getValue()));
+    };
+    ampDec.onStatusUpdate = [this](const juce::String&, const juce::String&) {
+        if (onStatusUpdate) onStatusUpdate("Amp Decay", formatAdsrTimeSec(ampDec.getValue()));
+    };
+    ampSus.onStatusUpdate = [this](const juce::String&, const juce::String&) {
+        if (onStatusUpdate) onStatusUpdate("Amp Sustain",
+            juce::String((int)std::round(ampSus.getValue())) + "%");
+    };
+    ampRel.onStatusUpdate = [this](const juce::String&, const juce::String&) {
+        const double v = ampRel.getValue();
+        if (onStatusUpdate) onStatusUpdate("Amp Release", v >= 10.0 ? "End" : formatAdsrTimeSec(v));
+    };
+
+    ampLevel.onValueChanged = [this](double v) { apvtsSet("ampLvl", juce::Decibels::decibelsToGain((float)v, -60.0f)); };
+    ampAccent.onValueChanged = [this](double v) { apvtsSet("accentDb", (float)(v / 100.0 * 12.0)); };
+    ampAtk.onValueChanged    = [this](double v) { apvtsSet("aEnvAtk",  (float)v); ampAtk.setLabel(adsrLabelStr("Attack", v)); };
+    ampDec.onValueChanged    = [this](double v) { apvtsSet("aEnvDec",  (float)v); ampDec.setLabel(adsrLabelStr("Decay",  v)); };
     ampSus.onValueChanged    = [this](double v) { apvtsSet("aEnvSus",  (float)v); };
-    ampRel.onValueChanged    = [this](double v) { apvtsSet("aEnvRel",  (float)v); };
+    ampRel.onValueChanged    = [this](double v) { apvtsSet("aEnvRel",  (float)v); ampRel.setLabel(v >= 10.0 ? "Release (s)" : adsrLabelStr("Release", v)); };
 
     ampSendEff.onValueChanged = [this](double v) {
         if (rhythmIndex < 0) return;
         if (auto* p = proc.apvts.getParameter("ch" + juce::String(rhythmIndex) + "_sendEff"))
-            p->setValueNotifyingHost(p->convertTo0to1((float)v));
+            p->setValueNotifyingHost(p->convertTo0to1((float)(v / 100.0)));
     };
     ampSendDly.onValueChanged = [this](double v) {
         if (rhythmIndex < 0) return;
         if (auto* p = proc.apvts.getParameter("ch" + juce::String(rhythmIndex) + "_sendDly"))
-            p->setValueNotifyingHost(p->convertTo0to1((float)v));
+            p->setValueNotifyingHost(p->convertTo0to1((float)(v / 100.0)));
     };
     ampSendRev.onValueChanged = [this](double v) {
         if (rhythmIndex < 0) return;
         if (auto* p = proc.apvts.getParameter("ch" + juce::String(rhythmIndex) + "_sendRev"))
-            p->setValueNotifyingHost(p->convertTo0to1((float)v));
+            p->setValueNotifyingHost(p->convertTo0to1((float)(v / 100.0)));
     };
 }
 
@@ -123,17 +171,18 @@ void AmpSubsection::loadFromRhythm()
     const auto& p = proc.getRhythm(rhythmIndex).voiceParams;
     constexpr auto dn = juce::dontSendNotification;
 
-    ampLevel.setValue(p.ampLevel,  dn);
-    ampAccent.setValue(p.accentDb, dn);
-    ampAtk.setValue(p.ampEnvAtk,   dn);
-    ampDec.setValue(p.ampEnvDec,   dn);
+    ampLevel.setValue(juce::Decibels::gainToDecibels(p.ampLevel, -60.0f), dn);
+    ampAccent.setValue(p.accentDb / 12.0 * 100.0, dn);
+    ampAtk.setValue(p.ampEnvAtk,   dn); ampAtk.setLabel(adsrLabelStr("Attack", p.ampEnvAtk));
+    ampDec.setValue(p.ampEnvDec,   dn); ampDec.setLabel(adsrLabelStr("Decay",  p.ampEnvDec));
     ampSus.setValue(p.ampEnvSus * 100.0, dn);
-    ampRel.setValue(p.ampRelToEnd ? 10.0 : p.ampEnvRel, dn);
+    { const double relV = p.ampRelToEnd ? 10.0 : p.ampEnvRel;
+      ampRel.setValue(relV, dn); ampRel.setLabel(relV >= 10.0 ? "Release (s)" : adsrLabelStr("Release", relV)); }
 
     const auto chPfx = "ch" + juce::String(rhythmIndex) + "_";
     auto load = [&](KnobWithLabel& k, const char* param) {
         if (auto* raw = proc.apvts.getRawParameterValue(chPfx + param))
-            k.setValue(*raw, dn);
+            k.setValue(*raw * 100.0, dn);
     };
     load(ampSendEff, "sendEff");
     load(ampSendDly, "sendDly");
@@ -146,20 +195,20 @@ void AmpSubsection::refreshSuffix(const juce::String& suffix)
     const auto& p = proc.getRhythm(rhythmIndex).voiceParams;
     constexpr auto dn = juce::dontSendNotification;
 
-    if      (suffix == "ampLvl")   ampLevel .setValue(p.ampLevel,                              dn);
-    else if (suffix == "accentDb") ampAccent.setValue(p.accentDb,                              dn);
-    else if (suffix == "aEnvAtk")  ampAtk   .setValue(p.ampEnvAtk,                             dn);
-    else if (suffix == "aEnvDec")  ampDec   .setValue(p.ampEnvDec,                             dn);
+    if      (suffix == "ampLvl")   ampLevel .setValue(juce::Decibels::gainToDecibels(p.ampLevel, -60.0f), dn);
+    else if (suffix == "accentDb") ampAccent.setValue(p.accentDb / 12.0 * 100.0,               dn);
+    else if (suffix == "aEnvAtk")  { ampAtk.setValue(p.ampEnvAtk, dn); ampAtk.setLabel(adsrLabelStr("Attack", p.ampEnvAtk)); }
+    else if (suffix == "aEnvDec")  { ampDec.setValue(p.ampEnvDec, dn); ampDec.setLabel(adsrLabelStr("Decay",  p.ampEnvDec)); }
     else if (suffix == "aEnvSus")  ampSus   .setValue(p.ampEnvSus * 100.0,                     dn);
-    else if (suffix == "aEnvRel")  ampRel   .setValue(p.ampRelToEnd ? 10.0 : p.ampEnvRel,      dn);
+    else if (suffix == "aEnvRel")  { const double rv = p.ampRelToEnd ? 10.0 : p.ampEnvRel; ampRel.setValue(rv, dn); ampRel.setLabel(rv >= 10.0 ? "Release (s)" : adsrLabelStr("Release", rv)); }
     else if (suffix == "sendEff" || suffix == "sendDly" || suffix == "sendRev")
     {
         const auto chPfx = "ch" + juce::String(rhythmIndex) + "_";
         if (auto* raw = proc.apvts.getRawParameterValue(chPfx + suffix))
         {
-            if      (suffix == "sendEff") ampSendEff.setValue(*raw, dn);
-            else if (suffix == "sendDly") ampSendDly.setValue(*raw, dn);
-            else                          ampSendRev.setValue(*raw, dn);
+            if      (suffix == "sendEff") ampSendEff.setValue(*raw * 100.0, dn);
+            else if (suffix == "sendDly") ampSendDly.setValue(*raw * 100.0, dn);
+            else                          ampSendRev.setValue(*raw * 100.0, dn);
         }
     }
 }

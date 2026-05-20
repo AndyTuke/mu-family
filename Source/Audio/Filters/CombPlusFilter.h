@@ -25,6 +25,8 @@ public:
             buf[ch].assign(maxCombSamples, 0.0f);
             wPos[ch] = 0;
         }
+        smoothedRes.reset(sampleRate, 0.005);  // 5 ms — eliminates resonance-knob crackle
+        smoothedRes.setCurrentAndTargetValue(0.0f);
     }
     void reset() override
     {
@@ -39,8 +41,8 @@ public:
                  float cutoffHz, float resonance) override
     {
         const float delayF = static_cast<float>(currentSampleRate) / juce::jmax(20.0f, cutoffHz);
-        const float g      = resonance;   // positive feedback
-        const int   nCh    = juce::jmin(numChannels, 2);
+        smoothedRes.setTargetValue(resonance);
+        const int nCh = juce::jmin(numChannels, 2);
         for (int ch = 0; ch < nCh; ++ch)
         {
             auto&     b       = buf[ch];
@@ -49,6 +51,9 @@ public:
             auto*     data    = audio.getWritePointer(ch);
             for (int i = 0; i < numSamples; ++i)
             {
+                // ch0 advances the ramp; ch1 reads the latest value.
+                const float g     = (ch == 0) ? smoothedRes.getNextValue()
+                                              : smoothedRes.getCurrentValue();
                 const float readF = static_cast<float>(w) - delayF;
                 const int   r0    = ((static_cast<int>(std::floor(readF)) % bufSize) + bufSize) % bufSize;
                 const int   r1    = (r0 + 1) % bufSize;
@@ -66,4 +71,5 @@ private:
     double             currentSampleRate = 44100.0;
     std::vector<float> buf[2];
     int                wPos[2] = { 0, 0 };
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedRes;
 };

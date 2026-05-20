@@ -20,6 +20,16 @@ static double parseAdsrTimeSec(const juce::String& s)
         return t.dropLastCharacters(1).trim().getDoubleValue();
     return t.getDoubleValue() / 1000.0;
 }
+static juce::String adsrLabelStr(const juce::String& name, double v)
+{
+    return name + (v < 1.0 ? " (ms)" : " (s)");
+}
+static juce::String adsrValueStr(double v)
+{
+    double ms = std::max(1.0, v * 1000.0);
+    return (ms < 1000.0) ? juce::String((int)std::round(ms))
+                         : juce::String(ms / 1000.0, 2);
+}
 } // namespace
 
 PitchSubsection::PitchSubsection(PluginProcessor& p) : proc(p)
@@ -30,12 +40,12 @@ PitchSubsection::PitchSubsection(PluginProcessor& p) : proc(p)
 
     pitchOctave.setRange(-4.0,   4.0,   1.0);   pitchOctave.setValue(0.0);
     pitchSemi  .setRange(-12.0, 12.0,   1.0);   pitchSemi  .setValue(0.0);
-    pitchFine  .setRange(-100.0,100.0,  0.1);   pitchFine  .setValue(0.0);
+    pitchFine  .setRange(-99.0, 99.0,   0.1);   pitchFine  .setValue(0.0);
     pitchAtk   .setRange(0.0, 10.0, 0.001);  pitchAtk.setValue(0.0);   pitchAtk.getSlider().setSkewFactor(0.3);
     pitchDec   .setRange(0.0, 10.0, 0.001);  pitchDec.setValue(0.03);  pitchDec.getSlider().setSkewFactor(0.3);
     pitchSus   .setRange(0.0, 100.0, 0.1);   pitchSus.setValue(0.0);
     pitchRel   .setRange(0.0, 10.0, 0.001);  pitchRel.setValue(0.03);  pitchRel.getSlider().setSkewFactor(0.3);
-    pitchDepth .setRange(0.0,  24.0, 0.1);   pitchDepth.setValue(0.0);
+    pitchDepth .setRange(0.0, 100.0, 1.0);   pitchDepth.setValue(0.0);
 
     wireCallbacks();
 }
@@ -52,15 +62,21 @@ void PitchSubsection::wireCallbacks()
 {
     for (auto* k : { &pitchAtk, &pitchDec, &pitchRel })
     {
-        k->getSlider().textFromValueFunction = [](double v) { return formatAdsrTimeSec(v); };
+        k->getSlider().textFromValueFunction = [](double v) { return adsrValueStr(v); };
         k->getSlider().valueFromTextFunction = [](const juce::String& s) { return parseAdsrTimeSec(s); };
     }
     pitchSus.getSlider().textFromValueFunction = [](double v) -> juce::String {
-        return juce::String((int)std::round(v)) + "%";
+        return juce::String((int)std::round(v));
     };
     pitchSus.getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
         return s.trim().dropLastCharacters(s.endsWith("%") ? 1 : 0).trim().getDoubleValue();
     };
+
+    // Set initial dynamic labels.
+    pitchAtk.setLabel(adsrLabelStr("Attack",  pitchAtk.getValue()));
+    pitchDec.setLabel(adsrLabelStr("Decay",   pitchDec.getValue()));
+    pitchSus.setLabel("Sustain (%)");
+    pitchRel.setLabel(adsrLabelStr("Release", pitchRel.getValue()));
 
     struct { KnobWithLabel* k; const char* name; } entries[] = {
         { &pitchOctave, "Pitch Octave"   }, { &pitchSemi,  "Pitch Semitone" },
@@ -76,14 +92,29 @@ void PitchSubsection::wireCallbacks()
         };
     }
 
+    // Per-knob status bar overrides: re-add unit since the value display no longer shows it.
+    pitchAtk.onStatusUpdate = [this](const juce::String&, const juce::String&) {
+        if (onStatusUpdate) onStatusUpdate("Pitch Attack", formatAdsrTimeSec(pitchAtk.getValue()));
+    };
+    pitchDec.onStatusUpdate = [this](const juce::String&, const juce::String&) {
+        if (onStatusUpdate) onStatusUpdate("Pitch Decay", formatAdsrTimeSec(pitchDec.getValue()));
+    };
+    pitchSus.onStatusUpdate = [this](const juce::String&, const juce::String&) {
+        if (onStatusUpdate) onStatusUpdate("Pitch Sustain",
+            juce::String((int)std::round(pitchSus.getValue())) + "%");
+    };
+    pitchRel.onStatusUpdate = [this](const juce::String&, const juce::String&) {
+        if (onStatusUpdate) onStatusUpdate("Pitch Release", formatAdsrTimeSec(pitchRel.getValue()));
+    };
+
     pitchOctave.onValueChanged = [this](double v) { apvtsSet("pitchOct",  (float)v); };
     pitchSemi  .onValueChanged = [this](double v) { apvtsSet("pitchSemi", (float)v); };
     pitchFine  .onValueChanged = [this](double v) { apvtsSet("pitchFine", (float)v); };
-    pitchAtk   .onValueChanged = [this](double v) { apvtsSet("pEnvAtk",   (float)v); };
-    pitchDec   .onValueChanged = [this](double v) { apvtsSet("pEnvDec",   (float)v); };
+    pitchAtk   .onValueChanged = [this](double v) { apvtsSet("pEnvAtk",   (float)v); pitchAtk.setLabel(adsrLabelStr("Attack",  v)); };
+    pitchDec   .onValueChanged = [this](double v) { apvtsSet("pEnvDec",   (float)v); pitchDec.setLabel(adsrLabelStr("Decay",   v)); };
     pitchSus   .onValueChanged = [this](double v) { apvtsSet("pEnvSus",   (float)v); };
-    pitchRel   .onValueChanged = [this](double v) { apvtsSet("pEnvRel",   (float)v); };
-    pitchDepth .onValueChanged = [this](double v) { apvtsSet("pEnvDep",   (float)v); };
+    pitchRel   .onValueChanged = [this](double v) { apvtsSet("pEnvRel",   (float)v); pitchRel.setLabel(adsrLabelStr("Release", v)); };
+    pitchDepth .onValueChanged = [this](double v) { apvtsSet("pEnvDep",   (float)(v / 100.0 * 24.0)); };
 }
 
 void PitchSubsection::setRhythm(int ri)
@@ -102,11 +133,11 @@ void PitchSubsection::loadFromRhythm()
     pitchOctave.setValue(p.pitchOctave,          dn);
     pitchSemi  .setValue(p.pitchSemitones,       dn);
     pitchFine  .setValue(p.pitchFine,            dn);
-    pitchAtk   .setValue(p.pitchEnvAtk,          dn);
-    pitchDec   .setValue(p.pitchEnvDec,          dn);
+    pitchAtk   .setValue(p.pitchEnvAtk,          dn); pitchAtk.setLabel(adsrLabelStr("Attack",  p.pitchEnvAtk));
+    pitchDec   .setValue(p.pitchEnvDec,          dn); pitchDec.setLabel(adsrLabelStr("Decay",   p.pitchEnvDec));
     pitchSus   .setValue(p.pitchEnvSus * 100.0,  dn);
-    pitchRel   .setValue(p.pitchEnvRel,          dn);
-    pitchDepth .setValue(p.pitchEnvDepth,        dn);
+    pitchRel   .setValue(p.pitchEnvRel,          dn); pitchRel.setLabel(adsrLabelStr("Release", p.pitchEnvRel));
+    pitchDepth .setValue(p.pitchEnvDepth / 24.0 * 100.0, dn);
 }
 
 void PitchSubsection::refreshSuffix(const juce::String& suffix)
@@ -118,11 +149,11 @@ void PitchSubsection::refreshSuffix(const juce::String& suffix)
     if      (suffix == "pitchOct")  pitchOctave.setValue(p.pitchOctave,         dn);
     else if (suffix == "pitchSemi") pitchSemi  .setValue(p.pitchSemitones,      dn);
     else if (suffix == "pitchFine") pitchFine  .setValue(p.pitchFine,           dn);
-    else if (suffix == "pEnvAtk")   pitchAtk   .setValue(p.pitchEnvAtk,         dn);
-    else if (suffix == "pEnvDec")   pitchDec   .setValue(p.pitchEnvDec,         dn);
+    else if (suffix == "pEnvAtk")   { pitchAtk.setValue(p.pitchEnvAtk, dn); pitchAtk.setLabel(adsrLabelStr("Attack",  p.pitchEnvAtk)); }
+    else if (suffix == "pEnvDec")   { pitchDec.setValue(p.pitchEnvDec, dn); pitchDec.setLabel(adsrLabelStr("Decay",   p.pitchEnvDec)); }
     else if (suffix == "pEnvSus")   pitchSus   .setValue(p.pitchEnvSus * 100.0, dn);
-    else if (suffix == "pEnvRel")   pitchRel   .setValue(p.pitchEnvRel,         dn);
-    else if (suffix == "pEnvDep")   pitchDepth .setValue(p.pitchEnvDepth,       dn);
+    else if (suffix == "pEnvRel")   { pitchRel.setValue(p.pitchEnvRel, dn); pitchRel.setLabel(adsrLabelStr("Release", p.pitchEnvRel)); }
+    else if (suffix == "pEnvDep")   pitchDepth .setValue(p.pitchEnvDepth / 24.0 * 100.0, dn);
 }
 
 void PitchSubsection::refreshModulatedIndicators()

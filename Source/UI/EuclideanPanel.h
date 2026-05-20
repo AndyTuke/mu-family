@@ -60,7 +60,7 @@ private:
     SegmentControl legatoCtrl { {"Trig","Leg"},
                                 SegmentControl::ActiveStyle::General,
                                 SegmentControl::DrawStyle::Pills };
-    SegmentControl logicCtrl { {"OR","AND","XOR","A Only","B Only"},
+    SegmentControl logicCtrl { {"OR","AND","XOR","A","B"},
                                SegmentControl::ActiveStyle::General,
                                SegmentControl::DrawStyle::Pills };
 

@@ -25,14 +25,14 @@ private:
     PluginProcessor& proc;
     int rhythmIndex = -1;
 
-    KnobWithLabel pitchOctave { "Octave",   Id::knobEuclidean };
-    KnobWithLabel pitchSemi   { "Semitone", Id::knobEuclidean };
-    KnobWithLabel pitchFine   { "Fine",     Id::knobEuclidean };
-    KnobWithLabel pitchAtk    { "Attack",   Id::knobEuclidean };
-    KnobWithLabel pitchDec    { "Decay",    Id::knobEuclidean };
-    KnobWithLabel pitchSus    { "Sustain",  Id::knobEuclidean };
-    KnobWithLabel pitchRel    { "Release",  Id::knobEuclidean };
-    KnobWithLabel pitchDepth  { "Depth",    Id::knobEuclidean };
+    KnobWithLabel pitchOctave { "Octave",      Id::knobEuclidean };
+    KnobWithLabel pitchSemi   { "Semitone",   Id::knobEuclidean };
+    KnobWithLabel pitchFine   { "Fine",       Id::knobEuclidean };
+    KnobWithLabel pitchAtk    { "Attack (ms)", Id::knobEuclidean };
+    KnobWithLabel pitchDec    { "Decay (ms)",  Id::knobEuclidean };
+    KnobWithLabel pitchSus    { "Sustain (%)", Id::knobEuclidean };
+    KnobWithLabel pitchRel    { "Release (ms)", Id::knobEuclidean };
+    KnobWithLabel pitchDepth  { "Depth",      Id::knobEuclidean };
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();

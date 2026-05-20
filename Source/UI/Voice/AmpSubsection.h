@@ -25,15 +25,15 @@ private:
     PluginProcessor& proc;
     int rhythmIndex = -1;
 
-    KnobWithLabel ampLevel   { "Level",   Id::knobLevel  };
-    KnobWithLabel ampSendEff { "Effect",  Id::knobFxSend };
-    KnobWithLabel ampSendDly { "Delay",   Id::knobFxSend };
-    KnobWithLabel ampSendRev { "Reverb",  Id::knobFxSend };
-    KnobWithLabel ampAccent  { "Accent",  Id::knobLevel  };
-    KnobWithLabel ampAtk     { "Attack",  Id::knobLevel  };
-    KnobWithLabel ampDec     { "Decay",   Id::knobLevel  };
-    KnobWithLabel ampSus     { "Sustain", Id::knobLevel  };
-    KnobWithLabel ampRel     { "Release", Id::knobLevel  };
+    KnobWithLabel ampLevel   { "Level (dB)",   Id::knobLevel  };
+    KnobWithLabel ampSendEff { "Effect",       Id::knobFxSend };
+    KnobWithLabel ampSendDly { "Delay",        Id::knobFxSend };
+    KnobWithLabel ampSendRev { "Reverb",       Id::knobFxSend };
+    KnobWithLabel ampAccent  { "Accent",       Id::knobLevel  };
+    KnobWithLabel ampAtk     { "Attack (ms)",  Id::knobLevel  };
+    KnobWithLabel ampDec     { "Decay (ms)",   Id::knobLevel  };
+    KnobWithLabel ampSus     { "Sustain (%)",  Id::knobLevel  };
+    KnobWithLabel ampRel     { "Release (ms)", Id::knobLevel  };
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();

@@ -347,6 +347,14 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/ModulationMatrixTests.cpp
     Source/Tests/ApvtsLayoutTests.cpp
     Source/Tests/InsertDSPSmokeTests.cpp
+    Source/Tests/FilterDSPSmokeTests.cpp
+    Source/Tests/RhythmParamBoundaryTests.cpp
+    Source/Tests/UIScalingConsistencyTests.cpp
+    Source/Tests/SendFXSmokeTests.cpp
+    Source/Tests/PresetXMLRoundTripTests.cpp
+    Source/Audio/FX/Slots/EffectSlot.cpp
+    Source/Audio/FX/Slots/DelaySlot.cpp
+    Source/Audio/FX/Slots/ReverbSlot.cpp
     Source/Modulation/ModulationMatrix.cpp
     Source/Sequencer/ControlSequence.cpp
     Source/Sequencer/HitGenerator.cpp
@@ -357,6 +365,8 @@ target_compile_features(mu-clid-tests PRIVATE cxx_std_17)
 
 target_include_directories(mu-clid-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/Source"
+    "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
+    "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
 )
 
 target_link_libraries(mu-clid-tests PRIVATE
@@ -365,6 +375,7 @@ target_link_libraries(mu-clid-tests PRIVATE
     juce::juce_events
     juce::juce_audio_basics
     juce::juce_audio_processors
+    juce::juce_dsp
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags

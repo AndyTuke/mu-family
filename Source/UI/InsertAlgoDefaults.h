@@ -57,12 +57,13 @@ inline const InsertAlgoDefaults kInsertAlgoDefaults[14] = {
     { 50.0f,  0.0f,  0.0f,   440.0f,   0.0f, 16.0f, 48000.0f },  // 9  Ring Mod   (50% mix, 440 Hz)
     { 0.0f,   0.0f,  0.0f,   20000.0f, 0.0f, 16.0f, 48000.0f },  // 10 Tape Sat   (0% drive = transparent)
     // Karplus-Strong: drvDrive=0→Note C, drvBits=1→Octave 1,
-    // drvDither=70→Feedback 70%, driveTone=20000→LP fully open.
-    { 0.0f,   0.0f,  70.0f,  20000.0f, 0.0f,  1.0f, 48000.0f },  // 11 Karplus-Strong
-    // Vocoder: drvDrive=0 → Saw; drvBits=4 → Note F (idx 3);
-    // drvDither=3 → Octave 3; drvOut=-20 → Unison index 1 (3 voices).
-    { 0.0f,  -20.0f, 3.0f,   20000.0f, 0.0f,  4.0f, 48000.0f },  // 12 Vocoder
-    { 0.0f,  -20.0f, 3.0f,   20000.0f, 0.0f,  4.0f, 48000.0f },  // 13 VocoderSt (same defaults as Vocoder)
+    // drvDither=0→Feedback 0% (loop gain 0, passthrough — no resonance on first visit),
+    // driveTone=20000→LP fully open.
+    { 0.0f,   0.0f,   0.0f,  20000.0f, 0.0f,  1.0f, 48000.0f },  // 11 Karplus-Strong
+    // Vocoder: drvDrive=0→Saw; drvBits=1→Note C (idx 0); drvDither=1→Octave 1 (lowest);
+    // drvOut=-24→Unison index 0 (1 voice, no detuning). All knobs at minimum.
+    { 0.0f,  -24.0f,  1.0f,  20000.0f, 0.0f,  1.0f, 48000.0f },  // 12 Vocoder
+    { 0.0f,  -24.0f,  1.0f,  20000.0f, 0.0f,  1.0f, 48000.0f },  // 13 VocoderSt (same defaults as Vocoder)
 };
 
 } // namespace mu_ui

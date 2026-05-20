@@ -27,12 +27,12 @@ private:
     int rhythmIndex = -1;
 
     DropdownSelect filterType;
-    KnobWithLabel  filterCutoff { "Cutoff",    Id::knobPostPad };
+    KnobWithLabel  filterCutoff { "Cutoff (kHz)", Id::knobPostPad };
     KnobWithLabel  filterRes    { "Resonance", Id::knobPostPad };
-    KnobWithLabel  filterAtk    { "Attack",    Id::knobPostPad };
-    KnobWithLabel  filterDec    { "Decay",     Id::knobPostPad };
-    KnobWithLabel  filterSus    { "Sustain",   Id::knobPostPad };
-    KnobWithLabel  filterRel    { "Release",   Id::knobPostPad };
+    KnobWithLabel  filterAtk    { "Attack (ms)",  Id::knobPostPad };
+    KnobWithLabel  filterDec    { "Decay (ms)",   Id::knobPostPad };
+    KnobWithLabel  filterSus    { "Sustain (%)",  Id::knobPostPad };
+    KnobWithLabel  filterRel    { "Release (ms)", Id::knobPostPad };
     KnobWithLabel  filterDepth  { "Depth",     Id::knobPostPad };
 
     void apvtsSet(const char* suffix, float v);

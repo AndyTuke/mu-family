@@ -1,5 +1,12 @@
 #include "FXRow.h"
 
+static juce::String fmtHzNum(double v)
+{
+    if (v < 1000.0)  return juce::String((int)std::round(v));
+    if (v < 10000.0) return juce::String(v / 1000.0, 2);
+    return juce::String(v / 1000.0, 1);
+}
+
 FXRow::FXRow(const juce::String& name,
              const std::vector<FXAlgorithmDef>& algorithms,
              MuClidLookAndFeel::ColourIds colour)
@@ -159,10 +166,9 @@ void FXRow::rebuildKnobs(int algorithmIndex)
 
         if (param.units == "Hz")
         {
+            knob->setLabel(param.name + " (Hz)");
             knob->getSlider().textFromValueFunction = [](double v) -> juce::String {
-                if (v < 1000.0)  return juce::String((int)v) + " Hz";
-                if (v < 10000.0) return juce::String(v / 1000.0, 2) + " kHz";
-                return juce::String(v / 1000.0, 1) + " kHz";
+                return fmtHzNum(v);
             };
             knob->getSlider().valueFromTextFunction = [](const juce::String& t) -> double {
                 const juce::String s = t.trim().toLowerCase();
@@ -174,7 +180,7 @@ void FXRow::rebuildKnobs(int algorithmIndex)
         else if (param.units == "%")
         {
             knob->getSlider().textFromValueFunction = [](double v) -> juce::String {
-                return juce::String((int)std::round(v)) + " %";
+                return juce::String((int)std::round(v));
             };
             knob->getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
                 return s.retainCharacters("-0123456789.").getDoubleValue();
@@ -182,9 +188,10 @@ void FXRow::rebuildKnobs(int algorithmIndex)
         }
         else if (param.units == "ms")
         {
+            knob->setLabel(param.name + " (ms)");
             knob->getSlider().textFromValueFunction = [](double v) -> juce::String {
-                if (v < 1000.0) return juce::String((int)std::round(v)) + " ms";
-                return juce::String(v / 1000.0, 2) + " s";
+                if (v < 1000.0) return juce::String((int)std::round(v));
+                return juce::String(v / 1000.0, 2);
             };
             knob->getSlider().valueFromTextFunction = [](const juce::String& t) -> double {
                 const juce::String s = t.trim().toLowerCase();
@@ -196,9 +203,9 @@ void FXRow::rebuildKnobs(int algorithmIndex)
         else if (param.minVal == 0.0f && param.maxVal == 1.0f)
         {
             // unitless 0..1 params (reverb Size, Diffusion, Damp, Mod, Dirt)
-            // displayed as 0..100 % so users see what they're adjusting.
+            // displayed as 0..100 integer so users see what they're adjusting.
             knob->getSlider().textFromValueFunction = [](double v) -> juce::String {
-                return juce::String((int)std::round(v * 100.0)) + " %";
+                return juce::String((int)std::round(v * 100.0));
             };
             knob->getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
                 return juce::jlimit(0.0, 1.0,

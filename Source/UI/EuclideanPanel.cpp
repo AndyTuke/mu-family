@@ -101,7 +101,7 @@ void EuclideanPanel::wireCallbacks()
     };
 
     // ── Logic ─────────────────────────────────────────────────────────────────
-    static const char* const logicNames[] = { "OR", "AND", "XOR", "A Only", "B Only" };
+    static const char* const logicNames[] = { "OR", "AND", "XOR", "A", "B" };
     logicCtrl.onChange = [this, notify](int idx) {
         apvtsSet("logic", (float)idx);  notify();
         if (onStatusUpdate && idx >= 0 && idx < 5)
@@ -408,7 +408,7 @@ void EuclideanPanel::resized()
     const int padX = kOuter + eW * 3;
     const int insX = padX + pW * 2;
 
-    const int knobH    = ctrlH - kSwitchH - 2;
+    const int knobH    = ctrlH - kSwitchH - 6;
     // Issue #48: widen Pad/Mute toggles 40→56 so the full text fits.
     const int insSw    = juce::jmin(56, pW);
     const int insSwX   = insX + (pW * 2 - insSw) / 2;
@@ -448,8 +448,8 @@ void EuclideanPanel::resized()
         const int logicX   = rowX + kLegatoW + kLogicGapW;
         const int logicW   = rowW - kLegatoW - kLogicGapW;
 
-        legatoCtrl.setBounds(rowX,   y + 1, kLegatoW, kLogicH - 2);
-        logicCtrl .setBounds(logicX, y + 1, logicW,   kLogicH - 2);
+        legatoCtrl.setBounds(rowX,   y + 3, kLegatoW, kLogicH - 6);
+        logicCtrl .setBounds(logicX, y + 3, logicW,   kLogicH - 6);
     }
 
     y += kLogicH;
@@ -493,8 +493,8 @@ void EuclideanPanel::paint(juce::Graphics& g)
     for (int rowY : rowOffsets)
     {
         const int cy = rowY + kLabelH;
-        g.drawRoundedRectangle((float)padX, (float)cy, (float)(pW * 2),             (float)ctrlH, 4.0f, 1.0f);
-        g.drawRoundedRectangle((float)insX, (float)cy, (float)(w - kOuter - insX),  (float)ctrlH, 4.0f, 1.0f);
+        g.drawRoundedRectangle((float)padX, (float)cy, (float)(pW * 2),             (float)ctrlH - 2.0f, 4.0f, 1.0f);
+        g.drawRoundedRectangle((float)insX, (float)cy, (float)(w - kOuter - insX),  (float)ctrlH - 2.0f, 4.0f, 1.0f);
     }
 
     // logic row is split into a Legato sub-panel and a Logic sub-panel
@@ -508,9 +508,9 @@ void EuclideanPanel::paint(juce::Graphics& g)
         const int logicX   = rowX + kLegatoW + kLogicGapW;
         const int logicW   = rowW - kLegatoW - kLogicGapW;
 
-        g.drawRoundedRectangle((float)(rowX - kLogicMP),      (float)rowY,
-                               (float)(kLegatoW + kLogicMP),  (float)kLogicH, 4.0f, 1.0f);
-        g.drawRoundedRectangle((float)logicX,                 (float)rowY,
-                               (float)(logicW + kLogicMP),    (float)kLogicH, 4.0f, 1.0f);
+        g.drawRoundedRectangle((float)(rowX - kLogicMP),      (float)rowY + 2.0f,
+                               (float)(kLegatoW + kLogicMP),  (float)kLogicH - 4.0f, 4.0f, 1.0f);
+        g.drawRoundedRectangle((float)logicX,                 (float)rowY + 2.0f,
+                               (float)(logicW + kLogicMP),    (float)kLogicH - 4.0f, 4.0f, 1.0f);
     }
 }
