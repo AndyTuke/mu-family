@@ -144,4 +144,10 @@ public:
 
     // Fixed 30-colour palette for rhythm colour picker
     static const juce::Colour rhythmPalette[30];
+
+    // Canonical knob sizes. Use these — don't hardcode pixel values in panels.
+    // Large: Euclid Steps/Hits/Rotate and the mixer FX-row knobs (Effect /
+    // Delay / Reverb). See docs/knob-size-audit.md for the per-bucket map of
+    // controls and the consolidation plan.
+    static constexpr int kKnobSizeLarge = 88;
 };
