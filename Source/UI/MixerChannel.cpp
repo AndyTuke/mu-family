@@ -163,6 +163,14 @@ void MixerChannel::resized()
     // (MixerOverlay) is expected to pass already-scaled width/height — i.e.
     // we treat `w` and `h` as physical pixels, then scale Medium-baseline
     // constants on top via s() so internal positions stay coherent.
+    //
+    // Vertical layout is uniform across channel types: every section
+    // (sidechain / sends / fader / outBus / mute-solo) reserves its slot
+    // regardless of whether the channel actually uses it. That way pans
+    // align horizontally across the whole mixer, all faders have the same
+    // height, and returns (no outBus) still bottom-align with rhythm
+    // channels. Sections that don't apply to a channel simply don't render
+    // their controls — the slot stays empty.
     using mu_ui::s;
     const int w      = getWidth();
     const int h      = getHeight();
@@ -173,8 +181,12 @@ void MixerChannel::resized()
 
     const int nameBottom = s(kColourBarH + kNameH);
 
-    // ── Sidechain section (Rhythm + Returns) — fixed Medium-baseline height ──
-    const int scH = hasSidechainControls() ? s(kSidechainH) : 0;
+    // ── Sidechain section — slot always reserved for vertical alignment ──
+    const int scH = s(kSidechainH);
+    scSourceBox.setVisible(hasSidechainControls());
+    scAmount   .setVisible(hasSidechainControls());
+    scAttack   .setVisible(hasSidechainControls());
+    scRelease  .setVisible(hasSidechainControls());
     if (hasSidechainControls())
     {
         // scAmount renders at Size 3 (73 × 46); scAttack/Release at Size 4
@@ -235,10 +247,13 @@ void MixerChannel::resized()
     }
 
     // ── Fader + VU + GR ───────────────────────────────────────────────────────
-    const int muteY   = hasMuteSolo() ? h - s(kButtonH) : h;
+    // Bottom-anchored sections always reserve their slot so pan/fader/mute
+    // align across channel types. Master (no mute/solo) and returns (no
+    // outBus) still leave the slot empty — controls just hide.
+    const int muteY   = h - s(kButtonH);
     const int dbY     = muteY - s(kDbH);
-    const int busY    = hasOutputBus() ? dbY - s(kOutBusH) : dbY;
-    const int faderEnd = hasOutputBus() ? busY - 2 : dbY - 2;
+    const int busY    = dbY - s(kOutBusH);
+    const int faderEnd = busY - 2;
     const int faderH  = juce::jmax(s(40), faderEnd - faderY);
 
     const int vuW = s(kVUW);
@@ -248,11 +263,14 @@ void MixerChannel::resized()
         grMeter.setBounds(stripW - vuW - grW,  faderY, grW,                faderH);
     vuMeter.setBounds(stripW - vuW,            faderY, vuW,                faderH);
 
+    outBusBox.setVisible(hasOutputBus());
     if (hasOutputBus())
         outBusBox.setBounds(0, busY, stripW, s(kOutBusH));
 
     dbLabel.setBounds(0, dbY, stripW, s(kDbH));
 
+    muteBtn.setVisible(hasMuteSolo());
+    soloBtn.setVisible(hasMuteSolo());
     if (hasMuteSolo())
     {
         const int hw = stripW / 2;
