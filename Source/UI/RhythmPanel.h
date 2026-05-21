@@ -86,6 +86,10 @@ public:
     void filesDropped(const juce::StringArray& files, int x, int y) override;
     void setPresetDropLeft(int x) noexcept { rhythmDropLeft = x; }
 
+    // Forwarder: PluginEditor calls this on mixer-effect-algorithm change so
+    // the voice-section Amp "Effect" send knob label tracks the mixer.
+    void setVoiceEffectSendLabel(const juce::String& name) { voiceSection.setEffectSendLabel(name); }
+
 private:
     PluginProcessor& proc;
     int currentRhythmIndex = -1;

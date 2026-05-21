@@ -15,6 +15,11 @@ public:
     void refreshSuffix(const juce::String& suffix);
     void refreshModulatedIndicators();
 
+    // Update the "Effect" send knob label to show the mixer's currently-
+    // selected effect algorithm name (e.g. "Phaser", "Echo"). PluginEditor
+    // wires this from MixerOverlay::onEffectAlgorithmNameChanged.
+    void setEffectSendLabel(const juce::String& name);
+
     void resized() override;
 
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;

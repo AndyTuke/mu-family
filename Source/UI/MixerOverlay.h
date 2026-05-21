@@ -26,6 +26,11 @@ public:
                        const juce::String& value,
                        juce::Colour channelColour)> onStatusUpdate;
 
+    // Fired whenever the effect-slot algorithm changes (or initial sync). The
+    // editor uses this to push the algorithm's display name into the voice
+    // section's Amp "Effect" send knob label.
+    std::function<void(const juce::String& algorithmName)> onEffectAlgorithmNameChanged;
+
     // Rebuild channel strips to match the current rhythm count.
     void refresh();
 

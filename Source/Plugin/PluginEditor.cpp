@@ -123,6 +123,14 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         statusBar.showParam(name, val, col);
     };
 
+    // Mirror the mixer's effect-slot algorithm name on the voice section's
+    // Amp "Effect" send knob so the user can read it without opening the
+    // mixer overlay.
+    mixerOverlay.onEffectAlgorithmNameChanged = [this](const juce::String& name)
+    {
+        rhythmPanel.setVoiceEffectSendLabel(name);
+    };
+
     rhythmPanel.onRhythmRenamed = [this]
     {
         sidebar.repaintItems();

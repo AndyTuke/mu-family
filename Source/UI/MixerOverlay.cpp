@@ -576,6 +576,11 @@ void MixerOverlay::updateEffectSendLabels()
     for (auto& ch : rhythmChannels)
         ch->setEffectSendLabel(name);
     effectReturn.setChannelName(name);
+
+    // Voice-section Amp "Effect" send label tracks the same name. PluginEditor
+    // wires this to RhythmPanel → VoiceSection → AmpSubsection.
+    if (onEffectAlgorithmNameChanged)
+        onEffectAlgorithmNameChanged(name);
 }
 
 void MixerOverlay::resized()

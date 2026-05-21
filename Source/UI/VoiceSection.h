@@ -19,6 +19,9 @@ public:
     void refreshModulatedIndicators();
     void refreshSuffix(const juce::String& suffix);
 
+    // Forwarder to AmpSubsection — see AmpSubsection::setEffectSendLabel.
+    void setEffectSendLabel(const juce::String& name) { ampSub.setEffectSendLabel(name); }
+
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
     std::function<void(int insertAlgo)> onInsertAlgorithmChanged;
 

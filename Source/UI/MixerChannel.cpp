@@ -316,11 +316,13 @@ void MixerChannel::resized()
             const int s2W = s(MuLookAndFeel::kKnobSize2W);
             const int s2H = s(MuLookAndFeel::kKnobSize2H);
 
-            if (charBox.getSelectedId() == 7) // EQ: single column High/Mid/MidHz/Low
+            if (charBox.getSelectedId() == 7) // EQ: stacked top→bottom = High / Mid dB / Mid Hz / Low
             {
                 const int rowH  = s2H;
                 const int knobX = ipX + (ipW - s2W) / 2;  // centre horizontally
-                KnobWithLabel* const eqOrder[] = { &ton, &out, &ext, &drv };
+                // Frequency-descending order so the visual mirrors a spectrum:
+                // top = high band, bottom = low band.
+                KnobWithLabel* const eqOrder[] = { &ext, &out, &ton, &drv };
                 for (int i = 0; i < 4; ++i)
                     eqOrder[i]->setBounds(knobX, ky + i * rowH, s2W, s2H);
             }

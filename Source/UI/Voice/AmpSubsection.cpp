@@ -247,6 +247,11 @@ void AmpSubsection::refreshModulatedIndicators()
     ampAccent.setModulatedNorm(arc(isAssigned("accentDb"),     kSnapAccent));
 }
 
+void AmpSubsection::setEffectSendLabel(const juce::String& name)
+{
+    ampSendEff.setLabel(name);
+}
+
 void AmpSubsection::resized()
 {
     // Voice section knobs render at Size 2 (55 × 56) — fixed PX, no
