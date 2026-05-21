@@ -261,13 +261,31 @@ public:
     //                      insStart/insLen); mixer channel-strip knobs
     //                      (sends / pan / sidechain Amount) except envelopes.
     //   Size 4 (smallest)— Sidechain envelope knobs (Attack + Release).
-    static constexpr int kKnobSize1 = 88;
-    static constexpr int kKnobSize2 = 55;
-    static constexpr int kKnobSize3 = 73;
-    static constexpr int kKnobSize4 = 36;
+    //
+    // Each bucket specifies BOTH width and height. KnobWithLabel draws the
+    // visible knob circle at `jmin(width, height - labelArea) / 2 - 2` — so
+    // a single "Size" constant (width only) lets cells of the same width
+    // but different heights render visibly different knobs. The W/H pair
+    // pins both dimensions across every consumer of a bucket.
+    //
+    // Heights were chosen to match the smallest naturally-occurring cell
+    // height in each bucket, so adopting the canonical size doesn't force
+    // any panel to grow (which would cascade into the parent layout).
+    static constexpr int kKnobSize1W = 88;
+    static constexpr int kKnobSize1H = 70;
+    static constexpr int kKnobSize2W = 55;
+    static constexpr int kKnobSize2H = 56;
+    static constexpr int kKnobSize3W = 73;
+    static constexpr int kKnobSize3H = 46;
+    static constexpr int kKnobSize4W = 36;
+    static constexpr int kKnobSize4H = 39;
 
-    // Backward-compat alias — previous code referred to the Large bucket as
-    // kKnobSizeLarge. Kept so existing call sites keep working until they're
-    // moved to the numbered names.
-    static constexpr int kKnobSizeLarge = kKnobSize1;
+    // Width-only legacy names — equal to the W component of each bucket.
+    // Existing call sites that set bounds with `(x, y, kKnobSize1, panelH)`
+    // keep their old layout meaning until they're moved to the W/H pair.
+    static constexpr int kKnobSize1     = kKnobSize1W;
+    static constexpr int kKnobSize2     = kKnobSize2W;
+    static constexpr int kKnobSize3     = kKnobSize3W;
+    static constexpr int kKnobSize4     = kKnobSize4W;
+    static constexpr int kKnobSizeLarge = kKnobSize1W;
 };

@@ -202,10 +202,12 @@ void DelayRow::resized()
     const int h = getHeight();
     int x = kPad;
 
-    // Fixed knob width — central constant in MuLookAndFeel::kKnobSizeLarge.
-    // Same value used by FXRow and EuclideanPanel so all three panels match.
-    constexpr int knobW = MuLookAndFeel::kKnobSizeLarge;
-    constexpr int msW   = knobW;
+    // Knob size is fixed (Size 1) — both width AND height. Never derived from
+    // the row's getHeight(), so the visible circle stays the same regardless
+    // of the parent's allocation.
+    constexpr int knobW = MuLookAndFeel::kKnobSize1W;
+    constexpr int knobH = MuLookAndFeel::kKnobSize1H;
+    const int     knobY = (h - knobH) / 2;
 
     if (showHeader)
     {
@@ -222,20 +224,20 @@ void DelayRow::resized()
         modeDropdown   .setBounds(x, colY,              kDropdownW, 24);
         modifierSegment.setBounds(x, colY + 24 + kPad,  kDropdownW, 24);
         x += kDropdownW + kPad;
-        multipleKnob   .setBounds(x, 0, knobW, h);
+        multipleKnob   .setBounds(x, knobY, knobW, knobH);
         x += knobW + kPad;
     }
     else
     {
         modeDropdown.setBounds(x, (h - 24) / 2, kDropdownW, 24);
         x += kDropdownW + kPad;
-        msKnob.setBounds(x, 0, msW, h);
-        x += msW + kPad;
+        msKnob.setBounds(x, knobY, knobW, knobH);
+        x += knobW + kPad;
     }
 
-    feedbackKnob.setBounds(x,             0, knobW, h);
-    spreadKnob  .setBounds(x + knobW,     0, knobW, h);
-    dirtKnob    .setBounds(x + knobW * 2, 0, knobW, h);
+    feedbackKnob.setBounds(x,             knobY, knobW, knobH);
+    spreadKnob  .setBounds(x + knobW,     knobY, knobW, knobH);
+    dirtKnob    .setBounds(x + knobW * 2, knobY, knobW, knobH);
 }
 
 void DelayRow::paint(juce::Graphics& g)

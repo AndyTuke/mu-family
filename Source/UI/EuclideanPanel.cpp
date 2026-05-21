@@ -401,12 +401,13 @@ void EuclideanPanel::resized()
     constexpr int ctrlH = rowH - kLabelH;   // control zone within each row (below label)
     constexpr int mP    = 4;
 
-    // Steps/Hits/Rotate use the canonical Large knob size — same constant the
-    // mixer FX rows use, so the panels stay matched.
-    constexpr int eW   = MuLookAndFeel::kKnobSizeLarge;
-    constexpr int pW   = (innerW - eW * 3) / 4;
-    constexpr int padX = kOuter + eW * 3;
-    constexpr int insX = padX + pW * 2;
+    // Steps/Hits/Rotate render at Size 1 (canonical) — same fixed W × H as
+    // the mixer FX rows. pW is the layout column for pad / insert clusters.
+    constexpr int eW    = MuLookAndFeel::kKnobSize1W;
+    constexpr int eH    = MuLookAndFeel::kKnobSize1H;
+    constexpr int pW    = (innerW - eW * 3) / 4;
+    constexpr int padX  = kOuter + eW * 3;
+    constexpr int insX  = padX + pW * 2;
 
     constexpr int knobH    = ctrlH - kSwitchH - 6;
     // Pad/Mute toggle width — fits the longest text ("MUTE") cleanly.
@@ -416,11 +417,11 @@ void EuclideanPanel::resized()
     constexpr int preSw_x  = padX + mP + (pW - mP - padSw) / 2;
     constexpr int postSw_x = padX + pW + (pW - mP - padSw) / 2;
 
-    // Pad / insert knobs render at Size 3 (the canonical mixer-strip knob
-    // width). Each knob is centered inside its layout column (pW wide), so
-    // the column structure that places the cluster boundaries stays the
-    // same while the visible knob matches mixer-knob width.
-    constexpr int padKnobW = MuLookAndFeel::kKnobSize3;
+    // Steps/Hits/Rotate render at Size 1 (88 × 70). Pad / insert knobs render
+    // at Size 3 (73 × 46), centred horizontally inside their layout column.
+    // Knob dimensions never depend on the panel's height — fixed PX always.
+    constexpr int padKnobW      = MuLookAndFeel::kKnobSize3W;
+    constexpr int padKnobH      = MuLookAndFeel::kKnobSize3H;
     constexpr int padKnobOffset = (pW - padKnobW) / 2;
 
     auto placeRow = [&](int y,
@@ -431,15 +432,15 @@ void EuclideanPanel::resized()
                         SegmentControl& insMode)
     {
         const int cy = y + kLabelH;  // top of control zone
-        steps.setBounds  (kOuter,        cy,      eW,      ctrlH);
-        hits.setBounds   (kOuter + eW,   cy,      eW,      ctrlH);
-        rot.setBounds    (kOuter + eW*2, cy,      eW,      ctrlH);
-        prePad.setBounds (padX     + padKnobOffset, cy + mP, padKnobW, knobH - mP);
-        postPad.setBounds(padX + pW + padKnobOffset, cy + mP, padKnobW, knobH - mP);
+        steps.setBounds  (kOuter,        cy,      eW,       eH);
+        hits.setBounds   (kOuter + eW,   cy,      eW,       eH);
+        rot.setBounds    (kOuter + eW*2, cy,      eW,       eH);
+        prePad.setBounds (padX     + padKnobOffset, cy + mP, padKnobW, padKnobH);
+        postPad.setBounds(padX + pW + padKnobOffset, cy + mP, padKnobW, padKnobH);
         prePadMode.setBounds (preSw_x,   cy + knobH + 2, padSw, kSwitchH);
         postPadMode.setBounds(postSw_x,  cy + knobH + 2, padSw, kSwitchH);
-        insSt.setBounds  (insX     + padKnobOffset, cy + mP, padKnobW, knobH - mP);
-        insLen.setBounds (insX + pW + padKnobOffset, cy + mP, padKnobW, knobH - mP);
+        insSt.setBounds  (insX     + padKnobOffset, cy + mP, padKnobW, padKnobH);
+        insLen.setBounds (insX + pW + padKnobOffset, cy + mP, padKnobW, padKnobH);
         insMode.setBounds(insSwX,        cy + knobH + 2, insSw, kSwitchH);
     };
 

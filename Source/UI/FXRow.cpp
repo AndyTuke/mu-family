@@ -111,14 +111,18 @@ void FXRow::resized()
     algorithmDropdown.setBounds(x, (h - 24) / 2, kDropdownW, 24);
     x += kDropdownW + kPadding;
 
-    // Fixed knob width — central constant in MuLookAndFeel::kKnobSizeLarge.
-    // Same value used by EuclideanPanel Steps/Hits/Rotate so the panels match.
+    // Knob size is fixed (Size 1) — both width AND height. Never derived from
+    // the row's getHeight(), so the visible circle stays the same regardless
+    // of the parent's allocation. Excess vertical space becomes padding
+    // above/below the knob cell.
     if (knobsVisible)
     {
-        constexpr int knobW = MuLookAndFeel::kKnobSizeLarge;
+        constexpr int knobW = MuLookAndFeel::kKnobSize1W;
+        constexpr int knobH = MuLookAndFeel::kKnobSize1H;
+        const int     knobY = (h - knobH) / 2;
         for (auto& k : knobs)
         {
-            k->setBounds(x, 0, knobW, h);
+            k->setBounds(x, knobY, knobW, knobH);
             x += knobW;
         }
     }

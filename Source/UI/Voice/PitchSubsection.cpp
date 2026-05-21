@@ -188,9 +188,11 @@ void PitchSubsection::refreshModulatedIndicators()
 
 void PitchSubsection::resized()
 {
-    constexpr int kW    = MuClidLookAndFeel::kVoicePFAKnobW;
+    // Voice section knobs render at Size 2 (55 × 56) — fixed PX, no
+    // dependency on the panel's actual height. See MuLookAndFeel.
+    constexpr int kW    = MuClidLookAndFeel::kKnobSize2W;
+    constexpr int rowH  = MuClidLookAndFeel::kKnobSize2H;
     constexpr int gap   = MuClidLookAndFeel::kVoiceGap;
-    constexpr int rowH  = MuClidLookAndFeel::kVoiceKnobCellH;
     constexpr int row2Y = rowH + gap;
 
     pitchOctave.setBounds(0 * kW, 0,    kW, rowH);

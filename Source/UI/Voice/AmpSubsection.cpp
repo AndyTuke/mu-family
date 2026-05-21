@@ -249,9 +249,11 @@ void AmpSubsection::refreshModulatedIndicators()
 
 void AmpSubsection::resized()
 {
-    constexpr int kW   = MuClidLookAndFeel::kVoicePFAKnobW;
-    constexpr int gap  = MuClidLookAndFeel::kVoiceGap;
-    constexpr int rowH = MuClidLookAndFeel::kVoiceKnobCellH;
+    // Voice section knobs render at Size 2 (55 × 56) — fixed PX, no
+    // dependency on the panel's actual height.
+    constexpr int kW    = MuClidLookAndFeel::kKnobSize2W;
+    constexpr int rowH  = MuClidLookAndFeel::kKnobSize2H;
+    constexpr int gap   = MuClidLookAndFeel::kVoiceGap;
     constexpr int row2Y = rowH + gap;
 
     ampLevel  .setBounds(0 * kW, 0,    kW, rowH);
