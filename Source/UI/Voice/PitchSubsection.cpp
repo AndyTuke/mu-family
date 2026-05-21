@@ -195,13 +195,14 @@ void PitchSubsection::resized()
     constexpr int gap   = MuClidLookAndFeel::kVoiceGap;
     constexpr int row2Y = rowH + gap;
 
-    pitchOctave.setBounds(0 * kW, 0,    kW, rowH);
-    pitchSemi  .setBounds(1 * kW, 0,    kW, rowH);
-    pitchFine  .setBounds(2 * kW, 0,    kW, rowH);
-    pitchDepth .setBounds(3 * kW, 0,    kW, rowH);
+    using mu_ui::s;
+    pitchOctave.setBounds(s(0 * kW), 0,        s(kW), s(rowH));
+    pitchSemi  .setBounds(s(1 * kW), 0,        s(kW), s(rowH));
+    pitchFine  .setBounds(s(2 * kW), 0,        s(kW), s(rowH));
+    pitchDepth .setBounds(s(3 * kW), 0,        s(kW), s(rowH));
 
-    pitchAtk.setBounds(0 * kW, row2Y, kW, rowH);
-    pitchDec.setBounds(1 * kW, row2Y, kW, rowH);
-    pitchSus.setBounds(2 * kW, row2Y, kW, rowH);
-    pitchRel.setBounds(3 * kW, row2Y, kW, rowH);
+    pitchAtk.setBounds(s(0 * kW), s(row2Y), s(kW), s(rowH));
+    pitchDec.setBounds(s(1 * kW), s(row2Y), s(kW), s(rowH));
+    pitchSus.setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));
+    pitchRel.setBounds(s(3 * kW), s(row2Y), s(kW), s(rowH));
 }

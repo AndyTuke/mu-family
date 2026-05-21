@@ -580,13 +580,22 @@ void MixerOverlay::updateEffectSendLabels()
 
 void MixerOverlay::resized()
 {
-    // Fixed Medium-baseline layout — see MuLookAndFeel for the constants.
-    constexpr int w        = MuClidLookAndFeel::kMixerOverlayW;
-    constexpr int fxAreaH  = MuClidLookAndFeel::kMixerFXAreaH;
-    constexpr int fxRowH   = MuClidLookAndFeel::kMixerFXRowH;
-    constexpr int stripH   = MuClidLookAndFeel::kMixerStripH;
-    constexpr int chanW    = MuClidLookAndFeel::kMixerChanW;
-    constexpr int masterTotalW = MuClidLookAndFeel::kMixerMasterTotalW;
+    // Medium baseline + s() wrap. The container width (getWidth()) is the
+    // already-scaled allocation from PluginEditor; everything else here
+    // multiplies through s() so toggling scale propagates uniformly.
+    using mu_ui::s;
+    const int w        = getWidth();
+    const int fxAreaH  = s(MuClidLookAndFeel::kMixerFXAreaH);
+    const int fxRowH   = s(MuClidLookAndFeel::kMixerFXRowH);
+    const int stripH   = s(MuClidLookAndFeel::kMixerStripH);
+    const int chanW    = s(MuClidLookAndFeel::kMixerChanW);
+    const int masterTotalW = s(MuClidLookAndFeel::kMixerMasterTotalW);
+    const int hdrH     = s(kHeaderH);
+    const int fxPad    = s(kFXPad);
+    const int fxGap    = s(kFXGap);
+    const int divW     = s(kDivW);
+    const int chanGap  = s(kChanGap);
+    const int labelPanelW = s(kLabelPanelW);
 
     lastFXAreaH = fxAreaH;
     lastFXRowH  = fxRowH;
@@ -594,39 +603,37 @@ void MixerOverlay::resized()
     lastChanW   = chanW;
 
     // Meter mode selector — right-aligned in the header strip
-    constexpr int kModeW = 176;
-    meterModeCtrl.setBounds(w - kModeW - 4, (kHeaderH - 18) / 2, kModeW, 18);
+    const int modeW = s(176);
+    const int modeBtnH = s(18);
+    meterModeCtrl.setBounds(w - modeW - s(4), (hdrH - modeBtnH) / 2, modeW, modeBtnH);
 
-    // Channel strips start below the header, offset right to leave room for the label panel.
-    int x = kLabelPanelW;
+    int x = labelPanelW;
     for (int i = 0; i < (int)rhythmChannels.size(); ++i)
     {
-        rhythmChannels[i]->setBounds(x, kHeaderH, chanW, stripH);
-        x += chanW + (i + 1 < (int)rhythmChannels.size() ? kChanGap : 0);
+        rhythmChannels[i]->setBounds(x, hdrH, chanW, stripH);
+        x += chanW + (i + 1 < (int)rhythmChannels.size() ? chanGap : 0);
     }
 
     lastDivX1 = x;
-    x += kDivW;
-    effectReturn .setBounds(x, kHeaderH, chanW, stripH);  x += chanW;
-    delayReturn  .setBounds(x, kHeaderH, chanW, stripH);  x += chanW;
-    reverbReturn .setBounds(x, kHeaderH, chanW, stripH);  x += chanW;
+    x += divW;
+    effectReturn .setBounds(x, hdrH, chanW, stripH);  x += chanW;
+    delayReturn  .setBounds(x, hdrH, chanW, stripH);  x += chanW;
+    reverbReturn .setBounds(x, hdrH, chanW, stripH);  x += chanW;
 
     lastDivX2 = x;
-    x += kDivW;
-    // Master strip fills any remaining horizontal space.
+    x += divW;
     const int masterActualW = juce::jmax(masterTotalW, w - x);
-    masterChannel.setBounds(x, kHeaderH, masterActualW, stripH);
+    masterChannel.setBounds(x, hdrH, masterActualW, stripH);
 
     // FX rows below the channel strips
-    int fy = kHeaderH + stripH + kFXPad;
-    effectRow.setBounds(kFXPad, fy, w - kFXPad * 2, fxRowH);
-    // echoRow occupies the knobs portion of the effectRow row (after the header area)
-    // so the effectRow algo dropdown stays visible for switching effect types.
-    echoRow.setBounds(kFXPad + FXRow::kHeaderWidth, fy,
-                      juce::jmax(0, w - kFXPad * 2 - FXRow::kHeaderWidth), fxRowH);
-    fy += fxRowH + kFXGap;
-    delayRow .setBounds(kFXPad, fy, w - kFXPad * 2, fxRowH);  fy += fxRowH + kFXGap;
-    reverbRow.setBounds(kFXPad, fy, w - kFXPad * 2, fxRowH);
+    int fy = hdrH + stripH + fxPad;
+    const int fxHeaderW = s(FXRow::kHeaderWidth);
+    effectRow.setBounds(fxPad, fy, w - fxPad * 2, fxRowH);
+    echoRow.setBounds(fxPad + fxHeaderW, fy,
+                      juce::jmax(0, w - fxPad * 2 - fxHeaderW), fxRowH);
+    fy += fxRowH + fxGap;
+    delayRow .setBounds(fxPad, fy, w - fxPad * 2, fxRowH);  fy += fxRowH + fxGap;
+    reverbRow.setBounds(fxPad, fy, w - fxPad * 2, fxRowH);
 }
 
 void MixerOverlay::propagateMeterMode(VUMeter::MeterMode m)

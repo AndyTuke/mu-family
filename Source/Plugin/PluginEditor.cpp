@@ -280,7 +280,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // from so layout bugs found after this can't be confused with window
     // resizing edge cases.
     setResizable(false, false);
-    setSize(MuLookAndFeel::kWindowWidth, MuLookAndFeel::kWindowHeight);
+    setSize(mu_ui::s(MuLookAndFeel::kWindowWidth), mu_ui::s(MuLookAndFeel::kWindowHeight));
 
     isStandalone = processorRef.wrapperType == juce::AudioProcessor::wrapperType_Standalone;
     loadKeybindings();
@@ -597,23 +597,25 @@ void PluginEditor::paint(juce::Graphics& g)
 
 void PluginEditor::resized()
 {
+    using mu_ui::s;
     const int w          = getWidth();
     const int h          = getHeight();
-    const int statusH    = 20;
-    const int transportH = 36;
-    const int bannerH    = processorRef.isLicensed() ? 0 : kDemoBannerH;
+    const int statusH    = s(MuLookAndFeel::kStatusBarH);
+    const int transportH = s(MuLookAndFeel::kTransportBarH);
+    const int sidebarW   = s(MuLookAndFeel::kSidebarW);
+    const int bannerH    = processorRef.isLicensed() ? 0 : s(kDemoBannerH);
     const int contentH   = h - transportH - statusH - bannerH;
 
-    const juce::Rectangle<int> mainArea { RhythmSidebar::kWidth, transportH,
-                                          w - RhythmSidebar::kWidth, contentH };
+    const juce::Rectangle<int> mainArea { sidebarW, transportH,
+                                          w - sidebarW, contentH };
 
     transportBar.setBounds(0, 0, w, transportH);
-    sidebar.setBounds(0, transportH, RhythmSidebar::kWidth, contentH);
+    sidebar.setBounds(0, transportH, sidebarW, contentH);
 
     // Align the rhythm preset dropdown's left edge with the main preset dropdown
     // above it (+ 10 px indent to show visual hierarchy). Computed after the
     // TransportBar has laid out so presetDropdown.getX() is valid.
-    rhythmPanel.setPresetDropLeft(transportBar.getPresetDropdownLeft() - RhythmSidebar::kWidth + 10);
+    rhythmPanel.setPresetDropLeft(transportBar.getPresetDropdownLeft() - sidebarW + s(10));
     rhythmPanel     .setBounds(mainArea);
     mixerOverlay    .setBounds(mainArea);
     presetBrowser   .setBounds(mainArea);

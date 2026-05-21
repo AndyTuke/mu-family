@@ -199,40 +199,41 @@ void DelayRow::fireSyncParams()
 
 void DelayRow::resized()
 {
+    using mu_ui::s;
     const int h = getHeight();
-    int x = kPad;
+    int x = s(kPad);
 
     // Knob size is fixed (Size 1) — both width AND height. Never derived from
-    // the row's getHeight(), so the visible circle stays the same regardless
+    // the row's getHeight() so the visible circle stays the same regardless
     // of the parent's allocation.
-    constexpr int knobW = MuLookAndFeel::kKnobSize1W;
-    constexpr int knobH = MuLookAndFeel::kKnobSize1H;
-    const int     knobY = (h - knobH) / 2;
+    const int knobW = s(MuLookAndFeel::kKnobSize1W);
+    const int knobH = s(MuLookAndFeel::kKnobSize1H);
+    const int knobY = (h - knobH) / 2;
 
     if (showHeader)
     {
-        enableButton.setBounds(x, (h - 22) / 2, kToggleW, 22);
-        x += kToggleW + kPad;
-        x += kNameW + kPad;  // name label is drawn, not a component
+        enableButton.setBounds(x, (h - s(22)) / 2, s(kToggleW), s(22));
+        x += s(kToggleW + kPad);
+        x += s(kNameW + kPad);  // name label is drawn, not a component
     }
 
     if (syncMode)
     {
         // Dropdown and modifier stacked vertically in the same column
-        const int colH = 24 + kPad + 24;
+        const int colH = s(24 + kPad + 24);
         const int colY = (h - colH) / 2;
-        modeDropdown   .setBounds(x, colY,              kDropdownW, 24);
-        modifierSegment.setBounds(x, colY + 24 + kPad,  kDropdownW, 24);
-        x += kDropdownW + kPad;
+        modeDropdown   .setBounds(x, colY,                 s(kDropdownW), s(24));
+        modifierSegment.setBounds(x, colY + s(24 + kPad),  s(kDropdownW), s(24));
+        x += s(kDropdownW + kPad);
         multipleKnob   .setBounds(x, knobY, knobW, knobH);
-        x += knobW + kPad;
+        x += knobW + s(kPad);
     }
     else
     {
-        modeDropdown.setBounds(x, (h - 24) / 2, kDropdownW, 24);
-        x += kDropdownW + kPad;
+        modeDropdown.setBounds(x, (h - s(24)) / 2, s(kDropdownW), s(24));
+        x += s(kDropdownW + kPad);
         msKnob.setBounds(x, knobY, knobW, knobH);
-        x += knobW + kPad;
+        x += knobW + s(kPad);
     }
 
     feedbackKnob.setBounds(x,             knobY, knobW, knobH);

@@ -424,6 +424,10 @@ void EuclideanPanel::resized()
     constexpr int padKnobH      = MuLookAndFeel::kKnobSize3H;
     constexpr int padKnobOffset = (pW - padKnobW) / 2;
 
+    // Every literal/constant in setBounds wrapped in mu_ui::s() so toggling
+    // the UI scale propagates uniformly. Identity at scale = 1.0.
+    using mu_ui::s;
+
     auto placeRow = [&](int y,
                         KnobWithLabel& steps, KnobWithLabel& hits, KnobWithLabel& rot,
                         KnobWithLabel& prePad, KnobWithLabel& postPad,
@@ -431,17 +435,17 @@ void EuclideanPanel::resized()
                         KnobWithLabel& insSt, KnobWithLabel& insLen,
                         SegmentControl& insMode)
     {
-        const int cy = y + kLabelH;  // top of control zone
-        steps.setBounds  (kOuter,        cy,      eW,       eH);
-        hits.setBounds   (kOuter + eW,   cy,      eW,       eH);
-        rot.setBounds    (kOuter + eW*2, cy,      eW,       eH);
-        prePad.setBounds (padX     + padKnobOffset, cy + mP, padKnobW, padKnobH);
-        postPad.setBounds(padX + pW + padKnobOffset, cy + mP, padKnobW, padKnobH);
-        prePadMode.setBounds (preSw_x,   cy + knobH + 2, padSw, kSwitchH);
-        postPadMode.setBounds(postSw_x,  cy + knobH + 2, padSw, kSwitchH);
-        insSt.setBounds  (insX     + padKnobOffset, cy + mP, padKnobW, padKnobH);
-        insLen.setBounds (insX + pW + padKnobOffset, cy + mP, padKnobW, padKnobH);
-        insMode.setBounds(insSwX,        cy + knobH + 2, insSw, kSwitchH);
+        const int cy = y + kLabelH;  // top of control zone (Medium space)
+        steps.setBounds  (s(kOuter),        s(cy),      s(eW),       s(eH));
+        hits.setBounds   (s(kOuter + eW),   s(cy),      s(eW),       s(eH));
+        rot.setBounds    (s(kOuter + eW*2), s(cy),      s(eW),       s(eH));
+        prePad.setBounds (s(padX     + padKnobOffset), s(cy + mP), s(padKnobW), s(padKnobH));
+        postPad.setBounds(s(padX + pW + padKnobOffset), s(cy + mP), s(padKnobW), s(padKnobH));
+        prePadMode.setBounds (s(preSw_x),   s(cy + knobH + 2), s(padSw), s(kSwitchH));
+        postPadMode.setBounds(s(postSw_x),  s(cy + knobH + 2), s(padSw), s(kSwitchH));
+        insSt.setBounds  (s(insX     + padKnobOffset), s(cy + mP), s(padKnobW), s(padKnobH));
+        insLen.setBounds (s(insX + pW + padKnobOffset), s(cy + mP), s(padKnobW), s(padKnobH));
+        insMode.setBounds(s(insSwX),        s(cy + knobH + 2), s(insSw), s(kSwitchH));
     };
 
     int y = kOuter;
@@ -456,8 +460,8 @@ void EuclideanPanel::resized()
         constexpr int logicX = rowX + kLegatoW + kLogicGapW;
         constexpr int logicW = rowW - kLegatoW - kLogicGapW;
 
-        legatoCtrl.setBounds(rowX,   y + 3, kLegatoW, kLogicH - 6);
-        logicCtrl .setBounds(logicX, y + 3, logicW,   kLogicH - 6);
+        legatoCtrl.setBounds(s(rowX),   s(y + 3), s(kLegatoW), s(kLogicH - 6));
+        logicCtrl .setBounds(s(logicX), s(y + 3), s(logicW),   s(kLogicH - 6));
     }
 
     y += kLogicH;
@@ -470,6 +474,7 @@ void EuclideanPanel::resized()
 void EuclideanPanel::paint(juce::Graphics& g)
 {
     using Id = MuClidLookAndFeel::ColourIds;
+    using mu_ui::s;
 
     // Match resized()'s constants exactly — see Medium-baseline values in MuLookAndFeel.
     constexpr int w      = MuLookAndFeel::kEuclidInnerW;
@@ -480,10 +485,10 @@ void EuclideanPanel::paint(juce::Graphics& g)
     constexpr int rowOffsets[3] = { kOuter, kOuter + rowH + kLogicH, kOuter + 2 * rowH + kLogicH };
     const char* rowLabels[3]    = { "Euclid A", "Euclid B", "Accent" };
 
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(9.0f))));
     g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
     for (int i = 0; i < 3; ++i)
-        g.drawText(rowLabels[i], kOuter, rowOffsets[i], innerW, kLabelH, juce::Justification::centredLeft, false);
+        g.drawText(rowLabels[i], s(kOuter), s(rowOffsets[i]), s(innerW), s(kLabelH), juce::Justification::centredLeft, false);
 
     if (rhythmColour == juce::Colours::transparentBlack)
         return;
@@ -491,7 +496,7 @@ void EuclideanPanel::paint(juce::Graphics& g)
     const juce::Colour minorCol = rhythmColour.withAlpha(0.5f);
     g.setColour(minorCol);
 
-    constexpr int eW   = MuLookAndFeel::kKnobSizeLarge;
+    constexpr int eW   = MuLookAndFeel::kKnobSize1W;
     constexpr int pW   = (innerW - eW * 3) / 4;
     constexpr int padX = kOuter + eW * 3;
     constexpr int insX = padX + pW * 2;
@@ -500,14 +505,10 @@ void EuclideanPanel::paint(juce::Graphics& g)
     for (int rowY : rowOffsets)
     {
         const int cy = rowY + kLabelH;
-        g.drawRoundedRectangle((float)padX, (float)cy, (float)(pW * 2),             (float)ctrlH - 2.0f, 4.0f, 1.0f);
-        g.drawRoundedRectangle((float)insX, (float)cy, (float)(w - kOuter - insX),  (float)ctrlH - 2.0f, 4.0f, 1.0f);
+        g.drawRoundedRectangle((float) s(padX), (float) s(cy), (float) s(pW * 2),                (float) s(ctrlH) - 2.0f, 4.0f, 1.0f);
+        g.drawRoundedRectangle((float) s(insX), (float) s(cy), (float) s(w - kOuter - insX),     (float) s(ctrlH) - 2.0f, 4.0f, 1.0f);
     }
 
-    // logic row is split into a Legato sub-panel and a Logic sub-panel
-    // separated by a small visual gap. Outline rectangles bracket the pill
-    // bounds with a one-mP margin on the outside (matches the spacing used
-    // by the other knob clusters above/below).
     {
         constexpr int rowY   = kOuter + rowH;
         constexpr int rowX   = kOuter + kLogicMP;
@@ -515,9 +516,9 @@ void EuclideanPanel::paint(juce::Graphics& g)
         constexpr int logicX = rowX + kLegatoW + kLogicGapW;
         constexpr int logicW = rowW - kLegatoW - kLogicGapW;
 
-        g.drawRoundedRectangle((float)(rowX - kLogicMP),      (float)rowY + 2.0f,
-                               (float)(kLegatoW + kLogicMP),  (float)kLogicH - 4.0f, 4.0f, 1.0f);
-        g.drawRoundedRectangle((float)logicX,                 (float)rowY + 2.0f,
-                               (float)(logicW + kLogicMP),    (float)kLogicH - 4.0f, 4.0f, 1.0f);
+        g.drawRoundedRectangle((float) s(rowX - kLogicMP),      (float) s(rowY) + 2.0f,
+                               (float) s(kLegatoW + kLogicMP),  (float) s(kLogicH) - 4.0f, 4.0f, 1.0f);
+        g.drawRoundedRectangle((float) s(logicX),               (float) s(rowY) + 2.0f,
+                               (float) s(logicW + kLogicMP),    (float) s(kLogicH) - 4.0f, 4.0f, 1.0f);
     }
 }

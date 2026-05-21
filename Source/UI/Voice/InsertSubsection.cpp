@@ -615,20 +615,21 @@ void InsertSubsection::resized()
     constexpr int gap   = MuClidLookAndFeel::kVoiceGap;
     constexpr int row2Y = rowH + gap;
 
-    insertAlgo.setBounds(0, rowH / 4, 4 * kW, rowH / 2);
+    using mu_ui::s;
+    insertAlgo.setBounds(0, s(rowH / 4), s(4 * kW), s(rowH / 2));
 
     const int selId = insertAlgo.getSelectedId();
     const bool showFour = (selId == 5 || (selId >= 7 && selId <= 9));
-    insertDrive .setBounds(0 * kW, row2Y, kW, rowH);
-    insertOutput.setBounds(1 * kW, row2Y, kW, rowH);
+    insertDrive .setBounds(s(0 * kW), s(row2Y), s(kW), s(rowH));
+    insertOutput.setBounds(s(1 * kW), s(row2Y), s(kW), s(rowH));
     if (showFour)
     {
-        insertDither.setBounds(2 * kW, row2Y, kW, rowH);
-        insertTone  .setBounds(3 * kW, row2Y, kW, rowH);
+        insertDither.setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));
+        insertTone  .setBounds(s(3 * kW), s(row2Y), s(kW), s(rowH));
     }
     else
     {
-        insertTone  .setBounds(2 * kW, row2Y, kW, rowH);
-        insertDither.setBounds(3 * kW, row2Y, kW, rowH);
+        insertTone  .setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));
+        insertDither.setBounds(s(3 * kW), s(row2Y), s(kW), s(rowH));
     }
 }

@@ -99,27 +99,31 @@ void FXRow::setKnobsVisible(bool visible)
 
 void FXRow::resized()
 {
+    // Every literal pixel value goes through mu_ui::s() so toggling the UI
+    // scale (Small / Medium / Large) propagates uniformly. At Medium (scale
+    // = 1.0) s() is the identity, so visual output is unchanged.
+    using mu_ui::s;
     const int h = getHeight();
-    int x = kPadding;
+    int x = s(kPadding);
 
-    enableButton.setBounds(x, (h - 22) / 2, kToggleW, 22);
-    x += kToggleW + kPadding;
+    enableButton.setBounds(x, (h - s(22)) / 2, s(kToggleW), s(22));
+    x += s(kToggleW + kPadding);
 
     // Name label area is painted, not a component — advance x past it.
-    x += kNameW + kPadding;
+    x += s(kNameW + kPadding);
 
-    algorithmDropdown.setBounds(x, (h - 24) / 2, kDropdownW, 24);
-    x += kDropdownW + kPadding;
+    algorithmDropdown.setBounds(x, (h - s(24)) / 2, s(kDropdownW), s(24));
+    x += s(kDropdownW + kPadding);
 
     // Knob size is fixed (Size 1) — both width AND height. Never derived from
-    // the row's getHeight(), so the visible circle stays the same regardless
+    // the row's getHeight() so the visible circle stays the same regardless
     // of the parent's allocation. Excess vertical space becomes padding
     // above/below the knob cell.
     if (knobsVisible)
     {
-        constexpr int knobW = MuLookAndFeel::kKnobSize1W;
-        constexpr int knobH = MuLookAndFeel::kKnobSize1H;
-        const int     knobY = (h - knobH) / 2;
+        const int knobW = s(MuLookAndFeel::kKnobSize1W);
+        const int knobH = s(MuLookAndFeel::kKnobSize1H);
+        const int knobY = (h - knobH) / 2;
         for (auto& k : knobs)
         {
             k->setBounds(x, knobY, knobW, knobH);

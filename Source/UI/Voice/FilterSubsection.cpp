@@ -267,16 +267,17 @@ void FilterSubsection::resized()
     constexpr int gap   = MuClidLookAndFeel::kVoiceGap;
     constexpr int row2Y = rowH + gap;
 
-    filterType  .setBounds(0 * kW, rowH / 4,     2 * kW, rowH / 2);
-    filterCutoff.setBounds(2 * kW, 0,             kW,     rowH);
-    filterRes   .setBounds(3 * kW, 0,             kW,     rowH);
-    filterDepth .setBounds(4 * kW, 0,             kW,     rowH);
+    using mu_ui::s;
+    filterType  .setBounds(s(0 * kW), s(rowH / 4),     s(2 * kW), s(rowH / 2));
+    filterCutoff.setBounds(s(2 * kW), 0,                s(kW),     s(rowH));
+    filterRes   .setBounds(s(3 * kW), 0,                s(kW),     s(rowH));
+    filterDepth .setBounds(s(4 * kW), 0,                s(kW),     s(rowH));
 
     // Envelope knobs left-justify (col 0..3) to line up with the Pitch and Amp
     // envelope columns; col 4 carries the Low Cut knob in the slot freed up.
-    filterAtk   .setBounds(0 * kW, row2Y, kW, rowH);
-    filterDec   .setBounds(1 * kW, row2Y, kW, rowH);
-    filterSus   .setBounds(2 * kW, row2Y, kW, rowH);
-    filterRel   .setBounds(3 * kW, row2Y, kW, rowH);
-    filterLowCut.setBounds(4 * kW, row2Y, kW, rowH);
+    filterAtk   .setBounds(s(0 * kW), s(row2Y), s(kW), s(rowH));
+    filterDec   .setBounds(s(1 * kW), s(row2Y), s(kW), s(rowH));
+    filterSus   .setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));
+    filterRel   .setBounds(s(3 * kW), s(row2Y), s(kW), s(rowH));
+    filterLowCut.setBounds(s(4 * kW), s(row2Y), s(kW), s(rowH));
 }

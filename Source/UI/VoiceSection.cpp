@@ -57,23 +57,25 @@ void VoiceSection::refreshSuffix(const juce::String& suffix)
 
 void VoiceSection::resized()
 {
-    // Fixed Medium-baseline layout — see MuLookAndFeel for the constants.
+    // Fixed Medium-baseline layout, wrapped in s() so the whole grid scales.
     using LF = MuClidLookAndFeel;
+    using mu_ui::s;
     constexpr int divW   = LF::kVoiceDivW;
     constexpr int labelH = LF::kVoiceLabelH;
     constexpr int kW     = LF::kVoiceUnitW;
     constexpr int subH   = LF::kVoiceSubH;
 
-    pitchSub .setBounds(0,                labelH, 5 * kW, subH);
-    filterSub.setBounds(5 * kW + divW,    labelH, 5 * kW, subH);
-    ampSub   .setBounds(10 * kW + 2*divW, labelH, 5 * kW, subH);
-    insertSub.setBounds(15 * kW + 3*divW, labelH, 4 * kW, subH);
+    pitchSub .setBounds(0,                       s(labelH), s(5 * kW), s(subH));
+    filterSub.setBounds(s(5 * kW + divW),        s(labelH), s(5 * kW), s(subH));
+    ampSub   .setBounds(s(10 * kW + 2 * divW),   s(labelH), s(5 * kW), s(subH));
+    insertSub.setBounds(s(15 * kW + 3 * divW),   s(labelH), s(4 * kW), s(subH));
 }
 
 void VoiceSection::paint(juce::Graphics& g)
 {
     using Id = MuClidLookAndFeel::ColourIds;
     using LF = MuClidLookAndFeel;
+    using mu_ui::s;
 
     const int h          = getHeight();
     constexpr int divW   = LF::kVoiceDivW;
@@ -81,18 +83,18 @@ void VoiceSection::paint(juce::Graphics& g)
     constexpr int kW     = LF::kVoiceUnitW;
 
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-    constexpr float kDivInset = 7.0f;   // top/bottom inset for the section divider lines
-    const float div1X = static_cast<float>(5 * kW) + divW * 0.5f;
-    const float div2X = static_cast<float>(10 * kW + divW) + divW * 0.5f;
-    const float div3X = static_cast<float>(15 * kW + 2 * divW) + divW * 0.5f;
+    const float kDivInset = mu_ui::sf(7.0f);
+    const float div1X = static_cast<float>(s(5 * kW) + s(divW) / 2);
+    const float div2X = static_cast<float>(s(10 * kW + divW) + s(divW) / 2);
+    const float div3X = static_cast<float>(s(15 * kW + 2 * divW) + s(divW) / 2);
     g.drawLine(div1X, kDivInset, div1X, (float)h - kDivInset, 0.5f);
     g.drawLine(div2X, kDivInset, div2X, (float)h - kDivInset, 0.5f);
     g.drawLine(div3X, kDivInset, div3X, (float)h - kDivInset, 0.5f);
 
     g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
-    g.drawText("PITCH",  0,                  0, 5 * kW, labelH, juce::Justification::centred, false);
-    g.drawText("FILTER", 5 * kW + divW,      0, 5 * kW, labelH, juce::Justification::centred, false);
-    g.drawText("AMP",    10 * kW + 2 * divW, 0, 5 * kW, labelH, juce::Justification::centred, false);
-    g.drawText("INSERT", 15 * kW + 3 * divW, 0, 4 * kW, labelH, juce::Justification::centred, false);
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(10.0f))));
+    g.drawText("PITCH",  0,                          0, s(5 * kW), s(labelH), juce::Justification::centred, false);
+    g.drawText("FILTER", s(5 * kW + divW),           0, s(5 * kW), s(labelH), juce::Justification::centred, false);
+    g.drawText("AMP",    s(10 * kW + 2 * divW),      0, s(5 * kW), s(labelH), juce::Justification::centred, false);
+    g.drawText("INSERT", s(15 * kW + 3 * divW),      0, s(4 * kW), s(labelH), juce::Justification::centred, false);
 }

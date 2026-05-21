@@ -256,14 +256,15 @@ void AmpSubsection::resized()
     constexpr int gap   = MuClidLookAndFeel::kVoiceGap;
     constexpr int row2Y = rowH + gap;
 
-    ampLevel  .setBounds(0 * kW, 0,    kW, rowH);
-    ampSendEff.setBounds(1 * kW, 0,    kW, rowH);
-    ampSendDly.setBounds(2 * kW, 0,    kW, rowH);
-    ampSendRev.setBounds(3 * kW, 0,    kW, rowH);
-    ampAccent .setBounds(4 * kW, 0,    kW, rowH);
+    using mu_ui::s;
+    ampLevel  .setBounds(s(0 * kW), 0,        s(kW), s(rowH));
+    ampSendEff.setBounds(s(1 * kW), 0,        s(kW), s(rowH));
+    ampSendDly.setBounds(s(2 * kW), 0,        s(kW), s(rowH));
+    ampSendRev.setBounds(s(3 * kW), 0,        s(kW), s(rowH));
+    ampAccent .setBounds(s(4 * kW), 0,        s(kW), s(rowH));
 
-    ampAtk.setBounds(0 * kW, row2Y, kW, rowH);
-    ampDec.setBounds(1 * kW, row2Y, kW, rowH);
-    ampSus.setBounds(2 * kW, row2Y, kW, rowH);
-    ampRel.setBounds(3 * kW, row2Y, kW, rowH);
+    ampAtk.setBounds(s(0 * kW), s(row2Y), s(kW), s(rowH));
+    ampDec.setBounds(s(1 * kW), s(row2Y), s(kW), s(rowH));
+    ampSus.setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));
+    ampRel.setBounds(s(3 * kW), s(row2Y), s(kW), s(rowH));
 }

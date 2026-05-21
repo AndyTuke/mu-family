@@ -159,37 +159,40 @@ void MixerChannel::updateDbLabel(float level)
 
 void MixerChannel::resized()
 {
+    // Every literal/constant in setBounds wrapped in mu_ui::s(). The parent
+    // (MixerOverlay) is expected to pass already-scaled width/height — i.e.
+    // we treat `w` and `h` as physical pixels, then scale Medium-baseline
+    // constants on top via s() so internal positions stay coherent.
+    using mu_ui::s;
     const int w      = getWidth();
     const int h      = getHeight();
 
     // Master: right portion is the insert panel; everything else uses the strip width.
-    const int insW   = hasInsert() ? kInsertPanelW : 0;
+    const int insW   = hasInsert() ? s(kInsertPanelW) : 0;
     const int stripW = w - insW;
 
-    const int nameBottom = kColourBarH + kNameH;   // y=25
+    const int nameBottom = s(kColourBarH + kNameH);
 
     // ── Sidechain section (Rhythm + Returns) — fixed Medium-baseline height ──
-    const int scH = hasSidechainControls() ? kSidechainH : 0;
+    const int scH = hasSidechainControls() ? s(kSidechainH) : 0;
     if (hasSidechainControls())
     {
         // scAmount renders at Size 3 (73 × 46); scAttack/Release at Size 4
-        // (36 × 39). Fixed PX, no dependency on strip width. The dropdown
-        // (scSourceBox) and the centring of envelope knobs still use stripW
-        // because they're not "knobs" — the dropdown spans the strip and the
-        // envelope pair shares the strip width.
-        constexpr int s3W = MuLookAndFeel::kKnobSize3W;
-        constexpr int s3H = MuLookAndFeel::kKnobSize3H;
-        constexpr int s4W = MuLookAndFeel::kKnobSize4W;
-        constexpr int s4H = MuLookAndFeel::kKnobSize4H;
+        // (36 × 39). Fixed PX, no dependency on strip width.
+        const int s3W = s(MuLookAndFeel::kKnobSize3W);
+        const int s3H = s(MuLookAndFeel::kKnobSize3H);
+        const int s4W = s(MuLookAndFeel::kKnobSize4W);
+        const int s4H = s(MuLookAndFeel::kKnobSize4H);
         const int s3X = (stripW - s3W) / 2;
-        // SC envelope pair sits side-by-side centred within the strip.
         const int envPairW = 2 * s4W;
         const int envStartX = (stripW - envPairW) / 2;
+        const int scAmtAbsY = nameBottom + s(kScSrcH);
+        const int scEnvAbsY = scAmtAbsY + s(kScAmtH);
 
-        scSourceBox.setBounds(0, nameBottom, stripW, kScSrcH);
-        scAmount   .setBounds(s3X, nameBottom + kScSrcH, s3W, s3H);
-        scAttack .setBounds(envStartX,         nameBottom + kScSrcH + kScAmtH, s4W, s4H);
-        scRelease.setBounds(envStartX + s4W,   nameBottom + kScSrcH + kScAmtH, s4W, s4H);
+        scSourceBox.setBounds(0, nameBottom, stripW, s(kScSrcH));
+        scAmount   .setBounds(s3X, scAmtAbsY, s3W, s3H);
+        scAttack .setBounds(envStartX,        scEnvAbsY, s4W, s4H);
+        scRelease.setBounds(envStartX + s4W,  scEnvAbsY, s4W, s4H);
 
         sidechainPaneBounds = { 1, nameBottom + 1, stripW - 2, scH - 2 };
     }
@@ -200,9 +203,8 @@ void MixerChannel::resized()
 
     // ── Sends + pan — fixed Medium-baseline height ───────────────────────────
     const int sendY  = nameBottom + scH;
-    constexpr int spH   = kSendsAreaH;
-    constexpr int sendH = kSendKnobH;
-    constexpr int panH  = kPanKnobH;
+    const int spH   = s(kSendsAreaH);
+    const int sendH = s(kSendKnobH);
     const int faderY = sendY + spH;
 
     // A return channel cannot send to itself (would feedback-loop). #429.
@@ -211,12 +213,9 @@ void MixerChannel::resized()
                                      && channelType != Type::ReverbReturn);
     sendReverb.setVisible(hasSends() && channelType != Type::ReverbReturn);
 
-    // Sends + pan render at Size 3 (73 × 46) — fixed PX, no dependency on
-    // strip width. For rhythm/return channels stripW already equals the
-    // canonical Size 3 width; for the wider master strip the knob centres
-    // horizontally so the visible knob stays the same regardless of strip.
-    constexpr int s3W = MuLookAndFeel::kKnobSize3W;
-    constexpr int s3H = MuLookAndFeel::kKnobSize3H;
+    // Sends + pan render at Size 3 — fixed PX, no dependency on strip width.
+    const int s3W = s(MuLookAndFeel::kKnobSize3W);
+    const int s3H = s(MuLookAndFeel::kKnobSize3H);
     const int s3X = (stripW - s3W) / 2;
     sendEffect.setBounds(s3X, sendY,             s3W, s3H);
     sendDelay .setBounds(s3X, sendY + sendH,     s3W, s3H);
@@ -236,29 +235,29 @@ void MixerChannel::resized()
     }
 
     // ── Fader + VU + GR ───────────────────────────────────────────────────────
-    const int muteY   = hasMuteSolo() ? h - kButtonH : h;
-    const int dbY     = muteY - kDbH;
-    // outBus sits just above the dB label on Rhythm channels.
-    const int busY    = hasOutputBus() ? dbY - kOutBusH : dbY;
+    const int muteY   = hasMuteSolo() ? h - s(kButtonH) : h;
+    const int dbY     = muteY - s(kDbH);
+    const int busY    = hasOutputBus() ? dbY - s(kOutBusH) : dbY;
     const int faderEnd = hasOutputBus() ? busY - 2 : dbY - 2;
-    const int faderH  = juce::jmax(40, faderEnd - faderY);
+    const int faderH  = juce::jmax(s(40), faderEnd - faderY);
 
-    const int grW = hasSidechainControls() ? kGRW : 0;
-    fader.setBounds  (0,                        faderY, stripW - kVUW - grW, faderH);
+    const int vuW = s(kVUW);
+    const int grW = hasSidechainControls() ? s(kGRW) : 0;
+    fader.setBounds  (0,                       faderY, stripW - vuW - grW, faderH);
     if (hasSidechainControls())
-        grMeter.setBounds(stripW - kVUW - grW,  faderY, grW,                 faderH);
-    vuMeter.setBounds(stripW - kVUW,            faderY, kVUW,                faderH);
+        grMeter.setBounds(stripW - vuW - grW,  faderY, grW,                faderH);
+    vuMeter.setBounds(stripW - vuW,            faderY, vuW,                faderH);
 
     if (hasOutputBus())
-        outBusBox.setBounds(0, busY, stripW, kOutBusH);
+        outBusBox.setBounds(0, busY, stripW, s(kOutBusH));
 
-    dbLabel.setBounds(0, dbY, stripW, kDbH);
+    dbLabel.setBounds(0, dbY, stripW, s(kDbH));
 
     if (hasMuteSolo())
     {
         const int hw = stripW / 2;
-        muteBtn.setBounds(0,  muteY, hw,          kButtonH);
-        soloBtn.setBounds(hw, muteY, stripW - hw, kButtonH);
+        muteBtn.setBounds(0,  muteY, hw,          s(kButtonH));
+        soloBtn.setBounds(hw, muteY, stripW - hw, s(kButtonH));
     }
 
     faderPaneBounds = { 1, faderY - 2, stripW - 2, h - faderY + 1 };
@@ -266,7 +265,7 @@ void MixerChannel::resized()
     // ── Insert panels (Master channel, right of strip) — two slots stacked top/bottom ─
     if (hasInsert())
     {
-        const int pad    = 4;
+        const int pad    = s(4);
         const int ipX    = stripW + pad;
         const int ipW    = insW - 2 * pad;
         const int insTop = nameBottom;
@@ -275,23 +274,23 @@ void MixerChannel::resized()
         insertMidY = insTop + halfH;
 
         // Both slots reserve kNameH for their own label, giving equal knob space.
-        const int slot1CharY = insTop + kNameH + pad;
-        const int slot2CharY = insertMidY + kNameH + pad;
+        const int slot1CharY = insTop + s(kNameH) + pad;
+        const int slot2CharY = insertMidY + s(kNameH) + pad;
 
         auto layoutSlot = [&](int charBoxY, int endY,
                                juce::ComboBox& charBox,
                                KnobWithLabel& drv, KnobWithLabel& out,
                                KnobWithLabel& ton, KnobWithLabel& ext)
         {
-            charBox.setBounds(ipX, charBoxY, ipW, kInsCharH);
-            const int ky      = charBoxY + kInsCharH + 2;
-            const int availH  = endY - ky - 2;
+            charBox.setBounds(ipX, charBoxY, ipW, s(kInsCharH));
+            const int ky = charBoxY + s(kInsCharH) + 2;
+            (void) endY;   // formerly used to derive an availH cap — now Size 2 H is fixed.
 
             // Master insert knobs render at Size 2 (55 × 56) — fixed PX, no
             // dependency on the insert panel width. Knobs centre within their
             // layout cell so the wider insert panel has padding around them.
-            constexpr int s2W = MuLookAndFeel::kKnobSize2W;
-            constexpr int s2H = MuLookAndFeel::kKnobSize2H;
+            const int s2W = s(MuLookAndFeel::kKnobSize2W);
+            const int s2H = s(MuLookAndFeel::kKnobSize2H);
 
             if (charBox.getSelectedId() == 7) // EQ: single column High/Mid/MidHz/Low
             {

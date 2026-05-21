@@ -759,46 +759,52 @@ void RhythmPanel::paint(juce::Graphics& g)
 void RhythmPanel::resized()
 {
     // Fixed Medium-baseline layout — see MuLookAndFeel for the constants.
-    // Panel sizes are pinned now that the plugin window is non-resizable.
-    constexpr int w = MuClidLookAndFeel::kRhythmPanelW;
-    constexpr int h = MuClidLookAndFeel::kRhythmPanelH;
+    // Every dimension wrapped in s() so scale toggles propagate.
+    using mu_ui::s;
+    const int w = getWidth();
+    const int h = getHeight();
 
-    // Top section locks to the Medium-baseline value so the modulator panel
-    // gets its required minimum height for the editor/pager/add/rows stack.
-    topH    = MuClidLookAndFeel::kRhythmTopH;
-    circleW = MuClidLookAndFeel::kCircleSize;
+    topH    = s(MuClidLookAndFeel::kRhythmTopH);
+    circleW = s(MuClidLookAndFeel::kCircleSize);
 
-    constexpr int topY = kHeaderH + kSampleBarH;
-    const     int modY = topY + topH + kVoiceH;
+    const int hdrH = s(kHeaderH);
+    const int sbH  = s(kSampleBarH);
+    const int voiH = s(kVoiceH);
+    const int topY = hdrH + sbH;
+    const int modY = topY + topH + voiH;
 
-    sampleRect = { 0,       kHeaderH,    w,           kSampleBarH             };
+    sampleRect = { 0,       hdrH,        w,           sbH                     };
     circleRect = { 0,       topY,        circleW,     topH                    };
     euclidRect = { circleW, topY,        w - circleW, topH                    };
-    voiceRect  = { 0,       topY + topH, w,           kVoiceH                 };
+    voiceRect  = { 0,       topY + topH, w,           voiH                    };
     modRect    = { 0,       modY,        w,           juce::jmax(0, h - modY) };
 
     // Header right-side controls (right to left).
     // rhythmDropLeft is set by PluginEditor after TransportBar layout so the
     // dropdown's left edge aligns with (and is indented 10 px from) the main
     // preset dropdown directly above. Falls back to a minimum if not yet set.
-    const int btnY     = (kHeaderH - 20) / 2;
-    const int rightEdge = w - 4;
-    const int dropRight = rightEdge - kIconBtnW * 2 - 4 - kPresetBtnW - 4;
-    const int dropLeft  = (rhythmDropLeft > 0 && rhythmDropLeft < dropRight - 80)
-                              ? rhythmDropLeft : juce::jmax(26, dropRight - 200);
-    deleteBtn           .setBounds(rightEdge - kIconBtnW,          btnY, kIconBtnW,   20);
-    resetBtn            .setBounds(rightEdge - kIconBtnW * 2 - 4, btnY, kIconBtnW,   20);
-    saveRhythmBtn       .setBounds(dropRight,                      btnY, kPresetBtnW, 20);
-    rhythmPresetDropdown.setBounds(dropLeft,                       btnY, dropRight - 4 - dropLeft, 20);
-    const int nameX   = 26;
-    const int nameEnd = dropLeft - 6;
-    nameRect = { nameX, 0, juce::jmax(0, nameEnd - nameX), kHeaderH };
-    nameLabel.setBounds(nameRect.reduced(4, 2));
+    const int btnH = s(20);
+    const int btnY = (hdrH - btnH) / 2;
+    const int rightEdge = w - s(4);
+    const int iconBtnW  = s(kIconBtnW);
+    const int presetBtnW = s(kPresetBtnW);
+    const int dropRight = rightEdge - iconBtnW * 2 - s(4) - presetBtnW - s(4);
+    const int dropLeft  = (rhythmDropLeft > 0 && rhythmDropLeft < dropRight - s(80))
+                              ? rhythmDropLeft : juce::jmax(s(26), dropRight - s(200));
+    deleteBtn           .setBounds(rightEdge - iconBtnW,             btnY, iconBtnW,    btnH);
+    resetBtn            .setBounds(rightEdge - iconBtnW * 2 - s(4),  btnY, iconBtnW,    btnH);
+    saveRhythmBtn       .setBounds(dropRight,                         btnY, presetBtnW,  btnH);
+    rhythmPresetDropdown.setBounds(dropLeft,                          btnY, dropRight - s(4) - dropLeft, btnH);
+    const int nameX   = s(26);
+    const int nameEnd = dropLeft - s(6);
+    nameRect = { nameX, 0, juce::jmax(0, nameEnd - nameX), hdrH };
+    nameLabel.setBounds(nameRect.reduced(s(4), s(2)));
 
-    circle.setBounds        (circleRect.reduced(kPanelPad + 1));
-    euclidPanel.setBounds   (euclidRect.reduced(kPanelPad + 1));
-    voiceSection.setBounds  (voiceRect.reduced(kPanelPad + 1));
-    modulatorPanel.setBounds(modRect.reduced(kPanelPad + 1));
+    const int rhythmInset = s(kPanelPad + 1);
+    circle.setBounds        (circleRect.reduced(rhythmInset));
+    euclidPanel.setBounds   (euclidRect.reduced(rhythmInset));
+    voiceSection.setBounds  (voiceRect.reduced(rhythmInset));
+    modulatorPanel.setBounds(modRect.reduced(rhythmInset));
     rhythmSaveDialog.setBounds(getLocalBounds());
 }
 

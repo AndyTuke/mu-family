@@ -1,5 +1,34 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <cmath>
+
+namespace mu_ui
+{
+    // Global UI scale factor. 1.0 = Medium baseline (the values stored in
+    // MuLookAndFeel are Medium); 0.85 = Small; 1.15 = Large. Phase 3 will
+    // surface a settings picker that writes this; Phase 1+2 leave it at 1.0
+    // so the visual output is identical to the pre-scaling code.
+    //
+    // Mutable so a future settings overlay can write to it. Audio code never
+    // reads this — it's UI-only.
+    inline float scale = 1.0f;
+
+    // Scale an integer pixel value (Medium baseline) to the current UI scale,
+    // rounded to the nearest integer. Wrap every literal and every constant
+    // reference inside setBounds with this so changing `scale` (Small / Large
+    // toggle) propagates uniformly without recompiling.
+    //
+    // `mu_ui::s(N)` is intentionally short — call sites are heavy. Drop a
+    // `using mu_ui::s;` at the top of resized() / paint() to use `s(N)`.
+    inline int s(int medium) noexcept
+    {
+        return (int) std::round((float) medium * scale);
+    }
+
+    // Float overload — for font heights, line widths, etc. where the int
+    // round-trip would lose precision.
+    inline float sf(float medium) noexcept { return medium * scale; }
+}
 
 class MuLookAndFeel : public juce::LookAndFeel_V4
 {
