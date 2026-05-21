@@ -306,6 +306,8 @@ void InsertSubsection::configureInsertAlgorithm(int charId)
 
         case 6:
         {
+            // 3-Band EQ — knob order left-to-right reads frequency-ascending:
+            // Low (dB) / Mid (dB) / Mid (Hz) / High (dB).
             auto dbFmt = [](double v) -> juce::String {
                 return juce::String(v, 1);
             };
@@ -321,35 +323,36 @@ void InsertSubsection::configureInsertAlgorithm(int charId)
             else   insertDrive.setValue(0.0, juce::dontSendNotification);
             insertDrive.setVisible(true);
 
-            insertOutput.setLabel("High (dB)");
+            insertOutput.setLabel("Mid (dB)");
             insertOutput.setRange(-18.0, 18.0, 0.1);
             insertOutput.getSlider().textFromValueFunction = dbFmt;
             insertOutput.getSlider().valueFromTextFunction = dbParse;
-            if (p) insertOutput.setValue(p->insertDither / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
+            if (p) insertOutput.setValue(p->insertEqMid, juce::dontSendNotification);
             else   insertOutput.setValue(0.0, juce::dontSendNotification);
             insertOutput.setVisible(true);
 
-            insertDither.setLabel("Mid (dB)");
-            insertDither.setRange(-18.0, 18.0, 0.1);
-            insertDither.getSlider().textFromValueFunction = dbFmt;
-            insertDither.getSlider().valueFromTextFunction = dbParse;
-            if (p) insertDither.setValue(p->insertEqMid, juce::dontSendNotification);
-            else   insertDither.setValue(0.0, juce::dontSendNotification);
+            insertDither.setLabel(fmtHzLabel("Mid", p ? juce::jlimit(200.0, 8000.0, (double)p->insertTone) : 1000.0));
+            insertDither.getSlider().setSkewFactor(1.0);
+            insertDither.setRange(200.0, 8000.0, 1.0);
+            insertDither.getSlider().textFromValueFunction = [](double v) { return fmtHzNum(v); };
+            insertDither.getSlider().valueFromTextFunction = parseHz;
+            if (p) insertDither.setValue(juce::jlimit(200.0, 8000.0, (double)p->insertTone), juce::dontSendNotification);
+            else   insertDither.setValue(1000.0, juce::dontSendNotification);
             insertDither.setVisible(true);
 
-            insertTone.setLabel(fmtHzLabel("Mid", p ? juce::jlimit(200.0, 8000.0, (double)p->insertTone) : 1000.0));
+            insertTone.setLabel("High (dB)");
             insertTone.getSlider().setSkewFactor(1.0);
-            insertTone.setRange(200.0, 8000.0, 1.0);
-            insertTone.getSlider().textFromValueFunction = [](double v) { return fmtHzNum(v); };
-            insertTone.getSlider().valueFromTextFunction = parseHz;
-            if (p) insertTone.setValue(juce::jlimit(200.0, 8000.0, (double)p->insertTone), juce::dontSendNotification);
-            else   insertTone.setValue(1000.0, juce::dontSendNotification);
+            insertTone.setRange(-18.0, 18.0, 0.1);
+            insertTone.getSlider().textFromValueFunction = dbFmt;
+            insertTone.getSlider().valueFromTextFunction = dbParse;
+            if (p) insertTone.setValue(p->insertDither / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
+            else   insertTone.setValue(0.0, juce::dontSendNotification);
             insertTone.setVisible(true);
 
             insertDrive .onValueChanged = [this](double v) { apvtsSet("drvDrv",    (float)((v + 18.0) / 36.0 * 100.0)); };
-            insertOutput.onValueChanged = [this](double v) { apvtsSet("drvDit",    (float)((v + 18.0) / 36.0 * 100.0)); };
-            insertDither.onValueChanged = [this](double v) { apvtsSet("eqMidGain", (float)v); };
-            insertTone  .onValueChanged = [this](double v) { apvtsSet("drvTon",    (float)v); insertTone.setLabel(fmtHzLabel("Mid", v)); };
+            insertOutput.onValueChanged = [this](double v) { apvtsSet("eqMidGain", (float)v); };
+            insertDither.onValueChanged = [this](double v) { apvtsSet("drvTon",    (float)v); insertDither.setLabel(fmtHzLabel("Mid", v)); };
+            insertTone  .onValueChanged = [this](double v) { apvtsSet("drvDit",    (float)((v + 18.0) / 36.0 * 100.0)); };
             break;
         }
 

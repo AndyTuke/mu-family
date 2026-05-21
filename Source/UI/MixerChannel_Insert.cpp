@@ -154,15 +154,17 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             if (proc) setParam(pChar, 4);
             break;
 
-        case 6: // 3-Band EQ — Low / Mid gain / Mid Hz / High (#248: 4 knobs)
+        case 6:
         {
+            // 3-Band EQ — knob order left-to-right reads frequency-ascending:
+            // Low (dB) / Mid (dB) / Mid (Hz) / High (dB).
             auto dbFmt = [](double v) -> juce::String {
                 return juce::String(v, 1);
             };
 
             drive .getSlider().setSkewFactor(1.0);
             output.getSlider().setSkewFactor(1.0);
-            tone  .getSlider().setSkewFactor(1.0);
+            extra .getSlider().setSkewFactor(1.0);
 
             drive .setLabel("Low (dB)");
             drive .setRange(-18.0, 18.0, 0.1);
@@ -176,23 +178,23 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             output.setValue(ip.insertEqMid, juce::dontSendNotification);
             output.setVisible(true);
 
-            tone  .setLabel("High (dB)");
-            tone  .setRange(-18.0, 18.0, 0.1);
-            tone  .getSlider().textFromValueFunction = dbFmt;
-            tone  .setValue(ip.insertDither / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
+            tone  .setLabel(fmtHzLabel("Mid", juce::jlimit(200.0, 8000.0, (double)ip.insertTone)));
+            tone  .setRange(200.0, 8000.0, 1.0);
+            tone  .getSlider().setSkewFactorFromMidPoint(1000.0);
+            tone  .getSlider().textFromValueFunction = [](double v) -> juce::String { return fmtHzNum(v); };
+            tone  .setValue(juce::jlimit(200.0, 8000.0, (double)ip.insertTone), juce::dontSendNotification);
             tone  .setVisible(true);
 
-            extra .setLabel(fmtHzLabel("Mid", juce::jlimit(200.0, 8000.0, (double)ip.insertTone)));
-            extra .setRange(200.0, 8000.0, 1.0);
-            extra .getSlider().setSkewFactorFromMidPoint(1000.0);
-            extra .getSlider().textFromValueFunction = [](double v) -> juce::String { return fmtHzNum(v); };
-            extra .setValue(juce::jlimit(200.0, 8000.0, (double)ip.insertTone), juce::dontSendNotification);
+            extra .setLabel("High (dB)");
+            extra .setRange(-18.0, 18.0, 0.1);
+            extra .getSlider().textFromValueFunction = dbFmt;
+            extra .setValue(ip.insertDither / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
             extra .setVisible(true);
 
             drive .onValueChanged = [setParam, pDrv](double v) { setParam(pDrv, (v + 18.0) / 36.0 * 100.0); };
             output.onValueChanged = [setParam, pMid](double v) { setParam(pMid, v); };
-            tone  .onValueChanged = [setParam, pDit](double v) { setParam(pDit, (v + 18.0) / 36.0 * 100.0); };
-            extra .onValueChanged = [this, slot, setParam, pTon](double v) { setParam(pTon, v); (slot == 0 ? insExtra : insExtra2).setLabel(fmtHzLabel("Mid", v)); };
+            tone  .onValueChanged = [this, slot, setParam, pTon](double v) { setParam(pTon, v); (slot == 0 ? insTone : insTone2).setLabel(fmtHzLabel("Mid", v)); };
+            extra .onValueChanged = [setParam, pDit](double v) { setParam(pDit, (v + 18.0) / 36.0 * 100.0); };
             if (proc) setParam(pChar, 6);
             break;
         }

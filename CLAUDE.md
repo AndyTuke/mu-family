@@ -109,6 +109,15 @@ All code changes must be logged as backlog entries to maintain a complete develo
 - **ModulationMatrix processes in dependency order** — detects and rejects circular dependencies at assignment creation time.
 - **Time-stretch DLL (SoundTouch/RubberBand) ships separately** — required for LGPL/GPL compliance when implemented.
 
+## Code style (mandatory)
+
+- **No backlog issue numbers in comments.** Writing `// #123`, `// fix for #123`, `// added in #xxx`, or any other backlog reference in source code is forbidden. Backlog context belongs in commit messages and PR descriptions. Comments rot out of sync with the backlog and a stale `#NNN` reference is worse than no reference.
+- **Comments must help Andy read and understand the code.** Concise, clear, and focused on the *why* and *what* (not the *how*, which the code itself shows).
+  - **Loops** — comment the purpose of the loop. What is it doing as a whole? (`// Apply per-voice modulation across all active rhythms.`)
+  - **Algorithms** — comment what the algorithm does, and cite the source if it's not obvious (`// ADAA tanh — Reiss & Stefanidis 2016`, `// Signalsmith FDN reverb`, `// Karplus-Strong delay-line feedback loop`). A reader should be able to look up the reference if they want to dig deeper.
+  - **Section headers** — when a function contains clearly separate phases, put a one-line comment at the top of each phase naming its purpose and result (`// Phase 1: gather analysis frames → spectrum[]`, `// Phase 2: smooth + threshold → mask[]`).
+- One sentence per comment is almost always enough. If you need more, the code probably wants to be split into named helpers instead.
+
 ## Key patterns discovered during implementation
 
 ### KnobWithLabel callbacks
