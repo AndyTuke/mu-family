@@ -28,6 +28,11 @@ void VoiceEngine::prepareToPlay(double sampleRate, int blockSize)
     pitchEnv.setSampleRate(sampleRate);
 
     voiceFilter.prepare(sampleRate, blockSize, 2);
+    lowCutFilter.prepare(sampleRate, blockSize, 2);
+    // Smooth the low-cut frequency so sweeps through the audible range produce
+    // a glide rather than a per-block coefficient step.
+    smoothedLowCutHz.reset(sampleRate, 0.015);
+    smoothedLowCutHz.setCurrentAndTargetValue(activeParams.filterLowCutHz);
 
     // per-sample pitch ratio buffer + 5 ms ramp on pitchMod.
     // Pre-fill ratios with playbackRatio so SamplePlayer always receives a
@@ -178,6 +183,14 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     voiceFilter.setCutoff(modCutoff);
     voiceFilter.process(tempBuffer, ns, nCh);
 
+    // 4-pole high-pass cleanup after the main filter. Bypassed (no DSP work)
+    // when the user knob is at 0; otherwise smoothed toward the target so a
+    // sweep glides instead of stepping per block.
+    smoothedLowCutHz.setTargetValue(activeParams.filterLowCutHz);
+    const float lowCutHz = smoothedLowCutHz.skip(ns);
+    if (lowCutHz > 0.5f)
+        lowCutFilter.process(tempBuffer, ns, nCh, lowCutHz, 0.0f);
+
     // ── Insert effects (delegated to InsertProcessor) ────────────────────────
     insertProc.process(tempBuffer, ns, nCh, activeParams);
 
@@ -216,6 +229,7 @@ void VoiceEngine::markRetired() noexcept
     pitchEnv.noteOff();
 
     voiceFilter.reset();
+    lowCutFilter.reset();
     insertProc.reset();
     retired = true;
 }
@@ -285,25 +299,24 @@ void VoiceEngine::applyPendingParams()
 
 void VoiceEngine::syncEnvelopes()
 {
-    // apply the 1 ms floor at the JUCE ADSR boundary instead of in
-    // applyRhythmSuffix's data layer. JUCE's ADSR doesn't accept zero times,
-    // but storing the floor inside voiceParams polluted UI reads — a knob
-    // set to 0 round-tripped as 0.001 and visibly crept up on the next
-    // refreshSuffix(). Floor is per-time-param only; sustains are amplitude
-    // (0 is legal — that's the user's "silence after decay" intent).
-    constexpr float kMinAdsrSec = 0.001f;
-    ampEnv.setParameters   ({ juce::jmax(kMinAdsrSec, activeParams.ampEnvAtk),
-                              juce::jmax(kMinAdsrSec, activeParams.ampEnvDec),
+    // Attack is allowed to be exactly 0 — juce::ADSR detects the zero case and
+    // jumps the envelope straight to peak on noteOn (no ramp). Decay and
+    // release keep a tiny floor because zero there would freeze the envelope
+    // in those phases (division-by-zero on the per-sample decrement rate).
+    // Sustain is amplitude, not time, so 0 is always legal there.
+    constexpr float kMinDecayRelSec = 0.001f;
+    ampEnv.setParameters   ({ activeParams.ampEnvAtk,
+                              juce::jmax(kMinDecayRelSec, activeParams.ampEnvDec),
                               activeParams.ampEnvSus,
-                              juce::jmax(kMinAdsrSec, activeParams.ampEnvRel) });
-    filterEnv.setParameters({ juce::jmax(kMinAdsrSec, activeParams.filterEnvAtk),
-                              juce::jmax(kMinAdsrSec, activeParams.filterEnvDec),
+                              juce::jmax(kMinDecayRelSec, activeParams.ampEnvRel) });
+    filterEnv.setParameters({ activeParams.filterEnvAtk,
+                              juce::jmax(kMinDecayRelSec, activeParams.filterEnvDec),
                               activeParams.filterEnvSus,
-                              juce::jmax(kMinAdsrSec, activeParams.filterEnvRel) });
-    pitchEnv.setParameters ({ juce::jmax(kMinAdsrSec, activeParams.pitchEnvAtk),
-                              juce::jmax(kMinAdsrSec, activeParams.pitchEnvDec),
+                              juce::jmax(kMinDecayRelSec, activeParams.filterEnvRel) });
+    pitchEnv.setParameters ({ activeParams.pitchEnvAtk,
+                              juce::jmax(kMinDecayRelSec, activeParams.pitchEnvDec),
                               activeParams.pitchEnvSus,
-                              juce::jmax(kMinAdsrSec, activeParams.pitchEnvRel) });
+                              juce::jmax(kMinDecayRelSec, activeParams.pitchEnvRel) });
 }
 
 void VoiceEngine::syncFilter()

@@ -23,6 +23,7 @@ struct VoiceParams
     float filterEnvRel   = 0.3f;
     float filterEnvDepth = 0.0f;     // semitones of cutoff sweep, 0..48
     bool  filterEnvLegato = false;   // false=Reset (default), true=Legato
+    float filterLowCutHz = 0.0f;     // 0..1000 Hz, 4-pole HPF inline with the voice filter chain — 0 = bypass
 
     // ─── Amp ─────────────────────────────────────────────────────────────
     float ampLevel    = 1.0f;        // 0..2  (Issue #121: 0 dB default — kHeadroomTrim alone provides summing safety)

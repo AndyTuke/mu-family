@@ -164,6 +164,8 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
                    [](const Rhythm& r) -> float { return r.voiceParams.filterEnvDepth; } },
     { "fEnvLeg",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.filterEnvLegato = (v > 0.5f); vd = true; },
                    [](const Rhythm& r) -> float { return r.voiceParams.filterEnvLegato ? 1.0f : 0.0f; },  ParamKind::Bool },
+    { "fltLoCut",  [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.filterLowCutHz = v; vd = true; },
+                   [](const Rhythm& r) -> float { return r.voiceParams.filterLowCutHz; } },
 
     // ── Amp + amp envelope ───────────────────────────────────────────────────
     { "ampLvl",    [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.ampLevel    = v; vd = true; },

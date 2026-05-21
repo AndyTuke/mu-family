@@ -51,7 +51,8 @@ FilterSubsection::FilterSubsection(PluginProcessor& p) : proc(p)
     addAndMakeVisible(filterType);
 
     for (auto* k : { &filterCutoff, &filterRes,
-                     &filterAtk, &filterDec, &filterSus, &filterRel, &filterDepth })
+                     &filterAtk, &filterDec, &filterSus, &filterRel, &filterDepth,
+                     &filterLowCut })
         addAndMakeVisible(k);
 
     filterCutoff.setRange(20.0, 20000.0, 1.0);  filterCutoff.setValue(8000.0);
@@ -62,6 +63,10 @@ FilterSubsection::FilterSubsection(PluginProcessor& p) : proc(p)
     filterSus   .setRange(0.0, 100.0, 0.1);    filterSus.setValue(0.0);
     filterRel   .setRange(0.0,  10.0, 0.001);  filterRel.setValue(0.09);  filterRel.getSlider().setSkewFactor(0.3);
     filterDepth .setRange(0.0,  100.0,  1.0);  filterDepth.setValue(0.0);
+    // Low cut: 0 (off) → 1 kHz, log-skewed so the audible low-end region gets
+    // most of the knob travel.
+    filterLowCut.setRange(0.0, 1000.0, 1.0);   filterLowCut.setValue(0.0);
+    filterLowCut.getSlider().setSkewFactor(0.35);
 
     wireCallbacks();
 }
@@ -117,7 +122,7 @@ void FilterSubsection::wireCallbacks()
         { &filterCutoff, "Filter Cutoff"           }, { &filterRes,   "Filter Resonance"       },
         { &filterAtk,    "Filter Envelope Attack"  }, { &filterDec,   "Filter Envelope Decay"  },
         { &filterSus,    "Filter Envelope Sustain" }, { &filterRel,   "Filter Envelope Release" },
-        { &filterDepth,  "Filter Envelope Depth"   },
+        { &filterDepth,  "Filter Envelope Depth"   }, { &filterLowCut, "Filter Low Cut"        },
     };
     for (auto& e : entries)
     {
@@ -147,6 +152,20 @@ void FilterSubsection::wireCallbacks()
     filterRel.onStatusUpdate = [this](const juce::String&, const juce::String&) {
         if (onStatusUpdate) onStatusUpdate("Filter Envelope Release", formatAdsrTimeSec(filterRel.getValue()));
     };
+    // Low Cut value display: "Off" when 0, else integer Hz / 1dp kHz.
+    filterLowCut.getSlider().textFromValueFunction = [](double v) -> juce::String {
+        if (v <= 0.0)   return "Off";
+        if (v < 1000.0) return juce::String((int)std::round(v));
+        return juce::String(v / 1000.0, 2);
+    };
+    filterLowCut.onStatusUpdate = [this](const juce::String&, const juce::String&) {
+        const double v = filterLowCut.getValue();
+        const juce::String fmt = v <= 0.0
+                                   ? juce::String("Off")
+                                   : (v < 1000.0 ? juce::String((int)std::round(v)) + " Hz"
+                                                  : juce::String(v / 1000.0, 2) + " kHz");
+        if (onStatusUpdate) onStatusUpdate("Filter Low Cut", fmt);
+    };
 
     filterType.onChange = [this](int id) {
         apvtsSet("fltType", (float)(id - 1));
@@ -162,6 +181,7 @@ void FilterSubsection::wireCallbacks()
     filterSus   .onValueChanged = [this](double v) { apvtsSet("fEnvSus", (float)v); };
     filterRel   .onValueChanged = [this](double v) { apvtsSet("fEnvRel", (float)v); filterRel.setLabel(adsrLabelStr("Release", v)); };
     filterDepth .onValueChanged = [this](double v) { apvtsSet("fEnvDep", (float)(v / 100.0 * 48.0)); };
+    filterLowCut.onValueChanged = [this](double v) { apvtsSet("fltLoCut", (float)v); };
 }
 
 void FilterSubsection::setRhythm(int ri)
@@ -186,6 +206,7 @@ void FilterSubsection::loadFromRhythm()
     filterSus   .setValue(p.filterEnvSus * 100.0,   dn);
     filterRel   .setValue(p.filterEnvRel,           dn); filterRel.setLabel(adsrLabelStr("Release", p.filterEnvRel));
     filterDepth .setValue(p.filterEnvDepth / 48.0 * 100.0, dn);
+    filterLowCut.setValue(p.filterLowCutHz, dn);
 }
 
 void FilterSubsection::refreshSuffix(const juce::String& suffix)
@@ -202,6 +223,7 @@ void FilterSubsection::refreshSuffix(const juce::String& suffix)
     else if (suffix == "fEnvSus") filterSus.setValue(p.filterEnvSus * 100.0, dn);
     else if (suffix == "fEnvRel") { filterRel.setValue(p.filterEnvRel, dn); filterRel.setLabel(adsrLabelStr("Release", p.filterEnvRel)); }
     else if (suffix == "fEnvDep") filterDepth .setValue(p.filterEnvDepth / 48.0 * 100.0, dn);
+    else if (suffix == "fltLoCut") filterLowCut.setValue(p.filterLowCutHz, dn);
 }
 
 void FilterSubsection::refreshModulatedIndicators()
@@ -248,8 +270,11 @@ void FilterSubsection::resized()
     filterRes   .setBounds(3 * kW, 0,             kW,     rowH);
     filterDepth .setBounds(4 * kW, 0,             kW,     rowH);
 
-    filterAtk.setBounds(1 * kW, row2Y, kW, rowH);
-    filterDec.setBounds(2 * kW, row2Y, kW, rowH);
-    filterSus.setBounds(3 * kW, row2Y, kW, rowH);
-    filterRel.setBounds(4 * kW, row2Y, kW, rowH);
+    // Envelope knobs left-justify (col 0..3) to line up with the Pitch and Amp
+    // envelope columns; col 4 carries the Low Cut knob in the slot freed up.
+    filterAtk   .setBounds(0 * kW, row2Y, kW, rowH);
+    filterDec   .setBounds(1 * kW, row2Y, kW, rowH);
+    filterSus   .setBounds(2 * kW, row2Y, kW, rowH);
+    filterRel   .setBounds(3 * kW, row2Y, kW, rowH);
+    filterLowCut.setBounds(4 * kW, row2Y, kW, rowH);
 }

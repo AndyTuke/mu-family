@@ -129,6 +129,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addAdsrT(p+"fEnvRel", n+"F Env Rel", 0.09f);   //         (≈ legacy 3.0 × 0.03)
         addF(p+"fEnvDep", n+"F Env Dep",  0.0f,  48.0f,  0.0f);
         addB(p+"fEnvLeg", n+"F Env Legato", false);
+        // 4-pole high-pass that sits inline with the main filter. Skewed so most
+        // of the knob travel lives in the audible low-end region (0–200 Hz).
+        layout.add(std::make_unique<juce::AudioParameterFloat>(
+            p+"fltLoCut", n+"Filter Low Cut",
+            juce::NormalisableRange<float>(0.0f, 1000.0f, 0.0f, 0.35f), 0.0f,
+            juce::AudioParameterFloatAttributes().withStringFromValueFunction(
+                [](float v, int) -> juce::String {
+                    if (v <= 0.0f)     return juce::String("Off");
+                    if (v < 1000.0f)   return juce::String((int)std::round(v)) + " Hz";
+                    return juce::String(v / 1000.0f, 2) + " kHz";
+                })));
         // Amp
         addF(p+"ampLvl",  n+"Amp Level",  0.0f,   2.0f,  1.0f);  // Issue #121: 0 dB default
         addAdsrT(p+"aEnvAtk", n+"A Env Atk", 0.005f);   // seconds
