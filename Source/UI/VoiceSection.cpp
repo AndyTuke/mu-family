@@ -81,12 +81,13 @@ void VoiceSection::paint(juce::Graphics& g)
     constexpr int kW     = LF::kVoiceUnitW;
 
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+    constexpr float kDivInset = 7.0f;   // top/bottom inset for the section divider lines
     const float div1X = static_cast<float>(5 * kW) + divW * 0.5f;
     const float div2X = static_cast<float>(10 * kW + divW) + divW * 0.5f;
     const float div3X = static_cast<float>(15 * kW + 2 * divW) + divW * 0.5f;
-    g.drawLine(div1X, h * 0.05f, div1X, h * 0.95f, 0.5f);
-    g.drawLine(div2X, h * 0.05f, div2X, h * 0.95f, 0.5f);
-    g.drawLine(div3X, h * 0.05f, div3X, h * 0.95f, 0.5f);
+    g.drawLine(div1X, kDivInset, div1X, (float)h - kDivInset, 0.5f);
+    g.drawLine(div2X, kDivInset, div2X, (float)h - kDivInset, 0.5f);
+    g.drawLine(div3X, kDivInset, div3X, (float)h - kDivInset, 0.5f);
 
     g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));

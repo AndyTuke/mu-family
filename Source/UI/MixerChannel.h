@@ -148,11 +148,20 @@ private:
     static constexpr int kButtonH    = 22;
     static constexpr int kVUW        = 10;
     static constexpr int kGRW        = 8;   // GR meter width (Rhythm channels only)
-    // Sidechain minimum heights — proportional values are computed in resized().
-    static constexpr int kScSrcH     = 20;
-    static constexpr int kScAmtH     = 44;
-    static constexpr int kScEnvH     = 40;
-    static constexpr int kSidechainH = kScSrcH + kScAmtH + kScEnvH;  // 104px minimum
+    // Sidechain section heights at Medium baseline. Previously these were the
+    // floor on a proportional `h * 0.20f` calculation; now the section is
+    // fixed at the values the calculation produced at the default strip
+    // height (531 px) so the layout no longer depends on the parent.
+    static constexpr int kScSrcH       = 20;
+    static constexpr int kScAmtH       = 47;   // was max(44, scRemain*0.55) → 47 at default
+    static constexpr int kScEnvH       = 39;   // was scH - kScSrcH - kScAmtH → 39 at default
+    static constexpr int kSidechainH   = 106;  // was max(104, h*0.20) → 106 at default
+
+    // Sends + pan area at Medium baseline. Previously the area was
+    // max(144, h*0.35) of strip height, divided 4-up. Now fixed.
+    static constexpr int kSendsAreaH   = 186;  // was max(144, h*0.35) → 186 at default
+    static constexpr int kSendKnobH    = 46;   // was kSendsAreaH / 4
+    static constexpr int kPanKnobH     = 48;   // was kSendsAreaH - 3 * kSendKnobH
 
     // Insert section (Master channel only)
     static constexpr int kInsCharH  = 20;

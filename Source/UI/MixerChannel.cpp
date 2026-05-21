@@ -168,21 +168,15 @@ void MixerChannel::resized()
 
     const int nameBottom = kColourBarH + kNameH;   // y=25
 
-    // ── Sidechain section (Rhythm + Returns): ~20% of strip height, min = kSidechainH ──
-    const int scH = hasSidechainControls()
-        ? juce::jmax(kSidechainH, juce::roundToInt(h * 0.20f))
-        : 0;
+    // ── Sidechain section (Rhythm + Returns) — fixed Medium-baseline height ──
+    const int scH = hasSidechainControls() ? kSidechainH : 0;
     if (hasSidechainControls())
     {
-        const int scRemain  = scH - kScSrcH;
-        const int scAmtH_l  = juce::jmax(kScAmtH, juce::roundToInt(scRemain * 0.55f));
-        const int scEnvH_l  = scH - kScSrcH - scAmtH_l;
-
         scSourceBox.setBounds(0, nameBottom, stripW, kScSrcH);
-        scAmount   .setBounds(0, nameBottom + kScSrcH, stripW, scAmtH_l);
+        scAmount   .setBounds(0, nameBottom + kScSrcH, stripW, kScAmtH);
         const int hw = stripW / 2;
-        scAttack .setBounds(0,  nameBottom + kScSrcH + scAmtH_l, hw,          scEnvH_l);
-        scRelease.setBounds(hw, nameBottom + kScSrcH + scAmtH_l, stripW - hw, scEnvH_l);
+        scAttack .setBounds(0,  nameBottom + kScSrcH + kScAmtH, hw,          kScEnvH);
+        scRelease.setBounds(hw, nameBottom + kScSrcH + kScAmtH, stripW - hw, kScEnvH);
 
         sidechainPaneBounds = { 1, nameBottom + 1, stripW - 2, scH - 2 };
     }
@@ -191,11 +185,11 @@ void MixerChannel::resized()
         sidechainPaneBounds = {};
     }
 
-    // ── Sends + pan: ~35% of strip height ────────────────────────────────────
+    // ── Sends + pan — fixed Medium-baseline height ───────────────────────────
     const int sendY  = nameBottom + scH;
-    const int spH    = juce::jmax(4 * 36, juce::roundToInt(h * 0.35f));
-    const int sendH  = spH / 4;
-    const int panH   = spH - 3 * sendH;
+    constexpr int spH   = kSendsAreaH;
+    constexpr int sendH = kSendKnobH;
+    constexpr int panH  = kPanKnobH;
     const int faderY = sendY + spH;
 
     // A return channel cannot send to itself (would feedback-loop). #429.
