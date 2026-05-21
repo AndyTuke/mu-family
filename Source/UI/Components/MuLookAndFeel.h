@@ -161,9 +161,92 @@ public:
     static constexpr int kWindowWidth  = 1170;
     static constexpr int kWindowHeight = 870;
 
-    // Canonical knob sizes.
+    // ── Top-level chrome ──────────────────────────────────────────────────
+    static constexpr int kTransportBarH = 36;
+    static constexpr int kStatusBarH    = 20;
+    static constexpr int kSidebarW      = 82;   // mirrored from RhythmSidebar::kWidth
+
+    // ── RhythmPanel regions (derived from the window minus chrome) ────────
+    // Main area: 1088 × 814 at default. RhythmPanel internal headers consume
+    // 28 (rhythm header) + 22 (sample bar) + 144 (voice section row) = 194
+    // px of vertical space before the dynamic top half / mod half split.
+    static constexpr int kRhythmPanelW    = kWindowWidth - kSidebarW;                          // 1088
+    static constexpr int kRhythmPanelH    = kWindowHeight - kTransportBarH - kStatusBarH;      // 814
+    static constexpr int kRhythmHeaderH   = 28;
+    static constexpr int kSampleBarH      = 22;
+    static constexpr int kVoiceSectionH   = 144;
+    // contentH = 814 - 28 - 22 - 144 = 620. Top half locks to 288 because
+    // the modulator minimum of 332 px takes the rest (avail = contentH - 332 = 288;
+    // raw 0.55 × contentH = 341 → clamped to avail).
+    static constexpr int kRhythmTopH      = 288;
+    static constexpr int kCircleSize      = kRhythmTopH;                                       // square
+    static constexpr int kEuclidPanelW    = kRhythmPanelW - kCircleSize;                       // 800
+    static constexpr int kEuclidPanelH    = kRhythmTopH;                                       // 288
+    static constexpr int kVoiceSectionW   = kRhythmPanelW;                                     // 1088
+    static constexpr int kModulatorPanelW = kRhythmPanelW;                                     // 1088
+    static constexpr int kModulatorPanelH = kRhythmPanelH - kRhythmHeaderH
+                                          - kSampleBarH - kRhythmTopH - kVoiceSectionH;        // 332
+
+    // RhythmPanel applies a 7 px inset (kPanelPad + 1) when placing the four
+    // big inner panels — these are the actual usable widths for layout math.
+    static constexpr int kPanelPad        = 6;
+    static constexpr int kRhythmInset     = kPanelPad + 1;                                     // 7
+    static constexpr int kCircleInnerSize = kCircleSize     - 2 * kRhythmInset;                // 274
+    static constexpr int kEuclidInnerW    = kEuclidPanelW   - 2 * kRhythmInset;                // 786
+    static constexpr int kEuclidInnerH    = kEuclidPanelH   - 2 * kRhythmInset;                // 274
+    static constexpr int kVoiceInnerW     = kVoiceSectionW  - 2 * kRhythmInset;                // 1074
+    static constexpr int kVoiceInnerH     = kVoiceSectionH  - 2 * kRhythmInset;                // 130
+    static constexpr int kModulatorInnerW = kModulatorPanelW - 2 * kRhythmInset;               // 1074
+    static constexpr int kModulatorInnerH = kModulatorPanelH - 2 * kRhythmInset;               // 318
+
+    // ── VoiceSection sub-panel widths ─────────────────────────────────────
+    // Layout: pitch / filter / amp = 5 × kW each, insert = 4 × kW, separated
+    // by 3 × divW. divW = 6, kW = (innerW − 3×divW) / 19. At innerW = 1074
+    // this gives kW = 55, sub widths = 275 / 275 / 275 / 220.
+    static constexpr int kVoiceDivW       = 6;
+    static constexpr int kVoiceUnitW      = (kVoiceInnerW - 3 * kVoiceDivW) / 19;              // 55
+    static constexpr int kVoiceLabelH     = 14;
+    static constexpr int kVoiceSubH       = kVoiceInnerH - kVoiceLabelH;                       // 116
+    static constexpr int kVoicePitchW     = 5 * kVoiceUnitW;                                   // 275
+    static constexpr int kVoiceFilterW    = 5 * kVoiceUnitW;
+    static constexpr int kVoiceAmpW       = 5 * kVoiceUnitW;
+    static constexpr int kVoiceInsertW    = 4 * kVoiceUnitW;                                   // 220
+
+    // Voice subsection knob cells — formula `kW = panelWidth / N` per panel.
+    // Pitch/Filter/Amp divide by 5, Insert divides by 4. At the sub-panel
+    // widths above these give the per-knob cell dimensions below.
+    static constexpr int kVoiceGap        = 4;
+    static constexpr int kVoiceKnobCellH  = (kVoiceSubH - kVoiceGap) / 2;                      // 56
+    static constexpr int kVoicePFAKnobW   = kVoicePitchW / 5;                                  // 55
+    static constexpr int kVoiceInsertKnobW = kVoiceInsertW / 4;                                // 55
+
+    // ── MixerOverlay layout ───────────────────────────────────────────────
+    // MixerOverlay occupies the same area as RhythmPanel (1088 × 814). The
+    // FX rows live in the bottom 32 % of the height; channel strips fill the
+    // rest. Channel widths are computed so 8 rhythm + 3 return strips share
+    // the available horizontal space alongside the master + label panel.
+    static constexpr int kMixerOverlayW    = kRhythmPanelW;                                    // 1088
+    static constexpr int kMixerOverlayH    = kRhythmPanelH;                                    // 814
+    static constexpr int kMixerHeaderH     = 22;
+    static constexpr int kMixerFXGap       = 6;
+    static constexpr int kMixerFXPad       = 6;
+    static constexpr int kMixerDivW        = 4;
+    static constexpr int kMixerChanGap     = 3;
+    static constexpr int kMixerMasterW     = 80;
+    static constexpr int kMixerLabelPanelW = 38;
+    static constexpr int kMixerInsertPanelW = 130;   // mirrored from MixerChannel::kInsertPanelW
+    // Derived heights/widths at the Medium baseline.
+    static constexpr int kMixerFXAreaH     = 261;   // jmax(220, round(814 * 0.32)) = 261
+    static constexpr int kMixerFXRowH      = (kMixerFXAreaH - kMixerFXGap * 2 - kMixerFXPad * 2) / 3;   // 79
+    static constexpr int kMixerStripH      = kMixerOverlayH - kMixerFXAreaH - kMixerHeaderH;   // 531
+    static constexpr int kMixerMasterTotalW = kMixerMasterW + kMixerInsertPanelW;              // 210
+    static constexpr int kMixerNumChans    = 8 + 3;                                            // 8 rhythm + 3 returns
+    static constexpr int kMixerChanW       = (kMixerOverlayW - kMixerLabelPanelW
+                                              - 2 * kMixerDivW - kMixerMasterTotalW
+                                              - (8 - 1) * kMixerChanGap) / kMixerNumChans;    // 73
+
+    // ── Canonical knob sizes ──────────────────────────────────────────────
     // Large: Euclid Steps/Hits/Rotate and the mixer FX-row knobs (Effect /
-    // Delay / Reverb). Panels tight on horizontal space clamp defensively
-    // (e.g. EuclideanPanel jmin-clamps against its per-column width).
-    static constexpr int kKnobSizeLarge = 88;
+    // Delay / Reverb).
+    static constexpr int kKnobSizeLarge   = 88;
 };

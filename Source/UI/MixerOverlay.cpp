@@ -580,20 +580,13 @@ void MixerOverlay::updateEffectSendLabels()
 
 void MixerOverlay::resized()
 {
-    const int w = getWidth();
-    const int h = getHeight();
-
-    // FX area height proportional to window height; row height derived from it.
-    const int fxAreaH = juce::jmax(220, juce::roundToInt(h * 0.32f));
-    const int fxRowH  = (fxAreaH - kFXGap * 2 - kFXPad * 2) / 3;
-    const int stripH  = juce::jmax(200, h - fxAreaH - kHeaderH);
-
-    // channel widths proportional to window width.
-    // 8 rhythm + 3 returns share available space; master fills any remainder.
-    const int masterTotalW = kMasterW + MixerChannel::kInsertPanelW;
-    const int nChans = MixerEngine::MaxChannels + 3;
-    const int chanW  = juce::jmax(44, (w - kLabelPanelW - 2 * kDivW - masterTotalW
-                                       - (MixerEngine::MaxChannels - 1) * kChanGap) / nChans);
+    // Fixed Medium-baseline layout — see MuLookAndFeel for the constants.
+    constexpr int w        = MuClidLookAndFeel::kMixerOverlayW;
+    constexpr int fxAreaH  = MuClidLookAndFeel::kMixerFXAreaH;
+    constexpr int fxRowH   = MuClidLookAndFeel::kMixerFXRowH;
+    constexpr int stripH   = MuClidLookAndFeel::kMixerStripH;
+    constexpr int chanW    = MuClidLookAndFeel::kMixerChanW;
+    constexpr int masterTotalW = MuClidLookAndFeel::kMixerMasterTotalW;
 
     lastFXAreaH = fxAreaH;
     lastFXRowH  = fxRowH;

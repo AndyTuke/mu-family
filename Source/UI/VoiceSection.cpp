@@ -57,12 +57,12 @@ void VoiceSection::refreshSuffix(const juce::String& suffix)
 
 void VoiceSection::resized()
 {
-    const int w      = getWidth();
-    const int h      = getHeight();
-    const int divW   = 6;
-    const int labelH = 14;
-    const int kW     = (w - 3 * divW) / 19;
-    const int subH   = h - labelH;
+    // Fixed Medium-baseline layout — see MuLookAndFeel for the constants.
+    using LF = MuClidLookAndFeel;
+    constexpr int divW   = LF::kVoiceDivW;
+    constexpr int labelH = LF::kVoiceLabelH;
+    constexpr int kW     = LF::kVoiceUnitW;
+    constexpr int subH   = LF::kVoiceSubH;
 
     pitchSub .setBounds(0,                labelH, 5 * kW, subH);
     filterSub.setBounds(5 * kW + divW,    labelH, 5 * kW, subH);
@@ -73,12 +73,12 @@ void VoiceSection::resized()
 void VoiceSection::paint(juce::Graphics& g)
 {
     using Id = MuClidLookAndFeel::ColourIds;
+    using LF = MuClidLookAndFeel;
 
-    const int w      = getWidth();
-    const int h      = getHeight();
-    const int divW   = 6;
-    const int labelH = 14;
-    const int kW     = (w - 3 * divW) / 19;
+    const int h          = getHeight();
+    constexpr int divW   = LF::kVoiceDivW;
+    constexpr int labelH = LF::kVoiceLabelH;
+    constexpr int kW     = LF::kVoiceUnitW;
 
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
     const float div1X = static_cast<float>(5 * kW) + divW * 0.5f;

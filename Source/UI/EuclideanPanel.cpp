@@ -393,31 +393,28 @@ void EuclideanPanel::refreshModulatedIndicators()
 
 void EuclideanPanel::resized()
 {
-    const int w      = getWidth();
-    const int h      = getHeight();
-    const int innerW = w - 2 * kOuter;
-    const int innerH = h - 2 * kOuter;
+    // Fixed Medium-baseline layout — see MuLookAndFeel for the constants.
+    constexpr int innerW = MuLookAndFeel::kEuclidInnerW - 2 * kOuter;   // panel width minus its 4 px border
+    constexpr int innerH = MuLookAndFeel::kEuclidInnerH - 2 * kOuter;
 
-    const int rowH = (innerH - kLogicH) / 3;
-    const int ctrlH = rowH - kLabelH;   // control zone within each row (below label)
-    const int mP   = 4;
+    constexpr int rowH  = (innerH - kLogicH) / 3;
+    constexpr int ctrlH = rowH - kLabelH;   // control zone within each row (below label)
+    constexpr int mP    = 4;
 
     // Steps/Hits/Rotate use the canonical Large knob size — same constant the
-    // mixer FX rows use, so the panels stay matched. jmin-clamp against the
-    // per-column width is a defensive fallback for minimum-size windows where
-    // the panel is too narrow for 7 × kKnobSizeLarge to fit.
-    const int eW   = juce::jmin(MuLookAndFeel::kKnobSizeLarge, innerW / 7);
-    const int pW   = (innerW - eW * 3) / 4;
-    const int padX = kOuter + eW * 3;
-    const int insX = padX + pW * 2;
+    // mixer FX rows use, so the panels stay matched.
+    constexpr int eW   = MuLookAndFeel::kKnobSizeLarge;
+    constexpr int pW   = (innerW - eW * 3) / 4;
+    constexpr int padX = kOuter + eW * 3;
+    constexpr int insX = padX + pW * 2;
 
-    const int knobH    = ctrlH - kSwitchH - 6;
-    // Issue #48: widen Pad/Mute toggles 40→56 so the full text fits.
-    const int insSw    = juce::jmin(56, pW);
-    const int insSwX   = insX + (pW * 2 - insSw) / 2;
-    const int padSw    = juce::jmin(56, pW - mP);
-    const int preSw_x  = padX + mP + (pW - mP - padSw) / 2;
-    const int postSw_x = padX + pW + (pW - mP - padSw) / 2;
+    constexpr int knobH    = ctrlH - kSwitchH - 6;
+    // Pad/Mute toggle width — fits the longest text ("MUTE") cleanly.
+    constexpr int insSw    = (pW < 56) ? pW : 56;
+    constexpr int insSwX   = insX + (pW * 2 - insSw) / 2;
+    constexpr int padSw    = (pW - mP < 56) ? (pW - mP) : 56;
+    constexpr int preSw_x  = padX + mP + (pW - mP - padSw) / 2;
+    constexpr int postSw_x = padX + pW + (pW - mP - padSw) / 2;
 
     auto placeRow = [&](int y,
                         KnobWithLabel& steps, KnobWithLabel& hits, KnobWithLabel& rot,
@@ -446,10 +443,10 @@ void EuclideanPanel::resized()
     // split the logic row into [Legato] | gap | [Logic]. Layout
     // constants live in the header so paint() can mirror them exactly.
     {
-        const int rowX     = kOuter + kLogicMP;
-        const int rowW     = innerW - kLogicMP * 2;
-        const int logicX   = rowX + kLegatoW + kLogicGapW;
-        const int logicW   = rowW - kLegatoW - kLogicGapW;
+        constexpr int rowX   = kOuter + kLogicMP;
+        constexpr int rowW   = innerW - kLogicMP * 2;
+        constexpr int logicX = rowX + kLegatoW + kLogicGapW;
+        constexpr int logicW = rowW - kLegatoW - kLogicGapW;
 
         legatoCtrl.setBounds(rowX,   y + 3, kLegatoW, kLogicH - 6);
         logicCtrl .setBounds(logicX, y + 3, logicW,   kLogicH - 6);
@@ -466,14 +463,14 @@ void EuclideanPanel::paint(juce::Graphics& g)
 {
     using Id = MuClidLookAndFeel::ColourIds;
 
-    const int w      = getWidth();
-    const int h      = getHeight();
-    const int innerW = w - 2 * kOuter;
-    const int innerH = h - 2 * kOuter;
-    const int rowH   = (innerH - kLogicH) / 3;
+    // Match resized()'s constants exactly — see Medium-baseline values in MuLookAndFeel.
+    constexpr int w      = MuLookAndFeel::kEuclidInnerW;
+    constexpr int innerW = w - 2 * kOuter;
+    constexpr int innerH = MuLookAndFeel::kEuclidInnerH - 2 * kOuter;
+    constexpr int rowH   = (innerH - kLogicH) / 3;
 
-    const int rowOffsets[3] = { kOuter, kOuter + rowH + kLogicH, kOuter + 2 * rowH + kLogicH };
-    const char* rowLabels[3] = { "Euclid A", "Euclid B", "Accent" };
+    constexpr int rowOffsets[3] = { kOuter, kOuter + rowH + kLogicH, kOuter + 2 * rowH + kLogicH };
+    const char* rowLabels[3]    = { "Euclid A", "Euclid B", "Accent" };
 
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
     g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
@@ -486,16 +483,12 @@ void EuclideanPanel::paint(juce::Graphics& g)
     const juce::Colour minorCol = rhythmColour.withAlpha(0.5f);
     g.setColour(minorCol);
 
-    // Steps/Hits/Rotate use the canonical Large knob size — same constant the
-    // mixer FX rows use, so the panels stay matched. jmin-clamp against the
-    // per-column width is a defensive fallback for minimum-size windows where
-    // the panel is too narrow for 7 × kKnobSizeLarge to fit.
-    const int eW   = juce::jmin(MuLookAndFeel::kKnobSizeLarge, innerW / 7);
-    const int pW   = (innerW - eW * 3) / 4;
-    const int padX = kOuter + eW * 3;
-    const int insX = padX + pW * 2;
+    constexpr int eW   = MuLookAndFeel::kKnobSizeLarge;
+    constexpr int pW   = (innerW - eW * 3) / 4;
+    constexpr int padX = kOuter + eW * 3;
+    constexpr int insX = padX + pW * 2;
 
-    const int ctrlH = rowH - kLabelH;
+    constexpr int ctrlH = rowH - kLabelH;
     for (int rowY : rowOffsets)
     {
         const int cy = rowY + kLabelH;
@@ -508,11 +501,11 @@ void EuclideanPanel::paint(juce::Graphics& g)
     // bounds with a one-mP margin on the outside (matches the spacing used
     // by the other knob clusters above/below).
     {
-        const int rowY     = kOuter + rowH;
-        const int rowX     = kOuter + kLogicMP;
-        const int rowW     = innerW - kLogicMP * 2;
-        const int logicX   = rowX + kLegatoW + kLogicGapW;
-        const int logicW   = rowW - kLegatoW - kLogicGapW;
+        constexpr int rowY   = kOuter + rowH;
+        constexpr int rowX   = kOuter + kLogicMP;
+        constexpr int rowW   = innerW - kLogicMP * 2;
+        constexpr int logicX = rowX + kLegatoW + kLogicGapW;
+        constexpr int logicW = rowW - kLegatoW - kLogicGapW;
 
         g.drawRoundedRectangle((float)(rowX - kLogicMP),      (float)rowY + 2.0f,
                                (float)(kLegatoW + kLogicMP),  (float)kLogicH - 4.0f, 4.0f, 1.0f);

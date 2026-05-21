@@ -608,10 +608,10 @@ void InsertSubsection::configureInsertAlgorithm(int charId)
 
 void InsertSubsection::resized()
 {
-    const int kW   = getWidth() / 4;
-    const int gap  = 4;
-    const int rowH = (getHeight() - gap) / 2;
-    const int row2Y = rowH + gap;
+    constexpr int kW    = MuClidLookAndFeel::kVoiceInsertKnobW;
+    constexpr int gap   = MuClidLookAndFeel::kVoiceGap;
+    constexpr int rowH  = MuClidLookAndFeel::kVoiceKnobCellH;
+    constexpr int row2Y = rowH + gap;
 
     insertAlgo.setBounds(0, rowH / 4, 4 * kW, rowH / 2);
 

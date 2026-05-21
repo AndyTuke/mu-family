@@ -758,20 +758,18 @@ void RhythmPanel::paint(juce::Graphics& g)
 
 void RhythmPanel::resized()
 {
-    const int w        = getWidth();
-    const int h        = getHeight();
-    const int contentH = h - kHeaderH - kSampleBarH - kVoiceH;
+    // Fixed Medium-baseline layout — see MuLookAndFeel for the constants.
+    // Panel sizes are pinned now that the plugin window is non-resizable.
+    constexpr int w = MuClidLookAndFeel::kRhythmPanelW;
+    constexpr int h = MuClidLookAndFeel::kRhythmPanelH;
 
-    // Top section: 55% of content height; circle is square, capped at 33% of panel width.
-    // Cap topH so the modulator panel always gets at least minModH pixels.
-    // tab(28) + header(28) + editor(150) + 4 + pager(20) + 4 + addBtn(28) + 2 rows(56) + reduce(14) = 332.
-    const int minModH = 332;
-    const int avail   = juce::jmax(80, contentH - minModH);
-    topH    = juce::jlimit(80, avail, (int)(contentH * 0.55f));
-    circleW = juce::jmin(topH, (int)(w * 0.33f));
+    // Top section locks to the Medium-baseline value so the modulator panel
+    // gets its required minimum height for the editor/pager/add/rows stack.
+    topH    = MuClidLookAndFeel::kRhythmTopH;
+    circleW = MuClidLookAndFeel::kCircleSize;
 
-    const int topY = kHeaderH + kSampleBarH;
-    const int modY = topY + topH + kVoiceH;
+    constexpr int topY = kHeaderH + kSampleBarH;
+    const     int modY = topY + topH + kVoiceH;
 
     sampleRect = { 0,       kHeaderH,    w,           kSampleBarH             };
     circleRect = { 0,       topY,        circleW,     topH                    };

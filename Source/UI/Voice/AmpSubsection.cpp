@@ -249,10 +249,10 @@ void AmpSubsection::refreshModulatedIndicators()
 
 void AmpSubsection::resized()
 {
-    const int kW   = getWidth() / 5;
-    const int gap  = 4;
-    const int rowH = (getHeight() - gap) / 2;
-    const int row2Y = rowH + gap;
+    constexpr int kW   = MuClidLookAndFeel::kVoicePFAKnobW;
+    constexpr int gap  = MuClidLookAndFeel::kVoiceGap;
+    constexpr int rowH = MuClidLookAndFeel::kVoiceKnobCellH;
+    constexpr int row2Y = rowH + gap;
 
     ampLevel  .setBounds(0 * kW, 0,    kW, rowH);
     ampSendEff.setBounds(1 * kW, 0,    kW, rowH);
