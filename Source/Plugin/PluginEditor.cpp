@@ -272,13 +272,15 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // defaults rather than the restored values, causing visible GR with no source shown.
     mixerOverlay.loadFromAPVTS();
 
-    setSize(1170, 870);
-    // min width = sidebar (82) + rhythm-panel content (circle + euclidean grid
-    // + voice knob row) ~ 940 → 1024 gives breathing room. Min height = transport (36)
-    // + status (20) + sample bar (32) + circle row (250) + voice (240) + modulator (80)
-    // ~ 660 → 720 gives a comfortable buffer. Below this the Mixer + Voice panels
-    // start overlapping their knob columns; the prior 780×580 floor cramped both.
-    setResizeLimits(1024, 720, 2400, 1600);
+    // Plugin window is now fixed-size at the Medium-baseline dimensions in
+    // MuLookAndFeel — see kWindowWidth / kWindowHeight there. Layout pass
+    // across the UI is being rearchitected to use fixed PX values measured
+    // from this baseline (Large / Small to arrive later as % scalings).
+    // Removing the resize affordance closes off the axis we're moving away
+    // from so layout bugs found after this can't be confused with window
+    // resizing edge cases.
+    setResizable(false, false);
+    setSize(MuLookAndFeel::kWindowWidth, MuLookAndFeel::kWindowHeight);
 
     isStandalone = processorRef.wrapperType == juce::AudioProcessor::wrapperType_Standalone;
     loadKeybindings();

@@ -145,18 +145,25 @@ public:
     // Fixed 30-colour palette for rhythm colour picker
     static const juce::Colour rhythmPalette[30];
 
-    // Canonical knob sizes — single source of truth. Change the number here to
-    // tune; every panel that uses the constant picks it up on rebuild.
+    // ──────────────────────────────────────────────────────────────────────
+    // Medium-baseline sizing constants. Single source of truth — change the
+    // value here, every consumer picks it up on rebuild. The plugin window
+    // is fixed-size at these dimensions; the responsive `getWidth() / N`
+    // layout formulas across the UI are being progressively replaced with
+    // fixed PX values measured from this baseline. Large / Small variants
+    // will arrive later as % scalings of these numbers.
     //
+    // See docs/knob-size-audit.md for the per-bucket map of which controls
+    // consume which constant.
+    // ──────────────────────────────────────────────────────────────────────
+
+    // Plugin window dimensions (the editor calls setSize with these).
+    static constexpr int kWindowWidth  = 1170;
+    static constexpr int kWindowHeight = 870;
+
+    // Canonical knob sizes.
     // Large: Euclid Steps/Hits/Rotate and the mixer FX-row knobs (Effect /
-    // Delay / Reverb). See docs/knob-size-audit.md for the wider per-bucket
-    // map of controls.
-    //
-    // Fixed PX (no window-based scaling). Panels that are tight on horizontal
-    // space when the window is at minimum dimensions are responsible for
-    // clamping defensively (e.g. EuclideanPanel jmin-clamps against its
-    // per-column width). When the window is at typical or larger sizes every
-    // knob renders at exactly this value, so the mixer FX rows and the Euclid
-    // Steps/Hits/Rotate columns stay visually matched.
+    // Delay / Reverb). Panels tight on horizontal space clamp defensively
+    // (e.g. EuclideanPanel jmin-clamps against its per-column width).
     static constexpr int kKnobSizeLarge = 88;
 };
