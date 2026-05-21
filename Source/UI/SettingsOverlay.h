@@ -89,8 +89,9 @@ private:
     static constexpr int kControlW      = 220;
     static constexpr int kContentMaxW   = 620;  // cap content column so it doesn't sprawl
     static constexpr int kLabelCtrlGap  = 12;   // horizontal gap between right-aligned label and control
-    static constexpr int kMasterVolW    = 80;
-    static constexpr int kMasterVolH    = 60;
+    // Master vol knob renders at Size 2 (matches voice subsection knobs).
+    static constexpr int kMasterVolW    = MuClidLookAndFeel::kKnobSize2W;
+    static constexpr int kMasterVolH    = MuClidLookAndFeel::kKnobSize2H;
     static constexpr int kCloseBtnW     = 70;
     static constexpr int kCloseBtnH     = 26;
     static constexpr int kFolderBtnW    = 90;
