@@ -413,9 +413,9 @@ void MixerChannel::paint(juce::Graphics& g)
 
         // "Main Insert 1/2" labels — rotated 90° CCW in the left strip of
         // each slot (same pattern as the section labels on the left of the
-        // mixer channel area). Frees up the vertical space the horizontal
-        // titles used to consume.
-        const juce::Colour labelCol = active ? MuClidLookAndFeel::colour(Id::headingText)
+        // mixer channel area). Uses the same colour as knob value text so it
+        // reads at the same weight as the knob values next to it.
+        const juce::Colour labelCol = active ? MuClidLookAndFeel::colour(Id::valueText)
                                              : MuClidLookAndFeel::colour(Id::mutedText);
         const int insTop = kColourBarH + kNameH;  // start of insert content area
         g.setColour(labelCol);
