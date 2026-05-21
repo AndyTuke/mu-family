@@ -267,9 +267,13 @@ void MixerChannel::resized()
             const int ky      = charBoxY + kInsCharH + 2;
             const int availH  = endY - ky - 2;
 
+            // Master insert knobs render at Size 2 height (the canonical voice
+            // subsection knob height). Width still spans the insert panel
+            // column or its half (so labels stay readable inside the panel).
+            constexpr int kMasterInsertRowH = MuLookAndFeel::kKnobSize2;
             if (charBox.getSelectedId() == 7) // EQ: single column High/Mid/MidHz/Low
             {
-                const int rowH = juce::jmin(60, availH / 4);
+                const int rowH = juce::jmin(kMasterInsertRowH, availH / 4);
                 KnobWithLabel* const eqOrder[] = { &ton, &out, &ext, &drv };
                 for (int i = 0; i < 4; ++i)
                     eqOrder[i]->setBounds(ipX, ky + i * rowH, ipW, rowH);
@@ -285,7 +289,7 @@ void MixerChannel::resized()
                 if (nVis > 0)
                 {
                     const int nRows = (nVis + 1) / 2;
-                    const int rowH  = juce::jmin(60, availH / nRows);
+                    const int rowH  = juce::jmin(kMasterInsertRowH, availH / nRows);
                     const int halfW = ipW / 2;
 
                     for (int i = 0; i < nVis; ++i)

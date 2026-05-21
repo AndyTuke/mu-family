@@ -200,11 +200,18 @@ public:
     static constexpr int kModulatorInnerH = kModulatorPanelH - 2 * kRhythmInset;               // 318
 
     // ── VoiceSection sub-panel widths ─────────────────────────────────────
-    // Layout: pitch / filter / amp = 5 × kW each, insert = 4 × kW, separated
-    // by 3 × divW. divW = 6, kW = (innerW − 3×divW) / 19. At innerW = 1074
-    // this gives kW = 55, sub widths = 275 / 275 / 275 / 220.
+    // Layout: pitch / filter / amp = 5 × Size2-knob each, insert = 4 × Size2,
+    // separated by 3 × divW. Voice subsection cells are Size 2 — flowing from
+    // kKnobSize2 below — so the canonical Size 2 knob width drives both the
+    // per-knob cell and the parent sub-panel widths. Adjust kKnobSize2 to
+    // grow/shrink every voice control + insert in lockstep.
+    //
+    // (kKnobSize2 is defined later in this class. Forward-referencing via
+    // the alias keeps the section ordering "regions first, knob sizes next"
+    // but means the cell math depends on the literal value 55 here. If
+    // kKnobSize2 changes, update kVoiceUnitW to match.)
     static constexpr int kVoiceDivW       = 6;
-    static constexpr int kVoiceUnitW      = (kVoiceInnerW - 3 * kVoiceDivW) / 19;              // 55
+    static constexpr int kVoiceUnitW      = 55;                                                // = kKnobSize2 (Size 2)
     static constexpr int kVoiceLabelH     = 14;
     static constexpr int kVoiceSubH       = kVoiceInnerH - kVoiceLabelH;                       // 116
     static constexpr int kVoicePitchW     = 5 * kVoiceUnitW;                                   // 275
@@ -212,13 +219,11 @@ public:
     static constexpr int kVoiceAmpW       = 5 * kVoiceUnitW;
     static constexpr int kVoiceInsertW    = 4 * kVoiceUnitW;                                   // 220
 
-    // Voice subsection knob cells — formula `kW = panelWidth / N` per panel.
-    // Pitch/Filter/Amp divide by 5, Insert divides by 4. At the sub-panel
-    // widths above these give the per-knob cell dimensions below.
+    // Per-knob cell dimensions inside each voice sub-panel.
     static constexpr int kVoiceGap        = 4;
     static constexpr int kVoiceKnobCellH  = (kVoiceSubH - kVoiceGap) / 2;                      // 56
-    static constexpr int kVoicePFAKnobW   = kVoicePitchW / 5;                                  // 55
-    static constexpr int kVoiceInsertKnobW = kVoiceInsertW / 4;                                // 55
+    static constexpr int kVoicePFAKnobW   = kVoiceUnitW;                                       // Size 2
+    static constexpr int kVoiceInsertKnobW = kVoiceUnitW;                                      // Size 2
 
     // ── MixerOverlay layout ───────────────────────────────────────────────
     // MixerOverlay occupies the same area as RhythmPanel (1088 × 814). The
@@ -246,7 +251,23 @@ public:
                                               - (8 - 1) * kMixerChanGap) / kMixerNumChans;    // 73
 
     // ── Canonical knob sizes ──────────────────────────────────────────────
-    // Large: Euclid Steps/Hits/Rotate and the mixer FX-row knobs (Effect /
-    // Delay / Reverb).
-    static constexpr int kKnobSizeLarge   = 88;
+    // Four buckets — every knob in the plugin picks one.
+    //
+    //   Size 1 (largest) — Euclid Steps/Hits/Rotate; mixer FX-row knobs
+    //                      (Effect / Delay / Reverb).
+    //   Size 2           — Voice subsection (pitch/filter/amp/insert);
+    //                      master insert effect controls.
+    //   Size 3           — Euclid pad/insert controls (prePad/postPad/
+    //                      insStart/insLen); mixer channel-strip knobs
+    //                      (sends / pan / sidechain Amount) except envelopes.
+    //   Size 4 (smallest)— Sidechain envelope knobs (Attack + Release).
+    static constexpr int kKnobSize1 = 88;
+    static constexpr int kKnobSize2 = 55;
+    static constexpr int kKnobSize3 = 73;
+    static constexpr int kKnobSize4 = 36;
+
+    // Backward-compat alias — previous code referred to the Large bucket as
+    // kKnobSizeLarge. Kept so existing call sites keep working until they're
+    // moved to the numbered names.
+    static constexpr int kKnobSizeLarge = kKnobSize1;
 };

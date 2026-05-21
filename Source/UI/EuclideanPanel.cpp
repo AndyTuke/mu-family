@@ -416,6 +416,13 @@ void EuclideanPanel::resized()
     constexpr int preSw_x  = padX + mP + (pW - mP - padSw) / 2;
     constexpr int postSw_x = padX + pW + (pW - mP - padSw) / 2;
 
+    // Pad / insert knobs render at Size 3 (the canonical mixer-strip knob
+    // width). Each knob is centered inside its layout column (pW wide), so
+    // the column structure that places the cluster boundaries stays the
+    // same while the visible knob matches mixer-knob width.
+    constexpr int padKnobW = MuLookAndFeel::kKnobSize3;
+    constexpr int padKnobOffset = (pW - padKnobW) / 2;
+
     auto placeRow = [&](int y,
                         KnobWithLabel& steps, KnobWithLabel& hits, KnobWithLabel& rot,
                         KnobWithLabel& prePad, KnobWithLabel& postPad,
@@ -427,12 +434,12 @@ void EuclideanPanel::resized()
         steps.setBounds  (kOuter,        cy,      eW,      ctrlH);
         hits.setBounds   (kOuter + eW,   cy,      eW,      ctrlH);
         rot.setBounds    (kOuter + eW*2, cy,      eW,      ctrlH);
-        prePad.setBounds (padX + mP,     cy + mP, pW - mP, knobH - mP);
-        postPad.setBounds(padX + pW,     cy + mP, pW - mP, knobH - mP);
+        prePad.setBounds (padX     + padKnobOffset, cy + mP, padKnobW, knobH - mP);
+        postPad.setBounds(padX + pW + padKnobOffset, cy + mP, padKnobW, knobH - mP);
         prePadMode.setBounds (preSw_x,   cy + knobH + 2, padSw, kSwitchH);
         postPadMode.setBounds(postSw_x,  cy + knobH + 2, padSw, kSwitchH);
-        insSt.setBounds  (insX + mP,     cy + mP, pW,      knobH - mP);
-        insLen.setBounds (insX + pW,     cy + mP, pW - mP, knobH - mP);
+        insSt.setBounds  (insX     + padKnobOffset, cy + mP, padKnobW, knobH - mP);
+        insLen.setBounds (insX + pW + padKnobOffset, cy + mP, padKnobW, knobH - mP);
         insMode.setBounds(insSwX,        cy + knobH + 2, insSw, kSwitchH);
     };
 
