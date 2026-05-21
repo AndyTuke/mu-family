@@ -166,7 +166,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             output.getSlider().setSkewFactor(1.0);
             extra .getSlider().setSkewFactor(1.0);
 
-            drive .setLabel("Low (dB)");
+            drive .setLabel("Low 200 (dB)");
             drive .setRange(-18.0, 18.0, 0.1);
             drive .getSlider().textFromValueFunction = dbFmt;
             drive .setValue(ip.insertDrive / 100.0 * 36.0 - 18.0, juce::dontSendNotification);
@@ -185,7 +185,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
             tone  .setValue(juce::jlimit(200.0, 8000.0, (double)ip.insertTone), juce::dontSendNotification);
             tone  .setVisible(true);
 
-            extra .setLabel("High (dB)");
+            extra .setLabel("High 8k (dB)");
             extra .setRange(-18.0, 18.0, 0.1);
             extra .getSlider().textFromValueFunction = dbFmt;
             extra .setValue(ip.insertDither / 100.0 * 36.0 - 18.0, juce::dontSendNotification);

@@ -315,7 +315,7 @@ void InsertSubsection::configureInsertAlgorithm(int charId)
                 return s.retainCharacters("0123456789.-+").getDoubleValue();
             };
 
-            insertDrive.setLabel("Low (dB)");
+            insertDrive.setLabel("Low 200 (dB)");
             insertDrive.setRange(-18.0, 18.0, 0.1);
             insertDrive.getSlider().textFromValueFunction = dbFmt;
             insertDrive.getSlider().valueFromTextFunction = dbParse;
@@ -340,7 +340,7 @@ void InsertSubsection::configureInsertAlgorithm(int charId)
             else   insertDither.setValue(1000.0, juce::dontSendNotification);
             insertDither.setVisible(true);
 
-            insertTone.setLabel("High (dB)");
+            insertTone.setLabel("High 8k (dB)");
             insertTone.getSlider().setSkewFactor(1.0);
             insertTone.setRange(-18.0, 18.0, 0.1);
             insertTone.getSlider().textFromValueFunction = dbFmt;
