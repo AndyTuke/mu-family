@@ -172,11 +172,24 @@ void MixerChannel::resized()
     const int scH = hasSidechainControls() ? kSidechainH : 0;
     if (hasSidechainControls())
     {
+        // scAmount renders at Size 3 (73 × 46); scAttack/Release at Size 4
+        // (36 × 39). Fixed PX, no dependency on strip width. The dropdown
+        // (scSourceBox) and the centring of envelope knobs still use stripW
+        // because they're not "knobs" — the dropdown spans the strip and the
+        // envelope pair shares the strip width.
+        constexpr int s3W = MuLookAndFeel::kKnobSize3W;
+        constexpr int s3H = MuLookAndFeel::kKnobSize3H;
+        constexpr int s4W = MuLookAndFeel::kKnobSize4W;
+        constexpr int s4H = MuLookAndFeel::kKnobSize4H;
+        const int s3X = (stripW - s3W) / 2;
+        // SC envelope pair sits side-by-side centred within the strip.
+        const int envPairW = 2 * s4W;
+        const int envStartX = (stripW - envPairW) / 2;
+
         scSourceBox.setBounds(0, nameBottom, stripW, kScSrcH);
-        scAmount   .setBounds(0, nameBottom + kScSrcH, stripW, kScAmtH);
-        const int hw = stripW / 2;
-        scAttack .setBounds(0,  nameBottom + kScSrcH + kScAmtH, hw,          kScEnvH);
-        scRelease.setBounds(hw, nameBottom + kScSrcH + kScAmtH, stripW - hw, kScEnvH);
+        scAmount   .setBounds(s3X, nameBottom + kScSrcH, s3W, s3H);
+        scAttack .setBounds(envStartX,         nameBottom + kScSrcH + kScAmtH, s4W, s4H);
+        scRelease.setBounds(envStartX + s4W,   nameBottom + kScSrcH + kScAmtH, s4W, s4H);
 
         sidechainPaneBounds = { 1, nameBottom + 1, stripW - 2, scH - 2 };
     }
@@ -198,10 +211,17 @@ void MixerChannel::resized()
                                      && channelType != Type::ReverbReturn);
     sendReverb.setVisible(hasSends() && channelType != Type::ReverbReturn);
 
-    sendEffect.setBounds(0, sendY,             stripW, sendH);
-    sendDelay .setBounds(0, sendY + sendH,     stripW, sendH);
-    sendReverb.setBounds(0, sendY + sendH * 2, stripW, sendH);
-    panKnob   .setBounds(0, sendY + sendH * 3, stripW, panH);
+    // Sends + pan render at Size 3 (73 × 46) — fixed PX, no dependency on
+    // strip width. For rhythm/return channels stripW already equals the
+    // canonical Size 3 width; for the wider master strip the knob centres
+    // horizontally so the visible knob stays the same regardless of strip.
+    constexpr int s3W = MuLookAndFeel::kKnobSize3W;
+    constexpr int s3H = MuLookAndFeel::kKnobSize3H;
+    const int s3X = (stripW - s3W) / 2;
+    sendEffect.setBounds(s3X, sendY,             s3W, s3H);
+    sendDelay .setBounds(s3X, sendY + sendH,     s3W, s3H);
+    sendReverb.setBounds(s3X, sendY + sendH * 2, s3W, s3H);
+    panKnob   .setBounds(s3X, sendY + sendH * 3, s3W, s3H);
 
     // Sends pane: from first visible send to end of pan.
     {
@@ -267,16 +287,19 @@ void MixerChannel::resized()
             const int ky      = charBoxY + kInsCharH + 2;
             const int availH  = endY - ky - 2;
 
-            // Master insert knobs render at Size 2 height (the canonical voice
-            // subsection knob height). Width still spans the insert panel
-            // column or its half (so labels stay readable inside the panel).
-            constexpr int kMasterInsertRowH = MuLookAndFeel::kKnobSize2;
+            // Master insert knobs render at Size 2 (55 × 56) — fixed PX, no
+            // dependency on the insert panel width. Knobs centre within their
+            // layout cell so the wider insert panel has padding around them.
+            constexpr int s2W = MuLookAndFeel::kKnobSize2W;
+            constexpr int s2H = MuLookAndFeel::kKnobSize2H;
+
             if (charBox.getSelectedId() == 7) // EQ: single column High/Mid/MidHz/Low
             {
-                const int rowH = juce::jmin(kMasterInsertRowH, availH / 4);
+                const int rowH  = s2H;
+                const int knobX = ipX + (ipW - s2W) / 2;  // centre horizontally
                 KnobWithLabel* const eqOrder[] = { &ton, &out, &ext, &drv };
                 for (int i = 0; i < 4; ++i)
-                    eqOrder[i]->setBounds(ipX, ky + i * rowH, ipW, rowH);
+                    eqOrder[i]->setBounds(knobX, ky + i * rowH, s2W, s2H);
             }
             else
             {
@@ -288,16 +311,17 @@ void MixerChannel::resized()
 
                 if (nVis > 0)
                 {
-                    const int nRows = (nVis + 1) / 2;
-                    const int rowH  = juce::jmin(kMasterInsertRowH, availH / nRows);
+                    const int rowH  = s2H;
                     const int halfW = ipW / 2;
+                    const int halfKnobX = (halfW - s2W) / 2;   // centre in half-column
 
                     for (int i = 0; i < nVis; ++i)
                     {
                         const bool isLastOdd = (i == nVis - 1) && (nVis % 2 == 1);
-                        const int kw = isLastOdd ? ipW : halfW;
-                        const int kx = ipX + (i % 2) * halfW;
-                        vis[i]->setBounds(kx, ky + (i / 2) * rowH, kw, rowH);
+                        const int kx = isLastOdd
+                                       ? ipX + (ipW - s2W) / 2          // last odd: centre in full panel
+                                       : ipX + (i % 2) * halfW + halfKnobX;
+                        vis[i]->setBounds(kx, ky + (i / 2) * rowH, s2W, s2H);
                     }
                 }
             }
