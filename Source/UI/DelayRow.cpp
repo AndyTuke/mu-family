@@ -202,11 +202,10 @@ void DelayRow::resized()
     const int h = getHeight();
     int x = kPad;
 
-    // Scale knob widths with the plugin window so this row matches FXRow and
-    // the Euclid Steps/Hits/Rotate knobs at any window size — see
-    // MuLookAndFeel::knobSizeLargeFor.
-    const int knobW = MuLookAndFeel::knobSizeLargeFor(this);
-    const int msW   = knobW;
+    // Fixed knob width — central constant in MuLookAndFeel::kKnobSizeLarge.
+    // Same value used by FXRow and EuclideanPanel so all three panels match.
+    constexpr int knobW = MuLookAndFeel::kKnobSizeLarge;
+    constexpr int msW   = knobW;
 
     if (showHeader)
     {

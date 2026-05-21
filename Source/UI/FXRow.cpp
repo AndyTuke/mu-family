@@ -111,12 +111,11 @@ void FXRow::resized()
     algorithmDropdown.setBounds(x, (h - 24) / 2, kDropdownW, 24);
     x += kDropdownW + kPadding;
 
-    // Knob width scales with the plugin window so the FX rows track other
-    // panels (Euclid Steps/Hits/Rotate) at any window size — see
-    // MuLookAndFeel::knobSizeLargeFor.
+    // Fixed knob width — central constant in MuLookAndFeel::kKnobSizeLarge.
+    // Same value used by EuclideanPanel Steps/Hits/Rotate so the panels match.
     if (knobsVisible)
     {
-        const int knobW = MuLookAndFeel::knobSizeLargeFor(this);
+        constexpr int knobW = MuLookAndFeel::kKnobSizeLarge;
         for (auto& k : knobs)
         {
             k->setBounds(x, 0, knobW, h);

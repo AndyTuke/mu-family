@@ -402,15 +402,14 @@ void EuclideanPanel::resized()
     const int ctrlH = rowH - kLabelH;   // control zone within each row (below label)
     const int mP   = 4;
 
-    // Steps/Hits/Rotate use the canonical Large knob size scaled by the
-    // plugin window — see MuLookAndFeel::knobSizeLargeFor. This keeps them in
-    // lockstep with the mixer FX rows at any window size. Clamp so the three
-    // columns can't overflow the panel's left half.
-    const int helperEW = MuLookAndFeel::knobSizeLargeFor(this);
-    const int eW       = juce::jmin(helperEW, innerW / 7);
-    const int pW       = (innerW - eW * 3) / 4;
-    const int padX     = kOuter + eW * 3;
-    const int insX     = padX + pW * 2;
+    // Steps/Hits/Rotate use the canonical Large knob size — same constant the
+    // mixer FX rows use, so the panels stay matched. jmin-clamp against the
+    // per-column width is a defensive fallback for minimum-size windows where
+    // the panel is too narrow for 7 × kKnobSizeLarge to fit.
+    const int eW   = juce::jmin(MuLookAndFeel::kKnobSizeLarge, innerW / 7);
+    const int pW   = (innerW - eW * 3) / 4;
+    const int padX = kOuter + eW * 3;
+    const int insX = padX + pW * 2;
 
     const int knobH    = ctrlH - kSwitchH - 6;
     // Issue #48: widen Pad/Mute toggles 40→56 so the full text fits.
@@ -487,15 +486,14 @@ void EuclideanPanel::paint(juce::Graphics& g)
     const juce::Colour minorCol = rhythmColour.withAlpha(0.5f);
     g.setColour(minorCol);
 
-    // Steps/Hits/Rotate use the canonical Large knob size scaled by the
-    // plugin window — see MuLookAndFeel::knobSizeLargeFor. This keeps them in
-    // lockstep with the mixer FX rows at any window size. Clamp so the three
-    // columns can't overflow the panel's left half.
-    const int helperEW = MuLookAndFeel::knobSizeLargeFor(this);
-    const int eW       = juce::jmin(helperEW, innerW / 7);
-    const int pW       = (innerW - eW * 3) / 4;
-    const int padX     = kOuter + eW * 3;
-    const int insX     = padX + pW * 2;
+    // Steps/Hits/Rotate use the canonical Large knob size — same constant the
+    // mixer FX rows use, so the panels stay matched. jmin-clamp against the
+    // per-column width is a defensive fallback for minimum-size windows where
+    // the panel is too narrow for 7 × kKnobSizeLarge to fit.
+    const int eW   = juce::jmin(MuLookAndFeel::kKnobSizeLarge, innerW / 7);
+    const int pW   = (innerW - eW * 3) / 4;
+    const int padX = kOuter + eW * 3;
+    const int insX = padX + pW * 2;
 
     const int ctrlH = rowH - kLabelH;
     for (int rowY : rowOffsets)
