@@ -60,6 +60,8 @@ private:
     static constexpr int kToggleW   = 36;
     static constexpr int kNameW     = 60;
     static constexpr int kDropdownW = 120;
-    static constexpr int kKnobW     = MuLookAndFeel::kKnobSizeLarge;
     static constexpr int kPadding   = 4;
+    // Knob width is computed at resize time via MuLookAndFeel::knobSizeLargeFor
+    // so it tracks the plugin window. Use that helper rather than a constant
+    // here — see FXRow::resized().
 };

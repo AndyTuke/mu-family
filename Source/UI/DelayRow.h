@@ -71,7 +71,7 @@ private:
     static constexpr int kToggleW   = 36;
     static constexpr int kNameW     = 60;
     static constexpr int kDropdownW = 120;  // same as FXRow algorithm dropdowns
-    static constexpr int kMsW       = MuLookAndFeel::kKnobSizeLarge;
-    static constexpr int kKnobW     = MuLookAndFeel::kKnobSizeLarge;
     static constexpr int kPad       = 4;
+    // Knob width is computed at resize time via MuLookAndFeel::knobSizeLargeFor
+    // so it tracks the plugin window. See DelayRow::resized().
 };

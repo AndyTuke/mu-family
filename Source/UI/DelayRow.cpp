@@ -202,6 +202,12 @@ void DelayRow::resized()
     const int h = getHeight();
     int x = kPad;
 
+    // Scale knob widths with the plugin window so this row matches FXRow and
+    // the Euclid Steps/Hits/Rotate knobs at any window size — see
+    // MuLookAndFeel::knobSizeLargeFor.
+    const int knobW = MuLookAndFeel::knobSizeLargeFor(this);
+    const int msW   = knobW;
+
     if (showHeader)
     {
         enableButton.setBounds(x, (h - 22) / 2, kToggleW, 22);
@@ -217,20 +223,20 @@ void DelayRow::resized()
         modeDropdown   .setBounds(x, colY,              kDropdownW, 24);
         modifierSegment.setBounds(x, colY + 24 + kPad,  kDropdownW, 24);
         x += kDropdownW + kPad;
-        multipleKnob   .setBounds(x, 0, kKnobW, h);
-        x += kKnobW + kPad;
+        multipleKnob   .setBounds(x, 0, knobW, h);
+        x += knobW + kPad;
     }
     else
     {
         modeDropdown.setBounds(x, (h - 24) / 2, kDropdownW, 24);
         x += kDropdownW + kPad;
-        msKnob.setBounds(x, 0, kMsW, h);
-        x += kMsW + kPad;
+        msKnob.setBounds(x, 0, msW, h);
+        x += msW + kPad;
     }
 
-    feedbackKnob.setBounds(x,              0, kKnobW, h);
-    spreadKnob  .setBounds(x + kKnobW,     0, kKnobW, h);
-    dirtKnob    .setBounds(x + kKnobW * 2, 0, kKnobW, h);
+    feedbackKnob.setBounds(x,             0, knobW, h);
+    spreadKnob  .setBounds(x + knobW,     0, knobW, h);
+    dirtKnob    .setBounds(x + knobW * 2, 0, knobW, h);
 }
 
 void DelayRow::paint(juce::Graphics& g)
