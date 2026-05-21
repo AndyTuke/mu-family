@@ -304,7 +304,7 @@ public:
     static constexpr int kKnobSize1H = 70;
     static constexpr int kKnobSize2W = 55;
     static constexpr int kKnobSize2H = 56;
-    static constexpr int kKnobSize3W = 73;
+    static constexpr int kKnobSize3W = 75;
     static constexpr int kKnobSize3H = 46;
     static constexpr int kKnobSize4W = 36;
     static constexpr int kKnobSize4H = 39;

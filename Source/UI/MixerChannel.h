@@ -164,9 +164,10 @@ private:
     static constexpr int kPanKnobH     = 48;   // was kSendsAreaH - 3 * kSendKnobH
 
     // Insert section (Master channel only)
-    static constexpr int kInsCharH  = 20;
-    static constexpr int kInsKnobH  = 44;
-    static constexpr int kInsertH   = kInsCharH + kInsKnobH;          // 64px
+    static constexpr int kInsCharH      = 20;
+    static constexpr int kInsKnobH      = 44;
+    static constexpr int kInsertH       = kInsCharH + kInsKnobH;          // 64px
+    static constexpr int kInsertLabelW  = 18;   // rotated "Main Insert N" label strip on the left of each slot
 
     // Section pane bounds — computed in resized(), drawn as rounded rects in paint().
     juce::Rectangle<int> sidechainPaneBounds;

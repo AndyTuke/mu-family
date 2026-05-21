@@ -283,17 +283,23 @@ void MixerChannel::resized()
     // ── Insert panels (Master channel, right of strip) — two slots stacked top/bottom ─
     if (hasInsert())
     {
-        const int pad    = s(4);
-        const int ipX    = stripW + pad;
-        const int ipW    = insW - 2 * pad;
-        const int insTop = nameBottom;
-        const int insH   = h - insTop - pad;
-        const int halfH  = insH / 2;
+        // Reserve a narrow strip on the LEFT of the insert column for the
+        // rotated "Main Insert 1/2" labels (drawn in paint()). Dropdown +
+        // knobs occupy the remaining horizontal width. Removes the previous
+        // horizontal name-label row, recovering ~22 px vertical so the four
+        // EQ knobs fit inside each slot.
+        const int pad     = s(4);
+        const int labelW  = s(kInsertLabelW);
+        const int ipX     = stripW + labelW + pad;
+        const int ipW     = insW - labelW - 2 * pad;
+        const int insTop  = nameBottom;
+        const int insH    = h - insTop - pad;
+        const int halfH   = insH / 2;
         insertMidY = insTop + halfH;
 
-        // Both slots reserve kNameH for their own label, giving equal knob space.
-        const int slot1CharY = insTop + s(kNameH) + pad;
-        const int slot2CharY = insertMidY + s(kNameH) + pad;
+        // No horizontal title row — title is rotated and lives in the labelW strip.
+        const int slot1CharY = insTop + pad;
+        const int slot2CharY = insertMidY + pad;
 
         auto layoutSlot = [&](int charBoxY, int endY,
                                juce::ComboBox& charBox,
@@ -403,24 +409,43 @@ void MixerChannel::paint(juce::Graphics& g)
         g.setColour(channelColour);
         g.fillRect(stripW, 0, kInsertPanelW, kColourBarH);
 
-        // "Main Insert 1/2" labels sit inside each half; shared name row is clear.
+        // "Main Insert 1/2" labels — rotated 90° CCW in the left strip of
+        // each slot (same pattern as the section labels on the left of the
+        // mixer channel area). Frees up the vertical space the horizontal
+        // titles used to consume.
         const juce::Colour labelCol = active ? MuClidLookAndFeel::colour(Id::headingText)
                                              : MuClidLookAndFeel::colour(Id::mutedText);
         const int insTop = kColourBarH + kNameH;  // start of insert content area
         g.setColour(labelCol);
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-        g.drawText("Main Insert 1", stripW, insTop, kInsertPanelW, kNameH,
-                   juce::Justification::centred, false);
+
+        auto drawSlotLabel = [&](const juce::String& text, int top, int bottom)
+        {
+            const int hSlot = bottom - top;
+            if (hSlot < 14) return;
+            const juce::Rectangle<int> r { stripW, top, kInsertLabelW, hSlot };
+            const float cx = (float) r.getCentreX();
+            const float cy = (float) r.getCentreY();
+            g.saveState();
+            g.addTransform(juce::AffineTransform::rotation(
+                -juce::MathConstants<float>::halfPi, cx, cy));
+            g.drawFittedText(text,
+                (int)(cx - r.getHeight() * 0.5f), (int)(cy - r.getWidth() * 0.5f),
+                r.getHeight(), r.getWidth(),
+                juce::Justification::centred, 1, 0.75f);
+            g.restoreState();
+        };
+
+        const int slot1Bottom = (insertMidY > 0) ? insertMidY : (h - 4);
+        drawSlotLabel("Main Insert 1", insTop, slot1Bottom);
         if (insertMidY > 0)
         {
             // Horizontal divider between the two insert slots
             g.setColour(borderCol.withAlpha(0.5f));
             g.drawLine((float)stripW, (float)insertMidY,
                        (float)(stripW + kInsertPanelW), (float)insertMidY, 1.0f);
-            // "Main Insert 2" label at the top of slot 2
             g.setColour(labelCol);
-            g.drawText("Main Insert 2", stripW, insertMidY, kInsertPanelW, kNameH,
-                       juce::Justification::centred, false);
+            drawSlotLabel("Main Insert 2", insertMidY, h - 4);
         }
     }
 
