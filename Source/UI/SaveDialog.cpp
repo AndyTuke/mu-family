@@ -130,11 +130,14 @@ void SaveDialog::updateDefaultModeState()
 
 void SaveDialog::mouseDown(const juce::MouseEvent& e)
 {
+    using mu_ui::s;
     const int w = getWidth();
     const int h = getHeight();
-    const int cardX = (w - kCardW) / 2;
-    const int cardY = (h - kCardH) / 2;
-    const juce::Rectangle<int> card { cardX, cardY, kCardW, kCardH };
+    const int cardW = s(kCardW);
+    const int cardH = s(kCardH);
+    const int cardX = (w - cardW) / 2;
+    const int cardY = (h - cardH) / 2;
+    const juce::Rectangle<int> card { cardX, cardY, cardW, cardH };
 
     if (!card.contains(e.getPosition()))
         if (onCancel) onCancel();
@@ -142,62 +145,70 @@ void SaveDialog::mouseDown(const juce::MouseEvent& e)
 
 void SaveDialog::resized()
 {
+    using mu_ui::s;
     const int w = getWidth();
     const int h = getHeight();
-    const int cardX = (w - kCardW) / 2;
-    const int cardY = (h - kCardH) / 2;
+    const int cardW = s(kCardW);
+    const int cardH = s(kCardH);
+    const int cardX = (w - cardW) / 2;
+    const int cardY = (h - cardH) / 2;
 
-    int y = cardY + 116;  // leave room for 96px logo + padding
-    const int fieldW = kCardW - 48;
-    const int fieldX = cardX + 24;
+    int y = cardY + s(116);  // leave room for 96px logo + padding
+    const int fieldW = cardW - s(48);
+    const int fieldX = cardX + s(24);
 
     const bool isDefault = saveAsDefaultToggle.getToggleState();
 
-    nameEditor    .setBounds(fieldX, y, fieldW, 28);  y += 36;
-    descEditor    .setBounds(fieldX, y, fieldW, 28);  y += 36;
-    categoryDropdown.setBounds(fieldX, y, fieldW, 28); y += 34;
+    nameEditor    .setBounds(fieldX, y, fieldW, s(28));  y += s(36);
+    descEditor    .setBounds(fieldX, y, fieldW, s(28));  y += s(36);
+    categoryDropdown.setBounds(fieldX, y, fieldW, s(28)); y += s(34);
 
     if (newCategoryEditor.isVisible() && !isDefault)
     {
-        newCategoryEditor.setBounds(fieldX, y, fieldW, 24);
-        y += 30;
+        newCategoryEditor.setBounds(fieldX, y, fieldW, s(24));
+        y += s(30);
     }
 
-    embedSamplesToggle .setBounds(fieldX, y, fieldW / 2, 24);
-    saveAsDefaultToggle.setBounds(fieldX + fieldW / 2, y, fieldW / 2, 24);
+    embedSamplesToggle .setBounds(fieldX, y, fieldW / 2, s(24));
+    saveAsDefaultToggle.setBounds(fieldX + fieldW / 2, y, fieldW / 2, s(24));
 
-    const int btnW = 80;
-    const int btnY = cardY + kCardH - 44;
-    cancelBtn.setBounds(fieldX,                   btnY, btnW, 28);
-    saveBtn  .setBounds(fieldX + fieldW - btnW,   btnY, btnW, 28);
+    const int btnW = s(80);
+    const int btnY = cardY + cardH - s(44);
+    cancelBtn.setBounds(fieldX,                   btnY, btnW, s(28));
+    saveBtn  .setBounds(fieldX + fieldW - btnW,   btnY, btnW, s(28));
 }
 
 void SaveDialog::paint(juce::Graphics& g)
 {
     using Id = MuClidLookAndFeel::ColourIds;
+    using mu_ui::s;
+    using mu_ui::sf;
 
     g.setColour(MuClidLookAndFeel::colour(Id::backgroundModalDim));
     g.fillAll();
 
     const int w = getWidth();
     const int h = getHeight();
-    const int cardX = (w - kCardW) / 2;
-    const int cardY = (h - kCardH) / 2;
+    const int cardW = s(kCardW);
+    const int cardH = s(kCardH);
+    const int cardX = (w - cardW) / 2;
+    const int cardY = (h - cardH) / 2;
 
     g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
-    g.fillRoundedRectangle((float)cardX, (float)cardY, (float)kCardW, (float)kCardH, 8.0f);
+    g.fillRoundedRectangle((float)cardX, (float)cardY, (float)cardW, (float)cardH, sf(8.0f));
 
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawRoundedRectangle((float)cardX, (float)cardY, (float)kCardW, (float)kCardH, 8.0f, 1.0f);
+    g.drawRoundedRectangle((float)cardX, (float)cardY, (float)cardW, (float)cardH, sf(8.0f), 1.0f);
 
     // Logo on the right side of the header, title on the left
     if (logoImage.isValid())
     {
-        g.drawImage(logoImage, cardX + 16, cardY + 12, 96, 96,
+        const int logoSz = s(96);
+        g.drawImage(logoImage, cardX + s(16), cardY + s(12), logoSz, logoSz,
                     0, 0, logoImage.getWidth(), logoImage.getHeight());
     }
     g.setColour(MuClidLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(14.0f)));
-    g.drawText("Save Preset", cardX + 120, cardY + 40, kCardW - 136, 20,
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(14.0f))));
+    g.drawText("Save Preset", cardX + s(120), cardY + s(40), cardW - s(136), s(20),
                juce::Justification::centredLeft, false);
 }

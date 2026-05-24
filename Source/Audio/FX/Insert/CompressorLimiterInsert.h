@@ -31,11 +31,16 @@ public:
                  const VoiceParams& p, float& grOut) override
     {
         const float sr        = (float)currentSampleRate;
-        const float threshLin = juce::Decibels::decibelsToGain(-(p.insertDrive / 100.0f) * 40.0f);
-        const float outGain   = juce::Decibels::decibelsToGain(p.insertOutput);
-        const float attackMs  = juce::jmax(0.1f, p.insertDither * 2.0f);
-        const float relMs     = juce::jmax(1.0f, p.insertTone);
-        const float ratio     = (p.insertAlgo == 8) ? 100.0f : 4.0f;
+        // Slot 0 = Threshold 0..100 (mapped to 0..-40 dB), Slot 1 = Output -24..24 dB,
+        // Slot 2 = Attack 0..100 (mapped to 0..200 ms), Slot 3 = Release 20..2000 ms (log).
+        const float threshKnob = insertSlot(p, 0);
+        const float outputDb   = insertSlot(p, 1);
+        const float attackKnob = insertSlot(p, 2);
+        const float relMs      = juce::jmax(1.0f, insertSlot(p, 3));
+        const float threshLin  = juce::Decibels::decibelsToGain(-(threshKnob / 100.0f) * 40.0f);
+        const float outGain    = juce::Decibels::decibelsToGain(outputDb);
+        const float attackMs   = juce::jmax(0.1f, attackKnob * 2.0f);
+        const float ratio      = (p.insertAlgo == 8) ? 100.0f : 4.0f;
         smoothedAtt   .setTargetValue(std::exp(-2.2f / (attackMs * 0.001f * sr)));
         smoothedRel   .setTargetValue(std::exp(-2.2f / (relMs    * 0.001f * sr)));
         smoothedThresh.setTargetValue(threshLin);

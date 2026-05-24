@@ -16,7 +16,8 @@
 
 class PluginEditor : public juce::AudioProcessorEditor,
                      public juce::KeyListener,
-                     private juce::ValueTree::Listener
+                     private juce::ValueTree::Listener,
+                     private juce::AudioProcessorValueTreeState::Listener
 {
 public:
     explicit PluginEditor(PluginProcessor&);
@@ -96,6 +97,13 @@ private:
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override { presetDirty = true; }
     void valueTreeChildAdded    (juce::ValueTree&, juce::ValueTree&)          override { presetDirty = true; }
     void valueTreeChildRemoved  (juce::ValueTree&, juce::ValueTree&, int)     override { presetDirty = true; }
+
+    // APVTS listener — drives voice-section Amp "Effect" send label off the
+    // global eff_algo parameter so host automation updates the label even
+    // when the mixer overlay is hidden (the MixerOverlay path only refreshes
+    // on visibility / timer flush when visible).
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+    void syncVoiceEffectSendLabel();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };

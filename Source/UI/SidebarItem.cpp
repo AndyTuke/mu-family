@@ -99,16 +99,19 @@ void SidebarItem::timerCallback()
 
 void SidebarItem::resized()
 {
+    using mu_ui::s;
     const int w          = getWidth();
-    const int nameH      = 14;
-    const int circleSize = juce::jmin(w - 8, getHeight() - nameH - 6);
+    const int nameH      = s(14);
+    const int circleSize = juce::jmin(w - s(8), getHeight() - nameH - s(6));
     const int circleX    = (w - circleSize) / 2;
-    miniCircle.setBounds(circleX, 4, circleSize, circleSize);
+    miniCircle.setBounds(circleX, s(4), circleSize, circleSize);
 }
 
 void SidebarItem::paint(juce::Graphics& g)
 {
     using Id = MuClidLookAndFeel::ColourIds;
+    using mu_ui::s;
+    using mu_ui::sf;
 
     const int w = getWidth();
     const int h = getHeight();
@@ -130,7 +133,7 @@ void SidebarItem::paint(juce::Graphics& g)
         if (r >= 1.0f)
         {
             g.setColour(rhythmColour.withAlpha(a * 0.9f));
-            g.drawEllipse(cx - r, cy - r, r * 2.0f, r * 2.0f, 2.0f);
+            g.drawEllipse(cx - r, cy - r, r * 2.0f, r * 2.0f, sf(2.0f));
         }
     }
 
@@ -138,41 +141,42 @@ void SidebarItem::paint(juce::Graphics& g)
     if (selected)
     {
         g.setColour(rhythmColour);
-        g.fillRect(w - 3, 0, 3, h);
+        const int tabW = s(3);
+        g.fillRect(w - tabW, 0, tabW, h);
     }
 
     // Name row below circle
-    const int nameY = miniCircle.getBottom() + 2;
-    const int nameRowH = h - nameY - 2;
+    const int nameY = miniCircle.getBottom() + s(2);
+    const int nameRowH = h - nameY - s(2);
     if (nameRowH > 0)
     {
         g.setColour(rhythmColour);
-        g.fillEllipse(5.0f, (float)(nameY + (nameRowH - 6) / 2), 6.0f, 6.0f);
+        g.fillEllipse(sf(5.0f), (float)(nameY + (nameRowH - s(6)) / 2), sf(6.0f), sf(6.0f));
 
         const juce::String name = rhythm ? juce::String(rhythm->name) : "---";
         g.setColour(MuClidLookAndFeel::colour(selected ? Id::valueText : Id::labelText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
-        g.drawText(name, 14, nameY, w - 18, nameRowH, juce::Justification::centredLeft, true);
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
+        g.drawText(name, s(14), nameY, w - s(18), nameRowH, juce::Justification::centredLeft, true);
     }
 
     // Pending hot-swap badge: orange pill in top-right with "SWP" text.
     // Clicking it (see mouseDown) cancels the staged swap.
     if (pendingSwap)
     {
-        constexpr int badgeH = 13;
-        constexpr int badgeW = 28;
-        const int badgeX = w - badgeW - 3;
-        const int badgeY = 3;
+        const int badgeH = s(13);
+        const int badgeW = s(28);
+        const int badgeX = w - badgeW - s(3);
+        const int badgeY = s(3);
         g.setColour(juce::Colours::orange.withAlpha(0.85f));
-        g.fillRoundedRectangle((float)badgeX, (float)badgeY, (float)badgeW, (float)badgeH, 3.0f);
+        g.fillRoundedRectangle((float)badgeX, (float)badgeY, (float)badgeW, (float)badgeH, sf(3.0f));
         g.setColour(juce::Colours::black);
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(8.0f)));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(8.0f))));
         g.drawText("SWP", badgeX, badgeY, badgeW, badgeH, juce::Justification::centred, false);
     }
 
     // Bottom separator
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawLine(4.0f, (float)(h - 1), (float)(w - 4), (float)(h - 1), 0.5f);
+    g.drawLine(sf(4.0f), (float)(h - 1), (float)(w - s(4)), (float)(h - 1), 0.5f);
 }
 
 void SidebarItem::mouseDown(const juce::MouseEvent& e)
@@ -180,10 +184,11 @@ void SidebarItem::mouseDown(const juce::MouseEvent& e)
     // Cancel staged swap if the pending badge was clicked.
     if (pendingSwap)
     {
-        constexpr int badgeH = 13;
-        constexpr int badgeW = 28;
-        const int badgeX = getWidth() - badgeW - 3;
-        const juce::Rectangle<int> badgeRect { badgeX, 3, badgeW, badgeH };
+        using mu_ui::s;
+        const int badgeH = s(13);
+        const int badgeW = s(28);
+        const int badgeX = getWidth() - badgeW - s(3);
+        const juce::Rectangle<int> badgeRect { badgeX, s(3), badgeW, badgeH };
         if (badgeRect.contains(e.getPosition()))
         {
             if (onCancelPendingSwap) onCancelPendingSwap(rhythmIndex);

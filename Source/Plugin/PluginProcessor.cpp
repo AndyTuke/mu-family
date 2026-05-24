@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginProcessor_Internal.h"
+#include "Audio/InsertSlotConfig.h"
 #if MUCLID_LITE_BUILD
 #include "LiteEditor.h"
 #else
@@ -54,6 +55,14 @@ PluginProcessor::PluginProcessor()
     multiBusEnabled.store(appSettings->getBoolValue("multiBusEnabled", true),
                           std::memory_order_relaxed);
 
+    // UI scale (Medium=1.0, Large=1.25). Persisted across plugin instances;
+    // the editor consults `getUiScale()` at ctor time so a fresh-open picks up
+    // the right scale BEFORE constructing children (fixes #574 for cold opens).
+    {
+        const double stored = appSettings->getDoubleValue("uiScale", (double) kUiScaleMedium);
+        uiScale = juce::jlimit(kUiScaleMedium, kUiScaleLarge, (float) stored);
+    }
+
     // Check license file — must run after appSettings so getContentDir() works.
     licenseInfo = LicenseChecker::check(getContentDir());
 
@@ -72,11 +81,10 @@ PluginProcessor::PluginProcessor()
                               "filter.cutoff", "filter.resonance",
                               "fenv.attack", "fenv.decay", "fenv.depth",
                               "pitch.semitones", "pitch.octave",
-                              "insert.drive", "insert.output",
-                              "insert.bits", "insert.rate", "insert.dither", "insert.lpf",
-                              // additions
+                              // Stage 36: 4 generic insert slots — semantics per
+                              // active algorithm via mu_ui::kInsertAlgoSlots.
+                              "insert.p1", "insert.p2", "insert.p3", "insert.p4",
                               "pitch.envDepth", "amp.level", "accentDb",
-                              // euclid pattern destinations (Stage A wiring)
                               "euclid.a.hits", "euclid.a.rotate",
                               "euclid.a.prePad", "euclid.a.postPad",
                               "euclid.a.insSt", "euclid.a.insLen",
@@ -85,12 +93,7 @@ PluginProcessor::PluginProcessor()
                               "euclid.b.insSt", "euclid.b.insLen",
                               "euclid.c.hits", "euclid.c.rotate",
                               "euclid.c.prePad", "euclid.c.postPad",
-                              "euclid.c.insSt", "euclid.c.insLen",
-                              // algorithm-specific destinations.
-                              // Seeded + written-back only when the matching insert
-                              // algorithm is active so unused destinations cost nothing.
-                              "ks.note", "ks.octave",
-                              "voc.note", "voc.octave", "voc.unison" })
+                              "euclid.c.insSt", "euclid.c.insLen" })
         modParamValues[key] = 0.0f;
 
     // Add default rhythm (16 steps, 4 hits) and sync its state to APVTS.
@@ -119,6 +122,18 @@ PluginProcessor::PluginProcessor()
     liteMidiNotePtr  = apvts.getRawParameterValue("lite_midiNote");
     liteAccentAmtPtr = apvts.getRawParameterValue("lite_accentAmt");
 #endif
+
+    // Cache pointers for the dly_sync* / echo_sync* sibling reads that
+    // syncFXParam does on every Denom/Dot/Trip change. parameterChanged can fire
+    // on the audio thread under DAW automation; raw hash lookups there are
+    // unsafe even for the brief lookups APVTS does. See PluginProcessor.h for
+    // lifetime guarantee.
+    dlySyncDenomPtr  = apvts.getRawParameterValue("dly_syncDenom");
+    dlySyncDotPtr    = apvts.getRawParameterValue("dly_syncDot");
+    dlySyncTripPtr   = apvts.getRawParameterValue("dly_syncTrip");
+    echoSyncDenomPtr = apvts.getRawParameterValue("echo_syncDenom");
+    echoSyncDotPtr   = apvts.getRawParameterValue("echo_syncDot");
+    echoSyncTripPtr  = apvts.getRawParameterValue("echo_syncTrip");
 
     {
         mu_core::ScopedApvtsLoading guard(apvtsLoading);
@@ -420,7 +435,17 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     for (int r = 0; r < numRhythms; ++r)
     {
         Rhythm& rhythm = sequencer.getRhythm(r);
-        VoiceParams modParams = rhythm.voiceParams;
+        // Snapshot voiceParams under voiceParamsLock so a concurrent
+        // message-thread apply (syncRhythmParam / forceSyncRhythmFromAPVTS)
+        // can't interleave a torn write. Held for ~struct-copy time only.
+        VoiceParams modParams;
+        {
+            bool expected = false;
+            while (! rhythm.voiceParamsLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+                expected = false;
+            modParams = rhythm.voiceParams;
+            rhythm.voiceParamsLock.store(false, std::memory_order_release);
+        }
 
         // gate the modulation pass on "matrix has assignments now, OR had
         // assignments last block". The first half is the normal case. The second half
@@ -452,29 +477,15 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 // pitch.octave and pitch.semitones both start at 0; summed at write-back → pitchMod.
                 modParamValues["pitch.semitones"]  = 0.0f;
                 modParamValues["pitch.octave"]     = 0.0f;
-                modParamValues["insert.drive"]     = modParams.insertDrive;
-                modParamValues["insert.output"]    = modParams.insertOutput;
-                modParamValues["insert.bits"]      = modParams.insertBits;
-                modParamValues["insert.rate"]      = (std::log(modParams.insertRate) - std::log(100.0f)) / (std::log(48000.0f) - std::log(100.0f)) * 100.0f;
-                modParamValues["insert.dither"]    = modParams.insertDither;
-                modParamValues["insert.lpf"]       = modParams.insertTone;
-                // algorithm-specific destination seeds, gated
-                // on insertAlgo so an inactive algorithm's seed stays 0 and the
-                // matrix has nothing to bias the write-back with. Karplus uses
-                // insertDrive=note, insertBits=octave. Vocoder uses insertBits=note+1,
-                // insertDither=octave, insertOutput=encoded unison.
-                const int dc = (int) modParams.insertAlgo;
-                if (dc == 11)   // Karplus
-                {
-                    modParamValues["ks.note"]   = modParams.insertDrive;     // 0..6
-                    modParamValues["ks.octave"] = modParams.insertBits;        // 0..3
-                }
-                else if (dc == 12)   // Vocoder
-                {
-                    modParamValues["voc.note"]   = modParams.insertBits - 1.0f;             // 0..6
-                    modParamValues["voc.octave"] = modParams.insertDither;                  // 1..5
-                    modParamValues["voc.unison"] = (modParams.insertOutput + 24.0f) * 0.25f;   // 0..6
-                }
+                // Stage 36: insert mod targets the 4 generic slots directly.
+                // Each algorithm's process() converts slot ↔ actual via the
+                // per-algo config table; modulation only sees normalised 0..1
+                // so the same destination name (`insert.p1`) means "knob 1
+                // of the active algorithm" regardless of which algo is loaded.
+                modParamValues["insert.p1"] = modParams.insertParam[0];
+                modParamValues["insert.p2"] = modParams.insertParam[1];
+                modParamValues["insert.p3"] = modParams.insertParam[2];
+                modParamValues["insert.p4"] = modParams.insertParam[3];
                 // new destinations
                 modParamValues["pitch.envDepth"]   = modParams.pitchEnvDepth;
                 modParamValues["amp.level"]        = modParams.ampLevel;
@@ -517,17 +528,39 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                     snap[kSnapAmpDec]      .store(sn(modParamValues["amp.decay"],        0.0f,    100.0f));
                     snap[kSnapAmpSus]      .store(sn(modParamValues["amp.sustain"],      0.0f,    100.0f));
                     snap[kSnapAmpRel]      .store(sn(modParamValues["amp.release"],      0.0f,    100.0f));
-                    snap[kSnapFilterCutoff].store(snLogHz(modParamValues["filter.cutoff"]));
+                    // Filter Cutoff stores the ACTUAL Hz value (not a
+                    // pre-normalised proportion). The UI calls
+                    // setModulatedActual which converts via the slider's
+                    // own valueToProportionOfLength — guarantees the mod
+                    // arc tracks the visual knob scale, regardless of which
+                    // skew the slider uses (currently setSkewFactorFromMidPoint
+                    // 640). Previously this snapshot used a pure-log
+                    // normalisation that disagreed with the slider's
+                    // midPoint-based skew, producing the negative-below /
+                    // positive-above artefact reported in the field.
+                    snap[kSnapFilterCutoff].store(juce::jlimit(20.0f, 20000.0f, modParamValues["filter.cutoff"]));
                     snap[kSnapFilterRes]   .store(sn(modParamValues["filter.resonance"], 0.0f,    100.0f));
                     snap[kSnapFenvAtk]     .store(sn(modParamValues["fenv.attack"],      0.0f,    100.0f));
                     snap[kSnapFenvDec]     .store(sn(modParamValues["fenv.decay"],       0.0f,    100.0f));
                     snap[kSnapFenvDepth]   .store(sn(modParamValues["fenv.depth"],       0.0f,     48.0f));
                     snap[kSnapPitchSemi]   .store(sn(modParamValues["pitch.semitones"], -12.0f,    12.0f));
-                    snap[kSnapInsDrive]    .store(sn(modParamValues["insert.drive"],     0.0f,    100.0f));
-                    snap[kSnapInsOutput]   .store(sn(modParamValues["insert.output"],   -24.0f,    0.0f));
-                    snap[kSnapInsBits]     .store(sn(modParamValues["insert.bits"],      1.0f,     16.0f));
-                    snap[kSnapInsDither]   .store(sn(modParamValues["insert.dither"],    0.0f,    100.0f));
-                    snap[kSnapInsLpf]      .store(snLogHz(modParamValues["insert.lpf"]));   // log
+                    // Insert mod snapshots store ACTUAL slider values (per
+                    // the active algo's slot range / skew) so the UI can run
+                    // them through `slider.valueToProportionOfLength` via
+                    // setModulatedActual. Same reasoning as filter cutoff:
+                    // the slider's log-skew (setSkewFactorFromMidPoint(sqrt(min·max)))
+                    // is NOT the same curve as the storage-space norm-to-actual
+                    // (lo · (max/lo)^norm), so a raw normalised snapshot would
+                    // disagree with the visual needle position. Converting to
+                    // actual + delegating proportion lookup to the slider
+                    // guarantees agreement regardless of slot skew (Linear,
+                    // Log, or IntStep) and regardless of which algorithm is
+                    // active.
+                    const int algForSnap = (int) modParams.insertAlgo;
+                    snap[kSnapInsP1].store(mu_ui::normToActual(modParamValues["insert.p1"], algForSnap, 0));
+                    snap[kSnapInsP2].store(mu_ui::normToActual(modParamValues["insert.p2"], algForSnap, 1));
+                    snap[kSnapInsP3].store(mu_ui::normToActual(modParamValues["insert.p3"], algForSnap, 2));
+                    snap[kSnapInsP4].store(mu_ui::normToActual(modParamValues["insert.p4"], algForSnap, 3));
                     // new destinations
                     snap[kSnapPitchEnvDep] .store(sn(modParamValues["pitch.envDepth"],   0.0f,    24.0f));
                     snap[kSnapAmpLvl]      .store(sn(modParamValues["amp.level"],        0.0f,     2.0f));
@@ -574,29 +607,14 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParams.pitchMod       = juce::jlimit(-48.0f, 48.0f,
                                                          modParamValues["pitch.octave"]
                                                        + modParamValues["pitch.semitones"]);
-                modParams.insertDrive     = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.drive"]);
-                modParams.insertOutput    = juce::jlimit(-24.0f, 24.0f,    modParamValues["insert.output"]);
-                modParams.insertBits        = juce::jlimit(1.0f,   16.0f,    modParamValues["insert.bits"]);
-                modParams.insertRate      = std::exp(std::log(100.0f) + juce::jlimit(0.0f, 100.0f, modParamValues["insert.rate"]) / 100.0f * (std::log(48000.0f) - std::log(100.0f)));
-                modParams.insertDither      = juce::jlimit(0.0f,  100.0f,    modParamValues["insert.dither"]);
-                modParams.insertTone      = juce::jlimit(20.0f, 20000.0f,  modParamValues["insert.lpf"]);
-                // algorithm-specific write-back. Overrides the
-                // generic insert.* write-backs above when the matching algorithm is
-                // active — clamps to the algorithm-facing range. For Vocoder note,
-                // converts back to insertBits storage (note+1). For Vocoder unison,
-                // converts the voice-index 0..6 back to the encoded -24..0.
-                if (dc == 11)   // Karplus
-                {
-                    modParams.insertDrive = juce::jlimit(0.0f, 6.0f, modParamValues["ks.note"]);
-                    modParams.insertBits    = juce::jlimit(0.0f, 3.0f, modParamValues["ks.octave"]);
-                }
-                else if (dc == 12)   // Vocoder
-                {
-                    modParams.insertBits    = juce::jlimit(1.0f, 7.0f, modParamValues["voc.note"] + 1.0f);
-                    modParams.insertDither  = juce::jlimit(1.0f, 5.0f, modParamValues["voc.octave"]);
-                    const float vIdx     = juce::jlimit(0.0f, 6.0f, modParamValues["voc.unison"]);
-                    modParams.insertOutput = vIdx * 4.0f - 24.0f;   // 0→-24, 6→0
-                }
+                // Stage 36: insert mod write-back to the 4 generic slots.
+                // Values stay normalised 0..1; per-algo de-normalisation
+                // happens inside each InsertAlgorithm::process via the config
+                // table. No algorithm-specific branching needed.
+                modParams.insertParam[0] = juce::jlimit(0.0f, 1.0f, modParamValues["insert.p1"]);
+                modParams.insertParam[1] = juce::jlimit(0.0f, 1.0f, modParamValues["insert.p2"]);
+                modParams.insertParam[2] = juce::jlimit(0.0f, 1.0f, modParamValues["insert.p3"]);
+                modParams.insertParam[3] = juce::jlimit(0.0f, 1.0f, modParamValues["insert.p4"]);
                 // new destinations write-back
                 modParams.pitchEnvDepth  = juce::jlimit(0.0f,   24.0f,    modParamValues["pitch.envDepth"]);
                 modParams.ampLevel       = juce::jlimit(0.0f,    2.0f,    modParamValues["amp.level"]);
@@ -884,6 +902,19 @@ void PluginProcessor::setMultiBusEnabled(bool on)
     multiBusEnabled.store(on, std::memory_order_relaxed);
     appSettings->setValue("multiBusEnabled", on);
     appSettings->saveIfNeeded();
+}
+
+void PluginProcessor::setUiScale(float scale)
+{
+    const float clamped = juce::jlimit(kUiScaleMedium, kUiScaleLarge, scale);
+    if (uiScale == clamped) return;
+    uiScale = clamped;
+    if (appSettings != nullptr)
+    {
+        appSettings->setValue("uiScale", (double) clamped);
+        appSettings->saveIfNeeded();
+    }
+    if (onUiScaleChanged) onUiScaleChanged(clamped);
 }
 
 bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const

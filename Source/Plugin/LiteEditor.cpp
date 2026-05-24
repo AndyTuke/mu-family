@@ -74,12 +74,37 @@ LiteEditor::LiteEditor(PluginProcessor& p)
         statusBar.showParam(name, value);
     };
 
+    // Catch host automation of the Lite-only params so the dropdown + accent
+    // knob track DAW automation lanes.
+    proc.apvts.addParameterListener("lite_midiNote",  this);
+    proc.apvts.addParameterListener("lite_accentAmt", this);
+
     setSize(760, 420);
 }
 
 LiteEditor::~LiteEditor()
 {
+    proc.apvts.removeParameterListener("lite_accentAmt", this);
+    proc.apvts.removeParameterListener("lite_midiNote",  this);
     setLookAndFeel(nullptr);
+}
+
+void LiteEditor::parameterChanged(const juce::String& parameterID, float newValue)
+{
+    juce::Component::SafePointer<LiteEditor> safe(this);
+    auto refresh = [safe, parameterID, newValue]
+    {
+        auto* self = safe.getComponent();
+        if (! self) return;
+        if (parameterID == "lite_midiNote")
+            self->noteSelector.setSelectedId((int) newValue + 1, false);
+        else if (parameterID == "lite_accentAmt")
+            self->accentKnob.setValue((double) newValue, juce::dontSendNotification);
+    };
+    if (juce::MessageManager::getInstance()->isThisTheMessageThread())
+        refresh();
+    else
+        juce::MessageManager::callAsync(std::move(refresh));
 }
 
 void LiteEditor::paint(juce::Graphics& g)

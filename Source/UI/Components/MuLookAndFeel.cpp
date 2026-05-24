@@ -109,23 +109,27 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
         case indicatorGRMeterBar:     return t.indicators.grMeterBar;
         // Mixer extras
         case mixerInactiveNameBg:     return t.mixer.inactiveNameBg;
+        // Global / non-rhythm accent (mixer borders, etc.)
+        case globalAccent:            return t.global.accent;
         // Sidebar tab line – runtime colour
         case sidebarTabLine:          return juce::Colours::transparentBlack;
         default:                      return juce::Colours::magenta;
     }
 }
 
-const juce::Colour MuLookAndFeel::rhythmPalette[30] = {
-    juce::Colour(0xff7F77DD), juce::Colour(0xff1D9E75), juce::Colour(0xffD4537E),
-    juce::Colour(0xffEF9F27), juce::Colour(0xffD85A30), juce::Colour(0xff378ADD),
-    juce::Colour(0xffE24B4A), juce::Colour(0xff56C4A0), juce::Colour(0xffA36BC9),
-    juce::Colour(0xffF4C842), juce::Colour(0xff4E9FD9), juce::Colour(0xffE87B51),
-    juce::Colour(0xff6DD87A), juce::Colour(0xffC46B8E), juce::Colour(0xffAAA3E8),
-    juce::Colour(0xff52B8E0), juce::Colour(0xffF08060), juce::Colour(0xff7ECF60),
-    juce::Colour(0xffD07AAA), juce::Colour(0xffFADA6A), juce::Colour(0xff5AADCF),
-    juce::Colour(0xffEB9040), juce::Colour(0xff88D888), juce::Colour(0xffB880C0),
-    juce::Colour(0xffC8C068), juce::Colour(0xff7088C8), juce::Colour(0xffE86868),
-    juce::Colour(0xff60C898), juce::Colour(0xffE898B8), juce::Colour(0xff98A8D8),
+// Fixed 8-colour rhythm palette. Order matches the rhythm slot index — slot 0
+// is Green, slot 1 is Red etc. Purple is intentionally absent (reserved for
+// the global / mixer accent — see MuTheme::Global::accent) so a rhythm border
+// and a mixer border never share a hue.
+const juce::Colour MuLookAndFeel::rhythmPalette[MuLookAndFeel::kRhythmPaletteSize] = {
+    juce::Colour(0xff4ADC8E),   // 0 Green
+    juce::Colour(0xffE24B4A),   // 1 Red
+    juce::Colour(0xff378ADD),   // 2 Blue
+    juce::Colour(0xffEF9F27),   // 3 Yellow / amber
+    juce::Colour(0xff8B6B4A),   // 4 Brown
+    juce::Colour(0xffD85A30),   // 5 Orange / coral
+    juce::Colour(0xff2BB5C5),   // 6 Cyan
+    juce::Colour(0xffB8B8B0),   // 7 Silver grey
 };
 
 MuLookAndFeel::MuLookAndFeel()

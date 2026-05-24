@@ -14,7 +14,7 @@ const char* const kEuclidSuffixes[] = {
     "prePadModeB", "postPadModeB", "insModeB",
     "stepsC", "hitsC", "rotC", "prePadC", "postPadC", "insStC", "insLenC",
     "prePadModeC", "postPadModeC", "insModeC",
-    "logic"
+    "logic", "patLeg", "vMono"
 };
 
 // hash-set membership check for the 31-entry euclid suffix table. Was a
@@ -39,11 +39,11 @@ bool isEuclidSuffix(const juce::String& suffix) noexcept
 // Voice panel params — all use r{ri}_ prefix.
 const char* const kVoiceSuffixes[] = {
     "pitchOct", "pitchSemi", "pitchFine",
-    "pEnvAtk", "pEnvDec", "pEnvSus", "pEnvRel", "pEnvDep",
-    "fltType", "fltCut", "fltRes",
-    "fEnvAtk", "fEnvDec", "fEnvSus", "fEnvRel", "fEnvDep",
+    "pEnvAtk", "pEnvDec", "pEnvSus", "pEnvRel", "pEnvDep", "pEnvLeg",
+    "fltType", "fltCut", "fltRes", "fltLoCut",
+    "fEnvAtk", "fEnvDec", "fEnvSus", "fEnvRel", "fEnvDep", "fEnvLeg",
     "ampLvl", "accentDb",
-    "aEnvAtk", "aEnvDec", "aEnvSus", "aEnvRel",
+    "aEnvAtk", "aEnvDec", "aEnvSus", "aEnvRel", "aEnvLeg",
     "drvChar", "drvDrv", "drvOut", "drvDit", "drvTon", "eqMidGain", "drvBits", "drvRate"
 };
 
@@ -505,7 +505,7 @@ juce::Colour RhythmPanel::currentColour() const
     if (currentRhythmIndex >= 0 && currentRhythmIndex < proc.getNumRhythms())
     {
         const Rhythm& r = proc.getRhythm(currentRhythmIndex);
-        return MuClidLookAndFeel::rhythmPalette[r.colourIndex % 30];
+        return MuClidLookAndFeel::rhythmPalette[r.colourIndex % MuClidLookAndFeel::kRhythmPaletteSize];
     }
     return juce::Colours::transparentBlack;
 }

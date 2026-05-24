@@ -39,7 +39,7 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
                                   juce::Justification just)
     {
         lbl.setText(text, juce::dontSendNotification);
-        lbl.setFont(juce::Font(juce::FontOptions{}.withHeight(12.0f)));
+        lbl.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(12.0f))));
         lbl.setColour(juce::Label::textColourId, textColour);
         lbl.setJustificationType(just);
         addAndMakeVisible(lbl);
@@ -47,6 +47,22 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
 
     const juce::Colour labelCol   = MuClidLookAndFeel::colour(MuClidLookAndFeel::ColourIds::labelText);
     const juce::Colour headingCol = MuClidLookAndFeel::colour(MuClidLookAndFeel::ColourIds::headingText);
+
+    // ── Display — UI size picker (Medium = 1.0, Large = 1.25 = 1463×1088 window)
+    makeFieldLabel(uiSizeLabel, "Size", labelCol, juce::Justification::centredRight);
+    {
+        const float current = proc.getUiScale();
+        // Medium=index 0, Large=index 1. Stored value > midpoint snaps to Large.
+        const int idx = (current >= (PluginProcessor::kUiScaleMedium
+                                     + PluginProcessor::kUiScaleLarge) * 0.5f) ? 1 : 0;
+        uiSizeCtrl.setSelectedIndex(idx, /*notify*/ false);
+    }
+    uiSizeCtrl.onChange = [this](int idx)
+    {
+        proc.setUiScale(idx == 1 ? PluginProcessor::kUiScaleLarge
+                                 : PluginProcessor::kUiScaleMedium);
+    };
+    addAndMakeVisible(uiSizeCtrl);
 
     makeFieldLabel(swapModeLabel, "Timing", labelCol, juce::Justification::centredRight);
 
@@ -186,132 +202,163 @@ void SettingsOverlay::updateSampleLibLabel()
 
 void SettingsOverlay::computeLayout()
 {
+    using mu_ui::s;
     const int w = getWidth();
-    layout.contentW = juce::jmin(kContentMaxW, w - kPad * 2);
+    layout.contentW = juce::jmin(s(kContentMaxW), w - s(kPad) * 2);
     layout.contentX = (w - layout.contentW) / 2;
 
-    int y = kHeaderH + kPad;
+    const int headH    = s(kSectionHeadH);
+    const int rowH     = s(kRowH);
+    const int rowGap   = s(kRowGap);
+    const int sectGap  = s(kSectionGap);
+
+    int y = s(kHeaderH) + s(kPad);
 
     // Section: Audio
     layout.audioHeader  = y;
-    y += kSectionHeadH;
+    y += headH;
     layout.masterVolY   = y;
-    y += 64;                              // tall enough for the rotary knob + label
-    y += kSectionGap;
+    y += s(64);                           // tall enough for the rotary knob + label
+    y += sectGap;
+
+    // Section: Display — UI size picker
+    layout.displayHeader = y;
+    y += headH;
+    layout.uiSizeRowY    = y;
+    y += rowH + rowGap;     // extra row gap so the hint label sits below the picker
+    y += rowH;
+    y += sectGap;
 
     // Section: Hot-swap
     layout.swapHeader   = y;
-    y += kSectionHeadH;
+    y += headH;
     layout.swapRowY     = y;
-    y += kRowH;
-    y += kSectionGap;
+    y += rowH;
+    y += sectGap;
 
     // Section: MIDI Clock (standalone only — collapsed entirely in DAW)
     if (isStandalone)
     {
         layout.midiClockHeader   = y;
-        y += kSectionHeadH;
+        y += headH;
         layout.clockSourceRowY   = y;
-        y += kRowH + kRowGap;
+        y += rowH + rowGap;
         layout.midiMessagesRowY  = y;
-        y += kRowH;
-        y += kSectionGap;
+        y += rowH;
+        y += sectGap;
     }
 
     // Section: MIDI Program Change
     layout.midiPCHeader     = y;
-    y += kSectionHeadH;
+    y += headH;
     layout.midiPresetsRowY  = y;
-    y += kRowH;
-    y += kSectionGap;
+    y += rowH;
+    y += sectGap;
 
     // Section: Output
     layout.outputHeader     = y;
-    y += kSectionHeadH;
+    y += headH;
     layout.multiBusRowY     = y;
-    y += kRowH;
-    y += kSectionGap;
+    y += rowH;
+    y += sectGap;
 
-    // Section: Sample Library (#418) — user's personal sample folder, used as
+    // Section: Sample Library — user's personal sample folder, used as
     // the default location for the sample-load dialog.
     layout.sampleLibHeader     = y;
-    y += kSectionHeadH;
+    y += headH;
     layout.sampleLibPathRowY   = y;
-    y += kRowH + kRowGap;
+    y += rowH + rowGap;
     layout.sampleLibBtnsRowY   = y;
-    y += kRowH;
-    y += kSectionGap;
+    y += rowH;
+    y += sectGap;
 
     // Section: Content Folder
     layout.contentHeader        = y;
-    y += kSectionHeadH;
+    y += headH;
     layout.contentPathRowY      = y;
-    y += kRowH + kRowGap;
+    y += rowH + rowGap;
     layout.contentBtnsRowY      = y;
 }
 
 void SettingsOverlay::resized()
 {
+    using mu_ui::s;
     computeLayout();
 
     const int w = getWidth();
-    closeBtn.setBounds(w - kPad - kCloseBtnW, (kHeaderH - kCloseBtnH) / 2, kCloseBtnW, kCloseBtnH);
+    const int closeW = s(kCloseBtnW);
+    const int closeH = s(kCloseBtnH);
+    const int headerH = s(kHeaderH);
+    closeBtn.setBounds(w - s(kPad) - closeW, (headerH - closeH) / 2, closeW, closeH);
 
-    const int x      = layout.contentX;
-    const int cw     = layout.contentW;
-    const int labelX = x;
-    const int ctrlX  = x + kLabelW + kLabelCtrlGap;
+    const int x       = layout.contentX;
+    const int cw      = layout.contentW;
+    const int labelX  = x;
+    const int labelW  = s(kLabelW);
+    const int ctrlGap = s(kLabelCtrlGap);
+    const int ctrlX   = x + labelW + ctrlGap;
+    const int ctrlW   = s(kControlW);
+    const int rowH    = s(kRowH);
+    const int mvW     = s(kMasterVolW);
+    const int mvH     = s(kMasterVolH);
+    const int fbtnW   = s(kFolderBtnW);
+    const int fbtnGap = s(kFolderBtnGap);
 
-    // Audio — Master Vol knob centred horizontally within the column. Previously
-    // anchored at column-left under a centred section header divider, which looked
-    // off-balance.
-    masterVolKnob.setBounds(x + (cw - kMasterVolW) / 2, layout.masterVolY,
-                            kMasterVolW, kMasterVolH);
+    // Audio — Master Vol knob centred horizontally within the column.
+    masterVolKnob.setBounds(x + (cw - mvW) / 2, layout.masterVolY, mvW, mvH);
 
-    swapModeLabel   .setBounds(labelX, layout.swapRowY, kLabelW, kRowH);
-    swapModeDropdown.setBounds(ctrlX,  layout.swapRowY, kControlW, kRowH);
+    // Display — Size picker (Medium / Large). Hint label drawn in paint() below.
+    uiSizeLabel.setBounds(labelX, layout.uiSizeRowY, labelW, rowH);
+    uiSizeCtrl .setBounds(ctrlX,  layout.uiSizeRowY, ctrlW,  rowH);
+
+    swapModeLabel   .setBounds(labelX, layout.swapRowY, labelW, rowH);
+    swapModeDropdown.setBounds(ctrlX,  layout.swapRowY, ctrlW,  rowH);
 
     if (isStandalone)
     {
-        clockSourceLabel    .setBounds(labelX, layout.clockSourceRowY, kLabelW, kRowH);
-        clockSourceDropdown .setBounds(ctrlX,  layout.clockSourceRowY, kControlW, kRowH);
+        clockSourceLabel    .setBounds(labelX, layout.clockSourceRowY, labelW, rowH);
+        clockSourceDropdown .setBounds(ctrlX,  layout.clockSourceRowY, ctrlW,  rowH);
 
-        midiMessagesLabel   .setBounds(labelX, layout.midiMessagesRowY, kLabelW, kRowH);
-        midiMessagesDropdown.setBounds(ctrlX,  layout.midiMessagesRowY, kControlW, kRowH);
+        midiMessagesLabel   .setBounds(labelX, layout.midiMessagesRowY, labelW, rowH);
+        midiMessagesDropdown.setBounds(ctrlX,  layout.midiMessagesRowY, ctrlW,  rowH);
     }
 
-    midiPresetsBtn.setBounds(ctrlX, layout.midiPresetsRowY, kControlW, kRowH);
+    midiPresetsBtn.setBounds(ctrlX, layout.midiPresetsRowY, ctrlW, rowH);
 
-    multiBusToggle.setBounds(ctrlX, layout.multiBusRowY, kControlW, kRowH);
+    multiBusToggle.setBounds(ctrlX, layout.multiBusRowY, ctrlW, rowH);
 
     // sample library row — same layout as Content Folder below.
-    sampleLibLabel.setBounds(x, layout.sampleLibPathRowY, cw, kRowH);
-    resetSampleLibBtn .setBounds(x + cw - kFolderBtnW,
-                                 layout.sampleLibBtnsRowY, kFolderBtnW, kRowH);
-    browseSampleLibBtn.setBounds(x + cw - kFolderBtnW * 2 - kFolderBtnGap,
-                                 layout.sampleLibBtnsRowY, kFolderBtnW, kRowH);
+    sampleLibLabel.setBounds(x, layout.sampleLibPathRowY, cw, rowH);
+    resetSampleLibBtn .setBounds(x + cw - fbtnW,
+                                 layout.sampleLibBtnsRowY, fbtnW, rowH);
+    browseSampleLibBtn.setBounds(x + cw - fbtnW * 2 - fbtnGap,
+                                 layout.sampleLibBtnsRowY, fbtnW, rowH);
 
-    contentFolderLabel.setBounds(x, layout.contentPathRowY, cw, kRowH);
-    resetContentFolderBtn .setBounds(x + cw - kFolderBtnW,
-                                     layout.contentBtnsRowY, kFolderBtnW, kRowH);
-    browseContentFolderBtn.setBounds(x + cw - kFolderBtnW * 2 - kFolderBtnGap,
-                                     layout.contentBtnsRowY, kFolderBtnW, kRowH);
+    contentFolderLabel.setBounds(x, layout.contentPathRowY, cw, rowH);
+    resetContentFolderBtn .setBounds(x + cw - fbtnW,
+                                     layout.contentBtnsRowY, fbtnW, rowH);
+    browseContentFolderBtn.setBounds(x + cw - fbtnW * 2 - fbtnGap,
+                                     layout.contentBtnsRowY, fbtnW, rowH);
 }
 
 void SettingsOverlay::paint(juce::Graphics& g)
 {
     using Id = MuClidLookAndFeel::ColourIds;
+    using mu_ui::s;
+    using mu_ui::sf;
 
     g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
     g.fillAll();
 
+    const int headerH = s(kHeaderH);
+
     // Top "Settings" bar
     g.setColour(MuClidLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(15.0f)));
-    g.drawText("Settings", kPad, 0, 200, kHeaderH, juce::Justification::centredLeft, false);
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(15.0f))));
+    g.drawText("Settings", s(kPad), 0, s(200), headerH, juce::Justification::centredLeft, false);
 
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawLine(0.0f, (float)kHeaderH, (float)getWidth(), (float)kHeaderH, 1.0f);
+    g.drawLine(0.0f, (float)headerH, (float)getWidth(), (float)headerH, 1.0f);
 
     const int x = layout.contentX;
     const int w = layout.contentW;
@@ -319,23 +366,24 @@ void SettingsOverlay::paint(juce::Graphics& g)
     auto drawSectionHeader = [&](int headerY, const juce::String& title)
     {
         g.setColour(MuClidLookAndFeel::colour(Id::headingText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
-        g.drawText(title, x, headerY, w, 18, juce::Justification::centredLeft, false);
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(13.0f))));
+        g.drawText(title, x, headerY, w, s(18), juce::Justification::centredLeft, false);
 
         g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-        const float lineY = (float)(headerY + 20);
+        const float lineY = (float)(headerY + s(20));
         g.drawLine((float)x, lineY, (float)(x + w), lineY, 0.5f);
     };
 
     auto drawHint = [&](int yCentre, const juce::String& text, int hintX, int hintW)
     {
         g.setColour(MuClidLookAndFeel::colour(Id::labelText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-        g.drawText(text, hintX, yCentre - 7, hintW, 14,
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
+        g.drawText(text, hintX, yCentre - s(7), hintW, s(14),
                    juce::Justification::centredLeft, false);
     };
 
     drawSectionHeader(layout.audioHeader,    "Audio");
+    drawSectionHeader(layout.displayHeader,  "Display");
     drawSectionHeader(layout.swapHeader,     "Hot-swap");
     if (isStandalone)
         drawSectionHeader(layout.midiClockHeader, "MIDI Clock");
@@ -345,8 +393,19 @@ void SettingsOverlay::paint(juce::Graphics& g)
     drawSectionHeader(layout.contentHeader,  "Content Folder");
 
     // Rescan-required hint next to the multi-bus toggle.
-    const int hintX = layout.contentX + kLabelW + kLabelCtrlGap + kControlW + kLabelCtrlGap;
+    const int hintX = layout.contentX + s(kLabelW) + s(kLabelCtrlGap) + s(kControlW) + s(kLabelCtrlGap);
     const int hintW = layout.contentX + layout.contentW - hintX;
-    drawHint(layout.multiBusRowY + kRowH / 2, "(host rescan required after toggling)",
+    drawHint(layout.multiBusRowY + s(kRowH) / 2, "(host rescan required after toggling)",
              hintX, hintW);
+
+    // UI Size — secondary hint about font rescaling. Ctor-time setFont calls
+    // on text labels capture mu_ui::sf(...) at construction; the live resize
+    // doesn't re-walk those, so fonts only fully match the new size after the
+    // editor is reopened. Painted hints / knob labels (which fetch fonts each
+    // paint) update immediately.
+    const int hintY = layout.uiSizeRowY + s(kRowH) + s(kRowGap) / 2;
+    drawHint(hintY, "(reopen the plugin for label fonts to fully rescale)",
+             layout.contentX + s(kLabelW) + s(kLabelCtrlGap),
+             layout.contentX + layout.contentW
+                - (layout.contentX + s(kLabelW) + s(kLabelCtrlGap)));
 }

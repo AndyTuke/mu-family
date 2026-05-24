@@ -9,12 +9,15 @@ RhythmPanel or MixerOverlay  (remaining area)
 StatusBar        20px  (bottom, full width)
 ```
 
-Window: default 1170×870, min 1024×720, max 2400×1600. All elements scale proportionally.
+Window: fixed at 1170×870 (Medium baseline). The window is non-resizable; Small / Large variants arrive as global `mu_ui::scale` multipliers on the Medium constants.
 
 ```cpp
-setSize(1170, 870);                           // default opening size (~50% larger than initial prototype)
-setResizeLimits(1024, 720, 2400, 1600);       // #388: prior 780×580 cramped Mixer + Voice panels
+setResizable(false, false);
+setSize(mu_ui::s(MuLookAndFeel::kWindowWidth),
+        mu_ui::s(MuLookAndFeel::kWindowHeight));
 ```
+
+Every layout dimension is a named Medium constant in `MuLookAndFeel.h` wrapped in `mu_ui::s()` at the call site. Toggling the global `mu_ui::scale` rescales the whole UI uniformly — no per-component responsive math.
 
 ## Transport Bar
 
@@ -47,25 +50,26 @@ kAddBtnH = 34;   // add button at bottom
 
 ## Rhythm Panel (main editing surface)
 
-Fixed vertical stacking with precise constants:
+Fixed vertical stacking. All values are Medium-baseline constants in `MuLookAndFeel.h`:
 
 ```cpp
-kHeaderH    = 28;   // header bar
-kSampleBarH = 22;   // sample file bar
-kCircleW    = 300;  // RhythmCircle width (left of top section)
-kTopH       = 300;  // RhythmCircle + EuclideanPanel height (proportional in practice)
-kVoiceH     = 144;  // VoiceSection height (expanded in Stage 9.5 to hold Pitch + Filter + Amp)
-kPanelPad   = 6;    // inset applied to each panel region
-// ModulatorPanel: remaining height (h - kHeaderH - kSampleBarH - kTopH - kVoiceH)
+kRhythmHeaderH = 28;   // header bar
+kSampleBarH    = 22;   // sample file bar
+kRhythmTopH    = 288;  // RhythmCircle + EuclideanPanel row height
+kCircleSize    = 288;  // RhythmCircle is square — width = kRhythmTopH
+kVoiceSectionH = 144;  // VoiceSection height
+kPanelPad      = 6;    // inset applied to each panel region
+// kModulatorPanelH = kRhythmPanelH - kRhythmHeaderH - kSampleBarH
+//                   - kRhythmTopH  - kVoiceSectionH                // 332
 ```
 
 Layout:
 ```
-Header bar        28px  — 4px colour accent strip | colour dot | rhythm name
-Sample bar        22px  — placeholder text or filename. Drag+drop target. "..." browse icon right.
-[RhythmCircle 300px | EuclideanPanel rest]  ~55% of content height (proportional)
+Header bar         28px — 4px colour accent strip | colour dot | rhythm name
+Sample bar         22px — placeholder text or filename. Drag+drop target. "..." browse icon right.
+[RhythmCircle 288 | EuclideanPanel 800]  top row, 288px high
 VoiceSection      144px
-ModulatorPanel    rest of height  (implemented Stage 7)
+ModulatorPanel    332px
 ```
 
 ### Header Bar
@@ -122,12 +126,11 @@ This lets the user see at a glance which gaps in the ring were created by which 
 Three knob rows (A, B, C) plus a 24px logic bar between A and B. One row per sequence, all controls in that row.
 
 ```cpp
-kLogicH  = 24;    // logic selector bar height
-kMaxRowH = 90;    // row height cap
-// rowH = jmin(kMaxRowH, (kTopH - kLogicH) / 3)
-// At kTopH=300: (300-24)/3 = 92, capped at 90 → 90px rows
-// colW = (panelWidth) / 8  for rows A and B (8 controls)
-// colW = (panelWidth) / 3  for row C (3 controls)
+kLogicH = 24;                    // logic selector bar height
+// Rows A and B: Size 1 knobs (kKnobSize1W × kKnobSize1H = 88 × 70) — Steps,
+//   Hits, Rotate; then Size 3 knobs (kKnobSize3W × kKnobSize3H = 75 × 46) —
+//   Pre Pad, Post Pad, Insert Start, Insert Length, Insert Mode.
+// Row C: 3 × Size 1 knobs (Steps, Hits, Rotate only — no padding/insert).
 ```
 
 **All knob labels use full words — no abbreviations.**
@@ -177,8 +180,10 @@ The existing `knobPadding` ColourId is retained as a legacy alias for `knobPostP
 Four-column panel, 144px tall. Three 6px dividers separate the columns. A 14px label row names each column; the remaining height splits into two equal rows (config row + envelope row) with a 4px gap.
 
 ```
-kW  = (w - 3 * divW) / 18   // 18 equal knob-widths across the full panel width
-                              // 5 Pitch | div | 5 Filter | div | 4 Amp | div | 4 Insert
+kVoiceUnitW = 55      // Size 2 knob width — drives every voice cell
+kVoiceDivW  = 6       // divider between sub-panels
+kVoicePitchW = kVoiceFilterW = kVoiceAmpW = 5 × kVoiceUnitW   // 275 each
+kVoiceInsertW = 4 × kVoiceUnitW                               // 220
 ```
 
 **Column layout:**
@@ -211,8 +216,8 @@ Row 2 (envelope):          Row 2 (envelope):            Row 2 (envelope):    Row
 *(Stage 13: + FX send knobs on Amp config row — Effect, Delay, Reverb; will require Amp column to expand to 5 kW, adjusting the 18-unit grid)*
 
 **INSERT** (`knobInsertPad` pink — same colour family as the insert pad to signal it is a per-voice insert effect):
-- Config row 1: Character (`DropdownSelect`, full-width) — 11 algorithms, alphabetised in the dropdown: None / 3-Band EQ / Bitcrusher / Clipper / Compressor / Fold / Hard Clip / Limiter / Ring Mod / Soft Clip / Tape Sat.
-- Config row 2: 4 knobs whose labels, ranges and meaning are reconfigured per-algorithm by `configureInsertAlgorithm()` (e.g. Drive / Output / Dither / LPF for Soft Clip; Bits / Rate / Dither / LPF for Bitcrusher; Threshold / Ratio / Attack / Release for Compressor, etc.). Per-algorithm knob snapshots are cached in `insertSnapshots[11]` so switching algorithms restores the user's last values for that algorithm.
+- Config row 1: Character (`DropdownSelect`, full-width) — 14 algorithms, alphabetised in the dropdown: None / 3-Band EQ / Bitcrusher / Clipper / Compressor / Fold / Hard Clip / Karplus-Strong / Limiter / Ring Mod / Soft Clip / Tape Sat / Vocoder / Vocoder St.
+- Config row 2: 4 knobs whose labels, ranges and meaning are reconfigured per-algorithm by `configureInsertAlgorithm()` (e.g. Drive / Output / Dither / LPF for Soft Clip; Bits / Rate / Dither / LPF for Bitcrusher; Threshold / Ratio / Attack / Release for Compressor; Low 200 / Mid dB / Mid Hz / High 8k for 3-Band EQ, etc.). Per-algorithm knob snapshots are cached in `insertSnapshots[14]` so switching algorithms restores the user's last values for that algorithm.
 - No envelope row (Insert has no ADSR). Bottom row is blank — drawn as empty space so the section border still frames correctly.
 - Character = None passes audio through unity.
 - Character switch is message-thread only (same constraint as `EffectSlot::setAlgorithm`).

@@ -15,7 +15,10 @@ enum ModSnapIdx : int
     kSnapFilterCutoff, kSnapFilterRes,
     kSnapFenvAtk, kSnapFenvDec, kSnapFenvDepth,
     kSnapPitchSemi,
-    kSnapInsDrive, kSnapInsOutput, kSnapInsBits, kSnapInsDither, kSnapInsLpf,
+    // Stage 36: 4 generic insert Param slots (normalised 0..1) replace the
+    // prior 5 semantically-named slots. Each algorithm interprets the slot
+    // through the per-algo config table in Source/Audio/InsertSlotConfig.h.
+    kSnapInsP1, kSnapInsP2, kSnapInsP3, kSnapInsP4,
     kSnapPitchEnvDep, kSnapAmpLvl, kSnapAccent,
     kSnapEucAHits,  kSnapEucARotate, kSnapEucAPrePad, kSnapEucAPostPad, kSnapEucAInsSt, kSnapEucAInsLen,
     kSnapEucBHits,  kSnapEucBRotate, kSnapEucBPrePad, kSnapEucBPostPad, kSnapEucBInsSt, kSnapEucBInsLen,

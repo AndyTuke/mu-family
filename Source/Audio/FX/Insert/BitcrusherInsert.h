@@ -27,12 +27,16 @@ public:
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
                  const VoiceParams& p, float& /*grOut*/) override
     {
-        const float bits    = juce::jlimit(1.0f, 16.0f, p.insertBits);
+        // Slot 0 = Bits 1..16 (int step), Slot 1 = Rate 100..48000 Hz (log),
+        // Slot 2 = Dither 0..100 %, Slot 3 (LPF) is applied downstream.
+        const float bits    = juce::jlimit(1.0f, 16.0f, insertSlot(p, 0));
+        const float rateHz  = juce::jmax(100.0f, insertSlot(p, 1));
+        const float ditherP = insertSlot(p, 2);
         const float q       = std::pow(2.0f, bits - 1.0f);
         const float ratioF  = juce::jmax(1.0f,
-            (float)(currentSampleRate / (double)juce::jmax(100.0f, p.insertRate)));
-        const float dither  = p.insertDither / 100.0f * (0.5f / q);
-        const float aaCut   = juce::jmin(p.insertRate * 0.45f,
+            (float)(currentSampleRate / (double) rateHz));
+        const float dither  = ditherP / 100.0f * (0.5f / q);
+        const float aaCut   = juce::jmin(rateHz * 0.45f,
                                          (float)currentSampleRate * 0.49f);
 
         for (int ch = 0; ch < nCh; ++ch)

@@ -51,7 +51,15 @@ struct VoiceSlot
     // Spin-lock protecting modulationMatrix and controlSequences from concurrent
     // message-thread writes and audio-thread reads.
     mutable CopyableSpinLock modLock;
+    // Spin-lock protecting `voiceParams` from concurrent message-thread writes
+    // (via syncRhythmParam / forceSyncRhythmFromAPVTS / preset apply) and
+    // audio-thread reads (the modulation-seed `VoiceParams modParams = ...`
+    // copy in processBlock). Without this the struct copy could interleave
+    // word-aligned scalar reads with concurrent writes; benign on x86 by
+    // accident but UB at the C++ level. Held for nanoseconds either side,
+    // so contention is essentially zero.
+    mutable CopyableSpinLock voiceParamsLock;
 
     std::string name        = "<unnamed>";
-    int         colourIndex = 0;   // index into the 30-colour palette
+    int         colourIndex = 0;   // index into MuClidLookAndFeel::rhythmPalette (8 colours)
 };

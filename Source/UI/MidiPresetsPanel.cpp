@@ -10,7 +10,7 @@ MidiPresetsPanel::MidiPresetsPanel(PluginProcessor& p)
     wireChannelToggles();
 
     listBox.setModel(this);
-    listBox.setRowHeight(kListRowH);
+    listBox.setRowHeight(mu_ui::s(kListRowH));
     listBox.setColour(juce::ListBox::backgroundColourId,
                       MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
     addAndMakeVisible(listBox);
@@ -145,21 +145,26 @@ void MidiPresetsPanel::clearRow(int row)
 
 void MidiPresetsPanel::resized()
 {
-    const int w = getWidth();
+    using mu_ui::s;
+    const int w   = getWidth();
+    const int pad = s(kPad);
+    const int chRowH = s(kChannelRowH);
+    const int headerH = s(kHeaderH);
+    const int hintH = s(kHintH);
 
-    closeBtn.setBounds(w - kPad * 3 - 60, kPad, 60, 28);
+    closeBtn.setBounds(w - pad * 3 - s(60), pad, s(60), s(28));
 
     // Channel toggles row.
-    const int chRowY      = kHeaderH + kPad;
-    const int totalToggleW = w - kPad * 2;
+    const int chRowY      = headerH + pad;
+    const int totalToggleW = w - pad * 2;
     const int toggleW      = totalToggleW / 8;
     for (int i = 0; i < 8; ++i)
-        channelToggles[(size_t) i].setBounds(kPad + i * toggleW, chRowY,
-                                             toggleW - 6, kChannelRowH);
+        channelToggles[(size_t) i].setBounds(pad + i * toggleW, chRowY,
+                                             toggleW - s(6), chRowH);
 
     // ListBox fills the rest, leaving room for the hint text drawn in paint().
-    const int listY = chRowY + kChannelRowH + kHintH + kPad;
-    listBox.setBounds(kPad, listY, w - kPad * 2, getHeight() - listY - kPad);
+    const int listY = chRowY + chRowH + hintH + pad;
+    listBox.setBounds(pad, listY, w - pad * 2, getHeight() - listY - pad);
 
     // the browser overlay (when visible) covers the whole panel.
     if (browser.isVisible())
@@ -169,21 +174,28 @@ void MidiPresetsPanel::resized()
 void MidiPresetsPanel::paint(juce::Graphics& g)
 {
     using Id = MuClidLookAndFeel::ColourIds;
+    using mu_ui::s;
+    using mu_ui::sf;
 
     g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
     g.fillAll();
 
+    const int pad = s(kPad);
+    const int headerH = s(kHeaderH);
+    const int chRowH  = s(kChannelRowH);
+    const int hintH   = s(kHintH);
+
     g.setColour(MuClidLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(14.0f)));
-    g.drawText("MIDI Program Change Presets", kPad, 0, 400, kHeaderH,
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(14.0f))));
+    g.drawText("MIDI Program Change Presets", pad, 0, s(400), headerH,
                juce::Justification::centredLeft, false);
 
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawLine(0.0f, (float) kHeaderH, (float) getWidth(), (float) kHeaderH, 0.5f);
+    g.drawLine(0.0f, (float) headerH, (float) getWidth(), (float) headerH, 0.5f);
 
     g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));
     g.drawText(juce::String::fromUTF8(u8"MIDI channel N (1-8) → rhythm slot N-1;  program number = preset index"),
-               kPad, kHeaderH + kPad + kChannelRowH + 2, getWidth() - kPad * 2, kHintH,
+               pad, headerH + pad + chRowH + s(2), getWidth() - pad * 2, hintH,
                juce::Justification::centredLeft, false);
 }

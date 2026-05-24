@@ -73,11 +73,11 @@ public:
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
                  const VoiceParams& p, float& /*grOut*/) override
     {
-        // Decode controls from the repurposed param fields.
-        const int   noteIdx = juce::jlimit(0, 11, (int) std::round(p.insertDrive));
-        // octave range extended to 0..3 (was 1..3). Octave 0 = SPN 1.
-        const int   octave  = juce::jlimit(0, 3, (int) std::round(p.insertBits));
-        const float fbKnob  = juce::jlimit(0.0f, 1.0f, p.insertDither / 100.0f);
+        // Slot 0 = Note 0..11 (int step), Slot 1 = Octave 0..3 (int step),
+        // Slot 2 = Feedback 0..100 %, Slot 3 = LPF 20..20000 Hz (log).
+        const int   noteIdx = juce::jlimit(0, 11, (int) std::round(insertSlot(p, 0)));
+        const int   octave  = juce::jlimit(0, 3,  (int) std::round(insertSlot(p, 1)));
+        const float fbKnob  = juce::jlimit(0.0f, 1.0f, insertSlot(p, 2) / 100.0f);
         // Cubic curve: loopGain = 1 - (1 - fbKnob)^3, capped at 0.9999.
         // Decay time scales as 1/log(loopGain), so a linear knob would compress
         // almost all audible range into the top 20 %. The cubic curve spreads it:
@@ -101,11 +101,12 @@ public:
         // (darker / quicker decay); higher cutoffs let high partials through
         // (brighter / longer ring). At 20 kHz the LP is effectively bypassed,
         // letting the loop gain alone determine the decay envelope.
-        const float lpCutoff = juce::jlimit(20.0f, 20000.0f, p.insertTone);
+        const float lpCutoff = juce::jlimit(20.0f, 20000.0f, insertSlot(p, 3));
         const float lpAlpha  = 1.0f - std::exp(-2.0f * juce::MathConstants<float>::pi
                                                 * lpCutoff / (float) currentSampleRate);
 
-        const float outGain  = std::pow(10.0f, p.insertOutput / 20.0f);
+        // Karplus has no dedicated Output slot — pass through unity.
+        const float outGain  = 1.0f;
         const int nChClamped = juce::jmin(nCh, 2);
         for (int ch = 0; ch < nChClamped; ++ch)
         {

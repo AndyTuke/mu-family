@@ -4,6 +4,7 @@
 #include "Components/NudgeInput.h"
 #include "Components/KnobWithLabel.h"
 #include "Components/DropdownSelect.h"
+#include "Components/SegmentControl.h"
 
 class PluginProcessor;
 
@@ -29,6 +30,13 @@ private:
 
     // Active: master volume knob (reads/writes from APVTS)
     KnobWithLabel masterVolKnob { "Master Vol", MuClidLookAndFeel::knobLevel };
+
+    // UI Size picker (Medium / Large). Writes to PluginProcessor::setUiScale,
+    // which persists via appSettings and triggers the editor's onUiScaleChanged
+    // callback. The window resizes immediately and layout reflows; ctor-time
+    // fonts (#574) only update on next editor open — hint label tells the user.
+    juce::Label     uiSizeLabel;
+    SegmentControl  uiSizeCtrl { { "Medium", "Large" } };
 
     // Hot-swap timing
     juce::Label    swapModeLabel;
@@ -69,6 +77,7 @@ private:
     struct LayoutY {
         int contentX = 0, contentW = 0;          // centered content column
         int audioHeader = 0, masterVolY = 0;
+        int displayHeader = 0, uiSizeRowY = 0;
         int swapHeader = 0, swapRowY = 0;
         int midiClockHeader = 0, clockSourceRowY = 0, midiMessagesRowY = 0;
         int midiPCHeader = 0, midiPresetsRowY = 0;

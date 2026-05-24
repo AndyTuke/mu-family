@@ -171,6 +171,16 @@ struct MuTheme
         juce::Colour inactiveNameBg    { 0xff404040 };  // inactive-rhythm name strip
     } mixer;
 
+    // ── Global / non-rhythm accent ────────────────────────────────────────
+    // Purple — used for borders and accents on views that aren't tied to a
+    // specific rhythm (mixer overlay, global FX rows, etc.). Kept deliberately
+    // OUT of the rhythm palette so a "rhythm border" and a "mixer border"
+    // never share a hue.
+    struct Global
+    {
+        juce::Colour accent            { 0xff7F77DD };  // purple
+    } global;
+
     // Mutable singleton.
     static MuTheme& current() noexcept;
 };

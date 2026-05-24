@@ -256,21 +256,24 @@ void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
             const VoiceParams& ip = slot == 0 ? engine.masterInsertParams
                                               : engine.masterInsertParams2;
             juce::ComboBox& charBox = slot == 0 ? insCharBox : insCharBox2;
-            InsertAlgoSnapshot* snaps      = slot == 0 ? insertSnapshots  : insertSnapshots2;
-            bool*               snapValid  = slot == 0 ? insertSnapshotValid : insertSnapshotValid2;
-            const juce::String  pDrv  = slot == 0 ? "mst_insDrv"  : "mst_ins2Drv";
-            const juce::String  pOut  = slot == 0 ? "mst_insOut"   : "mst_ins2Out";
-            const juce::String  pDit  = slot == 0 ? "mst_insDit"   : "mst_ins2Dit";
-            const juce::String  pTon  = slot == 0 ? "mst_insTon"   : "mst_ins2Ton";
-            const juce::String  pMid  = slot == 0 ? "mst_insMid"   : "mst_ins2Mid";
-            const juce::String  pBit  = slot == 0 ? "mst_insBits"  : "mst_ins2Bits";
-            const juce::String  pRte  = slot == 0 ? "mst_insRate"  : "mst_ins2Rate";
+            // Pointer-to-array — ternary across two different array members
+            // gives us a decayed pointer, not a reference; capturing as
+            // pointer keeps the type system happy.
+            float (* const snaps    )[mu_ui::kInsertSlotCount] =
+                slot == 0 ? insertSnapshots     : insertSnapshots2;
+            bool  * const snapValid =
+                slot == 0 ? insertSnapshotValid : insertSnapshotValid2;
+            const juce::String pSlot[4] = {
+                slot == 0 ? juce::String("mst_insP1") : juce::String("mst_ins2P1"),
+                slot == 0 ? juce::String("mst_insP2") : juce::String("mst_ins2P2"),
+                slot == 0 ? juce::String("mst_insP3") : juce::String("mst_ins2P3"),
+                slot == 0 ? juce::String("mst_insP4") : juce::String("mst_ins2P4"),
+            };
 
             charBox.setSelectedId(ip.insertAlgo + 1, juce::dontSendNotification);
             configureInsertAlgorithm(ip.insertAlgo, slot, proc);
 
-            charBox.onChange = [this, proc, slot, snaps, snapValid,
-                                pDrv, pOut, pDit, pTon, pMid, pBit, pRte]()
+            charBox.onChange = [this, proc, slot, &snaps, &snapValid, pSlot]()
             {
                 juce::ComboBox& cb = slot == 0 ? insCharBox : insCharBox2;
                 const int newChar = cb.getSelectedId() - 1;
@@ -285,30 +288,25 @@ void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
                             p->setValueNotifyingHost(p->convertTo0to1(v));
                     };
 
-                    if (oldChar >= 0 && oldChar <= 10)
+                    // Snapshot the OUTGOING algorithm's current slot values as
+                    // ACTUAL (so the restore re-normalises through actualToNorm
+                    // and the new algorithm sees the right per-slot value).
+                    if (oldChar >= 0 && oldChar < InsertProcessor::kNumInsertAlgos)
                     {
-                        auto& snap       = snaps[oldChar];
-                        snap.insertDrive  = cur.insertDrive;
-                        snap.insertOutput = cur.insertOutput;
-                        snap.insertDither   = cur.insertDither;
-                        snap.insertTone   = cur.insertTone;
-                        snap.insertEqMid   = cur.insertEqMid;
-                        snap.insertBits     = cur.insertBits;
-                        snap.insertRate   = cur.insertRate;
+                        for (int s = 0; s < mu_ui::kInsertSlotCount; ++s)
+                            snaps[oldChar][s] = mu_ui::normToActual(cur.insertParam[s], oldChar, s);
                         snapValid[oldChar] = true;
                     }
 
-                    // defaults shared with VoiceSection via UI/InsertAlgoDefaults.h.
-                    const InsertAlgoSnapshot& snap = snapValid[newChar]
-                                                     ? snaps[newChar]
-                                                     : mu_ui::kInsertAlgoDefaults[newChar];
-                    set(pDrv, snap.insertDrive);
-                    set(pOut, snap.insertOutput);
-                    set(pDit, snap.insertDither);
-                    set(pTon, snap.insertTone);
-                    set(pMid, snap.insertEqMid);
-                    set(pBit, snap.insertBits);
-                    set(pRte, snap.insertRate);
+                    // Restore either the user's snapshot or the algorithm's
+                    // first-visit defaults. Normalise back to APVTS storage.
+                    for (int s = 0; s < mu_ui::kInsertSlotCount; ++s)
+                    {
+                        const float actual = snapValid[newChar]
+                            ? snaps[newChar][s]
+                            : mu_ui::kInsertAlgoDefaults[newChar][s];
+                        set(pSlot[s], mu_ui::actualToNorm(actual, newChar, s));
+                    }
                 }
                 configureInsertAlgorithm(newChar, slot, proc);
             };

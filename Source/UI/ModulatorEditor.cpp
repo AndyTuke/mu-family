@@ -72,21 +72,24 @@ ModulatorEditor::AssignmentRow::AssignmentRow(const std::string& assignId, int d
 
 void ModulatorEditor::AssignmentRow::resized()
 {
+    using mu_ui::s;
     const int w = getWidth(), h = getHeight();
-    const int numW = 20, removeW = 22;
-    const int pairW = BipolarSliderRow::kDepthWidth + 2 + BipolarSliderRow::kCurveWidth;
-    const int destW = w - numW - pairW - removeW - 8;
-    destCombo  .setBounds(numW + 2,                              0, destW,  h);
-    bipolarPair.setBounds(numW + 2 + destW + 2,                  0, pairW,  h);
-    removeBtn  .setBounds(w - removeW, (h - 18) / 2, removeW, 18);
+    const int numW = s(20), removeW = s(22);
+    const int pairW = s(BipolarSliderRow::kDepthWidth) + s(2) + s(BipolarSliderRow::kCurveWidth);
+    const int destW = w - numW - pairW - removeW - s(8);
+    destCombo  .setBounds(numW + s(2),                                 0, destW,  h);
+    bipolarPair.setBounds(numW + s(2) + destW + s(2),                  0, pairW,  h);
+    removeBtn  .setBounds(w - removeW, (h - s(18)) / 2, removeW, s(18));
 }
 
 void ModulatorEditor::AssignmentRow::paint(juce::Graphics& g)
 {
+    using mu_ui::s;
+    using mu_ui::sf;
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
     g.drawText(juce::String(rowNumber) + ".",
-               2, 0, 18, getHeight(), juce::Justification::centred, false);
+               s(2), 0, s(18), getHeight(), juce::Justification::centred, false);
 }
 
 //==============================================================================
@@ -128,6 +131,12 @@ ModulatorEditor::ModulatorEditor()
     stepLabel.setVisible(false);
     stepDropdown.setVisible(false);
     stepMult.setVisible(false);
+
+    // Dice — randomises the modulator's values (stepValues / curvePoints.y)
+    // without changing its mode, polarity, loop / step timing or node count.
+    diceBtn.setTooltip("Randomise modulator values");
+    diceBtn.onClick = [this] { randomiseValues(); };
+    addAndMakeVisible(diceBtn);
 
     rowsViewport.setViewedComponent(&rowsBox, false);
     rowsViewport.setScrollBarsShown(false, false);
@@ -202,6 +211,43 @@ void ModulatorEditor::unlockMod()
 {
     if (rhythmModLock)
         rhythmModLock->store(false, std::memory_order_release);
+}
+
+void ModulatorEditor::randomiseValues()
+{
+    if (!cs) return;
+
+    // Stepped: stepValues are stored as the matrix-contract -100..+100 (bipolar)
+    //          or 0..+100 (unipolar). Walk every entry, replace with a fresh
+    //          random in-range, leave the array length untouched.
+    // Smooth:  curvePoints.y is stored as the editor-side -1..+1 (bipolar) /
+    //          0..+1 (unipolar). Walk every point, replace y; leave x,
+    //          hasBezierHandle, handleX, handleY alone so the curve's node
+    //          layout + segment types are preserved.
+    auto& rng = juce::Random::getSystemRandom();
+    const bool bipolar = cs->polarity == ControlSequence::Polarity::Bipolar;
+
+    lockMod();
+    if (cs->mode == ControlSequence::Mode::Stepped)
+    {
+        for (auto& v : cs->stepValues)
+            v = bipolar ? rng.nextFloat() * 200.0f - 100.0f
+                        : rng.nextFloat() * 100.0f;
+    }
+    else
+    {
+        for (auto& p : cs->curvePoints)
+            p.y = bipolar ? rng.nextFloat() * 2.0f - 1.0f
+                          : rng.nextFloat();
+    }
+    unlockMod();
+
+    // Re-bind both editors to the mutated CS so they pull fresh data + repaint.
+    lfoEditor .setPoints(cs->curvePoints);
+    stepEditor.setSteps(cs->stepValues);
+    lfoEditor .repaint();
+    stepEditor.repaint();
+    if (onChange) onChange();
 }
 
 void ModulatorEditor::loadFromCS()
@@ -526,78 +572,96 @@ void ModulatorEditor::rebuildRows()
 
 void ModulatorEditor::resized()
 {
+    using mu_ui::s;
     const int w = getWidth(), h = getHeight();
+    const int headerH = s(kHeaderH);
+    const int editorH = s(kEditorH);
+    const int rowH    = s(kRowH);
+    const int pagerH  = s(kPagerH);
+    const int addBtnH = s(kAddBtnH);
 
     // ── Single header row: [● Mod X painted] [mode] [polarity] [Loop dd mult] [Step dd mult] ──
-    const int nameW  = 68;
-    const int modeW  = 78;
-    const int polW   = 44;
-    const int lbW    = 30;   // "Loop" / "Step" label
-    const int ddW    = 58;   // note-value dropdown (fits "1/32T")
-    const int nmW    = 46;   // nudge "× N"
+    const int nameW  = s(68);
+    const int modeW  = s(78);
+    const int polW   = s(44);
+    const int lbW    = s(30);   // "Loop" / "Step" label
+    const int ddW    = s(58);   // note-value dropdown (fits "1/32T")
+    const int nmW    = s(46);   // nudge "× N"
+    const int gap2   = s(2);
+    const int gap4   = s(4);
+    const int gap8   = s(8);
 
     int x = nameW;
-    modeDropdown.setBounds(x, 0, modeW, kHeaderH); x += modeW + 4;
-    polarityCtrl.setBounds(x, 0, polW,  kHeaderH); x += polW + 8;
-    loopLabel   .setBounds(x, 0, lbW,   kHeaderH); x += lbW + 2;
-    loopDropdown.setBounds(x, 0, ddW,   kHeaderH); x += ddW + 2;
-    loopMult    .setBounds(x, 0, nmW,   kHeaderH); x += nmW + 8;
+    modeDropdown.setBounds(x, 0, modeW, headerH); x += modeW + gap4;
+    polarityCtrl.setBounds(x, 0, polW,  headerH); x += polW + gap8;
+    loopLabel   .setBounds(x, 0, lbW,   headerH); x += lbW + gap2;
+    loopDropdown.setBounds(x, 0, ddW,   headerH); x += ddW + gap2;
+    loopMult    .setBounds(x, 0, nmW,   headerH); x += nmW + gap8;
 
     if (stepDropdown.isVisible())
     {
-        stepLabel   .setBounds(x, 0, lbW, kHeaderH); x += lbW + 2;
-        stepDropdown.setBounds(x, 0, ddW, kHeaderH); x += ddW + 2;
-        stepMult    .setBounds(x, 0, nmW, kHeaderH);
+        stepLabel   .setBounds(x, 0, lbW, headerH); x += lbW + gap2;
+        stepDropdown.setBounds(x, 0, ddW, headerH); x += ddW + gap2;
+        stepMult    .setBounds(x, 0, nmW, headerH);
     }
 
+    // Dice button — anchored right of the header row, square (headerH × headerH).
+    const int diceW = headerH;
+    diceBtn.setBounds(w - diceW, 0, diceW, headerH);
+
     // ── LFO / Step editor ──────────────────────────────────────────────────────
-    lfoEditor .setBounds(0, kHeaderH, w, kEditorH);
-    stepEditor.setBounds(0, kHeaderH, w, kEditorH);
+    lfoEditor .setBounds(0, headerH, w, editorH);
+    stepEditor.setBounds(0, headerH, w, editorH);
 
     // ── Assignment rows viewport ───────────────────────────────────────────────
-    const int editorBottom = kHeaderH + kEditorH + 4;
-    const int viewH = juce::jmax(0, h - editorBottom - kPagerH - kAddBtnH - 4);
+    const int editorBottom = headerH + editorH + gap4;
+    const int viewH = juce::jmax(0, h - editorBottom - pagerH - addBtnH - gap4);
     rowsViewport.setBounds(0, editorBottom, w, viewH);
 
-    const int contentH = juce::jmax(viewH, (int)rows.size() * (kRowH + 2));
+    const int contentH = juce::jmax(viewH, (int)rows.size() * (rowH + gap2));
     rowsBox.setSize(w, contentH);
     int ry = 0;
-    for (auto& row : rows) { row->setBounds(0, ry, w, kRowH); ry += kRowH + 2; }
+    for (auto& row : rows) { row->setBounds(0, ry, w, rowH); ry += rowH + gap2; }
 
     // ── Pager row ─────────────────────────────────────────────────────────────
-    const int pagerY = editorBottom + viewH + 2;
-    const int btnW   = 20;
-    rowPrevBtn  .setBounds(0,          pagerY, btnW, kPagerH);
-    rowPageLabel.setBounds(btnW + 2,   pagerY, w - btnW * 2 - 4, kPagerH);
-    rowNextBtn  .setBounds(w - btnW,   pagerY, btnW, kPagerH);
+    const int pagerY = editorBottom + viewH + gap2;
+    const int btnW   = s(20);
+    rowPrevBtn  .setBounds(0,          pagerY, btnW, pagerH);
+    rowPageLabel.setBounds(btnW + gap2,   pagerY, w - btnW * 2 - gap4, pagerH);
+    rowNextBtn  .setBounds(w - btnW,   pagerY, btnW, pagerH);
 
     // ── Add button ─────────────────────────────────────────────────────────────
-    addBtn.setBounds(0, h - kAddBtnH, w, kAddBtnH);
+    addBtn.setBounds(0, h - addBtnH, w, addBtnH);
 
     updateRowPager();
 }
 
 void ModulatorEditor::paint(juce::Graphics& g)
 {
+    using mu_ui::s;
+    using mu_ui::sf;
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
     g.fillAll();
 
+    const int headerH = s(kHeaderH);
+    const float dotSize = sf(8.0f);
+
     // Header: colour dot + modulator name
-    const float dotY = (kHeaderH - 8) * 0.5f;
+    const float dotY = (headerH - dotSize) * 0.5f;
     g.setColour(modColour);
-    g.fillEllipse(8.0f, dotY, 8.0f, 8.0f);
+    g.fillEllipse(sf(8.0f), dotY, dotSize, dotSize);
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
     g.drawText("Mod " + juce::String::charToString(char('A' + modIndex)),
-               20, 0, 54, kHeaderH, juce::Justification::centredLeft, false);
+               s(20), 0, s(54), headerH, juce::Justification::centredLeft, false);
 
     // Step count drawn at far right of header row (Stepped mode only)
     if (cs && cs->mode == ControlSequence::Mode::Stepped)
     {
         g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
         g.drawText(juce::String(cs->getStepCount()) + " steps",
-                   getWidth() - 58, 0, 56, kHeaderH,
+                   getWidth() - s(58), 0, s(56), headerH,
                    juce::Justification::centredRight, false);
     }
 }

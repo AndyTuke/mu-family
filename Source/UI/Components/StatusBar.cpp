@@ -17,22 +17,25 @@ void StatusBar::showParam(const juce::String& paramName,
 void StatusBar::paint(juce::Graphics& g)
 {
     using Id = MuClidLookAndFeel::ColourIds;
+    using mu_ui::s;
+    using mu_ui::sf;
 
     g.setColour(MuClidLookAndFeel::colour(Id::statusBarBackground));
     g.fillAll();
 
     const int h = getHeight();
-    int textX = 8;
+    int textX = s(8);
+    const int tagW = s(kTagWidth);
 
     // Rhythm colour tag
     if (tagColour.getAlpha() > 0)
     {
         g.setColour(tagColour);
-        g.fillRect(0, 0, kTagWidth, h);
-        textX += kTagWidth + 4;
+        g.fillRect(0, 0, tagW, h);
+        textX += tagW + s(4);
     }
 
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
 
     // Param name
     g.setColour(MuClidLookAndFeel::colour(Id::statusBarText));

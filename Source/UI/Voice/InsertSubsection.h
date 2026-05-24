@@ -1,12 +1,19 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <string_view>
+#include <unordered_map>
 #include "../Components/KnobWithLabel.h"
 #include "../Components/DropdownSelect.h"
 #include "../Components/MuClidLookAndFeel.h"
-#include "../InsertAlgoDefaults.h"
+#include "Audio/InsertSlotConfig.h"
 
+namespace juce { class RangedAudioParameter; }
 class PluginProcessor;
 
+// Per-rhythm insert effect panel. Stage 36: a single 4-slot generic config
+// (Param1..Param4) replaces the prior 9 named fields. The 14 algorithms each
+// label and range their slots through mu_ui::kInsertAlgoSlots — adding a new
+// algorithm is one row in that table + one InsertProcessor dispatch entry.
 class InsertSubsection : public juce::Component
 {
 public:
@@ -28,17 +35,24 @@ private:
     PluginProcessor& proc;
     int rhythmIndex = -1;
 
-    using InsertAlgoSnapshot = InsertAlgoDefaults;
-    InsertAlgoSnapshot insertSnapshots[14];
-    bool               insertSnapshotValid[11] = {};
+    // A/B-style per-algorithm snapshot: when the user switches algos we save
+    // the current 4 slot values so cycling back restores them instead of
+    // reverting to mu_ui::kInsertAlgoDefaults. Stored as ACTUAL values so the
+    // restore path can re-normalise via actualToNorm into APVTS.
+    float insertSnapshots     [14][mu_ui::kInsertSlotCount] = {{0.0f}};
+    bool  insertSnapshotValid [14] = {};
 
     DropdownSelect insertAlgo;
-    KnobWithLabel  insertDrive  { "Drive",  Id::knobInsertPad };
-    KnobWithLabel  insertOutput { "Output", Id::knobInsertPad };
-    KnobWithLabel  insertDither { "Dither", Id::knobInsertPad };
-    KnobWithLabel  insertTone   { "LPF",    Id::knobInsertPad };
+    // 4 generic Param knobs. Labels / ranges / formatters are driven each
+    // algo switch by mu_ui::configureKnobFromSlot — no hard-coded labels here.
+    KnobWithLabel  insertParam1 { "P1", Id::knobInsertPad };
+    KnobWithLabel  insertParam2 { "P2", Id::knobInsertPad };
+    KnobWithLabel  insertParam3 { "P3", Id::knobInsertPad };
+    KnobWithLabel  insertParam4 { "P4", Id::knobInsertPad };
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();
     void configureInsertAlgorithm(int charId);
+
+    std::unordered_map<std::string_view, juce::RangedAudioParameter*> paramPtrCache;
 };

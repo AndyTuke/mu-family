@@ -6,7 +6,7 @@
 #include "Components/GRMeter.h"
 #include "Components/MuClidLookAndFeel.h"
 #include "../Audio/MixerEngine.h"
-#include "InsertAlgoDefaults.h"
+#include "Audio/InsertSlotConfig.h"
 
 class PluginProcessor;
 
@@ -96,27 +96,28 @@ private:
     KnobWithLabel     scAttack  { "/",   Id::knobFxSend };
     KnobWithLabel     scRelease { "\\",  Id::knobFxSend };
 
-    // Per-algorithm state snapshots for master inserts — enables A/B-ing between algorithms.
-    // Indexed by driveChar (0..13); snapshotValid[i] is false until first visit.
-    // struct + default table lifted to shared InsertAlgoDefaults.h.
-    using InsertAlgoSnapshot = InsertAlgoDefaults;
-    InsertAlgoSnapshot insertSnapshots[14];
-    bool               insertSnapshotValid[14] = {};
-    InsertAlgoSnapshot insertSnapshots2[14];
-    bool               insertSnapshotValid2[14] = {};
+    // Per-algorithm slot snapshots for master inserts — A/B-style: cycling
+    // back to a previously-edited algo restores its slot values. Stored as
+    // ACTUAL (denormalised) per slot so the restore path normalises back via
+    // mu_ui::actualToNorm. 4 slots per algo, 14 algos, 2 master slots.
+    float insertSnapshots     [14][4] = {{0.0f}};
+    bool  insertSnapshotValid [14]    = {};
+    float insertSnapshots2    [14][4] = {{0.0f}};
+    bool  insertSnapshotValid2[14]    = {};
 
-    // Insert controls (Master channel only) — two slots stacked vertically.
-    // insExtra / insExtra2 only visible in EQ mode.
+    // Master insert: 4 generic Param knobs per slot. Labels / ranges /
+    // formatters are driven each algo switch by mu_ui::configureKnobFromSlot.
     juce::ComboBox    insCharBox;
-    KnobWithLabel     insDrive  { "Drive",  Id::knobInsertPad };
-    KnobWithLabel     insOutput { "Output", Id::knobInsertPad };
-    KnobWithLabel     insTone   { "Tone",   Id::knobInsertPad };
-    KnobWithLabel     insExtra  { "Mid Hz", Id::knobInsertPad };
+    KnobWithLabel     insParam1  { "P1", Id::knobInsertPad };
+    KnobWithLabel     insParam2  { "P2", Id::knobInsertPad };
+    KnobWithLabel     insParam3  { "P3", Id::knobInsertPad };
+    KnobWithLabel     insParam4  { "P4", Id::knobInsertPad };
 
     juce::ComboBox    insCharBox2;
-    KnobWithLabel     insDrive2  { "Drive",  Id::knobInsertPad };
-    KnobWithLabel     insOutput2 { "Output", Id::knobInsertPad };
-    KnobWithLabel     insTone2   { "Tone",   Id::knobInsertPad };
+    KnobWithLabel     insParam1_2 { "P1", Id::knobInsertPad };
+    KnobWithLabel     insParam2_2 { "P2", Id::knobInsertPad };
+    KnobWithLabel     insParam3_2 { "P3", Id::knobInsertPad };
+    KnobWithLabel     insParam4_2 { "P4", Id::knobInsertPad };
     KnobWithLabel     insExtra2  { "Mid Hz", Id::knobInsertPad };
 
     // Configure knob labels/ranges/callbacks for the selected algorithm on one insert slot.
@@ -141,8 +142,13 @@ private:
 
     void updateDbLabel(float level);
 
-    static constexpr int kColourBarH = 3;
-    static constexpr int kNameH      = 22;
+    // Padding around the rhythm-name pill — used as the inset on all four
+    // sides of the kNameH-tall name area, so the rhythm-colour border has
+    // breathing room from the strip's outer edges and from the section below.
+    // Single source of truth — adjust here to change the spacing for every
+    // channel strip in lockstep.
+    static constexpr int kNamePadding = 4;
+    static constexpr int kNameH       = 22;
     static constexpr int kOutBusH    = 18;   // Out dropdown row (Rhythm channels only)
     static constexpr int kDbH        = 14;
     static constexpr int kButtonH    = 22;

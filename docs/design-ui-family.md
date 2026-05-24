@@ -13,7 +13,7 @@ This document is the authoritative reference for the visual and interaction lang
 | **No tooltips** | All feedback goes through the StatusBar — one consistent interaction model |
 | **Full words everywhere** | No label abbreviations. "Attack" not "ATK", "Frequency" not "Freq" |
 | **Controls are consistent** | Use the shared component library. Never build a one-off version of a standard control |
-| **Resizable within limits** | Every layout uses proportional arithmetic — no hardcoded pixel counts in drawing code |
+| **Fixed-PX baseline** | Every layout dimension is a named Medium constant in `MuLookAndFeel.h` wrapped in `mu_ui::s()` at the call site. The global `mu_ui::scale` (default 1.0) is the single Small/Medium/Large switch — no per-component responsive math. The plugin window itself is non-resizable; size variants arrive as scale-factor presets, not user-draggable corners. |
 
 ---
 

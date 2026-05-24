@@ -53,14 +53,15 @@ ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex,
 
 void ModMatrixPanel::MatrixRow::resized()
 {
+    using mu_ui::s;
     const int w = getWidth(), h = getHeight();
-    const int removeW = 22, srcW = 46;
-    const int pairW = BipolarSliderRow::kDepthWidth + 2 + BipolarSliderRow::kCurveWidth;
-    const int destW = w - srcW - pairW - removeW - 8;
+    const int removeW = s(22), srcW = s(46);
+    const int pairW = s(BipolarSliderRow::kDepthWidth) + s(2) + s(BipolarSliderRow::kCurveWidth);
+    const int destW = w - srcW - pairW - removeW - s(8);
     sourceLabel.setBounds(0,                                          0, srcW,  h);
-    destCombo  .setBounds(srcW + 2,                                   0, destW, h);
-    bipolarPair.setBounds(srcW + 2 + destW + 2,                       0, pairW, h);
-    removeBtn  .setBounds(w - removeW, (h - 18) / 2, removeW, 18);
+    destCombo  .setBounds(srcW + s(2),                                   0, destW, h);
+    bipolarPair.setBounds(srcW + s(2) + destW + s(2),                       0, pairW, h);
+    removeBtn  .setBounds(w - removeW, (h - s(18)) / 2, removeW, s(18));
 }
 
 //==============================================================================
@@ -243,50 +244,61 @@ void ModMatrixPanel::rebuildRows()
 
 void ModMatrixPanel::resized()
 {
+    using mu_ui::s;
     const int w   = getWidth();
     const int h   = getHeight();
     const int rpp = rowsPerPage();
+    const int headerH = s(kHeaderH);
+    const int pagerH  = s(kPagerH);
+    const int rowH    = s(kRowH);
+    const int addBtnH = s(kAddBtnH);
 
     // Pager row sits just below the header
-    const int pagerY = kHeaderH;
-    const int btnW   = 20;
-    matPrevBtn .setBounds(w - btnW * 2 - 4, pagerY, btnW, kPagerH);
-    matNextBtn .setBounds(w - btnW,          pagerY, btnW, kPagerH);
-    matPageLabel.setBounds(w - 120,          pagerY, 120 - btnW * 2 - 6, kPagerH);
+    const int pagerY = headerH;
+    const int btnW   = s(20);
+    const int labelW = s(120);
+    matPrevBtn .setBounds(w - btnW * 2 - s(4), pagerY, btnW, pagerH);
+    matNextBtn .setBounds(w - btnW,            pagerY, btnW, pagerH);
+    matPageLabel.setBounds(w - labelW,         pagerY, labelW - btnW * 2 - s(6), pagerH);
 
     // Rows: show only current page
-    const int rowsStart = kHeaderH + kPagerH + 2;
+    const int rowsStart = headerH + pagerH + s(2);
     const int startIdx  = matPage * rpp;
     int y = rowsStart;
     for (int i = 0; i < (int)matrixRows.size(); ++i)
     {
         const bool vis = (i >= startIdx && i < startIdx + rpp);
         matrixRows[i]->setVisible(vis);
-        if (vis) { matrixRows[i]->setBounds(0, y, w, kRowH); y += kRowH + 2; }
+        if (vis) { matrixRows[i]->setBounds(0, y, w, rowH); y += rowH + s(2); }
     }
 
     // Empty-state hint text lands at rowsStart + 8, add button at bottom
-    addBtn.setBounds(0, h - kAddBtnH, w, kAddBtnH);
+    addBtn.setBounds(0, h - addBtnH, w, addBtnH);
 }
 
 void ModMatrixPanel::paint(juce::Graphics& g)
 {
+    using mu_ui::s;
+    using mu_ui::sf;
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
     g.fillAll();
 
+    const int headerH = s(kHeaderH);
+    const int pagerH  = s(kPagerH);
+
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
-    g.drawText("SOURCE",      0,   0, 46,  kHeaderH, juce::Justification::centredLeft, false);
-    g.drawText("DESTINATION", 48,  0, 200, kHeaderH, juce::Justification::centredLeft, false);
-    g.drawText("DEPTH",       getWidth() - 22 - 120 - 4, 0, 120,
-               kHeaderH, juce::Justification::centredLeft, false);
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));
+    g.drawText("SOURCE",      0,    0, s(46),  headerH, juce::Justification::centredLeft, false);
+    g.drawText("DESTINATION", s(48),0, s(200), headerH, juce::Justification::centredLeft, false);
+    g.drawText("DEPTH",       getWidth() - s(22) - s(120) - s(4), 0, s(120),
+               headerH, juce::Justification::centredLeft, false);
 
     if (matrixRows.empty())
     {
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-        // rowsStart = kHeaderH + kPagerH + 2; draw hint below that with enough clearance
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
+        // rowsStart = headerH + pagerH + 2; draw hint below that with enough clearance
         g.drawText(juce::String::fromUTF8("No assignments \xe2\x80\x94 use the Mod tabs or Add Assignment below"),
-                   0, kHeaderH + kPagerH + 8, getWidth(), 20,
+                   0, headerH + pagerH + s(8), getWidth(), s(20),
                    juce::Justification::centred, false);
     }
 }

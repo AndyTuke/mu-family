@@ -136,6 +136,9 @@ public:
     void paint(juce::Graphics& g) override;
 
 private:
+    // Dice handler — randomise current modulator's values, leave structure.
+    void randomiseValues();
+
     ControlSequence*   cs       = nullptr;
     ModulationMatrix*  matrix   = nullptr;
     std::atomic<bool>* rhythmModLock = nullptr;
@@ -159,6 +162,11 @@ private:
     DropdownSelect stepDropdown;
     juce::Label    stepLabel;
     NudgeInput     stepMult { juce::String::fromUTF8("\xc3\x97"), 1, 16, 1 };
+    // Randomises the active modulator's values without touching its shape
+    // (mode / polarity / loop+step timing / point or step count). Stepped
+    // mode → fresh value per `stepValues[]` entry; Smooth mode → fresh y
+    // per `curvePoints[]` entry (x positions and bezier handles preserved).
+    juce::TextButton diceBtn { juce::String::fromUTF8("\xe2\x9a\x80") };  // ⚀
 
     struct AssignmentRow : public juce::Component
     {

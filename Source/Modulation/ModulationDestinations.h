@@ -43,12 +43,24 @@ namespace ModDest
         // ── Pitch (idx 9) ─────────────────────────────────────────────────────
         { "pitch.semitones",  "Pitch Semitones"    },
         // ── Insert (idx 10–15) ────────────────────────────────────────────────
-        { "insert.drive",     "Insert Drive"       },
-        { "insert.output",    "Insert Output"      },
-        { "insert.bits",      "Insert Bits"        },
-        { "insert.rate",      "Insert Rate"        },
-        { "insert.dither",    "Insert Dither"      },
-        { "insert.lpf",       "Insert LPF"         },
+        // Stage 36: 4 generic Param slots (normalised 0..1) replace the prior
+        // 6 semantically-named insert destinations. The same destination ID
+        // (`insert.p1`) means "knob 1 of the active insert algorithm" —
+        // semantics shift with the algorithm but the modulation routing is
+        // stable. Old IDs (insert.drive / .bits / .rate / .dither / .lpf /
+        // .output) become invalid; the preset loader maps them per-algo to
+        // the new slots on v2 → v3 migration.
+        { "insert.p1",        "Insert P1"          },
+        { "insert.p2",        "Insert P2"          },
+        { "insert.p3",        "Insert P3"          },
+        { "insert.p4",        "Insert P4"          },
+        // Two reserved slots to keep downstream kTable indices stable across
+        // the v2 → v3 migration (UI dropdown IDs are 1-based table indices,
+        // and existing test indices reference this layout). Picked invalid
+        // names so legacy preset modulation assignments to insert.dither etc.
+        // are rejected by isValidDestinationId() (caller then drops them).
+        { "_reserved.insert.5", "(reserved)"       },
+        { "_reserved.insert.6", "(reserved)"       },
         // ── Euclid A/B pattern (idx 16–19) ────────────────────────────────────
         { "euclid.a.hits",    "Euclid A Hits"      },
         { "euclid.a.rotate",  "Euclid A Rotate"    },
@@ -84,14 +96,16 @@ namespace ModDest
         { "euclid.c.postPad", "Euclid C Post Pad"      },
         { "euclid.c.insSt",   "Euclid C Insert Start"  },
         { "euclid.c.insLen",  "Euclid C Insert Length" },
-        // ── Algorithm-specific insert destinations (idx 39–43) ────────────────
-        // (Karplus): idx 39, 40
-        // (Vocoder): idx 41, 42, 43
-        { "ks.note",          "Karplus Note"           },
-        { "ks.octave",        "Karplus Octave"         },
-        { "voc.note",         "Vocoder Note"           },
-        { "voc.octave",       "Vocoder Octave"         },
-        { "voc.unison",       "Vocoder Unison"         },
+        // ── (Reserved) Stage 36 retired ks.* / voc.* destinations ─────────────
+        // Karplus and Vocoder now share the generic insert.p1..p4 destinations
+        // since each algorithm's slots have their own clean per-algo range
+        // (no more "Karplus Octave packed into insertBits" overload). Legacy
+        // assignments are mapped to the new slots in v2 → v3 preset migration.
+        { "_reserved.ks.note",   "(reserved)"  },
+        { "_reserved.ks.octave", "(reserved)"  },
+        { "_reserved.voc.note",  "(reserved)"  },
+        { "_reserved.voc.octave","(reserved)"  },
+        { "_reserved.voc.unison","(reserved)"  },
     };
     static constexpr int kTableSize = (int)(sizeof(kTable) / sizeof(kTable[0]));
 

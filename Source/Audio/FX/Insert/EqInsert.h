@@ -44,10 +44,12 @@ public:
                  const VoiceParams& p, float& /*grOut*/) override
     {
         const float sr      = static_cast<float>(currentSampleRate);
-        const float lowDb   = p.insertDrive  / 100.0f * 36.0f - 18.0f;
-        const float highDb  = p.insertDither / 100.0f * 36.0f - 18.0f;
-        const float midDb   = p.insertEqMid;
-        const float midFreq = juce::jlimit(20.0f, 20000.0f, p.insertTone);
+        // Slot 0 = Low ±18 dB, Slot 1 = Mid ±18 dB,
+        // Slot 2 = Mid Hz 200..8000 (log), Slot 3 = High ±18 dB.
+        const float lowDb   = insertSlot(p, 0);
+        const float midDb   = insertSlot(p, 1);
+        const float midFreq = juce::jlimit(20.0f, 20000.0f, insertSlot(p, 2));
+        const float highDb  = insertSlot(p, 3);
 
         // Push the latest target coefficients into each band. On the first
         // block after prepare/reset, snap to the targets instantly so the

@@ -54,14 +54,12 @@ TransportBar::TransportBar(PluginProcessor& p)
 
     loopStepLabel.setJustificationType(juce::Justification::centredLeft);
     loopStepLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-    // Sync initial visibility with the current loop param.
-    {
-        const int paramVal = (int)proc.apvts.getRawParameterValue("mstrLoop")->load();
-        loopStepLabel.setVisible(paramVal > 0);
-        if (paramVal > 0)
-            loopDropdown.setSelectedId(paramVal + 1, false);
-    }
+    syncLoopDropdownFromAPVTS();
     addAndMakeVisible(loopStepLabel);
+
+    // Catch host automation of mstrLoop so the dropdown / step label stay in
+    // sync with the DAW state. parameterChanged marshals to the message thread.
+    proc.apvts.addParameterListener("mstrLoop", this);
 
 #if !MUCLID_LITE_BUILD
     presetDropdown.setPlaceholderText("<unnamed preset>");
@@ -102,7 +100,29 @@ TransportBar::TransportBar(PluginProcessor& p)
 
 TransportBar::~TransportBar()
 {
+    proc.apvts.removeParameterListener("mstrLoop", this);
     stopTimer();
+}
+
+void TransportBar::syncLoopDropdownFromAPVTS()
+{
+    const int paramVal = (int) proc.apvts.getRawParameterValue("mstrLoop")->load();
+    loopStepLabel.setVisible(paramVal > 0);
+    loopDropdown.setSelectedId(paramVal + 1, false);
+}
+
+void TransportBar::parameterChanged(const juce::String& parameterID, float /*newValue*/)
+{
+    if (parameterID != "mstrLoop") return;
+
+    // host automation can fire on the audio thread; juce::Slider / DropdownSelect
+    // state isn't safe to mutate off the message thread.
+    juce::Component::SafePointer<TransportBar> safe(this);
+    auto refresh = [safe] { if (auto* self = safe.getComponent()) self->syncLoopDropdownFromAPVTS(); };
+    if (juce::MessageManager::getInstance()->isThisTheMessageThread())
+        refresh();
+    else
+        juce::MessageManager::callAsync(std::move(refresh));
 }
 
 void TransportBar::timerCallback()
@@ -307,7 +327,7 @@ void TransportBar::setSaveEnabled(bool enabled)
 
 void TransportBar::mouseDown(const juce::MouseEvent& e)
 {
-    if (e.x < kLogoW && onLogoClicked)
+    if (e.x < mu_ui::s(kLogoW) && onLogoClicked)
         onLogoClicked();
 }
 
@@ -322,78 +342,81 @@ void TransportBar::paint(juce::Graphics& g)
     const juce::Colour borderCol = MuClidLookAndFeel::colour(Id::segmentInactiveBorder);
     g.setColour(borderCol);
     if (!transportPaneBounds.isEmpty())
-        g.drawRoundedRectangle(transportPaneBounds.toFloat(), 3.0f, 1.0f);
+        g.drawRoundedRectangle(transportPaneBounds.toFloat(), mu_ui::sf(3.0f), 1.0f);
     if (!loopPaneBounds.isEmpty())
-        g.drawRoundedRectangle(loopPaneBounds.toFloat(), 3.0f, 1.0f);
+        g.drawRoundedRectangle(loopPaneBounds.toFloat(), mu_ui::sf(3.0f), 1.0f);
 
     g.setColour(MuClidLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(14.0f)));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(14.0f))));
     g.drawText(juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid")),
-               8, 0, kLogoW - 8, getHeight(),
+               mu_ui::s(8), 0, mu_ui::s(kLogoW - 8), getHeight(),
                juce::Justification::centredLeft, false);
 }
 
 void TransportBar::resized()
 {
+    using mu_ui::s;
     const int h      = getHeight();
-    const int inset  = 2;   // pane border vertical inset
-    const int pad    = 3;   // item vertical padding within pane
+    const int inset  = s(2);   // pane border vertical inset
+    const int pad    = s(3);   // item vertical padding within pane
     const int itemY  = pad;
     const int itemH  = h - 2 * pad;
-    const int posH   = 14;  // position label height (text only)
+    const int posH   = s(14);  // position label height (text only)
     const int posY   = (h - posH) / 2;
     const int btnH   = itemH;
     const int btnY   = itemY;
+    const int gap    = s(kGap);
+    const int padIn  = s(5);   // inner pane padding
 
     // ── Transport sub-pane: [play] [bpm] [pos] ────────────────────────────
-    const int tpOuterX = kLogoW + kGap;
-    int x = tpOuterX + 5;   // 5 px inner left padding
+    const int tpOuterX = s(kLogoW) + gap;
+    int x = tpOuterX + padIn;
 
-    playBtn.setBounds(x, btnY, kPlayW, btnH);
-    x += kPlayW + kGap;
+    playBtn.setBounds(x, btnY, s(kPlayW), btnH);
+    x += s(kPlayW) + gap;
 
     if (isStandalone)
     {
-        bpmInput.setBounds(x, itemY, kBpmW, itemH);
-        x += kBpmW + kGap;
+        bpmInput.setBounds(x, itemY, s(kBpmW), itemH);
+        x += s(kBpmW) + gap;
     }
 
-    posLabel.setBounds(x, posY, kPosW, posH);
-    x += kPosW + 5;   // 5 px inner right padding
+    posLabel.setBounds(x, posY, s(kPosW), posH);
+    x += s(kPosW) + padIn;
 
     transportPaneBounds = { tpOuterX, inset, x - tpOuterX, h - 2 * inset };
 
     // ── Loop sub-pane: [Loop:] [dropdown] [step counter] ──────────────────
-    const int lpOuterX = transportPaneBounds.getRight() + kGap;
-    x = lpOuterX + 5;  // 5 px inner left padding
+    const int lpOuterX = transportPaneBounds.getRight() + gap;
+    x = lpOuterX + padIn;
 
-    loopLabel.setBounds(x, btnY, kLoopLabelW, btnH);
-    x += kLoopLabelW + 2;
-    loopDropdown.setBounds(x, btnY, kLoopW, btnH);
-    x += kLoopW + 2;
-    loopStepLabel.setBounds(x, btnY, kLoopStepW, btnH);
-    x += kLoopStepW + 5;  // 5 px inner right padding
+    loopLabel.setBounds(x, btnY, s(kLoopLabelW), btnH);
+    x += s(kLoopLabelW) + s(2);
+    loopDropdown.setBounds(x, btnY, s(kLoopW), btnH);
+    x += s(kLoopW) + s(2);
+    loopStepLabel.setBounds(x, btnY, s(kLoopStepW), btnH);
+    x += s(kLoopStepW) + padIn;
 
     loopPaneBounds = { lpOuterX, inset, x - lpOuterX, h - 2 * inset };
 
     // ── Right group (right to left): Mixer | Gear | Save | Preset ─────────
 #if MUCLID_LITE_BUILD
-    gearBtn.setBounds(getWidth() - kGap - kGearW, btnY, kGearW, btnH);
+    gearBtn.setBounds(getWidth() - gap - s(kGearW), btnY, s(kGearW), btnH);
 #else
-    int rightEdge = getWidth() - kGap;
-    mixerBtn.setBounds(rightEdge - kMixerW, btnY, kMixerW, btnH);
-    rightEdge -= kMixerW + kGap;
+    int rightEdge = getWidth() - gap;
+    mixerBtn.setBounds(rightEdge - s(kMixerW), btnY, s(kMixerW), btnH);
+    rightEdge -= s(kMixerW) + gap;
 
-    gearBtn.setBounds(rightEdge - kGearW, btnY, kGearW, btnH);
-    rightEdge -= kGearW + kGap;
+    gearBtn.setBounds(rightEdge - s(kGearW), btnY, s(kGearW), btnH);
+    rightEdge -= s(kGearW) + gap;
 
-    saveBtn.setBounds(rightEdge - kSaveW, btnY, kSaveW, btnH);
-    rightEdge -= kSaveW + kGap;
+    saveBtn.setBounds(rightEdge - s(kSaveW), btnY, s(kSaveW), btnH);
+    rightEdge -= s(kSaveW) + gap;
 
-    newBtn.setBounds(rightEdge - kNewW, btnY, kNewW, btnH);
-    rightEdge -= kNewW + kGap;
+    newBtn.setBounds(rightEdge - s(kNewW), btnY, s(kNewW), btnH);
+    rightEdge -= s(kNewW) + gap;
 
-    const int presetLeft = loopPaneBounds.getRight() + kGap;
+    const int presetLeft = loopPaneBounds.getRight() + gap;
     presetDropdown.setBounds(presetLeft, btnY, rightEdge - presetLeft, btnH);
 #endif
 }

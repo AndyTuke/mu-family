@@ -2,6 +2,16 @@
 
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "Audio/VoiceParams.h"
+#include "Audio/InsertSlotConfig.h"
+
+// Shorthand: read the algorithm's actual (de-normalised + skewed) slot value
+// from the generic insertParam[N] storage. Equivalent to
+//   mu_ui::normToActual(p.insertParam[slot], p.insertAlgo, slot)
+// but reads naturally inside each algorithm's process() body.
+inline float insertSlot(const VoiceParams& p, int slot) noexcept
+{
+    return mu_ui::normToActual(p.insertParam[slot], p.insertAlgo, slot);
+}
 
 // abstract base for per-voice insert effect algorithms. Mirrors the
 // FX-rack pattern in Source/Audio/Processing/SendFX/EffectAlgorithmBase.h but

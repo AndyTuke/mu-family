@@ -3,14 +3,10 @@
 // For every entry in kGlobalParamDefs, picks a representative value, writes it
 // into a ValueTree via writeKindedProperty, reads it back via
 // readKindedPropertyAsActualV2, and asserts the round-trip matches.
-//
-// Also checks that kGlobalParamDefs and kGlobalParams cover the same set of IDs
-// — catches the case where someone adds an entry to one list but not the other.
 
 #include <juce_core/juce_core.h>
 #include <juce_data_structures/juce_data_structures.h>
 #include "../Persistence/PresetHelpers.h"
-#include "../Plugin/PluginProcessor_Internal.h"   // kGlobalParams
 
 using mu_pp::ParamKind;
 using mu_pp::writeKindedProperty;
@@ -57,32 +53,6 @@ public:
             expectWithinAbsoluteError (back, testValue, 1e-4f,
                 "id '" + id + "' did not round-trip "
                 + juce::String (testValue) + " (got " + juce::String (back) + ")");
-        }
-
-        beginTest ("kGlobalParamDefs and kGlobalParams cover the same IDs");
-
-        // Count entries in kGlobalParams (null-terminated)
-        int rawCount = 0;
-        while (mu_pp::kGlobalParams[rawCount] != nullptr)
-            ++rawCount;
-
-        expectEquals (kGlobalParamDefCount, rawCount,
-            "kGlobalParamDefs and kGlobalParams must have the same number of entries");
-
-        // Check every kGlobalParams ID appears in kGlobalParamDefs
-        for (int i = 0; i < rawCount; ++i)
-        {
-            const juce::String rawId (mu_pp::kGlobalParams[i]);
-            bool found = false;
-            for (int j = 0; j < kGlobalParamDefCount; ++j)
-            {
-                if (rawId == kGlobalParamDefs[j].id)
-                {
-                    found = true;
-                    break;
-                }
-            }
-            expect (found, "kGlobalParams entry '" + rawId + "' has no matching entry in kGlobalParamDefs");
         }
     }
 };

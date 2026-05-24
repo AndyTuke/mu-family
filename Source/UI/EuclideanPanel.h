@@ -1,9 +1,12 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <string_view>
+#include <unordered_map>
 #include "Components/KnobWithLabel.h"
 #include "Components/SegmentControl.h"
 #include "Components/MuClidLookAndFeel.h"
 
+namespace juce { class RangedAudioParameter; }
 class PluginProcessor;
 
 // Euclidean controls for one rhythm.
@@ -60,7 +63,10 @@ private:
     SegmentControl legatoCtrl { {"Trig","Leg"},
                                 SegmentControl::ActiveStyle::General,
                                 SegmentControl::DrawStyle::Pills };
-    SegmentControl logicCtrl { {"OR","AND","XOR","A","B"},
+    SegmentControl monoCtrl  { {"Poly","Mono"},
+                                SegmentControl::ActiveStyle::Warning,
+                                SegmentControl::DrawStyle::Pills };
+    SegmentControl logicCtrl { {"OR","AND","XOR","A not B","B not A"},
                                SegmentControl::ActiveStyle::General,
                                SegmentControl::DrawStyle::Pills };
 
@@ -95,11 +101,19 @@ private:
     // logic-row split — Legato pills (left) | gap | Logic pills (right).
     static constexpr int kLogicMP    = 4;    // matches the local `mP` used in placeRow
     static constexpr int kLegatoW    = 84;   // ~42 px per pill, two pills
-    static constexpr int kLogicGapW  = 8;    // sub-panel divider between Legato and Logic
+    static constexpr int kMonoW      = 84;   // ~42 px per pill, two pills (Poly/Mono)
+    static constexpr int kLogicGapW  = 8;    // sub-panel divider between groups
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();
     void updateRangesA(int steps);
     void updateRangesB(int steps);
     void updateRangesC(int steps);
+
+    // Lazily populated cache of "r{N}_{suffix}" → APVTS parameter pointer,
+    // keyed by `const char*` suffix (literal storage outlives the panel).
+    // Cleared in setRhythm() because the parameter ID depends on rhythmIndex.
+    // Eliminates the juce::String concat + APVTS hash lookup on every drag
+    // tick of every knob — saw ~50-200ns per tick × 60 Hz × N visible knobs.
+    std::unordered_map<std::string_view, juce::RangedAudioParameter*> paramPtrCache;
 };

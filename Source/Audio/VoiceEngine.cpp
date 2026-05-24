@@ -21,9 +21,12 @@ void VoiceEngine::prepareToPlay(double sampleRate, int blockSize)
     }
 
     tempBuffer.setSize(2, blockSize, false, true, false);
+    for (auto& vb : voiceBuffers)
+        vb.setSize(2, blockSize, false, true, false);
     insertProc.prepare(sampleRate, blockSize);
 
-    ampEnv.setSampleRate(sampleRate);
+    for (auto& env : ampEnvs)
+        env.setSampleRate(sampleRate);
     filterEnv.setSampleRate(sampleRate);
     pitchEnv.setSampleRate(sampleRate);
 
@@ -86,29 +89,49 @@ void VoiceEngine::trigger(bool isAccented, bool tied)
     static constexpr int kTiedFadeInSamples = 64;
     const int fadeIn = tied ? kTiedFadeInSamples : 0;
 
-    bool claimed = false;
-    for (auto& v : voices)
+    // Claim a voice slot. In poly mode (default): first inactive slot wins;
+    // if none, round-robin steal the oldest. In mono mode (voiceMono): every
+    // hit forces slot 0 — gives classic mono-synth retrigger behaviour where
+    // the previous voice is cut by the new attack.
+    int claimedIdx = 0;
+    if (activeParams.voiceMono)
     {
-        if (!v.isActive()) { v.trigger(fadeIn); claimed = true; break; }
+        voices[0].trigger(fadeIn);
     }
-    if (!claimed)
+    else
     {
-        voices[nextVoice].trigger(fadeIn);
-        nextVoice = (nextVoice + 1) % MaxVoices;
+        claimedIdx = -1;
+        for (int i = 0; i < MaxVoices; ++i)
+        {
+            if (!voices[(size_t) i].isActive()) { voices[(size_t) i].trigger(fadeIn); claimedIdx = i; break; }
+        }
+        if (claimedIdx < 0)
+        {
+            claimedIdx = nextVoice;
+            voices[(size_t) claimedIdx].trigger(fadeIn);
+            nextVoice = (nextVoice + 1) % MaxVoices;
+        }
     }
 
     // tied hits skip the envelope retrigger entirely — env state carries
     // through across contiguous pattern hits, so a long decay can finally
-    // breathe past the step length. The per-envelope #221 legato flags still
+    // breathe past the step length. The per-envelope legato flags still
     // apply on UNtied hits (i.e. when the user transitions from rest → hit, or
     // when patternLegato is disabled at the sequencer level).
     if (tied)
         return;
 
-    // Reset (default) clears envelope to zero before noteOn; Legato continues
-    // from the current level so rapid retriggers don't click on pad/melodic material.
-    if (!activeParams.ampEnvLegato)    ampEnv.reset();
+    // Per-voice amp envelope retrigger on the claimed slot only — slots still
+    // releasing from earlier hits keep their envelope state intact and play
+    // out independently. Reset (default) clears to zero before noteOn; Legato
+    // continues from the current level so rapid retriggers on the same slot
+    // don't click on pad/melodic material.
+    auto& ampEnv = ampEnvs[(size_t) claimedIdx];
+    if (!activeParams.ampEnvLegato) ampEnv.reset();
     ampEnv.noteOn();
+
+    // Filter / pitch envelopes are still monophonic (one envelope per engine,
+    // applied to the mixed signal / pitch ratio). Global retrigger as before.
     if (!activeParams.filterEnvLegato) filterEnv.reset();
     filterEnv.noteOn();
     if (!activeParams.pitchEnvLegato)  pitchEnv.reset();
@@ -155,21 +178,29 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     const int nCh = juce::jmin(output.getNumChannels(), tempBuffer.getNumChannels());
     tempBuffer.clear();
 
-    for (auto& v : voices)
-        v.process(buffer, pitchRatioBuffer.data(), tempBuffer, ns);
-
-    // always apply the amp envelope, regardless of ampRelToEnd. The prior
-    // gate skipped applyEnvelopeToBuffer entirely when ampRelToEnd was true,
-    // which made the user's sustain=0 + decay=4s setting produce no decay at all
-    // — the sample played at full level forever. ampRelToEnd's intent is "let
-    // the sample play through to its natural end instead of being cut by the
-    // RELEASE phase," not "bypass the envelope completely." Since this codebase
-    // never calls noteOff during normal play (drum-style triggers — env holds
-    // in Sustain), applying the env here only affects A/D/S. The release-to-
-    // end semantic is enforced in markRetired() instead: for ampRelToEnd, we
-    // skip the noteOff so the env stays at sustain level and the sample plays
-    // through unscaled (instead of fading via the release time).
-    ampEnv.applyEnvelopeToBuffer(tempBuffer, 0, ns);
+    // Per-voice render + envelope. Each sample slot renders into its own
+    // scratch buffer so its amp envelope (`ampEnvs[i]`) applies in isolation —
+    // a long release on slot 0 plays out untouched even when slot 1 attacks
+    // a new hit. Skip slots that are fully idle (no in-flight sample, no
+    // envelope tail) — saves the per-slot env-apply on unused voices. We
+    // always apply the envelope when active, regardless of ampRelToEnd:
+    // ampRelToEnd's intent is "let the sample play through to its natural end
+    // instead of being cut by the RELEASE phase," not "bypass the envelope
+    // completely." During normal play (no noteOff, env held in Sustain),
+    // applying the env only affects A/D/S. The release-to-end semantic is
+    // enforced in markRetired() instead — for ampRelToEnd, we skip the
+    // noteOff so the env stays at sustain level.
+    for (int vi = 0; vi < MaxVoices; ++vi)
+    {
+        if (! voices[(size_t) vi].isActive() && ! ampEnvs[(size_t) vi].isActive())
+            continue;
+        auto& vb = voiceBuffers[(size_t) vi];
+        vb.clear();
+        voices[(size_t) vi].process(buffer, pitchRatioBuffer.data(), vb, ns);
+        ampEnvs[(size_t) vi].applyEnvelopeToBuffer(vb, 0, ns);
+        for (int ch = 0; ch < nCh; ++ch)
+            tempBuffer.addFrom(ch, 0, vb, ch, 0, ns);
+    }
 
     // Filter envelope modulates cutoff (per-block approximation).
     float filterEnvVal = 0.0f;
@@ -209,17 +240,18 @@ void VoiceEngine::markRetired() noexcept
     // audio thread cannot be mid-process() on this engine, so direct state
     // mutation is safe.
 
-    // amp envelope noteOff is gated on ampRelToEnd.
-    //  - ampRelToEnd == false: noteOff so the env enters release; applyEnvelope-
-    //    ToBuffer (always called now, see process()) fades the sample over the
-    //    user's release time, then env reaches idle and the engine drains.
-    //  - ampRelToEnd == true: do NOT noteOff. Env stays at sustain level (or
-    //    wherever decay left it) and applyEnvelopeToBuffer keeps multiplying
-    //    by that level — sample plays through to its natural end at the
-    //    sustain-decided volume. isFullyDrained() handles the voices-only
-    //    drain criterion for this case.
+    // Per-voice amp envelope noteOff is gated on ampRelToEnd.
+    //  - ampRelToEnd == false: noteOff every voice so each env enters release;
+    //    applyEnvelopeToBuffer (always called when the slot is active, see
+    //    process()) fades each slot over the user's release time, then every
+    //    env reaches idle and the engine drains.
+    //  - ampRelToEnd == true: do NOT noteOff. Envs stay at whatever level
+    //    they reached and applyEnvelopeToBuffer keeps multiplying by that —
+    //    samples play through to their natural ends at the sustain-decided
+    //    volume. isFullyDrained() handles the voices-only drain criterion.
     if (!activeParams.ampRelToEnd)
-        ampEnv.noteOff();
+        for (auto& env : ampEnvs)
+            env.noteOff();
 
     // Filter / pitch envelopes don't have an ampRelToEnd-equivalent — they
     // always have a finite release. noteOff so they progress to idle; the
@@ -243,18 +275,26 @@ bool VoiceEngine::isFullyDrained() const noexcept
         if (v.isActive())
             return false;
 
-    // ampRelToEnd retired engines never get noteOff'd (env stays at
+    // ampRelToEnd retired engines never get noteOff'd (per-voice envs stay at
     // sustain level, sample plays through unscaled). isActive() therefore
     // never returns false for them. Voices-finished is the sole drain
     // criterion in that mode — at which point the engine produces silence
-    // regardless of where the env is.
+    // regardless of where the envs are.
     if (retired && activeParams.ampRelToEnd)
         return true;
 
-    // Standard mode: env idle (post-release) means the engine multiplies its
-    // sample by 0 → silent output, safe to destroy.
-    if (ampEnv.isActive())
-        return false;
+    // Standard mode: every per-voice envelope must be idle (post-release) for
+    // the engine to be drainable. Any one still active means it's still
+    // multiplying a (potentially silent) sample by something non-zero — but
+    // since the voices loop above already ensured no sample is rendering,
+    // the env tail produces silence and we COULD drain. However, JUCE ADSR
+    // can hit isActive()==true with non-zero internal level after a noteOff,
+    // and we don't want to destroy the engine while any env is mid-release
+    // since it indicates "still wants to be processed." Keep the original
+    // semantics: every per-voice env must report idle.
+    for (const auto& env : ampEnvs)
+        if (env.isActive())
+            return false;
 
     return true;
 }
@@ -305,10 +345,12 @@ void VoiceEngine::syncEnvelopes()
     // in those phases (division-by-zero on the per-sample decrement rate).
     // Sustain is amplitude, not time, so 0 is always legal there.
     constexpr float kMinDecayRelSec = 0.001f;
-    ampEnv.setParameters   ({ activeParams.ampEnvAtk,
-                              juce::jmax(kMinDecayRelSec, activeParams.ampEnvDec),
-                              activeParams.ampEnvSus,
-                              juce::jmax(kMinDecayRelSec, activeParams.ampEnvRel) });
+    const juce::ADSR::Parameters ampParams { activeParams.ampEnvAtk,
+                                             juce::jmax(kMinDecayRelSec, activeParams.ampEnvDec),
+                                             activeParams.ampEnvSus,
+                                             juce::jmax(kMinDecayRelSec, activeParams.ampEnvRel) };
+    for (auto& env : ampEnvs)
+        env.setParameters(ampParams);
     filterEnv.setParameters({ activeParams.filterEnvAtk,
                               juce::jmax(kMinDecayRelSec, activeParams.filterEnvDec),
                               activeParams.filterEnvSus,

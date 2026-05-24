@@ -5,7 +5,9 @@
 #include "Components/DropdownSelect.h"
 #include "Components/MuClidLookAndFeel.h"
 
-class TransportBar : public juce::Component, private juce::Timer
+class TransportBar : public juce::Component,
+                     public juce::AudioProcessorValueTreeState::Listener,
+                     private juce::Timer
 {
 public:
     explicit TransportBar(PluginProcessor& proc);
@@ -78,4 +80,14 @@ private:
     void refreshPlayBtn();
     void updatePositionLabel();
     void populatePresetDropdown();
+
+    // Sync `loopDropdown` + `loopStepLabel` from current APVTS state. Called
+    // from the ctor and from `parameterChanged("mstrLoop", ...)` so DAW
+    // automation of the master-loop length stays mirrored in the UI.
+    void syncLoopDropdownFromAPVTS();
+
+    // juce::AudioProcessorValueTreeState::Listener — only subscribed to
+    // "mstrLoop". Bounces to the message thread because host automation can
+    // fire this on the audio thread.
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
 };

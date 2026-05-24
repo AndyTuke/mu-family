@@ -89,13 +89,25 @@ private:
     VoiceParams params;        // base params — updated from message thread via setParams()
     VoiceParams activeParams;  // audio thread only — what process() actually uses
                                // (= params unless modulation overrides it each block)
-    juce::ADSR  ampEnv;
+
+    // Per-voice amp envelopes — one ADSR per sample slot so long releases play
+    // out independently when a retrigger claims a different slot. All envelopes
+    // share the same A/D/S/R parameters (driven by activeParams.ampEnv*); only
+    // their state diverges. Filter / pitch envelopes remain monophonic (one
+    // shared envelope, gates filter cutoff modulation and per-sample pitch
+    // ratio respectively) — those changes are tracked separately.
+    std::array<juce::ADSR, MaxVoices> ampEnvs;
     juce::ADSR  filterEnv;
     juce::ADSR  pitchEnv;
     MultiModeFilter voiceFilter;             // owns SVF / Ladder / 1-pole / biquad / comb state
     Hp24Filter      lowCutFilter;            // 4-pole HPF inline with voiceFilter — bypassed when cutoff <= 0
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedLowCutHz;
-    juce::AudioBuffer<float> tempBuffer;
+    juce::AudioBuffer<float> tempBuffer;     // post-envelope sum that feeds filter/insert
+
+    // Per-voice scratch buffer — each SamplePlayer writes into its own
+    // voiceBuffers[i] additively, ampEnvs[i] applied in place, then summed
+    // into tempBuffer. Sized in prepareToPlay so no audio-thread alloc.
+    std::array<juce::AudioBuffer<float>, MaxVoices> voiceBuffers;
 
 public:
     InsertProcessor insertProc;  // exposed so VoiceSection can read grReduction for the GR meter

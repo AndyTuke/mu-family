@@ -35,26 +35,34 @@ struct VoiceParams
     bool  ampEnvLegato = false;      // false=Reset (default), true=Legato
 
     // ─── Insert (after filter, before amp) ───────────────────────────────
-    // renamed `drive*` / `drv*` C++ fields → `insert*` for clarity —
-    // the algorithm dispatch table at this stage now covers EQ, Compressor,
-    // Limiter, RingMod, TapeSat, Karplus, and Vocoder, which were never
-    // "drive" algorithms. Only the in-memory field names change; APVTS IDs
-    // and preset XML keys are still `drv*` for full back-compat (DAW
-    // automation lanes and v0/v1/v2 preset files all keep working).
     // 0=None, 1=SoftClip, 2=HardClip, 3=Fold, 4=Bitcrusher, 5=Clipper, 6=EQ,
-    // 7=Compressor, 8=Limiter, 9=RingMod, 10=TapeSat, 11=Karplus, 12=Vocoder.
+    // 7=Compressor, 8=Limiter, 9=RingMod, 10=TapeSat, 11=Karplus, 12=Vocoder,
+    // 13=VocoderSt. Algorithm count is `mu_audio::kInsertAlgorithmCount`.
     int   insertAlgo   = 0;
-    // Soft Clip / Hard Clip / Fold params:
-    float insertDrive  = 0.0f;        // 0..100% input drive
-    float insertOutput = 0.0f;        // -24..0 dB output level
-    // Bitcrusher params:
-    float insertBits   = 16.0f;       // 1..16 bit depth
-    float insertRate   = 48000.0f;    // 100..48000 Hz target sample rate (48000 = no reduction)
-    float insertDither = 0.0f;        // 0..100% TPDF dither amount
-    // Shared:
-    float insertTone   = 20000.0f;    // 20..20000 Hz (1-pole LP post-drive; 20kHz = flat; also EQ mid freq / comp release ms)
-    // EQ params (insertAlgo=6): low shelf and high shelf gains stored as 0..100 in insertDrive/insertDither fields
-    float insertEqMid  = 0.0f;        // EQ mid peak gain, -18..+18 dB (#129)
+
+    // Generic 4-slot parameter array. Each algorithm interprets the slots
+    // through `mu_ui::kInsertAlgoSlots[insertAlgo]` (Source/Audio/InsertSlotConfig.h):
+    //   SoftClip  : [0]=Drive 0..100, [1]=Output -24..0 dB, [2]=—, [3]=LPF 20..20000 Hz
+    //   Bitcrusher: [0]=Bits 1..16,   [1]=Rate 100..48000 Hz, [2]=Dither 0..100 %, [3]=LPF
+    //   EQ        : [0]=Low ±18 dB,   [1]=Mid ±18 dB,         [2]=Mid 200..8000 Hz, [3]=High ±18 dB
+    //   …per the full table.
+    // Stored as NORMALISED 0..1 in both VoiceParams and APVTS; the DSP calls
+    // `mu_ui::normToActual(insertParam[N], insertAlgo, N)` to get the actual
+    // value with the slot's skew applied. This eliminates the prior overloading
+    // (insertDrive holding Note semantics when Karplus is active, insertOutput
+    // holding encoded-Unison when Vocoder is active, etc.) — every algorithm
+    // gets its own clean per-slot range, single source of truth in the config
+    // table.
+    static constexpr int kInsertSlotCount = 4;
+    float insertParam[kInsertSlotCount] = { 0.0f, 0.0f, 0.0f, 0.0f };
+
+    // ─── Polyphony ───────────────────────────────────────────────────────
+    // When true, VoiceEngine::trigger forces every hit to claim voices[0]
+    // (skips the inactive-slot search and the round-robin steal) and only
+    // exercises ampEnvs[0]. Combined with ampEnvLegato=false → classic
+    // mono-synth retrigger; with ampEnvLegato=true → mono with envelope
+    // continuity.
+    bool  voiceMono   = false;
 
     // ─── Accent ──────────────────────────────────────────────────────────
     float accentDb    = 0.0f;        // 0..12 dB boost applied to accented steps

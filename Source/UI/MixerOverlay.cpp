@@ -77,25 +77,21 @@ MixerOverlay::~MixerOverlay()
 
 void MixerOverlay::parameterChanged(const juce::String& /*parameterID*/, float /*newValue*/)
 {
-    apvtsDirty = true;
+    apvtsDirty.store(true, std::memory_order_release);
 }
 
 void MixerOverlay::visibilityChanged()
 {
-    if (isVisible() && apvtsDirty)
-    {
+    // exchange so a parameterChanged firing between the read and the clear
+    // is preserved for the next tick instead of being silently dropped.
+    if (isVisible() && apvtsDirty.exchange(false, std::memory_order_acq_rel))
         loadFromAPVTS();
-        apvtsDirty = false;
-    }
 }
 
 void MixerOverlay::timerCallback()
 {
-    if (apvtsDirty && isVisible())
-    {
+    if (isVisible() && apvtsDirty.exchange(false, std::memory_order_acq_rel))
         loadFromAPVTS();
-        apvtsDirty = false;
-    }
 }
 
 void MixerOverlay::buildRhythmChannels()
@@ -109,7 +105,7 @@ void MixerOverlay::buildRhythmChannels()
     for (int r = 0; r < MixerEngine::MaxChannels; ++r)
     {
         bool hasRhythm = r < numActive;
-        juce::Colour col = hasRhythm ? palette[proc.getRhythm(r).colourIndex % 30]
+        juce::Colour col = hasRhythm ? palette[proc.getRhythm(r).colourIndex % MuClidLookAndFeel::kRhythmPaletteSize]
                                      : MuClidLookAndFeel::colour(MuClidLookAndFeel::mixerInactiveNameBg);
         juce::String name = hasRhythm ? juce::String(proc.getRhythm(r).name) : "-";
         auto ch = std::make_unique<MixerChannel>(MixerChannel::Type::Rhythm, name, col);
@@ -178,6 +174,14 @@ void MixerOverlay::wireFXRows()
     effectRow.hideParameter("mix");
     effectRow.setEnabled(eff.isEnabled());
     effectRow.setSelectedAlgorithm(eff.getAlgorithmIndex());
+
+#if JUCE_DEBUG
+    // Debug visual — Size 1..4 knob demo at the right end of the Effect row
+    // so the user can compare the four canonical knob size buckets at a
+    // glance. Each knob is outlined at its actual rendered bounds. Only
+    // compiled into Debug builds; Release ships without the demo cluster.
+    effectRow.setShowSizeDemo(true);
+#endif
 
     effectRow.onEnabledChanged = [this](bool e) {
         if (auto* p = proc.apvts.getParameter("eff_en"))
@@ -342,6 +346,27 @@ void MixerOverlay::wireFXRows()
     reverbRow.onAlgorithmChanged = [this](int idx) {
         if (auto* p = proc.apvts.getParameter("rev_algo"))
             p->setValueNotifyingHost(p->convertTo0to1((float)idx));
+
+        // setAlgorithm runs via the APVTS listener above and overwrites the
+        // slot's internal size / predelay / diffusion / damp / mod with the
+        // new algorithm's defaults (see ReverbSlot::applyAlgorithmPreset).
+        // Push those defaults back into APVTS so the visible knobs match the
+        // slot's new state — otherwise the user sees stale knob positions
+        // while Hall (or whichever algo) plays at its internal defaults
+        // until they touch each knob. Also updates the row's own knob
+        // displays via the rev_size etc. listeners that fire from these
+        // setValueNotifyingHost calls.
+        auto& rev = proc.fxChain.reverbSlot();
+        auto pushP = [this](const char* aid, float v)
+        {
+            if (auto* pp = proc.apvts.getParameter(aid))
+                pp->setValueNotifyingHost(pp->convertTo0to1(v));
+        };
+        pushP("rev_size", rev.getSize());
+        pushP("rev_pre",  rev.getPreDelay());
+        pushP("rev_diff", rev.getDiffusion());
+        pushP("rev_damp", rev.getDamp());
+        pushP("rev_mod",  rev.getMod());
     };
 
     // Reverb params map directly to APVTS (matching ranges, no normalization needed).
@@ -652,6 +677,7 @@ void MixerOverlay::propagateMeterMode(VUMeter::MeterMode m)
 
 void MixerOverlay::paint(juce::Graphics& g)
 {
+    using mu_ui::sf;
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
     g.fillAll();
 
@@ -725,34 +751,58 @@ void MixerOverlay::paint(juce::Graphics& g)
     g.fillRect(lastDivX1, kHeaderH, kDivW, lastStripH);
     g.fillRect(lastDivX2, kHeaderH, kDivW, lastStripH);
 
-    // FX section: outer container panel + three inner row sub-panels
-    const juce::Colour borderCol = MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder);
+    // Mixer is a global view (not tied to a specific rhythm) so panel borders
+    // use globalAccent (purple) — the rhythm palette's purple was retired so
+    // this can't collide with any rhythm border. Each border is inset by
+    // kBorderInset on all sides so the visible purple line has clean breathing
+    // room — matches the .reduced(2) pattern in RhythmPanel::paint.
+    using mu_ui::s;
+    const int borderInset = s(2);
+    const juce::Colour globalCol = MuClidLookAndFeel::colour(MuClidLookAndFeel::globalAccent);
     const juce::Colour outerFill = MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground)
                                        .darker(0.15f);
     const juce::Colour rowFill   = MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground)
                                        .brighter(0.06f);
 
-    // Outer container
+    // ── Channel strips outline ─────────────────────────────────────────────
+    // One rounded rect framing the whole strips area (label panel → master),
+    // inset so the border doesn't sit on the overlay edge or against the FX
+    // container below it.
     {
-        juce::Rectangle<float> outer { 0.5f, (float)(kHeaderH + lastStripH) + 0.5f,
-                                       (float)getWidth() - 1.0f, (float)lastFXAreaH - 1.0f };
-        g.setColour(outerFill);
-        g.fillRoundedRectangle(outer, 6.0f);
-        g.setColour(borderCol);
-        g.drawRoundedRectangle(outer, 6.0f, 1.5f);
+        const juce::Rectangle<int> stripsArea {
+            0, kHeaderH, getWidth(), lastStripH };
+        g.setColour(globalCol);
+        g.drawRoundedRectangle(stripsArea.reduced(borderInset).toFloat(),
+                               sf(6.0f), sf(2.0f));
     }
 
-    // Inner row sub-panels (inset by kFXPad on all sides)
+    // ── FX section: outer container + three inner row sub-panels ──────────
+    // Outer container has its own .reduced(borderInset) so the gap between
+    // the strips outline and the FX outer matches the gap between the FX
+    // outer and the overlay edge.
+    {
+        const juce::Rectangle<int> outerArea {
+            0, kHeaderH + lastStripH, getWidth(), lastFXAreaH };
+        const auto outerF = outerArea.reduced(borderInset).toFloat();
+        g.setColour(outerFill);
+        g.fillRoundedRectangle(outerF, sf(6.0f));
+        g.setColour(globalCol);
+        g.drawRoundedRectangle(outerF, sf(6.0f), sf(2.0f));
+    }
+
+    // Inner FX rows — inset from the outer container's interior by kFXPad,
+    // and each row sub-panel reduced by 1 so its border doesn't touch its
+    // neighbour above/below.
     int fy = kHeaderH + lastStripH + kFXPad;
     for (int i = 0; i < 3; ++i)
     {
-        juce::Rectangle<float> panel { (float)kFXPad + 0.5f, (float)fy + 0.5f,
-                                       (float)(getWidth() - kFXPad * 2) - 1.0f,
-                                       (float)lastFXRowH - 1.0f };
+        const juce::Rectangle<int> rowArea {
+            kFXPad, fy, getWidth() - kFXPad * 2, lastFXRowH };
+        const auto rowF = rowArea.reduced(1).toFloat();
         g.setColour(rowFill);
-        g.fillRoundedRectangle(panel, 4.0f);
-        g.setColour(borderCol);
-        g.drawRoundedRectangle(panel, 4.0f, 1.0f);
+        g.fillRoundedRectangle(rowF, sf(4.0f));
+        g.setColour(globalCol);
+        g.drawRoundedRectangle(rowF, sf(4.0f), sf(1.5f));
         fy += lastFXRowH + kFXGap;
     }
 }

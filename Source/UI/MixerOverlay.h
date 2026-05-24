@@ -7,6 +7,7 @@
 #include "Components/SegmentControl.h"
 #include "../Plugin/PluginProcessor.h"
 #include "../Audio/MixerEngine.h"
+#include <atomic>
 #include <vector>
 #include <memory>
 
@@ -87,7 +88,11 @@ private:
     void visibilityChanged() override;
     void timerCallback() override;
 
-    bool apvtsDirty = false;
+    // Set by parameterChanged (any thread, including audio thread under host
+    // automation) and consumed by timerCallback / visibilityChanged on the
+    // message thread. Atomic + test-and-clear via exchange() so a write between
+    // the read and the clear is never silently dropped.
+    std::atomic<bool> apvtsDirty { false };
 
     // Per-algorithm snapshots for the effect row (A/B-style recall on algo switch).
     // Indexed by eff_algo (0..3). snapValid[i] is false until first departure from algo i.

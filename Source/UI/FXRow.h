@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <array>
 #include "../Audio/FX/Slots/FXAlgorithmDef.h"
 #include "Components/MuClidLookAndFeel.h"
 #include "Components/KnobWithLabel.h"
@@ -34,6 +35,12 @@ public:
     // Used when Echo mode is active so the algo dropdown remains accessible.
     void setKnobsVisible(bool visible);
 
+    // Append four sample knobs (Size 1 / 2 / 3 / 4) at the right end of the row
+    // with an outline drawn around each at the actual rendered bounds. Used to
+    // visually compare the four canonical knob size buckets — only enabled on
+    // the Effect row from MixerOverlay.
+    void setShowSizeDemo(bool show);
+
     void resized() override;
     void paint(juce::Graphics& g) override;
 
@@ -51,6 +58,13 @@ private:
     juce::TextButton             enableButton{ "On" };
     DropdownSelect               algorithmDropdown;
     std::vector<std::unique_ptr<KnobWithLabel>> knobs;
+
+    // Size-demo cluster (debug visual). Four KnobWithLabel instances sized to
+    // the four canonical Size buckets, drawn at the right edge of the row
+    // with an outline so the user can compare the rendered circle sizes.
+    std::array<std::unique_ptr<KnobWithLabel>, 4> sizeDemoKnobs;
+    std::array<juce::Rectangle<int>, 4>           sizeDemoBounds {};
+    bool showSizeDemo = false;
 
     int  currentAlgorithm = 0;
     bool isEnabled        = true;

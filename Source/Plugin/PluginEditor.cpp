@@ -1,7 +1,17 @@
 #include "PluginEditor.h"
+#include "../Audio/FX/Slots/FXAlgorithmDef.h"
 
 PluginEditor::PluginEditor(PluginProcessor& p)
-    : AudioProcessorEditor(&p), processorRef(p),
+    // Apply the stored UI scale BEFORE any child component is constructed.
+    // Comma expression evaluates as part of the base-class init arg; the C++
+    // standard guarantees the base class is fully constructed before member
+    // ctors run. So `mu_ui::scale` is correct when `transportBar(p)` and the
+    // other members below construct, which is the only way ctor-time
+    // `sf(...)` font assignments pick up the right size (audit #574).
+    : AudioProcessorEditor((mu_ui::scale = juce::jlimit(PluginProcessor::kUiScaleMedium,
+                                                        PluginProcessor::kUiScaleLarge,
+                                                        p.getUiScale()), &p)),
+      processorRef(p),
       transportBar(p), sidebar(p), rhythmPanel(p),
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p),
@@ -95,7 +105,25 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         if (processorRef.getNumRhythms() >= SequencerEngine::MaxRhythms) return;
         Rhythm r;
         r.name        = "<unnamed>";
-        r.colourIndex = processorRef.getNumRhythms() % 30;
+        // Pick the first palette index that no existing rhythm is using, so the
+        // new slot is visually distinct from every other rhythm. Falls back to
+        // the bare cyclic position only if all palette colours are in use
+        // (which can't happen since max rhythms = palette size = 8).
+        {
+            constexpr int N = MuClidLookAndFeel::kRhythmPaletteSize;
+            std::array<bool, N> used{};
+            const int nExisting = processorRef.getNumRhythms();
+            for (int i = 0; i < nExisting; ++i)
+                used[(size_t) (processorRef.getRhythm(i).colourIndex % N)] = true;
+            const int startProbe = nExisting % N;
+            int chosen = startProbe;
+            for (int i = 0; i < N; ++i)
+            {
+                const int candidate = (startProbe + i) % N;
+                if (! used[(size_t) candidate]) { chosen = candidate; break; }
+            }
+            r.colourIndex = chosen;
+        }
         processorRef.addRhythm(r);
         const int newIdx = processorRef.getNumRhythms() - 1;
         processorRef.applyDefaultRhythm(newIdx);
@@ -125,11 +153,15 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     // Mirror the mixer's effect-slot algorithm name on the voice section's
     // Amp "Effect" send knob so the user can read it without opening the
-    // mixer overlay.
+    // mixer overlay. Two paths feed this: (a) the mixer's own dropdown
+    // (synchronous from updateEffectSendLabels), (b) host automation of
+    // eff_algo (asynchronous via the APVTS listener registered below — fires
+    // regardless of mixer visibility).
     mixerOverlay.onEffectAlgorithmNameChanged = [this](const juce::String& name)
     {
         rhythmPanel.setVoiceEffectSendLabel(name);
     };
+    processorRef.apvts.addParameterListener("eff_algo", this);
 
     rhythmPanel.onRhythmRenamed = [this]
     {
@@ -290,6 +322,26 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     setResizable(false, false);
     setSize(mu_ui::s(MuLookAndFeel::kWindowWidth), mu_ui::s(MuLookAndFeel::kWindowHeight));
 
+    // React to runtime scale changes from SettingsOverlay. The picker writes
+    // through proc.setUiScale → callback → here. Layout reflows immediately
+    // (every panel's resized() / paint() uses mu_ui::s() / sf() so the
+    // geometry catches up). Ctor-time font assignments stay at the previous
+    // scale until the editor is reopened — the picker shows a hint about
+    // that to set expectations.
+    juce::Component::SafePointer<PluginEditor> safeThis(this);
+    processorRef.onUiScaleChanged = [safeThis](float scale)
+    {
+        if (auto* self = safeThis.getComponent())
+        {
+            mu_ui::scale = scale;
+            self->setSize(mu_ui::s(MuLookAndFeel::kWindowWidth),
+                          mu_ui::s(MuLookAndFeel::kWindowHeight));
+            self->sendLookAndFeelChange();    // re-fonts on components that hook it
+            self->resized();
+            self->repaint();
+        }
+    };
+
     isStandalone = processorRef.wrapperType == juce::AudioProcessor::wrapperType_Standalone;
     loadKeybindings();
     if (isStandalone)
@@ -328,9 +380,11 @@ PluginEditor::~PluginEditor()
     // a UAF. The lambdas all capture raw `[this]`. Mirror this any time we add a new
     // processorRef.on* callback below.
     processorRef.apvts.state.removeListener(this);
+    processorRef.apvts.removeParameterListener("eff_algo", this);
     processorRef.onRhythmHotSwapCommitted = nullptr;
     processorRef.onSaveAndQuit            = nullptr;
     processorRef.onLoadError              = nullptr;
+    processorRef.onUiScaleChanged         = nullptr;
 
     if (isStandalone)
         removeKeyListener(this);
@@ -638,4 +692,28 @@ void PluginEditor::resized()
         demoBanner.setBounds(0, h - statusH - bannerH, w, bannerH);
 
     statusBar.setBounds(0, h - statusH, w, statusH);
+}
+
+//==============================================================================
+// APVTS listener — fires from any thread (host automation hits the audio
+// thread). Marshal to the message thread before touching the UI.
+void PluginEditor::parameterChanged(const juce::String& parameterID, float)
+{
+    if (parameterID != "eff_algo") return;
+
+    juce::Component::SafePointer<PluginEditor> safeThis(this);
+    juce::MessageManager::callAsync([safeThis]
+    {
+        if (safeThis) safeThis->syncVoiceEffectSendLabel();
+    });
+}
+
+void PluginEditor::syncVoiceEffectSendLabel()
+{
+    const auto& algos = FXAlgorithmRegistry::effectAlgorithms();
+    const int ai = processorRef.fxChain.effectSlot().getAlgorithmIndex();
+    const juce::String name = (ai >= 0 && ai < (int) algos.size())
+                              ? algos[(size_t) ai].name
+                              : juce::String("Effect");
+    rhythmPanel.setVoiceEffectSendLabel(name);
 }

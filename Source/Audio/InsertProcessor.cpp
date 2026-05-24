@@ -1,4 +1,5 @@
 #include "InsertProcessor.h"
+#include "InsertSlotConfig.h"
 
 #include "Audio/FX/Insert/NoneInsert.h"
 #include "Audio/FX/Insert/SoftClipInsert.h"
@@ -79,19 +80,23 @@ void InsertProcessor::process(juce::AudioBuffer<float>& buf, int ns, int nCh,
     grReduction.store(gr);
 
     // Post-drive 1-pole LP tone filter — only for the drive-family algorithms
-    // (0..5) where p.insertTone is a cutoff. EQ (6) / Comp (7) / Limiter (8) /
-    // RingMod (9) / TapeSat (10) repurpose insertTone for other meanings and
-    // skip this step.
-    if (p.insertAlgo < 6 && p.insertTone < 19000.0f && currentSampleRate > 0.0)
+    // (0..5) where slot 3 is the LPF cutoff. EQ / Comp / Limiter / RingMod /
+    // TapeSat / Karplus / Vocoder all consume slot 3 themselves (or repurpose
+    // it as Note / Release / Freq / Tone) and shouldn't get a second LPF.
+    if (p.insertAlgo >= 1 && p.insertAlgo <= 5 && currentSampleRate > 0.0)
     {
-        for (int ch = 0; ch < nCh; ++ch)
-            postDriveTone[ch].prepare(p.insertTone, (float) currentSampleRate);
-
-        for (int ch = 0; ch < nCh; ++ch)
+        const float lpfHz = mu_ui::normToActual(p.insertParam[3], p.insertAlgo, 3);
+        if (lpfHz < 19000.0f)
         {
-            auto* data = buf.getWritePointer(ch);
-            for (int i = 0; i < ns; ++i)
-                data[i] = postDriveTone[ch].process(data[i]);
+            for (int ch = 0; ch < nCh; ++ch)
+                postDriveTone[ch].prepare(lpfHz, (float) currentSampleRate);
+
+            for (int ch = 0; ch < nCh; ++ch)
+            {
+                auto* data = buf.getWritePointer(ch);
+                for (int i = 0; i < ns; ++i)
+                    data[i] = postDriveTone[ch].process(data[i]);
+            }
         }
     }
 }

@@ -23,8 +23,12 @@ public:
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
                  const VoiceParams& p, float& /*grOut*/) override
     {
-        const float preGain = std::pow(10.0f, p.insertDrive / 100.0f * 2.0f);
-        const float outGain = std::pow(10.0f, p.insertOutput / 20.0f) / preGain;
+        // Slot 0 = Drive 0..100, Slot 1 = Output -24..0 dB. Slot 3 (LPF) is
+        // applied downstream by InsertProcessor's post-drive tone filter.
+        const float drive   = insertSlot(p, 0);
+        const float outputDb = insertSlot(p, 1);
+        const float preGain = std::pow(10.0f, drive / 100.0f * 2.0f);
+        const float outGain = std::pow(10.0f, outputDb / 20.0f) / preGain;
         smoothedPreGain.setTargetValue(preGain);
         smoothedOutGain.setTargetValue(outGain);
         auto ad1Tanh = [](float x) -> float {

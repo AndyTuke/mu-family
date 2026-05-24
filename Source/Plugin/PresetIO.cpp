@@ -3,12 +3,12 @@
 #include "PluginProcessor_Internal.h"
 #include "Persistence/PresetHelpers.h"      // writeKindedProperty, readKindedPropertyAsActualV2, kGlobalParamDefs
 #include "Persistence/ModulatorSerialise.h" // serialiseModulators, deserialiseModulators, clearModulators
+#include "UI/Components/MuClidLookAndFeel.h" // kRhythmPaletteSize
 #include <limits>               // std::numeric_limits for NaN sentinel
 
 using mu_pp::kRhythmParamDefs;
 using mu_pp::kRhythmParamCount;
 using mu_pp::kChannelSuffixes;
-using mu_pp::kGlobalParams;
 using mu_pp::applyRhythmSuffix;
 using mu_pp::kCurrentPresetVersion;
 using mu_pp::writeKindedProperty;
@@ -77,6 +77,293 @@ static float readGlobalPropertyAsActual(const juce::ValueTree& tree,
     if (! tree.hasProperty(propName))
         return std::numeric_limits<float>::quiet_NaN();
     return readKindedPropertyAsActualV2(tree, propName, def.kind, def.algorithmNames);
+}
+
+// Stage 36 (v3): collapse the per-rhythm insert from 9 named fields
+// (drvDrv / drvOut / drvDit / drvTon / drvBits / drvRate / eqLowGain /
+// eqMidGain / eqHighGain) to 4 generic normalised Param slots
+// (insP1 / insP2 / insP3 / insP4). The translation depends on the saved
+// algorithm — each algo's old field set maps to the new slots through
+// mu_ui::kInsertAlgoSlots' per-algo ranges. Pre-#597 EQ presets where Low /
+// High were packed into drvDrv / drvDit as 0..100 are also handled via the
+// formula `dB = old0to100 / 100 * 36 - 18`.
+//
+// Pre-condition: the old `eqLowGain` / `eqHighGain` migration (which this
+// supersedes) is no longer needed — those fields now feed straight into the
+// per-algo slot mapping for EQ.
+//
+// `srcPrefix` is "r0_" for rhythm presets / hot-swap loads, or "" for the
+// MuClidPreset per-rhythm Rhythm child tree.
+static void migrateInsertSlotsV3(juce::ValueTree& tree, const juce::String& srcPrefix)
+{
+    const juce::String charProp = srcPrefix + "drvChar";
+    if (! tree.hasProperty(charProp)) return;
+
+    // Skip if already v3 (any one of the new slot props present).
+    if (tree.hasProperty(srcPrefix + "insP1")) return;
+
+    const juce::String charName = tree.getProperty(charProp).toString();
+    const int algoIdx = mu_audio::indexFromName(mu_audio::kInsertAlgorithmNames, charName);
+    if (algoIdx < 0) return;
+
+    auto readD = [&tree, &srcPrefix](const juce::String& name, double dflt) -> float {
+        return tree.hasProperty(srcPrefix + name)
+            ? (float)(double) tree.getProperty(srcPrefix + name)
+            : (float) dflt;
+    };
+
+    const float oldDrv = readD("drvDrv", 0.0);
+    const float oldOut = readD("drvOut", 0.0);
+    const float oldDit = readD("drvDit", 0.0);
+    const float oldTon = readD("drvTon", 20000.0);
+    const float oldBit = readD("drvBits", 16.0);
+    const float oldRte = readD("drvRate", 48000.0);
+    const float oldEqM = readD("eqMidGain", 0.0);
+    const float oldEqL = readD("eqLowGain", 0.0);
+    const float oldEqH = readD("eqHighGain", 0.0);
+
+    float actual[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    switch (algoIdx)
+    {
+        case 1: case 2: case 3: case 5: case 10:  // SoftClip/Hard/Fold/Clipper/TapeSat
+            actual[0] = oldDrv;
+            actual[1] = oldOut;
+            actual[3] = oldTon;
+            break;
+        case 4:  // Bitcrusher
+            actual[0] = oldBit;
+            actual[1] = oldRte;
+            actual[2] = oldDit;
+            actual[3] = oldTon;
+            break;
+        case 6:  // EQ — prefer dedicated fields if present, else pre-#597 packed
+            actual[0] = tree.hasProperty(srcPrefix + "eqLowGain")  ? oldEqL
+                                                                   : (oldDrv / 100.0f * 36.0f - 18.0f);
+            actual[1] = oldEqM;
+            actual[2] = oldTon;   // Mid Hz lives in tone
+            actual[3] = tree.hasProperty(srcPrefix + "eqHighGain") ? oldEqH
+                                                                   : (oldDit / 100.0f * 36.0f - 18.0f);
+            break;
+        case 7: case 8:  // Compressor / Limiter
+            actual[0] = oldDrv;
+            actual[1] = oldOut;
+            actual[2] = oldDit;
+            actual[3] = oldTon;
+            break;
+        case 9:  // RingMod
+            actual[0] = oldDrv;
+            actual[3] = oldTon;
+            break;
+        case 11:  // Karplus
+            actual[0] = oldDrv;
+            actual[1] = oldBit;
+            actual[2] = oldDit;
+            actual[3] = oldTon;
+            break;
+        case 12: case 13:  // Vocoder / VocoderSt — Unison decode from -24..0 → 0..6
+            actual[0] = oldDrv;
+            actual[1] = (oldOut + 24.0f) * 0.25f;
+            actual[2] = oldDit;
+            actual[3] = oldBit;
+            break;
+        default: break;  // 0 None — leave zeros
+    }
+
+    for (int s = 0; s < 4; ++s)
+    {
+        const float norm = mu_ui::actualToNorm(actual[s], algoIdx, s);
+        tree.setProperty(srcPrefix + "insP" + juce::String(s + 1), (double) norm, nullptr);
+    }
+}
+
+// Same for master insert slots {1, 2} in a GlobalState child. Mirrors
+// migrateInsertSlotsV3 but consumes `mst_ins*` / `mst_ins2*` property names.
+static void migrateMasterInsertSlotsV3(juce::ValueTree& tree, int slot)
+{
+    const juce::String pfx = slot == 1 ? juce::String("mst_ins")
+                                       : juce::String("mst_ins2");
+    const juce::String charProp = pfx + "Char";
+    if (! tree.hasProperty(charProp)) return;
+    if (tree.hasProperty(pfx + "P1")) return;
+
+    const juce::String charName = tree.getProperty(charProp).toString();
+    const int algoIdx = mu_audio::indexFromName(mu_audio::kInsertAlgorithmNames, charName);
+    if (algoIdx < 0) return;
+
+    auto readD = [&tree, &pfx](const juce::String& name, double dflt) -> float {
+        return tree.hasProperty(pfx + name)
+            ? (float)(double) tree.getProperty(pfx + name)
+            : (float) dflt;
+    };
+
+    const float oldDrv = readD("Drv", 0.0);
+    const float oldOut = readD("Out", 0.0);
+    const float oldDit = readD("Dit", 0.0);
+    const float oldTon = readD("Ton", 20000.0);
+    const float oldBit = readD("Bits", 16.0);
+    const float oldRte = readD("Rate", 48000.0);
+    const float oldEqM = readD("Mid", 0.0);
+    const float oldEqL = readD("Low", 0.0);
+    const float oldEqH = readD("High", 0.0);
+
+    float actual[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    switch (algoIdx)
+    {
+        case 1: case 2: case 3: case 5: case 10:
+            actual[0] = oldDrv; actual[1] = oldOut; actual[3] = oldTon; break;
+        case 4:
+            actual[0] = oldBit; actual[1] = oldRte; actual[2] = oldDit; actual[3] = oldTon; break;
+        case 6:
+            actual[0] = tree.hasProperty(pfx + "Low")  ? oldEqL : (oldDrv / 100.0f * 36.0f - 18.0f);
+            actual[1] = oldEqM;
+            actual[2] = oldTon;
+            actual[3] = tree.hasProperty(pfx + "High") ? oldEqH : (oldDit / 100.0f * 36.0f - 18.0f);
+            break;
+        case 7: case 8:
+            actual[0] = oldDrv; actual[1] = oldOut; actual[2] = oldDit; actual[3] = oldTon; break;
+        case 9:
+            actual[0] = oldDrv; actual[3] = oldTon; break;
+        case 11:
+            actual[0] = oldDrv; actual[1] = oldBit; actual[2] = oldDit; actual[3] = oldTon; break;
+        case 12: case 13:
+            actual[0] = oldDrv; actual[1] = (oldOut + 24.0f) * 0.25f; actual[2] = oldDit; actual[3] = oldBit; break;
+        default: break;
+    }
+
+    for (int s = 0; s < 4; ++s)
+    {
+        const float norm = mu_ui::actualToNorm(actual[s], algoIdx, s);
+        tree.setProperty(pfx + "P" + juce::String(s + 1), (double) norm, nullptr);
+    }
+}
+
+// Modulator assignment migration: old destinations like "insert.drive" /
+// "ks.note" / "voc.octave" remap per-algo to the new "insert.p1".."insert.p4".
+// Caller supplies the rhythm's `Modulators` child + the resolved algoIdx.
+static void migrateModAssignmentsV3(juce::ValueTree& modsTree, int algoIdx)
+{
+    if (! modsTree.isValid() || algoIdx < 0) return;
+
+    // For each algo, which OLD destination ID maps to which NEW insert.pN slot.
+    // Empty target = drop the assignment (no slot in the new layout).
+    auto translate = [algoIdx](const juce::String& oldDest) -> juce::String {
+        // Generic insert names + algorithm-specific names. The mapping is the
+        // same table as migrateInsertSlotsV3 above, expressed as which OLD
+        // identifier should land on which NEW slot.
+        struct M { const char* oldId; int slot; };
+        static const M genericOnly[] = {
+            { "insert.drive",  0 }, { "insert.output", 1 },
+            { "insert.dither", 2 }, { "insert.lpf",    3 },
+        };
+        switch (algoIdx)
+        {
+            case 1: case 2: case 3: case 5: case 10:
+                for (auto& m : genericOnly) if (oldDest == m.oldId) return "insert.p" + juce::String(m.slot + 1);
+                break;
+            case 4:  // Bitcrusher
+                if (oldDest == "insert.bits")   return "insert.p1";
+                if (oldDest == "insert.rate")   return "insert.p2";
+                if (oldDest == "insert.dither") return "insert.p3";
+                if (oldDest == "insert.lpf")    return "insert.p4";
+                break;
+            case 6:  // EQ
+                if (oldDest == "insert.drive")  return "insert.p1";   // Low
+                if (oldDest == "insert.lpf")    return "insert.p3";   // Mid Hz (was tone in v2)
+                if (oldDest == "insert.dither") return "insert.p4";   // High
+                break;
+            case 7: case 8:
+                for (auto& m : genericOnly) if (oldDest == m.oldId) return "insert.p" + juce::String(m.slot + 1);
+                break;
+            case 9:
+                if (oldDest == "insert.drive") return "insert.p1";
+                if (oldDest == "insert.lpf")   return "insert.p4";
+                break;
+            case 11:  // Karplus
+                if (oldDest == "ks.note")       return "insert.p1";
+                if (oldDest == "ks.octave")     return "insert.p2";
+                if (oldDest == "insert.dither") return "insert.p3";
+                if (oldDest == "insert.lpf")    return "insert.p4";
+                break;
+            case 12: case 13:  // Vocoder
+                if (oldDest == "insert.drive")  return "insert.p1";   // Wave
+                if (oldDest == "voc.unison")    return "insert.p2";
+                if (oldDest == "voc.octave")    return "insert.p3";
+                if (oldDest == "voc.note")      return "insert.p4";
+                break;
+            default: break;
+        }
+        return {};
+    };
+
+    for (int i = 0; i < modsTree.getNumChildren(); ++i)
+    {
+        auto child = modsTree.getChild(i);
+        if (child.getType() != juce::Identifier("Asgn")) continue;
+        if (! child.hasProperty("dest")) continue;
+        const juce::String oldDest = child.getProperty("dest").toString();
+        const juce::String newDest = translate(oldDest);
+        if (newDest.isNotEmpty())
+            child.setProperty("dest", newDest, nullptr);
+    }
+}
+
+// In-place migration of pre-#597 EQ encoding inside a single rhythm ValueTree.
+// Old: when drvChar=="EQ", Low/High dB were packed into drvDrv/drvDit as a
+// 0..100 encoding of -18..+18. New: dedicated eqLowGain / eqHighGain fields.
+// If the new fields are absent on a preset whose insert algo is EQ, derive
+// them from the old encoding and inject as XML properties so downstream
+// restoreRhythmAPVTSParams reads the migrated values.
+//
+// `srcPrefix` is "r0_" for rhythm presets / hot-swap loads, or "" for
+// MuClidPreset's per-rhythm Rhythm child tree.
+static void migrateEqEncodingV2(juce::ValueTree& tree, const juce::String& srcPrefix)
+{
+    const juce::String charProp = srcPrefix + "drvChar";
+    const juce::String lowProp  = srcPrefix + "eqLowGain";
+    const juce::String highProp = srcPrefix + "eqHighGain";
+    const juce::String drvProp  = srcPrefix + "drvDrv";
+    const juce::String ditProp  = srcPrefix + "drvDit";
+
+    if (! tree.hasProperty(charProp)) return;
+    // drvChar is stored as a stable name string in v2. EQ = "EQ".
+    if (tree.getProperty(charProp).toString() != "EQ") return;
+
+    if (! tree.hasProperty(lowProp) && tree.hasProperty(drvProp))
+    {
+        const double drv0to100 = (double) tree.getProperty(drvProp);
+        tree.setProperty(lowProp, drv0to100 / 100.0 * 36.0 - 18.0, nullptr);
+    }
+    if (! tree.hasProperty(highProp) && tree.hasProperty(ditProp))
+    {
+        const double dit0to100 = (double) tree.getProperty(ditProp);
+        tree.setProperty(highProp, dit0to100 / 100.0 * 36.0 - 18.0, nullptr);
+    }
+}
+
+// Same for master insert slot {1, 2} in a GlobalState child.
+static void migrateMasterEqEncodingV2(juce::ValueTree& tree, int slot)
+{
+    const juce::String pfx     = slot == 1 ? juce::String("mst_ins")
+                                           : juce::String("mst_ins2");
+    const juce::String charProp = pfx + "Char";
+    const juce::String lowProp  = pfx + "Low";
+    const juce::String highProp = pfx + "High";
+    const juce::String drvProp  = pfx + "Drv";
+    const juce::String ditProp  = pfx + "Dit";
+
+    if (! tree.hasProperty(charProp)) return;
+    if (tree.getProperty(charProp).toString() != "EQ") return;
+
+    if (! tree.hasProperty(lowProp) && tree.hasProperty(drvProp))
+    {
+        const double drv0to100 = (double) tree.getProperty(drvProp);
+        tree.setProperty(lowProp, drv0to100 / 100.0 * 36.0 - 18.0, nullptr);
+    }
+    if (! tree.hasProperty(highProp) && tree.hasProperty(ditProp))
+    {
+        const double dit0to100 = (double) tree.getProperty(ditProp);
+        tree.setProperty(highProp, dit0to100 / 100.0 * 36.0 - 18.0, nullptr);
+    }
 }
 
 // Reject any preset file that doesn't declare presetVersion = kCurrentPresetVersion.
@@ -202,6 +489,11 @@ void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file)
     if (! requireSupportedPresetVersion(state, file.getFileName(), proc_.onLoadError))
         return;
 
+    // Stage 36 v3 migration: collapse old named insert fields → insP1..4
+    // (algo-aware, runs BEFORE the field-apply loop so the new fields are
+    // present when restoreRhythmAPVTSParams iterates kRhythmParamDefs).
+    migrateInsertSlotsV3(state, "r0_");
+
     for (int i = 0; i < kRhythmParamCount; ++i)
     {
         const auto& def = kRhythmParamDefs[i];
@@ -217,21 +509,30 @@ void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file)
         }
     }
 
-    // Name and colour.
-    auto nameVal = state.getProperty("r0_name");
-    if (nameVal.isString() && nameVal.toString().isNotEmpty())
-        newRhythm.name = nameVal.toString().toStdString();
+    // Name and colour. Prefer presetName (matches dropdown / filename) over
+    // r0_name — older presets carry a short historical r0_name (e.g. "Kick"
+    // inside "Kick Accents.muRhyth") which loses the user-facing context.
+    auto presetNameVal = state.getProperty("presetName");
+    auto rhythmNameVal = state.getProperty("r0_name");
+    if (presetNameVal.isString() && presetNameVal.toString().isNotEmpty())
+        newRhythm.name = presetNameVal.toString().toStdString();
+    else if (rhythmNameVal.isString() && rhythmNameVal.toString().isNotEmpty())
+        newRhythm.name = rhythmNameVal.toString().toStdString();
     newRhythm.colourIndex = (int)state.getProperty("r0_colour", newRhythm.colourIndex);
 
     // deserialise modulators from the preset. Mirrors the applyRhythmPreset
     // (stopped-state) path so hot-swap preset loads carry the preset's LFOs / step
     // sequences / matrix assignments instead of inheriting the previous rhythm's.
-    // newRhythm is a local copy — no other thread holds its modLock, so the spin
-    // inside clearModulators / deserialiseModulators resolves on the first attempt.
-    // Legacy .muRhyth files with no Modulators child are left alone (same opt-in
-    // policy as applyRhythmPreset — see [Source/PluginProcessor_Preset.cpp:281-285]).
+    // Stage 36: translate old `insert.drive` / `ks.note` / `voc.*` destination IDs
+    // to the new `insert.p1`..`insert.p4` slots before deserialiseModulators
+    // validates them (otherwise they'd be silently dropped as unknown destinations).
     if (auto mods = state.getChildWithName("Modulators"); mods.isValid())
     {
+        const int algoIdxForMig = mu_audio::indexFromName(
+            mu_audio::kInsertAlgorithmNames,
+            state.getProperty("r0_drvChar").toString());
+        migrateModAssignmentsV3(mods, algoIdxForMig);
+
         clearModulators(newRhythm);
         auto dropped = deserialiseModulators(mods, newRhythm);
         if (! dropped.isEmpty() && proc_.onLoadError)
@@ -467,11 +768,18 @@ bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIdx)
     restoreRhythmAPVTSParams (targetIdx, state, /*srcPropPrefix*/ "r0_");
     restoreRhythmModulators  (targetIdx, state);
 
-    // Name + colour (not APVTS-backed).
+    // Name + colour (not APVTS-backed). For a per-rhythm preset, the
+    // user-facing identity is the `presetName` (matches the dropdown entry
+    // and the filename); the older `r0_name` carries the slot's short
+    // historical name (e.g. "Kick" inside the "Kick Accents" preset).
+    // Prefer presetName, fall back to r0_name when the file is missing one.
     Rhythm& r = proc_.sequencer.getRhythm(targetIdx);
-    auto nameVal = state.getProperty("r0_name");
-    if (nameVal.isString() && nameVal.toString().isNotEmpty())
-        r.name = nameVal.toString().toStdString();
+    auto presetNameVal = state.getProperty("presetName");
+    auto rhythmNameVal = state.getProperty("r0_name");
+    if (presetNameVal.isString() && presetNameVal.toString().isNotEmpty())
+        r.name = presetNameVal.toString().toStdString();
+    else if (rhythmNameVal.isString() && rhythmNameVal.toString().isNotEmpty())
+        r.name = rhythmNameVal.toString().toStdString();
     r.colourIndex = (int)state.getProperty("r0_colour", r.colourIndex);
 
     // In .muRhyth the sample *path* is "r0_sample" but the embedded blob fields
@@ -496,7 +804,21 @@ bool PresetIO::applyDefaultRhythm(int rhythmIndex)
     // unchanged.
     const juce::File f = proc_.getRhythmsDir().getChildFile("_default.muRhyth");
     if (!f.existsAsFile()) return false;
+
+    // "Default rhythm" is a sequencer / voice settings reset — NOT an identity
+    // change. Colour is per-slot identity (cyclic next-in-palette assigned by
+    // PluginEditor when the slot is added). Save the colour, apply preset,
+    // restore the colour so a user-saved _default.muRhyth carrying an
+    // r0_colour attribute doesn't clobber the slot's intended visual identity.
+    // Stopped path is synchronous — restore immediately. Playing path stages
+    // into a pending Rhythm copy; the commit later replaces the live rhythm
+    // wholesale, so the restore needs to happen via the swap commit hook in
+    // PluginProcessor — see onRhythmHotSwapCommitted handling there.
+    const int savedColour = proc_.sequencer.getRhythm(rhythmIndex).colourIndex;
+    const bool wasPlaying = proc_.sequencerPlaying.load();
     stageRhythmPreset(rhythmIndex, f);
+    if (! wasPlaying)
+        proc_.sequencer.getRhythm(rhythmIndex).colourIndex = savedColour;
     return true;
 }
 
@@ -680,7 +1002,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
 
         r.name        = state.getProperty(slotPrefix + "name",
                                           "Rhythm " + juce::String(i + 1)).toString().toStdString();
-        r.colourIndex = (int)state.getProperty(slotPrefix + "colour", i % 30);
+        r.colourIndex = (int)state.getProperty(slotPrefix + "colour", i % MuClidLookAndFeel::kRhythmPaletteSize);
 
         // force-sync APVTS → Rhythm so shrink/grow cycles (preset A → B → A)
         // repopulate freshly-defaulted Rhythm fields even when JUCE skips listener
@@ -883,13 +1205,20 @@ void PresetIO::resizeRhythmArrays(int n)
 void PresetIO::restoreRhythmAPVTSParams(int apvtsSlot, const juce::ValueTree& rTree,
                                          const juce::String& srcPropPrefix)
 {
+    // Stage 36 v3 migration runs on a copy so the caller's tree is untouched.
+    // Order matters: v3 insert-slot migration consumes the old field names that
+    // the v2 EQ-encoding migration also touches, so the order doesn't matter
+    // (each is a no-op if the new slots are already present).
+    juce::ValueTree migrated = rTree.createCopy();
+    migrateInsertSlotsV3(migrated, srcPropPrefix);
+
     const juce::String dstPrefix = "r" + juce::String(apvtsSlot) + "_";
     for (int j = 0; j < kRhythmParamCount; ++j)
     {
         const auto& def = kRhythmParamDefs[j];
         if (auto* param = proc_.apvts.getParameter(dstPrefix + def.suffix))
         {
-            const float actualVal = readParamPropertyAsActual(rTree, srcPropPrefix + def.suffix, *param, def);
+            const float actualVal = readParamPropertyAsActual(migrated, srcPropPrefix + def.suffix, *param, def);
             if (! std::isnan(actualVal))
                 param->setValueNotifyingHost(param->convertTo0to1(actualVal));
         }
@@ -915,9 +1244,21 @@ void PresetIO::restoreRhythmModulators(int i, const juce::ValueTree& rTree)
     auto rMods = rTree.getChildWithName("Modulators");
     if (! rMods.isValid()) return;
 
+    // Stage 36: translate old insert.* / ks.* / voc.* destination IDs to the
+    // new insert.p1..p4 slots BEFORE deserialiseModulators validates them.
+    // Algorithm-aware — drvChar in the rTree (or empty fallback in the full
+    // MuClidPreset where Rhythm children don't carry the prefix).
+    juce::ValueTree migratedMods = rMods.createCopy();
+    const juce::String charProp = rTree.hasProperty("drvChar") ? "drvChar"
+                                                                : "r0_drvChar";
+    const int algoIdxForMig = mu_audio::indexFromName(
+        mu_audio::kInsertAlgorithmNames,
+        rTree.getProperty(charProp).toString());
+    migrateModAssignmentsV3(migratedMods, algoIdxForMig);
+
     Rhythm& r = proc_.sequencer.getRhythm(i);
     clearModulators(r);
-    auto dropped = deserialiseModulators(rMods, r);
+    auto dropped = deserialiseModulators(migratedMods, r);
     if (! dropped.isEmpty() && proc_.onLoadError)
         proc_.onLoadError("Dropped " + juce::String(dropped.size())
                     + " modulator assignment(s) on rhythm " + juce::String(i + 1)
@@ -1006,12 +1347,19 @@ void PresetIO::restoreGlobalState(const juce::ValueTree& root)
     {
         auto child = root.getChild(ci);
         if (child.getType() != juce::Identifier("GlobalState")) continue;
+
+        // Stage 36 v3 migration: collapse master-insert named fields →
+        // insP1..4 (algo-aware). Mutates a copy so original child is untouched.
+        juce::ValueTree migrated = child.createCopy();
+        migrateMasterInsertSlotsV3(migrated, 1);
+        migrateMasterInsertSlotsV3(migrated, 2);
+
         for (int gi = 0; gi < mu_pp::kGlobalParamDefCount; ++gi)
         {
             const auto& def = mu_pp::kGlobalParamDefs[gi];
             if (auto* param = proc_.apvts.getParameter(def.id))
             {
-                const float actualVal = readGlobalPropertyAsActual(child, juce::String(def.id),
+                const float actualVal = readGlobalPropertyAsActual(migrated, juce::String(def.id),
                                                                    *param, def);
                 if (! std::isnan(actualVal))
                     param->setValueNotifyingHost(param->convertTo0to1(actualVal));

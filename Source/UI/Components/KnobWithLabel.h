@@ -24,8 +24,17 @@ public:
     // around the knob whenever any modulation assignment targets this destination.
     // setModulatedNorm (0..1) additionally draws an animated secondary arc tracking
     // the live modulated value; pass NaN to disable.
+    //
+    // setModulatedActual takes the modulator's actual (un-normalised) value in
+    // the slider's display range — internally converts via
+    // `slider.valueToProportionOfLength(...)` so the arc respects whatever skew
+    // the slider uses (log / midPoint / linear) and lines up with the needle.
+    // Prefer this over setModulatedNorm whenever the snapshot stores a real
+    // value rather than a pre-normalised 0..1 — guarantees the arc matches the
+    // visual slider scale even on log-skewed knobs (cutoff, LPF, rate, etc.).
     void setIsModulated(bool b);
     void setModulatedNorm(float norm01);
+    void setModulatedActual(float actualValue) noexcept;
 
     // GR meter overlay (compressor/limiter): set to audio-thread-written atomic;
     // knob polls at 30 Hz and draws an orange arc showing gain reduction (0..1,

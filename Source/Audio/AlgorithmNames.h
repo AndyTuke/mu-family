@@ -184,4 +184,12 @@ inline constexpr int countNames(const char* const* table) noexcept
     return n;
 }
 
+// Pre-folded sizes. Prefer these over `countNames(kInsertAlgorithmNames)` at
+// call sites where readability matters — same value, no function call.
+// `std::size(arr) - 1` skips the trailing nullptr terminator. Works as a
+// constexpr because the array's bound is a compile-time constant.
+inline constexpr int kInsertAlgorithmCount = (int) (std::size(kInsertAlgorithmNames) - 1);
+inline constexpr int kFilterTypeCount      = (int) (std::size(kFilterTypeNames) - 1);
+inline constexpr int kLogicCount           = (int) (std::size(kLogicNames) - 1);
+
 } // namespace mu_audio

@@ -112,38 +112,13 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
         addAndMakeVisible(insCharBox);
         addAndMakeVisible(insCharBox2);
 
-        auto noVal = [](double) { return juce::String(); };
-        for (auto* k : { &insDrive, &insDrive2 })
-        {
-            k->setRange(0.0, 100.0, 0.1);
-            k->setValue(0.0);
-            k->getSlider().textFromValueFunction = noVal;
+        // Just register the 8 generic Param knobs (4 per master slot) as
+        // children. Their range / label / formatter / callbacks are populated
+        // each time configureInsertAlgorithm runs — driven by the per-algo
+        // config table in mu_ui::kInsertAlgoSlots.
+        for (auto* k : { &insParam1, &insParam2, &insParam3, &insParam4,
+                         &insParam1_2, &insParam2_2, &insParam3_2, &insParam4_2 })
             addAndMakeVisible(*k);
-        }
-        for (auto* k : { &insOutput, &insOutput2 })
-        {
-            k->setRange(-24.0, 0.0, 0.1);
-            k->setValue(0.0);
-            k->getSlider().textFromValueFunction = noVal;
-            addAndMakeVisible(*k);
-        }
-        for (auto* k : { &insTone, &insTone2 })
-        {
-            k->setRange(20.0, 20000.0, 1.0);
-            k->setValue(20000.0);
-            k->getSlider().setSkewFactorFromMidPoint(640.0);
-            k->getSlider().textFromValueFunction = noVal;
-            addAndMakeVisible(*k);
-        }
-        for (auto* k : { &insExtra, &insExtra2 })
-        {
-            k->setRange(200.0, 8000.0, 1.0);
-            k->getSlider().setSkewFactorFromMidPoint(1000.0);
-            k->setValue(1000.0);
-            k->getSlider().textFromValueFunction = noVal;
-            k->setVisible(false);
-            addAndMakeVisible(*k);
-        }
     }
 }
 
@@ -179,7 +154,10 @@ void MixerChannel::resized()
     const int insW   = hasInsert() ? s(kInsertPanelW) : 0;
     const int stripW = w - insW;
 
-    const int nameBottom = s(kColourBarH + kNameH);
+    // Name area total Y: top padding + name pill + bottom padding. Symmetric
+    // so the rhythm-colour pill border has equal breathing room above and
+    // below.
+    const int nameBottom = s(kNamePadding * 2 + kNameH);
 
     // ── Sidechain section — slot always reserved for vertical alignment ──
     const int scH = s(kSidechainH);
@@ -189,10 +167,10 @@ void MixerChannel::resized()
     scRelease  .setVisible(hasSidechainControls());
     if (hasSidechainControls())
     {
-        // scAmount renders at Size 3 (73 × 46); scAttack/Release at Size 4
-        // (36 × 39). Fixed PX, no dependency on strip width.
-        const int s3W = s(MuLookAndFeel::kKnobSize3W);
-        const int s3H = s(MuLookAndFeel::kKnobSize3H);
+        // scAmount renders at the mixer-strip knob size (kMixerStripKnobW —
+        // pinned to the strip width). scAttack/Release at Size 4.
+        const int s3W = s(MuLookAndFeel::kMixerStripKnobW);
+        const int s3H = s(MuLookAndFeel::kMixerStripKnobH);
         const int s4W = s(MuLookAndFeel::kKnobSize4W);
         const int s4H = s(MuLookAndFeel::kKnobSize4H);
         const int s3X = (stripW - s3W) / 2;
@@ -225,9 +203,9 @@ void MixerChannel::resized()
                                      && channelType != Type::ReverbReturn);
     sendReverb.setVisible(hasSends() && channelType != Type::ReverbReturn);
 
-    // Sends + pan render at Size 3 — fixed PX, no dependency on strip width.
-    const int s3W = s(MuLookAndFeel::kKnobSize3W);
-    const int s3H = s(MuLookAndFeel::kKnobSize3H);
+    // Sends + pan render at the mixer-strip knob size — pinned to strip width.
+    const int s3W = s(MuLookAndFeel::kMixerStripKnobW);
+    const int s3H = s(MuLookAndFeel::kMixerStripKnobH);
     const int s3X = (stripW - s3W) / 2;
     sendEffect.setBounds(s3X, sendY,             s3W, s3H);
     sendDelay .setBounds(s3X, sendY + sendH,     s3W, s3H);
@@ -303,57 +281,50 @@ void MixerChannel::resized()
 
         auto layoutSlot = [&](int charBoxY, int endY,
                                juce::ComboBox& charBox,
-                               KnobWithLabel& drv, KnobWithLabel& out,
-                               KnobWithLabel& ton, KnobWithLabel& ext)
+                               KnobWithLabel& p1, KnobWithLabel& p2,
+                               KnobWithLabel& p3, KnobWithLabel& p4)
         {
             charBox.setBounds(ipX, charBoxY, ipW, s(kInsCharH));
             const int ky = charBoxY + s(kInsCharH) + 2;
-            (void) endY;   // formerly used to derive an availH cap — now Size 2 H is fixed.
+            (void) endY;
 
-            // Master insert knobs render at Size 2 (55 × 56) — fixed PX, no
-            // dependency on the insert panel width. Knobs centre within their
-            // layout cell so the wider insert panel has padding around them.
             const int s2W = s(MuLookAndFeel::kKnobSize2W);
             const int s2H = s(MuLookAndFeel::kKnobSize2H);
 
-            if (charBox.getSelectedId() == 7) // EQ: stacked top→bottom = High / Mid dB / Mid Hz / Low
+            if (charBox.getSelectedId() == 7) // EQ: stacked top→bottom = P4 / P2 / P3 / P1
             {
-                const int rowH  = s2H;
                 const int knobX = ipX + (ipW - s2W) / 2;  // centre horizontally
-                // Frequency-descending order so the visual mirrors a spectrum:
-                // top = high band, bottom = low band.
-                KnobWithLabel* const eqOrder[] = { &ext, &out, &ton, &drv };
+                // Frequency-descending: P4(High dB) / P2(Mid dB) / P3(Mid Hz) / P1(Low dB)
+                KnobWithLabel* const eqOrder[] = { &p4, &p2, &p3, &p1 };
                 for (int i = 0; i < 4; ++i)
-                    eqOrder[i]->setBounds(knobX, ky + i * rowH, s2W, s2H);
+                    eqOrder[i]->setBounds(knobX, ky + i * s2H, s2W, s2H);
             }
             else
             {
+                // Pack the visible slots into a 2×2 grid; centre any odd last knob.
                 KnobWithLabel* vis[4];
                 int nVis = 0;
-                KnobWithLabel* const knobs[] = { &drv, &out, &ton, &ext };
-                for (auto* k : knobs)
+                for (auto* k : { &p1, &p2, &p3, &p4 })
                     if (k->isVisible()) vis[nVis++] = k;
 
                 if (nVis > 0)
                 {
-                    const int rowH  = s2H;
                     const int halfW = ipW / 2;
-                    const int halfKnobX = (halfW - s2W) / 2;   // centre in half-column
-
+                    const int halfKnobX = (halfW - s2W) / 2;
                     for (int i = 0; i < nVis; ++i)
                     {
                         const bool isLastOdd = (i == nVis - 1) && (nVis % 2 == 1);
                         const int kx = isLastOdd
-                                       ? ipX + (ipW - s2W) / 2          // last odd: centre in full panel
+                                       ? ipX + (ipW - s2W) / 2
                                        : ipX + (i % 2) * halfW + halfKnobX;
-                        vis[i]->setBounds(kx, ky + (i / 2) * rowH, s2W, s2H);
+                        vis[i]->setBounds(kx, ky + (i / 2) * s2H, s2W, s2H);
                     }
                 }
             }
         };
 
-        layoutSlot(slot1CharY, insertMidY,  insCharBox,  insDrive,  insOutput,  insTone,  insExtra);
-        layoutSlot(slot2CharY, h - pad,     insCharBox2, insDrive2, insOutput2, insTone2, insExtra2);
+        layoutSlot(slot1CharY, insertMidY,  insCharBox,  insParam1,   insParam2,   insParam3,   insParam4);
+        layoutSlot(slot2CharY, h - pad,     insCharBox2, insParam1_2, insParam2_2, insParam3_2, insParam4_2);
     }
 }
 void MixerChannel::setEffectSendLabel(const juce::String& name)
@@ -366,17 +337,27 @@ void MixerChannel::paint(juce::Graphics& g)
     const int w = getWidth();
     const int h = getHeight();
 
-    // Colour bar and name
-    g.setColour(channelColour);
-    g.fillRect(0, 0, w, kColourBarH);
-
+    // Rhythm colour goes JUST around the name — a rounded outline framing the
+    // name area. kNamePadding gives equal breathing room on all four sides
+    // of the kNameH-tall pill so the rhythm-colour border doesn't sit on
+    // the strip edge.
     const int stripW = w - (hasInsert() ? kInsertPanelW : 0);
 
     g.setColour(active ? MuClidLookAndFeel::colour(Id::headingText)
                        : MuClidLookAndFeel::colour(Id::mutedText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
-    g.drawText(channelName, 0, kColourBarH, stripW, kNameH,
+    g.drawText(channelName, 0, kNamePadding, stripW, kNameH,
                juce::Justification::centred, true);
+
+    // Rhythm-colour border around the name pill (rhythm strips only — returns
+    // and master keep their fixed colour scheme since they're not per-rhythm).
+    if (active && channelType == Type::Rhythm)
+    {
+        const juce::Rectangle<int> namePill {
+            kNamePadding, kNamePadding, stripW - 2 * kNamePadding, kNameH };
+        g.setColour(channelColour);
+        g.drawRoundedRectangle(namePill.toFloat(), 3.0f, 1.5f);
+    }
 
     // Right-edge channel divider
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
@@ -405,11 +386,7 @@ void MixerChannel::paint(juce::Graphics& g)
     {
         // Vertical separator between strip and insert panel
         g.setColour(borderCol.withAlpha(0.6f));
-        g.drawLine((float)stripW, (float)kColourBarH, (float)stripW, (float)h, 1.0f);
-
-        // Colour bar continuation
-        g.setColour(channelColour);
-        g.fillRect(stripW, 0, kInsertPanelW, kColourBarH);
+        g.drawLine((float)stripW, (float)kNamePadding, (float)stripW, (float)h, 1.0f);
 
         // "Main Insert 1/2" labels — rotated 90° CCW in the left strip of
         // each slot (same pattern as the section labels on the left of the
@@ -417,7 +394,7 @@ void MixerChannel::paint(juce::Graphics& g)
         // reads at the same weight as the knob values next to it.
         const juce::Colour labelCol = active ? MuClidLookAndFeel::colour(Id::valueText)
                                              : MuClidLookAndFeel::colour(Id::mutedText);
-        const int insTop = kColourBarH + kNameH;  // start of insert content area
+        const int insTop = kNamePadding * 2 + kNameH;  // start of insert content area — matches nameBottom in resized()
         g.setColour(labelCol);
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
 
@@ -451,10 +428,11 @@ void MixerChannel::paint(juce::Graphics& g)
         }
     }
 
-    // Inactive overlay
+    // Inactive overlay — covers everything below the name area
     if (!active)
     {
+        const int nameAreaEnd = kNamePadding * 2 + kNameH;
         g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::backgroundMixerStripDim));
-        g.fillRect(0, kColourBarH + kNameH, w, h - kColourBarH - kNameH);
+        g.fillRect(0, nameAreaEnd, w, h - nameAreaEnd);
     }
 }

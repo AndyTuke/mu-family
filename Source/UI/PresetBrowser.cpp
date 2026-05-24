@@ -11,7 +11,7 @@ PresetBrowser::PresetBrowser()
     addAndMakeVisible(categoryFilter);
 
     listBox.setModel(this);
-    listBox.setRowHeight(24);
+    listBox.setRowHeight(mu_ui::s(24));
     listBox.setColour(juce::ListBox::backgroundColourId,
                       MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
     addAndMakeVisible(listBox);
@@ -113,6 +113,8 @@ int PresetBrowser::getNumRows() { return (int)filteredIndices.size(); }
 void PresetBrowser::paintListBoxItem(int row, juce::Graphics& g, int w, int h, bool selected)
 {
     using Id = MuClidLookAndFeel::ColourIds;
+    using mu_ui::s;
+    using mu_ui::sf;
 
     if (selected)
     {
@@ -124,14 +126,14 @@ void PresetBrowser::paintListBoxItem(int row, juce::Graphics& g, int w, int h, b
     const auto& info = allPresets[filteredIndices[row]];
 
     g.setColour(MuClidLookAndFeel::colour(selected ? Id::headingText : Id::labelText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(12.0f)));
-    g.drawText(info.name, 8, 0, w / 2, h, juce::Justification::centredLeft, true);
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(12.0f))));
+    g.drawText(info.name, s(8), 0, w / 2, h, juce::Justification::centredLeft, true);
 
     g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));
     g.drawText(info.category, w / 2, 0, w / 4, h,
                juce::Justification::centredLeft, true);
-    g.drawText(info.description, w * 3 / 4, 0, w / 4 - 4, h,
+    g.drawText(info.description, w * 3 / 4, 0, w / 4 - s(4), h,
                juce::Justification::centredRight, true);
 
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
@@ -168,33 +170,40 @@ void PresetBrowser::listBoxItemDoubleClicked(int row, const juce::MouseEvent&)
 
 void PresetBrowser::resized()
 {
+    using mu_ui::s;
     const int w = getWidth();
     const int h = getHeight();
+    const int pad = s(kPad);
+    const int topH = s(kTopBarH);
+    const int botH = s(kBotBarH);
 
     // Top bar: search + category filter
-    int x = kPad;
-    const int searchW   = 160;
-    const int categoryW = w - searchW - kPad * 3;
-    searchBox    .setBounds(x, kPad, searchW, kTopBarH - kPad * 2);
-    categoryFilter.setBounds(x + searchW + kPad, kPad, categoryW, kTopBarH - kPad * 2);
+    int x = pad;
+    const int searchW   = s(160);
+    const int categoryW = w - searchW - pad * 3;
+    searchBox    .setBounds(x, pad, searchW, topH - pad * 2);
+    categoryFilter.setBounds(x + searchW + pad, pad, categoryW, topH - pad * 2);
 
     // Bottom bar
-    const int btnW = 80;
-    closeBtn.setBounds(kPad, h - kBotBarH + kPad, btnW, kBotBarH - kPad * 2);
-    loadBtn .setBounds(w - kPad - btnW, h - kBotBarH + kPad, btnW, kBotBarH - kPad * 2);
+    const int btnW = s(80);
+    closeBtn.setBounds(pad, h - botH + pad, btnW, botH - pad * 2);
+    loadBtn .setBounds(w - pad - btnW, h - botH + pad, btnW, botH - pad * 2);
 
     // List box fills the middle
-    listBox.setBounds(0, kTopBarH, w, h - kTopBarH - kBotBarH);
+    listBox.setBounds(0, topH, w, h - topH - botH);
 }
 
 void PresetBrowser::paint(juce::Graphics& g)
 {
     using Id = MuClidLookAndFeel::ColourIds;
+    using mu_ui::s;
     g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
     g.fillAll();
 
+    const int topH = s(kTopBarH);
+    const int botH = s(kBotBarH);
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawLine(0.0f, (float)kTopBarH, (float)getWidth(), (float)kTopBarH, 0.5f);
-    g.drawLine(0.0f, (float)(getHeight() - kBotBarH), (float)getWidth(),
-               (float)(getHeight() - kBotBarH), 0.5f);
+    g.drawLine(0.0f, (float)topH, (float)getWidth(), (float)topH, 0.5f);
+    g.drawLine(0.0f, (float)(getHeight() - botH), (float)getWidth(),
+               (float)(getHeight() - botH), 0.5f);
 }

@@ -21,11 +21,12 @@ void NudgeInput::nudge(int delta)
 
 void NudgeInput::resized()
 {
+    using mu_ui::s;
     const int w = getWidth(), h = getHeight();
-    const int arrowW = 16;
-    const int stepH  = showStepBtns ? 14 : 0;
+    const int arrowW = s(16);
+    const int stepH  = showStepBtns ? s(14) : 0;
     // Inline mode: label drawn inside display row — no vertical label space needed.
-    const int lblH   = (!showStepBtns && !label.isEmpty() && !labelInline) ? 12 : 0;
+    const int lblH   = (!showStepBtns && !label.isEmpty() && !labelInline) ? s(12) : 0;
     const int dispH  = h - stepH - lblH;
 
     upArrowBounds   = { w - arrowW, 0,       arrowW, dispH / 2 };
@@ -45,36 +46,38 @@ void NudgeInput::resized()
 void NudgeInput::paint(juce::Graphics& g)
 {
     using Id = MuClidLookAndFeel::ColourIds;
+    using mu_ui::s;
+    using mu_ui::sf;
 
     // Display area
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBg));
-    g.fillRoundedRectangle(displayBounds.toFloat(), 3.0f);
+    g.fillRoundedRectangle(displayBounds.toFloat(), sf(3.0f));
     g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawRoundedRectangle(displayBounds.toFloat().reduced(0.5f), 3.0f, 1.0f);
+    g.drawRoundedRectangle(displayBounds.toFloat().reduced(0.5f), sf(3.0f), 1.0f);
 
     if (labelInline && !label.isEmpty() && !showStepBtns)
     {
         // Label on the left, value on the right — both inside the display area.
-        const int inlineLblW = 14;
+        const int inlineLblW = s(14);
         const auto lblArea = displayBounds.withWidth(inlineLblW);
         const auto valArea = displayBounds.withTrimmedLeft(inlineLblW);
         g.setColour(MuClidLookAndFeel::colour(Id::labelText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
         g.drawText(label, lblArea, juce::Justification::centred, false);
         g.setColour(MuClidLookAndFeel::colour(Id::valueText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(13.0f))));
         g.drawText(juce::String(currentValue), valArea, juce::Justification::centred, false);
     }
     else
     {
         g.setColour(MuClidLookAndFeel::colour(Id::valueText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(13.0f))));
         g.drawText(juce::String(currentValue), displayBounds, juce::Justification::centred, false);
     }
 
     // Label below display
     g.setColour(MuClidLookAndFeel::colour(Id::labelText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
 
     // Up/down arrows
     auto drawArrow = [&](juce::Rectangle<int> bounds, bool up)
@@ -82,7 +85,7 @@ void NudgeInput::paint(juce::Graphics& g)
         g.setColour(MuClidLookAndFeel::colour(Id::labelText));
         const float cx = (float)bounds.getCentreX();
         const float cy = (float)bounds.getCentreY();
-        const float sz = 4.0f;
+        const float sz = sf(4.0f);
         juce::Path p;
         if (up)
         {
@@ -106,7 +109,7 @@ void NudgeInput::paint(juce::Graphics& g)
     if (!label.isEmpty() && !showStepBtns && !labelInline && labelBounds.getHeight() > 0)
     {
         g.setColour(MuClidLookAndFeel::colour(Id::labelText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
         g.drawText(label, labelBounds, juce::Justification::centred, false);
     }
 
@@ -121,7 +124,7 @@ void NudgeInput::paint(juce::Graphics& g)
             g.drawRect(b, 1);
             g.setColour(active ? MuClidLookAndFeel::colour(Id::segmentActiveBorder)
                                : MuClidLookAndFeel::colour(Id::segmentInactiveText));
-            g.setFont(juce::Font(juce::FontOptions{}.withHeight(9.0f)));
+            g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
             g.drawText(txt, b, juce::Justification::centred, false);
         };
         drawStep(step1Bounds,  "1",  stepSize == 1);

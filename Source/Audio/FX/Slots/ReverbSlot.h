@@ -36,6 +36,16 @@ public:
 
     void setParam(const juce::String& id, float value);
 
+    // Per-param getters — used by the UI / APVTS-push path right after
+    // setAlgorithm to read the algorithm's new defaults out of the slot and
+    // push them into APVTS so the visible knobs match the audible state.
+    float getSize()      const noexcept { return size; }
+    float getPreDelay()  const noexcept { return preDelay.load(std::memory_order_relaxed); }
+    float getDiffusion() const noexcept { return diffusion; }
+    float getDamp()      const noexcept { return damp; }
+    float getMod()       const noexcept { return mod; }
+    float getDirt()      const noexcept { return dirt.load(std::memory_order_relaxed); }
+
     static std::vector<FXAlgorithmDef> allDefs() { return FXAlgorithmRegistry::reverbAlgorithms(); }
 
 private:

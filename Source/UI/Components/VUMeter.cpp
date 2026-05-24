@@ -1,5 +1,5 @@
 #include "VUMeter.h"
-#include "MuLookAndFeel.h"
+#include "MuClidLookAndFeel.h"
 #include <cmath>
 
 VUMeter::VUMeter()  { startTimerHz(30); }
@@ -83,12 +83,13 @@ void VUMeter::mouseDown(const juce::MouseEvent&)
 
 void VUMeter::paint(juce::Graphics& g)
 {
+    using mu_ui::sf;
     const float w = (float)getWidth();
     const float h = (float)getHeight();
 
     using Id = MuLookAndFeel::ColourIds;
     g.setColour(MuLookAndFeel::colour(Id::vuMeterBackground));
-    g.fillRoundedRectangle(0.0f, 0.0f, w, h, 2.0f);
+    g.fillRoundedRectangle(0.0f, 0.0f, w, h, sf(2.0f));
 
     const float ref      = refDb();
     const float red      = redDb();
@@ -145,9 +146,9 @@ void VUMeter::paint(juce::Graphics& g)
     if (clipLit)
     {
         g.setColour(MuLookAndFeel::colour(Id::vuMeterClipFlash));
-        g.fillRect(0.0f, 0.0f, w, 3.0f);
+        g.fillRect(0.0f, 0.0f, w, sf(3.0f));
     }
 
     g.setColour(juce::Colours::black.withAlpha(0.5f));
-    g.drawRoundedRectangle(0.0f, 0.0f, w, h, 2.0f, 1.0f);
+    g.drawRoundedRectangle(0.0f, 0.0f, w, h, sf(2.0f), 1.0f);
 }

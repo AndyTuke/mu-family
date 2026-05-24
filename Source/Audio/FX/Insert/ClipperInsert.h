@@ -19,8 +19,10 @@ public:
     void process(juce::AudioBuffer<float>& buf, int ns, int nCh,
                  const VoiceParams& p, float& /*grOut*/) override
     {
-        const float thresh  = juce::jlimit(0.001f, 1.0f, p.insertDrive / 100.0f);
-        const float outGain = std::pow(10.0f, p.insertOutput / 20.0f);
+        // Slot 0 = Threshold 0..100 (encoded as 0..1 internal); Slot 1 = Output -24..0 dB.
+        const float thresh   = juce::jlimit(0.001f, 1.0f, insertSlot(p, 0) / 100.0f);
+        const float outputDb = insertSlot(p, 1);
+        const float outGain  = std::pow(10.0f, outputDb / 20.0f);
         smoothedThresh .setTargetValue(thresh);
         smoothedOutGain.setTargetValue(outGain);
         for (int ch = 0; ch < nCh; ++ch)

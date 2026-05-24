@@ -42,23 +42,24 @@ SampleBrowserContent::SampleBrowserContent(PluginProcessor& proc,
             dw->exitModalState(0);
     };
 
-    setSize(560, 470);
+    setSize(mu_ui::s(560), mu_ui::s(470));
 }
 
 SampleBrowserContent::~SampleBrowserContent() { proc.stopSamplePreview(); }
 
 void SampleBrowserContent::resized()
 {
-    auto area = getLocalBounds().reduced(8);
-    auto topRow = area.removeFromTop(26);
-    sourceToggle.setBounds(topRow.removeFromLeft(240));
-    area.removeFromTop(6);
+    using mu_ui::s;
+    auto area = getLocalBounds().reduced(s(8));
+    auto topRow = area.removeFromTop(s(26));
+    sourceToggle.setBounds(topRow.removeFromLeft(s(240)));
+    area.removeFromTop(s(6));
 
-    auto btnRow = area.removeFromBottom(32).reduced(0, 4);
-    cancelBtn.setBounds(btnRow.removeFromRight(80));
-    btnRow.removeFromRight(8);
-    loadBtn.setBounds(btnRow.removeFromRight(80));
-    browser.setBounds(area.reduced(0, 4));
+    auto btnRow = area.removeFromBottom(s(32)).reduced(0, s(4));
+    cancelBtn.setBounds(btnRow.removeFromRight(s(80)));
+    btnRow.removeFromRight(s(8));
+    loadBtn.setBounds(btnRow.removeFromRight(s(80)));
+    browser.setBounds(area.reduced(0, s(4)));
 }
 
 void SampleBrowserContent::selectionChanged()

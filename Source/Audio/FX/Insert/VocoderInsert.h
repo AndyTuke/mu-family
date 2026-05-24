@@ -93,11 +93,12 @@ public:
                  const VoiceParams& p, float& /*grOut*/) override
     {
         // ── Decode controls ─────────────────────────────────────────────
-        const int waveshape = juce::jlimit(0, 3, (int) std::round(p.insertDrive));
-        const int noteIdx   = juce::jlimit(0, 11, (int) std::round(p.insertBits - 1.0f));
-        const int octave    = juce::jlimit(1, 5, (int) std::round(p.insertDither));
-        // Unison stored in insertOutput (range -24..0). Linear map to 0..6.
-        const int unisonIdx = juce::jlimit(0, 6, (int) std::round((p.insertOutput + 24.0f) * 0.25f));
+        // Slot 0 = Wave 0..3 (int step), Slot 1 = Unison index 0..6,
+        // Slot 2 = Octave 1..5, Slot 3 = Note 1..12 (note letter = idx - 1).
+        const int waveshape = juce::jlimit(0, 3,  (int) std::round(insertSlot(p, 0)));
+        const int unisonIdx = juce::jlimit(0, 6,  (int) std::round(insertSlot(p, 1)));
+        const int octave    = juce::jlimit(1, 5,  (int) std::round(insertSlot(p, 2)));
+        const int noteIdx   = juce::jlimit(0, 11, (int) std::round(insertSlot(p, 3)) - 1);
         const int unisonN   = kUnisonVoices[unisonIdx];
 
         const bool noiseCarrier = (waveshape >= 2);

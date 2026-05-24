@@ -4,8 +4,9 @@
 // - syncRhythmParam / forceSyncRhythmFromAPVTS / syncFXParam / syncMixerParam
 // - pushRhythmToAPVTS / pushMixerChannelToAPVTS / swapAPVTSForRhythms
 //
-// Shared helpers (kRhythmSuffixes, kChannelSuffixes, kGlobalParams, applyRhythmSuffix,
-// adsrTime, adsrSus) live in PluginProcessor_Internal.h since the Preset TU needs them too.
+// Shared helpers (kChannelSuffixes, applyRhythmSuffix, adsrTime, adsrSus)
+// live in PluginProcessor_Internal.h since the Preset TU needs them too.
+// Global param IDs live in kGlobalParamDefs (PresetHelpers.h).
 
 #include "PluginProcessor.h"
 #include "PluginProcessor_Internal.h"
@@ -98,6 +99,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         // Logic
         addI(p+"logic",  n+"Logic",        0,   4,   0);
         addB(p+"patLeg", n+"Pattern Legato", false);
+        addB(p+"vMono",  n+"Voice Mono", false);  // true = polyphony capped at 1 voice
         addI(p+"rstSt",  n+"Reset Steps", -1, 256, -1);  // -1 = free-running (nullopt)
         // Pitch
         addI(p+"pitchOct",  n+"Pitch Oct",  -4,   4,  0);
@@ -148,15 +150,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addAdsrT(p+"aEnvRel", n+"A Env Rel", 0.5f);
         addB(p+"aEnvLeg",   n+"A Env Legato", false);
         addF(p+"accentDb",  n+"Accent",     0.0f,  12.0f,  0.0f);
-        // Drive
-        addI(p+"drvChar",    n+"Drive Char",   0,     13,      0);  // 0=None … 12=Vocoder (#423), 13=VocoderSt (#445)
-        addF(p+"drvDrv",     n+"Drive",        0.0f, 100.0f,    0.0f);  // Soft/Hard/Fold drive amount
-        addF(p+"drvOut",     n+"Drive Out",  -24.0f,   24.0f,   0.0f);  // insert output / makeup gain
-        addF(p+"drvBits",    n+"Bits",         0.0f,  16.0f,   16.0f);  // Bitcrusher bit depth (#429: range extended to 0 so Karplus Octave 0 fits)
-        addF(p+"drvRate",    n+"Drive Rate",  100.0f, 48000.0f, 48000.0f);  // Bitcrusher sample rate
-        addF(p+"drvDit",     n+"Dither",       0.0f, 100.0f,    0.0f);  // Bitcrusher dither amount
-        addF(p+"drvTon",     n+"Drive Tone",  20.0f, 20000.0f, 20000.0f);  // Shared LPF
-        addF(p+"eqMidGain",  n+"EQ Mid Gain",-18.0f,  18.0f,   0.0f);  // EQ mid-band gain (#129)
+        // Insert effect: algo selector + 4 generic Param slots stored as 0..1
+        // normalised. Each algorithm's process() reads p.insertParam[N] and
+        // converts to the actual value through mu_ui::normToActual using the
+        // per-slot range / skew table in Source/Audio/InsertSlotConfig.h. DAW
+        // automation lanes show 0..1; the editor UI shows the actual value
+        // with the correct unit ("Drive %" / "Bits" / "Mid Hz" / "Note" / ...)
+        // based on the active algorithm.
+        addI(p+"drvChar", n+"Insert Algo", 0, mu_audio::kInsertAlgorithmCount - 1, 0);
+        addF(p+"insP1",   n+"Insert P1",   0.0f, 1.0f, 0.0f);
+        addF(p+"insP2",   n+"Insert P2",   0.0f, 1.0f, 0.0f);
+        addF(p+"insP3",   n+"Insert P3",   0.0f, 1.0f, 0.0f);
+        addF(p+"insP4",   n+"Insert P4",   0.0f, 1.0f, 0.0f);
     }
 
     // ── Effect slot (8 params) ────────────────────────────────────────────────
@@ -172,27 +177,35 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     addF("eff_p4", "Effect P4", 0.0f, 1.0f, 0.5f);
 
     // ── Delay slot (11 params) ────────────────────────────────────────────────
+    // Defaults: Sync mode ON, dotted 1/8, 30% feedback — the user's preferred
+    // out-of-the-box delay feel (musical timing, moderate repeats).
     addB("dly_en",        "Delay Enable",    true);
-    addB("dly_mode",      "Delay Sync",      false);
+    addB("dly_mode",      "Delay Sync",      true);
     addF("dly_ms",        "Delay Time (ms)", 1.0f, 4000.0f, 250.0f);
-    addI("dly_syncDenom", "Delay Denom",     0, 3, 3);   // 0=1/32, 1=1/16, 2=1/8, 3=1/4
-    addB("dly_syncDot",   "Delay Dotted",    false);
+    addI("dly_syncDenom", "Delay Denom",     0, 3, 2);   // 0=1/32, 1=1/16, 2=1/8, 3=1/4
+    addB("dly_syncDot",   "Delay Dotted",    true);
     addB("dly_syncTrip",  "Delay Triplet",   false);
     addI("dly_count",     "Delay Count",     1, 8, 1);
-    addF("dly_fb",        "Delay Feedback",  0.0f,  0.98f, 0.45f);
+    addF("dly_fb",        "Delay Feedback",  0.0f,  0.98f, 0.30f);
     addF("dly_spread",    "Delay Spread",    0.0f,  1.0f,  0.0f);
     addF("dly_dirt",      "Delay Dirt",      0.0f,  1.0f,  0.0f);
     addF("dly_send",      "Delay Send",      0.0f,  1.0f,  1.0f);
 
     // ── Reverb slot (9 params) ────────────────────────────────────────────────
-    addI("rev_algo", "Reverb Algorithm",  0, 3,  0);
+    // Defaults match the Hall algorithm preset (rev_algo=1) so the knobs read
+    // the same values the slot loads at startup. ReverbSlot::applyAlgorithmPreset
+    // overwrites the slot's internal fields per-algorithm; matching those here
+    // means initial paint shows what the user hears without needing to touch
+    // each knob to sync. Switching to a different algorithm later still pushes
+    // that algorithm's defaults to APVTS via MixerOverlay::onAlgorithmChanged.
+    addI("rev_algo", "Reverb Algorithm",  0, 3,  1);          // 1 = Hall
     addB("rev_en",   "Reverb Enable",     true);
     addF("rev_lvl",  "Reverb Level",  0.0f,   1.0f,  1.0f);
-    addF("rev_size", "Reverb Size",   0.0f,   1.0f,  0.5f);
-    addF("rev_pre",  "Reverb Pre-Delay", 0.0f, 100.0f, 10.0f);
-    addF("rev_diff", "Reverb Diffusion", 0.0f,   1.0f,  0.7f);
-    addF("rev_damp", "Reverb Damp",   0.0f,   1.0f,  0.4f);
-    addF("rev_mod",  "Reverb Mod",    0.0f,   1.0f,  0.2f);
+    addF("rev_size", "Reverb Size",   0.0f,   1.0f,  0.75f);   // Hall default
+    addF("rev_pre",  "Reverb Pre-Delay", 0.0f, 100.0f, 25.0f); // Hall default
+    addF("rev_diff", "Reverb Diffusion", 0.0f,   1.0f,  0.80f); // Hall default
+    addF("rev_damp", "Reverb Damp",   0.0f,   1.0f,  0.30f);   // Hall default
+    addF("rev_mod",  "Reverb Mod",    0.0f,   1.0f,  0.15f);   // Hall default
     addF("rev_dirt", "Reverb Dirt",   0.0f,   1.0f,  0.0f);
 
     // ── Intra-FX routing (3 params) ───────────────────────────────────────────
@@ -255,23 +268,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     addF("mstr_pan",    "Master Pan",      -1.0f,    1.0f,     0.0f);
     addI("mstrLoop",    "Master Loop",      0,       16,       0);      // 0=free, 1-16 → 16-256 steps
     // Master insert effect (#124): same algorithm set as per-rhythm voice INSERT.
-    addI("mst_insChar", "Mst Insert Char",  0,       13,       0);      // 0=None … 12=Vocoder, 13=VocoderSt
-    addF("mst_insDrv",  "Mst Insert Drive", 0.0f,  100.0f,     0.0f);
-    addF("mst_insOut",  "Mst Insert Out", -24.0f,   24.0f,     0.0f);
-    addF("mst_insBits", "Mst Insert Bits",  0.0f,   16.0f,    16.0f);
-    addF("mst_insRate", "Mst Insert Rate", 100.0f, 48000.0f, 48000.0f);
-    addF("mst_insDit",  "Mst Insert Dit",   0.0f,  100.0f,     0.0f);
-    addF("mst_insTon",  "Mst Insert Tone", 20.0f, 20000.0f, 20000.0f);
-    addF("mst_insMid",  "Mst Insert Mid", -18.0f,   18.0f,     0.0f);  // EQ mid gain
+    // Stage 36: collapsed to algo + 4 generic Param slots (normalised 0..1)
+    // matching the per-rhythm insert layout above. See InsertSlotConfig.h.
+    addI("mst_insChar", "Mst Insert Algo", 0, mu_audio::kInsertAlgorithmCount - 1, 0);
+    addF("mst_insP1",   "Mst Insert P1",   0.0f, 1.0f, 0.0f);
+    addF("mst_insP2",   "Mst Insert P2",   0.0f, 1.0f, 0.0f);
+    addF("mst_insP3",   "Mst Insert P3",   0.0f, 1.0f, 0.0f);
+    addF("mst_insP4",   "Mst Insert P4",   0.0f, 1.0f, 0.0f);
     // Master insert 2 (#283): chained after insert 1.
-    addI("mst_ins2Char","Mst Insert2 Char", 0,       13,       0);
-    addF("mst_ins2Drv", "Mst Insert2 Drive",0.0f,  100.0f,     0.0f);
-    addF("mst_ins2Out", "Mst Insert2 Out",-24.0f,   24.0f,     0.0f);
-    addF("mst_ins2Bits","Mst Insert2 Bits", 0.0f,   16.0f,    16.0f);
-    addF("mst_ins2Rate","Mst Insert2 Rate",100.0f,48000.0f, 48000.0f);
-    addF("mst_ins2Dit", "Mst Insert2 Dit",  0.0f,  100.0f,     0.0f);
-    addF("mst_ins2Ton", "Mst Insert2 Tone",20.0f, 20000.0f, 20000.0f);
-    addF("mst_ins2Mid", "Mst Insert2 Mid",-18.0f,   18.0f,     0.0f);
+    addI("mst_ins2Char","Mst Insert2 Algo",0, mu_audio::kInsertAlgorithmCount - 1, 0);
+    addF("mst_ins2P1",  "Mst Insert2 P1",  0.0f, 1.0f, 0.0f);
+    addF("mst_ins2P2",  "Mst Insert2 P2",  0.0f, 1.0f, 0.0f);
+    addF("mst_ins2P3",  "Mst Insert2 P3",  0.0f, 1.0f, 0.0f);
+    addF("mst_ins2P4",  "Mst Insert2 P4",  0.0f, 1.0f, 0.0f);
 
 #if MUCLID_LITE_BUILD
     addI("lite_midiNote",   "MIDI Note", 0, 127, 36);
@@ -320,7 +329,17 @@ void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float 
     Rhythm& r = sequencer.getRhythm(ri);
     bool patternDirty = false;
     bool voiceDirty   = false;
-    applyRhythmSuffix(suffix, v, r, patternDirty, voiceDirty);
+
+    // Hold voiceParamsLock for the field mutation so the audio-thread
+    // modulation seed copy can't observe a torn write. Spin until acquired
+    // (audio side holds it for nanoseconds at a time).
+    {
+        bool expected = false;
+        while (! r.voiceParamsLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+            expected = false;
+        applyRhythmSuffix(suffix, v, r, patternDirty, voiceDirty);
+        r.voiceParamsLock.store(false, std::memory_order_release);
+    }
 
     if (!apvtsLoading.load(std::memory_order_acquire))
     {
@@ -346,10 +365,21 @@ void PluginProcessor::forceSyncRhythmFromAPVTS(int ri)
 
     bool patternDirty = false;
     bool voiceDirty   = false;
+    // Acquire/release per-field so the audio thread can squeeze its (very
+    // brief) seed-copy lock window in between our writes. Holding the lock
+    // across the whole bulk apply (~52 entries) would starve the audio thread
+    // for tens of microseconds — unacceptable even though forceSync usually
+    // runs from preset / state-restore paths.
     for (int j = 0; j < kRhythmParamCount; ++j)
     {
         if (auto* raw = apvts.getRawParameterValue(prefix + kRhythmParamDefs[j].suffix))
+        {
+            bool expected = false;
+            while (! r.voiceParamsLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+                expected = false;
             applyRhythmSuffix(kRhythmParamDefs[j].suffix, raw->load(), r, patternDirty, voiceDirty);
+            r.voiceParamsLock.store(false, std::memory_order_release);
+        }
     }
 
     if (patternDirty) sequencer.updatePattern(ri);
@@ -387,10 +417,12 @@ void PluginProcessor::syncFXParam(const juce::String& id, float v)
     else if (id == "dly_ms")   { dly.setDelayMs(v); }
     else if (id == "dly_syncDenom" || id == "dly_syncDot" || id == "dly_syncTrip")
     {
+        // Cached pointers (see PluginProcessor::ctor) so this audio-thread-
+        // reachable path doesn't do three hash-keyed lookups per automation tick.
         static const int denoms[] = { 32, 16, 8, 4 };
-        int idx  = juce::jlimit(0, 3, (int)*apvts.getRawParameterValue("dly_syncDenom"));
-        bool dot = *apvts.getRawParameterValue("dly_syncDot")  > 0.5f;
-        bool tri = *apvts.getRawParameterValue("dly_syncTrip") > 0.5f;
+        int idx  = juce::jlimit(0, 3, (int) dlySyncDenomPtr->load());
+        bool dot = dlySyncDotPtr ->load() > 0.5f;
+        bool tri = dlySyncTripPtr->load() > 0.5f;
         dly.setTimeDivision(denoms[idx], dot, tri);
     }
     else if (id == "dly_count")  { dly.setTimeCount(juce::jmax(1, (int)v)); }
@@ -416,9 +448,9 @@ void PluginProcessor::syncFXParam(const juce::String& id, float v)
     else if (id == "echo_syncDenom" || id == "echo_syncDot" || id == "echo_syncTrip")
     {
         static const int denoms[] = { 32, 16, 8, 4 };
-        int  idx = juce::jlimit(0, 3, (int)*apvts.getRawParameterValue("echo_syncDenom"));
-        bool dot = *apvts.getRawParameterValue("echo_syncDot")  > 0.5f;
-        bool tri = *apvts.getRawParameterValue("echo_syncTrip") > 0.5f;
+        int  idx = juce::jlimit(0, 3, (int) echoSyncDenomPtr->load());
+        bool dot = echoSyncDotPtr ->load() > 0.5f;
+        bool tri = echoSyncTripPtr->load() > 0.5f;
         eff.getEchoDelay().setTimeDivision(denoms[idx], dot, tri);
     }
     else if (id == "echo_count")  { eff.getEchoDelay().setTimeCount(juce::jmax(1, (int)v)); }
@@ -479,22 +511,16 @@ void PluginProcessor::syncMixerParam(const juce::String& id, float v)
 
     if      (id == "mstr_lvl") mixerEngine.masterLevel = v;
     else if (id == "mstr_pan") mixerEngine.masterPan   = v;
-    else if (id == "mst_insChar")  mixerEngine.masterInsertParams.insertAlgo  = juce::jlimit(0, 13, (int)v);
-    else if (id == "mst_insDrv")   mixerEngine.masterInsertParams.insertDrive = v;
-    else if (id == "mst_insOut")   mixerEngine.masterInsertParams.insertOutput= v;
-    else if (id == "mst_insBits")  mixerEngine.masterInsertParams.insertBits    = v;
-    else if (id == "mst_insRate")  mixerEngine.masterInsertParams.insertRate  = v;
-    else if (id == "mst_insDit")   mixerEngine.masterInsertParams.insertDither  = v;
-    else if (id == "mst_insTon")   mixerEngine.masterInsertParams.insertTone  = v;
-    else if (id == "mst_insMid")   mixerEngine.masterInsertParams.insertEqMid  = v;
-    else if (id == "mst_ins2Char") mixerEngine.masterInsertParams2.insertAlgo  = juce::jlimit(0, 13, (int)v);
-    else if (id == "mst_ins2Drv")  mixerEngine.masterInsertParams2.insertDrive = v;
-    else if (id == "mst_ins2Out")  mixerEngine.masterInsertParams2.insertOutput= v;
-    else if (id == "mst_ins2Bits") mixerEngine.masterInsertParams2.insertBits    = v;
-    else if (id == "mst_ins2Rate") mixerEngine.masterInsertParams2.insertRate  = v;
-    else if (id == "mst_ins2Dit")  mixerEngine.masterInsertParams2.insertDither  = v;
-    else if (id == "mst_ins2Ton")  mixerEngine.masterInsertParams2.insertTone  = v;
-    else if (id == "mst_ins2Mid")  mixerEngine.masterInsertParams2.insertEqMid  = v;
+    else if (id == "mst_insChar")  mixerEngine.masterInsertParams.insertAlgo  = juce::jlimit(0, mu_audio::kInsertAlgorithmCount - 1, (int)v);
+    else if (id == "mst_insP1")    mixerEngine.masterInsertParams.insertParam[0] = v;
+    else if (id == "mst_insP2")    mixerEngine.masterInsertParams.insertParam[1] = v;
+    else if (id == "mst_insP3")    mixerEngine.masterInsertParams.insertParam[2] = v;
+    else if (id == "mst_insP4")    mixerEngine.masterInsertParams.insertParam[3] = v;
+    else if (id == "mst_ins2Char") mixerEngine.masterInsertParams2.insertAlgo  = juce::jlimit(0, mu_audio::kInsertAlgorithmCount - 1, (int)v);
+    else if (id == "mst_ins2P1")   mixerEngine.masterInsertParams2.insertParam[0] = v;
+    else if (id == "mst_ins2P2")   mixerEngine.masterInsertParams2.insertParam[1] = v;
+    else if (id == "mst_ins2P3")   mixerEngine.masterInsertParams2.insertParam[2] = v;
+    else if (id == "mst_ins2P4")   mixerEngine.masterInsertParams2.insertParam[3] = v;
 }
 
 //==============================================================================

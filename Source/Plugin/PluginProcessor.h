@@ -92,6 +92,18 @@ public:
     void   setMultiBusEnabled(bool on);
     bool   getMultiBusEnabled() const { return multiBusEnabled.load(std::memory_order_relaxed); }
 
+    // UI scale (Medium=1.0, Large=1.25). Persisted via appSettings. Editor reads
+    // at ctor time and applies to mu_ui::scale BEFORE constructing children so
+    // ctor-time fonts (#574) pick up the right size on a fresh open. Runtime
+    // changes go via setUiScale → onUiScaleChanged callback so the editor can
+    // resize + relayout live (with a "reopen for fonts" hint near the picker).
+    static constexpr float kUiScaleMedium = 1.0f;
+    static constexpr float kUiScaleLarge  = 1.25f;
+    void  setUiScale(float scale);
+    float getUiScale() const noexcept { return uiScale; }
+    // Editor registers here to react to a settings-overlay-driven scale change.
+    std::function<void(float)> onUiScaleChanged;
+
     static constexpr int kMasterBusIndex   = 0;
     static constexpr int kFirstDirectOutBus = 1;   // Out 1 = bus 1 ... Out 8 = bus 8
     static constexpr int kFXReturnsBusIndex = 9;
@@ -308,6 +320,10 @@ private:
     // persisted to appSettings so it survives across plugin instances.
     std::atomic<bool> multiBusEnabled { true };
 
+    // UI scale (Medium=1.0 baseline, Large=1.25). Persisted via appSettings;
+    // editor consults at ctor + reacts to runtime changes via onUiScaleChanged.
+    float uiScale { kUiScaleMedium };
+
     MidiClockSync midiClockSync;
 
     // Pre-allocated modulation parameter map — reused every block to avoid audio-thread allocation.
@@ -339,6 +355,21 @@ private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void syncRhythmParam(int ri, const juce::String& suffix, float v);
     void syncFXParam(const juce::String& id, float v);
+
+    // Cached APVTS atomic pointers for the per-sync-param family reads in
+    // syncFXParam. parameterChanged for dly_syncDenom/Dot/Trip and
+    // echo_syncDenom/Dot/Trip needs the sibling values to call
+    // DelaySlot::setTimeDivision(denoms[idx], dot, tri); without caching, that
+    // path does three string-keyed hash lookups per host-automation tick on
+    // potentially the audio thread. Pointers are populated once in the ctor
+    // (after createParameterLayout() runs) and stay valid for the processor's
+    // lifetime — APVTS owns the underlying juce::AudioParameter objects.
+    std::atomic<float>* dlySyncDenomPtr = nullptr;
+    std::atomic<float>* dlySyncDotPtr   = nullptr;
+    std::atomic<float>* dlySyncTripPtr  = nullptr;
+    std::atomic<float>* echoSyncDenomPtr = nullptr;
+    std::atomic<float>* echoSyncDotPtr   = nullptr;
+    std::atomic<float>* echoSyncTripPtr  = nullptr;
     void syncMixerParam(const juce::String& id, float v);
     void pushRhythmToAPVTS(int ri);
     // Force-applies all APVTS r{i}_ params back into Rhythm fields, bypassing

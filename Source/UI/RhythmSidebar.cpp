@@ -26,7 +26,7 @@ void RhythmSidebar::refreshItems()
     {
         auto item = std::make_unique<SidebarItem>(i);
         const Rhythm& r = proc.getRhythm(i);
-        juce::Colour col = MuClidLookAndFeel::rhythmPalette[r.colourIndex % 30];
+        juce::Colour col = MuClidLookAndFeel::rhythmPalette[r.colourIndex % MuClidLookAndFeel::kRhythmPaletteSize];
         item->setRhythm(&r, col);
         item->setSelected(i == selectedIndex);
         item->setPlayState(&proc.rhythmPlayState[i], &proc.beatFraction, &proc.sequencerPlaying);
@@ -54,15 +54,17 @@ void RhythmSidebar::refreshItems()
 
 void RhythmSidebar::layoutItems(bool animate, int newItemIndex)
 {
-    const int w = itemContainer.getWidth();
+    using mu_ui::s;
+    const int w  = itemContainer.getWidth();
+    const int ih = s(kItemH);
     for (int i = 0; i < (int)items.size(); i++)
     {
-        const juce::Rectangle<int> target(0, i * kItemH, w, kItemH);
+        const juce::Rectangle<int> target(0, i * ih, w, ih);
         if (animate && i == newItemIndex)
         {
             // Start below and transparent, fade + slide into the correct position
             items[i]->setAlpha(0.0f);
-            items[i]->setBounds(0, (i + 1) * kItemH, w, kItemH);
+            items[i]->setBounds(0, (i + 1) * ih, w, ih);
             animator.animateComponent(items[i].get(), target, 1.0f, 120, false, 0.0, 1.0);
         }
         else if (animate)
@@ -234,16 +236,19 @@ void RhythmSidebar::cancelDrag()
 
 void RhythmSidebar::resized()
 {
-    const int w = getWidth();
-    const int h = getHeight();
-    const int addBtnY = h - kAddBtnH - 4;
+    using mu_ui::s;
+    const int w  = getWidth();
+    const int h  = getHeight();
+    const int ih = s(kItemH);
+    const int ah = s(kAddBtnH);
+    const int addBtnY = h - ah - s(4);
 
-    addButton.setBounds(4, addBtnY, w - 8, kAddBtnH);
-    viewport.setBounds(0, 0, w, addBtnY - 2);
-    itemContainer.setSize(w, juce::jmax(1, (int)items.size() * kItemH));
+    addButton.setBounds(s(4), addBtnY, w - s(8), ah);
+    viewport.setBounds(0, 0, w, addBtnY - s(2));
+    itemContainer.setSize(w, juce::jmax(1, (int)items.size() * ih));
 
     for (int i = 0; i < (int)items.size(); i++)
-        items[i]->setBounds(0, i * kItemH, w, kItemH);
+        items[i]->setBounds(0, i * ih, w, ih);
 }
 
 void RhythmSidebar::timerCallback()

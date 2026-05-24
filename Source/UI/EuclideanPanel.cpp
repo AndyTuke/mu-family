@@ -10,7 +10,7 @@ EuclideanPanel::EuclideanPanel(PluginProcessor& p) : proc(p)
         addAndMakeVisible(k);
 
     for (auto* s : { &prePadModeA, &postPadModeA, &insertModeA,
-                     &legatoCtrl, &logicCtrl,
+                     &legatoCtrl, &monoCtrl, &logicCtrl,
                      &prePadModeB, &postPadModeB, &insertModeB,
                      &prePadModeC, &postPadModeC, &insertModeC })
         addAndMakeVisible(s);
@@ -35,8 +35,13 @@ EuclideanPanel::EuclideanPanel(PluginProcessor& p) : proc(p)
 void EuclideanPanel::apvtsSet(const char* suffix, float v)
 {
     if (rhythmIndex < 0) return;
-    const auto id = "r" + juce::String(rhythmIndex) + "_" + suffix;
-    if (auto* p = proc.apvts.getParameter(id))
+    auto it = paramPtrCache.find(suffix);
+    if (it == paramPtrCache.end())
+    {
+        const auto id = "r" + juce::String(rhythmIndex) + "_" + suffix;
+        it = paramPtrCache.emplace(suffix, proc.apvts.getParameter(id)).first;
+    }
+    if (auto* p = it->second)
         p->setValueNotifyingHost(p->convertTo0to1(v));
 }
 
@@ -100,8 +105,16 @@ void EuclideanPanel::wireCallbacks()
         if (onStatusUpdate) onStatusUpdate("Pattern Legato", idx > 0 ? "On" : "Off");
     };
 
+    // Mono = polyphony cap. VoiceEngine::trigger forces voices[0] when active.
+    // Independent of legato — Legato controls retrigger behaviour on the
+    // single voice that exists in mono mode.
+    monoCtrl.onChange = [this, notify](int idx) {
+        apvtsSet("vMono", idx > 0 ? 1.0f : 0.0f);  notify();
+        if (onStatusUpdate) onStatusUpdate("Voice Mode", idx > 0 ? "Mono" : "Poly");
+    };
+
     // ── Logic ─────────────────────────────────────────────────────────────────
-    static const char* const logicNames[] = { "OR", "AND", "XOR", "A", "B" };
+    static const char* const logicNames[] = { "OR", "AND", "XOR", "A not B", "B not A" };
     logicCtrl.onChange = [this, notify](int idx) {
         apvtsSet("logic", (float)idx);  notify();
         if (onStatusUpdate && idx >= 0 && idx < 5)
@@ -197,6 +210,8 @@ void EuclideanPanel::wireCallbacks()
 
 void EuclideanPanel::setRhythm(int ri)
 {
+    if (ri != rhythmIndex)
+        paramPtrCache.clear();   // cached pointers were keyed to the previous rhythmIndex's IDs
     rhythmIndex = ri;
     loadFromRhythm();
 }
@@ -242,6 +257,7 @@ void EuclideanPanel::loadFromRhythm()
         if (r.logic == logics[i]) { logicCtrl.setSelectedIndex(i); break; }
 
     legatoCtrl.setSelectedIndex(r.patternLegato ? 1 : 0);
+    monoCtrl  .setSelectedIndex(r.voiceParams.voiceMono ? 1 : 0);
 }
 
 void EuclideanPanel::refreshSuffix(const juce::String& suffix)
@@ -294,9 +310,12 @@ void EuclideanPanel::refreshSuffix(const juce::String& suffix)
         for (int i = 0; i < 5; i++)
             if (r.logic == logics[i]) { logicCtrl.setSelectedIndex(i); break; }
     }
-    // ── Legato (#419)
+    // ── Legato
     else if (suffix == "patLeg")
         legatoCtrl.setSelectedIndex(r.patternLegato ? 1 : 0);
+    // ── Voice Mono
+    else if (suffix == "vMono")
+        monoCtrl.setSelectedIndex(r.voiceParams.voiceMono ? 1 : 0);
 }
 
 void EuclideanPanel::updateRangesA(int steps)
@@ -417,9 +436,10 @@ void EuclideanPanel::resized()
     constexpr int preSw_x  = padX + mP + (pW - mP - padSw) / 2;
     constexpr int postSw_x = padX + pW + (pW - mP - padSw) / 2;
 
-    // Steps/Hits/Rotate render at Size 1 (88 × 70). Pad / insert knobs render
-    // at Size 3 (73 × 46), centred horizontally inside their layout column.
-    // Knob dimensions never depend on the panel's height — fixed PX always.
+    // Steps/Hits/Rotate render at Size 1; pad / insert knobs render at Size 3,
+    // centred horizontally inside their layout column. W × H per bucket lives
+    // in MuLookAndFeel — comments referencing dimensions would rot if the
+    // bucket sizes change, so they're omitted here.
     constexpr int padKnobW      = MuLookAndFeel::kKnobSize3W;
     constexpr int padKnobH      = MuLookAndFeel::kKnobSize3H;
     constexpr int padKnobOffset = (pW - padKnobW) / 2;
@@ -452,15 +472,17 @@ void EuclideanPanel::resized()
     placeRow(y, stepsA, hitsA, rotA, prePadA, postPadA, prePadModeA, postPadModeA, insertStA, insertLenA, insertModeA);
 
     y += rowH;
-    // split the logic row into [Legato] | gap | [Logic]. Layout
+    // Three-up logic row: [Legato] | gap | [Mono] | gap | [Logic]. Layout
     // constants live in the header so paint() can mirror them exactly.
     {
         constexpr int rowX   = kOuter + kLogicMP;
         constexpr int rowW   = innerW - kLogicMP * 2;
-        constexpr int logicX = rowX + kLegatoW + kLogicGapW;
-        constexpr int logicW = rowW - kLegatoW - kLogicGapW;
+        constexpr int monoX  = rowX + kLegatoW + kLogicGapW;
+        constexpr int logicX = monoX + kMonoW + kLogicGapW;
+        constexpr int logicW = rowW - kLegatoW - kMonoW - kLogicGapW * 2;
 
         legatoCtrl.setBounds(s(rowX),   s(y + 3), s(kLegatoW), s(kLogicH - 6));
+        monoCtrl  .setBounds(s(monoX),  s(y + 3), s(kMonoW),   s(kLogicH - 6));
         logicCtrl .setBounds(s(logicX), s(y + 3), s(logicW),   s(kLogicH - 6));
     }
 
@@ -513,11 +535,15 @@ void EuclideanPanel::paint(juce::Graphics& g)
         constexpr int rowY   = kOuter + rowH;
         constexpr int rowX   = kOuter + kLogicMP;
         constexpr int rowW   = innerW - kLogicMP * 2;
-        constexpr int logicX = rowX + kLegatoW + kLogicGapW;
-        constexpr int logicW = rowW - kLegatoW - kLogicGapW;
+        constexpr int monoX  = rowX + kLegatoW + kLogicGapW;
+        constexpr int logicX = monoX + kMonoW + kLogicGapW;
+        constexpr int logicW = rowW - kLegatoW - kMonoW - kLogicGapW * 2;
 
+        // Three sub-panel borders matching the resized() split.
         g.drawRoundedRectangle((float) s(rowX - kLogicMP),      (float) s(rowY) + 2.0f,
                                (float) s(kLegatoW + kLogicMP),  (float) s(kLogicH) - 4.0f, 4.0f, 1.0f);
+        g.drawRoundedRectangle((float) s(monoX),                (float) s(rowY) + 2.0f,
+                               (float) s(kMonoW),               (float) s(kLogicH) - 4.0f, 4.0f, 1.0f);
         g.drawRoundedRectangle((float) s(logicX),               (float) s(rowY) + 2.0f,
                                (float) s(logicW + kLogicMP),    (float) s(kLogicH) - 4.0f, 4.0f, 1.0f);
     }

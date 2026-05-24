@@ -107,6 +107,9 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
     // patternLegato is sequencer-level — no engine sync needed.
     { "patLeg",    [](float v, Rhythm& r, bool&, bool&)     { r.patternLegato = (v > 0.5f); },
                    [](const Rhythm& r) -> float { return r.patternLegato ? 1.0f : 0.0f; },  ParamKind::Bool },
+    // voiceMono — polyphony cap. VoiceEngine::trigger consults activeParams.voiceMono.
+    { "vMono",     [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.voiceMono = (v > 0.5f); vd = true; },
+                   [](const Rhythm& r) -> float { return r.voiceParams.voiceMono ? 1.0f : 0.0f; },  ParamKind::Bool },
     // resetSteps: -1 → nullopt (free-running); 1..256 → fixed cycle length.
     { "rstSt",     [](float v, Rhythm& r, bool& pd, bool&)  {
                        const int n = (int)v;
@@ -186,26 +189,21 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
     { "accentDb",  [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.accentDb = v; vd = true; },
                    [](const Rhythm& r) -> float { return r.voiceParams.accentDb; } },
 
-    // ── Insert / drive ────────────────────────────────────────────────────────
-    // Stage 35: drvChar is an algorithm selector → string name in v2 preset XML.
-    // Upper bound is derived from kInsertAlgorithmNames so it auto-tracks new entries.
-    { "drvChar",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertAlgo  = juce::jlimit(0, mu_audio::countNames(mu_audio::kInsertAlgorithmNames) - 1, (int)v); vd = true; },
+    // ── Insert ────────────────────────────────────────────────────────────────
+    // Stage 36: 4 generic slots (insP1..insP4) replace the prior 9 named insert
+    // fields. APVTS storage + VoiceParams storage are both NORMALISED 0..1;
+    // algorithms denormalise per-slot via mu_ui::normToActual at process time.
+    { "drvChar",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertAlgo  = juce::jlimit(0, mu_audio::kInsertAlgorithmCount - 1, (int)v); vd = true; },
                    [](const Rhythm& r) -> float { return (float) r.voiceParams.insertAlgo; },
                    ParamKind::AlgorithmIndex, mu_audio::kInsertAlgorithmNames },
-    { "drvDrv",    [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertDrive  = v; vd = true; },
-                   [](const Rhythm& r) -> float { return r.voiceParams.insertDrive; } },
-    { "drvOut",    [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertOutput = v; vd = true; },
-                   [](const Rhythm& r) -> float { return r.voiceParams.insertOutput; } },
-    { "drvBits",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertBits     = v; vd = true; },
-                   [](const Rhythm& r) -> float { return r.voiceParams.insertBits; } },
-    { "drvRate",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertRate   = v; vd = true; },
-                   [](const Rhythm& r) -> float { return r.voiceParams.insertRate; } },
-    { "drvDit",    [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertDither   = v; vd = true; },
-                   [](const Rhythm& r) -> float { return r.voiceParams.insertDither; } },
-    { "drvTon",    [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertTone   = v; vd = true; },
-                   [](const Rhythm& r) -> float { return r.voiceParams.insertTone; } },
-    { "eqMidGain", [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertEqMid   = v; vd = true; },
-                   [](const Rhythm& r) -> float { return r.voiceParams.insertEqMid; } },
+    { "insP1",     [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertParam[0] = v; vd = true; },
+                   [](const Rhythm& r) -> float { return r.voiceParams.insertParam[0]; } },
+    { "insP2",     [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertParam[1] = v; vd = true; },
+                   [](const Rhythm& r) -> float { return r.voiceParams.insertParam[1]; } },
+    { "insP3",     [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertParam[2] = v; vd = true; },
+                   [](const Rhythm& r) -> float { return r.voiceParams.insertParam[2]; } },
+    { "insP4",     [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertParam[3] = v; vd = true; },
+                   [](const Rhythm& r) -> float { return r.voiceParams.insertParam[3]; } },
 };
 
 inline constexpr int kRhythmParamCount = (int)(sizeof(kRhythmParamDefs) / sizeof(kRhythmParamDefs[0]));

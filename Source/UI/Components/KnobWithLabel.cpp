@@ -72,10 +72,30 @@ void KnobWithLabel::setModulatedNorm(float norm01)
     }
 }
 
+void KnobWithLabel::setModulatedActual(float actualValue) noexcept
+{
+    // Route the actual value through the slider's own proportion-of-length so
+    // the arc respects the slider's skew (setSkewFactor / setSkewFactorFromMidPoint)
+    // by construction — same path as the needle's baseAngle in paintOverChildren.
+    // Without this, a snapshot pre-normalised via a different curve (e.g. pure
+    // log) than the slider (e.g. midPoint skew) makes the arc cross over the
+    // needle: appearing as a "negative" indicator below the midPoint and
+    // "positive" above. Original bug visible on Filter Cutoff at low values
+    // (mod ring drew counter-clockwise from the needle) vs high values (drew
+    // clockwise) — same mod amount, different visual.
+    if (std::isnan(actualValue))
+    {
+        setModulatedNorm(std::numeric_limits<float>::quiet_NaN());
+        return;
+    }
+    setModulatedNorm((float) slider.valueToProportionOfLength((double) actualValue));
+}
+
 void KnobWithLabel::resized()
 {
-    const int labelH = 14;
-    const int topPad = 4;  // room for modulation ring/arc drawn above the slider circle
+    using mu_ui::s;
+    const int labelH = s(MuClidLookAndFeel::kKnobLabelH);
+    const int topPad = s(MuClidLookAndFeel::kKnobTopPad);
     slider.setBounds(0, topPad, getWidth(), getHeight() - labelH - topPad);
 }
 
@@ -86,17 +106,19 @@ void KnobWithLabel::mouseDoubleClick(const juce::MouseEvent&)
 
 void KnobWithLabel::showInlineEditor()
 {
-    const int   labelH  = 14;
-    const int   topPad  = 4;
+    using mu_ui::s;
+    using mu_ui::sf;
+    const int   labelH  = s(MuClidLookAndFeel::kKnobLabelH);
+    const int   topPad  = s(MuClidLookAndFeel::kKnobTopPad);
     const float sliderH = (float)(getHeight() - labelH - topPad);
-    const float radius  = juce::jmin((float)getWidth(), sliderH) * 0.5f - 2.0f;
+    const float radius  = juce::jmin((float)getWidth(), sliderH) * 0.5f - sf(2.0f);
     const float cy      = (float)topPad + sliderH * 0.5f;
-    const int   valueY  = (int)(cy + radius * 0.75f) - 5;
+    const int   valueY  = (int)(cy + radius * 0.75f) - s(5);
 
     inlineEditor = std::make_unique<juce::TextEditor>();
     auto* ed = inlineEditor.get();
 
-    ed->setFont(juce::Font(juce::FontOptions{}.withHeight(8.0f)));
+    ed->setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuClidLookAndFeel::kKnobValueFont))));
     ed->setJustification(juce::Justification::centred);
     ed->setColour(juce::TextEditor::backgroundColourId,
                   MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
@@ -104,7 +126,7 @@ void KnobWithLabel::showInlineEditor()
                   MuClidLookAndFeel::colour(MuClidLookAndFeel::labelText));
     ed->setColour(juce::TextEditor::outlineColourId,
                   MuClidLookAndFeel::colour(MuClidLookAndFeel::knobEuclidean));
-    ed->setBounds(1, valueY, getWidth() - 2, 12);
+    ed->setBounds(1, valueY, getWidth() - 2, s(12));
     ed->setText(slider.getTextFromValue(slider.getValue()), false);
     ed->selectAll();
 
@@ -154,26 +176,28 @@ void KnobWithLabel::mouseEnter(const juce::MouseEvent&)
 
 void KnobWithLabel::paint(juce::Graphics& g)
 {
-    const int labelH = 14;
+    using mu_ui::s;
+    using mu_ui::sf;
+    const int labelH = s(MuClidLookAndFeel::kKnobLabelH);
 
     // Label below knob
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuClidLookAndFeel::kKnobLabelFont))));
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::labelText));
     g.drawText(labelText,
                juce::Rectangle<int>(0, getHeight() - labelH, getWidth(), labelH),
                juce::Justification::centred, true);
 
     // Value text in the dead zone (5–7 o'clock gap at the bottom of the arc)
-    const int   topPad  = 4;
+    const int   topPad  = s(MuClidLookAndFeel::kKnobTopPad);
     const float sliderH = (float)(getHeight() - labelH - topPad);
-    const float radius  = juce::jmin((float)getWidth(), sliderH) * 0.5f - 2.0f;
+    const float radius  = juce::jmin((float)getWidth(), sliderH) * 0.5f - sf(2.0f);
     const float cy      = (float)topPad + sliderH * 0.5f;
-    const int   valueY  = (int)(cy + radius * 0.75f) - 5;
+    const int   valueY  = (int)(cy + radius * 0.75f) - s(5);
 
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(8.0f)));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuClidLookAndFeel::kKnobValueFont))));
     g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::valueText));
     g.drawText(slider.getTextFromValue(slider.getValue()),
-               0, valueY, getWidth(), 11,
+               0, valueY, getWidth(), s(MuClidLookAndFeel::kKnobValueH),
                juce::Justification::centred, true);
 }
 
@@ -205,10 +229,11 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
     // Issue #133: modulation indicator + #246: GR arc.
     if (! isModulated && std::isnan(modulatedNorm) && grDisplay <= 0.005f) return;
 
+    using mu_ui::sf;
     const auto sb = slider.getBounds().toFloat();
     const float cx = sb.getCentreX();
     const float cy = sb.getCentreY();
-    const float radius = juce::jmin(sb.getWidth(), sb.getHeight()) * 0.5f - 2.0f;
+    const float radius = juce::jmin(sb.getWidth(), sb.getHeight()) * 0.5f - sf(2.0f);
     constexpr float startAngle = juce::MathConstants<float>::pi * 1.25f;  // matches juce::Slider rotary defaults
     constexpr float endAngle   = juce::MathConstants<float>::pi * 2.75f;
 
@@ -217,26 +242,31 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
     // Static "this knob is modulated" outer ring.
     if (isModulated)
     {
+        const float outerOff = sf(2.0f);
         g.setColour(modCol.withAlpha(0.55f));
-        g.drawEllipse(cx - radius - 2.0f, cy - radius - 2.0f,
-                      (radius + 2.0f) * 2.0f, (radius + 2.0f) * 2.0f, 1.2f);
+        g.drawEllipse(cx - radius - outerOff, cy - radius - outerOff,
+                      (radius + outerOff) * 2.0f, (radius + outerOff) * 2.0f, sf(1.2f));
     }
 
-    // Live arc tracking the modulated value — originates at the knob's current set position
-    // and sweeps clockwise (positive mod) or anti-clockwise (negative mod) from that point.
+    // Live arc tracking the modulated value — originates at the knob's current
+    // set position and sweeps to the modulator's current position. Uses
+    // `Slider::valueToProportionOfLength` so the base angle respects the
+    // slider's skew (setSkewFactor / setSkewFactorFromMidPoint) and lines up
+    // visually with the needle. Without this, a skewed knob (e.g. log cutoff)
+    // sees the arc start at the LINEAR proportional position — which can be
+    // far from the visible needle, so the arc draws "through" the needle
+    // creating the illusion of an indicator on both sides.
     if (! std::isnan(modulatedNorm))
     {
-        const double range = slider.getMaximum() - slider.getMinimum();
-        const float setNorm = (range > 0.0)
-            ? juce::jlimit(0.0f, 1.0f, (float)((slider.getValue() - slider.getMinimum()) / range))
-            : 0.0f;
-        const float baseAngle = startAngle + setNorm      * (endAngle - startAngle);
-        const float modAngle  = startAngle + modulatedNorm * (endAngle - startAngle);
+        const float setNorm = (float) slider.valueToProportionOfLength(slider.getValue());
+        const float baseAngle = startAngle + setNorm        * (endAngle - startAngle);
+        const float modAngle  = startAngle + modulatedNorm  * (endAngle - startAngle);
+        const float arcR = radius + sf(4.0f);
         juce::Path arc;
-        arc.addCentredArc(cx, cy, radius + 4.0f, radius + 4.0f, 0.0f,
+        arc.addCentredArc(cx, cy, arcR, arcR, 0.0f,
                           juce::jmin(baseAngle, modAngle), juce::jmax(baseAngle, modAngle), true);
         g.setColour(modCol.withAlpha(0.85f));
-        g.strokePath(arc, juce::PathStrokeType(1.5f, juce::PathStrokeType::curved,
+        g.strokePath(arc, juce::PathStrokeType(sf(1.5f), juce::PathStrokeType::curved,
                                                      juce::PathStrokeType::rounded));
     }
 
@@ -245,11 +275,12 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
     if (grDisplay > 0.005f)
     {
         const float grArcStart = endAngle - grDisplay * (endAngle - startAngle);
+        const float arcR = radius + sf(4.0f);
         juce::Path grArc;
-        grArc.addCentredArc(cx, cy, radius + 4.0f, radius + 4.0f, 0.0f,
+        grArc.addCentredArc(cx, cy, arcR, arcR, 0.0f,
                             grArcStart, endAngle, true);
         g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::indicatorGRTint).withAlpha(0.85f));
-        g.strokePath(grArc, juce::PathStrokeType(2.5f, juce::PathStrokeType::curved,
+        g.strokePath(grArc, juce::PathStrokeType(sf(2.5f), juce::PathStrokeType::curved,
                                                        juce::PathStrokeType::rounded));
     }
 }

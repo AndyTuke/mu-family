@@ -76,9 +76,11 @@ void ModulatorPanel::setRhythm(Rhythm* r)
 
 void ModulatorPanel::resized()
 {
+    using mu_ui::s;
     const int w = getWidth(), h = getHeight();
-    tabBar.setBounds(0, 0, w, kTabH);
-    const juce::Rectangle<int> content(0, kTabH, w, h - kTabH);
+    const int tabH = s(kTabH);
+    tabBar.setBounds(0, 0, w, tabH);
+    const juce::Rectangle<int> content(0, tabH, w, h - tabH);
     for (auto& e : editors) e.setBounds(content);
     matrixPanel.setBounds(content);
 }

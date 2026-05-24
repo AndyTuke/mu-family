@@ -37,6 +37,7 @@ PitchSubsection::PitchSubsection(PluginProcessor& p) : proc(p)
     for (auto* k : { &pitchOctave, &pitchSemi, &pitchFine,
                      &pitchAtk, &pitchDec, &pitchSus, &pitchRel, &pitchDepth })
         addAndMakeVisible(k);
+    addAndMakeVisible(pitchLegCtrl);
 
     pitchOctave.setRange(-4.0,   4.0,   1.0);   pitchOctave.setValue(0.0);
     pitchSemi  .setRange(-12.0, 12.0,   1.0);   pitchSemi  .setValue(0.0);
@@ -53,8 +54,13 @@ PitchSubsection::PitchSubsection(PluginProcessor& p) : proc(p)
 void PitchSubsection::apvtsSet(const char* suffix, float v)
 {
     if (rhythmIndex < 0) return;
-    const auto id = "r" + juce::String(rhythmIndex) + "_" + suffix;
-    if (auto* p = proc.apvts.getParameter(id))
+    auto it = paramPtrCache.find(suffix);
+    if (it == paramPtrCache.end())
+    {
+        const auto id = "r" + juce::String(rhythmIndex) + "_" + suffix;
+        it = paramPtrCache.emplace(suffix, proc.apvts.getParameter(id)).first;
+    }
+    if (auto* p = it->second)
         p->setValueNotifyingHost(p->convertTo0to1(v));
 }
 
@@ -72,11 +78,12 @@ void PitchSubsection::wireCallbacks()
         return s.trim().dropLastCharacters(s.endsWith("%") ? 1 : 0).trim().getDoubleValue();
     };
 
-    // Set initial dynamic labels.
-    pitchAtk.setLabel(adsrLabelStr("Attack",  pitchAtk.getValue()));
-    pitchDec.setLabel(adsrLabelStr("Decay",   pitchDec.getValue()));
-    pitchSus.setLabel("Sustain (%)");
-    pitchRel.setLabel(adsrLabelStr("Release", pitchRel.getValue()));
+    // Set initial dynamic labels. Single-letter A/D/S/R — universally understood,
+    // gives the knob label room to render the unit suffix without ellipsis.
+    pitchAtk.setLabel(adsrLabelStr("A", pitchAtk.getValue()));
+    pitchDec.setLabel(adsrLabelStr("D", pitchDec.getValue()));
+    pitchSus.setLabel("S (%)");
+    pitchRel.setLabel(adsrLabelStr("R", pitchRel.getValue()));
 
     struct { KnobWithLabel* k; const char* name; } entries[] = {
         { &pitchOctave, "Pitch Octave"   }, { &pitchSemi,  "Pitch Semitone" },
@@ -110,15 +117,23 @@ void PitchSubsection::wireCallbacks()
     pitchOctave.onValueChanged = [this](double v) { apvtsSet("pitchOct",  (float)v); };
     pitchSemi  .onValueChanged = [this](double v) { apvtsSet("pitchSemi", (float)v); };
     pitchFine  .onValueChanged = [this](double v) { apvtsSet("pitchFine", (float)v); };
-    pitchAtk   .onValueChanged = [this](double v) { apvtsSet("pEnvAtk",   (float)v); pitchAtk.setLabel(adsrLabelStr("Attack",  v)); };
-    pitchDec   .onValueChanged = [this](double v) { apvtsSet("pEnvDec",   (float)v); pitchDec.setLabel(adsrLabelStr("Decay",   v)); };
+    pitchAtk   .onValueChanged = [this](double v) { apvtsSet("pEnvAtk",   (float)v); pitchAtk.setLabel(adsrLabelStr("A", v)); };
+    pitchDec   .onValueChanged = [this](double v) { apvtsSet("pEnvDec",   (float)v); pitchDec.setLabel(adsrLabelStr("D", v)); };
     pitchSus   .onValueChanged = [this](double v) { apvtsSet("pEnvSus",   (float)v); };
-    pitchRel   .onValueChanged = [this](double v) { apvtsSet("pEnvRel",   (float)v); pitchRel.setLabel(adsrLabelStr("Release", v)); };
+    pitchRel   .onValueChanged = [this](double v) { apvtsSet("pEnvRel",   (float)v); pitchRel.setLabel(adsrLabelStr("R", v)); };
     pitchDepth .onValueChanged = [this](double v) { apvtsSet("pEnvDep",   (float)(v / 100.0 * 24.0)); };
+
+    pitchLegCtrl.onChange = [this](int idx)
+    {
+        apvtsSet("pEnvLeg", idx > 0 ? 1.0f : 0.0f);
+        if (onStatusUpdate) onStatusUpdate("Pitch Env Legato", idx > 0 ? "On" : "Off");
+    };
 }
 
 void PitchSubsection::setRhythm(int ri)
 {
+    if (ri != rhythmIndex)
+        paramPtrCache.clear();   // pointers were keyed to the prior rhythm's IDs
     rhythmIndex = ri;
     loadFromRhythm();
     refreshModulatedIndicators();
@@ -133,11 +148,12 @@ void PitchSubsection::loadFromRhythm()
     pitchOctave.setValue(p.pitchOctave,          dn);
     pitchSemi  .setValue(p.pitchSemitones,       dn);
     pitchFine  .setValue(p.pitchFine,            dn);
-    pitchAtk   .setValue(p.pitchEnvAtk,          dn); pitchAtk.setLabel(adsrLabelStr("Attack",  p.pitchEnvAtk));
-    pitchDec   .setValue(p.pitchEnvDec,          dn); pitchDec.setLabel(adsrLabelStr("Decay",   p.pitchEnvDec));
+    pitchAtk   .setValue(p.pitchEnvAtk,          dn); pitchAtk.setLabel(adsrLabelStr("A", p.pitchEnvAtk));
+    pitchDec   .setValue(p.pitchEnvDec,          dn); pitchDec.setLabel(adsrLabelStr("D", p.pitchEnvDec));
     pitchSus   .setValue(p.pitchEnvSus * 100.0,  dn);
-    pitchRel   .setValue(p.pitchEnvRel,          dn); pitchRel.setLabel(adsrLabelStr("Release", p.pitchEnvRel));
+    pitchRel   .setValue(p.pitchEnvRel,          dn); pitchRel.setLabel(adsrLabelStr("R", p.pitchEnvRel));
     pitchDepth .setValue(p.pitchEnvDepth / 24.0 * 100.0, dn);
+    pitchLegCtrl.setSelectedIndex(p.pitchEnvLegato ? 1 : 0);
 }
 
 void PitchSubsection::refreshSuffix(const juce::String& suffix)
@@ -149,11 +165,12 @@ void PitchSubsection::refreshSuffix(const juce::String& suffix)
     if      (suffix == "pitchOct")  pitchOctave.setValue(p.pitchOctave,         dn);
     else if (suffix == "pitchSemi") pitchSemi  .setValue(p.pitchSemitones,      dn);
     else if (suffix == "pitchFine") pitchFine  .setValue(p.pitchFine,           dn);
-    else if (suffix == "pEnvAtk")   { pitchAtk.setValue(p.pitchEnvAtk, dn); pitchAtk.setLabel(adsrLabelStr("Attack",  p.pitchEnvAtk)); }
-    else if (suffix == "pEnvDec")   { pitchDec.setValue(p.pitchEnvDec, dn); pitchDec.setLabel(adsrLabelStr("Decay",   p.pitchEnvDec)); }
+    else if (suffix == "pEnvAtk")   { pitchAtk.setValue(p.pitchEnvAtk, dn); pitchAtk.setLabel(adsrLabelStr("A", p.pitchEnvAtk)); }
+    else if (suffix == "pEnvDec")   { pitchDec.setValue(p.pitchEnvDec, dn); pitchDec.setLabel(adsrLabelStr("D", p.pitchEnvDec)); }
     else if (suffix == "pEnvSus")   pitchSus   .setValue(p.pitchEnvSus * 100.0, dn);
-    else if (suffix == "pEnvRel")   { pitchRel.setValue(p.pitchEnvRel, dn); pitchRel.setLabel(adsrLabelStr("Release", p.pitchEnvRel)); }
+    else if (suffix == "pEnvRel")   { pitchRel.setValue(p.pitchEnvRel, dn); pitchRel.setLabel(adsrLabelStr("R", p.pitchEnvRel)); }
     else if (suffix == "pEnvDep")   pitchDepth .setValue(p.pitchEnvDepth / 24.0 * 100.0, dn);
+    else if (suffix == "pEnvLeg")   pitchLegCtrl.setSelectedIndex(p.pitchEnvLegato ? 1 : 0);
 }
 
 void PitchSubsection::refreshModulatedIndicators()
@@ -196,13 +213,22 @@ void PitchSubsection::resized()
     constexpr int row2Y = rowH + gap;
 
     using mu_ui::s;
+    // Row 1: Octave / Semi / Fine / [empty] / Leg — 3 knob columns plus an
+    // env-legato pill in col 4. Pill sized to slot into the same column cell.
     pitchOctave.setBounds(s(0 * kW), 0,        s(kW), s(rowH));
     pitchSemi  .setBounds(s(1 * kW), 0,        s(kW), s(rowH));
     pitchFine  .setBounds(s(2 * kW), 0,        s(kW), s(rowH));
-    pitchDepth .setBounds(s(3 * kW), 0,        s(kW), s(rowH));
+    {
+        constexpr int pillH = 20;
+        const int pillY = (s(rowH) - s(pillH)) / 2;
+        pitchLegCtrl.setBounds(s(4 * kW + 4), pillY, s(kW - 8), s(pillH));
+    }
 
-    pitchAtk.setBounds(s(0 * kW), s(row2Y), s(kW), s(rowH));
-    pitchDec.setBounds(s(1 * kW), s(row2Y), s(kW), s(rowH));
-    pitchSus.setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));
-    pitchRel.setBounds(s(3 * kW), s(row2Y), s(kW), s(rowH));
+    // Row 2 (envelope): A / D / S / R / Depth — the envelope depth control is
+    // logically part of the envelope cluster so it now sits adjacent to A/D/S/R.
+    pitchAtk  .setBounds(s(0 * kW), s(row2Y), s(kW), s(rowH));
+    pitchDec  .setBounds(s(1 * kW), s(row2Y), s(kW), s(rowH));
+    pitchSus  .setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));
+    pitchRel  .setBounds(s(3 * kW), s(row2Y), s(kW), s(rowH));
+    pitchDepth.setBounds(s(4 * kW), s(row2Y), s(kW), s(rowH));
 }

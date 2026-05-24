@@ -24,10 +24,13 @@ void LFOEditor::setPlayheadPhase(float phase)
 
 juce::Point<float> LFOEditor::toScreen(float x, float y) const
 {
+    // CurvePoint::y is canonical -1..+1 (bipolar) or 0..1 (unipolar) — the DSP
+    // multiplies by 100 in ControlSequence::evaluateSmooth to reach the matrix's
+    // -100..+100 range. Display must match the data range, not the matrix range.
     const float h = (float)getHeight();
     const float screenY = unipolar
-        ? (1.0f - y / 100.0f) * h                        // 0→bottom, 100→top
-        : (1.0f - (y + 100.0f) / 200.0f) * h;            // -100→bottom, +100→top
+        ? (1.0f - y) * h                              // 0→bottom, 1→top
+        : (1.0f - (y + 1.0f) * 0.5f) * h;             // -1→bottom, +1→top
     return { x * (float)getWidth(), screenY };
 }
 
@@ -36,8 +39,8 @@ juce::Point<float> LFOEditor::fromScreen(float sx, float sy) const
     const float h = (float)getHeight();
     float x = sx / (float)getWidth();
     float y = unipolar
-        ? juce::jlimit(0.0f,    100.0f, (1.0f - sy / h) * 100.0f)
-        : juce::jlimit(-100.0f, 100.0f, (1.0f - sy / h) * 200.0f - 100.0f);
+        ? juce::jlimit(0.0f,  1.0f, 1.0f - sy / h)
+        : juce::jlimit(-1.0f, 1.0f, (1.0f - sy / h) * 2.0f - 1.0f);
     return { juce::jlimit(0.0f, 1.0f, x), y };
 }
 
@@ -94,18 +97,18 @@ void LFOEditor::paint(juce::Graphics& g)
 
         // Curve line
         g.setColour(MuClidLookAndFeel::colour(Id::lfoEditorCurve));
-        g.strokePath(curve, juce::PathStrokeType(1.5f));
+        g.strokePath(curve, juce::PathStrokeType(mu_ui::sf(1.5f)));
     }
 
     // Control points
+    const float pointR = mu_ui::sf(kPointRadius);
     for (int i = 0; i < (int)points.size(); ++i)
     {
         auto s = toScreen(points[i].x, points[i].y);
         bool hovered = (i == dragIndex);
         g.setColour(hovered ? MuClidLookAndFeel::colour(Id::lfoEditorPointHover)
                             : MuClidLookAndFeel::colour(Id::lfoEditorPoint));
-        g.fillEllipse(s.x - kPointRadius, s.y - kPointRadius,
-                      kPointRadius * 2, kPointRadius * 2);
+        g.fillEllipse(s.x - pointR, s.y - pointR, pointR * 2, pointR * 2);
     }
 
     // Playhead

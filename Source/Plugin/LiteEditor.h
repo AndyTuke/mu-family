@@ -13,7 +13,8 @@
 
 // Simplified editor for the mu-Clid Lite MIDI-effect build.
 // Shows TransportBar + RhythmCircle + EuclideanPanel; no sidebar, voice section, or mixer.
-class LiteEditor : public juce::AudioProcessorEditor
+class LiteEditor : public juce::AudioProcessorEditor,
+                   public juce::AudioProcessorValueTreeState::Listener
 {
 public:
     explicit LiteEditor(PluginProcessor&);
@@ -21,6 +22,11 @@ public:
 
     void paint(juce::Graphics&) override;
     void resized() override;
+
+    // Host automation arrives on whatever thread setValueNotifyingHost runs on
+    // (audio thread under DAW automation); marshal to message thread before
+    // touching the dropdown / knob.
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
 
 private:
     PluginProcessor& proc;

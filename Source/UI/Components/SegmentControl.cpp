@@ -41,12 +41,16 @@ void SegmentControl::paint(juce::Graphics& g)
 
     if (drawStyle == DrawStyle::Pills)
     {
-        // Each segment is an individual rounded button with a 2px gap between
-        const float gap      = 2.0f;
+        // Each segment is an individual rounded button. Gap and the font
+        // clamp range scale with mu_ui::scale so the pills retain their
+        // proportions at Phase 2 Large / Small variants — at scale = 1.0
+        // these match the historical 2 px / 8..11 pt values.
+        using mu_ui::sf;
+        const float gap      = sf(2.0f);
         const float pillW    = ((float)getWidth() - gap * (float)(n + 1)) / (float)n;
         const float pillH    = (float)getHeight() - gap * 2.0f;
         const float radius   = pillH * 0.45f;
-        const float fontSize = juce::jmax(8.0f, juce::jmin(11.0f, pillH * 0.6f));
+        const float fontSize = juce::jmax(sf(8.0f), juce::jmin(sf(11.0f), pillH * 0.6f));
 
         for (int i = 0; i < n; ++i)
         {
@@ -67,9 +71,10 @@ void SegmentControl::paint(juce::Graphics& g)
     else
     {
         // Bar style: single connected bar with dividers
+        using mu_ui::sf;
         const float segW = (float)getWidth() / (float)n;
         const float h    = (float)getHeight();
-        const float r    = 3.0f;
+        const float r    = sf(3.0f);
 
         for (int i = 0; i < n; ++i)
         {
@@ -95,7 +100,7 @@ void SegmentControl::paint(juce::Graphics& g)
             g.setColour(active ? activeBorder : MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
             if (i > 0) g.drawVerticalLine((int)(i * segW), 0, h);
 
-            g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+            g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
             g.setColour(active ? activeBorder : MuClidLookAndFeel::colour(Id::segmentInactiveText));
             g.drawText(options[i], seg.toNearestInt(), juce::Justification::centred, true);
         }

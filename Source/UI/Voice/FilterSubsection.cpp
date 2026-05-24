@@ -54,6 +54,7 @@ FilterSubsection::FilterSubsection(PluginProcessor& p) : proc(p)
                      &filterAtk, &filterDec, &filterSus, &filterRel, &filterDepth,
                      &filterLowCut })
         addAndMakeVisible(k);
+    addAndMakeVisible(filterLegCtrl);
 
     filterCutoff.setRange(20.0, 20000.0, 1.0);  filterCutoff.setValue(8000.0);
     filterCutoff.getSlider().setSkewFactorFromMidPoint(640.0);
@@ -74,8 +75,13 @@ FilterSubsection::FilterSubsection(PluginProcessor& p) : proc(p)
 void FilterSubsection::apvtsSet(const char* suffix, float v)
 {
     if (rhythmIndex < 0) return;
-    const auto id = "r" + juce::String(rhythmIndex) + "_" + suffix;
-    if (auto* p = proc.apvts.getParameter(id))
+    auto it = paramPtrCache.find(suffix);
+    if (it == paramPtrCache.end())
+    {
+        const auto id = "r" + juce::String(rhythmIndex) + "_" + suffix;
+        it = paramPtrCache.emplace(suffix, proc.apvts.getParameter(id)).first;
+    }
+    if (auto* p = it->second)
         p->setValueNotifyingHost(p->convertTo0to1(v));
 }
 
@@ -110,12 +116,13 @@ void FilterSubsection::wireCallbacks()
         return t.getDoubleValue();
     };
 
-    // Set initial dynamic labels.
+    // Set initial dynamic labels. Single-letter A/D/S/R — universally understood,
+    // gives the knob label room to render the unit suffix without ellipsis.
     filterCutoff.setLabel(cutoffLabelStr(filterCutoff.getValue()));
-    filterAtk   .setLabel(adsrLabelStr("Attack",  filterAtk.getValue()));
-    filterDec   .setLabel(adsrLabelStr("Decay",   filterDec.getValue()));
-    filterSus   .setLabel("Sustain (%)");
-    filterRel   .setLabel(adsrLabelStr("Release", filterRel.getValue()));
+    filterAtk   .setLabel(adsrLabelStr("A", filterAtk.getValue()));
+    filterDec   .setLabel(adsrLabelStr("D", filterDec.getValue()));
+    filterSus   .setLabel("S (%)");
+    filterRel   .setLabel(adsrLabelStr("R", filterRel.getValue()));
 
     // Default status bar callbacks (pass through formatted value).
     struct { KnobWithLabel* k; const char* name; } entries[] = {
@@ -176,16 +183,24 @@ void FilterSubsection::wireCallbacks()
         filterCutoff.setLabel(cutoffLabelStr(v));
     };
     filterRes   .onValueChanged = [this](double v) { apvtsSet("fltRes",  (float)(v / 100.0)); };
-    filterAtk   .onValueChanged = [this](double v) { apvtsSet("fEnvAtk", (float)v); filterAtk.setLabel(adsrLabelStr("Attack",  v)); };
-    filterDec   .onValueChanged = [this](double v) { apvtsSet("fEnvDec", (float)v); filterDec.setLabel(adsrLabelStr("Decay",   v)); };
+    filterAtk   .onValueChanged = [this](double v) { apvtsSet("fEnvAtk", (float)v); filterAtk.setLabel(adsrLabelStr("A", v)); };
+    filterDec   .onValueChanged = [this](double v) { apvtsSet("fEnvDec", (float)v); filterDec.setLabel(adsrLabelStr("D", v)); };
     filterSus   .onValueChanged = [this](double v) { apvtsSet("fEnvSus", (float)v); };
-    filterRel   .onValueChanged = [this](double v) { apvtsSet("fEnvRel", (float)v); filterRel.setLabel(adsrLabelStr("Release", v)); };
+    filterRel   .onValueChanged = [this](double v) { apvtsSet("fEnvRel", (float)v); filterRel.setLabel(adsrLabelStr("R", v)); };
     filterDepth .onValueChanged = [this](double v) { apvtsSet("fEnvDep", (float)(v / 100.0 * 48.0)); };
     filterLowCut.onValueChanged = [this](double v) { apvtsSet("fltLoCut", (float)v); };
+
+    filterLegCtrl.onChange = [this](int idx)
+    {
+        apvtsSet("fEnvLeg", idx > 0 ? 1.0f : 0.0f);
+        if (onStatusUpdate) onStatusUpdate("Filter Env Legato", idx > 0 ? "On" : "Off");
+    };
 }
 
 void FilterSubsection::setRhythm(int ri)
 {
+    if (ri != rhythmIndex)
+        paramPtrCache.clear();
     rhythmIndex = ri;
     loadFromRhythm();
     refreshModulatedIndicators();
@@ -201,12 +216,13 @@ void FilterSubsection::loadFromRhythm()
     filterCutoff.setValue(p.filterCutoff,           dn);
     filterCutoff.setLabel(cutoffLabelStr(p.filterCutoff));
     filterRes   .setValue(p.filterRes * 100.0,      dn);
-    filterAtk   .setValue(p.filterEnvAtk,           dn); filterAtk.setLabel(adsrLabelStr("Attack",  p.filterEnvAtk));
-    filterDec   .setValue(p.filterEnvDec,           dn); filterDec.setLabel(adsrLabelStr("Decay",   p.filterEnvDec));
+    filterAtk   .setValue(p.filterEnvAtk,           dn); filterAtk.setLabel(adsrLabelStr("A", p.filterEnvAtk));
+    filterDec   .setValue(p.filterEnvDec,           dn); filterDec.setLabel(adsrLabelStr("D", p.filterEnvDec));
     filterSus   .setValue(p.filterEnvSus * 100.0,   dn);
-    filterRel   .setValue(p.filterEnvRel,           dn); filterRel.setLabel(adsrLabelStr("Release", p.filterEnvRel));
+    filterRel   .setValue(p.filterEnvRel,           dn); filterRel.setLabel(adsrLabelStr("R", p.filterEnvRel));
     filterDepth .setValue(p.filterEnvDepth / 48.0 * 100.0, dn);
     filterLowCut.setValue(p.filterLowCutHz, dn);
+    filterLegCtrl.setSelectedIndex(p.filterEnvLegato ? 1 : 0);
 }
 
 void FilterSubsection::refreshSuffix(const juce::String& suffix)
@@ -218,12 +234,13 @@ void FilterSubsection::refreshSuffix(const juce::String& suffix)
     if      (suffix == "fltType") filterType  .setSelectedId(p.filterType + 1, false);
     else if (suffix == "fltCut")  { filterCutoff.setValue(p.filterCutoff, dn); filterCutoff.setLabel(cutoffLabelStr(p.filterCutoff)); }
     else if (suffix == "fltRes")  filterRes   .setValue(p.filterRes * 100.0,     dn);
-    else if (suffix == "fEnvAtk") { filterAtk.setValue(p.filterEnvAtk, dn); filterAtk.setLabel(adsrLabelStr("Attack",  p.filterEnvAtk)); }
-    else if (suffix == "fEnvDec") { filterDec.setValue(p.filterEnvDec, dn); filterDec.setLabel(adsrLabelStr("Decay",   p.filterEnvDec)); }
+    else if (suffix == "fEnvAtk") { filterAtk.setValue(p.filterEnvAtk, dn); filterAtk.setLabel(adsrLabelStr("A", p.filterEnvAtk)); }
+    else if (suffix == "fEnvDec") { filterDec.setValue(p.filterEnvDec, dn); filterDec.setLabel(adsrLabelStr("D", p.filterEnvDec)); }
     else if (suffix == "fEnvSus") filterSus.setValue(p.filterEnvSus * 100.0, dn);
-    else if (suffix == "fEnvRel") { filterRel.setValue(p.filterEnvRel, dn); filterRel.setLabel(adsrLabelStr("Release", p.filterEnvRel)); }
+    else if (suffix == "fEnvRel") { filterRel.setValue(p.filterEnvRel, dn); filterRel.setLabel(adsrLabelStr("R", p.filterEnvRel)); }
     else if (suffix == "fEnvDep") filterDepth .setValue(p.filterEnvDepth / 48.0 * 100.0, dn);
     else if (suffix == "fltLoCut") filterLowCut.setValue(p.filterLowCutHz, dn);
+    else if (suffix == "fEnvLeg")  filterLegCtrl.setSelectedIndex(p.filterEnvLegato ? 1 : 0);
 }
 
 void FilterSubsection::refreshModulatedIndicators()
@@ -251,11 +268,16 @@ void FilterSubsection::refreshModulatedIndicators()
     filterDec   .setIsModulated(playing && isAssigned("fenv.decay"));
     filterDepth .setIsModulated(playing && isAssigned("fenv.depth"));
 
-    filterCutoff.setModulatedNorm(arc(isAssigned("filter.cutoff"),    kSnapFilterCutoff));
-    filterRes   .setModulatedNorm(arc(isAssigned("filter.resonance"), kSnapFilterRes));
-    filterAtk   .setModulatedNorm(arc(isAssigned("fenv.attack"),      kSnapFenvAtk));
-    filterDec   .setModulatedNorm(arc(isAssigned("fenv.decay"),       kSnapFenvDec));
-    filterDepth .setModulatedNorm(arc(isAssigned("fenv.depth"),       kSnapFenvDepth));
+    // Filter Cutoff snapshot now stores ACTUAL Hz — use setModulatedActual
+    // so the arc proportion goes through the slider's own midPoint skew
+    // (matches the needle by construction). The other four destinations
+    // still pre-normalise their snapshot to 0..1 with the linear/range that
+    // matches their (also-linear) sliders, so setModulatedNorm stays correct.
+    filterCutoff.setModulatedActual(arc(isAssigned("filter.cutoff"),    kSnapFilterCutoff));
+    filterRes   .setModulatedNorm  (arc(isAssigned("filter.resonance"), kSnapFilterRes));
+    filterAtk   .setModulatedNorm  (arc(isAssigned("fenv.attack"),      kSnapFenvAtk));
+    filterDec   .setModulatedNorm  (arc(isAssigned("fenv.decay"),       kSnapFenvDec));
+    filterDepth .setModulatedNorm  (arc(isAssigned("fenv.depth"),       kSnapFenvDepth));
 }
 
 void FilterSubsection::resized()
@@ -268,16 +290,27 @@ void FilterSubsection::resized()
     constexpr int row2Y = rowH + gap;
 
     using mu_ui::s;
+    // Row 1: Type (2 cols) / Cutoff / Resonance / Low Cut.
     filterType  .setBounds(s(0 * kW), s(rowH / 4),     s(2 * kW), s(rowH / 2));
     filterCutoff.setBounds(s(2 * kW), 0,                s(kW),     s(rowH));
     filterRes   .setBounds(s(3 * kW), 0,                s(kW),     s(rowH));
-    filterDepth .setBounds(s(4 * kW), 0,                s(kW),     s(rowH));
+    filterLowCut.setBounds(s(4 * kW), 0,                s(kW),     s(rowH));
 
-    // Envelope knobs left-justify (col 0..3) to line up with the Pitch and Amp
-    // envelope columns; col 4 carries the Low Cut knob in the slot freed up.
+    // Row 2 (envelope): A / D / S / R / [Depth stacked over Leg pill].
+    // Both filter rows are full elsewhere so the env-legato pill stacks
+    // beneath filterDepth in col 4 (Depth shrinks vertically; pill takes
+    // the bottom strip). Tolerable size hit on Depth, none on the rest.
     filterAtk   .setBounds(s(0 * kW), s(row2Y), s(kW), s(rowH));
     filterDec   .setBounds(s(1 * kW), s(row2Y), s(kW), s(rowH));
     filterSus   .setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));
     filterRel   .setBounds(s(3 * kW), s(row2Y), s(kW), s(rowH));
-    filterLowCut.setBounds(s(4 * kW), s(row2Y), s(kW), s(rowH));
+    {
+        constexpr int pillH    = 18;
+        constexpr int stackGap = 2;
+        const int depthH = s(rowH) - s(pillH) - s(stackGap);
+        filterDepth .setBounds(s(4 * kW), s(row2Y), s(kW), depthH);
+        filterLegCtrl.setBounds(s(4 * kW + 4),
+                                 s(row2Y) + depthH + s(stackGap),
+                                 s(kW - 8), s(pillH));
+    }
 }

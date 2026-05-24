@@ -146,6 +146,10 @@ public:
         vuMeterClipFlash        = 0x100000cf,  // VU clip flash
         sampleBarMissingWarning = 0x100000d0,  // RhythmPanel sample-missing tint
         mixerInactiveNameBg     = 0x100000d1,  // inactive-rhythm name strip
+        globalAccent            = 0x100000d2,  // purple — borders / accents for views
+                                               // that aren't per-rhythm (mixer overlay,
+                                               // global FX rows). Sequencer page uses the
+                                               // current rhythm colour for the same role.
     };
 
     MuLookAndFeel();
@@ -171,8 +175,13 @@ public:
     // Static palette helpers
     static juce::Colour colour(ColourIds id) noexcept;
 
-    // Fixed 30-colour palette for rhythm colour picker
-    static const juce::Colour rhythmPalette[30];
+    // Fixed 8-colour palette for the 8 rhythm slots — Green / Red / Blue /
+    // Yellow / Brown / Orange / Cyan / Silver. Index matches creation order
+    // (rhythm 0 → palette[0]). Global / mixer accents use `globalAccent`
+    // (purple) instead — it's reserved out of this palette deliberately so a
+    // purple rhythm and a purple mixer border never collide visually.
+    static constexpr int kRhythmPaletteSize = 8;
+    static const juce::Colour rhythmPalette[kRhythmPaletteSize];
 
     // ──────────────────────────────────────────────────────────────────────
     // Medium-baseline sizing constants. Single source of truth — change the
@@ -235,12 +244,16 @@ public:
     // per-knob cell and the parent sub-panel widths. Adjust kKnobSize2 to
     // grow/shrink every voice control + insert in lockstep.
     //
-    // (kKnobSize2 is defined later in this class. Forward-referencing via
-    // the alias keeps the section ordering "regions first, knob sizes next"
-    // but means the cell math depends on the literal value 55 here. If
-    // kKnobSize2 changes, update kVoiceUnitW to match.)
+    // kVoiceUnitW is linked further down — the voice subsection column width
+    // tracks the Size 2 bucket width so adjusting kKnobCellPaddingX (or any
+    // Size 2 dimension) propagates through both the knob cell AND the parent
+    // sub-panel allocation in one step. Forward-declared as a literal here
+    // and then redefined via the alias at the bottom of this class.
     static constexpr int kVoiceDivW       = 6;
-    static constexpr int kVoiceUnitW      = 55;                                                // = kKnobSize2 (Size 2)
+    // The actual value comes from kVoiceUnitW_ at the bottom of the class —
+    // declared here as a forward stub equal to the Size 2 width literal so
+    // dependent constants (kVoicePitchW = 5 * kVoiceUnitW etc.) work.
+    static constexpr int kVoiceUnitW      = 54;   // = kKnobSize2W (Size 2 cell width)
     static constexpr int kVoiceLabelH     = 14;
     static constexpr int kVoiceSubH       = kVoiceInnerH - kVoiceLabelH;                       // 116
     static constexpr int kVoicePitchW     = 5 * kVoiceUnitW;                                   // 275
@@ -298,16 +311,45 @@ public:
     // pins both dimensions across every consumer of a bucket.
     //
     // Heights were chosen to match the smallest naturally-occurring cell
-    // height in each bucket, so adopting the canonical size doesn't force
-    // any panel to grow (which would cascade into the parent layout).
-    static constexpr int kKnobSize1W = 88;
+    // height in each bucket. Widths are now derived: cell width = visible
+    // knob circle diameter + 2 × per-bucket padding. KnobWithLabel reserves
+    // 14 px for the bottom label + 4 px topPad, so the slider area height
+    // = H − 18 and the visible circle diameter (when H-limited) = H − 22.
+    // Each bucket has its own X-padding constant — tune one bucket without
+    // affecting the others. Bigger knobs (Size 1) usually want a touch more
+    // horizontal breathing room for the longer labels that sit underneath.
+    static constexpr int kKnobCellPadding1X = 10;
+    static constexpr int kKnobCellPadding2X = 10;
+    static constexpr int kKnobCellPadding3X = 6;
+    static constexpr int kKnobCellPadding4X = 6;
+
     static constexpr int kKnobSize1H = 70;
-    static constexpr int kKnobSize2W = 55;
     static constexpr int kKnobSize2H = 56;
-    static constexpr int kKnobSize3W = 75;
     static constexpr int kKnobSize3H = 46;
-    static constexpr int kKnobSize4W = 36;
     static constexpr int kKnobSize4H = 39;
+
+    static constexpr int kKnobSize1W = (kKnobSize1H - 22) + 2 * kKnobCellPadding1X;   // 68
+    static constexpr int kKnobSize2W = (kKnobSize2H - 22) + 2 * kKnobCellPadding2X;   // 54
+    static constexpr int kKnobSize3W = (kKnobSize3H - 22) + 2 * kKnobCellPadding3X;   // 36
+    static constexpr int kKnobSize4W = (kKnobSize4H - 22) + 2 * kKnobCellPadding4X;   // 29
+
+    // KnobWithLabel internal chrome — these constants are used by every knob's
+    // resized() + paint() so a single edit here changes the label band size /
+    // top padding / font sizes uniformly. They're consumed via mu_ui::s() /
+    // sf() at the call site so Phase 2 scale propagates.
+    static constexpr int   kKnobLabelH    = 14;   // height of the bottom label band
+    static constexpr int   kKnobTopPad    = 4;    // pad above the rotary (room for mod ring)
+    static constexpr float kKnobLabelFont = 10.0f;
+    static constexpr float kKnobValueFont = 8.0f;
+    static constexpr int   kKnobValueH    = 11;   // value-text box height inside the rotary dead zone
+
+    // Voice subsection column width MUST equal Size 2 W so adjusting
+    // kKnobCellPaddingX rescales both the cell AND the voice section unit in
+    // lockstep. The constant is declared earlier in the class (so the
+    // dependent kVoicePitchW = 5 × kVoiceUnitW works at that point) — this
+    // assert holds the contract.
+    static_assert(kVoiceUnitW == kKnobSize2W,
+                  "kVoiceUnitW must equal kKnobSize2W — update both together");
 
     // Width-only legacy names — equal to the W component of each bucket.
     // Existing call sites that set bounds with `(x, y, kKnobSize1, panelH)`
@@ -317,4 +359,12 @@ public:
     static constexpr int kKnobSize3     = kKnobSize3W;
     static constexpr int kKnobSize4     = kKnobSize4W;
     static constexpr int kKnobSizeLarge = kKnobSize1W;
+
+    // Mixer channel-strip knob width — pinned to the strip width so the
+    // visible knob fills the strip without overhang. Size 3 was bumped to 75
+    // but kMixerChanW remains 73 (a function of how 11 strips pack into the
+    // overlay), so the mixer-strip uses its own width-matched constant rather
+    // than the Size 3 bucket. Height stays at Size 3 H.
+    static constexpr int kMixerStripKnobW = kMixerChanW;   // 73
+    static constexpr int kMixerStripKnobH = kKnobSize3H;   // 46
 };

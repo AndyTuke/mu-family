@@ -59,14 +59,21 @@
 
 ## APVTS Parameter Naming
 
-All parameters must be in APVTS. Actual ID format:
-- Rhythm parameters: `r{N}_{param}` e.g. `r0_stepsA`, `r0_hitsA`
-- FX parameters: `fx_effect_{param}`, `fx_delay_{param}`, `fx_reverb_{param}`
-- Mixer parameters: `mixer_rhythm_{index}_{param}`, `mixer_master_{param}`
-- Modulation: `r{N}_mod_{mod_index}_{param}`
+All host-automatable parameters live in APVTS. Actual ID format:
+- Rhythm parameters: `r{N}_{suffix}` e.g. `r0_stepsA`, `r0_hitsA` — flat at the APVTS root, not a per-rhythm subtree.
+- FX parameters: `eff_{param}`, `dly_{param}`, `rev_{param}`, `echo_{param}`, plus `eff2dly` / `eff2rev` / `dly2rev` for intra-FX sends.
+- Mixer channel parameters: `ch{N}_{param}` (rhythm channels), `ret_eff_{param}` / `ret_dly_{param}` / `ret_rev_{param}` (returns), `mstr_lvl` / `mstr_pan` / `mstrLoop` (master).
+- Master insert: `mst_ins{Char,Drv,Out,Bits,Rate,Dit,Ton,Mid}` and `mst_ins2{…}` for the chained second slot.
 
-Parameter IDs are strings in ModulationMatrix — this is what makes new sources/destinations automatic without refactoring.
+Parameter IDs are strings in ModulationMatrix — this is what makes new sources/destinations automatic without refactoring. Modulator state itself (LFO curves, step values, matrix assignments) is **not** APVTS-backed — it serialises to a `<Modulators>` child of the ValueTree alongside APVTS, save-roundtripped by `serialiseModulators` / `deserialiseModulators`.
 
-## Current State (Stage 10+ — APVTS wired)
+## Current State (post-Stage 10 — hybrid APVTS + manual wiring)
 
-All parameters are wired through APVTS (completed Stage 10). State saves and restores correctly between DAW sessions, and automation is supported. All UI panels use APVTS parameter attachments rather than direct `Rhythm` data writes.
+State saves and restores correctly between DAW sessions, host automation is supported, and v2 preset files round-trip every parameter via `kRhythmParamDefs` / `kGlobalParamDefs` (the single declarative tables in `Source/Persistence/RhythmParamTable.h` and `Source/Persistence/PresetHelpers.h`).
+
+UI panels do **not** use JUCE's `SliderAttachment` / `ButtonAttachment` / `ComboBoxAttachment` — the project's custom `KnobWithLabel` / `SegmentControl` / `DropdownSelect` controls don't derive from `juce::Slider` etc., so attachments don't apply. Each panel instead:
+1. Writes user changes through with `p->setValueNotifyingHost(p->convertTo0to1(v))` from the control's `onValueChanged` lambda (manual one-way push).
+2. Subscribes to APVTS via `addParameterListener` and bounces a per-suffix refresh back to the message thread in `parameterChanged` so DAW automation reflects in the UI.
+3. Reads display values directly from the `Rhythm` struct in `loadFromRhythm` / `refreshSuffix` — APVTS feeds the engine via `syncRhythmParam`, which mutates `Rhythm.voiceParams`; the panel reads the resulting struct rather than the APVTS atomic.
+
+The per-rhythm panel registers listeners through `RhythmPanel::registerRhythmListeners`; mixer subscribes through `MixerOverlay::isMixerRelevantParam`. Adding a new APVTS parameter requires touching three sites: `createParameterLayout` (registration), `kRhythmParamDefs` or `kGlobalParamDefs` (preset round-trip + Rhythm sync), and the owning panel's listener table + `refreshSuffix` handler.

@@ -143,13 +143,13 @@ inline const GlobalParamDef kGlobalParamDefs[] = {
     { "mstr_lvl" }, { "mstr_pan" },
     { "mstrLoop",      ParamKind::Int    },
     // ── Master insert 1 ─────────────────────────────────────────────────
+    // Stage 36: 4 generic Param slots (normalised 0..1) replace the prior 9
+    // named master-insert fields. Single algo selector + algo-aware UI.
     { "mst_insChar",   ParamKind::AlgorithmIndex, mu_audio::kInsertAlgorithmNames },
-    { "mst_insDrv" }, { "mst_insOut" }, { "mst_insBits" },
-    { "mst_insRate" }, { "mst_insDit" }, { "mst_insTon" }, { "mst_insMid" },
+    { "mst_insP1" }, { "mst_insP2" }, { "mst_insP3" }, { "mst_insP4" },
     // ── Master insert 2 ─────────────────────────────────────────────────
     { "mst_ins2Char",  ParamKind::AlgorithmIndex, mu_audio::kInsertAlgorithmNames },
-    { "mst_ins2Drv" }, { "mst_ins2Out" }, { "mst_ins2Bits" },
-    { "mst_ins2Rate" }, { "mst_ins2Dit" }, { "mst_ins2Ton" }, { "mst_ins2Mid" },
+    { "mst_ins2P1" }, { "mst_ins2P2" }, { "mst_ins2P3" }, { "mst_ins2P4" },
 };
 
 inline constexpr int kGlobalParamDefCount = (int)(sizeof(kGlobalParamDefs) / sizeof(kGlobalParamDefs[0]));
