@@ -3,6 +3,7 @@
 #include "Audio/InsertProcessor.h"
 #include "Audio/InsertSlotConfig.h"
 #include "Modulation/ModulationSnapshot.h"
+#include "Persistence/ScopedApvtsLoading.h"
 #include "Sequencer/Rhythm.h"
 #include "../InsertSlotUi.h"
 
@@ -77,20 +78,30 @@ void InsertSubsection::wireCallbacks()
             insertSnapshotValid[oldChar] = true;
         }
 
-        // Restore: either the user's snapshot or the algorithm's first-visit
-        // defaults from mu_ui::kInsertAlgoDefaults. Either way, push the
-        // normalised values into APVTS BEFORE swapping drvChar — so the
-        // algorithm sees its own first frame with the right slot values.
-        for (int slot = 0; slot < mu_ui::kInsertSlotCount; ++slot)
+        // Wrap the 5-write algorithm switch in apvtsLoading so RhythmPanel's
+        // parameterChanged listener skips its inline refreshSuffix calls —
+        // otherwise each insP{1..4} write triggers configureInsertAlgorithm
+        // with the STALE algo (drvChar hasn't been set yet) and the old
+        // algo's per-slot config table fires `setVisible(false)` on hidden
+        // slots, leaving the knobs hidden after the sequence settles.
+        //
+        // Engine sync (voiceEngines[ri]->setParams) is also suppressed under
+        // the guard, so we manually re-sync via forceSyncRhythmFromAPVTS
+        // after the guard exits — same pattern as preset load.
         {
-            const float actual = insertSnapshotValid[newChar]
-                ? insertSnapshots[newChar][slot]
-                : mu_ui::kInsertAlgoDefaults[newChar][slot];
-            const float norm = mu_ui::actualToNorm(actual, newChar, slot);
+            mu_core::ScopedApvtsLoading guard(proc.getApvtsLoadingFlag());
             const char* const slotSuffix[4] = { "insP1", "insP2", "insP3", "insP4" };
-            apvtsSet(slotSuffix[slot], norm);
+            for (int slot = 0; slot < mu_ui::kInsertSlotCount; ++slot)
+            {
+                const float actual = insertSnapshotValid[newChar]
+                    ? insertSnapshots[newChar][slot]
+                    : mu_ui::kInsertAlgoDefaults[newChar][slot];
+                apvtsSet(slotSuffix[slot], mu_ui::actualToNorm(actual, newChar, slot));
+            }
+            apvtsSet("drvChar", (float) newChar);
         }
-        apvtsSet("drvChar", (float) newChar);
+        if (rhythmIndex >= 0 && rhythmIndex < proc.getNumRhythms())
+            proc.forceSyncRhythmFromAPVTS(rhythmIndex);
 
         configureInsertAlgorithm(newChar);
         if (onStatusUpdate) onStatusUpdate("Insert Algorithm", insertAlgo.getText());

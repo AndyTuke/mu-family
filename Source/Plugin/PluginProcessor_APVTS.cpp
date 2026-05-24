@@ -110,7 +110,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addF     (p+"pEnvSus", n+"P Env Sus", 0.0f, 100.0f, 0.0f);   // sustain stays 0..100 %
         addAdsrT(p+"pEnvRel", n+"P Env Rel", 0.03f);   //         (≈ legacy 1.0 × 0.03)
         addF(p+"pEnvDep",   n+"P Env Dep",  0.0f,  24.0f,  0.0f);
-        addB(p+"pEnvLeg",   n+"P Env Legato", false);
         // Filter
         addI(p+"fltType", n+"Filter Type", 0, 15, 0);  // 0-15: LP12/HP12/BP12/Notch/LP24/HP24/BP24/LP6/Comb+/AP12/Notch24/HP6/Peak/LoShf/HiShf/Comb-
         // log-skewed range. Skew 0.25 puts ~1.3 kHz at slider centre and
@@ -130,7 +129,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addF     (p+"fEnvSus", n+"F Env Sus",  0.0f, 100.0f,  0.0f);   // sustain stays 0..100 %
         addAdsrT(p+"fEnvRel", n+"F Env Rel", 0.09f);   //         (≈ legacy 3.0 × 0.03)
         addF(p+"fEnvDep", n+"F Env Dep",  0.0f,  48.0f,  0.0f);
-        addB(p+"fEnvLeg", n+"F Env Legato", false);
         // 4-pole high-pass that sits inline with the main filter. Skewed so most
         // of the knob travel lives in the audible low-end region (0–200 Hz).
         layout.add(std::make_unique<juce::AudioParameterFloat>(
@@ -148,7 +146,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addAdsrT(p+"aEnvDec", n+"A Env Dec", 0.3f);
         addF(p+"aEnvSus", n+"A Env Sus",  0.0f, 100.0f, 80.0f);   // sustain stays 0..100 %
         addAdsrT(p+"aEnvRel", n+"A Env Rel", 0.5f);
-        addB(p+"aEnvLeg",   n+"A Env Legato", false);
         addF(p+"accentDb",  n+"Accent",     0.0f,  12.0f,  0.0f);
         // Insert effect: algo selector + 4 generic Param slots stored as 0..1
         // normalised. Each algorithm's process() reads p.insertParam[N] and

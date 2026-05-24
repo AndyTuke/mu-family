@@ -54,7 +54,6 @@ FilterSubsection::FilterSubsection(PluginProcessor& p) : proc(p)
                      &filterAtk, &filterDec, &filterSus, &filterRel, &filterDepth,
                      &filterLowCut })
         addAndMakeVisible(k);
-    addAndMakeVisible(filterLegCtrl);
 
     filterCutoff.setRange(20.0, 20000.0, 1.0);  filterCutoff.setValue(8000.0);
     filterCutoff.getSlider().setSkewFactorFromMidPoint(640.0);
@@ -189,12 +188,6 @@ void FilterSubsection::wireCallbacks()
     filterRel   .onValueChanged = [this](double v) { apvtsSet("fEnvRel", (float)v); filterRel.setLabel(adsrLabelStr("R", v)); };
     filterDepth .onValueChanged = [this](double v) { apvtsSet("fEnvDep", (float)(v / 100.0 * 48.0)); };
     filterLowCut.onValueChanged = [this](double v) { apvtsSet("fltLoCut", (float)v); };
-
-    filterLegCtrl.onChange = [this](int idx)
-    {
-        apvtsSet("fEnvLeg", idx > 0 ? 1.0f : 0.0f);
-        if (onStatusUpdate) onStatusUpdate("Filter Env Legato", idx > 0 ? "On" : "Off");
-    };
 }
 
 void FilterSubsection::setRhythm(int ri)
@@ -222,7 +215,6 @@ void FilterSubsection::loadFromRhythm()
     filterRel   .setValue(p.filterEnvRel,           dn); filterRel.setLabel(adsrLabelStr("R", p.filterEnvRel));
     filterDepth .setValue(p.filterEnvDepth / 48.0 * 100.0, dn);
     filterLowCut.setValue(p.filterLowCutHz, dn);
-    filterLegCtrl.setSelectedIndex(p.filterEnvLegato ? 1 : 0);
 }
 
 void FilterSubsection::refreshSuffix(const juce::String& suffix)
@@ -240,7 +232,6 @@ void FilterSubsection::refreshSuffix(const juce::String& suffix)
     else if (suffix == "fEnvRel") { filterRel.setValue(p.filterEnvRel, dn); filterRel.setLabel(adsrLabelStr("R", p.filterEnvRel)); }
     else if (suffix == "fEnvDep") filterDepth .setValue(p.filterEnvDepth / 48.0 * 100.0, dn);
     else if (suffix == "fltLoCut") filterLowCut.setValue(p.filterLowCutHz, dn);
-    else if (suffix == "fEnvLeg")  filterLegCtrl.setSelectedIndex(p.filterEnvLegato ? 1 : 0);
 }
 
 void FilterSubsection::refreshModulatedIndicators()
@@ -296,21 +287,13 @@ void FilterSubsection::resized()
     filterRes   .setBounds(s(3 * kW), 0,                s(kW),     s(rowH));
     filterLowCut.setBounds(s(4 * kW), 0,                s(kW),     s(rowH));
 
-    // Row 2 (envelope): A / D / S / R / [Depth stacked over Leg pill].
-    // Both filter rows are full elsewhere so the env-legato pill stacks
-    // beneath filterDepth in col 4 (Depth shrinks vertically; pill takes
-    // the bottom strip). Tolerable size hit on Depth, none on the rest.
+    // Row 2 (envelope): A / D / S / R / Depth. Depth gets the full row-2
+    // col 4 cell again (the env-legato pill stacked beneath it was removed
+    // in #614 — envelope retrigger is governed solely by the hit-generator
+    // pattern legato).
     filterAtk   .setBounds(s(0 * kW), s(row2Y), s(kW), s(rowH));
     filterDec   .setBounds(s(1 * kW), s(row2Y), s(kW), s(rowH));
     filterSus   .setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));
     filterRel   .setBounds(s(3 * kW), s(row2Y), s(kW), s(rowH));
-    {
-        constexpr int pillH    = 18;
-        constexpr int stackGap = 2;
-        const int depthH = s(rowH) - s(pillH) - s(stackGap);
-        filterDepth .setBounds(s(4 * kW), s(row2Y), s(kW), depthH);
-        filterLegCtrl.setBounds(s(4 * kW + 4),
-                                 s(row2Y) + depthH + s(stackGap),
-                                 s(kW - 8), s(pillH));
-    }
+    filterDepth .setBounds(s(4 * kW), s(row2Y), s(kW), s(rowH));
 }

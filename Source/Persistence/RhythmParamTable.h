@@ -141,9 +141,6 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
                    [](const Rhythm& r) -> float { return r.voiceParams.pitchEnvRel; } },
     { "pEnvDep",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.pitchEnvDepth  = v; vd = true; },
                    [](const Rhythm& r) -> float { return r.voiceParams.pitchEnvDepth; } },
-    // per-envelope legato (skip reset before noteOn so retriggers don't click).
-    { "pEnvLeg",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.pitchEnvLegato = (v > 0.5f); vd = true; },
-                   [](const Rhythm& r) -> float { return r.voiceParams.pitchEnvLegato ? 1.0f : 0.0f; },  ParamKind::Bool },
 
     // ── Filter + filter envelope ─────────────────────────────────────────────
     // Stage 35: fltType is an algorithm selector → string name in v2 preset XML.
@@ -165,8 +162,6 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
                    [](const Rhythm& r) -> float { return r.voiceParams.filterEnvRel; } },
     { "fEnvDep",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.filterEnvDepth = v; vd = true; },
                    [](const Rhythm& r) -> float { return r.voiceParams.filterEnvDepth; } },
-    { "fEnvLeg",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.filterEnvLegato = (v > 0.5f); vd = true; },
-                   [](const Rhythm& r) -> float { return r.voiceParams.filterEnvLegato ? 1.0f : 0.0f; },  ParamKind::Bool },
     { "fltLoCut",  [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.filterLowCutHz = v; vd = true; },
                    [](const Rhythm& r) -> float { return r.voiceParams.filterLowCutHz; } },
 
@@ -184,8 +179,6 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
     // to its natural end (ampRelToEnd). Both apply and push round-trip this.
     { "aEnvRel",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.ampEnvRel = v; r.voiceParams.ampRelToEnd = (v >= 10.0f); vd = true; },
                    [](const Rhythm& r) -> float { return r.voiceParams.ampRelToEnd ? 10.0f : r.voiceParams.ampEnvRel; } },
-    { "aEnvLeg",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.ampEnvLegato = (v > 0.5f); vd = true; },
-                   [](const Rhythm& r) -> float { return r.voiceParams.ampEnvLegato ? 1.0f : 0.0f; },  ParamKind::Bool },
     { "accentDb",  [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.accentDb = v; vd = true; },
                    [](const Rhythm& r) -> float { return r.voiceParams.accentDb; } },
 

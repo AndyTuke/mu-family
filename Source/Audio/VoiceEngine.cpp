@@ -121,20 +121,21 @@ void VoiceEngine::trigger(bool isAccented, bool tied)
     if (tied)
         return;
 
-    // Per-voice amp envelope retrigger on the claimed slot only — slots still
-    // releasing from earlier hits keep their envelope state intact and play
-    // out independently. Reset (default) clears to zero before noteOn; Legato
-    // continues from the current level so rapid retriggers on the same slot
-    // don't click on pad/melodic material.
+    // Per-voice amp envelope retrigger on the claimed slot only — slots
+    // still releasing from earlier hits keep their envelope state intact
+    // and play out independently. Untied hits always reset to zero before
+    // noteOn (#614: the prior per-envelope legato flags were removed;
+    // envelope-continue behaviour is now reserved for tied hits, which take
+    // the early-return above).
     auto& ampEnv = ampEnvs[(size_t) claimedIdx];
-    if (!activeParams.ampEnvLegato) ampEnv.reset();
+    ampEnv.reset();
     ampEnv.noteOn();
 
     // Filter / pitch envelopes are still monophonic (one envelope per engine,
     // applied to the mixed signal / pitch ratio). Global retrigger as before.
-    if (!activeParams.filterEnvLegato) filterEnv.reset();
+    filterEnv.reset();
     filterEnv.noteOn();
-    if (!activeParams.pitchEnvLegato)  pitchEnv.reset();
+    pitchEnv.reset();
     pitchEnv.noteOn();
 }
 

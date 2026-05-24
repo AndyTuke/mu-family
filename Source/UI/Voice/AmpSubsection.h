@@ -3,7 +3,6 @@
 #include <string_view>
 #include <unordered_map>
 #include "../Components/KnobWithLabel.h"
-#include "../Components/SegmentControl.h"
 #include "../Components/MuClidLookAndFeel.h"
 
 namespace juce { class RangedAudioParameter; }
@@ -43,11 +42,6 @@ private:
     KnobWithLabel ampDec     { "Decay (ms)",   Id::knobLevel  };
     KnobWithLabel ampSus     { "Sustain (%)",  Id::knobLevel  };
     KnobWithLabel ampRel     { "Release (ms)", Id::knobLevel  };
-    // Per-envelope legato (aEnvLeg). Skips ADSR retrigger on contiguous hits.
-    // Sits in the empty row 2 col 4 cell (next to Release).
-    SegmentControl ampLegCtrl { {"Trig","Leg"},
-                                SegmentControl::ActiveStyle::General,
-                                SegmentControl::DrawStyle::Pills };
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();

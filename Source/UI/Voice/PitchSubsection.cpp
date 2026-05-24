@@ -37,7 +37,6 @@ PitchSubsection::PitchSubsection(PluginProcessor& p) : proc(p)
     for (auto* k : { &pitchOctave, &pitchSemi, &pitchFine,
                      &pitchAtk, &pitchDec, &pitchSus, &pitchRel, &pitchDepth })
         addAndMakeVisible(k);
-    addAndMakeVisible(pitchLegCtrl);
 
     pitchOctave.setRange(-4.0,   4.0,   1.0);   pitchOctave.setValue(0.0);
     pitchSemi  .setRange(-12.0, 12.0,   1.0);   pitchSemi  .setValue(0.0);
@@ -122,12 +121,6 @@ void PitchSubsection::wireCallbacks()
     pitchSus   .onValueChanged = [this](double v) { apvtsSet("pEnvSus",   (float)v); };
     pitchRel   .onValueChanged = [this](double v) { apvtsSet("pEnvRel",   (float)v); pitchRel.setLabel(adsrLabelStr("R", v)); };
     pitchDepth .onValueChanged = [this](double v) { apvtsSet("pEnvDep",   (float)(v / 100.0 * 24.0)); };
-
-    pitchLegCtrl.onChange = [this](int idx)
-    {
-        apvtsSet("pEnvLeg", idx > 0 ? 1.0f : 0.0f);
-        if (onStatusUpdate) onStatusUpdate("Pitch Env Legato", idx > 0 ? "On" : "Off");
-    };
 }
 
 void PitchSubsection::setRhythm(int ri)
@@ -153,7 +146,6 @@ void PitchSubsection::loadFromRhythm()
     pitchSus   .setValue(p.pitchEnvSus * 100.0,  dn);
     pitchRel   .setValue(p.pitchEnvRel,          dn); pitchRel.setLabel(adsrLabelStr("R", p.pitchEnvRel));
     pitchDepth .setValue(p.pitchEnvDepth / 24.0 * 100.0, dn);
-    pitchLegCtrl.setSelectedIndex(p.pitchEnvLegato ? 1 : 0);
 }
 
 void PitchSubsection::refreshSuffix(const juce::String& suffix)
@@ -170,7 +162,6 @@ void PitchSubsection::refreshSuffix(const juce::String& suffix)
     else if (suffix == "pEnvSus")   pitchSus   .setValue(p.pitchEnvSus * 100.0, dn);
     else if (suffix == "pEnvRel")   { pitchRel.setValue(p.pitchEnvRel, dn); pitchRel.setLabel(adsrLabelStr("R", p.pitchEnvRel)); }
     else if (suffix == "pEnvDep")   pitchDepth .setValue(p.pitchEnvDepth / 24.0 * 100.0, dn);
-    else if (suffix == "pEnvLeg")   pitchLegCtrl.setSelectedIndex(p.pitchEnvLegato ? 1 : 0);
 }
 
 void PitchSubsection::refreshModulatedIndicators()
@@ -213,16 +204,12 @@ void PitchSubsection::resized()
     constexpr int row2Y = rowH + gap;
 
     using mu_ui::s;
-    // Row 1: Octave / Semi / Fine / [empty] / Leg — 3 knob columns plus an
-    // env-legato pill in col 4. Pill sized to slot into the same column cell.
+    // Row 1: Octave / Semi / Fine — col 4 left empty (the per-envelope
+    // Leg pill was removed in #614; envelope legato is governed solely by
+    // the hit-generator's pattern legato on EuclideanPanel's logic row).
     pitchOctave.setBounds(s(0 * kW), 0,        s(kW), s(rowH));
     pitchSemi  .setBounds(s(1 * kW), 0,        s(kW), s(rowH));
     pitchFine  .setBounds(s(2 * kW), 0,        s(kW), s(rowH));
-    {
-        constexpr int pillH = 20;
-        const int pillY = (s(rowH) - s(pillH)) / 2;
-        pitchLegCtrl.setBounds(s(4 * kW + 4), pillY, s(kW - 8), s(pillH));
-    }
 
     // Row 2 (envelope): A / D / S / R / Depth — the envelope depth control is
     // logically part of the envelope cluster so it now sits adjacent to A/D/S/R.

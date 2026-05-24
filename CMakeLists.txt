@@ -352,6 +352,7 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/UIScalingConsistencyTests.cpp
     Source/Tests/SendFXSmokeTests.cpp
     Source/Tests/PresetXMLRoundTripTests.cpp
+    Source/Tests/InsertAlgoTableTests.cpp
     Source/Audio/FX/Slots/EffectSlot.cpp
     Source/Audio/FX/Slots/DelaySlot.cpp
     Source/Audio/FX/Slots/ReverbSlot.cpp

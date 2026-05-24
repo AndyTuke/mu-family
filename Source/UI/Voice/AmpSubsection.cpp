@@ -37,7 +37,6 @@ AmpSubsection::AmpSubsection(PluginProcessor& p) : proc(p)
     for (auto* k : { &ampLevel, &ampSendEff, &ampSendDly, &ampSendRev, &ampAccent,
                      &ampAtk, &ampDec, &ampSus, &ampRel })
         addAndMakeVisible(k);
-    addAndMakeVisible(ampLegCtrl);
 
     ampLevel  .setRange(-60.0, 6.0,  0.1);  ampLevel  .setValue(0.0);
     ampSendEff.setRange(0.0, 100.0, 1.0);   ampSendEff.setValue(0.0);
@@ -163,12 +162,6 @@ void AmpSubsection::wireCallbacks()
         if (auto* p = proc.apvts.getParameter("ch" + juce::String(rhythmIndex) + "_sendRev"))
             p->setValueNotifyingHost(p->convertTo0to1((float)(v / 100.0)));
     };
-
-    ampLegCtrl.onChange = [this](int idx)
-    {
-        apvtsSet("aEnvLeg", idx > 0 ? 1.0f : 0.0f);
-        if (onStatusUpdate) onStatusUpdate("Amp Env Legato", idx > 0 ? "On" : "Off");
-    };
 }
 
 void AmpSubsection::setRhythm(int ri)
@@ -193,7 +186,6 @@ void AmpSubsection::loadFromRhythm()
     ampSus.setValue(p.ampEnvSus * 100.0, dn);
     { const double relV = p.ampRelToEnd ? 10.0 : p.ampEnvRel;
       ampRel.setValue(relV, dn); ampRel.setLabel(relV >= 10.0 ? "R (s)" : adsrLabelStr("R", relV)); }
-    ampLegCtrl.setSelectedIndex(p.ampEnvLegato ? 1 : 0);
 
     const auto chPfx = "ch" + juce::String(rhythmIndex) + "_";
     auto load = [&](KnobWithLabel& k, const char* param) {
@@ -217,7 +209,6 @@ void AmpSubsection::refreshSuffix(const juce::String& suffix)
     else if (suffix == "aEnvDec")  { ampDec.setValue(p.ampEnvDec, dn); ampDec.setLabel(adsrLabelStr("D", p.ampEnvDec)); }
     else if (suffix == "aEnvSus")  ampSus   .setValue(p.ampEnvSus * 100.0,                     dn);
     else if (suffix == "aEnvRel")  { const double rv = p.ampRelToEnd ? 10.0 : p.ampEnvRel; ampRel.setValue(rv, dn); ampRel.setLabel(rv >= 10.0 ? "R (s)" : adsrLabelStr("R", rv)); }
-    else if (suffix == "aEnvLeg")  ampLegCtrl.setSelectedIndex(p.ampEnvLegato ? 1 : 0);
     else if (suffix == "sendEff" || suffix == "sendDly" || suffix == "sendRev")
     {
         const auto chPfx = "ch" + juce::String(rhythmIndex) + "_";
@@ -291,10 +282,5 @@ void AmpSubsection::resized()
     ampDec.setBounds(s(1 * kW), s(row2Y), s(kW), s(rowH));
     ampSus.setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));
     ampRel.setBounds(s(3 * kW), s(row2Y), s(kW), s(rowH));
-    // Env legato pill in the empty col 4 of row 2.
-    {
-        constexpr int pillH = 20;
-        const int pillY = s(row2Y) + (s(rowH) - s(pillH)) / 2;
-        ampLegCtrl.setBounds(s(4 * kW + 4), pillY, s(kW - 8), s(pillH));
-    }
+    // col 4 of row 2 left empty (was the env-legato pill, removed in #614).
 }

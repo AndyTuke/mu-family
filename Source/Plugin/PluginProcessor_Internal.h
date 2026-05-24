@@ -48,7 +48,7 @@ inline const char* const kChannelSuffixes[] = {
 
 // Current preset-file schema version. v2 (Stage 35) is the only format the
 // loader accepts: actual de-normalised values + string algorithm names
-// (`r0_stepsA="16"`, `r0_drvChar="Bitcrusher"`, `r0_aEnvLeg="true"`).
+// (`r0_stepsA="16"`, `r0_drvChar="Bitcrusher"`, `r0_patLeg="true"`).
 //
 // Legacy formats (v0 / v1 — normalised values, pre-Stage-35) are REFUSED by
 // `requireSupportedPresetVersion` at the load entry point. Andy hand-converts

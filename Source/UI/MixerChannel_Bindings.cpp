@@ -4,6 +4,7 @@
 
 #include "MixerChannel.h"
 #include "../Plugin/PluginProcessor.h"
+#include "Audio/InsertSlotConfig.h"
 void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, std::atomic<float>& peak,
                                PluginProcessor* proc, const juce::String& prefix,
                                std::atomic<float>* grAtomic)
@@ -288,9 +289,6 @@ void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
                             p->setValueNotifyingHost(p->convertTo0to1(v));
                     };
 
-                    // Snapshot the OUTGOING algorithm's current slot values as
-                    // ACTUAL (so the restore re-normalises through actualToNorm
-                    // and the new algorithm sees the right per-slot value).
                     if (oldChar >= 0 && oldChar < InsertProcessor::kNumInsertAlgos)
                     {
                         for (int s = 0; s < mu_ui::kInsertSlotCount; ++s)
@@ -298,8 +296,12 @@ void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
                         snapValid[oldChar] = true;
                     }
 
-                    // Restore either the user's snapshot or the algorithm's
-                    // first-visit defaults. Normalise back to APVTS storage.
+                    // Master insert doesn't ride the same RhythmPanel
+                    // inline-refresh path as the per-rhythm insert (#613) —
+                    // MixerOverlay's listener is a deferred apvtsDirty flag
+                    // flushed by its 30 Hz timer, so the multi-write doesn't
+                    // produce intermediate stale-algo UI states. drvChar is
+                    // set inside configureInsertAlgorithm below.
                     for (int s = 0; s < mu_ui::kInsertSlotCount; ++s)
                     {
                         const float actual = snapValid[newChar]

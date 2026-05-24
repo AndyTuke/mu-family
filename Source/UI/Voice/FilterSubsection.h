@@ -4,7 +4,6 @@
 #include <unordered_map>
 #include "../Components/KnobWithLabel.h"
 #include "../Components/DropdownSelect.h"
-#include "../Components/SegmentControl.h"
 #include "../Components/MuClidLookAndFeel.h"
 
 namespace juce { class RangedAudioParameter; }
@@ -39,12 +38,6 @@ private:
     KnobWithLabel  filterRel    { "Release (ms)", Id::knobPostPad };
     KnobWithLabel  filterDepth  { "Depth",     Id::knobPostPad };
     KnobWithLabel  filterLowCut { "Low Cut",   Id::knobPostPad };
-    // Per-envelope legato (fEnvLeg). Skips ADSR retrigger on contiguous hits.
-    // Filter rows are both full; pill stacks beneath filterDepth in col 4
-    // (depth knob shrinks vertically to make space).
-    SegmentControl filterLegCtrl { {"Trig","Leg"},
-                                   SegmentControl::ActiveStyle::General,
-                                   SegmentControl::DrawStyle::Pills };
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();

@@ -11,7 +11,9 @@ struct VoiceParams
     float pitchEnvSus    = 0.0f;
     float pitchEnvRel    = 0.1f;
     float pitchEnvDepth  = 0.0f;     // semitones swept at envelope peak, 0..24
-    bool  pitchEnvLegato = false;    // false=Reset (default), true=Legato (continue from current level)
+    // Per-envelope legato fields removed in #614 — envelope retrigger now
+    // follows the rhythm-level `patternLegato` flag uniformly. Tied hits
+    // skip the noteOn/reset; untied hits always reset to zero.
 
     // ─── Filter ──────────────────────────────────────────────────────────
     int   filterType     = 0;        // 0=LP12, 1=HP12, 2=BP12, 3=Notch, 4=LP24, 5=HP24, 6=BP24, 7=LP6, 8=Comb+, 9=AP12, 10=Notch24, 11=HP6, 12=Peak, 13=LoShf, 14=HiShf, 15=Comb-
@@ -22,7 +24,6 @@ struct VoiceParams
     float filterEnvSus   = 0.0f;
     float filterEnvRel   = 0.3f;
     float filterEnvDepth = 0.0f;     // semitones of cutoff sweep, 0..48
-    bool  filterEnvLegato = false;   // false=Reset (default), true=Legato
     float filterLowCutHz = 0.0f;     // 0..1000 Hz, 4-pole HPF inline with the voice filter chain — 0 = bypass
 
     // ─── Amp ─────────────────────────────────────────────────────────────
@@ -32,7 +33,6 @@ struct VoiceParams
     float ampEnvSus   = 0.8f;
     float ampEnvRel   = 0.5f;
     bool  ampRelToEnd = false;       // true when Release is at max (100): amp envelope bypassed, sample plays to natural end
-    bool  ampEnvLegato = false;      // false=Reset (default), true=Legato
 
     // ─── Insert (after filter, before amp) ───────────────────────────────
     // 0=None, 1=SoftClip, 2=HardClip, 3=Fold, 4=Bitcrusher, 5=Clipper, 6=EQ,
@@ -59,9 +59,7 @@ struct VoiceParams
     // ─── Polyphony ───────────────────────────────────────────────────────
     // When true, VoiceEngine::trigger forces every hit to claim voices[0]
     // (skips the inactive-slot search and the round-robin steal) and only
-    // exercises ampEnvs[0]. Combined with ampEnvLegato=false → classic
-    // mono-synth retrigger; with ampEnvLegato=true → mono with envelope
-    // continuity.
+    // exercises ampEnvs[0].
     bool  voiceMono   = false;
 
     // ─── Accent ──────────────────────────────────────────────────────────

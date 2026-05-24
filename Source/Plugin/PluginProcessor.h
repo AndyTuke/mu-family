@@ -310,6 +310,20 @@ public:
     {
         return apvtsLoading.load(std::memory_order_acquire);
     }
+
+    // Reference accessor for UI orchestrators that want to wrap their own
+    // multi-write sequence in a `mu_core::ScopedApvtsLoading` guard so the
+    // intermediate APVTS state stays invisible to listeners (RhythmPanel's
+    // refreshSuffix in particular). Caller is responsible for any post-guard
+    // engine resync — see `forceSyncRhythmFromAPVTS` for the canonical pattern.
+    std::atomic<bool>& getApvtsLoadingFlag() noexcept { return apvtsLoading; }
+
+    // Public so the insert-algo-change UI flow can re-sync engine state after
+    // its guarded multi-write — APVTS holds the new slot values but
+    // setParams was suppressed under the guard, so VoiceEngine's pendingParams
+    // would otherwise lag a block. Iterates kRhythmParamDefs to populate
+    // r.voiceParams from current APVTS, then calls updatePattern + setParams.
+    void forceSyncRhythmFromAPVTS(int ri);
 private:
 
     // suspendProcessing() sets a flag but does NOT block until the current
@@ -372,12 +386,9 @@ private:
     std::atomic<float>* echoSyncTripPtr  = nullptr;
     void syncMixerParam(const juce::String& id, float v);
     void pushRhythmToAPVTS(int ri);
-    // Force-applies all APVTS r{i}_ params back into Rhythm fields, bypassing
-    // JUCE's unchanged-value parameterChanged-skip. Required after sequencer
-    // shrink/grow cycles (preset A → B → A) where Rhythm objects are destroyed
-    // and recreated with default fields but APVTS values stay the same — no
-    // listener fires, so r.voiceParams / r.genA.hits never repopulate.
-    void forceSyncRhythmFromAPVTS(int ri);
+    // forceSyncRhythmFromAPVTS lifted to the public section above so UI
+    // orchestrators (insert-algo dropdown #613) can call it after their own
+    // apvtsLoading-guarded multi-writes.
     void pushMixerChannelToAPVTS(int idx);
     void swapAPVTSForRhythms(int i, int j);
     void resetPlayState(int idx);

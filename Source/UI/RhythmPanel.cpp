@@ -39,11 +39,11 @@ bool isEuclidSuffix(const juce::String& suffix) noexcept
 // Voice panel params — all use r{ri}_ prefix.
 const char* const kVoiceSuffixes[] = {
     "pitchOct", "pitchSemi", "pitchFine",
-    "pEnvAtk", "pEnvDec", "pEnvSus", "pEnvRel", "pEnvDep", "pEnvLeg",
+    "pEnvAtk", "pEnvDec", "pEnvSus", "pEnvRel", "pEnvDep",
     "fltType", "fltCut", "fltRes", "fltLoCut",
-    "fEnvAtk", "fEnvDec", "fEnvSus", "fEnvRel", "fEnvDep", "fEnvLeg",
+    "fEnvAtk", "fEnvDec", "fEnvSus", "fEnvRel", "fEnvDep",
     "ampLvl", "accentDb",
-    "aEnvAtk", "aEnvDec", "aEnvSus", "aEnvRel", "aEnvLeg",
+    "aEnvAtk", "aEnvDec", "aEnvSus", "aEnvRel",
     "drvChar", "drvDrv", "drvOut", "drvDit", "drvTon", "eqMidGain", "drvBits", "drvRate"
 };
 
