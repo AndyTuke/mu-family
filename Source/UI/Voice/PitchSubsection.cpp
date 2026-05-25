@@ -38,9 +38,11 @@ PitchSubsection::PitchSubsection(PluginProcessor& p) : proc(p)
                      &pitchAtk, &pitchDec, &pitchSus, &pitchRel, &pitchDepth })
         addAndMakeVisible(k);
 
-    pitchOctave.setRange(-4.0,   4.0,   1.0);   pitchOctave.setValue(0.0);
+    // Pitch ranges per Andy's spec: octave ±3, semi ±12 (= ±1 octave), fine ±100 cents (1 cent step).
+    // Combined max static pitch shift = ±4 octaves (3 oct + 1 oct + ≤1 semi from fine).
+    pitchOctave.setRange(-3.0,   3.0,   1.0);   pitchOctave.setValue(0.0);
     pitchSemi  .setRange(-12.0, 12.0,   1.0);   pitchSemi  .setValue(0.0);
-    pitchFine  .setRange(-99.0, 99.0,   0.1);   pitchFine  .setValue(0.0);
+    pitchFine  .setRange(-100.0, 100.0, 1.0);   pitchFine  .setValue(0.0);
     pitchAtk   .setRange(0.0, 10.0, 0.001);  pitchAtk.setValue(0.0);   pitchAtk.getSlider().setSkewFactor(0.3);
     pitchDec   .setRange(0.0, 10.0, 0.001);  pitchDec.setValue(0.03);  pitchDec.getSlider().setSkewFactor(0.3);
     pitchSus   .setRange(0.0, 100.0, 0.1);   pitchSus.setValue(0.0);
@@ -183,15 +185,19 @@ void PitchSubsection::refreshModulatedIndicators()
         return (assigned && playing) ? sn(idx) : kNaN;
     };
 
-    pitchOctave.setIsModulated(false);
+    pitchOctave.setIsModulated(playing && isAssigned("pitch.octave"));
     pitchSemi  .setIsModulated(playing && isAssigned("pitch.semitones"));
     pitchFine  .setIsModulated(false);
     pitchDepth .setIsModulated(playing && isAssigned("pitch.envDepth"));
 
-    pitchOctave.setModulatedNorm(kNaN);
-    pitchSemi  .setModulatedNorm(arc(isAssigned("pitch.semitones"), kSnapPitchSemi));
+    // pitch.octave: snapshot stores (base octave + mod offset in octaves), slider is linear -4..+4.
+    // setModulatedActual routes through valueToProportionOfLength so the arc aligns with the needle.
+    pitchOctave.setModulatedActual(arc(isAssigned("pitch.octave"),     kSnapPitchOctave));
+    // pitch.semitones: snapshot stores (base + offset) in semitones, slider is linear -12..+12.
+    pitchSemi  .setModulatedActual(arc(isAssigned("pitch.semitones"),  kSnapPitchSemi));
     pitchFine  .setModulatedNorm(kNaN);
-    pitchDepth .setModulatedNorm(arc(isAssigned("pitch.envDepth"),  kSnapPitchEnvDep));
+    // pitch.envDepth: voiceParams semis 0..24, slider display 0..100 — snapshot stores display 0..100 (#623).
+    pitchDepth .setModulatedActual(arc(isAssigned("pitch.envDepth"),   kSnapPitchEnvDep));
 }
 
 void PitchSubsection::resized()

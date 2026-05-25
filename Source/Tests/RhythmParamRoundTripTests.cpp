@@ -44,7 +44,7 @@ public:
                 testValue = 1.0f;   // index 1 — first non-None entry for both insert and filter
 
             // Some suffixes have their own clamp ranges in apply() — e.g.
-            // pitchOctave clamps to -4..4, so 1.0 fits. logic clamps 0..4,
+            // pitchOctave clamps to -3..3, so 1.0 fits. logic clamps 0..4,
             // so 1.0 fits. We pick values inside every existing clamp.
 
             Rhythm r;

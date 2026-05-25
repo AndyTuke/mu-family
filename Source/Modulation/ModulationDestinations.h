@@ -106,6 +106,8 @@ namespace ModDest
         { "_reserved.voc.note",  "(reserved)"  },
         { "_reserved.voc.octave","(reserved)"  },
         { "_reserved.voc.unison","(reserved)"  },
+        // ── T5 follow-up (idx 44+) ─────────────────────────────────────────────
+        { "filter.lowCut",       "Filter Low Cut"     },
     };
     static constexpr int kTableSize = (int)(sizeof(kTable) / sizeof(kTable[0]));
 

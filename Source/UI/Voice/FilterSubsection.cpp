@@ -258,17 +258,19 @@ void FilterSubsection::refreshModulatedIndicators()
     filterAtk   .setIsModulated(playing && isAssigned("fenv.attack"));
     filterDec   .setIsModulated(playing && isAssigned("fenv.decay"));
     filterDepth .setIsModulated(playing && isAssigned("fenv.depth"));
+    filterLowCut.setIsModulated(playing && isAssigned("filter.lowCut"));
 
-    // Filter Cutoff snapshot now stores ACTUAL Hz — use setModulatedActual
-    // so the arc proportion goes through the slider's own midPoint skew
-    // (matches the needle by construction). The other four destinations
-    // still pre-normalise their snapshot to 0..1 with the linear/range that
-    // matches their (also-linear) sliders, so setModulatedNorm stays correct.
+    // filter.cutoff: snapshot stores ACTUAL Hz, arc goes through slider's midPoint skew (#612).
+    // filter.resonance: linear 0..100 — setModulatedNorm matches the slider directly.
+    // fenv.attack / fenv.decay: skewed 0..10 s — snapshot stores ACTUAL seconds, arc goes through skew (#623).
+    // fenv.depth: voiceParams stored as semis 0..48, slider displays 0..100 — snapshot stores display 0..100 (#623).
     filterCutoff.setModulatedActual(arc(isAssigned("filter.cutoff"),    kSnapFilterCutoff));
     filterRes   .setModulatedNorm  (arc(isAssigned("filter.resonance"), kSnapFilterRes));
-    filterAtk   .setModulatedNorm  (arc(isAssigned("fenv.attack"),      kSnapFenvAtk));
-    filterDec   .setModulatedNorm  (arc(isAssigned("fenv.decay"),       kSnapFenvDec));
-    filterDepth .setModulatedNorm  (arc(isAssigned("fenv.depth"),       kSnapFenvDepth));
+    filterAtk   .setModulatedActual(arc(isAssigned("fenv.attack"),      kSnapFenvAtk));
+    filterDec   .setModulatedActual(arc(isAssigned("fenv.decay"),       kSnapFenvDec));
+    filterDepth .setModulatedActual(arc(isAssigned("fenv.depth"),       kSnapFenvDepth));
+    // filter.lowCut: snap stores actual Hz; slider runs 0..1000 Hz with skewFactor 0.35.
+    filterLowCut.setModulatedActual(arc(isAssigned("filter.lowCut"),    kSnapFilterLowCut));
 }
 
 void FilterSubsection::resized()

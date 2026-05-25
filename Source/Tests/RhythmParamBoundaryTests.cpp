@@ -83,13 +83,13 @@ public:
         }
 
         // ── Pitch integer clamps ──────────────────────────────────────────────
-        beginTest ("pitchOct: clamps to [-4, 4]");
+        beginTest ("pitchOct: clamps to [-3, 3] (range reduced from ±4 per #640; ±4 oct combined max comes from oct + semi)");
         {
             auto& def = find("pitchOct");
-            expectWithinAbsoluteError (applyAndPush(def, -4.0f),  -4.0f, kTol, "min");
-            expectWithinAbsoluteError (applyAndPush(def, 4.0f),    4.0f, kTol, "max");
-            expectWithinAbsoluteError (applyAndPush(def, -10.0f), -4.0f, kTol, "-10 clamps to -4");
-            expectWithinAbsoluteError (applyAndPush(def, 10.0f),   4.0f, kTol, "10 clamps to 4");
+            expectWithinAbsoluteError (applyAndPush(def, -3.0f),  -3.0f, kTol, "min");
+            expectWithinAbsoluteError (applyAndPush(def, 3.0f),    3.0f, kTol, "max");
+            expectWithinAbsoluteError (applyAndPush(def, -10.0f), -3.0f, kTol, "-10 clamps to -3");
+            expectWithinAbsoluteError (applyAndPush(def, 10.0f),   3.0f, kTol, "10 clamps to 3");
         }
 
         beginTest ("pitchSemi: clamps to [-12, 12]");

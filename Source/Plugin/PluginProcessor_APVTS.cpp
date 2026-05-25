@@ -101,10 +101,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addB(p+"patLeg", n+"Pattern Legato", false);
         addB(p+"vMono",  n+"Voice Mono", false);  // true = polyphony capped at 1 voice
         addI(p+"rstSt",  n+"Reset Steps", -1, 256, -1);  // -1 = free-running (nullopt)
-        // Pitch
-        addI(p+"pitchOct",  n+"Pitch Oct",  -4,   4,  0);
+        // Pitch — octave ±3, semi ±12 (±1 oct), fine ±100 cents (1 cent step).
+        // Combined static max = ±4 octaves; clamped at the engine.
+        addI(p+"pitchOct",  n+"Pitch Oct",  -3,   3,  0);
         addI(p+"pitchSemi", n+"Pitch Semi", -12,  12,  0);
-        addF(p+"pitchFine", n+"Pitch Fine", -99.0f, 99.0f, 0.0f);
+        addI(p+"pitchFine", n+"Pitch Fine", -100, 100, 0);
         addAdsrT(p+"pEnvAtk", n+"P Env Atk", 0.0f);    // seconds (≈ legacy 0.0 × 0.03)
         addAdsrT(p+"pEnvDec", n+"P Env Dec", 0.03f);   //         (≈ legacy 1.0 × 0.03)
         addF     (p+"pEnvSus", n+"P Env Sus", 0.0f, 100.0f, 0.0f);   // sustain stays 0..100 %

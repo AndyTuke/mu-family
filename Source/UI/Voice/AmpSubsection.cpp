@@ -247,12 +247,16 @@ void AmpSubsection::refreshModulatedIndicators()
     ampLevel .setIsModulated(playing && isAssigned("amp.level"));
     ampAccent.setIsModulated(playing && isAssigned("accentDb"));
 
-    ampAtk   .setModulatedNorm(arc(isAssigned("amp.attack"),   kSnapAmpAtk));
-    ampDec   .setModulatedNorm(arc(isAssigned("amp.decay"),    kSnapAmpDec));
-    ampSus   .setModulatedNorm(arc(isAssigned("amp.sustain"),  kSnapAmpSus));
-    ampRel   .setModulatedNorm(arc(isAssigned("amp.release"),  kSnapAmpRel));
-    ampLevel .setModulatedNorm(arc(isAssigned("amp.level"),    kSnapAmpLvl));
-    ampAccent.setModulatedNorm(arc(isAssigned("accentDb"),     kSnapAccent));
+    // ADSR times: snapshot stores ACTUAL seconds (slider runs 0..10 s with skewFactor 0.3),
+    // route via setModulatedActual so the arc respects the skew (#623). Sustain is linear 0..100 — use setModulatedNorm.
+    ampAtk   .setModulatedActual(arc(isAssigned("amp.attack"),   kSnapAmpAtk));
+    ampDec   .setModulatedActual(arc(isAssigned("amp.decay"),    kSnapAmpDec));
+    ampSus   .setModulatedNorm  (arc(isAssigned("amp.sustain"),  kSnapAmpSus));
+    ampRel   .setModulatedActual(arc(isAssigned("amp.release"),  kSnapAmpRel));
+    // amp.level: voiceParams gain 0..2, slider in dB -60..+6 — snapshot stores actual dB (#623).
+    // accentDb: voiceParams dB 0..12, slider display 0..100 — snapshot stores display 0..100 (#623).
+    ampLevel .setModulatedActual(arc(isAssigned("amp.level"),  kSnapAmpLvl));
+    ampAccent.setModulatedActual(arc(isAssigned("accentDb"),   kSnapAccent));
 }
 
 void AmpSubsection::setEffectSendLabel(const juce::String& name)

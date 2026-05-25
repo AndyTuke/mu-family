@@ -13,6 +13,8 @@
 #include "../Modulation/ModulationMatrix.h"
 #include "../Modulation/ModulationAssignment.h"
 #include "../Modulation/ModulationDestinations.h"   // kTable now lives here
+#include "../Audio/InsertSlotConfig.h"               // kInsertAlgoSlots — per-algo slot labels
+#include "../Audio/AlgorithmNames.h"                 // kInsertAlgorithmNames — algo section heading
 
 namespace ModDest
 {
@@ -24,6 +26,10 @@ namespace ModDest
     // relevant for driveChar (0=None,1=SoftClip,2=HardClip,3=Fold,4=Bitcrusher,5=Clipper,
     // 6=EQ,7=Comp,8=Lim,9=RingMod,10=TapeSat).
     // Uses stable 1-based indices (= table index + 1) so saved assignments survive changes.
+    // populate() depends on insert.p1..p4 occupying kTable indices 10..13 so it can
+    // compute IDs as `10 + slot + 1`. A runtime invariant test in InsertAlgoTableTests
+    // (#617 follow-up) fails fast at unit-test startup if anyone reorders the table.
+
     inline void populate(DropdownSelect& dd, int driveChar)
     {
         // Helper: add item using the alias from kTable, with 1-based dropdown ID.
@@ -59,6 +65,7 @@ namespace ModDest
         dd.addSectionHeading("Filter");
         item(4);  item(5);   // Cutoff, Resonance
         item(6);  item(7);  item(8);  // Env Attack, Decay, Depth
+        item(44);  // Low Cut (T5 follow-up)
 
         // ── Amp ───────────────────────────────────────────────────────────────
         dd.addSectionHeading("Amp");
@@ -67,46 +74,32 @@ namespace ModDest
         item(26);  // Accent (#223)
 
         // ── Insert ────────────────────────────────────────────────────────────
-        // Group heading reflects the active algorithm name so the user can see which
-        // insert controls are exposed as modulation targets.
-        static const char* kInsertNames[] = {
-            nullptr,        // 0 = None
-            "Soft Clip",    // 1
-            "Hard Clip",    // 2
-            "Fold",         // 3
-            "Bitcrusher",   // 4
-            "Clipper",      // 5
-            "3-Band EQ",    // 6
-            "Compressor",   // 7
-            "Limiter",      // 8
-        };
-        switch (driveChar)
+        // Post-Stage-36: the 4 insert.p1..p4 destinations cover every algorithm; the
+        // visible slots + their per-algo labels come from mu_ui::kInsertAlgoSlots so
+        // the dropdown always reflects the active algorithm. Items added here keep the
+        // SAME 1-based table ID (11..14 = kTable indices 10..13 = insert.p1..p4) so
+        // saved assignments persist across algorithm changes — the dropdown text just
+        // re-labels them to whatever the new algo names that slot. Hidden slots
+        // (label == nullptr) are skipped so the menu reads cleanly per algo (#617).
+        if (driveChar > 0 && driveChar < (int) std::size(mu_audio::kInsertAlgorithmNames) - 1
+            && driveChar < 14)
         {
-            case 1: case 2: case 3:  // Soft Clip / Hard Clip / Fold
-            case 5:                  // Clipper — same drive/output/lpf knob mapping
-                dd.addSectionHeading(kInsertNames[driveChar]);
-                item(10);  item(11);  item(15);  // Drive, Output, LPF
-                break;
-            case 4:  // Bitcrusher
-                dd.addSectionHeading("Bitcrusher");
-                item(12);  item(13);  item(14);  item(15);  // Bits, Rate, Dither, LPF
-                break;
-            case 6: case 7: case 8:  // EQ / Compressor / Limiter — no mod destinations yet
-                break;
-            case 11:  // Karplus (#422-followups)
-                dd.addSectionHeading("Karplus");
-                item(39);  // KS Note    (drives driveDrive 0..6)
-                item(40);  // KS Octave  (drives drvBits 0..3)
-                item(14);  // Insert Dither = Feedback knob (continuous 0..100%)
-                item(15);  // Insert LPF  = damping cutoff
-                break;
-            case 12:  // Vocoder (#423-followups)
-                dd.addSectionHeading("Vocoder");
-                item(41);  // Voc Note    (drives drvBits offset by +1)
-                item(42);  // Voc Octave  (drives drvDither 1..5)
-                item(43);  // Voc Unison  (drives encoded driveOutput)
-                break;
-            default: break;          // None / TapeSat / RingMod — no insert params yet
+            const auto& slots = mu_ui::kInsertAlgoSlots[driveChar];
+            // Only add the section heading if at least one slot is visible — keeps
+            // the menu clean for algos with no insert mod destinations (None, etc.).
+            bool addedHeading = false;
+            for (int slot = 0; slot < mu_ui::kInsertSlotCount; ++slot)
+            {
+                if (slots[slot].label == nullptr) continue;
+                if (! addedHeading)
+                {
+                    dd.addSectionHeading(mu_audio::kInsertAlgorithmNames[driveChar]);
+                    addedHeading = true;
+                }
+                // ID = 10 + slot + 1 = 11..14 (1-based table index for insert.pN).
+                // Text = the algo-specific slot label ("Drive", "Note", "Threshold", etc.).
+                dd.addItem(slots[slot].label, 10 + slot + 1);
+            }
         }
     }
 }

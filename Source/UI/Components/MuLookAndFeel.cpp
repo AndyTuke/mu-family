@@ -123,13 +123,13 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
 // and a mixer border never share a hue.
 const juce::Colour MuLookAndFeel::rhythmPalette[MuLookAndFeel::kRhythmPaletteSize] = {
     juce::Colour(0xff4ADC8E),   // 0 Green
-    juce::Colour(0xffE24B4A),   // 1 Red
-    juce::Colour(0xff378ADD),   // 2 Blue
-    juce::Colour(0xffEF9F27),   // 3 Yellow / amber
-    juce::Colour(0xff8B6B4A),   // 4 Brown
-    juce::Colour(0xffD85A30),   // 5 Orange / coral
-    juce::Colour(0xff2BB5C5),   // 6 Cyan
-    juce::Colour(0xffB8B8B0),   // 7 Silver grey
+    juce::Colour(0xff378ADD),   // 1 Blue
+    juce::Colour(0xffEF9F27),   // 2 Yellow / amber
+    juce::Colour(0xff8B6B4A),   // 3 Brown
+    juce::Colour(0xffD85A30),   // 4 Orange / coral
+    juce::Colour(0xff2BB5C5),   // 5 Cyan
+    juce::Colour(0xffB8B8B0),   // 6 Silver grey
+    juce::Colour(0xffE24B4A),   // 7 Red (#616: moved to last so a fresh 2-rhythm patch picks Blue, not Red)
 };
 
 MuLookAndFeel::MuLookAndFeel()

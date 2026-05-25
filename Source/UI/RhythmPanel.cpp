@@ -493,7 +493,12 @@ void RhythmPanel::refreshCircle()
 {
     if (currentRhythmIndex < 0 || currentRhythmIndex >= proc.getNumRhythms()) return;
     const Rhythm& r = proc.getRhythm(currentRhythmIndex);
-    circle.setPatterns(r.genA.getStepTypes(), r.genB.getStepTypes(), r.genC.getStepTypes());
+    // #642: pass modulated euclid overrides through to getStepTypes so the ring reflects
+    // active modulation of hits/rotate/prePad/postPad/insSt/insLen. When no modulation is
+    // assigned, the audio thread keeps the override fields at base values — same result.
+    const EuclidOverrides ov = proc.getModulatedEuclidOverrides(currentRhythmIndex);
+    circle.setPatterns(r.genA.getStepTypes(ov.a), r.genB.getStepTypes(ov.b), r.genC.getStepTypes(ov.c));
+    lastCircleOverrides = ov;
     circle.setPlayState(&proc.rhythmPlayState[currentRhythmIndex],
                         &proc.beatFraction,
                         &proc.sequencerPlaying,
@@ -896,5 +901,16 @@ void RhythmPanel::timerCallback()
         modulatorPanel.setPlayheadBeat(proc.lastBeatPos.load());
     voiceSection.refreshModulatedIndicators();
     euclidPanel.refreshModulatedIndicators();
+
+    // #642 — re-render the RhythmCircle when euclid modulation changes the pattern
+    // (hits/rotate/prePad/etc.). Audio thread writes lastEuclidOverrides per block;
+    // we compare against the most recently applied snapshot and refresh on change.
+    if (currentRhythmIndex >= 0 && currentRhythmIndex < proc.getNumRhythms())
+    {
+        const EuclidOverrides ov = proc.getModulatedEuclidOverrides(currentRhythmIndex);
+        if (ov != lastCircleOverrides)
+            refreshCircle();
+    }
+
     wasPlayingLastTick = playing;
 }

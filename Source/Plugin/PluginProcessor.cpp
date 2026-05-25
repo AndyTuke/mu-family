@@ -464,16 +464,35 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             bool expected = false;
             if (rhythm.modLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
             {
-                // Fill param map with base values in 0–100 display scale.
-                modParamValues["amp.attack"]       = modParams.ampEnvAtk   * (100.0f/3.0f);
-                modParamValues["amp.decay"]        = modParams.ampEnvDec   * (100.0f/3.0f);
-                modParamValues["amp.sustain"]      = modParams.ampEnvSus   * 100.0f;
-                modParamValues["amp.release"]      = modParams.ampEnvRel   * (100.0f/3.0f);
-                modParamValues["filter.cutoff"]    = modParams.filterCutoff;
-                modParamValues["filter.resonance"] = modParams.filterRes   * 100.0f;
-                modParamValues["fenv.attack"]      = modParams.filterEnvAtk * (100.0f/3.0f);
-                modParamValues["fenv.decay"]       = modParams.filterEnvDec * (100.0f/3.0f);
+                // PROPORTION-SPACE modulation for skewed-slider destinations (#638):
+                // additive-in-display-units modulation on a skewed slider gives
+                // variable visual arc length (the same display delta covers a
+                // different visual proportion at different knob positions). Seed
+                // these destinations as the slider's proportion (0..1), apply
+                // modulation additively in proportion-space, then convert back
+                // via the slider's skew at write-back. ADSR times use skewFactor
+                // 0.3 on a 0..10 range; filter.lowCut uses skewFactor 0.35 on 0..1000.
+                // amp.level is dB-linear (-60..+6) so the slider's "proportion" is
+                // (dB + 60) / 66 — modulate in dB.
+                auto propFromAdsr   = [](float secs)  { return std::pow(juce::jlimit(0.0f, 1.0f, secs / 10.0f), 0.3f); };
+                auto propFromLowCut = [](float hz)    { return std::pow(juce::jlimit(0.0f, 1.0f, hz   / 1000.0f), 0.35f); };
+                auto propFromAmpLvl = [](float gain)  { return juce::jlimit(0.0f, 1.0f,
+                                                          (juce::Decibels::gainToDecibels(gain, -60.0f) + 60.0f) / 66.0f); };
+                // filter.cutoff: slider uses setSkewFactorFromMidPoint(640) on 20..20000 Hz
+                // which works out to internal skewFactor = log10(620/19980)/log10(0.5) ≈ 0.2.
+                // proportion = pow((hz - 20) / 19980, 0.2). Same skew applied in inverse at write-back.
+                auto propFromCutoff = [](float hz)    { return std::pow(juce::jlimit(0.0f, 1.0f, (hz - 20.0f) / 19980.0f), 0.2f); };
+
+                modParamValues["amp.attack"]       = propFromAdsr(modParams.ampEnvAtk);
+                modParamValues["amp.decay"]        = propFromAdsr(modParams.ampEnvDec);
+                modParamValues["amp.sustain"]      = modParams.ampEnvSus   * 100.0f;  // linear, unchanged
+                modParamValues["amp.release"]      = propFromAdsr(modParams.ampEnvRel);
+                modParamValues["filter.cutoff"]    = propFromCutoff(modParams.filterCutoff);  // #639 proportion-space
+                modParamValues["filter.resonance"] = modParams.filterRes   * 100.0f;  // linear
+                modParamValues["fenv.attack"]      = propFromAdsr(modParams.filterEnvAtk);
+                modParamValues["fenv.decay"]       = propFromAdsr(modParams.filterEnvDec);
                 modParamValues["fenv.depth"]       = modParams.filterEnvDepth;
+                modParamValues["filter.lowCut"]    = propFromLowCut(modParams.filterLowCutHz);
                 // pitch.octave and pitch.semitones both start at 0; summed at write-back → pitchMod.
                 modParamValues["pitch.semitones"]  = 0.0f;
                 modParamValues["pitch.octave"]     = 0.0f;
@@ -488,26 +507,33 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParamValues["insert.p4"] = modParams.insertParam[3];
                 // new destinations
                 modParamValues["pitch.envDepth"]   = modParams.pitchEnvDepth;
-                modParamValues["amp.level"]        = modParams.ampLevel;
+                modParamValues["amp.level"]        = propFromAmpLvl(modParams.ampLevel);  // #638 — dB-proportion, write-back converts
                 modParamValues["accentDb"]         = modParams.accentDb;
                 // Stage A: seed euclid pattern destinations with base gen values.
-                modParamValues["euclid.a.hits"]    = (float) rhythm.genA.hits;
-                modParamValues["euclid.a.rotate"]  = (float) rhythm.genA.rotate;
+                // hits/rotate/insSt use PROPORTION-SPACE modulation (#641) because their
+                // slider ranges depend on the current step count — proportion-space gives
+                // 100%-mod = 100%-knob-turn regardless of step count. prePad/postPad/insLen
+                // have FIXED slider ranges so additive-in-step-units works (scale = range).
+                const int stepsA_seed = juce::jmax(1, rhythm.genA.steps);
+                const int stepsB_seed = juce::jmax(1, rhythm.genB.steps);
+                const int stepsC_seed = juce::jmax(1, rhythm.genC.steps);
+                modParamValues["euclid.a.hits"]    = (float) rhythm.genA.hits         / (float) stepsA_seed;
+                modParamValues["euclid.a.rotate"]  = (float) rhythm.genA.rotate       / (float) juce::jmax(1, stepsA_seed - 1);
                 modParamValues["euclid.a.prePad"]  = (float) rhythm.genA.prePad;
                 modParamValues["euclid.a.postPad"] = (float) rhythm.genA.postPad;
-                modParamValues["euclid.a.insSt"]   = (float) rhythm.genA.insertStart;
+                modParamValues["euclid.a.insSt"]   = (float) rhythm.genA.insertStart  / (float) juce::jmax(1, stepsA_seed - 1);
                 modParamValues["euclid.a.insLen"]  = (float) rhythm.genA.insertLength;
-                modParamValues["euclid.b.hits"]    = (float) rhythm.genB.hits;
-                modParamValues["euclid.b.rotate"]  = (float) rhythm.genB.rotate;
+                modParamValues["euclid.b.hits"]    = (float) rhythm.genB.hits         / (float) stepsB_seed;
+                modParamValues["euclid.b.rotate"]  = (float) rhythm.genB.rotate       / (float) juce::jmax(1, stepsB_seed - 1);
                 modParamValues["euclid.b.prePad"]  = (float) rhythm.genB.prePad;
                 modParamValues["euclid.b.postPad"] = (float) rhythm.genB.postPad;
-                modParamValues["euclid.b.insSt"]   = (float) rhythm.genB.insertStart;
+                modParamValues["euclid.b.insSt"]   = (float) rhythm.genB.insertStart  / (float) juce::jmax(1, stepsB_seed - 1);
                 modParamValues["euclid.b.insLen"]  = (float) rhythm.genB.insertLength;
-                modParamValues["euclid.c.hits"]    = (float) rhythm.genC.hits;
-                modParamValues["euclid.c.rotate"]  = (float) rhythm.genC.rotate;
+                modParamValues["euclid.c.hits"]    = (float) rhythm.genC.hits         / (float) stepsC_seed;
+                modParamValues["euclid.c.rotate"]  = (float) rhythm.genC.rotate       / (float) juce::jmax(1, stepsC_seed - 1);
                 modParamValues["euclid.c.prePad"]  = (float) rhythm.genC.prePad;
                 modParamValues["euclid.c.postPad"] = (float) rhythm.genC.postPad;
-                modParamValues["euclid.c.insSt"]   = (float) rhythm.genC.insertStart;
+                modParamValues["euclid.c.insSt"]   = (float) rhythm.genC.insertStart  / (float) juce::jmax(1, stepsC_seed - 1);
                 modParamValues["euclid.c.insLen"]  = (float) rhythm.genC.insertLength;
 
                 rhythm.modulationMatrix.process(rhythm.controlSequences, beatPos, modParamValues);
@@ -518,32 +544,35 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 {
                     auto& snap = modSnapshot[r];
                     auto sn = [](float v, float mn, float mx) { return juce::jlimit(0.0f, 1.0f, (v - mn) / (mx - mn)); };
-                    // Hz destinations use log normalisation to match the slider's log skew,
-                    // so the live-arc dot tracks the visible knob position.
-                    auto snLogHz = [](float v) {
-                        return juce::jlimit(0.0f, 1.0f,
-                            std::log(juce::jmax(20.0f, v) / 20.0f) / std::log(1000.0f));  // log(20000/20)
-                    };
-                    snap[kSnapAmpAtk]      .store(sn(modParamValues["amp.attack"],       0.0f,    100.0f));
-                    snap[kSnapAmpDec]      .store(sn(modParamValues["amp.decay"],        0.0f,    100.0f));
-                    snap[kSnapAmpSus]      .store(sn(modParamValues["amp.sustain"],      0.0f,    100.0f));
-                    snap[kSnapAmpRel]      .store(sn(modParamValues["amp.release"],      0.0f,    100.0f));
-                    // Filter Cutoff stores the ACTUAL Hz value (not a
-                    // pre-normalised proportion). The UI calls
-                    // setModulatedActual which converts via the slider's
-                    // own valueToProportionOfLength — guarantees the mod
-                    // arc tracks the visual knob scale, regardless of which
-                    // skew the slider uses (currently setSkewFactorFromMidPoint
-                    // 640). Previously this snapshot used a pure-log
-                    // normalisation that disagreed with the slider's
-                    // midPoint-based skew, producing the negative-below /
-                    // positive-above artefact reported in the field.
-                    snap[kSnapFilterCutoff].store(juce::jlimit(20.0f, 20000.0f, modParamValues["filter.cutoff"]));
+                    // Proportion-space destinations (#638) — modParamValues holds slider proportion 0..1.
+                    // Snap stores the ACTUAL value (seconds / Hz / dB) so the UI's setModulatedActual
+                    // routes via valueToProportionOfLength and matches the needle's visual position
+                    // by construction. Same pattern as filter.cutoff (#612) and insert.pN (Stage 36).
+                    auto adsrFromProp   = [](float p) { return 10.0f   * std::pow(juce::jlimit(0.0f, 1.0f, p), 1.0f / 0.3f); };
+                    auto lowCutFromProp = [](float p) { return 1000.0f * std::pow(juce::jlimit(0.0f, 1.0f, p), 1.0f / 0.35f); };
+                    auto dbFromProp     = [](float p) { return juce::jlimit(0.0f, 1.0f, p) * 66.0f - 60.0f; };
+                    auto cutoffFromProp = [](float p) { return 20.0f + 19980.0f * std::pow(juce::jlimit(0.0f, 1.0f, p), 1.0f / 0.2f); };
+                    snap[kSnapAmpAtk]      .store(adsrFromProp(modParamValues["amp.attack"]));
+                    snap[kSnapAmpDec]      .store(adsrFromProp(modParamValues["amp.decay"]));
+                    snap[kSnapAmpSus]      .store(sn(modParamValues["amp.sustain"], 0.0f, 100.0f));
+                    snap[kSnapAmpRel]      .store(adsrFromProp(modParamValues["amp.release"]));
+                    // Filter Cutoff: proportion-space modulation (#639) — snap stores ACTUAL Hz
+                    // converted from the proportion, so the UI's setModulatedActual goes
+                    // through the slider's setSkewFactorFromMidPoint(640) via valueToProportionOfLength
+                    // and the arc matches the visual knob by construction.
+                    snap[kSnapFilterCutoff].store(cutoffFromProp(modParamValues["filter.cutoff"]));
                     snap[kSnapFilterRes]   .store(sn(modParamValues["filter.resonance"], 0.0f,    100.0f));
-                    snap[kSnapFenvAtk]     .store(sn(modParamValues["fenv.attack"],      0.0f,    100.0f));
-                    snap[kSnapFenvDec]     .store(sn(modParamValues["fenv.decay"],       0.0f,    100.0f));
-                    snap[kSnapFenvDepth]   .store(sn(modParamValues["fenv.depth"],       0.0f,     48.0f));
-                    snap[kSnapPitchSemi]   .store(sn(modParamValues["pitch.semitones"], -12.0f,    12.0f));
+                    // Filter ADSR times: proportion-space modulation (#638) — convert back to actual seconds.
+                    snap[kSnapFenvAtk]     .store(adsrFromProp(modParamValues["fenv.attack"]));
+                    snap[kSnapFenvDec]     .store(adsrFromProp(modParamValues["fenv.decay"]));
+                    // fenv.depth, pitch.envDepth, accentDb: voiceParams units (semis or dB) differ from the
+                    // slider's 0..100 display. Store the DISPLAY value (slider units) so setModulatedActual
+                    // routes through the slider's valueToProportionOfLength correctly.
+                    snap[kSnapFenvDepth]   .store(modParamValues["fenv.depth"]      / 48.0f * 100.0f);
+                    // pitch.semitones: snap stores BASE + OFFSET (in semitones) so the arc tracks the modulated
+                    // knob position regardless of where the base sits. Pre-fix stored only the offset, so a
+                    // negative mod read as ABOVE the needle when base was negative (#638-related; T6 follow-up).
+                    snap[kSnapPitchSemi]   .store(modParams.pitchSemitones + modParamValues["pitch.semitones"]);
                     // Insert mod snapshots store ACTUAL slider values (per
                     // the active algo's slot range / skew) so the UI can run
                     // them through `slider.valueToProportionOfLength` via
@@ -562,47 +591,64 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                     snap[kSnapInsP3].store(mu_ui::normToActual(modParamValues["insert.p3"], algForSnap, 2));
                     snap[kSnapInsP4].store(mu_ui::normToActual(modParamValues["insert.p4"], algForSnap, 3));
                     // new destinations
-                    snap[kSnapPitchEnvDep] .store(sn(modParamValues["pitch.envDepth"],   0.0f,    24.0f));
-                    snap[kSnapAmpLvl]      .store(sn(modParamValues["amp.level"],        0.0f,     2.0f));
-                    snap[kSnapAccent]      .store(sn(modParamValues["accentDb"],         0.0f,    12.0f));
-                    // Stage C: euclid pattern destinations. hits/rotate/insSt are
-                    // normalised against the UI slider's *current* range (which is per-
-                    // rhythm: hits=0..steps, rotate/insSt=0..steps-1) so the live arc on
-                    // the knob renders in the correct direction. prePad/postPad/insLen
-                    // have fixed slider ranges so use the constant values.
-                    const int stepsA = juce::jmax(1, rhythm.genA.steps);
-                    const int stepsB = juce::jmax(1, rhythm.genB.steps);
-                    const int stepsC = juce::jmax(1, rhythm.genC.steps);
-                    snap[kSnapEucAHits]    .store(sn(modParamValues["euclid.a.hits"],    0.0f, (float) stepsA));
-                    snap[kSnapEucARotate]  .store(sn(modParamValues["euclid.a.rotate"],  0.0f, (float) juce::jmax(1, stepsA - 1)));
+                    // pitch.envDepth / amp.level / accentDb — voiceParams unit ≠ slider unit, so convert here
+                    // and let setModulatedActual route through the slider's valueToProportionOfLength (#623 wider pattern).
+                    snap[kSnapPitchEnvDep] .store(modParamValues["pitch.envDepth"] / 24.0f * 100.0f);  // semis → display 0..100
+                    snap[kSnapAmpLvl]      .store(dbFromProp(modParamValues["amp.level"]));  // #638 proportion-space → actual dB
+                    snap[kSnapAccent]      .store(modParamValues["accentDb"]       / 12.0f * 100.0f);  // dB    → display 0..100
+                    // #638 — filter.lowCut: proportion-space modulation → actual Hz for setModulatedActual.
+                    snap[kSnapFilterLowCut].store(lowCutFromProp(modParamValues["filter.lowCut"]));
+                    // T5 follow-up — pitch.octave: modParamValues holds the modulation offset in SEMITONES (write-back
+                    // sums it with pitch.semitones into pitchMod). To show the arc on the pitchOctave knob (range -4..+4
+                    // octaves, linear), store base octave value + offset/12. UI uses setModulatedActual.
+                    snap[kSnapPitchOctave] .store(modParams.pitchOctave + modParamValues["pitch.octave"] / 12.0f);
+                    // Euclid pattern destinations (#641):
+                    //   hits/rotate/insSt: proportion-space mod (modParamValues already holds 0..1
+                    //     slider proportion). snap stores the proportion directly — UI uses
+                    //     setModulatedNorm.
+                    //   prePad/postPad/insLen: additive-in-step-units, FIXED slider ranges (0..12 /
+                    //     0..12 / 0..8). snap normalises to 0..1 for setModulatedNorm.
+                    auto prop = [](float v) { return juce::jlimit(0.0f, 1.0f, v); };
+                    snap[kSnapEucAHits]    .store(prop(modParamValues["euclid.a.hits"]));
+                    snap[kSnapEucARotate]  .store(prop(modParamValues["euclid.a.rotate"]));
                     snap[kSnapEucAPrePad]  .store(sn(modParamValues["euclid.a.prePad"],  0.0f, 12.0f));
                     snap[kSnapEucAPostPad] .store(sn(modParamValues["euclid.a.postPad"], 0.0f, 12.0f));
-                    snap[kSnapEucAInsSt]   .store(sn(modParamValues["euclid.a.insSt"],   0.0f, (float) juce::jmax(1, stepsA - 1)));
+                    snap[kSnapEucAInsSt]   .store(prop(modParamValues["euclid.a.insSt"]));
                     snap[kSnapEucAInsLen]  .store(sn(modParamValues["euclid.a.insLen"],  0.0f,  8.0f));
-                    snap[kSnapEucBHits]    .store(sn(modParamValues["euclid.b.hits"],    0.0f, (float) stepsB));
-                    snap[kSnapEucBRotate]  .store(sn(modParamValues["euclid.b.rotate"],  0.0f, (float) juce::jmax(1, stepsB - 1)));
+                    snap[kSnapEucBHits]    .store(prop(modParamValues["euclid.b.hits"]));
+                    snap[kSnapEucBRotate]  .store(prop(modParamValues["euclid.b.rotate"]));
                     snap[kSnapEucBPrePad]  .store(sn(modParamValues["euclid.b.prePad"],  0.0f, 12.0f));
                     snap[kSnapEucBPostPad] .store(sn(modParamValues["euclid.b.postPad"], 0.0f, 12.0f));
-                    snap[kSnapEucBInsSt]   .store(sn(modParamValues["euclid.b.insSt"],   0.0f, (float) juce::jmax(1, stepsB - 1)));
+                    snap[kSnapEucBInsSt]   .store(prop(modParamValues["euclid.b.insSt"]));
                     snap[kSnapEucBInsLen]  .store(sn(modParamValues["euclid.b.insLen"],  0.0f,  8.0f));
-                    snap[kSnapEucCHits]    .store(sn(modParamValues["euclid.c.hits"],    0.0f, (float) stepsC));
-                    snap[kSnapEucCRotate]  .store(sn(modParamValues["euclid.c.rotate"],  0.0f, (float) juce::jmax(1, stepsC - 1)));
+                    snap[kSnapEucCHits]    .store(prop(modParamValues["euclid.c.hits"]));
+                    snap[kSnapEucCRotate]  .store(prop(modParamValues["euclid.c.rotate"]));
                     snap[kSnapEucCPrePad]  .store(sn(modParamValues["euclid.c.prePad"],  0.0f, 12.0f));
                     snap[kSnapEucCPostPad] .store(sn(modParamValues["euclid.c.postPad"], 0.0f, 12.0f));
-                    snap[kSnapEucCInsSt]   .store(sn(modParamValues["euclid.c.insSt"],   0.0f, (float) juce::jmax(1, stepsC - 1)));
+                    snap[kSnapEucCInsSt]   .store(prop(modParamValues["euclid.c.insSt"]));
                     snap[kSnapEucCInsLen]  .store(sn(modParamValues["euclid.c.insLen"],  0.0f,  8.0f));
                 }
 
                 // Write modulated values back, clamping to safe ranges.
-                modParams.ampEnvAtk      = juce::jmax(0.001f, modParamValues["amp.attack"]   * 0.03f);
-                modParams.ampEnvDec      = juce::jmax(0.001f, modParamValues["amp.decay"]    * 0.03f);
+                // Proportion-space destinations (#638): convert prop → actual via the
+                // slider's inverse skew. ADSR times: skew 0.3 on 0..10 s → value = 10 * prop^(1/0.3).
+                // Low-cut: skew 0.35 on 0..1000 Hz → value = 1000 * prop^(1/0.35).
+                // amp.level: dB-linear -60..+6 → value = dBToGain(prop * 66 - 60).
+                auto adsrFromPropWB   = [](float p) { return 10.0f   * std::pow(juce::jlimit(0.0f, 1.0f, p), 1.0f / 0.3f); };
+                auto lowCutFromPropWB = [](float p) { return 1000.0f * std::pow(juce::jlimit(0.0f, 1.0f, p), 1.0f / 0.35f); };
+                auto gainFromPropWB   = [](float p) { return juce::Decibels::decibelsToGain(juce::jlimit(0.0f, 1.0f, p) * 66.0f - 60.0f, -60.0f); };
+                auto cutoffFromPropWB = [](float p) { return 20.0f + 19980.0f * std::pow(juce::jlimit(0.0f, 1.0f, p), 1.0f / 0.2f); };
+
+                modParams.ampEnvAtk      = juce::jmax(0.001f, adsrFromPropWB(modParamValues["amp.attack"]));
+                modParams.ampEnvDec      = juce::jmax(0.001f, adsrFromPropWB(modParamValues["amp.decay"]));
                 modParams.ampEnvSus      = juce::jlimit(0.0f, 1.0f, modParamValues["amp.sustain"] / 100.0f);
-                modParams.ampEnvRel      = juce::jmax(0.001f, modParamValues["amp.release"]  * 0.03f);
-                modParams.filterCutoff   = juce::jlimit(20.0f, 20000.0f, modParamValues["filter.cutoff"]);
+                modParams.ampEnvRel      = juce::jmax(0.001f, adsrFromPropWB(modParamValues["amp.release"]));
+                modParams.filterCutoff   = juce::jlimit(20.0f, 20000.0f, cutoffFromPropWB(modParamValues["filter.cutoff"]));
                 modParams.filterRes      = juce::jlimit(0.0f, 0.99f, modParamValues["filter.resonance"] / 100.0f);
-                modParams.filterEnvAtk   = juce::jmax(0.001f, modParamValues["fenv.attack"]  * 0.03f);
-                modParams.filterEnvDec   = juce::jmax(0.001f, modParamValues["fenv.decay"]   * 0.03f);
+                modParams.filterEnvAtk   = juce::jmax(0.001f, adsrFromPropWB(modParamValues["fenv.attack"]));
+                modParams.filterEnvDec   = juce::jmax(0.001f, adsrFromPropWB(modParamValues["fenv.decay"]));
                 modParams.filterEnvDepth = juce::jlimit(0.0f, 48.0f, modParamValues["fenv.depth"]);
+                modParams.filterLowCutHz = lowCutFromPropWB(modParamValues["filter.lowCut"]);
                 // single pitch destination, no more octave×12 + fine/100 stacking.
                 modParams.pitchMod       = juce::jlimit(-48.0f, 48.0f,
                                                          modParamValues["pitch.octave"]
@@ -617,33 +663,40 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParams.insertParam[3] = juce::jlimit(0.0f, 1.0f, modParamValues["insert.p4"]);
                 // new destinations write-back
                 modParams.pitchEnvDepth  = juce::jlimit(0.0f,   24.0f,    modParamValues["pitch.envDepth"]);
-                modParams.ampLevel       = juce::jlimit(0.0f,    2.0f,    modParamValues["amp.level"]);
+                modParams.ampLevel       = juce::jlimit(0.0f,    2.0f,    gainFromPropWB(modParamValues["amp.level"]));  // #638 dB-proportion → gain
                 modParams.accentDb       = juce::jlimit(0.0f,   12.0f,    modParamValues["accentDb"]);
 
                 // Stage A: write modulated euclid values back to the per-rhythm
-                // overrides snapshot. Integer-rounded so Stage B change-detection skips
-                // sub-step LFO jitter. Clamps applied per the destination ranges in
-                // ModDest::kTable (hits/rotate: 0..steps; pad: 0..12 / 0..63 / 0..8).
+                // overrides snapshot. #641: hits/rotate/insSt are proportion-space mod —
+                // convert the [0..1] proportion back to integer step count using the
+                // current step count of each gen. prePad/postPad/insLen are additive in
+                // step units; just round + clamp.
+                auto modPropToSteps = [&](const char* key, int steps) {
+                    return juce::roundToInt(juce::jlimit(0.0f, 1.0f, modParamValues[key]) * (float) steps);
+                };
                 auto modI = [&](const char* key) {
                     return juce::roundToInt(modParamValues[key]);
                 };
-                lastEuclidOverrides[r].a.hits         = juce::jlimit(0, 64, modI("euclid.a.hits"));
-                lastEuclidOverrides[r].a.rotate       = juce::jlimit(0, 63, modI("euclid.a.rotate"));
+                const int stepsA_wb = juce::jmax(1, rhythm.genA.steps);
+                const int stepsB_wb = juce::jmax(1, rhythm.genB.steps);
+                const int stepsC_wb = juce::jmax(1, rhythm.genC.steps);
+                lastEuclidOverrides[r].a.hits         = juce::jlimit(0, stepsA_wb,        modPropToSteps("euclid.a.hits",  stepsA_wb));
+                lastEuclidOverrides[r].a.rotate       = juce::jlimit(0, stepsA_wb - 1,    modPropToSteps("euclid.a.rotate", stepsA_wb - 1));
                 lastEuclidOverrides[r].a.prePad       = juce::jlimit(0, 12, modI("euclid.a.prePad"));
                 lastEuclidOverrides[r].a.postPad      = juce::jlimit(0, 12, modI("euclid.a.postPad"));
-                lastEuclidOverrides[r].a.insertStart  = juce::jlimit(0, 63, modI("euclid.a.insSt"));
+                lastEuclidOverrides[r].a.insertStart  = juce::jlimit(0, stepsA_wb - 1,    modPropToSteps("euclid.a.insSt", stepsA_wb - 1));
                 lastEuclidOverrides[r].a.insertLength = juce::jlimit(0,  8, modI("euclid.a.insLen"));
-                lastEuclidOverrides[r].b.hits         = juce::jlimit(0, 64, modI("euclid.b.hits"));
-                lastEuclidOverrides[r].b.rotate       = juce::jlimit(0, 63, modI("euclid.b.rotate"));
+                lastEuclidOverrides[r].b.hits         = juce::jlimit(0, stepsB_wb,        modPropToSteps("euclid.b.hits",  stepsB_wb));
+                lastEuclidOverrides[r].b.rotate       = juce::jlimit(0, stepsB_wb - 1,    modPropToSteps("euclid.b.rotate", stepsB_wb - 1));
                 lastEuclidOverrides[r].b.prePad       = juce::jlimit(0, 12, modI("euclid.b.prePad"));
                 lastEuclidOverrides[r].b.postPad      = juce::jlimit(0, 12, modI("euclid.b.postPad"));
-                lastEuclidOverrides[r].b.insertStart  = juce::jlimit(0, 63, modI("euclid.b.insSt"));
+                lastEuclidOverrides[r].b.insertStart  = juce::jlimit(0, stepsB_wb - 1,    modPropToSteps("euclid.b.insSt", stepsB_wb - 1));
                 lastEuclidOverrides[r].b.insertLength = juce::jlimit(0,  8, modI("euclid.b.insLen"));
-                lastEuclidOverrides[r].c.hits         = juce::jlimit(0, 64, modI("euclid.c.hits"));
-                lastEuclidOverrides[r].c.rotate       = juce::jlimit(0, 63, modI("euclid.c.rotate"));
+                lastEuclidOverrides[r].c.hits         = juce::jlimit(0, stepsC_wb,        modPropToSteps("euclid.c.hits",  stepsC_wb));
+                lastEuclidOverrides[r].c.rotate       = juce::jlimit(0, stepsC_wb - 1,    modPropToSteps("euclid.c.rotate", stepsC_wb - 1));
                 lastEuclidOverrides[r].c.prePad       = juce::jlimit(0, 12, modI("euclid.c.prePad"));
                 lastEuclidOverrides[r].c.postPad      = juce::jlimit(0, 12, modI("euclid.c.postPad"));
-                lastEuclidOverrides[r].c.insertStart  = juce::jlimit(0, 63, modI("euclid.c.insSt"));
+                lastEuclidOverrides[r].c.insertStart  = juce::jlimit(0, stepsC_wb - 1,    modPropToSteps("euclid.c.insSt", stepsC_wb - 1));
                 lastEuclidOverrides[r].c.insertLength = juce::jlimit(0,  8, modI("euclid.c.insLen"));
             }
         }

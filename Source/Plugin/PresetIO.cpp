@@ -366,24 +366,16 @@ static void migrateMasterEqEncodingV2(juce::ValueTree& tree, int slot)
     }
 }
 
-// Reject any preset file that doesn't declare presetVersion = kCurrentPresetVersion.
-// Returns true if the version is supported; false if the caller should bail.
-// On rejection, fires proc_.onLoadError with a clear message so the user knows the file
-// is in an obsolete format and needs to be re-saved (or hand-converted by Andy).
-static bool requireSupportedPresetVersion(const juce::ValueTree& tree,
-                                          const juce::String& fileName,
-                                          const std::function<void(const juce::String&)>& onLoadError)
+// Preset version gating removed — pre-distribution era, every preset just needs to work
+// with the current build (#643). Migration helpers (migrateInsertSlotsV3 etc.) still run
+// unconditionally inside the load path so older v0/v1/v2 properties still get translated;
+// any preset that survives those migrations loads fine. The unused fileName + onLoadError
+// params are kept on the signature so callers don't need restructuring.
+static bool requireSupportedPresetVersion(const juce::ValueTree& /*tree*/,
+                                          const juce::String& /*fileName*/,
+                                          const std::function<void(const juce::String&)>& /*onLoadError*/)
 {
-    const int v = (int) tree.getProperty("presetVersion", 0);
-    if (v == mu_pp::kCurrentPresetVersion)
-        return true;
-    if (onLoadError)
-    {
-        onLoadError("Preset '" + fileName + "' is in legacy format v" + juce::String(v)
-                    + " (current is v" + juce::String(mu_pp::kCurrentPresetVersion)
-                    + "). Legacy presets are not auto-migrated — paste the XML to the dev to upgrade.");
-    }
-    return false;
+    return true;
 }
 
 // detect a sample path that points into our embedded-sample decode temp
@@ -689,7 +681,7 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIdx, const juce::File& destFile,
     state.setProperty("presetCategory",     category,                               nullptr);
     state.setProperty("presetDescription",  description,                            nullptr);
     state.setProperty("presetEmbedSamples", embedSample ? 1 : 0,                   nullptr);
-    state.setProperty("presetVersion",      kCurrentPresetVersion,                  nullptr);
+    // presetVersion property dropped (#643): not distributing yet, current-build-only.
 
     const Rhythm& r = proc_.sequencer.getRhythm(rhythmIdx);
     state.setProperty("r0_name",   juce::String(r.name),        nullptr);
@@ -1080,7 +1072,7 @@ void PresetIO::savePreset(const juce::String& name,
     root.setProperty("presetDescription",  description,          nullptr);
     root.setProperty("presetEmbedSamples", embedSamples ? 1 : 0, nullptr);
     root.setProperty("presetCategory",    category,    nullptr);
-    root.setProperty("presetVersion",     kCurrentPresetVersion, nullptr);
+    // presetVersion property dropped (#643): not distributing yet, current-build-only.
 
     for (int i = 0; i < n; ++i)
     {

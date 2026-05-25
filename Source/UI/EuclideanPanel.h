@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include "Components/KnobWithLabel.h"
 #include "Components/SegmentControl.h"
+#include "Components/DropdownSelect.h"
 #include "Components/MuClidLookAndFeel.h"
 
 namespace juce { class RangedAudioParameter; }
@@ -66,9 +67,10 @@ private:
     SegmentControl monoCtrl  { {"Poly","Mono"},
                                 SegmentControl::ActiveStyle::Warning,
                                 SegmentControl::DrawStyle::Pills };
-    SegmentControl logicCtrl { {"OR","AND","XOR","A not B","B not A"},
-                               SegmentControl::ActiveStyle::General,
-                               SegmentControl::DrawStyle::Pills };
+    // Logic dropdown — was a 5-pill SegmentControl; pills crowded the row so
+    // converted to a dropdown (#621). IDs are 1-based (JUCE ComboBox convention)
+    // and map to APVTS "logic" param via id - 1.
+    DropdownSelect logicCtrl;
 
     // ── Euclid B ─────────────────────────────────────────────────────────────
     KnobWithLabel stepsB      { "Steps",         Id::knobEuclidean };
@@ -98,11 +100,21 @@ private:
     static constexpr int kSwitchH = 14;
     static constexpr int kOuter   = 4;
     static constexpr int kLabelH  = 10;
-    // logic-row split — Legato pills (left) | gap | Logic pills (right).
+    // logic-row split — Logic dropdown | gap | Legato | gap | Mono. Three sub-panels
+    // sized EQUALLY across the row; each control fills its sub-panel so pills spread
+    // evenly via SegmentControl's natural width-distribution.
     static constexpr int kLogicMP    = 4;    // matches the local `mP` used in placeRow
-    static constexpr int kLegatoW    = 84;   // ~42 px per pill, two pills
-    static constexpr int kMonoW      = 84;   // ~42 px per pill, two pills (Poly/Mono)
     static constexpr int kLogicGapW  = 8;    // sub-panel divider between groups
+    // Vertical offset (within the kLogicH band) that shifts the Logic-row buttons +
+    // sub-panel rects DOWN so the visible gap above the rects equals the gap below them.
+    // Pre-fix the band was top-aligned in the inter-row space, leaving 4 px above and
+    // 12 px below the rects — visibly uneven. Both pill Y and rect Y use this offset.
+    static constexpr int kLogicVOffset = 3;
+
+    // Euclid-row spacing (#618-#620).
+    static constexpr int kEucKnobGap   = 6;   // inter-knob gap between Steps/Hits/Rotate
+    static constexpr int kPadKnobGap   = 24;  // inter-knob gap between Pre Pad and Post Pad
+    static constexpr int kPadInsertGap = 6;   // gap between Pad sub-panel and Insert sub-panel borders
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();

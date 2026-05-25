@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>μ-Clid rhythm palette — order picker</title>
+<style>
+  body { background: #1c1c1b; color: #ddd; font-family: -apple-system, Segoe UI, sans-serif; padding: 32px; }
+  h1 { font-weight: 400; font-size: 16px; color: #9d9d9d; margin: 0 0 24px; }
+  .grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 12px; max-width: 1100px; }
+  .swatch {
+    height: 90px;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 8px;
+    font-size: 11px;
+    color: rgba(0,0,0,0.7);
+  }
+  .swatch .idx { font-size: 22px; font-weight: 600; line-height: 1; }
+  .swatch .hex { font-family: ui-monospace, monospace; opacity: 0.85; }
+  .swatch.dark { color: rgba(255,255,255,0.85); }
+  .name { margin-top: 6px; font-size: 13px; text-align: center; color: #9d9d9d; }
+  .col { display: flex; flex-direction: column; }
+  .note { margin-top: 32px; color: #777; font-size: 12px; max-width: 900px; line-height: 1.5; }
+  .note code { background: #2a2a28; padding: 1px 5px; border-radius: 3px; color: #b8b8b0; }
+</style>
+</head>
+<body>
+<h1>Rhythm slot colours (Source/UI/Components/MuLookAndFeel.cpp:124)</h1>
+
+<div class="grid">
+  <div class="col"><div class="swatch" style="background:#4ADC8E"><span class="idx">0</span><span class="hex">#4ADC8E</span></div><div class="name">Green</div></div>
+  <div class="col"><div class="swatch dark" style="background:#378ADD"><span class="idx">1</span><span class="hex">#378ADD</span></div><div class="name">Blue</div></div>
+  <div class="col"><div class="swatch" style="background:#EF9F27"><span class="idx">2</span><span class="hex">#EF9F27</span></div><div class="name">Yellow / amber</div></div>
+  <div class="col"><div class="swatch dark" style="background:#8B6B4A"><span class="idx">3</span><span class="hex">#8B6B4A</span></div><div class="name">Brown</div></div>
+  <div class="col"><div class="swatch dark" style="background:#D85A30"><span class="idx">4</span><span class="hex">#D85A30</span></div><div class="name">Orange / coral</div></div>
+  <div class="col"><div class="swatch" style="background:#2BB5C5"><span class="idx">5</span><span class="hex">#2BB5C5</span></div><div class="name">Cyan</div></div>
+  <div class="col"><div class="swatch" style="background:#B8B8B0"><span class="idx">6</span><span class="hex">#B8B8B0</span></div><div class="name">Silver grey</div></div>
+  <div class="col"><div class="swatch dark" style="background:#E24B4A"><span class="idx">7</span><span class="hex">#E24B4A</span></div><div class="name">Red</div></div>
+</div>
+
+<p class="note">
+"Add rhythm" picks the first-unused palette index from the natural cyclic position outward
+(see <code>PluginEditor.cpp:99</code>), so for a fresh patch the slot-0 default
+(Green) is followed by index 1 (Red). The complaint: Red is visually strong for the
+second slot — wants a softer second pick. Reorder the array above to whichever sequence
+reads as "calm → bold" for the typical 2-3 rhythm patch and let me know the new index
+order. Hex values + names are stable so the new order is just an array shuffle in
+<code>rhythmPalette[]</code>; existing presets store the palette INDEX in
+<code>r0_colour</code> so changing the order will re-tint existing presets — usually
+fine since the palette is small, but worth being aware of.
+</p>
+
+</body>
+</html>

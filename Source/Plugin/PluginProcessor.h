@@ -266,6 +266,20 @@ public:
         return modSnapshot[rhythmIdx][snapIdx].load();
     }
 
+    // UI accessor for the per-rhythm modulated euclid overrides — read by RhythmPanel +
+    // SidebarItem on a timer so the visual circles reflect modulation of hits/rotate/etc.
+    // (#642). Returns a struct copy; fields are integer-rounded by the audio thread so
+    // torn reads are benign for visual display. When the rhythm has no euclid modulation
+    // assignments, the audio thread keeps the override values at the base — safe to use
+    // unconditionally; passing it to `HitGenerator::getStepTypes(ov)` yields the same
+    // result as `getStepTypes()` for unmodulated rhythms.
+    EuclidOverrides getModulatedEuclidOverrides(int rhythmIdx) const noexcept
+    {
+        if (rhythmIdx < 0 || rhythmIdx >= (int) lastEuclidOverrides.size())
+            return {};
+        return lastEuclidOverrides[(size_t) rhythmIdx];
+    }
+
     // GR-meter pointer for the per-voice compressor/limiter insert UI knob.
     // Returns nullptr when the rhythm index is out of range or the engine is null.
     std::atomic<float>* getInsertGRReductionPtr(int ri)

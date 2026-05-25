@@ -53,20 +53,37 @@ static constexpr auto kMetaSuffix = "_depth";
 // destinations that already operate on a 0-100 display scale (amp/filter ADSR, etc.).
 static float depthScaleFor(const std::string& destId)
 {
-    // Hz-domain destinations apply multiplicatively in semitones (see isLogHzDest).
-    // Scale reduced 48→12 (±1 octave at full depth) so that small LFO amounts give
-    // subtle movement — at 48 even depth=5 caused >2 semitones which is too wide for
-    // narrow-band filters (notch). depth=5→0.6 semi, depth=25→3 semi, depth=100→12 semi.
-    if (destId == "filter.cutoff" || destId == "insert.lpf") return 12.0f;
-    // Semitones / dB / bits — match the destination's natural full range.
-    if (destId == "pitch.semitones") return 12.0f;   // ±12 semitones full swing
-    if (destId == "pitch.octave")    return 36.0f;   // ±3 octaves = ±36 semitones full swing
-    if (destId == "fenv.depth")      return 48.0f;   // 0..48 semitones (full range)
-    if (destId == "pitch.envDepth")  return 24.0f;   // 0..24 semitones (#223)
-    if (destId == "amp.level")       return 2.0f;    // 0..2 gain = -inf..+6 dB (#223)
-    if (destId == "accentDb")        return 12.0f;   // 0..12 dB (#223)
+    // Proportion-space destinations (#638 + #639) — modParamValues holds the slider's
+    // proportion (0..1) so the same depth always sweeps the same visual proportion of
+    // the knob's turn (Andy's design rule: "a 50% mod at full should turn the knob half
+    // of its available turn"). Seed + write-back in PluginProcessor.cpp convert between
+    // proportion and actual via each slider's skew. Linear sliders (resonance, sustain,
+    // pitch.semitones, fenv.depth, pitch.envDepth, accent display, euclid pad knobs) keep
+    // additive-in-display-units mod since their display proportion IS the knob turn.
+    if (destId == "filter.cutoff"
+     || destId == "amp.attack"  || destId == "amp.decay"  || destId == "amp.release"
+     || destId == "fenv.attack" || destId == "fenv.decay"
+     || destId == "filter.lowCut"
+     || destId == "amp.level")       return 1.0f;
+    // Additive-in-display destinations — scale = SLIDER RANGE so 100% mod at full src
+    // sweeps the entire slider (Andy's spec: 50% mod → 50% knob turn). #639 update:
+    // bumped pitch.semitones (12→24) and pitch.octave (36→96 semitones = 8 octaves)
+    // so they match the spec; previously they swept only half / 37.5% of slider range.
+    if (destId == "pitch.semitones") return 24.0f;   // ±12 semitones × 2 = 24 swing (full slider range)
+    if (destId == "pitch.octave")    return 72.0f;   // ±3 octaves × 2 × 12 semis = 72 swing (full slider range)
+    if (destId == "fenv.depth")      return 48.0f;   // 0..48 semitones (full range) — already matches slider 0..100 display × 0.48
+    if (destId == "pitch.envDepth")  return 24.0f;   // 0..24 semitones (#223) — slider display 0..100 × 0.24
+    if (destId == "accentDb")        return 12.0f;   // 0..12 dB (#223) — slider display 0..100 × 0.12
     if (destId == "insert.output")   return 24.0f;   // -24..0 dB (full range)
     if (destId == "insert.bits")     return 1.0f;    // 1..16 bits; ±1 bit at full depth (#266)
+    // Stage 36 generic insert slots — values stored in voiceParams.insertParam[] as
+    // NORMALISED 0..1; each algo's process() denormalises via kInsertAlgoSlots. So
+    // a full-depth modulation must span the normalised range — scale = 1.0, NOT
+    // the default 100. Pre-fix the default 100 made any positive mod saturate
+    // insertParam to 1.0 (jlimit clamp) — modulation was effectively binary on
+    // ALL insert algorithms.
+    if (destId == "insert.p1" || destId == "insert.p2"
+     || destId == "insert.p3" || destId == "insert.p4") return 1.0f;
     // algorithm-specific insert destinations. Scale equals the
     // full-swing range for the integer field so depth=100% × src=100% spans the
     // whole knob (e.g. ks.note covers all 7 chromatic notes).
@@ -75,19 +92,23 @@ static float depthScaleFor(const std::string& destId)
     if (destId == "voc.note")        return 6.0f;    // Vocoder note 0..6 (C..B)
     if (destId == "voc.octave")      return 4.0f;    // Vocoder octave 1..5 (range 4)
     if (destId == "voc.unison")      return 6.0f;    // Vocoder unison index 0..6
-    // Pattern destinations — hits/rotate. Halved from 16→8 (~half of typical 16-step
-    // pattern at full depth) so user-facing depth control feels less saturated.
-    if (destId == "euclid.a.hits"   || destId == "euclid.b.hits"   || destId == "euclid.c.hits"
-     || destId == "euclid.a.rotate" || destId == "euclid.b.rotate" || destId == "euclid.c.rotate")
-        return 8.0f;   // ±8 steps at full depth
-    // Pattern destinations — pad knobs. Halved 12→6 / 8→4 for the same reason.
+    // Pattern destinations — pad/insert knobs with FIXED slider ranges. Scale = full
+    // slider range so 100% mod = 100% knob turn (Andy's spec, #641). Previously halved
+    // for a "feels less saturated" UX which contradicted the design rule — user can
+    // dial depth down for subtler movement.
     if (destId == "euclid.a.prePad"  || destId == "euclid.b.prePad"  || destId == "euclid.c.prePad"
      || destId == "euclid.a.postPad" || destId == "euclid.b.postPad" || destId == "euclid.c.postPad")
-        return 6.0f;   // ±6 steps at full depth (half of 12-step pad range)
+        return 12.0f;  // full 0..12-step pad range
     if (destId == "euclid.a.insLen"  || destId == "euclid.b.insLen"  || destId == "euclid.c.insLen")
-        return 4.0f;   // ±4 steps at full depth (half of 8-step insert range)
-    if (destId == "euclid.a.insSt"   || destId == "euclid.b.insSt"   || destId == "euclid.c.insSt")
-        return 8.0f;   // ±8 positions at full depth (half of original 16)
+        return 8.0f;   // full 0..8-step insert-length range
+    // Pattern destinations — hits/rotate/insSt with DYNAMIC slider range (0..steps or
+    // 0..steps-1, varies per-rhythm). Scale = 1.0 because the seed + write-back
+    // convert via proportion (base/steps), not absolute step count. depth=100% +
+    // src=100% sweeps the full slider regardless of step count.
+    if (destId == "euclid.a.hits"   || destId == "euclid.b.hits"   || destId == "euclid.c.hits"
+     || destId == "euclid.a.rotate" || destId == "euclid.b.rotate" || destId == "euclid.c.rotate"
+     || destId == "euclid.a.insSt"  || destId == "euclid.b.insSt"  || destId == "euclid.c.insSt")
+        return 1.0f;
     return 100.0f;  // 0-100 display-scale default
 }
 
@@ -97,7 +118,10 @@ static float depthScaleFor(const std::string& destId)
 // VoiceEngine: `cutoff * 2^(semis/12)`.
 static bool isLogHzDest(const std::string& destId)
 {
-    return destId == "filter.cutoff" || destId == "insert.lpf";
+    // Empty since #639 — filter.cutoff switched to proportion-space modulation. Function
+    // kept for future destinations that may want multiplicative-in-octaves behaviour.
+    (void) destId;
+    return false;
 }
 
 bool ModulationMatrix::isMetaSource(const std::string& src, std::string& outDepId)

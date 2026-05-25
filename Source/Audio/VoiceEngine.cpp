@@ -161,9 +161,12 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     // argument. Removing the dead assign() also removes a Tier 2 audio-thread
     // allocation hazard that would have fired if the surrounding clamp ever
     // regressed.
-    const float baseSemitones = static_cast<float>(activeParams.pitchOctave) * 12.0f
-                              + static_cast<float>(activeParams.pitchSemitones)
-                              + activeParams.pitchFine / 100.0f;
+    // Static pitch shift clamped to ±4 octaves (octave ±3 oct = ±36 semis + semi ±12 + fine ±1
+    // could otherwise reach ±49 semis; Andy's spec: accept clamping when fine adds beyond ±4 oct).
+    const float baseSemitones = juce::jlimit(-48.0f, 48.0f,
+                                  static_cast<float>(activeParams.pitchOctave) * 12.0f
+                                + static_cast<float>(activeParams.pitchSemitones)
+                                + activeParams.pitchFine / 100.0f);
     const float pitchDepth = activeParams.pitchEnvDepth;
 
     smoothedPitchMod.setTargetValue(activeParams.pitchMod);

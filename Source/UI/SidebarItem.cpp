@@ -69,23 +69,33 @@ void SidebarItem::timerCallback()
     }
 
     // re-read the rhythm's pattern every tick so edits in the main
-    // EuclideanPanel (hits / rotation / steps / insert / pad) propagate to
-    // the sidebar mini-circle. setRhythm is only called at construction /
-    // reassign, so without this poll the sidebar shows a stale snapshot.
-    // compare HitGenerator::Signature (POD, no alloc) instead of fetching
-    // + comparing full StepType vectors every tick — only fetch when something changed.
+    // EuclideanPanel (hits / rotation / steps / insert / pad) AND modulation-driven
+    // pattern changes propagate to the sidebar mini-circle. compare HitGenerator::Signature
+    // + modulated overrides (POD, no alloc) instead of fetching + comparing full
+    // std::vector<StepType> every tick — only fetch when something changed (#642).
     if (rhythm)
     {
         const auto sigA = rhythm->genA.signature();
         const auto sigB = rhythm->genB.signature();
         const auto sigC = rhythm->genC.signature();
-        if (!lastSigValid || sigA != lastSigA || sigB != lastSigB || sigC != lastSigC)
+        const EuclidOverrides ov = proc ? proc->getModulatedEuclidOverrides(rhythmIndex)
+                                        : EuclidOverrides{
+                                            { rhythm->genA.hits, rhythm->genA.rotate, rhythm->genA.prePad,
+                                              rhythm->genA.postPad, rhythm->genA.insertStart, rhythm->genA.insertLength },
+                                            { rhythm->genB.hits, rhythm->genB.rotate, rhythm->genB.prePad,
+                                              rhythm->genB.postPad, rhythm->genB.insertStart, rhythm->genB.insertLength },
+                                            { rhythm->genC.hits, rhythm->genC.rotate, rhythm->genC.prePad,
+                                              rhythm->genC.postPad, rhythm->genC.insertStart, rhythm->genC.insertLength }
+                                          };
+        if (!lastSigValid || sigA != lastSigA || sigB != lastSigB || sigC != lastSigC
+            || ov != lastAppliedOverrides)
         {
             lastSigA = sigA; lastSigB = sigB; lastSigC = sigC;
+            lastAppliedOverrides = ov;
             lastSigValid = true;
-            miniCircle.setPatterns(rhythm->genA.getStepTypes(),
-                                   rhythm->genB.getStepTypes(),
-                                   rhythm->genC.getStepTypes());
+            miniCircle.setPatterns(rhythm->genA.getStepTypes(ov.a),
+                                   rhythm->genB.getStepTypes(ov.b),
+                                   rhythm->genC.getStepTypes(ov.c));
         }
     }
 

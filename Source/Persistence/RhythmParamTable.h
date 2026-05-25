@@ -119,12 +119,12 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
                    [](const Rhythm& r) -> float { return (float) r.resetSteps.value_or(-1); }, ParamKind::Int },
 
     // ── Pitch ────────────────────────────────────────────────────────────────
-    { "pitchOct",  [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.pitchOctave    = juce::jlimit(-4,  4, (int)v); vd = true; },
+    { "pitchOct",  [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.pitchOctave    = juce::jlimit(-3,  3, (int)v); vd = true; },
                    [](const Rhythm& r) -> float { return (float) r.voiceParams.pitchOctave; },    ParamKind::Int },
     { "pitchSemi", [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.pitchSemitones = juce::jlimit(-12, 12, (int)v); vd = true; },
                    [](const Rhythm& r) -> float { return (float) r.voiceParams.pitchSemitones; }, ParamKind::Int },
-    { "pitchFine", [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.pitchFine      = v; vd = true; },
-                   [](const Rhythm& r) -> float { return r.voiceParams.pitchFine; } },
+    { "pitchFine", [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.pitchFine      = juce::jlimit(-100.0f, 100.0f, v); vd = true; },
+                   [](const Rhythm& r) -> float { return r.voiceParams.pitchFine; },               ParamKind::Int },
 
     // ── Pitch envelope ───────────────────────────────────────────────────────
     // pEnv times stored in seconds directly (0..10 s, skew 0.3).

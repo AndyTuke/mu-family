@@ -23,5 +23,8 @@ enum ModSnapIdx : int
     kSnapEucAHits,  kSnapEucARotate, kSnapEucAPrePad, kSnapEucAPostPad, kSnapEucAInsSt, kSnapEucAInsLen,
     kSnapEucBHits,  kSnapEucBRotate, kSnapEucBPrePad, kSnapEucBPostPad, kSnapEucBInsSt, kSnapEucBInsLen,
     kSnapEucCHits,  kSnapEucCRotate, kSnapEucCPrePad, kSnapEucCPostPad, kSnapEucCInsSt, kSnapEucCInsLen,
+    // T5 follow-up — new mod destinations introduced after audit.
+    kSnapFilterLowCut,
+    kSnapPitchOctave,
     kSnapCount
 };
