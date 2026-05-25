@@ -90,24 +90,23 @@ private:
     VoiceParams activeParams;  // audio thread only — what process() actually uses
                                // (= params unless modulation overrides it each block)
 
-    // Per-voice amp envelopes — one ADSR per sample slot so long releases play
-    // out independently when a retrigger claims a different slot. All envelopes
-    // share the same A/D/S/R parameters (driven by activeParams.ampEnv*); only
-    // their state diverges. Filter / pitch envelopes remain monophonic (one
-    // shared envelope, gates filter cutoff modulation and per-sample pitch
-    // ratio respectively) — those changes are tracked separately.
-    std::array<juce::ADSR, MaxVoices> ampEnvs;
+    // Single engine-level amp envelope (#627). Pre-Stage-35 there was one ADSR per
+    // voice slot — that model never composed cleanly with the SHARED filter + insert
+    // chain that follows it (filter resonance / comb feedback could outlast any single
+    // voice's env), so #416 had to forcibly reset filter+insert state in markRetired()
+    // to kill the residual ringing. With the new "filter-then-amp" signal flow, voices
+    // mix raw into tempBuffer → filter + insert process the combined signal → engine
+    // ampEnv multiplies the result at the END of the chain. Filter / insert tails ring
+    // naturally and drain through the env release. Trade-off: rapid retriggers reset the
+    // engine env (no per-voice envelope independence on overlapping voices) — fine for
+    // drum-style triggers and pad use is mitigated by pattern legato (#419).
+    juce::ADSR  ampEnv;
     juce::ADSR  filterEnv;
     juce::ADSR  pitchEnv;
     MultiModeFilter voiceFilter;             // owns SVF / Ladder / 1-pole / biquad / comb state
     Hp24Filter      lowCutFilter;            // 4-pole HPF inline with voiceFilter — bypassed when cutoff <= 0
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedLowCutHz;
-    juce::AudioBuffer<float> tempBuffer;     // post-envelope sum that feeds filter/insert
-
-    // Per-voice scratch buffer — each SamplePlayer writes into its own
-    // voiceBuffers[i] additively, ampEnvs[i] applied in place, then summed
-    // into tempBuffer. Sized in prepareToPlay so no audio-thread alloc.
-    std::array<juce::AudioBuffer<float>, MaxVoices> voiceBuffers;
+    juce::AudioBuffer<float> tempBuffer;     // voice sum → filter → insert → env-gate → output
 
 public:
     InsertProcessor insertProc;  // exposed so VoiceSection can read grReduction for the GR meter

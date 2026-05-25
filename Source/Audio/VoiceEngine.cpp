@@ -21,12 +21,9 @@ void VoiceEngine::prepareToPlay(double sampleRate, int blockSize)
     }
 
     tempBuffer.setSize(2, blockSize, false, true, false);
-    for (auto& vb : voiceBuffers)
-        vb.setSize(2, blockSize, false, true, false);
     insertProc.prepare(sampleRate, blockSize);
 
-    for (auto& env : ampEnvs)
-        env.setSampleRate(sampleRate);
+    ampEnv.setSampleRate(sampleRate);
     filterEnv.setSampleRate(sampleRate);
     pitchEnv.setSampleRate(sampleRate);
 
@@ -121,18 +118,16 @@ void VoiceEngine::trigger(bool isAccented, bool tied)
     if (tied)
         return;
 
-    // Per-voice amp envelope retrigger on the claimed slot only — slots
-    // still releasing from earlier hits keep their envelope state intact
-    // and play out independently. Untied hits always reset to zero before
-    // noteOn (#614: the prior per-envelope legato flags were removed;
-    // envelope-continue behaviour is now reserved for tied hits, which take
-    // the early-return above).
-    auto& ampEnv = ampEnvs[(size_t) claimedIdx];
+    // #627 / Stage 35: engine-level amp envelope (single ADSR for the whole engine,
+    // not per-voice). Untied retrigger resets to zero and noteOns; the voice slot's
+    // sample audio mixes into tempBuffer and the env multiplies the post-filter +
+    // post-insert result at the END of process(). Tied hits already returned above so
+    // env state carries across contiguous pattern hits (pattern legato unchanged).
+    (void) claimedIdx;  // slot index no longer needed for env routing
     ampEnv.reset();
     ampEnv.noteOn();
 
-    // Filter / pitch envelopes are still monophonic (one envelope per engine,
-    // applied to the mixed signal / pitch ratio). Global retrigger as before.
+    // Filter / pitch envelopes — also engine-level, also retrigger on untied hits.
     filterEnv.reset();
     filterEnv.noteOn();
     pitchEnv.reset();
@@ -182,28 +177,21 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     const int nCh = juce::jmin(output.getNumChannels(), tempBuffer.getNumChannels());
     tempBuffer.clear();
 
-    // Per-voice render + envelope. Each sample slot renders into its own
-    // scratch buffer so its amp envelope (`ampEnvs[i]`) applies in isolation —
-    // a long release on slot 0 plays out untouched even when slot 1 attacks
-    // a new hit. Skip slots that are fully idle (no in-flight sample, no
-    // envelope tail) — saves the per-slot env-apply on unused voices. We
-    // always apply the envelope when active, regardless of ampRelToEnd:
-    // ampRelToEnd's intent is "let the sample play through to its natural end
-    // instead of being cut by the RELEASE phase," not "bypass the envelope
-    // completely." During normal play (no noteOff, env held in Sustain),
-    // applying the env only affects A/D/S. The release-to-end semantic is
-    // enforced in markRetired() instead — for ampRelToEnd, we skip the
-    // noteOff so the env stays at sustain level.
+    // #627 Stage 35 — FILTER-THEN-AMP signal flow. Voices render their raw sample
+    // audio (no per-voice env shaping) and mix additively into tempBuffer. The
+    // shared filter + insert chain then processes the combined signal, and the
+    // engine-level ampEnv multiplies the result at the END so:
+    //   • Filter resonance / comb feedback / reverb-style insert tails ring naturally
+    //     past sample-end and drain through the env release (no FX-tail truncation).
+    //   • Retired engines no longer need voiceFilter.reset() / insertProc.reset() —
+    //     #416's "comb-filter overlay" bug is solved by the env-gate at the output,
+    //     not by killing filter state.
+    //   • markRetired noteOffs ampEnv → release runs → output silenced when env idle.
     for (int vi = 0; vi < MaxVoices; ++vi)
     {
-        if (! voices[(size_t) vi].isActive() && ! ampEnvs[(size_t) vi].isActive())
+        if (! voices[(size_t) vi].isActive())
             continue;
-        auto& vb = voiceBuffers[(size_t) vi];
-        vb.clear();
-        voices[(size_t) vi].process(buffer, pitchRatioBuffer.data(), vb, ns);
-        ampEnvs[(size_t) vi].applyEnvelopeToBuffer(vb, 0, ns);
-        for (int ch = 0; ch < nCh; ++ch)
-            tempBuffer.addFrom(ch, 0, vb, ch, 0, ns);
+        voices[(size_t) vi].process(buffer, pitchRatioBuffer.data(), tempBuffer, ns);
     }
 
     // Filter envelope modulates cutoff (per-block approximation).
@@ -229,6 +217,11 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     // ── Insert effects (delegated to InsertProcessor) ────────────────────────
     insertProc.process(tempBuffer, ns, nCh, activeParams);
 
+    // #627 — engine amp env gates the FINAL post-DSP signal. applyEnvelopeToBuffer
+    // ticks the ADSR once per sample and multiplies in place, so any filter / insert
+    // residual ringing fades naturally with the envelope's release phase.
+    ampEnv.applyEnvelopeToBuffer(tempBuffer, 0, ns);
+
     for (int ch = 0; ch < nCh; ++ch)
         output.addFrom(ch, 0, tempBuffer, ch, 0, ns, activeParams.ampLevel * accentGain);
 }
@@ -244,29 +237,25 @@ void VoiceEngine::markRetired() noexcept
     // audio thread cannot be mid-process() on this engine, so direct state
     // mutation is safe.
 
-    // Per-voice amp envelope noteOff is gated on ampRelToEnd.
-    //  - ampRelToEnd == false: noteOff every voice so each env enters release;
-    //    applyEnvelopeToBuffer (always called when the slot is active, see
-    //    process()) fades each slot over the user's release time, then every
-    //    env reaches idle and the engine drains.
-    //  - ampRelToEnd == true: do NOT noteOff. Envs stay at whatever level
-    //    they reached and applyEnvelopeToBuffer keeps multiplying by that —
-    //    samples play through to their natural ends at the sustain-decided
-    //    volume. isFullyDrained() handles the voices-only drain criterion.
+    // #627: amp env noteOff is gated on ampRelToEnd.
+    //  - ampRelToEnd == false: noteOff so the env enters release. applyEnvelopeToBuffer
+    //    at the end of process() fades the COMBINED output (sample + filter + insert
+    //    tails) over the user's release time. When env hits idle, output is silent
+    //    regardless of filter/insert state.
+    //  - ampRelToEnd == true: do NOT noteOff. Env stays at sustain (or wherever decay
+    //    left it); sample plays through to its natural end at that level.
+    //    isFullyDrained() handles the voices-only drain criterion in this mode.
     if (!activeParams.ampRelToEnd)
-        for (auto& env : ampEnvs)
-            env.noteOff();
+        ampEnv.noteOff();
 
-    // Filter / pitch envelopes don't have an ampRelToEnd-equivalent — they
-    // always have a finite release. noteOff so they progress to idle; the
-    // filter is reset below anyway so filterEnv's modulation has no audible
-    // effect, but ticking it to idle keeps internal state tidy.
+    // Filter / pitch envelopes — also engine-level — get a finite release. noteOff
+    // so they progress to idle. Filter / insert state is NO LONGER reset (#627):
+    // their tails ring naturally and the ampEnv release gates the output to silence
+    // when env hits idle. This restores the FX-tail behaviour that #416's resets
+    // had to sacrifice (filter resonance, comb feedback, reverb-style insert tails).
     filterEnv.noteOff();
     pitchEnv.noteOff();
 
-    voiceFilter.reset();
-    lowCutFilter.reset();
-    insertProc.reset();
     retired = true;
 }
 
@@ -279,28 +268,17 @@ bool VoiceEngine::isFullyDrained() const noexcept
         if (v.isActive())
             return false;
 
-    // ampRelToEnd retired engines never get noteOff'd (per-voice envs stay at
-    // sustain level, sample plays through unscaled). isActive() therefore
-    // never returns false for them. Voices-finished is the sole drain
-    // criterion in that mode — at which point the engine produces silence
-    // regardless of where the envs are.
+    // ampRelToEnd retired engines never get noteOff'd (env stays at sustain level,
+    // sample plays through unscaled). ampEnv.isActive() therefore never returns
+    // false for them. Voices-finished is the sole drain criterion in that mode —
+    // at which point applyEnvelopeToBuffer's gain × 0 outputs silence regardless.
     if (retired && activeParams.ampRelToEnd)
         return true;
 
-    // Standard mode: every per-voice envelope must be idle (post-release) for
-    // the engine to be drainable. Any one still active means it's still
-    // multiplying a (potentially silent) sample by something non-zero — but
-    // since the voices loop above already ensured no sample is rendering,
-    // the env tail produces silence and we COULD drain. However, JUCE ADSR
-    // can hit isActive()==true with non-zero internal level after a noteOff,
-    // and we don't want to destroy the engine while any env is mid-release
-    // since it indicates "still wants to be processed." Keep the original
-    // semantics: every per-voice env must report idle.
-    for (const auto& env : ampEnvs)
-        if (env.isActive())
-            return false;
-
-    return true;
+    // Standard mode: ampEnv must be idle (post-release). Once env idles the engine
+    // output is gated to silence regardless of filter / insert state (#627 — the
+    // engine-level env at the END of process() handles this naturally).
+    return ! ampEnv.isActive();
 }
 
 void VoiceEngine::clearSample()
@@ -353,8 +331,7 @@ void VoiceEngine::syncEnvelopes()
                                              juce::jmax(kMinDecayRelSec, activeParams.ampEnvDec),
                                              activeParams.ampEnvSus,
                                              juce::jmax(kMinDecayRelSec, activeParams.ampEnvRel) };
-    for (auto& env : ampEnvs)
-        env.setParameters(ampParams);
+    ampEnv.setParameters(ampParams);
     filterEnv.setParameters({ activeParams.filterEnvAtk,
                               juce::jmax(kMinDecayRelSec, activeParams.filterEnvDec),
                               activeParams.filterEnvSus,

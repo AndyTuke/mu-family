@@ -76,7 +76,7 @@ Always build Release when producing tester builds — the CMake post-build hook 
 
 ## Development history
 
-Stages 1–33 are complete. See [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) for the full stage-by-stage log with dates. When a stage is completed, it should be moved to the DevelopmentHistory.md file.
+Stages 1–34 are complete. See [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) for the full stage-by-stage log with dates. When a stage is completed, it should be moved to the DevelopmentHistory.md file.
 
 ## Upcoming stages
 
@@ -86,7 +86,7 @@ All code changes must be logged as backlog entries to maintain a complete develo
 
 | Stage | Status | Scope | Issues |
 |---|---|---|---|
-| 34 | 🟢 In progress | Seamless hot-swap with polyphonic voice tail. Old `VoiceEngine` keeps rendering its in-flight sample / envelope after swap, drains naturally, gets cleaned up off the audio thread. See [docs/design-seamless-hotswap.md](docs/design-seamless-hotswap.md) for the step-by-step plan with test gates. Steps 1 + 2 + 3 landed in #413 / #414 / #415; #416 fixes a Step 3 issue where retired engines never drained (no noteOff anywhere) and their filter / insert state kept ringing into the channel buffer as an audible overlay on the new active rhythm. Step 4 (atomic-pointer swap for the active engine, eliminating the residual ~1.33 ms silence gap) is OPTIONAL — only worth doing if the residual artifact proves audible on listening tests. Awaiting user re-verification of Test 3.1 after #416, plus Tests 3.2–3.4. | #413, #414, #415 |
+| _none scheduled_ |  |  |  |
 
 
 ## Source layout (actual, as built)
