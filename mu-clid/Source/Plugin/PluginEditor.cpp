@@ -230,7 +230,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
         juce::String safeName = name.replaceCharacters("\\/:|*?<>\"", "_________");
         if (safeName.isEmpty()) safeName = "Preset";
-        const juce::File destFile = processorRef.getPresetsDir().getChildFile(safeName + ".muclid");
+        const juce::File destFile = processorRef.getPresetsDir().getChildFile(safeName + ".muClid");
 
         if (destFile.existsAsFile())
         {
@@ -259,6 +259,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     };
 
     // ── Preset browser ────────────────────────────────────────────────────────
+    presetBrowser.setFileExtension(processorRef.getFullPresetExtension());
     presetBrowser.onLoadPreset = [this](const juce::File& f)
     {
         processorRef.loadPreset(f);
@@ -601,7 +602,7 @@ void PluginEditor::doSavePreset(const juce::String& name, const juce::String& de
     transportBar.refreshPresets();
     juce::String safeName = name.replaceCharacters("\\/:|*?<>\"", "_________");
     if (safeName.isEmpty()) safeName = "Preset";
-    transportBar.setLoadedPreset(processorRef.getPresetsDir().getChildFile(safeName + ".muclid"));
+    transportBar.setLoadedPreset(processorRef.getPresetsDir().getChildFile(safeName + ".muClid"));
     presetDirty = false;
     showSaveDialog(false);
     if (pendingQuitCallback)
@@ -614,7 +615,7 @@ void PluginEditor::doSavePreset(const juce::String& name, const juce::String& de
 
 void PluginEditor::doNewPreset()
 {
-    const juce::File defaultFile = processorRef.getPresetsDir().getChildFile("_default.muclid");
+    const juce::File defaultFile = processorRef.getPresetsDir().getChildFile("_default.muClid");
     if (!defaultFile.existsAsFile())
     {
         statusBar.showParam("New", "No default preset saved \xe2\x80\x94 use Save \xe2\x86\x92 Save as Default first",

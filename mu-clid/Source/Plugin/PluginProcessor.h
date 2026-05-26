@@ -252,7 +252,7 @@ public:
     // Set true before constructing a PluginProcessor to skip the ctor's
     // automatic `loadDefaultPreset` call. Used by the headless render path
     // (Source/Plugin/RenderMode.cpp) so listening tests aren't perturbed by
-    // whatever the user has saved as their personal `_default.muclid`.
+    // whatever the user has saved as their personal `_default.muClid`.
     inline static bool skipAutoLoadDefault = false;
 
     SequencerEngine sequencer;
@@ -359,12 +359,16 @@ private:
     int getNumActiveChannels() const override
         { return numActiveRhythms.load(std::memory_order_acquire); }
 
-    // Per-slot + full preset directories / extensions for the shared MIDI editor
-    // panels (`MidiPresetsPanel` / `MidiFullPresetsPanel` in mu-core).
+public:
+    // Per-slot + full preset directories / extensions. Public so the shared
+    // MIDI editor panels (`MidiPresetsPanel` / `MidiFullPresetsPanel`) and the
+    // mu-clid editor (preset browser) can read them through a PluginProcessor&.
     juce::File   getPerSlotPresetDir()       const override { return getRhythmsDir(); }
-    juce::String getPerSlotPresetExtension() const override { return "muRhyth"; }
+    juce::String getPerSlotPresetExtension() const override { return "muRhythm"; }
     juce::File   getFullPresetDir()          const override { return getPresetsDir(); }
-    juce::String getFullPresetExtension()    const override { return "muclid"; }
+    juce::String getFullPresetExtension()    const override { return "muClid"; }
+
+private:
 
     std::unique_ptr<juce::PropertiesFile> appSettings;
 

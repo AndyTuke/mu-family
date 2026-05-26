@@ -2,8 +2,8 @@
   "test": "TS_swap",
   "description": "Full-preset hot-swap while playing (prestage + loop-point + tail-out). Plays TS1 (steady kick), then loads the EMPTY TS2 at 2.0s. The swap must defer to the next loop point, and TS1's retired voice must ring out across the boundary rather than hard-cut. After the tail decays, TS2 makes no sound, so the output must be silent. Catches: swap never commits (free-running hang), swap hard-cuts the tail, or TS1 keeps playing after the swap.",
   "render": {
-    "preset": "tests/presets/TS1.muclid",
-    "swap_preset": "tests/presets/TS2.muclid",
+    "preset": "tests/presets/TS1.muClid",
+    "swap_preset": "tests/presets/TS2.muClid",
     "swap_at": 2.0,
     "seconds": 4.0,
     "sample_rate": 48000,

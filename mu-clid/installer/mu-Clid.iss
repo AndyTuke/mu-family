@@ -87,13 +87,13 @@ Source: "{#SourceDir}\Standalone\{#MyAppExeName}"; \
 ; Source: "{#SourceDir}\CLAP\SoundTouch.dll";        DestDir: "{commoncf64}\CLAP"; Components: clap;       Flags: ignoreversion
 
 ; Factory presets — copied into the user content folder chosen on the content page.
-; Add .muclid files to content\Presets\ in the repo and they will be bundled automatically.
-Source: "{#ContentSrc}\Presets\*.muclid"; \
+; Add .muClid files to content\Presets\ in the repo and they will be bundled automatically.
+Source: "{#ContentSrc}\Presets\*.muClid"; \
     DestDir: "{code:GetContentDir}\Presets"; \
     Flags: skipifsourcedoesntexist ignoreversion
 
 ; Factory rhythm presets.
-Source: "{#ContentSrc}\Rhythms\*.muRhyth"; \
+Source: "{#ContentSrc}\Rhythms\*.muRhythm"; \
     DestDir: "{code:GetContentDir}\Rhythms"; \
     Flags: skipifsourcedoesntexist ignoreversion
 

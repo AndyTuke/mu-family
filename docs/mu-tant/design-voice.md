@@ -53,39 +53,39 @@ Differences from mu-clid:
 
 ## Pitch — scale-quantised, modulator-driven
 
-### Per-slot tonal centre
-
-A slot has a shared **tonal-centre setting** (one knob each):
+### Slot-level tonal centre (shared by both oscs)
 
 | Param | Range | Notes |
 |---|---|---|
-| `pitch.root` | C, C#, D, … B | Root note class |
-| `pitch.octave` | 0..8 | Octave of the root |
-| `pitch.scale` | Major, Minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian, Harmonic-Minor, Pentatonic-Major, Pentatonic-Minor, Blues, Chromatic | Initial set; easy to extend |
+| `pitch.root` | C, C#, D, … B | Root note class — shared |
+| `pitch.scale` | Major, Minor, Dorian, Phrygian, Lydian, Mixolydian, Locrian, Harmonic-Minor, Pentatonic-Major, Pentatonic-Minor, Blues, Chromatic | Shared. Initial set; full list TBD |
 
-The two oscillators share root + octave + scale (one tonal centre per slot). Each oscillator has its **own** scale-degree position (so the two oscs sit at different notes within the same scale).
+Both oscillators sit in the same scale. Bitonal drones aren't supported — they'd add UI complexity for niche payoff.
 
-### Per-osc pitch
+### Per-oscillator pitch
 
-Each oscillator has:
+Each oscillator has its own three knobs:
 
 | Param | Range | Notes |
 |---|---|---|
-| `osc<N>.scaleDegree` | 0..N continuous | Position within the scale; integer = on-scale, fractional = glide between notes |
-| `osc<N>.fine` | ±100 cents | Off-grid detune |
+| `osc<N>.octave` | 0..8 | Octave of the osc's root note |
+| `osc<N>.tone`   | 0..N continuous | Scale degree — steps through the notes of the slot's scale |
+| `osc<N>.fine`   | ±100 cents | Off-grid detune |
 
-**Step modulator** on `scaleDegree` → integer output → snap to scale notes (clean jumps).
-**Smooth modulator** on `scaleDegree` → fractional output → smooth pitch glide through frequency space; the glide passes through off-scale frequencies between two adjacent scale notes, which sounds like a glissando rather than a chromatic walk.
+The two oscs share `root` + `scale`, but each has its own `octave` + `tone` + `fine`. Two oscs an octave apart on different scale degrees gives a fat, intervallic drone within a single tonal centre.
+
+**Step modulator** on `tone` → integer output → snap to scale notes (clean jumps).
+**Smooth modulator** on `tone` → fractional output → smooth pitch glide through frequency space; the glide passes through off-scale frequencies between two adjacent scale notes, which sounds like a glissando rather than a chromatic walk.
 
 ### Frequency computation
 
 ```
 degreesPerOctave = len(scale)
-d_int  = floor(scaleDegree)
-d_frac = scaleDegree - d_int
+t_int  = floor(tone)
+t_frac = tone - t_int
 
-semitone(d) = scaleOffsets[d % len] + (d / len) * 12
-midi        = root + 12*octave + lerp(semitone(d_int), semitone(d_int+1), d_frac) + fine/100
+semitone(t) = scaleOffsets[t % len] + (t / len) * 12
+midi        = root + 12*octave + lerp(semitone(t_int), semitone(t_int+1), t_frac) + fine/100
 freq        = 440 * 2^((midi - 69) / 12)
 ```
 
@@ -120,36 +120,27 @@ Loaded into RAM at startup as `std::vector<float>` (≈ 2 MB per table). The ful
 | Param | Range | Notes |
 |---|---|---|
 | `osc.xmod` | 0..1 | Cross-mod amount, modulatable for evolving timbre |
-| `osc.xmodMode` | `Off` / `FM` / `Sync` | FM = Osc1 modulates Osc2's phase increment; Sync = Osc2 hard-syncs to Osc1's phase zero-crossing |
-| `osc.mix` | 0..1 | Balance Osc1 vs Osc2 (0 = all Osc1, 1 = all Osc2) |
+| `osc.xmodMode` | `Off` / `FM` / `Sync` | See direction table below |
+| `osc.mix` | 0..1 | Balance Osc1 (A) vs Osc2 (B) — 0 = all A, 1 = all B |
 
-Direction is one-way: Osc1 → Osc2. (Bidirectional adds complexity for little real-world benefit; Serum and Vital are both one-way.)
+Direction depends on mode (the two cross-mod styles operate in opposite directions):
 
-Per-osc levels live on `osc.mix` rather than separate `osc1.level`/`osc2.level` knobs — fewer knobs, equivalent expressivity. (Open question: should this be three knobs — `osc1.level`, `osc2.level`, separately — for finer control? Single mix knob is the cheaper default.)
+| Mode | Direction | Effect |
+|---|---|---|
+| FM   | **B → A** (A FM'd from B) | Osc B's signal modulates Osc A's phase increment |
+| Sync | **A → B** (B syncs to A)  | Osc B's phase is forced to 0 each time Osc A wraps |
+
+Single `osc.mix` balance knob (no separate `osc1.level` / `osc2.level`). Fewer knobs, equivalent expressivity.
 
 ---
 
-## Gate stage (the "sequencer" output)
+## Gate stage
 
-The gate stage sits between the filter and the insert. It receives a **0..1 envelope value per sample** from the gate sequencer and multiplies the post-filter signal by it. The continuous drone is left intact when the gate is 1.0; bursts are carved out when the gate descends from a step's trigger.
+The gate stage sits between the filter and the insert in the voice chain. It outputs a **0..1 sample-rate envelope** that multiplies the post-filter signal, carving rhythmic bursts out of the otherwise-continuous drone.
 
-### Gate pattern model
+The drawable pattern model, per-envelope options, audio-thread contract, and UI layout are documented separately: see [design-sequencer.md](design-sequencer.md). This doc only references the gate as a node in the voice chain.
 
-Per slot the user draws a pattern with:
-- **N steps** (initial: 16 or 32, TBD — same options as mu-clid's `stepCount`)
-- **Per step: active flag** + **decay length** (one of: 64th, 32nd, 16th, 8th note)
-- The pattern loops at the host tempo
-
-When an active step is reached:
-1. A new decay-envelope instance is spawned (attack = 0, decay = the step's note length).
-2. The decay envelope retriggers any in-flight envelope (last-trigger wins; no overlap accumulation — clean chops).
-3. The gate signal = current envelope value (1.0 immediately on trigger, decaying to 0).
-
-Between steps with no trigger, the gate sits at 0 — i.e. silent — until the next active step. So the drone is **only audible during decay bursts**. (Open question: alternative "gate floor" knob that holds the drone at e.g. 0.2 between bursts? Defaulting to 0 — pure chops — for v1.)
-
-### Decay-envelope shape
-
-Linear from 1.0 → 0.0 over the chosen note length. (Open: exponential might feel more musical; offer a curve knob in v2.)
+The gate is **purely a 0..1 multiplier** — volume / pitch / filter modulation all live in the modulator section, not in the gate. Decoupling volume from the gate means a long-form crescendo can be sculpted independently of the rhythmic chops.
 
 ---
 
@@ -158,46 +149,74 @@ Linear from 1.0 → 0.0 over the chosen note length. (Open: exponential might fe
 Explicit decisions to keep the design tight:
 
 - **No amp envelope** (no ADSR). The gate stage replaces it.
-- **No pitch envelope.** Pitch evolves via the modulator section (LFOs / control sequences targeting `scaleDegree`).
+- **No pitch envelope.** Pitch evolves via the modulator section (LFOs / control sequences targeting `osc<N>.tone`).
 - **No filter envelope.** Filter cutoff / resonance evolve via the modulator section.
 - **No user samples.** Built-in wavetable bank only.
 - **No granular.** Pure wavetable.
-- **No note-on / note-off.** No MIDI input drives the voices (TBD — MIDI may still drive program change for preset selection, like mu-clid).
+- **No note-on / note-off.** MIDI is PC-only (program-change picks a pattern). No played-note input.
 - **No unison stacks.** A single Osc1 + Osc2 pair per voice. Stack width via the 8 slots themselves.
 
 ---
 
 ## Modulation destinations (per slot)
 
-The modulator section is **retained from mu-core unchanged** (LFOs + control sequences). New mu-tant-specific destinations:
+The modulator section is **retained from mu-core unchanged** (LFOs + control sequences). Mu-tant-specific destinations:
 
 | Destination | Range | Notes |
 |---|---|---|
-| `osc1.scaleDegree` | 0..N continuous | Scale-snapped under step mod; glides under smooth mod |
-| `osc2.scaleDegree` | 0..N continuous | Same |
+| `osc1.tone` | 0..N continuous | Scale-snapped under step mod; glides under smooth mod |
+| `osc2.tone` | 0..N continuous | Same |
+| `osc1.octave` | 0..8 | Integer; step mods snap, smooth mods cross octaves smoothly |
+| `osc2.octave` | 0..8 | |
 | `osc1.position` | 0..1 | Wavetable scan |
 | `osc2.position` | 0..1 | |
 | `osc1.fine` | ±100 cents | |
 | `osc2.fine` | ±100 cents | |
 | `osc.xmod` | 0..1 | Cross-mod amount — modulate this for the evolving FM timbre |
-| `osc.mix` | 0..1 | Osc1 vs Osc2 |
+| `osc.mix` | 0..1 | Osc A vs Osc B |
+| `amp.level` | -60..+6 dB | Slot-level volume. **This is the volume curve** — the gate is pure 0..1 multiplier, all amplitude shaping happens via a mod targeting this destination. |
 | `filter.cutoff`, `filter.resonance`, `filter.lowCut` | same as mu-clid | Inherited from mu-core voice chain |
 | `insert.p1..p4` | 0..1 | Insert algo params |
-| `gate.floor` (if added) | 0..1 | Drone-bleed-through level |
 
-No `amp.*` or `*.envelope.*` destinations (they don't exist).
+No `amp.attack/decay/sustain/release` or `*.envelope.*` destinations — they don't exist on mu-tant.
 
 Mod-display rule from #641 applies: skewed sliders use proportion-space modulation; linear sliders use additive-in-display.
 
 ---
 
-## UI
+## UI layout
 
-- **Same screen real-estate as mu-clid's sequencer panel** — the rhythm-circle / euclidean-panel area gets replaced.
-- **Top half**: oscillator controls (root / octave / scale, per-osc wavetable / scaleDegree / fine / position, cross-mod, mix) + filter + insert. Same `KnobWithLabel` / `SegmentControl` / `DropdownSelect` widgets from `mu-core` — no one-off controls.
-- **Bottom half**: drawable gate pattern grid (per-step active + per-step decay length).
-- **Modulator section retained** at the bottom of the screen (same place as mu-clid).
-- **Mixer / FX rows / sidebar / transport** unchanged from mu-core.
+Three stacked bands fill the main content area. Sidebar sits to the left of the upper two bands; the envelope pattern editor at the bottom spans the **full window width** (the sidebar ends above it). Modulators live below the pattern editor in the same place mu-clid puts them.
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Transport bar (mu-core)                            │
+├──────────┬──────────────────────────────────────────┤
+│          │  Band 1: Osc 1 + Osc 2  (layer N)        │
+│          │  ── per-osc: wavetable / octave / tone / │
+│          │     fine / position; shared: root /      │
+│ Sidebar  │     scale; cross-mod mode + amount; mix  │
+│ (layers) ├──────────────────────────────────────────┤
+│          │  Band 2: Filter + Insert  (mu-core)      │
+├──────────┴──────────────────────────────────────────┤
+│  Band 3: Envelope pattern editor (full width)       │
+│  ── 2-bar grid at selected resolution;              │
+│     properties strip below for the selected env     │
+├─────────────────────────────────────────────────────┤
+│  Modulators (mu-core)                               │
+└─────────────────────────────────────────────────────┘
+```
+
+| Band | Contents | Source |
+|---|---|---|
+| 1 — Oscillators | Two-osc panel for the selected layer | mu-tant |
+| 2 — Filter + Insert | Below the oscillators | `mu-core::VoiceFilter` + `mu-core::InsertProc` |
+| 3 — Envelope pattern editor | Full-width 2-bar grid + properties strip — see [design-sequencer.md](design-sequencer.md) | mu-tant |
+| Modulators | Bottom of window | `mu-core::ControlSequence` + `ModulationMatrix` |
+
+Layer = mu-tant's term for a slot (a single voice configuration + its gate pattern). Eight layers per preset, selected via the sidebar.
+
+Same `KnobWithLabel` / `SegmentControl` / `DropdownSelect` widgets from `mu-core` throughout — no one-off controls.
 
 ---
 
@@ -220,17 +239,36 @@ What mu-tant **reuses from mu-core** (no duplication):
 - `ModulationMatrix`, `ControlSequence` (LFOs / step / draw modulators)
 - `MuLookAndFeel`, all shared widgets
 - `RenderMode` pattern (each plugin owns its own, structured the same)
-- **MIDI program-change path** — channel mask, async FIFO, drain, `MidiPresetMap` + `MidiFullPresetMap` storage, plus the matching `MidiPresetsPanel` / `MidiFullPresetsPanel` UI. **Currently in mu-clid; needs lifting to mu-core** as a follow-up. The audio-side FIFO + drain + channel-mask gating becomes a `ProcessorBase` capability with virtual hooks (`applyMidiPresetSlot(int, juce::File)`, `applyFullMidiPreset(juce::File)`) that each plugin implements with its own preset-load semantics. The maps + panels are pure data / UI and move wholesale.
+- **MIDI program-change path** — channel mask, async FIFO, drain, `MidiPresetMap` + `MidiFullPresetMap` storage, plus the matching `MidiPresetsPanel` / `MidiFullPresetsPanel` UI. **Lifted into mu-core in #660** — mu-tant just implements the four virtuals (`getPerSlotPresetDir/Extension`, `getFullPresetDir/Extension`) and the apply hooks. PC ch 1–8 picks a pattern per slot; ch 9 picks a full preset.
+
+---
+
+## File formats + MIDI
+
+| Scope | Extension | Loaded via |
+|---|---|---|
+| Per-layer pattern (one slot's state) | `.muPattern` | PC ch 1–8, slot N = channel N. Also: pattern dropdown in the slot's UI. |
+| Full preset (all 8 slots + mixer + FX) | `.muTant` | PC ch 9. Also: preset dropdown in the transport bar. |
+
+Wired into the ProcessorBase virtuals from #660:
+- `getPerSlotPresetExtension()` → `"muPattern"`
+- `getFullPresetExtension()`    → `"muTant"`
+
+### Hot-swap timing
+
+Pattern loads (PC ch 1–8 or UI) **defer to the loop point**, same mechanism as mu-clid's rhythm hot-swap (#653 staged-prebuild + commit-at-boundary). Mu-tant reuses the `HotSwapStager` machinery — the prepared-pattern payload is mu-tant-specific (oscillator state + gate pattern + modulator state) but the staging lifecycle is identical.
+
+This is also what makes the **"on staged-for-change only"** envelope option work — the gate engine reads the same `hasPendingPreset()` flag the stager exposes.
+
+### Wavetable bank
+
+V1 wavetables will be **generated by a custom tool** (sibling utility in `tools/wavetable-gen/` or similar). Not exporting from Vital / Serum — keeps the ship list curated and copyright-clean. Tool details TBD; bank size, category list, naming scheme to be decided as the tool is built.
 
 ---
 
 ## Open questions
 
-1. **Tonal centre per oscillator?** Currently shared at the slot level (one root/octave/scale per slot, two scale-degrees). Alternative: each osc has its own root/octave/scale, allowing the two oscs to sit in different keys for bitonal drones. Adds 4 knobs per slot; defaulting to shared.
-2. **Osc level vs mix knob.** Currently a single `osc.mix` balance. Separate `osc1.level` + `osc2.level` knobs allow per-osc gain (e.g. mute one without modulating mix). Cheaper default = single mix.
-3. **Gate floor.** Should the gate clamp to a user-set floor (e.g. 0.2) between bursts so the drone bleeds through? Or always go to silence? Defaulting to silence — chops are the point.
-4. **Decay shape.** Linear vs exponential vs user curve. Defaulting to linear; revisit after first listening pass.
-5. **Per-step retrigger vs overlap.** Currently last-trigger wins (clean chops). Alternative: overlap — sum two in-flight decays. Defaulting to clean.
-6. **MIDI input.** Does mu-tant respond to incoming MIDI notes at all? E.g. could MIDI note-on set `pitch.root` for live key changes? Or is MIDI strictly for program-change (preset select) like mu-clid? Defaulting to PC-only.
-7. **Pattern step count.** Same range as mu-clid (1..64) or tighter (e.g. always 16 or 32)? Defaulting to mu-clid-equivalent (1..64).
-8. **Cross-mod direction.** One-way Osc1 → Osc2 only? (Default — matches Serum / Vital.) Bidirectional adds complexity.
+Voice-DSP questions are resolved. Remaining mu-tant-wide questions:
+
+- **Wavetable bank** — custom generation tool to be built; bank size, category list, naming scheme, output format details TBD as the tool comes together. See "Wavetable bank" above.
+- See [design-sequencer.md](design-sequencer.md) for gate-pattern open questions (probability seed scope, multi-select bulk edit, visual indication of envelope options).

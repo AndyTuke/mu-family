@@ -74,7 +74,7 @@ Args parse(const juce::String& commandLine)
 
 int execute(const Args& args)
 {
-    // Suppress the ctor's automatic `_default.muclid` / `_default.muRhyth`
+    // Suppress the ctor's automatic `_default.muClid` / `_default.muRhythm`
     // load so tests start from a single fresh default rhythm. The user's
     // personal default would otherwise pre-populate multiple rhythm slots
     // and contaminate the render.
@@ -91,13 +91,13 @@ int execute(const Args& args)
             return 2;
         }
         const auto ext = args.presetFile.getFileExtension().toLowerCase();
-        if (ext == ".murhyth")
+        if (ext == ".murhythm")
             proc.applyRhythmPreset(args.presetFile, 0);
         else if (ext == ".muclid")
             proc.loadPreset(args.presetFile);
         else
         {
-            reportError("unrecognised preset extension: " + ext + " (expected .muRhyth or .muclid)");
+            reportError("unrecognised preset extension: " + ext + " (expected .muRhythm or .muClid)");
             return 2;
         }
     }

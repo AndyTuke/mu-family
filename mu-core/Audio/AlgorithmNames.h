@@ -5,7 +5,7 @@
 
 // Stage 35 Step 1: stable algorithm-name tables for the v2 preset format.
 //
-// Preset XML (.muRhyth / .muclid, v2+) saves algorithm-selector parameters as
+// Preset XML (.muRhythm / .muClid, v2+) saves algorithm-selector parameters as
 // string names rather than raw integer indices. That way the user can reorder /
 // insert / remove algorithms in the dispatch table without invalidating every
 // saved preset — the names stay stable across releases, the indices don't.

@@ -21,7 +21,7 @@
 //
 // New destinations MUST be appended to the end. The 1-based dropdown indices
 // are persisted across UI sessions, so reordering would scramble them — but
-// saved .muRhyth / .muclid assignments reference the string `id`, so they
+// saved .muRhythm / .muClid assignments reference the string `id`, so they
 // survive reordering of the table itself.
 
 namespace ModDest

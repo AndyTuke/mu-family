@@ -12,7 +12,7 @@
 // mutation auto-saves to that file.
 //
 // The map only stores strings; the referenced file extension is decided by
-// the plugin (mu-clid uses `.muRhyth`; mu-tant / mu-toni will define their
+// the plugin (mu-clid uses `.muRhythm`; mu-tant / mu-toni will define their
 // own per-slot preset formats).
 class MidiPresetMap
 {

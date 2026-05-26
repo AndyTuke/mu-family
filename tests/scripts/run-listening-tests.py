@@ -41,8 +41,8 @@ def standalone_exe(config: str) -> Path:
 
 def resolve_preset(rel: str) -> Path | None:
     """Resolve a preset path from a spec. Content-folder presets (e.g.
-    'Rhythms/T11.muRhyth') resolve under CONTENT_ROOT; repo-local test presets
-    (e.g. 'tests/presets/TS1.muclid') resolve under REPO_ROOT. Try both."""
+    'Rhythms/T11.muRhythm') resolve under CONTENT_ROOT; repo-local test presets
+    (e.g. 'tests/presets/TS1.muClid') resolve under REPO_ROOT. Try both."""
     for base in (CONTENT_ROOT, REPO_ROOT):
         p = base / rel
         if p.exists():

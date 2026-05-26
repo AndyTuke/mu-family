@@ -2,7 +2,7 @@
   "test": "T13",
   "description": "Polyphonic retrigger feel: dense overlapping hits on a percussive sample with 1 s amp decay. Engine-level env (#627) means each retrigger resets the env -- for drum patterns this should be inaudible. Continuous audible output throughout the 2 s render confirms hits are firing and voices overlap.",
   "render": {
-    "preset": "tests/presets/T13.muRhyth",
+    "preset": "tests/presets/T13.muRhythm",
     "seconds": 2.0,
     "sample_rate": 48000,
     "block_size": 512

@@ -12,7 +12,7 @@ Available as VST3, CLAP, and Standalone for Windows.
 
 Each slot plays back a sample through a full voice chain: pitch/filter/amp envelopes, a multi-mode insert effect (distortion, bitcrusher, flanger, echo), and sends to a shared Effect/Delay/Reverb bus. A built-in mixer gives you per-channel faders, pan, mute/solo, and sidechain ducking.
 
-Patterns can be modulated by up to 8 per-rhythm LFO/step modulators. Everything saves and loads as a preset (`.muclid` files).
+Patterns can be modulated by up to 8 per-rhythm LFO/step modulators. Everything saves and loads as a preset (`.muClid` files).
 
 ## Features
 
@@ -26,7 +26,7 @@ Patterns can be modulated by up to 8 per-rhythm LFO/step modulators. Everything 
 - Up to 8 LFO/step modulators per rhythm, with drawable shapes and bipolar/unipolar modes
 - Drag-to-reorder rhythm slots
 - Hot-swap a rhythm preset while playing (swaps at loop boundary)
-- Preset system: full presets (`.muclid`) and per-rhythm presets (`.muRhyth`), with optional sample embedding
+- Preset system: full presets (`.muClid`) and per-rhythm presets (`.muRhythm`), with optional sample embedding
 
 ## Building
 

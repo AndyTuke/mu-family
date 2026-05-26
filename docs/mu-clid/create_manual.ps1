@@ -70,10 +70,10 @@ Bullet "CLAP  —  copy mu-Clid.clap to %ProgramFiles%\Common Files\CLAP\"
 Bullet "Standalone  —  run mu-Clid.exe from any location"
 
 H2 "Content Folder"
-P "On first launch mu-Clid creates a content folder at %USERPROFILE%\Documents\TDP\muClid\ with three sub-folders: Presets (full preset files, .muclid), Rhythms (single-rhythm preset files, .muRhyth), and Samples (default browse location for samples). You can change the content folder path in the Settings overlay at any time."
+P "On first launch mu-Clid creates a content folder at %USERPROFILE%\Documents\TDP\muClid\ with three sub-folders: Presets (full preset files, .muClid), Rhythms (single-rhythm preset files, .muRhythm), and Samples (default browse location for samples). You can change the content folder path in the Settings overlay at any time."
 
 H2 "Default Presets"
-P "If a file named _default.muclid exists in your Presets folder it is loaded silently on startup. If _default.muRhyth exists in your Rhythms folder it is applied whenever you add a new rhythm. Save over either file to create a personal default."
+P "If a file named _default.muClid exists in your Presets folder it is loaded silently on startup. If _default.muRhythm exists in your Rhythms folder it is applied whenever you add a new rhythm. Save over either file to create a personal default."
 
 # ── 4. Interface Overview ─────────────────────────────────────────────────────
 H1 "4. Interface Overview"
@@ -115,7 +115,7 @@ H1 "7. Rhythm Panel"
 P "The Rhythm Panel is the main editing surface for the selected rhythm. It is divided into five sections from top to bottom: Header, Sample Bar, Rhythm Circle and Euclidean Panel, Voice Section, and Modulator Panel."
 
 H2 "Header"
-P "Shows the rhythm name (double-click to rename), Mute and Solo buttons, a Delete button, and a rhythm-preset dropdown that lists .muRhyth files from your Rhythms folder. Selecting a preset loads it into the current rhythm slot immediately (or stages a hot-swap during playback). A coloured accent strip on the left identifies the rhythm."
+P "Shows the rhythm name (double-click to rename), Mute and Solo buttons, a Delete button, and a rhythm-preset dropdown that lists .muRhythm files from your Rhythms folder. Selecting a preset loads it into the current rhythm slot immediately (or stages a hot-swap during playback). A coloured accent strip on the left identifies the rhythm."
 
 H2 "Sample Bar"
 P "Drag a sample file onto this bar or click it to browse. Supported formats: WAV, AIFF, MP3, FLAC. Once loaded the filename is shown. A missing-sample warning appears in amber; click the locator icon to find a replacement."
@@ -315,21 +315,21 @@ Pic "Effect, Delay, and Reverb FX rows side by side in the Mixer view."
 H1 "14. Presets"
 
 H2 "Saving a Preset"
-P "Click Save in the Transport Bar to open the save dialog. Enter a name, optional description, and category. Tick Embed Samples to include all loaded sample audio as base64 data inside the preset file, making it fully self-contained. Click Save to write a .muclid file to your Presets folder."
+P "Click Save in the Transport Bar to open the save dialog. Enter a name, optional description, and category. Tick Embed Samples to include all loaded sample audio as base64 data inside the preset file, making it fully self-contained. Click Save to write a .muClid file to your Presets folder."
 
 H2 "Loading a Preset"
 P "Select a preset from the dropdown in the Transport Bar. All rhythms, voice parameters, and sample references are restored immediately. If a sample cannot be found at its original path, mu-Clid searches the Samples folder in your content directory as a fallback. The preset dropdown shows <unnamed preset> when no preset is currently loaded."
 
 H2 "Hot-swap During Playback"
-P "Loading a single-rhythm .muRhyth file while playback is running stages the swap until the next loop boundary, so the change happens in time. The Settings overlay lets you choose between On Master Loop and On Rhythm Loop timing. A pending swap is shown by an orange SWP badge on the affected rhythm in the sidebar — click the badge to cancel."
+P "Loading a single-rhythm .muRhythm file while playback is running stages the swap until the next loop boundary, so the change happens in time. The Settings overlay lets you choose between On Master Loop and On Rhythm Loop timing. A pending swap is shown by an orange SWP badge on the affected rhythm in the sidebar — click the badge to cancel."
 P "FX tails survive the swap: when the new rhythm takes over, the old rhythm's sample continues playing through its amp envelope's release, and any filter resonance, comb feedback, or Karplus / vocoder feedback from its insert effect rings out naturally. The retired rhythm fades over its envelope's release time plus a short drain budget for feedback-based inserts (roughly two seconds), so transitions feel musical even when the old sample has a long tail or the insert effect was ringing at the moment of swap."
 
 H2 "Rhythm Presets"
-P ".muRhyth files are single-rhythm presets stored in the Rhythms folder. They can be saved with embedded samples and loaded into any rhythm slot. Save a rhythm preset to reuse a particular pattern and voice combination across multiple full presets."
-P "To load a rhythm preset, use the dropdown in the Rhythm Panel header (labelled 'rhythm preset…'). The dropdown lists all .muRhyth files in your Rhythms folder alphabetically. Selecting one loads it immediately, or stages a hot-swap if playback is running. Right-clicking an item offers Load and Delete options."
+P ".muRhythm files are single-rhythm presets stored in the Rhythms folder. They can be saved with embedded samples and loaded into any rhythm slot. Save a rhythm preset to reuse a particular pattern and voice combination across multiple full presets."
+P "To load a rhythm preset, use the dropdown in the Rhythm Panel header (labelled 'rhythm preset…'). The dropdown lists all .muRhythm files in your Rhythms folder alphabetically. Selecting one loads it immediately, or stages a hot-swap if playback is running. Right-clicking an item offers Load and Delete options."
 
 H2 "Preset File Format"
-P ".muclid and .muRhyth files are XML, with a MuClidPreset (or single Rhythm) root element. They can be inspected and edited with any text editor. Embedded sample audio is stored as base64 within the relevant Rhythm element."
+P ".muClid and .muRhythm files are XML, with a MuClidPreset (or single Rhythm) root element. They can be inspected and edited with any text editor. Embedded sample audio is stored as base64 within the relevant Rhythm element."
 
 # ── 15. MIDI ──────────────────────────────────────────────────────────────────
 H1 "15. MIDI Integration"
@@ -338,7 +338,7 @@ H2 "MIDI Clock Sync (Standalone)"
 P "When running as a standalone application, mu-Clid can lock to an external MIDI clock source. Open Settings and set Clock Source to MIDI In, choose which messages to honour (Clock only, Start/Stop/Continue, or Both), and select the MIDI input device. With external sync active the BPM display becomes read-only and shows the estimated tempo derived from incoming clock ticks."
 
 H2 "MIDI Program Change to Preset (DAW)"
-P "When running as a VST3 or CLAP plugin, incoming program change messages on MIDI channels 1 to 8 can load .muRhyth presets into rhythm slots 1 to 8 (channel N maps to slot N). The preset list is configured in the MIDI Presets panel — accessed from Settings — and stored as a JSON file alongside the plugin state. Hot-swap timing follows the swap-mode setting."
+P "When running as a VST3 or CLAP plugin, incoming program change messages on MIDI channels 1 to 8 can load .muRhythm presets into rhythm slots 1 to 8 (channel N maps to slot N). The preset list is configured in the MIDI Presets panel — accessed from Settings — and stored as a JSON file alongside the plugin state. Hot-swap timing follows the swap-mode setting."
 
 # ── 16. Settings ──────────────────────────────────────────────────────────────
 H1 "16. Settings"
@@ -362,7 +362,7 @@ Bullet "Accents with Ring C: Give Ring C a different step count to A and B and s
 Bullet "Groove via Pre Pad: Use Pre Pad on Ring A to push the whole pattern slightly later in the bar, similar to adding swing."
 Bullet "Sidechain pumping: Set rhythm 2's sidechain source to rhythm 1, dial Amount to 60-80%, and use a fast attack with a slow release for classic kick-ducks-bass."
 Bullet "Self-contained sharing: Tick Embed Samples when saving to share a preset with collaborators who may not have your sample library."
-Bullet "Default content: Save a preset as _default.muclid to have it load every session. Save a rhythm as _default.muRhyth to use it as the template for every new rhythm slot."
+Bullet "Default content: Save a preset as _default.muClid to have it load every session. Save a rhythm as _default.muRhythm to use it as the template for every new rhythm slot."
 Bullet "Status Bar: Hover over any knob to see its name and current value without clicking — the Status Bar never clears automatically."
 Bullet "DAW automation: Every per-rhythm parameter is exposed to the host with human-readable names. Recorded automation moves the on-screen knobs in real time."
 
@@ -378,8 +378,8 @@ Bullet "Modulators per rhythm: 8 (smooth LFO or stepped)"
 Bullet "Modulation assignments: up to 64 per rhythm"
 Bullet "Output buses (DAW): up to 10 stereo (Master + 8 Direct Outs + FX Returns)"
 Bullet "Supported sample formats: WAV, AIFF, MP3, FLAC"
-Bullet "Preset format: .muclid (XML)"
-Bullet "Rhythm preset format: .muRhyth (XML)"
+Bullet "Preset format: .muClid (XML)"
+Bullet "Rhythm preset format: .muRhythm (XML)"
 Bullet "Third-party libraries: JUCE, Signalsmith Reverb (MIT), Monocypher (BSD-2-Clause), clap-juce-extensions (MIT)"
 
 # ── Save ──────────────────────────────────────────────────────────────────────

@@ -301,14 +301,14 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
         if (rhythmSaveDialog.isSaveAsDefault())
         {
             proc.saveRhythmPresetToFile(currentRhythmIndex,
-                                        destDir.getChildFile("_default.muRhyth"),
+                                        destDir.getChildFile("_default.muRhythm"),
                                         embed, {}, {});
             rhythmSaveDialog.setVisible(false);
             return;
         }
 
         juce::String safeName = name.replaceCharacters("\\/:|*?<>\"", "_");
-        juce::File destFile   = destDir.getChildFile(safeName).withFileExtension(".muRhyth");
+        juce::File destFile   = destDir.getChildFile(safeName).withFileExtension(".muRhythm");
 
         if (destFile.existsAsFile())
         {
@@ -591,7 +591,7 @@ void RhythmPanel::refreshRhythmPresets()
         struct Entry { juce::File file; juce::String name, category; };
         std::vector<Entry> entries;
 
-        for (const auto& f : rhythmsDir.findChildFiles(juce::File::findFiles, false, "*.muRhyth"))
+        for (const auto& f : rhythmsDir.findChildFiles(juce::File::findFiles, false, "*.muRhythm"))
         {
             if (f.getFileNameWithoutExtension().equalsIgnoreCase("_default")) continue;
             Entry e { f, f.getFileNameWithoutExtension(), "Uncategorised" };

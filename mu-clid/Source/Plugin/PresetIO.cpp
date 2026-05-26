@@ -382,7 +382,7 @@ static bool requireSupportedPresetVersion(const juce::ValueTree& /*tree*/,
 // dir (%TEMP%/muClid_samples/). These paths come from loading a preset whose
 // `sampleData` was base64-decoded into a temp file by the load path; they are
 // NOT durable references — the temp dir gets wiped between OS sessions, and
-// any subsequent .muRhyth / .muclid save that records the temp path as
+// any subsequent .muRhythm / .muClid save that records the temp path as
 // `r0_sample` would silently break on next load. Used by the save flow below
 // to force-embed instead of writing the temp path.
 static bool isEmbeddedSampleTempPath(const juce::String& path)
@@ -503,7 +503,7 @@ void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file)
 
     // Name and colour. Prefer presetName (matches dropdown / filename) over
     // r0_name — older presets carry a short historical r0_name (e.g. "Kick"
-    // inside "Kick Accents.muRhyth") which loses the user-facing context.
+    // inside "Kick Accents.muRhythm") which loses the user-facing context.
     auto presetNameVal = state.getProperty("presetName");
     auto rhythmNameVal = state.getProperty("r0_name");
     if (presetNameVal.isString() && presetNameVal.toString().isNotEmpty())
@@ -625,7 +625,7 @@ juce::StringArray PresetIO::loadCategoryList() const
 {
     juce::StringArray cats;
     proc_.getPresetsDir().getChildFile("categories.txt").readLines(cats);
-    // Also scan .muclid and .muRhyth files for categories not yet in the list.
+    // Also scan .muClid and .muRhythm files for categories not yet in the list.
     auto scan = [&](const juce::File& dir, const juce::String& ext) {
         for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*." + ext))
         {
@@ -638,8 +638,8 @@ juce::StringArray PresetIO::loadCategoryList() const
             }
         }
     };
-    scan(proc_.getPresetsDir(), "muclid");
-    scan(proc_.getRhythmsDir(), "muRhyth");
+    scan(proc_.getPresetsDir(), "muClid");
+    scan(proc_.getRhythmsDir(), "muRhythm");
     cats.removeDuplicates(false);
     cats.removeEmptyStrings();
     cats.sort(false);
@@ -774,7 +774,7 @@ bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIdx)
         r.name = rhythmNameVal.toString().toStdString();
     r.colourIndex = (int)state.getProperty("r0_colour", r.colourIndex);
 
-    // In .muRhyth the sample *path* is "r0_sample" but the embedded blob fields
+    // In .muRhythm the sample *path* is "r0_sample" but the embedded blob fields
     // are unprefixed ("sampleData" / "sampleName").
     restoreRhythmSample(targetIdx, state, "r0_sample", "sampleData", "sampleName");
 
@@ -794,13 +794,13 @@ bool PresetIO::applyDefaultRhythm(int rhythmIndex)
     // (sidebar "Add Rhythm" / per-rhythm reset paths). stageRhythmPreset takes
     // the immediate-apply branch when stopped, so the stopped behaviour is
     // unchanged.
-    const juce::File f = proc_.getRhythmsDir().getChildFile("_default.muRhyth");
+    const juce::File f = proc_.getRhythmsDir().getChildFile("_default.muRhythm");
     if (!f.existsAsFile()) return false;
 
     // "Default rhythm" is a sequencer / voice settings reset — NOT an identity
     // change. Colour is per-slot identity (cyclic next-in-palette assigned by
     // PluginEditor when the slot is added). Save the colour, apply preset,
-    // restore the colour so a user-saved _default.muRhyth carrying an
+    // restore the colour so a user-saved _default.muRhythm carrying an
     // r0_colour attribute doesn't clobber the slot's intended visual identity.
     // Stopped path is synchronous — restore immediately. Playing path stages
     // into a pending Rhythm copy; the commit later replaces the live rhythm
@@ -816,16 +816,16 @@ bool PresetIO::applyDefaultRhythm(int rhythmIndex)
 
 void PresetIO::loadDefaultPreset()
 {
-    juce::File f = proc_.getPresetsDir().getChildFile("_default.muclid");
+    juce::File f = proc_.getPresetsDir().getChildFile("_default.muClid");
     if (f.existsAsFile())
     {
         loadPreset(f);
         return;
     }
-    // Fall back to a single-rhythm `_default.muRhyth` if the full-session default
+    // Fall back to a single-rhythm `_default.muRhythm` if the full-session default
     // isn't present. Used by the listening-test pipeline to set a known starting
-    // state on standalone launch without needing a complete `.muclid` file.
-    const juce::File rhy = proc_.getRhythmsDir().getChildFile("_default.muRhyth");
+    // state on standalone launch without needing a complete `.muClid` file.
+    const juce::File rhy = proc_.getRhythmsDir().getChildFile("_default.muRhythm");
     if (rhy.existsAsFile() && proc_.getNumRhythms() > 0)
         applyDefaultRhythm(0);
 }
@@ -1022,13 +1022,13 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
 
 void PresetIO::setStateInformation(const void* data, int sizeInBytes)
 {
-    // in standalone, the user's saved `_default.muclid` is authoritative
+    // in standalone, the user's saved `_default.muClid` is authoritative
     // on every launch — JUCE's auto-saved "filterState" should NOT override it.
     // The host (DAW) path still needs setStateInformation to restore project
     // state, so this override only fires when running standalone.
     if (proc_.wrapperType == juce::AudioProcessor::wrapperType_Standalone)
     {
-        const juce::File defaultPreset = proc_.getPresetsDir().getChildFile("_default.muclid");
+        const juce::File defaultPreset = proc_.getPresetsDir().getChildFile("_default.muClid");
         if (defaultPreset.existsAsFile())
         {
             loadPreset(defaultPreset);
@@ -1159,7 +1159,7 @@ void PresetIO::savePreset(const juce::String& name,
 
     juce::String safeName = name.replaceCharacters("\\/:|*?<>\"", "_________");
     if (safeName.isEmpty()) safeName = "Preset";
-    atomicReplaceWithText(dir.getChildFile(safeName + ".muclid"), root.toXmlString(), proc_.onLoadError);
+    atomicReplaceWithText(dir.getChildFile(safeName + ".muClid"), root.toXmlString(), proc_.onLoadError);
 }
 
 // ── PresetIO::loadPreset helpers ────────────────────────────────────────────
@@ -1240,7 +1240,7 @@ void PresetIO::restoreRhythmChannelParams(int apvtsSlot, const juce::ValueTree& 
 
 void PresetIO::restoreRhythmModulators(int i, const juce::ValueTree& rTree)
 {
-    // Opt-in: legacy .muclid files (no Modulators child per rhythm) leave the
+    // Opt-in: legacy .muClid files (no Modulators child per rhythm) leave the
     // rhythm's existing in-memory state in place — avoids accidental destruction.
     auto rMods = rTree.getChildWithName("Modulators");
     if (! rMods.isValid()) return;
@@ -1372,10 +1372,10 @@ void PresetIO::restoreGlobalState(const juce::ValueTree& root)
 
 // ── Prestaging (playing path) ───────────────────────────────────────────────
 //
-// Build a fully-prepared Rhythm + VoiceEngine from one .muclid <Rhythm> child,
+// Build a fully-prepared Rhythm + VoiceEngine from one .muClid <Rhythm> child,
 // entirely off the audio thread. Mirrors the per-rhythm hot-swap build in
 // stageRhythmPreset, but starts from a default Rhythm and reads the unprefixed
-// (.muclid) property names. The expensive bits — sample decode / disk load and
+// (.muClid) property names. The expensive bits — sample decode / disk load and
 // VoiceEngine::prepareToPlay — happen here at stage time so the loop-boundary
 // commit is glitch-free.
 static void prepareRhythmSlotFromTree(const juce::ValueTree& rTreeIn,
@@ -1388,7 +1388,7 @@ static void prepareRhythmSlotFromTree(const juce::ValueTree& rTreeIn,
 {
     Rhythm r;  // default; preset values applied on top
 
-    // v3 insert-slot migration (algo-aware) on a copy. .muclid Rhythm children use
+    // v3 insert-slot migration (algo-aware) on a copy. .muClid Rhythm children use
     // unprefixed property names, so srcPrefix is "".
     juce::ValueTree rTree = rTreeIn.createCopy();
     migrateInsertSlotsV3(rTree, "");
@@ -1533,7 +1533,7 @@ void PresetIO::loadPreset(const juce::File& file)
         return;
     }
 
-    // Playing → peek the root to decide. A full .muclid preset is deferred to the
+    // Playing → peek the root to decide. A full .muClid preset is deferred to the
     // next master loop boundary so the swap lands cleanly at the loop point, the
     // same way a per-rhythm preset hot-swap already does. A non-MuClidPreset root
     // is a host / project state restore — apply it immediately rather than defer.

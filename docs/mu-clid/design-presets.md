@@ -26,8 +26,8 @@
 
 | Type | Extension | Format |
 |---|---|---|
-| Full preset | `.muclid` | JUCE ValueTree → XML |
-| Rhythm preset | `.muRhyth` | JUCE ValueTree → XML (single rhythm subtree) |
+| Full preset | `.muClid` | JUCE ValueTree → XML |
+| Rhythm preset | `.muRhythm` | JUCE ValueTree → XML (single rhythm subtree) |
 
 ## Sample Embedding
 
@@ -38,15 +38,15 @@
 
 ## Default Preset / Rhythm
 
-- On plugin load: reads `Presets\_default.muclid` — restores silently; if missing, creates an empty fresh state (no error)
-- On new rhythm added: reads `Rhythms\_default.muRhyth` — applies silently; if missing, creates a blank rhythm
-- Users can **File → Save as Default** to overwrite `_default.muclid` / `_default.muRhyth`
+- On plugin load: reads `Presets\_default.muClid` — restores silently; if missing, creates an empty fresh state (no error)
+- On new rhythm added: reads `Rhythms\_default.muRhythm` — applies silently; if missing, creates a blank rhythm
+- Users can **File → Save as Default** to overwrite `_default.muClid` / `_default.muRhythm`
 
 ## Preset Storage
 
-- Patch presets: JUCE ValueTree serialised to XML in user content folder (`.muclid`)
-- Rhythm presets: same format, single rhythm subtree (`.muRhyth`)
-- Default preset: `_default.muclid` / `_default.muRhyth` in the respective subfolders
+- Patch presets: JUCE ValueTree serialised to XML in user content folder (`.muClid`)
+- Rhythm presets: same format, single rhythm subtree (`.muRhythm`)
+- Default preset: `_default.muClid` / `_default.muRhythm` in the respective subfolders
 - Factory presets: shipped with plugin, stored in plugin resources, restorable from Settings
 
 ## Preset Browser (Stage 10)

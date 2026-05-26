@@ -34,7 +34,7 @@ public:
     void savePreset(const juce::String& name, const juce::String& description,
                     const juce::String& category, bool embedSamples);
 
-    // Entry point. When the sequencer is playing, a full .muclid preset is staged
+    // Entry point. When the sequencer is playing, a full .muClid preset is staged
     // for commit at the next master loop boundary (matching per-rhythm hot-swap).
     // When stopped — or for a non-preset host-state restore — it applies now via
     // applyPresetImmediate.
@@ -69,18 +69,18 @@ private:
 
     // Restore the APVTS rhythm-param block for slot `apvtsSlot` from `rTree`.
     // `srcPropPrefix` is prepended to each property name when reading from the
-    // tree (e.g. "" for .muclid per-rhythm subtree, "r0_" for .muRhyth root).
+    // tree (e.g. "" for .muClid per-rhythm subtree, "r0_" for .muRhythm root).
     void restoreRhythmAPVTSParams(int apvtsSlot, const juce::ValueTree& rTree,
                                    const juce::String& srcPropPrefix);
 
     // Restore the channel-strip params for slot `apvtsSlot`. Only relevant for
-    // the .muclid format — legacy .muRhyth `ch_*` properties are intentionally
+    // the .muClid format — legacy .muRhythm `ch_*` properties are intentionally
     // ignored by applyRhythmPreset (see Mixer-state-stays-with-slot policy).
     void restoreRhythmChannelParams(int apvtsSlot, const juce::ValueTree& rTree);
 
     // Restore embedded-sample bytes (preferred) or stored sample path for slot.
     // The three property-name args spell out exactly which keys to read so the
-    // helper can serve unprefixed .muclid subtrees, "r0_"-prefixed .muRhyth
+    // helper can serve unprefixed .muClid subtrees, "r0_"-prefixed .muRhythm
     // roots, and "r{i}_"-prefixed host-state roots from a single body. Fires
     // onLoadError if the linked sample is missing.
     void restoreRhythmSample(int slot, const juce::ValueTree& tree,

@@ -12,7 +12,7 @@ expectations JSON schema are plugin-agnostic.
 
 ```
 tests/
-├── presets/                  -- repo-local test presets (e.g. TS1/TS2.muclid),
+├── presets/                  -- repo-local test presets (e.g. TS1/TS2.muClid),
 │                                versioned with the tests for reproducibility
 ├── expectations/             -- per-test JSON: render config + assertions
 │   ├── T11.json
@@ -25,7 +25,7 @@ tests/
 ```
 
 The render-mode plumbing lives in [Source/Plugin/RenderMode.{h,cpp}](../Source/Plugin/RenderMode.cpp);
-test presets themselves live in the content folder (`$MUCLID_CONTENT_DIR/Rhythms/T*.muRhyth`)
+test presets themselves live in the content folder (`$MUCLID_CONTENT_DIR/Rhythms/T*.muRhythm`)
 alongside user-facing presets, so they appear in the GUI's preset dropdown
 under the `test` category and can be opened by hand for ad-hoc listening too.
 
@@ -44,7 +44,7 @@ python tests/scripts/run-listening-tests.py --config Debug --filter T12
 # Manual single-step: render + analyse separately
 build/mu-clid_artefacts/Debug/Standalone/<plugin>.exe \
     --render --out tests/_out/T12.wav \
-    --preset "$MUCLID_CONTENT_DIR/Rhythms/T12.muRhyth" \
+    --preset "$MUCLID_CONTENT_DIR/Rhythms/T12.muRhythm" \
     --seconds 1.5
 python tests/scripts/analyse.py tests/_out/T12.wav tests/expectations/T12.json
 ```
@@ -55,13 +55,13 @@ Set `MUCLID_CONTENT_DIR` if your content folder isn't the default
 ## Render mode
 
 `<standalone>.exe --render --out <wav> [flags]` runs headless: no GUI, no
-audio device. Skips the `_default.muclid` auto-load so every test starts
+audio device. Skips the `_default.muClid` auto-load so every test starts
 from a fresh single-rhythm default. Flags:
 
 | Flag            | Default | Description                                       |
 |-----------------|---------|---------------------------------------------------|
 | `--out`         | (req'd) | Output WAV path                                   |
-| `--preset`      | none    | `.muRhyth` (single-rhythm) or `.muclid` (session) |
+| `--preset`      | none    | `.muRhythm` (single-rhythm) or `.muClid` (session) |
 | `--seconds`     | 4.0     | Render duration                                   |
 | `--samplerate`  | 48000   | Render sample rate                                |
 | `--blocksize`   | 512     | Process block size                                |
@@ -79,10 +79,10 @@ Output is 24-bit stereo WAV, written via `juce::WavAudioFormat`.
 
 On normal GUI launch (no `--render`), the standalone auto-loads the first of:
 
-1. `<content>/Presets/_default.muclid` -- a full session.
-2. `<content>/Rhythms/_default.muRhyth` -- a single rhythm applied to slot 0.
+1. `<content>/Presets/_default.muClid` -- a full session.
+2. `<content>/Rhythms/_default.muRhythm` -- a single rhythm applied to slot 0.
 
-Dropping a `_default.muRhyth` into the content folder lets you iterate on a
+Dropping a `_default.muRhythm` into the content folder lets you iterate on a
 test case without clicking through the preset browser.
 
 ## Expectations JSON
@@ -92,12 +92,12 @@ test case without clicking through the preset browser.
   "test": "T12",
   "description": "Karplus rings past env idle.",
   "render": {
-    "preset": "Rhythms/T12.muRhyth",   // resolved under $MUCLID_CONTENT_DIR, else repo root
+    "preset": "Rhythms/T12.muRhythm",   // resolved under $MUCLID_CONTENT_DIR, else repo root
     "seconds": 1.5,
     "sample_rate": 48000,
     "block_size": 512
     // optional full-preset swap test:
-    //   "swap_preset": "tests/presets/TS2.muclid",  // repo-local preset
+    //   "swap_preset": "tests/presets/TS2.muClid",  // repo-local preset
     //   "swap_at": 2.0                               // seconds; loaded mid-render
   },
   "assertions": [
@@ -134,12 +134,12 @@ when the assertion fails.
 
 1. **Pick a number.** `T<N>` where `N` is the next free index in the existing
    listening-test sequence (T11, T12, T13 ... -- continue T14 etc.).
-2. **Write the preset** at `$MUCLID_CONTENT_DIR/Rhythms/T<N>.muRhyth`. Use
+2. **Write the preset** at `$MUCLID_CONTENT_DIR/Rhythms/T<N>.muRhythm`. Use
    `presetCategory="test"` so it groups in the dropdown.
 3. **Render it once manually** to see what the audio looks like:
    ```bash
    build/.../Standalone/<plugin>.exe --render --out tests/_out/T<N>.wav \
-       --preset "$MUCLID_CONTENT_DIR/Rhythms/T<N>.muRhyth" --seconds <s>
+       --preset "$MUCLID_CONTENT_DIR/Rhythms/T<N>.muRhythm" --seconds <s>
    ```
 4. **Probe RMS values** to figure out sensible thresholds:
    ```python

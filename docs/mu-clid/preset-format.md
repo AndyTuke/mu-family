@@ -7,11 +7,11 @@ file types and the in-host state. Updated for Stage 35 (v2 format).
 
 | Extension       | Tree root        | Contents                                                 |
 |-----------------|------------------|----------------------------------------------------------|
-| `.muRhyth`      | `MuClidRhythm`   | One rhythm — sequencer + voice chain + modulators        |
-| `.muclid`       | `MuClidPreset`   | Full session — up to 8 rhythms + global FX + mixer state |
-| (DAW state)     | APVTS root tree  | Same APVTS state as `.muclid` but lives in the DAW project — written via JUCE's `setStateInformation`. Uses de-normalised PARAM children, not the preset XML schema. |
+| `.muRhythm`      | `MuClidRhythm`   | One rhythm — sequencer + voice chain + modulators        |
+| `.muClid`       | `MuClidPreset`   | Full session — up to 8 rhythms + global FX + mixer state |
+| (DAW state)     | APVTS root tree  | Same APVTS state as `.muClid` but lives in the DAW project — written via JUCE's `setStateInformation`. Uses de-normalised PARAM children, not the preset XML schema. |
 
-Both `.muRhyth` and `.muclid` are XML (UTF-8, no BOM) produced by
+Both `.muRhythm` and `.muClid` are XML (UTF-8, no BOM) produced by
 `juce::ValueTree::toXmlString()`. They are human-readable and intended to be
 hand-editable for power users.
 
@@ -53,7 +53,7 @@ point, to add a real migration ladder).
 ### Per-rhythm parameter property naming
 
 All rhythm parameter properties carry the `r0_` prefix. The "0" is purely
-historical (a single rhythm preset isn't indexed); inside `.muclid` files,
+historical (a single rhythm preset isn't indexed); inside `.muClid` files,
 the same suffixes appear *without* a `r0_` prefix because they're already
 nested under a `Rhythm` child.
 

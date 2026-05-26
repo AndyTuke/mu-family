@@ -2,7 +2,7 @@
 //
 // Proves that writeKindedProperty + readKindedPropertyAsActualV2 form a lossless
 // codec for every kRhythmParamDefs entry when a Rhythm is serialised and
-// deserialised via a ValueTree (the .muRhyth / .muclid XML format).
+// deserialised via a ValueTree (the .muRhythm / .muClid XML format).
 //
 // Test path for each parameter:
 //   1. apply(testValue, rhythm)        — write a non-default value into a Rhythm

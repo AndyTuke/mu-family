@@ -257,7 +257,7 @@ void TransportBar::populatePresetDropdown()
     struct Entry { juce::File file; juce::String name, category; };
     std::vector<Entry> entries;
 
-    for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*.muclid"))
+    for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*.muClid"))
     {
         if (f.getFileNameWithoutExtension().equalsIgnoreCase("_default")) continue;
         Entry e { f, f.getFileNameWithoutExtension(), "Uncategorised" };

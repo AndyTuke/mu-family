@@ -66,7 +66,7 @@ Docs are organised as **family-shared** (at `docs/` root) vs **product-specific*
 | [docs/mu-clid/design-voice.md](docs/mu-clid/design-voice.md) | Voice chain, ADSR, filter, interpolation quality, sample handling, time stretching (TimeStretcherBase) |
 | [docs/mu-clid/design-ui.md](docs/mu-clid/design-ui.md) | μ-Clid specific panel layouts — RhythmCircle, EuclideanPanel, Mixer, Transport. Defers to design-ui-family.md for colours/sizes. |
 | [docs/mu-clid/design-presets.md](docs/mu-clid/design-presets.md) | APVTS wiring plan, preset storage, save/restore, current pre-APVTS state |
-| [docs/mu-clid/preset-format.md](docs/mu-clid/preset-format.md) | **Preset format reference** — `.muRhyth` / `.muclid` XML schemas, versioning, ParamKind tags, algorithm-name contracts. Read when editing presets by hand or adding a new persisted parameter. |
+| [docs/mu-clid/preset-format.md](docs/mu-clid/preset-format.md) | **Preset format reference** — `.muRhythm` / `.muClid` XML schemas, versioning, ParamKind tags, algorithm-name contracts. Read when editing presets by hand or adding a new persisted parameter. |
 | [docs/mu-clid/TestPlan.md](docs/mu-clid/TestPlan.md) | 25-step manual smoke walkthrough of the μ-Clid standalone UI. |
 | [docs/mu-clid/archive/](docs/mu-clid/archive/) | Closed μ-Clid stage plans + one-shot audits. Read only if revisiting historical decisions. |
 | [docs/mu-clid/design.md](docs/mu-clid/design.md) | Full original μ-Clid spec — only read if the sub-docs don't cover it |

@@ -201,5 +201,5 @@ The shared visual identity (`MuLookAndFeel`) ensures a consistent look across al
 
 - [design-voice.md](design-voice.md) — voice chain, ADSR, filter, InsertProcessor details
 - [design-fx.md](design-fx.md) — FX chain, slot interface, intra-FX routing
-- [design-presets.md](design-presets.md) — preset storage; mu-tant will share the `.muRhyth` voice-slot format
+- [design-presets.md](design-presets.md) — preset storage; mu-tant will share the `.muRhythm` voice-slot format
 - [design-future.md](design-future.md) — inter-plugin sync (μ family), MIDI CC control
