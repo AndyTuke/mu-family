@@ -7,7 +7,7 @@ string(STRIP "${BUILD_NUM}" BUILD_NUM)
 execute_process(
     COMMAND "${ISCC_EXE}"
             "/DBuildNum=${BUILD_NUM}"
-            "${SOURCE_DIR}/installer/mu-Clid-Lite.iss"
+            "${SOURCE_DIR}/mu-clid/installer/mu-Clid-Lite.iss"
     RESULT_VARIABLE ISCC_RESULT
 )
 

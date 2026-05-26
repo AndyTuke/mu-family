@@ -1,5 +1,7 @@
 # #627 — Filter-then-Amp signal-flow refactor
 
+> **Revision (T12, v1.0.609)**: the amp env was moved from the *end* of the chain to **between filter and insert** so feedback-based insert FX (Karplus, etc.) can ring past env idle from their own internal state. Filter resonance / comb feedback in the filter stage is still env-gated (T11 behaviour preserved). Updated chain: `sample → filter → ampEnv → insert → output`. Retired engines hold a 2 s post-env-idle drain budget so audible insert tails complete before engine destruction in hot-swap. See [Source/Audio/VoiceEngine.cpp](../Source/Audio/VoiceEngine.cpp) for the current authoritative wiring.
+
 ## Goal
 
 Re-order the VoiceEngine signal flow so the amp envelope sits at the **end** of the chain (after filter + insert) instead of at the front (per-voice, pre-filter). This naturally gates ALL post-DSP audio by the amp envelope, fixing two related issues:

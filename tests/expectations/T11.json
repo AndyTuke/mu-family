@@ -1,0 +1,44 @@
+{
+  "test": "T11",
+  "description": "Filter resonance fades with amp env release (the env-gate sits AFTER the filter so resonance is gated by env idle, NOT by markRetired's voiceFilter.reset). Active-engine render; hot-swap aspect is verified manually.",
+  "render": {
+    "preset": "Rhythms/T11.muRhyth",
+    "seconds": 3.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "first_hit_audible",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [0.05, 0.15],
+      "min": -25
+    },
+    {
+      "name": "second_hit_audible",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [1.0, 1.1],
+      "min": -25,
+      "comment": "Hit at step 8 (t=1.0s) -- voice retrigger should produce a fresh peak comparable to the first"
+    },
+    {
+      "name": "between_hits_audible_filter_ring",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [0.5, 0.55],
+      "min": -55,
+      "max": -25,
+      "comment": "Midway between hits the sample + filter resonance must still ring (env still open). Drops sharply but not silent."
+    },
+    {
+      "name": "post_render_decay_present",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [2.5, 2.55],
+      "min": -55,
+      "comment": "After the third hit at t=2.0s + 0.5s decay we still expect audible filter ring (sample sustains, env decay 4s)"
+    }
+  ]
+}

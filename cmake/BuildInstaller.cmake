@@ -5,8 +5,8 @@ file(READ "${SOURCE_DIR}/build_number.txt" BUILD_NUM)
 string(STRIP "${BUILD_NUM}" BUILD_NUM)
 
 execute_process(
-    COMMAND "${ISCC_EXE}" "/DBuildNum=${BUILD_NUM}" "${SOURCE_DIR}/installer/mu-Clid.iss"
-    WORKING_DIRECTORY "${SOURCE_DIR}/installer"
+    COMMAND "${ISCC_EXE}" "/DBuildNum=${BUILD_NUM}" "${SOURCE_DIR}/mu-clid/installer/mu-Clid.iss"
+    WORKING_DIRECTORY "${SOURCE_DIR}/mu-clid/installer"
     RESULT_VARIABLE result
 )
 if(NOT result EQUAL 0)

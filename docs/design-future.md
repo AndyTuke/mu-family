@@ -16,6 +16,15 @@ For shipped features see [DevelopmentHistory.md](DevelopmentHistory.md).
 
 ## Unscheduled ideas
 
+### 🟢 Standalone: Bounce to WAV (user-facing render)
+
+Expose the headless render pipeline (introduced for the listening-test harness in #649) as a user-facing "File → Bounce…" dialog in the standalone. User picks duration, sample rate, output file → gets a WAV of the currently-loaded patch playing for N seconds. Useful for sample-pack workflows where the user wants to commit a μ-Clid pattern to disk without round-tripping through a DAW.
+
+- **Foundation in place:** [Source/Plugin/RenderMode.{h,cpp}](../Source/Plugin/RenderMode.h) already drives `processBlock` headlessly and writes WAV via `juce::WavAudioFormat`. The CLI path (`--render`) bypasses the GUI; the user-facing version reuses `RenderMode::execute` from a dialog instead of from `JUCEApplication::initialise`.
+- **Suggested implementation:** new `BounceDialog` modal in the standalone's menu bar. Form fields — filename (default `<preset name>_bounced.wav`), duration (default 8 s), sample rate (default current device rate), tail length (extra silence past playback to capture FX tails). On confirm: temporarily pause the live transport, call `RenderMode::execute` against a fresh PluginProcessor seeded from the current APVTS state, write the WAV, resume.
+- **Plugin / standalone parity question:** does the VST3/CLAP plugin also expose Bounce? Probably no — most DAWs have their own bounce/render workflow; a plugin offering a competing one is confusing. Standalone-only is the right scope.
+- **Side benefit:** the dialog code can live in `mu-core/UI/` so mu-tant / mu-toni inherit Bounce automatically (each plugin's own `RenderMode` plugs into the same dialog).
+
 ### 🟢 Demo build
 
 A separate distribution binary with full plugin functionality but reduced limits, for shareware-style trials. **Distinct from `mu-clid-lite`** (which is a permanent single-rhythm MIDI-only product, not a demo).

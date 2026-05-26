@@ -1,0 +1,48 @@
+{
+  "test": "T13",
+  "description": "Polyphonic retrigger feel: dense overlapping hits on a percussive sample with 1 s amp decay. Engine-level env (#627) means each retrigger resets the env -- for drum patterns this should be inaudible. Continuous audible output throughout the 2 s render confirms hits are firing and voices overlap.",
+  "render": {
+    "preset": "Rhythms/T13.muRhyth",
+    "seconds": 2.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "audio_present_through_render",
+      "metric": "duration_above_threshold",
+      "channel": "any",
+      "t_window": [0.05, 1.99],
+      "threshold_dbfs": -50,
+      "window_ms": 20,
+      "min_seconds": 1.7,
+      "comment": "8 hits every 0.25s -- engine-level amp env retriggers on each hit so the audio dips between hits, but should stay above -50 dBFS for the bulk of the render (~88%)"
+    },
+    {
+      "name": "all_eight_hit_peaks",
+      "metric": "duration_above_threshold",
+      "channel": "any",
+      "t_window": [0.0, 2.0],
+      "threshold_dbfs": -15,
+      "window_ms": 20,
+      "min_seconds": 0.32,
+      "comment": "Each of the 8 hits produces ~50ms above -15 dBFS at the attack -- so 8 x 0.05s = 0.4s, conservative floor 0.32s"
+    },
+    {
+      "name": "mid_render_voice_overlap",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [0.5, 0.6],
+      "min": -20,
+      "comment": "By 0.5s several hits have fired (each with 1s decay tail) -- RMS should reflect overlapping voices, not a single decaying hit"
+    },
+    {
+      "name": "final_hit_audible",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [1.75, 1.85],
+      "min": -25,
+      "comment": "Final hit at step 14 (t=1.75s) should still produce a strong retrigger"
+    }
+  ]
+}

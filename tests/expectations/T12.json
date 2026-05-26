@@ -1,0 +1,46 @@
+{
+  "test": "T12",
+  "description": "Karplus rings past env idle. Signal chain `sample->filter->ampEnv->insert` means the insert sits AFTER the env-gate, so Karplus feedback decays at its own natural rate (not gated by env release).",
+  "render": {
+    "preset": "Rhythms/T12.muRhyth",
+    "seconds": 1.5,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "first_hit_audible",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [0.05, 0.15],
+      "min": -30,
+      "comment": "First trigger at step 0 -- amp env attack + Karplus excitation should produce a strong RMS"
+    },
+    {
+      "name": "second_hit_audible",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [1.0, 1.1],
+      "min": -30,
+      "comment": "Second hit at step 8 (t=1.0s at 120BPM)"
+    },
+    {
+      "name": "karplus_tail_past_env_idle",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [1.4, 1.49],
+      "min": -45,
+      "comment": "Amp env decay is 300ms => env idle around t=1.3s; Karplus loop with 80% feedback must still ring audibly at t=1.4s+"
+    },
+    {
+      "name": "karplus_pitch_C3",
+      "metric": "spectral_peak_near",
+      "channel": "any",
+      "t_window": [1.0, 1.3],
+      "frequency_hz": 130.8,
+      "tolerance_hz": 8,
+      "search_hz": [60, 600],
+      "comment": "Note C, Octave 2 => 32.7 Hz * 2^(24/12) = 130.8 Hz"
+    }
+  ]
+}

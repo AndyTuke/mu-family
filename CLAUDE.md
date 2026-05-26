@@ -71,8 +71,8 @@ cmake --build build --config Release        # Release build
 cmake --build build --config Debug && cmake --build build --config Release  # Full build (both)
 ```
 
-Artefacts land in `build/mu-clid_artefacts/Debug/` or `.../Release/`.
-Always build Release when producing tester builds — the CMake post-build hook automatically deploys the VST3, CLAP, and Standalone to the OneDrive tester folder (`MUCLID_WIN_DIST` in CMakeLists.txt). Debug builds skip the deploy step.
+Artefacts land in `build/mu-clid/mu-clid_artefacts/Debug/` or `.../Release/` (the extra `mu-clid/` segment is the monorepo subdir; mu-clid-lite follows the same pattern at `build/mu-clid/mu-clid-lite_artefacts/...`).
+Always build Release when producing tester builds — the CMake post-build hook automatically deploys the VST3, CLAP, and Standalone to the OneDrive tester folder (`MUFAMILY_WIN_DIST` in the root CMakeLists.txt). Debug builds skip the deploy step.
 
 ## Development history
 
@@ -91,7 +91,14 @@ All code changes must be logged as backlog entries to maintain a complete develo
 
 ## Source layout (actual, as built)
 
-`Source/` top-level: `PluginProcessor`, `PluginEditor`, `Sequencer/`, `Audio/`, `Modulation/`, `FX/` (slots + `Effects/`), `UI/` (panels + `Components/`). Use Glob/Explore to navigate — the tree is derivable from the filesystem.
+**Monorepo** (umbrella at repo root, family-style):
+
+- `mu-core/` — shared audio + FX + modulation + mixer UI + `ProcessorBase` + `RenderMode`. INTERFACE library that every plugin links. Subdirs: `Audio/` (incl. `FX/`), `Modulation/`, `Sequencer/` (only `VoiceSlot.h` + `ControlSequence`), `UI/` (`Components/`, `MixerChannel*`, `MixerOverlay`, `FXRow`, `DelayRow`, `InsertSlotUi.h`, `FXAlgoDefaults.h`), `Plugin/` (`ProcessorBase`, `RenderMode`), `MuLimits.h`.
+- `mu-clid/Source/` — Euclidean-specific. Subdirs: `Plugin/` (`PluginProcessor`, `PluginEditor`, `PresetIO`, `HotSwapStager`, `StandaloneApp`, `LiteEditor`), `Sequencer/` (`Rhythm`, `HitGenerator`, `SequencerEngine`, `EuclideanGenerator`), `UI/` (Euclidean panels + voice subsections), `Persistence/`, `License/`, `Tests/`.
+- `tests/` — cross-plugin listening-test pipeline (Python `analyse.py`, runner, JSON expectations).
+- `cmake/`, `docs/`, `tools/`, `ThirdParty/` — shared at family root.
+
+Use Glob/Explore to navigate — the tree is derivable from the filesystem.
 
 ## Critical architectural rules
 
