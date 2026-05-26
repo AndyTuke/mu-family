@@ -135,6 +135,17 @@ public:
     Rhythm& getRhythm    (int index)       { return sequencer.getRhythm(index); }
     const Rhythm& getRhythm(int index) const { return sequencer.getRhythm(index); }
     int     getNumRhythms() const          { return sequencer.getNumRhythms(); }
+
+    // ProcessorBase channel-metadata interface — mu-clid maps "channel" → "rhythm".
+    int          getNumChannels()             const override { return getNumRhythms(); }
+    juce::String getChannelName(int idx)      const override
+    {
+        return (idx >= 0 && idx < getNumRhythms()) ? juce::String(getRhythm(idx).name) : juce::String();
+    }
+    int          getChannelColourIndex(int idx) const override
+    {
+        return (idx >= 0 && idx < getNumRhythms()) ? getRhythm(idx).colourIndex : 0;
+    }
     void    updatePattern (int index)      { sequencer.updatePattern(index); }
 
     void loadSampleForRhythm(int rhythmIndex, const juce::File& file);

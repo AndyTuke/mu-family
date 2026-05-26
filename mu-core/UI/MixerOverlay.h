@@ -5,7 +5,7 @@
 #include "FXRow.h"
 #include "DelayRow.h"
 #include "UI/Components/SegmentControl.h"
-#include "Plugin/PluginProcessor.h"
+#include "Plugin/ProcessorBase.h"
 #include "Audio/MixerEngine.h"
 #include <atomic>
 #include <vector>
@@ -19,7 +19,7 @@ class MixerOverlay : public juce::Component,
                      private juce::Timer
 {
 public:
-    explicit MixerOverlay(PluginProcessor& proc, MixerEngine& mixer);
+    explicit MixerOverlay(ProcessorBase& proc, MixerEngine& mixer);
     ~MixerOverlay() override;
 
     // status-bar forwarder — plugin editor wires this to the global StatusBar.
@@ -42,7 +42,7 @@ public:
     void paint(juce::Graphics&) override;
 
 private:
-    PluginProcessor& proc;
+    ProcessorBase& proc;
     MixerEngine&     mixer;
 
     std::vector<std::unique_ptr<MixerChannel>> rhythmChannels;

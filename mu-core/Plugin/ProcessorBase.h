@@ -38,6 +38,16 @@ public:
     FXChain     fxChain;
     MixerEngine mixerEngine;
 
+    // ─── Channel metadata for shared mixer UI ────────────────────────────────
+    // Each mu-family plugin has some N "channels" (rhythms in mu-clid; whatever
+    // the trigger model dictates in mu-tant / mu-toni) — each with a display
+    // name and a palette colour index. The shared MixerOverlay / MixerChannel
+    // UI calls these to label channel strips, populate sidechain-source
+    // dropdowns, etc., without needing to know what a channel actually IS.
+    virtual int         getNumChannels()              const = 0;
+    virtual juce::String getChannelName(int idx)       const = 0;
+    virtual int         getChannelColourIndex(int idx) const = 0;
+
 protected:
 
     // Sets the host BPM on the FX chain (tempo-synced FX) then calls

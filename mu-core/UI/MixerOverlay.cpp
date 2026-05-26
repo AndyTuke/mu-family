@@ -32,7 +32,7 @@ static bool isMixerRelevantParam(const juce::String& id) noexcept
     return false;
 }
 
-MixerOverlay::MixerOverlay(PluginProcessor& p, MixerEngine& m)
+MixerOverlay::MixerOverlay(ProcessorBase& p, MixerEngine& m)
     : proc(p), mixer(m),
       effectRow("Effect", FXAlgorithmRegistry::effectAlgorithms(), MuClidLookAndFeel::knobFxSend),
       reverbRow("Reverb", FXAlgorithmRegistry::reverbAlgorithms(), MuClidLookAndFeel::knobReverb)
@@ -101,13 +101,13 @@ void MixerOverlay::buildRhythmChannels()
     rhythmChannels.clear();
 
     const auto& palette = MuClidLookAndFeel::rhythmPalette;
-    const int numActive = proc.getNumRhythms();
+    const int numActive = proc.getNumChannels();
     for (int r = 0; r < MixerEngine::MaxChannels; ++r)
     {
         bool hasRhythm = r < numActive;
-        juce::Colour col = hasRhythm ? palette[proc.getRhythm(r).colourIndex % MuClidLookAndFeel::kRhythmPaletteSize]
+        juce::Colour col = hasRhythm ? palette[proc.getChannelColourIndex(r) % MuClidLookAndFeel::kRhythmPaletteSize]
                                      : MuClidLookAndFeel::colour(MuClidLookAndFeel::mixerInactiveNameBg);
-        juce::String name = hasRhythm ? juce::String(proc.getRhythm(r).name) : "-";
+        juce::String name = hasRhythm ? juce::String(proc.getChannelName(r)) : "-";
         auto ch = std::make_unique<MixerChannel>(MixerChannel::Type::Rhythm, name, col);
         const juce::String prefix = "ch" + juce::String(r) + "_";
         ch->bindRhythm(mixer.channels[r], mixer.channelPeaks[r], &proc, prefix,
@@ -126,9 +126,9 @@ void MixerOverlay::buildRhythmChannels()
 void MixerOverlay::refreshSidechainSources()
 {
     juce::StringArray names;
-    const int numActive = proc.getNumRhythms();
+    const int numActive = proc.getNumChannels();
     for (int r = 0; r < MixerEngine::MaxChannels; ++r)
-        names.add((r < numActive) ? juce::String(proc.getRhythm(r).name) : juce::String());
+        names.add((r < numActive) ? juce::String(proc.getChannelName(r)) : juce::String());
     for (int r = 0; r < (int)rhythmChannels.size(); ++r)
         rhythmChannels[r]->setSidechainSources(r, names);
     // Return channels can sidechain from any rhythm channel (no self-exclusion, pass -1).
@@ -466,7 +466,7 @@ void MixerOverlay::loadFromAPVTS()
     auto& apvts = proc.apvts;
 
     // Reload rhythm channel UI (only active channels have APVTS params).
-    const int numActive = proc.getNumRhythms();
+    const int numActive = proc.getNumChannels();
     for (int r = 0; r < numActive && r < (int)rhythmChannels.size(); ++r)
     {
         const juce::String prefix = "ch" + juce::String(r) + "_";
