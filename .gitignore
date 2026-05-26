@@ -40,3 +40,6 @@ cmake_install.cmake
 # License signing — private key must never be committed
 tools/private.key
 tools/private.pem
+
+# Discord bot credentials note (app ID + public key) — not for version control
+DiscordBot.md
