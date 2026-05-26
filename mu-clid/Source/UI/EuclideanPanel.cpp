@@ -441,8 +441,8 @@ void EuclideanPanel::resized()
     constexpr int eucBlockW = eW * 3 + kEucKnobGap * 2;
     constexpr int pW    = (innerW - eucBlockW) / 4;
     constexpr int padX  = kOuter + eucBlockW;
-    // #618 — kPadInsertGap splits the Pad and Insert sub-panel borders so
-    // they no longer share a pixel. Half the gap is taken from each side.
+    // kPadInsertGap splits the Pad and Insert sub-panel borders so they
+    // no longer share a pixel. Half the gap is taken from each side.
     constexpr int padPanelW = pW * 2 - kPadInsertGap / 2;
     constexpr int insX      = padX + pW * 2 + kPadInsertGap / 2;
     constexpr int insPanelW = MuLookAndFeel::kEuclidInnerW - kOuter - insX;
@@ -452,9 +452,9 @@ void EuclideanPanel::resized()
     constexpr int insSw    = (pW < 56) ? pW : 56;
     constexpr int insSwX   = insX + (insPanelW - insSw) / 2;
 
-    // #620 — pad knob pair tightened: two Size-3 knobs centred inside the
-    // Pad sub-panel with kPadKnobGap between them. Mute toggles centre under
-    // each knob; padSw is capped so the two toggles never overlap.
+    // Pad knob pair: two Size-3 knobs centred inside the Pad sub-panel with
+    // kPadKnobGap between them. Mute toggles centre under each knob; padSw is
+    // capped so the two toggles never overlap.
     constexpr int padKnobW      = MuLookAndFeel::kKnobSize3W;
     constexpr int padKnobH      = MuLookAndFeel::kKnobSize3H;
     constexpr int padPairW      = padKnobW * 2 + kPadKnobGap;

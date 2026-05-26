@@ -17,8 +17,8 @@
 //   insertDrive (0..100):   Note index — stored as 0..6 (C, D, E, F, G, A, B).
 //                          UI shows the note letter.
 //   insertBits    (1..16):    Octave knob — stored as 0..3 mapping to SPN octaves 1..4.
-//                          #429: added Octave 0 (= SPN C1 = 32.7 Hz) below the
-//                          original 1/2/3 — bottom of audible range.
+//                          Octave 0 (= SPN C1 = 32.7 Hz) is the bottom of the
+//                          audible range — useful for sub-bass plucks.
 //   insertDither  (0..100):   Feedback — stored as 0..100, mapped internally via
 //                          cubic curve 1-(1-x)³ to loop gain 0..0.9999.
 //                          0% = passthrough; 25% ≈ 125ms pluck; 50% ≈ 500ms;

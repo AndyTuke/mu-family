@@ -118,11 +118,11 @@ void VoiceEngine::trigger(bool isAccented, bool tied)
     if (tied)
         return;
 
-    // #627 / Stage 35: engine-level amp envelope (single ADSR for the whole engine,
-    // not per-voice). Untied retrigger resets to zero and noteOns; the voice slot's
-    // sample audio mixes into tempBuffer and the env multiplies the post-filter +
-    // post-insert result at the END of process(). Tied hits already returned above so
-    // env state carries across contiguous pattern hits (pattern legato unchanged).
+    // Engine-level amp envelope (single ADSR for the whole engine, not per-voice).
+    // Untied retrigger resets to zero and noteOns; the voice slot's sample audio
+    // mixes into tempBuffer and the env multiplies the post-filter signal before
+    // the insert. Tied hits already returned above so env state carries across
+    // contiguous pattern hits (pattern legato unchanged).
     (void) claimedIdx;  // slot index no longer needed for env routing
     ampEnv.reset();
     ampEnv.noteOn();
@@ -248,14 +248,14 @@ void VoiceEngine::markRetired() noexcept
     // audio thread cannot be mid-process() on this engine, so direct state
     // mutation is safe.
 
-    // #627: amp env noteOff is gated on ampRelToEnd.
-    //  - ampRelToEnd == false: noteOff so the env enters release. applyEnvelopeToBuffer
-    //    at the end of process() fades the COMBINED output (sample + filter + insert
-    //    tails) over the user's release time. When env hits idle, output is silent
-    //    regardless of filter/insert state.
+    // Amp env noteOff is gated on ampRelToEnd:
+    //  - ampRelToEnd == false: noteOff so the env enters release. ampEnv multiplies
+    //    the post-filter signal during release, so filter resonance fades into the
+    //    env's release curve. Insert state survives — its own feedback decay continues
+    //    past env idle, drained on the `retireDrainBlocks` timer.
     //  - ampRelToEnd == true: do NOT noteOff. Env stays at sustain (or wherever decay
     //    left it); sample plays through to its natural end at that level.
-    //    isFullyDrained() handles the voices-only drain criterion in this mode.
+    //    isFullyDrained() switches to a voices-only drain criterion in this mode.
     if (!activeParams.ampRelToEnd)
         ampEnv.noteOff();
 

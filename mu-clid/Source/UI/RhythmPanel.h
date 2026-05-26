@@ -99,7 +99,7 @@ private:
     // stopping the sequencer would freeze the rings in their last-played state.
     bool wasPlayingLastTick = false;
 
-    // #642: tracks the most recent euclid overrides applied to the RhythmCircle so the
+    // Tracks the most recent euclid overrides applied to the RhythmCircle so the
     // timer can detect modulation-driven changes and refresh the circle without
     // recomputing step types on every tick.
     EuclidOverrides lastCircleOverrides {};

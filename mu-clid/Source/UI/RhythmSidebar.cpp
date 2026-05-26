@@ -30,7 +30,7 @@ void RhythmSidebar::refreshItems()
         item->setRhythm(&r, col);
         item->setSelected(i == selectedIndex);
         item->setPlayState(&proc.rhythmPlayState[i], &proc.beatFraction, &proc.sequencerPlaying);
-        item->setProcessor(&proc);  // #642 — for modulated euclid override polling
+        item->setProcessor(&proc);  // for modulated euclid override polling on the mini-circle
         item->onSelected = [this](int idx)
         {
             setSelectedIndex(idx);

@@ -490,7 +490,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 modParamValues["amp.decay"]        = propFromAdsr(modParams.ampEnvDec);
                 modParamValues["amp.sustain"]      = modParams.ampEnvSus   * 100.0f;  // linear, unchanged
                 modParamValues["amp.release"]      = propFromAdsr(modParams.ampEnvRel);
-                modParamValues["filter.cutoff"]    = propFromCutoff(modParams.filterCutoff);  // #639 proportion-space
+                modParamValues["filter.cutoff"]    = propFromCutoff(modParams.filterCutoff);  // proportion-space, log-skewed
                 modParamValues["filter.resonance"] = modParams.filterRes;             // linear, slider 0..0.99
                 modParamValues["fenv.attack"]      = propFromAdsr(modParams.filterEnvAtk);
                 modParamValues["fenv.decay"]       = propFromAdsr(modParams.filterEnvDec);
@@ -598,7 +598,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                     snap[kSnapPitchEnvDep] .store(modParamValues["pitch.envDepth"]);  // semitones 0..24
                     snap[kSnapAmpLvl]      .store(modParamValues["amp.level"]);       // dB -60..+6
                     snap[kSnapAccent]      .store(modParamValues["accentDb"]);        // dB 0..12
-                    // #638 — filter.lowCut: proportion-space modulation → actual Hz for setModulatedActual.
+                    // filter.lowCut: proportion-space modulation → actual Hz for setModulatedActual.
                     snap[kSnapFilterLowCut].store(lowCutFromProp(modParamValues["filter.lowCut"]));
                     // T5 follow-up — pitch.octave: modParamValues holds the modulation offset in SEMITONES (write-back
                     // sums it with pitch.semitones into pitchMod). To show the arc on the pitchOctave knob (range -4..+4

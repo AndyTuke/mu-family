@@ -43,8 +43,7 @@ The full design is split into focused sub-documents. **Read only the relevant on
 | [docs/design-ui.md](docs/design-ui.md) | μ-Clid specific panel layouts — RhythmCircle, EuclideanPanel, Mixer, Transport. Defers to design-ui-family.md for colours/sizes. |
 | [docs/design-presets.md](docs/design-presets.md) | APVTS wiring plan, preset storage, save/restore, current pre-APVTS state |
 | [docs/design-future.md](docs/design-future.md) | Unscheduled future ideas — read to avoid closing off options during current stages |
-| [docs/design-seamless-hotswap.md](docs/design-seamless-hotswap.md) | **Stage 34 plan** — polyphonic voice-tail hot-swap. Step-by-step with test gates. Read before touching `handleAsyncUpdate` / `voiceEngines[]` lifecycle. |
-| [docs/design-stage35-preset-format.md](docs/design-stage35-preset-format.md) | **Stage 35 plan** — robust preset format (rename `drv*`→`ins*`, de-normalise values, string algorithm names). Read before touching `saveRhythmPreset` / `loadPreset` / APVTS layout. |
+| [docs/archive/](docs/archive/) | Closed-stage plans + one-shot audits. Read only if revisiting historical decisions — current behaviour described in the active docs below. |
 | [docs/preset-format.md](docs/preset-format.md) | **Preset format reference** — `.muRhyth` / `.muclid` XML schemas, versioning, ParamKind tags, algorithm-name contracts. Read when editing presets by hand or adding a new persisted parameter. |
 | [tests.md](tests.md) | **Test catalogue + status** — listening tests (T11/T12/T13...), C++ unit tests, manual smoke plan. Pass/fail tracking lives here, not in backlog. Read when adding a regression test or auditing what's covered. |
 | [tests/README.md](tests/README.md) | Listening-test pipeline mechanics — render flags, JSON schema, metric catalogue, adding-a-test recipe. |

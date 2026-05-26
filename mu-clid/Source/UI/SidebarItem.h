@@ -22,7 +22,7 @@ public:
                       const std::atomic<float>*         beatFrac,
                       const std::atomic<bool>*           playing);
 
-    // #642 — used by the timer to fetch modulated euclid overrides so the mini-circle
+    // Used by the timer to fetch modulated euclid overrides so the mini-circle
     // reflects pattern modulation. Optional; if not set the circle just shows base state.
     void setProcessor(const PluginProcessor* p) { proc = p; }
 
@@ -50,7 +50,7 @@ private:
     bool             isDragging = false;
 
     PluginProcessor::RhythmPlayState* playState = nullptr;
-    const PluginProcessor*            proc      = nullptr;   // #642 mod overrides accessor
+    const PluginProcessor*            proc      = nullptr;   // for modulated euclid override polling
     float pulseAlpha   = 0.0f;
     int   lastHitCount = 0;  // Issue #43: edge-detect against playState->hitCount
     bool  pendingSwap  = false;
@@ -62,7 +62,7 @@ private:
     // across all sidebar slots just to detect change.
     HitGenerator::Signature lastSigA {}, lastSigB {}, lastSigC {};
     bool                    lastSigValid = false;
-    // #642: track the modulation overrides applied to the mini-circle so the timer
+    // Track the modulation overrides applied to the mini-circle so the timer
     // can detect modulation-driven changes (without a full pattern re-render every tick).
     EuclidOverrides         lastAppliedOverrides {};
 

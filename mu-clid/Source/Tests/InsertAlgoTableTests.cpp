@@ -41,10 +41,10 @@ public:
 
         beginTest ("every non-None algorithm has at least one visible slot");
         {
-            // #613 root-cause guard: if a non-None algo had all four slots
-            // labelled nullptr, configureInsertAlgorithm would hide every
-            // knob and the algorithm would present as empty. This guarantees
-            // the UI driver always has SOMETHING to show — even if some
+            // Guard against the "all slots null" failure mode: if a non-None
+            // algo had all four slots labelled nullptr, configureInsertAlgorithm
+            // would hide every knob and the algorithm would present as empty.
+            // This guarantees the UI driver always has SOMETHING to show — even if some
             // future algorithm only needs one knob, at least one is visible.
             for (int algo = 1; algo < mu_audio::kInsertAlgorithmCount; ++algo)
             {
