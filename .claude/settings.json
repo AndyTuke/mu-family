@@ -35,7 +35,7 @@
             "shell": "powershell",
             "if": "Bash(cmake --build *)",
             "statusMessage": "Copying artifacts to OneDrive Windows folder...",
-            "command": "$data = $input | ConvertFrom-Json; if ($data.tool_response.exitCode -eq 0) { $dst = 'D:\\Andy Tuke\\Music - Music Software\\TDP\\Windows\\'; Copy-Item 'd:\\Dev\\mu-clid\\build\\mu-clid_artefacts\\Release\\Standalone\\mu-Clid.exe' $dst -Force 2>$null; Copy-Item 'd:\\Dev\\mu-clid\\build\\mu-clid_artefacts\\Release\\VST3\\mu-Clid.vst3' $dst -Recurse -Force 2>$null; Copy-Item 'd:\\Dev\\mu-clid\\build\\mu-clid_artefacts\\Release\\CLAP\\mu-Clid.clap' $dst -Force 2>$null }"
+            "command": "$data = $input | ConvertFrom-Json; if ($data.tool_response.exitCode -eq 0) { $dst = 'D:\\Andy Tuke\\Music - Music Software\\TDP\\Windows\\'; Copy-Item 'd:\\Dev\\mu\\build\\mu-clid_artefacts\\Release\\Standalone\\mu-Clid.exe' $dst -Force 2>$null; Copy-Item 'd:\\Dev\\mu\\build\\mu-clid_artefacts\\Release\\VST3\\mu-Clid.vst3' $dst -Recurse -Force 2>$null; Copy-Item 'd:\\Dev\\mu\\build\\mu-clid_artefacts\\Release\\CLAP\\mu-Clid.clap' $dst -Force 2>$null }"
           }
         ]
       }

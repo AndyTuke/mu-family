@@ -383,7 +383,7 @@ Bullet "Rhythm preset format: .muRhyth (XML)"
 Bullet "Third-party libraries: JUCE, Signalsmith Reverb (MIT), Monocypher (BSD-2-Clause), clap-juce-extensions (MIT)"
 
 # ── Save ──────────────────────────────────────────────────────────────────────
-$outPath = "d:\Dev\mu-clid\docs\mu-Clid User Manual.docx"
+$outPath = "d:\Dev\mu\docs\mu-Clid User Manual.docx"
 $doc.SaveAs([ref]$outPath, [ref]16)
 $doc.Close()
 $word.Quit()
