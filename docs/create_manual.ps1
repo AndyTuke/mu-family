@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 $word = New-Object -ComObject Word.Application
 $word.Visible = $false
 $doc = $word.Documents.Add()
@@ -157,12 +157,15 @@ Bullet "Insert Mode — Pad (steps excluded from hit distribution) or Mute (hits
 P "Ranges update dynamically: when Steps changes, Hits, Rotate, and Insert Start clamp to fit."
 
 H2 "Logic Bar"
-P "Five-pill selector between rows A and B. Sets how the two patterns combine:"
+P "Pill selector between rows A and B. The LEG toggle on the left controls Pattern Legato (see below). To its right, five logic pills set how the A and B patterns combine:"
 Bullet "OR — fires if either A or B fires"
 Bullet "AND — fires only when both A and B fire on the same step"
 Bullet "XOR — fires when exactly one of A or B fires"
 Bullet "A Only — only A fires; B is ignored"
 Bullet "B Only — only B fires; A is ignored"
+
+H2 "Pattern Legato (LEG)"
+P "The LEG pill on the Logic Bar toggles Pattern Legato for the whole rhythm. When OFF (default) every hit retriggers the pitch, filter, and amp envelopes from zero — the right behaviour for percussion. When ON, hits that follow immediately after another hit (no silent step between them) skip the envelope retrigger — the envelopes ride through the tied notes. This produces the smooth legato attack you expect from sustained pad or synth material, and is the recommended mode whenever a pattern has runs of consecutive hits and the sample is long enough that the retrigger would feel choppy."
 
 H2 "Euclid C — Accent Layer"
 P "Three knobs: Steps, Hits, Rotate. C has no logic relationship with A or B. When Ring C fires a hit on the same step as a combined A+B hit, that step is accented. The accent gain (in dB) is set by the Accent knob in the Amp column of the Voice Section."
@@ -191,11 +194,11 @@ Bullet "Peak / Lo Shf / Hi Shf — parametric EQ-style boosts (+12 dB)"
 P "Envelope: Attack, Decay, Sustain, Release, and Depth (up to 48 semitones of cutoff sweep)."
 
 H2 "Amp (amber)"
-P "Configuration: Level (0 to 2 linear), Accent (0 to +12 dB extra gain on accented steps), and three FX send knobs (Effect, Delay, Reverb)."
+P "Configuration: Level (-60 to +6 dB; -inf at minimum), Accent (0 to +12 dB extra gain on accented steps), and three FX send knobs (Effect, Delay, Reverb)."
 P "Envelope: Attack, Decay, Sustain, Release. Shapes the output volume of every hit."
 
 H2 "Insert (pink)"
-P "A per-voice character insert placed after the filter and before the amp envelope. Available algorithms (alphabetical in the dropdown after None):"
+P "A per-voice character insert placed in the voice chain after the amp envelope, so feedback-based algorithms (Karplus, Vocoder) can ring on past the envelope's release from their own internal state — a sustained Karplus pluck will continue after a short envelope decay. Available algorithms (alphabetical in the dropdown after None):"
 Bullet "None — bypass with no CPU cost"
 Bullet "3-Band EQ — low shelf, mid peak with adjustable centre frequency, and high shelf"
 Bullet "Bitcrusher — sample-rate and bit-depth reduction with anti-aliasing and dither"
@@ -203,11 +206,20 @@ Bullet "Clipper — soft or hard clipping at adjustable threshold"
 Bullet "Compressor — feed-forward dynamics (4:1 ratio)"
 Bullet "Fold — triangular foldback (metallic harmonics)"
 Bullet "Hard Clip — hard clipping (aggressive distortion)"
+Bullet "Karplus — physical-modelling plucked-string synthesiser; samples excite the K-S delay line"
 Bullet "Limiter — brick-wall limiting (100:1 ratio)"
 Bullet "Ring Mod — sine-wave ring modulation"
 Bullet "Soft Clip — tanh waveshaping (warm saturation)"
 Bullet "Tape Sat — tanh saturation with DC block and tone shaping"
-P "Four controls (Drive, Output, Dither, Tone) re-label themselves to match the algorithm — for example in Bitcrusher mode they become Drive (bit depth), Rate (sample rate), Dither, and Tone (LP filter cutoff). In 3-Band EQ mode they become Low, Mid Gain, Mid Hz, and High. A Gain Reduction arc sweeps anti-clockwise over the Output knob when Compressor or Limiter is active."
+Bullet "Vocoder — voice/carrier vocoder with internal pitched carrier; 20 analysis bands"
+Bullet "Vocoder St — stereo Vocoder; independent analysis on left/right channels for preserved width"
+P "Each algorithm exposes four slot knobs that take on algorithm-specific meanings. For example in Bitcrusher mode the slots are Bits, Rate, Dither, and LPF; in 3-Band EQ mode they are Low, Mid, Mid Hz, and High; in Karplus mode they are Note, Octave, Feedback, and LPF. The knob labels update automatically when you switch algorithm. A Gain Reduction arc sweeps anti-clockwise over the Output knob when Compressor or Limiter is active."
+
+H3 "Karplus"
+P "Karplus excites an internal delay-line resonator with the incoming sample audio, producing the characteristic decaying pluck of a string. Note and Octave set the pitch (C1 to B4); Feedback sets the decay time (above 95 percent the string rings for several seconds; at 100 percent it is effectively infinite); LPF darkens the feedback path to produce a softer, faster-decaying tone. Because the resonator's feedback is independent of the amp envelope, the pluck rings naturally past short decays — pair a 300 ms amp decay with 80 percent feedback for percussive plucks that bloom into sustained tones."
+
+H3 "Vocoder and Vocoder Stereo"
+P "Vocoder analyses the incoming sample as a modulator signal and shapes a pitched internal carrier with the resulting spectral envelope across 20 bands. The Wave knob picks the carrier waveform (Sine, Saw, White, Pink); for Sine and Saw the Note and Octave knobs set the pitch and Unison stacks up to seven detuned voices for width. The two noise carriers (White, Pink) grey out Note, Octave, and Unison since they have no fundamental pitch. Vocoder Stereo uses the same algorithm but with independent analysis on left and right channels — preserves stereo width from the source sample at extra CPU cost."
 
 H2 "Knob Interaction"
 P "Drag up to increase, drag down to decrease. Double-click to type an exact value. Hover over any knob to see its name and current value in the Status Bar. A cyan ring around a knob indicates it is being modulated; an animated arc shows the live modulated value."
@@ -310,6 +322,7 @@ P "Select a preset from the dropdown in the Transport Bar. All rhythms, voice pa
 
 H2 "Hot-swap During Playback"
 P "Loading a single-rhythm .muRhyth file while playback is running stages the swap until the next loop boundary, so the change happens in time. The Settings overlay lets you choose between On Master Loop and On Rhythm Loop timing. A pending swap is shown by an orange SWP badge on the affected rhythm in the sidebar — click the badge to cancel."
+P "FX tails survive the swap: when the new rhythm takes over, the old rhythm's sample continues playing through its amp envelope's release, and any filter resonance, comb feedback, or Karplus / vocoder feedback from its insert effect rings out naturally. The retired rhythm fades over its envelope's release time plus a short drain budget for feedback-based inserts (roughly two seconds), so transitions feel musical even when the old sample has a long tail or the insert effect was ringing at the moment of swap."
 
 H2 "Rhythm Presets"
 P ".muRhyth files are single-rhythm presets stored in the Rhythms folder. They can be saved with embedded samples and loaded into any rhythm slot. Save a rhythm preset to reuse a particular pattern and voice combination across multiple full presets."
