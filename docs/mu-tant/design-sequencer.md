@@ -61,7 +61,9 @@ The currently-selected envelope's options live in a **properties strip below the
 
 ## UI placement
 
-The pattern editor occupies the screen region where mu-clid puts the voice-parameters panel (right-hand side of the centre area). See the UI layout table in [design-voice.md](design-voice.md) for the full screen map.
+The pattern editor is the **third (bottom) band** of the main content area, **full window width** — sitting below the oscillator panel and filter / insert row, above the modulator section. See the UI layout diagram in [design-voice.md](design-voice.md) for the full screen map.
+
+Click an envelope to focus it; the per-envelope **properties strip** sits directly below the grid (within the same band).
 
 ---
 

@@ -199,7 +199,7 @@ The shared visual identity (`MuLookAndFeel`) ensures a consistent look across al
 
 ## Related design documents
 
-- [design-voice.md](design-voice.md) — voice chain, ADSR, filter, InsertProcessor details
-- [design-fx.md](design-fx.md) — FX chain, slot interface, intra-FX routing
-- [design-presets.md](design-presets.md) — preset storage; mu-tant will share the `.muRhythm` voice-slot format
+- [mu-clid/design-voice.md](mu-clid/design-voice.md) — μ-Clid voice chain, ADSR, filter, InsertProcessor details (mu-tant's voice doc lives at [mu-tant/design-voice.md](mu-tant/design-voice.md))
+- [design-fx.md](design-fx.md) — FX chain, slot interface, intra-FX routing (family-shared)
+- [mu-clid/design-presets.md](mu-clid/design-presets.md) — μ-Clid preset storage. Each product defines its own preset format under its own `design-presets.md`; the family-level conventions are: per-layer preset in camelCase noun (`.muRhythm` / `.muPattern`), full preset in plugin-name camelCase (`.muClid` / `.muTant`).
 - [design-future.md](design-future.md) — inter-plugin sync (μ family), MIDI CC control

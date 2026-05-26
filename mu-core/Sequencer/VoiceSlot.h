@@ -61,5 +61,5 @@ struct VoiceSlot
     mutable CopyableSpinLock voiceParamsLock;
 
     std::string name        = "<unnamed>";
-    int         colourIndex = 0;   // index into MuClidLookAndFeel::rhythmPalette (8 colours)
+    int         colourIndex = 0;   // index into MuLookAndFeel::channelPalette (8 colours; currently `rhythmPalette` pending #662 rename)
 };

@@ -37,7 +37,7 @@ UI placement: routing knobs in FX return channel strip in mixer, above pan.
 
 All distortion algorithms (Soft Clip, Hard Clip, Foldback, Bitcrush) and filter algorithms
 (Ladder Filter, Comb Filter) have been moved out of the shared Effect slot. Per-rhythm Drive
-is now part of the voice chain — see design-voice.md.
+is now part of the voice chain — see [mu-clid/design-voice.md](mu-clid/design-voice.md).
 
 The Effect slot hosts modulation and time-based algorithms only:
 

@@ -168,5 +168,5 @@ Preset format details + algorithm-name contracts: [docs/preset-format.md](preset
 
 - [design-627-filter-then-amp.md](design-627-filter-then-amp.md) — Stage 34 signal-flow refactor + the T12 chain reorder.
 - [design-seamless-hotswap.md](design-seamless-hotswap.md) — Stage 34 rhythm hot-swap mechanics (closed).
-- [design-fx.md](design-fx.md) — global FX chain (Effect / Delay / Reverb sends + master insert).
+- [../design-fx.md](../design-fx.md) — global FX chain (Effect / Delay / Reverb sends + master insert; family-shared).
 - [preset-format.md](preset-format.md) — `.muRhythm` / `.muClid` XML schema.

@@ -145,6 +145,8 @@ Use Glob/Explore to navigate — the tree is derivable from the filesystem.
 - **All UI uses the shared component library** — never build a one-off version of a standard control.
 - **ModulationMatrix processes in dependency order** — detects and rejects circular dependencies at assignment creation time.
 - **Time-stretch DLL (SoundTouch/RubberBand) ships separately** — required for LGPL/GPL compliance when implemented.
+- **Family consistency rule** — all project structuring (Source/ folder layout, docs/ topology, file extensions, naming conventions, ProcessorBase virtual hooks, backlog handling) must mirror across the mu-family (mu-clid / mu-tant / mu-toni / future siblings). Before adding a folder, naming a file, picking a convention for a new plugin, **mirror what the existing product does**. Before introducing a new convention for one product, **propagate it to the others**. Concrete current conventions: per-layer preset = camelCase noun (`.muRhythm`, `.muPattern`); full preset = plugin-name camelCase (`.muClid`, `.muTant`); Source subfolders = `{License, Persistence, Plugin, Sequencer, Tests, UI}`; product docs at `docs/<product>/` mirroring mu-clid's set as topics get decided.
+- **mu-core stays plugin-agnostic** — no `#include` of any product header from mu-core, no product-specific symbol names. Naming uses neutral terms (`channel` / `slot` / `layer` over `rhythm`). Use `MuLookAndFeel` directly from mu-core code, never the `MuClidLookAndFeel` back-compat alias.
 
 ## Code style (mandatory)
 

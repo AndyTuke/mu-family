@@ -8,7 +8,7 @@ Family rules apply: read [design-plugin-family.md](../design-plugin-family.md) f
 
 ## Scope
 
-This document covers **mu-tant's voice DSP and the gate-sequencer contract**. The drawable gate pattern UI and sequencer-rate handling live in the sibling doc `design-sequencer.md` (TBD); this one defines the voice DSP, its parameters, and what the gate stage receives.
+This document covers **mu-tant's voice DSP and the gate-sequencer contract**. The drawable gate pattern UI, envelope semantics, and per-envelope options live in the sibling doc [design-sequencer.md](design-sequencer.md); this one defines the voice DSP, its parameters, and how the gate stage plugs into the chain.
 
 ---
 
