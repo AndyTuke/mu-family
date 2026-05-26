@@ -191,6 +191,15 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         if (mixerVisible) mixerOverlay.refresh();
     };
 
+    // Deferred full-preset swaps commit at the loop boundary (see HotSwapStager).
+    // The browser / transport-bar load paths refresh the UI immediately, but when
+    // playing the swap is deferred, so the immediate refresh runs against the old
+    // state — this callback re-runs the same full refresh once the swap lands.
+    processorRef.onPresetSwapCommitted = [this]
+    {
+        selectRhythmAndRefresh(0, /*fullSidebarRefresh=*/true, MixerRefresh::FullReload);
+    };
+
     rhythmPanel.onRhythmDeleted = [this](int idx)
     {
         processorRef.removeRhythm(idx);
@@ -382,6 +391,7 @@ PluginEditor::~PluginEditor()
     processorRef.apvts.state.removeListener(this);
     processorRef.apvts.removeParameterListener("eff_algo", this);
     processorRef.onRhythmHotSwapCommitted = nullptr;
+    processorRef.onPresetSwapCommitted    = nullptr;
     processorRef.onSaveAndQuit            = nullptr;
     processorRef.onLoadError              = nullptr;
     processorRef.onUiScaleChanged         = nullptr;

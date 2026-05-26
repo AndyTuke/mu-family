@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<MuClidRhythm presetVersion="2" presetName="T11" presetCategory="test" presetEmbedSamples="0" presetDescription="T11 regression — LP24 resonance 0.85, cutoff 800 Hz, amp decay 4 s on a long sustained sample. Play, wait for the filter to ring at a hit, then hot-swap to a different preset. Old engine's filter resonance + sample tail should keep ringing into the env release as it decays." r0_name="T11" r0_colour="2" r0_sample="Synth C 01.wav" r0_stepsA="16" r0_hitsA="2" r0_rotA="0" r0_prePadA="0" r0_postPadA="0" r0_insStA="0" r0_insLenA="0" r0_insModeA="false" r0_prePadModeA="false" r0_postPadModeA="false" r0_stepsB="16" r0_hitsB="0" r0_rotB="0" r0_prePadB="0" r0_postPadB="0" r0_insStB="0" r0_insLenB="0" r0_insModeB="false" r0_prePadModeB="false" r0_postPadModeB="false" r0_stepsC="16" r0_hitsC="0" r0_rotC="0" r0_prePadC="0" r0_postPadC="0" r0_insStC="0" r0_insLenC="0" r0_insModeC="false" r0_prePadModeC="false" r0_postPadModeC="false" r0_logic="OR" r0_patLeg="false" r0_vMono="false" r0_rstSt="-1" r0_pitchOct="0" r0_pitchSemi="0" r0_pitchFine="0" r0_pEnvAtk="0" r0_pEnvDec="0" r0_pEnvSus="0" r0_pEnvRel="0" r0_pEnvDep="0" r0_pEnvLeg="false" r0_fltType="LP24" r0_fltCut="800" r0_fltRes="0.85" r0_fEnvAtk="0" r0_fEnvDec="0" r0_fEnvSus="0" r0_fEnvRel="0" r0_fEnvDep="0" r0_fEnvLeg="false" r0_fltLoCut="0" r0_ampLvl="0" r0_aEnvAtk="0.005" r0_aEnvDec="4.0" r0_aEnvSus="0" r0_aEnvRel="0.5" r0_aEnvLeg="false" r0_accentDb="0" r0_drvChar="None" r0_insP1="0" r0_insP2="0" r0_insP3="0" r0_insP4="0">
+  <Modulators>
+    <Seq id="cs0" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None" loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+    <Seq id="cs1" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None" loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+    <Seq id="cs2" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None" loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+    <Seq id="cs3" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None" loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+    <Seq id="cs4" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None" loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+    <Seq id="cs5" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None" loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+    <Seq id="cs6" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None" loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+    <Seq id="cs7" mode="Smooth" polarity="Bipolar" loopNV="Quarter" loopMod="None" loopMult="4" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+  </Modulators>
+</MuClidRhythm>

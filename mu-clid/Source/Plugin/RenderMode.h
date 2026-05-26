@@ -16,9 +16,11 @@ struct Args
 {
     juce::File outputWav;
     juce::File presetFile;          // optional — empty = use whatever loads by default
+    juce::File swapPresetFile;      // optional — a 2nd preset loaded mid-render (--swap-preset)
     double     seconds      = 4.0;
     double     sampleRate   = 48000.0;
     int        blockSize    = 512;
+    double     swapAtSeconds = -1.0; // when to load swapPresetFile (--swap-at); <0 = no swap
     bool       valid        = false;
 };
 

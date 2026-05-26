@@ -12,7 +12,8 @@ expectations JSON schema are plugin-agnostic.
 
 ```
 tests/
-├── presets/                  -- (none yet; future per-plugin local copies)
+├── presets/                  -- repo-local test presets (e.g. TS1/TS2.muclid),
+│                                versioned with the tests for reproducibility
 ├── expectations/             -- per-test JSON: render config + assertions
 │   ├── T11.json
 │   ├── T12.json
@@ -64,6 +65,13 @@ from a fresh single-rhythm default. Flags:
 | `--seconds`     | 4.0     | Render duration                                   |
 | `--samplerate`  | 48000   | Render sample rate                                |
 | `--blocksize`   | 512     | Process block size                                |
+| `--swap-preset` | none    | A 2nd preset loaded mid-render (full-preset hot-swap test) |
+| `--swap-at`     | none    | When (seconds) to load `--swap-preset`; needs both flags |
+
+`--swap-preset`/`--swap-at` load a second preset partway through the render while
+the sequencer is playing, exercising the real deferred / prestaged / tail-out
+full-preset hot-swap path (the swap commits at the next loop point, not at the
+flag time). See `tests/expectations/TS_swap.json` for a worked example.
 
 Output is 24-bit stereo WAV, written via `juce::WavAudioFormat`.
 
@@ -84,10 +92,13 @@ test case without clicking through the preset browser.
   "test": "T12",
   "description": "Karplus rings past env idle.",
   "render": {
-    "preset": "Rhythms/T12.muRhyth",   // path relative to $MUCLID_CONTENT_DIR
+    "preset": "Rhythms/T12.muRhyth",   // resolved under $MUCLID_CONTENT_DIR, else repo root
     "seconds": 1.5,
     "sample_rate": 48000,
     "block_size": 512
+    // optional full-preset swap test:
+    //   "swap_preset": "tests/presets/TS2.muclid",  // repo-local preset
+    //   "swap_at": 2.0                               // seconds; loaded mid-render
   },
   "assertions": [
     {

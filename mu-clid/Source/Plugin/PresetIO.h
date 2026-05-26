@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_utils/juce_audio_utils.h>
+#include "HotSwapStager.h"   // HotSwapStager::PreparedFullPreset (commit payload)
 
 class PluginProcessor;
 
@@ -32,7 +33,22 @@ public:
     // Full project preset I/O.
     void savePreset(const juce::String& name, const juce::String& description,
                     const juce::String& category, bool embedSamples);
+
+    // Entry point. When the sequencer is playing, a full .muclid preset is staged
+    // for commit at the next master loop boundary (matching per-rhythm hot-swap).
+    // When stopped — or for a non-preset host-state restore — it applies now via
+    // applyPresetImmediate.
     void loadPreset(const juce::File& file);
+
+    // The synchronous load body for the stopped path (and non-preset host-state
+    // restores). Parses + applies the preset immediately on the calling thread.
+    void applyPresetImmediate(const juce::File& file);
+
+    // Commit a pre-built full preset (prepared by loadPreset's playing path) into
+    // live state. Called from HotSwapStager::processSwaps at the loop boundary:
+    // installs the pre-built voices/rhythms under a single suspend, then finalises
+    // the APVTS / mixer / global params. `prepared` is consumed (voices moved out).
+    void commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepared);
 
     // JUCE AudioProcessor state (called from PluginProcessor's overrides).
     void getStateInformation(juce::MemoryBlock& destData);

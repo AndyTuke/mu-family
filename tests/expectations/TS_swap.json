@@ -1,0 +1,39 @@
+{
+  "test": "TS_swap",
+  "description": "Full-preset hot-swap while playing (prestage + loop-point + tail-out). Plays TS1 (steady kick), then loads the EMPTY TS2 at 2.0s. The swap must defer to the next loop point, and TS1's retired voice must ring out across the boundary rather than hard-cut. After the tail decays, TS2 makes no sound, so the output must be silent. Catches: swap never commits (free-running hang), swap hard-cuts the tail, or TS1 keeps playing after the swap.",
+  "render": {
+    "preset": "tests/presets/TS1.muclid",
+    "swap_preset": "tests/presets/TS2.muclid",
+    "swap_at": 2.0,
+    "seconds": 4.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "ts1_playing_before_swap",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [1.0, 1.9],
+      "min": -25,
+      "comment": "TS1's steady kick must be clearly audible before the swap is requested."
+    },
+    {
+      "name": "tail_rings_after_commit",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [2.1, 2.2],
+      "min": -70,
+      "max": -22,
+      "comment": "Just after the loop-point commit the retired TS1 voice must still be ringing (>= -70 dBFS = not hard-cut) but quieter than the active kicks (<= -22 dBFS = TS1 is no longer being triggered, i.e. the swap committed)."
+    },
+    {
+      "name": "silent_after_tail",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [3.0, 3.9],
+      "max": -120,
+      "comment": "TS2 is empty; once TS1's tail has decayed the output must be silent. Fails if the swap never committed (TS1 still playing) or TS1 hits leak through."
+    }
+  ]
+}

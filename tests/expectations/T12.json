@@ -2,7 +2,7 @@
   "test": "T12",
   "description": "Karplus rings past env idle. Signal chain `sample->filter->ampEnv->insert` means the insert sits AFTER the env-gate, so Karplus feedback decays at its own natural rate (not gated by env release).",
   "render": {
-    "preset": "Rhythms/T12.muRhyth",
+    "preset": "tests/presets/T12.muRhyth",
     "seconds": 1.5,
     "sample_rate": 48000,
     "block_size": 512

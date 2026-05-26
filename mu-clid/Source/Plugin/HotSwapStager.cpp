@@ -37,6 +37,23 @@ bool HotSwapStager::hasPendingSwap(int rhythmIndex) const
     return pendingSwaps[(size_t)rhythmIndex].isReady.load(std::memory_order_acquire);
 }
 
+void HotSwapStager::stageFullPreset(PreparedFullPreset&& prepared)
+{
+    // A full preset replaces every slot — drop any per-rhythm swaps still queued
+    // so they don't commit onto slots the preset is about to overwrite.
+    for (int r = 0; r < kMaxRhythms; ++r)
+        cancelPendingIfAny(r);
+
+    pendingPreset = std::move(prepared);
+    presetBoundaryReached.store(false, std::memory_order_relaxed);
+    presetReady.store(true, std::memory_order_release);
+}
+
+bool HotSwapStager::hasPendingFullPreset() const
+{
+    return presetReady.load(std::memory_order_acquire);
+}
+
 //==============================================================================
 bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
                                     int rhythmLoopWrapMask)
@@ -58,6 +75,25 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
             }
         }
     }
+
+    // Full-preset swaps wait for the MASTER loop point when a master loop is
+    // defined (a preset spans every rhythm, so the master loop is the musical
+    // boundary). When free-running (mstrLoop=0, the default), there is no master
+    // loop to wrap, so fall back to rhythm 0's loop — otherwise the swap would
+    // hang forever waiting for a boundary that never comes.
+    if (presetReady.load(std::memory_order_acquire)
+        && !presetBoundaryReached.load(std::memory_order_relaxed))
+    {
+        const bool hasMasterLoop = proc_.sequencer.getMasterLoopSteps() > 0;
+        const bool wrap = hasMasterLoop ? masterLoopWrapped
+                                        : ((rhythmLoopWrapMask & 1) != 0);
+        if (wrap)
+        {
+            presetBoundaryReached.store(true, std::memory_order_release);
+            needAsync = true;
+        }
+    }
+
     return needAsync;
 }
 
@@ -176,5 +212,20 @@ void HotSwapStager::processSwaps()
             if (proc_.onRhythmHotSwapCommitted)
                 proc_.onRhythmHotSwapCommitted(r);
         }
+    }
+
+    // Commit a staged full-preset swap once its loop boundary has been reached.
+    // Runs after the per-rhythm block; stageFullPreset already cancelled any
+    // per-rhythm swaps, so in practice only one path fires per call. All the heavy
+    // lifting (parse, voice build, sample load) happened at stage time, so the
+    // commit is just fast in-memory moves under suspend + an APVTS finalize.
+    if (presetBoundaryReached.load(std::memory_order_acquire))
+    {
+        presetBoundaryReached.store(false, std::memory_order_relaxed);
+        presetReady.store(false, std::memory_order_relaxed);
+        proc_.presetIO.commitStagedFullPreset(pendingPreset);
+        pendingPreset = PreparedFullPreset{};  // release the pre-built voices + tree
+        if (proc_.onPresetSwapCommitted)
+            proc_.onPresetSwapCommitted();
     }
 }

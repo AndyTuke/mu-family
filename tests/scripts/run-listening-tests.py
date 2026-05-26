@@ -39,6 +39,17 @@ def standalone_exe(config: str) -> Path:
     return candidates[0]
 
 
+def resolve_preset(rel: str) -> Path | None:
+    """Resolve a preset path from a spec. Content-folder presets (e.g.
+    'Rhythms/T11.muRhyth') resolve under CONTENT_ROOT; repo-local test presets
+    (e.g. 'tests/presets/TS1.muclid') resolve under REPO_ROOT. Try both."""
+    for base in (CONTENT_ROOT, REPO_ROOT):
+        p = base / rel
+        if p.exists():
+            return p
+    return None
+
+
 def run_one(test_name: str, spec_path: Path, exe: Path, verbose: bool) -> bool:
     spec = json.loads(spec_path.read_text(encoding='utf-8'))
     render = spec.get('render', {})
@@ -47,9 +58,9 @@ def run_one(test_name: str, spec_path: Path, exe: Path, verbose: bool) -> bool:
     if preset_rel is None:
         print(f'[{test_name}] SKIP (no render.preset specified)')
         return False
-    preset = CONTENT_ROOT / preset_rel
-    if not preset.exists():
-        print(f'[{test_name}] ERROR: preset not found: {preset}')
+    preset = resolve_preset(preset_rel)
+    if preset is None:
+        print(f'[{test_name}] ERROR: preset not found: {preset_rel} (looked under content + repo roots)')
         return False
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -63,6 +74,18 @@ def run_one(test_name: str, spec_path: Path, exe: Path, verbose: bool) -> bool:
         '--samplerate', str(render.get('sample_rate', 48000)),
         '--blocksize', str(render.get('block_size', 512)),
     ]
+
+    # Optional mid-render preset swap (exercises the deferred / prestaged /
+    # tail-out full-preset hot-swap). Both keys required to activate.
+    swap_rel = render.get('swap_preset')
+    swap_at  = render.get('swap_at')
+    if swap_rel is not None and swap_at is not None:
+        swap_preset = resolve_preset(swap_rel)
+        if swap_preset is None:
+            print(f'[{test_name}] ERROR: swap_preset not found: {swap_rel}')
+            return False
+        cmd += ['--swap-preset', str(swap_preset), '--swap-at', str(swap_at)]
+
     if verbose:
         print(f'[{test_name}] $ {" ".join(cmd)}')
 

@@ -179,6 +179,14 @@ public:
     void stageRhythmPreset(int ri, const juce::File& f)  { presetIO.stageRhythmPreset(ri, f); }
     void cancelStagedSwap (int ri)                        { hotSwapStager.cancelStagedSwap(ri); }
     bool hasPendingSwap   (int ri) const                  { return hotSwapStager.hasPendingSwap(ri); }
+    bool hasPendingFullPreset() const                     { return hotSwapStager.hasPendingFullPreset(); }
+
+    // Headless/offline render helper. The render loop drives processBlock directly
+    // and never returns to JUCE's message dispatch loop, so triggerAsyncUpdate()
+    // would never be serviced. Call this after each processBlock so deferred work
+    // (staged preset-swap commit, MIDI program-change handling) runs synchronously
+    // on the calling thread. No-op when nothing is pending.
+    void flushPendingAsyncUpdates() { handleUpdateNowIfNeeded(); }
 
     // fired (on the message thread, from handleAsyncUpdate) after a hot-swap
     // commit finishes. The editor uses this to refresh non-APVTS UI state — name
@@ -187,6 +195,12 @@ public:
     // destructor: the processor can outlive the editor (DAW close-window-keep-
     // plugin), and a swap commit firing into a destroyed editor is a UAF.
     std::function<void(int rhythmIndex)> onRhythmHotSwapCommitted;
+
+    // Fired on the message thread after a deferred full-preset swap commits at the
+    // loop boundary, so the editor can rebind non-APVTS UI (rhythm tabs, sidebar,
+    // mixer) against the freshly-loaded preset. Null in headless/render contexts.
+    // Same dtor-cleanup requirement as onRhythmHotSwapCommitted (UAF otherwise).
+    std::function<void()> onPresetSwapCommitted;
 
     // fired when a preset / state-restore parse fails (parseXML returns null
     // or the resulting tree is invalid). Editor surfaces via the status bar so the

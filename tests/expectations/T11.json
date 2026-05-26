@@ -2,7 +2,7 @@
   "test": "T11",
   "description": "Filter resonance fades with amp env release (the env-gate sits AFTER the filter so resonance is gated by env idle, NOT by markRetired's voiceFilter.reset). Active-engine render; hot-swap aspect is verified manually.",
   "render": {
-    "preset": "Rhythms/T11.muRhyth",
+    "preset": "tests/presets/T11.muRhyth",
     "seconds": 3.0,
     "sample_rate": 48000,
     "block_size": 512
