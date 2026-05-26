@@ -13,7 +13,7 @@ PresetBrowser::PresetBrowser()
     listBox.setModel(this);
     listBox.setRowHeight(mu_ui::s(24));
     listBox.setColour(juce::ListBox::backgroundColourId,
-                      MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
+                      MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
     addAndMakeVisible(listBox);
 
     loadBtn.onClick  = [this] { loadSelectedPreset(); };
@@ -112,31 +112,31 @@ int PresetBrowser::getNumRows() { return (int)filteredIndices.size(); }
 
 void PresetBrowser::paintListBoxItem(int row, juce::Graphics& g, int w, int h, bool selected)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
     using mu_ui::s;
     using mu_ui::sf;
 
     if (selected)
     {
-        g.setColour(MuClidLookAndFeel::colour(Id::segmentActiveBg));
+        g.setColour(MuLookAndFeel::colour(Id::segmentActiveBg));
         g.fillRect(0, 0, w, h);
     }
 
     if (row >= (int)filteredIndices.size()) return;
     const auto& info = allPresets[filteredIndices[row]];
 
-    g.setColour(MuClidLookAndFeel::colour(selected ? Id::headingText : Id::labelText));
+    g.setColour(MuLookAndFeel::colour(selected ? Id::headingText : Id::labelText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(12.0f))));
     g.drawText(info.name, s(8), 0, w / 2, h, juce::Justification::centredLeft, true);
 
-    g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
+    g.setColour(MuLookAndFeel::colour(Id::mutedText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));
     g.drawText(info.category, w / 2, 0, w / 4, h,
                juce::Justification::centredLeft, true);
     g.drawText(info.description, w * 3 / 4, 0, w / 4 - s(4), h,
                juce::Justification::centredRight, true);
 
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawLine(0.0f, (float)(h - 1), (float)w, (float)(h - 1), 0.5f);
 }
 
@@ -195,14 +195,14 @@ void PresetBrowser::resized()
 
 void PresetBrowser::paint(juce::Graphics& g)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
     using mu_ui::s;
-    g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
+    g.setColour(MuLookAndFeel::colour(Id::panelBackground));
     g.fillAll();
 
     const int topH = s(kTopBarH);
     const int botH = s(kBotBarH);
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawLine(0.0f, (float)topH, (float)getWidth(), (float)topH, 0.5f);
     g.drawLine(0.0f, (float)(getHeight() - botH), (float)getWidth(),
                (float)(getHeight() - botH), 0.5f);

@@ -1,20 +1,22 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "UI/Components/MuClidLookAndFeel.h"
+#include "UI/Components/MuLookAndFeel.h"
 #include "PresetBrowser.h"
 
-class PluginProcessor;
+class ProcessorBase;
 
-// Full-area overlay panel that lets the user assign .muRhyth files to the 128 MIDI
-// program-change slots and toggle which channels (1-8) are active. Stores changes
-// directly into PluginProcessor::midiPresetMap (which persists to JSON on every edit).
+// Full-area overlay panel that lets the user assign per-slot preset files to
+// the 128 MIDI program-change slots and toggle which channels (1-8) are
+// active. Stores changes directly into ProcessorBase::midiPresetMap (which
+// persists to JSON on every edit). File extension + browser root directory
+// come from the consuming plugin via virtuals on ProcessorBase.
 class MidiPresetsPanel : public juce::Component,
                          public juce::ListBoxModel
 {
 public:
     std::function<void()> onClose;
 
-    explicit MidiPresetsPanel(PluginProcessor& proc);
+    explicit MidiPresetsPanel(ProcessorBase& proc);
 
     void resized() override;
     void paint(juce::Graphics& g) override;
@@ -25,15 +27,15 @@ public:
     void listBoxItemClicked(int row, const juce::MouseEvent& e) override;
 
 private:
-    PluginProcessor& proc;
+    ProcessorBase& proc;
 
     juce::TextButton                  closeBtn { "Close" };
     std::array<juce::ToggleButton, 8> channelToggles;
     juce::ListBox                     listBox;
 
-    // in-app preset browser overlay shown when the user clicks Browse on
-    // a row. Reuses PresetBrowser configured for .muRhyth instead of a raw
-    // juce::FileChooser, so the user gets categories / search / preview.
+    // in-app preset browser overlay shown when the user clicks Browse on a
+    // row. Reuses PresetBrowser configured for the plugin's per-slot preset
+    // extension (mu-clid uses "muRhyth"; mu-tant will use its own).
     PresetBrowser                     browser;
     int                               pendingBrowseRow = -1;
 

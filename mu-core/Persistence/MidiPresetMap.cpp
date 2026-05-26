@@ -1,14 +1,8 @@
 #include "MidiPresetMap.h"
 
-juce::File MidiPresetMap::getDefaultFile()
+void MidiPresetMap::setStorageFile(juce::File f)
 {
-    juce::PropertiesFile::Options opts;
-    opts.applicationName     = "muClid";
-    opts.filenameSuffix      = "xml";
-    opts.folderName          = "TDP";
-    opts.osxLibrarySubFolder = "Application Support";
-    auto settingsFile = opts.getDefaultFile();
-    return settingsFile.getParentDirectory().getChildFile("muClid_midiPresets.json");
+    storageFile = std::move(f);
 }
 
 juce::String MidiPresetMap::getPresetPath(int index) const
@@ -45,10 +39,9 @@ void MidiPresetMap::setChannelMask(uint8_t mask)
 
 void MidiPresetMap::load()
 {
-    const auto file = getDefaultFile();
-    if (! file.existsAsFile()) return;
+    if (storageFile == juce::File() || ! storageFile.existsAsFile()) return;
 
-    const juce::var json = juce::JSON::parse(file);
+    const juce::var json = juce::JSON::parse(storageFile);
     auto* obj = json.getDynamicObject();
     if (obj == nullptr) return;
 
@@ -66,8 +59,8 @@ void MidiPresetMap::load()
 
 void MidiPresetMap::save() const
 {
-    const auto file = getDefaultFile();
-    file.getParentDirectory().createDirectory();
+    if (storageFile == juce::File()) return;   // never call before setStorageFile()
+    storageFile.getParentDirectory().createDirectory();
 
     auto* obj = new juce::DynamicObject();
     juce::var json(obj);  // var takes ownership
@@ -81,5 +74,5 @@ void MidiPresetMap::save() const
         presets.add(paths[(size_t) i]);
     obj->setProperty("presets", presets);
 
-    file.replaceWithText(juce::JSON::toString(json, true));
+    storageFile.replaceWithText(juce::JSON::toString(json, true));
 }

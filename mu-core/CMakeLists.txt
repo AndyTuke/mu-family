@@ -58,6 +58,13 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase.cpp"
     # RenderMode.cpp is consumed by each plugin's Standalone target rather than
     # the shared INTERFACE — needs JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP context.
+    # Persistence — MIDI PC preset maps (per-slot ch 1-8 + full-preset ch 9).
+    "${CMAKE_CURRENT_SOURCE_DIR}/Persistence/MidiPresetMap.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Persistence/MidiFullPresetMap.cpp"
+    # Shared preset browser + MIDI PC editor panels.
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/PresetBrowser.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiPresetsPanel.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiFullPresetsPanel.cpp"
 )
 
 # Consumers can `#include "Audio/VoiceEngine.h"` etc. — same path namespace as

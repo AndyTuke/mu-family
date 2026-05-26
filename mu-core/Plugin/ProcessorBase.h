@@ -4,6 +4,9 @@
 #include "Audio/FX/Slots/FXChain.h"
 #include "Audio/MixerEngine.h"
 #include "Audio/VoiceEngine.h"
+#include "Persistence/MidiPresetMap.h"
+#include "Persistence/MidiFullPresetMap.h"
+#include "MuLimits.h"
 
 #include <array>
 #include <memory>
@@ -48,7 +51,50 @@ public:
     virtual juce::String getChannelName(int idx)       const = 0;
     virtual int         getChannelColourIndex(int idx) const = 0;
 
+    // ─── MIDI program-change → preset loading ────────────────────────────────
+    // The maps + FIFO + audio-thread scan + message-thread drain live here so
+    // every mu-family plugin gets the same MIDI PC behaviour without
+    // duplication. The plugin-specific bits are exposed as virtuals:
+    //   - The per-slot preset directory + file extension (for the editor UI).
+    //   - The full-preset directory + file extension (for the editor UI).
+    //   - applyMidiPresetSlot / applyFullMidiPreset — how this plugin actually
+    //     loads the file (mu-clid stages a rhythm preset / defers a full
+    //     preset to the loop point; mu-tant will define its own semantics).
+    // Public so the shared MIDI editor panels can read/write directly.
+    MidiPresetMap     midiPresetMap;
+    MidiFullPresetMap midiFullPresetMap;
+
+    virtual juce::File   getPerSlotPresetDir()       const = 0;
+    virtual juce::String getPerSlotPresetExtension() const = 0;
+    virtual juce::File   getFullPresetDir()          const = 0;
+    virtual juce::String getFullPresetExtension()    const = 0;
+
+    // Audio-thread: scans incoming MIDI for program-change messages on
+    // channels 1-8 (per-slot map, gated by `midiPresetMap.getChannelMask()`)
+    // and channel 9 (full-preset map, gated by `midiFullPresetMap.isEnabled()`).
+    // Each matching PC is enqueued into the lock-free FIFO. Returns true if
+    // any PCs were enqueued — caller should then `triggerAsyncUpdate()`
+    // (the AsyncUpdater is owned by the derived processor; ProcessorBase
+    // doesn't inherit it so the derived class keeps full control of its
+    // async lifecycle for hot-swap etc.).
+    bool scanMidiProgramChanges(const juce::MidiBuffer& midi);
+
+    // Message-thread: drains the FIFO and dispatches each event via the
+    // applyMidiPresetSlot / applyFullMidiPreset virtuals. Call from the
+    // derived processor's handleAsyncUpdate().
+    void drainPendingMidiProgramChanges();
+
 protected:
+    virtual void applyMidiPresetSlot(int slot, const juce::File& f) = 0;
+    virtual void applyFullMidiPreset(const juce::File& f)            = 0;
+
+    // Number of active "channels" (rhythms / voices / whatever) — used to
+    // gate per-slot PCs so we don't try to load into an inactive slot.
+    // Default: getNumChannels(). Derived can override if the active count
+    // differs from the total (e.g. mu-clid's `numActiveRhythms` atomic
+    // tracks runtime-active rhythms separately from the static channel count).
+    virtual int getNumActiveChannels() const { return getNumChannels(); }
+
 
     // Sets the host BPM on the FX chain (tempo-synced FX) then calls
     // mixerEngine.processBlock(). Derived class calls this at the end of
@@ -65,5 +111,13 @@ protected:
                           const RetiredVoices*                     retired      = nullptr);
 
 private:
+    // MIDI program-change queue: audio thread enqueues on incoming PC;
+    // drainPendingMidiProgramChanges (message thread) drains and dispatches
+    // to the virtual hooks.
+    struct ProgramChangeEvent { int slot; int presetIndex; bool fullPreset; };
+    static constexpr int kPCFifoSize = mu_limits::kProgramChangeFifoSize;
+    juce::AbstractFifo                          pcFifo { kPCFifoSize };
+    std::array<ProgramChangeEvent, kPCFifoSize> pcQueue {};
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ProcessorBase)
 };

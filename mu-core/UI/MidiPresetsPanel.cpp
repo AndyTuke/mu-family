@@ -1,7 +1,7 @@
 #include "MidiPresetsPanel.h"
-#include "Plugin/PluginProcessor.h"
+#include "Plugin/ProcessorBase.h"
 
-MidiPresetsPanel::MidiPresetsPanel(PluginProcessor& p)
+MidiPresetsPanel::MidiPresetsPanel(ProcessorBase& p)
     : proc(p)
 {
     closeBtn.onClick = [this] { if (onClose) onClose(); };
@@ -12,11 +12,12 @@ MidiPresetsPanel::MidiPresetsPanel(PluginProcessor& p)
     listBox.setModel(this);
     listBox.setRowHeight(mu_ui::s(kListRowH));
     listBox.setColour(juce::ListBox::backgroundColourId,
-                      MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
+                      MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
     addAndMakeVisible(listBox);
 
-    // configure the in-app preset browser for rhythm presets.
-    browser.setFileExtension("muRhyth");
+    // configure the in-app preset browser for the plugin's per-slot preset
+    // extension (mu-clid uses "muRhyth"; mu-tant will define its own).
+    browser.setFileExtension(proc.getPerSlotPresetExtension());
     browser.onLoadPreset = [this](const juce::File& f)
     {
         if (pendingBrowseRow >= 0 && f.existsAsFile())
@@ -58,13 +59,13 @@ int MidiPresetsPanel::getNumRows() { return MidiPresetMap::NumSlots; }
 
 void MidiPresetsPanel::paintListBoxItem(int row, juce::Graphics& g, int width, int height, bool rowIsSelected)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
 
     if (rowIsSelected)
-        g.fillAll(MuClidLookAndFeel::colour(Id::sidebarItemSelected).withAlpha(0.25f));
+        g.fillAll(MuLookAndFeel::colour(Id::sidebarItemSelected).withAlpha(0.25f));
 
     // Index column (0-127, zero-padded).
-    g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
+    g.setColour(MuLookAndFeel::colour(Id::mutedText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
     g.drawText(juce::String(row).paddedLeft('0', 3), kPad, 0, kIndexW, height,
                juce::Justification::centredLeft, false);
@@ -77,30 +78,30 @@ void MidiPresetsPanel::paintListBoxItem(int row, juce::Graphics& g, int width, i
     const juce::String label = path.isEmpty()
                                  ? juce::String::charToString(0x2014)
                                  : juce::File(path).getFileName();
-    g.setColour(MuClidLookAndFeel::colour(path.isEmpty() ? Id::mutedText : Id::valueText));
+    g.setColour(MuLookAndFeel::colour(path.isEmpty() ? Id::mutedText : Id::valueText));
     g.drawText(label, kPad + kIndexW + 4, 0,
                browseX - (kPad + kIndexW + 4) - 4, height,
                juce::Justification::centredLeft, true);
 
     // Browse button.
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawRect(browseX, 2, kBrowseBtnW, height - 4, 1);
-    g.setColour(MuClidLookAndFeel::colour(Id::labelText));
+    g.setColour(MuLookAndFeel::colour(Id::labelText));
     g.drawText("Browse", browseX, 0, kBrowseBtnW, height,
                juce::Justification::centred, false);
 
     // Clear button (only shown when slot has an assignment).
     if (! path.isEmpty())
     {
-        g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+        g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
         g.drawRect(clearX, 2, kClearBtnW, height - 4, 1);
-        g.setColour(MuClidLookAndFeel::colour(Id::labelText));
+        g.setColour(MuLookAndFeel::colour(Id::labelText));
         g.drawText("Clear", clearX, 0, kClearBtnW, height,
                    juce::Justification::centred, false);
     }
 
     // Bottom separator.
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder).withAlpha(0.3f));
+    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder).withAlpha(0.3f));
     g.drawLine(0.0f, (float) (height - 1), (float) width, (float) (height - 1), 0.5f);
 }
 
@@ -128,10 +129,8 @@ void MidiPresetsPanel::listBoxItemClicked(int row, const juce::MouseEvent& e)
 void MidiPresetsPanel::browseForRow(int row)
 {
     // show the in-app PresetBrowser overlay rather than a native FileChooser.
-    // Categories + search + double-click-to-pick match the experience of the main
-    // PresetBrowser shown for .muclid full presets.
     pendingBrowseRow = row;
-    browser.refresh(proc.getRhythmsDir());
+    browser.refresh(proc.getPerSlotPresetDir());
     browser.setBounds(getLocalBounds());
     browser.setVisible(true);
     browser.toFront(true);
@@ -173,11 +172,11 @@ void MidiPresetsPanel::resized()
 
 void MidiPresetsPanel::paint(juce::Graphics& g)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
     using mu_ui::s;
     using mu_ui::sf;
 
-    g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
+    g.setColour(MuLookAndFeel::colour(Id::panelBackground));
     g.fillAll();
 
     const int pad = s(kPad);
@@ -185,17 +184,17 @@ void MidiPresetsPanel::paint(juce::Graphics& g)
     const int chRowH  = s(kChannelRowH);
     const int hintH   = s(kHintH);
 
-    g.setColour(MuClidLookAndFeel::colour(Id::headingText));
+    g.setColour(MuLookAndFeel::colour(Id::headingText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(14.0f))));
     g.drawText("MIDI Program Change Presets", pad, 0, s(400), headerH,
                juce::Justification::centredLeft, false);
 
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawLine(0.0f, (float) headerH, (float) getWidth(), (float) headerH, 0.5f);
 
-    g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
+    g.setColour(MuLookAndFeel::colour(Id::mutedText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));
-    g.drawText(juce::String::fromUTF8(u8"MIDI channel N (1-8) → rhythm slot N-1;  program number = preset index"),
+    g.drawText(juce::String::fromUTF8(u8"MIDI channel N (1-8) → slot N-1;  program number = preset index"),
                pad, headerH + pad + chRowH + s(2), getWidth() - pad * 2, hintH,
                juce::Justification::centredLeft, false);
 }

@@ -8,8 +8,6 @@
 #include "Audio/FX/Slots/FXChain.h"
 #include "Audio/MixerEngine.h"
 #include "License/LicenseChecker.h"
-#include "Persistence/MidiPresetMap.h"
-#include "Persistence/MidiFullPresetMap.h"
 #include "MuLimits.h"
 #include "Modulation/ModulationSnapshot.h"
 #include "SamplePreview.h"
@@ -344,31 +342,29 @@ public:
         return &voiceEngines[(size_t)ri]->insertProc.grReduction;
     }
 
-    // 128-entry MIDI program-change → .muRhyth preset path map. Public so the UI panel
-    // can read/write directly. All mutation is message-thread-only; audio thread reads
-    // only the channel mask atomic for gating.
-    MidiPresetMap midiPresetMap;
-
-    // 128-entry MIDI program-change → .muclid full-preset map, triggered on MIDI
-    // channel 9. Public so its UI editing panel can read/write directly. Same
-    // threading contract as midiPresetMap (message-thread mutation; audio thread
-    // reads only the enabled flag atomic for gating).
-    MidiFullPresetMap midiFullPresetMap;
-
 private:
     std::array<std::atomic<float>, kSnapCount> modSnapshot[SequencerEngine::MaxRhythms];
 
     std::atomic<int> swapModeAtomic { 0 }; // 0 = OnMasterLoop, 1 = OnRhythmLoop; read by HotSwapStager
 
-    // MIDI program-change queue: audio thread enqueues on incoming program-change,
-    // handleAsyncUpdate (message thread) drains and calls stageRhythmPreset (per-rhythm,
-    // ch 1-8) or loadPreset (full preset, ch 9 → fullPreset=true; slot is unused then).
-    struct ProgramChangeEvent { int slot; int presetIndex; bool fullPreset = false; };
-    static constexpr int kPCFifoSize = mu_limits::kProgramChangeFifoSize;
-    juce::AbstractFifo                              pcFifo { kPCFifoSize };
-    std::array<ProgramChangeEvent, kPCFifoSize>     pcQueue {};
-
     void handleAsyncUpdate() override;
+
+    // ProcessorBase MIDI PC hooks — dispatched from drainPendingMidiProgramChanges.
+    void applyMidiPresetSlot(int slot, const juce::File& f) override
+        { stageRhythmPreset(slot, f); }
+    void applyFullMidiPreset(const juce::File& f) override
+        { loadPreset(f); }
+
+    // Base uses this to gate per-slot PCs against the runtime-active rhythm count.
+    int getNumActiveChannels() const override
+        { return numActiveRhythms.load(std::memory_order_acquire); }
+
+    // Per-slot + full preset directories / extensions for the shared MIDI editor
+    // panels (`MidiPresetsPanel` / `MidiFullPresetsPanel` in mu-core).
+    juce::File   getPerSlotPresetDir()       const override { return getRhythmsDir(); }
+    juce::String getPerSlotPresetExtension() const override { return "muRhyth"; }
+    juce::File   getFullPresetDir()          const override { return getPresetsDir(); }
+    juce::String getFullPresetExtension()    const override { return "muclid"; }
 
     std::unique_ptr<juce::PropertiesFile> appSettings;
 

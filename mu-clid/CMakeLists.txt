@@ -35,8 +35,6 @@ target_sources(mu-clid
         Source/Plugin/HotSwapStager.cpp
         Source/Plugin/SamplePreview.cpp
         Source/Plugin/PluginEditor.cpp
-        Source/Persistence/MidiPresetMap.cpp
-        Source/Persistence/MidiFullPresetMap.cpp
         Source/Sequencer/EuclideanGenerator.cpp
         Source/Sequencer/HitGenerator.cpp
         Source/Sequencer/Rhythm.cpp
@@ -58,10 +56,7 @@ target_sources(mu-clid
         Source/UI/AboutPanel.cpp
         Source/UI/SaveDialog.cpp
         Source/UI/SampleBrowser.cpp
-        Source/UI/PresetBrowser.cpp
         Source/UI/SettingsOverlay.cpp
-        Source/UI/MidiPresetsPanel.cpp
-        Source/UI/MidiFullPresetsPanel.cpp
         Source/License/LicenseChecker.cpp
         "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
 )
@@ -187,8 +182,6 @@ target_sources(mu-clid-lite
         Source/Plugin/HotSwapStager.cpp
         Source/Plugin/SamplePreview.cpp
         Source/Plugin/LiteEditor.cpp
-        Source/Persistence/MidiPresetMap.cpp
-        Source/Persistence/MidiFullPresetMap.cpp
         Source/Sequencer/EuclideanGenerator.cpp
         Source/Sequencer/HitGenerator.cpp
         Source/Sequencer/Rhythm.cpp
