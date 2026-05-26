@@ -11,6 +11,7 @@
 #include "UI/PresetBrowser.h"
 #include "UI/SettingsOverlay.h"
 #include "UI/MidiPresetsPanel.h"
+#include "UI/MidiFullPresetsPanel.h"
 #include "UI/Components/StatusBar.h"
 #include "UI/Components/MuClidLookAndFeel.h"
 
@@ -46,6 +47,7 @@ private:
     PresetBrowser   presetBrowser;
     SettingsOverlay settingsOverlay;
     MidiPresetsPanel midiPresetsPanel;
+    MidiFullPresetsPanel midiFullPresetsPanel;
     StatusBar       statusBar;
     juce::Label     demoBanner;
 
@@ -57,6 +59,7 @@ private:
     bool browserVisible      = false;
     bool settingsVisible     = false;
     bool midiPresetsVisible  = false;
+    bool midiFullPresetsVisible = false;
 
     juce::ComponentAnimator animator;
 
@@ -71,6 +74,7 @@ private:
     void showPresetBrowser(bool show);
     void showSettings(bool show);
     void showMidiPresets(bool show);
+    void showMidiFullPresets(bool show);
     void doNewPreset();
 
     void hideAllOverlays();

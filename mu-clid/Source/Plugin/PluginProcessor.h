@@ -9,6 +9,7 @@
 #include "Audio/MixerEngine.h"
 #include "License/LicenseChecker.h"
 #include "Persistence/MidiPresetMap.h"
+#include "Persistence/MidiFullPresetMap.h"
 #include "MuLimits.h"
 #include "Modulation/ModulationSnapshot.h"
 #include "SamplePreview.h"
@@ -348,14 +349,21 @@ public:
     // only the channel mask atomic for gating.
     MidiPresetMap midiPresetMap;
 
+    // 128-entry MIDI program-change → .muclid full-preset map, triggered on MIDI
+    // channel 9. Public so its UI editing panel can read/write directly. Same
+    // threading contract as midiPresetMap (message-thread mutation; audio thread
+    // reads only the enabled flag atomic for gating).
+    MidiFullPresetMap midiFullPresetMap;
+
 private:
     std::array<std::atomic<float>, kSnapCount> modSnapshot[SequencerEngine::MaxRhythms];
 
     std::atomic<int> swapModeAtomic { 0 }; // 0 = OnMasterLoop, 1 = OnRhythmLoop; read by HotSwapStager
 
     // MIDI program-change queue: audio thread enqueues on incoming program-change,
-    // handleAsyncUpdate (message thread) drains and calls stageRhythmPreset.
-    struct ProgramChangeEvent { int slot; int presetIndex; };
+    // handleAsyncUpdate (message thread) drains and calls stageRhythmPreset (per-rhythm,
+    // ch 1-8) or loadPreset (full preset, ch 9 → fullPreset=true; slot is unused then).
+    struct ProgramChangeEvent { int slot; int presetIndex; bool fullPreset = false; };
     static constexpr int kPCFifoSize = mu_limits::kProgramChangeFifoSize;
     juce::AbstractFifo                              pcFifo { kPCFifoSize };
     std::array<ProgramChangeEvent, kPCFifoSize>     pcQueue {};

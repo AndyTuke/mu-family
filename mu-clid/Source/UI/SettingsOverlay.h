@@ -16,6 +16,7 @@ public:
     std::function<void()> onClose;
     std::function<void()> onContentDirChanged;
     std::function<void()> onMidiPresetsClicked;
+    std::function<void()> onFullPresetsClicked;
 
     explicit SettingsOverlay(PluginProcessor& proc);
 
@@ -49,7 +50,9 @@ private:
     DropdownSelect midiMessagesDropdown;
 
     // MIDI program-change preset assignments (button opens MidiPresetsPanel overlay).
-    juce::TextButton midiPresetsBtn { "MIDI Presets..." };
+    juce::TextButton midiPresetsBtn { "Rhythm Preset Table" };
+    // Ch-9 full-preset program-change map (button opens MidiFullPresetsPanel overlay).
+    juce::TextButton fullPresetsBtn { "Main Preset Table" };
 
     // Multi-bus output toggle (DAW only). Requires host rescan to take effect.
     juce::ToggleButton multiBusToggle { "Multi-bus output" };
@@ -76,12 +79,21 @@ private:
     // implementation mirrored Y values by hand in two places, easy to break on edits).
     struct LayoutY {
         int contentX = 0, contentW = 0;          // centered content column
+
+        // General sub-panel (Audio, Display, Output)
+        int generalGroupHeader = 0;
         int audioHeader = 0, masterVolY = 0;
         int displayHeader = 0, uiSizeRowY = 0;
+        int outputHeader = 0, multiBusRowY = 0;
+
+        // MIDI sub-panel (Hot-swap, MIDI Clock, MIDI Program Change)
+        int midiGroupHeader = 0;
         int swapHeader = 0, swapRowY = 0;
         int midiClockHeader = 0, clockSourceRowY = 0, midiMessagesRowY = 0;
-        int midiPCHeader = 0, midiPresetsRowY = 0;
-        int outputHeader = 0, multiBusRowY = 0;
+        int midiPCHeader = 0, midiPCRowY = 0;    // single row, two buttons side-by-side
+
+        // Locations sub-panel (Sample Library, Content Folder)
+        int locationsGroupHeader = 0;
         int sampleLibHeader = 0, sampleLibPathRowY = 0, sampleLibBtnsRowY = 0;
         int contentHeader = 0, contentPathRowY = 0, contentBtnsRowY = 0;
     };
@@ -90,8 +102,10 @@ private:
 
     static constexpr int kHeaderH       = 44;   // top "Settings" bar
     static constexpr int kPad           = 20;   // page padding
-    static constexpr int kSectionGap    = 22;   // vertical gap between sections
-    static constexpr int kSectionHeadH  = 28;   // section header band height
+    static constexpr int kGroupHeadH    = 30;   // sub-panel group header band
+    static constexpr int kGroupGap      = 16;   // vertical gap between sub-panels
+    static constexpr int kSectionGap    = 10;   // vertical gap between sections within a sub-panel
+    static constexpr int kSectionHeadH  = 22;   // section header band height
     static constexpr int kRowH          = 26;
     static constexpr int kRowGap        = 8;
     static constexpr int kLabelW        = 140;

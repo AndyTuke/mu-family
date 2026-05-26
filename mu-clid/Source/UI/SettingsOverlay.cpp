@@ -173,6 +173,9 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     midiPresetsBtn.onClick = [this] { if (onMidiPresetsClicked) onMidiPresetsClicked(); };
     addAndMakeVisible(midiPresetsBtn);
 
+    fullPresetsBtn.onClick = [this] { if (onFullPresetsClicked) onFullPresetsClicked(); };
+    addAndMakeVisible(fullPresetsBtn);
+
     multiBusToggle.setToggleState(proc.getMultiBusEnabled(), juce::dontSendNotification);
     multiBusToggle.onClick = [this]
     {
@@ -208,20 +211,24 @@ void SettingsOverlay::computeLayout()
     layout.contentX = (w - layout.contentW) / 2;
 
     const int headH    = s(kSectionHeadH);
+    const int groupH   = s(kGroupHeadH);
     const int rowH     = s(kRowH);
     const int rowGap   = s(kRowGap);
     const int sectGap  = s(kSectionGap);
+    const int groupGap = s(kGroupGap);
 
     int y = s(kHeaderH) + s(kPad);
 
-    // Section: Audio
+    // ── General sub-panel (Audio, Display, Output)
+    layout.generalGroupHeader = y;
+    y += groupH;
+
     layout.audioHeader  = y;
     y += headH;
     layout.masterVolY   = y;
     y += s(64);                           // tall enough for the rotary knob + label
     y += sectGap;
 
-    // Section: Display — UI size picker
     layout.displayHeader = y;
     y += headH;
     layout.uiSizeRowY    = y;
@@ -229,41 +236,46 @@ void SettingsOverlay::computeLayout()
     y += rowH;
     y += sectGap;
 
-    // Section: Hot-swap
-    layout.swapHeader   = y;
+    layout.outputHeader = y;
     y += headH;
-    layout.swapRowY     = y;
+    layout.multiBusRowY = y;
+    y += rowH;
+
+    y += groupGap;
+
+    // ── MIDI sub-panel (Hot-swap, MIDI Clock, MIDI Program Change)
+    layout.midiGroupHeader = y;
+    y += groupH;
+
+    layout.swapHeader = y;
+    y += headH;
+    layout.swapRowY   = y;
     y += rowH;
     y += sectGap;
 
-    // Section: MIDI Clock (standalone only — collapsed entirely in DAW)
+    // MIDI Clock standalone-only (collapsed entirely in DAW)
     if (isStandalone)
     {
-        layout.midiClockHeader   = y;
+        layout.midiClockHeader  = y;
         y += headH;
-        layout.clockSourceRowY   = y;
+        layout.clockSourceRowY  = y;
         y += rowH + rowGap;
-        layout.midiMessagesRowY  = y;
+        layout.midiMessagesRowY = y;
         y += rowH;
         y += sectGap;
     }
 
-    // Section: MIDI Program Change
-    layout.midiPCHeader     = y;
+    layout.midiPCHeader = y;
     y += headH;
-    layout.midiPresetsRowY  = y;
+    layout.midiPCRowY   = y;
     y += rowH;
-    y += sectGap;
 
-    // Section: Output
-    layout.outputHeader     = y;
-    y += headH;
-    layout.multiBusRowY     = y;
-    y += rowH;
-    y += sectGap;
+    y += groupGap;
 
-    // Section: Sample Library — user's personal sample folder, used as
-    // the default location for the sample-load dialog.
+    // ── Locations sub-panel (Sample Library, Content Folder)
+    layout.locationsGroupHeader = y;
+    y += groupH;
+
     layout.sampleLibHeader     = y;
     y += headH;
     layout.sampleLibPathRowY   = y;
@@ -272,7 +284,6 @@ void SettingsOverlay::computeLayout()
     y += rowH;
     y += sectGap;
 
-    // Section: Content Folder
     layout.contentHeader        = y;
     y += headH;
     layout.contentPathRowY      = y;
@@ -323,7 +334,15 @@ void SettingsOverlay::resized()
         midiMessagesDropdown.setBounds(ctrlX,  layout.midiMessagesRowY, ctrlW,  rowH);
     }
 
-    midiPresetsBtn.setBounds(ctrlX, layout.midiPresetsRowY, ctrlW, rowH);
+    // MIDI Program Change — two buttons side-by-side, centred within the content column.
+    {
+        const int btnGap = s(kFolderBtnGap);
+        const int btnW   = juce::jmin(s(200), (cw - btnGap) / 2);
+        const int totalW = btnW * 2 + btnGap;
+        const int btnX   = x + (cw - totalW) / 2;
+        midiPresetsBtn.setBounds(btnX,                       layout.midiPCRowY, btnW, rowH);
+        fullPresetsBtn.setBounds(btnX + btnW + btnGap,       layout.midiPCRowY, btnW, rowH);
+    }
 
     multiBusToggle.setBounds(ctrlX, layout.multiBusRowY, ctrlW, rowH);
 
@@ -363,14 +382,27 @@ void SettingsOverlay::paint(juce::Graphics& g)
     const int x = layout.contentX;
     const int w = layout.contentW;
 
+    // Sub-panel group header: larger font + thicker full-width divider.
+    auto drawGroupHeader = [&](int headerY, const juce::String& title)
+    {
+        g.setColour(MuClidLookAndFeel::colour(Id::headingText));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(15.0f))));
+        g.drawText(title, x, headerY, w, s(20), juce::Justification::centredLeft, false);
+
+        g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+        const float lineY = (float)(headerY + s(22));
+        g.drawLine((float)x, lineY, (float)(x + w), lineY, 1.0f);
+    };
+
+    // Section sub-header within a sub-panel — smaller font + thin divider.
     auto drawSectionHeader = [&](int headerY, const juce::String& title)
     {
         g.setColour(MuClidLookAndFeel::colour(Id::headingText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(13.0f))));
-        g.drawText(title, x, headerY, w, s(18), juce::Justification::centredLeft, false);
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(12.0f))));
+        g.drawText(title, x, headerY, w, s(16), juce::Justification::centredLeft, false);
 
         g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
-        const float lineY = (float)(headerY + s(20));
+        const float lineY = (float)(headerY + s(17));
         g.drawLine((float)x, lineY, (float)(x + w), lineY, 0.5f);
     };
 
@@ -382,15 +414,20 @@ void SettingsOverlay::paint(juce::Graphics& g)
                    juce::Justification::centredLeft, false);
     };
 
-    drawSectionHeader(layout.audioHeader,    "Audio");
-    drawSectionHeader(layout.displayHeader,  "Display");
-    drawSectionHeader(layout.swapHeader,     "Hot-swap");
+    drawGroupHeader(layout.generalGroupHeader,   "General");
+    drawSectionHeader(layout.audioHeader,        "Audio");
+    drawSectionHeader(layout.displayHeader,      "Display");
+    drawSectionHeader(layout.outputHeader,       "Output");
+
+    drawGroupHeader(layout.midiGroupHeader,      "MIDI");
+    drawSectionHeader(layout.swapHeader,         "Hot-swap");
     if (isStandalone)
         drawSectionHeader(layout.midiClockHeader, "MIDI Clock");
-    drawSectionHeader(layout.midiPCHeader,   "MIDI Program Change");
-    drawSectionHeader(layout.outputHeader,   "Output");
-    drawSectionHeader(layout.sampleLibHeader, "Sample Library");
-    drawSectionHeader(layout.contentHeader,  "Content Folder");
+    drawSectionHeader(layout.midiPCHeader,       "MIDI Program Change");
+
+    drawGroupHeader(layout.locationsGroupHeader, "Locations");
+    drawSectionHeader(layout.sampleLibHeader,    "Sample Library");
+    drawSectionHeader(layout.contentHeader,      "Content Folder");
 
     // Rescan-required hint next to the multi-bus toggle.
     const int hintX = layout.contentX + s(kLabelW) + s(kLabelCtrlGap) + s(kControlW) + s(kLabelCtrlGap);

@@ -51,6 +51,7 @@ PluginProcessor::PluginProcessor()
 
     // Load MIDI program-change preset map (lives in its own JSON file).
     midiPresetMap.load();
+    midiFullPresetMap.load();
 
     // Multi-bus output toggle (DAW). Default: on.
     multiBusEnabled.store(appSettings->getBoolValue("multiBusEnabled", true),
@@ -314,12 +315,15 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             ? midiClockSync.process(midiMessages, buffer.getNumSamples(), currentSampleRate)
             : 0.0;
 
-    // MIDI program change → rhythm preset (channel N → slot N-1, program = preset index).
-    // Audio thread enqueues into a lock-free FIFO; handleAsyncUpdate drains on the message
-    // thread and calls stageRhythmPreset (which can do file I/O).
+    // MIDI program change → preset load. Channels 1-8 (gated by the rhythm map's
+    // channel mask) → per-rhythm .muRhyth preset on slot N-1. Channel 9 (gated by
+    // the full-preset map's enabled flag) → full .muclid preset. Audio thread
+    // enqueues into a lock-free FIFO; handleAsyncUpdate drains on the message thread
+    // and calls stageRhythmPreset / loadPreset (which can do file I/O).
     {
-        const uint8_t chMask = midiPresetMap.getChannelMask();
-        if (chMask != 0)
+        const uint8_t chMask           = midiPresetMap.getChannelMask();
+        const bool    fullPresetEnabled = midiFullPresetMap.isEnabled();
+        if (chMask != 0 || fullPresetEnabled)
         {
             bool needPC = false;
             for (const auto& msgRef : midiMessages)
@@ -327,14 +331,30 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 const auto& m = msgRef.getMessage();
                 if (! m.isProgramChange()) continue;
                 const int ch = m.getChannel();      // 1-based, 1..16
-                if (ch < 1 || ch > 8) continue;
-                if (! (chMask & (1 << (ch - 1)))) continue;
+
+                int  slot   = -1;
+                bool isFull = false;
+                if (ch >= 1 && ch <= 8)
+                {
+                    if (! (chMask & (1 << (ch - 1)))) continue;
+                    slot = ch - 1;
+                }
+                else if (ch == MidiFullPresetMap::Channel)
+                {
+                    if (! fullPresetEnabled) continue;
+                    isFull = true;
+                }
+                else
+                {
+                    continue;
+                }
+
                 int start1, size1, start2, size2;
                 pcFifo.prepareToWrite(1, start1, size1, start2, size2);
                 if (size1 + size2 > 0)
                 {
                     const int dst = (size1 > 0) ? start1 : start2;
-                    pcQueue[(size_t) dst] = { ch - 1, m.getProgramChangeNumber() };
+                    pcQueue[(size_t) dst] = { slot, m.getProgramChangeNumber(), isFull };
                     pcFifo.finishedWrite(1);
                     needPC = true;
                 }
@@ -1031,6 +1051,16 @@ void PluginProcessor::handleAsyncUpdate()
             const int activeRhythms = numActiveRhythms.load(std::memory_order_acquire);
             auto handle = [this, activeRhythms](const ProgramChangeEvent& ev)
             {
+                if (ev.fullPreset)
+                {
+                    // Channel 9 → full .muclid preset. loadPreset defers to the loop
+                    // point via the hot-swap path when playing, applies now if stopped.
+                    if (! midiFullPresetMap.hasPreset(ev.presetIndex)) return;
+                    const juce::File f { midiFullPresetMap.getPresetPath(ev.presetIndex) };
+                    if (f.existsAsFile())
+                        loadPreset(f);
+                    return;
+                }
                 if (ev.slot < 0 || ev.slot >= activeRhythms) return;
                 if (! midiPresetMap.hasPreset(ev.presetIndex))   return;
                 const juce::File f { midiPresetMap.getPresetPath(ev.presetIndex) };

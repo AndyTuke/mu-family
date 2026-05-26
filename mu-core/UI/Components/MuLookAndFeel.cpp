@@ -263,6 +263,12 @@ void MuLookAndFeel::positionComboBoxText(juce::ComboBox& box, juce::Label& label
 
 void MuLookAndFeel::drawLabel(juce::Graphics& g, juce::Label& label)
 {
+    // Fill background — needed for labels used as coloured pills/banners
+    // (e.g. the preset hot-swap "SWP" badge, demo-mode banner). JUCE default
+    // for backgroundColourId is transparentBlack, so this is a no-op for the
+    // typical text-only label.
+    g.fillAll(label.findColour(juce::Label::backgroundColourId));
+
     if (!label.isBeingEdited())
     {
         g.setColour(label.findColour(juce::Label::textColourId));

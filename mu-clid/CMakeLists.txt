@@ -36,6 +36,7 @@ target_sources(mu-clid
         Source/Plugin/SamplePreview.cpp
         Source/Plugin/PluginEditor.cpp
         Source/Persistence/MidiPresetMap.cpp
+        Source/Persistence/MidiFullPresetMap.cpp
         Source/Sequencer/EuclideanGenerator.cpp
         Source/Sequencer/HitGenerator.cpp
         Source/Sequencer/Rhythm.cpp
@@ -60,6 +61,7 @@ target_sources(mu-clid
         Source/UI/PresetBrowser.cpp
         Source/UI/SettingsOverlay.cpp
         Source/UI/MidiPresetsPanel.cpp
+        Source/UI/MidiFullPresetsPanel.cpp
         Source/License/LicenseChecker.cpp
         "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
 )
@@ -149,6 +151,15 @@ clap_juce_extensions_plugin(TARGET mu-clid
     CLAP_ID "com.transwarp.mu-clid"
     CLAP_FEATURES instrument sampler drum-machine)
 
+# Keep deployed formats version-matched. The OneDrive deploy is a POST_BUILD on
+# mu-clid_Standalone; without this, building the Standalone could deploy before
+# the VST3/CLAP finished building (build-order race), shipping a stale plugin at
+# an older build number. Forcing the Standalone to depend on VST3 + CLAP means
+# they're always built first, so a deploy ships a matched set. (Placed after the
+# CLAP target is created.) Trade-off: also rebuilds VST3/CLAP on a Standalone-only
+# build — negligible for the usual full `cmake --build` (ALL_BUILD) flow.
+add_dependencies(mu-clid_Standalone mu-clid_VST3 mu-clid_CLAP)
+
 
 # ── mu-Clid Lite — single-rhythm MIDI-effect VST3/CLAP ──────────────────────
 juce_add_plugin(mu-clid-lite
@@ -177,6 +188,7 @@ target_sources(mu-clid-lite
         Source/Plugin/SamplePreview.cpp
         Source/Plugin/LiteEditor.cpp
         Source/Persistence/MidiPresetMap.cpp
+        Source/Persistence/MidiFullPresetMap.cpp
         Source/Sequencer/EuclideanGenerator.cpp
         Source/Sequencer/HitGenerator.cpp
         Source/Sequencer/Rhythm.cpp

@@ -15,7 +15,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       transportBar(p), sidebar(p), rhythmPanel(p),
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p),
-      midiPresetsPanel(p)
+      midiPresetsPanel(p),
+      midiFullPresetsPanel(p)
 {
     setLookAndFeel(&lookAndFeel);
 
@@ -28,6 +29,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     addChildComponent(presetBrowser);
     addChildComponent(settingsOverlay);
     addChildComponent(midiPresetsPanel);
+    addChildComponent(midiFullPresetsPanel);
     addAndMakeVisible(statusBar);
 
     // ── TransportBar callbacks ────────────────────────────────────────────────
@@ -284,6 +286,18 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         showSettings(true);
     };
 
+    settingsOverlay.onFullPresetsClicked = [this]
+    {
+        showSettings(false);
+        showMidiFullPresets(true);
+    };
+
+    midiFullPresetsPanel.onClose = [this]
+    {
+        showMidiFullPresets(false);
+        showSettings(true);
+    };
+
     // ── Demo mode ─────────────────────────────────────────────────────────────
     {
         using Id = MuClidLookAndFeel::ColourIds;
@@ -466,11 +480,13 @@ void PluginEditor::hideAllOverlays()
     animator.cancelAnimation(&presetBrowser,  true);
     animator.cancelAnimation(&settingsOverlay, true);
     animator.cancelAnimation(&midiPresetsPanel, true);
+    animator.cancelAnimation(&midiFullPresetsPanel, true);
     rhythmPanel     .setAlpha(1.0f);
     mixerOverlay    .setAlpha(1.0f);
     presetBrowser   .setAlpha(1.0f);
     settingsOverlay .setAlpha(1.0f);
     midiPresetsPanel.setAlpha(1.0f);
+    midiFullPresetsPanel.setAlpha(1.0f);
 
     mixerVisible       = false;
     transportBar.setMixerActive(false);
@@ -479,6 +495,7 @@ void PluginEditor::hideAllOverlays()
     browserVisible     = false;
     settingsVisible    = false;
     midiPresetsVisible = false;
+    midiFullPresetsVisible = false;
 
     mixerOverlay    .setVisible(false);
     aboutPanel      .setVisible(false);
@@ -486,6 +503,7 @@ void PluginEditor::hideAllOverlays()
     presetBrowser   .setVisible(false);
     settingsOverlay .setVisible(false);
     midiPresetsPanel.setVisible(false);
+    midiFullPresetsPanel.setVisible(false);
     rhythmPanel     .setVisible(true);
 }
 
@@ -661,6 +679,23 @@ void PluginEditor::showMidiPresets(bool show)
     }
 }
 
+void PluginEditor::showMidiFullPresets(bool show)
+{
+    if (show)
+    {
+        hideAllOverlays();
+        midiFullPresetsVisible = true;
+        rhythmPanel.setVisible(false);
+        midiFullPresetsPanel.setVisible(true);
+    }
+    else
+    {
+        midiFullPresetsVisible = false;
+        midiFullPresetsPanel.setVisible(false);
+        rhythmPanel.setVisible(!mixerVisible);
+    }
+}
+
 //==============================================================================
 void PluginEditor::paint(juce::Graphics& g)
 {
@@ -693,6 +728,7 @@ void PluginEditor::resized()
     presetBrowser   .setBounds(mainArea);
     settingsOverlay .setBounds(mainArea);
     midiPresetsPanel.setBounds(mainArea);
+    midiFullPresetsPanel.setBounds(mainArea);
 
     // Modal overlays span the full editor area
     aboutPanel .setBounds(getLocalBounds());
