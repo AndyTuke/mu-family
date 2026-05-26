@@ -1751,9 +1751,10 @@ for that rhythm.
 
 - Reverb: room, hall, plate, spring algorithms (Signalsmith library)
 
-- Effect/delay send crossfade (0-50% blend in, 50-100% fade dry)
-
-- Reverb pure send --- no dry interaction
+- All FX sends (Effect, Delay, Reverb) are standard parallel sends ---
+  dry always passes to master, send amount adds a scaled copy to the
+  FX return bus. (Original spec called for an Effect/Delay crossfade
+  curve; implementation chose standard sends and never reverted.)
 
 - Global intra-FX routing sends: Effect→Delay, Effect→Reverb,
   Delay→Reverb (knobs on FX strips)
@@ -2045,9 +2046,9 @@ for that rhythm.
                                               algorithm not just
                                               distortion
 
-  FX send behaviour     Effect/Delay          Musical wet/dry blend.
-                        crossfade. Reverb     Reverb always ambient.
-                        pure send.            
+  FX send behaviour     All sends parallel    Simple, predictable mix
+                        (dry always passes,   semantics. Reverb has no
+                        send adds wet copy).  mix knob — pure send only.
 
   Intra-FX routing      Global send knobs on  Simple, consistent signal
                         each FX strip         flow, not per-rhythm

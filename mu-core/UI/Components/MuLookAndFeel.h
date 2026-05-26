@@ -191,7 +191,7 @@ public:
     // fixed PX values measured from this baseline. Large / Small variants
     // will arrive later as % scalings of these numbers.
     //
-    // See docs/knob-size-audit.md for the per-bucket map of which controls
+    // See docs/mu-clid/archive/knob-size-audit.md for the per-bucket map of which controls
     // consume which constant.
     // ──────────────────────────────────────────────────────────────────────
 

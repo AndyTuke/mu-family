@@ -1,19 +1,67 @@
 # μ-family Plugin Architecture
 
-This document covers the shared-code strategy for building additional plugins in the μ-family (mu-tant, and future siblings) that reuse mu-clid's voice chain, modulation system, and mixer.
+This document covers the shared-code strategy for building additional plugins in the μ-family (mu-tant, mu-toni, and future siblings) that reuse mu-clid's voice chain, modulation system, and mixer.
 
 ---
 
 ## Goal
 
-A **mu-tant** plugin will use the same:
+A **mu-tant** / **mu-toni** plugin will use the same:
 - Voice engine (sample playback, ADSR, filter, insert processing)
 - Modulation system (ControlSequence LFO/step modulators, ModulationMatrix assignments)
 - Mixer (per-channel sends, sidechain, returns, master insert, FX chain)
 
 …but swap in a **different sequencer / trigger engine** in place of mu-clid's Euclidean generators.
 
-The code must be structured so these shared components live in a single `mu-core` library that both mu-clid and mu-tant (and any future μ plugin) link against, with zero duplication.
+The code must be structured so these shared components live in a single `mu-core` library that both mu-clid and its siblings (and any future μ plugin) link against, with zero duplication.
+
+---
+
+## Platform contract
+
+The standard mu platform is everything in `mu-core/`. New products link `mu-core` and supply their own sequencer / engine glue / UI under `<product>/Source/`.
+
+**Repo layout for a new product:**
+
+```
+<product>/
+  CMakeLists.txt           juce_add_plugin + target_sources + target_link_libraries(... mu-core)
+  resources/               icon set, logo
+  installer/               Inno Setup .iss
+  Source/
+    Plugin/                PluginProcessor (inherits ProcessorBase), PluginEditor, PresetIO,
+                           HotSwapStager, StandaloneApp, RenderMode, BuildNumber.h
+    Sequencer/             Product-specific sequencer (replaces mu-clid's Rhythm/HitGenerator/
+                           SequencerEngine/EuclideanGenerator)
+    UI/                    Product-specific panels — sidebars, main panels, voice subsections.
+                           Always built from mu-core/UI/Components/ widgets, never one-offs.
+    Persistence/           Product-specific param tables, preset I/O
+    License/               LicenseChecker (Monocypher-based; same pattern as mu-clid)
+    Tests/                 JUCE UnitTest subclasses for data-layer regressions
+```
+
+**What `mu-core` provides** (do not duplicate in a product):
+
+- `Plugin/ProcessorBase` — abstract base that owns `fxChain` + `mixerEngine` + `processCoreBlock()`. Every product's `PluginProcessor` inherits this.
+- `Audio/VoiceEngine` — per-slot voice chain: sample player → filter → amp env → insert FX. Engine-level ADSR, not per-voice.
+- `Audio/MixerEngine` — channel strips, sends, sidechain, FX returns, master inserts.
+- `Audio/FX/Slots/{Effect,Delay,Reverb,FXChain}` — global FX chain.
+- `Audio/MultiModeFilter`, `Audio/InsertProcessor`, `Audio/SamplePlayer`, `Audio/MidiOutputEngine`.
+- `Modulation/ModulationMatrix` + `Sequencer/ControlSequence` — modulation system. Product's slot type inherits `Sequencer/VoiceSlot`.
+- `UI/Components/` — every standard widget (knob, dropdown, segment, step editor, LFO editor, VU meter, status bar).
+- `UI/MixerChannel`, `UI/MixerOverlay`, `UI/FXRow`, `UI/DelayRow` — shared mixer + FX panels.
+
+**The swap-out point:**
+
+`mu-clid/Source/Sequencer/` defines what a "rhythm" is in μ-Clid: Euclidean generators, hit table, step-relative modulation timing. A new product replaces that file set with whatever drives it — a step matrix, a probability engine, a phrase grid, a MIDI re-trigger. The product still produces hits/voices that feed `VoiceEngine::trigger()` from `mu-core`, so everything downstream (voice chain, modulation, FX, mixer, UI controls) just works.
+
+**Boundary rule:** anything in `mu-core/` must be plugin-agnostic. If a `mu-core` source file reaches for `Rhythm`, `HitGenerator`, or a `PluginProcessor` subclass, it has crossed the line — lift the dependency back out into the consuming plugin's tree.
+
+**Wiring a new product into the build:**
+
+1. Implement the source files under `<product>/Source/`.
+2. Replace the placeholder `<product>/CMakeLists.txt` with a real `juce_add_plugin` (copy mu-clid/CMakeLists.txt and adjust).
+3. Add `add_subdirectory(<product>)` to the family root `CMakeLists.txt`.
 
 ---
 

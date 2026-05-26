@@ -4,15 +4,19 @@ project(mu-family VERSION 1.0.0)
 # ── mu-family monorepo umbrella ─────────────────────────────────────────────
 # This repo hosts the shared `mu-core` library plus one or more plugins built
 # on top of it. Today: mu-clid + mu-clid-lite. Future siblings (mu-tant,
-# mu-toni) drop in as additional `add_subdirectory` lines below.
+# mu-toni) are scaffolded under their own subdirectories with placeholder
+# CMakeLists.txt but are NOT yet wired into the build — uncomment their
+# add_subdirectory line below once their Source/ trees are real.
 #
 # Layout:
 #   mu-core/             shared audio/FX/modulation/UI source set + ProcessorBase
-#   mu-clid/             Euclidean rhythm sequencer plugin
+#   mu-clid/             Euclidean rhythm sequencer plugin (full + Lite variants)
+#   mu-tant/             scaffolding only — Source/ tree empty
+#   mu-toni/             scaffolding only — Source/ tree empty
 #   tools/               shared dev tools (license keygen etc.)
 #   tests/               cross-plugin listening-test pipeline (analyse.py, runners)
 #   cmake/               shared cmake helpers (build-number increment, installer)
-#   docs/                shared design docs
+#   docs/                family-shared design docs; product-specific docs under docs/<product>/
 #   ThirdParty/          vendored sources (clap-juce, signalsmith, monocypher)
 
 # Embed the VC++ runtime so plugins run without the Redistributable.
@@ -40,3 +44,5 @@ endif()
 # ── Subdirectories ──────────────────────────────────────────────────────────
 add_subdirectory(mu-core)
 add_subdirectory(mu-clid)
+# add_subdirectory(mu-tant)   # enable once mu-tant/Source/ has real targets
+# add_subdirectory(mu-toni)   # enable once mu-toni/Source/ has real targets

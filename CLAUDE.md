@@ -9,7 +9,20 @@ After every build, read `backlog.md` and fix open (unchecked) issues immediately
 After every response, if any issues in `backlog.md` have been changed status or new issues have been added, update `backlog.md` immediately to reflect the current state.
 
 New feature ideas live in `docs/design-future.md` under **Unscheduled Ideas**. Ask the user before implementing any of them.
-Update the stages as they up worked on, move to development history when done
+Update the stages as they up worked on, move to development history when done.
+
+## Monorepo layout
+
+```
+mu-core/        Shared audio + FX + modulation + mixer UI + ProcessorBase (INTERFACE library)
+mu-clid/        Euclidean rhythm sequencer + sample trigger plugin (VST3 + Standalone + Lite)
+mu-tant/        Scaffolding only — Source/{Plugin,Sequencer,UI,Persistence,License,Tests}/
+mu-toni/        Scaffolding only — Source/{Plugin,Sequencer,UI,Persistence,License,Tests}/
+docs/           Family-shared design docs; product-specific docs under docs/<product>/
+tests/          Cross-plugin listening-test pipeline
+```
+
+The standard mu platform is everything in `mu-core`. New products link `mu-core` and supply their own sequencer/engine/UI under `<product>/Source/`. See [docs/design-plugin-family.md](docs/design-plugin-family.md) for the platform contract and engine swap-point pattern.
 
 ## Git commit messages
 
@@ -33,21 +46,37 @@ Version: v1.0.103
 
 The full design is split into focused sub-documents. **Read only the relevant one** rather than the monolithic design.md.
 
+Docs are organised as **family-shared** (at `docs/` root) vs **product-specific** (under `docs/<product>/`). The first sibling is `docs/mu-clid/`; `docs/mu-tant/` and `docs/mu-toni/` are scaffolded for future products.
+
+**Family-shared:**
+
 | Sub-doc | When to read |
 |---|---|
-| [docs/design-sequencer.md](docs/design-sequencer.md) | Euclidean params, DAW sync, control sequence params, modulation signal flow |
-| [docs/design-voice.md](docs/design-voice.md) | Voice chain, ADSR, filter, interpolation quality, sample handling, time stretching (TimeStretcherBase) |
-| [docs/design-fx.md](docs/design-fx.md) | FX algorithms, delay, reverb, intra-FX routing, FXSlotBase interface |
-| [docs/design-plugin-family.md](docs/design-plugin-family.md) | **Shared plugin architecture** — `mu-core`, `ProcessorBase`, `VoiceSlot`, family conventions. Read before structural / cross-plugin work. |
+| [docs/design-plugin-family.md](docs/design-plugin-family.md) | **Shared plugin architecture** — `mu-core`, `ProcessorBase`, `VoiceSlot`, the platform contract / engine swap-point pattern. Read before structural / cross-plugin work. |
 | [docs/design-ui-family.md](docs/design-ui-family.md) | **Shared design system** — colour tokens, typography, control sizes, interaction patterns, shared module plan. Read this before any UI work. |
-| [docs/design-ui.md](docs/design-ui.md) | μ-Clid specific panel layouts — RhythmCircle, EuclideanPanel, Mixer, Transport. Defers to design-ui-family.md for colours/sizes. |
-| [docs/design-presets.md](docs/design-presets.md) | APVTS wiring plan, preset storage, save/restore, current pre-APVTS state |
+| [docs/design-fx.md](docs/design-fx.md) | FX algorithms, delay, reverb, intra-FX routing, FXSlotBase interface. Lives in `mu-core/Audio/FX/`, used by all products. |
 | [docs/design-future.md](docs/design-future.md) | Unscheduled future ideas — read to avoid closing off options during current stages |
-| [docs/archive/](docs/archive/) | Closed-stage plans + one-shot audits. Read only if revisiting historical decisions — current behaviour described in the active docs below. |
-| [docs/preset-format.md](docs/preset-format.md) | **Preset format reference** — `.muRhyth` / `.muclid` XML schemas, versioning, ParamKind tags, algorithm-name contracts. Read when editing presets by hand or adding a new persisted parameter. |
+| [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) | Family-wide stage log (build numbers are shared across products). |
+
+**μ-Clid product:**
+
+| Sub-doc | When to read |
+|---|---|
+| [docs/mu-clid/design-sequencer.md](docs/mu-clid/design-sequencer.md) | Euclidean params, DAW sync, control sequence params, modulation signal flow |
+| [docs/mu-clid/design-voice.md](docs/mu-clid/design-voice.md) | Voice chain, ADSR, filter, interpolation quality, sample handling, time stretching (TimeStretcherBase) |
+| [docs/mu-clid/design-ui.md](docs/mu-clid/design-ui.md) | μ-Clid specific panel layouts — RhythmCircle, EuclideanPanel, Mixer, Transport. Defers to design-ui-family.md for colours/sizes. |
+| [docs/mu-clid/design-presets.md](docs/mu-clid/design-presets.md) | APVTS wiring plan, preset storage, save/restore, current pre-APVTS state |
+| [docs/mu-clid/preset-format.md](docs/mu-clid/preset-format.md) | **Preset format reference** — `.muRhyth` / `.muclid` XML schemas, versioning, ParamKind tags, algorithm-name contracts. Read when editing presets by hand or adding a new persisted parameter. |
+| [docs/mu-clid/TestPlan.md](docs/mu-clid/TestPlan.md) | 25-step manual smoke walkthrough of the μ-Clid standalone UI. |
+| [docs/mu-clid/archive/](docs/mu-clid/archive/) | Closed μ-Clid stage plans + one-shot audits. Read only if revisiting historical decisions. |
+| [docs/mu-clid/design.md](docs/mu-clid/design.md) | Full original μ-Clid spec — only read if the sub-docs don't cover it |
+
+**Test catalogue:**
+
+| Sub-doc | When to read |
+|---|---|
 | [tests.md](tests.md) | **Test catalogue + status** — listening tests (T11/T12/T13...), C++ unit tests, manual smoke plan. Pass/fail tracking lives here, not in backlog. Read when adding a regression test or auditing what's covered. |
 | [tests/README.md](tests/README.md) | Listening-test pipeline mechanics — render flags, JSON schema, metric catalogue, adding-a-test recipe. |
-| [docs/design.md](docs/design.md) | Full original spec — only read if the sub-docs don't cover it |
 
 ---
 
@@ -157,4 +186,4 @@ All ring radii are computed proportionally from `min(width, height) / 2 - margin
 
 ## UI values
 
-Knob colour coding, ring colour coding, window sizing, and all layout constants are in [docs/design-ui.md](docs/design-ui.md).
+Knob colour coding, ring colour coding, window sizing, and all layout constants are in [docs/mu-clid/design-ui.md](docs/mu-clid/design-ui.md).

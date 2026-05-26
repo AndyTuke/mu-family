@@ -270,7 +270,7 @@ H2 "Sidechain Ducking"
 P "Each rhythm channel can duck from any other channel. The source dropdown selects the trigger channel, Amount sets the depth (0 to 100 percent), and Attack and Release shape the envelope follower. When a channel is being ducked, a downward-filling gain-reduction meter appears next to its main VU meter."
 
 H2 "FX Send Behaviour"
-P "Effect and Delay sends on rhythm channels use a parallel-blend curve: at 0 to 50 percent the dry signal stays at 100 percent and the wet rises from 0 to 100 percent; at 50 to 100 percent the wet stays at 100 percent and the dry fades from 100 to 0 percent. Reverb is always a pure send — increasing the Reverb send does not reduce the dry signal."
+P "All three FX sends (Effect, Delay, Reverb) on rhythm channels are standard parallel sends. The dry signal always passes to the master bus at the channel fader level, and the send knob adds a copy of the channel signal — scaled by the send amount — into the FX return bus. Turning a send up never reduces the dry signal."
 
 H2 "Master Insert"
 P "A compact insert panel attached to the Master strip provides the same eleven algorithms available on the per-rhythm voice insert (None, Soft Clip, Hard Clip, Fold, Bitcrusher, Clipper, 3-Band EQ, Compressor, Limiter, Ring Mod, Tape Sat). The Master Insert is placed post-master-fader and runs once on the summed output."
@@ -383,7 +383,7 @@ Bullet "Rhythm preset format: .muRhyth (XML)"
 Bullet "Third-party libraries: JUCE, Signalsmith Reverb (MIT), Monocypher (BSD-2-Clause), clap-juce-extensions (MIT)"
 
 # ── Save ──────────────────────────────────────────────────────────────────────
-$outPath = "d:\Dev\mu\docs\mu-Clid User Manual.docx"
+$outPath = "d:\Dev\mu\docs\mu-clid\mu-Clid User Manual.docx"
 $doc.SaveAs([ref]$outPath, [ref]16)
 $doc.Close()
 $word.Quit()
