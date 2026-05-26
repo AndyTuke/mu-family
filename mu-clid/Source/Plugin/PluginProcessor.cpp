@@ -16,7 +16,7 @@
 // pre-multi-bus behaviour). Hosts that support it can enable the extra buses.
 PluginProcessor::PluginProcessor()
 #if MUCLID_LITE_BUILD
-    : ProcessorBase(BusesProperties()),
+    : ProcessorBase(BusesProperties(), createParameterLayout(), juce::Identifier("MuClidState"))
 #else
     : ProcessorBase(BusesProperties()
           .withOutput("Master",     juce::AudioChannelSet::stereo(), true)
@@ -28,9 +28,10 @@ PluginProcessor::PluginProcessor()
           .withOutput("Out 6",      juce::AudioChannelSet::stereo(), false)
           .withOutput("Out 7",      juce::AudioChannelSet::stereo(), false)
           .withOutput("Out 8",      juce::AudioChannelSet::stereo(), false)
-          .withOutput("FX Returns", juce::AudioChannelSet::stereo(), false)),
+          .withOutput("FX Returns", juce::AudioChannelSet::stereo(), false),
+          createParameterLayout(),
+          juce::Identifier("MuClidState"))
 #endif
-      apvts(*this, nullptr, "MuClidState", createParameterLayout())
 {
     // Initialise ApplicationProperties (needed by getContentDir/getPresetsDir).
     {

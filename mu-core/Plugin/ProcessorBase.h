@@ -9,18 +9,32 @@
 #include <memory>
 
 // Abstract base for all mu-family plugin processors.
-// Owns the FX chain and mixer engine that every mu plugin shares;
-// provides processCoreBlock() as the common per-block mixing entry point.
+//
+// Owns the three pieces every mu-family plugin shares:
+//   1. apvts  — the APVTS instance. Derived plugins supply the layout
+//               at construction (createParameterLayout()).
+//   2. fxChain + mixerEngine — shared DSP plumbing.
+// Provides processCoreBlock() as the common per-block mixing entry point.
 // Derived classes supply the trigger engine (Euclidean, MIDI, etc.) and
 // call processCoreBlock() from their own processBlock().
+//
+// Keeping apvts on the base lets mu-core UI components (MixerChannel, FXRow,
+// MixerOverlay) take a `ProcessorBase*` instead of forward-declaring each
+// plugin's concrete `PluginProcessor` type — eliminates the layering
+// violation that previously had mu-core including mu-clid headers.
 class ProcessorBase : public juce::AudioProcessor
 {
 public:
-    explicit ProcessorBase(const BusesProperties& props = BusesProperties());
+    ProcessorBase(const BusesProperties& props,
+                  juce::AudioProcessorValueTreeState::ParameterLayout layout,
+                  const juce::Identifier& stateTreeType = juce::Identifier("MuFamilyState"));
     ~ProcessorBase() override = default;
 
-    // Public so UI panels (MixerOverlay, FXRow, etc.) can access them directly,
-    // matching the previous layout where they lived on PluginProcessor.
+    // Public so UI panels (MixerOverlay, FXRow, MixerChannel, etc.) can access
+    // them directly — matches the layout PluginProcessor had before extraction.
+    // `apvts` must be the FIRST data member: ProcessorBase's other members and
+    // derived-class members may depend on it during their construction.
+    juce::AudioProcessorValueTreeState apvts;
     FXChain     fxChain;
     MixerEngine mixerEngine;
 

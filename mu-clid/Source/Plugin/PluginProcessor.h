@@ -28,8 +28,10 @@ public:
     // Controls when a staged rhythm preset is committed to the live slot.
     enum class SwapMode { OnMasterLoop = 0, OnRhythmLoop = 1 };
 
-    // apvts must be the first data member — initialized first, destroyed last.
-    juce::AudioProcessorValueTreeState apvts;
+    // `apvts` lives on ProcessorBase (mu-core) — every mu-family plugin shares
+    // one. Layout is supplied via createParameterLayout() when the base ctor
+    // runs. PluginProcessor's own members below may reference apvts; they
+    // initialize after the base, so the reference is safe.
     juce::StringArray                  loadedSamplePaths;  // [MaxRhythms]
 
     PluginProcessor();

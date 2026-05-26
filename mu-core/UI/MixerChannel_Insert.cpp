@@ -14,10 +14,10 @@
 #include "MixerChannel.h"
 #include "UI/InsertSlotUi.h"
 #include "Audio/InsertSlotConfig.h"
-#include "Plugin/PluginProcessor.h"
+#include "Plugin/ProcessorBase.h"
 #include <cmath>
 
-void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcessor* proc)
+void MixerChannel::configureInsertAlgorithm(int charId, int slot, ProcessorBase* proc)
 {
     if (!hasInsert()) return;
 
@@ -41,7 +41,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, PluginProcesso
     // master insert may be reconfigured from loadFromAPVTS with proc=nullptr
     // (the dropdown value comes from APVTS, knob lambdas use the stored
     // masterInsertProc handle so the user can still drive the engine).
-    PluginProcessor* const knobProc = masterInsertProc;
+    ProcessorBase* const knobProc = masterInsertProc;
 
     const juce::String pChar = slot == 0 ? "mst_insChar" : "mst_ins2Char";
     const juce::String pSlot[4] = {

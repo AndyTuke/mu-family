@@ -3,10 +3,10 @@
 // MixerChannel_Insert.cpp holds configureInsertAlgorithm.
 
 #include "MixerChannel.h"
-#include "Plugin/PluginProcessor.h"
+#include "Plugin/ProcessorBase.h"
 #include "Audio/InsertSlotConfig.h"
 void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, std::atomic<float>& peak,
-                               PluginProcessor* proc, const juce::String& prefix,
+                               ProcessorBase* proc, const juce::String& prefix,
                                std::atomic<float>* grAtomic)
 {
     fader.setValue(state.level, juce::dontSendNotification);
@@ -133,7 +133,7 @@ void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, std::atomic<floa
 }
 
 void MixerChannel::bindReturn(MixerEngine::ReturnState& state, std::atomic<float>& peak,
-                               PluginProcessor* proc, const juce::String& prefix,
+                               ProcessorBase* proc, const juce::String& prefix,
                                std::atomic<float>* grAtomic)
 {
     fader.setValue(state.level, juce::dontSendNotification);
@@ -219,7 +219,7 @@ void MixerChannel::bindReturn(MixerEngine::ReturnState& state, std::atomic<float
     updateDbLabel(state.level);
 }
 
-void MixerChannel::bindMaster(MixerEngine& engine, PluginProcessor* proc)
+void MixerChannel::bindMaster(MixerEngine& engine, ProcessorBase* proc)
 {
     masterInsertProc = proc;   // keep knob lambdas alive across loadFromAPVTS rebinds
     fader.setValue(engine.masterLevel, juce::dontSendNotification);

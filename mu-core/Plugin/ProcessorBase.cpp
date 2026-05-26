@@ -1,7 +1,10 @@
 #include "Plugin/ProcessorBase.h"
 
-ProcessorBase::ProcessorBase(const BusesProperties& props)
-    : juce::AudioProcessor(props)
+ProcessorBase::ProcessorBase(const BusesProperties& props,
+                             juce::AudioProcessorValueTreeState::ParameterLayout layout,
+                             const juce::Identifier& stateTreeType)
+    : juce::AudioProcessor(props),
+      apvts(*this, nullptr, stateTreeType, std::move(layout))
 {}
 
 void ProcessorBase::processCoreBlock(juce::AudioBuffer<float>&                masterBus,

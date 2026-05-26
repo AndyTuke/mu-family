@@ -8,7 +8,7 @@
 #include "Audio/MixerEngine.h"
 #include "Audio/InsertSlotConfig.h"
 
-class PluginProcessor;
+class ProcessorBase;
 
 // One vertical channel strip.
 // Layout (top→bottom): colour bar | name | [sidechain] | sends+pan | fader+VU+GR | [outBus] | dB | [mute/solo]
@@ -32,13 +32,13 @@ public:
 
     // Bind to engine state + VU peak + optional GR atomic. Pass proc+prefix to route mutations through APVTS.
     void bindRhythm(MixerEngine::ChannelState& state, std::atomic<float>& peak,
-                    PluginProcessor* proc = nullptr, const juce::String& apvtsPrefix = {},
+                    ProcessorBase* proc = nullptr, const juce::String& apvtsPrefix = {},
                     std::atomic<float>* grAtomic = nullptr);
     void bindReturn(MixerEngine::ReturnState& state, std::atomic<float>& peak,
-                    PluginProcessor* proc = nullptr, const juce::String& apvtsPrefix = {},
+                    ProcessorBase* proc = nullptr, const juce::String& apvtsPrefix = {},
                     std::atomic<float>* grAtomic = nullptr);
     void bindMaster(MixerEngine& engine,
-                    PluginProcessor* proc = nullptr);
+                    ProcessorBase* proc = nullptr);
 
     // Wire intra-FX send knobs for EffectReturn / DelayReturn.
     void bindReturnSends(juce::AudioProcessorValueTreeState& apvts,
@@ -123,11 +123,11 @@ private:
     // Configure knob labels/ranges/callbacks for the selected algorithm on one insert slot.
     // slot=0 → first insert (mst_ins*), slot=1 → second insert (mst_ins2*).
     // proc non-null = write char param to APVTS; null = skip (called from loadFromAPVTS).
-    void configureInsertAlgorithm(int charId, int slot, PluginProcessor* proc);
+    void configureInsertAlgorithm(int charId, int slot, ProcessorBase* proc);
 
     // Captured by bindMaster so configureInsertAlgorithm's knob callbacks can
     // write to APVTS even when re-invoked from loadFromAPVTS with proc=nullptr.
-    PluginProcessor* masterInsertProc = nullptr;
+    ProcessorBase* masterInsertProc = nullptr;
 
     bool hasSends()            const { return channelType == Type::Rhythm
                                              || channelType == Type::EffectReturn

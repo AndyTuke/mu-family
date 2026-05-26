@@ -4,7 +4,7 @@
 // (its only consumer).
 
 #include "MixerChannel.h"
-#include "Plugin/PluginProcessor.h"
+#include "Plugin/ProcessorBase.h"
 #include <cmath>
 
 MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
