@@ -76,6 +76,17 @@ TransportBar::TransportBar(PluginProcessor& p)
     };
     addAndMakeVisible(presetDropdown);
 
+    // Staging badge for a pending full-preset hot-swap — orange "SWP" pill on the
+    // preset name, mirroring the rhythm hot-swap badge on the sidebar items.
+    // Added after (on top of) the dropdown; mouse-transparent so it doesn't block it.
+    presetStagingBadge.setText("SWP", juce::dontSendNotification);
+    presetStagingBadge.setJustificationType(juce::Justification::centred);
+    presetStagingBadge.setFont(juce::Font(juce::FontOptions{}.withHeight(8.0f)));
+    presetStagingBadge.setColour(juce::Label::backgroundColourId, juce::Colours::orange.withAlpha(0.85f));
+    presetStagingBadge.setColour(juce::Label::textColourId, juce::Colours::black);
+    presetStagingBadge.setInterceptsMouseClicks(false, false);
+    addChildComponent(presetStagingBadge);   // hidden until a swap is staged
+
     newBtn.onClick  = [this] { if (onNewPreset)  onNewPreset();  };
     addAndMakeVisible(newBtn);
 
@@ -140,6 +151,21 @@ void TransportBar::timerCallback()
         const bool midiTransport = proc.getMidiSyncEnabled() && proc.getMidiSyncMessages() != 0;
         playBtn.setEnabled(!midiTransport);
     }
+
+    // Reconcile the loop dropdown with the mstrLoop param every tick. A preset
+    // load sets the param via the APVTS, but if that doesn't fire our listener
+    // (value unchanged, or the editor opened with a preset already loaded) the
+    // dropdown could otherwise show a stale value — e.g. reading "64 steps" while
+    // the loaded preset is actually 32. Self-healing keeps the display honest.
+    if (const auto* p = proc.apvts.getRawParameterValue("mstrLoop"))
+    {
+        const int paramVal = (int) p->load();
+        if (loopDropdown.getSelectedId() != paramVal + 1)
+            syncLoopDropdownFromAPVTS();
+    }
+
+    // Show the staging badge while a full-preset hot-swap is queued for the loop point.
+    presetStagingBadge.setVisible(proc.hasPendingFullPreset());
 
     if (loopStepLabel.isVisible())
     {
@@ -418,5 +444,11 @@ void TransportBar::resized()
 
     const int presetLeft = loopPaneBounds.getRight() + gap;
     presetDropdown.setBounds(presetLeft, btnY, rightEdge - presetLeft, btnH);
+
+    // Staging badge: small pill at the top-right of the preset dropdown.
+    const int badgeW = s(28);
+    const int badgeH = s(11);
+    presetStagingBadge.setBounds(presetDropdown.getRight() - badgeW - s(4),
+                                 presetDropdown.getY() + s(2), badgeW, badgeH);
 #endif
 }

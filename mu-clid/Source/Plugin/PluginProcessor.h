@@ -180,6 +180,7 @@ public:
     void cancelStagedSwap (int ri)                        { hotSwapStager.cancelStagedSwap(ri); }
     bool hasPendingSwap   (int ri) const                  { return hotSwapStager.hasPendingSwap(ri); }
     bool hasPendingFullPreset() const                     { return hotSwapStager.hasPendingFullPreset(); }
+    int  getMasterLoopSteps() const                       { return sequencer.getMasterLoopSteps(); }
 
     // Headless/offline render helper. The render loop drives processBlock directly
     // and never returns to JUCE's message dispatch loop, so triggerAsyncUpdate()

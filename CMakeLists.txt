@@ -41,6 +41,16 @@ if(NOT ISCC_EXE)
     message(STATUS "Inno Setup not found — installer targets disabled across the family")
 endif()
 
+# MSVC defaults to the system codepage (1252) for source + command-line defines,
+# which mangles the UTF-8 µ (U+03BC) in the product display name
+# (JucePlugin_Name="µ-Clid" → "?-Clid" in the binary) and warns C4566 on µ string
+# literals. /utf-8 makes MSVC treat both source and execution charset as UTF-8 so
+# the µ branding survives into the VST3/CLAP/Standalone display name. Added after
+# JUCE/clap-juce-extensions so it only affects mu-core + the plugins.
+if(MSVC)
+    add_compile_options(/utf-8)
+endif()
+
 # ── Subdirectories ──────────────────────────────────────────────────────────
 add_subdirectory(mu-core)
 add_subdirectory(mu-clid)

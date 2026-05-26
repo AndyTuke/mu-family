@@ -16,7 +16,8 @@ juce_add_plugin(mu-clid
     PLUGIN_MANUFACTURER_CODE TDP1
     PLUGIN_CODE MCld
     FORMATS VST3 Standalone
-    PRODUCT_NAME "μ-Clid"
+    PRODUCT_NAME "mu-Clid"
+    PLUGIN_NAME  "μ-Clid"
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT TRUE
@@ -136,8 +137,8 @@ add_custom_command(TARGET mu-clid_Standalone POST_BUILD
     COMMAND "${CMAKE_COMMAND}"
             "-DCONFIG=$<CONFIG>"
             "-DSTANDALONE=$<TARGET_FILE:mu-clid_Standalone>"
-            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid_artefacts/$<CONFIG>/VST3/μ-Clid.vst3"
-            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid_artefacts/$<CONFIG>/CLAP/μ-Clid.clap"
+            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid_artefacts/$<CONFIG>/VST3/mu-Clid.vst3"
+            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid_artefacts/$<CONFIG>/CLAP/mu-Clid.clap"
             "-DDIST_WIN=${MUFAMILY_WIN_DIST}"
             -P "${CMAKE_SOURCE_DIR}/cmake/DeployRelease.cmake"
     COMMENT "Deploying Release artifacts to OneDrive (Debug skipped)"
@@ -156,7 +157,8 @@ juce_add_plugin(mu-clid-lite
     PLUGIN_MANUFACTURER_CODE TDP1
     PLUGIN_CODE MCLt
     FORMATS VST3
-    PRODUCT_NAME "μ-Clid Lite"
+    PRODUCT_NAME "mu-Clid Lite"
+    PLUGIN_NAME  "μ-Clid Lite"
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT FALSE
     NEEDS_MIDI_OUTPUT TRUE
@@ -243,8 +245,8 @@ clap_juce_extensions_plugin(TARGET mu-clid-lite
 add_custom_command(TARGET mu-clid-lite_VST3 POST_BUILD
     COMMAND "${CMAKE_COMMAND}"
             "-DCONFIG=$<CONFIG>"
-            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/VST3/μ-Clid Lite.vst3"
-            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/CLAP/μ-Clid Lite.clap"
+            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/VST3/mu-Clid Lite.vst3"
+            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/CLAP/mu-Clid Lite.clap"
             "-DDIST_WIN=${MUFAMILY_WIN_DIST}"
             -P "${CMAKE_SOURCE_DIR}/cmake/DeployReleaseLite.cmake"
     COMMENT "Deploying mu-Clid Lite VST3 to OneDrive (Debug skipped)"
@@ -253,8 +255,8 @@ add_custom_command(TARGET mu-clid-lite_VST3 POST_BUILD
 add_custom_command(TARGET mu-clid-lite_CLAP POST_BUILD
     COMMAND "${CMAKE_COMMAND}"
             "-DCONFIG=$<CONFIG>"
-            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/VST3/μ-Clid Lite.vst3"
-            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/CLAP/μ-Clid Lite.clap"
+            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/VST3/mu-Clid Lite.vst3"
+            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/CLAP/mu-Clid Lite.clap"
             "-DDIST_WIN=${MUFAMILY_WIN_DIST}"
             -P "${CMAKE_SOURCE_DIR}/cmake/DeployReleaseLite.cmake"
     COMMENT "Deploying mu-Clid Lite CLAP to OneDrive (Debug skipped)"

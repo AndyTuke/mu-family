@@ -102,12 +102,10 @@ int execute(const Args& args)
         }
     }
 
-    // Surface load errors + swap-commit timing to stderr so headless renders are
-    // debuggable (e.g. a missing sample, or whether a mid-render swap committed).
+    // Surface load errors to stderr so headless renders are debuggable
+    // (e.g. a missing sample in a preset).
     proc.onLoadError = [](const juce::String& m)
     { std::fputs(("mu-clid render: load: " + m + "\n").toRawUTF8(), stderr); std::fflush(stderr); };
-    proc.onPresetSwapCommitted = []
-    { std::fputs("mu-clid render: full-preset swap committed\n", stderr); std::fflush(stderr); };
 
     proc.setPlayConfigDetails(0, 2, args.sampleRate, args.blockSize);
     proc.prepareToPlay(args.sampleRate, args.blockSize);
@@ -137,6 +135,7 @@ int execute(const Args& args)
     bool swapTriggered = false;
 
     int written = 0;
+    bool wasPending = false;
     while (written < totalSamples)
     {
         if (swapAtSample >= 0 && ! swapTriggered && written >= swapAtSample)
@@ -146,6 +145,7 @@ int execute(const Args& args)
             std::fprintf(stderr, "mu-clid render: swap to %s requested at %.3fs\n",
                          args.swapPresetFile.getFileName().toRawUTF8(), written / args.sampleRate);
             std::fflush(stderr);
+            wasPending = true;
         }
 
         const int ns = juce::jmin(args.blockSize, totalSamples - written);
@@ -158,6 +158,14 @@ int execute(const Args& args)
         // The render loop never yields to JUCE's message loop, so service any
         // triggerAsyncUpdate() (e.g. the staged swap commit) synchronously here.
         proc.flushPendingAsyncUpdates();
+
+        if (wasPending && ! proc.hasPendingFullPreset())
+        {
+            std::fprintf(stderr, "mu-clid render: full-preset swap committed at %.3fs\n",
+                         (written + ns) / args.sampleRate);
+            std::fflush(stderr);
+            wasPending = false;
+        }
 
         for (int ch = 0; ch < outChannels; ++ch)
             captured.copyFrom(ch, written, block, ch, 0, ns);

@@ -51,6 +51,7 @@ private:
     DropdownSelect   loopDropdown;
     juce::Label      loopStepLabel;
     DropdownSelect   presetDropdown;
+    juce::Label      presetStagingBadge;   // "SWP" pill shown on a pending full-preset hot-swap
     juce::TextButton newBtn   { "New" };
     juce::TextButton saveBtn  { "Save" };
     juce::TextButton gearBtn;

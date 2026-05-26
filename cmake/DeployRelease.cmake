@@ -15,13 +15,13 @@ message(STATUS "Deploying Release artifacts to: ${DIST_WIN}")
 # themselves are still produced under build/mu-clid_artefacts/Release/ —
 # the user can install from the local installer or copy manually.
 if(EXISTS "${STANDALONE}")
-    file(COPY_FILE "${STANDALONE}" "${DIST_WIN}/μ-Clid.exe"
+    file(COPY_FILE "${STANDALONE}" "${DIST_WIN}/mu-Clid.exe"
          ONLY_IF_DIFFERENT
          RESULT copy_result)
     if(copy_result STREQUAL "")
-        message(STATUS "  Standalone -> ${DIST_WIN}/μ-Clid.exe")
+        message(STATUS "  Standalone -> ${DIST_WIN}/mu-Clid.exe")
     else()
-        message(WARNING "  Standalone deploy skipped (${copy_result}). Locked? Close any running μ-Clid.")
+        message(WARNING "  Standalone deploy skipped (${copy_result}). Locked? Close any running mu-Clid.")
     endif()
 else()
     message(WARNING "  Standalone not found: ${STANDALONE}")
@@ -31,11 +31,11 @@ if(IS_DIRECTORY "${VST3_BUNDLE}")
     # file(COPY) doesn't expose a RESULT var; wrap in a try-style execute_process
     # so a locked sub-file inside the bundle doesn't abort the build.
     execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E copy_directory "${VST3_BUNDLE}" "${DIST_WIN}/μ-Clid.vst3"
+        COMMAND "${CMAKE_COMMAND}" -E copy_directory "${VST3_BUNDLE}" "${DIST_WIN}/mu-Clid.vst3"
         RESULT_VARIABLE vst3_result
         OUTPUT_QUIET ERROR_QUIET)
     if(vst3_result EQUAL 0)
-        message(STATUS "  VST3 -> ${DIST_WIN}/μ-Clid.vst3")
+        message(STATUS "  VST3 -> ${DIST_WIN}/mu-Clid.vst3")
     else()
         message(WARNING "  VST3 deploy skipped (likely a locked file inside the bundle).")
     endif()
@@ -44,11 +44,11 @@ else()
 endif()
 
 if(EXISTS "${CLAP_FILE}")
-    file(COPY_FILE "${CLAP_FILE}" "${DIST_WIN}/μ-Clid.clap"
+    file(COPY_FILE "${CLAP_FILE}" "${DIST_WIN}/mu-Clid.clap"
          ONLY_IF_DIFFERENT
          RESULT copy_result)
     if(copy_result STREQUAL "")
-        message(STATUS "  CLAP -> ${DIST_WIN}/μ-Clid.clap")
+        message(STATUS "  CLAP -> ${DIST_WIN}/mu-Clid.clap")
     else()
         message(WARNING "  CLAP deploy skipped (${copy_result}).")
     endif()

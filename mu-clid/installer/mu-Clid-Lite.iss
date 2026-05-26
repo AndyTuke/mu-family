@@ -1,14 +1,15 @@
-﻿; μ-Clid Lite Inno Setup installer script
+﻿; mu-Clid Lite Inno Setup installer script
 ; Build with: iscc /DBuildNum=<N> mu-Clid-Lite.iss
 ; Or via CMake: cmake --build build --target mu-clid-lite_installer --config Release
-; NOTE: this .iss file must be saved as UTF-8 with BOM so Inno Setup reads
-; the Greek mu (μ) correctly in MyAppName / paths / output filename.
+; NOTE: file names + installer text are ASCII "mu-Clid" — Inno Setup mangles the
+; Greek mu (μ) in paths under Windows codepages. The plugin's DAW display name is
+; still "μ-Clid Lite" (set via PLUGIN_NAME in CMake, built with /utf-8).
 
 #ifndef BuildNum
   #define BuildNum "0"
 #endif
 
-#define MyAppName      "μ-Clid Lite"
+#define MyAppName      "mu-Clid Lite"
 #define MyAppVersion   "1.0." + BuildNum
 #define MyAppPublisher "Transwarp Development Project"
 ; Paths relative to mu-clid/installer/. Build output lives at family root.
@@ -22,11 +23,11 @@ AppPublisher={#MyAppPublisher}
 AppVerName={#MyAppName} {#MyAppVersion}
 VersionInfoVersion={#MyAppVersion}
 
-DefaultDirName={autopf}\Transwarp Development Project\μ-Clid Lite
+DefaultDirName={autopf}\Transwarp Development Project\mu-Clid Lite
 DisableDirPage=yes
 
 OutputDir=..\..\build\installer
-OutputBaseFilename=μ-Clid-Lite-Setup-v{#MyAppVersion}
+OutputBaseFilename=mu-Clid-Lite-Setup-v{#MyAppVersion}
 
 ArchitecturesInstallIn64BitMode=x64
 ArchitecturesAllowed=x64
@@ -52,19 +53,19 @@ Name: "clap"; Description: "CLAP Plugin   →  %ProgramFiles%\Common Files\CLAP\
 
 [Files]
 ; VST3 — copy the entire .vst3 bundle folder recursively.
-Source: "{#SourceDir}\VST3\μ-Clid Lite.vst3\*"; \
-    DestDir: "{commoncf64}\VST3\μ-Clid Lite.vst3"; \
+Source: "{#SourceDir}\VST3\mu-Clid Lite.vst3\*"; \
+    DestDir: "{commoncf64}\VST3\mu-Clid Lite.vst3"; \
     Components: vst3; \
     Flags: recursesubdirs createallsubdirs ignoreversion
 
 ; CLAP — single binary.
-Source: "{#SourceDir}\CLAP\μ-Clid Lite.clap"; \
+Source: "{#SourceDir}\CLAP\mu-Clid Lite.clap"; \
     DestDir: "{commoncf64}\CLAP"; \
     Components: clap; \
     Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{commoncf64}\VST3\μ-Clid Lite.vst3\Contents\x86_64-win\μ-Clid Lite.vst3"
+Name: "{group}\{#MyAppName}"; Filename: "{commoncf64}\VST3\mu-Clid Lite.vst3\Contents\x86_64-win\mu-Clid Lite.vst3"
 
 [Run]
 ; No post-install run step needed for plugin-only installers.

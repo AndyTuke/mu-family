@@ -28,8 +28,8 @@ endforeach()
 
 execute_process(
     COMMAND "${CMAKE_COMMAND}" -E copy
-        "${SOURCE_DIR}/build/installer/μ-Clid-Setup-v1.0.${BUILD_NUM}.exe"
-        "${DIST_DIR}/μ-Clid-Setup-v1.0.${BUILD_NUM}.exe"
+        "${SOURCE_DIR}/build/installer/mu-Clid-Setup-v1.0.${BUILD_NUM}.exe"
+        "${DIST_DIR}/mu-Clid-Setup-v1.0.${BUILD_NUM}.exe"
     RESULT_VARIABLE copy_result
 )
 if(NOT copy_result EQUAL 0)
