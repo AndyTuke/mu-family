@@ -46,6 +46,8 @@ The full design is split into focused sub-documents. **Read only the relevant on
 | [docs/design-seamless-hotswap.md](docs/design-seamless-hotswap.md) | **Stage 34 plan** — polyphonic voice-tail hot-swap. Step-by-step with test gates. Read before touching `handleAsyncUpdate` / `voiceEngines[]` lifecycle. |
 | [docs/design-stage35-preset-format.md](docs/design-stage35-preset-format.md) | **Stage 35 plan** — robust preset format (rename `drv*`→`ins*`, de-normalise values, string algorithm names). Read before touching `saveRhythmPreset` / `loadPreset` / APVTS layout. |
 | [docs/preset-format.md](docs/preset-format.md) | **Preset format reference** — `.muRhyth` / `.muclid` XML schemas, versioning, ParamKind tags, algorithm-name contracts. Read when editing presets by hand or adding a new persisted parameter. |
+| [tests.md](tests.md) | **Test catalogue + status** — listening tests (T11/T12/T13...), C++ unit tests, manual smoke plan. Pass/fail tracking lives here, not in backlog. Read when adding a regression test or auditing what's covered. |
+| [tests/README.md](tests/README.md) | Listening-test pipeline mechanics — render flags, JSON schema, metric catalogue, adding-a-test recipe. |
 | [docs/design.md](docs/design.md) | Full original spec — only read if the sub-docs don't cover it |
 
 ---

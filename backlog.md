@@ -1,18 +1,8 @@
 # Issues
 
-**Status key:** ✅ Fixed / resolved &nbsp;|&nbsp; 🔴 Open &nbsp;|&nbsp; 🟡 On Hold (deferred, blocked, or pending external action) &nbsp;|&nbsp; 🔵 Test pending (manual verification needed)
+**Status key:** ✅ Fixed / resolved &nbsp;|&nbsp; 🔴 Open &nbsp;|&nbsp; 🟡 On Hold (deferred, blocked, or pending external action)
 
-## 🔵 Tests
-
-Outstanding manual verification work — run through, mark ✅ when verified, log any failures as new Open issues.
-
-Outstanding listening tests for the #627 filter-then-amp signal flow refactor at v1.0.606.
-
-| # | Test | Status | Verified Build |
-|---|---|---|---|
-| T11 | **[#627 — FX tail survives hot-swap]** Load a preset with strong filter resonance (e.g. ladder LP @ res 85+, cutoff 800 Hz, decay 4 s) AND a long sustained sample (pad / drone). Play, wait for a hit + the filter to ring. Click a different preset (e.g. a clean kick). **Expected**: the old engine's sample + amp env tail continues AND the filter resonance keeps ringing as the env decays; both fade together as the env hits idle. Pre-fix #627 the filter ring was cut instantly at swap. **Failure**: filter ring still cut, OR retired engine's filter bleeds INTO the new active rhythm's audio (= the #416 "overlay" bug returning). | ✅ Pass | 608 |
-| T12 | **[#627 — Comb-filter / Karplus / reverb-style insert FX tails ring through env release on the ACTIVE engine]** Load a preset with Karplus insert (algo 11) with high feedback (Feedback ≈ 80 %), short decay (300 ms). Trigger a hit. **Expected**: Karplus ringing extends past the sample length, fading naturally with the envelope's release. Pre-fix this was already mostly OK on the active engine but had latent issues — confirm no regression. Repeat with a comb-filter preset (filter type Comb+ / Comb-) at high resonance. **Failure**: comb feedback cut at sample-end, OR continues at full level after env idle. | ✅ Pass | 609 |
-| T13 | **[#627 — Polyphonic retrigger behaviour change]** Engine-level amp env means rapid retriggers on overlapping voices now share the env state (no per-voice independent release tails). Trigger overlapping hits on a percussive preset with decay 1 s — listen for any subjectively-worse retrigger feel vs pre-#627. **Expected (drum patterns)**: no perceptible difference — each hit gets a clean retrigger. **Pad patterns**: enable Pattern Legato (#419) so tied hits keep the env going; without legato, expect the env to retrigger on each hit (= "pulsed" pad feel). Confirm pattern legato compensates. **Failure**: drum patterns sound wrong, OR pattern-legato pad doesn't behave smoothly. | 🔵 To run | — |
+Test pass/fail tracking lives in [tests.md](tests.md), not this backlog. Use this file for bugs / features / audit findings only.
 
 ## 🔴 Open
 
