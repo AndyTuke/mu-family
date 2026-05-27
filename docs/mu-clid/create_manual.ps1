@@ -197,6 +197,13 @@ H2 "Amp (amber)"
 P "Configuration: Level (-60 to +6 dB; -inf at minimum), Accent (0 to +12 dB extra gain on accented steps), and three FX send knobs (Effect, Delay, Reverb)."
 P "Envelope: Attack, Decay, Sustain, Release. Shapes the output volume of every hit."
 
+H2 "How the envelopes respond to triggers"
+P "A rhythm hit is a trigger, not a held key, so the Attack-Decay-Sustain-Release envelopes (pitch, filter, and amp) behave a little differently from a keyboard synthesiser:"
+Bullet "Attack and Decay run on every untied hit - the envelope retriggers from zero. For percussion this is usually all you hear: a fast pattern re-fires the attack before the envelope clears the decay stage, so it behaves like a classic attack-decay drum envelope."
+Bullet "Sustain is the level the envelope holds once decay finishes, and you only reach it during Pattern Legato runs (see the Logic Bar). Tied hits skip the retrigger, so the envelope rides through the contiguous notes and settles at the Sustain level. On non-legato percussion the sustain level has little effect because the next hit retriggers first."
+Bullet "Release is not a key-up fade. A triggered hit never sends a note-off, so the release stage is never entered during normal playback. Instead it sets how long a voice tails out when a rhythm or full-preset hot-swap retires it (see Hot-Swapping) - the retired voice fades over its release time so swaps stay smooth. For the same reason, Release is the one envelope stage that is not offered as a modulation target."
+P "So a legato phrase holds at the Sustain level and plays the sample out (or is retriggered by the next hit) rather than fading on a key-up - there is no note-off to start a release. To make a sound die away between hits, shape it with Decay and Sustain rather than Release."
+
 H2 "Insert (pink)"
 P "A per-voice character insert placed in the voice chain after the amp envelope, so feedback-based algorithms (Karplus, Vocoder) can ring on past the envelope's release from their own internal state — a sustained Karplus pluck will continue after a short envelope decay. Available algorithms (alphabetical in the dropdown after None):"
 Bullet "None — bypass with no CPU cost"
