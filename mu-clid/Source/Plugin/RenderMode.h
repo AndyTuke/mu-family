@@ -21,6 +21,20 @@ struct Args
     double     sampleRate   = 48000.0;
     int        blockSize    = 512;
     double     swapAtSeconds = -1.0; // when to load swapPresetFile (--swap-at); <0 = no swap
+
+    // Per-rhythm hot-swap (A9): stage a .muRhythm onto one slot mid-render via
+    // the deferred stageRhythmPreset path (--swap-rhythm-preset / -slot / -at).
+    juce::File swapRhythmFile;
+    int        swapRhythmSlot      = 0;
+    double     swapRhythmAtSeconds = -1.0;
+
+    // MIDI program-change → full-preset load (A2): seed the channel-9 full-preset
+    // map with program->preset, then inject a PC mid-render
+    // (--midi-program / --midi-program-preset / --midi-program-at).
+    juce::File midiProgramPreset;
+    int        midiProgram          = -1;
+    double     midiProgramAtSeconds = -1.0;
+
     bool       valid        = false;
 };
 

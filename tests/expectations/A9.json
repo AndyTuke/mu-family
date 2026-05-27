@@ -1,0 +1,33 @@
+{
+  "test": "A9",
+  "description": "Single-rhythm hot-swap (stageRhythmPreset) defers to the loop point AND changes content, via the per-rhythm staging path (distinct from A1's full-preset load). A9_base is a kick on every beat with a 2s master loop; a hat (.muRhythm) is staged onto slot 0 at 0.5s. The swap must defer to the 2.0s master boundary (kick keeps playing, centroid ~90 Hz) then commit (content becomes a hat, centroid ~10 kHz).",
+  "render": {
+    "preset": "tests/presets/A9_base.muClid",
+    "swap_rhythm_preset": "tests/presets/A9_hat.muRhythm",
+    "swap_rhythm_slot": 0,
+    "swap_rhythm_at": 0.5,
+    "seconds": 4.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "swap_deferred_kick_still_playing",
+      "metric": "spectral_centroid",
+      "channel": "any",
+      "t_window": [0.6, 1.9],
+      "search_hz": [80, 16000],
+      "max_hz": 600,
+      "comment": "after staging at 0.5s the content is still the kick (low centroid) — the swap did NOT take effect immediately; it waits for the 2.0s loop point"
+    },
+    {
+      "name": "content_swapped_to_hat",
+      "metric": "spectral_centroid",
+      "channel": "any",
+      "t_window": [2.7, 4.0],
+      "search_hz": [80, 16000],
+      "min_hz": 4000,
+      "comment": "after the master-boundary commit slot 0 is the hat (high centroid) — the per-rhythm swap applied"
+    }
+  ]
+}

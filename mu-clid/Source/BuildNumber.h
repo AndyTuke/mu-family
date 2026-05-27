@@ -1,2 +1,2 @@
 #pragma once
-#define BUILD_NUMBER 646
+#define BUILD_NUMBER 648

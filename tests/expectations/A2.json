@@ -1,0 +1,31 @@
+{
+  "test": "A2",
+  "description": "MIDI program-change → full-preset load. The channel-9 full-preset map is seeded program 5 → empty TS2; a PC(5) on channel 9 is injected at 1.0s while the kick preset TS1 plays. The PC must drive the deferred full-preset load (scanMidiProgramChanges → drain → applyFullMidiPreset → loadPreset), committing at the loop point: kicks keep playing past the PC, then the preset swaps to the empty TS2 and the output goes silent. Proves the ch-9 MIDI-PC trigger path end-to-end.",
+  "render": {
+    "preset": "tests/presets/TS1.muClid",
+    "midi_program": 5,
+    "midi_program_preset": "tests/presets/TS2.muClid",
+    "midi_program_at": 1.0,
+    "seconds": 4.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "kick_playing_when_pc_arrives",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [0.3, 1.9],
+      "min": -25,
+      "comment": "TS1's kick is sounding through the PC arrival (1.0s); the load is deferred, not immediate"
+    },
+    {
+      "name": "swapped_to_empty_after_commit",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [2.6, 4.0],
+      "max": -100,
+      "comment": "the PC-triggered full-preset load committed at the loop point and swapped to the empty TS2 — output is silent"
+    }
+  ]
+}

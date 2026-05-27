@@ -86,6 +86,32 @@ def run_one(test_name: str, spec_path: Path, exe: Path, verbose: bool) -> bool:
             return False
         cmd += ['--swap-preset', str(swap_preset), '--swap-at', str(swap_at)]
 
+    # Optional per-rhythm hot-swap (A9): stage a .muRhythm onto one slot mid-render.
+    swap_rhy_rel = render.get('swap_rhythm_preset')
+    swap_rhy_at  = render.get('swap_rhythm_at')
+    if swap_rhy_rel is not None and swap_rhy_at is not None:
+        swap_rhy = resolve_preset(swap_rhy_rel)
+        if swap_rhy is None:
+            print(f'[{test_name}] ERROR: swap_rhythm_preset not found: {swap_rhy_rel}')
+            return False
+        cmd += ['--swap-rhythm-preset', str(swap_rhy),
+                '--swap-rhythm-slot', str(render.get('swap_rhythm_slot', 0)),
+                '--swap-rhythm-at', str(swap_rhy_at)]
+
+    # Optional MIDI program-change → full-preset load (A2): seed the ch-9 map and
+    # inject a program change mid-render.
+    midi_prog        = render.get('midi_program')
+    midi_prog_rel    = render.get('midi_program_preset')
+    midi_prog_at     = render.get('midi_program_at')
+    if midi_prog is not None and midi_prog_rel is not None and midi_prog_at is not None:
+        midi_prog_preset = resolve_preset(midi_prog_rel)
+        if midi_prog_preset is None:
+            print(f'[{test_name}] ERROR: midi_program_preset not found: {midi_prog_rel}')
+            return False
+        cmd += ['--midi-program', str(midi_prog),
+                '--midi-program-preset', str(midi_prog_preset),
+                '--midi-program-at', str(midi_prog_at)]
+
     if verbose:
         print(f'[{test_name}] $ {" ".join(cmd)}')
 

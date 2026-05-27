@@ -45,6 +45,12 @@ Args parse(const juce::String& commandLine)
     const juce::String bs         = takeFlagValue(tokens, "--blocksize");
     const juce::String swapPreset = takeFlagValue(tokens, "--swap-preset");
     const juce::String swapAt     = takeFlagValue(tokens, "--swap-at");
+    const juce::String swapRhy    = takeFlagValue(tokens, "--swap-rhythm-preset");
+    const juce::String swapRhySlot= takeFlagValue(tokens, "--swap-rhythm-slot");
+    const juce::String swapRhyAt  = takeFlagValue(tokens, "--swap-rhythm-at");
+    const juce::String midiProg   = takeFlagValue(tokens, "--midi-program");
+    const juce::String midiProgPre= takeFlagValue(tokens, "--midi-program-preset");
+    const juce::String midiProgAt = takeFlagValue(tokens, "--midi-program-at");
 
     if (out.isEmpty())
     {
@@ -56,14 +62,26 @@ Args parse(const juce::String& commandLine)
         a.presetFile = juce::File::getCurrentWorkingDirectory().getChildFile(preset);
     if (swapPreset.isNotEmpty())
         a.swapPresetFile = juce::File::getCurrentWorkingDirectory().getChildFile(swapPreset);
+    if (swapRhy.isNotEmpty())
+        a.swapRhythmFile = juce::File::getCurrentWorkingDirectory().getChildFile(swapRhy);
+    if (midiProgPre.isNotEmpty())
+        a.midiProgramPreset = juce::File::getCurrentWorkingDirectory().getChildFile(midiProgPre);
     if (seconds.isNotEmpty()) a.seconds    = seconds.getDoubleValue();
     if (sr.isNotEmpty())      a.sampleRate = sr.getDoubleValue();
     if (bs.isNotEmpty())      a.blockSize  = bs.getIntValue();
     if (swapAt.isNotEmpty())  a.swapAtSeconds = swapAt.getDoubleValue();
+    if (swapRhySlot.isNotEmpty()) a.swapRhythmSlot      = swapRhySlot.getIntValue();
+    if (swapRhyAt.isNotEmpty())   a.swapRhythmAtSeconds = swapRhyAt.getDoubleValue();
+    if (midiProg.isNotEmpty())    a.midiProgram          = midiProg.getIntValue();
+    if (midiProgAt.isNotEmpty())  a.midiProgramAtSeconds = midiProgAt.getDoubleValue();
 
-    // A swap needs both a target preset and a time; if either is missing, disable it.
+    // Each optional action needs both a target and a time; if either is missing, disable it.
     if (a.swapPresetFile == juce::File{} || a.swapAtSeconds < 0.0)
         a.swapAtSeconds = -1.0;
+    if (a.swapRhythmFile == juce::File{} || a.swapRhythmAtSeconds < 0.0)
+        a.swapRhythmAtSeconds = -1.0;
+    if (a.midiProgramPreset == juce::File{} || a.midiProgram < 0 || a.midiProgramAtSeconds < 0.0)
+        a.midiProgramAtSeconds = -1.0;
 
     a.seconds    = juce::jlimit(0.05, 600.0, a.seconds);
     a.sampleRate = juce::jlimit(8000.0, 192000.0, a.sampleRate);
@@ -107,6 +125,15 @@ int execute(const Args& args)
     proc.onLoadError = [](const juce::String& m)
     { std::fputs(("mu-clid render: load: " + m + "\n").toRawUTF8(), stderr); std::fflush(stderr); };
 
+    // A2: seed the channel-9 full-preset map so an injected program change maps
+    // to a real preset file. setPresetPath auto-saves, but with no storage file
+    // set the save() is a no-op, so this stays in-memory (no disk write).
+    if (args.midiProgramAtSeconds >= 0.0)
+    {
+        proc.midiFullPresetMap.setEnabled(true);
+        proc.midiFullPresetMap.setPresetPath(args.midiProgram, args.midiProgramPreset);
+    }
+
     proc.setPlayConfigDetails(0, 2, args.sampleRate, args.blockSize);
     proc.prepareToPlay(args.sampleRate, args.blockSize);
 
@@ -134,6 +161,18 @@ int execute(const Args& args)
         : -1;
     bool swapTriggered = false;
 
+    // A9: per-rhythm deferred hot-swap (stageRhythmPreset).
+    const int swapRhythmAtSample = (args.swapRhythmAtSeconds >= 0.0)
+        ? (int) std::round(args.swapRhythmAtSeconds * args.sampleRate)
+        : -1;
+    bool swapRhythmTriggered = false;
+
+    // A2: MIDI program-change injection (channel 9 → full-preset map).
+    const int midiProgramAtSample = (args.midiProgramAtSeconds >= 0.0)
+        ? (int) std::round(args.midiProgramAtSeconds * args.sampleRate)
+        : -1;
+    bool midiProgramInjected = false;
+
     int written = 0;
     bool wasPending = false;
     while (written < totalSamples)
@@ -148,9 +187,34 @@ int execute(const Args& args)
             wasPending = true;
         }
 
+        // A9: stage a per-rhythm preset on one slot (defers to that rhythm's loop).
+        if (swapRhythmAtSample >= 0 && ! swapRhythmTriggered && written >= swapRhythmAtSample)
+        {
+            proc.stageRhythmPreset(args.swapRhythmSlot, args.swapRhythmFile);
+            swapRhythmTriggered = true;
+            std::fprintf(stderr, "mu-clid render: rhythm-%d swap to %s staged at %.3fs\n",
+                         args.swapRhythmSlot, args.swapRhythmFile.getFileName().toRawUTF8(),
+                         written / args.sampleRate);
+            std::fflush(stderr);
+        }
+
         const int ns = juce::jmin(args.blockSize, totalSamples - written);
         block.clear();
         midi.clear();
+
+        // A2: inject a channel-9 program change in this block (1-based MIDI
+        // channel 9). scanMidiProgramChanges enqueues it; the async drain below
+        // dispatches it through applyFullMidiPreset → loadPreset (deferred).
+        if (midiProgramAtSample >= 0 && ! midiProgramInjected && written >= midiProgramAtSample)
+        {
+            midi.addEvent(juce::MidiMessage::programChange(9, args.midiProgram), 0);
+            midiProgramInjected = true;
+            wasPending = true;
+            std::fprintf(stderr, "mu-clid render: MIDI program change %d (ch 9) injected at %.3fs\n",
+                         args.midiProgram, written / args.sampleRate);
+            std::fflush(stderr);
+        }
+
         if (ns != args.blockSize)
             block.setSize((int) outChannels, ns, false, false, true);
         proc.processBlock(block, midi);

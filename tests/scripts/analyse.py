@@ -174,6 +174,18 @@ def _peak(seg: np.ndarray, rate: int, f_lo: float, f_hi: float) -> float:
     return float(freqs[mask][int(np.argmax(psd[mask]))])
 
 
+def assert_spectral_centroid(audio: Audio, p: dict) -> tuple[bool, float]:
+    # Single-window spectral centroid (Hz) — the energy-weighted mean frequency,
+    # i.e. how bright the window is. Lets a test assert "this window is low-freq
+    # (a kick)" vs "high-freq (a hat)", e.g. to confirm a per-rhythm swap changed
+    # the sample (A9).
+    ch = audio.channel(p.get('channel', 'any'))
+    win = audio.window(ch, *p.get('t_window', [0.0, 1e9]))
+    f_lo, f_hi = p.get('search_hz', [20.0, 16000.0])
+    actual = _centroid(win, audio.rate, f_lo, f_hi)
+    return (p.get('min_hz', 0.0) <= actual <= p.get('max_hz', float('inf'))), actual
+
+
 def assert_spectral_centroid_range(audio: Audio, p: dict) -> tuple[bool, float]:
     # max-min of the per-sub-window spectral centroid (Hz). High = the spectral
     # brightness is sweeping → a filter-cutoff-style modulation is active.
@@ -239,6 +251,7 @@ HANDLERS = {
     'rms_dbfs': assert_rms_dbfs,
     'duration_above_threshold': assert_duration_above_threshold,
     'spectral_peak_near': assert_spectral_peak_near,
+    'spectral_centroid': assert_spectral_centroid,
     'spectral_centroid_range': assert_spectral_centroid_range,
     'rms_range_db': assert_rms_range_db,
     'spectral_peak_range': assert_spectral_peak_range,
@@ -254,6 +267,8 @@ def fmt(metric: str, actual: float) -> str:
     if metric == 'duration_above_threshold':
         return f'{actual:.3f} s'
     if metric == 'spectral_peak_near':
+        return f'{actual:.1f} Hz'
+    if metric == 'spectral_centroid':
         return f'{actual:.1f} Hz'
     if metric in ('spectral_centroid_range', 'spectral_peak_range'):
         return f'{actual:.1f} Hz range'
