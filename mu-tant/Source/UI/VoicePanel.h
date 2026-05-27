@@ -6,6 +6,7 @@
 #include "UI/Components/DropdownSelect.h"
 #include "UI/ModulatorPanel.h"
 #include "Modulation/MuTantModDest.h"
+#include "UI/GatingDesigner.h"
 
 namespace mu_tant
 {
@@ -87,6 +88,9 @@ private:
     // ── Output level ────────────────────────────────────────────────────────
     KnobWithLabel levelKnob { "Level" };
     std::unique_ptr<APVTS::SliderAttachment> levelAttachment;
+
+    // ── Gating designer (full-width 2-bar gate strip) ───────────────────────
+    GatingDesigner   gatingDesigner;
 
     // ── Modulator section (mu-core ModulatorPanel + mu-tant destinations) ──
     // Rebound to the current voice's VoiceSlot whenever setVoice() runs.

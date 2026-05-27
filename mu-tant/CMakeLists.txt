@@ -25,6 +25,7 @@ target_sources(mu-tant
         Source/Plugin/PluginEditor.cpp
         Source/UI/VoicePanel.cpp
         Source/UI/VoiceSidebar.cpp
+        Source/UI/GatingDesigner.cpp
         Source/Audio/WavetableBank.cpp
         Source/Audio/SynthVoice.cpp
 )
@@ -72,12 +73,16 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/TestMain.cpp
     Source/Tests/SynthDSPTests.cpp
     Source/Tests/ModulatorTests.cpp
+    Source/Tests/GatingDesignerTests.cpp
+    Source/UI/GatingDesigner.cpp
     Source/Audio/WavetableBank.cpp
-    # mu-core .cpps the modulator tests depend on (the console-app target
-    # doesn't share JUCE-plugin context, so it can't link mu-core directly).
+    # mu-core .cpps the modulator + gating tests depend on (the console-app
+    # target doesn't share JUCE-plugin context, so it can't link mu-core directly).
     "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/DropdownSelect.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/MuLookAndFeel.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/MuTheme.cpp"
 )
 
 target_compile_features(mu-tant-tests PRIVATE cxx_std_17)

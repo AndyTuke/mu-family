@@ -89,6 +89,9 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     populateFilterTypes(fltTypeDropdown);
     addAndMakeVisible(fltTypeDropdown);
 
+    // ── Gating designer ─────────────────────────────────────────────────────
+    addAndMakeVisible(gatingDesigner);
+
     // ── Modulator panel ─────────────────────────────────────────────────────
     addAndMakeVisible(modulatorPanel);
     modulatorPanel.setDestProvider(&modDestProvider);
@@ -230,8 +233,13 @@ void VoicePanel::resized()
     mixKnob.setBounds(x, y, knobW, knobH);             x += knobW + s(16);
     levelKnob.setBounds(w - pad - knobW, y, knobW, knobH);
 
+    // ── Gating designer (full-width, between knobs and modulator) ───────────
+    const int gateY = y + knobH + rowGap;
+    const int gateH = s(112);   // header (24) + grid (80) + slack
+    gatingDesigner.setBounds(pad, gateY, w - 2 * pad, gateH);
+
     // ── Modulator panel — bottom band, full width ───────────────────────────
-    const int modY = juce::jmax(y + knobH + rowGap, h - modPanelH - pad);
+    const int modY = juce::jmax(gateY + gateH + rowGap, h - modPanelH - pad);
     modulatorPanel.setBounds(pad, modY, w - 2 * pad,
                               juce::jmax(s(160), h - modY - pad));
 }
