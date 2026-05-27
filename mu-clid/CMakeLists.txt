@@ -55,8 +55,6 @@ target_sources(mu-clid
         Source/UI/ModMatrixPanel.cpp
         Source/UI/ModulatorPanel.cpp
         Source/UI/RhythmPanel.cpp
-        Source/UI/AboutPanel.cpp
-        Source/UI/SaveDialog.cpp
         Source/UI/SampleBrowser.cpp
         Source/UI/SettingsOverlay.cpp
         Source/License/LicenseChecker.cpp
@@ -106,9 +104,9 @@ target_sources(mu-clid_Standalone PRIVATE
 )
 
 # ── Build-number increment (Release only) ────────────────────────────────────
-# Header lands at mu-clid/Source/BuildNumber.h; AboutPanel reads it for display.
-# Counter file lives at the family root so all family plugins share the build
-# number space — keeps tester deliveries time-aligned across the suite.
+# Header lands at mu-core/BuildNumber.h; AboutPanel reads it for display.
+# Counter file + header both live in family-shared space so every product
+# reads the same build number — tester deliveries stay time-aligned across the suite.
 add_custom_target(increment_build_number ALL
     COMMAND ${CMAKE_COMMAND} -DBUILD_CONFIG=$<CONFIG> -P "${CMAKE_SOURCE_DIR}/cmake/IncrementBuildNumber.cmake"
     COMMENT "Incrementing build number"
@@ -193,7 +191,6 @@ target_sources(mu-clid-lite
         Source/UI/TransportBar.cpp
         Source/UI/RhythmCircle.cpp
         Source/UI/EuclideanPanel.cpp
-        Source/UI/AboutPanel.cpp
         Source/License/LicenseChecker.cpp
         "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
 )

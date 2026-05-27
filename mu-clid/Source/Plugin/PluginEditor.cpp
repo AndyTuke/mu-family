@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 #include "Audio/FX/Slots/FXAlgorithmDef.h"
+#include <BinaryData.h>
 
 PluginEditor::PluginEditor(PluginProcessor& p)
     // Apply the stored UI scale BEFORE any child component is constructed.
@@ -19,6 +20,19 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       midiFullPresetsPanel(p)
 {
     setLookAndFeel(&lookAndFeel);
+
+    // Supply product-specific chrome to the shared mu-core overlays.
+    aboutPanel.setProductInfo(
+        juce::String(juce::CharPointer_UTF8("\xce\xbc")) + "-Clid",
+        juce::StringArray {
+            juce::String(juce::CharPointer_UTF8("JUCE \xe2\x80\x94 Proprietary (JUCE 7 license)")),
+            juce::String(juce::CharPointer_UTF8("Signalsmith Reverb \xe2\x80\x94 MIT")),
+            juce::String(juce::CharPointer_UTF8("Monocypher \xe2\x80\x94 BSD-2-Clause")),
+            juce::String(juce::CharPointer_UTF8("clap-juce-extensions \xe2\x80\x94 MIT")),
+            juce::String(juce::CharPointer_UTF8("Bj\xc3\xb6rklund algorithm \xe2\x80\x94 public domain")),
+        });
+    saveDialog.setLogoImage(juce::ImageCache::getFromMemory(BinaryData::muclid_png,
+                                                            BinaryData::muclid_pngSize));
 
     addAndMakeVisible(transportBar);
     addAndMakeVisible(sidebar);

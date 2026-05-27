@@ -2,9 +2,6 @@
 
 SaveDialog::SaveDialog()
 {
-    logoImage = juce::ImageCache::getFromMemory(BinaryData::muclid_png,
-                                                BinaryData::muclid_pngSize);
-
     nameEditor.setTextToShowWhenEmpty("Preset name", juce::Colours::grey);
     nameEditor.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
     addAndMakeVisible(nameEditor);
@@ -29,6 +26,7 @@ SaveDialog::SaveDialog()
     };
 
     addAndMakeVisible(embedSamplesToggle);
+    embedSamplesToggle.setVisible(showEmbedSamples);
 
     saveAsDefaultToggle.onClick = [this] { updateDefaultModeState(); };
     addAndMakeVisible(saveAsDefaultToggle);
@@ -42,7 +40,7 @@ SaveDialog::SaveDialog()
         if (!isSaveAsDefault() && name.isEmpty()) return;
         if (onSave)
             onSave(name, descEditor.getText().trim(), resolveCategory(),
-                   embedSamplesToggle.getToggleState());
+                   showEmbedSamples && embedSamplesToggle.getToggleState());
     };
     addAndMakeVisible(saveBtn);
 
@@ -51,6 +49,19 @@ SaveDialog::SaveDialog()
 
     // Populate with just "All" + "New..." until setKnownCategories() is called.
     setKnownCategories({});
+}
+
+void SaveDialog::setLogoImage(const juce::Image& image)
+{
+    logoImage = image;
+    repaint();
+}
+
+void SaveDialog::setShowEmbedSamples(bool show)
+{
+    showEmbedSamples = show;
+    embedSamplesToggle.setVisible(show);
+    resized();
 }
 
 void SaveDialog::setKnownCategories(const juce::StringArray& cats)
@@ -110,7 +121,8 @@ void SaveDialog::visibilityChanged()
         }
         newCategoryEditor.setVisible(false);
         newCategoryEditor.clear();
-        embedSamplesToggle.setToggleState(pendingDefaultEmbed, juce::dontSendNotification);
+        embedSamplesToggle.setToggleState(showEmbedSamples && pendingDefaultEmbed,
+                                           juce::dontSendNotification);
         pendingDefaultEmbed = false;
         saveAsDefaultToggle.setToggleState(false, juce::dontSendNotification);
         updateDefaultModeState();
@@ -169,8 +181,17 @@ void SaveDialog::resized()
         y += s(30);
     }
 
-    embedSamplesToggle .setBounds(fieldX, y, fieldW / 2, s(24));
-    saveAsDefaultToggle.setBounds(fieldX + fieldW / 2, y, fieldW / 2, s(24));
+    // When the product has no embed-samples concept, the toggle is hidden and
+    // the "Save as Default" button gets the full row width.
+    if (showEmbedSamples)
+    {
+        embedSamplesToggle .setBounds(fieldX, y, fieldW / 2, s(24));
+        saveAsDefaultToggle.setBounds(fieldX + fieldW / 2, y, fieldW / 2, s(24));
+    }
+    else
+    {
+        saveAsDefaultToggle.setBounds(fieldX, y, fieldW, s(24));
+    }
 
     const int btnW = s(80);
     const int btnY = cardY + cardH - s(44);
@@ -180,11 +201,11 @@ void SaveDialog::resized()
 
 void SaveDialog::paint(juce::Graphics& g)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
     using mu_ui::s;
     using mu_ui::sf;
 
-    g.setColour(MuClidLookAndFeel::colour(Id::backgroundModalDim));
+    g.setColour(MuLookAndFeel::colour(Id::backgroundModalDim));
     g.fillAll();
 
     const int w = getWidth();
@@ -194,10 +215,10 @@ void SaveDialog::paint(juce::Graphics& g)
     const int cardX = (w - cardW) / 2;
     const int cardY = (h - cardH) / 2;
 
-    g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
+    g.setColour(MuLookAndFeel::colour(Id::panelBackground));
     g.fillRoundedRectangle((float)cardX, (float)cardY, (float)cardW, (float)cardH, sf(8.0f));
 
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawRoundedRectangle((float)cardX, (float)cardY, (float)cardW, (float)cardH, sf(8.0f), 1.0f);
 
     // Logo on the right side of the header, title on the left
@@ -207,7 +228,7 @@ void SaveDialog::paint(juce::Graphics& g)
         g.drawImage(logoImage, cardX + s(16), cardY + s(12), logoSz, logoSz,
                     0, 0, logoImage.getWidth(), logoImage.getHeight());
     }
-    g.setColour(MuClidLookAndFeel::colour(Id::headingText));
+    g.setColour(MuLookAndFeel::colour(Id::headingText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(14.0f))));
     g.drawText("Save Preset", cardX + s(120), cardY + s(40), cardW - s(136), s(20),
                juce::Justification::centredLeft, false);

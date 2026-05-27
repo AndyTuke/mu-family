@@ -1,10 +1,18 @@
 #include "AboutPanel.h"
-#include "../BuildNumber.h"
+#include "BuildNumber.h"
 
 AboutPanel::AboutPanel()
 {
     closeBtn.onClick = [this] { if (onDismiss) onDismiss(); };
     addAndMakeVisible(closeBtn);
+}
+
+void AboutPanel::setProductInfo(const juce::String& displayName,
+                                const juce::StringArray& credits)
+{
+    productName    = displayName;
+    productCredits = credits;
+    repaint();
 }
 
 void AboutPanel::mouseDown(const juce::MouseEvent& e)
@@ -37,12 +45,12 @@ void AboutPanel::resized()
 
 void AboutPanel::paint(juce::Graphics& g)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
     using mu_ui::s;
     using mu_ui::sf;
 
     // Dim background
-    g.setColour(MuClidLookAndFeel::colour(Id::backgroundModalDim));
+    g.setColour(MuLookAndFeel::colour(Id::backgroundModalDim));
     g.fillAll();
 
     const int w = getWidth();
@@ -53,25 +61,25 @@ void AboutPanel::paint(juce::Graphics& g)
     const int cardY = (h - cardH) / 2;
 
     // Card background
-    g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
+    g.setColour(MuLookAndFeel::colour(Id::panelBackground));
     g.fillRoundedRectangle((float)cardX, (float)cardY, (float)cardW, (float)cardH, sf(8.0f));
 
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawRoundedRectangle((float)cardX, (float)cardY, (float)cardW, (float)cardH, sf(8.0f), 1.0f);
 
     const int tx = cardX + s(24);
     int ty = cardY + s(24);
     const int textW = cardW - s(48);
 
-    // Title
-    g.setColour(MuClidLookAndFeel::colour(Id::headingText));
+    // Title — falls back to a neutral label if the product hasn't set its info yet.
+    g.setColour(MuLookAndFeel::colour(Id::headingText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(28.0f))));
-    g.drawText(juce::String(juce::CharPointer_UTF8("\xce\xbc")) + "-Clid",
+    g.drawText(productName.isNotEmpty() ? productName : juce::String("mu-Family"),
                tx, ty, textW, s(36), juce::Justification::centredLeft, false);
     ty += s(40);
 
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
-    g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
+    g.setColour(MuLookAndFeel::colour(Id::mutedText));
     g.drawText("v0.0.0." + juce::String(BUILD_NUMBER), tx, ty, textW, s(18),
                juce::Justification::centredLeft, false);
     ty += s(20);
@@ -80,17 +88,10 @@ void AboutPanel::paint(juce::Graphics& g)
                juce::Justification::centredLeft, false);
     ty += s(30);
 
-    // Credits
-    g.setColour(MuClidLookAndFeel::colour(Id::labelText));
+    // Credits — supplied by the product.
+    g.setColour(MuLookAndFeel::colour(Id::labelText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));
-    const juce::String credits[] = {
-        juce::String(juce::CharPointer_UTF8("JUCE \xe2\x80\x94 Proprietary (JUCE 7 license)")),
-        juce::String(juce::CharPointer_UTF8("Signalsmith Reverb \xe2\x80\x94 MIT")),
-        juce::String(juce::CharPointer_UTF8("Monocypher \xe2\x80\x94 BSD-2-Clause")),
-        juce::String(juce::CharPointer_UTF8("clap-juce-extensions \xe2\x80\x94 MIT")),
-        juce::String(juce::CharPointer_UTF8("Bj\xc3\xb6rklund algorithm \xe2\x80\x94 public domain")),
-    };
-    for (auto& line : credits)
+    for (const auto& line : productCredits)
     {
         g.drawText(line, tx, ty, textW, s(16), juce::Justification::centredLeft, false);
         ty += s(17);

@@ -1,10 +1,11 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "UI/Components/MuClidLookAndFeel.h"
+#include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/DropdownSelect.h"
-#include <BinaryData.h>
 
-// Modal overlay for naming and saving a preset.
+// Modal overlay for naming and saving a preset. Plugin-agnostic — each product
+// passes its own logo image via setLogoImage(), and products without per-preset
+// sample embedding (e.g. wavetable synths) hide the toggle via setShowEmbedSamples(false).
 class SaveDialog : public juce::Component
 {
 public:
@@ -15,6 +16,10 @@ public:
     std::function<void()> onCancel;
 
     SaveDialog();
+
+    // Product-supplied chrome.
+    void setLogoImage(const juce::Image& image);
+    void setShowEmbedSamples(bool show);
 
     // Call before showing to populate the category dropdown with known categories.
     void setKnownCategories(const juce::StringArray& cats);
@@ -45,6 +50,7 @@ private:
     juce::String       pendingDefaultName;
     juce::String       pendingDefaultCategory;
     bool               pendingDefaultEmbed = false;
+    bool               showEmbedSamples = true;
     juce::Image        logoImage;
 
     void updateDefaultModeState();

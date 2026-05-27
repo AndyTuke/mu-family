@@ -12,6 +12,14 @@ LiteEditor::LiteEditor(PluginProcessor& p)
     addAndMakeVisible(euclidPanel);
     addAndMakeVisible(statusBar);
 
+    aboutPanel.setProductInfo(
+        juce::String(juce::CharPointer_UTF8("\xce\xbc")) + "-Clid Lite",
+        juce::StringArray {
+            juce::String(juce::CharPointer_UTF8("JUCE \xe2\x80\x94 Proprietary (JUCE 7 license)")),
+            juce::String(juce::CharPointer_UTF8("Monocypher \xe2\x80\x94 BSD-2-Clause")),
+            juce::String(juce::CharPointer_UTF8("clap-juce-extensions \xe2\x80\x94 MIT")),
+            juce::String(juce::CharPointer_UTF8("Bj\xc3\xb6rklund algorithm \xe2\x80\x94 public domain")),
+        });
     aboutPanel.onDismiss = [this] { aboutPanel.setVisible(false); };
     addChildComponent(aboutPanel);
     transportBar.onLogoClicked = [this]

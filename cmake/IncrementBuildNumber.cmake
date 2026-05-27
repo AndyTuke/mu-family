@@ -2,9 +2,9 @@
 # CMAKE_CURRENT_LIST_DIR is the cmake/ subdirectory, so .. is the project root.
 set(ROOT_DIR     "${CMAKE_CURRENT_LIST_DIR}/..")
 set(COUNTER_FILE "${ROOT_DIR}/build_number.txt")
-# mu-family monorepo: BuildNumber.h lives in the mu-clid plugin subtree since
-# the build number is a per-plugin artefact (mu-tant will have its own).
-set(HEADER_FILE  "${ROOT_DIR}/mu-clid/Source/BuildNumber.h")
+# mu-family monorepo: BuildNumber.h lives in mu-core so every product reads the
+# same header (build counter is shared family-wide — single root build_number.txt).
+set(HEADER_FILE  "${ROOT_DIR}/mu-core/BuildNumber.h")
 
 file(READ "${COUNTER_FILE}" BUILD_NUMBER)
 string(STRIP "${BUILD_NUMBER}" BUILD_NUMBER)
