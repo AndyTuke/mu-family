@@ -2,6 +2,7 @@
 
 #include "Plugin/ProcessorBase.h"            // mu-core base
 #include "Sequencer/VoiceSlot.h"             // mu-core: per-voice modulator data container
+#include "Sequencer/GatePattern.h"           // mu-tant: per-voice gate pattern
 #include "Audio/SynthVoice.h"                // mu-tant voice
 #include "Audio/WavetableBank.h"
 
@@ -100,6 +101,11 @@ public:
     // per voice. Public so the UI (ModulatorPanel) can pass a pointer to the
     // currently-edited voice's slot.
     std::array<VoiceSlot, kMaxVoices> voiceSlots;
+
+    // Per-voice drawable gate pattern. Public so the (future) GatePatternEditor
+    // can mutate it under voiceSlots[v].modLock. Currently empty — audio path
+    // doesn't yet apply the gate.
+    std::array<GatePattern, kMaxVoices> gatePatterns;
 
 private:
     // Pre-allocated modulation paramValues map — reused every block to avoid

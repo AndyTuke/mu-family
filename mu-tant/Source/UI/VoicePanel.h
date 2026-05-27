@@ -104,6 +104,12 @@ private:
 
     void rebindAttachments();
 
+    // Band geometry — populated by resized(), consumed by paint() for the
+    // band outlines + labels so layout + decoration stay in sync.
+    int band1Y = 0, band1H = 0;   // Oscillators
+    int band2Y = 0, band2H = 0;   // Filter
+    int band3Y = 0, band3H = 0;   // Gating
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VoicePanel)
 };
 

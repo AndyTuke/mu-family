@@ -26,6 +26,7 @@ target_sources(mu-tant
         Source/UI/VoicePanel.cpp
         Source/UI/VoiceSidebar.cpp
         Source/UI/GatingDesigner.cpp
+        Source/Sequencer/GatePattern.cpp
         Source/Audio/WavetableBank.cpp
         Source/Audio/SynthVoice.cpp
 )
@@ -74,7 +75,9 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/SynthDSPTests.cpp
     Source/Tests/ModulatorTests.cpp
     Source/Tests/GatingDesignerTests.cpp
+    Source/Tests/GatePatternTests.cpp
     Source/UI/GatingDesigner.cpp
+    Source/Sequencer/GatePattern.cpp
     Source/Audio/WavetableBank.cpp
     # mu-core .cpps the modulator + gating tests depend on (the console-app
     # target doesn't share JUCE-plugin context, so it can't link mu-core directly).

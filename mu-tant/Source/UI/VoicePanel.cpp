@@ -164,13 +164,31 @@ void VoicePanel::refreshVoiceTag()
 void VoicePanel::paint(juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
+    using mu_ui::s;
+    using mu_ui::sf;
     g.fillAll(MuLookAndFeel::colour(Id::windowBackground));
 
-    // Header strip divider so the per-voice tag reads as a band, matching
-    // mu-clid's header strip above the RhythmCircle.
-    using mu_ui::s;
+    // Header strip divider matching mu-clid's header band above the RhythmCircle.
     g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     g.fillRect(0, s(32) - 1, getWidth(), 1);
+
+    // Band labels per design-voice.md "Three stacked bands fill the main content
+    // area." Drawn on the top-left of each band's outer border.
+    auto drawBandLabel = [&](const juce::String& text, int y)
+    {
+        g.setColour(MuLookAndFeel::colour(Id::mutedText));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
+        g.drawText(text, s(20), y - s(8), s(120), s(12),
+                   juce::Justification::centredLeft, false);
+    };
+    drawBandLabel("Oscillators", band1Y);
+    drawBandLabel("Filter",      band2Y);
+    drawBandLabel("Gating",      band3Y);
+
+    // Band outlines.
+    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
+    g.drawRect(juce::Rectangle<int>(s(12), band1Y, getWidth() - s(24), band1H), 1);
+    g.drawRect(juce::Rectangle<int>(s(12), band2Y, getWidth() - s(24), band2H), 1);
 }
 
 void VoicePanel::resized()
@@ -180,66 +198,92 @@ void VoicePanel::resized()
     const int h = getHeight();
     const int pad      = s(16);
     const int headerH  = s(32);
-    const int rowGap   = s(12);
+    const int rowGap   = s(8);
     const int knobW    = s(80);
     const int knobH    = s(80);
     const int labelW   = s(48);
     const int ddH      = s(24);
     const int hgap     = s(8);
-    const int modPanelH = s(320);   // modulator panel band height
+    const int bandInsetX = s(20);
+    const int bandPadY   = s(16);
+    const int modPanelH = s(280);   // modulator panel band height
 
     // ── Header strip ────────────────────────────────────────────────────────
     voiceTag.setBounds(pad, 0, w / 2 - pad, headerH);
 
-    // ── Row 1: tonal centre + filter ────────────────────────────────────────
+    // Shared tonal-centre row (Root / Scale) — sits in the header band just
+    // below the voice tag so the user always sees the active tuning.
+    {
+        int x = w / 2;
+        const int y = (headerH - ddH) / 2;
+        rootLabel   .setBounds(x, y, labelW, ddH);    x += labelW + s(4);
+        rootDropdown.setBounds(x, y, s(56), ddH);     x += s(56) + s(12);
+        scaleLabel  .setBounds(x, y, labelW, ddH);    x += labelW + s(4);
+        scaleDropdown.setBounds(x, y, s(100), ddH);
+    }
+
     int y = headerH + s(8);
-    int x = pad;
 
-    rootLabel.setBounds(x, y, labelW, ddH);            x += labelW + hgap;
-    rootDropdown.setBounds(x, y, s(64), ddH);          x += s(64) + s(16);
-    scaleLabel.setBounds(x, y, labelW, ddH);           x += labelW + hgap;
-    scaleDropdown.setBounds(x, y, s(120), ddH);
+    // ── Band 1: Oscillators (2 rows of 4 knobs + xmod row) ─────────────────
+    band1Y = y;
+    band1H = bandPadY + 2 * knobH + rowGap + ddH + bandPadY;
+    int innerY = y + bandPadY;
+    int innerX = bandInsetX + pad;
 
-    // Right cluster: filter type + cut + res
-    int rx = w - pad;
-    fltResKnob.setBounds(rx - knobW, y - s(2), knobW, knobH);  rx -= knobW + hgap;
-    fltCutKnob.setBounds(rx - knobW, y - s(2), knobW, knobH);  rx -= knobW + hgap;
-    fltTypeDropdown.setBounds(rx - s(100), y, s(100), ddH);    rx -= s(100) + hgap;
-    fltTypeLabel.setBounds(rx - labelW, y, labelW, ddH);
-
-    y += knobH + rowGap;
-
-    // ── Row 2: Osc1 four knobs ──────────────────────────────────────────────
-    x = pad;
+    // Row: Osc1 four knobs
+    int x = innerX;
     for (auto* k : { &o1OctKnob, &o1ToneKnob, &o1FineKnob, &o1PosKnob })
     {
-        k->setBounds(x, y, knobW, knobH);
+        k->setBounds(x, innerY, knobW, knobH);
         x += knobW + hgap;
     }
 
-    y += knobH + rowGap;
-
-    // ── Row 3: Osc2 four knobs + xmod + level ───────────────────────────────
-    x = pad;
+    // Row: Osc2 four knobs (immediately below)
+    int innerY2 = innerY + knobH + rowGap;
+    x = innerX;
     for (auto* k : { &o2OctKnob, &o2ToneKnob, &o2FineKnob, &o2PosKnob })
     {
-        k->setBounds(x, y, knobW, knobH);
+        k->setBounds(x, innerY2, knobW, knobH);
         x += knobW + hgap;
     }
-    x += s(16);
-    xmodKnob.setBounds(x, y, knobW, knobH);            x += knobW + hgap;
-    xmodLabel.setBounds(x, y, labelW, ddH);            x += labelW + hgap;
-    xmodModeDropdown.setBounds(x, y, s(80), ddH);      x += s(80) + s(16);
-    mixKnob.setBounds(x, y, knobW, knobH);             x += knobW + s(16);
-    levelKnob.setBounds(w - pad - knobW, y, knobW, knobH);
 
-    // ── Gating designer (full-width, between knobs and modulator) ───────────
-    const int gateY = y + knobH + rowGap;
+    // X-mod controls + mix knob to the right of the osc grid.
+    int xmodX = innerX + 4 * (knobW + hgap) + s(24);
+    xmodKnob.setBounds(xmodX, innerY, knobW, knobH);
+    xmodLabel.setBounds(xmodX, innerY + knobH + s(4), labelW, ddH);
+    xmodModeDropdown.setBounds(xmodX + labelW + s(4),
+                                innerY + knobH + s(4), s(72), ddH);
+    mixKnob.setBounds(xmodX + knobW + s(24), innerY, knobW, knobH);
+
+    y += band1H + rowGap;
+
+    // ── Band 2: Filter (type + cutoff + resonance + level) ─────────────────
+    band2Y = y;
+    band2H = bandPadY + knobH + bandPadY;
+    innerY = y + bandPadY;
+    innerX = bandInsetX + pad;
+
+    fltTypeLabel   .setBounds(innerX, innerY + (knobH - ddH) / 2, labelW, ddH);
+    fltTypeDropdown.setBounds(innerX + labelW + s(4),
+                               innerY + (knobH - ddH) / 2, s(100), ddH);
+    fltCutKnob.setBounds(innerX + labelW + s(4) + s(100) + s(16),
+                          innerY, knobW, knobH);
+    fltResKnob.setBounds(innerX + labelW + s(4) + s(100) + s(16) + knobW + hgap,
+                          innerY, knobW, knobH);
+    levelKnob .setBounds(w - bandInsetX - pad - knobW, innerY, knobW, knobH);
+
+    y += band2H + rowGap;
+
+    // ── Band 3: Gating designer (full-width strip) ─────────────────────────
     const int gateH = s(112);   // header (24) + grid (80) + slack
-    gatingDesigner.setBounds(pad, gateY, w - 2 * pad, gateH);
+    band3Y = y;
+    band3H = gateH;
+    gatingDesigner.setBounds(pad, y, w - 2 * pad, gateH);
+
+    y += gateH + rowGap;
 
     // ── Modulator panel — bottom band, full width ───────────────────────────
-    const int modY = juce::jmax(gateY + gateH + rowGap, h - modPanelH - pad);
+    const int modY = juce::jmax(y, h - modPanelH - pad);
     modulatorPanel.setBounds(pad, modY, w - 2 * pad,
                               juce::jmax(s(160), h - modY - pad));
 }
