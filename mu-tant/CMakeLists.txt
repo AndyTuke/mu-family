@@ -1,13 +1,88 @@
-# mu-tant — μ-family plugin (scaffolding only; not yet wired into the build).
+# mu-tant — wavetable drone synth (first-stab engine).
 #
-# This CMakeLists is a placeholder. When real source lands under Source/, copy
-# the juce_add_plugin / target_sources / target_link_libraries pattern from
-# mu-clid/CMakeLists.txt, then add `add_subdirectory(mu-tant)` to the family
-# root CMakeLists.txt.
-#
-# The standard mu platform pieces (audio engine slots, mixer, FX, modulation
-# matrix, shared UI components, ProcessorBase) come from mu-core via
-# target_link_libraries(mu-tant PRIVATE mu-core). Product-specific bits —
-# sequencer, voice/engine glue, panels, presets — live under this directory.
+# Debug-only for now (not shipped to testers). Plugin-specific sources live under
+# Source/; shared audio/UI/ProcessorBase come from mu-core via the link.
 
-message(STATUS "mu-tant: scaffolding only — no targets defined yet")
+# ── mu-Tant — Standalone (first stab; VST3/CLAP added when it's worth shipping) ──
+juce_add_plugin(mu-tant
+    COMPANY_NAME "Transwarp Development Project"
+    BUNDLE_ID "com.transwarp.mu-tant"
+    PLUGIN_MANUFACTURER_CODE TDP1
+    PLUGIN_CODE MTnt
+    FORMATS Standalone
+    PRODUCT_NAME "mu-Tant"
+    PLUGIN_NAME  "μ-Tant"
+    IS_SYNTH TRUE
+    NEEDS_MIDI_INPUT TRUE
+    NEEDS_MIDI_OUTPUT FALSE
+    IS_MIDI_EFFECT FALSE
+    EDITOR_WANTS_KEYBOARD_FOCUS FALSE
+)
+
+target_sources(mu-tant
+    PRIVATE
+        Source/Plugin/PluginProcessor.cpp
+        Source/Plugin/PluginEditor.cpp
+        Source/UI/VoicePanel.cpp
+        Source/Audio/WavetableBank.cpp
+        Source/Audio/SynthVoice.cpp
+)
+
+target_include_directories(mu-tant
+    PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/Source"
+    SYSTEM PRIVATE
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+)
+
+target_compile_definitions(mu-tant
+    PUBLIC
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_VST3_CAN_REPLACE_VST2=0
+)
+
+target_link_libraries(mu-tant
+    PRIVATE
+        mu-core
+        juce::juce_audio_utils
+        juce::juce_dsp
+        juce::juce_gui_basics
+        juce::juce_gui_extra
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+# ── mu-tant-tests — console UnitTests over the new synth DSP ─────────────────
+# Tests only mu-tant's self-contained DSP (Scales + WavetableOscillator +
+# WavetableBank) — no mu-core deps needed. EXCLUDE_FROM_ALL like mu-clid-tests.
+juce_add_console_app(mu-tant-tests PRODUCT_NAME "mu-tant-tests")
+
+target_sources(mu-tant-tests PRIVATE
+    Source/Tests/TestMain.cpp
+    Source/Tests/SynthDSPTests.cpp
+    Source/Audio/WavetableBank.cpp
+)
+
+target_compile_features(mu-tant-tests PRIVATE cxx_std_17)
+
+target_include_directories(mu-tant-tests PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source"
+)
+
+target_link_libraries(mu-tant-tests PRIVATE
+    juce::juce_core
+    juce::juce_audio_basics
+    juce::juce_recommended_config_flags
+    juce::juce_recommended_warning_flags
+)
+
+target_compile_definitions(mu-tant-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+
+# Built as part of ALL_BUILD from day 1 — mu-tant's DSP changes get caught
+# every build, matching mu-clid's full-coverage discipline.
+add_dependencies(mu-tant mu-tant-tests)

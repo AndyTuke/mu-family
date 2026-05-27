@@ -20,6 +20,10 @@ public:
     // Returns the currently displayed item text (or empty if nothing selected).
     juce::String getText() const { return combo.getText(); }
 
+    // Public accessor for binding to juce::AudioProcessorValueTreeState via
+    // ComboBoxAttachment. Visual styling stays driven by DropdownSelect.
+    juce::ComboBox& getComboBox() noexcept { return combo; }
+
     void resized() override;
 
 private:

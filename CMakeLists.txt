@@ -54,5 +54,5 @@ endif()
 # ── Subdirectories ──────────────────────────────────────────────────────────
 add_subdirectory(mu-core)
 add_subdirectory(mu-clid)
-# add_subdirectory(mu-tant)   # enable once mu-tant/Source/ has real targets
+add_subdirectory(mu-tant)     # first-stab wavetable drone synth (Debug-only)
 # add_subdirectory(mu-toni)   # enable once mu-toni/Source/ has real targets
