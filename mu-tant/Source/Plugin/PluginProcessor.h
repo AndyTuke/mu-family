@@ -1,11 +1,15 @@
 #pragma once
 
 #include "Plugin/ProcessorBase.h"            // mu-core base
+#include "Sequencer/VoiceSlot.h"             // mu-core: per-voice modulator data container
 #include "Audio/SynthVoice.h"                // mu-tant voice
 #include "Audio/WavetableBank.h"
 
 #include <array>
+#include <atomic>
 #include <memory>
+#include <string_view>
+#include <unordered_map>
 
 // mu-tant — wavetable drone synth.
 //
@@ -90,6 +94,27 @@ private:
     std::array<std::unique_ptr<VoiceEngine>, kMaxVoices>   voices;
     // Per-voice render scratch — allocated in prepareToPlay; reused each block.
     std::array<juce::AudioBuffer<float>,     kMaxVoices>   voiceBuffers;
+
+public:
+    // Per-voice modulator data — 8 ControlSequences + ModulationMatrix + modLock
+    // per voice. Public so the UI (ModulatorPanel) can pass a pointer to the
+    // currently-edited voice's slot.
+    std::array<VoiceSlot, kMaxVoices> voiceSlots;
+
+private:
+    // Pre-allocated modulation paramValues map — reused every block to avoid
+    // audio-thread allocation. Keys match the strings in MuTantModDest::kModDestTable.
+    // Values are seeded each block from the current VoiceConfig and read back
+    // after the matrix runs.
+    std::unordered_map<std::string_view, float> modParamValues;
+
+    // Internal free-running beat counter — mu-tant is a drone synth with no
+    // transport, so modulators evaluate against an always-incrementing beat
+    // position derived from sample rate + a fixed 120 BPM. Sized in beats
+    // (quarter notes) since ControlSequence::evaluate takes a beat position.
+    double internalBeatPos = 0.0;
+    double internalBpm     = 120.0;
+    double currentSampleRate = 44100.0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

@@ -51,9 +51,6 @@ target_sources(mu-clid
         Source/UI/Voice/FilterSubsection.cpp
         Source/UI/Voice/AmpSubsection.cpp
         Source/UI/Voice/InsertSubsection.cpp
-        Source/UI/ModulatorEditor.cpp
-        Source/UI/ModMatrixPanel.cpp
-        Source/UI/ModulatorPanel.cpp
         Source/UI/RhythmPanel.cpp
         Source/UI/SampleBrowser.cpp
         Source/UI/SettingsOverlay.cpp

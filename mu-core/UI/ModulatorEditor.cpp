@@ -49,19 +49,22 @@ static void populateNoteDropdown(DropdownSelect& dd)
 } // namespace
 
 //==============================================================================
-ModulatorEditor::AssignmentRow::AssignmentRow(const std::string& assignId, int driveChar)
+ModulatorEditor::AssignmentRow::AssignmentRow(const std::string& assignId, int driveChar,
+                                              const ModDestProvider* provider)
     : id(assignId)
 {
-    ModDest::populate(destCombo, driveChar);
+    if (provider && provider->populate)
+        provider->populate(destCombo, driveChar);
 
     // shared BipolarSliderRow replaces inline depth + curve juce::Slider setup.
     bipolarPair.onDepthChange = [this](float v) { if (onDepthChange) onDepthChange(v); };
     bipolarPair.onCurveChange = [this](float v) { if (onCurveChange) onCurveChange(v); };
 
-    destCombo.onChange = [this](int id_)
+    destCombo.onChange = [this, provider](int id_)
     {
-        if (id_ >= 1 && id_ <= ModDest::kTableSize && onDestChange)
-            onDestChange(ModDest::kTable[id_ - 1].id);
+        if (!provider || !provider->resolveId || !onDestChange) return;
+        const std::string dest = provider->resolveId(id_);
+        if (!dest.empty()) onDestChange(dest);
     };
     removeBtn.onClick = [this] { if (onRemove) onRemove(); };
 
@@ -86,7 +89,7 @@ void ModulatorEditor::AssignmentRow::paint(juce::Graphics& g)
 {
     using mu_ui::s;
     using mu_ui::sf;
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
     g.drawText(juce::String(rowNumber) + ".",
                s(2), 0, s(18), getHeight(), juce::Justification::centred, false);
@@ -108,7 +111,7 @@ ModulatorEditor::ModulatorEditor()
     loopLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     loopLabel.setJustificationType(juce::Justification::centredRight);
     loopLabel.setColour(juce::Label::textColourId,
-                        MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
+                        MuLookAndFeel::colour(MuLookAndFeel::mutedText));
     populateNoteDropdown(loopDropdown);
     loopMult.setShowStepButtons(false);
     loopMult.setLabelInline(true);
@@ -121,7 +124,7 @@ ModulatorEditor::ModulatorEditor()
     stepLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     stepLabel.setJustificationType(juce::Justification::centredRight);
     stepLabel.setColour(juce::Label::textColourId,
-                        MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
+                        MuLookAndFeel::colour(MuLookAndFeel::mutedText));
     populateNoteDropdown(stepDropdown);
     stepMult.setShowStepButtons(false);
     stepMult.setLabelInline(true);
@@ -145,7 +148,7 @@ ModulatorEditor::ModulatorEditor()
     rowPageLabel.setJustificationType(juce::Justification::centred);
     rowPageLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     rowPageLabel.setColour(juce::Label::textColourId,
-                           MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
+                           MuLookAndFeel::colour(MuLookAndFeel::mutedText));
     addAndMakeVisible(rowPrevBtn);
     addAndMakeVisible(rowNextBtn);
     addAndMakeVisible(rowPageLabel);
@@ -197,6 +200,12 @@ void ModulatorEditor::setInsertAlgorithm(int driveChar)
     rebuildRows();
     resized();
     repaint();
+}
+
+void ModulatorEditor::setDestProvider(const ModDestProvider* p)
+{
+    destProvider = p;
+    rebuildRows();
 }
 
 void ModulatorEditor::lockMod()
@@ -415,7 +424,12 @@ void ModulatorEditor::addTarget()
     ModulationAssignment a;
     a.id            = cs->id + "_assign_" + juce::Uuid().toString().toStdString();
     a.sourceId      = cs->id + "_output";
-    a.destinationId = ModDest::kTable[0].id;
+    // Default destination = the dropdown's first item via the provider. Empty
+    // string is fine — the row's dropdown will show no selection until the
+    // user picks one.
+    a.destinationId = (destProvider && destProvider->resolveId)
+                          ? destProvider->resolveId(1)
+                          : std::string{};
     a.depth         = 0.0f;
     lockMod();
     matrix->addAssignment(a);
@@ -475,12 +489,17 @@ void ModulatorEditor::updateStepQuantization()
         return;
     }
     const bool bipolar = (cs->polarity == ControlSequence::Polarity::Bipolar);
-    for (const auto& row : rows)
+    // mu-clid special case: when any assignment targets pitch.octave, snap the
+    // step editor to 7 (bipolar = ±3 oct, with 0) or 4 (unipolar = 0..3 oct).
+    // Generalised via the destination provider's resolveId so the rule only
+    // fires for products that actually expose "pitch.octave" (mu-tant doesn't).
+    if (destProvider && destProvider->resolveId)
     {
-        const int id = row->destCombo.getSelectedId();
-        if (id >= 1 && id <= ModDest::kTableSize)
+        for (const auto& row : rows)
         {
-            if (std::string(ModDest::kTable[id - 1].id) == "pitch.octave")
+            const int id = row->destCombo.getSelectedId();
+            if (id < 1) continue;
+            if (destProvider->resolveId(id) == "pitch.octave")
             {
                 stepEditor.setQuantization(bipolar ? 7 : 4);
                 return;
@@ -502,13 +521,15 @@ void ModulatorEditor::rebuildRows()
     {
         if (a.sourceId != sourceKey.toStdString()) continue;
 
-        auto row = std::make_unique<AssignmentRow>(a.id, currentDriveChar);
+        auto row = std::make_unique<AssignmentRow>(a.id, currentDriveChar, destProvider);
         row->rowNumber = (int)rows.size() + 1;
         rowsBox.addAndMakeVisible(*row);
 
-        for (int i = 0; i < ModDest::kTableSize; ++i)
-            if (ModDest::kTable[i].id == a.destinationId)
-                { row->destCombo.setSelectedId(i + 1); break; }
+        if (destProvider && destProvider->findDropdownId)
+        {
+            const int ddId = destProvider->findDropdownId(a.destinationId);
+            if (ddId > 0) row->destCombo.setSelectedId(ddId);
+        }
 
         row->bipolarPair.setDepth(a.depth, juce::dontSendNotification);
         row->bipolarPair.setCurve(a.curve, juce::dontSendNotification);
@@ -640,7 +661,7 @@ void ModulatorEditor::paint(juce::Graphics& g)
 {
     using mu_ui::s;
     using mu_ui::sf;
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
     g.fillAll();
 
     const int headerH = s(kHeaderH);
@@ -650,7 +671,7 @@ void ModulatorEditor::paint(juce::Graphics& g)
     const float dotY = (headerH - dotSize) * 0.5f;
     g.setColour(modColour);
     g.fillEllipse(sf(8.0f), dotY, dotSize, dotSize);
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::headingText));
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::headingText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
     g.drawText("Mod " + juce::String::charToString(char('A' + modIndex)),
                s(20), 0, s(54), headerH, juce::Justification::centredLeft, false);
@@ -658,7 +679,7 @@ void ModulatorEditor::paint(juce::Graphics& g)
     // Step count drawn at far right of header row (Stepped mode only)
     if (cs && cs->mode == ControlSequence::Mode::Stepped)
     {
-        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
         g.drawText(juce::String(cs->getStepCount()) + " steps",
                    getWidth() - s(58), 0, s(56), headerH,

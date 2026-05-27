@@ -71,18 +71,29 @@ juce_add_console_app(mu-tant-tests PRODUCT_NAME "mu-tant-tests")
 target_sources(mu-tant-tests PRIVATE
     Source/Tests/TestMain.cpp
     Source/Tests/SynthDSPTests.cpp
+    Source/Tests/ModulatorTests.cpp
     Source/Audio/WavetableBank.cpp
+    # mu-core .cpps the modulator tests depend on (the console-app target
+    # doesn't share JUCE-plugin context, so it can't link mu-core directly).
+    "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/DropdownSelect.cpp"
 )
 
 target_compile_features(mu-tant-tests PRIVATE cxx_std_17)
 
 target_include_directories(mu-tant-tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source"
+    "${CMAKE_SOURCE_DIR}/mu-core"
 )
 
 target_link_libraries(mu-tant-tests PRIVATE
     juce::juce_core
     juce::juce_audio_basics
+    juce::juce_data_structures
+    juce::juce_events
+    juce::juce_graphics
+    juce::juce_gui_basics
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags
 )

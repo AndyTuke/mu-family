@@ -72,6 +72,10 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/TransportBar.cpp"
     # Shared editor shell — chrome / overlay state machine / main-area layout.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/EditorShellBase.cpp"
+    # Shared modulator panels — product supplies its destination provider.
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/ModulatorPanel.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/ModulatorEditor.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/ModMatrixPanel.cpp"
 )
 
 # Consumers can `#include "Audio/VoiceEngine.h"` etc. — same path namespace as

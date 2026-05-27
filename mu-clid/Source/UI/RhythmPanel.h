@@ -3,7 +3,8 @@
 #include "RhythmCircle.h"
 #include "EuclideanPanel.h"
 #include "VoiceSection.h"
-#include "ModulatorPanel.h"
+#include "UI/ModulatorPanel.h"
+#include "Modulation/MuClidModDest.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/MuClidLookAndFeel.h"
 #include "Plugin/PluginProcessor.h"
@@ -108,6 +109,10 @@ private:
     EuclideanPanel  euclidPanel;
     VoiceSection    voiceSection;
     ModulatorPanel  modulatorPanel;
+    // mu-clid-specific destination provider — wraps the mu-clid kTable +
+    // populate logic and is passed into modulatorPanel so the mu-core panel
+    // stays product-agnostic.
+    ModDestProvider modDestProvider;
 
     juce::Label      nameLabel;
     juce::TextButton resetBtn        { juce::String::charToString(0x21BA) }; // ↺

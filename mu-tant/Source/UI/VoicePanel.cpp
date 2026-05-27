@@ -46,7 +46,8 @@ namespace
 }
 
 VoicePanel::VoicePanel(PluginProcessor& p)
-    : proc(p)
+    : proc(p),
+      modDestProvider(makeModDestProvider())
 {
     auto& apvts = proc.apvts;
 
@@ -88,6 +89,10 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     populateFilterTypes(fltTypeDropdown);
     addAndMakeVisible(fltTypeDropdown);
 
+    // ── Modulator panel ─────────────────────────────────────────────────────
+    addAndMakeVisible(modulatorPanel);
+    modulatorPanel.setDestProvider(&modDestProvider);
+
     rebindAttachments();
     refreshVoiceTag();
 }
@@ -101,6 +106,7 @@ void VoicePanel::setVoice(int voiceIndex)
     currentVoice = voiceIndex;
     rebindAttachments();
     refreshVoiceTag();
+    modulatorPanel.setVoiceSlot(&proc.voiceSlots[(size_t) currentVoice]);
 }
 
 void VoicePanel::rebindAttachments()
@@ -168,6 +174,7 @@ void VoicePanel::resized()
 {
     using mu_ui::s;
     const int w = getWidth();
+    const int h = getHeight();
     const int pad      = s(16);
     const int headerH  = s(32);
     const int rowGap   = s(12);
@@ -176,6 +183,7 @@ void VoicePanel::resized()
     const int labelW   = s(48);
     const int ddH      = s(24);
     const int hgap     = s(8);
+    const int modPanelH = s(320);   // modulator panel band height
 
     // ── Header strip ────────────────────────────────────────────────────────
     voiceTag.setBounds(pad, 0, w / 2 - pad, headerH);
@@ -221,6 +229,11 @@ void VoicePanel::resized()
     xmodModeDropdown.setBounds(x, y, s(80), ddH);      x += s(80) + s(16);
     mixKnob.setBounds(x, y, knobW, knobH);             x += knobW + s(16);
     levelKnob.setBounds(w - pad - knobW, y, knobW, knobH);
+
+    // ── Modulator panel — bottom band, full width ───────────────────────────
+    const int modY = juce::jmax(y + knobH + rowGap, h - modPanelH - pad);
+    modulatorPanel.setBounds(pad, modY, w - 2 * pad,
+                              juce::jmax(s(160), h - modY - pad));
 }
 
 } // namespace mu_tant

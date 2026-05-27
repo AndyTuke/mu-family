@@ -7,30 +7,34 @@
 // assignments vector inside ModulationMatrix::process().
 namespace
 {
-    inline void lockMods(Rhythm& r)
+    inline void lockMods(VoiceSlot& s)
     {
-        while (r.modLock.exchange(true, std::memory_order_acquire))
+        while (s.modLock.exchange(true, std::memory_order_acquire))
             std::this_thread::yield();
     }
-    inline void unlockMods(Rhythm& r) noexcept
+    inline void unlockMods(VoiceSlot& s) noexcept
     {
-        r.modLock.store(false, std::memory_order_release);
+        s.modLock.store(false, std::memory_order_release);
     }
 }
 
 //==============================================================================
-ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex, int driveChar)
+ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex,
+                                      int driveChar, const ModDestProvider* provider)
     : assignId(a.id)
 {
     sourceLabel.setText("Mod " + juce::String::charToString('A' + csIndex), juce::dontSendNotification);
     sourceLabel.setColour(juce::Label::textColourId,
-                          MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
+                          MuLookAndFeel::colour(MuLookAndFeel::mutedText));
     sourceLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
 
-    ModDest::populate(destCombo, driveChar);
-    for (int i = 0; i < ModDest::kTableSize; ++i)
-        if (ModDest::kTable[i].id == a.destinationId)
-            { destCombo.setSelectedId(i + 1); break; }
+    if (provider && provider->populate)
+        provider->populate(destCombo, driveChar);
+    if (provider && provider->findDropdownId)
+    {
+        const int ddId = provider->findDropdownId(a.destinationId);
+        if (ddId > 0) destCombo.setSelectedId(ddId);
+    }
 
     // shared BipolarSliderRow replaces inline depth + curve juce::Slider setup.
     bipolarPair.setDepth(a.depth, juce::dontSendNotification);
@@ -38,10 +42,11 @@ ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex,
     bipolarPair.onDepthChange = [this](float v) { if (onDepthChange) onDepthChange(v); };
     bipolarPair.onCurveChange = [this](float v) { if (onCurveChange) onCurveChange(v); };
 
-    destCombo.onChange = [this](int id_)
+    destCombo.onChange = [this, provider](int id_)
     {
-        if (id_ >= 1 && id_ <= ModDest::kTableSize && onDestChange)
-            onDestChange(ModDest::kTable[id_ - 1].id);
+        if (!provider || !provider->resolveId || !onDestChange) return;
+        const std::string dest = provider->resolveId(id_);
+        if (!dest.empty()) onDestChange(dest);
     };
     removeBtn.onClick = [this] { if (onRemove) onRemove(); };
 
@@ -73,30 +78,32 @@ ModMatrixPanel::ModMatrixPanel()
     matPageLabel.setJustificationType(juce::Justification::centred);
     matPageLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     matPageLabel.setColour(juce::Label::textColourId,
-                           MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
+                           MuLookAndFeel::colour(MuLookAndFeel::mutedText));
     addAndMakeVisible(matPageLabel);
     matPrevBtn.onClick = [this] { matPage = juce::jmax(0, matPage - 1); updateMatPager(); resized(); repaint(); };
     matNextBtn.onClick = [this] { matPage++; updateMatPager(); resized(); repaint(); };
 
     addBtn.onClick = [this]
     {
-        if (!rhythm) return;
+        if (!voiceSlot) return;
         juce::PopupMenu menu;
-        for (int i = 0; i < Rhythm::MaxControlSequences; ++i)
+        for (int i = 0; i < VoiceSlot::MaxControlSequences; ++i)
             menu.addItem(i + 1, "Mod " + juce::String::charToString('A' + i));
         menu.showMenuAsync(juce::PopupMenu::Options{}, [this](int result)
         {
-            if (result < 1 || !rhythm) return;
+            if (result < 1 || !voiceSlot) return;
             const int csIdx = result - 1;
             ModulationAssignment a;
             a.id            = "cs" + std::to_string(csIdx) + "_assign_" +
                               juce::Uuid().toString().toStdString();
             a.sourceId      = "cs" + std::to_string(csIdx) + "_output";
-            a.destinationId = ModDest::kTable[0].id;
+            a.destinationId = (destProvider && destProvider->resolveId)
+                                  ? destProvider->resolveId(1)
+                                  : std::string{};
             a.depth         = 0.0f;
-            lockMods(*rhythm);
-            rhythm->modulationMatrix.addAssignment(a);
-            unlockMods(*rhythm);
+            lockMods(*voiceSlot);
+            voiceSlot->modulationMatrix.addAssignment(a);
+            unlockMods(*voiceSlot);
             rebuildRows();
             resized();
             repaint();
@@ -105,9 +112,9 @@ ModMatrixPanel::ModMatrixPanel()
     };
 }
 
-void ModMatrixPanel::setRhythm(Rhythm* r)
+void ModMatrixPanel::setVoiceSlot(VoiceSlot* slot)
 {
-    rhythm = r;
+    voiceSlot = slot;
     rebuildRows();
     resized();
     repaint();
@@ -116,6 +123,14 @@ void ModMatrixPanel::setRhythm(Rhythm* r)
 void ModMatrixPanel::setInsertAlgorithm(int driveChar)
 {
     currentDriveChar = driveChar;
+    rebuildRows();
+    resized();
+    repaint();
+}
+
+void ModMatrixPanel::setDestProvider(const ModDestProvider* p)
+{
+    destProvider = p;
     rebuildRows();
     resized();
     repaint();
@@ -174,12 +189,12 @@ void ModMatrixPanel::rebuildRows()
     for (auto& row : matrixRows) removeChildComponent(row.get());
     matrixRows.clear();
     matPage = 0;
-    if (!rhythm) return;
+    if (!voiceSlot) return;
 
-    for (const auto& a : rhythm->modulationMatrix.getAssignments())
+    for (const auto& a : voiceSlot->modulationMatrix.getAssignments())
     {
         const int csIdx = csIndexFromSourceId(a.sourceId);
-        auto row = std::make_unique<MatrixRow>(a, csIdx, currentDriveChar);
+        auto row = std::make_unique<MatrixRow>(a, csIdx, currentDriveChar, destProvider);
         addAndMakeVisible(*row);
 
         const std::string rowId    = a.id;
@@ -187,9 +202,9 @@ void ModMatrixPanel::rebuildRows()
 
         row->onRemove = [this, rowId]
         {
-            lockMods(*rhythm);
-            rhythm->modulationMatrix.removeAssignment(rowId);
-            unlockMods(*rhythm);
+            lockMods(*voiceSlot);
+            voiceSlot->modulationMatrix.removeAssignment(rowId);
+            unlockMods(*voiceSlot);
             if (onChange) onChange();
             juce::Component::SafePointer<ModMatrixPanel> safe(this);
             juce::MessageManager::callAsync([safe]
@@ -202,18 +217,18 @@ void ModMatrixPanel::rebuildRows()
         {
             float d = 0.0f;
             float c = 0.0f;
-            lockMods(*rhythm);
-            for (const auto& a2 : rhythm->modulationMatrix.getAssignments())
+            lockMods(*voiceSlot);
+            for (const auto& a2 : voiceSlot->modulationMatrix.getAssignments())
                 if (a2.id == rowId) { d = a2.depth; c = a2.curve; break; }
-            rhythm->modulationMatrix.removeAssignment(rowId);
+            voiceSlot->modulationMatrix.removeAssignment(rowId);
             ModulationAssignment na;
             na.id            = rowId;
             na.sourceId      = sourceId;
             na.destinationId = dest;
             na.depth         = d;
             na.curve         = c;
-            rhythm->modulationMatrix.addAssignment(na);
-            unlockMods(*rhythm);
+            voiceSlot->modulationMatrix.addAssignment(na);
+            unlockMods(*voiceSlot);
             if (onChange) onChange();
             juce::Component::SafePointer<ModMatrixPanel> safe(this);
             juce::MessageManager::callAsync([safe]
@@ -224,16 +239,16 @@ void ModMatrixPanel::rebuildRows()
         };
         row->onDepthChange = [this, rowId](float d)
         {
-            lockMods(*rhythm);
-            rhythm->modulationMatrix.setDepth(rowId, d);
-            unlockMods(*rhythm);
+            lockMods(*voiceSlot);
+            voiceSlot->modulationMatrix.setDepth(rowId, d);
+            unlockMods(*voiceSlot);
             if (onChange) onChange();
         };
         row->onCurveChange = [this, rowId](float c)
         {
-            lockMods(*rhythm);
-            rhythm->modulationMatrix.setCurve(rowId, c);
-            unlockMods(*rhythm);
+            lockMods(*voiceSlot);
+            voiceSlot->modulationMatrix.setCurve(rowId, c);
+            unlockMods(*voiceSlot);
             if (onChange) onChange();
         };
 
@@ -280,13 +295,13 @@ void ModMatrixPanel::paint(juce::Graphics& g)
 {
     using mu_ui::s;
     using mu_ui::sf;
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
     g.fillAll();
 
     const int headerH = s(kHeaderH);
     const int pagerH  = s(kPagerH);
 
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));
     g.drawText("SOURCE",      0,    0, s(46),  headerH, juce::Justification::centredLeft, false);
     g.drawText("DESTINATION", s(48),0, s(200), headerH, juce::Justification::centredLeft, false);

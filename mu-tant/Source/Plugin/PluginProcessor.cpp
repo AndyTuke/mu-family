@@ -1,6 +1,7 @@
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/PluginEditor.h"
 #include "Audio/Scales.h"
+#include "Modulation/MuTantModDest.h"
 
 namespace mu_tant
 {
@@ -108,10 +109,18 @@ PluginProcessor::PluginProcessor()
         voices[(size_t) v] = std::make_unique<VoiceEngine>();
         voices[(size_t) v]->setBank(&bank);
     }
+
+    // Pre-allocate modParamValues entries once so the audio-thread map
+    // never allocates — keys live in static storage (the kModDestTable string
+    // literals), making string_view safe for the lifetime of the entries.
+    modParamValues.reserve((size_t) kModDestCount);
+    for (int i = 0; i < kModDestCount; ++i)
+        modParamValues[kModDestTable[i].id] = 0.0f;
 }
 
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
+    currentSampleRate = sampleRate;
     for (auto& v : voices)
         if (v) v->prepare(sampleRate, samplesPerBlock);
 
@@ -184,9 +193,54 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         const float level = raw(chId(v, "lvl"));
         const float pan   = juce::jlimit(-1.0f, 1.0f, raw(chId(v, "pan")));
 
+        // Modulation pass — seed paramValues from the current APVTS-derived
+        // config, then let this voice's matrix overwrite any modulated keys.
+        // The matrix is empty for voices the user hasn't assigned, so this
+        // collapses to a no-op + the seeded values pass through unchanged.
+        VoiceConfig cfg = readConfig(v);
+        modParamValues["osc1.octave"]      = (float) cfg.osc1Octave;
+        modParamValues["osc1.tone"]        = cfg.osc1Tone;
+        modParamValues["osc1.fine"]        = cfg.osc1Fine;
+        modParamValues["osc1.pos"]         = cfg.osc1Pos;
+        modParamValues["osc2.octave"]      = (float) cfg.osc2Octave;
+        modParamValues["osc2.tone"]        = cfg.osc2Tone;
+        modParamValues["osc2.fine"]        = cfg.osc2Fine;
+        modParamValues["osc2.pos"]         = cfg.osc2Pos;
+        modParamValues["xmod"]             = cfg.xmod;
+        modParamValues["mix"]              = cfg.mix;
+        modParamValues["filter.cutoff"]    = cfg.filterCutoff;
+        modParamValues["filter.resonance"] = cfg.filterRes;
+        modParamValues["level"]            = cfg.levelDb;
+
+        // tryLock-equivalent: ModulationMatrix mutations on the message thread
+        // hold modLock; on contention we skip the modulation pass this block
+        // (the voice still plays with un-modulated config).
+        auto& slot = voiceSlots[(size_t) v];
+        bool expected = false;
+        if (slot.modLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+        {
+            slot.modulationMatrix.process(slot.controlSequences, internalBeatPos, modParamValues);
+            slot.modLock.store(false, std::memory_order_release);
+
+            // Read modulated values back into the config.
+            cfg.osc1Octave   = (int) modParamValues["osc1.octave"];
+            cfg.osc1Tone     = modParamValues["osc1.tone"];
+            cfg.osc1Fine     = modParamValues["osc1.fine"];
+            cfg.osc1Pos      = modParamValues["osc1.pos"];
+            cfg.osc2Octave   = (int) modParamValues["osc2.octave"];
+            cfg.osc2Tone     = modParamValues["osc2.tone"];
+            cfg.osc2Fine     = modParamValues["osc2.fine"];
+            cfg.osc2Pos      = modParamValues["osc2.pos"];
+            cfg.xmod         = modParamValues["xmod"];
+            cfg.mix          = modParamValues["mix"];
+            cfg.filterCutoff = modParamValues["filter.cutoff"];
+            cfg.filterRes    = modParamValues["filter.resonance"];
+            cfg.levelDb      = modParamValues["level"];
+        }
+
         auto& voiceBuf = voiceBuffers[(size_t) v];
         voiceBuf.clear();
-        voices[(size_t) v]->setConfig(readConfig(v));
+        voices[(size_t) v]->setConfig(cfg);
         voices[(size_t) v]->process(voiceBuf, numSamples);
 
         // Equal-power constant-power pan, matching MixerEngine::applyPanGain.
@@ -200,6 +254,14 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 
     // Master fader.
     buffer.applyGain(raw("mstr_lvl"));
+
+    // Advance the internal free-running beat counter — mu-tant has no transport,
+    // so modulators evaluate against a beat position derived from elapsed audio
+    // time at a fixed 120 BPM. (BPM becomes a settings-overlay knob later.)
+    const double beatsPerSample = (internalBpm / 60.0) / currentSampleRate;
+    internalBeatPos += beatsPerSample * (double) numSamples;
+    // Wrap at a large value to keep precision (16 bars at 120 BPM ≈ 64 beats).
+    if (internalBeatPos > 16384.0) internalBeatPos -= 16384.0;
 }
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()

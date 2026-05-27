@@ -3,18 +3,19 @@
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/AddButton.h"
 #include "UI/Components/BipolarSliderRow.h"
-#include "UI/Components/MuClidLookAndFeel.h"
+#include "UI/Components/MuLookAndFeel.h"
 #include "ModulatorEditor.h"
-#include "Sequencer/Rhythm.h"
+#include "Sequencer/VoiceSlot.h"
 
-// Overview of all modulation assignments across all ControlSequences in a rhythm.
+// Overview of all modulation assignments across all ControlSequences in a voice slot.
 class ModMatrixPanel : public juce::Component
 {
 public:
     ModMatrixPanel();
 
-    void setRhythm(Rhythm* r);
+    void setVoiceSlot(VoiceSlot* slot);
     void setInsertAlgorithm(int driveChar);
+    void setDestProvider(const ModDestProvider* p);
     void refresh();
 
     std::function<void()> onChange;
@@ -23,7 +24,8 @@ public:
     void paint(juce::Graphics& g) override;
 
 private:
-    Rhythm* rhythm = nullptr;
+    VoiceSlot*             voiceSlot    = nullptr;
+    const ModDestProvider* destProvider = nullptr;
 
     struct MatrixRow : public juce::Component
     {
@@ -39,7 +41,8 @@ private:
         std::function<void(float depth)>              onDepthChange;
         std::function<void(float curve)>              onCurveChange;
 
-        MatrixRow(const ModulationAssignment& a, int csIndex, int driveChar);
+        MatrixRow(const ModulationAssignment& a, int csIndex, int driveChar,
+                  const ModDestProvider* provider);
         void resized() override;
     };
 

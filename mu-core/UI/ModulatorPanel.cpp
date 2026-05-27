@@ -46,31 +46,40 @@ void ModulatorPanel::setInsertAlgorithm(int driveChar)
     matrixPanel.setInsertAlgorithm(driveChar);
 }
 
+void ModulatorPanel::setDestProvider(const ModDestProvider* p)
+{
+    destProvider = p;
+    for (auto& e : editors)
+        e.setDestProvider(p);
+    matrixPanel.setDestProvider(p);
+}
+
 void ModulatorPanel::setPlayheadBeat(double beat)
 {
     if (activeTab < kNumMods)
         editors[activeTab].setPlayheadBeat(beat);
 }
 
-void ModulatorPanel::setRhythm(Rhythm* r)
+void ModulatorPanel::setVoiceSlot(VoiceSlot* slot)
 {
-    rhythm = r;
-    if (!r)
+    voiceSlot = slot;
+    if (!slot)
     {
         // Clear stale pointers in the editors and matrix panel — otherwise their
-        // ControlSequence*/ModulationMatrix* still point inside a destroyed Rhythm.
+        // ControlSequence*/ModulationMatrix* still point inside a destroyed VoiceSlot.
         for (int i = 0; i < kNumMods; ++i)
             editors[i].setData(nullptr, nullptr, modColour(i), i, nullptr);
-        matrixPanel.setRhythm(nullptr);
+        matrixPanel.setVoiceSlot(nullptr);
         return;
     }
 
     for (int i = 0; i < kNumMods; ++i)
     {
-        editors[i].setData(&r->controlSequences[i], &r->modulationMatrix, modColour(i), i, &r->modLock.v);
+        editors[i].setData(&slot->controlSequences[i], &slot->modulationMatrix,
+                            modColour(i), i, &slot->modLock.v);
         editors[i].onChange = [this] { if (onChange) onChange(); };
     }
-    matrixPanel.setRhythm(r);
+    matrixPanel.setVoiceSlot(slot);
     matrixPanel.onChange = [this] { if (onChange) onChange(); };
 }
 
@@ -87,6 +96,6 @@ void ModulatorPanel::resized()
 
 void ModulatorPanel::paint(juce::Graphics& g)
 {
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
     g.fillAll();
 }

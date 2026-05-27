@@ -4,6 +4,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/DropdownSelect.h"
+#include "UI/ModulatorPanel.h"
+#include "Modulation/MuTantModDest.h"
 
 namespace mu_tant
 {
@@ -85,6 +87,11 @@ private:
     // ── Output level ────────────────────────────────────────────────────────
     KnobWithLabel levelKnob { "Level" };
     std::unique_ptr<APVTS::SliderAttachment> levelAttachment;
+
+    // ── Modulator section (mu-core ModulatorPanel + mu-tant destinations) ──
+    // Rebound to the current voice's VoiceSlot whenever setVoice() runs.
+    ::ModulatorPanel modulatorPanel;
+    ModDestProvider  modDestProvider;
 
     // Voice indicator strip (top of panel). Mirrors the active voice's
     // palette colour so users always see which slot the panel is editing.

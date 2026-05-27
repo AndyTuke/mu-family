@@ -230,13 +230,15 @@ void RhythmSaveDialog::paint(juce::Graphics& g)
 
 //==============================================================================
 RhythmPanel::RhythmPanel(PluginProcessor& p)
-    : proc(p), euclidPanel(p), voiceSection(p)
+    : proc(p), euclidPanel(p), voiceSection(p),
+      modDestProvider(mu_clid::makeModDestProvider())
 {
     startTimerHz(30);
     addAndMakeVisible(circle);
     addAndMakeVisible(euclidPanel);
     addAndMakeVisible(voiceSection);
     addAndMakeVisible(modulatorPanel);
+    modulatorPanel.setDestProvider(&modDestProvider);
 
     // juce::Label provides bulletproof inline editing: handles single-click to edit,
     // Enter to commit, Escape to cancel, click-off to commit, focus management — all
@@ -475,7 +477,7 @@ void RhythmPanel::setRhythm(int index)
         // ModulatorEditor::rebuildRows(), which reads cs->id. If cs still points at a
         // just-destroyed Rhythm (e.g. after delete-last), cs->id is garbage and string
         // concat throws std::bad_alloc.
-        modulatorPanel.setRhythm(&proc.getRhythm(index));
+        modulatorPanel.setVoiceSlot(&proc.getRhythm(index));
         voiceSection.setRhythm(index);
         refreshCircle();
     }
@@ -484,7 +486,7 @@ void RhythmPanel::setRhythm(int index)
         nameLabel.setText("No Rhythm", juce::dontSendNotification);
         // Null out all child-panel rhythm pointers so they don't dereference stale memory
         // if a vector erase invalidated the previous rhythm before re-binding.
-        modulatorPanel.setRhythm(nullptr);
+        modulatorPanel.setVoiceSlot(nullptr);
     }
     repaint();
 }
