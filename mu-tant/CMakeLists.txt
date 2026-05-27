@@ -57,6 +57,11 @@ target_link_libraries(mu-tant
         juce::juce_recommended_warning_flags
 )
 
+# Family build-counter: depend on the shared increment target (defined in
+# mu-clid/CMakeLists.txt) so mu-tant builds also tick the session counter.
+# Without this, building only mu-tant would reuse a stale BuildNumber.h.
+add_dependencies(mu-tant increment_build_number)
+
 # ── mu-tant-tests — console UnitTests over the new synth DSP ─────────────────
 # Tests only mu-tant's self-contained DSP (Scales + WavetableOscillator +
 # WavetableBank) — no mu-core deps needed. EXCLUDE_FROM_ALL like mu-clid-tests.
