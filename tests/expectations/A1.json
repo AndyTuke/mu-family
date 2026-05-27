@@ -1,0 +1,30 @@
+{
+  "test": "A1",
+  "description": "Full-preset hot-swap defers to the MASTER loop boundary, not a rhythm's own loop. A1_master has mstrLoop=4 (64-step / 8.0s master loop @120bpm) and rhythm 0 looping every 4 steps (0.5s). A swap to the empty TS2 is requested at 1.0s; a correct commit waits until the 8.0s master boundary. The 'Well this is nice' bug committed at rhythm 0's loop (~1.5s) instead. Render is 9s so both the long pre-commit hold and the post-commit silence are observable.",
+  "render": {
+    "preset": "tests/presets/A1_master.muClid",
+    "swap_preset": "tests/presets/TS2.muClid",
+    "swap_at": 1.0,
+    "seconds": 9.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "plays_until_master_boundary",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [6.5, 7.9],
+      "min": -25,
+      "comment": "kicks must still be sounding at 6.5-7.9s — proves the swap did NOT commit early at rhythm 0's 0.5s loop (the bug); the master boundary is 8.0s"
+    },
+    {
+      "name": "swapped_after_master_boundary",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [8.6, 9.0],
+      "max": -90,
+      "comment": "by 8.6s the swap to empty TS2 has committed at the 8.0s master boundary and TS1's tail has decayed — output is silent"
+    }
+  ]
+}

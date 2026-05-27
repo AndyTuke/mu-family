@@ -1,0 +1,39 @@
+{
+  "test": "A8",
+  "description": "Deep tail-out across a full-preset swap. A8_tail plays a long-decay tonal synth on every beat (free-running, rhythm 0 loops 0.5s); a swap to the empty TS2 is requested at 2.0s and commits at the next 2.5s loop point. The retired voice must ring out and decay smoothly across the commit (graded -50 → -64 → -89 dBFS over ~0.5s) rather than hard-cutting to silence, then fall silent. Complements TS_swap (short kick) with a longer tonal tail.",
+  "render": {
+    "preset": "tests/presets/A8_tail.muClid",
+    "swap_preset": "tests/presets/TS2.muClid",
+    "swap_at": 2.0,
+    "seconds": 5.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "playing_before_swap",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [0.5, 2.4],
+      "min": -33,
+      "comment": "the synth is hitting on every beat before the swap commits"
+    },
+    {
+      "name": "tail_rings_after_commit",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [2.55, 2.85],
+      "min": -95,
+      "max": -45,
+      "comment": "just after the 2.5s commit the retired voice is still ringing (> -95 = not hard-cut) but quieter than the active hits (< -45 = committed, no longer triggering)"
+    },
+    {
+      "name": "silent_after_tail",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [3.5, 5.0],
+      "max": -100,
+      "comment": "once the tail has decayed the empty preset makes no sound"
+    }
+  ]
+}
