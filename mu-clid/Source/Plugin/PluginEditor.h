@@ -1,85 +1,40 @@
 #pragma once
 
-#include <juce_audio_processors/juce_audio_processors.h>
 #include "PluginProcessor.h"
-#include "UI/TransportBar.h"
+#include "UI/EditorShellBase.h"
 #include "UI/MasterLoopSection.h"
 #include "UI/RhythmSidebar.h"
 #include "UI/RhythmPanel.h"
 #include "UI/MixerOverlay.h"
-#include "UI/AboutPanel.h"
-#include "UI/SaveDialog.h"
-#include "UI/PresetBrowser.h"
 #include "UI/SettingsOverlay.h"
-#include "UI/MidiPresetsPanel.h"
-#include "UI/MidiFullPresetsPanel.h"
-#include "UI/Components/StatusBar.h"
-#include "UI/Components/MuClidLookAndFeel.h"
 
-class PluginEditor : public juce::AudioProcessorEditor,
-                     public juce::KeyListener,
-                     private juce::ValueTree::Listener,
+// μ-Clid editor: extends the shared mu-core shell with rhythm-specific
+// components (sidebar, RhythmPanel, MixerOverlay, SettingsOverlay) and the
+// rhythm-set refresh wiring that drives them after preset loads / hot-swaps.
+class PluginEditor : public EditorShellBase,
                      private juce::AudioProcessorValueTreeState::Listener
 {
 public:
     explicit PluginEditor(PluginProcessor&);
     ~PluginEditor() override;
 
-    void paint(juce::Graphics&) override;
-    void resized() override;
-
-    // juce::KeyListener — receives key events in standalone mode.
-    bool keyPressed(const juce::KeyPress& key, juce::Component* originator) override;
-    bool keyStateChanged(bool isKeyDown, juce::Component* originator) override;
-
-    void parentHierarchyChanged() override;
+    // ── EditorShellBase hooks ───────────────────────────────────────────────
+    void onPresetLoaded(const juce::File& file) override;
+    void onPresetSaved (const juce::File& file) override;
+    void onPresetNew()                          override;
+    juce::StringArray getProductKnownCategories() const override;
+    void onCategoriesRefreshed(const juce::StringArray& merged) override;
 
 private:
-    PluginProcessor& processorRef;
+    PluginProcessor& proc;
 
-    MuClidLookAndFeel lookAndFeel;
-
-    TransportBar       transportBar;
+    // mu-clid-specific product components — registered with the shell via
+    // setMainArea / setMixerOverlay / setSettingsOverlay in the ctor.
     MasterLoopSection  masterLoop;
     RhythmSidebar      sidebar;
-    RhythmPanel     rhythmPanel;
-    MixerOverlay    mixerOverlay;
-    AboutPanel      aboutPanel;
-    SaveDialog      saveDialog;
-    PresetBrowser   presetBrowser;
-    SettingsOverlay settingsOverlay;
-    MidiPresetsPanel midiPresetsPanel;
-    MidiFullPresetsPanel midiFullPresetsPanel;
-    StatusBar       statusBar;
-    juce::Label     demoBanner;
-
-    static constexpr int kDemoBannerH = 20;
-
-    bool mixerVisible        = false;
-    bool aboutVisible        = false;
-    bool saveVisible         = false;
-    bool browserVisible      = false;
-    bool settingsVisible     = false;
-    bool midiPresetsVisible  = false;
-    bool midiFullPresetsVisible = false;
-
-    juce::ComponentAnimator animator;
-
-    // Fade from→to over durationMs using ComponentAnimator.
-    void fadeSwitch(juce::Component* outgoing, juce::Component* incoming, int durationMs = 80);
-
-    void showMixer(bool show);
-    void showAbout(bool show);
-    void showSaveDialog(bool show);
-    void doSavePreset(const juce::String& name, const juce::String& desc,
-                      const juce::String& category, bool embedSamples);
-    void showPresetBrowser(bool show);
-    void showSettings(bool show);
-    void showMidiPresets(bool show);
-    void showMidiFullPresets(bool show);
-    void doNewPreset();
-
-    void hideAllOverlays();
+    RhythmPanel        rhythmPanel;
+    MixerOverlay       mixerOverlay;
+    SettingsOverlay    settingsOverlay;
 
     // consolidates the "refresh chrome after a rhythm-set mutation" boilerplate
     // that was repeated across 4 callbacks (preset load, new preset, sidebar reorder,
@@ -92,22 +47,9 @@ private:
                                 bool fullSidebarRefresh,
                                 MixerRefresh mixerRefresh);
 
-    bool isStandalone    = false;
-    bool needsFocusGrab  = false;
-    bool presetDirty     = false;
-    std::function<void()> pendingQuitCallback;
-    juce::KeyPress keybindPlayStop { juce::KeyPress::spaceKey };
-    void loadKeybindings();
-
-    // juce::ValueTree::Listener — used to track preset dirty state.
-    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override { presetDirty = true; }
-    void valueTreeChildAdded    (juce::ValueTree&, juce::ValueTree&)          override { presetDirty = true; }
-    void valueTreeChildRemoved  (juce::ValueTree&, juce::ValueTree&, int)     override { presetDirty = true; }
-
     // APVTS listener — drives voice-section Amp "Effect" send label off the
     // global eff_algo parameter so host automation updates the label even
-    // when the mixer overlay is hidden (the MixerOverlay path only refreshes
-    // on visibility / timer flush when visible).
+    // when the mixer overlay is hidden.
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void syncVoiceEffectSendLabel();
 

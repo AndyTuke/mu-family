@@ -70,6 +70,8 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/SaveDialog.cpp"
     # Shared transport bar — product slots in its own loop section + logo text.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/TransportBar.cpp"
+    # Shared editor shell — chrome / overlay state machine / main-area layout.
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/EditorShellBase.cpp"
 )
 
 # Consumers can `#include "Audio/VoiceEngine.h"` etc. — same path namespace as
