@@ -43,10 +43,25 @@ GatingDesigner::GatingDesigner()
 
 void GatingDesigner::setSubdivision(int denominator)
 {
-    if (denominator == subdivisionDenom) return;
+    if (denominator == subdivisionDenom && boundPattern == nullptr) return;
     subdivisionDenom = denominator;
     subdivDropdown.setSelectedId(idForDenom(denominator), false);
+    if (boundPattern != nullptr)
+        boundPattern->subdivision = static_cast<GatePattern::Subdivision>(denominator);
     repaint();
+}
+
+void GatingDesigner::setPattern(GatePattern* pattern)
+{
+    boundPattern = pattern;
+    if (pattern != nullptr)
+    {
+        // Pull the bound pattern's subdivision so the UI shows the persisted
+        // value when the user switches voices.
+        subdivisionDenom = static_cast<int>(pattern->subdivision);
+        subdivDropdown.setSelectedId(idForDenom(subdivisionDenom), false);
+        repaint();
+    }
 }
 
 int GatingDesigner::cellCount() const noexcept

@@ -110,6 +110,7 @@ void VoicePanel::setVoice(int voiceIndex)
     rebindAttachments();
     refreshVoiceTag();
     modulatorPanel.setVoiceSlot(&proc.voiceSlots[(size_t) currentVoice]);
+    gatingDesigner.setPattern(&proc.gatePatterns[(size_t) currentVoice]);
 }
 
 void VoicePanel::rebindAttachments()
