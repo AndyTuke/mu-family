@@ -6,6 +6,7 @@ namespace mu_tant
 PluginEditor::PluginEditor(PluginProcessor& p)
     : EditorShellBase(p),
       proc(p),
+      voiceSidebar(p),
       voicePanel(p)
 {
     // ── Product chrome on shared overlays ───────────────────────────────────
@@ -18,15 +19,22 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         });
     getTransportBar().setLogoText(juce::String(juce::CharPointer_UTF8("\xce\xbc-Tant")));
 
-    // First-stab scope: no preset library, no mixer, no settings overlay.
-    // Shell auto-hides the mixer toggle when no mixer overlay is registered;
-    // the gear button stays visible but is a no-op until settings land.
+    // First-stab scope: no preset library, no settings overlay yet. Mixer
+    // overlay lands in Stage A3.
     getTransportBar().setShowPresetControls(false);
     setMixerOverlay(nullptr);
     setSettingsOverlay(nullptr);
 
-    // Main area: voice panel only, no sidebar (single layer for now).
-    setMainArea(/*sidebar=*/nullptr, &voicePanel);
+    // Main area: 8-voice sidebar + per-voice editor panel.
+    setMainArea(&voiceSidebar, &voicePanel);
+
+    voiceSidebar.onVoiceSelected = [this](int idx)
+    {
+        voicePanel.setVoice(idx);
+    };
+
+    voiceSidebar.setSelectedIndex(0);
+    voicePanel.setVoice(0);
     clearPresetDirty();
 }
 

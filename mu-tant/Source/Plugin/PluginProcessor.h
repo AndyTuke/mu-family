@@ -4,17 +4,27 @@
 #include "Audio/SynthVoice.h"                // mu-tant voice
 #include "Audio/WavetableBank.h"
 
-// mu-tant — wavetable drone synth. FIRST STAB: a single free-running layer
-// (Osc1 + Osc2 -> cross-mod -> mix -> mu-core filter), driven entirely by APVTS
-// params with a GenericAudioProcessorEditor so the engine can be heard + tweaked
-// before the real UI, the 8-layer expansion, the drawable gate, and the mixer/FX
-// integration land.
+#include <array>
+#include <memory>
+
+// mu-tant — wavetable drone synth.
+//
+// Stage A1: expanded to 8 free-running voices. Each voice has its own
+// oscillators / cross-mod / filter / level state, exposed in APVTS under
+// per-voice subtree IDs `v{N}_*` (osc1/osc2/xmod/mix/filter/level). Shared
+// tonal centre (`root`, `scale`) stays global. processBlock sums voices
+// directly; the mixer's per-channel level / pan / mute / solo is applied
+// from `mixerEngine.channels[]` (FX sends + sidechain pending the
+// MixerEngine voice-render-callback refactor).
 namespace mu_tant
 {
 
 class PluginProcessor : public ProcessorBase
 {
 public:
+    // Family parity with mu-clid (max 8 rhythms / 8 voices / 8 channels).
+    static constexpr int kMaxVoices = 8;
+
     PluginProcessor();
     ~PluginProcessor() override = default;
 
@@ -41,16 +51,31 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
-    // ── ProcessorBase channel metadata (single layer for now) ─────────────────
-    int          getNumChannels()              const override { return 1; }
-    juce::String getChannelName(int)           const override { return "Layer 1"; }
-    int          getChannelColourIndex(int)    const override { return 0; }
+    // ── ProcessorBase channel metadata ───────────────────────────────────────
+    // mu-tant always exposes the full 8 channels — voices are always present;
+    // the user mutes / lowers what they don't want via the mixer.
+    int          getNumChannels()              const override { return kMaxVoices; }
+    juce::String getChannelName(int idx)       const override
+    {
+        return (idx >= 0 && idx < kMaxVoices) ? juce::String("Voice ") + juce::String(idx + 1)
+                                              : juce::String();
+    }
+    int          getChannelColourIndex(int idx) const override { return idx; }
 
     // ── ProcessorBase preset wiring (per design-voice.md file formats) ────────
     juce::File   getPerSlotPresetDir()       const override { return {}; }   // TODO: content dir
     juce::String getPerSlotPresetExtension() const override { return "muPattern"; }
     juce::File   getFullPresetDir()          const override { return {}; }   // TODO: content dir
     juce::String getFullPresetExtension()    const override { return "muTant"; }
+
+    // ── Per-voice param IDs (used by VoicePanel for SliderAttachment binding) ──
+    // Family rule: per-voice params are subtree-scoped via `v{N}_` prefix so a
+    // ValueTree restore round-trips cleanly + presets can target a specific
+    // voice without name collisions across the 8 slots.
+    static juce::String voiceParamId(int voice, const juce::String& base)
+    {
+        return juce::String("v") + juce::String(voice) + "_" + base;
+    }
 
 protected:
     // MIDI program-change apply hooks — stubbed in the first stab (no preset I/O yet).
@@ -59,10 +84,12 @@ protected:
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
-    VoiceConfig readConfig() const;
+    VoiceConfig readConfig(int voiceIdx) const;
 
-    WavetableBank bank;
-    VoiceEngine   voice;
+    WavetableBank                                          bank;
+    std::array<std::unique_ptr<VoiceEngine>, kMaxVoices>   voices;
+    // Per-voice render scratch — allocated in prepareToPlay; reused each block.
+    std::array<juce::AudioBuffer<float>,     kMaxVoices>   voiceBuffers;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

@@ -17,42 +17,61 @@ namespace
         for (const auto& s : kScales) a.add(s.name);
         return a;
     }
+
+    // Build the parameter family for a single voice. Called for v0..v7 so each
+    // voice gets its own independent osc/xmod/filter/level state in the APVTS.
+    void addVoiceParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
+                        int voice)
+    {
+        using namespace juce;
+        auto f = [](float lo, float hi, float step) { return NormalisableRange<float>(lo, hi, step); };
+        auto id = [voice](const char* base) {
+            return PluginProcessor::voiceParamId(voice, base);
+        };
+        auto label = [voice](const char* base) {
+            return juce::String("V") + juce::String(voice + 1) + " " + base;
+        };
+
+        // Per-oscillator pitch + wavetable position.
+        layout.add(std::make_unique<AudioParameterInt>  (ParameterID{id("o1_oct"), 1},  label("Osc1 Octave"), 0, 8, 4));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("o1_tone"), 1}, label("Osc1 Tone"),   f(0.0f, 14.0f, 0.01f), 0.0f));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("o1_fine"), 1}, label("Osc1 Fine"),   f(-100.0f, 100.0f, 0.1f), 0.0f));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("o1_pos"), 1},  label("Osc1 Position"), f(0.0f, 1.0f, 0.001f), 0.0f));
+        layout.add(std::make_unique<AudioParameterInt>  (ParameterID{id("o2_oct"), 1},  label("Osc2 Octave"), 0, 8, 3));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("o2_tone"), 1}, label("Osc2 Tone"),   f(0.0f, 14.0f, 0.01f), 2.0f));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("o2_fine"), 1}, label("Osc2 Fine"),   f(-100.0f, 100.0f, 0.1f), 0.0f));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("o2_pos"), 1},  label("Osc2 Position"), f(0.0f, 1.0f, 0.001f), 0.0f));
+
+        // Cross-mod + balance.
+        layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("xmod"), 1},  label("X-Mod"),      f(0.0f, 1.0f, 0.001f), 0.0f));
+        layout.add(std::make_unique<AudioParameterChoice>(ParameterID{id("xmode"), 1}, label("X-Mod Mode"), StringArray{ "Off", "FM", "Sync" }, 0));
+        layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("mix"), 1},   label("Osc Mix"),    f(0.0f, 1.0f, 0.001f), 0.5f));
+
+        // Filter (mu-core).
+        NormalisableRange<float> cutoff(20.0f, 20000.0f, 1.0f);
+        cutoff.setSkewForCentre(640.0f);
+        layout.add(std::make_unique<AudioParameterInt>  (ParameterID{id("flt_type"), 1}, label("Filter Type"), 0, 15, 0));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_cut"), 1},  label("Cutoff"), cutoff, 8000.0f));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_res"), 1},  label("Resonance"), f(0.0f, 0.99f, 0.001f), 0.2f));
+
+        // Per-voice level — distinct from the mixer fader (this is engine-level
+        // trim before the channel strip; the mixer adds its own per-channel level
+        // / pan / mute / solo on top, matching the mu-clid signal flow).
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("level"), 1}, label("Level"), f(-60.0f, 6.0f, 0.1f), -6.0f));
+    }
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout()
 {
     using namespace juce;
     AudioProcessorValueTreeState::ParameterLayout layout;
-    auto f = [](float lo, float hi, float step) { return NormalisableRange<float>(lo, hi, step); };
 
     // Shared tonal centre.
-    layout.add(std::make_unique<AudioParameterChoice>(ParameterID{"root", 1},  "Root",  rootNames(),  0));
+    layout.add(std::make_unique<AudioParameterChoice>(ParameterID{"root",  1}, "Root",  rootNames(),  0));
     layout.add(std::make_unique<AudioParameterChoice>(ParameterID{"scale", 1}, "Scale", scaleNames(), 0));
 
-    // Per-oscillator pitch + wavetable position.
-    layout.add(std::make_unique<AudioParameterInt>  (ParameterID{"o1_oct", 1},  "Osc1 Octave", 0, 8, 4));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"o1_tone", 1}, "Osc1 Tone",   f(0.0f, 14.0f, 0.01f), 0.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"o1_fine", 1}, "Osc1 Fine",   f(-100.0f, 100.0f, 0.1f), 0.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"o1_pos", 1},  "Osc1 Position", f(0.0f, 1.0f, 0.001f), 0.0f));
-    layout.add(std::make_unique<AudioParameterInt>  (ParameterID{"o2_oct", 1},  "Osc2 Octave", 0, 8, 3));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"o2_tone", 1}, "Osc2 Tone",   f(0.0f, 14.0f, 0.01f), 2.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"o2_fine", 1}, "Osc2 Fine",   f(-100.0f, 100.0f, 0.1f), 0.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"o2_pos", 1},  "Osc2 Position", f(0.0f, 1.0f, 0.001f), 0.0f));
-
-    // Cross-mod + balance.
-    layout.add(std::make_unique<AudioParameterFloat> (ParameterID{"xmod", 1},  "X-Mod",      f(0.0f, 1.0f, 0.001f), 0.0f));
-    layout.add(std::make_unique<AudioParameterChoice>(ParameterID{"xmode", 1}, "X-Mod Mode", StringArray{ "Off", "FM", "Sync" }, 0));
-    layout.add(std::make_unique<AudioParameterFloat> (ParameterID{"mix", 1},   "Osc Mix",    f(0.0f, 1.0f, 0.001f), 0.5f));
-
-    // Filter (mu-core).
-    NormalisableRange<float> cutoff(20.0f, 20000.0f, 1.0f);
-    cutoff.setSkewForCentre(640.0f);
-    layout.add(std::make_unique<AudioParameterInt>  (ParameterID{"flt_type", 1}, "Filter Type", 0, 15, 0));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"flt_cut", 1},  "Cutoff", cutoff, 8000.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"flt_res", 1},  "Resonance", f(0.0f, 0.99f, 0.001f), 0.2f));
-
-    // Slot level.
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"level", 1}, "Level", f(-60.0f, 6.0f, 0.1f), -6.0f));
+    for (int v = 0; v < kMaxVoices; ++v)
+        addVoiceParams(layout, v);
 
     return layout;
 }
@@ -63,45 +82,92 @@ PluginProcessor::PluginProcessor()
                     juce::Identifier("MuTantState"))
 {
     bank.generateBuiltIn();      // procedural sine->saw morph table (first stab)
-    voice.setBank(&bank);
+    for (int v = 0; v < kMaxVoices; ++v)
+    {
+        voices[(size_t) v] = std::make_unique<VoiceEngine>();
+        voices[(size_t) v]->setBank(&bank);
+    }
 }
 
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-    voice.prepare(sampleRate, samplesPerBlock);
+    for (auto& v : voices)
+        if (v) v->prepare(sampleRate, samplesPerBlock);
+
+    // Pre-allocate per-voice render scratch so processBlock never allocates.
+    for (auto& buf : voiceBuffers)
+        buf.setSize(2, samplesPerBlock, false, true, true);
+
+    mixerEngine.prepare(sampleRate, samplesPerBlock);
 }
 
-VoiceConfig PluginProcessor::readConfig() const
+VoiceConfig PluginProcessor::readConfig(int voiceIdx) const
 {
-    auto raw = [this](const char* id) { return apvts.getRawParameterValue(id)->load(); };
+    auto raw = [this](const juce::String& id) {
+        return apvts.getRawParameterValue(id)->load();
+    };
+    auto vid = [voiceIdx](const char* base) {
+        return voiceParamId(voiceIdx, base);
+    };
+
     VoiceConfig c;
+    // Tonal centre is global.
     c.root         = (int) raw("root");
     c.scaleIdx     = (int) raw("scale");
-    c.osc1Octave   = (int) raw("o1_oct");
-    c.osc1Tone     = raw("o1_tone");
-    c.osc1Fine     = raw("o1_fine");
-    c.osc1Pos      = raw("o1_pos");
-    c.osc2Octave   = (int) raw("o2_oct");
-    c.osc2Tone     = raw("o2_tone");
-    c.osc2Fine     = raw("o2_fine");
-    c.osc2Pos      = raw("o2_pos");
-    c.xmod         = raw("xmod");
-    c.xmodMode     = (int) raw("xmode");
-    c.mix          = raw("mix");
-    c.filterType   = (int) raw("flt_type");
-    c.filterCutoff = raw("flt_cut");
-    c.filterRes    = raw("flt_res");
-    c.levelDb      = raw("level");
+    // Per-voice osc + cross-mod + filter + level.
+    c.osc1Octave   = (int) raw(vid("o1_oct"));
+    c.osc1Tone     = raw(vid("o1_tone"));
+    c.osc1Fine     = raw(vid("o1_fine"));
+    c.osc1Pos      = raw(vid("o1_pos"));
+    c.osc2Octave   = (int) raw(vid("o2_oct"));
+    c.osc2Tone     = raw(vid("o2_tone"));
+    c.osc2Fine     = raw(vid("o2_fine"));
+    c.osc2Pos      = raw(vid("o2_pos"));
+    c.xmod         = raw(vid("xmod"));
+    c.xmodMode     = (int) raw(vid("xmode"));
+    c.mix          = raw(vid("mix"));
+    c.filterType   = (int) raw(vid("flt_type"));
+    c.filterCutoff = raw(vid("flt_cut"));
+    c.filterRes    = raw(vid("flt_res"));
+    c.levelDb      = raw(vid("level"));
     return c;
 }
 
 void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
+    const int numSamples = buffer.getNumSamples();
     buffer.clear();
 
-    voice.setConfig(readConfig());
-    voice.process(buffer, buffer.getNumSamples());
+    // Pre-resolve mixer state — soloing wins over muting, matching the
+    // mu-clid mixer convention.
+    bool anySolo = false;
+    for (int v = 0; v < kMaxVoices; ++v)
+        if (mixerEngine.channels[(size_t) v].solo) { anySolo = true; break; }
+
+    for (int v = 0; v < kMaxVoices; ++v)
+    {
+        const auto& ch = mixerEngine.channels[(size_t) v];
+        const bool audible = anySolo ? ch.solo : !ch.mute;
+        if (!audible) continue;
+
+        auto& voiceBuf = voiceBuffers[(size_t) v];
+        voiceBuf.clear();
+        voices[(size_t) v]->setConfig(readConfig(v));
+        voices[(size_t) v]->process(voiceBuf, numSamples);
+
+        // Equal-power constant-power pan, matching MixerEngine::applyPanGain.
+        const float pan   = juce::jlimit(-1.0f, 1.0f, ch.pan);
+        const float angle = (pan + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
+        const float gainL = ch.level * std::cos(angle);
+        const float gainR = ch.level * std::sin(angle);
+
+        buffer.addFrom(0, 0, voiceBuf, 0, 0, numSamples, gainL);
+        buffer.addFrom(1, 0, voiceBuf, 1, 0, numSamples, gainR);
+    }
+
+    // Master fader — apply unconditionally (no master mute concept).
+    buffer.applyGain(mixerEngine.masterLevel);
 }
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()

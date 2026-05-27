@@ -10,25 +10,33 @@ namespace mu_tant
 
 class PluginProcessor;
 
-// First-stab voice page for mu-Tant. Three rows of hand-laid mu-core knobs
-// bound to APVTS via juce::SliderAttachment so the audio engine stays the
-// single source of truth. Layout is deliberately simple — when the real synth
-// UI lands (multi-layer + drawable gate sequencer) this gets replaced.
+// Voice editor page — same layout shape as mu-clid's RhythmPanel (header strip /
+// central wavetable synth UI / bottom row of PITCH-equivalent FILTER LEVEL knobs).
+// `setVoice(idx)` rebinds every APVTS attachment to the v{idx}_* param family so
+// clicking a different voice in the sidebar swaps the editor's target slot.
+// Root + scale are shared (global APVTS params) and stay bound across voice
+// changes.
 class VoicePanel : public juce::Component
 {
 public:
     explicit VoicePanel(PluginProcessor& proc);
     ~VoicePanel() override;
 
+    // Rebind every per-voice attachment to the v{idx}_* family. Shared params
+    // (root, scale) are unaffected.
+    void setVoice(int voiceIndex);
+    int  getVoice() const noexcept { return currentVoice; }
+
     void paint(juce::Graphics& g) override;
     void resized() override;
 
 private:
     PluginProcessor& proc;
+    int currentVoice = 0;
 
     using APVTS = juce::AudioProcessorValueTreeState;
 
-    // ── Tonal centre ────────────────────────────────────────────────────────
+    // ── Tonal centre (shared across voices) ─────────────────────────────────
     juce::Label    rootLabel;
     DropdownSelect rootDropdown;
     juce::Label    scaleLabel;
@@ -77,6 +85,13 @@ private:
     // ── Output level ────────────────────────────────────────────────────────
     KnobWithLabel levelKnob { "Level" };
     std::unique_ptr<APVTS::SliderAttachment> levelAttachment;
+
+    // Voice indicator strip (top of panel). Mirrors the active voice's
+    // palette colour so users always see which slot the panel is editing.
+    juce::Label voiceTag;
+    void refreshVoiceTag();
+
+    void rebindAttachments();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VoicePanel)
 };

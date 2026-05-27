@@ -24,6 +24,7 @@ target_sources(mu-tant
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginEditor.cpp
         Source/UI/VoicePanel.cpp
+        Source/UI/VoiceSidebar.cpp
         Source/Audio/WavetableBank.cpp
         Source/Audio/SynthVoice.cpp
 )

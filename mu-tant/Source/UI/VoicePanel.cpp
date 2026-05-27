@@ -35,8 +35,7 @@ namespace
 
     void populateFilterTypes(DropdownSelect& d)
     {
-        // First-stab labels — the real engine will narrow this. Same id span as
-        // the AudioParameterInt 0..15 range so the attachment maps cleanly.
+        // First-stab labels — same id span as the AudioParameterInt 0..15 range.
         const char* names[] = { "LP 12", "LP 24", "HP 12", "HP 24",
                                 "BP 12", "BP 24", "Notch", "AP",
                                 "Comb",  "1P LP", "1P HP", "Peak",
@@ -59,7 +58,13 @@ VoicePanel::VoicePanel(PluginProcessor& p)
         addAndMakeVisible(l);
     };
 
-    // ── Tonal centre ────────────────────────────────────────────────────────
+    // ── Voice tag (top header strip) ────────────────────────────────────────
+    voiceTag.setText("Voice 1", juce::dontSendNotification);
+    voiceTag.setJustificationType(juce::Justification::centredLeft);
+    voiceTag.setFont(juce::Font(juce::FontOptions{}.withHeight(14.0f)));
+    addAndMakeVisible(voiceTag);
+
+    // ── Tonal centre (shared — bound once) ──────────────────────────────────
     setupLabel(rootLabel,  "Root");
     setupLabel(scaleLabel, "Scale");
     populateRoots(rootDropdown);
@@ -69,53 +74,94 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     rootAttachment  = std::make_unique<APVTS::ComboBoxAttachment>(apvts, "root",  rootDropdown.getComboBox());
     scaleAttachment = std::make_unique<APVTS::ComboBoxAttachment>(apvts, "scale", scaleDropdown.getComboBox());
 
-    // ── Oscillator 1 ────────────────────────────────────────────────────────
-    for (auto* k : { &o1OctKnob, &o1ToneKnob, &o1FineKnob, &o1PosKnob })
+    // ── Per-voice controls (added once, rebound per-voice) ──────────────────
+    for (auto* k : { &o1OctKnob, &o1ToneKnob, &o1FineKnob, &o1PosKnob,
+                     &o2OctKnob, &o2ToneKnob, &o2FineKnob, &o2PosKnob,
+                     &xmodKnob, &mixKnob, &fltCutKnob, &fltResKnob, &levelKnob })
         addAndMakeVisible(k);
-    o1OctAttachment  = std::make_unique<APVTS::SliderAttachment>(apvts, "o1_oct",  o1OctKnob.getSlider());
-    o1ToneAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, "o1_tone", o1ToneKnob.getSlider());
-    o1FineAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, "o1_fine", o1FineKnob.getSlider());
-    o1PosAttachment  = std::make_unique<APVTS::SliderAttachment>(apvts, "o1_pos",  o1PosKnob.getSlider());
 
-    // ── Oscillator 2 ────────────────────────────────────────────────────────
-    for (auto* k : { &o2OctKnob, &o2ToneKnob, &o2FineKnob, &o2PosKnob })
-        addAndMakeVisible(k);
-    o2OctAttachment  = std::make_unique<APVTS::SliderAttachment>(apvts, "o2_oct",  o2OctKnob.getSlider());
-    o2ToneAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, "o2_tone", o2ToneKnob.getSlider());
-    o2FineAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, "o2_fine", o2FineKnob.getSlider());
-    o2PosAttachment  = std::make_unique<APVTS::SliderAttachment>(apvts, "o2_pos",  o2PosKnob.getSlider());
-
-    // ── Cross-mod + balance ─────────────────────────────────────────────────
-    addAndMakeVisible(xmodKnob);
     setupLabel(xmodLabel, "Mode");
     populateXmodModes(xmodModeDropdown);
     addAndMakeVisible(xmodModeDropdown);
-    addAndMakeVisible(mixKnob);
-    xmodAttachment     = std::make_unique<APVTS::SliderAttachment>  (apvts, "xmod",  xmodKnob.getSlider());
-    xmodModeAttachment = std::make_unique<APVTS::ComboBoxAttachment>(apvts, "xmode", xmodModeDropdown.getComboBox());
-    mixAttachment      = std::make_unique<APVTS::SliderAttachment>  (apvts, "mix",   mixKnob.getSlider());
 
-    // ── Filter ──────────────────────────────────────────────────────────────
     setupLabel(fltTypeLabel, "Type");
     populateFilterTypes(fltTypeDropdown);
     addAndMakeVisible(fltTypeDropdown);
-    addAndMakeVisible(fltCutKnob);
-    addAndMakeVisible(fltResKnob);
-    fltTypeAttachment = std::make_unique<APVTS::ComboBoxAttachment>(apvts, "flt_type", fltTypeDropdown.getComboBox());
-    fltCutAttachment  = std::make_unique<APVTS::SliderAttachment>  (apvts, "flt_cut",  fltCutKnob.getSlider());
-    fltResAttachment  = std::make_unique<APVTS::SliderAttachment>  (apvts, "flt_res",  fltResKnob.getSlider());
 
-    // ── Level ───────────────────────────────────────────────────────────────
-    addAndMakeVisible(levelKnob);
-    levelAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, "level", levelKnob.getSlider());
+    rebindAttachments();
+    refreshVoiceTag();
 }
 
 VoicePanel::~VoicePanel() = default;
+
+void VoicePanel::setVoice(int voiceIndex)
+{
+    voiceIndex = juce::jlimit(0, PluginProcessor::kMaxVoices - 1, voiceIndex);
+    if (voiceIndex == currentVoice && o1OctAttachment != nullptr) return;
+    currentVoice = voiceIndex;
+    rebindAttachments();
+    refreshVoiceTag();
+}
+
+void VoicePanel::rebindAttachments()
+{
+    auto& apvts = proc.apvts;
+    auto id = [this](const char* base) {
+        return PluginProcessor::voiceParamId(currentVoice, base);
+    };
+
+    // Destroy previous attachments first — the JUCE attachment dtor unhooks
+    // the listener before the new one binds, so the slider doesn't briefly
+    // double-fire from two attachments while we swap.
+    o1OctAttachment      = nullptr; o1ToneAttachment   = nullptr;
+    o1FineAttachment     = nullptr; o1PosAttachment    = nullptr;
+    o2OctAttachment      = nullptr; o2ToneAttachment   = nullptr;
+    o2FineAttachment     = nullptr; o2PosAttachment    = nullptr;
+    xmodAttachment       = nullptr; xmodModeAttachment = nullptr;
+    mixAttachment        = nullptr;
+    fltTypeAttachment    = nullptr; fltCutAttachment   = nullptr;
+    fltResAttachment     = nullptr; levelAttachment    = nullptr;
+
+    o1OctAttachment  = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_oct"),  o1OctKnob.getSlider());
+    o1ToneAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_tone"), o1ToneKnob.getSlider());
+    o1FineAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_fine"), o1FineKnob.getSlider());
+    o1PosAttachment  = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_pos"),  o1PosKnob.getSlider());
+
+    o2OctAttachment  = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_oct"),  o2OctKnob.getSlider());
+    o2ToneAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_tone"), o2ToneKnob.getSlider());
+    o2FineAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_fine"), o2FineKnob.getSlider());
+    o2PosAttachment  = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_pos"),  o2PosKnob.getSlider());
+
+    xmodAttachment     = std::make_unique<APVTS::SliderAttachment>  (apvts, id("xmod"),  xmodKnob.getSlider());
+    xmodModeAttachment = std::make_unique<APVTS::ComboBoxAttachment>(apvts, id("xmode"), xmodModeDropdown.getComboBox());
+    mixAttachment      = std::make_unique<APVTS::SliderAttachment>  (apvts, id("mix"),   mixKnob.getSlider());
+
+    fltTypeAttachment = std::make_unique<APVTS::ComboBoxAttachment>(apvts, id("flt_type"), fltTypeDropdown.getComboBox());
+    fltCutAttachment  = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_cut"),  fltCutKnob.getSlider());
+    fltResAttachment  = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_res"),  fltResKnob.getSlider());
+
+    levelAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("level"), levelKnob.getSlider());
+}
+
+void VoicePanel::refreshVoiceTag()
+{
+    voiceTag.setText(juce::String("Voice ") + juce::String(currentVoice + 1),
+                     juce::dontSendNotification);
+    const auto tagCol = MuLookAndFeel::channelPalette[
+        (size_t)(currentVoice % MuLookAndFeel::kChannelPaletteSize)];
+    voiceTag.setColour(juce::Label::textColourId, tagCol);
+}
 
 void VoicePanel::paint(juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
     g.fillAll(MuLookAndFeel::colour(Id::windowBackground));
+
+    // Header strip divider so the per-voice tag reads as a band, matching
+    // mu-clid's header strip above the RhythmCircle.
+    using mu_ui::s;
+    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
+    g.fillRect(0, s(32) - 1, getWidth(), 1);
 }
 
 void VoicePanel::resized()
@@ -123,6 +169,7 @@ void VoicePanel::resized()
     using mu_ui::s;
     const int w = getWidth();
     const int pad      = s(16);
+    const int headerH  = s(32);
     const int rowGap   = s(12);
     const int knobW    = s(80);
     const int knobH    = s(80);
@@ -130,8 +177,11 @@ void VoicePanel::resized()
     const int ddH      = s(24);
     const int hgap     = s(8);
 
+    // ── Header strip ────────────────────────────────────────────────────────
+    voiceTag.setBounds(pad, 0, w / 2 - pad, headerH);
+
     // ── Row 1: tonal centre + filter ────────────────────────────────────────
-    int y = pad;
+    int y = headerH + s(8);
     int x = pad;
 
     rootLabel.setBounds(x, y, labelW, ddH);            x += labelW + hgap;
