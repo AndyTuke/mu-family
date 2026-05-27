@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "PluginProcessor.h"
 #include "UI/TransportBar.h"
+#include "UI/MasterLoopSection.h"
 #include "UI/RhythmSidebar.h"
 #include "UI/RhythmPanel.h"
 #include "UI/MixerOverlay.h"
@@ -38,8 +39,9 @@ private:
 
     MuClidLookAndFeel lookAndFeel;
 
-    TransportBar    transportBar;
-    RhythmSidebar   sidebar;
+    TransportBar       transportBar;
+    MasterLoopSection  masterLoop;
+    RhythmSidebar      sidebar;
     RhythmPanel     rhythmPanel;
     MixerOverlay    mixerOverlay;
     AboutPanel      aboutPanel;

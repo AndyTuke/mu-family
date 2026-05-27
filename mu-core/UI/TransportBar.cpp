@@ -4,7 +4,7 @@ static const juce::String kPlay = juce::String(juce::CharPointer_UTF8("\xe2\x96\
 static const juce::String kStop = juce::String(juce::CharPointer_UTF8("\xe2\x96\xa0"));
 static const juce::String kGear = juce::String(juce::CharPointer_UTF8("\xe2\x9a\x99"));
 
-TransportBar::TransportBar(PluginProcessor& p)
+TransportBar::TransportBar(ProcessorBase& p)
     : proc(p),
       isStandalone(p.wrapperType == juce::AudioProcessor::wrapperType_Standalone)
 {
@@ -33,35 +33,6 @@ TransportBar::TransportBar(PluginProcessor& p)
     posLabel.setText("1.1.1", juce::dontSendNotification);
     addAndMakeVisible(posLabel);
 
-    loopLabel.setText("Loop:", juce::dontSendNotification);
-    loopLabel.setJustificationType(juce::Justification::centredRight);
-    loopLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-    addAndMakeVisible(loopLabel);
-
-    loopDropdown.addItem(juce::String::charToString(0x221E), 1); // ∞ = pattern reset length disabled
-    for (int i = 1; i <= 16; ++i)
-        loopDropdown.addItem(juce::String(i * 16) + " steps", i + 1);
-    loopDropdown.setSelectedId(1, false); // default: off
-    loopDropdown.onChange = [this](int id)
-    {
-        const int paramVal = id - 1; // id=1→0 (off), id=2→1 (16 steps), ...
-        if (auto* p = proc.apvts.getParameter("mstrLoop"))
-            p->setValueNotifyingHost(p->convertTo0to1((float)paramVal));
-        loopStepLabel.setVisible(id != 1);
-        if (onStatusUpdate) onStatusUpdate("Master Loop", loopDropdown.getText());
-    };
-    addAndMakeVisible(loopDropdown);
-
-    loopStepLabel.setJustificationType(juce::Justification::centredLeft);
-    loopStepLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-    syncLoopDropdownFromAPVTS();
-    addAndMakeVisible(loopStepLabel);
-
-    // Catch host automation of mstrLoop so the dropdown / step label stay in
-    // sync with the DAW state. parameterChanged marshals to the message thread.
-    proc.apvts.addParameterListener("mstrLoop", this);
-
-#if !MUCLID_LITE_BUILD
     presetDropdown.setPlaceholderText("<unnamed preset>");
     presetDropdown.onChange = [this](int id)
     {
@@ -96,44 +67,54 @@ TransportBar::TransportBar(PluginProcessor& p)
     mixerBtn.setClickingTogglesState(true);
     mixerBtn.onClick = [this] { if (onMixerToggle) onMixerToggle(); };
     addAndMakeVisible(mixerBtn);
-#endif
 
     gearBtn.setButtonText(kGear);
     gearBtn.onClick = [this] { if (onSettingsToggle) onSettingsToggle(); };
     addAndMakeVisible(gearBtn);
 
-#if !MUCLID_LITE_BUILD
     populatePresetDropdown();
-#endif
     refreshPlayBtn();
     startTimerHz(30);
 }
 
 TransportBar::~TransportBar()
 {
-    proc.apvts.removeParameterListener("mstrLoop", this);
     stopTimer();
 }
 
-void TransportBar::syncLoopDropdownFromAPVTS()
+void TransportBar::setLogoText(const juce::String& text)
 {
-    const int paramVal = (int) proc.apvts.getRawParameterValue("mstrLoop")->load();
-    loopStepLabel.setVisible(paramVal > 0);
-    loopDropdown.setSelectedId(paramVal + 1, false);
+    logoText = text;
+    repaint();
 }
 
-void TransportBar::parameterChanged(const juce::String& parameterID, float /*newValue*/)
+void TransportBar::setShowPresetControls(bool show)
 {
-    if (parameterID != "mstrLoop") return;
+    showPresetControls = show;
+    presetDropdown.setVisible(show);
+    newBtn        .setVisible(show);
+    saveBtn       .setVisible(show);
+    if (!show) presetStagingBadge.setVisible(false);
+    resized();
+}
 
-    // host automation can fire on the audio thread; juce::Slider / DropdownSelect
-    // state isn't safe to mutate off the message thread.
-    juce::Component::SafePointer<TransportBar> safe(this);
-    auto refresh = [safe] { if (auto* self = safe.getComponent()) self->syncLoopDropdownFromAPVTS(); };
-    if (juce::MessageManager::getInstance()->isThisTheMessageThread())
-        refresh();
-    else
-        juce::MessageManager::callAsync(std::move(refresh));
+void TransportBar::setShowMixerToggle(bool show)
+{
+    showMixerToggle = show;
+    mixerBtn.setVisible(show);
+    resized();
+}
+
+void TransportBar::setLoopSection(juce::Component* component, int width)
+{
+    if (loopSection == component && loopSectionWidth == width) return;
+    if (loopSection != nullptr)
+        removeChildComponent(loopSection);
+    loopSection      = component;
+    loopSectionWidth = (component != nullptr) ? juce::jmax(0, width) : 0;
+    if (loopSection != nullptr)
+        addAndMakeVisible(loopSection);
+    resized();
 }
 
 void TransportBar::timerCallback()
@@ -152,54 +133,35 @@ void TransportBar::timerCallback()
         playBtn.setEnabled(!midiTransport);
     }
 
-    // Reconcile the loop dropdown with the mstrLoop param every tick. A preset
-    // load sets the param via the APVTS, but if that doesn't fire our listener
-    // (value unchanged, or the editor opened with a preset already loaded) the
-    // dropdown could otherwise show a stale value — e.g. reading "64 steps" while
-    // the loaded preset is actually 32. Self-healing keeps the display honest.
-    if (const auto* p = proc.apvts.getRawParameterValue("mstrLoop"))
-    {
-        const int paramVal = (int) p->load();
-        if (loopDropdown.getSelectedId() != paramVal + 1)
-            syncLoopDropdownFromAPVTS();
-    }
-
     // Show the staging badge while a full-preset hot-swap is queued for the loop point.
-    presetStagingBadge.setVisible(proc.hasPendingFullPreset());
-
-    if (loopStepLabel.isVisible())
-    {
-        const int steps   = proc.sequencer.getMasterLoopSteps();
-        const int current = proc.sequencer.getMasterLoopCurrentStep() + 1;
-        loopStepLabel.setText(juce::String(current) + " / " + juce::String(steps),
-                              juce::dontSendNotification);
-    }
+    if (showPresetControls)
+        presetStagingBadge.setVisible(proc.hasPendingFullPreset());
 }
 
 void TransportBar::refreshPlayBtn()
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
     if (isStandalone)
     {
         const bool playing = proc.isInternalPlaying() || proc.isMidiClockPlaying();
         playBtn.setButtonText(playing ? kStop : kPlay);
         if (playing)
         {
-            playBtn.setColour(juce::TextButton::buttonColourId,  MuClidLookAndFeel::colour(Id::transportWhilePlayingBg));
-            playBtn.setColour(juce::TextButton::textColourOffId, MuClidLookAndFeel::colour(Id::textBright));
+            playBtn.setColour(juce::TextButton::buttonColourId,  MuLookAndFeel::colour(Id::transportWhilePlayingBg));
+            playBtn.setColour(juce::TextButton::textColourOffId, MuLookAndFeel::colour(Id::textBright));
         }
         else
         {
-            playBtn.setColour(juce::TextButton::buttonColourId,  MuClidLookAndFeel::colour(Id::transportWhileStoppedBg));
-            playBtn.setColour(juce::TextButton::textColourOffId, MuClidLookAndFeel::colour(Id::textBright));
+            playBtn.setColour(juce::TextButton::buttonColourId,  MuLookAndFeel::colour(Id::transportWhileStoppedBg));
+            playBtn.setColour(juce::TextButton::textColourOffId, MuLookAndFeel::colour(Id::textBright));
         }
     }
     else
     {
         playBtn.setButtonText(kPlay);
         playBtn.setColour(juce::TextButton::buttonColourId,
-                          MuClidLookAndFeel::colour(Id::segmentInactiveBg));
-        playBtn.setColour(juce::TextButton::textColourOffId, MuClidLookAndFeel::colour(Id::textDisabledButton));
+                          MuLookAndFeel::colour(Id::segmentInactiveBg));
+        playBtn.setColour(juce::TextButton::textColourOffId, MuLookAndFeel::colour(Id::textDisabledButton));
     }
 }
 
@@ -254,10 +216,12 @@ void TransportBar::populatePresetDropdown()
     auto dir = proc.getPresetsDir();
     if (!dir.isDirectory()) return;
 
+    const juce::String wildcard = "*." + proc.getFullPresetExtension();
+
     struct Entry { juce::File file; juce::String name, category; };
     std::vector<Entry> entries;
 
-    for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*.muClid"))
+    for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, wildcard))
     {
         if (f.getFileNameWithoutExtension().equalsIgnoreCase("_default")) continue;
         Entry e { f, f.getFileNameWithoutExtension(), "Uncategorised" };
@@ -359,23 +323,23 @@ void TransportBar::mouseDown(const juce::MouseEvent& e)
 
 void TransportBar::paint(juce::Graphics& g)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
 
-    g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
+    g.setColour(MuLookAndFeel::colour(Id::panelBackground));
     g.fillAll();
 
-    // Two sub-pane borders: transport (play+bpm+pos) and loop (loop dropdown+counter).
-    const juce::Colour borderCol = MuClidLookAndFeel::colour(Id::segmentInactiveBorder);
+    // Two sub-pane borders: transport (play+bpm+pos) and optional loop section
+    // (when the product has supplied a loop component via setLoopSection).
+    const juce::Colour borderCol = MuLookAndFeel::colour(Id::segmentInactiveBorder);
     g.setColour(borderCol);
     if (!transportPaneBounds.isEmpty())
         g.drawRoundedRectangle(transportPaneBounds.toFloat(), mu_ui::sf(3.0f), 1.0f);
     if (!loopPaneBounds.isEmpty())
         g.drawRoundedRectangle(loopPaneBounds.toFloat(), mu_ui::sf(3.0f), 1.0f);
 
-    g.setColour(MuClidLookAndFeel::colour(Id::headingText));
+    g.setColour(MuLookAndFeel::colour(Id::headingText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(14.0f))));
-    g.drawText(juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid")),
-               mu_ui::s(8), 0, mu_ui::s(kLogoW - 8), getHeight(),
+    g.drawText(logoText, mu_ui::s(8), 0, mu_ui::s(kLogoW - 8), getHeight(),
                juce::Justification::centredLeft, false);
 }
 
@@ -412,43 +376,46 @@ void TransportBar::resized()
 
     transportPaneBounds = { tpOuterX, inset, x - tpOuterX, h - 2 * inset };
 
-    // ── Loop sub-pane: [Loop:] [dropdown] [step counter] ──────────────────
-    const int lpOuterX = transportPaneBounds.getRight() + gap;
-    x = lpOuterX + padIn;
-
-    loopLabel.setBounds(x, btnY, s(kLoopLabelW), btnH);
-    x += s(kLoopLabelW) + s(2);
-    loopDropdown.setBounds(x, btnY, s(kLoopW), btnH);
-    x += s(kLoopW) + s(2);
-    loopStepLabel.setBounds(x, btnY, s(kLoopStepW), btnH);
-    x += s(kLoopStepW) + padIn;
-
-    loopPaneBounds = { lpOuterX, inset, x - lpOuterX, h - 2 * inset };
+    // ── Optional loop section: positioned right of the transport pane ─────
+    if (loopSection != nullptr && loopSectionWidth > 0)
+    {
+        const int lpOuterX = transportPaneBounds.getRight() + gap;
+        loopPaneBounds = { lpOuterX, inset, loopSectionWidth, h - 2 * inset };
+        loopSection->setBounds(loopPaneBounds);
+    }
+    else
+    {
+        loopPaneBounds = {};
+    }
 
     // ── Right group (right to left): Mixer | Gear | Save | Preset ─────────
-#if MUCLID_LITE_BUILD
-    gearBtn.setBounds(getWidth() - gap - s(kGearW), btnY, s(kGearW), btnH);
-#else
     int rightEdge = getWidth() - gap;
-    mixerBtn.setBounds(rightEdge - s(kMixerW), btnY, s(kMixerW), btnH);
-    rightEdge -= s(kMixerW) + gap;
+
+    if (showMixerToggle)
+    {
+        mixerBtn.setBounds(rightEdge - s(kMixerW), btnY, s(kMixerW), btnH);
+        rightEdge -= s(kMixerW) + gap;
+    }
 
     gearBtn.setBounds(rightEdge - s(kGearW), btnY, s(kGearW), btnH);
     rightEdge -= s(kGearW) + gap;
 
-    saveBtn.setBounds(rightEdge - s(kSaveW), btnY, s(kSaveW), btnH);
-    rightEdge -= s(kSaveW) + gap;
+    if (showPresetControls)
+    {
+        saveBtn.setBounds(rightEdge - s(kSaveW), btnY, s(kSaveW), btnH);
+        rightEdge -= s(kSaveW) + gap;
 
-    newBtn.setBounds(rightEdge - s(kNewW), btnY, s(kNewW), btnH);
-    rightEdge -= s(kNewW) + gap;
+        newBtn.setBounds(rightEdge - s(kNewW), btnY, s(kNewW), btnH);
+        rightEdge -= s(kNewW) + gap;
 
-    const int presetLeft = loopPaneBounds.getRight() + gap;
-    presetDropdown.setBounds(presetLeft, btnY, rightEdge - presetLeft, btnH);
+        const int presetLeft = (loopPaneBounds.isEmpty() ? transportPaneBounds.getRight()
+                                                          : loopPaneBounds.getRight()) + gap;
+        presetDropdown.setBounds(presetLeft, btnY, rightEdge - presetLeft, btnH);
 
-    // Staging badge: small pill at the top-right of the preset dropdown.
-    const int badgeW = s(28);
-    const int badgeH = s(11);
-    presetStagingBadge.setBounds(presetDropdown.getRight() - badgeW - s(4),
-                                 presetDropdown.getY() + s(2), badgeW, badgeH);
-#endif
+        // Staging badge: small pill at the top-right of the preset dropdown.
+        const int badgeW = s(28);
+        const int badgeH = s(11);
+        presetStagingBadge.setBounds(presetDropdown.getRight() - badgeW - s(4),
+                                     presetDropdown.getY() + s(2), badgeW, badgeH);
+    }
 }

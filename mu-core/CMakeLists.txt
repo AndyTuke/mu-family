@@ -68,6 +68,8 @@ target_sources(mu-core INTERFACE
     # Shared modal overlays — product chrome supplied via setters.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/AboutPanel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/SaveDialog.cpp"
+    # Shared transport bar — product slots in its own loop section + logo text.
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/TransportBar.cpp"
 )
 
 # Consumers can `#include "Audio/VoiceEngine.h"` etc. — same path namespace as

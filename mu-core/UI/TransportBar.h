@@ -1,16 +1,23 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "Plugin/PluginProcessor.h"
+#include "Plugin/ProcessorBase.h"
 #include "UI/Components/NudgeInput.h"
 #include "UI/Components/DropdownSelect.h"
-#include "UI/Components/MuClidLookAndFeel.h"
+#include "UI/Components/MuLookAndFeel.h"
 
+// Shared mu-family transport bar — play / BPM / position / preset dropdown /
+// new / save / gear / mixer toggle. Plugin-agnostic: takes ProcessorBase, reads
+// transport + preset + license through its virtual surface (Phase 2).
+//
+// The bar reserves a central "loop section" slot between the transport pane
+// and the preset dropdown that a product can fill with its own component
+// (mu-clid's MasterLoopSection sits here). Lite-style builds without preset /
+// mixer chrome opt out via setShowPresetControls(false) + setShowMixerToggle(false).
 class TransportBar : public juce::Component,
-                     public juce::AudioProcessorValueTreeState::Listener,
                      private juce::Timer
 {
 public:
-    explicit TransportBar(PluginProcessor& proc);
+    explicit TransportBar(ProcessorBase& proc);
     ~TransportBar() override;
 
     std::function<void()>                      onMixerToggle;
@@ -19,9 +26,22 @@ public:
     std::function<void()>                      onSavePreset;
     std::function<void()>                      onNewPreset;
     std::function<void()>                      onSettingsToggle;
-    // status-bar coverage for chrome controls (bpmInput, loopDropdown).
-    // Plugin editor wires this to the global StatusBar; no rhythm-colour tag.
+    // status-bar coverage for the chrome (BPM input). Editor wires this to the
+    // global StatusBar; no per-channel colour tag (those come from the panels).
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
+
+    // ─── Product-supplied chrome ────────────────────────────────────────────
+    void setLogoText(const juce::String& text);
+    // When false, hides the preset dropdown + new/save buttons + staging badge.
+    // Default true.
+    void setShowPresetControls(bool show);
+    // When false, hides the mixer-toggle button. Default true.
+    void setShowMixerToggle(bool show);
+    // Embed a product-specific component (e.g. mu-clid's master-loop section)
+    // between the transport pane and the preset dropdown. Pass `width = 0` or
+    // `component = nullptr` to clear. The bar parents the component and lays
+    // it out in `loopPaneBounds`.
+    void setLoopSection(juce::Component* component, int width);
 
     void refreshPresets();
     // keep dropdown displaying the loaded preset's name. Pass an invalid
@@ -40,16 +60,19 @@ public:
     void mouseDown(const juce::MouseEvent& e) override;
 
 private:
-    PluginProcessor& proc;
+    ProcessorBase& proc;
     const bool isStandalone;
+
+    juce::String     logoText;
+    bool             showPresetControls = true;
+    bool             showMixerToggle    = true;
+    juce::Component* loopSection        = nullptr;
+    int              loopSectionWidth   = 0;
 
     juce::TextButton playBtn;
     NudgeInput       bpmInput { "BPM", 20, 300, 120 };
 
     juce::Label      posLabel;
-    juce::Label      loopLabel;
-    DropdownSelect   loopDropdown;
-    juce::Label      loopStepLabel;
     DropdownSelect   presetDropdown;
     juce::Label      presetStagingBadge;   // "SWP" pill shown on a pending full-preset hot-swap
     juce::TextButton newBtn   { "New" };
@@ -61,9 +84,6 @@ private:
     static constexpr int kPlayW      = 36;   // wider for clarity
     static constexpr int kBpmW       = 72;   // inline "BPM" label + value + arrows
     static constexpr int kPosW       = 56;
-    static constexpr int kLoopLabelW = 36;
-    static constexpr int kLoopW      = 100;
-    static constexpr int kLoopStepW  = 56;
     static constexpr int kPresetW    = 240;  // wider preset dropdown
     static constexpr int kNewW       = 36;
     static constexpr int kSaveW      = 44;
@@ -81,14 +101,4 @@ private:
     void refreshPlayBtn();
     void updatePositionLabel();
     void populatePresetDropdown();
-
-    // Sync `loopDropdown` + `loopStepLabel` from current APVTS state. Called
-    // from the ctor and from `parameterChanged("mstrLoop", ...)` so DAW
-    // automation of the master-loop length stays mirrored in the UI.
-    void syncLoopDropdownFromAPVTS();
-
-    // juce::AudioProcessorValueTreeState::Listener — only subscribed to
-    // "mstrLoop". Bounces to the message thread because host automation can
-    // fire this on the audio thread.
-    void parameterChanged(const juce::String& parameterID, float newValue) override;
 };

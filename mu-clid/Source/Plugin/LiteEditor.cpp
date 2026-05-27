@@ -3,9 +3,16 @@
 
 LiteEditor::LiteEditor(PluginProcessor& p)
     : AudioProcessorEditor(&p), proc(p),
-      transportBar(p), euclidPanel(p)
+      transportBar(p), masterLoop(p), euclidPanel(p)
 {
     setLookAndFeel(&lookAndFeel);
+
+    // Lite build: keep the master-loop section but drop the preset / mixer
+    // chrome (MIDI-effect, no preset library + no mixer overlay).
+    transportBar.setLogoText(juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid Lite")));
+    transportBar.setLoopSection(&masterLoop, MasterLoopSection::kWidth);
+    transportBar.setShowPresetControls(false);
+    transportBar.setShowMixerToggle(false);
 
     addAndMakeVisible(transportBar);
     addAndMakeVisible(rhythmCircle);

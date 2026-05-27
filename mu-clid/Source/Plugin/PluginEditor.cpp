@@ -13,7 +13,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
                                                         PluginProcessor::kUiScaleLarge,
                                                         p.getUiScale()), &p)),
       processorRef(p),
-      transportBar(p), sidebar(p), rhythmPanel(p),
+      transportBar(p), masterLoop(p), sidebar(p), rhythmPanel(p),
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p),
       midiPresetsPanel(p),
@@ -33,6 +33,14 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         });
     saveDialog.setLogoImage(juce::ImageCache::getFromMemory(BinaryData::muclid_png,
                                                             BinaryData::muclid_pngSize));
+
+    // Shared TransportBar — supply mu-clid chrome (logo + master-loop section).
+    transportBar.setLogoText(juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid")));
+    transportBar.setLoopSection(&masterLoop, MasterLoopSection::kWidth);
+    masterLoop.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
+    {
+        statusBar.showParam(name, val);
+    };
 
     addAndMakeVisible(transportBar);
     addAndMakeVisible(sidebar);

@@ -41,7 +41,7 @@ target_sources(mu-clid
         Source/Sequencer/HitGenerator.cpp
         Source/Sequencer/Rhythm.cpp
         Source/Sequencer/SequencerEngine.cpp
-        Source/UI/TransportBar.cpp
+        Source/UI/MasterLoopSection.cpp
         Source/UI/RhythmCircle.cpp
         Source/UI/SidebarItem.cpp
         Source/UI/RhythmSidebar.cpp
@@ -188,7 +188,7 @@ target_sources(mu-clid-lite
         Source/Sequencer/HitGenerator.cpp
         Source/Sequencer/Rhythm.cpp
         Source/Sequencer/SequencerEngine.cpp
-        Source/UI/TransportBar.cpp
+        Source/UI/MasterLoopSection.cpp
         Source/UI/RhythmCircle.cpp
         Source/UI/EuclideanPanel.cpp
         Source/License/LicenseChecker.cpp

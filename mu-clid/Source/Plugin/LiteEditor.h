@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "PluginProcessor.h"
 #include "UI/TransportBar.h"
+#include "UI/MasterLoopSection.h"
 #include "UI/RhythmCircle.h"
 #include "UI/EuclideanPanel.h"
 #include "UI/Components/StatusBar.h"
@@ -33,8 +34,9 @@ private:
 
     MuClidLookAndFeel lookAndFeel;
 
-    TransportBar   transportBar;
-    RhythmCircle   rhythmCircle;
+    TransportBar      transportBar;
+    MasterLoopSection masterLoop;
+    RhythmCircle      rhythmCircle;
     EuclideanPanel euclidPanel;
     StatusBar      statusBar;
     AboutPanel     aboutPanel;
