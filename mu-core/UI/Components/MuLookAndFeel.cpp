@@ -117,11 +117,11 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
     }
 }
 
-// Fixed 8-colour rhythm palette. Order matches the rhythm slot index — slot 0
-// is Green, slot 1 is Red etc. Purple is intentionally absent (reserved for
-// the global / mixer accent — see MuTheme::Global::accent) so a rhythm border
-// and a mixer border never share a hue.
-const juce::Colour MuLookAndFeel::rhythmPalette[MuLookAndFeel::kRhythmPaletteSize] = {
+// Fixed 8-colour palette indexed by channel (rhythm in mu-clid, layer in mu-tant).
+// Order matches the slot index — slot 0 is Green, slot 1 is Blue, etc. Purple is
+// intentionally absent (reserved for the global / mixer accent — see
+// MuTheme::Global::accent) so a channel border and a mixer border never share a hue.
+const juce::Colour MuLookAndFeel::channelPalette[MuLookAndFeel::kChannelPaletteSize] = {
     juce::Colour(0xff4ADC8E),   // 0 Green
     juce::Colour(0xff378ADD),   // 1 Blue
     juce::Colour(0xffEF9F27),   // 2 Yellow / amber

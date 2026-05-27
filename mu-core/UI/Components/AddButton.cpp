@@ -7,14 +7,14 @@ AddButton::AddButton(const juce::String& label) : labelText(label)
 
 void AddButton::paint(juce::Graphics& g)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
     using mu_ui::sf;
 
     auto bounds = getLocalBounds().toFloat().reduced(0.5f);
 
     if (hovered)
     {
-        g.setColour(MuClidLookAndFeel::colour(Id::addButtonHoverBg));
+        g.setColour(MuLookAndFeel::colour(Id::addButtonHoverBg));
         g.fillRoundedRectangle(bounds, sf(3.0f));
     }
 
@@ -22,13 +22,13 @@ void AddButton::paint(juce::Graphics& g)
     const float dashLen = sf(4.0f), gapLen = sf(3.0f);
     juce::Path border;
     border.addRoundedRectangle(bounds, sf(3.0f));
-    g.setColour(MuClidLookAndFeel::colour(Id::addButtonBorder));
+    g.setColour(MuLookAndFeel::colour(Id::addButtonBorder));
     juce::PathStrokeType stroke(1.0f);
     float dashes[] = { dashLen, gapLen };
     stroke.createDashedStroke(border, border, dashes, 2);
     g.strokePath(border, stroke);
 
-    g.setColour(MuClidLookAndFeel::colour(Id::addButtonText));
+    g.setColour(MuLookAndFeel::colour(Id::addButtonText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
     g.drawText("+ " + labelText, getLocalBounds(), juce::Justification::centred, true);
 }

@@ -4,7 +4,7 @@
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/VUMeter.h"
 #include "UI/Components/GRMeter.h"
-#include "UI/Components/MuClidLookAndFeel.h"
+#include "UI/Components/MuLookAndFeel.h"
 #include "Audio/MixerEngine.h"
 #include "Audio/InsertSlotConfig.h"
 
@@ -68,7 +68,7 @@ public:
     void paint(juce::Graphics&) override;
 
 private:
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
 
     Type         channelType;
     juce::String channelName;

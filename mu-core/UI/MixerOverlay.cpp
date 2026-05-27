@@ -34,10 +34,10 @@ static bool isMixerRelevantParam(const juce::String& id) noexcept
 
 MixerOverlay::MixerOverlay(ProcessorBase& p, MixerEngine& m)
     : proc(p), mixer(m),
-      effectRow("Effect", FXAlgorithmRegistry::effectAlgorithms(), MuClidLookAndFeel::knobFxSend),
-      reverbRow("Reverb", FXAlgorithmRegistry::reverbAlgorithms(), MuClidLookAndFeel::knobReverb)
+      effectRow("Effect", FXAlgorithmRegistry::effectAlgorithms(), MuLookAndFeel::knobFxSend),
+      reverbRow("Reverb", FXAlgorithmRegistry::reverbAlgorithms(), MuLookAndFeel::knobReverb)
 {
-    buildRhythmChannels();
+    buildChannels();
     wireReturns();
     wireFXRows();
 
@@ -94,19 +94,19 @@ void MixerOverlay::timerCallback()
         loadFromAPVTS();
 }
 
-void MixerOverlay::buildRhythmChannels()
+void MixerOverlay::buildChannels()
 {
     for (auto& ch : rhythmChannels)
         removeChildComponent(ch.get());
     rhythmChannels.clear();
 
-    const auto& palette = MuClidLookAndFeel::rhythmPalette;
+    const auto& palette = MuLookAndFeel::channelPalette;
     const int numActive = proc.getNumChannels();
     for (int r = 0; r < MixerEngine::MaxChannels; ++r)
     {
         bool hasRhythm = r < numActive;
-        juce::Colour col = hasRhythm ? palette[proc.getChannelColourIndex(r) % MuClidLookAndFeel::kRhythmPaletteSize]
-                                     : MuClidLookAndFeel::colour(MuClidLookAndFeel::mixerInactiveNameBg);
+        juce::Colour col = hasRhythm ? palette[proc.getChannelColourIndex(r) % MuLookAndFeel::kChannelPaletteSize]
+                                     : MuLookAndFeel::colour(MuLookAndFeel::mixerInactiveNameBg);
         juce::String name = hasRhythm ? juce::String(proc.getChannelName(r)) : "-";
         auto ch = std::make_unique<MixerChannel>(MixerChannel::Type::Rhythm, name, col);
         const juce::String prefix = "ch" + juce::String(r) + "_";
@@ -587,7 +587,7 @@ void MixerOverlay::loadFromAPVTS()
 
 void MixerOverlay::refresh()
 {
-    buildRhythmChannels();
+    buildChannels();
     updateEffectSendLabels();
     resized();
     repaint();
@@ -615,11 +615,11 @@ void MixerOverlay::resized()
     // multiplies through s() so toggling scale propagates uniformly.
     using mu_ui::s;
     const int w        = getWidth();
-    const int fxAreaH  = s(MuClidLookAndFeel::kMixerFXAreaH);
-    const int fxRowH   = s(MuClidLookAndFeel::kMixerFXRowH);
-    const int stripH   = s(MuClidLookAndFeel::kMixerStripH);
-    const int chanW    = s(MuClidLookAndFeel::kMixerChanW);
-    const int masterTotalW = s(MuClidLookAndFeel::kMixerMasterTotalW);
+    const int fxAreaH  = s(MuLookAndFeel::kMixerFXAreaH);
+    const int fxRowH   = s(MuLookAndFeel::kMixerFXRowH);
+    const int stripH   = s(MuLookAndFeel::kMixerStripH);
+    const int chanW    = s(MuLookAndFeel::kMixerChanW);
+    const int masterTotalW = s(MuLookAndFeel::kMixerMasterTotalW);
     const int hdrH     = s(kHeaderH);
     const int fxPad    = s(kFXPad);
     const int fxGap    = s(kFXGap);
@@ -678,11 +678,11 @@ void MixerOverlay::propagateMeterMode(VUMeter::MeterMode m)
 void MixerOverlay::paint(juce::Graphics& g)
 {
     using mu_ui::sf;
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
     g.fillAll();
 
     // Header separator line
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder));
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::segmentInactiveBorder));
     g.fillRect(0, kHeaderH - 1, getWidth(), 1);
 
     // ── Row label panel (left of channel strips, labels aligned with strip sections) ─
@@ -694,14 +694,14 @@ void MixerOverlay::paint(juce::Graphics& g)
         const int chY = kHeaderH;  // channels start at kHeaderH in MixerOverlay space
 
         // Slightly darker background for the label panel
-        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground).darker(0.25f));
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground).darker(0.25f));
         g.fillRect(lx, chY, lw, lastStripH);
 
         // Right-edge separator
-        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder));
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::segmentInactiveBorder));
         g.fillRect(lw - 1, chY, 1, lastStripH);
 
-        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::mutedText));
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
 
         // Draw a label rotated 90° CCW, centred in 'bounds' (component-space rect).
@@ -728,8 +728,8 @@ void MixerOverlay::paint(juce::Graphics& g)
             drawVLabel("Output", refCh->getOutBusBounds());
 
         // Horizontal section-separator lines spanning the full channel area.
-        const juce::Colour sepCol = MuClidLookAndFeel::colour(
-            MuClidLookAndFeel::segmentInactiveBorder).withAlpha(0.35f);
+        const juce::Colour sepCol = MuLookAndFeel::colour(
+            MuLookAndFeel::segmentInactiveBorder).withAlpha(0.35f);
         g.setColour(sepCol);
         const int lineX1 = lw;
         const int lineX2 = getWidth();
@@ -747,7 +747,7 @@ void MixerOverlay::paint(juce::Graphics& g)
     }
 
     // Dividers between rhythm channels and returns, and before master
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder));
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::segmentInactiveBorder));
     g.fillRect(lastDivX1, kHeaderH, kDivW, lastStripH);
     g.fillRect(lastDivX2, kHeaderH, kDivW, lastStripH);
 
@@ -758,10 +758,10 @@ void MixerOverlay::paint(juce::Graphics& g)
     // room — matches the .reduced(2) pattern in RhythmPanel::paint.
     using mu_ui::s;
     const int borderInset = s(2);
-    const juce::Colour globalCol = MuClidLookAndFeel::colour(MuClidLookAndFeel::globalAccent);
-    const juce::Colour outerFill = MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground)
+    const juce::Colour globalCol = MuLookAndFeel::colour(MuLookAndFeel::globalAccent);
+    const juce::Colour outerFill = MuLookAndFeel::colour(MuLookAndFeel::panelBackground)
                                        .darker(0.15f);
-    const juce::Colour rowFill   = MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground)
+    const juce::Colour rowFill   = MuLookAndFeel::colour(MuLookAndFeel::panelBackground)
                                        .brighter(0.06f);
 
     // ── Channel strips outline ─────────────────────────────────────────────

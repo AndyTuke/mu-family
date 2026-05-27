@@ -112,7 +112,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         // the bare cyclic position only if all palette colours are in use
         // (which can't happen since max rhythms = palette size = 8).
         {
-            constexpr int N = MuClidLookAndFeel::kRhythmPaletteSize;
+            constexpr int N = MuClidLookAndFeel::kChannelPaletteSize;
             std::array<bool, N> used{};
             const int nExisting = processorRef.getNumRhythms();
             for (int i = 0; i < nExisting; ++i)

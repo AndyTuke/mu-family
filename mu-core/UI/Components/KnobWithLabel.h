@@ -1,6 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "MuClidLookAndFeel.h"
+#include "MuLookAndFeel.h"
 
 // Rotary slider + category colour + label below + optional status bar callback.
 class KnobWithLabel : public juce::Component, private juce::Timer
@@ -10,7 +10,7 @@ public:
     std::function<void(double value)> onValueChanged;
 
     KnobWithLabel(const juce::String& label,
-                  MuClidLookAndFeel::ColourIds categoryColour = MuClidLookAndFeel::knobEuclidean);
+                  MuLookAndFeel::ColourIds categoryColour = MuLookAndFeel::knobEuclidean);
     ~KnobWithLabel() override { stopTimer(); }
 
     juce::Slider& getSlider() noexcept { return slider; }
@@ -50,7 +50,7 @@ public:
 private:
     juce::Slider slider;
     juce::String labelText;
-    MuClidLookAndFeel::ColourIds knobColour;
+    MuLookAndFeel::ColourIds knobColour;
 
     bool  isModulated   = false;
     float modulatedNorm = std::numeric_limits<float>::quiet_NaN();

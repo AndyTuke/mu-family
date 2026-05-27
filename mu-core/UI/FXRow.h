@@ -3,7 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <array>
 #include "Audio/FX/Slots/FXAlgorithmDef.h"
-#include "UI/Components/MuClidLookAndFeel.h"
+#include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/DropdownSelect.h"
 
@@ -21,7 +21,7 @@ public:
 
     FXRow(const juce::String& slotName,
           const std::vector<FXAlgorithmDef>& algorithms,
-          MuClidLookAndFeel::ColourIds knobColour = MuClidLookAndFeel::knobFxSend);
+          MuLookAndFeel::ColourIds knobColour = MuLookAndFeel::knobFxSend);
 
     void setEnabled(bool enabled, juce::NotificationType n = juce::dontSendNotification);
     void setSelectedAlgorithm(int index, juce::NotificationType n = juce::dontSendNotification);
@@ -53,7 +53,7 @@ private:
 
     juce::String slotName;
     std::vector<FXAlgorithmDef> algorithmDefs;
-    MuClidLookAndFeel::ColourIds knobColour;
+    MuLookAndFeel::ColourIds knobColour;
 
     juce::TextButton             enableButton{ "On" };
     DropdownSelect               algorithmDropdown;

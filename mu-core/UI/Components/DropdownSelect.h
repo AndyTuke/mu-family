@@ -1,6 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "MuClidLookAndFeel.h"
+#include "MuLookAndFeel.h"
 
 // Styled wrapper around juce::ComboBox.
 class DropdownSelect : public juce::Component

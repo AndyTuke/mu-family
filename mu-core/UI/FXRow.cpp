@@ -9,7 +9,7 @@ static juce::String fmtHzNum(double v)
 
 FXRow::FXRow(const juce::String& name,
              const std::vector<FXAlgorithmDef>& algorithms,
-             MuClidLookAndFeel::ColourIds colour)
+             MuLookAndFeel::ColourIds colour)
     : slotName(name), algorithmDefs(algorithms), knobColour(colour)
 {
     addAndMakeVisible(enableButton);
@@ -110,7 +110,7 @@ void FXRow::setShowSizeDemo(bool show)
         for (int i = 0; i < 4; ++i)
         {
             sizeDemoKnobs[(size_t) i] = std::make_unique<KnobWithLabel>(
-                labels[i], MuClidLookAndFeel::knobPan);
+                labels[i], MuLookAndFeel::knobPan);
             sizeDemoKnobs[(size_t) i]->setRange(0.0, 100.0, 1.0);
             sizeDemoKnobs[(size_t) i]->setValue(50.0, juce::dontSendNotification);
             addAndMakeVisible(*sizeDemoKnobs[(size_t) i]);
@@ -194,24 +194,24 @@ void FXRow::resized()
 void FXRow::paint(juce::Graphics& g)
 {
     // Row background
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
     g.fillRect(getLocalBounds());
 
     // Bottom separator line
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder));
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::segmentInactiveBorder));
     g.drawLine(0.0f, static_cast<float>(getHeight() - 1),
                static_cast<float>(getWidth()), static_cast<float>(getHeight() - 1), 0.5f);
 
     // Slot name label
     const int nameX = kPadding + kToggleW + kPadding;
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::labelText));
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::labelText));
     g.drawText(slotName, nameX, 0, kNameW, getHeight(), juce::Justification::centredLeft);
 
     // Dim overlay when disabled
     if (!isEnabled)
     {
-        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::backgroundFxRowDim));
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::backgroundFxRowDim));
         g.fillRect(getLocalBounds());
     }
 
@@ -220,7 +220,7 @@ void FXRow::paint(juce::Graphics& g)
     // glance. Drawn last so the disabled-row dim overlay doesn't grey them out.
     if (showSizeDemo)
     {
-        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::knobPrePad));
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::knobPrePad));
         for (const auto& r : sizeDemoBounds)
             if (!r.isEmpty())
                 g.drawRect(r, 1);

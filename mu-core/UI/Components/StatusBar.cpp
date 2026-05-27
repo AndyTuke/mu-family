@@ -16,11 +16,11 @@ void StatusBar::showParam(const juce::String& paramName,
 
 void StatusBar::paint(juce::Graphics& g)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
     using mu_ui::s;
     using mu_ui::sf;
 
-    g.setColour(MuClidLookAndFeel::colour(Id::statusBarBackground));
+    g.setColour(MuLookAndFeel::colour(Id::statusBarBackground));
     g.fillAll();
 
     const int h = getHeight();
@@ -38,12 +38,12 @@ void StatusBar::paint(juce::Graphics& g)
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
 
     // Param name
-    g.setColour(MuClidLookAndFeel::colour(Id::statusBarText));
+    g.setColour(MuLookAndFeel::colour(Id::statusBarText));
     g.drawText(currentName, textX, 0, getWidth() / 2, h,
                juce::Justification::centredLeft, true);
 
     // Value
-    g.setColour(MuClidLookAndFeel::colour(Id::statusBarValue));
+    g.setColour(MuLookAndFeel::colour(Id::statusBarValue));
     g.drawText(currentValue, textX + getWidth() / 2 - textX, 0,
                getWidth() / 2, h, juce::Justification::centredLeft, true);
 }

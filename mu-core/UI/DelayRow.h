@@ -1,7 +1,7 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "UI/Components/MuClidLookAndFeel.h"
+#include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/SegmentControl.h"
@@ -42,7 +42,7 @@ public:
     void paint(juce::Graphics&) override;
 
 private:
-    using LafId = MuClidLookAndFeel::ColourIds;
+    using LafId = MuLookAndFeel::ColourIds;
 
     void updateModeVisibility();
     void fireSyncParams();

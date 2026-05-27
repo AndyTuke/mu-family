@@ -73,14 +73,14 @@ juce::Path LFOEditor::buildCurvePath() const
 
 void LFOEditor::paint(juce::Graphics& g)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
 
-    g.setColour(MuClidLookAndFeel::colour(Id::lfoEditorBackground));
+    g.setColour(MuLookAndFeel::colour(Id::lfoEditorBackground));
     g.fillAll();
 
     // Zero/baseline line
     const float zeroY = unipolar ? (float)getHeight() : toScreen(0.0f, 0.0f).y;
-    g.setColour(MuClidLookAndFeel::colour(Id::lfoEditorZeroLine));
+    g.setColour(MuLookAndFeel::colour(Id::lfoEditorZeroLine));
     g.drawHorizontalLine((int)zeroY, 0.0f, (float)getWidth());
 
     if (points.size() >= 2)
@@ -92,11 +92,11 @@ void LFOEditor::paint(juce::Graphics& g)
         fill.lineTo((float)getWidth(), zeroY);
         fill.lineTo(0.0f, zeroY);
         fill.closeSubPath();
-        g.setColour(MuClidLookAndFeel::colour(Id::lfoEditorCurveFill));
+        g.setColour(MuLookAndFeel::colour(Id::lfoEditorCurveFill));
         g.fillPath(fill);
 
         // Curve line
-        g.setColour(MuClidLookAndFeel::colour(Id::lfoEditorCurve));
+        g.setColour(MuLookAndFeel::colour(Id::lfoEditorCurve));
         g.strokePath(curve, juce::PathStrokeType(mu_ui::sf(1.5f)));
     }
 
@@ -106,14 +106,14 @@ void LFOEditor::paint(juce::Graphics& g)
     {
         auto s = toScreen(points[i].x, points[i].y);
         bool hovered = (i == dragIndex);
-        g.setColour(hovered ? MuClidLookAndFeel::colour(Id::lfoEditorPointHover)
-                            : MuClidLookAndFeel::colour(Id::lfoEditorPoint));
+        g.setColour(hovered ? MuLookAndFeel::colour(Id::lfoEditorPointHover)
+                            : MuLookAndFeel::colour(Id::lfoEditorPoint));
         g.fillEllipse(s.x - pointR, s.y - pointR, pointR * 2, pointR * 2);
     }
 
     // Playhead
     const float phX = playheadPhase * getWidth();
-    g.setColour(MuClidLookAndFeel::colour(Id::lfoEditorPlayhead));
+    g.setColour(MuLookAndFeel::colour(Id::lfoEditorPlayhead));
     g.drawVerticalLine((int)phX, 0.0f, (float)getHeight());
 }
 

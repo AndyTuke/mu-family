@@ -16,24 +16,24 @@ void SegmentControl::setSelectedIndex(int index, bool notify)
 
 std::pair<juce::Colour, juce::Colour> SegmentControl::activeColours() const noexcept
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
     switch (style)
     {
         case ActiveStyle::Positive:
-            return { MuClidLookAndFeel::colour(Id::segmentPositiveBg),
-                     MuClidLookAndFeel::colour(Id::segmentPositiveBorder) };
+            return { MuLookAndFeel::colour(Id::segmentPositiveBg),
+                     MuLookAndFeel::colour(Id::segmentPositiveBorder) };
         case ActiveStyle::Warning:
-            return { MuClidLookAndFeel::colour(Id::segmentWarningBg),
-                     MuClidLookAndFeel::colour(Id::segmentWarningBorder) };
+            return { MuLookAndFeel::colour(Id::segmentWarningBg),
+                     MuLookAndFeel::colour(Id::segmentWarningBorder) };
         default:
-            return { MuClidLookAndFeel::colour(Id::segmentActiveBg),
-                     MuClidLookAndFeel::colour(Id::segmentActiveBorder) };
+            return { MuLookAndFeel::colour(Id::segmentActiveBg),
+                     MuLookAndFeel::colour(Id::segmentActiveBorder) };
     }
 }
 
 void SegmentControl::paint(juce::Graphics& g)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
     const int n = (int)options.size();
     if (n == 0) return;
 
@@ -57,13 +57,13 @@ void SegmentControl::paint(juce::Graphics& g)
             juce::Rectangle<float> pill(gap + (float)i * (pillW + gap), gap, pillW, pillH);
             bool active = (i == selectedIndex);
 
-            g.setColour(active ? activeBg : MuClidLookAndFeel::colour(Id::segmentInactiveBg));
+            g.setColour(active ? activeBg : MuLookAndFeel::colour(Id::segmentInactiveBg));
             g.fillRoundedRectangle(pill, radius);
 
-            g.setColour(active ? activeBorder : MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+            g.setColour(active ? activeBorder : MuLookAndFeel::colour(Id::segmentInactiveBorder));
             g.drawRoundedRectangle(pill.reduced(0.5f), radius, 1.0f);
 
-            g.setColour(active ? activeBorder : MuClidLookAndFeel::colour(Id::segmentInactiveText));
+            g.setColour(active ? activeBorder : MuLookAndFeel::colour(Id::segmentInactiveText));
             g.setFont(juce::Font(juce::FontOptions{}.withHeight(fontSize)));
             g.drawText(options[i], pill.toNearestInt(), juce::Justification::centred, true);
         }
@@ -81,7 +81,7 @@ void SegmentControl::paint(juce::Graphics& g)
             juce::Rectangle<float> seg(i * segW, 0.0f, segW, h);
             bool active = (i == selectedIndex);
 
-            g.setColour(active ? activeBg : MuClidLookAndFeel::colour(Id::segmentInactiveBg));
+            g.setColour(active ? activeBg : MuLookAndFeel::colour(Id::segmentInactiveBg));
             if (i == 0)
             {
                 g.fillRoundedRectangle(seg, r);
@@ -97,15 +97,15 @@ void SegmentControl::paint(juce::Graphics& g)
                 g.fillRect(seg);
             }
 
-            g.setColour(active ? activeBorder : MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+            g.setColour(active ? activeBorder : MuLookAndFeel::colour(Id::segmentInactiveBorder));
             if (i > 0) g.drawVerticalLine((int)(i * segW), 0, h);
 
             g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
-            g.setColour(active ? activeBorder : MuClidLookAndFeel::colour(Id::segmentInactiveText));
+            g.setColour(active ? activeBorder : MuLookAndFeel::colour(Id::segmentInactiveText));
             g.drawText(options[i], seg.toNearestInt(), juce::Justification::centred, true);
         }
 
-        g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+        g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
         g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), r, 1.0f);
     }
 }

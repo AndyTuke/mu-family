@@ -1,6 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "MuClidLookAndFeel.h"   // mu_ui::s for sized text box / bounds
+#include "MuLookAndFeel.h"   // mu_ui::s for sized text box / bounds
 
 // shared depth + curve slider pair used by ModulatorEditor::AssignmentRow and
 // ModMatrixPanel::MatrixRow. Replaces the duplicated raw juce::Slider setup that

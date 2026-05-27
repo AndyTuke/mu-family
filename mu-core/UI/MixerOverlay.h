@@ -77,7 +77,7 @@ private:
 
     void propagateMeterMode(VUMeter::MeterMode m);
 
-    void buildRhythmChannels();
+    void buildChannels();
     void wireReturns();
     void wireFXRows();
     void updateEffectSendLabels();

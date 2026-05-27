@@ -180,8 +180,8 @@ public:
     // (rhythm 0 → palette[0]). Global / mixer accents use `globalAccent`
     // (purple) instead — it's reserved out of this palette deliberately so a
     // purple rhythm and a purple mixer border never collide visually.
-    static constexpr int kRhythmPaletteSize = 8;
-    static const juce::Colour rhythmPalette[kRhythmPaletteSize];
+    static constexpr int kChannelPaletteSize = 8;
+    static const juce::Colour channelPalette[kChannelPaletteSize];
 
     // ──────────────────────────────────────────────────────────────────────
     // Medium-baseline sizing constants. Single source of truth — change the
@@ -208,34 +208,34 @@ public:
     // Main area: 1088 × 814 at default. RhythmPanel internal headers consume
     // 28 (rhythm header) + 22 (sample bar) + 144 (voice section row) = 194
     // px of vertical space before the dynamic top half / mod half split.
-    static constexpr int kRhythmPanelW    = kWindowWidth - kSidebarW;                          // 1088
-    static constexpr int kRhythmPanelH    = kWindowHeight - kTransportBarH - kStatusBarH;      // 814
-    static constexpr int kRhythmHeaderH   = 28;
+    static constexpr int kChannelPanelW    = kWindowWidth - kSidebarW;                          // 1088
+    static constexpr int kChannelPanelH    = kWindowHeight - kTransportBarH - kStatusBarH;      // 814
+    static constexpr int kChannelHeaderH   = 28;
     static constexpr int kSampleBarH      = 22;
     static constexpr int kVoiceSectionH   = 144;
     // contentH = 814 - 28 - 22 - 144 = 620. Top half locks to 288 because
     // the modulator minimum of 332 px takes the rest (avail = contentH - 332 = 288;
     // raw 0.55 × contentH = 341 → clamped to avail).
-    static constexpr int kRhythmTopH      = 288;
-    static constexpr int kCircleSize      = kRhythmTopH;                                       // square
-    static constexpr int kEuclidPanelW    = kRhythmPanelW - kCircleSize;                       // 800
-    static constexpr int kEuclidPanelH    = kRhythmTopH;                                       // 288
-    static constexpr int kVoiceSectionW   = kRhythmPanelW;                                     // 1088
-    static constexpr int kModulatorPanelW = kRhythmPanelW;                                     // 1088
-    static constexpr int kModulatorPanelH = kRhythmPanelH - kRhythmHeaderH
-                                          - kSampleBarH - kRhythmTopH - kVoiceSectionH;        // 332
+    static constexpr int kChannelTopH      = 288;
+    static constexpr int kCircleSize      = kChannelTopH;                                       // square
+    static constexpr int kEuclidPanelW    = kChannelPanelW - kCircleSize;                       // 800
+    static constexpr int kEuclidPanelH    = kChannelTopH;                                       // 288
+    static constexpr int kVoiceSectionW   = kChannelPanelW;                                     // 1088
+    static constexpr int kModulatorPanelW = kChannelPanelW;                                     // 1088
+    static constexpr int kModulatorPanelH = kChannelPanelH - kChannelHeaderH
+                                          - kSampleBarH - kChannelTopH - kVoiceSectionH;        // 332
 
     // RhythmPanel applies a 7 px inset (kPanelPad + 1) when placing the four
     // big inner panels — these are the actual usable widths for layout math.
     static constexpr int kPanelPad        = 6;
-    static constexpr int kRhythmInset     = kPanelPad + 1;                                     // 7
-    static constexpr int kCircleInnerSize = kCircleSize     - 2 * kRhythmInset;                // 274
-    static constexpr int kEuclidInnerW    = kEuclidPanelW   - 2 * kRhythmInset;                // 786
-    static constexpr int kEuclidInnerH    = kEuclidPanelH   - 2 * kRhythmInset;                // 274
-    static constexpr int kVoiceInnerW     = kVoiceSectionW  - 2 * kRhythmInset;                // 1074
-    static constexpr int kVoiceInnerH     = kVoiceSectionH  - 2 * kRhythmInset;                // 130
-    static constexpr int kModulatorInnerW = kModulatorPanelW - 2 * kRhythmInset;               // 1074
-    static constexpr int kModulatorInnerH = kModulatorPanelH - 2 * kRhythmInset;               // 318
+    static constexpr int kChannelInset     = kPanelPad + 1;                                     // 7
+    static constexpr int kCircleInnerSize = kCircleSize     - 2 * kChannelInset;                // 274
+    static constexpr int kEuclidInnerW    = kEuclidPanelW   - 2 * kChannelInset;                // 786
+    static constexpr int kEuclidInnerH    = kEuclidPanelH   - 2 * kChannelInset;                // 274
+    static constexpr int kVoiceInnerW     = kVoiceSectionW  - 2 * kChannelInset;                // 1074
+    static constexpr int kVoiceInnerH     = kVoiceSectionH  - 2 * kChannelInset;                // 130
+    static constexpr int kModulatorInnerW = kModulatorPanelW - 2 * kChannelInset;               // 1074
+    static constexpr int kModulatorInnerH = kModulatorPanelH - 2 * kChannelInset;               // 318
 
     // ── VoiceSection sub-panel widths ─────────────────────────────────────
     // Layout: pitch / filter / amp = 5 × Size2-knob each, insert = 4 × Size2,
@@ -272,8 +272,8 @@ public:
     // FX rows live in the bottom 32 % of the height; channel strips fill the
     // rest. Channel widths are computed so 8 rhythm + 3 return strips share
     // the available horizontal space alongside the master + label panel.
-    static constexpr int kMixerOverlayW    = kRhythmPanelW;                                    // 1088
-    static constexpr int kMixerOverlayH    = kRhythmPanelH;                                    // 814
+    static constexpr int kMixerOverlayW    = kChannelPanelW;                                    // 1088
+    static constexpr int kMixerOverlayH    = kChannelPanelH;                                    // 814
     static constexpr int kMixerHeaderH     = 22;
     static constexpr int kMixerFXGap       = 6;
     static constexpr int kMixerFXPad       = 6;

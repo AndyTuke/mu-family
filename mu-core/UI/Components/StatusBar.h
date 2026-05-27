@@ -1,6 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "MuClidLookAndFeel.h"
+#include "MuLookAndFeel.h"
 
 // Single-line parameter feedback bar. Shows last-touched param name + value.
 // Rhythm colour tag shown when the param belongs to a rhythm.

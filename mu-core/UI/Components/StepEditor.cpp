@@ -72,9 +72,9 @@ void StepEditor::applyAt(int x, int y)
 
 void StepEditor::paint(juce::Graphics& g)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
 
-    g.setColour(MuClidLookAndFeel::colour(Id::stepEditorBackground));
+    g.setColour(MuLookAndFeel::colour(Id::stepEditorBackground));
     g.fillAll();
 
     const int n = (int)steps.size();
@@ -84,7 +84,7 @@ void StepEditor::paint(juce::Graphics& g)
     const float h     = (float)getHeight();
 
     // Grid dividers
-    g.setColour(MuClidLookAndFeel::colour(Id::stepEditorGridLine));
+    g.setColour(MuLookAndFeel::colour(Id::stepEditorGridLine));
     for (int i = 1; i < n; ++i)
         g.drawVerticalLine((int)(i * barW), 0, h);
 
@@ -112,14 +112,14 @@ void StepEditor::paint(juce::Graphics& g)
             g.fillRect(i * barW + 1.0f, barTop, barW - 2.0f, barH);
         }
         // Centre zero line (bipolar only)
-        g.setColour(MuClidLookAndFeel::colour(Id::stepEditorZeroLine));
+        g.setColour(MuLookAndFeel::colour(Id::stepEditorZeroLine));
         g.drawHorizontalLine((int)(h * 0.5f), 0.0f, (float)getWidth());
     }
 
     // Bottom zero line (unipolar) or centre zero line (already drawn for bipolar above)
     if (unipolar)
     {
-        g.setColour(MuClidLookAndFeel::colour(Id::stepEditorZeroLine));
+        g.setColour(MuLookAndFeel::colour(Id::stepEditorZeroLine));
         g.drawHorizontalLine((int)(h - 1), 0.0f, (float)getWidth());
     }
 

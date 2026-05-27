@@ -26,7 +26,7 @@ void RhythmSidebar::refreshItems()
     {
         auto item = std::make_unique<SidebarItem>(i);
         const Rhythm& r = proc.getRhythm(i);
-        juce::Colour col = MuClidLookAndFeel::rhythmPalette[r.colourIndex % MuClidLookAndFeel::kRhythmPaletteSize];
+        juce::Colour col = MuClidLookAndFeel::channelPalette[r.colourIndex % MuClidLookAndFeel::kChannelPaletteSize];
         item->setRhythm(&r, col);
         item->setSelected(i == selectedIndex);
         item->setPlayState(&proc.rhythmPlayState[i], &proc.beatFraction, &proc.sequencerPlaying);

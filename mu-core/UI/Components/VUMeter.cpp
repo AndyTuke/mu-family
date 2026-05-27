@@ -1,5 +1,5 @@
 #include "VUMeter.h"
-#include "MuClidLookAndFeel.h"
+#include "MuLookAndFeel.h"
 #include <cmath>
 
 VUMeter::VUMeter()  { startTimerHz(30); }

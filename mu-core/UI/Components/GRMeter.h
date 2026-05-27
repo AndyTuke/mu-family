@@ -25,10 +25,10 @@ public:
         const float w = (float)getWidth();
         const float h = (float)getHeight();
 
-        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::indicatorGRMeterBg));
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::indicatorGRMeterBg));
         g.fillRoundedRectangle(0.0f, 0.0f, w, h, 2.0f);
 
-        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::indicatorGRMeterBar));
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::indicatorGRMeterBar));
         g.fillRect(0.0f, 0.0f, w, displayGR * h);
 
         g.setColour(juce::Colours::black.withAlpha(0.5f));

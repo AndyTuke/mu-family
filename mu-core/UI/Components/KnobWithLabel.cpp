@@ -1,15 +1,15 @@
 #include "KnobWithLabel.h"
 
 KnobWithLabel::KnobWithLabel(const juce::String& label,
-                             MuClidLookAndFeel::ColourIds categoryColour)
+                             MuLookAndFeel::ColourIds categoryColour)
     : labelText(label), knobColour(categoryColour)
 {
     slider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     slider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     slider.setColour(juce::Slider::rotarySliderFillColourId,
-                     MuClidLookAndFeel::colour(knobColour));
+                     MuLookAndFeel::colour(knobColour));
     slider.setColour(juce::Slider::rotarySliderOutlineColourId,
-                     MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder));
+                     MuLookAndFeel::colour(MuLookAndFeel::segmentInactiveBorder));
     slider.setDoubleClickReturnValue(false, slider.getMinimum());
 
     slider.onValueChange = [this]
@@ -94,8 +94,8 @@ void KnobWithLabel::setModulatedActual(float actualValue) noexcept
 void KnobWithLabel::resized()
 {
     using mu_ui::s;
-    const int labelH = s(MuClidLookAndFeel::kKnobLabelH);
-    const int topPad = s(MuClidLookAndFeel::kKnobTopPad);
+    const int labelH = s(MuLookAndFeel::kKnobLabelH);
+    const int topPad = s(MuLookAndFeel::kKnobTopPad);
     slider.setBounds(0, topPad, getWidth(), getHeight() - labelH - topPad);
 }
 
@@ -108,8 +108,8 @@ void KnobWithLabel::showInlineEditor()
 {
     using mu_ui::s;
     using mu_ui::sf;
-    const int   labelH  = s(MuClidLookAndFeel::kKnobLabelH);
-    const int   topPad  = s(MuClidLookAndFeel::kKnobTopPad);
+    const int   labelH  = s(MuLookAndFeel::kKnobLabelH);
+    const int   topPad  = s(MuLookAndFeel::kKnobTopPad);
     const float sliderH = (float)(getHeight() - labelH - topPad);
     const float radius  = juce::jmin((float)getWidth(), sliderH) * 0.5f - sf(2.0f);
     const float cy      = (float)topPad + sliderH * 0.5f;
@@ -118,14 +118,14 @@ void KnobWithLabel::showInlineEditor()
     inlineEditor = std::make_unique<juce::TextEditor>();
     auto* ed = inlineEditor.get();
 
-    ed->setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuClidLookAndFeel::kKnobValueFont))));
+    ed->setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuLookAndFeel::kKnobValueFont))));
     ed->setJustification(juce::Justification::centred);
     ed->setColour(juce::TextEditor::backgroundColourId,
-                  MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
+                  MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
     ed->setColour(juce::TextEditor::textColourId,
-                  MuClidLookAndFeel::colour(MuClidLookAndFeel::labelText));
+                  MuLookAndFeel::colour(MuLookAndFeel::labelText));
     ed->setColour(juce::TextEditor::outlineColourId,
-                  MuClidLookAndFeel::colour(MuClidLookAndFeel::knobEuclidean));
+                  MuLookAndFeel::colour(MuLookAndFeel::knobEuclidean));
     ed->setBounds(1, valueY, getWidth() - 2, s(12));
     ed->setText(slider.getTextFromValue(slider.getValue()), false);
     ed->selectAll();
@@ -178,26 +178,26 @@ void KnobWithLabel::paint(juce::Graphics& g)
 {
     using mu_ui::s;
     using mu_ui::sf;
-    const int labelH = s(MuClidLookAndFeel::kKnobLabelH);
+    const int labelH = s(MuLookAndFeel::kKnobLabelH);
 
     // Label below knob
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuClidLookAndFeel::kKnobLabelFont))));
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::labelText));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuLookAndFeel::kKnobLabelFont))));
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::labelText));
     g.drawText(labelText,
                juce::Rectangle<int>(0, getHeight() - labelH, getWidth(), labelH),
                juce::Justification::centred, true);
 
     // Value text in the dead zone (5–7 o'clock gap at the bottom of the arc)
-    const int   topPad  = s(MuClidLookAndFeel::kKnobTopPad);
+    const int   topPad  = s(MuLookAndFeel::kKnobTopPad);
     const float sliderH = (float)(getHeight() - labelH - topPad);
     const float radius  = juce::jmin((float)getWidth(), sliderH) * 0.5f - sf(2.0f);
     const float cy      = (float)topPad + sliderH * 0.5f;
     const int   valueY  = (int)(cy + radius * 0.75f) - s(5);
 
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuClidLookAndFeel::kKnobValueFont))));
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::valueText));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuLookAndFeel::kKnobValueFont))));
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::valueText));
     g.drawText(slider.getTextFromValue(slider.getValue()),
-               0, valueY, getWidth(), s(MuClidLookAndFeel::kKnobValueH),
+               0, valueY, getWidth(), s(MuLookAndFeel::kKnobValueH),
                juce::Justification::centred, true);
 }
 
@@ -237,7 +237,7 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
     constexpr float startAngle = juce::MathConstants<float>::pi * 1.25f;  // matches juce::Slider rotary defaults
     constexpr float endAngle   = juce::MathConstants<float>::pi * 2.75f;
 
-    const auto modCol = MuClidLookAndFeel::colour(MuClidLookAndFeel::indicatorModulationTint);
+    const auto modCol = MuLookAndFeel::colour(MuLookAndFeel::indicatorModulationTint);
 
     // Static "this knob is modulated" outer ring.
     if (isModulated)
@@ -279,7 +279,7 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
         juce::Path grArc;
         grArc.addCentredArc(cx, cy, arcR, arcR, 0.0f,
                             grArcStart, endAngle, true);
-        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::indicatorGRTint).withAlpha(0.85f));
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::indicatorGRTint).withAlpha(0.85f));
         g.strokePath(grArc, juce::PathStrokeType(sf(2.5f), juce::PathStrokeType::curved,
                                                        juce::PathStrokeType::rounded));
     }

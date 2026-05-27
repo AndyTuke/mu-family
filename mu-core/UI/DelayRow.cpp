@@ -243,10 +243,10 @@ void DelayRow::resized()
 
 void DelayRow::paint(juce::Graphics& g)
 {
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::panelBackground));
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
     g.fillRect(getLocalBounds());
 
-    g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::segmentInactiveBorder));
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::segmentInactiveBorder));
     g.drawLine(0.0f, static_cast<float>(getHeight() - 1),
                static_cast<float>(getWidth()), static_cast<float>(getHeight() - 1), 0.5f);
 
@@ -254,13 +254,13 @@ void DelayRow::paint(juce::Graphics& g)
     {
         const int nameX = kPad + kToggleW + kPad;
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::labelText));
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::labelText));
         g.drawText("Delay", nameX, 0, kNameW, getHeight(), juce::Justification::centredLeft);
     }
 
     if (!isEnabled)
     {
-        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::backgroundFxRowDim));
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::backgroundFxRowDim));
         g.fillRect(getLocalBounds());
     }
 }

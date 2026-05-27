@@ -45,14 +45,14 @@ void NudgeInput::resized()
 
 void NudgeInput::paint(juce::Graphics& g)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
     using mu_ui::s;
     using mu_ui::sf;
 
     // Display area
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBg));
+    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBg));
     g.fillRoundedRectangle(displayBounds.toFloat(), sf(3.0f));
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawRoundedRectangle(displayBounds.toFloat().reduced(0.5f), sf(3.0f), 1.0f);
 
     if (labelInline && !label.isEmpty() && !showStepBtns)
@@ -61,28 +61,28 @@ void NudgeInput::paint(juce::Graphics& g)
         const int inlineLblW = s(14);
         const auto lblArea = displayBounds.withWidth(inlineLblW);
         const auto valArea = displayBounds.withTrimmedLeft(inlineLblW);
-        g.setColour(MuClidLookAndFeel::colour(Id::labelText));
+        g.setColour(MuLookAndFeel::colour(Id::labelText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
         g.drawText(label, lblArea, juce::Justification::centred, false);
-        g.setColour(MuClidLookAndFeel::colour(Id::valueText));
+        g.setColour(MuLookAndFeel::colour(Id::valueText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(13.0f))));
         g.drawText(juce::String(currentValue), valArea, juce::Justification::centred, false);
     }
     else
     {
-        g.setColour(MuClidLookAndFeel::colour(Id::valueText));
+        g.setColour(MuLookAndFeel::colour(Id::valueText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(13.0f))));
         g.drawText(juce::String(currentValue), displayBounds, juce::Justification::centred, false);
     }
 
     // Label below display
-    g.setColour(MuClidLookAndFeel::colour(Id::labelText));
+    g.setColour(MuLookAndFeel::colour(Id::labelText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
 
     // Up/down arrows
     auto drawArrow = [&](juce::Rectangle<int> bounds, bool up)
     {
-        g.setColour(MuClidLookAndFeel::colour(Id::labelText));
+        g.setColour(MuLookAndFeel::colour(Id::labelText));
         const float cx = (float)bounds.getCentreX();
         const float cy = (float)bounds.getCentreY();
         const float sz = sf(4.0f);
@@ -108,7 +108,7 @@ void NudgeInput::paint(juce::Graphics& g)
     // Label drawn below the display when step buttons are hidden and not in inline mode
     if (!label.isEmpty() && !showStepBtns && !labelInline && labelBounds.getHeight() > 0)
     {
-        g.setColour(MuClidLookAndFeel::colour(Id::labelText));
+        g.setColour(MuLookAndFeel::colour(Id::labelText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
         g.drawText(label, labelBounds, juce::Justification::centred, false);
     }
@@ -117,13 +117,13 @@ void NudgeInput::paint(juce::Graphics& g)
     {
         auto drawStep = [&](juce::Rectangle<int> b, const juce::String& txt, bool active)
         {
-            g.setColour(active ? MuClidLookAndFeel::colour(Id::segmentActiveBg)
-                               : MuClidLookAndFeel::colour(Id::segmentInactiveBg));
+            g.setColour(active ? MuLookAndFeel::colour(Id::segmentActiveBg)
+                               : MuLookAndFeel::colour(Id::segmentInactiveBg));
             g.fillRect(b);
-            g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+            g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
             g.drawRect(b, 1);
-            g.setColour(active ? MuClidLookAndFeel::colour(Id::segmentActiveBorder)
-                               : MuClidLookAndFeel::colour(Id::segmentInactiveText));
+            g.setColour(active ? MuLookAndFeel::colour(Id::segmentActiveBorder)
+                               : MuLookAndFeel::colour(Id::segmentInactiveText));
             g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
             g.drawText(txt, b, juce::Justification::centred, false);
         };

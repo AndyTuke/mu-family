@@ -3,7 +3,7 @@
 #include "PluginProcessor_Internal.h"
 #include "Persistence/PresetHelpers.h"      // writeKindedProperty, readKindedPropertyAsActualV2, kGlobalParamDefs
 #include "Persistence/ModulatorSerialise.h" // serialiseModulators, deserialiseModulators, clearModulators
-#include "UI/Components/MuClidLookAndFeel.h" // kRhythmPaletteSize
+#include "UI/Components/MuClidLookAndFeel.h" // kChannelPaletteSize
 #include <limits>               // std::numeric_limits for NaN sentinel
 
 using mu_pp::kRhythmParamDefs;
@@ -1003,7 +1003,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
 
         r.name        = state.getProperty(slotPrefix + "name",
                                           "Rhythm " + juce::String(i + 1)).toString().toStdString();
-        r.colourIndex = (int)state.getProperty(slotPrefix + "colour", i % MuClidLookAndFeel::kRhythmPaletteSize);
+        r.colourIndex = (int)state.getProperty(slotPrefix + "colour", i % MuClidLookAndFeel::kChannelPaletteSize);
 
         // force-sync APVTS → Rhythm so shrink/grow cycles (preset A → B → A)
         // repopulate freshly-defaulted Rhythm fields even when JUCE skips listener

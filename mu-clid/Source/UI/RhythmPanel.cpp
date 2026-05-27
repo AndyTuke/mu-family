@@ -510,7 +510,7 @@ juce::Colour RhythmPanel::currentColour() const
     if (currentRhythmIndex >= 0 && currentRhythmIndex < proc.getNumRhythms())
     {
         const Rhythm& r = proc.getRhythm(currentRhythmIndex);
-        return MuClidLookAndFeel::rhythmPalette[r.colourIndex % MuClidLookAndFeel::kRhythmPaletteSize];
+        return MuClidLookAndFeel::channelPalette[r.colourIndex % MuClidLookAndFeel::kChannelPaletteSize];
     }
     return juce::Colours::transparentBlack;
 }
@@ -769,7 +769,7 @@ void RhythmPanel::resized()
     const int w = getWidth();
     const int h = getHeight();
 
-    topH    = s(MuClidLookAndFeel::kRhythmTopH);
+    topH    = s(MuClidLookAndFeel::kChannelTopH);
     circleW = s(MuClidLookAndFeel::kCircleSize);
 
     const int hdrH = s(kHeaderH);

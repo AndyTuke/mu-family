@@ -1,6 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "MuClidLookAndFeel.h"
+#include "MuLookAndFeel.h"
 
 // Integer display with ▲/▼ arrows and step-size buttons (×1, ×5, ×10).
 // Supports direct text entry on double-click.

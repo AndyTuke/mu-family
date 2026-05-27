@@ -343,8 +343,8 @@ void MixerChannel::paint(juce::Graphics& g)
     // the strip edge.
     const int stripW = w - (hasInsert() ? kInsertPanelW : 0);
 
-    g.setColour(active ? MuClidLookAndFeel::colour(Id::headingText)
-                       : MuClidLookAndFeel::colour(Id::mutedText));
+    g.setColour(active ? MuLookAndFeel::colour(Id::headingText)
+                       : MuLookAndFeel::colour(Id::mutedText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
     g.drawText(channelName, 0, kNamePadding, stripW, kNameH,
                juce::Justification::centred, true);
@@ -360,11 +360,11 @@ void MixerChannel::paint(juce::Graphics& g)
     }
 
     // Right-edge channel divider
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawLine((float)(w - 1), 0.0f, (float)(w - 1), (float)h, 0.5f);
 
     // ── Section pane borders ──────────────────────────────────────────────────
-    const juce::Colour borderCol = MuClidLookAndFeel::colour(Id::segmentInactiveBorder)
+    const juce::Colour borderCol = MuLookAndFeel::colour(Id::segmentInactiveBorder)
                                        .withAlpha(0.45f);
     g.setColour(borderCol);
     if (!sidechainPaneBounds.isEmpty())
@@ -376,7 +376,7 @@ void MixerChannel::paint(juce::Graphics& g)
 
     // Section labels (tiny, top-right of each pane)
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(8.0f)));
-    g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
+    g.setColour(MuLookAndFeel::colour(Id::mutedText));
     if (!sidechainPaneBounds.isEmpty() && hasOutputBus())  // "SC" tag only on rhythm strips (others have no output bus label)
         g.drawText("SC", sidechainPaneBounds.getRight() - 14, sidechainPaneBounds.getY() + 1,
                    12, 10, juce::Justification::centredRight, false);
@@ -392,8 +392,8 @@ void MixerChannel::paint(juce::Graphics& g)
         // each slot (same pattern as the section labels on the left of the
         // mixer channel area). Uses the same colour as knob value text so it
         // reads at the same weight as the knob values next to it.
-        const juce::Colour labelCol = active ? MuClidLookAndFeel::colour(Id::valueText)
-                                             : MuClidLookAndFeel::colour(Id::mutedText);
+        const juce::Colour labelCol = active ? MuLookAndFeel::colour(Id::valueText)
+                                             : MuLookAndFeel::colour(Id::mutedText);
         const int insTop = kNamePadding * 2 + kNameH;  // start of insert content area — matches nameBottom in resized()
         g.setColour(labelCol);
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
@@ -432,7 +432,7 @@ void MixerChannel::paint(juce::Graphics& g)
     if (!active)
     {
         const int nameAreaEnd = kNamePadding * 2 + kNameH;
-        g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::backgroundMixerStripDim));
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::backgroundMixerStripDim));
         g.fillRect(0, nameAreaEnd, w, h - nameAreaEnd);
     }
 }

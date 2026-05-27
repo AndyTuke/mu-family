@@ -1,6 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "MuClidLookAndFeel.h"
+#include "MuLookAndFeel.h"
 
 // Bipolar bar-graph step editor. Centre = zero, +100 = top, -100 = bottom.
 // All bars drawn in the modulator colour regardless of sign.
@@ -33,7 +33,7 @@ public:
 
 private:
     std::vector<float> steps;
-    juce::Colour barColour { MuClidLookAndFeel::colour(MuClidLookAndFeel::stepEditorBar) };
+    juce::Colour barColour { MuLookAndFeel::colour(MuLookAndFeel::stepEditorBar) };
     float playheadPhase = 0.0f;
     bool  unipolar      = false;
     int   quantizeLevels = 0;
