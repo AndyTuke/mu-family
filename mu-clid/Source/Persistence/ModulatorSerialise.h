@@ -145,6 +145,30 @@ inline juce::StringArray deserialiseModulators(const juce::ValueTree& mods, Rhyt
                         cs.curvePoints.push_back(pt);
                     }
                 }
+
+                // Finding-1 self-heal: a mode/data mismatch — an externally- or
+                // AI-authored preset with mode="Smooth" but only <Step>s (or
+                // mode="Stepped" with only <Point>s) — would load with the active
+                // mode's array empty, so evaluate() outputs a constant 0: modulation
+                // that looks wired but is silently inert. Flip the mode to match the
+                // data actually present so the sequence plays as authored. Both-empty
+                // is a legitimately undrawn LFO, so it's left alone. (evaluate() also
+                // falls back to whichever array has data — belt + braces.)
+                if (cs.mode == ControlSequence::Mode::Smooth
+                        && cs.curvePoints.empty() && ! cs.stepValues.empty())
+                {
+                    cs.mode = ControlSequence::Mode::Stepped;
+                    DBG("deserialiseModulators: Seq '" << cs.id << "' is mode=Smooth with no "
+                        "<Point>s but has <Step>s -- loading as Stepped (self-heal).");
+                }
+                else if (cs.mode == ControlSequence::Mode::Stepped
+                        && cs.stepValues.empty() && ! cs.curvePoints.empty())
+                {
+                    cs.mode = ControlSequence::Mode::Smooth;
+                    DBG("deserialiseModulators: Seq '" << cs.id << "' is mode=Stepped with no "
+                        "<Step>s but has <Point>s -- loading as Smooth (self-heal).");
+                }
+
                 break;
             }
         }

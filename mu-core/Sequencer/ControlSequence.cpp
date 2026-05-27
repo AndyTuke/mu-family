@@ -48,7 +48,19 @@ float ControlSequence::evaluate(double songBeatPos) const
     if (phase < 0.0)
         phase += 1.0;
 
-    float raw = (mode == Mode::Stepped) ? evaluateStepped(phase) : evaluateSmooth(phase);
+    // Evaluate the active mode's shape, but fall back to the other representation
+    // when the active one carries no data (e.g. a preset authored as mode="Smooth"
+    // but populated with <Step>s, or a runtime mode flip that outran its data).
+    // Without this a mode/data mismatch silently outputs a constant 0 — modulation
+    // that looks wired but does nothing. The loader (deserialiseModulators) also
+    // corrects the mode at load time; this is the belt to that braces.
+    const bool haveStep  = ! stepValues.empty();
+    const bool haveCurve = ! curvePoints.empty();
+    float raw;
+    if (mode == Mode::Stepped)
+        raw = haveStep  ? evaluateStepped(phase) : (haveCurve ? evaluateSmooth(phase)  : 0.0f);
+    else
+        raw = haveCurve ? evaluateSmooth(phase)  : (haveStep  ? evaluateStepped(phase) : 0.0f);
 
     if (polarity == Polarity::Unipolar)
         raw = std::max(0.0f, raw);

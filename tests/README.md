@@ -218,9 +218,11 @@ and one `<Asgn>` routing it to a destination, plus a metric that detects the
 resulting change over time. Gotchas learned building these:
 
 - **`<Seq mode="Stepped">` consumes `<Step v="…"/>` values; `mode="Smooth"`
-  interpolates `<Point>` Bézier nodes.** A `Smooth` sequence with only `<Step>`s
-  produces *no* output — the modulation is silently inert. Use `Stepped` for
-  step-defined LFOs.
+  interpolates `<Point>` Bézier nodes.** Match the mode to the data you author.
+  A mode/data mismatch (e.g. `Smooth` with only `<Step>`s) used to load silently
+  inert; it now **self-heals** — the loader flips the mode to match the data
+  present, and `ControlSequence::evaluate()` falls back to whichever array has
+  data (belt + braces). Still: author it right so the saved mode reflects intent.
 - **`amp.release` is a no-op for one-shot step triggers** (there is no note-off
   to start the release phase). To modulate the amp envelope's audible tail, drive
   `amp.decay` instead (see A7).
