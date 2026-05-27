@@ -296,6 +296,10 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/SendFXSmokeTests.cpp
     Source/Tests/PresetXMLRoundTripTests.cpp
     Source/Tests/InsertAlgoTableTests.cpp
+    Source/Tests/PresetMigrationTests.cpp      # C1 + C2 (format migrations)
+    Source/Tests/HotSwapBoundaryTests.cpp      # C3 (swap loop-boundary predicates)
+    Source/Tests/MidiFullPresetMapTests.cpp    # C4 (ch-9 map round-trip)
+    Source/Persistence/PresetMigrations.cpp    # under test by C1/C2
     Source/Sequencer/HitGenerator.cpp
     Source/Sequencer/EuclideanGenerator.cpp
     # Pull in mu-core .cpp's the tests need (they can't link mu-core directly
@@ -306,6 +310,7 @@ target_sources(mu-clid-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/ReverbSlot.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Persistence/MidiFullPresetMap.cpp"   # under test by C4
 )
 
 target_compile_features(mu-clid-tests PRIVATE cxx_std_17)

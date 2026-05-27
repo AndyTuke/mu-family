@@ -5,6 +5,46 @@
 namespace mu_pp_migrate
 {
 
+void migrateLegacyHostState(juce::ValueTree& state)
+{
+    const int version = (int)state.getProperty("formatVersion", 0);
+    if (version >= kCurrentStateFormatVersion) return;
+
+    auto isAdsrTimeSuffix = [](const juce::String& suffix) -> bool {
+        return suffix == "aEnvAtk" || suffix == "aEnvDec" || suffix == "aEnvRel"
+            || suffix == "fEnvAtk" || suffix == "fEnvDec" || suffix == "fEnvRel"
+            || suffix == "pEnvAtk" || suffix == "pEnvDec" || suffix == "pEnvRel";
+    };
+
+    const juce::Identifier paramType   ("PARAM");
+    const juce::Identifier idProperty  ("id");
+    const juce::Identifier valProperty ("value");
+
+    for (int i = 0; i < state.getNumChildren(); ++i)
+    {
+        auto child = state.getChild(i);
+        if (child.getType() != paramType) continue;
+
+        const juce::String id = child.getProperty(idProperty).toString();
+        // Match r{0-7}_<suffix>
+        if (id.length() < 4 || id[0] != 'r' || id[1] < '0' || id[1] > '7' || id[2] != '_')
+            continue;
+
+        const juce::String suffix = id.substring(3);
+        if (!isAdsrTimeSuffix(suffix)) continue;
+
+        const float oldVal = (float)child.getProperty(valProperty, 0.0);
+        float newVal = juce::jlimit(0.0f, 10.0f, oldVal * 0.03f);
+
+        // aEnvRel End-mode sentinel: old max (100) → new max (10).
+        if (suffix == "aEnvRel" && oldVal >= 100.0f) newVal = 10.0f;
+
+        child.setProperty(valProperty, newVal, nullptr);
+    }
+
+    state.setProperty("formatVersion", kCurrentStateFormatVersion, nullptr);
+}
+
 // Stage 36 (v3): collapse the per-rhythm insert from 9 named fields
 // (drvDrv / drvOut / drvDit / drvTon / drvBits / drvRate / eqLowGain /
 // eqMidGain / eqHighGain) to 4 generic normalised Param slots

@@ -11,17 +11,14 @@
 #include "PluginProcessor.h"
 #include "PluginProcessor_Internal.h"
 #include "Persistence/ModulatorSerialise.h" // serialiseModulators, deserialiseModulators, clearModulators
+#include "Persistence/PresetMigrations.h"   // kCurrentStateFormatVersion, migrateLegacyHostState (#664/test C2)
 #include "UI/Components/MuClidLookAndFeel.h" // kChannelPaletteSize
 
 using mu_pp::serialiseModulators;
 using mu_pp::deserialiseModulators;
 using mu_pp::clearModulators;
-
-// host-state format version. Bump whenever the on-disk schema changes
-// in a way that requires migration on load.
-//   v0 / v1 : legacy (pre-#217) — ADSR A/D/R stored as 0..100 (×0.03 → seconds)
-//   v2      : current (#217/#286/#287) — ADSR A/D/R stored as 0..10 (seconds direct)
-static constexpr int kCurrentStateFormatVersion = 2;
+using mu_pp_migrate::kCurrentStateFormatVersion;
+using mu_pp_migrate::migrateLegacyHostState;
 
 static void populateStateTree(juce::ValueTree& state, int numRhythms,
                               SequencerEngine& seq, const juce::StringArray& samplePaths)
@@ -47,53 +44,6 @@ void PresetIO::getStateInformation(juce::MemoryBlock& destData)
     auto state = proc_.apvts.copyState();
     populateStateTree(state, proc_.sequencer.getNumRhythms(), proc_.sequencer, proc_.loadedSamplePaths);
     juce::MemoryOutputStream(destData, true).writeString(state.toXmlString());
-}
-
-// in-place migration of pre-#217 host state. APVTS stores parameter
-// values as <PARAM id="..." value="..."/> children of the root tree. For
-// legacy state (formatVersion absent or < 2), the ADSR A/D/R values lived in
-// 0..100; the new schema stores them in 0..10 seconds directly. Migration:
-// multiply by 0.03 (the old display→seconds factor), clamp to the new max,
-// and preserve the End-mode sentinel on aEnvRel (old slider max 100 → new
-// slider max 10 means "play to natural sample end").
-static void migrateLegacyHostState(juce::ValueTree& state)
-{
-    const int version = (int)state.getProperty("formatVersion", 0);
-    if (version >= kCurrentStateFormatVersion) return;
-
-    auto isAdsrTimeSuffix = [](const juce::String& suffix) -> bool {
-        return suffix == "aEnvAtk" || suffix == "aEnvDec" || suffix == "aEnvRel"
-            || suffix == "fEnvAtk" || suffix == "fEnvDec" || suffix == "fEnvRel"
-            || suffix == "pEnvAtk" || suffix == "pEnvDec" || suffix == "pEnvRel";
-    };
-
-    const juce::Identifier paramType   ("PARAM");
-    const juce::Identifier idProperty  ("id");
-    const juce::Identifier valProperty ("value");
-
-    for (int i = 0; i < state.getNumChildren(); ++i)
-    {
-        auto child = state.getChild(i);
-        if (child.getType() != paramType) continue;
-
-        const juce::String id = child.getProperty(idProperty).toString();
-        // Match r{0-7}_<suffix>
-        if (id.length() < 4 || id[0] != 'r' || id[1] < '0' || id[1] > '7' || id[2] != '_')
-            continue;
-
-        const juce::String suffix = id.substring(3);
-        if (!isAdsrTimeSuffix(suffix)) continue;
-
-        const float oldVal = (float)child.getProperty(valProperty, 0.0);
-        float newVal = juce::jlimit(0.0f, 10.0f, oldVal * 0.03f);
-
-        // aEnvRel End-mode sentinel: old max (100) → new max (10).
-        if (suffix == "aEnvRel" && oldVal >= 100.0f) newVal = 10.0f;
-
-        child.setProperty(valProperty, newVal, nullptr);
-    }
-
-    state.setProperty("formatVersion", kCurrentStateFormatVersion, nullptr);
 }
 
 void PresetIO::restoreStateFromTree(const juce::ValueTree& state)

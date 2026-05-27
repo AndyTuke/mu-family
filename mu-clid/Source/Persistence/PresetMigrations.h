@@ -14,6 +14,21 @@
 namespace mu_pp_migrate
 {
 
+// Host-state format version. Bump whenever the on-disk schema changes in a way
+// that requires migration on load.
+//   v0 / v1 : legacy (pre-#217) — ADSR A/D/R stored as 0..100 (×0.03 → seconds)
+//   v2      : current (#217/#286/#287) — ADSR A/D/R stored as 0..10 (seconds direct)
+inline constexpr int kCurrentStateFormatVersion = 2;
+
+// In-place migration of pre-#217 host state. APVTS stores parameter values as
+// <PARAM id="..." value="..."/> children of the root tree. For legacy state
+// (formatVersion absent or < 2), the ADSR A/D/R values lived in 0..100; the new
+// schema stores them in 0..10 seconds directly. Migration multiplies by 0.03
+// (old display→seconds factor), clamps to the new max, and preserves the
+// End-mode sentinel on aEnvRel (old slider max 100 → new max 10 = "play to
+// natural sample end"). No-op once formatVersion >= kCurrentStateFormatVersion.
+void migrateLegacyHostState(juce::ValueTree& state);
+
 // v3 per-rhythm insert: collapse the 9 named drive/EQ fields (drvDrv / drvOut /
 // drvDit / drvTon / drvBits / drvRate / eqLowGain / eqMidGain / eqHighGain) to
 // 4 generic normalised slot params (insP1..insP4), per-algo. Also folds the
