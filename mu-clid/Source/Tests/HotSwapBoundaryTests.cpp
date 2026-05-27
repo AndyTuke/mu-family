@@ -16,7 +16,7 @@ public:
 
     void runTest() override
     {
-        using namespace mu_hotswap;
+        using namespace mu_clid::hotswap;
 
         beginTest ("C3: per-rhythm swap in master-loop mode follows the master wrap");
         {

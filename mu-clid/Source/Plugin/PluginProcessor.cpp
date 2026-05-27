@@ -493,12 +493,12 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
             // (dB + 60) / 66 — modulate in dB.
             // Skew conversions (forward + inverse) live in ModulationSkew.h so the
             // seed / snapshot / write-back blocks share one definition (test C5).
-            using mu_mod_skew::propFromAdsr;
-            using mu_mod_skew::propFromLowCut;
-            using mu_mod_skew::propFromCutoff;
-            using mu_mod_skew::adsrFromProp;
-            using mu_mod_skew::lowCutFromProp;
-            using mu_mod_skew::cutoffFromProp;
+            using mu_clid::mod_skew::propFromAdsr;
+            using mu_clid::mod_skew::propFromLowCut;
+            using mu_clid::mod_skew::propFromCutoff;
+            using mu_clid::mod_skew::adsrFromProp;
+            using mu_clid::mod_skew::lowCutFromProp;
+            using mu_clid::mod_skew::cutoffFromProp;
 
             modParamValues["amp.attack"]       = propFromAdsr(modParams.ampEnvAtk);
             modParamValues["amp.decay"]        = propFromAdsr(modParams.ampEnvDec);

@@ -5,7 +5,7 @@
 // — the logic the #653 free-running fix lives in — can be unit-tested without a
 // PluginProcessor. checkBoundaries() composes these with each swap's
 // ready / already-fired atomic state.
-namespace mu_hotswap
+namespace mu_clid::hotswap
 {
 
 // Per-rhythm staged swap. In master-loop mode (swapMode == 0) every rhythm
@@ -30,4 +30,4 @@ inline bool fullPresetBoundaryReached(bool hasMasterLoop,
                          : ((rhythmLoopWrapMask & 1) != 0);
 }
 
-} // namespace mu_hotswap
+} // namespace mu_clid::hotswap

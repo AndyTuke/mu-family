@@ -17,7 +17,7 @@ public:
 
     void runTest() override
     {
-        using namespace mu_mod_skew;
+        using namespace mu_clid::mod_skew;
 
         beginTest ("C5: ADSR seconds survive prop -> actual -> prop (0..10 s, skew 0.3)");
         for (float s : { 0.01f, 0.1f, 0.5f, 1.0f, 3.0f, 7.5f, 10.0f })

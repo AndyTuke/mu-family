@@ -1,5 +1,5 @@
 #include "HotSwapStager.h"
-#include "HotSwapBoundary.h"   // mu_hotswap:: pure loop-boundary predicates (#653 logic)
+#include "HotSwapBoundary.h"   // mu_clid::hotswap:: pure loop-boundary predicates (#653 logic)
 #include "PluginProcessor.h"
 #include "Persistence/ScopedApvtsLoading.h"
 #include "MuLimits.h"
@@ -67,7 +67,7 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
         if (sw.isReady.load(std::memory_order_acquire)
             && !sw.boundaryReached.load(std::memory_order_relaxed))
         {
-            const bool wrap = mu_hotswap::perRhythmBoundaryReached(mode, r, masterLoopWrapped,
+            const bool wrap = mu_clid::hotswap::perRhythmBoundaryReached(mode, r, masterLoopWrapped,
                                                                    rhythmLoopWrapMask);
             if (wrap)
             {
@@ -86,7 +86,7 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
         && !presetBoundaryReached.load(std::memory_order_relaxed))
     {
         const bool hasMasterLoop = proc_.sequencer.getMasterLoopSteps() > 0;
-        const bool wrap = mu_hotswap::fullPresetBoundaryReached(hasMasterLoop, masterLoopWrapped,
+        const bool wrap = mu_clid::hotswap::fullPresetBoundaryReached(hasMasterLoop, masterLoopWrapped,
                                                                 rhythmLoopWrapMask);
         if (wrap)
         {

@@ -17,7 +17,7 @@
 //   lowCut : skewFactor 0.35 on 0..1000 Hz
 //   cutoff : setSkewFactorFromMidPoint(640) on 20..20000 Hz  (~skewFactor 0.2):
 //            proportion = pow((hz - 20) / 19980, 0.2)
-namespace mu_mod_skew
+namespace mu_clid::mod_skew
 {
 
 inline float propFromAdsr   (float secs) { return std::pow (juce::jlimit (0.0f, 1.0f, secs / 10.0f),   0.3f); }
@@ -29,4 +29,4 @@ inline float lowCutFromProp (float p)    { return 1000.0f   * std::pow (juce::jl
 inline float propFromCutoff (float hz)   { return std::pow (juce::jlimit (0.0f, 1.0f, (hz - 20.0f) / 19980.0f), 0.2f); }
 inline float cutoffFromProp (float p)    { return 20.0f + 19980.0f * std::pow (juce::jlimit (0.0f, 1.0f, p), 1.0f / 0.2f); }
 
-} // namespace mu_mod_skew
+} // namespace mu_clid::mod_skew
