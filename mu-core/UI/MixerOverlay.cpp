@@ -275,7 +275,9 @@ void MixerOverlay::wireFXRows()
         }
     };
 
-    // Load current algo param values into FX row knobs.
+    // Load current algo param values into FX row knobs. Skip when the product
+    // doesn't define eff_pN — the row renders with its defaults.
+    if (proc.apvts.getParameter(kEffParamIds[0]) != nullptr)
     {
         int ai = eff.getAlgorithmIndex();
         const auto& algos = FXAlgorithmRegistry::effectAlgorithms();
@@ -284,9 +286,12 @@ void MixerOverlay::wireFXRows()
             const auto& params = algos[ai].params;
             for (int i = 0; i < (int)params.size() && i < 5; ++i)
             {
-                float norm = *proc.apvts.getRawParameterValue(kEffParamIds[i]);
-                float actual = params[i].minVal + norm * (params[i].maxVal - params[i].minVal);
-                effectRow.setParamValue(params[i].id, actual);
+                if (auto* raw = proc.apvts.getRawParameterValue(kEffParamIds[i]))
+                {
+                    float norm   = *raw;
+                    float actual = params[i].minVal + norm * (params[i].maxVal - params[i].minVal);
+                    effectRow.setParamValue(params[i].id, actual);
+                }
             }
         }
     }
@@ -479,6 +484,17 @@ void MixerOverlay::loadFromAPVTS()
     refreshSidechainSources();
 
     // FX rows: reload enable states, algo selection, and param values.
+    // Products without the FX rack (e.g. mu-tant first-stab) don't define
+    // the eff_/dly_/rev_/echo_ APVTS schema; skip the entire FX reload so the
+    // raw-value dereferences below don't null-crash. The FX UI rows still
+    // render — they're inert until the product wires the rack.
+    const bool hasFXRack = apvts.getParameter("eff_en") != nullptr;
+    if (!hasFXRack)
+    {
+        updateEffectSendLabels();
+        return;
+    }
+
     auto& eff = proc.fxChain.effectSlot();
     auto& rev = proc.fxChain.reverbSlot();
 
