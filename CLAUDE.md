@@ -134,6 +134,7 @@ Use Glob/Explore to navigate — the tree is derivable from the filesystem.
 
 - **Everything in APVTS** — if it's not in the ValueTree it won't save. Each rhythm in its own subtree. All parameters are wired through APVTS.
 - **Audio thread never allocates** — all allocation in `prepareToPlay`, never in `processBlock`.
+- **mu-core never depends on a plugin** — the dependency is strictly one-way: plugins (`mu-clid/`, future `mu-tant`/`mu-toni`) link `mu-core`, never the reverse. A `mu-core/**` file must not `#include` a plugin header or name a plugin symbol (the concrete `PluginProcessor`, a `mu_clid::` symbol…); mu-core knows only `ProcessorBase` + the shared interfaces. Enforced by `tests/scripts/check-core-boundary.py`. **When adding a file, decide its side first:** generic, with no plugin-specific param IDs/semantics → `mu-core`; references μ-Clid params, rhythms, or Euclidean concepts → `mu-clid`. New plugin-specific code goes under the `mu_clid::` namespace (retrofit incrementally) so the side is visible at every reference.
 - **ModulationMatrix is the single reader** — audio engine reads only from ModulationMatrix, never directly from APVTS or ControlSequence.
 - **Rhythms are fully self-contained** — ControlSequences may only target parameters within their own rhythm. No cross-rhythm modulation. Global FX parameters are not valid modulation destinations.
 - **ControlSequence lengths are independent** — never couple loop lengths or rates to rhythm step counts.
