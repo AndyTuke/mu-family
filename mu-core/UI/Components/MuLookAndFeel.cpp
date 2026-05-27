@@ -23,7 +23,6 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
         case backgroundMixerStripDim: return t.backgrounds.mixerStripDim;
         // Knob categories
         case knobEuclidean:           return t.knobs.euclidean;
-        case knobPadding:             return t.knobs.postPad;       // legacy alias
         case knobInsertPad:           return t.knobs.insertPad;
         case knobLevel:               return t.knobs.level;
         case knobFxSend:              return t.knobs.fxSend;

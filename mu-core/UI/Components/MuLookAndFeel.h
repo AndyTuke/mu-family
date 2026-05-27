@@ -45,7 +45,6 @@ public:
 
         // ── Knob category colours ─────────────────────────────────────────
         knobEuclidean           = 0x10000010,  // #7F77DD  purple: steps, hits, rotate, pitch
-        knobPadding             = 0x10000011,  // #1D9E75  teal:   legacy alias (use knobPostPad)
         knobInsertPad           = 0x10000012,  // #D4537E  pink:   insert start/length, modulator controls
         knobLevel               = 0x10000013,  // #EF9F27  amber:  amp ADSR, accent, Euclid C controls
         knobFxSend              = 0x10000014,  // #D85A30  coral:  effect/delay/reverb sends, intra-FX routing
