@@ -32,6 +32,7 @@ target_sources(mu-clid
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginProcessor_APVTS.cpp
         Source/Plugin/PresetIO.cpp
+        Source/Plugin/PresetIO_HostState.cpp
         Source/Persistence/PresetMigrations.cpp
         Source/Plugin/HotSwapStager.cpp
         Source/Plugin/SamplePreview.cpp
@@ -180,6 +181,7 @@ target_sources(mu-clid-lite
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginProcessor_APVTS.cpp
         Source/Plugin/PresetIO.cpp
+        Source/Plugin/PresetIO_HostState.cpp
         Source/Persistence/PresetMigrations.cpp
         Source/Plugin/HotSwapStager.cpp
         Source/Plugin/SamplePreview.cpp
