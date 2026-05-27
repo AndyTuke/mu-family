@@ -403,6 +403,32 @@ public:
     void forceSyncRhythmFromAPVTS(int ri);
 private:
 
+    // ── processBlock phases (#665) ──────────────────────────────────────────
+    // processBlock is decomposed into these private helpers, invoked in order on
+    // the audio thread. Full-build only — the Lite build keeps its MIDI-only path
+    // inline in processBlock. None allocate or take locks beyond what the caller
+    // already holds: they run under processBlock's rhythmsLock ScopedTryLock, so
+    // the RT ordering + locking is identical to the pre-split single function.
+#if ! MUCLID_LITE_BUILD
+    struct BlockTransport { bool playing; double beatPos; };
+    // Scan MIDI clock + program changes, read the playhead / clock / internal
+    // transport, reset the wrap detector on a stop->start edge, and publish
+    // sequencerPlaying + lastBeatPos.
+    BlockTransport deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages);
+    // Step the sequencer, fire voice triggers, check hot-swap boundaries, and
+    // publish per-rhythm UI play-state. Called only while playing.
+    void advanceSequencer(int numRhythms, double beatPos);
+    // Modulation pass for one rhythm: snapshot voiceParams, run the matrix,
+    // snapshot for the UI live-arc, write modulated values + euclid overrides back.
+    void applyRhythmModulation(int r, double beatPos);
+    // Effective BPM for tempo-synced FX: host playhead > MIDI clock > internal.
+    double deriveEffectiveBpm();
+    // Gather output buses, run the core mixer/voice render, mix the sample
+    // preview, and emit per-rhythm MIDI.
+    void renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
+                          int numRhythms, double effectiveBpm);
+#endif
+
     // suspendProcessing() sets a flag but does NOT block until the current
     // processBlock callback finishes. rhythmsLock provides the missing barrier.
     juce::CriticalSection rhythmsLock;
