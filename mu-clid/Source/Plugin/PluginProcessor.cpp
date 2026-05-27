@@ -87,7 +87,7 @@ PluginProcessor::PluginProcessor()
 
     // Pre-populate modulation param map so lookups never allocate on the audio thread.
     modParamValues.reserve(50);
-    for (const char* key : { "amp.attack", "amp.decay", "amp.sustain", "amp.release",
+    for (const char* key : { "amp.attack", "amp.decay", "amp.sustain",  // amp.release retired (#668)
                               "filter.cutoff", "filter.resonance",
                               "fenv.attack", "fenv.decay", "fenv.depth",
                               "pitch.semitones", "pitch.octave",
@@ -503,7 +503,8 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
             modParamValues["amp.attack"]       = propFromAdsr(modParams.ampEnvAtk);
             modParamValues["amp.decay"]        = propFromAdsr(modParams.ampEnvDec);
             modParamValues["amp.sustain"]      = modParams.ampEnvSus   * 100.0f;  // linear, unchanged
-            modParamValues["amp.release"]      = propFromAdsr(modParams.ampEnvRel);
+            // amp.release is not a modulation target (#668 — no note-off on a step
+            // trigger, so the release stage is never entered; see Finding 2).
             modParamValues["filter.cutoff"]    = propFromCutoff(modParams.filterCutoff);  // proportion-space, log-skewed
             modParamValues["filter.resonance"] = modParams.filterRes;             // linear, slider 0..0.99
             modParamValues["fenv.attack"]      = propFromAdsr(modParams.filterEnvAtk);
@@ -570,7 +571,6 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
                 snap[kSnapAmpAtk]      .store(adsrFromProp(modParamValues["amp.attack"]));
                 snap[kSnapAmpDec]      .store(adsrFromProp(modParamValues["amp.decay"]));
                 snap[kSnapAmpSus]      .store(sn(modParamValues["amp.sustain"], 0.0f, 100.0f));
-                snap[kSnapAmpRel]      .store(adsrFromProp(modParamValues["amp.release"]));
                 // Filter Cutoff: proportion-space modulation (#639) — snap stores ACTUAL Hz
                 // converted from the proportion, so the UI's setModulatedActual goes
                 // through the slider's setSkewFactorFromMidPoint(640) via valueToProportionOfLength
@@ -650,7 +650,6 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
             modParams.ampEnvAtk      = juce::jmax(0.001f, adsrFromProp(modParamValues["amp.attack"]));
             modParams.ampEnvDec      = juce::jmax(0.001f, adsrFromProp(modParamValues["amp.decay"]));
             modParams.ampEnvSus      = juce::jlimit(0.0f, 1.0f, modParamValues["amp.sustain"] / 100.0f);
-            modParams.ampEnvRel      = juce::jmax(0.001f, adsrFromProp(modParamValues["amp.release"]));
             modParams.filterCutoff   = juce::jlimit(20.0f, 20000.0f, cutoffFromProp(modParamValues["filter.cutoff"]));
             modParams.filterRes      = juce::jlimit(0.0f, 0.99f, modParamValues["filter.resonance"]);
             modParams.filterEnvAtk   = juce::jmax(0.001f, adsrFromProp(modParamValues["fenv.attack"]));

@@ -270,7 +270,7 @@ void AmpSubsection::refreshModulatedIndicators()
     ampAtk   .setIsModulated(playing && isAssigned("amp.attack"));
     ampDec   .setIsModulated(playing && isAssigned("amp.decay"));
     ampSus   .setIsModulated(playing && isAssigned("amp.sustain"));
-    ampRel   .setIsModulated(playing && isAssigned("amp.release"));
+    // ampRel: Release is not a modulation target (#668) — never shows a mod ring.
     ampLevel .setIsModulated(playing && isAssigned("amp.level"));
     ampAccent.setIsModulated(playing && isAssigned("accentDb"));
 
@@ -279,7 +279,6 @@ void AmpSubsection::refreshModulatedIndicators()
     ampAtk   .setModulatedActual(arc(isAssigned("amp.attack"),   kSnapAmpAtk));
     ampDec   .setModulatedActual(arc(isAssigned("amp.decay"),    kSnapAmpDec));
     ampSus   .setModulatedNorm  (arc(isAssigned("amp.sustain"),  kSnapAmpSus));
-    ampRel   .setModulatedActual(arc(isAssigned("amp.release"),  kSnapAmpRel));
     // amp.level: voiceParams gain 0..2, slider in dB -60..+6 — snapshot stores actual dB (#623).
     // accentDb: voiceParams dB 0..12, slider display 0..100 — snapshot stores display 0..100 (#623).
     ampLevel .setModulatedActual(arc(isAssigned("amp.level"),  kSnapAmpLvl));
