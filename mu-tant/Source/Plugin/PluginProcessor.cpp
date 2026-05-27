@@ -65,6 +65,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
 {
     using namespace juce;
     AudioProcessorValueTreeState::ParameterLayout layout;
+    auto f = [](float lo, float hi, float step) { return NormalisableRange<float>(lo, hi, step); };
 
     // Shared tonal centre.
     layout.add(std::make_unique<AudioParameterChoice>(ParameterID{"root",  1}, "Root",  rootNames(),  0));
@@ -72,6 +73,26 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
 
     for (int v = 0; v < kMaxVoices; ++v)
         addVoiceParams(layout, v);
+
+    // ── Mixer channel strips (4 params × 8 channels) — matches the shared
+    //    mu-core MixerChannel binding prefix `ch{N}_`. FX sends (sendEff/Dly/Rev)
+    //    and sidechain params are deliberately omitted until the MixerEngine
+    //    voice-render-callback refactor lets mu-tant route through the shared
+    //    mixer / FX path. Until then the strips' send / sidechain knobs are
+    //    inert (the MixerChannel binding tolerates missing params).
+    for (int i = 0; i < kMaxVoices; ++i)
+    {
+        const String c = "ch" + String(i) + "_";
+        const String n = "Voice " + String(i + 1) + " Ch ";
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"lvl",  1}, n+"Level", f(0.0f, 1.0f, 0.001f), 1.0f));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"pan",  1}, n+"Pan",   f(-1.0f, 1.0f, 0.001f), 0.0f));
+        layout.add(std::make_unique<AudioParameterBool> (ParameterID{c+"mute", 1}, n+"Mute",  false));
+        layout.add(std::make_unique<AudioParameterBool> (ParameterID{c+"solo", 1}, n+"Solo",  false));
+    }
+
+    // ── Master fader ────────────────────────────────────────────────────────
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"mstr_lvl", 1}, "Master Level", f(0.0f, 1.0f, 0.001f), 1.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"mstr_pan", 1}, "Master Pan",   f(-1.0f, 1.0f, 0.001f), 0.0f));
 
     return layout;
 }
@@ -139,17 +160,29 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     const int numSamples = buffer.getNumSamples();
     buffer.clear();
 
-    // Pre-resolve mixer state — soloing wins over muting, matching the
-    // mu-clid mixer convention.
+    // Read mixer state directly from APVTS — keeps the channel-strip UI as the
+    // single source of truth (no parameter-listener push into a separate engine
+    // struct). Solo wins over mute, matching mu-clid's mixer convention.
+    auto raw = [this](const juce::String& id) {
+        return apvts.getRawParameterValue(id)->load();
+    };
+    auto chId = [](int i, const char* base) {
+        return juce::String("ch") + juce::String(i) + "_" + base;
+    };
+
     bool anySolo = false;
     for (int v = 0; v < kMaxVoices; ++v)
-        if (mixerEngine.channels[(size_t) v].solo) { anySolo = true; break; }
+        if (raw(chId(v, "solo")) > 0.5f) { anySolo = true; break; }
 
     for (int v = 0; v < kMaxVoices; ++v)
     {
-        const auto& ch = mixerEngine.channels[(size_t) v];
-        const bool audible = anySolo ? ch.solo : !ch.mute;
+        const bool muted   = raw(chId(v, "mute")) > 0.5f;
+        const bool soloed  = raw(chId(v, "solo")) > 0.5f;
+        const bool audible = anySolo ? soloed : !muted;
         if (!audible) continue;
+
+        const float level = raw(chId(v, "lvl"));
+        const float pan   = juce::jlimit(-1.0f, 1.0f, raw(chId(v, "pan")));
 
         auto& voiceBuf = voiceBuffers[(size_t) v];
         voiceBuf.clear();
@@ -157,17 +190,16 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         voices[(size_t) v]->process(voiceBuf, numSamples);
 
         // Equal-power constant-power pan, matching MixerEngine::applyPanGain.
-        const float pan   = juce::jlimit(-1.0f, 1.0f, ch.pan);
         const float angle = (pan + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
-        const float gainL = ch.level * std::cos(angle);
-        const float gainR = ch.level * std::sin(angle);
+        const float gainL = level * std::cos(angle);
+        const float gainR = level * std::sin(angle);
 
         buffer.addFrom(0, 0, voiceBuf, 0, 0, numSamples, gainL);
         buffer.addFrom(1, 0, voiceBuf, 1, 0, numSamples, gainR);
     }
 
-    // Master fader — apply unconditionally (no master mute concept).
-    buffer.applyGain(mixerEngine.masterLevel);
+    // Master fader.
+    buffer.applyGain(raw("mstr_lvl"));
 }
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()

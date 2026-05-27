@@ -7,7 +7,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     : EditorShellBase(p),
       proc(p),
       voiceSidebar(p),
-      voicePanel(p)
+      voicePanel(p),
+      mixerOverlay(p, p.mixerEngine)
 {
     // ── Product chrome on shared overlays ───────────────────────────────────
     getAboutPanel().setProductInfo(
@@ -19,22 +20,32 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         });
     getTransportBar().setLogoText(juce::String(juce::CharPointer_UTF8("\xce\xbc-Tant")));
 
-    // First-stab scope: no preset library, no settings overlay yet. Mixer
-    // overlay lands in Stage A3.
+    // First-stab scope: no preset library, no settings overlay yet.
     getTransportBar().setShowPresetControls(false);
-    setMixerOverlay(nullptr);
     setSettingsOverlay(nullptr);
 
-    // Main area: 8-voice sidebar + per-voice editor panel.
+    // Main area + mixer overlay (Stage A3 — channel strip lvl/pan/mute/solo
+    // bound via apvts; FX send / sidechain knobs are visible but inert until
+    // MixerEngine accepts a per-voice render callback).
     setMainArea(&voiceSidebar, &voicePanel);
+    setMixerOverlay(&mixerOverlay);
 
     voiceSidebar.onVoiceSelected = [this](int idx)
     {
         voicePanel.setVoice(idx);
     };
 
+    // Forward mixer status updates to the shared StatusBar.
+    mixerOverlay.onStatusUpdate = [this](const juce::String& name,
+                                          const juce::String& val,
+                                          juce::Colour col)
+    {
+        getStatusBar().showParam(name, val, col);
+    };
+
     voiceSidebar.setSelectedIndex(0);
     voicePanel.setVoice(0);
+    mixerOverlay.loadFromAPVTS();
     clearPresetDirty();
 }
 

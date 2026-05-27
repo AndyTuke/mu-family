@@ -39,7 +39,7 @@ cmake --build build --config Debug && cmake --build build --config Release   # D
 
 After every build, read [backlog.md](backlog.md) and fix open (unchecked) issues immediately, without asking, up to a maximum of 5 issues. Prioritise issues related to the current stage.
 
-After every response, if any issues in `backlog.md` have changed status or new issues have been added, update `backlog.md` immediately to reflect the current state.
+After every response, if any issues in `backlog.md` have changed status or new issues have been added, update `backlog.md` immediately to reflect the current state and ensure items are ordered correctly.
 
 New feature ideas live in [docs/design-future.md](docs/design-future.md) under **Unscheduled Ideas**. Ask the user before implementing any of them.
 
