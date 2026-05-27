@@ -1,0 +1,30 @@
+{
+  "test": "A4",
+  "description": "Modulation → amp.level. A stepped bipolar LFO modulates the level of a steady 16th-note hat stream. Measured with 250 ms windows (wider than the 125 ms hit spacing) so the per-hit envelope averages out and only the slow tremolo shows: un-modulated the level is flat (~0 dB range), modulated it swings ~8 dB. Proves the amp.level modulation write-back path.",
+  "render": {
+    "preset": "tests/presets/A4_amp.muClid",
+    "seconds": 4.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "audio_present",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [0.3, 3.7],
+      "min": -70,
+      "comment": "the hat stream must be sounding"
+    },
+    {
+      "name": "level_oscillates",
+      "metric": "rms_range_db",
+      "channel": "any",
+      "t_window": [0.3, 3.7],
+      "window_ms": 250,
+      "floor_dbfs": -70,
+      "min_db": 4.0,
+      "comment": "tremolo swings the windowed level >4 dB; un-modulated baseline is ~0 dB"
+    }
+  ]
+}

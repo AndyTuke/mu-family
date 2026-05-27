@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='utf-8'?>
+<MuClidPreset presetName="A7_envelope" presetDescription="Modulation test A7 (amp envelope timing): a stepped unipolar LFO ramps amp.decay on a tonal synth hit on every beat. With a short base decay each hit is brief; as the LFO opens the decay, the tails ring across the gaps, so more of the render sits above threshold. NOTE: amp.release is a no-op for one-shot step triggers (there is no note-off to fire it), so the envelope-timing path is exercised via amp.decay." presetCategory="test">
+  <Rhythm name="A7_envelope" colour="2" sample="Synth C 01.wav" stepsA="16" hitsA="4" rotA="0" prePadA="0" postPadA="0" insStA="0" insLenA="0" insModeA="false" prePadModeA="false" postPadModeA="false" stepsB="8" hitsB="0" rotB="0" prePadB="0" postPadB="0" insStB="0" insLenB="0" insModeB="false" prePadModeB="false" postPadModeB="false" stepsC="8" hitsC="0" rotC="0" prePadC="0" postPadC="0" insStC="0" insLenC="0" insModeC="false" prePadModeC="false" postPadModeC="false" logic="OR" pitchOct="0" pitchSemi="0" pitchFine="0" pEnvAtk="0.0001" pEnvDec="0.0001" pEnvSus="0" pEnvRel="0.0001" pEnvDep="0" pEnvLeg="false" fltType="LP12" fltCut="20000" fltRes="0" fEnvAtk="0.0001" fEnvDec="0.005" fEnvSus="0" fEnvRel="0.005" fEnvDep="0" fEnvLeg="false" ampLvl="1.0" aEnvAtk="0.002" aEnvDec="0.02" aEnvSus="0" aEnvRel="0.02" aEnvLeg="false" accentDb="0" drvChar="None" ch_lvl="0.85" ch_pan="0.5" ch_mute="0.0" ch_solo="0.0" ch_sendEff="0.0" ch_sendDly="0.0" ch_sendRev="0.0" ch_scSrc="0.0" ch_scAmt="0.0" ch_outBus="0.0">
+    <Modulators>
+      <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="0.0" />
+        <Step v="6.66" />
+        <Step v="13.33" />
+        <Step v="20.0" />
+        <Step v="26.66" />
+        <Step v="33.33" />
+        <Step v="40.0" />
+        <Step v="46.66" />
+        <Step v="53.33" />
+        <Step v="60.0" />
+        <Step v="66.66" />
+        <Step v="73.33" />
+        <Step v="80.0" />
+        <Step v="86.66" />
+        <Step v="93.33" />
+        <Step v="100.0" />
+      </Seq>
+      <Asgn id="cs0_assign_a7dec" src="cs0_output" dest="amp.decay" depth="100.0" curve="0.0" />
+    </Modulators>
+  </Rhythm>
+  <GlobalState/>
+</MuClidPreset>

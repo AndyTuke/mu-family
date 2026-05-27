@@ -139,11 +139,110 @@ def assert_spectral_peak_near(audio: Audio, p: dict) -> tuple[bool, float]:
     return abs(peak_f - target) <= tol, peak_f
 
 
+# --- Modulation metrics (A3-A7) ----------------------------------------------
+#
+# These measure *change over time* within a window: modulation is "working" when
+# the quantity it drives (brightness / level / pitch / hit density) moves across
+# the render. Each splits the window into sub-windows and reports a range/count.
+
+def _subwindows(audio: Audio, ch: np.ndarray, t0: float, t1: float, win_ms: float) -> list:
+    win = audio.window(ch, t0, t1)
+    n = max(1, int(win_ms * audio.rate / 1000))
+    n_chunks = max(1, len(win) // n)
+    return [win[i * n:(i + 1) * n] for i in range(n_chunks)]
+
+
+def _centroid(seg: np.ndarray, rate: int, f_lo: float, f_hi: float) -> float:
+    if len(seg) < 256:
+        return 0.0
+    freqs, psd = welch(seg.astype(np.float64), fs=rate, nperseg=min(len(seg), 4096))
+    mask = (freqs >= f_lo) & (freqs <= f_hi)
+    if not mask.any():
+        return 0.0
+    f, pw = freqs[mask], psd[mask]
+    s = pw.sum()
+    return float((f * pw).sum() / s) if s > 0 else 0.0
+
+
+def _peak(seg: np.ndarray, rate: int, f_lo: float, f_hi: float) -> float:
+    if len(seg) < 256:
+        return 0.0
+    freqs, psd = welch(seg.astype(np.float64), fs=rate, nperseg=min(len(seg), 4096))
+    mask = (freqs >= f_lo) & (freqs <= f_hi)
+    if not mask.any():
+        return 0.0
+    return float(freqs[mask][int(np.argmax(psd[mask]))])
+
+
+def assert_spectral_centroid_range(audio: Audio, p: dict) -> tuple[bool, float]:
+    # max-min of the per-sub-window spectral centroid (Hz). High = the spectral
+    # brightness is sweeping → a filter-cutoff-style modulation is active.
+    ch = audio.channel(p.get('channel', 'any'))
+    t0, t1 = p.get('t_window', [0.0, 1e9])
+    f_lo, f_hi = p.get('search_hz', [20.0, 12000.0])
+    cents = [_centroid(s, audio.rate, f_lo, f_hi)
+             for s in _subwindows(audio, ch, t0, t1, p.get('window_ms', 120))]
+    cents = [c for c in cents if c > 0]
+    actual = (max(cents) - min(cents)) if len(cents) >= 2 else 0.0
+    return (p.get('min_hz', 0.0) <= actual <= p.get('max_hz', float('inf'))), actual
+
+
+def assert_rms_range_db(audio: Audio, p: dict) -> tuple[bool, float]:
+    # max-min of per-sub-window RMS (dB), ignoring sub-windows below `floor_dbfs`
+    # (the silent gaps between hits). High = level/envelope is being modulated.
+    ch = audio.channel(p.get('channel', 'any'))
+    t0, t1 = p.get('t_window', [0.0, 1e9])
+    levels = [dbfs(rms(s)) for s in _subwindows(audio, ch, t0, t1, p.get('window_ms', 60))]
+    levels = [l for l in levels if l > p.get('floor_dbfs', -90.0)]
+    actual = (max(levels) - min(levels)) if len(levels) >= 2 else 0.0
+    return (p.get('min_db', 0.0) <= actual <= p.get('max_db', float('inf'))), actual
+
+
+def assert_spectral_peak_range(audio: Audio, p: dict) -> tuple[bool, float]:
+    # max-min of the per-sub-window strongest spectral peak (Hz). High = the
+    # fundamental is moving → pitch modulation (vibrato) is active.
+    ch = audio.channel(p.get('channel', 'any'))
+    t0, t1 = p.get('t_window', [0.0, 1e9])
+    f_lo, f_hi = p.get('search_hz', [40.0, 4000.0])
+    peaks = [_peak(s, audio.rate, f_lo, f_hi)
+             for s in _subwindows(audio, ch, t0, t1, p.get('window_ms', 150))]
+    peaks = [pk for pk in peaks if pk > 0]
+    actual = (max(peaks) - min(peaks)) if len(peaks) >= 2 else 0.0
+    return (p.get('min_hz', 0.0) <= actual <= p.get('max_hz', float('inf'))), actual
+
+
+def assert_onset_count(audio: Audio, p: dict) -> tuple[bool, float]:
+    # Count rising-edge onsets: sub-window RMS crossing `threshold_dbfs` from
+    # below, with a refractory gap so one hit isn't counted twice. Lets a test
+    # assert how many hits land in a window (e.g. pattern modulation changing the
+    # hit density between the first and second half of the render).
+    ch = audio.channel(p.get('channel', 'any'))
+    t0, t1 = p.get('t_window', [0.0, 1e9])
+    win_ms = p.get('window_ms', 10)
+    thr = 10.0 ** (p.get('threshold_dbfs', -35.0) / 20.0)
+    refractory = max(1, int(p.get('refractory_ms', 40) / win_ms))
+    count, cooldown, prev_above = 0, 0, False
+    for seg in _subwindows(audio, ch, t0, t1, win_ms):
+        above = rms(seg) >= thr
+        if cooldown > 0:
+            cooldown -= 1
+        if above and not prev_above and cooldown == 0:
+            count += 1
+            cooldown = refractory
+        prev_above = above
+    actual = float(count)
+    return (p.get('min', 0) <= actual <= p.get('max', float('inf'))), actual
+
+
 HANDLERS = {
     'peak_dbfs': assert_peak_dbfs,
     'rms_dbfs': assert_rms_dbfs,
     'duration_above_threshold': assert_duration_above_threshold,
     'spectral_peak_near': assert_spectral_peak_near,
+    'spectral_centroid_range': assert_spectral_centroid_range,
+    'rms_range_db': assert_rms_range_db,
+    'spectral_peak_range': assert_spectral_peak_range,
+    'onset_count': assert_onset_count,
 }
 
 
@@ -156,6 +255,12 @@ def fmt(metric: str, actual: float) -> str:
         return f'{actual:.3f} s'
     if metric == 'spectral_peak_near':
         return f'{actual:.1f} Hz'
+    if metric in ('spectral_centroid_range', 'spectral_peak_range'):
+        return f'{actual:.1f} Hz range'
+    if metric == 'rms_range_db':
+        return f'{actual:.2f} dB range'
+    if metric == 'onset_count':
+        return f'{actual:.0f} onsets'
     return f'{actual:.3f}'
 
 

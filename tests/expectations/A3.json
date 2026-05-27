@@ -1,0 +1,30 @@
+{
+  "test": "A3",
+  "description": "Modulation → filter.cutoff. A stepped bipolar LFO (1-bar loop) sweeps the cutoff on a steady broadband hat; the spectral centroid (brightness) must sweep across the render. Proves the filter-cutoff modulation path (proportion-space skew + write-back). Baseline (no Asgn) centroid range is ~265 Hz; modulated is ~8500 Hz — threshold 3000 Hz sits well clear of both.",
+  "render": {
+    "preset": "tests/presets/A3_filter.muClid",
+    "seconds": 4.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "audio_present",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [0.2, 3.8],
+      "min": -50,
+      "comment": "the hat must be sounding so the filter has broadband content to sweep"
+    },
+    {
+      "name": "cutoff_sweeps_brightness",
+      "metric": "spectral_centroid_range",
+      "channel": "any",
+      "t_window": [0.2, 3.8],
+      "search_hz": [100, 12000],
+      "window_ms": 120,
+      "min_hz": 3000,
+      "comment": "modulated cutoff sweep moves the centroid >3 kHz; un-modulated baseline is ~265 Hz"
+    }
+  ]
+}

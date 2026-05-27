@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='utf-8'?>
+<MuClidPreset presetName="A4_amp" presetDescription="Modulation test A4: a stepped bipolar LFO (1-bar loop) modulates amp.level on a sustained synth tone. The rendered level (windowed RMS) must oscillate across the render — proving the amp/level modulation write-back path (tremolo)." presetCategory="test">
+  <Rhythm name="A4_amp" colour="2" sample="Hat 01.wav" stepsA="16" hitsA="16" rotA="0" prePadA="0" postPadA="0" insStA="0" insLenA="0" insModeA="false" prePadModeA="false" postPadModeA="false" stepsB="8" hitsB="0" rotB="0" prePadB="0" postPadB="0" insStB="0" insLenB="0" insModeB="false" prePadModeB="false" postPadModeB="false" stepsC="8" hitsC="0" rotC="0" prePadC="0" postPadC="0" insStC="0" insLenC="0" insModeC="false" prePadModeC="false" postPadModeC="false" logic="OR" pitchOct="0" pitchSemi="0" pitchFine="0" pEnvAtk="0.0001" pEnvDec="0.0001" pEnvSus="0" pEnvRel="0.0001" pEnvDep="0" pEnvLeg="false" fltType="LP12" fltCut="20000" fltRes="0" fEnvAtk="0.0001" fEnvDec="0.005" fEnvSus="0" fEnvRel="0.005" fEnvDep="0" fEnvLeg="false" ampLvl="1.0" aEnvAtk="0.001" aEnvDec="0.07" aEnvSus="0" aEnvRel="0.05" aEnvLeg="false" accentDb="0" drvChar="None" ch_lvl="0.85" ch_pan="0.5" ch_mute="0.0" ch_solo="0.0" ch_sendEff="0.0" ch_sendDly="0.0" ch_sendRev="0.0" ch_scSrc="0.0" ch_scAmt="0.0" ch_outBus="0.0">
+    <Modulators>
+      <Seq id="cs0" mode="Stepped" polarity="Bipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+        <Step v="0.0" />
+        <Step v="25.0" />
+        <Step v="50.0" />
+        <Step v="75.0" />
+        <Step v="100.0" />
+        <Step v="75.0" />
+        <Step v="50.0" />
+        <Step v="25.0" />
+        <Step v="0.0" />
+        <Step v="-25.0" />
+        <Step v="-50.0" />
+        <Step v="-75.0" />
+        <Step v="-100.0" />
+        <Step v="-75.0" />
+        <Step v="-50.0" />
+        <Step v="-25.0" />
+      </Seq>
+      <Asgn id="cs0_assign_a4amp" src="cs0_output" dest="amp.level" depth="100.0" curve="0.0" />
+    </Modulators>
+  </Rhythm>
+  <GlobalState/>
+</MuClidPreset>

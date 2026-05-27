@@ -1,0 +1,30 @@
+{
+  "test": "A7",
+  "description": "Modulation → amp envelope timing (amp.decay). A stepped unipolar LFO ramps the amp decay on a tonal synth hit on every beat; as the decay opens, tails ring across the gaps so more of the render stays above threshold. Proves the amp-envelope-timing modulation path. (amp.release is inert for one-shot step triggers — no note-off — so decay carries this axis.) Un-modulated keeps ~0.26 s above -40 dBFS; modulated ~1.1 s — threshold 0.6 s sits between.",
+  "render": {
+    "preset": "tests/presets/A7_envelope.muClid",
+    "seconds": 4.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "audio_present",
+      "metric": "peak_dbfs",
+      "channel": "any",
+      "t_window": [0.0, 4.0],
+      "min": -24,
+      "comment": "the synth hits must be audible"
+    },
+    {
+      "name": "decay_lengthens_tails",
+      "metric": "duration_above_threshold",
+      "channel": "any",
+      "t_window": [0.0, 4.0],
+      "window_ms": 20,
+      "threshold_dbfs": -40,
+      "min_seconds": 0.6,
+      "comment": "decay modulation fills the gaps with tails; un-modulated baseline is ~0.26 s above -40 dBFS"
+    }
+  ]
+}

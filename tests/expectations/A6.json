@@ -1,0 +1,31 @@
+{
+  "test": "A6",
+  "description": "Modulation → euclid.a.hits. A stepped unipolar LFO ramps the euclidean hit count up from the base of 2 hits/bar; the rendered onset count must be far above the un-modulated base. Proves the Stage-A/B euclid pattern recompute path (tryUpdatePatternFromModulation). Un-modulated yields ~4 onsets over the render; modulated yields ~16 — threshold 8 sits between.",
+  "render": {
+    "preset": "tests/presets/A6_pattern.muClid",
+    "seconds": 4.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "audio_present",
+      "metric": "peak_dbfs",
+      "channel": "any",
+      "t_window": [0.0, 4.0],
+      "min": -24,
+      "comment": "kicks must be audible to be counted as onsets"
+    },
+    {
+      "name": "hit_density_raised_by_modulation",
+      "metric": "onset_count",
+      "channel": "any",
+      "t_window": [0.0, 4.0],
+      "window_ms": 10,
+      "threshold_dbfs": -35,
+      "refractory_ms": 40,
+      "min": 8,
+      "comment": "modulation pushes hit density to ~16 onsets; un-modulated base is ~4"
+    }
+  ]
+}

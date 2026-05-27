@@ -1,0 +1,30 @@
+{
+  "test": "A5",
+  "description": "Modulation → pitch.semitones. A stepped bipolar LFO modulates the pitch of a sustained tonal synth; the strongest spectral peak (fundamental) must move across the render. Proves the pitch modulation write-back path (vibrato). Un-modulated peak range is ~35 Hz; modulated is ~3200 Hz — threshold 1000 Hz sits well clear of both.",
+  "render": {
+    "preset": "tests/presets/A5_pitch.muClid",
+    "seconds": 4.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "audio_present",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [0.3, 3.7],
+      "min": -50,
+      "comment": "the tonal synth must be sounding so it has a fundamental to shift"
+    },
+    {
+      "name": "pitch_moves",
+      "metric": "spectral_peak_range",
+      "channel": "any",
+      "t_window": [0.3, 3.7],
+      "search_hz": [40, 4000],
+      "window_ms": 150,
+      "min_hz": 1000,
+      "comment": "vibrato sweeps the fundamental >1 kHz; un-modulated baseline is ~35 Hz"
+    }
+  ]
+}
