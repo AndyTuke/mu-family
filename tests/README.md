@@ -223,9 +223,11 @@ resulting change over time. Gotchas learned building these:
   inert; it now **self-heals** — the loader flips the mode to match the data
   present, and `ControlSequence::evaluate()` falls back to whichever array has
   data (belt + braces). Still: author it right so the saved mode reflects intent.
-- **`amp.release` is a no-op for one-shot step triggers** (there is no note-off
-  to start the release phase). To modulate the amp envelope's audible tail, drive
-  `amp.decay` instead (see A7).
+- **`amp.release` is not a modulation target** — a one-shot step trigger never
+  note-offs during playback, so the amp env never reaches its release phase and
+  modulating it does nothing. It was retired from the destination list (Finding 2);
+  to modulate the amp envelope's audible tail, drive `amp.decay` instead (see A7).
+  (The release knob still works — it shapes a retired voice's hot-swap tail-out.)
 - **Always calibrate against a no-modulation control**: render the preset with
   the `<Asgn>` removed, measure the same metric, and set the threshold between
   the two. A modulated/un-modulated separation of <2× is too fragile.

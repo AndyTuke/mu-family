@@ -33,7 +33,13 @@ namespace ModDest
         { "amp.attack",       "Amp Attack"         },
         { "amp.decay",        "Amp Decay"          },
         { "amp.sustain",      "Amp Sustain"        },
-        { "amp.release",      "Amp Release"        },
+        // idx 3 ("amp.release") retired: a one-shot step trigger never note-offs
+        // during playback, so the amp env never reaches its release phase and
+        // modulating the release time is a no-op. Slot kept (invalid id) so kTable
+        // indices don't shift; legacy "amp.release" assignments are rejected by
+        // isValidDestinationId() and dropped at load. The release knob itself still
+        // works (it shapes a retired voice's hot-swap tail-out).
+        { "_reserved.amp.release", "(reserved)"    },
         // ── Filter (idx 4–8) ──────────────────────────────────────────────────
         { "filter.cutoff",    "Filter Cutoff"      },
         { "filter.resonance", "Filter Resonance"   },

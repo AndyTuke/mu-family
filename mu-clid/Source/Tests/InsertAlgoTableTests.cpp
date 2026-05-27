@@ -125,6 +125,22 @@ public:
                 }
             }
         }
+
+        beginTest ("amp.release retired as a modulation destination (Finding 2)");
+        {
+            // A one-shot step trigger never note-offs during playback, so the amp
+            // env never reaches release — modulating it is a no-op. It was retired
+            // from kTable; verify it's no longer a valid target, the retire didn't
+            // shift the insert.p1..p4 indices, and the other amp env destinations
+            // stayed valid.
+            expect (! ModDest::isValidDestinationId ("amp.release"),
+                "amp.release must not be a valid modulation destination");
+            expect (std::strcmp (ModDest::kTable[10].id, "insert.p1") == 0,
+                "insert.p1 must remain at index 10 after the amp.release retire");
+            expect (ModDest::isValidDestinationId ("amp.attack"),  "amp.attack still valid");
+            expect (ModDest::isValidDestinationId ("amp.decay"),   "amp.decay still valid");
+            expect (ModDest::isValidDestinationId ("amp.sustain"), "amp.sustain still valid");
+        }
     }
 };
 

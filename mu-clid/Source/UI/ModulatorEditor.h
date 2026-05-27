@@ -70,7 +70,11 @@ namespace ModDest
         // ── Amp ───────────────────────────────────────────────────────────────
         dd.addSectionHeading("Amp");
         item(25);  // Amp Level (#223)
-        item(0);  item(1);  item(2);  item(3);  // Attack, Decay, Sustain, Release
+        item(0);  item(1);  item(2);  // Attack, Decay, Sustain
+        // Amp Release (idx 3) is intentionally NOT a modulation target: a one-shot
+        // step trigger never note-offs during playback, so the amp env never enters
+        // its release phase — modulating the release time does nothing audible. The
+        // release knob still works (it shapes a retired voice's hot-swap tail-out).
         item(26);  // Accent (#223)
 
         // ── Insert ────────────────────────────────────────────────────────────

@@ -59,7 +59,7 @@ static float depthScaleFor(const std::string& destId)
     // of its available turn"). Seed + write-back in PluginProcessor.cpp convert between
     // proportion and actual via each slider's skew. Linear sliders use additive-in-display.
     if (destId == "filter.cutoff"
-     || destId == "amp.attack"  || destId == "amp.decay"  || destId == "amp.release"
+     || destId == "amp.attack"  || destId == "amp.decay"   // amp.release retired (not modulatable)
      || destId == "fenv.attack" || destId == "fenv.decay"
      || destId == "filter.lowCut")   return 1.0f;
     // Additive-in-display destinations — scale = SLIDER RANGE so 100% mod at full src
