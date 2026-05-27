@@ -931,6 +931,17 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     int n = juce::jlimit(1, SequencerEngine::MaxRhythms,
                          (int)state.getProperty("numRhythms", 1));
 
+    // #663: guard the live-state mutation below (sequencer resize, voiceEngine
+    // rebuild, per-rhythm sample swaps + pattern rebuilds) with suspendProcessing +
+    // rhythmsLock, matching loadSampleForRhythm / swapRhythms / the prestaged commit.
+    // Without it the audio thread can tear-read voiceEngines or a half-swapped sample
+    // buffer when a host restores project state on a live plugin. suspendProcessing
+    // alone is not enough — it doesn't block an in-flight processBlock; rhythmsLock
+    // does (the audio thread's ScopedTryLock bails while we hold it). The lock is held
+    // for the rest of the function (RAII) and released on return.
+    proc_.suspendProcessing(true);
+    const juce::ScopedLock sl(proc_.rhythmsLock);
+
     // Expand to MaxRhythms so parameterChanged can write to all 8 rhythm slots.
     proc_.sequencer.setNumRhythms(SequencerEngine::MaxRhythms);
 
@@ -1018,6 +1029,8 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
                              slotPrefix + "sampleData",
                              slotPrefix + "sampleName");
     }
+
+    proc_.suspendProcessing(false);   // rhythmsLock (sl) releases on return
 }
 
 void PresetIO::setStateInformation(const void* data, int sizeInBytes)
@@ -1592,48 +1605,64 @@ void PresetIO::applyPresetImmediate(const juce::File& file)
     if (! requireSupportedPresetVersion(root, file.getFileName(), proc_.onLoadError))
         return;
 
-    // Step 1: count Rhythm children and resize arrays.
+    // Step 1: count Rhythm children.
     int n = 0;
     for (int ci = 0; ci < root.getNumChildren(); ++ci)
         if (root.getChild(ci).getType() == juce::Identifier("Rhythm"))
             ++n;
     n = juce::jlimit(1, SequencerEngine::MaxRhythms, n);
-    resizeRhythmArrays(n);
 
-    // Step 2: under one APVTS-loading guard, restore each rhythm + globals.
-    mu_core::ScopedApvtsLoading guard(proc_.apvtsLoading);
-
-    int rhythmIdx = 0;
-    for (int ci = 0; ci < root.getNumChildren() && rhythmIdx < n; ++ci)
+    // #663: guard the whole live-state mutation (array resize, per-rhythm Rhythm /
+    // VoiceEngine sample swaps, sequencer pattern rebuilds) with suspendProcessing +
+    // rhythmsLock — the same pattern loadSampleForRhythm / swapRhythms / the prestaged
+    // commit use. Without it the audio thread can tear-read voiceEngines or a
+    // half-swapped sample buffer when a preset loads (or a DAW reloads project state)
+    // while processBlock is running. suspendProcessing alone is NOT enough: it doesn't
+    // block an in-flight processBlock; rhythmsLock does (the audio thread's ScopedTryLock
+    // bails while we hold it). Holding the lock across the setValueNotifyingHost calls is
+    // safe — under apvtsLoading, syncRhythmParam only mutates r.voiceParams under its own
+    // voiceParamsLock, and the audio thread bails before touching it.
+    proc_.suspendProcessing(true);
     {
-        auto rTree = root.getChild(ci);
-        if (rTree.getType() != juce::Identifier("Rhythm")) continue;
-        const int i = rhythmIdx++;
+        const juce::ScopedLock sl(proc_.rhythmsLock);
 
-        restoreRhythmAPVTSParams  (i, rTree, /*srcPropPrefix*/ "");
-        restoreRhythmChannelParams(i, rTree);
-        restoreRhythmModulators   (i, rTree);
+        resizeRhythmArrays(n);
 
-        // Name + colour (not APVTS-backed — sit on the Rhythm struct directly).
-        Rhythm& r = proc_.sequencer.getRhythm(i);
-        auto nameVal = rTree.getProperty("name");
-        if (nameVal.isString() && nameVal.toString().isNotEmpty())
-            r.name = nameVal.toString().toStdString();
-        r.colourIndex = (int)rTree.getProperty("colour", r.colourIndex);
+        // Under one APVTS-loading guard, restore each rhythm + globals.
+        mu_core::ScopedApvtsLoading guard(proc_.apvtsLoading);
 
-        restoreRhythmSample(i, rTree, "sample", "sampleData", "sampleName");
+        int rhythmIdx = 0;
+        for (int ci = 0; ci < root.getNumChildren() && rhythmIdx < n; ++ci)
+        {
+            auto rTree = root.getChild(ci);
+            if (rTree.getType() != juce::Identifier("Rhythm")) continue;
+            const int i = rhythmIdx++;
 
-        // force-sync APVTS → Rhythm so a preset that re-loads identical values
-        // into a freshly-recreated slot (preset A → B → A pattern) still
-        // populates r.voiceParams / r.genA.hits. JUCE skips listener callbacks
-        // when setValueNotifyingHost is called with an unchanged value, so
-        // parameterChanged → syncRhythmParam never fires. Internally calls
-        // updatePattern + proc_.voiceEngines[i]->setParams.
-        proc_.forceSyncRhythmFromAPVTS(i);
+            restoreRhythmAPVTSParams  (i, rTree, /*srcPropPrefix*/ "");
+            restoreRhythmChannelParams(i, rTree);
+            restoreRhythmModulators   (i, rTree);
+
+            // Name + colour (not APVTS-backed — sit on the Rhythm struct directly).
+            Rhythm& r = proc_.sequencer.getRhythm(i);
+            auto nameVal = rTree.getProperty("name");
+            if (nameVal.isString() && nameVal.toString().isNotEmpty())
+                r.name = nameVal.toString().toStdString();
+            r.colourIndex = (int)rTree.getProperty("colour", r.colourIndex);
+
+            restoreRhythmSample(i, rTree, "sample", "sampleData", "sampleName");
+
+            // force-sync APVTS → Rhythm so a preset that re-loads identical values
+            // into a freshly-recreated slot (preset A → B → A pattern) still
+            // populates r.voiceParams / r.genA.hits. JUCE skips listener callbacks
+            // when setValueNotifyingHost is called with an unchanged value, so
+            // parameterChanged → syncRhythmParam never fires. Internally calls
+            // updatePattern + proc_.voiceEngines[i]->setParams.
+            proc_.forceSyncRhythmFromAPVTS(i);
+        }
+
+        restoreGlobalState(root);
     }
-
-    restoreGlobalState(root);
-    // ScopedApvtsLoading guard goes out of scope at the closing brace.
+    proc_.suspendProcessing(false);
 }
 
 //==============================================================================
@@ -1642,11 +1671,15 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     const int n    = prepared.numRhythms;
     const int oldN = proc_.numActiveRhythms.load(std::memory_order_acquire);
 
-    // ── Install the pre-built voices + rhythms under a single suspend ──────────
-    // suspendProcessing fences the audio thread, so we can move engines / resize
-    // directly without the retire-slot dance the per-rhythm path uses. Everything
-    // here is in-memory (no parse, no disk I/O) — that work was done at stage time.
+    // ── Install the pre-built voices + rhythms under suspend + rhythmsLock ─────
+    // suspendProcessing stops FUTURE processBlock calls; rhythmsLock serialises with
+    // any IN-FLIGHT one (#663 — suspend alone doesn't block it). Everything here is
+    // in-memory (no parse, no disk I/O — done at stage time), so the lock is held for
+    // microseconds and the swap stays glitch-free. The lock is released before the
+    // APVTS finalize below so that (post-resume) work doesn't bail the audio thread.
     proc_.suspendProcessing(true);
+    {
+        const juce::ScopedLock sl(proc_.rhythmsLock);
 
     proc_.sequencer.setNumRhythms(n);
 
@@ -1695,7 +1728,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
 
     if (n > oldN)
         proc_.numActiveRhythms.store(n, std::memory_order_release);  // grow: publish after slots ready
-
+    }   // release rhythmsLock before resuming
     proc_.suspendProcessing(false);
 
     // ── APVTS / mixer / global finalize (message-thread, no I/O) ───────────────
