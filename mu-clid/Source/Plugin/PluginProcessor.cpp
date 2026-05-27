@@ -976,13 +976,14 @@ void PluginProcessor::setUiScale(float scale)
 {
     const float clamped = juce::jlimit(kUiScaleMedium, kUiScaleLarge, scale);
     if (uiScale == clamped) return;
-    uiScale = clamped;
+    // Persist before delegating — the base fires onUiScaleChanged after the
+    // store, so a listener that re-reads from appSettings sees the new value.
     if (appSettings != nullptr)
     {
         appSettings->setValue("uiScale", (double) clamped);
         appSettings->saveIfNeeded();
     }
-    if (onUiScaleChanged) onUiScaleChanged(clamped);
+    ProcessorBase::setUiScale(clamped);
 }
 
 bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const

@@ -72,16 +72,16 @@ public:
     // internalPlaying / internalBeatPos are touched by both audio (write) and
     // message thread (read + clear). std::atomic<> with relaxed ordering — no other
     // memory is published through them, so relaxed is sufficient.
-    void   toggleInternalPlay()
+    void   toggleInternalPlay() override
     {
         const bool nowPlaying = !internalPlaying.load(std::memory_order_relaxed);
         internalPlaying.store(nowPlaying, std::memory_order_relaxed);
         if (!nowPlaying) internalBeatPos.store(0.0, std::memory_order_relaxed);
     }
-    bool   isInternalPlaying()   const { return internalPlaying.load(std::memory_order_relaxed); }
-    void   setInternalBpm(double bpm)  { internalBpm = juce::jlimit(20.0, 300.0, bpm); }
-    double getInternalBpm()      const { return internalBpm; }
-    double getInternalBeatPos()  const
+    bool   isInternalPlaying()   const override { return internalPlaying.load(std::memory_order_relaxed); }
+    void   setInternalBpm(double bpm)  override { internalBpm = juce::jlimit(20.0, 300.0, bpm); }
+    double getInternalBpm()      const override { return internalBpm; }
+    double getInternalBeatPos()  const override
     {
         if (midiClockSync.isEnabled() && midiClockSync.isPlaying())
             return midiClockSync.getBeatPosUI();
@@ -98,12 +98,11 @@ public:
     // ctor-time fonts (#574) pick up the right size on a fresh open. Runtime
     // changes go via setUiScale → onUiScaleChanged callback so the editor can
     // resize + relayout live (with a "reopen for fonts" hint near the picker).
-    static constexpr float kUiScaleMedium = 1.0f;
-    static constexpr float kUiScaleLarge  = 1.25f;
-    void  setUiScale(float scale);
-    float getUiScale() const noexcept { return uiScale; }
-    // Editor registers here to react to a settings-overlay-driven scale change.
-    std::function<void(float)> onUiScaleChanged;
+    // kUiScaleMedium / kUiScaleLarge constants + onUiScaleChanged callback live
+    // on ProcessorBase; mu-clid's override persists through appSettings before
+    // delegating to the base.
+    void  setUiScale(float scale) override;
+    float getUiScale() const noexcept override { return uiScale; }
 
     static constexpr int kMasterBusIndex   = 0;
     static constexpr int kFirstDirectOutBus = 1;   // Out 1 = bus 1 ... Out 8 = bus 8
@@ -114,11 +113,11 @@ public:
 
     // MIDI clock sync (standalone only).
     void   setMidiSyncEnabled(bool on);
-    bool   getMidiSyncEnabled()  const { return midiClockSync.isEnabled(); }
+    bool   getMidiSyncEnabled()  const override { return midiClockSync.isEnabled(); }
     void   setMidiSyncMessages(int mode);
-    int    getMidiSyncMessages() const { return midiClockSync.getMessages(); }
-    bool   isMidiClockPlaying()  const { return midiClockSync.isPlaying(); }
-    double getMidiClockBpm()     const { return midiClockSync.getBpm(); }
+    int    getMidiSyncMessages() const override { return midiClockSync.getMessages(); }
+    bool   isMidiClockPlaying()  const override { return midiClockSync.isPlaying(); }
+    double getMidiClockBpm()     const override { return midiClockSync.getBpm(); }
 
     void    addRhythm    (const Rhythm& r);
     void    removeRhythm (int index);
@@ -178,7 +177,7 @@ public:
     void stageRhythmPreset(int ri, const juce::File& f)  { presetIO.stageRhythmPreset(ri, f); }
     void cancelStagedSwap (int ri)                        { hotSwapStager.cancelStagedSwap(ri); }
     bool hasPendingSwap   (int ri) const                  { return hotSwapStager.hasPendingSwap(ri); }
-    bool hasPendingFullPreset() const                     { return hotSwapStager.hasPendingFullPreset(); }
+    bool hasPendingFullPreset() const override            { return hotSwapStager.hasPendingFullPreset(); }
     int  getMasterLoopSteps() const                       { return sequencer.getMasterLoopSteps(); }
 
     // Headless/offline render helper. The render loop drives processBlock directly
@@ -194,25 +193,15 @@ public:
     // because those fields aren't APVTS parameters. Editor MUST clear this in its
     // destructor: the processor can outlive the editor (DAW close-window-keep-
     // plugin), and a swap commit firing into a destroyed editor is a UAF.
+    // onPresetSwapCommitted + onLoadError + onUiScaleChanged live on ProcessorBase
+    // since every plugin's shell handles them identically; onRhythmHotSwapCommitted
+    // stays here because "rhythm" is mu-clid-specific.
     std::function<void(int rhythmIndex)> onRhythmHotSwapCommitted;
-
-    // Fired on the message thread after a deferred full-preset swap commits at the
-    // loop boundary, so the editor can rebind non-APVTS UI (rhythm tabs, sidebar,
-    // mixer) against the freshly-loaded preset. Null in headless/render contexts.
-    // Same dtor-cleanup requirement as onRhythmHotSwapCommitted (UAF otherwise).
-    std::function<void()> onPresetSwapCommitted;
-
-    // fired when a preset / state-restore parse fails (parseXML returns null
-    // or the resulting tree is invalid). Editor surfaces via the status bar so the
-    // user sees feedback instead of a silent click. Same dtor-cleanup requirement
-    // as onRhythmHotSwapCommitted — clear in editor dtor to avoid UAF when the
-    // processor outlives the editor.
-    std::function<void(const juce::String& message)> onLoadError;
     void setSwapMode(SwapMode m) { swapModeAtomic.store((int)m, std::memory_order_relaxed); }
     SwapMode getSwapMode() const { return static_cast<SwapMode>(swapModeAtomic.load(std::memory_order_relaxed)); }
 
-    juce::File getContentDir() const;
-    juce::File getPresetsDir() const;
+    juce::File getContentDir() const override;
+    juce::File getPresetsDir() const override;
     juce::File getRhythmsDir() const;
     juce::File getSamplesDir() const;
     void setContentDir(const juce::File& dir);
@@ -227,24 +216,19 @@ public:
 
     // License — checked once at startup; result is immutable thereafter.
     LicenseChecker::Info licenseInfo;
-    bool isLicensed() const { return kBetaBuild || licenseInfo.status == LicenseStatus::Licensed; }
-
-    // Set by PluginEditor (standalone only): shows the SaveDialog then calls the quit callback on
-    // completion, or drops it if the user cancels. Allows the close-confirmation dialog to trigger
-    // a proper "Save As" flow before quitting rather than a raw state dump.
-    std::function<void(std::function<void()>)> onSaveAndQuit;
+    bool isLicensed() const override { return kBetaBuild || licenseInfo.status == LicenseStatus::Licensed; }
 
     void savePreset(const juce::String& n, const juce::String& d,
-                    const juce::String& c, bool e = false) { presetIO.savePreset(n, d, c, e); }
-    void loadPreset(const juce::File& f)  { presetIO.loadPreset(f); }
+                    const juce::String& c, bool e = false) override { presetIO.savePreset(n, d, c, e); }
+    void loadPreset(const juce::File& f) override { presetIO.loadPreset(f); }
     void saveRhythmPresetToFile(int ri, const juce::File& dest,
                                 bool emb = false, const juce::String& cat = {},
                                 const juce::String& desc = {})
                                 { presetIO.saveRhythmPresetToFile(ri, dest, emb, cat, desc); }
 
     // Shared preset category list.
-    juce::StringArray loadCategoryList() const   { return presetIO.loadCategoryList(); }
-    void ensureCategoryInList(const juce::String& c) { presetIO.ensureCategoryInList(c); }
+    juce::StringArray loadCategoryList() const override  { return presetIO.loadCategoryList(); }
+    void ensureCategoryInList(const juce::String& c) override { presetIO.ensureCategoryInList(c); }
     bool applyRhythmPreset(const juce::File& f, int ri) { return presetIO.applyRhythmPreset(f, ri); }
     bool applyDefaultRhythm(int ri)              { return presetIO.applyDefaultRhythm(ri); }
     void loadDefaultPreset()                     { presetIO.loadDefaultPreset(); }
@@ -437,9 +421,8 @@ private:
     // persisted to appSettings so it survives across plugin instances.
     std::atomic<bool> multiBusEnabled { true };
 
-    // UI scale (Medium=1.0 baseline, Large=1.25). Persisted via appSettings;
-    // editor consults at ctor + reacts to runtime changes via onUiScaleChanged.
-    float uiScale { kUiScaleMedium };
+    // uiScale storage lives on ProcessorBase (shared family-wide). mu-clid's
+    // setUiScale override persists through appSettings before delegating up.
 
     MidiClockSync midiClockSync;
 

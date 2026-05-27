@@ -69,6 +69,72 @@ public:
     virtual juce::File   getFullPresetDir()          const = 0;
     virtual juce::String getFullPresetExtension()    const = 0;
 
+    // ─── Shell-facing API (overridden by each plugin) ────────────────────────
+    // These are the surfaces the family's editor shell + TransportBar consume.
+    // Defaults are no-ops returning sensible values so a young plugin (no
+    // internal transport yet, no presets, no license gate) still builds and
+    // shows the shell. mu-clid overrides every one of these against its real
+    // implementations; mu-tant currently inherits the defaults for everything
+    // except whatever it has implemented.
+
+    // Internal transport (TransportBar play/BPM controls; standalone-only DAWs
+    // typically defer to the host playhead instead).
+    virtual bool   isInternalPlaying()      const          { return false; }
+    virtual void   toggleInternalPlay()                    {}
+    virtual double getInternalBpm()         const          { return 120.0; }
+    virtual void   setInternalBpm(double /*bpm*/)          {}
+    virtual double getInternalBeatPos()     const          { return 0.0; }
+
+    // MIDI clock sync (standalone).
+    virtual bool   getMidiSyncEnabled()     const          { return false; }
+    virtual int    getMidiSyncMessages()    const          { return 0; }
+    virtual double getMidiClockBpm()        const          { return 120.0; }
+    virtual bool   isMidiClockPlaying()     const          { return false; }
+
+    // Presets — directory, save/load, and the shared category list. Default
+    // returns yield a usable "no presets yet" UI state in the transport bar.
+    virtual juce::File         getPresetsDir()                                     const { return {}; }
+    virtual void               loadPreset(const juce::File& /*file*/)                    {}
+    virtual void               savePreset(const juce::String& /*name*/,
+                                           const juce::String& /*desc*/,
+                                           const juce::String& /*cat*/,
+                                           bool /*embedSamples*/)                        {}
+    virtual juce::StringArray  loadCategoryList()                                  const { return {}; }
+    virtual void               ensureCategoryInList(const juce::String& /*cat*/)         {}
+    virtual bool               hasPendingFullPreset()                              const { return false; }
+
+    // Content directory — where preset / sample-library / keybindings folders
+    // live. Returned File can be invalid; the shell tolerates that.
+    virtual juce::File getContentDir() const { return {}; }
+
+    // License gate — true by default so products without a licensing model
+    // (mu-tant currently) get the full editor instead of a demo banner.
+    virtual bool isLicensed() const { return true; }
+
+    // ─── UI scale (Medium baseline, Large 1.25x) ─────────────────────────────
+    // Storage lives on the base so every plugin inherits the same scale handling
+    // out of the box. Derived classes typically override setUiScale to persist
+    // through their appSettings PropertiesFile before delegating to the base.
+    static constexpr float kUiScaleMedium = 1.0f;
+    static constexpr float kUiScaleLarge  = 1.25f;
+    virtual float getUiScale() const noexcept { return uiScale; }
+    virtual void  setUiScale(float scale)
+    {
+        const float clamped = juce::jlimit(kUiScaleMedium, kUiScaleLarge, scale);
+        if (uiScale == clamped) return;
+        uiScale = clamped;
+        if (onUiScaleChanged) onUiScaleChanged(clamped);
+    }
+
+    // ─── Shell callbacks (message-thread, registered by the editor) ──────────
+    // Editor MUST clear these in its dtor — processor can outlive the editor
+    // when a DAW keeps the plugin loaded after closing the window. Any deferred
+    // invocation into a destroyed editor is a UAF.
+    std::function<void(std::function<void()>)>       onSaveAndQuit;
+    std::function<void(const juce::String& message)> onLoadError;
+    std::function<void()>                            onPresetSwapCommitted;
+    std::function<void(float)>                       onUiScaleChanged;
+
     // Audio-thread: scans incoming MIDI for program-change messages on
     // channels 1-8 (per-slot map, gated by `midiPresetMap.getChannelMask()`)
     // and channel 9 (full-preset map, gated by `midiFullPresetMap.isEnabled()`).
@@ -109,6 +175,11 @@ protected:
                           std::array<juce::AudioBuffer<float>*, 8>* directOuts  = nullptr,
                           juce::AudioBuffer<float>*                fxReturnsOut = nullptr,
                           const RetiredVoices*                     retired      = nullptr);
+
+protected:
+    // Backing storage for the default getUiScale / setUiScale. Derived classes
+    // typically also persist the value through their own appSettings file.
+    float uiScale { kUiScaleMedium };
 
 private:
     // MIDI program-change queue: audio thread enqueues on incoming PC;
