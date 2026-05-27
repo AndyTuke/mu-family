@@ -299,6 +299,7 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/PresetMigrationTests.cpp      # C1 + C2 (format migrations)
     Source/Tests/HotSwapBoundaryTests.cpp      # C3 (swap loop-boundary predicates)
     Source/Tests/MidiFullPresetMapTests.cpp    # C4 (ch-9 map round-trip)
+    Source/Tests/ModulationSkewTests.cpp       # C5 (proportion-space skew round-trips)
     Source/Persistence/PresetMigrations.cpp    # under test by C1/C2
     Source/Sequencer/HitGenerator.cpp
     Source/Sequencer/EuclideanGenerator.cpp

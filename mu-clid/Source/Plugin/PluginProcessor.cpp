@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginProcessor_Internal.h"
 #include "Audio/InsertSlotConfig.h"
+#include "Plugin/ModulationSkew.h"  // proportion-space skew helpers (shared with test C5)
 #if MUCLID_LITE_BUILD
 #include "LiteEditor.h"
 #else
@@ -490,12 +491,14 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
             // 0.3 on a 0..10 range; filter.lowCut uses skewFactor 0.35 on 0..1000.
             // amp.level is dB-linear (-60..+6) so the slider's "proportion" is
             // (dB + 60) / 66 — modulate in dB.
-            auto propFromAdsr   = [](float secs)  { return std::pow(juce::jlimit(0.0f, 1.0f, secs / 10.0f), 0.3f); };
-            auto propFromLowCut = [](float hz)    { return std::pow(juce::jlimit(0.0f, 1.0f, hz   / 1000.0f), 0.35f); };
-            // filter.cutoff: slider uses setSkewFactorFromMidPoint(640) on 20..20000 Hz
-            // which works out to internal skewFactor = log10(620/19980)/log10(0.5) ≈ 0.2.
-            // proportion = pow((hz - 20) / 19980, 0.2). Same skew applied in inverse at write-back.
-            auto propFromCutoff = [](float hz)    { return std::pow(juce::jlimit(0.0f, 1.0f, (hz - 20.0f) / 19980.0f), 0.2f); };
+            // Skew conversions (forward + inverse) live in ModulationSkew.h so the
+            // seed / snapshot / write-back blocks share one definition (test C5).
+            using mu_mod_skew::propFromAdsr;
+            using mu_mod_skew::propFromLowCut;
+            using mu_mod_skew::propFromCutoff;
+            using mu_mod_skew::adsrFromProp;
+            using mu_mod_skew::lowCutFromProp;
+            using mu_mod_skew::cutoffFromProp;
 
             modParamValues["amp.attack"]       = propFromAdsr(modParams.ampEnvAtk);
             modParamValues["amp.decay"]        = propFromAdsr(modParams.ampEnvDec);
@@ -562,9 +565,8 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
                 // Snap stores the ACTUAL value (seconds / Hz / dB) so the UI's setModulatedActual
                 // routes via valueToProportionOfLength and matches the needle's visual position
                 // by construction. Same pattern as filter.cutoff (#612) and insert.pN (Stage 36).
-                auto adsrFromProp   = [](float p) { return 10.0f   * std::pow(juce::jlimit(0.0f, 1.0f, p), 1.0f / 0.3f); };
-                auto lowCutFromProp = [](float p) { return 1000.0f * std::pow(juce::jlimit(0.0f, 1.0f, p), 1.0f / 0.35f); };
-                auto cutoffFromProp = [](float p) { return 20.0f + 19980.0f * std::pow(juce::jlimit(0.0f, 1.0f, p), 1.0f / 0.2f); };
+                // adsrFromProp / lowCutFromProp / cutoffFromProp come from ModulationSkew.h
+                // (brought in via the using-declarations above).
                 snap[kSnapAmpAtk]      .store(adsrFromProp(modParamValues["amp.attack"]));
                 snap[kSnapAmpDec]      .store(adsrFromProp(modParamValues["amp.decay"]));
                 snap[kSnapAmpSus]      .store(sn(modParamValues["amp.sustain"], 0.0f, 100.0f));
@@ -642,24 +644,19 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
                 snap[kSnapEucCInsLen]  .store(sn(modParamValues["euclid.c.insLen"],  0.0f,  8.0f));
             }
 
-            // Write modulated values back, clamping to safe ranges.
-            // Proportion-space destinations (#638): convert prop → actual via the
-            // slider's inverse skew. ADSR times: skew 0.3 on 0..10 s → value = 10 * prop^(1/0.3).
-            // Low-cut: skew 0.35 on 0..1000 Hz → value = 1000 * prop^(1/0.35).
-            auto adsrFromPropWB   = [](float p) { return 10.0f   * std::pow(juce::jlimit(0.0f, 1.0f, p), 1.0f / 0.3f); };
-            auto lowCutFromPropWB = [](float p) { return 1000.0f * std::pow(juce::jlimit(0.0f, 1.0f, p), 1.0f / 0.35f); };
-            auto cutoffFromPropWB = [](float p) { return 20.0f + 19980.0f * std::pow(juce::jlimit(0.0f, 1.0f, p), 1.0f / 0.2f); };
-
-            modParams.ampEnvAtk      = juce::jmax(0.001f, adsrFromPropWB(modParamValues["amp.attack"]));
-            modParams.ampEnvDec      = juce::jmax(0.001f, adsrFromPropWB(modParamValues["amp.decay"]));
+            // Write modulated values back, clamping to safe ranges. Proportion-space
+            // destinations (#638) convert prop → actual via the shared inverse-skew
+            // helpers in ModulationSkew.h (adsrFromProp / lowCutFromProp / cutoffFromProp).
+            modParams.ampEnvAtk      = juce::jmax(0.001f, adsrFromProp(modParamValues["amp.attack"]));
+            modParams.ampEnvDec      = juce::jmax(0.001f, adsrFromProp(modParamValues["amp.decay"]));
             modParams.ampEnvSus      = juce::jlimit(0.0f, 1.0f, modParamValues["amp.sustain"] / 100.0f);
-            modParams.ampEnvRel      = juce::jmax(0.001f, adsrFromPropWB(modParamValues["amp.release"]));
-            modParams.filterCutoff   = juce::jlimit(20.0f, 20000.0f, cutoffFromPropWB(modParamValues["filter.cutoff"]));
+            modParams.ampEnvRel      = juce::jmax(0.001f, adsrFromProp(modParamValues["amp.release"]));
+            modParams.filterCutoff   = juce::jlimit(20.0f, 20000.0f, cutoffFromProp(modParamValues["filter.cutoff"]));
             modParams.filterRes      = juce::jlimit(0.0f, 0.99f, modParamValues["filter.resonance"]);
-            modParams.filterEnvAtk   = juce::jmax(0.001f, adsrFromPropWB(modParamValues["fenv.attack"]));
-            modParams.filterEnvDec   = juce::jmax(0.001f, adsrFromPropWB(modParamValues["fenv.decay"]));
+            modParams.filterEnvAtk   = juce::jmax(0.001f, adsrFromProp(modParamValues["fenv.attack"]));
+            modParams.filterEnvDec   = juce::jmax(0.001f, adsrFromProp(modParamValues["fenv.decay"]));
             modParams.filterEnvDepth = juce::jlimit(0.0f, 48.0f, modParamValues["fenv.depth"]);
-            modParams.filterLowCutHz = lowCutFromPropWB(modParamValues["filter.lowCut"]);
+            modParams.filterLowCutHz = lowCutFromProp(modParamValues["filter.lowCut"]);
             // single pitch destination, no more octave×12 + fine/100 stacking.
             modParams.pitchMod       = juce::jlimit(-48.0f, 48.0f,
                                                      modParamValues["pitch.octave"]
