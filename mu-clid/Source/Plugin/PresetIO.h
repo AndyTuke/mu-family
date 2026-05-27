@@ -34,20 +34,17 @@ public:
     void savePreset(const juce::String& name, const juce::String& description,
                     const juce::String& category, bool embedSamples);
 
-    // Entry point. When the sequencer is playing, a full .muClid preset is staged
-    // for commit at the next master loop boundary (matching per-rhythm hot-swap).
-    // When stopped — or for a non-preset host-state restore — it applies now via
-    // applyPresetImmediate.
+    // Entry point for a full preset / host-state file. Parses, then routes by type:
+    // a .muclid full preset is pre-built off the audio thread and committed via
+    // commitStagedFullPreset — deferred to the next loop point when playing, applied
+    // immediately when stopped (one unified path). A non-MuClidPreset root is host /
+    // project state and goes straight to restoreStateFromTree.
     void loadPreset(const juce::File& file);
 
-    // The synchronous load body for the stopped path (and non-preset host-state
-    // restores). Parses + applies the preset immediately on the calling thread.
-    void applyPresetImmediate(const juce::File& file);
-
-    // Commit a pre-built full preset (prepared by loadPreset's playing path) into
-    // live state. Called from HotSwapStager::processSwaps at the loop boundary:
-    // installs the pre-built voices/rhythms under a single suspend, then finalises
-    // the APVTS / mixer / global params. `prepared` is consumed (voices moved out).
+    // Commit a pre-built full preset into live state under suspend + rhythmsLock, then
+    // finalise APVTS / mixer / global params. Called from loadPreset (stopped, immediate)
+    // and from HotSwapStager::processSwaps (playing, at the loop boundary). `prepared`
+    // is consumed (voices moved out).
     void commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepared);
 
     // JUCE AudioProcessor state (called from PluginProcessor's overrides).

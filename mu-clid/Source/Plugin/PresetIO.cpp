@@ -1539,17 +1539,6 @@ buildPreparedFullPreset(const juce::ValueTree& root, double sampleRate, int bloc
 
 void PresetIO::loadPreset(const juce::File& file)
 {
-    // Stopped → apply now (the single parse happens inside applyPresetImmediate).
-    if (! proc_.sequencerPlaying.load())
-    {
-        applyPresetImmediate(file);
-        return;
-    }
-
-    // Playing → peek the root to decide. A full .muClid preset is deferred to the
-    // next master loop boundary so the swap lands cleanly at the loop point, the
-    // same way a per-rhythm preset hot-swap already does. A non-MuClidPreset root
-    // is a host / project state restore — apply it immediately rather than defer.
     auto xml = juce::parseXML(file);
     if (! xml)
     {
@@ -1563,106 +1552,28 @@ void PresetIO::loadPreset(const juce::File& file)
         return;
     }
 
-    if (root.getType() == juce::Identifier("MuClidPreset"))
-    {
-        // Pre-build everything off the audio thread, then hand to the stager to
-        // commit at the next master loop point.
-        proc_.hotSwapStager.stageFullPreset(
-            buildPreparedFullPreset(root, proc_.currentSampleRate, proc_.currentBlockSize,
-                                    proc_.getSamplesDir(), proc_.onLoadError));
-    }
-    else
-    {
-        applyPresetImmediate(file);
-    }
-}
-
-void PresetIO::applyPresetImmediate(const juce::File& file)
-{
-    auto xml = juce::parseXML(file);
-    if (!xml)
-    {
-        if (proc_.onLoadError) proc_.onLoadError("Could not parse: " + file.getFileName());
-        return;
-    }
-    auto root = juce::ValueTree::fromXml(*xml);
-    if (!root.isValid())
-    {
-        if (proc_.onLoadError) proc_.onLoadError("Invalid preset: " + file.getFileName());
-        return;
-    }
-
+    // A non-MuClidPreset root is host / project state (the getStateInformation
+    // format), not a .muclid preset — restore it directly.
     if (root.getType() != juce::Identifier("MuClidPreset"))
     {
         restoreStateFromTree(root);
         return;
     }
 
-    // Reject legacy formats BEFORE mutating proc_.sequencer state. Otherwise a v0
-    // preset wipes the user's existing rhythms during the resize block below and
-    // only then reports the rejection — leaving the project in a half-loaded
-    // default state instead of the pre-load state.
-    if (! requireSupportedPresetVersion(root, file.getFileName(), proc_.onLoadError))
-        return;
-
-    // Step 1: count Rhythm children.
-    int n = 0;
-    for (int ci = 0; ci < root.getNumChildren(); ++ci)
-        if (root.getChild(ci).getType() == juce::Identifier("Rhythm"))
-            ++n;
-    n = juce::jlimit(1, SequencerEngine::MaxRhythms, n);
-
-    // #663: guard the whole live-state mutation (array resize, per-rhythm Rhythm /
-    // VoiceEngine sample swaps, sequencer pattern rebuilds) with suspendProcessing +
-    // rhythmsLock — the same pattern loadSampleForRhythm / swapRhythms / the prestaged
-    // commit use. Without it the audio thread can tear-read voiceEngines or a
-    // half-swapped sample buffer when a preset loads (or a DAW reloads project state)
-    // while processBlock is running. suspendProcessing alone is NOT enough: it doesn't
-    // block an in-flight processBlock; rhythmsLock does (the audio thread's ScopedTryLock
-    // bails while we hold it). Holding the lock across the setValueNotifyingHost calls is
-    // safe — under apvtsLoading, syncRhythmParam only mutates r.voiceParams under its own
-    // voiceParamsLock, and the audio thread bails before touching it.
-    proc_.suspendProcessing(true);
-    {
-        const juce::ScopedLock sl(proc_.rhythmsLock);
-
-        resizeRhythmArrays(n);
-
-        // Under one APVTS-loading guard, restore each rhythm + globals.
-        mu_core::ScopedApvtsLoading guard(proc_.apvtsLoading);
-
-        int rhythmIdx = 0;
-        for (int ci = 0; ci < root.getNumChildren() && rhythmIdx < n; ++ci)
-        {
-            auto rTree = root.getChild(ci);
-            if (rTree.getType() != juce::Identifier("Rhythm")) continue;
-            const int i = rhythmIdx++;
-
-            restoreRhythmAPVTSParams  (i, rTree, /*srcPropPrefix*/ "");
-            restoreRhythmChannelParams(i, rTree);
-            restoreRhythmModulators   (i, rTree);
-
-            // Name + colour (not APVTS-backed — sit on the Rhythm struct directly).
-            Rhythm& r = proc_.sequencer.getRhythm(i);
-            auto nameVal = rTree.getProperty("name");
-            if (nameVal.isString() && nameVal.toString().isNotEmpty())
-                r.name = nameVal.toString().toStdString();
-            r.colourIndex = (int)rTree.getProperty("colour", r.colourIndex);
-
-            restoreRhythmSample(i, rTree, "sample", "sampleData", "sampleName");
-
-            // force-sync APVTS → Rhythm so a preset that re-loads identical values
-            // into a freshly-recreated slot (preset A → B → A pattern) still
-            // populates r.voiceParams / r.genA.hits. JUCE skips listener callbacks
-            // when setValueNotifyingHost is called with an unchanged value, so
-            // parameterChanged → syncRhythmParam never fires. Internally calls
-            // updatePattern + proc_.voiceEngines[i]->setParams.
-            proc_.forceSyncRhythmFromAPVTS(i);
-        }
-
-        restoreGlobalState(root);
-    }
-    proc_.suspendProcessing(false);
+    // Full .muclid preset — ONE unified path. Pre-build every Rhythm + VoiceEngine +
+    // sample off the audio thread (buildPreparedFullPreset), then just trigger the
+    // switch: when playing, defer the flip to the next loop point (stageFullPreset →
+    // boundary commit); when stopped, flip immediately (commitStagedFullPreset). Same
+    // build + same commit code — only the trigger differs, so stopped and playing loads
+    // are identical by construction (no divergent second path — #666) and the stopped
+    // load is glitch-free with its sample disk I/O done off the rhythmsLock (#663).
+    auto prepared = buildPreparedFullPreset(root, proc_.currentSampleRate,
+                                            proc_.currentBlockSize, proc_.getSamplesDir(),
+                                            proc_.onLoadError);
+    if (proc_.sequencerPlaying.load())
+        proc_.hotSwapStager.stageFullPreset(std::move(prepared));
+    else
+        commitStagedFullPreset(prepared);
 }
 
 //==============================================================================
