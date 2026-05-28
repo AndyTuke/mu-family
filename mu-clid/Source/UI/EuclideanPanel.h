@@ -112,8 +112,14 @@ private:
     static constexpr int kLogicVOffset = 3;
 
     // Euclid-row spacing (#618-#620).
-    static constexpr int kEucKnobGap   = 6;   // inter-knob gap between Steps/Hits/Rotate
-    static constexpr int kPadKnobGap   = 24;  // inter-knob gap between Pre Pad and Post Pad
+    // kEucKnobGap widened so Steps/Hits/Rotate breathe; growing the Euclid
+    // block shrinks the Pad/Insert columns (pW is derived), so the right-hand
+    // sub-panels get smaller at the same time — both requested together.
+    // kPadKnobGap is now the SINGLE inter-knob gap used for BOTH the Pre/Post
+    // Pad pair AND the Insert pair, so their horizontal spacing matches (was
+    // 24 for Pad but a full column width ~104 for Insert — too close vs too far).
+    static constexpr int kEucKnobGap   = 18;  // inter-knob gap between Steps/Hits/Rotate
+    static constexpr int kPadKnobGap   = 48;  // shared gap for the Pad pair AND the Insert pair
     static constexpr int kPadInsertGap = 6;   // gap between Pad sub-panel and Insert sub-panel borders
 
     void apvtsSet(const char* suffix, float v);

@@ -465,9 +465,12 @@ void EuclideanPanel::resized()
     constexpr int preSw_x       = prePadX  + (padKnobW - padSw) / 2;
     constexpr int postSw_x      = postPadX + (padKnobW - padSw) / 2;
 
-    // Insert knobs still occupy their full pW column (only the Pad pair was
-    // tightened — Andy's #620 was specific to the Pad pair).
-    constexpr int insKnobOffset = (pW - padKnobW) / 2;
+    // Insert pair: centred inside the Insert sub-panel using the SAME pair
+    // geometry as the Pad pair (padPairW + kPadKnobGap), so the Pre/Post Pad
+    // spacing and the Insert spacing are identical. Previously the two insert
+    // knobs sat one-per-pW-column (~104 px apart) — far wider than the Pad pair.
+    constexpr int insStX  = insX + (insPanelW - padPairW) / 2;
+    constexpr int insLenX = insStX + padKnobW + kPadKnobGap;
 
     // Every literal/constant in setBounds wrapped in mu_ui::s() so toggling
     // the UI scale propagates uniformly. Identity at scale = 1.0.
@@ -488,8 +491,8 @@ void EuclideanPanel::resized()
         postPad.setBounds(s(postPadX), s(cy + mP), s(padKnobW), s(padKnobH));
         prePadMode.setBounds (s(preSw_x),  s(cy + knobH + 2), s(padSw), s(kSwitchH));
         postPadMode.setBounds(s(postSw_x), s(cy + knobH + 2), s(padSw), s(kSwitchH));
-        insSt.setBounds  (s(insX     + insKnobOffset), s(cy + mP), s(padKnobW), s(padKnobH));
-        insLen.setBounds (s(insX + pW + insKnobOffset), s(cy + mP), s(padKnobW), s(padKnobH));
+        insSt.setBounds  (s(insStX),  s(cy + mP), s(padKnobW), s(padKnobH));
+        insLen.setBounds (s(insLenX), s(cy + mP), s(padKnobW), s(padKnobH));
         insMode.setBounds(s(insSwX),       s(cy + knobH + 2), s(insSw), s(kSwitchH));
     };
 
