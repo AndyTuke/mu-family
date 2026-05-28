@@ -26,22 +26,32 @@ void VoiceEngine::setBank(const WavetableBank* b) noexcept
     osc2.setBank(b);
 }
 
+// Base octave the per-osc octave offset (-3..+3) sits on, so the playable
+// range lands in an audible drone register (octave 0 → MIDI ~48 = C3).
+static constexpr int kBaseOctave = 4;
+
 void VoiceEngine::setConfig(const VoiceConfig& c)
 {
     cfg = c;
 
-    const float midi1 = toneToMidi(cfg.scaleIdx, cfg.root, cfg.osc1Octave, cfg.osc1Tone, cfg.osc1Fine);
-    const float midi2 = toneToMidi(cfg.scaleIdx, cfg.root, cfg.osc2Octave, cfg.osc2Tone, cfg.osc2Fine);
+    const float midi1 = toneToMidi(cfg.scaleIdx, cfg.root, cfg.osc1Octave + kBaseOctave,
+                                   (float) cfg.osc1Semi, (float) cfg.osc1Fine);
+    const float midi2 = toneToMidi(cfg.scaleIdx, cfg.root, cfg.osc2Octave + kBaseOctave,
+                                   (float) cfg.osc2Semi, (float) cfg.osc2Fine);
     osc1.setFrequency(midiToFreq(midi1));
     osc2.setFrequency(midiToFreq(midi2));
-    osc1.setPosition(cfg.osc1Pos);
-    osc2.setPosition(cfg.osc2Pos);
+    // Position is a 0..255 frame index; normalise to the osc's 0..1 scan input.
+    osc1.setPosition(cfg.osc1Pos / 255.0f);
+    osc2.setPosition(cfg.osc2Pos / 255.0f);
 
     filter.setType(cfg.filterType);
     filter.setCutoff(cfg.filterCutoff);
     filter.setResonance(cfg.filterRes);
 
-    gain = juce::Decibels::decibelsToGain(cfg.levelDb, -60.0f);
+    gain      = juce::Decibels::decibelsToGain(cfg.levelDb,      -60.0f);
+    osc1Gain  = juce::Decibels::decibelsToGain(cfg.osc1LevelDb,  -60.0f);
+    osc2Gain  = juce::Decibels::decibelsToGain(cfg.osc2LevelDb,  -60.0f);
+    noiseGain = juce::Decibels::decibelsToGain(cfg.noiseLevelDb, -60.0f);
 }
 
 void VoiceEngine::process(juce::AudioBuffer<float>& out, int numSamples)
@@ -50,8 +60,9 @@ void VoiceEngine::process(juce::AudioBuffer<float>& out, int numSamples)
     if (ns <= 0) return;
 
     float* m = mono.getWritePointer(0);
-    const float mixB = cfg.mix;
-    const float mixA = 1.0f - cfg.mix;
+    // xmod is 0..127 in the UI; normalise to the 0..1 FM index.
+    const float xmodNorm = (float) cfg.xmod / 127.0f;
+    const auto  noiseType = static_cast<NoiseGen::Type>(cfg.noiseType);
 
     for (int i = 0; i < ns; ++i)
     {
@@ -67,10 +78,11 @@ void VoiceEngine::process(juce::AudioBuffer<float>& out, int numSamples)
         {
             // Off / FM. FM is B -> A: B modulates A's phase.
             b = osc2.render();
-            const float pm = (cfg.xmodMode == FM) ? (cfg.xmod * b * kFmDepth) : 0.0f;
+            const float pm = (cfg.xmodMode == FM) ? (xmodNorm * b * kFmDepth) : 0.0f;
             a = osc1.render(pm);
         }
-        m[i] = (a * mixA + b * mixB) * gain;
+        const float n = noise.render(noiseType);
+        m[i] = (a * osc1Gain + b * osc2Gain + n * noiseGain) * gain;
     }
 
     // Filter (mu-core) in place on the mono work buffer.

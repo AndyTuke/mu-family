@@ -33,29 +33,35 @@ namespace
             return juce::String("V") + juce::String(voice + 1) + " " + base;
         };
 
-        // Per-oscillator pitch + wavetable position.
-        layout.add(std::make_unique<AudioParameterInt>  (ParameterID{id("o1_oct"), 1},  label("Osc1 Octave"), 0, 8, 4));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("o1_tone"), 1}, label("Osc1 Tone"),   f(0.0f, 14.0f, 0.01f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("o1_fine"), 1}, label("Osc1 Fine"),   f(-100.0f, 100.0f, 0.1f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("o1_pos"), 1},  label("Osc1 Position"), f(0.0f, 1.0f, 0.001f), 0.0f));
-        layout.add(std::make_unique<AudioParameterInt>  (ParameterID{id("o2_oct"), 1},  label("Osc2 Octave"), 0, 8, 3));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("o2_tone"), 1}, label("Osc2 Tone"),   f(0.0f, 14.0f, 0.01f), 2.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("o2_fine"), 1}, label("Osc2 Fine"),   f(-100.0f, 100.0f, 0.1f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("o2_pos"), 1},  label("Osc2 Position"), f(0.0f, 1.0f, 0.001f), 0.0f));
+        // Per-oscillator pitch — all integer-stepped. Octave ±3 offset, Semi
+        // ±12 (scale-degree, see Scales.h), Fine ±100 cents. Wavetable position
+        // is a 0..255 frame index (256-frame Serum/Vital tables).
+        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_oct"),  1}, label("Osc1 Octave"),   -3, 3, 0));
+        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_semi"), 1}, label("Osc1 Semi"),     -12, 12, 0));
+        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_fine"), 1}, label("Osc1 Fine"),     -100, 100, 0));
+        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_pos"),  1}, label("Osc1 Position"), 0, 255, 0));
+        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_oct"),  1}, label("Osc2 Octave"),   -3, 3, 0));
+        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_semi"), 1}, label("Osc2 Semi"),     -12, 12, 2));
+        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_fine"), 1}, label("Osc2 Fine"),     -100, 100, 0));
+        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_pos"),  1}, label("Osc2 Position"), 0, 255, 0));
 
-        // Cross-mod + balance.
-        layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("xmod"), 1},  label("X-Mod"),      f(0.0f, 1.0f, 0.001f), 0.0f));
+        // Cross-mod.
+        layout.add(std::make_unique<AudioParameterInt>   (ParameterID{id("xmod"), 1},  label("X-Mod"),      0, 127, 0));
         layout.add(std::make_unique<AudioParameterChoice>(ParameterID{id("xmode"), 1}, label("X-Mod Mode"), StringArray{ "Off", "FM", "Sync" }, 0));
-        layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("mix"), 1},   label("Osc Mix"),    f(0.0f, 1.0f, 0.001f), 0.5f));
 
-        // Filter (mu-core).
-        NormalisableRange<float> cutoff(20.0f, 20000.0f, 1.0f);
-        cutoff.setSkewForCentre(640.0f);
+        // Per-source levels (replace the old osc-balance "mix").
+        layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("o1_lvl"),   1}, label("Osc1 Level"),  f(-60.0f, 6.0f, 0.1f), 0.0f));
+        layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("o2_lvl"),   1}, label("Osc2 Level"),  f(-60.0f, 6.0f, 0.1f), -6.0f));
+        layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("noise_lvl"),1}, label("Noise Level"), f(-60.0f, 6.0f, 0.1f), -60.0f));
+        layout.add(std::make_unique<AudioParameterChoice>(ParameterID{id("noise_type"),1}, label("Noise Type"), StringArray{ "White", "Pink" }, 0));
+
+        // Filter (mu-core) — cutoff range/skew match mu-clid (20..20000, skew 0.25, continuous).
+        NormalisableRange<float> cutoff(20.0f, 20000.0f, 0.0f, 0.25f);
         layout.add(std::make_unique<AudioParameterInt>  (ParameterID{id("flt_type"), 1}, label("Filter Type"), 0, 15, 0));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_cut"), 1},  label("Cutoff"), cutoff, 8000.0f));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_res"), 1},  label("Resonance"), f(0.0f, 0.99f, 0.001f), 0.2f));
 
-        // Per-voice level — distinct from the mixer fader (this is engine-level
+        // Per-voice slot output level — distinct from the mixer fader (engine-level
         // trim before the channel strip; the mixer adds its own per-channel level
         // / pan / mute / solo on top, matching the mu-clid signal flow).
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("level"), 1}, label("Level"), f(-60.0f, 6.0f, 0.1f), -6.0f));
@@ -144,18 +150,22 @@ VoiceConfig PluginProcessor::readConfig(int voiceIdx) const
     // Tonal centre is global.
     c.root         = (int) raw("root");
     c.scaleIdx     = (int) raw("scale");
-    // Per-voice osc + cross-mod + filter + level.
+    // Per-voice osc pitch (integer) + position.
     c.osc1Octave   = (int) raw(vid("o1_oct"));
-    c.osc1Tone     = raw(vid("o1_tone"));
-    c.osc1Fine     = raw(vid("o1_fine"));
+    c.osc1Semi     = (int) raw(vid("o1_semi"));
+    c.osc1Fine     = (int) raw(vid("o1_fine"));
     c.osc1Pos      = raw(vid("o1_pos"));
     c.osc2Octave   = (int) raw(vid("o2_oct"));
-    c.osc2Tone     = raw(vid("o2_tone"));
-    c.osc2Fine     = raw(vid("o2_fine"));
+    c.osc2Semi     = (int) raw(vid("o2_semi"));
+    c.osc2Fine     = (int) raw(vid("o2_fine"));
     c.osc2Pos      = raw(vid("o2_pos"));
-    c.xmod         = raw(vid("xmod"));
+    c.xmod         = (int) raw(vid("xmod"));
     c.xmodMode     = (int) raw(vid("xmode"));
-    c.mix          = raw(vid("mix"));
+    // Per-source levels.
+    c.osc1LevelDb  = raw(vid("o1_lvl"));
+    c.osc2LevelDb  = raw(vid("o2_lvl"));
+    c.noiseLevelDb = raw(vid("noise_lvl"));
+    c.noiseType    = (int) raw(vid("noise_type"));
     c.filterType   = (int) raw(vid("flt_type"));
     c.filterCutoff = raw(vid("flt_cut"));
     c.filterRes    = raw(vid("flt_res"));
@@ -199,15 +209,17 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         // collapses to a no-op + the seeded values pass through unchanged.
         VoiceConfig cfg = readConfig(v);
         modParamValues["osc1.octave"]      = (float) cfg.osc1Octave;
-        modParamValues["osc1.tone"]        = cfg.osc1Tone;
-        modParamValues["osc1.fine"]        = cfg.osc1Fine;
+        modParamValues["osc1.semi"]        = (float) cfg.osc1Semi;
+        modParamValues["osc1.fine"]        = (float) cfg.osc1Fine;
         modParamValues["osc1.pos"]         = cfg.osc1Pos;
         modParamValues["osc2.octave"]      = (float) cfg.osc2Octave;
-        modParamValues["osc2.tone"]        = cfg.osc2Tone;
-        modParamValues["osc2.fine"]        = cfg.osc2Fine;
+        modParamValues["osc2.semi"]        = (float) cfg.osc2Semi;
+        modParamValues["osc2.fine"]        = (float) cfg.osc2Fine;
         modParamValues["osc2.pos"]         = cfg.osc2Pos;
-        modParamValues["xmod"]             = cfg.xmod;
-        modParamValues["mix"]              = cfg.mix;
+        modParamValues["xmod"]             = (float) cfg.xmod;
+        modParamValues["osc1.level"]       = cfg.osc1LevelDb;
+        modParamValues["osc2.level"]       = cfg.osc2LevelDb;
+        modParamValues["noise.level"]      = cfg.noiseLevelDb;
         modParamValues["filter.cutoff"]    = cfg.filterCutoff;
         modParamValues["filter.resonance"] = cfg.filterRes;
         modParamValues["level"]            = cfg.levelDb;
@@ -224,15 +236,17 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 
             // Read modulated values back into the config.
             cfg.osc1Octave   = (int) modParamValues["osc1.octave"];
-            cfg.osc1Tone     = modParamValues["osc1.tone"];
-            cfg.osc1Fine     = modParamValues["osc1.fine"];
+            cfg.osc1Semi     = (int) modParamValues["osc1.semi"];
+            cfg.osc1Fine     = (int) modParamValues["osc1.fine"];
             cfg.osc1Pos      = modParamValues["osc1.pos"];
             cfg.osc2Octave   = (int) modParamValues["osc2.octave"];
-            cfg.osc2Tone     = modParamValues["osc2.tone"];
-            cfg.osc2Fine     = modParamValues["osc2.fine"];
+            cfg.osc2Semi     = (int) modParamValues["osc2.semi"];
+            cfg.osc2Fine     = (int) modParamValues["osc2.fine"];
             cfg.osc2Pos      = modParamValues["osc2.pos"];
-            cfg.xmod         = modParamValues["xmod"];
-            cfg.mix          = modParamValues["mix"];
+            cfg.xmod         = (int) modParamValues["xmod"];
+            cfg.osc1LevelDb  = modParamValues["osc1.level"];
+            cfg.osc2LevelDb  = modParamValues["osc2.level"];
+            cfg.noiseLevelDb = modParamValues["noise.level"];
             cfg.filterCutoff = modParamValues["filter.cutoff"];
             cfg.filterRes    = modParamValues["filter.resonance"];
             cfg.levelDb      = modParamValues["level"];

@@ -52,9 +52,10 @@ public:
             // uses must be findable by the provider — otherwise a saved
             // assignment from the UI would silently fail to drive the engine.
             const char* requiredKeys[] = {
-                "osc1.octave", "osc1.tone", "osc1.fine", "osc1.pos",
-                "osc2.octave", "osc2.tone", "osc2.fine", "osc2.pos",
-                "xmod", "mix", "filter.cutoff", "filter.resonance", "level"
+                "osc1.octave", "osc1.semi", "osc1.fine", "osc1.pos",
+                "osc2.octave", "osc2.semi", "osc2.fine", "osc2.pos",
+                "xmod", "osc1.level", "osc2.level", "noise.level",
+                "filter.cutoff", "filter.resonance", "level"
             };
             auto provider = makeModDestProvider();
             for (auto* k : requiredKeys)

@@ -49,32 +49,41 @@ private:
 
     // ── Oscillator 1 ────────────────────────────────────────────────────────
     KnobWithLabel o1OctKnob  { "Osc1 Oct" };
-    KnobWithLabel o1ToneKnob { "Osc1 Tone" };
+    KnobWithLabel o1SemiKnob { "Osc1 Semi" };
     KnobWithLabel o1FineKnob { "Osc1 Fine" };
     KnobWithLabel o1PosKnob  { "Osc1 Pos" };
     std::unique_ptr<APVTS::SliderAttachment> o1OctAttachment;
-    std::unique_ptr<APVTS::SliderAttachment> o1ToneAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> o1SemiAttachment;
     std::unique_ptr<APVTS::SliderAttachment> o1FineAttachment;
     std::unique_ptr<APVTS::SliderAttachment> o1PosAttachment;
 
     // ── Oscillator 2 ────────────────────────────────────────────────────────
     KnobWithLabel o2OctKnob  { "Osc2 Oct" };
-    KnobWithLabel o2ToneKnob { "Osc2 Tone" };
+    KnobWithLabel o2SemiKnob { "Osc2 Semi" };
     KnobWithLabel o2FineKnob { "Osc2 Fine" };
     KnobWithLabel o2PosKnob  { "Osc2 Pos" };
     std::unique_ptr<APVTS::SliderAttachment> o2OctAttachment;
-    std::unique_ptr<APVTS::SliderAttachment> o2ToneAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> o2SemiAttachment;
     std::unique_ptr<APVTS::SliderAttachment> o2FineAttachment;
     std::unique_ptr<APVTS::SliderAttachment> o2PosAttachment;
 
-    // ── Cross-mod + balance ─────────────────────────────────────────────────
+    // ── Cross-mod ─────────────────────────────────────────────────────────────
     KnobWithLabel  xmodKnob  { "X-Mod" };
     juce::Label    xmodLabel;
     DropdownSelect xmodModeDropdown;
-    KnobWithLabel  mixKnob   { "Mix" };
     std::unique_ptr<APVTS::SliderAttachment>   xmodAttachment;
     std::unique_ptr<APVTS::ComboBoxAttachment> xmodModeAttachment;
-    std::unique_ptr<APVTS::SliderAttachment>   mixAttachment;
+
+    // ── Levels (osc1 / osc2 / noise + White-Pink toggle) ──────────────────────
+    KnobWithLabel  osc1LevelKnob  { "Osc1 Lvl" };
+    KnobWithLabel  osc2LevelKnob  { "Osc2 Lvl" };
+    KnobWithLabel  noiseLevelKnob { "Noise" };
+    juce::Label    noiseTypeLabel;
+    DropdownSelect noiseTypeDropdown;
+    std::unique_ptr<APVTS::SliderAttachment>   osc1LevelAttachment;
+    std::unique_ptr<APVTS::SliderAttachment>   osc2LevelAttachment;
+    std::unique_ptr<APVTS::SliderAttachment>   noiseLevelAttachment;
+    std::unique_ptr<APVTS::ComboBoxAttachment> noiseTypeAttachment;
 
     // ── Filter ──────────────────────────────────────────────────────────────
     juce::Label    fltTypeLabel;

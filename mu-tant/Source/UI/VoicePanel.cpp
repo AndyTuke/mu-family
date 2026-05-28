@@ -43,6 +43,12 @@ namespace
         for (int i = 0; i < 16; ++i)
             d.addItem(names[i], i + 1);
     }
+
+    void populateNoiseTypes(DropdownSelect& d)
+    {
+        d.addItem("White", 1);
+        d.addItem("Pink",  2);
+    }
 }
 
 VoicePanel::VoicePanel(PluginProcessor& p)
@@ -76,14 +82,19 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     scaleAttachment = std::make_unique<APVTS::ComboBoxAttachment>(apvts, "scale", scaleDropdown.getComboBox());
 
     // ── Per-voice controls (added once, rebound per-voice) ──────────────────
-    for (auto* k : { &o1OctKnob, &o1ToneKnob, &o1FineKnob, &o1PosKnob,
-                     &o2OctKnob, &o2ToneKnob, &o2FineKnob, &o2PosKnob,
-                     &xmodKnob, &mixKnob, &fltCutKnob, &fltResKnob, &levelKnob })
+    for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PosKnob,
+                     &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PosKnob,
+                     &xmodKnob, &osc1LevelKnob, &osc2LevelKnob, &noiseLevelKnob,
+                     &fltCutKnob, &fltResKnob, &levelKnob })
         addAndMakeVisible(k);
 
     setupLabel(xmodLabel, "Mode");
     populateXmodModes(xmodModeDropdown);
     addAndMakeVisible(xmodModeDropdown);
+
+    setupLabel(noiseTypeLabel, "Noise");
+    populateNoiseTypes(noiseTypeDropdown);
+    addAndMakeVisible(noiseTypeDropdown);
 
     setupLabel(fltTypeLabel, "Type");
     populateFilterTypes(fltTypeDropdown);
@@ -123,28 +134,33 @@ void VoicePanel::rebindAttachments()
     // Destroy previous attachments first — the JUCE attachment dtor unhooks
     // the listener before the new one binds, so the slider doesn't briefly
     // double-fire from two attachments while we swap.
-    o1OctAttachment      = nullptr; o1ToneAttachment   = nullptr;
+    o1OctAttachment      = nullptr; o1SemiAttachment   = nullptr;
     o1FineAttachment     = nullptr; o1PosAttachment    = nullptr;
-    o2OctAttachment      = nullptr; o2ToneAttachment   = nullptr;
+    o2OctAttachment      = nullptr; o2SemiAttachment   = nullptr;
     o2FineAttachment     = nullptr; o2PosAttachment    = nullptr;
     xmodAttachment       = nullptr; xmodModeAttachment = nullptr;
-    mixAttachment        = nullptr;
+    osc1LevelAttachment  = nullptr; osc2LevelAttachment = nullptr;
+    noiseLevelAttachment = nullptr; noiseTypeAttachment = nullptr;
     fltTypeAttachment    = nullptr; fltCutAttachment   = nullptr;
     fltResAttachment     = nullptr; levelAttachment    = nullptr;
 
     o1OctAttachment  = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_oct"),  o1OctKnob.getSlider());
-    o1ToneAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_tone"), o1ToneKnob.getSlider());
+    o1SemiAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_semi"), o1SemiKnob.getSlider());
     o1FineAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_fine"), o1FineKnob.getSlider());
     o1PosAttachment  = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_pos"),  o1PosKnob.getSlider());
 
     o2OctAttachment  = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_oct"),  o2OctKnob.getSlider());
-    o2ToneAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_tone"), o2ToneKnob.getSlider());
+    o2SemiAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_semi"), o2SemiKnob.getSlider());
     o2FineAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_fine"), o2FineKnob.getSlider());
     o2PosAttachment  = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_pos"),  o2PosKnob.getSlider());
 
     xmodAttachment     = std::make_unique<APVTS::SliderAttachment>  (apvts, id("xmod"),  xmodKnob.getSlider());
     xmodModeAttachment = std::make_unique<APVTS::ComboBoxAttachment>(apvts, id("xmode"), xmodModeDropdown.getComboBox());
-    mixAttachment      = std::make_unique<APVTS::SliderAttachment>  (apvts, id("mix"),   mixKnob.getSlider());
+
+    osc1LevelAttachment  = std::make_unique<APVTS::SliderAttachment>  (apvts, id("o1_lvl"),     osc1LevelKnob.getSlider());
+    osc2LevelAttachment  = std::make_unique<APVTS::SliderAttachment>  (apvts, id("o2_lvl"),     osc2LevelKnob.getSlider());
+    noiseLevelAttachment = std::make_unique<APVTS::SliderAttachment>  (apvts, id("noise_lvl"),  noiseLevelKnob.getSlider());
+    noiseTypeAttachment  = std::make_unique<APVTS::ComboBoxAttachment>(apvts, id("noise_type"), noiseTypeDropdown.getComboBox());
 
     fltTypeAttachment = std::make_unique<APVTS::ComboBoxAttachment>(apvts, id("flt_type"), fltTypeDropdown.getComboBox());
     fltCutAttachment  = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_cut"),  fltCutKnob.getSlider());
@@ -231,30 +247,35 @@ void VoicePanel::resized()
     int innerY = y + bandPadY;
     int innerX = bandInsetX + pad;
 
-    // Row: Osc1 four knobs
+    // Row: Osc1 four pitch knobs (Oct / Semi / Fine / Pos) + Osc1 level
     int x = innerX;
-    for (auto* k : { &o1OctKnob, &o1ToneKnob, &o1FineKnob, &o1PosKnob })
+    for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PosKnob })
     {
         k->setBounds(x, innerY, knobW, knobH);
         x += knobW + hgap;
     }
+    osc1LevelKnob.setBounds(x + s(8), innerY, knobW, knobH);
 
-    // Row: Osc2 four knobs (immediately below)
+    // Row: Osc2 four pitch knobs + Osc2 level (immediately below)
     int innerY2 = innerY + knobH + rowGap;
     x = innerX;
-    for (auto* k : { &o2OctKnob, &o2ToneKnob, &o2FineKnob, &o2PosKnob })
+    for (auto* k : { &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PosKnob })
     {
         k->setBounds(x, innerY2, knobW, knobH);
         x += knobW + hgap;
     }
+    osc2LevelKnob.setBounds(x + s(8), innerY2, knobW, knobH);
 
-    // X-mod controls + mix knob to the right of the osc grid.
-    int xmodX = innerX + 4 * (knobW + hgap) + s(24);
-    xmodKnob.setBounds(xmodX, innerY, knobW, knobH);
-    xmodLabel.setBounds(xmodX, innerY + knobH + s(4), labelW, ddH);
-    xmodModeDropdown.setBounds(xmodX + labelW + s(4),
-                                innerY + knobH + s(4), s(72), ddH);
-    mixKnob.setBounds(xmodX + knobW + s(24), innerY, knobW, knobH);
+    // X-mod (knob + mode) + Noise (level knob + White/Pink) to the right of the
+    // osc grid, stacked across the two osc rows.
+    int rightX = innerX + 4 * (knobW + hgap) + knobW + s(24);
+    xmodKnob.setBounds(rightX, innerY, knobW, knobH);
+    xmodLabel.setBounds(rightX, innerY + knobH + s(2), labelW, ddH);
+    xmodModeDropdown.setBounds(rightX + labelW + s(4),
+                                innerY + knobH + s(2), s(72), ddH);
+    noiseLevelKnob.setBounds(rightX + knobW + s(24), innerY, knobW, knobH);
+    noiseTypeDropdown.setBounds(rightX + knobW + s(24),
+                                 innerY + knobH + s(2), s(72), ddH);
 
     y += band1H + rowGap;
 

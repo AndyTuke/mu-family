@@ -25,17 +25,20 @@ struct ModDest { const char* id; const char* alias; const char* section; };
 inline constexpr ModDest kModDestTable[] = {
     // ── Pitch (osc1) ────────────────────────────────────────────────────────
     { "osc1.octave",  "Osc1 Octave",   "Osc 1" },
-    { "osc1.tone",    "Osc1 Tone",     "Osc 1" },
+    { "osc1.semi",    "Osc1 Semi",     "Osc 1" },
     { "osc1.fine",    "Osc1 Fine",     "Osc 1" },
     { "osc1.pos",     "Osc1 Position", "Osc 1" },
     // ── Pitch (osc2) ────────────────────────────────────────────────────────
     { "osc2.octave",  "Osc2 Octave",   "Osc 2" },
-    { "osc2.tone",    "Osc2 Tone",     "Osc 2" },
+    { "osc2.semi",    "Osc2 Semi",     "Osc 2" },
     { "osc2.fine",    "Osc2 Fine",     "Osc 2" },
     { "osc2.pos",     "Osc2 Position", "Osc 2" },
-    // ── Cross-mod / balance ─────────────────────────────────────────────────
+    // ── Cross-mod ─────────────────────────────────────────────────────────────
     { "xmod",         "X-Mod",         "Mix"   },
-    { "mix",          "Osc Mix",       "Mix"   },
+    // ── Levels ────────────────────────────────────────────────────────────────
+    { "osc1.level",   "Osc1 Level",    "Levels" },
+    { "osc2.level",   "Osc2 Level",    "Levels" },
+    { "noise.level",  "Noise Level",   "Levels" },
     // ── Filter ──────────────────────────────────────────────────────────────
     { "filter.cutoff",     "Filter Cutoff",     "Filter" },
     { "filter.resonance",  "Filter Resonance",  "Filter" },
