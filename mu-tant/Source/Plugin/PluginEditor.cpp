@@ -21,8 +21,11 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         });
     getTransportBar().setLogoText(juce::String(juce::CharPointer_UTF8("\xce\xbc-Tant")));
 
-    // First-stab scope: no preset library yet.
-    getTransportBar().setShowPresetControls(false);
+    // Preset library — full presets via the shared shell chrome (TransportBar
+    // dropdown + Save dialog + Preset browser). The processor implements the
+    // save/load + directories; the shell drives the UI.
+    getTransportBar().setShowPresetControls(true);
+    getTransportBar().refreshPresets();
 
     // Basic settings page (master vol + UI size + BPM) behind the gear button.
     settingsOverlay.onClose = [this] { showSettings(false); };
@@ -34,9 +37,32 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     setMainArea(&voiceSidebar, &voicePanel);
     setMixerOverlay(&mixerOverlay);
 
-    voiceSidebar.onVoiceSelected = [this](int idx)
+    // Sidebar select / add / delete / reorder — same UX as mu-clid's rhythms.
+    voiceSidebar.onChannelSelected = [this](int idx) { voicePanel.setVoice(idx); };
+
+    voiceSidebar.onAddChannel = [this]
     {
+        const int idx = proc.addVoice();
+        if (idx < 0) return;                       // already at the 8-voice max
+        voiceSidebar.refreshItems();
+        voiceSidebar.setSelectedIndex(idx);
         voicePanel.setVoice(idx);
+    };
+
+    voiceSidebar.onChannelsReordered = [this](int newSelected)
+    {
+        voicePanel.setVoice(newSelected);
+    };
+
+    voicePanel.onDeleteVoice = [this]
+    {
+        if (proc.getNumVoices() <= 1) return;      // never delete the last voice
+        const int idx = voicePanel.getVoice();
+        proc.removeVoice(idx);
+        const int newIdx = juce::jlimit(0, proc.getNumVoices() - 1, idx);
+        voiceSidebar.refreshItems();
+        voiceSidebar.setSelectedIndex(newIdx);
+        voicePanel.setVoice(newIdx);
     };
 
     // Forward mixer status updates to the shared StatusBar.

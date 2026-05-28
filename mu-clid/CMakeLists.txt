@@ -43,7 +43,7 @@ target_sources(mu-clid
         Source/Sequencer/SequencerEngine.cpp
         Source/UI/MasterLoopSection.cpp
         Source/UI/RhythmCircle.cpp
-        Source/UI/SidebarItem.cpp
+        Source/UI/RhythmMiniVisual.cpp
         Source/UI/RhythmSidebar.cpp
         Source/UI/EuclideanPanel.cpp
         Source/UI/VoiceSection.cpp

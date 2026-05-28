@@ -77,6 +77,7 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/ModulatorTests.cpp
     Source/Tests/GatingDesignerTests.cpp
     Source/Tests/GatePatternTests.cpp
+    Source/Tests/GateStageTests.cpp
     Source/UI/GatingDesigner.cpp
     Source/Sequencer/GatePattern.cpp
     Source/Audio/WavetableBank.cpp

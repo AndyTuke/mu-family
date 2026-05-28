@@ -6,28 +6,50 @@
 namespace mu_tant
 {
 
-float GateEnvelope::value(float phase01) const noexcept
+namespace
 {
-    // Clamp phase outside [0, 1] to its boundary value so envelopes evaluated
-    // beyond their own span (audio-thread arithmetic round-off) saturate
-    // cleanly instead of producing garbage > 1 or negative.
-    if (phase01 <= 0.0f) return options.reverse ? 0.0f : 1.0f;
-    if (phase01 >= 1.0f) return options.reverse ? 1.0f : 0.0f;
+    inline float clamp01(float x) noexcept
+    {
+        return x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x);
+    }
 
-    // Default decay shape: linear 1.0 → 0.0 over [0, 1].
-    float linearDecay = 1.0f - phase01;
-    if (options.reverse) linearDecay = phase01;     // attack 0 → 1
+    // Bend a 0..1 line via a power curve. bend > 0 bulges it up (sustains
+    // higher than linear); bend < 0 bulges it down (moves away faster). The
+    // 2^(-bend*2) mapping gives a usable 0.25..4 exponent range across
+    // [+1, -1] without singularities at the extremes.
+    inline float bend(float x, float amount) noexcept
+    {
+        if (amount == 0.0f) return x;
+        const float exponent = std::pow(2.0f, -amount * 2.0f);
+        return std::pow(clamp01(x), exponent);
+    }
+}
 
-    // Curve bend in [-1, +1] reshapes the decay via power curve.
-    // For x in [0,1]: pow(x, e) < x when e > 1 (faster decay), > x when e < 1.
-    //   bend < 0 (concave) → exponent > 1 → faster initial drop, audible gap
-    //   bend > 0 (convex)  → exponent < 1 → sustains near 1, drops at end
-    //   bend = 0           → exponent 1 (linear)
-    // Empirical mapping: exponent = 2^(-bend * 2) gives a usable 0.25..4
-    // range across [+1, -1] without singularities at the extremes.
-    if (curveBend == 0.0f) return linearDecay;
-    const float exponent = std::pow(2.0f, -curveBend * 2.0f);
-    return std::pow(linearDecay, exponent);
+float GateEnvelope::shape(float p) const noexcept
+{
+    const float s = clamp01(split);
+    if (p <= s)
+    {
+        if (s <= 0.0f) return 1.0f;        // instant attack — already at peak
+        return bend(p / s, attackBend);    // attack rises 0 -> 1 over [0, s]
+    }
+    if (s >= 1.0f) return 1.0f;            // pure attack — full until the end
+    const float d = (p - s) / (1.0f - s);  // 0..1 across the decay span
+    return bend(1.0f - d, decayBend);       // decay falls 1 -> 0
+}
+
+float GateEnvelope::value(float phase01, float gap01) const noexcept
+{
+    phase01 = clamp01(phase01);
+    const float gap    = clamp01(gap01);
+    const float active = 1.0f - gap;          // leading fraction the shape fills
+    if (active <= 0.0f) return 0.0f;          // gap = 100% -> whole region silent
+    if (gap > 0.0f && phase01 >= active) return 0.0f;   // trailing silence tail
+
+    float p = phase01 / active;               // remap region-phase into [0,1]
+    if (p > 1.0f) p = 1.0f;
+    if (reverse) p = 1.0f - p;                // mirror -> swaps attack and decay
+    return shape(p);
 }
 
 int GatePattern::totalCells() const noexcept
@@ -35,59 +57,96 @@ int GatePattern::totalCells() const noexcept
     return kTotalBars * static_cast<int>(subdivision);
 }
 
-const GateEnvelope* GatePattern::cellEnvelope(int cellIdx) const noexcept
+const GateEnvelope* GatePattern::envelopeAtCell(int cellIdx) const noexcept
 {
-    // Direct match — one envelope per cell. Linear scan is fine: typical
-    // patterns have ≤ 64 cells, the loop fits comfortably in audio-thread
-    // budget at 30 evaluations per audio block.
+    // Linear scan — typical patterns have <= 64 cells and few envelopes.
     for (const auto& env : envelopes)
-        if (env.cell == cellIdx) return &env;
+        if (env.covers(cellIdx)) return &env;
     return nullptr;
 }
 
-GateEnvelope* GatePattern::addOrReplaceEnvelope(const GateEnvelope& env)
+void GatePattern::sortEnvelopes()
 {
-    // Drop any prior envelope at the same cell — design spec is "one
-    // envelope per cell"; adding overlaps just replaces.
-    for (auto it = envelopes.begin(); it != envelopes.end(); ++it)
-    {
-        if (it->cell == env.cell)
-        {
-            *it = env;
-            return &(*it);
-        }
-    }
-    envelopes.push_back(env);
-    // Keep sorted by cell so envelopeSpan() can find "next" cheaply.
     std::sort(envelopes.begin(), envelopes.end(),
-              [](const GateEnvelope& a, const GateEnvelope& b) { return a.cell < b.cell; });
-    // After sort, the pointer to the just-inserted entry needs a fresh lookup.
+              [](const GateEnvelope& a, const GateEnvelope& b) { return a.startCell < b.startCell; });
+}
+
+GateEnvelope* GatePattern::addEnvelope(const GateEnvelope& env)
+{
+    const int newStart = env.startCell;
+    const int newEnd   = env.startCell + env.lengthCells;   // exclusive
+
+    // Drop any existing envelope whose region overlaps the new one so the set
+    // stays non-overlapping.
+    envelopes.erase(
+        std::remove_if(envelopes.begin(), envelopes.end(),
+                       [newStart, newEnd](const GateEnvelope& e)
+                       {
+                           const int eStart = e.startCell;
+                           const int eEnd   = e.startCell + e.lengthCells;
+                           return eStart < newEnd && newStart < eEnd;   // ranges intersect
+                       }),
+        envelopes.end());
+
+    envelopes.push_back(env);
+    sortEnvelopes();
+
     for (auto& e : envelopes)
-        if (e.cell == env.cell) return &e;
+        if (e.startCell == newStart) return &e;
     return nullptr;
 }
 
-void GatePattern::removeEnvelopeAt(int cellIdx)
+void GatePattern::removeEnvelopeCovering(int cellIdx)
 {
     envelopes.erase(
         std::remove_if(envelopes.begin(), envelopes.end(),
-                       [cellIdx](const GateEnvelope& e) { return e.cell == cellIdx; }),
+                       [cellIdx](const GateEnvelope& e) { return e.covers(cellIdx); }),
         envelopes.end());
 }
 
-int GatePattern::envelopeSpan(int envIdx) const noexcept
+void GatePattern::mergeRange(int firstCell, int lastCell)
 {
-    if (envIdx < 0 || envIdx >= (int) envelopes.size()) return 0;
-    const int startCell = envelopes[(size_t) envIdx].cell;
-    const int endCell   = (envIdx + 1 < (int) envelopes.size())
-                              ? envelopes[(size_t) envIdx + 1].cell
-                              : totalCells();
-    return endCell - startCell;
+    if (lastCell < firstCell) std::swap(firstCell, lastCell);
+    firstCell = std::max(0, firstCell);
+    const int cells = totalCells();
+    if (cells <= 0) return;
+    lastCell = std::min(cells - 1, lastCell);
+    if (lastCell < firstCell) return;
+
+    const int rangeEnd = lastCell + 1;   // exclusive
+
+    // Average the shape of every envelope that intersects the dragged range.
+    float sumSplit = 0.0f, sumAtk = 0.0f, sumDec = 0.0f;
+    int   merged   = 0;
+    for (const auto& e : envelopes)
+    {
+        const int eStart = e.startCell;
+        const int eEnd   = e.startCell + e.lengthCells;
+        if (eStart < rangeEnd && firstCell < eEnd)   // intersects [firstCell, rangeEnd)
+        {
+            sumSplit += e.split;
+            sumAtk   += e.attackBend;
+            sumDec   += e.decayBend;
+            ++merged;
+        }
+    }
+
+    GateEnvelope env;
+    env.startCell   = firstCell;
+    env.lengthCells = rangeEnd - firstCell;
+    if (merged > 0)
+    {
+        env.split      = sumSplit / (float) merged;
+        env.attackBend = sumAtk   / (float) merged;
+        env.decayBend  = sumDec   / (float) merged;
+    }
+    // addEnvelope trims every overlapping envelope, then inserts the merged one.
+    addEnvelope(env);
 }
 
-float GatePattern::gateAt(double beatPos) const noexcept
+float GatePattern::gateAt(double beatPos, float gap01) const noexcept
 {
-    // Empty pattern → no gating, continuous drone.
+    // Empty pattern -> no gating, continuous drone.
     if (envelopes.empty()) return 1.0f;
 
     const int cells = totalCells();
@@ -100,19 +159,65 @@ float GatePattern::gateAt(double beatPos) const noexcept
 
     const double cellLen = patBeats / (double) cells;
     int cell = (int) (pos / cellLen);
-    if (cell < 0)          cell = 0;
-    if (cell > cells - 1)  cell = cells - 1;
+    if (cell < 0)         cell = 0;
+    if (cell > cells - 1) cell = cells - 1;
 
-    // Re-scan for the active envelope only when the cell changes.
+    // Re-scan for the covering envelope only when the cell changes.
     if (cell != cachedCell)
     {
         cachedCell = cell;
-        cachedEnv  = cellEnvelope(cell);
+        cachedEnv  = envelopeAtCell(cell);
     }
-    if (cachedEnv == nullptr) return 0.0f;   // cell with no envelope → silent
+    if (cachedEnv == nullptr) return 0.0f;   // cell with no envelope -> silent
 
-    const float phase = (float) ((pos - (double) cell * cellLen) / cellLen);
-    return cachedEnv->value(phase);
+    // Phase across the covering envelope's full region (not just this cell).
+    const double regionStart = (double) cachedEnv->startCell * cellLen;
+    const double regionLen   = (double) cachedEnv->lengthCells * cellLen;
+    const float phase = (float) ((pos - regionStart) / regionLen);
+    return cachedEnv->value(phase, gap01);
+}
+
+GateMode gateModeFor(bool bypassed, bool playing, bool patternEmpty) noexcept
+{
+    if (bypassed)     return GateMode::Pass;      // audition — raw drone passes
+    if (! playing)    return GateMode::Silence;   // stopped → gate closed
+    if (patternEmpty) return GateMode::Silence;   // nothing drawn → nothing passes
+    return GateMode::Envelope;
+}
+
+void applyGateBlock(GatePattern& pattern, float* left, float* right, int numSamples,
+                    float gap01, bool bypassed, bool playing,
+                    double beatStart, double beatsPerSample) noexcept
+{
+    const GateMode mode = gateModeFor(bypassed, playing, pattern.envelopes.empty());
+
+    if (mode == GateMode::Pass)
+        return;                                    // leave the buffer untouched
+
+    if (mode == GateMode::Silence)
+    {
+        for (int i = 0; i < numSamples; ++i)
+        {
+            if (left)  left[i]  = 0.0f;
+            if (right) right[i] = 0.0f;
+        }
+        return;
+    }
+
+    // Envelope — tryLock so a concurrent UI edit can't tear the envelope vector
+    // mid-read. On contention, leave the block as-is (a brief, edit-time blip).
+    bool expected = false;
+    if (pattern.editLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+    {
+        pattern.resetGateCache();
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const float g = pattern.gateAt(beatStart + beatsPerSample * (double) i, gap01);
+            if (left)  left[i]  *= g;
+            if (right) right[i] *= g;
+        }
+        pattern.editLock.store(false, std::memory_order_release);
+    }
 }
 
 } // namespace mu_tant

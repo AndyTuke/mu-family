@@ -76,6 +76,9 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/ModulatorPanel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/ModulatorEditor.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/ModMatrixPanel.cpp"
+    # Shared left sidebar — product injects the per-layer mini-graphic.
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/SidebarItem.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/ChannelSidebar.cpp"
 )
 
 # Consumers can `#include "Audio/VoiceEngine.h"` etc. — same path namespace as

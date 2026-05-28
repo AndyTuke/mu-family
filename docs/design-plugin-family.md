@@ -17,6 +17,37 @@ The code must be structured so these shared components live in a single `mu-core
 
 ---
 
+## UX parity principle (firm)
+
+Every mu-family product has an **identical UX and GUI**. The **only** part that
+differs per product is the **synth / voice engine** (the region the user marks
+with a red outline on a screenshot). The audio stream a product's engine
+produces is fed **into the insert effect and then onto the mixer** — that signal
+flow (`engine → insert → mixer`) is the same for every product.
+
+Consequences — treat these as firm rules, not preferences:
+
+- **Identical, shared, single-source.** The shell, sidebar + 8-layer management
+  (select / **add** / **delete** / reorder), preset load/save (full **and**
+  per-layer), panel **styling + colouring**, the **filter / insert effect /
+  mixer** experience, and the modulators are **the same across all products** and
+  therefore live in `mu-core`. A product never re-implements them.
+- **No duplicated code.** Any implementation common to more than one product is
+  centralised in `mu-core`. If a feature is built for one product and another
+  needs it, **lift it to `mu-core`** rather than copy it. Plan + do this whenever
+  it comes up — it does not need re-confirming.
+- **Mirror mu-clid; document the choice.** mu-clid is the reference. For any
+  design question, consult the mu-clid **design docs**; if it isn't documented,
+  derive it from the mu-clid **implementation**, **record the decision in the
+  mu-clid design docs**, then apply it to the sibling. Every design choice gets
+  written down.
+- **Product-specific = engine only.** A product supplies its engine/voice-
+  generation UI + DSP and its trigger/"sequencer" model (mu-clid: sample +
+  Euclidean circle; mu-tant: oscillators + gate pattern). Everything else is
+  inherited from `mu-core`.
+
+---
+
 ## Platform contract
 
 The standard mu platform is everything in `mu-core/`. New products link `mu-core` and supply their own sequencer / engine glue / UI under `<product>/Source/`.
@@ -50,6 +81,7 @@ The standard mu platform is everything in `mu-core/`. New products link `mu-core
 - `Modulation/ModulationMatrix` + `Sequencer/ControlSequence` — modulation system. Product's slot type inherits `Sequencer/VoiceSlot`.
 - `UI/Components/` — every standard widget (knob, dropdown, segment, step editor, LFO editor, VU meter, status bar).
 - `UI/MixerChannel`, `UI/MixerOverlay`, `UI/FXRow`, `UI/DelayRow` — shared mixer + FX panels.
+- `UI/ChannelSidebar` + `UI/SidebarItem` — the shared left "layers" sidebar (select / add / delete / drag-reorder). Reads channel metadata from `ProcessorBase::getNumChannels/getChannelName/getChannelColourIndex`. The per-layer mini-graphic (and its animation) is the only product-specific part, injected via `createMiniVisual` (mu-clid → `RhythmMiniVisual` wrapping a `RhythmCircle`; mu-tant → a voice glyph). Reorder + hot-swap semantics are product hooks (`onSwapChannels`, `isPendingSwap`, `onCancelPendingSwap`) so a product without hot-swap (mu-tant) leaves them null. Add/delete is driven by the product (`onAddChannel` + a panel delete button → `addVoice`/`removeVoice` in mu-tant, `addRhythm`/`removeRhythm` in mu-clid).
 
 **The swap-out point:**
 

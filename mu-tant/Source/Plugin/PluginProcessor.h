@@ -73,9 +73,10 @@ public:
     double getInternalBeatPos() const override { return internalBeatPos.load(std::memory_order_relaxed); }
 
     // ── ProcessorBase channel metadata ───────────────────────────────────────
-    // mu-tant always exposes the full 8 channels — voices are always present;
-    // the user mutes / lowers what they don't want via the mixer.
-    int          getNumChannels()              const override { return kMaxVoices; }
+    // mu-tant manages a dynamic set of voices ("layers") exactly like mu-clid's
+    // rhythms — there are no inactive voices, only the ones that exist. The
+    // count is `numVoices` (1..kMaxVoices); add/delete adjust it.
+    int          getNumChannels()              const override { return numVoices.load(std::memory_order_relaxed); }
     juce::String getChannelName(int idx)       const override
     {
         return (idx >= 0 && idx < kMaxVoices) ? juce::String("Voice ") + juce::String(idx + 1)
@@ -83,11 +84,31 @@ public:
     }
     int          getChannelColourIndex(int idx) const override { return idx; }
 
+    // ── Dynamic voice management (message-thread; mirrors mu-clid add/delete) ──
+    // addVoice appends a fresh default voice (returns its index, or -1 if full).
+    // removeVoice deletes a voice, shifting every higher voice's APVTS values +
+    // gate/modulator data down so the set stays contiguous. The last voice can't
+    // be removed. Both hold `voicesLock`; processBlock tryLocks it.
+    int  getNumVoices() const noexcept { return numVoices.load(std::memory_order_relaxed); }
+    int  addVoice();
+    void removeVoice(int idx);
+    void swapVoices(int a, int b);   // reorder (drag in the sidebar)
+
     // ── ProcessorBase preset wiring (per design-voice.md file formats) ────────
-    juce::File   getPerSlotPresetDir()       const override { return {}; }   // TODO: content dir
+    juce::File   getContentDir()             const override;
+    juce::File   getPresetsDir()             const override;   // full presets live here
+    juce::File   getPerSlotPresetDir()       const override;   // voice presets live here
     juce::String getPerSlotPresetExtension() const override { return "muPattern"; }
-    juce::File   getFullPresetDir()          const override { return {}; }   // TODO: content dir
+    juce::File   getFullPresetDir()          const override { return getPresetsDir(); }
     juce::String getFullPresetExtension()    const override { return "muTant"; }
+
+    // Full-preset save/load — the editor shell drives the UI (TransportBar
+    // dropdown + Save dialog + Preset browser) and calls these. A preset is the
+    // whole APVTS state wrapped with name/description/category metadata.
+    void              savePreset(const juce::String& name, const juce::String& desc,
+                                 const juce::String& category, bool embedSamples) override;
+    void              loadPreset(const juce::File& file) override;
+    juce::StringArray loadCategoryList() const override;
 
     // ── Per-voice param IDs (used by VoicePanel for SliderAttachment binding) ──
     // Family rule: per-voice params are subtree-scoped via `v{N}_` prefix so a
@@ -139,6 +160,20 @@ private:
     std::atomic<double> internalBeatPos { 0.0 };
     double internalBpm     = 120.0;
     double currentSampleRate = 44100.0;
+
+    // Number of existing voices (layers), 1..kMaxVoices. Audio thread reads it
+    // atomically; add/removeVoice mutate it on the message thread under voicesLock.
+    std::atomic<int> numVoices { 1 };
+    // Guards the voice count + the per-voice data shift during add/remove against
+    // the audio thread. processBlock takes a ScopedTryLock and silences the block
+    // on contention (a sub-millisecond gap while a voice is added/removed).
+    juce::CriticalSection voicesLock;
+
+    // Copy every `v{src}_*` and `ch{src}_*` APVTS parameter value to the matching
+    // `v{dst}_*` / `ch{dst}_*` parameter (used by removeVoice's down-shift).
+    void copyVoiceParams(int src, int dst);
+    // Reset one voice slot to defaults — APVTS params + gate pattern + modulators.
+    void resetVoiceSlot(int idx);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

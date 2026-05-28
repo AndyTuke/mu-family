@@ -1,87 +1,150 @@
 # mu-tant — Sequencer (Gate Pattern)
 
-Sketch / pre-implementation design. Subject to revision until first code lands.
+Implemented design. The drawable gate editor + per-envelope shapes described
+here are live; the per-envelope probability / loop-N options noted under
+**Deferred** are not.
 
-Sibling doc: [design-voice.md](design-voice.md) — voice DSP, oscillator chain, pitch model. The gate stage described here sits between the filter and the insert in that chain.
+Sibling doc: [design-voice.md](design-voice.md) — voice DSP, oscillator chain,
+pitch model. The gate stage described here sits between the filter and the
+output in that chain (post-filter, pre-pan).
 
 ---
 
 ## Scope
 
-mu-tant doesn't have a "sequencer" in the mu-clid sense — there's no per-step trigger of voices, no Euclidean rhythm, no per-step pitch. The oscillators run continuously as a drone. What this document describes is the **gate pattern**: a drawable 2-bar grid of decay envelopes that chop bursts out of the otherwise-continuous output.
+mu-tant doesn't have a "sequencer" in the mu-clid sense — there's no per-step
+trigger of voices, no Euclidean rhythm, no per-step pitch. The oscillators run
+continuously as a drone. What this document describes is the **gate pattern**:
+a drawable 2-bar grid of **attack/decay envelopes** that chop bursts out of the
+otherwise-continuous output.
 
-The gate is **purely a gate** (0..1 multiplier). Volume / pitch / cross-mod / filter all evolve via the modulator section (LFOs and control sequences from `mu-core`, unchanged from mu-clid).
+The gate is **purely a volume gate** (0..1 multiplier). Each envelope opens the
+gate to at most 100% and back to silence; the regions between envelopes are
+silent. Pitch / cross-mod / filter all evolve via the modulator section (LFOs
+and control sequences from `mu-core`, unchanged from mu-clid). **Output volume
+is controlled by a modulator** (the per-voice level destination), not by the
+gate — the gate only shapes *when* and *how* sound passes.
 
 ---
 
 ## Pattern model
 
-- **Length: fixed 2 bars** in host tempo. Loops continuously.
-- **Resolution selectable** per pattern, via the same dropdown UX the modulator section uses for its rate. Options: **64th, 32nd, 16th, 8th, plus triplet** variants.
-- **One pattern per voice slot.** Eight slots → up to eight independent gate patterns running in parallel.
+- **Length: fixed 2 bars** in host tempo (8 beats in 4/4). Loops continuously.
+- **Resolution selectable** per pattern via the grid dropdown: **1/4, 1/8,
+  1/16 (default), 1/32**. The resolution sets the cell width — the unit a
+  pencil click fills.
+- **One pattern per voice slot.** Eight slots → up to eight independent gate
+  patterns running in parallel.
 
-### Drawing
+### Envelope = one attack/decay region
 
-- **Click-drag** across a range of grid cells → produces a series of decay envelopes, one per cell at the selected resolution.
-- **ALT-drag** on an envelope → bends its decay curve. Concave (faster initial drop, audible gap) ↔ convex (sustain, less gap).
-- Default new-envelope shape: linear 1.0 → 0.0 across the cell.
+Each envelope occupies a contiguous **region** of one or more cells and is a
+single attack→peak→decay shape:
 
----
-
-## Envelope semantics
-
-Each envelope is a decay shape locked to one resolution cell:
-
-- **Always reaches 0** within its cell — no carry-over into the next cell.
-- **Adding an overlapping envelope shortens the underlying one** so it ends precisely when the new one starts. Clean hand-off, no overlap-sum, no last-trigger-wins truncation; the underlying envelope's decay is rescaled to fit the shortened span.
-- **Bending the curve down** (more concave) produces an audible **gap** within the cell — the envelope hits 0 before the cell ends, so the drone is silent for the remainder.
-- **Bending up** (more convex) sustains closer to 1.0 for longer, only dropping at the end of the cell — minimal gap, more sustain.
-
----
-
-## Per-envelope options
-
-Each envelope carries metadata that gates whether it actually fires on a given pass through the pattern. Initial set (expandable as use-cases emerge):
-
-| Option | Effect |
+| Field | Meaning |
 |---|---|
-| **Reverse** | Plays back as an attack instead of a decay (0 → 1 over the cell) |
-| **Probability** (0..100%) | Coin-flip each pass; only fires when the roll passes |
-| **Loop-N-of-M** | E.g. "play on loop 1 of 4 loops" — fires only on the chosen pass within the M-pattern cycle. **M is 1..8** (max cycle = 8 × 2-bar pattern = 16 bars before the long-form repeats). |
-| **First only** | Fires only on the first pass after the pattern starts (or after a pattern change) |
-| **On staged-for-change only** | Fires only while a pattern hot-swap is staged-but-not-yet-committed — useful for transition fills landing exactly at the swap point. Reads the same `hasPendingPreset()` flag the stager exposes. |
+| `startCell` | 0-based subdivision index where the region begins |
+| `lengthCells` | region span in cells (≥1); a pencil click makes 1, glue makes more |
+| `split` | peak position 0..1 within the region — the attack/decay split. `0` = instant attack (pure decay); `1` = pure attack |
+| `attackBend` | −1..+1 bend of the rising attack line (− concave, + convex) |
+| `decayBend` | −1..+1 bend of the falling decay line (− concave, + convex) |
+| `reverse` | mirror the shape in time, swapping attack and decay |
+
+The gate value across a region is, in region-phase `t` ∈ [0,1]:
+
+- attack: `t ≤ split` → rises 0 → 1, bent by `attackBend`
+- decay:  `t > split` → falls 1 → 0, bent by `decayBend`
+- `reverse` evaluates the shape at `1 − t`, which swaps attack and decay.
+
+Bend curve is `pow(x, 2^(−bend·2))`: `bend > 0` bulges the line up (sustain),
+`bend < 0` bulges it down (faster move, audible gap).
+
+Default new envelope: `split = 0` (instant attack), both bends `0` (linear
+decay 1 → 0) — i.e. the classic gate decay, then the user drags to taste.
+
+### Regions are non-overlapping
+
+Each cell belongs to at most one envelope. Drawing or gluing trims/removes any
+envelope it overlaps so the regions never overlap. Cells covered by no
+envelope are **silent** (gate 0).
 
 ---
 
-## Properties strip
+## The Gap dial
 
-The currently-selected envelope's options live in a **properties strip below the pattern grid**. Click an envelope to focus it; the strip refreshes to show its toggle / knob / dropdown controls. No right-click context menu, no modal dialog — direct edit in-place. Multi-select + bulk-edit is a v2 consideration.
+A per-voice **Gap** knob (0–100%) forces the **end of every envelope region to
+silence**, producing a cleaner gate. It's a percentage of the *whole region*:
+the envelope shape is squeezed into the leading `(1 − gap)` of the region and
+the trailing `gap` fraction outputs 0. At `gap = 0` the envelope fills the
+region; at `gap = 50%` the shape completes in the first half and the second
+half is silent.
+
+Gap is an APVTS parameter (`v{N}_gate_gap`, 0..1) so it saves with the project
+and is per-voice like the rest of the voice params. The audio gate evaluator
+and the editor renderer both apply it identically via `GateEnvelope::value`.
 
 ---
 
-## UI placement
+## Toolbox
 
-The pattern editor is the **third (bottom) band** of the main content area, **full window width** — sitting below the oscillator panel and filter / insert row, above the modulator section. See the UI layout diagram in [design-voice.md](design-voice.md) for the full screen map.
+Four radio-grouped tools in the gating header (procedural vector icons, no
+assets):
 
-Click an envelope to focus it; the per-envelope **properties strip** sits directly below the grid (within the same band).
+| Tool | Action |
+|---|---|
+| **Pencil** | Click an empty cell → draw a default 1-cell envelope filling that cell. Click+drag a **grab handle** on an existing envelope to reshape it (see below). |
+| **Eraser** | Click an envelope → erase it. |
+| **Glue** | Click+drag across several envelopes → merge them into one envelope filling the dragged region; its `split` / `attackBend` / `decayBend` are the **average** of the merged envelopes. |
+| **Reverse** | Click an envelope → flip its attack and decay. |
+
+### Pencil grab handles
+
+When the Pencil is active, each envelope exposes draggable handles. Hovering a
+handle turns the cursor into a **hand**; dragging it edits in place:
+
+- **Top point** (at the peak) — drag horizontally to move the **attack/decay
+  split** within the region.
+- **Attack line mid-grab** — drag vertically to bend the attack line up/down.
+- **Decay line mid-grab** — drag vertically to bend the decay line up/down.
+
+Clicking the pencil anywhere that isn't a grab handle draws a new 1-cell
+envelope.
 
 ---
 
 ## Audio-thread contract
 
-The gate stage runs in `VoiceEngine::process()` between the filter and the insert. Per sample:
+The gate stage runs in `PluginProcessor::processBlock` between the per-voice
+render and the pan/sum, per sample:
 
-1. Compute the pattern's current position from the host transport (musical time, modulo 2 bars).
-2. Determine which cell the current sample falls in.
-3. Look up the active envelope (if any) for that cell, taking into account: the envelope's options (probability roll, loop-N-of-M, etc.), and whether an overlapping envelope further forward in the cell is shortening it.
-4. Evaluate the envelope's curve at the within-cell phase → 0..1 gate value.
-5. Multiply the post-filter sample by the gate value.
+1. Compute the pattern's position from the internal transport (musical beats,
+   modulo 2 bars).
+2. Determine which cell the current sample falls in, and which envelope (if
+   any) covers that cell.
+3. No envelope → gate 0 (silent). Otherwise evaluate the envelope's shape at
+   the region-phase, applying the per-voice Gap → 0..1 gate value.
+4. Multiply the post-filter sample by the gate value.
 
-No allocation, no map lookups beyond bounded array indexing. Pattern data is laid out as a flat array of envelope structs (cell index + curve params + options); the audio thread reads a pre-built lookup of "for cell i, which envelope is active?" that's rebuilt on the message thread whenever the pattern is edited.
+No allocation, no map lookups beyond a bounded linear scan (≤ 64 cells). The
+evaluator caches the cell→envelope lookup so per-sample cost is O(1) except on
+cell changes.
 
-### Probability + Loop-N-of-M evaluation
+Block-level behaviour (shared `applyGateBlock`, used by the audio engine **and**
+the `GateStageTests` audio harness):
 
-These resolve **once per pass through the pattern** (at the loop boundary), not per-sample. The message thread (or a low-rate audio-side check) sets a per-envelope `firingThisPass` flag at each pattern wrap; the per-sample path just reads the flag. Coin flips happen on the message thread; the audio thread sees a precomputed boolean.
+| State | Output |
+|---|---|
+| **Gater bypass** (`v{N}_gate_bypass`) on | raw drone passes — audition / configure |
+| transport **stopped** | **silent** (gate closed — nothing audible on load) |
+| playing, **no envelopes** | **silent** (nothing drawn → nothing passes) |
+| playing, has envelopes | per-sample envelope gate |
+
+So on load (stopped, no envelopes, not bypassed) the plugin is silent. The gate
+is **per-voice** — gating one voice does not silence the others.
+
+Editing happens on the message thread under the pattern's `editLock` spin-flag;
+the audio thread `tryLock`s for its gate pass and leaves the block ungated on
+contention.
 
 ---
 
@@ -89,18 +152,32 @@ These resolve **once per pass through the pattern** (at the loop boundary), not 
 
 | Concern | Where |
 |---|---|
-| Oscillator + cross-mod DSP | `mu-tant/Source/Audio/VoiceEngine.{h,cpp}` ([design-voice.md](design-voice.md)) |
-| Gate pattern storage + sample-rate evaluator | `mu-tant/Source/Sequencer/GatePattern.{h,cpp}` |
-| Pattern editor UI (canvas + draw / ALT-drag) | `mu-tant/Source/UI/GatePatternEditor.{h,cpp}` |
-| Properties strip below editor | `mu-tant/Source/UI/EnvelopePropertiesStrip.{h,cpp}` |
-| Pattern hot-swap staging | reuses `mu-clid`'s `HotSwapStager` (or its mu-core successor); pattern payload is mu-tant-specific |
+| Oscillator + cross-mod DSP | `mu-tant/Source/Audio/SynthVoice.{h,cpp}` ([design-voice.md](design-voice.md)) |
+| Gate pattern storage + evaluator | `mu-tant/Source/Sequencer/GatePattern.{h,cpp}` |
+| Pattern editor UI (grid + toolbox + grab-handle drag) | `mu-tant/Source/UI/GatingDesigner.{h,cpp}` |
+| Gap knob + per-voice binding | `mu-tant/Source/UI/VoicePanel.{h,cpp}` (APVTS `v{N}_gate_gap`) |
 | Resolution dropdown widget | `mu-core::DropdownSelect` (shared) |
 | Modulator section (volume / pitch / filter mods) | mu-core, unchanged |
 
 ---
 
-## Open questions
+## UI placement
 
-- **Probability seed scope** — each envelope independent? Or per-pattern-pass deterministic (so probabilistic patterns sound the same across replays of the same preset)?
-- **Multi-select bulk edit** of envelope options — v1 or v2?
-- **Visual indication of options** — should an envelope render differently in the grid if it has e.g. probability < 100% or a loop-N-of-M filter active? Small icon overlay? Tinted fill? Defer until first listening pass.
+The gate editor is the **third (bottom-ish) band** of the voice panel,
+**full window width** — below the oscillator and filter rows, above the
+modulator section. The Gap knob sits in the gating band beside the grid.
+
+---
+
+## Deferred (not implemented)
+
+These were sketched in the original gate design but are **not** in the current
+model; revisit if use-cases emerge:
+
+- **Per-envelope options** — Probability (coin-flip per pass), Loop-N-of-M
+  (fire on pass N of M), First-only, On-staged-for-change.
+- **Properties strip** below the grid for the selected envelope's options.
+- **Pattern hot-swap staging** (reuse mu-clid's `HotSwapStager`).
+- **Preset I/O** — gate patterns aren't yet serialised (`.muPattern` /
+  `.muTant` extensions declared but unconsumed). Note: the Gap *parameter* does
+  save via APVTS, but the envelope vector does not yet.

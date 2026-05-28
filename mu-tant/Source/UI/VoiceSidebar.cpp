@@ -1,70 +1,62 @@
 #include "VoiceSidebar.h"
+#include "Plugin/PluginProcessor.h"
+#include "UI/Components/MuLookAndFeel.h"
+
+#include <cmath>
 
 namespace mu_tant
 {
 
-VoiceSidebar::VoiceSidebar(PluginProcessor& p)
-    : proc(p)
+namespace
 {
-    using Id = MuLookAndFeel::ColourIds;
-    for (int i = 0; i < PluginProcessor::kMaxVoices; ++i)
+    // Per-voice mini-graphic — placeholder static glyph (a waveform disc in the
+    // voice colour). The live per-product animation (osc / gate visualisation)
+    // lands later; the surrounding sidebar UX is the shared mu-core code.
+    class VoiceGlyph : public juce::Component
     {
-        auto btn = std::make_unique<juce::TextButton>(
-            juce::String("Voice ") + juce::String(i + 1));
-        btn->setClickingTogglesState(true);
-        btn->setRadioGroupId(1);   // mutually exclusive selection
-        btn->onClick = [this, i]
+    public:
+        explicit VoiceGlyph(juce::Colour c) : colour(c) {}
+
+        void paint(juce::Graphics& g) override
         {
-            selectedIndex = i;
-            refreshButtonStates();
-            if (onVoiceSelected) onVoiceSelected(i);
-        };
-        addAndMakeVisible(*btn);
-        buttons[(size_t) i] = std::move(btn);
-    }
-    juce::ignoreUnused(Id{});
-    refreshButtonStates();
-}
+            auto r = getLocalBounds().toFloat().reduced(2.0f);
+            g.setColour(colour.withAlpha(0.16f));
+            g.fillEllipse(r);
+            g.setColour(colour);
+            g.drawEllipse(r, 1.5f);
 
-void VoiceSidebar::setSelectedIndex(int idx)
-{
-    idx = juce::jlimit(0, PluginProcessor::kMaxVoices - 1, idx);
-    if (idx == selectedIndex) return;
-    selectedIndex = idx;
-    refreshButtonStates();
-}
-
-void VoiceSidebar::refreshButtonStates()
-{
-    for (int i = 0; i < PluginProcessor::kMaxVoices; ++i)
-        if (buttons[(size_t) i])
-            buttons[(size_t) i]->setToggleState(i == selectedIndex,
-                                                  juce::dontSendNotification);
-}
-
-void VoiceSidebar::paint(juce::Graphics& g)
-{
-    using Id = MuLookAndFeel::ColourIds;
-    g.fillAll(MuLookAndFeel::colour(Id::panelBackground));
-}
-
-void VoiceSidebar::resized()
-{
-    using mu_ui::s;
-    const int w   = getWidth();
-    const int pad = s(4);
-    const int gap = s(4);
-    const int btnH = s(48);
-
-    int y = pad;
-    for (int i = 0; i < PluginProcessor::kMaxVoices; ++i)
-    {
-        if (auto* b = buttons[(size_t) i].get())
-        {
-            b->setBounds(pad, y, w - 2 * pad, btnH);
-            y += btnH + gap;
+            juce::Path p;
+            const float midY = r.getCentreY();
+            const float amp  = r.getHeight() * 0.22f;
+            constexpr int N  = 40;
+            for (int i = 0; i <= N; ++i)
+            {
+                const float x = r.getX() + r.getWidth() * (float) i / (float) N;
+                const float y = midY - amp * std::sin((float) i / (float) N
+                                                       * juce::MathConstants<float>::twoPi);
+                if (i == 0) p.startNewSubPath(x, y);
+                else        p.lineTo(x, y);
+            }
+            g.strokePath(p, juce::PathStrokeType(1.4f));
         }
-    }
+
+    private:
+        juce::Colour colour;
+    };
+}
+
+VoiceSidebar::VoiceSidebar(PluginProcessor& p)
+    : ChannelSidebar(p, "Voice")
+{
+    createMiniVisual = [&p](int i) -> std::unique_ptr<juce::Component>
+    {
+        const auto col = MuLookAndFeel::channelPalette[
+            (size_t) (p.getChannelColourIndex(i) % MuLookAndFeel::kChannelPaletteSize)];
+        return std::make_unique<VoiceGlyph>(col);
+    };
+    onSwapChannels = [&p](int a, int b) { p.swapVoices(a, b); };
+
+    refreshItems();
 }
 
 } // namespace mu_tant

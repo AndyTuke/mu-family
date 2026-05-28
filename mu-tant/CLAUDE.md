@@ -17,22 +17,22 @@ The editor inherits `mu-core/UI/EditorShellBase.h` — same TransportBar, About,
 - Per-voice APVTS subtrees (`v{N}_*` for N=0..7) — osc1/osc2/xmod/mix/filter/level
 - Per-channel mixer params (`ch{N}_lvl/pan/mute/solo`) + `mstr_lvl/pan`, read directly from APVTS in `processBlock`
 - **Sidebar with 8 voice buttons** (`Source/UI/VoiceSidebar.{h,cpp}`) — radio-grouped, clicking rebinds `VoicePanel` to the selected voice
-- Hand-laid `VoicePanel` with knob rows + per-voice rebind via `setVoice(int)`
+- Hand-laid `VoicePanel` with per-voice rebind via `setVoice(int)`. Layout: per-oscillator horizontal sub-panels (wavetable selector on the left, then Oct/Semi/Fine/Pos as Size-2 knobs), an X-Mod/Noise row, a Filter row (Type + Cutoff + Resonance + per-voice Level, Size-2), the gate editor, and a right-hand **Mixer sub-panel** (3 Size-3 level knobs: Osc 1 / Osc 2 / Noise). Knob colours follow mu-clid's category logic (pitch=purple, filter=teal, level=amber, gate=coral); osc/mixer titles take the per-voice palette colour.
 - **Shared `MixerOverlay`** (`mu-core/UI/MixerOverlay.h`) — channel strips with level/pan/mute/solo are functional; FX-send + sidechain knobs render but are inert (their APVTS params aren't declared yet, see "MixerEngine refactor" below)
 - **Per-voice modulator chain** — `std::array<VoiceSlot, kMaxVoices> voiceSlots` (each with 8 `ControlSequence` + `ModulationMatrix` + `modLock`); the shared mu-core `ModulatorPanel` is embedded in `VoicePanel`'s bottom band and rebinds to the active voice's slot. mu-tant destinations declared in [`Source/Modulation/MuTantModDest.h`](Source/Modulation/MuTantModDest.h) — 13 dests across Osc 1 / Osc 2 / Mix / Filter / Amp sections.
 - Internal free-running beat counter (sample-rate-derived, 120 BPM default) drives modulator evaluation continuously (no transport needed)
-- **`GatingDesigner` placeholder** (`Source/UI/GatingDesigner.{h,cpp}`) — full-width 2-bar grid strip with subdivision dropdown (1/4 / 1/8 / 1/16 default / 1/32). No gate data yet; this is the visual scaffold the drawable gate editor will sit inside.
+- **Drawable gate editor** (`Source/UI/GatingDesigner.{h,cpp}` + `Source/Sequencer/GatePattern.{h,cpp}`) — full-width 2-bar grid with subdivision dropdown (1/4 / 1/8 / 1/16 default / 1/32). Each envelope is an **attack/decay shape**: `startCell` + `lengthCells` + `split` (peak position) + independent `attackBend` / `decayBend` + `reverse`. Toolbox tools are live: **Pencil** draws a 1-cell envelope and drags grab-handles (top point = attack/decay split; attack/decay line mid-grabs = bend, cursor → hand on hover); **Eraser** removes; **Glue** drag-merges several envelopes into one (averaging their shapes); **Reverse** flips attack/decay. Per-voice **Gap** knob (`v{N}_gate_gap`, integer 0–100 %) silences the trailing fraction of each region for a cleaner gate, and a per-voice **Gater bypass** toggle (`v{N}_gate_bypass`) skips the gate stage entirely so the raw drone passes (audition). Audio: the shared `applyGateBlock()` shapes each voice's post-filter output — **bypassed → raw drone passes** (audition); **stopped → silent** (gate closed; nothing audible on load); **playing + no envelopes → silent**; **playing + envelopes → per-sample envelope gate**. So on load (stopped, single default voice, no envelopes) the output is silent — guarded by the `GateStageTests` audio harness. The gate is **per-voice**. See [docs/mu-tant/design-sequencer.md](../docs/mu-tant/design-sequencer.md).
+- **Default patch = single voice** — voices 2–8 start muted (`ch{N}_mute` default true for N>0) so the out-of-the-box sound is one voice.
+- **Full preset system** — `getContentDir()` = `Documents/TDP/muTant`; full presets (`.muTant`) save/load the whole APVTS state (wrapped with name/description/category) in `Presets/`, driven by the shared shell chrome (TransportBar dropdown + Save dialog + Preset browser). Voice (per-slot `.muPattern`) presets are **not yet wired** (the shared TransportBar has no per-slot preset menu — needs a bespoke surface).
 - Shared editor shell + chrome (TransportBar, About, StatusBar, MuLookAndFeel)
-- Unit tests on every build — currently 14 across DSP / modulator / gating subsystems
+- Unit tests on every build — across DSP / modulator / gating subsystems
 
 **What's not yet implemented**
 - **Mixer FX rack**: the per-channel send knobs + return strips + Effect/Delay/Reverb rows render in the MixerOverlay but the APVTS params they bind to don't exist in mu-tant yet. The shared `MixerEngine::processBlock` also hard-codes `mu_core::VoiceEngine*` so mu-tant can't drive the shared FX/sidechain path until that signature accepts a render callback (see top-level backlog).
-- Three-stacked-bands voice layout from design-voice.md (current layout is a single flat panel; design calls for Band 1 = Oscillators, Band 2 = Filter + Insert, Band 3 = Gate)
 - Wavetable mip-mapping for anti-aliasing
 - Linear cross-fade between adjacent wavetable frames at `position`
-- Gate pattern data model (`GatePattern.{h,cpp}` in `Sequencer/`) and audio-thread evaluator
-- Drawable gate-pattern editor with ALT-drag bend + per-envelope options (Reverse / Probability / Loop-N-of-M / First only / On staged-for-change only) — see [design-sequencer.md](../docs/mu-tant/design-sequencer.md)
-- Properties strip below the gate grid
+- Per-envelope gate options (Probability / Loop-N-of-M / First only / On-staged-for-change) + a properties strip — deferred (see design-sequencer.md "Deferred"); the current editor is shape-only
+- Gate pattern serialisation — envelope vectors aren't saved yet (the Gap *param* does save via APVTS, the envelopes don't); lands with preset I/O
 - Pattern hot-swap timing (reuse mu-clid's `HotSwapStager` machinery)
 - Settings overlay (gear button is currently a no-op)
 - Preset library (`.muPattern` per-voice / `.muTant` full) — extensions declared but no save/load code

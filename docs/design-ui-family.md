@@ -260,7 +260,7 @@ Each plugin customises the shared base with:
 | Plugin name / logo | TransportBar | Draw plugin-specific logo; `headingText` for text fallback |
 | Window default size | `PluginEditor` constructor | Set per-plugin; min/max limits appropriate to content |
 | Plugin-specific knob colour tokens | Plugin subclass of `MuLookAndFeel` | Add in non-overlapping ID range `0x10001000+` |
-| Sidebar item content | Plugin-specific `SidebarItem` subclass | Use `MuLookAndFeel` for all drawing constants |
+| Sidebar (layers) | Shared `mu-core/UI/ChannelSidebar` + `SidebarItem` | Identical select/add/delete/reorder UX family-wide; inject only the per-layer mini-graphic via `createMiniVisual` (mu-clid `RhythmMiniVisual`, mu-tant voice glyph). Do NOT re-implement the sidebar per product. |
 | TransportBar controls | Plugin-specific layout | Standard chrome (play, BPM, preset, mixer) always present; plugin-specific additions to the right |
 
 ---

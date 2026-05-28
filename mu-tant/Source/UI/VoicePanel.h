@@ -31,6 +31,10 @@ public:
     void setVoice(int voiceIndex);
     int  getVoice() const noexcept { return currentVoice; }
 
+    // Fired when the header Delete button is clicked (editor removes the voice).
+    // Mirrors mu-clid's RhythmPanel delete affordance.
+    std::function<void()> onDeleteVoice;
+
     void paint(juce::Graphics& g) override;
     void resized() override;
 
@@ -48,37 +52,44 @@ private:
     std::unique_ptr<APVTS::ComboBoxAttachment> rootAttachment;
     std::unique_ptr<APVTS::ComboBoxAttachment> scaleAttachment;
 
+    // Knob colours follow mu-clid's category logic: oscillator/pitch = purple
+    // (knobEuclidean), filter = teal (knobPostPad), levels = amber (knobLevel),
+    // gate/FX = coral (knobFxSend).
     // ── Oscillator 1 ────────────────────────────────────────────────────────
-    KnobWithLabel o1OctKnob  { "Osc1 Oct" };
-    KnobWithLabel o1SemiKnob { "Osc1 Semi" };
-    KnobWithLabel o1FineKnob { "Osc1 Fine" };
-    KnobWithLabel o1PosKnob  { "Osc1 Pos" };
+    KnobWithLabel o1OctKnob  { "Oct",  MuLookAndFeel::knobEuclidean };
+    KnobWithLabel o1SemiKnob { "Semi", MuLookAndFeel::knobEuclidean };
+    KnobWithLabel o1FineKnob { "Fine", MuLookAndFeel::knobEuclidean };
+    KnobWithLabel o1PosKnob  { "Pos",  MuLookAndFeel::knobEuclidean };
     std::unique_ptr<APVTS::SliderAttachment> o1OctAttachment;
     std::unique_ptr<APVTS::SliderAttachment> o1SemiAttachment;
     std::unique_ptr<APVTS::SliderAttachment> o1FineAttachment;
     std::unique_ptr<APVTS::SliderAttachment> o1PosAttachment;
 
     // ── Oscillator 2 ────────────────────────────────────────────────────────
-    KnobWithLabel o2OctKnob  { "Osc2 Oct" };
-    KnobWithLabel o2SemiKnob { "Osc2 Semi" };
-    KnobWithLabel o2FineKnob { "Osc2 Fine" };
-    KnobWithLabel o2PosKnob  { "Osc2 Pos" };
+    KnobWithLabel o2OctKnob  { "Oct",  MuLookAndFeel::knobEuclidean };
+    KnobWithLabel o2SemiKnob { "Semi", MuLookAndFeel::knobEuclidean };
+    KnobWithLabel o2FineKnob { "Fine", MuLookAndFeel::knobEuclidean };
+    KnobWithLabel o2PosKnob  { "Pos",  MuLookAndFeel::knobEuclidean };
     std::unique_ptr<APVTS::SliderAttachment> o2OctAttachment;
     std::unique_ptr<APVTS::SliderAttachment> o2SemiAttachment;
     std::unique_ptr<APVTS::SliderAttachment> o2FineAttachment;
     std::unique_ptr<APVTS::SliderAttachment> o2PosAttachment;
 
+    // ── Wavetable selection (placeholder dropdowns — no engine wiring yet) ────
+    DropdownSelect osc1WaveDropdown;
+    DropdownSelect osc2WaveDropdown;
+
     // ── Cross-mod ─────────────────────────────────────────────────────────────
-    KnobWithLabel  xmodKnob  { "X-Mod" };
+    KnobWithLabel  xmodKnob  { "X-Mod", MuLookAndFeel::knobEuclidean };
     juce::Label    xmodLabel;
     DropdownSelect xmodModeDropdown;
     std::unique_ptr<APVTS::SliderAttachment>   xmodAttachment;
     std::unique_ptr<APVTS::ComboBoxAttachment> xmodModeAttachment;
 
-    // ── Levels (osc1 / osc2 / noise + White-Pink toggle) ──────────────────────
-    KnobWithLabel  osc1LevelKnob  { "Osc1 Lvl" };
-    KnobWithLabel  osc2LevelKnob  { "Osc2 Lvl" };
-    KnobWithLabel  noiseLevelKnob { "Noise" };
+    // ── Mixer levels (osc1 / osc2 / noise — Size-3 knobs in the right panel) ──
+    KnobWithLabel  osc1LevelKnob  { "Osc 1", MuLookAndFeel::knobLevel };
+    KnobWithLabel  osc2LevelKnob  { "Osc 2", MuLookAndFeel::knobLevel };
+    KnobWithLabel  noiseLevelKnob { "Noise", MuLookAndFeel::knobLevel };
     juce::Label    noiseTypeLabel;
     DropdownSelect noiseTypeDropdown;
     std::unique_ptr<APVTS::SliderAttachment>   osc1LevelAttachment;
@@ -89,18 +100,22 @@ private:
     // ── Filter ──────────────────────────────────────────────────────────────
     juce::Label    fltTypeLabel;
     DropdownSelect fltTypeDropdown;
-    KnobWithLabel  fltCutKnob { "Cutoff" };
-    KnobWithLabel  fltResKnob { "Resonance" };
+    KnobWithLabel  fltCutKnob { "Cutoff",    MuLookAndFeel::knobPostPad };
+    KnobWithLabel  fltResKnob { "Resonance", MuLookAndFeel::knobPostPad };
     std::unique_ptr<APVTS::ComboBoxAttachment> fltTypeAttachment;
     std::unique_ptr<APVTS::SliderAttachment>   fltCutAttachment;
     std::unique_ptr<APVTS::SliderAttachment>   fltResAttachment;
 
     // ── Output level ────────────────────────────────────────────────────────
-    KnobWithLabel levelKnob { "Level" };
+    KnobWithLabel levelKnob { "Level", MuLookAndFeel::knobLevel };
     std::unique_ptr<APVTS::SliderAttachment> levelAttachment;
 
-    // ── Gating designer (full-width 2-bar gate strip) ───────────────────────
+    // ── Gating designer + Gap knob + Gater bypass ───────────────────────────
     GatingDesigner   gatingDesigner;
+    KnobWithLabel    gapKnob { "Gap", MuLookAndFeel::knobFxSend };
+    std::unique_ptr<APVTS::SliderAttachment> gapAttachment;
+    juce::TextButton gateBypassButton { "Bypass" };
+    std::unique_ptr<APVTS::ButtonAttachment> gateBypassAttachment;
 
     // ── Modulator section (mu-core ModulatorPanel + mu-tant destinations) ──
     // Rebound to the current voice's VoiceSlot whenever setVoice() runs.
@@ -112,17 +127,18 @@ private:
     juce::Label voiceTag;
     void refreshVoiceTag();
 
+    // Header Delete button — removes the current voice (mirrors mu-clid).
+    juce::TextButton deleteVoiceButton { "Delete" };
+
     void rebindAttachments();
 
     // 30 Hz timer — drives the gating-grid playhead + modulator playhead from
     // the processor's transport beat position.
     void timerCallback() override;
 
-    // Band geometry — populated by resized(), consumed by paint() for the
-    // band outlines + labels so layout + decoration stay in sync.
-    int band1Y = 0, band1H = 0;   // Oscillators
-    int band2Y = 0, band2H = 0;   // Filter
-    int band3Y = 0, band3H = 0;   // Gating
+    // Sub-panel geometry — populated by resized(), consumed by paint() for the
+    // bordered sub-panels + their titles so layout + decoration stay in sync.
+    juce::Rectangle<int> osc1PanelR, osc2PanelR, modNoisePanelR, filterPanelR, mixerPanelR;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VoicePanel)
 };
