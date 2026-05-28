@@ -245,7 +245,7 @@ void VoicePanel::paint(juce::Graphics& g)
     using Id = MuLookAndFeel::ColourIds;
     using mu_ui::s;
     using mu_ui::sf;
-    g.fillAll(MuLookAndFeel::colour(Id::windowBackground));
+    g.fillAll(MuLookAndFeel::colour(Id::panelBackground));
 
     // Header strip divider.
     g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
@@ -253,33 +253,32 @@ void VoicePanel::paint(juce::Graphics& g)
 
     const auto voiceCol = MuLookAndFeel::channelPalette[
         (size_t)(currentVoice % MuLookAndFeel::kChannelPaletteSize)];
-    const auto border = MuLookAndFeel::colour(Id::segmentInactiveBorder);
-    const auto muted  = MuLookAndFeel::colour(Id::mutedText);
+    const auto muted = MuLookAndFeel::colour(Id::mutedText);
 
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));
 
-    // Horizontal sub-panels carry a vertically-centred title on the left; the
-    // mixer (a tall column) carries its title across the top. The oscillator +
-    // mixer titles take the per-voice palette colour (mu-clid's per-channel
-    // accent logic); the auxiliary sections stay muted-grey.
-    auto leftTitle = [&](const juce::Rectangle<int>& r, const juce::String& t, juce::Colour c)
+    // mu-clid panel styling: each sub-panel gets a 2px rounded border in the
+    // per-voice palette colour, with a small uppercase muted title on the left.
+    auto panel = [&](const juce::Rectangle<int>& r, const juce::String& title)
     {
         if (r.isEmpty()) return;
-        g.setColour(border); g.drawRect(r, 1);
-        g.setColour(c);
-        g.drawText(t, r.getX() + s(6), r.getY(), s(40), r.getHeight(),
+        g.setColour(voiceCol);
+        g.drawRoundedRectangle(r.toFloat().reduced(1.0f), sf(6.0f), sf(2.0f));
+        g.setColour(muted);
+        g.drawText(title, r.getX() + s(8), r.getY(), s(40), r.getHeight(),
                    juce::Justification::centredLeft, false);
     };
-    leftTitle(osc1PanelR,     "Osc 1",  voiceCol);
-    leftTitle(osc2PanelR,     "Osc 2",  voiceCol);
-    leftTitle(modNoisePanelR, "X-Mod",  muted);
-    leftTitle(filterPanelR,   "Filter", muted);
+    panel(osc1PanelR,     "OSC 1");
+    panel(osc2PanelR,     "OSC 2");
+    panel(modNoisePanelR, "X-MOD");
+    panel(filterPanelR,   "FILTER");
 
     if (! mixerPanelR.isEmpty())
     {
-        g.setColour(border); g.drawRect(mixerPanelR, 1);
         g.setColour(voiceCol);
-        g.drawText("Mixer", mixerPanelR.getX(), mixerPanelR.getY() + s(3),
+        g.drawRoundedRectangle(mixerPanelR.toFloat().reduced(1.0f), sf(6.0f), sf(2.0f));
+        g.setColour(muted);
+        g.drawText("MIXER", mixerPanelR.getX(), mixerPanelR.getY() + s(3),
                    mixerPanelR.getWidth(), s(12), juce::Justification::centred, false);
     }
 }
