@@ -3,6 +3,7 @@
 #include "RhythmCircle.h"
 #include "EuclideanPanel.h"
 #include "VoiceSection.h"
+#include "UI/ChannelHeaderBar.h"
 #include "UI/ModulatorPanel.h"
 #include "Modulation/MuClidModDest.h"
 #include "UI/Components/DropdownSelect.h"
@@ -85,7 +86,7 @@ public:
 
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
-    void setPresetDropLeft(int x) noexcept { rhythmDropLeft = x; }
+    void setPresetDropLeft(int) noexcept {}   // no-op: the shared header bar self-lays-out
 
     // Forwarder: PluginEditor calls this on mixer-effect-algorithm change so
     // the voice-section Amp "Effect" send knob label tracks the mixer.
@@ -114,18 +115,17 @@ private:
     // stays product-agnostic.
     ModDestProvider modDestProvider;
 
-    juce::Label      nameLabel;
-    juce::TextButton resetBtn        { juce::String::charToString(0x21BA) }; // ↺
-    juce::TextButton deleteBtn       { juce::String::charToString(0x2715) }; // ✕
-    DropdownSelect   rhythmPresetDropdown;
-    juce::TextButton saveRhythmBtn   { "Save" };
+    // Shared per-layer header bar (name / reset / delete / preset / save).
+    // `rhythmPresetDropdown` aliases the bar's dropdown so the existing
+    // preset-population + selection code is unchanged.
+    ChannelHeaderBar headerBar;
+    DropdownSelect&  rhythmPresetDropdown = headerBar.getPresetDropdown();
     juce::File lastBrowseDir;
     RhythmSaveDialog    rhythmSaveDialog;
 
     std::vector<juce::File> rhythmPresetFiles;
     juce::File              loadedRhythmPresetFile;
     juce::StringArray       knownRhythmCategories;
-    int                     rhythmDropLeft = 0;  // set by PluginEditor after transport bar layout
 
     // Fixed chrome heights/widths
     static constexpr int kHeaderH      = 28;
@@ -140,14 +140,13 @@ private:
     int circleW = 300;
     int topH    = 300;
     juce::Rectangle<int> sampleRect, circleRect, euclidRect, voiceRect, modRect;
-    juce::Rectangle<int> nameRect;   // header name hit-area
 
     void loadSample();
     void refreshRhythmPresets();
     void saveRhythmPreset();
     void refreshCircle();
     juce::Colour currentColour() const;
-    void commitNameFromLabel();
+    void commitNameFromLabel(const juce::String& rawName);
     void confirmReset();
     void confirmDelete();
     void timerCallback() override;

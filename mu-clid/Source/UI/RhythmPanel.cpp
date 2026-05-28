@@ -245,23 +245,13 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     // natively. Our previous TextEditor + onFocusLost setup was fragile because
     // onFocusLost only fires when another component grabs keyboard focus, which most
     // child components in this UI don't do.
-    nameLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
-    nameLabel.setJustificationType(juce::Justification::centredLeft);
-    nameLabel.setColour(juce::Label::textColourId,
-                        MuClidLookAndFeel::colour(MuClidLookAndFeel::ColourIds::headingText));
-    nameLabel.setEditable(true, true, false); // editOnSingleClick, editOnDoubleClick, lossOfFocusDiscardsChanges=false
-    nameLabel.onTextChange = [this] { commitNameFromLabel(); };
-    addAndMakeVisible(nameLabel);
-
-    resetBtn.onClick      = [this] { confirmReset();  };
-    deleteBtn.onClick     = [this] { confirmDelete(); };
-    saveRhythmBtn.onClick = [this] { saveRhythmPreset(); };
-    addAndMakeVisible(resetBtn);
-    addAndMakeVisible(deleteBtn);
-    addAndMakeVisible(saveRhythmBtn);
-
-    rhythmPresetDropdown.setPlaceholderText(juce::String::fromUTF8("rhythm preset\xe2\x80\xa6"));
-    rhythmPresetDropdown.onChange = [this](int id)
+    // Shared per-layer header bar (name / reset / delete / preset / save).
+    headerBar.setPresetPlaceholder(juce::String::fromUTF8("rhythm preset\xe2\x80\xa6"));
+    headerBar.onReset       = [this] { confirmReset();  };
+    headerBar.onDelete      = [this] { confirmDelete(); };
+    headerBar.onSave        = [this] { saveRhythmPreset(); };
+    headerBar.onNameChanged = [this](juce::String n) { commitNameFromLabel(n); };
+    headerBar.onPresetSelected = [this](int id)
     {
         const int idx = id - 1;
         if (idx >= 0 && idx < (int)rhythmPresetFiles.size() && currentRhythmIndex >= 0)
@@ -285,7 +275,7 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
             }
         }
     };
-    addAndMakeVisible(rhythmPresetDropdown);
+    addAndMakeVisible(headerBar);
 
     addAndMakeVisible(rhythmSaveDialog);
     rhythmSaveDialog.setVisible(false);
@@ -458,8 +448,7 @@ void RhythmPanel::setRhythm(int index)
     // Commit any in-progress edit (Label::hideEditor with discardChanges=false saves
     // current text and fires onTextChange synchronously, which writes the rename to
     // the OLD currentRhythmIndex before we update it).
-    if (nameLabel.getCurrentTextEditor() != nullptr)
-        nameLabel.hideEditor(false);
+    headerBar.commitNameEdit();   // commit any in-progress rename to the OLD rhythm first
 
     if (currentRhythmIndex != index)
         loadedRhythmPresetFile = {};
@@ -468,7 +457,8 @@ void RhythmPanel::setRhythm(int index)
     registerRhythmListeners(currentRhythmIndex);
     if (index >= 0 && index < proc.getNumRhythms())
     {
-        nameLabel.setText(juce::String(proc.getRhythm(index).name), juce::dontSendNotification);
+        headerBar.setLayerName(juce::String(proc.getRhythm(index).name));
+        headerBar.setColour(currentColour());
         refreshRhythmPresets();
         euclidPanel.setRhythm(index);
         euclidPanel.setRhythmColour(currentColour());
@@ -483,7 +473,7 @@ void RhythmPanel::setRhythm(int index)
     }
     else
     {
-        nameLabel.setText("No Rhythm", juce::dontSendNotification);
+        headerBar.setLayerName("No Rhythm");
         // Null out all child-panel rhythm pointers so they don't dereference stale memory
         // if a vector erase invalidated the previous rhythm before re-binding.
         modulatorPanel.setVoiceSlot(nullptr);
@@ -700,16 +690,8 @@ void RhythmPanel::paint(juce::Graphics& g)
     g.fillAll();
 
     // Header
-    juce::Colour col = currentColour();
-
-    // Header colour dot + rhythm-colour border around the name area.
-    // Name text itself is rendered by nameLabel (a child component).
-    if (currentRhythmIndex >= 0 && currentRhythmIndex < proc.getNumRhythms())
-    {
-        g.setColour(col);
-        g.fillEllipse(10.0f, (kHeaderH - 10) * 0.5f, 10.0f, 10.0f);
-        g.drawRoundedRectangle(nameRect.toFloat().reduced(1.0f), 4.0f, 1.5f);
-    }
+    juce::Colour col = currentColour();   // used below for the major panel outlines
+    // (Header colour dot + name border are drawn by the shared ChannelHeaderBar.)
 
     // Sample bar — content inset from panel outline
     {
@@ -786,26 +768,8 @@ void RhythmPanel::resized()
     voiceRect  = { 0,       topY + topH, w,           voiH                    };
     modRect    = { 0,       modY,        w,           juce::jmax(0, h - modY) };
 
-    // Header right-side controls (right to left).
-    // rhythmDropLeft is set by PluginEditor after TransportBar layout so the
-    // dropdown's left edge aligns with (and is indented 10 px from) the main
-    // preset dropdown directly above. Falls back to a minimum if not yet set.
-    const int btnH = s(20);
-    const int btnY = (hdrH - btnH) / 2;
-    const int rightEdge = w - s(4);
-    const int iconBtnW  = s(kIconBtnW);
-    const int presetBtnW = s(kPresetBtnW);
-    const int dropRight = rightEdge - iconBtnW * 2 - s(4) - presetBtnW - s(4);
-    const int dropLeft  = (rhythmDropLeft > 0 && rhythmDropLeft < dropRight - s(80))
-                              ? rhythmDropLeft : juce::jmax(s(26), dropRight - s(200));
-    deleteBtn           .setBounds(rightEdge - iconBtnW,             btnY, iconBtnW,    btnH);
-    resetBtn            .setBounds(rightEdge - iconBtnW * 2 - s(4),  btnY, iconBtnW,    btnH);
-    saveRhythmBtn       .setBounds(dropRight,                         btnY, presetBtnW,  btnH);
-    rhythmPresetDropdown.setBounds(dropLeft,                          btnY, dropRight - s(4) - dropLeft, btnH);
-    const int nameX   = s(26);
-    const int nameEnd = dropLeft - s(6);
-    nameRect = { nameX, 0, juce::jmax(0, nameEnd - nameX), hdrH };
-    nameLabel.setBounds(nameRect.reduced(s(4), s(2)));
+    // Shared header bar spans the full header strip (lays out its own controls).
+    headerBar.setBounds(0, 0, w, hdrH);
 
     const int rhythmInset = s(kPanelPad + 1);
     circle.setBounds        (circleRect.reduced(rhythmInset));
@@ -818,15 +782,15 @@ void RhythmPanel::resized()
 //==============================================================================
 // Called by juce::Label when the user finishes editing (Enter, click-off, etc.)
 // Writes the Label's text into the current rhythm and notifies listeners.
-void RhythmPanel::commitNameFromLabel()
+void RhythmPanel::commitNameFromLabel(const juce::String& rawName)
 {
     if (currentRhythmIndex < 0 || currentRhythmIndex >= proc.getNumRhythms()) return;
 
-    auto newName = nameLabel.getText().trim();
+    auto newName = rawName.trim();
     if (newName.isEmpty())
     {
         newName = "<unnamed>";
-        nameLabel.setText(newName, juce::dontSendNotification);
+        headerBar.setLayerName(newName);
     }
 
     // route through PluginProcessor::renameRhythm so the write happens under

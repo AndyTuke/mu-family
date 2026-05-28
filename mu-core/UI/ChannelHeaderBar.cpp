@@ -3,7 +3,7 @@
 ChannelHeaderBar::ChannelHeaderBar()
 {
     nameLabel.setJustificationType(juce::Justification::centredLeft);
-    nameLabel.setEditable(false, true, false);   // double-click to rename
+    nameLabel.setEditable(true, true, false);    // single- or double-click to rename (matches mu-clid)
     nameLabel.setColour(juce::Label::textColourId, MuLookAndFeel::colour(MuLookAndFeel::headingText));
     nameLabel.onTextChange = [this] { if (onNameChanged) onNameChanged(nameLabel.getText()); };
     addAndMakeVisible(nameLabel);
@@ -41,6 +41,12 @@ void ChannelHeaderBar::setShowReset(bool show)
     showReset = show;
     resetBtn.setVisible(show);
     resized();
+}
+
+void ChannelHeaderBar::commitNameEdit()
+{
+    if (nameLabel.getCurrentTextEditor() != nullptr)
+        nameLabel.hideEditor(false);   // discardChanges = false → commits the text
 }
 
 void ChannelHeaderBar::resized()
