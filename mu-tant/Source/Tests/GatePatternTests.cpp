@@ -110,6 +110,42 @@ public:
             expect((int) p.envelopes.size() == 2, "remove-nonexistent is no-op");
         }
 
+        beginTest("gateAt: empty pattern is fully open (continuous drone)");
+        {
+            GatePattern p;
+            p.subdivision = GatePattern::Subdivision::Sixteenth;
+            expectWithinAbsoluteError(p.gateAt(0.0),  1.0f, 1e-5f, "empty → 1.0 at beat 0");
+            expectWithinAbsoluteError(p.gateAt(3.7),  1.0f, 1e-5f, "empty → 1.0 mid-pattern");
+        }
+
+        beginTest("gateAt: envelope cell plays its curve, empty cells are silent");
+        {
+            GatePattern p;
+            p.subdivision = GatePattern::Subdivision::Sixteenth;   // 32 cells over 8 beats
+            // Envelope at cell 0, linear decay.
+            GateEnvelope a; a.cell = 0; a.curveBend = 0.0f;
+            p.addOrReplaceEnvelope(a);
+
+            const double cellLen = 8.0 / 32.0;   // beats per cell = 0.25
+            // Beat 0 = cell 0, phase 0 → linear decay starts at 1.0.
+            expectWithinAbsoluteError(p.gateAt(0.0), 1.0f, 1e-4f, "cell 0 phase 0 → 1.0");
+            // Halfway through cell 0 → linear decay ≈ 0.5.
+            expectWithinAbsoluteError(p.gateAt(cellLen * 0.5), 0.5f, 1e-3f, "cell 0 mid → 0.5");
+            // A beat inside cell 1 (no envelope) → silent.
+            expectWithinAbsoluteError(p.gateAt(cellLen * 1.5), 0.0f, 1e-5f, "cell 1 (no env) → 0.0");
+        }
+
+        beginTest("gateAt: wraps mod 2 bars (8 beats)");
+        {
+            GatePattern p;
+            p.subdivision = GatePattern::Subdivision::Sixteenth;
+            GateEnvelope a; a.cell = 0; a.curveBend = 0.0f;
+            p.addOrReplaceEnvelope(a);
+            // Beat 8.0 == beat 0.0 (pattern is 8 beats long).
+            expectWithinAbsoluteError(p.gateAt(8.0), p.gateAt(0.0), 1e-4f, "beat 8 wraps to beat 0");
+            expectWithinAbsoluteError(p.gateAt(16.0), p.gateAt(0.0), 1e-4f, "beat 16 wraps to beat 0");
+        }
+
         beginTest("envelopeSpan: cell range up to next envelope or pattern end");
         {
             GatePattern p;

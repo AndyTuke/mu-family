@@ -179,6 +179,12 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     const int numSamples = buffer.getNumSamples();
     buffer.clear();
 
+    // Transport snapshot for this block. Beat advances only while playing; when
+    // stopped the gate is held fully open so the oscillators stay auditionable.
+    const bool   isPlaying     = playing.load(std::memory_order_relaxed);
+    const double beatStart     = internalBeatPos.load(std::memory_order_relaxed);
+    const double beatsPerSample = (internalBpm / 60.0) / currentSampleRate;
+
     // Read mixer state directly from APVTS — keeps the channel-strip UI as the
     // single source of truth (no parameter-listener push into a separate engine
     // struct). Solo wins over mute, matching mu-clid's mixer convention.
@@ -231,7 +237,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         bool expected = false;
         if (slot.modLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
         {
-            slot.modulationMatrix.process(slot.controlSequences, internalBeatPos, modParamValues);
+            slot.modulationMatrix.process(slot.controlSequences, beatStart, modParamValues);
             slot.modLock.store(false, std::memory_order_release);
 
             // Read modulated values back into the config.
@@ -257,6 +263,29 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         voices[(size_t) v]->setConfig(cfg);
         voices[(size_t) v]->process(voiceBuf, numSamples);
 
+        // ── Gate stage ────────────────────────────────────────────────────────
+        // While playing, the per-voice gate pattern chops the (post-filter) voice
+        // output: cells with an envelope play that envelope's 0..1 curve, cells
+        // without one are silent. While stopped (or with an empty pattern) the
+        // gate stays open. tryLock the pattern so a concurrent UI edit can't tear
+        // the envelope vector mid-read; on contention we leave the block ungated.
+        auto& pattern = gatePatterns[(size_t) v];
+        bool gateExpected = false;
+        if (isPlaying && !pattern.envelopes.empty()
+            && pattern.editLock.compare_exchange_strong(gateExpected, true, std::memory_order_acquire))
+        {
+            pattern.resetGateCache();
+            float* gl = voiceBuf.getWritePointer(0);
+            float* gr = voiceBuf.getNumChannels() > 1 ? voiceBuf.getWritePointer(1) : nullptr;
+            for (int i = 0; i < numSamples; ++i)
+            {
+                const float g = pattern.gateAt(beatStart + beatsPerSample * (double) i);
+                gl[i] *= g;
+                if (gr) gr[i] *= g;
+            }
+            pattern.editLock.store(false, std::memory_order_release);
+        }
+
         // Equal-power constant-power pan, matching MixerEngine::applyPanGain.
         const float angle = (pan + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
         const float gainL = level * std::cos(angle);
@@ -269,13 +298,17 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // Master fader.
     buffer.applyGain(raw("mstr_lvl"));
 
-    // Advance the internal free-running beat counter — mu-tant has no transport,
-    // so modulators evaluate against a beat position derived from elapsed audio
-    // time at a fixed 120 BPM. (BPM becomes a settings-overlay knob later.)
-    const double beatsPerSample = (internalBpm / 60.0) / currentSampleRate;
-    internalBeatPos += beatsPerSample * (double) numSamples;
-    // Wrap at a large value to keep precision (16 bars at 120 BPM ≈ 64 beats).
-    if (internalBeatPos > 16384.0) internalBeatPos -= 16384.0;
+    // Advance the transport beat only while playing. Wrap at the 2-bar pattern
+    // length (8 beats in 4/4) so the gate + the gating-grid playhead loop cleanly
+    // and floating-point precision never drifts. Modulators evaluate against the
+    // same wrapped position.
+    if (isPlaying)
+    {
+        double pos = beatStart + beatsPerSample * (double) numSamples;
+        const double patBeats = (double) GatePattern::kTotalBars * 4.0;   // 8 beats
+        if (pos >= patBeats) pos -= patBeats;
+        internalBeatPos.store(pos, std::memory_order_relaxed);
+    }
 }
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()

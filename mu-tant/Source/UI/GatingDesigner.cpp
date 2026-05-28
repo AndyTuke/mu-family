@@ -1,5 +1,8 @@
 #include "GatingDesigner.h"
 
+#include <cmath>
+#include <thread>
+
 namespace mu_tant
 {
 
@@ -184,6 +187,64 @@ int GatingDesigner::cellCount() const noexcept
     return kTotalBars * subdivisionDenom;
 }
 
+juce::Rectangle<float> GatingDesigner::gridBounds() const noexcept
+{
+    using mu_ui::s;
+    return { 0.0f, (float) s(kHeaderH), (float) getWidth(), (float) s(kGridH) };
+}
+
+void GatingDesigner::setPlayhead(double beat01, bool visible)
+{
+    // Skip redundant repaints — only invalidate when the line actually moves
+    // a visible amount or visibility flips.
+    const bool changed = (visible != playheadVisible)
+                       || (visible && std::abs(beat01 - playheadBeat01) > 0.0005);
+    playheadBeat01  = beat01;
+    playheadVisible = visible;
+    if (changed) repaint();
+}
+
+void GatingDesigner::mouseDown(const juce::MouseEvent& e)
+{
+    if (boundPattern == nullptr) return;
+    const auto grid = gridBounds();
+    if (!grid.contains(e.position)) return;
+
+    const int cells = cellCount();
+    if (cells <= 0) return;
+    const float rel = (e.position.x - grid.getX()) / grid.getWidth();
+    int cell = (int) (rel * (float) cells);
+    if (cell < 0) cell = 0;
+    if (cell > cells - 1) cell = cells - 1;
+
+    // pencil → add a default envelope at the clicked cell; eraser → remove it.
+    // glue / reverse have no edit role yet (placeholders).
+    if (currentTool != GateTool::Pencil && currentTool != GateTool::Eraser)
+        return;
+
+    // Mutate under the pattern's editLock so the audio gate pass can't tear the
+    // envelope vector mid-read. Brief spin — the audio side only tryLocks.
+    while (boundPattern->editLock.exchange(true, std::memory_order_acquire))
+        std::this_thread::yield();
+
+    if (currentTool == GateTool::Pencil)
+    {
+        GateEnvelope env;
+        env.cell      = cell;
+        env.curveBend = 0.0f;   // linear default
+        boundPattern->addOrReplaceEnvelope(env);
+    }
+    else // Eraser
+    {
+        boundPattern->removeEnvelopeAt(cell);
+    }
+    // The audio thread re-fetches its cell cache each block, so no explicit
+    // invalidation is needed here beyond releasing the lock.
+    boundPattern->editLock.store(false, std::memory_order_release);
+
+    repaint();
+}
+
 void GatingDesigner::paint(juce::Graphics& g)
 {
     using mu_ui::s;
@@ -225,6 +286,46 @@ void GatingDesigner::paint(juce::Graphics& g)
                    gateRect.getHeight() - sf(4.0f));
     }
 
+    // ── Envelopes ─────────────────────────────────────────────────────────────
+    // Each envelope fills from its cell to the next envelope's cell (or pattern
+    // end), drawing its decay/attack curve as a filled area. Mirrors the audio
+    // gate: the filled height at any x is the gate value the engine outputs.
+    if (boundPattern != nullptr && !boundPattern->envelopes.empty())
+    {
+        const float top = gateRect.getY() + sf(2.0f);
+        const float bot = gateRect.getBottom() - sf(2.0f);
+        const float h   = bot - top;
+        const auto fill = MuLookAndFeel::colour(Id::knobFxSend).withAlpha(0.5f);
+        const auto edge = MuLookAndFeel::colour(Id::knobFxSend);
+
+        const auto& envs = boundPattern->envelopes;
+        for (int ei = 0; ei < (int) envs.size(); ++ei)
+        {
+            const auto& env  = envs[(size_t) ei];
+            const int   span = boundPattern->envelopeSpan(ei);
+            if (span <= 0) continue;
+            const float x0 = gateRect.getX() + cellW * (float) env.cell;
+            const float wpx = cellW * (float) span;
+
+            // Sample the envelope curve across its span into a filled path.
+            juce::Path p;
+            p.startNewSubPath(x0, bot);
+            const int steps = juce::jmax(2, (int) wpx);
+            for (int sx = 0; sx <= steps; ++sx)
+            {
+                const float ph = (float) sx / (float) steps;     // 0..1 across span
+                const float val = env.value(ph);                 // 0..1 gate
+                p.lineTo(x0 + wpx * ph, bot - h * val);
+            }
+            p.lineTo(x0 + wpx, bot);
+            p.closeSubPath();
+            g.setColour(fill);
+            g.fillPath(p);
+            g.setColour(edge);
+            g.strokePath(p, juce::PathStrokeType(1.0f));
+        }
+    }
+
     // "1 / 2" bar markers along the bottom edge for orientation.
     g.setColour(MuLookAndFeel::colour(Id::mutedText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
@@ -236,6 +337,15 @@ void GatingDesigner::paint(juce::Graphics& g)
                                           gateRect.getBottom() - sf(14.0f),
                                           sf(14.0f), sf(12.0f)),
                    juce::Justification::centredLeft, false);
+    }
+
+    // ── Playback timeline ─────────────────────────────────────────────────────
+    if (playheadVisible)
+    {
+        const float x = gateRect.getX()
+                      + gateRect.getWidth() * (float) juce::jlimit(0.0, 1.0, playheadBeat01);
+        g.setColour(MuLookAndFeel::colour(Id::textBright).withAlpha(0.9f));
+        g.fillRect(x - sf(0.5f), gateRect.getY(), sf(1.5f), gateRect.getHeight());
     }
 }
 

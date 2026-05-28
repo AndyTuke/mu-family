@@ -100,6 +100,19 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     populateFilterTypes(fltTypeDropdown);
     addAndMakeVisible(fltTypeDropdown);
 
+    // Cutoff readout: Hz (integer) below 1 kHz, kHz (2 dp) above — the default
+    // slider text on a continuous 20..20000 range shows ~6 decimal places.
+    fltCutKnob.getSlider().textFromValueFunction = [](double v)
+    {
+        return v < 1000.0 ? juce::String((int) std::round(v)) + " Hz"
+                          : juce::String(v / 1000.0, 2) + " kHz";
+    };
+    // Resonance: a clean 0..0.99 needs only 2 dp (was showing many).
+    fltResKnob.getSlider().textFromValueFunction = [](double v)
+    {
+        return juce::String(v, 2);
+    };
+
     // ── Gating designer ─────────────────────────────────────────────────────
     addAndMakeVisible(gatingDesigner);
 
@@ -109,9 +122,23 @@ VoicePanel::VoicePanel(PluginProcessor& p)
 
     rebindAttachments();
     refreshVoiceTag();
+
+    startTimerHz(30);
 }
 
-VoicePanel::~VoicePanel() = default;
+VoicePanel::~VoicePanel() { stopTimer(); }
+
+void VoicePanel::timerCallback()
+{
+    // 2 bars = 8 beats in 4/4. Normalise the transport beat to 0..1 across the
+    // gating grid + feed the modulator playhead.
+    const bool   playing = proc.isInternalPlaying();
+    const double beat    = proc.getInternalBeatPos();
+    constexpr double patBeats = (double) GatePattern::kTotalBars * 4.0;
+    const double beat01  = std::fmod(beat, patBeats) / patBeats;
+    gatingDesigner.setPlayhead(beat01, playing);
+    modulatorPanel.setPlayheadBeat(beat);
+}
 
 void VoicePanel::setVoice(int voiceIndex)
 {

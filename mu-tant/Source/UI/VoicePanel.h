@@ -19,7 +19,8 @@ class PluginProcessor;
 // clicking a different voice in the sidebar swaps the editor's target slot.
 // Root + scale are shared (global APVTS params) and stay bound across voice
 // changes.
-class VoicePanel : public juce::Component
+class VoicePanel : public juce::Component,
+                   private juce::Timer
 {
 public:
     explicit VoicePanel(PluginProcessor& proc);
@@ -112,6 +113,10 @@ private:
     void refreshVoiceTag();
 
     void rebindAttachments();
+
+    // 30 Hz timer — drives the gating-grid playhead + modulator playhead from
+    // the processor's transport beat position.
+    void timerCallback() override;
 
     // Band geometry — populated by resized(), consumed by paint() for the
     // band outlines + labels so layout + decoration stay in sync.

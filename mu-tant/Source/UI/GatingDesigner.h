@@ -49,8 +49,13 @@ public:
 
     GateTool selectedTool() const noexcept { return currentTool; }
 
+    // Move the playback timeline. `beat01` is the song position normalised to
+    // 0..1 across the 2-bar grid; `visible` hides the line when stopped.
+    void setPlayhead(double beat01, bool visible);
+
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void mouseDown(const juce::MouseEvent& e) override;
 
     // Total bars represented by the strip. Fixed at 2 per the design spec.
     static constexpr int kTotalBars = 2;
@@ -80,7 +85,13 @@ private:
     static constexpr int kToolW        = 22;   // toolbox button size
     static constexpr int kToolGap      = 4;
 
+    // Playback timeline.
+    double playheadBeat01 = 0.0;
+    bool   playheadVisible = false;
+
     int cellCount() const noexcept;
+    // The gate rectangle (below the header), in component coordinates.
+    juce::Rectangle<float> gridBounds() const noexcept;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GatingDesigner)
 };

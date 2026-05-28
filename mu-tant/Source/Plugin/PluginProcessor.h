@@ -56,6 +56,22 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
+    // ── Internal transport (drives the gate engine + the gating timeline) ─────
+    // mu-tant has no host-sync sequencer; the transport bar's play button starts
+    // / stops an internal free-running clock. While stopped the beat freezes at 0
+    // and the gate is held fully open (audition the oscillators); while playing
+    // the beat advances and the gate engine chops per the pattern.
+    bool   isInternalPlaying()  const override { return playing.load(std::memory_order_relaxed); }
+    void   toggleInternalPlay() override
+    {
+        const bool now = !playing.load(std::memory_order_relaxed);
+        playing.store(now, std::memory_order_relaxed);
+        if (!now) internalBeatPos.store(0.0, std::memory_order_relaxed);
+    }
+    double getInternalBpm()     const override { return internalBpm; }
+    void   setInternalBpm(double bpm) override { internalBpm = juce::jlimit(20.0, 300.0, bpm); }
+    double getInternalBeatPos() const override { return internalBeatPos.load(std::memory_order_relaxed); }
+
     // ── ProcessorBase channel metadata ───────────────────────────────────────
     // mu-tant always exposes the full 8 channels — voices are always present;
     // the user mutes / lowers what they don't want via the mixer.
@@ -114,11 +130,13 @@ private:
     // after the matrix runs.
     std::unordered_map<std::string_view, float> modParamValues;
 
-    // Internal free-running beat counter — mu-tant is a drone synth with no
-    // transport, so modulators evaluate against an always-incrementing beat
-    // position derived from sample rate + a fixed 120 BPM. Sized in beats
-    // (quarter notes) since ControlSequence::evaluate takes a beat position.
-    double internalBeatPos = 0.0;
+    // Internal transport. `playing` gates the beat advance; `internalBeatPos`
+    // is the song position in beats (quarter notes) that drives modulator
+    // evaluation + the gate engine + the gating-grid playhead. Atomic because
+    // the UI reads them at 30 Hz off the message thread while the audio thread
+    // advances them. internalBpm is message-thread-only (set from the BPM box).
+    std::atomic<bool>   playing { false };
+    std::atomic<double> internalBeatPos { 0.0 };
     double internalBpm     = 120.0;
     double currentSampleRate = 44100.0;
 

@@ -85,4 +85,34 @@ int GatePattern::envelopeSpan(int envIdx) const noexcept
     return endCell - startCell;
 }
 
+float GatePattern::gateAt(double beatPos) const noexcept
+{
+    // Empty pattern → no gating, continuous drone.
+    if (envelopes.empty()) return 1.0f;
+
+    const int cells = totalCells();
+    if (cells <= 0) return 1.0f;
+
+    // 2 bars in 4/4 = 8 beats. Wrap the absolute beat into the pattern span.
+    const double patBeats = (double) kTotalBars * 4.0;
+    double pos = std::fmod(beatPos, patBeats);
+    if (pos < 0.0) pos += patBeats;
+
+    const double cellLen = patBeats / (double) cells;
+    int cell = (int) (pos / cellLen);
+    if (cell < 0)          cell = 0;
+    if (cell > cells - 1)  cell = cells - 1;
+
+    // Re-scan for the active envelope only when the cell changes.
+    if (cell != cachedCell)
+    {
+        cachedCell = cell;
+        cachedEnv  = cellEnvelope(cell);
+    }
+    if (cachedEnv == nullptr) return 0.0f;   // cell with no envelope → silent
+
+    const float phase = (float) ((pos - (double) cell * cellLen) / cellLen);
+    return cachedEnv->value(phase);
+}
+
 } // namespace mu_tant
