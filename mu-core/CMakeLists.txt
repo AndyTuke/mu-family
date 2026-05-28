@@ -79,6 +79,8 @@ target_sources(mu-core INTERFACE
     # Shared left sidebar — product injects the per-layer mini-graphic.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/SidebarItem.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/ChannelSidebar.cpp"
+    # Shared per-layer header bar (name / reset / delete / preset / save).
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/ChannelHeaderBar.cpp"
 )
 
 # Consumers can `#include "Audio/VoiceEngine.h"` etc. — same path namespace as

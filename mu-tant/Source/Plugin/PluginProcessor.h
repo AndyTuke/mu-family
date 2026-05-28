@@ -100,6 +100,13 @@ public:
     int  addVoice();
     void removeVoice(int idx);
     void swapVoices(int a, int b);   // reorder (drag in the sidebar)
+    void resetVoice(int idx);        // reset a voice to defaults (keeps its colour)
+
+    // Per-voice ("layer") presets — the voice's `v{N}_*` subtree saved/loaded as
+    // a `.muPattern` file (voice-agnostic base IDs, so a preset loads into any
+    // slot). Mirrors mu-clid's per-rhythm preset I/O.
+    void saveVoicePreset(int voice, const juce::String& name);
+    void loadVoicePreset(int voice, const juce::File& file);
 
     // ── ProcessorBase preset wiring (per design-voice.md file formats) ────────
     juce::File   getContentDir()             const override;

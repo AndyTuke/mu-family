@@ -65,15 +65,41 @@ VoicePanel::VoicePanel(PluginProcessor& p)
         addAndMakeVisible(l);
     };
 
-    // ── Voice tag (top header strip) ────────────────────────────────────────
-    voiceTag.setText("Voice 1", juce::dontSendNotification);
-    voiceTag.setJustificationType(juce::Justification::centredLeft);
-    voiceTag.setFont(juce::Font(juce::FontOptions{}.withHeight(14.0f)));
-    addAndMakeVisible(voiceTag);
-
-    deleteVoiceButton.setTooltip("Delete this voice");
-    deleteVoiceButton.onClick = [this] { if (onDeleteVoice) onDeleteVoice(); };
-    addAndMakeVisible(deleteVoiceButton);
+    // ── Shared per-layer header bar (name / reset / delete / preset / save) ──
+    headerBar.onDelete = [this] { if (onDeleteVoice) onDeleteVoice(); };
+    headerBar.onReset  = [this]
+    {
+        proc.resetVoice(currentVoice);
+        setVoice(currentVoice);           // re-sync knobs / gate / modulators
+    };
+    headerBar.onPresetSelected = [this](int id)
+    {
+        const int i = id - 1;
+        if (i >= 0 && i < (int) voicePresetFiles.size())
+        {
+            proc.loadVoicePreset(currentVoice, voicePresetFiles[(size_t) i]);
+            setVoice(currentVoice);
+        }
+    };
+    headerBar.onSave = [this]
+    {
+        auto* w = new juce::AlertWindow("Save Voice Preset", "Preset name:",
+                                        juce::MessageBoxIconType::NoIcon);
+        w->addTextEditor("name", "Voice " + juce::String(currentVoice + 1));
+        w->addButton("Save",   1, juce::KeyPress(juce::KeyPress::returnKey));
+        w->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
+        juce::Component::SafePointer<VoicePanel> safe(this);
+        w->enterModalState(true, juce::ModalCallbackFunction::create(
+            [safe, w](int r)
+            {
+                if (safe != nullptr && r == 1)
+                {
+                    safe->proc.saveVoicePreset(safe->currentVoice, w->getTextEditorContents("name"));
+                    safe->refreshVoicePresetList();
+                }
+            }), true);
+    };
+    addAndMakeVisible(headerBar);
 
     // ── Tonal centre (shared — bound once) ──────────────────────────────────
     setupLabel(rootLabel,  "Root");
@@ -141,7 +167,7 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     modulatorPanel.setDestProvider(&modDestProvider);
 
     rebindAttachments();
-    refreshVoiceTag();
+    refreshHeader();
 
     startTimerHz(30);
 }
@@ -173,11 +199,11 @@ void VoicePanel::setVoice(int voiceIndex)
     {
         currentVoice = voiceIndex;
         rebindAttachments();
-        refreshVoiceTag();
     }
 
     modulatorPanel.setVoiceSlot(&proc.voiceSlots[(size_t) currentVoice]);
     gatingDesigner.setPattern(&proc.gatePatterns[(size_t) currentVoice]);
+    refreshHeader();
 }
 
 void VoicePanel::rebindAttachments()
@@ -231,13 +257,27 @@ void VoicePanel::rebindAttachments()
     gatingDesigner.setGap((float) (gapKnob.getValue() / 100.0));
 }
 
-void VoicePanel::refreshVoiceTag()
+void VoicePanel::refreshHeader()
 {
-    voiceTag.setText(juce::String("Voice ") + juce::String(currentVoice + 1),
-                     juce::dontSendNotification);
-    const auto tagCol = MuLookAndFeel::channelPalette[
-        (size_t)(proc.getChannelColourIndex(currentVoice) % MuLookAndFeel::kChannelPaletteSize)];
-    voiceTag.setColour(juce::Label::textColourId, tagCol);
+    headerBar.setLayerName(proc.getChannelName(currentVoice));
+    headerBar.setColour(MuLookAndFeel::channelPalette[
+        (size_t)(proc.getChannelColourIndex(currentVoice) % MuLookAndFeel::kChannelPaletteSize)]);
+    refreshVoicePresetList();
+}
+
+void VoicePanel::refreshVoicePresetList()
+{
+    voicePresetFiles.clear();
+    juce::StringArray names;
+    const auto dir = proc.getPerSlotPresetDir();
+    if (dir.isDirectory())
+        for (const auto& f : dir.findChildFiles(juce::File::findFiles, false,
+                                                "*." + proc.getPerSlotPresetExtension()))
+        {
+            voicePresetFiles.push_back(f);
+            names.add(f.getFileNameWithoutExtension());
+        }
+    headerBar.setPresetItems(names);
 }
 
 void VoicePanel::paint(juce::Graphics& g)
@@ -246,10 +286,6 @@ void VoicePanel::paint(juce::Graphics& g)
     using mu_ui::s;
     using mu_ui::sf;
     g.fillAll(MuLookAndFeel::colour(Id::panelBackground));
-
-    // Header strip divider.
-    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.fillRect(0, s(32) - 1, getWidth(), 1);
 
     const auto voiceCol = MuLookAndFeel::channelPalette[
         (size_t)(proc.getChannelColourIndex(currentVoice) % MuLookAndFeel::kChannelPaletteSize)];
@@ -290,7 +326,6 @@ void VoicePanel::resized()
     const int h = getHeight();
 
     const int pad      = s(12);
-    const int headerH  = s(32);
     const int gap      = s(8);
     const int ddH      = s(24);
     const int s2W      = s(MuLookAndFeel::kKnobSize2W);   // 54 — voice/filter/level knobs
@@ -298,25 +333,23 @@ void VoicePanel::resized()
     const int oscTitleW = s(46);                          // left title column inside each sub-panel
     const int modPanelH = s(260);
 
-    // ── Header strip (voice tag + shared Root / Scale + Delete) ─────────────
-    voiceTag.setBounds(pad, 0, w / 3 - pad, headerH);
+    // ── Shared header bar (full width) + shared Root / Scale row beneath ────
+    const int barH = s(ChannelHeaderBar::kHeight);
+    headerBar.setBounds(0, 0, w, barH);
+    const int tonalY = barH + s(2);
     {
-        const int delW = s(56);
-        deleteVoiceButton.setBounds(w - pad - delW, (headerH - s(20)) / 2, delW, s(20));
-
         const int labelW = s(44);
-        int x = w / 3;
-        const int yy = (headerH - ddH) / 2;
-        rootLabel    .setBounds(x, yy, labelW, ddH);   x += labelW + s(4);
-        rootDropdown .setBounds(x, yy, s(56), ddH);    x += s(56) + s(12);
-        scaleLabel   .setBounds(x, yy, labelW, ddH);   x += labelW + s(4);
-        scaleDropdown.setBounds(x, yy, s(100), ddH);
+        int x = pad;
+        rootLabel    .setBounds(x, tonalY, labelW, ddH);   x += labelW + s(4);
+        rootDropdown .setBounds(x, tonalY, s(56), ddH);    x += s(56) + s(12);
+        scaleLabel   .setBounds(x, tonalY, labelW, ddH);   x += labelW + s(4);
+        scaleDropdown.setBounds(x, tonalY, s(100), ddH);
     }
 
     // ── Right-hand Mixer column ──────────────────────────────────────────────
     const int mixerW     = s(88);
     const int mixerX     = w - pad - mixerW;
-    const int contentTop = headerH + gap;
+    const int contentTop = tonalY + ddH + gap;
 
     // Left content region (everything except the mixer column).
     const int leftX     = pad;

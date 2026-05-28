@@ -467,6 +467,54 @@ void PluginProcessor::swapVoices(int a, int b)
     gatePatterns[(size_t) b].copyDataFrom(tmpGate);
 }
 
+void PluginProcessor::resetVoice(int idx)
+{
+    const juce::ScopedLock sl(voicesLock);
+    if (idx < 0 || idx >= numVoices.load()) return;
+    const int keepColour = voiceColourIndex[(size_t) idx];
+    resetVoiceSlot(idx);                       // params + gate + modulators → defaults
+    voiceColourIndex[(size_t) idx] = keepColour;   // identity colour stays
+}
+
+void PluginProcessor::saveVoicePreset(int voice, const juce::String& name)
+{
+    auto dir = getPerSlotPresetDir();
+    dir.createDirectory();
+    juce::String safe = name.replaceCharacters("\\/:|*?<>\"", "_________");
+    if (safe.isEmpty()) safe = "Voice";
+
+    const juce::String prefix = juce::String("v") + juce::String(voice) + "_";
+    juce::XmlElement root("MuTantVoice");
+    for (auto* p : getParameters())
+        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
+        {
+            const juce::String id = rp->getParameterID();
+            if (id.startsWith(prefix))
+            {
+                auto* e = root.createNewChildElement("p");
+                e->setAttribute("id", id.substring(prefix.length()));  // voice-agnostic base
+                e->setAttribute("v", (double) rp->getValue());         // normalised 0..1
+            }
+        }
+    root.writeTo(dir.getChildFile(safe + "." + getPerSlotPresetExtension()));
+}
+
+void PluginProcessor::loadVoicePreset(int voice, const juce::File& file)
+{
+    if (! file.existsAsFile()) return;
+    auto xml = juce::XmlDocument::parse(file);
+    if (xml == nullptr || ! xml->hasTagName("MuTantVoice"))
+    {
+        if (onLoadError) onLoadError("Could not read \"" + file.getFileName() + "\"");
+        return;
+    }
+    const juce::String prefix = juce::String("v") + juce::String(voice) + "_";
+    for (auto* e : xml->getChildIterator())
+        if (e->hasTagName("p"))
+            if (auto* p = apvts.getParameter(prefix + e->getStringAttribute("id")))
+                p->setValueNotifyingHost((float) e->getDoubleAttribute("v"));
+}
+
 void PluginProcessor::copyVoiceParams(int src, int dst)
 {
     auto shift = [this](const juce::String& srcPrefix, const juce::String& dstPrefix)

@@ -4,9 +4,12 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/DropdownSelect.h"
+#include "UI/ChannelHeaderBar.h"
 #include "UI/ModulatorPanel.h"
 #include "Modulation/MuTantModDest.h"
 #include "UI/GatingDesigner.h"
+
+#include <vector>
 
 namespace mu_tant
 {
@@ -122,13 +125,12 @@ private:
     ::ModulatorPanel modulatorPanel;
     ModDestProvider  modDestProvider;
 
-    // Voice indicator strip (top of panel). Mirrors the active voice's
-    // palette colour so users always see which slot the panel is editing.
-    juce::Label voiceTag;
-    void refreshVoiceTag();
-
-    // Header Delete button — removes the current voice (mirrors mu-clid).
-    juce::TextButton deleteVoiceButton { "Delete" };
+    // Shared per-layer header bar (name / reset / delete / preset / save) —
+    // identical across mu-products. Replaces the bespoke voice tag + Delete btn.
+    ChannelHeaderBar headerBar;
+    void refreshHeader();              // name + colour + preset list for the active voice
+    void refreshVoicePresetList();
+    std::vector<juce::File> voicePresetFiles;   // dropdown id (1-based) → file
 
     void rebindAttachments();
 
