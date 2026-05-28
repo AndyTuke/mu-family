@@ -78,13 +78,15 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/GatingDesignerTests.cpp
     Source/Tests/GatePatternTests.cpp
     Source/Tests/GateStageTests.cpp
+    Source/Tests/InsertStageTests.cpp
     Source/UI/GatingDesigner.cpp
     Source/Sequencer/GatePattern.cpp
     Source/Audio/WavetableBank.cpp
-    # mu-core .cpps the modulator + gating tests depend on (the console-app
+    # mu-core .cpps the modulator + gating + insert tests depend on (the console-app
     # target doesn't share JUCE-plugin context, so it can't link mu-core directly).
     "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/InsertProcessor.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/DropdownSelect.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/MuLookAndFeel.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/MuTheme.cpp"

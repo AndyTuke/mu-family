@@ -88,6 +88,15 @@ namespace
         // Gater bypass — when on, the gate stage is skipped (raw drone passes,
         // for audition / configuration).
         layout.add(std::make_unique<AudioParameterBool>(ParameterID{id("gate_bypass"), 1}, label("Gate Bypass"), false));
+
+        // Insert effect (shared mu-core InsertProcessor) — same schema as mu-clid:
+        // `drvChar` = algorithm 0..(N-1), `insP1..insP4` = generic 0..1 slot params.
+        layout.add(std::make_unique<AudioParameterInt>  (ParameterID{id("drvChar"), 1}, label("Insert Algo"),
+                                                         0, InsertProcessor::kNumInsertAlgos - 1, 0));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("insP1"), 1}, label("Insert P1"), f(0.0f, 1.0f, 0.0f), 0.0f));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("insP2"), 1}, label("Insert P2"), f(0.0f, 1.0f, 0.0f), 0.0f));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("insP3"), 1}, label("Insert P3"), f(0.0f, 1.0f, 0.0f), 0.0f));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("insP4"), 1}, label("Insert P4"), f(0.0f, 1.0f, 0.0f), 0.0f));
     }
 }
 
@@ -156,6 +165,9 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     // Pre-allocate per-voice render scratch so processBlock never allocates.
     for (auto& buf : voiceBuffers)
         buf.setSize(2, samplesPerBlock, false, true, true);
+
+    for (auto& ins : inserts)
+        ins.prepare(sampleRate, samplesPerBlock);
 
     mixerEngine.prepare(sampleRate, samplesPerBlock);
 }
@@ -309,6 +321,19 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         float* gr = voiceBuf.getNumChannels() > 1 ? voiceBuf.getWritePointer(1) : nullptr;
         applyGateBlock(pattern, gl, gr, numSamples, gateGap, gateBypass, isPlaying,
                        beatStart, beatsPerSample);
+
+        // ── Insert effect ───────────────────────────────────────────────────
+        // Shared mu-core InsertProcessor, post-gate: engine → insert → mixer
+        // (the family-wide signal flow). Algo 0 (None) is a passthrough.
+        {
+            VoiceParams ip;
+            ip.insertAlgo     = (int) raw(voiceParamId(v, "drvChar"));
+            ip.insertParam[0] = raw(voiceParamId(v, "insP1"));
+            ip.insertParam[1] = raw(voiceParamId(v, "insP2"));
+            ip.insertParam[2] = raw(voiceParamId(v, "insP3"));
+            ip.insertParam[3] = raw(voiceParamId(v, "insP4"));
+            inserts[(size_t) v].process(voiceBuf, numSamples, voiceBuf.getNumChannels(), ip);
+        }
 
         // Equal-power constant-power pan, matching MixerEngine::applyPanGain.
         const float angle = (pan + 1.0f) * 0.25f * juce::MathConstants<float>::pi;

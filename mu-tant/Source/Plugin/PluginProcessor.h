@@ -5,6 +5,7 @@
 #include "Sequencer/GatePattern.h"           // mu-tant: per-voice gate pattern
 #include "Audio/SynthVoice.h"                // mu-tant voice
 #include "Audio/WavetableBank.h"
+#include "Audio/InsertProcessor.h"           // mu-core: shared per-voice insert FX
 
 #include <array>
 #include <atomic>
@@ -132,6 +133,10 @@ private:
     std::array<std::unique_ptr<VoiceEngine>, kMaxVoices>   voices;
     // Per-voice render scratch — allocated in prepareToPlay; reused each block.
     std::array<juce::AudioBuffer<float>,     kMaxVoices>   voiceBuffers;
+    // Per-voice insert effect (shared mu-core InsertProcessor) — runs after the
+    // gate, before the pan/sum into the mixer (engine → insert → mixer, the
+    // family-wide signal flow). Mirrors mu-clid's per-rhythm insert.
+    std::array<InsertProcessor,              kMaxVoices>   inserts;
 
 public:
     // Per-voice modulator data — 8 ControlSequences + ModulationMatrix + modLock
