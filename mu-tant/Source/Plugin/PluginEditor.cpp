@@ -8,7 +8,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       proc(p),
       voiceSidebar(p),
       voicePanel(p),
-      mixerOverlay(p, p.mixerEngine)
+      mixerOverlay(p, p.mixerEngine),
+      settingsOverlay(p)
 {
     // ── Product chrome on shared overlays ───────────────────────────────────
     getAboutPanel().setProductInfo(
@@ -20,9 +21,12 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         });
     getTransportBar().setLogoText(juce::String(juce::CharPointer_UTF8("\xce\xbc-Tant")));
 
-    // First-stab scope: no preset library, no settings overlay yet.
+    // First-stab scope: no preset library yet.
     getTransportBar().setShowPresetControls(false);
-    setSettingsOverlay(nullptr);
+
+    // Basic settings page (master vol + UI size + BPM) behind the gear button.
+    settingsOverlay.onClose = [this] { showSettings(false); };
+    setSettingsOverlay(&settingsOverlay);
 
     // Main area + mixer overlay (Stage A3 — channel strip lvl/pan/mute/solo
     // bound via apvts; FX send / sidechain knobs are visible but inert until

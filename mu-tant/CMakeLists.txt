@@ -26,6 +26,7 @@ target_sources(mu-tant
         Source/UI/VoicePanel.cpp
         Source/UI/VoiceSidebar.cpp
         Source/UI/GatingDesigner.cpp
+        Source/UI/SettingsOverlay.cpp
         Source/Sequencer/GatePattern.cpp
         Source/Audio/WavetableBank.cpp
         Source/Audio/SynthVoice.cpp

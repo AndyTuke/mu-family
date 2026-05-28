@@ -6,6 +6,7 @@
 #include "Plugin/PluginProcessor.h"
 #include "UI/VoicePanel.h"
 #include "UI/VoiceSidebar.h"
+#include "UI/SettingsOverlay.h"
 
 namespace mu_tant
 {
@@ -27,6 +28,7 @@ private:
     VoiceSidebar     voiceSidebar;
     VoicePanel       voicePanel;
     MixerOverlay     mixerOverlay;
+    SettingsOverlay  settingsOverlay;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };
