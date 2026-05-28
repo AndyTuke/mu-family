@@ -368,6 +368,7 @@ juce::AudioProcessorEditor* PluginProcessor::createEditor()
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     apvts.state.setProperty("numVoices", numVoices.load(), nullptr);
+    apvts.state.setProperty("voiceColours", serialiseVoiceColours(), nullptr);
     if (auto xml = apvts.copyState().createXml())
         copyXmlToBinary(*xml, destData);
 }
@@ -379,16 +380,32 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
         const juce::ScopedLock sl(voicesLock);
         apvts.replaceState(juce::ValueTree::fromXml(*xml));
         numVoices.store(juce::jlimit(1, kMaxVoices, (int) apvts.state.getProperty("numVoices", 1)));
+        restoreVoiceColours(apvts.state.getProperty("voiceColours", "").toString());
     }
 }
 
 // ── Dynamic voice management ─────────────────────────────────────────────────
+int PluginProcessor::firstUnusedColourIndex() const
+{
+    const int n = numVoices.load();
+    std::array<bool, kMaxVoices> used { };
+    for (int i = 0; i < n; ++i)
+    {
+        const int c = voiceColourIndex[(size_t) i];
+        if (c >= 0 && c < kMaxVoices) used[(size_t) c] = true;
+    }
+    for (int c = 0; c < kMaxVoices; ++c)
+        if (! used[(size_t) c]) return c;
+    return 0;
+}
+
 int PluginProcessor::addVoice()
 {
     const juce::ScopedLock sl(voicesLock);
     const int n = numVoices.load();
     if (n >= kMaxVoices) return -1;
     resetVoiceSlot(n);                              // fresh defaults for the new slot
+    voiceColourIndex[(size_t) n] = firstUnusedColourIndex();   // allocate its palette colour
     numVoices.store(n + 1);
     apvts.state.setProperty("numVoices", n + 1, nullptr);
     return n;
@@ -404,6 +421,7 @@ void PluginProcessor::removeVoice(int idx)
     for (int d = idx; d < n - 1; ++d)
     {
         copyVoiceParams(d + 1, d);
+        voiceColourIndex[(size_t) d] = voiceColourIndex[(size_t) (d + 1)];   // colour follows the voice
         voiceSlots[(size_t) d] = voiceSlots[(size_t) (d + 1)];          // CopyableSpinLock-safe
         gatePatterns[(size_t) d].copyDataFrom(gatePatterns[(size_t) (d + 1)]);
     }
@@ -437,6 +455,8 @@ void PluginProcessor::swapVoices(int a, int b)
     swapPrefix("v"  + juce::String(a) + "_", "v"  + juce::String(b) + "_");
     swapPrefix("ch" + juce::String(a) + "_", "ch" + juce::String(b) + "_");
 
+    std::swap(voiceColourIndex[(size_t) a], voiceColourIndex[(size_t) b]);   // colour follows the voice
+
     const VoiceSlot tmpSlot = voiceSlots[(size_t) a];
     voiceSlots[(size_t) a] = voiceSlots[(size_t) b];
     voiceSlots[(size_t) b] = tmpSlot;
@@ -462,6 +482,22 @@ void PluginProcessor::copyVoiceParams(int src, int dst)
     };
     shift("v"  + juce::String(src) + "_", "v"  + juce::String(dst) + "_");
     shift("ch" + juce::String(src) + "_", "ch" + juce::String(dst) + "_");
+}
+
+juce::String PluginProcessor::serialiseVoiceColours() const
+{
+    juce::String s;
+    for (int i = 0; i < kMaxVoices; ++i)
+        s += (i ? "," : "") + juce::String(voiceColourIndex[(size_t) i]);
+    return s;
+}
+
+void PluginProcessor::restoreVoiceColours(const juce::String& csv)
+{
+    if (csv.isEmpty()) return;
+    const auto toks = juce::StringArray::fromTokens(csv, ",", "");
+    for (int i = 0; i < kMaxVoices && i < toks.size(); ++i)
+        voiceColourIndex[(size_t) i] = juce::jlimit(0, kMaxVoices - 1, toks[i].getIntValue());
 }
 
 void PluginProcessor::resetVoiceSlot(int idx)
@@ -507,6 +543,7 @@ void PluginProcessor::savePreset(const juce::String& name, const juce::String& d
     root.setAttribute("description", desc);
     root.setAttribute("category", category);
     apvts.state.setProperty("numVoices", numVoices.load(), nullptr);
+    apvts.state.setProperty("voiceColours", serialiseVoiceColours(), nullptr);
     if (auto state = apvts.copyState().createXml())
         root.addChildElement(state.release());
 
@@ -538,6 +575,7 @@ void PluginProcessor::loadPreset(const juce::File& file)
     suspendProcessing(true);
     apvts.replaceState(juce::ValueTree::fromXml(*stateXml));
     numVoices.store(juce::jlimit(1, kMaxVoices, (int) apvts.state.getProperty("numVoices", 1)));
+    restoreVoiceColours(apvts.state.getProperty("voiceColours", "").toString());
     suspendProcessing(false);
 }
 

@@ -236,7 +236,7 @@ void VoicePanel::refreshVoiceTag()
     voiceTag.setText(juce::String("Voice ") + juce::String(currentVoice + 1),
                      juce::dontSendNotification);
     const auto tagCol = MuLookAndFeel::channelPalette[
-        (size_t)(currentVoice % MuLookAndFeel::kChannelPaletteSize)];
+        (size_t)(proc.getChannelColourIndex(currentVoice) % MuLookAndFeel::kChannelPaletteSize)];
     voiceTag.setColour(juce::Label::textColourId, tagCol);
 }
 
@@ -252,7 +252,7 @@ void VoicePanel::paint(juce::Graphics& g)
     g.fillRect(0, s(32) - 1, getWidth(), 1);
 
     const auto voiceCol = MuLookAndFeel::channelPalette[
-        (size_t)(currentVoice % MuLookAndFeel::kChannelPaletteSize)];
+        (size_t)(proc.getChannelColourIndex(currentVoice) % MuLookAndFeel::kChannelPaletteSize)];
     const auto muted = MuLookAndFeel::colour(Id::mutedText);
 
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));

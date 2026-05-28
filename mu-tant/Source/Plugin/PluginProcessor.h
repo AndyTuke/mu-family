@@ -83,7 +83,13 @@ public:
         return (idx >= 0 && idx < kMaxVoices) ? juce::String("Voice ") + juce::String(idx + 1)
                                               : juce::String();
     }
-    int          getChannelColourIndex(int idx) const override { return idx; }
+    // Each voice carries an allocated palette-colour index (mu-clid's rule:
+    // assigned first-unused on add, follows the voice through delete/reorder),
+    // so layers are distinctly + stably coloured.
+    int          getChannelColourIndex(int idx) const override
+    {
+        return (idx >= 0 && idx < kMaxVoices) ? voiceColourIndex[(size_t) idx] : 0;
+    }
 
     // ── Dynamic voice management (message-thread; mirrors mu-clid add/delete) ──
     // addVoice appends a fresh default voice (returns its index, or -1 if full).
@@ -169,6 +175,10 @@ private:
     // Number of existing voices (layers), 1..kMaxVoices. Audio thread reads it
     // atomically; add/removeVoice mutate it on the message thread under voicesLock.
     std::atomic<int> numVoices { 1 };
+    // Per-voice palette-colour index (0..7). Default identity; addVoice assigns
+    // the first-unused colour, remove/swap shift it so colour follows the voice.
+    std::array<int, kMaxVoices> voiceColourIndex { { 0, 1, 2, 3, 4, 5, 6, 7 } };
+    int firstUnusedColourIndex() const;   // lowest palette index not used by an active voice
     // Guards the voice count + the per-voice data shift during add/remove against
     // the audio thread. processBlock takes a ScopedTryLock and silences the block
     // on contention (a sub-millisecond gap while a voice is added/removed).
@@ -179,6 +189,11 @@ private:
     void copyVoiceParams(int src, int dst);
     // Reset one voice slot to defaults — APVTS params + gate pattern + modulators.
     void resetVoiceSlot(int idx);
+
+    // Per-voice colour allocation persistence (stored on the APVTS state tree
+    // alongside numVoices, so colours round-trip with full + per-... presets).
+    juce::String serialiseVoiceColours() const;
+    void         restoreVoiceColours(const juce::String& csv);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };
