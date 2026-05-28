@@ -14,6 +14,24 @@ namespace mu_tant
 // (1/4, 1/8, 1/16, ...). No gate data is wired yet — this is the visual
 // scaffold that the real drawable gate editor will sit inside once the
 // sequencer model lands.
+// Edit tool the toolbox selects. Roles are wired when the drawable editor
+// lands; for now selecting a tool just highlights its button.
+enum class GateTool { Pencil, Eraser, Glue, Reverse };
+
+// Small icon button that vector-draws one of the toolbox glyphs. Radio-grouped
+// so exactly one tool is active. The icon is drawn procedurally (no asset
+// dependency) so it scales with the UI and stays in the mu palette.
+class GateToolButton : public juce::Button
+{
+public:
+    explicit GateToolButton(GateTool t);
+    GateTool tool() const noexcept { return toolId; }
+    void paintButton(juce::Graphics& g, bool highlighted, bool down) override;
+
+private:
+    GateTool toolId;
+};
+
 class GatingDesigner : public juce::Component
 {
 public:
@@ -29,6 +47,8 @@ public:
     // ownership stays with the caller (PluginProcessor).
     void setPattern(GatePattern* pattern);
 
+    GateTool selectedTool() const noexcept { return currentTool; }
+
     void paint(juce::Graphics& g) override;
     void resized() override;
 
@@ -38,6 +58,14 @@ public:
 private:
     juce::Label    subdivLabel;
     DropdownSelect subdivDropdown;
+
+    // Toolbox: pencil / eraser / glue / reverse (roles TBD).
+    GateToolButton pencilBtn  { GateTool::Pencil };
+    GateToolButton eraserBtn  { GateTool::Eraser };
+    GateToolButton glueBtn    { GateTool::Glue };
+    GateToolButton reverseBtn { GateTool::Reverse };
+    GateTool       currentTool = GateTool::Pencil;
+    void selectTool(GateTool t);
 
     int subdivisionDenom = 16;   // 1/16 default — 32 cells over 2 bars
 
@@ -49,6 +77,8 @@ private:
     static constexpr int kGridH        = 80;   // gate rectangle height
     static constexpr int kHeaderInset  = 6;
     static constexpr int kDropdownW    = 88;
+    static constexpr int kToolW        = 22;   // toolbox button size
+    static constexpr int kToolGap      = 4;
 
     int cellCount() const noexcept;
 

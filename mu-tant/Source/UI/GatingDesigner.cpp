@@ -23,6 +23,103 @@ namespace
     }
 }
 
+// ── Toolbox button — procedural vector icons ──────────────────────────────
+GateToolButton::GateToolButton(GateTool t)
+    : juce::Button(juce::String()), toolId(t)
+{
+    setClickingTogglesState(true);
+    setRadioGroupId(0x6a7e);   // arbitrary shared id so the 4 tools are exclusive
+}
+
+void GateToolButton::paintButton(juce::Graphics& g, bool highlighted, bool /*down*/)
+{
+    using Id = MuLookAndFeel::ColourIds;
+    const bool on = getToggleState();
+    auto r = getLocalBounds().toFloat().reduced(2.0f);
+
+    // Button background — brighter when selected, subtle on hover.
+    g.setColour(on ? MuLookAndFeel::colour(Id::segmentActiveBg)
+                   : (highlighted ? MuLookAndFeel::colour(Id::segmentInactiveBg).brighter(0.1f)
+                                  : MuLookAndFeel::colour(Id::segmentInactiveBg)));
+    g.fillRoundedRectangle(r, 3.0f);
+    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
+    g.drawRoundedRectangle(r, 3.0f, 1.0f);
+
+    const auto ink = on ? MuLookAndFeel::colour(Id::textBright)
+                        : MuLookAndFeel::colour(Id::labelText);
+    g.setColour(ink);
+    auto b = r.reduced(r.getWidth() * 0.22f);
+
+    switch (toolId)
+    {
+        case GateTool::Pencil:
+        {
+            // Diagonal pencil: shaft line from bottom-left to top-right + a tip.
+            juce::Path p;
+            p.startNewSubPath(b.getX(), b.getBottom());
+            p.lineTo(b.getRight(), b.getY());
+            g.strokePath(p, juce::PathStrokeType(1.6f));
+            // tip triangle at bottom-left
+            juce::Path tip;
+            tip.addTriangle(b.getX(), b.getBottom(),
+                            b.getX() + b.getWidth() * 0.28f, b.getBottom() - b.getHeight() * 0.12f,
+                            b.getX() + b.getWidth() * 0.12f, b.getBottom() - b.getHeight() * 0.28f);
+            g.fillPath(tip);
+            break;
+        }
+        case GateTool::Eraser:
+        {
+            // Rubber block — a parallelogram.
+            juce::Path p;
+            p.startNewSubPath(b.getX() + b.getWidth() * 0.2f, b.getBottom());
+            p.lineTo(b.getRight(),                          b.getBottom());
+            p.lineTo(b.getRight() - b.getWidth() * 0.2f,    b.getY());
+            p.lineTo(b.getX(),                              b.getY());
+            p.closeSubPath();
+            g.strokePath(p, juce::PathStrokeType(1.4f));
+            break;
+        }
+        case GateTool::Glue:
+        {
+            // Glue droplet — a teardrop (circle + point on top).
+            const float cx = b.getCentreX();
+            const float cy = b.getCentreY() + b.getHeight() * 0.12f;
+            const float rad = b.getWidth() * 0.32f;
+            g.fillEllipse(cx - rad, cy - rad, rad * 2.0f, rad * 2.0f);
+            juce::Path drop;
+            drop.addTriangle(cx, b.getY(),
+                             cx - rad * 0.7f, cy,
+                             cx + rad * 0.7f, cy);
+            g.fillPath(drop);
+            break;
+        }
+        case GateTool::Reverse:
+        {
+            // Two opposing horizontal arrows.
+            const float midY = b.getCentreY();
+            const float q    = b.getHeight() * 0.22f;
+            juce::Path p;
+            // top arrow pointing right
+            p.startNewSubPath(b.getX(), midY - q);
+            p.lineTo(b.getRight(), midY - q);
+            // bottom arrow pointing left
+            p.startNewSubPath(b.getRight(), midY + q);
+            p.lineTo(b.getX(), midY + q);
+            g.strokePath(p, juce::PathStrokeType(1.4f));
+            // arrowheads
+            juce::Path heads;
+            heads.addTriangle(b.getRight(), midY - q,
+                              b.getRight() - q, midY - q - q * 0.6f,
+                              b.getRight() - q, midY - q + q * 0.6f);
+            heads.addTriangle(b.getX(), midY + q,
+                              b.getX() + q, midY + q - q * 0.6f,
+                              b.getX() + q, midY + q + q * 0.6f);
+            g.fillPath(heads);
+            break;
+        }
+    }
+}
+
 GatingDesigner::GatingDesigner()
 {
     subdivLabel.setText("Grid", juce::dontSendNotification);
@@ -39,6 +136,22 @@ GatingDesigner::GatingDesigner()
         setSubdivision(kSubdivOptions[id - 1].denom);
     };
     addAndMakeVisible(subdivDropdown);
+
+    // ── Toolbox (pencil / eraser / glue / reverse) ──────────────────────────
+    for (auto* b : { &pencilBtn, &eraserBtn, &glueBtn, &reverseBtn })
+    {
+        b->setTooltip(juce::String());   // roles TBD
+        b->onClick = [this, b] { selectTool(b->tool()); };
+        addAndMakeVisible(b);
+    }
+    pencilBtn.setToggleState(true, juce::dontSendNotification);
+}
+
+void GatingDesigner::selectTool(GateTool t)
+{
+    currentTool = t;
+    // The radio group keeps button toggle-state exclusive; nothing else to do
+    // until the tools' edit roles are wired to the (future) drawable canvas.
 }
 
 void GatingDesigner::setSubdivision(int denominator)
@@ -136,6 +249,18 @@ void GatingDesigner::resized()
     // Header right side: [Grid] [dropdown]
     subdivDropdown.setBounds(w - ddW - s(kHeaderInset), s(1), ddW, ddH);
     subdivLabel   .setBounds(w - ddW - s(kHeaderInset) - s(40), s(1), s(36), ddH);
+
+    // Toolbox row — sits after the "Gating" title (which paint() draws at ~x=6
+    // spanning ~120 px), left of the Grid label.
+    const int toolW = s(kToolW);
+    const int toolGap = s(kToolGap);
+    const int toolY = (hdrH - toolW) / 2;
+    int tx = s(kHeaderInset) + s(70);   // past the "Gating" title text
+    for (auto* b : { &pencilBtn, &eraserBtn, &glueBtn, &reverseBtn })
+    {
+        b->setBounds(tx, toolY, toolW, toolW);
+        tx += toolW + toolGap;
+    }
 }
 
 } // namespace mu_tant
