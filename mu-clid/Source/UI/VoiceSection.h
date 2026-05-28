@@ -3,7 +3,7 @@
 #include "Voice/PitchSubsection.h"
 #include "Voice/FilterSubsection.h"
 #include "Voice/AmpSubsection.h"
-#include "Voice/InsertSubsection.h"
+#include "UI/Voice/InsertSubsection.h"   // shared mu-core insert panel
 
 class PluginProcessor;
 
@@ -29,6 +29,9 @@ public:
     void paint(juce::Graphics&) override;
 
 private:
+    PluginProcessor& proc;
+    int              currentRhythm = -1;
+
     PitchSubsection  pitchSub;
     FilterSubsection filterSub;
     AmpSubsection    ampSub;

@@ -81,6 +81,8 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/ChannelSidebar.cpp"
     # Shared per-layer header bar (name / reset / delete / preset / save).
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/ChannelHeaderBar.cpp"
+    # Shared insert-effect voice subsection (algo dropdown + 4 slot knobs).
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Voice/InsertSubsection.cpp"
 )
 
 # Consumers can `#include "Audio/VoiceEngine.h"` etc. — same path namespace as

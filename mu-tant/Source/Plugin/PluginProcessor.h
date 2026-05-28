@@ -133,6 +133,14 @@ public:
         return juce::String("v") + juce::String(voice) + "_" + base;
     }
 
+    // GR-meter source for the shared InsertSubsection (Compressor / Limiter P2).
+    // Points at the per-voice insert's atomic reduction value; null when oob.
+    const std::atomic<float>* getInsertGRPtr(int voice) const noexcept
+    {
+        if (voice < 0 || voice >= kMaxVoices) return nullptr;
+        return &inserts[(size_t) voice].grReduction;
+    }
+
 protected:
     // MIDI program-change apply hooks — stubbed in the first stab (no preset I/O yet).
     void applyMidiPresetSlot(int, const juce::File&) override {}

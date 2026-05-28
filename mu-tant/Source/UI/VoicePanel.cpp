@@ -53,6 +53,7 @@ namespace
 
 VoicePanel::VoicePanel(PluginProcessor& p)
     : proc(p),
+      insertSub(p, "v"),
       modDestProvider(makeModDestProvider())
 {
     auto& apvts = proc.apvts;
@@ -162,6 +163,17 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     gateBypassButton.setTooltip("Bypass the gater so the drone passes through unmodulated");
     addAndMakeVisible(gateBypassButton);
 
+    // ── Insert effect (shared mu-core panel) ────────────────────────────────
+    // mu-tant reads its insert params fresh from APVTS each block (no listener),
+    // so the 5-write algo switch needs no bulk-change guard — leave runBulkChange
+    // null. Insert slots aren't modulation destinations in mu-tant yet, so the
+    // mod-arc hooks stay null too. Only the GR meter + transport state are wired.
+    addAndMakeVisible(insertSub);
+    insertSub.isPlaying   = [this] { return proc.isInternalPlaying(); };
+    insertSub.getInsertGR = [this]() -> const std::atomic<float>* {
+        return proc.getInsertGRPtr(currentVoice);
+    };
+
     // ── Modulator panel ─────────────────────────────────────────────────────
     addAndMakeVisible(modulatorPanel);
     modulatorPanel.setDestProvider(&modDestProvider);
@@ -203,6 +215,7 @@ void VoicePanel::setVoice(int voiceIndex)
 
     modulatorPanel.setVoiceSlot(&proc.voiceSlots[(size_t) currentVoice]);
     gatingDesigner.setPattern(&proc.gatePatterns[(size_t) currentVoice]);
+    insertSub.setChannel(currentVoice);   // reloads algo + slot knobs from APVTS
     refreshHeader();
 }
 
@@ -309,6 +322,16 @@ void VoicePanel::paint(juce::Graphics& g)
     panel(modNoisePanelR, "X-MOD");
     panel(filterPanelR,   "FILTER");
 
+    // Insert sub-panel: same rounded-border + centred title as the MIXER column.
+    if (! insertPanelR.isEmpty())
+    {
+        g.setColour(voiceCol);
+        g.drawRoundedRectangle(insertPanelR.toFloat().reduced(1.0f), sf(6.0f), sf(2.0f));
+        g.setColour(muted);
+        g.drawText("INSERT", insertPanelR.getX(), insertPanelR.getY() + s(3),
+                   insertPanelR.getWidth(), s(12), juce::Justification::centred, false);
+    }
+
     if (! mixerPanelR.isEmpty())
     {
         g.setColour(voiceCol);
@@ -382,10 +405,24 @@ void VoicePanel::resized()
     layoutOsc(osc2PanelR, osc2WaveDropdown, o2OctKnob, o2SemiKnob, o2FineKnob, o2PosKnob);
     const int oscRowsBottom = y - gap;   // bottom of the Osc 2 sub-panel
 
+    // ── Insert column — reserved on the right, spanning the X-Mod + Filter rows.
+    //    Family signal flow: synth engine → insert → mixer. The shared
+    //    InsertSubsection lays out an algo dropdown over a 4-knob row, so it needs
+    //    a 2-row-tall column; placing it beside the two single-height rows keeps
+    //    parity with mu-clid's Filter | Insert strip and adds no panel height. ──
+    const int insSubW   = s(4 * MuLookAndFeel::kKnobSize2W);
+    const int insSubH   = s(2 * MuLookAndFeel::kKnobSize2H + MuLookAndFeel::kVoiceGap);
+    const int insTitleH = s(14);
+    const int insColW   = insSubW + s(20);
+    const int insColX   = leftRight - insColW;
+    const int rowsRight = insColX - gap;     // X-Mod / Filter rows stop before the insert
+    const int rowsW     = rowsRight - leftX;
+    const int xmodFilterTop = y;
+
     // ── X-Mod / Noise sub-panel (mode + noise dropdowns kept apart) ─────────
     {
         const int rowH = s2H + s(8);
-        modNoisePanelR = { leftX, y, leftW, rowH };
+        modNoisePanelR = { leftX, y, rowsW, rowH };
         const int rowY  = y + s(4);
         const int ctrlY = rowY + (s2H - ddH) / 2;
         int x = leftX + oscTitleW;
@@ -400,7 +437,7 @@ void VoicePanel::resized()
     // ── Filter sub-panel (Type + Cutoff + Resonance) + per-voice Level ──────
     {
         const int rowH = s2H + s(8);
-        filterPanelR = { leftX, y, leftW, rowH };
+        filterPanelR = { leftX, y, rowsW, rowH };
         const int rowY  = y + s(4);
         const int ctrlY = rowY + (s2H - ddH) / 2;
         int x = leftX + oscTitleW;
@@ -408,8 +445,18 @@ void VoicePanel::resized()
         fltTypeDropdown.setBounds(x, ctrlY, s(96), ddH);       x += s(96) + gap;
         fltCutKnob.setBounds(x, rowY, s2W, s2H);               x += s2W + s(2);
         fltResKnob.setBounds(x, rowY, s2W, s2H);
-        levelKnob.setBounds(leftRight - s2W - s(6), rowY, s2W, s2H);
+        levelKnob.setBounds(rowsRight - s2W - s(6), rowY, s2W, s2H);
         y += rowH + gap;
+    }
+
+    // ── Insert sub-panel: title band + centred InsertSubsection, spanning both rows.
+    {
+        const int insBottom = y - gap;       // bottom of the Filter row above
+        insertPanelR = { insColX, xmodFilterTop, insColW, insBottom - xmodFilterTop };
+        const int subX = insColX + (insColW - insSubW) / 2;
+        const int subY = xmodFilterTop + insTitleH
+                       + (insertPanelR.getHeight() - insTitleH - insSubH) / 2;
+        insertSub.setBounds(subX, subY, insSubW, insSubH);
     }
 
     // ── Gating designer + Gap (Size 2) + Gater bypass ───────────────────────

@@ -6,6 +6,7 @@
 #include "UI/Components/DropdownSelect.h"
 #include "UI/ChannelHeaderBar.h"
 #include "UI/ModulatorPanel.h"
+#include "UI/Voice/InsertSubsection.h"   // shared mu-core insert panel
 #include "Modulation/MuTantModDest.h"
 #include "UI/GatingDesigner.h"
 
@@ -113,6 +114,13 @@ private:
     KnobWithLabel levelKnob { "Level", MuLookAndFeel::knobLevel };
     std::unique_ptr<APVTS::SliderAttachment> levelAttachment;
 
+    // ── Insert effect (shared mu-core InsertSubsection, "v" prefix) ──────────
+    // Identical UI to mu-clid; rebound to the active voice in setVoice(). Sits in
+    // the voice section: synth engine → insert → mixer (family signal flow).
+    // Constructed in the .cpp init list — needs PluginProcessor's complete type
+    // for the derived→ProcessorBase& conversion (only forward-declared here).
+    InsertSubsection insertSub;
+
     // ── Gating designer + Gap knob + Gater bypass ───────────────────────────
     GatingDesigner   gatingDesigner;
     KnobWithLabel    gapKnob { "Gap", MuLookAndFeel::knobFxSend };
@@ -140,7 +148,7 @@ private:
 
     // Sub-panel geometry — populated by resized(), consumed by paint() for the
     // bordered sub-panels + their titles so layout + decoration stay in sync.
-    juce::Rectangle<int> osc1PanelR, osc2PanelR, modNoisePanelR, filterPanelR, mixerPanelR;
+    juce::Rectangle<int> osc1PanelR, osc2PanelR, modNoisePanelR, filterPanelR, mixerPanelR, insertPanelR;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VoicePanel)
 };
