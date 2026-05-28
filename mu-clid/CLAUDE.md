@@ -47,13 +47,9 @@ The editor shell (TransportBar, About, Save, PresetBrowser, MIDI-preset panels, 
 | [docs/mu-clid/archive/](../docs/mu-clid/archive/) | Closed μ-Clid stage plans + one-shot audits. Read only if revisiting historical decisions. |
 | [docs/mu-clid/design.md](../docs/mu-clid/design.md) | Full original μ-Clid spec — only read if the sub-docs don't cover it |
 
-## Upcoming stages
+## Work tracking
 
-All work below resolves open issues from [backlog.md](../backlog.md). Issues are referenced by number.
-
-| Stage | Status | Scope | Issues |
-|---|---|---|---|
-| _none scheduled_ |  |  |  |
+No stages are scheduled — mu-clid is feature-complete through Stage 34. New work is tracked as numbered issues in [backlog.md](../backlog.md), grouped Open → On Hold → Fixed.
 
 ## mu-clid-specific architectural rules
 

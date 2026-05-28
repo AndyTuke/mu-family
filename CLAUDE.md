@@ -7,7 +7,7 @@ Family-shared guidance for Claude Code working in this monorepo. **Product-speci
 ```
 mu-core/        Shared audio + FX + modulation + mixer UI + ProcessorBase + EditorShellBase (INTERFACE library)
 mu-clid/        Euclidean rhythm sequencer + sample trigger plugin (VST3 + CLAP + Standalone + Lite)
-mu-tant/        Wavetable drone synth — first stab (Standalone only)
+mu-tant/        Wavetable drone synth — 8 voices, mixer, modulators, gate-pattern grid (Standalone, in progress)
 mu-toni/        Scaffolding only — Source/{Plugin,Sequencer,UI,Persistence,License,Tests}/
 docs/           Family-shared design docs; product-specific docs under docs/<product>/
 tests/          Cross-plugin listening-test pipeline
@@ -138,4 +138,4 @@ Knob colour coding, window sizing, and all layout constants are defined in [mu-c
 
 ## Development history
 
-Stages 1–34 are complete. See [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) for the full stage-by-stage log with dates. When a stage is completed, it should be moved to the DevelopmentHistory.md file.
+mu-clid Stages 1–34 are complete; see [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) for the stage-by-stage log. Post-Stage-34 work (the mu-core shell lift, the mu-tant build-out) is tracked as numbered [backlog.md](backlog.md) issues rather than staged — the "stage" framework was mu-clid's v1 roadmap and isn't used for cross-family / mu-tant work. Log every code change as a backlog entry (see Backlog handling).
