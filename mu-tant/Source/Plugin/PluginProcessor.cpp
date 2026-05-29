@@ -2,139 +2,82 @@
 #include "Plugin/PluginEditor.h"
 #include "Audio/Scales.h"
 #include "Modulation/MuTantModDest.h"
+#include "Modulation/ModulatorSerialise.h"   // mu-core: shared modulator (de)serialise
+
+#include <thread>
 
 namespace mu_tant
 {
 
 namespace
 {
-    juce::StringArray rootNames()
+    // Gate-pattern (de)serialise — mu-tant-specific (GatePattern is a mu-tant type).
+    juce::ValueTree serialiseGate(const GatePattern& g)
     {
-        return { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+        juce::ValueTree t("Gate");
+        t.setProperty("subdiv", (int) g.subdivision, nullptr);
+        for (const auto& e : g.envelopes)
+        {
+            juce::ValueTree env("Env");
+            env.setProperty("start", e.startCell,        nullptr);
+            env.setProperty("len",   e.lengthCells,      nullptr);
+            env.setProperty("split", e.split,            nullptr);
+            env.setProperty("atk",   e.attackBend,       nullptr);
+            env.setProperty("dec",   e.decayBend,        nullptr);
+            env.setProperty("rev",   e.reverse ? 1 : 0,  nullptr);
+            t.addChild(env, -1, nullptr);
+        }
+        return t;
     }
-    juce::StringArray scaleNames()
+
+    // Restore a <Gate> tree into `g` (clears + rebuilds). An invalid/absent tree
+    // clears the pattern. Always holds editLock, so it's safe to call without an
+    // outer suspend/voicesLock — an in-flight gate read on the audio thread can't
+    // see a half-rebuilt envelope vector.
+    void deserialiseGate(const juce::ValueTree& t, GatePattern& g)
     {
-        juce::StringArray a;
-        for (const auto& s : kScales) a.add(s.name);
-        return a;
+        const bool valid = t.isValid() && t.getType() == juce::Identifier("Gate");
+
+        while (g.editLock.exchange(true, std::memory_order_acquire))
+            std::this_thread::yield();
+
+        g.envelopes.clear();
+        if (valid)
+        {
+            g.subdivision = (GatePattern::Subdivision)(int)
+                t.getProperty("subdiv", (int) GatePattern::Subdivision::Sixteenth);
+            for (int i = 0; i < t.getNumChildren(); ++i)
+            {
+                auto c = t.getChild(i);
+                if (c.getType() != juce::Identifier("Env")) continue;
+                GateEnvelope e;
+                e.startCell   =        (int)    c.getProperty("start", 0);
+                e.lengthCells = juce::jmax(1, (int) c.getProperty("len", 1));
+                e.split       = (float)(double) c.getProperty("split", 0.0);
+                e.attackBend  = (float)(double) c.getProperty("atk",   0.0);
+                e.decayBend   = (float)(double) c.getProperty("dec",   0.0);
+                e.reverse     =        (int)    c.getProperty("rev", 0) != 0;
+                g.envelopes.push_back(e);
+            }
+        }
+        else
+        {
+            g.subdivision = GatePattern::Subdivision::Sixteenth;
+        }
+        g.resetGateCache();
+        g.editLock.store(false, std::memory_order_release);
     }
 
-    // Build the parameter family for a single voice. Called for v0..v7 so each
-    // voice gets its own independent osc/xmod/filter/level state in the APVTS.
-    void addVoiceParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
-                        int voice)
+    // mu-tant modulation-destination validator (drops assignments to dests this
+    // product doesn't expose; source IDs are ControlSequence ids, left unchecked).
+    bool isValidModDest(const std::string& id)
     {
-        using namespace juce;
-        auto f = [](float lo, float hi, float step) { return NormalisableRange<float>(lo, hi, step); };
-        auto id = [voice](const char* base) {
-            return PluginProcessor::voiceParamId(voice, base);
-        };
-        auto label = [voice](const char* base) {
-            return juce::String("V") + juce::String(voice + 1) + " " + base;
-        };
-
-        // Per-oscillator pitch — all integer-stepped. Octave ±3 offset, Semi
-        // ±12 (scale-degree, see Scales.h), Fine ±100 cents. Wavetable position
-        // is a 0..255 frame index (256-frame Serum/Vital tables).
-        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_oct"),  1}, label("Osc1 Octave"),   -3, 3, 0));
-        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_semi"), 1}, label("Osc1 Semi"),     -12, 12, 0));
-        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_fine"), 1}, label("Osc1 Fine"),     -100, 100, 0));
-        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_pos"),  1}, label("Osc1 Position"), 0, 255, 0));
-        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_oct"),  1}, label("Osc2 Octave"),   -3, 3, 0));
-        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_semi"), 1}, label("Osc2 Semi"),     -12, 12, 2));
-        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_fine"), 1}, label("Osc2 Fine"),     -100, 100, 0));
-        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_pos"),  1}, label("Osc2 Position"), 0, 255, 0));
-
-        // Cross-mod.
-        layout.add(std::make_unique<AudioParameterInt>   (ParameterID{id("xmod"), 1},  label("X-Mod"),      0, 127, 0));
-        layout.add(std::make_unique<AudioParameterChoice>(ParameterID{id("xmode"), 1}, label("X-Mod Mode"), StringArray{ "Off", "FM", "Sync" }, 0));
-
-        // Per-source levels (replace the old osc-balance "mix").
-        layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("o1_lvl"),   1}, label("Osc1 Level"),  f(-60.0f, 6.0f, 0.1f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("o2_lvl"),   1}, label("Osc2 Level"),  f(-60.0f, 6.0f, 0.1f), -6.0f));
-        layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("noise_lvl"),1}, label("Noise Level"), f(-60.0f, 6.0f, 0.1f), -60.0f));
-        layout.add(std::make_unique<AudioParameterChoice>(ParameterID{id("noise_type"),1}, label("Noise Type"), StringArray{ "White", "Pink" }, 0));
-
-        // Filter (mu-core) — match mu-clid's filter feel: cutoff 20..20000 Hz
-        // log-skewed so the dial centre lands on 640 Hz; resonance 0..0.99.
-        // Value formatting lives on the parameter (not the slider) because the
-        // JUCE SliderParameterAttachment overwrites the slider's
-        // textFromValueFunction with one that calls param.getText — so a
-        // slider-side formatter would be clobbered on every voice rebind.
-        NormalisableRange<float> cutoff(20.0f, 20000.0f);
-        cutoff.setSkewForCentre(640.0f);
-        auto cutoffText = [](float v, int) -> String {
-            return v < 1000.0f ? String((int) std::round(v))
-                               : String(v / 1000.0f, 1);
-        };
-        auto resText = [](float v, int) -> String { return String((int) std::round(v * 100.0f)); };
-        layout.add(std::make_unique<AudioParameterInt>  (ParameterID{id("flt_type"), 1}, label("Filter Type"), 0, 15, 0));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_cut"), 1},  label("Cutoff"), cutoff, 8000.0f,
-                    AudioParameterFloatAttributes().withStringFromValueFunction(cutoffText)));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_res"), 1},  label("Resonance"), f(0.0f, 0.99f, 0.001f), 0.2f,
-                    AudioParameterFloatAttributes().withStringFromValueFunction(resText)));
-
-        // Per-voice slot output level — distinct from the mixer fader (engine-level
-        // trim before the channel strip; the mixer adds its own per-channel level
-        // / pan / mute / solo on top, matching the mu-clid signal flow).
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("level"), 1}, label("Level"), f(-60.0f, 6.0f, 0.1f), -6.0f));
-
-        // Gate Gap — percentage of every gate-envelope region forced to silence
-        // at its end, for a cleaner gate. Integer 0..100 %; consumed as /100.
-        auto gapText = [](float v, int) -> String { return String((int) std::round(v)) + " %"; };
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("gate_gap"), 1}, label("Gate Gap"), f(0.0f, 100.0f, 1.0f), 0.0f,
-                    AudioParameterFloatAttributes().withStringFromValueFunction(gapText)));
-
-        // Gater bypass — when on, the gate stage is skipped (raw drone passes,
-        // for audition / configuration).
-        layout.add(std::make_unique<AudioParameterBool>(ParameterID{id("gate_bypass"), 1}, label("Gate Bypass"), false));
-
-        // Insert effect (shared mu-core InsertProcessor) — same schema as mu-clid:
-        // `drvChar` = algorithm 0..(N-1), `insP1..insP4` = generic 0..1 slot params.
-        layout.add(std::make_unique<AudioParameterInt>  (ParameterID{id("drvChar"), 1}, label("Insert Algo"),
-                                                         0, InsertProcessor::kNumInsertAlgos - 1, 0));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("insP1"), 1}, label("Insert P1"), f(0.0f, 1.0f, 0.0f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("insP2"), 1}, label("Insert P2"), f(0.0f, 1.0f, 0.0f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("insP3"), 1}, label("Insert P3"), f(0.0f, 1.0f, 0.0f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("insP4"), 1}, label("Insert P4"), f(0.0f, 1.0f, 0.0f), 0.0f));
+        for (int i = 0; i < kModDestCount; ++i)
+            if (id == kModDestTable[i].id) return true;
+        return false;
     }
 }
 
-juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout()
-{
-    using namespace juce;
-    AudioProcessorValueTreeState::ParameterLayout layout;
-    auto f = [](float lo, float hi, float step) { return NormalisableRange<float>(lo, hi, step); };
-
-    // Shared tonal centre.
-    layout.add(std::make_unique<AudioParameterChoice>(ParameterID{"root",  1}, "Root",  rootNames(),  0));
-    layout.add(std::make_unique<AudioParameterChoice>(ParameterID{"scale", 1}, "Scale", scaleNames(), 0));
-
-    for (int v = 0; v < kMaxVoices; ++v)
-        addVoiceParams(layout, v);
-
-    // ── Mixer channel strips (4 params × 8 channels) — matches the shared
-    //    mu-core MixerChannel binding prefix `ch{N}_`. FX sends (sendEff/Dly/Rev)
-    //    and sidechain params are deliberately omitted until the MixerEngine
-    //    voice-render-callback refactor lets mu-tant route through the shared
-    //    mixer / FX path. Until then the strips' send / sidechain knobs are
-    //    inert (the MixerChannel binding tolerates missing params).
-    for (int i = 0; i < kMaxVoices; ++i)
-    {
-        const String c = "ch" + String(i) + "_";
-        const String n = "Voice " + String(i + 1) + " Ch ";
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"lvl",  1}, n+"Level", f(0.0f, 1.0f, 0.001f), 1.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"pan",  1}, n+"Pan",   f(-1.0f, 1.0f, 0.001f), 0.0f));
-        layout.add(std::make_unique<AudioParameterBool> (ParameterID{c+"mute", 1}, n+"Mute",  false));
-        layout.add(std::make_unique<AudioParameterBool> (ParameterID{c+"solo", 1}, n+"Solo",  false));
-    }
-
-    // ── Master fader ────────────────────────────────────────────────────────
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"mstr_lvl", 1}, "Master Level", f(0.0f, 1.0f, 0.001f), 1.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"mstr_pan", 1}, "Master Pan",   f(-1.0f, 1.0f, 0.001f), 0.0f));
-
-    return layout;
-}
 
 PluginProcessor::PluginProcessor()
     : ProcessorBase(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true),
@@ -148,12 +91,65 @@ PluginProcessor::PluginProcessor()
         voices[(size_t) v]->setBank(&bank);
     }
 
+    cacheParamPointers();        // resolve all APVTS atomics once (audio thread reads these)
+
     // Pre-allocate modParamValues entries once so the audio-thread map
     // never allocates — keys live in static storage (the kModDestTable string
     // literals), making string_view safe for the lifetime of the entries.
     modParamValues.reserve((size_t) kModDestCount);
     for (int i = 0; i < kModDestCount; ++i)
         modParamValues[kModDestTable[i].id] = 0.0f;
+
+    // Render hook for the shared MixerEngine — captures only `this`, so no
+    // per-block std::function construction (which would allocate). The per-block
+    // transport snapshot it reads lives in the blk* members, set in processBlock.
+    renderVoiceCb = [this](int v, juce::AudioBuffer<float>& buf, int n) { renderVoice(v, buf, n); };
+
+    // Mixer + FX state is listener-synced into mixerEngine/fxChain (channel strips,
+    // sends, sidechain, returns, master, FX slots) — mirrors mu-clid. Seed it now
+    // since JUCE doesn't fire parameterChanged on construction.
+    registerFxListeners();
+    syncAllFxParams();
+}
+
+PluginProcessor::~PluginProcessor()
+{
+    for (auto* p : getParameters())
+        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
+        {
+            const juce::String id = rp->getParameterID();
+            if (id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id))
+                apvts.removeParameterListener(id, this);
+        }
+}
+
+void PluginProcessor::registerFxListeners()
+{
+    for (auto* p : getParameters())
+        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
+        {
+            const juce::String id = rp->getParameterID();
+            if (id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id))
+                apvts.addParameterListener(id, this);
+        }
+}
+
+void PluginProcessor::syncAllFxParams()
+{
+    for (auto* p : getParameters())
+        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
+        {
+            const juce::String id = rp->getParameterID();
+            if (id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id))
+                if (auto* a = apvts.getRawParameterValue(id))
+                    syncGlobalFxParam(id, a->load());
+        }
+}
+
+void PluginProcessor::parameterChanged(const juce::String& id, float v)
+{
+    if (id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id))
+        syncGlobalFxParam(id, v);
 }
 
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -162,49 +158,61 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     for (auto& v : voices)
         if (v) v->prepare(sampleRate, samplesPerBlock);
 
-    // Pre-allocate per-voice render scratch so processBlock never allocates.
-    for (auto& buf : voiceBuffers)
-        buf.setSize(2, samplesPerBlock, false, true, true);
-
     for (auto& ins : inserts)
         ins.prepare(sampleRate, samplesPerBlock);
 
     mixerEngine.prepare(sampleRate, samplesPerBlock);
+    fxChain.prepare(sampleRate, samplesPerBlock);   // shared Effect/Delay/Reverb rack
+}
+
+void PluginProcessor::cacheParamPointers()
+{
+    auto P = [this](const juce::String& id) { return apvts.getRawParameterValue(id); };
+    globalPtrs.root    = P("root");
+    globalPtrs.scale   = P("scale");
+
+    for (int v = 0; v < kMaxVoices; ++v)
+    {
+        auto vid = [v](const char* base) { return voiceParamId(v, base); };
+        auto& p = voicePtrs[(size_t) v];
+        p.o1Oct  = P(vid("o1_oct"));  p.o1Semi = P(vid("o1_semi")); p.o1Fine = P(vid("o1_fine")); p.o1Pos = P(vid("o1_pos"));
+        p.o2Oct  = P(vid("o2_oct"));  p.o2Semi = P(vid("o2_semi")); p.o2Fine = P(vid("o2_fine")); p.o2Pos = P(vid("o2_pos"));
+        p.xmod   = P(vid("xmod"));    p.xmode  = P(vid("xmode"));
+        p.o1Lvl  = P(vid("o1_lvl"));  p.o2Lvl  = P(vid("o2_lvl"));  p.noiseLvl = P(vid("noise_lvl")); p.noiseType = P(vid("noise_type"));
+        p.fltType= P(vid("flt_type"));p.fltCut = P(vid("flt_cut")); p.fltRes = P(vid("flt_res"));
+        p.level  = P(vid("level"));
+        p.gateGap= P(vid("gate_gap"));p.gateBypass = P(vid("gate_bypass"));
+        p.drvChar= P(vid("drvChar")); p.insP1  = P(vid("insP1")); p.insP2 = P(vid("insP2")); p.insP3 = P(vid("insP3")); p.insP4 = P(vid("insP4"));
+    }
 }
 
 VoiceConfig PluginProcessor::readConfig(int voiceIdx) const
 {
-    auto raw = [this](const juce::String& id) {
-        return apvts.getRawParameterValue(id)->load();
-    };
-    auto vid = [voiceIdx](const char* base) {
-        return voiceParamId(voiceIdx, base);
-    };
-
+    const auto& p = voicePtrs[(size_t) voiceIdx];
     VoiceConfig c;
     // Tonal centre is global.
-    c.root         = (int) raw("root");
-    c.scaleIdx     = (int) raw("scale");
+    c.root         = (int) globalPtrs.root->load();
+    c.scaleIdx     = (int) globalPtrs.scale->load();
     // Per-voice osc pitch (integer) + position.
-    c.osc1Octave   = (int) raw(vid("o1_oct"));
-    c.osc1Semi     = (int) raw(vid("o1_semi"));
-    c.osc1Fine     = (int) raw(vid("o1_fine"));
-    c.osc1Pos      = raw(vid("o1_pos"));
-    c.osc2Octave   = (int) raw(vid("o2_oct"));
-    c.osc2Semi     = (int) raw(vid("o2_semi"));
-    c.osc2Fine     = (int) raw(vid("o2_fine"));
-    c.osc2Pos      = raw(vid("o2_pos"));
-    c.xmod         = (int) raw(vid("xmod"));
-    c.xmodMode     = (int) raw(vid("xmode"));
+    c.osc1Octave   = (int) p.o1Oct->load();
+    c.osc1Semi     = (int) p.o1Semi->load();
+    c.osc1Fine     = (int) p.o1Fine->load();
+    c.osc1Pos      = p.o1Pos->load();
+    c.osc2Octave   = (int) p.o2Oct->load();
+    c.osc2Semi     = (int) p.o2Semi->load();
+    c.osc2Fine     = (int) p.o2Fine->load();
+    c.osc2Pos      = p.o2Pos->load();
+    c.xmod         = (int) p.xmod->load();
+    c.xmodMode     = (int) p.xmode->load();
     // Per-source levels.
-    c.osc1LevelDb  = raw(vid("o1_lvl"));
-    c.osc2LevelDb  = raw(vid("o2_lvl"));
-    c.noiseLevelDb = raw(vid("noise_lvl"));
-    c.noiseType    = (int) raw(vid("noise_type"));
-    c.filterType   = (int) raw(vid("flt_type"));
-    c.filterCutoff = raw(vid("flt_cut"));
-    c.filterRes    = raw(vid("flt_res"));
-    c.levelDb      = raw(vid("level"));
+    c.osc1LevelDb  = p.o1Lvl->load();
+    c.osc2LevelDb  = p.o2Lvl->load();
+    c.noiseLevelDb = p.noiseLvl->load();
+    c.noiseType    = (int) p.noiseType->load();
+    c.filterType   = (int) p.fltType->load();
+    c.filterCutoff = p.fltCut->load();
+    c.filterRes    = p.fltRes->load();
+    c.levelDb      = p.level->load();
     return c;
 }
 
@@ -223,141 +231,140 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 
     const int numActiveVoices = numVoices.load(std::memory_order_relaxed);
 
-    // Transport snapshot for this block. Beat advances only while playing; when
-    // stopped the gate is held fully open so the oscillators stay auditionable.
-    const bool   isPlaying     = playing.load(std::memory_order_relaxed);
-    const double beatStart     = internalBeatPos.load(std::memory_order_relaxed);
-    const double beatsPerSample = (internalBpm / 60.0) / currentSampleRate;
+    // Per-block transport snapshot for the render hook (audio-thread-only members,
+    // read by renderVoice within this same call). Beat advances only while playing;
+    // when stopped the gate is held open so the oscillators stay auditionable.
+    blkPlaying        = playing.load(std::memory_order_relaxed);
+    blkBeatStart      = internalBeatPos.load(std::memory_order_relaxed);
+    const double bpm  = internalBpm.load(std::memory_order_relaxed);   // snapshot once for this block
+    blkBeatsPerSample = (bpm / 60.0) / currentSampleRate;
 
-    // Read mixer state directly from APVTS — keeps the channel-strip UI as the
-    // single source of truth (no parameter-listener push into a separate engine
-    // struct). Solo wins over mute, matching mu-clid's mixer convention.
-    auto raw = [this](const juce::String& id) {
-        return apvts.getRawParameterValue(id)->load();
-    };
-    auto chId = [](int i, const char* base) {
-        return juce::String("ch") + juce::String(i) + "_" + base;
-    };
+    // Channel-strip + master + FX state lives in mixerEngine/fxChain, kept in sync
+    // by the parameterChanged listener (see syncGlobalFxParam) — no per-block push.
 
-    bool anySolo = false;
-    for (int v = 0; v < numActiveVoices; ++v)
-        if (raw(chId(v, "solo")) > 0.5f) { anySolo = true; break; }
-
-    for (int v = 0; v < numActiveVoices; ++v)
-    {
-        const bool muted   = raw(chId(v, "mute")) > 0.5f;
-        const bool soloed  = raw(chId(v, "solo")) > 0.5f;
-        const bool audible = anySolo ? soloed : !muted;
-        if (!audible) continue;
-
-        const float level = raw(chId(v, "lvl"));
-        const float pan   = juce::jlimit(-1.0f, 1.0f, raw(chId(v, "pan")));
-
-        // Modulation pass — seed paramValues from the current APVTS-derived
-        // config, then let this voice's matrix overwrite any modulated keys.
-        // The matrix is empty for voices the user hasn't assigned, so this
-        // collapses to a no-op + the seeded values pass through unchanged.
-        VoiceConfig cfg = readConfig(v);
-        modParamValues["osc1.octave"]      = (float) cfg.osc1Octave;
-        modParamValues["osc1.semi"]        = (float) cfg.osc1Semi;
-        modParamValues["osc1.fine"]        = (float) cfg.osc1Fine;
-        modParamValues["osc1.pos"]         = cfg.osc1Pos;
-        modParamValues["osc2.octave"]      = (float) cfg.osc2Octave;
-        modParamValues["osc2.semi"]        = (float) cfg.osc2Semi;
-        modParamValues["osc2.fine"]        = (float) cfg.osc2Fine;
-        modParamValues["osc2.pos"]         = cfg.osc2Pos;
-        modParamValues["xmod"]             = (float) cfg.xmod;
-        modParamValues["osc1.level"]       = cfg.osc1LevelDb;
-        modParamValues["osc2.level"]       = cfg.osc2LevelDb;
-        modParamValues["noise.level"]      = cfg.noiseLevelDb;
-        modParamValues["filter.cutoff"]    = cfg.filterCutoff;
-        modParamValues["filter.resonance"] = cfg.filterRes;
-        modParamValues["level"]            = cfg.levelDb;
-
-        // tryLock-equivalent: ModulationMatrix mutations on the message thread
-        // hold modLock; on contention we skip the modulation pass this block
-        // (the voice still plays with un-modulated config).
-        auto& slot = voiceSlots[(size_t) v];
-        bool expected = false;
-        if (slot.modLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
-        {
-            slot.modulationMatrix.process(slot.controlSequences, beatStart, modParamValues);
-            slot.modLock.store(false, std::memory_order_release);
-
-            // Read modulated values back into the config.
-            cfg.osc1Octave   = (int) modParamValues["osc1.octave"];
-            cfg.osc1Semi     = (int) modParamValues["osc1.semi"];
-            cfg.osc1Fine     = (int) modParamValues["osc1.fine"];
-            cfg.osc1Pos      = modParamValues["osc1.pos"];
-            cfg.osc2Octave   = (int) modParamValues["osc2.octave"];
-            cfg.osc2Semi     = (int) modParamValues["osc2.semi"];
-            cfg.osc2Fine     = (int) modParamValues["osc2.fine"];
-            cfg.osc2Pos      = modParamValues["osc2.pos"];
-            cfg.xmod         = (int) modParamValues["xmod"];
-            cfg.osc1LevelDb  = modParamValues["osc1.level"];
-            cfg.osc2LevelDb  = modParamValues["osc2.level"];
-            cfg.noiseLevelDb = modParamValues["noise.level"];
-            cfg.filterCutoff = modParamValues["filter.cutoff"];
-            cfg.filterRes    = modParamValues["filter.resonance"];
-            cfg.levelDb      = modParamValues["level"];
-        }
-
-        auto& voiceBuf = voiceBuffers[(size_t) v];
-        voiceBuf.clear();
-        voices[(size_t) v]->setConfig(cfg);
-        voices[(size_t) v]->process(voiceBuf, numSamples);
-
-        // ── Gate stage ────────────────────────────────────────────────────────
-        // The per-voice gater shapes the (post-filter) voice output:
-        //   bypassed             → raw drone passes (audition / configure)
-        //   stopped              → silence (gate closed — nothing audible on load)
-        //   playing, no envelopes→ silence (nothing drawn → nothing passes)
-        //   playing, envelopes   → per-sample envelope gate
-        // See applyGateBlock — the audio path + the audio test harness share it.
-        auto& pattern = gatePatterns[(size_t) v];
-        const float gateGap    = raw(voiceParamId(v, "gate_gap")) * 0.01f;   // 0..100% → 0..1
-        const bool  gateBypass = raw(voiceParamId(v, "gate_bypass")) > 0.5f;
-        float* gl = voiceBuf.getWritePointer(0);
-        float* gr = voiceBuf.getNumChannels() > 1 ? voiceBuf.getWritePointer(1) : nullptr;
-        applyGateBlock(pattern, gl, gr, numSamples, gateGap, gateBypass, isPlaying,
-                       beatStart, beatsPerSample);
-
-        // ── Insert effect ───────────────────────────────────────────────────
-        // Shared mu-core InsertProcessor, post-gate: engine → insert → mixer
-        // (the family-wide signal flow). Algo 0 (None) is a passthrough.
-        {
-            VoiceParams ip;
-            ip.insertAlgo     = (int) raw(voiceParamId(v, "drvChar"));
-            ip.insertParam[0] = raw(voiceParamId(v, "insP1"));
-            ip.insertParam[1] = raw(voiceParamId(v, "insP2"));
-            ip.insertParam[2] = raw(voiceParamId(v, "insP3"));
-            ip.insertParam[3] = raw(voiceParamId(v, "insP4"));
-            inserts[(size_t) v].process(voiceBuf, numSamples, voiceBuf.getNumChannels(), ip);
-        }
-
-        // Equal-power constant-power pan, matching MixerEngine::applyPanGain.
-        const float angle = (pan + 1.0f) * 0.25f * juce::MathConstants<float>::pi;
-        const float gainL = level * std::cos(angle);
-        const float gainR = level * std::sin(angle);
-
-        buffer.addFrom(0, 0, voiceBuf, 0, 0, numSamples, gainL);
-        buffer.addFrom(1, 0, voiceBuf, 1, 0, numSamples, gainR);
-    }
-
-    // Master fader.
-    buffer.applyGain(raw("mstr_lvl"));
+    // Render → gate → insert → mixer through the shared path (engine→insert→mixer,
+    // the family-wide signal flow). The render hook fills each channel buffer; the
+    // mixer owns the strip/master mix, so the VU meters (channelPeaks) now update.
+    processCoreBlock(buffer, nullptr, numActiveVoices, numSamples, bpm,
+                     nullptr, nullptr, nullptr, &renderVoiceCb);
 
     // Advance the transport beat only while playing. Wrap at the 2-bar pattern
     // length (8 beats in 4/4) so the gate + the gating-grid playhead loop cleanly
     // and floating-point precision never drifts. Modulators evaluate against the
     // same wrapped position.
-    if (isPlaying)
+    if (blkPlaying)
     {
-        double pos = beatStart + beatsPerSample * (double) numSamples;
+        double pos = blkBeatStart + blkBeatsPerSample * (double) numSamples;
         const double patBeats = (double) GatePattern::kTotalBars * 4.0;   // 8 beats
         if (pos >= patBeats) pos -= patBeats;
         internalBeatPos.store(pos, std::memory_order_relaxed);
     }
+}
+
+// One voice's full chain into the channel buffer: modulation → engine → gate →
+// insert. Invoked by MixerEngine::processBlock (Phase 1) per active channel; the
+// mixer then applies the channel strip + master. Renders even muted/un-soloed
+// voices (the mixer mutes at the mix), matching mu-clid's render-then-mute model.
+void PluginProcessor::renderVoice(int v, juce::AudioBuffer<float>& buf, int numSamples)
+{
+    const auto& vp = voicePtrs[(size_t) v];
+
+    // Modulation pass — seed paramValues from the current APVTS-derived config,
+    // then let this voice's matrix overwrite any modulated keys. The matrix is
+    // empty for voices the user hasn't assigned, so this collapses to a no-op.
+    VoiceConfig cfg = readConfig(v);
+    modParamValues["osc1.octave"]      = (float) cfg.osc1Octave;
+    modParamValues["osc1.semi"]        = (float) cfg.osc1Semi;
+    modParamValues["osc1.fine"]        = (float) cfg.osc1Fine;
+    modParamValues["osc1.pos"]         = cfg.osc1Pos;
+    modParamValues["osc2.octave"]      = (float) cfg.osc2Octave;
+    modParamValues["osc2.semi"]        = (float) cfg.osc2Semi;
+    modParamValues["osc2.fine"]        = (float) cfg.osc2Fine;
+    modParamValues["osc2.pos"]         = cfg.osc2Pos;
+    modParamValues["xmod"]             = (float) cfg.xmod;
+    modParamValues["osc1.level"]       = cfg.osc1LevelDb;
+    modParamValues["osc2.level"]       = cfg.osc2LevelDb;
+    modParamValues["noise.level"]      = cfg.noiseLevelDb;
+    modParamValues["filter.cutoff"]    = cfg.filterCutoff;
+    modParamValues["filter.resonance"] = cfg.filterRes;
+    modParamValues["level"]            = cfg.levelDb;
+
+    // tryLock-equivalent: ModulationMatrix mutations on the message thread hold
+    // modLock; on contention we skip the modulation pass this block (the voice
+    // still plays with un-modulated config).
+    auto& slot = voiceSlots[(size_t) v];
+    bool expected = false;
+    if (slot.modLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+    {
+        slot.modulationMatrix.process(slot.controlSequences, blkBeatStart, modParamValues);
+        slot.modLock.store(false, std::memory_order_release);
+
+        // Publish post-matrix values for the UI live-arc indicators.
+        auto& snap = voiceSnap[(size_t) v];
+        snap[mu_tant::kTantSnapOsc1Octave] .store(modParamValues["osc1.octave"]);
+        snap[mu_tant::kTantSnapOsc1Semi]   .store(modParamValues["osc1.semi"]);
+        snap[mu_tant::kTantSnapOsc1Fine]   .store(modParamValues["osc1.fine"]);
+        snap[mu_tant::kTantSnapOsc1Pos]    .store(modParamValues["osc1.pos"]);
+        snap[mu_tant::kTantSnapOsc2Octave] .store(modParamValues["osc2.octave"]);
+        snap[mu_tant::kTantSnapOsc2Semi]   .store(modParamValues["osc2.semi"]);
+        snap[mu_tant::kTantSnapOsc2Fine]   .store(modParamValues["osc2.fine"]);
+        snap[mu_tant::kTantSnapOsc2Pos]    .store(modParamValues["osc2.pos"]);
+        snap[mu_tant::kTantSnapXMod]       .store(modParamValues["xmod"]);
+        snap[mu_tant::kTantSnapOsc1Level]  .store(modParamValues["osc1.level"]);
+        snap[mu_tant::kTantSnapOsc2Level]  .store(modParamValues["osc2.level"]);
+        snap[mu_tant::kTantSnapNoiseLevel] .store(modParamValues["noise.level"]);
+        snap[mu_tant::kTantSnapFilterCutoff].store(modParamValues["filter.cutoff"]);
+        snap[mu_tant::kTantSnapFilterRes]  .store(modParamValues["filter.resonance"]);
+        snap[mu_tant::kTantSnapLevel]      .store(modParamValues["level"]);
+
+        cfg.osc1Octave   = (int) modParamValues["osc1.octave"];
+        cfg.osc1Semi     = (int) modParamValues["osc1.semi"];
+        cfg.osc1Fine     = (int) modParamValues["osc1.fine"];
+        cfg.osc1Pos      = modParamValues["osc1.pos"];
+        cfg.osc2Octave   = (int) modParamValues["osc2.octave"];
+        cfg.osc2Semi     = (int) modParamValues["osc2.semi"];
+        cfg.osc2Fine     = (int) modParamValues["osc2.fine"];
+        cfg.osc2Pos      = modParamValues["osc2.pos"];
+        cfg.xmod         = (int) modParamValues["xmod"];
+        cfg.osc1LevelDb  = modParamValues["osc1.level"];
+        cfg.osc2LevelDb  = modParamValues["osc2.level"];
+        cfg.noiseLevelDb = modParamValues["noise.level"];
+        cfg.filterCutoff = modParamValues["filter.cutoff"];
+        cfg.filterRes    = modParamValues["filter.resonance"];
+        cfg.levelDb      = modParamValues["level"];
+    }
+
+    buf.clear();
+    voices[(size_t) v]->setConfig(cfg);
+    voices[(size_t) v]->process(buf, numSamples);
+
+    // ── Gate stage ────────────────────────────────────────────────────────────
+    // The per-voice gater shapes the (post-filter) voice output:
+    //   bypassed             → raw drone passes (audition / configure)
+    //   stopped              → silence (gate closed — nothing audible on load)
+    //   playing, no envelopes→ silence (nothing drawn → nothing passes)
+    //   playing, envelopes   → per-sample envelope gate
+    // See applyGateBlock — the audio path + the audio test harness share it.
+    auto& pattern = gatePatterns[(size_t) v];
+    const float gateGap    = vp.gateGap->load() * 0.01f;   // 0..100% → 0..1
+    const bool  gateBypass = vp.gateBypass->load() > 0.5f;
+    float* gl = buf.getWritePointer(0);
+    float* gr = buf.getNumChannels() > 1 ? buf.getWritePointer(1) : nullptr;
+    applyGateBlock(pattern, gl, gr, numSamples, gateGap, gateBypass, blkPlaying,
+                   blkBeatStart, blkBeatsPerSample, currentSampleRate);
+
+    // ── Insert effect ───────────────────────────────────────────────────────
+    // Shared mu-core InsertProcessor, post-gate. Algo 0 (None) is a passthrough.
+    VoiceParams ip;
+    ip.insertAlgo     = (int) vp.drvChar->load();
+    ip.insertParam[0] = vp.insP1->load();
+    ip.insertParam[1] = vp.insP2->load();
+    ip.insertParam[2] = vp.insP3->load();
+    ip.insertParam[3] = vp.insP4->load();
+    inserts[(size_t) v].process(buf, numSamples, buf.getNumChannels(), ip);
+
+    // Feed the sidebar spectrum glyph — capture post-insert audio on the audio thread.
+    voiceRingBuffers[(size_t) v].write(buf, numSamples);
 }
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()
@@ -369,6 +376,7 @@ void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     apvts.state.setProperty("numVoices", numVoices.load(), nullptr);
     apvts.state.setProperty("voiceColours", serialiseVoiceColours(), nullptr);
+    writeVoiceDataToState();
     if (auto xml = apvts.copyState().createXml())
         copyXmlToBinary(*xml, destData);
 }
@@ -381,6 +389,8 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
         apvts.replaceState(juce::ValueTree::fromXml(*xml));
         numVoices.store(juce::jlimit(1, kMaxVoices, (int) apvts.state.getProperty("numVoices", 1)));
         restoreVoiceColours(apvts.state.getProperty("voiceColours", "").toString());
+        readVoiceDataFromState();
+        syncAllFxParams();   // re-seed mixer/FX engine state (unchanged values skip listeners)
     }
 }
 
@@ -496,6 +506,14 @@ void PluginProcessor::saveVoicePreset(int voice, const juce::String& name)
                 e->setAttribute("v", (double) rp->getValue());         // normalised 0..1
             }
         }
+
+    // Modulators + gate live outside APVTS — serialise them alongside the params
+    // so a .muPattern carries the whole voice (matches the full-preset path).
+    if (auto mods = mu_pp::serialiseModulators(voiceSlots[(size_t) voice]).createXml())
+        root.addChildElement(mods.release());
+    if (auto gate = serialiseGate(gatePatterns[(size_t) voice]).createXml())
+        root.addChildElement(gate.release());
+
     root.writeTo(dir.getChildFile(safe + "." + getPerSlotPresetExtension()));
 }
 
@@ -513,6 +531,16 @@ void PluginProcessor::loadVoicePreset(int voice, const juce::File& file)
         if (e->hasTagName("p"))
             if (auto* p = apvts.getParameter(prefix + e->getStringAttribute("id")))
                 p->setValueNotifyingHost((float) e->getDoubleAttribute("v"));
+
+    // Restore this voice's modulators + gate (per-voice spinlocks inside guard the
+    // audio thread, so no suspend/voicesLock needed). Absent children → cleared.
+    mu_pp::clearModulators(voiceSlots[(size_t) voice]);
+    auto* modsXml = xml->getChildByName("Modulators");
+    mu_pp::deserialiseModulators(modsXml ? juce::ValueTree::fromXml(*modsXml) : juce::ValueTree{},
+                                 voiceSlots[(size_t) voice], {}, isValidModDest);
+    auto* gateXml = xml->getChildByName("Gate");
+    deserialiseGate(gateXml ? juce::ValueTree::fromXml(*gateXml) : juce::ValueTree{},
+                    gatePatterns[(size_t) voice]);
 }
 
 void PluginProcessor::copyVoiceParams(int src, int dst)
@@ -546,6 +574,50 @@ void PluginProcessor::restoreVoiceColours(const juce::String& csv)
     const auto toks = juce::StringArray::fromTokens(csv, ",", "");
     for (int i = 0; i < kMaxVoices && i < toks.size(); ++i)
         voiceColourIndex[(size_t) i] = juce::jlimit(0, kMaxVoices - 1, toks[i].getIntValue());
+}
+
+void PluginProcessor::writeVoiceDataToState()
+{
+    // Rebuild a fresh <VoiceData> child (drop any stale one) holding each active
+    // voice's modulators + gate, so apvts.copyState() carries them into the file.
+    apvts.state.removeChild(apvts.state.getChildWithName("VoiceData"), nullptr);
+
+    juce::ValueTree vd("VoiceData");
+    const int n = numVoices.load();
+    for (int v = 0; v < n; ++v)
+    {
+        juce::ValueTree voice("Voice");
+        voice.setProperty("idx", v, nullptr);
+        voice.addChild(mu_pp::serialiseModulators(voiceSlots[(size_t) v]), -1, nullptr);
+        voice.addChild(serialiseGate(gatePatterns[(size_t) v]),            -1, nullptr);
+        vd.addChild(voice, -1, nullptr);
+    }
+    apvts.state.addChild(vd, -1, nullptr);
+}
+
+void PluginProcessor::readVoiceDataFromState()
+{
+    // Clear the active voices first so loading a preset without <VoiceData> (older
+    // or foreign) yields a clean slate rather than stale modulators / gates.
+    auto vd = apvts.state.getChildWithName("VoiceData");
+
+    // Clear then restore each active voice. clearModulators is required because
+    // deserialiseModulators accumulates assignments; deserialiseGate self-clears.
+    // An absent <VoiceData> (older / foreign preset) leaves every voice cleared.
+    const int n = numVoices.load();
+    for (int v = 0; v < n; ++v)
+    {
+        mu_pp::clearModulators(voiceSlots[(size_t) v]);
+        juce::ValueTree voice;
+        for (int i = 0; i < vd.getNumChildren(); ++i)
+            if (vd.getChild(i).getType() == juce::Identifier("Voice")
+                && (int) vd.getChild(i).getProperty("idx", -1) == v)
+            { voice = vd.getChild(i); break; }
+
+        mu_pp::deserialiseModulators(voice.getChildWithName("Modulators"),
+                                     voiceSlots[(size_t) v], {}, isValidModDest);
+        deserialiseGate(voice.getChildWithName("Gate"), gatePatterns[(size_t) v]);
+    }
 }
 
 void PluginProcessor::resetVoiceSlot(int idx)
@@ -592,6 +664,7 @@ void PluginProcessor::savePreset(const juce::String& name, const juce::String& d
     root.setAttribute("category", category);
     apvts.state.setProperty("numVoices", numVoices.load(), nullptr);
     apvts.state.setProperty("voiceColours", serialiseVoiceColours(), nullptr);
+    writeVoiceDataToState();
     if (auto state = apvts.copyState().createXml())
         root.addChildElement(state.release());
 
@@ -619,12 +692,15 @@ void PluginProcessor::loadPreset(const juce::File& file)
         return;
     }
 
-    // Swap the tree off the audio thread.
-    suspendProcessing(true);
+    // Swap the tree under voicesLock — the audio thread tryLocks it in
+    // processBlock and outputs a silent block on contention, so the swap is
+    // exclusive. Same guard as setStateInformation (one mechanism, not two).
+    const juce::ScopedLock sl(voicesLock);
     apvts.replaceState(juce::ValueTree::fromXml(*stateXml));
     numVoices.store(juce::jlimit(1, kMaxVoices, (int) apvts.state.getProperty("numVoices", 1)));
     restoreVoiceColours(apvts.state.getProperty("voiceColours", "").toString());
-    suspendProcessing(false);
+    readVoiceDataFromState();
+    syncAllFxParams();   // re-seed mixer/FX engine state (unchanged values skip listeners)
 }
 
 juce::StringArray PluginProcessor::loadCategoryList() const

@@ -1,11 +1,14 @@
 #pragma once
 
 #include "Plugin/ProcessorBase.h"            // mu-core base
+#include "Plugin/MixerFxParams.h"            // mu-core: shared global-FX/mixer APVTS layout
 #include "Sequencer/VoiceSlot.h"             // mu-core: per-voice modulator data container
 #include "Sequencer/GatePattern.h"           // mu-tant: per-voice gate pattern
 #include "Audio/SynthVoice.h"                // mu-tant voice
 #include "Audio/WavetableBank.h"
 #include "Audio/InsertProcessor.h"           // mu-core: shared per-voice insert FX
+
+#include "Modulation/MuTantModSnap.h"
 
 #include <array>
 #include <atomic>
@@ -25,14 +28,58 @@
 namespace mu_tant
 {
 
-class PluginProcessor : public ProcessorBase
+// Lock-free audio-to-UI ring buffer — written by the audio thread in renderVoice()
+// after the insert, read by VoiceSpectrumGlyph at 30 Hz to drive the sidebar animation.
+// kSize must be a power of 2 (enables fast bit-mask indexing).
+struct VoiceRingBuffer
+{
+    static constexpr int kSize = 1024;   // ~21 ms at 48 kHz
+
+    // Audio thread: mono-mix buf and append n frames.
+    void write(const juce::AudioBuffer<float>& buf, int n) noexcept
+    {
+        const int nCh  = buf.getNumChannels();
+        const float sc = nCh > 0 ? 1.0f / (float) nCh : 0.0f;
+        int head = writeHead.load(std::memory_order_relaxed);
+        for (int i = 0; i < n; ++i)
+        {
+            float s = 0.0f;
+            for (int c = 0; c < nCh; ++c)
+                s += buf.getSample(c, i);
+            data[(size_t)(head & (kSize - 1))] = s * sc;
+            ++head;
+        }
+        writeHead.store(head, std::memory_order_release);
+    }
+
+    // UI thread: copy the most-recent n samples into out[].
+    void read(float* out, int n) const noexcept
+    {
+        const int head  = writeHead.load(std::memory_order_acquire);
+        const int start = head - n;
+        for (int i = 0; i < n; ++i)
+            out[i] = data[(size_t)((start + i) & (kSize - 1))];
+    }
+
+    std::array<float, kSize> data {};
+    std::atomic<int>         writeHead { 0 };
+};
+
+class PluginProcessor : public ProcessorBase,
+                        public juce::AudioProcessorValueTreeState::Listener
 {
 public:
     // Family parity with mu-clid (max 8 rhythms / 8 voices / 8 channels).
     static constexpr int kMaxVoices = 8;
 
     PluginProcessor();
-    ~PluginProcessor() override = default;
+    ~PluginProcessor() override;
+
+    // Mixer / FX params (channel strips + global FX) drive mixerEngine + fxChain
+    // via the shared ProcessorBase::syncGlobalFxParam, kept in sync by this
+    // listener (mirrors mu-clid). Voice-engine params (v{N}_*) are read per-block
+    // via cached pointers instead, so they're not listened to here.
+    void parameterChanged(const juce::String& id, float v) override;
 
     // ── AudioProcessor ───────────────────────────────────────────────────────
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
@@ -69,8 +116,8 @@ public:
         playing.store(now, std::memory_order_relaxed);
         if (!now) internalBeatPos.store(0.0, std::memory_order_relaxed);
     }
-    double getInternalBpm()     const override { return internalBpm; }
-    void   setInternalBpm(double bpm) override { internalBpm = juce::jlimit(20.0, 300.0, bpm); }
+    double getInternalBpm()     const override { return internalBpm.load(std::memory_order_relaxed); }
+    void   setInternalBpm(double bpm) override { internalBpm.store(juce::jlimit(20.0, 300.0, bpm), std::memory_order_relaxed); }
     double getInternalBeatPos() const override { return internalBeatPos.load(std::memory_order_relaxed); }
 
     // ── ProcessorBase channel metadata ───────────────────────────────────────
@@ -133,6 +180,11 @@ public:
         return juce::String("v") + juce::String(voice) + "_" + base;
     }
 
+    // The APVTS layout factory (defined in PluginProcessor_APVTS.cpp). Public so
+    // the layout test can exercise the real param set without constructing the
+    // processor — pure static factory, no state. See #721.
+    static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
     // GR-meter source for the shared InsertSubsection (Compressor / Limiter P2).
     // Points at the per-voice insert's atomic reduction value; null when oob.
     const std::atomic<float>* getInsertGRPtr(int voice) const noexcept
@@ -141,19 +193,51 @@ public:
         return &inserts[(size_t) voice].grReduction;
     }
 
+    // Modulation snapshot accessor for VoicePanel knob live-arc indicators.
+    float getTantSnap(int voice, int snapIdx) const noexcept
+    {
+        if (voice < 0 || voice >= kMaxVoices) return 0.0f;
+        return voiceSnap[(size_t) voice][(size_t) snapIdx].load();
+    }
+
 protected:
     // MIDI program-change apply hooks — stubbed in the first stab (no preset I/O yet).
     void applyMidiPresetSlot(int, const juce::File&) override {}
     void applyFullMidiPreset(const juce::File&)      override {}
 
 private:
-    static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     VoiceConfig readConfig(int voiceIdx) const;
+
+    // Cached APVTS atomic pointers. The pointers returned by getRawParameterValue
+    // are stable for the processor's lifetime (replaceState changes values, not
+    // the parameter objects), so we resolve them once in the constructor and read
+    // them in processBlock — never rebuilding juce::String IDs on the audio thread.
+    struct VoicePtrs
+    {
+        std::atomic<float> *o1Oct, *o1Semi, *o1Fine, *o1Pos;
+        std::atomic<float> *o2Oct, *o2Semi, *o2Fine, *o2Pos;
+        std::atomic<float> *xmod, *xmode;
+        std::atomic<float> *o1Lvl, *o2Lvl, *noiseLvl, *noiseType;
+        std::atomic<float> *fltType, *fltCut, *fltRes;
+        std::atomic<float> *level, *gateGap, *gateBypass;
+        std::atomic<float> *drvChar, *insP1, *insP2, *insP3, *insP4;
+    };
+    std::array<VoicePtrs, kMaxVoices> voicePtrs {};
+    struct GlobalPtrs { std::atomic<float> *root, *scale; } globalPtrs {};
+    void cacheParamPointers();
+
+    // Per-channel render hook handed to the shared MixerEngine: runs one voice's
+    // modulation → engine → gate → insert into the channel buffer (engine→insert→
+    // mixer). Captures only `this`; the per-block transport snapshot it reads lives
+    // in the blk* members below, set at the top of processBlock (same thread).
+    MixerEngine::RenderChannelFn renderVoiceCb;
+    void   renderVoice(int voiceIdx, juce::AudioBuffer<float>& buf, int numSamples);
+    bool   blkPlaying        = false;
+    double blkBeatStart      = 0.0;
+    double blkBeatsPerSample = 0.0;
 
     WavetableBank                                          bank;
     std::array<std::unique_ptr<VoiceEngine>, kMaxVoices>   voices;
-    // Per-voice render scratch — allocated in prepareToPlay; reused each block.
-    std::array<juce::AudioBuffer<float>,     kMaxVoices>   voiceBuffers;
     // Per-voice insert effect (shared mu-core InsertProcessor) — runs after the
     // gate, before the pan/sum into the mixer (engine → insert → mixer, the
     // family-wide signal flow). Mirrors mu-clid's per-rhythm insert.
@@ -170,7 +254,17 @@ public:
     // doesn't yet apply the gate.
     std::array<GatePattern, kMaxVoices> gatePatterns;
 
+    // Per-voice post-insert audio ring buffers — written by the audio thread in
+    // renderVoice() after the insert; read by VoiceSpectrumGlyph at 30 Hz for
+    // the sidebar spectrum animation.
+    std::array<VoiceRingBuffer, kMaxVoices> voiceRingBuffers;
+
 private:
+    // Per-voice modulated-value snapshots — written by the audio thread in
+    // renderVoice() after the matrix runs; read by VoicePanel at ~30 Hz via
+    // getTantSnap() to drive live-arc indicators on bound knobs.
+    std::array<std::atomic<float>, mu_tant::kTantSnapCount> voiceSnap[kMaxVoices];
+
     // Pre-allocated modulation paramValues map — reused every block to avoid
     // audio-thread allocation. Keys match the strings in MuTantModDest::kModDestTable.
     // Values are seeded each block from the current VoiceConfig and read back
@@ -179,12 +273,13 @@ private:
 
     // Internal transport. `playing` gates the beat advance; `internalBeatPos`
     // is the song position in beats (quarter notes) that drives modulator
-    // evaluation + the gate engine + the gating-grid playhead. Atomic because
-    // the UI reads them at 30 Hz off the message thread while the audio thread
-    // advances them. internalBpm is message-thread-only (set from the BPM box).
+    // evaluation + the gate engine + the gating-grid playhead. All atomic: the UI
+    // reads/writes them off the message thread while the audio thread reads them
+    // (internalBpm is written by setInternalBpm from the BPM box and read every
+    // block for beatsPerSample — relaxed is fine, each is a lone published value).
     std::atomic<bool>   playing { false };
     std::atomic<double> internalBeatPos { 0.0 };
-    double internalBpm     = 120.0;
+    std::atomic<double> internalBpm { 120.0 };
     double currentSampleRate = 44100.0;
 
     // Number of existing voices (layers), 1..kMaxVoices. Audio thread reads it
@@ -209,6 +304,22 @@ private:
     // alongside numVoices, so colours round-trip with full + per-... presets).
     juce::String serialiseVoiceColours() const;
     void         restoreVoiceColours(const juce::String& csv);
+
+    // Per-voice modulator (ControlSequences + ModulationMatrix) + gate-pattern
+    // persistence. These live OUTSIDE the APVTS parameters (in voiceSlots /
+    // gatePatterns), so they're serialised into a <VoiceData> child of the APVTS
+    // state tree on save and restored on load — otherwise a saved patch silently
+    // loses every modulator assignment + drawn gate envelope. write/read cover the
+    // active voices for full-state + full-preset paths; the per-voice (.muPattern)
+    // path serialises one voice's modulators + gate alongside its params.
+    void writeVoiceDataToState();
+    void readVoiceDataFromState();
+
+    // Register mixer/FX param listeners + run an initial engine sync (JUCE
+    // doesn't fire parameterChanged on construction or for unchanged values, so
+    // we seed mixerEngine/fxChain explicitly here + after a preset load).
+    void registerFxListeners();
+    void syncAllFxParams();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };
