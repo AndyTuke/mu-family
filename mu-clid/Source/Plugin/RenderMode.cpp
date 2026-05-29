@@ -238,30 +238,30 @@ int execute(const Args& args)
 
     proc.releaseResources();
 
-    // Write WAV. JUCE's WavAudioFormat owns the FormatWriter ownership semantics:
-    // create the writer from the output stream, then `writeFromAudioSampleBuffer`,
-    // then delete the writer (which finalises the WAV header).
+    // Write WAV: createWriterFor takes ownership of outStream on success (sets it to nullptr).
+    // Deleting the writer finalises the WAV header.
     args.outputWav.getParentDirectory().createDirectory();
     if (args.outputWav.existsAsFile())
         args.outputWav.deleteFile();
 
     juce::WavAudioFormat wav;
-    std::unique_ptr<juce::FileOutputStream> outStream(args.outputWav.createOutputStream());
+    std::unique_ptr<juce::OutputStream> outStream(args.outputWav.createOutputStream());
     if (outStream == nullptr)
     {
         reportError("could not open output file for writing: " + args.outputWav.getFullPathName());
         return 3;
     }
 
-    std::unique_ptr<juce::AudioFormatWriter> writer(
-        wav.createWriterFor(outStream.get(), args.sampleRate, (unsigned int) outChannels,
-                            24, {}, 0));
+    const auto writerOptions = juce::AudioFormatWriterOptions{}
+                                   .withSampleRate (args.sampleRate)
+                                   .withNumChannels (outChannels)
+                                   .withBitsPerSample (24);
+    auto writer = wav.createWriterFor (outStream, writerOptions);
     if (writer == nullptr)
     {
         reportError("could not create WAV writer");
         return 3;
     }
-    outStream.release();   // ownership transferred to writer
 
     if (! writer->writeFromAudioSampleBuffer(captured, 0, captured.getNumSamples()))
     {

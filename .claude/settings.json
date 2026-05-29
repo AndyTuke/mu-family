@@ -36,6 +36,13 @@
             "if": "Bash(cmake --build *)",
             "statusMessage": "Copying artifacts to OneDrive Windows folder...",
             "command": "$data = $input | ConvertFrom-Json; if ($data.tool_response.exitCode -eq 0) { $dst = 'D:\\Andy Tuke\\Music - Music Software\\TDP\\Windows\\'; Copy-Item 'd:\\Dev\\mu\\build\\mu-clid_artefacts\\Release\\Standalone\\mu-Clid.exe' $dst -Force 2>$null; Copy-Item 'd:\\Dev\\mu\\build\\mu-clid_artefacts\\Release\\VST3\\mu-Clid.vst3' $dst -Recurse -Force 2>$null; Copy-Item 'd:\\Dev\\mu\\build\\mu-clid_artefacts\\Release\\CLAP\\mu-Clid.clap' $dst -Force 2>$null }"
+          },
+          {
+            "type": "agent",
+            "if": "Bash(cmake --build *)",
+            "statusMessage": "Scanning build output for compiler warnings...",
+            "timeout": 120,
+            "prompt": "Scan the cmake build output in this JSON for compiler warnings: $ARGUMENTS\n\nLook for warning lines in the tool_response output field. Warning patterns: ': warning:' (GCC/Clang) and 'warning C' (MSVC). Skip note/continuation lines that have no warning code. If no warnings are found, stop immediately and do nothing.\n\nFor each unique warning (deduplicate by file+line+warning-code):\n1. Read the source file at the indicated path to understand the context around the warning line.\n2. Determine what fix is needed and why.\n3. Read d:\\Dev\\mu\\backlog.md to find the current highest issue number in the Open section.\n4. Prepend a new Open issue at the very top of the Open section: - [ ] #NNN: Compiler warning: <brief description> (<filename>:<line>)\n\nNever add a duplicate if the same warning is already described in an existing Open backlog entry."
           }
         ]
       }

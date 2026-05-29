@@ -2,6 +2,8 @@
 #include "Plugin/PluginProcessor.h"
 #include "Audio/Scales.h"
 #include "UI/Components/MuLookAndFeel.h"
+#include "UI/ConfirmDialog.h"   // mu-core shared confirm dialogs
+#include "Modulation/MuTantModSnap.h"
 
 namespace mu_tant
 {
@@ -67,11 +69,23 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     };
 
     // ── Shared per-layer header bar (name / reset / delete / preset / save) ──
-    headerBar.onDelete = [this] { if (onDeleteVoice) onDeleteVoice(); };
+    // Reset + delete confirm first (shared mu-core dialog), matching mu-clid.
+    headerBar.onDelete = [this]
+    {
+        if (proc.getNumVoices() <= 1) return;   // can't delete the last voice
+        const juce::String name = proc.getChannelName(currentVoice);
+        mu_ui::confirmAsync("Delete Voice", "Delete \"" + name + "\"?\nThis cannot be undone.",
+                            "Delete", [this] { if (onDeleteVoice) onDeleteVoice(); });
+    };
     headerBar.onReset  = [this]
     {
-        proc.resetVoice(currentVoice);
-        setVoice(currentVoice);           // re-sync knobs / gate / modulators
+        const juce::String name = proc.getChannelName(currentVoice);
+        mu_ui::confirmAsync("Reset Voice", "Reset \"" + name + "\" to defaults?\nThis cannot be undone.",
+                            "Reset", [this]
+        {
+            proc.resetVoice(currentVoice);
+            setVoice(currentVoice);           // re-sync knobs / gate / modulators
+        });
     };
     headerBar.onPresetSelected = [this](int id)
     {
@@ -213,10 +227,17 @@ void VoicePanel::setVoice(int voiceIndex)
         rebindAttachments();
     }
 
+    // Re-bind unconditionally — same reason as modulatorPanel / gatingDesigner below:
+    // the ctor calls rebindAttachments() directly, so o1OctAttachment != nullptr when
+    // setVoice(0) first fires and the if-guard above is false, which would leave the
+    // knob arc bindings unset for voice 0 unless we re-bind here every time.
+    bindModulationIndicators();
+
     modulatorPanel.setVoiceSlot(&proc.voiceSlots[(size_t) currentVoice]);
     gatingDesigner.setPattern(&proc.gatePatterns[(size_t) currentVoice]);
     insertSub.setChannel(currentVoice);   // reloads algo + slot knobs from APVTS
     refreshHeader();
+    repaint();   // sub-panel borders + section titles paint in the active voice's palette colour
 }
 
 void VoicePanel::rebindAttachments()
@@ -268,6 +289,36 @@ void VoicePanel::rebindAttachments()
 
     // Sync the designer's render-only Gap mirror to the freshly-bound value (0..100 % → 0..1).
     gatingDesigner.setGap((float) (gapKnob.getValue() / 100.0));
+}
+
+void VoicePanel::bindModulationIndicators()
+{
+    const int vi = currentVoice;
+    const auto* mx = &proc.voiceSlots[(size_t) vi].modulationMatrix;
+    static const float kNaN = std::numeric_limits<float>::quiet_NaN();
+
+    auto bind = [&](KnobWithLabel& k, const char* destId, mu_tant::ModSnapIdx snap)
+    {
+        k.bindModulation(destId, mx,
+            [&proc = proc, vi, snap]() -> float {
+                return proc.isInternalPlaying() ? proc.getTantSnap(vi, (int) snap) : kNaN; });
+    };
+
+    bind(o1OctKnob,      "osc1.octave",       mu_tant::kTantSnapOsc1Octave);
+    bind(o1SemiKnob,     "osc1.semi",         mu_tant::kTantSnapOsc1Semi);
+    bind(o1FineKnob,     "osc1.fine",         mu_tant::kTantSnapOsc1Fine);
+    bind(o1PosKnob,      "osc1.pos",          mu_tant::kTantSnapOsc1Pos);
+    bind(o2OctKnob,      "osc2.octave",       mu_tant::kTantSnapOsc2Octave);
+    bind(o2SemiKnob,     "osc2.semi",         mu_tant::kTantSnapOsc2Semi);
+    bind(o2FineKnob,     "osc2.fine",         mu_tant::kTantSnapOsc2Fine);
+    bind(o2PosKnob,      "osc2.pos",          mu_tant::kTantSnapOsc2Pos);
+    bind(xmodKnob,       "xmod",              mu_tant::kTantSnapXMod);
+    bind(osc1LevelKnob,  "osc1.level",        mu_tant::kTantSnapOsc1Level);
+    bind(osc2LevelKnob,  "osc2.level",        mu_tant::kTantSnapOsc2Level);
+    bind(noiseLevelKnob, "noise.level",       mu_tant::kTantSnapNoiseLevel);
+    bind(fltCutKnob,     "filter.cutoff",     mu_tant::kTantSnapFilterCutoff);
+    bind(fltResKnob,     "filter.resonance",  mu_tant::kTantSnapFilterRes);
+    bind(levelKnob,      "level",             mu_tant::kTantSnapLevel);
 }
 
 void VoicePanel::refreshHeader()
@@ -332,13 +383,16 @@ void VoicePanel::paint(juce::Graphics& g)
                    insertPanelR.getWidth(), s(12), juce::Justification::centred, false);
     }
 
-    if (! mixerPanelR.isEmpty())
+    // NOISE + MIXER panels (right column): same centred-title styling.
+    for (const auto& p : { std::make_pair(&noisePanelR, "NOISE"),
+                           std::make_pair(&mixerPanelR, "MIXER") })
     {
+        if (p.first->isEmpty()) continue;
         g.setColour(voiceCol);
-        g.drawRoundedRectangle(mixerPanelR.toFloat().reduced(1.0f), sf(6.0f), sf(2.0f));
+        g.drawRoundedRectangle(p.first->toFloat().reduced(1.0f), sf(6.0f), sf(2.0f));
         g.setColour(muted);
-        g.drawText("MIXER", mixerPanelR.getX(), mixerPanelR.getY() + s(3),
-                   mixerPanelR.getWidth(), s(12), juce::Justification::centred, false);
+        g.drawText(p.second, p.first->getX(), p.first->getY() + s(3),
+                   p.first->getWidth(), s(12), juce::Justification::centred, false);
     }
 }
 
@@ -369,8 +423,9 @@ void VoicePanel::resized()
         scaleDropdown.setBounds(x, tonalY, s(100), ddH);
     }
 
-    // ── Right-hand Mixer column ──────────────────────────────────────────────
-    const int mixerW     = s(88);
+    // ── Right-hand column (NOISE panel + horizontal MIXER row beneath) ───────
+    // Wide enough for 3 Size-2 level knobs side by side in the MIXER row.
+    const int mixerW     = s(3 * MuLookAndFeel::kKnobSize2W + 24);
     const int mixerX     = w - pad - mixerW;
     const int contentTop = tonalY + ddH + gap;
 
@@ -428,9 +483,8 @@ void VoicePanel::resized()
         int x = leftX + oscTitleW;
         xmodKnob.setBounds(x, rowY, s2W, s2H);                 x += s2W + gap;
         xmodLabel.setBounds(x, ctrlY, s(40), ddH);             x += s(40) + s(2);
-        xmodModeDropdown.setBounds(x, ctrlY, s(78), ddH);      x += s(78) + s(40);
-        noiseTypeLabel.setBounds(x, ctrlY, s(44), ddH);        x += s(44) + s(2);
-        noiseTypeDropdown.setBounds(x, ctrlY, s(88), ddH);
+        xmodModeDropdown.setBounds(x, ctrlY, s(78), ddH);
+        // Noise type moved to its own NOISE panel (top-right); see below.
         y += rowH + gap;
     }
 
@@ -469,19 +523,29 @@ void VoicePanel::resized()
         gatingDesigner.setBounds(leftX, y, rightColX - gap - leftX, gateH);
         y += gateH + gap;
     }
-    // ── Mixer column — sits beside the two Osc rows (same height) ───────────
-    // 3 level knobs (Osc 1 / Osc 2 / Noise) stacked to fill that height.
-    mixerPanelR = { mixerX, contentTop, mixerW, oscRowsBottom - contentTop };
+    // ── Right column: NOISE panel (top, room to grow) + MIXER row beneath ───
+    // NOISE holds the noise-source config (type now; more later). MIXER is the
+    // 3 source levels (Osc 1 / Osc 2 / Noise) as a horizontal Size-2 knob row.
+    const int titleBand   = s(14);
+    const int noisePanelH = titleBand + ddH + s(14);     // title + dropdown row + grow room
+    noisePanelR = { mixerX, contentTop, mixerW, noisePanelH };
     {
-        const int titleBand = s(14);
-        const int cellW = mixerW - s(8);
-        const int cx    = mixerX + s(4);
-        const int slot  = (mixerPanelR.getHeight() - titleBand) / 3;
-        int ky = contentTop + titleBand;
+        const int innerX = mixerX + s(8);
+        const int innerW = mixerW - s(16);
+        noiseTypeLabel.setBounds(0, 0, 0, 0);            // hidden — the panel title says NOISE
+        noiseTypeDropdown.setBounds(innerX, contentTop + titleBand + s(2), innerW, ddH);
+    }
+
+    const int mixerY = contentTop + noisePanelH + gap;
+    mixerPanelR = { mixerX, mixerY, mixerW, oscRowsBottom - mixerY };
+    {
+        const int knobsY = mixerY + titleBand + s(2);
+        const int cellW  = mixerW / 3;
+        int cx = mixerX;
         for (auto* k : { &osc1LevelKnob, &osc2LevelKnob, &noiseLevelKnob })
         {
-            k->setBounds(cx, ky, cellW, slot);
-            ky += slot;
+            k->setBounds(cx + (cellW - s2W) / 2, knobsY, s2W, s2H);
+            cx += cellW;
         }
     }
 
