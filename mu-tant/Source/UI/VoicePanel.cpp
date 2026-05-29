@@ -41,7 +41,7 @@ namespace
         const char* names[] = { "LP 12", "LP 24", "HP 12", "HP 24",
                                 "BP 12", "BP 24", "Notch", "AP",
                                 "Comb",  "1P LP", "1P HP", "Peak",
-                                "Lo Shelf", "Hi Shelf", "—", "—" };
+                                "Lo Shelf", "Hi Shelf", "n/a", "n/a" };
         for (int i = 0; i < 16; ++i)
             d.addItem(names[i], i + 1);
     }

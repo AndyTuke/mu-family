@@ -89,22 +89,30 @@ namespace
             const float cx = b.getCentreX(), cy = b.getCentreY();
             const float maxR = std::min(b.getWidth(), b.getHeight()) * 0.5f;
 
-            // Static background disc — always visible so idle voices have a presence.
+            // Background disc — faint presence even when silent.
             g.setColour(colour.withAlpha(0.10f));
             g.fillEllipse(cx - maxR, cy - maxR, maxR * 2.0f, maxR * 2.0f);
 
-            // Draw from outermost band inward: each filled circle covers the centre
-            // of the previous one, producing an annular ring per band.
-            // Band 7 (outermost) = highest frequencies; band 0 (centre) = lowest.
-            for (int band = kBands - 1; band >= 0; --band)
+            // Each band is a separate stroked ring so bands are visually independent.
+            // Band 0 = innermost (low freq, ~94–188 Hz).
+            // Band 7 = outermost (high freq, ~12–20 kHz).
+            // A pixel gap between rings keeps them readable at small sizes.
+            const float usableR  = maxR - 1.0f;
+            const float bandStep = usableR / (float) kBands;
+            const float strokeW  = bandStep - 1.0f;  // 1 px gap between rings
+
+            for (int band = 0; band < kBands; ++band)
             {
-                const float r     = maxR * (float)(band + 1) / (float) kBands;
-                const float alpha = juce::jlimit(0.0f, 0.88f, 0.07f + bands[band] * 0.81f);
+                // Centre radius of this ring.
+                const float r     = (float)(band + 1) * bandStep - strokeW * 0.5f;
+                const float alpha = juce::jlimit(0.0f, 0.90f, 0.06f + bands[band] * 0.84f);
                 g.setColour(colour.withAlpha(alpha));
-                g.fillEllipse(cx - r, cy - r, r * 2.0f, r * 2.0f);
+                juce::Path ring;
+                ring.addEllipse(cx - r, cy - r, r * 2.0f, r * 2.0f);
+                g.strokePath(ring, juce::PathStrokeType(strokeW));
             }
 
-            // Thin border ring.
+            // Outer border.
             g.setColour(colour.withAlpha(0.40f));
             g.drawEllipse(b.reduced(0.5f), 1.0f);
         }
