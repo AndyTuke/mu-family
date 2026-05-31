@@ -5,7 +5,7 @@
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/SegmentControl.h"
 #include "UI/Components/DropdownSelect.h"
-#include "UI/Components/MuClidLookAndFeel.h"
+#include "UI/Components/MuLookAndFeel.h"
 
 namespace juce { class RangedAudioParameter; }
 class PluginProcessor;
@@ -30,14 +30,14 @@ public:
     // avoid rewriting all 31 knobs/segments on every single parameter change.
     void refreshSuffix(const juce::String& suffix);
 
-    // Issue #133: tag hits/rotate knobs with modulation indicator rings.
-    void refreshModulatedIndicators();
+    // Bind all euclidean knobs to their modulation destinations for the current rhythm.
+    void bindModulationIndicators();
 
     void resized() override;
     void paint(juce::Graphics&) override;
 
 private:
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
 
     PluginProcessor& proc;
     int rhythmIndex = -1;

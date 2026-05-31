@@ -4,7 +4,7 @@ Three test layers run for every release:
 
 | Layer | Mechanism | Run via |
 |---|---|---|
-| Compile/data invariants | JUCE `juce::UnitTest` subclasses in [mu-clid/Source/Tests/](mu-clid/Source/Tests/) | `cmake --build build --target mu-clid-tests --config Release && build/mu-clid/mu-clid-tests_artefacts/Release/mu-clid-tests.exe` |
+| Compile/data invariants | JUCE `juce::UnitTest` subclasses | See per-product sections below |
 | Audio behaviour | Python pipeline rendering presets via the standalone's `--render` CLI, then asserting on the WAV | `python tests/scripts/run-listening-tests.py --config Release` |
 | Manual smoke | 25-step walkthrough of the standalone UI | [docs/mu-clid/TestPlan.md](docs/mu-clid/TestPlan.md) |
 
@@ -31,9 +31,13 @@ See [tests/README.md](tests/README.md) for the full pipeline overview — render
 
 ---
 
-## C++ unit tests (data invariants + DSP smoke)
+## C++ unit tests — μ-Clid
 
-Console executable that runs every `juce::UnitTest` defined in [mu-clid/Source/Tests/](mu-clid/Source/Tests/). Excluded from the default ALL build — only compiled when asked, so day-to-day plugin iteration isn't slowed by test compilation.
+Console executable that runs every `juce::UnitTest` defined in [mu-clid/Source/Tests/](mu-clid/Source/Tests/). **Excluded from ALL build** (deliberate: Release builds deploy to testers and the 140-test suite linking `juce_audio_processors` adds significant compile time). Build on demand:
+
+```
+cmake --build build --target mu-clid-tests --config Release && build/mu-clid/mu-clid-tests_artefacts/Release/mu-clid-tests.exe
+```
 
 | Coverage | File |
 |---|---|
@@ -52,8 +56,41 @@ Console executable that runs every `juce::UnitTest` defined in [mu-clid/Source/T
 | Filter DSP smoke | `FilterDSPSmokeTests.cpp` |
 | Send-FX DSP smoke | `SendFXSmokeTests.cpp` |
 | Preset XML round-trip | `PresetXMLRoundTripTests.cpp` |
+| Preset migration (v0/v1 → v2 gate) | `PresetMigrationTests.cpp` |
+| MIDI full-preset map | `MidiFullPresetMapTests.cpp` |
+| Hot-swap boundary timing | `HotSwapBoundaryTests.cpp` |
+| Modulation skew (proportion ↔ display) | `ModulationSkewTests.cpp` |
 
-**Current status:** 119/119 tests pass at v1.0.614.
+**Current status:** 140/140 tests pass at v1.0.708.
+
+---
+
+## C++ unit tests — μ-Tant
+
+Built as part of **ALL_BUILD** every Debug build (mu-tant is local-only and the suite is small enough that the compile cost is negligible). Build command:
+
+```
+cmake --build build --target mu-tant-tests --config Debug && build/mu-tant/mu-tant-tests_artefacts/Debug/mu-tant-tests.exe
+```
+
+| Coverage | File |
+|---|---|
+| Scale-quantised pitch math + wavetable oscillator frequency | `SynthDSPTests.cpp` |
+| Voice engine (noise, FM/AM/Ring/Sync, level, additive sum) | `SynthVoiceTests.cpp` |
+| Gate envelope shape (split, bends, gap, reverse) | `GatePatternTests.cpp` |
+| Gate envelope playback rules (probability, loopMask/loopM) | `GatePatternTests.cpp` |
+| Gate pattern editing (addEnvelope, removeEnvelope, mergeRange) | `GatePatternTests.cpp` |
+| Block-level gater (bypass/stopped/playing states) | `GateStageTests.cpp` |
+| Gate editor interactions (pencil, eraser, glue, reverse tools) | `GatingDesignerTests.cpp` |
+| Modulator (ControlSequence + ModulationMatrix) | `ModulatorTests.cpp` |
+| Insert stage DSP smoke (None passthrough, SoftClip) | `InsertStageTests.cpp` |
+| Scales table correctness | `ScalesTests.cpp` |
+| ControlSequence timing/retrigger | `ControlSequenceTests.cpp` |
+| Modulator + gate persistence round-trip | `MuTantPersistTests.cpp` |
+| APVTS layout sanity (every `v{N}_*` / `ch{N}_*` param) | `ApvtsLayoutTests.cpp` |
+| Send-FX DSP smoke | `SendFXSmokeTests.cpp` |
+
+**Current status:** ~96 tests pass at v1.0.708 (count grows with each new feature batch).
 
 ---
 
@@ -67,5 +104,5 @@ See [docs/mu-clid/TestPlan.md](docs/mu-clid/TestPlan.md) — 25 atomic UI tests,
 
 1. **Decide the layer.** Compile-time / data invariant → C++ unit test. Audio behaviour → listening test. UI feel → smoke-test step.
 2. **Listening tests:** follow the 7-step recipe in [tests/README.md](tests/README.md#adding-a-new-listening-test).
-3. **C++ unit tests:** add a `Source/Tests/<Name>Tests.cpp` deriving from `juce::UnitTest`, add the file to `mu-clid-tests` in `mu-clid/CMakeLists.txt`.
+3. **C++ unit tests:** add a `Source/Tests/<Name>Tests.cpp` deriving from `juce::UnitTest`, add the file to `mu-clid-tests` (mu-clid) or `mu-tant-tests` (mu-tant) in the respective `CMakeLists.txt`.
 4. **Always** add a row above so the test isn't an orphan. Use the same status keys as the listening-tests table for consistency.

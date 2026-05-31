@@ -60,30 +60,31 @@ void MixerEngine::applyPanGain(juce::AudioBuffer<float>& buf,
 }
 
 void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
-                                int                          numActiveRhythms,
+                                int                          numActiveChannels,
                                 std::unique_ptr<VoiceEngine>* voices,
                                 FXChain&                     fxChain,
                                 int                          numSamples,
-                                std::array<juce::AudioBuffer<float>*, 8>* directOuts,
+                                std::array<juce::AudioBuffer<float>*, MaxChannels>* directOuts,
                                 juce::AudioBuffer<float>*    fxReturnsOut,
-                                const RetiredVoices*         retired)
+                                const RetiredVoices*         retired,
+                                const RenderChannelFn*       renderChannel)
 {
     output.clear();
     effectSendBuf.clear();
     delaySendBuf .clear();
     reverbSendBuf.clear();
 
-    const bool anySolo       = hasSolo(numActiveRhythms);
+    const bool anySolo       = hasSolo(numActiveChannels);
     // follow-up: when a return is soloed, the user wants to hear ONLY that wet
-    // signal — the rhythm channels' dry passthrough to master must also be muted, but
+    // signal — the channels' dry passthrough to master must also be muted, but
     // their FX sends must still run so the soloed return has something to render.
     const bool anyReturnSolo = returns[0].solo || returns[1].solo || returns[2].solo;
     const int  numOutCh      = output.getNumChannels();
 
-    // Clear peaks for channels that have no rhythm this block so their VUs go silent.
-    // Same for sidechainGR so a removed rhythm cannot leave a ghost reading on the
+    // Clear peaks for inactive channels this block so their VUs go silent.
+    // Same for sidechainGR so a removed channel cannot leave a ghost reading on the
     // inactive slot's GR meter.
-    for (int r = numActiveRhythms; r < MaxChannels; ++r)
+    for (int r = numActiveChannels; r < MaxChannels; ++r)
     {
         channelPeaks[r].store(0.0f);
         sidechainGR  [r].store(0.0f);
@@ -94,11 +95,13 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     const bool hasRetired = retired != nullptr
                          && retired->engines != nullptr
                          && retired->perSlot > 0;
-    for (int r = 0; r < numActiveRhythms; ++r)
+    const bool useRenderHook = renderChannel != nullptr && *renderChannel;
+    for (int r = 0; r < numActiveChannels; ++r)
     {
         auto& buf = channelBufs[r];
         buf.clear();
-        if (voices[r]) voices[r]->process(buf, numSamples);
+        if (useRenderHook)            (*renderChannel)(r, buf, numSamples);
+        else if (voices && voices[r]) voices[r]->process(buf, numSamples);
 
         // Stage 34 Step 2: retired engines (frozen post-swap tail-out) mix into the
         // SAME channel buf so they ride the same channel fader / pan / sends /
@@ -127,14 +130,14 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     }
 
     // Phase 2: apply sidechain ducking per channel.
-    for (int r = 0; r < numActiveRhythms; ++r)
+    for (int r = 0; r < numActiveChannels; ++r)
         sidechainGR[r].store(0.0f);
 
-    for (int r = 0; r < numActiveRhythms; ++r)
+    for (int r = 0; r < numActiveChannels; ++r)
     {
         const auto& ch  = channels[r];
         const int   src = ch.sidechainSource;
-        if (src < 0 || src >= numActiveRhythms || src == r) continue;
+        if (src < 0 || src >= numActiveChannels || src == r) continue;
         if (ch.sidechainAmount <= 0.0f) continue;
 
         const float sr_f = (float)sampleRate;
@@ -175,7 +178,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     }
 
     // Phase 3: pan/gain, route to output bus, FX sends, peak capture.
-    for (int r = 0; r < numActiveRhythms; ++r)
+    for (int r = 0; r < numActiveChannels; ++r)
     {
         const auto& ch  = channels[r];
         auto&       buf = channelBufs[r];
@@ -251,7 +254,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     {
         const auto& ret = returns[ri];
         const int src = ret.sidechainSource;
-        if (src < 0 || src >= numActiveRhythms || ret.sidechainAmount <= 0.0f)
+        if (src < 0 || src >= numActiveChannels || ret.sidechainAmount <= 0.0f)
         {
             returnSidechainGR[ri].store(0.0f);
             continue;

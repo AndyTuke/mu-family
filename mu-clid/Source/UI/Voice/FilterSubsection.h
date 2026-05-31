@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/DropdownSelect.h"
-#include "UI/Components/MuClidLookAndFeel.h"
+#include "UI/Components/MuLookAndFeel.h"
 
 namespace juce { class RangedAudioParameter; }
 class PluginProcessor;
@@ -17,14 +17,14 @@ public:
     void setRhythm(int ri);
     void loadFromRhythm();
     void refreshSuffix(const juce::String& suffix);
-    void refreshModulatedIndicators();
+    void bindModulationIndicators();
 
     void resized() override;
 
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
 
 private:
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
 
     PluginProcessor& proc;
     int rhythmIndex = -1;

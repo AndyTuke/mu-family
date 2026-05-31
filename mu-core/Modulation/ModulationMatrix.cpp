@@ -81,6 +81,15 @@ static float depthScaleFor(const std::string& destId)
     // ALL insert algorithms.
     if (destId == "insert.p1" || destId == "insert.p2"
      || destId == "insert.p3" || destId == "insert.p4") return 1.0f;
+    // mu-tant osc/voice parameters — scale = full slider range so depth=100%+src=100%
+    // sweeps the entire knob, matching the family "50% mod → 50% knob turn" rule.
+    if (destId == "osc1.octave"  || destId == "osc2.octave")  return 6.0f;   // -3..+3
+    if (destId == "osc1.semi"    || destId == "osc2.semi")    return 24.0f;  // -12..+12
+    if (destId == "osc1.fine"    || destId == "osc2.fine")    return 200.0f; // -100..+100
+    if (destId == "osc1.pos"     || destId == "osc2.pos")     return 255.0f; // 0..255
+    if (destId == "xmod")                                      return 127.0f; // 0..127
+    if (destId == "osc1.level"   || destId == "osc2.level"
+     || destId == "noise.level"  || destId == "level")        return 66.0f;  // -60..+6 dB
     // algorithm-specific insert destinations. Scale equals the
     // full-swing range for the integer field so depth=100% × src=100% spans the
     // whole knob (e.g. ks.note covers all 7 chromatic notes).

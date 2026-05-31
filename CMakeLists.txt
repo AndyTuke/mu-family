@@ -26,6 +26,13 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_subdirectory($ENV{JUCE_PATH} JUCE)
 add_subdirectory(ThirdParty/clap-juce-extensions)
 
+# Tester-deploy kill-switch. OFF by default so NO build (Debug or Release, and
+# regardless of any runner that forces a Release pass) can push artefacts to the
+# OneDrive tester share. Flip ON only for an intentional tester release:
+#     cmake -B build -DMUFAMILY_DEPLOY_TESTERS=ON
+# The per-plugin OneDrive POST_BUILD deploy steps are guarded by this option.
+option(MUFAMILY_DEPLOY_TESTERS "Deploy Release artefacts to the OneDrive tester share" OFF)
+
 # Distribution paths the plugin subdirs reference for installer + deploy hooks.
 # Cached so cmake/IncrementBuildNumber.cmake and per-plugin installers can find them.
 set(MUFAMILY_WIN_DIST "D:/Andy Tuke/Music - Music Software/TDP/Windows"
@@ -54,5 +61,5 @@ endif()
 # ── Subdirectories ──────────────────────────────────────────────────────────
 add_subdirectory(mu-core)
 add_subdirectory(mu-clid)
-add_subdirectory(mu-tant)     # first-stab wavetable drone synth (Debug-only)
-# add_subdirectory(mu-toni)   # enable once mu-toni/Source/ has real targets
+add_subdirectory(mu-tant)     # wavetable drone synth (Standalone + VST3 + CLAP)
+add_subdirectory(mu-toni)     # scaffold: shared shell + mixer wired, engine TBD (Standalone + VST3 + CLAP)

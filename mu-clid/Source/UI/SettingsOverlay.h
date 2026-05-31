@@ -1,6 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "UI/Components/MuClidLookAndFeel.h"
+#include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/NudgeInput.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/DropdownSelect.h"
@@ -30,7 +30,7 @@ private:
     juce::TextButton closeBtn { "Close" };
 
     // Active: master volume knob (reads/writes from APVTS)
-    KnobWithLabel masterVolKnob { "Master Vol", MuClidLookAndFeel::knobLevel };
+    KnobWithLabel masterVolKnob { "Master Vol", MuLookAndFeel::knobLevel };
 
     // UI Size picker (Medium / Large). Writes to PluginProcessor::setUiScale,
     // which persists via appSettings and triggers the editor's onUiScaleChanged
@@ -48,6 +48,10 @@ private:
     DropdownSelect clockSourceDropdown;
     juce::Label    midiMessagesLabel;
     DropdownSelect midiMessagesDropdown;
+
+    // MIDI Note mode (plugin only): Free = host transport, Note = Note On/Off gated.
+    juce::Label    midiModeLabel;
+    DropdownSelect midiModeDropdown;
 
     // MIDI program-change preset assignments (button opens MidiPresetsPanel overlay).
     juce::TextButton midiPresetsBtn { "Rhythm Preset Table" };
@@ -90,6 +94,7 @@ private:
         int midiGroupHeader = 0;
         int swapHeader = 0, swapRowY = 0;
         int midiClockHeader = 0, clockSourceRowY = 0, midiMessagesRowY = 0;
+        int midiModeHeader = 0, midiModeRowY = 0;   // plugin-only
         int midiPCHeader = 0, midiPCRowY = 0;    // single row, two buttons side-by-side
 
         // Locations sub-panel (Sample Library, Content Folder)
@@ -113,8 +118,8 @@ private:
     static constexpr int kContentMaxW   = 620;  // cap content column so it doesn't sprawl
     static constexpr int kLabelCtrlGap  = 12;   // horizontal gap between right-aligned label and control
     // Master vol knob renders at Size 2 (matches voice subsection knobs).
-    static constexpr int kMasterVolW    = MuClidLookAndFeel::kKnobSize2W;
-    static constexpr int kMasterVolH    = MuClidLookAndFeel::kKnobSize2H;
+    static constexpr int kMasterVolW    = MuLookAndFeel::kKnobSize2W;
+    static constexpr int kMasterVolH    = MuLookAndFeel::kKnobSize2H;
     static constexpr int kCloseBtnW     = 70;
     static constexpr int kCloseBtnH     = 26;
     static constexpr int kFolderBtnW    = 90;

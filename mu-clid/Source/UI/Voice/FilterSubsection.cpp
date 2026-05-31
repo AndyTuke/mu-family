@@ -206,7 +206,7 @@ void FilterSubsection::setRhythm(int ri)
         paramPtrCache.clear();
     rhythmIndex = ri;
     loadFromRhythm();
-    refreshModulatedIndicators();
+    bindModulationIndicators();
 }
 
 void FilterSubsection::loadFromRhythm()
@@ -244,52 +244,51 @@ void FilterSubsection::refreshSuffix(const juce::String& suffix)
     else if (suffix == "fltLoCut") filterLowCut.setValue(p.filterLowCutHz, dn);
 }
 
-void FilterSubsection::refreshModulatedIndicators()
+void FilterSubsection::bindModulationIndicators()
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
-    const auto& assigns = proc.getRhythm(rhythmIndex).modulationMatrix.getAssignments();
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms())
+    {
+        for (auto* k : { &filterCutoff, &filterRes, &filterAtk, &filterDec,
+                         &filterDepth, &filterLowCut })
+            k->clearModBinding();
+        return;
+    }
+    const auto* mx = &proc.getRhythm(rhythmIndex).modulationMatrix;
+    static const float kNaN = std::numeric_limits<float>::quiet_NaN();
 
-    auto isAssigned = [&assigns](const char* destId) -> bool {
-        for (const auto& a : assigns)
-            if (a.destinationId == destId) return true;
-        return false;
-    };
-
-    auto sn = [&](int i) { return proc.getModSnapshot(rhythmIndex, i); };
-    const float kNaN   = std::numeric_limits<float>::quiet_NaN();
-    const bool playing = proc.sequencerPlaying.load();
-
-    auto arc = [&](bool assigned, int idx) -> float {
-        return (assigned && playing) ? sn(idx) : kNaN;
-    };
-
-    filterCutoff.setIsModulated(playing && isAssigned("filter.cutoff"));
-    filterRes   .setIsModulated(playing && isAssigned("filter.resonance"));
-    filterAtk   .setIsModulated(playing && isAssigned("fenv.attack"));
-    filterDec   .setIsModulated(playing && isAssigned("fenv.decay"));
-    filterDepth .setIsModulated(playing && isAssigned("fenv.depth"));
-    filterLowCut.setIsModulated(playing && isAssigned("filter.lowCut"));
-
-    // filter.cutoff: snapshot stores ACTUAL Hz, arc goes through slider's midPoint skew (#612).
-    // filter.resonance: linear 0..100 — setModulatedNorm matches the slider directly.
-    // fenv.attack / fenv.decay: skewed 0..10 s — snapshot stores ACTUAL seconds, arc goes through skew (#623).
-    // fenv.depth: voiceParams stored as semis 0..48, slider displays 0..100 — snapshot stores display 0..100 (#623).
-    filterCutoff.setModulatedActual(arc(isAssigned("filter.cutoff"),    kSnapFilterCutoff));
-    filterRes   .setModulatedNorm  (arc(isAssigned("filter.resonance"), kSnapFilterRes));
-    filterAtk   .setModulatedActual(arc(isAssigned("fenv.attack"),      kSnapFenvAtk));
-    filterDec   .setModulatedActual(arc(isAssigned("fenv.decay"),       kSnapFenvDec));
-    filterDepth .setModulatedActual(arc(isAssigned("fenv.depth"),       kSnapFenvDepth));
+    // filter.cutoff: snap stores ACTUAL Hz → setModulatedActual routes through midPoint skew.
+    filterCutoff.bindModulation("filter.cutoff", mx,
+        [&proc = proc, ri = rhythmIndex]() -> float {
+            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapFilterCutoff) : kNaN; });
+    // filter.resonance: linear 0..0.99 — snap stores normalised 0..1.
+    filterRes.bindModulation("filter.resonance", mx,
+        [&proc = proc, ri = rhythmIndex]() -> float {
+            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapFilterRes) : kNaN; },
+        true);
+    // fenv ADSR: snap stores ACTUAL seconds → setModulatedActual respects skewFactor 0.3.
+    filterAtk.bindModulation("fenv.attack", mx,
+        [&proc = proc, ri = rhythmIndex]() -> float {
+            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapFenvAtk) : kNaN; });
+    filterDec.bindModulation("fenv.decay", mx,
+        [&proc = proc, ri = rhythmIndex]() -> float {
+            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapFenvDec) : kNaN; });
+    // fenv.depth: snap stores display 0..100 semitones.
+    filterDepth.bindModulation("fenv.depth", mx,
+        [&proc = proc, ri = rhythmIndex]() -> float {
+            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapFenvDepth) : kNaN; });
     // filter.lowCut: snap stores actual Hz; slider runs 0..1000 Hz with skewFactor 0.35.
-    filterLowCut.setModulatedActual(arc(isAssigned("filter.lowCut"),    kSnapFilterLowCut));
+    filterLowCut.bindModulation("filter.lowCut", mx,
+        [&proc = proc, ri = rhythmIndex]() -> float {
+            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapFilterLowCut) : kNaN; });
 }
 
 void FilterSubsection::resized()
 {
     // Voice section knobs render at Size 2 (55 × 56) — fixed PX, no
     // dependency on the panel's actual height.
-    constexpr int kW    = MuClidLookAndFeel::kKnobSize2W;
-    constexpr int rowH  = MuClidLookAndFeel::kKnobSize2H;
-    constexpr int gap   = MuClidLookAndFeel::kVoiceGap;
+    constexpr int kW    = MuLookAndFeel::kKnobSize2W;
+    constexpr int rowH  = MuLookAndFeel::kKnobSize2H;
+    constexpr int gap   = MuLookAndFeel::kVoiceGap;
     constexpr int row2Y = rowH + gap;
 
     using mu_ui::s;

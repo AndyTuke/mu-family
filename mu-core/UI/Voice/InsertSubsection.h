@@ -22,7 +22,8 @@ class ProcessorBase;
 //   - GR meter source for Compressor/Limiter (getInsertGR)
 //   - the algo-switch multi-write wrapper (runBulkChange) — mu-clid wraps it in
 //     its hot-swap loading guard + resync; products without that just call fn().
-class InsertSubsection : public juce::Component
+class InsertSubsection : public juce::Component,
+                         private juce::Timer
 {
 public:
     InsertSubsection(ProcessorBase& processor, juce::String channelPrefix);  // prefix "r" / "v" / …
@@ -51,8 +52,8 @@ private:
     juce::String   prefix;          // e.g. "r" / "v"
     int            channelIndex = -1;
 
-    float insertSnapshots     [14][mu_ui::kInsertSlotCount] = {{0.0f}};
-    bool  insertSnapshotValid [14] = {};
+    float insertSnapshots     [mu_ui::kInsertAlgoCount][mu_ui::kInsertSlotCount] = {{0.0f}};
+    bool  insertSnapshotValid [mu_ui::kInsertAlgoCount] = {};
 
     DropdownSelect insertAlgo;
     KnobWithLabel  insertParam1 { "P1", Id::knobInsertPad };
@@ -69,6 +70,8 @@ private:
     void configureInsertAlgorithm(int charId);
 
     std::unordered_map<std::string_view, juce::RangedAudioParameter*> paramPtrCache;
+
+    void timerCallback() override { refreshModulatedIndicators(); }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(InsertSubsection)
 };

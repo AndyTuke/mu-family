@@ -7,7 +7,7 @@
 #include "UI/ModulatorPanel.h"
 #include "Modulation/MuClidModDest.h"
 #include "UI/Components/DropdownSelect.h"
-#include "UI/Components/MuClidLookAndFeel.h"
+#include "UI/Components/MuLookAndFeel.h"
 #include "Plugin/PluginProcessor.h"
 
 //==============================================================================
@@ -95,11 +95,6 @@ public:
 private:
     PluginProcessor& proc;
     int currentRhythmIndex = -1;
-
-    // edge-trigger so the play→stop transition still gets ONE final indicator
-    // refresh to clear the cyan mod rings + live arcs from the knobs. Without this,
-    // stopping the sequencer would freeze the rings in their last-played state.
-    bool wasPlayingLastTick = false;
 
     // Tracks the most recent euclid overrides applied to the RhythmCircle so the
     // timer can detect modulation-driven changes and refresh the circle without

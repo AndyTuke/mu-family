@@ -23,7 +23,6 @@ public:
 
     bool isEnabled() const  { return enabled; }
     void setEnabled(bool e) { enabled = e; }
-    void setSend(float v)   { sendAmount = juce::jlimit(0.0f, 1.0f, v); }
 
     // Send-bus processing: runs delay with no dry/wet blend (wet-only output).
     void processReturn(juce::AudioBuffer<float>&);
@@ -51,7 +50,6 @@ private:
     static constexpr int MaxDelaySamples = 4 * 192000;  // 4s at 192kHz
 
     bool   enabled    = true;
-    float  sendAmount = 1.0f;
     float  feedback   = 0.45f;
     float  spread     = 0.0f;
     float  dirt       = 0.0f;

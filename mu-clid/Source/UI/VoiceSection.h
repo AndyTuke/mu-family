@@ -16,7 +16,6 @@ public:
 
     void setRhythm(int rhythmIndex);
     void loadFromRhythm();
-    void refreshModulatedIndicators();
     void refreshSuffix(const juce::String& suffix);
 
     // Forwarder to AmpSubsection — see AmpSubsection::setEffectSendLabel.

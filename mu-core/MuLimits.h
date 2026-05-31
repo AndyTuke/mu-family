@@ -8,27 +8,28 @@
 // (gain trims, filter band centres, envelope time constants, etc.) stay
 // next to the code they tune.
 //
-// Each owning class re-exports its own historical name via a `static
-// constexpr` alias so existing references like `SequencerEngine::MaxRhythms`
-// keep compiling. The values live here.
+// Naming is plugin-agnostic ("channel" / "layer" / "slot"), since mu-core is
+// shared. Each product may re-export a domain alias (e.g. mu-clid's
+// `SequencerEngine::MaxRhythms = mu_limits::kMaxChannels`) pointing here.
 namespace mu_limits
 {
-    // Maximum simultaneous rhythm slots. Mixer channel count and per-rhythm
-    // array sizing across the plugin track this — they are conceptually the
-    // same number (one mixer strip per rhythm).
-    inline constexpr int kMaxRhythms = 8;
+    // Maximum simultaneous channels (layers). The mixer strip count and
+    // per-channel array sizing across the plugin track this — conceptually the
+    // same number (one mixer strip per channel). A "channel" is a rhythm in
+    // mu-clid, a voice in mu-tant.
+    inline constexpr int kMaxChannels = 8;
 
-    // Per-rhythm modulator (ControlSequence) count. The UI tab count in
+    // Per-channel modulator (ControlSequence) count. The UI tab count in
     // ModulatorPanel mirrors this; the two must stay equal.
     inline constexpr int kMaxControlSequences = 8;
 
-    // Maximum modulation assignments per ModulationMatrix (per rhythm).
+    // Maximum modulation assignments per ModulationMatrix (per channel).
     inline constexpr int kMaxModulationAssignments = 64;
 
-    // Per-rhythm polyphony for the SamplePlayer voice pool.
+    // Per-channel polyphony for the SamplePlayer voice pool.
     inline constexpr int kMaxSamplerVoices = 4;
 
-    // Stage 34: per-rhythm retired-voice-engine slots for the polyphonic
+    // Stage 34: per-channel retired-voice-engine slots for the polyphonic
     // hot-swap tail. Each retired engine keeps rendering its in-flight
     // sample / envelope until it reports isFullyDrained.
     inline constexpr int kMaxRetiredVoiceEngines = 4;
@@ -37,8 +38,8 @@ namespace mu_limits
     // handleAsyncUpdate drains on the message thread.
     inline constexpr int kProgramChangeFifoSize = 32;
 
-    // First N rhythms expose full "Rhythm N " APVTS parameter names so DAW
-    // automation lanes are readable; remaining rhythms use short "RN " names.
-    // Raise (up to kMaxRhythms) to expose more rhythms with full names.
-    inline constexpr int kMaxAutomatedRhythms = 3;
+    // First N channels expose full "<Layer> N " APVTS parameter names so DAW
+    // automation lanes are readable; remaining channels use short "N " names.
+    // Raise (up to kMaxChannels) to expose more channels with full names.
+    inline constexpr int kMaxAutomatedChannels = 3;
 }

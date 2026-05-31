@@ -124,7 +124,7 @@ void LiteEditor::parameterChanged(const juce::String& parameterID, float newValu
 
 void LiteEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(lookAndFeel.findColour(MuClidLookAndFeel::windowBackground));
+    g.fillAll(lookAndFeel.findColour(MuLookAndFeel::windowBackground));
 }
 
 void LiteEditor::resized()

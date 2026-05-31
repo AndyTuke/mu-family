@@ -30,17 +30,19 @@ struct VoiceConfig
     float osc1Pos     = 0.0f, osc2Pos    = 0.0f;
 
     int   xmod        = 0;     // 0..127 cross-mod amount
-    int   xmodMode    = 0;     // 0=Off, 1=FM (B->A), 2=Sync (A->B)
+    int   xmodMode    = 0;     // 0=Off, 1=FM (B→A phase-mod), 2=AM (B→A amplitude), 3=Ring
+    bool  sync        = false; // hard sync: osc1 wraps → reset osc2 phase
 
     // Per-source levels (replace the old single osc-balance "mix"). dB.
     float osc1LevelDb = 0.0f, osc2LevelDb = -6.0f;
     float noiseLevelDb = -60.0f;   // -60 dB ≡ off
     int   noiseType    = 0;        // 0=White, 1=Pink
 
-    int   filterType  = 0;
-    float filterCutoff= 8000.0f;
-    float filterRes   = 0.2f;
-    float levelDb     = -6.0f; // slot output level (feeds the mixer channel)
+    int   filterType      = 0;
+    float filterCutoff    = 8000.0f;
+    float filterRes       = 0.2f;
+    float filterEnvDepth  = 1.0f;  // 0..1 how far the filter envelope sweeps the cutoff
+    float levelDb         = -6.0f; // slot output level (feeds the mixer channel)
 };
 
 // White + Pink noise generator. Pink uses Paul Kellet's economy filter
@@ -71,7 +73,7 @@ private:
 class VoiceEngine
 {
 public:
-    enum XMod { Off = 0, FM = 1, Sync = 2 };
+    enum XMod { Off = 0, FM = 1, AM = 2, RingMod = 3 };
 
     void prepare(double sampleRate, int blockSize);
     void setBank(const WavetableBank* b) noexcept;

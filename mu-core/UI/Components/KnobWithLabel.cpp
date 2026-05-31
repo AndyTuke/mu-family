@@ -201,17 +201,54 @@ void KnobWithLabel::paint(juce::Graphics& g)
                juce::Justification::centred, true);
 }
 
+void KnobWithLabel::bindModulation(const char*             destId,
+                                   const ModulationMatrix* matrix,
+                                   std::function<float()>  liveValueFn,
+                                   bool                    normMode)
+{
+    modDestId    = destId ? destId : "";
+    modMatrix    = matrix;
+    modLiveValue = std::move(liveValueFn);
+    modNormMode  = normMode;
+    hasModBind   = true;
+    if (!isTimerRunning()) startTimerHz(30);
+}
+
+void KnobWithLabel::clearModBinding() noexcept
+{
+    hasModBind   = false;
+    modMatrix    = nullptr;
+    modLiveValue = nullptr;
+    modDestId.clear();
+    setIsModulated(false);
+    setModulatedNorm(std::numeric_limits<float>::quiet_NaN());
+    if (!grSource) stopTimer();
+}
+
 void KnobWithLabel::setGRSource(const std::atomic<float>* gr)
 {
     grSource  = gr;
     grDisplay = 0.0f;
     if (gr) startTimerHz(30);
-    else    stopTimer();
+    else if (!hasModBind) stopTimer();
     repaint();
 }
 
 void KnobWithLabel::timerCallback()
 {
+    if (hasModBind)
+    {
+        bool assigned = false;
+        if (modMatrix)
+            for (const auto& a : modMatrix->getAssignments())
+                if (a.destinationId == modDestId) { assigned = true; break; }
+        setIsModulated(assigned);
+        const float kNaN = std::numeric_limits<float>::quiet_NaN();
+        const float live = (assigned && modLiveValue) ? modLiveValue() : kNaN;
+        if (modNormMode) setModulatedNorm(live);
+        else             setModulatedActual(live);
+    }
+
     const float incoming = grSource ? grSource->load() : 0.0f;
     const float prev     = grDisplay;
     grDisplay = (incoming > grDisplay)

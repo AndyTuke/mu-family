@@ -87,10 +87,13 @@ private:
     KnobWithLabel  xmodKnob  { "X-Mod", MuLookAndFeel::knobEuclidean };
     juce::Label    xmodLabel;
     DropdownSelect xmodModeDropdown;
+    juce::TextButton syncButton { "Sync" };
     std::unique_ptr<APVTS::SliderAttachment>   xmodAttachment;
     std::unique_ptr<APVTS::ComboBoxAttachment> xmodModeAttachment;
+    std::unique_ptr<APVTS::ButtonAttachment>   syncAttachment;
 
-    // ── Mixer levels (osc1 / osc2 / noise — Size-3 knobs in the right panel) ──
+    // ── Mixer levels (osc1 / osc2 / noise — Size-2 knobs, horizontal MIXER row
+    //    under the NOISE panel) + noise type (in its own NOISE panel) ─────────
     KnobWithLabel  osc1LevelKnob  { "Osc 1", MuLookAndFeel::knobLevel };
     KnobWithLabel  osc2LevelKnob  { "Osc 2", MuLookAndFeel::knobLevel };
     KnobWithLabel  noiseLevelKnob { "Noise", MuLookAndFeel::knobLevel };
@@ -104,11 +107,13 @@ private:
     // ── Filter ──────────────────────────────────────────────────────────────
     juce::Label    fltTypeLabel;
     DropdownSelect fltTypeDropdown;
-    KnobWithLabel  fltCutKnob { "Cutoff",    MuLookAndFeel::knobPostPad };
-    KnobWithLabel  fltResKnob { "Resonance", MuLookAndFeel::knobPostPad };
+    KnobWithLabel  fltCutKnob      { "Cutoff",    MuLookAndFeel::knobPostPad };
+    KnobWithLabel  fltResKnob      { "Resonance", MuLookAndFeel::knobPostPad };
+    KnobWithLabel  fltEnvDepthKnob { "FEnv",      MuLookAndFeel::knobPostPad };
     std::unique_ptr<APVTS::ComboBoxAttachment> fltTypeAttachment;
     std::unique_ptr<APVTS::SliderAttachment>   fltCutAttachment;
     std::unique_ptr<APVTS::SliderAttachment>   fltResAttachment;
+    std::unique_ptr<APVTS::SliderAttachment>   fltEnvDepthAttachment;
 
     // ── Output level ────────────────────────────────────────────────────────
     KnobWithLabel levelKnob { "Level", MuLookAndFeel::knobLevel };
@@ -121,11 +126,9 @@ private:
     // for the derived→ProcessorBase& conversion (only forward-declared here).
     InsertSubsection insertSub;
 
-    // ── Gating designer + Gap knob + Gater bypass ───────────────────────────
-    GatingDesigner   gatingDesigner;
-    KnobWithLabel    gapKnob { "Gap", MuLookAndFeel::knobFxSend };
+    // ── Gating designer (full-width; Gap slider + Bypass button live inside it) ──
+    GatingDesigner gatingDesigner;
     std::unique_ptr<APVTS::SliderAttachment> gapAttachment;
-    juce::TextButton gateBypassButton { "Bypass" };
     std::unique_ptr<APVTS::ButtonAttachment> gateBypassAttachment;
 
     // ── Modulator section (mu-core ModulatorPanel + mu-tant destinations) ──
@@ -141,6 +144,7 @@ private:
     std::vector<juce::File> voicePresetFiles;   // dropdown id (1-based) → file
 
     void rebindAttachments();
+    void bindModulationIndicators();
 
     // 30 Hz timer — drives the gating-grid playhead + modulator playhead from
     // the processor's transport beat position.
@@ -148,7 +152,7 @@ private:
 
     // Sub-panel geometry — populated by resized(), consumed by paint() for the
     // bordered sub-panels + their titles so layout + decoration stay in sync.
-    juce::Rectangle<int> osc1PanelR, osc2PanelR, modNoisePanelR, filterPanelR, mixerPanelR, insertPanelR;
+    juce::Rectangle<int> osc1PanelR, osc2PanelR, modNoisePanelR, filterPanelR, noisePanelR, mixerPanelR, insertPanelR;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VoicePanel)
 };

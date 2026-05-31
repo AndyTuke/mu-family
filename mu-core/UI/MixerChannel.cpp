@@ -198,7 +198,7 @@ void MixerChannel::resized()
     const int faderY = sendY + spH;
 
     // A return channel cannot send to itself (would feedback-loop). #429.
-    sendEffect.setVisible(hasSends() && channelType == Type::Rhythm);
+    sendEffect.setVisible(hasSends() && channelType == Type::Channel);
     sendDelay .setVisible(hasSends() && channelType != Type::DelayReturn
                                      && channelType != Type::ReverbReturn);
     sendReverb.setVisible(hasSends() && channelType != Type::ReverbReturn);
@@ -214,7 +214,7 @@ void MixerChannel::resized()
 
     // Sends pane: from first visible send to end of pan.
     {
-        const int firstOff = (channelType == Type::Rhythm)      ? 0
+        const int firstOff = (channelType == Type::Channel)      ? 0
                            : (channelType == Type::EffectReturn) ? sendH
                            : (channelType == Type::DelayReturn)  ? sendH * 2
                            : sendH * 3;  // ReverbReturn / Master: pan only
@@ -351,7 +351,7 @@ void MixerChannel::paint(juce::Graphics& g)
 
     // Rhythm-colour border around the name pill (rhythm strips only — returns
     // and master keep their fixed colour scheme since they're not per-rhythm).
-    if (active && channelType == Type::Rhythm)
+    if (active && channelType == Type::Channel)
     {
         const juce::Rectangle<int> namePill {
             kNamePadding, kNamePadding, stripW - 2 * kNamePadding, kNameH };

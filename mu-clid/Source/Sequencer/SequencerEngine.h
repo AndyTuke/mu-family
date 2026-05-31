@@ -23,7 +23,7 @@ struct BlockResult
 class SequencerEngine : public juce::ChangeBroadcaster
 {
 public:
-    static constexpr int    MaxRhythms      = mu_limits::kMaxRhythms;
+    static constexpr int    MaxRhythms      = mu_limits::kMaxChannels;
     static constexpr double StepLengthBeats = 0.25; // 1/16th note default
 
     SequencerEngine();

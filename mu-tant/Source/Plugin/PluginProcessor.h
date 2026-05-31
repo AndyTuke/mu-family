@@ -216,9 +216,9 @@ private:
     {
         std::atomic<float> *o1Oct, *o1Semi, *o1Fine, *o1Pos;
         std::atomic<float> *o2Oct, *o2Semi, *o2Fine, *o2Pos;
-        std::atomic<float> *xmod, *xmode;
+        std::atomic<float> *xmod, *xmode, *sync;
         std::atomic<float> *o1Lvl, *o2Lvl, *noiseLvl, *noiseType;
-        std::atomic<float> *fltType, *fltCut, *fltRes;
+        std::atomic<float> *fltType, *fltCut, *fltRes, *fltEnvDepth;
         std::atomic<float> *level, *gateGap, *gateBypass;
         std::atomic<float> *drvChar, *insP1, *insP2, *insP3, *insP4;
     };
@@ -249,10 +249,12 @@ public:
     // currently-edited voice's slot.
     std::array<VoiceSlot, kMaxVoices> voiceSlots;
 
-    // Per-voice drawable gate pattern. Public so the (future) GatePatternEditor
-    // can mutate it under voiceSlots[v].modLock. Currently empty — audio path
-    // doesn't yet apply the gate.
+    // Per-voice drawable gate pattern. Public so GatingDesigner can mutate it.
     std::array<GatePattern, kMaxVoices> gatePatterns;
+
+    // Per-voice filter envelope pattern. Same drawable model as gatePatterns but
+    // modulates filter cutoff (0=20 Hz, 1=base cutoff) instead of amplitude.
+    std::array<GatePattern, kMaxVoices> filterPatterns;
 
     // Per-voice post-insert audio ring buffers — written by the audio thread in
     // renderVoice() after the insert; read by VoiceSpectrumGlyph at 30 Hz for
@@ -281,6 +283,12 @@ private:
     std::atomic<double> internalBeatPos { 0.0 };
     std::atomic<double> internalBpm { 120.0 };
     double currentSampleRate = 44100.0;
+
+    // Counts completed 2-bar pattern loops (incremented at each wrap in processBlock).
+    // Read by the audio thread in renderVoice to drive per-envelope loopN/loopM +
+    // probability rules. Wraps safely at uint max — the modulo check in playsOnLoop
+    // is stable across the wrap.
+    std::atomic<int> loopCount { 0 };
 
     // Number of existing voices (layers), 1..kMaxVoices. Audio thread reads it
     // atomically; add/removeVoice mutate it on the message thread under voicesLock.

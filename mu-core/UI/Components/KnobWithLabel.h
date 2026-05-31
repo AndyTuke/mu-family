@@ -1,6 +1,9 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <functional>
+#include <string>
 #include "MuLookAndFeel.h"
+#include "Modulation/ModulationMatrix.h"
 
 // Rotary slider + category colour + label below + optional status bar callback.
 class KnobWithLabel : public juce::Component, private juce::Timer
@@ -36,6 +39,25 @@ public:
     void setModulatedNorm(float norm01);
     void setModulatedActual(float actualValue) noexcept;
 
+    // Declarative mod binding — the knob polls the matrix at 30 Hz and drives
+    // its own rings without any external refreshModulatedIndicators() call.
+    //
+    // destId:      the ModulationMatrix destination string for this knob.
+    // matrix:      the matrix to query for assignment state; may be null (rings stay off).
+    // liveValueFn: returns the current modulated value each timer tick.
+    //              Use actual display units (Hz, dB, semitones, etc.) unless normMode=true.
+    //              Return NaN when the sequencer isn't playing — clears the live arc.
+    // normMode:    when true liveValueFn returns 0..1 proportion → setModulatedNorm;
+    //              when false (default) it returns actual display units → setModulatedActual.
+    //
+    // Calling bindModulation() again re-binds (e.g. when setRhythm / setVoice fires).
+    // clearModBinding() removes the binding and stops the ring.
+    void bindModulation(const char*             destId,
+                        const ModulationMatrix* matrix,
+                        std::function<float()>  liveValueFn,
+                        bool                    normMode = false);
+    void clearModBinding() noexcept;
+
     // GR meter overlay (compressor/limiter): set to audio-thread-written atomic;
     // knob polls at 30 Hz and draws an orange arc showing gain reduction (0..1,
     // where 1 ≡ 24 dB). Pass nullptr to disable.
@@ -54,6 +76,12 @@ private:
 
     bool  isModulated   = false;
     float modulatedNorm = std::numeric_limits<float>::quiet_NaN();
+
+    bool                    hasModBind   = false;
+    bool                    modNormMode  = false;
+    std::string             modDestId;
+    const ModulationMatrix* modMatrix    = nullptr;
+    std::function<float()>  modLiveValue;
 
     // when true, suppress onValueChanged dispatch from the slider's
     // onValueChange lambda. Set transiently inside setRange so JUCE's setRange

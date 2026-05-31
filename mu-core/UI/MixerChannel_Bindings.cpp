@@ -5,7 +5,7 @@
 #include "MixerChannel.h"
 #include "Plugin/ProcessorBase.h"
 #include "Audio/InsertSlotConfig.h"
-void MixerChannel::bindRhythm(MixerEngine::ChannelState& state, std::atomic<float>& peak,
+void MixerChannel::bindChannel(MixerEngine::ChannelState& state, std::atomic<float>& peak,
                                ProcessorBase* proc, const juce::String& prefix,
                                std::atomic<float>* grAtomic)
 {

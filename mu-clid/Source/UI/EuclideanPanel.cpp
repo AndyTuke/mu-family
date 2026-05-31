@@ -1,5 +1,6 @@
 #include "EuclideanPanel.h"
 #include "Plugin/PluginProcessor.h"
+#include "Modulation/ModulationSnapshot.h"
 #include <limits>
 
 EuclideanPanel::EuclideanPanel(PluginProcessor& p) : proc(p)
@@ -226,6 +227,7 @@ void EuclideanPanel::setRhythm(int ri)
         paramPtrCache.clear();   // cached pointers were keyed to the previous rhythmIndex's IDs
     rhythmIndex = ri;
     loadFromRhythm();
+    bindModulationIndicators();
 }
 
 void EuclideanPanel::loadFromRhythm()
@@ -357,69 +359,49 @@ void EuclideanPanel::setRhythmColour(juce::Colour c)
     repaint();
 }
 
-void EuclideanPanel::refreshModulatedIndicators()
+void EuclideanPanel::bindModulationIndicators()
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
-    const auto& assigns = proc.getRhythm(rhythmIndex).modulationMatrix.getAssignments();
-
-    auto isAssigned = [&assigns](const char* destId) -> bool
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms())
     {
-        const std::string s = destId;
-        for (const auto& a : assigns)
-            if (a.destinationId == s) return true;
-        return false;
+        for (auto* k : { &hitsA, &rotA, &prePadA, &postPadA, &insertStA, &insertLenA,
+                         &hitsB, &rotB, &prePadB, &postPadB, &insertStB, &insertLenB,
+                         &hitsC, &rotC, &prePadC, &postPadC, &insertStC, &insertLenC })
+            k->clearModBinding();
+        return;
+    }
+    const auto* mx = &proc.getRhythm(rhythmIndex).modulationMatrix;
+    static const float kNaN = std::numeric_limits<float>::quiet_NaN();
+
+    // Euclid destinations: modParamValues are 0..1 proportions → normMode=true for all.
+    // Arc clears when sequencer stops.
+    auto bind = [&](KnobWithLabel& k, const char* destId, int snapIdx)
+    {
+        k.bindModulation(destId, mx,
+            [&proc = proc, ri = rhythmIndex, snapIdx]() -> float {
+                return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, snapIdx) : kNaN; },
+            true);
     };
 
-    // Only show ring + live arc while playing — when stopped the snapshot holds the
-    // last played position, which would read as a permanent misleading indicator.
-    const bool playing = proc.sequencerPlaying.load();
+    bind(hitsA,      "euclid.a.hits",    kSnapEucAHits);
+    bind(rotA,       "euclid.a.rotate",  kSnapEucARotate);
+    bind(prePadA,    "euclid.a.prePad",  kSnapEucAPrePad);
+    bind(postPadA,   "euclid.a.postPad", kSnapEucAPostPad);
+    bind(insertStA,  "euclid.a.insSt",   kSnapEucAInsSt);
+    bind(insertLenA, "euclid.a.insLen",  kSnapEucAInsLen);
 
-    hitsA    .setIsModulated(playing && isAssigned("euclid.a.hits"));
-    rotA     .setIsModulated(playing && isAssigned("euclid.a.rotate"));
-    prePadA  .setIsModulated(playing && isAssigned("euclid.a.prePad"));
-    postPadA .setIsModulated(playing && isAssigned("euclid.a.postPad"));
-    insertStA.setIsModulated(playing && isAssigned("euclid.a.insSt"));
-    insertLenA.setIsModulated(playing && isAssigned("euclid.a.insLen"));
+    bind(hitsB,      "euclid.b.hits",    kSnapEucBHits);
+    bind(rotB,       "euclid.b.rotate",  kSnapEucBRotate);
+    bind(prePadB,    "euclid.b.prePad",  kSnapEucBPrePad);
+    bind(postPadB,   "euclid.b.postPad", kSnapEucBPostPad);
+    bind(insertStB,  "euclid.b.insSt",   kSnapEucBInsSt);
+    bind(insertLenB, "euclid.b.insLen",  kSnapEucBInsLen);
 
-    hitsB    .setIsModulated(playing && isAssigned("euclid.b.hits"));
-    rotB     .setIsModulated(playing && isAssigned("euclid.b.rotate"));
-    prePadB  .setIsModulated(playing && isAssigned("euclid.b.prePad"));
-    postPadB .setIsModulated(playing && isAssigned("euclid.b.postPad"));
-    insertStB.setIsModulated(playing && isAssigned("euclid.b.insSt"));
-    insertLenB.setIsModulated(playing && isAssigned("euclid.b.insLen"));
-
-    hitsC    .setIsModulated(playing && isAssigned("euclid.c.hits"));
-    rotC     .setIsModulated(playing && isAssigned("euclid.c.rotate"));
-    prePadC  .setIsModulated(playing && isAssigned("euclid.c.prePad"));
-    postPadC .setIsModulated(playing && isAssigned("euclid.c.postPad"));
-    insertStC.setIsModulated(playing && isAssigned("euclid.c.insSt"));
-    insertLenC.setIsModulated(playing && isAssigned("euclid.c.insLen"));
-
-    // Stage C: live-arc indicator values from the modulation snapshot.
-    auto sn  = [&](int i) { return proc.getModSnapshot(rhythmIndex, i); };
-    const float kNaN = std::numeric_limits<float>::quiet_NaN();
-    auto arc = [&](bool assigned, int idx) { return (assigned && playing) ? sn(idx) : kNaN; };
-
-    hitsA     .setModulatedNorm(arc(isAssigned("euclid.a.hits"),    kSnapEucAHits));
-    rotA      .setModulatedNorm(arc(isAssigned("euclid.a.rotate"),  kSnapEucARotate));
-    prePadA   .setModulatedNorm(arc(isAssigned("euclid.a.prePad"),  kSnapEucAPrePad));
-    postPadA  .setModulatedNorm(arc(isAssigned("euclid.a.postPad"), kSnapEucAPostPad));
-    insertStA .setModulatedNorm(arc(isAssigned("euclid.a.insSt"),   kSnapEucAInsSt));
-    insertLenA.setModulatedNorm(arc(isAssigned("euclid.a.insLen"),  kSnapEucAInsLen));
-
-    hitsB     .setModulatedNorm(arc(isAssigned("euclid.b.hits"),    kSnapEucBHits));
-    rotB      .setModulatedNorm(arc(isAssigned("euclid.b.rotate"),  kSnapEucBRotate));
-    prePadB   .setModulatedNorm(arc(isAssigned("euclid.b.prePad"),  kSnapEucBPrePad));
-    postPadB  .setModulatedNorm(arc(isAssigned("euclid.b.postPad"), kSnapEucBPostPad));
-    insertStB .setModulatedNorm(arc(isAssigned("euclid.b.insSt"),   kSnapEucBInsSt));
-    insertLenB.setModulatedNorm(arc(isAssigned("euclid.b.insLen"),  kSnapEucBInsLen));
-
-    hitsC     .setModulatedNorm(arc(isAssigned("euclid.c.hits"),    kSnapEucCHits));
-    rotC      .setModulatedNorm(arc(isAssigned("euclid.c.rotate"),  kSnapEucCRotate));
-    prePadC   .setModulatedNorm(arc(isAssigned("euclid.c.prePad"),  kSnapEucCPrePad));
-    postPadC  .setModulatedNorm(arc(isAssigned("euclid.c.postPad"), kSnapEucCPostPad));
-    insertStC .setModulatedNorm(arc(isAssigned("euclid.c.insSt"),   kSnapEucCInsSt));
-    insertLenC.setModulatedNorm(arc(isAssigned("euclid.c.insLen"),  kSnapEucCInsLen));
+    bind(hitsC,      "euclid.c.hits",    kSnapEucCHits);
+    bind(rotC,       "euclid.c.rotate",  kSnapEucCRotate);
+    bind(prePadC,    "euclid.c.prePad",  kSnapEucCPrePad);
+    bind(postPadC,   "euclid.c.postPad", kSnapEucCPostPad);
+    bind(insertStC,  "euclid.c.insSt",   kSnapEucCInsSt);
+    bind(insertLenC, "euclid.c.insLen",  kSnapEucCInsLen);
 }
 
 void EuclideanPanel::resized()
@@ -530,7 +512,7 @@ void EuclideanPanel::resized()
 
 void EuclideanPanel::paint(juce::Graphics& g)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
     using mu_ui::s;
 
     // Match resized()'s constants exactly — see Medium-baseline values in MuLookAndFeel.
@@ -543,7 +525,7 @@ void EuclideanPanel::paint(juce::Graphics& g)
     const char* rowLabels[3]    = { "Euclid A", "Euclid B", "Accent" };
 
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(9.0f))));
-    g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
+    g.setColour(MuLookAndFeel::colour(Id::mutedText));
     for (int i = 0; i < 3; ++i)
         g.drawText(rowLabels[i], s(kOuter), s(rowOffsets[i]), s(innerW), s(kLabelH), juce::Justification::centredLeft, false);
 

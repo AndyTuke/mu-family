@@ -204,6 +204,58 @@ public:
             expectWithinAbsoluteError(p.gateAt(8.0, 0.0f),  p.gateAt(0.0, 0.0f), 1e-4f, "beat 8 wraps to beat 0");
             expectWithinAbsoluteError(p.gateAt(16.0, 0.0f), p.gateAt(0.0, 0.0f), 1e-4f, "beat 16 wraps to beat 0");
         }
+
+        beginTest("playsOnLoop: probability 1.0 always fires");
+        {
+            GateEnvelope env;
+            env.probability = 1.0f;
+            env.loopM = 1; env.loopMask = 0x01;
+            for (int loop = 0; loop < 16; ++loop)
+                expect(env.playsOnLoop(loop), "probability 1.0 fires on loop " + juce::String(loop));
+        }
+
+        beginTest("playsOnLoop: loopM=2 loopMask=0x01 fires only on even loops");
+        {
+            GateEnvelope env;
+            env.probability = 1.0f;
+            env.loopM = 2; env.loopMask = 0x01;   // position 0 (bit 0) only
+            expect( env.playsOnLoop(0), "loop 0 (pos 0 of 2) fires");
+            expect(!env.playsOnLoop(1), "loop 1 (pos 1 of 2) silent");
+            expect( env.playsOnLoop(2), "loop 2 (pos 0 of 2) fires");
+            expect(!env.playsOnLoop(3), "loop 3 (pos 1 of 2) silent");
+        }
+
+        beginTest("playsOnLoop: loopM=4 loopMask=0x05 fires on positions 0 and 2");
+        {
+            GateEnvelope env;
+            env.probability = 1.0f;
+            env.loopM = 4; env.loopMask = 0x05;   // bits 0 and 2 set
+            expect( env.playsOnLoop(0), "loop 0 (pos 0) fires");
+            expect(!env.playsOnLoop(1), "loop 1 (pos 1) silent");
+            expect( env.playsOnLoop(2), "loop 2 (pos 2) fires");
+            expect(!env.playsOnLoop(3), "loop 3 (pos 3) silent");
+            expect( env.playsOnLoop(4), "loop 4 wraps to pos 0 → fires");
+        }
+
+        beginTest("playsOnLoop: loopMask=0x00 always silent (no positions selected)");
+        {
+            GateEnvelope env;
+            env.probability = 1.0f;
+            env.loopM = 4; env.loopMask = 0x00;
+            for (int loop = 0; loop < 8; ++loop)
+                expect(!env.playsOnLoop(loop), "mask 0x00 never fires (loop " + juce::String(loop) + ")");
+        }
+
+        beginTest("playsOnLoop: probability 0 never fires");
+        {
+            GateEnvelope env;
+            env.probability = 0.0f;
+            env.loopM = 1; env.loopMask = 0xFF;
+            bool anyFired = false;
+            for (int loop = 0; loop < 64; ++loop)
+                if (env.playsOnLoop(loop)) { anyFired = true; break; }
+            expect(!anyFired, "probability 0.0 never fires across 64 loops");
+        }
     }
 };
 

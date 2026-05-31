@@ -83,7 +83,7 @@ void InsertSubsection::wireCallbacks()
 
         // A/B snapshot: stash the OUTGOING algo's current ACTUAL slot values so
         // cycling back restores the user's edits instead of the defaults table.
-        if (oldChar >= 0 && oldChar < 14 && validChannel())
+        if (oldChar >= 0 && oldChar < mu_ui::kInsertAlgoCount && validChannel())
         {
             for (int slot = 0; slot < mu_ui::kInsertSlotCount; ++slot)
                 insertSnapshots[oldChar][slot] = mu_ui::normToActual(readSlot(slot), oldChar, slot);
@@ -95,7 +95,7 @@ void InsertSubsection::wireCallbacks()
         // configureInsertAlgorithm with the stale algo mid-sequence.
         auto applyAlgoSwitch = [this, newChar]
         {
-            const char* const slotSuffix[4] = { "insP1", "insP2", "insP3", "insP4" };
+            const char* const slotSuffix[mu_ui::kInsertSlotCount] = { "insP1", "insP2", "insP3", "insP4" };
             for (int slot = 0; slot < mu_ui::kInsertSlotCount; ++slot)
             {
                 const float actual = insertSnapshotValid[newChar]
@@ -121,6 +121,11 @@ void InsertSubsection::setChannel(int idx)
     std::fill(std::begin(insertSnapshotValid), std::end(insertSnapshotValid), false);
     loadFromChannel();
     refreshModulatedIndicators();
+    // Start the 30 Hz self-refresh when a channel is bound and mod hooks are wired.
+    if (validChannel() && (isSlotModulated || slotModValue))
+        startTimerHz(30);
+    else
+        stopTimer();
 }
 
 void InsertSubsection::loadFromChannel()
@@ -148,8 +153,8 @@ void InsertSubsection::refreshModulatedIndicators()
     const float kNaN   = std::numeric_limits<float>::quiet_NaN();
     const bool  playing = isPlaying ? isPlaying() : false;
 
-    KnobWithLabel* knobs[4] = { &insertParam1, &insertParam2, &insertParam3, &insertParam4 };
-    for (int slot = 0; slot < 4; ++slot)
+    KnobWithLabel* knobs[mu_ui::kInsertSlotCount] = { &insertParam1, &insertParam2, &insertParam3, &insertParam4 };
+    for (int slot = 0; slot < mu_ui::kInsertSlotCount; ++slot)
     {
         const bool assigned = isSlotModulated ? isSlotModulated(slot) : false;
         knobs[slot]->setIsModulated(playing && assigned);
@@ -166,10 +171,10 @@ void InsertSubsection::configureInsertAlgorithm(int charId)
     }
     insertParam2.setGRSource(nullptr);
 
-    KnobWithLabel* knobs[4] = { &insertParam1, &insertParam2, &insertParam3, &insertParam4 };
-    const char* const slotSuffix[4] = { "insP1", "insP2", "insP3", "insP4" };
+    KnobWithLabel* knobs[mu_ui::kInsertSlotCount] = { &insertParam1, &insertParam2, &insertParam3, &insertParam4 };
+    const char* const slotSuffix[mu_ui::kInsertSlotCount] = { "insP1", "insP2", "insP3", "insP4" };
 
-    for (int slot = 0; slot < 4; ++slot)
+    for (int slot = 0; slot < mu_ui::kInsertSlotCount; ++slot)
     {
         const float currentNorm = validChannel() ? readSlot(slot) : 0.0f;
         const char* suffix = slotSuffix[slot];

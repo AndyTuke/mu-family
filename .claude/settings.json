@@ -43,6 +43,25 @@
             "statusMessage": "Scanning build output for compiler warnings...",
             "timeout": 120,
             "prompt": "Scan the cmake build output in this JSON for compiler warnings: $ARGUMENTS\n\nLook for warning lines in the tool_response output field. Warning patterns: ': warning:' (GCC/Clang) and 'warning C' (MSVC). Skip note/continuation lines that have no warning code. If no warnings are found, stop immediately and do nothing.\n\nFor each unique warning (deduplicate by file+line+warning-code):\n1. Read the source file at the indicated path to understand the context around the warning line.\n2. Determine what fix is needed and why.\n3. Read d:\\Dev\\mu\\backlog.md to find the current highest issue number in the Open section.\n4. Prepend a new Open issue at the very top of the Open section: - [ ] #NNN: Compiler warning: <brief description> (<filename>:<line>)\n\nNever add a duplicate if the same warning is already described in an existing Open backlog entry."
+          },
+          {
+            "type": "command",
+            "shell": "powershell",
+            "if": "Bash(cmake --build *)",
+            "statusMessage": "Checking first build of day for oversight trigger...",
+            "command": "powershell -NonInteractive -File \"d:\\Dev\\mu\\scripts\\mu_build_hook.ps1\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "statusMessage": "Checking for pending oversight audit...",
+            "command": "powershell -NonInteractive -File \"d:\\Dev\\mu\\scripts\\mu_oversight_inject.ps1\""
           }
         ]
       }

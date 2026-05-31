@@ -80,7 +80,7 @@ inline void configureKnobFromSlot(KnobWithLabel& k,
                                   float currentNorm,
                                   std::function<void(float /*newNorm*/)> onWriteNorm)
 {
-    if (algoIdx < 0 || algoIdx >= 14 || slotIdx < 0 || slotIdx >= kInsertSlotCount)
+    if (algoIdx < 0 || algoIdx >= kInsertAlgoCount || slotIdx < 0 || slotIdx >= kInsertSlotCount)
     {
         k.setVisible(false);
         k.onValueChanged = nullptr;

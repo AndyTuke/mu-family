@@ -1,6 +1,7 @@
 #include "VoicePanel.h"
 #include "Plugin/PluginProcessor.h"
 #include "Audio/Scales.h"
+#include "Audio/AlgorithmNames.h"   // mu-core: kFilterTypeNames (shared canonical list)
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/ConfirmDialog.h"   // mu-core shared confirm dialogs
 #include "Modulation/MuTantModSnap.h"
@@ -32,18 +33,16 @@ namespace
     {
         d.addItem("Off",  1);
         d.addItem("FM",   2);
-        d.addItem("Sync", 3);
+        d.addItem("AM",   3);
+        d.addItem("Ring", 4);
     }
 
     void populateFilterTypes(DropdownSelect& d)
     {
-        // First-stab labels — same id span as the AudioParameterInt 0..15 range.
-        const char* names[] = { "LP 12", "LP 24", "HP 12", "HP 24",
-                                "BP 12", "BP 24", "Notch", "AP",
-                                "Comb",  "1P LP", "1P HP", "Peak",
-                                "Lo Shelf", "Hi Shelf", "n/a", "n/a" };
-        for (int i = 0; i < 16; ++i)
-            d.addItem(names[i], i + 1);
+        // Source from the shared mu-core canonical list so it stays in sync with
+        // MultiModeFilter's algorithm array.
+        for (int i = 0; mu_audio::kFilterTypeNames[i] != nullptr; ++i)
+            d.addItem(mu_audio::kFilterTypeNames[i], i + 1);
     }
 
     void populateNoiseTypes(DropdownSelect& d)
@@ -130,7 +129,7 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PosKnob,
                      &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PosKnob,
                      &xmodKnob, &osc1LevelKnob, &osc2LevelKnob, &noiseLevelKnob,
-                     &fltCutKnob, &fltResKnob, &levelKnob })
+                     &fltCutKnob, &fltResKnob, &fltEnvDepthKnob, &levelKnob })
         addAndMakeVisible(k);
 
     // Placeholder wavetable selectors — one per oscillator, sitting to the left
@@ -146,6 +145,10 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     setupLabel(xmodLabel, "Mode");
     populateXmodModes(xmodModeDropdown);
     addAndMakeVisible(xmodModeDropdown);
+
+    syncButton.setClickingTogglesState(true);
+    syncButton.setTooltip("Hard sync: osc1 wrap resets osc2 phase");
+    addAndMakeVisible(syncButton);
 
     setupLabel(noiseTypeLabel, "Noise");
     populateNoiseTypes(noiseTypeDropdown);
@@ -164,18 +167,10 @@ VoicePanel::VoicePanel(PluginProcessor& p)
         fltCutKnob.setLabel(v < 1000.0 ? "Cutoff (Hz)" : "Cutoff (kHz)");
     };
 
-    // ── Gating designer + Gap knob + Gater bypass ───────────────────────────
+    // ── Gating designer (Gap slider + Bypass button are inside it) ──────────
+    // The GatingDesigner owns the Gap slider and Bypass button as children;
+    // VoicePanel just creates the APVTS attachments per-voice in rebindAttachments.
     addAndMakeVisible(gatingDesigner);
-    addAndMakeVisible(gapKnob);
-    // Gap is a 0..100 % integer param (the trailing fraction of each gate region
-    // forced to silence). The designer renders in 0..1, so scale on the way in.
-    gapKnob.onValueChanged = [this](double v) { gatingDesigner.setGap((float) (v / 100.0)); };
-
-    // Gater bypass — when on, the gate stage is skipped so the raw drone passes
-    // (audition / configuration). Per-voice APVTS toggle, rebound per voice.
-    gateBypassButton.setClickingTogglesState(true);
-    gateBypassButton.setTooltip("Bypass the gater so the drone passes through unmodulated");
-    addAndMakeVisible(gateBypassButton);
 
     // ── Insert effect (shared mu-core panel) ────────────────────────────────
     // mu-tant reads its insert params fresh from APVTS each block (no listener),
@@ -235,6 +230,7 @@ void VoicePanel::setVoice(int voiceIndex)
 
     modulatorPanel.setVoiceSlot(&proc.voiceSlots[(size_t) currentVoice]);
     gatingDesigner.setPattern(&proc.gatePatterns[(size_t) currentVoice]);
+    gatingDesigner.setFilterPattern(&proc.filterPatterns[(size_t) currentVoice]);
     insertSub.setChannel(currentVoice);   // reloads algo + slot knobs from APVTS
     refreshHeader();
     repaint();   // sub-panel borders + section titles paint in the active voice's palette colour
@@ -254,12 +250,13 @@ void VoicePanel::rebindAttachments()
     o1FineAttachment     = nullptr; o1PosAttachment    = nullptr;
     o2OctAttachment      = nullptr; o2SemiAttachment   = nullptr;
     o2FineAttachment     = nullptr; o2PosAttachment    = nullptr;
-    xmodAttachment       = nullptr; xmodModeAttachment = nullptr;
+    xmodAttachment = nullptr; xmodModeAttachment = nullptr; syncAttachment = nullptr;
     osc1LevelAttachment  = nullptr; osc2LevelAttachment = nullptr;
     noiseLevelAttachment = nullptr; noiseTypeAttachment = nullptr;
-    fltTypeAttachment    = nullptr; fltCutAttachment   = nullptr;
-    fltResAttachment     = nullptr; levelAttachment    = nullptr;
-    gapAttachment        = nullptr; gateBypassAttachment = nullptr;
+    fltTypeAttachment     = nullptr; fltCutAttachment       = nullptr;
+    fltResAttachment      = nullptr; fltEnvDepthAttachment = nullptr;
+    levelAttachment       = nullptr;
+    gapAttachment = nullptr; gateBypassAttachment = nullptr;
 
     o1OctAttachment  = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_oct"),  o1OctKnob.getSlider());
     o1SemiAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_semi"), o1SemiKnob.getSlider());
@@ -273,22 +270,24 @@ void VoicePanel::rebindAttachments()
 
     xmodAttachment     = std::make_unique<APVTS::SliderAttachment>  (apvts, id("xmod"),  xmodKnob.getSlider());
     xmodModeAttachment = std::make_unique<APVTS::ComboBoxAttachment>(apvts, id("xmode"), xmodModeDropdown.getComboBox());
+    syncAttachment     = std::make_unique<APVTS::ButtonAttachment>  (apvts, id("sync"),  syncButton);
 
     osc1LevelAttachment  = std::make_unique<APVTS::SliderAttachment>  (apvts, id("o1_lvl"),     osc1LevelKnob.getSlider());
     osc2LevelAttachment  = std::make_unique<APVTS::SliderAttachment>  (apvts, id("o2_lvl"),     osc2LevelKnob.getSlider());
     noiseLevelAttachment = std::make_unique<APVTS::SliderAttachment>  (apvts, id("noise_lvl"),  noiseLevelKnob.getSlider());
     noiseTypeAttachment  = std::make_unique<APVTS::ComboBoxAttachment>(apvts, id("noise_type"), noiseTypeDropdown.getComboBox());
 
-    fltTypeAttachment = std::make_unique<APVTS::ComboBoxAttachment>(apvts, id("flt_type"), fltTypeDropdown.getComboBox());
-    fltCutAttachment  = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_cut"),  fltCutKnob.getSlider());
-    fltResAttachment  = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_res"),  fltResKnob.getSlider());
+    fltTypeAttachment     = std::make_unique<APVTS::ComboBoxAttachment>(apvts, id("flt_type"),      fltTypeDropdown.getComboBox());
+    fltCutAttachment      = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_cut"),       fltCutKnob.getSlider());
+    fltResAttachment      = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_res"),       fltResKnob.getSlider());
+    fltEnvDepthAttachment = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_env_depth"), fltEnvDepthKnob.getSlider());
 
     levelAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("level"), levelKnob.getSlider());
-    gapAttachment   = std::make_unique<APVTS::SliderAttachment>(apvts, id("gate_gap"), gapKnob.getSlider());
-    gateBypassAttachment = std::make_unique<APVTS::ButtonAttachment>(apvts, id("gate_bypass"), gateBypassButton);
+    gapAttachment        = std::make_unique<APVTS::SliderAttachment>(apvts, id("gate_gap"),     gatingDesigner.gapSlider);
+    gateBypassAttachment = std::make_unique<APVTS::ButtonAttachment>(apvts, id("gate_bypass"), gatingDesigner.bypassButton);
 
-    // Sync the designer's render-only Gap mirror to the freshly-bound value (0..100 % → 0..1).
-    gatingDesigner.setGap((float) (gapKnob.getValue() / 100.0));
+    // Mirror the Gap value into the designer's render cache.
+    gatingDesigner.setGap((float)(gatingDesigner.gapSlider.getValue() / 100.0));
 }
 
 void VoicePanel::bindModulationIndicators()
@@ -483,7 +482,8 @@ void VoicePanel::resized()
         int x = leftX + oscTitleW;
         xmodKnob.setBounds(x, rowY, s2W, s2H);                 x += s2W + gap;
         xmodLabel.setBounds(x, ctrlY, s(40), ddH);             x += s(40) + s(2);
-        xmodModeDropdown.setBounds(x, ctrlY, s(78), ddH);
+        xmodModeDropdown.setBounds(x, ctrlY, s(78), ddH);      x += s(78) + s(8);
+        syncButton.setBounds(x, ctrlY, s(46), ddH);
         // Noise type moved to its own NOISE panel (top-right); see below.
         y += rowH + gap;
     }
@@ -498,7 +498,8 @@ void VoicePanel::resized()
         fltTypeLabel.setBounds(x, ctrlY, s(36), ddH);          x += s(36) + s(2);
         fltTypeDropdown.setBounds(x, ctrlY, s(96), ddH);       x += s(96) + gap;
         fltCutKnob.setBounds(x, rowY, s2W, s2H);               x += s2W + s(2);
-        fltResKnob.setBounds(x, rowY, s2W, s2H);
+        fltResKnob.setBounds(x, rowY, s2W, s2H);               x += s2W + s(2);
+        fltEnvDepthKnob.setBounds(x, rowY, s2W, s2H);
         levelKnob.setBounds(rowsRight - s2W - s(6), rowY, s2W, s2H);
         y += rowH + gap;
     }
@@ -513,14 +514,11 @@ void VoicePanel::resized()
         insertSub.setBounds(subX, subY, insSubW, insSubH);
     }
 
-    // ── Gating designer + Gap (Size 2) + Gater bypass ───────────────────────
+    // ── Gating designer — full width; Gap + Bypass are inside the component ──
     {
-        const int gateH     = s(112);
-        const int rightColW = s2W + s(8);
-        const int rightColX = leftRight - rightColW;
-        gateBypassButton.setBounds(rightColX, y, rightColW, ddH);
-        gapKnob.setBounds(rightColX + (rightColW - s2W) / 2, y + ddH + s(4), s2W, s2H);
-        gatingDesigner.setBounds(leftX, y, rightColX - gap - leftX, gateH);
+        // header-row-1(24) + header-row-2/gap(22) + grid(80) + props(56) + margin
+        const int gateH = s(24 + 22 + 80 + 56 + 4);
+        gatingDesigner.setBounds(leftX, y, leftRight - leftX, gateH);
         y += gateH + gap;
     }
     // ── Right column: NOISE panel (top, room to grow) + MIXER row beneath ───

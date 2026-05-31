@@ -95,7 +95,7 @@ inline const GlobalParamDef kGlobalParamDefs[] = {
     // ── Effect slot ──────────────────────────────────────────────────────
     { "eff_algo",      ParamKind::AlgorithmIndex, mu_audio::kEffectAlgorithmNames },
     { "eff_en",        ParamKind::Bool   },
-    { "eff_send" },     { "eff_p0" }, { "eff_p1" }, { "eff_p2" }, { "eff_p3" }, { "eff_p4" },
+    { "eff_p0" }, { "eff_p1" }, { "eff_p2" }, { "eff_p3" }, { "eff_p4" },
     // ── Delay slot ───────────────────────────────────────────────────────
     { "dly_en",        ParamKind::Bool   },
     { "dly_mode",      ParamKind::Bool   },
@@ -104,7 +104,7 @@ inline const GlobalParamDef kGlobalParamDefs[] = {
     { "dly_syncDot",   ParamKind::Bool   },
     { "dly_syncTrip",  ParamKind::Bool   },
     { "dly_count",     ParamKind::Int    },
-    { "dly_fb" }, { "dly_spread" }, { "dly_dirt" }, { "dly_send" },
+    { "dly_fb" }, { "dly_spread" }, { "dly_dirt" },
     // ── Reverb slot ──────────────────────────────────────────────────────
     { "rev_algo",      ParamKind::AlgorithmIndex, mu_audio::kReverbAlgorithmNames },
     { "rev_en",        ParamKind::Bool   },

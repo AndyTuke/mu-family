@@ -126,6 +126,9 @@ if(ISCC_EXE)
 endif()
 
 # ── Deploy Release artifacts to the tester drop folder ──────────────────────
+# Guarded by MUFAMILY_DEPLOY_TESTERS (OFF by default) so no build pushes to the
+# tester share unless explicitly opted in. See root CMakeLists.txt.
+if(MUFAMILY_DEPLOY_TESTERS)
 add_custom_command(TARGET mu-clid_Standalone POST_BUILD
     COMMAND "${CMAKE_COMMAND}"
             "-DCONFIG=$<CONFIG>"
@@ -137,6 +140,7 @@ add_custom_command(TARGET mu-clid_Standalone POST_BUILD
     COMMENT "Deploying Release artifacts to OneDrive (Debug skipped)"
     VERBATIM
 )
+endif()
 
 clap_juce_extensions_plugin(TARGET mu-clid
     CLAP_ID "com.transwarp.mu-clid"
@@ -244,6 +248,8 @@ clap_juce_extensions_plugin(TARGET mu-clid-lite
     CLAP_ID "com.transwarp.mu-clid-lite"
     CLAP_FEATURES midi-effect)
 
+# mu-Clid Lite tester deploys — guarded by MUFAMILY_DEPLOY_TESTERS (OFF default).
+if(MUFAMILY_DEPLOY_TESTERS)
 add_custom_command(TARGET mu-clid-lite_VST3 POST_BUILD
     COMMAND "${CMAKE_COMMAND}"
             "-DCONFIG=$<CONFIG>"
@@ -264,6 +270,7 @@ add_custom_command(TARGET mu-clid-lite_CLAP POST_BUILD
     COMMENT "Deploying mu-Clid Lite CLAP to OneDrive (Debug skipped)"
     VERBATIM
 )
+endif()
 
 # ── mu-clid-tests — data-layer regression tests (#442) ──────────────────────
 # Console executable that runs every juce::UnitTest defined in Source/Tests/.

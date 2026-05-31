@@ -10,7 +10,7 @@ Product-specific guidance for working in `mu-clid/`. Read alongside the family-w
 
 - `mu-clid` — full plugin (VST3 + CLAP + Standalone)
 - `mu-clid-lite` — single-rhythm MIDI-effect variant (VST3 + CLAP)
-- `mu-clid-tests` — console UnitTest runner; **builds as part of `ALL_BUILD`** when its EXCLUDE_FROM_ALL is dropped (currently EXCLUDE_FROM_ALL TRUE; built on demand via `cmake --build build --target mu-clid-tests`)
+- `mu-clid-tests` — console UnitTest runner; **`EXCLUDE_FROM_ALL TRUE`**, built on demand via `cmake --build build --target mu-clid-tests`. **Deliberate divergence from mu-tant-tests** (which builds every default build): mu-clid's Release build deploys to testers via OneDrive, and compiling the heavy 140-test suite (links `juce_audio_processors` + many cpps) on every tester-deploy build costs time for no deploy benefit. mu-tant is small + Debug-only/local, so building its tests every time is cheap. This is a build-speed concession, not family-consistency drift — keep the split unless the deploy-build cost stops mattering.
 
 Release build of `mu-clid_Standalone` triggers the OneDrive post-build deploy to `MUFAMILY_WIN_DIST`. Debug skips deploy. Lite installer requires Inno Setup.
 
@@ -22,11 +22,11 @@ mu-clid/Source/
 │                     PresetIO + PresetIO_HostState, HotSwapStager + HotSwapBoundary,
 │                     ModulationSkew, RenderMode, StandaloneApp, LiteEditor, SamplePreview
 ├── Sequencer/        Rhythm, HitGenerator, SequencerEngine, EuclideanGenerator
-├── UI/               TransportBar's master-loop section + Euclidean panels +
-│                     voice subsections (Pitch, Filter, Amp, Insert), MixerOverlay
-│                     callbacks, RhythmCircle, RhythmSidebar, RhythmPanel,
-│                     ModulatorPanel + ModMatrixPanel + ModulatorEditor,
-│                     SampleBrowser, SettingsOverlay, MasterLoopSection
+├── UI/               Euclidean panels + VoiceSection (Pitch/Filter/Amp
+│                     subsections; the Insert subsection + the ModulatorPanel /
+│                     ModMatrixPanel / ModulatorEditor / MixerOverlay are shared
+│                     from mu-core), RhythmCircle, RhythmMiniVisual, RhythmSidebar,
+│                     RhythmPanel, SampleBrowser, SettingsOverlay, MasterLoopSection
 ├── Persistence/      PresetMigrations + helpers
 ├── License/          LicenseChecker
 └── Tests/            juce::UnitTest suite

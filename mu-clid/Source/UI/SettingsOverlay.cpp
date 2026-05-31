@@ -45,8 +45,8 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
         addAndMakeVisible(lbl);
     };
 
-    const juce::Colour labelCol   = MuClidLookAndFeel::colour(MuClidLookAndFeel::ColourIds::labelText);
-    const juce::Colour headingCol = MuClidLookAndFeel::colour(MuClidLookAndFeel::ColourIds::headingText);
+    const juce::Colour labelCol   = MuLookAndFeel::colour(MuLookAndFeel::ColourIds::labelText);
+    const juce::Colour headingCol = MuLookAndFeel::colour(MuLookAndFeel::ColourIds::headingText);
 
     // ── Display — UI size picker (Medium = 1.0, Large = 1.25 = 1463×1088 window)
     makeFieldLabel(uiSizeLabel, "Size", labelCol, juce::Justification::centredRight);
@@ -103,6 +103,20 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
         addAndMakeVisible(midiMessagesDropdown);
 
         updateMidiSyncVisibility();
+    }
+
+    if (!isStandalone)
+    {
+        makeFieldLabel(midiModeLabel, "Mode", labelCol, juce::Justification::centredRight);
+
+        midiModeDropdown.addItem("Free", 1);
+        midiModeDropdown.addItem("Note", 2);
+        midiModeDropdown.setSelectedId(proc.getMidiNoteMode() + 1, false);
+        midiModeDropdown.onChange = [this](int id)
+        {
+            proc.setMidiNoteMode(id - 1);
+        };
+        addAndMakeVisible(midiModeDropdown);
     }
 
     // Content folder shows the path itself (set by updateFolderLabel) — heading colour
@@ -265,6 +279,16 @@ void SettingsOverlay::computeLayout()
         y += sectGap;
     }
 
+    // MIDI Note Mode: plugin-only (collapsed entirely in standalone)
+    if (!isStandalone)
+    {
+        layout.midiModeHeader = y;
+        y += headH;
+        layout.midiModeRowY   = y;
+        y += rowH;
+        y += sectGap;
+    }
+
     layout.midiPCHeader = y;
     y += headH;
     layout.midiPCRowY   = y;
@@ -334,6 +358,12 @@ void SettingsOverlay::resized()
         midiMessagesDropdown.setBounds(ctrlX,  layout.midiMessagesRowY, ctrlW,  rowH);
     }
 
+    if (!isStandalone)
+    {
+        midiModeLabel   .setBounds(labelX, layout.midiModeRowY, labelW, rowH);
+        midiModeDropdown.setBounds(ctrlX,  layout.midiModeRowY, ctrlW,  rowH);
+    }
+
     // MIDI Program Change — two buttons side-by-side, centred within the content column.
     {
         const int btnGap = s(kFolderBtnGap);
@@ -362,21 +392,21 @@ void SettingsOverlay::resized()
 
 void SettingsOverlay::paint(juce::Graphics& g)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
     using mu_ui::s;
     using mu_ui::sf;
 
-    g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
+    g.setColour(MuLookAndFeel::colour(Id::panelBackground));
     g.fillAll();
 
     const int headerH = s(kHeaderH);
 
     // Top "Settings" bar
-    g.setColour(MuClidLookAndFeel::colour(Id::headingText));
+    g.setColour(MuLookAndFeel::colour(Id::headingText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(15.0f))));
     g.drawText("Settings", s(kPad), 0, s(200), headerH, juce::Justification::centredLeft, false);
 
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawLine(0.0f, (float)headerH, (float)getWidth(), (float)headerH, 1.0f);
 
     const int x = layout.contentX;
@@ -385,11 +415,11 @@ void SettingsOverlay::paint(juce::Graphics& g)
     // Sub-panel group header: larger font + thicker full-width divider.
     auto drawGroupHeader = [&](int headerY, const juce::String& title)
     {
-        g.setColour(MuClidLookAndFeel::colour(Id::headingText));
+        g.setColour(MuLookAndFeel::colour(Id::headingText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(15.0f))));
         g.drawText(title, x, headerY, w, s(20), juce::Justification::centredLeft, false);
 
-        g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+        g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
         const float lineY = (float)(headerY + s(22));
         g.drawLine((float)x, lineY, (float)(x + w), lineY, 1.0f);
     };
@@ -397,18 +427,18 @@ void SettingsOverlay::paint(juce::Graphics& g)
     // Section sub-header within a sub-panel — smaller font + thin divider.
     auto drawSectionHeader = [&](int headerY, const juce::String& title)
     {
-        g.setColour(MuClidLookAndFeel::colour(Id::headingText));
+        g.setColour(MuLookAndFeel::colour(Id::headingText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(12.0f))));
         g.drawText(title, x, headerY, w, s(16), juce::Justification::centredLeft, false);
 
-        g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+        g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
         const float lineY = (float)(headerY + s(17));
         g.drawLine((float)x, lineY, (float)(x + w), lineY, 0.5f);
     };
 
     auto drawHint = [&](int yCentre, const juce::String& text, int hintX, int hintW)
     {
-        g.setColour(MuClidLookAndFeel::colour(Id::labelText));
+        g.setColour(MuLookAndFeel::colour(Id::labelText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
         g.drawText(text, hintX, yCentre - s(7), hintW, s(14),
                    juce::Justification::centredLeft, false);
@@ -423,6 +453,8 @@ void SettingsOverlay::paint(juce::Graphics& g)
     drawSectionHeader(layout.swapHeader,         "Hot-swap");
     if (isStandalone)
         drawSectionHeader(layout.midiClockHeader, "MIDI Clock");
+    if (!isStandalone)
+        drawSectionHeader(layout.midiModeHeader,  "MIDI Mode");
     drawSectionHeader(layout.midiPCHeader,       "MIDI Program Change");
 
     drawGroupHeader(layout.locationsGroupHeader, "Locations");

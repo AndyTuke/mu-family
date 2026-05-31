@@ -3,8 +3,10 @@
 //
 // Build:  cmake --build build --config Debug --target mu-tant-tests
 // Run:    build/mu-tant/mu-tant-tests_artefacts/Debug/mu-tant-tests.exe
-// Scope:  self-contained synth DSP only (scales, wavetable osc/bank) — no
-//         PluginProcessor / mu-core link needed. Fast + deterministic.
+// Scope:  synth DSP + modulator/gate/insert/persist coverage, plus a shared
+//         global-FX APVTS layout test (mu_mixfx::addGlobalFxParams behind a
+//         headless AudioProcessor stub). The full mu-tant PluginProcessor is not
+//         linked — its createEditor() drags in the editor/UI tree (see #721).
 
 #include <juce_core/juce_core.h>
 #include <cstdio>

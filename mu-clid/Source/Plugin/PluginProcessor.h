@@ -109,7 +109,7 @@ public:
     static constexpr int kFXReturnsBusIndex = 9;
     static constexpr int kTotalBuses        = 10;
 
-    static constexpr int kAutomatedRhythms  = mu_limits::kMaxAutomatedRhythms;
+    static constexpr int kAutomatedRhythms  = mu_limits::kMaxAutomatedChannels;
 
     // MIDI clock sync (standalone only).
     void   setMidiSyncEnabled(bool on);
@@ -118,6 +118,10 @@ public:
     int    getMidiSyncMessages() const override { return midiClockSync.getMessages(); }
     bool   isMidiClockPlaying()  const override { return midiClockSync.isPlaying(); }
     double getMidiClockBpm()     const override { return midiClockSync.getBpm(); }
+
+    // MIDI Note mode (plugin only). 0=Free (host transport drives play), 1=Note (Note On/Off drives play).
+    void setMidiNoteMode(int mode);
+    int  getMidiNoteMode() const { return midiNoteMode.load(std::memory_order_relaxed); }
 
     void    addRhythm    (const Rhythm& r);
     void    removeRhythm (int index);
@@ -426,6 +430,12 @@ private:
 
     MidiClockSync midiClockSync;
 
+    // Note mode state (audio thread writes, message thread reads getMidiNoteMode).
+    std::atomic<int>    midiNoteMode    { 0 };   // 0=Free, 1=Note
+    std::atomic<int>    midiHeldNotes   { 0 };   // count of currently held MIDI notes (Note mode)
+    std::atomic<bool>   noteModePlaying { false };
+    std::atomic<double> noteModeBeatPos { 0.0 };
+
     // Pre-allocated modulation parameter map — reused every block to avoid audio-thread allocation.
     // Keys match ModDest::ids. Values are initialised in constructor and updated each block.
     // keyed by `std::string_view` rather than `std::string`. All write/read sites use
@@ -454,23 +464,8 @@ private:
 
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void syncRhythmParam(int ri, const juce::String& suffix, float v);
-    void syncFXParam(const juce::String& id, float v);
-
-    // Cached APVTS atomic pointers for the per-sync-param family reads in
-    // syncFXParam. parameterChanged for dly_syncDenom/Dot/Trip and
-    // echo_syncDenom/Dot/Trip needs the sibling values to call
-    // DelaySlot::setTimeDivision(denoms[idx], dot, tri); without caching, that
-    // path does three string-keyed hash lookups per host-automation tick on
-    // potentially the audio thread. Pointers are populated once in the ctor
-    // (after createParameterLayout() runs) and stay valid for the processor's
-    // lifetime — APVTS owns the underlying juce::AudioParameter objects.
-    std::atomic<float>* dlySyncDenomPtr = nullptr;
-    std::atomic<float>* dlySyncDotPtr   = nullptr;
-    std::atomic<float>* dlySyncTripPtr  = nullptr;
-    std::atomic<float>* echoSyncDenomPtr = nullptr;
-    std::atomic<float>* echoSyncDotPtr   = nullptr;
-    std::atomic<float>* echoSyncTripPtr  = nullptr;
-    void syncMixerParam(const juce::String& id, float v);
+    // FX / return / master / channel-strip params route to the shared
+    // ProcessorBase::syncGlobalFxParam (mu-core) — see #720.
     void pushRhythmToAPVTS(int ri);
     // forceSyncRhythmFromAPVTS lifted to the public section above so UI
     // orchestrators (insert-algo dropdown #613) can call it after their own

@@ -3,7 +3,7 @@
 #include <string_view>
 #include <unordered_map>
 #include "UI/Components/KnobWithLabel.h"
-#include "UI/Components/MuClidLookAndFeel.h"
+#include "UI/Components/MuLookAndFeel.h"
 
 namespace juce { class RangedAudioParameter; }
 class PluginProcessor;
@@ -16,7 +16,7 @@ public:
     void setRhythm(int ri);
     void loadFromRhythm();
     void refreshSuffix(const juce::String& suffix);
-    void refreshModulatedIndicators();
+    void bindModulationIndicators();
 
     // Update the "Effect" send knob label to show the mixer's currently-
     // selected effect algorithm name (e.g. "Phaser", "Echo"). PluginEditor
@@ -28,7 +28,7 @@ public:
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
 
 private:
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
 
     PluginProcessor& proc;
     int rhythmIndex = -1;

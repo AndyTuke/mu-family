@@ -148,14 +148,14 @@ void RhythmCircle::timerCallback()
 //==============================================================================
 juce::Colour RhythmCircle::stepColour(StepType t, juce::Colour hitClr, bool isCurrent)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
     juce::Colour base;
     switch (t)
     {
         case StepType::Hit:       base = hitClr; break;
-        case StepType::PrePad:    base = MuClidLookAndFeel::colour(Id::ringPrePad)   .withAlpha(0.5f); break;
-        case StepType::PostPad:   base = MuClidLookAndFeel::colour(Id::ringPostPad)  .withAlpha(0.5f); break;
-        case StepType::InsertPad: base = MuClidLookAndFeel::colour(Id::ringInsertPad).withAlpha(0.5f); break;
+        case StepType::PrePad:    base = MuLookAndFeel::colour(Id::ringPrePad)   .withAlpha(0.5f); break;
+        case StepType::PostPad:   base = MuLookAndFeel::colour(Id::ringPostPad)  .withAlpha(0.5f); break;
+        case StepType::InsertPad: base = MuLookAndFeel::colour(Id::ringInsertPad).withAlpha(0.5f); break;
         default:                  base = hitClr.withAlpha(0.18f); break;
     }
     if (isCurrent) base = base.brighter(0.5f);
@@ -224,17 +224,17 @@ void RhythmCircle::drawRing(juce::Graphics& g,
     // x = cx + r·sin(angle), y = cy − r·cos(angle) — instead of cos/sin
     // standard-math (which left the divider at 12 o'clock while segments
     // started at 9). Now divider and segments share the same anchor.
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
     const float loopSin = std::sin(startOff);
     const float loopCos = std::cos(startOff);
-    g.setColour(MuClidLookAndFeel::colour(Id::panelBackground).brighter(0.6f).withAlpha(0.85f));
+    g.setColour(MuLookAndFeel::colour(Id::panelBackground).brighter(0.6f).withAlpha(0.85f));
     g.drawLine(cx + innerR * loopSin, cy - innerR * loopCos,
                cx + outerR * loopSin, cy - outerR * loopCos, 1.5f);
 }
 
 void RhythmCircle::paint(juce::Graphics& g)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
 
     const float cx   = getWidth()  * 0.5f;
     const float cy   = getHeight() * 0.5f;
@@ -257,12 +257,12 @@ void RhythmCircle::paint(juce::Graphics& g)
     if (!patternA.empty())
     {
         drawRing(g, patternA, cx, cy, aOuter, aInner,
-                 MuClidLookAndFeel::colour(Id::ringEuclidA), stepA, rotAngleA,
+                 MuLookAndFeel::colour(Id::ringEuclidA), stepA, rotAngleA,
                  ringCaches[0]);
     }
     else
     {
-        g.setColour(MuClidLookAndFeel::colour(Id::ringEuclidA).withAlpha(0.12f));
+        g.setColour(MuLookAndFeel::colour(Id::ringEuclidA).withAlpha(0.12f));
         juce::Path ring;
         ring.addCentredArc(cx, cy, aOuter, aOuter, 0.0f, 0.0f, juce::MathConstants<float>::twoPi, true);
         ring.addCentredArc(cx, cy, aInner, aInner, 0.0f, juce::MathConstants<float>::twoPi, 0.0f, false);
@@ -281,12 +281,12 @@ void RhythmCircle::paint(juce::Graphics& g)
         if (!patternB.empty())
         {
             drawRing(g, patternB, cx, cy, bOuter, bInner,
-                     MuClidLookAndFeel::colour(Id::ringEuclidB), stepB, rotAngleB,
+                     MuLookAndFeel::colour(Id::ringEuclidB), stepB, rotAngleB,
                      ringCaches[1]);
         }
         else
         {
-            g.setColour(MuClidLookAndFeel::colour(Id::ringEuclidB).withAlpha(0.12f));
+            g.setColour(MuLookAndFeel::colour(Id::ringEuclidB).withAlpha(0.12f));
             juce::Path ring;
             ring.addCentredArc(cx, cy, bOuter, bOuter, 0.0f, 0.0f, juce::MathConstants<float>::twoPi, true);
             ring.addCentredArc(cx, cy, bInner, bInner, 0.0f, juce::MathConstants<float>::twoPi, 0.0f, false);
@@ -303,7 +303,7 @@ void RhythmCircle::paint(juce::Graphics& g)
         if (cInner > 0.0f)
         {
             drawRing(g, patternC, cx, cy, cOuter, cInner,
-                     MuClidLookAndFeel::colour(Id::ringEuclidC), -1, rotAngleC,
+                     MuLookAndFeel::colour(Id::ringEuclidC), -1, rotAngleC,
                      ringCaches[2]);
             innerLimit = cInner - ringGap;
         }
@@ -340,7 +340,7 @@ void RhythmCircle::paint(juce::Graphics& g)
             g.fillEllipse(cx - innerLimit, cy - innerLimit,
                           innerLimit * 2.0f, innerLimit * 2.0f);
         }
-        g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
+        g.setColour(MuLookAndFeel::colour(Id::panelBackground));
         g.fillEllipse(cx - innerLimit, cy - innerLimit,
                       innerLimit * 2.0f, innerLimit * 2.0f);
     }

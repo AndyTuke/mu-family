@@ -208,21 +208,21 @@ void RhythmSaveDialog::resized()
 
 void RhythmSaveDialog::paint(juce::Graphics& g)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
 
-    g.setColour(MuClidLookAndFeel::colour(Id::backgroundModalDim));
+    g.setColour(MuLookAndFeel::colour(Id::backgroundModalDim));
     g.fillAll();
 
     const int cardX = (getWidth()  - kCardW) / 2;
     const int cardY = (getHeight() - kCardH) / 2;
 
-    g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
+    g.setColour(MuLookAndFeel::colour(Id::panelBackground));
     g.fillRoundedRectangle((float)cardX, (float)cardY, (float)kCardW, (float)kCardH, 8.0f);
 
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawRoundedRectangle((float)cardX, (float)cardY, (float)kCardW, (float)kCardH, 8.0f, 1.0f);
 
-    g.setColour(MuClidLookAndFeel::colour(Id::headingText));
+    g.setColour(MuLookAndFeel::colour(Id::headingText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(14.0f)));
     g.drawText("Save Rhythm Preset", cardX + 20, cardY + 12, kCardW - 40, 20,
                juce::Justification::centredLeft, false);
@@ -502,7 +502,7 @@ juce::Colour RhythmPanel::currentColour() const
     if (currentRhythmIndex >= 0 && currentRhythmIndex < proc.getNumRhythms())
     {
         const Rhythm& r = proc.getRhythm(currentRhythmIndex);
-        return MuClidLookAndFeel::channelPalette[r.colourIndex % MuClidLookAndFeel::kChannelPaletteSize];
+        return MuLookAndFeel::channelPalette[r.colourIndex % MuLookAndFeel::kChannelPaletteSize];
     }
     return juce::Colours::transparentBlack;
 }
@@ -564,7 +564,7 @@ void RhythmPanel::loadSample()
             safeThis->repaint();
         }));
     opts.dialogTitle          = "Load Sample";
-    opts.dialogBackgroundColour = MuClidLookAndFeel::colour(MuClidLookAndFeel::backgroundDialog);
+    opts.dialogBackgroundColour = MuLookAndFeel::colour(MuLookAndFeel::backgroundDialog);
     opts.useNativeTitleBar    = false;
     opts.resizable            = true;
     opts.launchAsync();
@@ -684,9 +684,9 @@ void RhythmPanel::mouseDown(const juce::MouseEvent& e)
 
 void RhythmPanel::paint(juce::Graphics& g)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
+    using Id = MuLookAndFeel::ColourIds;
 
-    g.setColour(MuClidLookAndFeel::colour(Id::panelBackground));
+    g.setColour(MuLookAndFeel::colour(Id::panelBackground));
     g.fillAll();
 
     // Header
@@ -696,7 +696,7 @@ void RhythmPanel::paint(juce::Graphics& g)
     // Sample bar — content inset from panel outline
     {
         const auto inner = sampleRect.reduced(3);
-        g.setColour(MuClidLookAndFeel::colour(Id::sampleBarBackground));
+        g.setColour(MuLookAndFeel::colour(Id::sampleBarBackground));
         g.fillRect(inner);
 
         const juce::String sampleName = proc.getSampleName(currentRhythmIndex);
@@ -706,7 +706,7 @@ void RhythmPanel::paint(juce::Graphics& g)
             // Linked sample referenced by a preset could not be found at its recorded
             // path nor in the user Samples folder. Show the filename in amber with a
             // "missing — click to find" hint so the user knows what to look for.
-            g.setColour(MuClidLookAndFeel::colour(MuClidLookAndFeel::sampleBarMissingWarning));
+            g.setColour(MuLookAndFeel::colour(MuLookAndFeel::sampleBarMissingWarning));
             g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
             g.drawText("Missing: " + sampleName + "  —  click to find",
                        inner.getX() + 5, inner.getY(), inner.getWidth() - 28, inner.getHeight(),
@@ -714,7 +714,7 @@ void RhythmPanel::paint(juce::Graphics& g)
         }
         else if (sampleName.isNotEmpty())
         {
-            g.setColour(MuClidLookAndFeel::colour(Id::labelText));
+            g.setColour(MuLookAndFeel::colour(Id::labelText));
             g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
             g.drawText(sampleName,
                        inner.getX() + 5, inner.getY(), inner.getWidth() - 28, inner.getHeight(),
@@ -722,14 +722,14 @@ void RhythmPanel::paint(juce::Graphics& g)
         }
         else
         {
-            g.setColour(MuClidLookAndFeel::colour(Id::sampleBarNoSample));
+            g.setColour(MuLookAndFeel::colour(Id::sampleBarNoSample));
             g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f).withStyle("Italic")));
             g.drawText("drop sample here or click to browse",
                        inner.getX() + 5, inner.getY(), inner.getWidth() - 28, inner.getHeight(),
                        juce::Justification::centredLeft, true);
         }
 
-        g.setColour(MuClidLookAndFeel::colour(Id::labelText));
+        g.setColour(MuLookAndFeel::colour(Id::labelText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
         g.drawText("...", inner.getRight() - 24, inner.getY(), 24, inner.getHeight(),
                    juce::Justification::centred, false);
@@ -753,8 +753,8 @@ void RhythmPanel::resized()
     const int w = getWidth();
     const int h = getHeight();
 
-    topH    = s(MuClidLookAndFeel::kChannelTopH);
-    circleW = s(MuClidLookAndFeel::kCircleSize);
+    topH    = s(MuLookAndFeel::kChannelTopH);
+    circleW = s(MuLookAndFeel::kCircleSize);
 
     const int hdrH = s(kHeaderH);
     const int sbH  = s(kSampleBarH);
@@ -853,30 +853,18 @@ void RhythmPanel::confirmDelete()
 
 void RhythmPanel::timerCallback()
 {
-    // gate the indicator refreshes on play state — when stopped, no
-    // modulators run, so values never change. The helpers iterate ~60 knobs
-    // each calling setIsModulated(false) which no-ops on unchanged state,
-    // but the iteration itself burned ~1800 method calls/sec for nothing.
-    // The play→stop edge still needs one final refresh pass so the cyan mod
-    // rings + live arcs visibly clear (they're gated on `playing` inside the
-    // refresh helpers — see EuclideanPanel.cpp:328 / VoiceSection.cpp:329).
     const bool playing = proc.sequencerPlaying.load();
-    if (! playing && ! wasPlayingLastTick) return;
 
     if (playing)
         modulatorPanel.setPlayheadBeat(proc.lastBeatPos.load());
-    voiceSection.refreshModulatedIndicators();
-    euclidPanel.refreshModulatedIndicators();
 
     // Re-render the RhythmCircle when euclid modulation changes the pattern
     // (hits/rotate/prePad/etc.). Audio thread writes lastEuclidOverrides per block;
     // we compare against the most recently applied snapshot and refresh on change.
-    if (currentRhythmIndex >= 0 && currentRhythmIndex < proc.getNumRhythms())
+    if (playing && currentRhythmIndex >= 0 && currentRhythmIndex < proc.getNumRhythms())
     {
         const EuclidOverrides ov = proc.getModulatedEuclidOverrides(currentRhythmIndex);
         if (ov != lastCircleOverrides)
             refreshCircle();
     }
-
-    wasPlayingLastTick = playing;
 }

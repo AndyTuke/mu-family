@@ -4,7 +4,7 @@
 #include "Persistence/PresetHelpers.h"      // writeKindedProperty, readKindedPropertyAsActualV2, kGlobalParamDefs
 #include "Persistence/PresetMigrations.h"   // v3 insert/master/mod-assignment migrations (#664)
 #include "Persistence/ModulatorSerialise.h" // serialiseModulators, deserialiseModulators, clearModulators
-#include "UI/Components/MuClidLookAndFeel.h" // kChannelPaletteSize
+#include "UI/Components/MuLookAndFeel.h" // kChannelPaletteSize
 #include <limits>               // std::numeric_limits for NaN sentinel
 
 using mu_pp::kRhythmParamDefs;

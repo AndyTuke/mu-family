@@ -108,9 +108,9 @@ void MixerOverlay::buildChannels()
         juce::Colour col = hasRhythm ? palette[proc.getChannelColourIndex(r) % MuLookAndFeel::kChannelPaletteSize]
                                      : MuLookAndFeel::colour(MuLookAndFeel::mixerInactiveNameBg);
         juce::String name = hasRhythm ? juce::String(proc.getChannelName(r)) : "-";
-        auto ch = std::make_unique<MixerChannel>(MixerChannel::Type::Rhythm, name, col);
+        auto ch = std::make_unique<MixerChannel>(MixerChannel::Type::Channel, name, col);
         const juce::String prefix = "ch" + juce::String(r) + "_";
-        ch->bindRhythm(mixer.channels[r], mixer.channelPeaks[r], &proc, prefix,
+        ch->bindChannel(mixer.channels[r], mixer.channelPeaks[r], &proc, prefix,
                        &mixer.sidechainGR[r]);
         if (!hasRhythm) ch->setActive(false);
         // forward status updates to the global StatusBar via PluginEditor.

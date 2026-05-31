@@ -20,7 +20,7 @@ class PluginProcessor;
 class HotSwapStager
 {
 public:
-    static constexpr int kMaxRhythms = 8; // = mu_limits::kMaxRhythms
+    static constexpr int kMaxRhythms = 8; // = mu_limits::kMaxChannels
 
     // A full .muClid preset pre-built off the audio thread, ready to swap in at the
     // next loop boundary. The expensive work (parsing, per-slot VoiceEngine build +

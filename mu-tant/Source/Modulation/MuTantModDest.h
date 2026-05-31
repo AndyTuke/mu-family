@@ -2,6 +2,8 @@
 
 #include "UI/ModulatorEditor.h"           // mu-core: ModDestProvider
 #include "UI/Components/DropdownSelect.h"
+#include "Audio/AlgorithmNames.h"         // mu-core: kInsertAlgorithmNames
+#include "Audio/InsertSlotConfig.h"        // mu-core: kInsertAlgoSlots / kInsertSlotCount
 
 #include <array>
 #include <cstring>
@@ -43,7 +45,12 @@ inline constexpr ModDest kModDestTable[] = {
     { "filter.cutoff",     "Filter Cutoff",     "Filter" },
     { "filter.resonance",  "Filter Resonance",  "Filter" },
     // ── Amp ─────────────────────────────────────────────────────────────────
-    { "level",        "Level",         "Amp"   },
+    { "level",        "Level",         "Amp"    },
+    // ── Insert (normalised 0..1 — same IDs as mu-clid so depthScaleFor=1.0) ──
+    { "insert.p1",    "Insert P1",     "Insert" },
+    { "insert.p2",    "Insert P2",     "Insert" },
+    { "insert.p3",    "Insert P3",     "Insert" },
+    { "insert.p4",    "Insert P4",     "Insert" },
 };
 
 inline constexpr int kModDestCount = (int) (sizeof(kModDestTable) / sizeof(kModDestTable[0]));
@@ -52,20 +59,54 @@ inline ModDestProvider makeModDestProvider()
 {
     ModDestProvider p;
 
-    p.populate = [](DropdownSelect& dd, int /*driveChar*/)
+    p.populate = [](DropdownSelect& dd, int driveChar)
     {
         // Walk the table once, opening a new section heading whenever the
         // section string changes. Items use the table index + 1 as their
         // 1-based dropdown ID so saved assignments can be reverse-resolved.
+        // The Insert section uses per-algo slot labels when an algo is active.
         const char* currentSection = nullptr;
         for (int i = 0; i < kModDestCount; ++i)
         {
+            const bool isInsert = (std::strcmp(kModDestTable[i].section, "Insert") == 0);
+
             if (currentSection == nullptr || std::strcmp(currentSection, kModDestTable[i].section) != 0)
             {
                 currentSection = kModDestTable[i].section;
-                dd.addSectionHeading(currentSection);
+                // For the Insert section: open with the algo name when one is active.
+                if (isInsert)
+                {
+                    if (driveChar > 0
+                        && driveChar < (int) std::size(mu_audio::kInsertAlgorithmNames) - 1)
+                        dd.addSectionHeading(mu_audio::kInsertAlgorithmNames[driveChar]);
+                    else
+                        dd.addSectionHeading("Insert");
+                }
+                else
+                {
+                    dd.addSectionHeading(currentSection);
+                }
             }
-            dd.addItem(kModDestTable[i].alias, i + 1);
+
+            if (isInsert)
+            {
+                // Use the per-algo slot label when available, otherwise the generic alias.
+                const int slot = i - (kModDestCount - 4);   // 0..3 for the 4 insert destinations
+                const char* label = kModDestTable[i].alias;
+                if (driveChar > 0
+                    && driveChar < (int) std::size(mu_audio::kInsertAlgorithmNames) - 1
+                    && slot >= 0 && slot < mu_ui::kInsertSlotCount)
+                {
+                    const auto& sl = mu_ui::kInsertAlgoSlots[driveChar][slot];
+                    if (sl.label != nullptr) label = sl.label;
+                    else continue;   // hidden slot → skip
+                }
+                dd.addItem(label, i + 1);
+            }
+            else
+            {
+                dd.addItem(kModDestTable[i].alias, i + 1);
+            }
         }
     };
 

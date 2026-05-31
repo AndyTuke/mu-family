@@ -29,6 +29,9 @@
 namespace mu_ui {
 
 inline constexpr int kInsertSlotCount = 4;
+// Number of insert algorithms (rows in kInsertAlgoSlots / kInsertAlgoDefaults).
+// Must equal InsertProcessor::kNumInsertAlgos.
+inline constexpr int kInsertAlgoCount = 14;
 
 // Skew shape between the displayed actual value and the normalised 0..1
 // stored in VoiceParams + APVTS. Knobs apply the SAME skew on the slider
@@ -76,7 +79,7 @@ inline const char* const kUnisonNames[7]   = { "1","3","5","7","9","11","13" };
 // stale algo flowed into configureInsertAlgorithm. Enforced by a runtime
 // expect inside InsertAlgoTableTests (no constexpr path because the labels
 // are non-`constexpr` string-literal pointers on MSVC).
-inline const SlotConfig kInsertAlgoSlots[14][kInsertSlotCount] = {
+inline const SlotConfig kInsertAlgoSlots[kInsertAlgoCount][kInsertSlotCount] = {
     // ── 0 None ─────────────────────────────────────────────────────────
     { {}, {}, {}, {} },
 
@@ -163,7 +166,7 @@ inline const SlotConfig kInsertAlgoSlots[14][kInsertSlotCount] = {
 // stored as ACTUAL (not normalised) values so they read naturally. The init
 // path normalises via actualToNorm() before writing to APVTS. Replaces the
 // prior `kInsertAlgoDefaults[14]` table that listed 7 named fields per algo.
-inline const float kInsertAlgoDefaults[14][kInsertSlotCount] = {
+inline const float kInsertAlgoDefaults[kInsertAlgoCount][kInsertSlotCount] = {
     /* 0 None        */ { 0.0f,    0.0f,    0.0f,   20000.0f },
     /* 1 SoftClip    */ { 0.0f,    0.0f,    0.0f,   20000.0f },
     /* 2 HardClip    */ { 0.0f,    0.0f,    0.0f,   20000.0f },
@@ -185,7 +188,7 @@ inline const float kInsertAlgoDefaults[14][kInsertSlotCount] = {
 // (label == nullptr) simply return the slot's minVal (0).
 inline float normToActual(float norm, int algoIdx, int slot) noexcept
 {
-    if (algoIdx < 0 || algoIdx >= 14 || slot < 0 || slot >= kInsertSlotCount)
+    if (algoIdx < 0 || algoIdx >= kInsertAlgoCount || slot < 0 || slot >= kInsertSlotCount)
         return 0.0f;
     const auto& cfg = kInsertAlgoSlots[algoIdx][slot];
     norm = std::clamp(norm, 0.0f, 1.0f);
@@ -211,7 +214,7 @@ inline float normToActual(float norm, int algoIdx, int slot) noexcept
 // normToActual, with matching skew handling.
 inline float actualToNorm(float actual, int algoIdx, int slot) noexcept
 {
-    if (algoIdx < 0 || algoIdx >= 14 || slot < 0 || slot >= kInsertSlotCount)
+    if (algoIdx < 0 || algoIdx >= kInsertAlgoCount || slot < 0 || slot >= kInsertSlotCount)
         return 0.0f;
     const auto& cfg = kInsertAlgoSlots[algoIdx][slot];
     actual = std::clamp(actual, cfg.minVal, cfg.maxVal);

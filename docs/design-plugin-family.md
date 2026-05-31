@@ -85,10 +85,12 @@ The standard mu platform is everything in `mu-core/`. New products link `mu-core
 - `Audio/MixerEngine` — channel strips, sends, sidechain, FX returns, master inserts.
 - `Audio/FX/Slots/{Effect,Delay,Reverb,FXChain}` — global FX chain.
 - `Audio/MultiModeFilter`, `Audio/InsertProcessor`, `Audio/SamplePlayer`, `Audio/MidiOutputEngine`.
-- `Modulation/ModulationMatrix` + `Sequencer/ControlSequence` — modulation system. Product's slot type inherits `Sequencer/VoiceSlot`.
+- `Modulation/ModulationMatrix` + `Sequencer/ControlSequence` — modulation system. Product's slot type inherits `Sequencer/VoiceSlot`. `Modulation/ModulatorSerialise.h` is the shared (de)serialise for a `VoiceSlot`'s ControlSequences + matrix assignments (products inject their own source/dest ID validators).
 - `UI/Components/` — every standard widget (knob, dropdown, segment, step editor, LFO editor, VU meter, status bar).
 - `UI/MixerChannel`, `UI/MixerOverlay`, `UI/FXRow`, `UI/DelayRow` — shared mixer + FX panels.
 - `UI/ChannelSidebar` + `UI/SidebarItem` — the shared left "layers" sidebar (select / add / delete / drag-reorder). Reads channel metadata from `ProcessorBase::getNumChannels/getChannelName/getChannelColourIndex`. The per-layer mini-graphic (and its animation) is the only product-specific part, injected via `createMiniVisual` (mu-clid → `RhythmMiniVisual` wrapping a `RhythmCircle`; mu-tant → a voice glyph). Reorder + hot-swap semantics are product hooks (`onSwapChannels`, `isPendingSwap`, `onCancelPendingSwap`) so a product without hot-swap (mu-tant) leaves them null. Add/delete is driven by the product (`onAddChannel` + a panel delete button → `addVoice`/`removeVoice` in mu-tant, `addRhythm`/`removeRhythm` in mu-clid).
+- `UI/ChannelHeaderBar` — the shared per-layer header (colour dot · editable name · reset · delete · per-layer preset dropdown · Save). Product wires the callbacks to its own reset / delete / preset / rename semantics.
+- `UI/Voice/InsertSubsection` — the shared insert-effect voice subsection (algorithm dropdown + 4 generic slot knobs), bound to a channel via a constructor prefix (`"r"` / `"v"`); optional product hooks for mod-arc indicators, the Comp/Limiter GR meter, and the algo-switch bulk-write wrapper. Part of the voice section (engine → insert → mixer).
 
 **The swap-out point:**
 
@@ -104,36 +106,47 @@ The standard mu platform is everything in `mu-core/`. New products link `mu-core
 
 ---
 
-## Architecture as of Stage 33
+## Current shared / product-specific split
 
-Stage 33 introduced the `mu-core` INTERFACE library, `VoiceSlot` base struct, `ProcessorBase`, and the `MuLookAndFeel` rename. See "Stage 33 (complete)" section below for details.
+The `mu-core` INTERFACE library (introduced in Stage 33) holds everything shared; each product supplies only its engine + engine UI. Paths are relative to the repo root.
 
 ### Shared (mu-core) components
 
-| Component | File(s) | Status |
+| Component | File(s) | Notes |
 |---|---|---|
-| `VoiceEngine` | `Audio/VoiceEngine.{h,cpp}` | ✅ No PluginProcessor dependency; pure audio unit |
-| `MixerEngine` | `Audio/MixerEngine.{h,cpp}` | ✅ Takes voice array + FXChain by reference; self-contained |
-| `InsertProcessor` | `Audio/InsertProcessor.{h,cpp}` | ✅ Parameterised entirely via `VoiceParams` |
-| `ModulationMatrix` | `Modulation/ModulationMatrix.{h,cpp}` | ✅ Generic source→assignment; no rhythm knowledge |
-| `ControlSequence` | `Sequencer/ControlSequence.{h,cpp}` | ✅ Timing evaluator; no Euclidean dependency |
-| `FXChain` + slots | `FX/` | ✅ Generic send/return/insert chain |
-| All UI components | `UI/Components/` | ✅ No audio coupling |
-| `MixerChannel`, `MixerOverlay`, `FXRow` | `UI/` | ✅ Driven by `MixerEngine` state; no sequencer knowledge |
+| `ProcessorBase` | `mu-core/Plugin/ProcessorBase.{h,cpp}` | Abstract base; owns apvts + fxChain + mixerEngine + `processCoreBlock()` + MIDI-PC preset plumbing + `syncGlobalFxParam()` (maps a mixer/FX/return/master/`ch{N}_` APVTS id → fxChain/mixerEngine state; prefix-routes to per-family helpers) |
+| `MixerFxParams` | `mu-core/Plugin/MixerFxParams.h` | `mu_mixfx::addGlobalFxParams(layout)` declares the shared global-FX / return / master param set (`eff_`/`dly_`/`rev_`/`eff2*`/`echo_`/`ret_*`/`mstr_lvl`/`mstr_pan`/`mst_ins*`) the MixerOverlay/FXRow/DelayRow bind to. **Split:** the product declares its own per-channel `ch{N}_` strips + product globals (e.g. mu-clid `mstrLoop`); the shared helper owns everything else. **Sync contract:** the product registers a `parameterChanged` listener and routes these ids to `ProcessorBase::syncGlobalFxParam` (both mu-clid + mu-tant) |
+| `VoiceEngine` | `mu-core/Audio/VoiceEngine.{h,cpp}` | Per-slot voice chain; no PluginProcessor dependency |
+| `MixerEngine` | `mu-core/Audio/MixerEngine.{h,cpp}` | Channel strips / sends / sidechain / returns / master; optional per-channel render hook (`RenderChannelFn`) |
+| `InsertProcessor` | `mu-core/Audio/InsertProcessor.{h,cpp}` | Parameterised entirely via `VoiceParams` |
+| `MultiModeFilter`, `SamplePlayer`, `MidiOutputEngine` | `mu-core/Audio/` | Generic audio units |
+| `FXChain` + slots | `mu-core/Audio/FX/` | Generic send / return / insert chain |
+| `ModulationMatrix`, `ControlSequence`, `ModulatorSerialise` | `mu-core/Modulation/`, `mu-core/Sequencer/` | Modulation system + shared (de)serialise; product's slot inherits `VoiceSlot` |
+| UI widgets | `mu-core/UI/Components/` | Knob, dropdown, segment, step / LFO editor, VU, status bar, `MuLookAndFeel` |
+| `MixerChannel`, `MixerOverlay`, `FXRow`, `DelayRow` | `mu-core/UI/` | Shared mixer + FX panels |
+| `ChannelSidebar` + `SidebarItem` | `mu-core/UI/` | Shared layers sidebar (product injects the mini-graphic) |
+| `ChannelHeaderBar` | `mu-core/UI/` | Shared per-layer header (name / reset / delete / preset / save) |
+| `InsertSubsection` | `mu-core/UI/Voice/` | Shared insert-effect voice subsection (channel-prefix bound) |
+| `ModulatorPanel`, `ModMatrixPanel`, `ModulatorEditor` | `mu-core/UI/` | Shared modulator UI (take `VoiceSlot&` + a product `ModDestProvider`) |
+| `EditorShellBase`, `TransportBar`, `AboutPanel`, `SaveDialog`, `PresetBrowser`, MIDI-preset panels | `mu-core/UI/` | Shared editor shell + chrome |
+| `ConfirmDialog` | `mu-core/UI/ConfirmDialog.h` | `mu_ui::confirmAsync` (reset/delete yes-no) + `mu_ui::confirmQuitAsync` (OK/Save/Cancel close prompt) — one shared implementation so every product's confirmation prompts match |
 
-### mu-clid-specific components
+### Product-specific components (under `<product>/Source/`)
 
 | Component | Why specific |
 |---|---|
-| `SequencerEngine` | Euclidean pattern generation, rhythm slot management |
-| `Rhythm : VoiceSlot` | Adds `HitGenerator genA/B/C` (Euclidean) on top of the shared `VoiceSlot` base |
-| `HitGenerator` | Euclidean algorithm |
-| `EuclideanPanel`, `RhythmPanel`, `RhythmCircle`, `RhythmSidebar` | Euclidean UI |
-| `ModMatrixPanel`, `ModulatorEditor` | Take `VoiceSlot&` — shared once mu-tant targets them |
+| mu-clid `SequencerEngine` | Euclidean pattern generation, rhythm slot management |
+| mu-clid `Rhythm : VoiceSlot` | Adds `HitGenerator genA/B/C` (Euclidean) on top of the shared `VoiceSlot` |
+| mu-clid `HitGenerator`, `EuclideanGenerator` | Euclidean algorithm |
+| mu-clid `EuclideanPanel`, `RhythmPanel`, `RhythmCircle`, `RhythmMiniVisual`, `RhythmSidebar`, `VoiceSection` | Euclidean / sample-trigger engine UI (`RhythmSidebar` is a thin `ChannelSidebar` subclass) |
+| mu-tant `SynthVoice`, `WavetableBank` / `WavetableOscillator`, `GatePattern`, `VoicePanel`, `VoiceSidebar`, `GatingDesigner` | Wavetable-drone engine + gate UI |
+| each product's `PluginProcessor : ProcessorBase`, `PluginEditor : EditorShellBase` | Product glue |
 
 ---
 
 ## Stage 33 (complete — build 368)
+
+> **Historical snapshot.** The paths below are the original single-tree (`Source/…`) layout as Stage 33 left it. They have since been relocated to the `mu-core/` + `<product>/Source/` monorepo layout (see "Current shared / product-specific split" above for the authoritative current locations) and the `MuClidLookAndFeel` shim was removed. This section is kept for the decision history.
 
 ### #258 — `mu-core` CMake INTERFACE library
 

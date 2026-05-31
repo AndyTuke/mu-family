@@ -1,6 +1,7 @@
 #pragma once
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <atomic>
+#include <functional>
 #include <memory>
 #include "InsertProcessor.h"
 #include "VoiceParams.h"
@@ -28,8 +29,15 @@ struct RetiredVoices
 class MixerEngine
 {
 public:
-    // One mixer channel per rhythm slot — must equal mu_limits::kMaxRhythms.
-    static constexpr int MaxChannels = mu_limits::kMaxRhythms;
+    // One mixer channel per layer — must equal mu_limits::kMaxChannels.
+    static constexpr int MaxChannels = mu_limits::kMaxChannels;
+
+    // Optional per-channel render hook. When supplied, Phase 1 invokes it to fill
+    // channel r's buffer (channel index, target buffer, sample count) INSTEAD of
+    // calling voices[r]->process — lets a product run its own engine→insert chain
+    // into the channel buffer before the shared trim/sidechain/fader/pan/sends/
+    // master path. Null → render from `voices` as before (mu-clid).
+    using RenderChannelFn = std::function<void(int, juce::AudioBuffer<float>&, int)>;
 
     // Stage 20: fixed −6 dB pre-fader trim on every channel input. Absorbs the
     // worst-case +18 dB of summing across 8 simultaneous correlated voices and
@@ -104,13 +112,14 @@ public:
     // the master mix). Channels routed to direct outs skip FX sends and the master fader.
     // fxReturnsOut (if non-null) receives a copy of the post-fader FX return mix.
     void processBlock(juce::AudioBuffer<float>&   output,
-                      int                         numActiveRhythms,
+                      int                         numActiveChannels,
                       std::unique_ptr<VoiceEngine>* voices,
                       FXChain&                    fxChain,
                       int                         numSamples,
-                      std::array<juce::AudioBuffer<float>*, 8>* directOuts = nullptr,
+                      std::array<juce::AudioBuffer<float>*, MaxChannels>* directOuts = nullptr,
                       juce::AudioBuffer<float>*    fxReturnsOut = nullptr,
-                      const RetiredVoices*        retired      = nullptr);
+                      const RetiredVoices*        retired      = nullptr,
+                      const RenderChannelFn*      renderChannel = nullptr);
 
     // Reset the sidechain envelope follower state for one channel slot. Called
     // by PluginProcessor::swapRhythms so the previous tenant's ducking envelope

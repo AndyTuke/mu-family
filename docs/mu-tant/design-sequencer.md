@@ -169,15 +169,38 @@ modulator section. The Gap knob sits in the gating band beside the grid.
 
 ---
 
-## Deferred (not implemented)
+## Filter envelope layer
 
-These were sketched in the original gate design but are **not** in the current
-model; revisit if use-cases emerge:
+A second pattern layer (toggled [GATE|FILT] in the editor header) shapes the
+**filter cutoff** instead of amplitude. Envelope value 0 → 20 Hz (filter
+closed); 1 → base cutoff (fully open). Uncovered cells close the filter (0).
+Only active while transport is playing; when the pattern is empty the filter
+cutoff is unchanged.
 
-- **Per-envelope options** — Probability (coin-flip per pass), Loop-N-of-M
-  (fire on pass N of M), First-only, On-staged-for-change.
-- **Properties strip** below the grid for the selected envelope's options.
+Ghost rendering: the inactive layer is drawn at 20% alpha in its own colour
+(gate = coral `knobFxSend`, filter = teal `knobPostPad`) so both layers can be
+aligned visually.
+
+## Toolbox — Arrow tool
+
+A fifth tool (`Arrow`, leftmost in the toolbox) selects an envelope by clicking
+it. The selected envelope is highlighted and its per-envelope properties appear
+in the **properties strip** below the grid.
+
+## Properties strip
+
+A 40 px band below the grid, always present:
+- **Prob** — horizontal slider 0..100 %. Probability this envelope fires each
+  loop pass. Uses a deterministic hash of `(loopCount, startCell)` so the
+  decision is stable across the whole loop and varies each pass.
+- **Loop** — `N` dropdown (1..8) and `M` dropdown (1..8). Fires on loop `N-1
+  mod M` of the pattern cycle. `1 / 1` = every loop (default). `1 / 2` = play
+  the first of every two loops.
+
+When no envelope is selected the strip shows "Select an envelope with the Arrow
+tool to edit its properties".
+
+## Deferred (not yet implemented)
+
 - **Pattern hot-swap staging** (reuse mu-clid's `HotSwapStager`).
-- **Preset I/O** — gate patterns aren't yet serialised (`.muPattern` /
-  `.muTant` extensions declared but unconsumed). Note: the Gap *parameter* does
-  save via APVTS, but the envelope vector does not yet.
+- **On-staged-for-change** / **First-only** per-envelope fire rules.

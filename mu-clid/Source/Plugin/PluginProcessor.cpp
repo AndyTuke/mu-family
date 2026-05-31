@@ -49,6 +49,7 @@ PluginProcessor::PluginProcessor()
     // Load MIDI sync settings.
     midiClockSync.setEnabled (appSettings->getBoolValue("midiSyncEnabled",  false));
     midiClockSync.setMessages(appSettings->getIntValue ("midiSyncMessages", 2));
+    midiNoteMode.store(appSettings->getIntValue("midiNoteMode", 0), std::memory_order_relaxed);
 
     // Load MIDI program-change preset maps (each lives in its own JSON file
     // next to appSettings). Maps are owned by ProcessorBase; we just point
@@ -132,18 +133,6 @@ PluginProcessor::PluginProcessor()
     liteMidiNotePtr  = apvts.getRawParameterValue("lite_midiNote");
     liteAccentAmtPtr = apvts.getRawParameterValue("lite_accentAmt");
 #endif
-
-    // Cache pointers for the dly_sync* / echo_sync* sibling reads that
-    // syncFXParam does on every Denom/Dot/Trip change. parameterChanged can fire
-    // on the audio thread under DAW automation; raw hash lookups there are
-    // unsafe even for the brief lookups APVTS does. See PluginProcessor.h for
-    // lifetime guarantee.
-    dlySyncDenomPtr  = apvts.getRawParameterValue("dly_syncDenom");
-    dlySyncDotPtr    = apvts.getRawParameterValue("dly_syncDot");
-    dlySyncTripPtr   = apvts.getRawParameterValue("dly_syncTrip");
-    echoSyncDenomPtr = apvts.getRawParameterValue("echo_syncDenom");
-    echoSyncDotPtr   = apvts.getRawParameterValue("echo_syncDot");
-    echoSyncTripPtr  = apvts.getRawParameterValue("echo_syncTrip");
 
     {
         mu_core::ScopedApvtsLoading guard(apvtsLoading);
@@ -369,30 +358,83 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     double beatPos = 0.0;
     bool   playing = false;
 
-    if (auto* ph = getPlayHead())
+    const int  noteMode = midiNoteMode.load(std::memory_order_relaxed);
+    const bool isPlugin = (wrapperType != wrapperType_Standalone);
+
+    if (noteMode == 1 && isPlugin)
     {
-        if (auto pos = ph->getPosition())
+        // Note mode: scan Note On/Off to gate play state. First Note On resets
+        // sequences to beat 0 (like pressing Play in standalone). All notes released
+        // stops the sequencer; envelopes and FX tails play out naturally.
+        for (const auto& meta : midiMessages)
         {
-            playing = pos->getIsPlaying();
-            if (auto ppq = pos->getPpqPosition())
-                beatPos = *ppq;
+            const auto msg = meta.getMessage();
+            if (msg.isNoteOn())
+            {
+                // First held note starts playback from beat 0.
+                if (midiHeldNotes.fetch_add(1, std::memory_order_relaxed) == 0)
+                {
+                    noteModeBeatPos.store(0.0, std::memory_order_relaxed);
+                    noteModePlaying.store(true, std::memory_order_relaxed);
+                }
+            }
+            else if (msg.isNoteOff())
+            {
+                const int prev = midiHeldNotes.fetch_sub(1, std::memory_order_relaxed);
+                if (prev <= 1)
+                {
+                    midiHeldNotes  .store(0,     std::memory_order_relaxed);
+                    noteModePlaying.store(false,  std::memory_order_relaxed);
+                }
+            }
+        }
+
+        playing = noteModePlaying.load(std::memory_order_relaxed);
+        if (playing)
+        {
+            const double pos = noteModeBeatPos.load(std::memory_order_relaxed);
+            beatPos = pos;
+            // Use host BPM when available so tempo-synced FX tracks the DAW;
+            // fall back to the internal transport BPM (set via the BPM field).
+            double bpm = internalBpm;
+            if (auto* ph = getPlayHead())
+                if (auto phPos = ph->getPosition())
+                    if (auto hostBpm = phPos->getBpm())
+                        bpm = *hostBpm;
+            noteModeBeatPos.store(
+                pos + (buffer.getNumSamples() / currentSampleRate) * (bpm / 60.0),
+                std::memory_order_relaxed);
         }
     }
+    else
+    {
+        // Free mode (default): host transport drives play, with MIDI clock and
+        // internal transport as fallbacks (existing behaviour).
+        if (auto* ph = getPlayHead())
+        {
+            if (auto pos = ph->getPosition())
+            {
+                playing = pos->getIsPlaying();
+                if (auto ppq = pos->getPpqPosition())
+                    beatPos = *ppq;
+            }
+        }
 
-    if (!playing && midiClockSync.isEnabled()
-                 && wrapperType == wrapperType_Standalone
-                 && (midiClockSync.isPlaying() || internalPlaying.load(std::memory_order_relaxed)))
-    {
-        playing = true;
-        beatPos = midiClockBlockBeatPos;
-    }
-    else if (!playing && internalPlaying.load(std::memory_order_relaxed))
-    {
-        playing  = true;
-        const double pos = internalBeatPos.load(std::memory_order_relaxed);
-        beatPos  = pos;
-        internalBeatPos.store(pos + (buffer.getNumSamples() / currentSampleRate) * (internalBpm / 60.0),
-                              std::memory_order_relaxed);
+        if (!playing && midiClockSync.isEnabled()
+                     && wrapperType == wrapperType_Standalone
+                     && (midiClockSync.isPlaying() || internalPlaying.load(std::memory_order_relaxed)))
+        {
+            playing = true;
+            beatPos = midiClockBlockBeatPos;
+        }
+        else if (!playing && internalPlaying.load(std::memory_order_relaxed))
+        {
+            playing  = true;
+            const double pos = internalBeatPos.load(std::memory_order_relaxed);
+            beatPos  = pos;
+            internalBeatPos.store(pos + (buffer.getNumSamples() / currentSampleRate) * (internalBpm / 60.0),
+                                  std::memory_order_relaxed);
+        }
     }
 
     // detect transport stop→start edge and reset the sequencer's wrap detector
@@ -962,6 +1004,21 @@ void PluginProcessor::setMidiSyncMessages(int mode)
 {
     midiClockSync.setMessages(mode);
     appSettings->setValue("midiSyncMessages", mode);
+    appSettings->saveIfNeeded();
+}
+
+void PluginProcessor::setMidiNoteMode(int mode)
+{
+    midiNoteMode.store(mode, std::memory_order_relaxed);
+    if (mode == 0)
+    {
+        // Switching back to Free: clear any held-note state so the next Free-mode
+        // block doesn't see stale noteModePlaying = true from a prior Note session.
+        midiHeldNotes  .store(0,     std::memory_order_relaxed);
+        noteModePlaying.store(false, std::memory_order_relaxed);
+        noteModeBeatPos.store(0.0,   std::memory_order_relaxed);
+    }
+    appSettings->setValue("midiNoteMode", mode);
     appSettings->saveIfNeeded();
 }
 

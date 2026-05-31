@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 namespace mu_tant
 {
@@ -23,6 +24,27 @@ namespace
         const float exponent = std::pow(2.0f, -amount * 2.0f);
         return std::pow(clamp01(x), exponent);
     }
+}
+
+bool GateEnvelope::playsOnLoop(int loopCount) const noexcept
+{
+    // Loop mask: fire only if the bit for the current position in the M-loop
+    // cycle is set. Bit 0 = position 0 (first loop in cycle), etc.
+    const int m = loopM < 1 ? 1 : loopM;
+    const int pos = loopCount % m;
+    if (!((loopMask >> pos) & 1u))
+        return false;
+
+    // Probability: deterministic per-(loop, startCell) hash so the decision is
+    // stable across the duration of one loop and different each loop.
+    if (probability < 1.0f)
+    {
+        uint32_t h = (uint32_t) loopCount * 2654435761u ^ (uint32_t) startCell * 40503u;
+        h ^= h >> 16; h *= 0x45d9f3bu; h ^= h >> 16;
+        const float r = (float) (h & 0xFFFFFFu) / (float) 0x1000000u;
+        if (r >= probability) return false;
+    }
+    return true;
 }
 
 float GateEnvelope::shape(float p) const noexcept
@@ -144,7 +166,7 @@ void GatePattern::mergeRange(int firstCell, int lastCell)
     addEnvelope(env);
 }
 
-float GatePattern::gateAt(double beatPos, float gap01) const noexcept
+float GatePattern::gateAt(double beatPos, float gap01, int loopCount) const noexcept
 {
     // Empty pattern -> no gating, continuous drone.
     if (envelopes.empty()) return 1.0f;
@@ -170,6 +192,9 @@ float GatePattern::gateAt(double beatPos, float gap01) const noexcept
     }
     if (cachedEnv == nullptr) return 0.0f;   // cell with no envelope -> silent
 
+    // Probability / loop-N-of-M gate: envelope suppressed this loop → silent.
+    if (!cachedEnv->playsOnLoop(loopCount)) return 0.0f;
+
     // Phase across the covering envelope's full region (not just this cell).
     const double regionStart = (double) cachedEnv->startCell * cellLen;
     const double regionLen   = (double) cachedEnv->lengthCells * cellLen;
@@ -187,7 +212,8 @@ GateMode gateModeFor(bool bypassed, bool playing, bool patternEmpty) noexcept
 
 void applyGateBlock(GatePattern& pattern, float* left, float* right, int numSamples,
                     float gap01, bool bypassed, bool playing,
-                    double beatStart, double beatsPerSample) noexcept
+                    double beatStart, double beatsPerSample, double sampleRate,
+                    int loopCount) noexcept
 {
     const GateMode mode = gateModeFor(bypassed, playing, pattern.envelopes.empty());
 
@@ -196,6 +222,7 @@ void applyGateBlock(GatePattern& pattern, float* left, float* right, int numSamp
 
     if (mode == GateMode::Silence)
     {
+        pattern.gateLevel = 0.0f;                  // gate fully closed; re-open ramps from 0
         for (int i = 0; i < numSamples; ++i)
         {
             if (left)  left[i]  = 0.0f;
@@ -203,6 +230,14 @@ void applyGateBlock(GatePattern& pattern, float* left, float* right, int numSamp
         }
         return;
     }
+
+    // Max gate rise per sample — caps an instant (0-attack) open to kMinAttackMs
+    // so it ramps instead of clicking. Falling edges follow the envelope exactly
+    // (drawn decays are preserved); attacks drawn slower than the cap pass through
+    // unchanged. sampleRate <= 0 disables the slew (rise == full scale).
+    const float maxRise = (sampleRate > 0.0 && GatePattern::kMinAttackMs > 0.0f)
+                        ? (float) (1.0 / ((double) GatePattern::kMinAttackMs * 0.001 * sampleRate))
+                        : 1.0f;
 
     // Envelope — tryLock so a concurrent UI edit can't tear the envelope vector
     // mid-read. On contention, leave the block as-is (a brief, edit-time blip).
@@ -212,7 +247,12 @@ void applyGateBlock(GatePattern& pattern, float* left, float* right, int numSamp
         pattern.resetGateCache();
         for (int i = 0; i < numSamples; ++i)
         {
-            const float g = pattern.gateAt(beatStart + beatsPerSample * (double) i, gap01);
+            const float target = pattern.gateAt(beatStart + beatsPerSample * (double) i, gap01, loopCount);
+            // Slew-limit the rising edge only; fall instantly so decay shapes are exact.
+            pattern.gateLevel = (target > pattern.gateLevel)
+                              ? std::min(target, pattern.gateLevel + maxRise)
+                              : target;
+            const float g = pattern.gateLevel;
             if (left)  left[i]  *= g;
             if (right) right[i] *= g;
         }

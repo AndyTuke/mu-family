@@ -66,21 +66,25 @@ void VoiceEngine::process(juce::AudioBuffer<float>& out, int numSamples)
 
     for (int i = 0; i < ns; ++i)
     {
-        float a, b;
-        if (cfg.xmodMode == Sync)
-        {
-            // A -> B: B's phase is forced to 0 each time A wraps.
-            a = osc1.render();
-            if (osc1.justWrapped()) osc2.resetPhase();
-            b = osc2.render();
-        }
-        else
-        {
-            // Off / FM. FM is B -> A: B modulates A's phase.
-            b = osc2.render();
-            const float pm = (cfg.xmodMode == FM) ? (xmodNorm * b * kFmDepth) : 0.0f;
-            a = osc1.render(pm);
-        }
+        // Osc2 renders first; osc1 can FM-modulate from osc2's current output.
+        const float b = osc2.render();
+
+        // Cross-mod: determine the phase-mod input for osc1.
+        const float phaseMod = (cfg.xmodMode == FM) ? (xmodNorm * b * kFmDepth) : 0.0f;
+        float a = osc1.render(phaseMod);
+
+        // AM (amplitude modulation): osc2 modulates osc1's amplitude.
+        if (cfg.xmodMode == AM)
+            a *= (1.0f + xmodNorm * b);   // standard AM: carrier × (1 + idx × modulator)
+
+        // Ring Mod: crossfade from dry osc1 to osc1×osc2.
+        if (cfg.xmodMode == RingMod)
+            a = a * (1.0f - xmodNorm) + (a * b) * xmodNorm;
+
+        // Hard sync: osc1 wrap resets osc2 phase (takes effect next sample).
+        if (cfg.sync && osc1.justWrapped())
+            osc2.resetPhase();
+
         const float n = noise.render(noiseType);
         m[i] = (a * osc1Gain + b * osc2Gain + n * noiseGain) * gain;
     }

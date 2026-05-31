@@ -16,7 +16,9 @@ class ProcessorBase;
 class MixerChannel : public juce::Component
 {
 public:
-    enum class Type { Rhythm, EffectReturn, DelayReturn, ReverbReturn, Master };
+    // A per-layer channel strip (Channel) vs the FX-return / master strips. The
+    // product's layer is a rhythm in mu-clid, a voice in mu-tant.
+    enum class Type { Channel, EffectReturn, DelayReturn, ReverbReturn, Master };
 
     // Width of the insert panel drawn to the right of the Master strip.
     // Both inserts share this width, stacked vertically (top = INS 1, bottom = INS 2).
@@ -31,7 +33,7 @@ public:
                        juce::Colour channelColour)> onStatusUpdate;
 
     // Bind to engine state + VU peak + optional GR atomic. Pass proc+prefix to route mutations through APVTS.
-    void bindRhythm(MixerEngine::ChannelState& state, std::atomic<float>& peak,
+    void bindChannel(MixerEngine::ChannelState& state, std::atomic<float>& peak,
                     ProcessorBase* proc = nullptr, const juce::String& apvtsPrefix = {},
                     std::atomic<float>* grAtomic = nullptr);
     void bindReturn(MixerEngine::ReturnState& state, std::atomic<float>& peak,
@@ -87,10 +89,10 @@ private:
     juce::TextButton  muteBtn { "M" };
     juce::TextButton  soloBtn { "S" };
 
-    // Output bus dropdown (Rhythm channels only): M = Master, 1..8 = direct out.
+    // Output bus dropdown (layer channels only): M = Master, 1..8 = direct out.
     juce::ComboBox    outBusBox;
 
-    // Sidechain controls (Rhythm channels only)
+    // Sidechain controls (layer channels only)
     juce::ComboBox    scSourceBox;
     KnobWithLabel     scAmount  { "Amt", Id::knobFxSend };
     KnobWithLabel     scAttack  { "/",   Id::knobFxSend };
@@ -99,11 +101,11 @@ private:
     // Per-algorithm slot snapshots for master inserts — A/B-style: cycling
     // back to a previously-edited algo restores its slot values. Stored as
     // ACTUAL (denormalised) per slot so the restore path normalises back via
-    // mu_ui::actualToNorm. 4 slots per algo, 14 algos, 2 master slots.
-    float insertSnapshots     [14][4] = {{0.0f}};
-    bool  insertSnapshotValid [14]    = {};
-    float insertSnapshots2    [14][4] = {{0.0f}};
-    bool  insertSnapshotValid2[14]    = {};
+    // mu_ui::actualToNorm. kInsertSlotCount slots per algo, kInsertAlgoCount algos, 2 master slots.
+    float insertSnapshots     [mu_ui::kInsertAlgoCount][mu_ui::kInsertSlotCount] = {{0.0f}};
+    bool  insertSnapshotValid [mu_ui::kInsertAlgoCount]    = {};
+    float insertSnapshots2    [mu_ui::kInsertAlgoCount][mu_ui::kInsertSlotCount] = {{0.0f}};
+    bool  insertSnapshotValid2[mu_ui::kInsertAlgoCount]    = {};
 
     // Master insert: 4 generic Param knobs per slot. Labels / ranges /
     // formatters are driven each algo switch by mu_ui::configureKnobFromSlot.
@@ -129,15 +131,15 @@ private:
     // write to APVTS even when re-invoked from loadFromAPVTS with proc=nullptr.
     ProcessorBase* masterInsertProc = nullptr;
 
-    bool hasSends()            const { return channelType == Type::Rhythm
+    bool hasSends()            const { return channelType == Type::Channel
                                              || channelType == Type::EffectReturn
                                              || channelType == Type::DelayReturn; }
     bool hasMuteSolo()         const { return channelType != Type::Master; }
-    bool hasSidechainControls() const { return channelType == Type::Rhythm
+    bool hasSidechainControls() const { return channelType == Type::Channel
                                              || channelType == Type::EffectReturn
                                              || channelType == Type::DelayReturn
                                              || channelType == Type::ReverbReturn; }
-    bool hasOutputBus()        const { return channelType == Type::Rhythm; }
+    bool hasOutputBus()        const { return channelType == Type::Channel; }
     bool hasInsert()           const { return channelType == Type::Master; }
 
     void updateDbLabel(float level);

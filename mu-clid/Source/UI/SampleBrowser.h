@@ -2,7 +2,7 @@
 
 #include "Plugin/PluginProcessor.h"
 #include "UI/Components/SegmentControl.h"
-#include "UI/Components/MuClidLookAndFeel.h"
+#include "UI/Components/MuLookAndFeel.h"
 
 // Custom file browser used for sample loading so the user can audition files
 // before committing to a slot. Launched inside a DialogWindow (modal) from

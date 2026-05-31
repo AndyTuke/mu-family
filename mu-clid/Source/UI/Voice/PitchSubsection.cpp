@@ -132,7 +132,7 @@ void PitchSubsection::setRhythm(int ri)
         paramPtrCache.clear();   // pointers were keyed to the prior rhythm's IDs
     rhythmIndex = ri;
     loadFromRhythm();
-    refreshModulatedIndicators();
+    bindModulationIndicators();
 }
 
 void PitchSubsection::loadFromRhythm()
@@ -167,47 +167,39 @@ void PitchSubsection::refreshSuffix(const juce::String& suffix)
     else if (suffix == "pEnvDep")   pitchDepth .setValue(p.pitchEnvDepth, dn);
 }
 
-void PitchSubsection::refreshModulatedIndicators()
+void PitchSubsection::bindModulationIndicators()
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
-    const auto& assigns = proc.getRhythm(rhythmIndex).modulationMatrix.getAssignments();
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms())
+    {
+        for (auto* k : { &pitchOctave, &pitchSemi, &pitchDepth })
+            k->clearModBinding();
+        return;
+    }
+    const auto* mx = &proc.getRhythm(rhythmIndex).modulationMatrix;
+    static const float kNaN = std::numeric_limits<float>::quiet_NaN();
 
-    auto isAssigned = [&assigns](const char* destId) -> bool {
-        for (const auto& a : assigns)
-            if (a.destinationId == destId) return true;
-        return false;
-    };
-
-    auto sn = [&](int i) { return proc.getModSnapshot(rhythmIndex, i); };
-    const float kNaN   = std::numeric_limits<float>::quiet_NaN();
-    const bool playing = proc.sequencerPlaying.load();
-
-    auto arc = [&](bool assigned, int idx) -> float {
-        return (assigned && playing) ? sn(idx) : kNaN;
-    };
-
-    pitchOctave.setIsModulated(playing && isAssigned("pitch.octave"));
-    pitchSemi  .setIsModulated(playing && isAssigned("pitch.semitones"));
-    pitchFine  .setIsModulated(false);
-    pitchDepth .setIsModulated(playing && isAssigned("pitch.envDepth"));
-
-    // pitch.octave: snapshot stores (base octave + mod offset in octaves), slider is linear -4..+4.
-    // setModulatedActual routes through valueToProportionOfLength so the arc aligns with the needle.
-    pitchOctave.setModulatedActual(arc(isAssigned("pitch.octave"),     kSnapPitchOctave));
-    // pitch.semitones: snapshot stores (base + offset) in semitones, slider is linear -12..+12.
-    pitchSemi  .setModulatedActual(arc(isAssigned("pitch.semitones"),  kSnapPitchSemi));
-    pitchFine  .setModulatedNorm(kNaN);
-    // pitch.envDepth: voiceParams semis 0..24, slider display 0..100 — snapshot stores display 0..100 (#623).
-    pitchDepth .setModulatedActual(arc(isAssigned("pitch.envDepth"),   kSnapPitchEnvDep));
+    // pitch.octave: snap stores base+offset in octaves, slider linear -3..+3.
+    pitchOctave.bindModulation("pitch.octave", mx,
+        [&proc = proc, ri = rhythmIndex]() -> float {
+            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapPitchOctave) : kNaN; });
+    // pitch.semitones: snap stores base+offset in semitones, slider linear -12..+12.
+    pitchSemi.bindModulation("pitch.semitones", mx,
+        [&proc = proc, ri = rhythmIndex]() -> float {
+            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapPitchSemi) : kNaN; });
+    // pitchFine: not a modulation target — no binding.
+    // pitch.envDepth: snap stores display 0..100 semitones.
+    pitchDepth.bindModulation("pitch.envDepth", mx,
+        [&proc = proc, ri = rhythmIndex]() -> float {
+            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapPitchEnvDep) : kNaN; });
 }
 
 void PitchSubsection::resized()
 {
     // Voice section knobs render at Size 2 (55 × 56) — fixed PX, no
     // dependency on the panel's actual height. See MuLookAndFeel.
-    constexpr int kW    = MuClidLookAndFeel::kKnobSize2W;
-    constexpr int rowH  = MuClidLookAndFeel::kKnobSize2H;
-    constexpr int gap   = MuClidLookAndFeel::kVoiceGap;
+    constexpr int kW    = MuLookAndFeel::kKnobSize2W;
+    constexpr int rowH  = MuLookAndFeel::kKnobSize2H;
+    constexpr int gap   = MuLookAndFeel::kVoiceGap;
     constexpr int row2Y = rowH + gap;
 
     using mu_ui::s;

@@ -7,7 +7,7 @@
 #include "UI/RhythmCircle.h"
 #include "UI/EuclideanPanel.h"
 #include "UI/Components/StatusBar.h"
-#include "UI/Components/MuClidLookAndFeel.h"
+#include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/AboutPanel.h"
@@ -32,7 +32,7 @@ public:
 private:
     PluginProcessor& proc;
 
-    MuClidLookAndFeel lookAndFeel;
+    MuLookAndFeel lookAndFeel;
 
     TransportBar      transportBar;
     MasterLoopSection masterLoop;
@@ -42,7 +42,7 @@ private:
     AboutPanel     aboutPanel;
     DropdownSelect noteSelector;
     juce::Label    noteSelectorLabel;
-    KnobWithLabel  accentKnob { "Accent", MuClidLookAndFeel::knobLevel };
+    KnobWithLabel  accentKnob { "Accent", MuLookAndFeel::knobLevel };
 
     static constexpr int kTransportH  = 40;
     static constexpr int kStatusH     = 22;

@@ -9,7 +9,7 @@ juce_add_plugin(mu-tant
     BUNDLE_ID "com.transwarp.mu-tant"
     PLUGIN_MANUFACTURER_CODE TDP1
     PLUGIN_CODE MTnt
-    FORMATS Standalone
+    FORMATS VST3 Standalone
     PRODUCT_NAME "mu-Tant"
     PLUGIN_NAME  "μ-Tant"
     IS_SYNTH TRUE
@@ -22,6 +22,7 @@ juce_add_plugin(mu-tant
 target_sources(mu-tant
     PRIVATE
         Source/Plugin/PluginProcessor.cpp
+        Source/Plugin/PluginProcessor_APVTS.cpp
         Source/Plugin/PluginEditor.cpp
         Source/UI/VoicePanel.cpp
         Source/UI/VoiceSidebar.cpp
@@ -61,6 +62,17 @@ target_link_libraries(mu-tant
         juce::juce_recommended_warning_flags
 )
 
+# Custom standalone app — shows the shared "Close μ-Tant?" confirmation on quit
+# (mirrors mu-clid). Compiled only into the Standalone target.
+target_compile_definitions(mu-tant_Standalone PRIVATE JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
+target_sources(mu-tant_Standalone PRIVATE
+    Source/Plugin/StandaloneApp.cpp)
+
+# CLAP format via clap-juce-extensions (mirrors mu-clid). Creates mu-tant_CLAP.
+clap_juce_extensions_plugin(TARGET mu-tant
+    CLAP_ID "com.transwarp.mu-tant"
+    CLAP_FEATURES instrument synthesizer)
+
 # Family build-counter: depend on the shared increment target (defined in
 # mu-clid/CMakeLists.txt) so mu-tant builds also tick the session counter.
 # Without this, building only mu-tant would reuse a stale BuildNumber.h.
@@ -79,14 +91,29 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/GatePatternTests.cpp
     Source/Tests/GateStageTests.cpp
     Source/Tests/InsertStageTests.cpp
+    Source/Tests/ScalesTests.cpp
+    Source/Tests/ControlSequenceTests.cpp
+    Source/Tests/SynthVoiceTests.cpp
+    Source/Tests/MuTantPersistTests.cpp
+    Source/Tests/ApvtsLayoutTests.cpp      # real createParameterLayout coverage (#721)
+    Source/Tests/SendFXSmokeTests.cpp      # FX-slot DSP smoke, ported from mu-clid (#721)
     Source/UI/GatingDesigner.cpp
     Source/Sequencer/GatePattern.cpp
     Source/Audio/WavetableBank.cpp
-    # mu-core .cpps the modulator + gating + insert tests depend on (the console-app
-    # target doesn't share JUCE-plugin context, so it can't link mu-core directly).
+    Source/Audio/SynthVoice.cpp
+    # Editor-free APVTS layout factory — lets the ApvtsLayout test exercise the
+    # real createParameterLayout() without pulling in PluginEditor/UI (#721).
+    Source/Plugin/PluginProcessor_APVTS.cpp
+    # mu-core .cpps the modulator + gating + insert + voice + layout/FX tests depend
+    # on (the console-app target doesn't share JUCE-plugin context, so it can't link
+    # mu-core directly).
     "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/InsertProcessor.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/MultiModeFilter.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/EffectSlot.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/DelaySlot.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/ReverbSlot.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/DropdownSelect.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/MuLookAndFeel.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/MuTheme.cpp"
@@ -97,15 +124,20 @@ target_compile_features(mu-tant-tests PRIVATE cxx_std_17)
 target_include_directories(mu-tant-tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source"
     "${CMAKE_SOURCE_DIR}/mu-core"
+    SYSTEM
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
 )
 
 target_link_libraries(mu-tant-tests PRIVATE
     juce::juce_core
     juce::juce_audio_basics
+    juce::juce_audio_processors    # APVTS + AudioProcessor for the layout coverage test (#721)
     juce::juce_data_structures
     juce::juce_events
     juce::juce_graphics
     juce::juce_gui_basics
+    juce::juce_dsp                 # MultiModeFilter (SynthVoice tests) uses juce::dsp filters
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags
 )

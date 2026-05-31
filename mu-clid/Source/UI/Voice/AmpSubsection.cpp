@@ -197,7 +197,7 @@ void AmpSubsection::setRhythm(int ri)
         paramPtrCache.clear();
     rhythmIndex = ri;
     loadFromRhythm();
-    refreshModulatedIndicators();
+    bindModulationIndicators();
 }
 
 void AmpSubsection::loadFromRhythm()
@@ -248,41 +248,38 @@ void AmpSubsection::refreshSuffix(const juce::String& suffix)
     }
 }
 
-void AmpSubsection::refreshModulatedIndicators()
+void AmpSubsection::bindModulationIndicators()
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
-    const auto& assigns = proc.getRhythm(rhythmIndex).modulationMatrix.getAssignments();
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms())
+    {
+        for (auto* k : { &ampAtk, &ampDec, &ampSus, &ampLevel, &ampAccent })
+            k->clearModBinding();
+        return;
+    }
+    const auto* mx = &proc.getRhythm(rhythmIndex).modulationMatrix;
+    static const float kNaN = std::numeric_limits<float>::quiet_NaN();
 
-    auto isAssigned = [&assigns](const char* destId) -> bool {
-        for (const auto& a : assigns)
-            if (a.destinationId == destId) return true;
-        return false;
-    };
-
-    auto sn = [&](int i) { return proc.getModSnapshot(rhythmIndex, i); };
-    const float kNaN   = std::numeric_limits<float>::quiet_NaN();
-    const bool playing = proc.sequencerPlaying.load();
-
-    auto arc = [&](bool assigned, int idx) -> float {
-        return (assigned && playing) ? sn(idx) : kNaN;
-    };
-
-    ampAtk   .setIsModulated(playing && isAssigned("amp.attack"));
-    ampDec   .setIsModulated(playing && isAssigned("amp.decay"));
-    ampSus   .setIsModulated(playing && isAssigned("amp.sustain"));
-    // ampRel: Release is not a modulation target (#668) — never shows a mod ring.
-    ampLevel .setIsModulated(playing && isAssigned("amp.level"));
-    ampAccent.setIsModulated(playing && isAssigned("accentDb"));
-
-    // ADSR times: snapshot stores ACTUAL seconds (slider runs 0..10 s with skewFactor 0.3),
-    // route via setModulatedActual so the arc respects the skew (#623). Sustain is linear 0..100 — use setModulatedNorm.
-    ampAtk   .setModulatedActual(arc(isAssigned("amp.attack"),   kSnapAmpAtk));
-    ampDec   .setModulatedActual(arc(isAssigned("amp.decay"),    kSnapAmpDec));
-    ampSus   .setModulatedNorm  (arc(isAssigned("amp.sustain"),  kSnapAmpSus));
-    // amp.level: voiceParams gain 0..2, slider in dB -60..+6 — snapshot stores actual dB (#623).
-    // accentDb: voiceParams dB 0..12, slider display 0..100 — snapshot stores display 0..100 (#623).
-    ampLevel .setModulatedActual(arc(isAssigned("amp.level"),  kSnapAmpLvl));
-    ampAccent.setModulatedActual(arc(isAssigned("accentDb"),   kSnapAccent));
+    // ADSR attack/decay: snap stores ACTUAL seconds (skewFactor 0.3 slider) → setModulatedActual.
+    ampAtk.bindModulation("amp.attack", mx,
+        [&proc = proc, ri = rhythmIndex]() -> float {
+            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapAmpAtk) : kNaN; });
+    ampDec.bindModulation("amp.decay", mx,
+        [&proc = proc, ri = rhythmIndex]() -> float {
+            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapAmpDec) : kNaN; });
+    // Sustain: snap normalised 0..1, slider linear 0..100 → normMode.
+    ampSus.bindModulation("amp.sustain", mx,
+        [&proc = proc, ri = rhythmIndex]() -> float {
+            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapAmpSus) : kNaN; },
+        true);
+    // amp.level: snap stores actual dB (-60..+6).
+    ampLevel.bindModulation("amp.level", mx,
+        [&proc = proc, ri = rhythmIndex]() -> float {
+            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapAmpLvl) : kNaN; });
+    // accentDb: snap stores display 0..100 dB.
+    ampAccent.bindModulation("accentDb", mx,
+        [&proc = proc, ri = rhythmIndex]() -> float {
+            return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapAccent) : kNaN; });
+    // ampRel: Release is not a modulation target — leave unbound.
 }
 
 void AmpSubsection::setEffectSendLabel(const juce::String& name)
@@ -294,9 +291,9 @@ void AmpSubsection::resized()
 {
     // Voice section knobs render at Size 2 (55 × 56) — fixed PX, no
     // dependency on the panel's actual height.
-    constexpr int kW    = MuClidLookAndFeel::kKnobSize2W;
-    constexpr int rowH  = MuClidLookAndFeel::kKnobSize2H;
-    constexpr int gap   = MuClidLookAndFeel::kVoiceGap;
+    constexpr int kW    = MuLookAndFeel::kKnobSize2W;
+    constexpr int rowH  = MuLookAndFeel::kKnobSize2H;
+    constexpr int gap   = MuLookAndFeel::kVoiceGap;
     constexpr int row2Y = rowH + gap;
 
     using mu_ui::s;

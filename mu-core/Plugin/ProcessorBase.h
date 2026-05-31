@@ -150,6 +150,13 @@ public:
     // derived processor's handleAsyncUpdate().
     void drainPendingMidiProgramChanges();
 
+    // Maps a shared global-FX / return / master / channel-strip APVTS parameter
+    // to fxChain + mixerEngine state. Products route the matching IDs here from
+    // their parameterChanged (the param set is declared by mu_mixfx::addGlobalFxParams
+    // + the product's `ch{i}_*` strip). Handles: `ch{i}_*`, `ret_*`, `mstr_lvl/pan`,
+    // `mst_ins*`, `eff_*`, `eff2*`, `dly_*`, `rev_*`, `echo_*`. Unrecognised IDs no-op.
+    void syncGlobalFxParam(const juce::String& id, float v);
+
 protected:
     virtual void applyMidiPresetSlot(int slot, const juce::File& f) = 0;
     virtual void applyFullMidiPreset(const juce::File& f)            = 0;
@@ -172,9 +179,10 @@ protected:
                           int                                      numVoices,
                           int                                      numSamples,
                           double                                   effectiveBpm,
-                          std::array<juce::AudioBuffer<float>*, 8>* directOuts  = nullptr,
+                          std::array<juce::AudioBuffer<float>*, MixerEngine::MaxChannels>* directOuts = nullptr,
                           juce::AudioBuffer<float>*                fxReturnsOut = nullptr,
-                          const RetiredVoices*                     retired      = nullptr);
+                          const RetiredVoices*                     retired      = nullptr,
+                          const MixerEngine::RenderChannelFn*      renderChannel = nullptr);
 
 protected:
     // Backing storage for the default getUiScale / setUiScale. Derived classes
@@ -182,6 +190,14 @@ protected:
     float uiScale { kUiScaleMedium };
 
 private:
+    // syncGlobalFxParam dispatch helpers — one per ID family, so the public
+    // entry point is a short prefix router rather than a ~100-line if/else chain.
+    // syncMaster returns true when it handled the id.
+    void syncChannelStripParam(int channel, const juce::String& param, float v);
+    void syncReturnStripParam (int retIdx,  const juce::String& rest,  float v);
+    bool syncMasterParam      (const juce::String& id, float v);
+    void syncFxSlotParam      (const juce::String& id, float v);
+
     // MIDI program-change queue: audio thread enqueues on incoming PC;
     // drainPendingMidiProgramChanges (message thread) drains and dispatches
     // to the virtual hooks.

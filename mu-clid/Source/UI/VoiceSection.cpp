@@ -1,7 +1,6 @@
 #include "VoiceSection.h"
 #include "Plugin/PluginProcessor.h"
 #include "Sequencer/Rhythm.h"
-#include "Modulation/ModulationSnapshot.h"
 #include "Persistence/ScopedApvtsLoading.h"
 
 VoiceSection::VoiceSection(PluginProcessor& p)
@@ -72,14 +71,6 @@ void VoiceSection::loadFromRhythm()
     insertSub.loadFromChannel();
 }
 
-void VoiceSection::refreshModulatedIndicators()
-{
-    pitchSub .refreshModulatedIndicators();
-    filterSub.refreshModulatedIndicators();
-    ampSub   .refreshModulatedIndicators();
-    insertSub.refreshModulatedIndicators();
-}
-
 void VoiceSection::refreshSuffix(const juce::String& suffix)
 {
     pitchSub .refreshSuffix(suffix);
@@ -91,7 +82,7 @@ void VoiceSection::refreshSuffix(const juce::String& suffix)
 void VoiceSection::resized()
 {
     // Fixed Medium-baseline layout, wrapped in s() so the whole grid scales.
-    using LF = MuClidLookAndFeel;
+    using LF = MuLookAndFeel;
     using mu_ui::s;
     constexpr int divW   = LF::kVoiceDivW;
     constexpr int labelH = LF::kVoiceLabelH;
@@ -106,8 +97,8 @@ void VoiceSection::resized()
 
 void VoiceSection::paint(juce::Graphics& g)
 {
-    using Id = MuClidLookAndFeel::ColourIds;
-    using LF = MuClidLookAndFeel;
+    using Id = MuLookAndFeel::ColourIds;
+    using LF = MuLookAndFeel;
     using mu_ui::s;
 
     const int h          = getHeight();
@@ -115,7 +106,7 @@ void VoiceSection::paint(juce::Graphics& g)
     constexpr int labelH = LF::kVoiceLabelH;
     constexpr int kW     = LF::kVoiceUnitW;
 
-    g.setColour(MuClidLookAndFeel::colour(Id::segmentInactiveBorder));
+    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     const float kDivInset = mu_ui::sf(7.0f);
     const float div1X = static_cast<float>(s(5 * kW) + s(divW) / 2);
     const float div2X = static_cast<float>(s(10 * kW + divW) + s(divW) / 2);
@@ -124,7 +115,7 @@ void VoiceSection::paint(juce::Graphics& g)
     g.drawLine(div2X, kDivInset, div2X, (float)h - kDivInset, 0.5f);
     g.drawLine(div3X, kDivInset, div3X, (float)h - kDivInset, 0.5f);
 
-    g.setColour(MuClidLookAndFeel::colour(Id::mutedText));
+    g.setColour(MuLookAndFeel::colour(Id::mutedText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(10.0f))));
     g.drawText("PITCH",  0,                          0, s(5 * kW), s(labelH), juce::Justification::centred, false);
     g.drawText("FILTER", s(5 * kW + divW),           0, s(5 * kW), s(labelH), juce::Justification::centred, false);
