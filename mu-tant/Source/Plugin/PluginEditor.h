@@ -12,11 +12,8 @@ namespace mu_tant
 {
 
 // mu-Tant editor: shared mu-core shell + mu-tant-specific sidebar (8 voice
-// buttons), main panel (per-voice synth UI), and mixer overlay (per-channel
-// level/pan/mute/solo via the shared MixerOverlay; FX sends + sidechain UI
-// is present but inert until the MixerEngine voice-render-callback refactor
-// lets mu-tant route through the shared mixer / FX path). No settings overlay
-// yet (gear button is currently a no-op).
+// buttons), main panel (per-voice synth UI), mixer overlay (full FX + sidechain
+// rack via the shared MixerOverlay), and settings overlay (gear button).
 class PluginEditor : public EditorShellBase
 {
 public:

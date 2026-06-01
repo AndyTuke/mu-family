@@ -4,7 +4,7 @@ Product-specific guidance for working in `mu-tant/`. Read alongside the family-w
 
 ## Project overview
 
-**μ-Tant** is a JUCE/C++ wavetable drone synth by Transwarp Development Project. Engine: a dynamic set of **1–8 free-running voices** (default 1), each with two wavetable oscillators (cross-mod / FM / Sync), shared scale-quantised pitch, mu-core filter, a per-voice drawable **gater**, and a shared insert effect. Builds Standalone + VST3 + CLAP (not yet deployed to testers — only mu-clid has the OneDrive deploy step).
+**μ-Tant** is a JUCE/C++ wavetable drone synth by Transwarp Development Project. Engine: a dynamic set of **1–8 free-running voices** (default 1), each with two wavetable oscillators (cross-mod / FM / Sync), shared scale-quantised pitch, mu-core filter, a per-voice drawable **gater**, and a shared insert effect. Builds Standalone + VST3 + CLAP (Debug + Release; Release deploys to the OneDrive tester share via `MUFAMILY_DEPLOY_TESTERS=ON`, matching mu-clid).
 
 The editor inherits `mu-core/UI/EditorShellBase.h` — same TransportBar, About, StatusBar, window sizing, and `MuLookAndFeel` knob style as mu-Clid by construction. The differences vs mu-Clid are the voice engine and (eventually) the sequencer model.
 
@@ -37,7 +37,7 @@ The editor inherits `mu-core/UI/EditorShellBase.h` — same TransportBar, About,
 - Linear cross-fade between adjacent wavetable frames at `position`
 - Per-envelope Probability + Loop-N-of-M are **implemented** (Arrow tool + properties strip). Remaining: "First-only" and "On-staged-for-change" are still deferred.
 - Pattern hot-swap timing (reuse mu-clid's `HotSwapStager` machinery)
-- Tester deploy (the OneDrive drop is mu-clid-only; mu-tant builds all formats but stays local)
+- Pattern hot-swap timing (reuse mu-clid's `HotSwapStager` machinery)
 
 ## Build targets
 

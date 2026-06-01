@@ -94,9 +94,6 @@ void VoiceEngine::process(juce::AudioBuffer<float>& out, int numSamples)
     // Filter (mu-core) in place on the mono work buffer — drive + main filter + lo-cut all inside.
     filter.process(mono, ns, 1);
 
-    // [gate stub] — drawable-gate pattern multiply goes here (design-sequencer.md).
-    // [insert stub] — mu-core InsertProcessor goes here.
-
     // Sum the mono voice into every output channel.
     for (int ch = 0; ch < out.getNumChannels(); ++ch)
         out.addFrom(ch, 0, mono, 0, 0, ns);

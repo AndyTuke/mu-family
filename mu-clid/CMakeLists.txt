@@ -136,8 +136,9 @@ add_custom_command(TARGET mu-clid_Standalone POST_BUILD
             "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid_artefacts/$<CONFIG>/VST3/mu-Clid.vst3"
             "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid_artefacts/$<CONFIG>/CLAP/mu-Clid.clap"
             "-DDIST_WIN=${MUFAMILY_WIN_DIST}"
+            "-DPRODUCT_FILENAME=mu-Clid"
             -P "${CMAKE_SOURCE_DIR}/cmake/DeployRelease.cmake"
-    COMMENT "Deploying Release artifacts to OneDrive (Debug skipped)"
+    COMMENT "Deploying mu-Clid Release artifacts to OneDrive (Debug skipped)"
     VERBATIM
 )
 endif()

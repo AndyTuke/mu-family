@@ -18,13 +18,11 @@
 
 // mu-tant — wavetable drone synth.
 //
-// Stage A1: expanded to 8 free-running voices. Each voice has its own
-// oscillators / cross-mod / filter / level state, exposed in APVTS under
-// per-voice subtree IDs `v{N}_*` (osc1/osc2/xmod/mix/filter/level). Shared
-// tonal centre (`root`, `scale`) stays global. processBlock sums voices
-// directly; the mixer's per-channel level / pan / mute / solo is applied
-// from `mixerEngine.channels[]` (FX sends + sidechain pending the
-// MixerEngine voice-render-callback refactor).
+// 1–8 free-running voices, each with two wavetable oscillators (cross-mod /
+// FM / Sync), scale-quantised pitch, mu-core filter + drive + lo-cut, a
+// per-voice drawable gater + filter envelope + pitch envelope, and a shared
+// insert effect. processBlock routes through the shared MixerEngine
+// (FX sends + sidechain + returns + master) via the renderVoiceCb hook.
 namespace mu_tant
 {
 

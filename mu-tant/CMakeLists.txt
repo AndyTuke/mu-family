@@ -1,7 +1,9 @@
-# mu-tant — wavetable drone synth (first-stab engine).
+# mu-tant — wavetable drone synth.
 #
-# Debug-only for now (not shipped to testers). Plugin-specific sources live under
-# Source/; shared audio/UI/ProcessorBase come from mu-core via the link.
+# Builds Standalone + VST3 + CLAP (Debug and Release). Release deploy to the
+# OneDrive tester share is guarded by MUFAMILY_DEPLOY_TESTERS (OFF by default).
+# Plugin-specific sources live under Source/; shared audio/UI/ProcessorBase come
+# from mu-core via the link.
 
 # ── mu-Tant — Standalone (first stab; VST3/CLAP added when it's worth shipping) ──
 juce_add_plugin(mu-tant
@@ -77,6 +79,27 @@ clap_juce_extensions_plugin(TARGET mu-tant
 # mu-clid/CMakeLists.txt) so mu-tant builds also tick the session counter.
 # Without this, building only mu-tant would reuse a stale BuildNumber.h.
 add_dependencies(mu-tant increment_build_number)
+
+# ── Deploy Release artifacts to the tester drop folder ──────────────────────
+# Mirrors mu-clid's deploy pattern. Guarded by MUFAMILY_DEPLOY_TESTERS (OFF by
+# default). See root CMakeLists.txt.
+if(MUFAMILY_DEPLOY_TESTERS)
+add_custom_command(TARGET mu-tant_Standalone POST_BUILD
+    COMMAND "${CMAKE_COMMAND}"
+            "-DCONFIG=$<CONFIG>"
+            "-DSTANDALONE=$<TARGET_FILE:mu-tant_Standalone>"
+            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-tant/mu-tant_artefacts/$<CONFIG>/VST3/mu-Tant.vst3"
+            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-tant/mu-tant_artefacts/$<CONFIG>/CLAP/mu-Tant.clap"
+            "-DDIST_WIN=${MUFAMILY_WIN_DIST}"
+            "-DPRODUCT_FILENAME=mu-Tant"
+            -P "${CMAKE_SOURCE_DIR}/cmake/DeployRelease.cmake"
+    COMMENT "Deploying mu-Tant Release artifacts to OneDrive (Debug skipped)"
+    VERBATIM
+)
+endif()
+
+# Keep deployed formats version-matched — Standalone waits for VST3 + CLAP.
+add_dependencies(mu-tant_Standalone mu-tant_VST3 mu-tant_CLAP)
 
 # ── mu-tant-tests — console UnitTests over the new synth DSP ─────────────────
 # Tests only mu-tant's self-contained DSP (Scales + WavetableOscillator +
