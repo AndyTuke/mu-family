@@ -285,6 +285,10 @@ private:
     // audio-thread allocation. Keys match the strings in MuTantModDest::kModDestTable.
     // Values are seeded each block from the current VoiceConfig and read back
     // after the matrix runs.
+    // THREADING: MixerEngine calls renderVoice sequentially (one voice at a time)
+    // so this map is never accessed concurrently — safe to share across voices.
+    // If MixerEngine ever renders channels in parallel, move this into a per-voice
+    // structure to avoid a data race.
     std::unordered_map<std::string_view, float> modParamValues;
 
     // Internal transport. `playing` gates the beat advance; `internalBeatPos`

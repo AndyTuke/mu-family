@@ -31,12 +31,12 @@
 //  14  HighShelf  (biquad high shelf, +12 dB)
 //  15  Comb-      (feedback comb, negative feedback — peaks at f0/2, 3f0/2, 5f0/2…)
 //
-// implementation refactored from a single 200-line switch in
-// MultiModeFilter.cpp into per-algorithm classes living in
-// Source/Audio/Processing/Filters/. MultiModeFilter is now a thin orchestrator
-// that pre-allocates one instance of each algorithm and dispatches via a
-// fixed-index table. Each algorithm owns its own DSP state. Public API is
-// unchanged so call sites (VoiceEngine, etc.) need no edits.
+// Implementation: a single switch in MultiModeFilter.cpp was refactored into
+// per-algorithm classes under mu-core/Audio/Filters/. MultiModeFilter is now a
+// thin orchestrator that pre-allocates one instance of each algorithm and
+// dispatches via a fixed-index table. Each algorithm owns its own DSP state.
+// Public API is unchanged so call sites (VoiceEngine, SynthVoice, etc.) need
+// no edits.
 class MultiModeFilter
 {
 public:

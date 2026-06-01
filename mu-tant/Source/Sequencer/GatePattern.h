@@ -11,8 +11,8 @@ namespace mu_tant
 // 2-bar gate grid. See docs/mu-tant/design-sequencer.md.
 //
 //   startCell    0-based subdivision index where the region begins.
-//   lengthCells  region span in cells (>=1). A pencil click makes 1; glue
-//                merges several into one wider region.
+//   lengthCells  region span in cells (>=1). A pencil click makes 1; start/end
+//                grab handles extend a region to multiple cells.
 //   split        peak position 0..1 within the region (the attack/decay split):
 //                  0 -> instant attack, pure decay (the gate default)
 //                  1 -> pure attack, no decay
@@ -61,9 +61,9 @@ private:
 
 // Drawable 2-bar gate pattern. See docs/mu-tant/design-sequencer.md.
 //
-// Storage is a flat std::vector<GateEnvelope> kept sorted by startCell and
-// non-overlapping. The message thread mutates (under editLock); the audio
-// thread reads via gateAt() which is bounded-array indexed and allocation-free.
+// Storage is a sorted, non-overlapping std::vector<GateEnvelope> (by startCell).
+// The message thread mutates under editLock; the audio thread reads via gateAt()
+// which is bounded-array indexed and allocation-free.
 class GatePattern
 {
 public:
@@ -115,10 +115,10 @@ public:
     // Remove whichever envelope covers cellIdx (if any). No-op if none.
     void removeEnvelopeCovering(int cellIdx);
 
-    // Glue: merge every envelope intersecting [firstCell, lastCell] into one
-    // envelope filling that whole range. The merged envelope's split /
-    // attackBend / decayBend are the average of the envelopes that were there
-    // (defaults if the range was empty). reverse is cleared.
+    // Merge every envelope intersecting [firstCell, lastCell] into one envelope
+    // filling that whole range. The merged envelope's split / attackBend /
+    // decayBend are the average of the merged envelopes (defaults if empty).
+    // reverse is cleared. Used internally and by tests; no UI tool exposes this.
     void mergeRange(int firstCell, int lastCell);
 
     // ── Audio-thread gate evaluation ─────────────────────────────────────────

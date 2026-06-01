@@ -407,15 +407,23 @@ void GatingDesigner::rebuildPathCache()
     {
         cache.clear();
         if (pat == nullptr) return;
+        // Pre-size the cache before acquiring editLock so Path object construction
+        // (which may allocate) doesn't extend the lock hold. The audio thread's
+        // bounded spin (#795) can exhaust if the lock is held during allocation.
+        // We read envelopes.size() without the lock here — safe because only the
+        // message thread writes envelopes, so a concurrent read is coherent.
+        cache.resize(pat->envelopes.size());
         withLock(pat, [&]
         {
             const float gap = (pat == boundPattern) ? juce::jlimit(0.0f, 1.0f, gapValue) : 0.0f;
+            // Adjust if envelopes changed between the pre-size and the lock acquire.
             cache.resize(pat->envelopes.size());
             for (std::size_t ei = 0; ei < pat->envelopes.size(); ++ei)
             {
                 const auto& env = pat->envelopes[ei];
                 const auto L = layoutFor(env);
                 juce::Path& p = cache[ei];
+                p.clear();
                 if (L.wpx <= 0.0f) continue;
                 p.startNewSubPath(L.x0, L.bot);
                 const int steps = juce::jmax(2, (int)L.wpx);

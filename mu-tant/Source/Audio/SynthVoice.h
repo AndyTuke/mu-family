@@ -6,10 +6,10 @@
 #include "Audio/MultiModeFilter.h"   // mu-core (reused unchanged)
 
 // mu-tant per-layer voice (design-voice.md "Per-slot voice chain").
-//   Osc1 + Osc2 --(FM / Sync)--> mix --> Filter --> [gate stub] --> [insert stub] --> out
-// Free-running drone: no note-on/off, no amp/pitch/filter envelopes. The gate
-// stage and the mu-core insert are stubbed in this first stab (the gate is a
-// pass-through; insert is not yet wired) and slot in once the rest is proven.
+//   Osc1 + Osc2 --(FM / Sync)--> mix --> Filter --> out (to caller)
+// Free-running drone: no note-on/off, no amp/pitch/filter envelopes.
+// Gate, filter envelope, pitch envelope, and the mu-core insert are applied
+// by the caller (PluginProcessor::renderVoice) after process() returns.
 namespace mu_tant
 {
 

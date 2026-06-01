@@ -133,7 +133,13 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
 {
     applyPendingParams();
 
-    juce::ScopedReadLock sl(bufferLock);
+    // tryEnterRead avoids blocking the audio thread if loadFile() holds the
+    // write lock (file I/O + buffer allocation can be hundreds of ms). On
+    // contention: output a silent block rather than stalling the audio thread.
+    if (!bufferLock.tryEnterRead())
+        return;
+    struct ReadGuard { juce::ReadWriteLock& l; ~ReadGuard() { l.exitRead(); } } readGuard { bufferLock };
+
     if (!sampleLoaded || buffer.getNumSamples() == 0 || buffer.getNumChannels() == 0)
         return;
 

@@ -1,6 +1,6 @@
 # mu-tant — Voice Engine
 
-Sketch / pre-implementation design. Subject to revision until first code lands.
+Implemented design. Reflects the shipped voice chain; update when DSP changes.
 
 Family rules apply: read [design-plugin-family.md](../design-plugin-family.md) for the platform contract (`mu-core` boundary, `ProcessorBase`, `VoiceSlot`) before changing any structural decision below.
 
@@ -20,7 +20,7 @@ A **drone instrument**, not a note instrument. Each of 8 slots runs **two oscill
 - **FM and oscillator sync** between the two oscs, modulatable for timbral evolution
 - **A drawable gate pattern** that chops bursts out of the drone with per-step decay envelopes
 
-There is **no pitch envelope, no amp envelope, no filter envelope**. All time-varying behaviour comes from the modulator section (LFOs, control sequences) plus the gate pattern that chops the output.
+There is **no amp envelope**. Time-varying behaviour comes from: (1) the modulator section (LFOs, control sequences) driving osc pitch / filter / level, (2) the gate pattern that chops the drone into bursts, (3) a **filter envelope** layer (drawn on the filter grid tab — shapes filter cutoff 20 Hz..base over the same 2-bar grid), and (4) a **pitch envelope** layer (drawn on the pitch grid tab — adds ±24 semitones to osc1/osc2 pitch per block).
 
 ---
 
@@ -40,14 +40,19 @@ There is **no pitch envelope, no amp envelope, no filter envelope**. All time-va
 ```
 [Osc1] ─┐
         ├─ X-mod (FM / Sync) ─→ Filter ─→ Gate ─→ Insert ─→ mixer bus
-[Osc2] ─┘
+[Osc2] ─┘                         ↑         ↑
+                         Filter envelope  Gate envelope
+                         (pattern layer)  (pattern layer)
+                         Pitch envelope applies to Osc1/Osc2 pitch before Filter.
 ```
 
 Differences from mu-clid:
 - **No `ampEnv`** — the gate stage replaces it.
 - **No retrigger** — oscs never reset phase; they're continuous from `prepareToPlay`.
-- **Filter is the same** (`mu-core::VoiceFilter`, same algorithm list).
-- **Insert is the same** (`mu-core::InsertProc`, same algo set).
+- **Filter is the same** (`mu-core::MultiModeFilter`, same algorithm list).
+- **Insert is the same** (`mu-core::InsertProcessor`, same algo set).
+- **Filter envelope** — a second drawable pattern layer (toggled [GATE|FILT]) shapes filter cutoff.
+- **Pitch envelope** — a third drawable pattern layer (toggled [PITCH]) shifts osc1/osc2 pitch.
 
 ---
 

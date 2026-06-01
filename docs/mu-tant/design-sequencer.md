@@ -1,8 +1,7 @@
 # mu-tant — Sequencer (Gate Pattern)
 
-Implemented design. The drawable gate editor + per-envelope shapes described
-here are live; the per-envelope probability / loop-N options noted under
-**Deferred** are not.
+Implemented design. The drawable gate editor, per-envelope shapes, per-envelope
+probability, and loop-N-of-M are all live.
 
 Sibling doc: [design-voice.md](design-voice.md) — voice DSP, oscillator chain,
 pitch model. The gate stage described here sits between the filter and the
@@ -44,7 +43,7 @@ single attack→peak→decay shape:
 | Field | Meaning |
 |---|---|
 | `startCell` | 0-based subdivision index where the region begins |
-| `lengthCells` | region span in cells (≥1); a pencil click makes 1, glue makes more |
+| `lengthCells` | region span in cells (≥1); a pencil click makes 1, start/end grab handles extend it |
 | `split` | peak position 0..1 within the region — the attack/decay split. `0` = instant attack (pure decay); `1` = pure attack |
 | `attackBend` | −1..+1 bend of the rising attack line (− concave, + convex) |
 | `decayBend` | −1..+1 bend of the falling decay line (− concave, + convex) |
@@ -92,16 +91,20 @@ assets):
 
 | Tool | Action |
 |---|---|
-| **Pencil** | Click an empty cell → draw a default 1-cell envelope filling that cell. Click+drag a **grab handle** on an existing envelope to reshape it (see below). |
+| **Arrow** | Click an envelope → select it; its per-envelope properties appear in the strip below the grid. |
+| **Pencil** | Click an empty cell → draw a default 1-cell envelope. Click+drag a **grab handle** on an existing envelope to reshape it (see below). |
 | **Eraser** | Click an envelope → erase it. |
-| **Glue** | Click+drag across several envelopes → merge them into one envelope filling the dragged region; its `split` / `attackBend` / `decayBend` are the **average** of the merged envelopes. |
 | **Reverse** | Click an envelope → flip its attack and decay. |
 
 ### Pencil grab handles
 
 When the Pencil is active, each envelope exposes draggable handles. Hovering a
-handle turns the cursor into a **hand**; dragging it edits in place:
+handle changes the cursor; dragging it edits in place:
 
+- **Start Grab** (bottom-left corner square) — drag left/right to move the start
+  cell; the right edge stays fixed so the region stretches or shrinks.
+- **End Grab** (bottom-right corner square) — drag left/right to move the end
+  cell; the start cell stays fixed.
 - **Top point** (at the peak) — drag horizontally to move the **attack/decay
   split** within the region.
 - **Attack line mid-grab** — drag vertically to bend the attack line up/down.

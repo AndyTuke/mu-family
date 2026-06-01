@@ -131,7 +131,11 @@ VoicePanel::VoicePanel(PluginProcessor& p)
                      &fltDrvKnob, &fltCutKnob, &fltResKnob, &fltLoCutKnob, &fltEnvDepthKnob })
         addAndMakeVisible(k);
     addAndMakeVisible(levelKnob);
-    levelKnob.setVisible(false);   // per-voice level removed from the panel; APVTS param kept
+    // Level knob is intentionally hidden: the per-voice output level is driven by
+    // readConfig() directly from the APVTS param (cfg.levelDb) every block, so the
+    // param and engine are always in sync even without a visible control. Keeping the
+    // SliderAttachment ensures the APVTS param still saves/loads and can be modulated.
+    levelKnob.setVisible(false);
 
     // Wavetable selectors: hidden until the wavetable bank API lands.
     // No APVTS binding or engine wiring yet — hidden to avoid a visible
@@ -201,6 +205,7 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     modulatorPanel.setDestProvider(&modDestProvider);
 
     rebindAttachments();
+    refreshVoicePresetList();   // initial scan; onSave will re-scan after any save
     refreshHeader();
 
     startTimerHz(30);
@@ -299,7 +304,9 @@ void VoicePanel::rebindAttachments()
     // Item ID = algorithm index + 1, matching the AudioParameterInt(0..15) stored value.
     {
         auto* fltParam = apvts.getParameter(id("flt_type"));
-        const int algo = juce::jlimit(0, 15, (int) apvts.getRawParameterValue(id("flt_type"))->load());
+        int algo = 0;
+        if (auto* raw = apvts.getRawParameterValue(id("flt_type")))
+            algo = juce::jlimit(0, 15, (int) raw->load());
         fltTypeDropdown.setSelectedId(algo + 1, juce::dontSendNotification);
         fltTypeDropdown.onChange = [fltParam](int itemId) {
             if (fltParam)
@@ -355,7 +362,9 @@ void VoicePanel::refreshHeader()
     headerBar.setLayerName(proc.getChannelName(currentVoice));
     headerBar.setColour(MuLookAndFeel::channelPalette[
         (size_t)(proc.getChannelColourIndex(currentVoice) % MuLookAndFeel::kChannelPaletteSize)]);
-    refreshVoicePresetList();
+    // Preset list is NOT rescanned here — it doesn't change on voice switch,
+    // only after a save. refreshVoicePresetList() is called from the ctor and
+    // from the onSave callback instead.
 }
 
 void VoicePanel::refreshVoicePresetList()
