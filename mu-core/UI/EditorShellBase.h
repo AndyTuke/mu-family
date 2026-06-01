@@ -121,6 +121,8 @@ protected:
     juce::ComponentAnimator animator;
     void fadeSwitch(juce::Component* outgoing, juce::Component* incoming, int durationMs = 80);
 
+    juce::TooltipWindow tooltipWindow { this, 700 };
+
     bool isStandalone   = false;
     bool needsFocusGrab = false;
     bool presetDirty    = false;

@@ -113,47 +113,47 @@ void ProcessorBase::syncGlobalFxParam(const juce::String& id, float v)
 void ProcessorBase::syncChannelStripParam(int channel, const juce::String& param, float v)
 {
     auto& ch = mixerEngine.channels[(size_t) channel];
-    if      (param == "lvl")     ch.level      = v;
-    else if (param == "pan")     ch.pan        = v;
-    else if (param == "mute")    ch.mute       = v > 0.5f;
-    else if (param == "solo")    ch.solo       = v > 0.5f;
-    else if (param == "sendEff") ch.sendEffect = v;
-    else if (param == "sendDly") ch.sendDelay  = v;
-    else if (param == "sendRev") ch.sendReverb = v;
-    else if (param == "scSrc")   ch.sidechainSource    = juce::roundToInt(v) - 1;
-    else if (param == "scAmt")   ch.sidechainAmount    = v;
-    else if (param == "scAtk")   ch.sidechainAttackMs  = v;
-    else if (param == "scRel")   ch.sidechainReleaseMs = v;
-    else if (param == "outBus")  ch.outputBus          = juce::jlimit(0, 8, juce::roundToInt(v));
+    if      (param == "lvl")     ch.level.store(v, std::memory_order_relaxed);
+    else if (param == "pan")     ch.pan.store(v, std::memory_order_relaxed);
+    else if (param == "mute")    ch.mute.store(v > 0.5f, std::memory_order_relaxed);
+    else if (param == "solo")    ch.solo.store(v > 0.5f, std::memory_order_relaxed);
+    else if (param == "sendEff") ch.sendEffect.store(v, std::memory_order_relaxed);
+    else if (param == "sendDly") ch.sendDelay.store(v, std::memory_order_relaxed);
+    else if (param == "sendRev") ch.sendReverb.store(v, std::memory_order_relaxed);
+    else if (param == "scSrc")   ch.sidechainSource.store(juce::roundToInt(v) - 1, std::memory_order_relaxed);
+    else if (param == "scAmt")   ch.sidechainAmount.store(v, std::memory_order_relaxed);
+    else if (param == "scAtk")   ch.sidechainAttackMs.store(v, std::memory_order_relaxed);
+    else if (param == "scRel")   ch.sidechainReleaseMs.store(v, std::memory_order_relaxed);
+    else if (param == "outBus")  ch.outputBus.store(juce::jlimit(0, 8, juce::roundToInt(v)), std::memory_order_relaxed);
 }
 
 void ProcessorBase::syncReturnStripParam(int retIdx, const juce::String& rest, float v)
 {
     auto& ret = mixerEngine.returns[(size_t) retIdx];
-    if      (rest == "lvl")   ret.level             = v;
-    else if (rest == "pan")   ret.pan               = v;
-    else if (rest == "mute")  ret.mute              = v > 0.5f;
-    else if (rest == "solo")  ret.solo              = v > 0.5f;
-    else if (rest == "scSrc") ret.sidechainSource   = juce::jlimit(0, 8, (int) v) - 1;
-    else if (rest == "scAmt") ret.sidechainAmount   = juce::jlimit(0.0f, 1.0f, v);
-    else if (rest == "scAtk") ret.sidechainAttackMs  = v;
-    else if (rest == "scRel") ret.sidechainReleaseMs = v;
+    if      (rest == "lvl")   ret.level.store(v, std::memory_order_relaxed);
+    else if (rest == "pan")   ret.pan.store(v, std::memory_order_relaxed);
+    else if (rest == "mute")  ret.mute.store(v > 0.5f, std::memory_order_relaxed);
+    else if (rest == "solo")  ret.solo.store(v > 0.5f, std::memory_order_relaxed);
+    else if (rest == "scSrc") ret.sidechainSource.store(juce::jlimit(0, 9, (int) v) - 1, std::memory_order_relaxed);
+    else if (rest == "scAmt") ret.sidechainAmount.store(juce::jlimit(0.0f, 1.0f, v), std::memory_order_relaxed);
+    else if (rest == "scAtk") ret.sidechainAttackMs.store(v, std::memory_order_relaxed);
+    else if (rest == "scRel") ret.sidechainReleaseMs.store(v, std::memory_order_relaxed);
 }
 
 bool ProcessorBase::syncMasterParam(const juce::String& id, float v)
 {
-    if (id == "mstr_lvl")      { mixerEngine.masterLevel = v; return true; }
-    if (id == "mstr_pan")      { mixerEngine.masterPan   = v; return true; }
-    if (id == "mst_insChar")   { mixerEngine.masterInsertParams.insertAlgo     = juce::jlimit(0, mu_audio::kInsertAlgorithmCount - 1, (int) v); return true; }
-    if (id == "mst_insP1")     { mixerEngine.masterInsertParams.insertParam[0]  = v; return true; }
-    if (id == "mst_insP2")     { mixerEngine.masterInsertParams.insertParam[1]  = v; return true; }
-    if (id == "mst_insP3")     { mixerEngine.masterInsertParams.insertParam[2]  = v; return true; }
-    if (id == "mst_insP4")     { mixerEngine.masterInsertParams.insertParam[3]  = v; return true; }
-    if (id == "mst_ins2Char")  { mixerEngine.masterInsertParams2.insertAlgo    = juce::jlimit(0, mu_audio::kInsertAlgorithmCount - 1, (int) v); return true; }
-    if (id == "mst_ins2P1")    { mixerEngine.masterInsertParams2.insertParam[0] = v; return true; }
-    if (id == "mst_ins2P2")    { mixerEngine.masterInsertParams2.insertParam[1] = v; return true; }
-    if (id == "mst_ins2P3")    { mixerEngine.masterInsertParams2.insertParam[2] = v; return true; }
-    if (id == "mst_ins2P4")    { mixerEngine.masterInsertParams2.insertParam[3] = v; return true; }
+    if (id == "mstr_lvl")     { mixerEngine.masterLevel.store(v, std::memory_order_relaxed); return true; }
+    if (id == "mstr_pan")     { mixerEngine.masterPan.store(v, std::memory_order_relaxed);   return true; }
+    if (id == "mst_insChar")  { mixerEngine.masterInsert1Algo.store(juce::jlimit(0, mu_audio::kInsertAlgorithmCount - 1, (int) v), std::memory_order_relaxed); return true; }
+    if (id == "mst_insP1")    { mixerEngine.masterInsert1Param[0].store(v, std::memory_order_relaxed); return true; }
+    if (id == "mst_insP2")    { mixerEngine.masterInsert1Param[1].store(v, std::memory_order_relaxed); return true; }
+    if (id == "mst_insP3")    { mixerEngine.masterInsert1Param[2].store(v, std::memory_order_relaxed); return true; }
+    if (id == "mst_insP4")    { mixerEngine.masterInsert1Param[3].store(v, std::memory_order_relaxed); return true; }
+    if (id == "mst_ins2Char") { mixerEngine.masterInsert2Algo.store(juce::jlimit(0, mu_audio::kInsertAlgorithmCount - 1, (int) v), std::memory_order_relaxed); return true; }
+    if (id == "mst_ins2P1")   { mixerEngine.masterInsert2Param[0].store(v, std::memory_order_relaxed); return true; }
+    if (id == "mst_ins2P2")   { mixerEngine.masterInsert2Param[1].store(v, std::memory_order_relaxed); return true; }
+    if (id == "mst_ins2P3")   { mixerEngine.masterInsert2Param[2].store(v, std::memory_order_relaxed); return true; }
+    if (id == "mst_ins2P4")   { mixerEngine.masterInsert2Param[3].store(v, std::memory_order_relaxed); return true; }
     return false;
 }
 

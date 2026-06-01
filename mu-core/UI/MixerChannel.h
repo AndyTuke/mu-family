@@ -51,6 +51,12 @@ public:
     // ownChannelIndex is excluded (pass -1 for return channels to include all rhythm channels).
     void setSidechainSources(int ownChannelIndex, const juce::StringArray& channelNames);
 
+    // Update the intra-FX send knob display values directly. Used by MixerOverlay::loadFromAPVTS
+    // to refresh eff2dly / eff2rev / dly2rev into the return strips; those params live outside
+    // the ret_*_ prefix scheme and can't be found by the usual prefix-based reload.
+    void setDelaySendValue(float v) { sendDelay .setValue(v, juce::dontSendNotification); }
+    void setRevSendValue  (float v) { sendReverb.setValue(v, juce::dontSendNotification); }
+
     // Public getters for section bounds — used by MixerOverlay to align the row-label panel.
     juce::Rectangle<int> getSidechainPaneBounds() const { return sidechainPaneBounds; }
     juce::Rectangle<int> getSendsPaneBounds()     const { return sendsPaneBounds;     }

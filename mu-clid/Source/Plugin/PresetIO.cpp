@@ -696,7 +696,7 @@ void PresetIO::resizeRhythmArrays(int n)
             // Wipe mixer channel state and sample-path memory so the now-inactive
             // slot doesn't retain stale fader/sidechain/sample data from the
             // pre-load session.
-            proc_.mixerEngine.channels[i] = MixerEngine::ChannelState{};
+            proc_.mixerEngine.channels[i].reset();
             if (i < proc_.loadedSamplePaths.size())
                 proc_.loadedSamplePaths.set(i, juce::String());
         }
@@ -1133,7 +1133,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     {
         proc_.voiceEngines[(size_t) i].reset();
         proc_.midiEngines[(size_t) i] = MidiOutputEngine{};
-        proc_.mixerEngine.channels[(size_t) i] = MixerEngine::ChannelState{};
+        proc_.mixerEngine.channels[(size_t) i].reset();
         proc_.loadedSamplePaths.set(i, juce::String());
     }
 

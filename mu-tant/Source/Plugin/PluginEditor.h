@@ -23,6 +23,10 @@ public:
     explicit PluginEditor(PluginProcessor&);
     ~PluginEditor() override = default;
 
+    // Refresh the voice panel (insert algo + knobs) and mixer after a full preset load.
+    void onPresetLoaded(const juce::File&) override;
+    void onPresetNew()                     override;
+
 private:
     PluginProcessor& proc;
     VoiceSidebar     voiceSidebar;

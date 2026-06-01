@@ -9,9 +9,8 @@ enum class NoteMod    { None, Triplet, Dotted };
 class ControlSequence
 {
 public:
-    enum class Mode        { Smooth, Stepped };
-    enum class Polarity    { Unipolar, Bipolar };
-    enum class InputSource { Internal };  // MIDI_CC removed in #308
+    enum class Mode     { Smooth, Stepped };
+    enum class Polarity { Unipolar, Bipolar };
 
     struct CurvePoint
     {
@@ -28,10 +27,8 @@ public:
 
     std::string id;              // stable ID used as modulation source key, e.g. "cs0"
 
-    Mode        mode        = Mode::Stepped;
-    Polarity    polarity    = Polarity::Bipolar;
-    InputSource inputSource = InputSource::Internal;
-    int         midiCCNumber = 0;
+    Mode     mode     = Mode::Stepped;
+    Polarity polarity = Polarity::Bipolar;
 
     NoteValue loopNoteValue  = NoteValue::Whole;
     NoteMod   loopNoteMod    = NoteMod::None;

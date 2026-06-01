@@ -237,10 +237,24 @@ void ChannelSidebar::resized()
     const int h  = getHeight();
     const int ih = s(kItemH);
     const int ah = s(kAddBtnH);
-    const int addBtnY = h - ah - s(4);
 
-    addButton.setBounds(s(4), addBtnY, w - s(8), ah);
-    viewport.setBounds(0, 0, w, addBtnY - s(2));
+    // Hide the Add button (and expand the viewport to fill) when the product
+    // hasn't wired onAddChannel — avoids a visible, interactive control that
+    // does nothing (e.g. mu-toni with no engine yet defined).
+    const bool showAdd = static_cast<bool>(onAddChannel);
+    addButton.setVisible(showAdd);
+
+    if (showAdd)
+    {
+        const int addBtnY = h - ah - s(4);
+        addButton.setBounds(s(4), addBtnY, w - s(8), ah);
+        viewport.setBounds(0, 0, w, addBtnY - s(2));
+    }
+    else
+    {
+        viewport.setBounds(0, 0, w, h);
+    }
+
     itemContainer.setSize(w, juce::jmax(1, (int) items.size() * ih));
 
     for (int i = 0; i < (int) items.size(); ++i)
@@ -253,6 +267,11 @@ void ChannelSidebar::timerCallback()
     // setStateInformation after the editor opened).
     if (proc.getNumChannels() != (int) items.size())
         refreshItems();
+
+    // Sync Add button visibility in case onAddChannel was wired (or cleared)
+    // after the last resized() call.
+    if (addButton.isVisible() != static_cast<bool>(onAddChannel))
+        resized();
 
     if (isPendingSwap)
         for (int i = 0; i < (int) items.size(); ++i)

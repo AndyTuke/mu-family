@@ -12,24 +12,25 @@
 
 #include <thread>   // std::this_thread::yield in modulator deserialise lock-spin
 
-// Declare 10 stereo output buses: Master (always enabled), Out 1..8 + FX Returns
-// (disabled by default so a fresh project loads with just one stereo output, matching
-// pre-multi-bus behaviour). Hosts that support it can enable the extra buses.
+// Declare one stereo sidechain input (disabled by default; DAW enables when the user
+// wires an external signal) + 10 stereo output buses: Master (always enabled),
+// Out 1..8 + FX Returns (disabled by default, matching pre-multi-bus behaviour).
 PluginProcessor::PluginProcessor()
 #if MUCLID_LITE_BUILD
     : ProcessorBase(BusesProperties(), createParameterLayout(), juce::Identifier("MuClidState"))
 #else
     : ProcessorBase(BusesProperties()
-          .withOutput("Master",     juce::AudioChannelSet::stereo(), true)
-          .withOutput("Out 1",      juce::AudioChannelSet::stereo(), false)
-          .withOutput("Out 2",      juce::AudioChannelSet::stereo(), false)
-          .withOutput("Out 3",      juce::AudioChannelSet::stereo(), false)
-          .withOutput("Out 4",      juce::AudioChannelSet::stereo(), false)
-          .withOutput("Out 5",      juce::AudioChannelSet::stereo(), false)
-          .withOutput("Out 6",      juce::AudioChannelSet::stereo(), false)
-          .withOutput("Out 7",      juce::AudioChannelSet::stereo(), false)
-          .withOutput("Out 8",      juce::AudioChannelSet::stereo(), false)
-          .withOutput("FX Returns", juce::AudioChannelSet::stereo(), false),
+          .withInput ("Sidechain",   juce::AudioChannelSet::stereo(), false)
+          .withOutput("Master",      juce::AudioChannelSet::stereo(), true)
+          .withOutput("Out 1",       juce::AudioChannelSet::stereo(), false)
+          .withOutput("Out 2",       juce::AudioChannelSet::stereo(), false)
+          .withOutput("Out 3",       juce::AudioChannelSet::stereo(), false)
+          .withOutput("Out 4",       juce::AudioChannelSet::stereo(), false)
+          .withOutput("Out 5",       juce::AudioChannelSet::stereo(), false)
+          .withOutput("Out 6",       juce::AudioChannelSet::stereo(), false)
+          .withOutput("Out 7",       juce::AudioChannelSet::stereo(), false)
+          .withOutput("Out 8",       juce::AudioChannelSet::stereo(), false)
+          .withOutput("FX Returns",  juce::AudioChannelSet::stereo(), false),
           createParameterLayout(),
           juce::Identifier("MuClidState"))
 #endif
@@ -243,7 +244,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         const double pos = internalBeatPos.load(std::memory_order_relaxed);
         beatPos = pos;
         const int ns = juce::jmax(1, buffer.getNumSamples());
-        internalBeatPos.store(pos + (ns / currentSampleRate) * (internalBpm / 60.0),
+        internalBeatPos.store(pos + (ns / currentSampleRate) * (internalBpm.load(std::memory_order_relaxed) / 60.0),
                               std::memory_order_relaxed);
     }
 
@@ -392,11 +393,14 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
         playing = noteModePlaying.load(std::memory_order_relaxed);
         if (playing)
         {
+            // noteModeBeatPos is written exclusively by this audio-thread path —
+            // no CAS needed. Any future UI reset (e.g. "Reset to bar 0" button)
+            // must use fetch_add on a tick accumulator to avoid a load+store race.
             const double pos = noteModeBeatPos.load(std::memory_order_relaxed);
             beatPos = pos;
             // Use host BPM when available so tempo-synced FX tracks the DAW;
             // fall back to the internal transport BPM (set via the BPM field).
-            double bpm = internalBpm;
+            double bpm = internalBpm.load(std::memory_order_relaxed);
             if (auto* ph = getPlayHead())
                 if (auto phPos = ph->getPosition())
                     if (auto hostBpm = phPos->getBpm())
@@ -432,7 +436,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
             playing  = true;
             const double pos = internalBeatPos.load(std::memory_order_relaxed);
             beatPos  = pos;
-            internalBeatPos.store(pos + (buffer.getNumSamples() / currentSampleRate) * (internalBpm / 60.0),
+            internalBeatPos.store(pos + (buffer.getNumSamples() / currentSampleRate) * (internalBpm.load(std::memory_order_relaxed) / 60.0),
                                   std::memory_order_relaxed);
         }
     }
@@ -775,7 +779,7 @@ double PluginProcessor::deriveEffectiveBpm()
     // in DAW mode, MIDI clock estimate when locked in standalone, otherwise the
     // internal transport. Previously this always used internalBpm, so DAW-hosted
     // sessions saw the delay always tempo-synced to 120 regardless of host tempo.
-    double effectiveBpm = internalBpm;
+    double effectiveBpm = internalBpm.load(std::memory_order_relaxed);
     if (auto* ph = getPlayHead())
         if (auto pos = ph->getPosition())
             if (auto hostBpm = pos->getBpm())
@@ -817,6 +821,19 @@ void PluginProcessor::renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::M
                 fxRetBuf = getBusBuffer(buffer, false, kFXReturnsBusIndex);
                 fxRetPtr = &fxRetBuf;
             }
+
+    // Supply the external DAW sidechain bus to the mixer (null when bus is inactive).
+    mixerEngine.setExternalSidechain(nullptr, nullptr);
+    if (getBusCount(true) > 0)
+        if (auto* scBus = getBus(true, 0); scBus && scBus->isEnabled())
+        {
+            auto scBuf = getBusBuffer(buffer, true, 0);
+            const int nCh = scBuf.getNumChannels();
+            if (nCh >= 1)
+                mixerEngine.setExternalSidechain(
+                    scBuf.getReadPointer(0),
+                    nCh >= 2 ? scBuf.getReadPointer(1) : scBuf.getReadPointer(0));
+        }
 
     // Stage 34 Step 2: pass the retired-voice descriptor through. The 2D arrays
     // (MaxRhythms × kMaxRetiredEngines) are stored contiguously row-major in
@@ -915,11 +932,12 @@ bool PluginProcessor::swapRhythms(int i, int j)
         for (int c = 0; c < n; ++c)
         {
             auto& src = mixerEngine.channels[c].sidechainSource;
-            if      (src == i) src = j;
-            else if (src == j) src = i;
+            const int s = src.load(std::memory_order_relaxed);
+            if      (s == i) src.store(j, std::memory_order_relaxed);
+            else if (s == j) src.store(i, std::memory_order_relaxed);
         }
 
-        std::swap(mixerEngine.channels[i], mixerEngine.channels[j]);
+        mixerEngine.swapChannelState(i, j);
 
         // Reset envelope follower state on both moved slots so the previous tenant's
         // ducking envelope doesn't bleed into the freshly arrived rhythm.
@@ -948,11 +966,11 @@ void PluginProcessor::removeRhythm(int index)
         {
             voiceEngines[i] = std::move(voiceEngines[i + 1]);
             midiEngines[i]  = std::move(midiEngines[i + 1]);
-            mixerEngine.channels[i] = mixerEngine.channels[i + 1];
+            mixerEngine.channels[i].copyFrom(mixerEngine.channels[i + 1]);
         }
         voiceEngines[newN].reset();
         midiEngines[newN] = MidiOutputEngine{};
-        mixerEngine.channels[newN] = MixerEngine::ChannelState{};
+        mixerEngine.channels[newN].reset();
     }
     suspendProcessing(false);
 }
@@ -1050,6 +1068,13 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
     return layouts.getMainInputChannelSet()  == juce::AudioChannelSet::disabled()
         && layouts.getMainOutputChannelSet() == juce::AudioChannelSet::disabled();
 #else
+    // Sidechain input bus: at most one, must be stereo or disabled.
+    const auto& ins = layouts.inputBuses;
+    if (ins.size() > 1) return false;
+    if (ins.size() == 1 && ins.getReference(0) != juce::AudioChannelSet::stereo()
+                        && ins.getReference(0) != juce::AudioChannelSet::disabled())
+        return false;
+
     const auto& outs = layouts.outputBuses;
     if (outs.size() < 1 || outs.size() > kTotalBuses)
         return false;
@@ -1058,7 +1083,7 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
     if (! multiBusEnabled.load(std::memory_order_relaxed) && outs.size() > 1)
         return false;
 
-    // Each declared bus must be either stereo or disabled.
+    // Each declared output bus must be either stereo or disabled.
     for (int i = 0; i < outs.size(); ++i)
     {
         const auto& set = outs.getReference(i);

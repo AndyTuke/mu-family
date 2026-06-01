@@ -149,6 +149,18 @@ public:
                                                // that aren't per-rhythm (mixer overlay,
                                                // global FX rows). Sequencer page uses the
                                                // current rhythm colour for the same role.
+
+        // ── Modulator label colours A–H ───────────────────────────────────
+        // Named tokens for the per-modulator label palette so that all colour
+        // values live here — no inline `juce::Colour(0xFF...)` in component code.
+        modLabelA               = 0x100000e0,  // teal
+        modLabelB               = 0x100000e1,  // amber
+        modLabelC               = 0x100000e2,  // pink
+        modLabelD               = 0x100000e3,  // blue
+        modLabelE               = 0x100000e4,  // purple
+        modLabelF               = 0x100000e5,  // coral
+        modLabelG               = 0x100000e6,  // cyan-teal
+        modLabelH               = 0x100000e7,  // grey
     };
 
     MuLookAndFeel();

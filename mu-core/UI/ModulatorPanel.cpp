@@ -2,17 +2,10 @@
 
 juce::Colour ModulatorPanel::modColour(int index) noexcept
 {
-    static const juce::Colour colours[] = {
-        juce::Colour(0xFF1D9E75),  // A: teal
-        juce::Colour(0xFFEF9F27),  // B: amber
-        juce::Colour(0xFFD4537E),  // C: pink
-        juce::Colour(0xFF378ADD),  // D: blue
-        juce::Colour(0xFF7F77DD),  // E: purple
-        juce::Colour(0xFFD85A30),  // F: coral
-        juce::Colour(0xFF2BB5C5),  // G: cyan-teal
-        juce::Colour(0xFF888780),  // H: grey
-    };
-    return colours[juce::jlimit(0, 7, index)];
+    using Id = MuLookAndFeel::ColourIds;
+    // All 8 label colours live in MuLookAndFeel so the design system is the
+    // single source of truth. modLabelA..H are consecutive IDs, so index directly.
+    return MuLookAndFeel::colour(static_cast<Id>(Id::modLabelA + juce::jlimit(0, 7, index)));
 }
 
 ModulatorPanel::ModulatorPanel()

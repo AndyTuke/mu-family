@@ -131,9 +131,6 @@ ModulatorEditor::ModulatorEditor()
     addAndMakeVisible(stepLabel);
     addAndMakeVisible(stepDropdown);
     addAndMakeVisible(stepMult);
-    stepLabel.setVisible(false);
-    stepDropdown.setVisible(false);
-    stepMult.setVisible(false);
 
     // Dice — randomises the modulator's values (stepValues / curvePoints.y)
     // without changing its mode, polarity, loop / step timing or node count.
@@ -271,9 +268,6 @@ void ModulatorEditor::loadFromCS()
     stepEditor.setUnipolar(unipolar);
     lfoEditor.setVisible(smooth);
     stepEditor.setVisible(!smooth);
-    stepLabel.setVisible(!smooth);
-    stepDropdown.setVisible(!smooth);
-    stepMult.setVisible(!smooth);
 
     if (smooth)
     {
@@ -289,6 +283,7 @@ void ModulatorEditor::loadFromCS()
         syncStepValues();
     }
 
+    lfoEditor.setStepCount(cs->getStepCount());
     loopDropdown.setSelectedId(noteToId(cs->loopNoteValue, cs->loopNoteMod));
     loopMult.setValue(cs->loopMultiplier);
     stepDropdown.setSelectedId(noteToId(cs->stepNoteValue, cs->stepNoteMod));
@@ -324,9 +319,6 @@ void ModulatorEditor::wireHeader()
         const bool smooth = (cs->mode == ControlSequence::Mode::Smooth);
         lfoEditor.setVisible(smooth);
         stepEditor.setVisible(!smooth);
-        stepLabel.setVisible(!smooth);
-        stepDropdown.setVisible(!smooth);
-        stepMult.setVisible(!smooth);
         if (!smooth) syncStepValues();
         else loadFromCS();
         updateStepQuantization();
@@ -360,6 +352,7 @@ void ModulatorEditor::wireTiming()
         cs->loopNoteValue = nv;
         cs->loopNoteMod   = mod;
         if (cs->mode == ControlSequence::Mode::Stepped) syncStepValues();
+        lfoEditor.setStepCount(cs->getStepCount());
         unlockMod();
         repaint();
         if (onChange) onChange();
@@ -370,6 +363,7 @@ void ModulatorEditor::wireTiming()
         lockMod();
         cs->loopMultiplier = v;
         if (cs->mode == ControlSequence::Mode::Stepped) syncStepValues();
+        lfoEditor.setStepCount(cs->getStepCount());
         unlockMod();
         repaint();
         if (onChange) onChange();
@@ -383,6 +377,7 @@ void ModulatorEditor::wireTiming()
         cs->stepNoteValue = nv;
         cs->stepNoteMod   = mod;
         syncStepValues();
+        lfoEditor.setStepCount(cs->getStepCount());
         unlockMod();
         repaint();
         if (onChange) onChange();
@@ -393,6 +388,7 @@ void ModulatorEditor::wireTiming()
         lockMod();
         cs->stepMultiplier = v;
         syncStepValues();
+        lfoEditor.setStepCount(cs->getStepCount());
         unlockMod();
         repaint();
         if (onChange) onChange();

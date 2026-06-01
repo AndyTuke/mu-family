@@ -93,20 +93,21 @@ void MixerChannel::bindChannel(MixerEngine::ChannelState& state, std::atomic<flo
     else
     {
         fader.onValueChange = [&state, this] {
-            state.level = (float)fader.getValue();
-            updateDbLabel(state.level);
+            const float lv = (float)fader.getValue();
+            state.level.store(lv, std::memory_order_relaxed);
+            updateDbLabel(lv);
         };
-        panKnob.onValueChanged    = [&state](double v) { state.pan        = (float)v; };
-        sendEffect.onValueChanged = [&state](double v) { state.sendEffect = (float)v; };
-        sendDelay.onValueChanged  = [&state](double v) { state.sendDelay  = (float)v; };
-        sendReverb.onValueChanged = [&state](double v) { state.sendReverb = (float)v; };
-        muteBtn.onClick = [&state, this] { state.mute = muteBtn.getToggleState(); };
-        soloBtn.onClick = [&state, this] { state.solo = soloBtn.getToggleState(); };
+        panKnob.onValueChanged    = [&state](double v) { state.pan.store        ((float)v, std::memory_order_relaxed); };
+        sendEffect.onValueChanged = [&state](double v) { state.sendEffect.store ((float)v, std::memory_order_relaxed); };
+        sendDelay.onValueChanged  = [&state](double v) { state.sendDelay.store  ((float)v, std::memory_order_relaxed); };
+        sendReverb.onValueChanged = [&state](double v) { state.sendReverb.store ((float)v, std::memory_order_relaxed); };
+        muteBtn.onClick = [&state, this] { state.mute.store(muteBtn.getToggleState(), std::memory_order_relaxed); };
+        soloBtn.onClick = [&state, this] { state.solo.store(soloBtn.getToggleState(), std::memory_order_relaxed); };
         if (hasOutputBus())
         {
             outBusBox.setSelectedId(state.outputBus + 1, juce::dontSendNotification);
             outBusBox.onChange = [&state, this] {
-                state.outputBus = juce::jlimit(0, 8, outBusBox.getSelectedId() - 1);
+                state.outputBus.store(juce::jlimit(0, 8, outBusBox.getSelectedId() - 1), std::memory_order_relaxed);
                 if (onStatusUpdate) onStatusUpdate(channelName + " Output", outBusBox.getText(), channelColour);
             };
         }
@@ -114,12 +115,12 @@ void MixerChannel::bindChannel(MixerEngine::ChannelState& state, std::atomic<flo
         {
             scSourceBox.onChange    = [&state, this] {
                 int id = scSourceBox.getSelectedId();
-                state.sidechainSource = (id <= 1) ? -1 : (id - 2);
+                state.sidechainSource.store((id <= 1) ? -1 : (id - 2), std::memory_order_relaxed);
                 if (onStatusUpdate) onStatusUpdate(channelName + " Sidechain", scSourceBox.getText(), channelColour);
             };
-            scAmount.onValueChanged  = [&state](double v) { state.sidechainAmount   = (float)v / 100.0f; };
-            scAttack.onValueChanged  = [&state](double v) { state.sidechainAttackMs  = (float)v; };
-            scRelease.onValueChanged = [&state](double v) { state.sidechainReleaseMs = (float)v; };
+            scAmount.onValueChanged  = [&state](double v) { state.sidechainAmount.store   ((float)v / 100.0f, std::memory_order_relaxed); };
+            scAttack.onValueChanged  = [&state](double v) { state.sidechainAttackMs.store ((float)v,          std::memory_order_relaxed); };
+            scRelease.onValueChanged = [&state](double v) { state.sidechainReleaseMs.store((float)v,          std::memory_order_relaxed); };
             scAmount.setValue(state.sidechainAmount * 100.0, juce::dontSendNotification);
             scAttack.setValue(state.sidechainAttackMs,       juce::dontSendNotification);
             scRelease.setValue(state.sidechainReleaseMs,     juce::dontSendNotification);
@@ -194,22 +195,23 @@ void MixerChannel::bindReturn(MixerEngine::ReturnState& state, std::atomic<float
     else
     {
         fader.onValueChange = [&state, this] {
-            state.level = (float)fader.getValue();
-            updateDbLabel(state.level);
+            const float lv = (float)fader.getValue();
+            state.level.store(lv, std::memory_order_relaxed);
+            updateDbLabel(lv);
         };
-        panKnob.onValueChanged = [&state](double v) { state.pan  = (float)v; };
-        muteBtn.onClick = [&state, this] { state.mute = muteBtn.getToggleState(); };
-        soloBtn.onClick = [&state, this] { state.solo = soloBtn.getToggleState(); };
+        panKnob.onValueChanged = [&state](double v) { state.pan.store((float)v, std::memory_order_relaxed); };
+        muteBtn.onClick = [&state, this] { state.mute.store(muteBtn.getToggleState(), std::memory_order_relaxed); };
+        soloBtn.onClick = [&state, this] { state.solo.store(soloBtn.getToggleState(), std::memory_order_relaxed); };
         if (hasSidechainControls())
         {
             scSourceBox.onChange    = [&state, this] {
                 int id = scSourceBox.getSelectedId();
-                state.sidechainSource = (id <= 1) ? -1 : (id - 2);
+                state.sidechainSource.store((id <= 1) ? -1 : (id - 2), std::memory_order_relaxed);
                 if (onStatusUpdate) onStatusUpdate(channelName + " Sidechain", scSourceBox.getText(), channelColour);
             };
-            scAmount.onValueChanged  = [&state](double v) { state.sidechainAmount   = (float)v / 100.0f; };
-            scAttack.onValueChanged  = [&state](double v) { state.sidechainAttackMs  = (float)v; };
-            scRelease.onValueChanged = [&state](double v) { state.sidechainReleaseMs = (float)v; };
+            scAmount.onValueChanged  = [&state](double v) { state.sidechainAmount.store   ((float)v / 100.0f, std::memory_order_relaxed); };
+            scAttack.onValueChanged  = [&state](double v) { state.sidechainAttackMs.store ((float)v,          std::memory_order_relaxed); };
+            scRelease.onValueChanged = [&state](double v) { state.sidechainReleaseMs.store((float)v,          std::memory_order_relaxed); };
         }
     }
 
@@ -222,8 +224,8 @@ void MixerChannel::bindReturn(MixerEngine::ReturnState& state, std::atomic<float
 void MixerChannel::bindMaster(MixerEngine& engine, ProcessorBase* proc)
 {
     masterInsertProc = proc;   // keep knob lambdas alive across loadFromAPVTS rebinds
-    fader.setValue(engine.masterLevel, juce::dontSendNotification);
-    panKnob.setValue(engine.masterPan, juce::dontSendNotification);
+    fader.setValue(engine.masterLevel.load(std::memory_order_relaxed), juce::dontSendNotification);
+    panKnob.setValue(engine.masterPan.load(std::memory_order_relaxed), juce::dontSendNotification);
 
     if (proc)
     {
@@ -241,21 +243,21 @@ void MixerChannel::bindMaster(MixerEngine& engine, ProcessorBase* proc)
     else
     {
         fader.onValueChange = [&engine, this] {
-            engine.masterLevel = (float)fader.getValue();
-            updateDbLabel(engine.masterLevel);
+            const float v = (float)fader.getValue();
+            engine.masterLevel.store(v, std::memory_order_relaxed);
+            updateDbLabel(v);
         };
-        panKnob.onValueChanged = [&engine](double v) { engine.masterPan = (float)v; };
+        panKnob.onValueChanged = [&engine](double v) { engine.masterPan.store((float)v, std::memory_order_relaxed); };
     }
 
     vuMeter.getLevel = [&engine] { return engine.masterPeak.load(); };
-    updateDbLabel(engine.masterLevel);
+    updateDbLabel(engine.masterLevel.load(std::memory_order_relaxed));
 
     if (hasInsert())
     {
         auto wireInsertSlot = [this, &engine, proc](int slot)
         {
-            const VoiceParams& ip = slot == 0 ? engine.masterInsertParams
-                                              : engine.masterInsertParams2;
+            const VoiceParams ip = engine.getMasterInsertParams(slot);
             juce::ComboBox& charBox = slot == 0 ? insCharBox : insCharBox2;
             // Pointer-to-array — ternary across two different array members
             // gives us a decayed pointer, not a reference; capturing as
@@ -285,8 +287,7 @@ void MixerChannel::bindMaster(MixerEngine& engine, ProcessorBase* proc)
                 const int newChar = cb.getSelectedId() - 1;
                 if (proc)
                 {
-                    const VoiceParams& cur = slot == 0 ? proc->mixerEngine.masterInsertParams
-                                                       : proc->mixerEngine.masterInsertParams2;
+                    const VoiceParams cur = proc->mixerEngine.getMasterInsertParams(slot);
                     const int oldChar = cur.insertAlgo;
                     auto set = [proc](const juce::String& id, float v)
                     {
@@ -362,6 +363,8 @@ void MixerChannel::setSidechainSources(int ownIdx, const juce::StringArray& name
                                                       : names[i];
         scSourceBox.addItem(label, i + 2);  // ID = channel index + 2
     }
+    // External DAW sidechain bus — ID = MaxChannels + 2 (maps to apvts=9, engine=kExtSidechainSrc).
+    scSourceBox.addItem("Ext In", MixerEngine::MaxChannels + 2);
     // Restore previous selection if still valid, else default to none
     if (prevId > 1 && scSourceBox.indexOfItemId(prevId) >= 0)
         scSourceBox.setSelectedId(prevId, juce::dontSendNotification);

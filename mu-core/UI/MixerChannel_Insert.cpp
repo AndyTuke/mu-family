@@ -57,9 +57,8 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, ProcessorBase*
             p->setValueNotifyingHost(p->convertTo0to1(normValue));
     };
 
-    const VoiceParams& ip = masterInsertProc
-        ? (slot == 0 ? masterInsertProc->mixerEngine.masterInsertParams
-                     : masterInsertProc->mixerEngine.masterInsertParams2)
+    const VoiceParams ip = masterInsertProc
+        ? masterInsertProc->mixerEngine.getMasterInsertParams(slot)
         : VoiceParams{};
 
     // None (algo 0) hides all four knobs via the config table (label==nullptr).

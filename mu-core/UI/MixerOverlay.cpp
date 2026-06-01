@@ -26,8 +26,11 @@ static bool isMixerRelevantParam(const juce::String& id) noexcept
     if (id.startsWith("mstr_") || id.startsWith("mst_ins"))
         return true;
     // FX algorithm + per-algo params (effectRow, delayRow, reverbRow) + Echo mode.
-    if (id.startsWith("eff_") || id.startsWith("dly_") || id.startsWith("rev_")
-     || id.startsWith("echo_"))
+    // Also intra-FX routing params (eff2dly, eff2rev, dly2rev) — these live outside
+    // the ret_*_ prefix scheme but affect the return strip send knob display.
+    if (id.startsWith("eff_") || id.startsWith("eff2")
+     || id.startsWith("dly_") || id.startsWith("dly2")
+     || id.startsWith("rev_") || id.startsWith("echo_"))
         return true;
     return false;
 }
@@ -481,6 +484,14 @@ void MixerOverlay::loadFromAPVTS()
     delayReturn  .loadFromAPVTS(apvts, "ret_dly_");
     reverbReturn .loadFromAPVTS(apvts, "ret_rev_");
     masterChannel.loadFromAPVTS(apvts, "mstr_");
+
+    // Intra-FX routing sends (eff2dly, eff2rev, dly2rev) are stored outside the
+    // ret_*_ prefix scheme so loadFromAPVTS can't find them via the prefix. Refresh
+    // the return strip send knobs explicitly so they track preset loads and automation.
+    if (auto* p = apvts.getRawParameterValue("eff2dly")) effectReturn.setDelaySendValue(*p);
+    if (auto* p = apvts.getRawParameterValue("eff2rev")) effectReturn.setRevSendValue(*p);
+    if (auto* p = apvts.getRawParameterValue("dly2rev")) delayReturn .setRevSendValue(*p);
+
     refreshSidechainSources();
 
     // FX rows: reload enable states, algo selection, and param values.

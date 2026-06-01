@@ -110,6 +110,15 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
         case mixerInactiveNameBg:     return t.mixer.inactiveNameBg;
         // Global / non-rhythm accent (mixer borders, etc.)
         case globalAccent:            return t.global.accent;
+        // Modulator label colours A–H (reuse the ring/knob theme fields by intent)
+        case modLabelA:               return t.rings.modA;
+        case modLabelB:               return t.rings.modB;
+        case modLabelC:               return t.rings.modC;
+        case modLabelD:               return t.rings.modD;
+        case modLabelE:               return t.knobs.euclidean;
+        case modLabelF:               return t.knobs.fxSend;
+        case modLabelG:               return t.knobs.prePad;
+        case modLabelH:               return t.knobs.pan;
         // Sidebar tab line – runtime colour
         case sidebarTabLine:          return juce::Colours::transparentBlack;
         default:                      return juce::Colours::magenta;

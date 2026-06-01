@@ -24,7 +24,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"sendEff", 1}, n+"Send Eff", f(0.0f, 1.0f, 0.001f), 0.0f));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"sendDly", 1}, n+"Send Dly", f(0.0f, 1.0f, 0.001f), 0.0f));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"sendRev", 1}, n+"Send Rev", f(0.0f, 1.0f, 0.001f), 0.0f));
-        layout.add(std::make_unique<AudioParameterInt>  (ParameterID{c+"scSrc",   1}, n+"SC Src",  0, 8, 0));
+        layout.add(std::make_unique<AudioParameterInt>  (ParameterID{c+"scSrc",   1}, n+"SC Src",  0, 9, 0));  // 0=off, 1-8=ch0-ch7, 9=ext DAW bus
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"scAmt",   1}, n+"SC Amount", f(0.0f, 1.0f, 0.001f), 0.0f));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"scAtk",   1}, n+"SC Attack", f(1.0f, 500.0f, 0.1f), 5.0f));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"scRel",   1}, n+"SC Release", f(10.0f, 2000.0f, 1.0f), 100.0f));
@@ -38,7 +38,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
 }
 
 PluginProcessor::PluginProcessor()
-    : ProcessorBase(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true),
+    : ProcessorBase(BusesProperties()
+                        .withInput ("Sidechain", juce::AudioChannelSet::stereo(), false)
+                        .withOutput("Output",    juce::AudioChannelSet::stereo(), true),
                     createParameterLayout(),
                     juce::Identifier("MuToniState"))
 {
@@ -97,6 +99,18 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     fxChain.prepare(sampleRate, samplesPerBlock);
 }
 
+bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+{
+    // Sidechain input: at most one, must be stereo or disabled.
+    const auto& ins = layouts.inputBuses;
+    if (ins.size() > 1) return false;
+    if (ins.size() == 1 && ins.getReference(0) != juce::AudioChannelSet::stereo()
+                        && ins.getReference(0) != juce::AudioChannelSet::disabled())
+        return false;
+    // Main output: must be stereo.
+    return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
+}
+
 void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
@@ -104,6 +118,19 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     buffer.clear();
 
     const double bpm = internalBpm.load(std::memory_order_relaxed);
+
+    // Supply the external DAW sidechain bus to the mixer (null when bus is inactive).
+    mixerEngine.setExternalSidechain(nullptr, nullptr);
+    if (getBusCount(true) > 0)
+        if (auto* scBus = getBus(true, 0); scBus && scBus->isEnabled())
+        {
+            auto scBuf = getBusBuffer(buffer, true, 0);
+            const int nCh = scBuf.getNumChannels();
+            if (nCh >= 1)
+                mixerEngine.setExternalSidechain(
+                    scBuf.getReadPointer(0),
+                    nCh >= 2 ? scBuf.getReadPointer(1) : scBuf.getReadPointer(0));
+        }
 
     // Render (silent) → mixer through the shared path (engine→insert→mixer). With
     // no engine the render hook clears each channel; the mixer owns the strip +

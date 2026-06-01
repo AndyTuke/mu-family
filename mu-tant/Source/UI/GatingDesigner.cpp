@@ -126,8 +126,13 @@ GatingDesigner::GatingDesigner()
     filterLayerBtn.setClickingTogglesState(true);
     filterLayerBtn.setRadioGroupId(0x6a8a);
     filterLayerBtn.onClick = [this] { if (currentLayer != GateLayer::Filter) setLayer(GateLayer::Filter); };
+    pitchLayerBtn.setClickingTogglesState(true);
+    pitchLayerBtn.setRadioGroupId(0x6a8a);
+    pitchLayerBtn.setTooltip("Edit the pitch envelope (shifts osc pitch per-voice)");
+    pitchLayerBtn.onClick = [this] { if (currentLayer != GateLayer::Pitch) setLayer(GateLayer::Pitch); };
     addAndMakeVisible(gaterLayerBtn);
     addAndMakeVisible(filterLayerBtn);
+    addAndMakeVisible(pitchLayerBtn);
 
     // ── Bypass (public, VoicePanel binds the APVTS attachment) ───────────────
     bypassButton.setClickingTogglesState(true);
@@ -229,6 +234,7 @@ void GatingDesigner::setLayer(GateLayer layer)
     currentLayer = layer;
     gaterLayerBtn .setToggleState(layer == GateLayer::Gater,  juce::dontSendNotification);
     filterLayerBtn.setToggleState(layer == GateLayer::Filter, juce::dontSendNotification);
+    pitchLayerBtn .setToggleState(layer == GateLayer::Pitch,  juce::dontSendNotification);
     if (auto* pat = getActivePattern())
     {
         subdivisionDenom = static_cast<int>(pat->subdivision);
@@ -269,6 +275,17 @@ void GatingDesigner::setFilterPattern(GatePattern* pattern)
     repaint();
 }
 
+void GatingDesigner::setPitchPattern(GatePattern* pattern)
+{
+    pitchPattern = pattern;
+    if (pattern != nullptr && currentLayer == GateLayer::Pitch)
+    {
+        subdivisionDenom = static_cast<int>(pattern->subdivision);
+        subdivDropdown.setSelectedId(idForDenom(subdivisionDenom), false);
+    }
+    repaint();
+}
+
 void GatingDesigner::setGap(float gap01)
 {
     gap01 = juce::jlimit(0.0f, 1.0f, gap01);
@@ -279,15 +296,14 @@ void GatingDesigner::setGap(float gap01)
 
 juce::Colour GatingDesigner::activeLayerColour() const noexcept
 {
-    return (currentLayer == GateLayer::Gater)
-        ? MuLookAndFeel::colour(MuLookAndFeel::knobFxSend)
-        : MuLookAndFeel::colour(MuLookAndFeel::knobPostPad);
+    if (currentLayer == GateLayer::Gater)  return MuLookAndFeel::colour(MuLookAndFeel::knobFxSend);
+    if (currentLayer == GateLayer::Filter) return MuLookAndFeel::colour(MuLookAndFeel::knobPostPad);
+    return MuLookAndFeel::colour(MuLookAndFeel::knobEuclidean);   // Pitch = purple
 }
 juce::Colour GatingDesigner::ghostLayerColour() const noexcept
 {
-    return (currentLayer == GateLayer::Gater)
-        ? MuLookAndFeel::colour(MuLookAndFeel::knobPostPad)
-        : MuLookAndFeel::colour(MuLookAndFeel::knobFxSend);
+    // All non-gate layers ghost the gate in coral as a timing reference.
+    return MuLookAndFeel::colour(MuLookAndFeel::knobFxSend);
 }
 
 int GatingDesigner::cellCount() const noexcept { return kTotalBars * subdivisionDenom; }
@@ -356,10 +372,24 @@ template <typename Fn>
 void GatingDesigner::withLock(GatePattern* pat, Fn&& fn)
 {
     if (pat == nullptr) return;
-    while (pat->editLock.exchange(true, std::memory_order_acquire))
+    // Bounded spin — the audio thread holds editLock for at most one block's
+    // per-sample loop, but to avoid blocking the message thread for a full audio
+    // block (~10 ms at 48 kHz/512), we cap the spin at 1000 yields and give up
+    // if we can't acquire. The next drag/click event will retry; the missed edit
+    // is imperceptible at typical mouse-event rates (60+ Hz).
+    constexpr int kMaxSpins = 1000;
+    for (int i = 0; i < kMaxSpins; ++i)
+    {
+        bool expected = false;
+        if (pat->editLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+        {
+            fn();
+            pat->editLock.store(false, std::memory_order_release);
+            return;
+        }
         std::this_thread::yield();
-    fn();
-    pat->editLock.store(false, std::memory_order_release);
+    }
+    // Contention too long — skip this frame rather than stall the message thread.
 }
 
 // ── Selection ─────────────────────────────────────────────────────────────────
@@ -742,12 +772,13 @@ void GatingDesigner::resized()
     const int ddW     = s(kDdW);
     const int ddH     = h1H - s(2);
 
-    // Header row 1: [GATE][FILT] | tools | [Bypass] | [Grid][dropdown]
+    // Header row 1: [GATE][FILT][PITCH] | tools | [Bypass] | [Grid][dropdown]
     const int layerBtnW = s(36);
-    gaterLayerBtn .setBounds(s(kHdrInset),                     toolY, layerBtnW, toolW);
-    filterLayerBtn.setBounds(s(kHdrInset) + layerBtnW + s(2),  toolY, layerBtnW, toolW);
+    gaterLayerBtn .setBounds(s(kHdrInset),                         toolY, layerBtnW, toolW);
+    filterLayerBtn.setBounds(s(kHdrInset) + layerBtnW + s(2),     toolY, layerBtnW, toolW);
+    pitchLayerBtn .setBounds(s(kHdrInset) + 2 * layerBtnW + s(4), toolY, s(40), toolW);
 
-    int tx = s(kHdrInset) + 2 * layerBtnW + s(8);
+    int tx = s(kHdrInset) + 2 * layerBtnW + s(4) + s(40) + s(4);
     for (auto* b : { &arrowBtn, &pencilBtn, &eraserBtn, &glueBtn, &reverseBtn })
     {
         b->setBounds(tx, toolY, toolW, toolW);

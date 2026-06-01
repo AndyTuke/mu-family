@@ -8,20 +8,6 @@
     ]
   },
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "powershell",
-            "if": "Bash(cmake --build *)",
-            "statusMessage": "Enforcing full Debug + Release build...",
-            "command": "$j = $input | ConvertFrom-Json; $c = $j.tool_input.command; $hD = $c -match '--config\\s+Debug'; $hR = $c -match '--config\\s+Release'; if ($hD -xor $hR) { $null = $c -match 'cmake\\s+--build\\s+(\\S+)'; $p = $matches[1]; @{hookSpecificOutput=@{hookEventName='PreToolUse';updatedInput=@{command=\"cmake --build $p --config Debug && cmake --build $p --config Release\"}}} | ConvertTo-Json -Compress }"
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "Bash",
@@ -35,7 +21,7 @@
             "shell": "powershell",
             "if": "Bash(cmake --build *)",
             "statusMessage": "Copying artifacts to OneDrive Windows folder...",
-            "command": "$data = $input | ConvertFrom-Json; if ($data.tool_response.exitCode -eq 0) { $dst = 'D:\\Andy Tuke\\Music - Music Software\\TDP\\Windows\\'; Copy-Item 'd:\\Dev\\mu\\build\\mu-clid_artefacts\\Release\\Standalone\\mu-Clid.exe' $dst -Force 2>$null; Copy-Item 'd:\\Dev\\mu\\build\\mu-clid_artefacts\\Release\\VST3\\mu-Clid.vst3' $dst -Recurse -Force 2>$null; Copy-Item 'd:\\Dev\\mu\\build\\mu-clid_artefacts\\Release\\CLAP\\mu-Clid.clap' $dst -Force 2>$null }"
+            "command": "$data = $input | ConvertFrom-Json; if ($data.tool_response.exitCode -eq 0 -and $data.tool_input.command -match '--config\\s+Release') { $dst = 'D:\\Andy Tuke\\Music - Music Software\\TDP\\Windows\\'; Copy-Item 'd:\\Dev\\mu\\build\\mu-clid\\mu-clid_artefacts\\Release\\Standalone\\mu-Clid.exe' $dst -Force 2>$null; Copy-Item 'd:\\Dev\\mu\\build\\mu-clid\\mu-clid_artefacts\\Release\\VST3\\mu-Clid.vst3' $dst -Recurse -Force 2>$null; Copy-Item 'd:\\Dev\\mu\\build\\mu-clid\\mu-clid_artefacts\\Release\\CLAP\\mu-Clid.clap' $dst -Force 2>$null }"
           },
           {
             "type": "agent",
@@ -50,6 +36,13 @@
             "if": "Bash(cmake --build *)",
             "statusMessage": "Checking first build of day for oversight trigger...",
             "command": "powershell -NonInteractive -File \"d:\\Dev\\mu\\scripts\\mu_build_hook.ps1\""
+          },
+          {
+            "type": "command",
+            "shell": "powershell",
+            "if": "Bash(cmake --build *)",
+            "statusMessage": "Collecting build artifacts...",
+            "command": "pwsh -NonInteractive -File \"d:\\Dev\\mu\\scripts\\mu_build_artifacts.ps1\""
           }
         ]
       }

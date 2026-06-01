@@ -36,11 +36,12 @@ public:
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    bool isBusesLayoutSupported(const BusesLayout&) const override;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
 
-    const juce::String getName() const override { return "mu-Toni"; }
+    const juce::String getName() const override { return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Toni")); }
     bool acceptsMidi()  const override { return true; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }

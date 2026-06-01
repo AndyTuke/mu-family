@@ -91,6 +91,14 @@ public:
     Subdivision subdivision = Subdivision::Sixteenth;
     std::vector<GateEnvelope> envelopes;   // sorted by startCell, non-overlapping
 
+    // Lock-free flag: true iff envelopes is non-empty. Written by the message
+    // thread (inside editLock context) after any mutation; read by the audio
+    // thread as a pre-lock early-out so envelopes is never touched without
+    // the lock. Relaxed ordering is sufficient — the audio thread's
+    // compare_exchange_strong (acquire) on editLock is the synchronisation
+    // point for the actual vector access.
+    std::atomic<bool> hasEnvelopes { false };
+
     // Total cells in the pattern given the current subdivision (kTotalBars * denom).
     int totalCells() const noexcept;
 
@@ -132,13 +140,28 @@ public:
     // leaving this pattern's editLock untouched and resetting the gate cache.
     // Used when voices are added/removed and the per-voice patterns shift slots.
     // Call on the message thread while the audio thread is excluded (the
-    // processor holds its voicesLock during the shift). GatePattern can't be
-    // copy/move-assigned directly because of the embedded std::atomic editLock.
+    // processor holds its voicesLock during the shift). Acquires other.editLock
+    // to guard against a concurrent GatingDesigner edit on the source pattern
+    // (e.g. user drawing on voice N while voice N is being removed). GatePattern
+    // can't be copy/move-assigned directly because of the embedded std::atomic
+    // editLock.
     void copyDataFrom(const GatePattern& other) noexcept
     {
+        // Spin-acquire the source's lock — the UI holds it only briefly around
+        // single-envelope mutations, so contention is negligible.
+        while (true)
+        {
+            bool expected = false;
+            if (other.editLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+                break;
+        }
         subdivision = other.subdivision;
         envelopes   = other.envelopes;
+        other.editLock.store(false, std::memory_order_release);
+
+        hasEnvelopes.store(!envelopes.empty(), std::memory_order_relaxed);
         gateLevel   = 0.0f;
+        filterLevel = 1.0f;
         resetGateCache();
     }
 
@@ -151,6 +174,11 @@ public:
     // Persists across blocks for edge continuity; NOT reset by resetGateCache.
     // Reset to 0 on copyDataFrom + whenever the gate is held closed.
     float gateLevel = 0.0f;
+
+    // Audio-thread slew state for filter envelope — applies the same kMinAttackMs
+    // rise-limiting to prevent filter clicks when gate and filter envelopes are
+    // out of sync. Persists across blocks; reset to 1.0 on copyDataFrom.
+    float filterLevel = 1.0f;
 
 private:
     void sortEnvelopes();

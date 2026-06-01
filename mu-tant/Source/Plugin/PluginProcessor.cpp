@@ -3,6 +3,7 @@
 #include "Audio/Scales.h"
 #include "Modulation/MuTantModDest.h"
 #include "Modulation/ModulatorSerialise.h"   // mu-core: shared modulator (de)serialise
+#include "Sequencer/GatePatternSerialise.h"  // mu-tant: gate (de)serialise (also used by tests)
 
 #include <thread>
 
@@ -25,80 +26,6 @@ namespace
         return 20.0f + 19980.0f * std::pow(juce::jlimit(0.0f, 1.0f, p), 5.0f);
     }
 
-    // Gate-pattern (de)serialise — mu-tant-specific (GatePattern is a mu-tant type).
-    // tagName lets callers use a different XML tag for filter patterns ("FilterGate").
-    juce::ValueTree serialiseGate(const GatePattern& g, const char* tagName = "Gate")
-    {
-        juce::ValueTree t(tagName);
-        t.setProperty("subdiv", (int) g.subdivision, nullptr);
-        for (const auto& e : g.envelopes)
-        {
-            juce::ValueTree env("Env");
-            env.setProperty("start", e.startCell,        nullptr);
-            env.setProperty("len",   e.lengthCells,      nullptr);
-            env.setProperty("split", e.split,            nullptr);
-            env.setProperty("atk",   e.attackBend,       nullptr);
-            env.setProperty("dec",   e.decayBend,        nullptr);
-            env.setProperty("rev",   e.reverse ? 1 : 0,  nullptr);
-            env.setProperty("prob",     e.probability,              nullptr);
-            env.setProperty("loopMask", (int) e.loopMask,          nullptr);
-            env.setProperty("loopM",    e.loopM,                    nullptr);
-            t.addChild(env, -1, nullptr);
-        }
-        return t;
-    }
-
-    // Restore a gate tree into `g` (clears + rebuilds). Accepts both "Gate" and
-    // "FilterGate" tags so the same function handles both pattern types. An
-    // invalid/absent tree clears the pattern. Always holds editLock, so it's safe
-    // to call without an outer suspend/voicesLock.
-    void deserialiseGate(const juce::ValueTree& t, GatePattern& g)
-    {
-        const bool valid = t.isValid()
-                        && (t.getType() == juce::Identifier("Gate")
-                            || t.getType() == juce::Identifier("FilterGate"));
-
-        while (g.editLock.exchange(true, std::memory_order_acquire))
-            std::this_thread::yield();
-
-        g.envelopes.clear();
-        if (valid)
-        {
-            g.subdivision = (GatePattern::Subdivision)(int)
-                t.getProperty("subdiv", (int) GatePattern::Subdivision::Sixteenth);
-            for (int i = 0; i < t.getNumChildren(); ++i)
-            {
-                auto c = t.getChild(i);
-                if (c.getType() != juce::Identifier("Env")) continue;
-                GateEnvelope e;
-                e.startCell   =        (int)    c.getProperty("start", 0);
-                e.lengthCells = juce::jmax(1, (int) c.getProperty("len", 1));
-                e.split       = (float)(double) c.getProperty("split", 0.0);
-                e.attackBend  = (float)(double) c.getProperty("atk",   0.0);
-                e.decayBend   = (float)(double) c.getProperty("dec",   0.0);
-                e.reverse     =        (int)    c.getProperty("rev", 0) != 0;
-                e.probability = juce::jlimit(0.0f, 1.0f,
-                                    (float)(double) c.getProperty("prob", 1.0));
-                // loopMask: load new format, or convert legacy loopN to a single-bit mask.
-                if (c.hasProperty("loopMask"))
-                    e.loopMask = (uint8_t) juce::jlimit(1, 255, (int) c.getProperty("loopMask", 1));
-                else
-                {
-                    const int legacyN = juce::jlimit(1, 8, (int) c.getProperty("loopN", 1));
-                    e.loopMask = (uint8_t)(1 << (legacyN - 1));
-                }
-                e.loopM = juce::jlimit(1, 8, (int) c.getProperty("loopM", 1));
-                g.envelopes.push_back(e);
-            }
-        }
-        else
-        {
-            g.subdivision = GatePattern::Subdivision::Sixteenth;
-        }
-        g.resetGateCache();
-        g.editLock.store(false, std::memory_order_release);
-    }
-
     // mu-tant modulation-destination validator (drops assignments to dests this
     // product doesn't expose; source IDs are ControlSequence ids, left unchecked).
     bool isValidModDest(const std::string& id)
@@ -111,10 +38,29 @@ namespace
 
 
 PluginProcessor::PluginProcessor()
-    : ProcessorBase(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true),
+    : ProcessorBase(BusesProperties()
+                        .withInput ("Sidechain", juce::AudioChannelSet::stereo(), false)
+                        .withOutput("Output",    juce::AudioChannelSet::stereo(), true),
                     createParameterLayout(),
                     juce::Identifier("MuTantState"))
 {
+    // Persistent settings file (UI scale, future toggles).
+    {
+        juce::PropertiesFile::Options opts;
+        opts.applicationName     = "muTant";
+        opts.filenameSuffix      = "xml";
+        opts.folderName          = "TDP";
+        opts.osxLibrarySubFolder = "Application Support";
+        auto settingsFile = opts.getDefaultFile();
+        settingsFile.getParentDirectory().createDirectory();
+        appSettings = std::make_unique<juce::PropertiesFile>(settingsFile, opts);
+    }
+    // Restore persisted UI scale so a fresh open uses the last-selected size.
+    {
+        const double stored = appSettings->getDoubleValue("uiScale", (double) kUiScaleMedium);
+        uiScale = juce::jlimit(kUiScaleMedium, kUiScaleLarge, (float) stored);
+    }
+
     bank.generateBuiltIn();      // procedural sine->saw morph table (first stab)
     for (int v = 0; v < kMaxVoices; ++v)
     {
@@ -185,6 +131,18 @@ void PluginProcessor::parameterChanged(const juce::String& id, float v)
         syncGlobalFxParam(id, v);
 }
 
+bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+{
+    // Sidechain input: at most one, must be stereo or disabled.
+    const auto& ins = layouts.inputBuses;
+    if (ins.size() > 1) return false;
+    if (ins.size() == 1 && ins.getReference(0) != juce::AudioChannelSet::stereo()
+                        && ins.getReference(0) != juce::AudioChannelSet::disabled())
+        return false;
+    // Main output: must be stereo.
+    return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
+}
+
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     currentSampleRate = sampleRate;
@@ -213,6 +171,7 @@ void PluginProcessor::cacheParamPointers()
         p.xmod   = P(vid("xmod"));    p.xmode  = P(vid("xmode"));   p.sync = P(vid("sync"));
         p.o1Lvl  = P(vid("o1_lvl"));  p.o2Lvl  = P(vid("o2_lvl"));  p.noiseLvl = P(vid("noise_lvl")); p.noiseType = P(vid("noise_type"));
         p.fltType= P(vid("flt_type"));p.fltCut = P(vid("flt_cut")); p.fltRes = P(vid("flt_res")); p.fltEnvDepth = P(vid("flt_env_depth"));
+        p.o1PenvDepth = P(vid("o1_penv_depth")); p.o2PenvDepth = P(vid("o2_penv_depth"));
         p.level  = P(vid("level"));
         p.gateGap= P(vid("gate_gap"));p.gateBypass = P(vid("gate_bypass"));
         p.drvChar= P(vid("drvChar")); p.insP1  = P(vid("insP1")); p.insP2 = P(vid("insP2")); p.insP3 = P(vid("insP3")); p.insP4 = P(vid("insP4"));
@@ -276,6 +235,19 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 
     // Channel-strip + master + FX state lives in mixerEngine/fxChain, kept in sync
     // by the parameterChanged listener (see syncGlobalFxParam) — no per-block push.
+
+    // Supply the external DAW sidechain bus to the mixer (null when bus is inactive).
+    mixerEngine.setExternalSidechain(nullptr, nullptr);
+    if (getBusCount(true) > 0)
+        if (auto* scBus = getBus(true, 0); scBus && scBus->isEnabled())
+        {
+            auto scBuf = getBusBuffer(buffer, true, 0);
+            const int nCh = scBuf.getNumChannels();
+            if (nCh >= 1)
+                mixerEngine.setExternalSidechain(
+                    scBuf.getReadPointer(0),
+                    nCh >= 2 ? scBuf.getReadPointer(1) : scBuf.getReadPointer(0));
+        }
 
     // Render → gate → insert → mixer through the shared path (engine→insert→mixer,
     // the family-wide signal flow). The render hook fills each channel buffer; the
@@ -383,29 +355,63 @@ void PluginProcessor::renderVoice(int v, juce::AudioBuffer<float>& buf, int numS
     }
 
     // ── Filter envelope (block-accurate modulation of filter cutoff) ─────────
-    // Filter pattern envelopes shape cfg.filterCutoff in proportion space:
-    // envelope value 0→filter at 20 Hz, 1→filter at base cutoff.
+    // Filter pattern envelopes add to cfg.filterCutoff in proportion space.
+    // envelope value 0 → no change from base; 1 at depth=1 → fully open.
     // Only applies while playing; when the pattern is empty, no modulation.
+    // Apply the same kMinAttackMs rise-limiting as the gate to prevent clicks
+    // when gate and filter envelopes are out of sync.
     {
         auto& fPat = filterPatterns[(size_t) v];
-        if (blkPlaying && !fPat.envelopes.empty())
+        if (blkPlaying && fPat.hasEnvelopes.load(std::memory_order_relaxed))
         {
+            const float maxRise = (currentSampleRate > 0.0 && GatePattern::kMinAttackMs > 0.0f)
+                                ? (float) (1.0 / ((double) GatePattern::kMinAttackMs * 0.001 * currentSampleRate))
+                                : 1.0f;
             bool fExpected = false;
             if (fPat.editLock.compare_exchange_strong(fExpected, true, std::memory_order_acquire))
             {
                 fPat.resetGateCache();
-                const float fEnvVal  = fPat.gateAt(blkBeatStart, 0.0f, loopCount.load(std::memory_order_relaxed));
+                const float target   = fPat.gateAt(blkBeatStart, 0.0f, loopCount.load(std::memory_order_relaxed));
+                // Slew-limit the filter envelope rising edge (same as gate)
+                fPat.filterLevel = (target > fPat.filterLevel)
+                                 ? std::min(target, fPat.filterLevel + maxRise)
+                                 : target;
                 const float depth    = juce::jlimit(-1.0f, 1.0f, cfg.filterEnvDepth);
                 const float baseProp = tantPropFromCutoff(cfg.filterCutoff);
-                // baseProp * (1 - depth*(1-fEnvVal)):
-                //   depth=1, fEnvVal=0 → baseProp*0 (fully closed)
-                //   depth=0             → baseProp   (no effect)
-                //   depth=-1,fEnvVal=0  → baseProp*2 (inverted: opens wider)
-                const float modProp  = baseProp * (1.0f - depth * (1.0f - fEnvVal));
+                // baseProp + depth*filterLevel: envelope adds on top of base cutoff.
+                //   depth=1, filterLevel=0 → baseProp (no change)
+                //   depth=1, filterLevel=1 → clamped to 1.0 (fully open)
+                //   depth=-1,filterLevel=1 → baseProp-1 (clamped toward 20 Hz)
+                const float modProp  = juce::jlimit(0.0f, 1.0f, baseProp + depth * fPat.filterLevel);
                 cfg.filterCutoff = juce::jlimit(20.0f, 20000.0f, tantCutoffFromProp(modProp));
                 fPat.editLock.store(false, std::memory_order_release);
             }
             // On lock contention: use un-modulated cutoff (edit-time blip)
+        }
+        else if (!blkPlaying)
+        {
+            fPat.filterLevel = 1.0f;  // reset when stopped
+        }
+    }
+
+    // ── Pitch envelope (block-accurate pitch modulation per osc) ─────────────
+    // Pitch pattern envelope value (0..1) × depth (±24 semitones) shifts
+    // osc1/osc2 pitch before VoiceEngine processes it this block.
+    {
+        auto& pPat = pitchPatterns[(size_t) v];
+        if (blkPlaying && pPat.hasEnvelopes.load(std::memory_order_relaxed))
+        {
+            bool pExpected = false;
+            if (pPat.editLock.compare_exchange_strong(pExpected, true, std::memory_order_acquire))
+            {
+                pPat.resetGateCache();
+                const float envLevel = pPat.gateAt(blkBeatStart, 0.0f, loopCount.load(std::memory_order_relaxed));
+                const float d1 = voicePtrs[(size_t) v].o1PenvDepth->load();
+                const float d2 = voicePtrs[(size_t) v].o2PenvDepth->load();
+                cfg.osc1Semi += (int) roundf(d1 * envLevel);
+                cfg.osc2Semi += (int) roundf(d2 * envLevel);
+                pPat.editLock.store(false, std::memory_order_release);
+            }
         }
     }
 
@@ -511,6 +517,7 @@ void PluginProcessor::removeVoice(int idx)
         voiceSlots[(size_t) d] = voiceSlots[(size_t) (d + 1)];          // CopyableSpinLock-safe
         gatePatterns[(size_t) d].copyDataFrom(gatePatterns[(size_t) (d + 1)]);
         filterPatterns[(size_t) d].copyDataFrom(filterPatterns[(size_t) (d + 1)]);
+        pitchPatterns[(size_t) d].copyDataFrom(pitchPatterns[(size_t) (d + 1)]);
     }
     resetVoiceSlot(n - 1);                          // clear the vacated top slot
     numVoices.store(n - 1);
@@ -557,6 +564,11 @@ void PluginProcessor::swapVoices(int a, int b)
     tmpFilter.copyDataFrom(filterPatterns[(size_t) a]);
     filterPatterns[(size_t) a].copyDataFrom(filterPatterns[(size_t) b]);
     filterPatterns[(size_t) b].copyDataFrom(tmpFilter);
+
+    GatePattern tmpPitch;
+    tmpPitch.copyDataFrom(pitchPatterns[(size_t) a]);
+    pitchPatterns[(size_t) a].copyDataFrom(pitchPatterns[(size_t) b]);
+    pitchPatterns[(size_t) b].copyDataFrom(tmpPitch);
 }
 
 void PluginProcessor::resetVoice(int idx)
@@ -597,6 +609,8 @@ void PluginProcessor::saveVoicePreset(int voice, const juce::String& name)
         root.addChildElement(gate.release());
     if (auto fGate = serialiseGate(filterPatterns[(size_t) voice], "FilterGate").createXml())
         root.addChildElement(fGate.release());
+    if (auto pGate = serialiseGate(pitchPatterns[(size_t) voice], "PitchGate").createXml())
+        root.addChildElement(pGate.release());
 
     root.writeTo(dir.getChildFile(safe + "." + getPerSlotPresetExtension()));
 }
@@ -628,6 +642,9 @@ void PluginProcessor::loadVoicePreset(int voice, const juce::File& file)
     auto* fGateXml = xml->getChildByName("FilterGate");
     deserialiseGate(fGateXml ? juce::ValueTree::fromXml(*fGateXml) : juce::ValueTree{},
                     filterPatterns[(size_t) voice]);
+    auto* pGateXml = xml->getChildByName("PitchGate");
+    deserialiseGate(pGateXml ? juce::ValueTree::fromXml(*pGateXml) : juce::ValueTree{},
+                    pitchPatterns[(size_t) voice]);
 }
 
 void PluginProcessor::copyVoiceParams(int src, int dst)
@@ -678,6 +695,7 @@ void PluginProcessor::writeVoiceDataToState()
         voice.addChild(mu_pp::serialiseModulators(voiceSlots[(size_t) v]),          -1, nullptr);
         voice.addChild(serialiseGate(gatePatterns[(size_t) v]),                     -1, nullptr);
         voice.addChild(serialiseGate(filterPatterns[(size_t) v], "FilterGate"),     -1, nullptr);
+        voice.addChild(serialiseGate(pitchPatterns[(size_t) v],  "PitchGate"),      -1, nullptr);
         vd.addChild(voice, -1, nullptr);
     }
     apvts.state.addChild(vd, -1, nullptr);
@@ -706,6 +724,7 @@ void PluginProcessor::readVoiceDataFromState()
                                      voiceSlots[(size_t) v], {}, isValidModDest);
         deserialiseGate(voice.getChildWithName("Gate"),       gatePatterns[(size_t) v]);
         deserialiseGate(voice.getChildWithName("FilterGate"), filterPatterns[(size_t) v]);
+        deserialiseGate(voice.getChildWithName("PitchGate"),  pitchPatterns[(size_t) v]);
     }
 }
 
@@ -725,7 +744,21 @@ void PluginProcessor::resetVoiceSlot(int idx)
     resetPrefix("ch" + juce::String(idx) + "_");
     gatePatterns[(size_t) idx].copyDataFrom(GatePattern{});
     filterPatterns[(size_t) idx].copyDataFrom(GatePattern{});
+    pitchPatterns[(size_t) idx].copyDataFrom(GatePattern{});
     voiceSlots[(size_t) idx] = VoiceSlot{};
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+void PluginProcessor::setUiScale(float scale)
+{
+    const float clamped = juce::jlimit(kUiScaleMedium, kUiScaleLarge, scale);
+    if (uiScale == clamped) return;
+    if (appSettings != nullptr)
+    {
+        appSettings->setValue("uiScale", (double) clamped);
+        appSettings->saveIfNeeded();
+    }
+    ProcessorBase::setUiScale(clamped);
 }
 
 // ── Presets ──────────────────────────────────────────────────────────────────

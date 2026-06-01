@@ -80,7 +80,7 @@ inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayou
         addF(q+"pan",   nm+"Pan",     -1.0f,    1.0f,    0.0f);
         addB(q+"mute",  nm+"Mute",    false);
         addB(q+"solo",  nm+"Solo",    false);
-        addI(q+"scSrc", nm+"SC Src",  0,        8,       0);
+        addI(q+"scSrc", nm+"SC Src",  0,        9,       0);  // 0=off, 1-8=ch0-ch7, 9=ext DAW bus
         addF(q+"scAmt", nm+"SC Amt",  0.0f,     1.0f,    0.0f);
         addF(q+"scAtk", nm+"SC Atk",  1.0f,   500.0f,    5.0f);
         addF(q+"scRel", nm+"SC Rel",  10.0f, 2000.0f,  100.0f);
@@ -107,7 +107,8 @@ inline void addGlobalFxParams(juce::AudioProcessorValueTreeState::ParameterLayou
 inline bool isGlobalFxParamId(const juce::String& id)
 {
     return id.startsWith("eff_") || id.startsWith("eff2")
-        || id.startsWith("dly_") || id.startsWith("rev_")
+        || id.startsWith("dly_") || id.startsWith("dly2")   // dly2rev: delay→reverb intra-FX send
+        || id.startsWith("rev_")
         || id.startsWith("echo_") || id.startsWith("ret_")
         || id == "mstr_lvl" || id == "mstr_pan" || id.startsWith("mst_ins");
 }

@@ -85,11 +85,12 @@ public:
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    bool isBusesLayoutSupported(const BusesLayout&) const override;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
 
-    const juce::String getName() const override { return "mu-Tant"; }
+    const juce::String getName() const override { return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Tant")); }
     bool acceptsMidi()  const override { return true; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
@@ -114,7 +115,13 @@ public:
     {
         const bool now = !playing.load(std::memory_order_relaxed);
         playing.store(now, std::memory_order_relaxed);
-        if (!now) internalBeatPos.store(0.0, std::memory_order_relaxed);
+        if (!now)
+        {
+            // Reset beat + loop counter on stop so Loop-N-of-M offsets restart
+            // from position 0 the next time the user presses Play.
+            internalBeatPos.store(0.0, std::memory_order_relaxed);
+            loopCount.store(0, std::memory_order_relaxed);
+        }
     }
     double getInternalBpm()     const override { return internalBpm.load(std::memory_order_relaxed); }
     void   setInternalBpm(double bpm) override { internalBpm.store(juce::jlimit(20.0, 300.0, bpm), std::memory_order_relaxed); }
@@ -171,6 +178,10 @@ public:
     void              loadPreset(const juce::File& file) override;
     juce::StringArray loadCategoryList() const override;
 
+    // Persist the UI scale selection (Medium / Large) so it survives a plugin
+    // close/reopen. Writes to appSettings before delegating to the base class.
+    void setUiScale(float scale) override;
+
     // ── Per-voice param IDs (used by VoicePanel for SliderAttachment binding) ──
     // Family rule: per-voice params are subtree-scoped via `v{N}_` prefix so a
     // ValueTree restore round-trips cleanly + presets can target a specific
@@ -219,6 +230,7 @@ private:
         std::atomic<float> *xmod, *xmode, *sync;
         std::atomic<float> *o1Lvl, *o2Lvl, *noiseLvl, *noiseType;
         std::atomic<float> *fltType, *fltCut, *fltRes, *fltEnvDepth;
+        std::atomic<float> *o1PenvDepth, *o2PenvDepth;
         std::atomic<float> *level, *gateGap, *gateBypass;
         std::atomic<float> *drvChar, *insP1, *insP2, *insP3, *insP4;
     };
@@ -256,6 +268,10 @@ public:
     // modulates filter cutoff (0=20 Hz, 1=base cutoff) instead of amplitude.
     std::array<GatePattern, kMaxVoices> filterPatterns;
 
+    // Per-voice pitch envelope pattern. Envelope value (0..1) × depth (±24 st)
+    // adds semitones to osc1/osc2 pitch on each block.
+    std::array<GatePattern, kMaxVoices> pitchPatterns;
+
     // Per-voice post-insert audio ring buffers — written by the audio thread in
     // renderVoice() after the insert; read by VoiceSpectrumGlyph at 30 Hz for
     // the sidebar spectrum animation.
@@ -282,6 +298,7 @@ private:
     std::atomic<bool>   playing { false };
     std::atomic<double> internalBeatPos { 0.0 };
     std::atomic<double> internalBpm { 120.0 };
+    // Written in prepareToPlay (host suspends the audio thread first) — no atomic needed.
     double currentSampleRate = 44100.0;
 
     // Counts completed 2-bar pattern loops (incremented at each wrap in processBlock).
@@ -328,6 +345,10 @@ private:
     // we seed mixerEngine/fxChain explicitly here + after a preset load).
     void registerFxListeners();
     void syncAllFxParams();
+
+    // Persistent user settings (UI scale, future BPM, etc.) — stored next to
+    // the content dir so settings survive plugin re-installs.
+    std::unique_ptr<juce::PropertiesFile> appSettings;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

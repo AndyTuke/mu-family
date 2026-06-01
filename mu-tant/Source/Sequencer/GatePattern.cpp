@@ -112,6 +112,7 @@ GateEnvelope* GatePattern::addEnvelope(const GateEnvelope& env)
 
     envelopes.push_back(env);
     sortEnvelopes();
+    hasEnvelopes.store(true, std::memory_order_relaxed);
 
     for (auto& e : envelopes)
         if (e.startCell == newStart) return &e;
@@ -124,6 +125,7 @@ void GatePattern::removeEnvelopeCovering(int cellIdx)
         std::remove_if(envelopes.begin(), envelopes.end(),
                        [cellIdx](const GateEnvelope& e) { return e.covers(cellIdx); }),
         envelopes.end());
+    hasEnvelopes.store(!envelopes.empty(), std::memory_order_relaxed);
 }
 
 void GatePattern::mergeRange(int firstCell, int lastCell)
@@ -215,7 +217,8 @@ void applyGateBlock(GatePattern& pattern, float* left, float* right, int numSamp
                     double beatStart, double beatsPerSample, double sampleRate,
                     int loopCount) noexcept
 {
-    const GateMode mode = gateModeFor(bypassed, playing, pattern.envelopes.empty());
+    const GateMode mode = gateModeFor(bypassed, playing,
+                                       !pattern.hasEnvelopes.load(std::memory_order_relaxed));
 
     if (mode == GateMode::Pass)
         return;                                    // leave the buffer untouched

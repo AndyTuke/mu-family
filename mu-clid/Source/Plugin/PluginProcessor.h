@@ -79,8 +79,8 @@ public:
         if (!nowPlaying) internalBeatPos.store(0.0, std::memory_order_relaxed);
     }
     bool   isInternalPlaying()   const override { return internalPlaying.load(std::memory_order_relaxed); }
-    void   setInternalBpm(double bpm)  override { internalBpm = juce::jlimit(20.0, 300.0, bpm); }
-    double getInternalBpm()      const override { return internalBpm; }
+    void   setInternalBpm(double bpm)  override { internalBpm.store(juce::jlimit(20.0, 300.0, bpm), std::memory_order_relaxed); }
+    double getInternalBpm()      const override { return internalBpm.load(std::memory_order_relaxed); }
     double getInternalBeatPos()  const override
     {
         if (midiClockSync.isEnabled() && midiClockSync.isPlaying())
@@ -487,7 +487,10 @@ private:
     // atomic for safe cross-thread access (audio writes, UI reads + clears).
     std::atomic<bool>   internalPlaying   { false };
     std::atomic<double> internalBeatPos   { 0.0 };
-    double              internalBpm       = 120.0;   // message-thread only
+    std::atomic<double> internalBpm       { 120.0 };  // written by message thread, read by audio thread
+    // Written in prepareToPlay; read in processBlock. JUCE calls prepareToPlay
+    // while the audio thread is suspended by the host, so these fields are never
+    // concurrently read and written — no atomic needed.
     double currentSampleRate = 44100.0;
     int    currentBlockSize  = 512;
 

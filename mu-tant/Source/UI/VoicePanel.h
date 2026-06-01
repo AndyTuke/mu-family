@@ -39,6 +39,10 @@ public:
     // Mirrors mu-clid's RhythmPanel delete affordance.
     std::function<void()> onDeleteVoice;
 
+    // Null out the modulator slot pointer so no timer or paint callback can
+    // dereference it during the voice-remove → setVoice rebind window.
+    void clearModulatorSlot() { modulatorPanel.setVoiceSlot(nullptr); }
+
     void paint(juce::Graphics& g) override;
     void resized() override;
 
@@ -60,24 +64,28 @@ private:
     // (knobEuclidean), filter = teal (knobPostPad), levels = amber (knobLevel),
     // gate/FX = coral (knobFxSend).
     // ── Oscillator 1 ────────────────────────────────────────────────────────
-    KnobWithLabel o1OctKnob  { "Oct",  MuLookAndFeel::knobEuclidean };
-    KnobWithLabel o1SemiKnob { "Semi", MuLookAndFeel::knobEuclidean };
-    KnobWithLabel o1FineKnob { "Fine", MuLookAndFeel::knobEuclidean };
-    KnobWithLabel o1PosKnob  { "Pos",  MuLookAndFeel::knobEuclidean };
+    KnobWithLabel o1OctKnob      { "Oct",  MuLookAndFeel::knobEuclidean };
+    KnobWithLabel o1SemiKnob     { "Semi", MuLookAndFeel::knobEuclidean };
+    KnobWithLabel o1FineKnob     { "Fine", MuLookAndFeel::knobEuclidean };
+    KnobWithLabel o1PosKnob      { "Pos",  MuLookAndFeel::knobEuclidean };
+    KnobWithLabel o1PenvDepthKnob{ "PEnv", MuLookAndFeel::knobEuclidean };
     std::unique_ptr<APVTS::SliderAttachment> o1OctAttachment;
     std::unique_ptr<APVTS::SliderAttachment> o1SemiAttachment;
     std::unique_ptr<APVTS::SliderAttachment> o1FineAttachment;
     std::unique_ptr<APVTS::SliderAttachment> o1PosAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> o1PenvDepthAttachment;
 
     // ── Oscillator 2 ────────────────────────────────────────────────────────
-    KnobWithLabel o2OctKnob  { "Oct",  MuLookAndFeel::knobEuclidean };
-    KnobWithLabel o2SemiKnob { "Semi", MuLookAndFeel::knobEuclidean };
-    KnobWithLabel o2FineKnob { "Fine", MuLookAndFeel::knobEuclidean };
-    KnobWithLabel o2PosKnob  { "Pos",  MuLookAndFeel::knobEuclidean };
+    KnobWithLabel o2OctKnob      { "Oct",  MuLookAndFeel::knobEuclidean };
+    KnobWithLabel o2SemiKnob     { "Semi", MuLookAndFeel::knobEuclidean };
+    KnobWithLabel o2FineKnob     { "Fine", MuLookAndFeel::knobEuclidean };
+    KnobWithLabel o2PosKnob      { "Pos",  MuLookAndFeel::knobEuclidean };
+    KnobWithLabel o2PenvDepthKnob{ "PEnv", MuLookAndFeel::knobEuclidean };
     std::unique_ptr<APVTS::SliderAttachment> o2OctAttachment;
     std::unique_ptr<APVTS::SliderAttachment> o2SemiAttachment;
     std::unique_ptr<APVTS::SliderAttachment> o2FineAttachment;
     std::unique_ptr<APVTS::SliderAttachment> o2PosAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> o2PenvDepthAttachment;
 
     // ── Wavetable selection (placeholder dropdowns — no engine wiring yet) ────
     DropdownSelect osc1WaveDropdown;

@@ -58,6 +58,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     {
         if (proc.getNumVoices() <= 1) return;      // never delete the last voice
         const int idx = voicePanel.getVoice();
+        // Null out modulator panel pointer before the slot data is shifted so no
+        // timer or paint callback can dereference a stale slot during the window.
+        voicePanel.clearModulatorSlot();
         proc.removeVoice(idx);
         const int newIdx = juce::jlimit(0, proc.getNumVoices() - 1, idx);
         voiceSidebar.refreshItems();
@@ -77,6 +80,22 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     voicePanel.setVoice(0);
     mixerOverlay.loadFromAPVTS();
     clearPresetDirty();
+}
+
+void PluginEditor::onPresetLoaded(const juce::File&)
+{
+    voiceSidebar.refreshItems();
+    voiceSidebar.setSelectedIndex(0);
+    voicePanel.setVoice(0);         // re-reads insert algo + slot knobs from APVTS
+    mixerOverlay.loadFromAPVTS();
+}
+
+void PluginEditor::onPresetNew()
+{
+    voiceSidebar.refreshItems();
+    voiceSidebar.setSelectedIndex(0);
+    voicePanel.setVoice(0);
+    mixerOverlay.loadFromAPVTS();
 }
 
 } // namespace mu_tant

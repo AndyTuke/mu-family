@@ -95,6 +95,7 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/ControlSequenceTests.cpp
     Source/Tests/SynthVoiceTests.cpp
     Source/Tests/MuTantPersistTests.cpp
+    Source/Tests/PresetRoundTripTests.cpp  # gate serialise round-trip + tool ops (#791)
     Source/Tests/ApvtsLayoutTests.cpp      # real createParameterLayout coverage (#721)
     Source/Tests/SendFXSmokeTests.cpp      # FX-slot DSP smoke, ported from mu-clid (#721)
     Source/UI/GatingDesigner.cpp

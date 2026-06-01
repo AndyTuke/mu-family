@@ -2,6 +2,7 @@
 
 #include <juce_core/juce_core.h>
 #include <cstring>
+#include "Audio/InsertSlotConfig.h"   // for the kInsertAlgoCount cross-check below
 
 // Stage 35 Step 1: stable algorithm-name tables for the v2 preset format.
 //
@@ -191,5 +192,9 @@ inline constexpr int countNames(const char* const* table) noexcept
 inline constexpr int kInsertAlgorithmCount = (int) (std::size(kInsertAlgorithmNames) - 1);
 inline constexpr int kFilterTypeCount      = (int) (std::size(kFilterTypeNames) - 1);
 inline constexpr int kLogicCount           = (int) (std::size(kLogicNames) - 1);
+
+// Cross-check with the UI slot table and the processor — must all agree.
+static_assert(kInsertAlgorithmCount == mu_ui::kInsertAlgoCount,
+              "kInsertAlgorithmNames length != mu_ui::kInsertAlgoCount — update both tables");
 
 } // namespace mu_audio

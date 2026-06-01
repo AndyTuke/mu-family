@@ -187,7 +187,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addF(c+"sendDly", n+"Send Dly",  0.0f, 1.0f,  0.0f);
         addF(c+"sendRev", n+"Send Rev",  0.0f, 1.0f,  0.0f);
         // Sidechain
-        addI(c+"scSrc",   n+"SC Src",    0, 8,     0);  // 0=off, 1-8=ch1-ch8
+        addI(c+"scSrc",   n+"SC Src",    0, 9,     0);  // 0=off, 1-8=ch1-ch8, 9=ext DAW bus
         addF(c+"scAmt",   n+"SC Amount", 0.0f, 1.0f, 0.0f);
         addF(c+"scAtk",   n+"SC Attack", 1.0f, 500.0f, 5.0f);
         addF(c+"scRel",   n+"SC Release",10.0f, 2000.0f, 100.0f);

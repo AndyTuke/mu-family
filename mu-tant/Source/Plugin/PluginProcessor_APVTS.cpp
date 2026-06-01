@@ -93,6 +93,16 @@ namespace
         // base cutoff. +1 = full close-to-open sweep; 0 = no effect; -1 = inverted.
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_env_depth"), 1}, label("Filter Env Depth"), f(-1.0f, 1.0f, 0.01f), 1.0f));
 
+        // Pitch envelope depth — semitones added to osc1/osc2 pitch when the pitch
+        // envelope is at full value. +24 = 2 oct up; -24 = 2 oct down; 0 = no effect.
+        auto penvText = [](float v, int) -> String {
+            return String(v, 1) + " st";
+        };
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("o1_penv_depth"), 1}, label("Osc1 Pitch Env"),
+            f(-24.0f, 24.0f, 0.5f), 0.0f, AudioParameterFloatAttributes().withStringFromValueFunction(penvText)));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("o2_penv_depth"), 1}, label("Osc2 Pitch Env"),
+            f(-24.0f, 24.0f, 0.5f), 0.0f, AudioParameterFloatAttributes().withStringFromValueFunction(penvText)));
+
         // Per-voice slot output level — distinct from the mixer fader (engine-level
         // trim before the channel strip; the mixer adds its own per-channel level
         // / pan / mute / solo on top, matching the mu-clid signal flow).
@@ -148,7 +158,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"sendEff", 1}, n+"Send Eff", f(0.0f, 1.0f, 0.001f), 0.0f));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"sendDly", 1}, n+"Send Dly", f(0.0f, 1.0f, 0.001f), 0.0f));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"sendRev", 1}, n+"Send Rev", f(0.0f, 1.0f, 0.001f), 0.0f));
-        layout.add(std::make_unique<AudioParameterInt>  (ParameterID{c+"scSrc",   1}, n+"SC Src",  0, 8, 0));
+        layout.add(std::make_unique<AudioParameterInt>  (ParameterID{c+"scSrc",   1}, n+"SC Src",  0, 9, 0));  // 0=off, 1-8=ch0-ch7, 9=ext DAW bus
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"scAmt",   1}, n+"SC Amount", f(0.0f, 1.0f, 0.001f), 0.0f));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"scAtk",   1}, n+"SC Attack", f(1.0f, 500.0f, 0.1f), 5.0f));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"scRel",   1}, n+"SC Release", f(10.0f, 2000.0f, 1.0f), 100.0f));

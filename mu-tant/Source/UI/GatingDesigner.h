@@ -10,7 +10,7 @@ namespace mu_tant
 {
 
 enum class GateTool  { Arrow, Pencil, Eraser, Glue, Reverse };
-enum class GateLayer { Gater, Filter };
+enum class GateLayer { Gater, Filter, Pitch };
 
 class GateToolButton : public juce::Button
 {
@@ -43,6 +43,7 @@ public:
 
     void setPattern(GatePattern* pattern);
     void setFilterPattern(GatePattern* pattern);
+    void setPitchPattern(GatePattern* pattern);
     void setGap(float gap01);            // render-only mirror; also called by gapSlider.onValueChange
     void setLayer(GateLayer layer);
     GateLayer getLayer()           const noexcept { return currentLayer; }
@@ -68,6 +69,7 @@ private:
     // ── Layer toggle ─────────────────────────────────────────────────────────
     juce::TextButton gaterLayerBtn  { "GATE" };
     juce::TextButton filterLayerBtn { "FILT" };
+    juce::TextButton pitchLayerBtn  { "PITCH" };
     GateLayer currentLayer = GateLayer::Gater;
 
     // ── Subdivision ─────────────────────────────────────────────────────────
@@ -88,6 +90,7 @@ private:
 
     GatePattern* boundPattern  = nullptr;
     GatePattern* filterPattern = nullptr;
+    GatePattern* pitchPattern  = nullptr;
 
     // ── Layout constants ─────────────────────────────────────────────────────
     static constexpr int kHdr1H    = 24;   // tool / layer / bypass / grid dropdown
@@ -125,11 +128,14 @@ private:
 
     GatePattern* getActivePattern() const noexcept
     {
-        return (currentLayer == GateLayer::Gater) ? boundPattern : filterPattern;
+        if (currentLayer == GateLayer::Gater)  return boundPattern;
+        if (currentLayer == GateLayer::Filter) return filterPattern;
+        return pitchPattern;
     }
     GatePattern* getGhostPattern() const noexcept
     {
-        return (currentLayer == GateLayer::Gater) ? filterPattern : boundPattern;
+        // Show the gate layer as a timing reference ghost when editing filter/pitch.
+        return (currentLayer == GateLayer::Gater) ? nullptr : boundPattern;
     }
     juce::Colour activeLayerColour() const noexcept;
     juce::Colour ghostLayerColour()  const noexcept;

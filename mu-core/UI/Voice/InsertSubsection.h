@@ -27,6 +27,7 @@ class InsertSubsection : public juce::Component,
 {
 public:
     InsertSubsection(ProcessorBase& processor, juce::String channelPrefix);  // prefix "r" / "v" / …
+    ~InsertSubsection() override { stopTimer(); }
 
     void setChannel(int idx);
     void loadFromChannel();

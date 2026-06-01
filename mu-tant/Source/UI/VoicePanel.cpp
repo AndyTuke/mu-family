@@ -126,23 +126,26 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     scaleAttachment = std::make_unique<APVTS::ComboBoxAttachment>(apvts, "scale", scaleDropdown.getComboBox());
 
     // ── Per-voice controls (added once, rebound per-voice) ──────────────────
-    for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PosKnob,
-                     &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PosKnob,
+    for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PosKnob, &o1PenvDepthKnob,
+                     &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PosKnob, &o2PenvDepthKnob,
                      &xmodKnob, &osc1LevelKnob, &osc2LevelKnob, &noiseLevelKnob,
-                     &fltCutKnob, &fltResKnob, &fltEnvDepthKnob, &levelKnob })
+                     &fltCutKnob, &fltResKnob, &fltEnvDepthKnob })
         addAndMakeVisible(k);
+    addAndMakeVisible(levelKnob);
+    levelKnob.setVisible(false);   // per-voice level removed from the panel; APVTS param kept
 
-    // Placeholder wavetable selectors — one per oscillator, sitting to the left
-    // of that oscillator's knobs. No engine wiring or APVTS binding yet; the
-    // real wavetable bank lands later. Inert for now.
+    // Wavetable selectors: hidden until the wavetable bank API lands.
+    // No APVTS binding or engine wiring yet — hidden to avoid a visible
+    // control that accepts interaction but changes nothing.
     for (auto* d : { &osc1WaveDropdown, &osc2WaveDropdown })
     {
-        d->addItem("Basic", 1);   // single placeholder entry until the bank exists
+        d->addItem("Basic", 1);
         d->setSelectedId(1, false);
-        addAndMakeVisible(d);
+        addChildComponent(d);     // parented but not visible
     }
 
     setupLabel(xmodLabel, "Mode");
+    xmodLabel.setJustificationType(juce::Justification::centred);
     populateXmodModes(xmodModeDropdown);
     addAndMakeVisible(xmodModeDropdown);
 
@@ -231,6 +234,7 @@ void VoicePanel::setVoice(int voiceIndex)
     modulatorPanel.setVoiceSlot(&proc.voiceSlots[(size_t) currentVoice]);
     gatingDesigner.setPattern(&proc.gatePatterns[(size_t) currentVoice]);
     gatingDesigner.setFilterPattern(&proc.filterPatterns[(size_t) currentVoice]);
+    gatingDesigner.setPitchPattern(&proc.pitchPatterns[(size_t) currentVoice]);
     insertSub.setChannel(currentVoice);   // reloads algo + slot knobs from APVTS
     refreshHeader();
     repaint();   // sub-panel borders + section titles paint in the active voice's palette colour
@@ -246,10 +250,10 @@ void VoicePanel::rebindAttachments()
     // Destroy previous attachments first — the JUCE attachment dtor unhooks
     // the listener before the new one binds, so the slider doesn't briefly
     // double-fire from two attachments while we swap.
-    o1OctAttachment      = nullptr; o1SemiAttachment   = nullptr;
-    o1FineAttachment     = nullptr; o1PosAttachment    = nullptr;
-    o2OctAttachment      = nullptr; o2SemiAttachment   = nullptr;
-    o2FineAttachment     = nullptr; o2PosAttachment    = nullptr;
+    o1OctAttachment  = nullptr; o1SemiAttachment      = nullptr;
+    o1FineAttachment = nullptr; o1PosAttachment       = nullptr; o1PenvDepthAttachment = nullptr;
+    o2OctAttachment  = nullptr; o2SemiAttachment      = nullptr;
+    o2FineAttachment = nullptr; o2PosAttachment       = nullptr; o2PenvDepthAttachment = nullptr;
     xmodAttachment = nullptr; xmodModeAttachment = nullptr; syncAttachment = nullptr;
     osc1LevelAttachment  = nullptr; osc2LevelAttachment = nullptr;
     noiseLevelAttachment = nullptr; noiseTypeAttachment = nullptr;
@@ -258,15 +262,17 @@ void VoicePanel::rebindAttachments()
     levelAttachment       = nullptr;
     gapAttachment = nullptr; gateBypassAttachment = nullptr;
 
-    o1OctAttachment  = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_oct"),  o1OctKnob.getSlider());
-    o1SemiAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_semi"), o1SemiKnob.getSlider());
-    o1FineAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_fine"), o1FineKnob.getSlider());
-    o1PosAttachment  = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_pos"),  o1PosKnob.getSlider());
+    o1OctAttachment       = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_oct"),         o1OctKnob.getSlider());
+    o1SemiAttachment      = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_semi"),        o1SemiKnob.getSlider());
+    o1FineAttachment      = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_fine"),        o1FineKnob.getSlider());
+    o1PosAttachment       = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_pos"),         o1PosKnob.getSlider());
+    o1PenvDepthAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_penv_depth"),  o1PenvDepthKnob.getSlider());
 
     o2OctAttachment  = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_oct"),  o2OctKnob.getSlider());
-    o2SemiAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_semi"), o2SemiKnob.getSlider());
-    o2FineAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_fine"), o2FineKnob.getSlider());
-    o2PosAttachment  = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_pos"),  o2PosKnob.getSlider());
+    o2SemiAttachment      = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_semi"),        o2SemiKnob.getSlider());
+    o2FineAttachment      = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_fine"),        o2FineKnob.getSlider());
+    o2PosAttachment       = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_pos"),         o2PosKnob.getSlider());
+    o2PenvDepthAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_penv_depth"),  o2PenvDepthKnob.getSlider());
 
     xmodAttachment     = std::make_unique<APVTS::SliderAttachment>  (apvts, id("xmod"),  xmodKnob.getSlider());
     xmodModeAttachment = std::make_unique<APVTS::ComboBoxAttachment>(apvts, id("xmode"), xmodModeDropdown.getComboBox());
@@ -356,43 +362,24 @@ void VoicePanel::paint(juce::Graphics& g)
 
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));
 
-    // mu-clid panel styling: each sub-panel gets a 2px rounded border in the
-    // per-voice palette colour, with a small uppercase muted title on the left.
+    // Panel styling: 2px rounded border in the per-voice palette colour, small
+    // uppercase muted title in the top-left corner of every sub-panel.
     auto panel = [&](const juce::Rectangle<int>& r, const juce::String& title)
     {
         if (r.isEmpty()) return;
         g.setColour(voiceCol);
         g.drawRoundedRectangle(r.toFloat().reduced(1.0f), sf(6.0f), sf(2.0f));
         g.setColour(muted);
-        g.drawText(title, r.getX() + s(8), r.getY(), s(40), r.getHeight(),
+        g.drawText(title, r.getX() + s(8), r.getY() + s(4), s(50), s(12),
                    juce::Justification::centredLeft, false);
     };
     panel(osc1PanelR,     "OSC 1");
     panel(osc2PanelR,     "OSC 2");
+    panel(noisePanelR,    "NOISE");
     panel(modNoisePanelR, "X-MOD");
     panel(filterPanelR,   "FILTER");
-
-    // Insert sub-panel: same rounded-border + centred title as the MIXER column.
-    if (! insertPanelR.isEmpty())
-    {
-        g.setColour(voiceCol);
-        g.drawRoundedRectangle(insertPanelR.toFloat().reduced(1.0f), sf(6.0f), sf(2.0f));
-        g.setColour(muted);
-        g.drawText("INSERT", insertPanelR.getX(), insertPanelR.getY() + s(3),
-                   insertPanelR.getWidth(), s(12), juce::Justification::centred, false);
-    }
-
-    // NOISE + MIXER panels (right column): same centred-title styling.
-    for (const auto& p : { std::make_pair(&noisePanelR, "NOISE"),
-                           std::make_pair(&mixerPanelR, "MIXER") })
-    {
-        if (p.first->isEmpty()) continue;
-        g.setColour(voiceCol);
-        g.drawRoundedRectangle(p.first->toFloat().reduced(1.0f), sf(6.0f), sf(2.0f));
-        g.setColour(muted);
-        g.drawText(p.second, p.first->getX(), p.first->getY() + s(3),
-                   p.first->getWidth(), s(12), juce::Justification::centred, false);
-    }
+    panel(insertPanelR,   "INSERT");
+    panel(mixerPanelR,    "MIXER");
 }
 
 void VoicePanel::resized()
@@ -401,155 +388,165 @@ void VoicePanel::resized()
     const int w = getWidth();
     const int h = getHeight();
 
-    const int pad      = s(12);
-    const int gap      = s(8);
-    const int ddH      = s(24);
-    const int s2W      = s(MuLookAndFeel::kKnobSize2W);   // 54 — voice/filter/level knobs
-    const int s2H      = s(MuLookAndFeel::kKnobSize2H);   // 56
-    const int oscTitleW = s(46);                          // left title column inside each sub-panel
-    const int modPanelH = s(260);
+    const int pad = s(12);
+    const int gap = s(8);
+    const int ddH = s(24);
+    const int s2W = s(MuLookAndFeel::kKnobSize2W);   // 54
+    const int s2H = s(MuLookAndFeel::kKnobSize2H);   // 56
 
-    // ── Shared header bar (full width) + shared Root / Scale row beneath ────
-    const int barH = s(ChannelHeaderBar::kHeight);
+    // ── Shared header bar + Root / Scale row ────────────────────────────────
+    const int barH = s(ChannelHeaderBar::kHeight);   // 28
     headerBar.setBounds(0, 0, w, barH);
     const int tonalY = barH + s(2);
     {
         const int labelW = s(44);
         int x = pad;
         rootLabel    .setBounds(x, tonalY, labelW, ddH);   x += labelW + s(4);
-        rootDropdown .setBounds(x, tonalY, s(56), ddH);    x += s(56) + s(12);
+        rootDropdown .setBounds(x, tonalY, s(56),   ddH);  x += s(56)  + s(12);
         scaleLabel   .setBounds(x, tonalY, labelW, ddH);   x += labelW + s(4);
-        scaleDropdown.setBounds(x, tonalY, s(100), ddH);
+        scaleDropdown.setBounds(x, tonalY, s(100),  ddH);
     }
+    const int contentTop = tonalY + ddH + gap;   // top of all sub-panels
 
-    // ── Right-hand column (NOISE panel + horizontal MIXER row beneath) ───────
-    // Wide enough for 3 Size-2 level knobs side by side in the MIXER row.
-    const int mixerW     = s(3 * MuLookAndFeel::kKnobSize2W + 24);
-    const int mixerX     = w - pad - mixerW;
-    const int contentTop = tonalY + ddH + gap;
-
-    // Left content region (everything except the mixer column).
-    const int leftX     = pad;
+    // ── Column geometry ─────────────────────────────────────────────────────
+    // Mixer column (far right, spans Row A + Row B): one knob wide, three knobs tall.
+    const int mixerW  = s(MuLookAndFeel::kKnobSize2W + 20);   // ~74
+    const int mixerX  = w - pad - mixerW;
+    // Left region (up to Mixer):
     const int leftRight = mixerX - gap;
-    const int leftW     = leftRight - leftX;
-
-    int y = contentTop;
-
-    // ── Osc 1 / Osc 2 horizontal sub-panels: [title | Wave | Oct Semi Fine Pos] ──
-    const int oscSubH = s2H + s(8);
-    const int waveW   = s(108);
-
-    auto layoutOsc = [&](juce::Rectangle<int>& panelR, DropdownSelect& wave,
-                         KnobWithLabel& kOct, KnobWithLabel& kSemi,
-                         KnobWithLabel& kFine, KnobWithLabel& kPos)
-    {
-        panelR = { leftX, y, leftW, oscSubH };
-        const int rowY = y + s(4);
-        int x = leftX + oscTitleW;
-        wave.setBounds(x, rowY + (s2H - ddH) / 2, waveW, ddH);
-        x += waveW + gap;
-        for (auto* k : { &kOct, &kSemi, &kFine, &kPos })
-        {
-            k->setBounds(x, rowY, s2W, s2H);
-            x += s2W + s(2);
-        }
-        y += oscSubH + gap;
-    };
-    layoutOsc(osc1PanelR, osc1WaveDropdown, o1OctKnob, o1SemiKnob, o1FineKnob, o1PosKnob);
-    layoutOsc(osc2PanelR, osc2WaveDropdown, o2OctKnob, o2SemiKnob, o2FineKnob, o2PosKnob);
-    const int oscRowsBottom = y - gap;   // bottom of the Osc 2 sub-panel
-
-    // ── Insert column — reserved on the right, spanning the X-Mod + Filter rows.
-    //    Family signal flow: synth engine → insert → mixer. The shared
-    //    InsertSubsection lays out an algo dropdown over a 4-knob row, so it needs
-    //    a 2-row-tall column; placing it beside the two single-height rows keeps
-    //    parity with mu-clid's Filter | Insert strip and adds no panel height. ──
-    const int insSubW   = s(4 * MuLookAndFeel::kKnobSize2W);
-    const int insSubH   = s(2 * MuLookAndFeel::kKnobSize2H + MuLookAndFeel::kVoiceGap);
+    const int leftW     = leftRight - pad;    // 870 at default window width
+    // Insert column (right of rowsW, left of Mixer, spans Row B only):
+    const int insSubW  = s(4 * MuLookAndFeel::kKnobSize2W);        // 216
+    const int insSubH  = s(2 * MuLookAndFeel::kKnobSize2H + MuLookAndFeel::kVoiceGap);  // 116
     const int insTitleH = s(14);
-    const int insColW   = insSubW + s(20);
-    const int insColX   = leftRight - insColW;
-    const int rowsRight = insColX - gap;     // X-Mod / Filter rows stop before the insert
-    const int rowsW     = rowsRight - leftX;
-    const int xmodFilterTop = y;
+    const int insColW  = insSubW + s(20);     // 236
+    const int insColX  = leftRight - insColW; // 646
+    const int rowsW    = insColX - gap - pad; // 626 — shared by Row A osc zone and Row B X-Mod/Filter
 
-    // ── X-Mod / Noise sub-panel (mode + noise dropdowns kept apart) ─────────
+    // ── Row heights ──────────────────────────────────────────────────────────
+    // Row A: Osc 1 | Osc 2 | Noise side-by-side — natural knob height.
+    const int rowAH = s2H + s(8);   // 64
+    // Row B: X-Mod | Filter | Insert — height set by Insert subsection height so
+    // Insert fits without modification. X-Mod and Filter controls are centred within it.
+    const int rowBH = insTitleH + insSubH + s(6);   // 14+116+6 = 136
+
+    // ── Row A: Osc 1 | Osc 2 | Noise (side by side, using full leftW) ───────
+    // Osc panels extend across the Insert column zone since Insert is Row B only.
     {
-        const int rowH = s2H + s(8);
-        modNoisePanelR = { leftX, y, rowsW, rowH };
-        const int rowY  = y + s(4);
-        const int ctrlY = rowY + (s2H - ddH) / 2;
-        int x = leftX + oscTitleW;
-        xmodKnob.setBounds(x, rowY, s2W, s2H);                 x += s2W + gap;
-        xmodLabel.setBounds(x, ctrlY, s(40), ddH);             x += s(40) + s(2);
-        xmodModeDropdown.setBounds(x, ctrlY, s(78), ddH);      x += s(78) + s(8);
-        syncButton.setBounds(x, ctrlY, s(46), ddH);
-        // Noise type moved to its own NOISE panel (top-right); see below.
-        y += rowH + gap;
+        const int oscTitleW = s(36);
+        const int waveW     = s(70);
+        const int noiseW    = s(170);
+        const int oscW      = (leftW - noiseW - 2 * gap) / 2;   // ≈ 342
+        const int rowY      = contentTop + s(4);
+        const int waveY     = rowY + (s2H - ddH) / 2;
+
+        // Osc 1
+        osc1PanelR = { pad, contentTop, oscW, rowAH };
+        {
+            int x = pad + oscTitleW;
+            // Wavetable dropdown is hidden (addChildComponent, not addAndMakeVisible)
+            // until the bank API lands. When made visible, setVisible(true) must be
+            // followed by resized() so the knobs shift right and oscW must be verified
+            // wide enough for 5 knobs + waveW + oscTitleW.
+            osc1WaveDropdown.setBounds(x, waveY, waveW, ddH);
+            if (osc1WaveDropdown.isVisible()) x += waveW + s(4);
+            for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PosKnob, &o1PenvDepthKnob })
+            { k->setBounds(x, rowY, s2W, s2H);  x += s2W + s(2); }
+        }
+
+        // Osc 2
+        const int osc2X = pad + oscW + gap;
+        osc2PanelR = { osc2X, contentTop, oscW, rowAH };
+        {
+            int x = osc2X + oscTitleW;
+            osc2WaveDropdown.setBounds(x, waveY, waveW, ddH);  // hidden until bank lands (see Osc 1 comment)
+            if (osc2WaveDropdown.isVisible()) x += waveW + s(4);
+            for (auto* k : { &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PosKnob, &o2PenvDepthKnob })
+            { k->setBounds(x, rowY, s2W, s2H);  x += s2W + s(2); }
+        }
+
+        // Noise section (type dropdown; level is in the Mixer column)
+        const int noiseX      = pad + oscW + gap + oscW + gap;
+        const int noiseTitleW = s(42);   // clear space for "NOISE" panel label in paint()
+        noisePanelR = { noiseX, contentTop, noiseW, rowAH };
+        noiseTypeLabel.setBounds(0, 0, 0, 0);   // title drawn by paint(), label hidden
+        noiseTypeDropdown.setBounds(noiseX + noiseTitleW, waveY, noiseW - noiseTitleW - s(8), ddH);
     }
 
-    // ── Filter sub-panel (Type + Cutoff + Resonance) + per-voice Level ──────
+    // ── Row B: X-Mod | Filter (no Level) | Insert ───────────────────────────
+    const int rowBY = contentTop + rowAH + gap;   // top of Row B
     {
-        const int rowH = s2H + s(8);
-        filterPanelR = { leftX, y, rowsW, rowH };
-        const int rowY  = y + s(4);
-        const int ctrlY = rowY + (s2H - ddH) / 2;
-        int x = leftX + oscTitleW;
-        fltTypeLabel.setBounds(x, ctrlY, s(36), ddH);          x += s(36) + s(2);
-        fltTypeDropdown.setBounds(x, ctrlY, s(96), ddH);       x += s(96) + gap;
-        fltCutKnob.setBounds(x, rowY, s2W, s2H);               x += s2W + s(2);
-        fltResKnob.setBounds(x, rowY, s2W, s2H);               x += s2W + s(2);
-        fltEnvDepthKnob.setBounds(x, rowY, s2W, s2H);
-        levelKnob.setBounds(rowsRight - s2W - s(6), rowY, s2W, s2H);
-        y += rowH + gap;
+        // Vertical centering helpers — knob and dropdown centres align to row midline.
+        const int knobY = rowBY + (rowBH - s2H) / 2;
+        const int ctrlY = rowBY + (rowBH - ddH)  / 2;
+
+        // X-Mod panel
+        const int xmodTitleW = s(30);
+        const int xmodW      = s(200);
+        modNoisePanelR = { pad, rowBY, xmodW, rowBH };
+        {
+            int x = pad + xmodTitleW;
+            // Knob / Mode label / dropdown stacked vertically in one column,
+            // Sync button centred to their right.
+            const int colW    = s(72);   // dropdown sets column width; knob centred within it
+            const int labelH  = s(14);
+            const int stackH  = s2H + s(4) + labelH + ddH;   // 56+4+14+24 = 98
+            const int stackY  = rowBY + (rowBH - stackH) / 2;
+            xmodKnob.setBounds(x + (colW - s2W) / 2, stackY, s2W, s2H);
+            xmodLabel.setBounds(x, stackY + s2H + s(4), colW, labelH);
+            xmodModeDropdown.setBounds(x, stackY + s2H + s(4) + labelH, colW, ddH);
+            x += colW + gap;
+            syncButton.setBounds(x, rowBY + (rowBH - ddH) / 2, s(44), ddH);
+        }
+
+        // Filter panel (no Level knob)
+        const int filterX     = pad + xmodW + gap;
+        const int filterTitleW = s(30);
+        const int filterW     = rowsW - xmodW - gap;   // remaining rowsW
+        filterPanelR = { filterX, rowBY, filterW, rowBH };
+        {
+            int x = filterX + filterTitleW;
+            fltTypeLabel.setBounds(x, ctrlY, s(28), ddH);          x += s(28) + s(2);
+            fltTypeDropdown.setBounds(x, ctrlY, s(88), ddH);       x += s(88) + gap;
+            fltCutKnob.setBounds(x, knobY, s2W, s2H);              x += s2W + s(2);
+            fltResKnob.setBounds(x, knobY, s2W, s2H);              x += s2W + s(2);
+            fltEnvDepthKnob.setBounds(x, knobY, s2W, s2H);
+        }
+
+        // Insert panel (Row B only, same height as Row B)
+        insertPanelR = { insColX, rowBY, insColW, rowBH };
+        {
+            const int subX = insColX + (insColW - insSubW) / 2;
+            const int subY = rowBY + insTitleH + (rowBH - insTitleH - insSubH) / 2;
+            insertSub.setBounds(subX, subY, insSubW, insSubH);
+        }
     }
 
-    // ── Insert sub-panel: title band + centred InsertSubsection, spanning both rows.
+    // ── Mixer column — spans Row A + Row B, knobs stacked vertically ──────────
     {
-        const int insBottom = y - gap;       // bottom of the Filter row above
-        insertPanelR = { insColX, xmodFilterTop, insColW, insBottom - xmodFilterTop };
-        const int subX = insColX + (insColW - insSubW) / 2;
-        const int subY = xmodFilterTop + insTitleH
-                       + (insertPanelR.getHeight() - insTitleH - insSubH) / 2;
-        insertSub.setBounds(subX, subY, insSubW, insSubH);
-    }
-
-    // ── Gating designer — full width; Gap + Bypass are inside the component ──
-    {
-        // header-row-1(24) + header-row-2/gap(22) + grid(80) + props(56) + margin
-        const int gateH = s(24 + 22 + 80 + 56 + 4);
-        gatingDesigner.setBounds(leftX, y, leftRight - leftX, gateH);
-        y += gateH + gap;
-    }
-    // ── Right column: NOISE panel (top, room to grow) + MIXER row beneath ───
-    // NOISE holds the noise-source config (type now; more later). MIXER is the
-    // 3 source levels (Osc 1 / Osc 2 / Noise) as a horizontal Size-2 knob row.
-    const int titleBand   = s(14);
-    const int noisePanelH = titleBand + ddH + s(14);     // title + dropdown row + grow room
-    noisePanelR = { mixerX, contentTop, mixerW, noisePanelH };
-    {
-        const int innerX = mixerX + s(8);
-        const int innerW = mixerW - s(16);
-        noiseTypeLabel.setBounds(0, 0, 0, 0);            // hidden — the panel title says NOISE
-        noiseTypeDropdown.setBounds(innerX, contentTop + titleBand + s(2), innerW, ddH);
-    }
-
-    const int mixerY = contentTop + noisePanelH + gap;
-    mixerPanelR = { mixerX, mixerY, mixerW, oscRowsBottom - mixerY };
-    {
-        const int knobsY = mixerY + titleBand + s(2);
-        const int cellW  = mixerW / 3;
-        int cx = mixerX;
+        const int spanH   = rowAH + gap + rowBH;
+        mixerPanelR = { mixerX, contentTop, mixerW, spanH };
+        const int knobX   = mixerX + (mixerW - s2W) / 2;
+        const int stackH  = 3 * s2H + 2 * gap;
+        int ky = contentTop + (spanH - stackH) / 2;
         for (auto* k : { &osc1LevelKnob, &osc2LevelKnob, &noiseLevelKnob })
         {
-            k->setBounds(cx + (cellW - s2W) / 2, knobsY, s2W, s2H);
-            cx += cellW;
+            k->setBounds(knobX, ky, s2W, s2H);
+            ky += s2H + gap;
         }
     }
 
-    // ── Modulator panel — full width, fills the remaining bottom space ──────
-    const int modY = y;
-    modulatorPanel.setBounds(pad, modY, w - 2 * pad, juce::jmax(modPanelH, h - modY - pad));
+    // ── Gating designer — full width ─────────────────────────────────────────
+    int y = rowBY + rowBH + gap;
+    {
+        const int gateH = s(24 + 22 + 80 + 56 + 4);   // 186
+        gatingDesigner.setBounds(pad, y, w - 2 * pad, gateH);
+        y += gateH + gap;
+    }
+
+    // ── Modulator panel — fills remaining height (minimum matches mu-clid) ───
+    modulatorPanel.setBounds(pad, y, w - 2 * pad,
+                             juce::jmax(s(332), h - y - pad));
 }
 
 } // namespace mu_tant

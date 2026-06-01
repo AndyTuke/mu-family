@@ -29,7 +29,7 @@ void MixerEngine::prepare(double sr, int blockSize)
 bool MixerEngine::hasSolo(int numActive) const
 {
     for (int i = 0; i < numActive; ++i)
-        if (channels[i].solo) return true;
+        if (channels[i].solo.load(std::memory_order_relaxed)) return true;
     return false;
 }
 
@@ -78,7 +78,9 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     // follow-up: when a return is soloed, the user wants to hear ONLY that wet
     // signal — the channels' dry passthrough to master must also be muted, but
     // their FX sends must still run so the soloed return has something to render.
-    const bool anyReturnSolo = returns[0].solo || returns[1].solo || returns[2].solo;
+    const bool anyReturnSolo = returns[0].solo.load(std::memory_order_relaxed)
+                            || returns[1].solo.load(std::memory_order_relaxed)
+                            || returns[2].solo.load(std::memory_order_relaxed);
     const int  numOutCh      = output.getNumChannels();
 
     // Clear peaks for inactive channels this block so their VUs go silent.
@@ -136,19 +138,27 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     for (int r = 0; r < numActiveChannels; ++r)
     {
         const auto& ch  = channels[r];
-        const int   src = ch.sidechainSource;
-        if (src < 0 || src >= numActiveChannels || src == r) continue;
-        if (ch.sidechainAmount <= 0.0f) continue;
+        // Snapshot all fields used in this block so we don't re-load atomics per sample.
+        const int   src    = ch.sidechainSource.load(std::memory_order_relaxed);
+        const float scAmt  = ch.sidechainAmount.load(std::memory_order_relaxed);
+        if (scAmt <= 0.0f) continue;
+
+        const bool isExt = (src == kExtSidechainSrc);
+        if (!isExt && (src < 0 || src >= numActiveChannels || src == r)) continue;
+        if  (isExt && extScL == nullptr) continue;
 
         const float sr_f = (float)sampleRate;
-        const float atk  = (ch.sidechainAttackMs  > 0.0f)
-                         ? std::exp(-1.0f / (ch.sidechainAttackMs  * 0.001f * sr_f)) : 0.0f;
-        const float rel  = (ch.sidechainReleaseMs > 0.0f)
-                         ? std::exp(-1.0f / (ch.sidechainReleaseMs * 0.001f * sr_f)) : 0.0f;
+        const float scAtk = ch.sidechainAttackMs.load(std::memory_order_relaxed);
+        const float scRel = ch.sidechainReleaseMs.load(std::memory_order_relaxed);
+        const float atk  = (scAtk  > 0.0f)
+                         ? std::exp(-1.0f / (scAtk  * 0.001f * sr_f)) : 0.0f;
+        const float rel  = (scRel > 0.0f)
+                         ? std::exp(-1.0f / (scRel * 0.001f * sr_f)) : 0.0f;
 
-        const float* srcL = channelBufs[src].getReadPointer(0);
-        const float* srcR = channelBufs[src].getNumChannels() > 1
-                          ? channelBufs[src].getReadPointer(1) : srcL;
+        const float* srcL = isExt ? extScL : channelBufs[src].getReadPointer(0);
+        const float* srcR = isExt ? extScR
+                          : (channelBufs[src].getNumChannels() > 1
+                             ? channelBufs[src].getReadPointer(1) : srcL);
         float* tgtL = channelBufs[r].getWritePointer(0);
         float* tgtR = channelBufs[r].getNumChannels() > 1
                     ? channelBufs[r].getWritePointer(1) : nullptr;
@@ -157,7 +167,10 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         // releases to 0 when silent. Raw amplitude following produced negligible gain
         // reduction for typical samples (−18 dBFS kick → <1 dB duck at 100% amount).
         constexpr float kScThreshold = 0.001f; // ≈ −60 dBFS post-trim
-        const bool sourceActive = !channels[src].mute && !(anySolo && !channels[src].solo);
+        // External DAW sidechain always active; internal respects mute/solo state.
+        const bool srcMute = channels[src].mute.load(std::memory_order_relaxed);
+        const bool srcSolo = channels[src].solo.load(std::memory_order_relaxed);
+        const bool sourceActive = isExt ? true : (!srcMute && !(anySolo && !srcSolo));
         float peakGR = 0.0f;
         for (int i = 0; i < numSamples; ++i)
         {
@@ -169,8 +182,8 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                      ? atk * scEnv[r] + (1.0f - atk) * target
                      : rel * scEnv[r] + (1.0f - rel) * target;
 
-            const float gain = 1.0f - ch.sidechainAmount * scEnv[r];
-            peakGR = juce::jmax(peakGR, ch.sidechainAmount * scEnv[r]);
+            const float gain = 1.0f - scAmt * scEnv[r];
+            peakGR = juce::jmax(peakGR, scAmt * scEnv[r]);
             tgtL[i] *= gain;
             if (tgtR) tgtR[i] *= gain;
         }
@@ -183,10 +196,14 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         const auto& ch  = channels[r];
         auto&       buf = channelBufs[r];
 
+        // Snapshot atomic fields once per channel per block.
+        const bool  chMute = ch.mute.load(std::memory_order_relaxed);
+        const bool  chSolo = ch.solo.load(std::memory_order_relaxed);
+
         // hardMute: rhythm is fully silent — no master output, no FX sends.
         // skipMaster: dry passthrough to master suppressed (because a return is soloed),
         // but FX sends still run so the soloed return has source material to render.
-        const bool hardMute   = ch.mute || (anySolo && !ch.solo);
+        const bool hardMute   = chMute || (anySolo && !chSolo);
         const bool skipMaster = hardMute || anyReturnSolo;
 
         if (hardMute)
@@ -195,10 +212,11 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
             continue;
         }
 
-        applyPanGain(buf, ch.level, ch.pan, numSamples);
+        applyPanGain(buf, ch.level.load(std::memory_order_relaxed),
+                          ch.pan.load(std::memory_order_relaxed), numSamples);
         channelPeaks[r].store(peakOf(buf, numSamples));
 
-        const int bus = ch.outputBus;  // 0 = master, 1..8 = direct out
+        const int bus = ch.outputBus.load(std::memory_order_relaxed);  // 0 = master, 1..8 = direct out
         if (bus == 0)
         {
             // Master mix — also feeds FX sends. skipMaster suppresses just the dry add.
@@ -206,15 +224,18 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                 for (int c = 0; c < numOutCh; ++c)
                     output.addFrom(c, 0, buf, c, 0, numSamples);
 
-            if (ch.sendEffect > 0.0f)
+            const float sEff = ch.sendEffect.load(std::memory_order_relaxed);
+            const float sDly = ch.sendDelay.load(std::memory_order_relaxed);
+            const float sRev = ch.sendReverb.load(std::memory_order_relaxed);
+            if (sEff > 0.0f)
                 for (int c = 0; c < numOutCh; ++c)
-                    effectSendBuf.addFrom(c, 0, buf, c, 0, numSamples, ch.sendEffect);
-            if (ch.sendDelay > 0.0f)
+                    effectSendBuf.addFrom(c, 0, buf, c, 0, numSamples, sEff);
+            if (sDly > 0.0f)
                 for (int c = 0; c < numOutCh; ++c)
-                    delaySendBuf.addFrom(c, 0, buf, c, 0, numSamples, ch.sendDelay);
-            if (ch.sendReverb > 0.0f)
+                    delaySendBuf.addFrom(c, 0, buf, c, 0, numSamples, sDly);
+            if (sRev > 0.0f)
                 for (int c = 0; c < numOutCh; ++c)
-                    reverbSendBuf.addFrom(c, 0, buf, c, 0, numSamples, ch.sendReverb);
+                    reverbSendBuf.addFrom(c, 0, buf, c, 0, numSamples, sRev);
         }
         else
         {
@@ -253,31 +274,50 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     for (int ri = 0; ri < 3; ++ri)
     {
         const auto& ret = returns[ri];
-        const int src = ret.sidechainSource;
-        if (src < 0 || src >= numActiveChannels || ret.sidechainAmount <= 0.0f)
+        // Snapshot atomic fields once per return per block.
+        const int   src    = ret.sidechainSource.load(std::memory_order_relaxed);
+        const float scAmt  = ret.sidechainAmount.load(std::memory_order_relaxed);
+        if (scAmt <= 0.0f)
+        {
+            returnSidechainGR[ri].store(0.0f);
+            continue;
+        }
+
+        const bool isExt = (src == kExtSidechainSrc);
+        if (!isExt && (src < 0 || src >= numActiveChannels))
+        {
+            returnSidechainGR[ri].store(0.0f);
+            continue;
+        }
+        if (isExt && extScL == nullptr)
         {
             returnSidechainGR[ri].store(0.0f);
             continue;
         }
 
         const float sr_f = (float)sampleRate;
-        const float atk  = (ret.sidechainAttackMs > 0.0f)
-                         ? std::exp(-1.0f / (ret.sidechainAttackMs  * 0.001f * sr_f)) : 0.0f;
-        const float rel  = (ret.sidechainReleaseMs > 0.0f)
-                         ? std::exp(-1.0f / (ret.sidechainReleaseMs * 0.001f * sr_f)) : 0.0f;
+        const float scAtk = ret.sidechainAttackMs.load(std::memory_order_relaxed);
+        const float scRel = ret.sidechainReleaseMs.load(std::memory_order_relaxed);
+        const float atk  = (scAtk > 0.0f)
+                         ? std::exp(-1.0f / (scAtk  * 0.001f * sr_f)) : 0.0f;
+        const float rel  = (scRel > 0.0f)
+                         ? std::exp(-1.0f / (scRel * 0.001f * sr_f)) : 0.0f;
 
         auto& retBuf = (ri == 0) ? effectSendBuf
                      : (ri == 1) ? delaySendBuf
                                  : reverbSendBuf;
 
-        const float* srcL = channelBufs[src].getReadPointer(0);
-        const float* srcR = channelBufs[src].getNumChannels() > 1
-                          ? channelBufs[src].getReadPointer(1) : srcL;
+        const float* srcL = isExt ? extScL : channelBufs[src].getReadPointer(0);
+        const float* srcR = isExt ? extScR
+                          : (channelBufs[src].getNumChannels() > 1
+                             ? channelBufs[src].getReadPointer(1) : srcL);
         float* tgtL = retBuf.getWritePointer(0);
         float* tgtR = retBuf.getNumChannels() > 1 ? retBuf.getWritePointer(1) : nullptr;
 
         constexpr float kScThreshold = 0.001f;
-        const bool sourceActive = !channels[src].mute && !(anySolo && !channels[src].solo);
+        const bool srcMute = channels[src].mute.load(std::memory_order_relaxed);
+        const bool srcSolo = channels[src].solo.load(std::memory_order_relaxed);
+        const bool sourceActive = isExt ? true : (!srcMute && !(anySolo && !srcSolo));
         float peakGR = 0.0f;
         for (int i = 0; i < numSamples; ++i)
         {
@@ -288,8 +328,8 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
             scRetEnv[ri] = (target > scRetEnv[ri])
                          ? atk * scRetEnv[ri] + (1.0f - atk) * target
                          : rel * scRetEnv[ri] + (1.0f - rel) * target;
-            const float gain = 1.0f - ret.sidechainAmount * scRetEnv[ri];
-            peakGR = juce::jmax(peakGR, ret.sidechainAmount * scRetEnv[ri]);
+            const float gain = 1.0f - scAmt * scRetEnv[ri];
+            peakGR = juce::jmax(peakGR, scAmt * scRetEnv[ri]);
             tgtL[i] *= gain;
             if (tgtR) tgtR[i] *= gain;
         }
@@ -300,8 +340,10 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     // channel send signal this block, so we cannot use the pre-processing doEffect flag.
     if (hasSignal(effectSendBuf, numSamples))
     {
-        applyPanGain(effectSendBuf, returns[0].level, returns[0].pan, numSamples);
-        if (!returns[0].mute && !(anyReturnSolo && !returns[0].solo))
+        applyPanGain(effectSendBuf, returns[0].level.load(std::memory_order_relaxed),
+                                    returns[0].pan.load(std::memory_order_relaxed), numSamples);
+        if (!returns[0].mute.load(std::memory_order_relaxed)
+            && !(anyReturnSolo && !returns[0].solo.load(std::memory_order_relaxed)))
         {
             returnPeaks[0].store(peakOf(effectSendBuf, numSamples));
             for (int c = 0; c < numOutCh; ++c)
@@ -314,8 +356,10 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
 
     if (hasSignal(delaySendBuf, numSamples))
     {
-        applyPanGain(delaySendBuf, returns[1].level, returns[1].pan, numSamples);
-        if (!returns[1].mute && !(anyReturnSolo && !returns[1].solo))
+        applyPanGain(delaySendBuf, returns[1].level.load(std::memory_order_relaxed),
+                                   returns[1].pan.load(std::memory_order_relaxed), numSamples);
+        if (!returns[1].mute.load(std::memory_order_relaxed)
+            && !(anyReturnSolo && !returns[1].solo.load(std::memory_order_relaxed)))
         {
             returnPeaks[1].store(peakOf(delaySendBuf, numSamples));
             for (int c = 0; c < numOutCh; ++c)
@@ -330,8 +374,10 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     // added signal to reverbSendBuf even when no channels had a direct reverb send.
     if (hasSignal(reverbSendBuf, numSamples))
     {
-        applyPanGain(reverbSendBuf, returns[2].level, returns[2].pan, numSamples);
-        if (!returns[2].mute && !(anyReturnSolo && !returns[2].solo))
+        applyPanGain(reverbSendBuf, returns[2].level.load(std::memory_order_relaxed),
+                                    returns[2].pan.load(std::memory_order_relaxed), numSamples);
+        if (!returns[2].mute.load(std::memory_order_relaxed)
+            && !(anyReturnSolo && !returns[2].solo.load(std::memory_order_relaxed)))
         {
             returnPeaks[2].store(peakOf(reverbSendBuf, numSamples));
             for (int c = 0; c < numOutCh; ++c)
@@ -343,10 +389,20 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     else { returnPeaks[2].store(0.0f); }
 
     // Apply master gain first, then capture peak so master VU reflects the master fader.
-    applyPanGain(output, masterLevel, masterPan, numSamples);
+    applyPanGain(output, masterLevel.load(std::memory_order_relaxed),
+                         masterPan.load(std::memory_order_relaxed), numSamples);
     masterPeak.store(peakOf(output, numSamples));
 
     // Master inserts — post-fader, post-metering, chained Insert 1 → Insert 2.
-    masterInsert.process(output, numSamples, output.getNumChannels(), masterInsertParams);
-    masterInsert2.process(output, numSamples, output.getNumChannels(), masterInsertParams2);
+    // Assemble local VoiceParams from the atomic fields so InsertProcessor::process
+    // gets a stable snapshot for this block (no race while the message thread updates).
+    VoiceParams mi1, mi2;
+    mi1.insertAlgo = masterInsert1Algo.load(std::memory_order_relaxed);
+    for (int i = 0; i < VoiceParams::kInsertSlotCount; ++i)
+        mi1.insertParam[i] = masterInsert1Param[i].load(std::memory_order_relaxed);
+    mi2.insertAlgo = masterInsert2Algo.load(std::memory_order_relaxed);
+    for (int i = 0; i < VoiceParams::kInsertSlotCount; ++i)
+        mi2.insertParam[i] = masterInsert2Param[i].load(std::memory_order_relaxed);
+    masterInsert.process(output, numSamples, output.getNumChannels(), mi1);
+    masterInsert2.process(output, numSamples, output.getNumChannels(), mi2);
 }

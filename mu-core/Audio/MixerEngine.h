@@ -49,48 +49,101 @@ public:
     // around −14 dBFS at the master output (≈ +4 dB on the calibrated VU).
     static constexpr float kHeadroomTrim = 0.5f;
 
+    // External DAW sidechain: value one beyond the max channel index (8).
+    // Set sidechainSource to this value to duck from the DAW sidechain input bus
+    // instead of an internal mixer channel. The bus pointers are supplied via
+    // setExternalSidechain() before each processBlock call.
+    static constexpr int kExtSidechainSrc = MaxChannels;
+
+    // Per-channel and per-return state.  All fields are atomics so they can be
+    // written by the message thread (via syncChannelStripParam / parameterChanged)
+    // and read by the audio thread (processBlock) without a data race.
+    // Relaxed ordering suffices: each field is independent, and the audio thread
+    // reads a consistent value for the current block — it does not need an ordering
+    // guarantee relative to other fields.
     struct ChannelState
     {
-        float level      = 1.0f;    // 0–1 linear fader (Issue #121: 0 dB default)
-        float pan        = 0.0f;    // -1 (L) … +1 (R)
-        float sendEffect = 0.0f;
-        float sendDelay  = 0.0f;
-        float sendReverb = 0.0f;
-        bool  mute       = false;
-        bool  solo       = false;
+        std::atomic<float> level      { 1.0f };   // 0–1 linear fader (0 dB default)
+        std::atomic<float> pan        { 0.0f };   // -1 (L) … +1 (R)
+        std::atomic<float> sendEffect { 0.0f };
+        std::atomic<float> sendDelay  { 0.0f };
+        std::atomic<float> sendReverb { 0.0f };
+        std::atomic<bool>  mute       { false };
+        std::atomic<bool>  solo       { false };
         // Sidechain ducking
-        int   sidechainSource   = -1;     // -1 = off, 0-7 = source channel index
-        float sidechainAmount   = 0.0f;   // 0-1 ducking depth
-        float sidechainAttackMs  =   5.0f;
-        float sidechainReleaseMs = 100.0f;
+        std::atomic<int>   sidechainSource   { -1 };     // -1=off, 0-7=channel index, kExtSidechainSrc=DAW bus
+        std::atomic<float> sidechainAmount   { 0.0f };   // 0-1 ducking depth
+        std::atomic<float> sidechainAttackMs  { 5.0f };
+        std::atomic<float> sidechainReleaseMs { 100.0f };
         // Multi-bus output routing (DAW only): 0 = Master mix (default, applies master fader + FX),
         // 1..8 = direct out to Bus 1..8 (post-channel-fader, no master fader, no FX sends).
-        int   outputBus = 0;
+        std::atomic<int>   outputBus { 0 };
+
+        // Copy all fields from another ChannelState. Use instead of `= other`
+        // since atomics are not copy-assignable.
+        void copyFrom(const ChannelState& o) noexcept
+        {
+            level.store(o.level.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            pan.store(o.pan.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            sendEffect.store(o.sendEffect.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            sendDelay.store(o.sendDelay.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            sendReverb.store(o.sendReverb.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            mute.store(o.mute.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            solo.store(o.solo.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            sidechainSource.store(o.sidechainSource.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            sidechainAmount.store(o.sidechainAmount.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            sidechainAttackMs.store(o.sidechainAttackMs.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            sidechainReleaseMs.store(o.sidechainReleaseMs.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            outputBus.store(o.outputBus.load(std::memory_order_relaxed), std::memory_order_relaxed);
+        }
+
+        // Reset all fields to their default values. Use instead of `= ChannelState{}`
+        // since atomics are not copy-assignable.
+        void reset() noexcept
+        {
+            level.store(1.0f, std::memory_order_relaxed);
+            pan.store(0.0f, std::memory_order_relaxed);
+            sendEffect.store(0.0f, std::memory_order_relaxed);
+            sendDelay.store(0.0f, std::memory_order_relaxed);
+            sendReverb.store(0.0f, std::memory_order_relaxed);
+            mute.store(false, std::memory_order_relaxed);
+            solo.store(false, std::memory_order_relaxed);
+            sidechainSource.store(-1, std::memory_order_relaxed);
+            sidechainAmount.store(0.0f, std::memory_order_relaxed);
+            sidechainAttackMs.store(5.0f, std::memory_order_relaxed);
+            sidechainReleaseMs.store(100.0f, std::memory_order_relaxed);
+            outputBus.store(0, std::memory_order_relaxed);
+        }
     };
 
     struct ReturnState
     {
-        float level = 0.75f;
-        float pan   = 0.0f;
-        bool  mute  = false;
-        bool  solo  = false;
-        // Sidechain ducking (source = rhythm channel index, -1 = off)
-        int   sidechainSource   = -1;
-        float sidechainAmount   = 0.0f;
-        float sidechainAttackMs  =   5.0f;
-        float sidechainReleaseMs = 100.0f;
+        std::atomic<float> level { 0.75f };
+        std::atomic<float> pan   { 0.0f };
+        std::atomic<bool>  mute  { false };
+        std::atomic<bool>  solo  { false };
+        // Sidechain ducking (source = channel index, -1=off, kExtSidechainSrc=DAW bus)
+        std::atomic<int>   sidechainSource   { -1 };
+        std::atomic<float> sidechainAmount   { 0.0f };
+        std::atomic<float> sidechainAttackMs  { 5.0f };
+        std::atomic<float> sidechainReleaseMs { 100.0f };
     };
 
     std::array<ChannelState, MaxChannels> channels;
     std::array<ReturnState,  3>           returns;   // 0=effect, 1=delay, 2=reverb
-    float masterLevel = 1.0f;       // Issue #121: 0 dB default (was 0.75 = -2.5 dB)
-    float masterPan   = 0.0f;
+    std::atomic<float> masterLevel { 1.0f };   // 0 dB default
+    std::atomic<float> masterPan   { 0.0f };
 
     // Master insert effects — Insert 1 → Insert 2 → master output.
-    VoiceParams      masterInsertParams;
-    InsertProcessor  masterInsert;
-    VoiceParams      masterInsertParams2;
-    InsertProcessor  masterInsert2;
+    // Written by the message thread via syncMasterParam; read by the audio thread
+    // in processBlock. Each field is individually atomic so concurrent reads and
+    // writes never produce a torn value.
+    std::atomic<int>   masterInsert1Algo    { 0 };
+    std::atomic<float> masterInsert1Param[VoiceParams::kInsertSlotCount] {};
+    std::atomic<int>   masterInsert2Algo    { 0 };
+    std::atomic<float> masterInsert2Param[VoiceParams::kInsertSlotCount] {};
+    InsertProcessor    masterInsert;
+    InsertProcessor    masterInsert2;
 
     // Peak levels written from the audio thread, read by the UI at 30 Hz.
     std::atomic<float> channelPeaks[MaxChannels];
@@ -104,6 +157,19 @@ public:
     MixerEngine();
 
     void prepare(double sampleRate, int blockSize);
+
+    // UI helper: assemble a VoiceParams snapshot from the master-insert atomics.
+    // slot 0 = Insert 1, slot 1 = Insert 2. Called from the message thread.
+    VoiceParams getMasterInsertParams(int slot) const noexcept
+    {
+        VoiceParams vp;
+        const auto& algo   = (slot == 0) ? masterInsert1Algo   : masterInsert2Algo;
+        const auto* params = (slot == 0) ? masterInsert1Param  : masterInsert2Param;
+        vp.insertAlgo = algo.load(std::memory_order_relaxed);
+        for (int i = 0; i < VoiceParams::kInsertSlotCount; ++i)
+            vp.insertParam[i] = params[i].load(std::memory_order_relaxed);
+        return vp;
+    }
 
 
     // Clears output, accumulates per-channel audio with mixing applied, then runs fxChain.
@@ -121,6 +187,44 @@ public:
                       const RetiredVoices*        retired      = nullptr,
                       const RenderChannelFn*      renderChannel = nullptr);
 
+    // Swap two ChannelState entries in place. std::swap cannot be used because
+    // std::atomic<T> is not moveable; this does a field-by-field load/store swap.
+    // Called on the message thread during rhythm reorder; the audio thread is
+    // quiescent (suspendProcessing) at that point so no race.
+    void swapChannelState(int i, int j) noexcept
+    {
+        if (i == j) return;
+        auto& a = channels[(size_t)i];
+        auto& b = channels[(size_t)j];
+        auto swapF = [](std::atomic<float>& x, std::atomic<float>& y) noexcept {
+            const float t = x.load(std::memory_order_relaxed);
+            x.store(y.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            y.store(t, std::memory_order_relaxed);
+        };
+        auto swapB = [](std::atomic<bool>& x, std::atomic<bool>& y) noexcept {
+            const bool t = x.load(std::memory_order_relaxed);
+            x.store(y.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            y.store(t, std::memory_order_relaxed);
+        };
+        auto swapI = [](std::atomic<int>& x, std::atomic<int>& y) noexcept {
+            const int t = x.load(std::memory_order_relaxed);
+            x.store(y.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            y.store(t, std::memory_order_relaxed);
+        };
+        swapF(a.level,              b.level);
+        swapF(a.pan,                b.pan);
+        swapF(a.sendEffect,         b.sendEffect);
+        swapF(a.sendDelay,          b.sendDelay);
+        swapF(a.sendReverb,         b.sendReverb);
+        swapB(a.mute,               b.mute);
+        swapB(a.solo,               b.solo);
+        swapI(a.sidechainSource,    b.sidechainSource);
+        swapF(a.sidechainAmount,    b.sidechainAmount);
+        swapF(a.sidechainAttackMs,  b.sidechainAttackMs);
+        swapF(a.sidechainReleaseMs, b.sidechainReleaseMs);
+        swapI(a.outputBus,          b.outputBus);
+    }
+
     // Reset the sidechain envelope follower state for one channel slot. Called
     // by PluginProcessor::swapRhythms so the previous tenant's ducking envelope
     // does not bleed into the freshly arrived rhythm.
@@ -130,10 +234,23 @@ public:
             scEnv[channelIndex] = 0.0f;
     }
 
+    // Supply the DAW sidechain input bus pointers for the upcoming processBlock call.
+    // Call with (nullptr, nullptr) when the bus is inactive. Pointers must remain
+    // valid for the duration of processBlock — they are raw views into the host buffer.
+    void setExternalSidechain(const float* L, const float* R) noexcept
+    {
+        extScL = L;
+        extScR = (R != nullptr) ? R : L;   // mono sidechain: fold to both channels
+    }
+
 private:
     double sampleRate = 44100.0;
     float  scEnv[MaxChannels] {};     // per-channel sidechain envelope state
     float  scRetEnv[3] {};            // per-return sidechain envelope state
+
+    // External DAW sidechain bus — set by setExternalSidechain() before processBlock.
+    const float* extScL = nullptr;
+    const float* extScR = nullptr;
 
     juce::AudioBuffer<float> channelBufs[MaxChannels];
     juce::AudioBuffer<float> effectSendBuf, delaySendBuf, reverbSendBuf;

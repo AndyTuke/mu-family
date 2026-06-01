@@ -55,6 +55,12 @@ private:
     // 8 alias the same CompressorLimiterInsert instance.
     std::array<InsertAlgorithmBase*, kNumInsertAlgos> dispatch { };
 
+    // kNumInsertAlgos must equal the UI slot table size and the algorithm-names count.
+    // Caught here at compile time so adding an algorithm to one table without updating
+    // the others fails the build immediately.
+    static_assert(kNumInsertAlgos == mu_ui::kInsertAlgoCount,
+                  "InsertProcessor::kNumInsertAlgos != mu_ui::kInsertAlgoCount — update both");
+
     double currentSampleRate = 44100.0;
 
     // Post-drive tone filter — runs after the algorithm dispatch ONLY for
