@@ -42,6 +42,8 @@ struct VoiceConfig
     float filterCutoff    = 8000.0f;
     float filterRes       = 0.2f;
     float filterEnvDepth  = 1.0f;  // 0..1 how far the filter envelope sweeps the cutoff
+    float filterDrive     = 0.0f;  // 0..1 pre-filter valve saturation (0 = bypass)
+    float filterLowCutHz  = 0.0f;  // 0..1000 Hz 4-pole HPF post-filter (0 = bypass)
     float levelDb         = -6.0f; // slot output level (feeds the mixer channel)
 };
 

@@ -197,6 +197,12 @@ void ModulationMatrix::rebuildCache()
     const std::size_t needed = 8 + n + 4;
     if (workMap.bucket_count() < needed)
         workMap.reserve(needed + 16);
+
+    // Pre-insert every depth key so process() only overwrites, never inserts.
+    // Without this, the first process() call after addAssignment() would insert
+    // a new hash-map node on the audio thread — a one-time but RT-unsafe alloc.
+    for (std::size_t i = 0; i < n; ++i)
+        workMap.emplace(cachedDepthKeys[i], 0.0f);
 }
 
 void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,

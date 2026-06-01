@@ -265,12 +265,15 @@ public:
     // declared here as a forward stub equal to the Size 2 width literal so
     // dependent constants (kVoicePitchW = 5 * kVoiceUnitW etc.) work.
     static constexpr int kVoiceUnitW      = 54;   // = kKnobSize2W (Size 2 cell width)
+    // Filter sub-section uses narrower columns (6 cols × 50 = 300 px) to make
+    // room for the Drive knob while keeping pitch/amp/insert at the standard 54.
+    static constexpr int kVoiceFilterColW = 50;
     static constexpr int kVoiceLabelH     = 14;
     static constexpr int kVoiceSubH       = kVoiceInnerH - kVoiceLabelH;                       // 116
-    static constexpr int kVoicePitchW     = 5 * kVoiceUnitW;                                   // 275
-    static constexpr int kVoiceFilterW    = 5 * kVoiceUnitW;
-    static constexpr int kVoiceAmpW       = 5 * kVoiceUnitW;
-    static constexpr int kVoiceInsertW    = 4 * kVoiceUnitW;                                   // 220
+    static constexpr int kVoicePitchW     = 5 * kVoiceUnitW;                                   // 270
+    static constexpr int kVoiceFilterW    = 6 * kVoiceFilterColW;                              // 300 (6 cols)
+    static constexpr int kVoiceAmpW       = 5 * kVoiceUnitW;                                   // 270
+    static constexpr int kVoiceInsertW    = 4 * kVoiceUnitW;                                   // 216
 
     // Per-knob cell dimensions inside each voice sub-panel.
     static constexpr int kVoiceGap        = 4;

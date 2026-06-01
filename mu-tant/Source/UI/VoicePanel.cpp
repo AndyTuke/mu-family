@@ -128,7 +128,7 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PosKnob, &o1PenvDepthKnob,
                      &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PosKnob, &o2PenvDepthKnob,
                      &xmodKnob, &osc1LevelKnob, &osc2LevelKnob, &noiseLevelKnob,
-                     &fltCutKnob, &fltResKnob, &fltEnvDepthKnob })
+                     &fltDrvKnob, &fltCutKnob, &fltResKnob, &fltLoCutKnob, &fltEnvDepthKnob })
         addAndMakeVisible(k);
     addAndMakeVisible(levelKnob);
     levelKnob.setVisible(false);   // per-voice level removed from the panel; APVTS param kept
@@ -164,6 +164,17 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     // createParameterLayout) so the SliderAttachment can't clobber it. The
     // cutoff value reads as a bare number (Hz / kHz), so carry the unit in the
     // knob label, switching it as the value crosses 1 kHz — matching mu-clid.
+    fltDrvKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
+        return juce::String((int)std::round(v * 100.0));
+    };
+    fltLoCutKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
+        if (v <= 0.0) return "Off";
+        if (v < 1000.0) return juce::String((int)std::round(v));
+        return juce::String(v / 1000.0, 2);
+    };
+    fltLoCutKnob.onValueChanged = [this](double v) {
+        fltLoCutKnob.setLabel(v <= 0.0 ? "Low Cut" : (v < 1000.0 ? "Low Cut (Hz)" : "Low Cut (kHz)"));
+    };
     fltCutKnob.onValueChanged = [this](double v)
     {
         fltCutKnob.setLabel(v < 1000.0 ? "Cutoff (Hz)" : "Cutoff (kHz)");
@@ -256,8 +267,10 @@ void VoicePanel::rebindAttachments()
     xmodAttachment = nullptr; xmodModeAttachment = nullptr; syncAttachment = nullptr;
     osc1LevelAttachment  = nullptr; osc2LevelAttachment = nullptr;
     noiseLevelAttachment = nullptr; noiseTypeAttachment = nullptr;
-    fltCutAttachment       = nullptr;
-    fltResAttachment      = nullptr; fltEnvDepthAttachment = nullptr;
+    fltDrvAttachment      = nullptr;
+    fltCutAttachment      = nullptr;
+    fltResAttachment      = nullptr;
+    fltLoCutAttachment    = nullptr; fltEnvDepthAttachment = nullptr;
     levelAttachment       = nullptr;
     gapAttachment = nullptr; gateBypassAttachment = nullptr;
 
@@ -293,8 +306,10 @@ void VoicePanel::rebindAttachments()
                 fltParam->setValueNotifyingHost(fltParam->convertTo0to1((float)(itemId - 1)));
         };
     }
+    fltDrvAttachment      = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_drv"),       fltDrvKnob.getSlider());
     fltCutAttachment      = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_cut"),       fltCutKnob.getSlider());
     fltResAttachment      = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_res"),       fltResKnob.getSlider());
+    fltLoCutAttachment    = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_lo_cut"),    fltLoCutKnob.getSlider());
     fltEnvDepthAttachment = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_env_depth"), fltEnvDepthKnob.getSlider());
 
     levelAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("level"), levelKnob.getSlider());
@@ -517,8 +532,11 @@ void VoicePanel::resized()
             int x = filterX + filterTitleW;
             fltTypeLabel.setBounds(x, ctrlY, s(28), ddH);          x += s(28) + s(2);
             fltTypeDropdown.setBounds(x, ctrlY, s(88), ddH);       x += s(88) + gap;
+            // Audio flow order: Drive → Cutoff → Resonance → Low Cut → FEnv
+            fltDrvKnob.setBounds(x, knobY, s2W, s2H);              x += s2W + s(2);
             fltCutKnob.setBounds(x, knobY, s2W, s2H);              x += s2W + s(2);
             fltResKnob.setBounds(x, knobY, s2W, s2H);              x += s2W + s(2);
+            fltLoCutKnob.setBounds(x, knobY, s2W, s2H);            x += s2W + s(2);
             fltEnvDepthKnob.setBounds(x, knobY, s2W, s2H);
         }
 

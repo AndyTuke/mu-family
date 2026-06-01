@@ -87,16 +87,6 @@ void GateToolButton::paintButton(juce::Graphics& g, bool highlighted, bool)
             g.strokePath(p, juce::PathStrokeType(1.4f));
             break;
         }
-        case GateTool::Glue:
-        {
-            const float cx = b.getCentreX(), cy = b.getCentreY() + b.getHeight() * 0.12f;
-            const float rad = b.getWidth() * 0.32f;
-            g.fillEllipse(cx - rad, cy - rad, rad * 2.0f, rad * 2.0f);
-            juce::Path drop;
-            drop.addTriangle(cx, b.getY(), cx - rad * 0.7f, cy, cx + rad * 0.7f, cy);
-            g.fillPath(drop);
-            break;
-        }
         case GateTool::Reverse:
         {
             const float midY = b.getCentreY(), q = b.getHeight() * 0.22f;
@@ -143,7 +133,7 @@ GatingDesigner::GatingDesigner()
     gapSlider.setRange(0.0, 100.0, 1.0);
     gapSlider.setSliderStyle(juce::Slider::LinearHorizontal);
     gapSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 36, 16);
-    gapSlider.setTooltip("Gap: silence at the end of each envelope region (0–100 %)");
+    gapSlider.setTooltip("Gap: silence at the end of each envelope region (0-100 %)");
     gapSlider.onValueChange = [this] { setGap((float)(gapSlider.getValue() / 100.0)); };
     addAndMakeVisible(gapSlider);
 
@@ -162,12 +152,11 @@ GatingDesigner::GatingDesigner()
     addAndMakeVisible(subdivDropdown);
 
     // ── Toolbox ──────────────────────────────────────────────────────────────
-    arrowBtn  .setTooltip("Arrow — select an envelope to edit its properties");
-    pencilBtn .setTooltip("Pencil — draw; drag handles to reshape");
-    eraserBtn .setTooltip("Eraser — click to remove");
-    glueBtn   .setTooltip("Glue — drag to merge envelopes");
-    reverseBtn.setTooltip("Reverse — flip attack/decay");
-    for (auto* b : { &arrowBtn, &pencilBtn, &eraserBtn, &glueBtn, &reverseBtn })
+    arrowBtn  .setTooltip("Arrow - select an envelope to edit its properties");
+    pencilBtn .setTooltip("Pencil - draw; drag handles to reshape");
+    eraserBtn .setTooltip("Eraser - click to remove");
+    reverseBtn.setTooltip("Reverse - flip attack/decay");
+    for (auto* b : { &arrowBtn, &pencilBtn, &eraserBtn, &reverseBtn })
     {
         b->onClick = [this, b] { selectTool(b->tool()); };
         addAndMakeVisible(b);
@@ -179,7 +168,7 @@ GatingDesigner::GatingDesigner()
     probKnob.setValue(100.0, juce::dontSendNotification);
     probKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     probKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 14);
-    probKnob.setTooltip("Probability this envelope plays each loop (1–100 %)");
+    probKnob.setTooltip("Probability this envelope plays each loop (1-100 %)");
     probKnob.onValueChange = [this] { if (!propsUpdating) writePropsToSelection(); };
     addAndMakeVisible(probKnob);
     probLabel.setText("Prob", juce::dontSendNotification);
@@ -224,6 +213,7 @@ void GatingDesigner::selectTool(GateTool t)
     if (t != GateTool::Arrow) clearSelection();
     currentTool = t;
     setMouseCursor(juce::MouseCursor::NormalCursor);
+    markPathsDirty();   // handle visibility changes (pencil vs arrow vs eraser)
     repaint();
 }
 
@@ -240,6 +230,7 @@ void GatingDesigner::setLayer(GateLayer layer)
         subdivisionDenom = static_cast<int>(pat->subdivision);
         subdivDropdown.setSelectedId(idForDenom(subdivisionDenom), false);
     }
+    markPathsDirty();
     repaint();
 }
 
@@ -249,13 +240,16 @@ void GatingDesigner::setSubdivision(int denominator)
     subdivisionDenom = denominator;
     subdivDropdown.setSelectedId(idForDenom(denominator), false);
     if (auto* pat = getActivePattern())
-        pat->subdivision = static_cast<GatePattern::Subdivision>(denominator);
+        withLock(pat, [&] { pat->subdivision = static_cast<GatePattern::Subdivision>(denominator); });
+    markPathsDirty();
     repaint();
 }
 
 void GatingDesigner::setPattern(GatePattern* pattern)
 {
     boundPattern = pattern;
+    clearSelection();
+    markPathsDirty();
     if (pattern != nullptr && currentLayer == GateLayer::Gater)
     {
         subdivisionDenom = static_cast<int>(pattern->subdivision);
@@ -267,6 +261,8 @@ void GatingDesigner::setPattern(GatePattern* pattern)
 void GatingDesigner::setFilterPattern(GatePattern* pattern)
 {
     filterPattern = pattern;
+    clearSelection();
+    markPathsDirty();
     if (pattern != nullptr && currentLayer == GateLayer::Filter)
     {
         subdivisionDenom = static_cast<int>(pattern->subdivision);
@@ -278,6 +274,8 @@ void GatingDesigner::setFilterPattern(GatePattern* pattern)
 void GatingDesigner::setPitchPattern(GatePattern* pattern)
 {
     pitchPattern = pattern;
+    clearSelection();
+    markPathsDirty();
     if (pattern != nullptr && currentLayer == GateLayer::Pitch)
     {
         subdivisionDenom = static_cast<int>(pattern->subdivision);
@@ -291,6 +289,7 @@ void GatingDesigner::setGap(float gap01)
     gap01 = juce::jlimit(0.0f, 1.0f, gap01);
     if (std::abs(gap01 - gapValue) < 1e-4f) return;
     gapValue = gap01;
+    markPathsDirty();
     repaint();
 }
 
@@ -358,6 +357,15 @@ GatingDesigner::HandleHit GatingDesigner::hitTestHandles(juce::Point<float> p, G
     if (pat == nullptr) return {};
     const float r = sf(kHandleRadius);
     const auto& envs = pat->envelopes;
+    // Start/end grab handles tested first so they take priority over body drags.
+    for (int i = 0; i < (int)envs.size(); ++i)
+    {
+        const auto L = layoutFor(envs[(size_t)i]);
+        const auto startPt = juce::Point<float>(L.x0,           L.bot);
+        const auto endPt   = juce::Point<float>(L.x0 + L.wpx,  L.bot);
+        if (p.getDistanceFrom(startPt) <= r) return { i, Handle::StartGrab };
+        if (p.getDistanceFrom(endPt)   <= r) return { i, Handle::EndGrab };
+    }
     for (int i = 0; i < (int)envs.size(); ++i)
     {
         const auto L = layoutFor(envs[(size_t)i]);
@@ -390,6 +398,40 @@ void GatingDesigner::withLock(GatePattern* pat, Fn&& fn)
         std::this_thread::yield();
     }
     // Contention too long — skip this frame rather than stall the message thread.
+}
+
+// ── Path cache ────────────────────────────────────────────────────────────────
+void GatingDesigner::rebuildPathCache()
+{
+    auto buildPaths = [&](GatePattern* pat, std::vector<juce::Path>& cache)
+    {
+        cache.clear();
+        if (pat == nullptr) return;
+        withLock(pat, [&]
+        {
+            const float gap = (pat == boundPattern) ? juce::jlimit(0.0f, 1.0f, gapValue) : 0.0f;
+            cache.resize(pat->envelopes.size());
+            for (std::size_t ei = 0; ei < pat->envelopes.size(); ++ei)
+            {
+                const auto& env = pat->envelopes[ei];
+                const auto L = layoutFor(env);
+                juce::Path& p = cache[ei];
+                if (L.wpx <= 0.0f) continue;
+                p.startNewSubPath(L.x0, L.bot);
+                const int steps = juce::jmax(2, (int)L.wpx);
+                for (int sx = 0; sx <= steps; ++sx)
+                {
+                    const float ph = (float)sx / (float)steps;
+                    p.lineTo(L.x0 + L.wpx * ph, L.bot - L.h * env.value(ph, gap));
+                }
+                p.lineTo(L.x0 + L.wpx, L.bot);
+                p.closeSubPath();
+            }
+        });
+    };
+    buildPaths(getActivePattern(), activePathCache);
+    buildPaths(getGhostPattern(),  ghostPathCache);
+    pathsDirty = false;
 }
 
 // ── Selection ─────────────────────────────────────────────────────────────────
@@ -473,17 +515,29 @@ void GatingDesigner::mouseDown(const juce::MouseEvent& e)
     switch (currentTool)
     {
         case GateTool::Arrow:
-        {
-            int found = -1;
-            const auto& envs = pat->envelopes;
-            for (int i = 0; i < (int)envs.size(); ++i)
-                if (envs[(size_t)i].covers(cell)) { found = i; break; }
-            selectEnvelope(found);
-            break;
-        }
         case GateTool::Pencil:
         {
             const auto hit = hitTestHandles(e.position, pat);
+            if (hit.handle == Handle::StartGrab || hit.handle == Handle::EndGrab)
+            {
+                dragEnvIndex    = hit.envIndex;
+                const auto& env = pat->envelopes[(size_t)hit.envIndex];
+                dragOriginalEnd = env.startCell + env.lengthCells - 1;
+                dragKind = (hit.handle == Handle::StartGrab) ? DragKind::StartEdge : DragKind::EndEdge;
+                setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
+                return;
+            }
+            if (currentTool == GateTool::Arrow)
+            {
+                // Arrow body-click: select the envelope under the cursor.
+                int found = -1;
+                const auto& envs = pat->envelopes;
+                for (int i = 0; i < (int)envs.size(); ++i)
+                    if (envs[(size_t)i].covers(cell)) { found = i; break; }
+                selectEnvelope(found);
+                break;
+            }
+            // Pencil: check pencil-specific shape handles then draw.
             if (hit.handle != Handle::None)
             {
                 dragEnvIndex = hit.envIndex;
@@ -496,20 +550,18 @@ void GatingDesigner::mouseDown(const juce::MouseEvent& e)
                 return;
             }
             withLock(pat, [&] { GateEnvelope env; env.startCell = cell; env.lengthCells = 1; pat->addEnvelope(env); });
+            markPathsDirty();
             repaint();
             break;
         }
         case GateTool::Eraser:
             withLock(pat, [&] { pat->removeEnvelopeCovering(cell); });
-            repaint();
-            break;
-        case GateTool::Glue:
-            dragKind = DragKind::GlueRange;
-            glueFirstCell = glueLastCell = cell;
+            markPathsDirty();
             repaint();
             break;
         case GateTool::Reverse:
             withLock(pat, [&] { for (auto& env : pat->envelopes) if (env.covers(cell)) { env.reverse = !env.reverse; break; } });
+            markPathsDirty();
             repaint();
             break;
     }
@@ -529,6 +581,7 @@ void GatingDesigner::mouseDrag(const juce::MouseEvent& e)
             const auto L    = layoutFor(pat->envelopes[(size_t)dragEnvIndex]);
             const float pf  = juce::jlimit(0.0f, 1.0f, (e.position.x - L.x0) / juce::jmax(1.0f, L.activeW));
             withLock(pat, [&] { auto& env = pat->envelopes[(size_t)dragEnvIndex]; env.split = env.reverse ? (1.0f - pf) : pf; });
+            markPathsDirty();
             repaint();
             break;
         }
@@ -543,13 +596,33 @@ void GatingDesigner::mouseDrag(const juce::MouseEvent& e)
                 if (dragKind == DragKind::RiseBend) (env.reverse ? env.decayBend  : env.attackBend) = nb;
                 else                                (env.reverse ? env.attackBend : env.decayBend)  = nb;
             });
+            markPathsDirty();
             repaint();
             break;
         }
-        case DragKind::GlueRange:
+        case DragKind::StartEdge:
         {
-            const int c = cellAtX(e.position.x);
-            if (c >= 0) { glueLastCell = c; repaint(); }
+            if (dragEnvIndex < 0 || dragEnvIndex >= envCount) return;
+            const int newStart = juce::jlimit(0, dragOriginalEnd, cellAtX(e.position.x));
+            withLock(pat, [&] {
+                auto& env = pat->envelopes[(size_t)dragEnvIndex];
+                env.startCell   = newStart;
+                env.lengthCells = juce::jmax(1, dragOriginalEnd - newStart + 1);
+            });
+            markPathsDirty();
+            repaint();
+            break;
+        }
+        case DragKind::EndEdge:
+        {
+            if (dragEnvIndex < 0 || dragEnvIndex >= envCount) return;
+            const int curStart = pat->envelopes[(size_t)dragEnvIndex].startCell;
+            const int newEnd   = juce::jmax(curStart, cellAtX(e.position.x));
+            withLock(pat, [&] {
+                pat->envelopes[(size_t)dragEnvIndex].lengthCells = newEnd - curStart + 1;
+            });
+            markPathsDirty();
+            repaint();
             break;
         }
         case DragKind::None: break;
@@ -558,27 +631,36 @@ void GatingDesigner::mouseDrag(const juce::MouseEvent& e)
 
 void GatingDesigner::mouseUp(const juce::MouseEvent& e)
 {
-    auto* pat = getActivePattern();
-    if (pat != nullptr && dragKind == DragKind::GlueRange && glueFirstCell >= 0 && glueLastCell >= 0)
-    {
-        withLock(pat, [&] { pat->mergeRange(glueFirstCell, glueLastCell); });
-        repaint();
-    }
-    dragKind = DragKind::None;
-    dragEnvIndex = -1;
-    glueFirstCell = glueLastCell = -1;
+    const bool wasDragging = (dragKind != DragKind::None);
+    dragKind        = DragKind::None;
+    dragEnvIndex    = -1;
+    dragOriginalEnd = -1;
+    if (wasDragging) markPathsDirty();
 
-    const bool over = pat != nullptr && currentTool == GateTool::Pencil
-                   && hitTestHandles(e.position, pat).handle != Handle::None;
-    setMouseCursor(over ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+    auto* pat = getActivePattern();
+    const bool overHandle = pat != nullptr
+                         && hitTestHandles(e.position, pat).handle != Handle::None;
+    const bool isEdge = overHandle && (hitTestHandles(e.position, pat).handle == Handle::StartGrab
+                                    || hitTestHandles(e.position, pat).handle == Handle::EndGrab);
+    if (isEdge)
+        setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
+    else if (overHandle && currentTool == GateTool::Pencil)
+        setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    else
+        setMouseCursor(juce::MouseCursor::NormalCursor);
 }
 
 void GatingDesigner::mouseMove(const juce::MouseEvent& e)
 {
     auto* pat = getActivePattern();
-    const bool over = pat != nullptr && currentTool == GateTool::Pencil
-                   && hitTestHandles(e.position, pat).handle != Handle::None;
-    setMouseCursor(over ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+    if (pat == nullptr) { setMouseCursor(juce::MouseCursor::NormalCursor); return; }
+    const auto hit = hitTestHandles(e.position, pat);
+    if (hit.handle == Handle::StartGrab || hit.handle == Handle::EndGrab)
+        setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
+    else if (hit.handle != Handle::None && currentTool == GateTool::Pencil)
+        setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    else
+        setMouseCursor(juce::MouseCursor::NormalCursor);
 }
 
 void GatingDesigner::mouseExit(const juce::MouseEvent&)
@@ -629,68 +711,63 @@ void GatingDesigner::paint(juce::Graphics& g)
         }
     }
 
-    // Glue drag highlight.
-    if (dragKind == DragKind::GlueRange && glueFirstCell >= 0 && glueLastCell >= 0 && cells > 0)
-    {
-        const float cellW = gateRect.getWidth() / (float)cells;
-        const int lo = juce::jmin(glueFirstCell, glueLastCell);
-        const int hi = juce::jmax(glueFirstCell, glueLastCell);
-        g.setColour(activeLayerColour().withAlpha(0.18f));
-        g.fillRect(gateRect.getX() + cellW * (float)lo, gateRect.getY(), cellW * (float)(hi - lo + 1), gateRect.getHeight());
-    }
+    // Draw envelopes from cached paths; rebuild the cache if stale.
+    if (pathsDirty) rebuildPathCache();
 
-    // Draw envelopes.
-    auto drawEnvs = [&](GatePattern* pat, juce::Colour col, float alpha, bool showHandles)
+    auto drawEnvPaths = [&](GatePattern* pat, const std::vector<juce::Path>& paths,
+                             juce::Colour col, float alpha, bool showHandles)
     {
-        if (pat == nullptr || pat->envelopes.empty()) return;
-        const float gap  = (pat == boundPattern) ? juce::jlimit(0.0f, 1.0f, gapValue) : 0.0f;
-        const auto  fill = col.withAlpha(alpha * 0.5f);
-        const auto  edge = col.withAlpha(alpha);
+        if (pat == nullptr || paths.empty()) return;
+        const auto fill = col.withAlpha(alpha * 0.5f);
+        const auto edge = col.withAlpha(alpha);
         const auto& envs = pat->envelopes;
-        for (int ei = 0; ei < (int)envs.size(); ++ei)
+        const int  n    = juce::jmin((int)paths.size(), (int)envs.size());
+        for (int ei = 0; ei < n; ++ei)
         {
-            const auto& env = envs[(size_t)ei];
-            const auto L = layoutFor(env);
-            if (L.wpx <= 0.0f) continue;
-            juce::Path p;
-            p.startNewSubPath(L.x0, L.bot);
-            const int steps = juce::jmax(2, (int)L.wpx);
-            for (int sx = 0; sx <= steps; ++sx)
-            {
-                const float ph = (float)sx / (float)steps;
-                p.lineTo(L.x0 + L.wpx * ph, L.bot - L.h * env.value(ph, gap));
-            }
-            p.lineTo(L.x0 + L.wpx, L.bot);
-            p.closeSubPath();
+            const auto& p = paths[(size_t)ei];
+            if (p.isEmpty()) continue;
             g.setColour(fill); g.fillPath(p);
             g.setColour(edge); g.strokePath(p, juce::PathStrokeType(1.0f));
 
-            // Selection border.
+            // Selection border (Arrow tool).
             if (showHandles && currentTool == GateTool::Arrow && ei == selEnvIndex)
             {
+                const auto L = layoutFor(envs[(size_t)ei]);
                 g.setColour(col.brighter(0.4f).withAlpha(alpha));
                 g.drawRoundedRectangle(L.x0, L.top, L.wpx, L.h, 2.0f, 1.5f);
             }
         }
-        if (showHandles && currentTool == GateTool::Pencil)
+        if (showHandles)
         {
             const float r = sf(kHandleRadius);
-            for (const auto& env : envs)
+            for (int ei = 0; ei < n; ++ei)
             {
-                const auto L = layoutFor(env);
+                const auto L = layoutFor(envs[(size_t)ei]);
                 if (L.wpx <= 0.0f) continue;
-                g.setColour(col.brighter(0.3f).withAlpha(alpha));
-                for (auto pt : { L.riseMid, L.fallMid })
-                    g.fillEllipse(pt.x - r * 0.7f, pt.y - r * 0.7f, r * 1.4f, r * 1.4f);
-                g.setColour(MuLookAndFeel::colour(Id::textBright).withAlpha(alpha));
-                g.fillEllipse(L.peak.x - r, L.peak.y - r, r * 2.0f, r * 2.0f);
-                g.setColour(MuLookAndFeel::colour(Id::panelBackground));
-                g.drawEllipse(L.peak.x - r, L.peak.y - r, r * 2.0f, r * 2.0f, 1.0f);
+
+                // Start/end grab handles (bottom-left / bottom-right corners).
+                const auto startPt = juce::Point<float>(L.x0,          L.bot);
+                const auto endPt   = juce::Point<float>(L.x0 + L.wpx, L.bot);
+                g.setColour(col.withAlpha(alpha));
+                g.fillRect(juce::Rectangle<float>(startPt.x - r * 0.6f, startPt.y - r * 0.6f, r * 1.2f, r * 1.2f));
+                g.fillRect(juce::Rectangle<float>(endPt  .x - r * 0.6f, endPt  .y - r * 0.6f, r * 1.2f, r * 1.2f));
+
+                // Pencil shape handles (peak + bend midpoints).
+                if (currentTool == GateTool::Pencil)
+                {
+                    g.setColour(col.brighter(0.3f).withAlpha(alpha));
+                    for (auto pt : { L.riseMid, L.fallMid })
+                        g.fillEllipse(pt.x - r * 0.7f, pt.y - r * 0.7f, r * 1.4f, r * 1.4f);
+                    g.setColour(MuLookAndFeel::colour(Id::textBright).withAlpha(alpha));
+                    g.fillEllipse(L.peak.x - r, L.peak.y - r, r * 2.0f, r * 2.0f);
+                    g.setColour(MuLookAndFeel::colour(Id::panelBackground));
+                    g.drawEllipse(L.peak.x - r, L.peak.y - r, r * 2.0f, r * 2.0f, 1.0f);
+                }
             }
         }
     };
-    drawEnvs(getGhostPattern(),  ghostLayerColour(), 0.18f, false);
-    drawEnvs(getActivePattern(), activeLayerColour(), 1.0f, true);
+    drawEnvPaths(getGhostPattern(),  ghostPathCache,  ghostLayerColour(), 0.18f, false);
+    drawEnvPaths(getActivePattern(), activePathCache, activeLayerColour(), 1.0f, true);
 
     // Bar number markers.
     if (cells > 0)
@@ -758,6 +835,7 @@ void GatingDesigner::setPlayhead(double beat01, bool visible)
 // ── Resized ───────────────────────────────────────────────────────────────────
 void GatingDesigner::resized()
 {
+    markPathsDirty();
     using mu_ui::s;
     using mu_ui::sf;
     const int w = getWidth();
@@ -779,7 +857,7 @@ void GatingDesigner::resized()
     pitchLayerBtn .setBounds(s(kHdrInset) + 2 * layerBtnW + s(4), toolY, s(40), toolW);
 
     int tx = s(kHdrInset) + 2 * layerBtnW + s(4) + s(40) + s(4);
-    for (auto* b : { &arrowBtn, &pencilBtn, &eraserBtn, &glueBtn, &reverseBtn })
+    for (auto* b : { &arrowBtn, &pencilBtn, &eraserBtn, &reverseBtn })
     {
         b->setBounds(tx, toolY, toolW, toolW);
         tx += toolW + toolGap;

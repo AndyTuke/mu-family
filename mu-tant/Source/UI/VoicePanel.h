@@ -115,11 +115,15 @@ private:
     // ── Filter ──────────────────────────────────────────────────────────────
     juce::Label    fltTypeLabel;
     DropdownSelect fltTypeDropdown;
+    KnobWithLabel  fltDrvKnob      { "Drive",     MuLookAndFeel::knobPostPad };
     KnobWithLabel  fltCutKnob      { "Cutoff",    MuLookAndFeel::knobPostPad };
     KnobWithLabel  fltResKnob      { "Resonance", MuLookAndFeel::knobPostPad };
+    KnobWithLabel  fltLoCutKnob    { "Low Cut",   MuLookAndFeel::knobPostPad };
     KnobWithLabel  fltEnvDepthKnob { "FEnv",      MuLookAndFeel::knobPostPad };
+    std::unique_ptr<APVTS::SliderAttachment>   fltDrvAttachment;
     std::unique_ptr<APVTS::SliderAttachment>   fltCutAttachment;
     std::unique_ptr<APVTS::SliderAttachment>   fltResAttachment;
+    std::unique_ptr<APVTS::SliderAttachment>   fltLoCutAttachment;
     std::unique_ptr<APVTS::SliderAttachment>   fltEnvDepthAttachment;
 
     // ── Output level ────────────────────────────────────────────────────────

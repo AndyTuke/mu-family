@@ -143,6 +143,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
                     if (v < 1000.0f)   return juce::String((int)std::round(v)) + " Hz";
                     return juce::String(v / 1000.0f, 2) + " kHz";
                 })));
+        // Pre-filter valve saturation depth. 0 = bypass, 1 = full warmth.
+        addF(p+"fltDrv", n+"Filter Drive", 0.0f, 1.0f, 0.0f);
         // Amp — level stored in dB (-60..+6), engine converts to gain at read.
         // Default 0 dB = unity gain.
         addF(p+"ampLvl",  n+"Amp Level", -60.0f,   6.0f,  0.0f);

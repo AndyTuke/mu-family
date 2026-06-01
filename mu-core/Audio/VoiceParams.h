@@ -25,6 +25,7 @@ struct VoiceParams
     float filterEnvRel   = 0.3f;
     float filterEnvDepth = 0.0f;     // semitones of cutoff sweep, 0..48
     float filterLowCutHz = 0.0f;     // 0..1000 Hz, 4-pole HPF inline with the voice filter chain — 0 = bypass
+    float filterDrive    = 0.0f;     // 0..1 pre-filter valve saturation (0 = bypass)
 
     // ─── Amp ─────────────────────────────────────────────────────────────
     // Stored in dB, -60..+6. VoiceEngine converts to linear gain at the

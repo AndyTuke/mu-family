@@ -2,6 +2,7 @@
 
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "Audio/Filters/FilterAlgorithmBase.h"
+#include "Audio/Filters/Hp24Filter.h"
 
 #include <array>
 #include <memory>
@@ -51,6 +52,10 @@ public:
     void setType(int typeCode) noexcept     { typeCodeValue = juce::jlimit(0, kNumFilterAlgos - 1, typeCode); }
     void setCutoff(float hz) noexcept       { cutoffHz = hz; }
     void setResonance(float r) noexcept     { resonance = r; }
+    // Pre-filter valve saturation depth (0 = bypass, 1 = full warmth).
+    void setDrive(float d) noexcept         { smoothedDrive.setTargetValue(juce::jlimit(0.0f, 1.0f, d)); }
+    // Post-filter 4-pole high-pass cutoff in Hz (0 = bypass).
+    void setLowCut(float hz) noexcept       { smoothedLowCutHz.setTargetValue(juce::jmax(0.0f, hz)); }
 
     // Apply the configured filter in-place to the buffer (first numChannels
     // channels, numSamples samples). Allocation-free.
@@ -60,6 +65,10 @@ private:
     int    typeCodeValue = 0;
     float  cutoffHz      = 1000.0f;
     float  resonance     = 0.1f;
+
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedDrive;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedLowCutHz;
+    Hp24Filter lowCutFilter;
 
     std::array<std::unique_ptr<FilterAlgorithmBase>, kNumFilterAlgos> algorithms;
 

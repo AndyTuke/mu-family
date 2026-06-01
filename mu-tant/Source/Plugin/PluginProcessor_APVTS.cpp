@@ -85,6 +85,17 @@ namespace
                     AudioParameterFloatAttributes().withStringFromValueFunction(cutoffText)));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_res"), 1},  label("Resonance"), f(0.0f, 0.99f, 0.001f), 0.2f,
                     AudioParameterFloatAttributes().withStringFromValueFunction(resText)));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_drv"), 1}, label("Filter Drive"), f(0.0f, 1.0f, 0.01f), 0.0f,
+                    AudioParameterFloatAttributes().withStringFromValueFunction(
+                        [](float v, int) -> juce::String { return juce::String((int)std::round(v * 100.0f)); })));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_lo_cut"), 1}, label("Low Cut"),
+                    juce::NormalisableRange<float>(0.0f, 1000.0f, 0.0f, 0.35f), 0.0f,
+                    AudioParameterFloatAttributes().withStringFromValueFunction(
+                        [](float v, int) -> juce::String {
+                            if (v <= 0.0f)   return "Off";
+                            if (v < 1000.0f) return juce::String((int)std::round(v)) + " Hz";
+                            return juce::String(v / 1000.0f, 2) + " kHz";
+                        })));
 
         // Filter envelope depth — scales how far the filter envelope sweeps from the
         // base cutoff. +1 = full close-to-open sweep; 0 = no effect; -1 = inverted.

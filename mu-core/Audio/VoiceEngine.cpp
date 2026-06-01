@@ -28,11 +28,6 @@ void VoiceEngine::prepareToPlay(double sampleRate, int blockSize)
     pitchEnv.setSampleRate(sampleRate);
 
     voiceFilter.prepare(sampleRate, blockSize, 2);
-    lowCutFilter.prepare(sampleRate, blockSize, 2);
-    // Smooth the low-cut frequency so sweeps through the audible range produce
-    // a glide rather than a per-block coefficient step.
-    smoothedLowCutHz.reset(sampleRate, 0.015);
-    smoothedLowCutHz.setCurrentAndTargetValue(activeParams.filterLowCutHz);
 
     // per-sample pitch ratio buffer + 5 ms ramp on pitchMod.
     // Pre-fill ratios with playbackRatio so SamplePlayer always receives a
@@ -209,16 +204,10 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
                     * std::pow(2.0f, filterEnvVal * activeParams.filterEnvDepth / 12.0f);
     modCutoff = juce::jlimit(20.0f, 20000.0f, modCutoff);
 
+    voiceFilter.setDrive(activeParams.filterDrive);
+    voiceFilter.setLowCut(activeParams.filterLowCutHz);
     voiceFilter.setCutoff(modCutoff);
     voiceFilter.process(tempBuffer, ns, nCh);
-
-    // 4-pole high-pass cleanup after the main filter. Bypassed (no DSP work)
-    // when the user knob is at 0; otherwise smoothed toward the target so a
-    // sweep glides instead of stepping per block.
-    smoothedLowCutHz.setTargetValue(activeParams.filterLowCutHz);
-    const float lowCutHz = smoothedLowCutHz.skip(ns);
-    if (lowCutHz > 0.5f)
-        lowCutFilter.process(tempBuffer, ns, nCh, lowCutHz, 0.0f);
 
     // Apply ampEnv to the post-filter signal BEFORE insert. Filter ringing
     // is gated; insert receives env-shaped input but feedback-based inserts

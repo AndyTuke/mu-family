@@ -9,7 +9,7 @@
 namespace mu_tant
 {
 
-enum class GateTool  { Arrow, Pencil, Eraser, Glue, Reverse };
+enum class GateTool  { Arrow, Pencil, Eraser, Reverse };
 enum class GateLayer { Gater, Filter, Pitch };
 
 class GateToolButton : public juce::Button
@@ -80,7 +80,6 @@ private:
     GateToolButton arrowBtn   { GateTool::Arrow };
     GateToolButton pencilBtn  { GateTool::Pencil };
     GateToolButton eraserBtn  { GateTool::Eraser };
-    GateToolButton glueBtn    { GateTool::Glue };
     GateToolButton reverseBtn { GateTool::Reverse };
     GateTool       currentTool = GateTool::Pencil;
     void selectTool(GateTool t);
@@ -148,17 +147,23 @@ private:
     };
     EnvLayout layoutFor(const GateEnvelope& e) const noexcept;
 
-    enum class Handle { None, Split, RiseBend, FallBend };
+    enum class Handle { None, Split, RiseBend, FallBend, StartGrab, EndGrab };
     struct HandleHit { int envIndex = -1; Handle handle = Handle::None; };
     HandleHit hitTestHandles(juce::Point<float> p, GatePattern* pat) const noexcept;
 
-    enum class DragKind { None, Split, RiseBend, FallBend, GlueRange };
-    DragKind dragKind      = DragKind::None;
-    int      dragEnvIndex  = -1;
-    float    dragStartBend = 0.0f;
-    float    dragStartY    = 0.0f;
-    int      glueFirstCell = -1;
-    int      glueLastCell  = -1;
+    enum class DragKind { None, Split, RiseBend, FallBend, StartEdge, EndEdge };
+    DragKind dragKind        = DragKind::None;
+    int      dragEnvIndex    = -1;
+    float    dragStartBend   = 0.0f;
+    float    dragStartY      = 0.0f;
+    int      dragOriginalEnd = -1;   // for StartEdge drag — keeps right edge fixed
+
+    // ── Path cache (#801) ────────────────────────────────────────────────────
+    std::vector<juce::Path> activePathCache;
+    std::vector<juce::Path> ghostPathCache;
+    bool pathsDirty = true;
+    void markPathsDirty() noexcept { pathsDirty = true; }
+    void rebuildPathCache();
 
     template <typename Fn> void withLock(GatePattern* pat, Fn&& fn);
 

@@ -6,7 +6,6 @@
 #include "VoiceParams.h"
 #include "MultiModeFilter.h"
 #include "InsertProcessor.h"
-#include "Filters/Hp24Filter.h"
 #include "MuLimits.h"
 
 #include <array>
@@ -103,9 +102,7 @@ private:
     juce::ADSR  ampEnv;
     juce::ADSR  filterEnv;
     juce::ADSR  pitchEnv;
-    MultiModeFilter voiceFilter;             // owns SVF / Ladder / 1-pole / biquad / comb state
-    Hp24Filter      lowCutFilter;            // 4-pole HPF inline with voiceFilter — bypassed when cutoff <= 0
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> smoothedLowCutHz;
+    MultiModeFilter voiceFilter;             // drive + main filter + lo-cut, all owned here
     juce::AudioBuffer<float> tempBuffer;     // voice sum → filter → insert → env-gate → output
 
 public:

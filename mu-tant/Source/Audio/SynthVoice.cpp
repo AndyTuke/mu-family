@@ -47,6 +47,8 @@ void VoiceEngine::setConfig(const VoiceConfig& c)
     filter.setType(cfg.filterType);
     filter.setCutoff(cfg.filterCutoff);
     filter.setResonance(cfg.filterRes);
+    filter.setDrive(cfg.filterDrive);
+    filter.setLowCut(cfg.filterLowCutHz);
 
     gain      = juce::Decibels::decibelsToGain(cfg.levelDb,      -60.0f);
     osc1Gain  = juce::Decibels::decibelsToGain(cfg.osc1LevelDb,  -60.0f);
@@ -89,7 +91,7 @@ void VoiceEngine::process(juce::AudioBuffer<float>& out, int numSamples)
         m[i] = (a * osc1Gain + b * osc2Gain + n * noiseGain) * gain;
     }
 
-    // Filter (mu-core) in place on the mono work buffer.
+    // Filter (mu-core) in place on the mono work buffer — drive + main filter + lo-cut all inside.
     filter.process(mono, ns, 1);
 
     // [gate stub] — drawable-gate pattern multiply goes here (design-sequencer.md).

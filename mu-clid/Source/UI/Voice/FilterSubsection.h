@@ -38,6 +38,7 @@ private:
     KnobWithLabel  filterRel    { "Release (ms)", Id::knobPostPad };
     KnobWithLabel  filterDepth  { "Depth",     Id::knobPostPad };
     KnobWithLabel  filterLowCut { "Low Cut",   Id::knobPostPad };
+    KnobWithLabel  filterDrive  { "Drive",     Id::knobPostPad };
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();

@@ -81,7 +81,7 @@ cmake --build build --target mu-tant-tests --config Debug && build/mu-tant/mu-ta
 | Gate envelope playback rules (probability, loopMask/loopM) | `GatePatternTests.cpp` |
 | Gate pattern editing (addEnvelope, removeEnvelope, mergeRange) | `GatePatternTests.cpp` |
 | Block-level gater (bypass/stopped/playing states) | `GateStageTests.cpp` |
-| Gate editor interactions (pencil, eraser, glue, reverse tools) | `GatingDesignerTests.cpp` |
+| Gate editor interactions (pencil, eraser, reverse tools; mergeRange data model) | `GatingDesignerTests.cpp` |
 | Modulator (ControlSequence + ModulationMatrix) | `ModulatorTests.cpp` |
 | Insert stage DSP smoke (None passthrough, SoftClip) | `InsertStageTests.cpp` |
 | Scales table correctness | `ScalesTests.cpp` |
@@ -89,8 +89,9 @@ cmake --build build --target mu-tant-tests --config Debug && build/mu-tant/mu-ta
 | Modulator + gate persistence round-trip | `MuTantPersistTests.cpp` |
 | APVTS layout sanity (every `v{N}_*` / `ch{N}_*` param) | `ApvtsLayoutTests.cpp` |
 | Send-FX DSP smoke | `SendFXSmokeTests.cpp` |
+| Preset serialisation round-trip (envelopes, filter/pitch gate, copyDataFrom) | `PresetRoundTripTests.cpp` |
 
-**Current status:** ~96 tests pass at v1.0.708 (count grows with each new feature batch).
+**Current status:** 112/112 tests pass at v1.0.723.
 
 ---
 

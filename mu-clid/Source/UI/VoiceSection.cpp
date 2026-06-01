@@ -82,17 +82,25 @@ void VoiceSection::refreshSuffix(const juce::String& suffix)
 void VoiceSection::resized()
 {
     // Fixed Medium-baseline layout, wrapped in s() so the whole grid scales.
+    // Pitch / Amp / Insert use the standard 54-px column (kVoiceUnitW).
+    // Filter gets 6 narrower 50-px columns (kVoiceFilterColW) for the Drive knob.
+    // Total: 5×54 + 6×50 + 5×54 + 4×54 + 3×6 = 1074 px (= available width exactly).
     using LF = MuLookAndFeel;
     using mu_ui::s;
     constexpr int divW   = LF::kVoiceDivW;
     constexpr int labelH = LF::kVoiceLabelH;
-    constexpr int kW     = LF::kVoiceUnitW;
+    constexpr int kW     = LF::kVoiceUnitW;       // 54 — pitch / amp / insert columns
+    constexpr int kFltW  = LF::kVoiceFilterColW;  // 50 — filter columns (6 of them)
     constexpr int subH   = LF::kVoiceSubH;
 
-    pitchSub .setBounds(0,                       s(labelH), s(5 * kW), s(subH));
-    filterSub.setBounds(s(5 * kW + divW),        s(labelH), s(5 * kW), s(subH));
-    ampSub   .setBounds(s(10 * kW + 2 * divW),   s(labelH), s(5 * kW), s(subH));
-    insertSub.setBounds(s(15 * kW + 3 * divW),   s(labelH), s(4 * kW), s(subH));
+    constexpr int fltX  = 5 * kW + divW;                      // 276
+    constexpr int ampX  = fltX + 6 * kFltW + divW;            // 582
+    constexpr int insX  = ampX + 5 * kW + divW;               // 858
+
+    pitchSub .setBounds(0,          s(labelH), s(5 * kW),    s(subH));
+    filterSub.setBounds(s(fltX),    s(labelH), s(6 * kFltW), s(subH));
+    ampSub   .setBounds(s(ampX),    s(labelH), s(5 * kW),    s(subH));
+    insertSub.setBounds(s(insX),    s(labelH), s(4 * kW),    s(subH));
 }
 
 void VoiceSection::paint(juce::Graphics& g)
@@ -105,20 +113,24 @@ void VoiceSection::paint(juce::Graphics& g)
     constexpr int divW   = LF::kVoiceDivW;
     constexpr int labelH = LF::kVoiceLabelH;
     constexpr int kW     = LF::kVoiceUnitW;
+    constexpr int kFltW  = LF::kVoiceFilterColW;
 
     g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     const float kDivInset = mu_ui::sf(7.0f);
+    constexpr int fltX = 5 * kW + divW;
+    constexpr int ampX = fltX + 6 * kFltW + divW;
+    constexpr int insX = ampX + 5 * kW + divW;
     const float div1X = static_cast<float>(s(5 * kW) + s(divW) / 2);
-    const float div2X = static_cast<float>(s(10 * kW + divW) + s(divW) / 2);
-    const float div3X = static_cast<float>(s(15 * kW + 2 * divW) + s(divW) / 2);
+    const float div2X = static_cast<float>(s(fltX + 6 * kFltW) + s(divW) / 2);
+    const float div3X = static_cast<float>(s(ampX + 5 * kW) + s(divW) / 2);
     g.drawLine(div1X, kDivInset, div1X, (float)h - kDivInset, 0.5f);
     g.drawLine(div2X, kDivInset, div2X, (float)h - kDivInset, 0.5f);
     g.drawLine(div3X, kDivInset, div3X, (float)h - kDivInset, 0.5f);
 
     g.setColour(MuLookAndFeel::colour(Id::mutedText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(10.0f))));
-    g.drawText("PITCH",  0,                          0, s(5 * kW), s(labelH), juce::Justification::centred, false);
-    g.drawText("FILTER", s(5 * kW + divW),           0, s(5 * kW), s(labelH), juce::Justification::centred, false);
-    g.drawText("AMP",    s(10 * kW + 2 * divW),      0, s(5 * kW), s(labelH), juce::Justification::centred, false);
-    g.drawText("INSERT", s(15 * kW + 3 * divW),      0, s(4 * kW), s(labelH), juce::Justification::centred, false);
+    g.drawText("PITCH",  0,         0, s(5 * kW),    s(labelH), juce::Justification::centred, false);
+    g.drawText("FILTER", s(fltX),   0, s(6 * kFltW), s(labelH), juce::Justification::centred, false);
+    g.drawText("AMP",    s(ampX),   0, s(5 * kW),    s(labelH), juce::Justification::centred, false);
+    g.drawText("INSERT", s(insX),   0, s(4 * kW),    s(labelH), juce::Justification::centred, false);
 }

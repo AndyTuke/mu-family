@@ -12,6 +12,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       settingsOverlay(p)
 {
     // ── Product chrome on shared overlays ───────────────────────────────────
+    getSaveDialog().setShowEmbedSamples(false);   // mu-tant has no sample engine
     getAboutPanel().setProductInfo(
         juce::String(juce::CharPointer_UTF8("\xce\xbc")) + "-Tant",
         juce::StringArray {

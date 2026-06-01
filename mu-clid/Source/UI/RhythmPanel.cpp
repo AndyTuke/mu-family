@@ -40,7 +40,7 @@ bool isEuclidSuffix(const juce::String& suffix) noexcept
 const char* const kVoiceSuffixes[] = {
     "pitchOct", "pitchSemi", "pitchFine",
     "pEnvAtk", "pEnvDec", "pEnvSus", "pEnvRel", "pEnvDep",
-    "fltType", "fltCut", "fltRes", "fltLoCut",
+    "fltType", "fltCut", "fltRes", "fltLoCut", "fltDrv",
     "fEnvAtk", "fEnvDec", "fEnvSus", "fEnvRel", "fEnvDep",
     "ampLvl", "accentDb",
     "aEnvAtk", "aEnvDec", "aEnvSus", "aEnvRel",

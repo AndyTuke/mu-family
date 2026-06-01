@@ -94,7 +94,7 @@ public:
     bool acceptsMidi()  const override { return true; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
-    double getTailLengthSeconds() const override { return 0.0; }
+    double getTailLengthSeconds() const override { return 10.0; }
 
     int  getNumPrograms() override { return 1; }
     int  getCurrentProgram() override { return 0; }
@@ -229,7 +229,7 @@ private:
         std::atomic<float> *o2Oct, *o2Semi, *o2Fine, *o2Pos;
         std::atomic<float> *xmod, *xmode, *sync;
         std::atomic<float> *o1Lvl, *o2Lvl, *noiseLvl, *noiseType;
-        std::atomic<float> *fltType, *fltCut, *fltRes, *fltEnvDepth;
+        std::atomic<float> *fltType, *fltCut, *fltRes, *fltEnvDepth, *fltDrv, *fltLoCut;
         std::atomic<float> *o1PenvDepth, *o2PenvDepth;
         std::atomic<float> *level, *gateGap, *gateBypass;
         std::atomic<float> *drvChar, *insP1, *insP2, *insP3, *insP4;

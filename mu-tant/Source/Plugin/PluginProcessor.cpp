@@ -170,7 +170,7 @@ void PluginProcessor::cacheParamPointers()
         p.o2Oct  = P(vid("o2_oct"));  p.o2Semi = P(vid("o2_semi")); p.o2Fine = P(vid("o2_fine")); p.o2Pos = P(vid("o2_pos"));
         p.xmod   = P(vid("xmod"));    p.xmode  = P(vid("xmode"));   p.sync = P(vid("sync"));
         p.o1Lvl  = P(vid("o1_lvl"));  p.o2Lvl  = P(vid("o2_lvl"));  p.noiseLvl = P(vid("noise_lvl")); p.noiseType = P(vid("noise_type"));
-        p.fltType= P(vid("flt_type"));p.fltCut = P(vid("flt_cut")); p.fltRes = P(vid("flt_res")); p.fltEnvDepth = P(vid("flt_env_depth"));
+        p.fltType= P(vid("flt_type"));p.fltCut = P(vid("flt_cut")); p.fltRes = P(vid("flt_res")); p.fltEnvDepth = P(vid("flt_env_depth")); p.fltDrv = P(vid("flt_drv")); p.fltLoCut = P(vid("flt_lo_cut"));
         p.o1PenvDepth = P(vid("o1_penv_depth")); p.o2PenvDepth = P(vid("o2_penv_depth"));
         p.level  = P(vid("level"));
         p.gateGap= P(vid("gate_gap"));p.gateBypass = P(vid("gate_bypass"));
@@ -206,6 +206,8 @@ VoiceConfig PluginProcessor::readConfig(int voiceIdx) const
     c.filterCutoff    = p.fltCut->load();
     c.filterRes       = p.fltRes->load();
     c.filterEnvDepth  = p.fltEnvDepth->load();
+    c.filterDrive     = p.fltDrv->load();
+    c.filterLowCutHz  = p.fltLoCut->load();
     c.levelDb         = p.level->load();
     return c;
 }

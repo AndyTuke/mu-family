@@ -1,5 +1,8 @@
 #include "ReverbSlot.h"
+#pragma warning(push)
+#pragma warning(disable: 4244)  // signalsmith-dsp/filters.h: double-to-float narrowing in BiquadStatic
 #include <signalsmith-basics/reverb.h>
+#pragma warning(pop)
 #include <cmath>
 
 // Pimpl: keeps Signalsmith headers (and their transitive windows.h) out of ReverbSlot.h.

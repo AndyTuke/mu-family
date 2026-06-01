@@ -47,7 +47,7 @@ FilterSubsection::FilterSubsection(PluginProcessor& p) : proc(p)
 
     for (auto* k : { &filterCutoff, &filterRes,
                      &filterAtk, &filterDec, &filterSus, &filterRel, &filterDepth,
-                     &filterLowCut })
+                     &filterLowCut, &filterDrive })
         addAndMakeVisible(k);
 
     // Slider units match APVTS / voiceParams units 1:1 (#598 Step 0):
@@ -66,6 +66,7 @@ FilterSubsection::FilterSubsection(PluginProcessor& p) : proc(p)
     // most of the knob travel.
     filterLowCut.setRange(0.0, 1000.0, 1.0);   filterLowCut.setValue(0.0);
     filterLowCut.getSlider().setSkewFactor(0.35);
+    filterDrive.setRange(0.0, 100.0, 0.1);     filterDrive.setValue(0.0);
 
     wireCallbacks();
 }
@@ -128,12 +129,18 @@ void FilterSubsection::wireCallbacks()
     filterSus   .setLabel("S (%)");
     filterRel   .setLabel(adsrLabelStr("R", filterRel.getValue()));
 
+    // Drive: display as integer 0-100.
+    filterDrive.getSlider().textFromValueFunction = [](double v) -> juce::String {
+        return juce::String((int)std::round(v));
+    };
+
     // Default status bar callbacks (pass through formatted value).
     struct { KnobWithLabel* k; const char* name; } entries[] = {
         { &filterCutoff, "Filter Cutoff"           }, { &filterRes,   "Filter Resonance"       },
         { &filterAtk,    "Filter Envelope Attack"  }, { &filterDec,   "Filter Envelope Decay"  },
         { &filterSus,    "Filter Envelope Sustain" }, { &filterRel,   "Filter Envelope Release" },
         { &filterDepth,  "Filter Envelope Depth"   }, { &filterLowCut, "Filter Low Cut"        },
+        { &filterDrive,  "Filter Drive"            },
     };
     for (auto& e : entries)
     {
@@ -193,6 +200,8 @@ void FilterSubsection::wireCallbacks()
     filterRel   .onValueChanged = [this](double v) { apvtsSet("fEnvRel", (float)v); filterRel.setLabel(adsrLabelStr("R", v)); };
     filterDepth .onValueChanged = [this](double v) { apvtsSet("fEnvDep", (float)v); };
     filterLowCut.onValueChanged = [this](double v) { apvtsSet("fltLoCut", (float)v); };
+    // Drive UI is 0..100; APVTS stores 0..1.
+    filterDrive .onValueChanged = [this](double v) { apvtsSet("fltDrv", (float)(v / 100.0)); };
 }
 
 void FilterSubsection::setRhythm(int ri)
@@ -220,6 +229,7 @@ void FilterSubsection::loadFromRhythm()
     filterRel   .setValue(p.filterEnvRel,           dn); filterRel.setLabel(adsrLabelStr("R", p.filterEnvRel));
     filterDepth .setValue(p.filterEnvDepth, dn);            // semitones (#598 Step 0)
     filterLowCut.setValue(p.filterLowCutHz, dn);
+    filterDrive .setValue(p.filterDrive * 100.0, dn);  // 0..1 → 0..100 display
 }
 
 void FilterSubsection::refreshSuffix(const juce::String& suffix)
@@ -237,6 +247,7 @@ void FilterSubsection::refreshSuffix(const juce::String& suffix)
     else if (suffix == "fEnvRel") { filterRel.setValue(p.filterEnvRel, dn); filterRel.setLabel(adsrLabelStr("R", p.filterEnvRel)); }
     else if (suffix == "fEnvDep") filterDepth .setValue(p.filterEnvDepth, dn);
     else if (suffix == "fltLoCut") filterLowCut.setValue(p.filterLowCutHz, dn);
+    else if (suffix == "fltDrv")  filterDrive .setValue(p.filterDrive * 100.0, dn);
 }
 
 void FilterSubsection::bindModulationIndicators()
@@ -244,7 +255,7 @@ void FilterSubsection::bindModulationIndicators()
     if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms())
     {
         for (auto* k : { &filterCutoff, &filterRes, &filterAtk, &filterDec,
-                         &filterDepth, &filterLowCut })
+                         &filterDepth, &filterLowCut, &filterDrive })
             k->clearModBinding();
         return;
     }
@@ -279,24 +290,22 @@ void FilterSubsection::bindModulationIndicators()
 
 void FilterSubsection::resized()
 {
-    // Voice section knobs render at Size 2 (55 × 56) — fixed PX, no
-    // dependency on the panel's actual height.
-    constexpr int kW    = MuLookAndFeel::kKnobSize2W;
-    constexpr int rowH  = MuLookAndFeel::kKnobSize2H;
+    // Filter uses kVoiceFilterColW (50 px) columns — slightly narrower than the
+    // standard 54 px to fit 6 columns (Type×2, Cutoff, Res, LowCut, Drive) in row 1.
+    constexpr int kW    = MuLookAndFeel::kVoiceFilterColW;  // 50
+    constexpr int rowH  = MuLookAndFeel::kKnobSize2H;       // 56
     constexpr int gap   = MuLookAndFeel::kVoiceGap;
     constexpr int row2Y = rowH + gap;
 
     using mu_ui::s;
-    // Row 1: Type (2 cols) / Cutoff / Resonance / Low Cut.
+    // Row 1: Type (2 cols) / Drive / Cutoff / Resonance / Low Cut — audio flow order.
     filterType  .setBounds(s(0 * kW), s(rowH / 4),     s(2 * kW), s(rowH / 2));
-    filterCutoff.setBounds(s(2 * kW), 0,                s(kW),     s(rowH));
-    filterRes   .setBounds(s(3 * kW), 0,                s(kW),     s(rowH));
-    filterLowCut.setBounds(s(4 * kW), 0,                s(kW),     s(rowH));
+    filterDrive .setBounds(s(2 * kW), 0,                s(kW),     s(rowH));
+    filterCutoff.setBounds(s(3 * kW), 0,                s(kW),     s(rowH));
+    filterRes   .setBounds(s(4 * kW), 0,                s(kW),     s(rowH));
+    filterLowCut.setBounds(s(5 * kW), 0,                s(kW),     s(rowH));
 
-    // Row 2 (envelope): A / D / S / R / Depth. Depth gets the full row-2
-    // col 4 cell again (the env-legato pill stacked beneath it was removed
-    // in #614 — envelope retrigger is governed solely by the hit-generator
-    // pattern legato).
+    // Row 2 (envelope): A / D / S / R / Depth.
     filterAtk   .setBounds(s(0 * kW), s(row2Y), s(kW), s(rowH));
     filterDec   .setBounds(s(1 * kW), s(row2Y), s(kW), s(rowH));
     filterSus   .setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));

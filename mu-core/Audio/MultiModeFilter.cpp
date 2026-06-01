@@ -1,4 +1,5 @@
 #include "MultiModeFilter.h"
+#include <cmath>
 
 #include "Audio/Filters/Lp12Filter.h"
 #include "Audio/Filters/Hp12Filter.h"
@@ -45,12 +46,20 @@ void MultiModeFilter::prepare(double sampleRate, int blockSize, int numChannels)
 {
     for (auto& a : algorithms)
         if (a) a->prepare(sampleRate, blockSize, numChannels);
+
+    lowCutFilter.prepare(sampleRate, blockSize, numChannels);
+
+    smoothedDrive.reset(sampleRate, 0.01);
+    smoothedDrive.setCurrentAndTargetValue(0.0f);
+    smoothedLowCutHz.reset(sampleRate, 0.015);
+    smoothedLowCutHz.setCurrentAndTargetValue(0.0f);
 }
 
 void MultiModeFilter::reset()
 {
     for (auto& a : algorithms)
         if (a) a->reset();
+    lowCutFilter.reset();
 }
 
 void MultiModeFilter::process(juce::AudioBuffer<float>& buffer,
@@ -60,7 +69,35 @@ void MultiModeFilter::process(juce::AudioBuffer<float>& buffer,
     const int ns  = juce::jmin(numSamples, buffer.getNumSamples());
     if (ns <= 0 || nCh <= 0) return;
 
+    // Pre-filter valve saturation: asymmetric tanh/algebraic soft-clip adds
+    // even harmonics (warmth). Bypassed when drive is zero and settled.
+    if (smoothedDrive.getCurrentValue() > 0.001f || smoothedDrive.isSmoothing())
+    {
+        float* chData[MaxChannels] = {};
+        for (int ch = 0; ch < nCh; ++ch)
+            chData[ch] = buffer.getWritePointer(ch);
+
+        for (int i = 0; i < ns; ++i)
+        {
+            const float drv     = smoothedDrive.getNextValue();
+            const float preGain = 1.0f + drv * 5.0f;   // 1×..6×
+            const float invGain = 1.0f / preGain;
+            for (int ch = 0; ch < nCh; ++ch)
+            {
+                const float y = chData[ch][i] * preGain;
+                // Positive: tanh.  Negative: x/(1−x) (slightly harder → even harmonics).
+                chData[ch][i] = (y >= 0.0f ? std::tanhf(y) : y / (1.0f - y)) * invGain;
+            }
+        }
+    }
+
+    // Main filter algorithm.
     const int idx = juce::jlimit(0, kNumFilterAlgos - 1, typeCodeValue);
     if (auto* algo = algorithms[(size_t) idx].get())
         algo->process(buffer, ns, nCh, cutoffHz, resonance);
+
+    // Post-filter 4-pole high-pass (lo-cut). Per-block smoothed; bypassed at 0.
+    const float loHz = smoothedLowCutHz.skip(ns);
+    if (loHz > 0.5f)
+        lowCutFilter.process(buffer, ns, nCh, loHz, 0.0f);
 }

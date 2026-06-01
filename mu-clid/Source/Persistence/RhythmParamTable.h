@@ -164,6 +164,8 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
                    [](const Rhythm& r) -> float { return r.voiceParams.filterEnvDepth; } },
     { "fltLoCut",  [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.filterLowCutHz = v; vd = true; },
                    [](const Rhythm& r) -> float { return r.voiceParams.filterLowCutHz; } },
+    { "fltDrv",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.filterDrive    = juce::jlimit(0.0f, 1.0f, v); vd = true; },
+                   [](const Rhythm& r) -> float { return r.voiceParams.filterDrive; } },
 
     // ── Amp + amp envelope ───────────────────────────────────────────────────
     { "ampLvl",    [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.ampLevel = juce::jlimit(-60.0f, 6.0f, v); vd = true; },
