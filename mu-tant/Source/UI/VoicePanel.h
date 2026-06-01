@@ -118,7 +118,6 @@ private:
     KnobWithLabel  fltCutKnob      { "Cutoff",    MuLookAndFeel::knobPostPad };
     KnobWithLabel  fltResKnob      { "Resonance", MuLookAndFeel::knobPostPad };
     KnobWithLabel  fltEnvDepthKnob { "FEnv",      MuLookAndFeel::knobPostPad };
-    std::unique_ptr<APVTS::ComboBoxAttachment> fltTypeAttachment;
     std::unique_ptr<APVTS::SliderAttachment>   fltCutAttachment;
     std::unique_ptr<APVTS::SliderAttachment>   fltResAttachment;
     std::unique_ptr<APVTS::SliderAttachment>   fltEnvDepthAttachment;

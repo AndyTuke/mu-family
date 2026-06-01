@@ -197,4 +197,26 @@ inline constexpr int kLogicCount           = (int) (std::size(kLogicNames) - 1);
 static_assert(kInsertAlgorithmCount == mu_ui::kInsertAlgoCount,
               "kInsertAlgorithmNames length != mu_ui::kInsertAlgoCount — update both tables");
 
+// Canonical filter-type dropdown population helper — shared across all mu-family
+// products so the display order is always the same. Item ID = algorithm index + 1,
+// which matches the integer stored in the per-product "flt_type" APVTS param
+// (AudioParameterInt(0, 15, 0)). Call as:
+//   mu_audio::populateFilterTypeDropdown([&d](const char* n, int id){ d.addItem(n, id); });
+//
+// Display order: LP family (6/12/24) → BP family → HP family → Notch → AP → Comb → EQ.
+// Matches mu-clid's FilterSubsection ordering (see FilterSubsection.cpp).
+template <typename AddItemFn>
+inline void populateFilterTypeDropdown(AddItemFn&& addItem)
+{
+    // kFilterTypeNames index → ID (= index + 1) → display name
+    addItem("LP 6",    8);  addItem("LP 12",   1);
+    addItem("LP 24",   5);  addItem("BP 12",   3);
+    addItem("BP 24",   7);  addItem("HP 6",   12);
+    addItem("HP 12",   2);  addItem("HP 24",   6);
+    addItem("Notch",   4);  addItem("Notch 24",11);
+    addItem("AP 12",  10);  addItem("Comb +",   9);
+    addItem("Comb -", 16);  addItem("Peak",    13);
+    addItem("Lo Shf", 14);  addItem("Hi Shf",  15);
+}
+
 } // namespace mu_audio

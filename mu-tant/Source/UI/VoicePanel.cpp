@@ -39,10 +39,9 @@ namespace
 
     void populateFilterTypes(DropdownSelect& d)
     {
-        // Source from the shared mu-core canonical list so it stays in sync with
-        // MultiModeFilter's algorithm array.
-        for (int i = 0; mu_audio::kFilterTypeNames[i] != nullptr; ++i)
-            d.addItem(mu_audio::kFilterTypeNames[i], i + 1);
+        // Use the family-canonical display order from mu-core — same order as
+        // mu-clid's FilterSubsection. Item ID = algorithm index + 1.
+        mu_audio::populateFilterTypeDropdown([&d](const char* n, int id) { d.addItem(n, id); });
     }
 
     void populateNoiseTypes(DropdownSelect& d)
@@ -257,7 +256,7 @@ void VoicePanel::rebindAttachments()
     xmodAttachment = nullptr; xmodModeAttachment = nullptr; syncAttachment = nullptr;
     osc1LevelAttachment  = nullptr; osc2LevelAttachment = nullptr;
     noiseLevelAttachment = nullptr; noiseTypeAttachment = nullptr;
-    fltTypeAttachment     = nullptr; fltCutAttachment       = nullptr;
+    fltCutAttachment       = nullptr;
     fltResAttachment      = nullptr; fltEnvDepthAttachment = nullptr;
     levelAttachment       = nullptr;
     gapAttachment = nullptr; gateBypassAttachment = nullptr;
@@ -283,7 +282,17 @@ void VoicePanel::rebindAttachments()
     noiseLevelAttachment = std::make_unique<APVTS::SliderAttachment>  (apvts, id("noise_lvl"),  noiseLevelKnob.getSlider());
     noiseTypeAttachment  = std::make_unique<APVTS::ComboBoxAttachment>(apvts, id("noise_type"), noiseTypeDropdown.getComboBox());
 
-    fltTypeAttachment     = std::make_unique<APVTS::ComboBoxAttachment>(apvts, id("flt_type"),      fltTypeDropdown.getComboBox());
+    // Filter type — manual wiring (item IDs ≠ sequential, so no ComboBoxAttachment).
+    // Item ID = algorithm index + 1, matching the AudioParameterInt(0..15) stored value.
+    {
+        auto* fltParam = apvts.getParameter(id("flt_type"));
+        const int algo = juce::jlimit(0, 15, (int) apvts.getRawParameterValue(id("flt_type"))->load());
+        fltTypeDropdown.setSelectedId(algo + 1, juce::dontSendNotification);
+        fltTypeDropdown.onChange = [fltParam](int itemId) {
+            if (fltParam)
+                fltParam->setValueNotifyingHost(fltParam->convertTo0to1((float)(itemId - 1)));
+        };
+    }
     fltCutAttachment      = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_cut"),       fltCutKnob.getSlider());
     fltResAttachment      = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_res"),       fltResKnob.getSlider());
     fltEnvDepthAttachment = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_env_depth"), fltEnvDepthKnob.getSlider());

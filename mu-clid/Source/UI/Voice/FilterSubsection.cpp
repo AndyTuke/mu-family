@@ -2,6 +2,7 @@
 #include "Plugin/PluginProcessor.h"
 #include "Modulation/ModulationSnapshot.h"
 #include "Sequencer/Rhythm.h"
+#include "Audio/AlgorithmNames.h"   // mu_audio::populateFilterTypeDropdown
 
 namespace {
 static juce::String cutoffLabelStr(double hz)
@@ -38,15 +39,9 @@ static double parseAdsrTimeSec(const juce::String& s)
 
 FilterSubsection::FilterSubsection(PluginProcessor& p) : proc(p)
 {
-    // Types 0-3,9: SVF. Types 4-6,10: LadderFilter. 7: 1-pole LP. 11: 1-pole HP. 8: Comb. 12-14: Biquad EQ.
-    filterType.addItem("LP 6",    8);   filterType.addItem("LP 12",   1);
-    filterType.addItem("LP 24",   5);   filterType.addItem("BP 12",   3);
-    filterType.addItem("BP 24",   7);   filterType.addItem("HP 6",    12);
-    filterType.addItem("HP 12",   2);   filterType.addItem("HP 24",   6);
-    filterType.addItem("Notch",   4);   filterType.addItem("Notch 24",11);
-    filterType.addItem("AP 12",   10);  filterType.addItem("Comb +",  9);
-    filterType.addItem("Comb -",  16);  filterType.addItem("Peak",    13);
-    filterType.addItem("Lo Shf",  14);  filterType.addItem("Hi Shf",  15);
+    // Canonical family-wide filter display order (LP/BP/HP family → Notch → AP → Comb → EQ).
+    // Defined once in mu_audio::populateFilterTypeDropdown so all products stay in sync.
+    mu_audio::populateFilterTypeDropdown([this](const char* n, int id) { filterType.addItem(n, id); });
     filterType.setSelectedId(1, false);
     addAndMakeVisible(filterType);
 

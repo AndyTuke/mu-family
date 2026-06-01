@@ -75,15 +75,12 @@ namespace
                                : String(v / 1000.0f, 1);
         };
         auto resText = [](float v, int) -> String { return String((int) std::round(v * 100.0f)); };
-        // AudioParameterChoice: ComboBoxAttachment maps choice index 0..N-1 to combo
-        // IDs 1..N automatically, so no off-by-one vs AudioParameterInt (where the
-        // attachment maps selectedId directly to the int value).
-        {
-            juce::StringArray filterNames;
-            for (int i = 0; mu_audio::kFilterTypeNames[i] != nullptr; ++i)
-                filterNames.add(mu_audio::kFilterTypeNames[i]);
-            layout.add(std::make_unique<AudioParameterChoice>(ParameterID{id("flt_type"), 1}, label("Filter Type"), filterNames, 0));
-        }
+        // AudioParameterInt(0..15): stores the algorithm index directly (same
+        // normalisation as AudioParameterChoice(16) — both map 0..15 over 0..1).
+        // The UI dropdown uses mu_audio::populateFilterTypeDropdown (item ID = index+1)
+        // and wires manually (no ComboBoxAttachment) to keep display order independent
+        // of the algorithm table order — matching mu-clid's FilterSubsection pattern.
+        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("flt_type"), 1}, label("Filter Type"), 0, 15, 0));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_cut"), 1},  label("Cutoff"), cutoff, 8000.0f,
                     AudioParameterFloatAttributes().withStringFromValueFunction(cutoffText)));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_res"), 1},  label("Resonance"), f(0.0f, 0.99f, 0.001f), 0.2f,
