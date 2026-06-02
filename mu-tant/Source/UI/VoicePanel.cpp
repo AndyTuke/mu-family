@@ -148,7 +148,7 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     }
 
     setupLabel(xmodLabel, "Mode");
-    xmodLabel.setJustificationType(juce::Justification::centred);
+    xmodLabel.setJustificationType(juce::Justification::centredRight);
     populateXmodModes(xmodModeDropdown);
     addAndMakeVisible(xmodModeDropdown);
 
@@ -223,6 +223,17 @@ void VoicePanel::timerCallback()
     const double beat01  = std::fmod(beat, patBeats) / patBeats;
     gatingDesigner.setPlayhead(beat01, playing);
     modulatorPanel.setPlayheadBeat(beat);
+
+    // Sync filter-type dropdown from APVTS so DAW automation is reflected in the UI.
+    // The dropdown uses manual wiring (no ComboBoxAttachment) so there is no automatic
+    // reverse path from APVTS changes to the displayed value.
+    if (auto* raw = proc.apvts.getRawParameterValue(
+            PluginProcessor::voiceParamId(currentVoice, "flt_type")))
+    {
+        const int apvtsAlgo = juce::jlimit(0, 15, (int) raw->load());
+        if (fltTypeDropdown.getSelectedId() != apvtsAlgo + 1)
+            fltTypeDropdown.setSelectedId(apvtsAlgo + 1, false);
+    }
 }
 
 void VoicePanel::setVoice(int voiceIndex)
@@ -518,18 +529,25 @@ void VoicePanel::resized()
         const int xmodW      = s(200);
         modNoisePanelR = { pad, rowBY, xmodW, rowBH };
         {
-            int x = pad + xmodTitleW;
-            // Knob / Mode label / dropdown stacked vertically in one column,
-            // Sync button centred to their right.
-            const int colW    = s(72);   // dropdown sets column width; knob centred within it
-            const int labelH  = s(14);
-            const int stackH  = s2H + s(4) + labelH + ddH;   // 56+4+14+24 = 98
-            const int stackY  = rowBY + (rowBH - stackH) / 2;
-            xmodKnob.setBounds(x + (colW - s2W) / 2, stackY, s2W, s2H);
-            xmodLabel.setBounds(x, stackY + s2H + s(4), colW, labelH);
-            xmodModeDropdown.setBounds(x, stackY + s2H + s(4) + labelH, colW, ddH);
-            x += colW + gap;
-            syncButton.setBounds(x, rowBY + (rowBH - ddH) / 2, s(44), ddH);
+            const int x     = pad + xmodTitleW;
+            const int avail = xmodW - xmodTitleW;   // 170 px
+
+            // Knob centred above; Mode label + dropdown + Sync in one row below.
+            const int totalH  = s2H + s(6) + ddH;   // 56+6+24 = 86
+            const int startY  = rowBY + (rowBH - totalH) / 2;
+
+            xmodKnob.setBounds(x + (avail - s2W) / 2, startY, s2W, s2H);
+
+            // Bottom row — centred in the available width.
+            const int modeLabelW = s(30);
+            const int modeDropW  = s(72);
+            const int syncW      = s(44);
+            const int rowW = modeLabelW + s(4) + modeDropW + s(4) + syncW;
+            int rx = x + (avail - rowW) / 2;
+            const int rowY2 = startY + s2H + s(6);
+            xmodLabel.setBounds(rx, rowY2, modeLabelW, ddH);       rx += modeLabelW + s(4);
+            xmodModeDropdown.setBounds(rx, rowY2, modeDropW, ddH); rx += modeDropW  + s(4);
+            syncButton.setBounds(rx, rowY2, syncW, ddH);
         }
 
         // Filter panel (no Level knob)

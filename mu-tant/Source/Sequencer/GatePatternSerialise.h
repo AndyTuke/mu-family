@@ -47,8 +47,22 @@ inline void deserialiseGate(const juce::ValueTree& t, GatePattern& g)
                         || t.getType() == juce::Identifier("FilterGate")
                         || t.getType() == juce::Identifier("PitchGate"));
 
-    while (g.editLock.exchange(true, std::memory_order_acquire))
-        std::this_thread::yield();
+    // Capped spin matching GatingDesigner::withLock. The audio thread holds
+    // editLock for at most one block (~10 ms); 1000 yields covers that comfortably.
+    // If still contended after the cap (scheduler anomaly), leave the pattern
+    // unchanged and return — the preset gate data stays at its previous value.
+    {
+        constexpr int kMaxSpins = 1000;
+        bool acquired = false;
+        for (int i = 0; i < kMaxSpins; ++i)
+        {
+            bool expected = false;
+            if (g.editLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+            { acquired = true; break; }
+            std::this_thread::yield();
+        }
+        if (!acquired) return;
+    }
 
     g.envelopes.clear();
     if (valid)

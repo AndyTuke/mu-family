@@ -201,7 +201,13 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
         voices[(size_t) vi].process(buffer, pitchRatioBuffer.data(), tempBuffer, ns);
     }
 
-    // Filter envelope modulates cutoff (per-block approximation).
+    // Filter envelope modulates cutoff — per-block approximation. JUCE ADSR has
+    // no skip() so all ns samples are advanced to keep envelope state correct,
+    // but only the final sample is used to set the cutoff for the block. This is
+    // intentional: the filter biquad coefficients change at most once per block
+    // anyway (setCutoff is called once below), so sample-accurate cutoff modulation
+    // would require a per-sample filter update loop that is not worth the cost
+    // for a slowly-evolving envelope-driven filter.
     float filterEnvVal = 0.0f;
     for (int i = 0; i < ns; ++i)
         filterEnvVal = filterEnv.getNextSample();

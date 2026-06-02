@@ -149,9 +149,11 @@ The filter sits between the oscillator mix and the gate. It shapes the tone cont
 
 | Control | Range | Notes |
 |---|---|---|
-| Type | LP 6, LP 12, LP 24, BP 12, BP 24, HP 12, HP 24, Notch, Comb, AP 12, Notch 24, HP 6, Peak, Lo Shelf, Hi Shelf | 15 filter algorithms |
+| Type | LP 6, LP 12, LP 24, BP 12, BP 24, HP 6, HP 12, HP 24, Notch, Notch 24, AP 12, Comb +, Comb -, Peak, Lo Shf, Hi Shf | 16 filter algorithms |
+| Drive | 0–100 % | Pre-filter valve saturation (asymmetric tanh). Adds harmonic warmth before the filter shapes it. |
 | Cutoff | 20 Hz–20 kHz | Log-scaled; visual centre ≈ 640 Hz |
 | Resonance | 0–100 % | Q / feedback |
+| Low Cut | 20 Hz–20 kHz | Post-filter 4-pole high-pass. Removes subsonic buildup from high resonance settings. |
 | FEnv | –1 to +1 | Filter envelope depth: how far the **FILT** gate layer modulates the cutoff |
 
 **FEnv (filter envelope depth)** — controls how much the filter envelope layer (drawn in the gate editor on the FILT layer) affects the cutoff. At +1.0, the filter envelope sweeps from 20 Hz (fully closed) to the base cutoff (open). At 0, the filter envelope does nothing. At –1.0, the sweep is inverted.
@@ -189,12 +191,13 @@ The gate editor is the heart of μ-Tant's rhythmic character. It occupies the fu
 
 ### Layers
 
-The gate editor has two layers, toggled by **GATE** and **FILT** buttons:
+The gate editor has three layers, toggled by **GATE**, **FILT**, and **PITCH** buttons:
 
 - **GATE** — shapes amplitude. Envelope value 0 = silent, 1 = full level.
-- **FILT** — shapes filter cutoff. Envelope value 0 = 20 Hz (closed), 1 = base cutoff (open).
+- **FILT** — shapes filter cutoff. Envelope value 0 = 20 Hz (closed), 1 = base cutoff (open). Depth controlled by the FEnv knob in the filter row.
+- **PITCH** — shifts oscillator pitch. Depth controlled by the PEnv knobs on Osc 1 and Osc 2 (±24 semitones). Envelope value 0 = no shift, 1 = full PEnv depth above the base Semi value.
 
-The inactive layer is rendered as a ghost at 20% alpha so you can align both layers visually.
+The inactive layers are rendered as ghosts at 20% alpha (GATE layer shown as the reference on FILT and PITCH) so you can align layers visually.
 
 ### Grid Controls
 
@@ -204,14 +207,13 @@ The inactive layer is rendered as a ghost at 20% alpha so you can align both lay
 
 ### Toolbox
 
-Five tools in the header (left to right):
+Four tools in the header (left to right):
 
 | Tool | Icon | Action |
 |---|---|---|
 | Arrow | ↖ | Select an envelope to view/edit its properties |
-| Pencil | ✏ | Click an empty cell to draw a 1-cell envelope; drag handles to reshape |
+| Pencil | ✏ | Click an empty cell to draw a 1-cell envelope; drag start/end grab handles (bottom corners) to extend a region |
 | Eraser | ✕ | Click an envelope to delete it |
-| Glue | ◇ | Click-drag across envelopes to merge them into one wider region |
 | Reverse | ⟲ | Click an envelope to flip its attack and decay |
 
 ### Envelope Shape
@@ -378,7 +380,6 @@ Mixer:   Channel strips → Effect / Delay / Reverb sends → master → audio o
 ## Not in μ-Tant (Design Decisions)
 
 - **No amplitude envelope** — the gate stage does this job.
-- **No pitch envelope** — use a modulator targeting Osc Semi/Fine/Octave.
 - **No note-on / note-off** — oscillators run continuously; MIDI is not used for played notes.
 - **No user samples** — the built-in wavetable bank only.
 - **No granular** — pure wavetable synthesis.

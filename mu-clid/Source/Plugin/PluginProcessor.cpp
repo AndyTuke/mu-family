@@ -226,85 +226,14 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
 #if MUCLID_LITE_BUILD
     // Lite mode: MIDI-only sequencing, no audio processing.
-    double beatPos = 0.0;
-    bool   playing = false;
-
-    if (auto* ph = getPlayHead())
-    {
-        if (auto pos = ph->getPosition())
-        {
-            playing = pos->getIsPlaying();
-            if (auto ppq = pos->getPpqPosition())
-                beatPos = *ppq;
-        }
-    }
-    if (!playing && internalPlaying.load(std::memory_order_relaxed))
-    {
-        playing = true;
-        const double pos = internalBeatPos.load(std::memory_order_relaxed);
-        beatPos = pos;
-        const int ns = juce::jmax(1, buffer.getNumSamples());
-        internalBeatPos.store(pos + (ns / currentSampleRate) * (internalBpm.load(std::memory_order_relaxed) / 60.0),
-                              std::memory_order_relaxed);
-    }
-
-    sequencerPlaying.store(playing);
-    lastBeatPos.store(beatPos);
+    const auto transport = computeLiteTransport(buffer.getNumSamples());
 
     const juce::ScopedTryLock rLock(rhythmsLock);
     if (!rLock.isLocked()) return;
     const int numRhythms = numActiveRhythms.load(std::memory_order_acquire);
 
-    if (playing)
-    {
-        const auto blockResult = sequencer.processBlock(beatPos);
-        {
-            const int   midiNote  = (int)liteMidiNotePtr->load();
-            const float accentAmt = liteAccentAmtPtr->load();
-
-            // Bottom half (0–50): accented ramps 100→127, non-accented stays 100.
-            // Top half  (50–100): accented stays 127, non-accented ramps 100→75.
-            float accentedVel, normalVel;
-            if (accentAmt <= 50.0f)
-            {
-                const float t = accentAmt / 50.0f;
-                accentedVel = (100.0f + t * 27.0f) / 127.0f;
-                normalVel   =  100.0f               / 127.0f;
-            }
-            else
-            {
-                const float t = (accentAmt - 50.0f) / 50.0f;
-                accentedVel = 1.0f;
-                normalVel   = (100.0f - t * 25.0f)  / 127.0f;
-            }
-
-            for (int r = 0; r < numRhythms; ++r)
-            {
-                if (blockResult.firedMask & (1 << r))
-                {
-                    const bool  isAccented = (blockResult.accentMask & (1 << r)) != 0;
-                    midiEngines[r].trigger(midiMessages, 0, midiNote, 1,
-                                           isAccented ? accentedVel : normalVel);
-                    rhythmPlayState[r].hitCount.store(rhythmPlayState[r].hitCount.load() + 1);   // hitFired (legacy) removed — UI uses hitCount
-                }
-            }
-        }
-        const float frac = static_cast<float>(
-            std::fmod(beatPos / SequencerEngine::StepLengthBeats, 1.0));
-        beatFraction.store(frac);
-        for (int r = 0; r < numRhythms; ++r)
-        {
-            rhythmPlayState[r].currentStep  .store(sequencer.getLastStepIndex(r));
-            rhythmPlayState[r].currentStepC .store(sequencer.getLastAccentStepIndex(r));
-            rhythmPlayState[r].patternLength.store(sequencer.getPatternLength(r));
-            const Rhythm& rhy = sequencer.getRhythm(r);
-            rhythmPlayState[r].stepsA.store(juce::jmax(1, rhy.genA.steps));
-            rhythmPlayState[r].stepsB.store(juce::jmax(1, rhy.genB.steps));
-            rhythmPlayState[r].stepsC.store(juce::jmax(1, rhy.genC.steps));
-        }
-    }
-    for (int r = 0; r < numRhythms; ++r)
-        midiEngines[r].processBlock(midiMessages, juce::jmax(1, buffer.getNumSamples()));
+    advanceLiteSequencer(numRhythms, transport.playing, transport.beatPos,
+                         midiMessages, buffer.getNumSamples());
 #else
 
     const BlockTransport transport = deriveTransport(buffer, midiMessages);
@@ -336,7 +265,94 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 #endif
 }
 
-#if ! MUCLID_LITE_BUILD
+#if MUCLID_LITE_BUILD
+//==============================================================================
+// Lite processBlock helpers (#828).
+//==============================================================================
+PluginProcessor::BlockTransport PluginProcessor::computeLiteTransport(int numSamples)
+{
+    double beatPos = 0.0;
+    bool   playing = false;
+
+    if (auto* ph = getPlayHead())
+    {
+        if (auto pos = ph->getPosition())
+        {
+            playing = pos->getIsPlaying();
+            if (auto ppq = pos->getPpqPosition())
+                beatPos = *ppq;
+        }
+    }
+    if (!playing && internalPlaying.load(std::memory_order_relaxed))
+    {
+        playing = true;
+        const double pos = internalBeatPos.load(std::memory_order_relaxed);
+        beatPos = pos;
+        internalBeatPos.store(pos + (juce::jmax(1, numSamples) / currentSampleRate)
+                                  * (internalBpm.load(std::memory_order_relaxed) / 60.0),
+                              std::memory_order_relaxed);
+    }
+
+    sequencerPlaying.store(playing);
+    lastBeatPos.store(beatPos);
+    return { playing, beatPos };
+}
+
+void PluginProcessor::advanceLiteSequencer(int numRhythms, bool playing, double beatPos,
+                                            juce::MidiBuffer& midi, int numSamples)
+{
+    if (playing)
+    {
+        const auto blockResult = sequencer.processBlock(beatPos);
+        const int   midiNote  = (int) liteMidiNotePtr->load();
+        const float accentAmt = liteAccentAmtPtr->load();
+
+        // Bottom half (0–50): accented ramps 100→127, non-accented stays 100.
+        // Top half  (50–100): accented stays 127, non-accented ramps 100→75.
+        float accentedVel, normalVel;
+        if (accentAmt <= 50.0f)
+        {
+            const float t = accentAmt / 50.0f;
+            accentedVel = (100.0f + t * 27.0f) / 127.0f;
+            normalVel   =  100.0f               / 127.0f;
+        }
+        else
+        {
+            const float t = (accentAmt - 50.0f) / 50.0f;
+            accentedVel = 1.0f;
+            normalVel   = (100.0f - t * 25.0f)  / 127.0f;
+        }
+
+        for (int r = 0; r < numRhythms; ++r)
+        {
+            if (blockResult.firedMask & (1 << r))
+            {
+                const bool isAccented = (blockResult.accentMask & (1 << r)) != 0;
+                midiEngines[r].trigger(midi, 0, midiNote, 1,
+                                       isAccented ? accentedVel : normalVel);
+                rhythmPlayState[r].hitCount.store(rhythmPlayState[r].hitCount.load() + 1);
+            }
+        }
+
+        const float frac = static_cast<float>(
+            std::fmod(beatPos / SequencerEngine::StepLengthBeats, 1.0));
+        beatFraction.store(frac);
+        for (int r = 0; r < numRhythms; ++r)
+        {
+            rhythmPlayState[r].currentStep  .store(sequencer.getLastStepIndex(r));
+            rhythmPlayState[r].currentStepC .store(sequencer.getLastAccentStepIndex(r));
+            rhythmPlayState[r].patternLength.store(sequencer.getPatternLength(r));
+            const Rhythm& rhy = sequencer.getRhythm(r);
+            rhythmPlayState[r].stepsA.store(juce::jmax(1, rhy.genA.steps));
+            rhythmPlayState[r].stepsB.store(juce::jmax(1, rhy.genB.steps));
+            rhythmPlayState[r].stepsC.store(juce::jmax(1, rhy.genC.steps));
+        }
+    }
+    for (int r = 0; r < numRhythms; ++r)
+        midiEngines[r].processBlock(midi, juce::jmax(1, numSamples));
+}
+
+#else
 //==============================================================================
 // processBlock phases (#665). Behaviour-preserving extraction of the full-build
 // audio-thread path; called in order from processBlock under its rhythmsLock.
@@ -856,7 +872,7 @@ void PluginProcessor::renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::M
     for (int r = 0; r < numRhythms; ++r)
         midiEngines[r].processBlock(midiMessages, buffer.getNumSamples());
 }
-#endif // ! MUCLID_LITE_BUILD
+#endif // MUCLID_LITE_BUILD
 
 //==============================================================================
 bool PluginProcessor::hasEditor() const { return true; }

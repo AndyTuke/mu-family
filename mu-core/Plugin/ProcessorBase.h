@@ -189,6 +189,21 @@ protected:
     // typically also persist the value through their own appSettings file.
     float uiScale { kUiScaleMedium };
 
+    // ─── VST3 sidechain bus type ─────────────────────────────────────────────
+    // JUCE maps the first input bus to Vst::kMain by default. For mu-family
+    // plugins whose only input is a sidechain (no main audio input), kMain
+    // prevents DAWs (e.g. Bitwig) from showing it as a routable sidechain pin.
+    // Overriding getPluginHasMainInput() to return false tells JUCE to use
+    // Vst::kAux instead, which DAWs recognise as a sidechain input.
+    struct SidechainVST3Extensions final : public juce::VST3ClientExtensions
+    {
+        bool getPluginHasMainInput() const override { return false; }
+    };
+    SidechainVST3Extensions vst3Extensions;
+
+public:
+    juce::VST3ClientExtensions* getVST3ClientExtensions() override { return &vst3Extensions; }
+
 private:
     // syncGlobalFxParam dispatch helpers — one per ID family, so the public
     // entry point is a short prefix router rather than a ~100-line if/else chain.

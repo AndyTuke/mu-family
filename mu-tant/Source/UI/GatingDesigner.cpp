@@ -586,8 +586,16 @@ void GatingDesigner::mouseDrag(const juce::MouseEvent& e)
         case DragKind::Split:
         {
             if (dragEnvIndex < 0 || dragEnvIndex >= envCount) return;
-            const auto L    = layoutFor(pat->envelopes[(size_t)dragEnvIndex]);
-            const float pf  = juce::jlimit(0.0f, 1.0f, (e.position.x - L.x0) / juce::jmax(1.0f, L.activeW));
+            const auto L  = layoutFor(pat->envelopes[(size_t)dragEnvIndex]);
+            float pf = juce::jlimit(0.0f, 1.0f, (e.position.x - L.x0) / juce::jmax(1.0f, L.activeW));
+            if (!e.mods.isAltDown())
+            {
+                // Snap peak to cell boundaries within the envelope (same as corner handles).
+                // ALT held = free fine control.
+                const int cells = pat->envelopes[(size_t)dragEnvIndex].lengthCells;
+                if (cells > 0)
+                    pf = std::round(pf * (float)cells) / (float)cells;
+            }
             withLock(pat, [&] { auto& env = pat->envelopes[(size_t)dragEnvIndex]; env.split = env.reverse ? (1.0f - pf) : pf; });
             markPathsDirty();
             repaint();

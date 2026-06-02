@@ -154,8 +154,8 @@ The gate is **purely a 0..1 multiplier** — volume / pitch / filter modulation 
 Explicit decisions to keep the design tight:
 
 - **No amp envelope** (no ADSR). The gate stage replaces it.
-- **No pitch envelope.** Pitch evolves via the modulator section (LFOs / control sequences targeting `osc<N>.tone`).
-- **No filter envelope.** Filter cutoff / resonance evolve via the modulator section.
+- **Pitch envelope** — implemented as the PITCH drawable layer in the GatingDesigner (#760). `v{N}_o1_penv_depth` / `v{N}_o2_penv_depth` (±24 semitones) control depth per oscillator; the drawn envelope shape shifts pitch above the base Semi setting.
+- **Filter envelope** — implemented as the FILT drawable layer in the GatingDesigner (#735). `v{N}_flt_env_depth` (-1..+1) controls how far the filter envelope sweeps the cutoff above the base value.
 - **No user samples.** Built-in wavetable bank only.
 - **No granular.** Pure wavetable.
 - **No note-on / note-off.** MIDI is PC-only (program-change picks a pattern). No played-note input.

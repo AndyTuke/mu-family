@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <thread>
 #include <vector>
 
 namespace mu_tant
@@ -147,13 +148,21 @@ public:
     // editLock.
     void copyDataFrom(const GatePattern& other) noexcept
     {
-        // Spin-acquire the source's lock — the UI holds it only briefly around
-        // single-envelope mutations, so contention is negligible.
-        while (true)
+        // Capped spin matching GatingDesigner::withLock. The UI holds editLock
+        // only briefly around single-envelope mutations; 1000 yields covers any
+        // contention comfortably. If not acquired by the cap, skip the copy —
+        // the source pattern remains unchanged and the caller can retry.
         {
-            bool expected = false;
-            if (other.editLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
-                break;
+            constexpr int kMaxSpins = 1000;
+            bool acquired = false;
+            for (int i = 0; i < kMaxSpins; ++i)
+            {
+                bool expected = false;
+                if (other.editLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+                    { acquired = true; break; }
+                std::this_thread::yield();
+            }
+            if (!acquired) return;
         }
         subdivision = other.subdivision;
         envelopes   = other.envelopes;

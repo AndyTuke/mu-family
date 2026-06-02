@@ -46,9 +46,11 @@ Consequences — treat these as firm rules, not preferences:
   filter / amp ENVELOPE sections** — those are mu-clid's engine, **not** shared.
   - mu-clid engine: sample playback + Euclidean trigger + pitch/filter/amp ADSR.
   - mu-tant engine: oscillators + the **Gater** (gate pattern) + **modulation**
-    controlling parameters. mu-tant has **no pitch/filter/amp envelopes** — the
-    Gater is the amp; modulators move parameters. (Its filter cutoff/res/type are
-    mu-tant engine controls, not the shared mu-clid filter-with-ADSR.)
+    controlling parameters. The Gater replaces amp ADSR; **drawable PITCH and FILT
+    envelope layers** (added in #760 / #735) shape pitch and filter cutoff
+    per-voice via the GatingDesigner. No sample-playback / Euclidean trigger.
+    (Its filter cutoff/res/type are mu-tant engine controls, not the shared
+    mu-clid filter-with-ADSR.)
   The engine's output is fed `engine → insert → mixer`. Everything else (shell,
   sidebar/layers, presets, insert effect, mixer, modulators, panel styling) is
   inherited from `mu-core`.

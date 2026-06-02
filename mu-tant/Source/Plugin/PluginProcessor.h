@@ -242,6 +242,10 @@ private:
     // in the blk* members below, set at the top of processBlock (same thread).
     MixerEngine::RenderChannelFn renderVoiceCb;
     void   renderVoice(int voiceIdx, juce::AudioBuffer<float>& buf, int numSamples);
+    // renderVoice phases — called in order; each handles one concern.
+    void   applyModulation    (int v, VoiceConfig& cfg);
+    void   applyFilterEnvelope(int v, VoiceConfig& cfg);
+    void   applyPitchEnvelope (int v, VoiceConfig& cfg);
     bool   blkPlaying        = false;
     double blkBeatStart      = 0.0;
     double blkBeatsPerSample = 0.0;

@@ -5,7 +5,12 @@
 # Plugin-specific sources live under Source/; shared audio/UI/ProcessorBase come
 # from mu-core via the link.
 
-# ── mu-Tant — Standalone (first stab; VST3/CLAP added when it's worth shipping) ──
+# Binary resources (logo PNG — mirrors mu-clid's pattern).
+juce_add_binary_data(mu-tant-resources
+    SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/mu-tant.png"
+)
+
+# ── mu-Tant — Standalone + VST3 + CLAP ──────────────────────────────────────
 juce_add_plugin(mu-tant
     COMPANY_NAME "Transwarp Development Project"
     BUNDLE_ID "com.transwarp.mu-tant"
@@ -19,7 +24,23 @@ juce_add_plugin(mu-tant
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
+    VERSION         "${MUFAMILY_PLUGIN_VERSION}"
+    COMPANY_COPYRIGHT "${MUFAMILY_COPYRIGHT}"
+    ICON_BIG   "${CMAKE_CURRENT_SOURCE_DIR}/resources/Icon.png"
+    ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/Icon.png"
 )
+
+# Generate a custom Windows VERSIONINFO RC that uses μ-Tant (Greek mu) in the
+# file description. configure_file runs at configure time; the embedded version
+# number is the configure-time build number (accurate after a fresh cmake -B build).
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/resources/versioninfo.rc.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc"
+    @ONLY
+    NEWLINE_STYLE CRLF   # RC compiler expects CRLF on Windows
+)
+target_compile_definitions(mu-tant     PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc\"")
+target_compile_definitions(mu-tant_rc_lib PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc\"")
 
 target_sources(mu-tant
     PRIVATE
@@ -53,6 +74,7 @@ target_compile_definitions(mu-tant
 target_link_libraries(mu-tant
     PRIVATE
         mu-core
+        mu-tant-resources
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_basics
@@ -121,6 +143,7 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/PresetRoundTripTests.cpp  # gate serialise round-trip + tool ops (#791)
     Source/Tests/ApvtsLayoutTests.cpp      # real createParameterLayout coverage (#721)
     Source/Tests/SendFXSmokeTests.cpp      # FX-slot DSP smoke, ported from mu-clid (#721)
+    Source/Tests/PluginTransportTests.cpp  # host-playhead→gate contract; regression guard for #837
     Source/UI/GatingDesigner.cpp
     Source/Sequencer/GatePattern.cpp
     Source/Audio/WavetableBank.cpp

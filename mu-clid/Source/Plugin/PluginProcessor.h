@@ -391,14 +391,21 @@ public:
     void forceSyncRhythmFromAPVTS(int ri);
 private:
 
-    // ── processBlock phases (#665) ──────────────────────────────────────────
-    // processBlock is decomposed into these private helpers, invoked in order on
-    // the audio thread. Full-build only — the Lite build keeps its MIDI-only path
-    // inline in processBlock. None allocate or take locks beyond what the caller
-    // already holds: they run under processBlock's rhythmsLock ScopedTryLock, so
-    // the RT ordering + locking is identical to the pre-split single function.
-#if ! MUCLID_LITE_BUILD
+    // ── processBlock phases (#665, Lite path #828) ──────────────────────────
+    // processBlock is decomposed into private helpers invoked in order on the
+    // audio thread. None allocate or take locks beyond processBlock's own
+    // rhythmsLock ScopedTryLock.
     struct BlockTransport { bool playing; double beatPos; };
+#if MUCLID_LITE_BUILD
+    // Lite MIDI-only path: read playhead / internal transport, publish
+    // sequencerPlaying + lastBeatPos.
+    BlockTransport computeLiteTransport(int numSamples);
+    // Step the sequencer, compute accent velocities, dispatch MIDI triggers,
+    // update play-state atomics, and flush midiEngines. Called unconditionally
+    // (handles the playing/stopped branch internally).
+    void advanceLiteSequencer(int numRhythms, bool playing, double beatPos,
+                              juce::MidiBuffer& midi, int numSamples);
+#else
     // Scan MIDI clock + program changes, read the playhead / clock / internal
     // transport, reset the wrap detector on a stop->start edge, and publish
     // sequencerPlaying + lastBeatPos.

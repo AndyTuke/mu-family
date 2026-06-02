@@ -4,6 +4,7 @@
 #include "Modulation/MuTantModDest.h"
 #include "Modulation/ModulatorSerialise.h"   // mu-core: shared modulator (de)serialise
 #include "Sequencer/GatePatternSerialise.h"  // mu-tant: gate (de)serialise (also used by tests)
+#include "Plugin/HostTransport.h"            // mu-core: shared host-playhead reader
 
 #include <thread>
 
@@ -228,11 +229,25 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     const int numActiveVoices = numVoices.load(std::memory_order_relaxed);
 
     // Per-block transport snapshot for the render hook (audio-thread-only members,
-    // read by renderVoice within this same call). Beat advances only while playing;
-    // when stopped the gate is held open so the oscillators stay auditionable.
-    blkPlaying        = playing.load(std::memory_order_relaxed);
+    // read by renderVoice within this same call). In plugin mode, play state and BPM
+    // are derived from the host playhead; in standalone, the internal transport
+    // (play button) drives both. The gate advances while playing; while stopped the
+    // gate is held open so the oscillators stay auditionable.
+    double bpm = internalBpm.load(std::memory_order_relaxed);
+    if (wrapperType != wrapperType_Standalone)
+    {
+        // Plugin mode: derive play state and BPM from the host DAW.
+        const auto ht = mu_core::readHostTransport(getPlayHead());
+        if (ht.bpm > 0.0) bpm = ht.bpm;
+        // Reflect host state in the playing atomic so the UI timer can read it.
+        playing.store(ht.playing, std::memory_order_relaxed);
+        blkPlaying = ht.playing;
+    }
+    else
+    {
+        blkPlaying = playing.load(std::memory_order_relaxed);
+    }
     blkBeatStart      = internalBeatPos.load(std::memory_order_relaxed);
-    const double bpm  = internalBpm.load(std::memory_order_relaxed);   // snapshot once for this block
     blkBeatsPerSample = (bpm / 60.0) / currentSampleRate;
 
     // Channel-strip + master + FX state lives in mixerEngine/fxChain, kept in sync
@@ -274,18 +289,12 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     }
 }
 
-// One voice's full chain into the channel buffer: modulation → engine → gate →
-// insert. Invoked by MixerEngine::processBlock (Phase 1) per active channel; the
-// mixer then applies the channel strip + master. Renders even muted/un-soloed
-// voices (the mixer mutes at the mix), matching mu-clid's render-then-mute model.
-void PluginProcessor::renderVoice(int v, juce::AudioBuffer<float>& buf, int numSamples)
+void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
 {
+    // Seed paramValues from the current APVTS-derived config, then let this
+    // voice's matrix overwrite any modulated keys. The matrix is empty for
+    // voices the user hasn't assigned, so this collapses to a no-op.
     const auto& vp = voicePtrs[(size_t) v];
-
-    // Modulation pass — seed paramValues from the current APVTS-derived config,
-    // then let this voice's matrix overwrite any modulated keys. The matrix is
-    // empty for voices the user hasn't assigned, so this collapses to a no-op.
-    VoiceConfig cfg = readConfig(v);
     modParamValues["osc1.octave"]      = (float) cfg.osc1Octave;
     modParamValues["osc1.semi"]        = (float) cfg.osc1Semi;
     modParamValues["osc1.fine"]        = (float) cfg.osc1Fine;
@@ -306,9 +315,8 @@ void PluginProcessor::renderVoice(int v, juce::AudioBuffer<float>& buf, int numS
     modParamValues["insert.p3"]        = vp.insP3->load();
     modParamValues["insert.p4"]        = vp.insP4->load();
 
-    // tryLock-equivalent: ModulationMatrix mutations on the message thread hold
-    // modLock; on contention we skip the modulation pass this block (the voice
-    // still plays with un-modulated config).
+    // tryLock-equivalent: on contention skip the modulation pass this block
+    // (voice plays with un-modulated config).
     auto& slot = voiceSlots[(size_t) v];
     bool expected = false;
     if (slot.modLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
@@ -355,89 +363,98 @@ void PluginProcessor::renderVoice(int v, juce::AudioBuffer<float>& buf, int numS
         cfg.filterRes    = modParamValues["filter.resonance"];
         cfg.levelDb      = modParamValues["level"];
     }
+}
 
-    // ── Filter envelope (block-accurate modulation of filter cutoff) ─────────
+void PluginProcessor::applyFilterEnvelope(int v, VoiceConfig& cfg)
+{
     // Filter pattern envelopes add to cfg.filterCutoff in proportion space.
     // envelope value 0 → no change from base; 1 at depth=1 → fully open.
-    // Only applies while playing; when the pattern is empty, no modulation.
     // Apply the same kMinAttackMs rise-limiting as the gate to prevent clicks
     // when gate and filter envelopes are out of sync.
+    auto& fPat = filterPatterns[(size_t) v];
+    if (blkPlaying && fPat.hasEnvelopes.load(std::memory_order_relaxed))
     {
-        auto& fPat = filterPatterns[(size_t) v];
-        if (blkPlaying && fPat.hasEnvelopes.load(std::memory_order_relaxed))
+        const float maxRise = (currentSampleRate > 0.0 && GatePattern::kMinAttackMs > 0.0f)
+                            ? (float) (1.0 / ((double) GatePattern::kMinAttackMs * 0.001 * currentSampleRate))
+                            : 1.0f;
+        bool fExpected = false;
+        if (fPat.editLock.compare_exchange_strong(fExpected, true, std::memory_order_acquire))
         {
-            const float maxRise = (currentSampleRate > 0.0 && GatePattern::kMinAttackMs > 0.0f)
-                                ? (float) (1.0 / ((double) GatePattern::kMinAttackMs * 0.001 * currentSampleRate))
-                                : 1.0f;
-            bool fExpected = false;
-            if (fPat.editLock.compare_exchange_strong(fExpected, true, std::memory_order_acquire))
-            {
-                fPat.resetGateCache();
-                const float target   = fPat.gateAt(blkBeatStart, 0.0f, loopCount.load(std::memory_order_relaxed));
-                // Slew-limit the filter envelope rising edge (same as gate)
-                fPat.filterLevel = (target > fPat.filterLevel)
-                                 ? std::min(target, fPat.filterLevel + maxRise)
-                                 : target;
-                const float depth    = juce::jlimit(-1.0f, 1.0f, cfg.filterEnvDepth);
-                const float baseProp = tantPropFromCutoff(cfg.filterCutoff);
-                // baseProp + depth*filterLevel: envelope adds on top of base cutoff.
-                //   depth=1, filterLevel=0 → baseProp (no change)
-                //   depth=1, filterLevel=1 → clamped to 1.0 (fully open)
-                //   depth=-1,filterLevel=1 → baseProp-1 (clamped toward 20 Hz)
-                const float modProp  = juce::jlimit(0.0f, 1.0f, baseProp + depth * fPat.filterLevel);
-                cfg.filterCutoff = juce::jlimit(20.0f, 20000.0f, tantCutoffFromProp(modProp));
-                fPat.editLock.store(false, std::memory_order_release);
-            }
-            // On lock contention: use un-modulated cutoff (edit-time blip)
+            fPat.resetGateCache();
+            const float target   = fPat.gateAt(blkBeatStart, 0.0f, loopCount.load(std::memory_order_relaxed));
+            // Slew-limit the filter envelope rising edge (same as gate)
+            fPat.filterLevel = (target > fPat.filterLevel)
+                             ? std::min(target, fPat.filterLevel + maxRise)
+                             : target;
+            const float depth    = juce::jlimit(-1.0f, 1.0f, cfg.filterEnvDepth);
+            const float baseProp = tantPropFromCutoff(cfg.filterCutoff);
+            // baseProp + depth*filterLevel: envelope adds on top of base cutoff.
+            //   depth=1, filterLevel=0 → baseProp (no change)
+            //   depth=1, filterLevel=1 → clamped to 1.0 (fully open)
+            //   depth=-1,filterLevel=1 → baseProp-1 (clamped toward 20 Hz)
+            const float modProp  = juce::jlimit(0.0f, 1.0f, baseProp + depth * fPat.filterLevel);
+            cfg.filterCutoff = juce::jlimit(20.0f, 20000.0f, tantCutoffFromProp(modProp));
+            fPat.editLock.store(false, std::memory_order_release);
         }
-        else if (!blkPlaying)
-        {
-            fPat.filterLevel = 1.0f;  // reset when stopped
-        }
+        // On lock contention: use un-modulated cutoff (edit-time blip)
     }
+    else if (!blkPlaying)
+    {
+        fPat.filterLevel = 1.0f;  // reset when stopped
+    }
+}
 
-    // ── Pitch envelope (block-accurate pitch modulation per osc) ─────────────
+void PluginProcessor::applyPitchEnvelope(int v, VoiceConfig& cfg)
+{
     // Pitch pattern envelope value (0..1) × depth (±24 semitones) shifts
     // osc1/osc2 pitch before VoiceEngine processes it this block.
+    auto& pPat = pitchPatterns[(size_t) v];
+    if (blkPlaying && pPat.hasEnvelopes.load(std::memory_order_relaxed))
     {
-        auto& pPat = pitchPatterns[(size_t) v];
-        if (blkPlaying && pPat.hasEnvelopes.load(std::memory_order_relaxed))
+        bool pExpected = false;
+        if (pPat.editLock.compare_exchange_strong(pExpected, true, std::memory_order_acquire))
         {
-            bool pExpected = false;
-            if (pPat.editLock.compare_exchange_strong(pExpected, true, std::memory_order_acquire))
-            {
-                pPat.resetGateCache();
-                const float envLevel = pPat.gateAt(blkBeatStart, 0.0f, loopCount.load(std::memory_order_relaxed));
-                const float d1 = voicePtrs[(size_t) v].o1PenvDepth->load();
-                const float d2 = voicePtrs[(size_t) v].o2PenvDepth->load();
-                cfg.osc1Semi += (int) roundf(d1 * envLevel);
-                cfg.osc2Semi += (int) roundf(d2 * envLevel);
-                pPat.editLock.store(false, std::memory_order_release);
-            }
+            pPat.resetGateCache();
+            const float envLevel = pPat.gateAt(blkBeatStart, 0.0f, loopCount.load(std::memory_order_relaxed));
+            const float d1 = voicePtrs[(size_t) v].o1PenvDepth->load();
+            const float d2 = voicePtrs[(size_t) v].o2PenvDepth->load();
+            cfg.osc1Semi += (int) roundf(d1 * envLevel);
+            cfg.osc2Semi += (int) roundf(d2 * envLevel);
+            pPat.editLock.store(false, std::memory_order_release);
         }
     }
+}
+
+// One voice's full chain into the channel buffer: modulation → engine → gate →
+// insert. Invoked by MixerEngine::processBlock (Phase 1) per active channel; the
+// mixer then applies the channel strip + master. Renders even muted/un-soloed
+// voices (the mixer mutes at the mix), matching mu-clid's render-then-mute model.
+void PluginProcessor::renderVoice(int v, juce::AudioBuffer<float>& buf, int numSamples)
+{
+    VoiceConfig cfg = readConfig(v);
+    applyModulation(v, cfg);
+    applyFilterEnvelope(v, cfg);
+    applyPitchEnvelope(v, cfg);
 
     buf.clear();
     voices[(size_t) v]->setConfig(cfg);
     voices[(size_t) v]->process(buf, numSamples);
 
-    // ── Gate stage ────────────────────────────────────────────────────────────
     // The per-voice gater shapes the (post-filter) voice output:
     //   bypassed             → raw drone passes (audition / configure)
     //   stopped              → silence (gate closed — nothing audible on load)
     //   playing, no envelopes→ silence (nothing drawn → nothing passes)
     //   playing, envelopes   → per-sample envelope gate
     // See applyGateBlock — the audio path + the audio test harness share it.
-    auto& pattern = gatePatterns[(size_t) v];
+    const auto& vp = voicePtrs[(size_t) v];
     const float gateGap    = vp.gateGap->load() * 0.01f;   // 0..100% → 0..1
     const bool  gateBypass = vp.gateBypass->load() > 0.5f;
     float* gl = buf.getWritePointer(0);
     float* gr = buf.getNumChannels() > 1 ? buf.getWritePointer(1) : nullptr;
-    applyGateBlock(pattern, gl, gr, numSamples, gateGap, gateBypass, blkPlaying,
-                   blkBeatStart, blkBeatsPerSample, currentSampleRate,
+    applyGateBlock(gatePatterns[(size_t) v], gl, gr, numSamples, gateGap, gateBypass,
+                   blkPlaying, blkBeatStart, blkBeatsPerSample, currentSampleRate,
                    loopCount.load(std::memory_order_relaxed));
 
-    // ── Insert effect ───────────────────────────────────────────────────────
     // Use modulated insert param values (modulation may have adjusted them).
     VoiceParams ip;
     ip.insertAlgo     = (int) vp.drvChar->load();

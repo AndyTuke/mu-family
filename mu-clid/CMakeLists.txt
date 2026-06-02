@@ -23,9 +23,21 @@ juce_add_plugin(mu-clid
     NEEDS_MIDI_OUTPUT TRUE
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
+    VERSION         "${MUFAMILY_PLUGIN_VERSION}"
+    COMPANY_COPYRIGHT "${MUFAMILY_COPYRIGHT}"
     ICON_BIG   "${CMAKE_CURRENT_SOURCE_DIR}/resources/Icon.png"
     ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/Icon.png"
 )
+
+# Custom VERSIONINFO with Greek μ in description (shared by full + Lite).
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/resources/versioninfo.rc.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc"
+    @ONLY
+    NEWLINE_STYLE CRLF
+)
+target_compile_definitions(mu-clid     PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc\"")
+target_compile_definitions(mu-clid_rc_lib PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc\"")
 
 target_sources(mu-clid
     PRIVATE
@@ -171,9 +183,20 @@ juce_add_plugin(mu-clid-lite
     NEEDS_MIDI_OUTPUT TRUE
     IS_MIDI_EFFECT TRUE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
+    VERSION         "${MUFAMILY_PLUGIN_VERSION}"
+    COMPANY_COPYRIGHT "${MUFAMILY_COPYRIGHT}"
     ICON_BIG   "${CMAKE_CURRENT_SOURCE_DIR}/resources/Icon.png"
     ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/Icon.png"
 )
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/resources/versioninfo-lite.rc.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/versioninfo-lite.rc"
+    @ONLY
+    NEWLINE_STYLE CRLF
+)
+target_compile_definitions(mu-clid-lite     PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo-lite.rc\"")
+target_compile_definitions(mu-clid-lite_rc_lib PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo-lite.rc\"")
 
 target_sources(mu-clid-lite
     PRIVATE

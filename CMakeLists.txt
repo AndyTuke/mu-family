@@ -33,6 +33,24 @@ add_subdirectory(ThirdParty/clap-juce-extensions)
 # The per-plugin OneDrive POST_BUILD deploy steps are guarded by this option.
 option(MUFAMILY_DEPLOY_TESTERS "Deploy Release artefacts to the OneDrive tester share" OFF)
 
+# ── Family-wide version metadata ────────────────────────────────────────────
+# Read the current build number at configure time so PLUGIN_VERSION in every
+# juce_add_plugin call reflects the real release number rather than the cmake
+# project fallback (1.0.0.0). Note: the build step increments build_number.txt
+# *after* configure, so the version embedded in a first-session build is N (the
+# previous session's number); subsequent builds within the same session are exact.
+# This is accurate enough for tester identification and far better than 1.0.0.0.
+file(READ "${CMAKE_SOURCE_DIR}/build_number.txt" MUFAMILY_BUILD_NUMBER)
+string(STRIP "${MUFAMILY_BUILD_NUMBER}" MUFAMILY_BUILD_NUMBER)
+string(TIMESTAMP MUFAMILY_YEAR "%Y")
+set(MUFAMILY_PLUGIN_VERSION "1.0.${MUFAMILY_BUILD_NUMBER}")
+set(MUFAMILY_COPYRIGHT "Copyright (c) ${MUFAMILY_YEAR} Transwarp Development Project")
+# Windows FILEVERSION uses comma-separated quads (1,0,736,0).
+string(REPLACE "." "," MUFAMILY_FILEVERSION "${MUFAMILY_PLUGIN_VERSION}")
+set(MUFAMILY_FILEVERSION "${MUFAMILY_FILEVERSION},0")
+
+message(STATUS "mu-family version: ${MUFAMILY_PLUGIN_VERSION}")
+
 # Distribution paths the plugin subdirs reference for installer + deploy hooks.
 # Cached so cmake/IncrementBuildNumber.cmake and per-plugin installers can find them.
 set(MUFAMILY_WIN_DIST "D:/Andy Tuke/Music - Music Software/TDP/Windows"
