@@ -19,19 +19,18 @@ namespace mu_tant
 inline juce::ValueTree serialiseGate(const GatePattern& g, const char* tagName = "Gate")
 {
     juce::ValueTree t(tagName);
-    t.setProperty("subdiv", (int) g.subdivision, nullptr);
+    t.setProperty("subdiv",  (int) g.subdivision,       nullptr);
+    t.setProperty("bars",    g.patternLengthBars,        nullptr);
     for (const auto& e : g.envelopes)
     {
         juce::ValueTree env("Env");
-        env.setProperty("start",    e.startCell,         nullptr);
-        env.setProperty("len",      e.lengthCells,       nullptr);
-        env.setProperty("split",    e.split,             nullptr);
-        env.setProperty("atk",      e.attackBend,        nullptr);
-        env.setProperty("dec",      e.decayBend,         nullptr);
-        env.setProperty("rev",      e.reverse ? 1 : 0,  nullptr);
-        env.setProperty("prob",     e.probability,       nullptr);
-        env.setProperty("loopMask", (int) e.loopMask,   nullptr);
-        env.setProperty("loopM",    e.loopM,             nullptr);
+        env.setProperty("start", e.startCell,         nullptr);
+        env.setProperty("len",   e.lengthCells,       nullptr);
+        env.setProperty("split", e.split,             nullptr);
+        env.setProperty("atk",   e.attackBend,        nullptr);
+        env.setProperty("dec",   e.decayBend,         nullptr);
+        env.setProperty("rev",   e.reverse ? 1 : 0,  nullptr);
+        env.setProperty("prob",  e.probability,       nullptr);
         t.addChild(env, -1, nullptr);
     }
     return t;
@@ -69,6 +68,8 @@ inline void deserialiseGate(const juce::ValueTree& t, GatePattern& g)
     {
         g.subdivision = (GatePattern::Subdivision)(int)
             t.getProperty("subdiv", (int) GatePattern::Subdivision::Sixteenth);
+        g.patternLengthBars = juce::jlimit(1, GatePattern::kMaxPatternBars,
+                                            (int) t.getProperty("bars", 2));
         for (int i = 0; i < t.getNumChildren(); ++i)
         {
             auto c = t.getChild(i);
@@ -82,21 +83,14 @@ inline void deserialiseGate(const juce::ValueTree& t, GatePattern& g)
             e.reverse     =        (int)    c.getProperty("rev", 0) != 0;
             e.probability = juce::jlimit(0.0f, 1.0f,
                                 (float)(double) c.getProperty("prob", 1.0));
-            // loopMask: new format, or convert legacy loopN to a single-bit mask.
-            if (c.hasProperty("loopMask"))
-                e.loopMask = (uint8_t) juce::jlimit(1, 255, (int) c.getProperty("loopMask", 1));
-            else
-            {
-                const int legacyN = juce::jlimit(1, 8, (int) c.getProperty("loopN", 1));
-                e.loopMask = (uint8_t)(1 << (legacyN - 1));
-            }
-            e.loopM = juce::jlimit(1, 8, (int) c.getProperty("loopM", 1));
+            // loopMask/loopM/loopN properties from older presets are silently ignored.
             g.envelopes.push_back(e);
         }
     }
     else
     {
-        g.subdivision = GatePattern::Subdivision::Sixteenth;
+        g.subdivision       = GatePattern::Subdivision::Sixteenth;
+        g.patternLengthBars = 2;
     }
     g.resetGateCache();
     g.hasEnvelopes.store(!g.envelopes.empty(), std::memory_order_relaxed);

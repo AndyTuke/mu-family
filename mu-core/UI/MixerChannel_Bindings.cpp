@@ -303,7 +303,7 @@ void MixerChannel::bindMaster(MixerEngine& engine, ProcessorBase* proc)
                     }
 
                     // Master insert doesn't ride the same RhythmPanel
-                    // inline-refresh path as the per-rhythm insert (#613) —
+                    // inline-refresh path as the per-rhythm insert —
                     // MixerOverlay's listener is a deferred apvtsDirty flag
                     // flushed by its 30 Hz timer, so the multi-write doesn't
                     // produce intermediate stale-algo UI states. drvChar is

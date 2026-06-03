@@ -126,7 +126,7 @@ public:
         // ── Sidebar tab line ─────────────────────────────────────────────
         sidebarTabLine          = 0x100000b0,  // matches rhythm colour, drawn at runtime
 
-        // ── #366: new tokens for the audit-flagged hardcoded colours ─────
+        // ── Extra colour tokens replacing previously hardcoded values ────
         backgroundDialog        = 0x100000c0,  // modal dialog cards
         backgroundModalDim      = 0x100000c1,  // dim behind modal cards (semi-transparent)
         backgroundFxRowDim      = 0x100000c2,  // FX/Delay row disabled overlay

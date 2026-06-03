@@ -48,21 +48,6 @@ void GateToolButton::paintButton(juce::Graphics& g, bool highlighted, bool)
 
     switch (toolId)
     {
-        case GateTool::Arrow:
-        {
-            // Pointer arrow
-            juce::Path p;
-            p.startNewSubPath(b.getX(), b.getY());
-            p.lineTo(b.getX(), b.getBottom() - b.getHeight() * 0.25f);
-            p.lineTo(b.getX() + b.getWidth() * 0.32f,  b.getCentreY() + b.getHeight() * 0.1f);
-            p.lineTo(b.getX() + b.getWidth() * 0.55f,  b.getBottom());
-            p.lineTo(b.getRight(),                      b.getBottom() - b.getHeight() * 0.3f);
-            p.lineTo(b.getX() + b.getWidth() * 0.6f,   b.getCentreY() - b.getHeight() * 0.05f);
-            p.lineTo(b.getRight() - b.getWidth() * 0.1f, b.getY());
-            p.closeSubPath();
-            g.fillPath(p);
-            break;
-        }
         case GateTool::Pencil:
         {
             juce::Path p;
@@ -129,10 +114,10 @@ GatingDesigner::GatingDesigner()
     bypassButton.setTooltip("Bypass the gater so the drone passes through");
     addAndMakeVisible(bypassButton);
 
-    // ── Gap slider (public, VoicePanel binds the APVTS attachment) ───────────
+    // ── Gap rotary (public, VoicePanel binds the APVTS attachment) ──────────
     gapSlider.setRange(0.0, 100.0, 1.0);
-    gapSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    gapSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 36, 16);
+    gapSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    gapSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, kGapTbW, 16);
     gapSlider.setTooltip("Gap: silence at the end of each envelope region (0-100 %)");
     gapSlider.onValueChange = [this] { setGap((float)(gapSlider.getValue() / 100.0)); };
     addAndMakeVisible(gapSlider);
@@ -152,75 +137,42 @@ GatingDesigner::GatingDesigner()
     addAndMakeVisible(subdivDropdown);
 
     // ── Toolbox ──────────────────────────────────────────────────────────────
-    arrowBtn  .setTooltip("Arrow - select an envelope to edit its properties");
     pencilBtn .setTooltip("Pencil - draw; drag handles to reshape");
     eraserBtn .setTooltip("Eraser - click to remove");
     reverseBtn.setTooltip("Reverse - flip attack/decay");
-    for (auto* b : { &arrowBtn, &pencilBtn, &eraserBtn, &reverseBtn })
+    for (auto* b : { &pencilBtn, &eraserBtn, &reverseBtn })
     {
         b->onClick = [this, b] { selectTool(b->tool()); };
         addAndMakeVisible(b);
     }
     pencilBtn.setToggleState(true, juce::dontSendNotification);
 
-    // ── Properties strip: probability rotary ─────────────────────────────────
-    probKnob.setRange(1.0, 100.0, 1.0);
-    probKnob.setValue(100.0, juce::dontSendNotification);
-    probKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    probKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 38, 14);
-    probKnob.setTooltip("Probability this envelope plays each loop (1-100 %)");
-    probKnob.onValueChange = [this] { if (!propsUpdating) writePropsToSelection(); };
-    addAndMakeVisible(probKnob);
-    probLabel.setText("Prob", juce::dontSendNotification);
-    probLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
-    probLabel.setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(probLabel);
+    // ── Pattern length dropdown (1-16 bars) ──────────────────────────────────
+    for (int b = 1; b <= GatePattern::kMaxPatternBars; ++b)
+        barsDropdown.addItem(juce::String(b), b);
+    barsDropdown.setSelectedId(2, false);
+    barsDropdown.onChange = [this](int id) { if (id >= 1) setPatternBars(id); };
+    addAndMakeVisible(barsDropdown);
 
-    // ── Properties strip: loop mask ───────────────────────────────────────────
-    loopMLabel.setText("Loop", juce::dontSendNotification);
-    loopMLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
-    loopMLabel.setJustificationType(juce::Justification::centredRight);
-    addAndMakeVisible(loopMLabel);
-
-    for (int i = 1; i <= 8; ++i) loopMDropdown.addItem(juce::String(i), i);
-    loopMDropdown.setSelectedId(1, false);
-    loopMDropdown.onChange = [this](int) {
-        if (!propsUpdating) { updateLoopBtnEnabled(); writePropsToSelection(); }
-    };
-    addAndMakeVisible(loopMDropdown);
-
-    for (int i = 0; i < 8; ++i)
-    {
-        loopBtn[i].setButtonText(juce::String(i + 1));
-        loopBtn[i].setClickingTogglesState(true);
-        loopBtn[i].setTooltip("Play on loop position " + juce::String(i + 1));
-        loopBtn[i].onClick = [this] { if (!propsUpdating) writePropsToSelection(); };
-        addAndMakeVisible(loopBtn[i]);
-    }
-    loopBtn[0].setToggleState(true, juce::dontSendNotification);  // default: play on every loop
-
-    // All props invisible until an envelope is selected.
-    for (juce::Component* c : { static_cast<juce::Component*>(&probKnob),
-                                 static_cast<juce::Component*>(&probLabel),
-                                 static_cast<juce::Component*>(&loopMLabel),
-                                 static_cast<juce::Component*>(&loopMDropdown) })
-        c->setVisible(false);
-    for (auto& b : loopBtn) b.setVisible(false);
+    // ── Scrollbar ────────────────────────────────────────────────────────────
+    scrollBar.setRangeLimits(0.0, 2.0);
+    scrollBar.setCurrentRange(0.0, 2.0);
+    scrollBar.setAutoHide(false);
+    scrollBar.addListener(this);
+    addAndMakeVisible(scrollBar);
 }
 
 void GatingDesigner::selectTool(GateTool t)
 {
-    if (t != GateTool::Arrow) clearSelection();
     currentTool = t;
     setMouseCursor(juce::MouseCursor::NormalCursor);
-    markPathsDirty();   // handle visibility changes (pencil vs arrow vs eraser)
+    markPathsDirty();
     repaint();
 }
 
 void GatingDesigner::setLayer(GateLayer layer)
 {
     if (layer == currentLayer) return;
-    clearSelection();
     currentLayer = layer;
     gaterLayerBtn .setToggleState(layer == GateLayer::Gater,  juce::dontSendNotification);
     filterLayerBtn.setToggleState(layer == GateLayer::Filter, juce::dontSendNotification);
@@ -245,42 +197,104 @@ void GatingDesigner::setSubdivision(int denominator)
     repaint();
 }
 
+void GatingDesigner::setPatternBars(int bars)
+{
+    bars = juce::jlimit(1, GatePattern::kMaxPatternBars, bars);
+    barsDropdown.setSelectedId(bars, false);
+
+    // Update all three patterns (they share the same temporal grid).
+    for (auto* pat : { boundPattern, filterPattern, pitchPattern })
+    {
+        if (pat == nullptr) continue;
+        withLock(pat, [&] {
+            pat->patternLengthBars = bars;
+            // Remove envelopes that start at or beyond the new total cells.
+            const int maxCell = bars * (int) pat->subdivision;
+            pat->envelopes.erase(
+                std::remove_if(pat->envelopes.begin(), pat->envelopes.end(),
+                    [maxCell](const GateEnvelope& e) { return e.startCell >= maxCell; }),
+                pat->envelopes.end());
+            // Clip any envelope extending past the new end.
+            for (auto& e : pat->envelopes)
+            {
+                const int end = e.startCell + e.lengthCells;
+                if (end > maxCell) e.lengthCells = maxCell - e.startCell;
+            }
+            pat->hasEnvelopes.store(!pat->envelopes.empty(), std::memory_order_relaxed);
+        });
+    }
+
+    setViewStart(0.0);   // snap view back to start on length change
+    updateScrollRange();
+    markPathsDirty();
+    repaint();
+}
+
+void GatingDesigner::updateScrollRange()
+{
+    auto* pat = getActivePattern();
+    const int bars = (pat != nullptr) ? pat->patternLengthBars : kViewBars;
+    const double total = (double) bars;
+    const double view  = (double) kViewBars;
+    scrollBar.setRangeLimits(0.0, total);
+    scrollBar.setCurrentRange(juce::jlimit(0.0, total - view, viewStartBar), view);
+    // Only show scrollbar when pattern is longer than the view window.
+    scrollBar.setVisible(bars > kViewBars);
+}
+
+void GatingDesigner::setViewStart(double bar)
+{
+    auto* pat = getActivePattern();
+    const int bars = (pat != nullptr) ? pat->patternLengthBars : kViewBars;
+    const double maxStart = (double) juce::jmax(0, bars - kViewBars);
+    viewStartBar = juce::jlimit(0.0, maxStart, bar);
+    scrollBar.setCurrentRange(viewStartBar, (double) kViewBars, juce::dontSendNotification);
+    markPathsDirty();
+    repaint();
+}
+
 void GatingDesigner::setPattern(GatePattern* pattern)
 {
     boundPattern = pattern;
-    clearSelection();
     markPathsDirty();
     if (pattern != nullptr && currentLayer == GateLayer::Gater)
     {
         subdivisionDenom = static_cast<int>(pattern->subdivision);
         subdivDropdown.setSelectedId(idForDenom(subdivisionDenom), false);
+        barsDropdown.setSelectedId(pattern->patternLengthBars, false);
     }
+    setViewStart(0.0);
+    updateScrollRange();
     repaint();
 }
 
 void GatingDesigner::setFilterPattern(GatePattern* pattern)
 {
     filterPattern = pattern;
-    clearSelection();
     markPathsDirty();
     if (pattern != nullptr && currentLayer == GateLayer::Filter)
     {
         subdivisionDenom = static_cast<int>(pattern->subdivision);
         subdivDropdown.setSelectedId(idForDenom(subdivisionDenom), false);
+        barsDropdown.setSelectedId(pattern->patternLengthBars, false);
     }
+    setViewStart(0.0);
+    updateScrollRange();
     repaint();
 }
 
 void GatingDesigner::setPitchPattern(GatePattern* pattern)
 {
     pitchPattern = pattern;
-    clearSelection();
     markPathsDirty();
     if (pattern != nullptr && currentLayer == GateLayer::Pitch)
     {
         subdivisionDenom = static_cast<int>(pattern->subdivision);
         subdivDropdown.setSelectedId(idForDenom(subdivisionDenom), false);
+        barsDropdown.setSelectedId(pattern->patternLengthBars, false);
     }
+    setViewStart(0.0);
+    updateScrollRange();
     repaint();
 }
 
@@ -305,21 +319,36 @@ juce::Colour GatingDesigner::ghostLayerColour() const noexcept
     return MuLookAndFeel::colour(MuLookAndFeel::knobFxSend);
 }
 
-int GatingDesigner::cellCount() const noexcept { return kTotalBars * subdivisionDenom; }
+int GatingDesigner::cellCount() const noexcept
+{
+    if (auto* p = getActivePattern()) return p->patternLengthBars * subdivisionDenom;
+    return kViewBars * subdivisionDenom;
+}
 
 juce::Rectangle<float> GatingDesigner::gridBounds() const noexcept
 {
     using mu_ui::s;
-    return { 0.0f, (float)(s(kHdr1H) + s(kHdr2H)), (float)getWidth(), (float)s(kGridH) };
+    return { 0.0f, (float)s(kHdr1H), (float)getWidth(), (float)s(kGridH) };
+}
+
+// Pixel width of one cell in the view (based on viewCellCount = kViewBars * subdivisionDenom).
+float GatingDesigner::viewCellW() const noexcept
+{
+    const float viewCells = (float)(kViewBars * subdivisionDenom);
+    return viewCells > 0.0f ? gridBounds().getWidth() / viewCells : 0.0f;
 }
 
 int GatingDesigner::cellAtX(float x) const noexcept
 {
     const auto grid = gridBounds();
-    const int cells = cellCount();
-    if (cells <= 0 || grid.getWidth() <= 0.0f) return -1;
+    const int totalCells = cellCount();
+    if (totalCells <= 0 || grid.getWidth() <= 0.0f) return -1;
     if (x < grid.getX() || x > grid.getRight()) return -1;
-    return juce::jlimit(0, cells - 1, (int)((x - grid.getX()) / grid.getWidth() * (float)cells));
+    const float cw = viewCellW();
+    if (cw <= 0.0f) return -1;
+    const float viewStartBeat = (float)(viewStartBar * subdivisionDenom);
+    const int cell = (int)(viewStartBeat + (x - grid.getX()) / cw);
+    return juce::jlimit(0, totalCells - 1, cell);
 }
 
 GatingDesigner::EnvLayout GatingDesigner::layoutFor(const GateEnvelope& e) const noexcept
@@ -327,10 +356,10 @@ GatingDesigner::EnvLayout GatingDesigner::layoutFor(const GateEnvelope& e) const
     using mu_ui::sf;
     EnvLayout L;
     const auto grid = gridBounds();
-    const int cells = cellCount();
-    if (cells <= 0) return L;
-    const float cellW = grid.getWidth() / (float)cells;
-    L.x0  = grid.getX() + cellW * (float)e.startCell;
+    const float cellW = viewCellW();
+    if (cellW <= 0.0f) return L;
+    const float viewStartBeat = (float)(viewStartBar * subdivisionDenom);
+    L.x0  = grid.getX() + cellW * ((float)e.startCell - viewStartBeat);
     L.wpx = cellW * (float)e.lengthCells;
     L.top = grid.getY() + sf(2.0f);
     L.bot = grid.getBottom() - sf(2.0f);
@@ -409,7 +438,7 @@ void GatingDesigner::rebuildPathCache()
         if (pat == nullptr) return;
         // Pre-size the cache before acquiring editLock so Path object construction
         // (which may allocate) doesn't extend the lock hold. The audio thread's
-        // bounded spin (#795) can exhaust if the lock is held during allocation.
+        // bounded spin can exhaust if the lock is held during allocation.
         // We read envelopes.size() without the lock here — safe because only the
         // message thread writes envelopes, so a concurrent read is coherent.
         cache.resize(pat->envelopes.size());
@@ -443,72 +472,6 @@ void GatingDesigner::rebuildPathCache()
 }
 
 // ── Selection ─────────────────────────────────────────────────────────────────
-void GatingDesigner::clearSelection()
-{
-    selEnvIndex = -1;
-    for (juce::Component* c : { static_cast<juce::Component*>(&probKnob),
-                                 static_cast<juce::Component*>(&probLabel),
-                                 static_cast<juce::Component*>(&loopMLabel),
-                                 static_cast<juce::Component*>(&loopMDropdown) })
-        c->setVisible(false);
-    for (auto& b : loopBtn) b.setVisible(false);
-    repaint();
-}
-
-void GatingDesigner::selectEnvelope(int idx)
-{
-    selEnvIndex = idx;
-    const bool valid = (idx >= 0);
-    for (juce::Component* c : { static_cast<juce::Component*>(&probKnob),
-                                 static_cast<juce::Component*>(&probLabel),
-                                 static_cast<juce::Component*>(&loopMLabel),
-                                 static_cast<juce::Component*>(&loopMDropdown) })
-        c->setVisible(valid);
-    for (auto& b : loopBtn) b.setVisible(valid);
-    if (valid) updatePropsFromSelection();
-    repaint();
-}
-
-void GatingDesigner::updateLoopBtnEnabled()
-{
-    const int m = loopMDropdown.getSelectedId();
-    for (int i = 0; i < 8; ++i)
-        loopBtn[i].setEnabled(i < m);
-}
-
-void GatingDesigner::updatePropsFromSelection()
-{
-    auto* pat = getActivePattern();
-    if (pat == nullptr || selEnvIndex < 0 || selEnvIndex >= (int)pat->envelopes.size())
-    { clearSelection(); return; }
-
-    propsUpdating = true;
-    const auto& env = pat->envelopes[(size_t)selEnvIndex];
-    probKnob.setValue(juce::jlimit(1.0, 100.0, (double)(env.probability * 100.0f)),
-                      juce::dontSendNotification);
-    loopMDropdown.setSelectedId(juce::jlimit(1, 8, env.loopM), false);
-    for (int i = 0; i < 8; ++i)
-        loopBtn[i].setToggleState(((env.loopMask >> i) & 1u) != 0, juce::dontSendNotification);
-    propsUpdating = false;
-    updateLoopBtnEnabled();
-}
-
-void GatingDesigner::writePropsToSelection()
-{
-    auto* pat = getActivePattern();
-    if (pat == nullptr || selEnvIndex < 0 || selEnvIndex >= (int)pat->envelopes.size())
-        return;
-    withLock(pat, [&] {
-        auto& env = pat->envelopes[(size_t)selEnvIndex];
-        env.probability = juce::jlimit(0.01f, 1.0f, (float)(probKnob.getValue() / 100.0));
-        env.loopM       = juce::jlimit(1, 8, loopMDropdown.getSelectedId());
-        uint8_t mask = 0;
-        for (int i = 0; i < 8; ++i)
-            if (loopBtn[i].getToggleState()) mask |= (uint8_t)(1 << i);
-        if (mask == 0) mask = 0x01;   // at least one position must play
-        env.loopMask = mask;
-    });
-}
 
 // ── Mouse ─────────────────────────────────────────────────────────────────────
 void GatingDesigner::mouseDown(const juce::MouseEvent& e)
@@ -522,7 +485,6 @@ void GatingDesigner::mouseDown(const juce::MouseEvent& e)
 
     switch (currentTool)
     {
-        case GateTool::Arrow:
         case GateTool::Pencil:
         {
             const auto hit = hitTestHandles(e.position, pat);
@@ -535,17 +497,6 @@ void GatingDesigner::mouseDown(const juce::MouseEvent& e)
                 setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
                 return;
             }
-            if (currentTool == GateTool::Arrow)
-            {
-                // Arrow body-click: select the envelope under the cursor.
-                int found = -1;
-                const auto& envs = pat->envelopes;
-                for (int i = 0; i < (int)envs.size(); ++i)
-                    if (envs[(size_t)i].covers(cell)) { found = i; break; }
-                selectEnvelope(found);
-                break;
-            }
-            // Pencil: check pencil-specific shape handles then draw.
             if (hit.handle != Handle::None)
             {
                 dragEnvIndex = hit.envIndex;
@@ -691,18 +642,22 @@ void GatingDesigner::paint(juce::Graphics& g)
     using mu_ui::sf;
     using Id = MuLookAndFeel::ColourIds;
 
-    // Header rows background.
+    // Header row background.
+    const int hdrH = s(kHdr1H);
     g.setColour(MuLookAndFeel::colour(Id::panelBackground));
-    g.fillRect(0, 0, getWidth(), s(kHdr1H) + s(kHdr2H));
+    g.fillRect(0, 0, getWidth(), hdrH);
 
-    // Thin divider between header rows.
-    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder).withAlpha(0.4f));
-    g.fillRect(0, s(kHdr1H), getWidth(), 1);
-
-    // "Gap" label in row 2.
+    // "Gap" label painted just before the gap rotary. Position mirrors resized():
+    // Bypass(kBtnW) + layers(3 × kBtnW) + tools(3 × kToolW) + gaps.
+    const int afterLeftBtns = s(kHdrInset) + 4 * s(kBtnW) + 3 * s(4) + s(6);
+    const int afterTools    = afterLeftBtns + 3 * (s(kToolW) + s(kToolGap)) + s(6);
     g.setColour(MuLookAndFeel::colour(Id::labelText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.5f))));
-    g.drawText("Gap", s(kHdrInset), s(kHdr1H), s(32), s(kHdr2H), juce::Justification::centredLeft, false);
+    g.drawText("Gap", afterTools, 0, s(26), hdrH, juce::Justification::centredLeft, false);
+
+    // "Bars" label painted immediately left of the bars dropdown.
+    g.drawText("Bars", barsDropdown.getX() - s(26), 0, s(26), hdrH,
+               juce::Justification::centredLeft, false);
 
     // Gate grid.
     const auto gateRect = gridBounds();
@@ -711,19 +666,22 @@ void GatingDesigner::paint(juce::Graphics& g)
     g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawRect(gateRect, 1.0f);
 
-    // Subdivision gridlines.
-    const int cells = cellCount();
-    if (cells > 0)
+    // Subdivision gridlines — rendered in view-coordinate space.
+    const float cw = viewCellW();
+    const float viewStartBeat = (float)(viewStartBar * subdivisionDenom);
+    if (cw > 0.0f)
     {
-        const float cellW = gateRect.getWidth() / (float)cells;
-        const int cpb = cells / kTotalBars;
-        for (int i = 1; i < cells; ++i)
+        const int totalCells = cellCount();
+        const int viewCells  = kViewBars * subdivisionDenom;
+        for (int i = 0; i <= viewCells; ++i)
         {
-            const float x = gateRect.getX() + cellW * (float)i;
-            const bool bar = (i % cpb) == 0;
-            g.setColour(bar ? MuLookAndFeel::colour(Id::headingText).withAlpha(0.55f)
-                            : MuLookAndFeel::colour(Id::mutedText).withAlpha(0.25f));
-            g.fillRect(x, gateRect.getY() + sf(2.0f), bar ? sf(1.5f) : sf(1.0f), gateRect.getHeight() - sf(4.0f));
+            const int absCell = (int)(viewStartBeat) + i;
+            if (absCell < 0 || absCell > totalCells) continue;
+            const float x = gateRect.getX() + cw * (float)i;
+            const bool isBar = (absCell % subdivisionDenom) == 0;
+            g.setColour(isBar ? MuLookAndFeel::colour(Id::headingText).withAlpha(0.55f)
+                              : MuLookAndFeel::colour(Id::mutedText).withAlpha(0.25f));
+            g.fillRect(x, gateRect.getY() + sf(2.0f), isBar ? sf(1.5f) : sf(1.0f), gateRect.getHeight() - sf(4.0f));
         }
     }
 
@@ -744,14 +702,6 @@ void GatingDesigner::paint(juce::Graphics& g)
             if (p.isEmpty()) continue;
             g.setColour(fill); g.fillPath(p);
             g.setColour(edge); g.strokePath(p, juce::PathStrokeType(1.0f));
-
-            // Selection border (Arrow tool).
-            if (showHandles && currentTool == GateTool::Arrow && ei == selEnvIndex)
-            {
-                const auto L = layoutFor(envs[(size_t)ei]);
-                g.setColour(col.brighter(0.4f).withAlpha(alpha));
-                g.drawRoundedRectangle(L.x0, L.top, L.wpx, L.h, 2.0f, 1.5f);
-            }
         }
         if (showHandles)
         {
@@ -785,58 +735,40 @@ void GatingDesigner::paint(juce::Graphics& g)
     drawEnvPaths(getGhostPattern(),  ghostPathCache,  ghostLayerColour(), 0.18f, false);
     drawEnvPaths(getActivePattern(), activePathCache, activeLayerColour(), 1.0f, true);
 
-    // Bar number markers.
-    if (cells > 0)
+    // Absolute bar number markers at each visible bar boundary.
+    if (cw > 0.0f)
     {
         g.setColour(MuLookAndFeel::colour(Id::mutedText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
-        for (int bar = 0; bar < kTotalBars; ++bar)
+        const int firstBar = (int)viewStartBar;
+        const int lastBar  = firstBar + kViewBars + 1;
+        for (int absBar = firstBar; absBar <= lastBar; ++absBar)
         {
-            const float x = gateRect.getX() + (gateRect.getWidth() / kTotalBars) * (float)bar;
-            g.drawText(juce::String(bar + 1),
-                       juce::Rectangle<float>(x + sf(4.0f), gateRect.getBottom() - sf(14.0f), sf(14.0f), sf(12.0f)),
+            const float cellOffset = (float)(absBar * subdivisionDenom) - viewStartBeat;
+            const float x = gateRect.getX() + cw * cellOffset;
+            if (x < gateRect.getX() - 1.0f || x > gateRect.getRight()) continue;
+            g.drawText(juce::String(absBar + 1),
+                       juce::Rectangle<float>(x + sf(4.0f), gateRect.getBottom() - sf(14.0f), sf(20.0f), sf(12.0f)),
                        juce::Justification::centredLeft, false);
         }
     }
 
-    // Playhead.
-    if (playheadVisible)
+    // Playhead — convert pattern-relative beat01 to view-relative pixel position.
+    // beat01 is fraction of the full pattern length; the view shows kViewBars at offset viewStartBar.
+    if (playheadVisible && cw > 0.0f)
     {
-        const float x = gateRect.getX() + gateRect.getWidth() * (float)juce::jlimit(0.0, 1.0, playheadBeat01);
+        const auto* activePat = getActivePattern();
+        const int patBars = (activePat != nullptr) ? activePat->patternLengthBars : kViewBars;
+        const float absoluteBar = (float)(playheadBeat01 * patBars);
+        const float viewRelFrac = (absoluteBar - (float)viewStartBar) / (float)kViewBars;
+        if (viewRelFrac >= 0.0f && viewRelFrac <= 1.0f)
+        {
+        const float x = gateRect.getX() + gateRect.getWidth() * viewRelFrac;
         g.setColour(MuLookAndFeel::colour(Id::textBright).withAlpha(0.9f));
         g.fillRect(x - sf(0.5f), gateRect.getY(), sf(1.5f), gateRect.getHeight());
+        } // viewRelFrac in range
     }
 
-    // Properties strip background.
-    const int propsY = s(kHdr1H) + s(kHdr2H) + s(kGridH);
-    g.setColour(MuLookAndFeel::colour(Id::panelBackground).darker(0.08f));
-    g.fillRect(0, propsY, getWidth(), s(kPropsH));
-    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.fillRect(0, propsY, getWidth(), 1);
-
-    // Hint text when nothing is selected.
-    if (selEnvIndex < 0)
-    {
-        g.setColour(MuLookAndFeel::colour(Id::mutedText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.5f))));
-        g.drawText("Select an envelope with the Arrow tool to edit its properties",
-                   s(8), propsY, getWidth() - s(16), s(kPropsH),
-                   juce::Justification::centredLeft, false);
-    }
-    else
-    {
-        // Section labels.
-        g.setColour(MuLookAndFeel::colour(Id::mutedText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.5f))));
-        const int divX = getWidth() / 3;
-        g.fillRect(divX, propsY + s(6), 1, s(kPropsH) - s(12));
-
-        // "Loop:" header text for the loop-mask section.
-        g.setColour(MuLookAndFeel::colour(Id::labelText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));
-        g.drawText("Loops (of", divX + s(6), propsY + s(4), s(64), s(14),
-                   juce::Justification::centredLeft, false);
-    }
 }
 
 void GatingDesigner::setPlayhead(double beat01, bool visible)
@@ -853,74 +785,56 @@ void GatingDesigner::resized()
 {
     markPathsDirty();
     using mu_ui::s;
-    using mu_ui::sf;
-    const int w = getWidth();
-    const int h1H = s(kHdr1H);
-    const int h2Y = h1H;
-    const int h2H = s(kHdr2H);
-    const int propsY  = h1H + h2H + s(kGridH);
-    const int propsH  = s(kPropsH);
+    const int w      = getWidth();
+    const int hdrH   = s(kHdr1H);
+    const int gridY  = hdrH;
+    const int gridH  = s(kGridH);
+    const int scrollY = gridY + gridH;
     const int toolW   = s(kToolW);
     const int toolGap = s(kToolGap);
-    const int toolY   = (h1H - toolW) / 2;
+    const int toolY   = (hdrH - toolW) / 2;
     const int ddW     = s(kDdW);
-    const int ddH     = h1H - s(2);
+    const int ddH     = hdrH - s(2);
 
-    // Header row 1: [GATE][FILT][PITCH] | tools | [Bypass] | [Grid][dropdown]
-    const int layerBtnW = s(36);
-    gaterLayerBtn .setBounds(s(kHdrInset),                         toolY, layerBtnW, toolW);
-    filterLayerBtn.setBounds(s(kHdrInset) + layerBtnW + s(2),     toolY, layerBtnW, toolW);
-    pitchLayerBtn .setBounds(s(kHdrInset) + 2 * layerBtnW + s(4), toolY, s(40), toolW);
+    // ── Scrollbar ─────────────────────────────────────────────────────────────
+    scrollBar.setBounds(0, scrollY, w, s(kScrollH));
 
-    int tx = s(kHdrInset) + 2 * layerBtnW + s(4) + s(40) + s(4);
-    for (auto* b : { &arrowBtn, &pencilBtn, &eraserBtn, &reverseBtn })
+    // ── Right-anchored controls ────────────────────────────────────────────────
+    // "Grid" label + subdivision dropdown at far right.
+    subdivDropdown.setBounds(w - ddW - s(kHdrInset),         s(1), ddW,   ddH);
+    subdivLabel   .setBounds(w - ddW - s(kHdrInset) - s(40), s(1), s(36), ddH);
+
+    // "Bars" label + dropdown immediately left of the Grid controls.
+    const int barsLabelW = s(26);
+    const int barsGroupRight = w - ddW - s(kHdrInset) - s(40) - s(6);
+    const int barsDropX = barsGroupRight - s(kBarsW);
+    const int barsLabelX = barsDropX - barsLabelW;
+    barsDropdown.setBounds(barsDropX, s(1), s(kBarsW), ddH);
+
+    // ── Left-anchored controls (left→right) ────────────────────────────────────
+    // [Bypass][GATE][FILT][PITCH] — all same width kBtnW | [✏][⌫][⟺] | Gap ●
+    const int btnW = s(kBtnW);
+    int lx = s(kHdrInset);
+    bypassButton .setBounds(lx, toolY, btnW, toolW); lx += btnW + s(4);
+    gaterLayerBtn .setBounds(lx, toolY, btnW, toolW); lx += btnW + s(4);
+    filterLayerBtn.setBounds(lx, toolY, btnW, toolW); lx += btnW + s(4);
+    pitchLayerBtn .setBounds(lx, toolY, btnW, toolW); lx += btnW + s(6);
+
+    // Tools (Pencil, Eraser, Reverse — no Arrow).
+    for (auto* b : { &pencilBtn, &eraserBtn, &reverseBtn })
     {
-        b->setBounds(tx, toolY, toolW, toolW);
-        tx += toolW + toolGap;
+        b->setBounds(lx, toolY, toolW, toolW);
+        lx += toolW + toolGap;
     }
+    lx += s(6);
 
-    subdivDropdown.setBounds(w - ddW - s(kHdrInset),           s(1),  ddW,    ddH);
-    subdivLabel   .setBounds(w - ddW - s(kHdrInset) - s(40),   s(1),  s(36),  ddH);
+    // Gap: "Gap" label painted, then rotary.
+    lx += s(26);   // painted "Gap" label width
+    gapSlider.setBounds(lx, (hdrH - s(kGapKnobW)) / 2, s(kGapKnobW) + s(kGapTbW), s(kGapKnobW));
+    lx += s(kGapKnobW) + s(kGapTbW) + s(10);
 
-    const int bypassW = s(54);
-    bypassButton.setBounds(w - ddW - s(kHdrInset) - s(40) - s(4) - bypassW, toolY, bypassW, toolW);
-
-    // Header row 2: "Gap" (painted) + gap slider
-    const int gapLabelW = s(32);
-    gapSlider.setBounds(s(kHdrInset) + gapLabelW + s(4), h2Y + (h2H - s(16)) / 2,
-                        w - s(kHdrInset) * 2 - gapLabelW - s(4) - s(4), s(16));
-
-    // Properties strip.
-    const int knobDiam = s(38);
-    const int knobX    = s(kHdrInset) + s(4);
-    const int knobY    = propsY + (propsH - knobDiam - s(14)) / 2;
-    probKnob .setBounds(knobX, knobY, knobDiam, knobDiam);
-    probLabel.setBounds(knobX, knobY + knobDiam + s(1), knobDiam, s(12));
-
-    // Loop section: past first-third divider.
-    const int divX   = w / 3;
-    const int loopX0 = divX + s(6);
-
-    // "Loop (of M):" occupies a compact row.
-    const int loopLbW  = s(50);   // "Loop (of"
-    const int mDdW     = s(32);
-    int lx = loopX0 + s(4);
-    // The "Loop (of" text is painted. Just lay the dropdown + close bracket label.
-    loopMLabel.setBounds(lx, propsY + s(4), loopLbW, s(14));   lx += loopLbW;
-    loopMDropdown.setBounds(lx, propsY + s(3), mDdW, s(16));    lx += mDdW + s(2);
-
-    // 8 loop position toggle buttons in a 2-row grid of 4.
-    const int btnW = s(20), btnH = s(18), btnGap = s(2);
-    const int btnsStartX = loopX0;
-    const int btnsStartY = propsY + s(22);
-    for (int i = 0; i < 8; ++i)
-    {
-        const int col = i % 4;
-        const int row = i / 4;
-        loopBtn[i].setBounds(btnsStartX + col * (btnW + btnGap),
-                             btnsStartY + row * (btnH + btnGap),
-                             btnW, btnH);
-    }
+    // Selection props: "Prob" painted label + prob rotary (hidden until selection).
+    lx += s(28);   // painted "Prob" label width
 }
 
 } // namespace mu_tant

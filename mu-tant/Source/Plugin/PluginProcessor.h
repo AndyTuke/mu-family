@@ -115,10 +115,8 @@ public:
         playing.store(now, std::memory_order_relaxed);
         if (!now)
         {
-            // Reset beat + loop counter on stop so Loop-N-of-M offsets restart
-            // from position 0 the next time the user presses Play.
+            // Reset beat position on stop so pattern loops restart cleanly.
             internalBeatPos.store(0.0, std::memory_order_relaxed);
-            loopCount.store(0, std::memory_order_relaxed);
         }
     }
     double getInternalBpm()     const override { return internalBpm.load(std::memory_order_relaxed); }
@@ -191,7 +189,7 @@ public:
 
     // The APVTS layout factory (defined in PluginProcessor_APVTS.cpp). Public so
     // the layout test can exercise the real param set without constructing the
-    // processor — pure static factory, no state. See #721.
+    // processor — pure static factory, no state.
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
     // GR-meter source for the shared InsertSubsection (Compressor / Limiter P2).
@@ -225,9 +223,11 @@ private:
     {
         std::atomic<float> *o1Oct, *o1Semi, *o1Fine, *o1Pos;
         std::atomic<float> *o2Oct, *o2Semi, *o2Fine, *o2Pos;
-        std::atomic<float> *xmod, *xmode, *sync;
+        std::atomic<float> *xmodFm, *xmodAm, *xmodRing, *sync;
         std::atomic<float> *o1Lvl, *o2Lvl, *noiseLvl, *noiseType;
-        std::atomic<float> *fltType, *fltCut, *fltRes, *fltEnvDepth, *fltDrv, *fltLoCut;
+        std::atomic<float> *fltType,  *fltCut,  *fltRes,  *fltEnvDepth,  *fltDrv,  *fltLoCut;
+        std::atomic<float> *flt2Type, *flt2Cut, *flt2Res, *flt2EnvDepth, *flt2Drv, *flt2LoCut;
+        std::atomic<float> *fltSeries;
         std::atomic<float> *o1PenvDepth, *o2PenvDepth;
         std::atomic<float> *level, *gateGap, *gateBypass;
         std::atomic<float> *drvChar, *insP1, *insP2, *insP3, *insP4;
@@ -311,8 +311,6 @@ private:
     // Read by the audio thread in renderVoice to drive per-envelope loopN/loopM +
     // probability rules. Wraps safely at uint max — the modulo check in playsOnLoop
     // is stable across the wrap.
-    std::atomic<int> loopCount { 0 };
-
     // Number of existing voices (layers), 1..kMaxVoices. Audio thread reads it
     // atomically; add/removeVoice mutate it on the message thread under voicesLock.
     std::atomic<int> numVoices { 1 };

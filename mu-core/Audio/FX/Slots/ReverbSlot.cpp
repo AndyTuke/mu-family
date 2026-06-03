@@ -149,7 +149,7 @@ void ReverbSlot::setParam(const juce::String& id, float value)
 
 void ReverbSlot::applyAlgorithmPreset()
 {
-    // preDelay is atomic now (#358); use store for the assignment.
+    // preDelay is atomic (read on the audio thread); use store for the assignment.
     auto setPreDelay = [this](float v) { preDelay.store(v, std::memory_order_relaxed); };
     switch (static_cast<Algorithm>(algorithmIndex))
     {

@@ -13,7 +13,7 @@ public:
     void prepare(double sampleRate, int) override
     {
         // 15 ms ramps on preGain + outGain eliminate per-block step crackle on
-        // drive/output knob movement. Same pattern as #511/#512/#513/#514/#535.
+        // drive/output knob movement.
         smoothedPreGain.reset(sampleRate, 0.015);  smoothedPreGain.setCurrentAndTargetValue(1.0f);
         smoothedOutGain.reset(sampleRate, 0.015);  smoothedOutGain.setCurrentAndTargetValue(1.0f);
         reset();

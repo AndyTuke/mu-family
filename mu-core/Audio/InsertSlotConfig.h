@@ -75,8 +75,8 @@ inline const char* const kUnisonNames[7]   = { "1","3","5","7","9","11","13" };
 //
 // Invariant: every non-None algorithm (idx >= 1) must have at least ONE slot
 // with `label != nullptr`. Otherwise the UI driver hides all four knobs and
-// the algorithm presents as empty — the symptom that #613 surfaced when a
-// stale algo flowed into configureInsertAlgorithm. Enforced by a runtime
+// the algorithm presents as empty — the symptom that surfaces when a
+// stale algo flows into configureInsertAlgorithm. Enforced by a runtime
 // expect inside InsertAlgoTableTests (no constexpr path because the labels
 // are non-`constexpr` string-literal pointers on MSVC).
 inline const SlotConfig kInsertAlgoSlots[kInsertAlgoCount][kInsertSlotCount] = {

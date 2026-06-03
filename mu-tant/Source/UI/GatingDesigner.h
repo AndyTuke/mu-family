@@ -3,13 +3,12 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/MuLookAndFeel.h"
-#include "UI/Components/KnobWithLabel.h"
 #include "Sequencer/GatePattern.h"
 
 namespace mu_tant
 {
 
-enum class GateTool  { Arrow, Pencil, Eraser, Reverse };
+enum class GateTool  { Pencil, Eraser, Reverse };
 enum class GateLayer { Gater, Filter, Pitch };
 
 class GateToolButton : public juce::Button
@@ -24,16 +23,15 @@ private:
 
 // Per-voice drawable gate editor.
 //
-// Layout (three bands, top to bottom):
-//   Header row 1 (kHdr1H): layer toggle | toolbox | Bypass btn | Grid dropdown
-//   Header row 2 (kHdr2H): Gap: ========slider======== [value]
-//   Grid           (kGridH): 2-bar envelope grid
-//   Properties     (kPropsH): prob knob + loop-mask buttons (Arrow tool)
+// Layout (two bands, top to bottom):
+//   Header row (kHdr1H): [Bypass][GATE][FILT][PITCH] | tools | Gap rotary | Bars dd | Grid dd
+//   Grid        (kGridH): envelope drawing area — always shows kViewBars bars
+//   Scrollbar   (kScrollH): smooth horizontal scroll through longer patterns
 //
-// The Gap slider and Bypass button live here so the parent can make this
-// component fully-width; VoicePanel binds their APVTS attachments via the
-// public `gapSlider` and `bypassButton` members.
-class GatingDesigner : public juce::Component
+// Gap rotary and Bypass button live here; VoicePanel binds APVTS attachments
+// via the public `gapSlider` and `bypassButton` members.
+class GatingDesigner : public juce::Component,
+                       private juce::ScrollBar::Listener
 {
 public:
     GatingDesigner();
@@ -44,11 +42,11 @@ public:
     void setPattern(GatePattern* pattern);
     void setFilterPattern(GatePattern* pattern);
     void setPitchPattern(GatePattern* pattern);
-    void setGap(float gap01);            // render-only mirror; also called by gapSlider.onValueChange
+    void setGap(float gap01);
     void setLayer(GateLayer layer);
-    GateLayer getLayer()           const noexcept { return currentLayer; }
-    GateTool  selectedTool()       const noexcept { return currentTool; }
-    int       selectedEnvIndex()   const noexcept { return selEnvIndex; }
+    void setPatternBars(int bars);
+    GateLayer getLayer()     const noexcept { return currentLayer; }
+    GateTool  selectedTool() const noexcept { return currentTool; }
     void setPlayhead(double beat01, bool visible);
 
     void paint(juce::Graphics& g) override;
@@ -59,10 +57,10 @@ public:
     void mouseMove(const juce::MouseEvent& e) override;
     void mouseExit(const juce::MouseEvent& e) override;
 
-    static constexpr int kTotalBars = 2;
+    static constexpr int kViewBars = 2;    // bars visible at once (public for tests)
 
     // Public: VoicePanel binds APVTS attachments to these.
-    juce::Slider     gapSlider;       // LinearHorizontal, 0..100 %
+    juce::Slider     gapSlider;
     juce::TextButton bypassButton { "Bypass" };
 
 private:
@@ -76,8 +74,10 @@ private:
     juce::Label    subdivLabel;
     DropdownSelect subdivDropdown;
 
-    // ── Toolbox ─────────────────────────────────────────────────────────────
-    GateToolButton arrowBtn   { GateTool::Arrow };
+    // ── Pattern length (1-16 bars) ───────────────────────────────────────────
+    DropdownSelect barsDropdown;
+
+    // ── Toolbox (Pencil, Eraser, Reverse — no Arrow) ─────────────────────────
     GateToolButton pencilBtn  { GateTool::Pencil };
     GateToolButton eraserBtn  { GateTool::Eraser };
     GateToolButton reverseBtn { GateTool::Reverse };
@@ -92,37 +92,39 @@ private:
     GatePattern* pitchPattern  = nullptr;
 
     // ── Layout constants ─────────────────────────────────────────────────────
-    static constexpr int kHdr1H    = 24;   // tool / layer / bypass / grid dropdown
-    static constexpr int kHdr2H    = 22;   // gap slider row
-    static constexpr int kGridH    = 80;
-    static constexpr int kPropsH   = 56;   // properties strip (prob knob + loop buttons)
+    // Total: kHdr1H + kGridH + kScrollH + 4 = 186px (unchanged).
+    static constexpr int kHdr1H    = 38;   // header row (holds size-3 rotary)
+    static constexpr int kGridH    = 134;  // visual grid area
+    static constexpr int kScrollH  = 10;   // horizontal scrollbar
     static constexpr int kHdrInset = 6;
-    static constexpr int kDdW      = 88;
+    static constexpr int kDdW      = 88;   // Grid dropdown width
+    static constexpr int kBarsW    = 52;   // Bars dropdown width (fits "16")
     static constexpr int kToolW    = 22;
     static constexpr int kToolGap  = 4;
+    static constexpr int kBtnW     = 54;   // shared width: Bypass / GATE / FILT / PITCH
+    static constexpr int kGapKnobW = 32;   // gap rotary diameter (size-3)
+    static constexpr int kGapTbW   = 46;   // gap textbox width (fits "100 %")
 
     // ── Playhead ─────────────────────────────────────────────────────────────
     double playheadBeat01  = 0.0;
     bool   playheadVisible = false;
 
-    // ── Envelope selection (Arrow tool) ──────────────────────────────────────
-    int selEnvIndex = -1;
+    // ── Scroll state ─────────────────────────────────────────────────────────
+    double viewStartBar = 0.0;
+    juce::ScrollBar scrollBar { false };
 
-    // ── Properties strip ─────────────────────────────────────────────────────
-    // Probability: compact rotary knob 1..100 integers.
-    juce::Slider probKnob;           // Rotary, 1..100 step 1
-    juce::Label  probLabel;
+    void updateScrollRange();
+    void setViewStart(double bar);
 
-    // Loop mask: M dropdown + 8 small toggle buttons for loop positions.
-    juce::Label    loopMLabel;
-    DropdownSelect loopMDropdown;    // 1..8
-    juce::TextButton loopBtn[8];     // position buttons 1..8
-
-    bool propsUpdating = false;
+    void scrollBarMoved(juce::ScrollBar*, double newRangeStart) override
+    {
+        setViewStart(newRangeStart);
+    }
 
     // ── Grid geometry ─────────────────────────────────────────────────────────
     int cellCount() const noexcept;
     juce::Rectangle<float> gridBounds() const noexcept;
+    float viewCellW() const noexcept;
     int cellAtX(float x) const noexcept;
 
     GatePattern* getActivePattern() const noexcept
@@ -133,13 +135,12 @@ private:
     }
     GatePattern* getGhostPattern() const noexcept
     {
-        // Show the gate layer as a timing reference ghost when editing filter/pitch.
         return (currentLayer == GateLayer::Gater) ? nullptr : boundPattern;
     }
     juce::Colour activeLayerColour() const noexcept;
     juce::Colour ghostLayerColour()  const noexcept;
 
-    // ── Grab-handle (Pencil) ──────────────────────────────────────────────────
+    // ── Envelope handles (Pencil tool) ────────────────────────────────────────
     struct EnvLayout
     {
         float x0 = 0, wpx = 0, top = 0, bot = 0, h = 0, activeW = 0;
@@ -156,9 +157,9 @@ private:
     int      dragEnvIndex    = -1;
     float    dragStartBend   = 0.0f;
     float    dragStartY      = 0.0f;
-    int      dragOriginalEnd = -1;   // for StartEdge drag — keeps right edge fixed
+    int      dragOriginalEnd = -1;
 
-    // ── Path cache (#801) ────────────────────────────────────────────────────
+    // ── Path cache ───────────────────────────────────────────────────────────
     std::vector<juce::Path> activePathCache;
     std::vector<juce::Path> ghostPathCache;
     bool pathsDirty = true;
@@ -166,12 +167,6 @@ private:
     void rebuildPathCache();
 
     template <typename Fn> void withLock(GatePattern* pat, Fn&& fn);
-
-    void clearSelection();
-    void selectEnvelope(int idx);
-    void updatePropsFromSelection();
-    void writePropsToSelection();
-    void updateLoopBtnEnabled();   // grey out buttons beyond loopM
 
     static constexpr float kHandleRadius = 6.0f;
 

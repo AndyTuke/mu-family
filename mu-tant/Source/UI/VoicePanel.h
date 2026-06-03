@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "UI/Components/KnobWithLabel.h"
+#include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/ChannelHeaderBar.h"
 #include "UI/ModulatorPanel.h"
@@ -14,6 +15,30 @@
 
 namespace mu_tant
 {
+
+// Round toggle button for filter Series / Parallel routing.
+// Always renders in the family purple (knobEuclidean). Clicking animates a 90° rotation:
+//   Parallel (off) = 0°  — two horizontal lines (═), two signal paths side by side
+//   Series   (on)  = 90° — two vertical lines (‖)
+class FilterRoutingButton : public juce::Button,
+                            private juce::Timer,
+                            private juce::Value::Listener
+{
+public:
+    FilterRoutingButton();
+    ~FilterRoutingButton() override;
+    void paintButton(juce::Graphics&, bool highlighted, bool) override;
+
+private:
+    float animAngle   = 0.0f;    // current rendered angle (0=horizontal, 90=vertical)
+    float targetAngle = 0.0f;
+    bool  angleInit   = false;   // snap to state on first sync, animate thereafter
+
+    // Sync the glyph to the toggle state from ANY source (user click, preset load,
+    // DAW automation, voice rebind) — not just user clicks.
+    void valueChanged(juce::Value&) override;
+    void timerCallback() override;
+};
 
 class PluginProcessor;
 
@@ -42,6 +67,11 @@ public:
     // Null out the modulator slot pointer so no timer or paint callback can
     // dereference it during the voice-remove → setVoice rebind window.
     void clearModulatorSlot() { modulatorPanel.setVoiceSlot(nullptr); }
+
+    // Clear raw ModulationMatrix pointers from all KnobWithLabel mod-binding arcs.
+    // Call before resetVoiceSlot / removeVoice destroys the VoiceSlot so the
+    // 30 Hz timer cannot dereference freed matrix memory.
+    void clearAllModBindings();
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -91,14 +121,15 @@ private:
     DropdownSelect osc1WaveDropdown;
     DropdownSelect osc2WaveDropdown;
 
-    // ── Cross-mod ─────────────────────────────────────────────────────────────
-    KnobWithLabel  xmodKnob  { "X-Mod", MuLookAndFeel::knobEuclidean };
-    juce::Label    xmodLabel;
-    DropdownSelect xmodModeDropdown;
+    // ── Cross-mod (FM / AM / Ring — all simultaneously at individual depths) ────
+    KnobWithLabel xmodFmKnob   { "FM",   MuLookAndFeel::knobEuclidean };
+    KnobWithLabel xmodAmKnob   { "AM",   MuLookAndFeel::knobEuclidean };
+    KnobWithLabel xmodRingKnob { "Ring", MuLookAndFeel::knobEuclidean };
     juce::TextButton syncButton { "Sync" };
-    std::unique_ptr<APVTS::SliderAttachment>   xmodAttachment;
-    std::unique_ptr<APVTS::ComboBoxAttachment> xmodModeAttachment;
-    std::unique_ptr<APVTS::ButtonAttachment>   syncAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> xmodFmAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> xmodAmAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> xmodRingAttachment;
+    std::unique_ptr<APVTS::ButtonAttachment> syncAttachment;
 
     // ── Mixer levels (osc1 / osc2 / noise — Size-2 knobs, horizontal MIXER row
     //    under the NOISE panel) + noise type (in its own NOISE panel) ─────────
@@ -112,19 +143,35 @@ private:
     std::unique_ptr<APVTS::SliderAttachment>   noiseLevelAttachment;
     std::unique_ptr<APVTS::ComboBoxAttachment> noiseTypeAttachment;
 
-    // ── Filter ──────────────────────────────────────────────────────────────
+    // ── Filter 1 ────────────────────────────────────────────────────────────
     juce::Label    fltTypeLabel;
     DropdownSelect fltTypeDropdown;
     KnobWithLabel  fltDrvKnob      { "Drive",     MuLookAndFeel::knobPostPad };
     KnobWithLabel  fltCutKnob      { "Cutoff",    MuLookAndFeel::knobPostPad };
     KnobWithLabel  fltResKnob      { "Resonance", MuLookAndFeel::knobPostPad };
-    KnobWithLabel  fltLoCutKnob    { "Low Cut",   MuLookAndFeel::knobPostPad };
     KnobWithLabel  fltEnvDepthKnob { "FEnv",      MuLookAndFeel::knobPostPad };
+    KnobWithLabel  fltLoCutKnob    { "Low Cut",   MuLookAndFeel::knobPostPad };
     std::unique_ptr<APVTS::SliderAttachment>   fltDrvAttachment;
     std::unique_ptr<APVTS::SliderAttachment>   fltCutAttachment;
     std::unique_ptr<APVTS::SliderAttachment>   fltResAttachment;
-    std::unique_ptr<APVTS::SliderAttachment>   fltLoCutAttachment;
     std::unique_ptr<APVTS::SliderAttachment>   fltEnvDepthAttachment;
+    std::unique_ptr<APVTS::SliderAttachment>   fltLoCutAttachment;
+
+    // ── Filter 2 ────────────────────────────────────────────────────────────
+    juce::Label    flt2TypeLabel;
+    DropdownSelect flt2TypeDropdown;
+    KnobWithLabel  flt2DrvKnob      { "Drive",     MuLookAndFeel::knobPostPad };
+    KnobWithLabel  flt2CutKnob      { "Cutoff",    MuLookAndFeel::knobPostPad };
+    KnobWithLabel  flt2ResKnob      { "Resonance", MuLookAndFeel::knobPostPad };
+    KnobWithLabel  flt2EnvDepthKnob { "FEnv",      MuLookAndFeel::knobPostPad };
+    KnobWithLabel  flt2LoCutKnob    { "Low Cut",   MuLookAndFeel::knobPostPad };
+    FilterRoutingButton fltSeriesBtn;
+    std::unique_ptr<APVTS::SliderAttachment>   flt2DrvAttachment;
+    std::unique_ptr<APVTS::SliderAttachment>   flt2CutAttachment;
+    std::unique_ptr<APVTS::SliderAttachment>   flt2ResAttachment;
+    std::unique_ptr<APVTS::SliderAttachment>   flt2EnvDepthAttachment;
+    std::unique_ptr<APVTS::SliderAttachment>   flt2LoCutAttachment;
+    std::unique_ptr<APVTS::ButtonAttachment>   fltSeriesAttachment;
 
     // ── Output level ────────────────────────────────────────────────────────
     KnobWithLabel levelKnob { "Level", MuLookAndFeel::knobLevel };

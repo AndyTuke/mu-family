@@ -28,7 +28,7 @@ public:
             phase[v]    = static_cast<float>(v) / MaxVoices;
         }
         // 15 ms ramps on every continuous knob so block-to-block param steps
-        // do not produce clicks/crackle. Same pattern as #511/#512/#513/#514/#535.
+        // do not produce clicks or crackle.
         smoothedDepth .reset(sr, 0.015);  smoothedDepth .setCurrentAndTargetValue(depth);
         smoothedRate  .reset(sr, 0.015);  smoothedRate  .setCurrentAndTargetValue(rate);
         smoothedMix   .reset(sr, 0.015);  smoothedMix   .setCurrentAndTargetValue(mix);

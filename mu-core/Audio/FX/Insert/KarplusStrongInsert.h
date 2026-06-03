@@ -29,7 +29,7 @@
 //
 // Pitch math: target_freq = 32.7 Hz * 2 ^ ((semi + 12*oct) / 12)
 //   where semi = {0, 2, 4, 5, 7, 9, 11} for C, D, E, F, G, A, B.
-//   So Octave 0 + Note C  = 32.7 Hz  (SPN C1 — new in #429)
+//   So Octave 0 + Note C  = 32.7 Hz  (SPN C1)
 //      Octave 1 + Note C  = 65.4 Hz  (SPN C2)
 //      Octave 3 + Note B  = 493.9 Hz (SPN B4)
 //

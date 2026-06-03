@@ -23,7 +23,7 @@ public:
     double getValue() const;
     void setLabel(const juce::String& newLabel);
 
-    // Issue #133: modulation indicator. setIsModulated draws a static tinted ring
+    // Modulation indicator. setIsModulated draws a static tinted ring
     // around the knob whenever any modulation assignment targets this destination.
     // setModulatedNorm (0..1) additionally draws an animated secondary arc tracking
     // the live modulated value; pass NaN to disable.

@@ -36,7 +36,9 @@ inline constexpr ModDest kModDestTable[] = {
     { "osc2.fine",    "Osc2 Fine",     "Osc 2" },
     { "osc2.pos",     "Osc2 Position", "Osc 2" },
     // ── Cross-mod ─────────────────────────────────────────────────────────────
-    { "xmod",         "X-Mod",         "Mix"   },
+    { "xmod.fm",      "FM Depth",      "X-Mod" },
+    { "xmod.am",      "AM Depth",      "X-Mod" },
+    { "xmod.ring",    "Ring Depth",    "X-Mod" },
     // ── Levels ────────────────────────────────────────────────────────────────
     { "osc1.level",   "Osc1 Level",    "Levels" },
     { "osc2.level",   "Osc2 Level",    "Levels" },

@@ -169,9 +169,11 @@ void PluginProcessor::cacheParamPointers()
         auto& p = voicePtrs[(size_t) v];
         p.o1Oct  = P(vid("o1_oct"));  p.o1Semi = P(vid("o1_semi")); p.o1Fine = P(vid("o1_fine")); p.o1Pos = P(vid("o1_pos"));
         p.o2Oct  = P(vid("o2_oct"));  p.o2Semi = P(vid("o2_semi")); p.o2Fine = P(vid("o2_fine")); p.o2Pos = P(vid("o2_pos"));
-        p.xmod   = P(vid("xmod"));    p.xmode  = P(vid("xmode"));   p.sync = P(vid("sync"));
+        p.xmodFm = P(vid("xmod_fm")); p.xmodAm = P(vid("xmod_am")); p.xmodRing = P(vid("xmod_ring")); p.sync = P(vid("sync"));
         p.o1Lvl  = P(vid("o1_lvl"));  p.o2Lvl  = P(vid("o2_lvl"));  p.noiseLvl = P(vid("noise_lvl")); p.noiseType = P(vid("noise_type"));
-        p.fltType= P(vid("flt_type"));p.fltCut = P(vid("flt_cut")); p.fltRes = P(vid("flt_res")); p.fltEnvDepth = P(vid("flt_env_depth")); p.fltDrv = P(vid("flt_drv")); p.fltLoCut = P(vid("flt_lo_cut"));
+        p.fltType= P(vid("flt_type")); p.fltCut = P(vid("flt_cut")); p.fltRes = P(vid("flt_res")); p.fltEnvDepth = P(vid("flt_env_depth")); p.fltDrv = P(vid("flt_drv")); p.fltLoCut = P(vid("flt_lo_cut"));
+        p.flt2Type=P(vid("flt2_type"));p.flt2Cut=P(vid("flt2_cut"));p.flt2Res=P(vid("flt2_res"));p.flt2EnvDepth=P(vid("flt2_env_depth"));p.flt2Drv=P(vid("flt2_drv"));p.flt2LoCut=P(vid("flt2_lo_cut"));
+        p.fltSeries = P(vid("flt_series"));
         p.o1PenvDepth = P(vid("o1_penv_depth")); p.o2PenvDepth = P(vid("o2_penv_depth"));
         p.level  = P(vid("level"));
         p.gateGap= P(vid("gate_gap"));p.gateBypass = P(vid("gate_bypass"));
@@ -195,9 +197,10 @@ VoiceConfig PluginProcessor::readConfig(int voiceIdx) const
     c.osc2Semi     = (int) p.o2Semi->load();
     c.osc2Fine     = (int) p.o2Fine->load();
     c.osc2Pos      = p.o2Pos->load();
-    c.xmod         = (int) p.xmod->load();
-    c.xmodMode     = (int) p.xmode->load();
-    c.sync         = p.sync->load() > 0.5f;
+    c.xmodFm   = p.xmodFm->load()   * 0.01f;   // 0..100 → 0..1
+    c.xmodAm   = p.xmodAm->load()   * 0.01f;
+    c.xmodRing = p.xmodRing->load() * 0.01f;
+    c.sync     = p.sync->load() > 0.5f;
     // Per-source levels.
     c.osc1LevelDb  = p.o1Lvl->load();
     c.osc2LevelDb  = p.o2Lvl->load();
@@ -209,6 +212,13 @@ VoiceConfig PluginProcessor::readConfig(int voiceIdx) const
     c.filterEnvDepth  = p.fltEnvDepth->load();
     c.filterDrive     = p.fltDrv->load();
     c.filterLowCutHz  = p.fltLoCut->load();
+    c.filter2Type     = (int) p.flt2Type->load();
+    c.filter2Cutoff   = p.flt2Cut->load();
+    c.filter2Res      = p.flt2Res->load();
+    c.filter2EnvDepth = p.flt2EnvDepth->load();
+    c.filter2Drive    = p.flt2Drv->load();
+    c.filter2LowCutHz = p.flt2LoCut->load();
+    c.filterSeries    = p.fltSeries->load() > 0.5f;
     c.levelDb         = p.level->load();
     return c;
 }
@@ -272,19 +282,15 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     processCoreBlock(buffer, nullptr, numActiveVoices, numSamples, bpm,
                      nullptr, nullptr, nullptr, &renderVoiceCb);
 
-    // Advance the transport beat only while playing. Wrap at the 2-bar pattern
-    // length (8 beats in 4/4) so the gate + the gating-grid playhead loop cleanly
-    // and floating-point precision never drifts. Modulators evaluate against the
-    // same wrapped position.
+    // Advance the transport beat. Wrap at the maximum pattern length (64 beats =
+    // 16 bars in 4/4) to keep floating-point precision bounded across long sessions.
+    // Each GatePattern wraps internally at its own patternLengthBars, so the global
+    // counter just needs a ceiling above the maximum drawable length.
     if (blkPlaying)
     {
         double pos = blkBeatStart + blkBeatsPerSample * (double) numSamples;
-        const double patBeats = (double) GatePattern::kTotalBars * 4.0;   // 8 beats
-        if (pos >= patBeats)
-        {
-            pos -= patBeats;
-            loopCount.fetch_add(1, std::memory_order_relaxed);
-        }
+        constexpr double kMaxPatBeats = (double) GatePattern::kMaxPatternBars * 4.0; // 64
+        if (pos >= kMaxPatBeats) pos -= kMaxPatBeats;
         internalBeatPos.store(pos, std::memory_order_relaxed);
     }
 }
@@ -303,7 +309,9 @@ void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
     modParamValues["osc2.semi"]        = (float) cfg.osc2Semi;
     modParamValues["osc2.fine"]        = (float) cfg.osc2Fine;
     modParamValues["osc2.pos"]         = cfg.osc2Pos;
-    modParamValues["xmod"]             = (float) cfg.xmod;
+    modParamValues["xmod.fm"]          = cfg.xmodFm   * 100.0f;   // 0..1 → 0..100 display units
+    modParamValues["xmod.am"]          = cfg.xmodAm   * 100.0f;
+    modParamValues["xmod.ring"]        = cfg.xmodRing * 100.0f;
     modParamValues["osc1.level"]       = cfg.osc1LevelDb;
     modParamValues["osc2.level"]       = cfg.osc2LevelDb;
     modParamValues["noise.level"]      = cfg.noiseLevelDb;
@@ -334,7 +342,9 @@ void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
         snap[mu_tant::kTantSnapOsc2Semi]   .store(modParamValues["osc2.semi"]);
         snap[mu_tant::kTantSnapOsc2Fine]   .store(modParamValues["osc2.fine"]);
         snap[mu_tant::kTantSnapOsc2Pos]    .store(modParamValues["osc2.pos"]);
-        snap[mu_tant::kTantSnapXMod]       .store(modParamValues["xmod"]);
+        snap[mu_tant::kTantSnapXModFm]     .store(modParamValues["xmod.fm"]);
+        snap[mu_tant::kTantSnapXModAm]     .store(modParamValues["xmod.am"]);
+        snap[mu_tant::kTantSnapXModRing]   .store(modParamValues["xmod.ring"]);
         snap[mu_tant::kTantSnapOsc1Level]  .store(modParamValues["osc1.level"]);
         snap[mu_tant::kTantSnapOsc2Level]  .store(modParamValues["osc2.level"]);
         snap[mu_tant::kTantSnapNoiseLevel] .store(modParamValues["noise.level"]);
@@ -355,7 +365,9 @@ void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
         cfg.osc2Semi     = (int) modParamValues["osc2.semi"];
         cfg.osc2Fine     = (int) modParamValues["osc2.fine"];
         cfg.osc2Pos      = modParamValues["osc2.pos"];
-        cfg.xmod         = (int) modParamValues["xmod"];
+        cfg.xmodFm   = modParamValues["xmod.fm"]   * 0.01f;
+        cfg.xmodAm   = modParamValues["xmod.am"]   * 0.01f;
+        cfg.xmodRing = modParamValues["xmod.ring"] * 0.01f;
         cfg.osc1LevelDb  = modParamValues["osc1.level"];
         cfg.osc2LevelDb  = modParamValues["osc2.level"];
         cfg.noiseLevelDb = modParamValues["noise.level"];
@@ -381,7 +393,7 @@ void PluginProcessor::applyFilterEnvelope(int v, VoiceConfig& cfg)
         if (fPat.editLock.compare_exchange_strong(fExpected, true, std::memory_order_acquire))
         {
             fPat.resetGateCache();
-            const float target   = fPat.gateAt(blkBeatStart, 0.0f, loopCount.load(std::memory_order_relaxed));
+            const float target   = fPat.gateAt(blkBeatStart, 0.0f);
             // Slew-limit the filter envelope rising edge (same as gate)
             fPat.filterLevel = (target > fPat.filterLevel)
                              ? std::min(target, fPat.filterLevel + maxRise)
@@ -394,9 +406,16 @@ void PluginProcessor::applyFilterEnvelope(int v, VoiceConfig& cfg)
             //   depth=-1,filterLevel=1 → baseProp-1 (clamped toward 20 Hz)
             const float modProp  = juce::jlimit(0.0f, 1.0f, baseProp + depth * fPat.filterLevel);
             cfg.filterCutoff = juce::jlimit(20.0f, 20000.0f, tantCutoffFromProp(modProp));
+
+            // Apply the same envelope to Filter 2 with its own depth.
+            const float depth2   = juce::jlimit(-1.0f, 1.0f, cfg.filter2EnvDepth);
+            const float baseProp2 = tantPropFromCutoff(cfg.filter2Cutoff);
+            const float modProp2  = juce::jlimit(0.0f, 1.0f, baseProp2 + depth2 * fPat.filterLevel);
+            cfg.filter2Cutoff = juce::jlimit(20.0f, 20000.0f, tantCutoffFromProp(modProp2));
+
             fPat.editLock.store(false, std::memory_order_release);
         }
-        // On lock contention: use un-modulated cutoff (edit-time blip)
+        // On lock contention: use un-modulated cutoffs (edit-time blip)
     }
     else if (!blkPlaying)
     {
@@ -415,7 +434,7 @@ void PluginProcessor::applyPitchEnvelope(int v, VoiceConfig& cfg)
         if (pPat.editLock.compare_exchange_strong(pExpected, true, std::memory_order_acquire))
         {
             pPat.resetGateCache();
-            const float envLevel = pPat.gateAt(blkBeatStart, 0.0f, loopCount.load(std::memory_order_relaxed));
+            const float envLevel = pPat.gateAt(blkBeatStart, 0.0f);
             const float d1 = voicePtrs[(size_t) v].o1PenvDepth->load();
             const float d2 = voicePtrs[(size_t) v].o2PenvDepth->load();
             cfg.osc1Semi += (int) roundf(d1 * envLevel);
@@ -452,8 +471,7 @@ void PluginProcessor::renderVoice(int v, juce::AudioBuffer<float>& buf, int numS
     float* gl = buf.getWritePointer(0);
     float* gr = buf.getNumChannels() > 1 ? buf.getWritePointer(1) : nullptr;
     applyGateBlock(gatePatterns[(size_t) v], gl, gr, numSamples, gateGap, gateBypass,
-                   blkPlaying, blkBeatStart, blkBeatsPerSample, currentSampleRate,
-                   loopCount.load(std::memory_order_relaxed));
+                   blkPlaying, blkBeatStart, blkBeatsPerSample, currentSampleRate);
 
     // Use modulated insert param values (modulation may have adjusted them).
     VoiceParams ip;

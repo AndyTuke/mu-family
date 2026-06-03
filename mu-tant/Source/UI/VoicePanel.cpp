@@ -1,4 +1,4 @@
-#include "VoicePanel.h"
+﻿#include "VoicePanel.h"
 #include "Plugin/PluginProcessor.h"
 #include "Audio/Scales.h"
 #include "Audio/AlgorithmNames.h"   // mu-core: kFilterTypeNames (shared canonical list)
@@ -9,6 +9,66 @@
 namespace mu_tant
 {
 
+// ── FilterRoutingButton ───────────────────────────────────────────────────────
+FilterRoutingButton::FilterRoutingButton() : juce::Button({})
+{
+    setClickingTogglesState(true);
+    setToggleState(true, juce::dontSendNotification);
+    setTooltip("Series: F1 into F2.  Parallel: F1 + F2 mixed.");
+    targetAngle = animAngle = 90.0f;   // default Series = vertical (‖)
+    getToggleStateValue().addListener(this);
+}
+
+FilterRoutingButton::~FilterRoutingButton()
+{
+    stopTimer();   // a rotation animation may be mid-flight at teardown
+    getToggleStateValue().removeListener(this);
+}
+
+void FilterRoutingButton::valueChanged(juce::Value&)
+{
+    targetAngle = getToggleState() ? 90.0f : 0.0f;   // Series=90° (‖), Parallel=0° (═ two side-by-side paths)
+    if (! angleInit) { animAngle = targetAngle; angleInit = true; repaint(); }  // no spin on first load
+    else             { startTimerHz(60); }
+}
+
+void FilterRoutingButton::timerCallback()
+{
+    constexpr float kStep = 6.0f;
+    const float diff = targetAngle - animAngle;
+    if (std::abs(diff) <= kStep) { animAngle = targetAngle; stopTimer(); }
+    else { animAngle += diff > 0.0f ? kStep : -kStep; }
+    repaint();
+}
+
+void FilterRoutingButton::paintButton(juce::Graphics& g, bool highlighted, bool)
+{
+    const auto r = getLocalBounds().toFloat().reduced(1.5f);
+    // Family purple — rendered at all times regardless of Series/Parallel state.
+    const auto accent = MuLookAndFeel::colour(MuLookAndFeel::knobEuclidean);
+    g.setColour(highlighted ? accent.brighter(0.25f) : accent.withAlpha(0.9f));
+    g.fillEllipse(r);
+    g.setColour(accent.brighter(0.4f));
+    g.drawEllipse(r, 1.2f);
+
+    const auto  b     = r.reduced(r.getWidth() * 0.20f);
+    const float thick = juce::jmax(1.8f, b.getHeight() * 0.13f);
+    const float sep   = b.getHeight() * 0.22f;
+    const float hw    = b.getWidth() * 0.5f;
+    const float cx    = b.getCentreX(), cy = b.getCentreY();
+    const float rad   = animAngle * juce::MathConstants<float>::pi / 180.0f;
+    const float cosA  = std::cos(rad), sinA = std::sin(rad);
+    g.setColour(juce::Colours::white.withAlpha(0.95f));
+    for (int sign : { -1, 1 })
+    {
+        const float ox = -sinA * sep * (float) sign;
+        const float oy =  cosA * sep * (float) sign;
+        juce::Path line;
+        line.startNewSubPath(cx + ox - cosA * hw, cy + oy - sinA * hw);
+        line.lineTo        (cx + ox + cosA * hw, cy + oy + sinA * hw);
+        g.strokePath(line, juce::PathStrokeType(thick, juce::PathStrokeType::mitered, juce::PathStrokeType::square));
+    }
+}
 namespace
 {
     juce::StringArray rootNames()
@@ -127,8 +187,10 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     // ── Per-voice controls (added once, rebound per-voice) ──────────────────
     for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PosKnob, &o1PenvDepthKnob,
                      &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PosKnob, &o2PenvDepthKnob,
-                     &xmodKnob, &osc1LevelKnob, &osc2LevelKnob, &noiseLevelKnob,
-                     &fltDrvKnob, &fltCutKnob, &fltResKnob, &fltLoCutKnob, &fltEnvDepthKnob })
+                     &xmodFmKnob, &xmodAmKnob, &xmodRingKnob,
+                     &osc1LevelKnob, &osc2LevelKnob, &noiseLevelKnob,
+                     &fltDrvKnob, &fltCutKnob, &fltResKnob, &fltEnvDepthKnob, &fltLoCutKnob,
+                     &flt2DrvKnob, &flt2CutKnob, &flt2ResKnob, &flt2EnvDepthKnob, &flt2LoCutKnob })
         addAndMakeVisible(k);
     addAndMakeVisible(levelKnob);
     // Level knob is intentionally hidden: the per-voice output level is driven by
@@ -147,10 +209,6 @@ VoicePanel::VoicePanel(PluginProcessor& p)
         addChildComponent(d);     // parented but not visible
     }
 
-    setupLabel(xmodLabel, "Mode");
-    xmodLabel.setJustificationType(juce::Justification::centredRight);
-    populateXmodModes(xmodModeDropdown);
-    addAndMakeVisible(xmodModeDropdown);
 
     syncButton.setClickingTogglesState(true);
     syncButton.setTooltip("Hard sync: osc1 wrap resets osc2 phase");
@@ -160,9 +218,12 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     populateNoiseTypes(noiseTypeDropdown);
     addAndMakeVisible(noiseTypeDropdown);
 
-    setupLabel(fltTypeLabel, "Type");
+    setupLabel(fltTypeLabel,  "Type");
+    setupLabel(flt2TypeLabel, "Type");
     populateFilterTypes(fltTypeDropdown);
+    populateFilterTypes(flt2TypeDropdown);
     addAndMakeVisible(fltTypeDropdown);
+    addAndMakeVisible(flt2TypeDropdown);
 
     // Cutoff / Resonance value formatting lives on the APVTS parameter (see
     // createParameterLayout) so the SliderAttachment can't clobber it. The
@@ -183,6 +244,28 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     {
         fltCutKnob.setLabel(v < 1000.0 ? "Cutoff (Hz)" : "Cutoff (kHz)");
     };
+
+    // ── Filter 2 ────────────────────────────────────────────────────────────
+    setupLabel(flt2TypeLabel, "Type");
+    populateFilterTypes(flt2TypeDropdown);
+    addAndMakeVisible(flt2TypeDropdown);
+
+    flt2DrvKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
+        return juce::String((int)std::round(v * 100.0));
+    };
+    flt2LoCutKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
+        if (v <= 0.0) return "Off";
+        if (v < 1000.0) return juce::String((int)std::round(v));
+        return juce::String(v / 1000.0, 2);
+    };
+    flt2LoCutKnob.onValueChanged = [this](double v) {
+        flt2LoCutKnob.setLabel(v <= 0.0 ? "Low Cut" : (v < 1000.0 ? "Low Cut (Hz)" : "Low Cut (kHz)"));
+    };
+    flt2CutKnob.onValueChanged = [this](double v) {
+        flt2CutKnob.setLabel(v < 1000.0 ? "Cutoff (Hz)" : "Cutoff (kHz)");
+    };
+
+    addAndMakeVisible(fltSeriesBtn);
 
     // ── Gating designer (Gap slider + Bypass button are inside it) ──────────
     // The GatingDesigner owns the Gap slider and Bypass button as children;
@@ -215,12 +298,13 @@ VoicePanel::~VoicePanel() { stopTimer(); }
 
 void VoicePanel::timerCallback()
 {
-    // 2 bars = 8 beats in 4/4. Normalise the transport beat to 0..1 across the
-    // gating grid + feed the modulator playhead.
+    // Normalise the transport beat to 0..1 across the current pattern length
+    // for the gating-grid playhead. Pattern length may be 1..16 bars.
     const bool   playing = proc.isInternalPlaying();
     const double beat    = proc.getInternalBeatPos();
-    constexpr double patBeats = (double) GatePattern::kTotalBars * 4.0;
-    const double beat01  = std::fmod(beat, patBeats) / patBeats;
+    const auto* gPat = &proc.gatePatterns[(size_t) currentVoice];
+    const double patBeats = (double) gPat->patternLengthBars * 4.0;
+    const double beat01  = (patBeats > 0.0) ? std::fmod(beat, patBeats) / patBeats : 0.0;
     gatingDesigner.setPlayhead(beat01, playing);
     modulatorPanel.setPlayheadBeat(beat);
 
@@ -233,6 +317,13 @@ void VoicePanel::timerCallback()
         const int apvtsAlgo = juce::jlimit(0, 15, (int) raw->load());
         if (fltTypeDropdown.getSelectedId() != apvtsAlgo + 1)
             fltTypeDropdown.setSelectedId(apvtsAlgo + 1, false);
+    }
+    if (auto* raw = proc.apvts.getRawParameterValue(
+            PluginProcessor::voiceParamId(currentVoice, "flt2_type")))
+    {
+        const int apvtsAlgo = juce::jlimit(0, 15, (int) raw->load());
+        if (flt2TypeDropdown.getSelectedId() != apvtsAlgo + 1)
+            flt2TypeDropdown.setSelectedId(apvtsAlgo + 1, false);
     }
 }
 
@@ -280,14 +371,14 @@ void VoicePanel::rebindAttachments()
     o1FineAttachment = nullptr; o1PosAttachment       = nullptr; o1PenvDepthAttachment = nullptr;
     o2OctAttachment  = nullptr; o2SemiAttachment      = nullptr;
     o2FineAttachment = nullptr; o2PosAttachment       = nullptr; o2PenvDepthAttachment = nullptr;
-    xmodAttachment = nullptr; xmodModeAttachment = nullptr; syncAttachment = nullptr;
+    xmodFmAttachment = nullptr; xmodAmAttachment = nullptr; xmodRingAttachment = nullptr; syncAttachment = nullptr;
     osc1LevelAttachment  = nullptr; osc2LevelAttachment = nullptr;
     noiseLevelAttachment = nullptr; noiseTypeAttachment = nullptr;
-    fltDrvAttachment      = nullptr;
-    fltCutAttachment      = nullptr;
-    fltResAttachment      = nullptr;
-    fltLoCutAttachment    = nullptr; fltEnvDepthAttachment = nullptr;
-    levelAttachment       = nullptr;
+    fltDrvAttachment = nullptr; fltCutAttachment = nullptr; fltResAttachment = nullptr;
+    fltEnvDepthAttachment = nullptr; fltLoCutAttachment = nullptr;
+    flt2DrvAttachment = nullptr; flt2CutAttachment = nullptr; flt2ResAttachment = nullptr;
+    flt2EnvDepthAttachment = nullptr; flt2LoCutAttachment = nullptr; fltSeriesAttachment = nullptr;
+    levelAttachment = nullptr;
     gapAttachment = nullptr; gateBypassAttachment = nullptr;
 
     o1OctAttachment       = std::make_unique<APVTS::SliderAttachment>(apvts, id("o1_oct"),         o1OctKnob.getSlider());
@@ -302,9 +393,10 @@ void VoicePanel::rebindAttachments()
     o2PosAttachment       = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_pos"),         o2PosKnob.getSlider());
     o2PenvDepthAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_penv_depth"),  o2PenvDepthKnob.getSlider());
 
-    xmodAttachment     = std::make_unique<APVTS::SliderAttachment>  (apvts, id("xmod"),  xmodKnob.getSlider());
-    xmodModeAttachment = std::make_unique<APVTS::ComboBoxAttachment>(apvts, id("xmode"), xmodModeDropdown.getComboBox());
-    syncAttachment     = std::make_unique<APVTS::ButtonAttachment>  (apvts, id("sync"),  syncButton);
+    xmodFmAttachment   = std::make_unique<APVTS::SliderAttachment>(apvts, id("xmod_fm"),   xmodFmKnob.getSlider());
+    xmodAmAttachment   = std::make_unique<APVTS::SliderAttachment>(apvts, id("xmod_am"),   xmodAmKnob.getSlider());
+    xmodRingAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("xmod_ring"), xmodRingKnob.getSlider());
+    syncAttachment     = std::make_unique<APVTS::ButtonAttachment>(apvts, id("sync"),      syncButton);
 
     osc1LevelAttachment  = std::make_unique<APVTS::SliderAttachment>  (apvts, id("o1_lvl"),     osc1LevelKnob.getSlider());
     osc2LevelAttachment  = std::make_unique<APVTS::SliderAttachment>  (apvts, id("o2_lvl"),     osc2LevelKnob.getSlider());
@@ -324,11 +416,30 @@ void VoicePanel::rebindAttachments()
                 fltParam->setValueNotifyingHost(fltParam->convertTo0to1((float)(itemId - 1)));
         };
     }
-    fltDrvAttachment      = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_drv"),       fltDrvKnob.getSlider());
-    fltCutAttachment      = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_cut"),       fltCutKnob.getSlider());
-    fltResAttachment      = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_res"),       fltResKnob.getSlider());
-    fltLoCutAttachment    = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_lo_cut"),    fltLoCutKnob.getSlider());
-    fltEnvDepthAttachment = std::make_unique<APVTS::SliderAttachment>  (apvts, id("flt_env_depth"), fltEnvDepthKnob.getSlider());
+    fltDrvAttachment      = std::make_unique<APVTS::SliderAttachment>(apvts, id("flt_drv"),       fltDrvKnob.getSlider());
+    fltCutAttachment      = std::make_unique<APVTS::SliderAttachment>(apvts, id("flt_cut"),       fltCutKnob.getSlider());
+    fltResAttachment      = std::make_unique<APVTS::SliderAttachment>(apvts, id("flt_res"),       fltResKnob.getSlider());
+    fltEnvDepthAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("flt_env_depth"), fltEnvDepthKnob.getSlider());
+    fltLoCutAttachment    = std::make_unique<APVTS::SliderAttachment>(apvts, id("flt_lo_cut"),    fltLoCutKnob.getSlider());
+
+    // Filter 2 — same manual-wiring approach for the type dropdown.
+    {
+        auto* flt2Param = apvts.getParameter(id("flt2_type"));
+        int algo2 = 0;
+        if (auto* raw = apvts.getRawParameterValue(id("flt2_type")))
+            algo2 = juce::jlimit(0, 15, (int) raw->load());
+        flt2TypeDropdown.setSelectedId(algo2 + 1, juce::dontSendNotification);
+        flt2TypeDropdown.onChange = [flt2Param](int itemId) {
+            if (flt2Param)
+                flt2Param->setValueNotifyingHost(flt2Param->convertTo0to1((float)(itemId - 1)));
+        };
+    }
+    flt2DrvAttachment      = std::make_unique<APVTS::SliderAttachment>(apvts, id("flt2_drv"),       flt2DrvKnob.getSlider());
+    flt2CutAttachment      = std::make_unique<APVTS::SliderAttachment>(apvts, id("flt2_cut"),       flt2CutKnob.getSlider());
+    flt2ResAttachment      = std::make_unique<APVTS::SliderAttachment>(apvts, id("flt2_res"),       flt2ResKnob.getSlider());
+    flt2EnvDepthAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("flt2_env_depth"), flt2EnvDepthKnob.getSlider());
+    flt2LoCutAttachment    = std::make_unique<APVTS::SliderAttachment>(apvts, id("flt2_lo_cut"),    flt2LoCutKnob.getSlider());
+    fltSeriesAttachment    = std::make_unique<APVTS::ButtonAttachment>(apvts, id("flt_series"),     fltSeriesBtn);
 
     levelAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("level"), levelKnob.getSlider());
     gapAttachment        = std::make_unique<APVTS::SliderAttachment>(apvts, id("gate_gap"),     gatingDesigner.gapSlider);
@@ -359,13 +470,38 @@ void VoicePanel::bindModulationIndicators()
     bind(o2SemiKnob,     "osc2.semi",         mu_tant::kTantSnapOsc2Semi);
     bind(o2FineKnob,     "osc2.fine",         mu_tant::kTantSnapOsc2Fine);
     bind(o2PosKnob,      "osc2.pos",          mu_tant::kTantSnapOsc2Pos);
-    bind(xmodKnob,       "xmod",              mu_tant::kTantSnapXMod);
+    bind(xmodFmKnob,     "xmod.fm",           mu_tant::kTantSnapXModFm);
+    bind(xmodAmKnob,     "xmod.am",           mu_tant::kTantSnapXModAm);
+    bind(xmodRingKnob,   "xmod.ring",         mu_tant::kTantSnapXModRing);
     bind(osc1LevelKnob,  "osc1.level",        mu_tant::kTantSnapOsc1Level);
     bind(osc2LevelKnob,  "osc2.level",        mu_tant::kTantSnapOsc2Level);
     bind(noiseLevelKnob, "noise.level",       mu_tant::kTantSnapNoiseLevel);
     bind(fltCutKnob,     "filter.cutoff",     mu_tant::kTantSnapFilterCutoff);
     bind(fltResKnob,     "filter.resonance",  mu_tant::kTantSnapFilterRes);
     bind(levelKnob,      "level",             mu_tant::kTantSnapLevel);
+}
+
+void VoicePanel::clearAllModBindings()
+{
+    o1OctKnob.clearModBinding();
+    o1SemiKnob.clearModBinding();
+    o1FineKnob.clearModBinding();
+    o1PosKnob.clearModBinding();
+    o2OctKnob.clearModBinding();
+    o2SemiKnob.clearModBinding();
+    o2FineKnob.clearModBinding();
+    o2PosKnob.clearModBinding();
+    xmodFmKnob.clearModBinding();
+    xmodAmKnob.clearModBinding();
+    xmodRingKnob.clearModBinding();
+    osc1LevelKnob.clearModBinding();
+    osc2LevelKnob.clearModBinding();
+    noiseLevelKnob.clearModBinding();
+    fltCutKnob.clearModBinding();
+    fltResKnob.clearModBinding();
+    flt2CutKnob.clearModBinding();
+    flt2ResKnob.clearModBinding();
+    levelKnob.clearModBinding();
 }
 
 void VoicePanel::refreshHeader()
@@ -470,9 +606,9 @@ void VoicePanel::resized()
     // ── Row heights ──────────────────────────────────────────────────────────
     // Row A: Osc 1 | Osc 2 | Noise side-by-side — natural knob height.
     const int rowAH = s2H + s(8);   // 64
-    // Row B: X-Mod | Filter | Insert — height set by Insert subsection height so
-    // Insert fits without modification. X-Mod and Filter controls are centred within it.
-    const int rowBH = insTitleH + insSubH + s(6);   // 14+116+6 = 136
+    // Row B: height for two filter rows + vertical padding. The Series/Parallel toggle
+    // sits at the left edge between the rows, so it doesn't add to the height requirement.
+    const int rowBH = 2 * s2H + s(32);              // 2×56 + 32 = 144px
 
     // ── Row A: Osc 1 | Osc 2 | Noise (side by side, using full leftW) ───────
     // Osc panels extend across the Insert column zone since Insert is Row B only.
@@ -520,51 +656,73 @@ void VoicePanel::resized()
     // ── Row B: X-Mod | Filter (no Level) | Insert ───────────────────────────
     const int rowBY = contentTop + rowAH + gap;   // top of Row B
     {
-        // Vertical centering helpers — knob and dropdown centres align to row midline.
-        const int knobY = rowBY + (rowBH - s2H) / 2;
-        const int ctrlY = rowBY + (rowBH - ddH)  / 2;
 
-        // X-Mod panel
-        const int xmodTitleW = s(30);
+        // X-Mod panel — FM / AM / Ring knobs centred in the full panel width; Sync below.
         const int xmodW      = s(200);
         modNoisePanelR = { pad, rowBY, xmodW, rowBH };
         {
-            const int x     = pad + xmodTitleW;
-            const int avail = xmodW - xmodTitleW;   // 170 px
+            // Centre the 3 knobs symmetrically within the full xmodW (not shifted by title).
+            const int threeKnobsW = 3 * s2W + 2 * s(4);
+            const int knobsStartX = pad + (xmodW - threeKnobsW) / 2;
 
-            // Knob centred above; Mode label + dropdown + Sync in one row below.
-            const int totalH  = s2H + s(6) + ddH;   // 56+6+24 = 86
+            const int totalH  = s2H + s(6) + ddH;
             const int startY  = rowBY + (rowBH - totalH) / 2;
+            const int rowY2   = startY + s2H + s(6);
 
-            xmodKnob.setBounds(x + (avail - s2W) / 2, startY, s2W, s2H);
+            xmodFmKnob.setBounds(knobsStartX,                  startY, s2W, s2H);
+            xmodAmKnob.setBounds(knobsStartX + s2W + s(4),     startY, s2W, s2H);
+            xmodRingKnob.setBounds(knobsStartX + 2*(s2W+s(4)), startY, s2W, s2H);
 
-            // Bottom row — centred in the available width.
-            const int modeLabelW = s(30);
-            const int modeDropW  = s(72);
-            const int syncW      = s(44);
-            const int rowW = modeLabelW + s(4) + modeDropW + s(4) + syncW;
-            int rx = x + (avail - rowW) / 2;
-            const int rowY2 = startY + s2H + s(6);
-            xmodLabel.setBounds(rx, rowY2, modeLabelW, ddH);       rx += modeLabelW + s(4);
-            xmodModeDropdown.setBounds(rx, rowY2, modeDropW, ddH); rx += modeDropW  + s(4);
-            syncButton.setBounds(rx, rowY2, syncW, ddH);
+            const int syncW = s(44);
+            syncButton.setBounds(pad + (xmodW - syncW) / 2, rowY2, syncW, ddH);
         }
 
-        // Filter panel (no Level knob)
-        const int filterX     = pad + xmodW + gap;
+        // Filter panel — two rows (Filter 1 + Filter 2) with Series/Parallel toggle.
+        const int filterX      = pad + xmodW + gap;
         const int filterTitleW = s(30);
-        const int filterW     = rowsW - xmodW - gap;   // remaining rowsW
+        const int filterW      = rowsW - xmodW - gap;
         filterPanelR = { filterX, rowBY, filterW, rowBH };
         {
-            int x = filterX + filterTitleW;
-            fltTypeLabel.setBounds(x, ctrlY, s(28), ddH);          x += s(28) + s(2);
-            fltTypeDropdown.setBounds(x, ctrlY, s(88), ddH);       x += s(88) + gap;
-            // Audio flow order: Drive → Cutoff → Resonance → Low Cut → FEnv
-            fltDrvKnob.setBounds(x, knobY, s2W, s2H);              x += s2W + s(2);
-            fltCutKnob.setBounds(x, knobY, s2W, s2H);              x += s2W + s(2);
-            fltResKnob.setBounds(x, knobY, s2W, s2H);              x += s2W + s(2);
-            fltLoCutKnob.setBounds(x, knobY, s2W, s2H);            x += s2W + s(2);
-            fltEnvDepthKnob.setBounds(x, knobY, s2W, s2H);
+            // Each row: type_dd + 5×s2W knobs, the dropdown taking the remaining width.
+            const int rowH = s2H;
+            // Two filter rows, vertically centred in rowBH.
+            const int twoRowsH   = 2 * rowH + s(8);
+            const int rowsStartY = rowBY + (rowBH - twoRowsH) / 2;
+            const int row1Y = rowsStartY;
+            const int row2Y = row1Y + rowH + s(8);
+
+            // Series/Parallel round button — at the left edge of the panel (just inside
+            // the border, below the "FILTER" title), vertically centred between the rows.
+            juce::ignoreUnused(filterTitleW);
+            const int serBtnD = s(30);
+            const int serBtnX = filterX + s(8);
+            const int serBtnY = rowBY + (rowBH - serBtnD) / 2;
+            fltSeriesBtn.setBounds(serBtnX, serBtnY, serBtnD, serBtnD);
+
+            // Controls start after the button.
+            const int xStart     = serBtnX + serBtnD + s(8);
+            const int knobGap    = s(2);
+            // Dropdown width fills remaining space: filterX+filterW - xStart - 5×s2W - 4×knobGap
+            const int fullTypeDdW = (filterX + filterW) - xStart - 5 * s2W - 4 * knobGap;
+
+            // Type labels hidden — the dropdown content is self-explanatory.
+            fltTypeLabel .setBounds(0, 0, 0, 0);
+            flt2TypeLabel.setBounds(0, 0, 0, 0);
+
+            // Filter 1 row
+            {
+                int x = xStart;
+                fltTypeDropdown.setBounds(x, row1Y + (rowH - ddH) / 2, fullTypeDdW, ddH); x += fullTypeDdW + knobGap;
+                for (auto* k : { &fltDrvKnob, &fltCutKnob, &fltResKnob, &fltEnvDepthKnob, &fltLoCutKnob })
+                    { k->setBounds(x, row1Y, s2W, s2H); x += s2W + knobGap; }
+            }
+            // Filter 2 row
+            {
+                int x = xStart;
+                flt2TypeDropdown.setBounds(x, row2Y + (rowH - ddH) / 2, fullTypeDdW, ddH); x += fullTypeDdW + knobGap;
+                for (auto* k : { &flt2DrvKnob, &flt2CutKnob, &flt2ResKnob, &flt2EnvDepthKnob, &flt2LoCutKnob })
+                    { k->setBounds(x, row2Y, s2W, s2H); x += s2W + knobGap; }
+            }
         }
 
         // Insert panel (Row B only, same height as Row B)
@@ -593,7 +751,7 @@ void VoicePanel::resized()
     // ── Gating designer — full width ─────────────────────────────────────────
     int y = rowBY + rowBH + gap;
     {
-        const int gateH = s(24 + 22 + 80 + 56 + 4);   // 186
+        const int gateH = s(38 + 134 + 10 + 4);   // 186 — kHdr1H + kGridH + kScrollH + border
         gatingDesigner.setBounds(pad, y, w - 2 * pad, gateH);
         y += gateH + gap;
     }

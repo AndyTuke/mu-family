@@ -89,16 +89,16 @@ private:
     VoiceParams activeParams;  // audio thread only — what process() actually uses
                                // (= params unless modulation overrides it each block)
 
-    // Single engine-level amp envelope (#627). Pre-Stage-35 there was one ADSR per
+    // Single engine-level amp envelope. Pre-Stage-35 there was one ADSR per
     // voice slot — that model never composed cleanly with the SHARED filter + insert
     // chain that follows it (filter resonance / comb feedback could outlast any single
-    // voice's env), so #416 had to forcibly reset filter+insert state in markRetired()
-    // to kill the residual ringing. With the new "filter-then-amp" signal flow, voices
-    // mix raw into tempBuffer → filter + insert process the combined signal → engine
-    // ampEnv multiplies the result at the END of the chain. Filter / insert tails ring
-    // naturally and drain through the env release. Trade-off: rapid retriggers reset the
-    // engine env (no per-voice envelope independence on overlapping voices) — fine for
-    // drum-style triggers and pad use is mitigated by pattern legato (#419).
+    // voice's env), so the old design had to forcibly reset filter+insert state in
+    // markRetired() to kill the residual ringing. With the new "filter-then-amp" signal
+    // flow, voices mix raw into tempBuffer → filter + insert process the combined signal
+    // → engine ampEnv multiplies the result at the END of the chain. Filter / insert
+    // tails ring naturally and drain through the env release. Trade-off: rapid retriggers
+    // reset the engine env (no per-voice envelope independence on overlapping voices) —
+    // fine for drum-style triggers and pad use is mitigated by pattern legato.
     juce::ADSR  ampEnv;
     juce::ADSR  filterEnv;
     juce::ADSR  pitchEnv;

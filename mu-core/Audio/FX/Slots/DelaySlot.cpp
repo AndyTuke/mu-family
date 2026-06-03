@@ -58,7 +58,7 @@ void DelaySlot::process(juce::AudioBuffer<float>& buffer)
 
 void DelaySlot::processReturn(juce::AudioBuffer<float>& buffer)
 {
-    if (!enabled) return;
+    if (!enabled.load(std::memory_order_relaxed)) return;
 
     const int numCh      = buffer.getNumChannels();
     const int numSamples = buffer.getNumSamples();
@@ -77,8 +77,9 @@ void DelaySlot::processReturn(juce::AudioBuffer<float>& buffer)
         const float delayedL = hermiteDelay(bufL, writePosL, smoothedDelayL);
         const float delayedR = hermiteDelay(bufR, writePosR, smoothedDelayR);
 
-        feedL = processDirt(delayedL * feedback);
-        feedR = processDirt(delayedR * feedback);
+        const float fb = feedback.load(std::memory_order_relaxed);
+        feedL = processDirt(delayedL * fb);
+        feedR = processDirt(delayedR * fb);
 
         bufL[writePosL] = inL + feedL;
         bufR[writePosR] = inR + feedR;
@@ -94,14 +95,14 @@ void DelaySlot::processReturn(juce::AudioBuffer<float>& buffer)
 void DelaySlot::setTimeCount(int count)
 {
     syncCount = juce::jmax(1, count);
-    if (timeMode == TimeMode::Sync)
+    if (timeMode.load(std::memory_order_relaxed) == TimeMode::Sync)
         updateDelayFromMode();
 }
 
 void DelaySlot::setDelayMs(float ms)
 {
     delayMs = juce::jlimit(1.0f, 4000.0f, ms);
-    if (timeMode == TimeMode::Free)
+    if (timeMode.load(std::memory_order_relaxed) == TimeMode::Free)
         updateDelayFromMode();
 }
 
@@ -110,14 +111,14 @@ void DelaySlot::setTimeDivision(int denominator, bool dotted, bool triplet)
     syncDenominator = denominator;
     syncDotted      = dotted;
     syncTriplet     = triplet;
-    if (timeMode == TimeMode::Sync)
+    if (timeMode.load(std::memory_order_relaxed) == TimeMode::Sync)
         updateDelayFromMode();
 }
 
 void DelaySlot::updateDelayFromMode()
 {
     float ms;
-    if (timeMode == TimeMode::Free)
+    if (timeMode.load(std::memory_order_relaxed) == TimeMode::Free)
     {
         ms = delayMs;
     }
@@ -132,7 +133,7 @@ void DelaySlot::updateDelayFromMode()
     }
 
     const float sampL = static_cast<float>(ms * sr / 1000.0);
-    const float sampR = sampL * (1.0f + spread * 0.1f);
+    const float sampR = sampL * (1.0f + spread.load(std::memory_order_relaxed) * 0.1f);
     setDelaySamplesLR(sampL, sampR);
 }
 
@@ -144,8 +145,9 @@ void DelaySlot::setDelaySamplesLR(float sampL, float sampR)
 
 float DelaySlot::processDirt(float x) const
 {
-    if (dirt < 0.001f) return x;
-    const float gain = 1.0f + dirt * 8.0f;
+    const float d = dirt.load(std::memory_order_relaxed);
+    if (d < 0.001f) return x;
+    const float gain = 1.0f + d * 8.0f;
     const float sat  = std::tanh(x * gain) / gain;
-    return x + (sat - x) * dirt;
+    return x + (sat - x) * d;
 }

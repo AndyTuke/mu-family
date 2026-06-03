@@ -37,11 +37,10 @@
 //                         `idx = (drvOut + 24) / 4`. This field's negative
 //                         range avoided a clash with insertTone (which has
 //                         a 20..20k clamp that would corrupt small-int
-//                         storage — see #428).
+//                         storage).
 //
-// Carrier pitch (when waveshape is Saw/Square): SPN-anchored. #429 shifted
-// the octave range down by one so Octave 1 = SPN C1 = 32.7 Hz (was C2 = 65.4 Hz).
-// Octave knob 1..5 now spans SPN octaves 1..5 — same total span, just lower
+// Carrier pitch (when waveshape is Saw/Square): SPN-anchored. Octave 1 = SPN C1
+// = 32.7 Hz. Octave knob 1..5 spans SPN octaves 1..5 — same total span, just lower
 // overall. White / Pink Noise carriers ignore Note / Octave / Unison entirely
 // (no fundamental to detune).
 //
@@ -147,7 +146,7 @@ public:
                 const float cents = t * detuneCents;
                 const float fr    = baseFreq * std::pow(2.0f, cents / 1200.0f);
                 voiceInc [v] = fr / sr;
-                // Outer voices drop to 0.4× the centre (per #423 spec):
+                // Outer voices drop to 0.4× the centre:
                 //   gain = 1 - 0.6 * (|t|)
                 voiceGain[v] = 1.0f - 0.6f * std::abs(t);
                 gainSum     += voiceGain[v];
@@ -273,12 +272,12 @@ private:
     static constexpr float kBandQ            = 5.0f;
     static constexpr float kEnvAttackMs      = 5.0f;
     static constexpr float kEnvReleaseMs     = 30.0f;
-    static constexpr float kLowestFreq       = 32.7f;     // SPN C1 — #429 shift
+    static constexpr float kLowestFreq       = 32.7f;     // SPN C1
     static constexpr int   kMaxUnisonVoices  = 13;
     // per-voice gain ramp time for Unison-up entries.
     static constexpr float kEntryRampMs      = 5.0f;
 
-    // Voice counts per Unison knob position (#423 spec).
+    // Voice counts per Unison knob position.
     static constexpr int   kUnisonVoices      [7] = { 1, 3, 5, 7, 9, 11, 13 };
     // Detune spread D(N) in cents per Unison position.
     static constexpr float kUnisonSpreadCents [7] = { 0.0f, 8.0f, 16.0f, 24.0f, 32.0f, 40.0f, 50.0f };

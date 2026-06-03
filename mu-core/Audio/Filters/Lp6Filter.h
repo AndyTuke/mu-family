@@ -5,7 +5,7 @@
 
 // type 7 — 6 dB/oct lowpass via the project's `OnePoleLP` primitive
 // (one per channel). Coefficient recompute is gated on cutoff/sample-rate
-// changes — see the #368 change-detection cache.
+// changes — coefficient recompute skip is guarded by a cached last-value check.
 class Lp6Filter : public FilterAlgorithmBase
 {
 public:

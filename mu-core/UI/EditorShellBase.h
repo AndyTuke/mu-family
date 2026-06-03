@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Plugin/ProcessorBase.h"
 #include "UI/Components/MuLookAndFeel.h"
@@ -71,8 +72,10 @@ public:
 
     // Preset-dirty tracking — set whenever the APVTS tree changes; cleared
     // by the product after a successful load / save / new.
-    bool isPresetDirty() const noexcept { return presetDirty; }
-    void clearPresetDirty() noexcept   { presetDirty = false; }
+    // Atomic because JUCE can invoke ValueTree listeners on the audio thread
+    // (DAW automation writes APVTS on the audio thread); read on message thread.
+    bool isPresetDirty() const noexcept { return presetDirty.load(std::memory_order_relaxed); }
+    void clearPresetDirty() noexcept   { presetDirty.store(false, std::memory_order_relaxed); }
 
     // ─── Product hooks (override to refresh product-specific UI) ─────────────
     // Fired after a preset is loaded from the browser, transport dropdown, or
@@ -125,15 +128,15 @@ protected:
 
     bool isStandalone   = false;
     bool needsFocusGrab = false;
-    bool presetDirty    = false;
+    std::atomic<bool> presetDirty { false };
     std::function<void()> pendingQuitCallback;
     juce::KeyPress keybindPlayStop { juce::KeyPress::spaceKey };
     void loadKeybindings();
 
     // juce::ValueTree::Listener — tracks preset-dirty state.
-    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override { presetDirty = true; }
-    void valueTreeChildAdded    (juce::ValueTree&, juce::ValueTree&)          override { presetDirty = true; }
-    void valueTreeChildRemoved  (juce::ValueTree&, juce::ValueTree&, int)     override { presetDirty = true; }
+    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override { presetDirty.store(true, std::memory_order_relaxed); }
+    void valueTreeChildAdded    (juce::ValueTree&, juce::ValueTree&)          override { presetDirty.store(true, std::memory_order_relaxed); }
+    void valueTreeChildRemoved  (juce::ValueTree&, juce::ValueTree&, int)     override { presetDirty.store(true, std::memory_order_relaxed); }
 
 private:
     // Internal: actually run the save against the processor + refresh chrome.

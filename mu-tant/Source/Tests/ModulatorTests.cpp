@@ -54,7 +54,7 @@ public:
             const char* requiredKeys[] = {
                 "osc1.octave", "osc1.semi", "osc1.fine", "osc1.pos",
                 "osc2.octave", "osc2.semi", "osc2.fine", "osc2.pos",
-                "xmod", "osc1.level", "osc2.level", "noise.level",
+                "xmod.fm", "xmod.am", "xmod.ring", "osc1.level", "osc2.level", "noise.level",
                 "filter.cutoff", "filter.resonance", "level"
             };
             auto provider = makeModDestProvider();

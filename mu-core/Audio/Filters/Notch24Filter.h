@@ -17,13 +17,18 @@ public:
         ladder.setMode(juce::dsp::LadderFilter<float>::Mode::BPF24);
         dryScratch.setSize(2, blockSize, false, true, false);
     }
-    void reset() override { ladder.reset(); }
+    void reset() override { ladder.reset(); lastCutoffHz = -1.0f; lastResonance = -1.0f; }
 
     void process(juce::AudioBuffer<float>& buf, int numSamples, int numChannels,
                  float cutoffHz, float resonance) override
     {
-        ladder.setCutoffFrequencyHz(cutoffHz);
-        ladder.setResonance(juce::jmax(0.01f, resonance));
+        // Skip the coefficient recompute when cutoff/resonance are unchanged.
+        if (cutoffHz != lastCutoffHz || resonance != lastResonance)
+        {
+            ladder.setCutoffFrequencyHz(cutoffHz);
+            ladder.setResonance(juce::jmax(0.01f, resonance));
+            lastCutoffHz = cutoffHz; lastResonance = resonance;
+        }
 
         const int nCh = juce::jmin(numChannels, 2);
         for (int ch = 0; ch < nCh; ++ch)
@@ -47,4 +52,5 @@ public:
 private:
     juce::dsp::LadderFilter<float> ladder;
     juce::AudioBuffer<float> dryScratch;
+    float lastCutoffHz = -1.0f, lastResonance = -1.0f;
 };

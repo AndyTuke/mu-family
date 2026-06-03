@@ -44,6 +44,8 @@ MultiModeFilter::MultiModeFilter()
 
 void MultiModeFilter::prepare(double sampleRate, int blockSize, int numChannels)
 {
+    currentSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
+
     for (auto& a : algorithms)
         if (a) a->prepare(sampleRate, blockSize, numChannels);
 
@@ -91,13 +93,19 @@ void MultiModeFilter::process(juce::AudioBuffer<float>& buffer,
         }
     }
 
+    // Clamp cutoff against the real Nyquist before any algorithm sees it. The
+    // APVTS ceiling is 20 kHz, which exceeds Nyquist at sample rates ≤ 40 kHz —
+    // the SVF/Ladder would assert (debug) or go unstable (release) above fs/2.
+    const float maxCut  = 0.45f * (float) currentSampleRate;
+    const float safeCut = juce::jlimit(20.0f, maxCut, cutoffHz);
+
     // Main filter algorithm.
     const int idx = juce::jlimit(0, kNumFilterAlgos - 1, typeCodeValue);
     if (auto* algo = algorithms[(size_t) idx].get())
-        algo->process(buffer, ns, nCh, cutoffHz, resonance);
+        algo->process(buffer, ns, nCh, safeCut, resonance);
 
     // Post-filter 4-pole high-pass (lo-cut). Per-block smoothed; bypassed at 0.
     const float loHz = smoothedLowCutHz.skip(ns);
     if (loHz > 0.5f)
-        lowCutFilter.process(buffer, ns, nCh, loHz, 0.0f);
+        lowCutFilter.process(buffer, ns, nCh, juce::jmin(loHz, maxCut), 0.0f);
 }

@@ -13,7 +13,7 @@ public:
     {
         currentSampleRate = sampleRate;
         // 15 ms ramps eliminate "step" sound on freq sweeps and crackle on mix
-        // movement. Same pattern as #511/#512/#513/#514/#535.
+        // movement.
         smoothedPhInc.reset(sampleRate, 0.015);  smoothedPhInc.setCurrentAndTargetValue(0.0f);
         smoothedMix  .reset(sampleRate, 0.015);  smoothedMix  .setCurrentAndTargetValue(0.0f);
         reset();

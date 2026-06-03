@@ -11,6 +11,7 @@
 #include "Audio/FX/Send/EchoEffect.h"
 
 #include <array>
+#include <atomic>
 #include <memory>
 
 // Hosts one of the 4 effect algorithms (Chorus, Flanger, Phaser, Echo).
@@ -40,15 +41,15 @@ public:
     void setStateInformation(const void*, int) override {}
 
     void setAlgorithm(int index);   // 0–3 — allocation-free; just flips active index
-    int  getAlgorithmIndex() const { return algorithmIndex; }
+    int  getAlgorithmIndex() const { return algorithmIndex.load(std::memory_order_relaxed); }
 
     void setParam(const juce::String& id, float value);
 
     // Send-bus entry point — runs algorithm on the buffer (wet-only, no internal dry blend).
     void processReturn(juce::AudioBuffer<float>&);
 
-    bool isEnabled() const  { return enabled; }
-    void setEnabled(bool e) { enabled = e; }
+    bool isEnabled() const  { return enabled.load(std::memory_order_relaxed); }
+    void setEnabled(bool e) { enabled.store(e, std::memory_order_relaxed); }
 
     static const std::vector<FXAlgorithmDef>& allDefs() { return FXAlgorithmRegistry::effectAlgorithms(); }
 
@@ -58,7 +59,9 @@ public:
     // True when the feedback loop must run every block regardless of input signal.
     bool needsContinuousProcessing() const
     {
-        return algorithmIndex == kEchoAlgoIndex && enabled && echoDelay.isEnabled();
+        return algorithmIndex.load(std::memory_order_relaxed) == kEchoAlgoIndex
+            && enabled.load(std::memory_order_relaxed)
+            && echoDelay.isEnabled();
     }
 
 private:
@@ -67,14 +70,16 @@ private:
 
     EffectAlgorithmBase* currentAlgorithm() const
     {
-        return algorithms[(size_t) algorithmIndex].get();
+        return algorithms[(size_t) algorithmIndex.load(std::memory_order_relaxed)].get();
     }
 
     std::unique_ptr<OversampledProcessor> oversampler;
     DelaySlot echoDelay;
 
-    int    algorithmIndex = 0;
-    bool   enabled        = true;
+    // Fields read on the audio thread are atomic — setEnabled / setAlgorithm can be
+    // called from parameterChanged on any thread when a DAW automates eff_algo/bypass.
+    std::atomic<int>  algorithmIndex { 0 };
+    std::atomic<bool> enabled        { true };
     double currentRate    = 44100.0;
     int    currentBlock   = 512;
 };

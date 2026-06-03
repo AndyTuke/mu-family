@@ -15,11 +15,11 @@
 // as a const VoiceParams& each block so there is no internal copy to keep in
 // sync.
 //
-// refactored from a single ~600-line switch statement into a dispatch
+// Refactored from a single ~600-line switch statement into a dispatch
 // table over insertAlgo → InsertAlgorithmBase*. Each insertAlgo code maps to a
 // concrete subclass living in Source/Audio/Processing/InsertFX/. All algorithms are pre-
 // allocated in the constructor so prepare() / param-change paths never heap-
-// allocate — matches the FX-rack pattern fixed under #402.
+// allocate — matches the FX-rack pattern used across the send/return chain.
 //
 // Compressor (insertAlgo = 7) and Limiter (insertAlgo = 8) share a single
 // CompressorLimiterInsert instance: the dispatch table aliases both slots to

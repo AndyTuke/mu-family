@@ -2,8 +2,8 @@
 
 #include <juce_audio_basics/juce_audio_basics.h>
 
-// abstract base for the 16 voice-filter algorithms. Mirrors the
-// InsertFX / SendFX dispatch pattern (see #425/#426). Each concrete subclass
+// Abstract base for the 16 voice-filter algorithms. Mirrors the
+// InsertFX / SendFX dispatch pattern. Each concrete subclass
 // implements ONE filter type code (see MultiModeFilter's dropdown order):
 //   0  Lp12Filter         (SVF 12 dB/oct LP)
 //   1  Hp12Filter         (SVF 12 dB/oct HP)
@@ -29,8 +29,8 @@
 //
 // `cutoffHz` and `resonance` are passed per-call rather than via setters so
 // the algorithm doesn't have to keep its own copy in sync. Coefficient-
-// recompute skip (#368) is implemented inside each algorithm against its
-// own cached last-value members.
+// recompute skip is implemented inside each algorithm against its own
+// cached last-value members.
 class FilterAlgorithmBase
 {
 public:

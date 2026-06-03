@@ -6,9 +6,9 @@
 #include <cmath>
 #include <functional>
 
-// Shared UI driver for the 4 generic insert-slot knobs. Closes the #609
-// duplication between the per-rhythm InsertSubsection and the master
-// MixerChannel_Insert — both call this once per slot to configure label,
+// Shared UI driver for the 4 generic insert-slot knobs. Eliminates duplication
+// between the per-rhythm InsertSubsection and the master MixerChannel_Insert —
+// both call this once per slot to configure label,
 // range, skew, display formatter, value, and onValueChanged write-back from
 // the same per-algo config table (mu_ui::kInsertAlgoSlots).
 //

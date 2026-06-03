@@ -45,9 +45,9 @@ inline const char* const kInsertAlgorithmNames[] = {
     "Limiter",      // 8
     "RingMod",      // 9
     "TapeSat",      // 10
-    "Karplus",      // 11    #422
-    "Vocoder",      // 12    #423
-    "VocoderSt",    // 13    #445
+    "Karplus",      // 11
+    "Vocoder",      // 12
+    "VocoderSt",    // 13
     nullptr
 };
 

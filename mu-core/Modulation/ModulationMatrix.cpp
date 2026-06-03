@@ -25,22 +25,22 @@ static constexpr auto kMetaSuffix = "_depth";
 //  amp.decay           display 0-100       0..100          100     full-range additive
 //  amp.sustain         display 0-100       0..100          100     full-range additive
 //  amp.release         display 0-100       0..100          100     full-range additive
-//  amp.level           dB -60..+6          -60..+6 dB      66      full-range additive (#598 Step 0)
-//  accentDb            dB 0-12             0..12           12      (#223)
-//  filter.cutoff       Hz (log-mult)       20..20000 Hz    12      ±1 octave (#291, reduced from 48)
-//  filter.resonance    0-0.99              0..0.99         0.99    full-range additive (#598 Step 0)
+//  amp.level           dB -60..+6          -60..+6 dB      66      full-range additive
+//  accentDb            dB 0-12             0..12           12      full-range additive
+//  filter.cutoff       Hz (log-mult)       20..20000 Hz    12      ±1 octave
+//  filter.resonance    0-0.99              0..0.99         0.99    full-range additive
 //  fenv.attack         display 0-100       0..100          100     full-range additive
 //  fenv.decay          display 0-100       0..100          100     full-range additive
 //  fenv.depth          semitones 0-48      0..48           48      full-range additive
 //  pitch.semitones     semitones 0 base    ±12 st          12      ±1 octave
 //  pitch.octave        semitones 0 base    ±36 st          36      ±3 octaves
-//  pitch.envDepth      semitones 0-24      0..24           24      (#223)
+//  pitch.envDepth      semitones 0-24      0..24           24      full-range additive
 //  insert.drive        display 0-100       0..100          100     full-range additive
 //  insert.output       dB -24..0           -24..0 dB       24      full-range additive
-//  insert.bits         actual bits 1-16    1..16 bits      1       ±1 bit at full depth (#266)
+//  insert.bits         actual bits 1-16    1..16 bits      1       ±1 bit at full depth
 //  insert.rate         log-norm 0-100      0..100          100     full-range additive (log space)
 //  insert.dither       display 0-100       0..100          100     full-range additive
-//  insert.lpf          Hz (log-mult)       20..20000 Hz    48      ±4 octaves (#291)
+//  insert.lpf          Hz (log-mult)       20..20000 Hz    48      ±4 octaves
 //  euclid.*.hits       steps 0-64          0..64           16      ±16 steps (~25% of max)
 //  euclid.*.rotate     steps 0-63          0..63           16      ±16 steps
 //  euclid.*.prePad     steps 0-12          0..12           12      full pre-pad range
@@ -53,7 +53,7 @@ static constexpr auto kMetaSuffix = "_depth";
 // destinations that already operate on a 0-100 display scale (amp/filter ADSR, etc.).
 static float depthScaleFor(const std::string& destId)
 {
-    // Proportion-space destinations (#638 + #639) — modParamValues holds the slider's
+    // Proportion-space destinations — modParamValues holds the slider's
     // proportion (0..1) so the same depth always sweeps the same visual proportion of
     // the knob's turn (Andy's design rule: "a 50% mod at full should turn the knob half
     // of its available turn"). Seed + write-back in PluginProcessor.cpp convert between
@@ -69,10 +69,10 @@ static float depthScaleFor(const std::string& destId)
     if (destId == "fenv.depth")      return 48.0f;   // 0..48 semitones (full slider range)
     if (destId == "pitch.envDepth")  return 24.0f;   // 0..24 semitones (full slider range)
     if (destId == "accentDb")        return 12.0f;   // 0..12 dB (full slider range)
-    if (destId == "amp.level")       return 66.0f;   // -60..+6 dB (full slider range; #598 Step 0)
-    if (destId == "filter.resonance") return 0.99f;  // 0..0.99 (full slider range; #598 Step 0)
+    if (destId == "amp.level")       return 66.0f;   // -60..+6 dB (full slider range)
+    if (destId == "filter.resonance") return 0.99f;  // 0..0.99 (full slider range)
     if (destId == "insert.output")   return 24.0f;   // -24..0 dB (full range)
-    if (destId == "insert.bits")     return 1.0f;    // 1..16 bits; ±1 bit at full depth (#266)
+    if (destId == "insert.bits")     return 1.0f;    // 1..16 bits; ±1 bit at full depth
     // Stage 36 generic insert slots — values stored in voiceParams.insertParam[] as
     // NORMALISED 0..1; each algo's process() denormalises via kInsertAlgoSlots. So
     // a full-depth modulation must span the normalised range — scale = 1.0, NOT
@@ -99,9 +99,8 @@ static float depthScaleFor(const std::string& destId)
     if (destId == "voc.octave")      return 4.0f;    // Vocoder octave 1..5 (range 4)
     if (destId == "voc.unison")      return 6.0f;    // Vocoder unison index 0..6
     // Pattern destinations — pad/insert knobs with FIXED slider ranges. Scale = full
-    // slider range so 100% mod = 100% knob turn (Andy's spec, #641). Previously halved
-    // for a "feels less saturated" UX which contradicted the design rule — user can
-    // dial depth down for subtler movement.
+    // slider range so 100% mod = 100% knob turn (100% mod at full depth → full swing).
+    // User can dial depth down for subtler movement.
     if (destId == "euclid.a.prePad"  || destId == "euclid.b.prePad"  || destId == "euclid.c.prePad"
      || destId == "euclid.a.postPad" || destId == "euclid.b.postPad" || destId == "euclid.c.postPad")
         return 12.0f;  // full 0..12-step pad range
@@ -124,7 +123,7 @@ static float depthScaleFor(const std::string& destId)
 // VoiceEngine: `cutoff * 2^(semis/12)`.
 static bool isLogHzDest(const std::string& destId)
 {
-    // Empty since #639 — filter.cutoff switched to proportion-space modulation. Function
+    // Currently empty — filter.cutoff switched to proportion-space modulation. Function
     // kept for future destinations that may want multiplicative-in-octaves behaviour.
     (void) destId;
     return false;

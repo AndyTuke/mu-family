@@ -1,6 +1,7 @@
 #pragma once
 
 #include "FXSlotBase.h"
+#include <atomic>
 #include <vector>
 
 // Insert-style stereo delay with sync/free time, feedback path saturation (dirt),
@@ -21,8 +22,8 @@ public:
     void getStateInformation(juce::MemoryBlock&) override {}
     void setStateInformation(const void*, int) override {}
 
-    bool isEnabled() const  { return enabled; }
-    void setEnabled(bool e) { enabled = e; }
+    bool isEnabled() const  { return enabled.load(std::memory_order_relaxed); }
+    void setEnabled(bool e) { enabled.store(e, std::memory_order_relaxed); }
 
     // Send-bus processing: runs delay with no dry/wet blend (wet-only output).
     void processReturn(juce::AudioBuffer<float>&);
@@ -33,14 +34,14 @@ public:
     // Sync mode: denominator of note value (1=whole, 2=half, 4=quarter, 8=eighth, etc.)
     // dotted and triplet modify the time.  count multiplies the resulting duration.
     void setTimeDivision(int denominator, bool dotted, bool triplet);
-    void setTimeMode(TimeMode m) { timeMode = m; updateDelayFromMode(); }
+    void setTimeMode(TimeMode m) { timeMode.store(m, std::memory_order_relaxed); updateDelayFromMode(); }
     void setTimeCount(int count);
-    TimeMode getTimeMode() const { return timeMode; }
+    TimeMode getTimeMode() const { return timeMode.load(std::memory_order_relaxed); }
 
-    void setFeedback(float fb)  { feedback = juce::jlimit(0.0f, 0.98f, fb); }
-    void setSpread(float s)     { spread   = juce::jlimit(0.0f, 1.0f, s); }
-    void setDirt(float d)       { dirt     = juce::jlimit(0.0f, 1.0f, d); }
-    void setHostBpm(double bpm) { hostBpm  = bpm; if (timeMode == TimeMode::Sync) updateDelayFromMode(); }
+    void setFeedback(float fb)  { feedback.store(juce::jlimit(0.0f, 0.98f, fb), std::memory_order_relaxed); }
+    void setSpread(float s)     { spread.store(juce::jlimit(0.0f, 1.0f, s), std::memory_order_relaxed); }
+    void setDirt(float d)       { dirt.store(juce::jlimit(0.0f, 1.0f, d), std::memory_order_relaxed); }
+    void setHostBpm(double bpm) { hostBpm  = bpm; if (timeMode.load(std::memory_order_relaxed) == TimeMode::Sync) updateDelayFromMode(); }
 
 private:
     void updateDelayFromMode();
@@ -49,14 +50,17 @@ private:
 
     static constexpr int MaxDelaySamples = 4 * 192000;  // 4s at 192kHz
 
-    bool   enabled    = true;
-    float  feedback   = 0.45f;
-    float  spread     = 0.0f;
-    float  dirt       = 0.0f;
+    // Fields read on the audio thread are atomic — setEnabled / setFeedback /
+    // setDirt / setSpread / setTimeMode can be called from parameterChanged on
+    // any thread when a DAW automates delay parameters. Mirrors ReverbSlot.
+    std::atomic<bool>     enabled  { true };
+    std::atomic<float>    feedback { 0.45f };
+    std::atomic<float>    spread   { 0.0f };
+    std::atomic<float>    dirt     { 0.0f };
     double sr         = 44100.0;
     double hostBpm    = 120.0;
 
-    TimeMode timeMode = TimeMode::Free;
+    std::atomic<TimeMode> timeMode { TimeMode::Free };
     float    delayMs  = 250.0f;
     int      syncDenominator = 4;
     bool     syncDotted      = false;

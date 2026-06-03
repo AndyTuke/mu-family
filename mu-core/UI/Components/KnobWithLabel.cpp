@@ -263,7 +263,7 @@ void KnobWithLabel::timerCallback()
 
 void KnobWithLabel::paintOverChildren(juce::Graphics& g)
 {
-    // Issue #133: modulation indicator + #246: GR arc.
+    // Modulation indicator ring and GR arc overlay.
     if (! isModulated && std::isnan(modulatedNorm) && grDisplay <= 0.005f) return;
 
     using mu_ui::sf;

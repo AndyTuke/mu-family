@@ -197,7 +197,7 @@ void MixerChannel::resized()
     const int sendH = s(kSendKnobH);
     const int faderY = sendY + spH;
 
-    // A return channel cannot send to itself (would feedback-loop). #429.
+    // A return channel cannot send to itself (would create a feedback loop).
     sendEffect.setVisible(hasSends() && channelType == Type::Channel);
     sendDelay .setVisible(hasSends() && channelType != Type::DelayReturn
                                      && channelType != Type::ReverbReturn);

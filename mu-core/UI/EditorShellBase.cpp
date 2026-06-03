@@ -6,7 +6,7 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
     // standard guarantees the base class is fully constructed before member
     // ctors run. So `mu_ui::scale` is correct when `transportBar(proc)` and
     // the other members below construct, which is the only way ctor-time
-    // `sf(...)` font assignments pick up the right size (audit #574).
+    // `sf(...)` font assignments pick up the right size.
     : AudioProcessorEditor((mu_ui::scale = juce::jlimit(ProcessorBase::kUiScaleMedium,
                                                         ProcessorBase::kUiScaleLarge,
                                                         proc.getUiScale()), &proc)),

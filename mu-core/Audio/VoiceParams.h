@@ -11,7 +11,7 @@ struct VoiceParams
     float pitchEnvSus    = 0.0f;
     float pitchEnvRel    = 0.1f;
     float pitchEnvDepth  = 0.0f;     // semitones swept at envelope peak, 0..24
-    // Per-envelope legato fields removed in #614 — envelope retrigger now
+    // Per-envelope legato fields removed — envelope retrigger now
     // follows the rhythm-level `patternLegato` flag uniformly. Tied hits
     // skip the noteOn/reset; untied hits always reset to zero.
 

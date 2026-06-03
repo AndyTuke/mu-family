@@ -118,7 +118,7 @@ float ControlSequence::evaluateSmooth(double phase) const
     // cubic Bézier when either endpoint carries a handle. handleY is an
     // offset from the segment midpoint in normalised y units, used to derive the
     // two control points y-values c1y = midY + handleY0 and c2y = midY + handleY1.
-    // Per #225, handleX is intentionally ignored (the evaluator parameterises t
+    // handleX is intentionally ignored (the evaluator parameterises t
     // as chord progress, not the cubic x-axis — keeps playhead-vs-time mapping
     // simple). When neither endpoint has a handle the result degenerates to
     // linear interpolation via the Bézier formula with zero offsets.

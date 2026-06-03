@@ -28,19 +28,14 @@ public:
             gd.setSubdivision(32);  expect(gd.getSubdivision() == 32, "set to 1/32");
         }
 
-        beginTest("strip represents exactly 2 bars");
+        beginTest("view window is exactly 2 bars");
         {
-            // The total bars is a design-spec constant; if it ever changes,
-            // the math relating subdivision → cell count below also changes.
-            expect(GatingDesigner::kTotalBars == 2,
-                   "design spec: gating strip = 2 bars total");
+            expect(GatingDesigner::kViewBars == 2,
+                   "design spec: gating view window = 2 bars");
         }
 
-        // The cell-count math is exercised via the public subdivision setter.
-        // The expectation: cells = bars * denom (one cell per Nth-note over the
-        // total bar span). cellCount() itself is private, but the grid-line
-        // pattern in paint() is a direct consequence.
-        beginTest("subdivision implies expected cell count per 2 bars");
+        // kViewBars × subdivision = cells in view; cell-count math check.
+        beginTest("subdivision implies expected cell count per view window");
         {
             struct Case { int denom; int expectedCells; };
             const Case cases[] = {
@@ -51,7 +46,7 @@ public:
             };
             for (const auto& c : cases)
             {
-                const int cells = GatingDesigner::kTotalBars * c.denom;
+                const int cells = GatingDesigner::kViewBars * c.denom;
                 expect(cells == c.expectedCells,
                        "denom 1/" + juce::String(c.denom)
                            + " → " + juce::String(c.expectedCells) + " cells");

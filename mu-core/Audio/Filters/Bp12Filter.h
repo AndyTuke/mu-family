@@ -13,13 +13,18 @@ public:
         svf.prepare({ sampleRate, static_cast<juce::uint32>(blockSize), chans });
         svf.setType(juce::dsp::StateVariableTPTFilterType::bandpass);
     }
-    void reset() override { svf.reset(); }
+    void reset() override { svf.reset(); lastCutoffHz = -1.0f; lastResonance = -1.0f; }
 
     void process(juce::AudioBuffer<float>& buf, int numSamples, int numChannels,
                  float cutoffHz, float resonance) override
     {
-        svf.setCutoffFrequency(cutoffHz);
-        svf.setResonance(juce::jmax(0.01f, resonance));
+        // Skip the coefficient recompute when cutoff/resonance are unchanged.
+        if (cutoffHz != lastCutoffHz || resonance != lastResonance)
+        {
+            svf.setCutoffFrequency(cutoffHz);
+            svf.setResonance(juce::jmax(0.01f, resonance));
+            lastCutoffHz = cutoffHz; lastResonance = resonance;
+        }
         juce::dsp::AudioBlock<float> block(buf.getArrayOfWritePointers(),
                                            static_cast<size_t>(numChannels), 0,
                                            static_cast<size_t>(numSamples));
@@ -29,4 +34,5 @@ public:
 
 private:
     juce::dsp::StateVariableTPTFilter<float> svf;
+    float lastCutoffHz = -1.0f, lastResonance = -1.0f;
 };

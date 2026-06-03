@@ -29,21 +29,35 @@ struct VoiceConfig
     // Wavetable scan position — frame index 0..255 (256-frame Serum/Vital tables).
     float osc1Pos     = 0.0f, osc2Pos    = 0.0f;
 
-    int   xmod        = 0;     // 0..127 cross-mod amount
-    int   xmodMode    = 0;     // 0=Off, 1=FM (B→A phase-mod), 2=AM (B→A amplitude), 3=Ring
-    bool  sync        = false; // hard sync: osc1 wraps → reset osc2 phase
+    // Cross-modulation depths — all three active simultaneously (0..1 each).
+    float xmodFm   = 0.0f;  // FM: osc2 phase-modulates osc1
+    float xmodAm   = 0.0f;  // AM: osc2 amplitude-modulates osc1
+    float xmodRing = 0.0f;  // Ring mod: crossfade dry→multiplied
+    bool  sync     = false; // hard sync: osc1 wrap resets osc2 phase
 
     // Per-source levels (replace the old single osc-balance "mix"). dB.
     float osc1LevelDb = 0.0f, osc2LevelDb = -6.0f;
     float noiseLevelDb = -60.0f;   // -60 dB ≡ off
     int   noiseType    = 0;        // 0=White, 1=Pink
 
+    // Filter 1
     int   filterType      = 0;
     float filterCutoff    = 8000.0f;
     float filterRes       = 0.2f;
-    float filterEnvDepth  = 1.0f;  // 0..1 how far the filter envelope sweeps the cutoff
-    float filterDrive     = 0.0f;  // 0..1 pre-filter valve saturation (0 = bypass)
-    float filterLowCutHz  = 0.0f;  // 0..1000 Hz 4-pole HPF post-filter (0 = bypass)
+    float filterEnvDepth  = 1.0f;
+    float filterDrive     = 0.0f;
+    float filterLowCutHz  = 0.0f;
+
+    // Filter 2
+    int   filter2Type     = 0;
+    float filter2Cutoff   = 8000.0f;
+    float filter2Res      = 0.2f;
+    float filter2EnvDepth = 1.0f;
+    float filter2Drive    = 0.0f;
+    float filter2LowCutHz = 0.0f;
+
+    bool  filterSeries    = true;   // true = series (F1→F2), false = parallel (mix)
+
     float levelDb         = -6.0f; // slot output level (feeds the mixer channel)
 };
 
@@ -75,7 +89,6 @@ private:
 class VoiceEngine
 {
 public:
-    enum XMod { Off = 0, FM = 1, AM = 2, RingMod = 3 };
 
     void prepare(double sampleRate, int blockSize);
     void setBank(const WavetableBank* b) noexcept;
@@ -87,11 +100,12 @@ public:
 private:
     WavetableOscillator      osc1, osc2;
     NoiseGen                 noise;
-    MultiModeFilter          filter;
+    MultiModeFilter          filter1, filter2;
     VoiceConfig              cfg;
-    juce::AudioBuffer<float> mono;     // 1-channel work buffer
+    juce::AudioBuffer<float> mono;    // primary 1-channel work buffer
+    juce::AudioBuffer<float> mono2;   // second buffer for parallel filter path
     double                   sr   = 44100.0;
-    float                    gain = 1.0f;       // slot output gain
+    float                    gain = 1.0f;
     float                    osc1Gain = 1.0f;
     float                    osc2Gain = 0.5f;
     float                    noiseGain = 0.0f;

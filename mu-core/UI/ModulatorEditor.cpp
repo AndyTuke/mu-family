@@ -98,11 +98,10 @@ void ModulatorEditor::AssignmentRow::paint(juce::Graphics& g)
 //==============================================================================
 ModulatorEditor::ModulatorEditor()
 {
-    // Mode dropdown replaces SegmentControl (#157)
     modeDropdown.addItem("Smooth",  1);
     modeDropdown.addItem("Stepped", 2);
     addAndMakeVisible(modeDropdown);
-    addAndMakeVisible(polarityCtrl);  // placed below editor (#156)
+    addAndMakeVisible(polarityCtrl);
     addAndMakeVisible(lfoEditor);
     addAndMakeVisible(stepEditor);
 
@@ -320,7 +319,7 @@ void ModulatorEditor::wireHeader()
         lfoEditor.setVisible(smooth);
         stepEditor.setVisible(!smooth);
         if (!smooth) syncStepValues();
-        else loadFromCS();
+        else { lockMod(); loadFromCS(); unlockMod(); }
         updateStepQuantization();
         resized();
         if (onChange) onChange();

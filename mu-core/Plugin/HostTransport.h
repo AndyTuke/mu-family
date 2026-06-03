@@ -3,8 +3,8 @@
 // All mu-family products call readHostTransport(getPlayHead()) at the top of
 // their processBlock to derive play state and BPM before snapshotting blk* fields.
 //
-// Keeping the logic in one place means new products cannot accidentally omit it
-// (the same omission caused mu-tant #837 — gate silence in all DAW hosts).
+// Keeping the logic in one place means new products cannot accidentally omit it —
+// omitting host-transport reads causes gate silence in all DAW plugin modes.
 
 #include <juce_audio_processors/juce_audio_processors.h>
 

@@ -35,18 +35,15 @@ struct GateEnvelope
     float decayBend   = 0.0f;
     bool  reverse     = false;
 
-    // Per-envelope playback options. Evaluated once per pattern loop by the
-    // audio gate, so changes take effect on the next loop boundary.
-    float   probability = 1.0f;   // 0..1 chance this envelope fires each loop
-    uint8_t loopMask    = 0x01;   // bitmask: bit N set = play on position N of every loopM loops
-    int     loopM       = 1;      // cycle length in loops (1..8); positions 0..loopM-1
+    // Per-envelope probability. 0..1 chance this envelope fires each pattern
+    // loop; evaluated via a deterministic per-(loop,cell) hash so the decision
+    // is stable across the duration of one loop and different each loop.
+    float probability = 1.0f;
 
     float value(float phase01, float gap01 = 0.0f) const noexcept;
 
-    // Returns false when loopCount/probability rule suppresses this envelope.
-    // Uses a deterministic per-(loop,cell) hash for probability so the
-    // decision is consistent within a loop pass and different each loop.
-    bool playsOnLoop(int loopCount) const noexcept;
+    // Returns false when the probability rule suppresses this envelope this loop.
+    bool playsOnLoop(int localLoopCount) const noexcept;
 
     // True if this region covers the given cell.
     bool covers(int cellIdx) const noexcept
@@ -60,7 +57,8 @@ private:
     float shape(float p) const noexcept;
 };
 
-// Drawable 2-bar gate pattern. See docs/mu-tant/design-sequencer.md.
+// Drawable gate pattern — 1 to kMaxPatternBars bars long, always viewed in
+// a 2-bar window that scrolls smoothly. See docs/mu-tant/design-sequencer.md.
 //
 // Storage is a sorted, non-overlapping std::vector<GateEnvelope> (by startCell).
 // The message thread mutates under editLock; the audio thread reads via gateAt()
@@ -76,8 +74,11 @@ public:
         ThirtySecond = 32
     };
 
-    // 2 bars in 4/4 — design-spec constant.
-    static constexpr int kTotalBars = 2;
+    static constexpr int kMaxPatternBars = 16;  // maximum editable length
+
+    // Mutable pattern length (1..kMaxPatternBars bars). Written by the UI;
+    // read by the audio thread inside gateAt (always under editLock).
+    int patternLengthBars = 2;
 
     // Minimum gate-open time. A "0 attack" envelope opens instantly (0→1), which
     // clicks; the gater slew-limits the RISING edge so the gate can't open faster
@@ -100,7 +101,7 @@ public:
     // point for the actual vector access.
     std::atomic<bool> hasEnvelopes { false };
 
-    // Total cells in the pattern given the current subdivision (kTotalBars * denom).
+    // Total cells in the pattern given the current subdivision (patternLengthBars * denom).
     int totalCells() const noexcept;
 
     // The envelope whose region covers the given cell, or nullptr. Message- and
@@ -124,13 +125,13 @@ public:
 
     // ── Audio-thread gate evaluation ─────────────────────────────────────────
     // Returns the 0..1 gate value at the given absolute beat position (wrapped
-    // mod the 2-bar pattern), with the per-voice Gap applied. 1.0 when the
+    // mod the pattern length), with the per-voice Gap applied. 1.0 when the
     // pattern is empty (no gating — continuous drone). Cells with no envelope
     // return 0 (silent). Caches the cell->envelope lookup so per-sample cost is
     // O(1) except on cell changes; cache state is audio-thread-only.
-    // `loopCount` is the number of completed pattern loops; used to evaluate
-    // per-envelope loopN/loopM and probability rules.
-    float gateAt(double beatPos, float gap01, int loopCount = 0) const noexcept;
+    // The function computes its own local loop count from beatPos for probability
+    // evaluation — the caller need not maintain a separate loop counter.
+    float gateAt(double beatPos, float gap01) const noexcept;
 
     // Invalidate the gate cache — call once at the top of each block's gate
     // pass (under editLock) so a between-block edit can't leave a dangling
@@ -164,8 +165,9 @@ public:
             }
             if (!acquired) return;
         }
-        subdivision = other.subdivision;
-        envelopes   = other.envelopes;
+        subdivision       = other.subdivision;
+        patternLengthBars = other.patternLengthBars;
+        envelopes         = other.envelopes;
         other.editLock.store(false, std::memory_order_release);
 
         hasEnvelopes.store(!envelopes.empty(), std::memory_order_relaxed);
@@ -210,12 +212,11 @@ GateMode gateModeFor(bool bypassed, bool playing, bool patternEmpty) noexcept;
 
 // Apply the gater to a voice's stereo channel pointers in place (`right` may be
 // null for mono). Pure except for the pattern's audio-thread gate cache + a
-// tryLock around the envelope read. Allocation-free.
-// `loopCount` is the number of completed pattern loops; forwarded to gateAt so
-// per-envelope loopN/loopM and probability rules are evaluated correctly.
+// tryLock around the envelope read. Allocation-free. Each pattern internally
+// wraps the beat position at its own patternLengthBars and computes per-loop
+// probability rolls — no loopCount argument needed.
 void applyGateBlock(GatePattern& pattern, float* left, float* right, int numSamples,
                     float gap01, bool bypassed, bool playing,
-                    double beatStart, double beatsPerSample, double sampleRate,
-                    int loopCount = 0) noexcept;
+                    double beatStart, double beatsPerSample, double sampleRate) noexcept;
 
 } // namespace mu_tant

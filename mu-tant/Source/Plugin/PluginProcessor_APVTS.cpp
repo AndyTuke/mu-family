@@ -51,10 +51,11 @@ namespace
         layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_fine"), 1}, label("Osc2 Fine"),     -100, 100, 0));
         layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_pos"),  1}, label("Osc2 Position"), 0, 255, 0));
 
-        // Cross-mod character + separate hard-sync toggle.
-        layout.add(std::make_unique<AudioParameterInt>   (ParameterID{id("xmod"),  1}, label("X-Mod"),      0, 127, 0));
-        layout.add(std::make_unique<AudioParameterChoice>(ParameterID{id("xmode"), 1}, label("X-Mod Mode"), StringArray{ "Off", "FM", "AM", "Ring" }, 0));
-        layout.add(std::make_unique<AudioParameterBool>  (ParameterID{id("sync"),  1}, label("Osc Sync"), false));
+        // Cross-mod depths — all three active simultaneously; 0 = that type off.
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("xmod_fm"),   1}, label("FM Depth"),   f(0.0f, 100.0f, 1.0f), 0.0f));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("xmod_am"),   1}, label("AM Depth"),   f(0.0f, 100.0f, 1.0f), 0.0f));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("xmod_ring"), 1}, label("Ring Depth"), f(0.0f, 100.0f, 1.0f), 0.0f));
+        layout.add(std::make_unique<AudioParameterBool> (ParameterID{id("sync"),      1}, label("Osc Sync"), false));
 
         // Per-source levels (replace the old osc-balance "mix").
         layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("o1_lvl"),   1}, label("Osc1 Level"),  f(-60.0f, 6.0f, 0.1f), 0.0f));
@@ -97,9 +98,31 @@ namespace
                             return juce::String(v / 1000.0f, 2) + " kHz";
                         })));
 
-        // Filter envelope depth — scales how far the filter envelope sweeps from the
-        // base cutoff. +1 = full close-to-open sweep; 0 = no effect; -1 = inverted.
+        // Filter 1 envelope depth.
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_env_depth"), 1}, label("Filter Env Depth"), f(-1.0f, 1.0f, 0.01f), 1.0f));
+
+        // Filter 2 — same param set as Filter 1; cutoff defaults to 8 kHz (matching
+        // Filter 1) so adding a second filter is audible out of the box, not transparent.
+        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("flt2_type"), 1}, label("Filter2 Type"), 0, 15, 0));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt2_cut"), 1},  label("F2 Cutoff"), cutoff, 8000.0f,
+                    AudioParameterFloatAttributes().withStringFromValueFunction(cutoffText)));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt2_res"), 1},  label("F2 Resonance"), f(0.0f, 0.99f, 0.001f), 0.0f,
+                    AudioParameterFloatAttributes().withStringFromValueFunction(resText)));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt2_drv"), 1}, label("F2 Drive"), f(0.0f, 1.0f, 0.01f), 0.0f,
+                    AudioParameterFloatAttributes().withStringFromValueFunction(
+                        [](float v, int) -> juce::String { return juce::String((int)std::round(v * 100.0f)); })));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt2_lo_cut"), 1}, label("F2 Low Cut"),
+                    juce::NormalisableRange<float>(0.0f, 1000.0f, 0.0f, 0.35f), 0.0f,
+                    AudioParameterFloatAttributes().withStringFromValueFunction(
+                        [](float v, int) -> juce::String {
+                            if (v <= 0.0f)   return "Off";
+                            if (v < 1000.0f) return juce::String((int)std::round(v)) + " Hz";
+                            return juce::String(v / 1000.0f, 2) + " kHz";
+                        })));
+        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt2_env_depth"), 1}, label("F2 Env Depth"), f(-1.0f, 1.0f, 0.01f), 0.0f));
+
+        // Series (true) / Parallel (false) routing for the two filters.
+        layout.add(std::make_unique<AudioParameterBool>(ParameterID{id("flt_series"), 1}, label("Filter Series"), true));
 
         // Pitch envelope depth — semitones added to osc1/osc2 pitch when the pitch
         // envelope is at full value. +24 = 2 oct up; -24 = 2 oct down; 0 = no effect.

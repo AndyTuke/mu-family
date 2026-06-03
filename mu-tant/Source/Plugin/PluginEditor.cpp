@@ -62,6 +62,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         // Null out modulator panel pointer before the slot data is shifted so no
         // timer or paint callback can dereference a stale slot during the window.
         voicePanel.clearModulatorSlot();
+        voicePanel.clearAllModBindings();
         proc.removeVoice(idx);
         const int newIdx = juce::jlimit(0, proc.getNumVoices() - 1, idx);
         voiceSidebar.refreshItems();

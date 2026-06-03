@@ -35,8 +35,6 @@ public:
             e.decayBend   = -0.3f;
             e.reverse     = true;
             e.probability = 0.75f;
-            e.loopMask    = 0x05;   // positions 0 and 2
-            e.loopM       = 4;
             src.envelopes.push_back(e);
             src.hasEnvelopes.store(true, std::memory_order_relaxed);
 
@@ -59,8 +57,6 @@ public:
             expectWithinAbsoluteError(re.decayBend,  -0.3f, 0.001f);
             expect(re.reverse == true, "reverse restored");
             expectWithinAbsoluteError(re.probability, 0.75f, 0.001f);
-            expectEquals((int) re.loopMask, 0x05);
-            expectEquals(re.loopM, 4);
         }
 
         // ── FilterGate tag ─────────────────────────────────────────────────────
@@ -121,7 +117,7 @@ public:
         }
 
         // ── Legacy loopN → loopMask conversion ───────────────────────────────
-        beginTest("legacy loopN converted to single-bit loopMask");
+        beginTest("legacy loopN/loopM properties silently ignored on load");
         {
             juce::ValueTree t("Gate");
             t.setProperty("subdiv", (int) GatePattern::Subdivision::Sixteenth, nullptr);
@@ -135,9 +131,7 @@ public:
             GatePattern dst;
             deserialiseGate(t, dst);
             expect(dst.envelopes.size() == 1u, "one envelope");
-            // loopN=3 → bit 2 set (0-indexed) = mask = 0x04
-            expectEquals((int) dst.envelopes[0].loopMask, 0x04, "loopN=3 → bit 2");
-            expectEquals(dst.envelopes[0].loopM, 4);
+            // loopN/loopM legacy properties are silently ignored on load.
         }
 
         // ── Invalid tree clears the pattern ────────────────────────────────────

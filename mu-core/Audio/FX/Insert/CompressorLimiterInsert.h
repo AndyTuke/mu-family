@@ -15,9 +15,9 @@ public:
     void prepare(double sampleRate, int) override
     {
         currentSampleRate = sampleRate;
-        smoothedAtt   .reset(sampleRate, 0.015);  // 15 ms — eliminates att/rel knob crackle (#514)
+        smoothedAtt   .reset(sampleRate, 0.015);  // 15 ms — eliminates att/rel knob crackle
         smoothedRel   .reset(sampleRate, 0.015);
-        smoothedThresh.reset(sampleRate, 0.015);  // 15 ms — eliminates threshold knob crackle (#535)
+        smoothedThresh.reset(sampleRate, 0.015);  // 15 ms — eliminates threshold knob crackle
         smoothedOut   .reset(sampleRate, 0.015);  // 15 ms — same pattern, applied to output gain
         smoothedAtt   .setCurrentAndTargetValue(1.0f);
         smoothedRel   .setCurrentAndTargetValue(1.0f);

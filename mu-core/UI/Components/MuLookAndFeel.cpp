@@ -137,7 +137,7 @@ const juce::Colour MuLookAndFeel::channelPalette[MuLookAndFeel::kChannelPaletteS
     juce::Colour(0xffD85A30),   // 4 Orange / coral
     juce::Colour(0xff2BB5C5),   // 5 Cyan
     juce::Colour(0xffB8B8B0),   // 6 Silver grey
-    juce::Colour(0xffE24B4A),   // 7 Red (#616: moved to last so a fresh 2-rhythm patch picks Blue, not Red)
+    juce::Colour(0xffE24B4A),   // 7 Red (moved to last so a fresh 2-rhythm patch picks Blue, not Red)
 };
 
 MuLookAndFeel::MuLookAndFeel()

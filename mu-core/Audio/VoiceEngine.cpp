@@ -178,11 +178,10 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     const int nCh = juce::jmin(output.getNumChannels(), tempBuffer.getNumChannels());
     tempBuffer.clear();
 
-    // Signal chain (#627 / T12): sample → filter → ampEnv → insert → output.
+    // Signal chain: sample → filter → ampEnv → insert → output.
     // The ampEnv sits BETWEEN filter and insert, so:
     //   • Filter resonance / comb feedback in the filter stage is env-gated — it
-    //     rings during env release and is silenced at env idle (#627's original
-    //     fix for the "rings past env" latent bug).
+    //     rings during env release and is silenced at env idle.
     //   • Insert-stage FX (Karplus, Vocoder feedback paths, reverb-style) sit
     //     AFTER the env gate, so they receive env-shaped input but their own
     //     internal state (delay-line feedback, etc.) decays at the FX's own
@@ -191,9 +190,8 @@ void VoiceEngine::process(juce::AudioBuffer<float>& output, int numSamples)
     //     at 0.9999 (decays in ~5 min worst case, sub-second typical). The
     //     `retiredDrainBlocks` counter in markRetired delays isFullyDrained by
     //     ~2 s past env-idle so audible feedback FX tails aren't cut by engine
-    //     destruction during hot-swap (#416 "overlay" prevention remains: the
-    //     env-gate at filter output keeps the retired engine's filter resonance
-    //     from leaking into the next active rhythm).
+    //     destruction during hot-swap (the env-gate at filter output keeps the
+    //     retired engine's filter resonance from leaking into the next active rhythm).
     for (int vi = 0; vi < MaxVoices; ++vi)
     {
         if (! voices[(size_t) vi].isActive())
@@ -261,10 +259,10 @@ void VoiceEngine::markRetired() noexcept
         ampEnv.noteOff();
 
     // Filter / pitch envelopes — also engine-level — get a finite release. noteOff
-    // so they progress to idle. Filter / insert state is NO LONGER reset (#627):
+    // so they progress to idle. Filter / insert state is NOT reset on note-off:
     // their tails ring naturally and the ampEnv release gates the output to silence
-    // when env hits idle. This restores the FX-tail behaviour that #416's resets
-    // had to sacrifice (filter resonance, comb feedback, reverb-style insert tails).
+    // when env hits idle (restores FX-tail behaviour for filter resonance, comb
+    // feedback, and reverb-style insert tails).
     filterEnv.noteOff();
     pitchEnv.noteOff();
 

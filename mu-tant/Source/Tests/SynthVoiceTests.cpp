@@ -90,28 +90,36 @@ public:
             expect(render(-24.0f) < render(0.0f), "lower slot level → quieter");
         }
 
-        beginTest("X-Mod Off / FM / AM / Ring all stay finite and non-silent");
+        beginTest("X-Mod FM / AM / Ring all stay finite and non-silent");
         {
-            const char* modeNames[] = { "Off", "FM", "AM", "Ring" };
-            for (int mode = 0; mode <= 3; ++mode)
+            // Test each modulation type at full depth — all should be finite and audible.
+            struct Case { float fm; float am; float ring; const char* name; };
+            const Case cases[] = {
+                { 0.0f,  0.0f,  0.0f,  "Off (no xmod)" },
+                { 1.0f,  0.0f,  0.0f,  "FM only" },
+                { 0.0f,  1.0f,  0.0f,  "AM only" },
+                { 0.0f,  0.0f,  1.0f,  "Ring only" },
+                { 1.0f,  1.0f,  1.0f,  "FM+AM+Ring combined" },
+            };
+            for (const auto& tc : cases)
             {
                 VoiceEngine v; v.setBank(&bank); v.prepare(sr, N);
                 VoiceConfig c;
-                c.xmod = 100; c.xmodMode = mode;
+                c.xmodFm = tc.fm; c.xmodAm = tc.am; c.xmodRing = tc.ring;
                 c.osc1LevelDb = 0.0f; c.osc2LevelDb = 0.0f; c.levelDb = 0.0f;
                 v.setConfig(c);
                 juce::AudioBuffer<float> buf(2, N); buf.clear();
                 v.process(buf, N);
-                expect(allFinite(buf, N),      juce::String(modeNames[mode]) + " x-mod: finite");
-                expect(peakOf(buf, N) > 0.0f,  juce::String(modeNames[mode]) + " x-mod: non-silent");
+                expect(allFinite(buf, N),     juce::String(tc.name) + ": finite");
+                expect(peakOf(buf, N) > 0.0f, juce::String(tc.name) + ": non-silent");
             }
         }
 
-        beginTest("hard sync: Sync=true renders finite output with FM cross-mod");
+        beginTest("hard sync renders finite output with FM cross-mod");
         {
             VoiceEngine v; v.setBank(&bank); v.prepare(sr, N);
             VoiceConfig c;
-            c.xmod = 80; c.xmodMode = (int) VoiceEngine::FM; c.sync = true;
+            c.xmodFm = 0.63f; c.sync = true;
             c.osc1LevelDb = 0.0f; c.osc2LevelDb = 0.0f; c.levelDb = 0.0f;
             v.setConfig(c);
             juce::AudioBuffer<float> buf(2, N); buf.clear();
@@ -120,42 +128,38 @@ public:
             expect(peakOf(buf, N) > 0.0f, "sync + FM: non-silent");
         }
 
-        beginTest("AM mode output amplitude is bounded and modulated by Osc2");
+        beginTest("AM output changes with depth amount");
         {
-            // AM: signal = Osc1 * (1 + xmodNorm * Osc2). Output should be non-silent
-            // and bounded; a high xmod amount should produce a different level than xmod=0.
-            auto renderPeak = [&](int xmodAmt)
+            auto renderPeak = [&](float depth)
             {
                 VoiceEngine v; v.setBank(&bank); v.prepare(sr, N);
                 VoiceConfig c;
-                c.xmod = xmodAmt; c.xmodMode = (int) VoiceEngine::AM;
+                c.xmodAm = depth;
                 c.osc1LevelDb = 0.0f; c.osc2LevelDb = 0.0f; c.levelDb = 0.0f;
                 v.setConfig(c);
                 juce::AudioBuffer<float> buf(2, N); buf.clear();
                 v.process(buf, N);
-                expect(allFinite(buf, N), "AM xmod=" + juce::String(xmodAmt) + " finite");
+                expect(allFinite(buf, N), "AM depth=" + juce::String(depth) + " finite");
                 return peakOf(buf, N);
             };
-            // AM with xmod=0 and xmod=127 produce different peak levels.
-            const float p0 = renderPeak(0), p127 = renderPeak(127);
-            expect(p0 != p127, "AM output changes with xmod amount");
+            expect(renderPeak(0.0f) != renderPeak(1.0f), "AM output changes with depth");
         }
 
-        beginTest("Ring Mod output is bounded and changes with xmod amount");
+        beginTest("Ring Mod output changes with depth amount");
         {
-            auto renderPeak = [&](int xmodAmt)
+            auto renderPeak = [&](float depth)
             {
                 VoiceEngine v; v.setBank(&bank); v.prepare(sr, N);
                 VoiceConfig c;
-                c.xmod = xmodAmt; c.xmodMode = (int) VoiceEngine::RingMod;
+                c.xmodRing = depth;
                 c.osc1LevelDb = 0.0f; c.osc2LevelDb = 0.0f; c.levelDb = 0.0f;
                 v.setConfig(c);
                 juce::AudioBuffer<float> buf(2, N); buf.clear();
                 v.process(buf, N);
-                expect(allFinite(buf, N), "Ring xmod=" + juce::String(xmodAmt) + " finite");
+                expect(allFinite(buf, N), "Ring depth=" + juce::String(depth) + " finite");
                 return peakOf(buf, N);
             };
-            expect(renderPeak(0) != renderPeak(127), "Ring Mod output changes with xmod amount");
+            expect(renderPeak(0.0f) != renderPeak(1.0f), "Ring Mod output changes with depth");
         }
 
         beginTest("noise-only voice (oscs muted) is audible");

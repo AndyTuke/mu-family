@@ -62,6 +62,7 @@ public:
     void process(juce::AudioBuffer<float>& buffer, int numSamples, int numChannels);
 
 private:
+    double currentSampleRate = 44100.0;
     int    typeCodeValue = 0;
     float  cutoffHz      = 1000.0f;
     float  resonance     = 0.1f;

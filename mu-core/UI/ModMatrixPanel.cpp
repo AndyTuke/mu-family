@@ -7,10 +7,22 @@
 // assignments vector inside ModulationMatrix::process().
 namespace
 {
-    inline void lockMods(VoiceSlot& s)
+    // Returns true if the lock was acquired. Capped at 1000 iterations to avoid
+    // stalling the message thread for a full audio block on contention — matches
+    // the GatingDesigner::withLock and GatePattern::copyDataFrom patterns.
+    // Callers MUST check the return value: only call unlockMods on true return.
+    [[nodiscard]] inline bool lockMods(VoiceSlot& s)
     {
-        while (s.modLock.exchange(true, std::memory_order_acquire))
+        bool expected = false;
+        for (int i = 0; i < 1000; ++i)
+        {
+            if (s.modLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+                return true;
+            expected = false;
             std::this_thread::yield();
+        }
+        jassertfalse; // could not acquire — caller must skip mutation
+        return false;
     }
     inline void unlockMods(VoiceSlot& s) noexcept
     {
@@ -101,9 +113,11 @@ ModMatrixPanel::ModMatrixPanel()
                                   ? destProvider->resolveId(1)
                                   : std::string{};
             a.depth         = 0.0f;
-            lockMods(*voiceSlot);
-            voiceSlot->modulationMatrix.addAssignment(a);
-            unlockMods(*voiceSlot);
+            if (lockMods(*voiceSlot))
+            {
+                voiceSlot->modulationMatrix.addAssignment(a);
+                unlockMods(*voiceSlot);
+            }
             rebuildRows();
             resized();
             repaint();
@@ -202,9 +216,11 @@ void ModMatrixPanel::rebuildRows()
 
         row->onRemove = [this, rowId]
         {
-            lockMods(*voiceSlot);
-            voiceSlot->modulationMatrix.removeAssignment(rowId);
-            unlockMods(*voiceSlot);
+            if (lockMods(*voiceSlot))
+            {
+                voiceSlot->modulationMatrix.removeAssignment(rowId);
+                unlockMods(*voiceSlot);
+            }
             if (onChange) onChange();
             juce::Component::SafePointer<ModMatrixPanel> safe(this);
             juce::MessageManager::callAsync([safe]
@@ -215,20 +231,22 @@ void ModMatrixPanel::rebuildRows()
         };
         row->onDestChange = [this, rowId, sourceId](const std::string& dest)
         {
-            float d = 0.0f;
-            float c = 0.0f;
-            lockMods(*voiceSlot);
-            for (const auto& a2 : voiceSlot->modulationMatrix.getAssignments())
-                if (a2.id == rowId) { d = a2.depth; c = a2.curve; break; }
-            voiceSlot->modulationMatrix.removeAssignment(rowId);
-            ModulationAssignment na;
-            na.id            = rowId;
-            na.sourceId      = sourceId;
-            na.destinationId = dest;
-            na.depth         = d;
-            na.curve         = c;
-            voiceSlot->modulationMatrix.addAssignment(na);
-            unlockMods(*voiceSlot);
+            if (lockMods(*voiceSlot))
+            {
+                float d = 0.0f;
+                float c = 0.0f;
+                for (const auto& a2 : voiceSlot->modulationMatrix.getAssignments())
+                    if (a2.id == rowId) { d = a2.depth; c = a2.curve; break; }
+                voiceSlot->modulationMatrix.removeAssignment(rowId);
+                ModulationAssignment na;
+                na.id            = rowId;
+                na.sourceId      = sourceId;
+                na.destinationId = dest;
+                na.depth         = d;
+                na.curve         = c;
+                voiceSlot->modulationMatrix.addAssignment(na);
+                unlockMods(*voiceSlot);
+            }
             if (onChange) onChange();
             juce::Component::SafePointer<ModMatrixPanel> safe(this);
             juce::MessageManager::callAsync([safe]
@@ -239,16 +257,20 @@ void ModMatrixPanel::rebuildRows()
         };
         row->onDepthChange = [this, rowId](float d)
         {
-            lockMods(*voiceSlot);
-            voiceSlot->modulationMatrix.setDepth(rowId, d);
-            unlockMods(*voiceSlot);
+            if (lockMods(*voiceSlot))
+            {
+                voiceSlot->modulationMatrix.setDepth(rowId, d);
+                unlockMods(*voiceSlot);
+            }
             if (onChange) onChange();
         };
         row->onCurveChange = [this, rowId](float c)
         {
-            lockMods(*voiceSlot);
-            voiceSlot->modulationMatrix.setCurve(rowId, c);
-            unlockMods(*voiceSlot);
+            if (lockMods(*voiceSlot))
+            {
+                voiceSlot->modulationMatrix.setCurve(rowId, c);
+                unlockMods(*voiceSlot);
+            }
             if (onChange) onChange();
         };
 
