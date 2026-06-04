@@ -16,24 +16,28 @@ class WavetableOscillator
 public:
     void prepare(double sampleRate) noexcept { sr = sampleRate > 0 ? sampleRate : 44100.0; }
     void setBank(const WavetableBank* b) noexcept { bank = b; }
+    void setTable(int t) noexcept { tableIndex = t < 0 ? 0 : t; }
     void setFrequency(float hz) noexcept { inc = (double) hz / sr; }
     void setPosition(float p01) noexcept { position = p01 < 0 ? 0.0f : (p01 > 1 ? 1.0f : p01); }
     void resetPhase() noexcept { phase = 0.0; }
 
     // Render one sample and advance. `phaseMod` is an added phase offset in cycles
     // (phase-modulation "FM"). Sets the wrap flag readable via justWrapped().
+    // `inc` is passed to the bank so it picks the anti-aliased mip level for this pitch.
     float render(float phaseMod = 0.0f) noexcept
     {
         if (bank == nullptr) return 0.0f;
+        const int nf = bank->numFrames(tableIndex);
+        if (nf <= 0) return 0.0f;
 
         const float ph = (float) phase + phaseMod;
 
         // cross-fade between the two morph frames straddling `position`.
-        const float framePos = position * (float) (bank->numFrames() - 1);
+        const float framePos = position * (float) (nf - 1);
         const int   f0       = (int) framePos;
         const float fFrac    = framePos - (float) f0;
-        const float s0       = bank->frameSample(f0,     ph);
-        const float s1       = bank->frameSample(f0 + 1, ph);
+        const float s0       = bank->frameSample(tableIndex, inc, f0,     ph);
+        const float s1       = bank->frameSample(tableIndex, inc, f0 + 1, ph);
         const float out      = s0 + fFrac * (s1 - s0);
 
         phase += inc;
@@ -47,6 +51,7 @@ public:
 
 private:
     const WavetableBank* bank = nullptr;
+    int    tableIndex = 0;
     double sr       = 44100.0;
     double phase    = 0.0;
     double inc      = 0.0;

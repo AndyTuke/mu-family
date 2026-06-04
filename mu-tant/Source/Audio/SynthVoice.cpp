@@ -44,6 +44,8 @@ void VoiceEngine::setConfig(const VoiceConfig& c)
     // Position is a 0..255 frame index; normalise to the osc's 0..1 scan input.
     osc1.setPosition(cfg.osc1Pos / 255.0f);
     osc2.setPosition(cfg.osc2Pos / 255.0f);
+    osc1.setTable(cfg.osc1Wavetable);
+    osc2.setTable(cfg.osc2Wavetable);
 
     filter1.setType(cfg.filterType);
     filter1.setCutoff(cfg.filterCutoff);

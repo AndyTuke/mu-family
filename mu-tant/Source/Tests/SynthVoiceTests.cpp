@@ -41,7 +41,7 @@ public:
         const int    N  = 512;
 
         WavetableBank bank;
-        bank.generateBuiltIn();
+        bank.loadFactoryBank();
 
         beginTest("NoiseGen white output stays within [-1, 1]");
         {

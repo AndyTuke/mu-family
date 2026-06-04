@@ -29,6 +29,9 @@ struct VoiceConfig
     // Wavetable scan position — frame index 0..255 (256-frame Serum/Vital tables).
     float osc1Pos     = 0.0f, osc2Pos    = 0.0f;
 
+    // Selected wavetable (index into the shared WavetableBank).
+    int   osc1Wavetable = 0,  osc2Wavetable = 0;
+
     // Cross-modulation depths — all three active simultaneously (0..1 each).
     float xmodFm   = 0.0f;  // FM: osc2 phase-modulates osc1
     float xmodAm   = 0.0f;  // AM: osc2 amplitude-modulates osc1

@@ -51,6 +51,12 @@ namespace
         layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_fine"), 1}, label("Osc2 Fine"),     -100, 100, 0));
         layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_pos"),  1}, label("Osc2 Position"), 0, 255, 0));
 
+        // Selected wavetable (index into the WavetableBank). Range tracks the
+        // factory table count so APVTS + UI dropdown share one source of truth.
+        const int maxWt = juce::jmax(0, WavetableBank::factoryTableNames().size() - 1);
+        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_wt"), 1}, label("Osc1 Wavetable"), 0, maxWt, 0));
+        layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_wt"), 1}, label("Osc2 Wavetable"), 0, maxWt, 0));
+
         // Cross-mod depths — all three active simultaneously; 0 = that type off.
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("xmod_fm"),   1}, label("FM Depth"),   f(0.0f, 100.0f, 1.0f), 0.0f));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("xmod_am"),   1}, label("AM Depth"),   f(0.0f, 100.0f, 1.0f), 0.0f));

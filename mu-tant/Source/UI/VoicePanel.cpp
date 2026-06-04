@@ -199,14 +199,17 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     // SliderAttachment ensures the APVTS param still saves/loads and can be modulated.
     levelKnob.setVisible(false);
 
-    // Wavetable selectors: hidden until the wavetable bank API lands.
-    // No APVTS binding or engine wiring yet — hidden to avoid a visible
-    // control that accepts interaction but changes nothing.
-    for (auto* d : { &osc1WaveDropdown, &osc2WaveDropdown })
+    // Wavetable selectors — populated from the bank's factory table names.
+    // Item ID = table index + 1 (matches the AudioParameterInt stored value).
+    // Manual APVTS wiring happens in rebindAttachments (per active voice).
     {
-        d->addItem("Basic", 1);
-        d->setSelectedId(1, false);
-        addChildComponent(d);     // parented but not visible
+        const auto& names = WavetableBank::factoryTableNames();
+        for (auto* d : { &osc1WaveDropdown, &osc2WaveDropdown })
+        {
+            for (int i = 0; i < names.size(); ++i) d->addItem(names[i], i + 1);
+            d->setSelectedId(1, false);
+            addAndMakeVisible(d);
+        }
     }
 
 
@@ -325,6 +328,19 @@ void VoicePanel::timerCallback()
         if (flt2TypeDropdown.getSelectedId() != apvtsAlgo + 1)
             flt2TypeDropdown.setSelectedId(apvtsAlgo + 1, false);
     }
+
+    // Sync the wavetable dropdowns from APVTS (preset load / DAW automation).
+    const int maxWt = juce::jmax(0, WavetableBank::factoryTableNames().size() - 1);
+    auto syncWt = [&](DropdownSelect& dd, const char* pid)
+    {
+        if (auto* raw = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentVoice, pid)))
+        {
+            const int idx = juce::jlimit(0, maxWt, (int) raw->load());
+            if (dd.getSelectedId() != idx + 1) dd.setSelectedId(idx + 1, false);
+        }
+    };
+    syncWt(osc1WaveDropdown, "o1_wt");
+    syncWt(osc2WaveDropdown, "o2_wt");
 }
 
 void VoicePanel::setVoice(int voiceIndex)
@@ -392,6 +408,23 @@ void VoicePanel::rebindAttachments()
     o2FineAttachment      = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_fine"),        o2FineKnob.getSlider());
     o2PosAttachment       = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_pos"),         o2PosKnob.getSlider());
     o2PenvDepthAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_penv_depth"),  o2PenvDepthKnob.getSlider());
+
+    // Wavetable selectors — manual wiring (item ID = table index + 1), mirroring
+    // the filter-type dropdowns. The timer poll syncs the displayed value back
+    // from APVTS (preset load / DAW automation).
+    {
+        const int maxWt = juce::jmax(0, WavetableBank::factoryTableNames().size() - 1);
+        auto wire = [&](DropdownSelect& dd, const char* pid)
+        {
+            auto* param = apvts.getParameter(id(pid));
+            int idx = 0;
+            if (auto* raw = apvts.getRawParameterValue(id(pid))) idx = juce::jlimit(0, maxWt, (int) raw->load());
+            dd.setSelectedId(idx + 1, juce::dontSendNotification);
+            dd.onChange = [param](int itemId) { if (param) param->setValueNotifyingHost(param->convertTo0to1((float) (itemId - 1))); };
+        };
+        wire(osc1WaveDropdown, "o1_wt");
+        wire(osc2WaveDropdown, "o2_wt");
+    }
 
     xmodFmAttachment   = std::make_unique<APVTS::SliderAttachment>(apvts, id("xmod_fm"),   xmodFmKnob.getSlider());
     xmodAmAttachment   = std::make_unique<APVTS::SliderAttachment>(apvts, id("xmod_am"),   xmodAmKnob.getSlider());
@@ -613,23 +646,22 @@ void VoicePanel::resized()
     // ── Row A: Osc 1 | Osc 2 | Noise (side by side, using full leftW) ───────
     // Osc panels extend across the Insert column zone since Insert is Row B only.
     {
-        const int oscTitleW = s(36);
-        const int waveW     = s(70);
+        const int waveW     = s(56);   // wavetable selector dropdown (left of the knobs)
         const int noiseW    = s(170);
         const int oscW      = (leftW - noiseW - 2 * gap) / 2;   // ≈ 342
         const int rowY      = contentTop + s(4);
         const int waveY     = rowY + (s2H - ddH) / 2;
 
-        // Osc 1
+        // 5 pitch / scan knobs are right-aligned in each panel; the wavetable
+        // dropdown fills the space to their left and grows with the panel width.
+        const int knobsW = 5 * s2W + 4 * s(2);
+
+        // Osc 1 (the "OSC 1" panel title sits in the top-left corner above this row).
         osc1PanelR = { pad, contentTop, oscW, rowAH };
         {
-            int x = pad + oscTitleW;
-            // Wavetable dropdown is hidden (addChildComponent, not addAndMakeVisible)
-            // until the bank API lands. When made visible, setVisible(true) must be
-            // followed by resized() so the knobs shift right and oscW must be verified
-            // wide enough for 5 knobs + waveW + oscTitleW.
-            osc1WaveDropdown.setBounds(x, waveY, waveW, ddH);
-            if (osc1WaveDropdown.isVisible()) x += waveW + s(4);
+            const int knobsX = pad + oscW - knobsW - s(6);
+            osc1WaveDropdown.setBounds(pad, waveY, juce::jmax(waveW, knobsX - pad - s(8)), ddH);
+            int x = knobsX;
             for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PosKnob, &o1PenvDepthKnob })
             { k->setBounds(x, rowY, s2W, s2H);  x += s2W + s(2); }
         }
@@ -638,9 +670,9 @@ void VoicePanel::resized()
         const int osc2X = pad + oscW + gap;
         osc2PanelR = { osc2X, contentTop, oscW, rowAH };
         {
-            int x = osc2X + oscTitleW;
-            osc2WaveDropdown.setBounds(x, waveY, waveW, ddH);  // hidden until bank lands (see Osc 1 comment)
-            if (osc2WaveDropdown.isVisible()) x += waveW + s(4);
+            const int knobsX = osc2X + oscW - knobsW - s(6);
+            osc2WaveDropdown.setBounds(osc2X, waveY, juce::jmax(waveW, knobsX - osc2X - s(8)), ddH);
+            int x = knobsX;
             for (auto* k : { &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PosKnob, &o2PenvDepthKnob })
             { k->setBounds(x, rowY, s2W, s2H);  x += s2W + s(2); }
         }

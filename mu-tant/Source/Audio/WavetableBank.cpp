@@ -1,61 +1,285 @@
 #include "WavetableBank.h"
+#include <juce_dsp/juce_dsp.h>
 #include <cmath>
 #include <algorithm>
 
 namespace mu_tant
 {
 
-void WavetableBank::generateBuiltIn(int numFrames, int tableSize, int maxHarmonics)
+static constexpr double kPi    = 3.14159265358979323846;
+static constexpr double kTwoPi = 6.283185307179586;
+
+WavetableBank::WavetableBank()
 {
-    frames = std::max(1, numFrames);
-    size   = std::max(4, tableSize);
-    data.assign((size_t) frames * (size_t) size, 0.0f);
-
-    constexpr double kTwoPi = 6.283185307179586;
-    // Harmonic count is capped below the table's own Nyquist (size/2) so the
-    // single-cycle frame itself is well-sampled.
-    const int kMax = std::min(maxHarmonics, size / 2 - 1);
-
-    for (int f = 0; f < frames; ++f)
-    {
-        // morph 0 (pure sine) -> 1 (band-limited saw). Higher harmonics fade in
-        // with the morph; the fundamental is always present.
-        const double morph = (frames > 1) ? (double) f / (double) (frames - 1) : 0.0;
-
-        float* frameData = &data[(size_t) f * (size_t) size];
-        float  peak = 0.0f;
-        for (int i = 0; i < size; ++i)
-        {
-            const double x = (double) i / (double) size;   // phase 0..1
-            double acc = std::sin(kTwoPi * x);              // fundamental
-            for (int k = 2; k <= kMax; ++k)
-                acc += (morph / (double) k) * std::sin(kTwoPi * (double) k * x);
-            frameData[i] = (float) acc;
-            peak = std::max(peak, std::abs(frameData[i]));
-        }
-        // Normalise each frame to unit peak so morphing doesn't change level.
-        if (peak > 1.0e-6f)
-        {
-            const float g = 1.0f / peak;
-            for (int i = 0; i < size; ++i) frameData[i] *= g;
-        }
-    }
+    formatManager.registerBasicFormats();
 }
 
-float WavetableBank::frameSample(int f, float phase01) const noexcept
+const juce::StringArray& WavetableBank::factoryTableNames()
 {
-    if (data.empty()) return 0.0f;
-    f = std::clamp(f, 0, frames - 1);
+    static const juce::StringArray names {
+        "Basic Shapes", "Saw Morph", "Square PWM", "FM Stack", "Formant", "Additive"
+    };
+    return names;
+}
 
-    // wrap phase into [0,1)
+const juce::String& WavetableBank::tableName(int t) const noexcept
+{
+    static const juce::String empty;
+    return (t >= 0 && t < (int) tables.size()) ? tables[(size_t) t].name : empty;
+}
+
+int WavetableBank::numFrames(int t) const noexcept
+{
+    return (t >= 0 && t < (int) tables.size()) ? tables[(size_t) t].frames : 0;
+}
+
+// ── Procedural factory synthesis ───────────────────────────────────────────────
+// One full-res frame for a factory table at morph position `m`. Additive where it
+// keeps the frame naturally band-limited; the FFT mip pass cleans up the rest.
+void WavetableBank::synthFactoryFrame(Factory kind, float m, float* out, int size) noexcept
+{
+    const int maxH = std::min(size / 2 - 1, 256);   // top harmonic synthesised
+    m = juce::jlimit(0.0f, 1.0f, m);
+
+    switch (kind)
+    {
+        case Factory::SawMorph:        // sine → band-limited saw as harmonics fade in
+            for (int i = 0; i < size; ++i)
+            {
+                const double x = (double) i / size;
+                double acc = std::sin(kTwoPi * x);
+                for (int k = 2; k <= maxH; ++k)
+                    acc += ((double) m / k) * std::sin(kTwoPi * k * x);
+                out[i] = (float) acc;
+            }
+            break;
+
+        case Factory::SquarePwm:       // band-limited pulse, duty 0.5 → 0.1
+        {
+            const double duty = 0.5 - 0.4 * (double) m;
+            for (int i = 0; i < size; ++i)
+            {
+                const double x = (double) i / size;
+                double acc = 0.0;
+                for (int k = 1; k <= maxH; ++k)
+                    acc += (2.0 / (k * kPi)) * std::sin(k * kPi * duty) * std::cos(kTwoPi * k * x);
+                out[i] = (float) acc;
+            }
+            break;
+        }
+
+        case Factory::FmStack:         // 2-op FM, index 0 → 8
+        {
+            const double ratio = 2.0, index = 8.0 * (double) m;
+            for (int i = 0; i < size; ++i)
+            {
+                const double x = (double) i / size;
+                out[i] = (float) std::sin(kTwoPi * x + index * std::sin(kTwoPi * ratio * x));
+            }
+            break;
+        }
+
+        case Factory::Formant:         // gaussian harmonic peak sweeping up the series
+        {
+            const double centre = 2.0 + 30.0 * (double) m, width = 6.0;
+            for (int i = 0; i < size; ++i)
+            {
+                const double x = (double) i / size;
+                double acc = 0.0;
+                for (int k = 1; k <= maxH; ++k)
+                {
+                    const double d = ((double) k - centre) / width;
+                    acc += std::exp(-0.5 * d * d) * std::sin(kTwoPi * k * x);
+                }
+                out[i] = (float) acc;
+            }
+            break;
+        }
+
+        case Factory::Additive:        // moving harmonic emphasis (comb-like)
+        {
+            const double peak = 1.0 + 15.0 * (double) m;
+            for (int i = 0; i < size; ++i)
+            {
+                const double x = (double) i / size;
+                double acc = 0.0;
+                for (int k = 1; k <= maxH; ++k)
+                    acc += (1.0 / (1.0 + std::abs((double) k - peak))) * std::sin(kTwoPi * k * x);
+                out[i] = (float) acc;
+            }
+            break;
+        }
+
+        case Factory::BasicShapes:     // sine → triangle → saw → square
+        default:
+        {
+            auto sineS = [&](double x) { return std::sin(kTwoPi * x); };
+            auto triS  = [&](double x) { double a = 0; for (int k = 1; k <= maxH; k += 2) { const int n = (k - 1) / 2; a += ((n % 2 == 0) ? 1.0 : -1.0) * std::sin(kTwoPi * k * x) / (double) (k * k); } return a * (8.0 / (kPi * kPi)); };
+            auto sawS  = [&](double x) { double a = 0; for (int k = 1; k <= maxH; ++k) a += std::sin(kTwoPi * k * x) / (double) k; return a * (2.0 / kPi); };
+            auto sqS   = [&](double x) { double a = 0; for (int k = 1; k <= maxH; k += 2) a += std::sin(kTwoPi * k * x) / (double) k; return a * (4.0 / kPi); };
+
+            const double seg = (double) m * 3.0;
+            int s0 = (int) seg; double f = seg - s0;
+            if (s0 >= 3) { s0 = 2; f = 1.0; }
+            auto eval = [&](int s, double x) { return s == 0 ? sineS(x) : s == 1 ? triS(x) : s == 2 ? sawS(x) : sqS(x); };
+            for (int i = 0; i < size; ++i)
+            {
+                const double x = (double) i / size;
+                const double v0 = eval(s0, x), v1 = eval(s0 + 1, x);
+                out[i] = (float) (v0 + f * (v1 - v0));
+            }
+            break;
+        }
+    }
+
+    // Normalise the frame to unit peak so morph / mip changes don't jump level.
+    float pk = 0.0f;
+    for (int i = 0; i < size; ++i) pk = std::max(pk, std::abs(out[i]));
+    if (pk > 1.0e-6f) { const float g = 1.0f / pk; for (int i = 0; i < size; ++i) out[i] *= g; }
+}
+
+// ── Mip building ────────────────────────────────────────────────────────────────
+// For each frame: FFT once, then per mip level zero the bins above that octave's
+// harmonic ceiling, inverse FFT, and decimate to the level's (smaller) table size.
+void WavetableBank::buildTable(const std::vector<float>& fullRes, int frameCount,
+                               int frameSize, const juce::String& name)
+{
+    if (frameCount <= 0 || frameSize < kMinMipSize) return;
+
+    Wavetable wt;
+    wt.name   = name;
+    wt.frames = frameCount;
+    for (int s = frameSize; s >= kMinMipSize; s /= 2) wt.mipSize.push_back(s);
+    const int numMips = wt.numMips();
+    wt.mip.resize((size_t) numMips);
+    for (int L = 0; L < numMips; ++L)
+        wt.mip[(size_t) L].assign((size_t) frameCount * (size_t) wt.mipSize[(size_t) L], 0.0f);
+
+    const int order = (int) std::lround(std::log2((double) frameSize));
+    juce::dsp::FFT fft(order);
+    std::vector<float> fwd((size_t) frameSize * 2, 0.0f);
+    std::vector<float> inv((size_t) frameSize * 2, 0.0f);
+
+    for (int f = 0; f < frameCount; ++f)
+    {
+        const float* src = fullRes.data() + (size_t) f * frameSize;
+
+        // Level 0 = full resolution, stored as-is.
+        std::copy(src, src + frameSize, wt.mip[0].data() + (size_t) f * frameSize);
+
+        std::fill(fwd.begin(), fwd.end(), 0.0f);
+        std::copy(src, src + frameSize, fwd.begin());
+        fft.performRealOnlyForwardTransform(fwd.data(), true);
+
+        for (int L = 1; L < numMips; ++L)
+        {
+            const int keep = std::min(wt.mipSize[(size_t) L] / 2, frameSize / 2);
+            std::fill(inv.begin(), inv.end(), 0.0f);
+            for (int k = 0; k <= keep; ++k) { inv[(size_t) (2 * k)] = fwd[(size_t) (2 * k)]; inv[(size_t) (2 * k + 1)] = fwd[(size_t) (2 * k + 1)]; }
+            fft.performRealOnlyInverseTransform(inv.data());
+
+            const int sz   = wt.mipSize[(size_t) L];
+            const int step = frameSize / sz;
+            float* dst = wt.mip[(size_t) L].data() + (size_t) f * sz;
+            for (int i = 0; i < sz; ++i) dst[i] = inv[(size_t) (i * step)];
+        }
+    }
+
+    // Global normalise by the full-res peak (preserves relative frame levels).
+    float pk = 0.0f;
+    for (float v : wt.mip[0]) pk = std::max(pk, std::abs(v));
+    if (pk > 1.0e-6f) { const float g = 1.0f / pk; for (auto& lvl : wt.mip) for (float& v : lvl) v *= g; }
+
+    tables.push_back(std::move(wt));
+}
+
+// ── WAV ingestion ─────────────────────────────────────────────────────────────
+int WavetableBank::addFromWav(const void* wavData, size_t numBytes, const juce::String& name)
+{
+    auto stream = std::make_unique<juce::MemoryInputStream>(wavData, numBytes, false);
+    std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(std::move(stream)));
+    if (reader == nullptr) return -1;
+
+    const int total = (int) reader->lengthInSamples;
+    const int ch    = (int) reader->numChannels;
+    if (total < kFrameSize || ch < 1) return -1;
+
+    juce::AudioBuffer<float> buf(ch, total);
+    reader->read(&buf, 0, total, 0, true, ch > 1);
+
+    const int usable = (total / kFrameSize) * kFrameSize;   // whole frames only
+    std::vector<float> mono((size_t) usable);
+    for (int i = 0; i < usable; ++i)
+    {
+        float s = 0.0f;
+        for (int c = 0; c < ch; ++c) s += buf.getSample(c, i);
+        mono[(size_t) i] = s / (float) ch;
+    }
+
+    buildTable(mono, usable / kFrameSize, kFrameSize, name);
+    return numTables() - 1;
+}
+
+int WavetableBank::addFromFile(const juce::File& file)
+{
+    juce::MemoryBlock mb;
+    if (! file.loadFileAsData(mb)) return -1;
+    return addFromWav(mb.getData(), mb.getSize(), file.getFileNameWithoutExtension());
+}
+
+void WavetableBank::appendProceduralFactory(Factory kind, const juce::String& name)
+{
+    std::vector<float> full((size_t) kFactoryFrames * kFrameSize);
+    for (int f = 0; f < kFactoryFrames; ++f)
+    {
+        const float m = (kFactoryFrames > 1) ? (float) f / (float) (kFactoryFrames - 1) : 0.0f;
+        synthFactoryFrame(kind, m, full.data() + (size_t) f * kFrameSize, kFrameSize);
+    }
+    buildTable(full, kFactoryFrames, kFrameSize, name);
+}
+
+void WavetableBank::loadFactoryBank()
+{
+    // Phase 1: synthesise the factory bank procedurally so the engine has the full
+    // named set. Phase 2 swaps this for loading the embedded Serum/Vital .wav assets
+    // (authored by tools/wavetable-gen) through addFromWav — same internal model.
+    tables.clear();
+    const auto& names = factoryTableNames();
+    const Factory kinds[] = { Factory::BasicShapes, Factory::SawMorph, Factory::SquarePwm,
+                              Factory::FmStack, Factory::Formant, Factory::Additive };
+    const int n = std::min((int) names.size(), (int) std::size(kinds));
+    for (int i = 0; i < n; ++i)
+        appendProceduralFactory(kinds[(size_t) i], names[i]);
+}
+
+// ── Runtime sampling ──────────────────────────────────────────────────────────
+int WavetableBank::mipForInc(const Wavetable& wt, double inc) const noexcept
+{
+    if (inc <= 0.0) return 0;
+    const int allowed = (int) std::floor(0.5 / inc);   // harmonics below Nyquist
+    for (int L = 0; L < wt.numMips(); ++L)
+        if (wt.mipSize[(size_t) L] / 2 <= allowed) return L;
+    return wt.numMips() - 1;
+}
+
+float WavetableBank::frameSample(int t, double inc, int frame, float phase01) const noexcept
+{
+    if (t < 0 || t >= (int) tables.size()) return 0.0f;
+    const Wavetable& wt = tables[(size_t) t];
+    if (! wt.valid()) return 0.0f;
+
+    const int L  = mipForInc(wt, inc);
+    const int sz = wt.mipSize[(size_t) L];
+    frame = juce::jlimit(0, wt.frames - 1, frame);
+
     phase01 -= std::floor(phase01);
-    const float pos  = phase01 * (float) size;
+    const float pos  = phase01 * (float) sz;
     int         i0   = (int) pos;
+    if (i0 >= sz) i0 = sz - 1;
+    const int   i1   = (i0 + 1) % sz;
     const float frac = pos - (float) i0;
-    if (i0 >= size) i0 = size - 1;
-    const int   i1   = (i0 + 1) % size;
 
-    const float* fr = &data[(size_t) f * (size_t) size];
+    const float* fr = wt.mip[(size_t) L].data() + (size_t) frame * sz;
     return fr[i0] + frac * (fr[i1] - fr[i0]);
 }
 

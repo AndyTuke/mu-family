@@ -62,7 +62,7 @@ PluginProcessor::PluginProcessor()
         uiScale = juce::jlimit(kUiScaleMedium, kUiScaleLarge, (float) stored);
     }
 
-    bank.generateBuiltIn();      // procedural sine->saw morph table (first stab)
+    bank.loadFactoryBank();      // multi-table, mip-mapped factory wavetable bank
     for (int v = 0; v < kMaxVoices; ++v)
     {
         voices[(size_t) v] = std::make_unique<VoiceEngine>();
@@ -167,8 +167,8 @@ void PluginProcessor::cacheParamPointers()
     {
         auto vid = [v](const char* base) { return voiceParamId(v, base); };
         auto& p = voicePtrs[(size_t) v];
-        p.o1Oct  = P(vid("o1_oct"));  p.o1Semi = P(vid("o1_semi")); p.o1Fine = P(vid("o1_fine")); p.o1Pos = P(vid("o1_pos"));
-        p.o2Oct  = P(vid("o2_oct"));  p.o2Semi = P(vid("o2_semi")); p.o2Fine = P(vid("o2_fine")); p.o2Pos = P(vid("o2_pos"));
+        p.o1Oct  = P(vid("o1_oct"));  p.o1Semi = P(vid("o1_semi")); p.o1Fine = P(vid("o1_fine")); p.o1Pos = P(vid("o1_pos")); p.o1Wt = P(vid("o1_wt"));
+        p.o2Oct  = P(vid("o2_oct"));  p.o2Semi = P(vid("o2_semi")); p.o2Fine = P(vid("o2_fine")); p.o2Pos = P(vid("o2_pos")); p.o2Wt = P(vid("o2_wt"));
         p.xmodFm = P(vid("xmod_fm")); p.xmodAm = P(vid("xmod_am")); p.xmodRing = P(vid("xmod_ring")); p.sync = P(vid("sync"));
         p.o1Lvl  = P(vid("o1_lvl"));  p.o2Lvl  = P(vid("o2_lvl"));  p.noiseLvl = P(vid("noise_lvl")); p.noiseType = P(vid("noise_type"));
         p.fltType= P(vid("flt_type")); p.fltCut = P(vid("flt_cut")); p.fltRes = P(vid("flt_res")); p.fltEnvDepth = P(vid("flt_env_depth")); p.fltDrv = P(vid("flt_drv")); p.fltLoCut = P(vid("flt_lo_cut"));
@@ -193,10 +193,12 @@ VoiceConfig PluginProcessor::readConfig(int voiceIdx) const
     c.osc1Semi     = (int) p.o1Semi->load();
     c.osc1Fine     = (int) p.o1Fine->load();
     c.osc1Pos      = p.o1Pos->load();
+    c.osc1Wavetable = (int) p.o1Wt->load();
     c.osc2Octave   = (int) p.o2Oct->load();
     c.osc2Semi     = (int) p.o2Semi->load();
     c.osc2Fine     = (int) p.o2Fine->load();
     c.osc2Pos      = p.o2Pos->load();
+    c.osc2Wavetable = (int) p.o2Wt->load();
     c.xmodFm   = p.xmodFm->load()   * 0.01f;   // 0..100 → 0..1
     c.xmodAm   = p.xmodAm->load()   * 0.01f;
     c.xmodRing = p.xmodRing->load() * 0.01f;

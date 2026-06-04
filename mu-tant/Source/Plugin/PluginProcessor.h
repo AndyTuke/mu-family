@@ -221,8 +221,8 @@ private:
     // them in processBlock — never rebuilding juce::String IDs on the audio thread.
     struct VoicePtrs
     {
-        std::atomic<float> *o1Oct, *o1Semi, *o1Fine, *o1Pos;
-        std::atomic<float> *o2Oct, *o2Semi, *o2Fine, *o2Pos;
+        std::atomic<float> *o1Oct, *o1Semi, *o1Fine, *o1Pos, *o1Wt;
+        std::atomic<float> *o2Oct, *o2Semi, *o2Fine, *o2Pos, *o2Wt;
         std::atomic<float> *xmodFm, *xmodAm, *xmodRing, *sync;
         std::atomic<float> *o1Lvl, *o2Lvl, *noiseLvl, *noiseType;
         std::atomic<float> *fltType,  *fltCut,  *fltRes,  *fltEnvDepth,  *fltDrv,  *fltLoCut;

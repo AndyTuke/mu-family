@@ -38,6 +38,7 @@ The editor shell (TransportBar, About, Save, PresetBrowser, MIDI-preset panels, 
 
 | Sub-doc | When to read |
 |---|---|
+| [docs/mu-clid/create_manual.ps1](../docs/mu-clid/create_manual.ps1) | **End-user manual source** — generates `mu-Clid User Manual.docx` via Word automation. Edit this script (not the `.docx`) to change the manual, then re-run it. |
 | [docs/mu-clid/design-sequencer.md](../docs/mu-clid/design-sequencer.md) | Euclidean params, DAW sync, control sequence params, modulation signal flow |
 | [docs/mu-clid/design-voice.md](../docs/mu-clid/design-voice.md) | Voice chain, ADSR, filter, interpolation quality, sample handling, time stretching (TimeStretcherBase) |
 | [docs/mu-clid/design-ui.md](../docs/mu-clid/design-ui.md) | μ-Clid specific panel layouts — RhythmCircle, EuclideanPanel, Mixer, Transport. Defers to design-ui-family.md for colours/sizes. |

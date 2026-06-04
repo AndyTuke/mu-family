@@ -89,11 +89,30 @@ private:
     DropdownSelect stepDropdown;
     juce::Label    stepLabel;
     NudgeInput     stepMult { juce::String::fromUTF8("\xc3\x97"), 1, 16, 1 };
+    // Square header button drawing the die glyph (⚀) large + centred on an
+    // opaque panel-coloured fill — legible at header height, and the opaque
+    // fill stops any control underlapping the header from peeping through.
+    struct DiceButton : public juce::Button
+    {
+        DiceButton() : juce::Button("Randomise") {}
+        void paintButton(juce::Graphics& g, bool over, bool down) override
+        {
+            const auto r = getLocalBounds();
+            g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
+            g.fillRect(r);
+            auto fg = MuLookAndFeel::colour(MuLookAndFeel::headingText);
+            if (down)       fg = fg.brighter(0.30f);
+            else if (over)  fg = fg.brighter(0.15f);
+            g.setColour(fg);
+            g.setFont(juce::Font(juce::FontOptions{}.withHeight((float) r.getHeight() * 0.78f)));
+            g.drawText(juce::String::fromUTF8("\xe2\x9a\x80"), r, juce::Justification::centred, false);
+        }
+    };
     // Randomises the active modulator's values without touching its shape
     // (mode / polarity / loop+step timing / point or step count). Stepped
     // mode → fresh value per `stepValues[]` entry; Smooth mode → fresh y
     // per `curvePoints[]` entry (x positions and bezier handles preserved).
-    juce::TextButton diceBtn { juce::String::fromUTF8("\xe2\x9a\x80") };  // ⚀
+    DiceButton diceBtn;
 
     struct AssignmentRow : public juce::Component
     {

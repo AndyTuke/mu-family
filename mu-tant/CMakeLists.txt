@@ -184,7 +184,8 @@ target_link_libraries(mu-tant-tests PRIVATE
     juce::juce_events
     juce::juce_graphics
     juce::juce_gui_basics
-    juce::juce_dsp                 # MultiModeFilter (SynthVoice tests) uses juce::dsp filters
+    juce::juce_dsp                 # MultiModeFilter + WavetableBank mip FFT
+    juce::juce_audio_formats       # WavetableBank WAV loader + WAV-loader test
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags
 )

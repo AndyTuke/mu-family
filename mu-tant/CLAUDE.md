@@ -66,7 +66,7 @@ When new subsystems land they go under the same `{Audio, Sequencer, UI, Persiste
 |---|---|
 | [docs/mu-tant/design-voice.md](../docs/mu-tant/design-voice.md) | Voice chain, oscillators, scale-quantised pitch, filter |
 | [docs/mu-tant/design-sequencer.md](../docs/mu-tant/design-sequencer.md) | Gate / pattern editor design |
-| [docs/mu-tant/user-manual.md](../docs/mu-tant/user-manual.md) | End-user manual — feature overview, controls, tips |
+| [docs/mu-tant/create_manual.ps1](../docs/mu-tant/create_manual.ps1) | **End-user manual source** — generates `mu-Tant User Manual.docx` via Word automation (mirrors mu-clid). Edit this script (not the `.docx`), then re-run it. |
 
 Add new product docs at `docs/mu-tant/` mirroring `docs/mu-clid/` as topics get decided.
 

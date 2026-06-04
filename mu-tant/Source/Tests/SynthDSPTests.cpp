@@ -43,7 +43,7 @@ public:
             constexpr int    nSamp   = (int) sr;   // 1 second
 
             WavetableBank bank;
-            bank.generateBuiltIn();                // frame 0 = sine
+            bank.loadFactoryBank();                // table 0 "Basic Shapes", frame 0 = sine
 
             WavetableOscillator osc;
             osc.setBank (&bank);
@@ -73,8 +73,8 @@ public:
         beginTest ("oscillator position scan changes the timbre (sine vs saw frame)");
         {
             WavetableBank bank;
-            bank.generateBuiltIn();
-            // The last frame (saw) should have more harmonic energy than frame 0 (sine):
+            bank.loadFactoryBank();
+            // The last frame (square) should have more harmonic energy than frame 0 (sine):
             // compare a crude brightness proxy — sum of |first difference| over one cycle.
             auto roughness = [&bank](float pos)
             {
@@ -85,7 +85,62 @@ public:
                 return acc;
             };
             expect (roughness (1.0f) > roughness (0.0f),
-                "saw frame (pos 1) should be brighter/rougher than the sine frame (pos 0)");
+                "square frame (pos 1) should be brighter/rougher than the sine frame (pos 0)");
+        }
+
+        beginTest ("factory bank loads the full named table set");
+        {
+            WavetableBank bank; bank.loadFactoryBank();
+            expectEquals (bank.numTables(), WavetableBank::factoryTableNames().size(),
+                          "loadFactoryBank should produce one table per factory name");
+            for (int t = 0; t < bank.numTables(); ++t)
+                expect (bank.numFrames (t) > 0, "table " + juce::String (t) + " has frames");
+        }
+
+        beginTest ("selecting a different wavetable changes the output");
+        {
+            WavetableBank bank; bank.loadFactoryBank();
+            auto energy = [&bank] (int table)
+            {
+                WavetableOscillator o; o.setBank (&bank); o.prepare (48000.0);
+                o.setTable (table); o.setFrequency (110.0f); o.setPosition (1.0f);
+                double acc = 0.0; for (int i = 0; i < 1024; ++i) acc += std::abs (o.render());
+                return acc;
+            };
+            expect (std::abs (energy (0) - energy (3)) > 1.0e-3,
+                    "two different factory tables should not produce identical output");
+        }
+
+        beginTest ("mip-mapping keeps high notes finite and bounded");
+        {
+            WavetableBank bank; bank.loadFactoryBank();
+            WavetableOscillator o; o.setBank (&bank); o.prepare (48000.0);
+            o.setTable (1); o.setPosition (1.0f); o.setFrequency (8000.0f);   // very high pitch
+            float peak = 0.0f; bool finite = true;
+            for (int i = 0; i < 4096; ++i) { const float s = o.render(); finite = finite && std::isfinite (s); peak = std::max (peak, std::abs (s)); }
+            expect (finite, "high-pitch render must stay finite");
+            expect (peak < 4.0f, "high-pitch render must stay bounded (peak=" + juce::String (peak) + ")");
+        }
+
+        beginTest ("WAV loader slices a 2048-frame mono table");
+        {
+            constexpr int frameSize = WavetableBank::kFrameSize, frames = 4;
+            juce::AudioBuffer<float> ab (1, frameSize * frames);
+            for (int f = 0; f < frames; ++f)
+                for (int i = 0; i < frameSize; ++i)
+                    ab.setSample (0, f * frameSize + i,
+                                  std::sin (juce::MathConstants<float>::twoPi * (float) i / (float) frameSize));
+            juce::MemoryBlock mb;
+            {
+                juce::WavAudioFormat wav;
+                auto* mos = new juce::MemoryOutputStream (mb, false);   // writer takes ownership
+                std::unique_ptr<juce::AudioFormatWriter> w (wav.createWriterFor (mos, 48000.0, 1, 16, {}, 0));
+                if (w != nullptr) w->writeFromAudioSampleBuffer (ab, 0, ab.getNumSamples());
+            }
+            WavetableBank bank;
+            const int idx = bank.addFromWav (mb.getData(), mb.getSize(), "test");
+            expect (idx >= 0, "addFromWav should succeed on a valid mono WAV");
+            expectEquals (bank.numFrames (idx), frames, "should slice into the correct frame count");
         }
     }
 };
