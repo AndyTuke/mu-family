@@ -778,28 +778,56 @@ void VoicePanel::resized()
                              juce::jmax(s(332), h - y - pad));
 }
 
-// IDs above the factory item range (1..N): the loaded user table, and the "Load" action.
-static constexpr int kWtUserItemId = 901;
-static constexpr int kWtLoadItemId = 902;
+// Item-ID ranges. Factory tables use 1..N (= APVTS index + 1). The Wavetables/
+// folder files use kWtFolderBase + i (path-based, via the disk-import machinery).
+static constexpr int kWtUserItemId = 901;   // active table loaded from OUTSIDE the folder
+static constexpr int kWtLoadItemId = 902;   // "Load .wav…" browse action
+static constexpr int kWtFolderBase = 1000;  // first Wavetables/ folder file
 
 void VoicePanel::refreshWavetableDropdowns()
 {
     const auto& names = WavetableBank::factoryTableNames();
+
+    // Scan the Wavetables/ content folder once (shared by both oscillators).
+    wtFolderFiles.clear();
+    for (const auto& f : proc.getWavetablesDir().findChildFiles(juce::File::findFiles, false, "*.wav"))
+        wtFolderFiles.push_back(f);
+    std::sort(wtFolderFiles.begin(), wtFolderFiles.end(),
+              [](const juce::File& a, const juce::File& b) { return a.getFileName().compareNatural(b.getFileName()) < 0; });
+
     auto rebuild = [&](DropdownSelect& dd, int osc, const char* pid)
     {
         dd.clear();
         for (int i = 0; i < names.size(); ++i) dd.addItem(names[i], i + 1);
 
+        if (! wtFolderFiles.empty())
+        {
+            dd.addSectionHeading("Wavetables");
+            for (int i = 0; i < (int) wtFolderFiles.size(); ++i)
+                dd.addItem(wtFolderFiles[(size_t) i].getFileNameWithoutExtension(), kWtFolderBase + i);
+        }
+
         const auto path = proc.userWavetablePath(currentVoice, osc);
-        if (path.isNotEmpty())
+        const bool inFolder = path.isNotEmpty()
+            && juce::File(path).getParentDirectory() == proc.getWavetablesDir();
+
+        // A loaded table from OUTSIDE the folder gets its own item; in-folder ones
+        // are selected via their folder item.
+        if (path.isNotEmpty() && ! inFolder)
         {
             const juce::String fn = juce::File(path).getFileNameWithoutExtension();
             dd.addItem(proc.userWavetableMissing(currentVoice, osc) ? ("! " + fn) : fn, kWtUserItemId);
         }
         dd.addItem(juce::String::fromUTF8("Load .wav\xe2\x80\xa6"), kWtLoadItemId);
 
+        // Reflect the current selection.
         if (path.isNotEmpty())
-            dd.setSelectedId(kWtUserItemId, false);          // user table active
+        {
+            int folderId = -1;
+            for (int i = 0; i < (int) wtFolderFiles.size(); ++i)
+                if (wtFolderFiles[(size_t) i].getFullPathName() == path) { folderId = kWtFolderBase + i; break; }
+            dd.setSelectedId(folderId >= 0 ? folderId : kWtUserItemId, false);
+        }
         else
         {
             int idx = 0;
@@ -819,7 +847,7 @@ void VoicePanel::handleWtSelection(int oscIdx, int itemId)
     if (itemId == kWtLoadItemId)
     {
         const int v = currentVoice;        // freeze target voice for the async callback
-        wtChooser = std::make_unique<juce::FileChooser>("Load wavetable (.wav)", juce::File{}, "*.wav");
+        wtChooser = std::make_unique<juce::FileChooser>("Load wavetable (.wav)", proc.getWavetablesDir(), "*.wav");
         auto safe = juce::Component::SafePointer<VoicePanel>(this);
         wtChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
             [safe, oscIdx, v](const juce::FileChooser& fc)
@@ -829,6 +857,15 @@ void VoicePanel::handleWtSelection(int oscIdx, int itemId)
                 if (f.existsAsFile()) safe->proc.loadUserWavetable(v, oscIdx, f);
                 safe->refreshWavetableDropdowns();   // show new table, or revert on cancel
             });
+        return;
+    }
+
+    if (itemId >= kWtFolderBase)           // a Wavetables/ folder file → load by path
+    {
+        const int fi = itemId - kWtFolderBase;
+        if (fi >= 0 && fi < (int) wtFolderFiles.size())
+            proc.loadUserWavetable(currentVoice, oscIdx, wtFolderFiles[(size_t) fi]);
+        refreshWavetableDropdowns();
         return;
     }
 

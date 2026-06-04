@@ -173,6 +173,7 @@ public:
     juce::String getPerSlotPresetExtension() const override { return "muPattern"; }
     juce::File   getFullPresetDir()          const override { return getPresetsDir(); }
     juce::String getFullPresetExtension()    const override { return "muTant"; }
+    juce::File   getWavetablesDir()          const;            // user/factory .wav wavetables live here
 
     // Full-preset save/load — the editor shell drives the UI (TransportBar
     // dropdown + Save dialog + Preset browser) and calls these. A preset is the

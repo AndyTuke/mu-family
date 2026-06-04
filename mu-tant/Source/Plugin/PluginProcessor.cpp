@@ -899,6 +899,7 @@ juce::File PluginProcessor::getContentDir() const
 
 juce::File PluginProcessor::getPresetsDir()     const { return getContentDir().getChildFile("Presets"); }
 juce::File PluginProcessor::getPerSlotPresetDir() const { return getContentDir().getChildFile("Voices"); }
+juce::File PluginProcessor::getWavetablesDir()  const { return getContentDir().getChildFile("Wavetables"); }
 
 void PluginProcessor::savePreset(const juce::String& name, const juce::String& desc,
                                  const juce::String& category, bool /*embedSamples*/)

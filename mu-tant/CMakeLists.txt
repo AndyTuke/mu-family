@@ -195,3 +195,20 @@ target_compile_definitions(mu-tant-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSE
 # Built as part of ALL_BUILD from day 1 — mu-tant's DSP changes get caught
 # every build, matching mu-clid's full-coverage discipline.
 add_dependencies(mu-tant mu-tant-tests)
+
+# ── mu-tant-wavetable-gen — offline tool that writes the factory wavetable .wav set ──
+# Self-contained (no mu-core/plugin deps). EXCLUDE_FROM_ALL — built + run on demand:
+#   cmake --build build --config Release --target mu-tant-wavetable-gen
+#   <exe> "D:/OneDrive/Documents/TDP/muTant/Wavetables"
+juce_add_console_app(mu-tant-wavetable-gen PRODUCT_NAME "mu-tant-wavetable-gen")
+target_sources(mu-tant-wavetable-gen PRIVATE
+    "${CMAKE_SOURCE_DIR}/tools/wavetable-gen/WavetableGen.cpp")
+target_compile_features(mu-tant-wavetable-gen PRIVATE cxx_std_17)
+target_link_libraries(mu-tant-wavetable-gen PRIVATE
+    juce::juce_core
+    juce::juce_audio_basics
+    juce::juce_audio_formats
+    juce::juce_recommended_config_flags
+    juce::juce_recommended_warning_flags)
+target_compile_definitions(mu-tant-wavetable-gen PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+set_target_properties(mu-tant-wavetable-gen PROPERTIES EXCLUDE_FROM_ALL TRUE)

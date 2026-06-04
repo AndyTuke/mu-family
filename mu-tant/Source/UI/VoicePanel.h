@@ -209,6 +209,7 @@ private:
     void refreshWavetableDropdowns();
     void handleWtSelection(int oscIdx, int itemId);
     std::unique_ptr<juce::FileChooser> wtChooser;   // kept alive during async load
+    std::vector<juce::File> wtFolderFiles;          // dropdown id (kWtFolderBase+i) → Wavetables/ file
 
     // 30 Hz timer — drives the gating-grid playhead + modulator playhead from
     // the processor's transport beat position.
