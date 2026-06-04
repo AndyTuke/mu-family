@@ -24,6 +24,7 @@ namespace mu_tant
 struct Wavetable
 {
     juce::String                    name;
+    juce::String                    sourcePath;   // empty for factory tables; file path for user imports
     int                             frames = 0;
     std::vector<int>                mipSize;   // samples per frame at each level
     std::vector<std::vector<float>> mip;       // mip[level] : frames*mipSize[level], row-major
@@ -52,6 +53,11 @@ public:
     // append as a named table. Returns the new table index, or -1 on failure.
     int  addFromWav(const void* wavData, size_t numBytes, const juce::String& name);
     int  addFromFile(const juce::File& file);
+
+    // User-import helpers: dedup by absolute path so re-loading the same file (or two
+    // voices using it) reuses one bank slot. findByPath returns the index or -1.
+    int  findByPath(const juce::String& absolutePath) const noexcept;
+    int  addOrLoadFile(const juce::File& file);
 
     int  numTables() const noexcept { return (int) tables.size(); }
     const juce::String& tableName(int t) const noexcept;

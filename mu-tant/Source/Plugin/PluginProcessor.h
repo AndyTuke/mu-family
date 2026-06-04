@@ -158,6 +158,14 @@ public:
     void saveVoicePreset(int voice, const juce::String& name);
     void loadVoicePreset(int voice, const juce::File& file);
 
+    // ── User wavetable import (per oscillator) ───────────────────────────────
+    // Load a Serum/Vital .wav into the shared bank (dedup by path) and point the
+    // given voice's oscillator at it; clear reverts to the factory selection.
+    void         loadUserWavetable(int voice, int oscIdx, const juce::File& file);
+    void         clearUserWavetable(int voice, int oscIdx);
+    juce::String userWavetablePath(int voice, int oscIdx) const;    // "" = factory selection
+    bool         userWavetableMissing(int voice, int oscIdx) const; // path set but file gone
+
     // ── ProcessorBase preset wiring (per design-voice.md file formats) ────────
     juce::File   getContentDir()             const override;
     juce::File   getPresetsDir()             const override;   // full presets live here
@@ -317,6 +325,12 @@ private:
     // Per-voice palette-colour index (0..7). Default identity; addVoice assigns
     // the first-unused colour, remove/swap shift it so colour follows the voice.
     std::array<int, kMaxVoices> voiceColourIndex { { 0, 1, 2, 3, 4, 5, 6, 7 } };
+    // Per-voice user-imported wavetable path (one per oscillator) — the source of
+    // truth, following the voice through swap/save like voiceColourIndex. The
+    // atomic resolved bank index is what the audio thread reads each block;
+    // -1 = no user table → fall back to the factory o{1,2}_wt selection.
+    std::array<juce::String, kMaxVoices>     osc1UserPath, osc2UserPath;
+    std::array<std::atomic<int>, kMaxVoices> osc1UserIdx, osc2UserIdx;
     int firstUnusedColourIndex() const;   // lowest palette index not used by an active voice
     // Guards the voice count + the per-voice data shift during add/remove against
     // the audio thread. processBlock takes a ScopedTryLock and silences the block

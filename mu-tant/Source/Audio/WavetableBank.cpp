@@ -224,7 +224,24 @@ int WavetableBank::addFromFile(const juce::File& file)
 {
     juce::MemoryBlock mb;
     if (! file.loadFileAsData(mb)) return -1;
-    return addFromWav(mb.getData(), mb.getSize(), file.getFileNameWithoutExtension());
+    const int idx = addFromWav(mb.getData(), mb.getSize(), file.getFileNameWithoutExtension());
+    if (idx >= 0) tables[(size_t) idx].sourcePath = file.getFullPathName();   // tag for dedup + persistence
+    return idx;
+}
+
+int WavetableBank::findByPath(const juce::String& absolutePath) const noexcept
+{
+    if (absolutePath.isEmpty()) return -1;
+    for (int i = 0; i < (int) tables.size(); ++i)
+        if (tables[(size_t) i].sourcePath == absolutePath) return i;
+    return -1;
+}
+
+int WavetableBank::addOrLoadFile(const juce::File& file)
+{
+    const int existing = findByPath(file.getFullPathName());
+    if (existing >= 0) return existing;
+    return addFromFile(file);
 }
 
 void WavetableBank::appendProceduralFactory(Factory kind, const juce::String& name)

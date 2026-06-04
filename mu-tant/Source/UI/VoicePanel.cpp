@@ -199,18 +199,12 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     // SliderAttachment ensures the APVTS param still saves/loads and can be modulated.
     levelKnob.setVisible(false);
 
-    // Wavetable selectors — populated from the bank's factory table names.
-    // Item ID = table index + 1 (matches the AudioParameterInt stored value).
-    // Manual APVTS wiring happens in rebindAttachments (per active voice).
-    {
-        const auto& names = WavetableBank::factoryTableNames();
-        for (auto* d : { &osc1WaveDropdown, &osc2WaveDropdown })
-        {
-            for (int i = 0; i < names.size(); ++i) d->addItem(names[i], i + 1);
-            d->setSelectedId(1, false);
-            addAndMakeVisible(d);
-        }
-    }
+    // Wavetable selectors — items are rebuilt per voice by refreshWavetableDropdowns
+    // (factory names + optional user import + "Load .wav…"); onChange routes here.
+    addAndMakeVisible(osc1WaveDropdown);
+    addAndMakeVisible(osc2WaveDropdown);
+    osc1WaveDropdown.onChange = [this](int itemId) { handleWtSelection(0, itemId); };
+    osc2WaveDropdown.onChange = [this](int itemId) { handleWtSelection(1, itemId); };
 
 
     syncButton.setClickingTogglesState(true);
@@ -329,18 +323,20 @@ void VoicePanel::timerCallback()
             flt2TypeDropdown.setSelectedId(apvtsAlgo + 1, false);
     }
 
-    // Sync the wavetable dropdowns from APVTS (preset load / DAW automation).
+    // Sync the wavetable dropdowns' factory selection from APVTS (preset / automation).
+    // A loaded user table overrides the factory index, so leave its item selected.
     const int maxWt = juce::jmax(0, WavetableBank::factoryTableNames().size() - 1);
-    auto syncWt = [&](DropdownSelect& dd, const char* pid)
+    auto syncWt = [&](DropdownSelect& dd, int osc, const char* pid)
     {
+        if (proc.userWavetablePath(currentVoice, osc).isNotEmpty()) return;
         if (auto* raw = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentVoice, pid)))
         {
             const int idx = juce::jlimit(0, maxWt, (int) raw->load());
             if (dd.getSelectedId() != idx + 1) dd.setSelectedId(idx + 1, false);
         }
     };
-    syncWt(osc1WaveDropdown, "o1_wt");
-    syncWt(osc2WaveDropdown, "o2_wt");
+    syncWt(osc1WaveDropdown, 0, "o1_wt");
+    syncWt(osc2WaveDropdown, 1, "o2_wt");
 }
 
 void VoicePanel::setVoice(int voiceIndex)
@@ -409,22 +405,9 @@ void VoicePanel::rebindAttachments()
     o2PosAttachment       = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_pos"),         o2PosKnob.getSlider());
     o2PenvDepthAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("o2_penv_depth"),  o2PenvDepthKnob.getSlider());
 
-    // Wavetable selectors — manual wiring (item ID = table index + 1), mirroring
-    // the filter-type dropdowns. The timer poll syncs the displayed value back
-    // from APVTS (preset load / DAW automation).
-    {
-        const int maxWt = juce::jmax(0, WavetableBank::factoryTableNames().size() - 1);
-        auto wire = [&](DropdownSelect& dd, const char* pid)
-        {
-            auto* param = apvts.getParameter(id(pid));
-            int idx = 0;
-            if (auto* raw = apvts.getRawParameterValue(id(pid))) idx = juce::jlimit(0, maxWt, (int) raw->load());
-            dd.setSelectedId(idx + 1, juce::dontSendNotification);
-            dd.onChange = [param](int itemId) { if (param) param->setValueNotifyingHost(param->convertTo0to1((float) (itemId - 1))); };
-        };
-        wire(osc1WaveDropdown, "o1_wt");
-        wire(osc2WaveDropdown, "o2_wt");
-    }
+    // Wavetable selectors are rebuilt for the active voice (factory selection or a
+    // loaded user table); onChange was wired once in the constructor.
+    refreshWavetableDropdowns();
 
     xmodFmAttachment   = std::make_unique<APVTS::SliderAttachment>(apvts, id("xmod_fm"),   xmodFmKnob.getSlider());
     xmodAmAttachment   = std::make_unique<APVTS::SliderAttachment>(apvts, id("xmod_am"),   xmodAmKnob.getSlider());
@@ -646,7 +629,6 @@ void VoicePanel::resized()
     // ── Row A: Osc 1 | Osc 2 | Noise (side by side, using full leftW) ───────
     // Osc panels extend across the Insert column zone since Insert is Row B only.
     {
-        const int waveW     = s(56);   // wavetable selector dropdown (left of the knobs)
         const int noiseW    = s(170);
         const int oscW      = (leftW - noiseW - 2 * gap) / 2;   // ≈ 342
         const int rowY      = contentTop + s(4);
@@ -654,13 +636,15 @@ void VoicePanel::resized()
 
         // 5 pitch / scan knobs are right-aligned in each panel; the wavetable
         // dropdown fills the space to their left and grows with the panel width.
-        const int knobsW = 5 * s2W + 4 * s(2);
+        const int knobsW  = 5 * s2W + 4 * s(2);
+        const int wtInset = s(8);   // keep the dropdown clear of the panel border + knobs
 
         // Osc 1 (the "OSC 1" panel title sits in the top-left corner above this row).
         osc1PanelR = { pad, contentTop, oscW, rowAH };
         {
             const int knobsX = pad + oscW - knobsW - s(6);
-            osc1WaveDropdown.setBounds(pad, waveY, juce::jmax(waveW, knobsX - pad - s(8)), ddH);
+            const int wtX    = pad + wtInset;
+            osc1WaveDropdown.setBounds(wtX, waveY, juce::jmax(s(40), knobsX - wtX - wtInset), ddH);
             int x = knobsX;
             for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PosKnob, &o1PenvDepthKnob })
             { k->setBounds(x, rowY, s2W, s2H);  x += s2W + s(2); }
@@ -671,7 +655,8 @@ void VoicePanel::resized()
         osc2PanelR = { osc2X, contentTop, oscW, rowAH };
         {
             const int knobsX = osc2X + oscW - knobsW - s(6);
-            osc2WaveDropdown.setBounds(osc2X, waveY, juce::jmax(waveW, knobsX - osc2X - s(8)), ddH);
+            const int wtX    = osc2X + wtInset;
+            osc2WaveDropdown.setBounds(wtX, waveY, juce::jmax(s(40), knobsX - wtX - wtInset), ddH);
             int x = knobsX;
             for (auto* k : { &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PosKnob, &o2PenvDepthKnob })
             { k->setBounds(x, rowY, s2W, s2H);  x += s2W + s(2); }
@@ -791,6 +776,67 @@ void VoicePanel::resized()
     // ── Modulator panel — fills remaining height (minimum matches mu-clid) ───
     modulatorPanel.setBounds(pad, y, w - 2 * pad,
                              juce::jmax(s(332), h - y - pad));
+}
+
+// IDs above the factory item range (1..N): the loaded user table, and the "Load" action.
+static constexpr int kWtUserItemId = 901;
+static constexpr int kWtLoadItemId = 902;
+
+void VoicePanel::refreshWavetableDropdowns()
+{
+    const auto& names = WavetableBank::factoryTableNames();
+    auto rebuild = [&](DropdownSelect& dd, int osc, const char* pid)
+    {
+        dd.clear();
+        for (int i = 0; i < names.size(); ++i) dd.addItem(names[i], i + 1);
+
+        const auto path = proc.userWavetablePath(currentVoice, osc);
+        if (path.isNotEmpty())
+        {
+            const juce::String fn = juce::File(path).getFileNameWithoutExtension();
+            dd.addItem(proc.userWavetableMissing(currentVoice, osc) ? ("! " + fn) : fn, kWtUserItemId);
+        }
+        dd.addItem(juce::String::fromUTF8("Load .wav\xe2\x80\xa6"), kWtLoadItemId);
+
+        if (path.isNotEmpty())
+            dd.setSelectedId(kWtUserItemId, false);          // user table active
+        else
+        {
+            int idx = 0;
+            if (auto* raw = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentVoice, pid)))
+                idx = juce::jlimit(0, names.size() - 1, (int) raw->load());
+            dd.setSelectedId(idx + 1, false);
+        }
+    };
+    rebuild(osc1WaveDropdown, 0, "o1_wt");
+    rebuild(osc2WaveDropdown, 1, "o2_wt");
+}
+
+void VoicePanel::handleWtSelection(int oscIdx, int itemId)
+{
+    if (itemId == kWtUserItemId) return;   // already on the loaded user table
+
+    if (itemId == kWtLoadItemId)
+    {
+        const int v = currentVoice;        // freeze target voice for the async callback
+        wtChooser = std::make_unique<juce::FileChooser>("Load wavetable (.wav)", juce::File{}, "*.wav");
+        auto safe = juce::Component::SafePointer<VoicePanel>(this);
+        wtChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+            [safe, oscIdx, v](const juce::FileChooser& fc)
+            {
+                if (safe == nullptr) return;
+                const auto f = fc.getResult();
+                if (f.existsAsFile()) safe->proc.loadUserWavetable(v, oscIdx, f);
+                safe->refreshWavetableDropdowns();   // show new table, or revert on cancel
+            });
+        return;
+    }
+
+    // Factory item (1..N): clear any user table for this osc, set the APVTS index.
+    proc.clearUserWavetable(currentVoice, oscIdx);
+    if (auto* p = proc.apvts.getParameter(PluginProcessor::voiceParamId(currentVoice, oscIdx == 0 ? "o1_wt" : "o2_wt")))
+        p->setValueNotifyingHost(p->convertTo0to1((float) (itemId - 1)));
+    refreshWavetableDropdowns();
 }
 
 } // namespace mu_tant

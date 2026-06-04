@@ -134,7 +134,9 @@ public:
             {
                 juce::WavAudioFormat wav;
                 auto* mos = new juce::MemoryOutputStream (mb, false);   // writer takes ownership
+                JUCE_BEGIN_IGNORE_WARNINGS_MSVC (4996)
                 std::unique_ptr<juce::AudioFormatWriter> w (wav.createWriterFor (mos, 48000.0, 1, 16, {}, 0));
+                JUCE_END_IGNORE_WARNINGS_MSVC
                 if (w != nullptr) w->writeFromAudioSampleBuffer (ab, 0, ab.getNumSamples());
             }
             WavetableBank bank;

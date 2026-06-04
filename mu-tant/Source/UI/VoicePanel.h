@@ -204,6 +204,12 @@ private:
     void rebindAttachments();
     void bindModulationIndicators();
 
+    // Wavetable selector dropdowns: rebuilt per voice (factory names + an optional
+    // user-import item + "Load .wav…"). Selection routes through handleWtSelection.
+    void refreshWavetableDropdowns();
+    void handleWtSelection(int oscIdx, int itemId);
+    std::unique_ptr<juce::FileChooser> wtChooser;   // kept alive during async load
+
     // 30 Hz timer — drives the gating-grid playhead + modulator playhead from
     // the processor's transport beat position.
     void timerCallback() override;
