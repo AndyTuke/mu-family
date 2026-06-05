@@ -619,17 +619,14 @@ void ModulatorEditor::resized()
     const int diceX = w - diceW;
     diceBtn.setBounds(diceX, 0, diceW, headerH);
 
-    // Step group (Stepped mode only) is right-anchored against the dice so its
-    // "× N" multiplier is always fully visible to the LEFT of the dice, rather
-    // than left-flowed and ending up hidden behind it when the header is tight.
-    // The loop group above flows from the left; in Smooth mode (no step group)
-    // it is far narrower than the dice anchor, so it never reaches the dice.
+    // Step group (Stepped mode only) flows from the left, immediately after the
+    // Loop group — left-justified with the other controls. Only the dice is
+    // right-anchored; the step group sits well clear of it.
     if (stepDropdown.isVisible())
     {
-        int sx = diceX - gap8 - nmW;
-        stepMult    .setBounds(sx, 0, nmW, headerH);
-        sx -= gap2 + ddW;  stepDropdown.setBounds(sx, 0, ddW, headerH);
-        sx -= gap2 + lbW;  stepLabel   .setBounds(sx, 0, lbW, headerH);
+        stepLabel   .setBounds(x, 0, lbW, headerH); x += lbW + gap2;
+        stepDropdown.setBounds(x, 0, ddW, headerH); x += ddW + gap2;
+        stepMult    .setBounds(x, 0, nmW, headerH); x += nmW + gap8;
     }
 
     // ── LFO / Step editor ──────────────────────────────────────────────────────

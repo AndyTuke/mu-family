@@ -25,7 +25,7 @@ public:
         if (cutoffHz != lastCutoffHz || resonance != lastResonance)
         {
             svf.setCutoffFrequency(cutoffHz);
-            svf.setResonance(juce::jmax(0.01f, resonance));
+            svf.setResonance(mu_filter::svfResonanceToQ(resonance));
             lastCutoffHz = cutoffHz; lastResonance = resonance;
         }
 

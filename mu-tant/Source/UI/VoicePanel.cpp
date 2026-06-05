@@ -365,6 +365,10 @@ void VoicePanel::setVoice(int voiceIndex)
     gatingDesigner.setFilterPattern(&proc.filterPatterns[(size_t) currentVoice]);
     gatingDesigner.setPitchPattern(&proc.pitchPatterns[(size_t) currentVoice]);
     insertSub.setChannel(currentVoice);   // reloads algo + slot knobs from APVTS
+    // Unconditional — a preset load calls setVoice(0) while already on voice 0, so
+    // the rebindAttachments() guard above is skipped; the wavetable dropdowns are
+    // not APVTS attachments, so they must be rebuilt here to reflect the loaded table.
+    refreshWavetableDropdowns();
     refreshHeader();
     repaint();   // sub-panel borders + section titles paint in the active voice's palette colour
 }
@@ -787,33 +791,59 @@ static constexpr int kWtFolderBase = 1000;  // first Wavetables/ folder file
 void VoicePanel::refreshWavetableDropdowns()
 {
     const auto& names = WavetableBank::factoryTableNames();
+    const auto  root  = proc.getWavetablesDir();
 
-    // Scan the Wavetables/ content folder once (shared by both oscillators).
+    // Scan the Wavetables/ content folder recursively (shared by both oscillators).
+    // Each containing sub-folder becomes a category heading; files in the root sit
+    // under "Wavetables". Category = the parent's path relative to the root.
+    auto categoryOf = [&root](const juce::File& f) -> juce::String
+    {
+        const auto parent = f.getParentDirectory();
+        if (parent == root) return {};                       // root → "Wavetables" heading
+        return parent.getRelativePathFrom(root)              // nested → "Parent / Child"
+                     .replaceCharacter('\\', '/').replace("/", " / ");
+    };
+
     wtFolderFiles.clear();
-    for (const auto& f : proc.getWavetablesDir().findChildFiles(juce::File::findFiles, false, "*.wav"))
+    for (const auto& f : root.findChildFiles(juce::File::findFiles, true, "*.wav"))
         wtFolderFiles.push_back(f);
+    // Group by category (root files first), then natural filename within a category.
     std::sort(wtFolderFiles.begin(), wtFolderFiles.end(),
-              [](const juce::File& a, const juce::File& b) { return a.getFileName().compareNatural(b.getFileName()) < 0; });
+              [&](const juce::File& a, const juce::File& b)
+              {
+                  const auto ca = categoryOf(a), cb = categoryOf(b);
+                  if (ca != cb) return ca.isEmpty() != cb.isEmpty() ? ca.isEmpty()
+                                                                    : ca.compareNatural(cb) < 0;
+                  return a.getFileName().compareNatural(b.getFileName()) < 0;
+              });
 
     auto rebuild = [&](DropdownSelect& dd, int osc, const char* pid)
     {
         dd.clear();
         for (int i = 0; i < names.size(); ++i) dd.addItem(names[i], i + 1);
 
-        if (! wtFolderFiles.empty())
+        juce::String lastCat = "\x01";   // sentinel so the first file always emits a heading
+        for (int i = 0; i < (int) wtFolderFiles.size(); ++i)
         {
-            dd.addSectionHeading("Wavetables");
-            for (int i = 0; i < (int) wtFolderFiles.size(); ++i)
-                dd.addItem(wtFolderFiles[(size_t) i].getFileNameWithoutExtension(), kWtFolderBase + i);
+            const auto cat = categoryOf(wtFolderFiles[(size_t) i]);
+            if (cat != lastCat)
+            {
+                dd.addSectionHeading(cat.isEmpty() ? "Wavetables" : cat);
+                lastCat = cat;
+            }
+            dd.addItem(wtFolderFiles[(size_t) i].getFileNameWithoutExtension(), kWtFolderBase + i);
         }
 
         const auto path = proc.userWavetablePath(currentVoice, osc);
-        const bool inFolder = path.isNotEmpty()
-            && juce::File(path).getParentDirectory() == proc.getWavetablesDir();
 
-        // A loaded table from OUTSIDE the folder gets its own item; in-folder ones
-        // are selected via their folder item.
-        if (path.isNotEmpty() && ! inFolder)
+        // Find the scanned-folder item for the loaded table (anywhere under the root,
+        // sub-folders included). A table loaded from OUTSIDE the tree gets its own item.
+        int folderId = -1;
+        if (path.isNotEmpty())
+            for (int i = 0; i < (int) wtFolderFiles.size(); ++i)
+                if (wtFolderFiles[(size_t) i].getFullPathName() == path) { folderId = kWtFolderBase + i; break; }
+
+        if (path.isNotEmpty() && folderId < 0)
         {
             const juce::String fn = juce::File(path).getFileNameWithoutExtension();
             dd.addItem(proc.userWavetableMissing(currentVoice, osc) ? ("! " + fn) : fn, kWtUserItemId);
@@ -823,9 +853,6 @@ void VoicePanel::refreshWavetableDropdowns()
         // Reflect the current selection.
         if (path.isNotEmpty())
         {
-            int folderId = -1;
-            for (int i = 0; i < (int) wtFolderFiles.size(); ++i)
-                if (wtFolderFiles[(size_t) i].getFullPathName() == path) { folderId = kWtFolderBase + i; break; }
             dd.setSelectedId(folderId >= 0 ? folderId : kWtUserItemId, false);
         }
         else

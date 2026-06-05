@@ -49,8 +49,10 @@ public:
     // so the engine always has the full named set.
     void loadFactoryBank();
 
-    // Decode a mono Serum/Vital WAV (2048-sample frames concatenated), build mips,
-    // append as a named table. Returns the new table index, or -1 on failure.
+    // Decode a mono Serum/Vital WAV (single-cycle frames concatenated), build mips,
+    // append as a named table. Frame size comes from the Serum "clm " chunk when
+    // present (power-of-two), else defaults to kFrameSize. Returns the new table
+    // index, or -1 on failure.
     int  addFromWav(const void* wavData, size_t numBytes, const juce::String& name);
     int  addFromFile(const juce::File& file);
 

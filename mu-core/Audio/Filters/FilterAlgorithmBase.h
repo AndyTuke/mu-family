@@ -1,6 +1,24 @@
 #pragma once
 
 #include <juce_audio_basics/juce_audio_basics.h>
+#include <cmath>
+
+namespace mu_filter
+{
+// Map a normalized resonance (0..1 — the APVTS flt_res range) to a musical Q for the
+// TPT state-variable filters. res=0 → Q≈0.707 (Butterworth: flat, full passband, NOT
+// over-damped), rising exponentially to ≈8 (resonant) as res→1. Without this the SVF
+// treats the normalized value directly as its Q, so the default 0.2 gave Q=0.2 — an
+// over-damped lowpass that guts the passband and sounds very quiet/dull. Shared by all
+// four SVF algorithms (Lp12/Hp12/Bp12/Notch12) so the mapping lives in one place. The
+// Ladder algorithms keep using the raw 0..1 value (LadderFilter expects normalized
+// resonance, not Q).
+inline float svfResonanceToQ(float resonance) noexcept
+{
+    const float r = juce::jlimit(0.0f, 1.0f, resonance);
+    return 0.707f * std::pow(2.0f, 3.5f * r);   // 0.707 … ~7.9
+}
+} // namespace mu_filter
 
 // Abstract base for the 16 voice-filter algorithms. Mirrors the
 // InsertFX / SendFX dispatch pattern. Each concrete subclass

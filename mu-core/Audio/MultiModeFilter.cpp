@@ -83,7 +83,10 @@ void MultiModeFilter::process(juce::AudioBuffer<float>& buffer,
         {
             const float drv     = smoothedDrive.getNextValue();
             const float preGain = 1.0f + drv * 5.0f;   // 1×..6×
-            const float invGain = 1.0f / preGain;
+            // Square-root makeup (not full 1/preGain): saturated peaks hold their
+            // level and quiet passages get boosted by the residual gain → fatter,
+            // not thinner. Full inverse compensation collapsed level past ~30%.
+            const float invGain = 1.0f / std::sqrt(preGain);
             for (int ch = 0; ch < nCh; ++ch)
             {
                 const float y = chData[ch][i] * preGain;

@@ -144,6 +144,53 @@ public:
             expect (idx >= 0, "addFromWav should succeed on a valid mono WAV");
             expectEquals (bank.numFrames (idx), frames, "should slice into the correct frame count");
         }
+
+        beginTest ("WAV loader honours Serum clm chunk frame size");
+        {
+            // 4096 samples = 2 frames at the default 2048, but 4 frames at 1024.
+            // A spliced clm chunk declaring 1024 must drive the slice to 4 frames.
+            constexpr int clmFrame = 1024, frames = 4;
+            juce::AudioBuffer<float> ab (1, clmFrame * frames);
+            for (int i = 0; i < ab.getNumSamples(); ++i)
+                ab.setSample (0, i, std::sin (juce::MathConstants<float>::twoPi
+                                              * (float) (i % clmFrame) / (float) clmFrame));
+            juce::MemoryBlock mb;
+            {
+                juce::WavAudioFormat wav;
+                auto* mos = new juce::MemoryOutputStream (mb, false);
+                JUCE_BEGIN_IGNORE_WARNINGS_MSVC (4996)
+                std::unique_ptr<juce::AudioFormatWriter> w (wav.createWriterFor (mos, 48000.0, 1, 16, {}, 0));
+                JUCE_END_IGNORE_WARNINGS_MSVC
+                if (w != nullptr) w->writeFromAudioSampleBuffer (ab, 0, ab.getNumSamples());
+            }
+
+            // Build a "clm " chunk and splice it in after the RIFF/WAVE header (offset 12).
+            const juce::String clm = "<!>1024 10000000 wavetable (test)";
+            const int payload = (int) clm.getNumBytesAsUTF8();
+            juce::MemoryBlock chunk;
+            {
+                juce::MemoryOutputStream os (chunk, false);
+                os.write ("clm ", 4);
+                os.writeInt (payload);                       // LE chunk size
+                os.write (clm.toRawUTF8(), (size_t) payload);
+                if (payload & 1) os.writeByte (0);           // word-align
+            }
+            juce::MemoryBlock spliced;
+            spliced.append (mb.getData(), 12);
+            spliced.append (chunk.getData(), chunk.getSize());
+            spliced.append (static_cast<const char*> (mb.getData()) + 12, mb.getSize() - 12);
+
+            // Fix the RIFF size field (bytes 4..7, LE) to include the inserted chunk.
+            const juce::uint32 newRiff = (juce::uint32) (spliced.getSize() - 8);
+            auto* p = static_cast<juce::uint8*> (spliced.getData());
+            p[4] = (juce::uint8) (newRiff & 0xff);         p[5] = (juce::uint8) ((newRiff >> 8)  & 0xff);
+            p[6] = (juce::uint8) ((newRiff >> 16) & 0xff); p[7] = (juce::uint8) ((newRiff >> 24) & 0xff);
+
+            WavetableBank bank;
+            const int idx = bank.addFromWav (spliced.getData(), spliced.getSize(), "clmtest");
+            expect (idx >= 0, "addFromWav should succeed on a clm-tagged WAV");
+            expectEquals (bank.numFrames (idx), frames, "clm frame size (1024) should yield 4 frames, not 2");
+        }
     }
 };
 

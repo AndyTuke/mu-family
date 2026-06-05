@@ -1,6 +1,8 @@
 #include "WavetableBank.h"
 #include <juce_dsp/juce_dsp.h>
 #include <cmath>
+#include <cstring>
+#include <cstdint>
 #include <algorithm>
 
 namespace mu_tant
@@ -8,6 +10,36 @@ namespace mu_tant
 
 static constexpr double kPi    = 3.14159265358979323846;
 static constexpr double kTwoPi = 6.283185307179586;
+
+// Serum/Vital embed the single-cycle frame length in a RIFF "clm " sub-chunk,
+// an ASCII string of the form "<!>2048 10000000 wavetable (www.xferrecords.com)".
+// Walk the WAV's chunk list for "clm " and return the integer after "<!>", or 0
+// if the chunk is absent / unparsable. Lets us slice imports authored at frame
+// sizes other than 2048 correctly instead of assuming the default.
+static int parseSerumFrameSize(const void* data, size_t numBytes) noexcept
+{
+    const auto* bytes = static_cast<const uint8_t*>(data);
+    if (numBytes < 12 || std::memcmp(bytes, "RIFF", 4) != 0 || std::memcmp(bytes + 8, "WAVE", 4) != 0)
+        return 0;
+
+    size_t pos = 12;   // first chunk after the RIFF/WAVE header
+    while (pos + 8 <= numBytes)
+    {
+        const uint32_t sz = (uint32_t) bytes[pos + 4]        | ((uint32_t) bytes[pos + 5] << 8)
+                          | ((uint32_t) bytes[pos + 6] << 16) | ((uint32_t) bytes[pos + 7] << 24);
+        const size_t body = pos + 8;
+        if (std::memcmp(bytes + pos, "clm ", 4) == 0)
+        {
+            const size_t avail = std::min((size_t) sz, numBytes - body);
+            juce::String s (juce::CharPointer_UTF8 ((const char*) (bytes + body)),
+                            juce::CharPointer_UTF8 ((const char*) (bytes + body + avail)));
+            const int marker = s.indexOf("<!>");
+            return (marker >= 0 ? s.substring(marker + 3) : s).trimStart().getIntValue();
+        }
+        pos = body + sz + (sz & 1u);   // RIFF chunks are word-aligned (pad odd sizes)
+    }
+    return 0;
+}
 
 WavetableBank::WavetableBank()
 {
@@ -202,12 +234,19 @@ int WavetableBank::addFromWav(const void* wavData, size_t numBytes, const juce::
 
     const int total = (int) reader->lengthInSamples;
     const int ch    = (int) reader->numChannels;
-    if (total < kFrameSize || ch < 1) return -1;
+
+    // Prefer the frame size declared in Serum's "clm " chunk; accept it only if it's
+    // a power of two in range (FFT mip-mapping needs power-of-two), else use 2048.
+    int frameSize = parseSerumFrameSize(wavData, numBytes);
+    if (frameSize < kMinMipSize || frameSize > 8192 || (frameSize & (frameSize - 1)) != 0)
+        frameSize = kFrameSize;
+
+    if (total < frameSize || ch < 1) return -1;
 
     juce::AudioBuffer<float> buf(ch, total);
     reader->read(&buf, 0, total, 0, true, ch > 1);
 
-    const int usable = (total / kFrameSize) * kFrameSize;   // whole frames only
+    const int usable = (total / frameSize) * frameSize;   // whole frames only
     std::vector<float> mono((size_t) usable);
     for (int i = 0; i < usable; ++i)
     {
@@ -216,7 +255,7 @@ int WavetableBank::addFromWav(const void* wavData, size_t numBytes, const juce::
         mono[(size_t) i] = s / (float) ch;
     }
 
-    buildTable(mono, usable / kFrameSize, kFrameSize, name);
+    buildTable(mono, usable / frameSize, frameSize, name);
     return numTables() - 1;
 }
 
