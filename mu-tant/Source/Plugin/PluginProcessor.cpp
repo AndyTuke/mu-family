@@ -755,7 +755,20 @@ void PluginProcessor::applyVoicePresetTree(int voice, const juce::ValueTree& tre
     {
         paths[(size_t) voice] = path;
         int idx = -1;
-        if (path.isNotEmpty()) { juce::File f(path); if (f.existsAsFile()) { const juce::ScopedLock sl(voicesLock); idx = bank.addOrLoadFile(f); } }
+        if (path.isNotEmpty())
+        {
+            // Lock-free resolve first: the hot-swap stage already pre-loaded the
+            // table, so the boundary commit never takes voicesLock — taking it here
+            // would bail the audio render to silence for the coincident block (the
+            // intermittent swap pause). Fall back to the locked disk load only when
+            // not preloaded (stopped / immediate / host restore — audio silent then).
+            idx = bank.findByPath(path);
+            if (idx < 0)
+            {
+                juce::File f(path);
+                if (f.existsAsFile()) { const juce::ScopedLock sl(voicesLock); idx = bank.addOrLoadFile(f); }
+            }
+        }
         idxs[(size_t) voice].store(idx);
     };
     loadWt(tree.getProperty("o1WtPath").toString(), osc1UserPath, osc1UserIdx);
@@ -939,8 +952,16 @@ void PluginProcessor::readVoiceDataFromState()
             int idx = -1;
             if (path.isNotEmpty())
             {
-                juce::File f(path);
-                if (f.existsAsFile()) { const juce::ScopedLock sl(voicesLock); idx = bank.addOrLoadFile(f); }
+                // Lock-free resolve first (preloaded at hot-swap stage time); only
+                // fall back to the locked disk load when not already in the bank
+                // (stopped / immediate / host restore). Keeps the boundary commit
+                // off voicesLock so the audio render never bails → no swap pause.
+                idx = bank.findByPath(path);
+                if (idx < 0)
+                {
+                    juce::File f(path);
+                    if (f.existsAsFile()) { const juce::ScopedLock sl(voicesLock); idx = bank.addOrLoadFile(f); }
+                }
             }
             idxs[(size_t) v].store(idx);
         };
