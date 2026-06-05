@@ -22,6 +22,10 @@ public:
     explicit SettingsOverlay(PluginProcessor& proc);
 
     std::function<void()> onClose;
+    // Fired when the user opens a MIDI program-change table; the editor swaps in
+    // the shared mu-core overlay (showMidiPresets / showMidiFullPresets).
+    std::function<void()> onMidiPresetsClicked;   // Ch 1-8 → per-voice presets
+    std::function<void()> onFullPresetsClicked;   // Ch 9   → full presets
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -40,6 +44,13 @@ private:
 
     juce::Label    bpmLabel;
     NudgeInput     bpmInput { "BPM", 20, 300, 120 };
+
+    // ── MIDI Program Change (same model as mu-clid) ──────────────────────────
+    // Two tables: per-voice presets on Ch 1-8, full presets on Ch 9. The tables
+    // themselves are the shared mu-core overlays; these just open them.
+    juce::Label      midiPCLabel;
+    juce::TextButton midiPresetsBtn { "Voice Presets" };
+    juce::TextButton fullPresetsBtn { "Full Presets" };
 
     static constexpr int kHeaderH  = 44;
     static constexpr int kRowH     = 28;

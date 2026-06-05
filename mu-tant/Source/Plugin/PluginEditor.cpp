@@ -30,7 +30,22 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     // Basic settings page (master vol + UI size + BPM) behind the gear button.
     settingsOverlay.onClose = [this] { showSettings(false); };
+    // MIDI program-change tables — open the shared mu-core overlays (Ch 1-8 →
+    // per-voice presets, Ch 9 → full presets); their onClose returns to settings.
+    settingsOverlay.onMidiPresetsClicked = [this] { showSettings(false); showMidiPresets(true); };
+    settingsOverlay.onFullPresetsClicked = [this] { showSettings(false); showMidiFullPresets(true); };
     setSettingsOverlay(&settingsOverlay);
+
+    // Hot-swap commit refresh. A staged preset is applied on the message thread
+    // at the loop boundary (after the shell's synchronous onPresetLoaded has
+    // already run against the pre-swap state), so re-run the refresh here.
+    proc.onPresetSwapCommitted = [this] { onPresetLoaded({}); };
+    proc.onVoiceHotSwapCommitted = [this](int v)
+    {
+        voiceSidebar.refreshItems();              // glyph / colour may have changed
+        if (voicePanel.getVoice() == v)
+            voicePanel.setVoice(v);               // re-read knobs + wavetable dropdowns
+    };
 
     // Main area + mixer overlay (Stage A3 — channel strip lvl/pan/mute/solo
     // bound via apvts; FX send / sidechain knobs are visible but inert until
@@ -82,6 +97,14 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     voicePanel.setVoice(0);
     mixerOverlay.loadFromAPVTS();
     clearPresetDirty();
+}
+
+PluginEditor::~PluginEditor()
+{
+    // The processor can outlive the editor (DAW close-window-keep-plugin); clear
+    // the hot-swap callbacks so a boundary commit can't fire into a dead editor.
+    proc.onPresetSwapCommitted   = nullptr;
+    proc.onVoiceHotSwapCommitted = nullptr;
 }
 
 void PluginEditor::onPresetLoaded(const juce::File&)

@@ -9,6 +9,7 @@
 #include "Audio/InsertProcessor.h"           // mu-core: shared per-voice insert FX
 
 #include "Modulation/MuTantModSnap.h"
+#include "Plugin/VoiceHotSwapStager.h"       // mu-tant: preset hot-swap staging
 
 #include <array>
 #include <atomic>
@@ -64,7 +65,8 @@ struct VoiceRingBuffer
 };
 
 class PluginProcessor : public ProcessorBase,
-                        public juce::AudioProcessorValueTreeState::Listener
+                        public juce::AudioProcessorValueTreeState::Listener,
+                        public juce::AsyncUpdater
 {
 public:
     // Family parity with mu-clid (max 8 rhythms / 8 voices / 8 channels).
@@ -102,6 +104,11 @@ public:
 
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
+
+    // Message-thread: commit any hot-swap that reached its loop boundary, then
+    // drain the MIDI program-change queue. Triggered from processBlock via
+    // triggerAsyncUpdate() when the audio thread flags a boundary / a PC arrives.
+    void handleAsyncUpdate() override;
 
     // ── Internal transport (drives the gate engine + the gating timeline) ─────
     // mu-tant has no host-sync sequencer; the transport bar's play button starts
@@ -183,6 +190,14 @@ public:
     void              loadPreset(const juce::File& file) override;
     juce::StringArray loadCategoryList() const override;
 
+    // Fired (message thread, from handleAsyncUpdate) after a per-voice hot-swap
+    // commit finishes, so the editor can refresh that voice's panel + sidebar +
+    // wavetable dropdowns (state the APVTS round-trip doesn't cover by itself).
+    // Full-preset commits use ProcessorBase::onPresetSwapCommitted. The editor
+    // MUST clear this in its destructor: the processor can outlive the editor
+    // (DAW close-window-keep-plugin), and a swap firing into a dead editor is a UAF.
+    std::function<void(int voice)> onVoiceHotSwapCommitted;
+
     // Persist the UI scale selection (Medium / Large) so it survives a plugin
     // close/reopen. Writes to appSettings before delegating to the base class.
     void setUiScale(float scale) override;
@@ -217,9 +232,12 @@ public:
     }
 
 protected:
-    // MIDI program-change apply hooks — stubbed in the first stab (no preset I/O yet).
-    void applyMidiPresetSlot(int, const juce::File&) override {}
-    void applyFullMidiPreset(const juce::File&)      override {}
+    // MIDI program-change apply hooks (drained on the message thread). Ch 1-8 →
+    // per-voice preset into the matching slot; Ch 9 → full preset. Both entry
+    // points hot-swap (stage at the loop boundary when playing, apply immediately
+    // when stopped).
+    void applyMidiPresetSlot(int slot, const juce::File& f) override { loadVoicePreset(slot, f); }
+    void applyFullMidiPreset(const juce::File& f)           override { loadPreset(f); }
 
 private:
     VoiceConfig readConfig(int voiceIdx) const;
@@ -358,6 +376,23 @@ private:
     // path serialises one voice's modulators + gate alongside its params.
     void writeVoiceDataToState();
     void readVoiceDataFromState();
+
+    // ── Preset hot-swap (#880 full / #883 per-voice) ─────────────────────────
+    // loadPreset / loadVoicePreset stage the parsed tree when the transport is
+    // playing (commit at the loop boundary) and apply immediately when stopped.
+    // The apply bodies are factored out so the boundary commit (handleAsyncUpdate)
+    // and the immediate path share one code path.
+    VoiceHotSwapStager hotSwapStager;
+    // Previous block's play state (audio-thread only) — drives the playing→stopped
+    // edge that commits a staged swap on stop.
+    bool wasPlaying = false;
+    void applyFullPresetTree (const juce::ValueTree& state);          // replaceState + voice data + FX
+    void applyVoicePresetTree(int voice, const juce::ValueTree& tree); // .muPattern body, from a tree
+    // Warm the wavetable bank (dedup-by-path) for every user wavetable referenced
+    // by a staged tree, so the boundary commit does no disk I/O. Lock-safe vs the
+    // audio thread (bank append under voicesLock).
+    void preloadWavetablesFromState(const juce::ValueTree& state);     // full: walk <VoiceData>
+    void preloadWavetablesFromVoiceTree(const juce::ValueTree& voiceTree); // per-voice: o1/o2WtPath
 
     // Register mixer/FX param listeners + run an initial engine sync (JUCE
     // doesn't fire parameterChanged on construction or for unchanged values, so

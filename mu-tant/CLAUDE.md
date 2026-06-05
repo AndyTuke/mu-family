@@ -28,7 +28,9 @@ The editor inherits `mu-core/UI/EditorShellBase.h` — same TransportBar, About,
 - **Full preset system** — `getContentDir()` = `Documents/TDP/muTant`; full presets (`.muTant`) save/load the whole APVTS state (name/description/category) in `Presets/`, driven by the shared shell chrome
 - **Per-voice presets** (`.muPattern`, in `Voices/`) — save/load one voice's `v{N}_*` params via the shared `ChannelHeaderBar` Save/dropdown
 - **Modulator + gate + filter gate persistence** — each voice's `ControlSequence`s + `ModulationMatrix` + gate envelopes + filter envelopes serialised into `<VoiceData>` child of the APVTS state for full + `.muTant` presets, and into each `.muPattern`. New `probability`/`loopN`/`loopM` envelope fields serialised alongside the existing shape fields.
-- **Settings overlay** (`Source/UI/SettingsOverlay.{h,cpp}`) behind the gear button — master vol + UI size + BPM
+- **Preset hot-swap** — full presets (`loadPreset`) and per-voice `.muPattern` (`loadVoicePreset`) stage while the transport plays and commit at a loop boundary (voice 0's gate pattern for a full preset; the voice's own for a per-voice swap), so a switch is musically seamless; stopped → applies immediately. Product-side `Source/Plugin/{HotSwapBoundary,VoiceHotSwapStager}.h` (the mu-clid `HotSwapStager` is deliberately NOT centralised to mu-core — payload + boundary semantics are product-specific). `PluginProcessor` is a `juce::AsyncUpdater`; commits fire `onPresetSwapCommitted` / `onVoiceHotSwapCommitted` for the editor refresh
+- **MIDI program change → preset** (same model as mu-clid) — Ch 1-8 hot-swap the matching voice's `.muPattern`, Ch 9 hot-swaps the full `.muTant` preset, via the shared mu-core `MidiPresetMap` / `MidiFullPresetMap` + `scanMidiProgramChanges`. Configured from the SettingsOverlay "MIDI Prog. Change" row (Voice / Full Presets buttons → the shared `MidiPresetsPanel` / `MidiFullPresetsPanel`)
+- **Settings overlay** (`Source/UI/SettingsOverlay.{h,cpp}`) behind the gear button — master vol + UI size + BPM + MIDI program-change tables
 - Shared editor shell + chrome (TransportBar, About, StatusBar, MuLookAndFeel)
 - Unit tests on every build — across DSP / modulator / gating / insert subsystems
 
@@ -36,8 +38,6 @@ The editor inherits `mu-core/UI/EditorShellBase.h` — same TransportBar, About,
 - Wavetable mip-mapping for anti-aliasing
 - Linear cross-fade between adjacent wavetable frames at `position`
 - Per-envelope Probability + Loop-N-of-M are **implemented** (Arrow tool + properties strip). Remaining: "First-only" and "On-staged-for-change" are still deferred.
-- Pattern hot-swap timing (reuse mu-clid's `HotSwapStager` machinery)
-- Pattern hot-swap timing (reuse mu-clid's `HotSwapStager` machinery)
 
 ## Build targets
 

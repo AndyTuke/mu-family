@@ -144,6 +144,7 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/ApvtsLayoutTests.cpp      # real createParameterLayout coverage (#721)
     Source/Tests/SendFXSmokeTests.cpp      # FX-slot DSP smoke, ported from mu-clid (#721)
     Source/Tests/PluginTransportTests.cpp  # host-playhead→gate contract; regression guard for #837
+    Source/Tests/HotSwapBoundaryTests.cpp  # hot-swap boundary predicates + stager handshake (#880/#883)
     Source/UI/GatingDesigner.cpp
     Source/Sequencer/GatePattern.cpp
     Source/Audio/WavetableBank.cpp

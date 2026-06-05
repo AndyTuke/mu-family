@@ -39,6 +39,13 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     bpmInput.setValue((int) proc.getInternalBpm());
     bpmInput.onChange = [this](int v) { proc.setInternalBpm((double) v); };
     addAndMakeVisible(bpmInput);
+
+    // ── MIDI Program Change (Ch 1-8 → voice presets, Ch 9 → full presets) ────
+    setupLabel(midiPCLabel, "MIDI Prog. Change");
+    midiPresetsBtn.onClick = [this] { if (onMidiPresetsClicked) onMidiPresetsClicked(); };
+    fullPresetsBtn.onClick = [this] { if (onFullPresetsClicked) onFullPresetsClicked(); };
+    addAndMakeVisible(midiPresetsBtn);
+    addAndMakeVisible(fullPresetsBtn);
 }
 
 void SettingsOverlay::paint(juce::Graphics& g)
@@ -91,6 +98,14 @@ void SettingsOverlay::resized()
 
     bpmLabel.setBounds(colX, y, labelW, rowH);
     bpmInput.setBounds(colX + labelW + gap, y, s(90), rowH);
+    y += rowH + rowGap;
+
+    // MIDI Program Change — label on the left, two buttons sharing the control column.
+    midiPCLabel.setBounds(colX, y, labelW, rowH);
+    const int btnGap = s(8);
+    const int btnW   = (ctrlW - btnGap) / 2;
+    midiPresetsBtn.setBounds(colX + labelW + gap,                 y, btnW, rowH);
+    fullPresetsBtn.setBounds(colX + labelW + gap + btnW + btnGap, y, btnW, rowH);
 }
 
 } // namespace mu_tant

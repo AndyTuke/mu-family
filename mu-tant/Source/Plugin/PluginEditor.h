@@ -18,7 +18,7 @@ class PluginEditor : public EditorShellBase
 {
 public:
     explicit PluginEditor(PluginProcessor&);
-    ~PluginEditor() override = default;
+    ~PluginEditor() override;
 
     // Refresh the voice panel (insert algo + knobs) and mixer after a full preset load.
     void onPresetLoaded(const juce::File&) override;

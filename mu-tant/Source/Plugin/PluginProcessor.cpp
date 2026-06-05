@@ -62,6 +62,18 @@ PluginProcessor::PluginProcessor()
         uiScale = juce::jlimit(kUiScaleMedium, kUiScaleLarge, (float) stored);
     }
 
+    // MIDI program-change preset maps (Ch 1-8 → per-voice .muPattern, Ch 9 →
+    // full .muTant preset). The scan/drain machinery + the editor panels live in
+    // mu-core; we only point the maps at the plugin's settings dir + load them.
+    // Mirrors mu-clid.
+    {
+        const auto settingsDir = appSettings->getFile().getParentDirectory();
+        midiPresetMap    .setStorageFile(settingsDir.getChildFile("muTant_midiPresets.json"));
+        midiFullPresetMap.setStorageFile(settingsDir.getChildFile("muTant_midiFullPresets.json"));
+        midiPresetMap    .load();
+        midiFullPresetMap.load();
+    }
+
     bank.loadFactoryBank();      // multi-table, mip-mapped factory wavetable bank
     for (int v = 0; v < kMaxVoices; ++v)
     {
@@ -96,6 +108,7 @@ PluginProcessor::PluginProcessor()
 
 PluginProcessor::~PluginProcessor()
 {
+    cancelPendingUpdate();   // no hot-swap / MIDI drain fires into a half-destroyed processor
     for (auto* p : getParameters())
         if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
         {
@@ -233,11 +246,17 @@ VoiceConfig PluginProcessor::readConfig(int voiceIdx) const
     return c;
 }
 
-void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
     const int numSamples = buffer.getNumSamples();
     buffer.clear();
+
+    // MIDI program-change → preset load. Enqueue matching PCs (Ch 1-8 per-voice,
+    // Ch 9 full) into the lock-free FIFO; handleAsyncUpdate drains them. Done
+    // before the voicesTryLock so PCs aren't dropped during a voice add/remove.
+    if (scanMidiProgramChanges(midiMessages))
+        triggerAsyncUpdate();
 
     // Exclude the audio thread while a voice is being added/removed (the message
     // thread holds voicesLock + shifts per-voice data). On contention, output a
@@ -296,13 +315,30 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // 16 bars in 4/4) to keep floating-point precision bounded across long sessions.
     // Each GatePattern wraps internally at its own patternLengthBars, so the global
     // counter just needs a ceiling above the maximum drawable length.
+    const double oldPos    = blkBeatStart;
+    double       newPosRaw = oldPos;   // pre-ceiling advanced position for boundary detection
     if (blkPlaying)
     {
-        double pos = blkBeatStart + blkBeatsPerSample * (double) numSamples;
+        newPosRaw = oldPos + blkBeatsPerSample * (double) numSamples;
+        double pos = newPosRaw;
         constexpr double kMaxPatBeats = (double) GatePattern::kMaxPatternBars * 4.0; // 64
         if (pos >= kMaxPatBeats) pos -= kMaxPatBeats;
         internalBeatPos.store(pos, std::memory_order_relaxed);
     }
+
+    // Hot-swap boundary check: a staged preset commits when its reference pattern
+    // wraps (voice's own length for a per-voice swap, voice 0's for a full preset)
+    // or on the playing→stopped edge. Uses the RAW pre-ceiling position so the
+    // loop-index test holds for pattern lengths that don't divide 64. Only flags
+    // when something is staged; commit happens on the message thread.
+    std::array<double, VoiceHotSwapStager::kMaxVoices> voicePatBeats {};
+    for (int v = 0; v < VoiceHotSwapStager::kMaxVoices; ++v)
+        voicePatBeats[(size_t) v] = (double) gatePatterns[(size_t) v].patternLengthBars * 4.0;
+    const double fullPatBeats = voicePatBeats[0];   // voice-0 reference for full presets
+    if (hotSwapStager.checkBoundaries(numActiveVoices, blkPlaying, wasPlaying,
+                                      oldPos, newPosRaw, voicePatBeats, fullPatBeats))
+        triggerAsyncUpdate();
+    wasPlaying = blkPlaying;
 }
 
 void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
@@ -513,14 +549,7 @@ void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
 void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
-    {
-        const juce::ScopedLock sl(voicesLock);
-        apvts.replaceState(juce::ValueTree::fromXml(*xml));
-        numVoices.store(juce::jlimit(1, kMaxVoices, (int) apvts.state.getProperty("numVoices", 1)));
-        restoreVoiceColours(apvts.state.getProperty("voiceColours", "").toString());
-        readVoiceDataFromState();
-        syncAllFxParams();   // re-seed mixer/FX engine state (unchanged values skip listeners)
-    }
+        applyFullPresetTree(juce::ValueTree::fromXml(*xml));   // host state restore — always immediate
 }
 
 // ── Dynamic voice management ─────────────────────────────────────────────────
@@ -673,36 +702,56 @@ void PluginProcessor::saveVoicePreset(int voice, const juce::String& name)
 
 void PluginProcessor::loadVoicePreset(int voice, const juce::File& file)
 {
-    if (! file.existsAsFile()) return;
+    if (voice < 0 || voice >= kMaxVoices || ! file.existsAsFile()) return;
     auto xml = juce::XmlDocument::parse(file);
     if (xml == nullptr || ! xml->hasTagName("MuTantVoice"))
     {
         if (onLoadError) onLoadError("Could not read \"" + file.getFileName() + "\"");
         return;
     }
+    auto tree = juce::ValueTree::fromXml(*xml);
+
+    // Hot-swap: while playing, stage and commit at THIS voice's own loop boundary
+    // (handleAsyncUpdate); while stopped, apply immediately. Referenced wavetables
+    // are pre-loaded into the bank now so the boundary commit does no disk I/O.
+    if (isInternalPlaying())
+    {
+        preloadWavetablesFromVoiceTree(tree);
+        hotSwapStager.stageVoice(voice, std::move(tree));
+    }
+    else
+    {
+        applyVoicePresetTree(voice, tree);
+    }
+}
+
+// Apply a per-voice (.muPattern) preset from a parsed tree (shared by the
+// stopped load + the boundary commit). Per-pattern spinlocks guard the audio
+// thread, so no voicesLock is needed here.
+void PluginProcessor::applyVoicePresetTree(int voice, const juce::ValueTree& tree)
+{
+    if (voice < 0 || voice >= kMaxVoices) return;
     const juce::String prefix = juce::String("v") + juce::String(voice) + "_";
-    for (auto* e : xml->getChildIterator())
-        if (e->hasTagName("p"))
-            if (auto* p = apvts.getParameter(prefix + e->getStringAttribute("id")))
-                p->setValueNotifyingHost((float) e->getDoubleAttribute("v"));
 
-    // Restore this voice's modulators + gate (per-voice spinlocks inside guard the
-    // audio thread, so no suspend/voicesLock needed). Absent children → cleared.
+    // Params — voice-agnostic base id → v{voice}_ param, normalised 0..1.
+    for (int i = 0; i < tree.getNumChildren(); ++i)
+    {
+        const auto child = tree.getChild(i);
+        if (child.hasType(juce::Identifier("p")))
+            if (auto* p = apvts.getParameter(prefix + child.getProperty("id").toString()))
+                p->setValueNotifyingHost((float) (double) child.getProperty("v"));
+    }
+
+    // Modulators + gate / filter / pitch envelopes (live outside APVTS). Absent
+    // children → cleared (getChildWithName returns an invalid tree).
     mu_pp::clearModulators(voiceSlots[(size_t) voice]);
-    auto* modsXml = xml->getChildByName("Modulators");
-    mu_pp::deserialiseModulators(modsXml ? juce::ValueTree::fromXml(*modsXml) : juce::ValueTree{},
+    mu_pp::deserialiseModulators(tree.getChildWithName("Modulators"),
                                  voiceSlots[(size_t) voice], {}, isValidModDest);
-    auto* gateXml = xml->getChildByName("Gate");
-    deserialiseGate(gateXml ? juce::ValueTree::fromXml(*gateXml) : juce::ValueTree{},
-                    gatePatterns[(size_t) voice]);
-    auto* fGateXml = xml->getChildByName("FilterGate");
-    deserialiseGate(fGateXml ? juce::ValueTree::fromXml(*fGateXml) : juce::ValueTree{},
-                    filterPatterns[(size_t) voice]);
-    auto* pGateXml = xml->getChildByName("PitchGate");
-    deserialiseGate(pGateXml ? juce::ValueTree::fromXml(*pGateXml) : juce::ValueTree{},
-                    pitchPatterns[(size_t) voice]);
+    deserialiseGate(tree.getChildWithName("Gate"),       gatePatterns[(size_t) voice]);
+    deserialiseGate(tree.getChildWithName("FilterGate"), filterPatterns[(size_t) voice]);
+    deserialiseGate(tree.getChildWithName("PitchGate"),  pitchPatterns[(size_t) voice]);
 
-    // User wavetable paths — resolve to bank indices (missing → clear to factory).
+    // User wavetable paths → bank indices (missing file → clear to factory).
     auto loadWt = [this, voice](const juce::String& path,
                                 std::array<juce::String, kMaxVoices>& paths,
                                 std::array<std::atomic<int>, kMaxVoices>& idxs)
@@ -712,8 +761,56 @@ void PluginProcessor::loadVoicePreset(int voice, const juce::File& file)
         if (path.isNotEmpty()) { juce::File f(path); if (f.existsAsFile()) { const juce::ScopedLock sl(voicesLock); idx = bank.addOrLoadFile(f); } }
         idxs[(size_t) voice].store(idx);
     };
-    loadWt(xml->getStringAttribute("o1WtPath"), osc1UserPath, osc1UserIdx);
-    loadWt(xml->getStringAttribute("o2WtPath"), osc2UserPath, osc2UserIdx);
+    loadWt(tree.getProperty("o1WtPath").toString(), osc1UserPath, osc1UserIdx);
+    loadWt(tree.getProperty("o2WtPath").toString(), osc2UserPath, osc2UserIdx);
+}
+
+// Warm the wavetable bank (dedup-by-path, append under voicesLock) for the user
+// wavetables a staged voice tree references, so the boundary commit is disk-free.
+void PluginProcessor::preloadWavetablesFromVoiceTree(const juce::ValueTree& voiceTree)
+{
+    auto warm = [this](const juce::String& path)
+    {
+        if (path.isEmpty()) return;
+        juce::File f(path);
+        if (f.existsAsFile()) { const juce::ScopedLock sl(voicesLock); bank.addOrLoadFile(f); }
+    };
+    warm(voiceTree.getProperty("o1WtPath").toString());
+    warm(voiceTree.getProperty("o2WtPath").toString());
+}
+
+// Same, for a full preset: each <VoiceData>/<Voice> carries o1WtPath / o2WtPath.
+void PluginProcessor::preloadWavetablesFromState(const juce::ValueTree& state)
+{
+    auto vd = state.getChildWithName("VoiceData");
+    for (int i = 0; i < vd.getNumChildren(); ++i)
+    {
+        const auto voice = vd.getChild(i);
+        if (voice.hasType(juce::Identifier("Voice")))
+            preloadWavetablesFromVoiceTree(voice);
+    }
+}
+
+void PluginProcessor::handleAsyncUpdate()
+{
+    // Commit any hot-swap that reached its loop boundary. The full preset commits
+    // first (it supersedes per-voice swaps), then each flagged per-voice swap.
+    juce::ValueTree tree;
+    if (hotSwapStager.takeFull(tree))
+    {
+        applyFullPresetTree(tree);
+        if (onPresetSwapCommitted) onPresetSwapCommitted();
+    }
+    for (int v = 0; v < kMaxVoices; ++v)
+        if (hotSwapStager.takeVoice(v, tree))
+        {
+            applyVoicePresetTree(v, tree);
+            if (onVoiceHotSwapCommitted) onVoiceHotSwapCommitted(v);
+        }
+
+    // Drain the MIDI program-change queue → applyMidiPresetSlot / applyFullMidiPreset
+    // (which themselves hot-swap: stage while playing, apply while stopped).
+    drainPendingMidiProgramChanges();
 }
 
 void PluginProcessor::loadUserWavetable(int voice, int oscIdx, const juce::File& file)
@@ -944,12 +1041,32 @@ void PluginProcessor::loadPreset(const juce::File& file)
         if (onLoadError) onLoadError("Preset has no saved state");
         return;
     }
+    auto state = juce::ValueTree::fromXml(*stateXml);
 
-    // Swap the tree under voicesLock — the audio thread tryLocks it in
-    // processBlock and outputs a silent block on contention, so the swap is
-    // exclusive. Same guard as setStateInformation (one mechanism, not two).
+    // Hot-swap: while the transport is playing, stage the parsed state and commit
+    // it at voice 0's next loop boundary (handleAsyncUpdate) so the switch is
+    // musically seamless; while stopped, apply immediately. Wavetables referenced
+    // by the staged state are pre-loaded into the bank now so the boundary commit
+    // does no disk I/O.
+    if (isInternalPlaying())
+    {
+        preloadWavetablesFromState(state);
+        hotSwapStager.stageFull(std::move(state));
+    }
+    else
+    {
+        applyFullPresetTree(state);
+    }
+}
+
+// Apply a full preset's APVTS state immediately (the shared commit path for the
+// stopped load, the boundary commit, and host state restore). Swaps the tree
+// under voicesLock — the audio thread tryLocks it in processBlock and outputs a
+// silent block on contention, so the swap is exclusive.
+void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
+{
     const juce::ScopedLock sl(voicesLock);
-    apvts.replaceState(juce::ValueTree::fromXml(*stateXml));
+    apvts.replaceState(state);
     numVoices.store(juce::jlimit(1, kMaxVoices, (int) apvts.state.getProperty("numVoices", 1)));
     restoreVoiceColours(apvts.state.getProperty("voiceColours", "").toString());
     readVoiceDataFromState();
