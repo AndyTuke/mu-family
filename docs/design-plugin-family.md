@@ -291,13 +291,24 @@ a third concrete user exists. The two implementations:
 4. **Advance the transport / boundary detection OUTSIDE the render lock.** If the
    render bails on a lock, the transport must still advance — otherwise a commit
    freezes the playhead.
-5. **Resolve shared resources lock-free at commit.** mu-tant's hard-won lesson
-   (#886): resolving a wavetable via `bank.addOrLoadFile()` (which takes the bank
-   lock) *at commit* makes the render bail to silence for the coincident block — an
-   *intermittent* pause. Pre-load the resource at **stage** time and resolve it at
-   commit with a lock-free lookup (`findByPath`). **Any** lock held during the
-   commit, however briefly, can silence the render for a block.
-6. **Editor refresh after commit** via `ProcessorBase::onPresetSwapCommitted` (full)
+5. **Resolve shared resources lock-free at commit, and decode/build them off the
+   lock at stage.** mu-tant's hard-won lesson (#886/#888): (a) resolving a wavetable
+   via `bank.addOrLoadFile()` (which takes the bank lock) *at commit* makes the render
+   bail to silence for the coincident block; pre-load at **stage** and resolve at
+   commit with a lock-free lookup (`findByPath`). (b) Even at *stage* time, don't do
+   the heavy decode/build **under** the lock — that silences the render for the whole
+   decode (an intermittent pause when staging a new resource while playing). Split the
+   resource load into a lock-free **decode** (`WavetableBank::decodeFile`) and a
+   microsecond locked **append** (`appendTable`). **Any** lock held around slow work,
+   stage or commit, can silence the render for as long as it's held.
+6. **Readiness gate — never commit a half-built payload.** Set the staging `isReady`
+   store-release flag **only after** the entire payload is prepared; the audio-thread
+   boundary check must only flag swaps whose `isReady` is true. Then if a loop
+   boundary arrives before the new state is ready, it is skipped and the swap commits
+   at the next loop point — the commit never blocks the audio thread waiting on a
+   build, and never installs a partial payload. (This also makes a future background
+   decode safe with no extra machinery.)
+7. **Editor refresh after commit** via `ProcessorBase::onPresetSwapCommitted` (full)
    and a product per-layer callback (`onRhythmHotSwapCommitted` /
    `onVoiceHotSwapCommitted`) — the shell calls `onPresetLoaded` *synchronously*
    after `loadPreset`, which for a staged swap runs against pre-swap state, so the

@@ -88,6 +88,14 @@ handleAsyncUpdate()
   (`isReady`, `boundaryReached`). The *payloads* are never touched by the audio
   thread.
 - **No lock is held during `stage()`** — the `isReady` store-release is the barrier.
+- **Readiness gate (no half-ready commit).** `isReady` is set **only after the whole
+  payload is built** (parse + `VoiceEngine` + sample/wavetable load), and
+  `checkBoundaries` only ever flags a swap whose `isReady` is true. So if a loop
+  boundary arrives while the build is still running, that boundary is **skipped** and
+  the swap commits at the *next* loop point — the commit can never fire on a
+  half-prepared payload, and it never blocks the audio thread waiting for a build.
+  (This is why the build can safely move to a background thread in future: the gate
+  already handles "not ready at cutover".)
 - `processSwaps()` is the only place the live slots change, under
   `suspendProcessing` (stops future blocks) **+** `rhythmsLock` (serialises with any
   in-flight block — suspend alone does not block an already-running `processBlock`,

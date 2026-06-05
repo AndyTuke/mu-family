@@ -782,8 +782,17 @@ void PluginProcessor::preloadWavetablesFromVoiceTree(const juce::ValueTree& voic
     auto warm = [this](const juce::String& path)
     {
         if (path.isEmpty()) return;
+        if (bank.findByPath(path) >= 0) return;       // already in the bank — nothing to do
         juce::File f(path);
-        if (f.existsAsFile()) { const juce::ScopedLock sl(voicesLock); bank.addOrLoadFile(f); }
+        if (! f.existsAsFile()) return;
+        // Decode (file read + WAV decode + FFT mip build) OFF the lock — this is the
+        // slow part. Only the brief append takes voicesLock, so the audio render is
+        // excluded for microseconds, not for the whole decode (the residual swap
+        // pause: decoding under the lock silenced the render for the decode duration).
+        auto wt = bank.decodeFile(f);
+        if (wt.frames <= 0) return;
+        const juce::ScopedLock sl(voicesLock);
+        if (bank.findByPath(path) < 0) bank.appendTable(std::move(wt));   // defensive re-check
     };
     warm(voiceTree.getProperty("o1WtPath").toString());
     warm(voiceTree.getProperty("o2WtPath").toString());

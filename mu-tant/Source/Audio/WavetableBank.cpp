@@ -173,10 +173,10 @@ void WavetableBank::synthFactoryFrame(Factory kind, float m, float* out, int siz
 // ── Mip building ────────────────────────────────────────────────────────────────
 // For each frame: FFT once, then per mip level zero the bins above that octave's
 // harmonic ceiling, inverse FFT, and decimate to the level's (smaller) table size.
-void WavetableBank::buildTable(const std::vector<float>& fullRes, int frameCount,
-                               int frameSize, const juce::String& name)
+Wavetable WavetableBank::buildTableData(const std::vector<float>& fullRes, int frameCount,
+                                        int frameSize, const juce::String& name) const
 {
-    if (frameCount <= 0 || frameSize < kMinMipSize) return;
+    if (frameCount <= 0 || frameSize < kMinMipSize) return {};   // frames == 0 → failure
 
     Wavetable wt;
     wt.name   = name;
@@ -222,15 +222,25 @@ void WavetableBank::buildTable(const std::vector<float>& fullRes, int frameCount
     for (float v : wt.mip[0]) pk = std::max(pk, std::abs(v));
     if (pk > 1.0e-6f) { const float g = 1.0f / pk; for (auto& lvl : wt.mip) for (float& v : lvl) v *= g; }
 
-    tables.push_back(std::move(wt));
+    return wt;
+}
+
+// Append path used by the factory / ctor build (no audio thread running).
+void WavetableBank::buildTable(const std::vector<float>& fullRes, int frameCount,
+                               int frameSize, const juce::String& name)
+{
+    auto wt = buildTableData(fullRes, frameCount, frameSize, name);
+    if (wt.frames > 0) tables.push_back(std::move(wt));
 }
 
 // ── WAV ingestion ─────────────────────────────────────────────────────────────
-int WavetableBank::addFromWav(const void* wavData, size_t numBytes, const juce::String& name)
+// Decode a mono Serum/Vital WAV into a Wavetable WITHOUT touching the bank (pure
+// aside from the format reader) — safe to run off any lock.
+Wavetable WavetableBank::decodeWavData(const void* wavData, size_t numBytes, const juce::String& name)
 {
     auto stream = std::make_unique<juce::MemoryInputStream>(wavData, numBytes, false);
     std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(std::move(stream)));
-    if (reader == nullptr) return -1;
+    if (reader == nullptr) return {};
 
     const int total = (int) reader->lengthInSamples;
     const int ch    = (int) reader->numChannels;
@@ -241,7 +251,7 @@ int WavetableBank::addFromWav(const void* wavData, size_t numBytes, const juce::
     if (frameSize < kMinMipSize || frameSize > 8192 || (frameSize & (frameSize - 1)) != 0)
         frameSize = kFrameSize;
 
-    if (total < frameSize || ch < 1) return -1;
+    if (total < frameSize || ch < 1) return {};
 
     juce::AudioBuffer<float> buf(ch, total);
     reader->read(&buf, 0, total, 0, true, ch > 1);
@@ -255,17 +265,44 @@ int WavetableBank::addFromWav(const void* wavData, size_t numBytes, const juce::
         mono[(size_t) i] = s / (float) ch;
     }
 
-    buildTable(mono, usable / frameSize, frameSize, name);
+    return buildTableData(mono, usable / frameSize, frameSize, name);
+}
+
+// Append path: decode (under the caller's lock) then push. Kept for the immediate /
+// stopped load + tests. The hot-swap preload uses decodeFile + appendTable instead,
+// to keep the decode off the lock.
+int WavetableBank::addFromWav(const void* wavData, size_t numBytes, const juce::String& name)
+{
+    auto wt = decodeWavData(wavData, numBytes, name);
+    if (wt.frames <= 0) return -1;
+    tables.push_back(std::move(wt));
+    return numTables() - 1;
+}
+
+// Decode a file into a tagged Wavetable WITHOUT touching the bank — safe off-lock.
+Wavetable WavetableBank::decodeFile(const juce::File& file)
+{
+    juce::MemoryBlock mb;
+    if (! file.loadFileAsData(mb)) return {};
+    auto wt = decodeWavData(mb.getData(), mb.getSize(), file.getFileNameWithoutExtension());
+    if (wt.frames > 0) wt.sourcePath = file.getFullPathName();   // tag for dedup + persistence
+    return wt;
+}
+
+// Install a pre-decoded table. Caller holds the bank lock (voicesLock) for the brief
+// push; returns the new index, or -1 for an empty/failed decode.
+int WavetableBank::appendTable(Wavetable&& wt)
+{
+    if (wt.frames <= 0) return -1;
+    tables.push_back(std::move(wt));
     return numTables() - 1;
 }
 
 int WavetableBank::addFromFile(const juce::File& file)
 {
-    juce::MemoryBlock mb;
-    if (! file.loadFileAsData(mb)) return -1;
-    const int idx = addFromWav(mb.getData(), mb.getSize(), file.getFileNameWithoutExtension());
-    if (idx >= 0) tables[(size_t) idx].sourcePath = file.getFullPathName();   // tag for dedup + persistence
-    return idx;
+    auto wt = decodeFile(file);
+    if (wt.frames <= 0) return -1;
+    return appendTable(std::move(wt));
 }
 
 int WavetableBank::findByPath(const juce::String& absolutePath) const noexcept

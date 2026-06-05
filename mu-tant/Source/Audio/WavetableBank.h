@@ -61,6 +61,17 @@ public:
     int  findByPath(const juce::String& absolutePath) const noexcept;
     int  addOrLoadFile(const juce::File& file);
 
+    // ── Two-phase load for a real-time-safe hot-swap preload (#888) ─────────────
+    // decodeFile does ALL the slow work (file read + WAV decode + FFT mip build)
+    // into a returned Wavetable WITHOUT touching the bank, so it runs off any lock;
+    // appendTable then installs a pre-decoded table (caller holds the bank lock only
+    // for the brief push). The hot-swap stage decodes off-lock then appends under a
+    // microsecond lock — instead of decoding under the lock, which silenced the audio
+    // render for the whole decode (the residual ~1-in-10 swap pause). Returns a table
+    // with frames == 0 on failure.
+    Wavetable decodeFile(const juce::File& file);
+    int       appendTable(Wavetable&& wt);   // returns the new index (caller locks)
+
     int  numTables() const noexcept { return (int) tables.size(); }
     const juce::String& tableName(int t) const noexcept;
     int  numFrames(int t) const noexcept;
@@ -86,9 +97,15 @@ private:
     juce::AudioFormatManager formatManager;
 
     // Build all mip levels for a table from `frameCount` full-res frames of
-    // `frameSize` samples (row-major), normalise, and append.
-    void buildTable(const std::vector<float>& fullRes, int frameCount, int frameSize,
-                    const juce::String& name);
+    // `frameSize` samples (row-major) and normalise. buildTableData returns the
+    // table without touching the bank (pure — safe off any lock); buildTable
+    // appends it (factory / ctor path, no audio thread). decodeWavData decodes a
+    // mono WAV into a table (no bank access).
+    Wavetable buildTableData(const std::vector<float>& fullRes, int frameCount, int frameSize,
+                             const juce::String& name) const;
+    void      buildTable(const std::vector<float>& fullRes, int frameCount, int frameSize,
+                         const juce::String& name);
+    Wavetable decodeWavData(const void* wavData, size_t numBytes, const juce::String& name);
 
     int mipForInc(const Wavetable& wt, double inc) const noexcept;
 
