@@ -43,6 +43,7 @@ The editor shell (TransportBar, About, Save, PresetBrowser, MIDI-preset panels, 
 | [docs/mu-clid/design-voice.md](../docs/mu-clid/design-voice.md) | Voice chain, ADSR, filter, interpolation quality, sample handling, time stretching (TimeStretcherBase) |
 | [docs/mu-clid/design-ui.md](../docs/mu-clid/design-ui.md) | μ-Clid specific panel layouts — RhythmCircle, EuclideanPanel, Mixer, Transport. Defers to design-ui-family.md for colours/sizes. |
 | [docs/mu-clid/design-presets.md](../docs/mu-clid/design-presets.md) | APVTS wiring plan, preset storage, save/restore |
+| [docs/mu-clid/design-hotswap.md](../docs/mu-clid/design-hotswap.md) | **Seamless preset/rhythm hot-swap** — `HotSwapStager`, boundary detection, retire-then-swap voice tail, threading contract. Read before touching staging, `PresetIO` commit, or the retired-voice path. |
 | [docs/mu-clid/preset-format.md](../docs/mu-clid/preset-format.md) | **Preset format reference** — `.muRhythm` / `.muClid` XML schemas, versioning, ParamKind tags, algorithm-name contracts. Read when editing presets by hand or adding a new persisted parameter. |
 | [docs/mu-clid/TestPlan.md](../docs/mu-clid/TestPlan.md) | 25-step manual smoke walkthrough of the μ-Clid standalone UI. |
 | [docs/mu-clid/archive/](../docs/mu-clid/archive/) | Closed μ-Clid stage plans + one-shot audits. Read only if revisiting historical decisions. |

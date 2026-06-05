@@ -90,7 +90,7 @@ The standard mu platform is everything in `mu-core/`. New products link `mu-core
 - `Modulation/ModulationMatrix` + `Sequencer/ControlSequence` — modulation system. Product's slot type inherits `Sequencer/VoiceSlot`. `Modulation/ModulatorSerialise.h` is the shared (de)serialise for a `VoiceSlot`'s ControlSequences + matrix assignments (products inject their own source/dest ID validators).
 - `UI/Components/` — every standard widget (knob, dropdown, segment, step editor, LFO editor, VU meter, status bar).
 - `UI/MixerChannel`, `UI/MixerOverlay`, `UI/FXRow`, `UI/DelayRow` — shared mixer + FX panels.
-- `UI/ChannelSidebar` + `UI/SidebarItem` — the shared left "layers" sidebar (select / add / delete / drag-reorder). Reads channel metadata from `ProcessorBase::getNumChannels/getChannelName/getChannelColourIndex`. The per-layer mini-graphic (and its animation) is the only product-specific part, injected via `createMiniVisual` (mu-clid → `RhythmMiniVisual` wrapping a `RhythmCircle`; mu-tant → a voice glyph). Reorder + hot-swap semantics are product hooks (`onSwapChannels`, `isPendingSwap`, `onCancelPendingSwap`) so a product without hot-swap (mu-tant) leaves them null. Add/delete is driven by the product (`onAddChannel` + a panel delete button → `addVoice`/`removeVoice` in mu-tant, `addRhythm`/`removeRhythm` in mu-clid).
+- `UI/ChannelSidebar` + `UI/SidebarItem` — the shared left "layers" sidebar (select / add / delete / drag-reorder). Reads channel metadata from `ProcessorBase::getNumChannels/getChannelName/getChannelColourIndex`. The per-layer mini-graphic (and its animation) is the only product-specific part, injected via `createMiniVisual` (mu-clid → `RhythmMiniVisual` wrapping a `RhythmCircle`; mu-tant → a voice glyph). Reorder + hot-swap semantics are product hooks (`onSwapChannels`, `isPendingSwap`, `onCancelPendingSwap`) wired by each product to its own stager (both mu-clid and mu-tant implement hot-swap — see [Hot-swap](#hot-swap-staged-preset--layer-swaps-family-pattern) below). Add/delete is driven by the product (`onAddChannel` + a panel delete button → `addVoice`/`removeVoice` in mu-tant, `addRhythm`/`removeRhythm` in mu-clid).
 - `UI/ChannelHeaderBar` — the shared per-layer header (colour dot · editable name · reset · delete · per-layer preset dropdown · Save). Product wires the callbacks to its own reset / delete / preset / rename semantics.
 - `UI/Voice/InsertSubsection` — the shared insert-effect voice subsection (algorithm dropdown + 4 generic slot knobs), bound to a channel via a constructor prefix (`"r"` / `"v"`); optional product hooks for mod-arc indicators, the Comp/Limiter GR meter, and the algo-switch bulk-write wrapper. Part of the voice section (engine → insert → mixer).
 
@@ -251,9 +251,70 @@ The shared visual identity (`MuLookAndFeel`) ensures a consistent look across al
 
 ---
 
+## Hot-swap (staged preset / layer swaps) — family pattern
+
+Both products load presets *while playing* without an audible glitch by **staging**
+the incoming state and **committing it at a musical loop boundary**. The pattern is
+shared; the implementation is **product-side** (a deliberate exception to the
+centralise-to-mu-core rule).
+
+**Why product-side, not mu-core.** mu-clid's `HotSwapStager` payload (`Rhythm` +
+`VoiceEngine` + sample paths) and boundary semantics (`swapMode`, per-rhythm
+`rhythmLoopWrapMask`, master loop) are entirely mu-clid concepts; mu-tant's payload
+is a parsed APVTS `ValueTree` + per-voice `GatePattern`/modulator data and its
+boundary is a gate-pattern wrap. Only the ~30-line store-release/load-acquire
+*handshake* is common. A generic `mu-core BoundaryStager<Payload>` is deferred until
+a third concrete user exists. The two implementations:
+
+| | mu-clid | mu-tant |
+|---|---|---|
+| Deep-dive doc | [mu-clid/design-hotswap.md](mu-clid/design-hotswap.md) | — (this section + the mu-clid doc) |
+| Stager | `HotSwapStager` (`Rhythm` + `VoiceEngine` payload) | `VoiceHotSwapStager` (`ValueTree` payload) |
+| Boundary predicates | `HotSwapBoundary.h` (`mu_clid::hotswap`) | `HotSwapBoundary.h` (`mu_tant::hotswap`) |
+| Reference boundary | master loop / per-rhythm wrap (`swapMode`) | full preset → voice 0's gate-pattern wrap; per-voice → that voice's own wrap |
+| Commit isolation | `suspendProcessing` + `rhythmsLock`, microseconds (heavy work pre-built at stage) | **no blanket lock** — relies on the audio render's existing fine-grained locks |
+
+**Shared principles (hold for any future product):**
+
+1. **All heavy work at stage time, off the audio thread** — parse, build engines,
+   load samples/wavetables. The commit is only fast in-memory moves / atomic stores.
+2. **Stopped = commit immediately; playing = stage + commit at the boundary** — same
+   build + same commit code, only the trigger differs (no divergent second path).
+3. **The commit must not block the audio thread for more than ~1 block.** Two
+   product-specific ways to achieve it:
+   - mu-clid pre-builds the `VoiceEngine` and the commit is a pointer/`std::move`
+     swap under a microsecond `suspendProcessing`; the **old engine is retired and
+     plays out its tail** (see the mu-clid doc §8) rather than being hard-cut.
+   - mu-tant takes **no blanket lock** at commit at all — each structure it mutates
+     is already guarded by its own fine-grained lock the audio render respects
+     (APVTS params atomic; `GatePattern.editLock`; `VoiceSlot.modLock`; bank append).
+4. **Advance the transport / boundary detection OUTSIDE the render lock.** If the
+   render bails on a lock, the transport must still advance — otherwise a commit
+   freezes the playhead.
+5. **Resolve shared resources lock-free at commit.** mu-tant's hard-won lesson
+   (#886): resolving a wavetable via `bank.addOrLoadFile()` (which takes the bank
+   lock) *at commit* makes the render bail to silence for the coincident block — an
+   *intermittent* pause. Pre-load the resource at **stage** time and resolve it at
+   commit with a lock-free lookup (`findByPath`). **Any** lock held during the
+   commit, however briefly, can silence the render for a block.
+6. **Editor refresh after commit** via `ProcessorBase::onPresetSwapCommitted` (full)
+   and a product per-layer callback (`onRhythmHotSwapCommitted` /
+   `onVoiceHotSwapCommitted`) — the shell calls `onPresetLoaded` *synchronously*
+   after `loadPreset`, which for a staged swap runs against pre-swap state, so the
+   commit must re-trigger the refresh. **Clear the callbacks in the editor dtor**
+   (processor outlives editor → UAF).
+
+**Staging badges (shared, automatic):** `TransportBar` shows a "SWP" pill from
+`ProcessorBase::hasPendingFullPreset()`; `ChannelSidebar` shows a per-layer badge
+from the product's `isPendingSwap(i)` / cancels via `onCancelPendingSwap(i)`. A
+product only has to override/​wire those.
+
+---
+
 ## Related design documents
 
 - [mu-clid/design-voice.md](mu-clid/design-voice.md) — μ-Clid voice chain, ADSR, filter, InsertProcessor details (mu-tant's voice doc lives at [mu-tant/design-voice.md](mu-tant/design-voice.md))
 - [design-fx.md](design-fx.md) — FX chain, slot interface, intra-FX routing (family-shared)
+- [mu-clid/design-hotswap.md](mu-clid/design-hotswap.md) — **seamless preset/rhythm hot-swap** deep-dive (stager, boundary detection, retire-then-swap voice tail, threading). The family-level pattern + the product-side decision + the mu-tant variant are summarised in [Hot-swap](#hot-swap-staged-preset--layer-swaps-family-pattern) above.
 - [mu-clid/design-presets.md](mu-clid/design-presets.md) — μ-Clid preset storage. Each product defines its own preset format under its own `design-presets.md`; the family-level conventions are: per-layer preset in camelCase noun (`.muRhythm` / `.muPattern`), full preset in plugin-name camelCase (`.muClid` / `.muTant`).
 - [design-future.md](design-future.md) — inter-plugin sync (μ family), MIDI CC control

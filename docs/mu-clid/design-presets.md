@@ -4,6 +4,7 @@
 
 - Full state stored in APVTS `ValueTree` — serialised by JUCE `getStateInformation` / `setStateInformation`
 - Each rhythm lives in its own ValueTree subtree — enables per-rhythm preset save/load and hot-swap
+- **Hot-swap** (loading a preset/rhythm while playing → committed seamlessly at the next loop boundary) is documented in full in [design-hotswap.md](design-hotswap.md)
 - DAW project save/restore is automatic — full state restored on project open, samples reloaded immediately
 - Preset name shows asterisk (*) when current state differs from last saved preset
 - Fresh instance: loads user default preset if set, otherwise factory demo patch
