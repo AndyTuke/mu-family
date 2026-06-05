@@ -891,6 +891,7 @@ void PluginProcessor::addRhythm(const Rhythm& r)
 {
     int ri = sequencer.getNumRhythms();
     if (ri >= SequencerEngine::MaxRhythms) return;
+    hotSwapStager.cancelPendingIfAny(ri);          // the new slot must carry no stale staged swap
     voiceEngines[ri] = std::make_unique<VoiceEngine>();
     voiceEngines[ri]->prepareToPlay(currentSampleRate, currentBlockSize);
     midiEngines[ri].prepare(currentSampleRate, currentBlockSize);
@@ -922,6 +923,12 @@ bool PluginProcessor::swapRhythms(int i, int j)
 {
     const int n = numActiveRhythms.load(std::memory_order_acquire);
     if (i < 0 || j < 0 || i >= n || j >= n || i == j) return false;
+
+    // Pending per-rhythm staged swaps are keyed by index; swapping the slots would
+    // misdirect them, so drop both. (A staged full preset is index-independent — it
+    // replaces every slot at commit — so it is left to win.)
+    hotSwapStager.cancelPendingIfAny(i);
+    hotSwapStager.cancelPendingIfAny(j);
 
     // suspendProcessing only sets a flag — it does NOT block the in-flight
     // processBlock callback (see PluginProcessor.h:266). Take rhythmsLock to
@@ -971,6 +978,12 @@ void PluginProcessor::removeRhythm(int index)
     if (index < 0 || index >= sequencer.getNumRhythms()) return;
     const int newN = sequencer.getNumRhythms() - 1;
 
+    // The down-shift renumbers every rhythm from `index` upward, so any pending
+    // per-rhythm staged swap (keyed by index) would land on the wrong slot — drop
+    // them all. A staged full preset is index-independent, so it is left to win.
+    for (int r = 0; r < SequencerEngine::MaxRhythms; ++r)
+        hotSwapStager.cancelPendingIfAny(r);
+
     // suspendProcessing ensures no in-progress processBlock holds a stale
     // numActiveRhythms snapshot and reads rhythms[r] while we erase and shift.
     suspendProcessing(true);
@@ -994,6 +1007,7 @@ void PluginProcessor::removeRhythm(int index)
 void PluginProcessor::resetRhythm(int index)
 {
     if (index < 0 || index >= sequencer.getNumRhythms()) return;
+    hotSwapStager.cancelPendingIfAny(index);   // a staged swap would re-fill what we're clearing
 
     // was a UI-thread spin on rhythm.modLock + concurrent vector destruction
     // risk in ModulationMatrix::process. Now uses the same suspendProcessing +

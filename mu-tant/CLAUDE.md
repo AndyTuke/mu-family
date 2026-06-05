@@ -66,7 +66,7 @@ When new subsystems land they go under the same `{Audio, Sequencer, UI, Persiste
 |---|---|
 | [docs/mu-tant/design-voice.md](../docs/mu-tant/design-voice.md) | Voice chain, oscillators, scale-quantised pitch, filter |
 | [docs/mu-tant/design-sequencer.md](../docs/mu-tant/design-sequencer.md) | Gate / pattern editor design |
-| [docs/design-plugin-family.md#hot-swap-staged-preset--layer-swaps-family-pattern](../docs/design-plugin-family.md) + [docs/mu-clid/design-hotswap.md](../docs/mu-clid/design-hotswap.md) | **Preset/voice hot-swap** — the family pattern + lock lessons (esp. resolve resources lock-free at commit, advance transport outside the render lock) live in the family doc; the mu-clid deep-dive covers the staging/boundary/retire-tail mechanics. mu-tant's impl: `Source/Plugin/{HotSwapBoundary,VoiceHotSwapStager}.h` + `loadPreset`/`loadVoicePreset`/`handleAsyncUpdate`. |
+| [docs/mu-tant/design-hotswap.md](../docs/mu-tant/design-hotswap.md) | **Preset/voice hot-swap** — mu-tant's APVTS-centric implementation: stager, boundary, off-lock decode, the no-blanket-lock commit + lock-discipline table, structural-edit cancellation, how/why it differs from mu-clid. Family pattern + lessons in [docs/design-plugin-family.md](../docs/design-plugin-family.md#hot-swap-staged-preset--layer-swaps-family-pattern); mu-clid mechanics (retire-tail) in [docs/mu-clid/design-hotswap.md](../docs/mu-clid/design-hotswap.md). |
 | [docs/mu-tant/create_manual.ps1](../docs/mu-tant/create_manual.ps1) | **End-user manual source** — generates `mu-Tant User Manual.docx` via Word automation (mirrors mu-clid). Edit this script (not the `.docx`), then re-run it. |
 
 Add new product docs at `docs/mu-tant/` mirroring `docs/mu-clid/` as topics get decided.

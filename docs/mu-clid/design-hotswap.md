@@ -245,6 +245,12 @@ normally, so they don't need this.)
 
 - **Cancel race:** a swap cancelled between the audio thread setting `boundaryReached`
   and `processSwaps` running is skipped (the `isReady`-cleared check).
+- **Structural rhythm edits cancel pending per-rhythm swaps.** `addRhythm` /
+  `removeRhythm` / `swapRhythms` / `resetRhythm` renumber or clear slots by index, so
+  a staged per-rhythm swap (keyed by index) would land on the wrong slot — they call
+  `hotSwapStager.cancelPendingIfAny(...)` for the affected slots (`removeRhythm`
+  cancels all, since the down-shift renumbers everything). A staged **full** preset is
+  index-independent (it replaces every slot at commit) and is left to win.
 - **Full supersedes per-rhythm:** `stageFullPreset` cancels all pending per-rhythm
   swaps so they can't commit onto slots the preset is about to overwrite.
 - **Free-running** (no master loop): the full-preset swap falls back to rhythm 0's

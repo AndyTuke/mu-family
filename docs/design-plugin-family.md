@@ -315,6 +315,14 @@ a third concrete user exists. The two implementations:
    commit must re-trigger the refresh. **Clear the callbacks in the editor dtor**
    (processor outlives editor → UAF).
 
+**Structural layer edits cancel pending per-layer swaps.** Add / remove / reorder /
+reset of a layer renumbers or clears slots by index, so a staged per-layer swap
+(keyed by index) would commit to the wrong slot — the structural-edit functions
+cancel the affected pending swaps (a remove/down-shift cancels all). A staged **full
+preset** is index-independent (it replaces every slot at commit) and is left to win.
+Both products implement this (mu-clid `cancelPendingIfAny`, mu-tant
+`hotSwapStager.cancelVoice`).
+
 **Staging badges (shared, automatic):** `TransportBar` shows a "SWP" pill from
 `ProcessorBase::hasPendingFullPreset()`; `ChannelSidebar` shows a per-layer badge
 from the product's `isPendingSwap(i)` / cancels via `onCancelPendingSwap(i)`. A

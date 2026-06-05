@@ -569,6 +569,7 @@ int PluginProcessor::addVoice()
     const juce::ScopedLock sl(voicesLock);
     const int n = numVoices.load();
     if (n >= kMaxVoices) return -1;
+    hotSwapStager.cancelVoice(n);                   // the new slot must carry no stale staged swap
     resetVoiceSlot(n);                              // fresh defaults for the new slot
     voiceColourIndex[(size_t) n] = firstUnusedColourIndex();   // allocate its palette colour
     numVoices.store(n + 1);
@@ -581,6 +582,12 @@ void PluginProcessor::removeVoice(int idx)
     const juce::ScopedLock sl(voicesLock);
     const int n = numVoices.load();
     if (n <= 1 || idx < 0 || idx >= n) return;     // never remove the last voice
+
+    // The down-shift renumbers every voice from idx upward, so any pending per-voice
+    // hot-swap (keyed by index) would land on the wrong slot — drop them all. (A
+    // staged FULL preset is index-independent: it replaces the whole state at commit,
+    // so it stays and simply wins.)
+    for (int v = 0; v < kMaxVoices; ++v) hotSwapStager.cancelVoice(v);
 
     // Shift every higher voice down one slot — APVTS values + gate + modulators.
     for (int d = idx; d < n - 1; ++d)
@@ -602,6 +609,11 @@ void PluginProcessor::swapVoices(int a, int b)
     const juce::ScopedLock sl(voicesLock);
     const int n = numVoices.load();
     if (a < 0 || b < 0 || a >= n || b >= n || a == b) return;
+
+    // Pending per-voice swaps are keyed by index; swapping the two slots would
+    // misdirect them, so drop both.
+    hotSwapStager.cancelVoice(a);
+    hotSwapStager.cancelVoice(b);
 
     auto swapPrefix = [this](const juce::String& pa, const juce::String& pb)
     {
@@ -653,6 +665,7 @@ void PluginProcessor::resetVoice(int idx)
 {
     const juce::ScopedLock sl(voicesLock);
     if (idx < 0 || idx >= numVoices.load()) return;
+    hotSwapStager.cancelVoice(idx);            // a staged swap would re-fill what we're clearing
     const int keepColour = voiceColourIndex[(size_t) idx];
     resetVoiceSlot(idx);                       // params + gate + modulators → defaults
     voiceColourIndex[(size_t) idx] = keepColour;   // identity colour stays
