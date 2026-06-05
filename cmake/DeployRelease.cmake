@@ -26,7 +26,11 @@ if(EXISTS "${STANDALONE}")
     file(COPY_FILE "${STANDALONE}" "${DIST_WIN}/${PRODUCT_FILENAME}.exe"
          ONLY_IF_DIFFERENT
          RESULT copy_result)
-    if(copy_result STREQUAL "")
+    # file(COPY_FILE) RESULT is "0" on success (incl. an ONLY_IF_DIFFERENT no-op),
+    # or a human-readable error string on real failure. Accept both "0" and ""
+    # (older CMake) as success — checking only "" mis-reported every successful
+    # deploy as "skipped (0)", which falsely looked like a locked/running app.
+    if(copy_result STREQUAL "0" OR copy_result STREQUAL "")
         message(STATUS "  Standalone -> ${DIST_WIN}/${PRODUCT_FILENAME}.exe")
     else()
         message(WARNING "  Standalone deploy skipped (${copy_result}). Locked? Close any running ${PRODUCT_FILENAME}.")
@@ -55,7 +59,7 @@ if(EXISTS "${CLAP_FILE}")
     file(COPY_FILE "${CLAP_FILE}" "${DIST_WIN}/${PRODUCT_FILENAME}.clap"
          ONLY_IF_DIFFERENT
          RESULT copy_result)
-    if(copy_result STREQUAL "")
+    if(copy_result STREQUAL "0" OR copy_result STREQUAL "")   # "0" = success (see Standalone note)
         message(STATUS "  CLAP -> ${DIST_WIN}/${PRODUCT_FILENAME}.clap")
     else()
         message(WARNING "  CLAP deploy skipped (${copy_result}).")
