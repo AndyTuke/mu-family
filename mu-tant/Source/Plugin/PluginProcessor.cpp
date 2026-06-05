@@ -258,28 +258,18 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     if (scanMidiProgramChanges(midiMessages))
         triggerAsyncUpdate();
 
-    // Exclude the audio thread while a voice is being added/removed (the message
-    // thread holds voicesLock + shifts per-voice data). On contention, output a
-    // silent block — a sub-millisecond gap during an edit.
-    const juce::ScopedTryLock voicesTryLock(voicesLock);
-    if (! voicesTryLock.isLocked())
-        return;
-
-    const int numActiveVoices = numVoices.load(std::memory_order_relaxed);
-
     // Per-block transport snapshot for the render hook (audio-thread-only members,
-    // read by renderVoice within this same call). In plugin mode, play state and BPM
-    // are derived from the host playhead; in standalone, the internal transport
-    // (play button) drives both. The gate advances while playing; while stopped the
-    // gate is held open so the oscillators stay auditionable.
+    // read by renderVoice). In plugin mode, play state and BPM come from the host
+    // playhead; in standalone, the internal transport (play button) drives both.
+    // No voice data here, so this — and the beat advance + hot-swap boundary check
+    // at the end — run OUTSIDE the render lock: the transport keeps advancing even
+    // while a preset hot-swap commits on the message thread (no transport freeze).
     double bpm = internalBpm.load(std::memory_order_relaxed);
     if (wrapperType != wrapperType_Standalone)
     {
-        // Plugin mode: derive play state and BPM from the host DAW.
         const auto ht = mu_core::readHostTransport(getPlayHead());
         if (ht.bpm > 0.0) bpm = ht.bpm;
-        // Reflect host state in the playing atomic so the UI timer can read it.
-        playing.store(ht.playing, std::memory_order_relaxed);
+        playing.store(ht.playing, std::memory_order_relaxed);   // UI timer reads this
         blkPlaying = ht.playing;
     }
     else
@@ -289,32 +279,40 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     blkBeatStart      = internalBeatPos.load(std::memory_order_relaxed);
     blkBeatsPerSample = (bpm / 60.0) / currentSampleRate;
 
-    // Channel-strip + master + FX state lives in mixerEngine/fxChain, kept in sync
-    // by the parameterChanged listener (see syncGlobalFxParam) — no per-block push.
-
-    // Supply the external DAW sidechain bus to the mixer (null when bus is inactive).
-    mixerEngine.setExternalSidechain(nullptr, nullptr);
-    if (getBusCount(true) > 0)
-        if (auto* scBus = getBus(true, 0); scBus && scBus->isEnabled())
+    // Render → gate → insert → mixer through the shared path (engine→insert→mixer).
+    // Guarded by a try-lock ONLY against a voice add/remove data shift (the message
+    // thread holds voicesLock for those). On contention, leave the buffer silent for
+    // this block — a sub-ms gap during a structural edit. A preset hot-swap does NOT
+    // take this lock (its data lands through the per-structure editLock / modLock +
+    // atomic params), so a swap commit never silences the render here.
+    {
+        const juce::ScopedTryLock voicesTryLock(voicesLock);
+        if (voicesTryLock.isLocked())
         {
-            auto scBuf = getBusBuffer(buffer, true, 0);
-            const int nCh = scBuf.getNumChannels();
-            if (nCh >= 1)
-                mixerEngine.setExternalSidechain(
-                    scBuf.getReadPointer(0),
-                    nCh >= 2 ? scBuf.getReadPointer(1) : scBuf.getReadPointer(0));
-        }
+            const int numActiveVoices = numVoices.load(std::memory_order_relaxed);
 
-    // Render → gate → insert → mixer through the shared path (engine→insert→mixer,
-    // the family-wide signal flow). The render hook fills each channel buffer; the
-    // mixer owns the strip/master mix, so the VU meters (channelPeaks) now update.
-    processCoreBlock(buffer, nullptr, numActiveVoices, numSamples, bpm,
-                     nullptr, nullptr, nullptr, &renderVoiceCb);
+            // Supply the external DAW sidechain bus to the mixer (null when inactive).
+            mixerEngine.setExternalSidechain(nullptr, nullptr);
+            if (getBusCount(true) > 0)
+                if (auto* scBus = getBus(true, 0); scBus && scBus->isEnabled())
+                {
+                    auto scBuf = getBusBuffer(buffer, true, 0);
+                    const int nCh = scBuf.getNumChannels();
+                    if (nCh >= 1)
+                        mixerEngine.setExternalSidechain(
+                            scBuf.getReadPointer(0),
+                            nCh >= 2 ? scBuf.getReadPointer(1) : scBuf.getReadPointer(0));
+                }
+
+            processCoreBlock(buffer, nullptr, numActiveVoices, numSamples, bpm,
+                             nullptr, nullptr, nullptr, &renderVoiceCb);
+        }
+    }
 
     // Advance the transport beat. Wrap at the maximum pattern length (64 beats =
-    // 16 bars in 4/4) to keep floating-point precision bounded across long sessions.
-    // Each GatePattern wraps internally at its own patternLengthBars, so the global
-    // counter just needs a ceiling above the maximum drawable length.
+    // 16 bars in 4/4) to keep floating-point precision bounded. Each GatePattern
+    // wraps internally at its own patternLengthBars; the global counter just needs a
+    // ceiling. Runs unconditionally (atomics only) so the transport never freezes.
     const double oldPos    = blkBeatStart;
     double       newPosRaw = oldPos;   // pre-ceiling advanced position for boundary detection
     if (blkPlaying)
@@ -329,14 +327,13 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // Hot-swap boundary check: a staged preset commits when its reference pattern
     // wraps (voice's own length for a per-voice swap, voice 0's for a full preset)
     // or on the playing→stopped edge. Uses the RAW pre-ceiling position so the
-    // loop-index test holds for pattern lengths that don't divide 64. Only flags
-    // when something is staged; commit happens on the message thread.
+    // loop-index test holds for pattern lengths that don't divide 64.
     std::array<double, VoiceHotSwapStager::kMaxVoices> voicePatBeats {};
     for (int v = 0; v < VoiceHotSwapStager::kMaxVoices; ++v)
         voicePatBeats[(size_t) v] = (double) gatePatterns[(size_t) v].patternLengthBars * 4.0;
-    const double fullPatBeats = voicePatBeats[0];   // voice-0 reference for full presets
-    if (hotSwapStager.checkBoundaries(numActiveVoices, blkPlaying, wasPlaying,
-                                      oldPos, newPosRaw, voicePatBeats, fullPatBeats))
+    if (hotSwapStager.checkBoundaries(numVoices.load(std::memory_order_relaxed),
+                                      blkPlaying, wasPlaying,
+                                      oldPos, newPosRaw, voicePatBeats, voicePatBeats[0]))
         triggerAsyncUpdate();
     wasPlaying = blkPlaying;
 }
@@ -1065,7 +1062,13 @@ void PluginProcessor::loadPreset(const juce::File& file)
 // silent block on contention, so the swap is exclusive.
 void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
 {
-    const juce::ScopedLock sl(voicesLock);
+    // No blanket voicesLock here: every structure this touches is already guarded by
+    // its own fine-grained lock that the audio render respects — APVTS params are
+    // atomic (replaceState), gate patterns use editLock (deserialiseGate), modulator
+    // slots use modLock (deserialise/clearModulators), and the wavetable bank append
+    // self-locks. Holding a blanket lock instead made the audio render bail to silence
+    // AND froze the transport for the whole commit (the hot-swap glitch). Without it,
+    // a concurrent block sees old-or-new per structure (≤1 block, inaudible) instead.
     apvts.replaceState(state);
     numVoices.store(juce::jlimit(1, kMaxVoices, (int) apvts.state.getProperty("numVoices", 1)));
     restoreVoiceColours(apvts.state.getProperty("voiceColours", "").toString());

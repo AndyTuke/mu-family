@@ -198,6 +198,13 @@ public:
     // (DAW close-window-keep-plugin), and a swap firing into a dead editor is a UAF.
     std::function<void(int voice)> onVoiceHotSwapCommitted;
 
+    // Hot-swap staging queries — drive the shared "SWP" badges (TransportBar for a
+    // pending full preset, ChannelSidebar for a pending per-voice swap) + cancel.
+    // Mirrors mu-clid. Polled by the UI timers.
+    bool hasPendingFullPreset() const override { return hotSwapStager.hasFullPending(); }
+    bool hasPendingSwap(int voice) const       { return hotSwapStager.hasVoicePending(voice); }
+    void cancelStagedSwap(int voice)           { hotSwapStager.cancelVoice(voice); }
+
     // Persist the UI scale selection (Medium / Large) so it survives a plugin
     // close/reopen. Writes to appSettings before delegating to the base class.
     void setUiScale(float scale) override;
