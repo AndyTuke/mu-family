@@ -14,6 +14,7 @@ It is **not** a system-wide Windows audio driver. Because we own every client, i
 - **Hardware backend:** runtime-selectable WASAPI/ASIO via JUCE `AudioDeviceManager`.
 - **Coupling:** async double-buffered rings — underrun fills silence + logs, never clicks the master.
 - **Clock:** internal sample-accurate transport (the hardware word clock is the master) + MIDI-clock OUT to outboard gear. **No Ableton Link** (GPL/proprietary — avoided).
+- **Clock source (L7):** mu-link is master **or** slaves to **external MIDI clock** (manual GUI toggle). When slaving, a tempo **PLL** (`MidiClockEstimator`) smooths the incoming F8 stream and sets only the transport *tempo* — the frame counter stays the timebase, so the bus never inherits MIDI jitter. The estimator is pure/headless-tested; `MidiClockInput` is the JUCE adapter; never let raw MIDI clock become the timebase.
 - **Tempo:** **mu-link is always tempo master** — clients follow the shared `TransportBlock`; a connected client surrenders its own tempo. No client-as-master feedback path.
 - **Summing:** **plain sum first** (Stage L2); per-client level/pan/mute/solo via mu-core `MixerEngine` later (Stage L6).
 - **First client wired:** **mu-clid** (Stage L5).
@@ -36,7 +37,8 @@ mu-core/Link/   (shared — used by mu-link AND every product's standalone)
 
 mu-link/Source/
 ├── Ipc/       MuLinkServerMemory.h — the SERVER composer (creates/owns all regions)        ✅ implemented
-├── Clock/     TransportClock.h (sample-accurate master), MidiClockOut.h (F8 bridge)        ✅ implemented
+├── Clock/     TransportClock.h (sample-accurate master), MidiClockOut.h (F8 out),          ✅ implemented
+│              MidiClockEstimator.h (tempo PLL, pure), MidiClockInput.h (MIDI-in adapter)
 ├── Server/    ServerEngine.h (pure RT core: publish→sum→advance→pulses + peak meters),     ✅ implemented
 │              AudioServer.h (owns HW device, delegates each callback to the engine)
 ├── Plugin/    Main.cpp — JUCEApplication + DocumentWindow owning the AudioServer            ✅ implemented

@@ -7,6 +7,7 @@
 #include <vector>
 #include "../Server/ServerEngine.h"
 #include "../Ipc/MuLinkServerMemory.h"
+#include "../Clock/MidiClockEstimator.h"
 #include "Link/MuLinkSharedMemory.h"
 
 #ifdef _WIN32
@@ -286,6 +287,31 @@ public:
             mem.ring(1).writeFrames(norm.data(), 64);
             engine.renderBlock(out.data(), 2, 64);
             expectWithinAbsoluteError(out.storage[0][0], 0.5f, 1.0e-6f);   // transparent below knee
+        }
+
+        beginTest("MIDI clock estimator tracks tempo + transport (external-clock slave)");
+        {
+            MidiClockEstimator est;
+            expect(! est.isRunning(), "should begin stopped");
+
+            est.onStart();
+            expect(est.isRunning(), "Start (0xFA) → running");
+            expect(est.consumeReset(), "Start requests a position reset");
+            expect(! est.consumeReset(), "reset is consumed exactly once");
+
+            // 24-ppqn pulses at 120 BPM: quarter = 0.5 s, so a pulse every 0.5/24 s.
+            double t = 0.0;
+            const double pulse120 = 0.5 / 24.0;
+            for (int i = 0; i < 80; ++i) { est.onClockPulse(t); t += pulse120; }
+            expectWithinAbsoluteError(est.bpm(), 120.0, 0.5);
+
+            // Speed up to 140 BPM — the smoothed estimate tracks toward it (jitter-free input).
+            const double pulse140 = (60.0 / 140.0) / 24.0;
+            for (int i = 0; i < 300; ++i) { est.onClockPulse(t); t += pulse140; }
+            expectWithinAbsoluteError(est.bpm(), 140.0, 1.0);
+
+            est.onStop();
+            expect(! est.isRunning(), "Stop (0xFC) → stopped");
         }
     }
 };

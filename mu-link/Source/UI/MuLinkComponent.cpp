@@ -18,7 +18,7 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
       deviceSelector(serverToShow.audioDeviceManager(),
                      0, 0,        // no audio inputs
                      2, 2,        // stereo output
-                     false,       // no MIDI input options
+                     true,        // MIDI input options (pick the external clock source)
                      true,        // MIDI output selector (drives MIDI-clock-out)
                      true,        // channels as stereo pairs
                      false)       // show advanced options
@@ -33,9 +33,22 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
     addAndMakeVisible(subtitleLabel);
     addAndMakeVisible(clientsHeading);
 
-    // Transport — mu-link is always the tempo master.
+    // Transport.
     playButton.onClick = [this] { togglePlay(); };
     addAndMakeVisible(playButton);
+
+    // Clock source toggle: Internal (mu-link is master) ↔ External MIDI (slave to MIDI clock).
+    clockSourceButton.setClickingTogglesState(true);
+    clockSourceButton.setColour(juce::TextButton::buttonColourId,   lnf.colour(MuLookAndFeel::panelBackground));
+    clockSourceButton.setColour(juce::TextButton::buttonOnColourId, lnf.colour(MuLookAndFeel::knobReverb));
+    clockSourceButton.onClick = [this]
+    {
+        const bool external = clockSourceButton.getToggleState();
+        clockSourceButton.setButtonText(external ? "Clock: Ext MIDI" : "Clock: Internal");
+        server.setClockSource(external ? mu_link::ClockSource::ExternalMidi
+                                       : mu_link::ClockSource::Internal);
+    };
+    addAndMakeVisible(clockSourceButton);
 
     tempoSlider.setSliderStyle(juce::Slider::LinearHorizontal);
     tempoSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 72, 22);
@@ -132,6 +145,18 @@ void MuLinkComponent::timerCallback()
 
     // Keep MIDI-clock-out routed to whatever the picker has selected (none → no-op).
     server.setMidiClockOutput(server.audioDeviceManager().getDefaultMidiOutput());
+
+    // In external-MIDI-clock mode the tempo + transport are driven by the incoming clock,
+    // so reflect them read-only and lock out the user controls; restore them in internal mode.
+    const bool external = server.clockSourceMode() == mu_link::ClockSource::ExternalMidi;
+    tempoSlider.setEnabled(! external);
+    playButton .setEnabled(! external);
+    if (external)
+    {
+        const double bpm = server.externalBpm();
+        if (bpm > 0.0) tempoSlider.setValue(bpm, juce::dontSendNotification);
+        playButton.setButtonText(server.externalRunning() ? "Stop" : "Play");
+    }
 }
 
 void MuLinkComponent::paint(juce::Graphics& g)
@@ -161,7 +186,9 @@ void MuLinkComponent::resized()
     area.removeFromTop(8);
 
     auto transport = area.removeFromTop(40);
-    playButton.setBounds(transport.removeFromLeft(88));
+    playButton.setBounds(transport.removeFromLeft(76));
+    transport.removeFromLeft(10);
+    clockSourceButton.setBounds(transport.removeFromLeft(120));
     transport.removeFromLeft(14);
     tempoSlider.setBounds(transport);
     area.removeFromTop(16);

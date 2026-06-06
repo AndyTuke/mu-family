@@ -4,6 +4,7 @@
 #include "Link/AudioRing.h"
 #include "../Ipc/MuLinkServerMemory.h"
 #include "../Clock/TransportClock.h"
+#include "../Clock/MidiClockEstimator.h"
 
 #include <algorithm>
 #include <atomic>
@@ -22,6 +23,10 @@
 // tail, never a click on the master), then advance the clock by the block length.
 namespace mu_link
 {
+
+// The master clock's tempo + transport source. Internal = mu-link is master (user tempo +
+// play button); ExternalMidi = mu-link slaves to incoming MIDI clock (L7).
+enum class ClockSource { Internal, ExternalMidi };
 
 struct BlockStats
 {
@@ -99,6 +104,12 @@ public:
 
     const TransportClock& transportClock() const noexcept { return clock; }
 
+    // Clock source (message thread sets, audio thread reads). In ExternalMidi mode the
+    // engine follows the attached MidiClockEstimator each block instead of the user tempo.
+    void        setClockSource(ClockSource s) noexcept { clockSource.store(s, std::memory_order_relaxed); }
+    ClockSource clockSourceMode()       const noexcept { return clockSource.load(std::memory_order_relaxed); }
+    void        attachMidiClock(MidiClockEstimator* e) noexcept { midiClock = e; }
+
     // Latest per-block peak (linear, 0–1) for metering. Per active client and the summed
     // master; the GUI reads these on the message thread and applies its own ballistics.
     float clientPeak(int slot) const noexcept { return clientPeakLevel[slot].load(std::memory_order_relaxed); }
@@ -115,6 +126,19 @@ public:
             std::fill(output[ch], output[ch] + numFrames, 0.0f);
 
         BlockStats stats;
+
+        // External MIDI clock (slave): follow the smoothed tempo + transport BEFORE we
+        // publish/advance, so the master rides the external clock yet stays sample-accurate
+        // (the frame counter is still the timebase; only its tempo tracks the estimate).
+        if (clockSource.load(std::memory_order_relaxed) == ClockSource::ExternalMidi && midiClock != nullptr)
+        {
+            if (midiClock->consumeReset())
+                clock.rewind();
+            const double extBpm = midiClock->bpm();
+            if (extBpm > 0.0)
+                clock.setTempo(extBpm);
+            clock.setPlaying(midiClock->isRunning());
+        }
 
         // Publish the start-of-block transport so clients align the block they render ahead.
         if (mem != nullptr)
@@ -232,6 +256,9 @@ private:
     TransportClock      clock;
     double              sr = 48000.0;
     std::vector<float>  scratch;   // de-interleave buffer, allocated in prepare()
+
+    std::atomic<ClockSource> clockSource { ClockSource::Internal };
+    MidiClockEstimator*      midiClock = nullptr;   // not owned (lives in AudioServer)
     std::atomic<float>  clientPeakLevel[kMaxClients];   // latest per-block peak, per slot
     std::atomic<float>  masterPeakLevel { 0.0f };       // latest per-block summed peak
 

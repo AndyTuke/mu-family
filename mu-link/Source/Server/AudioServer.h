@@ -3,6 +3,7 @@
 #include "ServerEngine.h"
 #include "../Ipc/MuLinkServerMemory.h"
 #include "../Clock/MidiClockOut.h"
+#include "../Clock/MidiClockInput.h"
 
 #include <juce_audio_devices/juce_audio_devices.h>
 
@@ -21,7 +22,11 @@ namespace mu_link
 class AudioServer : private juce::AudioIODeviceCallback
 {
 public:
-    AudioServer() { engine.attachMemory(&mem); }
+    AudioServer()
+    {
+        engine.attachMemory(&mem);
+        engine.attachMidiClock(&midiClockInput.estimator());   // available when in ExternalMidi mode
+    }
     ~AudioServer() override { stop(); }
 
     AudioServer(const AudioServer&)            = delete;
@@ -41,6 +46,7 @@ public:
         engineTempo = preferredTempo;
         deviceManager.initialiseWithDefaultDevices(0, 2);   // selector can repair/change later
         deviceManager.addAudioCallback(this);
+        deviceManager.addMidiInputDeviceCallback({}, &midiClockInput);   // all enabled MIDI ins → clock estimator
         started = true;
         return true;
     }
@@ -49,6 +55,7 @@ public:
     {
         if (! started)
             return;
+        deviceManager.removeMidiInputDeviceCallback({}, &midiClockInput);
         deviceManager.removeAudioCallback(this);
         deviceManager.closeAudioDevice();
         started = false;
@@ -81,6 +88,12 @@ public:
     void setPlaying(bool shouldPlay) noexcept    { engine.setPlaying(shouldPlay); }
     void setMidiClockOutput(juce::MidiOutput* o) noexcept { midiClock.setOutput(o); }
 
+    // Clock source (L7): Internal (master) or ExternalMidi (slave to incoming MIDI clock).
+    void        setClockSource(ClockSource s) noexcept { engine.setClockSource(s); }
+    ClockSource clockSourceMode()       const noexcept { return engine.clockSourceMode(); }
+    double      externalBpm()           const noexcept { return midiClockInput.estimator().bpm(); }
+    bool        externalRunning()       const noexcept { return midiClockInput.estimator().isRunning(); }
+
 private:
     void audioDeviceAboutToStart(juce::AudioIODevice* device) override
     {
@@ -105,6 +118,7 @@ private:
     MuLinkServerMemory       mem;
     ServerEngine             engine;
     MidiClockOut             midiClock;
+    MidiClockInput           midiClockInput;
     double                   engineTempo = 120.0;
     bool                     started     = false;
 };

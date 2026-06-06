@@ -40,6 +40,7 @@ private:
     juce::AudioDeviceSelectorComponent deviceSelector;
     juce::Label   titleLabel, subtitleLabel, clientsHeading;
     juce::TextButton playButton { "Stop" };
+    juce::TextButton clockSourceButton { "Clock: Internal" };
     juce::Slider  tempoSlider;
     VUMeter       masterMeter;
     juce::Label   masterLabel;
