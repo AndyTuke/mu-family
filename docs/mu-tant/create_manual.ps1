@@ -128,6 +128,13 @@ Bullet "Pos (0 to 255) — wavetable frame position; morphs through the table"
 Bullet "PEnv (plus or minus 24 semitones) — pitch-envelope depth: how far the gate editor's PITCH layer shifts this oscillator's pitch"
 P "Modulating Semi with a stepped modulator snaps cleanly between scale notes (integer jumps). Modulating Semi with a smooth modulator glides through frequency space, passing through off-scale pitches for a glissando effect."
 
+H2 "Wavetables"
+P "Each oscillator's wavetable selector chooses the waveform set it morphs through with the Pos knob. mu-Tant uses the Serum/Vital 2048-samples-per-frame format internally, and offers three sources in the dropdown:"
+Bullet "Built-in tables — a set of procedural factory tables, automatable by index."
+Bullet "Wavetables folder — drop .wav wavetables into Documents\TDP\muTant\Wavetables (sub-folders become categories) and they appear under their own headings; selected by path so they survive preset reload."
+Bullet "Load .wav… — import any Serum/Vital-format wavetable .wav from disk; the path is saved with the preset."
+P "The Pos knob (and its modulation) sweeps smoothly through the frames of whichever table is selected."
+
 Pic "OSC 1 and OSC 2 panels showing the wavetable selector and the five knobs."
 
 # ── 9. Cross-Modulation and Noise ─────────────────────────────────────────────
@@ -192,9 +199,11 @@ Bullet "Grid — the cell subdivision: 1/4, 1/8, 1/16 (default), or 1/32."
 Bullet "Gap — forces a silence tail at the end of every envelope region. At 0 percent the envelope fills the full region; at 50 percent it completes in the first half and the second half is silent."
 
 H2 "Toolbox"
-P "Three tools in the header:"
+P "Five tools in the header:"
+Bullet "Arrow — select an envelope to edit its shape handles and reveal the properties strip (Probability and Loop)."
 Bullet "Pencil — click an empty cell to draw a one-cell envelope; drag the start/end grab handles (bottom corners) to extend a region"
 Bullet "Eraser — click an envelope to delete it"
+Bullet "Glue — merge adjacent envelopes into one continuous region"
 Bullet "Reverse — click an envelope to flip its attack and decay"
 
 H2 "Envelope Shape"
@@ -203,6 +212,11 @@ Bullet "Top handle (the peak point) — drag horizontally to move where within t
 Bullet "Attack bend handle (mid-point on the rising line) — drag vertically to bow the attack."
 Bullet "Decay bend handle (mid-point on the falling line) — drag vertically to bow the decay."
 P "A new envelope defaults to instant attack with a linear decay - the classic gate sound."
+
+H2 "Per-Envelope Probability and Loop"
+P "Select an envelope with the Arrow tool to open the properties strip below the grid:"
+Bullet "Probability (0 to 100 percent) — the chance the envelope fires on each pass. Below 100 percent it drops out at random, adding generative variation to a pattern."
+Bullet "Loop N of M — the envelope fires only on loop N of every M-loop cycle, so an event can recur once every few bars rather than every pass."
 
 H2 "Audio Behaviour"
 Bullet "Stopped — silent (gate closed)"
@@ -241,13 +255,27 @@ P "Click the gear icon to open the Settings overlay:"
 Bullet "Master Volume — overall output level"
 Bullet "UI Size — Medium or Large window"
 Bullet "Tempo (BPM) — internal clock, also editable from the transport BPM field"
+Bullet "MIDI Prog. Change — open the Voice Presets and Full Presets tables to map incoming program-change messages to presets (see below)."
 
-# ── 18. Signal Flow ───────────────────────────────────────────────────────────
-H1 "18. Signal Flow"
+H2 "MIDI Program Change to Preset"
+P "mu-Tant can load presets from incoming MIDI program-change messages. On channels 1 to 8 a program change loads the matching .muPattern into that voice slot; on channel 9 it loads a full .muTant preset. While playing, the change is staged and applied seamlessly at the next loop boundary (hot-swap). Configure the mappings from the MIDI Prog. Change row in Settings."
+
+# ── 18. Connecting to mu-link ─────────────────────────────────────────────────
+H1 "18. Connecting to mu-link"
+P "mu-link is a companion application from Transwarp Development Project: a local audio hub and master clock for the mu family. When mu-link is running, the mu-Tant standalone application connects to it automatically — mu-Tant's audio is summed into mu-link's mix and its transport locks to mu-link's master clock. The plug-in versions are unaffected; only the standalone connects, because in a DAW the host already owns the clock and audio device."
+H2 "How to Connect"
+Bullet "Launch mu-link, then launch mu-Tant standalone — in either order. Within about a second the mu-Tant title bar shows 'mu-link connected'."
+Bullet "mu-Tant's audio now plays through mu-link's output device, summed with any other connected mu apps, and appears as a channel in mu-link's client strip with its own level, pan, mute, and solo."
+Bullet "mu-Tant's gate and modulators follow mu-link's clock: mu-link is the tempo master, and its Play/Stop and tempo drive mu-Tant. Use mu-link's transport (not mu-Tant's) while connected."
+Bullet "Quit mu-link and mu-Tant instantly reverts to its own audio device and internal transport — no restart needed."
+P "This lets you run mu-Tant, mu-Clid, and other mu standalones together, perfectly in sync and mixed to a single output — and lets mu-link slave the whole rig to an external MIDI clock. See the mu-link User Manual for the full picture."
+
+# ── 19. Signal Flow ───────────────────────────────────────────────────────────
+H1 "19. Signal Flow"
 P "Osc 1 and Osc 2 are combined with FM / AM / Ring cross-modulation and optional hard Sync, summed with the Noise source, then passed through the dual filter (series: Filter 1 into Filter 2; parallel: Filter 1 plus Filter 2 mixed). The result passes through the gate (GATE layer amplitude, FILT layer cutoff sweep, PITCH layer pitch shift), then the per-voice insert, then into the voice's mixer channel. The mixer routes channel strips through the Effect / Delay / Reverb sends to the master and out."
 
-# ── 19. Tips and Workflow ─────────────────────────────────────────────────────
-H1 "19. Tips and Workflow"
+# ── 20. Tips and Workflow ─────────────────────────────────────────────────────
+H1 "20. Tips and Workflow"
 Bullet "Starting from silence: press Play, then draw at least one cell on the GATE layer - an empty gate produces no sound."
 Bullet "Auditioning the raw drone: press Bypass in the gate editor to hear the uncut oscillator/filter tone."
 Bullet "Dual-filter character: set Filter 1 to Comb + and Filter 2 to LP 24 in Series for a tuned resonator rolled off by a smooth low-pass; or use Parallel with a low-pass on one side and a high-pass on the other to carve a band."
@@ -256,8 +284,8 @@ Bullet "Filter morphing: draw a slow attack / fast decay on the FILT layer and s
 Bullet "FM drones: raise the X-MOD FM knob to 60 to 80 percent and modulate Osc 2 Semi with a stepped sequencer - each step adds a new FM timbre as Osc 2's ratio changes."
 Bullet "Long evolving patterns: set Bars to 8 or 16 and scroll through the pattern, combining sparse GATE hits with a slowly drifting Smooth modulator on Filter Cutoff."
 
-# ── 20. Technical Specifications ──────────────────────────────────────────────
-H1 "20. Technical Specifications"
+# ── 21. Technical Specifications ──────────────────────────────────────────────
+H1 "21. Technical Specifications"
 Bullet "Formats: VST3, CLAP, Standalone (Windows)"
 Bullet "Voices: up to 8 simultaneous, each with two wavetable oscillators plus a noise source"
 Bullet "Cross-modulation: FM, AM, and Ring simultaneously, plus hard sync"
@@ -269,11 +297,11 @@ Bullet "Modulators per voice: 8 (smooth LFO or stepped), plus a matrix view"
 Bullet "Full preset format: .muTant (XML). Per-voice preset format: .muPattern (XML)"
 Bullet "Third-party libraries: JUCE, Signalsmith Reverb (MIT), Monocypher (BSD-2-Clause), clap-juce-extensions (MIT)"
 
-# ── 21. Not in mu-Tant ────────────────────────────────────────────────────────
-H1 "21. Design Decisions (Not in mu-Tant)"
+# ── 22. Not in mu-Tant ────────────────────────────────────────────────────────
+H1 "22. Design Decisions (Not in mu-Tant)"
 Bullet "No amplitude envelope - the gate stage does this job."
-Bullet "No note-on / note-off - oscillators run continuously; MIDI is not used for played notes."
-Bullet "No user samples - the built-in wavetable bank only."
+Bullet "No played notes - oscillators run continuously; MIDI note-on / note-off is not used (MIDI program change is, for preset loading - see Settings)."
+Bullet "No user audio samples - oscillators use wavetables only, though you can import your own Serum/Vital-format wavetable .wav files (see Wavetables)."
 Bullet "No granular - pure wavetable synthesis."
 
 # ── Save ──────────────────────────────────────────────────────────────────────

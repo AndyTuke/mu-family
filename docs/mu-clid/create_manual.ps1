@@ -373,8 +373,18 @@ Bullet "Default content: Save a preset as _default.muClid to have it load every 
 Bullet "Status Bar: Hover over any knob to see its name and current value without clicking — the Status Bar never clears automatically."
 Bullet "DAW automation: Every per-rhythm parameter is exposed to the host with human-readable names. Recorded automation moves the on-screen knobs in real time."
 
-# ── 18. Technical Specifications ──────────────────────────────────────────────
-H1 "18. Technical Specifications"
+# ── 18. Connecting to mu-link ─────────────────────────────────────────────────
+H1 "18. Connecting to mu-link"
+P "mu-link is a companion application from Transwarp Development Project: a local audio hub and master clock for the mu family. When mu-link is running, the mu-Clid standalone application connects to it automatically — mu-Clid's audio is summed into mu-link's mix and its transport locks to mu-link's master clock. The plug-in versions are unaffected; only the standalone connects, because in a DAW the host already owns the clock and audio device."
+H2 "How to Connect"
+Bullet "Launch mu-link, then launch mu-Clid standalone — in either order. Within about a second the mu-Clid title bar shows 'mu-link connected'."
+Bullet "mu-Clid's audio now plays through mu-link's output device, summed with any other connected mu apps. mu-Clid appears as a channel in mu-link's client strip with its own level, pan, mute, and solo."
+Bullet "mu-Clid's transport follows mu-link: mu-link is the tempo master, and its Play/Stop and tempo drive mu-Clid. Use mu-link's transport (not mu-Clid's) while connected."
+Bullet "Quit mu-link and mu-Clid instantly reverts to its own audio device and internal transport — no restart needed."
+P "This lets you run mu-Clid, mu-Tant, and other mu standalones together, perfectly in sync and mixed to a single output — and lets mu-link slave the whole rig to an external MIDI clock from a drum machine or DAW. See the mu-link User Manual for the full picture."
+
+# ── 19. Technical Specifications ──────────────────────────────────────────────
+H1 "19. Technical Specifications"
 Bullet "Formats: VST3, CLAP, Standalone (Windows)"
 Bullet "Rhythms: up to 8 simultaneous slots"
 Bullet "Steps per generator: 1 to 64"
