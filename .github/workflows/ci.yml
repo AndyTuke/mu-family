@@ -1,0 +1,90 @@
+name: CI build
+
+# Cross-platform safety net: builds the mu-family plugins (VST3/CLAP/Standalone) + the unit
+# tests on Linux, macOS, and Windows, and runs the test suites + the mu-core boundary check.
+# Catches portability regressions early. No signing / installers / tester deploy here — those
+# stay on the local Windows release flow. mu-link (Win32 shared-memory bus) builds on Windows
+# only until the POSIX backend lands; off-Windows the standalone bridge is a no-op stub.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    env:
+      JUCE_PATH: ${{ github.workspace }}/JUCE
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout JUCE 8.0.12
+        uses: actions/checkout@v4
+        with:
+          repository: juce-framework/JUCE
+          ref: 8.0.12
+          path: JUCE
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev libjack-jackd2-dev \
+            libx11-dev libxext-dev libxinerama-dev libxrandr-dev libxcursor-dev \
+            libxcomposite-dev libxrender-dev \
+            libfreetype6-dev libfontconfig1-dev libgl1-mesa-dev
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DMUFAMILY_DEPLOY_TESTERS=OFF
+
+      - name: Build plugins + Standalone + tests
+        run: >
+          cmake --build build --config Debug --target
+          mu-clid_VST3 mu-clid_CLAP mu-clid_Standalone
+          mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone
+          mu-clid-tests mu-tant-tests
+
+      - name: Build mu-link (Windows only)
+        if: runner.os == 'Windows'
+        run: cmake --build build --config Debug --target mu-link mu-link-server mu-link-tone mu-link-harness mu-link-tests
+
+      - name: Run mu-Clid tests
+        shell: bash
+        run: |
+          exe="build/mu-clid/mu-clid-tests_artefacts/Debug/mu-clid-tests"
+          [ -f "$exe.exe" ] && exe="$exe.exe"
+          "$exe"
+
+      - name: Run mu-Tant tests
+        shell: bash
+        run: |
+          exe="build/mu-tant/mu-tant-tests_artefacts/Debug/mu-tant-tests"
+          [ -f "$exe.exe" ] && exe="$exe.exe"
+          "$exe"
+
+      - name: Run mu-link tests (Windows only)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          exe="build/mu-link/mu-link-tests_artefacts/Debug/mu-link-tests"
+          [ -f "$exe.exe" ] && exe="$exe.exe"
+          "$exe"
+
+      - name: mu-core boundary check
+        run: python tests/scripts/check-core-boundary.py

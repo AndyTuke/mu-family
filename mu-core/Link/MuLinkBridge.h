@@ -29,6 +29,8 @@
 namespace mu_link
 {
 
+#ifdef _WIN32
+
 class MuLinkBridge : private juce::Timer
 {
 public:
@@ -147,5 +149,21 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MuLinkBridge)
 };
+
+#else // _WIN32
+
+// mu-link's shared-memory bus is currently Windows-only (a POSIX shm_open/mmap backend is
+// the pending cross-platform port). Off Windows the bridge is a no-op with the same public
+// shape, so each product's StandaloneApp compiles and runs unchanged — it simply behaves as
+// if mu-link were never present (own device, internal transport).
+class MuLinkBridge
+{
+public:
+    MuLinkBridge(juce::AudioProcessor&, juce::AudioProcessorPlayer&,
+                 juce::String, std::function<void(bool)>) {}
+    bool isConnected() const noexcept { return false; }
+};
+
+#endif // _WIN32
 
 } // namespace mu_link
