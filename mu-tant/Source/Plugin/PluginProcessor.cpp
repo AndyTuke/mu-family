@@ -258,25 +258,43 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     if (scanMidiProgramChanges(midiMessages))
         triggerAsyncUpdate();
 
-    // Per-block transport snapshot for the render hook (audio-thread-only members,
-    // read by renderVoice). In plugin mode, play state and BPM come from the host
-    // playhead; in standalone, the internal transport (play button) drives both.
-    // No voice data here, so this — and the beat advance + hot-swap boundary check
-    // at the end — run OUTSIDE the render lock: the transport keeps advancing even
-    // while a preset hot-swap commits on the message thread (no transport freeze).
+    // Per-block transport snapshot for the render hook (audio-thread-only members, read by
+    // renderVoice). Family standard (mu-core HostTransport): consult the playhead first.
+    //   • Plugin: host drives play + BPM (mu-Tant keeps its own free-running beat, by design).
+    //   • Standalone + mu-link: the injected MuLinkPlayHead supplies a beat POSITION → slave
+    //     the beat to it (phase-locked to the mu-link master clock).
+    //   • Standalone, free-running: no playhead → the internal play button drives.
+    // No voice data here, so this — and the beat advance + hot-swap boundary check at the end —
+    // run OUTSIDE the render lock: the transport keeps advancing even while a preset hot-swap
+    // commits on the message thread (no transport freeze).
     double bpm = internalBpm.load(std::memory_order_relaxed);
+    const auto ht = mu_core::readHostTransport(getPlayHead());
+
+    bool   slaved     = false;
+    double slavedBeat = 0.0;
     if (wrapperType != wrapperType_Standalone)
     {
-        const auto ht = mu_core::readHostTransport(getPlayHead());
         if (ht.bpm > 0.0) bpm = ht.bpm;
         playing.store(ht.playing, std::memory_order_relaxed);   // UI timer reads this
         blkPlaying = ht.playing;
+    }
+    else if (ht.hasPosition)
+    {
+        // Slaved to mu-link. Wrap the master ppq into mu-Tant's bounded beat space (the same
+        // ceiling the internal transport uses) so the gate + hot-swap boundary see positions
+        // exactly as they do free-running — only the SOURCE of the beat changes.
+        if (ht.bpm > 0.0) bpm = ht.bpm;
+        playing.store(ht.playing, std::memory_order_relaxed);
+        blkPlaying = ht.playing;
+        slaved     = true;
+        slavedBeat = std::fmod(ht.ppqPosition, (double) GatePattern::kMaxPatternBars * 4.0);
     }
     else
     {
         blkPlaying = playing.load(std::memory_order_relaxed);
     }
-    blkBeatStart      = internalBeatPos.load(std::memory_order_relaxed);
+
+    blkBeatStart      = slaved ? slavedBeat : internalBeatPos.load(std::memory_order_relaxed);
     blkBeatsPerSample = (bpm / 60.0) / currentSampleRate;
 
     // Render → gate → insert → mixer through the shared path (engine→insert→mixer).

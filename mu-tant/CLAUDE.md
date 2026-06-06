@@ -48,7 +48,7 @@ The editor inherits `mu-core/UI/EditorShellBase.h` — same TransportBar, About,
 
 ```
 mu-tant/Source/
-├── Plugin/           PluginProcessor (dynamic voices + preset/modulator/gate I/O), PluginEditor (extends EditorShellBase)
+├── Plugin/           PluginProcessor (dynamic voices + preset/modulator/gate I/O), PluginEditor (extends EditorShellBase), StandaloneApp (+ standalone-only mu-link bridge)
 ├── Sequencer/        GatePattern (drawable gate model + shared block gater)
 ├── UI/               VoicePanel + VoiceSidebar (ChannelSidebar subclass) + GatingDesigner + SettingsOverlay
 ├── Audio/            SynthVoice (multi-voice), WavetableOscillator, WavetableBank, Scales
@@ -59,6 +59,10 @@ mu-tant/Source/
 ```
 
 When new subsystems land they go under the same `{Audio, Sequencer, UI, Persistence}` topology as mu-Clid per the family consistency rule.
+
+## mu-link integration (STANDALONE-ONLY)
+
+Like mu-Clid, mu-Tant connects to mu-link via the **shared header-only `mu-core/Link/MuLinkBridge.h`**, `#include`d only by `StandaloneApp.cpp` — so VST3/CLAP never compile it and a plugin can never attach (the host owns the clock + device). **Transport slaving uses the family standard:** `processBlock` reads the playhead via `mu_core::readHostTransport()` (now carries `hasPosition`/`ppqPosition`), and in **standalone** mode it slaves the beat to `ppqPosition` when present (mu-link attached), else free-runs the internal transport — plugin + free-running-standalone behaviour is byte-identical. The bus audio is the post-mixer `processBlock` output, so the synth engine is irrelevant. Never add mu-link hooks to the shared `PluginProcessor` beyond the playhead consult — keep them in the standalone TU. See [docs/mu-link/design-mulink.md](../docs/mu-link/design-mulink.md) §3.3.
 
 ## Design documents
 

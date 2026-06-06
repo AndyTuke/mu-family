@@ -103,14 +103,14 @@ target_link_libraries(mu-clid
         juce::juce_recommended_warning_flags
 )
 
-# Standalone-only: custom app class with close confirmation dialog (#167)
-# plus headless --render CLI for the listening-test pipeline (#649) plus the mu-link
-# bridge (#899) — all compiled ONLY into the Standalone target, so VST3/CLAP never attach.
+# Standalone-only: custom app class with close confirmation dialog (#167) plus headless
+# --render CLI for the listening-test pipeline (#649). The mu-link bridge (#899/#902) is now
+# the shared header-only mu-core/Link/MuLinkBridge.h — included ONLY by StandaloneApp.cpp, so
+# VST3/CLAP never compile it and a plugin can never attach.
 target_compile_definitions(mu-clid_Standalone PRIVATE JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
 target_sources(mu-clid_Standalone PRIVATE
     Source/Plugin/StandaloneApp.cpp
     Source/Plugin/RenderMode.cpp
-    Source/Plugin/MuLinkBridge.cpp
 )
 
 # ── Build-number increment (Release only) ────────────────────────────────────

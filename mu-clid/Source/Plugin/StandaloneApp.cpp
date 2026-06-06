@@ -5,7 +5,7 @@
 
 #include "PluginProcessor.h"
 #include "Plugin/RenderMode.h"
-#include "Plugin/MuLinkBridge.h"
+#include "Link/MuLinkBridge.h"   // shared mu-core standalone↔mu-link bridge (header-only)
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 
 //==============================================================================
@@ -141,8 +141,8 @@ public:
             {
                 juce::Component::SafePointer<MuClidWindow> safeWin (mainWindow.get());
                 const juce::String baseTitle = getApplicationName();
-                muLinkBridge = std::make_unique<mu_clid::MuLinkBridge> (
-                    *holderPtr->processor, holderPtr->player,
+                muLinkBridge = std::make_unique<mu_link::MuLinkBridge> (
+                    *holderPtr->processor, holderPtr->player, "mu-Clid",
                     [safeWin, baseTitle] (bool connected) mutable
                     {
                         if (safeWin != nullptr)
@@ -180,7 +180,7 @@ public:
 private:
     juce::ApplicationProperties           appProperties;
     std::unique_ptr<MuClidWindow>         mainWindow;
-    std::unique_ptr<mu_clid::MuLinkBridge> muLinkBridge;
+    std::unique_ptr<mu_link::MuLinkBridge> muLinkBridge;
 };
 
 //==============================================================================

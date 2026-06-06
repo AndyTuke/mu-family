@@ -20,8 +20,7 @@ Release build of `mu-clid_Standalone` triggers the OneDrive post-build deploy to
 mu-clid/Source/
 ├── Plugin/           PluginProcessor, PluginEditor (extends EditorShellBase),
 │                     PresetIO + PresetIO_HostState, HotSwapStager + HotSwapBoundary,
-│                     ModulationSkew, RenderMode, StandaloneApp, LiteEditor, SamplePreview,
-│                     MuLinkBridge + MuLinkPlayHead (standalone-only mu-link client)
+│                     ModulationSkew, RenderMode, StandaloneApp, LiteEditor, SamplePreview
 ├── Sequencer/        Rhythm, HitGenerator, SequencerEngine, EuclideanGenerator
 ├── UI/               Euclidean panels + VoiceSection (Pitch/Filter/Amp
 │                     subsections; the Insert subsection + the ModulatorPanel /
@@ -61,7 +60,7 @@ No stages are scheduled — mu-clid is feature-complete through Stage 34. New wo
 - **Each rhythm is its own APVTS subtree** — preset save/load + per-rhythm hot-swap rely on the subtree structure.
 - **Hot-swap uses `suspendProcessing` + `std::move`** — new `Rhythm` + `VoiceEngine` are staged on the message thread (`stageRhythmPreset`), committed atomically at the next loop boundary under a single suspend per `handleAsyncUpdate` call (multi-rhythm bursts batch into one suspend). The "atomic pointer hot-swap" pattern (lock-free pointer exchange + message-thread cleanup queue for the old engine) is a v2 candidate if perceptible suspend-gap clicks become a complaint — current single-block silence gap (~1.33 ms at 48k/64) is short enough to be inaudible on percussive material, occasionally audible on sustained pads.
 - **RhythmSidebar item order supports variable ordering from day one** — required for v2 drag-to-reorder.
-- **mu-link integration is STANDALONE-ONLY** — `MuLinkBridge` + `MuLinkPlayHead` are compiled only into `mu-clid_Standalone` (never VST3/CLAP — the host owns the clock + device). The bridge slaves the sequencer by handing the processor a `MuLinkPlayHead`, so the existing `deriveTransport()`/`getPlayHead()` path follows mu-link with **no `processBlock` change**. When attached it detaches the processor from the local `AudioProcessorPlayer` and lets `MuLinkClient` (mu-core) drive it; on mu-link quit it reattaches the local device. Never add mu-link hooks to the shared `PluginProcessor` — keep them in the standalone TU. See [docs/mu-link/design-mulink.md](../docs/mu-link/design-mulink.md) §3.3.
+- **mu-link integration is STANDALONE-ONLY** — the bridge is the **shared header-only `mu-core/Link/MuLinkBridge.h`** (promoted from mu-clid in #902), `#include`d only by `StandaloneApp.cpp`, so VST3/CLAP never compile it and a plugin can never attach (the host owns the clock + device). It slaves the sequencer by handing the processor a `mu_link::MuLinkPlayHead`, so the existing `deriveTransport()`/`getPlayHead()` path follows mu-link with **no `processBlock` change**; when attached it detaches the processor from the local `AudioProcessorPlayer` and lets `MuLinkClient` drive it; on mu-link quit it reattaches the local device. Never add mu-link hooks to the shared `PluginProcessor` — keep them in the standalone TU. See [docs/mu-link/design-mulink.md](../docs/mu-link/design-mulink.md) §3.3.
 
 ## Key mu-clid patterns
 

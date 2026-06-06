@@ -5,6 +5,7 @@
 
 #include "PluginProcessor.h"
 #include "UI/ConfirmDialog.h"
+#include "Link/MuLinkBridge.h"   // shared mu-core standalone↔mu-link bridge (header-only)
 #include <juce_audio_utils/juce_audio_utils.h>   // AudioDeviceSelectorComponent — StandaloneFilterWindow needs it in scope
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 
@@ -98,10 +99,30 @@ public:
             std::move (holder));
 
         mainWindow->setVisible (true);
+
+        // Standalone-only mu-link bridge (shared mu-core): when mu-link is running, route
+        // audio to its bus and slave the transport; absent → mu-Tant runs normally on its own
+        // device. Compiled only into the Standalone target, so plugins never attach.
+        if (auto* holderPtr = mainWindow->pluginHolder.get())
+            if (holderPtr->processor != nullptr)
+            {
+                juce::Component::SafePointer<MuTantWindow> safeWin (mainWindow.get());
+                const juce::String baseTitle = getApplicationName();
+                muLinkBridge = std::make_unique<mu_link::MuLinkBridge> (
+                    *holderPtr->processor, holderPtr->player, "mu-Tant",
+                    [safeWin, baseTitle] (bool connected) mutable
+                    {
+                        if (safeWin != nullptr)
+                            safeWin->setName (connected
+                                ? baseTitle + juce::String (juce::CharPointer_UTF8 ("  \xe2\x80\xa2  mu-link connected"))
+                                : baseTitle);
+                    });
+            }
     }
 
     void shutdown() override
     {
+        muLinkBridge = nullptr;   // references the holder's processor + player — tear down first
         if (mainWindow != nullptr && mainWindow->pluginHolder != nullptr)
             mainWindow->pluginHolder->saveAudioDeviceState();
         mainWindow = nullptr;
@@ -117,8 +138,9 @@ public:
     }
 
 private:
-    juce::ApplicationProperties     appProperties;
-    std::unique_ptr<MuTantWindow>   mainWindow;
+    juce::ApplicationProperties      appProperties;
+    std::unique_ptr<MuTantWindow>    mainWindow;
+    std::unique_ptr<mu_link::MuLinkBridge> muLinkBridge;
 };
 
 //==============================================================================

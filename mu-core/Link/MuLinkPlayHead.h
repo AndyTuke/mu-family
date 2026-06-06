@@ -3,22 +3,24 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Link/MuLinkProtocol.h"
 
-// MuLinkPlayHead — a juce::AudioPlayHead that reports the mu-link master transport.
+// MuLinkPlayHead — a juce::AudioPlayHead that reports the mu-link master transport. Shared
+// by every product's standalone (lives in mu-core/Link).
 //
-// This is the whole trick behind L5 transport-slaving: PluginProcessor::deriveTransport()
-// already reads play state + position from getPlayHead(). By handing the standalone
-// processor this playhead while attached to mu-link, the sequencer follows the mu-link
-// clock with NO change to processBlock — it's the same code path a DAW host drives.
+// This is the whole trick behind transport-slaving: a product's processBlock reads play
+// state + position from getPlayHead() (the family standard — see mu-core/Plugin/
+// HostTransport.h). Hand the standalone processor this playhead while attached to mu-link
+// and the sequencer follows the mu-link clock with NO processBlock change — the same path a
+// DAW host drives.
 //
 // The snapshot is set on the render thread immediately before each processBlock call (same
 // thread), so a plain member needs no synchronisation.
-namespace mu_clid
+namespace mu_link
 {
 
 class MuLinkPlayHead : public juce::AudioPlayHead
 {
 public:
-    void setSnapshot(const mu_link::TransportSnapshot& s) noexcept { snap = s; }
+    void setSnapshot(const TransportSnapshot& s) noexcept { snap = s; }
 
     juce::Optional<PositionInfo> getPosition() const override
     {
@@ -36,7 +38,7 @@ public:
     }
 
 private:
-    mu_link::TransportSnapshot snap;
+    TransportSnapshot snap;
 };
 
-} // namespace mu_clid
+} // namespace mu_link
