@@ -26,21 +26,24 @@ juce_add_plugin(mu-tant
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     VERSION         "${MUFAMILY_PLUGIN_VERSION}"
     COMPANY_COPYRIGHT "${MUFAMILY_COPYRIGHT}"
-    ICON_BIG   "${CMAKE_CURRENT_SOURCE_DIR}/resources/Icon.png"
-    ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/Icon.png"
+    ICON_BIG   "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
+    ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
 )
 
-# Generate a custom Windows VERSIONINFO RC that uses μ-Tant (Greek mu) in the
-# file description. configure_file runs at configure time; the embedded version
-# number is the configure-time build number (accurate after a fresh cmake -B build).
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/resources/versioninfo.rc.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc"
-    @ONLY
-    NEWLINE_STYLE CRLF   # RC compiler expects CRLF on Windows
-)
-target_compile_definitions(mu-tant     PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc\"")
-target_compile_definitions(mu-tant_rc_lib PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc\"")
+# Generate a custom Windows VERSIONINFO RC that uses μ-Tant (Greek mu) in the file
+# description. Windows-only — the .rc + JUCE's `<target>_rc_lib` resource target only exist
+# on Windows. configure_file runs at configure time; the embedded version number is the
+# configure-time build number (accurate after a fresh cmake -B build).
+if(WIN32)
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/versioninfo.rc.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc"
+        @ONLY
+        NEWLINE_STYLE CRLF   # RC compiler expects CRLF on Windows
+    )
+    target_compile_definitions(mu-tant        PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc\"")
+    target_compile_definitions(mu-tant_rc_lib PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc\"")
+endif()
 
 target_sources(mu-tant
     PRIVATE

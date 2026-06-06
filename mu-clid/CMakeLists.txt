@@ -29,15 +29,18 @@ juce_add_plugin(mu-clid
     ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/Icon.png"
 )
 
-# Custom VERSIONINFO with Greek μ in description (shared by full + Lite).
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/resources/versioninfo.rc.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc"
-    @ONLY
-    NEWLINE_STYLE CRLF
-)
-target_compile_definitions(mu-clid     PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc\"")
-target_compile_definitions(mu-clid_rc_lib PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc\"")
+# Custom VERSIONINFO with Greek μ in description (shared by full + Lite). Windows-only —
+# the .rc + the JUCE `<target>_rc_lib` resource target only exist on Windows.
+if(WIN32)
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/versioninfo.rc.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc"
+        @ONLY
+        NEWLINE_STYLE CRLF
+    )
+    target_compile_definitions(mu-clid        PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc\"")
+    target_compile_definitions(mu-clid_rc_lib PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo.rc\"")
+endif()
 
 target_sources(mu-clid
     PRIVATE
@@ -191,14 +194,16 @@ juce_add_plugin(mu-clid-lite
     ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/Icon.png"
 )
 
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/resources/versioninfo-lite.rc.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/versioninfo-lite.rc"
-    @ONLY
-    NEWLINE_STYLE CRLF
-)
-target_compile_definitions(mu-clid-lite     PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo-lite.rc\"")
-target_compile_definitions(mu-clid-lite_rc_lib PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo-lite.rc\"")
+if(WIN32)
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/versioninfo-lite.rc.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/versioninfo-lite.rc"
+        @ONLY
+        NEWLINE_STYLE CRLF
+    )
+    target_compile_definitions(mu-clid-lite        PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo-lite.rc\"")
+    target_compile_definitions(mu-clid-lite_rc_lib PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo-lite.rc\"")
+endif()
 
 target_sources(mu-clid-lite
     PRIVATE
