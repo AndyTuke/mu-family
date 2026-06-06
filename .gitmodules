@@ -1,0 +1,9 @@
+[submodule "ThirdParty/clap-juce-extensions"]
+	path = ThirdParty/clap-juce-extensions
+	url = https://github.com/free-audio/clap-juce-extensions.git
+[submodule "ThirdParty/signalsmith-basics"]
+	path = ThirdParty/signalsmith-basics
+	url = https://github.com/Signalsmith-Audio/basics.git
+[submodule "ThirdParty/signalsmith-dsp"]
+	path = ThirdParty/signalsmith-dsp
+	url = https://github.com/Signalsmith-Audio/dsp.git

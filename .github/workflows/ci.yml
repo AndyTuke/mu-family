@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive   # ThirdParty/{clap-juce-extensions,signalsmith-*} are submodules
 
       - name: Checkout JUCE 8.0.12
         uses: actions/checkout@v4
