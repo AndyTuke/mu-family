@@ -43,8 +43,16 @@ private:
     juce::Slider  tempoSlider;
     VUMeter       masterMeter;
     juce::Label   masterLabel;
+    juce::Slider  masterGain;
 
-    struct ClientStrip { VUMeter meter; juce::Label name; };
+    // One mixer strip per client slot: meter + name + gain knob + mute/solo.
+    struct ClientStrip
+    {
+        VUMeter        meter;
+        juce::Label    name;
+        juce::Slider   gain;
+        juce::TextButton mute { "M" }, solo { "S" };
+    };
     std::array<ClientStrip, mu_link::kMaxClients> clients;
 
     bool playing = true;

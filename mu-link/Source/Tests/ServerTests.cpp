@@ -165,6 +165,98 @@ public:
             st = engine.renderBlock(out.data(), 2, 24000);
             expectEquals((int) st.midiPulsesInBlock, 24);
         }
+
+        beginTest("reaps a client whose heartbeat freezes (died without detaching)");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            engine.prepare(48000.0, 512, 120.0);
+            engine.setPlaying(true);
+
+            // Simulate a client that attached then died: slot active, heartbeat set once
+            // and never advanced again.
+            mem.registry().slots[0].active.store(1);
+            mem.registry().slots[0].heartbeat.store(777);
+
+            OutputBuffers out(2, 512);
+            bool reaped = false;
+            // Threshold is 2 s = 96000 frames ≈ 188 blocks of 512; run well past it.
+            for (int b = 0; b < 300 && ! reaped; ++b)
+                if (engine.renderBlock(out.data(), 2, 512).reapedClients > 0)
+                    reaped = true;
+
+            expect(reaped, "zombie slot was never reaped");
+            expectEquals((int) mem.registry().slots[0].active.load(), 0);
+        }
+
+        beginTest("does not reap a client whose heartbeat keeps advancing");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            engine.prepare(48000.0, 512, 120.0);
+            engine.setPlaying(true);
+
+            mem.registry().slots[0].active.store(1);
+
+            OutputBuffers out(2, 512);
+            for (int b = 0; b < 300; ++b)
+            {
+                mem.registry().slots[0].heartbeat.store((std::uint64_t) (b + 1));   // alive
+                engine.renderBlock(out.data(), 2, 512);
+            }
+            expectEquals((int) mem.registry().slots[0].active.load(), 1);   // never reaped
+        }
+
+        beginTest("mixer: per-client gain scales, mute silences");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            engine.prepare(48000.0, 64, 120.0);
+            engine.setPlaying(true);
+
+            // Slot 0 active with a constant 1.0 stereo block in its ring.
+            mem.registry().slots[0].active.store(1);
+            std::vector<float> in(64 * kMaxChannels, 1.0f);
+            mem.ring(0).writeFrames(in.data(), 64);
+
+            engine.setClientGain(0, 0.5f);
+            OutputBuffers out(2, 64);
+            engine.renderBlock(out.data(), 2, 64);
+            expectWithinAbsoluteError(out.storage[0][0], 0.5f, 1.0e-6f);   // 1.0 × 0.5 gain
+
+            // Refill (the block was consumed) and mute → silence.
+            mem.ring(0).writeFrames(in.data(), 64);
+            engine.setClientMute(0, true);
+            engine.renderBlock(out.data(), 2, 64);
+            expectWithinAbsoluteError(out.storage[0][0], 0.0f, 1.0e-6f);
+        }
+
+        beginTest("mixer: solo isolates the soloed client");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            engine.prepare(48000.0, 64, 120.0);
+            engine.setPlaying(true);
+
+            mem.registry().slots[0].active.store(1);
+            mem.registry().slots[1].active.store(1);
+            std::vector<float> a(64 * kMaxChannels, 1.0f), b(64 * kMaxChannels, 0.3f);
+            mem.ring(0).writeFrames(a.data(), 64);
+            mem.ring(1).writeFrames(b.data(), 64);
+
+            engine.setClientSolo(1, true);   // only slot 1 audible
+            OutputBuffers out(2, 64);
+            engine.renderBlock(out.data(), 2, 64);
+            expectWithinAbsoluteError(out.storage[0][0], 0.3f, 1.0e-6f);   // slot 0 excluded
+        }
     }
 };
 

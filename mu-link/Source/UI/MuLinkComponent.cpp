@@ -53,17 +53,47 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
 
     for (int i = 0; i < (int) clients.size(); ++i)
     {
-        clients[(size_t) i].meter.getLevel = [this, i] { return server.clientPeak(i); };
-        addAndMakeVisible(clients[(size_t) i].meter);
-        styleLabel(clients[(size_t) i].name, "—", juce::Justification::centred, MuLookAndFeel::mutedText, 10.0f);
-        addAndMakeVisible(clients[(size_t) i].name);
+        auto& strip = clients[(size_t) i];
+        strip.meter.getLevel = [this, i] { return server.clientPeak(i); };
+        addAndMakeVisible(strip.meter);
+        styleLabel(strip.name, "—", juce::Justification::centred, MuLookAndFeel::mutedText, 10.0f);
+        addAndMakeVisible(strip.name);
+
+        // Per-client gain knob (linear 0–1.5, unity at 1.0).
+        strip.gain.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+        strip.gain.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+        strip.gain.setRange(0.0, 1.5, 0.01);
+        strip.gain.setValue(1.0, juce::dontSendNotification);
+        strip.gain.onValueChange = [this, i] { server.setClientGain(i, (float) clients[(size_t) i].gain.getValue()); };
+        addAndMakeVisible(strip.gain);
+
+        // Mute / solo toggles.
+        for (auto* b : { &strip.mute, &strip.solo })
+        {
+            b->setClickingTogglesState(true);
+            b->setColour(juce::TextButton::buttonColourId,   lnf.colour(MuLookAndFeel::panelBackground));
+            b->setColour(juce::TextButton::textColourOffId,  lnf.colour(MuLookAndFeel::labelText));
+            addAndMakeVisible(b);
+        }
+        strip.mute.setColour(juce::TextButton::buttonOnColourId, lnf.colour(MuLookAndFeel::vuMeterClip));
+        strip.solo.setColour(juce::TextButton::buttonOnColourId, lnf.colour(MuLookAndFeel::knobLevel));
+        strip.mute.onClick = [this, i] { server.setClientMute(i, clients[(size_t) i].mute.getToggleState()); };
+        strip.solo.onClick = [this, i] { server.setClientSolo(i, clients[(size_t) i].solo.getToggleState()); };
     }
+
+    // Master gain knob, under the master meter.
+    masterGain.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    masterGain.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    masterGain.setRange(0.0, 1.5, 0.01);
+    masterGain.setValue(1.0, juce::dontSendNotification);
+    masterGain.onValueChange = [this] { server.setMasterGain((float) masterGain.getValue()); };
+    addAndMakeVisible(masterGain);
 
     // Match the engine's initial state (it begins playing when a device opens).
     server.setTempo(120.0);
     server.setPlaying(true);
 
-    setSize(900, 560);
+    setSize(900, 620);
     startTimerHz(12);
 }
 
@@ -142,7 +172,11 @@ void MuLinkComponent::resized()
     auto meters = area.reduced(10, 8);
     const int labelH = 18;
 
+    // Each column, bottom-up: mute|solo row → gain knob → name → meter.
+    const int ctrlH = 20, knobH = 40;
+
     auto masterBlock = meters.removeFromRight(56);
+    masterGain.setBounds(masterBlock.removeFromBottom(knobH).reduced(6, 2));
     masterLabel.setBounds(masterBlock.removeFromBottom(labelH));
     masterMeter.setBounds(masterBlock.reduced(10, 0));
     meters.removeFromRight(14);
@@ -151,8 +185,15 @@ void MuLinkComponent::resized()
     const int cw = juce::jmax(1, meters.getWidth() / n);
     for (int i = 0; i < n; ++i)
     {
-        auto col = meters.removeFromLeft(cw);
-        clients[(size_t) i].name.setBounds(col.removeFromBottom(labelH));
-        clients[(size_t) i].meter.setBounds(col.reduced(6, 0));
+        auto& strip = clients[(size_t) i];
+        auto  col   = meters.removeFromLeft(cw);
+
+        auto ctrl = col.removeFromBottom(ctrlH);
+        const int bw = juce::jmax(1, ctrl.getWidth() / 2 - 2);
+        strip.mute.setBounds(ctrl.removeFromLeft(bw));
+        strip.solo.setBounds(ctrl.removeFromRight(bw));
+        strip.gain.setBounds(col.removeFromBottom(knobH).reduced(6, 2));
+        strip.name.setBounds(col.removeFromBottom(labelH));
+        strip.meter.setBounds(col.reduced(6, 0));
     }
 }
