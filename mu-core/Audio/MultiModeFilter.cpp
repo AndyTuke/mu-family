@@ -91,7 +91,7 @@ void MultiModeFilter::process(juce::AudioBuffer<float>& buffer,
             {
                 const float y = chData[ch][i] * preGain;
                 // Positive: tanh.  Negative: x/(1−x) (slightly harder → even harmonics).
-                chData[ch][i] = (y >= 0.0f ? std::tanhf(y) : y / (1.0f - y)) * invGain;
+                chData[ch][i] = (y >= 0.0f ? std::tanh(y) : y / (1.0f - y)) * invGain;
             }
         }
     }
