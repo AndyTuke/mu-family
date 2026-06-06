@@ -47,8 +47,27 @@ mu-link/Source/
 
 Targets: `mu-link-tests` (juce_core only — the sacred clock/ring/summing/client logic,
 tested headless), `mu-link-server` (headless server), `mu-link-tone` (reference tone
-client on `MuLinkClient`), and `mu-link` (the GUI app). Every target puts `mu-core` on its
-include path so `#include "Link/..."` resolves; none link the mu-core INTERFACE library.
+client on `MuLinkClient`), `mu-link-harness` (headless audio verification — see below),
+and `mu-link` (the GUI app). Every target puts `mu-core` on its include path so
+`#include "Link/..."` resolves; none link the mu-core INTERFACE library.
+
+## Verifying audio (no hardware needed)
+
+`mu-link-harness` is a **headless "virtual mu-link"**: it creates the bus + runs the real
+`ServerEngine`, but instead of a soundcard it captures the summed master to WAV
+(real-time-paced, so clients' render-ahead behaves exactly as in production) and
+**self-asserts** with per-frequency Goertzel + RMS analysis (exit 0 = PASS). A real
+`mu-link.exe` must NOT be running (it owns the same shared-memory names).
+
+```
+pwsh mu-link/scripts/verify-bus.ps1 -Build      # build + run all scenarios, PASS/FAIL
+```
+
+Producers: `--internal-tone <hz>` (in-process `MuLinkClient` sine — hermetic, CI-friendly),
+`--spawn "<cmd>"` (a real client process — e.g. `mu-link-tone`, or any mu standalone, which
+auto-attaches), or none (just capture for N seconds — launch an app by hand against it).
+To capture **mu-Clid through the bus**: run `mu-link-harness --seconds 10 --out muclid.wav`,
+then launch mu-Clid standalone and load a sound — its audio is summed into the capture.
 
 ### Why mu-link does NOT use EditorShellBase (documented deviation)
 
@@ -67,11 +86,12 @@ Client-side bus glue (attach / push audio / read transport / fallback) now lives
 ## Build
 
 ```
-cmake --build build --config Debug --target mu-link mu-link-tests mu-link-server mu-link-tone
-build/mu-link/mu-link-tests_artefacts/Debug/mu-link-tests.exe     # 20/20 green
+cmake --build build --config Debug --target mu-link mu-link-tests mu-link-server mu-link-tone mu-link-harness
+build/mu-link/mu-link-tests_artefacts/Debug/mu-link-tests.exe     # 23/23 green
 build/mu-link/mu-link_artefacts/Debug/mu-link.exe                 # the GUI app
 build/mu-link/mu-link-server_artefacts/Debug/mu-link-server.exe   # headless summing server
 build/mu-link/mu-link-tone_artefacts/Debug/mu-link-tone.exe 440   # reference tone client
+pwsh mu-link/scripts/verify-bus.ps1                              # headless audio PASS/FAIL
 ```
 
 mu-link is **local-only** — no plugin formats, no tester deploy.

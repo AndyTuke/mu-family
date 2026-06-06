@@ -90,12 +90,37 @@ target_link_libraries(mu-link-tone PRIVATE
 
 target_compile_definitions(mu-link-tone PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
 
+# ── mu-link-harness — headless "virtual mu-link": render the bus to WAV + self-assert ──
+juce_add_console_app(mu-link-harness PRODUCT_NAME "mu-link-harness")
+
+target_sources(mu-link-harness PRIVATE
+    Source/Tools/HarnessMain.cpp
+)
+
+target_compile_features(mu-link-harness PRIVATE cxx_std_17)
+
+target_include_directories(mu-link-harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source"
+    "${MU_CORE_DIR}"
+)
+
+target_link_libraries(mu-link-harness PRIVATE
+    juce::juce_audio_formats
+    juce::juce_audio_basics
+    juce::juce_recommended_config_flags
+    juce::juce_recommended_warning_flags
+)
+
+target_compile_definitions(mu-link-harness PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+
 # ── mu-link — the GUI app (device picker, client meters, master transport) ────
 # Not a plugin, so it does NOT link the mu-core INTERFACE library (that pulls the whole
 # plugin stack: ProcessorBase, EditorShellBase, …). Instead it compiles just the shared
 # design-system sources it needs for family visual parity — MuLookAndFeel + MuTheme +
 # VUMeter — alongside its own window. See docs/mu-link/design-mulink.md §3.3.
-juce_add_gui_app(mu-link PRODUCT_NAME "mu-link")
+juce_add_gui_app(mu-link PRODUCT_NAME "mu-link"
+    ICON_BIG   "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
+    ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png")
 
 target_sources(mu-link PRIVATE
     Source/Plugin/Main.cpp

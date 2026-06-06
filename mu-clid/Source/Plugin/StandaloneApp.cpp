@@ -5,6 +5,7 @@
 
 #include "PluginProcessor.h"
 #include "Plugin/RenderMode.h"
+#include "Plugin/MuLinkBridge.h"
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 
 //==============================================================================
@@ -131,10 +132,32 @@ public:
             std::move (holder));
 
         mainWindow->setVisible (true);
+
+        // Standalone-only mu-link bridge: when mu-link is running, route audio to its bus
+        // and slave the transport; absent → mu-Clid runs normally on its own device. This
+        // code is compiled only into the Standalone target, so plugins never attach.
+        if (auto* holderPtr = mainWindow->pluginHolder.get())
+            if (holderPtr->processor != nullptr)
+            {
+                juce::Component::SafePointer<MuClidWindow> safeWin (mainWindow.get());
+                const juce::String baseTitle = getApplicationName();
+                muLinkBridge = std::make_unique<mu_clid::MuLinkBridge> (
+                    *holderPtr->processor, holderPtr->player,
+                    [safeWin, baseTitle] (bool connected) mutable
+                    {
+                        if (safeWin != nullptr)
+                            safeWin->setName (connected
+                                ? baseTitle + juce::String (juce::CharPointer_UTF8 ("  \xe2\x80\xa2  mu-link connected"))
+                                : baseTitle);
+                    });
+            }
     }
 
     void shutdown() override
     {
+        // Tear the mu-link bridge down first — it references the holder's processor + player.
+        muLinkBridge = nullptr;
+
         // Persist the live audio device choice before the holder is destroyed.
         // StandalonePluginHolder writes audioSetup only on explicit saveAudioDeviceState
         // calls (closing the audio-settings dialog after a change), so a user who picks
@@ -155,8 +178,9 @@ public:
     }
 
 private:
-    juce::ApplicationProperties          appProperties;
-    std::unique_ptr<MuClidWindow>        mainWindow;
+    juce::ApplicationProperties           appProperties;
+    std::unique_ptr<MuClidWindow>         mainWindow;
+    std::unique_ptr<mu_clid::MuLinkBridge> muLinkBridge;
 };
 
 //==============================================================================

@@ -46,7 +46,11 @@ public:
     // Try to attach to a running mu-link. `numChannels` is recorded in the registry
     // (informational). Returns false if mu-link isn't running, the protocol version
     // mismatches, or every slot is taken — the product then runs on its own device.
-    bool attach(const juce::String& displayName, int numChannels)
+    //
+    // `startRendering` defaults to true (the producer thread starts immediately). Pass
+    // false when the caller must finish wiring before audio flows — e.g. re-prepare the
+    // processor at mu-link's sample rate — then call start() once ready.
+    bool attach(const juce::String& displayName, int numChannels, bool startRendering = true)
     {
         if (attached)
             return true;
@@ -59,8 +63,16 @@ public:
         }
         ringChannels = juce::jlimit(1, kMaxChannels, mem.ring().numChannels());
         attached = true;
-        startThread(juce::Thread::Priority::high);
+        if (startRendering)
+            start();
         return true;
+    }
+
+    // Begin the producer thread (no-op if already running). Pairs with attach(..., false).
+    void start()
+    {
+        if (attached && ! isThreadRunning())
+            startThread(juce::Thread::Priority::high);
     }
 
     // Stop the producer thread and release the slot. Safe to call when not attached.
@@ -85,6 +97,14 @@ public:
         return attached ? readTransport(mem.transport()) : TransportSnapshot{};
     }
 
+    // Raw seqlock generation of the transport block — advances every server block (even
+    // while stopped). A frozen generation across polls means mu-link has stopped rendering
+    // (quit, or closed its device); the product uses this to fall back. 0 when detached.
+    std::uint64_t transportGeneration() const noexcept
+    {
+        return attached ? mem.transport().generation.load(std::memory_order_acquire) : 0;
+    }
+
 private:
     static constexpr int kRenderChunk = 512;   // frames rendered per fill pass
 
@@ -103,12 +123,18 @@ private:
 
         while (! threadShouldExit())
         {
-            const TransportSnapshot snap = readTransport(mem.transport());
-
             int space = ring.writeAvailable();
             while (space > 0 && ! threadShouldExit())
             {
                 const int n = juce::jmin(space, kRenderChunk);
+
+                // Consume-time transport: this look-ahead block plays AFTER everything
+                // already queued, so project the master position forward by the buffered
+                // frames. That keeps a render-ahead client sample-accurately in sync —
+                // the block carries the position at which mu-link will actually play it.
+                TransportSnapshot snap = readTransport(mem.transport());
+                snap.samplePos += (std::uint64_t) ring.readAvailable();
+
                 for (int c = 0; c < rc; ++c)
                     std::fill(chanPtrs[(std::size_t) c], chanPtrs[(std::size_t) c] + n, 0.0f);
 
