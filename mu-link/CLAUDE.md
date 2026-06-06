@@ -96,7 +96,7 @@ build/mu-link/mu-link-tone_artefacts/Debug/mu-link-tone.exe 440   # reference to
 pwsh mu-link/scripts/verify-bus.ps1                              # headless audio PASS/FAIL
 ```
 
-mu-link is **local-only** — no plugin formats, no tester deploy.
+mu-link has **no plugin formats** (standalone GUI app only). It now **ships the Release exe to the tester share** (bare `mu-link.exe`, no installer) via a POST_BUILD on the `mu-link` target guarded by `MUFAMILY_DEPLOY_TESTERS` — testers need it to use the mu-Clid↔mu-link bridge. Debug is skipped (run Debug from the build folder).
 
 ## Critical rules
 

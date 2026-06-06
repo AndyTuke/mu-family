@@ -151,3 +151,19 @@ target_compile_definitions(mu-link PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_STANDALONE_APPLICATION=1
 )
+
+# ── Deploy the Release exe to the tester share (bare exe — no installer) ──────
+# Guarded by MUFAMILY_DEPLOY_TESTERS (OFF by default). Testers need mu-link.exe to use the
+# mu-Clid standalone↔mu-link bridge, so mu-link now ships alongside the plugins. Debug is
+# skipped inside the script; run Debug builds from the build output folder.
+if(MUFAMILY_DEPLOY_TESTERS)
+add_custom_command(TARGET mu-link POST_BUILD
+    COMMAND "${CMAKE_COMMAND}"
+            "-DCONFIG=$<CONFIG>"
+            "-DAPP_EXE=$<TARGET_FILE:mu-link>"
+            "-DDIST_WIN=${MUFAMILY_WIN_DIST}"
+            -P "${CMAKE_SOURCE_DIR}/cmake/DeployMuLink.cmake"
+    COMMENT "Deploying mu-link Release exe to OneDrive (Debug skipped)"
+    VERBATIM
+)
+endif()
