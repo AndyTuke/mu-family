@@ -1,0 +1,71 @@
+name: Release artifacts
+
+# Manual release build: builds the mu-family plugins in RELEASE on Linux, macOS, and Windows
+# and uploads the binaries (VST3 / CLAP / Standalone) as downloadable artifacts. CI runners
+# can't write to the local OneDrive share, so the Mac/Linux artifacts are downloaded on the
+# Windows machine and copied into TDP/Mac + TDP/Linux. (Windows Release is built + deployed
+# locally with the installer.) Version comes from the committed build_number.txt at the run's
+# commit, so pin/commit it before dispatching for a coordinated cross-platform version.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    env:
+      JUCE_PATH: ${{ github.workspace }}/JUCE
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Checkout JUCE 8.0.12
+        uses: actions/checkout@v4
+        with:
+          repository: juce-framework/JUCE
+          ref: 8.0.12
+          path: JUCE
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev libjack-jackd2-dev \
+            libx11-dev libxext-dev libxinerama-dev libxrandr-dev libxcursor-dev \
+            libxcomposite-dev libxrender-dev \
+            libfreetype6-dev libfontconfig1-dev libgl1-mesa-dev
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DMUFAMILY_DEPLOY_TESTERS=OFF
+
+      - name: Build Release plugins
+        run: >
+          cmake --build build --config Release --target
+          mu-clid_VST3 mu-clid_CLAP mu-clid_Standalone
+          mu-clid-lite_VST3 mu-clid-lite_CLAP
+          mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mu-family-${{ matrix.os }}-Release
+          if-no-files-found: warn
+          path: |
+            build/mu-clid/mu-clid_artefacts/Release/VST3
+            build/mu-clid/mu-clid_artefacts/Release/CLAP
+            build/mu-clid/mu-clid_artefacts/Release/Standalone
+            build/mu-clid/mu-clid-lite_artefacts/Release/VST3
+            build/mu-clid/mu-clid-lite_artefacts/Release/CLAP
+            build/mu-tant/mu-tant_artefacts/Release/VST3
+            build/mu-tant/mu-tant_artefacts/Release/CLAP
+            build/mu-tant/mu-tant_artefacts/Release/Standalone
