@@ -451,7 +451,7 @@ void RhythmPanel::setRhythm(int index)
     headerBar.commitNameEdit();   // commit any in-progress rename to the OLD rhythm first
 
     if (currentRhythmIndex != index)
-        loadedRhythmPresetFile = {};
+        loadedRhythmPresetFile = juce::File();   // explicit: '= {}' is ambiguous on GCC/Clang
     deregisterRhythmListeners(currentRhythmIndex);
     currentRhythmIndex = index;
     registerRhythmListeners(currentRhythmIndex);
