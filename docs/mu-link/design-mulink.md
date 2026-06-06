@@ -1,6 +1,6 @@
-# mu-link — design (v0.2)
+# mu-link — design (v0.3)
 
-**Status:** architecture decided (see [Decisions](#5-decisions-locked)). Foundation (IPC ring + transport clock + tests) scaffolded. Audio server, shared-memory mapping, GUI, and client-side mu-core glue are the next increments.
+**Status:** architecture decided (see [Decisions](#5-decisions-locked)) **and the build is staged** (see [§6 Build stages](#6-build-stages-l1l6)). Foundation (IPC ring + transport clock + tests) scaffolded and unit-tested. Win32 shared-memory mapping, audio server, GUI, and client-side mu-core glue are the staged increments.
 
 ## 1. Purpose
 
@@ -69,9 +69,12 @@ JUCE's `juce_audio_devices` already wraps all three, so the backend is mostly a 
 
 ### 3.3 Client integration (mu-core)
 
+> **CRITICAL — standalone-only.** mu-link integration is wired **only into the Standalone build** of each product. The **VST3 and CLAP plugin formats are never touched** — a plugin always uses the host's transport and the host's audio I/O, exactly as today, because *the host owns the clock and the audio device*; a plugin attaching to mu-link would fight its host. Every mu-link hook is gated on `getWrapperType() == juce::AudioProcessor::wrapperType_Standalone` (equivalently the standalone app wrapper), so the plugin code path is provably unchanged.
+
 - A new `mu-core` module, **`MuLinkClient`**, encapsulates: discover/attach to a running mu-link, allocate this client's audio ring, and expose the `TransportBlock`.
-- When mu-link is present, a mu product routes its render into the bus instead of opening its own `AudioDeviceManager` output, and **slaves its transport** to the shared block. mu-core already has [`HostTransport`](../../mu-core/Plugin/HostTransport.h) — the natural seam to feed from mu-link instead of the plugin host / internal transport.
-- When mu-link is **absent**, the product behaves exactly as today (own audio device, own internal transport). mu-link is additive, never a hard dependency.
+- **Auto-detection (no config).** mu-link is the hub: it creates and owns the named shared-memory regions (`kTransportMapName` / `kRegistryMapName`). Each standalone, at startup and periodically, tries to `OpenFileMapping` those names — success means "mu-link is running" and the standalone registers a `ClientSlot` and attaches its ring; failure means "run alone." So launching mu-link, mu-clid, mu-tant in any order, they discover each other automatically through the registry with zero user setup. mu-link's UI lists every attached client.
+- When mu-link is present, a **standalone** routes its render into the bus instead of opening its own `AudioDeviceManager` output, and **slaves its transport** (clock + tempo + play/stop) to the shared `TransportBlock`. mu-core already has [`HostTransport`](../../mu-core/Plugin/HostTransport.h) — the natural seam to feed from mu-link instead of the internal standalone transport.
+- When mu-link is **absent**, the standalone behaves exactly as today (own audio device, own internal transport). mu-link is additive, never a hard dependency — and a standalone that was attached must cleanly revert to its own device the moment mu-link quits.
 
 ### 3.4 Summing / mixing
 
@@ -102,15 +105,31 @@ Client-side bus glue lives in **`mu-core/Link/MuLinkClient.*`** (shared by all p
 3. **Client↔server coupling** → **Async double-buffered rings** (click-resistant). Underrun → silence + log, never a pop on the master.
 4. **Clock outputs** → internal sample-accurate transport bus **+ MIDI-clock OUT** to outboard gear. **No Ableton Link** (avoids the GPL/proprietary licence).
 
-### Secondary questions (design detail, not blocking)
-- **Tempo ownership:** is mu-link always tempo master, or can a client (e.g. mu-clid) be master and mu-link follow?
-- **Channel layout:** stereo per client summed to a stereo master, or multi-channel / per-client returns?
-- **Mixing depth:** plain sum, or reuse `MixerEngine` for per-client level/pan/mute/solo + master?
-- **Max clients** expected (fixes ring/shared-memory sizing).
-- **Discovery/handshake:** auto-attach when mu-link is running (named shared memory + registration); how to present "mu-link connected" in each product's UI.
-- **Sample-rate / buffer authority:** mu-link dictates SR + block size; clients must conform (confirm).
+### Secondary decisions (resolved)
+- **Tempo ownership** → **mu-link is always tempo master.** All clients follow the shared `TransportBlock`; a connected client surrenders its own tempo control. (Simplest path to the "rock-solid clock" goal; no feedback path into the master clock.)
+- **Mixing depth** → **plain sum first** (L2), grow into per-client level/pan/mute/solo + master via mu-core `MixerEngine` in **L6**.
+- **First client wired** → **mu-clid** (L5) — the most mature product; rhythmic transients make sync tightness audible.
+- **Channel layout** → stereo per client summed to a stereo master (`kMaxChannels = 2`). Multi-channel / per-client returns deferred.
+- **Max clients** → 8 (`kMaxClients = 8`), fixes ring / shared-memory sizing.
+- **Sample-rate / buffer authority** → **mu-link dictates SR + block size**; clients conform (a client whose device can't is refused and falls back to its own output).
 
-## 6. Licensing notes
+### Still open (design detail, not blocking)
+- **Discovery/handshake:** auto-attach when mu-link is running (named shared memory + registration); how to present "mu-link connected" in each product's UI. Settled during L4/L5.
+
+## 6. Build stages (L1–L6)
+
+Numbered like mu-clid's v1 roadmap. Each stage ends green (tests + build) before the next starts. Stages share the family build-number stream.
+
+| Stage | Scope | Done when |
+|---|---|---|
+| **L1** ✅ | **Win32 shared-memory mapping.** `SharedMemoryBus` wrapper over `CreateFileMapping`/`MapViewOfFile` for the `TransportBlock`, the `ClientRegistry`, and one ring region per client. `AudioRing` storage + indices relocate into the mapping unchanged (the header already notes this is pure relocation). | **Done (v1.0.779, #893).** Server publishes a `TransportBlock`; a spawned child process attaches by name, version-checks, reads it back, and produces a ring the parent consumes in order. 15/15 tests green. |
+| **L2** ✅ | **`AudioServer` + hardware device.** JUCE `AudioDeviceManager` (runtime WASAPI/ASIO), one callback → `clock.advance`, publish transport, **plain-sum** active client rings (zero-fill underrun + log), write to device. MIDI-clock-out bridge from `pulsesElapsed` delta. | **Done (v1.0.779, #895).** Pure `ServerEngine` (publish→sum→advance→pulse-count) unit-tested headless: two clients sum sample-accurately, underrun tail is silent (never clicks), 24-ppqn pulses track the clock. Device-owning `AudioServer` + runnable `mu-link-server` app build clean. 20/20 tests green. |
+| **L3** ✅ | **GUI app target.** `juce_add_gui_app`; window with device picker, connected-client list + level meters, master tempo + transport. | **Done (v1.0.779, #897).** `mu-link.exe` runs: `AudioDeviceSelectorComponent` picker (+ MIDI-clock-out port), play/stop + tempo (always master), and a mixer-style strip of 8 client meters + master, live-polled from the registry. **Reuses the shared design system (`MuLookAndFeel` + `VUMeter`) but NOT the plugin `EditorShellBase`** — mu-link is a server app, not an `AudioProcessor`, so it composes a bespoke `DocumentWindow` instead (documented deviation). 20/20 tests green. |
+| **L4** ✅ | **`mu-core/Link/MuLinkClient`.** Lift the client glue (auto-detect via `OpenFileMapping`, register a `ClientSlot`, allocate this client's ring, expose the `TransportBlock`) into mu-core; `MuLinkProtocol.h` moves to mu-core as the shared contract. Absent/quit → fallback. | **Done (v1.0.779, #898).** `mu-core/Link/` now holds `MuLinkProtocol.h` + `AudioRing.h` + `MuLinkSharedMemory.h` (`SharedMemoryRegion` + `MuLinkClientMemory`) + `MuLinkClient.h` (auto-detect attach, high-priority render-ahead thread, `onRender` callback, transport read, heartbeat, clean detach). mu-link keeps only the server half (`MuLinkServerMemory`). `mu-link-tone` rebuilt on `MuLinkClient`. Headless `MuLinkClient` test: attach → render-ahead → server sums → transport read-back → detach → re-claim. Core-boundary check passes; 23/23 tests green. |
+| **L5** | **Wire mu-clid — STANDALONE ONLY.** Gate every hook on `wrapperType_Standalone`; the VST3/CLAP path is untouched. The standalone routes its render into the bus instead of its own output device and slaves `HostTransport` to the shared block; "mu-link connected" indicator; clean fallback when mu-link isn't running or quits mid-session. | mu-clid **standalone** plays through mu-link, sample-accurately synced, and reverts to its own device when mu-link quits — while mu-clid VST3/CLAP behave byte-identically to before. |
+| **L6** | **Mixing + robustness.** Per-client level/pan/mute/solo + master via mu-core `MixerEngine`; heartbeat-based client reaping (reap a client that died without detaching); MIDI-clock-out to outboard gear validated. | Mixer strips work; a killed client is reaped without glitching the master; outboard gear locks to MIDI-clock out. |
+
+## 7. Licensing notes
 
 - **ASIO SDK** — free but under a Steinberg licence agreement; the SDK cannot be redistributed. Only relevant if we pick the ASIO backend.
 - **Ableton Link** — dual GPLv2+ / proprietary. A closed-source product needs the paid licence. Avoided unless we choose to be a Link peer; the internal clock is custom and licence-free.

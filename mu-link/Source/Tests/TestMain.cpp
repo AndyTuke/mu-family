@@ -9,7 +9,9 @@
 
 #include <juce_core/juce_core.h>
 #include <cstdio>
+#include <cstring>
 #include <iostream>
+#include "ShmTestVectors.h"
 
 class StdoutLogger : public juce::Logger
 {
@@ -17,8 +19,17 @@ public:
     void logMessage(const juce::String& msg) override { std::cout << msg << std::endl; }
 };
 
-int main(int, char**)
+int main(int argc, char** argv)
 {
+    // Child mode: the cross-process shared-memory test re-launches this exe with
+    // --shm-child to act as a real mu-link client. Do the client work and exit with a
+    // status the parent reads — do NOT run the unit-test suite (would recurse).
+#ifdef _WIN32
+    for (int i = 1; i < argc; ++i)
+        if (std::strcmp(argv[i], "--shm-child") == 0)
+            return mu_link_test::runShmChild();
+#endif
+
     StdoutLogger logger;
     juce::Logger::setCurrentLogger(&logger);
 

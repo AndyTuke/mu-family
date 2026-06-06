@@ -14,32 +14,72 @@ It is **not** a system-wide Windows audio driver. Because we own every client, i
 - **Hardware backend:** runtime-selectable WASAPI/ASIO via JUCE `AudioDeviceManager`.
 - **Coupling:** async double-buffered rings — underrun fills silence + logs, never clicks the master.
 - **Clock:** internal sample-accurate transport (the hardware word clock is the master) + MIDI-clock OUT to outboard gear. **No Ableton Link** (GPL/proprietary — avoided).
+- **Tempo:** **mu-link is always tempo master** — clients follow the shared `TransportBlock`; a connected client surrenders its own tempo. No client-as-master feedback path.
+- **Summing:** **plain sum first** (Stage L2); per-client level/pan/mute/solo via mu-core `MixerEngine` later (Stage L6).
+- **First client wired:** **mu-clid** (Stage L5).
+
+## Build stages (see design doc §6)
+
+L1 Win32 shared-memory mapping → L2 `AudioServer` + HW device (plain sum, MIDI-clock-out) → L3 GUI app → L4 lift client glue to `mu-core/Link/MuLinkClient` → L5 wire mu-clid → L6 MixerEngine strips + heartbeat reaping. Each stage ends green before the next.
 
 ## Source layout
 
+The IPC **contract + client half live in mu-core** (`mu-core/Link/`) so every product's
+standalone shares them; mu-link owns only the **server half** + the app.
+
 ```
+mu-core/Link/   (shared — used by mu-link AND every product's standalone)
+├── MuLinkProtocol.h     contract + seqlock transport read/write                            ✅ implemented
+├── AudioRing.h          AudioRingHeader/View/owner — same SPSC logic in-proc or over shm   ✅ implemented
+├── MuLinkSharedMemory.h SharedMemoryRegion (Win32 RAII) + MuLinkClientMemory (client)      ✅ implemented
+└── MuLinkClient.h       product-facing: auto-detect attach, render-ahead thread, fallback  ✅ implemented
+
 mu-link/Source/
-├── Ipc/       MuLinkProtocol.h (shared-memory contract), AudioRing.h (lock-free SPSC)   ✅ implemented
-├── Clock/     TransportClock.h (sample-accurate master clock)                            ✅ implemented
-├── Server/    AudioServer.h (owns HW device, sums clients, publishes transport)          ⏳ skeleton
-├── Plugin/    standalone app entry + main window                                          ⏳ TODO
-├── UI/        EditorShellBase-style window: clients, levels, master tempo, device picker  ⏳ TODO
-└── Tests/     TestMain + IpcTests (AudioRing SPSC + TransportClock)                        ✅ implemented
+├── Ipc/       MuLinkServerMemory.h — the SERVER composer (creates/owns all regions)        ✅ implemented
+├── Clock/     TransportClock.h (sample-accurate master), MidiClockOut.h (F8 bridge)        ✅ implemented
+├── Server/    ServerEngine.h (pure RT core: publish→sum→advance→pulses + peak meters),     ✅ implemented
+│              AudioServer.h (owns HW device, delegates each callback to the engine)
+├── Plugin/    Main.cpp — JUCEApplication + DocumentWindow owning the AudioServer            ✅ implemented
+├── UI/        MuLinkComponent — device picker + transport + client/master meter strip       ✅ implemented
+├── Tools/     ToneClientMain.cpp — mu-link-tone reference client (built on MuLinkClient)     ✅ implemented
+└── Tests/     TestMain + Ipc + SharedMemory (+child proc) + Server + Client                 ✅ 23/23 green
 ```
 
-Client-side bus glue (attach / push audio / read transport) will be lifted into **`mu-core/Link/MuLinkClient`** when the first product is wired, so every product shares it. The IPC contract (`MuLinkProtocol.h`) is the single source of truth for both sides — it moves to mu-core at that point.
+Targets: `mu-link-tests` (juce_core only — the sacred clock/ring/summing/client logic,
+tested headless), `mu-link-server` (headless server), `mu-link-tone` (reference tone
+client on `MuLinkClient`), and `mu-link` (the GUI app). Every target puts `mu-core` on its
+include path so `#include "Link/..."` resolves; none link the mu-core INTERFACE library.
+
+### Why mu-link does NOT use EditorShellBase (documented deviation)
+
+The family design rule is "share ONE UX via mu-core." mu-link honours the *visual* half —
+it reuses `MuLookAndFeel` (palette/sizes) and `VUMeter` from mu-core for family parity.
+But it deliberately does **not** derive its window from `EditorShellBase`: that shell is a
+`juce::AudioProcessorEditor` bound to a `ProcessorBase` (APVTS, presets, plugin formats),
+and mu-link is a **server app, not a plugin** — there is no `AudioProcessor`. Forcing it
+through the plugin shell would mean faking a processor. So mu-link composes a bespoke
+`DocumentWindow` + `MuLinkComponent`, and the GUI target compiles just the three shared UI
+sources it needs (`MuLookAndFeel`/`MuTheme`/`VUMeter`) rather than linking the whole
+mu-core INTERFACE library (which would drag in the entire plugin stack).
+
+Client-side bus glue (attach / push audio / read transport / fallback) now lives in **`mu-core/Link/MuLinkClient`** (L4), shared by every product. The IPC contract (`mu-core/Link/MuLinkProtocol.h`) is the single source of truth for both sides. L5 wires the first product (mu-clid **standalone only**) onto `MuLinkClient`.
 
 ## Build
 
 ```
-cmake --build build --config Debug --target mu-link-tests
-build/mu-link/mu-link-tests_artefacts/Debug/mu-link-tests.exe
+cmake --build build --config Debug --target mu-link mu-link-tests mu-link-server mu-link-tone
+build/mu-link/mu-link-tests_artefacts/Debug/mu-link-tests.exe     # 20/20 green
+build/mu-link/mu-link_artefacts/Debug/mu-link.exe                 # the GUI app
+build/mu-link/mu-link-server_artefacts/Debug/mu-link-server.exe   # headless summing server
+build/mu-link/mu-link-tone_artefacts/Debug/mu-link-tone.exe 440   # reference tone client
 ```
 
-The GUI app target is not wired yet (foundation phase). mu-link is **local-only** — no plugin formats, no tester deploy.
+mu-link is **local-only** — no plugin formats, no tester deploy.
 
 ## Critical rules
 
+- **Standalone-only integration — plugins are never touched.** mu-link hooks (route audio to the bus, slave the transport) are wired **only into each product's Standalone build**, gated on `getWrapperType() == juce::AudioProcessor::wrapperType_Standalone`. The **VST3 and CLAP formats keep using the host's transport and host audio I/O, completely unchanged** — the host owns the clock and device; a plugin must never attach to mu-link. A standalone running with no mu-link present behaves exactly as it does today (own device, own transport); it must also revert cleanly to its own device if mu-link quits mid-session.
+- **Auto-detection, zero config.** mu-link owns the named shared-memory regions; standalones detect it by `OpenFileMapping` on the known names and self-register in the `ClientRegistry`. Any launch order works; no user setup. When attached, a standalone takes its clock/tempo/transport **and** its audio output from mu-link.
 - **The clock is sacred.** It is derived from the hardware audio callback's frame count — never from wall-clock time, a `juce::Timer`, or MIDI input. Any feature that needs musical time reads `TransportClock`.
 - **The audio thread never blocks and never allocates.** `AudioRing` is lock-free SPSC by contract: exactly one writer (a client) and one reader (the server) per ring. Never add a second writer/reader.
 - **Underruns degrade gracefully** — a late client yields silence for its own stream plus a log line, and must never stall or glitch the summed master output.

@@ -5,7 +5,7 @@
 #include <juce_core/juce_core.h>
 #include <thread>
 #include <vector>
-#include "../Ipc/AudioRing.h"
+#include "Link/AudioRing.h"
 #include "../Clock/TransportClock.h"
 
 using namespace mu_link;
