@@ -100,8 +100,9 @@ public:
             expectEquals(a.claimSlot("a", 2), 0);
             expectEquals(b.claimSlot("b", 2), 1);
 
-            produce(a, 64, [](int i, int c) { return (float) (i * 2 + c); });
-            produce(b, 64, [](int i, int c) { return 100.0f + (float) (i * 2 + c); });
+            // Sub-knee levels so the master soft-clip is transparent and the sum is exact.
+            produce(a, 64, [](int i, int c) { return 0.001f * (float) (i * 2 + c); });
+            produce(b, 64, [](int i, int c) { return 0.4f + 0.001f * (float) (i * 2 + c); });
 
             OutputBuffers out(2, 64);
             auto st = engine.renderBlock(out.data(), 2, 64);
@@ -112,8 +113,8 @@ public:
             for (int i = 0; i < 64; ++i)
                 for (int c = 0; c < 2; ++c)
                 {
-                    const float expected = 100.0f + 2.0f * (float) (i * 2 + c);
-                    if (out.storage[(std::size_t) c][(std::size_t) i] != expected) ok = false;
+                    const float expected = 0.4f + 0.002f * (float) (i * 2 + c);   // A + B
+                    if (std::abs(out.storage[(std::size_t) c][(std::size_t) i] - expected) > 1.0e-5f) ok = false;
                 }
             expect(ok, "summed master does not match A+B");
         }
@@ -130,7 +131,7 @@ public:
             MuLinkClientMemory a;
             expect(a.open(), "client failed to attach");
             expectEquals(a.claimSlot("short", 2), 0);
-            produce(a, 10, [](int, int) { return 1.0f; });   // only 10 of 64 frames available
+            produce(a, 10, [](int, int) { return 0.5f; });   // only 10 of 64 frames (sub-knee level)
 
             OutputBuffers out(2, 64);
             auto st = engine.renderBlock(out.data(), 2, 64);
@@ -141,7 +142,7 @@ public:
                 for (int c = 0; c < 2; ++c)
                 {
                     const float v = out.storage[(std::size_t) c][(std::size_t) i];
-                    if (i < 10) { if (v != 1.0f) headOk = false; }
+                    if (i < 10) { if (std::abs(v - 0.5f) > 1.0e-6f) headOk = false; }
                     else        { if (v != 0.0f) tailSilent = false; }
                 }
             expect(headOk, "available frames not summed");
@@ -256,6 +257,35 @@ public:
             OutputBuffers out(2, 64);
             engine.renderBlock(out.data(), 2, 64);
             expectWithinAbsoluteError(out.storage[0][0], 0.3f, 1.0e-6f);   // slot 0 excluded
+        }
+
+        beginTest("master safety soft-clip keeps a hot signal under full scale");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            engine.prepare(48000.0, 64, 120.0);
+            engine.setPlaying(true);
+
+            // A grossly over-unity client (2.0) must not produce > 1.0 on the master.
+            mem.registry().slots[0].active.store(1);
+            std::vector<float> hot(64 * kMaxChannels, 2.0f);
+            mem.ring(0).writeFrames(hot.data(), 64);
+
+            OutputBuffers out(2, 64);
+            engine.renderBlock(out.data(), 2, 64);
+            expect(out.storage[0][0] <= 1.0f, "soft-clip let the master exceed full scale");
+            expect(out.storage[0][0] >  0.9f, "soft-clip should still pass near full scale");
+
+            // And a normal-level signal (0.5) passes through untouched (below the knee).
+            mem.registry().slots[0].active.store(0);
+            for (int b = 0; b < 2; ++b) engine.renderBlock(out.data(), 2, 64);   // let slot meter fall
+            mem.registry().slots[1].active.store(1);
+            std::vector<float> norm(64 * kMaxChannels, 0.5f);
+            mem.ring(1).writeFrames(norm.data(), 64);
+            engine.renderBlock(out.data(), 2, 64);
+            expectWithinAbsoluteError(out.storage[0][0], 0.5f, 1.0e-6f);   // transparent below knee
         }
     }
 };
