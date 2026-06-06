@@ -1,6 +1,7 @@
 #pragma once
 
 #include "EuclideanGenerator.h"
+#include <cstdint>   // uint8_t (StepType underlying type) — not transitively provided off-MSVC
 #include <vector>
 
 enum class InsertMode { Pad, Mute };
