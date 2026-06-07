@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Family-shared guidance for Claude Code working in this monorepo. **Product-specific rules live under each plugin's own CLAUDE.md** ([mu-clid/CLAUDE.md](mu-clid/CLAUDE.md), [mu-tant/CLAUDE.md](mu-tant/CLAUDE.md), [mu-toni/CLAUDE.md](mu-toni/CLAUDE.md)) — read the one matching the product you're working on, in addition to this file.
+Family-shared guidance for Claude Code working in this monorepo. **Product-specific rules live under each plugin's own CLAUDE.md** ([mu-clid/CLAUDE.md](mu-clid/CLAUDE.md), [mu-tant/CLAUDE.md](mu-tant/CLAUDE.md), [mu-toni/CLAUDE.md](mu-toni/CLAUDE.md), [mu-on/CLAUDE.md](mu-on/CLAUDE.md)) — read the one matching the product you're working on, in addition to this file.
 
 ## Monorepo layout
 
@@ -9,6 +9,7 @@ mu-core/        Shared audio + FX + modulation + mixer UI + ProcessorBase + Edit
 mu-clid/        Euclidean rhythm sequencer + sample trigger plugin (VST3 + CLAP + Standalone + Lite)
 mu-tant/        Wavetable drone synth — 8 voices, mixer, modulators, gate-pattern grid (Standalone, in progress)
 mu-toni/        Scaffolding only — Source/{Plugin,Sequencer,UI,Persistence,License,Tests}/
+mu-on/          909-style groove sequencer — Kick/Bass/Hat/Snare lanes, step grid, bass↔kick sidechain
 docs/           Family-shared design docs; product-specific docs under docs/<product>/
 tests/          Cross-plugin listening-test pipeline
 ```

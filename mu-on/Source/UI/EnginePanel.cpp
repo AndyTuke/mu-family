@@ -14,8 +14,11 @@ namespace
         switch (channel)
         {
             case Kick:  return { {"k_tune","Tune"}, {"k_ptch","Pitch"}, {"k_pdec","P.Dec"}, {"k_adec","Decay"}, {"k_drive","Drive"} };
+            // Bass also exposes its sidechain-to-Kick controls (the key interaction):
+            // Duck depth + envelope — small Duck = smooth, large = pumping.
             case Bass:  return { {"b_wave","Wave"}, {"b_tune","Tune"}, {"b_sub","Sub"}, {"b_cut","Cutoff"}, {"b_res","Reso"},
-                                 {"b_env","F.Env"}, {"b_edec","E.Dec"}, {"b_atk","Atk"}, {"b_dec","Dec"}, {"b_sus","Sus"}, {"b_drive","Drive"} };
+                                 {"b_env","F.Env"}, {"b_edec","E.Dec"}, {"b_atk","Atk"}, {"b_dec","Dec"}, {"b_sus","Sus"}, {"b_drive","Drive"},
+                                 {"ch1_scAmt","Duck"}, {"ch1_scAtk","D.Atk"}, {"ch1_scRel","D.Rel"} };
             case Hat:   return { {"h_tune","Tune"}, {"h_dec","Decay"} };
             case Snare: return { {"s_tune","Tune"}, {"s_dec","Decay"} };
             default:    return {};
@@ -89,19 +92,23 @@ void EnginePanel::resized()
     auto area = getLocalBounds().withTrimmedTop(28).reduced(8, 4);
     if (controls.empty()) return;
 
-    const int n = (int) controls.size();
-    const int colW = juce::jmax(48, area.getWidth() / juce::jmax(1, n));
-    const int knobH = juce::jmin(area.getHeight() - 16, colW);
+    // Wrapping grid: fit as many ~64 px columns per row as the width allows, then wrap.
+    const int n      = (int) controls.size();
+    const int colW   = 64;
+    const int perRow = juce::jlimit(1, n, juce::jmax(1, area.getWidth() / colW));
+    const int rows   = (n + perRow - 1) / perRow;
+    const int cellW  = area.getWidth() / perRow;
+    const int cellH  = juce::jmax(40, area.getHeight() / juce::jmax(1, rows));
+    const int knobH  = juce::jmin(cellH - 16, cellW - 8);
 
-    int x = area.getX();
-    for (auto& c : controls)
+    for (int i = 0; i < n; ++i)
     {
-        juce::Rectangle<int> col(x, area.getY(), colW, area.getHeight());
-        c->name.setBounds(col.removeFromTop(14));
-        auto ctlR = col.removeFromTop(knobH).reduced(4, 0);
-        if (c->combo) c->combo->setBounds(ctlR.removeFromTop(24));
-        else if (c->knob) c->knob->setBounds(ctlR);
-        x += colW;
+        const int r = i / perRow, c = i % perRow;
+        juce::Rectangle<int> cell(area.getX() + c * cellW, area.getY() + r * cellH, cellW, cellH);
+        controls[(size_t) i]->name.setBounds(cell.removeFromTop(13));
+        auto ctlR = cell.removeFromTop(knobH).reduced(4, 0);
+        if (controls[(size_t) i]->combo) controls[(size_t) i]->combo->setBounds(ctlR.removeFromTop(24));
+        else if (controls[(size_t) i]->knob) controls[(size_t) i]->knob->setBounds(ctlR);
     }
 }
 
