@@ -313,6 +313,53 @@ public:
             est.onStop();
             expect(! est.isRunning(), "Stop (0xFC) → stopped");
         }
+
+        beginTest("renderBlock tolerates a block larger than the prepared max (#913)");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            engine.prepare(48000.0, 64, 120.0);   // de-interleave scratch sized for 64 frames
+            engine.setPlaying(true);
+
+            mem.registry().slots[0].active.store(1);
+            std::vector<float> in(64 * kMaxChannels, 0.25f);
+            mem.ring(0).writeFrames(in.data(), 64);
+
+            // The device hands us a BIGGER block than was prepared — must not overrun the
+            // scratch. The available client frames sum in; the rest stays clean silence.
+            OutputBuffers out(2, 256);
+            auto st = engine.renderBlock(out.data(), 2, 256);
+            expectEquals(st.activeClients, 1);
+            expectWithinAbsoluteError(out.storage[0][0],   0.25f, 1.0e-6f);
+            expectWithinAbsoluteError(out.storage[0][120], 0.0f,  1.0e-6f);   // beyond the prepared max
+        }
+
+        beginTest("external MIDI clock: a stalled stream stops the transport (#912)");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            MidiClockEstimator est;
+            engine.attachMidiClock(&est);
+            engine.setClockSource(ClockSource::ExternalMidi);
+            engine.prepare(48000.0, 512, 120.0);
+
+            est.onStart();
+            double t = 0.0; const double pulse = 0.5 / 24.0;   // 120 BPM
+            for (int i = 0; i < 10; ++i) { est.onClockPulse(t); t += pulse; }
+
+            OutputBuffers out(2, 512);
+            engine.renderBlock(out.data(), 2, 512);            // fresh pulses → running
+            expectEquals((int) readTransport(mem.transport()).playing, 1, "should be playing while clock is live");
+
+            // No further pulses arrive (cable pulled, no 0xFC). After > 0.5 s of frames the
+            // stall watchdog stops the transport rather than coasting forever at last tempo.
+            for (int b = 0; b < 60; ++b) engine.renderBlock(out.data(), 2, 512);   // ≈ 0.64 s
+            expectEquals((int) readTransport(mem.transport()).playing, 0, "stalled external clock should stop the transport");
+        }
     }
 };
 

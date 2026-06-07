@@ -1,8 +1,10 @@
 #pragma once
 
+#include <algorithm>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <vector>
 
 // Lock-free single-producer / single-consumer audio ring (interleaved float frames).
@@ -47,12 +49,25 @@ public:
 
     bool valid() const noexcept { return header != nullptr && data != nullptr; }
 
+    // Capacity MUST be a power of two so the monotonic uint32 write/read indices wrap
+    // seamlessly across the 2^32 counter boundary (2^32 is an exact multiple of any power
+    // of two, so `index % capacity` stays contiguous through the wrap; a non-power-of-two
+    // capacity would corrupt the ring after ~2^32 frames). We round UP here so any
+    // requested size is safe, and layout() + bytesFor() agree by both rounding identically.
+    static std::uint32_t roundedCapacity(int capacityFrames) noexcept
+    {
+        std::uint32_t c = capacityFrames > 0 ? (std::uint32_t) capacityFrames : 1u;
+        std::uint32_t p = 1u;
+        while (p < c) p <<= 1;
+        return p;
+    }
+
     // Server-side one-time init of a freshly-mapped (or freshly-allocated) region:
     // stamp the geometry and zero the indices. Call once before either side streams.
     static void layout(AudioRingHeader* h, int numChannels, int capacityFrames) noexcept
     {
-        h->channels = numChannels   > 0 ? (std::uint32_t) numChannels   : 1;
-        h->capacity = capacityFrames > 0 ? (std::uint32_t) capacityFrames : 1;
+        h->channels = numChannels > 0 ? (std::uint32_t) numChannels : 1;
+        h->capacity = roundedCapacity(capacityFrames);
         h->writePos.store(0, std::memory_order_relaxed);
         h->readPos .store(0, std::memory_order_relaxed);
     }
@@ -60,8 +75,8 @@ public:
     // Total bytes a shared region must reserve for [header][capacity*channels floats].
     static std::size_t bytesFor(int numChannels, int capacityFrames) noexcept
     {
-        const std::size_t ch  = numChannels   > 0 ? (std::size_t) numChannels   : 1;
-        const std::size_t cap = capacityFrames > 0 ? (std::size_t) capacityFrames : 1;
+        const std::size_t ch  = numChannels > 0 ? (std::size_t) numChannels : 1;
+        const std::size_t cap = roundedCapacity(capacityFrames);
         return sizeof(AudioRingHeader) + cap * ch * sizeof(float);
     }
 
@@ -94,12 +109,16 @@ public:
         const int  freeFrames = (int) (cap - (std::uint32_t) (w - r));
         const int  n = numFrames < freeFrames ? numFrames : freeFrames;
 
-        for (int i = 0; i < n; ++i)
-        {
-            const std::size_t slot = (std::size_t) ((w + (std::uint32_t) i) % cap) * (std::size_t) channels;
-            for (int c = 0; c < channels; ++c)
-                data[slot + (std::size_t) c] = src[(std::size_t) i * (std::size_t) channels + (std::size_t) c];
-        }
+        // Storage is contiguous except across the single wrap point, so copy at most two
+        // runs (pre-wrap, post-wrap) with memcpy rather than N modulo-indexed element copies.
+        const std::uint32_t start = w % cap;
+        const int first = std::min(n, (int) (cap - start));
+        std::memcpy(data + (std::size_t) start * channels, src,
+                    (std::size_t) first * channels * sizeof(float));
+        if (n > first)
+            std::memcpy(data, src + (std::size_t) first * channels,
+                        (std::size_t) (n - first) * channels * sizeof(float));
+
         header->writePos.store(w + (std::uint32_t) n, std::memory_order_release);   // publish
         return n;
     }
@@ -116,12 +135,15 @@ public:
         const int  avail = (int) (w - r);
         const int  n = numFrames < avail ? numFrames : avail;
 
-        for (int i = 0; i < n; ++i)
-        {
-            const std::size_t slot = (std::size_t) ((r + (std::uint32_t) i) % cap) * (std::size_t) channels;
-            for (int c = 0; c < channels; ++c)
-                dst[(std::size_t) i * (std::size_t) channels + (std::size_t) c] = data[slot + (std::size_t) c];
-        }
+        // Mirror of writeFrames: at most two contiguous memcpy runs across the wrap point.
+        const std::uint32_t start = r % cap;
+        const int first = std::min(n, (int) (cap - start));
+        std::memcpy(dst, data + (std::size_t) start * channels,
+                    (std::size_t) first * channels * sizeof(float));
+        if (n > first)
+            std::memcpy(dst + (std::size_t) first * channels, data,
+                        (std::size_t) (n - first) * channels * sizeof(float));
+
         header->readPos.store(r + (std::uint32_t) n, std::memory_order_release);    // release space
         return n;
     }

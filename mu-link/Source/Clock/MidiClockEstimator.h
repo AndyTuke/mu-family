@@ -41,6 +41,7 @@ public:
         }
         lastTimestamp = timestampSeconds;
         haveLast      = true;
+        pulseCounter.fetch_add(1, std::memory_order_relaxed);   // liveness tick (stall detection)
     }
 
     void onStart() noexcept     // 0xFA — play from the top
@@ -63,6 +64,12 @@ public:
     double bpm()       const noexcept { return bpmOut.load(std::memory_order_relaxed); }
     bool   isRunning() const noexcept { return running.load(std::memory_order_relaxed); }
 
+    // Monotonic count of clock pulses received — the audio thread watches this for a STALL
+    // (a source that stops sending 0xF8 without a 0xFC, e.g. a pulled cable): if it stops
+    // advancing the engine treats the external clock as lost rather than playing forever at
+    // the frozen tempo. The frame counter stays the timebase, so detection lives server-side.
+    std::uint64_t pulseCount() const noexcept { return pulseCounter.load(std::memory_order_relaxed); }
+
     // True exactly once after each Start, so the consumer can rewind the transport to 0.
     bool consumeReset() noexcept { return resetRequest.exchange(false, std::memory_order_acq_rel); }
 
@@ -77,9 +84,10 @@ private:
     bool   haveLast      = false;
 
     // Cross-thread outputs.
-    std::atomic<double> bpmOut       { 0.0 };
-    std::atomic<bool>   running      { false };
-    std::atomic<bool>   resetRequest { false };
+    std::atomic<double>        bpmOut       { 0.0 };
+    std::atomic<bool>          running      { false };
+    std::atomic<bool>          resetRequest { false };
+    std::atomic<std::uint64_t> pulseCounter { 0 };   // liveness; see pulseCount()
 };
 
 } // namespace mu_link

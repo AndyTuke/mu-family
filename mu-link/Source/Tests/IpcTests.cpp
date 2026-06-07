@@ -6,6 +6,7 @@
 #include <thread>
 #include <vector>
 #include "Link/AudioRing.h"
+#include "Link/MuLinkProtocol.h"
 #include "../Clock/TransportClock.h"
 
 using namespace mu_link;
@@ -72,6 +73,21 @@ public:
                 expectEquals(ring.readFrames(out, 5), 5);
                 for (int i = 0; i < 5; ++i) { expect(out[i] == expected, "FIFO order broken on wrap"); expected += 1.0f; }
             }
+        }
+
+        beginTest("capacity rounds up to a power of two for seamless uint32 wrap (#915)");
+        {
+            AudioRing ring;
+            ring.prepare(2, 100);                  // 100 is not a power of two
+            expectEquals(ring.capacityFrames(), 128);   // rounded up
+            expectEquals(ring.writeAvailable(), 128);
+
+            // Still round-trips correctly at the rounded capacity (exercises the memcpy runs).
+            std::vector<float> in { 0,0.5f, 1,1.5f, 2,2.5f };
+            expectEquals(ring.writeFrames(in.data(), 3), 3);
+            std::vector<float> out(6, -1.0f);
+            expectEquals(ring.readFrames(out.data(), 3), 3);
+            for (int i = 0; i < 6; ++i) expect(out[(size_t) i] == in[(size_t) i], "sample mismatch after rounding");
         }
 
         beginTest("concurrent producer/consumer transfers every frame in order");
@@ -149,8 +165,70 @@ public:
             c.advance(24000);                      // 2 beats
             expectEquals((int) c.pulsesElapsed(24), 48);
         }
+
+        beginTest("tempo change does not retroactively shift accumulated beats (#916)");
+        {
+            TransportClock c; c.prepare(48000.0, 120.0); c.setPlaying(true);
+            c.advance(24000);                      // 1 beat at 120 BPM
+            expectWithinAbsoluteError(c.beats(), 1.0, 1.0e-9);
+
+            c.setTempo(60.0);                      // halve the tempo
+            c.advance(48000);                      // 1.0 s at 60 BPM = 1 more beat
+
+            // Beats accumulate: the first beat is preserved and the second accrues at the
+            // NEW rate → 2.0. The old recompute-from-samples (72000/48000 × 60/60 = 1.5)
+            // would have rewritten the already-elapsed beat — the bug #916 fixes.
+            expectWithinAbsoluteError(c.beats(), 2.0, 1.0e-9);
+            expectEquals((int) c.samplePosition(), 72000);
+        }
     }
 };
 
-static AudioRingTest      audioRingTest;
-static TransportClockTest transportClockTest;
+// Seqlock transport publish/consume (the torn-free snapshot contract) + its bounded-spin
+// fail-safe when a writer dies mid-write. The block is plain in-process memory here; the
+// same code runs over shared memory in production.
+class TransportSeqlockTest : public juce::UnitTest
+{
+public:
+    TransportSeqlockTest() : juce::UnitTest("mu-link IPC / Transport seqlock") {}
+
+    void runTest() override
+    {
+        beginTest("publish → consume round-trips every field incl. ppqPosition");
+        {
+            TransportBlock blk;
+            TransportSnapshot in;
+            in.samplePos = 96000; in.ppqPosition = 4.25; in.tempoBpm = 137.5;
+            in.sampleRate = 48000; in.playing = 1; in.blockSize = 256;
+            writeTransport(blk, in);
+
+            const auto out = readTransport(blk);
+            expectEquals((int) out.samplePos, 96000);
+            expectWithinAbsoluteError(out.ppqPosition, 4.25, 1.0e-12);
+            expectWithinAbsoluteError(out.tempoBpm, 137.5, 1.0e-12);
+            expectEquals((int) out.sampleRate, 48000);
+            expectEquals((int) out.playing, 1);
+            expectEquals((int) out.blockSize, 256);
+        }
+
+        beginTest("reader fails safe to a stopped snapshot when the writer is stuck odd (#914)");
+        {
+            TransportBlock blk;
+            TransportSnapshot in;
+            in.samplePos = 1000; in.playing = 1; in.tempoBpm = 120.0;
+            writeTransport(blk, in);                 // leaves generation even (stable)
+
+            // Simulate a server that crashed mid-write: bump generation to odd and never
+            // bring it back to even. readTransport must bound its spin and return a safe
+            // stopped snapshot rather than hang the caller's render thread forever.
+            blk.generation.fetch_add(1);             // → odd
+            const auto out = readTransport(blk);
+            expectEquals((int) out.playing, 0, "stuck-odd writer should yield a stopped snapshot");
+            expectEquals((int) out.samplePos, 0);
+        }
+    }
+};
+
+static AudioRingTest         audioRingTest;
+static TransportClockTest    transportClockTest;
+static TransportSeqlockTest  transportSeqlockTest;

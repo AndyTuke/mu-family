@@ -69,16 +69,20 @@ public:
     void attachMemory(MuLinkServerMemory* sharedMem) noexcept { mem = sharedMem; }
 
     // ─── Per-client mixer (message thread sets, audio thread reads) ──────────────
-    void setClientGain(int slot, float linearGain) noexcept { clientGain[slot].store(linearGain, std::memory_order_relaxed); }
-    void setClientPan (int slot, float pan)         noexcept { clientPan[slot].store(std::clamp(pan, -1.0f, 1.0f), std::memory_order_relaxed); }
-    void setClientMute(int slot, bool muted)        noexcept { clientMute[slot].store(muted ? 1u : 0u, std::memory_order_relaxed); }
-    void setClientSolo(int slot, bool soloed)       noexcept { clientSolo[slot].store(soloed ? 1u : 0u, std::memory_order_relaxed); }
+    // All slot-indexed accessors guard the index — an out-of-range slot is a no-op (read
+    // returns a neutral default) rather than an out-of-bounds atomic-array access.
+    static bool validSlot(int slot) noexcept { return slot >= 0 && slot < kMaxClients; }
+
+    void setClientGain(int slot, float linearGain) noexcept { if (validSlot(slot)) clientGain[slot].store(linearGain, std::memory_order_relaxed); }
+    void setClientPan (int slot, float pan)         noexcept { if (validSlot(slot)) clientPan[slot].store(std::clamp(pan, -1.0f, 1.0f), std::memory_order_relaxed); }
+    void setClientMute(int slot, bool muted)        noexcept { if (validSlot(slot)) clientMute[slot].store(muted ? 1u : 0u, std::memory_order_relaxed); }
+    void setClientSolo(int slot, bool soloed)       noexcept { if (validSlot(slot)) clientSolo[slot].store(soloed ? 1u : 0u, std::memory_order_relaxed); }
     void setMasterGain(float linearGain)            noexcept { masterGainLevel.store(linearGain, std::memory_order_relaxed); }
 
-    float clientGainValue(int slot) const noexcept { return clientGain[slot].load(std::memory_order_relaxed); }
-    float clientPanValue (int slot) const noexcept { return clientPan[slot].load(std::memory_order_relaxed); }
-    bool  clientMuted    (int slot) const noexcept { return clientMute[slot].load(std::memory_order_relaxed) != 0; }
-    bool  clientSoloed   (int slot) const noexcept { return clientSolo[slot].load(std::memory_order_relaxed) != 0; }
+    float clientGainValue(int slot) const noexcept { return validSlot(slot) ? clientGain[slot].load(std::memory_order_relaxed) : 1.0f; }
+    float clientPanValue (int slot) const noexcept { return validSlot(slot) ? clientPan[slot].load(std::memory_order_relaxed) : 0.0f; }
+    bool  clientMuted    (int slot) const noexcept { return validSlot(slot) && clientMute[slot].load(std::memory_order_relaxed) != 0; }
+    bool  clientSoloed   (int slot) const noexcept { return validSlot(slot) && clientSolo[slot].load(std::memory_order_relaxed) != 0; }
     float masterGainValue()         const noexcept { return masterGainLevel.load(std::memory_order_relaxed); }
 
     // Message-thread setup before streaming. Sizes the de-interleave scratch to the
@@ -87,7 +91,8 @@ public:
     {
         sr = sampleRate > 0.0 ? sampleRate : 48000.0;
         clock.prepare(sr, tempoBpm);
-        scratch.assign((std::size_t) kMaxChannels * (std::size_t) std::max(1, maxBlockSize), 0.0f);
+        maxBlockFrames = std::max(1, maxBlockSize);
+        scratch.assign((std::size_t) kMaxChannels * (std::size_t) maxBlockFrames, 0.0f);
         for (auto& p : clientPeakLevel) p.store(0.0f, std::memory_order_relaxed);
         masterPeakLevel.store(0.0f, std::memory_order_relaxed);
 
@@ -95,6 +100,12 @@ public:
         // slot's heartbeat is frozen for this many frames it has died without detaching and
         // is reaped. 2 s is far longer than any scheduling hiccup, so no false positives.
         reapThresholdFrames = (std::uint64_t) (2.0 * sr);
+
+        // External-MIDI stall: if no new clock pulse arrives for this many frames the source
+        // has gone silent without a Stop (e.g. cable pulled) — treat the clock as lost. 0.5 s
+        // is > 4 pulse periods even at the 20 BPM floor, so a live clock never trips it.
+        extStaleThresholdFrames = (std::uint64_t) (0.5 * sr);
+        lastExtPulseCount = 0; extStaleFrames = 0;
         for (int i = 0; i < kMaxClients; ++i) { lastHeartbeat[i] = 0; staleFrames[i] = 0; }
     }
 
@@ -112,7 +123,7 @@ public:
 
     // Latest per-block peak (linear, 0–1) for metering. Per active client and the summed
     // master; the GUI reads these on the message thread and applies its own ballistics.
-    float clientPeak(int slot) const noexcept { return clientPeakLevel[slot].load(std::memory_order_relaxed); }
+    float clientPeak(int slot) const noexcept { return validSlot(slot) ? clientPeakLevel[slot].load(std::memory_order_relaxed) : 0.0f; }
     float masterPeak()         const noexcept { return masterPeakLevel.load(std::memory_order_relaxed); }
 
     // Render one block into `output` (per-channel device buffers, numChannels ≤ kMaxChannels).
@@ -134,10 +145,19 @@ public:
         {
             if (midiClock->consumeReset())
                 clock.rewind();
+
+            // Stall watchdog: track whether the pulse count is still advancing. A source that
+            // stopped sending 0xF8 without a 0xFC freezes it → treat the clock as lost (stop)
+            // instead of coasting forever at the last tempo.
+            const std::uint64_t pc = midiClock->pulseCount();
+            if (pc != lastExtPulseCount) { lastExtPulseCount = pc; extStaleFrames = 0; }
+            else                         { extStaleFrames += (std::uint64_t) numFrames; }
+            const bool extAlive = extStaleFrames <= extStaleThresholdFrames;
+
             const double extBpm = midiClock->bpm();
-            if (extBpm > 0.0)
+            if (extBpm > 0.0 && extAlive)
                 clock.setTempo(extBpm);
-            clock.setPlaying(midiClock->isRunning());
+            clock.setPlaying(midiClock->isRunning() && extAlive);
         }
 
         // Publish the start-of-block transport so clients align the block they render ahead.
@@ -191,7 +211,10 @@ public:
                 AudioRingView ring = mem->ring(slot);
                 const int rc  = ring.numChannels();
                 float*    tmp = scratch.data();                       // interleaved, rc channels
-                const int got = ring.readFrames(tmp, numFrames);      // ≤ numFrames; short = underrun
+                // Never read more than the de-interleave scratch was sized for in prepare()
+                // — a driver delivering a block larger than the prepared max must not overrun.
+                const int want = std::min(numFrames, maxBlockFrames);
+                const int got  = ring.readFrames(tmp, want);          // ≤ want; short = underrun
                 if (got < numFrames)
                     stats.underrunFrames += (numFrames - got);
 
@@ -207,16 +230,21 @@ public:
                 // De-interleave the frames we got, apply the strip, and add into the master,
                 // tracking this client's post-fader peak. A mono ring feeds every output
                 // channel; otherwise map channel-for-channel (clamped). ch1 = R, else L.
+                // Per-channel constants (source index + gain) are hoisted out of the sample
+                // loop — the inner loop is then a tight multiply-add on the audio thread.
                 float clientPk = 0.0f;
-                for (int i = 0; i < got; ++i)
-                    for (int ch = 0; ch < chans; ++ch)
+                for (int ch = 0; ch < chans; ++ch)
+                {
+                    const int   rch = ch < rc ? ch : rc - 1;
+                    const float g   = (ch == 1) ? gainR : gainL;
+                    float* const outCh = output[ch];
+                    for (int i = 0; i < got; ++i)
                     {
-                        const int   rch = ch < rc ? ch : rc - 1;
-                        const float g   = (ch == 1) ? gainR : gainL;
-                        const float v   = tmp[(std::size_t) i * (std::size_t) rc + (std::size_t) rch] * g;
-                        output[ch][i] += v;
+                        const float v = tmp[(std::size_t) i * (std::size_t) rc + (std::size_t) rch] * g;
+                        outCh[i] += v;
                         clientPk = std::max(clientPk, std::fabs(v));
                     }
+                }
                 clientPeakLevel[slot].store(clientPk, std::memory_order_relaxed);
             }
         }
@@ -244,21 +272,28 @@ private:
     TransportSnapshot snapshot(std::uint32_t numFrames) const noexcept
     {
         TransportSnapshot s;
-        s.samplePos  = clock.samplePosition();
-        s.tempoBpm   = clock.tempo();
-        s.sampleRate = (std::uint32_t) sr;
-        s.playing    = clock.isPlaying() ? 1u : 0u;
-        s.blockSize  = numFrames;
+        s.samplePos   = clock.samplePosition();
+        s.ppqPosition = clock.beats();              // accumulated; tempo-change safe
+        s.tempoBpm    = clock.tempo();
+        s.sampleRate  = (std::uint32_t) sr;
+        s.playing     = clock.isPlaying() ? 1u : 0u;
+        s.blockSize   = numFrames;
         return s;
     }
 
     MuLinkServerMemory* mem = nullptr;
     TransportClock      clock;
     double              sr = 48000.0;
+    int                 maxBlockFrames = 0;   // de-interleave scratch capacity (frames)
     std::vector<float>  scratch;   // de-interleave buffer, allocated in prepare()
 
     std::atomic<ClockSource> clockSource { ClockSource::Internal };
     MidiClockEstimator*      midiClock = nullptr;   // not owned (lives in AudioServer)
+
+    // External-MIDI stall watchdog (audio-thread only).
+    std::uint64_t lastExtPulseCount       = 0;
+    std::uint64_t extStaleFrames          = 0;
+    std::uint64_t extStaleThresholdFrames = 0;
     std::atomic<float>  clientPeakLevel[kMaxClients];   // latest per-block peak, per slot
     std::atomic<float>  masterPeakLevel { 0.0f };       // latest per-block summed peak
 

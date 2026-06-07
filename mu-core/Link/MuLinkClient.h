@@ -132,8 +132,13 @@ private:
                 // already queued, so project the master position forward by the buffered
                 // frames. That keeps a render-ahead client sample-accurately in sync —
                 // the block carries the position at which mu-link will actually play it.
+                // Project BOTH the sample position and the musical (ppq) position so the
+                // slaved sequencer's bar position lands where mu-link will play this block.
                 TransportSnapshot snap = readTransport(mem.transport());
-                snap.samplePos += (std::uint64_t) ring.readAvailable();
+                const std::uint64_t buffered = (std::uint64_t) ring.readAvailable();
+                snap.samplePos += buffered;
+                const double projSr = snap.sampleRate != 0 ? (double) snap.sampleRate : 48000.0;
+                snap.ppqPosition += ((double) buffered / projSr) * (snap.tempoBpm / 60.0);
 
                 for (int c = 0; c < rc; ++c)
                     std::fill(chanPtrs[(std::size_t) c], chanPtrs[(std::size_t) c] + n, 0.0f);

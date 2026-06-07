@@ -51,22 +51,24 @@ inline constexpr int kRingCapacityFrames = 8192;   // ≈ 170 ms @ 48 kHz; ample
 // only between two equal even reads (see writeTransport / readTransport below).
 struct TransportBlock
 {
-    std::atomic<std::uint64_t> generation { 0 };   // seqlock: even = stable, odd = writing
-    std::atomic<std::uint64_t> samplePos  { 0 };   // absolute frames since transport start
-    std::atomic<double>        tempoBpm   { 120.0 };
-    std::atomic<std::uint32_t> sampleRate { 0 };
-    std::atomic<std::uint32_t> playing    { 0 };   // 0 = stopped, 1 = playing
-    std::atomic<std::uint32_t> blockSize  { 0 };   // frames the server consumes per callback
+    std::atomic<std::uint64_t> generation  { 0 };   // seqlock: even = stable, odd = writing
+    std::atomic<std::uint64_t> samplePos   { 0 };   // absolute frames since transport start
+    std::atomic<double>        ppqPosition { 0.0 }; // accumulated quarter notes (tempo-change safe)
+    std::atomic<double>        tempoBpm    { 120.0 };
+    std::atomic<std::uint32_t> sampleRate  { 0 };
+    std::atomic<std::uint32_t> playing     { 0 };   // 0 = stopped, 1 = playing
+    std::atomic<std::uint32_t> blockSize   { 0 };   // frames the server consumes per callback
 };
 
 // A consistent copy of the transport for a client to render against.
 struct TransportSnapshot
 {
-    std::uint64_t samplePos  = 0;
-    double        tempoBpm   = 120.0;
-    std::uint32_t sampleRate = 0;
-    std::uint32_t playing    = 0;
-    std::uint32_t blockSize  = 0;
+    std::uint64_t samplePos   = 0;
+    double        ppqPosition = 0.0;   // musical position; carried, not re-derived from samples
+    double        tempoBpm    = 120.0;
+    std::uint32_t sampleRate  = 0;
+    std::uint32_t playing     = 0;
+    std::uint32_t blockSize   = 0;
 };
 
 // Server side: publish a snapshot under the seqlock. Bump to odd (write in progress),
@@ -77,34 +79,43 @@ inline void writeTransport(TransportBlock& t, const TransportSnapshot& s) noexce
     const std::uint64_t g = t.generation.load(std::memory_order_relaxed);
     t.generation.store(g + 1, std::memory_order_release);          // odd: writing
     std::atomic_thread_fence(std::memory_order_release);
-    t.samplePos .store(s.samplePos,  std::memory_order_relaxed);
-    t.tempoBpm  .store(s.tempoBpm,   std::memory_order_relaxed);
-    t.sampleRate.store(s.sampleRate, std::memory_order_relaxed);
-    t.playing   .store(s.playing,    std::memory_order_relaxed);
-    t.blockSize .store(s.blockSize,  std::memory_order_relaxed);
+    t.samplePos  .store(s.samplePos,   std::memory_order_relaxed);
+    t.ppqPosition.store(s.ppqPosition, std::memory_order_relaxed);
+    t.tempoBpm   .store(s.tempoBpm,    std::memory_order_relaxed);
+    t.sampleRate .store(s.sampleRate,  std::memory_order_relaxed);
+    t.playing    .store(s.playing,     std::memory_order_relaxed);
+    t.blockSize  .store(s.blockSize,   std::memory_order_relaxed);
     t.generation.store(g + 2, std::memory_order_release);          // even: stable
 }
 
 // Client side: take a torn-free snapshot. Spin while a write is in progress (odd) or the
 // generation moved under us. Lock-free and wait-free in practice (the writer holds the
 // odd state for only a handful of relaxed stores).
+//
+// The spin is BOUNDED: if the writer never reaches a stable even generation within
+// kMaxSpins (the mu-link server crashed mid-write, leaving generation odd forever) we fail
+// safe to a stopped snapshot rather than hang the caller's render thread. The bridge's
+// generation-stall watchdog then detaches the client back to its own device.
 inline TransportSnapshot readTransport(const TransportBlock& t) noexcept
 {
-    for (;;)
+    constexpr int kMaxSpins = 4096;   // ample: the writer holds odd for ~5 relaxed stores
+    for (int spin = 0; spin < kMaxSpins; ++spin)
     {
         const std::uint64_t g1 = t.generation.load(std::memory_order_acquire);
         if ((g1 & 1u) != 0u)
             continue;                                              // mid-write, retry
         TransportSnapshot s;
-        s.samplePos  = t.samplePos .load(std::memory_order_relaxed);
-        s.tempoBpm   = t.tempoBpm  .load(std::memory_order_relaxed);
-        s.sampleRate = t.sampleRate.load(std::memory_order_relaxed);
-        s.playing    = t.playing   .load(std::memory_order_relaxed);
-        s.blockSize  = t.blockSize .load(std::memory_order_relaxed);
+        s.samplePos   = t.samplePos  .load(std::memory_order_relaxed);
+        s.ppqPosition = t.ppqPosition.load(std::memory_order_relaxed);
+        s.tempoBpm    = t.tempoBpm   .load(std::memory_order_relaxed);
+        s.sampleRate  = t.sampleRate .load(std::memory_order_relaxed);
+        s.playing     = t.playing    .load(std::memory_order_relaxed);
+        s.blockSize   = t.blockSize  .load(std::memory_order_relaxed);
         std::atomic_thread_fence(std::memory_order_acquire);
         if (t.generation.load(std::memory_order_acquire) == g1)
             return s;                                             // stable across the read
     }
+    return TransportSnapshot{};   // writer stuck (server died mid-write) → fail safe to stopped
 }
 
 // One row of the client registry — how a client announces itself to the server and

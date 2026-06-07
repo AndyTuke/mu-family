@@ -26,13 +26,15 @@ public:
     {
         const double sr      = snap.sampleRate != 0 ? (double) snap.sampleRate : 48000.0;
         const double seconds = (double) snap.samplePos / sr;
-        const double beats   = seconds * (snap.tempoBpm / 60.0);   // ppq = quarter notes = beats
 
+        // Use the ppq position the server ACCUMULATED (carried in the snapshot), not a
+        // recompute from samples × current tempo — the latter would jump on a tempo change
+        // (notably the continuous re-estimate under external-MIDI slave). See backlog #916.
         PositionInfo info;
         info.setIsPlaying(snap.playing != 0);
         info.setTimeInSamples((juce::int64) snap.samplePos);
         info.setTimeInSeconds(seconds);
-        info.setPpqPosition(beats);
+        info.setPpqPosition(snap.ppqPosition);
         info.setBpm(snap.tempoBpm);
         return info;
     }

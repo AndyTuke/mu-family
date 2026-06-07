@@ -21,29 +21,33 @@ public:
         sampleRate = sampleRateHz > 0.0 ? sampleRateHz : 48000.0;
         bpm        = tempoBpm > 0.0 ? tempoBpm : 120.0;
         samplePos  = 0;
+        beatPos    = 0.0;
     }
 
     void setTempo(double tempoBpm) noexcept { if (tempoBpm > 0.0) bpm = tempoBpm; }
     void setPlaying(bool shouldPlay) noexcept { playing = shouldPlay; }
-    void rewind() noexcept { samplePos = 0; }
+    void rewind() noexcept { samplePos = 0; beatPos = 0.0; }
 
     // Advance the master position by one audio block. No-op while stopped, so a paused
-    // transport holds its exact sample position.
+    // transport holds its exact sample position. Beats are ACCUMULATED at the tempo in
+    // effect for this block — never recomputed from absolute samples × current tempo — so
+    // a tempo change (constant under Internal master, continuous under external-MIDI slave)
+    // only changes the rate going forward and never retroactively shifts the beat position.
     void advance(int numFrames) noexcept
     {
         if (playing && numFrames > 0)
+        {
             samplePos += (std::uint64_t) numFrames;
+            beatPos   += ((double) numFrames / sampleRate) * (bpm / 60.0);
+        }
     }
 
     std::uint64_t samplePosition() const noexcept { return samplePos; }
     double        tempo()          const noexcept { return bpm; }
     bool          isPlaying()      const noexcept { return playing; }
 
-    // Musical position derived from the frame counter.
-    double beats() const noexcept
-    {
-        return ((double) samplePos / sampleRate) * (bpm / 60.0);
-    }
+    // Musical position (quarter notes since transport start), accumulated incrementally.
+    double beats() const noexcept { return beatPos; }
 
     // Phase within a bar of `beatsPerBar` beats, in [0, 1).
     double barPhase(double beatsPerBar = 4.0) const noexcept
@@ -66,6 +70,7 @@ private:
     double        bpm        = 120.0;
     bool          playing    = false;
     std::uint64_t samplePos  = 0;
+    double        beatPos    = 0.0;   // accumulated quarter notes (see advance())
 };
 
 } // namespace mu_link
