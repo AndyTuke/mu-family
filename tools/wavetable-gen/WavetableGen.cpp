@@ -139,11 +139,14 @@ int main(int argc, char* argv[])
 
         const juce::File outFile = outDir.getChildFile(juce::String(kNames[t]) + ".wav");
         outFile.deleteFile();
-        auto* stream = new juce::FileOutputStream(outFile);
-        if (! stream->openedOk()) { std::fprintf(stderr, "cannot open %s\n", outFile.getFullPathName().toRawUTF8()); delete stream; continue; }
-        JUCE_BEGIN_IGNORE_WARNINGS_MSVC(4996)
-        std::unique_ptr<juce::AudioFormatWriter> writer(wav.createWriterFor(stream, 44100.0, 1, 16, {}, 0));
-        JUCE_END_IGNORE_WARNINGS_MSVC
+        auto fileStream = std::make_unique<juce::FileOutputStream>(outFile);
+        if (! fileStream->openedOk()) { std::fprintf(stderr, "cannot open %s\n", outFile.getFullPathName().toRawUTF8()); continue; }
+        // createWriterFor takes ownership of the stream on success (nulls the unique_ptr).
+        std::unique_ptr<juce::OutputStream> stream = std::move(fileStream);
+        auto writer = wav.createWriterFor(stream, juce::AudioFormatWriterOptions{}
+                                                      .withSampleRate(44100.0)
+                                                      .withNumChannels(1)
+                                                      .withBitsPerSample(16));
         if (writer != nullptr) writer->writeFromAudioSampleBuffer(table, 0, table.getNumSamples());
         std::printf("wrote %s (%d frames x %d)\n", outFile.getFileName().toRawUTF8(), kFrames, kSize);
     }
