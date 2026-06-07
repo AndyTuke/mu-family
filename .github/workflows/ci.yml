@@ -60,7 +60,8 @@ jobs:
           cmake --build build --config Debug --target
           mu-clid_VST3 mu-clid_CLAP mu-clid_Standalone
           mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone
-          mu-clid-tests mu-tant-tests
+          mu-on_VST3 mu-on_CLAP mu-on_Standalone
+          mu-clid-tests mu-tant-tests mu-on-tests
 
       - name: Build mu-link (Windows only)
         if: runner.os == 'Windows'
@@ -73,7 +74,7 @@ jobs:
         if: runner.os == 'macOS'
         run: >
           cmake --build build --config Debug --target
-          mu-clid_AU mu-clid-lite_AU mu-tant_AU mu-toni_AU
+          mu-clid_AU mu-clid-lite_AU mu-tant_AU mu-toni_AU mu-on_AU
 
       # Validate each component with Apple's auval. Install the freshly-built bundles into
       # the user Components folder and force a re-scan first. Best-effort (continue-on-error)
@@ -88,12 +89,14 @@ jobs:
           cp -R "build/mu-clid/mu-clid-lite_artefacts/Debug/AU/mu-Clid Lite.component" "$comp_dir/"
           cp -R "build/mu-tant/mu-tant_artefacts/Debug/AU/mu-Tant.component"        "$comp_dir/"
           cp -R "build/mu-toni/mu-toni_artefacts/Debug/AU/mu-Toni.component"        "$comp_dir/"
+          cp -R "build/mu-on/mu-on_artefacts/Debug/AU/mu-On.component"              "$comp_dir/"
           killall -9 AudioComponentRegistrar 2>/dev/null || true
           auval -a
           auval -v aumu MCld TDP1   # mu-Clid (instrument)
           auval -v aumi MCLt TDP1   # mu-Clid Lite (MIDI effect)
           auval -v aumu MTnt TDP1   # mu-Tant (instrument)
           auval -v aumu MTni TDP1   # mu-Toni (instrument)
+          auval -v aumu MuOn TDP1   # mu-On (instrument)
 
       # Make the Mac builds downloadable from the run (no Mac needed to obtain them).
       - name: Upload AU components (macOS only)
@@ -115,6 +118,13 @@ jobs:
         shell: bash
         run: |
           exe="build/mu-tant/mu-tant-tests_artefacts/Debug/mu-tant-tests"
+          [ -f "$exe.exe" ] && exe="$exe.exe"
+          "$exe"
+
+      - name: Run mu-On tests
+        shell: bash
+        run: |
+          exe="build/mu-on/mu-on-tests_artefacts/Debug/mu-on-tests"
           [ -f "$exe.exe" ] && exe="$exe.exe"
           "$exe"
 
