@@ -16,7 +16,7 @@ juce_add_plugin(mu-tant
     BUNDLE_ID "com.transwarp.mu-tant"
     PLUGIN_MANUFACTURER_CODE TDP1
     PLUGIN_CODE MTnt
-    FORMATS VST3 Standalone
+    FORMATS VST3 Standalone ${MUFAMILY_AU_FORMAT}   # AU on macOS only (family rule)
     PRODUCT_NAME "mu-Tant"
     PLUGIN_NAME  "μ-Tant"
     IS_SYNTH TRUE

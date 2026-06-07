@@ -15,7 +15,7 @@ juce_add_plugin(mu-clid
     BUNDLE_ID "com.transwarp.mu-clid"
     PLUGIN_MANUFACTURER_CODE TDP1
     PLUGIN_CODE MCld
-    FORMATS VST3 Standalone
+    FORMATS VST3 Standalone ${MUFAMILY_AU_FORMAT}   # AU on macOS only (family rule)
     PRODUCT_NAME "mu-Clid"
     PLUGIN_NAME  "μ-Clid"
     IS_SYNTH TRUE
@@ -180,7 +180,7 @@ juce_add_plugin(mu-clid-lite
     BUNDLE_ID "com.transwarp.mu-clid-lite"
     PLUGIN_MANUFACTURER_CODE TDP1
     PLUGIN_CODE MCLt
-    FORMATS VST3
+    FORMATS VST3 ${MUFAMILY_AU_FORMAT}   # AU on macOS only (family rule); Lite has no Standalone
     PRODUCT_NAME "mu-Clid Lite"
     PLUGIN_NAME  "μ-Clid Lite"
     IS_SYNTH FALSE

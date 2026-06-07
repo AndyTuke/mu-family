@@ -76,6 +76,20 @@ if(MSVC)
     add_compile_options(/utf-8)
 endif()
 
+# ── Family plugin formats ───────────────────────────────────────────────────
+# AU (Audio Unit v2) is macOS-only — the JUCE wrapper needs Apple's AudioUnit /
+# CoreAudio SDK, so it can only be built on a Mac. Expose it as one variable every
+# product appends to its FORMATS list; empty off-Apple so an unquoted ${MUFAMILY_AU_FORMAT}
+# expands to nothing and the Windows/Linux configure is unchanged. FAMILY RULE: every
+# product's juce_add_plugin FORMATS must include ${MUFAMILY_AU_FORMAT} so new siblings get
+# AU automatically (see CLAUDE.md "Plugin formats"). VST3 + Standalone are cross-platform;
+# CLAP is added separately via clap_juce_extensions_plugin.
+if(APPLE)
+    set(MUFAMILY_AU_FORMAT AU)
+else()
+    set(MUFAMILY_AU_FORMAT "")
+endif()
+
 # ── Subdirectories ──────────────────────────────────────────────────────────
 add_subdirectory(mu-core)
 add_subdirectory(mu-clid)

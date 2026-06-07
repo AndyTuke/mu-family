@@ -11,7 +11,7 @@ juce_add_plugin(mu-toni
     BUNDLE_ID "com.transwarp.mu-toni"
     PLUGIN_MANUFACTURER_CODE TDP1
     PLUGIN_CODE MTni
-    FORMATS VST3 Standalone
+    FORMATS VST3 Standalone ${MUFAMILY_AU_FORMAT}   # AU on macOS only (family rule)
     PRODUCT_NAME "mu-Toni"
     PLUGIN_NAME  "μ-Toni"
     IS_SYNTH TRUE

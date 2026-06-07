@@ -37,6 +37,8 @@ cmake --build build --config Debug && cmake --build build --config Release   # D
 - Only `mu-clid` is copied to the OneDrive tester share (post-build deploy on `mu-clid_Standalone`). Other products build but stay local.
 - Artefacts land at `build/<product>/<target>_artefacts/<Config>/<Format>/`. mu-clid/mu-clid-lite both use `build/mu-clid/...` because they share a CMakeLists.
 
+**Plugin formats (family rule).** Every product builds **VST3 + Standalone + CLAP** on all platforms, **plus AU (Audio Unit v2) on macOS**. AU is macOS-only (needs Apple's AudioUnit SDK), so the root [CMakeLists.txt](CMakeLists.txt) defines `MUFAMILY_AU_FORMAT` (= `AU` on `APPLE`, empty otherwise) and **every `juce_add_plugin` must append `${MUFAMILY_AU_FORMAT}` to its `FORMATS`** — that's how a new sibling gets AU for free. (CLAP is added separately via `clap_juce_extensions_plugin`.) AU requires the shared `PLUGIN_MANUFACTURER_CODE TDP1` plus a **unique 4-char `PLUGIN_CODE`** per product. The `_AU` targets exist only in an `APPLE` configure, so they're built/validated on the macOS CI runner (`auval`), never locally on Windows. Shipping AU to Mac users later needs Apple notarization + signing (the Apple side of #99).
+
 After every build, read [backlog.md](backlog.md) and fix open (unchecked) issues immediately, without asking, up to a maximum of 5 issues. Prioritise issues related to the current stage.
 
 After every response, if any issues in `backlog.md` have changed status or new issues have been added, update `backlog.md` immediately to reflect the current state and ensure items are ordered correctly.

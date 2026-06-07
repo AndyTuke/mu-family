@@ -66,6 +66,44 @@ jobs:
         if: runner.os == 'Windows'
         run: cmake --build build --config Debug --target mu-link mu-link-server mu-link-tone mu-link-harness mu-link-tests
 
+      # AU (Audio Unit v2) is macOS-only — the wrapper needs Apple's AudioUnit SDK, so the
+      # _AU targets exist only in an Apple configure. Building them here is the real proof
+      # AU compiles for every product (we have no local Mac). Hard pass/fail.
+      - name: Build AU (macOS only)
+        if: runner.os == 'macOS'
+        run: >
+          cmake --build build --config Debug --target
+          mu-clid_AU mu-clid-lite_AU mu-tant_AU mu-toni_AU
+
+      # Validate each component with Apple's auval. Install the freshly-built bundles into
+      # the user Components folder and force a re-scan first. Best-effort (continue-on-error)
+      # until proven stable on the headless runner — the build step above is the hard gate.
+      - name: Validate AU with auval (macOS only)
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        run: |
+          comp_dir="$HOME/Library/Audio/Plug-Ins/Components"
+          mkdir -p "$comp_dir"
+          cp -R "build/mu-clid/mu-clid_artefacts/Debug/AU/mu-Clid.component"        "$comp_dir/"
+          cp -R "build/mu-clid/mu-clid-lite_artefacts/Debug/AU/mu-Clid Lite.component" "$comp_dir/"
+          cp -R "build/mu-tant/mu-tant_artefacts/Debug/AU/mu-Tant.component"        "$comp_dir/"
+          cp -R "build/mu-toni/mu-toni_artefacts/Debug/AU/mu-Toni.component"        "$comp_dir/"
+          killall -9 AudioComponentRegistrar 2>/dev/null || true
+          auval -a
+          auval -v aumu MCld TDP1   # mu-Clid (instrument)
+          auval -v aumi MCLt TDP1   # mu-Clid Lite (MIDI effect)
+          auval -v aumu MTnt TDP1   # mu-Tant (instrument)
+          auval -v aumu MTni TDP1   # mu-Toni (instrument)
+
+      # Make the Mac builds downloadable from the run (no Mac needed to obtain them).
+      - name: Upload AU components (macOS only)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mu-family-AU-components
+          path: build/**/Debug/AU/*.component
+          if-no-files-found: error
+
       - name: Run mu-Clid tests
         shell: bash
         run: |
