@@ -5,7 +5,8 @@
 
 #include "PluginProcessor.h"
 #include "Plugin/RenderMode.h"
-#include "Link/MuLinkBridge.h"   // shared mu-core standalone↔mu-link bridge (header-only)
+#include "UI/ConfirmDialog.h"        // shared mu-core close prompt (mu_ui::confirmQuitAsync)
+#include "Link/MuLinkStandalone.h"   // shared mu-core standalone↔mu-link bridge helper (header-only)
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 
 //==============================================================================
@@ -20,48 +21,37 @@ public:
 
     void closeButtonPressed() override
     {
-        // If a dialog is already open, cancel it and quit immediately.
         if (dialogOpen) return;
         dialogOpen = true;
 
-        auto opts = juce::MessageBoxOptions()
-            .withIconType (juce::MessageBoxIconType::QuestionIcon)
-            .withTitle (juce::String(juce::CharPointer_UTF8("Close \xce\xbc-Clid?")))
-            .withMessage ("Are you sure you want to close?")
-            .withButton ("OK")
-            .withButton ("Save")
-            .withButton ("Cancel");
-
         juce::Component::SafePointer<MuClidWindow> safeThis (this);
-        juce::AlertWindow::showAsync (opts, [safeThis] (int result)
-        {
-            if (safeThis == nullptr) return;
-            safeThis->dialogOpen = false;
+        const auto name = juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Clid"));
 
-            if (result == 1) // OK: close without explicit save
+        mu_ui::confirmQuitAsync (name,
+            [safeThis]   // OK — close without explicit save
             {
+                if (safeThis != nullptr) safeThis->dialogOpen = false;
                 juce::JUCEApplication::getInstance()->quit();
-            }
-            else if (result == 2) // Save: open Save dialog, quit on completion
+            },
+            [safeThis]   // Save — defer to the processor's save+quit, else save state
             {
+                if (safeThis == nullptr) return;
+                safeThis->dialogOpen = false;
                 auto* proc = safeThis->pluginHolder
                     ? dynamic_cast<PluginProcessor*>(safeThis->pluginHolder->processor.get())
                     : nullptr;
-                if (proc && proc->onSaveAndQuit)
-                {
-                    proc->onSaveAndQuit([]
-                    {
-                        juce::JUCEApplication::getInstance()->quit();
-                    });
-                }
+                if (proc != nullptr && proc->onSaveAndQuit)
+                    proc->onSaveAndQuit ([] { juce::JUCEApplication::getInstance()->quit(); });
                 else
                 {
-                    safeThis->pluginHolder->savePluginState();
+                    if (safeThis->pluginHolder != nullptr) safeThis->pluginHolder->savePluginState();
                     juce::JUCEApplication::getInstance()->quit();
                 }
-            }
-            // result == 0 (Cancel / Escape / dismissed): do nothing
-        });
+            },
+            [safeThis]   // Cancel — let the window be closeable again
+            {
+                if (safeThis != nullptr) safeThis->dialogOpen = false;
+            });
     }
 
 private:
@@ -133,24 +123,13 @@ public:
 
         mainWindow->setVisible (true);
 
-        // Standalone-only mu-link bridge: when mu-link is running, route audio to its bus
-        // and slave the transport; absent → mu-Clid runs normally on its own device. This
-        // code is compiled only into the Standalone target, so plugins never attach.
+        // Standalone-only mu-link bridge (shared mu-core helper): when mu-link is running,
+        // route audio to its bus and slave the transport; absent → mu-Clid runs normally on
+        // its own device. Compiled only into the Standalone target, so plugins never attach.
         if (auto* holderPtr = mainWindow->pluginHolder.get())
             if (holderPtr->processor != nullptr)
-            {
-                juce::Component::SafePointer<MuClidWindow> safeWin (mainWindow.get());
-                const juce::String baseTitle = getApplicationName();
-                muLinkBridge = std::make_unique<mu_link::MuLinkBridge> (
-                    *holderPtr->processor, holderPtr->player, "mu-Clid",
-                    [safeWin, baseTitle] (bool connected) mutable
-                    {
-                        if (safeWin != nullptr)
-                            safeWin->setName (connected
-                                ? baseTitle + juce::String (juce::CharPointer_UTF8 ("  \xe2\x80\xa2  mu-link connected"))
-                                : baseTitle);
-                    });
-            }
+                muLinkBridge = mu_link::makeStandaloneBridge (
+                    *mainWindow, *holderPtr->processor, holderPtr->player, "mu-Clid");
     }
 
     void shutdown() override
