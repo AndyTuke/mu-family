@@ -30,6 +30,7 @@ target_sources(mu-on
         Source/Plugin/PluginEditor.cpp
         Source/Sequencer/GrooveSequencer.cpp
         Source/UI/GrooveGrid.cpp
+        Source/UI/EnginePanel.cpp
 )
 
 target_include_directories(mu-on
@@ -83,7 +84,9 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/TestMain.cpp
     Source/Tests/ApvtsLayoutTests.cpp
     Source/Tests/SequencerTests.cpp
+    Source/Tests/EngineTests.cpp
     Source/Sequencer/GrooveSequencer.cpp
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/SamplePlayer.cpp"   # SampleChannel dependency
 )
 
 target_compile_features(mu-on-tests PRIVATE cxx_std_17)

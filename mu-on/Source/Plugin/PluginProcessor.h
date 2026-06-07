@@ -2,8 +2,10 @@
 
 #include "Plugin/ProcessorBase.h"        // mu-core base
 #include "Plugin/MixerFxParams.h"         // mu-core: shared global-FX / mixer APVTS layout
+#include "Plugin/MuOnChannels.h"
 #include "Sequencer/StepPattern.h"
 #include "Sequencer/GrooveSequencer.h"
+#include "Audio/GrooveVoices.h"
 
 #include <array>
 #include <atomic>
@@ -20,9 +22,6 @@
 // mixer so the strips + VU meters are live; the sequencer + engines land next.
 namespace mu_on
 {
-
-// Fixed channel layout — the four 909 instrument lanes.
-enum Channel { Kick = 0, Bass = 1, Hat = 2, Snare = 3, kNumChannels = 4 };
 
 class PluginProcessor : public ProcessorBase,
                         public juce::AudioProcessorValueTreeState::Listener
@@ -124,6 +123,7 @@ private:
     // 909 sequencer — owns the grid pattern; clocked off the internal transport each block.
     StepPattern     stepPattern;
     GrooveSequencer sequencer { stepPattern };
+    GrooveVoices    grooveVoices;                              // the four instrument engines
     std::array<std::atomic<int>, kNumChannels> triggers { };   // per-lane trigger counter (UI pulse)
 
     // Cached APVTS pointers for the product sequencer params (read each block).

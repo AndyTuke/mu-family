@@ -44,6 +44,32 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"seq_swing",  1}, "Swing",  f(0.0f, 1.0f, 0.001f), 0.0f));
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"seq_accent", 1}, "Accent", f(0.0f, 1.0f, 0.001f), 1.0f));
 
+    // ── Kick engine (synthesis) ───────────────────────────────────────────────
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"k_tune",  1}, "Kick Tune",       f(30.0f, 120.0f, 0.1f), 50.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"k_ptch",  1}, "Kick Pitch Amt",  f(0.0f, 600.0f, 1.0f), 220.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"k_pdec",  1}, "Kick Pitch Decay",f(5.0f, 200.0f, 0.1f), 50.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"k_adec",  1}, "Kick Decay",      f(20.0f, 800.0f, 1.0f), 180.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"k_drive", 1}, "Kick Drive",      f(0.0f, 1.0f, 0.001f), 0.2f));
+
+    // ── Bass engine (deep synth — the focus) ──────────────────────────────────
+    layout.add(std::make_unique<AudioParameterChoice>(ParameterID{"b_wave", 1}, "Bass Wave", juce::StringArray{ "Sine", "Saw", "Square" }, 0));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_sub",   1}, "Bass Sub",        f(0.0f, 1.0f, 0.001f), 0.5f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_tune",  1}, "Bass Tune",       f(20.0f, 120.0f, 0.1f), 41.2f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_cut",   1}, "Bass Cutoff",     f(40.0f, 4000.0f, 1.0f), 600.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_res",   1}, "Bass Resonance",  f(0.0f, 1.0f, 0.001f), 0.2f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_env",   1}, "Bass Filter Env", f(0.0f, 1.0f, 0.001f), 0.4f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_edec",  1}, "Bass Env Decay",  f(10.0f, 1000.0f, 1.0f), 180.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_atk",   1}, "Bass Attack",     f(0.5f, 200.0f, 0.1f), 2.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_dec",   1}, "Bass Decay",      f(20.0f, 1500.0f, 1.0f), 200.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_sus",   1}, "Bass Sustain",    f(0.0f, 1.0f, 0.001f), 0.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_drive", 1}, "Bass Drive",      f(0.0f, 1.0f, 0.001f), 0.2f));
+
+    // ── Hat / Snare (sample channels) ─────────────────────────────────────────
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"h_tune", 1}, "Hat Tune",   f(-12.0f, 12.0f, 0.1f), 0.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"h_dec",  1}, "Hat Decay",  f(10.0f, 400.0f, 1.0f), 60.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"s_tune", 1}, "Snare Tune", f(-12.0f, 12.0f, 0.1f), 0.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"s_dec",  1}, "Snare Decay",f(20.0f, 600.0f, 1.0f), 160.0f));
+
     // ── Shared global FX rack + returns + master (mu-core) ────────────────────
     mu_mixfx::addGlobalFxParams(layout);
 
@@ -57,15 +83,16 @@ PluginProcessor::PluginProcessor()
                     createParameterLayout(),
                     juce::Identifier("MuOnState"))
 {
-    // Silent channel render (engines land next increment) — the shared mixer still applies
-    // the strip, the bass→kick sidechain, and the master mix, so the meters/sequencer are wired.
-    renderChannelCb = [](int, juce::AudioBuffer<float>& buf, int) { buf.clear(); };
+    // Each channel renders its instrument engine; the shared mixer then applies the strip,
+    // the bass→kick sidechain, and the master mix.
+    renderChannelCb = [this](int ch, juce::AudioBuffer<float>& buf, int n) { grooveVoices.render(ch, buf, n); };
 
     // A default groove so a fresh instance plays something immediately.
     stepPattern.loadDefaultGroove();
 
     seqSwingParam  = apvts.getRawParameterValue("seq_swing");
     seqAccentParam = apvts.getRawParameterValue("seq_accent");
+    grooveVoices.cacheParams(apvts);
 
     registerFxListeners();
     syncAllFxParams();   // JUCE doesn't fire parameterChanged on construction
@@ -115,6 +142,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     currentSampleRate = sampleRate;
     sequencer.prepare(sampleRate);
+    grooveVoices.prepare(sampleRate, samplesPerBlock);
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     fxChain.prepare(sampleRate, samplesPerBlock);
 }
@@ -138,16 +166,18 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     const double bpm       = internalBpm.load(std::memory_order_relaxed);
     const double beatStart = internalBeatPos.load(std::memory_order_relaxed);
 
-    // Clock the 909 sequencer for this block (before the render so engines can start
-    // sample-accurately within the block). For now each fired lane just bumps a trigger
-    // counter the editor polls to pulse the sidebar — the engines consume it next increment.
+    // Refresh engine params from the APVTS, then clock the 909 sequencer for this block
+    // (before the render so a step's engine is armed for this same block). Each fired lane
+    // triggers its engine and bumps a counter the editor polls to pulse the sidebar.
+    grooveVoices.applyParams();
     if (playing.load(std::memory_order_relaxed))
     {
         sequencer.setSwing (seqSwingParam  ? seqSwingParam->load()  : 0.0f);
         sequencer.setAccentVelocity(seqAccentParam ? seqAccentParam->load() : 1.0f);
         sequencer.process(beatStart, numSamples, bpm,
-                          [this](int track, float /*vel*/, int /*off*/)
+                          [this](int track, float vel, int /*off*/)
                           {
+                              grooveVoices.trigger(track, vel);
                               if (track >= 0 && track < kNumChannels)
                                   triggers[(size_t) track].fetch_add(1, std::memory_order_relaxed);
                           });
