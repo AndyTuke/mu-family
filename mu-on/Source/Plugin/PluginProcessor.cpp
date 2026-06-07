@@ -40,6 +40,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         layout.add(std::make_unique<AudioParameterInt>  (ParameterID{c+"outBus",  1}, n+"Output Bus", 0, 8, 0));
     }
 
+    // ── Sequencer (global groove controls) ────────────────────────────────────
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"seq_swing",  1}, "Swing",  f(0.0f, 1.0f, 0.001f), 0.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"seq_accent", 1}, "Accent", f(0.0f, 1.0f, 0.001f), 1.0f));
+
     // ── Shared global FX rack + returns + master (mu-core) ────────────────────
     mu_mixfx::addGlobalFxParams(layout);
 
@@ -53,9 +57,15 @@ PluginProcessor::PluginProcessor()
                     createParameterLayout(),
                     juce::Identifier("MuOnState"))
 {
-    // Silent channel render (no engine yet) — the shared mixer still applies the strip,
-    // the bass→kick sidechain, and the master mix, so the MixerOverlay + VU meters are wired.
+    // Silent channel render (engines land next increment) — the shared mixer still applies
+    // the strip, the bass→kick sidechain, and the master mix, so the meters/sequencer are wired.
     renderChannelCb = [](int, juce::AudioBuffer<float>& buf, int) { buf.clear(); };
+
+    // A default groove so a fresh instance plays something immediately.
+    stepPattern.loadDefaultGroove();
+
+    seqSwingParam  = apvts.getRawParameterValue("seq_swing");
+    seqAccentParam = apvts.getRawParameterValue("seq_accent");
 
     registerFxListeners();
     syncAllFxParams();   // JUCE doesn't fire parameterChanged on construction
@@ -104,6 +114,7 @@ void PluginProcessor::parameterChanged(const juce::String& id, float v)
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     currentSampleRate = sampleRate;
+    sequencer.prepare(sampleRate);
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     fxChain.prepare(sampleRate, samplesPerBlock);
 }
@@ -124,7 +135,23 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     const int numSamples = buffer.getNumSamples();
     buffer.clear();
 
-    const double bpm = internalBpm.load(std::memory_order_relaxed);
+    const double bpm       = internalBpm.load(std::memory_order_relaxed);
+    const double beatStart = internalBeatPos.load(std::memory_order_relaxed);
+
+    // Clock the 909 sequencer for this block (before the render so engines can start
+    // sample-accurately within the block). For now each fired lane just bumps a trigger
+    // counter the editor polls to pulse the sidebar — the engines consume it next increment.
+    if (playing.load(std::memory_order_relaxed))
+    {
+        sequencer.setSwing (seqSwingParam  ? seqSwingParam->load()  : 0.0f);
+        sequencer.setAccentVelocity(seqAccentParam ? seqAccentParam->load() : 1.0f);
+        sequencer.process(beatStart, numSamples, bpm,
+                          [this](int track, float /*vel*/, int /*off*/)
+                          {
+                              if (track >= 0 && track < kNumChannels)
+                                  triggers[(size_t) track].fetch_add(1, std::memory_order_relaxed);
+                          });
+    }
 
     // Supply the external DAW sidechain bus to the mixer (null when bus is inactive).
     mixerEngine.setExternalSidechain(nullptr, nullptr);
@@ -160,7 +187,9 @@ juce::AudioProcessorEditor* PluginProcessor::createEditor()
 
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    if (auto xml = apvts.copyState().createXml())
+    auto state = apvts.copyState();
+    stepPattern.serialise(state);   // ride the 909 grid along in the state tree
+    if (auto xml = state.createXml())
         copyXmlToBinary(*xml, destData);
 }
 
@@ -170,6 +199,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
         if (xml->hasTagName(apvts.state.getType()))
         {
             apvts.replaceState(juce::ValueTree::fromXml(*xml));
+            stepPattern.deserialise(apvts.state);
             syncAllFxParams();   // re-seed mixer/FX (unchanged values skip listeners)
         }
 }

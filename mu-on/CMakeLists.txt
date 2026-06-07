@@ -28,6 +28,8 @@ target_sources(mu-on
     PRIVATE
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginEditor.cpp
+        Source/Sequencer/GrooveSequencer.cpp
+        Source/UI/GrooveGrid.cpp
 )
 
 target_include_directories(mu-on
@@ -80,6 +82,8 @@ juce_add_console_app(mu-on-tests PRODUCT_NAME "mu-on-tests")
 target_sources(mu-on-tests PRIVATE
     Source/Tests/TestMain.cpp
     Source/Tests/ApvtsLayoutTests.cpp
+    Source/Tests/SequencerTests.cpp
+    Source/Sequencer/GrooveSequencer.cpp
 )
 
 target_compile_features(mu-on-tests PRIVATE cxx_std_17)

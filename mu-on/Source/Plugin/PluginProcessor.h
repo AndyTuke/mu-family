@@ -2,7 +2,10 @@
 
 #include "Plugin/ProcessorBase.h"        // mu-core base
 #include "Plugin/MixerFxParams.h"         // mu-core: shared global-FX / mixer APVTS layout
+#include "Sequencer/StepPattern.h"
+#include "Sequencer/GrooveSequencer.h"
 
+#include <array>
 #include <atomic>
 
 // mu-On — groove sequencer.
@@ -86,6 +89,15 @@ public:
         return (idx >= 0 && idx < kNumChannels) ? kColours[idx] : 0;
     }
 
+    // ── 909 sequencer access (for the editor's grid + playhead) ───────────────
+    StepPattern& pattern() noexcept { return stepPattern; }
+    // Per-channel trigger counter — bumped on the audio thread when the sequencer fires
+    // that lane; the editor polls it to pulse the sidebar lane. Read-only for the editor.
+    int triggerCount(int ch) const noexcept
+    {
+        return (ch >= 0 && ch < kNumChannels) ? triggers[(size_t) ch].load(std::memory_order_relaxed) : 0;
+    }
+
     // ── Preset directories / extensions (per family file-format rule) ─────────
     // Full = .muOn; per-channel ("track" = one instrument lane) = .muTrack.
     juce::File   getContentDir()             const override;
@@ -106,8 +118,17 @@ private:
     void registerFxListeners();
     void syncAllFxParams();
 
-    // Silent per-channel render hook handed to the shared MixerEngine (no engine yet).
+    // Silent per-channel render hook handed to the shared MixerEngine (engines land next).
     MixerEngine::RenderChannelFn renderChannelCb;
+
+    // 909 sequencer — owns the grid pattern; clocked off the internal transport each block.
+    StepPattern     stepPattern;
+    GrooveSequencer sequencer { stepPattern };
+    std::array<std::atomic<int>, kNumChannels> triggers { };   // per-lane trigger counter (UI pulse)
+
+    // Cached APVTS pointers for the product sequencer params (read each block).
+    std::atomic<float>* seqSwingParam  = nullptr;
+    std::atomic<float>* seqAccentParam = nullptr;
 
     std::atomic<bool>   playing { false };
     std::atomic<double> internalBeatPos { 0.0 };

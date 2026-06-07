@@ -34,7 +34,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     : EditorShellBase(p),
       proc(p),
       sidebar(p, "Track"),
-      enginePanel(p),
+      groovePanel(p),
       mixerOverlay(p, p.mixerEngine)
 {
     getAboutPanel().setProductInfo(
@@ -54,10 +54,20 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         const juce::String name = p.getChannelName(i);
         return std::make_unique<ChannelGlyph>(col, name.substring(0, 1));
     };
-    sidebar.onChannelSelected = [this](int idx) { enginePanel.setChannel(idx); };
+    sidebar.onChannelSelected = [this](int idx) { groovePanel.setChannel(idx); };
+    // Pulse a lane in the sidebar when the sequencer fires it (polled ~5 Hz; the grid's
+    // own 30 Hz playhead is the primary timing feedback).
+    sidebar.onAnimationTick = [this]
+    {
+        for (int ch = 0; ch < kNumChannels; ++ch)
+        {
+            const int c = proc.triggerCount(ch);
+            if (c != lastTriggers[(size_t) ch]) { lastTriggers[(size_t) ch] = c; sidebar.pulseItem(ch); }
+        }
+    };
     sidebar.refreshItems();   // fixed 4 lanes; add/reorder hooks stay null (no add/delete)
 
-    setMainArea(&sidebar, &enginePanel);
+    setMainArea(&sidebar, &groovePanel);
     setMixerOverlay(&mixerOverlay);
 
     mixerOverlay.onStatusUpdate = [this](const juce::String& name,
@@ -68,7 +78,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     };
 
     sidebar.setSelectedIndex(0);
-    enginePanel.setChannel(0);
+    groovePanel.setChannel(0);
     mixerOverlay.loadFromAPVTS();
     clearPresetDirty();
 }

@@ -4,14 +4,16 @@
 #include "UI/ChannelSidebar.h"     // mu-core shared sidebar
 #include "UI/MixerOverlay.h"       // mu-core shared mixer
 #include "Plugin/PluginProcessor.h"
-#include "UI/EnginePanel.h"
+#include "UI/GroovePanel.h"
+
+#include <array>
 
 namespace mu_on
 {
 
 // mu-On editor: the shared mu-core shell (TransportBar / StatusBar / About / overlays /
 // window sizing / MuLookAndFeel) + the shared ChannelSidebar (the four instrument lanes)
-// + shared MixerOverlay, around the EnginePanel (909 grid + engine controls land next).
+// + shared MixerOverlay, around the GroovePanel (909 grid + per-channel engine controls).
 class PluginEditor : public EditorShellBase
 {
 public:
@@ -21,8 +23,11 @@ public:
 private:
     PluginProcessor& proc;
     ChannelSidebar   sidebar;
-    EnginePanel      enginePanel;
+    GroovePanel      groovePanel;
     MixerOverlay     mixerOverlay;
+
+    // Last-seen per-lane trigger counts — diffed each animation tick to pulse the sidebar.
+    std::array<int, kNumChannels> lastTriggers { };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };
