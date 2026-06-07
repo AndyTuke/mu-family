@@ -147,7 +147,7 @@ public:
             // External / AI-authored mismatch: mode says Smooth but the data is Steps.
             // The loader must flip the mode to match the data actually present so the
             // sequence isn't silently inert.
-            juce::ValueTree mods ("Modulators");
+            juce::ValueTree modsTree ("Modulators");
             juce::ValueTree seq ("Seq");
             seq.setProperty ("id", "cs0", nullptr);
             seq.setProperty ("mode", "Smooth", nullptr);   // mismatch — no <Point>s below
@@ -157,17 +157,17 @@ public:
                 st.setProperty ("v", v, nullptr);
                 seq.addChild (st, -1, nullptr);
             }
-            mods.addChild (seq, -1, nullptr);
+            modsTree.addChild (seq, -1, nullptr);
 
-            Rhythm dst;
-            clearModulators (dst);
-            deserialiseModulators (mods, dst);
+            Rhythm dstR;
+            clearModulators (dstR);
+            deserialiseModulators (modsTree, dstR);
 
-            const auto& cs = dst.controlSequences[0];
-            expectEquals ((int) cs.mode, (int) ControlSequence::Mode::Stepped,
+            const auto& loadedCs = dstR.controlSequences[0];
+            expectEquals ((int) loadedCs.mode, (int) ControlSequence::Mode::Stepped,
                 "mode must self-heal Smooth -> Stepped when only <Step>s are present");
-            expect (cs.stepValues.size() == 4, "step values still loaded");
-            expect (cs.curvePoints.empty(), "no curve points were present");
+            expect (loadedCs.stepValues.size() == 4, "step values still loaded");
+            expect (loadedCs.curvePoints.empty(), "no curve points were present");
         }
 
         beginTest ("Finding-1 braces: evaluate() falls back to the populated array when the active mode is empty");
@@ -175,12 +175,12 @@ public:
             // Same data, two modes; the Smooth one has no curvePoints, so evaluate()
             // must fall back to the step data rather than output a constant 0.
             ControlSequence stepped, smoothNoCurve;
-            for (auto* cs : { &stepped, &smoothNoCurve })
+            for (auto* csPtr : { &stepped, &smoothNoCurve })
             {
-                cs->loopNoteValue  = NoteValue::Quarter;  cs->loopMultiplier = 1;
-                cs->stepNoteValue  = NoteValue::Sixteenth; cs->stepMultiplier = 1;
-                cs->polarity       = ControlSequence::Polarity::Bipolar;
-                cs->stepValues     = { 100.0f, -100.0f, 50.0f, -50.0f };
+                csPtr->loopNoteValue  = NoteValue::Quarter;  csPtr->loopMultiplier = 1;
+                csPtr->stepNoteValue  = NoteValue::Sixteenth; csPtr->stepMultiplier = 1;
+                csPtr->polarity       = ControlSequence::Polarity::Bipolar;
+                csPtr->stepValues     = { 100.0f, -100.0f, 50.0f, -50.0f };
             }
             stepped.mode       = ControlSequence::Mode::Stepped;
             smoothNoCurve.mode = ControlSequence::Mode::Smooth;   // no curvePoints
@@ -188,9 +188,9 @@ public:
             bool anyNonZero = false;
             for (double beat = 0.0; beat < 1.0; beat += 0.1)
             {
-                const float a = stepped.evaluate (beat);
+                const float steppedVal = stepped.evaluate (beat);
                 const float b = smoothNoCurve.evaluate (beat);
-                expectWithinAbsoluteError (b, a, 1.0e-4f,
+                expectWithinAbsoluteError (b, steppedVal, 1.0e-4f,
                     "Smooth-with-no-curve must evaluate identically to Stepped at beat " + juce::String (beat));
                 if (std::abs (b) > 1.0e-3f) anyNonZero = true;
             }
