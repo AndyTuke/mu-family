@@ -57,6 +57,14 @@ jobs:
           mu-on_VST3 mu-on_CLAP mu-on_Standalone
           mu-toni_VST3 mu-toni_CLAP mu-toni_Standalone
 
+      # AU is macOS-only: the _AU targets only exist in an APPLE configure (family rule —
+      # MUFAMILY_AU_FORMAT appended to each FORMATS). Build them on the Mac runner only.
+      - name: Build AU (macOS only)
+        if: runner.os == 'macOS'
+        run: >
+          cmake --build build --config Release --target
+          mu-clid_AU mu-clid-lite_AU mu-tant_AU mu-on_AU mu-toni_AU
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -77,3 +85,8 @@ jobs:
             build/mu-toni/mu-toni_artefacts/Release/VST3
             build/mu-toni/mu-toni_artefacts/Release/CLAP
             build/mu-toni/mu-toni_artefacts/Release/Standalone
+            build/mu-clid/mu-clid_artefacts/Release/AU
+            build/mu-clid/mu-clid-lite_artefacts/Release/AU
+            build/mu-tant/mu-tant_artefacts/Release/AU
+            build/mu-on/mu-on_artefacts/Release/AU
+            build/mu-toni/mu-toni_artefacts/Release/AU
