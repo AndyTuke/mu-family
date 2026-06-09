@@ -28,7 +28,7 @@ public:
     std::string id;              // stable ID used as modulation source key, e.g. "cs0"
 
     Mode     mode     = Mode::Stepped;
-    Polarity polarity = Polarity::Bipolar;
+    Polarity polarity = Polarity::Unipolar;   // new modulators start unipolar; presets restore their saved polarity
 
     NoteValue loopNoteValue  = NoteValue::Whole;
     NoteMod   loopNoteMod    = NoteMod::None;
