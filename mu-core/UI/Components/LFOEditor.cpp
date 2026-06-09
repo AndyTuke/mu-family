@@ -51,11 +51,13 @@ juce::Point<float> LFOEditor::fromScreen(float sx, float sy) const
 
 float LFOEditor::snapX(float x) const
 {
-    if (stepCount <= 1)
+    // Snap to the nearest fixed-width step boundary (k·stepFraction). No grid when the step
+    // is ≥ the loop (stepFraction ≥ 1) or unset (0). The boundaries tile the loop with a
+    // partial final cell — snapping clamps to [0,1] so the trailing partial cell is honoured.
+    if (stepFraction <= 0.0f || stepFraction >= 1.0f)
         return x;
 
-    const float step = 1.0f / (float)stepCount;
-    return juce::jlimit(0.0f, 1.0f, std::round(x / step) * step);
+    return juce::jlimit(0.0f, 1.0f, std::round(x / stepFraction) * stepFraction);
 }
 
 int LFOEditor::hitSegment(juce::Point<float> screen) const
@@ -179,12 +181,15 @@ void LFOEditor::paint(juce::Graphics& g)
 
     if (points.size() >= 2)
     {
-        if (stepCount > 1)
+        if (stepFraction > 0.0f && stepFraction < 1.0f)
         {
+            // Tile the loop with fixed-width steps: a line at each k·stepFraction below 1.0,
+            // so a step that doesn't divide the loop leaves a narrower final cell (e.g. 3/16
+            // in a 16/16 loop → lines at 3,6,9,12,15 sixteenths → 5 full cells + a 1/16 cell).
             g.setColour(MuLookAndFeel::colour(Id::stepEditorGridLine));
-            const float stepW = (float)getWidth() / (float)stepCount;
-            for (int i = 0; i <= stepCount; ++i)
-                g.drawVerticalLine((int)(i * stepW), 0.0f, (float)getHeight());
+            const float w = (float)getWidth();
+            for (int k = 1; k * stepFraction < 0.9995f; ++k)
+                g.drawVerticalLine((int)(k * stepFraction * w), 0.0f, (float)getHeight());
         }
 
         auto curve = buildCurvePath();

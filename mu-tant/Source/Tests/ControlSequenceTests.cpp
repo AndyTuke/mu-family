@@ -30,6 +30,22 @@ public:
             expectEquals(cs.getStepCount(), 8);
         }
 
+        beginTest("getStepFraction: tiles by step width, not equal division");
+        {
+            ControlSequence cs;
+            // 1-bar loop (whole note = 4 beats = 16 sixteenths), step = 1/16 × 3 = 3/16.
+            cs.loopNoteValue = NoteValue::Whole;     cs.loopMultiplier = 1;
+            cs.stepNoteValue = NoteValue::Sixteenth; cs.stepMultiplier = 3;
+            // 3/16 of the loop → the grid tiles 3/16 ×5 + a 1/16 remainder, NOT 5 equal cells.
+            expectWithinAbsoluteError(cs.getStepFraction(), 0.1875, 1.0e-6);
+            // An evenly-dividing step gives the exact reciprocal.
+            cs.stepMultiplier = 1;
+            expectWithinAbsoluteError(cs.getStepFraction(), 0.0625, 1.0e-6);   // 1/16
+            // A step ≥ the loop collapses to a single cell (no internal grid).
+            cs.stepNoteValue = NoteValue::Whole; cs.stepMultiplier = 2;
+            expectWithinAbsoluteError(cs.getStepFraction(), 1.0, 1.0e-6);
+        }
+
         beginTest("stepped: constant step values yield a constant output anywhere in the loop");
         {
             ControlSequence cs;

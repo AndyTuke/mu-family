@@ -38,6 +38,15 @@ int ControlSequence::getStepCount() const
     return std::max(1, static_cast<int>(std::round(loop / step)));
 }
 
+double ControlSequence::getStepFraction() const
+{
+    const double loop = getLoopLengthBeats();
+    const double step = noteValueToBeats(stepNoteValue, stepNoteMod) * stepMultiplier;
+    if (loop <= 0.0 || step <= 0.0)
+        return 1.0;
+    return std::min(1.0, step / loop);
+}
+
 float ControlSequence::evaluate(double songBeatPos) const
 {
     const double loop = getLoopLengthBeats();

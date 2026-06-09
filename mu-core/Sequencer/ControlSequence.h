@@ -47,6 +47,13 @@ public:
     // Returns the step count for stepped mode (= round(loopLength / stepLength)).
     int getStepCount() const;
 
+    // Returns one step's length as a fraction of the loop (= stepLength / loopLength,
+    // clamped to (0,1]). Drives the smooth editor's step grid + X-snap: the loop is tiled
+    // by fixed-width steps with a partial final cell (e.g. step 3/16 in a 16/16 loop →
+    // 0.1875 → five full cells + a 1/16 remainder), NOT divided into equal cells. Returns
+    // 1.0 (single cell / no internal grid) when the step is ≥ the loop or either is zero.
+    double getStepFraction() const;
+
     // Evaluates the output at the given absolute song position in beats.
     // Returns a value in [-100, +100] (bipolar) or [0, +100] (unipolar).
     float evaluate(double songBeatPos) const;

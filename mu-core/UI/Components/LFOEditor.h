@@ -27,7 +27,11 @@ public:
         for (auto& p : points) p.y = juce::jlimit(yFloor, 1.0f, p.y);
         repaint();
     }
-    void setStepCount(int count) { stepCount = count; repaint(); }
+    // Step grid as a fraction of the loop (step/loop, 0..1). The grid tiles the editor with
+    // fixed-width cells of this fraction + a partial final cell (so a 3/16 step in a 16/16 loop
+    // shows 5 full cells + a 1/16 remainder), and X-snap lands on the cell boundaries. 0 or ≥1
+    // = no grid / no snap. Replaces the old equal-`stepCount`-division model.
+    void setStepFraction(float frac) { stepFraction = frac; repaint(); }
 
     // playhead: 0.0 = start, 1.0 = end of loop
     void setPlayheadPhase(float phase);
@@ -47,7 +51,7 @@ private:
     std::vector<ControlSequence::CurvePoint> points;
     float playheadPhase = 0.0f;
     int   dragIndex = -1;
-    int   stepCount = 0;
+    float stepFraction = 0.0f;   // one step as a fraction of the loop; 0/≥1 = no grid
     int   hoverSegment = -1;
     bool  unipolar  = false;
 
