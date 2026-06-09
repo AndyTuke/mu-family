@@ -28,6 +28,30 @@ public:
             expectEquals(cs.getStepCount(), 4);
             cs.stepNoteValue = NoteValue::Eighth;
             expectEquals(cs.getStepCount(), 8);
+            // Non-dividing step tiles with a partial final step (ceil): 16/16 loop, 3/16 step
+            // → 3,3,3,3,3,1 = 6 steps (was round()=5).
+            cs.stepNoteValue = NoteValue::Sixteenth; cs.stepMultiplier = 3;
+            expectEquals(cs.getStepCount(), 6);
+        }
+
+        beginTest("evaluateStepped tiles by step width (partial final step), not equal division");
+        {
+            // 16/16 loop, 3/16 step → 6 steps tiling 3,3,3,3,3,1. Distinct value per step so we
+            // can read back which step each phase lands in.
+            ControlSequence cs;
+            cs.mode = ControlSequence::Mode::Stepped;
+            cs.polarity = ControlSequence::Polarity::Bipolar;
+            cs.loopNoteValue = NoteValue::Whole;     cs.loopMultiplier = 1;
+            cs.stepNoteValue = NoteValue::Sixteenth; cs.stepMultiplier = 3;
+            cs.loopNoteMod = NoteMod::None; cs.stepNoteMod = NoteMod::None;
+            cs.stepValues = { 10.0f, 20.0f, 30.0f, 40.0f, 50.0f, 60.0f };   // 6 steps
+            const double loopBeats = cs.getLoopLengthBeats();              // 4 beats
+            // Step boundaries at 3/16,6/16,9/16,12/16,15/16 of the loop. Sample mid-cell.
+            auto at = [&](double sixteenths) { return cs.evaluate(loopBeats * sixteenths / 16.0); };
+            expectWithinAbsoluteError(at(1.5),  10.0f, 0.01f);   // step 0  (0..3/16)
+            expectWithinAbsoluteError(at(4.5),  20.0f, 0.01f);   // step 1  (3..6/16)
+            expectWithinAbsoluteError(at(13.5), 50.0f, 0.01f);   // step 4  (12..15/16)
+            expectWithinAbsoluteError(at(15.5), 60.0f, 0.01f);   // step 5  partial (15..16/16)
         }
 
         beginTest("getStepFraction: tiles by step width, not equal division");

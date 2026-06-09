@@ -34,10 +34,15 @@ void StepEditor::setPlayheadPhase(float phase)
 
 int StepEditor::hitStepIndex(int x) const
 {
-    if (steps.empty()) return -1;
-    const int barW = getWidth() / (int)steps.size();
-    int idx = x / barW;
-    return juce::jlimit(0, (int)steps.size() - 1, idx);
+    const int n = (int)steps.size();
+    if (n == 0 || getWidth() <= 0) return -1;
+    const float px = (float)x / (float)getWidth();   // 0..1 across the loop
+    // Tile by step width (so a click in the narrow final cell still resolves to it) or
+    // fall back to equal cells when no fraction is set.
+    const int idx = (stepFraction > 0.0f && stepFraction < 1.0f)
+                  ? (int)(px / stepFraction)
+                  : (int)(px * (float)n);
+    return juce::jlimit(0, n - 1, idx);
 }
 
 float StepEditor::yToValue(int y) const
@@ -80,13 +85,21 @@ void StepEditor::paint(juce::Graphics& g)
     const int n = (int)steps.size();
     if (n == 0) return;
 
-    const float barW  = (float)getWidth() / n;
-    const float h     = (float)getHeight();
+    const float w = (float)getWidth();
+    const float h = (float)getHeight();
 
-    // Grid dividers
+    // Cell boundaries: tile by the step fraction with a narrower partial final cell when set,
+    // else equal 1/n cells. Matches the audio (evaluateStepped) + the smooth editor's grid.
+    const bool tiled = (stepFraction > 0.0f && stepFraction < 1.0f);
+    auto cellL = [&](int i){ return (tiled ? (float)i * stepFraction : (float)i / (float)n) * w; };
+    auto cellR = [&](int i){ return (tiled ? juce::jmin(1.0f, (float)(i + 1) * stepFraction)
+                                           : (float)(i + 1) / (float)n) * w; };
+    auto barW  = [&](int i){ return juce::jmax(1.0f, cellR(i) - cellL(i) - 2.0f); };
+
+    // Grid dividers at each internal cell boundary
     g.setColour(MuLookAndFeel::colour(Id::stepEditorGridLine));
     for (int i = 1; i < n; ++i)
-        g.drawVerticalLine((int)(i * barW), 0, h);
+        g.drawVerticalLine((int)cellL(i), 0, h);
 
     // Bars
     if (unipolar)
@@ -96,7 +109,7 @@ void StepEditor::paint(juce::Graphics& g)
             const float v    = juce::jmax(0.0f, steps[(size_t)i]); // clamp to 0..100
             const float barH = (v / 100.0f) * h;
             g.setColour(barColour.withAlpha(0.85f));
-            g.fillRect(i * barW + 1.0f, h - barH, barW - 2.0f, barH);
+            g.fillRect(cellL(i) + 1.0f, h - barH, barW(i), barH);
         }
     }
     else
@@ -109,7 +122,7 @@ void StepEditor::paint(juce::Graphics& g)
             const float barH   = std::abs(norm) * h;
             const float barTop = (norm >= 0.0f) ? centY - barH : centY;
             g.setColour(barColour.withAlpha(0.85f));
-            g.fillRect(i * barW + 1.0f, barTop, barW - 2.0f, barH);
+            g.fillRect(cellL(i) + 1.0f, barTop, barW(i), barH);
         }
         // Centre zero line (bipolar only)
         g.setColour(MuLookAndFeel::colour(Id::stepEditorZeroLine));

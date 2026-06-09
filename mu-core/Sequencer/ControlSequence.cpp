@@ -35,7 +35,11 @@ int ControlSequence::getStepCount() const
     const double step = noteValueToBeats(stepNoteValue, stepNoteMod) * stepMultiplier;
     if (step <= 0.0)
         return 1;
-    return std::max(1, static_cast<int>(std::round(loop / step)));
+    // Tile the loop with fixed-length steps + a partial final step for any remainder
+    // (ceil), NOT equal division: a 3/16 step in a 16/16 loop gives 3,3,3,3,3,1 = 6 steps.
+    // For a step that divides the loop evenly, ceil == round, so integer configs are
+    // unchanged. Matches getStepFraction() and the editors' grid.
+    return std::max(1, static_cast<int>(std::ceil(loop / step - 1.0e-9)));
 }
 
 double ControlSequence::getStepFraction() const
@@ -85,7 +89,13 @@ float ControlSequence::evaluateStepped(double phase) const
     if (count == 0 || stepValues.empty())
         return 0.0f;
 
-    const int idx = std::min(static_cast<int>(phase * count), count - 1);
+    // Tile by the actual step width (phase / stepFraction), so the final partial step
+    // occupies only its real remainder rather than an equal 1/count slice. For a step that
+    // divides the loop evenly this equals the old phase*count. Matches the editor grid.
+    const double frac = getStepFraction();
+    const int idx = (frac > 0.0)
+        ? std::min(count - 1, static_cast<int>(phase / frac))
+        : std::min(static_cast<int>(phase * count), count - 1);
     return (idx < static_cast<int>(stepValues.size())) ? stepValues[idx] : 0.0f;
 }
 

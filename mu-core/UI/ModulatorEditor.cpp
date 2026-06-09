@@ -305,6 +305,7 @@ void ModulatorEditor::syncStepValues()
     cs->stepValues.resize((size_t)rawCount, 0.0f);
     stepEditor.setSteps(cs->stepValues);
     stepEditor.setStepCount(rawCount);
+    stepEditor.setStepFraction((float) cs->getStepFraction());   // tile cells by step width (partial last)
 }
 
 void ModulatorEditor::wireHeader()

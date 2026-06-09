@@ -44,7 +44,10 @@ public:
     // Returns the loop length in beats (assumes 4/4 quarter-note = 1 beat).
     double getLoopLengthBeats() const;
 
-    // Returns the step count for stepped mode (= round(loopLength / stepLength)).
+    // Returns the step count for stepped mode = ceil(loopLength / stepLength): the loop is
+    // tiled by fixed-length steps plus a partial final step for any remainder (e.g. a 3/16
+    // step in a 16/16 loop → 6 steps: 3,3,3,3,3,1). For a step that divides the loop evenly
+    // this equals round. Pairs with getStepFraction() for the editor grid + evaluateStepped.
     int getStepCount() const;
 
     // Returns one step's length as a fraction of the loop (= stepLength / loopLength,

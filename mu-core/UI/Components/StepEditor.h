@@ -15,6 +15,10 @@ public:
     void setSteps(const std::vector<float>& values);
     const std::vector<float>& getSteps() const noexcept { return steps; }
     void setStepCount(int count);
+    // One step as a fraction of the loop (step/loop). When set in (0,1) the cells tile the
+    // editor at k·stepFraction with a narrower partial final cell (matching the audio +
+    // the smooth editor); 0 or ≥1 falls back to equal 1/count cells.
+    void setStepFraction(float frac) { stepFraction = frac; repaint(); }
     void setBarColour(juce::Colour c);
     // Unipolar: bars from bottom (0 baseline), all values 0..+100.
     // Bipolar: bars from centre (0 baseline), values -100..+100 (default).
@@ -37,6 +41,7 @@ private:
     float playheadPhase = 0.0f;
     bool  unipolar      = false;
     int   quantizeLevels = 0;
+    float stepFraction  = 0.0f;   // step/loop; 0 or ≥1 → equal 1/count cells
 
     int hitStepIndex(int x) const;
     float yToValue(int y) const;
