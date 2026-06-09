@@ -388,14 +388,11 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
     }
     else { returnPeaks[2].store(0.0f); }
 
-    // Apply master gain first, then capture peak so master VU reflects the master fader.
-    applyPanGain(output, masterLevel.load(std::memory_order_relaxed),
-                         masterPan.load(std::memory_order_relaxed), numSamples);
-    masterPeak.store(peakOf(output, numSamples));
-
-    // Master inserts — post-fader, post-metering, chained Insert 1 → Insert 2.
-    // Assemble local VoiceParams from the atomic fields so InsertProcessor::process
-    // gets a stable snapshot for this block (no race while the message thread updates).
+    // Master inserts — run on the summed bus BEFORE the fader/meter (standard master-bus
+    // processing, so a master compressor/limiter sees a consistent pre-fader level), chained
+    // Insert 1 → Insert 2. Assemble local VoiceParams from the atomic fields so
+    // InsertProcessor::process gets a stable snapshot for this block (no race while the
+    // message thread updates).
     VoiceParams mi1, mi2;
     mi1.insertAlgo = masterInsert1Algo.load(std::memory_order_relaxed);
     for (int i = 0; i < VoiceParams::kInsertSlotCount; ++i)
@@ -405,4 +402,10 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         mi2.insertParam[i] = masterInsert2Param[i].load(std::memory_order_relaxed);
     masterInsert.process(output, numSamples, output.getNumChannels(), mi1);
     masterInsert2.process(output, numSamples, output.getNumChannels(), mi2);
+
+    // Apply the master fader, then capture the peak — so the master VU reflects the true
+    // post-insert, post-fader output that actually leaves the mixer.
+    applyPanGain(output, masterLevel.load(std::memory_order_relaxed),
+                         masterPan.load(std::memory_order_relaxed), numSamples);
+    masterPeak.store(peakOf(output, numSamples));
 }
