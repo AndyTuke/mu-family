@@ -1,0 +1,28 @@
+mu-family — Proprietary Software Licence
+========================================
+
+Copyright (c) 2026 Transwarp Development Project. All rights reserved.
+
+This repository, including its source code, build scripts, resources, and
+documentation (collectively, "the Software"), is the proprietary and
+confidential property of Transwarp Development Project ("the Author").
+
+The Software is NOT open source. No licence, right, or permission is granted to
+any person to use, copy, reproduce, modify, adapt, merge, publish, distribute,
+sublicense, sell, or disclose the Software or any portion of it, in source or
+binary form, except under a separate written agreement signed by the Author.
+
+Compiled binaries of the mu-family products (mu-Clid, mu-Clid Lite, mu-Tant,
+mu-On, mu-Toni) and the mu-link application are distributed to end users under
+a separate End-User Licence Agreement and may require a valid product licence
+key. Possession of a compiled binary conveys no rights to the source code.
+
+The Software incorporates third-party components that are licensed separately;
+their notices and licence terms are set out in THIRD_PARTY_NOTICES.txt and
+continue to govern those components.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
