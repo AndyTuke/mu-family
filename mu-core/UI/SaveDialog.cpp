@@ -1,4 +1,5 @@
 #include "SaveDialog.h"
+#include "UI/ModalCard.h"   // shared dim + card chrome
 
 SaveDialog::SaveDialog()
 {
@@ -205,8 +206,7 @@ void SaveDialog::paint(juce::Graphics& g)
     using mu_ui::s;
     using mu_ui::sf;
 
-    g.setColour(MuLookAndFeel::colour(Id::backgroundModalDim));
-    g.fillAll();
+    mu_ui::fillModalDim(g);
 
     const int w = getWidth();
     const int h = getHeight();
@@ -215,11 +215,7 @@ void SaveDialog::paint(juce::Graphics& g)
     const int cardX = (w - cardW) / 2;
     const int cardY = (h - cardH) / 2;
 
-    g.setColour(MuLookAndFeel::colour(Id::panelBackground));
-    g.fillRoundedRectangle((float)cardX, (float)cardY, (float)cardW, (float)cardH, sf(8.0f));
-
-    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawRoundedRectangle((float)cardX, (float)cardY, (float)cardW, (float)cardH, sf(8.0f), 1.0f);
+    mu_ui::paintModalCard(g, { cardX, cardY, cardW, cardH });
 
     // Logo on the right side of the header, title on the left
     if (logoImage.isValid())

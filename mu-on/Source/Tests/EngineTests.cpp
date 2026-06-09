@@ -17,6 +17,14 @@ namespace
             for (int i = 0; i < n; ++i) { const float v = b.getReadPointer(c)[i]; sum += (double) v * v; }
         return (float) std::sqrt(sum / juce::jmax(1, n * b.getNumChannels()));
     }
+
+    // RMS over the sample range [from, to) on channel 0.
+    float rmsRange(const juce::AudioBuffer<float>& b, int from, int to)
+    {
+        double sum = 0.0; const int n = juce::jmax(1, to - from);
+        for (int i = from; i < to; ++i) { const float v = b.getReadPointer(0)[i]; sum += (double) v * v; }
+        return (float) std::sqrt(sum / n);
+    }
 }
 
 class EngineTest : public juce::UnitTest
@@ -66,6 +74,50 @@ public:
             float tail = 1.0f;
             for (int b = 0; b < (int) (sr / n); ++b) { buf.clear(); hat.render(buf, n); tail = rms(buf, n); }
             expect(tail < 1.0e-3f, "hat should decay to silence");
+        }
+
+        beginTest("KickEngine: sample-accurate onset — silent before the offset, sounds after");
+        {
+            KickEngine kick;
+            kick.prepare(sr);
+            kick.setParams(50.0f, 220.0f, 50.0f, 120.0f, 0.3f);
+
+            const int off = n / 2;
+            kick.trigger(1.0f, off);
+            juce::AudioBuffer<float> buf(2, n);
+            buf.clear(); kick.render(buf, n);
+            expect(rmsRange(buf, 0, off)  < 1.0e-7f, "silent before the onset sample");
+            expect(rmsRange(buf, off, n)  > 0.01f,   "sounds from the onset sample on");
+        }
+
+        beginTest("SampleChannel: sample-accurate onset — silent before the offset, sounds after");
+        {
+            SampleChannel hat;
+            hat.prepare(sr, n, SampleChannel::HiHat);
+            hat.setParams(0.0f, 60.0f);
+
+            const int off = n / 2;
+            hat.trigger(1.0f, off);
+            juce::AudioBuffer<float> buf(2, n);
+            buf.clear(); hat.render(buf, n);
+            expect(rmsRange(buf, 0, off) < 1.0e-7f, "silent before the onset sample");
+            expect(rmsRange(buf, off, n) > 0.002f,  "sounds from the onset sample on");
+        }
+
+        beginTest("reset() silences an active engine (transport stop)");
+        {
+            KickEngine kick;
+            kick.prepare(sr);
+            kick.setParams(50.0f, 220.0f, 50.0f, 5000.0f, 0.0f);   // long decay so it would still ring
+
+            juce::AudioBuffer<float> buf(2, n);
+            kick.trigger(1.0f);
+            buf.clear(); kick.render(buf, n);
+            expect(rms(buf, n) > 0.01f, "kick is ringing");
+
+            kick.reset();
+            buf.clear(); kick.render(buf, n);
+            expect(rms(buf, n) < 1.0e-7f, "reset() silences the voice immediately");
         }
     }
 };

@@ -68,9 +68,11 @@ public:
 
     void deserialise(const juce::ValueTree& parent)
     {
+        // Clear first so a state with no <Pattern> child (old/hand-edited preset) loads a
+        // clean grid instead of silently inheriting the previously-loaded steps.
+        clear();
         const auto pat = parent.getChildWithName("Pattern");
         if (! pat.isValid()) return;
-        clear();
         for (int i = 0; i < pat.getNumChildren(); ++i)
         {
             const auto row = pat.getChild(i);

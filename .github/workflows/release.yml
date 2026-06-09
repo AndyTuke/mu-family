@@ -54,6 +54,8 @@ jobs:
           mu-clid_VST3 mu-clid_CLAP mu-clid_Standalone
           mu-clid-lite_VST3 mu-clid-lite_CLAP
           mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone
+          mu-on_VST3 mu-on_CLAP mu-on_Standalone
+          mu-toni_VST3 mu-toni_CLAP mu-toni_Standalone
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -69,3 +71,9 @@ jobs:
             build/mu-tant/mu-tant_artefacts/Release/VST3
             build/mu-tant/mu-tant_artefacts/Release/CLAP
             build/mu-tant/mu-tant_artefacts/Release/Standalone
+            build/mu-on/mu-on_artefacts/Release/VST3
+            build/mu-on/mu-on_artefacts/Release/CLAP
+            build/mu-on/mu-on_artefacts/Release/Standalone
+            build/mu-toni/mu-toni_artefacts/Release/VST3
+            build/mu-toni/mu-toni_artefacts/Release/CLAP
+            build/mu-toni/mu-toni_artefacts/Release/Standalone

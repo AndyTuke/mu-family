@@ -14,6 +14,10 @@ LFOEditor::LFOEditor()
 void LFOEditor::setPoints(const std::vector<ControlSequence::CurvePoint>& pts)
 {
     points = pts;
+    // Defensive: clamp any out-of-range anchor y (a curve persisted before range-clamping,
+    // or carried across a polarity switch) into the visible range so it can't draw off-panel.
+    const float yFloor = unipolar ? 0.0f : -1.0f;
+    for (auto& p : points) p.y = juce::jlimit(yFloor, 1.0f, p.y);
     repaint();
 }
 
@@ -135,21 +139,27 @@ juce::Path LFOEditor::buildCurvePath() const
             const float cy = 2.0f * dragS.y - 0.5f * prevS.y - 0.5f * currS.y;
             path.quadraticTo(cx, cy, currS.x, currS.y);
         }
-        else if (prev.hasBezierHandle || curr.hasBezierHandle)
-        {
-            const float midY = (prev.y + curr.y) * 0.5f;
-            const float c1y  = midY + (prev.hasBezierHandle ? prev.handleY : 0.0f);
-            const float c2y  = midY + (curr.hasBezierHandle ? curr.handleY : 0.0f);
-
-            const float c1x = prevS.x + (currS.x - prevS.x) * 0.33f;
-            const float c1Y = toScreen(0.0f, c1y).y;
-            const float c2x = prevS.x + (currS.x - prevS.x) * 0.66f;
-            const float c2Y = toScreen(0.0f, c2y).y;
-            path.cubicTo(c1x, c1Y, c2x, c2Y, currS.x, currS.y);
-        }
         else
         {
-            path.lineTo(currS.x, currS.y);
+            // Smooth (Catmull-Rom) cubic through the anchors — matches
+            // ControlSequence::evaluateSmooth so the drawing and the audio agree. Interior
+            // tangents are centred differences; boundaries use one-sided (2-point → linear).
+            // An explicit per-segment bend (handleY) adds on top.
+            const int n  = (int) points.size();
+            const int lo = i - 1;
+            auto py = [&](int k) { return points[(size_t) juce::jlimit(0, n - 1, k)].y; };
+            const float m0 = (lo == 0)         ? (py(lo + 1) - py(lo)) : 0.5f * (py(lo + 1) - py(lo - 1));
+            const float m1 = (lo + 1 == n - 1) ? (py(lo + 1) - py(lo)) : 0.5f * (py(lo + 2) - py(lo));
+            // Clamp the bezier control points to the visible range (bottom = 0 unipolar / -1
+            // bipolar, top = 1) so the curve can't draw past the panel — the convex-hull
+            // property keeps the whole segment in range. Matches ControlSequence::evaluateSmooth.
+            const float yFloor = unipolar ? 0.0f : -1.0f;
+            const float c1y = juce::jlimit(yFloor, 1.0f, prev.y + m0 / 3.0f + (prev.hasBezierHandle ? prev.handleY : 0.0f));
+            const float c2y = juce::jlimit(yFloor, 1.0f, curr.y - m1 / 3.0f + (curr.hasBezierHandle ? curr.handleY : 0.0f));
+
+            const float c1x = prevS.x + (currS.x - prevS.x) * 0.33f;
+            const float c2x = prevS.x + (currS.x - prevS.x) * 0.66f;
+            path.cubicTo(c1x, toScreen(0.0f, c1y).y, c2x, toScreen(0.0f, c2y).y, currS.x, currS.y);
         }
     }
     return path;
@@ -364,6 +374,22 @@ void LFOEditor::mouseUp(const juce::MouseEvent&)
     if (dragIndex >= 0)
         notifyChanged();
     dragIndex = -1;
+}
+
+void LFOEditor::mouseDoubleClick(const juce::MouseEvent& e)
+{
+    // Double-click an existing interior node to delete it (same as right-click, a more
+    // discoverable gesture). The two boundary anchors (first/last, pinned to x=0/x=1) stay.
+    // The first click of the double already landed on the node (hitTest > 0 → no add), so
+    // there's nothing spurious to undo. Reset dragIndex so the trailing mouseUp — which the
+    // second click's mouseDown set — doesn't re-notify against the now-shifted indices.
+    const int idx = hitTest(e.position);
+    if (idx > 0 && idx < (int) points.size() - 1)
+    {
+        points.erase(points.begin() + idx);
+        dragIndex = -1;
+        notifyChanged();
+    }
 }
 
 void LFOEditor::mouseMove(const juce::MouseEvent& e)

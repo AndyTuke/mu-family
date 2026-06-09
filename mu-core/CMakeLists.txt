@@ -68,6 +68,10 @@ target_sources(mu-core INTERFACE
     # Shared modal overlays — product chrome supplied via setters.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/AboutPanel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/SaveDialog.cpp"
+    # Shared themed modal dialog (replaces juce::AlertWindow) + its convenience builders.
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/ModalDialog.cpp"
+    # Shared spec-driven wrapping grid of APVTS-bound knobs/combos (engine surface).
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/ParamKnobGrid.cpp"
     # Shared transport bar — product slots in its own loop section + logo text.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/TransportBar.cpp"
     # Shared editor shell — chrome / overlay state machine / main-area layout.

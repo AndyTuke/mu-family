@@ -1,6 +1,8 @@
 # μ-family Plugin Architecture
 
-This document covers the shared-code strategy for building additional plugins in the μ-family (mu-tant, mu-toni, and future siblings) that reuse mu-clid's voice chain, modulation system, and mixer.
+This document covers the shared-code strategy for building additional plugins in the μ-family (mu-tant, mu-toni, mu-on, and future siblings) that reuse mu-clid's voice chain, modulation system, and mixer.
+
+**Siblings already built on this platform:** **mu-tant** (wavetable drone synth — per-voice oscillators + gater), **mu-on** (909 groove sequencer — five fixed engine lanes + a per-lane `ModulationMatrix` resolved through the shared `mu_mod::resolveLane` helper), and **mu-toni** (scaffold). Each supplies only its engine(s) + sequencer/trigger model and inherits `ProcessorBase`, `EditorShellBase`, the mixer/FX rack, and the modulation system unchanged.
 
 ---
 
@@ -131,7 +133,7 @@ The `mu-core` INTERFACE library (introduced in Stage 33) holds everything shared
 | `InsertSubsection` | `mu-core/UI/Voice/` | Shared insert-effect voice subsection (channel-prefix bound) |
 | `ModulatorPanel`, `ModMatrixPanel`, `ModulatorEditor` | `mu-core/UI/` | Shared modulator UI (take `VoiceSlot&` + a product `ModDestProvider`) |
 | `EditorShellBase`, `TransportBar`, `AboutPanel`, `SaveDialog`, `PresetBrowser`, MIDI-preset panels | `mu-core/UI/` | Shared editor shell + chrome |
-| `ConfirmDialog` | `mu-core/UI/ConfirmDialog.h` | `mu_ui::confirmAsync` (reset/delete yes-no) + `mu_ui::confirmQuitAsync` (OK/Save/Cancel close prompt) — one shared implementation so every product's confirmation prompts match |
+| `ModalDialog` + `ConfirmDialog` | `mu-core/UI/ModalDialog.{h,cpp}` + `ConfirmDialog.h` | Themed in-editor modal dialog (replaces `juce::AlertWindow`) + the `mu_ui::messageAsync`/`confirmAsync`/`promptTextAsync`/`confirmQuitAsync` builders (each takes an editor-anchor `Component*`). One shared implementation so every prompt matches; extensible via an injected content component. |
 
 ### Product-specific components (under `<product>/Source/`)
 

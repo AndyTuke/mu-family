@@ -44,6 +44,16 @@ public:
 
     const std::vector<ModulationAssignment>& getAssignments() const { return assignments; }
 
+    // Register a product-specific destination's full-swing depth scale (the magnitude a
+    // depth=100% × source=100% modulation adds, in the units the product seeds into
+    // paramValues). mu-core knows only the generic `.prop` convention (scale 1.0) + the
+    // shared voice/filter/insert vocabulary + a 100 default; each product registers its
+    // engine-specific destinations (e.g. mu-tant `osc1.octave`, mu-clid `euclid.a.hits`)
+    // so the shared platform stays plugin-agnostic. Call once at static-init time (the
+    // ModDest headers do this via an inline registration variable) — never from the audio
+    // thread.
+    static void registerDepthScale(const std::string& destId, float scale);
+
     // Evaluates all ControlSequences at songBeatPos, then applies every assignment
     // to paramValues. Values not present in paramValues are silently skipped.
     // paramValues is keyed by string_view (literals only). a.destinationId is

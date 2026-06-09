@@ -1,5 +1,7 @@
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/PluginEditor.h"
+#include "Modulation/MuOnModDest.h"
+#include "Modulation/ModulatorSerialise.h"   // mu-core: shared modulator (de)serialise
 
 namespace mu_on
 {
@@ -10,7 +12,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     AudioProcessorValueTreeState::ParameterLayout layout;
     auto f = [](float lo, float hi, float step) { return NormalisableRange<float>(lo, hi, step); };
 
-    static const char* kNames[kNumChannels] = { "Kick", "Bass", "Hat", "Snare" };
+    static const char* kNames[kNumChannels] = { "Kick", "Bass", "Hat", "Snare", "Rumble" };
 
     // ── Mixer channel strips — one per instrument lane (shared `ch{N}_` binding the
     //    MixerChannel / MixerOverlay use). The Bass lane (ch1) pre-wires its sidechain
@@ -22,7 +24,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         const String n = String(kNames[i]) + " Ch ";
 
         const bool isBass = (i == Bass);
-        const int   scSrcDefault = isBass ? (Kick + 1) : 0;   // param 1..8 = ch0..7; +1 maps Kick→1
+        // Bass + Rumble pre-wire their sidechain SOURCE to the Kick (bass ducks the kick out of
+        // the box; Rumble exposes it for optional kick-pumping — amount left at 0 by default).
+        const bool fromKick = isBass || (i == Rumble);
+        const int   scSrcDefault = fromKick ? (Kick + 1) : 0;   // param 1..8 = ch0..7; +1 maps Kick→1
         const float scAmtDefault = isBass ? 0.4f : 0.0f;
         const float scRelDefault = isBass ? 120.0f : 100.0f;
 
@@ -70,6 +75,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"s_tune", 1}, "Snare Tune", f(-12.0f, 12.0f, 0.1f), 0.0f));
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"s_dec",  1}, "Snare Decay",f(20.0f, 600.0f, 1.0f), 160.0f));
 
+    // ── Rumble engine (processes the Kick feed: drive → delays → reverb → env → filter) ──
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_drive", 1}, "Rumble Drive",   f(0.0f, 1.0f, 0.001f), 0.4f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_d1",    1}, "Rumble 1/16",    f(0.0f, 1.0f, 0.001f), 0.5f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_d2",    1}, "Rumble 2/16",    f(0.0f, 1.0f, 0.001f), 0.35f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_d3",    1}, "Rumble 3/16",    f(0.0f, 1.0f, 0.001f), 0.25f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_size",  1}, "Rumble Rev Size",f(0.0f, 1.0f, 0.001f), 0.7f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_revmix",1}, "Rumble Rev Mix", f(0.0f, 1.0f, 0.001f), 0.5f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_revlp", 1}, "Rumble Rev LP",
+                juce::NormalisableRange<float>(200.0f, 18000.0f, 1.0f, 0.3f), 1200.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_cut",   1}, "Rumble Cutoff",
+                juce::NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 800.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_res",   1}, "Rumble Resonance",f(0.0f, 1.0f, 0.001f), 0.2f));
+
     // ── Shared global FX rack + returns + master (mu-core) ────────────────────
     mu_mixfx::addGlobalFxParams(layout);
 
@@ -90,8 +108,26 @@ PluginProcessor::PluginProcessor()
     // A default groove so a fresh instance plays something immediately.
     stepPattern.loadDefaultGroove();
 
+    // Rumble bar-volume envelope: a smooth, unipolar curve drawn in the grid slot for the
+    // Rumble lane. Default = flat at full level (no shaping until the user draws one).
+    rumbleEnv.mode           = ControlSequence::Mode::Smooth;
+    rumbleEnv.polarity       = ControlSequence::Polarity::Unipolar;
+    rumbleEnv.loopNoteValue  = NoteValue::Quarter;
+    rumbleEnv.loopNoteMod    = NoteMod::None;
+    rumbleEnv.loopMultiplier = 4;   // 1 bar (4 beats) so it cycles once per bar
+    rumbleEnv.curvePoints    = { { 0.0f, 1.0f }, { 1.0f, 1.0f } };   // flat full by default
+    grooveVoices.setRumbleEnv(&rumbleEnv, &rumbleEnvLock);
+
+    // Tag each modulation slot with its lane identity (name + palette colour).
+    for (int v = 0; v < kNumChannels; ++v)
+    {
+        voiceSlots[(size_t) v].name        = getChannelName(v).toStdString();
+        voiceSlots[(size_t) v].colourIndex = getChannelColourIndex(v);
+    }
+
     seqSwingParam  = apvts.getRawParameterValue("seq_swing");
     seqAccentParam = apvts.getRawParameterValue("seq_accent");
+    grooveVoices.setSlots(&voiceSlots);
     grooveVoices.cacheParams(apvts);
 
     registerFxListeners();
@@ -169,15 +205,19 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // Refresh engine params from the APVTS, then clock the 909 sequencer for this block
     // (before the render so a step's engine is armed for this same block). Each fired lane
     // triggers its engine and bumps a counter the editor polls to pulse the sidebar.
-    grooveVoices.applyParams();
-    if (playing.load(std::memory_order_relaxed))
+    grooveVoices.applyParams(beatStart, bpm);
+    const bool isPlaying = playing.load(std::memory_order_relaxed);
+    // Stop edge: silence the voices so a sustaining bass (no note-off yet) doesn't drone on.
+    if (wasPlaying && ! isPlaying) grooveVoices.reset();
+    wasPlaying = isPlaying;
+    if (isPlaying)
     {
         sequencer.setSwing (seqSwingParam  ? seqSwingParam->load()  : 0.0f);
         sequencer.setAccentVelocity(seqAccentParam ? seqAccentParam->load() : 1.0f);
         sequencer.process(beatStart, numSamples, bpm,
-                          [this](int track, float vel, int /*off*/)
+                          [this](int track, float vel, int off)
                           {
-                              grooveVoices.trigger(track, vel);
+                              grooveVoices.trigger(track, vel, off);
                               if (track >= 0 && track < kNumChannels)
                                   triggers[(size_t) track].fetch_add(1, std::memory_order_relaxed);
                           });
@@ -196,7 +236,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
                     nCh >= 2 ? scBuf.getReadPointer(1) : scBuf.getReadPointer(0));
         }
 
-    // Render (silent for now) → mixer through the shared path (engine→insert→mixer).
+    // Render the engines → mixer through the shared path (engine→insert→mixer).
     processCoreBlock(buffer, nullptr, kNumChannels, numSamples, bpm,
                      nullptr, nullptr, nullptr, &renderChannelCb);
 
@@ -218,7 +258,25 @@ juce::AudioProcessorEditor* PluginProcessor::createEditor()
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
-    stepPattern.serialise(state);   // ride the 909 grid along in the state tree
+    stepPattern.serialise(state);    // ride the 909 grid along in the state tree
+    writeVoiceDataToState(state);    // + each lane's modulators
+
+    // Rumble bar-volume envelope — its curve points (read under the env lock).
+    state.removeChild(state.getChildWithName("RumbleEnv"), nullptr);
+    juce::ValueTree env("RumbleEnv");
+    {
+        bool e = false; while (! rumbleEnvLock.compare_exchange_strong(e, true, std::memory_order_acquire)) e = false;
+        for (const auto& p : rumbleEnv.curvePoints)
+        {
+            juce::ValueTree pt("P");
+            pt.setProperty("x", p.x, nullptr);
+            pt.setProperty("y", p.y, nullptr);
+            env.addChild(pt, -1, nullptr);
+        }
+        rumbleEnvLock.store(false, std::memory_order_release);
+    }
+    state.addChild(env, -1, nullptr);
+
     if (auto xml = state.createXml())
         copyXmlToBinary(*xml, destData);
 }
@@ -230,8 +288,65 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
         {
             apvts.replaceState(juce::ValueTree::fromXml(*xml));
             stepPattern.deserialise(apvts.state);
+            readVoiceDataFromState(apvts.state);
+
+            // Rumble bar-volume envelope curve points.
+            if (auto env = apvts.state.getChildWithName("RumbleEnv"); env.isValid())
+            {
+                std::vector<ControlSequence::CurvePoint> pts;
+                for (int i = 0; i < env.getNumChildren(); ++i)
+                {
+                    const auto p = env.getChild(i);
+                    ControlSequence::CurvePoint cp;
+                    cp.x = (float) p.getProperty("x", 0.0f);
+                    cp.y = (float) p.getProperty("y", 0.0f);
+                    pts.push_back(cp);
+                }
+                if (pts.size() >= 2)
+                {
+                    bool e = false; while (! rumbleEnvLock.compare_exchange_strong(e, true, std::memory_order_acquire)) e = false;
+                    rumbleEnv.curvePoints = std::move(pts);
+                    rumbleEnvLock.store(false, std::memory_order_release);
+                }
+            }
             syncAllFxParams();   // re-seed mixer/FX (unchanged values skip listeners)
         }
+}
+
+// Rebuild a fresh <VoiceData> child holding each lane's modulators so copyState()
+// carries them into the file/host state. Mirrors mu-tant's per-voice approach.
+void PluginProcessor::writeVoiceDataToState(juce::ValueTree& state)
+{
+    state.removeChild(state.getChildWithName("VoiceData"), nullptr);
+    juce::ValueTree vd("VoiceData");
+    for (int v = 0; v < kNumChannels; ++v)
+    {
+        juce::ValueTree lane("Lane");
+        lane.setProperty("idx", v, nullptr);
+        lane.addChild(mu_pp::serialiseModulators(voiceSlots[(size_t) v]), -1, nullptr);
+        vd.addChild(lane, -1, nullptr);
+    }
+    state.addChild(vd, -1, nullptr);
+}
+
+// Clear then restore each lane's modulators. An absent <VoiceData> (older / foreign
+// state) leaves every lane cleared rather than carrying stale assignments.
+void PluginProcessor::readVoiceDataFromState(const juce::ValueTree& state)
+{
+    auto vd = state.getChildWithName("VoiceData");
+    for (int v = 0; v < kNumChannels; ++v)
+    {
+        mu_pp::clearModulators(voiceSlots[(size_t) v]);
+        juce::ValueTree lane;
+        for (int i = 0; i < vd.getNumChildren(); ++i)
+            if (vd.getChild(i).getType() == juce::Identifier("Lane")
+                && (int) vd.getChild(i).getProperty("idx", -1) == v)
+            { lane = vd.getChild(i); break; }
+
+        mu_pp::deserialiseModulators(lane.getChildWithName("Modulators"),
+                                     voiceSlots[(size_t) v], {},
+                                     [v](const std::string& id) { return isValidLaneDest(v, id); });
+    }
 }
 
 juce::File PluginProcessor::getContentDir() const

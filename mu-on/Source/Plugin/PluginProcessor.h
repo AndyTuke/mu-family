@@ -6,6 +6,7 @@
 #include "Sequencer/StepPattern.h"
 #include "Sequencer/GrooveSequencer.h"
 #include "Audio/GrooveVoices.h"
+#include "Sequencer/VoiceSlot.h"   // mu-core: per-lane modulation slot
 
 #include <array>
 #include <atomic>
@@ -18,8 +19,10 @@
 // + FXChain, the shared sidebar + MixerOverlay). The bass↔kick side-chain ducking is
 // the shared MixerEngine's channel-to-channel sidechain (wired by default in the ctor).
 //
-// Scaffold stage: processBlock routes a SILENT per-channel render through the shared
-// mixer so the strips + VU meters are live; the sequencer + engines land next.
+// processBlock clocks the 909 step sequencer and renders the four engines (Kick/Bass/
+// Hat/Snare) through the shared mixer (engine → insert → mixer), so the strips + VU
+// meters are live and the lanes are audible. Each lane's engine params are resolved
+// through its ModulationMatrix before rendering.
 namespace mu_on
 {
 
@@ -79,17 +82,29 @@ public:
     juce::String getChannelName(int idx)       const override
     {
         switch (idx) { case Kick: return "Kick"; case Bass: return "Bass";
-                       case Hat: return "Hat";   case Snare: return "Snare"; default: return {}; }
+                       case Hat: return "Hat";   case Snare: return "Snare";
+                       case Rumble: return "Rumble"; default: return {}; }
     }
     // Distinct palette entries per instrument lane.
     int          getChannelColourIndex(int idx) const override
     {
-        static constexpr int kColours[kNumChannels] = { 0, 2, 5, 7 };  // Kick/Bass/Hat/Snare
+        static constexpr int kColours[kNumChannels] = { 0, 2, 5, 7, 4 };  // Kick/Bass/Hat/Snare/Rumble
         return (idx >= 0 && idx < kNumChannels) ? kColours[idx] : 0;
     }
 
     // ── 909 sequencer access (for the editor's grid + playhead) ───────────────
     StepPattern& pattern() noexcept { return stepPattern; }
+
+    // Rumble lane's drawable bar-volume envelope (a smooth ControlSequence drawn in the grid
+    // slot for the Rumble lane). Edited on the message thread under `rumbleEnvLock`; the audio
+    // thread evaluates it under a try-lock each block. Persists in the state tree.
+    ControlSequence&  rumbleEnvelope() noexcept { return rumbleEnv; }
+    CopyableSpinLock& rumbleEnvLockRef() noexcept { return rumbleEnvLock; }
+
+    // Per-lane modulation slot (ControlSequences + ModulationMatrix) — the editor's
+    // shared ModulatorPanel binds to the selected lane's slot; the audio thread reads
+    // it via GrooveVoices each block.
+    VoiceSlot& voiceSlot(int lane) noexcept { return voiceSlots[(size_t) juce::jlimit(0, kNumChannels - 1, lane)]; }
     // Per-channel trigger counter — bumped on the audio thread when the sequencer fires
     // that lane; the editor polls it to pulse the sidebar lane. Read-only for the editor.
     int triggerCount(int ch) const noexcept
@@ -117,13 +132,22 @@ private:
     void registerFxListeners();
     void syncAllFxParams();
 
-    // Silent per-channel render hook handed to the shared MixerEngine (engines land next).
+    // Per-lane modulator (de)serialise into a <VoiceData> child of the state tree
+    // (mirrors mu-tant; rides the APVTS state alongside the <Pattern> grid).
+    void writeVoiceDataToState(juce::ValueTree& state);
+    void readVoiceDataFromState(const juce::ValueTree& state);
+
+    // Per-channel render hook handed to the shared MixerEngine — fills each lane's buffer
+    // from its engine (Kick/Bass/Hat/Snare) via GrooveVoices.
     MixerEngine::RenderChannelFn renderChannelCb;
 
     // 909 sequencer — owns the grid pattern; clocked off the internal transport each block.
     StepPattern     stepPattern;
     GrooveSequencer sequencer { stepPattern };
     GrooveVoices    grooveVoices;                              // the four instrument engines
+    std::array<VoiceSlot, kNumChannels> voiceSlots;            // per-lane modulation (ControlSequences + matrix)
+    ControlSequence  rumbleEnv;                                // Rumble lane drawable bar-volume envelope
+    CopyableSpinLock rumbleEnvLock;                            // guards rumbleEnv (msg edit ↔ audio eval)
     std::array<std::atomic<int>, kNumChannels> triggers { };   // per-lane trigger counter (UI pulse)
 
     // Cached APVTS pointers for the product sequencer params (read each block).
@@ -134,6 +158,7 @@ private:
     std::atomic<double> internalBeatPos { 0.0 };
     std::atomic<double> internalBpm { 120.0 };
     double currentSampleRate = 44100.0;
+    bool   wasPlaying = false;   // audio-thread only — detects the play→stop edge to silence voices
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

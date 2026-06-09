@@ -28,7 +28,7 @@ struct MuTheme
         juce::Colour sidebarItemSelected { 0xff2d2d2b };
         juce::Colour overlay           { 0xff111110 };  // mod / FX overlay bg
         juce::Colour dialog            { 0xff1a1a1a };  // modal dialog cards
-        juce::Colour modalDim          { 0xe6000000 };  // dim behind modal cards
+        juce::Colour modalDim          { 0x73000000 };  // dim behind modal cards (~45% — keeps the app clearly visible)
         juce::Colour fxRowDim          { 0x60000000 };  // FX/Delay row disabled overlay
         juce::Colour mixerStripDim     { 0x88000000 };  // inactive mixer-channel overlay
     } backgrounds;

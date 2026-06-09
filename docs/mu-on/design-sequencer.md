@@ -1,6 +1,8 @@
 # μ-On — Sequencer design
 
-A 909-style step sequencer drives the four instrument lanes.
+A 909-style step sequencer drives the four **stepped** instrument lanes (Kick/Bass/Hat/Snare).
+The fifth lane, **Rumble**, is not sequenced — it processes the Kick's audio (see
+[design-engine.md](design-engine.md)) — so the grid stays 4 tracks.
 
 ## Model — `StepPattern`
 [mu-on/Source/Sequencer/StepPattern.h](../../mu-on/Source/Sequencer/StepPattern.h) — a grid of

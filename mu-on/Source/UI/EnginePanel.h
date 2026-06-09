@@ -4,14 +4,11 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Plugin/ProcessorBase.h"
 #include "Plugin/MuOnChannels.h"
-
-#include <memory>
-#include <vector>
+#include "UI/ParamKnobGrid.h"   // shared spec-driven knob/combo grid
 
 // EnginePanel — the controls for the currently-selected instrument lane. On setChannel()
-// it rebuilds a row of knobs (and a combo for choice params) bound to that engine's APVTS
-// params via attachments. The shell + mixer handle everything else, so this is purely the
-// product engine surface.
+// it feeds that engine's {paramId,label} specs to the shared mu_ui::ParamKnobGrid, which
+// builds + attaches + lays out the knobs/combos. This panel only adds the lane header.
 namespace mu_on
 {
 
@@ -27,21 +24,9 @@ public:
     void resized() override;
 
 private:
-    struct Control
-    {
-        juce::String label;
-        std::unique_ptr<juce::Slider>   knob;
-        std::unique_ptr<juce::ComboBox> combo;
-        juce::Label                     name;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   knobAtt;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> comboAtt;
-    };
-
-    void rebuild();
-
-    ProcessorBase& proc;
-    int currentChannel = 0;
-    std::vector<std::unique_ptr<Control>> controls;
+    ProcessorBase&      proc;
+    int                 currentChannel = 0;
+    mu_ui::ParamKnobGrid grid;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EnginePanel)
 };

@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <string_view>
 #include "Modulation/MuTantModDest.h"
+#include "Modulation/LaneModulation.h"       // mu-core: mu_mod::resolveLane (converged routing)
 #include "Sequencer/VoiceSlot.h"
 #include "Sequencer/ControlSequence.h"
 #include "Modulation/ModulationMatrix.h"
@@ -55,7 +56,8 @@ public:
                 "osc1.octave", "osc1.semi", "osc1.fine", "osc1.pos",
                 "osc2.octave", "osc2.semi", "osc2.fine", "osc2.pos",
                 "xmod.fm", "xmod.am", "xmod.ring", "osc1.level", "osc2.level", "noise.level",
-                "filter.cutoff", "filter.resonance", "level"
+                "filter.cutoff", "filter.resonance",
+                "filter2.cutoff.prop", "filter2.resonance.prop", "level"
             };
             auto provider = makeModDestProvider();
             for (auto* k : requiredKeys)
@@ -109,6 +111,93 @@ public:
             // depth assignment MUST change the seeded value.
             expect(pv["filter.cutoff"] != 1000.0f,
                    "non-zero modulation depth altered filter.cutoff from baseline");
+        }
+
+        beginTest("filter2 '.prop' destination sweeps the full proportion at full depth+source");
+        {
+            // Filter 2 uses the generic proportion-space convention: a destination id
+            // ending in ".prop" gets depthScaleFor = 1.0, so full depth (100) × full
+            // source (100) adds exactly 1.0 to the seeded 0..1 proportion.
+            VoiceSlot slot;
+            auto& cs = slot.controlSequences[0];
+            cs.mode       = ControlSequence::Mode::Stepped;
+            cs.polarity   = ControlSequence::Polarity::Unipolar;
+            cs.stepValues = { 100.0f };   // full source
+            cs.loopNoteValue = NoteValue::Quarter; cs.loopNoteMod = NoteMod::None; cs.loopMultiplier = 1;
+            cs.stepNoteValue = NoteValue::Quarter; cs.stepNoteMod = NoteMod::None; cs.stepMultiplier = 1;
+
+            ModulationAssignment a;
+            a.id            = "cs0_to_f2cut";
+            a.sourceId      = "cs0_output";
+            a.destinationId = "filter2.cutoff.prop";
+            a.depth         = 100.0f;
+            expect(slot.modulationMatrix.addAssignment(a), "matrix accepts filter2 assignment");
+
+            std::unordered_map<std::string_view, float> pv;
+            for (int i = 0; i < kModDestCount; ++i) pv[kModDestTable[i].id] = 0.0f;
+            pv["filter2.cutoff.prop"] = 0.25f;   // seeded base proportion
+
+            slot.modulationMatrix.process(slot.controlSequences, 0.0, pv);
+            expectWithinAbsoluteError(pv["filter2.cutoff.prop"], 1.25f, 1.0e-4f,
+                   "full depth+source adds 1.0 to the proportion (scale 1.0)");
+        }
+
+        beginTest("registered product depth-scale is proportion-space (osc1.semi → scale 1.0)");
+        {
+            // mu-tant's engine dests are now routed through mu_mod::resolveLane, which seeds
+            // proportions (0..1) — so every registered scale is 1.0 (not the old display-unit
+            // 24). Verify the registration overrides mu-core's 0..100 default of 100: a full
+            // depth+source mod adds exactly 1.0 to a proportion seed.
+            registerDepthScales();   // idempotent (call_once); normally the processor ctor calls it
+
+            VoiceSlot slot;
+            auto& cs = slot.controlSequences[0];
+            cs.mode       = ControlSequence::Mode::Stepped;
+            cs.polarity   = ControlSequence::Polarity::Unipolar;
+            cs.stepValues = { 100.0f };
+            cs.loopNoteValue = NoteValue::Quarter; cs.loopNoteMod = NoteMod::None; cs.loopMultiplier = 1;
+            cs.stepNoteValue = NoteValue::Quarter; cs.stepNoteMod = NoteMod::None; cs.stepMultiplier = 1;
+
+            ModulationAssignment a;
+            a.id = "cs0_to_semi"; a.sourceId = "cs0_output"; a.destinationId = "osc1.semi"; a.depth = 100.0f;
+            expect(slot.modulationMatrix.addAssignment(a), "matrix accepts osc1.semi assignment");
+
+            std::unordered_map<std::string_view, float> pv;
+            for (int i = 0; i < kModDestCount; ++i) pv[kModDestTable[i].id] = 0.0f;
+            pv["osc1.semi"] = 0.5f;   // mid-range proportion
+            slot.modulationMatrix.process(slot.controlSequences, 0.0, pv);
+            expectWithinAbsoluteError(pv["osc1.semi"], 1.5f, 1.0e-4f,
+                   "full depth+source adds the proportion-space scale (1.0), not the 100 default");
+        }
+
+        beginTest("resolveLane converges osc1.semi to its range rail (proportion-clamped)");
+        {
+            // End-to-end check of the converged path: a full-depth unipolar mod on osc1.semi
+            // (range -12..12) seeds the param's mid proportion and sweeps to the +12 rail,
+            // clamped — the behaviour mu-tant's renderVoice now relies on via resolveLane.
+            registerDepthScales();
+
+            VoiceSlot slot;
+            auto& cs = slot.controlSequences[0];
+            cs.mode       = ControlSequence::Mode::Stepped;
+            cs.polarity   = ControlSequence::Polarity::Unipolar;
+            cs.stepValues = { 100.0f };
+            cs.loopNoteValue = NoteValue::Quarter; cs.loopNoteMod = NoteMod::None; cs.loopMultiplier = 1;
+            cs.stepNoteValue = NoteValue::Quarter; cs.stepNoteMod = NoteMod::None; cs.stepMultiplier = 1;
+            ModulationAssignment a;
+            a.id = "cs0_to_semi"; a.sourceId = "cs0_output"; a.destinationId = "osc1.semi"; a.depth = 100.0f;
+            expect(slot.modulationMatrix.addAssignment(a), "matrix accepts osc1.semi assignment");
+
+            const juce::NormalisableRange<float> semiRange(-12.0f, 12.0f, 1.0f);
+            std::atomic<float> semiAtom { 0.0f };   // base value 0 → proportion 0.5
+            const char* ids[1] { "osc1.semi" };
+            const std::atomic<float>* atoms[1] { &semiAtom };
+            std::unordered_map<std::string_view, float> pv;
+            pv.emplace(std::string_view("osc1.semi"), 0.0f);
+            float out[1] {};
+            mu_mod::resolveLane(&slot, 0.0, 1, ids, atoms, &semiRange, pv, out);
+            expectWithinAbsoluteError(out[0], 12.0f, 1.0e-3f,
+                   "full-depth mod from base 0 sweeps osc1.semi to its +12 rail");
         }
 
         beginTest("modulation matrix is a no-op when no assignments exist");

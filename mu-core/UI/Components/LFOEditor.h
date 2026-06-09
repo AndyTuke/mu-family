@@ -18,7 +18,15 @@ public:
     const std::vector<ControlSequence::CurvePoint>& getPoints() const noexcept { return points; }
 
     // Unipolar: curve spans 0..+100 (bottom=0); bipolar: -100..+100 (centre=0, default).
-    void setUnipolar(bool u) { unipolar = u; repaint(); }
+    void setUnipolar(bool u)
+    {
+        unipolar = u;
+        // Re-clamp stored anchors into the new visible range — a bipolar→unipolar switch can
+        // otherwise leave negative y below the unipolar floor, drawing the curve off-panel.
+        const float yFloor = u ? 0.0f : -1.0f;
+        for (auto& p : points) p.y = juce::jlimit(yFloor, 1.0f, p.y);
+        repaint();
+    }
     void setStepCount(int count) { stepCount = count; repaint(); }
 
     // playhead: 0.0 = start, 1.0 = end of loop
@@ -29,6 +37,7 @@ public:
     void mouseDrag(const juce::MouseEvent& e) override;
     void mouseMove(const juce::MouseEvent& e) override;
     void mouseUp(const juce::MouseEvent& e) override;
+    void mouseDoubleClick(const juce::MouseEvent& e) override;
     void mouseExit(const juce::MouseEvent& e) override;
 
 private:

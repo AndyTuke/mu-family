@@ -24,6 +24,7 @@ public:
         generate(k);
         scratch.setSize(1, juce::jmax(1, maxBlock));
         ratios.assign((size_t) juce::jmax(1, maxBlock), 1.0);
+        filledRatio = -1.0;   // force the first render to fill ratios to the live tune
         active = false;
     }
 
@@ -34,20 +35,33 @@ public:
         decayInv = 1.0f / juce::jmax(1.0f, decayMs * 0.001f * (float) sampleRate);
     }
 
-    void trigger(float velocity) noexcept { player.trigger(); restart = true; pendingVel = velocity; }
+    void trigger(float velocity, int onset = 0) noexcept { player.trigger(); restart = true; pendingVel = velocity; pendingOnset = juce::jmax(0, onset); }
+
+    // Silence the lane immediately (e.g. transport stop). The next render adds nothing.
+    void reset() noexcept { active = false; restart = false; }
 
     void render(juce::AudioBuffer<float>& buf, int n)
     {
-        if (restart) { t = 0.0f; vel = pendingVel; active = true; restart = false; }
+        // A step landing mid-block starts the sample + gate at its sample offset; 0 on
+        // continuation blocks (the player just keeps streaming from sample 0 of the block).
+        int onset = 0;
+        if (restart) { t = 0.0f; vel = pendingVel; active = true; restart = false; onset = juce::jmin(pendingOnset, n - 1); }
 
         // Pull the one-shot into the mono scratch (SamplePlayer ADDS, so clear first).
         scratch.clear();
-        for (int i = 0; i < n; ++i) ratios[(size_t) i] = ratio;
-        player.process(sampleBuf, ratios.data(), scratch, n);
+        // Refill the per-sample ratio span only when the tune (ratio) changed — it's
+        // block-constant, so the old per-sample rewrite was pure busywork.
+        if (ratio != filledRatio) { std::fill(ratios.begin(), ratios.end(), ratio); filledRatio = ratio; }
+        const int playN = n - onset;
+        if (playN > 0)
+        {
+            juce::AudioBuffer<float> sub(scratch.getArrayOfWritePointers(), 1, onset, playN);
+            player.process(sampleBuf, ratios.data(), sub, playN);
+        }
 
         const int chs = buf.getNumChannels();
         const float* src = scratch.getReadPointer(0);
-        for (int i = 0; i < n; ++i)
+        for (int i = onset; i < n; ++i)
         {
             float g = 0.0f;
             if (active)
@@ -99,8 +113,9 @@ private:
     SamplePlayer            player;
     juce::AudioBuffer<float> sampleBuf, scratch;
     std::vector<double>      ratios;
-    double sampleRate = 44100.0, ratio = 1.0;
+    double sampleRate = 44100.0, ratio = 1.0, filledRatio = -1.0;
     float  decayInv = 0.01f, t = 0.0f, vel = 1.0f, pendingVel = 1.0f;
+    int    pendingOnset = 0;
     bool   active = false, restart = false;
 };
 

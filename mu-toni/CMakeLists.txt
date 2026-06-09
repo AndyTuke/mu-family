@@ -72,6 +72,23 @@ clap_juce_extensions_plugin(TARGET mu-toni
 # Family build-counter (shared increment target defined in mu-clid/CMakeLists.txt).
 add_dependencies(mu-toni increment_build_number)
 
+# ── Deploy Release artifacts to the tester drop folder ──────────────────────
+# Mirrors mu-tant's deploy pattern. Guarded by MUFAMILY_DEPLOY_TESTERS (OFF by default).
+if(MUFAMILY_DEPLOY_TESTERS)
+add_custom_command(TARGET mu-toni_Standalone POST_BUILD
+    COMMAND "${CMAKE_COMMAND}"
+            "-DCONFIG=$<CONFIG>"
+            "-DSTANDALONE=$<TARGET_FILE:mu-toni_Standalone>"
+            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-toni/mu-toni_artefacts/$<CONFIG>/VST3/mu-Toni.vst3"
+            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-toni/mu-toni_artefacts/$<CONFIG>/CLAP/mu-Toni.clap"
+            "-DDIST_WIN=${MUFAMILY_WIN_DIST}"
+            "-DPRODUCT_FILENAME=mu-Toni"
+            -P "${CMAKE_SOURCE_DIR}/cmake/DeployRelease.cmake"
+    COMMENT "Deploying mu-Toni Release artifacts to OneDrive (Debug skipped)"
+    VERBATIM
+)
+endif()
+
 # ── mu-toni-tests — console UnitTests ───────────────────────────────────────
 # Built as part of ALL_BUILD (mirrors mu-tant-tests: small + local, not a tester
 # deploy, so building every build is cheap — the speed concession that keeps

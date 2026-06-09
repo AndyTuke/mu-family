@@ -16,6 +16,10 @@ public:
                          std::function<void(const juce::File&)> onChosen);
     ~SampleBrowserContent() override;
 
+    // Called when the browser wants to close (Load committed or Cancel). The host (an
+    // in-editor OverlayHost) wires this to remove the overlay.
+    std::function<void()> onDismiss;
+
     void resized() override;
 
     void selectionChanged() override;

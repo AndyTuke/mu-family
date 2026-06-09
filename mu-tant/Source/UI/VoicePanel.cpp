@@ -132,13 +132,13 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     {
         if (proc.getNumVoices() <= 1) return;   // can't delete the last voice
         const juce::String name = proc.getChannelName(currentVoice);
-        mu_ui::confirmAsync("Delete Voice", "Delete \"" + name + "\"?\nThis cannot be undone.",
+        mu_ui::confirmAsync(this, "Delete Voice", "Delete \"" + name + "\"?\nThis cannot be undone.",
                             "Delete", [this] { if (onDeleteVoice) onDeleteVoice(); });
     };
     headerBar.onReset  = [this]
     {
         const juce::String name = proc.getChannelName(currentVoice);
-        mu_ui::confirmAsync("Reset Voice", "Reset \"" + name + "\" to defaults?\nThis cannot be undone.",
+        mu_ui::confirmAsync(this, "Reset Voice", "Reset \"" + name + "\" to defaults?\nThis cannot be undone.",
                             "Reset", [this]
         {
             proc.resetVoice(currentVoice);
@@ -156,21 +156,17 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     };
     headerBar.onSave = [this]
     {
-        auto* w = new juce::AlertWindow("Save Voice Preset", "Preset name:",
-                                        juce::MessageBoxIconType::NoIcon);
-        w->addTextEditor("name", "Voice " + juce::String(currentVoice + 1));
-        w->addButton("Save",   1, juce::KeyPress(juce::KeyPress::returnKey));
-        w->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
         juce::Component::SafePointer<VoicePanel> safe(this);
-        w->enterModalState(true, juce::ModalCallbackFunction::create(
-            [safe, w](int r)
+        mu_ui::promptTextAsync(this, "Save Voice Preset", "Preset name:",
+                               "Voice " + juce::String(currentVoice + 1), "Save",
+            [safe](const juce::String& name)
             {
-                if (safe != nullptr && r == 1)
+                if (safe != nullptr && name.isNotEmpty())
                 {
-                    safe->proc.saveVoicePreset(safe->currentVoice, w->getTextEditorContents("name"));
+                    safe->proc.saveVoicePreset(safe->currentVoice, name);
                     safe->refreshVoicePresetList();
                 }
-            }), true);
+            });
     };
     addAndMakeVisible(headerBar);
 
@@ -279,6 +275,12 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     insertSub.getInsertGR = [this]() -> const std::atomic<float>* {
         return proc.getInsertGRPtr(currentVoice);
     };
+    // Re-label the insert modulation destinations to the active algo's slot names
+    // (mirrors mu-clid) so the dropdown shows e.g. "Drive"/"Tone" instead of P1..P4.
+    insertSub.onInsertAlgorithmChanged = [this](int charId)
+    {
+        modulatorPanel.setInsertAlgorithm(charId);
+    };
 
     // ── Modulator panel ─────────────────────────────────────────────────────
     addAndMakeVisible(modulatorPanel);
@@ -365,6 +367,8 @@ void VoicePanel::setVoice(int voiceIndex)
     gatingDesigner.setFilterPattern(&proc.filterPatterns[(size_t) currentVoice]);
     gatingDesigner.setPitchPattern(&proc.pitchPatterns[(size_t) currentVoice]);
     insertSub.setChannel(currentVoice);   // reloads algo + slot knobs from APVTS
+    // setChannel → configureInsertAlgorithm fires insertSub.onInsertAlgorithmChanged,
+    // which re-labels the modulator insert destinations for this voice's algo.
     // Unconditional — a preset load calls setVoice(0) while already on voice 0, so
     // the rebindAttachments() guard above is skipped; the wavetable dropdowns are
     // not APVTS attachments, so they must be rebuilt here to reflect the loaded table.

@@ -35,6 +35,55 @@ namespace
             if (id == kModDestTable[i].id) return true;
         return false;
     }
+
+    // Modulation destinations in kModDestTable order, each paired with the per-voice APVTS
+    // base id whose NormalisableRange + atom back it. mu_mod::resolveLane seeds each dest in
+    // proportion space (range.convertTo0to1 of the atom) and writes the modulated value back
+    // in the param's own units. Order MUST match kModDestTable so saved-assignment ids line up
+    // with the map keys the matrix reads — the D_* enum below indexes the resolved `out` array.
+    struct TantModParam { const char* destId; const char* apvtsBase; };
+    constexpr TantModParam kTantModParams[] = {
+        { "osc1.octave", "o1_oct" }, { "osc1.semi", "o1_semi" }, { "osc1.fine", "o1_fine" }, { "osc1.pos", "o1_pos" },
+        { "osc2.octave", "o2_oct" }, { "osc2.semi", "o2_semi" }, { "osc2.fine", "o2_fine" }, { "osc2.pos", "o2_pos" },
+        { "xmod.fm", "xmod_fm" },    { "xmod.am", "xmod_am" },   { "xmod.ring", "xmod_ring" },
+        { "osc1.level", "o1_lvl" },  { "osc2.level", "o2_lvl" }, { "noise.level", "noise_lvl" },
+        { "filter.cutoff", "flt_cut" }, { "filter.resonance", "flt_res" },
+        { "filter2.cutoff.prop", "flt2_cut" }, { "filter2.resonance.prop", "flt2_res" },
+        { "level", "level" },
+        { "insert.p1", "insP1" }, { "insert.p2", "insP2" }, { "insert.p3", "insP3" }, { "insert.p4", "insP4" },
+    };
+    static_assert((int) std::size(kTantModParams) == kModDestCount,
+                  "kTantModParams must pair every kModDestTable destination 1:1");
+
+    // Index of each resolved value in the resolveLane `out` array (kTantModParams order).
+    enum { D_o1Oct = 0, D_o1Semi, D_o1Fine, D_o1Pos, D_o2Oct, D_o2Semi, D_o2Fine, D_o2Pos,
+           D_xmFm, D_xmAm, D_xmRing, D_o1Lvl, D_o2Lvl, D_nzLvl, D_fCut, D_fRes,
+           D_f2Cut, D_f2Res, D_level, D_insP1, D_insP2, D_insP3, D_insP4 };
+
+    // Compile-time integrity guard: pin kTantModParams' row order to kModDestTable (the
+    // persisted assignment ids) AND to the D_* indices, so a reorder/insert that would seed
+    // resolveLane with the wrong atom/range for a dest id fails to COMPILE rather than silently
+    // mis-routing modulation. A constexpr static_assert beats a runtime test here — the tables
+    // are file-local, and the check can never be forgotten or skipped.
+    constexpr bool cstrEq(const char* a, const char* b)
+    {
+        while (*a != '\0' && *a == *b) { ++a; ++b; }
+        return *a == *b;
+    }
+    constexpr bool tantModParamsAligned()
+    {
+        for (int i = 0; i < kModDestCount; ++i)
+            if (! cstrEq(kTantModParams[i].destId, kModDestTable[i].id))
+                return false;
+        return true;
+    }
+    static_assert(tantModParamsAligned(),
+                  "kTantModParams row order must match kModDestTable (saved-assignment ids)");
+    // Representative D_* ↔ destination pins (catch an enum/table desync independent of the loop).
+    static_assert(cstrEq(kTantModParams[D_o1Semi].destId, "osc1.semi"),     "D_o1Semi desync");
+    static_assert(cstrEq(kTantModParams[D_fCut].destId,   "filter.cutoff"), "D_fCut desync");
+    static_assert(cstrEq(kTantModParams[D_level].destId,  "level"),         "D_level desync");
+    static_assert(cstrEq(kTantModParams[D_insP4].destId,  "insert.p4"),     "D_insP4 desync");
 }
 
 
@@ -45,6 +94,10 @@ PluginProcessor::PluginProcessor()
                     createParameterLayout(),
                     juce::Identifier("MuTantState"))
 {
+    // Register mu-tant's modulation depth scales with mu-core before any audio runs
+    // (once, message thread) — keeps mu-core from enumerating mu-tant param ids.
+    registerDepthScales();
+
     // Persistent settings file (UI scale, future toggles).
     {
         juce::PropertiesFile::Options opts;
@@ -193,6 +246,24 @@ void PluginProcessor::cacheParamPointers()
         p.level  = P(vid("level"));
         p.gateGap= P(vid("gate_gap"));p.gateBypass = P(vid("gate_bypass"));
         p.drvChar= P(vid("drvChar")); p.insP1  = P(vid("insP1")); p.insP2 = P(vid("insP2")); p.insP3 = P(vid("insP3")); p.insP4 = P(vid("insP4"));
+    }
+
+    // Build the cached modulation routing for resolveLane: dest ids + each param's range are
+    // voice-independent (cached once); the backing atomics differ per voice. Using the param's
+    // own NormalisableRange (via getParameterRange) means the filter-cutoff proportion seed
+    // exactly matches its skewed knob — no separate tantPropFromCutoff to drift.
+    modParamValues.reserve((size_t) kNumModDests + 4);   // pre-size → no audio-thread rehash
+    for (int i = 0; i < kNumModDests; ++i)
+    {
+        modDestIds[(size_t) i]    = kTantModParams[i].destId;
+        modDestRanges[(size_t) i] = apvts.getParameterRange(voiceParamId(0, kTantModParams[i].apvtsBase));
+        modParamValues.emplace(std::string_view(kTantModParams[i].destId), 0.0f);   // pre-insert key
+        for (int v = 0; v < kMaxVoices; ++v)
+        {
+            modDestAtoms[(size_t) v][(size_t) i] =
+                apvts.getRawParameterValue(voiceParamId(v, kTantModParams[i].apvtsBase));
+            jassert(modDestAtoms[(size_t) v][(size_t) i] != nullptr);   // catch an apvtsBase drift
+        }
     }
 }
 
@@ -358,84 +429,66 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 
 void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
 {
-    // Seed paramValues from the current APVTS-derived config, then let this
-    // voice's matrix overwrite any modulated keys. The matrix is empty for
-    // voices the user hasn't assigned, so this collapses to a no-op.
-    const auto& vp = voicePtrs[(size_t) v];
-    modParamValues["osc1.octave"]      = (float) cfg.osc1Octave;
-    modParamValues["osc1.semi"]        = (float) cfg.osc1Semi;
-    modParamValues["osc1.fine"]        = (float) cfg.osc1Fine;
-    modParamValues["osc1.pos"]         = cfg.osc1Pos;
-    modParamValues["osc2.octave"]      = (float) cfg.osc2Octave;
-    modParamValues["osc2.semi"]        = (float) cfg.osc2Semi;
-    modParamValues["osc2.fine"]        = (float) cfg.osc2Fine;
-    modParamValues["osc2.pos"]         = cfg.osc2Pos;
-    modParamValues["xmod.fm"]          = cfg.xmodFm   * 100.0f;   // 0..1 → 0..100 display units
-    modParamValues["xmod.am"]          = cfg.xmodAm   * 100.0f;
-    modParamValues["xmod.ring"]        = cfg.xmodRing * 100.0f;
-    modParamValues["osc1.level"]       = cfg.osc1LevelDb;
-    modParamValues["osc2.level"]       = cfg.osc2LevelDb;
-    modParamValues["noise.level"]      = cfg.noiseLevelDb;
-    modParamValues["filter.cutoff"]    = tantPropFromCutoff(cfg.filterCutoff);   // proportion-space
-    modParamValues["filter.resonance"] = cfg.filterRes;
-    modParamValues["level"]            = cfg.levelDb;
-    modParamValues["insert.p1"]        = vp.insP1->load();
-    modParamValues["insert.p2"]        = vp.insP2->load();
-    modParamValues["insert.p3"]        = vp.insP3->load();
-    modParamValues["insert.p4"]        = vp.insP4->load();
+    // Resolve this voice's modulation through the shared mu-core range-based routing: seed each
+    // destination's proportion from its APVTS atom, run the voice's matrix under a try-lock
+    // (skipped on contention → the voice plays un-modulated this block), then write the
+    // modulated values back in param units. On lock-miss or with no assignments the values
+    // round-trip to the base config, so cfg + the live-arc snapshot stay correct either way.
+    // The dests are now proportion-clamped (scale 1.0) — a full-depth mod sweeps the whole
+    // range and clamps at the rails, instead of overflowing it as the old display-unit path did.
+    float out[kNumModDests];
+    mu_mod::resolveLane(&voiceSlots[(size_t) v], blkBeatStart, kNumModDests,
+                        modDestIds.data(), modDestAtoms[(size_t) v].data(),
+                        modDestRanges.data(), modParamValues, out);
 
-    // tryLock-equivalent: on contention skip the modulation pass this block
-    // (voice plays with un-modulated config).
-    auto& slot = voiceSlots[(size_t) v];
-    bool expected = false;
-    if (slot.modLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
-    {
-        slot.modulationMatrix.process(slot.controlSequences, blkBeatStart, modParamValues);
-        slot.modLock.store(false, std::memory_order_release);
+    // Write the resolved values back into the voice config. Integer pitch dests round to the
+    // nearest step (the proportion round-trip isn't bit-exact, so a plain truncation could drop
+    // a semitone); the rest map straight across, already range-clamped by resolveLane.
+    cfg.osc1Octave   = juce::roundToInt(out[D_o1Oct]);
+    cfg.osc1Semi     = juce::roundToInt(out[D_o1Semi]);
+    cfg.osc1Fine     = juce::roundToInt(out[D_o1Fine]);
+    cfg.osc1Pos      = out[D_o1Pos];
+    cfg.osc2Octave   = juce::roundToInt(out[D_o2Oct]);
+    cfg.osc2Semi     = juce::roundToInt(out[D_o2Semi]);
+    cfg.osc2Fine     = juce::roundToInt(out[D_o2Fine]);
+    cfg.osc2Pos      = out[D_o2Pos];
+    cfg.xmodFm       = out[D_xmFm]   * 0.01f;   // param 0..100 → engine 0..1
+    cfg.xmodAm       = out[D_xmAm]   * 0.01f;
+    cfg.xmodRing     = out[D_xmRing] * 0.01f;
+    cfg.osc1LevelDb  = out[D_o1Lvl];
+    cfg.osc2LevelDb  = out[D_o2Lvl];
+    cfg.noiseLevelDb = out[D_nzLvl];
+    cfg.filterCutoff = out[D_fCut];
+    cfg.filterRes    = out[D_fRes];
+    cfg.filter2Cutoff= out[D_f2Cut];
+    cfg.filter2Res   = out[D_f2Res];
+    cfg.levelDb      = out[D_level];
 
-        // Publish post-matrix values for the UI live-arc indicators.
-        auto& snap = voiceSnap[(size_t) v];
-        snap[mu_tant::kTantSnapOsc1Octave] .store(modParamValues["osc1.octave"]);
-        snap[mu_tant::kTantSnapOsc1Semi]   .store(modParamValues["osc1.semi"]);
-        snap[mu_tant::kTantSnapOsc1Fine]   .store(modParamValues["osc1.fine"]);
-        snap[mu_tant::kTantSnapOsc1Pos]    .store(modParamValues["osc1.pos"]);
-        snap[mu_tant::kTantSnapOsc2Octave] .store(modParamValues["osc2.octave"]);
-        snap[mu_tant::kTantSnapOsc2Semi]   .store(modParamValues["osc2.semi"]);
-        snap[mu_tant::kTantSnapOsc2Fine]   .store(modParamValues["osc2.fine"]);
-        snap[mu_tant::kTantSnapOsc2Pos]    .store(modParamValues["osc2.pos"]);
-        snap[mu_tant::kTantSnapXModFm]     .store(modParamValues["xmod.fm"]);
-        snap[mu_tant::kTantSnapXModAm]     .store(modParamValues["xmod.am"]);
-        snap[mu_tant::kTantSnapXModRing]   .store(modParamValues["xmod.ring"]);
-        snap[mu_tant::kTantSnapOsc1Level]  .store(modParamValues["osc1.level"]);
-        snap[mu_tant::kTantSnapOsc2Level]  .store(modParamValues["osc2.level"]);
-        snap[mu_tant::kTantSnapNoiseLevel] .store(modParamValues["noise.level"]);
-        // filter.cutoff snap stores actual Hz (convert back from proportion).
-        snap[mu_tant::kTantSnapFilterCutoff].store(tantCutoffFromProp(modParamValues["filter.cutoff"]));
-        snap[mu_tant::kTantSnapFilterRes]  .store(modParamValues["filter.resonance"]);
-        snap[mu_tant::kTantSnapLevel]      .store(modParamValues["level"]);
-        snap[mu_tant::kTantSnapInsP1]      .store(modParamValues["insert.p1"]);
-        snap[mu_tant::kTantSnapInsP2]      .store(modParamValues["insert.p2"]);
-        snap[mu_tant::kTantSnapInsP3]      .store(modParamValues["insert.p3"]);
-        snap[mu_tant::kTantSnapInsP4]      .store(modParamValues["insert.p4"]);
-
-        cfg.osc1Octave   = (int) modParamValues["osc1.octave"];
-        cfg.osc1Semi     = (int) modParamValues["osc1.semi"];
-        cfg.osc1Fine     = (int) modParamValues["osc1.fine"];
-        cfg.osc1Pos      = modParamValues["osc1.pos"];
-        cfg.osc2Octave   = (int) modParamValues["osc2.octave"];
-        cfg.osc2Semi     = (int) modParamValues["osc2.semi"];
-        cfg.osc2Fine     = (int) modParamValues["osc2.fine"];
-        cfg.osc2Pos      = modParamValues["osc2.pos"];
-        cfg.xmodFm   = modParamValues["xmod.fm"]   * 0.01f;
-        cfg.xmodAm   = modParamValues["xmod.am"]   * 0.01f;
-        cfg.xmodRing = modParamValues["xmod.ring"] * 0.01f;
-        cfg.osc1LevelDb  = modParamValues["osc1.level"];
-        cfg.osc2LevelDb  = modParamValues["osc2.level"];
-        cfg.noiseLevelDb = modParamValues["noise.level"];
-        cfg.filterCutoff = juce::jlimit(20.0f, 20000.0f, tantCutoffFromProp(modParamValues["filter.cutoff"]));
-        cfg.filterRes    = modParamValues["filter.resonance"];
-        cfg.levelDb      = modParamValues["level"];
-    }
+    // Publish post-matrix values for the UI live-arc indicators (same units as the bound knobs:
+    // filter cutoff in Hz, xmod 0..100, levels in dB). Filter 2 + insert P1-4 are read by the
+    // audio path from `out` / modParamValues; the two filter-2 dests have no live-arc.
+    auto& snap = voiceSnap[(size_t) v];
+    snap[mu_tant::kTantSnapOsc1Octave] .store(out[D_o1Oct]);
+    snap[mu_tant::kTantSnapOsc1Semi]   .store(out[D_o1Semi]);
+    snap[mu_tant::kTantSnapOsc1Fine]   .store(out[D_o1Fine]);
+    snap[mu_tant::kTantSnapOsc1Pos]    .store(out[D_o1Pos]);
+    snap[mu_tant::kTantSnapOsc2Octave] .store(out[D_o2Oct]);
+    snap[mu_tant::kTantSnapOsc2Semi]   .store(out[D_o2Semi]);
+    snap[mu_tant::kTantSnapOsc2Fine]   .store(out[D_o2Fine]);
+    snap[mu_tant::kTantSnapOsc2Pos]    .store(out[D_o2Pos]);
+    snap[mu_tant::kTantSnapXModFm]     .store(out[D_xmFm]);
+    snap[mu_tant::kTantSnapXModAm]     .store(out[D_xmAm]);
+    snap[mu_tant::kTantSnapXModRing]   .store(out[D_xmRing]);
+    snap[mu_tant::kTantSnapOsc1Level]  .store(out[D_o1Lvl]);
+    snap[mu_tant::kTantSnapOsc2Level]  .store(out[D_o2Lvl]);
+    snap[mu_tant::kTantSnapNoiseLevel] .store(out[D_nzLvl]);
+    snap[mu_tant::kTantSnapFilterCutoff].store(out[D_fCut]);   // actual Hz
+    snap[mu_tant::kTantSnapFilterRes]  .store(out[D_fRes]);
+    snap[mu_tant::kTantSnapLevel]      .store(out[D_level]);
+    snap[mu_tant::kTantSnapInsP1]      .store(out[D_insP1]);
+    snap[mu_tant::kTantSnapInsP2]      .store(out[D_insP2]);
+    snap[mu_tant::kTantSnapInsP3]      .store(out[D_insP3]);
+    snap[mu_tant::kTantSnapInsP4]      .store(out[D_insP4]);
 }
 
 void PluginProcessor::applyFilterEnvelope(int v, VoiceConfig& cfg)

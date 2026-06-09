@@ -82,7 +82,10 @@ void MultiModeFilter::process(juce::AudioBuffer<float>& buffer,
         for (int i = 0; i < ns; ++i)
         {
             const float drv     = smoothedDrive.getNextValue();
-            const float preGain = 1.0f + drv * 5.0f;   // 1×..6×
+            // Squared drive curve: same 1×..6× pre-gain endpoints (drv=1 → 6×) but a
+            // gradual onset, so the lower half of the knob adds far less saturation
+            // (drv=0.5 → 2.25× rather than 3.5×) — drive no longer "kicks in" early.
+            const float preGain = 1.0f + drv * drv * 5.0f;
             // Square-root makeup (not full 1/preGain): saturated peaks hold their
             // level and quiet passages get boosted by the residual gain → fatter,
             // not thinner. Full inverse compensation collapsed level past ~30%.

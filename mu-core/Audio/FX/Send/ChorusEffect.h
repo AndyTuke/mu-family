@@ -8,7 +8,6 @@ class ChorusEffect : public EffectAlgorithmBase
 {
 public:
     static constexpr int MaxVoices = 4;
-    static constexpr int MaxDelaySamples = 4096;
 
     ChorusEffect()
     {
@@ -20,10 +19,16 @@ public:
     void prepareInner(double sampleRate, int /*blockSize*/) override
     {
         sr = sampleRate;
+        // Size the delay lines for the worst-case read offset at THIS sample rate: the read
+        // reaches baseSamp (0.03·sr) + depthSamp·spread (up to 0.03·sr) ≈ 0.06·sr behind the
+        // write head, plus the Hermite read's +2 lookahead. 0.07·sr gives headroom so the
+        // wrap modulo in hermiteDelay can never go negative (was a fixed 4096 → out-of-bounds
+        // read above ~68 kHz, i.e. at 88.2/96/192 kHz).
+        delaySize = juce::jmax(4096, (int) std::ceil(0.07 * sr));
         for (int v = 0; v < MaxVoices; ++v)
         {
-            delayL[v].resize(MaxDelaySamples, 0.0f);
-            delayR[v].resize(MaxDelaySamples, 0.0f);
+            delayL[v].assign((size_t) delaySize, 0.0f);
+            delayR[v].assign((size_t) delaySize, 0.0f);
             writePos[v] = 0;
             phase[v]    = static_cast<float>(v) / MaxVoices;
         }
@@ -84,7 +89,7 @@ public:
                 phase[v] += rateNow * detune / static_cast<float>(sr);
                 if (phase[v] >= 1.0f) phase[v] -= 1.0f;
 
-                writePos[v] = (writePos[v] + 1) % MaxDelaySamples;
+                writePos[v] = (writePos[v] + 1) % delaySize;
             }
 
             const float scale = 1.0f / numVoices;
@@ -137,6 +142,7 @@ private:
 
     std::vector<float> delayL[MaxVoices];
     std::vector<float> delayR[MaxVoices];
+    int   delaySize           = 4096;   // per-line length, sized from sr in prepareInner
     int   writePos[MaxVoices] = {};
     float phase[MaxVoices]    = {};
 

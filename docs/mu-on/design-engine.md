@@ -1,12 +1,14 @@
 # μ-On — Engine design
 
-μ-On is a 909-style groove sequencer with **four fixed instrument lanes**: Kick (synthesis),
-Bass (deep synth — the focus), Hat (sample), Snare (sample). Each lane is an independent
-engine rendered into its mixer channel via the shared `MixerEngine::RenderChannelFn` hook;
-the shared mixer then applies the per-channel strip, the **bass→kick sidechain**, sends, and
-master. `GrooveVoices` ([mu-on/Source/Audio/GrooveVoices.h](../../mu-on/Source/Audio/GrooveVoices.h))
-owns the four engines, routes the sequencer's triggers, and pulls engine params from cached
-APVTS atomic pointers each block (no per-block string lookups, no audio-thread allocation).
+μ-On is a 909-style groove sequencer with **five fixed instrument lanes**: Kick (synthesis),
+Bass (deep synth — the focus), Hat (sample), Snare (sample), and Rumble (processes the Kick's
+audio rather than stepping). The first four are sequenced on the step grid; Rumble has no steps.
+Each lane is an independent engine rendered into its mixer channel via the shared
+`MixerEngine::RenderChannelFn` hook; the shared mixer then applies the per-channel strip, the
+**bass→kick sidechain**, sends, and master. `GrooveVoices`
+([mu-on/Source/Audio/GrooveVoices.h](../../mu-on/Source/Audio/GrooveVoices.h)) owns the five
+engines, routes the sequencer's triggers, and pulls engine params from cached APVTS atomic
+pointers each block (no per-block string lookups, no audio-thread allocation).
 
 ## Lanes
 
@@ -43,6 +45,20 @@ one-shot per trigger with **tune** (playback ratio) and a **decay gate** (`h_tun
 noise + 180 Hz body tone snare) so the product makes sound with no shipped assets. **The only seam
 to change is the buffer** — "Load .wav…" (a file chooser) + factory `.wav` content (shipped via
 `juce_add_binary_data`, gated on code-signing like #99) is the next step, reusing the same player.
+
+### Rumble — `RumbleEngine` (processes the kick feed)
+Not sequenced — the classic techno **rumble**. It takes the **Kick's rendered audio** (stashed by
+`GrooveVoices` after the Kick renders, since channels render in index order and Rumble is lane 4)
+and runs it through, in order: input **drive** (the `MultiModeFilter` valve), three tempo-synced
+**delay taps** (1/16·2/16·3/16, each with a level), a **dark reverb** (mu-core `ReverbSlot` + a
+low-pass, with size + dry/wet mix), a per-bar **volume envelope** (a drawable smooth curve — the
+shared `LFOEditor` — that sits in the Rumble lane's otherwise-empty step-grid slot, persisted in
+state, evaluated audio-side under a try-lock), and a final **multimode filter**. Params:
+`r_drive`, `r_d1`/`r_d2`/`r_d3`, `r_size`, `r_revmix`, `r_revlp`, `r_cut`, `r_res`. The mixer strip
+pre-wires Rumble's sidechain source to the Kick (amount 0 by default → optional kick-pumping).
+The reverb tone + the block-rate envelope are deliberately basic for now (framework stage). *(Note:
+distinct from the Bass lane's "rumble" voicing above, which is a tonal character of `BassEngine`,
+not this lane.)*
 
 ## Bass↔Kick sidechain (the key interaction)
 This is **not new DSP** — the shared `MixerEngine` already supports **channel-to-channel

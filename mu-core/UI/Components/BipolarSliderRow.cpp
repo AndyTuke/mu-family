@@ -15,7 +15,7 @@ BipolarSliderRow::BipolarSliderRow()
     curveSlider.setRange(-100.0, 100.0, 0.1);
     curveSlider.setValue(0.0, juce::dontSendNotification);
     curveSlider.setDoubleClickReturnValue(true, 0.0);
-    curveSlider.setTooltip("Curve: log .. linear .. exp (#224)");
+    curveSlider.setTooltip("Curve: log .. linear .. exp");
 
     depthSlider.onValueChange = [this]
     {

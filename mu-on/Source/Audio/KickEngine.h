@@ -6,7 +6,8 @@
 // KickEngine — a synthesized 909-style kick: a sine body with an exponential PITCH
 // envelope (start tune → base) for the thump, an exponential AMP envelope, and a tanh
 // drive for click/punch. Mono; rendered (additively) into every channel of the buffer.
-// Block-start onset (sample-accurate onset is a future refinement). Allocation-free.
+// Sample-accurate onset: trigger() takes the step's sample offset within the block.
+// Allocation-free.
 namespace mu_on
 {
 
@@ -25,14 +26,18 @@ public:
         drive    = juce::jlimit(0.0f, 1.0f, drv);
     }
 
-    void trigger(float velocity) noexcept { restart = true; pendingVel = velocity; }
+    void trigger(float velocity, int onset = 0) noexcept { restart = true; pendingVel = velocity; pendingOnset = juce::jmax(0, onset); }
+
+    // Silence the voice immediately (e.g. transport stop). Allocation-free.
+    void reset() noexcept { active = false; restart = false; }
 
     void render(juce::AudioBuffer<float>& buf, int n) noexcept
     {
         const int chs = buf.getNumChannels();
         for (int i = 0; i < n; ++i)
         {
-            if (restart) { active = true; phase = 0.0f; t = 0.0f; vel = pendingVel; restart = false; }
+            // Sample-accurate onset: a step landing mid-block starts the voice at its offset.
+            if (restart && i >= pendingOnset) { active = true; phase = 0.0f; t = 0.0f; vel = pendingVel; restart = false; }
 
             float s = 0.0f;
             if (active)
@@ -58,6 +63,7 @@ private:
     double sampleRate = 44100.0;
     float  baseFreq = 50.0f, pitchAmt = 220.0f, pitchInv = 0.01f, ampInv = 0.002f, drive = 0.2f;
     float  phase = 0.0f, t = 0.0f, vel = 1.0f, pendingVel = 1.0f;
+    int    pendingOnset = 0;
     bool   active = false, restart = false;
 };
 

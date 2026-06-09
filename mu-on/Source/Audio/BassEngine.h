@@ -48,21 +48,28 @@ public:
         filter.setDrive(juce::jlimit(0.0f, 1.0f, drv));
     }
 
-    void trigger(float velocity) noexcept { restart = true; pendingVel = velocity; }
+    void trigger(float velocity, int onset = 0) noexcept { restart = true; pendingVel = velocity; pendingOnset = juce::jmax(0, onset); }
+
+    // Silence the voice + clear the filter ring immediately (e.g. transport stop).
+    void reset() noexcept { active = false; restart = false; filter.reset(); }
 
     void render(juce::AudioBuffer<float>& buf, int n)
     {
         const int chs = buf.getNumChannels();
 
-        // Block-rate filter envelope: cutoff sweeps from base+depth down to base.
-        const float fEnv = active ? std::exp(-t * filterEnvInv) : 0.0f;
+        // Block-rate filter envelope: cutoff sweeps from base+depth down to base. On the
+        // block a trigger lands, t resets to 0 mid-loop — use 0 here too so the filter
+        // envelope opens on the onset block instead of reading the previous block's t.
+        const float envT   = restart ? 0.0f : t;
+        const float fEnv   = (active || restart) ? std::exp(-envT * filterEnvInv) : 0.0f;
         const float cutoff = juce::jlimit(20.0f, (float) sampleRate * 0.45f,
                                           baseCut + fEnv * envDepth * 6000.0f);
         filter.setCutoff(cutoff);
 
         for (int i = 0; i < n; ++i)
         {
-            if (restart) { active = true; phase = 0.0f; subPhase = 0.0f; t = 0.0f; amp = 0.0f; vel = pendingVel; restart = false; }
+            // Sample-accurate onset: a step landing mid-block starts the voice at its offset.
+            if (restart && i >= pendingOnset) { active = true; phase = 0.0f; subPhase = 0.0f; t = 0.0f; amp = 0.0f; vel = pendingVel; restart = false; }
 
             float s = 0.0f;
             if (active)
@@ -109,6 +116,7 @@ private:
     float  rootFreq = 41.2f, sub = 0.5f, baseCut = 600.0f, envDepth = 0.4f;
     float  filterEnvInv = 0.004f, atkInv = 0.2f, decInv = 0.004f, sustain = 0.0f;
     float  phase = 0.0f, subPhase = 0.0f, t = 0.0f, amp = 0.0f, vel = 1.0f, pendingVel = 1.0f;
+    int    pendingOnset = 0;
     bool   active = false, restart = false;
 };
 

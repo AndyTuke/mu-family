@@ -4,9 +4,11 @@
 #include "UI/Components/DropdownSelect.h"
 #include "Audio/AlgorithmNames.h"         // mu-core: kInsertAlgorithmNames
 #include "Audio/InsertSlotConfig.h"        // mu-core: kInsertAlgoSlots / kInsertSlotCount
+#include "Modulation/ModulationMatrix.h"  // mu-core: registerDepthScale
 
 #include <array>
 #include <cstring>
+#include <mutex>
 
 // mu-tant's modulation-destination registry + provider.
 //
@@ -46,6 +48,9 @@ inline constexpr ModDest kModDestTable[] = {
     // ── Filter ──────────────────────────────────────────────────────────────
     { "filter.cutoff",     "Filter Cutoff",     "Filter" },
     { "filter.resonance",  "Filter Resonance",  "Filter" },
+    // ── Filter 2 (proportion-space — ".prop" → depthScaleFor=1.0, no mu-core edit) ──
+    { "filter2.cutoff.prop",    "Filter 2 Cutoff",    "Filter 2" },
+    { "filter2.resonance.prop", "Filter 2 Resonance", "Filter 2" },
     // ── Amp ─────────────────────────────────────────────────────────────────
     { "level",        "Level",         "Amp"    },
     // ── Insert (normalised 0..1 — same IDs as mu-clid so depthScaleFor=1.0) ──
@@ -56,6 +61,32 @@ inline constexpr ModDest kModDestTable[] = {
 };
 
 inline constexpr int kModDestCount = (int) (sizeof(kModDestTable) / sizeof(kModDestTable[0]));
+
+// Register mu-tant's engine-specific destination depth scales with mu-core (so mu-core no
+// longer enumerates mu-tant param ids). Idempotent + thread-safe via call_once; call from
+// the PluginProcessor ctor so it runs once on the message thread before any audio reads the
+// scales.
+//
+// These dests are now routed through the shared mu_mod::resolveLane helper, which seeds each
+// in PROPORTION space (slider NormalisableRange → 0..1) and writes the modulated value back in
+// the param's own units — so every scale is 1.0 (a full-depth mod sweeps the whole range and
+// clamps at the rails, matching mu-on + the `.prop` convention). The previous display-unit
+// scales (osc=6/24/200/255, level=66) equalled each param's range width, so the modulation
+// magnitude is unchanged; only the rail-clamping is new. The registration still overrides the
+// mu-core 0..100 default of 100 (the ids don't end in `.prop`, so they need an explicit entry).
+// `filter.cutoff`/`filter.resonance` are shared mu-core dests (1.0 / 0.99) — left untouched here
+// so a co-loaded mu-clid keeps its scales; mu-tant's `.prop` dests need no entry.
+inline void registerDepthScales()
+{
+    static std::once_flag once;
+    std::call_once(once, []
+    {
+        for (const char* id : { "osc1.octave", "osc2.octave", "osc1.semi", "osc2.semi",
+                                "osc1.fine",   "osc2.fine",   "osc1.pos",  "osc2.pos",
+                                "osc1.level",  "osc2.level",  "noise.level", "level" })
+            ModulationMatrix::registerDepthScale(id, 1.0f);
+    });
+}
 
 inline ModDestProvider makeModDestProvider()
 {
@@ -112,19 +143,9 @@ inline ModDestProvider makeModDestProvider()
         }
     };
 
-    p.resolveId = [](int dropdownId) -> std::string
-    {
-        const int idx = dropdownId - 1;
-        if (idx < 0 || idx >= kModDestCount) return {};
-        return std::string(kModDestTable[idx].id);
-    };
-
-    p.findDropdownId = [](const std::string& destId) -> int
-    {
-        for (int i = 0; i < kModDestCount; ++i)
-            if (destId == kModDestTable[i].id) return i + 1;
-        return 0;
-    };
+    wireTableModDestResolve(p,
+        [](int i) { return std::string(kModDestTable[i].id); },
+        kModDestCount);
 
     return p;
 }

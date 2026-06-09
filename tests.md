@@ -95,9 +95,38 @@ cmake --build build --target mu-tant-tests --config Debug && build/mu-tant/mu-ta
 
 ---
 
+## C++ unit tests — μ-On
+
+Built as part of **ALL_BUILD** every build (mirrors mu-tant-tests — local-only product, small suite). Build command:
+
+```
+cmake --build build --target mu-on-tests --config Debug && build/mu-on/mu-on-tests_artefacts/Debug/mu-on-tests.exe
+```
+
+| Coverage | File |
+|---|---|
+| APVTS layout sanity (every `ch{N}_*` / engine / sequencer param ID + range + default) | `ApvtsLayoutTests.cpp` |
+| Sequencer beat→step mapping, step-edge firing, swing, accent velocity, `<Pattern>` serialise | `SequencerTests.cpp` |
+| Engine smoke — Kick/Hat make sound + decay to silence | `EngineTests.cpp` |
+| Per-lane modulation — `.prop` proportion-space scale (1.0), lane-scoped dest tables | `ModulationTests.cpp` |
+| **Per-lane dest-table ↔ engine `setParams` order integrity guard** (pins each lane's full id order) | `ModulationTests.cpp` |
+| Modulator serialise round-trip drops foreign-lane destinations | `ModulationTests.cpp` |
+
+**Current status:** 15/15 tests pass at v1.0.812.
+
+---
+
 ## Manual smoke test plan
 
 See [docs/mu-clid/TestPlan.md](docs/mu-clid/TestPlan.md) — 25 atomic UI tests, ordered so each builds on the previous. Run end-to-end against a Release build. Investigate any deviation before proceeding.
+
+### Manual hardware / mu-link sync tests
+
+These need real audio + MIDI hardware (and/or multiple running apps), so they can't run in the headless pipeline. Same status key as the listening-tests table.
+
+| # | Test | Status | Verified Build |
+|---|---|---|---|
+| MS1 | **[#878 — mu-link MIDI-clock sync]** With an external MIDI-clock source driving real outboard gear, verify mu sync stays locked **both ways**: (a) mu-clid slaved **through mu-link** (the bus carries clock + audio to the shared device), and (b) mu-clid **standalone on its own** (direct external-MIDI slave, no mu-link present). **Expected**: transport/tempo follow the master with no audible drift; standalone reverts cleanly to its own device when mu-link isn't running. | ✅ Pass | 793 |
 
 ---
 
@@ -105,5 +134,5 @@ See [docs/mu-clid/TestPlan.md](docs/mu-clid/TestPlan.md) — 25 atomic UI tests,
 
 1. **Decide the layer.** Compile-time / data invariant → C++ unit test. Audio behaviour → listening test. UI feel → smoke-test step.
 2. **Listening tests:** follow the 7-step recipe in [tests/README.md](tests/README.md#adding-a-new-listening-test).
-3. **C++ unit tests:** add a `Source/Tests/<Name>Tests.cpp` deriving from `juce::UnitTest`, add the file to `mu-clid-tests` (mu-clid) or `mu-tant-tests` (mu-tant) in the respective `CMakeLists.txt`.
+3. **C++ unit tests:** add a `Source/Tests/<Name>Tests.cpp` deriving from `juce::UnitTest`, add the file to the product's test target (`mu-clid-tests` / `mu-tant-tests` / `mu-on-tests`) in the respective `CMakeLists.txt`.
 4. **Always** add a row above so the test isn't an orphan. Use the same status keys as the listening-tests table for consistency.

@@ -15,7 +15,7 @@ GrooveGrid::GrooveGrid(ProcessorBase& processor, StepPattern& patternToEdit)
         addAndMakeVisible(s);
         lab.setText(text, juce::dontSendNotification);
         lab.setJustificationType(juce::Justification::centred);
-        lab.setFont(juce::Font(juce::FontOptions(12.0f)));
+        lab.setFont(juce::Font(juce::FontOptions(mu_ui::sf(12.0f))));
         addAndMakeVisible(lab);
     };
     setupKnob(swingSlider,  swingLabel,  "Swing");
@@ -35,19 +35,25 @@ juce::Colour GrooveGrid::trackColour(int t) const
 
 juce::Rectangle<int> GrooveGrid::gridArea() const
 {
-    return getLocalBounds().withTrimmedTop(kHeaderH).reduced(8);
+    return getLocalBounds().withTrimmedTop(mu_ui::s(kHeaderH)).reduced(mu_ui::s(8));
+}
+
+// The cell row for the selected lane (gridArea minus the lane-title band).
+juce::Rectangle<int> GrooveGrid::rowArea() const
+{
+    return gridArea().withTrimmedTop(mu_ui::s(kTitleH));
 }
 
 void GrooveGrid::resized()
 {
-    auto header = getLocalBounds().removeFromTop(kHeaderH).reduced(8, 4);
-    const int knobW = 54;
+    auto header = getLocalBounds().removeFromTop(mu_ui::s(kHeaderH)).reduced(mu_ui::s(8), mu_ui::s(4));
+    const int knobW = mu_ui::s(54);
     auto place = [&](juce::Slider& s, juce::Label& lab)
     {
         auto col = header.removeFromLeft(knobW);
-        lab.setBounds(col.removeFromBottom(14));
+        lab.setBounds(col.removeFromBottom(mu_ui::s(14)));
         s.setBounds(col);
-        header.removeFromLeft(8);
+        header.removeFromLeft(mu_ui::s(8));
     };
     place(swingSlider, swingLabel);
     place(accentSlider, accentLabel);
@@ -58,72 +64,64 @@ void GrooveGrid::paint(juce::Graphics& g)
     using Id = MuLookAndFeel::ColourIds;
     g.fillAll(MuLookAndFeel::colour(Id::panelBackground));
 
-    auto area = gridArea();
-    const int rows  = StepPattern::kNumTracks;
-    const int steps = StepPattern::kNumSteps;
-    const int cellsX = area.getX() + kLabelW;
-    const int cellsW = area.getWidth() - kLabelW;
-    const int rowH   = (area.getHeight() - (rows - 1) * kRowGap) / rows;
-    const float cellW = cellsW / (float) steps;
+    const int  t     = selectedTrack;          // single-lane editor: only the selected lane
+    const int  steps = StepPattern::kNumSteps;
+    const auto col   = trackColour(t);
 
-    for (int t = 0; t < rows; ++t)
+    // Lane title above the step row.
+    auto title = gridArea().removeFromTop(mu_ui::s(kTitleH));
+    g.setColour(col);
+    g.setFont(juce::Font(juce::FontOptions(mu_ui::sf(15.0f), juce::Font::bold)));
+    g.drawText(proc.getChannelName(t) + "  steps", title, juce::Justification::centredLeft, false);
+
+    auto row = rowArea();
+    const float cellW = row.getWidth() / (float) steps;
+    const float rowH  = (float) row.getHeight();
+
+    for (int s = 0; s < steps; ++s)
     {
-        const int rowY = area.getY() + t * (rowH + kRowGap);
-        const auto col = trackColour(t);
+        juce::Rectangle<float> cell((float) row.getX() + s * cellW + 1.5f, (float) row.getY() + 1.5f,
+                                    cellW - 3.0f, rowH - 3.0f);
 
-        // Row label (instrument name); selected row gets a stronger tint.
-        auto labelR = juce::Rectangle<int>(area.getX(), rowY, kLabelW - 6, rowH);
-        g.setColour(col.withAlpha(t == selectedTrack ? 0.30f : 0.14f));
-        g.fillRoundedRectangle(labelR.toFloat(), 4.0f);
-        g.setColour(col);
-        g.setFont(juce::Font(juce::FontOptions((float) juce::jmin(15, rowH - 6), juce::Font::bold)));
-        g.drawText(proc.getChannelName(t), labelR.reduced(4, 0), juce::Justification::centredLeft, false);
+        const bool isBeat = (s % 4) == 0;        // beat boundary — brighter base
+        const bool isPlay = (s == playheadStep);
 
-        for (int s = 0; s < steps; ++s)
+        // Cell background — beat groups slightly lighter; playhead column highlighted.
+        g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder).withAlpha(isBeat ? 0.55f : 0.30f));
+        if (isPlay) g.setColour(col.withAlpha(0.22f));
+        g.fillRoundedRectangle(cell, 3.0f);
+
+        if (pattern.isOn(t, s))
         {
-            juce::Rectangle<float> cell((float) cellsX + s * cellW + 1.5f, (float) rowY + 1.5f,
-                                        cellW - 3.0f, (float) rowH - 3.0f);
-
-            const bool isBeat = (s % 4) == 0;        // beat boundary — brighter base
-            const bool isPlay = (s == playheadStep);
-
-            // Cell background — beat groups slightly lighter; playhead column highlighted.
-            g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder).withAlpha(isBeat ? 0.55f : 0.30f));
-            if (isPlay) g.setColour(col.withAlpha(0.22f));
+            g.setColour(col.withAlpha(0.95f));
             g.fillRoundedRectangle(cell, 3.0f);
-
-            if (pattern.isOn(t, s))
+            if (pattern.isAccent(t, s))   // accent = brighter inner pip
             {
-                g.setColour(col.withAlpha(0.95f));
-                g.fillRoundedRectangle(cell, 3.0f);
-                if (pattern.isAccent(t, s))   // accent = brighter inner pip
-                {
-                    g.setColour(juce::Colours::white.withAlpha(0.85f));
-                    g.fillRoundedRectangle(cell.reduced(cell.getWidth() * 0.32f, cell.getHeight() * 0.32f), 2.0f);
-                }
+                g.setColour(juce::Colours::white.withAlpha(0.85f));
+                g.fillRoundedRectangle(cell.reduced(cell.getWidth() * 0.30f, cell.getHeight() * 0.30f), 2.0f);
             }
+        }
+
+        // Step number under the beat-group starts (1/5/9/13).
+        if (isBeat)
+        {
+            g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder).withAlpha(0.7f));
+            g.setFont(juce::Font(juce::FontOptions(mu_ui::sf(9.0f))));
+            g.drawText(juce::String(s + 1), cell.toNearestInt(), juce::Justification::topLeft, false);
         }
     }
 }
 
 bool GrooveGrid::cellAt(juce::Point<int> p, int& track, int& step) const
 {
-    auto area = gridArea();
-    const int rows  = StepPattern::kNumTracks;
+    auto row = rowArea();
     const int steps = StepPattern::kNumSteps;
-    const int cellsX = area.getX() + kLabelW;
-    const int cellsW = area.getWidth() - kLabelW;
-    const int rowH   = (area.getHeight() - (rows - 1) * kRowGap) / rows;
-    const float cellW = cellsW / (float) steps;
+    const float cellW = row.getWidth() / (float) steps;
 
-    if (p.x < cellsX || p.x >= cellsX + cellsW) return false;
-    step = juce::jlimit(0, steps - 1, (int) ((p.x - cellsX) / cellW));
-    for (int t = 0; t < rows; ++t)
-    {
-        const int rowY = area.getY() + t * (rowH + kRowGap);
-        if (p.y >= rowY && p.y < rowY + rowH) { track = t; return true; }
-    }
-    return false;
+    if (! row.contains(p)) return false;
+    step  = juce::jlimit(0, steps - 1, (int) ((p.x - row.getX()) / cellW));
+    track = selectedTrack;
+    return true;
 }
 
 void GrooveGrid::mouseDown(const juce::MouseEvent& e)
@@ -131,10 +129,17 @@ void GrooveGrid::mouseDown(const juce::MouseEvent& e)
     int t, s;
     if (! cellAt(e.getPosition(), t, s)) return;
 
+    // Right-click toggles accent, but only on an ON step (accent is invisible/inert
+    // otherwise); on an OFF step it turns the step on so the gesture is never a no-op.
     if (e.mods.isRightButtonDown())
-        pattern.setAccent(t, s, ! pattern.isAccent(t, s));   // right-click → accent
+    {
+        if (pattern.isOn(t, s)) pattern.setAccent(t, s, ! pattern.isAccent(t, s));
+        else                    { pattern.setOn(t, s, true); pattern.setAccent(t, s, true); }
+    }
     else
+    {
         pattern.toggle(t, s);                                 // left-click → on/off
+    }
 
     repaint();
 }

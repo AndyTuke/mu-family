@@ -1,4 +1,5 @@
 #include "EditorShellBase.h"
+#include "UI/ConfirmDialog.h"   // shared themed confirm/prompt dialogs (mu_ui::confirmAsync)
 
 EditorShellBase::EditorShellBase(ProcessorBase& proc)
     // Apply the stored UI scale BEFORE any child component is constructed.
@@ -49,17 +50,8 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
         if (presetDirty)
         {
             juce::Component::SafePointer<EditorShellBase> safeThis(this);
-            auto* w = new juce::AlertWindow("New Preset",
-                                            "Discard unsaved changes?",
-                                            juce::MessageBoxIconType::QuestionIcon);
-            w->addButton("Discard", 1, juce::KeyPress(juce::KeyPress::returnKey));
-            w->addButton("Cancel",  0, juce::KeyPress(juce::KeyPress::escapeKey));
-            w->enterModalState(true,
-                juce::ModalCallbackFunction::create([safeThis](int result) {
-                    if (safeThis && result == 1)
-                        safeThis->doNewPreset();
-                }),
-                true);
+            mu_ui::confirmAsync(this, "New Preset", "Discard unsaved changes?", "Discard",
+                [safeThis] { if (safeThis) safeThis->doNewPreset(); });
             return;
         }
         doNewPreset();
@@ -100,19 +92,9 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
         if (destFile.existsAsFile())
         {
             juce::Component::SafePointer<EditorShellBase> safeThis(this);
-            auto* w = new juce::AlertWindow("Overwrite Preset",
-                                            "Overwrite \"" + name + "\"?",
-                                            juce::AlertWindow::QuestionIcon);
-            w->addButton("Overwrite", 1, juce::KeyPress(juce::KeyPress::returnKey));
-            w->addButton("Cancel",    0, juce::KeyPress(juce::KeyPress::escapeKey));
-            w->enterModalState(true,
-                juce::ModalCallbackFunction::create(
-                    [safeThis, n = name, d = desc, c = category, e = embedSamples](int result)
-                    {
-                        if (safeThis && result == 1)
-                            safeThis->doSavePreset(n, d, c, e);
-                    }),
-                true);
+            mu_ui::confirmAsync(this, "Overwrite Preset", "Overwrite \"" + name + "\"?", "Overwrite",
+                [safeThis, n = name, d = desc, c = category, e = embedSamples]
+                { if (safeThis) safeThis->doSavePreset(n, d, c, e); });
             return;
         }
         doSavePreset(name, desc, category, embedSamples);
@@ -486,7 +468,7 @@ void EditorShellBase::showPresetBrowser(bool show)
     {
         browserVisible = false;
         presetBrowser.setVisible(false);
-        if (mainPanel) mainPanel->setVisible(!mixerVisible);
+        if (mainPanel) mainPanel->setVisible(true);   // opening any overlay cleared the mixer (hideAllOverlays) → always return to main
     }
 }
 
@@ -504,7 +486,7 @@ void EditorShellBase::showSettings(bool show)
     {
         settingsVisible = false;
         settingsOverlay->setVisible(false);
-        if (mainPanel) mainPanel->setVisible(!mixerVisible);
+        if (mainPanel) mainPanel->setVisible(true);   // opening any overlay cleared the mixer (hideAllOverlays) → always return to main
     }
 }
 
@@ -521,7 +503,7 @@ void EditorShellBase::showMidiPresets(bool show)
     {
         midiPresetsVisible = false;
         midiPresetsPanel.setVisible(false);
-        if (mainPanel) mainPanel->setVisible(!mixerVisible);
+        if (mainPanel) mainPanel->setVisible(true);   // opening any overlay cleared the mixer (hideAllOverlays) → always return to main
     }
 }
 
@@ -538,7 +520,7 @@ void EditorShellBase::showMidiFullPresets(bool show)
     {
         midiFullPresetsVisible = false;
         midiFullPresetsPanel.setVisible(false);
-        if (mainPanel) mainPanel->setVisible(!mixerVisible);
+        if (mainPanel) mainPanel->setVisible(true);   // opening any overlay cleared the mixer (hideAllOverlays) → always return to main
     }
 }
 

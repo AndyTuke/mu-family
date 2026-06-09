@@ -38,8 +38,7 @@ SampleBrowserContent::SampleBrowserContent(PluginProcessor& proc,
     cancelBtn.onClick = [this]
     {
         this->proc.stopSamplePreview();
-        if (auto* dw = findParentComponentOfClass<juce::DialogWindow>())
-            dw->exitModalState(0);
+        if (onDismiss) onDismiss();
     };
 
     setSize(mu_ui::s(560), mu_ui::s(470));
@@ -75,6 +74,5 @@ void SampleBrowserContent::commit(const juce::File& f)
 {
     proc.stopSamplePreview();
     onChosen(f);
-    if (auto* dw = findParentComponentOfClass<juce::DialogWindow>())
-        dw->exitModalState(1);
+    if (onDismiss) onDismiss();
 }

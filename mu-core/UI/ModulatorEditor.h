@@ -33,6 +33,29 @@ struct ModDestProvider
     std::function<int(const std::string& destId)>          findDropdownId;
 };
 
+// Wire a provider's resolveId + findDropdownId from a destination-id-by-index accessor
+// (the family contract: 1-based dropdown ID == table index + 1). Every product repeated
+// this identical forward/reverse plumbing; this is the one shared implementation. The
+// product still supplies populate() — the dropdown layout (sections, per-algo insert
+// labels) is product-specific. `idAt(i)` returns the stable destination id at 0-based
+// index i; `count` is the table size.
+inline void wireTableModDestResolve(ModDestProvider& p,
+                                    std::function<std::string(int idx)> idAt,
+                                    int count)
+{
+    p.resolveId = [idAt, count](int dropdownId) -> std::string
+    {
+        const int idx = dropdownId - 1;
+        return (idx >= 0 && idx < count) ? idAt(idx) : std::string{};
+    };
+    p.findDropdownId = [idAt, count](const std::string& destId) -> int
+    {
+        for (int i = 0; i < count; ++i)
+            if (destId == idAt(i)) return i + 1;
+        return 0;
+    };
+}
+
 // Editor panel for one ControlSequence.
 // Layout: mode/polarity header | LFO or Step editor | loop (+ step) timing | assignment list | add button
 class ModulatorEditor : public juce::Component
@@ -150,6 +173,9 @@ private:
     static constexpr int kPagerH  = 20;
 
     int currentDriveChar = 0;
+    // X where the "N steps" readout starts — set in resized() just after the step
+    // group so paint() can left-justify it next to the × multiplier (Stepped mode).
+    int stepReadoutX = 0;
 
     void wireHeader();
     void wireTiming();

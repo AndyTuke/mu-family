@@ -2,6 +2,7 @@
 #include "PluginProcessor_Internal.h"
 #include "Audio/InsertSlotConfig.h"
 #include "Plugin/ModulationSkew.h"  // proportion-space skew helpers (shared with test C5)
+#include "Modulation/MuClidModDest.h"  // mu_clid::registerDepthScales (mu-core depth-scale reg)
 #if MUCLID_LITE_BUILD
 #include "LiteEditor.h"
 #else
@@ -35,6 +36,10 @@ PluginProcessor::PluginProcessor()
           juce::Identifier("MuClidState"))
 #endif
 {
+    // Register mu-clid's modulation depth scales with mu-core before any audio runs
+    // (once, message thread) — keeps mu-core from enumerating mu-clid param ids.
+    mu_clid::registerDepthScales();
+
     // Initialise ApplicationProperties (needed by getContentDir/getPresetsDir).
     {
         juce::PropertiesFile::Options opts;

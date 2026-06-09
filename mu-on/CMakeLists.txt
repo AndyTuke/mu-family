@@ -22,6 +22,8 @@ juce_add_plugin(mu-on
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     VERSION         "${MUFAMILY_PLUGIN_VERSION}"
     COMPANY_COPYRIGHT "${MUFAMILY_COPYRIGHT}"
+    ICON_BIG   "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
+    ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
 )
 
 target_sources(mu-on
@@ -76,6 +78,23 @@ clap_juce_extensions_plugin(TARGET mu-on
 # Family build-counter (shared increment target defined in mu-clid/CMakeLists.txt).
 add_dependencies(mu-on increment_build_number)
 
+# ── Deploy Release artifacts to the tester drop folder ──────────────────────
+# Mirrors mu-tant's deploy pattern. Guarded by MUFAMILY_DEPLOY_TESTERS (OFF by default).
+if(MUFAMILY_DEPLOY_TESTERS)
+add_custom_command(TARGET mu-on_Standalone POST_BUILD
+    COMMAND "${CMAKE_COMMAND}"
+            "-DCONFIG=$<CONFIG>"
+            "-DSTANDALONE=$<TARGET_FILE:mu-on_Standalone>"
+            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-on/mu-on_artefacts/$<CONFIG>/VST3/mu-On.vst3"
+            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-on/mu-on_artefacts/$<CONFIG>/CLAP/mu-On.clap"
+            "-DDIST_WIN=${MUFAMILY_WIN_DIST}"
+            "-DPRODUCT_FILENAME=mu-On"
+            -P "${CMAKE_SOURCE_DIR}/cmake/DeployRelease.cmake"
+    COMMENT "Deploying mu-On Release artifacts to OneDrive (Debug skipped)"
+    VERBATIM
+)
+endif()
+
 # ── mu-on-tests — console UnitTests ─────────────────────────────────────────
 # Built as part of ALL_BUILD (mirrors mu-tant-tests / mu-toni-tests: small + local).
 juce_add_console_app(mu-on-tests PRODUCT_NAME "mu-on-tests")
@@ -85,8 +104,11 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/ApvtsLayoutTests.cpp
     Source/Tests/SequencerTests.cpp
     Source/Tests/EngineTests.cpp
+    Source/Tests/ModulationTests.cpp
     Source/Sequencer/GrooveSequencer.cpp
-    "${CMAKE_SOURCE_DIR}/mu-core/Audio/SamplePlayer.cpp"   # SampleChannel dependency
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/SamplePlayer.cpp"            # SampleChannel dependency
+    "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"   # modulation tests
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"     # modulation tests
 )
 
 target_compile_features(mu-on-tests PRIVATE cxx_std_17)

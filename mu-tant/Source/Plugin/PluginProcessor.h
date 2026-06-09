@@ -3,6 +3,7 @@
 #include "Plugin/ProcessorBase.h"            // mu-core base
 #include "Plugin/MixerFxParams.h"            // mu-core: shared global-FX/mixer APVTS layout
 #include "Sequencer/VoiceSlot.h"             // mu-core: per-voice modulator data container
+#include "Modulation/LaneModulation.h"       // mu-core: shared range-based per-lane resolve
 #include "Sequencer/GatePattern.h"           // mu-tant: per-voice gate pattern
 #include "Audio/SynthVoice.h"                // mu-tant voice
 #include "Audio/WavetableBank.h"
@@ -328,6 +329,16 @@ private:
     // If MixerEngine ever renders channels in parallel, move this into a per-voice
     // structure to avoid a data race.
     std::unordered_map<std::string_view, float> modParamValues;
+
+    // Cached modulation-destination routing for mu_mod::resolveLane (built once in
+    // cacheParamPointers). `modDestIds` are the kModDestTable ids (proportion-space keys);
+    // `modDestRanges` each param's NormalisableRange (voice-independent); `modDestAtoms` the
+    // per-voice backing APVTS atomics. resolveLane seeds proportions from the atoms, runs the
+    // voice's matrix under a try-lock, and writes the modulated values back in param units.
+    static constexpr int kNumModDests = 23;   // == mu_tant::kModDestCount (asserted in the .cpp)
+    std::array<const char*, kNumModDests>                    modDestIds   {};
+    std::array<juce::NormalisableRange<float>, kNumModDests> modDestRanges{};
+    std::array<std::array<const std::atomic<float>*, kNumModDests>, kMaxVoices> modDestAtoms{};
 
     // Internal transport. `playing` gates the beat advance; `internalBeatPos`
     // is the song position in beats (quarter notes) that drives modulator

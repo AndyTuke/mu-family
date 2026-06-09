@@ -13,22 +13,20 @@
 // based on the feedback gain, with the low-pass progressively damping high
 // frequencies for the characteristic decaying-pluck tone.
 //
-// Controls (insertAlgo = 11):
-//   insertDrive (0..100):   Note index — stored as 0..6 (C, D, E, F, G, A, B).
-//                          UI shows the note letter.
-//   insertBits    (1..16):    Octave knob — stored as 0..3 mapping to SPN octaves 1..4.
-//                          Octave 0 (= SPN C1 = 32.7 Hz) is the bottom of the
-//                          audible range — useful for sub-bass plucks.
-//   insertDither  (0..100):   Feedback — stored as 0..100, mapped internally via
-//                          cubic curve 1-(1-x)³ to loop gain 0..0.9999.
-//                          0% = passthrough; 25% ≈ 125ms pluck; 50% ≈ 500ms;
-//                          75% ≈ 4s sustain; 100% = near-infinite sustain.
-//   insertTone  (20..20k):  LP cutoff inside the feedback loop. Lower = darker
-//                          / faster damping; higher = brighter / longer ring.
-//                          At 20 kHz effectively bypasses the LP (no damping).
+// Controls (insertAlgo = 11) — the four generic insert slots (see InsertSlotConfig.h row 11):
+//   Slot 0  Note     (0..11): chromatic semitone index C, C#, D, … B (kNoteNames).
+//                            UI shows the note name.
+//   Slot 1  Octave   (0..3):  octave offset. Octave 0 + Note C = SPN C1 = 32.7 Hz, the
+//                            bottom of the range — useful for sub-bass plucks.
+//   Slot 2  Feedback (0..100%): mapped via the cubic curve 1-(1-x)³ to loop gain 0..0.9999.
+//                            0% = passthrough; 25% ≈ 125ms pluck; 50% ≈ 500ms;
+//                            75% ≈ 4s sustain; 100% = near-infinite sustain.
+//   Slot 3  LPF      (20..20k Hz): LP cutoff inside the feedback loop. Lower = darker /
+//                            faster damping; higher = brighter / longer ring. At 20 kHz
+//                            the LP is effectively bypassed (no damping).
 //
-// Pitch math: target_freq = 32.7 Hz * 2 ^ ((semi + 12*oct) / 12)
-//   where semi = {0, 2, 4, 5, 7, 9, 11} for C, D, E, F, G, A, B.
+// Pitch math: target_freq = 32.7 Hz * 2 ^ ((note + 12*oct) / 12)
+//   where `note` is the chromatic 0..11 index directly (NOT a diatonic lookup).
 //   So Octave 0 + Note C  = 32.7 Hz  (SPN C1)
 //      Octave 1 + Note C  = 65.4 Hz  (SPN C2)
 //      Octave 3 + Note B  = 493.9 Hz (SPN B4)
@@ -90,8 +88,8 @@ public:
         const float loopGain = juce::jmin(0.9999f, 1.0f - inv * inv * inv);
         smoothedGain.setTargetValue(loopGain);
 
-        // Pitch: SPN-anchored at C=32.7 Hz for Octave 0 (= SPN C1). Notes
-        // ascend C→B chromatically (semi offsets 0/2/4/5/7/9/11 for C..B).
+        // Pitch: SPN-anchored at C=32.7 Hz for Octave 0 (= SPN C1). `noteIdx` is the
+        // chromatic 0..11 semitone index, used directly (C=0, C#=1, … B=11).
         const float semitones = static_cast<float>(noteIdx + 12 * octave);
         const float targetFreq = kLowestFreq * std::pow(2.0f, semitones / 12.0f);
         smoothedFreq.setTargetValue(targetFreq);

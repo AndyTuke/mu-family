@@ -804,11 +804,9 @@ void GatingDesigner::resized()
     subdivDropdown.setBounds(w - ddW - s(kHdrInset),         s(1), ddW,   ddH);
     subdivLabel   .setBounds(w - ddW - s(kHdrInset) - s(40), s(1), s(36), ddH);
 
-    // "Bars" label + dropdown immediately left of the Grid controls.
-    const int barsLabelW = s(26);
+    // "Bars" dropdown immediately left of the Grid controls.
     const int barsGroupRight = w - ddW - s(kHdrInset) - s(40) - s(6);
     const int barsDropX = barsGroupRight - s(kBarsW);
-    const int barsLabelX = barsDropX - barsLabelW;
     barsDropdown.setBounds(barsDropX, s(1), s(kBarsW), ddH);
 
     // ── Left-anchored controls (left→right) ────────────────────────────────────

@@ -332,6 +332,10 @@ void ModulatorEditor::wireHeader()
         lockMod();
         cs->polarity = unipolar ? ControlSequence::Polarity::Unipolar
                                 : ControlSequence::Polarity::Bipolar;
+        // Clamp the stored curve anchors into the new visible range so a bipolar→unipolar
+        // switch can't leave negative y below the floor (off-range draw + audio overshoot).
+        const float yFloor = unipolar ? 0.0f : -1.0f;
+        for (auto& p : cs->curvePoints) p.y = juce::jlimit(yFloor, 1.0f, p.y);
         unlockMod();
         lfoEditor.setUnipolar(unipolar);
         stepEditor.setUnipolar(unipolar);
@@ -628,6 +632,9 @@ void ModulatorEditor::resized()
         stepDropdown.setBounds(x, 0, ddW, headerH); x += ddW + gap2;
         stepMult    .setBounds(x, 0, nmW, headerH); x += nmW + gap8;
     }
+    // The "N steps" readout (drawn in paint, Stepped mode) is left-justified here,
+    // immediately after the step group's × multiplier.
+    stepReadoutX = x;
 
     // ── LFO / Step editor ──────────────────────────────────────────────────────
     lfoEditor .setBounds(0, headerH, w, editorH);
@@ -675,13 +682,21 @@ void ModulatorEditor::paint(juce::Graphics& g)
     g.drawText("Mod " + juce::String::charToString(char('A' + modIndex)),
                s(20), 0, s(54), headerH, juce::Justification::centredLeft, false);
 
-    // Step count drawn at far right of header row (Stepped mode only)
+    // Step count drawn left-justified immediately after the step group's ×
+    // multiplier (Stepped mode only). Bounded on the right by the dice (right-
+    // anchored at getWidth() - headerH, opaque fill) so it never underlaps it.
     if (cs && cs->mode == ControlSequence::Mode::Stepped)
     {
-        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
-        g.drawText(juce::String(cs->getStepCount()) + " steps",
-                   getWidth() - s(58), 0, s(56), headerH,
-                   juce::Justification::centredRight, false);
+        const int diceW     = headerH;       // dice is a headerH × headerH square
+        const int rightEdge = getWidth() - diceW - s(4);   // small gap before the dice
+        const int textW     = juce::jmax(0, rightEdge - stepReadoutX);
+        if (textW > 0)
+        {
+            g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
+            g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
+            g.drawText(juce::String(cs->getStepCount()) + " steps",
+                       stepReadoutX, 0, textW, headerH,
+                       juce::Justification::centredLeft, false);
+        }
     }
 }

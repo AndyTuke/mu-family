@@ -1,5 +1,7 @@
 #include "RhythmPanel.h"
 #include "SampleBrowser.h"
+#include "UI/ConfirmDialog.h"   // shared themed confirm dialogs (mu_ui::confirmAsync)
+#include "UI/OverlayHost.h"     // shared dimmed in-editor overlay host (sample browser)
 
 #include <string_view>
 #include <unordered_set>
@@ -305,34 +307,27 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
         if (destFile.existsAsFile())
         {
             juce::Component::SafePointer<RhythmPanel> safeThis(this);
-            auto* w = new juce::AlertWindow("Overwrite Rhythm Preset",
-                                            "Overwrite \"" + name + "\"?",
-                                            juce::AlertWindow::QuestionIcon);
-            w->addButton("Overwrite", 1, juce::KeyPress(juce::KeyPress::returnKey));
-            w->addButton("Cancel",    0, juce::KeyPress(juce::KeyPress::escapeKey));
-            w->enterModalState(true,
-                juce::ModalCallbackFunction::create(
-                    [safeThis, destFile, name, desc, category, embed](int result)
+            mu_ui::confirmAsync(this, "Overwrite Rhythm Preset", "Overwrite \"" + name + "\"?", "Overwrite",
+                [safeThis, destFile, name, desc, category, embed]
+                {
+                    if (!safeThis) return;
+                    safeThis->proc.ensureCategoryInList(category);
+                    safeThis->proc.saveRhythmPresetToFile(safeThis->currentRhythmIndex,
+                                                          destFile, embed, category, desc);
+                    safeThis->loadedRhythmPresetFile = destFile;
+                    safeThis->rhythmSaveDialog.setVisible(false);
+                    safeThis->refreshRhythmPresets();
+                    for (int i = 0; i < (int)safeThis->rhythmPresetFiles.size(); ++i)
                     {
-                        if (!safeThis || result != 1) return;
-                        safeThis->proc.ensureCategoryInList(category);
-                        safeThis->proc.saveRhythmPresetToFile(safeThis->currentRhythmIndex,
-                                                              destFile, embed, category, desc);
-                        safeThis->loadedRhythmPresetFile = destFile;
-                        safeThis->rhythmSaveDialog.setVisible(false);
-                        safeThis->refreshRhythmPresets();
-                        for (int i = 0; i < (int)safeThis->rhythmPresetFiles.size(); ++i)
+                        if (safeThis->rhythmPresetFiles[i].getFullPathName()
+                                == destFile.getFullPathName())
                         {
-                            if (safeThis->rhythmPresetFiles[i].getFullPathName()
-                                    == destFile.getFullPathName())
-                            {
-                                safeThis->rhythmPresetDropdown.setSelectedId(
-                                    i + 1, juce::dontSendNotification);
-                                break;
-                            }
+                            safeThis->rhythmPresetDropdown.setSelectedId(
+                                i + 1, juce::dontSendNotification);
+                            break;
                         }
-                    }),
-                true);
+                    }
+                });
             return;
         }
 
@@ -553,8 +548,10 @@ void RhythmPanel::loadSample()
     juce::Component::SafePointer<RhythmPanel> safeThis(this);
     const int rhythmIdx = currentRhythmIndex;
 
-    juce::DialogWindow::LaunchOptions opts;
-    opts.content.setOwned(new SampleBrowserContent(
+    // Host the sample browser as a dimmed in-editor overlay (consistent with the other modals)
+    // rather than a floating DialogWindow. The browser brings its own Load/Cancel; OverlayHost
+    // supplies the dim backdrop + centring + click-outside-to-dismiss.
+    auto content = std::make_unique<SampleBrowserContent>(
         proc, startDir,
         [safeThis, rhythmIdx](const juce::File& f)
         {
@@ -562,12 +559,11 @@ void RhythmPanel::loadSample()
             safeThis->lastBrowseDir = f.getParentDirectory();
             safeThis->proc.loadSampleForRhythm(rhythmIdx, f);
             safeThis->repaint();
-        }));
-    opts.dialogTitle          = "Load Sample";
-    opts.dialogBackgroundColour = MuLookAndFeel::colour(MuLookAndFeel::backgroundDialog);
-    opts.useNativeTitleBar    = false;
-    opts.resizable            = true;
-    opts.launchAsync();
+        });
+
+    auto* overlay = new mu_ui::OverlayHost();
+    content->onDismiss = [overlay] { overlay->dismiss(); };
+    overlay->show(this, std::move(content));
 }
 
 void RhythmPanel::refreshRhythmPresets()
@@ -806,26 +802,18 @@ void RhythmPanel::confirmReset()
     const juce::String name(proc.getRhythm(idx).name);
 
     juce::Component::SafePointer<RhythmPanel> safeThis(this);
-    auto* w = new juce::AlertWindow("Reset Rhythm",
-                                    "Reset \"" + name + "\" to defaults?\nThis cannot be undone.",
-                                    juce::AlertWindow::WarningIcon);
-    w->addButton("Reset",  1, juce::KeyPress(juce::KeyPress::returnKey));
-    w->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
-    w->enterModalState(true,
-        juce::ModalCallbackFunction::create([safeThis, idx](int result)
+    mu_ui::confirmAsync(this, "Reset Rhythm",
+                        "Reset \"" + name + "\" to defaults?\nThis cannot be undone.", "Reset",
+        [safeThis, idx]
         {
-            if (result == 1 && safeThis != nullptr)
+            if (safeThis != nullptr && idx >= 0 && idx < safeThis->proc.getNumRhythms())
             {
-                if (idx >= 0 && idx < safeThis->proc.getNumRhythms())
-                {
-                    // PluginProcessor::resetRhythm owns the concurrency dance
-                    // (suspendProcessing + rhythmsLock). No more UI-thread spin on modLock.
-                    safeThis->proc.resetRhythm(idx);
-                    safeThis->setRhythm(idx);
-                }
+                // PluginProcessor::resetRhythm owns the concurrency dance
+                // (suspendProcessing + rhythmsLock). No more UI-thread spin on modLock.
+                safeThis->proc.resetRhythm(idx);
+                safeThis->setRhythm(idx);
             }
-        }),
-        true);
+        });
 }
 
 void RhythmPanel::confirmDelete()
@@ -836,19 +824,13 @@ void RhythmPanel::confirmDelete()
     const juce::String name(proc.getRhythm(idx).name);
 
     juce::Component::SafePointer<RhythmPanel> safeThis(this);
-    auto* w = new juce::AlertWindow("Delete Rhythm",
-                                    "Delete \"" + name + "\"?\nThis cannot be undone.",
-                                    juce::AlertWindow::WarningIcon);
-    w->addButton("Delete", 1, juce::KeyPress(juce::KeyPress::returnKey));
-    w->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
-    w->enterModalState(true,
-        juce::ModalCallbackFunction::create([safeThis, idx](int result)
+    mu_ui::confirmAsync(this, "Delete Rhythm",
+                        "Delete \"" + name + "\"?\nThis cannot be undone.", "Delete",
+        [safeThis, idx]
         {
-            if (result == 1 && safeThis != nullptr)
-                if (safeThis->onRhythmDeleted)
-                    safeThis->onRhythmDeleted(idx);
-        }),
-        true);
+            if (safeThis != nullptr && safeThis->onRhythmDeleted)
+                safeThis->onRhythmDeleted(idx);
+        });
 }
 
 void RhythmPanel::timerCallback()

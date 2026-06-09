@@ -72,6 +72,17 @@ target_sources(mu-clid
         "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
 )
 
+# monocypher is vendored third-party crypto. Silence MSVC C4244 (a benign u64→u32
+# narrowing in its Argon2 block-index math — the value is bounded well within u32)
+# at the build level rather than patching upstream source, so our /W4 build stays
+# warning-clean without diverging from the vendor file. Directory-scoped, so it
+# covers both mu-clid and mu-clid-lite (which compile the same file).
+if(MSVC)
+    set_source_files_properties(
+        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
+        PROPERTIES COMPILE_OPTIONS "/wd4244")
+endif()
+
 # Plugin-local Source/ is on the include path so `#include "Sequencer/Rhythm.h"`
 # resolves locally; mu-core adds its own include directory via the link.
 target_include_directories(mu-clid
