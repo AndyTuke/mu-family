@@ -42,7 +42,7 @@ jobs:
           python-version: '3.x'
 
       - name: Install analysis deps
-        run: pip install numpy
+        run: pip install numpy scipy   # analyse.py uses numpy + scipy.io.wavfile / scipy.signal.welch
 
       # Create the report dir up front so even a configure/build failure leaves its log
       # in the uploaded artifact (not only the Actions console). pipefail makes `| tee`
