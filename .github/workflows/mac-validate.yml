@@ -44,20 +44,26 @@ jobs:
       - name: Install analysis deps
         run: pip install numpy
 
-      - name: Configure (Release, universal)
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DMUFAMILY_DEPLOY_TESTERS=OFF
-
-      - name: Build plugins + Standalone + AU (Release)
-        run: >
-          cmake --build build --config Release --target
-          mu-clid_VST3 mu-clid_CLAP mu-clid_Standalone mu-clid_AU
-          mu-clid-lite_VST3 mu-clid-lite_CLAP mu-clid-lite_AU
-          mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone mu-tant_AU
-          mu-on_VST3 mu-on_CLAP mu-on_Standalone mu-on_AU
-          mu-toni_VST3 mu-toni_CLAP mu-toni_Standalone mu-toni_AU
-
+      # Create the report dir up front so even a configure/build failure leaves its log
+      # in the uploaded artifact (not only the Actions console). pipefail makes `| tee`
+      # propagate cmake's exit code so a build failure actually fails the step.
       - name: Prepare report dir
         run: mkdir -p report
+
+      - name: Configure (Release, universal)
+        run: |
+          set -o pipefail
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DMUFAMILY_DEPLOY_TESTERS=OFF 2>&1 | tee report/configure.txt
+
+      - name: Build plugins + Standalone + AU (Release)
+        run: |
+          set -o pipefail
+          cmake --build build --config Release --target \
+            mu-clid_VST3 mu-clid_CLAP mu-clid_Standalone mu-clid_AU \
+            mu-clid-lite_VST3 mu-clid-lite_CLAP mu-clid-lite_AU \
+            mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone mu-tant_AU \
+            mu-on_VST3 mu-on_CLAP mu-on_Standalone mu-on_AU \
+            mu-toni_VST3 mu-toni_CLAP mu-toni_Standalone mu-toni_AU 2>&1 | tee report/build.txt
 
       # ── Universal proof (hard gate) ─────────────────────────────────────────
       # An Intel tester needs the x86_64 slice to load the plugins at all; fail unless
@@ -85,7 +91,7 @@ jobs:
       # parameter fuzz. The strongest automated "does it actually work on Mac" signal.
       - name: pluginval (VST3)
         run: |
-          set -e
+          set -eo pipefail   # pipefail so `$PV | tee` reports pluginval's exit, not tee's
           curl -sL -o pluginval.zip \
             https://github.com/Tracktion/pluginval/releases/download/v1.0.3/pluginval_macOS.zip
           unzip -q pluginval.zip
@@ -128,7 +134,7 @@ jobs:
       # asserts the drone sits above the noise floor (proven locally: ~-14 dBFS).
       - name: Render + analyse (mu-Tant drone)
         run: |
-          set -e
+          set -eo pipefail   # pipefail so a render crash OR a failed analyse (silent drone) fails the gate, not tee
           BIN="build/mu-tant/mu-tant_artefacts/Release/Standalone/mu-Tant.app/Contents/MacOS/mu-Tant"
           "$BIN" --render --out report/mutant_drone.wav --seconds 4 2>&1 | tee report/mutant_render.txt
           python tests/scripts/analyse.py report/mutant_drone.wav tests/expectations/mutant_drone.json --verbose | tee report/mutant_analyse.txt
