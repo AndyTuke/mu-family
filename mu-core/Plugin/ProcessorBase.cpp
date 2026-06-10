@@ -2,6 +2,10 @@
 #include "Audio/FX/Slots/FXAlgorithmDef.h"   // FXAlgorithmRegistry
 #include "Audio/AlgorithmNames.h"             // mu_audio::kInsertAlgorithmCount
 
+#if MU_CORE_HAS_CLAP
+ #pragma message("mu-core: ProcessorBase built WITH CLAP sidechain capability (isInputMain=false)")
+#endif
+
 ProcessorBase::ProcessorBase(const BusesProperties& props,
                              juce::AudioProcessorValueTreeState::ParameterLayout layout,
                              const juce::Identifier& stateTreeType)

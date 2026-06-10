@@ -1,6 +1,21 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+
+// CLAP sidechain support. The family's only audio input is a sidechain, not a main input. In
+// VST3 this is handled by SidechainVST3Extensions::getPluginHasMainInput()=false (below); CLAP
+// needs the parallel clap_juce_audio_processor_capabilities::isInputMain() override, or the CLAP
+// wrapper flags input port 0 as CLAP_AUDIO_PORT_IS_MAIN and DAWs (e.g. Bitwig) won't show it as a
+// sidechain. The header is only on the include path when this TU is compiled into a `_CLAP`
+// target (clap_juce_extensions is PUBLIC there), so guard with __has_include — the VST3/Standalone
+// builds compile with no CLAP dependency at all.
+#if __has_include(<clap-juce-extensions/clap-juce-extensions.h>)
+ #include <clap-juce-extensions/clap-juce-extensions.h>
+ #define MU_CORE_HAS_CLAP 1
+#else
+ #define MU_CORE_HAS_CLAP 0
+#endif
+
 #include "Audio/FX/Slots/FXChain.h"
 #include "Audio/MixerEngine.h"
 #include "Audio/VoiceEngine.h"
@@ -26,6 +41,9 @@
 // plugin's concrete `PluginProcessor` type — eliminates the layering
 // violation that previously had mu-core including mu-clid headers.
 class ProcessorBase : public juce::AudioProcessor
+#if MU_CORE_HAS_CLAP
+                    , public clap_juce_extensions::clap_juce_audio_processor_capabilities
+#endif
 {
 public:
     ProcessorBase(const BusesProperties& props,
@@ -203,6 +221,13 @@ protected:
 
 public:
     juce::VST3ClientExtensions* getVST3ClientExtensions() override { return &vst3Extensions; }
+
+#if MU_CORE_HAS_CLAP
+    // CLAP parallel to getPluginHasMainInput()=false above: report that NO input port is the
+    // main audio input, so the CLAP wrapper does not flag input port 0 as
+    // CLAP_AUDIO_PORT_IS_MAIN. DAWs (Bitwig) then expose the lone input bus as a sidechain.
+    bool isInputMain(int /*input*/) override { return false; }
+#endif
 
 private:
     // syncGlobalFxParam dispatch helpers — one per ID family, so the public
