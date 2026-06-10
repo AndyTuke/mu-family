@@ -88,6 +88,18 @@ foreach ($dir in $vst3Dirs) {
         continue
     }
 
+    # A JUCE .vst3 bundle is a directory, and CMake/JUCE leaves an EMPTY bundle skeleton
+    # for a target that wasn't built (CI builds a product subset). pluginval would fail
+    # such a stub with "No types found" — so skip any bundle with no compiled module inside
+    # (the inner Contents/<arch>/<name>.vst3 binary file) rather than counting it a failure.
+    $module = Get-ChildItem -LiteralPath $bundle.FullName -Recurse -File -ErrorAction SilentlyContinue |
+              Where-Object { $_.Extension -eq '.vst3' } | Select-Object -First 1
+    if (-not $module) {
+        Write-Host "  [skip] $($bundle.Name) (empty bundle — target not built)" -ForegroundColor DarkYellow
+        $skipped++
+        continue
+    }
+
     Write-Host "`n--- validating $($bundle.Name) ---" -ForegroundColor Cyan
     & $pluginval @baseArgs $bundle.FullName | Out-Host
     if ($LASTEXITCODE -eq 0) { $passed++; Write-Host "  -> passed" -ForegroundColor Green }

@@ -62,7 +62,7 @@ jobs:
       - name: Build plugins + Standalone + tests
         run: >
           cmake --build build --config Debug --target
-          mu-clid_VST3 mu-clid_CLAP mu-clid_Standalone
+          mu-clid_VST3 mu-clid_CLAP mu-clid_Standalone mu-clid-lite_VST3
           mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone
           mu-on_VST3 mu-on_CLAP mu-on_Standalone
           mu-clid-tests mu-tant-tests mu-on-tests
