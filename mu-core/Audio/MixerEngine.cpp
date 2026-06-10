@@ -22,6 +22,7 @@ void MixerEngine::prepare(double sr, int blockSize)
     effectSendBuf.setSize(2, blockSize, false, true, true);
     delaySendBuf .setSize(2, blockSize, false, true, true);
     reverbSendBuf.setSize(2, blockSize, false, true, true);
+    extScCapture .setSize(2, blockSize, false, true, true);
     masterInsert.prepare(sr, blockSize);
     masterInsert2.prepare(sr, blockSize);
 }

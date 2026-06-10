@@ -1,4 +1,18 @@
 cmake_minimum_required(VERSION 3.22)
+
+# ── macOS universal binary (arm64 + x86_64) ─────────────────────────────────
+# Without this the build only targets the configuring machine's native arch —
+# and the CI Mac runner (macos-latest) is Apple Silicon, so the artefacts came out
+# arm64-only and Intel Macs couldn't load the plugins at all (no Gatekeeper trick
+# helps a missing slice). Build both arches so the Mac binaries run everywhere.
+# Set BEFORE project() so the architectures are honoured during toolchain setup.
+# Guarded by NOT DEFINED so a local dev build can override for speed, e.g.
+#     cmake -B build -DCMAKE_OSX_ARCHITECTURES=arm64
+# No-op off Apple. (Signing/notarization to clear Gatekeeper is separate — #99.)
+if(APPLE AND NOT DEFINED CMAKE_OSX_ARCHITECTURES)
+    set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "macOS universal build (arm64 + x86_64)")
+endif()
+
 project(mu-family VERSION 1.0.0)
 
 # ── mu-family monorepo umbrella ─────────────────────────────────────────────

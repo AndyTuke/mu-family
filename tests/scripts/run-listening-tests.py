@@ -28,15 +28,29 @@ CONTENT_ROOT = Path(os.environ.get('MUCLID_CONTENT_DIR',
 
 
 def standalone_exe(config: str) -> Path:
-    # JUCE writes the standalone exe with a unicode glyph in the filename.
-    # The standard location is build/mu-clid_artefacts/<config>/Standalone/.
-    # Monorepo layout: artefacts live under build/<plugin>/<plugin>_artefacts/<Config>/.
+    # JUCE writes the standalone with a unicode glyph in the filename, and the
+    # artefact shape is per-platform. Monorepo layout: build/<plugin>/<plugin>_artefacts/<Config>/Standalone/.
+    #   Windows: <Name>.exe   macOS: <Name>.app/Contents/MacOS/<bin>   Linux: bare <bin>
+    # This makes the listening pipeline runnable on the macOS CI runner, not just Windows.
     artefacts = REPO_ROOT / 'build' / 'mu-clid' / 'mu-clid_artefacts' / config / 'Standalone'
-    # Pick whatever .exe lives there -- the JUCE filename is environment-dependent.
-    candidates = sorted(artefacts.glob('*.exe'))
-    if not candidates:
-        raise FileNotFoundError(f'no standalone .exe in {artefacts} -- run `cmake --build build --config {config}` first')
-    return candidates[0]
+
+    exes = sorted(artefacts.glob('*.exe'))
+    if exes:
+        return exes[0]
+
+    apps = sorted(artefacts.glob('*.app'))
+    if apps:
+        macos_bins = [p for p in (apps[0] / 'Contents' / 'MacOS').glob('*') if p.is_file()]
+        if macos_bins:
+            return macos_bins[0]
+
+    # Linux: a bare executable file directly in the Standalone dir.
+    linux_bins = [p for p in artefacts.glob('*')
+                  if p.is_file() and os.access(p, os.X_OK)]
+    if linux_bins:
+        return linux_bins[0]
+
+    raise FileNotFoundError(f'no standalone binary in {artefacts} -- run `cmake --build build --config {config}` first')
 
 
 def resolve_preset(rel: str) -> Path | None:

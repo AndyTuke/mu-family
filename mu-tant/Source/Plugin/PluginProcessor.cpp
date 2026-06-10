@@ -321,7 +321,10 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 {
     juce::ScopedNoDenormals noDenormals;
     const int numSamples = buffer.getNumSamples();
-    buffer.clear();
+
+    // Preserve the DAW sidechain, then clear (the SC input bus shares buffer channels
+    // with the output, so a bare clear would wipe it → no ducking / dead GR). Shared.
+    captureSidechainAndClear(buffer);
 
     // MIDI program-change → preset load. Enqueue matching PCs (Ch 1-8 per-voice,
     // Ch 9 full) into the lock-free FIFO; handleAsyncUpdate drains them. Done
@@ -380,19 +383,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         {
             const int numActiveVoices = numVoices.load(std::memory_order_relaxed);
 
-            // Supply the external DAW sidechain bus to the mixer (null when inactive).
-            mixerEngine.setExternalSidechain(nullptr, nullptr);
-            if (getBusCount(true) > 0)
-                if (auto* scBus = getBus(true, 0); scBus && scBus->isEnabled())
-                {
-                    auto scBuf = getBusBuffer(buffer, true, 0);
-                    const int nCh = scBuf.getNumChannels();
-                    if (nCh >= 1)
-                        mixerEngine.setExternalSidechain(
-                            scBuf.getReadPointer(0),
-                            nCh >= 2 ? scBuf.getReadPointer(1) : scBuf.getReadPointer(0));
-                }
-
+            // (Sidechain already captured at the top of processBlock, before the clear.)
             processCoreBlock(buffer, nullptr, numActiveVoices, numSamples, bpm,
                              nullptr, nullptr, nullptr, &renderVoiceCb);
         }

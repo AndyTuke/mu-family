@@ -115,22 +115,12 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 {
     juce::ScopedNoDenormals noDenormals;
     const int numSamples = buffer.getNumSamples();
-    buffer.clear();
+
+    // Preserve the DAW sidechain, then clear (shared — the SC input bus shares buffer
+    // channels with the output, so a bare clear would wipe it).
+    captureSidechainAndClear(buffer);
 
     const double bpm = internalBpm.load(std::memory_order_relaxed);
-
-    // Supply the external DAW sidechain bus to the mixer (null when bus is inactive).
-    mixerEngine.setExternalSidechain(nullptr, nullptr);
-    if (getBusCount(true) > 0)
-        if (auto* scBus = getBus(true, 0); scBus && scBus->isEnabled())
-        {
-            auto scBuf = getBusBuffer(buffer, true, 0);
-            const int nCh = scBuf.getNumChannels();
-            if (nCh >= 1)
-                mixerEngine.setExternalSidechain(
-                    scBuf.getReadPointer(0),
-                    nCh >= 2 ? scBuf.getReadPointer(1) : scBuf.getReadPointer(0));
-        }
 
     // Render (silent) → mixer through the shared path (engine→insert→mixer). With
     // no engine the render hook clears each channel; the mixer owns the strip +

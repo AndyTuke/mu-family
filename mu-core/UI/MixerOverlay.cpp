@@ -475,6 +475,24 @@ void MixerOverlay::loadFromAPVTS()
 
     // Reload rhythm channel UI (only active channels have APVTS params).
     const int numActive = proc.getNumChannels();
+
+    // Keep each strip's active/name/colour in sync with the live channel count.
+    // buildChannels() (which sets these) only runs on refresh(), gated on mixer
+    // visibility — so a preset / host-state load that changes the channel count
+    // while the mixer is hidden would leave stale dim overlays + names when it's
+    // next shown. loadFromAPVTS runs on visibilityChanged + preset reload, so
+    // refreshing here makes the colouring track the count regardless of when it changed.
+    const auto& palette = MuLookAndFeel::channelPalette;
+    for (int r = 0; r < (int)rhythmChannels.size(); ++r)
+    {
+        const bool hasRhythm = r < numActive;
+        rhythmChannels[r]->setActive(hasRhythm);
+        rhythmChannels[r]->setChannelName(hasRhythm ? juce::String(proc.getChannelName(r)) : "-");
+        rhythmChannels[r]->setChannelColour(
+            hasRhythm ? palette[proc.getChannelColourIndex(r) % MuLookAndFeel::kChannelPaletteSize]
+                      : MuLookAndFeel::colour(MuLookAndFeel::mixerInactiveNameBg));
+    }
+
     for (int r = 0; r < numActive && r < (int)rhythmChannels.size(); ++r)
     {
         const juce::String prefix = "ch" + juce::String(r) + "_";

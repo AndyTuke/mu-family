@@ -784,6 +784,11 @@ void PresetIO::restoreRhythmSample(int i, const juce::ValueTree& tree,
                                     const juce::String& sampleDataProp,
                                     const juce::String& sampleNameProp)
 {
+    // The Lite (MIDI-effect) build has no sample-playback engine on this slot, so there's
+    // nothing to load a sample into — bail before any voiceEngines[i] deref. The caller
+    // maintains loadedSamplePaths. (Mirrors the null guard in forceSyncRhythmFromAPVTS.)
+    if (! proc_.voiceEngines[i]) return;
+
     const juce::String sampleData = tree.getProperty(juce::Identifier(sampleDataProp)).toString();
     const juce::String sampleName = tree.getProperty(juce::Identifier(sampleNameProp)).toString();
     const juce::String samplePath = tree.getProperty(juce::Identifier(samplePathProp)).toString();

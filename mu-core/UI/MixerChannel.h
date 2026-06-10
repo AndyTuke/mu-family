@@ -69,6 +69,7 @@ public:
 
     void setEffectSendLabel(const juce::String& name);
     void setChannelName(const juce::String& n) { channelName = n; repaint(); }
+    void setChannelColour(juce::Colour c) { channelColour = c; repaint(); }
     void setActive(bool a) { active = a; repaint(); }
     void setMeterMode(VUMeter::MeterMode m) { vuMeter.setMode(m); }
 

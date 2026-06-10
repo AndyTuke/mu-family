@@ -93,7 +93,8 @@ target_link_libraries(mu-tant
 # (mirrors mu-clid). Compiled only into the Standalone target.
 target_compile_definitions(mu-tant_Standalone PRIVATE JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
 target_sources(mu-tant_Standalone PRIVATE
-    Source/Plugin/StandaloneApp.cpp)
+    Source/Plugin/StandaloneApp.cpp
+    Source/Plugin/RenderMode.cpp)
 
 # CLAP format via clap-juce-extensions (mirrors mu-clid). Creates mu-tant_CLAP.
 clap_juce_extensions_plugin(TARGET mu-tant

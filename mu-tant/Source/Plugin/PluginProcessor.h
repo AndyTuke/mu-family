@@ -113,9 +113,10 @@ public:
 
     // ── Internal transport (drives the gate engine + the gating timeline) ─────
     // mu-tant has no host-sync sequencer; the transport bar's play button starts
-    // / stops an internal free-running clock. While stopped the beat freezes at 0
-    // and the gate is held fully open (audition the oscillators); while playing
-    // the beat advances and the gate engine chops per the pattern.
+    // / stops an internal free-running clock. While stopped the beat freezes at 0 and
+    // the gater is CLOSED — so the voice is silent on load (gateModeFor: !playing →
+    // Silence). To audition the raw oscillator drone, bypass the gater (gate_bypass →
+    // Pass). While playing the beat advances and the gate engine chops per the pattern.
     bool   isInternalPlaying()  const override { return playing.load(std::memory_order_relaxed); }
     void   toggleInternalPlay() override
     {

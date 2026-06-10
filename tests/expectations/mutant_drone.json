@@ -1,0 +1,19 @@
+{
+  "test": "mutant_drone",
+  "description": "mu-Tant headless render smoke. mu-Tant is a wavetable synth: at default the transport is stopped, which holds the gate fully open, so the oscillators drone — guaranteed non-silent audio with NO preset and NO sample dependency. Used by mac-validate.yml to prove the Mac build actually produces sound, host- and content-independently. Rendered via `mu-Tant --render --out <wav> --seconds 4`.",
+  "render": {
+    "seconds": 4.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "drone_is_audible",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [0.5, 3.5],
+      "min": -60,
+      "comment": "the default oscillator drone must sit clearly above the noise floor across the render — a silent clip means the Mac build isn't producing audio"
+    }
+  ]
+}

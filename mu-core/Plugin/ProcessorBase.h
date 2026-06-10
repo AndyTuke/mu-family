@@ -202,6 +202,34 @@ protected:
                           const RetiredVoices*                     retired      = nullptr,
                           const MixerEngine::RenderChannelFn*      renderChannel = nullptr);
 
+    // Capture the DAW sidechain input BEFORE the product clears its process buffer.
+    // For an instrument the sidechain input bus can share buffer channels with the
+    // main output (equal channel counts), so the buffer.clear() at the top of
+    // processBlock would wipe the sidechain before the mixer reads it — producing no
+    // ducking and a dead GR meter. Call this at the very top of processBlock, before
+    // buffer.clear(). The mixer keeps a private copy (sized in MixerEngine::prepare),
+    // so nothing allocates on the audio thread.
+    void captureSidechainInput(juce::AudioBuffer<float>& buffer)
+    {
+        if (getBusCount(true) > 0)
+            if (auto* scBus = getBus(true, 0); scBus != nullptr && scBus->isEnabled())
+            {
+                mixerEngine.copyExternalSidechain(getBusBuffer(buffer, true, 0));
+                return;
+            }
+        mixerEngine.setExternalSidechain(nullptr, nullptr);
+    }
+
+    // Family block-start primitive: preserve the DAW sidechain, THEN clear the buffer.
+    // Every product calls this single shared method as the first line of processBlock
+    // (replacing a bare buffer.clear()), so a new sibling gets the correct behaviour for
+    // free and can't reintroduce the "clear wipes the sidechain" bug.
+    void captureSidechainAndClear(juce::AudioBuffer<float>& buffer)
+    {
+        captureSidechainInput(buffer);
+        buffer.clear();
+    }
+
 protected:
     // Backing storage for the default getUiScale / setUiScale. Derived classes
     // typically also persist the value through their own appSettings file.

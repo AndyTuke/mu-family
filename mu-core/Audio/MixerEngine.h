@@ -243,14 +243,34 @@ public:
         extScR = (R != nullptr) ? R : L;   // mono sidechain: fold to both channels
     }
 
+    // Copy the DAW sidechain input into a private buffer and point the follower at it.
+    // Use this (not setExternalSidechain) when the host's source channels would be
+    // overwritten before processBlock reads them — e.g. an instrument whose sidechain
+    // input bus shares buffer channels with its main output, which the buffer.clear()
+    // at the top of processBlock wipes. The copy is sized in prepare(), so this never
+    // allocates on the audio thread.
+    void copyExternalSidechain(const juce::AudioBuffer<float>& scBuf) noexcept
+    {
+        const int nCh = juce::jmin(scBuf.getNumChannels(), extScCapture.getNumChannels());
+        const int n   = juce::jmin(scBuf.getNumSamples(),  extScCapture.getNumSamples());
+        if (nCh < 1 || n < 1) { extScL = extScR = nullptr; return; }
+        for (int c = 0; c < nCh; ++c)
+            extScCapture.copyFrom(c, 0, scBuf, c, 0, n);
+        extScL = extScCapture.getReadPointer(0);
+        extScR = (nCh >= 2) ? extScCapture.getReadPointer(1) : extScL;
+    }
+
 private:
     double sampleRate = 44100.0;
     float  scEnv[MaxChannels] {};     // per-channel sidechain envelope state
     float  scRetEnv[3] {};            // per-return sidechain envelope state
 
-    // External DAW sidechain bus — set by setExternalSidechain() before processBlock.
+    // External DAW sidechain bus — set by setExternalSidechain() before processBlock,
+    // or copied into extScCapture by copyExternalSidechain() when the host channels
+    // would be clobbered by the product's buffer.clear() (instrument SC/out overlap).
     const float* extScL = nullptr;
     const float* extScR = nullptr;
+    juce::AudioBuffer<float> extScCapture;   // private copy that survives buffer.clear()
 
     juce::AudioBuffer<float> channelBufs[MaxChannels];
     juce::AudioBuffer<float> effectSendBuf, delaySendBuf, reverbSendBuf;

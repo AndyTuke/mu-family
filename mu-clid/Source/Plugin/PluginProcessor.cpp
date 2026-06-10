@@ -227,7 +227,11 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                                    juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
-    buffer.clear();
+
+    // Preserve the DAW sidechain, then clear (shared — the SC input bus shares buffer
+    // channels with the master output, so a bare clear would wipe it → no ducking /
+    // dead GR). No-op in the Lite build (no buses); the mixer keeps a private copy.
+    captureSidechainAndClear(buffer);
 
 #if MUCLID_LITE_BUILD
     // Lite mode: MIDI-only sequencing, no audio processing.
@@ -843,18 +847,9 @@ void PluginProcessor::renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::M
                 fxRetPtr = &fxRetBuf;
             }
 
-    // Supply the external DAW sidechain bus to the mixer (null when bus is inactive).
-    mixerEngine.setExternalSidechain(nullptr, nullptr);
-    if (getBusCount(true) > 0)
-        if (auto* scBus = getBus(true, 0); scBus && scBus->isEnabled())
-        {
-            auto scBuf = getBusBuffer(buffer, true, 0);
-            const int nCh = scBuf.getNumChannels();
-            if (nCh >= 1)
-                mixerEngine.setExternalSidechain(
-                    scBuf.getReadPointer(0),
-                    nCh >= 2 ? scBuf.getReadPointer(1) : scBuf.getReadPointer(0));
-        }
+    // (External DAW sidechain already captured at the top of processBlock, before the
+    // clear — the input bus shares channels with the master output, so reading it here
+    // post-clear would yield silence.)
 
     // Stage 34 Step 2: pass the retired-voice descriptor through. The 2D arrays
     // (MaxRhythms × kMaxRetiredEngines) are stored contiguously row-major in
