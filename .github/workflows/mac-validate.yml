@@ -158,14 +158,29 @@ jobs:
             tests/_out/**
           if-no-files-found: warn
 
-      - name: Upload Mac plugin bundles (universal, unsigned)
+      # Package the bundles into a permission-preserving zip via `ditto` (Apple's tool).
+      # The owner has no Mac, so distribution goes Mac-runner -> GitHub -> Windows -> OneDrive
+      # -> tester's Mac. A RAW bundle loses the Unix executable bit, symlinks, AND the arm64
+      # ad-hoc code signature on that path — which breaks the .app and makes the arm64 slice
+      # unloadable on Apple Silicon (a likely cause of testers' "can't open"). `ditto -c -k`
+      # on the Mac preserves all of it inside the zip. The owner must place this zip in the
+      # OneDrive Mac folder WITHOUT extracting on Windows; testers extract it ON their Mac.
+      - name: Package Mac bundles for distribution (perms + signature preserving)
+        if: always()
+        run: |
+          set -eo pipefail
+          stage=mac-plugins; rm -rf "$stage"; mkdir -p "$stage"/{VST3,CLAP,Components,Standalone}
+          cp -R build/*/*_artefacts/Release/VST3/*.vst3      "$stage/VST3/"       2>/dev/null || true
+          cp -R build/*/*_artefacts/Release/CLAP/*.clap      "$stage/CLAP/"       2>/dev/null || true
+          cp -R build/*/*_artefacts/Release/AU/*.component   "$stage/Components/" 2>/dev/null || true
+          cp -R build/*/*_artefacts/Release/Standalone/*.app "$stage/Standalone/" 2>/dev/null || true
+          ditto -c -k --sequesterRsrc --keepParent "$stage" mu-family-mac.zip
+          echo "=== packaged (perms preserved) ==="; unzip -l mu-family-mac.zip | tail -25
+
+      - name: Upload Mac distribution zip (extract on a Mac — do NOT extract on Windows)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mac-plugins-release
-          path: |
-            build/*/*_artefacts/Release/AU/*.component
-            build/*/*_artefacts/Release/VST3/*.vst3
-            build/*/*_artefacts/Release/CLAP/*.clap
-            build/*/*_artefacts/Release/Standalone/*.app
+          path: mu-family-mac.zip
           if-no-files-found: error
