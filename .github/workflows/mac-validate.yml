@@ -55,6 +55,8 @@ jobs:
           set -o pipefail
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DMUFAMILY_DEPLOY_TESTERS=OFF 2>&1 | tee report/configure.txt
 
+      # mu-toni is a not-yet-worked-on scaffold (owner) — excluded from the Mac build to cut
+      # the (10x-billed) macOS runner cost. Re-add its targets here when it gets an engine.
       - name: Build plugins + Standalone + AU (Release)
         run: |
           set -o pipefail
@@ -62,8 +64,7 @@ jobs:
             mu-clid_VST3 mu-clid_CLAP mu-clid_Standalone mu-clid_AU \
             mu-clid-lite_VST3 mu-clid-lite_CLAP mu-clid-lite_AU \
             mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone mu-tant_AU \
-            mu-on_VST3 mu-on_CLAP mu-on_Standalone mu-on_AU \
-            mu-toni_VST3 mu-toni_CLAP mu-toni_Standalone mu-toni_AU 2>&1 | tee report/build.txt
+            mu-on_VST3 mu-on_CLAP mu-on_Standalone mu-on_AU 2>&1 | tee report/build.txt
 
       # ── Universal proof (hard gate) ─────────────────────────────────────────
       # An Intel tester needs the x86_64 slice to load the plugins at all; fail unless
@@ -78,7 +79,7 @@ jobs:
             echo "$archs" | grep -qw arm64  || { echo "::error::missing arm64 slice in $bin";  exit 1; }
             echo "$archs" | grep -qw x86_64 || { echo "::error::missing x86_64 slice in $bin"; exit 1; }
           }
-          for p in mu-clid/mu-clid_artefacts mu-tant/mu-tant_artefacts mu-on/mu-on_artefacts mu-toni/mu-toni_artefacts; do
+          for p in mu-clid/mu-clid_artefacts mu-tant/mu-tant_artefacts mu-on/mu-on_artefacts; do
             name="$(basename "$(ls -d build/$p/Release/VST3/*.vst3)" .vst3)"
             check "build/$p/Release/VST3/$name.vst3/Contents/MacOS/$name"
           done
@@ -119,13 +120,11 @@ jobs:
           cp -R build/mu-clid/mu-clid-lite_artefacts/Release/AU/*.component "$comp/" || true
           cp -R build/mu-tant/mu-tant_artefacts/Release/AU/*.component "$comp/" || true
           cp -R build/mu-on/mu-on_artefacts/Release/AU/*.component "$comp/" || true
-          cp -R build/mu-toni/mu-toni_artefacts/Release/AU/*.component "$comp/" || true
           killall -9 AudioComponentRegistrar 2>/dev/null || true
           { auval -v aumu MCld TDP1
             auval -v aumi MCLt TDP1
             auval -v aumu MTnt TDP1
-            auval -v aumu MuOn TDP1
-            auval -v aumu MTni TDP1; } 2>&1 | tee report/auval.txt
+            auval -v aumu MuOn TDP1; } 2>&1 | tee report/auval.txt
 
       # ── Render mu-Tant drone + analyse (hard gate — guaranteed audio) ───────
       # mu-Tant is a wavetable synth, so a headless render with the gater bypassed
@@ -174,6 +173,25 @@ jobs:
           cp -R build/*/*_artefacts/Release/CLAP/*.clap      "$stage/CLAP/"       2>/dev/null || true
           cp -R build/*/*_artefacts/Release/AU/*.component   "$stage/Components/" 2>/dev/null || true
           cp -R build/*/*_artefacts/Release/Standalone/*.app "$stage/Standalone/" 2>/dev/null || true
+          cat > "$stage/READ-ME-FIRST.txt" <<'TXT'
+          mu-family for macOS (universal — Apple Silicon + Intel), unsigned test build.
+
+          EXTRACT THIS ZIP ON YOUR MAC (Finder double-click) — not on Windows, or the
+          plugins' permissions/signature break and they won't load.
+
+          Install (copy each into your user plug-in folders):
+            VST3/*.vst3        -> ~/Library/Audio/Plug-Ins/VST3/
+            CLAP/*.clap        -> ~/Library/Audio/Plug-Ins/CLAP/
+            Components/*.component -> ~/Library/Audio/Plug-Ins/Components/   (AU)
+            Standalone/*.app   -> /Applications/   (optional)
+
+          These are not notarized yet, so clear macOS quarantine once, in Terminal:
+            xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/mu-*.vst3
+            xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/CLAP/mu-*.clap
+            xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/Components/mu-*.component
+            xattr -dr com.apple.quarantine /Applications/mu-*.app
+          Then rescan plug-ins in your DAW.
+          TXT
           ditto -c -k --sequesterRsrc --keepParent "$stage" mu-family-mac.zip
           echo "=== packaged (perms preserved) ==="; unzip -l mu-family-mac.zip | tail -25
 
