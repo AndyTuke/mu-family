@@ -141,6 +141,21 @@ endif()
 # Keep deployed formats version-matched — Standalone waits for VST3 + CLAP.
 add_dependencies(mu-tant_Standalone mu-tant_VST3 mu-tant_CLAP)
 
+# Package mu-Tant Release zip in build/dist/ (Release only; script skips Debug silently).
+add_custom_command(TARGET mu-tant_Standalone POST_BUILD
+    COMMAND "${CMAKE_COMMAND}"
+            "-DCONFIG=$<CONFIG>"
+            "-DPRODUCT=mu-Tant"
+            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-tant/mu-tant_artefacts/$<CONFIG>/VST3/mu-Tant.vst3"
+            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-tant/mu-tant_artefacts/$<CONFIG>/CLAP/mu-Tant.clap"
+            "-DSTANDALONE=$<TARGET_FILE:mu-tant_Standalone>"
+            "-DDIST_DIR=${CMAKE_BINARY_DIR}/dist"
+            "-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
+            -P "${CMAKE_SOURCE_DIR}/cmake/PackageRelease.cmake"
+    COMMENT "Packaging mu-Tant Release zip"
+    VERBATIM
+)
+
 # ── mu-tant-tests — console UnitTests over the new synth DSP ─────────────────
 # Tests only mu-tant's self-contained DSP (Scales + WavetableOscillator +
 # WavetableBank) — no mu-core deps needed. EXCLUDE_FROM_ALL like mu-clid-tests.

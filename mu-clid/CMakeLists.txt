@@ -187,6 +187,21 @@ clap_juce_extensions_plugin(TARGET mu-clid
 # build — negligible for the usual full `cmake --build` (ALL_BUILD) flow.
 add_dependencies(mu-clid_Standalone mu-clid_VST3 mu-clid_CLAP)
 
+# Package mu-Clid Release zip in build/dist/ (Release only; script skips Debug silently).
+add_custom_command(TARGET mu-clid_Standalone POST_BUILD
+    COMMAND "${CMAKE_COMMAND}"
+            "-DCONFIG=$<CONFIG>"
+            "-DPRODUCT=mu-Clid"
+            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid_artefacts/$<CONFIG>/VST3/mu-Clid.vst3"
+            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid_artefacts/$<CONFIG>/CLAP/mu-Clid.clap"
+            "-DSTANDALONE=$<TARGET_FILE:mu-clid_Standalone>"
+            "-DDIST_DIR=${CMAKE_BINARY_DIR}/dist"
+            "-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
+            -P "${CMAKE_SOURCE_DIR}/cmake/PackageRelease.cmake"
+    COMMENT "Packaging mu-Clid Release zip"
+    VERBATIM
+)
+
 
 # ── mu-Clid Lite — single-rhythm MIDI-effect VST3/CLAP ──────────────────────
 juce_add_plugin(mu-clid-lite
@@ -314,6 +329,22 @@ add_custom_command(TARGET mu-clid-lite_CLAP POST_BUILD
     VERBATIM
 )
 endif()
+
+# Package mu-Clid Lite Release zip (VST3 + CLAP, no Standalone). A dedicated custom
+# target (rather than POST_BUILD) lets us declare explicit deps on both format targets.
+add_custom_target(mu-clid-lite-zip ALL
+    COMMAND "${CMAKE_COMMAND}"
+            "-DCONFIG=$<CONFIG>"
+            "-DPRODUCT=mu-Clid-Lite"
+            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/VST3/mu-Clid Lite.vst3"
+            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/CLAP/mu-Clid Lite.clap"
+            "-DDIST_DIR=${CMAKE_BINARY_DIR}/dist"
+            "-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
+            -P "${CMAKE_SOURCE_DIR}/cmake/PackageRelease.cmake"
+    COMMENT "Packaging mu-Clid Lite Release zip"
+    VERBATIM
+)
+add_dependencies(mu-clid-lite-zip mu-clid-lite_VST3 mu-clid-lite_CLAP increment_build_number)
 
 # ── mu-clid-tests — data-layer regression tests (#442) ──────────────────────
 # Console executable that runs every juce::UnitTest defined in Source/Tests/.
