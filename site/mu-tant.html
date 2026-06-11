@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>μ-tant — Wavetable Drone Sequencer | Transwarp Development Project</title>
+  <meta name="description" content="μ-tant is a VST3 & CLAP wavetable drone sequencer for Windows. Dual-oscillator drone with FM & ring modulation, envelope gate sequencer up to 16 bars, per-step filter and pitch control.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+/* ── RESET & ROOT ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #07060E; --bg2: #0D0B18; --bg3: #131128; --bg4: #1A1834;
+  --accent: #6B5FE4; --accent-b: #8B80F0; --glow: rgba(107,95,228,0.35);
+  --teal: #1DB880; --teal-b: #2ECFA0; --glow2: rgba(29,184,128,0.25);
+  --amber: #D4895C; --amber-b: #E8A878; --amber-glow: rgba(212,137,92,0.3);
+  --cyan: #3CB8D4; --cyan-b: #5CCEE8; --cyan-glow: rgba(60,184,212,0.3);
+  --text: #E8E4D8; --text2: #7A758F; --text3: #4A4565;
+  --border: #1E1C32; --border2: #2A2745;
+  --ff-disp: 'Syne', sans-serif;
+  --ff-mono: 'Space Mono', monospace;
+  --ff-body: 'Outfit', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--ff-body); font-size: 16px; line-height: 1.6; overflow-x: hidden; }
+body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(ellipse 80% 50% at 20% 40%, rgba(107,95,228,0.07) 0%, transparent 70%), radial-gradient(ellipse 60% 40% at 80% 70%, rgba(29,184,128,0.04) 0%, transparent 70%); pointer-events: none; z-index: 0; }
+.container { max-width: 1160px; margin: 0 auto; padding: 0 32px; position: relative; }
+a { color: inherit; text-decoration: none; }
+section { position: relative; z-index: 1; }
+
+/* ── NAV ── */
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px; height: 60px; display: flex; align-items: center; justify-content: space-between; background: rgba(7,6,14,0.88); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+.nav-logo { display: flex; flex-direction: column; line-height: 1; gap: 2px; }
+.nav-logo .brand { font-family: var(--ff-disp); font-size: 17px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+.nav-logo .brand .mu { color: var(--accent-b); }
+.nav-logo .sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.14em; color: var(--text3); text-transform: uppercase; }
+.nav-links { display: flex; align-items: center; gap: 26px; }
+.nav-links a { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase; transition: color .2s; }
+.nav-links a:hover, .nav-links a.active { color: var(--text); }
+.nav-links .nav-clid { color: var(--accent-b); }
+.nav-links .nav-tant { color: var(--amber-b); }
+.nav-links .nav-free { color: var(--cyan-b); }
+.nav-links .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; transition: background .2s, box-shadow .2s; }
+.nav-links .nav-cta:hover { background: var(--accent-b); box-shadow: 0 0 20px var(--glow); }
+
+/* ── SHARED TYPOGRAPHY ── */
+.section-label { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.22em; color: var(--accent-b); text-transform: uppercase; margin-bottom: 12px; }
+.section-label.teal { color: var(--teal); }
+.section-label.amber { color: var(--amber-b); }
+.section-label.cyan { color: var(--cyan-b); }
+.section-heading { font-family: var(--ff-disp); font-size: clamp(28px,3.5vw,46px); font-weight: 800; line-height: 1.05; letter-spacing: -0.02em; margin-bottom: 16px; }
+.section-sub { font-size: 17px; font-weight: 300; color: var(--text2); max-width: 600px; line-height: 1.65; }
+.pill { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.12em; color: var(--text2); border: 1px solid var(--border2); border-radius: 2px; padding: 5px 10px; text-transform: uppercase; }
+.pill.teal   { color: var(--teal);    border-color: rgba(29,184,128,0.3); }
+.pill.amber  { color: var(--amber-b); border-color: rgba(212,137,92,0.3); }
+.pill.purple { color: var(--accent-b);border-color: rgba(107,95,228,0.3); }
+.pill.cyan   { color: var(--cyan-b);  border-color: rgba(60,184,212,0.3); }
+
+/* ── BUTTONS ── */
+.btn-primary { display: inline-flex; align-items: center; gap: 10px; background: var(--accent); color: #fff; font-family: var(--ff-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; padding: 13px 26px; border-radius: 4px; border: none; cursor: pointer; transition: all .2s; }
+.btn-primary:hover { background: var(--accent-b); box-shadow: 0 0 32px var(--glow); transform: translateY(-1px); }
+.btn-amber { background: var(--amber) !important; }
+.btn-amber:hover { background: var(--amber-b) !important; box-shadow: 0 0 32px var(--amber-glow) !important; }
+.btn-cyan { background: var(--cyan) !important; color: var(--bg) !important; }
+.btn-cyan:hover { background: var(--cyan-b) !important; box-shadow: 0 0 32px var(--cyan-glow) !important; }
+.btn-secondary { display: inline-flex; align-items: center; gap: 8px; background: transparent; color: var(--text); font-family: var(--ff-mono); font-size: 12px; letter-spacing: 0.08em; padding: 13px 22px; border-radius: 4px; border: 1px solid var(--border2); cursor: pointer; transition: all .2s; }
+.btn-secondary:hover { border-color: var(--teal); color: var(--teal-b); transform: translateY(-1px); }
+.btn-price { opacity: 0.7; font-size: 10px; }
+
+/* ── FEATURE GRID ── */
+.features-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.feature-card { background: var(--bg2); padding: 32px 28px; transition: background .25s; }
+.feature-card:hover { background: var(--bg3); }
+.feature-icon { width: 40px; height: 40px; border-radius: 7px; background: var(--bg4); border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; margin-bottom: 18px; }
+.feature-icon svg { width: 20px; height: 20px; }
+.feature-card h3 { font-family: var(--ff-disp); font-size: 16px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 8px; }
+.feature-card p { font-size: 13px; font-weight: 300; color: var(--text2); line-height: 1.65; }
+.feature-card .tag { display: inline-block; margin-top: 12px; font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; }
+.feature-card .tag.purple { color: var(--accent-b); }
+.feature-card .tag.teal   { color: var(--teal); }
+.feature-card .tag.amber  { color: var(--amber-b); }
+.feature-card .tag.cyan   { color: var(--cyan-b); }
+
+/* ── SCREENSHOTS ── */
+.screenshots-wrap { margin-top: 56px; }
+.screenshot-primary { display: grid; grid-template-columns: 1fr 300px; gap: 36px; align-items: center; margin-bottom: 20px; }
+.ss-placeholder { background: var(--bg2); border: 1px solid var(--border2); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+.ss-placeholder img { width: 100%; height: auto; display: block; border-radius: 7px; }
+.ss-placeholder.ss-empty { aspect-ratio: 16/9; }
+.ss-inner { display: flex; flex-direction: column; align-items: center; gap: 10px; opacity: 0.3; padding: 40px; }
+.ss-inner span { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase; text-align: center; }
+.ss-caption { padding: 4px 0; }
+.sc-label { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 8px; }
+.clid-cap .sc-label { color: var(--accent-b); }
+.tant-cap .sc-label { color: var(--amber-b); }
+.ss-caption h3 { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.015em; margin-bottom: 10px; }
+.ss-caption p { font-size: 14px; color: var(--text2); font-weight: 300; line-height: 1.65; }
+.screenshot-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+.ss-item .ss-placeholder.ss-empty { aspect-ratio: 4/3; }
+.ss-item-caption { padding: 12px 2px 0; }
+.ss-item-caption strong { font-size: 13px; font-weight: 600; display: block; margin-bottom: 3px; }
+.ss-item-caption p { font-size: 12px; color: var(--text2); line-height: 1.55; }
+
+/* ── PRICING ── */
+.coming-soon-banner { display: flex; align-items: center; gap: 12px; background: rgba(29,184,128,0.07); border: 1px solid rgba(29,184,128,0.25); border-radius: 6px; padding: 16px 22px; margin-bottom: 40px; font-size: 14px; color: var(--teal-b); }
+.coming-soon-banner svg { flex-shrink: 0; }
+.pricing-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; align-items: start; }
+.pricing-card { border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; background: var(--bg2); transition: box-shadow .3s; }
+.pricing-card.featured.clid-feat { border-color: var(--accent); background: var(--bg3); box-shadow: 0 0 40px rgba(107,95,228,0.15); }
+.pricing-card.featured.tant-feat { border-color: var(--amber); background: var(--bg3); box-shadow: 0 0 40px rgba(212,137,92,0.15); }
+.pricing-badge { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; text-align: center; padding: 7px; color: #fff; }
+.pricing-badge.clid-badge { background: var(--accent); }
+.pricing-badge.tant-badge { background: var(--amber); }
+.pricing-head { padding: 24px 24px 0; }
+.pricing-tier { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.18em; color: var(--text2); text-transform: uppercase; margin-bottom: 4px; }
+.pricing-name { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 12px; }
+.pricing-name .mu { color: var(--accent-b); }
+.tant-col .pricing-name .mu { color: var(--amber-b); }
+.pricing-price-block { display: flex; align-items: baseline; gap: 8px; margin-bottom: 16px; }
+.price-main { font-family: var(--ff-disp); font-size: 36px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.price-was { font-family: var(--ff-mono); font-size: 13px; color: var(--text3); text-decoration: line-through; }
+.price-note { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.1em; color: var(--teal); margin-top: 2px; }
+.tant-col .price-note { color: var(--amber); }
+.pricing-divider { height: 1px; background: var(--border); margin: 0 24px; }
+.pricing-features { padding: 16px 24px 20px; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.pricing-features li { font-size: 13px; color: var(--text2); display: flex; align-items: flex-start; gap: 8px; padding: 3px 0; }
+.pricing-features li::before { content: '·'; font-size: 18px; line-height: 1; flex-shrink: 0; }
+.pricing-features li.hi::before { color: var(--accent-b); }
+.tant-col .pricing-features li.hi::before { color: var(--amber-b); }
+.pricing-cta { padding: 0 24px 20px; }
+.btn-full { display: block; width: 100%; text-align: center; font-family: var(--ff-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 12px; border-radius: 4px; cursor: pointer; border: none; transition: all .2s; }
+.btn-full.clid-p { background: var(--accent); color: #fff; }
+.btn-full.clid-p:hover { background: var(--accent-b); box-shadow: 0 0 24px var(--glow); }
+.btn-full.clid-s { background: transparent; color: var(--teal-b); border: 1px solid rgba(29,184,128,0.35); }
+.btn-full.clid-s:hover { background: rgba(29,184,128,0.07); }
+.btn-full.tant-p { background: var(--amber); color: #fff; }
+.btn-full.tant-p:hover { background: var(--amber-b); box-shadow: 0 0 24px var(--amber-glow); }
+.btn-full.tant-s { background: transparent; color: var(--amber-b); border: 1px solid rgba(212,137,92,0.35); }
+.btn-full.tant-s:hover { background: rgba(212,137,92,0.07); }
+.btn-full.ghost { background: transparent; color: var(--text2); border: 1px solid var(--border2); }
+.btn-full.ghost:hover { border-color: var(--text2); color: var(--text); }
+.pricing-fine { text-align: center; margin-top: 28px; font-size: 12px; color: var(--text3); font-family: var(--ff-mono); }
+
+/* ── HIGHLIGHTS STRIP ── */
+.highlights-strip { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; background: var(--bg2); }
+.highlight-item { padding: 30px 26px; display: flex; gap: 16px; align-items: flex-start; transition: background .2s; }
+.highlight-item:hover { background: var(--bg3); }
+.hi-icon { flex-shrink:0; width:38px; height:38px; border-radius:7px; background:var(--bg4); border:1px solid var(--border2); display:flex; align-items:center; justify-content:center; }
+.hi-icon svg { width:18px; height:18px; }
+.hi-body h4 { font-family: var(--ff-disp); font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+.hi-body p { font-size: 13px; color: var(--text2); font-weight: 300; line-height: 1.6; }
+.highlight-divider { width: 1px; background: var(--border2); }
+
+/* ── FORMATS ── */
+.formats-inner { display: flex; align-items: center; justify-content: space-between; gap: 40px; flex-wrap: wrap; }
+.formats-chips { display: flex; gap: 10px; flex-wrap: wrap; }
+.format-chip { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 16px 18px; border: 1px solid var(--border2); border-radius: 6px; background: var(--bg2); }
+.format-chip .fc-icon svg { width: 24px; height: 24px; }
+.format-chip .fc-label { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.14em; color: var(--text2); text-transform: uppercase; }
+.format-chip .fc-detail { font-family: var(--ff-mono); font-size: 8px; color: var(--text3); }
+.format-chip-soon { opacity: 0.45; }
+.fc-soon { color: var(--teal) !important; }
+
+/* ── COMMUNITY ── */
+.community-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: start; }
+.community-links { display: flex; flex-direction: column; gap: 10px; margin-top: 24px; }
+.community-link { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg2); transition: border-color .2s, background .2s; }
+.community-link:hover { border-color: var(--border2); background: var(--bg3); }
+.community-link .cl-icon { width: 28px; height: 28px; border-radius: 4px; background: var(--bg4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.community-link .cl-icon svg { width: 14px; height: 14px; }
+.community-link .cl-name { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--text); }
+.community-link .cl-desc { font-size: 11px; color: var(--text3); margin-top: 1px; }
+.community-link .cl-arrow { margin-left: auto; color: var(--text3); }
+.community-link-soon { opacity: 0.6; cursor: default; pointer-events: none; }
+.soon-badge { display: inline-block; font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--teal); border: 1px solid rgba(29,184,128,0.4); border-radius: 2px; padding: 1px 5px; margin-left: 6px; vertical-align: middle; }
+.email-signup { background: var(--bg3); border: 1px solid var(--border2); border-radius: 8px; padding: 30px 26px; }
+.email-signup h3 { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.015em; margin-bottom: 8px; }
+.email-signup p { font-size: 14px; color: var(--text2); font-weight: 300; line-height: 1.65; margin-bottom: 20px; }
+.email-note { font-size: 11px !important; color: var(--text3) !important; margin-top: 10px !important; font-family: var(--ff-mono) !important; margin-bottom: 0 !important; }
+
+/* ── FOOTER ── */
+footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
+.footer-inner { display: grid; grid-template-columns: 220px 1fr 1fr 1fr; gap: 40px; margin-bottom: 40px; }
+.footer-brand .fb-logo { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+.footer-brand .fb-sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.16em; color: var(--text3); text-transform: uppercase; margin-bottom: 14px; }
+.footer-brand p { font-size: 12px; color: var(--text3); line-height: 1.65; }
+.footer-col h4 { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.18em; color: var(--text2); text-transform: uppercase; margin-bottom: 14px; }
+.footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+.footer-col li a { font-size: 13px; color: var(--text3); transition: color .2s; }
+.footer-col li a:hover { color: var(--text); }
+.footer-bottom { border-top: 1px solid var(--border); padding-top: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.footer-bottom .copy { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text3); }
+.footer-social { display: flex; gap: 16px; }
+.footer-social a { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.12em; color: var(--text3); text-transform: uppercase; transition: color .2s; }
+.footer-social a:hover { color: var(--teal-b); }
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+.fade-1 { animation: fadeUp .6s ease .1s both; }
+.fade-2 { animation: fadeUp .6s ease .25s both; }
+.fade-3 { animation: fadeUp .6s ease .4s both; }
+.fade-4 { animation: fadeUp .6s ease .5s both; }
+.fade-5 { animation: fadeUp .6s ease .6s both; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .features-grid { grid-template-columns: 1fr 1fr; }
+  .screenshot-primary { grid-template-columns: 1fr; }
+  .community-inner { grid-template-columns: 1fr; }
+  .footer-inner { grid-template-columns: 1fr 1fr; }
+  .highlights-strip { grid-template-columns: 1fr; }
+  .highlight-divider { width: auto; height: 1px; }
+  .pricing-grid { grid-template-columns: 1fr; gap: 14px; }
+  .nav-links a:not(.nav-cta) { display: none; }
+}
+@media (max-width: 600px) {
+  .container { padding: 0 20px; }
+  nav { padding: 0 20px; }
+  .features-grid, .screenshot-grid { grid-template-columns: 1fr; }
+  .footer-inner { grid-template-columns: 1fr; }
+}
+
+</style>
+  <style>
+    #hero { min-height: 80vh; display: flex; align-items: center; padding: 120px 0 80px; border-bottom: 1px solid var(--border); }
+    .hero-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
+    .hero-eyebrow { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.2em; color: var(--amber-b); text-transform: uppercase; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+    .hero-eyebrow::before { content:''; display:block; width:30px; height:1px; background:var(--amber-b); }
+    .hero-title { font-family: var(--ff-disp); font-size: clamp(48px,6vw,80px); font-weight: 800; line-height: 0.9; letter-spacing: -0.03em; margin-bottom: 20px; }
+    .hero-title .mu { color: var(--amber-b); }
+    .hero-title .sub { display: block; font-size: clamp(14px,1.6vw,20px); font-weight: 700; color: var(--text2); margin-top: 12px; }
+    .hero-sub { font-size: 16px; font-weight: 300; color: var(--text2); margin-bottom: 28px; line-height: 1.7; }
+    .hero-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+    .hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+    .hero-visual { border-radius: 8px; overflow: hidden; border: 1px solid rgba(212,137,92,0.25); background: var(--bg2); display: flex; align-items: center; justify-content: center; aspect-ratio: 4/3; }
+    .product-section { padding: 100px 0; border-top: 1px solid var(--border); }
+    .product-section-header { margin-bottom: 52px; }
+    #pricing { padding: 100px 0; border-top: 1px solid var(--border); }
+    .pricing-header { text-align: center; margin-bottom: 48px; }
+    .pricing-header .section-sub { margin: 0 auto; }
+    #formats { padding: 80px 0; border-top: 1px solid var(--border); }
+    .tant-col .pricing-features li.hi::before { color: var(--amber-b); }
+    .btn-tant-p { background: var(--amber); color: #fff; }
+    .btn-tant-p:hover { background: var(--amber-b); box-shadow: 0 0 24px var(--amber-glow); }
+    .btn-tant-s { background: transparent; color: var(--amber-b); border: 1px solid rgba(212,137,92,0.35); }
+    .btn-tant-s:hover { background: rgba(212,137,92,0.07); }
+    .pricing-card.featured { position: relative; top: -10px; }
+    @media (max-width: 900px) { .hero-inner { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="index.html" class="nav-logo">
+      <span class="brand"><span class="mu">μ</span>-series</span>
+      <span class="sub">Transwarp Development Project</span>
+    </a>
+    <div class="nav-links">
+      <a href="mu-clid.html" class="nav-clid"><span style="font-family:var(--ff-disp)">μ</span>-clid</a>
+      <a href="mu-tant.html" class="nav-tant active"><span style="font-family:var(--ff-disp)">μ</span>-tant</a>
+      <a href="free.html" class="nav-free">Free</a>
+      <a href="index.html#community">Community</a>
+      <a href="#pricing" class="nav-cta">Store Opening Soon</a>
+    </div>
+  </nav>
+
+  <section id="hero">
+    <div class="container">
+      <div class="hero-inner">
+        <div>
+          <div class="hero-eyebrow fade-1">Wavetable Drone &amp; Envelope Gate Sequencer</div>
+          <h1 class="hero-title fade-2"><span class="mu">μ</span>-tant<span class="sub">Drone. Sculpted by sequence.</span></h1>
+          <p class="hero-sub fade-3">A permanent dual-oscillator wavetable drone — shaped by FM and ring modulation — sculpted rhythmically by an envelope gate sequencer. Each step has its own envelope controlling gate, filter cutoff, and pitch across up to 16 bars.</p>
+          <div class="hero-pills fade-4">
+            <span class="pill amber">Wavetable Drone</span>
+            <span class="pill amber">FM &amp; Ring Mod</span>
+            <span class="pill amber">Envelope Gate Seq</span>
+            <span class="pill">VST3 &amp; CLAP</span>
+            <span class="pill">Windows</span>
+          </div>
+          <div class="hero-ctas fade-5">
+            <a href="#pricing" class="btn-primary btn-amber">Store Opening Soon <span class="btn-price">· $35</span></a>
+            <a href="#pricing" class="btn-secondary" style="border-color:rgba(212,137,92,0.3);color:var(--amber-b)">Try the Demo ↓</a>
+          </div>
+        </div>
+        <div class="hero-visual fade-3">
+          <svg viewBox="0 0 300 220" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%">
+            <text x="150" y="50" text-anchor="middle" font-family="Space Mono, monospace" font-size="11" fill="#4A4565" letter-spacing="3">WAVETABLE DRONE</text>
+            <path d="M20 110 Q37 60 55 110 Q72 160 90 110 Q107 60 125 110 Q142 160 160 110 Q177 60 195 110 Q212 160 230 110 Q247 60 265 110 Q282 160 280 110" stroke="#D4895C" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <path d="M20 130 Q45 100 70 130 Q95 160 120 130 Q145 100 170 130 Q195 160 220 130 Q245 100 270 130" stroke="#E8A878" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+            <line x1="20" y1="150" x2="280" y2="150" stroke="#1E1C32" stroke-width="1"/>
+            <text x="150" y="195" text-anchor="middle" font-family="Space Mono, monospace" font-size="9" fill="#4A4565" letter-spacing="2">ENVELOPE GATE SEQUENCER</text>
+            <rect x="25" y="155" width="18" height="20" rx="2" fill="#D4895C" opacity="0.8"/>
+            <rect x="48" y="162" width="18" height="13" rx="2" fill="#D4895C" opacity="0.4"/>
+            <rect x="71" y="155" width="18" height="20" rx="2" fill="#D4895C" opacity="0.8"/>
+            <rect x="94" y="160" width="18" height="15" rx="2" fill="#D4895C" opacity="0.5"/>
+            <rect x="117" y="155" width="18" height="20" rx="2" fill="#D4895C" opacity="0.8"/>
+            <rect x="140" y="163" width="18" height="12" rx="2" fill="#D4895C" opacity="0.3"/>
+            <rect x="163" y="155" width="18" height="20" rx="2" fill="#D4895C" opacity="0.9"/>
+            <rect x="186" y="158" width="18" height="17" rx="2" fill="#D4895C" opacity="0.6"/>
+            <rect x="209" y="155" width="18" height="20" rx="2" fill="#D4895C" opacity="0.8"/>
+            <rect x="232" y="161" width="18" height="14" rx="2" fill="#D4895C" opacity="0.4"/>
+            <rect x="255" y="155" width="18" height="20" rx="2" fill="#D4895C" opacity="0.7"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="product-section">
+    <div class="container">
+      <div class="product-section-header">
+        <div class="section-label amber">Capabilities</div>
+        <h2 class="section-heading">Drone synthesis,<br>rhythmically sculpted.</h2>
+        <p class="section-sub">μ-tant is built for producers who want to push synthesis beyond static patches into evolving, rhythmically alive textures.</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon"><svg viewBox="0 0 22 22" fill="none"><path d="M2 11 Q4 5 6 11 Q8 17 10 11 Q12 5 14 11 Q16 17 18 11 Q19 8 20 11" stroke="#D4895C" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="2" cy="11" r="1.3" fill="#D4895C"/><circle cx="20" cy="11" r="1.3" fill="#D4895C"/></svg></div>
+          <h3>2-Oscillator Wavetable Drone</h3>
+          <p>Two wavetable oscillators run continuously, producing a permanent drone. Independent wavetable selection and position on each oscillator — blend and morph for rich, evolving harmonic content.</p>
+          <span class="tag amber">Core Voice</span>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><svg viewBox="0 0 22 22" fill="none"><circle cx="7" cy="11" r="4" stroke="#D4895C" stroke-width="1.3"/><circle cx="15" cy="11" r="4" stroke="#E8A878" stroke-width="1.3"/><line x1="11" y1="7" x2="15" y2="9" stroke="#D4895C" stroke-width="1.2" stroke-linecap="round" opacity="0.8"/><line x1="11" y1="15" x2="15" y2="13" stroke="#D4895C" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/></svg></div>
+          <h3>FM &amp; Ring Modulation</h3>
+          <p>X-mod routes FM and ring modulation between the two oscillators. Dial in subtle harmonic enrichment or push into metallic, clangorous territory — all while the drone continuously evolves.</p>
+          <span class="tag amber">X-Mod</span>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><svg viewBox="0 0 22 22" fill="none"><rect x="2" y="7" width="18" height="8" rx="1.5" stroke="#D4895C" stroke-width="1.3"/><line x1="5.5" y1="7" x2="5.5" y2="15" stroke="#D4895C" stroke-width="1" opacity="0.35"/><line x1="9" y1="7" x2="9" y2="15" stroke="#D4895C" stroke-width="1" opacity="0.35"/><line x1="12.5" y1="7" x2="12.5" y2="15" stroke="#D4895C" stroke-width="1" opacity="0.35"/><line x1="16" y1="7" x2="16" y2="15" stroke="#D4895C" stroke-width="1" opacity="0.35"/><path d="M3 12 L3 9 L5.5 9 L5.5 13 L9 13 L9 8 L12.5 8 L12.5 12 L16 12 L16 10 L19 10 L19 12" stroke="#E8A878" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg></div>
+          <h3>Envelope Gate Sequencer</h3>
+          <p>Up to 16 bars of step-based gating. Each step has its own customisable envelope — shape the attack and release from a hard chop to a slow, swelling fade. The drone breathes with the sequence.</p>
+          <span class="tag amber">Sequencer</span>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><svg viewBox="0 0 22 22" fill="none"><rect x="2" y="6" width="18" height="10" rx="1.5" stroke="#E8A878" stroke-width="1.3"/><line x1="5.5" y1="6" x2="5.5" y2="16" stroke="#E8A878" stroke-width="0.8" opacity="0.35"/><line x1="9" y1="6" x2="9" y2="16" stroke="#E8A878" stroke-width="0.8" opacity="0.35"/><line x1="12.5" y1="6" x2="12.5" y2="16" stroke="#E8A878" stroke-width="0.8" opacity="0.35"/><line x1="16" y1="6" x2="16" y2="16" stroke="#E8A878" stroke-width="0.8" opacity="0.35"/><circle cx="5.5" cy="10" r="1.5" fill="#D4895C"/><circle cx="9" cy="13" r="1.5" fill="#E8A878"/><circle cx="12.5" cy="9" r="1.5" fill="#D4895C"/><circle cx="16" cy="11" r="1.5" fill="#E8A878" opacity="0.6"/></svg></div>
+          <h3>Per-Step Filter &amp; Pitch</h3>
+          <p>Each step in the gate sequencer independently controls filter cutoff and pitch. Programme melodic sequences, filter sweeps, or pitch jumps — all driven by the envelope-gated drone.</p>
+          <span class="tag amber">Step Control</span>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><svg viewBox="0 0 22 22" fill="none"><path d="M3 16 C5 8, 8 14, 11 6 C14 14, 17 8, 19 16" stroke="#D4895C" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="3" cy="16" r="1.5" fill="#D4895C"/><circle cx="11" cy="6" r="1.5" fill="#D4895C" opacity="0.6"/><circle cx="19" cy="16" r="1.5" fill="#D4895C"/></svg></div>
+          <h3>8 Modulation Sources</h3>
+          <p>Eight MSEG or stepped-sequence modulators per voice, routable to any parameter — wavetable position, oscillator pitch, filter cutoff, x-mod depth. The synthesis is never static unless you want it to be.</p>
+          <span class="tag amber">Modulation</span>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><svg viewBox="0 0 22 22" fill="none"><rect x="2" y="5" width="18" height="12" rx="1.5" stroke="#D4895C" stroke-width="1.3"/><line x1="7" y1="5" x2="7" y2="17" stroke="#D4895C" stroke-width="1" opacity="0.4"/><line x1="12" y1="5" x2="12" y2="17" stroke="#D4895C" stroke-width="1" opacity="0.4"/><line x1="17" y1="5" x2="17" y2="17" stroke="#D4895C" stroke-width="1" opacity="0.4"/><rect x="3.5" y="8" width="2" height="6" rx="0.5" fill="#D4895C"/><rect x="8.5" y="7" width="2" height="7" rx="0.5" fill="#E8A878"/><rect x="13.5" y="9" width="2" height="5" rx="0.5" fill="#D4895C" opacity="0.7"/></svg></div>
+          <h3>Mixer &amp; Sidechain</h3>
+          <p>Identical mixer to μ-clid — three sends, two master inserts, sidechain on every channel. Use a μ-clid kick to pump a μ-tant drone pad for classic electronic textures.</p>
+          <span class="tag amber">Mixing</span>
+        </div>
+      </div>
+
+      <div class="screenshots-wrap">
+        <div class="screenshot-primary">
+          <div class="ss-placeholder ss-empty"><div class="ss-inner"><svg viewBox="0 0 40 40" fill="none" width="36" height="36"><rect x="4" y="4" width="32" height="32" rx="3" stroke="#2A2745" stroke-width="1.5"/><path d="M8 20 Q11 12 14 20 Q17 28 20 20 Q23 12 26 20 Q28 16 32 20" stroke="#2A2745" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg><span>μ-tant full interface</span><span>Screenshot coming soon</span></div></div>
+          <div class="ss-caption tant-cap">
+            <div class="sc-label">μ-tant Interface</div>
+            <h3>Drone meets the sequencer.</h3>
+            <p>Oscillators, x-mod, filters, and the envelope gate sequencer — shaping a continuous wavetable drone into rhythmic textures across up to 16 bars.</p>
+          </div>
+        </div>
+        <div class="screenshot-grid">
+          <div class="ss-item"><div class="ss-placeholder ss-empty"><div class="ss-inner"><svg viewBox="0 0 28 28" fill="none" width="24" height="24"><path d="M4 14 Q7 6 10 14 Q13 22 16 14 Q19 6 24 14" stroke="#2A2745" stroke-width="1.5" fill="none"/></svg><span>Wavetable &amp; x-mod</span></div></div><div class="ss-item-caption"><strong>Wavetable &amp; X-Mod</strong><p>Dual oscillators with FM and ring modulation between them.</p></div></div>
+          <div class="ss-item"><div class="ss-placeholder ss-empty"><div class="ss-inner"><svg viewBox="0 0 28 28" fill="none" width="24" height="24"><rect x="4" y="10" width="20" height="8" rx="2" stroke="#2A2745" stroke-width="1.5"/><line x1="8" y1="10" x2="8" y2="18" stroke="#2A2745" stroke-width="2" stroke-linecap="round" opacity="0.6"/><line x1="14" y1="10" x2="14" y2="18" stroke="#2A2745" stroke-width="2" stroke-linecap="round" opacity="0.3"/><line x1="20" y1="10" x2="20" y2="18" stroke="#2A2745" stroke-width="2" stroke-linecap="round" opacity="0.6"/></svg><span>Gate sequencer</span></div></div><div class="ss-item-caption"><strong>Envelope Gate Sequencer</strong><p>Per-step envelopes controlling gate, filter, and pitch across up to 16 bars.</p></div></div>
+          <div class="ss-item"><div class="ss-placeholder ss-empty"><div class="ss-inner"><svg viewBox="0 0 28 28" fill="none" width="24" height="24"><path d="M4 18 C7 8, 11 16, 14 8 C17 16, 21 10, 24 18" stroke="#2A2745" stroke-width="1.5" fill="none"/></svg><span>Modulation</span></div></div><div class="ss-item-caption"><strong>Modulation Engine</strong><p>Route modulators to wavetable position, pitch, filter, and x-mod depth.</p></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="pricing">
+    <div class="container">
+      <div class="pricing-header">
+        <div class="section-label amber">Pricing</div>
+        <h2 class="section-heading">Try it. Then go deep.</h2>
+        <p class="section-sub">A full-featured save-disabled demo is available to try μ-tant before you buy. The full version launches at an introductory price.</p>
+      </div>
+      <div class="coming-soon-banner">
+        <svg viewBox="0 0 20 20" fill="none" width="18" height="18"><circle cx="10" cy="10" r="8" stroke="#1DB880" stroke-width="1.5"/><line x1="10" y1="5" x2="10" y2="10.5" stroke="#1DB880" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="13.5" r="1" fill="#1DB880"/></svg>
+        <span>The store is coming soon — sign up at <a href="index.html#community" style="color:var(--teal-b);text-decoration:underline;">transwarp.me</a> to be notified and lock in the introductory price.</span>
+      </div>
+      <div class="pricing-grid" style="grid-template-columns:1fr 1fr;max-width:700px;margin:0 auto;">
+        <div class="pricing-card featured tant-feat" style="top:0;">
+          <div class="pricing-badge tant-badge">⚡ Store Opening Soon</div>
+          <div class="pricing-head">
+            <div class="pricing-tier">Full Version</div>
+            <div class="pricing-name" style="color:var(--text)"><span style="color:var(--amber-b)">μ</span>-tant</div>
+            <div class="pricing-price-block"><span class="price-main">$35</span><span class="price-was">$50</span></div>
+            <div class="price-note" style="color:var(--amber)">Introductory price</div><br>
+            <div class="pricing-divider"></div>
+          </div>
+          <ul class="pricing-features" style="--hi-color:var(--amber-b)">
+            <li class="hi" style="--c:var(--amber-b)">8 voice tracks</li>
+            <li class="hi">2-oscillator wavetable drone</li>
+            <li class="hi">FM &amp; ring modulation (x-mod)</li>
+            <li class="hi">Envelope gate sequencer (16 bars)</li>
+            <li class="hi">Per-step filter &amp; pitch control</li>
+            <li class="hi">8 modulators per voice</li>
+            <li class="hi">Mixer + sidechain + sends</li>
+            <li>VST3 · CLAP · Standalone · Windows</li>
+            <li>Free updates within v1.x</li>
+          </ul>
+          <div class="pricing-cta"><a href="index.html#community" class="btn-full btn-tant-p">Notify Me — Store Opening Soon</a></div>
+        </div>
+        <div class="pricing-card">
+          <div class="pricing-head">
+            <div class="pricing-tier">Try Before You Buy</div>
+            <div class="pricing-name" style="color:var(--text)"><span style="color:var(--amber-b)">μ</span>-tant Demo</div>
+            <div class="pricing-price-block"><span class="price-main">$0</span></div>
+            <div class="pricing-divider"></div>
+          </div>
+          <ul class="pricing-features">
+            <li class="hi">All full-version features</li>
+            <li class="hi">All 8 voice tracks</li>
+            <li>Save disabled</li>
+            <li>No session time limit</li>
+          </ul>
+          <div class="pricing-cta"><a href="index.html#community" class="btn-full ghost">Notify Me When Available</a></div>
+        </div>
+      </div>
+      <p class="pricing-fine">Store opening soon. All prices in USD. VST3 &amp; CLAP for Windows. macOS to follow.</p>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand"><div class="fb-logo">Transwarp</div><div class="fb-sub">Development Project</div><p>Indie audio plugin development from Bath, UK.</p></div>
+        <div class="footer-col"><h4>μ-tant</h4><ul><li><a href="#pricing">Pricing</a></li><li><a href="#">Documentation</a></li><li><a href="#">System Requirements</a></li></ul></div>
+        <div class="footer-col"><h4>Products</h4><ul><li><a href="index.html">Home</a></li><li><a href="mu-clid.html">μ-clid</a></li><li><a href="free.html">Free</a></li></ul></div>
+        <div class="footer-col"><h4>Company</h4><ul><li><a href="index.html#community">Community</a></li><li><a href="#">EULA</a></li><li><a href="mailto:hello@transwarp.me">hello@transwarp.me</a></li></ul></div>
+      </div>
+      <div class="footer-bottom">
+        <span class="copy">© 2026 Transwarp Development Project · transwarp.me · Bath, UK</span>
+        <div class="footer-social"><a href="#">YouTube</a><a href="#">X / Twitter</a><a href="#">GitHub</a><a href="#">KVR Audio</a></div>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
