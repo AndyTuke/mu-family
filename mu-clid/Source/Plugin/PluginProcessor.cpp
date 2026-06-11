@@ -80,6 +80,7 @@ PluginProcessor::PluginProcessor()
         uiScale = juce::jlimit(kUiScaleMedium, kUiScaleLarge, (float) stored);
     }
 
+   #if !MUCLID_LITE_BUILD
     // Check license file — must run after appSettings so getContentDir() works.
     licenseInfo = mu_core::LicenseManager::check(getContentDir(),
                                                  mu_clid::kLicenseProductId,
@@ -95,6 +96,7 @@ PluginProcessor::PluginProcessor()
         if (o.ok) onlineActivated.store(true, std::memory_order_relaxed);
         return o;
     };
+   #endif
 
     // Register listener for every parameter.
     for (auto* param : getParameters())

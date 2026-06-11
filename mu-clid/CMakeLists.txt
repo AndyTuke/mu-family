@@ -78,8 +78,8 @@ target_sources(mu-clid
 # monocypher is vendored third-party crypto. Silence MSVC C4244 (a benign u64→u32
 # narrowing in its Argon2 block-index math — the value is bounded well within u32)
 # at the build level rather than patching upstream source, so our /W4 build stays
-# warning-clean without diverging from the vendor file. Directory-scoped, so it
-# covers both mu-clid and mu-clid-lite (which compile the same file).
+# warning-clean without diverging from the vendor file. Applies to mu-clid only
+# (mu-clid-lite omits the license stack and never compiles monocypher.c).
 if(MSVC)
     set_source_files_properties(
         "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
@@ -236,11 +236,6 @@ target_sources(mu-clid-lite
         Source/UI/MasterLoopSection.cpp
         Source/UI/RhythmCircle.cpp
         Source/UI/EuclideanPanel.cpp
-        # Offline-license verifier lives in mu-core (shared); compiled here + monocypher.c.
-        "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
-        "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
-        "${CMAKE_SOURCE_DIR}/mu-core/License/OnlineActivation.cpp"
-        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
 )
 
 target_include_directories(mu-clid-lite

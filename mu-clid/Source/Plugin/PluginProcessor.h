@@ -224,7 +224,9 @@ public:
     mu_core::LicenseManager::Info licenseInfo;
     bool isLicensed() const override
     {
-       #if MUFAMILY_REQUIRE_LICENSE
+       #if MUCLID_LITE_BUILD
+        return true;   // Lite is always licensed — no activation, no demo caps.
+       #elif MUFAMILY_REQUIRE_LICENSE
         // Licensed if EITHER the offline signed .lic verifies OR the machine is online-activated.
         return licenseInfo.status == mu_core::LicenseStatus::Licensed || isOnlineActivated();
        #else
