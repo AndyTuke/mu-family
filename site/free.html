@@ -263,18 +263,18 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
 
     .comparison-strip { margin-top: 60px; padding: 40px; background: var(--bg2); border: 1px solid var(--border2); border-radius: 8px; }
     .comparison-strip h3 { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.015em; margin-bottom: 28px; }
-    .comparison-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-    .cg-col { background: var(--bg3); }
-    .cg-header { padding: 14px 18px; border-bottom: 1px solid var(--border2); }
-    .cg-header .cg-name { font-family: var(--ff-disp); font-size: 16px; font-weight: 800; letter-spacing: -0.01em; }
-    .cg-header .cg-free { font-family: var(--ff-mono); font-size: 9px; color: var(--teal); letter-spacing: 0.12em; text-transform: uppercase; }
-    .cg-header .cg-paid { font-family: var(--ff-mono); font-size: 9px; color: var(--accent-b); letter-spacing: 0.12em; text-transform: uppercase; }
-    .cg-rows { padding: 14px 18px; display: flex; flex-direction: column; gap: 8px; }
-    .cg-row { font-size: 13px; color: var(--text2); display: flex; align-items: center; gap: 8px; }
-    .cg-row .tick { color: var(--teal); }
-    .cg-row .cross { color: var(--text3); }
-    .cg-col.featured-col { background: var(--bg2); }
-    .cg-col.featured-col .cg-header { background: rgba(107,95,228,0.1); }
+    /* Row-based grid: items flow left→right so each row auto-equalises height. */
+    .comparison-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; background: var(--border); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+    .cg-cell { background: var(--bg3); padding: 12px 18px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text2); display: flex; align-items: center; gap: 8px; }
+    .cg-cell.cg-header { padding: 14px 18px; border-bottom: 2px solid var(--border2); flex-direction: column; align-items: flex-start; gap: 3px; }
+    .cg-cell.cg-header .cg-name { font-family: var(--ff-disp); font-size: 16px; font-weight: 800; letter-spacing: -0.01em; color: var(--text); }
+    .cg-cell.cg-header .cg-free { font-family: var(--ff-mono); font-size: 9px; color: var(--teal); letter-spacing: 0.12em; text-transform: uppercase; }
+    .cg-cell.cg-header .cg-paid { font-family: var(--ff-mono); font-size: 9px; color: var(--accent-b); letter-spacing: 0.12em; text-transform: uppercase; }
+    .cg-cell.cg-label { color: var(--text2); font-size: 13px; }
+    .cg-cell.featured { background: var(--bg2); }
+    .cg-cell.featured.cg-header { background: rgba(107,95,228,0.1); }
+    .cg-cell .tick { color: var(--teal); }
+    .cg-cell .cross { color: var(--text3); }
 
     @media (max-width: 900px) {
       .free-section-inner { grid-template-columns: 1fr; }
@@ -340,42 +340,38 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <div class="comparison-strip">
               <h3>LITE vs Full</h3>
               <div class="comparison-grid">
-                <div class="cg-col">
-                  <div class="cg-header"><div class="cg-name">Feature</div></div>
-                  <div class="cg-rows">
-                    <div class="cg-row">Euclidean algorithm</div>
-                    <div class="cg-row">Rhythm tracks</div>
-                    <div class="cg-row">Sample engine</div>
-                    <div class="cg-row">Pattern ring display</div>
-                    <div class="cg-row">Modulation sources</div>
-                    <div class="cg-row">Mixer &amp; sidechain</div>
-                    <div class="cg-row">Save / recall</div>
-                  </div>
-                </div>
-                <div class="cg-col">
-                  <div class="cg-header"><div class="cg-name">LITE</div><div class="cg-free">Free forever</div></div>
-                  <div class="cg-rows">
-                    <div class="cg-row"><span class="tick">✓</span> Full algorithm</div>
-                    <div class="cg-row"><span class="tick">✓</span> 1 track</div>
-                    <div class="cg-row"><span class="cross">—</span> MIDI only</div>
-                    <div class="cg-row"><span class="cross">—</span></div>
-                    <div class="cg-row"><span class="cross">—</span></div>
-                    <div class="cg-row"><span class="cross">—</span></div>
-                    <div class="cg-row"><span class="tick">✓</span></div>
-                  </div>
-                </div>
-                <div class="cg-col featured-col">
-                  <div class="cg-header"><div class="cg-name">Full</div><div class="cg-paid">$35 intro</div></div>
-                  <div class="cg-rows">
-                    <div class="cg-row"><span class="tick">✓</span> Full algorithm</div>
-                    <div class="cg-row"><span class="tick">✓</span> 8 tracks</div>
-                    <div class="cg-row"><span class="tick">✓</span> Full engine</div>
-                    <div class="cg-row"><span class="tick">✓</span></div>
-                    <div class="cg-row"><span class="tick">✓</span> 8 per rhythm</div>
-                    <div class="cg-row"><span class="tick">✓</span> Full mixer</div>
-                    <div class="cg-row"><span class="tick">✓</span></div>
-                  </div>
-                </div>
+                <!-- Header row -->
+                <div class="cg-cell cg-header"><div class="cg-name">Feature</div></div>
+                <div class="cg-cell cg-header"><div class="cg-name">LITE</div><div class="cg-free">Free forever</div></div>
+                <div class="cg-cell cg-header featured"><div class="cg-name">Full</div><div class="cg-paid">$35 intro</div></div>
+                <!-- Euclidean algorithm -->
+                <div class="cg-cell cg-label">Euclidean algorithm</div>
+                <div class="cg-cell"><span class="tick">✓</span> Full algorithm</div>
+                <div class="cg-cell featured"><span class="tick">✓</span> Full algorithm</div>
+                <!-- Rhythm tracks -->
+                <div class="cg-cell cg-label">Rhythm tracks</div>
+                <div class="cg-cell"><span class="tick">✓</span> 1 track</div>
+                <div class="cg-cell featured"><span class="tick">✓</span> 8 tracks</div>
+                <!-- Sample engine -->
+                <div class="cg-cell cg-label">Sample engine</div>
+                <div class="cg-cell"><span class="cross">—</span> MIDI only</div>
+                <div class="cg-cell featured"><span class="tick">✓</span> Full engine</div>
+                <!-- Pattern ring display -->
+                <div class="cg-cell cg-label">Pattern ring display</div>
+                <div class="cg-cell"><span class="tick">✓</span></div>
+                <div class="cg-cell featured"><span class="tick">✓</span></div>
+                <!-- Modulation sources -->
+                <div class="cg-cell cg-label">Modulation sources</div>
+                <div class="cg-cell"><span class="cross">—</span></div>
+                <div class="cg-cell featured"><span class="tick">✓</span> 8 per rhythm</div>
+                <!-- Mixer & sidechain -->
+                <div class="cg-cell cg-label">Mixer &amp; sidechain</div>
+                <div class="cg-cell"><span class="cross">—</span></div>
+                <div class="cg-cell featured"><span class="tick">✓</span> Full mixer</div>
+                <!-- Save / recall -->
+                <div class="cg-cell cg-label">Save / recall</div>
+                <div class="cg-cell"><span class="tick">✓</span></div>
+                <div class="cg-cell featured"><span class="tick">✓</span></div>
               </div>
             </div>
           </div>
