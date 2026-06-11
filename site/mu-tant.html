@@ -223,6 +223,10 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
 
 </style>
   <style>
+    /* Normalise grid screenshot heights regardless of image aspect ratio */
+    .screenshot-grid .ss-placeholder { aspect-ratio: 16/10; }
+    .screenshot-grid .ss-placeholder img { width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+
     #hero { min-height: 80vh; display: flex; align-items: center; padding: 120px 0 80px; border-bottom: 1px solid var(--border); }
     .hero-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
     .hero-eyebrow { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.2em; color: var(--amber-b); text-transform: uppercase; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
@@ -415,7 +419,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <li>Save disabled</li>
             <li>No session time limit</li>
           </ul>
-          <div class="pricing-cta"><a href="https://github.com/AndyTuke/mu-family/releases/download/v1.0.843/mu-Tant-v1.0.843-Windows.zip" class="btn-full ghost" target="_blank" rel="noopener">Download Demo — Windows ↓</a></div>
+          <div class="pricing-cta"><a href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Tant-Windows.zip" class="btn-full ghost" target="_blank" rel="noopener">Download Demo — Windows ↓</a></div>
         </div>
       </div>
       <p class="pricing-fine">All prices in USD. VST3 &amp; CLAP for Windows. macOS to follow.</p>

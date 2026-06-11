@@ -90,3 +90,61 @@ jobs:
             build/mu-tant/mu-tant_artefacts/Release/AU
             build/mu-on/mu-on_artefacts/Release/AU
             build/mu-toni/mu-toni_artefacts/Release/AU
+
+      # Package demo zips and publish a GitHub Release. Only runs on the Windows
+      # runner — Mac/Linux builds are for tester downloads via the artifact above.
+      - name: Read build number
+        if: runner.os == 'Windows'
+        id: version
+        shell: pwsh
+        run: |
+          $build = (Get-Content build_number.txt).Trim()
+          "build=$build"  >> $env:GITHUB_OUTPUT
+          "tag=v1.0.$build" >> $env:GITHUB_OUTPUT
+
+      - name: Stage and zip demo builds
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $base = "build"
+
+          # mu-Clid (VST3 + CLAP + Standalone)
+          New-Item -ItemType Directory -Path staging\mu-Clid -Force | Out-Null
+          Copy-Item "$base\mu-clid\mu-clid_artefacts\Release\VST3\mu-Clid.vst3" `
+                    staging\mu-Clid\ -Recurse
+          Copy-Item "$base\mu-clid\mu-clid_artefacts\Release\CLAP\mu-Clid.clap" `
+                    staging\mu-Clid\
+          Copy-Item "$base\mu-clid\mu-clid_artefacts\Release\Standalone\mu-Clid.exe" `
+                    staging\mu-Clid\
+          Compress-Archive -Path staging\mu-Clid\* -DestinationPath mu-Clid-Windows.zip
+
+          # mu-Clid Lite (VST3 + CLAP, no Standalone)
+          New-Item -ItemType Directory -Path "staging\mu-Clid Lite" -Force | Out-Null
+          Copy-Item "$base\mu-clid\mu-clid-lite_artefacts\Release\VST3\mu-Clid Lite.vst3" `
+                    "staging\mu-Clid Lite\" -Recurse
+          Copy-Item "$base\mu-clid\mu-clid-lite_artefacts\Release\CLAP\mu-Clid Lite.clap" `
+                    "staging\mu-Clid Lite\"
+          Compress-Archive -Path "staging\mu-Clid Lite\*" -DestinationPath mu-Clid-Lite-Windows.zip
+
+          # mu-Tant (VST3 + CLAP + Standalone)
+          New-Item -ItemType Directory -Path staging\mu-Tant -Force | Out-Null
+          Copy-Item "$base\mu-tant\mu-tant_artefacts\Release\VST3\mu-Tant.vst3" `
+                    staging\mu-Tant\ -Recurse
+          Copy-Item "$base\mu-tant\mu-tant_artefacts\Release\CLAP\mu-Tant.clap" `
+                    staging\mu-Tant\
+          Copy-Item "$base\mu-tant\mu-tant_artefacts\Release\Standalone\mu-Tant.exe" `
+                    staging\mu-Tant\
+          Compress-Archive -Path staging\mu-Tant\* -DestinationPath mu-Tant-Windows.zip
+
+      - name: Publish GitHub Release
+        if: runner.os == 'Windows'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release create ${{ steps.version.outputs.tag }} `
+            --title "mu-family ${{ steps.version.outputs.tag }}" `
+            --notes "Windows demo release ${{ steps.version.outputs.tag }}" `
+            mu-Clid-Windows.zip `
+            mu-Clid-Lite-Windows.zip `
+            mu-Tant-Windows.zip
