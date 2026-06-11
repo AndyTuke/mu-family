@@ -115,6 +115,22 @@ PluginProcessor::PluginProcessor()
         uiScale = juce::jlimit(kUiScaleMedium, kUiScaleLarge, (float) stored);
     }
 
+    // Check license file — after appSettings so getContentDir() resolves.
+    licenseInfo = mu_core::LicenseManager::check(getContentDir(),
+                                                 kLicenseProductId,
+                                                 kLicenseFilename,
+                                                 kLicensePublicKey);
+
+    // Online activation (Lemon Squeezy). Startup uses a LOCAL-only check so plugin load never
+    // blocks on the network; the overlay's activateOnlineFn does the real network activate.
+    if (mu_core::OnlineActivation::hasLocalActivation(getContentDir(), kActivationFilename))
+        onlineActivated.store(true, std::memory_order_relaxed);
+    activateOnlineFn = [this](const juce::String& key) {
+        auto o = mu_core::OnlineActivation::activate(getContentDir(), kActivationFilename, key);
+        if (o.ok) onlineActivated.store(true, std::memory_order_relaxed);
+        return o;
+    };
+
     // MIDI program-change preset maps (Ch 1-8 → per-voice .muPattern, Ch 9 →
     // full .muTant preset). The scan/drain machinery + the editor panels live in
     // mu-core; we only point the maps at the plugin's settings dir + load them.
@@ -1175,7 +1191,12 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
     // AND froze the transport for the whole commit (the hot-swap glitch). Without it,
     // a concurrent block sees old-or-new per structure (≤1 block, inaudible) instead.
     apvts.replaceState(state);
-    numVoices.store(juce::jlimit(1, kMaxVoices, (int) apvts.state.getProperty("numVoices", 1)));
+    int nv = juce::jlimit(1, kMaxVoices, (int) apvts.state.getProperty("numVoices", 1));
+    // Demo cap: an unlicensed build activates at most demoMaxChannels() voices. The other
+    // voices' params/data still load but stay inactive (getNumChannels() == numVoices).
+    if (! isLicensed())
+        nv = juce::jmin(nv, demoMaxChannels());
+    numVoices.store(nv);
     restoreVoiceColours(apvts.state.getProperty("voiceColours", "").toString());
     readVoiceDataFromState();
     syncAllFxParams();   // re-seed mixer/FX engine state (unchanged values skip listeners)

@@ -154,8 +154,10 @@ VoicePanel::VoicePanel(PluginProcessor& p)
             setVoice(currentVoice);
         }
     };
+    headerBar.setSaveEnabled(proc.canSaveLayerPreset());   // demo: per-layer save disabled
     headerBar.onSave = [this]
     {
+        if (! proc.canSaveLayerPreset()) return;
         juce::Component::SafePointer<VoicePanel> safe(this);
         mu_ui::promptTextAsync(this, "Save Voice Preset", "Preset name:",
                                "Voice " + juce::String(currentVoice + 1), "Save",

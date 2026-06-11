@@ -81,7 +81,20 @@ PluginProcessor::PluginProcessor()
     }
 
     // Check license file — must run after appSettings so getContentDir() works.
-    licenseInfo = LicenseChecker::check(getContentDir());
+    licenseInfo = mu_core::LicenseManager::check(getContentDir(),
+                                                 mu_clid::kLicenseProductId,
+                                                 mu_clid::kLicenseFilename,
+                                                 mu_clid::kLicensePublicKey);
+
+    // Online activation (Lemon Squeezy). Startup uses a LOCAL-only check so plugin load never
+    // blocks on the network; the overlay's activateOnlineFn does the real network activate.
+    if (mu_core::OnlineActivation::hasLocalActivation(getContentDir(), kActivationFilename))
+        onlineActivated.store(true, std::memory_order_relaxed);
+    activateOnlineFn = [this](const juce::String& key) {
+        auto o = mu_core::OnlineActivation::activate(getContentDir(), kActivationFilename, key);
+        if (o.ok) onlineActivated.store(true, std::memory_order_relaxed);
+        return o;
+    };
 
     // Register listener for every parameter.
     for (auto* param : getParameters())

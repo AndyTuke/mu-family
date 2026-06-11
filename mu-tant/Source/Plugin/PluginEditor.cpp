@@ -20,6 +20,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
             juce::String(juce::CharPointer_UTF8("Signalsmith Reverb \xe2\x80\x94 MIT")),
             juce::String(juce::CharPointer_UTF8("clap-juce-extensions \xe2\x80\x94 MIT")),
         });
+    getActivationPanel().setProductName(juce::String(juce::CharPointer_UTF8("\xce\xbc-Tant")));
     getTransportBar().setLogoText(juce::String(juce::CharPointer_UTF8("\xce\xbc-Tant")));
 
     // Preset library — full presets via the shared shell chrome (TransportBar
@@ -58,6 +59,12 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     voiceSidebar.onAddChannel = [this]
     {
+        if (!proc.canAddChannel())
+        {
+            getStatusBar().showParam("Demo", juce::String::fromUTF8(u8"Demo limited to 1 voice — purchase a license to unlock all 8"),
+                                     MuLookAndFeel::colour(MuLookAndFeel::knobLevel));
+            return;
+        }
         const int idx = proc.addVoice();
         if (idx < 0) return;                       // already at the 8-voice max
         voiceSidebar.refreshItems();

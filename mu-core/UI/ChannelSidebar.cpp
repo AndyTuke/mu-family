@@ -49,6 +49,9 @@ void ChannelSidebar::refreshItems()
         items.push_back(std::move(item));
     }
 
+    // Demo cap: disable Add once the unlicensed channel limit is reached.
+    addButton.setEnabled(proc.canAddChannel());
+
     itemContainer.setSize(kWidth, (int) items.size() * kItemH);
     resized();
 
@@ -267,6 +270,11 @@ void ChannelSidebar::timerCallback()
     // setStateInformation after the editor opened).
     if (proc.getNumChannels() != (int) items.size())
         refreshItems();
+
+    // Keep the Add button's demo-cap state current even when the count didn't
+    // change through us (host state restore can flip licensing-relevant state).
+    if (addButton.isEnabled() != proc.canAddChannel())
+        addButton.setEnabled(proc.canAddChannel());
 
     // Sync Add button visibility in case onAddChannel was wired (or cleared)
     // after the last resized() call.

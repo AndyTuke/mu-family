@@ -13,6 +13,7 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
                                                         proc.getUiScale()), &proc)),
       processorRef(proc),
       transportBar(proc),
+      activationPanel(proc),
       midiPresetsPanel(proc),
       midiFullPresetsPanel(proc)
 {
@@ -20,6 +21,7 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
 
     addAndMakeVisible(transportBar);
     addChildComponent(aboutPanel);
+    addChildComponent(activationPanel);
     addChildComponent(saveDialog);
     addChildComponent(presetBrowser);
     addChildComponent(midiPresetsPanel);
@@ -70,6 +72,20 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
 
     // ── About panel ─────────────────────────────────────────────────────────
     aboutPanel.onDismiss = [this] { showAbout(false); };
+
+    // ── Activation overlay (non-blocking — Demo until activated) ──────────────
+    activationPanel.onDismiss   = [this] { showActivation(false); };
+    activationPanel.onActivated = [this]
+    {
+        // License state just flipped (online-activated) — drop the demo banner + relayout.
+        // Demo-cap affordances (add button etc.) re-sync via their own refresh timers.
+        showActivation(false);
+        const bool licensed = processorRef.isLicensed();
+        transportBar.setSaveEnabled(licensed);
+        demoBanner.setVisible(!licensed);
+        resized();
+        repaint();
+    };
 
     // ── Save dialog ─────────────────────────────────────────────────────────
     saveDialog.onSave = [this](const juce::String& name,
@@ -139,7 +155,7 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
         const bool licensed = processorRef.isLicensed();
         transportBar.setSaveEnabled(licensed);
 
-        demoBanner.setText("DEMO  \xe2\x80\x94  Save disabled  \xe2\x80\x94  Purchase a license to unlock all features",
+        demoBanner.setText(juce::String::fromUTF8("DEMO  \xe2\x80\x94  Save disabled  \xe2\x80\x94  Click here to activate and unlock all features"),
                            juce::dontSendNotification);
         demoBanner.setJustificationType(juce::Justification::centred);
         demoBanner.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
@@ -149,6 +165,10 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
                              MuLookAndFeel::colour(Id::segmentWarningBorder));
         addChildComponent(demoBanner);
         demoBanner.setVisible(!licensed);
+        // Whole banner is a click target → opens the activation overlay.
+        demoBanner.setInterceptsMouseClicks(true, false);
+        demoBanner.addMouseListener(this, false);
+        demoBanner.setMouseCursor(juce::MouseCursor::PointingHandCursor);
     }
 
     // ── Window sizing ───────────────────────────────────────────────────────
@@ -309,6 +329,7 @@ void EditorShellBase::hideAllOverlays()
     setOne(mixerOverlay);
     setOne(settingsOverlay);
     aboutPanel.setVisible(false);
+    activationPanel.setVisible(false);
     saveDialog.setVisible(false);
     presetBrowser.setVisible(false);
     midiPresetsPanel.setVisible(false);
@@ -317,6 +338,7 @@ void EditorShellBase::hideAllOverlays()
     mixerVisible           = false;
     transportBar.setMixerActive(false);
     aboutVisible           = false;
+    activationVisible      = false;
     saveVisible            = false;
     browserVisible         = false;
     settingsVisible        = false;
@@ -378,6 +400,20 @@ void EditorShellBase::showAbout(bool show)
     aboutVisible = show;
     aboutPanel.setVisible(show);
     aboutPanel.toFront(false);
+}
+
+void EditorShellBase::showActivation(bool show)
+{
+    activationVisible = show;
+    activationPanel.setVisible(show);
+    activationPanel.toFront(true);
+}
+
+void EditorShellBase::mouseDown(const juce::MouseEvent& e)
+{
+    // The demo banner is the only registered listener target — clicking it opens activation.
+    if (e.eventComponent == &demoBanner && !processorRef.isLicensed())
+        showActivation(true);
 }
 
 void EditorShellBase::showSaveDialog(bool show)
@@ -554,6 +590,7 @@ void EditorShellBase::resized()
 
     // Modal overlays span the full editor area
     aboutPanel.setBounds(getLocalBounds());
+    activationPanel.setBounds(getLocalBounds());
     saveDialog.setBounds(getLocalBounds());
 
     if (bannerH > 0)

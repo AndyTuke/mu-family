@@ -51,6 +51,12 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     int n = juce::jlimit(1, SequencerEngine::MaxRhythms,
                          (int)state.getProperty("numRhythms", 1));
 
+    // Demo cap: an unlicensed build activates at most demoMaxChannels() rhythms. The
+    // rest of the preset's params still load into APVTS but stay inactive — identical
+    // to the normal "smaller preset" shrink path, so no extra teardown is needed.
+    if (! proc_.isLicensed())
+        n = juce::jmin(n, proc_.demoMaxChannels());
+
     // #663: guard the live-state mutation below (sequencer resize, voiceEngine
     // rebuild, per-rhythm sample swaps + pattern rebuilds) with suspendProcessing +
     // rhythmsLock, matching loadSampleForRhythm / swapRhythms / the prestaged commit.

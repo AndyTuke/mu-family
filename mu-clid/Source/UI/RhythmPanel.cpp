@@ -251,7 +251,8 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     headerBar.setPresetPlaceholder(juce::String::fromUTF8("rhythm preset\xe2\x80\xa6"));
     headerBar.onReset       = [this] { confirmReset();  };
     headerBar.onDelete      = [this] { confirmDelete(); };
-    headerBar.onSave        = [this] { saveRhythmPreset(); };
+    headerBar.onSave        = [this] { if (proc.canSaveLayerPreset()) saveRhythmPreset(); };
+    headerBar.setSaveEnabled(proc.canSaveLayerPreset());   // demo: per-layer save disabled
     headerBar.onNameChanged = [this](juce::String n) { commitNameFromLabel(n); };
     headerBar.onPresetSelected = [this](int id)
     {

@@ -37,9 +37,12 @@ CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
 
-# License signing — private key must never be committed
+# License signing — private keys must never be committed
 tools/private.key
 tools/private.pem
+tools/keys/
+*.key
+*.key.pub.txt
 
 # Discord bot credentials note (app ID + public key) — not for version control
 DiscordBot.md

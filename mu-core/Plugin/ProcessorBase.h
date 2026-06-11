@@ -22,8 +22,12 @@
 #include "Persistence/MidiPresetMap.h"
 #include "Persistence/MidiFullPresetMap.h"
 #include "MuLimits.h"
+#include "License/MachineFingerprint.h"
+#include "License/OnlineActivation.h"   // OnlineActivationOutcome (decls only; .cpp is per-licensed-product)
 
 #include <array>
+#include <atomic>
+#include <limits>
 #include <memory>
 
 // Abstract base for all mu-family plugin processors.
@@ -125,9 +129,38 @@ public:
     // live. Returned File can be invalid; the shell tolerates that.
     virtual juce::File getContentDir() const { return {}; }
 
-    // License gate — true by default so products without a licensing model
-    // (mu-tant currently) get the full editor instead of a demo banner.
+    // License gate — true by default so products without a licensing model get the
+    // full editor instead of a demo banner. A licensed product overrides this to
+    // consult its LicenseManager result under MUFAMILY_REQUIRE_LICENSE (Release).
     virtual bool isLicensed() const { return true; }
+
+    // ─── Demo-mode caps (consulted ONLY when !isLicensed()) ──────────────────
+    // Max "channels" (rhythms / voices / layers) the unlicensed editor allows.
+    // Default: no limit, so a licensed build — or a product with no demo tier —
+    // is unrestricted. A product with a demo tier overrides this (e.g. 1).
+    virtual int demoMaxChannels() const { return std::numeric_limits<int>::max(); }
+
+    // Single source for the shell/product UI to gate demo-restricted affordances:
+    //   - canAddChannel:      is the add-rhythm/voice control allowed right now?
+    //   - canSaveLayerPreset: may a per-layer preset (.muRhythm/.muPattern) be saved?
+    // Full-preset save + the demo banner are already gated on isLicensed() directly
+    // in EditorShellBase; per-layer save is blocked in demo to match.
+    bool canAddChannel()      const { return isLicensed() || getNumChannels() < demoMaxChannels(); }
+    bool canSaveLayerPreset() const { return isLicensed(); }
+
+    // ─── Online activation (Lemon Squeezy, Phase 1) ──────────────────────────
+    // Licensed products set activateOnlineFn (a lambda calling mu_core::OnlineActivation,
+    // compiled into the product) and flip onlineActivated at startup + on success. The
+    // shell's activation overlay invokes activateOnlineFn OFF the message thread; unlicensed
+    // products leave it null, so the overlay simply reports "unavailable". isLicensed() in a
+    // licensed product returns true when the offline `.lic` OR the online activation is valid.
+    std::function<mu_core::OnlineActivationOutcome(const juce::String& licenseKey)> activateOnlineFn;
+    std::atomic<bool> onlineActivated { false };
+    bool isOnlineActivated() const noexcept { return onlineActivated.load(std::memory_order_relaxed); }
+
+    // The machine "challenge" code shown in the overlay's offline path (and what a `.lic` is
+    // bound to). juce_core-only, safe to call from any product/the shell.
+    juce::String licenseChallengeCode() const { return mu_core::MachineFingerprint::getShortCode(); }
 
     // ─── UI scale (Medium baseline, Large 1.25x) ─────────────────────────────
     // Storage lives on the base so every plugin inherits the same scale handling

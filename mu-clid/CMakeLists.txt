@@ -68,7 +68,10 @@ target_sources(mu-clid
         Source/UI/RhythmPanel.cpp
         Source/UI/SampleBrowser.cpp
         Source/UI/SettingsOverlay.cpp
-        Source/License/LicenseChecker.cpp
+        # Offline-license verifier lives in mu-core (shared); compiled here + monocypher.c.
+        "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
+        "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
+        "${CMAKE_SOURCE_DIR}/mu-core/License/OnlineActivation.cpp"
         "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
 )
 
@@ -233,7 +236,10 @@ target_sources(mu-clid-lite
         Source/UI/MasterLoopSection.cpp
         Source/UI/RhythmCircle.cpp
         Source/UI/EuclideanPanel.cpp
-        Source/License/LicenseChecker.cpp
+        # Offline-license verifier lives in mu-core (shared); compiled here + monocypher.c.
+        "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
+        "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
+        "${CMAKE_SOURCE_DIR}/mu-core/License/OnlineActivation.cpp"
         "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
 )
 

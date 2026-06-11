@@ -11,6 +11,8 @@
 
 #include "Modulation/MuTantModSnap.h"
 #include "Plugin/VoiceHotSwapStager.h"       // mu-tant: preset hot-swap staging
+#include "License/LicenseManager.h"          // mu-core: shared offline-license verifier
+#include "License/LicenseKey.h"              // product: mu-Tant id + filename + public key
 
 #include <array>
 #include <atomic>
@@ -210,6 +212,23 @@ public:
     // Persist the UI scale selection (Medium / Large) so it survives a plugin
     // close/reopen. Writes to appSettings before delegating to the base class.
     void setUiScale(float scale) override;
+
+    // License — checked once at startup; result is immutable thereafter. Release builds
+    // require a valid license (no license → Demo); Debug builds (testers) run unlocked.
+    mu_core::LicenseManager::Info licenseInfo;
+    bool isLicensed() const override
+    {
+       #if MUFAMILY_REQUIRE_LICENSE
+        // Licensed if EITHER the offline signed .lic verifies OR the machine is online-activated.
+        return licenseInfo.status == mu_core::LicenseStatus::Licensed || isOnlineActivated();
+       #else
+        return true;   // Debug / tester build — full features, no license required
+       #endif
+    }
+    // Activation record filename (online path), next to the offline .lic in the content dir.
+    static constexpr const char* kActivationFilename = "mutant.activation";
+    // Demo limits the unlicensed editor to a single voice.
+    int demoMaxChannels() const override { return 1; }
 
     // ── Per-voice param IDs (used by VoicePanel for SliderAttachment binding) ──
     // Family rule: per-voice params are subtree-scoped via `v{N}_` prefix so a

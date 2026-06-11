@@ -57,7 +57,21 @@ target_sources(mu-tant
         Source/Sequencer/GatePattern.cpp
         Source/Audio/WavetableBank.cpp
         Source/Audio/SynthVoice.cpp
+        # Offline-license verifier lives in mu-core (shared); compiled here + monocypher.c.
+        "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
+        "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
+        "${CMAKE_SOURCE_DIR}/mu-core/License/OnlineActivation.cpp"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
 )
+
+# Silence MSVC C4244 in vendored monocypher (benign u64→u32 narrowing in its Argon2
+# block-index math) at the build level — keeps our /W4 build warning-clean without
+# patching the vendor file. Mirrors mu-clid's handling; directory-scoped to mu-tant.
+if(MSVC)
+    set_source_files_properties(
+        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
+        PROPERTIES COMPILE_OPTIONS "/wd4244")
+endif()
 
 target_include_directories(mu-tant
     PRIVATE

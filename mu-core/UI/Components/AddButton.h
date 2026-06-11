@@ -14,6 +14,8 @@ public:
     void mouseDown(const juce::MouseEvent& e) override;
     void mouseEnter(const juce::MouseEvent& e) override;
     void mouseExit(const juce::MouseEvent& e) override;
+    // Dim + drop the pointing-hand cursor when disabled (e.g. demo channel cap reached).
+    void enablementChanged() override;
 
 private:
     juce::String labelText;

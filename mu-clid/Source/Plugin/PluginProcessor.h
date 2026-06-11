@@ -7,7 +7,8 @@
 #include "Audio/MidiOutputEngine.h"
 #include "Audio/FX/Slots/FXChain.h"
 #include "Audio/MixerEngine.h"
-#include "License/LicenseChecker.h"
+#include "License/LicenseManager.h"   // mu-core: shared offline-license verifier
+#include "License/LicenseKey.h"       // product: mu-Clid id + filename + public key
 #include "MuLimits.h"
 #include "Modulation/ModulationSnapshot.h"
 #include "SamplePreview.h"
@@ -218,9 +219,22 @@ public:
     juce::File getPrimarySampleDir() const;
     void       setPrimarySampleDir(const juce::File& dir);
 
-    // License — checked once at startup; result is immutable thereafter.
-    LicenseChecker::Info licenseInfo;
-    bool isLicensed() const override { return kBetaBuild || licenseInfo.status == LicenseStatus::Licensed; }
+    // License — checked once at startup; result is immutable thereafter. Release builds
+    // require a valid license (no license → Demo); Debug builds (testers) run unlocked.
+    mu_core::LicenseManager::Info licenseInfo;
+    bool isLicensed() const override
+    {
+       #if MUFAMILY_REQUIRE_LICENSE
+        // Licensed if EITHER the offline signed .lic verifies OR the machine is online-activated.
+        return licenseInfo.status == mu_core::LicenseStatus::Licensed || isOnlineActivated();
+       #else
+        return true;   // Debug / tester build — full features, no license required
+       #endif
+    }
+    // Activation record filename (online path), next to the offline .lic in the content dir.
+    static constexpr const char* kActivationFilename = "muclid.activation";
+    // Demo limits the unlicensed editor to a single rhythm.
+    int demoMaxChannels() const override { return 1; }
 
     void savePreset(const juce::String& n, const juce::String& d,
                     const juce::String& c, bool e = false) override { presetIO.savePreset(n, d, c, e); }

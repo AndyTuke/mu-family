@@ -1,21 +1,10 @@
-#include "LicenseChecker.h"
-#include "../../ThirdParty/monocypher/monocypher.h"
+#include "License/LicenseManager.h"
+#include "License/LicenseCanonical.h"
+#include "License/MachineFingerprint.h"
+#include <monocypher.h>
 
-// Build the canonical string that was signed by gen_license.ps1.
-// Fields are sorted alphabetically — must match the PowerShell tool exactly.
-static juce::String buildCanonical(const juce::String& email,
-                                   const juce::String& expires,
-                                   const juce::String& issued,
-                                   const juce::String& name,
-                                   const juce::String& order)
+namespace mu_core
 {
-    return "email="   + email   + "\n"
-         + "expires=" + expires + "\n"
-         + "issued="  + issued  + "\n"
-         + "name="    + name    + "\n"
-         + "order="   + order   + "\n"
-         + "product=mu-Clid";
-}
 
 static bool isExpired(const juce::String& expires)
 {
@@ -28,11 +17,14 @@ static bool isExpired(const juce::String& expires)
     return expires < today;
 }
 
-LicenseChecker::Info LicenseChecker::check(const juce::File& contentDir)
+LicenseManager::Info LicenseManager::check(const juce::File&   contentDir,
+                                           const juce::String& productId,
+                                           const juce::String& licenseFilename,
+                                           const uint8_t       publicKey[32])
 {
     Info result; // default: Demo
 
-    auto licFile = contentDir.getChildFile("muclid.lic");
+    auto licFile = contentDir.getChildFile(licenseFilename);
     if (!licFile.existsAsFile())
         return result;
 
@@ -45,20 +37,26 @@ LicenseChecker::Info LicenseChecker::check(const juce::File& contentDir)
         return obj->getProperty(key).toString();
     };
 
-    const auto email     = get("email");
-    const auto expires   = get("expires");
-    const auto issued    = get("issued");
-    const auto name      = get("name");
-    const auto order     = get("order");
-    const auto product   = get("product");
-    const auto sigBase64 = get("signature");
+    const auto email       = get("email");
+    const auto expires     = get("expires");
+    const auto fingerprint = get("fingerprint");
+    const auto issued      = get("issued");
+    const auto name        = get("name");
+    const auto order       = get("order");
+    const auto product     = get("product");
+    const auto sigBase64   = get("signature");
 
     // Reject obviously incomplete files
-    if (email.isEmpty() || name.isEmpty() || order.isEmpty() || sigBase64.isEmpty())
+    if (email.isEmpty() || name.isEmpty() || order.isEmpty() || sigBase64.isEmpty() || fingerprint.isEmpty())
         return result;
 
-    // Product check — future-proof against cross-product license reuse
-    if (product != "mu-Clid")
+    // Product check — a key for one product must not unlock another.
+    if (product != productId)
+        return result;
+
+    // Machine lock — the license is bound to one machine's fingerprint, so a `.lic` can't
+    // be copied to another machine. Checked before the (cheaper-to-skip) crypto verify.
+    if (fingerprint != MachineFingerprint::getShortCode())
         return result;
 
     // Decode base64 signature
@@ -69,12 +67,12 @@ LicenseChecker::Info LicenseChecker::check(const juce::File& contentDir)
         return result;
 
     // Rebuild the canonical payload and verify the Ed25519 signature
-    const auto canonical = buildCanonical(email, expires, issued, name, order);
+    const auto canonical = buildLicenseCanonical(email, expires, fingerprint, issued, name, order, productId);
     const auto* msg      = reinterpret_cast<const uint8_t*>(canonical.toRawUTF8());
     const auto  msgSize  = static_cast<size_t>(canonical.getNumBytesAsUTF8());
     const auto* sig      = static_cast<const uint8_t*>(sigStream.getData());
 
-    if (crypto_eddsa_check(sig, kPublicKey, msg, msgSize) != 0)
+    if (crypto_eddsa_check(sig, publicKey, msg, msgSize) != 0)
         return result;
 
     // Signature is valid — check expiry
@@ -88,3 +86,5 @@ LicenseChecker::Info LicenseChecker::check(const juce::File& contentDir)
     result.expires = expires;
     return result;
 }
+
+} // namespace mu_core

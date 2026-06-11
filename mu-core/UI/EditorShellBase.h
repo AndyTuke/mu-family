@@ -7,6 +7,7 @@
 #include "UI/Components/StatusBar.h"
 #include "UI/TransportBar.h"
 #include "UI/AboutPanel.h"
+#include "UI/ActivationPanel.h"
 #include "UI/SaveDialog.h"
 #include "UI/PresetBrowser.h"
 #include "UI/MidiPresetsPanel.h"
@@ -44,6 +45,7 @@ public:
     TransportBar&         getTransportBar()         { return transportBar; }
     StatusBar&            getStatusBar()            { return statusBar; }
     AboutPanel&           getAboutPanel()           { return aboutPanel; }
+    ActivationPanel&      getActivationPanel()      { return activationPanel; }
     SaveDialog&           getSaveDialog()           { return saveDialog; }
     PresetBrowser&        getPresetBrowser()        { return presetBrowser; }
     MidiPresetsPanel&     getMidiPresetsPanel()     { return midiPresetsPanel; }
@@ -53,6 +55,7 @@ public:
     // when it needs to drive overlay state from its own panels.
     void showMixer(bool show);
     void showAbout(bool show);
+    void showActivation(bool show);
     void showSaveDialog(bool show);
     void showPresetBrowser(bool show);
     void showSettings(bool show);
@@ -64,6 +67,7 @@ public:
 
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void mouseDown(const juce::MouseEvent& e) override;
 
     // juce::KeyListener — receives key events in standalone mode.
     bool keyPressed(const juce::KeyPress& key, juce::Component* originator) override;
@@ -99,6 +103,7 @@ protected:
     MuLookAndFeel        lookAndFeel;
     TransportBar         transportBar;
     AboutPanel           aboutPanel;
+    ActivationPanel      activationPanel;
     SaveDialog           saveDialog;
     PresetBrowser        presetBrowser;
     MidiPresetsPanel     midiPresetsPanel;
@@ -115,6 +120,7 @@ protected:
 
     bool mixerVisible           = false;
     bool aboutVisible           = false;
+    bool activationVisible      = false;
     bool saveVisible            = false;
     bool browserVisible         = false;
     bool settingsVisible        = false;

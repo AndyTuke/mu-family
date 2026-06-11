@@ -25,6 +25,7 @@ public:
     void setPresetPlaceholder(const juce::String& t);
     void setStagingBadge(bool show);                  // optional hot-swap "SWP" pill
     void setShowReset(bool show);                     // some products may hide reset
+    void setSaveEnabled(bool enabled);                // demo: per-layer save disabled when unlicensed
     void commitNameEdit();                            // commit any in-progress rename (call before switching layer)
 
     DropdownSelect& getPresetDropdown() noexcept { return presetDD; }

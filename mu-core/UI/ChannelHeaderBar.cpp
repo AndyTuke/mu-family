@@ -43,6 +43,12 @@ void ChannelHeaderBar::setShowReset(bool show)
     resized();
 }
 
+void ChannelHeaderBar::setSaveEnabled(bool enabled)
+{
+    // Demo mode disables saving per-layer presets; loading existing ones stays allowed.
+    saveBtn.setEnabled(enabled);
+}
+
 void ChannelHeaderBar::commitNameEdit()
 {
     if (nameLabel.getCurrentTextEditor() != nullptr)

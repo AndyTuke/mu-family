@@ -67,6 +67,7 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiFullPresetsPanel.cpp"
     # Shared modal overlays — product chrome supplied via setters.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/AboutPanel.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/ActivationPanel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/SaveDialog.cpp"
     # Shared themed modal dialog (replaces juce::AlertWindow) + its convenience builders.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/ModalDialog.cpp"
@@ -94,4 +95,13 @@ target_sources(mu-core INTERFACE
 # plugin compile without changing existing include directives.
 target_include_directories(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+# Monocypher header path for License/LicenseManager.cpp (the offline-license verifier).
+# The verifier source LIVES in mu-core (License/LicenseManager.cpp) but is compiled per
+# product — each licensed product adds it + monocypher.c to its own target_sources (not
+# the INTERFACE source list, so non-licensed siblings like mu-on/mu-toni/mu-link don't
+# pull in monocypher). This SYSTEM include just lets the verifier find <monocypher.h>.
+target_include_directories(mu-core SYSTEM INTERFACE
+    "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"
 )
