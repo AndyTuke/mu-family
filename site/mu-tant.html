@@ -44,10 +44,10 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px;
 .nav-links { display: flex; align-items: center; gap: 26px; }
 .nav-links a { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase; transition: color .2s; }
 .nav-links a:hover, .nav-links a.active { color: var(--text); }
-.nav-links .nav-clid { color: var(--accent-b); }
-.nav-links .nav-tant { color: var(--amber-b); }
+.nav-links .nav-clid { color: var(--accent-b); text-transform: none; }
+.nav-links .nav-tant { color: var(--amber-b); text-transform: none; }
 .nav-links .nav-free { color: var(--cyan-b); }
-.nav-links .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; transition: background .2s, box-shadow .2s; }
+.nav-links .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; text-transform: none; transition: background .2s, box-shadow .2s; }
 .nav-links .nav-cta:hover { background: var(--accent-b); box-shadow: 0 0 20px var(--glow); }
 
 /* ── SHARED TYPOGRAPHY ── */
@@ -266,8 +266,8 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
       <span class="sub">Transwarp Development Project</span>
     </a>
     <div class="nav-links">
-      <a href="mu-clid.html" class="nav-clid"><span style="font-family:var(--ff-disp)">μ</span>-clid</a>
-      <a href="mu-tant.html" class="nav-tant active"><span style="font-family:var(--ff-disp)">μ</span>-tant</a>
+      <a href="mu-clid.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid</a>
+      <a href="mu-tant.html" class="nav-tant active"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-tant</a>
       <a href="free.html" class="nav-free">Free</a>
       <a href="index.html#community">Community</a>
       <a href="https://transwarp.lemonsqueezy.com/checkout/buy/b2dd23a7-cd2c-48b2-baa5-8fdda3aa7576" class="nav-cta" target="_blank" rel="noopener">Buy μ-tant · $35</a>
@@ -346,7 +346,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
         <div class="feature-card">
           <div class="feature-icon"><svg viewBox="0 0 22 22" fill="none"><rect x="2" y="6" width="18" height="10" rx="1.5" stroke="#E8A878" stroke-width="1.3"/><line x1="5.5" y1="6" x2="5.5" y2="16" stroke="#E8A878" stroke-width="0.8" opacity="0.35"/><line x1="9" y1="6" x2="9" y2="16" stroke="#E8A878" stroke-width="0.8" opacity="0.35"/><line x1="12.5" y1="6" x2="12.5" y2="16" stroke="#E8A878" stroke-width="0.8" opacity="0.35"/><line x1="16" y1="6" x2="16" y2="16" stroke="#E8A878" stroke-width="0.8" opacity="0.35"/><circle cx="5.5" cy="10" r="1.5" fill="#D4895C"/><circle cx="9" cy="13" r="1.5" fill="#E8A878"/><circle cx="12.5" cy="9" r="1.5" fill="#D4895C"/><circle cx="16" cy="11" r="1.5" fill="#E8A878" opacity="0.6"/></svg></div>
           <h3>Per-Step Filter &amp; Pitch</h3>
-          <p>Each step in the gate sequencer independently controls filter cutoff and pitch. Programme melodic sequences, filter sweeps, or pitch jumps — all driven by the envelope-gated drone.</p>
+          <p>Two filters — run them in series for deep sculpting or in parallel for split-band textures. Each step in the gate sequencer independently controls filter cutoff and pitch. Programme melodic sequences, filter sweeps, or pitch jumps — all driven by the envelope-gated drone.</p>
           <span class="tag amber">Step Control</span>
         </div>
         <div class="feature-card">
@@ -395,7 +395,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <div class="pricing-tier">Full Version</div>
             <div class="pricing-name" style="color:var(--text)"><span style="color:var(--amber-b)">μ</span>-tant</div>
             <div class="pricing-price-block"><span class="price-main">$35</span><span class="price-was">$50</span></div>
-            <div class="price-note" style="color:var(--amber)">Introductory price</div><br>
+            <div class="price-note" style="color:var(--amber)">Intro price · until 1 Sep 2026</div><br>
             <div class="pricing-divider"></div>
           </div>
           <ul class="pricing-features" style="--hi-color:var(--amber-b)">
@@ -403,6 +403,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <li class="hi">2-oscillator wavetable drone</li>
             <li class="hi">FM &amp; ring modulation (x-mod)</li>
             <li class="hi">Envelope gate sequencer (16 bars)</li>
+            <li class="hi">Dual filter — series or parallel routing</li>
             <li class="hi">Per-step filter &amp; pitch control</li>
             <li class="hi">Per-step probability &amp; loop-N-of-M</li>
             <li class="hi">8 modulators per voice</li>
@@ -421,7 +422,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
           </div>
           <ul class="pricing-features">
             <li class="hi">All full-version features</li>
-            <li class="hi">All 8 voice tracks</li>
+            <li>1 voice track (full version: 8)</li>
             <li>Save disabled</li>
             <li>No session time limit</li>
           </ul>

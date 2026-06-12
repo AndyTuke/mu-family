@@ -44,10 +44,10 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px;
 .nav-links { display: flex; align-items: center; gap: 26px; }
 .nav-links a { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase; transition: color .2s; }
 .nav-links a:hover, .nav-links a.active { color: var(--text); }
-.nav-links .nav-clid { color: var(--accent-b); }
-.nav-links .nav-tant { color: var(--amber-b); }
+.nav-links .nav-clid { color: var(--accent-b); text-transform: none; }
+.nav-links .nav-tant { color: var(--amber-b); text-transform: none; }
 .nav-links .nav-free { color: var(--cyan-b); }
-.nav-links .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; transition: background .2s, box-shadow .2s; }
+.nav-links .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; text-transform: none; transition: background .2s, box-shadow .2s; }
 .nav-links .nav-cta:hover { background: var(--accent-b); box-shadow: 0 0 20px var(--glow); }
 
 /* ── SHARED TYPOGRAPHY ── */
@@ -326,8 +326,8 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
       <span class="sub">Transwarp Development Project</span>
     </a>
     <div class="nav-links">
-      <a href="mu-clid.html" class="nav-clid"><span style="font-family:var(--ff-disp)">μ</span>-clid</a>
-      <a href="mu-tant.html" class="nav-tant"><span style="font-family:var(--ff-disp)">μ</span>-tant</a>
+      <a href="mu-clid.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid</a>
+      <a href="mu-tant.html" class="nav-tant"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-tant</a>
       <a href="free.html" class="nav-free">Free</a>
       <a href="#community">Community</a>
       <a href="mu-clid.html#pricing" class="nav-cta">Shop</a>
@@ -380,7 +380,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <p class="pc-desc">Drive samples with mathematical precision. Three independent euclidean layers per track combine through boolean logic gates to produce hits that no human would programme.</p>
             <div class="pc-price">
               <span class="price-num">$35</span><span class="price-was">$50</span>
-              <div><div class="price-note">Intro price</div></div>
+              <div><div class="price-note">Intro · until 1 Sep 2026</div></div>
             </div>
             <div class="pc-ctas">
               <a href="mu-clid.html" class="btn-pc btn-pc-buy">Learn More</a>
@@ -398,7 +398,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <p class="pc-desc">Permanent dual-oscillator wavetable drone with FM and ring modulation, sculpted by an envelope gate sequencer. Per-step control of gate, filter, and pitch across up to 16 bars.</p>
             <div class="pc-price">
               <span class="price-num">$35</span><span class="price-was">$50</span>
-              <div><div class="price-note" style="color:var(--amber)">Intro price</div></div>
+              <div><div class="price-note" style="color:var(--amber)">Intro · until 1 Sep 2026</div></div>
             </div>
             <div class="pc-ctas">
               <a href="mu-tant.html" class="btn-pc btn-pc-buy">Learn More</a>

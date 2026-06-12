@@ -44,10 +44,10 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px;
 .nav-links { display: flex; align-items: center; gap: 26px; }
 .nav-links a { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase; transition: color .2s; }
 .nav-links a:hover, .nav-links a.active { color: var(--text); }
-.nav-links .nav-clid { color: var(--accent-b); }
-.nav-links .nav-tant { color: var(--amber-b); }
+.nav-links .nav-clid { color: var(--accent-b); text-transform: none; }
+.nav-links .nav-tant { color: var(--amber-b); text-transform: none; }
 .nav-links .nav-free { color: var(--cyan-b); }
-.nav-links .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; transition: background .2s, box-shadow .2s; }
+.nav-links .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; text-transform: none; transition: background .2s, box-shadow .2s; }
 .nav-links .nav-cta:hover { background: var(--accent-b); box-shadow: 0 0 20px var(--glow); }
 
 /* ── SHARED TYPOGRAPHY ── */
@@ -265,8 +265,8 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
       <span class="sub">Transwarp Development Project</span>
     </a>
     <div class="nav-links">
-      <a href="mu-clid.html" class="nav-clid active"><span style="font-family:var(--ff-disp)">μ</span>-clid</a>
-      <a href="mu-tant.html" class="nav-tant"><span style="font-family:var(--ff-disp)">μ</span>-tant</a>
+      <a href="mu-clid.html" class="nav-clid active"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid</a>
+      <a href="mu-tant.html" class="nav-tant"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-tant</a>
       <a href="free.html" class="nav-free">Free</a>
       <a href="index.html#community">Community</a>
       <a href="https://transwarp.lemonsqueezy.com/checkout/buy/ba9e6fba-f65d-4b09-87d8-5a6b295c84c2" class="nav-cta" target="_blank" rel="noopener">Buy μ-clid · $35</a>
@@ -393,7 +393,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
             <div class="pricing-tier">Full Version</div>
             <div class="pricing-name"><span class="mu">μ</span>-clid</div>
             <div class="pricing-price-block"><span class="price-main">$35</span><span class="price-was">$50</span></div>
-            <div class="price-note">Introductory price</div><br>
+            <div class="price-note">Intro price · until 1 Sep 2026</div><br>
             <div class="pricing-divider"></div>
           </div>
           <ul class="pricing-features">
@@ -418,7 +418,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; }
           </div>
           <ul class="pricing-features">
             <li class="hi">All full-version features</li>
-            <li class="hi">All 8 tracks unlocked</li>
+            <li>1 track (full version: 8)</li>
             <li>Save disabled</li>
             <li>No session time limit</li>
           </ul>
