@@ -1,11 +1,14 @@
 name: Release artifacts
 
-# Manual release build: builds the mu-family plugins in RELEASE on Linux, macOS, and Windows
-# and uploads the binaries (VST3 / CLAP / Standalone) as downloadable artifacts. CI runners
-# can't write to the local OneDrive share, so the Mac/Linux artifacts are downloaded on the
-# Windows machine and copied into TDP/Mac + TDP/Linux. (Windows Release is built + deployed
-# locally with the installer.) Version comes from the committed build_number.txt at the run's
-# commit, so pin/commit it before dispatching for a coordinated cross-platform version.
+# Manual cross-platform release. Builds the mu-family plugins in RELEASE on Linux, macOS and
+# Windows, packages a per-platform demo zip on each runner (macOS uses `ditto` so bundle exec
+# bits / symlinks / ad-hoc signatures survive — see backlog #978), then a final `publish` job
+# collects all platform zips and creates/updates the GitHub Release. The fixed-name zips are
+# what the download site links to (releases/latest/download/<name>). Version comes from the
+# committed build_number.txt at the run's commit — pin/commit it before dispatching.
+#
+# Windows is also built + deployed locally with the installer; this workflow is the source of
+# the Mac/Linux (Beta) builds, which also get copied into the OneDrive TDP/Mac + TDP/Linux shares.
 
 on:
   workflow_dispatch:
@@ -57,96 +60,127 @@ jobs:
           mu-on_VST3 mu-on_CLAP mu-on_Standalone
           mu-toni_VST3 mu-toni_CLAP mu-toni_Standalone
 
-      # AU is macOS-only: the _AU targets only exist in an APPLE configure (family rule —
-      # MUFAMILY_AU_FORMAT appended to each FORMATS). Build them on the Mac runner only.
+      # AU is macOS-only (the _AU targets only exist in an APPLE configure — family rule).
       - name: Build AU (macOS only)
         if: runner.os == 'macOS'
         run: >
           cmake --build build --config Release --target
           mu-clid_AU mu-clid-lite_AU mu-tant_AU mu-on_AU mu-toni_AU
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: mu-family-${{ matrix.os }}-Release
-          if-no-files-found: warn
-          path: |
-            build/mu-clid/mu-clid_artefacts/Release/VST3
-            build/mu-clid/mu-clid_artefacts/Release/CLAP
-            build/mu-clid/mu-clid_artefacts/Release/Standalone
-            build/mu-clid/mu-clid-lite_artefacts/Release/VST3
-            build/mu-clid/mu-clid-lite_artefacts/Release/CLAP
-            build/mu-tant/mu-tant_artefacts/Release/VST3
-            build/mu-tant/mu-tant_artefacts/Release/CLAP
-            build/mu-tant/mu-tant_artefacts/Release/Standalone
-            build/mu-on/mu-on_artefacts/Release/VST3
-            build/mu-on/mu-on_artefacts/Release/CLAP
-            build/mu-on/mu-on_artefacts/Release/Standalone
-            build/mu-toni/mu-toni_artefacts/Release/VST3
-            build/mu-toni/mu-toni_artefacts/Release/CLAP
-            build/mu-toni/mu-toni_artefacts/Release/Standalone
-            build/mu-clid/mu-clid_artefacts/Release/AU
-            build/mu-clid/mu-clid-lite_artefacts/Release/AU
-            build/mu-tant/mu-tant_artefacts/Release/AU
-            build/mu-on/mu-on_artefacts/Release/AU
-            build/mu-toni/mu-toni_artefacts/Release/AU
-
-      # Package demo zips and publish a GitHub Release. Only runs on the Windows
-      # runner — Mac/Linux builds are for tester downloads via the artifact above.
-      - name: Read build number
-        if: runner.os == 'Windows'
-        id: version
-        shell: pwsh
-        run: |
-          $build = (Get-Content build_number.txt).Trim()
-          "build=$build"  >> $env:GITHUB_OUTPUT
-          # 4-part tag (v1.0.0.NNN) to match the app/file-properties version (1.0.0.NNN)
-          # and the prior release (v1.0.0.847) — keep all surfaces aligned.
-          "tag=v1.0.0.$build" >> $env:GITHUB_OUTPUT
-
-      - name: Stage and zip demo builds
+      # ── Package per-platform demo zips (fixed names the download site links to) ──
+      - name: Package demo zips (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $base = "build"
-
+          $r = "build"
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
           # mu-Clid (VST3 + CLAP + Standalone)
           New-Item -ItemType Directory -Path staging\mu-Clid -Force | Out-Null
-          Copy-Item "$base\mu-clid\mu-clid_artefacts\Release\VST3\mu-Clid.vst3" `
-                    staging\mu-Clid\ -Recurse
-          Copy-Item "$base\mu-clid\mu-clid_artefacts\Release\CLAP\mu-Clid.clap" `
-                    staging\mu-Clid\
-          Copy-Item "$base\mu-clid\mu-clid_artefacts\Release\Standalone\mu-Clid.exe" `
-                    staging\mu-Clid\
-          Compress-Archive -Path staging\mu-Clid\* -DestinationPath mu-Clid-Windows.zip
-
-          # mu-Clid Lite (VST3 + CLAP, no Standalone)
+          Copy-Item "$r\mu-clid\mu-clid_artefacts\Release\VST3\mu-Clid.vst3" staging\mu-Clid\ -Recurse
+          Copy-Item "$r\mu-clid\mu-clid_artefacts\Release\CLAP\mu-Clid.clap" staging\mu-Clid\
+          Copy-Item "$r\mu-clid\mu-clid_artefacts\Release\Standalone\mu-Clid.exe" staging\mu-Clid\
+          Compress-Archive -Path staging\mu-Clid\* -DestinationPath dist\mu-Clid-Windows.zip
+          # mu-Clid Lite (VST3 + CLAP)
           New-Item -ItemType Directory -Path "staging\mu-Clid Lite" -Force | Out-Null
-          Copy-Item "$base\mu-clid\mu-clid-lite_artefacts\Release\VST3\mu-Clid Lite.vst3" `
-                    "staging\mu-Clid Lite\" -Recurse
-          Copy-Item "$base\mu-clid\mu-clid-lite_artefacts\Release\CLAP\mu-Clid Lite.clap" `
-                    "staging\mu-Clid Lite\"
-          Compress-Archive -Path "staging\mu-Clid Lite\*" -DestinationPath mu-Clid-Lite-Windows.zip
-
+          Copy-Item "$r\mu-clid\mu-clid-lite_artefacts\Release\VST3\mu-Clid Lite.vst3" "staging\mu-Clid Lite\" -Recurse
+          Copy-Item "$r\mu-clid\mu-clid-lite_artefacts\Release\CLAP\mu-Clid Lite.clap" "staging\mu-Clid Lite\"
+          Compress-Archive -Path "staging\mu-Clid Lite\*" -DestinationPath dist\mu-Clid-Lite-Windows.zip
           # mu-Tant (VST3 + CLAP + Standalone)
           New-Item -ItemType Directory -Path staging\mu-Tant -Force | Out-Null
-          Copy-Item "$base\mu-tant\mu-tant_artefacts\Release\VST3\mu-Tant.vst3" `
-                    staging\mu-Tant\ -Recurse
-          Copy-Item "$base\mu-tant\mu-tant_artefacts\Release\CLAP\mu-Tant.clap" `
-                    staging\mu-Tant\
-          Copy-Item "$base\mu-tant\mu-tant_artefacts\Release\Standalone\mu-Tant.exe" `
-                    staging\mu-Tant\
-          Compress-Archive -Path staging\mu-Tant\* -DestinationPath mu-Tant-Windows.zip
+          Copy-Item "$r\mu-tant\mu-tant_artefacts\Release\VST3\mu-Tant.vst3" staging\mu-Tant\ -Recurse
+          Copy-Item "$r\mu-tant\mu-tant_artefacts\Release\CLAP\mu-Tant.clap" staging\mu-Tant\
+          Copy-Item "$r\mu-tant\mu-tant_artefacts\Release\Standalone\mu-Tant.exe" staging\mu-Tant\
+          Compress-Archive -Path staging\mu-Tant\* -DestinationPath dist\mu-Tant-Windows.zip
 
-      - name: Publish GitHub Release
-        if: runner.os == 'Windows'
+      - name: Package demo zips (macOS — ditto preserves perms/signature)
+        if: runner.os == 'macOS'
+        run: |
+          set -e
+          mkdir -p dist
+          pack() {  # $1 = staging subdir name, $2 = output zip
+            ditto -c -k --sequesterRsrc --keepParent "staging/$1" "dist/$2"
+          }
+          R=build
+          # mu-Clid (VST3 + CLAP + AU + Standalone.app)
+          mkdir -p "staging/mu-Clid"
+          cp -R "$R/mu-clid/mu-clid_artefacts/Release/VST3/mu-Clid.vst3"        "staging/mu-Clid/"
+          cp -R "$R/mu-clid/mu-clid_artefacts/Release/CLAP/mu-Clid.clap"        "staging/mu-Clid/"
+          cp -R "$R/mu-clid/mu-clid_artefacts/Release/AU/mu-Clid.component"     "staging/mu-Clid/" 2>/dev/null || true
+          cp -R "$R/mu-clid/mu-clid_artefacts/Release/Standalone/mu-Clid.app"   "staging/mu-Clid/" 2>/dev/null || true
+          pack "mu-Clid" "mu-Clid-macOS.zip"
+          # mu-Clid Lite (VST3 + CLAP + AU)
+          mkdir -p "staging/mu-Clid Lite"
+          cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/VST3/mu-Clid Lite.vst3"    "staging/mu-Clid Lite/"
+          cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/CLAP/mu-Clid Lite.clap"    "staging/mu-Clid Lite/"
+          cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/AU/mu-Clid Lite.component" "staging/mu-Clid Lite/" 2>/dev/null || true
+          pack "mu-Clid Lite" "mu-Clid-Lite-macOS.zip"
+          # mu-Tant (VST3 + CLAP + AU + Standalone.app)
+          mkdir -p "staging/mu-Tant"
+          cp -R "$R/mu-tant/mu-tant_artefacts/Release/VST3/mu-Tant.vst3"        "staging/mu-Tant/"
+          cp -R "$R/mu-tant/mu-tant_artefacts/Release/CLAP/mu-Tant.clap"        "staging/mu-Tant/"
+          cp -R "$R/mu-tant/mu-tant_artefacts/Release/AU/mu-Tant.component"     "staging/mu-Tant/" 2>/dev/null || true
+          cp -R "$R/mu-tant/mu-tant_artefacts/Release/Standalone/mu-Tant.app"   "staging/mu-Tant/" 2>/dev/null || true
+          pack "mu-Tant" "mu-Tant-macOS.zip"
+
+      - name: Package demo zips (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -e
+          mkdir -p dist
+          R=build
+          # mu-Clid (VST3 + CLAP + Standalone)
+          mkdir -p "staging/mu-Clid"
+          cp -R "$R/mu-clid/mu-clid_artefacts/Release/VST3/mu-Clid.vst3"      "staging/mu-Clid/"
+          cp -R "$R/mu-clid/mu-clid_artefacts/Release/CLAP/mu-Clid.clap"      "staging/mu-Clid/"
+          cp -R "$R/mu-clid/mu-clid_artefacts/Release/Standalone/mu-Clid"     "staging/mu-Clid/" 2>/dev/null || true
+          ( cd staging && zip -r -y "../dist/mu-Clid-Linux.zip" "mu-Clid" )
+          # mu-Clid Lite (VST3 + CLAP)
+          mkdir -p "staging/mu-Clid Lite"
+          cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/VST3/mu-Clid Lite.vst3" "staging/mu-Clid Lite/"
+          cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/CLAP/mu-Clid Lite.clap" "staging/mu-Clid Lite/"
+          ( cd staging && zip -r -y "../dist/mu-Clid-Lite-Linux.zip" "mu-Clid Lite" )
+          # mu-Tant (VST3 + CLAP + Standalone)
+          mkdir -p "staging/mu-Tant"
+          cp -R "$R/mu-tant/mu-tant_artefacts/Release/VST3/mu-Tant.vst3"      "staging/mu-Tant/"
+          cp -R "$R/mu-tant/mu-tant_artefacts/Release/CLAP/mu-Tant.clap"      "staging/mu-Tant/"
+          cp -R "$R/mu-tant/mu-tant_artefacts/Release/Standalone/mu-Tant"     "staging/mu-Tant/" 2>/dev/null || true
+          ( cd staging && zip -r -y "../dist/mu-Tant-Linux.zip" "mu-Tant" )
+
+      - name: Upload platform release zips
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-zips-${{ matrix.os }}
+          if-no-files-found: error
+          path: dist/*.zip
+
+  # ── Collect every platform's zips and publish one GitHub Release ────────────
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all platform release zips
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-zips-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create / update the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: pwsh
         run: |
-          gh release create ${{ steps.version.outputs.tag }} `
-            --title "mu-family ${{ steps.version.outputs.tag }}" `
-            --notes "Windows demo release ${{ steps.version.outputs.tag }}" `
-            mu-Clid-Windows.zip `
-            mu-Clid-Lite-Windows.zip `
-            mu-Tant-Windows.zip
+          build=$(tr -d '[:space:]' < build_number.txt)
+          tag="v1.0.0.$build"
+          echo "Publishing $tag with:"; ls -1 dist
+          # Create if new, otherwise upload/replace assets on the existing release.
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/*.zip --clobber
+          else
+            gh release create "$tag" \
+              --title "mu-family $tag" \
+              --notes "mu-family $tag — Windows release; macOS & Linux are Beta. Please report any issues." \
+              dist/*.zip
+          fi
