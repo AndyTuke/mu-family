@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>μ-tant Release Notes | Transwarp Development Project</title>
+  <meta name="description" content="What's new in μ-tant — release notes and change history for each version.">
+  <link rel="canonical" href="https://transwarp.me/mu-tant-releases">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://transwarp.me/mu-tant-releases">
+  <meta property="og:title" content="μ-tant Release Notes | Transwarp Development Project">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #07060E; --bg2: #0D0B18; --bg3: #131128; --bg4: #1A1834;
+  --accent: #6B5FE4; --accent-b: #8B80F0; --glow: rgba(107,95,228,0.35);
+  --teal: #1DB880; --teal-b: #2ECFA0; --glow2: rgba(29,184,128,0.25);
+  --amber: #D4895C; --amber-b: #E8A878;
+  --cyan: #3CB8D4; --cyan-b: #5CCEE8;
+  --text: #E8E4D8; --text2: #7A758F; --text3: #4A4565;
+  --border: #1E1C32; --border2: #2A2745;
+  --ff-disp: 'Syne', sans-serif; --ff-mono: 'Space Mono', monospace; --ff-body: 'Outfit', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--ff-body); font-size: 16px; line-height: 1.6; overflow-x: hidden; }
+a { color: inherit; text-decoration: none; }
+.container { max-width: 880px; margin: 0 auto; padding: 0 40px; }
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px; height: 56px; display: flex; align-items: center; justify-content: space-between; background: rgba(7,6,14,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+.nav-logo { display: flex; flex-direction: column; line-height: 1; gap: 2px; }
+.nav-logo .brand { font-family: var(--ff-disp); font-size: 17px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+.nav-logo .sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.14em; color: var(--text3); text-transform: uppercase; }
+.nav-links { display: flex; align-items: center; gap: 26px; }
+.nav-links a { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase; transition: color .2s; }
+.nav-links a:hover, .nav-links a.active { color: var(--text); }
+.nav-links .nav-clid { color: var(--accent-b); text-transform: none; }
+.nav-links .nav-tant { color: var(--amber-b); text-transform: none; }
+.nav-links .nav-free { color: var(--cyan-b); }
+.nav-links .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; text-transform: none; }
+
+/* ── RELEASE NOTES ── */
+.rn-hero { padding-top: 130px; padding-bottom: 10px; }
+.rn-eyebrow { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.22em; color: var(--amber-b); text-transform: uppercase; margin-bottom: 14px; }
+.rn-hero h1 { font-family: var(--ff-disp); font-size: clamp(30px,4vw,46px); font-weight: 800; line-height: 1.0; letter-spacing: -0.03em; margin-bottom: 14px; }
+.rn-hero h1 .mu { color: var(--amber-b); }
+.rn-hero p { font-size: 16px; font-weight: 300; color: var(--text2); max-width: 620px; }
+.rn-hero .rn-links { margin-top: 18px; display: flex; gap: 18px; font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.06em; }
+.rn-hero .rn-links a { color: var(--amber-b); }
+
+.release { padding: 38px 0; border-top: 1px solid var(--border); }
+.release:first-of-type { border-top: none; }
+.rel-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+.rel-ver { font-family: var(--ff-disp); font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+.rel-date { font-family: var(--ff-mono); font-size: 11px; color: var(--text3); letter-spacing: 0.08em; }
+.rel-pill { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; padding: 3px 9px; border-radius: 3px; }
+.rel-pill.testing { color: var(--amber-b); border: 1px solid var(--amber); }
+.rel-pill.current { color: var(--teal-b); border: 1px solid var(--teal); }
+.rel-note { font-size: 13px; color: var(--text2); margin: -10px 0 22px; font-style: italic; }
+
+.rn-group { margin-bottom: 20px; }
+.rn-group h3 { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 10px; }
+.rn-group.new h3 { color: var(--teal-b); }
+.rn-group.improved h3 { color: var(--cyan-b); }
+.rn-group.fixed h3 { color: var(--amber-b); }
+.rn-group ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.rn-group li { position: relative; padding-left: 18px; font-size: 15px; color: var(--text); line-height: 1.55; }
+.rn-group li::before { content: ''; position: absolute; left: 2px; top: 10px; width: 5px; height: 5px; border-radius: 50%; background: var(--border2); }
+.rn-group.new li::before { background: var(--teal); }
+.rn-group.improved li::before { background: var(--cyan); }
+.rn-group.fixed li::before { background: var(--amber); }
+.ref { font-family: var(--ff-mono); font-size: 11px; color: var(--text3); }
+
+footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 60px; }
+.footer-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.footer-bottom .copy { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text3); }
+.footer-social { display: flex; gap: 16px; }
+.footer-social a { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text3); text-transform: uppercase; }
+@media (max-width: 600px) { .container { padding: 0 20px; } nav { padding: 0 20px; } .nav-links { gap: 16px; } }
+</style>
+</head>
+<body>
+
+  <nav>
+    <a href="index.html" class="nav-logo">
+      <span class="brand">Transwarp</span>
+      <span class="sub">Development Project</span>
+    </a>
+    <div class="nav-links">
+      <a href="mu-clid.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid</a>
+      <a href="mu-tant.html" class="nav-tant active"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-tant</a>
+      <a href="free.html" class="nav-free">Free</a>
+      <a href="download.html">Download</a>
+      <a href="index.html#community">Community</a>
+      <a href="index.html#pricing" class="nav-cta">Shop</a>
+    </div>
+  </nav>
+
+  <main>
+    <section class="rn-hero">
+      <div class="container">
+        <div class="rn-eyebrow">Release Notes</div>
+        <h1><span class="mu">μ</span>-tant — what's new</h1>
+        <p>Every change that affects you, version by version. Numbers in brackets are our internal tracking references.</p>
+        <div class="rn-links">
+          <a href="download.html">Download ↓</a>
+          <a href="mu-clid-releases.html">μ-clid release notes →</a>
+        </div>
+      </div>
+    </section>
+
+    <div class="container">
+
+      <!-- ── In testing — next release ── -->
+      <section class="release">
+        <div class="rel-head">
+          <span class="rel-ver">Next release</span>
+          <span class="rel-pill testing">In testing</span>
+        </div>
+        <p class="rel-note">These changes are in internal testing and will ship in the next public update.</p>
+        <div class="rn-group improved">
+          <h3>Improved</h3>
+          <ul>
+            <li>In a DAW, the transport play button now turns into a stop icon while the host is playing — matching the standalone. <span class="ref">(994)</span></li>
+            <li>Transport bar polish: clearer play/stop state and tidier spacing and labels. <span class="ref">(990, 991)</span></li>
+          </ul>
+        </div>
+        <div class="rn-group fixed">
+          <h3>Fixed</h3>
+          <ul>
+            <li>Fixed knobs accidentally changing value when you scroll over them in a DAW (e.g. while scrolling the timeline). <span class="ref">(988)</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ── v1.0.847 ── -->
+      <section class="release">
+        <div class="rel-head">
+          <span class="rel-ver">v1.0.847</span>
+          <span class="rel-date">released 12 June 2026</span>
+          <span class="rel-pill current">Current</span>
+        </div>
+        <div class="rn-group new">
+          <h3>New</h3>
+          <ul>
+            <li>Demo mode: try the full synth with a single voice; saving is disabled until you activate a licence. <span class="ref">(981, 982)</span></li>
+            <li>The sidechain input now appears in CLAP hosts such as Bitwig, matching VST3. <span class="ref">(969)</span></li>
+          </ul>
+        </div>
+        <div class="rn-group improved">
+          <h3>Improved</h3>
+          <ul>
+            <li>New modulators now start in Unipolar mode. <span class="ref">(968)</span></li>
+            <li>The modulator step grid now lines up with the actual step length. <span class="ref">(963, 967)</span></li>
+            <li>Double-click a modulator node to delete it. <span class="ref">(962)</span></li>
+            <li>Modulation curves no longer overshoot the visible range when bending. <span class="ref">(957)</span></li>
+            <li>The master meter and fader now reflect the master insert effects. <span class="ref">(965)</span></li>
+          </ul>
+        </div>
+        <div class="rn-group fixed">
+          <h3>Fixed</h3>
+          <ul>
+            <li>External (DAW) sidechain now ducks correctly — previously it could produce no ducking at all. <span class="ref">(974)</span></li>
+            <li>Fixed a possible crash at high sample rates (88.2 kHz and above) in the Chorus effect. <span class="ref">(961)</span></li>
+          </ul>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-bottom">
+        <span class="copy">© 2026 Transwarp Development Project · transwarp.me · Bath, UK</span>
+        <div class="footer-social"><a href="download.html">Download</a><a href="mu-clid-releases.html">μ-clid notes</a><a href="contact.html">Contact</a><a href="https://github.com/AndyTuke/mu-family">GitHub</a></div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
