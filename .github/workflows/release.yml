@@ -100,7 +100,9 @@ jobs:
         run: |
           $build = (Get-Content build_number.txt).Trim()
           "build=$build"  >> $env:GITHUB_OUTPUT
-          "tag=v1.0.$build" >> $env:GITHUB_OUTPUT
+          # 4-part tag (v1.0.0.NNN) to match the app/file-properties version (1.0.0.NNN)
+          # and the prior release (v1.0.0.847) — keep all surfaces aligned.
+          "tag=v1.0.0.$build" >> $env:GITHUB_OUTPUT
 
       - name: Stage and zip demo builds
         if: runner.os == 'Windows'
