@@ -411,7 +411,7 @@ private:
     void writeVoiceDataToState();
     void readVoiceDataFromState();
 
-    // ── Preset hot-swap (#880 full / #883 per-voice) ─────────────────────────
+    // ── Preset hot-swap (full / per-voice) ─────────────────────────
     // loadPreset / loadVoicePreset stage the parsed tree when the transport is
     // playing (commit at the loop boundary) and apply immediately when stopped.
     // The apply bodies are factored out so the boundary commit (handleAsyncUpdate)

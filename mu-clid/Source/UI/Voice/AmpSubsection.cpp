@@ -38,7 +38,7 @@ AmpSubsection::AmpSubsection(PluginProcessor& p) : proc(p)
                      &ampAtk, &ampDec, &ampSus, &ampRel })
         addAndMakeVisible(k);
 
-    // Slider ranges match APVTS units 1:1 (#598 Step 0) — no conversion lambdas
+    // Slider ranges match APVTS units 1:1 (Step 0) — no conversion lambdas
     // in onValueChanged / loadFromRhythm. ampLevel + accent are in dB; sends use
     // 0..1 normalised matching the mixer-channel sends + APVTS ch*_send* params.
     ampLevel  .setRange(-60.0, 6.0,  0.1);  ampLevel  .setValue(0.0);
@@ -173,7 +173,7 @@ void AmpSubsection::wireCallbacks()
         }
     }
 
-    // Slider value == APVTS value (#598 Step 0) — no conversion in the lambdas.
+    // Slider value == APVTS value (Step 0) — no conversion in the lambdas.
     ampLevel.onValueChanged  = [this](double v) { apvtsSet("ampLvl",   (float)v); };
     ampAccent.onValueChanged = [this](double v) { apvtsSet("accentDb", (float)v); };
     ampAtk.onValueChanged    = [this](double v) { apvtsSet("aEnvAtk",  (float)v); ampAtk.setLabel(adsrLabelStr("A", v)); };
@@ -206,7 +206,7 @@ void AmpSubsection::loadFromRhythm()
     const auto& p = proc.getRhythm(rhythmIndex).voiceParams;
     constexpr auto dn = juce::dontSendNotification;
 
-    ampLevel.setValue(p.ampLevel,  dn);          // dB already (#598 Step 0)
+    ampLevel.setValue(p.ampLevel,  dn);          // dB already (Step 0)
     ampAccent.setValue(p.accentDb, dn);          // dB already
     ampAtk.setValue(p.ampEnvAtk,   dn); ampAtk.setLabel(adsrLabelStr("A", p.ampEnvAtk));
     ampDec.setValue(p.ampEnvDec,   dn); ampDec.setLabel(adsrLabelStr("D", p.ampEnvDec));
@@ -309,5 +309,5 @@ void AmpSubsection::resized()
     ampDec.setBounds(s(1 * kW), s(row2Y), s(kW), s(rowH));
     ampSus.setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));
     ampRel.setBounds(s(3 * kW), s(row2Y), s(kW), s(rowH));
-    // col 4 of row 2 left empty (was the env-legato pill, removed in #614).
+    // col 4 of row 2 left empty (was the env-legato pill, since removed).
 }

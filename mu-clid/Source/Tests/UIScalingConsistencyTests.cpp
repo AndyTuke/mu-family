@@ -1,6 +1,6 @@
 // UI ↔ APVTS scaling consistency tests.
 //
-// After #598 Step 0 most voice-chain knobs have identical slider and APVTS units —
+// After Step 0 most voice-chain knobs have identical slider and APVTS units —
 // the historical scaling lambdas (display % ↔ semitones / dB / gain) are gone, so
 // the round-trip is trivially identity for those controls. These tests now serve
 // as guards that:

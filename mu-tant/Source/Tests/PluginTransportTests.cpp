@@ -1,6 +1,6 @@
 // mu-tant plugin transport regression tests.
 //
-// Root cause of #837: mu-tant's processBlock never read getPlayHead() in plugin
+// Root cause: mu-tant's processBlock never read getPlayHead() in plugin
 // mode, so blkPlaying was always false. applyGateBlock with playing=false
 // returns GateMode::Silence, producing no audio in any DAW host.
 //
@@ -93,7 +93,7 @@ public:
 
         // ── Part 2: transport→gate contract ──────────────────────────────────
         // Verifies that the playing field returned by readHostTransport feeds
-        // applyGateBlock correctly. The bug #837 path: in plugin mode, playing was
+        // applyGateBlock correctly. The bug path: in plugin mode, playing was
         // never true → gate always silenced → no audio in any DAW host.
 
         using namespace mu_tant;
@@ -109,7 +109,7 @@ public:
             pat.addEnvelope(env);
         }
 
-        beginTest("gate silent when host says stopped (the #837 regression path)");
+        beginTest("gate silent when host says stopped (the regression path)");
         {
             MockPlayHead ph;
             ph.playing = false;

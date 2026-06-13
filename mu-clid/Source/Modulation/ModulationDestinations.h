@@ -73,17 +73,17 @@ namespace ModDest
         { "euclid.b.hits",    "Euclid B Hits"      },
         { "euclid.b.rotate",  "Euclid B Rotate"    },
         // ── Pitch octave (idx 20) ─────────────────────────────────────────────
-        // idx 21 ("pitch.fine") was retired in #218 — the slot stays so subsequent
+        // idx 21 ("pitch.fine") was retired — the slot stays so subsequent
         // kTable indices don't shift (UI dropdown IDs are 1-based table indices).
         // The id below intentionally doesn't match any valid destination string,
         // so `isValidDestinationId("pitch.fine")` returns false and legacy preset
         // assignments are rejected at load.
         { "pitch.octave",     "Pitch Octave"       },
-        { "_reserved.pitch.fine", "(reserved)"     },   // formerly "pitch.fine" — #218
+        { "_reserved.pitch.fine", "(reserved)"     },   // formerly "pitch.fine"
         // ── Euclid C pattern (idx 22–23) ──────────────────────────────────────
         { "euclid.c.hits",    "Euclid C Hits"      },
         { "euclid.c.rotate",  "Euclid C Rotate"    },
-        // ── #223 additions (idx 24–26) ────────────────────────────────────────
+        // ── Added destinations (idx 24–26) ────────────────────────────────────────
         { "pitch.envDepth",   "Pitch Env Depth"    },
         { "amp.level",        "Amp Level"          },
         { "accentDb",         "Accent"             },

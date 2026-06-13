@@ -5,7 +5,7 @@
 // Run:    build/mu-toni/mu-toni-tests_artefacts/Debug/mu-toni-tests.exe
 // Scope:  scaffold coverage — the shared global-FX APVTS layout the mixer binds
 //         to. Grows as mu-toni's engine lands. The full PluginProcessor is not
-//         linked (its createEditor() drags the editor/UI tree in — see #721).
+//         linked (its createEditor() drags the editor/UI tree in — see the backlog).
 
 #include <juce_core/juce_core.h>
 #include <cstdio>

@@ -50,7 +50,7 @@ FilterSubsection::FilterSubsection(PluginProcessor& p) : proc(p)
                      &filterLowCut, &filterDrive })
         addAndMakeVisible(k);
 
-    // Slider units match APVTS / voiceParams units 1:1 (#598 Step 0):
+    // Slider units match APVTS / voiceParams units 1:1 (Step 0):
     //   filterRes — 0..0.99 fractional (was display 0..100)
     //   filterDepth — 0..48 semitones (was display 0..100)
     // textFromValueFunction below still presents the familiar 0..100 reading to users.
@@ -100,7 +100,7 @@ void FilterSubsection::wireCallbacks()
         return s.trim().dropLastCharacters(s.endsWith("%") ? 1 : 0).trim().getDoubleValue();
     };
     // Resonance: slider is 0..0.99 fractional but display the familiar 0..100 integer
-    // so users see the same number as before Step 0 of #598.
+    // so users see the same number as before Step 0.
     filterRes  .getSlider().textFromValueFunction = [](double v) -> juce::String { return juce::String((int)std::round(v * 100.0)); };
     filterRes  .getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
         const auto t = s.trim().dropLastCharacters(s.endsWith("%") ? 1 : 0).trim();
@@ -222,12 +222,12 @@ void FilterSubsection::loadFromRhythm()
     filterType  .setSelectedId(p.filterType + 1, false);
     filterCutoff.setValue(p.filterCutoff,           dn);
     filterCutoff.setLabel(cutoffLabelStr(p.filterCutoff));
-    filterRes   .setValue(p.filterRes,              dn);   // 0..0.99 fractional (#598 Step 0)
+    filterRes   .setValue(p.filterRes,              dn);   // 0..0.99 fractional (Step 0)
     filterAtk   .setValue(p.filterEnvAtk,           dn); filterAtk.setLabel(adsrLabelStr("A", p.filterEnvAtk));
     filterDec   .setValue(p.filterEnvDec,           dn); filterDec.setLabel(adsrLabelStr("D", p.filterEnvDec));
     filterSus   .setValue(p.filterEnvSus * 100.0,   dn);
     filterRel   .setValue(p.filterEnvRel,           dn); filterRel.setLabel(adsrLabelStr("R", p.filterEnvRel));
-    filterDepth .setValue(p.filterEnvDepth, dn);            // semitones (#598 Step 0)
+    filterDepth .setValue(p.filterEnvDepth, dn);            // semitones (Step 0)
     filterLowCut.setValue(p.filterLowCutHz, dn);
     filterDrive .setValue(p.filterDrive * 100.0, dn);  // 0..1 → 0..100 display
 }

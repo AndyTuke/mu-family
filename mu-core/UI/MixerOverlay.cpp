@@ -171,7 +171,7 @@ void MixerOverlay::wireFXRows()
     auto& rev = proc.fxChain.reverbSlot();
 
     // ── Effect row ───────────────────────────────────────────────────────────
-    // Issue #44: Effect is a send/return path — the dry signal already lives in the
+    // Effect is a send/return path — the dry signal already lives in the
     // main bus, so the algorithm's wet/dry mix knob would double the dry component.
     // Hide the mix knob; EffectSlot forces the algorithm into sendMode (wet-only).
     effectRow.hideParameter("mix");

@@ -1,9 +1,9 @@
-// C1 + C2 — preset format-migration tests (#664 extraction made these testable).
+// C1 + C2 — preset format-migration tests.
 //
 // C1: migrateInsertSlotsV3 translates the legacy 9-field per-rhythm insert
 //     (drvDrv/drvOut/drvDit/drvTon/drvBits/drvRate/eq*) into the 4 generic
 //     normalised slots (insP1..insP4), per active algorithm, via mu_ui::actualToNorm.
-// C2: migrateLegacyHostState rescales pre-#217 host-state ADSR times from the old
+// C2: migrateLegacyHostState rescales pre-v2 host-state ADSR times from the old
 //     0..100 display range to 0..10 seconds, preserving the aEnvRel End sentinel.
 //
 // Both are pure ValueTree transforms — these guard the relocated PresetMigrations

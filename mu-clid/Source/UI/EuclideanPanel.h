@@ -60,7 +60,7 @@ private:
     KnobWithLabel insertLenA   { "Insert Length", Id::knobInsertPad };
     SegmentControl insertModeA  { {"Pad","Mute"}, SegmentControl::ActiveStyle::Warning };
 
-    // ── Legato + Logic (#419) ────────────────────────────────────────────────
+    // ── Legato + Logic ────────────────────────────────────────────────
     // Pattern legato sits FIRST on the same row as the logic pills, separated
     // by a sub-panel gap. Visually communicates that legato is a per-rhythm
     // sequencer modifier distinct from the per-step logic-combination choice
@@ -72,7 +72,7 @@ private:
                                 SegmentControl::ActiveStyle::Warning,
                                 SegmentControl::DrawStyle::Pills };
     // Logic dropdown — was a 5-pill SegmentControl; pills crowded the row so
-    // converted to a dropdown (#621). IDs are 1-based (JUCE ComboBox convention)
+    // converted to a dropdown. IDs are 1-based (JUCE ComboBox convention)
     // and map to APVTS "logic" param via id - 1.
     DropdownSelect logicCtrl;
 
@@ -115,7 +115,7 @@ private:
     // 12 px below the rects — visibly uneven. Both pill Y and rect Y use this offset.
     static constexpr int kLogicVOffset = 3;
 
-    // Euclid-row spacing (#618-#620).
+    // Euclid-row spacing.
     // kEucKnobGap widened so Steps/Hits/Rotate breathe; growing the Euclid
     // block shrinks the Pad/Insert columns (pW is derived), so the right-hand
     // sub-panels get smaller at the same time — both requested together.

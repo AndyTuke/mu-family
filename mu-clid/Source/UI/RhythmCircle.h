@@ -20,7 +20,7 @@ public:
                      const std::vector<StepType>& patC = {});
 
     // Connect to PluginProcessor play-state atomics for self-driven animation.
-    // state is non-const so we can update lastHitCount tracking (Issue #43).
+    // state is non-const so we can update lastHitCount tracking.
     void setPlayState(PluginProcessor::RhythmPlayState*  state,
                       const std::atomic<float>*          beatFrac,
                       const std::atomic<bool>*            playing,
@@ -57,7 +57,7 @@ private:
     std::array<ArcPulse, kMaxPulses> arcPulses;
     int   nextPulse    = 0;
     float hubAlpha     = 0.0f;
-    int   lastHitCount = 0;  // Issue #43: edge-detect against playState->hitCount
+    int   lastHitCount = 0;  // edge-detect against playState->hitCount
 
     void triggerHitPulse(int combinedStep, int stepsA);
 

@@ -104,7 +104,7 @@ void EuclideanPanel::wireCallbacks()
         if (onStatusUpdate) onStatusUpdate("Euclid A Insert Mode", padModeLabel(idx));
     };
 
-    // ── Legato (#419) ─────────────────────────────────────────────────────────
+    // ── Legato ─────────────────────────────────────────────────────────
     // Trig (default) = every step retriggers the envelope.
     // Leg              = contiguous hits skip the envelope retrigger; the
     //                    envelope state continues across the run, and the
@@ -414,7 +414,7 @@ void EuclideanPanel::resized()
     constexpr int ctrlH = rowH - kLabelH;   // control zone within each row (below label)
     constexpr int mP    = 4;
 
-    // Steps/Hits/Rotate render at Size 1 (canonical). #619 — kEucKnobGap
+    // Steps/Hits/Rotate render at Size 1 (canonical). kEucKnobGap
     // separates the three knobs visually; the whole block then defines where
     // the Pad sub-panel begins, so the row's right-hand columns shrink to
     // absorb the extra width.
@@ -535,7 +535,7 @@ void EuclideanPanel::paint(juce::Graphics& g)
     const juce::Colour minorCol = rhythmColour.withAlpha(0.5f);
     g.setColour(minorCol);
 
-    // Constants mirror resized() exactly — Euclid block + Pad/Insert split (#618-#620).
+    // Constants mirror resized() exactly — Euclid block + Pad/Insert split.
     constexpr int eW        = MuLookAndFeel::kKnobSize1W;
     constexpr int eucBlockW = eW * 3 + kEucKnobGap * 2;
     constexpr int pW        = (innerW - eucBlockW) / 4;

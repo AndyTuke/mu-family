@@ -6,7 +6,7 @@
 // Scope:  synth DSP + modulator/gate/insert/persist coverage, plus a shared
 //         global-FX APVTS layout test (mu_mixfx::addGlobalFxParams behind a
 //         headless AudioProcessor stub). The full mu-tant PluginProcessor is not
-//         linked — its createEditor() drags in the editor/UI tree (see #721).
+//         linked — its createEditor() drags in the editor/UI tree.
 
 #include <juce_core/juce_core.h>
 #include <cstdio>

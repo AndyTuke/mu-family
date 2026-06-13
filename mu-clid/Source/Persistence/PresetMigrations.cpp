@@ -50,7 +50,7 @@ void migrateLegacyHostState(juce::ValueTree& state)
 // eqMidGain / eqHighGain) to 4 generic normalised Param slots
 // (insP1 / insP2 / insP3 / insP4). The translation depends on the saved
 // algorithm — each algo's old field set maps to the new slots through
-// mu_ui::kInsertAlgoSlots' per-algo ranges. Pre-#597 EQ presets where Low /
+// mu_ui::kInsertAlgoSlots' per-algo ranges. Older EQ presets where Low /
 // High were packed into drvDrv / drvDit as 0..100 are also handled via the
 // formula `dB = old0to100 / 100 * 36 - 18`.
 //
@@ -102,7 +102,7 @@ void migrateInsertSlotsV3(juce::ValueTree& tree, const juce::String& srcPrefix)
             actual[2] = oldDit;
             actual[3] = oldTon;
             break;
-        case 6:  // EQ — prefer dedicated fields if present, else pre-#597 packed
+        case 6:  // EQ — prefer dedicated fields if present, else legacy packed
             actual[0] = tree.hasProperty(srcPrefix + "eqLowGain")  ? oldEqL
                                                                    : (oldDrv / 100.0f * 36.0f - 18.0f);
             actual[1] = oldEqM;

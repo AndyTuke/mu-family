@@ -1,4 +1,4 @@
-// InsertAlgoTable invariants test (#613).
+// InsertAlgoTable invariants test.
 //
 // Catches the class of bug where the per-algorithm UI driver presents an
 // algorithm as "all knobs hidden" — either because the slot config table
@@ -78,20 +78,20 @@ public:
             }
         }
 
-        beginTest ("ModDest::kTable insert.p1..p4 occupy indices 10..13 (#617 guard)");
+        beginTest ("ModDest::kTable insert.p1..p4 occupy indices 10..13");
         {
             // ModDest::populate computes insert-section IDs as `10 + slot + 1` so a
             // reorder of kTable would silently aim the dropdown at `_reserved.*`
-            // placeholders — the exact bug that caused #617 (blank dropdown items
+            // placeholders — the exact bug that caused blank dropdown items
             // for clip / fold / bitcrusher / EQ / Karplus / Vocoder algorithms).
             expect (std::strcmp (ModDest::kTable[10].id, "insert.p1") == 0,
-                "kTable[10] must be insert.p1 — see #617; if you reorder kTable, update populate()");
+                "kTable[10] must be insert.p1 — see the backlog; if you reorder kTable, update populate()");
             expect (std::strcmp (ModDest::kTable[11].id, "insert.p2") == 0,
-                "kTable[11] must be insert.p2 — see #617");
+                "kTable[11] must be insert.p2 — see the backlog");
             expect (std::strcmp (ModDest::kTable[12].id, "insert.p3") == 0,
-                "kTable[12] must be insert.p3 — see #617");
+                "kTable[12] must be insert.p3 — see the backlog");
             expect (std::strcmp (ModDest::kTable[13].id, "insert.p4") == 0,
-                "kTable[13] must be insert.p4 — see #617");
+                "kTable[13] must be insert.p4 — see the backlog");
         }
 
         beginTest ("normToActual ↔ actualToNorm round-trips for every visible slot");

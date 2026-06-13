@@ -1,7 +1,7 @@
 // PresetIO host-state I/O — DAW project / plugin-state serialise + restore.
 //
 // Partial class: these are PresetIO members declared in PresetIO.h, split out
-// of PresetIO.cpp (#664 phase 2) so the preset save / .muClid load path and the
+// of PresetIO.cpp so the preset save / .muClid load path and the
 // host-state path each read as their own file. This TU owns the host-state
 // format version, the message-thread state tree builder, the legacy-state
 // migration, and the three AudioProcessor state overrides. The per-rhythm load
@@ -11,7 +11,7 @@
 #include "PluginProcessor.h"
 #include "PluginProcessor_Internal.h"
 #include "Persistence/ModulatorSerialise.h" // serialiseModulators, deserialiseModulators, clearModulators
-#include "Persistence/PresetMigrations.h"   // kCurrentStateFormatVersion, migrateLegacyHostState (#664/test C2)
+#include "Persistence/PresetMigrations.h"   // kCurrentStateFormatVersion, migrateLegacyHostState
 #include "UI/Components/MuLookAndFeel.h" // kChannelPaletteSize
 
 using mu_pp::serialiseModulators;
@@ -57,7 +57,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     if (! proc_.isLicensed())
         n = juce::jmin(n, proc_.demoMaxChannels());
 
-    // #663: guard the live-state mutation below (sequencer resize, voiceEngine
+    // Guard the live-state mutation below (sequencer resize, voiceEngine
     // rebuild, per-rhythm sample swaps + pattern rebuilds) with suspendProcessing +
     // rhythmsLock, matching loadSampleForRhythm / swapRhythms / the prestaged commit.
     // Without it the audio thread can tear-read voiceEngines or a half-swapped sample

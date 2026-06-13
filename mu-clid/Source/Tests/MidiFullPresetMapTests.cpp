@@ -1,4 +1,4 @@
-// C4 — MidiFullPresetMap JSON round-trip (#655 ch-9 full-preset map).
+// C4 — MidiFullPresetMap JSON round-trip (ch-9 full-preset map).
 //
 // Guards the persistence of the channel-9 program→full-preset map: paths set
 // per program number, the enabled flag, and clear, must survive a save→reload

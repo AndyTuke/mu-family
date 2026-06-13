@@ -1,4 +1,4 @@
-// kGlobalParamDefs round-trip test (#453).
+// kGlobalParamDefs round-trip test.
 //
 // For every entry in kGlobalParamDefs, picks a representative value, writes it
 // into a ValueTree via writeKindedProperty, reads it back via

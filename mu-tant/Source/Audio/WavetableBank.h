@@ -61,7 +61,7 @@ public:
     int  findByPath(const juce::String& absolutePath) const noexcept;
     int  addOrLoadFile(const juce::File& file);
 
-    // ── Two-phase load for a real-time-safe hot-swap preload (#888) ─────────────
+    // ── Two-phase load for a real-time-safe hot-swap preload ─────────────
     // decodeFile does ALL the slow work (file read + WAV decode + FFT mip build)
     // into a returned Wavetable WITHOUT touching the bank, so it runs off any lock;
     // appendTable then installs a pre-decoded table (caller holds the bank lock only

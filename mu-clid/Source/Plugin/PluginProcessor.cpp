@@ -74,7 +74,7 @@ PluginProcessor::PluginProcessor()
 
     // UI scale (Medium=1.0, Large=1.25). Persisted across plugin instances;
     // the editor consults `getUiScale()` at ctor time so a fresh-open picks up
-    // the right scale BEFORE constructing children (fixes #574 for cold opens).
+    // the right scale BEFORE constructing children (fixes the cold-open scale bug).
     {
         const double stored = appSettings->getDoubleValue("uiScale", (double) kUiScaleMedium);
         uiScale = juce::jlimit(kUiScaleMedium, kUiScaleLarge, (float) stored);
@@ -109,7 +109,7 @@ PluginProcessor::PluginProcessor()
 
     // Pre-populate modulation param map so lookups never allocate on the audio thread.
     modParamValues.reserve(50);
-    for (const char* key : { "amp.attack", "amp.decay", "amp.sustain",  // amp.release retired (#668)
+    for (const char* key : { "amp.attack", "amp.decay", "amp.sustain",  // amp.release retired
                               "filter.cutoff", "filter.resonance",
                               "fenv.attack", "fenv.decay", "fenv.depth",
                               "pitch.semitones", "pitch.octave",
@@ -291,7 +291,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
 #if MUCLID_LITE_BUILD
 //==============================================================================
-// Lite processBlock helpers (#828).
+// Lite processBlock helpers.
 //==============================================================================
 PluginProcessor::BlockTransport PluginProcessor::computeLiteTransport(int numSamples)
 {
@@ -378,7 +378,7 @@ void PluginProcessor::advanceLiteSequencer(int numRhythms, bool playing, double 
 
 #else
 //==============================================================================
-// processBlock phases (#665). Behaviour-preserving extraction of the full-build
+// processBlock phases. Behaviour-preserving extraction of the full-build
 // audio-thread path; called in order from processBlock under its rhythmsLock.
 //==============================================================================
 PluginProcessor::BlockTransport
@@ -530,7 +530,7 @@ void PluginProcessor::advanceSequencer(int numRhythms, double beatPos)
         rhythmPlayState[r].stepsC.store(juce::jmax(1, rhy.genC.steps));
         if (blockResult.firedMask & (1 << r))
         {
-            rhythmPlayState[r].hitCount.store(rhythmPlayState[r].hitCount.load() + 1); // Issue #43: monotonic counter for race-free UI hit detection (#412: hitFired legacy field removed)
+            rhythmPlayState[r].hitCount.store(rhythmPlayState[r].hitCount.load() + 1); // monotonic counter for race-free UI hit detection
         }
     }
 }
@@ -567,7 +567,7 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
         bool expected = false;
         if (rhythm.modLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
         {
-            // PROPORTION-SPACE modulation for skewed-slider destinations (#638):
+            // PROPORTION-SPACE modulation for skewed-slider destinations:
             // additive-in-display-units modulation on a skewed slider gives
             // variable visual arc length (the same display delta covers a
             // different visual proportion at different knob positions). Seed
@@ -589,7 +589,7 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
             modParamValues["amp.attack"]       = propFromAdsr(modParams.ampEnvAtk);
             modParamValues["amp.decay"]        = propFromAdsr(modParams.ampEnvDec);
             modParamValues["amp.sustain"]      = modParams.ampEnvSus   * 100.0f;  // linear, unchanged
-            // amp.release is not a modulation target (#668 — no note-off on a step
+            // amp.release is not a modulation target (no note-off on a step
             // trigger, so the release stage is never entered; see Finding 2).
             modParamValues["filter.cutoff"]    = propFromCutoff(modParams.filterCutoff);  // proportion-space, log-skewed
             modParamValues["filter.resonance"] = modParams.filterRes;             // linear, slider 0..0.99
@@ -614,7 +614,7 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
             modParamValues["amp.level"]        = modParams.ampLevel;               // additive in dB; slider -60..+6 is linear
             modParamValues["accentDb"]         = modParams.accentDb;
             // Stage A: seed euclid pattern destinations with base gen values.
-            // hits/rotate/insSt use PROPORTION-SPACE modulation (#641) because their
+            // hits/rotate/insSt use PROPORTION-SPACE modulation because their
             // slider ranges depend on the current step count — proportion-space gives
             // 100%-mod = 100%-knob-turn regardless of step count. prePad/postPad/insLen
             // have FIXED slider ranges so additive-in-step-units works (scale = range).
@@ -644,26 +644,26 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
 
             rhythm.modLock.store(false, std::memory_order_release);
 
-            // Snapshot pre-normalised values for the UI live-arc indicator (#133).
+            // Snapshot pre-normalised values for the UI live-arc indicator.
             {
                 auto& snap = modSnapshot[r];
                 auto sn = [](float v, float mn, float mx) { return juce::jlimit(0.0f, 1.0f, (v - mn) / (mx - mn)); };
-                // Proportion-space destinations (#638) — modParamValues holds slider proportion 0..1.
+                // Proportion-space destinations — modParamValues holds slider proportion 0..1.
                 // Snap stores the ACTUAL value (seconds / Hz / dB) so the UI's setModulatedActual
                 // routes via valueToProportionOfLength and matches the needle's visual position
-                // by construction. Same pattern as filter.cutoff (#612) and insert.pN (Stage 36).
+                // by construction. Same pattern as filter.cutoff and insert.pN (Stage 36).
                 // adsrFromProp / lowCutFromProp / cutoffFromProp come from ModulationSkew.h
                 // (brought in via the using-declarations above).
                 snap[kSnapAmpAtk]      .store(adsrFromProp(modParamValues["amp.attack"]));
                 snap[kSnapAmpDec]      .store(adsrFromProp(modParamValues["amp.decay"]));
                 snap[kSnapAmpSus]      .store(sn(modParamValues["amp.sustain"], 0.0f, 100.0f));
-                // Filter Cutoff: proportion-space modulation (#639) — snap stores ACTUAL Hz
+                // Filter Cutoff: proportion-space modulation — snap stores ACTUAL Hz
                 // converted from the proportion, so the UI's setModulatedActual goes
                 // through the slider's setSkewFactorFromMidPoint(640) via valueToProportionOfLength
                 // and the arc matches the visual knob by construction.
                 snap[kSnapFilterCutoff].store(cutoffFromProp(modParamValues["filter.cutoff"]));
                 snap[kSnapFilterRes]   .store(sn(modParamValues["filter.resonance"], 0.0f, 0.99f));
-                // Filter ADSR times: proportion-space modulation (#638) — convert back to actual seconds.
+                // Filter ADSR times: proportion-space modulation — convert back to actual seconds.
                 snap[kSnapFenvAtk]     .store(adsrFromProp(modParamValues["fenv.attack"]));
                 snap[kSnapFenvDec]     .store(adsrFromProp(modParamValues["fenv.decay"]));
                 // fenv.depth, pitch.envDepth, accentDb: voiceParams units (semis or dB) differ from the
@@ -672,7 +672,7 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
                 snap[kSnapFenvDepth]   .store(modParamValues["fenv.depth"]);     // semitones 0..48
                 // pitch.semitones: snap stores BASE + OFFSET (in semitones) so the arc tracks the modulated
                 // knob position regardless of where the base sits. Pre-fix stored only the offset, so a
-                // negative mod read as ABOVE the needle when base was negative (#638-related; T6 follow-up).
+                // negative mod read as ABOVE the needle when base was negative (proportion-space follow-up).
                 snap[kSnapPitchSemi]   .store(modParams.pitchSemitones + modParamValues["pitch.semitones"]);
                 // Insert mod snapshots store ACTUAL slider values (per
                 // the active algo's slot range / skew) so the UI can run
@@ -691,7 +691,7 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
                 snap[kSnapInsP2].store(mu_ui::normToActual(modParamValues["insert.p2"], algForSnap, 1));
                 snap[kSnapInsP3].store(mu_ui::normToActual(modParamValues["insert.p3"], algForSnap, 2));
                 snap[kSnapInsP4].store(mu_ui::normToActual(modParamValues["insert.p4"], algForSnap, 3));
-                // new destinations — sliders now match voiceParams units (Step 0 of #598),
+                // new destinations — sliders now match voiceParams units (Step 0),
                 // so snapshots store the raw value and setModulatedActual routes through the
                 // slider's valueToProportionOfLength directly.
                 snap[kSnapPitchEnvDep] .store(modParamValues["pitch.envDepth"]);  // semitones 0..24
@@ -703,7 +703,7 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
                 // sums it with pitch.semitones into pitchMod). To show the arc on the pitchOctave knob (range -4..+4
                 // octaves, linear), store base octave value + offset/12. UI uses setModulatedActual.
                 snap[kSnapPitchOctave] .store(modParams.pitchOctave + modParamValues["pitch.octave"] / 12.0f);
-                // Euclid pattern destinations (#641):
+                // Euclid pattern destinations:
                 //   hits/rotate/insSt: proportion-space mod (modParamValues already holds 0..1
                 //     slider proportion). snap stores the proportion directly — UI uses
                 //     setModulatedNorm.
@@ -731,7 +731,7 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
             }
 
             // Write modulated values back, clamping to safe ranges. Proportion-space
-            // destinations (#638) convert prop → actual via the shared inverse-skew
+            // destinations convert prop → actual via the shared inverse-skew
             // helpers in ModulationSkew.h (adsrFromProp / lowCutFromProp / cutoffFromProp).
             modParams.ampEnvAtk      = juce::jmax(0.001f, adsrFromProp(modParamValues["amp.attack"]));
             modParams.ampEnvDec      = juce::jmax(0.001f, adsrFromProp(modParamValues["amp.decay"]));
@@ -760,7 +760,7 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
             modParams.accentDb       = juce::jlimit(0.0f,   12.0f,    modParamValues["accentDb"]);
 
             // Stage A: write modulated euclid values back to the per-rhythm
-            // overrides snapshot. #641: hits/rotate/insSt are proportion-space mod —
+            // overrides snapshot. hits/rotate/insSt are proportion-space mod —
             // convert the [0..1] proportion back to integer step count using the
             // current step count of each gen. prePad/postPad/insLen are additive in
             // step units; just round + clamp.

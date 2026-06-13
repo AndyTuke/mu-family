@@ -3,12 +3,12 @@
 #include <juce_core/juce_core.h>
 #include <cmath>
 
-// Proportion-space skew conversions for modulation (#638/#639). Skewed-slider
+// Proportion-space skew conversions for modulation. Skewed-slider
 // destinations (ADSR times, filter cutoff, filter low-cut) are modulated in the
 // slider's *proportion* space (0..1) so a given modulation depth covers the same
 // visual arc regardless of knob position; the value is seeded with propFrom*()
 // and converted back with the matching *FromProp() at write-back. Extracted from
-// PluginProcessor::applyRhythmModulation (#665 follow-up) where the same formulas
+// PluginProcessor::applyRhythmModulation where the same formulas
 // were triplicated across the seed / UI-snapshot / write-back blocks, so the
 // forward and inverse can be unit-tested as a true round-trip (test C5).
 //

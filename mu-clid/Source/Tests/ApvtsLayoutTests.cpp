@@ -4,7 +4,7 @@
 // value — the second registration wins, making the first permanently broken.
 // This test catches suffix/ID collisions at the table level, where it's cheap
 // to check.  The kGlobalParamDefs / kGlobalParams cross-check lives in
-// GlobalParamDefsTests.cpp (#453).
+// GlobalParamDefsTests.cpp.
 
 #include <juce_core/juce_core.h>
 #include <unordered_map>

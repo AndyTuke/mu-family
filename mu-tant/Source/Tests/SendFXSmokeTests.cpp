@@ -1,4 +1,4 @@
-// Send-FX DSP smoke tests (ported from mu-clid for #721 parity).
+// Send-FX DSP smoke tests (ported from mu-clid for parity).
 //
 // Verifies all three shared mu-core send-FX slots run without crash or NaN/Inf
 // when fed a stereo impulse at representative settings — the same FX rack

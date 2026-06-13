@@ -1,4 +1,4 @@
-// Modulator (de)serialise round-trip test (#455).
+// Modulator (de)serialise round-trip test.
 //
 // Constructs a Rhythm with:
 //   - A non-default ControlSequence (Stepped mode, Bipolar, custom timing,

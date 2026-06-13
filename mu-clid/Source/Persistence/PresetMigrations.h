@@ -2,13 +2,13 @@
 
 #include <juce_data_structures/juce_data_structures.h>
 
-// Format-migration helpers extracted from PresetIO.cpp (#664). Each one
+// Format-migration helpers extracted from PresetIO.cpp. Each one
 // rewrites an older on-disk preset / host-state encoding into the current
 // schema, in place on a parsed ValueTree, before the load path reads
 // parameters back out of it.
 //
 // They run unconditionally on every load — preset-version gating was removed
-// in #643 (pre-distribution era). A tree already in the current format is
+// in the pre-distribution era. A tree already in the current format is
 // detected and left untouched by each function's early-out, so re-running is a
 // no-op.
 namespace mu_pp_migrate
@@ -16,11 +16,11 @@ namespace mu_pp_migrate
 
 // Host-state format version. Bump whenever the on-disk schema changes in a way
 // that requires migration on load.
-//   v0 / v1 : legacy (pre-#217) — ADSR A/D/R stored as 0..100 (×0.03 → seconds)
-//   v2      : current (#217/#286/#287) — ADSR A/D/R stored as 0..10 (seconds direct)
+//   v0 / v1 : legacy (pre-v2) — ADSR A/D/R stored as 0..100 (×0.03 → seconds)
+//   v2      : current — ADSR A/D/R stored as 0..10 (seconds direct)
 inline constexpr int kCurrentStateFormatVersion = 2;
 
-// In-place migration of pre-#217 host state. APVTS stores parameter values as
+// In-place migration of pre-v2 host state. APVTS stores parameter values as
 // <PARAM id="..." value="..."/> children of the root tree. For legacy state
 // (formatVersion absent or < 2), the ADSR A/D/R values lived in 0..100; the new
 // schema stores them in 0..10 seconds directly. Migration multiplies by 0.03
@@ -32,7 +32,7 @@ void migrateLegacyHostState(juce::ValueTree& state);
 // v3 per-rhythm insert: collapse the 9 named drive/EQ fields (drvDrv / drvOut /
 // drvDit / drvTon / drvBits / drvRate / eqLowGain / eqMidGain / eqHighGain) to
 // 4 generic normalised slot params (insP1..insP4), per-algo. Also folds the
-// pre-#597 packed-EQ encoding (Low/High in drvDrv/drvDit as 0..100) into the EQ
+// legacy packed-EQ encoding (Low/High in drvDrv/drvDit as 0..100) into the EQ
 // algo's slots. `srcPrefix` is "r0_" for rhythm presets / hot-swap loads, or ""
 // for a MuClidPreset per-rhythm Rhythm child tree.
 void migrateInsertSlotsV3(juce::ValueTree& tree, const juce::String& srcPrefix);

@@ -5,7 +5,7 @@
 // Run:    build/mu-on/mu-on-tests_artefacts/Debug/mu-on-tests.exe
 // Scope:  shared global-FX APVTS layout (the mixer binds to it), the 909 sequencer,
 //         and the channel engines. The full PluginProcessor is not linked (its
-//         createEditor() drags the editor/UI tree into a console app — see #721).
+//         createEditor() drags the editor/UI tree into a console app — see the backlog).
 
 #include <juce_core/juce_core.h>
 #include <cstdio>

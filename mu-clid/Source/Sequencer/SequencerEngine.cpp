@@ -235,10 +235,10 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                     // aligned (re)start, fire the current step." That sentinel is
                     // set by:
                     //   (a) the ctor's fill(-1) — cold start, never-played rhythm
-                    //       (#384 / #280: first hit lands in the first audio block
+                    //       (first hit lands in the first audio block
                     //       instead of being delayed by one step).
                     //   (b) PluginProcessor::handleAsyncUpdate's swap commit
-                    //       (#385: hot-swapped rhythm fires its first hit at the
+                    //       (hot-swapped rhythm fires its first hit at the
                     //       commit step instead of dropping it).
                     // Mid-play knob changes leave lastStepIndex>=0 so they still
                     // absorb, preventing retroactive triggers. lastAccentStepIndex
@@ -275,7 +275,7 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
         if (prevStep < 0)
         {
             // First call: just check the current step. No back-walk possible —
-            // and no temporal predecessor to be tied to (#419), so tiedMask
+            // and no temporal predecessor to be tied to, so tiedMask
             // stays clear regardless of pattern[stepIndex-1].
             if (pattern[stepIndex])
             {

@@ -47,8 +47,8 @@ public:
 
     const juce::String getName() const override;
     // True for both DAW and standalone:
-    //   - Standalone: MIDI clock sync (#126).
-    //   - DAW (VST3/CLAP): program-change → preset hot-swap (#127).
+    //   - Standalone: MIDI clock sync.
+    //   - DAW (VST3/CLAP): program-change → preset hot-swap.
     bool acceptsMidi() const override { return true; }
     bool producesMidi() const override { return true; }
     bool isMidiEffect() const override
@@ -96,7 +96,7 @@ public:
 
     // UI scale (Medium=1.0, Large=1.25). Persisted via appSettings. Editor reads
     // at ctor time and applies to mu_ui::scale BEFORE constructing children so
-    // ctor-time fonts (#574) pick up the right size on a fresh open. Runtime
+    // ctor-time fonts pick up the right size on a fresh open. Runtime
     // changes go via setUiScale → onUiScaleChanged callback so the editor can
     // resize + relayout live (with a "reopen for fonts" hint near the picker).
     // kUiScaleMedium / kUiScaleLarge constants + onUiScaleChanged callback live
@@ -291,7 +291,7 @@ public:
         std::atomic<int>  stepsA        { 1 }; // individual ring step counts for per-ring rotation
         std::atomic<int>  stepsB        { 1 };
         std::atomic<int>  stepsC        { 1 };
-        std::atomic<int>  hitCount      { 0 };     // monotonic counter — audio thread increments per hit, UI tracks lastSeen (Issue #43: avoids one-shot-flag race between RhythmCircle + SidebarItem)
+        std::atomic<int>  hitCount      { 0 };     // monotonic counter — audio thread increments per hit, UI tracks lastSeen (avoids one-shot-flag race between RhythmCircle + SidebarItem)
     };
     std::array<RhythmPlayState, SequencerEngine::MaxRhythms> rhythmPlayState;
     std::atomic<float>  beatFraction     { 0.0f }; // fractional position within the current 1/16 step
@@ -306,8 +306,8 @@ public:
 
     // UI accessor for the per-rhythm modulated euclid overrides — read by RhythmPanel +
     // SidebarItem on a timer so the visual circles reflect modulation of hits/rotate/etc.
-    // (#642). Returns a struct copy; fields are integer-rounded by the audio thread so
-    // torn reads are benign for visual display. Pre-fix (#648) the audio thread only
+    //. Returns a struct copy; fields are integer-rounded by the audio thread so
+    // torn reads are benign for visual display. Pre-fix the audio thread only
     // wrote `lastEuclidOverrides[r]` when the modulation pass actually ran, leaving the
     // overrides at C++-default zeros for any rhythm with no assignments — so the default
     // rhythm at startup drew no hits. Fall back to the rhythm's base gen values when no
@@ -407,7 +407,7 @@ public:
     void forceSyncRhythmFromAPVTS(int ri);
 private:
 
-    // ── processBlock phases (#665, Lite path #828) ──────────────────────────
+    // ── processBlock phases (full + Lite paths) ──────────────────────────
     // processBlock is decomposed into private helpers invoked in order on the
     // audio thread. None allocate or take locks beyond processBlock's own
     // rhythmsLock ScopedTryLock.
@@ -488,10 +488,10 @@ private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void syncRhythmParam(int ri, const juce::String& suffix, float v);
     // FX / return / master / channel-strip params route to the shared
-    // ProcessorBase::syncGlobalFxParam (mu-core) — see #720.
+    // ProcessorBase::syncGlobalFxParam (mu-core) — see the backlog.
     void pushRhythmToAPVTS(int ri);
     // forceSyncRhythmFromAPVTS lifted to the public section above so UI
-    // orchestrators (insert-algo dropdown #613) can call it after their own
+    // orchestrators (insert-algo dropdown) can call it after their own
     // apvtsLoading-guarded multi-writes.
     void pushMixerChannelToAPVTS(int idx);
     void swapAPVTSForRhythms(int i, int j);

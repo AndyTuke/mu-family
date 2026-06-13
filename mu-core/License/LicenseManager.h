@@ -23,7 +23,7 @@ enum class LicenseStatus { Demo, Licensed };
 //
 // This is the OFFLINE path (a signed `.lic` file dropped next to the plugin). The online
 // Lemon Squeezy activation + offline challenge-response fallback land on top of this and
-// produce the same Info; see backlog #980. mu-core stays plugin-agnostic — the product
+// produce the same Info; see the backlog. mu-core stays plugin-agnostic — the product
 // id / filename / key are passed in, never hard-coded here.
 class LicenseManager
 {

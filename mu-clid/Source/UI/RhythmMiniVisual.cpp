@@ -29,7 +29,7 @@ void RhythmMiniVisual::resized()
 
 void RhythmMiniVisual::timerCallback()
 {
-    // Step-hit edge detection (monotonic counter, Issue #43) → pulse the parent.
+    // Step-hit edge detection (monotonic counter) → pulse the parent.
     const int currentHitCount = proc.rhythmPlayState[rhythmIndex].hitCount.load();
     if (currentHitCount != lastHitCount)
     {
@@ -39,7 +39,7 @@ void RhythmMiniVisual::timerCallback()
 
     // Re-read the rhythm pattern (base + modulated overrides) only when a cheap
     // POD signature changes — keeps the mini-circle in sync with EuclideanPanel
-    // edits + modulation without allocating a vector every tick (#642).
+    // edits + modulation without allocating a vector every tick.
     const Rhythm& r = proc.getRhythm(rhythmIndex);
     const auto sigA = r.genA.signature();
     const auto sigB = r.genB.signature();

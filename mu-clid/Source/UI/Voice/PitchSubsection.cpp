@@ -47,7 +47,7 @@ PitchSubsection::PitchSubsection(PluginProcessor& p) : proc(p)
     pitchDec   .setRange(0.0, 10.0, 0.001);  pitchDec.setValue(0.03);  pitchDec.getSlider().setSkewFactor(0.3);
     pitchSus   .setRange(0.0, 100.0, 0.1);   pitchSus.setValue(0.0);
     pitchRel   .setRange(0.0, 10.0, 0.001);  pitchRel.setValue(0.03);  pitchRel.getSlider().setSkewFactor(0.3);
-    // Slider unit matches APVTS / voiceParams unit (semitones, 0..24) — #598 Step 0.
+    // Slider unit matches APVTS / voiceParams unit (semitones, 0..24) Step 0.
     pitchDepth .setRange(0.0, 24.0, 1.0);    pitchDepth.setValue(0.0);
 
     wireCallbacks();
@@ -148,7 +148,7 @@ void PitchSubsection::loadFromRhythm()
     pitchDec   .setValue(p.pitchEnvDec,          dn); pitchDec.setLabel(adsrLabelStr("D", p.pitchEnvDec));
     pitchSus   .setValue(p.pitchEnvSus * 100.0,  dn);
     pitchRel   .setValue(p.pitchEnvRel,          dn); pitchRel.setLabel(adsrLabelStr("R", p.pitchEnvRel));
-    pitchDepth .setValue(p.pitchEnvDepth, dn);                     // semitones (#598 Step 0)
+    pitchDepth .setValue(p.pitchEnvDepth, dn);                     // semitones (Step 0)
 }
 
 void PitchSubsection::refreshSuffix(const juce::String& suffix)
@@ -204,7 +204,7 @@ void PitchSubsection::resized()
 
     using mu_ui::s;
     // Row 1: Octave / Semi / Fine — col 4 left empty (the per-envelope
-    // Leg pill was removed in #614; envelope legato is governed solely by
+    // Leg pill was removed; envelope legato is governed solely by
     // the hit-generator's pattern legato on EuclideanPanel's logic row).
     pitchOctave.setBounds(s(0 * kW), 0,        s(kW), s(rowH));
     pitchSemi  .setBounds(s(1 * kW), 0,        s(kW), s(rowH));

@@ -2,7 +2,7 @@
 #include "PluginProcessor.h"
 #include "PluginProcessor_Internal.h"
 #include "Persistence/PresetHelpers.h"      // writeKindedProperty, readKindedPropertyAsActualV2, kGlobalParamDefs
-#include "Persistence/PresetMigrations.h"   // v3 insert/master/mod-assignment migrations (#664)
+#include "Persistence/PresetMigrations.h"   // v3 insert/master/mod-assignment migrations
 #include "Persistence/ModulatorSerialise.h" // serialiseModulators, deserialiseModulators, clearModulators
 #include "UI/Components/MuLookAndFeel.h" // kChannelPaletteSize
 #include <limits>               // std::numeric_limits for NaN sentinel
@@ -21,7 +21,7 @@ using mu_pp::deserialiseModulators;
 using mu_pp::clearModulators;
 using mu_pp::enumName;
 using mu_pp::readEnumIndex;
-using mu_pp_migrate::migrateInsertSlotsV3;       // moved to PresetMigrations (#664)
+using mu_pp_migrate::migrateInsertSlotsV3;       // moved to PresetMigrations
 using mu_pp_migrate::migrateMasterInsertSlotsV3;
 using mu_pp_migrate::migrateModAssignmentsV3;
 
@@ -78,7 +78,7 @@ static float readGlobalPropertyAsActual(const juce::ValueTree& tree,
 }
 
 // Preset version gating removed — pre-distribution era, every preset just needs to work
-// with the current build (#643). Migration helpers (migrateInsertSlotsV3 etc.) still run
+// with the current build. Migration helpers (migrateInsertSlotsV3 etc.) still run
 // unconditionally inside the load path so older v0/v1/v2 properties still get translated;
 // any preset that survives those migrations loads fine. The unused fileName + onLoadError
 // params are kept on the signature so callers don't need restructuring.
@@ -327,7 +327,7 @@ void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file)
 // PluginProcessor::saveRhythmPreset deleted — was dead code. The only call
 // site (RhythmPanel::saveRhythmPreset) routes through saveRhythmPresetToFile
 // instead, and the dead function had already drifted from its sibling (missing
-// the modulator-child write). Removing it also resolves #432: the ch_* mixer-
+// the modulator-child write). Removing it also fixes the ch_* mixer-
 // channel write that this function emitted was never read back by any load path
 // (mixer settings stay attached to the slot, not the rhythm preset), so deleting
 // the function removes the dead write at the same time.
@@ -392,7 +392,7 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIdx, const juce::File& destFile,
     state.setProperty("presetCategory",     category,                               nullptr);
     state.setProperty("presetDescription",  description,                            nullptr);
     state.setProperty("presetEmbedSamples", embedSample ? 1 : 0,                   nullptr);
-    // presetVersion property dropped (#643): not distributing yet, current-build-only.
+    // presetVersion property dropped: not distributing yet, current-build-only.
 
     const Rhythm& r = proc_.sequencer.getRhythm(rhythmIdx);
     state.setProperty("r0_name",   juce::String(r.name),        nullptr);
@@ -594,7 +594,7 @@ void PresetIO::savePreset(const juce::String& name,
     root.setProperty("presetDescription",  description,          nullptr);
     root.setProperty("presetEmbedSamples", embedSamples ? 1 : 0, nullptr);
     root.setProperty("presetCategory",    category,    nullptr);
-    // presetVersion property dropped (#643): not distributing yet, current-build-only.
+    // presetVersion property dropped: not distributing yet, current-build-only.
 
     for (int i = 0; i < n; ++i)
     {
@@ -652,7 +652,7 @@ void PresetIO::savePreset(const juce::String& name,
     }
 
     // Save global FX/mixer state so a preset fully restores the session.
-    // Stage 35 + #451: v2 writes GlobalState per the ParamKind in kGlobalParamDefs.
+    // Stage 35: v2 writes GlobalState per the ParamKind in kGlobalParamDefs.
     // eff_algo / rev_algo / mst_insChar / mst_ins2Char emit their stable algorithm
     // name string; bool params emit "true"/"false"; the rest emit actual values.
     juce::ValueTree globalTree("GlobalState");
@@ -858,8 +858,8 @@ void PresetIO::restoreRhythmSample(int i, const juce::ValueTree& tree,
 
 void PresetIO::restoreGlobalState(const juce::ValueTree& root)
 {
-    // GlobalState child was added in #123; older files omit this and the loop
-    // simply does nothing. Stage 35 + #451: iterate kGlobalParamDefs so algorithm-
+    // GlobalState child was added later; older files omit this and the loop
+    // simply does nothing. Stage 35: iterate kGlobalParamDefs so algorithm-
     // selector params (eff_algo / rev_algo / mst_insChar / mst_ins2Char) use the
     // name-string lookup path in v2.
     for (int ci = 0; ci < root.getNumChildren(); ++ci)
@@ -1070,8 +1070,8 @@ void PresetIO::loadPreset(const juce::File& file)
     // switch: when playing, defer the flip to the next loop point (stageFullPreset →
     // boundary commit); when stopped, flip immediately (commitStagedFullPreset). Same
     // build + same commit code — only the trigger differs, so stopped and playing loads
-    // are identical by construction (no divergent second path — #666) and the stopped
-    // load is glitch-free with its sample disk I/O done off the rhythmsLock (#663).
+    // are identical by construction (no divergent second path) and the stopped
+    // load is glitch-free with its sample disk I/O done off the rhythmsLock.
     auto prepared = buildPreparedFullPreset(root, proc_.currentSampleRate,
                                             proc_.currentBlockSize, proc_.getSamplesDir(),
                                             proc_.onLoadError);
@@ -1089,7 +1089,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
 
     // ── Install the pre-built voices + rhythms under suspend + rhythmsLock ─────
     // suspendProcessing stops FUTURE processBlock calls; rhythmsLock serialises with
-    // any IN-FLIGHT one (#663 — suspend alone doesn't block it). Everything here is
+    // any IN-FLIGHT one (suspend alone doesn't block it). Everything here is
     // in-memory (no parse, no disk I/O — done at stage time), so the lock is held for
     // microseconds and the swap stays glitch-free. The lock is released before the
     // APVTS finalize below so that (post-resume) work doesn't bail the audio thread.

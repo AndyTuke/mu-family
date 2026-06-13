@@ -49,7 +49,7 @@ public:
     // Same as getPattern() but annotates each step with its type (hit, empty, pre/post/insert pad).
     std::vector<StepType> getStepTypes() const;
     // Override-aware variant — uses ov's hits/rotate/prePad/postPad/insertStart/insertLength
-    // instead of the member values, so the UI can render the visually-modulated pattern (#642).
+    // instead of the member values, so the UI can render the visually-modulated pattern.
     std::vector<StepType> getStepTypes(const EuclidGenOverrides& ov) const;
 
     // compact POD snapshot of every field that affects getPattern / getStepTypes

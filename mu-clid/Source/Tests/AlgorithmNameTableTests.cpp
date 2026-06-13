@@ -1,4 +1,4 @@
-// Algorithm name table sanity tests (#457).
+// Algorithm name table sanity tests.
 //
 // Asserts that each algorithm name table has the same number of entries as the
 // corresponding dispatch-table constant. Catches the failure mode where someone

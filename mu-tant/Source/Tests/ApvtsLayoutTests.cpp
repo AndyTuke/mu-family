@@ -108,7 +108,7 @@ public:
                 expect (has(id), juce::String("missing global-FX param '") + id + "'");
         }
 
-        beginTest ("Dead legacy sends removed (#724)");
+        beginTest ("Dead legacy sends removed");
         {
             expect (! has("eff_send"), "eff_send must not exist");
             expect (! has("dly_send"), "dly_send must not exist");

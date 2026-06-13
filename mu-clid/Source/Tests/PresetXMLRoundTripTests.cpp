@@ -16,7 +16,7 @@
 // e.g. a Bool written as int instead of "true"/"false" string, or an
 // AlgorithmIndex written as an integer index when the v2 reader expects a
 // name string. That class of bug silently corrupted preset save/load in the
-// v0/v1 formats (bugs fixed in #458, #472, #478).
+// v0/v1 formats.
 //
 // Companion tests: RhythmParamRoundTripTests proves apply/push are inverses;
 // KindedPropertyRoundTripTests proves the codec primitives individually.

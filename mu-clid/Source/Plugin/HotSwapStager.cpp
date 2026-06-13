@@ -1,5 +1,5 @@
 #include "HotSwapStager.h"
-#include "HotSwapBoundary.h"   // mu_clid::hotswap:: pure loop-boundary predicates (#653 logic)
+#include "HotSwapBoundary.h"   // mu_clid::hotswap:: pure loop-boundary predicates
 #include "PluginProcessor.h"
 #include "Persistence/ScopedApvtsLoading.h"
 #include "MuLimits.h"

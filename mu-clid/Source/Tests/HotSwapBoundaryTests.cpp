@@ -1,8 +1,8 @@
-// C3 — hot-swap loop-boundary predicate tests (#665 extraction; #653 logic).
+// C3 — hot-swap loop-boundary predicate tests.
 //
 // The swap-defer decision in HotSwapStager::checkBoundaries was extracted into
 // pure predicates (HotSwapBoundary.h) so the rule can be tested without a live
-// PluginProcessor. The headline case is the #653 fix: a free-running full-preset
+// PluginProcessor. The headline case: a free-running full-preset
 // swap (no master loop) must fall back to rhythm 0's wrap, NOT wait on a master
 // loop that never arrives.
 
@@ -40,14 +40,14 @@ public:
             expect (! fullPresetBoundaryReached (/*hasMaster*/ true, /*master*/ false, /*mask*/ 0xFF), "does NOT fire on a rhythm wrap when a master loop is defined");
         }
 
-        beginTest ("C3: free-running full-preset swap falls back to rhythm 0 (#653)");
+        beginTest ("C3: free-running full-preset swap falls back to rhythm 0");
         {
             // The bug: with mstrLoop=0 (free-running) the swap waited on a master
             // wrap that never comes. The fix falls back to rhythm 0's loop.
             expect (  fullPresetBoundaryReached (/*hasMaster*/ false, /*master*/ false, /*mask*/ 0x01), "fires when rhythm 0 wraps");
             expect (! fullPresetBoundaryReached (/*hasMaster*/ false, /*master*/ false, /*mask*/ 0x02), "does NOT fire when only rhythm 1 wraps");
             expect (! fullPresetBoundaryReached (/*hasMaster*/ false, /*master*/ true,  /*mask*/ 0x00),
-                "free-running ignores masterLoopWrapped — that signal is meaningless without a master loop (the #653 trap)");
+                "free-running ignores masterLoopWrapped — that signal is meaningless without a master loop (the free-running trap)");
         }
     }
 };

@@ -10,7 +10,7 @@
 // Exit:   0 on success, non-zero if any test reported a failure.
 //
 // Scope: DATA-LAYER tests only — no PluginProcessor / MessageManager / audio-
-// thread setup. The point is to catch #430-class drift in:
+// thread setup. The point is to catch drift in:
 //   - kRhythmParamDefs apply/push lambda pairs
 //   - writeKindedProperty / readKindedPropertyAsActualV2 round-trip
 //   - serialiseModulators / deserialiseModulators round-trip

@@ -2,8 +2,8 @@
 
 #include <cmath>
 
-// Pure loop-boundary predicates for mu-tant's preset hot-swap (see backlog
-// #880 / #883). Extracted from PluginProcessor so the swap-defer decision can
+// Pure loop-boundary predicates for mu-tant's preset hot-swap (see the
+// backlog). Extracted from PluginProcessor so the swap-defer decision can
 // be unit-tested without a processor (mirrors mu-clid's HotSwapBoundary.h).
 //
 // mu-tant has no master loop: the transport's `internalBeatPos` advances

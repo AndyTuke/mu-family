@@ -75,7 +75,7 @@ public:
             }
         }
 
-        beginTest("capacity rounds up to a power of two for seamless uint32 wrap (#915)");
+        beginTest("capacity rounds up to a power of two for seamless uint32 wrap");
         {
             AudioRing ring;
             ring.prepare(2, 100);                  // 100 is not a power of two
@@ -166,7 +166,7 @@ public:
             expectEquals((int) c.pulsesElapsed(24), 48);
         }
 
-        beginTest("tempo change does not retroactively shift accumulated beats (#916)");
+        beginTest("tempo change does not retroactively shift accumulated beats");
         {
             TransportClock c; c.prepare(48000.0, 120.0); c.setPlaying(true);
             c.advance(24000);                      // 1 beat at 120 BPM
@@ -177,7 +177,7 @@ public:
 
             // Beats accumulate: the first beat is preserved and the second accrues at the
             // NEW rate → 2.0. The old recompute-from-samples (72000/48000 × 60/60 = 1.5)
-            // would have rewritten the already-elapsed beat — the bug #916 fixes.
+            // would have rewritten the already-elapsed beat — the bug this fixes.
             expectWithinAbsoluteError(c.beats(), 2.0, 1.0e-9);
             expectEquals((int) c.samplePosition(), 72000);
         }
@@ -211,7 +211,7 @@ public:
             expectEquals((int) out.blockSize, 256);
         }
 
-        beginTest("reader fails safe to a stopped snapshot when the writer is stuck odd (#914)");
+        beginTest("reader fails safe to a stopped snapshot when the writer is stuck odd");
         {
             TransportBlock blk;
             TransportSnapshot in;

@@ -314,7 +314,7 @@ public:
             expect(! est.isRunning(), "Stop (0xFC) → stopped");
         }
 
-        beginTest("renderBlock tolerates a block larger than the prepared max (#913)");
+        beginTest("renderBlock tolerates a block larger than the prepared max");
         {
             MuLinkServerMemory mem;
             expect(mem.create(), "server memory failed");
@@ -336,7 +336,7 @@ public:
             expectWithinAbsoluteError(out.storage[0][120], 0.0f,  1.0e-6f);   // beyond the prepared max
         }
 
-        beginTest("external MIDI clock: a stalled stream stops the transport (#912)");
+        beginTest("external MIDI clock: a stalled stream stops the transport");
         {
             MuLinkServerMemory mem;
             expect(mem.create(), "server memory failed");

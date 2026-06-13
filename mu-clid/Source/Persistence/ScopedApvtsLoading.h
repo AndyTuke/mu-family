@@ -5,7 +5,7 @@
 // pattern proved general: any plugin with an APVTS that does bulk-load paths
 // (state restore, swap commit, batch parameter push) needs the same "atomic
 // flag + RAII reset on exception" guard to keep UI / engine listeners from
-// silently dropping per-param syncs during the push. See #391 for the original
+// silently dropping per-param syncs during the push. See the backlog for the original
 // rationale.
 //
 // Usage:

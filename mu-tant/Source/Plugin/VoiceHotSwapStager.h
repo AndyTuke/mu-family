@@ -8,8 +8,8 @@
 namespace mu_tant
 {
 
-// Hot-swap staging state machine for mu-tant (product-side; see backlog
-// #880 / #883). Holds the per-voice pending slots plus a single full-preset
+// Hot-swap staging state machine for mu-tant (product-side; see the
+// backlog). Holds the per-voice pending slots plus a single full-preset
 // pending slot and orchestrates the store-release / load-acquire handshake;
 // the actual state application (replaceState / readVoiceDataFromState /
 // loadVoicePreset body) lives in PluginProcessor, which drains committed swaps

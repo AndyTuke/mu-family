@@ -7,7 +7,7 @@
 //   - Sentinel values with special semantics are preserved (aEnvRel >= 10.0,
 //     rstSt = -1 → nullopt)
 //   - AlgorithmIndex params clamp to countNames()-1, not a stale hardcoded
-//     limit (regression test for #480: drvChar clamped to 12, not 13)
+//     limit (regression: drvChar clamped to 12, not 13)
 //   - Bool params serialise as 0.0 / 1.0 only
 //   - patternDirty / voiceDirty are set by the correct param families
 
@@ -83,7 +83,7 @@ public:
         }
 
         // ── Pitch integer clamps ──────────────────────────────────────────────
-        beginTest ("pitchOct: clamps to [-3, 3] (range reduced from ±4 per #640; ±4 oct combined max comes from oct + semi)");
+        beginTest ("pitchOct: clamps to [-3, 3] (range reduced from ±4; ±4 oct combined max comes from oct + semi)");
         {
             auto& def = find("pitchOct");
             expectWithinAbsoluteError (applyAndPush(def, -3.0f),  -3.0f, kTol, "min");
@@ -171,7 +171,7 @@ public:
             }
         }
 
-        // ── AlgorithmIndex: drvChar regression for #480 ───────────────────────
+        // ── AlgorithmIndex: drvChar regression ───────────────────────
         beginTest ("drvChar: clamps to countNames()-1, not a stale hardcoded limit");
         {
             auto& def = find("drvChar");

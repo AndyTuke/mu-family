@@ -2,7 +2,7 @@
 // - createParameterLayout (the big APVTS layout factory)
 // - parameterChanged dispatcher
 // - syncRhythmParam / forceSyncRhythmFromAPVTS (FX/mixer route to mu-core's
-//   ProcessorBase::syncGlobalFxParam — see #720)
+//   ProcessorBase::syncGlobalFxParam — see the backlog)
 // - pushRhythmToAPVTS / pushMixerChannelToAPVTS / swapAPVTSForRhythms
 //
 // Shared helpers (kChannelSuffixes, applyRhythmSuffix, adsrTime, adsrSus)
@@ -181,7 +181,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         const juce::String n = (i < kAutomatedRhythms)
                                    ? "Rhythm " + juce::String(i + 1) + " Ch "
                                    : "Ch"      + juce::String(i + 1) + " ";
-        addF(c+"lvl",     n+"Level",      0.0f, 1.0f,  1.0f);  // Issue #121: 0 dB default
+        addF(c+"lvl",     n+"Level",      0.0f, 1.0f,  1.0f);  // 0 dB default
         addF(c+"pan",     n+"Pan",       -1.0f, 1.0f,  0.0f);
         addB(c+"mute",    n+"Mute",      false);
         addB(c+"solo",    n+"Solo",      false);
@@ -307,7 +307,7 @@ void PluginProcessor::forceSyncRhythmFromAPVTS(int ri)
 
 // syncFXParam / syncMixerParam removed — mu-clid now routes its FX / return /
 // master / channel-strip parameterChanged callbacks to the shared
-// ProcessorBase::syncGlobalFxParam (mu-core), matching mu-tant. See #720.
+// ProcessorBase::syncGlobalFxParam (mu-core), matching mu-tant. See the backlog.
 
 //==============================================================================
 void PluginProcessor::pushRhythmToAPVTS(int ri)

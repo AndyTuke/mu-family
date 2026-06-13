@@ -1,4 +1,4 @@
-// writeKindedProperty / readKindedPropertyAsActualV2 round-trip test (#454).
+// writeKindedProperty / readKindedPropertyAsActualV2 round-trip test.
 //
 // For each ParamKind, picks a representative value, writes it into a ValueTree
 // via writeKindedProperty, reads it back via readKindedPropertyAsActualV2, and

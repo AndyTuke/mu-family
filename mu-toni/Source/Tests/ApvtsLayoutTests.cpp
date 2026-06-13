@@ -5,7 +5,7 @@
 // from that helper (behind a minimal headless AudioProcessor) and asserts the
 // exact ID set — so drift in the shared layout is caught here. Like mu-clid- and
 // mu-tant-tests, it does NOT construct the full PluginProcessor (its createEditor()
-// drags the editor/UI tree into a console app — see backlog #721).
+// drags the editor/UI tree into a console app — see the backlog).
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Plugin/MixerFxParams.h"   // mu-core: mu_mixfx::addGlobalFxParams
@@ -63,7 +63,7 @@ public:
                         juce::String ("missing global-FX param '") + id + "'");
         }
 
-        beginTest ("Dead legacy sends stay removed (#724)");
+        beginTest ("Dead legacy sends stay removed");
         {
             expect (apvts.getParameter ("eff_send") == nullptr, "eff_send must not exist");
             expect (apvts.getParameter ("dly_send") == nullptr, "dly_send must not exist");

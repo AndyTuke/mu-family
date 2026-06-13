@@ -29,7 +29,7 @@ public:
 
         // Use the ppq position the server ACCUMULATED (carried in the snapshot), not a
         // recompute from samples × current tempo — the latter would jump on a tempo change
-        // (notably the continuous re-estimate under external-MIDI slave). See backlog #916.
+        // (notably the continuous re-estimate under external-MIDI slave). See the backlog.
         PositionInfo info;
         info.setIsPlaying(snap.playing != 0);
         info.setTimeInSamples((juce::int64) snap.samplePos);

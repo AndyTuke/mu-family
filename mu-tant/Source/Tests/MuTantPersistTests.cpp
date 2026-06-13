@@ -1,8 +1,8 @@
 // mu-tant modulator-persistence tests — exercises the shared mu-core modulator
-// (de)serialise (mu_pp, lifted in #706) the way mu-tant uses it: a VoiceSlot's
+// (de)serialise (mu_pp) the way mu-tant uses it: a VoiceSlot's
 // ControlSequences + ModulationMatrix assignments round-trip through a ValueTree
 // with mu-tant's destination validator. Guards against the silent loss the
-// #706 fix addressed.
+// fix addressed.
 
 #include <juce_core/juce_core.h>
 #include <juce_data_structures/juce_data_structures.h>

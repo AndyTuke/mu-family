@@ -10,10 +10,10 @@
 // out of sync — e.g. push writes `vp.x` but apply reads to `vp.y`. That kind
 // of typo would silently corrupt every preset save → load cycle.
 //
-// Why this test matters: pre-#434, applyRhythmSuffix's if/else chain and
+// Why this test matters: before the table consolidation, applyRhythmSuffix's if/else chain and
 // pushRhythmToAPVTS's set() chain were two independent hand-written
 // implementations of the same suffix dispatch. They were vulnerable to drift.
-// The table consolidation in #434 made them share code, but only this test
+// The table consolidation made them share code, but only this test
 // proves the shared code is correct.
 
 #include <juce_core/juce_core.h>

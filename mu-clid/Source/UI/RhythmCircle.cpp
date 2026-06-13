@@ -89,7 +89,7 @@ void RhythmCircle::timerCallback()
             rotAngleB = ((float)(step % sB) + frac) / (float)sB * twoPi;
             rotAngleC = ((float)stepC        + frac) / (float)sC * twoPi;
 
-            // Issue #43: edge-detect via monotonic counter so multiple readers
+            // edge-detect via monotonic counter so multiple readers
             // (this circle + sidebar mini-circles + sidebar pulse) can all observe
             // the same hit without racing each other on a shared one-shot flag.
             const int currentHitCount = playState->hitCount.load();

@@ -30,7 +30,7 @@ public:
 
 private:
     // The μ (U+03BC) is hard-coded as UTF-8 bytes for the title bar — the JucePlugin_Name
-    // macro mangles it in the CMake `-D` round-trip (see #421).
+    // macro mangles it in the CMake `-D` round-trip.
     static juce::String displayName()
     {
        #if MUCLID_LITE_BUILD

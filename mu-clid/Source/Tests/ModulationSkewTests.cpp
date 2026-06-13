@@ -1,4 +1,4 @@
-// C5 - proportion-space modulation skew round-trips (#638/#639).
+// C5 - proportion-space modulation skew round-trips.
 //
 // Skewed-slider modulation seeds a value into proportion space with propFrom*()
 // and converts it back with *FromProp(). These were triplicated inline lambdas in
