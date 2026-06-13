@@ -41,13 +41,20 @@ private:
     StatusBar      statusBar;
     AboutPanel     aboutPanel;
     DropdownSelect noteSelector;
+    DropdownSelect sizeDropdown;
     juce::Label    noteSelectorLabel;
     KnobWithLabel  accentKnob { "Accent", MuLookAndFeel::knobLevel };
 
-    static constexpr int kTransportH  = 40;
-    static constexpr int kStatusH     = 22;
-    static constexpr int kCircleSize  = 300;
-    static constexpr int kControlsH   = 60;
+    // Unscaled window dimensions — multiply by mu_ui::s() / mu_ui::scale at use.
+    static constexpr int kLiteW        = 1110;
+    static constexpr int kLiteH        = 420;
+    static constexpr int kTransportH   = 40;
+    static constexpr int kStatusH      = 22;
+    // Circle uses the family constant; kCircleMargin adds left inset so the
+    // circle doesn't sit flush against the window edge.
+    static constexpr int kCircleMargin = 12;
+    // kControlsH raised to fit Size 1 knobs (kKnobSize1H = 70) with 2 px top/bottom margin.
+    static constexpr int kControlsH    = 74;
 
     void refreshCircle();
     static juce::String midiNoteName(int note);

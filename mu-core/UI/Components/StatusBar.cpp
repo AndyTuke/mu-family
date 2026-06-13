@@ -35,15 +35,28 @@ void StatusBar::paint(juce::Graphics& g)
         textX += tagW + s(4);
     }
 
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
+    if (currentName.isEmpty() && currentValue.isEmpty()) return;
 
-    // Param name
+    const juce::Font font(juce::FontOptions{}.withHeight(sf(11.0f)));
+    g.setFont(font);
+
+    // Measure and centre the name + value pair as a unit inside the bar.
+    // Both draw in a full-height strip so centredLeft vertically centres them.
+    auto measureW = [&font](const juce::String& t) -> float
+    {
+        juce::GlyphArrangement ga;
+        ga.addLineOfText(font, t, 0.0f, 0.0f);
+        return ga.getBoundingBox(0, ga.getNumGlyphs(), true).getWidth();
+    };
+    const float nameW = measureW(currentName);
+    const float sepW  = measureW("  ");
+    const float valW  = measureW(currentValue);
+    const int   startX = juce::jmax(textX, (int)(((float)getWidth() - nameW - sepW - valW) * 0.5f));
+
     g.setColour(MuLookAndFeel::colour(Id::statusBarText));
-    g.drawText(currentName, textX, 0, getWidth() / 2, h,
-               juce::Justification::centredLeft, true);
-
-    // Value
+    g.drawText(currentName,  startX,                                   0,
+               (int)std::ceil(nameW),     h, juce::Justification::centredLeft, false);
     g.setColour(MuLookAndFeel::colour(Id::statusBarValue));
-    g.drawText(currentValue, textX + getWidth() / 2 - textX, 0,
-               getWidth() / 2, h, juce::Justification::centredLeft, true);
+    g.drawText(currentValue, startX + (int)std::ceil(nameW + sepW),    0,
+               (int)std::ceil(valW) + 1, h, juce::Justification::centredLeft, false);
 }

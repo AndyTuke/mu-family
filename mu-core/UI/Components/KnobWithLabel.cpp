@@ -6,6 +6,9 @@ KnobWithLabel::KnobWithLabel(const juce::String& label,
 {
     slider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     slider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    // Scroll-wheel events from the DAW (timeline scroll during playback) would
+    // otherwise change knob values on hover. Disable to prevent accidental edits.
+    slider.setScrollWheelEnabled(false);
     slider.setColour(juce::Slider::rotarySliderFillColourId,
                      MuLookAndFeel::colour(knobColour));
     slider.setColour(juce::Slider::rotarySliderOutlineColourId,

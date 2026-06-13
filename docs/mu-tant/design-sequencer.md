@@ -1,7 +1,7 @@
 # mu-tant — Sequencer (Gate Pattern)
 
-Implemented design. The drawable gate editor, per-envelope shapes, per-envelope
-probability, and loop-N-of-M are all live.
+Implemented design. The drawable gate editor and per-envelope attack/decay
+shapes are live.
 
 Sibling doc: [design-voice.md](design-voice.md) — voice DSP, oscillator chain,
 pitch model. The gate stage described here sits between the filter and the
@@ -184,26 +184,6 @@ Ghost rendering: the inactive layer is drawn at 20% alpha in its own colour
 (gate = coral `knobFxSend`, filter = teal `knobPostPad`) so both layers can be
 aligned visually.
 
-## Toolbox — Arrow tool
-
-A fifth tool (`Arrow`, leftmost in the toolbox) selects an envelope by clicking
-it. The selected envelope is highlighted and its per-envelope properties appear
-in the **properties strip** below the grid.
-
-## Properties strip
-
-A 40 px band below the grid, always present:
-- **Prob** — horizontal slider 0..100 %. Probability this envelope fires each
-  loop pass. Uses a deterministic hash of `(loopCount, startCell)` so the
-  decision is stable across the whole loop and varies each pass.
-- **Loop** — `N` dropdown (1..8) and `M` dropdown (1..8). Fires on loop `N-1
-  mod M` of the pattern cycle. `1 / 1` = every loop (default). `1 / 2` = play
-  the first of every two loops.
-
-When no envelope is selected the strip shows "Select an envelope with the Arrow
-tool to edit its properties".
-
 ## Deferred (not yet implemented)
 
 - **Pattern hot-swap staging** (reuse mu-clid's `HotSwapStager`).
-- **On-staged-for-change** / **First-only** per-envelope fire rules.

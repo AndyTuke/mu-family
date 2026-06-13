@@ -75,6 +75,9 @@ P "On first launch mu-Clid creates a content folder at %USERPROFILE%\Documents\T
 H2 "Default Presets"
 P "If a file named _default.muClid exists in your Presets folder it is loaded silently on startup. If _default.muRhythm exists in your Rhythms folder it is applied whenever you add a new rhythm. Save over either file to create a personal default."
 
+H2 "LITE Version"
+P "A free LITE version of mu-Clid is available from transwarp.me. It is identical to the full version in every respect except that it is limited to a single rhythm track and cannot save presets. If you are running the LITE version, all documentation in this manual applies — only the eight-rhythm capability is not available."
+
 # ── 4. Interface Overview ─────────────────────────────────────────────────────
 H1 "4. Interface Overview"
 P "The mu-Clid window is divided into four regions:"
@@ -274,7 +277,7 @@ Bullet "Master (slightly wider, with a Master Insert panel attached)"
 P "Each rhythm strip contains, from top to bottom: a coloured header, the channel name, a sidechain section (source dropdown, Amount, Attack, Release), three FX send rotaries (Effect, Delay, Reverb), an output bus selector, a pan knob, a vertical fader with VU meter and gain-reduction meter, a level readout, and Mute and Solo buttons."
 
 H2 "Sidechain Ducking"
-P "Each rhythm channel can duck from any other channel. The source dropdown selects the trigger channel, Amount sets the depth (0 to 100 percent), and Attack and Release shape the envelope follower. When a channel is being ducked, a downward-filling gain-reduction meter appears next to its main VU meter."
+P "Each rhythm channel can duck from any other channel, or from an external sidechain signal fed in through the host (VST3 / CLAP side-chain bus). The source dropdown includes all rhythm channels plus an External option; Amount sets the depth (0 to 100 percent), and Attack and Release shape the envelope follower. When a channel is being ducked, a downward-filling gain-reduction meter appears next to its main VU meter."
 
 H2 "FX Send Behaviour"
 P "All three FX sends (Effect, Delay, Reverb) on rhythm channels are standard parallel sends. The dry signal always passes to the master bus at the channel fader level, and the send knob adds a copy of the channel signal — scaled by the send amount — into the FX return bus. Turning a send up never reduces the dry signal."

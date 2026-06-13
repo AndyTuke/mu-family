@@ -372,10 +372,6 @@ private:
     // Written in prepareToPlay (host suspends the audio thread first) — no atomic needed.
     double currentSampleRate = 44100.0;
 
-    // Counts completed 2-bar pattern loops (incremented at each wrap in processBlock).
-    // Read by the audio thread in renderVoice to drive per-envelope loopN/loopM +
-    // probability rules. Wraps safely at uint max — the modulo check in playsOnLoop
-    // is stable across the wrap.
     // Number of existing voices (layers), 1..kMaxVoices. Audio thread reads it
     // atomically; add/removeVoice mutate it on the message thread under voicesLock.
     std::atomic<int> numVoices { 1 };

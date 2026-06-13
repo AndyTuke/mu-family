@@ -7,7 +7,7 @@ Family-shared guidance for Claude Code working in this monorepo. **Product-speci
 ```
 mu-core/        Shared audio + FX + modulation + mixer UI + ProcessorBase + EditorShellBase (INTERFACE library)
 mu-clid/        Euclidean rhythm sequencer + sample trigger plugin (VST3 + CLAP + Standalone + Lite)
-mu-tant/        Wavetable drone synth — 8 voices, mixer, modulators, gate-pattern grid (Standalone, in progress)
+mu-tant/        Wavetable drone synth — 8 voices, mixer, modulators, gate-pattern grid (VST3 + CLAP + Standalone)
 mu-toni/        Scaffolding only — Source/{Plugin,Sequencer,UI,Persistence,License,Tests}/
 mu-on/          909-style groove sequencer — Kick/Bass/Hat/Snare lanes, step grid, bass↔kick sidechain
 docs/           Family-shared design docs; product-specific docs under docs/<product>/
@@ -26,16 +26,24 @@ $env:JUCE_PATH = "D:\JUCE"
 
 ## Build workflow
 
-**Cardinal rule:** the default build is Debug **and** Release for **all products**, and Debug + Release within one session must ship at the **same build number**. Tester reports of "v1.0.NNN" must be reproducible locally without ambiguity over config.
+**Cardinal rule — build-number policy (owner rules, [cmake/IncrementBuildNumber.cmake](cmake/IncrementBuildNumber.cmake)):**
+
+1. **A code change → a Debug build only.** Every Debug build **increments the number by exactly 1**, no matter how soon after the last one — there is no time/session throttle. Each Debug build is a distinct testable artefact with its own number.
+2. **Release builds happen only when the owner explicitly says so.** A Release **rebuilds only the Release artefacts** (Debug artefacts are never touched) and is stamped with the **same number as the last Debug build** — Release **never** increments.
+3. **Release ≤ last Debug, always.** At ship time Release equals the last Debug; as development continues the Debug counter marches ahead, so a previously-shipped Release legitimately sits *below* the current counter — that is normal. A Release coming out **higher** than the last Debug means the counter advanced without a Debug build → the build **stops with a FATAL_ERROR**; surface it to the owner, don't work around it.
+4. **Every Release ships three ways:** (a) artefacts copied to the OneDrive tester share, (b) a zip built and uploaded to the GitHub "latest release" so the website download links resolve, **and** (c) **release notes promoted** — move the accumulated "Next release · In testing" items into a new dated `v1.0.NNN` section in each affected product's notes (`site/mu-clid-releases.html`, `site/mu-tant-releases.html`), clear the In-Testing section, and bump the hardcoded version default in `site/download.html`.
+
+**Release notes on EVERY build (not just releases):** whenever a **Debug** build fixes or improves anything **user-facing**, add a plain-English one-liner — ending with the backlog item number in parens, e.g. "Fixed a rare crash when hot-swapping a rhythm (995)", grouped **New / Improved / Fixed**, **no low-level/internal detail** — to the **"Next release · In testing"** section of each affected product's release-notes page (a shared mu-core fix goes on every product whose code path it touches), then **commit + push the site** (site-only → Netlify auto-deploys, no CI). The In-Testing section is public and must always be current so users can see what's coming in the next version.
+5. **No GitHub Actions workflow runs on push — ever.** `ci.yml` (Linux + Windows build + pluginval), `release.yml` (all-platform release), and `mac-validate.yml` (macOS) are all **`workflow_dispatch`-only**, so a `git push` of any path triggers nothing (GitHub minutes cost money). CI/release/mac-validate run **only** when the owner explicitly dispatches them — never as a side-effect of a build, commit, or push, and never re-add `push:`/`pull_request:` triggers.
 
 ```bash
 cmake -B build                              # Configure (once, or after CMakeLists changes)
-cmake --build build --config Debug && cmake --build build --config Release   # Default: Debug + Release
+cmake --build build --config Debug          # Default for a change: Debug only, +1 to the build number
+cmake --build build --config Release        # Owner-requested release: reuses the last Debug number
 ```
 
-- The cmake increment script ([cmake/IncrementBuildNumber.cmake](cmake/IncrementBuildNumber.cmake)) uses a 5-minute session window — Debug + Release back-to-back share one bump.
-- "Debug only" is an explicit opt-in when the user says so. The next Release after a Debug-only session must match the Debug-only number.
-- Only `mu-clid` is copied to the OneDrive tester share (post-build deploy on `mu-clid_Standalone`). Other products build but stay local.
+- **Always report the build number read from `mu-core/BuildNumber.h` *after* the final build** — never quote a number from an intermediate build log, or it will be stale.
+- On a **Release** build configured with `-DMUFAMILY_DEPLOY_TESTERS=ON` (the `MUFAMILY_DEPLOY_TESTERS` option is **OFF by default**), **every product** deploys to the OneDrive tester share: mu-clid (+ Lite), mu-tant, mu-on, mu-toni, and mu-link's exe (each via a `MUFAMILY_DEPLOY_TESTERS`-guarded POST_BUILD). A plain Release with the flag off builds but stays local. Debug never deploys.
 - Artefacts land at `build/<product>/<target>_artefacts/<Config>/<Format>/`. mu-clid/mu-clid-lite both use `build/mu-clid/...` because they share a CMakeLists.
 
 **Plugin formats (family rule).** Every product builds **VST3 + Standalone + CLAP** on all platforms, **plus AU (Audio Unit v2) on macOS**. AU is macOS-only (needs Apple's AudioUnit SDK), so the root [CMakeLists.txt](CMakeLists.txt) defines `MUFAMILY_AU_FORMAT` (= `AU` on `APPLE`, empty otherwise) and **every `juce_add_plugin` must append `${MUFAMILY_AU_FORMAT}` to its `FORMATS`** — that's how a new sibling gets AU for free. (CLAP is added separately via `clap_juce_extensions_plugin`.) AU requires the shared `PLUGIN_MANUFACTURER_CODE TDP1` plus a **unique 4-char `PLUGIN_CODE`** per product. The `_AU` targets exist only in an `APPLE` configure, so they're built/validated on the macOS CI runner (`auval`), never locally on Windows. Shipping AU to Mac users later needs Apple notarization + signing (the Apple side of #99).

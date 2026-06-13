@@ -492,7 +492,7 @@ void EuclideanPanel::resized()
     // Pad rect above; gap = same width as the Pad/Insert gap to keep visual rhythm).
     {
         constexpr int logicX  = kOuter;
-        constexpr int logicW  = eucBlockW - kPadInsertGap;  // shrink right edge to create gap
+        constexpr int logicW  = kLogicDropW;  // fitted to widest item ("B not A")
         constexpr int legatoX = padX;
         constexpr int legatoW = padPanelW;            // matches Pad sub-panel rect above
         constexpr int monoX_  = insX;
@@ -525,7 +525,7 @@ void EuclideanPanel::paint(juce::Graphics& g)
     const char* rowLabels[3]    = { "Euclid A", "Euclid B", "Accent" };
 
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(9.0f))));
-    g.setColour(MuLookAndFeel::colour(Id::mutedText));
+    g.setColour(MuLookAndFeel::colour(Id::labelText));
     for (int i = 0; i < 3; ++i)
         g.drawText(rowLabels[i], s(kOuter), s(rowOffsets[i]), s(innerW), s(kLabelH), juce::Justification::centredLeft, false);
 
@@ -562,7 +562,7 @@ void EuclideanPanel::paint(juce::Graphics& g)
         constexpr int rectH  = kLogicH - 4;
 
         g.drawRoundedRectangle((float) s(kOuter), (float) s(rectY),
-                               (float) s(eucBlockW - kPadInsertGap),  (float) s(rectH), 4.0f, 1.0f);
+                               (float) s(kLogicDropW), (float) s(rectH), 4.0f, 1.0f);
         g.drawRoundedRectangle((float) s(padX),   (float) s(rectY),
                                (float) s(padPanelW),  (float) s(rectH), 4.0f, 1.0f);
         g.drawRoundedRectangle((float) s(insX),   (float) s(rectY),

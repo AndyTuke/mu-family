@@ -26,17 +26,6 @@ namespace
     }
 }
 
-bool GateEnvelope::playsOnLoop(int localLoopCount) const noexcept
-{
-    if (probability >= 1.0f) return true;
-    // Deterministic per-(loop, startCell) hash so the decision is stable across
-    // the duration of one loop and different each loop.
-    uint32_t h = (uint32_t) localLoopCount * 2654435761u ^ (uint32_t) startCell * 40503u;
-    h ^= h >> 16; h *= 0x45d9f3bu; h ^= h >> 16;
-    const float r = (float) (h & 0xFFFFFFu) / (float) 0x1000000u;
-    return r < probability;
-}
-
 float GateEnvelope::shape(float p) const noexcept
 {
     const float s = clamp01(split);
@@ -166,12 +155,10 @@ float GatePattern::gateAt(double beatPos, float gap01) const noexcept
     const int cells = totalCells();
     if (cells <= 0) return 1.0f;
 
-    // Wrap beat position into the pattern span; compute local loop count for
-    // probability — each complete pattern loop gets a different seed.
+    // Wrap beat position into the pattern span.
     const double patBeats = (double) patternLengthBars * 4.0;
     if (patBeats <= 0.0) return 1.0f;
-    const int localLoopCount = (int) (beatPos / patBeats);
-    double pos = beatPos - (double) localLoopCount * patBeats;
+    double pos = std::fmod(beatPos, patBeats);
     if (pos < 0.0) pos += patBeats;
 
     const double cellLen = patBeats / (double) cells;
@@ -186,9 +173,6 @@ float GatePattern::gateAt(double beatPos, float gap01) const noexcept
         cachedEnv  = envelopeAtCell(cell);
     }
     if (cachedEnv == nullptr) return 0.0f;   // cell with no envelope -> silent
-
-    // Probability gate: envelope suppressed this loop → silent.
-    if (!cachedEnv->playsOnLoop(localLoopCount)) return 0.0f;
 
     // Phase across the covering envelope's full region (not just this cell).
     const double regionStart = (double) cachedEnv->startCell * cellLen;

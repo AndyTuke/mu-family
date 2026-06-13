@@ -6,14 +6,14 @@ name: CI build
 # stay on the local Windows release flow. mu-link (Win32 shared-memory bus) builds on Windows
 # only until the POSIX backend lands; off-Windows the standalone bridge is a no-op stub.
 #
-# macOS is deliberately NOT on this every-push matrix — macOS runners bill at 10x the minute
-# rate. All Mac work (universal build + AU + lipo + pluginval + auval + render evidence pack)
-# lives in mac-validate.yml, which is workflow_dispatch only — run it before cutting a release.
+# Run this manually before a release (Actions → Run workflow). macOS is NOT in this matrix —
+# all Mac work (universal build + AU + lipo + pluginval + auval + render pack) lives in
+# mac-validate.yml (also manual). Both bill GitHub minutes, so neither runs on push.
 
+# MANUAL ONLY — a git push or PR must NEVER trigger CI (it costs money). This workflow
+# runs solely when the owner explicitly dispatches it (Actions tab → Run workflow, or
+# `gh workflow run ci.yml`). Do NOT re-add push/pull_request triggers.
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
 
 jobs:

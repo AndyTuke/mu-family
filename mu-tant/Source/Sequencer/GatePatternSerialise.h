@@ -30,7 +30,6 @@ inline juce::ValueTree serialiseGate(const GatePattern& g, const char* tagName =
         env.setProperty("atk",   e.attackBend,        nullptr);
         env.setProperty("dec",   e.decayBend,         nullptr);
         env.setProperty("rev",   e.reverse ? 1 : 0,  nullptr);
-        env.setProperty("prob",  e.probability,       nullptr);
         t.addChild(env, -1, nullptr);
     }
     return t;
@@ -81,9 +80,8 @@ inline void deserialiseGate(const juce::ValueTree& t, GatePattern& g)
             e.attackBend  = (float)(double) c.getProperty("atk",   0.0);
             e.decayBend   = (float)(double) c.getProperty("dec",   0.0);
             e.reverse     =        (int)    c.getProperty("rev", 0) != 0;
-            e.probability = juce::jlimit(0.0f, 1.0f,
-                                (float)(double) c.getProperty("prob", 1.0));
-            // loopMask/loopM/loopN properties from older presets are silently ignored.
+            // prob/loopMask/loopM/loopN properties from older presets are silently
+            // ignored (the per-envelope probability / loop-N-of-M feature was removed).
             g.envelopes.push_back(e);
         }
     }

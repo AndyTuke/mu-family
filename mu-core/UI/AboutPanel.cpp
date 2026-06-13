@@ -74,7 +74,7 @@ void AboutPanel::paint(juce::Graphics& g)
 
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
     g.setColour(MuLookAndFeel::colour(Id::mutedText));
-    g.drawText("v0.0.0." + juce::String(BUILD_NUMBER), tx, ty, textW, s(18),
+    g.drawText("v1.0.0." + juce::String(BUILD_NUMBER), tx, ty, textW, s(18),
                juce::Justification::centredLeft, false);
     ty += s(20);
 

@@ -57,11 +57,11 @@ option(MUFAMILY_DEPLOY_TESTERS "Deploy Release artefacts to the OneDrive tester 
 file(READ "${CMAKE_SOURCE_DIR}/build_number.txt" MUFAMILY_BUILD_NUMBER)
 string(STRIP "${MUFAMILY_BUILD_NUMBER}" MUFAMILY_BUILD_NUMBER)
 string(TIMESTAMP MUFAMILY_YEAR "%Y")
-set(MUFAMILY_PLUGIN_VERSION "1.0.${MUFAMILY_BUILD_NUMBER}")
+set(MUFAMILY_PLUGIN_VERSION "1.0.0.${MUFAMILY_BUILD_NUMBER}")
 set(MUFAMILY_COPYRIGHT "Copyright (c) ${MUFAMILY_YEAR} Transwarp Development Project")
-# Windows FILEVERSION uses comma-separated quads (1,0,736,0).
+# Windows FILEVERSION uses comma-separated quads (1,0,0,846). The version
+# string is already 4-part so a straight replace gives the right quad.
 string(REPLACE "." "," MUFAMILY_FILEVERSION "${MUFAMILY_PLUGIN_VERSION}")
-set(MUFAMILY_FILEVERSION "${MUFAMILY_FILEVERSION},0")
 
 message(STATUS "mu-family version: ${MUFAMILY_PLUGIN_VERSION}")
 

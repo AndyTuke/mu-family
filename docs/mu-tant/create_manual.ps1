@@ -72,6 +72,9 @@ Bullet "Standalone  —  run mu-Tant.exe from any location"
 H2 "Content Folder"
 P "On first launch mu-Tant creates a content folder at %USERPROFILE%\Documents\TDP\muTant\ with two sub-folders: Presets (full preset files, .muTant) and Voices (single-voice preset files, .muPattern)."
 
+H2 "Demo Version"
+P "A free save-disabled demo of mu-Tant is available from transwarp.me. It is limited to a single voice; all other features are fully functional. If you are running the demo, all documentation in this manual applies — only the eight-voice capability is not available. The demo cannot save presets or voice files."
+
 # ── 4. Interface Overview ─────────────────────────────────────────────────────
 H1 "4. Interface Overview"
 P "The mu-Tant window is divided into four regions:"
@@ -199,8 +202,7 @@ Bullet "Grid — the cell subdivision: 1/4, 1/8, 1/16 (default), or 1/32."
 Bullet "Gap — forces a silence tail at the end of every envelope region. At 0 percent the envelope fills the full region; at 50 percent it completes in the first half and the second half is silent."
 
 H2 "Toolbox"
-P "Five tools in the header:"
-Bullet "Arrow — select an envelope to edit its shape handles and reveal the properties strip (Probability and Loop)."
+P "Four tools in the header:"
 Bullet "Pencil — click an empty cell to draw a one-cell envelope; drag the start/end grab handles (bottom corners) to extend a region"
 Bullet "Eraser — click an envelope to delete it"
 Bullet "Glue — merge adjacent envelopes into one continuous region"
@@ -212,11 +214,6 @@ Bullet "Top handle (the peak point) — drag horizontally to move where within t
 Bullet "Attack bend handle (mid-point on the rising line) — drag vertically to bow the attack."
 Bullet "Decay bend handle (mid-point on the falling line) — drag vertically to bow the decay."
 P "A new envelope defaults to instant attack with a linear decay - the classic gate sound."
-
-H2 "Per-Envelope Probability and Loop"
-P "Select an envelope with the Arrow tool to open the properties strip below the grid:"
-Bullet "Probability (0 to 100 percent) — the chance the envelope fires on each pass. Below 100 percent it drops out at random, adding generative variation to a pattern."
-Bullet "Loop N of M — the envelope fires only on loop N of every M-loop cycle, so an event can recur once every few bars rather than every pass."
 
 H2 "Audio Behaviour"
 Bullet "Stopped — silent (gate closed)"
@@ -238,7 +235,7 @@ Pic "Modulator panel with the Stepped editor and several destination targets."
 # ── 15. Mixer ─────────────────────────────────────────────────────────────────
 H1 "15. Mixer"
 P "Click the Mixer button in the transport bar to open the mixer overlay. Each voice occupies one channel strip; to the right are the Effect, Delay, and Reverb return channels and the Master strip. This is the same shared mixer and FX rack as mu-Clid."
-P "Each voice strip has a fader with VU metering, pan, mute and solo, sidechain ducking (source, amount, attack, release), and Effect / Delay / Reverb sends. The FX return strips carry intra-FX routing (Effect to Delay, Effect to Reverb, Delay to Reverb), and the master strip carries a master insert. The three FX unit rows (Effect / Delay / Reverb) sit below the strips with algorithm selectors and inline parameters."
+P "Each voice strip has a fader with VU metering, pan, mute and solo, sidechain ducking (source, amount, attack, release), and Effect / Delay / Reverb sends. The sidechain source dropdown includes all other voice channels plus an External option — duck any voice from any other, or from a signal fed in through the host's sidechain bus (VST3 / CLAP). The FX return strips carry intra-FX routing (Effect to Delay, Effect to Reverb, Delay to Reverb), and the master strip carries a master insert. The three FX unit rows (Effect / Delay / Reverb) sit below the strips with algorithm selectors and inline parameters."
 
 Pic "Mixer overlay with voice channels, FX returns, and master."
 

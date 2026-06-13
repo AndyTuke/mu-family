@@ -830,9 +830,6 @@ void GatingDesigner::resized()
     lx += s(26);   // painted "Gap" label width
     gapSlider.setBounds(lx, (hdrH - s(kGapKnobW)) / 2, s(kGapKnobW) + s(kGapTbW), s(kGapKnobW));
     lx += s(kGapKnobW) + s(kGapTbW) + s(10);
-
-    // Selection props: "Prob" painted label + prob rotary (hidden until selection).
-    lx += s(28);   // painted "Prob" label width
 }
 
 } // namespace mu_tant

@@ -37,6 +37,8 @@ public:
     void setShowPresetControls(bool show);
     // When false, hides the mixer-toggle button. Default true.
     void setShowMixerToggle(bool show);
+    // When false, hides the gear/settings button. Default true.
+    void setShowSettingsButton(bool show);
     // Embed a product-specific component (e.g. mu-clid's master-loop section)
     // between the transport pane and the preset dropdown. Pass `width = 0` or
     // `component = nullptr` to clear. The bar parents the component and lays
@@ -64,8 +66,9 @@ private:
     const bool isStandalone;
 
     juce::String     logoText;
-    bool             showPresetControls = true;
-    bool             showMixerToggle    = true;
+    bool             showPresetControls  = true;
+    bool             showMixerToggle     = true;
+    bool             showSettingsButton  = true;
     juce::Component* loopSection        = nullptr;
     int              loopSectionWidth   = 0;
 

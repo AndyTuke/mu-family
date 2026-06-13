@@ -204,24 +204,6 @@ public:
             expectWithinAbsoluteError(p.gateAt(8.0, 0.0f),  p.gateAt(0.0, 0.0f), 1e-4f, "beat 8 wraps to beat 0");
             expectWithinAbsoluteError(p.gateAt(16.0, 0.0f), p.gateAt(0.0, 0.0f), 1e-4f, "beat 16 wraps to beat 0");
         }
-
-        beginTest("playsOnLoop: probability 1.0 always fires");
-        {
-            GateEnvelope env;
-            env.probability = 1.0f;
-            for (int loop = 0; loop < 16; ++loop)
-                expect(env.playsOnLoop(loop), "probability 1.0 fires on loop " + juce::String(loop));
-        }
-
-        beginTest("playsOnLoop: probability 0 never fires");
-        {
-            GateEnvelope env;
-            env.probability = 0.0f;
-            bool anyFired = false;
-            for (int loop = 0; loop < 64; ++loop)
-                if (env.playsOnLoop(loop)) { anyFired = true; break; }
-            expect(!anyFired, "probability 0.0 never fires across 64 loops");
-        }
     }
 };
 

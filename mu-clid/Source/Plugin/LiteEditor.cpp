@@ -2,7 +2,12 @@
 #include "Sequencer/Rhythm.h"
 
 LiteEditor::LiteEditor(PluginProcessor& p)
-    : AudioProcessorEditor(&p), proc(p),
+    // Apply stored scale before any child component constructs — same pattern as EditorShellBase.
+    : AudioProcessorEditor((mu_ui::scale = juce::jlimit(ProcessorBase::kUiScaleMedium,
+                                                        ProcessorBase::kUiScaleLarge,
+                                                        p.getUiScale()),
+                             &p)),
+      proc(p),
       transportBar(p), masterLoop(p), euclidPanel(p)
 {
     setLookAndFeel(&lookAndFeel);
@@ -13,6 +18,7 @@ LiteEditor::LiteEditor(PluginProcessor& p)
     transportBar.setLoopSection(&masterLoop, MasterLoopSection::kWidth);
     transportBar.setShowPresetControls(false);
     transportBar.setShowMixerToggle(false);
+    transportBar.setShowSettingsButton(false);
 
     addAndMakeVisible(transportBar);
     addAndMakeVisible(rhythmCircle);
@@ -94,11 +100,41 @@ LiteEditor::LiteEditor(PluginProcessor& p)
     proc.apvts.addParameterListener("lite_midiNote",  this);
     proc.apvts.addParameterListener("lite_accentAmt", this);
 
-    setSize(760, 420);
+    // Size dropdown — Normal / Large, right-aligned in the transport bar row.
+    sizeDropdown.addItem("Normal", 1);
+    sizeDropdown.addItem("Large",  2);
+    {
+        const bool isLarge = (proc.getUiScale() >= ProcessorBase::kUiScaleLarge);
+        sizeDropdown.setSelectedId(isLarge ? 2 : 1, false);
+    }
+    sizeDropdown.onChange = [this](int id)
+    {
+        const float scale = (id == 2) ? ProcessorBase::kUiScaleLarge : ProcessorBase::kUiScaleMedium;
+        proc.setUiScale(scale); // fires onUiScaleChanged below
+    };
+    addAndMakeVisible(sizeDropdown);
+
+    // React to scale changes (from size dropdown or external trigger).
+    juce::Component::SafePointer<LiteEditor> safeThis(this);
+    proc.onUiScaleChanged = [safeThis](float scale)
+    {
+        if (auto* self = safeThis.getComponent())
+        {
+            mu_ui::scale = scale;
+            self->setSize(mu_ui::s(kLiteW), mu_ui::s(kLiteH));
+            self->sendLookAndFeelChange();
+            self->resized();
+            self->repaint();
+        }
+    };
+
+    // Window size respects current scale.
+    setSize(mu_ui::s(kLiteW), mu_ui::s(kLiteH));
 }
 
 LiteEditor::~LiteEditor()
 {
+    proc.onUiScaleChanged = nullptr;
     proc.apvts.removeParameterListener("lite_accentAmt", this);
     proc.apvts.removeParameterListener("lite_midiNote",  this);
     setLookAndFeel(nullptr);
@@ -124,28 +160,54 @@ void LiteEditor::parameterChanged(const juce::String& parameterID, float newValu
 
 void LiteEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(lookAndFeel.findColour(MuLookAndFeel::windowBackground));
+    using Id = MuLookAndFeel::ColourIds;
+    using mu_ui::s;
+    // Window background behind transport and status bars.
+    g.fillAll(MuLookAndFeel::colour(Id::windowBackground));
+    // Content area matches full-plugin RhythmPanel background (#232322 panelBackground).
+    g.setColour(MuLookAndFeel::colour(Id::panelBackground));
+    g.fillRect(getLocalBounds().withTrimmedTop(s(kTransportH)).withTrimmedBottom(s(kStatusH)));
 }
 
 void LiteEditor::resized()
 {
+    using mu_ui::s;
     auto area = getLocalBounds();
-    transportBar.setBounds(area.removeFromTop(kTransportH));
-    statusBar.setBounds(area.removeFromBottom(kStatusH));
 
-    const int circleSize = juce::jmin(area.getHeight(), kCircleSize);
-    rhythmCircle.setBounds(area.removeFromLeft(circleSize)
+    // Transport bar row: size dropdown right-aligned, transport bar fills the rest.
+    auto transportRow = area.removeFromTop(s(kTransportH));
+    const int dropW   = s(90);
+    const int dropGap = s(6);
+    const int dropH   = s(24);
+    sizeDropdown.setBounds(transportRow.removeFromRight(dropW + dropGap)
+                                        .reduced(dropGap / 2, (s(kTransportH) - dropH) / 2));
+    transportBar.setBounds(transportRow);
+
+    statusBar.setBounds(area.removeFromBottom(s(kStatusH)));
+
+    const int circleSize = juce::jmin(area.getHeight(), s(MuLookAndFeel::kCircleSize));
+    rhythmCircle.setBounds(area.removeFromLeft(circleSize + s(kCircleMargin))
                                .withSizeKeepingCentre(circleSize, circleSize));
-    // Controls row at the bottom of the right panel: note selector + accent knob.
-    auto controlsRow = area.removeFromBottom(kControlsH);
-    auto accentArea  = controlsRow.removeFromRight(70);
-    accentKnob.setBounds(accentArea.reduced(2, 2));
-    const int labelW = 70;
-    noteSelectorLabel.setBounds(controlsRow.removeFromLeft(labelW).withSizeKeepingCentre(labelW, 22));
-    noteSelector.setBounds(controlsRow.withSizeKeepingCentre(controlsRow.getWidth(), 24));
+
+    // Controls row: [Accent knob (Size 1)] [gap] [MIDI Note label] [Note dropdown (fitted)]
+    auto controlsRow = area.removeFromBottom(s(kControlsH));
+
+    // Indent by EuclideanPanel's border inset so the accent knob's left edge
+    // aligns with the Steps knobs above.
+    controlsRow.removeFromLeft(s(EuclideanPanel::kPanelInset));
+
+    const int knobW = s(MuLookAndFeel::kKnobSize1W);
+    const int knobH = s(MuLookAndFeel::kKnobSize1H);
+    auto knobArea = controlsRow.removeFromLeft(knobW);
+    accentKnob.setBounds(knobArea.withSizeKeepingCentre(knobW, juce::jmin(knobH, knobArea.getHeight())));
+
+    controlsRow.removeFromLeft(s(4));
+    const int labelW = s(70);
+    noteSelectorLabel.setBounds(controlsRow.removeFromLeft(labelW).withSizeKeepingCentre(labelW, s(22)));
+    const int noteDropW = s(65);
+    noteSelector.setBounds(controlsRow.removeFromLeft(noteDropW).withSizeKeepingCentre(noteDropW, s(24)));
 
     euclidPanel.setBounds(area);
-
     aboutPanel.setBounds(getLocalBounds());
 }
 

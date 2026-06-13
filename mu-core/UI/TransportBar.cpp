@@ -10,10 +10,11 @@ TransportBar::TransportBar(ProcessorBase& p)
 {
     playBtn.onClick = [this]
     {
+        if (!isStandalone) return;
         proc.toggleInternalPlay();
         refreshPlayBtn();
     };
-    playBtn.setEnabled(isStandalone);
+    playBtn.setEnabled(true); // always enabled so colour reflects state; click is no-op in plugin
     addAndMakeVisible(playBtn);
 
     if (isStandalone)
@@ -105,6 +106,13 @@ void TransportBar::setShowMixerToggle(bool show)
     resized();
 }
 
+void TransportBar::setShowSettingsButton(bool show)
+{
+    showSettingsButton = show;
+    gearBtn.setVisible(show);
+    resized();
+}
+
 void TransportBar::setLoopSection(juce::Component* component, int width)
 {
     if (loopSection == component && loopSectionWidth == width) return;
@@ -158,10 +166,25 @@ void TransportBar::refreshPlayBtn()
     }
     else
     {
-        playBtn.setButtonText(kPlay);
-        playBtn.setColour(juce::TextButton::buttonColourId,
-                          MuLookAndFeel::colour(Id::segmentInactiveBg));
-        playBtn.setColour(juce::TextButton::textColourOffId, MuLookAndFeel::colour(Id::textDisabledButton));
+        // Reflect DAW transport state via icon + colour (matches standalone:
+        // ▶ play → ■ stop while the host plays); button is non-interactive in
+        // plugin mode — the host owns transport, so this is display-only.
+        bool dawPlaying = false;
+        if (auto* ph = proc.getPlayHead())
+            if (auto pos = ph->getPosition())
+                dawPlaying = pos->getIsPlaying();
+
+        playBtn.setButtonText(dawPlaying ? kStop : kPlay);
+        if (dawPlaying)
+        {
+            playBtn.setColour(juce::TextButton::buttonColourId,  MuLookAndFeel::colour(Id::transportWhilePlayingBg));
+            playBtn.setColour(juce::TextButton::textColourOffId, MuLookAndFeel::colour(Id::textBright));
+        }
+        else
+        {
+            playBtn.setColour(juce::TextButton::buttonColourId,  MuLookAndFeel::colour(Id::transportWhileStoppedBg));
+            playBtn.setColour(juce::TextButton::textColourOffId, MuLookAndFeel::colour(Id::textBright));
+        }
     }
 }
 
@@ -348,15 +371,11 @@ void TransportBar::resized()
     using mu_ui::s;
     const int h      = getHeight();
     const int inset  = s(2);   // pane border vertical inset
-    const int pad    = s(3);   // item vertical padding within pane
-    const int itemY  = pad;
-    const int itemH  = h - 2 * pad;
-    const int posH   = s(14);  // position label height (text only)
-    const int posY   = (h - posH) / 2;
-    const int btnH   = itemH;
-    const int btnY   = itemY;
+    const int pad    = s(5);   // item vertical padding — gives visible gap top/bottom
+    const int btnY   = pad;
+    const int btnH   = h - 2 * pad;
     const int gap    = s(kGap);
-    const int padIn  = s(5);   // inner pane padding
+    const int padIn  = s(6);   // inner pane padding — matches inter-item gap for even ends
 
     // ── Transport sub-pane: [play] [bpm] [pos] ────────────────────────────
     const int tpOuterX = s(kLogoW) + gap;
@@ -367,11 +386,11 @@ void TransportBar::resized()
 
     if (isStandalone)
     {
-        bpmInput.setBounds(x, itemY, s(kBpmW), itemH);
+        bpmInput.setBounds(x, btnY, s(kBpmW), btnH);
         x += s(kBpmW) + gap;
     }
 
-    posLabel.setBounds(x, posY, s(kPosW), posH);
+    posLabel.setBounds(x, btnY, s(kPosW), btnH);
     x += s(kPosW) + padIn;
 
     transportPaneBounds = { tpOuterX, inset, x - tpOuterX, h - 2 * inset };
@@ -397,8 +416,11 @@ void TransportBar::resized()
         rightEdge -= s(kMixerW) + gap;
     }
 
-    gearBtn.setBounds(rightEdge - s(kGearW), btnY, s(kGearW), btnH);
-    rightEdge -= s(kGearW) + gap;
+    if (showSettingsButton)
+    {
+        gearBtn.setBounds(rightEdge - s(kGearW), btnY, s(kGearW), btnH);
+        rightEdge -= s(kGearW) + gap;
+    }
 
     if (showPresetControls)
     {

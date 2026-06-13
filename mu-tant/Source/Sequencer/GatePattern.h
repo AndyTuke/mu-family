@@ -35,15 +35,7 @@ struct GateEnvelope
     float decayBend   = 0.0f;
     bool  reverse     = false;
 
-    // Per-envelope probability. 0..1 chance this envelope fires each pattern
-    // loop; evaluated via a deterministic per-(loop,cell) hash so the decision
-    // is stable across the duration of one loop and different each loop.
-    float probability = 1.0f;
-
     float value(float phase01, float gap01 = 0.0f) const noexcept;
-
-    // Returns false when the probability rule suppresses this envelope this loop.
-    bool playsOnLoop(int localLoopCount) const noexcept;
 
     // True if this region covers the given cell.
     bool covers(int cellIdx) const noexcept
@@ -129,8 +121,6 @@ public:
     // pattern is empty (no gating — continuous drone). Cells with no envelope
     // return 0 (silent). Caches the cell->envelope lookup so per-sample cost is
     // O(1) except on cell changes; cache state is audio-thread-only.
-    // The function computes its own local loop count from beatPos for probability
-    // evaluation — the caller need not maintain a separate loop counter.
     float gateAt(double beatPos, float gap01) const noexcept;
 
     // Invalidate the gate cache — call once at the top of each block's gate
@@ -213,8 +203,7 @@ GateMode gateModeFor(bool bypassed, bool playing, bool patternEmpty) noexcept;
 // Apply the gater to a voice's stereo channel pointers in place (`right` may be
 // null for mono). Pure except for the pattern's audio-thread gate cache + a
 // tryLock around the envelope read. Allocation-free. Each pattern internally
-// wraps the beat position at its own patternLengthBars and computes per-loop
-// probability rolls — no loopCount argument needed.
+// wraps the beat position at its own patternLengthBars — no loopCount argument needed.
 void applyGateBlock(GatePattern& pattern, float* left, float* right, int numSamples,
                     float gap01, bool bypassed, bool playing,
                     double beatStart, double beatsPerSample, double sampleRate) noexcept;

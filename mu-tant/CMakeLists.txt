@@ -119,6 +119,12 @@ clap_juce_extensions_plugin(TARGET mu-tant
 # mu-clid/CMakeLists.txt) so mu-tant builds also tick the session counter.
 # Without this, building only mu-tant would reuse a stale BuildNumber.h.
 add_dependencies(mu-tant increment_build_number)
+# Compile the freshly regenerated versioninfo.rc (post-increment number) so the Windows
+# file-properties version matches the About panel / BuildNumber.h. The increment target
+# (mu-clid/CMakeLists.txt) regenerates mu-tant's .rc; this orders the rc compile after it.
+if(WIN32)
+    add_dependencies(mu-tant_rc_lib increment_build_number)
+endif()
 
 # ── Deploy Release artifacts to the tester drop folder ──────────────────────
 # Mirrors mu-clid's deploy pattern. Guarded by MUFAMILY_DEPLOY_TESTERS (OFF by

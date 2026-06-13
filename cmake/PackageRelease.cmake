@@ -14,7 +14,7 @@
 #   STANDALONE    — path to the built Standalone .exe (omit for Lite/MIDI-effect variants)
 #   PRESETS_DIR   — path to a factory Presets folder to bundle (omit if none yet)
 #
-# Output: <DIST_DIR>/<PRODUCT>-v1.0.<build>-Windows.zip
+# Output: <DIST_DIR>/<PRODUCT>-v1.0.0.<build>-Windows.zip
 
 if(NOT CONFIG STREQUAL "Release")
     return()
@@ -23,7 +23,7 @@ endif()
 # Read the current build number.
 file(READ "${SOURCE_DIR}/build_number.txt" _bn)
 string(STRIP "${_bn}" _bn)
-set(_version "1.0.${_bn}")
+set(_version "1.0.0.${_bn}")
 
 message(STATUS "Packaging ${PRODUCT} v${_version}...")
 

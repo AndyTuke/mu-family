@@ -130,16 +130,30 @@ target_sources(mu-clid_Standalone PRIVATE
     Source/Plugin/RenderMode.cpp
 )
 
-# ── Build-number increment (Release only) ────────────────────────────────────
-# Header lands at mu-core/BuildNumber.h; AboutPanel reads it for display.
-# Counter file + header both live in family-shared space so every product
-# reads the same build number — tester deliveries stay time-aligned across the suite.
+# ── Build-number increment (runs every build; Debug bumps, Release reuses) ────
+# Writes mu-core/BuildNumber.h (About panel) AND regenerates the Windows version
+# resources from the same post-increment number, so file properties == About panel.
+# Counter file + header live in family-shared space so every product shares one number.
 add_custom_target(increment_build_number ALL
-    COMMAND ${CMAKE_COMMAND} -DBUILD_CONFIG=$<CONFIG> -P "${CMAKE_SOURCE_DIR}/cmake/IncrementBuildNumber.cmake"
-    COMMENT "Incrementing build number"
+    COMMAND ${CMAKE_COMMAND} -DBUILD_CONFIG=$<CONFIG>
+            "-DMUFAMILY_COPYRIGHT=${MUFAMILY_COPYRIGHT}"
+            "-DRC1_IN=${CMAKE_SOURCE_DIR}/mu-clid/resources/versioninfo.rc.in"
+            "-DRC1_OUT=${CMAKE_BINARY_DIR}/mu-clid/versioninfo.rc"
+            "-DRC2_IN=${CMAKE_SOURCE_DIR}/mu-clid/resources/versioninfo-lite.rc.in"
+            "-DRC2_OUT=${CMAKE_BINARY_DIR}/mu-clid/versioninfo-lite.rc"
+            "-DRC3_IN=${CMAKE_SOURCE_DIR}/mu-tant/resources/versioninfo.rc.in"
+            "-DRC3_OUT=${CMAKE_BINARY_DIR}/mu-tant/versioninfo.rc"
+            -P "${CMAKE_SOURCE_DIR}/cmake/IncrementBuildNumber.cmake"
+    COMMENT "Incrementing build number + regenerating version resources"
     VERBATIM
 )
 add_dependencies(mu-clid increment_build_number)
+# The resource lib must compile the FRESHLY regenerated .rc (post-increment number),
+# so depend on the increment target — otherwise Windows file properties lag by one on Debug.
+# (mu-clid-lite_rc_lib gets the same dependency after the Lite target is defined below.)
+if(WIN32)
+    add_dependencies(mu-clid_rc_lib increment_build_number)
+endif()
 
 # ── Installer (Release only, requires Inno Setup) ───────────────────────────
 if(ISCC_EXE)
@@ -232,6 +246,8 @@ if(WIN32)
     )
     target_compile_definitions(mu-clid-lite        PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo-lite.rc\"")
     target_compile_definitions(mu-clid-lite_rc_lib PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo-lite.rc\"")
+    # Compile the freshly regenerated .rc (post-increment number) — see increment_build_number above.
+    add_dependencies(mu-clid-lite_rc_lib increment_build_number)
 endif()
 
 target_sources(mu-clid-lite

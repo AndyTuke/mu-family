@@ -90,7 +90,7 @@ void MasterLoopSection::resized()
     const int pad  = s(3);
     const int btnH = h - 2 * pad;
     const int btnY = pad;
-    const int innerPad = s(5);
+    const int innerPad = s(6);
 
     int x = innerPad;
     loopLabel.setBounds(x, btnY, s(36), btnH); x += s(36) + s(2);

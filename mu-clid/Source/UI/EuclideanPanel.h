@@ -36,6 +36,10 @@ public:
     void resized() override;
     void paint(juce::Graphics&) override;
 
+    // Left/right border inset inside the panel — used by LiteEditor to align
+    // controls below the panel with the Steps knobs above.
+    static constexpr int kPanelInset = 4;
+
 private:
     using Id = MuLookAndFeel::ColourIds;
 
@@ -121,6 +125,9 @@ private:
     static constexpr int kEucKnobGap   = 18;  // inter-knob gap between Steps/Hits/Rotate
     static constexpr int kPadKnobGap   = 48;  // shared gap for the Pad pair AND the Insert pair
     static constexpr int kPadInsertGap = 6;   // gap between Pad sub-panel and Insert sub-panel borders
+    // Logic dropdown fitted width — just wide enough for the widest item ("B not A")
+    // plus ComboBox chrome (~5 px left pad + ~20 px arrow).
+    static constexpr int kLogicDropW   = 88;
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();

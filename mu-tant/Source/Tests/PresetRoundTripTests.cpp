@@ -2,8 +2,8 @@
 //
 // Covers the three gate-pattern types (Gate / FilterGate / PitchGate):
 //   - Envelope attributes round-trip through serialiseGate → deserialiseGate
-//   - probability, loopMask, loopM, reverse, attackBend, decayBend preserved
-//   - Legacy loopN attribute correctly converted to single-bit loopMask
+//     (start, len, split, attackBend, decayBend, reverse preserved)
+//   - Legacy prob / loopN / loopM attributes silently ignored on load
 //   - Invalid / absent tree clears the pattern to defaults
 //   - copyDataFrom transfers envelopes correctly (with hasEnvelopes flag)
 // Does not construct PluginProcessor (which drags in the UI tree).
@@ -34,7 +34,6 @@ public:
             e.attackBend  = 0.7f;
             e.decayBend   = -0.3f;
             e.reverse     = true;
-            e.probability = 0.75f;
             src.envelopes.push_back(e);
             src.hasEnvelopes.store(true, std::memory_order_relaxed);
 
@@ -56,7 +55,6 @@ public:
             expectWithinAbsoluteError(re.attackBend, 0.7f,  0.001f);
             expectWithinAbsoluteError(re.decayBend,  -0.3f, 0.001f);
             expect(re.reverse == true, "reverse restored");
-            expectWithinAbsoluteError(re.probability, 0.75f, 0.001f);
         }
 
         // ── FilterGate tag ─────────────────────────────────────────────────────

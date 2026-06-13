@@ -17,7 +17,7 @@ public:
 
     // Width (in baseline pixels, pre-scale) the section needs for its three
     // controls + paddings. Pass to TransportBar::setLoopSection().
-    static constexpr int kWidth = 36 /*label*/ + 2 + 100 /*dropdown*/ + 2 + 56 /*step counter*/ + 10 /*inner pad*/;
+    static constexpr int kWidth = 6 /*pad*/ + 36 /*label*/ + 2 + 100 /*dropdown*/ + 2 + 56 /*step counter*/ + 6 /*pad*/;
 
     // Status-bar wiring — fired when the user picks a new loop length.
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;

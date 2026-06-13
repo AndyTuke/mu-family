@@ -37,6 +37,9 @@ CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
 
+# Local witness of the last Debug build number (written by IncrementBuildNumber.cmake)
+.last_debug_build
+
 # License signing — private keys must never be committed
 tools/private.key
 tools/private.pem

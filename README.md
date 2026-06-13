@@ -21,7 +21,7 @@ Up to 8 independent polyrhythmic Euclidean rhythm slots, each with two hit gener
 
 ## μ-Tant
 
-A permanent dual-oscillator wavetable drone shaped by FM and ring modulation (x-mod) and sculpted rhythmically by an envelope gate sequencer of up to 16 bars. Each step in the gate sequencer has its own envelope, per-step filter cutoff and pitch, probability, and loop-N-of-M gating. Up to 8 voices, each with its own modulator chain. Routes through the same mixer as μ-Clid (three sends, two master inserts, per-channel sidechain).
+A permanent dual-oscillator wavetable drone shaped by FM and ring modulation (x-mod) and sculpted rhythmically by an envelope gate sequencer of up to 16 bars. Each step in the gate sequencer has its own envelope, with per-step filter cutoff and pitch. Up to 8 voices, each with its own modulator chain. Routes through the same mixer as μ-Clid (three sends, two master inserts, per-channel sidechain).
 
 ## μ-link
 
@@ -36,8 +36,8 @@ mu-core/        Shared audio engine, FX, modulation, mixer UI (INTERFACE library
 mu-clid/        μ-Clid + μ-Clid Lite source
 mu-tant/        μ-Tant source
 mu-link/        μ-link sync hub
+mu-on/          909-style groove sequencer — alpha, in development
 mu-toni/        Scaffolding (not yet in development)
-mu-on/          Scaffolding (not yet in development)
 docs/           Design documents
 site/           Marketing website (deployed to transwarp.me via Netlify)
 tests/          Cross-plugin listening-test pipeline

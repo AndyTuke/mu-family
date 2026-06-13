@@ -212,13 +212,16 @@ void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int
 }
 
 void MuLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button,
-                                          const juce::Colour& /*bg*/,
+                                          const juce::Colour& bg,
                                           bool isOver, bool isDown)
 {
     auto bounds = button.getLocalBounds().toFloat().reduced(0.5f);
-    bool on = button.getToggleState();
+    const bool on = button.getToggleState();
 
-    auto bgColour = on ? colour(segmentActiveBg) : colour(segmentInactiveBg);
+    // Use bg directly — JUCE passes button.findColour(buttonColourId or buttonOnColourId),
+    // so per-button setColour() calls (e.g. the transport play button's state colours) are
+    // respected here rather than overridden by hardcoded segment colours.
+    auto bgColour = bg;
     if (isDown) bgColour = bgColour.brighter(0.15f);
     else if (isOver) bgColour = bgColour.brighter(0.08f);
 
@@ -233,8 +236,10 @@ void MuLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button
 void MuLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& button,
                                     bool /*isOver*/, bool /*isDown*/)
 {
-    bool on = button.getToggleState();
-    g.setColour(on ? colour(segmentActiveBorder) : colour(segmentInactiveText));
+    const bool on = button.getToggleState();
+    // Respect per-button text colour overrides (e.g. playBtn.setColour(textColourOffId, ...)).
+    g.setColour(on ? button.findColour(juce::TextButton::textColourOnId)
+                   : button.findColour(juce::TextButton::textColourOffId));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(12.0f)));
     g.drawText(button.getButtonText(), button.getLocalBounds(),
                juce::Justification::centred, true);

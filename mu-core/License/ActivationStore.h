@@ -26,7 +26,11 @@ struct ActivationStore
         if (! f.existsAsFile())
             return rec;
 
-        if (auto* obj = juce::JSON::parse (f.loadFileAsString()).getDynamicObject())
+        // Hold the parsed var in a named local: getDynamicObject() returns a raw pointer
+        // owned by the var's reference count, so the var must outlive the property reads.
+        // (A temporary in the `if` condition is destroyed before the body → use-after-free.)
+        const auto parsed = juce::JSON::parse (f.loadFileAsString());
+        if (auto* obj = parsed.getDynamicObject())
         {
             rec.licenseKey    = obj->getProperty ("license_key").toString();
             rec.instanceId    = obj->getProperty ("instance_id").toString();
