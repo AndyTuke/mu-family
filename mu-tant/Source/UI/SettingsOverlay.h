@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "UI/SettingsOverlayBase.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/SegmentControl.h"
 #include "UI/Components/NudgeInput.h"
@@ -12,51 +13,61 @@ namespace mu_tant
 
 class PluginProcessor;
 
-// Basic mu-tant settings page. Appears in place of the main area (the shell's
-// gear button toggles it). First cut: master volume + UI size + transport BPM.
-// More settings (content folder, MIDI, etc.) land alongside the features that
-// need them, mirroring mu-clid's SettingsOverlay structure as it grows.
-class SettingsOverlay : public juce::Component
+// mu-tant settings page. Shares the header bar / Close button / centred content
+// column / group + section header styling with mu-clid via mu_ui::SettingsOverlayBase,
+// so both products' settings pages look identical. Content: master volume + UI size
+// + transport BPM + MIDI program-change tables, grouped General / MIDI.
+class SettingsOverlay : public mu_ui::SettingsOverlayBase
 {
 public:
     explicit SettingsOverlay(PluginProcessor& proc);
 
-    std::function<void()> onClose;
     // Fired when the user opens a MIDI program-change table; the editor swaps in
     // the shared mu-core overlay (showMidiPresets / showMidiFullPresets).
     std::function<void()> onMidiPresetsClicked;   // Ch 1-8 → per-voice presets
     std::function<void()> onFullPresetsClicked;   // Ch 9   → full presets
 
-    void paint(juce::Graphics& g) override;
-    void resized() override;
+    void paintContent(juce::Graphics& g) override;
+    void layoutContent() override;
 
 private:
     PluginProcessor& proc;
 
-    juce::TextButton closeBtn { "Close" };
-
-    juce::Label    masterVolLabel;
+    // Audio — master volume (reads/writes the mixer master fader param directly,
+    // not via a SliderAttachment — the attachment overwrites the dB
+    // textFromValueFunction with the parameter's raw formatter, mirrors mu-clid).
     KnobWithLabel  masterVolKnob { "Master Vol", MuLookAndFeel::knobLevel };
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> masterVolAttachment;
 
+    // Display — UI size (Medium / Large).
     juce::Label    uiSizeLabel;
     SegmentControl uiSizeCtrl { { "Medium", "Large" } };
 
+    // Transport — internal free-running BPM.
     juce::Label    bpmLabel;
     NudgeInput     bpmInput { "BPM", 20, 300, 120 };
 
-    // ── MIDI Program Change (same model as mu-clid) ──────────────────────────
-    // Two tables: per-voice presets on Ch 1-8, full presets on Ch 9. The tables
-    // themselves are the shared mu-core overlays; these just open them.
-    juce::Label      midiPCLabel;
+    // MIDI Program Change — two tables (Ch 1-8 voice presets, Ch 9 full presets).
+    // The tables themselves are the shared mu-core overlays; these just open them.
     juce::TextButton midiPresetsBtn { "Voice Presets" };
     juce::TextButton fullPresetsBtn { "Full Presets" };
 
-    static constexpr int kHeaderH  = 44;
-    static constexpr int kRowH     = 28;
-    static constexpr int kRowGap   = 18;
-    static constexpr int kLabelW   = 140;
-    static constexpr int kCtrlW    = 200;
+    // Layout sources of truth — populated by computeLayout(), consumed by
+    // layoutContent() AND paintContent() so headers can't drift from their rows.
+    struct LayoutY {
+        int contentX = 0, contentW = 0;
+        int generalGroupHeader = 0;
+        int audioHeader = 0, masterVolY = 0;
+        int displayHeader = 0, uiSizeRowY = 0;
+        int transportHeader = 0, bpmRowY = 0;
+        int midiGroupHeader = 0;
+        int midiPCHeader = 0, midiPCRowY = 0;
+    };
+    LayoutY layout;
+    void computeLayout();
+
+    // Master vol knob renders at Size 2 (matches mu-clid + voice subsection knobs).
+    static constexpr int kMasterVolW = MuLookAndFeel::kKnobSize2W;
+    static constexpr int kMasterVolH = MuLookAndFeel::kKnobSize2H;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SettingsOverlay)
 };

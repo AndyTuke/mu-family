@@ -65,6 +65,8 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/PresetBrowser.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiPresetsPanel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiFullPresetsPanel.cpp"
+    # Shared settings-overlay framework — header bar, content column, group/section headers.
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/SettingsOverlayBase.cpp"
     # Shared modal overlays — product chrome supplied via setters.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/AboutPanel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/ActivationPanel.cpp"

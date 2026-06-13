@@ -5,9 +5,7 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     : proc(p),
       isStandalone(p.wrapperType == juce::AudioProcessor::wrapperType_Standalone)
 {
-    closeBtn.onClick = [this] { if (onClose) onClose(); };
-    addAndMakeVisible(closeBtn);
-
+    // Header bar + Close button are owned by mu_ui::SettingsOverlayBase.
     masterVolKnob.setRange(0.0, 1.0, 0.001);
     // skew + dB readout to match the MixerChannel master fader's behaviour.
     // The underlying APVTS scale is the same linear 0..1 in both places (see
@@ -220,9 +218,9 @@ void SettingsOverlay::updateSampleLibLabel()
 void SettingsOverlay::computeLayout()
 {
     using mu_ui::s;
-    const int w = getWidth();
-    layout.contentW = juce::jmin(s(kContentMaxW), w - s(kPad) * 2);
-    layout.contentX = (w - layout.contentW) / 2;
+    // Content column geometry is owned by the base (centred + width-capped).
+    layout.contentX = contentX();
+    layout.contentW = contentW();
 
     const int headH    = s(kSectionHeadH);
     const int groupH   = s(kGroupHeadH);
@@ -315,16 +313,10 @@ void SettingsOverlay::computeLayout()
     layout.contentBtnsRowY      = y;
 }
 
-void SettingsOverlay::resized()
+void SettingsOverlay::layoutContent()
 {
     using mu_ui::s;
-    computeLayout();
-
-    const int w = getWidth();
-    const int closeW = s(kCloseBtnW);
-    const int closeH = s(kCloseBtnH);
-    const int headerH = s(kHeaderH);
-    closeBtn.setBounds(w - s(kPad) - closeW, (headerH - closeH) / 2, closeW, closeH);
+    computeLayout();   // Close button + header bar are positioned by the base.
 
     const int x       = layout.contentX;
     const int cw      = layout.contentW;
@@ -390,81 +382,32 @@ void SettingsOverlay::resized()
                                      layout.contentBtnsRowY, fbtnW, rowH);
 }
 
-void SettingsOverlay::paint(juce::Graphics& g)
+void SettingsOverlay::paintContent(juce::Graphics& g)
 {
-    using Id = MuLookAndFeel::ColourIds;
     using mu_ui::s;
-    using mu_ui::sf;
 
-    g.setColour(MuLookAndFeel::colour(Id::panelBackground));
-    g.fillAll();
+    // Background + "Settings" header bar + divider are painted by the base.
+    drawGroupHeader(g, layout.generalGroupHeader,   "General");
+    drawSectionHeader(g, layout.audioHeader,        "Audio");
+    drawSectionHeader(g, layout.displayHeader,      "Display");
+    drawSectionHeader(g, layout.outputHeader,       "Output");
 
-    const int headerH = s(kHeaderH);
-
-    // Top "Settings" bar
-    g.setColour(MuLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(15.0f))));
-    g.drawText("Settings", s(kPad), 0, s(200), headerH, juce::Justification::centredLeft, false);
-
-    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawLine(0.0f, (float)headerH, (float)getWidth(), (float)headerH, 1.0f);
-
-    const int x = layout.contentX;
-    const int w = layout.contentW;
-
-    // Sub-panel group header: larger font + thicker full-width divider.
-    auto drawGroupHeader = [&](int headerY, const juce::String& title)
-    {
-        g.setColour(MuLookAndFeel::colour(Id::headingText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(15.0f))));
-        g.drawText(title, x, headerY, w, s(20), juce::Justification::centredLeft, false);
-
-        g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
-        const float lineY = (float)(headerY + s(22));
-        g.drawLine((float)x, lineY, (float)(x + w), lineY, 1.0f);
-    };
-
-    // Section sub-header within a sub-panel — smaller font + thin divider.
-    auto drawSectionHeader = [&](int headerY, const juce::String& title)
-    {
-        g.setColour(MuLookAndFeel::colour(Id::headingText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(12.0f))));
-        g.drawText(title, x, headerY, w, s(16), juce::Justification::centredLeft, false);
-
-        g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
-        const float lineY = (float)(headerY + s(17));
-        g.drawLine((float)x, lineY, (float)(x + w), lineY, 0.5f);
-    };
-
-    auto drawHint = [&](int yCentre, const juce::String& text, int hintX, int hintW)
-    {
-        g.setColour(MuLookAndFeel::colour(Id::labelText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
-        g.drawText(text, hintX, yCentre - s(7), hintW, s(14),
-                   juce::Justification::centredLeft, false);
-    };
-
-    drawGroupHeader(layout.generalGroupHeader,   "General");
-    drawSectionHeader(layout.audioHeader,        "Audio");
-    drawSectionHeader(layout.displayHeader,      "Display");
-    drawSectionHeader(layout.outputHeader,       "Output");
-
-    drawGroupHeader(layout.midiGroupHeader,      "MIDI");
-    drawSectionHeader(layout.swapHeader,         "Hot-swap");
+    drawGroupHeader(g, layout.midiGroupHeader,      "MIDI");
+    drawSectionHeader(g, layout.swapHeader,         "Hot-swap");
     if (isStandalone)
-        drawSectionHeader(layout.midiClockHeader, "MIDI Clock");
+        drawSectionHeader(g, layout.midiClockHeader, "MIDI Clock");
     if (!isStandalone)
-        drawSectionHeader(layout.midiModeHeader,  "MIDI Mode");
-    drawSectionHeader(layout.midiPCHeader,       "MIDI Program Change");
+        drawSectionHeader(g, layout.midiModeHeader,  "MIDI Mode");
+    drawSectionHeader(g, layout.midiPCHeader,       "MIDI Program Change");
 
-    drawGroupHeader(layout.locationsGroupHeader, "Locations");
-    drawSectionHeader(layout.sampleLibHeader,    "Sample Library");
-    drawSectionHeader(layout.contentHeader,      "Content Folder");
+    drawGroupHeader(g, layout.locationsGroupHeader, "Locations");
+    drawSectionHeader(g, layout.sampleLibHeader,    "Sample Library");
+    drawSectionHeader(g, layout.contentHeader,      "Content Folder");
 
     // Rescan-required hint next to the multi-bus toggle.
     const int hintX = layout.contentX + s(kLabelW) + s(kLabelCtrlGap) + s(kControlW) + s(kLabelCtrlGap);
     const int hintW = layout.contentX + layout.contentW - hintX;
-    drawHint(layout.multiBusRowY + s(kRowH) / 2, "(host rescan required after toggling)",
+    drawHint(g, layout.multiBusRowY + s(kRowH) / 2, "(host rescan required after toggling)",
              hintX, hintW);
 
     // UI Size — secondary hint about font rescaling. Ctor-time setFont calls
@@ -473,7 +416,7 @@ void SettingsOverlay::paint(juce::Graphics& g)
     // editor is reopened. Painted hints / knob labels (which fetch fonts each
     // paint) update immediately.
     const int hintY = layout.uiSizeRowY + s(kRowH) + s(kRowGap) / 2;
-    drawHint(hintY, "(reopen the plugin for label fonts to fully rescale)",
+    drawHint(g, hintY, "(reopen the plugin for label fonts to fully rescale)",
              layout.contentX + s(kLabelW) + s(kLabelCtrlGap),
              layout.contentX + layout.contentW
                 - (layout.contentX + s(kLabelW) + s(kLabelCtrlGap)));

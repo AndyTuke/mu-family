@@ -1,5 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "UI/SettingsOverlayBase.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/NudgeInput.h"
 #include "UI/Components/KnobWithLabel.h"
@@ -10,24 +11,23 @@ class PluginProcessor;
 
 // Settings panel overlay.  Appears in place of the main area.
 // Active settings write to ApplicationProperties; the rest are placeholders.
-class SettingsOverlay : public juce::Component
+// The header bar, Close button, centred content column and group/section header
+// drawing come from mu_ui::SettingsOverlayBase; this class supplies the rows.
+class SettingsOverlay : public mu_ui::SettingsOverlayBase
 {
 public:
-    std::function<void()> onClose;
     std::function<void()> onContentDirChanged;
     std::function<void()> onMidiPresetsClicked;
     std::function<void()> onFullPresetsClicked;
 
     explicit SettingsOverlay(PluginProcessor& proc);
 
-    void resized() override;
-    void paint(juce::Graphics& g) override;
+    void layoutContent() override;
+    void paintContent(juce::Graphics& g) override;
 
 private:
     PluginProcessor& proc;
     const bool isStandalone;
-
-    juce::TextButton closeBtn { "Close" };
 
     // Active: master volume knob (reads/writes from APVTS)
     KnobWithLabel masterVolKnob { "Master Vol", MuLookAndFeel::knobLevel };
@@ -35,7 +35,7 @@ private:
     // UI Size picker (Medium / Large). Writes to PluginProcessor::setUiScale,
     // which persists via appSettings and triggers the editor's onUiScaleChanged
     // callback. The window resizes immediately and layout reflows; ctor-time
-    // fonts (#574) only update on next editor open — hint label tells the user.
+    // fonts only update on next editor open — hint label tells the user.
     juce::Label     uiSizeLabel;
     SegmentControl  uiSizeCtrl { { "Medium", "Large" } };
 
@@ -105,23 +105,11 @@ private:
     LayoutY layout;
     void computeLayout();
 
-    static constexpr int kHeaderH       = 44;   // top "Settings" bar
-    static constexpr int kPad           = 20;   // page padding
-    static constexpr int kGroupHeadH    = 30;   // sub-panel group header band
-    static constexpr int kGroupGap      = 16;   // vertical gap between sub-panels
-    static constexpr int kSectionGap    = 10;   // vertical gap between sections within a sub-panel
-    static constexpr int kSectionHeadH  = 22;   // section header band height
-    static constexpr int kRowH          = 26;
-    static constexpr int kRowGap        = 8;
-    static constexpr int kLabelW        = 140;
-    static constexpr int kControlW      = 220;
-    static constexpr int kContentMaxW   = 620;  // cap content column so it doesn't sprawl
-    static constexpr int kLabelCtrlGap  = 12;   // horizontal gap between right-aligned label and control
+    // Shared chrome constants (kHeaderH, kPad, kRowH, kLabelW, kControlW, …) are
+    // inherited from mu_ui::SettingsOverlayBase. Only mu-clid-specific sizes live here.
     // Master vol knob renders at Size 2 (matches voice subsection knobs).
     static constexpr int kMasterVolW    = MuLookAndFeel::kKnobSize2W;
     static constexpr int kMasterVolH    = MuLookAndFeel::kKnobSize2H;
-    static constexpr int kCloseBtnW     = 70;
-    static constexpr int kCloseBtnH     = 26;
     static constexpr int kFolderBtnW    = 90;
     static constexpr int kFolderBtnGap  = 8;
 };
