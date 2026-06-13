@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Download | Transwarp Development Project</title>
+  <meta name="description" content="Download μ-clid, μ-clid LITE (free) and μ-tant — VST3, CLAP and Standalone for Windows. Always the latest version.">
+  <link rel="canonical" href="https://transwarp.me/download">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://transwarp.me/download">
+  <meta property="og:title" content="Download | Transwarp Development Project">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+/* ── RESET & ROOT ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #07060E; --bg2: #0D0B18; --bg3: #131128; --bg4: #1A1834;
+  --accent: #6B5FE4; --accent-b: #8B80F0; --glow: rgba(107,95,228,0.35);
+  --teal: #1DB880; --teal-b: #2ECFA0; --glow2: rgba(29,184,128,0.25);
+  --amber: #D4895C; --amber-b: #E8A878; --amber-glow: rgba(212,137,92,0.3);
+  --cyan: #3CB8D4; --cyan-b: #5CCEE8; --cyan-glow: rgba(60,184,212,0.3);
+  --text: #E8E4D8; --text2: #7A758F; --text3: #4A4565;
+  --border: #1E1C32; --border2: #2A2745;
+  --ff-disp: 'Syne', sans-serif;
+  --ff-mono: 'Space Mono', monospace;
+  --ff-body: 'Outfit', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--ff-body); font-size: 16px; line-height: 1.6; overflow-x: hidden; }
+a { color: inherit; text-decoration: none; }
+.container { max-width: 1100px; margin: 0 auto; padding: 0 40px; }
+
+/* ── NAV ── */
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px; height: 56px; display: flex; align-items: center; justify-content: space-between; background: rgba(7,6,14,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+.nav-logo { display: flex; flex-direction: column; line-height: 1; gap: 2px; }
+.nav-logo .brand { font-family: var(--ff-disp); font-size: 17px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+.nav-logo .brand .mu { color: var(--accent-b); }
+.nav-logo .sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.14em; color: var(--text3); text-transform: uppercase; }
+.nav-links { display: flex; align-items: center; gap: 26px; }
+.nav-links a { font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase; transition: color .2s; }
+.nav-links a:hover, .nav-links a.active { color: var(--text); }
+.nav-links .nav-clid { color: var(--accent-b); text-transform: none; }
+.nav-links .nav-tant { color: var(--amber-b); text-transform: none; }
+.nav-links .nav-free { color: var(--cyan-b); }
+.nav-links .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 16px; border-radius: 4px; font-size: 11px; letter-spacing: 0.08em; text-transform: none; transition: background .2s, box-shadow .2s; }
+.nav-links .nav-cta:hover { background: var(--accent-b); box-shadow: 0 0 20px var(--glow); }
+
+/* ── HERO ── */
+.dl-hero { padding-top: 130px; padding-bottom: 28px; }
+.dl-eyebrow { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.22em; color: var(--accent-b); text-transform: uppercase; margin-bottom: 16px; }
+.dl-hero h1 { font-family: var(--ff-disp); font-size: clamp(32px,4vw,52px); font-weight: 800; line-height: 1.0; letter-spacing: -0.03em; margin-bottom: 18px; }
+.dl-hero p { font-size: 17px; font-weight: 300; color: var(--text2); line-height: 1.7; max-width: 620px; }
+
+/* ── VERSION BANNER ── */
+.ver-banner { display: inline-flex; align-items: center; gap: 14px; margin-top: 26px; background: var(--bg3); border: 1px solid var(--border2); border-radius: 8px; padding: 14px 22px; }
+.ver-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--teal-b); box-shadow: 0 0 10px var(--glow2); flex: none; }
+.ver-label { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.18em; color: var(--text3); text-transform: uppercase; }
+.ver-num { font-family: var(--ff-mono); font-size: 16px; font-weight: 700; color: var(--text); }
+.ver-date { font-family: var(--ff-mono); font-size: 11px; color: var(--text2); }
+
+/* ── DOWNLOAD ROWS ── */
+.dl-list { display: flex; flex-direction: column; gap: 18px; padding: 40px 0 20px; }
+.dl-card { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 26px 30px; transition: border-color .2s; }
+.dl-card:hover { border-color: var(--border2); }
+.dl-card.clid { border-left: 3px solid var(--accent); }
+.dl-card.lite { border-left: 3px solid var(--cyan); }
+.dl-card.tant { border-left: 3px solid var(--amber); }
+.dl-name { font-family: var(--ff-disp); font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+.dl-name .mu { font-weight: 800; }
+.dl-card.clid .dl-name .mu { color: var(--accent-b); }
+.dl-card.lite .dl-name .mu { color: var(--cyan-b); }
+.dl-card.tant .dl-name .mu { color: var(--amber-b); }
+.dl-tag { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; padding: 3px 8px; border-radius: 3px; margin-left: 10px; vertical-align: middle; }
+.dl-tag.free { color: var(--cyan-b); border: 1px solid var(--cyan); }
+.dl-tag.demo { color: var(--text2); border: 1px solid var(--border2); }
+.dl-formats { font-size: 13px; color: var(--text2); margin-bottom: 10px; }
+.dl-meta { font-family: var(--ff-mono); font-size: 11px; color: var(--text3); letter-spacing: 0.04em; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.dl-meta b { color: var(--text2); font-weight: 700; }
+.dl-actions { text-align: right; }
+.btn-dl { display: inline-block; font-family: var(--ff-body); font-weight: 600; font-size: 14px; padding: 13px 24px; border-radius: 6px; white-space: nowrap; transition: box-shadow .2s, background .2s, transform .1s; }
+.btn-dl:active { transform: translateY(1px); }
+.btn-dl.clid { background: var(--accent); color: #fff; }
+.btn-dl.clid:hover { box-shadow: 0 0 22px var(--glow); }
+.btn-dl.lite { background: var(--cyan); color: #06121A; }
+.btn-dl.lite:hover { box-shadow: 0 0 22px var(--cyan-glow); }
+.btn-dl.tant { background: var(--amber); color: #1A0E06; }
+.btn-dl.tant:hover { box-shadow: 0 0 22px var(--amber-glow); }
+.dl-sub { font-family: var(--ff-mono); font-size: 10px; color: var(--text3); margin-top: 8px; }
+
+/* ── NOTES ── */
+.dl-note { background: var(--bg2); border: 1px dashed var(--border2); border-radius: 10px; padding: 22px 28px; margin-top: 6px; }
+.dl-note h3 { font-family: var(--ff-disp); font-size: 16px; font-weight: 700; margin-bottom: 6px; color: var(--text); }
+.dl-note p { font-size: 13px; color: var(--text2); }
+.dl-note a { color: var(--accent-b); }
+.dl-help { margin-top: 36px; font-size: 13px; color: var(--text3); }
+.dl-help a { color: var(--accent-b); }
+
+/* ── FOOTER ── */
+footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 80px; }
+.footer-inner { display: grid; grid-template-columns: 200px 1fr 1fr 1fr; gap: 30px; margin-bottom: 40px; }
+.footer-brand .fb-logo { font-family: var(--ff-disp); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+.footer-brand .fb-sub { font-family: var(--ff-mono); font-size: 8px; letter-spacing: 0.16em; color: var(--text3); text-transform: uppercase; margin-bottom: 14px; }
+.footer-brand p { font-size: 12px; color: var(--text3); line-height: 1.65; }
+.footer-col h4 { font-family: var(--ff-mono); font-size: 9px; letter-spacing: 0.18em; color: var(--text2); text-transform: uppercase; margin-bottom: 14px; }
+.footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+.footer-col li a { font-size: 13px; color: var(--text3); transition: color .2s; }
+.footer-col li a:hover { color: var(--text); }
+.footer-bottom { border-top: 1px solid var(--border); padding-top: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.footer-bottom .copy { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text3); }
+.footer-social { display: flex; gap: 16px; }
+.footer-social a { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--text3); text-transform: uppercase; transition: color .2s; }
+.footer-social a:hover { color: var(--text); }
+
+@media (max-width: 820px) {
+  .dl-card { grid-template-columns: 1fr; gap: 16px; }
+  .dl-actions { text-align: left; }
+  .footer-inner { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .container { padding: 0 20px; }
+  nav { padding: 0 20px; }
+  .nav-links { gap: 16px; }
+  .footer-inner { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+  <nav>
+    <a href="index.html" class="nav-logo">
+      <span class="brand">Transwarp</span>
+      <span class="sub">Development Project</span>
+    </a>
+    <div class="nav-links">
+      <a href="mu-clid.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid</a>
+      <a href="mu-tant.html" class="nav-tant"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-tant</a>
+      <a href="free.html" class="nav-free">Free</a>
+      <a href="download.html" class="active">Download</a>
+      <a href="index.html#community">Community</a>
+      <a href="index.html#pricing" class="nav-cta">Shop</a>
+    </div>
+  </nav>
+
+  <main>
+    <section class="dl-hero">
+      <div class="container">
+        <div class="dl-eyebrow">Downloads</div>
+        <h1>Get the plugins.</h1>
+        <p>Every download below is always the current release — you'll get exactly the version shown here. Windows VST3, CLAP and Standalone. macOS and Linux are on the way.</p>
+        <div class="ver-banner">
+          <span class="ver-dot"></span>
+          <div>
+            <div class="ver-label">Latest release</div>
+            <div><span class="ver-num" data-version>v1.0.0.847</span> <span class="ver-date" data-reldate>· released 12 Jun 2026</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="container">
+        <div class="dl-list">
+
+          <!-- μ-clid (Demo / Full) -->
+          <div class="dl-card clid">
+            <div>
+              <div class="dl-name"><span class="mu">μ</span>-clid<span class="dl-tag demo">Demo · Full</span></div>
+              <div class="dl-formats">8-track euclidean rhythm sequencer + sampler · VST3 · CLAP · Standalone · Windows 10/11</div>
+              <div class="dl-meta"><span>Version <b data-version>v1.0.0.847</b></span><span data-asset="mu-Clid-Windows.zip">11.8 MB</span><span>Full-featured demo — single track, saving disabled. Add your licence key to unlock all 8 tracks and saving.</span></div>
+            </div>
+            <div class="dl-actions">
+              <a class="btn-dl clid" href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Clid-Windows.zip">Download — Windows ↓</a>
+              <div class="dl-sub">No registration required</div>
+            </div>
+          </div>
+
+          <!-- μ-clid LITE (Free) -->
+          <div class="dl-card lite">
+            <div>
+              <div class="dl-name"><span class="mu">μ</span>-clid LITE<span class="dl-tag free">Free forever</span></div>
+              <div class="dl-formats">Single-track euclidean MIDI sequencer · VST3 · CLAP · Windows 10/11</div>
+              <div class="dl-meta"><span>Version <b data-version>v1.0.0.847</b></span><span data-asset="mu-Clid-Lite-Windows.zip">6.9 MB</span><span>No time limit · No registration · Free forever</span></div>
+            </div>
+            <div class="dl-actions">
+              <a class="btn-dl lite" href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Clid-Lite-Windows.zip">Download Free — Windows ↓</a>
+              <div class="dl-sub">Permanent install</div>
+            </div>
+          </div>
+
+          <!-- μ-tant (Demo / Full) -->
+          <div class="dl-card tant">
+            <div>
+              <div class="dl-name"><span class="mu">μ</span>-tant<span class="dl-tag demo">Demo · Full</span></div>
+              <div class="dl-formats">Wavetable drone synth · VST3 · CLAP · Standalone · Windows 10/11</div>
+              <div class="dl-meta"><span>Version <b data-version>v1.0.0.847</b></span><span data-asset="mu-Tant-Windows.zip">11.0 MB</span><span>Full-featured demo — single voice, saving disabled. Add your licence key to unlock all 8 voices and saving.</span></div>
+            </div>
+            <div class="dl-actions">
+              <a class="btn-dl tant" href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Tant-Windows.zip">Download — Windows ↓</a>
+              <div class="dl-sub">No registration required</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="dl-note">
+          <h3>macOS &amp; Linux</h3>
+          <p>Mac (Universal — Apple Silicon + Intel) and Linux builds are in testing and will appear here soon. In the meantime, <a href="contact.html">get in touch</a> if you'd like to help test.</p>
+        </div>
+
+        <p class="dl-help">All downloads are <code>.zip</code> archives containing the VST3, CLAP (and Standalone where applicable). Unzip and copy the plugin into your system plugin folder. Already bought a licence? Open the plugin, click the demo banner, and paste your key to activate. Trouble installing? <a href="contact.html">Contact support</a>.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand"><div class="fb-logo">Transwarp</div><div class="fb-sub">Development Project</div><p>Indie audio plugin development from Bath, UK.</p></div>
+        <div class="footer-col"><h4>Products</h4><ul><li><a href="mu-clid.html"><span style="text-transform:none">μ</span>-clid</a></li><li><a href="mu-tant.html"><span style="text-transform:none">μ</span>-tant</a></li><li><a href="free.html">LITE (Free)</a></li><li><a href="download.html">Download</a></li></ul></div>
+        <div class="footer-col"><h4>Resources</h4><ul><li><a href="index.html#community">Community</a></li><li><a href="index.html#pricing">Shop</a></li><li><a href="#">Documentation</a></li><li><a href="#">System Requirements</a></li></ul></div>
+        <div class="footer-col"><h4>Company</h4><ul><li><a href="contact.html">Contact</a></li><li><a href="mailto:support@transwarp.me">support@transwarp.me</a></li><li><a href="mailto:info@transwarp.me">info@transwarp.me</a></li><li><a href="#">EULA</a></li></ul></div>
+      </div>
+      <div class="footer-bottom">
+        <span class="copy">© 2026 Transwarp Development Project · transwarp.me · Bath, UK</span>
+        <div class="footer-social"><a href="#">YouTube</a><a href="#">X / Twitter</a><a href="https://github.com/AndyTuke/mu-family">GitHub</a><a href="#">KVR Audio</a></div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+  // Show the version that will actually be downloaded by querying GitHub's
+  // "latest release" — the same release the download buttons resolve to.
+  (function () {
+    var REPO = 'AndyTuke/mu-family';
+    var setAll = function (sel, val) {
+      document.querySelectorAll(sel).forEach(function (el) { el.textContent = val; });
+    };
+    fetch('https://api.github.com/repos/' + REPO + '/releases/latest', { headers: { 'Accept': 'application/vnd.github+json' } })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (rel) {
+        setAll('[data-version]', rel.tag_name || 'latest');
+        if (rel.published_at) {
+          var d = new Date(rel.published_at);
+          setAll('[data-reldate]', '· released ' + d.toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' }));
+        }
+        (rel.assets || []).forEach(function (a) {
+          var el = document.querySelector('[data-asset="' + a.name + '"]');
+          if (el && a.size) el.textContent = (a.size / 1048576).toFixed(1) + ' MB';
+        });
+      })
+      .catch(function () {
+        // API unavailable (offline, rate-limited, or local file:// preview where
+        // cross-origin fetch is blocked): keep the hardcoded defaults baked into the
+        // HTML so a real version + sizes are always shown. Nothing to do here.
+      });
+  })();
+  </script>
+
+</body>
+</html>
