@@ -398,8 +398,11 @@ void TransportBar::resized()
     // ── Optional loop section: positioned right of the transport pane ─────
     if (loopSection != nullptr && loopSectionWidth > 0)
     {
+        // loopSectionWidth is an unscaled baseline (the product passes kWidth) — scale
+        // it like every other transport element so the pane matches its s()-scaled
+        // children in Large mode (otherwise the step counter overflows + clips).
         const int lpOuterX = transportPaneBounds.getRight() + gap;
-        loopPaneBounds = { lpOuterX, inset, loopSectionWidth, h - 2 * inset };
+        loopPaneBounds = { lpOuterX, inset, s(loopSectionWidth), h - 2 * inset };
         loopSection->setBounds(loopPaneBounds);
     }
     else

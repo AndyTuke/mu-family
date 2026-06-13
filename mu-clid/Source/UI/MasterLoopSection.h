@@ -34,4 +34,9 @@ private:
     void timerCallback() override;
     void syncLoopDropdownFromAPVTS();
     void parameterChanged(const juce::String& parameterID, float newValue) override;
+
+    // Last values shown in loopStepLabel — the timer only rebuilds the string when
+    // one changes, so a 30 Hz tick doesn't allocate a juce::String every frame.
+    int lastShownStep = -1;
+    int lastShownSteps = -1;
 };

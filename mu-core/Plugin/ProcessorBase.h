@@ -293,9 +293,11 @@ public:
 private:
     // syncGlobalFxParam dispatch helpers — one per ID family, so the public
     // entry point is a short prefix router rather than a ~100-line if/else chain.
-    // syncMaster returns true when it handled the id.
-    void syncChannelStripParam(int channel, const juce::String& param, float v);
-    void syncReturnStripParam (int retIdx,  const juce::String& rest,  float v);
+    // syncMaster returns true when it handled the id. The channel/return helpers
+    // take a raw `const char*` suffix pointing into the caller's id buffer (NOT a
+    // juce::String substring) so the audio-thread automation path allocates nothing.
+    void syncChannelStripParam(int channel, const char* param, float v);
+    void syncReturnStripParam (int retIdx,  const char* rest,  float v);
     bool syncMasterParam      (const juce::String& id, float v);
     void syncFxSlotParam      (const juce::String& id, float v);
 

@@ -78,8 +78,15 @@ void MasterLoopSection::timerCallback()
     {
         const int steps   = proc.sequencer.getMasterLoopSteps();
         const int current = proc.sequencer.getMasterLoopCurrentStep() + 1;
-        loopStepLabel.setText(juce::String(current) + " / " + juce::String(steps),
-                              juce::dontSendNotification);
+        // Only rebuild the "n / m" string when it actually changes — avoids a
+        // per-tick heap allocation when the counter is paused or unchanged.
+        if (current != lastShownStep || steps != lastShownSteps)
+        {
+            lastShownStep  = current;
+            lastShownSteps = steps;
+            loopStepLabel.setText(juce::String(current) + " / " + juce::String(steps),
+                                  juce::dontSendNotification);
+        }
     }
 }
 

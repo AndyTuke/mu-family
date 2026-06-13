@@ -623,8 +623,12 @@ void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
 
 void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
+    // Validate the root tag before applying (mirrors mu-on / mu-toni): a corrupt or
+    // foreign chunk that still parses as XML must NOT replace our APVTS root, or the
+    // params detach. Only apply a tree tagged as our own state type.
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
-        applyFullPresetTree(juce::ValueTree::fromXml(*xml));   // host state restore — always immediate
+        if (xml->hasTagName(apvts.state.getType()))
+            applyFullPresetTree(juce::ValueTree::fromXml(*xml));   // host state restore — always immediate
 }
 
 // ── Dynamic voice management ─────────────────────────────────────────────────

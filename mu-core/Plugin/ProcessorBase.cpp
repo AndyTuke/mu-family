@@ -1,6 +1,7 @@
 #include "Plugin/ProcessorBase.h"
 #include "Audio/FX/Slots/FXAlgorithmDef.h"   // FXAlgorithmRegistry
 #include "Audio/AlgorithmNames.h"             // mu_audio::kInsertAlgorithmCount
+#include <cstring>                            // std::strcmp — alloc-free suffix compare
 
 #if MU_CORE_HAS_CLAP
  #pragma message("mu-core: ProcessorBase built WITH CLAP sidechain capability (isInputMain=false)")
@@ -94,7 +95,7 @@ void ProcessorBase::syncGlobalFxParam(const juce::String& id, float v)
     {
         const int i = id[2] - '0';
         if (i >= 0 && i < MixerEngine::MaxChannels)
-            syncChannelStripParam(i, id.substring(4), v);
+            syncChannelStripParam(i, id.toRawUTF8() + 4, v);   // suffix into id buffer, no alloc
         return;
     }
 
@@ -105,7 +106,7 @@ void ProcessorBase::syncGlobalFxParam(const juce::String& id, float v)
         else if (id.startsWith("ret_dly_")) retIdx = 1;
         else if (id.startsWith("ret_rev_")) retIdx = 2;
         if (retIdx >= 0)
-            syncReturnStripParam(retIdx, id.substring(8), v);
+            syncReturnStripParam(retIdx, id.toRawUTF8() + 8, v);   // suffix into id buffer, no alloc
         return;
     }
 
@@ -114,34 +115,39 @@ void ProcessorBase::syncGlobalFxParam(const juce::String& id, float v)
     syncFxSlotParam(id, v);                                                 // eff_*, eff2*, dly_*, rev_*, echo_*
 }
 
-void ProcessorBase::syncChannelStripParam(int channel, const juce::String& param, float v)
+// param / rest are raw NUL-terminated suffixes pointing into the caller's id
+// buffer (param IDs are pure ASCII). std::strcmp avoids building any juce::String,
+// so this stays allocation-free on the audio-thread automation path.
+void ProcessorBase::syncChannelStripParam(int channel, const char* param, float v)
 {
     auto& ch = mixerEngine.channels[(size_t) channel];
-    if      (param == "lvl")     ch.level.store(v, std::memory_order_relaxed);
-    else if (param == "pan")     ch.pan.store(v, std::memory_order_relaxed);
-    else if (param == "mute")    ch.mute.store(v > 0.5f, std::memory_order_relaxed);
-    else if (param == "solo")    ch.solo.store(v > 0.5f, std::memory_order_relaxed);
-    else if (param == "sendEff") ch.sendEffect.store(v, std::memory_order_relaxed);
-    else if (param == "sendDly") ch.sendDelay.store(v, std::memory_order_relaxed);
-    else if (param == "sendRev") ch.sendReverb.store(v, std::memory_order_relaxed);
-    else if (param == "scSrc")   ch.sidechainSource.store(juce::roundToInt(v) - 1, std::memory_order_relaxed);
-    else if (param == "scAmt")   ch.sidechainAmount.store(v, std::memory_order_relaxed);
-    else if (param == "scAtk")   ch.sidechainAttackMs.store(v, std::memory_order_relaxed);
-    else if (param == "scRel")   ch.sidechainReleaseMs.store(v, std::memory_order_relaxed);
-    else if (param == "outBus")  ch.outputBus.store(juce::jlimit(0, 8, juce::roundToInt(v)), std::memory_order_relaxed);
+    auto is = [param](const char* s) { return std::strcmp(param, s) == 0; };
+    if      (is("lvl"))     ch.level.store(v, std::memory_order_relaxed);
+    else if (is("pan"))     ch.pan.store(v, std::memory_order_relaxed);
+    else if (is("mute"))    ch.mute.store(v > 0.5f, std::memory_order_relaxed);
+    else if (is("solo"))    ch.solo.store(v > 0.5f, std::memory_order_relaxed);
+    else if (is("sendEff")) ch.sendEffect.store(v, std::memory_order_relaxed);
+    else if (is("sendDly")) ch.sendDelay.store(v, std::memory_order_relaxed);
+    else if (is("sendRev")) ch.sendReverb.store(v, std::memory_order_relaxed);
+    else if (is("scSrc"))   ch.sidechainSource.store(juce::roundToInt(v) - 1, std::memory_order_relaxed);
+    else if (is("scAmt"))   ch.sidechainAmount.store(v, std::memory_order_relaxed);
+    else if (is("scAtk"))   ch.sidechainAttackMs.store(v, std::memory_order_relaxed);
+    else if (is("scRel"))   ch.sidechainReleaseMs.store(v, std::memory_order_relaxed);
+    else if (is("outBus"))  ch.outputBus.store(juce::jlimit(0, 8, juce::roundToInt(v)), std::memory_order_relaxed);
 }
 
-void ProcessorBase::syncReturnStripParam(int retIdx, const juce::String& rest, float v)
+void ProcessorBase::syncReturnStripParam(int retIdx, const char* rest, float v)
 {
     auto& ret = mixerEngine.returns[(size_t) retIdx];
-    if      (rest == "lvl")   ret.level.store(v, std::memory_order_relaxed);
-    else if (rest == "pan")   ret.pan.store(v, std::memory_order_relaxed);
-    else if (rest == "mute")  ret.mute.store(v > 0.5f, std::memory_order_relaxed);
-    else if (rest == "solo")  ret.solo.store(v > 0.5f, std::memory_order_relaxed);
-    else if (rest == "scSrc") ret.sidechainSource.store(juce::jlimit(0, 9, (int) v) - 1, std::memory_order_relaxed);
-    else if (rest == "scAmt") ret.sidechainAmount.store(juce::jlimit(0.0f, 1.0f, v), std::memory_order_relaxed);
-    else if (rest == "scAtk") ret.sidechainAttackMs.store(v, std::memory_order_relaxed);
-    else if (rest == "scRel") ret.sidechainReleaseMs.store(v, std::memory_order_relaxed);
+    auto is = [rest](const char* s) { return std::strcmp(rest, s) == 0; };
+    if      (is("lvl"))   ret.level.store(v, std::memory_order_relaxed);
+    else if (is("pan"))   ret.pan.store(v, std::memory_order_relaxed);
+    else if (is("mute"))  ret.mute.store(v > 0.5f, std::memory_order_relaxed);
+    else if (is("solo"))  ret.solo.store(v > 0.5f, std::memory_order_relaxed);
+    else if (is("scSrc")) ret.sidechainSource.store(juce::jlimit(0, 9, (int) v) - 1, std::memory_order_relaxed);
+    else if (is("scAmt")) ret.sidechainAmount.store(juce::jlimit(0.0f, 1.0f, v), std::memory_order_relaxed);
+    else if (is("scAtk")) ret.sidechainAttackMs.store(v, std::memory_order_relaxed);
+    else if (is("scRel")) ret.sidechainReleaseMs.store(v, std::memory_order_relaxed);
 }
 
 bool ProcessorBase::syncMasterParam(const juce::String& id, float v)
