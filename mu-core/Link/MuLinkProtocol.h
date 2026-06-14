@@ -20,7 +20,7 @@ namespace mu_link
 // Bump whenever the shared-memory layout changes incompatibly. A client whose version
 // doesn't match the server's refuses to attach (and falls back to its own audio device)
 // rather than reading a mismatched struct.
-inline constexpr std::uint32_t kProtocolVersion = 1;
+inline constexpr std::uint32_t kProtocolVersion = 2;   // v2: per-client program-change control (scene switching)
 
 inline constexpr int kMaxClients     = 8;     // family is ≤8 products in practice
 inline constexpr int kMaxChannels    = 2;     // stereo per client for now (see design §"channel layout")
@@ -128,6 +128,15 @@ struct ClientSlot
     std::atomic<std::uint32_t> numChannels{ 0 };
     std::atomic<std::uint64_t> heartbeat  { 0 };   // liveness counter
     char                       name[kMaxNameChars] { };
+
+    // Server → client targeted program change (scene switching). Clients share MIDI
+    // channels, so mu-link targets each one by SLOT, not channel: it writes pcProgram +
+    // pcChannel, then bumps pcEpoch. The client polls pcEpoch and, on a new value, injects
+    // MidiMessage::programChange(pcChannel, pcProgram) into its standalone MIDI stream →
+    // the existing scanMidiProgramChanges → preset hot-swap. Server writes / client reads.
+    std::atomic<std::uint32_t> pcEpoch    { 0 };   // bumped by the server on each targeted send
+    std::atomic<std::uint32_t> pcProgram  { 0 };   // program number 0-127
+    std::atomic<std::uint32_t> pcChannel  { 9 };   // MIDI channel 1-16 (9 = Ch-9 full-preset table)
 };
 
 struct ClientRegistry
@@ -135,5 +144,15 @@ struct ClientRegistry
     std::atomic<std::uint32_t> protocolVersion { kProtocolVersion };
     ClientSlot                 slots[kMaxClients];
 };
+
+// Server side: target a program change at one client slot (scene switching). Write the
+// payload first, then bump the epoch (release) so the client's acquire-load of pcEpoch
+// observes a consistent (program, channel). program is clamped to 0-127, channel to 1-16.
+inline void sendProgramChange(ClientSlot& s, int program, int channel) noexcept
+{
+    s.pcProgram.store((std::uint32_t) (program < 0 ? 0 : program > 127 ? 127 : program), std::memory_order_relaxed);
+    s.pcChannel.store((std::uint32_t) (channel < 1 ? 1 : channel > 16 ? 16 : channel),   std::memory_order_relaxed);
+    s.pcEpoch.fetch_add(1, std::memory_order_release);
+}
 
 } // namespace mu_link

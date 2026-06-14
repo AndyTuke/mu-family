@@ -62,6 +62,7 @@ public:
             return false;
         }
         ringChannels = juce::jlimit(1, kMaxChannels, mem.ring().numChannels());
+        lastPcEpoch  = 0;   // claimSlot reset the slot's pcEpoch to 0 — match it so no stale fire
         attached = true;
         if (startRendering)
             start();
@@ -103,6 +104,28 @@ public:
     std::uint64_t transportGeneration() const noexcept
     {
         return attached ? mem.transport().generation.load(std::memory_order_acquire) : 0;
+    }
+
+    // Poll for a targeted program change from mu-link (scene switching). Returns true and
+    // fills program (0-127) + channel (1-16) when the server has sent a NEW one since the
+    // last poll; false otherwise. Call from the standalone bridge's poll (message thread);
+    // the product then injects MidiMessage::programChange(channel, program) into its MIDI
+    // stream → the existing scanMidiProgramChanges → preset hot-swap.
+    bool pollProgramChange(int& program, int& channel) noexcept
+    {
+        if (! attached)
+            return false;
+        const int slot = mem.claimedSlotIndex();
+        if (slot < 0)
+            return false;
+        auto& s = mem.registry().slots[slot];
+        const std::uint32_t epoch = s.pcEpoch.load(std::memory_order_acquire);
+        if (epoch == lastPcEpoch)
+            return false;
+        lastPcEpoch = epoch;
+        program = (int) s.pcProgram.load(std::memory_order_relaxed);
+        channel = (int) s.pcChannel.load(std::memory_order_relaxed);
+        return true;
     }
 
 private:
@@ -165,6 +188,7 @@ private:
     RenderCallback     renderCb;
     bool               attached     = false;
     int                ringChannels = kMaxChannels;
+    std::uint32_t      lastPcEpoch  = 0;   // last scene PC epoch seen (pollProgramChange)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MuLinkClient)
 };

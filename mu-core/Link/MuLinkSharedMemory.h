@@ -140,6 +140,9 @@ public:
                 reg.slots[slot].clientId.store((std::uint32_t) slot + 1, std::memory_order_relaxed);
                 reg.slots[slot].numChannels.store((std::uint32_t) numChannels, std::memory_order_relaxed);
                 reg.slots[slot].heartbeat.store(0, std::memory_order_relaxed);
+                reg.slots[slot].pcEpoch.store(0, std::memory_order_relaxed);    // start clean: no stale scene PC
+                reg.slots[slot].pcProgram.store(0, std::memory_order_relaxed);
+                reg.slots[slot].pcChannel.store(9, std::memory_order_relaxed);
                 std::memset(reg.slots[slot].name, 0, sizeof(reg.slots[slot].name));
                 for (int i = 0; displayName != nullptr && displayName[i] != '\0' && i < kMaxNameChars - 1; ++i)
                     reg.slots[slot].name[i] = displayName[i];   // bounded copy, always NUL-terminated
