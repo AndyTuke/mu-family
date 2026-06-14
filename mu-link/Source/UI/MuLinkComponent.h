@@ -46,15 +46,38 @@ private:
     juce::Label   masterLabel;
     juce::Slider  masterGain;
 
-    // One mixer strip per client slot: meter + name + gain knob + mute/solo.
+    // One mixer strip per client slot: meter + name + gain knob + mute/solo, plus the
+    // selected scene's per-client cell editor (enable + program + channel).
     struct ClientStrip
     {
         VUMeter        meter;
         juce::Label    name;
         juce::Slider   gain;
         juce::TextButton mute { "M" }, solo { "S" };
+        juce::ToggleButton sceneOn;        // is this client targeted by the selected scene?
+        juce::Label        scenePc;        // editable program number 0-127
+        juce::Label        sceneCh;        // editable MIDI channel 1-16 (9 = full preset)
     };
     std::array<ClientStrip, mu_link::kMaxClients> clients;
+
+    // ── Scenes ───────────────────────────────────────────────────────────────
+    // A scene is a set of per-client program changes (each with its own MIDI channel, so a
+    // scene can mix full-preset recalls (Ch 9) with per-layer swaps (Ch 1-8)). Triggering a
+    // scene sends each enabled client its program change via mu_link::sendProgramChange.
+    static constexpr int kNumScenes = 8;
+    struct SceneCell { bool enabled = false; int program = 0; int channel = 9; };
+    std::array<std::array<SceneCell, mu_link::kMaxClients>, kNumScenes> scenes {};
+    int editScene = 0;   // which scene the per-client cell editors are bound to
+
+    juce::Label                                  scenesHeading;
+    std::array<juce::TextButton, kNumScenes>     sceneButtons;
+
+    void triggerScene(int s);          // send each enabled client its program change
+    void selectScene(int s);           // bind the cell editors to scene s (and highlight it)
+    void refreshSceneEditors();        // reload the editors from scenes[editScene]
+    juce::File scenesFile() const;     // Documents/TDP/muLink/scenes.json
+    void loadScenes();
+    void saveScenes() const;
 
     bool playing = true;
 

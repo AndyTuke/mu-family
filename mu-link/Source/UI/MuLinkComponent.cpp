@@ -102,11 +102,68 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
     masterGain.onValueChange = [this] { server.setMasterGain((float) masterGain.getValue()); };
     addAndMakeVisible(masterGain);
 
+    // ── Scenes: trigger buttons + the selected scene's per-client (program, channel) cells ──
+    styleLabel(scenesHeading, "SCENES  \xc2\xb7  click to recall", juce::Justification::centredLeft,
+               MuLookAndFeel::labelText, 12.0f, true);
+    addAndMakeVisible(scenesHeading);
+
+    for (int s = 0; s < kNumScenes; ++s)
+    {
+        auto& b = sceneButtons[(size_t) s];
+        b.setButtonText(juce::String(s + 1));
+        b.setClickingTogglesState(false);
+        b.setColour(juce::TextButton::buttonColourId,   lnf.colour(MuLookAndFeel::panelBackground));
+        b.setColour(juce::TextButton::buttonOnColourId, lnf.colour(MuLookAndFeel::knobLevel));
+        b.onClick = [this, s] { selectScene(s); triggerScene(s); };
+        addAndMakeVisible(b);
+    }
+
+    for (int i = 0; i < (int) clients.size(); ++i)
+    {
+        auto& strip = clients[(size_t) i];
+        strip.sceneOn.setColour(juce::ToggleButton::tickColourId, lnf.colour(MuLookAndFeel::knobLevel));
+        strip.sceneOn.onClick = [this, i]
+        {
+            scenes[(size_t) editScene][(size_t) i].enabled = clients[(size_t) i].sceneOn.getToggleState();
+            saveScenes();
+        };
+        addAndMakeVisible(strip.sceneOn);
+
+        auto styleNum = [this](juce::Label& l)
+        {
+            l.setEditable(true);
+            l.setJustificationType(juce::Justification::centred);
+            l.setColour(juce::Label::textColourId,       lnf.colour(MuLookAndFeel::valueText));
+            l.setColour(juce::Label::backgroundColourId, lnf.colour(MuLookAndFeel::windowBackground));
+            l.setFont(juce::Font(juce::FontOptions(11.0f, juce::Font::plain)));
+            addAndMakeVisible(l);
+        };
+        styleNum(strip.scenePc);
+        styleNum(strip.sceneCh);
+        strip.scenePc.onTextChange = [this, i]
+        {
+            scenes[(size_t) editScene][(size_t) i].program =
+                juce::jlimit(0, 127, clients[(size_t) i].scenePc.getText().getIntValue());
+            refreshSceneEditors();
+            saveScenes();
+        };
+        strip.sceneCh.onTextChange = [this, i]
+        {
+            scenes[(size_t) editScene][(size_t) i].channel =
+                juce::jlimit(1, 16, clients[(size_t) i].sceneCh.getText().getIntValue());
+            refreshSceneEditors();
+            saveScenes();
+        };
+    }
+
+    loadScenes();
+    selectScene(0);
+
     // Match the engine's initial state (it begins playing when a device opens).
     server.setTempo(120.0);
     server.setPlaying(true);
 
-    setSize(900, 620);
+    setSize(900, 740);
     startTimerHz(12);
 }
 
@@ -121,6 +178,94 @@ void MuLinkComponent::togglePlay()
     playing = ! playing;
     server.setPlaying(playing);
     playButton.setButtonText(playing ? "Stop" : "Play");
+}
+
+void MuLinkComponent::selectScene(int s)
+{
+    editScene = juce::jlimit(0, kNumScenes - 1, s);
+    for (int i = 0; i < kNumScenes; ++i)
+        sceneButtons[(size_t) i].setToggleState(i == editScene, juce::dontSendNotification);   // highlight
+    refreshSceneEditors();
+}
+
+void MuLinkComponent::refreshSceneEditors()
+{
+    for (int i = 0; i < (int) clients.size(); ++i)
+    {
+        const auto& cell = scenes[(size_t) editScene][(size_t) i];
+        clients[(size_t) i].sceneOn.setToggleState(cell.enabled, juce::dontSendNotification);
+        clients[(size_t) i].scenePc.setText(juce::String(cell.program), juce::dontSendNotification);
+        clients[(size_t) i].sceneCh.setText(juce::String(cell.channel), juce::dontSendNotification);
+    }
+}
+
+void MuLinkComponent::triggerScene(int s)
+{
+    // Send each enabled + connected client its targeted program change; the client's
+    // standalone bridge injects it → the product's existing PC→preset hot-swap fires.
+    auto& reg = server.registry();
+    for (int i = 0; i < (int) clients.size(); ++i)
+    {
+        const auto& cell = scenes[(size_t) s][(size_t) i];
+        if (! cell.enabled)
+            continue;
+        if (reg.slots[i].active.load(std::memory_order_acquire) == 0)
+            continue;   // slot not connected
+        mu_link::sendProgramChange(reg.slots[i], cell.program, cell.channel);
+    }
+}
+
+juce::File MuLinkComponent::scenesFile() const
+{
+    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+               .getChildFile("TDP").getChildFile("muLink").getChildFile("scenes.json");
+}
+
+void MuLinkComponent::saveScenes() const
+{
+    juce::Array<juce::var> sceneArr;
+    for (int s = 0; s < kNumScenes; ++s)
+    {
+        juce::Array<juce::var> cells;
+        for (int i = 0; i < (int) clients.size(); ++i)
+        {
+            const auto& c = scenes[(size_t) s][(size_t) i];
+            auto* o = new juce::DynamicObject();
+            o->setProperty("on", c.enabled);
+            o->setProperty("pc", c.program);
+            o->setProperty("ch", c.channel);
+            cells.add(juce::var(o));
+        }
+        sceneArr.add(juce::var(cells));
+    }
+    const auto f = scenesFile();
+    f.getParentDirectory().createDirectory();
+    f.replaceWithText(juce::JSON::toString(juce::var(sceneArr)));
+}
+
+void MuLinkComponent::loadScenes()
+{
+    const auto f = scenesFile();
+    if (! f.existsAsFile())
+        return;
+    const auto parsed = juce::JSON::parse(f.loadFileAsString());
+    auto* sceneArr = parsed.getArray();
+    if (sceneArr == nullptr)
+        return;
+    for (int s = 0; s < juce::jmin(kNumScenes, sceneArr->size()); ++s)
+    {
+        auto* cells = (*sceneArr)[s].getArray();
+        if (cells == nullptr)
+            continue;
+        for (int i = 0; i < juce::jmin((int) clients.size(), cells->size()); ++i)
+        {
+            const auto& cv = (*cells)[i];
+            auto& c = scenes[(size_t) s][(size_t) i];
+            c.enabled = (bool) cv.getProperty("on", false);
+            c.program = juce::jlimit(0, 127, (int) cv.getProperty("pc", 0));
+            c.channel = juce::jlimit(1, 16,  (int) cv.getProperty("ch", 9));
+        }
+    }
 }
 
 void MuLinkComponent::timerCallback()
@@ -194,6 +339,35 @@ void MuLinkComponent::resized()
     area.removeFromTop(16);
 
     clientsHeading.setBounds(area.removeFromTop(20));
+
+    // Scenes band pinned to the bottom; the meter strip fills the space between.
+    auto scenesBand = area.removeFromBottom(108);
+    scenesHeading.setBounds(scenesBand.removeFromTop(18));
+    scenesBand.removeFromTop(4);
+    {
+        auto btnRow = scenesBand.removeFromTop(28);
+        const int sbw = juce::jmax(1, btnRow.getWidth() / kNumScenes);
+        for (int s = 0; s < kNumScenes; ++s)
+            sceneButtons[(size_t) s].setBounds(btnRow.removeFromLeft(sbw).reduced(3, 2));
+    }
+    scenesBand.removeFromTop(6);
+    {
+        // Per-client cells aligned under the meter columns: mirror the meters' 10 px
+        // horizontal inset + the master block on the right, so the 8 cells line up.
+        auto cellsRow = scenesBand.reduced(10, 0);
+        cellsRow.removeFromRight(56 + 14);
+        const int n = (int) clients.size();
+        const int cw = juce::jmax(1, cellsRow.getWidth() / n);
+        for (int i = 0; i < n; ++i)
+        {
+            auto cell = cellsRow.removeFromLeft(cw).reduced(3, 0);
+            clients[(size_t) i].sceneOn.setBounds(cell.removeFromTop(20));
+            const int half = juce::jmax(1, cell.getWidth() / 2 - 1);
+            clients[(size_t) i].scenePc.setBounds(cell.removeFromLeft(half));
+            clients[(size_t) i].sceneCh.setBounds(cell.removeFromRight(half));
+        }
+    }
+    area.removeFromBottom(12);
 
     // Meter strip: master pinned right, the eight client meters fill the rest.
     auto meters = area.reduced(10, 8);
