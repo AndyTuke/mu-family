@@ -3,6 +3,7 @@
 #include "Plugin/ProcessorBase.h"
 #include "UI/EditorShellBase.h"
 #include "UI/MixerOverlay.h"
+#include "UI/MasterLoopSection.h"
 #include "Plugin/PluginProcessor.h"
 #include "UI/VoicePanel.h"
 #include "UI/VoiceSidebar.h"
@@ -25,11 +26,12 @@ public:
     void onPresetNew()                     override;
 
 private:
-    PluginProcessor& proc;
-    VoiceSidebar     voiceSidebar;
-    VoicePanel       voicePanel;
-    MixerOverlay     mixerOverlay;
-    SettingsOverlay  settingsOverlay;
+    PluginProcessor&  proc;
+    VoiceSidebar      voiceSidebar;
+    VoicePanel        voicePanel;
+    MixerOverlay      mixerOverlay;
+    SettingsOverlay   settingsOverlay;
+    MasterLoopSection masterLoop;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };

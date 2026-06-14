@@ -166,7 +166,17 @@ PluginProcessor::PluginProcessor()
     // Render hook for the shared MixerEngine — captures only `this`, so no
     // per-block std::function construction (which would allocate). The per-block
     // transport snapshot it reads lives in the blk* members, set in processBlock.
-    renderVoiceCb = [this](int v, juce::AudioBuffer<float>& buf, int n) { renderVoice(v, buf, n); };
+    renderVoiceCb = [this](int v, juce::AudioBuffer<float>& buf, int n)
+    {
+        // Active voices render normally; a voice past the active count that is still
+        // retiring (count-reducing swap) fades its old tail; anything else is silent.
+        if (v < numVoices.load(std::memory_order_relaxed))
+            renderVoice(v, buf, n);
+        else if (retiring[(size_t) v].samplesLeft.load(std::memory_order_acquire) > 0)
+            renderRetiringVoice(v, buf, n);
+        else
+            buf.clear();
+    };
 
     // Mixer + FX state is listener-synced into mixerEngine/fxChain (channel strips,
     // sends, sidechain, returns, master, FX slots) — mirrors mu-clid. Seed it now
@@ -239,6 +249,10 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     fxChain.prepare(sampleRate, samplesPerBlock);   // shared Effect/Delay/Reverb rack
+
+    // Cancel any in-flight retire fade — its ramp length was derived from the old SR.
+    for (auto& r : retiring)
+        r.samplesLeft.store(0, std::memory_order_relaxed);
 }
 
 void PluginProcessor::cacheParamPointers()
@@ -246,6 +260,7 @@ void PluginProcessor::cacheParamPointers()
     auto P = [this](const juce::String& id) { return apvts.getRawParameterValue(id); };
     globalPtrs.root    = P("root");
     globalPtrs.scale   = P("scale");
+    mstrLoopPtr        = P("mstrLoop");   // master-loop length, read RT-safely in processBlock
 
     for (int v = 0; v < kMaxVoices; ++v)
     {
@@ -399,8 +414,15 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         {
             const int numActiveVoices = numVoices.load(std::memory_order_relaxed);
 
+            // Extend the rendered channel count to cover any voices still fading out
+            // from a count-reducing swap, so the mixer keeps mixing their tail.
+            int renderCount = numActiveVoices;
+            for (int v = numActiveVoices; v < kMaxVoices; ++v)
+                if (retiring[(size_t) v].samplesLeft.load(std::memory_order_acquire) > 0)
+                    renderCount = v + 1;
+
             // (Sidechain already captured at the top of processBlock, before the clear.)
-            processCoreBlock(buffer, nullptr, numActiveVoices, numSamples, bpm,
+            processCoreBlock(buffer, nullptr, renderCount, numSamples, bpm,
                              nullptr, nullptr, nullptr, &renderVoiceCb);
         }
     }
@@ -420,16 +442,31 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         internalBeatPos.store(pos, std::memory_order_relaxed);
     }
 
-    // Hot-swap boundary check: a staged preset commits when its reference pattern
-    // wraps (voice's own length for a per-voice swap, voice 0's for a full preset)
-    // or on the playing→stopped edge. Uses the RAW pre-ceiling position so the
-    // loop-index test holds for pattern lengths that don't divide 64.
+    // Hot-swap boundary check: a staged preset commits when its reference loop wraps
+    // (or on the playing→stopped edge). Uses the RAW pre-ceiling position so the
+    // loop-index test holds for lengths that don't divide 64. The reference loop
+    // depends on the Hot-swap timing (SwapMode) + the master loop:
+    //   • master-loop length in beats = mstrLoop steps / 4 (4 steps/beat); 0 = off.
+    //   • per-voice swap: OnMasterLoop (+ a loop set) → master loop; else the voice's
+    //     own gate-pattern boundary (so a swap can't hang when no master loop exists).
+    //   • full preset: master loop when one is defined, else voice 0's gate boundary.
+    const int    mlSteps         = mstrLoopPtr ? (int) mstrLoopPtr->load() * 16 : 0;
+    const double masterLoopBeats = mlSteps > 0 ? (double) mlSteps / 4.0 : 0.0;
+    const bool   onMasterLoop    = (swapModeAtomic.load(std::memory_order_relaxed) == 0)
+                                   && masterLoopBeats > 0.0;
+
     std::array<double, VoiceHotSwapStager::kMaxVoices> voicePatBeats {};
     for (int v = 0; v < VoiceHotSwapStager::kMaxVoices; ++v)
-        voicePatBeats[(size_t) v] = (double) gatePatterns[(size_t) v].patternLengthBars * 4.0;
+    {
+        const double gateBeats = (double) gatePatterns[(size_t) v].patternLengthBars * 4.0;
+        voicePatBeats[(size_t) v] = onMasterLoop ? masterLoopBeats : gateBeats;
+    }
+    const double fullPatBeats = masterLoopBeats > 0.0
+                                ? masterLoopBeats
+                                : (double) gatePatterns[0].patternLengthBars * 4.0;
     if (hotSwapStager.checkBoundaries(numVoices.load(std::memory_order_relaxed),
                                       blkPlaying, wasPlaying,
-                                      oldPos, newPosRaw, voicePatBeats, voicePatBeats[0]))
+                                      oldPos, newPosRaw, voicePatBeats, fullPatBeats))
         triggerAsyncUpdate();
     wasPlaying = blkPlaying;
 }
@@ -605,6 +642,40 @@ void PluginProcessor::renderVoice(int v, juce::AudioBuffer<float>& buf, int numS
 
     // Feed the sidebar spectrum glyph — capture post-insert audio on the audio thread.
     voiceRingBuffers[(size_t) v].write(buf, numSamples);
+}
+
+void PluginProcessor::renderRetiringVoice(int v, juce::AudioBuffer<float>& buf, int numSamples)
+{
+    auto& r = retiring[(size_t) v];
+    const int left = r.samplesLeft.load(std::memory_order_acquire);
+    if (left <= 0) { buf.clear(); return; }
+
+    // Render the OLD voice (snapshot config) through its still-intact engine — same
+    // oscillators + filter state as the instant before the swap, so the tail is faithful.
+    buf.clear();
+    voices[(size_t) v]->setConfig(r.config);
+    voices[(size_t) v]->process(buf, numSamples);
+
+    // Falling linear gain across the retire window: gain at sample i = (left - i) * gainStep,
+    // clamped ≥ 0 so the slot is silent once the countdown is spent.
+    for (int ch = 0; ch < buf.getNumChannels(); ++ch)
+    {
+        float* d = buf.getWritePointer(ch);
+        for (int i = 0; i < numSamples; ++i)
+            d[i] *= juce::jmax(0.0f, (float) (left - i) * r.gainStep);
+    }
+
+    // Run the OLD insert (snapshot algo + params) so an effect tail the new preset
+    // drops still fades out instead of vanishing at the swap instant.
+    VoiceParams ip;
+    ip.insertAlgo     = r.insAlgo;
+    ip.insertParam[0] = r.insP[0];
+    ip.insertParam[1] = r.insP[1];
+    ip.insertParam[2] = r.insP[2];
+    ip.insertParam[3] = r.insP[3];
+    inserts[(size_t) v].process(buf, numSamples, buf.getNumChannels(), ip);
+
+    r.samplesLeft.store(juce::jmax(0, left - numSamples), std::memory_order_release);
 }
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()
@@ -1194,12 +1265,37 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
     // self-locks. Holding a blanket lock instead made the audio render bail to silence
     // AND froze the transport for the whole commit (the hot-swap glitch). Without it,
     // a concurrent block sees old-or-new per structure (≤1 block, inaudible) instead.
-    apvts.replaceState(state);
-    int nv = juce::jlimit(1, kMaxVoices, (int) apvts.state.getProperty("numVoices", 1));
+
     // Demo cap: an unlicensed build activates at most demoMaxChannels() voices. The other
     // voices' params/data still load but stay inactive (getNumChannels() == numVoices).
+    const int oldN = numVoices.load(std::memory_order_relaxed);
+    int nv = juce::jlimit(1, kMaxVoices, (int) state.getProperty("numVoices", 1));
     if (! isLicensed())
         nv = juce::jmin(nv, demoMaxChannels());
+
+    // Retire-tail: when this preset drops voices while playing, snapshot each dropped
+    // voice's OLD engine + insert config NOW (before replaceState clobbers the params)
+    // and arm a short fade so its comb-filter / insert tail rings out (see #1013).
+    if (isInternalPlaying() && nv < oldN)
+    {
+        const int ramp = retireRampSamples();
+        for (int v = nv; v < oldN; ++v)
+        {
+            auto& r = retiring[(size_t) v];
+            r.samplesLeft.store(0, std::memory_order_release);   // pause any in-flight read of `config`
+            r.config   = readConfig(v);                          // OLD osc + filter
+            const auto& vp = voicePtrs[(size_t) v];
+            r.insAlgo  = (int) vp.drvChar->load();
+            r.insP     = { juce::jlimit(0.0f, 1.0f, vp.insP1->load()),
+                           juce::jlimit(0.0f, 1.0f, vp.insP2->load()),
+                           juce::jlimit(0.0f, 1.0f, vp.insP3->load()),
+                           juce::jlimit(0.0f, 1.0f, vp.insP4->load()) };
+            r.gainStep = 1.0f / (float) ramp;
+            r.samplesLeft.store(ramp, std::memory_order_release);
+        }
+    }
+
+    apvts.replaceState(state);
     numVoices.store(nv);
     restoreVoiceColours(apvts.state.getProperty("voiceColours", "").toString());
     readVoiceDataFromState();

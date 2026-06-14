@@ -107,6 +107,14 @@ public:
     virtual void   setInternalBpm(double /*bpm*/)          {}
     virtual double getInternalBeatPos()     const          { return 0.0; }
 
+    // Master loop — the global loop the shared mu-core MasterLoopSection displays
+    // (and which products may use to gate preset/program-change swap timing). The
+    // length lives in the `mstrLoop` APVTS param (0 = free; 1..16 → 16..256 steps,
+    // 16 steps = 1 bar); products turn that into a step total + a live counter.
+    // Default 0/off so a product without a master loop simply shows nothing.
+    virtual int    getMasterLoopSteps()       const        { return 0; }
+    virtual int    getMasterLoopCurrentStep() const        { return 0; }
+
     // MIDI clock sync (standalone).
     virtual bool   getMidiSyncEnabled()     const          { return false; }
     virtual int    getMidiSyncMessages()    const          { return 0; }

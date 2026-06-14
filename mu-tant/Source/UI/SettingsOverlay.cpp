@@ -52,6 +52,18 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     bpmInput.onChange = [this](int v) { proc.setInternalBpm((double) v); };
     addAndMakeVisible(bpmInput);
 
+    // ── Hot-swap timing — when a staged preset / program-change swap commits ───
+    makeFieldLabel(swapModeLabel, "Timing");
+    swapModeDropdown.addItem("On master loop", 1);
+    swapModeDropdown.addItem("On voice loop",  2);
+    swapModeDropdown.setSelectedId((int) proc.getSwapMode() + 1, false);
+    swapModeDropdown.onChange = [this](int id)
+    {
+        proc.setSwapMode(id == 2 ? PluginProcessor::SwapMode::OnVoiceLoop
+                                 : PluginProcessor::SwapMode::OnMasterLoop);
+    };
+    addAndMakeVisible(swapModeDropdown);
+
     // ── MIDI Program Change (Ch 1-8 → voice presets, Ch 9 → full presets) ──────
     midiPresetsBtn.onClick = [this] { if (onMidiPresetsClicked) onMidiPresetsClicked(); };
     fullPresetsBtn.onClick = [this] { if (onFullPresetsClicked) onFullPresetsClicked(); };
@@ -97,9 +109,15 @@ void SettingsOverlay::computeLayout()
 
     y += groupGap;
 
-    // ── MIDI sub-panel (Program Change)
+    // ── MIDI sub-panel (Hot-swap, Program Change)
     layout.midiGroupHeader = y;
     y += groupH;
+
+    layout.swapHeader = y;
+    y += headH;
+    layout.swapRowY   = y;
+    y += rowH;
+    y += sectGap;
 
     layout.midiPCHeader = y;
     y += headH;
@@ -130,6 +148,9 @@ void SettingsOverlay::layoutContent()
     bpmLabel.setBounds(x,     layout.bpmRowY, labelW, rowH);
     bpmInput.setBounds(ctrlX, layout.bpmRowY, s(90), rowH);
 
+    swapModeLabel   .setBounds(x,     layout.swapRowY, labelW, rowH);
+    swapModeDropdown.setBounds(ctrlX, layout.swapRowY, ctrlW,  rowH);
+
     // MIDI Program Change — two buttons side-by-side, centred within the column.
     const int btnGap = s(8);
     const int btnW   = juce::jmin(s(200), (cw - btnGap) / 2);
@@ -148,6 +169,7 @@ void SettingsOverlay::paintContent(juce::Graphics& g)
     drawSectionHeader(g, layout.transportHeader,  "Transport");
 
     drawGroupHeader(g, layout.midiGroupHeader,    "MIDI");
+    drawSectionHeader(g, layout.swapHeader,        "Hot-swap");
     drawSectionHeader(g, layout.midiPCHeader,     "MIDI Program Change");
 }
 

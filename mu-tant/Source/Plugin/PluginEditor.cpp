@@ -9,7 +9,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       voiceSidebar(p),
       voicePanel(p),
       mixerOverlay(p, p.mixerEngine),
-      settingsOverlay(p)
+      settingsOverlay(p),
+      masterLoop(p)
 {
     // ── Product chrome on shared overlays ───────────────────────────────────
     getSaveDialog().setShowEmbedSamples(false);   // mu-tant has no sample engine
@@ -22,6 +23,14 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         });
     getActivationPanel().setProductName(juce::String(juce::CharPointer_UTF8("\xce\xbc-Tant")));
     getTransportBar().setLogoText(juce::String(juce::CharPointer_UTF8("\xce\xbc-Tant")));
+
+    // Master-loop sub-pane in the transport (shared mu-core MasterLoopSection):
+    // Loop-length dropdown + step counter driven by the mstrLoop param + beat pos.
+    getTransportBar().setLoopSection(&masterLoop, MasterLoopSection::kWidth);
+    masterLoop.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
+    {
+        getStatusBar().showParam(name, val);
+    };
 
     // Preset library — full presets via the shared shell chrome (TransportBar
     // dropdown + Save dialog + Preset browser). The processor implements the

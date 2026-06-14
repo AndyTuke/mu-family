@@ -183,7 +183,8 @@ public:
     void cancelStagedSwap (int ri)                        { hotSwapStager.cancelStagedSwap(ri); }
     bool hasPendingSwap   (int ri) const                  { return hotSwapStager.hasPendingSwap(ri); }
     bool hasPendingFullPreset() const override            { return hotSwapStager.hasPendingFullPreset(); }
-    int  getMasterLoopSteps() const                       { return sequencer.getMasterLoopSteps(); }
+    int  getMasterLoopSteps() const override              { return sequencer.getMasterLoopSteps(); }
+    int  getMasterLoopCurrentStep() const override        { return sequencer.getMasterLoopCurrentStep(); }
 
     // Headless/offline render helper. The render loop drives processBlock directly
     // and never returns to JUCE's message dispatch loop, so triggerAsyncUpdate()

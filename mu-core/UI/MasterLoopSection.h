@@ -1,18 +1,20 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "Plugin/PluginProcessor.h"
+#include "Plugin/ProcessorBase.h"
 #include "UI/Components/DropdownSelect.h"
 
-// mu-clid's transport-bar "Master Loop" sub-pane — picks the master-loop length
-// (Off / 16..256 steps) and displays the current step counter while playing.
-// Mounted into the shared mu-core TransportBar via setLoopSection() so the
-// shell layout stays the same as before the shell-lift refactor.
+// Shared transport-bar "Master Loop" sub-pane — picks the master-loop length
+// (Off / 16..256 steps via the `mstrLoop` APVTS param) and shows the current
+// step counter while playing. Mounted into the shared mu-core TransportBar via
+// setLoopSection(). Product-agnostic: it reads the length + live step from
+// ProcessorBase::getMasterLoopSteps()/getMasterLoopCurrentStep() (each product
+// derives those from its own engine — mu-clid's sequencer, mu-tant's beat pos).
 class MasterLoopSection : public juce::Component,
                           public juce::AudioProcessorValueTreeState::Listener,
                           private juce::Timer
 {
 public:
-    explicit MasterLoopSection(PluginProcessor& proc);
+    explicit MasterLoopSection(ProcessorBase& proc);
     ~MasterLoopSection() override;
 
     // Width (in baseline pixels, pre-scale) the section needs for its three
@@ -25,7 +27,7 @@ public:
     void resized() override;
 
 private:
-    PluginProcessor& proc;
+    ProcessorBase& proc;
 
     juce::Label    loopLabel;
     DropdownSelect loopDropdown;

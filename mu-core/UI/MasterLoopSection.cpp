@@ -1,7 +1,7 @@
 #include "MasterLoopSection.h"
 #include "UI/Components/MuLookAndFeel.h"
 
-MasterLoopSection::MasterLoopSection(PluginProcessor& p)
+MasterLoopSection::MasterLoopSection(ProcessorBase& p)
     : proc(p)
 {
     loopLabel.setText("Loop:", juce::dontSendNotification);
@@ -76,8 +76,8 @@ void MasterLoopSection::timerCallback()
 
     if (loopStepLabel.isVisible())
     {
-        const int steps   = proc.sequencer.getMasterLoopSteps();
-        const int current = proc.sequencer.getMasterLoopCurrentStep() + 1;
+        const int steps   = proc.getMasterLoopSteps();
+        const int current = proc.getMasterLoopCurrentStep() + 1;
         // Only rebuild the "n / m" string when it actually changes — avoids a
         // per-tick heap allocation when the counter is paused or unchanged.
         if (current != lastShownStep || steps != lastShownSteps)

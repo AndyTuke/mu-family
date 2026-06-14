@@ -6,6 +6,7 @@
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/SegmentControl.h"
 #include "UI/Components/NudgeInput.h"
+#include "UI/Components/DropdownSelect.h"
 #include "UI/Components/MuLookAndFeel.h"
 
 namespace mu_tant
@@ -46,6 +47,10 @@ private:
     juce::Label    bpmLabel;
     NudgeInput     bpmInput { "BPM", 20, 300, 120 };
 
+    // MIDI / Hot-swap — when a staged preset/program-change swap commits.
+    juce::Label    swapModeLabel;
+    DropdownSelect swapModeDropdown;
+
     // MIDI Program Change — two tables (Ch 1-8 voice presets, Ch 9 full presets).
     // The tables themselves are the shared mu-core overlays; these just open them.
     juce::TextButton midiPresetsBtn { "Voice Presets" };
@@ -60,6 +65,7 @@ private:
         int displayHeader = 0, uiSizeRowY = 0;
         int transportHeader = 0, bpmRowY = 0;
         int midiGroupHeader = 0;
+        int swapHeader = 0, swapRowY = 0;
         int midiPCHeader = 0, midiPCRowY = 0;
     };
     LayoutY layout;

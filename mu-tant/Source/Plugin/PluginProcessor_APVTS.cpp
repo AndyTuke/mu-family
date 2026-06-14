@@ -176,6 +176,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     layout.add(std::make_unique<AudioParameterChoice>(ParameterID{"root",  1}, "Root",  rootNames(),  0));
     layout.add(std::make_unique<AudioParameterChoice>(ParameterID{"scale", 1}, "Scale", scaleNames(), 0));
 
+    // Master loop length — 0 = free; 1..16 → 16..256 steps (16 steps = 1 bar, 4 steps/beat).
+    // Drives the shared transport MasterLoopSection counter and (future) preset-swap timing.
+    // Voices stay free-running — this is a global loop, not coupled to any gate-pattern length.
+    layout.add(std::make_unique<AudioParameterInt>(ParameterID{"mstrLoop", 1}, "Master Loop", 0, 16, 0));
+
     for (int v = 0; v < kMaxVoices; ++v)
         addVoiceParams(layout, v);
 

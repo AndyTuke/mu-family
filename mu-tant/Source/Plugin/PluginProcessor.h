@@ -134,6 +134,28 @@ public:
     void   setInternalBpm(double bpm) override { internalBpm.store(juce::jlimit(20.0, 300.0, bpm), std::memory_order_relaxed); }
     double getInternalBeatPos() const override { return internalBeatPos.load(std::memory_order_relaxed); }
 
+    // Master loop — length from the mstrLoop param (0 = free; 1..16 → 16..256 steps),
+    // live step derived from the free-running beat (4 steps/beat = 16 steps/bar, same
+    // step grid as mu-clid). UI-thread reads only (the shared MasterLoopSection timer).
+    int getMasterLoopSteps() const override
+    {
+        const auto* p = mstrLoopPtr ? mstrLoopPtr : apvts.getRawParameterValue("mstrLoop");
+        return p ? (int) p->load() * 16 : 0;
+    }
+    int getMasterLoopCurrentStep() const override
+    {
+        const int steps = getMasterLoopSteps();
+        if (steps <= 0) return 0;
+        const double loopBeats = steps / 4.0;
+        const double pos = std::fmod(getInternalBeatPos(), loopBeats);
+        return juce::jlimit(0, steps - 1, (int) (pos * 4.0));
+    }
+
+    // Hot-swap timing (mirrors mu-clid). OnVoiceLoop = the per-voice gate boundary.
+    enum class SwapMode { OnMasterLoop = 0, OnVoiceLoop = 1 };
+    SwapMode getSwapMode() const { return (SwapMode) swapModeAtomic.load(std::memory_order_relaxed); }
+    void     setSwapMode(SwapMode m) { swapModeAtomic.store((int) m, std::memory_order_relaxed); }
+
     // ── ProcessorBase channel metadata ───────────────────────────────────────
     // mu-tant manages a dynamic set of voices ("layers") exactly like mu-clid's
     // rhythms — there are no inactive voices, only the ones that exist. The
@@ -297,6 +319,9 @@ private:
     // in the blk* members below, set at the top of processBlock (same thread).
     MixerEngine::RenderChannelFn renderVoiceCb;
     void   renderVoice(int voiceIdx, juce::AudioBuffer<float>& buf, int numSamples);
+    // Render a voice being retired by a count-reducing full-preset swap: its OLD
+    // (pre-swap) config through its still-intact engine+insert, under a falling gain.
+    void   renderRetiringVoice(int v, juce::AudioBuffer<float>& buf, int numSamples);
     // renderVoice phases — called in order; each handles one concern.
     void   applyModulation    (int v, VoiceConfig& cfg);
     void   applyFilterEnvelope(int v, VoiceConfig& cfg);
@@ -311,6 +336,25 @@ private:
     // gate, before the pan/sum into the mixer (engine → insert → mixer, the
     // family-wide signal flow). Mirrors mu-clid's per-rhythm insert.
     std::array<InsertProcessor,              kMaxVoices>   inserts;
+
+    // ── Retire-tail for count-reducing full-preset swaps ──────────────────────
+    // A committed full preset with fewer voices would hard-cut the dropped voices
+    // (the render loop just sums fewer channels), snapping their comb-filter / insert
+    // tail. Instead we snapshot each dropped voice's OLD config before replaceState
+    // and keep rendering it through its (intact) engine+insert under a falling gain
+    // for ~25 ms, then stop — so the tail fades. `samplesLeft` is the audio-thread
+    // countdown; `config` is written (message thread) before `samplesLeft` is armed
+    // (release) and read only when samplesLeft>0 (acquire), so no lock is needed.
+    struct RetiringVoice
+    {
+        std::atomic<int>    samplesLeft { 0 };
+        float               gainStep = 0.0f;   // per-sample gain decrement (= 1/rampLen)
+        VoiceConfig         config;            // OLD engine config (osc + filter)
+        int                 insAlgo = 0;       // OLD insert algo + params, so the insert
+        std::array<float,4> insP {};           // tail (e.g. a reverb the new preset drops) fades too
+    };
+    std::array<RetiringVoice, kMaxVoices> retiring {};
+    int retireRampSamples() const { return juce::jmax(1, (int) (currentSampleRate * 0.025)); }
 
 public:
     // Per-voice modulator data — 8 ControlSequences + ModulationMatrix + modLock
@@ -369,6 +413,15 @@ private:
     std::atomic<bool>   playing { false };
     std::atomic<double> internalBeatPos { 0.0 };
     std::atomic<double> internalBpm { 120.0 };
+
+    // Master-loop length param pointer, cached for RT-safe reads (no per-block
+    // string lookup) in processBlock. Set in cacheParamPointers().
+    const std::atomic<float>* mstrLoopPtr { nullptr };
+    // Hot-swap timing: which loop a staged preset / program-change swap commits on.
+    // 0 = OnMasterLoop (default) — commit at the master-loop wrap when a loop is set;
+    // 1 = OnVoiceLoop — commit at the per-voice gate-pattern boundary. A full preset
+    // always uses the master loop when one is defined, else voice 0's gate boundary.
+    std::atomic<int> swapModeAtomic { 0 };
     // Written in prepareToPlay (host suspends the audio thread first) — no atomic needed.
     double currentSampleRate = 44100.0;
 

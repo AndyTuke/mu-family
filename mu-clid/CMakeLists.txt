@@ -56,7 +56,6 @@ target_sources(mu-clid
         Source/Sequencer/HitGenerator.cpp
         Source/Sequencer/Rhythm.cpp
         Source/Sequencer/SequencerEngine.cpp
-        Source/UI/MasterLoopSection.cpp
         Source/UI/RhythmCircle.cpp
         Source/UI/RhythmMiniVisual.cpp
         Source/UI/RhythmSidebar.cpp
@@ -264,7 +263,6 @@ target_sources(mu-clid-lite
         Source/Sequencer/HitGenerator.cpp
         Source/Sequencer/Rhythm.cpp
         Source/Sequencer/SequencerEngine.cpp
-        Source/UI/MasterLoopSection.cpp
         Source/UI/RhythmCircle.cpp
         Source/UI/EuclideanPanel.cpp
 )
