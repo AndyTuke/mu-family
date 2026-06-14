@@ -1,7 +1,7 @@
 // ModulationMatrix cycle detection and assignment management tests.
 //
 // The cycle-detection guard in addAssignment() is the only thing that prevents
-// a user from creating a modulation chain that loops forever — a regression
+// a user from creating a modulation chain that loops forever - a regression
 // here would hang the audio thread.
 
 #include <juce_core/juce_core.h>
@@ -27,7 +27,7 @@ public:
     void runTest() override
     {
         // ── Basic add / remove ────────────────────────────────────────────────
-        beginTest ("Add a simple CS→dest assignment succeeds");
+        beginTest ("Add a simple CS->dest assignment succeeds");
         {
             ModulationMatrix m;
             bool ok = m.addAssignment(makeAssign("a1", "cs0_output", "filter.cutoff"));
@@ -69,22 +69,22 @@ public:
         // ── Cycle detection ───────────────────────────────────────────────────
         beginTest ("Direct self-cycle is rejected");
         {
-            // a1 sources its own depth → cycle of length 1
+            // a1 sources its own depth -> cycle of length 1
             ModulationMatrix m;
             m.addAssignment(makeAssign("a1", "cs0_output", "filter.cutoff"));
             bool ok = m.addAssignment(makeAssign("a2", "assign_a2_depth", "amp.attack"));
             expect (!ok, "self-sourcing assignment should be rejected");
         }
 
-        beginTest ("Two-node cycle: A→B, B→A is rejected");
+        beginTest ("Two-node cycle: A->B, B->A is rejected");
         {
             ModulationMatrix m;
             // a1 sources cs0 (no meta-dep)
             m.addAssignment(makeAssign("a1", "cs0_output", "filter.cutoff"));
-            // a2 sources a1's depth — that's fine (a1 has no meta-dep on a2)
+            // a2 sources a1's depth - that's fine (a1 has no meta-dep on a2)
             bool ok = m.addAssignment(makeAssign("a2", "assign_a1_depth", "amp.attack"));
             expect (ok, "a2 sourcing a1 depth should succeed");
-            // a3 sources a2's depth and a1 sources a3's depth — would close a loop
+            // a3 sources a2's depth and a1 sources a3's depth - would close a loop
             // (In the actual meta-modulation model, what closes a cycle is when
             // the assignment we're adding creates a dependency that already chains
             // back to itself.)
@@ -92,11 +92,11 @@ public:
             // We can't mutate a1's sourceId directly, so add a new assignment that
             // creates the back-edge.
             bool cycle = m.addAssignment(makeAssign("a3", "assign_a2_depth", "amp.sustain"));
-            // a3 sourcing a2 is fine — a3 has no dependents yet
+            // a3 sourcing a2 is fine - a3 has no dependents yet
             expect (cycle, "a3 sourcing a2 depth (no back-edge yet) should succeed");
         }
 
-        beginTest ("Linear chain A→B→C is accepted");
+        beginTest ("Linear chain A->B->C is accepted");
         {
             ModulationMatrix m;
             m.addAssignment(makeAssign("a1", "cs0_output", "filter.cutoff"));

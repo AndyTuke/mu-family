@@ -2,7 +2,7 @@
 //
 // Verifies all 16 filter algorithms run without crash or NaN/Inf output when
 // fed a stereo impulse at representative cutoff and resonance settings.
-// These are not golden-master tests — exact DSP output is not asserted.
+// These are not golden-master tests - exact DSP output is not asserted.
 // Goals: (a) no crash, (b) no NaN/Inf in output buffer.
 
 #include <juce_core/juce_core.h>
@@ -55,70 +55,70 @@ public:
 
     void runTest() override
     {
-        beginTest ("algo 0: Lp12Filter — no crash, no NaN");
+        beginTest ("algo 0: Lp12Filter - no crash, no NaN");
         { Lp12Filter f; smokeFilter(f, "Lp12Filter"); }
 
-        beginTest ("algo 1: Hp12Filter — no crash, no NaN");
+        beginTest ("algo 1: Hp12Filter - no crash, no NaN");
         { Hp12Filter f; smokeFilter(f, "Hp12Filter"); }
 
-        beginTest ("algo 2: Bp12Filter — no crash, no NaN");
+        beginTest ("algo 2: Bp12Filter - no crash, no NaN");
         { Bp12Filter f; smokeFilter(f, "Bp12Filter"); }
 
-        beginTest ("algo 3: Notch12Filter — no crash, no NaN");
+        beginTest ("algo 3: Notch12Filter - no crash, no NaN");
         { Notch12Filter f; smokeFilter(f, "Notch12Filter"); }
 
-        beginTest ("algo 4: Lp24Filter — no crash, no NaN");
+        beginTest ("algo 4: Lp24Filter - no crash, no NaN");
         { Lp24Filter f; smokeFilter(f, "Lp24Filter"); }
 
-        beginTest ("algo 5: Hp24Filter — no crash, no NaN");
+        beginTest ("algo 5: Hp24Filter - no crash, no NaN");
         { Hp24Filter f; smokeFilter(f, "Hp24Filter"); }
 
-        beginTest ("algo 6: Bp24Filter — no crash, no NaN");
+        beginTest ("algo 6: Bp24Filter - no crash, no NaN");
         { Bp24Filter f; smokeFilter(f, "Bp24Filter"); }
 
-        beginTest ("algo 7: Lp6Filter — no crash, no NaN");
+        beginTest ("algo 7: Lp6Filter - no crash, no NaN");
         { Lp6Filter f; smokeFilter(f, "Lp6Filter"); }
 
-        beginTest ("algo 8: CombPlusFilter — no crash, no NaN");
+        beginTest ("algo 8: CombPlusFilter - no crash, no NaN");
         { CombPlusFilter f; smokeFilter(f, "CombPlusFilter", 220.0f, 0.5f); }
 
-        beginTest ("algo 9: Ap12Filter — no crash, no NaN");
+        beginTest ("algo 9: Ap12Filter - no crash, no NaN");
         { Ap12Filter f; smokeFilter(f, "Ap12Filter"); }
 
-        beginTest ("algo 10: Notch24Filter — no crash, no NaN");
+        beginTest ("algo 10: Notch24Filter - no crash, no NaN");
         { Notch24Filter f; smokeFilter(f, "Notch24Filter"); }
 
-        beginTest ("algo 11: Hp6Filter — no crash, no NaN");
+        beginTest ("algo 11: Hp6Filter - no crash, no NaN");
         { Hp6Filter f; smokeFilter(f, "Hp6Filter"); }
 
-        beginTest ("algo 12: PeakFilter — no crash, no NaN");
+        beginTest ("algo 12: PeakFilter - no crash, no NaN");
         { PeakFilter f; smokeFilter(f, "PeakFilter"); }
 
-        beginTest ("algo 13: LowShelfFilter — no crash, no NaN");
+        beginTest ("algo 13: LowShelfFilter - no crash, no NaN");
         { LowShelfFilter f; smokeFilter(f, "LowShelfFilter"); }
 
-        beginTest ("algo 14: HighShelfFilter — no crash, no NaN");
+        beginTest ("algo 14: HighShelfFilter - no crash, no NaN");
         { HighShelfFilter f; smokeFilter(f, "HighShelfFilter"); }
 
-        beginTest ("algo 15: CombMinusFilter — no crash, no NaN");
+        beginTest ("algo 15: CombMinusFilter - no crash, no NaN");
         { CombMinusFilter f; smokeFilter(f, "CombMinusFilter", 220.0f, 0.5f); }
 
         // ── High-resonance stress test ────────────────────────────────────────
         // SVF-based filters should stay stable even at resonance=0.99.
-        beginTest ("Lp12Filter: high resonance (0.99) — no crash, no NaN");
+        beginTest ("Lp12Filter: high resonance (0.99) - no crash, no NaN");
         { Lp12Filter f; smokeFilter(f, "Lp12Filter-HiRes", 2000.0f, 0.99f); }
 
-        beginTest ("Hp12Filter: high resonance (0.99) — no crash, no NaN");
+        beginTest ("Hp12Filter: high resonance (0.99) - no crash, no NaN");
         { Hp12Filter f; smokeFilter(f, "Hp12Filter-HiRes", 2000.0f, 0.99f); }
 
-        beginTest ("Bp12Filter: high resonance (0.99) — no crash, no NaN");
+        beginTest ("Bp12Filter: high resonance (0.99) - no crash, no NaN");
         { Bp12Filter f; smokeFilter(f, "Bp12Filter-HiRes", 2000.0f, 0.99f); }
 
         // ── Extreme cutoff frequencies ────────────────────────────────────────
-        beginTest ("Lp12Filter: low cutoff (20 Hz) — no crash, no NaN");
+        beginTest ("Lp12Filter: low cutoff (20 Hz) - no crash, no NaN");
         { Lp12Filter f; smokeFilter(f, "Lp12Filter-LowCut", 20.0f, 0.3f); }
 
-        beginTest ("Lp12Filter: high cutoff (20 kHz) — no crash, no NaN");
+        beginTest ("Lp12Filter: high cutoff (20 kHz) - no crash, no NaN");
         { Lp12Filter f; smokeFilter(f, "Lp12Filter-HiCut", 20000.0f, 0.3f); }
     }
 };

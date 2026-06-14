@@ -1,7 +1,7 @@
 // APVTS parameter layout uniqueness tests.
 //
 // Duplicate APVTS parameter IDs silently bind both parameters to the same
-// value — the second registration wins, making the first permanently broken.
+// value - the second registration wins, making the first permanently broken.
 // This test catches suffix/ID collisions at the table level, where it's cheap
 // to check.  The kGlobalParamDefs / kGlobalParams cross-check lives in
 // GlobalParamDefsTests.cpp.
@@ -19,7 +19,7 @@ public:
     void runTest() override
     {
         // ── kRhythmParamDefs suffix uniqueness ────────────────────────────────
-        beginTest ("kRhythmParamDefs — all suffixes are unique");
+        beginTest ("kRhythmParamDefs - all suffixes are unique");
         {
             std::unordered_map<std::string, int> seen;
             for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
@@ -35,8 +35,8 @@ public:
                 "Expected " + juce::String(mu_pp::kRhythmParamCount) + " unique suffixes");
         }
 
-        // ── kRhythmParamDefs — no empty suffixes ──────────────────────────────
-        beginTest ("kRhythmParamDefs — no entry has an empty suffix");
+        // ── kRhythmParamDefs - no empty suffixes ──────────────────────────────
+        beginTest ("kRhythmParamDefs - no entry has an empty suffix");
         {
             for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
             {
@@ -47,7 +47,7 @@ public:
         }
 
         // ── kGlobalParamDefs ID uniqueness ────────────────────────────────────
-        beginTest ("kGlobalParamDefs — all IDs are unique");
+        beginTest ("kGlobalParamDefs - all IDs are unique");
         {
             std::unordered_map<std::string, int> seen;
             for (int i = 0; i < mu_pp::kGlobalParamDefCount; ++i)
@@ -62,7 +62,7 @@ public:
             expectEquals ((int)seen.size(), mu_pp::kGlobalParamDefCount);
         }
 
-        // ── kRhythmParamDefs — AlgorithmIndex entries have non-null tables ────
+        // ── kRhythmParamDefs - AlgorithmIndex entries have non-null tables ────
         beginTest ("AlgorithmIndex params each have a non-null algorithm name table");
         {
             for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)

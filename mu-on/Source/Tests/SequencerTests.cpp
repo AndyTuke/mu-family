@@ -1,4 +1,4 @@
-// Unit tests for the 909 sequencer: beat→step mapping, step-edge trigger firing,
+// Unit tests for the 909 sequencer: beat->step mapping, step-edge trigger firing,
 // swing, accent velocity, pattern serialise/deserialise round-trip, and length wrap.
 
 #include <juce_data_structures/juce_data_structures.h>
@@ -29,7 +29,7 @@ public:
 
     void runTest() override
     {
-        beginTest("beat → step mapping wraps every 16 steps (4 beats)");
+        beginTest("beat -> step mapping wraps every 16 steps (4 beats)");
         {
             expectEquals(GrooveSequencer::currentStep(0.0),  0);
             expectEquals(GrooveSequencer::currentStep(0.25), 1);
@@ -46,7 +46,7 @@ public:
             GrooveSequencer seq(p);
             seq.prepare(48000.0);
 
-            // One bar (4 beats) at 120 BPM = 0.5 s = 96000 samples — but the per-block guard
+            // One bar (4 beats) at 120 BPM = 0.5 s = 96000 samples - but the per-block guard
             // caps at 32 steps; process in four 1-beat blocks (12000 samples each).
             std::vector<Hit> all;
             double beat = 0.0;
@@ -86,7 +86,7 @@ public:
                 seq.setSwing(swing);
                 auto h = run(seq, 0.0, 24000, 120.0);        // covers beats [0, 1.0)
                 if (h.empty()) return -1.0;
-                return h[0].offset * (120.0 / 60.0) / 48000.0;   // offset → beats
+                return h[0].offset * (120.0 / 60.0) / 48000.0;   // offset -> beats
             };
             const double straight = fireBeatOfStep1(0.0f);
             const double swung    = fireBeatOfStep1(1.0f);
@@ -94,7 +94,7 @@ public:
             expect(swung > straight + 0.02, "swing should push the odd step later in the bar");
         }
 
-        beginTest("pattern serialise → deserialise round-trips on/accent");
+        beginTest("pattern serialise -> deserialise round-trips on/accent");
         {
             StepPattern a;
             a.setOn(0, 0, true); a.setAccent(0, 0, true);

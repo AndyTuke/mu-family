@@ -1,7 +1,7 @@
-// Tests for the Stage L4 mu-core MuLinkClient — the product-facing client lifted into
-// mu-core. Drives a real producer thread against an in-process ServerEngine: attach →
-// the client renders ahead into its ring → the server consumes + sums it → transport is
-// read back → clean detach frees the slot. Also covers the no-server fallback.
+// Tests for the Stage L4 mu-core MuLinkClient - the product-facing client lifted into
+// mu-core. Drives a real producer thread against an in-process ServerEngine: attach ->
+// the client renders ahead into its ring -> the server consumes + sums it -> transport is
+// read back -> clean detach frees the slot. Also covers the no-server fallback.
 
 #include <juce_core/juce_core.h>
 #include <vector>

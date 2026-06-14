@@ -1,4 +1,4 @@
-// C1 + C2 — preset format-migration tests.
+// C1 + C2 - preset format-migration tests.
 //
 // C1: migrateInsertSlotsV3 translates the legacy 9-field per-rhythm insert
 //     (drvDrv/drvOut/drvDit/drvTon/drvBits/drvRate/eq*) into the 4 generic
@@ -6,8 +6,8 @@
 // C2: migrateLegacyHostState rescales pre-v2 host-state ADSR times from the old
 //     0..100 display range to 0..10 seconds, preserving the aEnvRel End sentinel.
 //
-// Both are pure ValueTree transforms — these guard the relocated PresetMigrations
-// module against a silent regression in the on-disk → in-memory translation.
+// Both are pure ValueTree transforms - these guard the relocated PresetMigrations
+// module against a silent regression in the on-disk -> in-memory translation.
 
 #include <juce_data_structures/juce_data_structures.h>
 #include "Persistence/PresetMigrations.h"
@@ -29,7 +29,7 @@ public:
     {
         beginTest ("C1: migrateInsertSlotsV3 maps Bitcrusher's 4 fields to insP1..4");
         {
-            // Bitcrusher (algo idx 4): bits→p1, rate→p2, dither→p3, tone→p4.
+            // Bitcrusher (algo idx 4): bits->p1, rate->p2, dither->p3, tone->p4.
             constexpr int algo = 4;
             juce::ValueTree t ("Rhythm");
             t.setProperty ("r0_drvChar", "Bitcrusher", nullptr);
@@ -40,15 +40,15 @@ public:
 
             mu_pp_migrate::migrateInsertSlotsV3 (t, "r0_");
 
-            expectWithinAbsoluteError (prop (t, "r0_insP1"), mu_ui::actualToNorm (8.0f,     algo, 0), 1e-4f, "bits → p1");
-            expectWithinAbsoluteError (prop (t, "r0_insP2"), mu_ui::actualToNorm (24000.0f, algo, 1), 1e-4f, "rate → p2");
-            expectWithinAbsoluteError (prop (t, "r0_insP3"), mu_ui::actualToNorm (0.5f,     algo, 2), 1e-4f, "dither → p3");
-            expectWithinAbsoluteError (prop (t, "r0_insP4"), mu_ui::actualToNorm (5000.0f,  algo, 3), 1e-4f, "tone → p4");
+            expectWithinAbsoluteError (prop (t, "r0_insP1"), mu_ui::actualToNorm (8.0f,     algo, 0), 1e-4f, "bits -> p1");
+            expectWithinAbsoluteError (prop (t, "r0_insP2"), mu_ui::actualToNorm (24000.0f, algo, 1), 1e-4f, "rate -> p2");
+            expectWithinAbsoluteError (prop (t, "r0_insP3"), mu_ui::actualToNorm (0.5f,     algo, 2), 1e-4f, "dither -> p3");
+            expectWithinAbsoluteError (prop (t, "r0_insP4"), mu_ui::actualToNorm (5000.0f,  algo, 3), 1e-4f, "tone -> p4");
         }
 
         beginTest ("C1: migrateInsertSlotsV3 maps SoftClip drive/output/tone");
         {
-            // SoftClip (algo idx 1): drive→p1, output→p2, (p3 unused=0), tone→p4.
+            // SoftClip (algo idx 1): drive->p1, output->p2, (p3 unused=0), tone->p4.
             constexpr int algo = 1;
             juce::ValueTree t ("Rhythm");
             t.setProperty ("r0_drvChar", "SoftClip", nullptr);
@@ -58,10 +58,10 @@ public:
 
             mu_pp_migrate::migrateInsertSlotsV3 (t, "r0_");
 
-            expectWithinAbsoluteError (prop (t, "r0_insP1"), mu_ui::actualToNorm (0.7f,    algo, 0), 1e-4f, "drive → p1");
-            expectWithinAbsoluteError (prop (t, "r0_insP2"), mu_ui::actualToNorm (0.5f,    algo, 1), 1e-4f, "output → p2");
-            expectWithinAbsoluteError (prop (t, "r0_insP3"), mu_ui::actualToNorm (0.0f,    algo, 2), 1e-4f, "unused → p3 (0)");
-            expectWithinAbsoluteError (prop (t, "r0_insP4"), mu_ui::actualToNorm (8000.0f, algo, 3), 1e-4f, "tone → p4");
+            expectWithinAbsoluteError (prop (t, "r0_insP1"), mu_ui::actualToNorm (0.7f,    algo, 0), 1e-4f, "drive -> p1");
+            expectWithinAbsoluteError (prop (t, "r0_insP2"), mu_ui::actualToNorm (0.5f,    algo, 1), 1e-4f, "output -> p2");
+            expectWithinAbsoluteError (prop (t, "r0_insP3"), mu_ui::actualToNorm (0.0f,    algo, 2), 1e-4f, "unused -> p3 (0)");
+            expectWithinAbsoluteError (prop (t, "r0_insP4"), mu_ui::actualToNorm (8000.0f, algo, 3), 1e-4f, "tone -> p4");
         }
 
         beginTest ("C1: migrateInsertSlotsV3 is idempotent (already-v3 left untouched)");
@@ -84,7 +84,7 @@ public:
             expect (! t.hasProperty ("r0_insP1"), "no insert slots created from an empty tree");
         }
 
-        beginTest ("C2: migrateLegacyHostState rescales ADSR 0..100 → 0..10 s");
+        beginTest ("C2: migrateLegacyHostState rescales ADSR 0..100 -> 0..10 s");
         {
             juce::ValueTree s ("PARAMETERS");
             auto add = [&s] (const char* id, double v)
@@ -94,11 +94,11 @@ public:
                 p.setProperty ("value", v, nullptr);
                 s.addChild (p, -1, nullptr);
             };
-            add ("r0_aEnvAtk", 100.0);   // → jlimit(0,10, 100*0.03) = 3.0
-            add ("r0_fEnvDec", 50.0);    // → 1.5
-            add ("r0_aEnvRel", 100.0);   // → End-mode sentinel = 10.0
-            add ("r0_fltCut",  800.0);   // non-ADSR → unchanged
-            add ("global_x",   100.0);   // non-r{0-7}_ → unchanged
+            add ("r0_aEnvAtk", 100.0);   // -> jlimit(0,10, 100*0.03) = 3.0
+            add ("r0_fEnvDec", 50.0);    // -> 1.5
+            add ("r0_aEnvRel", 100.0);   // -> End-mode sentinel = 10.0
+            add ("r0_fltCut",  800.0);   // non-ADSR -> unchanged
+            add ("global_x",   100.0);   // non-r{0-7}_ -> unchanged
 
             mu_pp_migrate::migrateLegacyHostState (s);
 
@@ -109,9 +109,9 @@ public:
                         return (float) (double) s.getChild (i).getProperty ("value");
                 return -999.0f;
             };
-            expectWithinAbsoluteError (val ("r0_aEnvAtk"), 3.0f,   1e-4f, "attack 100 → 3.0 s");
-            expectWithinAbsoluteError (val ("r0_fEnvDec"), 1.5f,   1e-4f, "filter decay 50 → 1.5 s");
-            expectWithinAbsoluteError (val ("r0_aEnvRel"), 10.0f,  1e-4f, "release 100 → End sentinel 10.0");
+            expectWithinAbsoluteError (val ("r0_aEnvAtk"), 3.0f,   1e-4f, "attack 100 -> 3.0 s");
+            expectWithinAbsoluteError (val ("r0_fEnvDec"), 1.5f,   1e-4f, "filter decay 50 -> 1.5 s");
+            expectWithinAbsoluteError (val ("r0_aEnvRel"), 10.0f,  1e-4f, "release 100 -> End sentinel 10.0");
             expectWithinAbsoluteError (val ("r0_fltCut"),  800.0f, 1e-4f, "non-ADSR param untouched");
             expectWithinAbsoluteError (val ("global_x"),   100.0f, 1e-4f, "non-rhythm param untouched");
             expectEquals ((int) s.getProperty ("formatVersion"),

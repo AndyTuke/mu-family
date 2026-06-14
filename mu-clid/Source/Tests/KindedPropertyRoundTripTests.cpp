@@ -3,7 +3,7 @@
 // For each ParamKind, picks a representative value, writes it into a ValueTree
 // via writeKindedProperty, reads it back via readKindedPropertyAsActualV2, and
 // asserts the values match. Catches format drift where the writer and reader
-// disagree on how a kind is encoded — e.g. Bool writer emits "true" but reader
+// disagree on how a kind is encoded - e.g. Bool writer emits "true" but reader
 // expected an int 1, or AlgorithmIndex writer emits a name string but reader
 // misparses it.
 
@@ -42,7 +42,7 @@ public:
         {
             juce::ValueTree t ("T");
             writeKindedProperty (t, "v", 1.0f, ParamKind::Bool, nullptr);
-            // Bool is written as the string "true" — check that the property is
+            // Bool is written as the string "true" - check that the property is
             // readable as a boolean and that the round-trip gives back 1.0.
             expect (t.getProperty ("v").toString() == "true", "Bool true should be written as string 'true'");
             const float back = readKindedPropertyAsActualV2 (t, "v", ParamKind::Bool, nullptr);

@@ -1,9 +1,9 @@
 // Tests for the Stage L1 Win32 shared-memory bus: named mappings for the TransportBlock,
 // the ClientRegistry, and per-slot AudioRings. Two layers of coverage:
-//   • in-process — server + client composers map the SAME named kernel objects through
+//   • in-process - server + client composers map the SAME named kernel objects through
 //     independent MapViewOfFile views, proving the cast + atomic visibility + ring SPSC
 //     all work across separate mappings (not just separate pointers into one buffer);
-//   • cross-process — a child mu-link-tests process attaches as a real client, verifies
+//   • cross-process - a child mu-link-tests process attaches as a real client, verifies
 //     the published transport, and pushes a ring payload the parent reads back.
 
 #include <juce_core/juce_core.h>

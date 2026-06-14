@@ -3,14 +3,14 @@
 // Asserts that each algorithm name table has the same number of entries as the
 // corresponding dispatch-table constant. Catches the failure mode where someone
 // adds a new algorithm to a dispatch table but forgets to append a stable name,
-// causing the v2 preset writer to fall back to writing an integer index — which
+// causing the v2 preset writer to fall back to writing an integer index - which
 // silently breaks the reorder-safety contract.
 //
-// Table → constant pairing:
-//   kInsertAlgorithmNames  → InsertProcessor::kNumInsertAlgos  (13)
-//   kFilterTypeNames       → MultiModeFilter::kNumFilterAlgos  (16)
-//   kEffectAlgorithmNames  → FXAlgorithmRegistry::effectAlgorithms().size() (4)
-//   kReverbAlgorithmNames  → FXAlgorithmRegistry::reverbAlgorithms().size() (4)
+// Table -> constant pairing:
+//   kInsertAlgorithmNames  -> InsertProcessor::kNumInsertAlgos  (13)
+//   kFilterTypeNames       -> MultiModeFilter::kNumFilterAlgos  (16)
+//   kEffectAlgorithmNames  -> FXAlgorithmRegistry::effectAlgorithms().size() (4)
+//   kReverbAlgorithmNames  -> FXAlgorithmRegistry::reverbAlgorithms().size() (4)
 
 #include <juce_core/juce_core.h>
 #include "Audio/AlgorithmNames.h"

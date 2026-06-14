@@ -30,10 +30,10 @@ public:
             const juce::String id (def.id);
 
             // Pick a representative value per kind:
-            //   Float          → 0.5
-            //   Int            → 2
-            //   Bool           → 1.0 (true)
-            //   AlgorithmIndex → 1 (first non-None / non-zero entry)
+            //   Float          -> 0.5
+            //   Int            -> 2
+            //   Bool           -> 1.0 (true)
+            //   AlgorithmIndex -> 1 (first non-None / non-zero entry)
             float testValue = 0.5f;
             switch (def.kind)
             {

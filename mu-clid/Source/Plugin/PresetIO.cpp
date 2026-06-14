@@ -305,7 +305,7 @@ void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file)
                     samplePath = storedPath;
                     if (proc_.onLoadError)
                         proc_.onLoadError("Sample '" + sf.getFileName()
-                                    + "' missing — rhythm loaded without audio.");
+                                    + juce::String::fromUTF8("' missing \xe2\x80\x94 rhythm loaded without audio."));
                 }
             }
             else
@@ -314,7 +314,7 @@ void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file)
                 samplePath = sf.getFullPathName();
                 if (proc_.onLoadError)
                     proc_.onLoadError("Sample '" + sf.getFileName()
-                                + "' missing from content folder — rhythm loaded without audio.");
+                                + juce::String::fromUTF8("' missing from content folder \xe2\x80\x94 rhythm loaded without audio."));
             }
         }
     }
@@ -997,7 +997,7 @@ static void prepareRhythmSlotFromTree(const juce::ValueTree& rTreeIn,
                     outVoice->clearSample();
                     outSamplePath = storedPath;
                     if (onLoadError)
-                        onLoadError("Sample '" + f.getFileName() + "' missing — rhythm loaded without audio.");
+                        onLoadError("Sample '" + f.getFileName() + juce::String::fromUTF8("' missing \xe2\x80\x94 rhythm loaded without audio."));
                 }
             }
             else
@@ -1006,7 +1006,7 @@ static void prepareRhythmSlotFromTree(const juce::ValueTree& rTreeIn,
                 outSamplePath = f.getFullPathName();
                 if (onLoadError)
                     onLoadError("Sample '" + f.getFileName()
-                                + "' missing from content folder — rhythm loaded without audio.");
+                                + juce::String::fromUTF8("' missing from content folder \xe2\x80\x94 rhythm loaded without audio."));
             }
         }
     }

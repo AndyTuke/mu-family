@@ -1,6 +1,6 @@
-// mu-tant modulator unit tests — covers the destination provider's
+// mu-tant modulator unit tests - covers the destination provider's
 // populate/resolveId/findDropdownId callbacks, the per-voice ModulationMatrix
-// + ControlSequence integration, and the audio-path "seed → matrix.process →
+// + ControlSequence integration, and the audio-path "seed -> matrix.process ->
 // read back" round-trip pattern that PluginProcessor::processBlock uses.
 
 #include <juce_core/juce_core.h>
@@ -50,7 +50,7 @@ public:
         beginTest("destination table contains the audio-thread keys mu-tant needs");
         {
             // Every key the PluginProcessor::processBlock seed-and-read pattern
-            // uses must be findable by the provider — otherwise a saved
+            // uses must be findable by the provider - otherwise a saved
             // assignment from the UI would silently fail to drive the engine.
             const char* requiredKeys[] = {
                 "osc1.octave", "osc1.semi", "osc1.fine", "osc1.pos",
@@ -106,8 +106,8 @@ public:
             slot.modulationMatrix.process(slot.controlSequences, 0.0, pv);
 
             // Stepped CS at phase 0 with value 50 + full depth (100) drives the
-            // value upward. We don't pin the exact amount — the depth scaling
-            // factor in the matrix is implementation-defined — but a non-zero
+            // value upward. We don't pin the exact amount - the depth scaling
+            // factor in the matrix is implementation-defined - but a non-zero
             // depth assignment MUST change the seeded value.
             expect(pv["filter.cutoff"] != 1000.0f,
                    "non-zero modulation depth altered filter.cutoff from baseline");
@@ -116,7 +116,7 @@ public:
         beginTest("filter2 '.prop' destination sweeps the full proportion at full depth+source");
         {
             // Filter 2 uses the generic proportion-space convention: a destination id
-            // ending in ".prop" gets depthScaleFor = 1.0, so full depth (100) × full
+            // ending in ".prop" gets depthScaleFor = 1.0, so full depth (100) x full
             // source (100) adds exactly 1.0 to the seeded 0..1 proportion.
             VoiceSlot slot;
             auto& cs = slot.controlSequences[0];
@@ -142,10 +142,10 @@ public:
                    "full depth+source adds 1.0 to the proportion (scale 1.0)");
         }
 
-        beginTest("registered product depth-scale is proportion-space (osc1.semi → scale 1.0)");
+        beginTest("registered product depth-scale is proportion-space (osc1.semi -> scale 1.0)");
         {
             // mu-tant's engine dests are now routed through mu_mod::resolveLane, which seeds
-            // proportions (0..1) — so every registered scale is 1.0 (not the old display-unit
+            // proportions (0..1) - so every registered scale is 1.0 (not the old display-unit
             // 24). Verify the registration overrides mu-core's 0..100 default of 100: a full
             // depth+source mod adds exactly 1.0 to a proportion seed.
             registerDepthScales();   // idempotent (call_once); normally the processor ctor calls it
@@ -174,7 +174,7 @@ public:
         {
             // End-to-end check of the converged path: a full-depth unipolar mod on osc1.semi
             // (range -12..12) seeds the param's mid proportion and sweeps to the +12 rail,
-            // clamped — the behaviour mu-tant's renderVoice now relies on via resolveLane.
+            // clamped - the behaviour mu-tant's renderVoice now relies on via resolveLane.
             registerDepthScales();
 
             VoiceSlot slot;
@@ -189,7 +189,7 @@ public:
             expect(slot.modulationMatrix.addAssignment(a), "matrix accepts osc1.semi assignment");
 
             const juce::NormalisableRange<float> semiRange(-12.0f, 12.0f, 1.0f);
-            std::atomic<float> semiAtom { 0.0f };   // base value 0 → proportion 0.5
+            std::atomic<float> semiAtom { 0.0f };   // base value 0 -> proportion 0.5
             const char* ids[1] { "osc1.semi" };
             const std::atomic<float>* atoms[1] { &semiAtom };
             std::unordered_map<std::string_view, float> pv;
@@ -213,7 +213,7 @@ public:
 
         beginTest("matrix rejects circular dependencies");
         {
-            // Meta-modulation source format is "assign_{id}_depth" — assignment B
+            // Meta-modulation source format is "assign_{id}_depth" - assignment B
             // sources assignment A's depth, and assignment A sources B's depth.
             // The second add must be rejected.
             VoiceSlot slot;
@@ -231,7 +231,7 @@ public:
             b.depth = 10.0f;
             expect(slot.modulationMatrix.addAssignment(b), "meta-mod assignment accepted");
 
-            // Now mutate a so it sources b's depth — should be rejected.
+            // Now mutate a so it sources b's depth - should be rejected.
             slot.modulationMatrix.removeAssignment("a");
             ModulationAssignment cyclic;
             cyclic.id = "a";

@@ -705,7 +705,7 @@ void RhythmPanel::paint(juce::Graphics& g)
             // "missing — click to find" hint so the user knows what to look for.
             g.setColour(MuLookAndFeel::colour(MuLookAndFeel::sampleBarMissingWarning));
             g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
-            g.drawText("Missing: " + sampleName + "  —  click to find",
+            g.drawText("Missing: " + sampleName + juce::String::fromUTF8("  \xe2\x80\x94  click to find"),
                        inner.getX() + 5, inner.getY(), inner.getWidth() - 28, inner.getHeight(),
                        juce::Justification::centredLeft, true);
         }

@@ -1,7 +1,7 @@
 // Unit tests for mu-On's per-lane modulation wiring:
 //   • the generic ".prop" proportion-space scale rule (mu-core depthScaleFor) drives a
 //     full-depth mod across the whole 0..1 proportion (scale 1.0, not the 100 default),
-//   • the per-lane MuOnModDest provider resolves dropdown ids ↔ destination strings and
+//   • the per-lane MuOnModDest provider resolves dropdown ids <-> destination strings and
 //     rejects another lane's destinations,
 //   • a lane's modulators serialise/deserialise round-trip, dropping foreign destinations.
 
@@ -44,7 +44,7 @@ public:
             pv["k.tune.prop"] = 0.25f;
             m.process(seqs, 0.0, pv);
 
-            // amount = src(100) * depth(100) * scale(1.0) * 0.0001 = 1.0 → 0.25 + 1.0.
+            // amount = src(100) * depth(100) * scale(1.0) * 0.0001 = 1.0 -> 0.25 + 1.0.
             expectWithinAbsoluteError(pv["k.tune.prop"], 1.25f, 0.001f);
         }
 
@@ -69,7 +69,7 @@ public:
             // 1-based dropdown id (addItem(alias, i+1)), the resolved out[] index, and the
             // positional argument order of that lane's Engine::setParams() (the GrooveVoices
             // dispatch). An insert/reorder/delete in any one would re-route modulation to the
-            // wrong engine param with no other failure — so pin the full ordered id list per
+            // wrong engine param with no other failure - so pin the full ordered id list per
             // lane here. If a dest is added, update BOTH this list and the engine dispatch.
             // Counts equal each engine's modulatable arity: Kick 5, Bass 10 (wave choice
             // omitted), Hat/Snare 2, Rumble 9 (bpm transport excluded).

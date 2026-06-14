@@ -1,9 +1,9 @@
-// mu-link test runner — console entry that runs every juce::UnitTest in the link
+// mu-link test runner - console entry that runs every juce::UnitTest in the link
 // graph (each test file defines a `static MyTest x;` at file scope).
 //
 // Build:  cmake --build build --config Debug --target mu-link-tests
 // Run:    build/mu-link/mu-link-tests_artefacts/Debug/mu-link-tests.exe
-// Scope:  the portable IPC foundation — lock-free SPSC AudioRing + sample-accurate
+// Scope:  the portable IPC foundation - lock-free SPSC AudioRing + sample-accurate
 //         TransportClock. The audio server, shared-memory mapping, and GUI are not
 //         linked here (they arrive in later increments).
 
@@ -23,7 +23,7 @@ int main(int argc, char** argv)
 {
     // Child mode: the cross-process shared-memory test re-launches this exe with
     // --shm-child to act as a real mu-link client. Do the client work and exit with a
-    // status the parent reads — do NOT run the unit-test suite (would recurse).
+    // status the parent reads - do NOT run the unit-test suite (would recurse).
 #ifdef _WIN32
     for (int i = 1; i < argc; ++i)
         if (std::strcmp(argv[i], "--shm-child") == 0)

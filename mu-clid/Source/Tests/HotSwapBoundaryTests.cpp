@@ -1,4 +1,4 @@
-// C3 — hot-swap loop-boundary predicate tests.
+// C3 - hot-swap loop-boundary predicate tests.
 //
 // The swap-defer decision in HotSwapStager::checkBoundaries was extracted into
 // pure predicates (HotSwapBoundary.h) so the rule can be tested without a live
@@ -47,7 +47,7 @@ public:
             expect (  fullPresetBoundaryReached (/*hasMaster*/ false, /*master*/ false, /*mask*/ 0x01), "fires when rhythm 0 wraps");
             expect (! fullPresetBoundaryReached (/*hasMaster*/ false, /*master*/ false, /*mask*/ 0x02), "does NOT fire when only rhythm 1 wraps");
             expect (! fullPresetBoundaryReached (/*hasMaster*/ false, /*master*/ true,  /*mask*/ 0x00),
-                "free-running ignores masterLoopWrapped — that signal is meaningless without a master loop (the free-running trap)");
+                "free-running ignores masterLoopWrapped - that signal is meaningless without a master loop (the free-running trap)");
         }
     }
 };

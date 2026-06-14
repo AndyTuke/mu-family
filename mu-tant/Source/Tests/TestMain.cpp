@@ -1,4 +1,4 @@
-// mu-tant test runner — console entry that runs every juce::UnitTest registered
+// mu-tant test runner - console entry that runs every juce::UnitTest registered
 // in the link graph (each test file defines a `static MyTest x;` at file scope).
 //
 // Build:  cmake --build build --config Debug --target mu-tant-tests
@@ -6,7 +6,7 @@
 // Scope:  synth DSP + modulator/gate/insert/persist coverage, plus a shared
 //         global-FX APVTS layout test (mu_mixfx::addGlobalFxParams behind a
 //         headless AudioProcessor stub). The full mu-tant PluginProcessor is not
-//         linked — its createEditor() drags in the editor/UI tree.
+//         linked - its createEditor() drags in the editor/UI tree.
 
 #include <juce_core/juce_core.h>
 #include <cstdio>

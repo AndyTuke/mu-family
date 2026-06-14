@@ -5,7 +5,7 @@
 //   - Min and max of clamped ranges actually hit their limits and round-trip
 //   - Over-range inputs are clamped (never escape into undefined behaviour)
 //   - Sentinel values with special semantics are preserved (aEnvRel >= 10.0,
-//     rstSt = -1 → nullopt)
+//     rstSt = -1 -> nullopt)
 //   - AlgorithmIndex params clamp to countNames()-1, not a stale hardcoded
 //     limit (regression: drvChar clamped to 12, not 13)
 //   - Bool params serialise as 0.0 / 1.0 only
@@ -83,7 +83,7 @@ public:
         }
 
         // ── Pitch integer clamps ──────────────────────────────────────────────
-        beginTest ("pitchOct: clamps to [-3, 3] (range reduced from ±4; ±4 oct combined max comes from oct + semi)");
+        beginTest ("pitchOct: clamps to [-3, 3] (range reduced from +/-4; +/-4 oct combined max comes from oct + semi)");
         {
             auto& def = find("pitchOct");
             expectWithinAbsoluteError (applyAndPush(def, -3.0f),  -3.0f, kTol, "min");
@@ -100,8 +100,8 @@ public:
             expectWithinAbsoluteError (applyAndPush(def, -24.0f), -12.0f, kTol, "-24 clamps to -12");
         }
 
-        // ── ADSR sustain 0-100 ↔ 0-1 scaling ─────────────────────────────────
-        beginTest ("pEnvSus: display 0–100 round-trips via stored 0–1");
+        // ── ADSR sustain 0-100 <-> 0-1 scaling ─────────────────────────────────
+        beginTest ("pEnvSus: display 0-100 round-trips via stored 0-1");
         {
             auto& def = find("pEnvSus");
             expectWithinAbsoluteError (applyAndPush(def, 0.0f),   0.0f,   kTol, "min");
@@ -109,7 +109,7 @@ public:
             expectWithinAbsoluteError (applyAndPush(def, 50.0f),  50.0f,  kTol, "midpoint");
         }
 
-        beginTest ("aEnvSus: display 0–100 round-trips via stored 0–1");
+        beginTest ("aEnvSus: display 0-100 round-trips via stored 0-1");
         {
             auto& def = find("aEnvSus");
             expectWithinAbsoluteError (applyAndPush(def, 0.0f),   0.0f,   kTol, "min");

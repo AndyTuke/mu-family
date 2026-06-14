@@ -7,10 +7,10 @@
 // These tests guard the contract at two levels:
 //   1. readHostTransport() correctly forwards host play state and BPM.
 //   2. The transport playing flag directly controls gate output (the path that
-//      was broken): playing=false → silence, playing=true+envelopes → audio.
+//      was broken): playing=false -> silence, playing=true+envelopes -> audio.
 //
 // Level 2 is already partially covered by GateStageTests, but repeating the key
-// cases here makes the transport→gate dependency explicit in one file.
+// cases here makes the transport->gate dependency explicit in one file.
 
 #include <juce_core/juce_core.h>
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -55,7 +55,7 @@ public:
     {
         // ── Part 1: readHostTransport unit tests ─────────────────────────────
 
-        beginTest("null playhead → not playing, bpm=0");
+        beginTest("null playhead -> not playing, bpm=0");
         {
             const auto t = mu_core::readHostTransport(nullptr);
             expect(!t.playing, "null playhead must report not playing");
@@ -82,7 +82,7 @@ public:
             expectEquals(t.bpm, 130.0, "BPM is still forwarded when stopped");
         }
 
-        beginTest("host provides no position → not playing, bpm=0");
+        beginTest("host provides no position -> not playing, bpm=0");
         {
             MockPlayHead ph;
             ph.hasPos = false;
@@ -91,10 +91,10 @@ public:
             expectEquals(t.bpm, 0.0, "empty position must report no BPM");
         }
 
-        // ── Part 2: transport→gate contract ──────────────────────────────────
+        // ── Part 2: transport->gate contract ──────────────────────────────────
         // Verifies that the playing field returned by readHostTransport feeds
         // applyGateBlock correctly. The bug path: in plugin mode, playing was
-        // never true → gate always silenced → no audio in any DAW host.
+        // never true -> gate always silenced -> no audio in any DAW host.
 
         using namespace mu_tant;
         constexpr int    N   = 1024;
@@ -105,7 +105,7 @@ public:
         {
             mu_tant::GateEnvelope env;
             env.startCell   = 0;
-            env.lengthCells = 8;   // spans cells 0–7, well within the block
+            env.lengthCells = 8;   // spans cells 0-7, well within the block
             pat.addEnvelope(env);
         }
 

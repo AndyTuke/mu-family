@@ -2,9 +2,9 @@
 //
 // mu-on's mixer binds to the params declared by mu_mixfx::addGlobalFxParams (mu-core)
 // and synced via ProcessorBase::syncGlobalFxParam. This builds an APVTS from that helper
-// behind a minimal headless AudioProcessor and asserts the ID set — so drift in the
+// behind a minimal headless AudioProcessor and asserts the ID set - so drift in the
 // shared layout is caught here. Like the rest of the family it does NOT construct the
-// full PluginProcessor (its createEditor() drags the editor/UI tree in — see the backlog).
+// full PluginProcessor (its createEditor() drags the editor/UI tree in - see the backlog).
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Plugin/MixerFxParams.h"   // mu-core: mu_mixfx::addGlobalFxParams

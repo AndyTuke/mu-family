@@ -1,7 +1,7 @@
 // InsertAlgoTable invariants test.
 //
 // Catches the class of bug where the per-algorithm UI driver presents an
-// algorithm as "all knobs hidden" — either because the slot config table
+// algorithm as "all knobs hidden" - either because the slot config table
 // genuinely has every label==nullptr for that algo, or because the row
 // count drifts away from kInsertAlgorithmCount and a non-existent row
 // gets read with garbage labels.
@@ -28,7 +28,7 @@ public:
             const int rows = (int) (sizeof(mu_ui::kInsertAlgoSlots)
                                   / sizeof(mu_ui::kInsertAlgoSlots[0]));
             expectEquals (rows, mu_audio::kInsertAlgorithmCount,
-                "kInsertAlgoSlots[] must have one row per algorithm in kInsertAlgorithmNames — drift will read garbage labels and cause the UI to present blank knobs");
+                "kInsertAlgoSlots[] must have one row per algorithm in kInsertAlgorithmNames - drift will read garbage labels and cause the UI to present blank knobs");
         }
 
         beginTest ("kInsertAlgoDefaults row count matches kInsertAlgorithmCount");
@@ -36,7 +36,7 @@ public:
             const int rows = (int) (sizeof(mu_ui::kInsertAlgoDefaults)
                                   / sizeof(mu_ui::kInsertAlgoDefaults[0]));
             expectEquals (rows, mu_audio::kInsertAlgorithmCount,
-                "kInsertAlgoDefaults[] must have one row per algorithm — first-visit restore would OOB without this");
+                "kInsertAlgoDefaults[] must have one row per algorithm - first-visit restore would OOB without this");
         }
 
         beginTest ("every non-None algorithm has at least one visible slot");
@@ -44,7 +44,7 @@ public:
             // Guard against the "all slots null" failure mode: if a non-None
             // algo had all four slots labelled nullptr, configureInsertAlgorithm
             // would hide every knob and the algorithm would present as empty.
-            // This guarantees the UI driver always has SOMETHING to show — even if some
+            // This guarantees the UI driver always has SOMETHING to show - even if some
             // future algorithm only needs one knob, at least one is visible.
             for (int algo = 1; algo < mu_audio::kInsertAlgorithmCount; ++algo)
             {
@@ -55,7 +55,7 @@ public:
                 expect (visible > 0,
                     "Algorithm '" + juce::String(mu_audio::kInsertAlgorithmNames[algo])
                     + "' (idx " + juce::String(algo) + ") has zero visible slots "
-                    + "— UI would render as empty knobs");
+                    + "- UI would render as empty knobs");
             }
         }
 
@@ -68,7 +68,7 @@ public:
                 for (int slot = 0; slot < mu_ui::kInsertSlotCount; ++slot)
                 {
                     const auto& cfg = mu_ui::kInsertAlgoSlots[algo][slot];
-                    if (cfg.label == nullptr) continue;   // hidden slot — range doesn't matter
+                    if (cfg.label == nullptr) continue;   // hidden slot - range doesn't matter
                     expect (cfg.maxVal > cfg.minVal,
                         "Algorithm '" + juce::String(mu_audio::kInsertAlgorithmNames[algo])
                         + "' slot " + juce::String(slot) + " (label '" + juce::String(cfg.label)
@@ -82,19 +82,19 @@ public:
         {
             // ModDest::populate computes insert-section IDs as `10 + slot + 1` so a
             // reorder of kTable would silently aim the dropdown at `_reserved.*`
-            // placeholders — the exact bug that caused blank dropdown items
+            // placeholders - the exact bug that caused blank dropdown items
             // for clip / fold / bitcrusher / EQ / Karplus / Vocoder algorithms).
             expect (std::strcmp (ModDest::kTable[10].id, "insert.p1") == 0,
-                "kTable[10] must be insert.p1 — see the backlog; if you reorder kTable, update populate()");
+                "kTable[10] must be insert.p1 - see the backlog; if you reorder kTable, update populate()");
             expect (std::strcmp (ModDest::kTable[11].id, "insert.p2") == 0,
-                "kTable[11] must be insert.p2 — see the backlog");
+                "kTable[11] must be insert.p2 - see the backlog");
             expect (std::strcmp (ModDest::kTable[12].id, "insert.p3") == 0,
-                "kTable[12] must be insert.p3 — see the backlog");
+                "kTable[12] must be insert.p3 - see the backlog");
             expect (std::strcmp (ModDest::kTable[13].id, "insert.p4") == 0,
-                "kTable[13] must be insert.p4 — see the backlog");
+                "kTable[13] must be insert.p4 - see the backlog");
         }
 
-        beginTest ("normToActual ↔ actualToNorm round-trips for every visible slot");
+        beginTest ("normToActual <-> actualToNorm round-trips for every visible slot");
         {
             // Catches a stale skew handler / formula divergence: if
             // normToActual and actualToNorm don't invert each other, the UI
@@ -113,7 +113,7 @@ public:
                         // IntStep snaps to nearest integer in [min, max], so
                         // for spans < 1 the round-trip is exact; for larger
                         // spans normToActual rounds to int and actualToNorm
-                        // re-normalises — within 1/(maxVal - minVal).
+                        // re-normalises - within 1/(maxVal - minVal).
                         const float tol = (cfg.skew == mu_ui::SkewMode::IntStep)
                             ? 1.5f / (cfg.maxVal - cfg.minVal)
                             : 1e-4f;
@@ -129,7 +129,7 @@ public:
         beginTest ("amp.release retired as a modulation destination (Finding 2)");
         {
             // A one-shot step trigger never note-offs during playback, so the amp
-            // env never reaches release — modulating it is a no-op. It was retired
+            // env never reaches release - modulating it is a no-op. It was retired
             // from kTable; verify it's no longer a valid target, the retire didn't
             // shift the insert.p1..p4 indices, and the other amp env destinations
             // stayed valid.

@@ -1,4 +1,4 @@
-// mu-tant hot-swap staging tests — the pure loop-boundary predicates
+// mu-tant hot-swap staging tests - the pure loop-boundary predicates
 // (HotSwapBoundary.h) and the VoiceHotSwapStager store-release/load-acquire
 // handshake. No PluginProcessor needed: this is the regression guard for the
 // swap-defer decision (wrap detection incl. non-divisor pattern lengths,
@@ -27,7 +27,7 @@ public:
             expect(  patternWrapped(7.9, 8.1, 8.0),  "wrap crossing 8.0");
             expect(  patternWrapped(15.9, 16.1, 8.0), "wrap crossing the 2nd loop point");
             expect(! patternWrapped(8.0, 8.0, 8.0),  "zero-length block never wraps");
-            expect(! patternWrapped(1.0, 2.0, 0.0),  "non-positive patBeats → never");
+            expect(! patternWrapped(1.0, 2.0, 0.0),  "non-positive patBeats -> never");
         }
 
         beginTest("patternWrapped: non-divisor lengths (12, 20 beats) work pre-ceiling");
@@ -42,12 +42,12 @@ public:
         beginTest("swapBoundaryReached: playing / stop-edge / stopped");
         {
             // Playing: commit only on a reference-pattern wrap.
-            expect(! swapBoundaryReached(true,  true,  0.0, 1.0, 8.0),  "playing, no wrap → wait");
-            expect(  swapBoundaryReached(true,  true,  7.9, 8.1, 8.0),  "playing, wrap → commit");
+            expect(! swapBoundaryReached(true,  true,  0.0, 1.0, 8.0),  "playing, no wrap -> wait");
+            expect(  swapBoundaryReached(true,  true,  7.9, 8.1, 8.0),  "playing, wrap -> commit");
             // Stop edge: commit immediately regardless of position.
-            expect(  swapBoundaryReached(false, true,  3.0, 3.0, 8.0),  "playing→stopped edge → commit");
+            expect(  swapBoundaryReached(false, true,  3.0, 3.0, 8.0),  "playing->stopped edge -> commit");
             // Stopped, no edge: never (a stopped stage applies immediately at stage time).
-            expect(! swapBoundaryReached(false, false, 0.0, 0.0, 8.0),  "stopped, no edge → never");
+            expect(! swapBoundaryReached(false, false, 0.0, 0.0, 8.0),  "stopped, no edge -> never");
         }
 
         beginTest("Stager: full-preset swap commits at voice-0 boundary");
@@ -64,7 +64,7 @@ public:
             // Mid-loop: not yet.
             expect(! st.checkBoundaries(2, true, true, 0.0, 1.0, patBeats, fullPat),
                    "no boundary mid-loop");
-            // Cross voice-0's wrap → flagged.
+            // Cross voice-0's wrap -> flagged.
             expect(st.checkBoundaries(2, true, true, 7.9, 8.1, patBeats, fullPat),
                    "voice-0 wrap flags the full swap");
 
@@ -122,7 +122,7 @@ public:
             VoiceHotSwapStager st;
             juce::ValueTree v("Voice"); st.stageVoice(0, std::move(v));
             std::array<double, VoiceHotSwapStager::kMaxVoices> patBeats {}; patBeats.fill(8.0);
-            // playing→stopped with no wrap: still flagged via the stop edge.
+            // playing->stopped with no wrap: still flagged via the stop edge.
             expect(st.checkBoundaries(1, /*playing*/false, /*wasPlaying*/true,
                                       2.0, 2.0, patBeats, 8.0),
                    "stop edge commits the staged voice swap");

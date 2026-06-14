@@ -6,7 +6,7 @@
 //   - DelaySlot:  Free mode and Sync mode
 //   - ReverbSlot: all 4 algorithms (Room, Hall, Plate, Spring)
 //
-// These are not golden-master tests — exact DSP output is not asserted.
+// These are not golden-master tests - exact DSP output is not asserted.
 
 #include <juce_core/juce_core.h>
 #include <juce_audio_basics/juce_audio_basics.h>
@@ -50,7 +50,7 @@ public:
         for (int algo = 0; algo < EffectSlot::kNumEffectAlgos; ++algo)
         {
             beginTest (juce::String("EffectSlot algo ") + juce::String(algo)
-                       + ": " + effectNames[algo] + " — no crash, no NaN");
+                       + ": " + effectNames[algo] + " - no crash, no NaN");
             {
                 EffectSlot slot;
                 slot.setAlgorithm(algo);
@@ -64,8 +64,8 @@ public:
             }
         }
 
-        // Echo also has a processReturn path — test it too
-        beginTest ("EffectSlot Echo: processReturn — no crash, no NaN");
+        // Echo also has a processReturn path - test it too
+        beginTest ("EffectSlot Echo: processReturn - no crash, no NaN");
         {
             EffectSlot slot;
             slot.setAlgorithm(EffectSlot::kEchoAlgoIndex);
@@ -78,7 +78,7 @@ public:
         }
 
         // ── DelaySlot: Free mode ──────────────────────────────────────────────
-        beginTest ("DelaySlot: Free mode (250 ms) — no crash, no NaN");
+        beginTest ("DelaySlot: Free mode (250 ms) - no crash, no NaN");
         {
             DelaySlot slot;
             slot.setTimeMode(DelaySlot::TimeMode::Free);
@@ -93,7 +93,7 @@ public:
         }
 
         // ── DelaySlot: Sync mode ──────────────────────────────────────────────
-        beginTest ("DelaySlot: Sync mode (quarter note @ 120 BPM) — no crash, no NaN");
+        beginTest ("DelaySlot: Sync mode (quarter note @ 120 BPM) - no crash, no NaN");
         {
             DelaySlot slot;
             slot.setHostBpm(120.0);
@@ -110,7 +110,7 @@ public:
         }
 
         // DelaySlot processReturn path
-        beginTest ("DelaySlot: processReturn — no crash, no NaN");
+        beginTest ("DelaySlot: processReturn - no crash, no NaN");
         {
             DelaySlot slot;
             slot.setDelayMs(100.0f);
@@ -127,7 +127,7 @@ public:
         for (int algo = 0; algo < 4; ++algo)
         {
             beginTest (juce::String("ReverbSlot algo ") + juce::String(algo)
-                       + ": " + reverbNames[algo] + " — no crash, no NaN");
+                       + ": " + reverbNames[algo] + " - no crash, no NaN");
             {
                 ReverbSlot slot;
                 slot.setAlgorithm(algo);
@@ -142,7 +142,7 @@ public:
         }
 
         // ReverbSlot processReturn path (wet-only send-bus mode)
-        beginTest ("ReverbSlot: processReturn — no crash, no NaN");
+        beginTest ("ReverbSlot: processReturn - no crash, no NaN");
         {
             ReverbSlot slot;
             slot.prepare(kSR, kNs);
@@ -155,7 +155,7 @@ public:
 
         // ── Multi-block stability ─────────────────────────────────────────────
         // Run several blocks to verify feedback paths don't diverge.
-        beginTest ("DelaySlot: 8 blocks of noise — feedback stays finite");
+        beginTest ("DelaySlot: 8 blocks of noise - feedback stays finite");
         {
             DelaySlot slot;
             slot.setDelayMs(50.0f);
@@ -177,7 +177,7 @@ public:
             expect (ok, "DelaySlot produced NaN/Inf during multi-block noise run");
         }
 
-        beginTest ("ReverbSlot: 8 blocks of noise — output stays finite");
+        beginTest ("ReverbSlot: 8 blocks of noise - output stays finite");
         {
             ReverbSlot slot;
             slot.prepare(kSR, kNs);

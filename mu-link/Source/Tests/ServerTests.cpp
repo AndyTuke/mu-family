@@ -1,4 +1,4 @@
-// Tests for the Stage L2 ServerEngine — the headless real-time core: transport publish
+// Tests for the Stage L2 ServerEngine - the headless real-time core: transport publish
 // (read back through the seqlock snapshot), lock-free summing of client rings, underrun
 // zero-fill, and the 24-ppqn MIDI-clock pulse math. The device-owning AudioServer is a
 // thin shell over this and is exercised by the runnable mu-link-server app, not here.
@@ -147,7 +147,7 @@ public:
                     else        { if (v != 0.0f) tailSilent = false; }
                 }
             expect(headOk, "available frames not summed");
-            expect(tailSilent, "underrun tail was not silent — would click the master");
+            expect(tailSilent, "underrun tail was not silent - would click the master");
         }
 
         beginTest("MIDI-clock pulses track the clock at 24 ppqn");
@@ -230,9 +230,9 @@ public:
             engine.setClientGain(0, 0.5f);
             OutputBuffers out(2, 64);
             engine.renderBlock(out.data(), 2, 64);
-            expectWithinAbsoluteError(out.storage[0][0], 0.5f, 1.0e-6f);   // 1.0 × 0.5 gain
+            expectWithinAbsoluteError(out.storage[0][0], 0.5f, 1.0e-6f);   // 1.0 x 0.5 gain
 
-            // Refill (the block was consumed) and mute → silence.
+            // Refill (the block was consumed) and mute -> silence.
             mem.ring(0).writeFrames(in.data(), 64);
             engine.setClientMute(0, true);
             engine.renderBlock(out.data(), 2, 64);
@@ -295,7 +295,7 @@ public:
             expect(! est.isRunning(), "should begin stopped");
 
             est.onStart();
-            expect(est.isRunning(), "Start (0xFA) → running");
+            expect(est.isRunning(), "Start (0xFA) -> running");
             expect(est.consumeReset(), "Start requests a position reset");
             expect(! est.consumeReset(), "reset is consumed exactly once");
 
@@ -305,13 +305,13 @@ public:
             for (int i = 0; i < 80; ++i) { est.onClockPulse(t); t += pulse120; }
             expectWithinAbsoluteError(est.bpm(), 120.0, 0.5);
 
-            // Speed up to 140 BPM — the smoothed estimate tracks toward it (jitter-free input).
+            // Speed up to 140 BPM - the smoothed estimate tracks toward it (jitter-free input).
             const double pulse140 = (60.0 / 140.0) / 24.0;
             for (int i = 0; i < 300; ++i) { est.onClockPulse(t); t += pulse140; }
             expectWithinAbsoluteError(est.bpm(), 140.0, 1.0);
 
             est.onStop();
-            expect(! est.isRunning(), "Stop (0xFC) → stopped");
+            expect(! est.isRunning(), "Stop (0xFC) -> stopped");
         }
 
         beginTest("renderBlock tolerates a block larger than the prepared max");
@@ -327,7 +327,7 @@ public:
             std::vector<float> in(64 * kMaxChannels, 0.25f);
             mem.ring(0).writeFrames(in.data(), 64);
 
-            // The device hands us a BIGGER block than was prepared — must not overrun the
+            // The device hands us a BIGGER block than was prepared - must not overrun the
             // scratch. The available client frames sum in; the rest stays clean silence.
             OutputBuffers out(2, 256);
             auto st = engine.renderBlock(out.data(), 2, 256);
@@ -352,7 +352,7 @@ public:
             for (int i = 0; i < 10; ++i) { est.onClockPulse(t); t += pulse; }
 
             OutputBuffers out(2, 512);
-            engine.renderBlock(out.data(), 2, 512);            // fresh pulses → running
+            engine.renderBlock(out.data(), 2, 512);            // fresh pulses -> running
             expectEquals((int) readTransport(mem.transport()).playing, 1, "should be playing while clock is live");
 
             // No further pulses arrive (cable pulled, no 0xFC). After > 0.5 s of frames the

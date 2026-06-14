@@ -1,4 +1,4 @@
-// mu-tant modulator-evaluator tests — ControlSequence is shared mu-core DSP that
+// mu-tant modulator-evaluator tests - ControlSequence is shared mu-core DSP that
 // drives every mu-tant modulation source, so pin its evaluate() invariants.
 
 #include <juce_core/juce_core.h>
@@ -11,7 +11,7 @@ public:
 
     void runTest() override
     {
-        beginTest("getLoopLengthBeats: whole note = 4 beats, ×2 = 8");
+        beginTest("getLoopLengthBeats: whole note = 4 beats, x2 = 8");
         {
             ControlSequence cs;
             cs.loopNoteValue = NoteValue::Whole; cs.loopMultiplier = 1;
@@ -29,14 +29,14 @@ public:
             cs.stepNoteValue = NoteValue::Eighth;
             expectEquals(cs.getStepCount(), 8);
             // Non-dividing step tiles with a partial final step (ceil): 16/16 loop, 3/16 step
-            // → 3,3,3,3,3,1 = 6 steps (was round()=5).
+            // -> 3,3,3,3,3,1 = 6 steps (was round()=5).
             cs.stepNoteValue = NoteValue::Sixteenth; cs.stepMultiplier = 3;
             expectEquals(cs.getStepCount(), 6);
         }
 
         beginTest("evaluateStepped tiles by step width (partial final step), not equal division");
         {
-            // 16/16 loop, 3/16 step → 6 steps tiling 3,3,3,3,3,1. Distinct value per step so we
+            // 16/16 loop, 3/16 step -> 6 steps tiling 3,3,3,3,3,1. Distinct value per step so we
             // can read back which step each phase lands in.
             ControlSequence cs;
             cs.mode = ControlSequence::Mode::Stepped;
@@ -57,10 +57,10 @@ public:
         beginTest("getStepFraction: tiles by step width, not equal division");
         {
             ControlSequence cs;
-            // 1-bar loop (whole note = 4 beats = 16 sixteenths), step = 1/16 × 3 = 3/16.
+            // 1-bar loop (whole note = 4 beats = 16 sixteenths), step = 1/16 x 3 = 3/16.
             cs.loopNoteValue = NoteValue::Whole;     cs.loopMultiplier = 1;
             cs.stepNoteValue = NoteValue::Sixteenth; cs.stepMultiplier = 3;
-            // 3/16 of the loop → the grid tiles 3/16 ×5 + a 1/16 remainder, NOT 5 equal cells.
+            // 3/16 of the loop -> the grid tiles 3/16 x5 + a 1/16 remainder, NOT 5 equal cells.
             expectWithinAbsoluteError(cs.getStepFraction(), 0.1875, 1.0e-6);
             // An evenly-dividing step gives the exact reciprocal.
             cs.stepMultiplier = 1;

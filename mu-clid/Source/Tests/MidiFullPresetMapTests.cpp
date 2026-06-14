@@ -1,7 +1,7 @@
-// C4 — MidiFullPresetMap JSON round-trip (ch-9 full-preset map).
+// C4 - MidiFullPresetMap JSON round-trip (ch-9 full-preset map).
 //
-// Guards the persistence of the channel-9 program→full-preset map: paths set
-// per program number, the enabled flag, and clear, must survive a save→reload
+// Guards the persistence of the channel-9 program->full-preset map: paths set
+// per program number, the enabled flag, and clear, must survive a save->reload
 // cycle. Catches a serialiser/parser drift that would silently drop a user's
 // MIDI program-change bindings.
 
@@ -20,7 +20,7 @@ public:
         const auto presetA = juce::File::getCurrentWorkingDirectory().getChildFile ("Aaa.muClid");
         const auto presetB = juce::File::getCurrentWorkingDirectory().getChildFile ("Bbb.muClid");
 
-        beginTest ("C4: paths + enabled flag survive save → reload");
+        beginTest ("C4: paths + enabled flag survive save -> reload");
         {
             {
                 MidiFullPresetMap m;

@@ -1,6 +1,6 @@
-// mu-tant insert-stage audio harness — exercises the shared mu-core
+// mu-tant insert-stage audio harness - exercises the shared mu-core
 // InsertProcessor exactly as mu-tant wires it into the per-voice path
-// (engine → insert → mixer). Confirms None (algo 0) is a passthrough and a
+// (engine -> insert -> mixer). Confirms None (algo 0) is a passthrough and a
 // drive algorithm actually processes + bounds the signal, so the insert DSP is
 // linked + working in mu-tant's build.
 

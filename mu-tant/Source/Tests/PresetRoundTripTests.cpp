@@ -1,7 +1,7 @@
 // mu-tant gate-pattern serialisation round-trip tests.
 //
 // Covers the three gate-pattern types (Gate / FilterGate / PitchGate):
-//   - Envelope attributes round-trip through serialiseGate → deserialiseGate
+//   - Envelope attributes round-trip through serialiseGate -> deserialiseGate
 //     (start, len, split, attackBend, decayBend, reverse preserved)
 //   - Legacy prob / loopN / loopM attributes silently ignored on load
 //   - Invalid / absent tree clears the pattern to defaults
@@ -114,7 +114,7 @@ public:
             }
         }
 
-        // ── Legacy loopN → loopMask conversion ───────────────────────────────
+        // ── Legacy loopN -> loopMask conversion ───────────────────────────────
         beginTest("legacy loopN/loopM properties silently ignored on load");
         {
             juce::ValueTree t("Gate");
@@ -172,7 +172,7 @@ public:
         // ── Empty pattern serialises cleanly ──────────────────────────────────
         beginTest("empty pattern serialises and restores as empty");
         {
-            GatePattern src;   // empty — no envelopes
+            GatePattern src;   // empty - no envelopes
             const auto tree = serialiseGate(src, "Gate");
             expectEquals(tree.getNumChildren(), 0);
 

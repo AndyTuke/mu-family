@@ -1,11 +1,11 @@
-// mu-on test runner — console entry that runs every juce::UnitTest registered in the
+// mu-on test runner - console entry that runs every juce::UnitTest registered in the
 // link graph (each test file defines a `static MyTest x;` at file scope).
 //
 // Build:  cmake --build build --config Debug --target mu-on-tests
 // Run:    build/mu-on/mu-on-tests_artefacts/Debug/mu-on-tests.exe
 // Scope:  shared global-FX APVTS layout (the mixer binds to it), the 909 sequencer,
 //         and the channel engines. The full PluginProcessor is not linked (its
-//         createEditor() drags the editor/UI tree into a console app — see the backlog).
+//         createEditor() drags the editor/UI tree into a console app - see the backlog).
 
 #include <juce_core/juce_core.h>
 #include <cstdio>

@@ -69,7 +69,7 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
         auto& strip = clients[(size_t) i];
         strip.meter.getLevel = [this, i] { return server.clientPeak(i); };
         addAndMakeVisible(strip.meter);
-        styleLabel(strip.name, "—", juce::Justification::centred, MuLookAndFeel::mutedText, 10.0f);
+        styleLabel(strip.name, juce::String::charToString(0x2014), juce::Justification::centred, MuLookAndFeel::mutedText, 10.0f);
         addAndMakeVisible(strip.name);
 
         // Per-client gain knob (linear 0–1.5, unity at 1.0).
@@ -138,7 +138,7 @@ void MuLinkComponent::timerCallback()
         }
         else
         {
-            name.setText("—", juce::dontSendNotification);
+            name.setText(juce::String::charToString(0x2014), juce::dontSendNotification);
             name.setColour(juce::Label::textColourId, lnf.colour(MuLookAndFeel::mutedText));
         }
     }

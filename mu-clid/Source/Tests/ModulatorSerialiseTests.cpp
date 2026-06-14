@@ -4,7 +4,7 @@
 //   - A non-default ControlSequence (Stepped mode, Bipolar, custom timing,
 //     populated stepValues + curvePoints)
 //   - A ModulationAssignment with non-default depth + curve
-// Passes through serialiseModulators → deserialiseModulators into a fresh
+// Passes through serialiseModulators -> deserialiseModulators into a fresh
 // Rhythm, then asserts every member matches. Confirms the enum-name path
 // (kModulatorModeNames, kModulatorPolarityNames, kNoteValueNames, kNoteModNames)
 // is symmetric.
@@ -150,7 +150,7 @@ public:
             juce::ValueTree modsTree ("Modulators");
             juce::ValueTree seq ("Seq");
             seq.setProperty ("id", "cs0", nullptr);
-            seq.setProperty ("mode", "Smooth", nullptr);   // mismatch — no <Point>s below
+            seq.setProperty ("mode", "Smooth", nullptr);   // mismatch - no <Point>s below
             for (float v : { 0.0f, 80.0f, -40.0f, 20.0f })
             {
                 juce::ValueTree st ("Step");

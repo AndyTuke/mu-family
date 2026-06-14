@@ -1,4 +1,4 @@
-// mu-tant gate-pattern tests — the attack/decay envelope model + evaluator the
+// mu-tant gate-pattern tests - the attack/decay envelope model + evaluator the
 // drawable gate editor + audio path both consume.
 
 #include <juce_core/juce_core.h>
@@ -13,7 +13,7 @@ public:
     {
         using namespace mu_tant;
 
-        beginTest("subdivision → total cell count (2-bar pattern)");
+        beginTest("subdivision -> total cell count (2-bar pattern)");
         {
             GatePattern p;
             p.subdivision = GatePattern::Subdivision::Quarter;
@@ -26,28 +26,28 @@ public:
             expect(p.totalCells() == 64, "1/32 over 2 bars = 64 cells");
         }
 
-        beginTest("default envelope (split 0) is a pure linear decay 1 → 0");
+        beginTest("default envelope (split 0) is a pure linear decay 1 -> 0");
         {
             GateEnvelope env;   // split 0, bends 0
-            expectWithinAbsoluteError(env.value(0.0f), 1.0f, 1e-5f, "phase 0 → 1.0 (instant attack)");
-            expectWithinAbsoluteError(env.value(0.5f), 0.5f, 1e-5f, "phase 0.5 → 0.5 (linear)");
-            expectWithinAbsoluteError(env.value(1.0f), 0.0f, 1e-5f, "phase 1 → 0.0");
+            expectWithinAbsoluteError(env.value(0.0f), 1.0f, 1e-5f, "phase 0 -> 1.0 (instant attack)");
+            expectWithinAbsoluteError(env.value(0.5f), 0.5f, 1e-5f, "phase 0.5 -> 0.5 (linear)");
+            expectWithinAbsoluteError(env.value(1.0f), 0.0f, 1e-5f, "phase 1 -> 0.0");
         }
 
-        beginTest("split = 0.5 → symmetric attack/decay triangle");
+        beginTest("split = 0.5 -> symmetric attack/decay triangle");
         {
             GateEnvelope env; env.split = 0.5f;
             expectWithinAbsoluteError(env.value(0.0f),  0.0f, 1e-5f, "starts at 0 (attack)");
-            expectWithinAbsoluteError(env.value(0.25f), 0.5f, 1e-5f, "quarter → mid attack");
+            expectWithinAbsoluteError(env.value(0.25f), 0.5f, 1e-5f, "quarter -> mid attack");
             expectWithinAbsoluteError(env.value(0.5f),  1.0f, 1e-5f, "peak at the split");
-            expectWithinAbsoluteError(env.value(0.75f), 0.5f, 1e-5f, "three-quarter → mid decay");
+            expectWithinAbsoluteError(env.value(0.75f), 0.5f, 1e-5f, "three-quarter -> mid decay");
             expectWithinAbsoluteError(env.value(1.0f),  0.0f, 1e-5f, "ends at 0 (decay)");
         }
 
         beginTest("reverse flips attack and decay (mirror in time)");
         {
-            GateEnvelope env;                 // split 0 → pure decay
-            env.reverse = true;               // → pure attack 0 → 1
+            GateEnvelope env;                 // split 0 -> pure decay
+            env.reverse = true;               // -> pure attack 0 -> 1
             expectWithinAbsoluteError(env.value(0.0f), 0.0f, 1e-5f, "reversed starts at 0");
             expectWithinAbsoluteError(env.value(0.5f), 0.5f, 1e-5f, "reversed linear midpoint");
             expectWithinAbsoluteError(env.value(1.0f), 1.0f, 1e-5f, "reversed ends at 1");
@@ -71,14 +71,14 @@ public:
 
         beginTest("Gap forces the trailing fraction of the region to silence");
         {
-            GateEnvelope env;   // split 0 → pure decay
+            GateEnvelope env;   // split 0 -> pure decay
             const float gap = 0.5f;
             expectWithinAbsoluteError(env.value(0.0f,  gap), 1.0f, 1e-5f, "phase 0 still full");
             expectWithinAbsoluteError(env.value(0.25f, gap), 0.5f, 1e-5f, "shape squeezed into first half");
             expectWithinAbsoluteError(env.value(0.5f,  gap), 0.0f, 1e-5f, "second half silent");
-            expectWithinAbsoluteError(env.value(0.9f,  gap), 0.0f, 1e-5f, "well into the gap → silent");
-            // Gap = 100% → whole region silent.
-            expectWithinAbsoluteError(env.value(0.1f, 1.0f), 0.0f, 1e-5f, "gap 100% → silent everywhere");
+            expectWithinAbsoluteError(env.value(0.9f,  gap), 0.0f, 1e-5f, "well into the gap -> silent");
+            // Gap = 100% -> whole region silent.
+            expectWithinAbsoluteError(env.value(0.1f, 1.0f), 0.0f, 1e-5f, "gap 100% -> silent everywhere");
         }
 
         beginTest("addEnvelope: overlapping insert trims the underlying region");
@@ -90,7 +90,7 @@ public:
             p.addEnvelope(wide);
             expect((int) p.envelopes.size() == 1, "one wide envelope");
 
-            // Pencil a 1-cell envelope inside it → the overlapping wide one is removed.
+            // Pencil a 1-cell envelope inside it -> the overlapping wide one is removed.
             GateEnvelope dot; dot.startCell = 2; dot.lengthCells = 1;
             p.addEnvelope(dot);
             expect((int) p.envelopes.size() == 1, "overlap replaced, not added");
@@ -121,7 +121,7 @@ public:
             expect((int) p.envelopes.size() == 0, "removed via an interior cell");
 
             p.addEnvelope(e);
-            p.removeEnvelopeCovering(99);  // outside → no-op
+            p.removeEnvelopeCovering(99);  // outside -> no-op
             expect((int) p.envelopes.size() == 1, "remove-outside is a no-op");
         }
 
@@ -149,8 +149,8 @@ public:
         {
             GatePattern p;
             p.subdivision = GatePattern::Subdivision::Sixteenth;
-            expectWithinAbsoluteError(p.gateAt(0.0, 0.0f), 1.0f, 1e-5f, "empty → 1.0 at beat 0");
-            expectWithinAbsoluteError(p.gateAt(3.7, 0.0f), 1.0f, 1e-5f, "empty → 1.0 mid-pattern");
+            expectWithinAbsoluteError(p.gateAt(0.0, 0.0f), 1.0f, 1e-5f, "empty -> 1.0 at beat 0");
+            expectWithinAbsoluteError(p.gateAt(3.7, 0.0f), 1.0f, 1e-5f, "empty -> 1.0 mid-pattern");
         }
 
         beginTest("gateAt: covered cells play the curve, uncovered cells are silent");
@@ -161,9 +161,9 @@ public:
             p.addEnvelope(a);
 
             const double cellLen = 8.0 / 32.0;   // 0.25 beats per cell
-            expectWithinAbsoluteError(p.gateAt(0.0, 0.0f), 1.0f, 1e-4f, "cell 0 phase 0 → 1.0");
-            expectWithinAbsoluteError(p.gateAt(cellLen * 0.5, 0.0f), 0.5f, 1e-3f, "cell 0 mid → 0.5");
-            expectWithinAbsoluteError(p.gateAt(cellLen * 1.5, 0.0f), 0.0f, 1e-5f, "cell 1 (uncovered) → silent");
+            expectWithinAbsoluteError(p.gateAt(0.0, 0.0f), 1.0f, 1e-4f, "cell 0 phase 0 -> 1.0");
+            expectWithinAbsoluteError(p.gateAt(cellLen * 0.5, 0.0f), 0.5f, 1e-3f, "cell 0 mid -> 0.5");
+            expectWithinAbsoluteError(p.gateAt(cellLen * 1.5, 0.0f), 0.0f, 1e-5f, "cell 1 (uncovered) -> silent");
         }
 
         beginTest("gateAt: phase spans the whole region, not a single cell");
@@ -177,7 +177,7 @@ public:
             const double regionLen = cellLen * 4.0;
             // Decay reaches 0.5 at the region midpoint (cell 2 boundary), not cell 0.5.
             expectWithinAbsoluteError(p.gateAt(regionLen * 0.5, 0.0f), 0.5f, 1e-3f,
-                                      "region midpoint → 0.5 (region-wide phase)");
+                                      "region midpoint -> 0.5 (region-wide phase)");
         }
 
         beginTest("gateAt: Gap silences the region tail");
@@ -189,9 +189,9 @@ public:
 
             const double cellLen  = 8.0 / 32.0;
             const double regionLen = cellLen * 4.0;
-            // Gap 0.5 → second half of the region is silent.
+            // Gap 0.5 -> second half of the region is silent.
             expectWithinAbsoluteError(p.gateAt(regionLen * 0.75, 0.5f), 0.0f, 1e-5f,
-                                      "75% through region with 50% gap → silent");
+                                      "75% through region with 50% gap -> silent");
             expect(p.gateAt(regionLen * 0.25, 0.5f) > 0.0f, "first quarter still sounds");
         }
 

@@ -76,7 +76,7 @@ public:
             expect(tail < 1.0e-3f, "hat should decay to silence");
         }
 
-        beginTest("KickEngine: sample-accurate onset — silent before the offset, sounds after");
+        beginTest("KickEngine: sample-accurate onset - silent before the offset, sounds after");
         {
             KickEngine kick;
             kick.prepare(sr);
@@ -90,7 +90,7 @@ public:
             expect(rmsRange(buf, off, n)  > 0.01f,   "sounds from the onset sample on");
         }
 
-        beginTest("SampleChannel: sample-accurate onset — silent before the offset, sounds after");
+        beginTest("SampleChannel: sample-accurate onset - silent before the offset, sounds after");
         {
             SampleChannel hat;
             hat.prepare(sr, n, SampleChannel::HiHat);

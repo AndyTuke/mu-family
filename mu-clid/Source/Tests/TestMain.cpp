@@ -2,14 +2,14 @@
 //
 // This is a console-app entry point that runs every juce::UnitTest subclass
 // registered in the same translation unit's link graph. Each test source file
-// in this directory defines a `static MyTest myTestInstance;` at file scope —
+// in this directory defines a `static MyTest myTestInstance;` at file scope -
 // JUCE's UnitTestRunner picks them up automatically.
 //
 // Build:  cmake --build build --target mu-clid-tests
 // Run:    build/mu-clid-tests_artefacts/Release/mu-clid-tests.exe
 // Exit:   0 on success, non-zero if any test reported a failure.
 //
-// Scope: DATA-LAYER tests only — no PluginProcessor / MessageManager / audio-
+// Scope: DATA-LAYER tests only - no PluginProcessor / MessageManager / audio-
 // thread setup. The point is to catch drift in:
 //   - kRhythmParamDefs apply/push lambda pairs
 //   - writeKindedProperty / readKindedPropertyAsActualV2 round-trip

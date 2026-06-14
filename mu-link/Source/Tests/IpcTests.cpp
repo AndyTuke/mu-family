@@ -53,7 +53,7 @@ public:
             std::vector<float> in { 1, 2, 3 };
             ring.writeFrames(in.data(), 3);
             std::vector<float> out(8, 0.0f);
-            expectEquals(ring.readFrames(out.data(), 8), 3);    // only 3 available → underrun
+            expectEquals(ring.readFrames(out.data(), 8), 3);    // only 3 available -> underrun
         }
 
         beginTest("wrap-around preserves data across the capacity boundary");
@@ -61,7 +61,7 @@ public:
             AudioRing ring;
             ring.prepare(1, 8);
             float v = 0.0f;
-            // Push/pull 5 at a time, 40 times — forces many wraps; verify FIFO order.
+            // Push/pull 5 at a time, 40 times - forces many wraps; verify FIFO order.
             float expected = 0.0f;
             for (int iter = 0; iter < 40; ++iter)
             {
@@ -140,18 +140,18 @@ public:
             expectEquals((int) c.samplePosition(), 0);
         }
 
-        beginTest("120 BPM → 1 beat after half a second");
+        beginTest("120 BPM -> 1 beat after half a second");
         {
             TransportClock c; c.prepare(48000.0, 120.0); c.setPlaying(true);
             c.advance(24000);                      // 0.5 s at 48 kHz
-            expectWithinAbsoluteError(c.beats(), 1.0, 1.0e-9);   // 2 beats/sec × 0.5 s
+            expectWithinAbsoluteError(c.beats(), 1.0, 1.0e-9);   // 2 beats/sec x 0.5 s
             expectEquals((int) c.samplePosition(), 24000);
         }
 
         beginTest("bar phase wraps over 4 beats");
         {
             TransportClock c; c.prepare(48000.0, 120.0); c.setPlaying(true);
-            c.advance(24000 * 4);                  // exactly 4 beats → bar boundary
+            c.advance(24000 * 4);                  // exactly 4 beats -> bar boundary
             expectWithinAbsoluteError(c.barPhase(4.0), 0.0, 1.0e-9);
             c.advance(24000);                      // +1 beat into the next bar
             expectWithinAbsoluteError(c.barPhase(4.0), 0.25, 1.0e-9);
@@ -176,8 +176,8 @@ public:
             c.advance(48000);                      // 1.0 s at 60 BPM = 1 more beat
 
             // Beats accumulate: the first beat is preserved and the second accrues at the
-            // NEW rate → 2.0. The old recompute-from-samples (72000/48000 × 60/60 = 1.5)
-            // would have rewritten the already-elapsed beat — the bug this fixes.
+            // NEW rate -> 2.0. The old recompute-from-samples (72000/48000 x 60/60 = 1.5)
+            // would have rewritten the already-elapsed beat - the bug this fixes.
             expectWithinAbsoluteError(c.beats(), 2.0, 1.0e-9);
             expectEquals((int) c.samplePosition(), 72000);
         }
@@ -194,7 +194,7 @@ public:
 
     void runTest() override
     {
-        beginTest("publish → consume round-trips every field incl. ppqPosition");
+        beginTest("publish -> consume round-trips every field incl. ppqPosition");
         {
             TransportBlock blk;
             TransportSnapshot in;
@@ -221,7 +221,7 @@ public:
             // Simulate a server that crashed mid-write: bump generation to odd and never
             // bring it back to even. readTransport must bound its spin and return a safe
             // stopped snapshot rather than hang the caller's render thread forever.
-            blk.generation.fetch_add(1);             // → odd
+            blk.generation.fetch_add(1);             // -> odd
             const auto out = readTransport(blk);
             expectEquals((int) out.playing, 0, "stuck-odd writer should yield a stopped snapshot");
             expectEquals((int) out.samplePos, 0);

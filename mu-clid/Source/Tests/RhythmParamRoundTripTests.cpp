@@ -7,8 +7,8 @@
 //   4. Asserts the round-tripped value equals the original (within precision)
 //
 // Catches the failure mode where the apply / push lambdas for one suffix get
-// out of sync — e.g. push writes `vp.x` but apply reads to `vp.y`. That kind
-// of typo would silently corrupt every preset save → load cycle.
+// out of sync - e.g. push writes `vp.x` but apply reads to `vp.y`. That kind
+// of typo would silently corrupt every preset save -> load cycle.
 //
 // Why this test matters: before the table consolidation, applyRhythmSuffix's if/else chain and
 // pushRhythmToAPVTS's set() chain were two independent hand-written
@@ -37,13 +37,13 @@ public:
             // first value the parameter's clamp range will accept so we never
             // need to know the per-suffix range out-of-band. For bools we use
             // 1.0 (true). For algorithm-selectors we use index 1 (skips None=0
-            // which is also the default — distinguishes "really wrote" from
+            // which is also the default - distinguishes "really wrote" from
             // "uninitialised"). For everything else we use 1.0.
             float testValue = 1.0f;
             if (def.kind == mu_pp::ParamKind::AlgorithmIndex)
-                testValue = 1.0f;   // index 1 — first non-None entry for both insert and filter
+                testValue = 1.0f;   // index 1 - first non-None entry for both insert and filter
 
-            // Some suffixes have their own clamp ranges in apply() — e.g.
+            // Some suffixes have their own clamp ranges in apply() - e.g.
             // pitchOctave clamps to -3..3, so 1.0 fits. logic clamps 0..4,
             // so 1.0 fits. We pick values inside every existing clamp.
 
@@ -53,10 +53,10 @@ public:
 
             const float roundTripped = def.push (r);
 
-            // Bools and ints quantise — push returns the de-quantised value.
-            // AlgorithmIndex stores an int internally → push returns float idx.
+            // Bools and ints quantise - push returns the de-quantised value.
+            // AlgorithmIndex stores an int internally -> push returns float idx.
             // Use a tolerance generous enough for ADSR sustain (display-scale
-            // 0..100 ↔ 0..1 storage means 1.0 input → 0.01 stored → 1.0 readback,
+            // 0..100 <-> 0..1 storage means 1.0 input -> 0.01 stored -> 1.0 readback,
             // exact). Floats with no transformation should be exact too.
             const float tolerance = 1e-4f;
             expectWithinAbsoluteError (roundTripped, testValue, tolerance,

@@ -1,4 +1,4 @@
-// mu-tant audio gate-stage harness — renders a loud synthetic "drone" buffer
+// mu-tant audio gate-stage harness - renders a loud synthetic "drone" buffer
 // through the same applyGateBlock() the audio engine uses, and asserts the gate
 // silences the output on load (transport stopped, no envelopes, not bypassed).
 // This is the regression guard for "no drone audible when the app loads", plus
@@ -34,10 +34,10 @@ public:
         const double SR  = 48000.0;
         const double bps = (120.0 / 60.0) / SR;   // beats per sample @ 120 BPM, 48k
 
-        // ── THE load case: stopped, no envelopes, gater active → SILENCE ────────
-        beginTest("On load (transport stopped, no envelopes, not bypassed) → silent");
+        // ── THE load case: stopped, no envelopes, gater active -> SILENCE ────────
+        beginTest("On load (transport stopped, no envelopes, not bypassed) -> silent");
         {
-            GatePattern p;                       // empty pattern — the default state
+            GatePattern p;                       // empty pattern - the default state
             std::vector<float> L(N, 1.0f), R(N, 1.0f);   // full-scale drone
             applyGateBlock(p, L.data(), R.data(), N, /*gap*/0.0f,
                            /*bypassed*/false, /*playing*/false, /*beat*/0.0, bps, SR);
@@ -47,11 +47,11 @@ public:
 
         beginTest("gateModeFor: the block-level decisions");
         {
-            expect(gateModeFor(false, false, true)  == GateMode::Silence,  "stopped + empty → silence");
-            expect(gateModeFor(false, false, false) == GateMode::Silence,  "stopped → silence even with envelopes");
-            expect(gateModeFor(false, true,  true)  == GateMode::Silence,  "playing + empty → silence");
-            expect(gateModeFor(false, true,  false) == GateMode::Envelope, "playing + envelopes → envelope");
-            expect(gateModeFor(true,  false, true)  == GateMode::Pass,     "bypass → pass (audition)");
+            expect(gateModeFor(false, false, true)  == GateMode::Silence,  "stopped + empty -> silence");
+            expect(gateModeFor(false, false, false) == GateMode::Silence,  "stopped -> silence even with envelopes");
+            expect(gateModeFor(false, true,  true)  == GateMode::Silence,  "playing + empty -> silence");
+            expect(gateModeFor(false, true,  false) == GateMode::Envelope, "playing + envelopes -> envelope");
+            expect(gateModeFor(true,  false, true)  == GateMode::Pass,     "bypass -> pass (audition)");
             expect(gateModeFor(true,  true,  false) == GateMode::Pass,     "bypass overrides transport + pattern");
         }
 
@@ -81,7 +81,7 @@ public:
             GateEnvelope e; e.startCell = 0; e.lengthCells = 1;    // decay in cell 0 only
             p.addEnvelope(e);
 
-            // Render at the very start of cell 0 — the (0-attack) envelope opens, now
+            // Render at the very start of cell 0 - the (0-attack) envelope opens, now
             // via the de-click ramp: near-silent at sample 0, open by the block's end.
             // Block must span the kMinAttackMs ramp (≈480 samples @48k) so it fully opens.
             const int M = (int) (GatePattern::kMinAttackMs * 0.001 * SR) + 64;
@@ -90,12 +90,12 @@ public:
             expect(std::abs(L[0]) < 0.1f,      "0-attack opens via a short ramp, not an instant click");
             expect(std::abs(L[M - 1]) > 0.5f,  "gate has opened by the end of the block");
 
-            // Render inside an empty cell (cell 1) with a frozen position → silent.
+            // Render inside an empty cell (cell 1) with a frozen position -> silent.
             const double beatInEmptyCell = (8.0 / 32.0) * 1.5;
             std::vector<float> L2(N, 1.0f), R2(N, 1.0f);
             applyGateBlock(p, L2.data(), R2.data(), N, 0.0f, false, /*playing*/true,
                            beatInEmptyCell, /*beatsPerSample*/0.0, SR);
-            expectWithinAbsoluteError(peak(L2, R2), 0.0f, 1.0e-6f, "empty cell → silent while playing");
+            expectWithinAbsoluteError(peak(L2, R2), 0.0f, 1.0e-6f, "empty cell -> silent while playing");
         }
 
         beginTest("0-attack envelope ramps over ~kMinAttackMs instead of clicking");
@@ -111,7 +111,7 @@ public:
 
             const int rampSamples = (int) std::round((double) GatePattern::kMinAttackMs * 0.001 * SR); // ≈480 @48k
 
-            expect(std::abs(L[0]) < 0.1f, "starts near silent — no instant 0→1 jump");
+            expect(std::abs(L[0]) < 0.1f, "starts near silent - no instant 0->1 jump");
             expect(std::abs(L[rampSamples / 2]) > std::abs(L[0]), "rises during the ramp");
             expect(std::abs(L[std::min(M - 1, rampSamples)]) > 0.9f, "fully open by ~kMinAttackMs");
             // Sanity: the slope never exceeds the cap (no faster-than-ramp jump).

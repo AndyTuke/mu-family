@@ -1,11 +1,11 @@
-// mu-toni test runner — console entry that runs every juce::UnitTest registered
+// mu-toni test runner - console entry that runs every juce::UnitTest registered
 // in the link graph (each test file defines a `static MyTest x;` at file scope).
 //
 // Build:  cmake --build build --config Debug --target mu-toni-tests
 // Run:    build/mu-toni/mu-toni-tests_artefacts/Debug/mu-toni-tests.exe
-// Scope:  scaffold coverage — the shared global-FX APVTS layout the mixer binds
+// Scope:  scaffold coverage - the shared global-FX APVTS layout the mixer binds
 //         to. Grows as mu-toni's engine lands. The full PluginProcessor is not
-//         linked (its createEditor() drags the editor/UI tree in — see the backlog).
+//         linked (its createEditor() drags the editor/UI tree in - see the backlog).
 
 #include <juce_core/juce_core.h>
 #include <cstdio>

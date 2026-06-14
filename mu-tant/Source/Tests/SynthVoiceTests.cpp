@@ -1,4 +1,4 @@
-// mu-tant synth-voice audio tests — render the actual VoiceEngine + NoiseGen
+// mu-tant synth-voice audio tests - render the actual VoiceEngine + NoiseGen
 // and assert output is finite, non-silent, and level-responsive. These are the
 // "does the synth actually make sound?" smoke tests for the DSP path.
 
@@ -87,12 +87,12 @@ public:
                 v.process(buf, N);
                 return peakOf(buf, N);
             };
-            expect(render(-24.0f) < render(0.0f), "lower slot level → quieter");
+            expect(render(-24.0f) < render(0.0f), "lower slot level -> quieter");
         }
 
         beginTest("X-Mod FM / AM / Ring all stay finite and non-silent");
         {
-            // Test each modulation type at full depth — all should be finite and audible.
+            // Test each modulation type at full depth - all should be finite and audible.
             struct Case { float fm; float am; float ring; const char* name; };
             const Case cases[] = {
                 { 0.0f,  0.0f,  0.0f,  "Off (no xmod)" },

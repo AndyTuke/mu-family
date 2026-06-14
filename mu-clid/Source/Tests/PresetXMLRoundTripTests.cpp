@@ -5,14 +5,14 @@
 // deserialised via a ValueTree (the .muRhythm / .muClid XML format).
 //
 // Test path for each parameter:
-//   1. apply(testValue, rhythm)        — write a non-default value into a Rhythm
-//   2. push(rhythm)                    — read it back as an actual float
-//   3. writeKindedProperty(tree, ...)  — serialise into a ValueTree (XML format)
-//   4. readKindedPropertyAsActualV2    — deserialise back to float
-//   5. apply(readBack, rhythm2)        — write into a second Rhythm
-//   6. push(rhythm2) ≈ push(rhythm)    — verify the values survived the codec
+//   1. apply(testValue, rhythm)        - write a non-default value into a Rhythm
+//   2. push(rhythm)                    - read it back as an actual float
+//   3. writeKindedProperty(tree, ...)  - serialise into a ValueTree (XML format)
+//   4. readKindedPropertyAsActualV2    - deserialise back to float
+//   5. apply(readBack, rhythm2)        - write into a second Rhythm
+//   6. push(rhythm2) ≈ push(rhythm)    - verify the values survived the codec
 //
-// This catches the failure mode where the XML codec mis-encodes a value —
+// This catches the failure mode where the XML codec mis-encodes a value -
 // e.g. a Bool written as int instead of "true"/"false" string, or an
 // AlgorithmIndex written as an integer index when the v2 reader expects a
 // name string. That class of bug silently corrupted preset save/load in the
@@ -20,7 +20,7 @@
 //
 // Companion tests: RhythmParamRoundTripTests proves apply/push are inverses;
 // KindedPropertyRoundTripTests proves the codec primitives individually.
-// This test proves the full stack — Rhythm → XML → Rhythm — end-to-end.
+// This test proves the full stack - Rhythm -> XML -> Rhythm - end-to-end.
 
 #include <juce_core/juce_core.h>
 #include <juce_data_structures/juce_data_structures.h>
@@ -82,7 +82,7 @@ public:
                 def.apply(readBack, r2, pd, vd);
             }
 
-            // Pass 3: compare push() values — they must match.
+            // Pass 3: compare push() values - they must match.
             for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
             {
                 const auto& def = mu_pp::kRhythmParamDefs[i];
@@ -90,7 +90,7 @@ public:
                 const float recovered = def.push(r2);
                 expectWithinAbsoluteError(recovered, original, kTol,
                     juce::String(def.suffix) + " XML round-trip: "
-                    + juce::String(original, 4) + " → stored → "
+                    + juce::String(original, 4) + " -> stored -> "
                     + juce::String(recovered, 4));
             }
         }
@@ -132,7 +132,7 @@ public:
 
                 const juce::String s (def.suffix);
 
-                // Write index 1 — must produce a string property (not int).
+                // Write index 1 - must produce a string property (not int).
                 juce::ValueTree t ("T");
                 writeKindedProperty(t, "v", 1.0f, ParamKind::AlgorithmIndex, def.algorithmNames);
 
@@ -157,7 +157,7 @@ public:
 
             if (rstStDef != nullptr)
             {
-                // Sentinel -1 → nullopt
+                // Sentinel -1 -> nullopt
                 juce::ValueTree t ("T");
                 writeKindedProperty(t, "v", -1.0f, rstStDef->kind, rstStDef->algorithmNames);
                 const float back = readKindedPropertyAsActualV2(

@@ -1,4 +1,4 @@
-// HitGenerator::getPattern() and getStepTypes() — euclidean pattern generation tests.
+// HitGenerator::getPattern() and getStepTypes() - euclidean pattern generation tests.
 //
 // These tests verify the core correctness of the euclidean step sequencer. A
 // regression here would silently produce wrong rhythms for all users.
@@ -14,7 +14,7 @@ public:
     void runTest() override
     {
         // ── Basic euclidean distribution ─────────────────────────────────────
-        beginTest ("E(0,8) — zero hits → all false");
+        beginTest ("E(0,8) - zero hits -> all false");
         {
             HitGenerator h;
             h.steps = 8; h.hits = 0;
@@ -23,7 +23,7 @@ public:
             for (bool b : pat) expect (!b);
         }
 
-        beginTest ("E(8,8) — all hits → all true");
+        beginTest ("E(8,8) - all hits -> all true");
         {
             HitGenerator h;
             h.steps = 8; h.hits = 8;
@@ -32,7 +32,7 @@ public:
             for (bool b : pat) expect (b);
         }
 
-        beginTest ("E(4,8) — evenly spaced, 4 hits out of 8 steps");
+        beginTest ("E(4,8) - evenly spaced, 4 hits out of 8 steps");
         {
             HitGenerator h;
             h.steps = 8; h.hits = 4;
@@ -45,7 +45,7 @@ public:
             expect (pat[4]); expect (!pat[5]); expect (pat[6]); expect (!pat[7]);
         }
 
-        beginTest ("E(3,8) — classic Euclidean: 3 hits out of 8");
+        beginTest ("E(3,8) - classic Euclidean: 3 hits out of 8");
         {
             HitGenerator h;
             h.steps = 8; h.hits = 3;
@@ -74,7 +74,7 @@ public:
         }
 
         // ── Mute ─────────────────────────────────────────────────────────────
-        beginTest ("Mute → all false regardless of hits");
+        beginTest ("Mute -> all false regardless of hits");
         {
             HitGenerator h;
             h.steps = 8; h.hits = 4; h.mute = true;
@@ -83,7 +83,7 @@ public:
         }
 
         // ── Hit count clamping ────────────────────────────────────────────────
-        beginTest ("hits > steps → clamps gracefully, no crash");
+        beginTest ("hits > steps -> clamps gracefully, no crash");
         {
             HitGenerator h;
             h.steps = 4; h.hits = 8;

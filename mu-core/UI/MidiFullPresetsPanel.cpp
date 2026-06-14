@@ -166,7 +166,7 @@ void MidiFullPresetsPanel::paint(juce::Graphics& g)
 
     g.setColour(MuLookAndFeel::colour(Id::headingText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(14.0f))));
-    g.drawText("MIDI Program Change — Full Presets (Ch 9)", pad, 0, s(420), headerH,
+    g.drawText(juce::String::fromUTF8("MIDI Program Change \xe2\x80\x94 Full Presets (Ch 9)"), pad, 0, s(420), headerH,
                juce::Justification::centredLeft, false);
 
     g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));

@@ -1,4 +1,4 @@
-// Processor-level APVTS layout coverage — the real mu-tant createParameterLayout.
+// Processor-level APVTS layout coverage - the real mu-tant createParameterLayout.
 //
 // Builds an APVTS from mu_tant::PluginProcessor::createParameterLayout() (the
 // actual factory, compiled via the editor-free PluginProcessor_APVTS.cpp TU)
@@ -8,9 +8,9 @@
 //   - global FX / return / master (mu_mixfx::addGlobalFxParams)
 // plus representative ranges/defaults and the removal of the dead eff_send/dly_send.
 //
-// It does NOT construct the full PluginProcessor — its createEditor() drags the
+// It does NOT construct the full PluginProcessor - its createEditor() drags the
 // editor/UI tree into the console app (the same constraint mu-clid-tests works
-// around). The live syncGlobalFxParam→engine path + .muTant file round-trip stay
+// around). The live syncGlobalFxParam->engine path + .muTant file round-trip stay
 // out for that reason (the modulator/gate serialise round-trip is covered by
 // MuTantPersistTests; the sync is exercised at runtime in both products).
 

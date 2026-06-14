@@ -1,7 +1,7 @@
 // Send-FX DSP smoke tests (ported from mu-clid for parity).
 //
 // Verifies all three shared mu-core send-FX slots run without crash or NaN/Inf
-// when fed a stereo impulse at representative settings — the same FX rack
+// when fed a stereo impulse at representative settings - the same FX rack
 // mu-tant's MixerOverlay drives. Not golden-master; exact DSP output isn't asserted.
 //   - EffectSlot: all algorithms + Echo processReturn
 //   - DelaySlot:  Free + Sync modes + processReturn + multi-block feedback
@@ -48,7 +48,7 @@ public:
         for (int algo = 0; algo < EffectSlot::kNumEffectAlgos; ++algo)
         {
             beginTest (juce::String("EffectSlot algo ") + juce::String(algo)
-                       + ": " + effectNames[algo] + " — no crash, no NaN");
+                       + ": " + effectNames[algo] + " - no crash, no NaN");
             {
                 EffectSlot slot;
                 slot.setAlgorithm(algo);
@@ -59,7 +59,7 @@ public:
             }
         }
 
-        beginTest ("EffectSlot Echo: processReturn — no crash, no NaN");
+        beginTest ("EffectSlot Echo: processReturn - no crash, no NaN");
         {
             EffectSlot slot;
             slot.setAlgorithm(EffectSlot::kEchoAlgoIndex);
@@ -69,7 +69,7 @@ public:
             expect (!hasNaN(buf, 2, kNs), "Echo processReturn produced NaN/Inf");
         }
 
-        beginTest ("DelaySlot: Free mode (250 ms) — no crash, no NaN");
+        beginTest ("DelaySlot: Free mode (250 ms) - no crash, no NaN");
         {
             DelaySlot slot;
             slot.setTimeMode(DelaySlot::TimeMode::Free);
@@ -81,7 +81,7 @@ public:
             expect (!hasNaN(buf, 2, kNs), "DelaySlot Free produced NaN/Inf");
         }
 
-        beginTest ("DelaySlot: Sync mode (quarter @ 120 BPM) — no crash, no NaN");
+        beginTest ("DelaySlot: Sync mode (quarter @ 120 BPM) - no crash, no NaN");
         {
             DelaySlot slot;
             slot.setHostBpm(120.0);
@@ -95,7 +95,7 @@ public:
             expect (!hasNaN(buf, 2, kNs), "DelaySlot Sync produced NaN/Inf");
         }
 
-        beginTest ("DelaySlot: processReturn — no crash, no NaN");
+        beginTest ("DelaySlot: processReturn - no crash, no NaN");
         {
             DelaySlot slot;
             slot.setDelayMs(100.0f);
@@ -109,7 +109,7 @@ public:
         for (int algo = 0; algo < 4; ++algo)
         {
             beginTest (juce::String("ReverbSlot algo ") + juce::String(algo)
-                       + ": " + reverbNames[algo] + " — no crash, no NaN");
+                       + ": " + reverbNames[algo] + " - no crash, no NaN");
             {
                 ReverbSlot slot;
                 slot.setAlgorithm(algo);
@@ -120,7 +120,7 @@ public:
             }
         }
 
-        beginTest ("ReverbSlot: processReturn — no crash, no NaN");
+        beginTest ("ReverbSlot: processReturn - no crash, no NaN");
         {
             ReverbSlot slot;
             slot.prepare(kSR, kNs);
@@ -129,7 +129,7 @@ public:
             expect (!hasNaN(buf, 2, kNs), "ReverbSlot processReturn produced NaN/Inf");
         }
 
-        beginTest ("DelaySlot: 8 blocks of noise — feedback stays finite");
+        beginTest ("DelaySlot: 8 blocks of noise - feedback stays finite");
         {
             DelaySlot slot;
             slot.setDelayMs(50.0f);
@@ -149,7 +149,7 @@ public:
             expect (ok, "DelaySlot produced NaN/Inf during multi-block noise run");
         }
 
-        beginTest ("ReverbSlot: 8 blocks of noise — output stays finite");
+        beginTest ("ReverbSlot: 8 blocks of noise - output stays finite");
         {
             ReverbSlot slot;
             slot.prepare(kSR, kNs);

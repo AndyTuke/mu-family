@@ -1,5 +1,5 @@
 // mu-tant first-stab DSP tests: scale-quantised pitch + the wavetable oscillator.
-// Pure mu-tant code (no mu-core link) — verifies the synth core objectively:
+// Pure mu-tant code (no mu-core link) - verifies the synth core objectively:
 // the pitch math lands on the right notes, and the oscillator actually produces
 // a non-silent tone at the frequency it was set to.
 
@@ -75,7 +75,7 @@ public:
             WavetableBank bank;
             bank.loadFactoryBank();
             // The last frame (square) should have more harmonic energy than frame 0 (sine):
-            // compare a crude brightness proxy — sum of |first difference| over one cycle.
+            // compare a crude brightness proxy - sum of |first difference| over one cycle.
             auto roughness = [&bank](float pos)
             {
                 WavetableOscillator o; o.setBank (&bank); o.prepare (48000.0);

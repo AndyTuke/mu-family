@@ -1,4 +1,4 @@
-// mu-tant gating designer tests — covers the subdivision math (cells per
+// mu-tant gating designer tests - covers the subdivision math (cells per
 // 2 bars), the subdivision-denominator dropdown round-trip, default/fallback
 // behaviour, and the underlying GatePattern tool operations (pencil / eraser /
 // glue / reverse) that the UI tools drive.
@@ -34,7 +34,7 @@ public:
                    "design spec: gating view window = 2 bars");
         }
 
-        // kViewBars × subdivision = cells in view; cell-count math check.
+        // kViewBars x subdivision = cells in view; cell-count math check.
         beginTest("subdivision implies expected cell count per view window");
         {
             struct Case { int denom; int expectedCells; };
@@ -49,7 +49,7 @@ public:
                 const int cells = GatingDesigner::kViewBars * c.denom;
                 expect(cells == c.expectedCells,
                        "denom 1/" + juce::String(c.denom)
-                           + " → " + juce::String(c.expectedCells) + " cells");
+                           + " -> " + juce::String(c.expectedCells) + " cells");
             }
         }
 
@@ -180,9 +180,9 @@ public:
             p.addEnvelope(e1);
             p.addEnvelope(e2);
 
-            expect(p.envelopeAtCell(2) == &p.envelopes[0], "cell 2 → first envelope");
-            expect(p.envelopeAtCell(9) == &p.envelopes[1], "cell 9 → second envelope");
-            expect(p.envelopeAtCell(5) == nullptr,          "cell 5 → no envelope");
+            expect(p.envelopeAtCell(2) == &p.envelopes[0], "cell 2 -> first envelope");
+            expect(p.envelopeAtCell(9) == &p.envelopes[1], "cell 9 -> second envelope");
+            expect(p.envelopeAtCell(5) == nullptr,          "cell 5 -> no envelope");
         }
     }
 };

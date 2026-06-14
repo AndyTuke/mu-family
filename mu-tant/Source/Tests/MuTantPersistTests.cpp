@@ -1,4 +1,4 @@
-// mu-tant modulator-persistence tests — exercises the shared mu-core modulator
+// mu-tant modulator-persistence tests - exercises the shared mu-core modulator
 // (de)serialise (mu_pp) the way mu-tant uses it: a VoiceSlot's
 // ControlSequences + ModulationMatrix assignments round-trip through a ValueTree
 // with mu-tant's destination validator. Guards against the silent loss the
