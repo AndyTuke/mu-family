@@ -48,12 +48,23 @@ public:
     {
         // Producer-thread render: publish mu-link's (consume-time projected) transport into
         // our playhead, then render the block through the real processor. MIDI out discarded.
+        scratchMidi.ensureSize(256);   // so an injected program-change never allocates on the bus thread
+
         client.onRender([this] (float* const* output, int numChannels, int numFrames,
                                 const TransportSnapshot& t)
         {
             playHead.setSnapshot(t);
             juce::AudioBuffer<float> buffer(const_cast<float**>(output), numChannels, numFrames);
             scratchMidi.clear();
+
+            // Scene switching: mu-link can target a program change at THIS client (clients share
+            // MIDI channels, so it addresses us by slot). Inject it into the processor's MIDI so
+            // the product's existing scanMidiProgramChanges picks it up → preset hot-swap. Polled
+            // on the producer thread only, so lastPcEpoch needs no synchronisation.
+            int pcProgram = 0, pcChannel = 9;
+            if (client.pollProgramChange(pcProgram, pcChannel))
+                scratchMidi.addEvent(juce::MidiMessage::programChange(pcChannel, pcProgram), 0);
+
             processor.processBlock(buffer, scratchMidi);
         });
 
