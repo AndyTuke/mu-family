@@ -121,8 +121,8 @@ void VoiceEngine::process(juce::AudioBuffer<float>& out, int numSamples)
 
         lastA = a;                                   // feedback tap = raw carrier output
 
-        // Lane B — amplitude/multiply bus.
-        if (ampMode == 1)
+        // Lane B — amplitude/multiply bus (mode: 0 AM, 1 RM, 2 SSB).
+        if (ampMode == 2)
         {
             // SSB / frequency shift: shift every partial of the carrier by ssbHz. Take the
             // analytic signal (Hilbert) and multiply by a complex exponential, keep the real
@@ -135,11 +135,19 @@ void VoiceEngine::process(juce::AudioBuffer<float>& out, int numSamples)
         }
         else if (depthSm != 0.0f)
         {
-            // Mult: AM↔RM morph. k=|depth| sets modulation amount + carrier suppression
-            // (offset = 1−k → carrier fades AM→RM as k→1); sign flips modulator phase.
-            const float k   = std::abs(depthSm);
-            const float sgn = depthSm < 0.0f ? -1.0f : 1.0f;
-            a *= (1.0f - k) + sgn * k * b;
+            // AM keeps the carrier (classic amplitude mod); RM crossfades dry → ring so the
+            // carrier is suppressed at full depth. Depth is bipolar (centre = off; sign flips
+            // the modulator phase).
+            if (ampMode == 0)                       // AM
+            {
+                a *= 1.0f + depthSm * b;
+            }
+            else                                    // RM
+            {
+                const float k   = std::abs(depthSm);
+                const float sgn = depthSm < 0.0f ? -1.0f : 1.0f;
+                a = a * (1.0f - k) + sgn * (a * b) * k;
+            }
         }
 
         const float n = noise.render(noiseType);

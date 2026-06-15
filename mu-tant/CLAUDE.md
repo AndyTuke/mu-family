@@ -4,7 +4,7 @@ Product-specific guidance for working in `mu-tant/`. Read alongside the family-w
 
 ## Project overview
 
-**μ-Tant** is a JUCE/C++ wavetable drone synth by Transwarp Development Project. Engine: a dynamic set of **1–8 free-running voices** (default 1), each with two wavetable oscillators, a **2-lane X-Mod** section (Lane A phase/index: FM/PM/TZFM + Sync + Feedback; Lane B amplitude: AM↔RM morph + SSB frequency-shift — see [docs/mu-tant/mu-tant-xmod-design.md](../docs/mu-tant/mu-tant-xmod-design.md)), shared scale-quantised pitch, mu-core filter, a per-voice drawable **gater**, and a shared insert effect. Builds Standalone + VST3 + CLAP (Debug + Release; Release deploys to the OneDrive tester share via `MUFAMILY_DEPLOY_TESTERS=ON`, matching mu-clid).
+**μ-Tant** is a JUCE/C++ wavetable drone synth by Transwarp Development Project. Engine: a dynamic set of **1–8 free-running voices** (default 1), each with two wavetable oscillators, a **2-lane X-Mod** section (Lane A phase/index: FM/PM/TZFM + Sync + Feedback; Lane B amplitude: AM / RM / SSB frequency-shift — see [docs/mu-tant/mu-tant-xmod-design.md](../docs/mu-tant/mu-tant-xmod-design.md)), shared scale-quantised pitch, mu-core filter, a per-voice drawable **gater**, and a shared insert effect. Builds Standalone + VST3 + CLAP (Debug + Release; Release deploys to the OneDrive tester share via `MUFAMILY_DEPLOY_TESTERS=ON`, matching mu-clid).
 
 The editor inherits `mu-core/UI/EditorShellBase.h` — same TransportBar, About, StatusBar, window sizing, and `MuLookAndFeel` knob style as mu-Clid by construction. The differences vs mu-Clid are the voice engine and (eventually) the sequencer model.
 

@@ -65,7 +65,7 @@ namespace
         layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("xmod_index"),     1}, label("X-Mod Index"),      f(0.0f, 100.0f, 1.0f), 0.0f));
         layout.add(std::make_unique<AudioParameterBool>  (ParameterID{id("sync"),           1}, label("Osc Sync"), false));
         layout.add(std::make_unique<AudioParameterBool>  (ParameterID{id("xmod_fdbk"),      1}, label("X-Mod Feedback"), false));
-        layout.add(std::make_unique<AudioParameterChoice>(ParameterID{id("xmod_ampMode"),   1}, label("X-Mod Amp Mode"), StringArray{ "Mult", "SSB" }, 0));
+        layout.add(std::make_unique<AudioParameterChoice>(ParameterID{id("xmod_ampMode"),   1}, label("X-Mod Amp Mode"), StringArray{ "AM", "RM", "SSB" }, 0));
         layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("xmod_depth"),     1}, label("X-Mod Depth"),     f(-100.0f, 100.0f, 1.0f), 0.0f));
         layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("xmod_ssb"),       1}, label("X-Mod SSB Shift"), f(-2000.0f, 2000.0f, 1.0f), 0.0f,
                     AudioParameterFloatAttributes().withStringFromValueFunction(

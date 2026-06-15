@@ -39,9 +39,9 @@ struct VoiceConfig
     float xmodIndex     = 0.0f;  // 0..1 modulation index (osc2 → osc1)
     bool  sync          = false; // hard sync: osc1 wrap resets osc2 phase
     bool  xmodFeedback  = false; // mutual feedback FM: osc1's prev output phase-mods osc2
-    // Lane B — amplitude / multiply bus (one bipolar depth, mode switch).
-    int   xmodAmpMode   = 0;     // 0=Mult (AM↔RM morph), 1=SSB (frequency shift)
-    float xmodDepth     = 0.0f;  // -1..1 (Mult): centre=off; |d| morphs AM→RM; sign=phase
+    // Lane B — amplitude / multiply bus (one bipolar depth, 3-way mode switch).
+    int   xmodAmpMode   = 0;     // 0=AM (carrier kept), 1=RM (carrier suppressed), 2=SSB (freq shift)
+    float xmodDepth     = 0.0f;  // -1..1: centre=off; AM/RM amount; sign flips modulator phase
     float xmodSsbHz     = 0.0f;  // SSB shift (Hz, bipolar; sign = shift up/down)
 
     // Per-source levels (replace the old single osc-balance "mix"). dB.

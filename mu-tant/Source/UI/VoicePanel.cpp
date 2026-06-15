@@ -225,7 +225,7 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     ampModeCtrl.onChange = [this](int idx) {
         if (auto* p = proc.apvts.getParameter(PluginProcessor::voiceParamId(currentVoice, "xmod_ampMode")))
             p->setValueNotifyingHost(p->convertTo0to1((float) idx));
-        bindAmpDepthKnob(idx == 1);   // SSB → bind Depth knob to the shift param
+        bindAmpDepthKnob(idx == 2);   // SSB → bind Depth knob to the shift param
     };
 
     setupLabel(noiseTypeLabel, "Noise");
@@ -450,10 +450,10 @@ void VoicePanel::rebindAttachments()
         if (auto* raw = apvts.getRawParameterValue(id("xmod_phaseMode"))) pm = juce::jlimit(0, 2, (int) raw->load());
         phaseModeCtrl.setSelectedIndex(pm, false);
         int am = 0;
-        if (auto* raw = apvts.getRawParameterValue(id("xmod_ampMode")))   am = juce::jlimit(0, 1, (int) raw->load());
+        if (auto* raw = apvts.getRawParameterValue(id("xmod_ampMode")))   am = juce::jlimit(0, 2, (int) raw->load());
         ampModeCtrl.setSelectedIndex(am, false);
         currentAmpMode = am;
-        bindAmpDepthKnob(am == 1);   // binds xmodDepthAttachment to depth/ssb for the active voice
+        bindAmpDepthKnob(am == 2);   // binds xmodDepthAttachment to depth/ssb for the active voice
     }
 
     osc1LevelAttachment  = std::make_unique<APVTS::SliderAttachment>  (apvts, id("o1_lvl"),     osc1LevelKnob.getSlider());
@@ -725,35 +725,37 @@ void VoicePanel::resized()
     const int rowBY = contentTop + rowAH + gap;   // top of Row B
     {
 
-        // X-Mod panel — two lanes side by side. Lane A (left): Index knob + Phase-mode
-        // switch + Sync/Feedback toggles. Lane B (right): Depth knob + Amp-mode switch.
-        const int xmodW = s(200);
+        // X-Mod panel — two horizontal lanes (one per row). Each lane: knob, then a mode
+        // SegmentControl, then (Lane A only) the Sync + Feedback toggles. Widened so the
+        // lanes read left-to-right; the Filter panel's type dropdowns shrink to suit.
+        const int xmodW = s(248);
         modNoisePanelR = { pad, rowBY, xmodW, rowBH };
         {
-            const int colW   = xmodW / 2;
-            const int segW   = colW - s(12);
-            const int segH   = ddH;
-            const int gapY   = s(5);
-            const int totalH = s2H + gapY + segH + gapY + segH;   // knob / mode / toggle rows
-            const int startY = rowBY + juce::jmax(s(2), (rowBH - totalH) / 2);
-            const int modeY  = startY + s2H + gapY;
-            const int togY   = modeY + segH + gapY;
+            const int titleH = s(14);                       // room for the "X-MOD" panel title
+            const int rowH   = (rowBH - titleH) / 2;        // two equal lane rows
+            const int row1Y  = rowBY + titleH;
+            const int row2Y  = row1Y + rowH;
+            const int innerX = pad + s(6);
+            const int segW   = s(96);                       // 3-segment mode switch
+            const int togW   = s(32);
 
-            const int laneAx = pad;
-            const int laneBx = pad + colW;
-            const int segAx  = laneAx + (colW - segW) / 2;
-            const int segBx  = laneBx + (colW - segW) / 2;
+            // Place a lane's knob + mode segment; returns the segment's right edge.
+            auto layoutLane = [&](int rowY, KnobWithLabel& knob, SegmentControl& seg) -> int
+            {
+                knob.setBounds(innerX, rowY + (rowH - s2H) / 2, s2W, s2H);
+                const int segX = innerX + s2W + s(8);
+                seg.setBounds(segX, rowY + (rowH - ddH) / 2, segW, ddH);
+                return segX + segW;
+            };
 
-            // Lane A — Index knob, Phase mode, Sync + Feedback toggles.
-            xmodIndexKnob.setBounds(laneAx + (colW - s2W) / 2, startY, s2W, s2H);
-            phaseModeCtrl.setBounds(segAx, modeY, segW, segH);
-            const int tW = (segW - s(4)) / 2;
-            syncButton.setBounds(segAx,             togY, tW, segH);
-            fdbkButton.setBounds(segAx + tW + s(4), togY, tW, segH);
+            // Lane A — Index knob, Phase mode (FM/PM/TZFM), Sync + Feedback toggles.
+            const int seg1R = layoutLane(row1Y, xmodIndexKnob, phaseModeCtrl);
+            const int togY  = row1Y + (rowH - ddH) / 2;
+            syncButton.setBounds(seg1R + s(8),                togY, togW, ddH);
+            fdbkButton.setBounds(seg1R + s(8) + togW + s(3),  togY, togW, ddH);
 
-            // Lane B — Depth knob, Amp mode.
-            xmodDepthKnob.setBounds(laneBx + (colW - s2W) / 2, startY, s2W, s2H);
-            ampModeCtrl.setBounds(segBx, modeY, segW, segH);
+            // Lane B — Depth knob, Amp mode (AM/RM/SSB).
+            layoutLane(row2Y, xmodDepthKnob, ampModeCtrl);
         }
 
         // Filter panel — two rows (Filter 1 + Filter 2) with Series/Parallel toggle.

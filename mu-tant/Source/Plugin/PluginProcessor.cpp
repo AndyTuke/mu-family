@@ -337,7 +337,7 @@ VoiceConfig PluginProcessor::readConfig(int voiceIdx) const
     c.xmodIndex     = p.xmodIndex->load() * 0.01f;     // 0..100 → 0..1
     c.sync          = p.sync->load() > 0.5f;
     c.xmodFeedback  = p.xmodFdbk->load() > 0.5f;
-    c.xmodAmpMode   = (int) p.xmodAmpMode->load();     // 0 Mult, 1 SSB
+    c.xmodAmpMode   = (int) p.xmodAmpMode->load();     // 0 AM, 1 RM, 2 SSB
     c.xmodDepth     = p.xmodDepth->load() * 0.01f;     // -100..100 → -1..1
     c.xmodSsbHz     = p.xmodSsb->load();               // Hz
     // Per-source levels.
@@ -993,8 +993,10 @@ namespace
             const float rgv = rg.isValid() ? (float) rg.getProperty("value") : 0.0f;
             setParamNode(state, pre + "xmod_index",     fmv);              // FM depth → index
             setParamNode(state, pre + "xmod_phaseMode", 1.0f);            // old FM was phase-mod → PM
-            setParamNode(state, pre + "xmod_depth",     juce::jmax(amv, rgv));  // AM/Ring → +depth (lossy)
-            setParamNode(state, pre + "xmod_ampMode",   0.0f);            // Mult
+            // Old AM vs Ring → the matching amp mode + depth (the larger wins if both set).
+            const bool amWins = amv >= rgv;
+            setParamNode(state, pre + "xmod_depth",   amWins ? amv : rgv);
+            setParamNode(state, pre + "xmod_ampMode", amWins ? 0.0f : 1.0f);   // AM : RM
         }
         migrateModDestIds(state.getChildWithName("VoiceData"));
     }
@@ -1032,8 +1034,9 @@ void PluginProcessor::applyVoicePresetTree(int voice, const juce::ValueTree& tre
         };
         setN("xmod_index",     oldFmNorm * 100.0f);                          // 0..100
         setN("xmod_phaseMode", 1.0f);                                        // PM
-        setN("xmod_depth",     juce::jmax(oldAmNorm, oldRingNorm) * 100.0f); // 0..100 → +depth
-        setN("xmod_ampMode",   0.0f);                                        // Mult
+        const bool amWins = oldAmNorm >= oldRingNorm;                        // larger → its mode
+        setN("xmod_depth",     (amWins ? oldAmNorm : oldRingNorm) * 100.0f); // 0..100 → +depth
+        setN("xmod_ampMode",   amWins ? 0.0f : 1.0f);                        // AM : RM
     }
 
     // Modulators + gate / filter / pitch envelopes (live outside APVTS). Absent

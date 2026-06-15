@@ -4,15 +4,15 @@ Compact cross-modulation panel for the two-oscillator (osc 1 → osc 2) section.
 Goal: cover more modulation types than the current FM / AM / Ring-mod layout while
 using *fewer* on-screen controls.
 
-> **Implemented (build 899).** Both lanes ship, including SSB. As-built deviations from
-> the first-cut spec below, made for usability:
-> - **Lane B is a 2-way mode switch (Mult / SSB)**, not 3-way — the AM↔RM morph lives on
->   the bipolar Depth knob (the design's own parameter-mapping table).
-> - **Depth-knob centre = OFF** (not "pure AM"): `a *= (1−k) + sign·k·b` with `k=|depth|`,
->   so a centre-detent default means no modulation; turning up morphs off→AM→RM. Sign flips
->   modulator phase.
+> **Implemented.** Both lanes ship, including SSB, laid out as two horizontal rows
+> (knob · mode switch · toggles). As-built notes:
+> - **Lane B is a 3-way switch — AM / RM / SSB.** AM keeps the carrier (`a·(1+depth·b)`);
+>   RM crossfades dry→ring so the carrier is suppressed at full (`a·(1−k)+sgn·k·(a·b)`); SSB
+>   frequency-shifts via the Hilbert split. (The first-cut spec framed AM↔RM as a knob morph;
+>   discrete AM/RM modes read more clearly against the mockup.)
+> - **Depth knob is bipolar, centre = OFF**; sign flips the modulator phase.
 > - **SSB shift is its own param** (`xmod_ssb`, −2..+2 kHz) that the Depth knob drives in SSB
->   mode (attachment swaps with the mode), so Mult depth and SSB shift each persist.
+>   mode (attachment swaps with the mode), so AM/RM depth and SSB shift each persist.
 > - **Feedback is a fixed-depth toggle** (conservative), per the "conservative fixed depth" note.
 > - **Click-free:** the continuous controls (index / depth / SSB shift) are one-pole smoothed
 >   (~5 ms); a full dual-path crossfade on discrete mode switches is a possible later refinement.

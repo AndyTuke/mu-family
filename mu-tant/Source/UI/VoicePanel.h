@@ -129,7 +129,7 @@ private:
     KnobWithLabel    xmodIndexKnob { "Index", MuLookAndFeel::knobEuclidean };
     KnobWithLabel    xmodDepthKnob { "Depth", MuLookAndFeel::knobEuclidean };
     SegmentControl   phaseModeCtrl { { "FM", "PM", "TZFM" } };
-    SegmentControl   ampModeCtrl   { { "Mult", "SSB" } };
+    SegmentControl   ampModeCtrl   { { "AM", "RM", "SSB" } };
     juce::TextButton syncButton { "Sync" };
     juce::TextButton fdbkButton { "Fdbk" };
     std::unique_ptr<APVTS::SliderAttachment> xmodIndexAttachment;
