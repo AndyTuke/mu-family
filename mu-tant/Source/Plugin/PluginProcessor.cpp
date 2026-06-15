@@ -114,6 +114,9 @@ PluginProcessor::PluginProcessor()
         const double stored = appSettings->getDoubleValue("uiScale", (double) kUiScaleMedium);
         uiScale = juce::jlimit(kUiScaleMedium, kUiScaleLarge, (float) stored);
     }
+    // Restore persisted MIDI-clock-sync prefs (standalone external clock). Mirrors mu-clid.
+    midiClockSync.setEnabled (appSettings->getBoolValue("midiSyncEnabled",  false));
+    midiClockSync.setMessages(appSettings->getIntValue ("midiSyncMessages", 2));
 
     // Check license file — after appSettings so getContentDir() resolves.
     licenseInfo = mu_core::LicenseManager::check(getContentDir(),
@@ -363,6 +366,10 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     if (scanMidiProgramChanges(midiMessages))
         triggerAsyncUpdate();
 
+    // External MIDI clock (standalone): scan the buffer + advance the clock estimate. Returns
+    // the start-of-block beat (0 when disabled); the transport derivation below slaves to it.
+    const double midiClockBeat = midiClockSync.process(midiMessages, numSamples, currentSampleRate);
+
     // Per-block transport snapshot for the render hook (audio-thread-only members, read by
     // renderVoice). Family standard (mu-core HostTransport): consult the playhead first.
     //   • Plugin: host drives play + BPM (mu-Tant keeps its own free-running beat, by design).
@@ -393,6 +400,16 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         blkPlaying = ht.playing;
         slaved     = true;
         slavedBeat = std::fmod(ht.ppqPosition, (double) GatePattern::kMaxPatternBars * 4.0);
+    }
+    else if (midiClockSync.isEnabled() && midiClockSync.isPlaying())
+    {
+        // Slaved to external MIDI clock (standalone, MIDI-in). Same bounded beat space as the
+        // others — only the SOURCE of the beat changes (mu-link takes priority above when attached).
+        bpm = midiClockSync.getBpm();
+        playing.store(true, std::memory_order_relaxed);
+        blkPlaying = true;
+        slaved     = true;
+        slavedBeat = std::fmod(midiClockBeat, (double) GatePattern::kMaxPatternBars * 4.0);
     }
     else
     {
@@ -1178,6 +1195,18 @@ void PluginProcessor::setUiScale(float scale)
         appSettings->saveIfNeeded();
     }
     ProcessorBase::setUiScale(clamped);
+}
+
+void PluginProcessor::setMidiSyncEnabled(bool on)
+{
+    midiClockSync.setEnabled(on);
+    if (appSettings != nullptr) { appSettings->setValue("midiSyncEnabled", on); appSettings->saveIfNeeded(); }
+}
+
+void PluginProcessor::setMidiSyncMessages(int mode)
+{
+    midiClockSync.setMessages(mode);
+    if (appSettings != nullptr) { appSettings->setValue("midiSyncMessages", mode); appSettings->saveIfNeeded(); }
 }
 
 // ── Presets ──────────────────────────────────────────────────────────────────

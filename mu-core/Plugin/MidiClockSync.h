@@ -4,17 +4,18 @@
 #include <array>
 #include <atomic>
 
-// MIDI clock sync state machine, extracted from PluginProcessor.
+// MIDI clock sync state machine — a SHARED, plugin-agnostic mu-core component
+// (lifted from mu-clid so every synth product slaves to external MIDI clock the
+// same way). Pure JUCE + atomics, no product symbols.
 //
-// Audio thread calls process() each block; it scans the MidiBuffer for
-// real-time messages (0xF8 clock tick, 0xFA/FB/FC start/continue/stop),
-// maintains a 24-slot ring buffer of inter-tick intervals for BPM estimation,
-// and returns the start-of-block beat position.
+// Audio thread calls process() each block; it scans the MidiBuffer for real-time
+// messages (0xF8 clock tick, 0xFA/FB/FC start/continue/stop), maintains a 24-slot
+// ring buffer of inter-tick intervals for BPM estimation, and returns the
+// start-of-block beat position.
 //
-// All cross-thread reads (isEnabled, isPlaying, getBpm, getBeatPosUI) are
-// backed by atomics and are safe to call from the message thread. The
-// audio-thread-only fields (beatPos_, ringHead_, etc.) must not be accessed
-// from any other thread.
+// All cross-thread reads (isEnabled, isPlaying, getBpm, getBeatPosUI) are backed by
+// atomics and safe to call from the message thread. The audio-thread-only fields
+// (beatPos_, ringHead_, etc.) must not be accessed from any other thread.
 class MidiClockSync
 {
 public:

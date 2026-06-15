@@ -5,7 +5,8 @@ namespace mu_tant
 {
 
 SettingsOverlay::SettingsOverlay(PluginProcessor& p)
-    : proc(p)
+    : proc(p),
+      isStandalone(p.wrapperType == juce::AudioProcessor::wrapperType_Standalone)
 {
     // Header bar + Close button are owned by mu_ui::SettingsOverlayBase.
 
@@ -64,6 +65,31 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     };
     addAndMakeVisible(swapModeDropdown);
 
+    // ── MIDI Clock (standalone only) — slave the beat/tempo to external MIDI clock ──
+    if (isStandalone)
+    {
+        makeFieldLabel(clockSourceLabel, "Source");
+        clockSourceDropdown.addItem("Internal", 1);
+        clockSourceDropdown.addItem("MIDI In",  2);
+        clockSourceDropdown.setSelectedId(proc.getMidiSyncEnabled() ? 2 : 1, false);
+        clockSourceDropdown.onChange = [this](int id)
+        {
+            proc.setMidiSyncEnabled(id == 2);
+            updateMidiSyncVisibility();
+        };
+        addAndMakeVisible(clockSourceDropdown);
+
+        makeFieldLabel(midiMessagesLabel, "Messages");
+        midiMessagesDropdown.addItem("Clock only", 1);
+        midiMessagesDropdown.addItem("Transport",  2);
+        midiMessagesDropdown.addItem("Both",       3);
+        midiMessagesDropdown.setSelectedId(proc.getMidiSyncMessages() + 1, false);
+        midiMessagesDropdown.onChange = [this](int id) { proc.setMidiSyncMessages(id - 1); };
+        addAndMakeVisible(midiMessagesDropdown);
+
+        updateMidiSyncVisibility();
+    }
+
     // ── MIDI Program Change (Ch 1-8 → voice presets, Ch 9 → full presets) ──────
     midiPresetsBtn.onClick = [this] { if (onMidiPresetsClicked) onMidiPresetsClicked(); };
     fullPresetsBtn.onClick = [this] { if (onFullPresetsClicked) onFullPresetsClicked(); };
@@ -119,9 +145,29 @@ void SettingsOverlay::computeLayout()
     y += rowH;
     y += sectGap;
 
+    // MIDI Clock — standalone only (collapsed entirely in a DAW).
+    if (isStandalone)
+    {
+        layout.midiClockHeader  = y;
+        y += headH;
+        layout.clockSourceRowY  = y;
+        y += rowH;
+        layout.midiMessagesRowY = y;
+        y += rowH;
+        y += sectGap;
+    }
+
     layout.midiPCHeader = y;
     y += headH;
     layout.midiPCRowY   = y;
+}
+
+void SettingsOverlay::updateMidiSyncVisibility()
+{
+    // The Messages row only matters when MIDI-clock input is selected.
+    const bool on = proc.getMidiSyncEnabled();
+    midiMessagesLabel   .setVisible(on);
+    midiMessagesDropdown.setVisible(on);
 }
 
 void SettingsOverlay::layoutContent()
@@ -151,6 +197,14 @@ void SettingsOverlay::layoutContent()
     swapModeLabel   .setBounds(x,     layout.swapRowY, labelW, rowH);
     swapModeDropdown.setBounds(ctrlX, layout.swapRowY, ctrlW,  rowH);
 
+    if (isStandalone)
+    {
+        clockSourceLabel    .setBounds(x,     layout.clockSourceRowY,  labelW, rowH);
+        clockSourceDropdown .setBounds(ctrlX, layout.clockSourceRowY,  ctrlW,  rowH);
+        midiMessagesLabel   .setBounds(x,     layout.midiMessagesRowY, labelW, rowH);
+        midiMessagesDropdown.setBounds(ctrlX, layout.midiMessagesRowY, ctrlW,  rowH);
+    }
+
     // MIDI Program Change — two buttons side-by-side, centred within the column.
     const int btnGap = s(8);
     const int btnW   = juce::jmin(s(200), (cw - btnGap) / 2);
@@ -170,6 +224,8 @@ void SettingsOverlay::paintContent(juce::Graphics& g)
 
     drawGroupHeader(g, layout.midiGroupHeader,    "MIDI");
     drawSectionHeader(g, layout.swapHeader,        "Hot-swap");
+    if (isStandalone)
+        drawSectionHeader(g, layout.midiClockHeader, "MIDI Clock");
     drawSectionHeader(g, layout.midiPCHeader,     "MIDI Program Change");
 }
 

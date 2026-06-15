@@ -33,6 +33,7 @@ public:
 
 private:
     PluginProcessor& proc;
+    const bool isStandalone;
 
     // Audio — master volume (reads/writes the mixer master fader param directly,
     // not via a SliderAttachment — the attachment overwrites the dB
@@ -51,6 +52,13 @@ private:
     juce::Label    swapModeLabel;
     DropdownSelect swapModeDropdown;
 
+    // MIDI Clock (standalone only) — slave the beat/tempo to external MIDI clock.
+    juce::Label    clockSourceLabel;
+    DropdownSelect clockSourceDropdown;
+    juce::Label    midiMessagesLabel;
+    DropdownSelect midiMessagesDropdown;
+    void updateMidiSyncVisibility();
+
     // MIDI Program Change — two tables (Ch 1-8 voice presets, Ch 9 full presets).
     // The tables themselves are the shared mu-core overlays; these just open them.
     juce::TextButton midiPresetsBtn { "Voice Presets" };
@@ -66,6 +74,7 @@ private:
         int transportHeader = 0, bpmRowY = 0;
         int midiGroupHeader = 0;
         int swapHeader = 0, swapRowY = 0;
+        int midiClockHeader = 0, clockSourceRowY = 0, midiMessagesRowY = 0;   // standalone only
         int midiPCHeader = 0, midiPCRowY = 0;
     };
     LayoutY layout;

@@ -11,6 +11,7 @@
 
 #include "Modulation/MuTantModSnap.h"
 #include "Plugin/VoiceHotSwapStager.h"       // mu-tant: preset hot-swap staging
+#include "Plugin/MidiClockSync.h"            // mu-core: shared MIDI-clock slave
 #include "License/LicenseManager.h"          // mu-core: shared offline-license verifier
 #include "License/LicenseKey.h"              // product: mu-Tant id + filename + public key
 
@@ -155,6 +156,16 @@ public:
     enum class SwapMode { OnMasterLoop = 0, OnVoiceLoop = 1 };
     SwapMode getSwapMode() const { return (SwapMode) swapModeAtomic.load(std::memory_order_relaxed); }
     void     setSwapMode(SwapMode m) { swapModeAtomic.store((int) m, std::memory_order_relaxed); }
+
+    // MIDI clock sync (standalone) — slaves the beat/tempo to external MIDI clock via the
+    // shared mu-core MidiClockSync. Overrides the ProcessorBase MIDI virtuals (standard
+    // synth feature). Setters persist to appSettings + drive the engine.
+    bool   getMidiSyncEnabled()  const override { return midiClockSync.isEnabled(); }
+    int    getMidiSyncMessages() const override { return midiClockSync.getMessages(); }
+    bool   isMidiClockPlaying()  const override { return midiClockSync.isPlaying(); }
+    double getMidiClockBpm()     const override { return midiClockSync.getBpm(); }
+    void   setMidiSyncEnabled(bool on);
+    void   setMidiSyncMessages(int mode);
 
     // ── ProcessorBase channel metadata ───────────────────────────────────────
     // mu-tant manages a dynamic set of voices ("layers") exactly like mu-clid's
@@ -422,6 +433,10 @@ private:
     // 1 = OnVoiceLoop — commit at the per-voice gate-pattern boundary. A full preset
     // always uses the master loop when one is defined, else voice 0's gate boundary.
     std::atomic<int> swapModeAtomic { 0 };
+
+    // Shared MIDI-clock slave (standalone). process() scans the MIDI buffer each block;
+    // when enabled + playing, processBlock slaves the beat/tempo to it.
+    MidiClockSync midiClockSync;
     // Written in prepareToPlay (host suspends the audio thread first) — no atomic needed.
     double currentSampleRate = 44100.0;
 

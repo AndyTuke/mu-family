@@ -12,7 +12,7 @@
 #include "MuLimits.h"
 #include "Modulation/ModulationSnapshot.h"
 #include "SamplePreview.h"
-#include "MidiClockSync.h"
+#include "Plugin/MidiClockSync.h"   // shared mu-core MIDI-clock slave
 #include "PresetIO.h"
 #include "HotSwapStager.h"
 
