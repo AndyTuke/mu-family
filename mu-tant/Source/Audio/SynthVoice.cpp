@@ -27,18 +27,16 @@ void VoiceEngine::setBank(const WavetableBank* b) noexcept
     osc2.setBank(b);
 }
 
-// Base octave the per-osc octave offset (-3..+3) sits on, so the playable
-// range lands in an audible drone register (octave 0 → MIDI ~48 = C3).
-static constexpr int kBaseOctave = 4;
-
 void VoiceEngine::setConfig(const VoiceConfig& c)
 {
     cfg = c;
 
+    // pitchOffsetSemis transposes the whole voice (0 in Free mode; the held-note
+    // offset in Note mode) — added after toneToMidi so scale intervals are preserved.
     const float midi1 = toneToMidi(cfg.scaleIdx, cfg.root, cfg.osc1Octave + kBaseOctave,
-                                   (float) cfg.osc1Semi, (float) cfg.osc1Fine);
+                                   (float) cfg.osc1Semi, (float) cfg.osc1Fine) + cfg.pitchOffsetSemis;
     const float midi2 = toneToMidi(cfg.scaleIdx, cfg.root, cfg.osc2Octave + kBaseOctave,
-                                   (float) cfg.osc2Semi, (float) cfg.osc2Fine);
+                                   (float) cfg.osc2Semi, (float) cfg.osc2Fine) + cfg.pitchOffsetSemis;
     osc1.setFrequency(midiToFreq(midi1));
     osc2.setFrequency(midiToFreq(midi2));
     // Position is a 0..255 frame index; normalise to the osc's 0..1 scan input.

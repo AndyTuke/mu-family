@@ -118,6 +118,12 @@ PluginProcessor::PluginProcessor()
     midiClockSync.setEnabled (appSettings->getBoolValue("midiSyncEnabled",  false));
     midiClockSync.setMessages(appSettings->getIntValue ("midiSyncMessages", 2));
 
+    // Restore persisted MIDI Note mode (0 = Free, 1 = Note). Seed the audio-thread
+    // gate so a fresh open in Note mode starts silent (closed) until a note arrives.
+    midiNoteMode.store(appSettings->getIntValue("midiNoteMode", 0), std::memory_order_relaxed);
+    lastNoteMode = midiNoteMode.load(std::memory_order_relaxed);
+    noteGateGain = (lastNoteMode == 1) ? 0.0f : 1.0f;
+
     // Check license file — after appSettings so getContentDir() resolves.
     licenseInfo = mu_core::LicenseManager::check(getContentDir(),
                                                  kLicenseProductId,
@@ -366,6 +372,11 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     if (scanMidiProgramChanges(midiMessages))
         triggerAsyncUpdate();
 
+    // Note mode (gate + pitch-track): scan note on/off into the held-note stack so
+    // renderVoice can pitch-track the held note. The amplitude gate is applied to the
+    // final mix after the render (applyNoteModeGate). No-op in Free mode.
+    scanNoteMode(midiMessages);
+
     // External MIDI clock (standalone): scan the buffer + advance the clock estimate. Returns
     // the start-of-block beat (0 when disabled); the transport derivation below slaves to it.
     const double midiClockBeat = midiClockSync.process(midiMessages, numSamples, currentSampleRate);
@@ -443,6 +454,11 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
                              nullptr, nullptr, nullptr, &renderVoiceCb);
         }
     }
+
+    // Note mode: gate the whole mix on the held→silent edge with a short anti-click
+    // fade (runs even if the render was skipped on lock contention — buffer is silent,
+    // the ramp still tracks). No-op in Free mode.
+    applyNoteModeGate(buffer, numSamples);
 
     // Advance the transport beat. Wrap at the maximum pattern length (64 beats =
     // 16 bars in 4/4) to keep floating-point precision bounded. Each GatePattern
@@ -629,6 +645,12 @@ void PluginProcessor::renderVoice(int v, juce::AudioBuffer<float>& buf, int numS
     applyModulation(v, cfg);
     applyFilterEnvelope(v, cfg);
     applyPitchEnvelope(v, cfg);
+
+    // Note mode pitch-track: transpose the voice so its tonal centre lands on the held
+    // MIDI note. Free-mode centre = root + 12*kBaseOctave (octave 0, root → C3), so the
+    // offset is held - that centre; scale intervals + per-osc oct/semi/fine still apply.
+    if (midiNoteMode.load(std::memory_order_relaxed) == 1 && noteCurrentMidi >= 0)
+        cfg.pitchOffsetSemis = (float) (noteCurrentMidi - (cfg.root + 12 * kBaseOctave));
 
     buf.clear();
     voices[(size_t) v]->setConfig(cfg);
@@ -1207,6 +1229,89 @@ void PluginProcessor::setMidiSyncMessages(int mode)
 {
     midiClockSync.setMessages(mode);
     if (appSettings != nullptr) { appSettings->setValue("midiSyncMessages", mode); appSettings->saveIfNeeded(); }
+}
+
+void PluginProcessor::setMidiNoteMode(int mode)
+{
+    midiNoteMode.store(mode, std::memory_order_relaxed);
+    if (appSettings != nullptr) { appSettings->setValue("midiNoteMode", mode); appSettings->saveIfNeeded(); }
+}
+
+// ── Note mode (gate + pitch-track) ───────────────────────────────────────────
+// Audio-thread-only: scanNoteMode + applyNoteModeGate both run within processBlock
+// on one thread, so the held-note stack + ramp state need no synchronisation.
+
+void PluginProcessor::scanNoteMode(const juce::MidiBuffer& midi)
+{
+    const int mode = midiNoteMode.load(std::memory_order_relaxed);
+
+    // A Free↔Note switch resets the held stack + gate so neither mode inherits stale
+    // state (e.g. Free wouldn't get stuck silent, Note wouldn't open from a phantom note).
+    if (mode != lastNoteMode)
+    {
+        numHeldNotes    = 0;
+        noteCurrentMidi = -1;
+        noteGateGain    = (mode == 1) ? 0.0f : 1.0f;
+        lastNoteMode    = mode;
+    }
+
+    if (mode != 1)
+        return;
+
+    // Maintain a last-note-priority held-note stack: a Note On pushes (de-duped), a
+    // Note Off removes; the stack top is the sounding pitch. Stack capped at 16 held
+    // notes — beyond that the oldest is dropped (silently) to keep the array bounded.
+    for (const auto meta : midi)
+    {
+        const auto msg = meta.getMessage();
+        if (msg.isNoteOn())
+        {
+            const int note = msg.getNoteNumber();
+            for (int i = 0; i < numHeldNotes; ++i)        // de-dupe a re-pressed note
+                if (heldNotes[(size_t) i] == note) { --numHeldNotes;
+                    for (int j = i; j < numHeldNotes; ++j) heldNotes[(size_t) j] = heldNotes[(size_t) j + 1];
+                    break; }
+            if (numHeldNotes == (int) heldNotes.size())   // full → drop the oldest
+            {
+                for (int j = 0; j + 1 < numHeldNotes; ++j) heldNotes[(size_t) j] = heldNotes[(size_t) j + 1];
+                --numHeldNotes;
+            }
+            heldNotes[(size_t) numHeldNotes++] = note;
+        }
+        else if (msg.isNoteOff())
+        {
+            const int note = msg.getNoteNumber();
+            for (int i = 0; i < numHeldNotes; ++i)
+                if (heldNotes[(size_t) i] == note) { --numHeldNotes;
+                    for (int j = i; j < numHeldNotes; ++j) heldNotes[(size_t) j] = heldNotes[(size_t) j + 1];
+                    break; }
+        }
+    }
+
+    noteCurrentMidi = numHeldNotes > 0 ? heldNotes[(size_t) (numHeldNotes - 1)] : -1;
+}
+
+void PluginProcessor::applyNoteModeGate(juce::AudioBuffer<float>& buffer, int numSamples)
+{
+    if (midiNoteMode.load(std::memory_order_relaxed) != 1)
+        return;
+
+    // Linear amplitude ramp toward 1 (a note held) or 0 (all released), reaching the
+    // target over ~8 ms so the held→silent edge fades instead of clicking.
+    const float target   = numHeldNotes > 0 ? 1.0f : 0.0f;
+    const float fadeSecs  = 0.008f;
+    const float gainStep = 1.0f / (float) juce::jmax(1.0, fadeSecs * currentSampleRate);
+
+    float* l = buffer.getWritePointer(0);
+    float* r = buffer.getNumChannels() > 1 ? buffer.getWritePointer(1) : nullptr;
+    float  g = noteGateGain;
+    for (int i = 0; i < numSamples; ++i)
+    {
+        g += juce::jlimit(-gainStep, gainStep, target - g);
+        l[i] *= g;
+        if (r != nullptr) r[i] *= g;
+    }
+    noteGateGain = g;
 }
 
 // ── Presets ──────────────────────────────────────────────────────────────────

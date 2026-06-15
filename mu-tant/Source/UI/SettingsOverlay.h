@@ -59,6 +59,11 @@ private:
     DropdownSelect midiMessagesDropdown;
     void updateMidiSyncVisibility();
 
+    // MIDI Note mode (Free / Note) — shown in both standalone + plugin, unlike
+    // mu-clid's plugin-only row (mu-tant's Note mode works from a keyboard too).
+    juce::Label    noteModeLabel;
+    DropdownSelect noteModeDropdown;
+
     // MIDI Program Change — two tables (Ch 1-8 voice presets, Ch 9 full presets).
     // The tables themselves are the shared mu-core overlays; these just open them.
     juce::TextButton midiPresetsBtn { "Voice Presets" };
@@ -75,6 +80,7 @@ private:
         int midiGroupHeader = 0;
         int swapHeader = 0, swapRowY = 0;
         int midiClockHeader = 0, clockSourceRowY = 0, midiMessagesRowY = 0;   // standalone only
+        int noteModeHeader = 0, noteModeRowY = 0;
         int midiPCHeader = 0, midiPCRowY = 0;
     };
     LayoutY layout;

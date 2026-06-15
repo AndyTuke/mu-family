@@ -90,6 +90,14 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
         updateMidiSyncVisibility();
     }
 
+    // ── MIDI Note mode (Free / Note) — gate + pitch-track the drone from notes ──
+    makeFieldLabel(noteModeLabel, "Mode");
+    noteModeDropdown.addItem("Free", 1);
+    noteModeDropdown.addItem("Note", 2);
+    noteModeDropdown.setSelectedId(proc.getMidiNoteMode() + 1, false);
+    noteModeDropdown.onChange = [this](int id) { proc.setMidiNoteMode(id - 1); };
+    addAndMakeVisible(noteModeDropdown);
+
     // ── MIDI Program Change (Ch 1-8 → voice presets, Ch 9 → full presets) ──────
     midiPresetsBtn.onClick = [this] { if (onMidiPresetsClicked) onMidiPresetsClicked(); };
     fullPresetsBtn.onClick = [this] { if (onFullPresetsClicked) onFullPresetsClicked(); };
@@ -157,6 +165,13 @@ void SettingsOverlay::computeLayout()
         y += sectGap;
     }
 
+    // Note mode — shown in both standalone + plugin.
+    layout.noteModeHeader = y;
+    y += headH;
+    layout.noteModeRowY   = y;
+    y += rowH;
+    y += sectGap;
+
     layout.midiPCHeader = y;
     y += headH;
     layout.midiPCRowY   = y;
@@ -205,6 +220,9 @@ void SettingsOverlay::layoutContent()
         midiMessagesDropdown.setBounds(ctrlX, layout.midiMessagesRowY, ctrlW,  rowH);
     }
 
+    noteModeLabel   .setBounds(x,     layout.noteModeRowY, labelW, rowH);
+    noteModeDropdown.setBounds(ctrlX, layout.noteModeRowY, ctrlW,  rowH);
+
     // MIDI Program Change — two buttons side-by-side, centred within the column.
     const int btnGap = s(8);
     const int btnW   = juce::jmin(s(200), (cw - btnGap) / 2);
@@ -226,6 +244,7 @@ void SettingsOverlay::paintContent(juce::Graphics& g)
     drawSectionHeader(g, layout.swapHeader,        "Hot-swap");
     if (isStandalone)
         drawSectionHeader(g, layout.midiClockHeader, "MIDI Clock");
+    drawSectionHeader(g, layout.noteModeHeader,   "Note Mode");
     drawSectionHeader(g, layout.midiPCHeader,     "MIDI Program Change");
 }
 

@@ -167,6 +167,13 @@ public:
     void   setMidiSyncEnabled(bool on);
     void   setMidiSyncMessages(int mode);
 
+    // MIDI Note mode (plugin DAW notes + standalone keyboard). Free = the drone runs
+    // continuously (default). Note = gate + pitch-track — the drone sounds only while
+    // a MIDI note is held, and the held note (last-note priority) sets the tonal centre.
+    // 0 = Free, 1 = Note. Setter persists to appSettings.
+    void setMidiNoteMode(int mode);
+    int  getMidiNoteMode() const { return midiNoteMode.load(std::memory_order_relaxed); }
+
     // ── ProcessorBase channel metadata ───────────────────────────────────────
     // mu-tant manages a dynamic set of voices ("layers") exactly like mu-clid's
     // rhythms — there are no inactive voices, only the ones that exist. The
@@ -433,6 +440,24 @@ private:
     // 1 = OnVoiceLoop — commit at the per-voice gate-pattern boundary. A full preset
     // always uses the master loop when one is defined, else voice 0's gate boundary.
     std::atomic<int> swapModeAtomic { 0 };
+
+    // ── MIDI Note mode (gate + pitch-track) ──────────────────────────────────
+    // 0 = Free, 1 = Note. Set from the Settings overlay (message thread), read on
+    // the audio thread. The rest of the note-mode state below is touched ONLY on
+    // the audio thread (scanned + applied within processBlock/renderVoice on one
+    // thread) so it needs no synchronisation.
+    std::atomic<int>    midiNoteMode { 0 };
+    std::array<int, 16> heldNotes {};         // held-note stack (last-note priority)
+    int                 numHeldNotes   = 0;
+    int                 noteCurrentMidi = -1; // top of stack (-1 = none) → pitch-track
+    float               noteGateGain   = 1.0f;// ramped amplitude gate (anti-click)
+    int                 lastNoteMode   = 0;   // detects a Free↔Note switch → reset state
+    // Scans note on/off into the held-note stack → updates noteCurrentMidi (drives
+    // pitch-track in renderVoice). Run before the render. No-op in Free mode.
+    void scanNoteMode(const juce::MidiBuffer& midi);
+    // Advances the anti-click amplitude ramp toward the held/silent target and applies
+    // it to the final mix. Run after the render. No-op in Free mode (gate stays open).
+    void applyNoteModeGate(juce::AudioBuffer<float>& buffer, int numSamples);
 
     // Shared MIDI-clock slave (standalone). process() scans the MIDI buffer each block;
     // when enabled + playing, processBlock slaves the beat/tempo to it.

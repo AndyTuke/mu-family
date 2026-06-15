@@ -62,6 +62,11 @@ struct VoiceConfig
     bool  filterSeries    = true;   // true = series (F1→F2), false = parallel (mix)
 
     float levelDb         = -6.0f; // slot output level (feeds the mixer channel)
+
+    // Note-mode pitch-track transpose (semitones, 0 in Free mode). Added to both
+    // oscillators' final MIDI pitch so a held MIDI note shifts the whole drone's
+    // tonal centre while scale intervals + per-osc oct/semi/fine still apply.
+    float pitchOffsetSemis = 0.0f;
 };
 
 // White + Pink noise generator. Pink uses Paul Kellet's economy filter

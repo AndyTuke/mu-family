@@ -38,6 +38,11 @@ inline constexpr std::array<Scale, 12> kScales = {{
 
 inline constexpr int kNumScales = (int) kScales.size();
 
+// Base octave the per-osc octave offset (-3..+3) sits on, so the playable range
+// lands in an audible drone register (octave 0, root C → MIDI 48 = C3). Shared by
+// the voice engine (free-mode pitch) and the processor (Note-mode pitch-tracking).
+inline constexpr int kBaseOctave = 4;
+
 inline int clampScaleIdx(int i) noexcept
 {
     return i < 0 ? 0 : (i >= kNumScales ? kNumScales - 1 : i);
