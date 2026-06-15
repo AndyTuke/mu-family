@@ -33,6 +33,7 @@ target_sources(mu-on
         Source/Sequencer/GrooveSequencer.cpp
         Source/UI/GrooveGrid.cpp
         Source/UI/EnginePanel.cpp
+        Source/UI/SettingsOverlay.cpp
 )
 
 target_include_directories(mu-on

@@ -48,6 +48,23 @@ PluginProcessor::PluginProcessor()
     // the strip + master mix, so the MixerOverlay + VU meters are fully wired.
     renderChannelCb = [](int, juce::AudioBuffer<float>& buf, int) { buf.clear(); };
 
+    // Persistent settings file (UI scale + MIDI-clock prefs) — mirrors mu-tant.
+    {
+        juce::PropertiesFile::Options opts;
+        opts.applicationName     = "muToni";
+        opts.filenameSuffix      = "xml";
+        opts.folderName          = "TDP";
+        opts.osxLibrarySubFolder = "Application Support";
+        auto settingsFile = opts.getDefaultFile();
+        settingsFile.getParentDirectory().createDirectory();
+        appSettings = std::make_unique<juce::PropertiesFile>(settingsFile, opts);
+    }
+    uiScale = juce::jlimit(kUiScaleMedium, kUiScaleLarge,
+                           (float) appSettings->getDoubleValue("uiScale", (double) kUiScaleMedium));
+    // Restore persisted MIDI-clock-sync prefs (standalone external clock).
+    midiClockSync.setEnabled (appSettings->getBoolValue("midiSyncEnabled",  false));
+    midiClockSync.setMessages(appSettings->getIntValue ("midiSyncMessages", 2));
+
     registerFxListeners();
     syncAllFxParams();   // JUCE doesn't fire parameterChanged on construction
 }
@@ -111,7 +128,7 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
     return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
 }
 
-void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
     const int numSamples = buffer.getNumSamples();
@@ -120,7 +137,17 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // channels with the output, so a bare clear would wipe it).
     captureSidechainAndClear(buffer);
 
-    const double bpm = internalBpm.load(std::memory_order_relaxed);
+    // External MIDI clock (standalone): scan the buffer + advance the clock estimate.
+    // When enabled + playing it drives the tempo + play-state (transport bar reflects it).
+    midiClockSync.process(midiMessages, numSamples, currentSampleRate);
+    const bool clockSlaved = wrapperType == wrapperType_Standalone
+                             && midiClockSync.isEnabled() && midiClockSync.isPlaying();
+    double bpm = internalBpm.load(std::memory_order_relaxed);
+    if (clockSlaved)
+    {
+        bpm = midiClockSync.getBpm();
+        playing.store(true, std::memory_order_relaxed);   // UI play button reflects the clock
+    }
 
     // Render (silent) → mixer through the shared path (engine→insert→mixer). With
     // no engine the render hook clears each channel; the mixer owns the strip +
@@ -167,6 +194,24 @@ juce::File PluginProcessor::getContentDir() const
 
 juce::File PluginProcessor::getPresetsDir()       const { return getContentDir().getChildFile("Presets"); }
 juce::File PluginProcessor::getPerSlotPresetDir() const { return getContentDir().getChildFile("Layers"); }
+
+void PluginProcessor::setUiScale(float scale)
+{
+    ProcessorBase::setUiScale(scale);   // clamps + notifies the editor
+    if (appSettings != nullptr) { appSettings->setValue("uiScale", (double) getUiScale()); appSettings->saveIfNeeded(); }
+}
+
+void PluginProcessor::setMidiSyncEnabled(bool on)
+{
+    midiClockSync.setEnabled(on);
+    if (appSettings != nullptr) { appSettings->setValue("midiSyncEnabled", on); appSettings->saveIfNeeded(); }
+}
+
+void PluginProcessor::setMidiSyncMessages(int mode)
+{
+    midiClockSync.setMessages(mode);
+    if (appSettings != nullptr) { appSettings->setValue("midiSyncMessages", mode); appSettings->saveIfNeeded(); }
+}
 
 } // namespace mu_toni
 

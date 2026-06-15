@@ -35,7 +35,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       proc(p),
       sidebar(p, "Track"),
       groovePanel(p),
-      mixerOverlay(p, p.mixerEngine)
+      mixerOverlay(p, p.mixerEngine),
+      settingsOverlay(p)
 {
     getAboutPanel().setProductInfo(
         juce::String(juce::CharPointer_UTF8("\xce\xbc-On")),
@@ -69,6 +70,11 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     setMainArea(&sidebar, &groovePanel);
     setMixerOverlay(&mixerOverlay);
+
+    // Settings page (master vol + UI size + BPM + standalone MIDI Clock) behind the
+    // gear button — registering it reveals the gear (hidden when null).
+    settingsOverlay.onClose = [this] { showSettings(false); };
+    setSettingsOverlay(&settingsOverlay);
 
     mixerOverlay.onStatusUpdate = [this](const juce::String& name,
                                          const juce::String& val,

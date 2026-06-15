@@ -5,6 +5,7 @@
 #include "UI/MixerOverlay.h"       // mu-core shared mixer
 #include "Plugin/PluginProcessor.h"
 #include "UI/EnginePanel.h"
+#include "UI/SettingsOverlay.h"
 
 namespace mu_toni
 {
@@ -25,6 +26,7 @@ private:
     ChannelSidebar   sidebar;
     EnginePanel      enginePanel;
     MixerOverlay     mixerOverlay;
+    SettingsOverlay  settingsOverlay;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };

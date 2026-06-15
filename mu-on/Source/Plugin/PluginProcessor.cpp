@@ -130,6 +130,23 @@ PluginProcessor::PluginProcessor()
     grooveVoices.setSlots(&voiceSlots);
     grooveVoices.cacheParams(apvts);
 
+    // Persistent settings file (UI scale + MIDI-clock prefs) — mirrors mu-tant.
+    {
+        juce::PropertiesFile::Options opts;
+        opts.applicationName     = "muOn";
+        opts.filenameSuffix      = "xml";
+        opts.folderName          = "TDP";
+        opts.osxLibrarySubFolder = "Application Support";
+        auto settingsFile = opts.getDefaultFile();
+        settingsFile.getParentDirectory().createDirectory();
+        appSettings = std::make_unique<juce::PropertiesFile>(settingsFile, opts);
+    }
+    uiScale = juce::jlimit(kUiScaleMedium, kUiScaleLarge,
+                           (float) appSettings->getDoubleValue("uiScale", (double) kUiScaleMedium));
+    // Restore persisted MIDI-clock-sync prefs (standalone external clock).
+    midiClockSync.setEnabled (appSettings->getBoolValue("midiSyncEnabled",  false));
+    midiClockSync.setMessages(appSettings->getIntValue ("midiSyncMessages", 2));
+
     registerFxListeners();
     syncAllFxParams();   // JUCE doesn't fire parameterChanged on construction
 }
@@ -193,7 +210,7 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
     return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
 }
 
-void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
     const int numSamples = buffer.getNumSamples();
@@ -202,14 +219,28 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // channels with the output, so a bare clear would wipe it).
     captureSidechainAndClear(buffer);
 
-    const double bpm       = internalBpm.load(std::memory_order_relaxed);
-    const double beatStart = internalBeatPos.load(std::memory_order_relaxed);
+    // External MIDI clock (standalone): scan the buffer + advance the clock estimate. When
+    // the Source is "MIDI In" the external clock is the sole transport authority — it drives
+    // tempo, beat AND play/stop (MIDI Start/Stop), overriding the internal play button. The
+    // clock beat is monotonic between Starts, so it feeds the sequencer like the internal one.
+    const double midiClockBeat = midiClockSync.process(midiMessages, numSamples, currentSampleRate);
+    const bool   clockEnabled  = wrapperType == wrapperType_Standalone && midiClockSync.isEnabled();
+
+    double bpm       = internalBpm.load(std::memory_order_relaxed);
+    double beatStart = internalBeatPos.load(std::memory_order_relaxed);
+    bool   isPlaying = playing.load(std::memory_order_relaxed);
+    if (clockEnabled)
+    {
+        isPlaying = midiClockSync.isPlaying();
+        if (midiClockSync.getBpm() > 0.0) bpm = midiClockSync.getBpm();
+        beatStart = midiClockBeat;
+        playing.store(isPlaying, std::memory_order_relaxed);   // UI play button mirrors the external transport
+    }
 
     // Refresh engine params from the APVTS, then clock the 909 sequencer for this block
     // (before the render so a step's engine is armed for this same block). Each fired lane
     // triggers its engine and bumps a counter the editor polls to pulse the sidebar.
     grooveVoices.applyParams(beatStart, bpm);
-    const bool isPlaying = playing.load(std::memory_order_relaxed);
     // Stop edge: silence the voices so a sustaining bass (no note-off yet) doesn't drone on.
     if (wasPlaying && ! isPlaying) grooveVoices.reset();
     wasPlaying = isPlaying;
@@ -232,12 +263,17 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     processCoreBlock(buffer, nullptr, kNumChannels, numSamples, bpm,
                      nullptr, nullptr, nullptr, &renderChannelCb);
 
-    // Advance the free-running transport while playing (the sequencer will read this).
-    if (playing.load(std::memory_order_relaxed))
+    // Advance the transport beat. When slaved to external MIDI clock the beat comes from
+    // the clock each block, so mirror it into internalBeatPos (no separate advance) — the
+    // internal transport then resumes seamlessly if the clock is later disabled.
+    if (clockEnabled)
+    {
+        internalBeatPos.store(beatStart, std::memory_order_relaxed);
+    }
+    else if (isPlaying)
     {
         const double beatsPerSample = (bpm / 60.0) / currentSampleRate;
-        internalBeatPos.store(internalBeatPos.load(std::memory_order_relaxed)
-                              + beatsPerSample * (double) numSamples,
+        internalBeatPos.store(beatStart + beatsPerSample * (double) numSamples,
                               std::memory_order_relaxed);
     }
 }
@@ -349,6 +385,24 @@ juce::File PluginProcessor::getContentDir() const
 
 juce::File PluginProcessor::getPresetsDir()       const { return getContentDir().getChildFile("Presets"); }
 juce::File PluginProcessor::getPerSlotPresetDir() const { return getContentDir().getChildFile("Tracks"); }
+
+void PluginProcessor::setUiScale(float scale)
+{
+    ProcessorBase::setUiScale(scale);   // clamps + notifies the editor
+    if (appSettings != nullptr) { appSettings->setValue("uiScale", (double) getUiScale()); appSettings->saveIfNeeded(); }
+}
+
+void PluginProcessor::setMidiSyncEnabled(bool on)
+{
+    midiClockSync.setEnabled(on);
+    if (appSettings != nullptr) { appSettings->setValue("midiSyncEnabled", on); appSettings->saveIfNeeded(); }
+}
+
+void PluginProcessor::setMidiSyncMessages(int mode)
+{
+    midiClockSync.setMessages(mode);
+    if (appSettings != nullptr) { appSettings->setValue("midiSyncMessages", mode); appSettings->saveIfNeeded(); }
+}
 
 } // namespace mu_on
 

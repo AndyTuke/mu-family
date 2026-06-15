@@ -27,6 +27,7 @@ target_sources(mu-toni
     PRIVATE
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginEditor.cpp
+        Source/UI/SettingsOverlay.cpp
 )
 
 target_include_directories(mu-toni

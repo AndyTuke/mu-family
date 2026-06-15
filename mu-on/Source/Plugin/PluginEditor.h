@@ -5,6 +5,7 @@
 #include "UI/MixerOverlay.h"       // mu-core shared mixer
 #include "Plugin/PluginProcessor.h"
 #include "UI/GroovePanel.h"
+#include "UI/SettingsOverlay.h"
 
 #include <array>
 
@@ -25,6 +26,7 @@ private:
     ChannelSidebar   sidebar;
     GroovePanel      groovePanel;
     MixerOverlay     mixerOverlay;
+    SettingsOverlay  settingsOverlay;
 
     // Last-seen per-lane trigger counts — diffed each animation tick to pulse the sidebar.
     std::array<int, kNumChannels> lastTriggers { };

@@ -37,7 +37,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       proc(p),
       sidebar(p, "Layer"),
       enginePanel(p),
-      mixerOverlay(p, p.mixerEngine)
+      mixerOverlay(p, p.mixerEngine),
+      settingsOverlay(p)
 {
     // Product chrome on the shared overlays.
     getAboutPanel().setProductInfo(
@@ -64,6 +65,11 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // Main area (sidebar + blank engine panel) + shared mixer overlay.
     setMainArea(&sidebar, &enginePanel);
     setMixerOverlay(&mixerOverlay);
+
+    // Settings page (master vol + UI size + BPM + standalone MIDI Clock) behind the
+    // gear button — registering it reveals the gear (hidden when null).
+    settingsOverlay.onClose = [this] { showSettings(false); };
+    setSettingsOverlay(&settingsOverlay);
 
     // Forward mixer status updates to the shared StatusBar.
     mixerOverlay.onStatusUpdate = [this](const juce::String& name,
