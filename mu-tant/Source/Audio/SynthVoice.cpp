@@ -4,9 +4,16 @@
 namespace mu_tant
 {
 
-// FM is phase-modulation: osc B's output shifts osc A's read phase.
-// 0.5 cycles at full FM depth gives a strong but stable index.
-static constexpr float kFmScale = 0.5f;
+// X-Mod index scaling (mu-tant-xmod-design.md):
+//   PM: index 1.0 → up to 2 cycles (~4π rad) of phase displacement — "DX-style" depth.
+//   FM/TZFM: index 1.0 → up to an 8× frequency-modulation ratio.
+//   Feedback: a conservative fixed phase depth (feedback FM turns chaotic fast).
+static constexpr float kPmScale = 2.0f;
+static constexpr float kFmRatio = 8.0f;
+static constexpr float kFbScale = 0.3f;
+// One-pole smoothing time for the continuous X-Mod controls (index / depth / SSB shift),
+// so sweeping a knob — or a per-block mode change — ramps instead of zippering/clicking.
+static constexpr float kXModSmoothMs = 5.0f;
 
 void VoiceEngine::prepare(double sampleRate, int blockSize)
 {
@@ -17,6 +24,10 @@ void VoiceEngine::prepare(double sampleRate, int blockSize)
     filter1.reset();
     filter2.prepare(sr, blockSize, 1);
     filter2.reset();
+    hilbert.reset();
+    lastA    = 0.0f;
+    ssbPhase = 0.0;
+    indexSm  = depthSm = ssbHzSm = 0.0f;
     mono .setSize(1, blockSize, false, false, true);  mono .clear();
     mono2.setSize(1, blockSize, false, false, true);  mono2.clear();
 }
@@ -70,29 +81,66 @@ void VoiceEngine::process(juce::AudioBuffer<float>& out, int numSamples)
 
     float* m = mono.getWritePointer(0);
     const auto noiseType = static_cast<NoiseGen::Type>(cfg.noiseType);
-    // All three cross-mod types are active simultaneously at their individual depths.
-    const float fmAmt   = juce::jlimit(0.0f, 1.0f, cfg.xmodFm);
-    const float amAmt   = juce::jlimit(0.0f, 1.0f, cfg.xmodAm);
-    const float ringAmt = juce::jlimit(0.0f, 1.0f, cfg.xmodRing);
+
+    // 2-lane X-Mod (mu-tant-xmod-design.md). Lane A (phase/index) and Lane B
+    // (amplitude/multiply) run in parallel; the mode within each lane is mutually
+    // exclusive. Continuous controls smooth per-sample toward their target.
+    const int   phaseMode = cfg.xmodPhaseMode;        // 0 FM, 1 PM, 2 TZFM
+    const bool  fdbk      = cfg.xmodFeedback;
+    const int   ampMode   = cfg.xmodAmpMode;          // 0 Mult, 1 SSB
+    const float idxTgt    = juce::jlimit(0.0f, 1.0f, cfg.xmodIndex);
+    const float depTgt    = juce::jlimit(-1.0f, 1.0f, cfg.xmodDepth);
+    const float ssbTgt    = cfg.xmodSsbHz;
+    const float smCoef    = 1.0f - std::exp(-1.0f / (kXModSmoothMs * 0.001f * (float) sr));
 
     for (int i = 0; i < ns; ++i)
     {
-        // Osc2 renders first; osc1 reads osc2's current output for all cross-mod types.
-        const float b = osc2.render();
+        indexSm += (idxTgt - indexSm) * smCoef;
+        depthSm += (depTgt - depthSm) * smCoef;
+        ssbHzSm += (ssbTgt - ssbHzSm) * smCoef;
 
-        // FM (phase modulation): osc2 displaces osc1's read phase.
-        const float phaseMod = fmAmt * b * kFmScale;
-        float a = osc1.render(phaseMod);
+        // Modulator (osc2) renders first; feedback FM phase-mods it with osc1's prev output.
+        const float b = osc2.render(fdbk ? kFbScale * lastA : 0.0f);
 
-        // AM: osc2 modulates osc1's amplitude (standard AM: carrier × (1 + idx × mod)).
-        if (amAmt > 0.0f)   a *= (1.0f + amAmt * b);
-
-        // Ring: crossfade from dry osc1 to osc1 × osc2.
-        if (ringAmt > 0.0f) a = a * (1.0f - ringAmt) + (a * b) * ringAmt;
+        // Lane A — carrier (osc1) phase/index bus.
+        float a;
+        if (phaseMode == 1)                          // PM: displace osc1's read phase
+        {
+            a = osc1.render(indexSm * b * kPmScale);
+        }
+        else                                         // FM / TZFM: scale osc1's increment
+        {
+            double incMul = 1.0 + (double) (indexSm * kFmRatio) * b;
+            if (phaseMode == 0) incMul = juce::jmax(0.0, incMul);   // FM clamps ≥ 0 (no through-zero)
+            a = osc1.render(0.0f, incMul);
+        }
 
         // Hard sync: osc1 wrap resets osc2 phase (takes effect next sample).
         if (cfg.sync && osc1.justWrapped())
             osc2.resetPhase();
+
+        lastA = a;                                   // feedback tap = raw carrier output
+
+        // Lane B — amplitude/multiply bus.
+        if (ampMode == 1)
+        {
+            // SSB / frequency shift: shift every partial of the carrier by ssbHz. Take the
+            // analytic signal (Hilbert) and multiply by a complex exponential, keep the real
+            // part → one sideband. Sign of the shift sets up/down.
+            const auto  q   = hilbert.process(a);
+            const float ang = (float) (ssbPhase * juce::MathConstants<double>::twoPi);
+            a = q.re * std::cos(ang) - q.im * std::sin(ang);
+            ssbPhase += (double) ssbHzSm / sr;
+            ssbPhase -= std::floor(ssbPhase);
+        }
+        else if (depthSm != 0.0f)
+        {
+            // Mult: AM↔RM morph. k=|depth| sets modulation amount + carrier suppression
+            // (offset = 1−k → carrier fades AM→RM as k→1); sign flips modulator phase.
+            const float k   = std::abs(depthSm);
+            const float sgn = depthSm < 0.0f ? -1.0f : 1.0f;
+            a *= (1.0f - k) + sgn * k * b;
+        }
 
         const float n = noise.render(noiseType);
         m[i] = (a * osc1Gain + b * osc2Gain + n * noiseGain) * gain;

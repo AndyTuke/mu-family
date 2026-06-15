@@ -21,16 +21,20 @@ public:
     void setPosition(float p01) noexcept { position = p01 < 0 ? 0.0f : (p01 > 1 ? 1.0f : p01); }
     void resetPhase() noexcept { phase = 0.0; }
 
-    // Render one sample and advance. `phaseMod` is an added phase offset in cycles
-    // (phase-modulation "FM"). Sets the wrap flag readable via justWrapped().
-    // `inc` is passed to the bank so it picks the anti-aliased mip level for this pitch.
-    float render(float phaseMod = 0.0f) noexcept
+    // Render one sample and advance.
+    //   phaseOffset : added phase offset in cycles (phase-modulation / PM).
+    //   incMul      : per-sample multiplier on the base increment (frequency modulation /
+    //                 FM, TZFM). 1.0 = unmodulated. May be negative for through-zero FM,
+    //                 where the phase runs backwards. The mip level still keys off the base
+    //                 |inc| so anti-aliasing stays stable under modulation.
+    // Sets the wrap flag (forward 1.0 crossing only) readable via justWrapped() for sync.
+    float render(float phaseOffset = 0.0f, double incMul = 1.0) noexcept
     {
         if (bank == nullptr) return 0.0f;
         const int nf = bank->numFrames(tableIndex);
         if (nf <= 0) return 0.0f;
 
-        const float ph = (float) phase + phaseMod;
+        const float ph = (float) phase + phaseOffset;
 
         // cross-fade between the two morph frames straddling `position`.
         const float framePos = position * (float) (nf - 1);
@@ -40,9 +44,9 @@ public:
         const float s1       = bank->frameSample(tableIndex, inc, f0 + 1, ph);
         const float out      = s0 + fFrac * (s1 - s0);
 
-        phase += inc;
-        wrapped = (phase >= 1.0);
-        if (wrapped) phase -= std::floor(phase);
+        phase += inc * incMul;
+        wrapped = (phase >= 1.0);                 // forward wrap → drives hard-sync
+        phase  -= std::floor(phase);              // wrap into [0,1) either direction
 
         return out;
     }

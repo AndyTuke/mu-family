@@ -37,10 +37,10 @@ inline constexpr ModDest kModDestTable[] = {
     { "osc2.semi",    "Osc2 Semi",     "Osc 2" },
     { "osc2.fine",    "Osc2 Fine",     "Osc 2" },
     { "osc2.pos",     "Osc2 Position", "Osc 2" },
-    // ── Cross-mod ─────────────────────────────────────────────────────────────
-    { "xmod.fm",      "FM Depth",      "X-Mod" },
-    { "xmod.am",      "AM Depth",      "X-Mod" },
-    { "xmod.ring",    "Ring Depth",    "X-Mod" },
+    // ── Cross-mod (2-lane bus model — mu-tant-xmod-design.md) ─────────────────
+    { "xmod.index",   "X-Mod Index",   "X-Mod" },
+    { "xmod.depth",   "X-Mod Depth",   "X-Mod" },
+    { "xmod.ssb",     "X-Mod SSB",     "X-Mod" },
     // ── Levels ────────────────────────────────────────────────────────────────
     { "osc1.level",   "Osc1 Level",    "Levels" },
     { "osc2.level",   "Osc2 Level",    "Levels" },

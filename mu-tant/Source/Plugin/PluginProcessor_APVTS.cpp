@@ -57,11 +57,19 @@ namespace
         layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o1_wt"), 1}, label("Osc1 Wavetable"), 0, maxWt, 0));
         layout.add(std::make_unique<AudioParameterInt>(ParameterID{id("o2_wt"), 1}, label("Osc2 Wavetable"), 0, maxWt, 0));
 
-        // Cross-mod depths — all three active simultaneously; 0 = that type off.
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("xmod_fm"),   1}, label("FM Depth"),   f(0.0f, 100.0f, 1.0f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("xmod_am"),   1}, label("AM Depth"),   f(0.0f, 100.0f, 1.0f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("xmod_ring"), 1}, label("Ring Depth"), f(0.0f, 100.0f, 1.0f), 0.0f));
-        layout.add(std::make_unique<AudioParameterBool> (ParameterID{id("sync"),      1}, label("Osc Sync"), false));
+        // Cross-mod — 2-lane bus model (mu-tant-xmod-design.md).
+        //  Lane A (phase/index): one index knob + a mode switch (FM/PM/TZFM) + Sync + Feedback.
+        //  Lane B (amplitude):   one bipolar depth knob (AM↔RM morph) + a mode switch (Mult/SSB)
+        //                        + a separate SSB shift amount the knob drives in SSB mode.
+        layout.add(std::make_unique<AudioParameterChoice>(ParameterID{id("xmod_phaseMode"), 1}, label("X-Mod Phase Mode"), StringArray{ "FM", "PM", "TZFM" }, 1));
+        layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("xmod_index"),     1}, label("X-Mod Index"),      f(0.0f, 100.0f, 1.0f), 0.0f));
+        layout.add(std::make_unique<AudioParameterBool>  (ParameterID{id("sync"),           1}, label("Osc Sync"), false));
+        layout.add(std::make_unique<AudioParameterBool>  (ParameterID{id("xmod_fdbk"),      1}, label("X-Mod Feedback"), false));
+        layout.add(std::make_unique<AudioParameterChoice>(ParameterID{id("xmod_ampMode"),   1}, label("X-Mod Amp Mode"), StringArray{ "Mult", "SSB" }, 0));
+        layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("xmod_depth"),     1}, label("X-Mod Depth"),     f(-100.0f, 100.0f, 1.0f), 0.0f));
+        layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("xmod_ssb"),       1}, label("X-Mod SSB Shift"), f(-2000.0f, 2000.0f, 1.0f), 0.0f,
+                    AudioParameterFloatAttributes().withStringFromValueFunction(
+                        [](float v, int) -> juce::String { return juce::String((int) std::round(v)) + " Hz"; })));
 
         // Per-source levels (replace the old osc-balance "mix").
         layout.add(std::make_unique<AudioParameterFloat> (ParameterID{id("o1_lvl"),   1}, label("Osc1 Level"),  f(-60.0f, 6.0f, 0.1f), 0.0f));

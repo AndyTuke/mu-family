@@ -5,6 +5,7 @@
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/DropdownSelect.h"
+#include "UI/Components/SegmentControl.h"
 #include "UI/ChannelHeaderBar.h"
 #include "UI/ModulatorPanel.h"
 #include "UI/Voice/InsertSubsection.h"   // shared mu-core insert panel
@@ -121,15 +122,23 @@ private:
     DropdownSelect osc1WaveDropdown;
     DropdownSelect osc2WaveDropdown;
 
-    // ── Cross-mod (FM / AM / Ring — all simultaneously at individual depths) ────
-    KnobWithLabel xmodFmKnob   { "FM",   MuLookAndFeel::knobEuclidean };
-    KnobWithLabel xmodAmKnob   { "AM",   MuLookAndFeel::knobEuclidean };
-    KnobWithLabel xmodRingKnob { "Ring", MuLookAndFeel::knobEuclidean };
+    // ── Cross-mod — 2-lane bus model (mu-tant-xmod-design.md) ───────────────────
+    // Lane A: Index knob + Phase mode (FM/PM/TZFM) + Sync + Feedback toggles.
+    // Lane B: Depth knob (drives Depth in Mult mode, SSB shift in SSB mode — the
+    //         attachment + range swap with the mode) + Amp mode (Mult/SSB).
+    KnobWithLabel    xmodIndexKnob { "Index", MuLookAndFeel::knobEuclidean };
+    KnobWithLabel    xmodDepthKnob { "Depth", MuLookAndFeel::knobEuclidean };
+    SegmentControl   phaseModeCtrl { { "FM", "PM", "TZFM" } };
+    SegmentControl   ampModeCtrl   { { "Mult", "SSB" } };
     juce::TextButton syncButton { "Sync" };
-    std::unique_ptr<APVTS::SliderAttachment> xmodFmAttachment;
-    std::unique_ptr<APVTS::SliderAttachment> xmodAmAttachment;
-    std::unique_ptr<APVTS::SliderAttachment> xmodRingAttachment;
+    juce::TextButton fdbkButton { "Fdbk" };
+    std::unique_ptr<APVTS::SliderAttachment> xmodIndexAttachment;
+    std::unique_ptr<APVTS::SliderAttachment> xmodDepthAttachment;   // rebound to depth/ssb on mode change
     std::unique_ptr<APVTS::ButtonAttachment> syncAttachment;
+    std::unique_ptr<APVTS::ButtonAttachment> fdbkAttachment;
+    // Rebinds the Depth knob to xmod_depth (Mult) or xmod_ssb (SSB) for the active voice.
+    void bindAmpDepthKnob(bool ssbMode);
+    int  currentAmpMode = 0;   // cached so a mode change can rebind the depth knob
 
     // ── Mixer levels (osc1 / osc2 / noise — Size-2 knobs, horizontal MIXER row
     //    under the NOISE panel) + noise type (in its own NOISE panel) ─────────

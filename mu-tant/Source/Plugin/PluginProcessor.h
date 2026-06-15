@@ -318,7 +318,7 @@ private:
     {
         std::atomic<float> *o1Oct, *o1Semi, *o1Fine, *o1Pos, *o1Wt;
         std::atomic<float> *o2Oct, *o2Semi, *o2Fine, *o2Pos, *o2Wt;
-        std::atomic<float> *xmodFm, *xmodAm, *xmodRing, *sync;
+        std::atomic<float> *xmodPhaseMode, *xmodIndex, *sync, *xmodFdbk, *xmodAmpMode, *xmodDepth, *xmodSsb;
         std::atomic<float> *o1Lvl, *o2Lvl, *noiseLvl, *noiseType;
         std::atomic<float> *fltType,  *fltCut,  *fltRes,  *fltEnvDepth,  *fltDrv,  *fltLoCut;
         std::atomic<float> *flt2Type, *flt2Cut, *flt2Res, *flt2EnvDepth, *flt2Drv, *flt2LoCut;

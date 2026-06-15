@@ -3,6 +3,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "WavetableOscillator.h"
 #include "WavetableBank.h"
+#include "HilbertTransform.h"
 #include "Audio/MultiModeFilter.h"   // mu-core (reused unchanged)
 
 // mu-tant per-layer voice (design-voice.md "Per-slot voice chain").
@@ -32,11 +33,16 @@ struct VoiceConfig
     // Selected wavetable (index into the shared WavetableBank).
     int   osc1Wavetable = 0,  osc2Wavetable = 0;
 
-    // Cross-modulation depths — all three active simultaneously (0..1 each).
-    float xmodFm   = 0.0f;  // FM: osc2 phase-modulates osc1
-    float xmodAm   = 0.0f;  // AM: osc2 amplitude-modulates osc1
-    float xmodRing = 0.0f;  // Ring mod: crossfade dry→multiplied
-    bool  sync     = false; // hard sync: osc1 wrap resets osc2 phase
+    // Cross-modulation — 2-lane bus model (mu-tant-xmod-design.md).
+    // Lane A — phase / index bus (one index, mutually-exclusive mode, two toggles).
+    int   xmodPhaseMode = 1;     // 0=FM (true freq-mod), 1=PM (default, drone-safe), 2=TZFM
+    float xmodIndex     = 0.0f;  // 0..1 modulation index (osc2 → osc1)
+    bool  sync          = false; // hard sync: osc1 wrap resets osc2 phase
+    bool  xmodFeedback  = false; // mutual feedback FM: osc1's prev output phase-mods osc2
+    // Lane B — amplitude / multiply bus (one bipolar depth, mode switch).
+    int   xmodAmpMode   = 0;     // 0=Mult (AM↔RM morph), 1=SSB (frequency shift)
+    float xmodDepth     = 0.0f;  // -1..1 (Mult): centre=off; |d| morphs AM→RM; sign=phase
+    float xmodSsbHz     = 0.0f;  // SSB shift (Hz, bipolar; sign = shift up/down)
 
     // Per-source levels (replace the old single osc-balance "mix"). dB.
     float osc1LevelDb = 0.0f, osc2LevelDb = -6.0f;
@@ -109,10 +115,16 @@ private:
     WavetableOscillator      osc1, osc2;
     NoiseGen                 noise;
     MultiModeFilter          filter1, filter2;
+    HilbertTransform         hilbert;          // quadrature split for SSB frequency-shift
     VoiceConfig              cfg;
     juce::AudioBuffer<float> mono;    // primary 1-channel work buffer
     juce::AudioBuffer<float> mono2;   // second buffer for parallel filter path
     double                   sr   = 44100.0;
+    float                    lastA    = 0.0f;  // osc1 prev output (feedback FM z^-1)
+    double                   ssbPhase = 0.0;    // SSB shift-oscillator phase (cycles)
+    float                    indexSm  = 0.0f;   // smoothed Lane A index (anti-zipper/click)
+    float                    depthSm  = 0.0f;   // smoothed Lane B depth
+    float                    ssbHzSm  = 0.0f;   // smoothed SSB shift (Hz)
     float                    gain = 1.0f;
     float                    osc1Gain = 1.0f;
     float                    osc2Gain = 0.5f;

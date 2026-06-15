@@ -122,6 +122,12 @@ Loaded into RAM at startup as `std::vector<float>` (≈ 2 MB per table). The ful
 
 ## Two-oscillator cross-modulation
 
+> **Superseded by the 2-lane X-Mod (build 899) — see [mu-tant-xmod-design.md](mu-tant-xmod-design.md).**
+> The current engine uses Lane A (phase/index: FM/PM/TZFM + Sync + Feedback) and Lane B
+> (amplitude: AM↔RM morph + SSB). APVTS: `xmod_phaseMode`, `xmod_index`, `sync`, `xmod_fdbk`,
+> `xmod_ampMode`, `xmod_depth`, `xmod_ssb`. The table below is the original single-mode sketch,
+> kept for historical context only.
+
 | Param | Range | Notes |
 |---|---|---|
 | `osc.xmod` | 0..1 | Cross-mod amount, modulatable for evolving timbre |

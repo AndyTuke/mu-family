@@ -61,7 +61,8 @@ public:
         {
             static const char* base[] = {
                 "o1_oct","o1_semi","o1_fine","o1_pos","o2_oct","o2_semi","o2_fine","o2_pos",
-                "xmod_fm","xmod_am","xmod_ring","o1_lvl","o2_lvl","noise_lvl","noise_type",
+                "xmod_phaseMode","xmod_index","sync","xmod_fdbk","xmod_ampMode","xmod_depth","xmod_ssb",
+                "o1_lvl","o2_lvl","noise_lvl","noise_type",
                 "flt_type","flt_cut","flt_res","level","gate_gap","gate_bypass",
                 "drvChar","insP1","insP2","insP3","insP4",
             };

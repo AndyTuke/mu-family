@@ -92,20 +92,26 @@ public:
 
         beginTest("X-Mod FM / AM / Ring all stay finite and non-silent");
         {
-            // Test each modulation type at full depth - all should be finite and audible.
-            struct Case { float fm; float am; float ring; const char* name; };
+            // Exercise both lanes across every mode — all should be finite and audible.
+            // (phaseMode 0=FM 1=PM 2=TZFM; ampMode 0=Mult 1=SSB.)
+            struct Case { int phaseMode; float index; int ampMode; float depth; float ssb; const char* name; };
             const Case cases[] = {
-                { 0.0f,  0.0f,  0.0f,  "Off (no xmod)" },
-                { 1.0f,  0.0f,  0.0f,  "FM only" },
-                { 0.0f,  1.0f,  0.0f,  "AM only" },
-                { 0.0f,  0.0f,  1.0f,  "Ring only" },
-                { 1.0f,  1.0f,  1.0f,  "FM+AM+Ring combined" },
+                { 1, 0.0f, 0, 0.0f,    0.0f, "Off (no xmod)" },
+                { 1, 1.0f, 0, 0.0f,    0.0f, "PM index" },
+                { 0, 1.0f, 0, 0.0f,    0.0f, "FM index" },
+                { 2, 1.0f, 0, 0.0f,    0.0f, "TZFM index" },
+                { 1, 0.0f, 0, 0.5f,    0.0f, "Mult AM-ward" },
+                { 1, 0.0f, 0, 1.0f,    0.0f, "Mult RM (ring)" },
+                { 1, 0.0f, 0,-1.0f,    0.0f, "Mult inverted RM" },
+                { 1, 0.0f, 1, 0.0f,  500.0f, "SSB shift +500 Hz" },
+                { 1, 0.8f, 0, 0.7f,    0.0f, "PM index + Mult depth" },
             };
             for (const auto& tc : cases)
             {
                 VoiceEngine v; v.setBank(&bank); v.prepare(sr, N);
                 VoiceConfig c;
-                c.xmodFm = tc.fm; c.xmodAm = tc.am; c.xmodRing = tc.ring;
+                c.xmodPhaseMode = tc.phaseMode; c.xmodIndex = tc.index;
+                c.xmodAmpMode   = tc.ampMode;   c.xmodDepth = tc.depth; c.xmodSsbHz = tc.ssb;
                 c.osc1LevelDb = 0.0f; c.osc2LevelDb = 0.0f; c.levelDb = 0.0f;
                 v.setConfig(c);
                 juce::AudioBuffer<float> buf(2, N); buf.clear();
@@ -119,7 +125,7 @@ public:
         {
             VoiceEngine v; v.setBank(&bank); v.prepare(sr, N);
             VoiceConfig c;
-            c.xmodFm = 0.63f; c.sync = true;
+            c.xmodPhaseMode = 0; c.xmodIndex = 0.63f; c.sync = true;
             c.osc1LevelDb = 0.0f; c.osc2LevelDb = 0.0f; c.levelDb = 0.0f;
             v.setConfig(c);
             juce::AudioBuffer<float> buf(2, N); buf.clear();
@@ -128,38 +134,36 @@ public:
             expect(peakOf(buf, N) > 0.0f, "sync + FM: non-silent");
         }
 
-        beginTest("AM output changes with depth amount");
+        beginTest("Mult-lane output changes with depth amount");
         {
+            // Render enough blocks for the smoothed depth to settle before measuring.
             auto renderPeak = [&](float depth)
             {
                 VoiceEngine v; v.setBank(&bank); v.prepare(sr, N);
                 VoiceConfig c;
-                c.xmodAm = depth;
+                c.xmodDepth = depth;
                 c.osc1LevelDb = 0.0f; c.osc2LevelDb = 0.0f; c.levelDb = 0.0f;
                 v.setConfig(c);
-                juce::AudioBuffer<float> buf(2, N); buf.clear();
-                v.process(buf, N);
-                expect(allFinite(buf, N), "AM depth=" + juce::String(depth) + " finite");
-                return peakOf(buf, N);
+                juce::AudioBuffer<float> buf(2, N);
+                float pk = 0.0f;
+                for (int blk = 0; blk < 8; ++blk) { buf.clear(); v.process(buf, N); pk = peakOf(buf, N); }
+                expect(allFinite(buf, N), "depth=" + juce::String(depth) + " finite");
+                return pk;
             };
-            expect(renderPeak(0.0f) != renderPeak(1.0f), "AM output changes with depth");
+            expect(renderPeak(0.0f) != renderPeak(1.0f), "Mult output changes with depth");
         }
 
-        beginTest("Ring Mod output changes with depth amount");
+        beginTest("SSB frequency-shift renders finite, non-silent output");
         {
-            auto renderPeak = [&](float depth)
-            {
-                VoiceEngine v; v.setBank(&bank); v.prepare(sr, N);
-                VoiceConfig c;
-                c.xmodRing = depth;
-                c.osc1LevelDb = 0.0f; c.osc2LevelDb = 0.0f; c.levelDb = 0.0f;
-                v.setConfig(c);
-                juce::AudioBuffer<float> buf(2, N); buf.clear();
-                v.process(buf, N);
-                expect(allFinite(buf, N), "Ring depth=" + juce::String(depth) + " finite");
-                return peakOf(buf, N);
-            };
-            expect(renderPeak(0.0f) != renderPeak(1.0f), "Ring Mod output changes with depth");
+            VoiceEngine v; v.setBank(&bank); v.prepare(sr, N);
+            VoiceConfig c;
+            c.xmodAmpMode = 1; c.xmodSsbHz = 750.0f;
+            c.osc1LevelDb = 0.0f; c.osc2LevelDb = -60.0f; c.levelDb = 0.0f;
+            v.setConfig(c);
+            juce::AudioBuffer<float> buf(2, N);
+            for (int blk = 0; blk < 8; ++blk) { buf.clear(); v.process(buf, N); }
+            expect(allFinite(buf, N),     "SSB: finite");
+            expect(peakOf(buf, N) > 0.0f, "SSB: non-silent");
         }
 
         beginTest("noise-only voice (oscs muted) is audible");

@@ -55,7 +55,7 @@ public:
             const char* requiredKeys[] = {
                 "osc1.octave", "osc1.semi", "osc1.fine", "osc1.pos",
                 "osc2.octave", "osc2.semi", "osc2.fine", "osc2.pos",
-                "xmod.fm", "xmod.am", "xmod.ring", "osc1.level", "osc2.level", "noise.level",
+                "xmod.index", "xmod.depth", "xmod.ssb", "osc1.level", "osc2.level", "noise.level",
                 "filter.cutoff", "filter.resonance",
                 "filter2.cutoff.prop", "filter2.resonance.prop", "level"
             };

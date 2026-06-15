@@ -185,7 +185,7 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     // ── Per-voice controls (added once, rebound per-voice) ──────────────────
     for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PosKnob, &o1PenvDepthKnob,
                      &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PosKnob, &o2PenvDepthKnob,
-                     &xmodFmKnob, &xmodAmKnob, &xmodRingKnob,
+                     &xmodIndexKnob, &xmodDepthKnob,
                      &osc1LevelKnob, &osc2LevelKnob, &noiseLevelKnob,
                      &fltDrvKnob, &fltCutKnob, &fltResKnob, &fltEnvDepthKnob, &fltLoCutKnob,
                      &flt2DrvKnob, &flt2CutKnob, &flt2ResKnob, &flt2EnvDepthKnob, &flt2LoCutKnob })
@@ -208,6 +208,25 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     syncButton.setClickingTogglesState(true);
     syncButton.setTooltip("Hard sync: osc1 wrap resets osc2 phase");
     addAndMakeVisible(syncButton);
+
+    fdbkButton.setClickingTogglesState(true);
+    fdbkButton.setTooltip("Feedback FM: osc1's output also modulates osc2");
+    addAndMakeVisible(fdbkButton);
+
+    // X-Mod mode switches — manually wired to the choice params (item index = choice
+    // index) in setVoice(); the amp-mode change also rebinds the Depth knob's target.
+    xmodDepthKnob.getSlider().setDoubleClickReturnValue(true, 0.0);
+    addAndMakeVisible(phaseModeCtrl);
+    addAndMakeVisible(ampModeCtrl);
+    phaseModeCtrl.onChange = [this](int idx) {
+        if (auto* p = proc.apvts.getParameter(PluginProcessor::voiceParamId(currentVoice, "xmod_phaseMode")))
+            p->setValueNotifyingHost(p->convertTo0to1((float) idx));
+    };
+    ampModeCtrl.onChange = [this](int idx) {
+        if (auto* p = proc.apvts.getParameter(PluginProcessor::voiceParamId(currentVoice, "xmod_ampMode")))
+            p->setValueNotifyingHost(p->convertTo0to1((float) idx));
+        bindAmpDepthKnob(idx == 1);   // SSB → bind Depth knob to the shift param
+    };
 
     setupLabel(noiseTypeLabel, "Noise");
     populateNoiseTypes(noiseTypeDropdown);
@@ -393,7 +412,7 @@ void VoicePanel::rebindAttachments()
     o1FineAttachment = nullptr; o1PosAttachment       = nullptr; o1PenvDepthAttachment = nullptr;
     o2OctAttachment  = nullptr; o2SemiAttachment      = nullptr;
     o2FineAttachment = nullptr; o2PosAttachment       = nullptr; o2PenvDepthAttachment = nullptr;
-    xmodFmAttachment = nullptr; xmodAmAttachment = nullptr; xmodRingAttachment = nullptr; syncAttachment = nullptr;
+    xmodIndexAttachment = nullptr; xmodDepthAttachment = nullptr; syncAttachment = nullptr; fdbkAttachment = nullptr;
     osc1LevelAttachment  = nullptr; osc2LevelAttachment = nullptr;
     noiseLevelAttachment = nullptr; noiseTypeAttachment = nullptr;
     fltDrvAttachment = nullptr; fltCutAttachment = nullptr; fltResAttachment = nullptr;
@@ -419,10 +438,23 @@ void VoicePanel::rebindAttachments()
     // loaded user table); onChange was wired once in the constructor.
     refreshWavetableDropdowns();
 
-    xmodFmAttachment   = std::make_unique<APVTS::SliderAttachment>(apvts, id("xmod_fm"),   xmodFmKnob.getSlider());
-    xmodAmAttachment   = std::make_unique<APVTS::SliderAttachment>(apvts, id("xmod_am"),   xmodAmKnob.getSlider());
-    xmodRingAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("xmod_ring"), xmodRingKnob.getSlider());
-    syncAttachment     = std::make_unique<APVTS::ButtonAttachment>(apvts, id("sync"),      syncButton);
+    xmodIndexAttachment = std::make_unique<APVTS::SliderAttachment>(apvts, id("xmod_index"), xmodIndexKnob.getSlider());
+    syncAttachment      = std::make_unique<APVTS::ButtonAttachment>(apvts, id("sync"),       syncButton);
+    fdbkAttachment      = std::make_unique<APVTS::ButtonAttachment>(apvts, id("xmod_fdbk"),  fdbkButton);
+
+    // Mode switches — manual (choice item index = stored choice index), matching the
+    // filter-type dropdown pattern; the amp-mode selection also drives which param the
+    // Depth knob binds to.
+    {
+        int pm = 1;
+        if (auto* raw = apvts.getRawParameterValue(id("xmod_phaseMode"))) pm = juce::jlimit(0, 2, (int) raw->load());
+        phaseModeCtrl.setSelectedIndex(pm, false);
+        int am = 0;
+        if (auto* raw = apvts.getRawParameterValue(id("xmod_ampMode")))   am = juce::jlimit(0, 1, (int) raw->load());
+        ampModeCtrl.setSelectedIndex(am, false);
+        currentAmpMode = am;
+        bindAmpDepthKnob(am == 1);   // binds xmodDepthAttachment to depth/ssb for the active voice
+    }
 
     osc1LevelAttachment  = std::make_unique<APVTS::SliderAttachment>  (apvts, id("o1_lvl"),     osc1LevelKnob.getSlider());
     osc2LevelAttachment  = std::make_unique<APVTS::SliderAttachment>  (apvts, id("o2_lvl"),     osc2LevelKnob.getSlider());
@@ -475,6 +507,17 @@ void VoicePanel::rebindAttachments()
     gatingDesigner.setGap((float)(gatingDesigner.gapSlider.getValue() / 100.0));
 }
 
+void VoicePanel::bindAmpDepthKnob(bool ssbMode)
+{
+    // The single Depth knob drives xmod_depth (Mult) or xmod_ssb (SSB) — swap the
+    // attachment (and thus the slider's range) to whichever the active mode uses.
+    currentAmpMode = ssbMode ? 1 : 0;
+    xmodDepthAttachment = nullptr;
+    xmodDepthAttachment = std::make_unique<APVTS::SliderAttachment>(
+        proc.apvts, PluginProcessor::voiceParamId(currentVoice, ssbMode ? "xmod_ssb" : "xmod_depth"),
+        xmodDepthKnob.getSlider());
+}
+
 void VoicePanel::bindModulationIndicators()
 {
     const int vi = currentVoice;
@@ -496,9 +539,8 @@ void VoicePanel::bindModulationIndicators()
     bind(o2SemiKnob,     "osc2.semi",         mu_tant::kTantSnapOsc2Semi);
     bind(o2FineKnob,     "osc2.fine",         mu_tant::kTantSnapOsc2Fine);
     bind(o2PosKnob,      "osc2.pos",          mu_tant::kTantSnapOsc2Pos);
-    bind(xmodFmKnob,     "xmod.fm",           mu_tant::kTantSnapXModFm);
-    bind(xmodAmKnob,     "xmod.am",           mu_tant::kTantSnapXModAm);
-    bind(xmodRingKnob,   "xmod.ring",         mu_tant::kTantSnapXModRing);
+    bind(xmodIndexKnob,  "xmod.index",        mu_tant::kTantSnapXModIndex);
+    bind(xmodDepthKnob,  "xmod.depth",        mu_tant::kTantSnapXModDepth);
     bind(osc1LevelKnob,  "osc1.level",        mu_tant::kTantSnapOsc1Level);
     bind(osc2LevelKnob,  "osc2.level",        mu_tant::kTantSnapOsc2Level);
     bind(noiseLevelKnob, "noise.level",       mu_tant::kTantSnapNoiseLevel);
@@ -517,9 +559,8 @@ void VoicePanel::clearAllModBindings()
     o2SemiKnob.clearModBinding();
     o2FineKnob.clearModBinding();
     o2PosKnob.clearModBinding();
-    xmodFmKnob.clearModBinding();
-    xmodAmKnob.clearModBinding();
-    xmodRingKnob.clearModBinding();
+    xmodIndexKnob.clearModBinding();
+    xmodDepthKnob.clearModBinding();
     osc1LevelKnob.clearModBinding();
     osc2LevelKnob.clearModBinding();
     noiseLevelKnob.clearModBinding();
@@ -684,24 +725,35 @@ void VoicePanel::resized()
     const int rowBY = contentTop + rowAH + gap;   // top of Row B
     {
 
-        // X-Mod panel — FM / AM / Ring knobs centred in the full panel width; Sync below.
-        const int xmodW      = s(200);
+        // X-Mod panel — two lanes side by side. Lane A (left): Index knob + Phase-mode
+        // switch + Sync/Feedback toggles. Lane B (right): Depth knob + Amp-mode switch.
+        const int xmodW = s(200);
         modNoisePanelR = { pad, rowBY, xmodW, rowBH };
         {
-            // Centre the 3 knobs symmetrically within the full xmodW (not shifted by title).
-            const int threeKnobsW = 3 * s2W + 2 * s(4);
-            const int knobsStartX = pad + (xmodW - threeKnobsW) / 2;
+            const int colW   = xmodW / 2;
+            const int segW   = colW - s(12);
+            const int segH   = ddH;
+            const int gapY   = s(5);
+            const int totalH = s2H + gapY + segH + gapY + segH;   // knob / mode / toggle rows
+            const int startY = rowBY + juce::jmax(s(2), (rowBH - totalH) / 2);
+            const int modeY  = startY + s2H + gapY;
+            const int togY   = modeY + segH + gapY;
 
-            const int totalH  = s2H + s(6) + ddH;
-            const int startY  = rowBY + (rowBH - totalH) / 2;
-            const int rowY2   = startY + s2H + s(6);
+            const int laneAx = pad;
+            const int laneBx = pad + colW;
+            const int segAx  = laneAx + (colW - segW) / 2;
+            const int segBx  = laneBx + (colW - segW) / 2;
 
-            xmodFmKnob.setBounds(knobsStartX,                  startY, s2W, s2H);
-            xmodAmKnob.setBounds(knobsStartX + s2W + s(4),     startY, s2W, s2H);
-            xmodRingKnob.setBounds(knobsStartX + 2*(s2W+s(4)), startY, s2W, s2H);
+            // Lane A — Index knob, Phase mode, Sync + Feedback toggles.
+            xmodIndexKnob.setBounds(laneAx + (colW - s2W) / 2, startY, s2W, s2H);
+            phaseModeCtrl.setBounds(segAx, modeY, segW, segH);
+            const int tW = (segW - s(4)) / 2;
+            syncButton.setBounds(segAx,             togY, tW, segH);
+            fdbkButton.setBounds(segAx + tW + s(4), togY, tW, segH);
 
-            const int syncW = s(44);
-            syncButton.setBounds(pad + (xmodW - syncW) / 2, rowY2, syncW, ddH);
+            // Lane B — Depth knob, Amp mode.
+            xmodDepthKnob.setBounds(laneBx + (colW - s2W) / 2, startY, s2W, s2H);
+            ampModeCtrl.setBounds(segBx, modeY, segW, segH);
         }
 
         // Filter panel — two rows (Filter 1 + Filter 2) with Series/Parallel toggle.

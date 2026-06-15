@@ -45,7 +45,7 @@ namespace
     constexpr TantModParam kTantModParams[] = {
         { "osc1.octave", "o1_oct" }, { "osc1.semi", "o1_semi" }, { "osc1.fine", "o1_fine" }, { "osc1.pos", "o1_pos" },
         { "osc2.octave", "o2_oct" }, { "osc2.semi", "o2_semi" }, { "osc2.fine", "o2_fine" }, { "osc2.pos", "o2_pos" },
-        { "xmod.fm", "xmod_fm" },    { "xmod.am", "xmod_am" },   { "xmod.ring", "xmod_ring" },
+        { "xmod.index", "xmod_index" }, { "xmod.depth", "xmod_depth" }, { "xmod.ssb", "xmod_ssb" },
         { "osc1.level", "o1_lvl" },  { "osc2.level", "o2_lvl" }, { "noise.level", "noise_lvl" },
         { "filter.cutoff", "flt_cut" }, { "filter.resonance", "flt_res" },
         { "filter2.cutoff.prop", "flt2_cut" }, { "filter2.resonance.prop", "flt2_res" },
@@ -57,7 +57,7 @@ namespace
 
     // Index of each resolved value in the resolveLane `out` array (kTantModParams order).
     enum { D_o1Oct = 0, D_o1Semi, D_o1Fine, D_o1Pos, D_o2Oct, D_o2Semi, D_o2Fine, D_o2Pos,
-           D_xmFm, D_xmAm, D_xmRing, D_o1Lvl, D_o2Lvl, D_nzLvl, D_fCut, D_fRes,
+           D_xmIndex, D_xmDepth, D_xmSsb, D_o1Lvl, D_o2Lvl, D_nzLvl, D_fCut, D_fRes,
            D_f2Cut, D_f2Res, D_level, D_insP1, D_insP2, D_insP3, D_insP4 };
 
     // Compile-time integrity guard: pin kTantModParams' row order to kModDestTable (the
@@ -277,7 +277,8 @@ void PluginProcessor::cacheParamPointers()
         auto& p = voicePtrs[(size_t) v];
         p.o1Oct  = P(vid("o1_oct"));  p.o1Semi = P(vid("o1_semi")); p.o1Fine = P(vid("o1_fine")); p.o1Pos = P(vid("o1_pos")); p.o1Wt = P(vid("o1_wt"));
         p.o2Oct  = P(vid("o2_oct"));  p.o2Semi = P(vid("o2_semi")); p.o2Fine = P(vid("o2_fine")); p.o2Pos = P(vid("o2_pos")); p.o2Wt = P(vid("o2_wt"));
-        p.xmodFm = P(vid("xmod_fm")); p.xmodAm = P(vid("xmod_am")); p.xmodRing = P(vid("xmod_ring")); p.sync = P(vid("sync"));
+        p.xmodPhaseMode = P(vid("xmod_phaseMode")); p.xmodIndex = P(vid("xmod_index")); p.sync = P(vid("sync"));
+        p.xmodFdbk = P(vid("xmod_fdbk")); p.xmodAmpMode = P(vid("xmod_ampMode")); p.xmodDepth = P(vid("xmod_depth")); p.xmodSsb = P(vid("xmod_ssb"));
         p.o1Lvl  = P(vid("o1_lvl"));  p.o2Lvl  = P(vid("o2_lvl"));  p.noiseLvl = P(vid("noise_lvl")); p.noiseType = P(vid("noise_type"));
         p.fltType= P(vid("flt_type")); p.fltCut = P(vid("flt_cut")); p.fltRes = P(vid("flt_res")); p.fltEnvDepth = P(vid("flt_env_depth")); p.fltDrv = P(vid("flt_drv")); p.fltLoCut = P(vid("flt_lo_cut"));
         p.flt2Type=P(vid("flt2_type"));p.flt2Cut=P(vid("flt2_cut"));p.flt2Res=P(vid("flt2_res"));p.flt2EnvDepth=P(vid("flt2_env_depth"));p.flt2Drv=P(vid("flt2_drv"));p.flt2LoCut=P(vid("flt2_lo_cut"));
@@ -331,10 +332,14 @@ VoiceConfig PluginProcessor::readConfig(int voiceIdx) const
         c.osc1Wavetable = (u1 >= 0) ? u1 : (int) p.o1Wt->load();
         c.osc2Wavetable = (u2 >= 0) ? u2 : (int) p.o2Wt->load();
     }
-    c.xmodFm   = p.xmodFm->load()   * 0.01f;   // 0..100 → 0..1
-    c.xmodAm   = p.xmodAm->load()   * 0.01f;
-    c.xmodRing = p.xmodRing->load() * 0.01f;
-    c.sync     = p.sync->load() > 0.5f;
+    // X-Mod — Lane A (phase/index) + Lane B (amplitude/multiply).
+    c.xmodPhaseMode = (int) p.xmodPhaseMode->load();   // 0 FM, 1 PM, 2 TZFM
+    c.xmodIndex     = p.xmodIndex->load() * 0.01f;     // 0..100 → 0..1
+    c.sync          = p.sync->load() > 0.5f;
+    c.xmodFeedback  = p.xmodFdbk->load() > 0.5f;
+    c.xmodAmpMode   = (int) p.xmodAmpMode->load();     // 0 Mult, 1 SSB
+    c.xmodDepth     = p.xmodDepth->load() * 0.01f;     // -100..100 → -1..1
+    c.xmodSsbHz     = p.xmodSsb->load();               // Hz
     // Per-source levels.
     c.osc1LevelDb  = p.o1Lvl->load();
     c.osc2LevelDb  = p.o2Lvl->load();
@@ -529,9 +534,9 @@ void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
     cfg.osc2Semi     = juce::roundToInt(out[D_o2Semi]);
     cfg.osc2Fine     = juce::roundToInt(out[D_o2Fine]);
     cfg.osc2Pos      = out[D_o2Pos];
-    cfg.xmodFm       = out[D_xmFm]   * 0.01f;   // param 0..100 → engine 0..1
-    cfg.xmodAm       = out[D_xmAm]   * 0.01f;
-    cfg.xmodRing     = out[D_xmRing] * 0.01f;
+    cfg.xmodIndex    = out[D_xmIndex] * 0.01f;   // param 0..100 → engine 0..1
+    cfg.xmodDepth    = out[D_xmDepth] * 0.01f;   // param -100..100 → engine -1..1
+    cfg.xmodSsbHz    = out[D_xmSsb];             // Hz (direct)
     cfg.osc1LevelDb  = out[D_o1Lvl];
     cfg.osc2LevelDb  = out[D_o2Lvl];
     cfg.noiseLevelDb = out[D_nzLvl];
@@ -553,9 +558,9 @@ void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
     snap[mu_tant::kTantSnapOsc2Semi]   .store(out[D_o2Semi]);
     snap[mu_tant::kTantSnapOsc2Fine]   .store(out[D_o2Fine]);
     snap[mu_tant::kTantSnapOsc2Pos]    .store(out[D_o2Pos]);
-    snap[mu_tant::kTantSnapXModFm]     .store(out[D_xmFm]);
-    snap[mu_tant::kTantSnapXModAm]     .store(out[D_xmAm]);
-    snap[mu_tant::kTantSnapXModRing]   .store(out[D_xmRing]);
+    snap[mu_tant::kTantSnapXModIndex]  .store(out[D_xmIndex]);
+    snap[mu_tant::kTantSnapXModDepth]  .store(out[D_xmDepth]);
+    snap[mu_tant::kTantSnapXModSsb]    .store(out[D_xmSsb]);
     snap[mu_tant::kTantSnapOsc1Level]  .store(out[D_o1Lvl]);
     snap[mu_tant::kTantSnapOsc2Level]  .store(out[D_o2Lvl]);
     snap[mu_tant::kTantSnapNoiseLevel] .store(out[D_nzLvl]);
@@ -930,25 +935,116 @@ void PluginProcessor::loadVoicePreset(int voice, const juce::File& file)
 // Apply a per-voice (.muPattern) preset from a parsed tree (shared by the
 // stopped load + the boundary commit). Per-pattern spinlocks guard the audio
 // thread, so no voicesLock is needed here.
+// ── X-Mod preset migration (best-effort) ─────────────────────────────────────
+// Old presets/patches carry v{N}_xmod_fm / _am / _ring (+ modulator assignments to
+// xmod.fm/.am/.ring). The 2-lane redesign replaces them. Map on load: old FM depth →
+// Lane A index in PM mode (the old "FM" was phase-mod); old AM/Ring → Lane B depth in
+// Mult mode (lossy if both were set); remap modulator dest ids. No-op on new presets.
+namespace
+{
+    juce::ValueTree findParamNode(const juce::ValueTree& state, const juce::String& id)
+    {
+        for (int i = 0; i < state.getNumChildren(); ++i)
+        {
+            auto c = state.getChild(i);
+            if (c.hasType(juce::Identifier("PARAM")) && c.getProperty("id").toString() == id)
+                return c;
+        }
+        return {};
+    }
+
+    void setParamNode(juce::ValueTree& state, const juce::String& id, float value)
+    {
+        auto p = findParamNode(state, id);
+        if (p.isValid()) { p.setProperty("value", value, nullptr); return; }
+        juce::ValueTree np(juce::Identifier("PARAM"));
+        np.setProperty("id", id, nullptr);
+        np.setProperty("value", value, nullptr);
+        state.appendChild(np, nullptr);
+    }
+
+    // Rewrite any "dest" property naming an old xmod id → its new id (recursive).
+    void migrateModDestIds(juce::ValueTree tree)
+    {
+        if (! tree.isValid()) return;
+        if (tree.hasProperty("dest"))
+        {
+            const juce::String d = tree.getProperty("dest").toString();
+            if      (d == "xmod.fm")                       tree.setProperty("dest", "xmod.index", nullptr);
+            else if (d == "xmod.am" || d == "xmod.ring")   tree.setProperty("dest", "xmod.depth", nullptr);
+        }
+        for (int i = 0; i < tree.getNumChildren(); ++i)
+            migrateModDestIds(tree.getChild(i));
+    }
+
+    // Full-state migration: per-voice PARAM nodes + the <VoiceData> modulator assignments.
+    void migrateXModFullState(juce::ValueTree& state, int maxVoices)
+    {
+        for (int v = 0; v < maxVoices; ++v)
+        {
+            const juce::String pre = "v" + juce::String(v) + "_";
+            auto fm = findParamNode(state, pre + "xmod_fm");
+            if (! fm.isValid()) continue;                                  // not an old voice
+            if (findParamNode(state, pre + "xmod_index").isValid()) continue;  // already migrated
+            const float fmv = (float) fm.getProperty("value");
+            auto  am  = findParamNode(state, pre + "xmod_am");
+            auto  rg  = findParamNode(state, pre + "xmod_ring");
+            const float amv = am.isValid() ? (float) am.getProperty("value") : 0.0f;
+            const float rgv = rg.isValid() ? (float) rg.getProperty("value") : 0.0f;
+            setParamNode(state, pre + "xmod_index",     fmv);              // FM depth → index
+            setParamNode(state, pre + "xmod_phaseMode", 1.0f);            // old FM was phase-mod → PM
+            setParamNode(state, pre + "xmod_depth",     juce::jmax(amv, rgv));  // AM/Ring → +depth (lossy)
+            setParamNode(state, pre + "xmod_ampMode",   0.0f);            // Mult
+        }
+        migrateModDestIds(state.getChildWithName("VoiceData"));
+    }
+}
+
 void PluginProcessor::applyVoicePresetTree(int voice, const juce::ValueTree& tree)
 {
     if (voice < 0 || voice >= kMaxVoices) return;
     const juce::String prefix = juce::String("v") + juce::String(voice) + "_";
 
-    // Params — voice-agnostic base id → v{voice}_ param, normalised 0..1.
+    // Params — voice-agnostic base id → v{voice}_ param, normalised 0..1. Old X-Mod
+    // ids (xmod_fm/am/ring) are intercepted for best-effort migration to the 2-lane model.
+    bool  sawOldXmodFm = false, sawNewXmodIndex = false;
+    float oldFmNorm = 0.0f, oldAmNorm = 0.0f, oldRingNorm = 0.0f;   // stored values are normalised 0..1
     for (int i = 0; i < tree.getNumChildren(); ++i)
     {
         const auto child = tree.getChild(i);
-        if (child.hasType(juce::Identifier("p")))
-            if (auto* p = apvts.getParameter(prefix + child.getProperty("id").toString()))
-                p->setValueNotifyingHost((float) (double) child.getProperty("v"));
+        if (! child.hasType(juce::Identifier("p"))) continue;
+        const juce::String base = child.getProperty("id").toString();
+        const float vn = (float) (double) child.getProperty("v");
+        if      (base == "xmod_fm")    { oldFmNorm   = vn; sawOldXmodFm = true; continue; }   // param gone
+        else if (base == "xmod_am")    { oldAmNorm   = vn; continue; }
+        else if (base == "xmod_ring")  { oldRingNorm = vn; continue; }
+        if (base == "xmod_index") sawNewXmodIndex = true;
+        if (auto* p = apvts.getParameter(prefix + base))
+            p->setValueNotifyingHost(vn);
+    }
+    // Best-effort X-Mod migration for an old .muPattern (old ranges were all 0..100,
+    // so the normalised FM value maps straight to the same-range index; AM/Ring → depth).
+    if (sawOldXmodFm && ! sawNewXmodIndex)
+    {
+        auto setN = [this, &prefix](const char* base, float denorm) {
+            if (auto* p = apvts.getParameter(prefix + base))
+                p->setValueNotifyingHost(p->convertTo0to1(denorm));
+        };
+        setN("xmod_index",     oldFmNorm * 100.0f);                          // 0..100
+        setN("xmod_phaseMode", 1.0f);                                        // PM
+        setN("xmod_depth",     juce::jmax(oldAmNorm, oldRingNorm) * 100.0f); // 0..100 → +depth
+        setN("xmod_ampMode",   0.0f);                                        // Mult
     }
 
     // Modulators + gate / filter / pitch envelopes (live outside APVTS). Absent
-    // children → cleared (getChildWithName returns an invalid tree).
+    // children → cleared (getChildWithName returns an invalid tree). Migrate old
+    // xmod.* assignment dest ids first so they survive the redesign.
     mu_pp::clearModulators(voiceSlots[(size_t) voice]);
-    mu_pp::deserialiseModulators(tree.getChildWithName("Modulators"),
-                                 voiceSlots[(size_t) voice], {}, isValidModDest);
+    {
+        auto mods = tree.getChildWithName("Modulators").createCopy();
+        migrateModDestIds(mods);
+        mu_pp::deserialiseModulators(mods, voiceSlots[(size_t) voice], {}, isValidModDest);
+    }
     deserialiseGate(tree.getChildWithName("Gate"),       gatePatterns[(size_t) voice]);
     deserialiseGate(tree.getChildWithName("FilterGate"), filterPatterns[(size_t) voice]);
     deserialiseGate(tree.getChildWithName("PitchGate"),  pitchPatterns[(size_t) voice]);
@@ -1390,8 +1486,13 @@ void PluginProcessor::loadPreset(const juce::File& file)
 // stopped load, the boundary commit, and host state restore). Swaps the tree
 // under voicesLock — the audio thread tryLocks it in processBlock and outputs a
 // silent block on contention, so the swap is exclusive.
-void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
+void PluginProcessor::applyFullPresetTree(const juce::ValueTree& stateIn)
 {
+    // Migrate a mutable copy so old xmod params/assignments map to the new 2-lane model
+    // before they reach the APVTS / modulator deserialise.
+    juce::ValueTree state = stateIn.createCopy();
+    migrateXModFullState(state, kMaxVoices);
+
     // No blanket voicesLock here: every structure this touches is already guarded by
     // its own fine-grained lock that the audio render respects — APVTS params are
     // atomic (replaceState), gate patterns use editLock (deserialiseGate), modulator
