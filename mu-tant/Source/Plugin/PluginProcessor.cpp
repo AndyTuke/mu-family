@@ -573,7 +573,7 @@ void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
     snap[mu_tant::kTantSnapInsP4]      .store(out[D_insP4]);
 }
 
-void PluginProcessor::applyFilterEnvelope(int v, VoiceConfig& cfg)
+void PluginProcessor::applyFilterEnvelope(int v, VoiceConfig& cfg, int numSamples)
 {
     // Filter pattern envelopes add to cfg.filterCutoff in proportion space.
     // envelope value 0 → no change from base; 1 at depth=1 → fully open.
@@ -582,8 +582,13 @@ void PluginProcessor::applyFilterEnvelope(int v, VoiceConfig& cfg)
     auto& fPat = filterPatterns[(size_t) v];
     if (blkPlaying && fPat.hasEnvelopes.load(std::memory_order_relaxed))
     {
+        // The filter cutoff is a per-BLOCK value, so the de-click slew (a per-sample
+        // rate from kMinAttackMs) must be scaled by the block length — otherwise the
+        // rising edge is limited ~blockSize× too slowly and a per-bar decay envelope
+        // never re-opens the filter (it would take seconds to reach its peak).
         const float maxRise = (currentSampleRate > 0.0 && GatePattern::kMinAttackMs > 0.0f)
-                            ? (float) (1.0 / ((double) GatePattern::kMinAttackMs * 0.001 * currentSampleRate))
+                            ? (float) ((double) juce::jmax(1, numSamples)
+                                       / ((double) GatePattern::kMinAttackMs * 0.001 * currentSampleRate))
                             : 1.0f;
         bool fExpected = false;
         if (fPat.editLock.compare_exchange_strong(fExpected, true, std::memory_order_acquire))
@@ -648,7 +653,7 @@ void PluginProcessor::renderVoice(int v, juce::AudioBuffer<float>& buf, int numS
 {
     VoiceConfig cfg = readConfig(v);
     applyModulation(v, cfg);
-    applyFilterEnvelope(v, cfg);
+    applyFilterEnvelope(v, cfg, numSamples);
     applyPitchEnvelope(v, cfg);
 
     // Note mode pitch-track: transpose the voice so its tonal centre lands on the held

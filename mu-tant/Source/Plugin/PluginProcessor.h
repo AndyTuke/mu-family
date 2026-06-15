@@ -342,7 +342,7 @@ private:
     void   renderRetiringVoice(int v, juce::AudioBuffer<float>& buf, int numSamples);
     // renderVoice phases — called in order; each handles one concern.
     void   applyModulation    (int v, VoiceConfig& cfg);
-    void   applyFilterEnvelope(int v, VoiceConfig& cfg);
+    void   applyFilterEnvelope(int v, VoiceConfig& cfg, int numSamples);
     void   applyPitchEnvelope (int v, VoiceConfig& cfg);
     bool   blkPlaying        = false;
     double blkBeatStart      = 0.0;
