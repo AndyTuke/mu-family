@@ -31,6 +31,11 @@ namespace
             startTimerHz(30);
         }
 
+        // Stop the timer before this object's members are torn down — matches the
+        // family convention (RhythmMiniVisual / GroovePanel / VoicePanel …) so a
+        // pending tick can't run on a half-destroyed glyph.
+        ~VoiceSpectrumGlyph() override { stopTimer(); }
+
     private:
         void timerCallback() override
         {
