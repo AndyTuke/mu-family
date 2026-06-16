@@ -123,6 +123,34 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
   .nav-links { gap: 16px; }
   .footer-inner { grid-template-columns: 1fr; }
 }
+
+/* ── DOWNLOAD GATE MODAL ── */
+.dl-gate { position: fixed; inset: 0; z-index: 200; display: none; align-items: center; justify-content: center; background: rgba(7,6,14,0.82); backdrop-filter: blur(6px); padding: 20px; }
+.dl-gate.open { display: flex; }
+.dl-gate-card { position: relative; width: 100%; max-width: 420px; background: var(--bg2); border: 1px solid var(--border2); border-radius: 12px; padding: 34px 30px 28px; box-shadow: 0 24px 60px rgba(0,0,0,0.5); animation: fadeUp .3s ease both; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+.dl-gate-close { position: absolute; top: 12px; right: 14px; width: 30px; height: 30px; border: none; background: transparent; color: var(--text3); font-size: 24px; line-height: 1; cursor: pointer; transition: color .2s; }
+.dl-gate-close:hover { color: var(--text); }
+.dl-gate-card h3 { font-family: var(--ff-disp); font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px; }
+.dl-gate-card .gate-intro { font-size: 14px; color: var(--text2); font-weight: 300; line-height: 1.6; margin-bottom: 18px; }
+.dl-gate-card .gate-product { color: var(--accent-b); font-weight: 500; }
+.dl-gate-card .email-note { font-size: 11px; color: var(--text3); margin-top: 12px; margin-bottom: 0; font-family: var(--ff-mono); }
+
+/* MailerLite embedded form — dark restyle to match the site (form ID 41362604). */
+#mlb2-41362604.ml-form-embedContainer { margin: 0 !important; }
+#mlb2-41362604.ml-form-embedContainer .ml-form-embedWrapper { background: transparent !important; border: none !important; width: 100% !important; max-width: 100% !important; }
+#mlb2-41362604.ml-form-embedContainer .ml-form-embedWrapper .ml-form-embedBody, #mlb2-41362604.ml-form-embedContainer .ml-form-embedWrapper .ml-form-successBody { padding: 0 !important; }
+#mlb2-41362604.ml-form-embedContainer .ml-form-embedWrapper .ml-form-embedBody .ml-form-embedContent { margin: 0 !important; }
+#mlb2-41362604.ml-form-embedContainer .ml-form-embedWrapper .ml-form-embedBody .ml-form-embedContent h4, #mlb2-41362604.ml-form-embedContainer .ml-form-embedWrapper .ml-form-embedBody .ml-form-embedContent p { display: none !important; }
+#mlb2-41362604.ml-form-embedContainer .ml-form-embedWrapper .ml-form-embedBody .ml-form-fieldRow input { background: #0D0B18 !important; color: #E8E4D8 !important; border-color: #2A2745 !important; border-radius: 4px !important; font-family: 'Outfit', sans-serif !important; font-size: 14px !important; padding: 11px 16px !important; }
+#mlb2-41362604.ml-form-embedContainer .ml-form-embedWrapper .ml-form-embedBody .ml-form-fieldRow input::placeholder { color: #4A4565 !important; }
+#mlb2-41362604.ml-form-embedContainer .ml-form-embedWrapper .ml-form-embedBody .ml-form-fieldRow input:focus { border-color: #6B5FE4 !important; outline: none !important; }
+#mlb2-41362604.ml-form-embedContainer .ml-form-embedWrapper .ml-form-embedBody .ml-form-embedSubmit { margin: 10px 0 0 !important; }
+#mlb2-41362604.ml-form-embedContainer .ml-form-embedWrapper .ml-form-embedBody .ml-form-embedSubmit button.primary { background: #6B5FE4 !important; border-radius: 4px !important; font-family: 'Space Mono', monospace !important; font-size: 11px !important; font-weight: 700 !important; letter-spacing: .1em !important; text-transform: uppercase !important; padding: 12px !important; }
+#mlb2-41362604.ml-form-embedContainer .ml-form-embedWrapper .ml-form-embedBody .ml-form-embedSubmit button.primary:hover { background: #8B80F0 !important; }
+#mlb2-41362604.ml-form-embedContainer .ml-form-embedWrapper .ml-form-successBody .ml-form-successContent h4 { color: #2ECFA0 !important; font-family: 'Syne', sans-serif !important; font-size: 20px !important; }
+#mlb2-41362604.ml-form-embedContainer .ml-form-embedWrapper .ml-form-successBody .ml-form-successContent p { color: #7A758F !important; font-family: 'Outfit', sans-serif !important; font-size: 14px !important; }
+#mlb2-41362604.ml-form-embedContainer .ml-form-embedWrapper .ml-form-successBody .ml-form-successContent p a { color: #8B80F0 !important; }
 </style>
 </head>
 <body>
@@ -225,6 +253,36 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
     </section>
   </main>
 
+  <!-- ── Download gate: email capture before the download starts ── -->
+  <div class="dl-gate" id="dl-gate" role="dialog" aria-modal="true" aria-labelledby="dl-gate-title">
+    <div class="dl-gate-card">
+      <button class="dl-gate-close" id="dl-gate-close" aria-label="Close" type="button">&times;</button>
+      <h3 id="dl-gate-title">One quick step.</h3>
+      <p class="gate-intro">Enter your email to start your <span class="gate-product" id="dl-gate-product">download</span>. You'll join the μ mailing list for release news and the occasional offer — unsubscribe any time.</p>
+
+      <div id="mlb2-41362604" class="ml-form-embedContainer ml-subscribe-form ml-subscribe-form-41362604">
+        <div class="ml-form-align-center"><div class="ml-form-embedWrapper embedForm">
+          <div class="ml-form-embedBody ml-form-embedBodyDefault row-form" style="display:block">
+            <div class="ml-form-embedContent"></div>
+            <form class="ml-block-form" action="https://assets.mailerlite.com/jsonp/2351946/forms/187565985782302067/subscribe" data-code="" method="post" target="_blank">
+              <div class="ml-form-formContent"><div class="ml-form-fieldRow ml-last-item"><div class="ml-field-group ml-field-email ml-validate-email ml-validate-required">
+                <input aria-label="email" aria-required="true" type="email" class="form-control" name="fields[email]" placeholder="your@email.com" autocomplete="email">
+              </div></div></div>
+              <input type="hidden" name="ml-submit" value="1">
+              <div class="ml-form-embedSubmit">
+                <button type="submit" class="primary">Subscribe &amp; download</button>
+                <button disabled="disabled" style="display:none;" type="button" class="loading"><div class="ml-form-embedSubmitLoad"></div><span class="sr-only">Loading...</span></button>
+              </div>
+              <input type="hidden" name="anticsrf" value="true">
+            </form>
+          </div>
+          <div class="ml-form-successBody row-success" style="display:none"><div class="ml-form-successContent"><h4>Thanks — you're on the list!</h4><p>Your download is starting. If it doesn't begin, <a href="#" id="dl-gate-manual">click here to download</a>.</p></div></div>
+        </div></div>
+      </div>
+      <p class="email-note">By subscribing you agree to receive occasional emails from Transwarp Development Project. Unsubscribe any time.</p>
+    </div>
+  </div>
+
   <footer>
     <div class="container">
       <div class="footer-inner">
@@ -268,6 +326,73 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
       });
   })();
   </script>
+
+  <script>
+  // ── Download gate ──
+  // Every GitHub release link opens the email-capture modal first; the actual
+  // download fires only after a successful MailerLite signup (wired in
+  // ml_webform_success_41362604 below). Browsers that already subscribed skip it.
+  (function () {
+    var gate    = document.getElementById('dl-gate');
+    var closeEl = document.getElementById('dl-gate-close');
+    var prodEl  = document.getElementById('dl-gate-product');
+    var pendingUrl = null;
+
+    function productName(url) {
+      if (/Lite/i.test(url)) return 'μ-clid LITE download';
+      if (/Clid/i.test(url)) return 'μ-clid download';
+      if (/Tant/i.test(url)) return 'μ-tant download';
+      return 'download';
+    }
+    function startDownload(url) {
+      var a = document.createElement('a');
+      a.href = url; a.rel = 'noopener';
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+    function subscribed() {
+      try { return localStorage.getItem('mu_subscribed') === '1'; } catch (e) { return false; }
+    }
+    function openGate(url) {
+      pendingUrl = url;
+      if (prodEl) prodEl.textContent = productName(url);
+      gate.classList.add('open');
+    }
+    function closeGate() { gate.classList.remove('open'); }
+
+    // Fired by the MailerLite success callback once an email is submitted.
+    window.__muGateOnSuccess = function () {
+      if (!pendingUrl) return;
+      try { localStorage.setItem('mu_subscribed', '1'); } catch (e) {}
+      var manual = document.getElementById('dl-gate-manual');
+      if (manual) manual.href = pendingUrl;
+      startDownload(pendingUrl);
+    };
+
+    document.querySelectorAll('a[href*="releases/latest/download/"]').forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        if (subscribed()) return;               // returning subscriber → straight to download
+        e.preventDefault();
+        openGate(a.getAttribute('href'));
+      });
+    });
+
+    closeEl.addEventListener('click', closeGate);
+    gate.addEventListener('click', function (e) { if (e.target === gate) closeGate(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeGate(); });
+  })();
+  </script>
+
+  <!-- MailerLite embedded-form success hook + loader (form ID 41362604) -->
+  <script>
+    function ml_webform_success_41362604() {
+      var $ = ml_jQuery || jQuery;
+      $('.ml-subscribe-form-41362604 .row-success').show();
+      $('.ml-subscribe-form-41362604 .row-form').hide();
+      if (window.__muGateOnSuccess) window.__muGateOnSuccess();   // start the gated download
+    }
+  </script>
+  <script src="https://groot.mailerlite.com/js/w/webforms.min.js?vb397d78ebaa8a0f631d35384c46d781b" type="text/javascript"></script>
+  <script>fetch("https://assets.mailerlite.com/jsonp/2351946/forms/187565985782302067/takel")</script>
 
 </body>
 </html>
