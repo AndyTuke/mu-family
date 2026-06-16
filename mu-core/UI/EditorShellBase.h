@@ -110,13 +110,22 @@ protected:
     MidiFullPresetsPanel midiFullPresetsPanel;
     StatusBar            statusBar;
     juce::Label          demoBanner;
+    juce::Label          upgradeBanner;   // shown when a newer release is available online
 
     juce::Component* sidebar         = nullptr;
     juce::Component* mainPanel       = nullptr;
     juce::Component* mixerOverlay    = nullptr;
     juce::Component* settingsOverlay = nullptr;
 
-    static constexpr int kDemoBannerH = 20;
+    static constexpr int kDemoBannerH    = 20;
+    static constexpr int kUpgradeBannerH = 20;
+
+    // Set true (message thread) once an online version check finds a newer release.
+    std::atomic<bool> upgradeAvailable { false };
+    // Kicks off the async GitHub "latest release" check; fail-silent + off-thread.
+    void startVersionCheck();
+    // The page opened when the upgrade banner is clicked.
+    static constexpr const char* kDownloadUrl = "https://transwarp.me/download";
 
     bool mixerVisible           = false;
     bool aboutVisible           = false;

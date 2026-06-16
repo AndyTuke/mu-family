@@ -1,4 +1,5 @@
 #include "EditorShellBase.h"
+#include "BuildNumber.h"        // BUILD_NUMBER — local version for the upgrade check
 #include "UI/ConfirmDialog.h"   // shared themed confirm/prompt dialogs (mu_ui::confirmAsync)
 
 EditorShellBase::EditorShellBase(ProcessorBase& proc)
@@ -171,6 +172,24 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
         demoBanner.setMouseCursor(juce::MouseCursor::PointingHandCursor);
     }
 
+    // ── Upgrade banner ──────────────────────────────────────────────────────
+    // Hidden until the async version check finds a newer release online.
+    {
+        using Id = MuLookAndFeel::ColourIds;
+        upgradeBanner.setJustificationType(juce::Justification::centred);
+        upgradeBanner.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+        upgradeBanner.setColour(juce::Label::backgroundColourId,
+                                MuLookAndFeel::colour(Id::segmentActiveBg));
+        upgradeBanner.setColour(juce::Label::textColourId,
+                                MuLookAndFeel::colour(Id::headingText));
+        addChildComponent(upgradeBanner);
+        upgradeBanner.setVisible(false);
+        // Whole banner is a click target → opens the download page.
+        upgradeBanner.setInterceptsMouseClicks(true, false);
+        upgradeBanner.addMouseListener(this, false);
+        upgradeBanner.setMouseCursor(juce::MouseCursor::PointingHandCursor);
+    }
+
     // ── Window sizing ───────────────────────────────────────────────────────
     setResizable(false, false);
     setSize(mu_ui::s(MuLookAndFeel::kWindowWidth), mu_ui::s(MuLookAndFeel::kWindowHeight));
@@ -201,6 +220,51 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
 
     processorRef.apvts.state.addListener(this);
     presetDirty = false;
+
+    startVersionCheck();
+}
+
+void EditorShellBase::startVersionCheck()
+{
+    // Ask GitHub for the "latest release" — the same endpoint the website's
+    // download page uses — parse the build number out of its tag (v1.0.0.NNN),
+    // and raise the upgrade banner if it beats our local BUILD_NUMBER. Runs on
+    // a throwaway thread (the fetch blocks on the network) and fails silently
+    // offline / when rate-limited, so it never disrupts the editor.
+    juce::Component::SafePointer<EditorShellBase> safe(this);
+    juce::Thread::launch([safe]
+    {
+        const juce::URL url("https://api.github.com/repos/AndyTuke/mu-family/releases/latest");
+        const auto opts = juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)
+                              .withConnectionTimeoutMs(5000);
+        std::unique_ptr<juce::InputStream> stream(url.createInputStream(opts));
+        if (stream == nullptr) return;
+
+        const juce::String body = stream->readEntireStreamAsString();
+        const juce::var json = juce::JSON::parse(body);
+        const juce::String tag = json.getProperty("tag_name", {}).toString();  // e.g. "v1.0.0.920"
+        if (tag.isEmpty()) return;
+
+        // The build number is the final dot-separated segment of the tag.
+        const int latestBuild = tag.fromLastOccurrenceOf(".", false, false).getIntValue();
+        if (latestBuild <= BUILD_NUMBER) return;
+
+        juce::MessageManager::callAsync([safe, latestBuild]
+        {
+            if (safe == nullptr) return;   // editor closed mid-check
+            const juce::String current   = "v1.0.0." + juce::String(BUILD_NUMBER);
+            const juce::String available = "v1.0.0." + juce::String(latestBuild);
+            safe->upgradeBanner.setText(
+                juce::String::fromUTF8("Update available  \xe2\x80\x94  you have ") + current
+                    + juce::String::fromUTF8("  \xe2\x80\x94  ") + available
+                    + juce::String::fromUTF8(" is out  \xe2\x80\x94  click here to download"),
+                juce::dontSendNotification);
+            safe->upgradeAvailable.store(true);
+            safe->upgradeBanner.setVisible(true);
+            safe->resized();
+            safe->repaint();
+        });
+    });
 }
 
 EditorShellBase::~EditorShellBase()
@@ -411,9 +475,11 @@ void EditorShellBase::showActivation(bool show)
 
 void EditorShellBase::mouseDown(const juce::MouseEvent& e)
 {
-    // The demo banner is the only registered listener target — clicking it opens activation.
+    // Clicking the demo banner opens activation; the upgrade banner opens the download page.
     if (e.eventComponent == &demoBanner && !processorRef.isLicensed())
         showActivation(true);
+    else if (e.eventComponent == &upgradeBanner)
+        juce::URL(kDownloadUrl).launchInDefaultBrowser();
 }
 
 void EditorShellBase::showSaveDialog(bool show)
@@ -573,7 +639,9 @@ void EditorShellBase::resized()
     const int statusH    = s(MuLookAndFeel::kStatusBarH);
     const int transportH = s(MuLookAndFeel::kTransportBarH);
     const int sidebarW   = (sidebar != nullptr) ? s(MuLookAndFeel::kSidebarW) : 0;
-    const int bannerH    = processorRef.isLicensed() ? 0 : s(kDemoBannerH);
+    const int demoH      = processorRef.isLicensed()      ? 0 : s(kDemoBannerH);
+    const int upgradeH   = upgradeAvailable.load()        ? s(kUpgradeBannerH) : 0;
+    const int bannerH    = demoH + upgradeH;
     const int contentH   = h - transportH - statusH - bannerH;
 
     const juce::Rectangle<int> mainArea { sidebarW, transportH,
@@ -593,8 +661,10 @@ void EditorShellBase::resized()
     activationPanel.setBounds(getLocalBounds());
     saveDialog.setBounds(getLocalBounds());
 
-    if (bannerH > 0)
-        demoBanner.setBounds(0, h - statusH - bannerH, w, bannerH);
+    // Stack the banners just above the status bar (upgrade on top, demo below).
+    int by = h - statusH - bannerH;
+    if (upgradeH > 0) { upgradeBanner.setBounds(0, by, w, upgradeH); by += upgradeH; }
+    if (demoH    > 0) { demoBanner   .setBounds(0, by, w, demoH); }
 
     statusBar.setBounds(0, h - statusH, w, statusH);
 }
