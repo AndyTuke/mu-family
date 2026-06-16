@@ -518,22 +518,44 @@ void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
     // round-trip to the base config, so cfg + the live-arc snapshot stay correct either way.
     // The dests are now proportion-clamped (scale 1.0) — a full-depth mod sweeps the whole
     // range and clamps at the rails, instead of overflowing it as the old display-unit path did.
+    // Refresh the "stepped pitch source?" cache under the mod try-lock (cheap walk of the
+    // assignments). On contention reuse last block's value — ≤1 block stale, inaudible.
+    {
+        auto& slot = voiceSlots[(size_t) v];
+        bool expected = false;
+        if (slot.modLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+        {
+            osc1SemiStepped[(size_t) v] = pitchDestHasSteppedSource(slot, "osc1.semi");
+            osc2SemiStepped[(size_t) v] = pitchDestHasSteppedSource(slot, "osc2.semi");
+            slot.modLock.store(false, std::memory_order_release);
+        }
+    }
+
     float out[kNumModDests];
     mu_mod::resolveLane(&voiceSlots[(size_t) v], blkBeatStart, kNumModDests,
                         modDestIds.data(), modDestAtoms[(size_t) v].data(),
                         modDestRanges.data(), modParamValues, out);
 
-    // Write the resolved values back into the voice config. Integer pitch dests round to the
+    // Write the resolved values back into the voice config. Octave/fine pitch dests round to the
     // nearest step (the proportion round-trip isn't bit-exact, so a plain truncation could drop
-    // a semitone); the rest map straight across, already range-clamped by resolveLane.
+    // a step); the rest map straight across, already range-clamped by resolveLane.
     cfg.osc1Octave   = juce::roundToInt(out[D_o1Oct]);
-    cfg.osc1Semi     = juce::roundToInt(out[D_o1Semi]);
     cfg.osc1Fine     = juce::roundToInt(out[D_o1Fine]);
     cfg.osc1Pos      = out[D_o1Pos];
     cfg.osc2Octave   = juce::roundToInt(out[D_o2Oct]);
-    cfg.osc2Semi     = juce::roundToInt(out[D_o2Semi]);
     cfg.osc2Fine     = juce::roundToInt(out[D_o2Fine]);
     cfg.osc2Pos      = out[D_o2Pos];
+
+    // Pitch (semitones): a Stepped CS snaps the whole result to a semitone (melodies); a
+    // smooth source glides via a fractional offset on top of the exact integer base.
+    {
+        const float o1Base = (float) voicePtrs[(size_t) v].o1Semi->load();
+        const float o2Base = (float) voicePtrs[(size_t) v].o2Semi->load();
+        if (osc1SemiStepped[(size_t) v]) { cfg.osc1Semi = juce::roundToInt(out[D_o1Semi]); cfg.osc1SemiMod = 0.0f; }
+        else                             { cfg.osc1Semi = juce::roundToInt(o1Base);        cfg.osc1SemiMod = out[D_o1Semi] - o1Base; }
+        if (osc2SemiStepped[(size_t) v]) { cfg.osc2Semi = juce::roundToInt(out[D_o2Semi]); cfg.osc2SemiMod = 0.0f; }
+        else                             { cfg.osc2Semi = juce::roundToInt(o2Base);        cfg.osc2SemiMod = out[D_o2Semi] - o2Base; }
+    }
     cfg.xmodIndex    = out[D_xmIndex] * 0.01f;   // param 0..100 → engine 0..1
     cfg.xmodDepth    = out[D_xmDepth] * 0.01f;   // param -100..100 → engine -1..1
     cfg.xmodSsbHz    = out[D_xmSsb];             // Hz (direct)
@@ -638,11 +660,33 @@ void PluginProcessor::applyPitchEnvelope(int v, VoiceConfig& cfg)
             const float envLevel = pPat.gateAt(blkBeatStart, 0.0f);
             const float d1 = voicePtrs[(size_t) v].o1PenvDepth->load();
             const float d2 = voicePtrs[(size_t) v].o2PenvDepth->load();
-            cfg.osc1Semi += (int) roundf(d1 * envLevel);
-            cfg.osc2Semi += (int) roundf(d2 * envLevel);
+            // Fractional semitone offset — the envelope sweeps smoothly (no semitone stepping).
+            cfg.osc1SemiMod += d1 * envLevel;
+            cfg.osc2SemiMod += d2 * envLevel;
             pPat.editLock.store(false, std::memory_order_release);
         }
     }
+}
+
+bool PluginProcessor::pitchDestHasSteppedSource(const VoiceSlot& slot, const char* destId) const
+{
+    // A pitch destination is "stepped" if any assigned source is a Stepped ControlSequence.
+    // Allocation-free: compares sourceId ("csN_output") against each CS id without building
+    // strings, so it's safe to call on the audio thread (under the mod lock).
+    for (const auto& a : slot.modulationMatrix.getAssignments())
+    {
+        if (a.destinationId != destId) continue;
+        for (const auto& cs : slot.controlSequences)
+        {
+            if (cs.mode != ControlSequence::Mode::Stepped) continue;
+            const auto& sid = cs.id;
+            if (a.sourceId.size() == sid.size() + 7
+                && a.sourceId.compare(0, sid.size(), sid) == 0
+                && a.sourceId.compare(sid.size(), 7, "_output") == 0)
+                return true;
+        }
+    }
+    return false;
 }
 
 // One voice's full chain into the channel buffer: modulation → engine → gate →

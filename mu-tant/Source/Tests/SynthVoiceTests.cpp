@@ -166,6 +166,31 @@ public:
             expect(peakOf(buf, N) > 0.0f, "SSB: non-silent");
         }
 
+        beginTest("fractional pitch offset (osc1SemiMod) glides smoothly, not stepped");
+        {
+            // Render osc1 alone at a fractional semitone offset; a quarter-tone shift must
+            // change the waveform vs no offset — impossible if the engine rounded pitch to int.
+            auto renderInto = [&](float semiMod, juce::AudioBuffer<float>& dst)
+            {
+                VoiceEngine v; v.setBank(&bank); v.prepare(sr, N);
+                VoiceConfig c;
+                c.osc2LevelDb = -60.0f; c.noiseLevelDb = -60.0f;   // osc1 only, clean tone
+                c.osc1SemiMod = semiMod;
+                c.osc1LevelDb = 0.0f; c.levelDb = 0.0f;
+                v.setConfig(c);
+                dst.clear();
+                v.process(dst, N);
+                expect(allFinite(dst, N), "semiMod=" + juce::String(semiMod) + " finite");
+            };
+            juce::AudioBuffer<float> a(2, N), b(2, N);
+            renderInto(0.0f,  a);
+            renderInto(0.25f, b);   // quarter-tone — only audible if pitch is fractional
+            float maxDiff = 0.0f;
+            for (int i = 0; i < N; ++i)
+                maxDiff = std::max(maxDiff, std::abs(a.getSample(0, i) - b.getSample(0, i)));
+            expect(maxDiff > 1.0e-4f, "quarter-tone offset changes the waveform (fractional pitch)");
+        }
+
         beginTest("noise-only voice (oscs muted) is audible");
         {
             VoiceEngine v; v.setBank(&bank); v.prepare(sr, N);

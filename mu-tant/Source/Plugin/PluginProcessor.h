@@ -344,6 +344,9 @@ private:
     void   applyModulation    (int v, VoiceConfig& cfg);
     void   applyFilterEnvelope(int v, VoiceConfig& cfg, int numSamples);
     void   applyPitchEnvelope (int v, VoiceConfig& cfg);
+    // True if a Stepped ControlSequence is assigned to `destId` — those snap pitch to
+    // semitones (melodies); smooth sources + the envelope glide. Read under modLock.
+    bool   pitchDestHasSteppedSource(const VoiceSlot& slot, const char* destId) const;
     bool   blkPlaying        = false;
     double blkBeatStart      = 0.0;
     double blkBeatsPerSample = 0.0;
@@ -421,6 +424,11 @@ private:
     std::array<const char*, kNumModDests>                    modDestIds   {};
     std::array<juce::NormalisableRange<float>, kNumModDests> modDestRanges{};
     std::array<std::array<const std::atomic<float>*, kNumModDests>, kMaxVoices> modDestAtoms{};
+
+    // Audio-thread cache (per voice): does a Stepped CS drive osc{1,2}.semi? Refreshed
+    // under the mod try-lock each block; on lock contention the last value is reused.
+    std::array<bool, kMaxVoices> osc1SemiStepped {};
+    std::array<bool, kMaxVoices> osc2SemiStepped {};
 
     // Internal transport. `playing` gates the beat advance; `internalBeatPos`
     // is the song position in beats (quarter notes) that drives modulator

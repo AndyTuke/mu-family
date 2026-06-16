@@ -27,6 +27,11 @@ struct VoiceConfig
     int   osc1Semi    = 0,   osc2Semi   = 2;
     int   osc1Fine    = 0,   osc2Fine   = 0;
 
+    // Fractional semitone offset from the pitch envelope + smooth pitch modulation.
+    // Kept separate from the integer osc{1,2}Semi base so smooth sources glide rather
+    // than stepping; stepped modulators instead snap osc{1,2}Semi (melodies).
+    float osc1SemiMod = 0.0f, osc2SemiMod = 0.0f;
+
     // Wavetable scan position — frame index 0..255 (256-frame Serum/Vital tables).
     float osc1Pos     = 0.0f, osc2Pos    = 0.0f;
 
