@@ -51,7 +51,7 @@ inline ModDestProvider makeModDestProvider()
 {
     ModDestProvider p;
 
-    p.populate = [](DropdownSelect& dd, int driveChar)
+    p.populate = [](DropdownSelect& dd, int driveChar, bool steppedMode)
     {
         // Helper: add item using the alias from kTable, with 1-based dropdown ID.
         auto item = [&](int idx) { dd.addItem(ModDest::kTable[idx].alias, idx + 1); };
@@ -78,7 +78,7 @@ inline ModDestProvider makeModDestProvider()
         // pitch.octave: ±3 octaves full swing (scale=36 semitones).
         // pitch.semitones: ±12 semitones full swing. Combined max ±48 st.
         dd.addSectionHeading("Pitch");
-        item(20);  // Pitch Octave (±3 oct)
+        if (steppedMode) item(20);  // Pitch Octave (±3 oct) — stepped-only (no smooth octave glide)
         item(9);   // Pitch Semitones (±12 st)
         item(24);  // Pitch Env Depth
 

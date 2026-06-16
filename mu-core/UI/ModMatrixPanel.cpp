@@ -32,7 +32,7 @@ namespace
 
 //==============================================================================
 ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex,
-                                      int driveChar, const ModDestProvider* provider)
+                                      int driveChar, const ModDestProvider* provider, bool steppedMode)
     : assignId(a.id)
 {
     sourceLabel.setText("Mod " + juce::String::charToString('A' + csIndex), juce::dontSendNotification);
@@ -41,7 +41,7 @@ ModMatrixPanel::MatrixRow::MatrixRow(const ModulationAssignment& a, int csIndex,
     sourceLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
 
     if (provider && provider->populate)
-        provider->populate(destCombo, driveChar);
+        provider->populate(destCombo, driveChar, steppedMode);
     if (provider && provider->findDropdownId)
     {
         const int ddId = provider->findDropdownId(a.destinationId);
@@ -208,7 +208,12 @@ void ModMatrixPanel::rebuildRows()
     for (const auto& a : voiceSlot->modulationMatrix.getAssignments())
     {
         const int csIdx = csIndexFromSourceId(a.sourceId);
-        auto row = std::make_unique<MatrixRow>(a, csIdx, currentDriveChar, destProvider);
+        // A row's source modulator may be Stepped or Smooth; Smooth omits stepped-only dests.
+        const auto& seqs = voiceSlot->controlSequences;
+        const bool steppedMode = (csIdx >= 0 && csIdx < (int) seqs.size())
+                                 ? (seqs[(size_t) csIdx].mode == ControlSequence::Mode::Stepped)
+                                 : true;
+        auto row = std::make_unique<MatrixRow>(a, csIdx, currentDriveChar, destProvider, steppedMode);
         addAndMakeVisible(*row);
 
         const std::string rowId    = a.id;

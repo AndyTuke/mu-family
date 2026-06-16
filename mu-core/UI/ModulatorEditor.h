@@ -24,7 +24,10 @@
 // ignore it.
 struct ModDestProvider
 {
-    std::function<void(DropdownSelect& dd, int driveChar)> populate;
+    // Populate the destination dropdown. `steppedMode` = the modulator is a Stepped
+    // sequence; when false (Smooth), providers omit "stepped-only" destinations such as
+    // octave (a continuous octave glide isn't musical — octave belongs to step melodies).
+    std::function<void(DropdownSelect& dd, int driveChar, bool steppedMode)> populate;
     std::function<std::string(int dropdownId)>             resolveId;
     // Reverse lookup — given a stored destination string, return the 1-based
     // dropdown ID currently representing it (or 0 if it isn't in the provider's
@@ -158,7 +161,8 @@ private:
 
         int rowNumber = 0;
 
-        AssignmentRow(const std::string& assignId, int driveChar, const ModDestProvider* provider);
+        AssignmentRow(const std::string& assignId, int driveChar, const ModDestProvider* provider,
+                      bool steppedMode);
         void resized() override;
         void paint(juce::Graphics& g) override;
     };

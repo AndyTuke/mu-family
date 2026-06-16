@@ -112,8 +112,10 @@ inline ModDestProvider makeModDestProvider(int lane)
 {
     ModDestProvider p;
 
-    p.populate = [lane](DropdownSelect& dd, int /*driveChar*/)
+    p.populate = [lane](DropdownSelect& dd, int /*driveChar*/, bool /*steppedMode*/)
     {
+        // mu-on's lane destinations are all continuous engine params (no octave/pitch
+        // dests yet), so there are no stepped-only entries to omit in Smooth mode.
         int n = 0;
         const ModDestEntry* t = destsForLane(lane, n);
         for (int i = 0; i < n; ++i)

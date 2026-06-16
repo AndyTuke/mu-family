@@ -98,12 +98,21 @@ inline int unitsPerDirectionFor(const std::string& destId)
     return 0;
 }
 
+// Destinations that only make sense as discrete jumps — a smooth (LFO-style) sweep of them
+// isn't musical, so they're hidden from the destination list when the modulator is Smooth.
+// Octave is the canonical case (a continuous octave glide); scale-degree stays available
+// (it glides between degrees for the envelope / smooth modulators).
+inline bool isSteppedOnlyDest(const char* destId)
+{
+    return std::strcmp(destId, "osc1.octave") == 0 || std::strcmp(destId, "osc2.octave") == 0;
+}
+
 inline ModDestProvider makeModDestProvider()
 {
     ModDestProvider p;
     p.unitsPerDirection = [](const std::string& destId) { return unitsPerDirectionFor(destId); };
 
-    p.populate = [](DropdownSelect& dd, int driveChar)
+    p.populate = [](DropdownSelect& dd, int driveChar, bool steppedMode)
     {
         // Walk the table once, opening a new section heading whenever the
         // section string changes. Items use the table index + 1 as their
@@ -112,6 +121,10 @@ inline ModDestProvider makeModDestProvider()
         const char* currentSection = nullptr;
         for (int i = 0; i < kModDestCount; ++i)
         {
+            // In Smooth mode, omit stepped-only destinations (octave) — the IDs are the
+            // table index +1, so skipping an item leaves the others' IDs unchanged.
+            if (! steppedMode && isSteppedOnlyDest(kModDestTable[i].id)) continue;
+
             const bool isInsert = (std::strcmp(kModDestTable[i].section, "Insert") == 0);
 
             if (currentSection == nullptr || std::strcmp(currentSection, kModDestTable[i].section) != 0)

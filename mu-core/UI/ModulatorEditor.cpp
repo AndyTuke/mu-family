@@ -50,11 +50,11 @@ static void populateNoteDropdown(DropdownSelect& dd)
 
 //==============================================================================
 ModulatorEditor::AssignmentRow::AssignmentRow(const std::string& assignId, int driveChar,
-                                              const ModDestProvider* provider)
+                                              const ModDestProvider* provider, bool steppedMode)
     : id(assignId)
 {
     if (provider && provider->populate)
-        provider->populate(destCombo, driveChar);
+        provider->populate(destCombo, driveChar, steppedMode);
 
     // shared BipolarSliderRow replaces inline depth + curve juce::Slider setup.
     bipolarPair.onDepthChange = [this](float v) { if (onDepthChange) onDepthChange(v); };
@@ -322,6 +322,7 @@ void ModulatorEditor::wireHeader()
         if (!smooth) syncStepValues();
         else { lockMod(); loadFromCS(); unlockMod(); }
         updateStepQuantization();
+        rebuildRows();   // refresh destination dropdowns — Smooth hides stepped-only dests (octave)
         resized();
         if (onChange) onChange();
     };
@@ -530,11 +531,12 @@ void ModulatorEditor::rebuildRows()
     if (!cs || !matrix) return;
 
     const juce::String sourceKey = cs->id + "_output";
+    const bool steppedMode = (cs->mode == ControlSequence::Mode::Stepped);
     for (const auto& a : matrix->getAssignments())
     {
         if (a.sourceId != sourceKey.toStdString()) continue;
 
-        auto row = std::make_unique<AssignmentRow>(a.id, currentDriveChar, destProvider);
+        auto row = std::make_unique<AssignmentRow>(a.id, currentDriveChar, destProvider, steppedMode);
         row->rowNumber = (int)rows.size() + 1;
         rowsBox.addAndMakeVisible(*row);
 

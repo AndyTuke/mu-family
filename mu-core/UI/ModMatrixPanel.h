@@ -42,7 +42,7 @@ private:
         std::function<void(float curve)>              onCurveChange;
 
         MatrixRow(const ModulationAssignment& a, int csIndex, int driveChar,
-                  const ModDestProvider* provider);
+                  const ModDestProvider* provider, bool steppedMode);
         void resized() override;
     };
 
