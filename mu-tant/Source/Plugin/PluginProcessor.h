@@ -202,6 +202,11 @@ public:
     void removeVoice(int idx);
     void swapVoices(int a, int b);   // reorder (drag in the sidebar)
     void resetVoice(int idx);        // reset a voice to defaults (keeps its colour)
+    // Recompute the cached stepped-pitch flags for one voice / all voices. Call on the
+    // message thread whenever a voice's modulators change (editor edit, preset load,
+    // voice add/remove/swap/reset); the audio thread reads the flags lock-free.
+    void refreshPitchQuantFlags(int v);
+    void refreshAllPitchQuantFlags();
 
     // Per-voice ("layer") presets — the voice's `v{N}_*` subtree saved/loaded as
     // a `.muPattern` file (voice-agnostic base IDs, so a preset loads into any
@@ -345,7 +350,7 @@ private:
     void   applyFilterEnvelope(int v, VoiceConfig& cfg, int numSamples);
     void   applyPitchEnvelope (int v, VoiceConfig& cfg);
     // True if a Stepped ControlSequence is assigned to `destId` — those snap pitch to
-    // semitones (melodies); smooth sources + the envelope glide. Read under modLock.
+    // semitones (melodies); smooth sources + the envelope glide.
     bool   pitchDestHasSteppedSource(const VoiceSlot& slot, const char* destId) const;
     bool   blkPlaying        = false;
     double blkBeatStart      = 0.0;
@@ -425,10 +430,11 @@ private:
     std::array<juce::NormalisableRange<float>, kNumModDests> modDestRanges{};
     std::array<std::array<const std::atomic<float>*, kNumModDests>, kMaxVoices> modDestAtoms{};
 
-    // Audio-thread cache (per voice): does a Stepped CS drive osc{1,2}.semi? Refreshed
-    // under the mod try-lock each block; on lock contention the last value is reused.
-    std::array<bool, kMaxVoices> osc1SemiStepped {};
-    std::array<bool, kMaxVoices> osc2SemiStepped {};
+    // Per voice: does a Stepped CS drive osc{1,2}.semi? Computed on the message thread when
+    // modulators change (refreshPitchQuantFlags), read lock-free by the audio thread —
+    // stepped pitch snaps to semitones, smooth glides (see #1021/#1025).
+    std::array<std::atomic<bool>, kMaxVoices> osc1SemiStepped {};
+    std::array<std::atomic<bool>, kMaxVoices> osc2SemiStepped {};
 
     // Internal transport. `playing` gates the beat advance; `internalBeatPos`
     // is the song position in beats (quarter notes) that drives modulator

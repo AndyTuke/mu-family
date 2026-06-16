@@ -162,6 +162,7 @@ PluginProcessor::PluginProcessor()
     }
 
     cacheParamPointers();        // resolve all APVTS atomics once (audio thread reads these)
+    refreshAllPitchQuantFlags(); // seed the stepped-pitch flags (default state has no modulators)
 
     // Pre-allocate modParamValues entries once so the audio-thread map
     // never allocates — keys live in static storage (the kModDestTable string
@@ -518,19 +519,6 @@ void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
     // round-trip to the base config, so cfg + the live-arc snapshot stay correct either way.
     // The dests are now proportion-clamped (scale 1.0) — a full-depth mod sweeps the whole
     // range and clamps at the rails, instead of overflowing it as the old display-unit path did.
-    // Refresh the "stepped pitch source?" cache under the mod try-lock (cheap walk of the
-    // assignments). On contention reuse last block's value — ≤1 block stale, inaudible.
-    {
-        auto& slot = voiceSlots[(size_t) v];
-        bool expected = false;
-        if (slot.modLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
-        {
-            osc1SemiStepped[(size_t) v] = pitchDestHasSteppedSource(slot, "osc1.semi");
-            osc2SemiStepped[(size_t) v] = pitchDestHasSteppedSource(slot, "osc2.semi");
-            slot.modLock.store(false, std::memory_order_release);
-        }
-    }
-
     float out[kNumModDests];
     mu_mod::resolveLane(&voiceSlots[(size_t) v], blkBeatStart, kNumModDests,
                         modDestIds.data(), modDestAtoms[(size_t) v].data(),
@@ -551,10 +539,12 @@ void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
     {
         const float o1Base = (float) voicePtrs[(size_t) v].o1Semi->load();
         const float o2Base = (float) voicePtrs[(size_t) v].o2Semi->load();
-        if (osc1SemiStepped[(size_t) v]) { cfg.osc1Semi = juce::roundToInt(out[D_o1Semi]); cfg.osc1SemiMod = 0.0f; }
-        else                             { cfg.osc1Semi = juce::roundToInt(o1Base);        cfg.osc1SemiMod = out[D_o1Semi] - o1Base; }
-        if (osc2SemiStepped[(size_t) v]) { cfg.osc2Semi = juce::roundToInt(out[D_o2Semi]); cfg.osc2SemiMod = 0.0f; }
-        else                             { cfg.osc2Semi = juce::roundToInt(o2Base);        cfg.osc2SemiMod = out[D_o2Semi] - o2Base; }
+        const bool  o1Stepped = osc1SemiStepped[(size_t) v].load(std::memory_order_relaxed);
+        const bool  o2Stepped = osc2SemiStepped[(size_t) v].load(std::memory_order_relaxed);
+        if (o1Stepped) { cfg.osc1Semi = juce::roundToInt(out[D_o1Semi]); cfg.osc1SemiMod = 0.0f; }
+        else           { cfg.osc1Semi = juce::roundToInt(o1Base);        cfg.osc1SemiMod = out[D_o1Semi] - o1Base; }
+        if (o2Stepped) { cfg.osc2Semi = juce::roundToInt(out[D_o2Semi]); cfg.osc2SemiMod = 0.0f; }
+        else           { cfg.osc2Semi = juce::roundToInt(o2Base);        cfg.osc2SemiMod = out[D_o2Semi] - o2Base; }
     }
     cfg.xmodIndex    = out[D_xmIndex] * 0.01f;   // param 0..100 → engine 0..1
     cfg.xmodDepth    = out[D_xmDepth] * 0.01f;   // param -100..100 → engine -1..1
@@ -689,6 +679,22 @@ bool PluginProcessor::pitchDestHasSteppedSource(const VoiceSlot& slot, const cha
     return false;
 }
 
+void PluginProcessor::refreshPitchQuantFlags(int v)
+{
+    if (v < 0 || v >= kMaxVoices) return;
+    // Message-thread only (after any modulator mutation); the audio thread reads the
+    // resulting atomics lock-free. Reading the assignments here is safe: the message
+    // thread is the sole writer and the mutation has already completed.
+    const auto& slot = voiceSlots[(size_t) v];
+    osc1SemiStepped[(size_t) v].store(pitchDestHasSteppedSource(slot, "osc1.semi"), std::memory_order_relaxed);
+    osc2SemiStepped[(size_t) v].store(pitchDestHasSteppedSource(slot, "osc2.semi"), std::memory_order_relaxed);
+}
+
+void PluginProcessor::refreshAllPitchQuantFlags()
+{
+    for (int v = 0; v < kMaxVoices; ++v) refreshPitchQuantFlags(v);
+}
+
 // One voice's full chain into the channel buffer: modulation → engine → gate →
 // insert. Invoked by MixerEngine::processBlock (Phase 1) per active channel; the
 // mixer then applies the channel strip + master. Renders even muted/un-soloed
@@ -820,6 +826,7 @@ int PluginProcessor::addVoice()
     voiceColourIndex[(size_t) n] = firstUnusedColourIndex();   // allocate its palette colour
     numVoices.store(n + 1);
     apvts.state.setProperty("numVoices", n + 1, nullptr);
+    refreshPitchQuantFlags(n);   // fresh slot has no modulators → flags off
     return n;
 }
 
@@ -848,6 +855,7 @@ void PluginProcessor::removeVoice(int idx)
     resetVoiceSlot(n - 1);                          // clear the vacated top slot
     numVoices.store(n - 1);
     apvts.state.setProperty("numVoices", n - 1, nullptr);
+    refreshAllPitchQuantFlags();                    // the down-shift renumbered every voice
 }
 
 void PluginProcessor::swapVoices(int a, int b)
@@ -905,6 +913,8 @@ void PluginProcessor::swapVoices(int a, int b)
     tmpPitch.copyDataFrom(pitchPatterns[(size_t) a]);
     pitchPatterns[(size_t) a].copyDataFrom(pitchPatterns[(size_t) b]);
     pitchPatterns[(size_t) b].copyDataFrom(tmpPitch);
+    refreshPitchQuantFlags(a);   // the two slots' modulators swapped
+    refreshPitchQuantFlags(b);
 }
 
 void PluginProcessor::resetVoice(int idx)
@@ -915,6 +925,7 @@ void PluginProcessor::resetVoice(int idx)
     const int keepColour = voiceColourIndex[(size_t) idx];
     resetVoiceSlot(idx);                       // params + gate + modulators → defaults
     voiceColourIndex[(size_t) idx] = keepColour;   // identity colour stays
+    refreshPitchQuantFlags(idx);               // modulators cleared → flags off
 }
 
 void PluginProcessor::saveVoicePreset(int voice, const juce::String& name)
@@ -1097,6 +1108,7 @@ void PluginProcessor::applyVoicePresetTree(int voice, const juce::ValueTree& tre
         migrateModDestIds(mods);
         mu_pp::deserialiseModulators(mods, voiceSlots[(size_t) voice], {}, isValidModDest);
     }
+    refreshPitchQuantFlags(voice);   // assignments changed → refresh stepped-pitch flags
     deserialiseGate(tree.getChildWithName("Gate"),       gatePatterns[(size_t) voice]);
     deserialiseGate(tree.getChildWithName("FilterGate"), filterPatterns[(size_t) voice]);
     deserialiseGate(tree.getChildWithName("PitchGate"),  pitchPatterns[(size_t) voice]);
@@ -1330,6 +1342,7 @@ void PluginProcessor::readVoiceDataFromState()
         resolveWt(voice.getProperty("o1WtPath", "").toString(), osc1UserPath, osc1UserIdx);
         resolveWt(voice.getProperty("o2WtPath", "").toString(), osc2UserPath, osc2UserIdx);
     }
+    refreshAllPitchQuantFlags();   // modulators reloaded → refresh stepped-pitch flags
 }
 
 void PluginProcessor::resetVoiceSlot(int idx)

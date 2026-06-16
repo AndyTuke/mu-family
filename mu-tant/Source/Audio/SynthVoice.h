@@ -126,7 +126,8 @@ private:
     juce::AudioBuffer<float> mono2;   // second buffer for parallel filter path
     double                   sr   = 44100.0;
     float                    lastA    = 0.0f;  // osc1 prev output (feedback FM z^-1)
-    double                   ssbPhase = 0.0;    // SSB shift-oscillator phase (cycles)
+    float                    ssbCos   = 1.0f;   // SSB shift phasor (recursive rotator)
+    float                    ssbSin   = 0.0f;
     float                    indexSm  = 0.0f;   // smoothed Lane A index (anti-zipper/click)
     float                    depthSm  = 0.0f;   // smoothed Lane B depth
     float                    ssbHzSm  = 0.0f;   // smoothed SSB shift (Hz)

@@ -306,6 +306,9 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     // ── Modulator panel ─────────────────────────────────────────────────────
     addAndMakeVisible(modulatorPanel);
     modulatorPanel.setDestProvider(&modDestProvider);
+    // A modulator edit (assignment/mode/dest change) may flip whether a Stepped CS drives
+    // pitch — refresh the processor's cached flags for the active voice (message thread).
+    modulatorPanel.onChange = [this] { proc.refreshPitchQuantFlags(currentVoice); };
 
     rebindAttachments();
     refreshVoicePresetList();   // initial scan; onSave will re-scan after any save

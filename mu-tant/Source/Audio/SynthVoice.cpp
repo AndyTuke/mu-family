@@ -26,7 +26,8 @@ void VoiceEngine::prepare(double sampleRate, int blockSize)
     filter2.reset();
     hilbert.reset();
     lastA    = 0.0f;
-    ssbPhase = 0.0;
+    ssbCos   = 1.0f;
+    ssbSin   = 0.0f;
     indexSm  = depthSm = ssbHzSm = 0.0f;
     mono .setSize(1, blockSize, false, false, true);  mono .clear();
     mono2.setSize(1, blockSize, false, false, true);  mono2.clear();
@@ -95,11 +96,23 @@ void VoiceEngine::process(juce::AudioBuffer<float>& out, int numSamples)
     const float ssbTgt    = cfg.xmodSsbHz;
     const float smCoef    = 1.0f - std::exp(-1.0f / (kXModSmoothMs * 0.001f * (float) sr));
 
+    // SSB uses a recursive complex rotator instead of a per-sample cos/sin: smooth the
+    // shift frequency at block rate, derive the per-sample rotation increment once (one
+    // cos/sin pair per block), then advance the phasor with 4 mults/sample and renormalise
+    // once at block end. ssbHz smoothing moves to block rate (shift changes are slow).
+    float rotC = 1.0f, rotS = 0.0f;
+    if (ampMode == 2)
+    {
+        ssbHzSm += (ssbTgt - ssbHzSm) * juce::jmin(1.0f, smCoef * (float) ns);
+        const double omega = juce::MathConstants<double>::twoPi * (double) ssbHzSm / sr;
+        rotC = (float) std::cos(omega);
+        rotS = (float) std::sin(omega);
+    }
+
     for (int i = 0; i < ns; ++i)
     {
         indexSm += (idxTgt - indexSm) * smCoef;
         depthSm += (depTgt - depthSm) * smCoef;
-        ssbHzSm += (ssbTgt - ssbHzSm) * smCoef;
 
         // Modulator (osc2) renders first; feedback FM phase-mods it with osc1's prev output.
         const float b = osc2.render(fdbk ? kFbScale * lastA : 0.0f);
@@ -127,13 +140,14 @@ void VoiceEngine::process(juce::AudioBuffer<float>& out, int numSamples)
         if (ampMode == 2)
         {
             // SSB / frequency shift: shift every partial of the carrier by ssbHz. Take the
-            // analytic signal (Hilbert) and multiply by a complex exponential, keep the real
-            // part → one sideband. Sign of the shift sets up/down.
-            const auto  q   = hilbert.process(a);
-            const float ang = (float) (ssbPhase * juce::MathConstants<double>::twoPi);
-            a = q.re * std::cos(ang) - q.im * std::sin(ang);
-            ssbPhase += (double) ssbHzSm / sr;
-            ssbPhase -= std::floor(ssbPhase);
+            // analytic signal (Hilbert) and multiply by the running complex phasor (cos/sin
+            // of the shift), keep the real part → one sideband. Advance the phasor by the
+            // per-block rotation increment (sign of the shift sets up/down).
+            const auto q = hilbert.process(a);
+            a = q.re * ssbCos - q.im * ssbSin;
+            const float nc = ssbCos * rotC - ssbSin * rotS;
+            ssbSin         = ssbCos * rotS + ssbSin * rotC;
+            ssbCos         = nc;
         }
         else if (depthSm != 0.0f)
         {
@@ -154,6 +168,14 @@ void VoiceEngine::process(juce::AudioBuffer<float>& out, int numSamples)
 
         const float n = noise.render(noiseType);
         m[i] = (a * osc1Gain + b * osc2Gain + n * noiseGain) * gain;
+    }
+
+    // Renormalise the SSB phasor once per block to counter slow magnitude drift from the
+    // recursive rotation (keeps |phasor| = 1 without a per-sample sqrt).
+    if (ampMode == 2)
+    {
+        const float mag = std::sqrt(ssbCos * ssbCos + ssbSin * ssbSin);
+        if (mag > 1.0e-6f) { ssbCos /= mag; ssbSin /= mag; }
     }
 
     // Dual filter — series or parallel.
