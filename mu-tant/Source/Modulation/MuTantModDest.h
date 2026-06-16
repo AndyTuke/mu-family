@@ -88,9 +88,20 @@ inline void registerDepthScales()
     });
 }
 
+// Discrete units per direction for a destination, so a STEPPED modulator's editor snaps
+// the graphic to whole units (an octave = 3 steps up/down, a scale degree = 12). Continuous
+// destinations (cutoff, levels, position, fine, x-mod…) return 0 → no snapping.
+inline int unitsPerDirectionFor(const std::string& destId)
+{
+    if (destId == "osc1.octave" || destId == "osc2.octave") return 3;    // ±3 octaves
+    if (destId == "osc1.semi"   || destId == "osc2.semi")   return 12;   // ±12 scale degrees
+    return 0;
+}
+
 inline ModDestProvider makeModDestProvider()
 {
     ModDestProvider p;
+    p.unitsPerDirection = [](const std::string& destId) { return unitsPerDirectionFor(destId); };
 
     p.populate = [](DropdownSelect& dd, int driveChar)
     {

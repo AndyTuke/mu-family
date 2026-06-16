@@ -489,21 +489,34 @@ void ModulatorEditor::updateStepQuantization()
         return;
     }
     const bool bipolar = (cs->polarity == ControlSequence::Polarity::Bipolar);
-    // mu-clid special case: when any assignment targets pitch.octave, snap the
-    // step editor to 7 (bipolar = ±3 oct, with 0) or 4 (unipolar = 0..3 oct).
-    // Generalised via the destination provider's resolveId so the rule only
-    // fires for products that actually expose "pitch.octave" (mu-tant doesn't).
+    // A stepped modulator snaps its editor to the destination's discrete units, so the
+    // graphic steps in whole units rather than drawing a smooth range that's quantised
+    // under the hood: U units/direction → 2U+1 levels bipolar (±U with 0), U+1 unipolar.
+    // The per-destination unit count comes from the product's provider (octave=3,
+    // scale-degree=12, continuous dests=0). The shared "pitch.octave" rule is kept as a
+    // fallback for products that don't supply unitsPerDirection (e.g. mu-clid).
     if (destProvider && destProvider->resolveId)
     {
+        int  bestUnits = 0;
+        bool sawSharedOctave = false;
         for (const auto& row : rows)
         {
             const int id = row->destCombo.getSelectedId();
             if (id < 1) continue;
-            if (destProvider->resolveId(id) == "pitch.octave")
-            {
-                stepEditor.setQuantization(bipolar ? 7 : 4);
-                return;
-            }
+            const std::string destId = destProvider->resolveId(id);
+            if (destProvider->unitsPerDirection)
+                bestUnits = juce::jmax(bestUnits, destProvider->unitsPerDirection(destId));
+            if (destId == "pitch.octave") sawSharedOctave = true;
+        }
+        if (bestUnits > 0)
+        {
+            stepEditor.setQuantization(bipolar ? 2 * bestUnits + 1 : bestUnits + 1);
+            return;
+        }
+        if (sawSharedOctave)
+        {
+            stepEditor.setQuantization(bipolar ? 7 : 4);
+            return;
         }
     }
     stepEditor.setQuantization(0);

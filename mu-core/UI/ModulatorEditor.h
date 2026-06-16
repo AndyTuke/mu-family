@@ -31,6 +31,12 @@ struct ModDestProvider
     // current destination set). Used to highlight the right item when rebuilding
     // the dropdown after a preset load.
     std::function<int(const std::string& destId)>          findDropdownId;
+    // Number of discrete units a destination has per direction (e.g. osc octave = 3,
+    // scale-degree = 12), so a STEPPED modulator's editor snaps to whole units (an
+    // octave gets 3 steps up/down, a scale degree 12). Return 0 for continuous
+    // destinations (filter cutoff, levels…) → no snapping. Optional; null = no per-dest
+    // quantization (the shared pitch.octave rule still applies as a fallback).
+    std::function<int(const std::string& destId)>          unitsPerDirection;
 };
 
 // Wire a provider's resolveId + findDropdownId from a destination-id-by-index accessor
