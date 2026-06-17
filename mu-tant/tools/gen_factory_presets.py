@@ -256,7 +256,7 @@ def write_voice_preset(voice):
 
 
 # ── .muTant (full preset) ────────────────────────────────────────────────────
-def write_full_preset(name, desc, category, voices, mixer, fx):
+def write_full_preset(name, desc, category, voices, mixer, fx, gate_overrides=None):
     root = ET.Element("MuTantPreset", name=name, description=desc, category=category)
     n = len(voices)
     colours = ",".join(str(i % 8) for i in range(8))
@@ -288,12 +288,15 @@ def write_full_preset(name, desc, category, voices, mixer, fx):
     for key, spec in FX_SPEC.items():
         param(key, float(fx.get(key, spec[3])))
 
-    # VoiceData (modulators + gates per active voice).
+    # VoiceData (modulators + gates per active voice). gate_overrides[v], when set,
+    # replaces the voice's own gate with a phase-shifted copy so layered voices
+    # interlock into call-and-response rather than hitting in unison (rule 6).
     vd = ET.SubElement(state, "VoiceData")
     for v in range(n):
         vt = ET.SubElement(vd, "Voice", idx=str(v))
         modulators_xml(vt, voices[v])
-        gate_xml(vt, "Gate", voices[v].gate)
+        g = gate_overrides[v] if (gate_overrides and gate_overrides[v] is not None) else voices[v].gate
+        gate_xml(vt, "Gate", g)
         gate_xml(vt, "FilterGate", voices[v].filtergate)
         gate_xml(vt, "PitchGate", voices[v].pitchgate)
 
@@ -301,25 +304,80 @@ def write_full_preset(name, desc, category, voices, mixer, fx):
     write_xml(root, os.path.join(PRESETS_DIR, safe + ".muTant"))
 
 
-# ── Rhythm helpers (32 cells over 2 bars at 1/16) ────────────────────────────
-def quarter_pulse(decay=0.6):
-    return [env(c, 2, split=0.0, dec=decay) for c in range(0, 32, 4)]
+# ── Gate-pattern vocabulary (32 cells = 2 bars at 1/16) ──────────────────────
+# Owner's vision: NO voice ships bypassed; gates are interesting (not straight
+# 16ths/8ths) and often leave large GAPS so layered voices interlock into
+# call-and-response. Sustained voices get slow gapped swells, never a static hold.
 
-def eighth_pulse(decay=0.4):
-    return [env(c, 1, split=0.0, dec=decay) for c in range(0, 32, 2)]
+def _bjorklund(k, n):
+    # Even spread of k onsets across n steps — Euclidean rhythm (Bjorklund 2005).
+    if k <= 0:
+        return [0] * n
+    if k >= n:
+        return [1] * n
+    counts, rem = [], [k]
+    divisor, level = n - k, 0
+    while True:
+        counts.append(divisor // rem[level])
+        rem.append(divisor % rem[level])
+        divisor = rem[level]
+        level += 1
+        if rem[level] <= 1:
+            break
+    counts.append(divisor)
 
-def offbeat():
-    return [env(c, 2, split=0.0, dec=0.5) for c in range(2, 32, 4)]
+    def build(l):
+        if l == -1:
+            return [0]
+        if l == -2:
+            return [1]
+        seq = []
+        for _ in range(counts[l]):
+            seq += build(l - 1)
+        if rem[l]:
+            seq += build(l - 2)
+        return seq
 
-def syncopated():
-    starts = [0, 3, 6, 8, 11, 14, 16, 19, 22, 24, 27, 30]
-    return [env(c, 1, split=0.0, dec=0.5) for c in starts]
+    res = build(level)
+    i = res.index(1)
+    return res[i:] + res[:i]
 
-def swell():
-    return [env(c, 8, split=0.9, atk=0.3) for c in range(0, 32, 8)]
 
-def half_pulse():
-    return [env(c, 4, split=0.0, dec=0.7) for c in range(0, 32, 8)]
+def euclid(k, n=16, rot=0, length=1, dec=0.5, scale=2):
+    # k Euclidean onsets over n steps; each step spans `scale` cells; rotated.
+    pat = _bjorklund(k, n)
+    pat = pat[rot % n:] + pat[:rot % n]
+    return [env(i * scale, length, dec=dec) for i, on in enumerate(pat)
+            if on and i * scale < 32]
+
+
+def hits(cells, length=1, dec=0.5, split=0.0, atk=0.0):
+    # Explicit onset cells → short envelopes (plucks/stabs).
+    return [env(c, length, split=split, atk=atk, dec=dec) for c in cells if c < 32]
+
+
+def swells(segs):
+    # Sustained-but-moving: (start, len, atk, dec) long envelopes separated by gaps.
+    return [env(s, l, split=0.6, atk=a, dec=d) for (s, l, a, d) in segs]
+
+# Sustained-voice gate families — long envelopes with gaps (movement, never held).
+def tidal():      return swells([(0, 22, 0.5, 0.5)])                         # one big swell, then rest
+def two_swells(): return swells([(0, 12, 0.45, 0.4), (16, 12, 0.45, 0.4)])   # breathe · gap · breathe
+def breath():     return swells([(0, 14, 0.6, 0.3), (20, 8, 0.5, 0.5)])      # long in, short answer
+def three_rise(): return swells([(0, 6, 0.5, 0.3), (10, 8, 0.5, 0.3), (22, 8, 0.6, 0.4)])
+
+# Rhythmic / call-and-response families — sparse, big gaps for interlocking.
+def call():       return hits([0, 3, 6], length=2, dec=0.5)                  # phrase in bar 1, silence after
+def response():   return hits([18, 21, 24], length=2, dec=0.5)              # answer late in bar 2
+def clave():      return hits([0, 3, 6, 10, 12], length=1, dec=0.6)         # 3-2 son-clave feel
+def dub():        return hits([4, 12, 20, 28], length=2, dec=0.7)           # spacious offbeat stabs
+def broken():     return hits([0, 3, 4, 11, 16, 22, 27], length=1, dec=0.55)
+def sparse():     return hits([0, 11, 22], length=3, dec=0.5)               # three widely-spaced plucks
+
+
+def rotate_gate(envs, offset):
+    # Shift every envelope's start by offset cells (wrap in the 32-cell grid).
+    return [dict(e, start=(e["start"] + offset) % 32) for e in envs]
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -366,12 +424,16 @@ drone_specs = [
     ("Permafrost",     dict(o1_wt=WT["sq2sine"], o2_wt=WT["bell"], o1_oct=-1, o2_oct=0, o2_semi=12, flt_type=FT["LP12"], flt_cut=2800, flt_res=0.15, level=-11)),
     ("Pressure Drop",  dict(o1_wt=WT["sine"], o2_wt=WT["fm21"], o1_oct=-2, o2_oct=-1, xmod_index=18, xmod_phaseMode=1, flt_type=FT["LP24"], flt_cut=600, level=-9)),
 ]
+DRONE_GATES = [tidal, two_swells, breath, three_rise]
 for nm, pr in drone_specs:
-    v = make(nm, "Drones", gate_bypass=1, **pr)
-    v.lfo("cs0", "filter.cutoff", round(random.uniform(0.12, 0.30), 2), loopNV="Whole",
-          shape=random.choice(["sine", "triangle"]))
-    if random.random() < 0.4:
-        v.lfo("cs1", "osc1.pos", round(random.uniform(0.1, 0.25), 2), loopNV="Half", shape="sine")
+    v = make(nm, "Drones", **pr)                          # rule 1: never bypassed
+    v.add_gate(random.choice(DRONE_GATES)(), "gate")      # slow gapped swell = movement
+    v.lfo("cs0", "filter.cutoff", round(random.uniform(0.15, 0.35), 2), loopNV="Whole",
+          shape=random.choice(["sine", "triangle"]))      # rule 4: stay dynamic
+    if random.random() < 0.6:
+        v.lfo("cs1", "osc1.pos", round(random.uniform(0.12, 0.28), 2), loopNV="Half", shape="sine")
+    if random.random() < 0.35:
+        v.lfo("cs2", "osc2.fine", round(random.uniform(0.04, 0.10), 2), loopNV="Whole", shape="triangle")
 
 # ── PADS (lush, sustained, brighter, movement on position) ───────────────────
 pad_specs = [
@@ -396,11 +458,13 @@ pad_specs = [
     ("Slow Bloom",     dict(o1_wt=WT["even"], o2_wt=WT["saw2sine"], o1_oct=0, o2_oct=0, o2_fine=8, flt_type=FT["LP24"], flt_cut=3000, flt_res=0.2)),
     ("Horizon Line",   dict(o1_wt=WT["formanthi"], o2_wt=WT["sine"], o1_oct=0, o2_oct=1, flt_type=FT["LP12"], flt_cut=4800, flt_res=0.14)),
 ]
+PAD_GATES = [two_swells, three_rise, breath]
 for nm, pr in pad_specs:
-    v = make(nm, "Pads", gate_bypass=1, level=-8, **pr)
-    v.lfo("cs0", "osc1.pos", round(random.uniform(0.15, 0.35), 2), loopNV="Whole", shape="sine")
-    if random.random() < 0.5:
-        v.lfo("cs1", "filter.cutoff", round(random.uniform(0.1, 0.22), 2), loopNV="Half", shape="triangle")
+    v = make(nm, "Pads", level=-8, **pr)                  # rule 1: never bypassed
+    v.add_gate(random.choice(PAD_GATES)(), "gate")        # gentle gapped swells
+    v.lfo("cs0", "osc1.pos", round(random.uniform(0.18, 0.38), 2), loopNV="Whole", shape="sine")
+    if random.random() < 0.6:
+        v.lfo("cs1", "filter.cutoff", round(random.uniform(0.12, 0.25), 2), loopNV="Half", shape="triangle")
 
 # ── BASSES (low, focused, bypassed sustain) ──────────────────────────────────
 bass_specs = [
@@ -420,8 +484,19 @@ bass_specs = [
     ("Pluck Bass",     dict(o1_wt=WT["fm11"], o2_wt=WT["sine"], o1_oct=-1, o2_oct=-2, xmod_index=20, flt_type=FT["LP24"], flt_cut=800, flt_res=0.3)),
     ("Cavern Bass",    dict(o1_wt=WT["hollow"], o2_wt=WT["triangle"], o1_oct=-2, o2_oct=-2, flt_type=FT["LP12"], flt_cut=400, flt_res=0.2)),
 ]
+def bass_gate():
+    return random.choice([
+        lambda: euclid(3, 8,  rot=random.randint(0, 3), length=2, dec=0.6),
+        lambda: euclid(5, 16, rot=random.randint(0, 4), length=1, dec=0.55),
+        sparse, dub, call,
+    ])()
 for nm, pr in bass_specs:
-    make(nm, "Bass", gate_bypass=1, level=-6, o1_lvl=0, o2_lvl=-4, **pr)
+    v = make(nm, "Bass", level=-6, o1_lvl=0, o2_lvl=-4, **pr)   # rule 1: never bypassed
+    v.add_gate(bass_gate(), "gate")                              # sparse plucks w/ big gaps
+    if random.random() < 0.5:
+        v.lfo("cs0", "filter.cutoff", round(random.uniform(0.12, 0.28), 2), loopNV="Half", shape="triangle")
+    if v.p.get("drvChar", 0) == 0 and random.random() < 0.5:     # rule 5: more inserts
+        v.set(drvChar=INS["TapeSat"], insP1=round(random.uniform(0.3, 0.5), 2))
 
 # ── LEADS (mid/high, expressive) ─────────────────────────────────────────────
 lead_specs = [
@@ -436,9 +511,18 @@ lead_specs = [
     ("Resin Lead",     dict(o1_wt=WT["saw"], o2_wt=WT["odd"], o1_oct=0, o2_oct=0, o2_fine=-6, flt_type=FT["LP24"], flt_cut=3800, flt_res=0.35)),
     ("Theremin",       dict(o1_wt=WT["sine"], o2_wt=WT["triangle"], o1_oct=1, o2_oct=0, o1_penv_depth=2, flt_type=FT["LP12"], flt_cut=5200, flt_res=0.12)),
 ]
+def lead_gate():
+    return random.choice([
+        lambda: euclid(5, 16, rot=random.randint(0, 5), length=1, dec=0.45),
+        lambda: euclid(7, 16, rot=random.randint(0, 6), length=1, dec=0.40),
+        call, broken,
+    ])()
 for nm, pr in lead_specs:
-    v = make(nm, "Leads", gate_bypass=1, level=-8, **pr)
-    v.lfo("cs0", "osc1.fine", round(random.uniform(0.05, 0.12), 2), loopNV="Quarter", shape="sine")
+    v = make(nm, "Leads", level=-8, **pr)                # rule 1: never bypassed
+    v.add_gate(lead_gate(), "gate")                       # gappy melodic phrases
+    v.lfo("cs0", "osc1.fine", round(random.uniform(0.04, 0.10), 2), loopNV="Quarter", shape="sine")
+    if v.p.get("drvChar", 0) == 0 and random.random() < 0.4:
+        v.set(drvChar=INS["TapeSat"], insP1=round(random.uniform(0.25, 0.45), 2))
 
 # ── TEXTURES / FX (xmod-heavy, noise, inharmonic) ────────────────────────────
 texture_specs = [
@@ -455,35 +539,50 @@ texture_specs = [
     ("Solar Wind",     dict(o1_wt=WT["formantsweep"], o2_wt=WT["harmstack"], xmod_ampMode=2, xmod_ssb=250, flt_type=FT["BP12"], flt_cut=2000, flt_res=0.4)),
     ("Tape Ghosts",    dict(o1_wt=WT["vocal"], o2_wt=WT["sparse"], xmod_index=35, xmod_fdbk=1, drvChar=INS["TapeSat"], insP1=0.6, flt_type=FT["BP24"], flt_cut=1800, flt_res=0.4)),
 ]
+def texture_gate():
+    return random.choice([
+        broken,
+        lambda: euclid(7, 16, rot=random.randint(0, 6), length=1, dec=0.5),
+        lambda: hits(sorted(random.sample(range(32), 6)), length=1, dec=0.5),  # irregular/glitchy
+        sparse,
+    ])()
 for nm, pr in texture_specs:
-    v = make(nm, "Textures", gate_bypass=1, level=-10, **pr)
-    v.lfo("cs0", "xmod.index", round(random.uniform(0.2, 0.45), 2), loopNV="Half",
+    v = make(nm, "Textures", level=-10, **pr)            # rule 1: never bypassed
+    v.add_gate(texture_gate(), "gate")                    # irregular gates, big gaps
+    v.lfo("cs0", "xmod.index", round(random.uniform(0.25, 0.50), 2), loopNV="Half",
           shape=random.choice(["sine", "triangle", "random"]))
+    if random.random() < 0.5:
+        v.lfo("cs1", "filter.cutoff", round(random.uniform(0.2, 0.4), 2), loopNV="Whole", shape="random")
+    if v.p.get("drvChar", 0) == 0 and random.random() < 0.6:   # rule 5: more inserts
+        v.set(drvChar=random.choice([INS["Bitcrusher"], INS["Fold"], INS["TapeSat"]]),
+              insP1=round(random.uniform(0.4, 0.7), 2))
 
 # ── RHYTHMIC / GATED (gate envelopes; audible while playing) ──────────────────
+# Each rhythmic voice picks an interesting gappy gate (Euclidean / clave / broken
+# / call-response) — never a straight 16th/8th grid. (name, gate-factory, params).
 rhythm_specs = [
-    ("Pulse Engine",   quarter_pulse(), dict(o1_wt=WT["saw"], o2_wt=WT["square"], o1_oct=-1, o2_oct=-1, flt_type=FT["LP24"], flt_cut=1600, flt_res=0.4)),
-    ("Ticker",         eighth_pulse(),  dict(o1_wt=WT["pwm"], o2_wt=WT["sine"], o1_oct=0, o2_oct=-1, flt_type=FT["BP12"], flt_cut=2400, flt_res=0.3)),
-    ("Offbeat Stab",   offbeat(),       dict(o1_wt=WT["square"], o2_wt=WT["saw"], o1_oct=0, o2_oct=0, flt_type=FT["LP24"], flt_cut=2000, flt_res=0.45)),
-    ("Sync Sequence",  syncopated(),    dict(o1_wt=WT["syncsaw"], o2_wt=WT["pwm"], o1_oct=-1, o2_oct=0, flt_type=FT["LP24"], flt_cut=2200, flt_res=0.4)),
-    ("Slow Swell",     swell(),         dict(o1_wt=WT["saw2sine"], o2_wt=WT["bell"], o1_oct=0, o2_oct=0, flt_type=FT["LP12"], flt_cut=3000, flt_res=0.2)),
-    ("Half Note Pump", half_pulse(),    dict(o1_wt=WT["organ"], o2_wt=WT["saw2sine"], o1_oct=0, o2_oct=-1, flt_type=FT["LP12"], flt_cut=2600, flt_res=0.2)),
-    ("Plucked Drone",  quarter_pulse(0.8), dict(o1_wt=WT["bell"], o2_wt=WT["sine"], o1_oct=0, o2_oct=0, flt_type=FT["LP12"], flt_cut=4000, flt_res=0.2)),
-    ("Stutter Bass",   eighth_pulse(0.6),  dict(o1_wt=WT["saw"], o2_wt=WT["square"], o1_oct=-2, o2_oct=-1, flt_type=FT["LP24"], flt_cut=900, flt_res=0.4)),
-    ("Tremolo Pad",    eighth_pulse(0.2),  dict(o1_wt=WT["saw2sine"], o2_wt=WT["sq2sine"], o1_oct=0, o2_oct=0, flt_type=FT["LP12"], flt_cut=3200, flt_res=0.2)),
-    ("Gated Choir",    quarter_pulse(0.5), dict(o1_wt=WT["vocal"], o2_wt=WT["formantlo"], o1_oct=0, o2_oct=0, flt_type=FT["BP12"], flt_cut=1800, flt_res=0.35)),
-    ("Machine Pulse",  syncopated(),    dict(o1_wt=WT["fm21"], o2_wt=WT["square"], o1_oct=-1, o2_oct=-1, xmod_index=30, flt_type=FT["LP24"], flt_cut=1400, flt_res=0.4)),
-    ("Heartbeat",      half_pulse(),    dict(o1_wt=WT["sine"], o2_wt=WT["triangle"], o1_oct=-2, o2_oct=-2, flt_type=FT["LP12"], flt_cut=500)),
-    ("Arpeggio Bed",   eighth_pulse(0.5),  dict(o1_wt=WT["harmstack"], o2_wt=WT["bell"], o1_oct=0, o2_oct=1, flt_type=FT["LP12"], flt_cut=4200, flt_res=0.18)),
-    ("Throb",          quarter_pulse(0.4), dict(o1_wt=WT["odd"], o2_wt=WT["saw"], o1_oct=-1, o2_oct=-1, flt_type=FT["LP24"], flt_cut=1200, flt_res=0.45)),
-    ("Ratchet",        eighth_pulse(0.7),  dict(o1_wt=WT["sparse"], o2_wt=WT["fm31"], o1_oct=0, o2_oct=0, xmod_index=40, flt_type=FT["BP12"], flt_cut=2600, flt_res=0.4)),
-    ("Morse Code",     syncopated(),    dict(o1_wt=WT["sine"], o2_wt=WT["square"], o1_oct=0, o2_oct=-1, flt_type=FT["LP12"], flt_cut=2000)),
-    ("Iron Pendulum",  half_pulse(),    dict(o1_wt=WT["odd"], o2_wt=WT["hollow"], o1_oct=-1, o2_oct=-2, flt_type=FT["LP24"], flt_cut=800, flt_res=0.4, drvChar=INS["SoftClip"], insP1=0.4)),
-    ("Chime Sequence", quarter_pulse(0.7), dict(o1_wt=WT["bell"], o2_wt=WT["harmstack"], o1_oct=0, o2_oct=1, flt_type=FT["LP12"], flt_cut=5000, flt_res=0.15)),
+    ("Pulse Engine",   lambda: euclid(5, 16, rot=0, length=1, dec=0.5),  dict(o1_wt=WT["saw"], o2_wt=WT["square"], o1_oct=-1, o2_oct=-1, flt_type=FT["LP24"], flt_cut=1600, flt_res=0.4)),
+    ("Ticker",         lambda: euclid(7, 16, rot=2, length=1, dec=0.4),  dict(o1_wt=WT["pwm"], o2_wt=WT["sine"], o1_oct=0, o2_oct=-1, flt_type=FT["BP12"], flt_cut=2400, flt_res=0.3)),
+    ("Offbeat Stab",   dub,                                              dict(o1_wt=WT["square"], o2_wt=WT["saw"], o1_oct=0, o2_oct=0, flt_type=FT["LP24"], flt_cut=2000, flt_res=0.45)),
+    ("Sync Sequence",  clave,                                            dict(o1_wt=WT["syncsaw"], o2_wt=WT["pwm"], o1_oct=-1, o2_oct=0, flt_type=FT["LP24"], flt_cut=2200, flt_res=0.4)),
+    ("Slow Swell",     three_rise,                                       dict(o1_wt=WT["saw2sine"], o2_wt=WT["bell"], o1_oct=0, o2_oct=0, flt_type=FT["LP12"], flt_cut=3000, flt_res=0.2)),
+    ("Half Note Pump", lambda: euclid(3, 8, rot=0, length=2, dec=0.7),   dict(o1_wt=WT["organ"], o2_wt=WT["saw2sine"], o1_oct=0, o2_oct=-1, flt_type=FT["LP12"], flt_cut=2600, flt_res=0.2)),
+    ("Plucked Drone",  lambda: euclid(5, 16, rot=3, length=1, dec=0.8),  dict(o1_wt=WT["bell"], o2_wt=WT["sine"], o1_oct=0, o2_oct=0, flt_type=FT["LP12"], flt_cut=4000, flt_res=0.2)),
+    ("Stutter Bass",   broken,                                           dict(o1_wt=WT["saw"], o2_wt=WT["square"], o1_oct=-2, o2_oct=-1, flt_type=FT["LP24"], flt_cut=900, flt_res=0.4)),
+    ("Tremolo Pad",    lambda: euclid(7, 16, rot=1, length=1, dec=0.2),  dict(o1_wt=WT["saw2sine"], o2_wt=WT["sq2sine"], o1_oct=0, o2_oct=0, flt_type=FT["LP12"], flt_cut=3200, flt_res=0.2)),
+    ("Gated Choir",    call,                                             dict(o1_wt=WT["vocal"], o2_wt=WT["formantlo"], o1_oct=0, o2_oct=0, flt_type=FT["BP12"], flt_cut=1800, flt_res=0.35)),
+    ("Machine Pulse",  lambda: euclid(5, 16, rot=2, length=1, dec=0.45), dict(o1_wt=WT["fm21"], o2_wt=WT["square"], o1_oct=-1, o2_oct=-1, xmod_index=30, flt_type=FT["LP24"], flt_cut=1400, flt_res=0.4)),
+    ("Heartbeat",      lambda: hits([0, 2, 16, 18], length=2, dec=0.7),  dict(o1_wt=WT["sine"], o2_wt=WT["triangle"], o1_oct=-2, o2_oct=-2, flt_type=FT["LP12"], flt_cut=500)),
+    ("Arpeggio Bed",   lambda: euclid(7, 16, rot=4, length=1, dec=0.5),  dict(o1_wt=WT["harmstack"], o2_wt=WT["bell"], o1_oct=0, o2_oct=1, flt_type=FT["LP12"], flt_cut=4200, flt_res=0.18)),
+    ("Throb",          lambda: euclid(3, 8, rot=1, length=2, dec=0.4),   dict(o1_wt=WT["odd"], o2_wt=WT["saw"], o1_oct=-1, o2_oct=-1, flt_type=FT["LP24"], flt_cut=1200, flt_res=0.45)),
+    ("Ratchet",        lambda: hits([0, 1, 2, 8, 16, 17, 18, 24], length=1, dec=0.7), dict(o1_wt=WT["sparse"], o2_wt=WT["fm31"], o1_oct=0, o2_oct=0, xmod_index=40, flt_type=FT["BP12"], flt_cut=2600, flt_res=0.4)),
+    ("Morse Code",     lambda: hits([0, 2, 4, 10, 16, 18, 26], length=1, dec=0.5), dict(o1_wt=WT["sine"], o2_wt=WT["square"], o1_oct=0, o2_oct=-1, flt_type=FT["LP12"], flt_cut=2000)),
+    ("Iron Pendulum",  lambda: euclid(3, 8, rot=2, length=2, dec=0.5),   dict(o1_wt=WT["odd"], o2_wt=WT["hollow"], o1_oct=-1, o2_oct=-2, flt_type=FT["LP24"], flt_cut=800, flt_res=0.4, drvChar=INS["SoftClip"], insP1=0.4)),
+    ("Chime Sequence", lambda: euclid(5, 16, rot=5, length=1, dec=0.7),  dict(o1_wt=WT["bell"], o2_wt=WT["harmstack"], o1_oct=0, o2_oct=1, flt_type=FT["LP12"], flt_cut=5000, flt_res=0.15)),
 ]
-for nm, g, pr in rhythm_specs:
-    v = make(nm, "Rhythmic", gate_bypass=0, gate_gap=8, level=-7, **pr)
-    v.add_gate(g, "gate")
+for nm, gfn, pr in rhythm_specs:
+    v = make(nm, "Rhythmic", gate_gap=8, level=-7, **pr)
+    v.add_gate(gfn(), "gate")
     if random.random() < 0.4:
         v.lfo("cs0", "filter.cutoff", round(random.uniform(0.15, 0.3), 2), loopNV="Whole", shape="triangle")
 
@@ -548,12 +647,23 @@ full_count = 0
 for ti, (base_name, cat, draw_cats, nv, fxfn, sends) in enumerate(full_templates):
     for variant in range(5):    # 20 templates × 5 = 100
         name = base_name if variant == 0 else f"{base_name} {variant + 1}"
-        # Pick nv voices from the requested categories (cycle through cats).
-        pool = []
-        for c in draw_cats:
-            pool += by_cat.get(c, [])
-        chosen = random.sample(pool, min(nv, len(pool)))
+        # Pick nv complementary voices by ROUND-ROBINing the listed categories, so a
+        # template that pairs e.g. Rhythmic+Bass yields one of each, not two of one.
+        chosen, guard = [], 0
+        while len(chosen) < nv and guard < nv * 6:
+            c = draw_cats[len(chosen) % len(draw_cats)]
+            pool = [x for x in by_cat.get(c, []) if x not in chosen]
+            if pool:
+                chosen.append(random.choice(pool))
+            guard += 1
         nv_actual = len(chosen)
+
+        # Interlocking gates: phase-shift each layered voice's gate by an even slice
+        # of the 2-bar grid so they answer each other (call-and-response).
+        overrides = []
+        for ci, vc in enumerate(chosen):
+            off = (ci * 32 // nv_actual) if nv_actual > 1 else 0
+            overrides.append(rotate_gate(vc.gate, off) if off else None)
 
         # Mixer: spread pans, set per-channel level + FX sends so the rack is heard.
         mixer = {"root": random.choice(list(ROOTS.values())), "scale": 0, "mstrLoop": 0}
@@ -567,7 +677,7 @@ for ti, (base_name, cat, draw_cats, nv, fxfn, sends) in enumerate(full_templates
 
         fx = fxfn()
         write_full_preset(name, f"{cat} — {', '.join(v.name for v in chosen)}",
-                          cat, chosen, mixer, fx)
+                          cat, chosen, mixer, fx, gate_overrides=overrides)
         full_count += 1
 
 # ── Write all voice presets ──────────────────────────────────────────────────
