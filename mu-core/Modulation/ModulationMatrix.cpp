@@ -141,14 +141,21 @@ void ModulationMatrix::rebuildCache()
     for (std::size_t i = 0; i < n; ++i)
         cachedDepthKeys[i] = std::string(kMetaPrefix) + assignments[i].id + kMetaSuffix;
 
-    // Pre-size workMap so process() never rehashes (8 CS + n assignments + headroom).
-    const std::size_t needed = 8 + n + 4;
+    // Rebuild workMap on the message thread so process() (audio thread) only ever
+    // OVERWRITES existing keys — never inserts (an insert allocates a node, RT-unsafe).
+    // clear() here also purges stale keys left by removed assignments. We pre-insert
+    // BOTH key families process() writes each block:
+    //   - every CS-output key (cs0_output..csN_output) — written from `sequences`
+    //   - every assignment depth key (meta-modulation sources)
+    // (A previous version cleared + re-inserted inside process(), which freed these
+    // nodes every block and reallocated them on the audio thread.)
+    const std::size_t needed = (std::size_t) mu_limits::kMaxControlSequences + n + 4;
+    workMap.clear();
     if (workMap.bucket_count() < needed)
         workMap.reserve(needed + 16);
 
-    // Pre-insert every depth key so process() only overwrites, never inserts.
-    // Without this, the first process() call after addAssignment() would insert
-    // a new hash-map node on the audio thread — a one-time but RT-unsafe alloc.
+    for (int i = 0; i < mu_limits::kMaxControlSequences; ++i)
+        workMap.emplace("cs" + std::to_string(i) + "_output", 0.0f);
     for (std::size_t i = 0; i < n; ++i)
         workMap.emplace(cachedDepthKeys[i], 0.0f);
 }
@@ -160,9 +167,8 @@ void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,
     if (assignments.empty())
         return;
 
-    // workMap is pre-sized in rebuildCache(); no reserve needed here.
-    workMap.clear();
-
+    // No clear()/insert here — rebuildCache() (message thread) pre-inserted every
+    // CS-output and depth key, so these are pure overwrites: no audio-thread alloc.
     // CS output keys are short ("cs0_output" = 10 chars) and fit in SSO on all platforms.
     for (const auto& cs : sequences)
         workMap[cs.id + "_output"] = cs.evaluate(songBeatPos);

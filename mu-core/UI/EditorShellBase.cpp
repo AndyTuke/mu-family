@@ -224,13 +224,41 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
     startVersionCheck();
 }
 
+void EditorShellBase::showUpgradeAvailable(int latestBuild)
+{
+    const juce::String current   = "v1.0.0." + juce::String(BUILD_NUMBER);
+    const juce::String available = "v1.0.0." + juce::String(latestBuild);
+    upgradeBanner.setText(
+        juce::String::fromUTF8("Update available  \xe2\x80\x94  you have ") + current
+            + juce::String::fromUTF8("  \xe2\x80\x94  ") + available
+            + juce::String::fromUTF8(" is out  \xe2\x80\x94  click here to download"),
+        juce::dontSendNotification);
+    upgradeAvailable.store(true);
+    upgradeBanner.setVisible(true);
+    resized();
+    repaint();
+}
+
 void EditorShellBase::startVersionCheck()
 {
-    // Ask GitHub for the "latest release" — the same endpoint the website's
-    // download page uses — parse the build number out of its tag (v1.0.0.NNN),
-    // and raise the upgrade banner if it beats our local BUILD_NUMBER. Runs on
-    // a throwaway thread (the fetch blocks on the network) and fails silently
-    // offline / when rate-limited, so it never disrupts the editor.
+    // Ask GitHub for the "latest release" — the same endpoint the website's download
+    // page uses — parse the build number out of its tag (v1.0.0.NNN), and raise the
+    // upgrade banner if it beats our local BUILD_NUMBER.
+    //
+    // The result is cached PROCESS-WIDE so we fetch at most once per process: reopening
+    // the editor, or running many plugin instances in one DAW session, all share the
+    // single result instead of each hammering GitHub's unauthenticated API (60 req/hr/IP,
+    // after which the call would just fail). Fetch runs on a throwaway thread (it blocks
+    // on the network) and fails silently offline.
+    //   -1 = not yet checked   0 = checked, nothing newer   >BUILD_NUMBER = newer build
+    static std::atomic<int>  s_latestBuild  { -1 };
+    static std::atomic<bool> s_fetchStarted { false };
+
+    const int cached = s_latestBuild.load(std::memory_order_acquire);
+    if (cached > BUILD_NUMBER) { showUpgradeAvailable(cached); return; }  // already known
+    if (cached >= 0)           return;                                    // already checked, none newer
+    if (s_fetchStarted.exchange(true)) return;                           // a fetch is already in flight
+
     juce::Component::SafePointer<EditorShellBase> safe(this);
     juce::Thread::launch([safe]
     {
@@ -238,31 +266,24 @@ void EditorShellBase::startVersionCheck()
         const auto opts = juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)
                               .withConnectionTimeoutMs(5000);
         std::unique_ptr<juce::InputStream> stream(url.createInputStream(opts));
-        if (stream == nullptr) return;
 
-        const juce::String body = stream->readEntireStreamAsString();
-        const juce::var json = juce::JSON::parse(body);
-        const juce::String tag = json.getProperty("tag_name", {}).toString();  // e.g. "v1.0.0.920"
-        if (tag.isEmpty()) return;
+        int latestBuild = 0;   // 0 = nothing newer / fetch failed
+        if (stream != nullptr)
+        {
+            const juce::var json = juce::JSON::parse(stream->readEntireStreamAsString());
+            const juce::String tag = json.getProperty("tag_name", {}).toString();  // e.g. "v1.0.0.920"
+            if (tag.isNotEmpty())   // build number = final dot-separated segment
+                latestBuild = tag.fromLastOccurrenceOf(".", false, false).getIntValue();
+        }
 
-        // The build number is the final dot-separated segment of the tag.
-        const int latestBuild = tag.fromLastOccurrenceOf(".", false, false).getIntValue();
+        // Cache the verdict for this process (clamp to 0 when nothing newer / failed).
+        s_latestBuild.store(latestBuild > BUILD_NUMBER ? latestBuild : 0, std::memory_order_release);
         if (latestBuild <= BUILD_NUMBER) return;
 
         juce::MessageManager::callAsync([safe, latestBuild]
         {
             if (safe == nullptr) return;   // editor closed mid-check
-            const juce::String current   = "v1.0.0." + juce::String(BUILD_NUMBER);
-            const juce::String available = "v1.0.0." + juce::String(latestBuild);
-            safe->upgradeBanner.setText(
-                juce::String::fromUTF8("Update available  \xe2\x80\x94  you have ") + current
-                    + juce::String::fromUTF8("  \xe2\x80\x94  ") + available
-                    + juce::String::fromUTF8(" is out  \xe2\x80\x94  click here to download"),
-                juce::dontSendNotification);
-            safe->upgradeAvailable.store(true);
-            safe->upgradeBanner.setVisible(true);
-            safe->resized();
-            safe->repaint();
+            safe->showUpgradeAvailable(latestBuild);
         });
     });
 }

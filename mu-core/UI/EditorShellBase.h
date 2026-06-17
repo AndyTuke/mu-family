@@ -123,7 +123,10 @@ protected:
     // Set true (message thread) once an online version check finds a newer release.
     std::atomic<bool> upgradeAvailable { false };
     // Kicks off the async GitHub "latest release" check; fail-silent + off-thread.
+    // Result is cached process-wide so it fetches at most once per process.
     void startVersionCheck();
+    // Raises the upgrade banner for the given available build number (message thread).
+    void showUpgradeAvailable(int latestBuild);
     // The page opened when the upgrade banner is clicked.
     static constexpr const char* kDownloadUrl = "https://transwarp.me/download";
 
