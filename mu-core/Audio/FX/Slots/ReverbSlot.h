@@ -34,7 +34,12 @@ public:
     void setAlgorithm(int index);
     int  getAlgorithmIndex() const { return algorithmIndex; }
 
-    void setParam(const juce::String& id, float value);
+    // Primary, allocation-free overload — string literals at the call sites bind here
+    // (no juce::String constructed), so the audio-thread automation path (#1040) and
+    // mu-on's per-block RumbleEngine push (#1041) don't heap-allocate.
+    void setParam(const char* id, float value);
+    // Convenience overload for callers that already hold a juce::String.
+    void setParam(const juce::String& id, float value) { setParam(id.toRawUTF8(), value); }
 
     // Per-param getters — used by the UI / APVTS-push path right after
     // setAlgorithm to read the algorithm's new defaults out of the slot and

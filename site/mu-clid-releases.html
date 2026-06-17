@@ -134,6 +134,7 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
           <h3>Fixed</h3>
           <ul>
             <li>Fixed a potential click/dropout when using modulation — the modulation engine no longer allocates memory on the audio thread. <span class="ref">(1039)</span></li>
+            <li>Fixed a potential click/dropout when automating reverb or effect parameters — these no longer allocate memory on the audio thread. <span class="ref">(1040)</span></li>
             <li>The in-plugin update check now runs once per session instead of on every window open. <span class="ref">(1038)</span></li>
             <li>Aligned the Close button on the MIDI program-change preset tables. <span class="ref">(1032)</span></li>
             <li>Fixed garbled characters in the MIDI program-change preset table headings and in the "sample missing" messages. <span class="ref">(1014)</span></li>

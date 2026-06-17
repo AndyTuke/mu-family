@@ -4,6 +4,7 @@
 #include <signalsmith-basics/reverb.h>
 #pragma warning(pop)
 #include <cmath>
+#include <cstring>   // std::strcmp (alloc-free setParam)
 
 // Pimpl: keeps Signalsmith headers (and their transitive windows.h) out of ReverbSlot.h.
 struct ReverbSlot::ReverbImpl
@@ -136,14 +137,17 @@ void ReverbSlot::setAlgorithm(int index)
     updateReverb();
 }
 
-void ReverbSlot::setParam(const juce::String& id, float value)
+void ReverbSlot::setParam(const char* id, float value)
 {
-    if      (id == "size")      size      = value;
-    else if (id == "predelay")  preDelay.store(value, std::memory_order_relaxed);
-    else if (id == "diffusion") diffusion = value;
-    else if (id == "damp")      damp      = value;
-    else if (id == "mod")       mod       = value;
-    else if (id == "dirt")      dirt.store(value, std::memory_order_relaxed);
+    // strcmp on the raw id — no juce::String built, so this is safe to call per-block
+    // (RumbleEngine) and on the audio-thread automation path (syncFxSlotParam).
+    auto is = [id](const char* s) { return std::strcmp(id, s) == 0; };
+    if      (is("size"))      size      = value;
+    else if (is("predelay"))  preDelay.store(value, std::memory_order_relaxed);
+    else if (is("diffusion")) diffusion = value;
+    else if (is("damp"))      damp      = value;
+    else if (is("mod"))       mod       = value;
+    else if (is("dirt"))      dirt.store(value, std::memory_order_relaxed);
     updateReverb();
 }
 

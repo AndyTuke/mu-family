@@ -185,7 +185,7 @@ void ProcessorBase::syncFxSlotParam(const juce::String& id, float v)
     else if (id == "eff_en")   eff.setEnabled(v > 0.5f);
     else if (id.startsWith("eff_p"))
     {
-        const int idx = id.substring(5).getIntValue();
+        const int idx = id.getTrailingIntValue();   // "eff_pN" → N, alloc-free (no substring)
         const auto& algos = FXAlgorithmRegistry::effectAlgorithms();
         const int ai = eff.getAlgorithmIndex();
         if (ai < (int) algos.size() && idx < (int) algos[(size_t) ai].params.size())
