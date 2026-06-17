@@ -36,6 +36,11 @@ protected:
     int contentW()   const noexcept { return colW; }
     int contentTop() const noexcept;   // first usable Y, below the header bar + page pad
 
+    // Row geometry — controls sit left-aligned, indented from the section headings
+    // (which start at contentX()). Shared so every product's rows line up the same.
+    int rowLabelX()   const noexcept { return colX + s(kRowIndent); }
+    int rowControlX() const noexcept { return colX + s(kRowIndent) + s(kLabelW) + s(kLabelCtrlGap); }
+
     // ── Styled drawing helpers for paintContent() ──────────────────────────────
     // Group header — larger font + thick full-width divider (sub-panel banner).
     void drawGroupHeader  (juce::Graphics&, int y, const juce::String& title) const;
@@ -54,10 +59,11 @@ protected:
     static constexpr int kSectionHeadH = 22;   // section header band height
     static constexpr int kRowH         = 26;
     static constexpr int kRowGap       = 8;
-    static constexpr int kLabelW       = 140;
+    static constexpr int kRowIndent    = 16;   // rows indented this far in from the section headings
+    static constexpr int kLabelW       = 90;   // left-aligned row label column
     static constexpr int kControlW     = 220;
     static constexpr int kContentMaxW  = 620;  // cap content column so it doesn't sprawl
-    static constexpr int kLabelCtrlGap = 12;   // horizontal gap between right-aligned label and control
+    static constexpr int kLabelCtrlGap = 12;   // horizontal gap between label and control
     static constexpr int kCloseBtnW    = 70;
     static constexpr int kCloseBtnH    = 26;
 
@@ -65,6 +71,7 @@ private:
     void computeColumn();   // populates colX/colW from the current width
 
     juce::TextButton closeBtn { "Close" };
+    juce::HyperlinkButton supportLink;   // "Contact Support" → mailto:support@transwarp.me (footer)
     int colX = 0;
     int colW = 0;
 };

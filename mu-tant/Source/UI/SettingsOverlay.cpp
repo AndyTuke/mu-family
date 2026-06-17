@@ -16,7 +16,7 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
         lbl.setText(text, juce::dontSendNotification);
         lbl.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(12.0f))));
         lbl.setColour(juce::Label::textColourId, MuLookAndFeel::colour(MuLookAndFeel::labelText));
-        lbl.setJustificationType(juce::Justification::centredRight);
+        lbl.setJustificationType(juce::Justification::centredLeft);
         addAndMakeVisible(lbl);
     };
 
@@ -190,46 +190,42 @@ void SettingsOverlay::layoutContent()
     using mu_ui::s;
     computeLayout();   // Close button + header bar are positioned by the base.
 
-    const int x       = layout.contentX;
-    const int cw      = layout.contentW;
+    const int lblX    = rowLabelX();      // indented from the section headings
+    const int ctrlX   = rowControlX();    // left-aligned control column
     const int labelW  = s(kLabelW);
-    const int ctrlGap = s(kLabelCtrlGap);
-    const int ctrlX   = x + labelW + ctrlGap;
     const int ctrlW   = s(kControlW);
     const int rowH    = s(kRowH);
     const int mvW     = s(kMasterVolW);
     const int mvH     = s(kMasterVolH);
 
-    // Audio — Master Vol knob centred horizontally within the column.
-    masterVolKnob.setBounds(x + (cw - mvW) / 2, layout.masterVolY, mvW, mvH);
+    // Audio — Master Vol knob left-aligned at the row indent.
+    masterVolKnob.setBounds(lblX, layout.masterVolY, mvW, mvH);
 
-    uiSizeLabel.setBounds(x,     layout.uiSizeRowY, labelW, rowH);
+    uiSizeLabel.setBounds(lblX,  layout.uiSizeRowY, labelW, rowH);
     uiSizeCtrl .setBounds(ctrlX, layout.uiSizeRowY, ctrlW,  rowH);
 
-    bpmLabel.setBounds(x,     layout.bpmRowY, labelW, rowH);
+    bpmLabel.setBounds(lblX,  layout.bpmRowY, labelW, rowH);
     bpmInput.setBounds(ctrlX, layout.bpmRowY, s(90), rowH);
 
-    swapModeLabel   .setBounds(x,     layout.swapRowY, labelW, rowH);
+    swapModeLabel   .setBounds(lblX,  layout.swapRowY, labelW, rowH);
     swapModeDropdown.setBounds(ctrlX, layout.swapRowY, ctrlW,  rowH);
 
     if (isStandalone)
     {
-        clockSourceLabel    .setBounds(x,     layout.clockSourceRowY,  labelW, rowH);
+        clockSourceLabel    .setBounds(lblX,  layout.clockSourceRowY,  labelW, rowH);
         clockSourceDropdown .setBounds(ctrlX, layout.clockSourceRowY,  ctrlW,  rowH);
-        midiMessagesLabel   .setBounds(x,     layout.midiMessagesRowY, labelW, rowH);
+        midiMessagesLabel   .setBounds(lblX,  layout.midiMessagesRowY, labelW, rowH);
         midiMessagesDropdown.setBounds(ctrlX, layout.midiMessagesRowY, ctrlW,  rowH);
     }
 
-    noteModeLabel   .setBounds(x,     layout.noteModeRowY, labelW, rowH);
+    noteModeLabel   .setBounds(lblX,  layout.noteModeRowY, labelW, rowH);
     noteModeDropdown.setBounds(ctrlX, layout.noteModeRowY, ctrlW,  rowH);
 
-    // MIDI Program Change — two buttons side-by-side, centred within the column.
+    // MIDI Program Change — two buttons side-by-side, left-aligned at the row indent.
     const int btnGap = s(8);
-    const int btnW   = juce::jmin(s(200), (cw - btnGap) / 2);
-    const int totalW = btnW * 2 + btnGap;
-    const int btnX   = x + (cw - totalW) / 2;
-    midiPresetsBtn.setBounds(btnX,                 layout.midiPCRowY, btnW, rowH);
-    fullPresetsBtn.setBounds(btnX + btnW + btnGap, layout.midiPCRowY, btnW, rowH);
+    const int btnW   = s(180);
+    midiPresetsBtn.setBounds(lblX,                 layout.midiPCRowY, btnW, rowH);
+    fullPresetsBtn.setBounds(lblX + btnW + btnGap, layout.midiPCRowY, btnW, rowH);
 }
 
 void SettingsOverlay::paintContent(juce::Graphics& g)

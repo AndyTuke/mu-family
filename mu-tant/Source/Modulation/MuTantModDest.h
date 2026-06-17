@@ -45,12 +45,17 @@ inline constexpr ModDest kModDestTable[] = {
     { "osc1.level",   "Osc1 Level",    "Levels" },
     { "osc2.level",   "Osc2 Level",    "Levels" },
     { "noise.level",  "Noise Level",   "Levels" },
-    // ── Filter ──────────────────────────────────────────────────────────────
-    { "filter.cutoff",     "Filter Cutoff",     "Filter" },
-    { "filter.resonance",  "Filter Resonance",  "Filter" },
+    // ── Filter 1 (cutoff/resonance are shared mu-core dests; drive/lo-cut use the
+    //    ".prop" proportion convention → depthScaleFor=1.0, no mu-core edit) ──────
+    { "filter.cutoff",     "Cutoff",     "Filter 1" },
+    { "filter.resonance",  "Resonance",  "Filter 1" },
+    { "filter.drive.prop", "Drive",      "Filter 1" },
+    { "filter.locut.prop", "Low Cut",    "Filter 1" },
     // ── Filter 2 (proportion-space — ".prop" → depthScaleFor=1.0, no mu-core edit) ──
-    { "filter2.cutoff.prop",    "Filter 2 Cutoff",    "Filter 2" },
-    { "filter2.resonance.prop", "Filter 2 Resonance", "Filter 2" },
+    { "filter2.cutoff.prop",    "Cutoff",     "Filter 2" },
+    { "filter2.resonance.prop", "Resonance",  "Filter 2" },
+    { "filter2.drive.prop",     "Drive",      "Filter 2" },
+    { "filter2.locut.prop",     "Low Cut",    "Filter 2" },
     // ── Amp ─────────────────────────────────────────────────────────────────
     { "level",        "Level",         "Amp"    },
     // ── Insert (normalised 0..1 — same IDs as mu-clid so depthScaleFor=1.0) ──

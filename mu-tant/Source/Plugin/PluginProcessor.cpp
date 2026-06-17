@@ -48,7 +48,9 @@ namespace
         { "xmod.index", "xmod_index" }, { "xmod.depth", "xmod_depth" }, { "xmod.ssb", "xmod_ssb" },
         { "osc1.level", "o1_lvl" },  { "osc2.level", "o2_lvl" }, { "noise.level", "noise_lvl" },
         { "filter.cutoff", "flt_cut" }, { "filter.resonance", "flt_res" },
+        { "filter.drive.prop", "flt_drv" }, { "filter.locut.prop", "flt_lo_cut" },
         { "filter2.cutoff.prop", "flt2_cut" }, { "filter2.resonance.prop", "flt2_res" },
+        { "filter2.drive.prop", "flt2_drv" }, { "filter2.locut.prop", "flt2_lo_cut" },
         { "level", "level" },
         { "insert.p1", "insP1" }, { "insert.p2", "insP2" }, { "insert.p3", "insP3" }, { "insert.p4", "insP4" },
     };
@@ -58,7 +60,8 @@ namespace
     // Index of each resolved value in the resolveLane `out` array (kTantModParams order).
     enum { D_o1Oct = 0, D_o1Semi, D_o1Fine, D_o1Pos, D_o2Oct, D_o2Semi, D_o2Fine, D_o2Pos,
            D_xmIndex, D_xmDepth, D_xmSsb, D_o1Lvl, D_o2Lvl, D_nzLvl, D_fCut, D_fRes,
-           D_f2Cut, D_f2Res, D_level, D_insP1, D_insP2, D_insP3, D_insP4 };
+           D_fDrv, D_fLoCut, D_f2Cut, D_f2Res, D_f2Drv, D_f2LoCut, D_level,
+           D_insP1, D_insP2, D_insP3, D_insP4 };
 
     // Compile-time integrity guard: pin kTantModParams' row order to kModDestTable (the
     // persisted assignment ids) AND to the D_* indices, so a reorder/insert that would seed
@@ -552,11 +555,15 @@ void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
     cfg.osc1LevelDb  = out[D_o1Lvl];
     cfg.osc2LevelDb  = out[D_o2Lvl];
     cfg.noiseLevelDb = out[D_nzLvl];
-    cfg.filterCutoff = out[D_fCut];
-    cfg.filterRes    = out[D_fRes];
-    cfg.filter2Cutoff= out[D_f2Cut];
-    cfg.filter2Res   = out[D_f2Res];
-    cfg.levelDb      = out[D_level];
+    cfg.filterCutoff   = out[D_fCut];
+    cfg.filterRes      = out[D_fRes];
+    cfg.filterDrive    = out[D_fDrv];
+    cfg.filterLowCutHz = out[D_fLoCut];
+    cfg.filter2Cutoff  = out[D_f2Cut];
+    cfg.filter2Res     = out[D_f2Res];
+    cfg.filter2Drive   = out[D_f2Drv];
+    cfg.filter2LowCutHz= out[D_f2LoCut];
+    cfg.levelDb        = out[D_level];
 
     // Publish post-matrix values for the UI live-arc indicators (same units as the bound knobs:
     // filter cutoff in Hz, xmod 0..100, levels in dB). Filter 2 + insert P1-4 are read by the

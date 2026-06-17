@@ -47,7 +47,7 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     const juce::Colour headingCol = MuLookAndFeel::colour(MuLookAndFeel::ColourIds::headingText);
 
     // ── Display — UI size picker (Medium = 1.0, Large = 1.25 = 1463×1088 window)
-    makeFieldLabel(uiSizeLabel, "Size", labelCol, juce::Justification::centredRight);
+    makeFieldLabel(uiSizeLabel, "Size", labelCol, juce::Justification::centredLeft);
     {
         const float current = proc.getUiScale();
         // Medium=index 0, Large=index 1. Stored value > midpoint snaps to Large.
@@ -62,7 +62,7 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     };
     addAndMakeVisible(uiSizeCtrl);
 
-    makeFieldLabel(swapModeLabel, "Timing", labelCol, juce::Justification::centredRight);
+    makeFieldLabel(swapModeLabel, "Timing", labelCol, juce::Justification::centredLeft);
 
     swapModeDropdown.addItem("On master loop", 1);
     swapModeDropdown.addItem("On rhythm loop", 2);
@@ -76,7 +76,7 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
 
     if (isStandalone)
     {
-        makeFieldLabel(clockSourceLabel, "Source", labelCol, juce::Justification::centredRight);
+        makeFieldLabel(clockSourceLabel, "Source", labelCol, juce::Justification::centredLeft);
 
         clockSourceDropdown.addItem("Internal", 1);
         clockSourceDropdown.addItem("MIDI In",  2);
@@ -88,7 +88,7 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
         };
         addAndMakeVisible(clockSourceDropdown);
 
-        makeFieldLabel(midiMessagesLabel, "Messages", labelCol, juce::Justification::centredRight);
+        makeFieldLabel(midiMessagesLabel, "Messages", labelCol, juce::Justification::centredLeft);
 
         midiMessagesDropdown.addItem("Clock only",  1);
         midiMessagesDropdown.addItem("Transport",   2);
@@ -105,7 +105,7 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
 
     if (!isStandalone)
     {
-        makeFieldLabel(midiModeLabel, "Mode", labelCol, juce::Justification::centredRight);
+        makeFieldLabel(midiModeLabel, "Mode", labelCol, juce::Justification::centredLeft);
 
         midiModeDropdown.addItem("Free", 1);
         midiModeDropdown.addItem("Note", 2);
@@ -320,10 +320,9 @@ void SettingsOverlay::layoutContent()
 
     const int x       = layout.contentX;
     const int cw      = layout.contentW;
-    const int labelX  = x;
+    const int labelX  = rowLabelX();      // indented from the section headings
     const int labelW  = s(kLabelW);
-    const int ctrlGap = s(kLabelCtrlGap);
-    const int ctrlX   = x + labelW + ctrlGap;
+    const int ctrlX   = rowControlX();    // left-aligned control column
     const int ctrlW   = s(kControlW);
     const int rowH    = s(kRowH);
     const int mvW     = s(kMasterVolW);
@@ -331,8 +330,8 @@ void SettingsOverlay::layoutContent()
     const int fbtnW   = s(kFolderBtnW);
     const int fbtnGap = s(kFolderBtnGap);
 
-    // Audio — Master Vol knob centred horizontally within the column.
-    masterVolKnob.setBounds(x + (cw - mvW) / 2, layout.masterVolY, mvW, mvH);
+    // Audio — Master Vol knob left-aligned at the row indent.
+    masterVolKnob.setBounds(labelX, layout.masterVolY, mvW, mvH);
 
     // Display — Size picker (Medium / Large). Hint label drawn in paint() below.
     uiSizeLabel.setBounds(labelX, layout.uiSizeRowY, labelW, rowH);
@@ -356,14 +355,12 @@ void SettingsOverlay::layoutContent()
         midiModeDropdown.setBounds(ctrlX,  layout.midiModeRowY, ctrlW,  rowH);
     }
 
-    // MIDI Program Change — two buttons side-by-side, centred within the content column.
+    // MIDI Program Change — two buttons side-by-side, left-aligned at the row indent.
     {
         const int btnGap = s(kFolderBtnGap);
-        const int btnW   = juce::jmin(s(200), (cw - btnGap) / 2);
-        const int totalW = btnW * 2 + btnGap;
-        const int btnX   = x + (cw - totalW) / 2;
-        midiPresetsBtn.setBounds(btnX,                       layout.midiPCRowY, btnW, rowH);
-        fullPresetsBtn.setBounds(btnX + btnW + btnGap,       layout.midiPCRowY, btnW, rowH);
+        const int btnW   = s(180);
+        midiPresetsBtn.setBounds(labelX,                  layout.midiPCRowY, btnW, rowH);
+        fullPresetsBtn.setBounds(labelX + btnW + btnGap,  layout.midiPCRowY, btnW, rowH);
     }
 
     multiBusToggle.setBounds(ctrlX, layout.multiBusRowY, ctrlW, rowH);
@@ -405,7 +402,7 @@ void SettingsOverlay::paintContent(juce::Graphics& g)
     drawSectionHeader(g, layout.contentHeader,      "Content Folder");
 
     // Rescan-required hint next to the multi-bus toggle.
-    const int hintX = layout.contentX + s(kLabelW) + s(kLabelCtrlGap) + s(kControlW) + s(kLabelCtrlGap);
+    const int hintX = rowControlX() + s(kControlW) + s(kLabelCtrlGap);
     const int hintW = layout.contentX + layout.contentW - hintX;
     drawHint(g, layout.multiBusRowY + s(kRowH) / 2, "(host rescan required after toggling)",
              hintX, hintW);
@@ -417,7 +414,6 @@ void SettingsOverlay::paintContent(juce::Graphics& g)
     // paint) update immediately.
     const int hintY = layout.uiSizeRowY + s(kRowH) + s(kRowGap) / 2;
     drawHint(g, hintY, "(reopen the plugin for label fonts to fully rescale)",
-             layout.contentX + s(kLabelW) + s(kLabelCtrlGap),
-             layout.contentX + layout.contentW
-                - (layout.contentX + s(kLabelW) + s(kLabelCtrlGap)));
+             rowControlX(),
+             layout.contentX + layout.contentW - rowControlX());
 }

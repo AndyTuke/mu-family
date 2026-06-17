@@ -135,7 +135,8 @@ void MidiFullPresetsPanel::resized()
     const int headerH = s(kHeaderH);
     const int hintH = s(kHintH);
 
-    closeBtn.setBounds(w - pad * 3 - s(60), pad, s(60), s(28));
+    // Right edge aligned with the toggle row / list (inset by pad, not pad*3).
+    closeBtn.setBounds(w - pad - s(60), pad, s(60), s(28));
 
     // Enabled toggle row.
     const int toggleRowY = headerH + pad;

@@ -425,7 +425,7 @@ private:
     // `modDestRanges` each param's NormalisableRange (voice-independent); `modDestAtoms` the
     // per-voice backing APVTS atomics. resolveLane seeds proportions from the atoms, runs the
     // voice's matrix under a try-lock, and writes the modulated values back in param units.
-    static constexpr int kNumModDests = 23;   // == mu_tant::kModDestCount (asserted in the .cpp)
+    static constexpr int kNumModDests = 27;   // == mu_tant::kModDestCount (asserted in the .cpp)
     std::array<const char*, kNumModDests>                    modDestIds   {};
     std::array<juce::NormalisableRange<float>, kNumModDests> modDestRanges{};
     std::array<std::array<const std::atomic<float>*, kNumModDests>, kMaxVoices> modDestAtoms{};

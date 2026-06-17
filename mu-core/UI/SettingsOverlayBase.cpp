@@ -7,6 +7,15 @@ SettingsOverlayBase::SettingsOverlayBase()
 {
     closeBtn.onClick = [this] { if (onClose) onClose(); };
     addAndMakeVisible(closeBtn);
+
+    // Contact Support footer link (shared across every product's settings page).
+    supportLink.setButtonText("Contact Support");
+    supportLink.setURL(juce::URL("mailto:support@transwarp.me"));
+    supportLink.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(12.0f))), false,
+                        juce::Justification::centredLeft);
+    supportLink.setColour(juce::HyperlinkButton::textColourId,
+                          MuLookAndFeel::colour(MuLookAndFeel::ColourIds::globalAccent));
+    addAndMakeVisible(supportLink);
 }
 
 void SettingsOverlayBase::computeColumn()
@@ -30,6 +39,10 @@ void SettingsOverlayBase::resized()
     const int closeH  = s(kCloseBtnH);
     const int headerH = s(kHeaderH);
     closeBtn.setBounds(w - s(kPad) - closeW, (headerH - closeH) / 2, closeW, closeH);
+
+    // "Contact Support" footer — bottom-left, aligned under the section headings.
+    const int linkH = s(20);
+    supportLink.setBounds(colX, getHeight() - s(kPad) - linkH, s(160), linkH);
 
     layoutContent();
 }
