@@ -700,7 +700,7 @@ void VoicePanel::resized()
             const int wtX    = pad + wtInset;
             osc1WaveDropdown.setBounds(wtX, waveY, juce::jmax(s(40), knobsX - wtX - wtInset), ddH);
             int x = knobsX;
-            for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PosKnob, &o1PenvDepthKnob })
+            for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PenvDepthKnob, &o1PosKnob })
             { k->setBounds(x, rowY, s2W, s2H);  x += s2W + s(2); }
         }
 
@@ -712,7 +712,7 @@ void VoicePanel::resized()
             const int wtX    = osc2X + wtInset;
             osc2WaveDropdown.setBounds(wtX, waveY, juce::jmax(s(40), knobsX - wtX - wtInset), ddH);
             int x = knobsX;
-            for (auto* k : { &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PosKnob, &o2PenvDepthKnob })
+            for (auto* k : { &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PenvDepthKnob, &o2PosKnob })
             { k->setBounds(x, rowY, s2W, s2H);  x += s2W + s(2); }
         }
 

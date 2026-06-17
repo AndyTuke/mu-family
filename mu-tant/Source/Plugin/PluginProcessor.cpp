@@ -43,14 +43,14 @@ namespace
     // with the map keys the matrix reads — the D_* enum below indexes the resolved `out` array.
     struct TantModParam { const char* destId; const char* apvtsBase; };
     constexpr TantModParam kTantModParams[] = {
-        { "osc1.octave", "o1_oct" }, { "osc1.semi", "o1_semi" }, { "osc1.fine", "o1_fine" }, { "osc1.pos", "o1_pos" },
-        { "osc2.octave", "o2_oct" }, { "osc2.semi", "o2_semi" }, { "osc2.fine", "o2_fine" }, { "osc2.pos", "o2_pos" },
+        { "osc1.octave", "o1_oct" }, { "osc1.semi", "o1_semi" }, { "osc1.fine", "o1_fine" }, { "osc1.pos", "o1_pos" }, { "osc1.penv.prop", "o1_penv_depth" },
+        { "osc2.octave", "o2_oct" }, { "osc2.semi", "o2_semi" }, { "osc2.fine", "o2_fine" }, { "osc2.pos", "o2_pos" }, { "osc2.penv.prop", "o2_penv_depth" },
         { "xmod.index", "xmod_index" }, { "xmod.depth", "xmod_depth" }, { "xmod.ssb", "xmod_ssb" },
         { "osc1.level", "o1_lvl" },  { "osc2.level", "o2_lvl" }, { "noise.level", "noise_lvl" },
         { "filter.cutoff", "flt_cut" }, { "filter.resonance", "flt_res" },
-        { "filter.drive.prop", "flt_drv" }, { "filter.locut.prop", "flt_lo_cut" },
+        { "filter.drive.prop", "flt_drv" }, { "filter.locut.prop", "flt_lo_cut" }, { "filter.env.prop", "flt_env_depth" },
         { "filter2.cutoff.prop", "flt2_cut" }, { "filter2.resonance.prop", "flt2_res" },
-        { "filter2.drive.prop", "flt2_drv" }, { "filter2.locut.prop", "flt2_lo_cut" },
+        { "filter2.drive.prop", "flt2_drv" }, { "filter2.locut.prop", "flt2_lo_cut" }, { "filter2.env.prop", "flt2_env_depth" },
         { "level", "level" },
         { "insert.p1", "insP1" }, { "insert.p2", "insP2" }, { "insert.p3", "insP3" }, { "insert.p4", "insP4" },
     };
@@ -58,9 +58,11 @@ namespace
                   "kTantModParams must pair every kModDestTable destination 1:1");
 
     // Index of each resolved value in the resolveLane `out` array (kTantModParams order).
-    enum { D_o1Oct = 0, D_o1Semi, D_o1Fine, D_o1Pos, D_o2Oct, D_o2Semi, D_o2Fine, D_o2Pos,
-           D_xmIndex, D_xmDepth, D_xmSsb, D_o1Lvl, D_o2Lvl, D_nzLvl, D_fCut, D_fRes,
-           D_fDrv, D_fLoCut, D_f2Cut, D_f2Res, D_f2Drv, D_f2LoCut, D_level,
+    enum { D_o1Oct = 0, D_o1Semi, D_o1Fine, D_o1Pos, D_o1Penv,
+           D_o2Oct, D_o2Semi, D_o2Fine, D_o2Pos, D_o2Penv,
+           D_xmIndex, D_xmDepth, D_xmSsb, D_o1Lvl, D_o2Lvl, D_nzLvl,
+           D_fCut, D_fRes, D_fDrv, D_fLoCut, D_fEnv,
+           D_f2Cut, D_f2Res, D_f2Drv, D_f2LoCut, D_f2Env, D_level,
            D_insP1, D_insP2, D_insP3, D_insP4 };
 
     // Compile-time integrity guard: pin kTantModParams' row order to kModDestTable (the
@@ -362,6 +364,8 @@ VoiceConfig PluginProcessor::readConfig(int voiceIdx) const
     c.filter2Drive    = p.flt2Drv->load();
     c.filter2LowCutHz = p.flt2LoCut->load();
     c.filterSeries    = p.fltSeries->load() > 0.5f;
+    c.osc1PitchEnvDepth = p.o1PenvDepth->load();
+    c.osc2PitchEnvDepth = p.o2PenvDepth->load();
     c.levelDb         = p.level->load();
     return c;
 }
@@ -555,14 +559,18 @@ void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
     cfg.osc1LevelDb  = out[D_o1Lvl];
     cfg.osc2LevelDb  = out[D_o2Lvl];
     cfg.noiseLevelDb = out[D_nzLvl];
+    cfg.osc1PitchEnvDepth = out[D_o1Penv];
+    cfg.osc2PitchEnvDepth = out[D_o2Penv];
     cfg.filterCutoff   = out[D_fCut];
     cfg.filterRes      = out[D_fRes];
     cfg.filterDrive    = out[D_fDrv];
     cfg.filterLowCutHz = out[D_fLoCut];
+    cfg.filterEnvDepth = out[D_fEnv];
     cfg.filter2Cutoff  = out[D_f2Cut];
     cfg.filter2Res     = out[D_f2Res];
     cfg.filter2Drive   = out[D_f2Drv];
     cfg.filter2LowCutHz= out[D_f2LoCut];
+    cfg.filter2EnvDepth= out[D_f2Env];
     cfg.levelDb        = out[D_level];
 
     // Publish post-matrix values for the UI live-arc indicators (same units as the bound knobs:
@@ -655,8 +663,10 @@ void PluginProcessor::applyPitchEnvelope(int v, VoiceConfig& cfg)
         {
             pPat.resetGateCache();
             const float envLevel = pPat.gateAt(blkBeatStart, 0.0f);
-            const float d1 = voicePtrs[(size_t) v].o1PenvDepth->load();
-            const float d2 = voicePtrs[(size_t) v].o2PenvDepth->load();
+            // Depth comes from cfg (so it tracks any pitch-env-depth modulation applied
+            // in applyModulation), not the raw param.
+            const float d1 = cfg.osc1PitchEnvDepth;
+            const float d2 = cfg.osc2PitchEnvDepth;
             // Fractional semitone offset — the envelope sweeps smoothly (no semitone stepping).
             cfg.osc1SemiMod += d1 * envLevel;
             cfg.osc2SemiMod += d2 * envLevel;

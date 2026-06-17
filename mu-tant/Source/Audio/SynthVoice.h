@@ -32,6 +32,10 @@ struct VoiceConfig
     // than stepping; stepped modulators instead snap osc{1,2}Semi (melodies).
     float osc1SemiMod = 0.0f, osc2SemiMod = 0.0f;
 
+    // Pitch-envelope depth (±24 semitones) per osc — consumed by applyPitchEnvelope.
+    // Held in the config so modulation of the depth (a mod destination) is honoured.
+    float osc1PitchEnvDepth = 0.0f, osc2PitchEnvDepth = 0.0f;
+
     // Wavetable scan position — frame index 0..255 (256-frame Serum/Vital tables).
     float osc1Pos     = 0.0f, osc2Pos    = 0.0f;
 

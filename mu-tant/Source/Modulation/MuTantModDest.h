@@ -32,11 +32,13 @@ inline constexpr ModDest kModDestTable[] = {
     { "osc1.semi",    "Osc1 Semi",     "Osc 1" },
     { "osc1.fine",    "Osc1 Fine",     "Osc 1" },
     { "osc1.pos",     "Osc1 Position", "Osc 1" },
+    { "osc1.penv.prop", "Pitch Env",   "Osc 1" },
     // ── Pitch (osc2) ────────────────────────────────────────────────────────
     { "osc2.octave",  "Osc2 Octave",   "Osc 2" },
     { "osc2.semi",    "Osc2 Semi",     "Osc 2" },
     { "osc2.fine",    "Osc2 Fine",     "Osc 2" },
     { "osc2.pos",     "Osc2 Position", "Osc 2" },
+    { "osc2.penv.prop", "Pitch Env",   "Osc 2" },
     // ── Cross-mod (2-lane bus model — mu-tant-xmod-design.md) ─────────────────
     { "xmod.index",   "X-Mod Index",   "X-Mod" },
     { "xmod.depth",   "X-Mod Depth",   "X-Mod" },
@@ -51,11 +53,13 @@ inline constexpr ModDest kModDestTable[] = {
     { "filter.resonance",  "Resonance",  "Filter 1" },
     { "filter.drive.prop", "Drive",      "Filter 1" },
     { "filter.locut.prop", "Low Cut",    "Filter 1" },
+    { "filter.env.prop",   "Env Depth",  "Filter 1" },
     // ── Filter 2 (proportion-space — ".prop" → depthScaleFor=1.0, no mu-core edit) ──
     { "filter2.cutoff.prop",    "Cutoff",     "Filter 2" },
     { "filter2.resonance.prop", "Resonance",  "Filter 2" },
     { "filter2.drive.prop",     "Drive",      "Filter 2" },
     { "filter2.locut.prop",     "Low Cut",    "Filter 2" },
+    { "filter2.env.prop",       "Env Depth",  "Filter 2" },
     // ── Amp ─────────────────────────────────────────────────────────────────
     { "level",        "Level",         "Amp"    },
     // ── Insert (normalised 0..1 — same IDs as mu-clid so depthScaleFor=1.0) ──
@@ -131,6 +135,10 @@ inline ModDestProvider makeModDestProvider()
             if (! steppedMode && isSteppedOnlyDest(kModDestTable[i].id)) continue;
 
             const bool isInsert = (std::strcmp(kModDestTable[i].section, "Insert") == 0);
+
+            // No insert algorithm selected → hide the Insert section + its P1-P4 targets
+            // entirely (mirrors mu-clid, which only adds them when driveChar > 0).
+            if (isInsert && driveChar <= 0) continue;
 
             if (currentSection == nullptr || std::strcmp(currentSection, kModDestTable[i].section) != 0)
             {
