@@ -26,27 +26,15 @@ $env:JUCE_PATH = "D:\JUCE"
 
 ## Build workflow
 
-**Cardinal rule — build-number policy (owner rules, [cmake/IncrementBuildNumber.cmake](cmake/IncrementBuildNumber.cmake)):**
+**Procedure lives in the `/build` and `/release` skills** ([.claude/commands/build.md](.claude/commands/build.md), [.claude/commands/release.md](.claude/commands/release.md)); full reference detail (plugin formats, deploy, artefact paths, three-way ship) is in [docs/design-plugin-family.md](docs/design-plugin-family.md#build--packaging-reference). The invariants that hold on every build:
 
-1. **A code change → a Debug build only.** Every Debug build **increments the number by exactly 1**, no matter how soon after the last one — there is no time/session throttle. Each Debug build is a distinct testable artefact with its own number.
-2. **Release builds happen only when the owner explicitly says so.** A Release **rebuilds only the Release artefacts** (Debug artefacts are never touched) and is stamped with the **same number as the last Debug build** — Release **never** increments.
-3. **Release ≤ last Debug, always.** At ship time Release equals the last Debug; as development continues the Debug counter marches ahead, so a previously-shipped Release legitimately sits *below* the current counter — that is normal. A Release coming out **higher** than the last Debug means the counter advanced without a Debug build → the build **stops with a FATAL_ERROR**; surface it to the owner, don't work around it.
-4. **Every Release ships three ways:** (a) artefacts copied to the OneDrive tester share, (b) a zip built and uploaded to the GitHub "latest release" so the website download links resolve, **and** (c) **release notes promoted** — move the accumulated "Next release · In testing" items into a new dated `v1.0.NNN` section in each affected product's notes (`site/mu-clid-releases.html`, `site/mu-tant-releases.html`), clear the In-Testing section, and bump the hardcoded version default in `site/download.html`.
+- **Always reconfigure first** (`cmake -B build`) — generated files (icon, versioninfo.rc, build-number bake) go stale otherwise.
+- **A code change → a Debug build only**, all products. Every Debug build **increments the number by exactly 1**. **Never bump `build_number.txt` manually.**
+- **Release builds only when the owner says so** — reuses the last Debug number, never increments; **Release ≤ last Debug** (a higher Release aborts with FATAL_ERROR — surface it, don't work around).
+- **Report the number read from `mu-core/BuildNumber.h` *after* the final build** — never an intermediate log value.
+- **No GitHub Actions workflow runs on push — ever.** `ci.yml`, `release.yml`, `mac-validate.yml` are all `workflow_dispatch`-only; run them **only** when the owner explicitly dispatches them, never as a side-effect of a build/commit/push, and never re-add `push:`/`pull_request:` triggers.
 
-**Release notes on EVERY build (not just releases):** whenever a **Debug** build fixes or improves anything **user-facing**, add a plain-English one-liner — ending with the backlog item number in parens, e.g. "Fixed a rare crash when hot-swapping a rhythm (995)", grouped **New / Improved / Fixed**, **no low-level/internal detail** — to the **"Next release · In testing"** section of each affected product's release-notes page (a shared mu-core fix goes on every product whose code path it touches), then **commit + push the site** (site-only → Netlify auto-deploys, no CI). The In-Testing section is public and must always be current so users can see what's coming in the next version.
-5. **No GitHub Actions workflow runs on push — ever.** `ci.yml` (Linux + Windows build + pluginval), `release.yml` (all-platform release), and `mac-validate.yml` (macOS) are all **`workflow_dispatch`-only**, so a `git push` of any path triggers nothing (GitHub minutes cost money). CI/release/mac-validate run **only** when the owner explicitly dispatches them — never as a side-effect of a build, commit, or push, and never re-add `push:`/`pull_request:` triggers.
-
-```bash
-cmake -B build                              # Configure (once, or after CMakeLists changes)
-cmake --build build --config Debug          # Default for a change: Debug only, +1 to the build number
-cmake --build build --config Release        # Owner-requested release: reuses the last Debug number
-```
-
-- **Always report the build number read from `mu-core/BuildNumber.h` *after* the final build** — never quote a number from an intermediate build log, or it will be stale.
-- On a **Release** build configured with `-DMUFAMILY_DEPLOY_TESTERS=ON` (the `MUFAMILY_DEPLOY_TESTERS` option is **OFF by default**), **every product** deploys to the OneDrive tester share: mu-clid (+ Lite), mu-tant, mu-on, mu-toni, and mu-link's exe (each via a `MUFAMILY_DEPLOY_TESTERS`-guarded POST_BUILD). A plain Release with the flag off builds but stays local. Debug never deploys.
-- Artefacts land at `build/<product>/<target>_artefacts/<Config>/<Format>/`. mu-clid/mu-clid-lite both use `build/mu-clid/...` because they share a CMakeLists.
-
-**Plugin formats (family rule).** Every product builds **VST3 + Standalone + CLAP** on all platforms, **plus AU (Audio Unit v2) on macOS**. AU is macOS-only (needs Apple's AudioUnit SDK), so the root [CMakeLists.txt](CMakeLists.txt) defines `MUFAMILY_AU_FORMAT` (= `AU` on `APPLE`, empty otherwise) and **every `juce_add_plugin` must append `${MUFAMILY_AU_FORMAT}` to its `FORMATS`** — that's how a new sibling gets AU for free. (CLAP is added separately via `clap_juce_extensions_plugin`.) AU requires the shared `PLUGIN_MANUFACTURER_CODE TDP1` plus a **unique 4-char `PLUGIN_CODE`** per product. The `_AU` targets exist only in an `APPLE` configure, so they're built/validated on the macOS CI runner (`auval`), never locally on Windows. Shipping AU to Mac users later needs Apple notarization + signing (the Apple side of #99).
+**Release notes on EVERY build (not just releases):** whenever a build fixes or improves anything **user-facing**, run `/notes` ([.claude/commands/notes.md](.claude/commands/notes.md)) to add a plain-English one-liner to the **"Next release · In testing"** section of each affected product's release-notes page, then commit + push the site. The In-Testing section is public and must always be current so users can see what's coming in the next version.
 
 After every build, read [backlog.md](backlog.md) and fix open (unchecked) issues immediately, without asking, up to a maximum of 5 issues. Prioritise issues related to the current stage.
 
@@ -56,18 +44,13 @@ New feature ideas live in [docs/design-future.md](docs/design-future.md) under *
 
 ## Git commit messages
 
-Every commit message must include:
-1. **Stage(s)** — which development stage(s) are included in this commit (e.g. `Stage 12`, `Stages 12–13`).
-2. **Issues closed** — list each issue number and its one-line description (e.g. `Closes #12: rhythm rename propagation`).
-3. **Full version** — `v1.0.<build>` using the current value from `build_number.txt`.
+Every commit message must include three things: **Stage(s)** (e.g. `Stage 12`), **Issues closed** (each number + one-line description, e.g. `Closes #12: rhythm rename propagation`), and **Full version** (`v1.0.<build>` from `build_number.txt`). Example:
 
-Example:
 ```
-Stage 13: UI completions — Amp FX sends, intra-FX wiring verified, Settings Overlay audit
+Stage 13: UI completions — Amp FX sends, intra-FX wiring verified
 
-Closes #17: Amp FX send knobs (Effect/Delay/Reverb) added to Voice Amp row
+Closes #17: Amp FX send knobs added to Voice Amp row
 Closes #22: Intra-FX APVTS wiring verified end-to-end
-Closes #23: Settings Overlay audited against design spec
 
 Version: v1.0.103
 ```
@@ -134,14 +117,7 @@ Never override `getSlider().onValueChange` directly — it replaces both callbac
 
 ## Third-party libraries
 
-| Library | Purpose | Notes |
-|---|---|---|
-| JUCE | Core framework | Via `JUCE_PATH` env var |
-| Signalsmith Reverb | Room/hall/plate reverb | MIT, header-only |
-| Monocypher | License key crypto | BSD-2-Clause, compiled in |
-| clap-juce-extensions | CLAP format support | MIT, compiled in |
-| SoundTouch | Time stretching (v1, planned) | LGPL — will ship as DLL when implemented |
-| RubberBand | Time stretching (v2, planned) | Wrapped behind `TimeStretcherBase` — no refactor needed when upgrading |
+JUCE (via `JUCE_PATH`), Signalsmith Reverb, Monocypher, clap-juce-extensions, and the planned SoundTouch/RubberBand time-stretch engines — full table with licences in [docs/design-plugin-family.md](docs/design-plugin-family.md#third-party-libraries).
 
 ## UI values
 

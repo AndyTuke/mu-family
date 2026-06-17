@@ -332,6 +332,62 @@ product only has to override/​wire those.
 
 ---
 
+## Build & packaging reference
+
+The day-to-day build/release **procedure** lives in the `/build` and `/release` skills
+(`.claude/commands/`). This section is the *reference detail* behind those skills.
+
+### Plugin formats (family rule)
+
+Every product builds **VST3 + Standalone + CLAP** on all platforms, **plus AU (Audio
+Unit v2) on macOS**. AU is macOS-only (needs Apple's AudioUnit SDK), so the root
+[CMakeLists.txt](../CMakeLists.txt) defines `MUFAMILY_AU_FORMAT` (= `AU` on `APPLE`,
+empty otherwise) and **every `juce_add_plugin` must append `${MUFAMILY_AU_FORMAT}` to
+its `FORMATS`** — that's how a new sibling gets AU for free. (CLAP is added separately
+via `clap_juce_extensions_plugin`.) AU requires the shared `PLUGIN_MANUFACTURER_CODE
+TDP1` plus a **unique 4-char `PLUGIN_CODE`** per product. The `_AU` targets exist only
+in an `APPLE` configure, so they're built/validated on the macOS CI runner (`auval`),
+never locally on Windows. Shipping AU to Mac users later needs Apple notarization +
+signing (the Apple side of #99).
+
+### Build-number policy (owner rules, [cmake/IncrementBuildNumber.cmake](../cmake/IncrementBuildNumber.cmake))
+
+1. A code change → a **Debug** build only. Every Debug build **increments the number by
+   exactly 1** — no time/session throttle. Each Debug build is a distinct testable artefact.
+2. **Release** builds happen only when the owner explicitly says so. A Release rebuilds
+   only the Release artefacts (Debug untouched) and is stamped with the **same number as
+   the last Debug build** — Release **never** increments.
+3. **Release ≤ last Debug, always.** A Release coming out *higher* than the last Debug
+   means the counter advanced without a Debug build → the build **stops with a
+   FATAL_ERROR**; surface it to the owner, don't work around it.
+
+### Shipping a Release (three ways, every time)
+
+(a) artefacts copied to the OneDrive tester share (Release configured with
+`-DMUFAMILY_DEPLOY_TESTERS=ON`, OFF by default — deploys mu-clid + Lite, mu-tant, mu-on,
+mu-toni, mu-link's exe via guarded POST_BUILDs; a plain Release stays local; Debug never
+deploys); (b) a zip built and uploaded to the GitHub "latest release" so website download
+links resolve; (c) **release notes promoted** — move accumulated "Next release · In
+testing" items into a new dated `v1.0.NNN` section in each affected product's notes
+(`site/mu-clid-releases.html`, `site/mu-tant-releases.html`), clear the In-Testing section,
+and bump the hardcoded version default in `site/download.html`.
+
+Artefacts land at `build/<product>/<target>_artefacts/<Config>/<Format>/`. mu-clid and
+mu-clid-lite both use `build/mu-clid/...` because they share a CMakeLists.
+
+### Third-party libraries
+
+| Library | Purpose | Notes |
+|---|---|---|
+| JUCE | Core framework | Via `JUCE_PATH` env var |
+| Signalsmith Reverb | Room/hall/plate reverb | MIT, header-only |
+| Monocypher | License key crypto | BSD-2-Clause, compiled in |
+| clap-juce-extensions | CLAP format support | MIT, compiled in |
+| SoundTouch | Time stretching (v1, planned) | LGPL — will ship as DLL when implemented |
+| RubberBand | Time stretching (v2, planned) | Wrapped behind `TimeStretcherBase` — no refactor needed when upgrading |
+
+---
+
 ## Related design documents
 
 - [mu-clid/design-voice.md](mu-clid/design-voice.md) — μ-Clid voice chain, ADSR, filter, InsertProcessor details (mu-tant's voice doc lives at [mu-tant/design-voice.md](mu-tant/design-voice.md))
