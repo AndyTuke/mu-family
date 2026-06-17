@@ -49,6 +49,7 @@ target_sources(mu-tant
     PRIVATE
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginProcessor_APVTS.cpp
+        Source/Plugin/PluginProcessor_Preset.cpp
         Source/Plugin/PluginEditor.cpp
         Source/UI/VoicePanel.cpp
         Source/UI/VoiceSidebar.cpp

@@ -171,25 +171,34 @@ Explicit decisions to keep the design tight:
 
 ## Modulation destinations (per slot)
 
-The modulator section is **retained from mu-core unchanged** (LFOs + control sequences). Mu-tant-specific destinations:
+The modulator section is **retained from mu-core unchanged** (LFOs + control sequences). The
+destination set is `kModDestTable` in [Source/Modulation/MuTantModDest.h](../../mu-tant/Source/Modulation/MuTantModDest.h),
+grouped in the dropdown by section. Destinations whose id ends `.prop` are seeded in
+proportion space (mu-core `depthScaleFor` = 1.0 → full-depth sweeps the whole range):
 
-| Destination | Range | Notes |
-|---|---|---|
-| `osc1.tone` | 0..N continuous | Scale-snapped under step mod; glides under smooth mod |
-| `osc2.tone` | 0..N continuous | Same |
-| `osc1.octave` | 0..8 | Integer; step mods snap, smooth mods cross octaves smoothly |
-| `osc2.octave` | 0..8 | |
-| `osc1.position` | 0..1 | Wavetable scan |
-| `osc2.position` | 0..1 | |
-| `osc1.fine` | ±100 cents | |
-| `osc2.fine` | ±100 cents | |
-| `osc.xmod` | 0..1 | Cross-mod amount — modulate this for the evolving FM timbre |
-| `osc.mix` | 0..1 | Osc A vs Osc B |
-| `amp.level` | -60..+6 dB | Slot-level volume. **This is the volume curve** — the gate is pure 0..1 multiplier, all amplitude shaping happens via a mod targeting this destination. |
-| `filter.cutoff`, `filter.resonance`, `filter.lowCut` | same as mu-clid | Inherited from mu-core voice chain |
-| `insert.p1..p4` | 0..1 | Insert algo params |
+| Section | Destination id | Dropdown label | Notes |
+|---|---|---|---|
+| Osc 1 | `osc1.octave` | Osc1 Octave | Integer; step mods snap, smooth mods hidden (octave is step-only) |
+| Osc 1 | `osc1.semi` | Osc1 Semi | Scale-degree; step mods snap to semitones, smooth mods glide |
+| Osc 1 | `osc1.fine` | Osc1 Fine | ±100 cents |
+| Osc 1 | `osc1.pos` | Osc1 Position | Wavetable scan (0..255) |
+| Osc 1 | `osc1.penv.prop` | Pitch Env | Pitch-envelope depth (±24 st) |
+| Osc 2 | `osc2.octave` / `osc2.semi` / `osc2.fine` / `osc2.pos` / `osc2.penv.prop` | (as Osc 1) | Same set for osc 2 |
+| X-Mod | `xmod.index` | X-Mod Index | Lane A index (0..100) |
+| X-Mod | `xmod.depth` | X-Mod Depth | Lane B amplitude depth (−100..100) |
+| X-Mod | `xmod.ssb` | X-Mod SSB | SSB shift (±2 kHz) |
+| Levels | `osc1.level` / `osc2.level` / `noise.level` | Osc1/Osc2/Noise Level | −60..+6 dB |
+| Filter 1 | `filter.cutoff` | Cutoff | Shared mu-core dest |
+| Filter 1 | `filter.resonance` | Resonance | Shared mu-core dest |
+| Filter 1 | `filter.drive.prop` | Drive | 0..1 |
+| Filter 1 | `filter.locut.prop` | Low Cut | 0..1000 Hz (skewed) |
+| Filter 1 | `filter.env.prop` | Env Depth | Filter-envelope depth (−1..1) |
+| Filter 2 | `filter2.cutoff.prop` / `filter2.resonance.prop` / `filter2.drive.prop` / `filter2.locut.prop` / `filter2.env.prop` | (as Filter 1) | Same set for filter 2 |
+| Amp | `level` | Level | −60..+6 dB slot level. **This is the volume curve** — the gate is a pure 0..1 multiplier; amplitude shaping happens via a mod targeting this destination. |
+| Insert | `insert.p1..p4` | per-algo labels | Insert algo params (hidden when no insert algorithm is selected) |
 
-No `amp.attack/decay/sustain/release` or `*.envelope.*` destinations — they don't exist on mu-tant.
+There is no amp ADSR (`amp.attack/decay/sustain/release`) — mu-tant has no amp envelope; time-varying
+amplitude comes from the gate + a mod on `level`.
 
 Mod-display rule from #641 applies: skewed sliders use proportion-space modulation; linear sliders use additive-in-display.
 
