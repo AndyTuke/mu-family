@@ -1,31 +1,37 @@
-Ship a Release of the mu-family. **Only run when the owner explicitly asks for a release.** A Release reuses the last Debug number (never increments) and rebuilds only Release artefacts.
+Ship a complete release of the mu-family. **Only run when the owner explicitly asks for a release.** Run the whole pipeline beginning to end — do not stop after the local build. A Release reuses the last Debug number (never increments).
 
-## Pre-flight
+## 1. Build + deploy (local Windows)
 
-1. Confirm a Debug build exists at the intended number (`mu-core/BuildNumber.h`). Release must be ≤ last Debug.
-2. Reconfigure with tester deploy on: `cmake -B build -DMUFAMILY_DEPLOY_TESTERS=ON`
+1. Reconfigure with tester deploy on: `cmake -B build -DMUFAMILY_DEPLOY_TESTERS=ON`
    (`MUFAMILY_DEPLOY_TESTERS` is OFF by default; ON copies every product to the OneDrive tester share via POST_BUILD.)
+2. Build Debug (bumps the number), then Release (reuses it, deploys):
+   `cmake --build build --config Debug && cmake --build build --config Release`
+   - Run builds through the **Bash tool** so the artifact/warning/deploy hooks fire. Heavy build → run in background.
+   - Release ≤ last Debug always; a higher Release aborts with FATAL_ERROR — surface it, don't work around.
+   - If exe versions look stale, build the explicit format targets (see `/build`).
+3. Read the final number from `mu-core/BuildNumber.h`. Verify the Windows artefacts landed in the OneDrive share (mu-clid + Lite, mu-tant, mu-on, mu-toni, mu-link).
 
-## Build
+## 2. Pin the build number for CI
 
-`cmake --build build --config Release`
+CI checks out the pushed commit and reads `build_number.txt`. Commit + push the bump:
+`git add build_number.txt mu-core/BuildNumber.h && git commit && git push` (message: `Release v1.0.NNN — build-number bump…`, with `Version: v1.0.NNN`).
 
-If the exe versions look stale, build the explicit format targets (see `/build`): the aggregate target may not relink the Standalone/VST3/CLAP exes.
+## 3. (b) GitHub release — all platforms via CI
 
-## Ship — all three, every time (CLAUDE.md cardinal rule)
+The repo is public, so macOS + Linux CI minutes are free — **always** publish a full cross-platform release. Dispatch the complete workflow (it builds Windows + macOS + Linux, packages the fixed-name zips the site links to, and creates/updates the GitHub Release `v1.0.0.NNN` from `build_number.txt`):
 
-1. **OneDrive tester share** — handled by the `DEPLOY_TESTERS` POST_BUILD: mu-clid (+ Lite), mu-tant, mu-on, mu-toni, mu-link's exe. Verify the Windows artefacts landed in `TDP/Windows`.
-2. **GitHub "latest release" zip** — build a zip and upload it so the website download links resolve.
-3. **Promote release notes** — for each affected product (`site/mu-clid-releases.html`, `site/mu-tant-releases.html`):
-   - Move the accumulated "Next release · In testing" items into a new dated `v1.0.NNN` section.
-   - Clear the In-Testing section.
-   - Bump the hardcoded version default in `site/download.html`.
-   - Commit + push the site (Netlify auto-deploys; no CI).
+`gh workflow run release.yml --ref main`
 
-## macOS / Linux (only if owner asks)
+Then confirm it started: `gh run list --workflow=release.yml --limit 1`. (Do **not** hand-build zips or carry forward stale platform binaries — CI builds all three fresh.) `release.yml` is the only workflow dispatched as part of a release; `ci.yml` + `mac-validate.yml` still run only on explicit owner request, and none run on push.
 
-Windows builds locally. Mac/Linux come from `release.yml` CI — `gh workflow run release.yml` builds all products × platforms from the pushed commit; download and copy artefacts into `TDP/Mac` + `TDP/Linux`. **Never dispatch CI as a side-effect** — owner must explicitly request it.
+## 4. (c) Promote release notes + bump download page
 
-## Reporting
+For each affected product (`site/mu-clid-releases.html`, `site/mu-tant-releases.html`):
+- Turn the "Next release · In testing" section into a dated `v1.0.0.NNN` "Current" release (`rel-pill testing` → `rel-pill current`, `Next release`/`in testing` → `v1.0.0.NNN`/`released <D Month YYYY>`).
+- Insert a fresh empty In-Testing section above it; demote the previous release (remove its `rel-pill current`).
+- `site/download.html`: bump the hardcoded `data-version`/`data-reldate` fallbacks (live values come from the GitHub latest-release tag via JS, so this is just the pre-JS default).
+- Commit + push the site (Netlify auto-deploys; no CI).
 
-Read the number from `mu-core/BuildNumber.h` after the build; report "Release clean at v1.0.NNN" and confirm all three ship steps done. End with the `## Release builds` artefact list.
+## 5. Report
+
+Report the build number (from `BuildNumber.h`), the OneDrive deploy, the dispatched CI run URL, and the site push. End with the `## Release builds` artefact list. Note that the GitHub release assets appear once CI finishes (mac/linux take a few minutes).

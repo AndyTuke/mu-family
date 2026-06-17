@@ -32,7 +32,7 @@ $env:JUCE_PATH = "D:\JUCE"
 - **A code change → a Debug build only**, all products. Every Debug build **increments the number by exactly 1**. **Never bump `build_number.txt` manually.**
 - **Release builds only when the owner says so** — reuses the last Debug number, never increments; **Release ≤ last Debug** (a higher Release aborts with FATAL_ERROR — surface it, don't work around).
 - **Report the number read from `mu-core/BuildNumber.h` *after* the final build** — never an intermediate log value.
-- **No GitHub Actions workflow runs on push — ever.** `ci.yml`, `release.yml`, `mac-validate.yml` are all `workflow_dispatch`-only; run them **only** when the owner explicitly dispatches them, never as a side-effect of a build/commit/push, and never re-add `push:`/`pull_request:` triggers.
+- **No GitHub Actions workflow runs on push — ever.** All workflows are `workflow_dispatch`-only; never re-add `push:`/`pull_request:` triggers, and nothing runs as a side-effect of a plain build/commit/push. **`release.yml` is the exception that IS dispatched as a standard step of every release** (`/release` step b) — the repo is public so macOS/Linux CI minutes are free, so a release always publishes a full cross-platform GitHub release. `ci.yml` + `mac-validate.yml` still run only on explicit owner request.
 
 **Release notes on EVERY build (not just releases):** whenever a build fixes or improves anything **user-facing**, run `/notes` ([.claude/commands/notes.md](.claude/commands/notes.md)) to add a plain-English one-liner to the **"Next release · In testing"** section of each affected product's release-notes page, then commit + push the site. The In-Testing section is public and must always be current so users can see what's coming in the next version.
 
