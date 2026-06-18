@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include "Plugin/RenderSupport.h"   // mu-core: shared render scaffold (BaseArgs / loop / WAV write)
 
 // Headless render-to-WAV mode for the standalone. Invoked when the standalone is
 // launched with `--render --out <out.wav> [--seconds N --samplerate SR --blocksize BS]`.
@@ -12,16 +13,11 @@
 // audio with NO preset and NO sample dependency. That makes it the family's host- and
 // content-independent "does the Mac build actually make sound" check (see
 // .github/workflows/mac-validate.yml + tests/expectations/mutant_drone.json).
+//
+// mu-Tant needs no extra CLI flags beyond the shared set, so Args == the mu-core base.
 namespace mu_tant::render_mode {
 
-struct Args
-{
-    juce::File outputWav;
-    double     seconds    = 4.0;
-    double     sampleRate = 48000.0;
-    int        blockSize  = 512;
-    bool       valid      = false;
-};
+using Args = mu_core::render_mode::BaseArgs;
 
 // Parse the standalone command line. Returns valid=true only when a recognised
 // `--render` invocation is present; on parse error returns valid=false and prints

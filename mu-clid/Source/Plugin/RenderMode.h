@@ -1,25 +1,25 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include "Plugin/RenderSupport.h"   // mu-core: shared render scaffold (BaseArgs / loop / WAV write)
 
 // Headless render-to-WAV mode for the standalone. Invoked when the standalone
-// is launched with `--render <out.wav> --seconds N [...]` on the command line.
+// is launched with `--render --out <out.wav> --seconds N [...]` on the command line.
 // Bypasses the GUI window and the audio device, drives processBlock() in a
 // tight loop, writes the captured output as a stereo WAV, and quits the app.
 //
 // Used by the listening-test pipeline in `tests/scripts/run-listening-tests.py`
 // to produce reproducible audio for automated analysis (see
 // `tests/scripts/analyse.py`).
+//
+// mu-Clid extends the shared mu-core args with mid-render actions: preset / per-rhythm
+// hot-swaps and a MIDI program-change injection, each fired at a given time.
 namespace mu_clid::render_mode {
 
-struct Args
+struct Args : mu_core::render_mode::BaseArgs
 {
-    juce::File outputWav;
     juce::File presetFile;          // optional — empty = use whatever loads by default
     juce::File swapPresetFile;      // optional — a 2nd preset loaded mid-render (--swap-preset)
-    double     seconds      = 4.0;
-    double     sampleRate   = 48000.0;
-    int        blockSize    = 512;
     double     swapAtSeconds = -1.0; // when to load swapPresetFile (--swap-at); <0 = no swap
 
     // Per-rhythm hot-swap (A9): stage a .muRhythm onto one slot mid-render via
@@ -34,8 +34,6 @@ struct Args
     juce::File midiProgramPreset;
     int        midiProgram          = -1;
     double     midiProgramAtSeconds = -1.0;
-
-    bool       valid        = false;
 };
 
 // Parse the standalone command line. Returns `valid=true` only when a recognised
