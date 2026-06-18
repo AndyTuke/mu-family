@@ -8,6 +8,8 @@ Test pass/fail tracking lives in [tests.md](tests.md), not this backlog. Use thi
 
 | # | Description | Status | Fixed Build |
 |---|---|---|---|
+| 1051 | **[Audit]** — the headless render-to-WAV scaffold is duplicated across products (mu-family reuse candidate). [mu-clid/Source/Plugin/RenderMode.h](mu-clid/Source/Plugin/RenderMode.h)+.cpp and [mu-tant/Source/Plugin/RenderMode.h](mu-tant/Source/Plugin/RenderMode.h)+.cpp each declare a `render_mode` namespace with the same core — a `RenderConfig` (seconds / sampleRate / blockSize / valid), `--render` CLI parsing, the `processBlock` render loop, and WAV writing — diverging only in product extras (mu-clid adds preset / rhythm / MIDI-program swap). The two `StandaloneApp.cpp` ([mu-clid](mu-clid/Source/Plugin/StandaloneApp.cpp), [mu-tant](mu-tant/Source/Plugin/StandaloneApp.cpp)) likewise duplicate the render-dispatch boilerplate, so a new sibling re-copies it all. Fix sketch: lift a `mu_core::render_mode` base (RenderConfig + parse + render-loop + WAV write) into mu-core; products extend it for their extra CLI options. | 🔴 Open | — |
+| 1050 | **[Audit]** — [mu-core/UI/Components/MuLookAndFeel.cpp](mu-core/UI/Components/MuLookAndFeel.cpp) maps ColourIds → theme-token struct fields via a 94-case `switch` (one `case` per colour — the project's largest). It's documented as a deliberate legacy-ColourId→Theme bridge and has no runtime cost, but every new colour token needs a new hand-written case. Low priority. Fix sketch: optional — drive it from a static table indexed off the ColourId enum (id − base offset) so adding a colour is a one-row edit, or leave as-is given the explanatory comment. | 🔴 Open | — |
 ## 🟡 On Hold
 
 | # | Description | Status | Fixed Build |
