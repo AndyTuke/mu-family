@@ -350,7 +350,7 @@ void MixerChannel::paint(juce::Graphics& g)
                juce::Justification::centred, true);
 
     // Rhythm-colour border around the name pill (rhythm strips only — returns
-    // and master keep their fixed colour scheme since they're not per-rhythm).
+    // and master keep their fixed colour scheme since they're not per-channel).
     if (active && channelType == Type::Channel)
     {
         const juce::Rectangle<int> namePill {

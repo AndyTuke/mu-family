@@ -13,12 +13,12 @@ public:
     {
         using namespace mu_tant;
 
-        beginTest("clampScaleIdx bounds to [0, kNumScales)");
+        beginTest("clampScaleIndex bounds to [0, kNumScales)");
         {
-            expectEquals(clampScaleIdx(-5), 0);
-            expectEquals(clampScaleIdx(0), 0);
-            expectEquals(clampScaleIdx(kNumScales - 1), kNumScales - 1);
-            expectEquals(clampScaleIdx(99999), kNumScales - 1);
+            expectEquals(clampScaleIndex(-5), 0);
+            expectEquals(clampScaleIndex(0), 0);
+            expectEquals(clampScaleIndex(kNumScales - 1), kNumScales - 1);
+            expectEquals(clampScaleIndex(99999), kNumScales - 1);
         }
 
         beginTest("every scale's degree 0 is the root (offset 0) + count in 1..12");

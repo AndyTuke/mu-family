@@ -24,7 +24,7 @@ GrooveGrid::GrooveGrid(ProcessorBase& processor, StepPattern& patternToEdit)
     swingAtt  = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(proc.apvts, "seq_swing",  swingSlider);
     accentAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(proc.apvts, "seq_accent", accentSlider);
 
-    startTimerHz(30);   // playhead
+    startTimerHz(mu_ui::kUiRefreshHz);   // playhead
 }
 
 juce::Colour GrooveGrid::trackColour(int t) const

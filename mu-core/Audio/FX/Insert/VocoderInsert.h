@@ -83,7 +83,7 @@ public:
         for (auto& ph : phases) ph = 0.0f;
         for (auto& s  : pinkState) s = 0.0f;
         for (auto& g  : voiceGainSmooth) g = 0.0f;
-        lastNoteIdx = -1;
+        lastNoteIndex = -1;
         lastOctave  = -1;
         lastUnison  = -1;
     }
@@ -95,22 +95,22 @@ public:
         // Slot 0 = Wave 0..3 (int step), Slot 1 = Unison index 0..6,
         // Slot 2 = Octave 1..5, Slot 3 = Note 1..12 (note letter = idx - 1).
         const int waveshape = juce::jlimit(0, 3,  (int) std::round(insertSlot(p, 0)));
-        const int unisonIdx = juce::jlimit(0, 6,  (int) std::round(insertSlot(p, 1)));
+        const int unisonIndex = juce::jlimit(0, 6,  (int) std::round(insertSlot(p, 1)));
         const int octave    = juce::jlimit(1, 5,  (int) std::round(insertSlot(p, 2)));
-        const int noteIdx   = juce::jlimit(0, 11, (int) std::round(insertSlot(p, 3)) - 1);
-        const int unisonN   = kUnisonVoices[unisonIdx];
+        const int noteIndex   = juce::jlimit(0, 11, (int) std::round(insertSlot(p, 3)) - 1);
+        const int unisonN   = kUnisonVoices[unisonIndex];
 
         const bool noiseCarrier = (waveshape >= 2);
 
         // ── Carrier frequency (pitched carriers only) ──────────────────
-        const float semitones  = static_cast<float>(noteIdx + 12 * (octave - 1));
+        const float semitones  = static_cast<float>(noteIndex + 12 * (octave - 1));
         const float baseFreq   = kLowestFreq * std::pow(2.0f, semitones / 12.0f);
-        const float detuneCents = kUnisonSpreadCents[unisonIdx];
+        const float detuneCents = kUnisonSpreadCents[unisonIndex];
 
         // ── Coefficient recompute on change (cheap path skips when nothing moved)
-        const bool needRecalc = (noteIdx != lastNoteIdx)
+        const bool needRecalc = (noteIndex != lastNoteIndex)
                              || (octave  != lastOctave)
-                             || (unisonIdx != lastUnison);
+                             || (unisonIndex != lastUnison);
         if (needRecalc)
         {
             const float sr = (float) currentSampleRate;
@@ -121,9 +121,9 @@ public:
                 analysisBpR[b].setPeak(bandCentres[b], kBandQ, 0.0f, sr);
                 synthBp    [b].setPeak(bandCentres[b], kBandQ, 0.0f, sr);
             }
-            lastNoteIdx = noteIdx;
+            lastNoteIndex = noteIndex;
             lastOctave  = octave;
-            lastUnison  = unisonIdx;
+            lastUnison  = unisonIndex;
         }
 
         // Envelope follower time-constants (per-sample alphas).
@@ -308,7 +308,7 @@ private:
     juce::Random                         rng;
 
     // Change-detection so coefficient recomputes don't run every block.
-    int lastNoteIdx = -1;
+    int lastNoteIndex = -1;
     int lastOctave  = -1;
     int lastUnison  = -1;
 };

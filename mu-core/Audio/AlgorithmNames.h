@@ -101,7 +101,7 @@ inline const char* const kReverbAlgorithmNames[] = {
 // modulator enum names. ControlSequence's `Mode`, `Polarity`, and the
 // timing enums `NoteValue` / `NoteMod` live in Source/Sequencer/ControlSequence.h
 // and Source/Sequencer/Rhythm.h respectively. They're saved by serialiseModulators
-// as raw int indices — same drift hazard as the per-rhythm algorithm selectors
+// as raw int indices — same drift hazard as the per-channel algorithm selectors
 // fixed in Stage 35 step 1, just in the modulator subtree. Name tables here
 // drive the v2-name-string serialisation; the deserialiser accepts either a
 // name string or an int (legacy compat).
@@ -139,7 +139,7 @@ inline const char* const kNoteModNames[] = {
     nullptr
 };
 
-// Logic { OR, AND, XOR, AOnly, BOnly } — used by `r.logic` per-rhythm.
+// Logic { OR, AND, XOR, AOnly, BOnly } — used by the product's per-channel logic selector.
 // Persisted via kRhythmParamDefs as an Int today; Stage 35 follow-up could
 // upgrade this entry to AlgorithmIndex pointing at the table below so
 // reordering Logic enumerators stays preset-safe.

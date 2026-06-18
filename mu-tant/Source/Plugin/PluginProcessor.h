@@ -217,10 +217,10 @@ public:
     // ── User wavetable import (per oscillator) ───────────────────────────────
     // Load a Serum/Vital .wav into the shared bank (dedup by path) and point the
     // given voice's oscillator at it; clear reverts to the factory selection.
-    void         loadUserWavetable(int voice, int oscIdx, const juce::File& file);
-    void         clearUserWavetable(int voice, int oscIdx);
-    juce::String userWavetablePath(int voice, int oscIdx) const;    // "" = factory selection
-    bool         userWavetableMissing(int voice, int oscIdx) const; // path set but file gone
+    void         loadUserWavetable(int voice, int oscIndex, const juce::File& file);
+    void         clearUserWavetable(int voice, int oscIndex);
+    juce::String userWavetablePath(int voice, int oscIndex) const;    // "" = factory selection
+    bool         userWavetableMissing(int voice, int oscIndex) const; // path set but file gone
 
     // ── ProcessorBase preset wiring (per design-voice.md file formats) ────────
     juce::File   getContentDir()             const override;
@@ -298,10 +298,10 @@ public:
     }
 
     // Modulation snapshot accessor for VoicePanel knob live-arc indicators.
-    float getTantSnap(int voice, int snapIdx) const noexcept
+    float getTantSnap(int voice, int snapIndex) const noexcept
     {
         if (voice < 0 || voice >= kMaxVoices) return 0.0f;
-        return voiceSnap[(size_t) voice][(size_t) snapIdx].load();
+        return voiceSnap[(size_t) voice][(size_t) snapIndex].load();
     }
 
 protected:
@@ -313,7 +313,7 @@ protected:
     void applyFullMidiPreset(const juce::File& f)           override { loadPreset(f); }
 
 private:
-    VoiceConfig readConfig(int voiceIdx) const;
+    VoiceConfig readConfig(int voiceIndex) const;
 
     // Cached APVTS atomic pointers. The pointers returned by getRawParameterValue
     // are stable for the processor's lifetime (replaceState changes values, not
@@ -341,7 +341,7 @@ private:
     // mixer). Captures only `this`; the per-block transport snapshot it reads lives
     // in the blk* members below, set at the top of processBlock (same thread).
     MixerEngine::RenderChannelFn renderVoiceCb;
-    void   renderVoice(int voiceIdx, juce::AudioBuffer<float>& buf, int numSamples);
+    void   renderVoice(int voiceIndex, juce::AudioBuffer<float>& buf, int numSamples);
     // Render a voice being retired by a count-reducing full-preset swap: its OLD
     // (pre-swap) config through its still-intact engine+insert, under a falling gain.
     void   renderRetiringVoice(int v, juce::AudioBuffer<float>& buf, int numSamples);
@@ -432,7 +432,7 @@ private:
 
     // Per voice: does a Stepped CS drive osc{1,2}.semi? Computed on the message thread when
     // modulators change (refreshPitchQuantFlags), read lock-free by the audio thread —
-    // stepped pitch snaps to semitones, smooth glides (see #1021/#1025).
+    // stepped pitch snaps to semitones, smooth glides.
     std::array<std::atomic<bool>, kMaxVoices> osc1SemiStepped {};
     std::array<std::atomic<bool>, kMaxVoices> osc2SemiStepped {};
 
@@ -490,7 +490,7 @@ private:
     // atomic resolved bank index is what the audio thread reads each block;
     // -1 = no user table → fall back to the factory o{1,2}_wt selection.
     std::array<juce::String, kMaxVoices>     osc1UserPath, osc2UserPath;
-    std::array<std::atomic<int>, kMaxVoices> osc1UserIdx, osc2UserIdx;
+    std::array<std::atomic<int>, kMaxVoices> osc1UserIndex, osc2UserIndex;
     int firstUnusedColourIndex() const;   // lowest palette index not used by an active voice
     // Guards the voice count + the per-voice data shift during add/remove against
     // the audio thread. processBlock takes a ScopedTryLock and silences the block

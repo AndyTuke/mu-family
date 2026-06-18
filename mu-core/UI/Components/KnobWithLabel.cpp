@@ -214,7 +214,7 @@ void KnobWithLabel::bindModulation(const char*             destId,
     modLiveValue = std::move(liveValueFn);
     modNormMode  = normMode;
     hasModBind   = true;
-    if (!isTimerRunning()) startTimerHz(30);
+    if (!isTimerRunning()) startTimerHz(mu_ui::kUiRefreshHz);
 }
 
 void KnobWithLabel::clearModBinding() noexcept
@@ -232,7 +232,7 @@ void KnobWithLabel::setGRSource(const std::atomic<float>* gr)
 {
     grSource  = gr;
     grDisplay = 0.0f;
-    if (gr) startTimerHz(30);
+    if (gr) startTimerHz(mu_ui::kUiRefreshHz);
     else if (!hasModBind) stopTimer();
     repaint();
 }

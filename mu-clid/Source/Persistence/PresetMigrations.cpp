@@ -69,8 +69,8 @@ void migrateInsertSlotsV3(juce::ValueTree& tree, const juce::String& srcPrefix)
     if (tree.hasProperty(srcPrefix + "insP1")) return;
 
     const juce::String charName = tree.getProperty(charProp).toString();
-    const int algoIdx = mu_audio::indexFromName(mu_audio::kInsertAlgorithmNames, charName);
-    if (algoIdx < 0) return;
+    const int algoIndex = mu_audio::indexFromName(mu_audio::kInsertAlgorithmNames, charName);
+    if (algoIndex < 0) return;
 
     auto readD = [&tree, &srcPrefix](const juce::String& name, double dflt) -> float {
         return tree.hasProperty(srcPrefix + name)
@@ -89,7 +89,7 @@ void migrateInsertSlotsV3(juce::ValueTree& tree, const juce::String& srcPrefix)
     const float oldEqH = readD("eqHighGain", 0.0);
 
     float actual[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    switch (algoIdx)
+    switch (algoIndex)
     {
         case 1: case 2: case 3: case 5: case 10:  // SoftClip/Hard/Fold/Clipper/TapeSat
             actual[0] = oldDrv;
@@ -137,7 +137,7 @@ void migrateInsertSlotsV3(juce::ValueTree& tree, const juce::String& srcPrefix)
 
     for (int s = 0; s < 4; ++s)
     {
-        const float norm = mu_ui::actualToNorm(actual[s], algoIdx, s);
+        const float norm = mu_ui::actualToNorm(actual[s], algoIndex, s);
         tree.setProperty(srcPrefix + "insP" + juce::String(s + 1), (double) norm, nullptr);
     }
 }
@@ -153,8 +153,8 @@ void migrateMasterInsertSlotsV3(juce::ValueTree& tree, int slot)
     if (tree.hasProperty(pfx + "P1")) return;
 
     const juce::String charName = tree.getProperty(charProp).toString();
-    const int algoIdx = mu_audio::indexFromName(mu_audio::kInsertAlgorithmNames, charName);
-    if (algoIdx < 0) return;
+    const int algoIndex = mu_audio::indexFromName(mu_audio::kInsertAlgorithmNames, charName);
+    if (algoIndex < 0) return;
 
     auto readD = [&tree, &pfx](const juce::String& name, double dflt) -> float {
         return tree.hasProperty(pfx + name)
@@ -173,7 +173,7 @@ void migrateMasterInsertSlotsV3(juce::ValueTree& tree, int slot)
     const float oldEqH = readD("High", 0.0);
 
     float actual[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    switch (algoIdx)
+    switch (algoIndex)
     {
         case 1: case 2: case 3: case 5: case 10:
             actual[0] = oldDrv; actual[1] = oldOut; actual[3] = oldTon; break;
@@ -198,21 +198,21 @@ void migrateMasterInsertSlotsV3(juce::ValueTree& tree, int slot)
 
     for (int s = 0; s < 4; ++s)
     {
-        const float norm = mu_ui::actualToNorm(actual[s], algoIdx, s);
+        const float norm = mu_ui::actualToNorm(actual[s], algoIndex, s);
         tree.setProperty(pfx + "P" + juce::String(s + 1), (double) norm, nullptr);
     }
 }
 
 // Modulator assignment migration: old destinations like "insert.drive" /
 // "ks.note" / "voc.octave" remap per-algo to the new "insert.p1".."insert.p4".
-// Caller supplies the rhythm's `Modulators` child + the resolved algoIdx.
-void migrateModAssignmentsV3(juce::ValueTree& modsTree, int algoIdx)
+// Caller supplies the rhythm's `Modulators` child + the resolved algoIndex.
+void migrateModAssignmentsV3(juce::ValueTree& modsTree, int algoIndex)
 {
-    if (! modsTree.isValid() || algoIdx < 0) return;
+    if (! modsTree.isValid() || algoIndex < 0) return;
 
     // For each algo, which OLD destination ID maps to which NEW insert.pN slot.
     // Empty target = drop the assignment (no slot in the new layout).
-    auto translate = [algoIdx](const juce::String& oldDest) -> juce::String {
+    auto translate = [algoIndex](const juce::String& oldDest) -> juce::String {
         // Generic insert names + algorithm-specific names. The mapping is the
         // same table as migrateInsertSlotsV3 above, expressed as which OLD
         // identifier should land on which NEW slot.
@@ -221,7 +221,7 @@ void migrateModAssignmentsV3(juce::ValueTree& modsTree, int algoIdx)
             { "insert.drive",  0 }, { "insert.output", 1 },
             { "insert.dither", 2 }, { "insert.lpf",    3 },
         };
-        switch (algoIdx)
+        switch (algoIndex)
         {
             case 1: case 2: case 3: case 5: case 10:
                 for (auto& m : genericOnly) if (oldDest == m.oldId) return "insert.p" + juce::String(m.slot + 1);

@@ -38,9 +38,9 @@ struct GateEnvelope
     float value(float phase01, float gap01 = 0.0f) const noexcept;
 
     // True if this region covers the given cell.
-    bool covers(int cellIdx) const noexcept
+    bool covers(int cellIndex) const noexcept
     {
-        return cellIdx >= startCell && cellIdx < startCell + lengthCells;
+        return cellIndex >= startCell && cellIndex < startCell + lengthCells;
     }
 
 private:
@@ -98,7 +98,7 @@ public:
 
     // The envelope whose region covers the given cell, or nullptr. Message- and
     // audio-thread safe (read-only linear scan).
-    const GateEnvelope* envelopeAtCell(int cellIdx) const noexcept;
+    const GateEnvelope* envelopeAtCell(int cellIndex) const noexcept;
 
     // ── Editing (message-thread-only, under editLock) ────────────────────────
     // Insert `env`, first removing any existing envelope that overlaps its
@@ -106,8 +106,8 @@ public:
     // envelope (valid until the next mutation).
     GateEnvelope* addEnvelope(const GateEnvelope& env);
 
-    // Remove whichever envelope covers cellIdx (if any). No-op if none.
-    void removeEnvelopeCovering(int cellIdx);
+    // Remove whichever envelope covers cellIndex (if any). No-op if none.
+    void removeEnvelopeCovering(int cellIndex);
 
     // Merge every envelope intersecting [firstCell, lastCell] into one envelope
     // filling that whole range. The merged envelope's split / attackBend /

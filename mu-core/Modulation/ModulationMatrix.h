@@ -11,7 +11,7 @@
 //==============================================================================
 // ModulationMatrix
 //
-// One instance per rhythm. Owns a list of ModulationAssignments.
+// One instance per channel. Owns a list of ModulationAssignments.
 // process() evaluates every ControlSequence in the rhythm at the current
 // song position, then applies each assignment to the caller's parameter map.
 //

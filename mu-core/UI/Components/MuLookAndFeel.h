@@ -4,6 +4,10 @@
 
 namespace mu_ui
 {
+    // Shared UI repaint cadence (Hz) for animated components — VU/GR meters,
+    // transport, sidebars, panels. One place to tune the family's frame rate.
+    inline constexpr int kUiRefreshHz = 30;
+
     // Global UI scale factor. 1.0 = Medium baseline (the values stored in
     // MuLookAndFeel are Medium); 0.85 = Small; 1.15 = Large. Phase 3 will
     // surface a settings picker that writes this; Phase 1+2 leave it at 1.0
@@ -146,7 +150,7 @@ public:
         sampleBarMissingWarning = 0x100000d0,  // RhythmPanel sample-missing tint
         mixerInactiveNameBg     = 0x100000d1,  // inactive-rhythm name strip
         globalAccent            = 0x100000d2,  // purple — borders / accents for views
-                                               // that aren't per-rhythm (mixer overlay,
+                                               // that aren't per-channel (mixer overlay,
                                                // global FX rows). Sequencer page uses the
                                                // current rhythm colour for the same role.
 

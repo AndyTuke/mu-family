@@ -58,11 +58,11 @@ int GatePattern::totalCells() const noexcept
     return patternLengthBars * static_cast<int>(subdivision);
 }
 
-const GateEnvelope* GatePattern::envelopeAtCell(int cellIdx) const noexcept
+const GateEnvelope* GatePattern::envelopeAtCell(int cellIndex) const noexcept
 {
     // Linear scan — typical patterns have <= 64 cells and few envelopes.
     for (const auto& env : envelopes)
-        if (env.covers(cellIdx)) return &env;
+        if (env.covers(cellIndex)) return &env;
     return nullptr;
 }
 
@@ -98,11 +98,11 @@ GateEnvelope* GatePattern::addEnvelope(const GateEnvelope& env)
     return nullptr;
 }
 
-void GatePattern::removeEnvelopeCovering(int cellIdx)
+void GatePattern::removeEnvelopeCovering(int cellIndex)
 {
     envelopes.erase(
         std::remove_if(envelopes.begin(), envelopes.end(),
-                       [cellIdx](const GateEnvelope& e) { return e.covers(cellIdx); }),
+                       [cellIndex](const GateEnvelope& e) { return e.covers(cellIndex); }),
         envelopes.end());
     hasEnvelopes.store(!envelopes.empty(), std::memory_order_relaxed);
 }

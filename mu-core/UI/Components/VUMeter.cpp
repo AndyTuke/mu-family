@@ -2,7 +2,7 @@
 #include "MuLookAndFeel.h"
 #include <cmath>
 
-VUMeter::VUMeter()  { startTimerHz(30); }
+VUMeter::VUMeter()  { startTimerHz(mu_ui::kUiRefreshHz); }
 VUMeter::~VUMeter() { stopTimer(); }
 
 float VUMeter::linToDb(float lin) noexcept

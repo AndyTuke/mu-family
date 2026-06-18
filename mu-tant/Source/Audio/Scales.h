@@ -43,7 +43,7 @@ inline constexpr int kNumScales = (int) kScales.size();
 // the voice engine (free-mode pitch) and the processor (Note-mode pitch-tracking).
 inline constexpr int kBaseOctave = 4;
 
-inline int clampScaleIdx(int i) noexcept
+inline int clampScaleIndex(int i) noexcept
 {
     return i < 0 ? 0 : (i >= kNumScales ? kNumScales - 1 : i);
 }
@@ -60,9 +60,9 @@ inline float scaleSemitone(const Scale& s, int t) noexcept
 }
 
 // Continuous tone -> MIDI note. `root` 0..11 (C..B), `octave` 0..8, `fine` cents.
-inline float toneToMidi(int scaleIdx, int root, int octave, float tone, float fineCents) noexcept
+inline float toneToMidi(int scaleIndex, int root, int octave, float tone, float fineCents) noexcept
 {
-    const Scale& s = kScales[(size_t) clampScaleIdx(scaleIdx)];
+    const Scale& s = kScales[(size_t) clampScaleIndex(scaleIndex)];
     const int    t0 = (int) std::floor(tone);
     const float  fr = tone - (float) t0;
     const float  semi = scaleSemitone(s, t0) + fr * (scaleSemitone(s, t0 + 1) - scaleSemitone(s, t0));

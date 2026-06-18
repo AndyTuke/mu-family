@@ -9,7 +9,7 @@
 //   • DSP   — each InsertAlgorithm::process reads `p.insertParam[slot]` (a
 //     normalised 0..1 value) and calls `normToActual(norm, algo, slot)` to
 //     get the real-world value with the right range + skew applied.
-//   • UI    — the per-rhythm InsertSubsection + the master MixerChannel_Insert
+//   • UI    — the per-channel InsertSubsection + the master MixerChannel_Insert
 //     iterate the 4 slots, read label/range/skew/unit from here, and wire the
 //     knob's `setValue` / `onValueChanged` to convert between the displayed
 //     actual range and the normalised APVTS storage via the same helpers.
@@ -186,11 +186,11 @@ inline const float kInsertAlgoDefaults[kInsertAlgoCount][kInsertSlotCount] = {
 // Convert a normalised 0..1 storage value to the algorithm's actual value
 // with the slot's skew applied. Safe for any (algo, slot) — hidden slots
 // (label == nullptr) simply return the slot's minVal (0).
-inline float normToActual(float norm, int algoIdx, int slot) noexcept
+inline float normToActual(float norm, int algoIndex, int slot) noexcept
 {
-    if (algoIdx < 0 || algoIdx >= kInsertAlgoCount || slot < 0 || slot >= kInsertSlotCount)
+    if (algoIndex < 0 || algoIndex >= kInsertAlgoCount || slot < 0 || slot >= kInsertSlotCount)
         return 0.0f;
-    const auto& cfg = kInsertAlgoSlots[algoIdx][slot];
+    const auto& cfg = kInsertAlgoSlots[algoIndex][slot];
     norm = std::clamp(norm, 0.0f, 1.0f);
     switch (cfg.skew)
     {
@@ -212,11 +212,11 @@ inline float normToActual(float norm, int algoIdx, int slot) noexcept
 
 // Convert an actual value to its 0..1 normalised storage form. Inverse of
 // normToActual, with matching skew handling.
-inline float actualToNorm(float actual, int algoIdx, int slot) noexcept
+inline float actualToNorm(float actual, int algoIndex, int slot) noexcept
 {
-    if (algoIdx < 0 || algoIdx >= kInsertAlgoCount || slot < 0 || slot >= kInsertSlotCount)
+    if (algoIndex < 0 || algoIndex >= kInsertAlgoCount || slot < 0 || slot >= kInsertSlotCount)
         return 0.0f;
-    const auto& cfg = kInsertAlgoSlots[algoIdx][slot];
+    const auto& cfg = kInsertAlgoSlots[algoIndex][slot];
     actual = std::clamp(actual, cfg.minVal, cfg.maxVal);
     switch (cfg.skew)
     {

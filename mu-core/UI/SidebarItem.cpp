@@ -21,7 +21,7 @@ void SidebarItem::setPendingSwap(bool p)
 void SidebarItem::pulse()
 {
     pulseAlpha = 0.4f;
-    if (! isTimerRunning()) startTimerHz(30);
+    if (! isTimerRunning()) startTimerHz(mu_ui::kUiRefreshHz);
     repaint();
 }
 

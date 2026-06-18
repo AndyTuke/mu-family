@@ -104,11 +104,11 @@ ModMatrixPanel::ModMatrixPanel()
         menu.showMenuAsync(juce::PopupMenu::Options{}, [this](int result)
         {
             if (result < 1 || !voiceSlot) return;
-            const int csIdx = result - 1;
+            const int csIndex = result - 1;
             ModulationAssignment a;
-            a.id            = "cs" + std::to_string(csIdx) + "_assign_" +
+            a.id            = "cs" + std::to_string(csIndex) + "_assign_" +
                               juce::Uuid().toString().toStdString();
-            a.sourceId      = "cs" + std::to_string(csIdx) + "_output";
+            a.sourceId      = "cs" + std::to_string(csIndex) + "_output";
             a.destinationId = (destProvider && destProvider->resolveId)
                                   ? destProvider->resolveId(1)
                                   : std::string{};
@@ -207,13 +207,13 @@ void ModMatrixPanel::rebuildRows()
 
     for (const auto& a : voiceSlot->modulationMatrix.getAssignments())
     {
-        const int csIdx = csIndexFromSourceId(a.sourceId);
+        const int csIndex = csIndexFromSourceId(a.sourceId);
         // A row's source modulator may be Stepped or Smooth; Smooth omits stepped-only dests.
         const auto& seqs = voiceSlot->controlSequences;
-        const bool steppedMode = (csIdx >= 0 && csIdx < (int) seqs.size())
-                                 ? (seqs[(size_t) csIdx].mode == ControlSequence::Mode::Stepped)
+        const bool steppedMode = (csIndex >= 0 && csIndex < (int) seqs.size())
+                                 ? (seqs[(size_t) csIndex].mode == ControlSequence::Mode::Stepped)
                                  : true;
-        auto row = std::make_unique<MatrixRow>(a, csIdx, currentDriveChar, destProvider, steppedMode);
+        auto row = std::make_unique<MatrixRow>(a, csIndex, currentDriveChar, destProvider, steppedMode);
         addAndMakeVisible(*row);
 
         const std::string rowId    = a.id;
@@ -305,11 +305,11 @@ void ModMatrixPanel::resized()
 
     // Rows: show only current page
     const int rowsStart = headerH + pagerH + s(2);
-    const int startIdx  = matPage * rpp;
+    const int startIndex  = matPage * rpp;
     int y = rowsStart;
     for (int i = 0; i < (int)matrixRows.size(); ++i)
     {
-        const bool vis = (i >= startIdx && i < startIdx + rpp);
+        const bool vis = (i >= startIndex && i < startIndex + rpp);
         matrixRows[i]->setVisible(vis);
         if (vis) { matrixRows[i]->setBounds(0, y, w, rowH); y += rowH + s(2); }
     }

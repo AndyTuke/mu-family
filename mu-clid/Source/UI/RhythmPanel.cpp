@@ -235,7 +235,7 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     : proc(p), euclidPanel(p), voiceSection(p),
       modDestProvider(mu_clid::makeModDestProvider())
 {
-    startTimerHz(30);
+    startTimerHz(mu_ui::kUiRefreshHz);
     addAndMakeVisible(circle);
     addAndMakeVisible(euclidPanel);
     addAndMakeVisible(voiceSection);
@@ -547,18 +547,18 @@ void RhythmPanel::loadSample()
                                            : juce::File::getSpecialLocation(juce::File::userMusicDirectory));
 
     juce::Component::SafePointer<RhythmPanel> safeThis(this);
-    const int rhythmIdx = currentRhythmIndex;
+    const int rhythmIndex = currentRhythmIndex;
 
     // Host the sample browser as a dimmed in-editor overlay (consistent with the other modals)
     // rather than a floating DialogWindow. The browser brings its own Load/Cancel; OverlayHost
     // supplies the dim backdrop + centring + click-outside-to-dismiss.
     auto content = std::make_unique<SampleBrowserContent>(
         proc, startDir,
-        [safeThis, rhythmIdx](const juce::File& f)
+        [safeThis, rhythmIndex](const juce::File& f)
         {
             if (safeThis == nullptr) return;
             safeThis->lastBrowseDir = f.getParentDirectory();
-            safeThis->proc.loadSampleForRhythm(rhythmIdx, f);
+            safeThis->proc.loadSampleForRhythm(rhythmIndex, f);
             safeThis->repaint();
         });
 

@@ -216,7 +216,7 @@ private:
     // Wavetable selector dropdowns: rebuilt per voice (factory names + an optional
     // user-import item + "Load .wav…"). Selection routes through handleWtSelection.
     void refreshWavetableDropdowns();
-    void handleWtSelection(int oscIdx, int itemId);
+    void handleWtSelection(int oscIndex, int itemId);
     std::unique_ptr<juce::FileChooser> wtChooser;   // kept alive during async load
     std::vector<juce::File> wtFolderFiles;          // dropdown id (kWtFolderBase+i) → Wavetables/ file
 

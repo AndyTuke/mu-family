@@ -842,12 +842,12 @@ void PluginProcessor::renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::M
     std::array<juce::AudioBuffer<float>*, 8> directPtrs {};
     for (int i = 0; i < 8; ++i)
     {
-        const int busIdx = kFirstDirectOutBus + i;
-        if (busIdx < getBusCount(false))
-            if (auto* bus = getBus(false, busIdx))
+        const int busIndex = kFirstDirectOutBus + i;
+        if (busIndex < getBusCount(false))
+            if (auto* bus = getBus(false, busIndex))
                 if (bus->isEnabled())
                 {
-                    directBufs[(size_t) i] = getBusBuffer(buffer, false, busIdx);
+                    directBufs[(size_t) i] = getBusBuffer(buffer, false, busIndex);
                     directPtrs[(size_t) i] = &directBufs[(size_t) i];
                 }
     }

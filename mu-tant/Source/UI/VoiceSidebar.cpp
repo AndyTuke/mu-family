@@ -28,7 +28,7 @@ namespace
         VoiceSpectrumGlyph(juce::Colour col, const VoiceRingBuffer* rb)
             : colour(col), ringBuffer(rb), fft(kFftOrder)
         {
-            startTimerHz(30);
+            startTimerHz(mu_ui::kUiRefreshHz);
         }
 
         // Stop the timer before this object's members are torn down — matches the

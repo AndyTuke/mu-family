@@ -101,12 +101,12 @@ void ProcessorBase::syncGlobalFxParam(const juce::String& id, float v)
 
     if (id.startsWith("ret_"))                                              // ret_{eff|dly|rev}_{param}
     {
-        int retIdx = -1;
-        if      (id.startsWith("ret_eff_")) retIdx = 0;
-        else if (id.startsWith("ret_dly_")) retIdx = 1;
-        else if (id.startsWith("ret_rev_")) retIdx = 2;
-        if (retIdx >= 0)
-            syncReturnStripParam(retIdx, id.toRawUTF8() + 8, v);   // suffix into id buffer, no alloc
+        int retIndex = -1;
+        if      (id.startsWith("ret_eff_")) retIndex = 0;
+        else if (id.startsWith("ret_dly_")) retIndex = 1;
+        else if (id.startsWith("ret_rev_")) retIndex = 2;
+        if (retIndex >= 0)
+            syncReturnStripParam(retIndex, id.toRawUTF8() + 8, v);   // suffix into id buffer, no alloc
         return;
     }
 
@@ -136,9 +136,9 @@ void ProcessorBase::syncChannelStripParam(int channel, const char* param, float 
     else if (is("outBus"))  ch.outputBus.store(juce::jlimit(0, 8, juce::roundToInt(v)), std::memory_order_relaxed);
 }
 
-void ProcessorBase::syncReturnStripParam(int retIdx, const char* rest, float v)
+void ProcessorBase::syncReturnStripParam(int retIndex, const char* rest, float v)
 {
-    auto& ret = mixerEngine.returns[(size_t) retIdx];
+    auto& ret = mixerEngine.returns[(size_t) retIndex];
     auto is = [rest](const char* s) { return std::strcmp(rest, s) == 0; };
     if      (is("lvl"))   ret.level.store(v, std::memory_order_relaxed);
     else if (is("pan"))   ret.pan.store(v, std::memory_order_relaxed);

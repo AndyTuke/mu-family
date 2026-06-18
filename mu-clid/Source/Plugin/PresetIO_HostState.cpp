@@ -85,7 +85,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     proc_.sequencer.setNumRhythms(n);
 
     // restore per-rhythm modulator state from the Modulators children.
-    // Each child carries a rhythmIdx property so we apply to the right slot
+    // Each child carries a rhythmIndex property so we apply to the right slot
     // regardless of child ordering. Legacy state (no Modulators children)
     // leaves rhythm defaults in place — clean degradation.
     for (int ci = 0; ci < state.getNumChildren(); ++ci)

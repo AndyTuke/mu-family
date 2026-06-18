@@ -1,11 +1,11 @@
 // Master-insert algorithm UI configuration.
 //
 // Stage 36: this was a ~480-line switch with one case per algorithm; the
-// per-rhythm InsertSubsection carried a near-identical second copy of the
+// per-channel InsertSubsection carried a near-identical second copy of the
 // same logic. Both now defer to the shared `mu_ui::configureKnobFromSlot`
-// driver (Source/UI/InsertSlotUi.h), which reads label / range / skew /
+// driver (mu-core/UI/InsertSlotUi.h), which reads label / range / skew /
 // formatter from the per-algorithm config table in
-// Source/Audio/InsertSlotConfig.h.
+// mu-core/Audio/InsertSlotConfig.h.
 //
 // The only master-specific extras left here are:
 //   • Comp / Limiter GR meter — wired onto Param 2 (Output)

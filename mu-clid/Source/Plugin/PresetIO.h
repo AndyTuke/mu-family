@@ -22,7 +22,7 @@ public:
     void              ensureCategoryInList(const juce::String& cat);
 
     // Per-rhythm preset I/O.
-    void saveRhythmPresetToFile(int rhythmIdx, const juce::File& destFile,
+    void saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFile,
                                 bool embedSample = false,
                                 const juce::String& category = {},
                                 const juce::String& description = {});

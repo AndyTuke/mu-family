@@ -175,12 +175,12 @@ public:
         beginTest ("drvChar: clamps to countNames()-1, not a stale hardcoded limit");
         {
             auto& def = find("drvChar");
-            const int maxIdx = mu_audio::countNames(mu_audio::kInsertAlgorithmNames) - 1;
+            const int maxIndex = mu_audio::countNames(mu_audio::kInsertAlgorithmNames) - 1;
 
             expectWithinAbsoluteError (applyAndPush(def, 0.0f),           0.0f,           kTol, "None (0)");
-            expectWithinAbsoluteError (applyAndPush(def, (float)maxIdx), (float)maxIdx,   kTol, "max valid index");
-            expectWithinAbsoluteError (applyAndPush(def, (float)(maxIdx + 5)), (float)maxIdx, kTol,
-                                       "over-range clamps to maxIdx, not to stale 12");
+            expectWithinAbsoluteError (applyAndPush(def, (float)maxIndex), (float)maxIndex,   kTol, "max valid index");
+            expectWithinAbsoluteError (applyAndPush(def, (float)(maxIndex + 5)), (float)maxIndex, kTol,
+                                       "over-range clamps to maxIndex, not to stale 12");
         }
 
         beginTest ("fltType: clamps to [0, 15]");

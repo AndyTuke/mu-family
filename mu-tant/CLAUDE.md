@@ -53,7 +53,7 @@ mu-tant/Source/
 ├── Audio/            SynthVoice (multi-voice), WavetableOscillator, WavetableBank, Scales
 ├── Modulation/       MuTantModDest (destination provider for the shared ModulatorPanel)
 ├── Persistence/      (empty — preset/modulator/gate I/O lives in PluginProcessor + mu-core's ModulatorSerialise)
-├── License/          (empty — no licensing yet)
+├── License/          LicenseKey.h (embedded public key + product id; verifier lives in mu-core)
 └── Tests/            TestMain + SynthDSPTests + ModulatorTests + GatingDesignerTests + GatePatternTests + GateStageTests + InsertStageTests
 ```
 

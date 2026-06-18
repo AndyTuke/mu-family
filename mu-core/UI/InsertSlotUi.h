@@ -7,7 +7,7 @@
 #include <functional>
 
 // Shared UI driver for the 4 generic insert-slot knobs. Eliminates duplication
-// between the per-rhythm InsertSubsection and the master MixerChannel_Insert —
+// between the per-channel InsertSubsection and the master MixerChannel_Insert —
 // both call this once per slot to configure label,
 // range, skew, display formatter, value, and onValueChanged write-back from
 // the same per-algo config table (mu_ui::kInsertAlgoSlots).
@@ -73,21 +73,21 @@ inline juce::String composeSlotLabel(const SlotConfig& cfg, double currentActual
 // Configure one slot knob from the per-algo config table. `onWriteNorm` is
 // invoked with the NEW NORMALISED value whenever the user moves the knob,
 // so the caller can route to its preferred APVTS write path (apvtsSet for
-// per-rhythm, setParam(fullId) for master).
+// per-channel, setParam(fullId) for master).
 inline void configureKnobFromSlot(KnobWithLabel& k,
-                                  int algoIdx,
-                                  int slotIdx,
+                                  int algoIndex,
+                                  int slotIndex,
                                   float currentNorm,
                                   std::function<void(float /*newNorm*/)> onWriteNorm)
 {
-    if (algoIdx < 0 || algoIdx >= kInsertAlgoCount || slotIdx < 0 || slotIdx >= kInsertSlotCount)
+    if (algoIndex < 0 || algoIndex >= kInsertAlgoCount || slotIndex < 0 || slotIndex >= kInsertSlotCount)
     {
         k.setVisible(false);
         k.onValueChanged = nullptr;
         return;
     }
 
-    const SlotConfig& cfg = kInsertAlgoSlots[algoIdx][slotIdx];
+    const SlotConfig& cfg = kInsertAlgoSlots[algoIndex][slotIndex];
 
     if (cfg.label == nullptr)
     {
@@ -119,15 +119,15 @@ inline void configureKnobFromSlot(KnobWithLabel& k,
     k.getSlider().valueFromTextFunction = nullptr;
 
     // Snap the value (actual scale).
-    const double actual = (double) normToActual(currentNorm, algoIdx, slotIdx);
+    const double actual = (double) normToActual(currentNorm, algoIndex, slotIndex);
     k.setValue(actual, juce::dontSendNotification);
     k.setLabel(composeSlotLabel(cfg, actual));
 
     // onValueChanged: convert back to normalised + tell caller. Also refreshes
     // the label so dynamicUnit Hz→kHz flips track the slider live.
-    k.onValueChanged = [&k, cfg, algoIdx, slotIdx, onWriteNorm](double v)
+    k.onValueChanged = [&k, cfg, algoIndex, slotIndex, onWriteNorm](double v)
     {
-        onWriteNorm(actualToNorm((float) v, algoIdx, slotIdx));
+        onWriteNorm(actualToNorm((float) v, algoIndex, slotIndex));
         k.setLabel(composeSlotLabel(cfg, v));
     };
 }

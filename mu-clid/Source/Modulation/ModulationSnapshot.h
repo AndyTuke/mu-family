@@ -8,7 +8,7 @@
 //
 // Lives here (not on PluginProcessor) so VoiceSection / EuclideanPanel can
 // consume the indices without pulling in the full processor header.
-// Access the values via PluginProcessor::getModSnapshot(rhythmIdx, snapIdx).
+// Access the values via PluginProcessor::getModSnapshot(rhythmIndex, snapIndex).
 enum ModSnapIdx : int
 {
     kSnapAmpAtk = 0, kSnapAmpDec, kSnapAmpSus, kSnapAmpRel,

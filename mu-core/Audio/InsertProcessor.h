@@ -10,7 +10,7 @@
 #include "VoiceParams.h"
 #include "Audio/FX/Insert/InsertAlgorithmBase.h"
 
-// Self-contained insert-effect processor used by both VoiceEngine (per-rhythm)
+// Self-contained insert-effect processor used by both VoiceEngine (per-channel)
 // and MixerEngine (master bus). Owns all DSP state; parameters are passed in
 // as a const VoiceParams& each block so there is no internal copy to keep in
 // sync.

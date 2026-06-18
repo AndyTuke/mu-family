@@ -75,7 +75,7 @@ TransportBar::TransportBar(ProcessorBase& p)
 
     populatePresetDropdown();
     refreshPlayBtn();
-    startTimerHz(30);
+    startTimerHz(mu_ui::kUiRefreshHz);
 }
 
 TransportBar::~TransportBar()

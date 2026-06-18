@@ -370,17 +370,17 @@ void PresetIO::ensureCategoryInList(const juce::String& cat)
     }
 }
 
-void PresetIO::saveRhythmPresetToFile(int rhythmIdx, const juce::File& destFile,
+void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFile,
                                              bool embedSample, const juce::String& category,
                                              const juce::String& description)
 {
-    if (rhythmIdx < 0 || rhythmIdx >= proc_.sequencer.getNumRhythms()) return;
+    if (rhythmIndex < 0 || rhythmIndex >= proc_.sequencer.getNumRhythms()) return;
 
     // if the current sample comes from an embedded-sample decode (path
     // points into %TEMP%/muClid_samples/), force-embed so we never write the
     // ephemeral temp path as `r0_sample`. The temp file would not survive an
     // OS reboot, so any later load would lose the sample.
-    if (isEmbeddedSampleTempPath(proc_.loadedSamplePaths[rhythmIdx]) && ! embedSample)
+    if (isEmbeddedSampleTempPath(proc_.loadedSamplePaths[rhythmIndex]) && ! embedSample)
     {
         embedSample = true;
         if (proc_.onLoadError)
@@ -394,13 +394,13 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIdx, const juce::File& destFile,
     state.setProperty("presetEmbedSamples", embedSample ? 1 : 0,                   nullptr);
     // presetVersion property dropped: not distributing yet, current-build-only.
 
-    const Rhythm& r = proc_.sequencer.getRhythm(rhythmIdx);
+    const Rhythm& r = proc_.sequencer.getRhythm(rhythmIndex);
     state.setProperty("r0_name",   juce::String(r.name),        nullptr);
     state.setProperty("r0_colour", r.colourIndex,                nullptr);
     state.setProperty("r0_sample",
                       embedSample
                           ? juce::String()
-                          : toRelativeSamplePath(proc_.loadedSamplePaths[rhythmIdx], proc_.getSamplesDir()),
+                          : toRelativeSamplePath(proc_.loadedSamplePaths[rhythmIndex], proc_.getSamplesDir()),
                       nullptr);
 
     // Rhythm presets store ONLY proc_.sequencer-page state (Euclidean params, voice chain,
@@ -409,7 +409,7 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIdx, const juce::File& destFile,
     // Stage 35: v2 writes actual values + algorithm-name strings via
     // writeParamPropertyV2. Ints / bools / algorithm selectors get their
     // natural representation in XML; floats get raw actual values.
-    const juce::String srcPrefix = "r" + juce::String(rhythmIdx) + "_";
+    const juce::String srcPrefix = "r" + juce::String(rhythmIndex) + "_";
     for (int i = 0; i < kRhythmParamCount; ++i)
         if (auto* param = proc_.apvts.getParameter(srcPrefix + kRhythmParamDefs[i].suffix))
             writeParamPropertyV2(state,
@@ -418,11 +418,11 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIdx, const juce::File& destFile,
                                  kRhythmParamDefs[i]);
 
     // serialise modulators (ControlSequences + ModulationMatrix assignments).
-    state.addChild(serialiseModulators(proc_.sequencer.getRhythm(rhythmIdx)), -1, nullptr);
+    state.addChild(serialiseModulators(proc_.sequencer.getRhythm(rhythmIndex)), -1, nullptr);
 
     if (embedSample)
     {
-        const juce::String path = proc_.loadedSamplePaths[rhythmIdx];
+        const juce::String path = proc_.loadedSamplePaths[rhythmIndex];
         if (path.isNotEmpty())
         {
             juce::File f(path);
@@ -442,7 +442,7 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIdx, const juce::File& destFile,
     atomicReplaceWithText(destFile, state.toXmlString(), proc_.onLoadError);
 }
 
-bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIdx)
+bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex)
 {
     if (!file.existsAsFile())
     {
@@ -468,15 +468,15 @@ bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIdx)
     // Load only sequencer-page state — mixer settings stay attached to the slot.
     // Older rhythm preset files may include "ch_*" properties; those are simply
     // ignored (we don't call restoreRhythmChannelParams here).
-    restoreRhythmAPVTSParams (targetIdx, state, /*srcPropPrefix*/ "r0_");
-    restoreRhythmModulators  (targetIdx, state);
+    restoreRhythmAPVTSParams (targetIndex, state, /*srcPropPrefix*/ "r0_");
+    restoreRhythmModulators  (targetIndex, state);
 
     // Name + colour (not APVTS-backed). For a per-rhythm preset, the
     // user-facing identity is the `presetName` (matches the dropdown entry
     // and the filename); the older `r0_name` carries the slot's short
     // historical name (e.g. "Kick" inside the "Kick Accents" preset).
     // Prefer presetName, fall back to r0_name when the file is missing one.
-    Rhythm& r = proc_.sequencer.getRhythm(targetIdx);
+    Rhythm& r = proc_.sequencer.getRhythm(targetIndex);
     auto presetNameVal = state.getProperty("presetName");
     auto rhythmNameVal = state.getProperty("r0_name");
     if (presetNameVal.isString() && presetNameVal.toString().isNotEmpty())
@@ -487,13 +487,13 @@ bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIdx)
 
     // In .muRhythm the sample *path* is "r0_sample" but the embedded blob fields
     // are unprefixed ("sampleData" / "sampleName").
-    restoreRhythmSample(targetIdx, state, "r0_sample", "sampleData", "sampleName");
+    restoreRhythmSample(targetIndex, state, "r0_sample", "sampleData", "sampleName");
 
     // force-sync APVTS → Rhythm so freshly-defaulted slots (after a shrink/grow
     // cycle) get their fields repopulated even when JUCE skips the
     // parameterChanged listener because incoming values match the already-
     // stored APVTS values.
-    proc_.forceSyncRhythmFromAPVTS(targetIdx);
+    proc_.forceSyncRhythmFromAPVTS(targetIndex);
     return true;
 }
 
@@ -932,9 +932,9 @@ static void prepareRhythmSlotFromTree(const juce::ValueTree& rTreeIn,
     // the per-rhythm hot-swap path.
     if (auto mods = rTree.getChildWithName("Modulators"); mods.isValid())
     {
-        const int algoIdx = mu_audio::indexFromName(mu_audio::kInsertAlgorithmNames,
+        const int algoIndex = mu_audio::indexFromName(mu_audio::kInsertAlgorithmNames,
                                                     rTree.getProperty("drvChar").toString());
-        migrateModAssignmentsV3(mods, algoIdx);
+        migrateModAssignmentsV3(mods, algoIndex);
         clearModulators(r);
         auto dropped = deserialiseModulators(mods, r);
         if (! dropped.isEmpty() && onLoadError)
@@ -1155,12 +1155,12 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     // freshly-installed voice. Channel + global params come from the parsed tree.
     mu_core::ScopedApvtsLoading guard(proc_.apvtsLoading);
     const juce::ValueTree& root = prepared.tree;
-    int rhythmIdx = 0;
-    for (int ci = 0; ci < root.getNumChildren() && rhythmIdx < n; ++ci)
+    int rhythmIndex = 0;
+    for (int ci = 0; ci < root.getNumChildren() && rhythmIndex < n; ++ci)
     {
         auto rTree = root.getChild(ci);
         if (rTree.getType() != juce::Identifier("Rhythm")) continue;
-        const int i = rhythmIdx++;
+        const int i = rhythmIndex++;
         proc_.pushRhythmToAPVTS(i);
         restoreRhythmChannelParams(i, rTree);
     }

@@ -95,10 +95,10 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         voicePanel.clearModulatorSlot();
         voicePanel.clearAllModBindings();
         proc.removeVoice(idx);
-        const int newIdx = juce::jlimit(0, proc.getNumVoices() - 1, idx);
+        const int newIndex = juce::jlimit(0, proc.getNumVoices() - 1, idx);
         voiceSidebar.refreshItems();
-        voiceSidebar.setSelectedIndex(newIdx);
-        voicePanel.setVoice(newIdx);
+        voiceSidebar.setSelectedIndex(newIndex);
+        voicePanel.setVoice(newIndex);
     };
 
     // Forward mixer status updates to the shared StatusBar.

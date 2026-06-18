@@ -12,7 +12,7 @@ class GRMeter : public juce::Component, private juce::Timer
 public:
     std::function<float()> getGR;
 
-    GRMeter()  { startTimerHz(30); }
+    GRMeter()  { startTimerHz(mu_ui::kUiRefreshHz); }
     ~GRMeter() override { stopTimer(); }
 
     void paint(juce::Graphics& g) override

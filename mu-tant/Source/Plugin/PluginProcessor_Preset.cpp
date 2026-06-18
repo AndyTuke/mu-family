@@ -236,8 +236,8 @@ void PluginProcessor::applyVoicePresetTree(int voice, const juce::ValueTree& tre
         }
         idxs[(size_t) voice].store(idx);
     };
-    loadWt(tree.getProperty("o1WtPath").toString(), osc1UserPath, osc1UserIdx);
-    loadWt(tree.getProperty("o2WtPath").toString(), osc2UserPath, osc2UserIdx);
+    loadWt(tree.getProperty("o1WtPath").toString(), osc1UserPath, osc1UserIndex);
+    loadWt(tree.getProperty("o2WtPath").toString(), osc2UserPath, osc2UserIndex);
 }
 
 // Warm the wavetable bank (dedup-by-path, append under voicesLock) for the user
@@ -364,8 +364,8 @@ void PluginProcessor::readVoiceDataFromState()
             }
             idxs[(size_t) v].store(idx);
         };
-        resolveWt(voice.getProperty("o1WtPath", "").toString(), osc1UserPath, osc1UserIdx);
-        resolveWt(voice.getProperty("o2WtPath", "").toString(), osc2UserPath, osc2UserIdx);
+        resolveWt(voice.getProperty("o1WtPath", "").toString(), osc1UserPath, osc1UserIndex);
+        resolveWt(voice.getProperty("o2WtPath", "").toString(), osc2UserPath, osc2UserIndex);
     }
     refreshAllPitchQuantFlags();   // modulators reloaded → refresh stepped-pitch flags
 }
@@ -469,7 +469,7 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& stateIn)
 
     // Retire-tail: when this preset drops voices while playing, snapshot each dropped
     // voice's OLD engine + insert config NOW (before replaceState clobbers the params)
-    // and arm a short fade so its comb-filter / insert tail rings out (see #1013).
+    // and arm a short fade so its comb-filter / insert tail rings out.
     if (isInternalPlaying() && nv < oldN)
     {
         const int ramp = retireRampSamples();

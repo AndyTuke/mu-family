@@ -31,7 +31,7 @@ MasterLoopSection::MasterLoopSection(ProcessorBase& p)
     // Catch host automation of mstrLoop so the dropdown / step label stay in
     // sync with the DAW state.
     proc.apvts.addParameterListener("mstrLoop", this);
-    startTimerHz(30);
+    startTimerHz(mu_ui::kUiRefreshHz);
 }
 
 MasterLoopSection::~MasterLoopSection()

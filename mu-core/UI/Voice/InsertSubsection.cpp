@@ -123,7 +123,7 @@ void InsertSubsection::setChannel(int idx)
     refreshModulatedIndicators();
     // Start the 30 Hz self-refresh when a channel is bound and mod hooks are wired.
     if (validChannel() && (isSlotModulated || slotModValue))
-        startTimerHz(30);
+        startTimerHz(mu_ui::kUiRefreshHz);
     else
         stopTimer();
 }

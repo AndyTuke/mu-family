@@ -155,8 +155,8 @@ PluginProcessor::PluginProcessor()
     {
         voices[(size_t) v] = std::make_unique<VoiceEngine>();
         voices[(size_t) v]->setBank(&bank);
-        osc1UserIdx[(size_t) v].store(-1);   // no user wavetable → factory selection
-        osc2UserIdx[(size_t) v].store(-1);
+        osc1UserIndex[(size_t) v].store(-1);   // no user wavetable → factory selection
+        osc2UserIndex[(size_t) v].store(-1);
     }
 
     cacheParamPointers();        // resolve all APVTS atomics once (audio thread reads these)
@@ -307,13 +307,13 @@ void PluginProcessor::cacheParamPointers()
     }
 }
 
-VoiceConfig PluginProcessor::readConfig(int voiceIdx) const
+VoiceConfig PluginProcessor::readConfig(int voiceIndex) const
 {
-    const auto& p = voicePtrs[(size_t) voiceIdx];
+    const auto& p = voicePtrs[(size_t) voiceIndex];
     VoiceConfig c;
     // Tonal centre is global.
     c.root         = (int) globalPtrs.root->load();
-    c.scaleIdx     = (int) globalPtrs.scale->load();
+    c.scaleIndex     = (int) globalPtrs.scale->load();
     // Per-voice osc pitch (integer) + position.
     c.osc1Octave   = (int) p.o1Oct->load();
     c.osc1Semi     = (int) p.o1Semi->load();
@@ -326,8 +326,8 @@ VoiceConfig PluginProcessor::readConfig(int voiceIdx) const
     // Wavetable: a loaded user table (resolved bank index) overrides the factory
     // o{1,2}_wt selection; -1 → use the factory index.
     {
-        const int u1 = osc1UserIdx[(size_t) voiceIdx].load();
-        const int u2 = osc2UserIdx[(size_t) voiceIdx].load();
+        const int u1 = osc1UserIndex[(size_t) voiceIndex].load();
+        const int u2 = osc2UserIndex[(size_t) voiceIndex].load();
         c.osc1Wavetable = (u1 >= 0) ? u1 : (int) p.o1Wt->load();
         c.osc2Wavetable = (u2 >= 0) ? u2 : (int) p.o2Wt->load();
     }
@@ -902,8 +902,8 @@ void PluginProcessor::swapVoices(int a, int b)
     // User-wavetable selection follows the voice too.
     std::swap(osc1UserPath[(size_t) a], osc1UserPath[(size_t) b]);
     std::swap(osc2UserPath[(size_t) a], osc2UserPath[(size_t) b]);
-    { const int t1 = osc1UserIdx[(size_t) a].load(); osc1UserIdx[(size_t) a].store(osc1UserIdx[(size_t) b].load()); osc1UserIdx[(size_t) b].store(t1); }
-    { const int t2 = osc2UserIdx[(size_t) a].load(); osc2UserIdx[(size_t) a].store(osc2UserIdx[(size_t) b].load()); osc2UserIdx[(size_t) b].store(t2); }
+    { const int t1 = osc1UserIndex[(size_t) a].load(); osc1UserIndex[(size_t) a].store(osc1UserIndex[(size_t) b].load()); osc1UserIndex[(size_t) b].store(t1); }
+    { const int t2 = osc2UserIndex[(size_t) a].load(); osc2UserIndex[(size_t) a].store(osc2UserIndex[(size_t) b].load()); osc2UserIndex[(size_t) b].store(t2); }
 
     const VoiceSlot tmpSlot = voiceSlots[(size_t) a];
     voiceSlots[(size_t) a] = voiceSlots[(size_t) b];
@@ -960,7 +960,7 @@ void PluginProcessor::handleAsyncUpdate()
     drainPendingMidiProgramChanges();
 }
 
-void PluginProcessor::loadUserWavetable(int voice, int oscIdx, const juce::File& file)
+void PluginProcessor::loadUserWavetable(int voice, int oscIndex, const juce::File& file)
 {
     if (voice < 0 || voice >= kMaxVoices || ! file.existsAsFile()) return;
     int idx;
@@ -970,26 +970,26 @@ void PluginProcessor::loadUserWavetable(int voice, int oscIdx, const juce::File&
     }
     if (idx < 0) { if (onLoadError) onLoadError("Could not load wavetable \"" + file.getFileName() + "\""); return; }
     const juce::String path = file.getFullPathName();
-    if (oscIdx == 0) { osc1UserPath[(size_t) voice] = path; osc1UserIdx[(size_t) voice].store(idx); }
-    else             { osc2UserPath[(size_t) voice] = path; osc2UserIdx[(size_t) voice].store(idx); }
+    if (oscIndex == 0) { osc1UserPath[(size_t) voice] = path; osc1UserIndex[(size_t) voice].store(idx); }
+    else             { osc2UserPath[(size_t) voice] = path; osc2UserIndex[(size_t) voice].store(idx); }
 }
 
-void PluginProcessor::clearUserWavetable(int voice, int oscIdx)
+void PluginProcessor::clearUserWavetable(int voice, int oscIndex)
 {
     if (voice < 0 || voice >= kMaxVoices) return;
-    if (oscIdx == 0) { osc1UserPath[(size_t) voice].clear(); osc1UserIdx[(size_t) voice].store(-1); }
-    else             { osc2UserPath[(size_t) voice].clear(); osc2UserIdx[(size_t) voice].store(-1); }
+    if (oscIndex == 0) { osc1UserPath[(size_t) voice].clear(); osc1UserIndex[(size_t) voice].store(-1); }
+    else             { osc2UserPath[(size_t) voice].clear(); osc2UserIndex[(size_t) voice].store(-1); }
 }
 
-juce::String PluginProcessor::userWavetablePath(int voice, int oscIdx) const
+juce::String PluginProcessor::userWavetablePath(int voice, int oscIndex) const
 {
     if (voice < 0 || voice >= kMaxVoices) return {};
-    return (oscIdx == 0) ? osc1UserPath[(size_t) voice] : osc2UserPath[(size_t) voice];
+    return (oscIndex == 0) ? osc1UserPath[(size_t) voice] : osc2UserPath[(size_t) voice];
 }
 
-bool PluginProcessor::userWavetableMissing(int voice, int oscIdx) const
+bool PluginProcessor::userWavetableMissing(int voice, int oscIndex) const
 {
-    const auto p = userWavetablePath(voice, oscIdx);
+    const auto p = userWavetablePath(voice, oscIndex);
     return p.isNotEmpty() && ! juce::File(p).existsAsFile();
 }
 
@@ -1009,8 +1009,8 @@ void PluginProcessor::copyVoiceParams(int src, int dst)
     shift("v"  + juce::String(src) + "_", "v"  + juce::String(dst) + "_");
     shift("ch" + juce::String(src) + "_", "ch" + juce::String(dst) + "_");
     // User-wavetable selection copies with the voice (same bank index, already loaded).
-    osc1UserPath[(size_t) dst] = osc1UserPath[(size_t) src]; osc1UserIdx[(size_t) dst].store(osc1UserIdx[(size_t) src].load());
-    osc2UserPath[(size_t) dst] = osc2UserPath[(size_t) src]; osc2UserIdx[(size_t) dst].store(osc2UserIdx[(size_t) src].load());
+    osc1UserPath[(size_t) dst] = osc1UserPath[(size_t) src]; osc1UserIndex[(size_t) dst].store(osc1UserIndex[(size_t) src].load());
+    osc2UserPath[(size_t) dst] = osc2UserPath[(size_t) src]; osc2UserIndex[(size_t) dst].store(osc2UserIndex[(size_t) src].load());
 }
 
 void PluginProcessor::resetVoiceSlot(int idx)
@@ -1031,8 +1031,8 @@ void PluginProcessor::resetVoiceSlot(int idx)
     filterPatterns[(size_t) idx].copyDataFrom(GatePattern{});
     pitchPatterns[(size_t) idx].copyDataFrom(GatePattern{});
     voiceSlots[(size_t) idx] = VoiceSlot{};
-    osc1UserPath[(size_t) idx].clear(); osc1UserIdx[(size_t) idx].store(-1);
-    osc2UserPath[(size_t) idx].clear(); osc2UserIdx[(size_t) idx].store(-1);
+    osc1UserPath[(size_t) idx].clear(); osc1UserIndex[(size_t) idx].store(-1);
+    osc2UserPath[(size_t) idx].clear(); osc2UserIndex[(size_t) idx].store(-1);
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────

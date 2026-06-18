@@ -314,7 +314,7 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     refreshVoicePresetList();   // initial scan; onSave will re-scan after any save
     refreshHeader();
 
-    startTimerHz(30);
+    startTimerHz(mu_ui::kUiRefreshHz);
 }
 
 VoicePanel::~VoicePanel() { stopTimer(); }
@@ -930,7 +930,7 @@ void VoicePanel::refreshWavetableDropdowns()
     rebuild(osc2WaveDropdown, 1, "o2_wt");
 }
 
-void VoicePanel::handleWtSelection(int oscIdx, int itemId)
+void VoicePanel::handleWtSelection(int oscIndex, int itemId)
 {
     if (itemId == kWtUserItemId) return;   // already on the loaded user table
 
@@ -940,11 +940,11 @@ void VoicePanel::handleWtSelection(int oscIdx, int itemId)
         wtChooser = std::make_unique<juce::FileChooser>("Load wavetable (.wav)", proc.getWavetablesDir(), "*.wav");
         auto safe = juce::Component::SafePointer<VoicePanel>(this);
         wtChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-            [safe, oscIdx, v](const juce::FileChooser& fc)
+            [safe, oscIndex, v](const juce::FileChooser& fc)
             {
                 if (safe == nullptr) return;
                 const auto f = fc.getResult();
-                if (f.existsAsFile()) safe->proc.loadUserWavetable(v, oscIdx, f);
+                if (f.existsAsFile()) safe->proc.loadUserWavetable(v, oscIndex, f);
                 safe->refreshWavetableDropdowns();   // show new table, or revert on cancel
             });
         return;
@@ -954,14 +954,14 @@ void VoicePanel::handleWtSelection(int oscIdx, int itemId)
     {
         const int fi = itemId - kWtFolderBase;
         if (fi >= 0 && fi < (int) wtFolderFiles.size())
-            proc.loadUserWavetable(currentVoice, oscIdx, wtFolderFiles[(size_t) fi]);
+            proc.loadUserWavetable(currentVoice, oscIndex, wtFolderFiles[(size_t) fi]);
         refreshWavetableDropdowns();
         return;
     }
 
     // Factory item (1..N): clear any user table for this osc, set the APVTS index.
-    proc.clearUserWavetable(currentVoice, oscIdx);
-    if (auto* p = proc.apvts.getParameter(PluginProcessor::voiceParamId(currentVoice, oscIdx == 0 ? "o1_wt" : "o2_wt")))
+    proc.clearUserWavetable(currentVoice, oscIndex);
+    if (auto* p = proc.apvts.getParameter(PluginProcessor::voiceParamId(currentVoice, oscIndex == 0 ? "o1_wt" : "o2_wt")))
         p->setValueNotifyingHost(p->convertTo0to1((float) (itemId - 1)));
     refreshWavetableDropdowns();
 }

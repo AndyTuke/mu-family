@@ -114,20 +114,20 @@ void HitGenerator::getPattern(const EuclidGenOverrides& ov,
 
     out.assign((size_t) steps, false);
 
-    int outIdx = preReserve;
+    int outIndex = preReserve;
     if (insertMode == InsertMode::Pad && ov.insertLength > 0 && activeSteps > 0)
     {
         const int clampedStart = std::clamp(ov.insertStart, 0, activeSteps);
-        for (int i = 0; i < clampedStart && outIdx < steps; ++i, ++outIdx)
-            out[(size_t) outIdx] = scratch[(size_t) i];
-        outIdx += ov.insertLength;  // skip insert zone (already false)
-        for (int i = clampedStart; i < activeSteps && outIdx < steps; ++i, ++outIdx)
-            out[(size_t) outIdx] = scratch[(size_t) i];
+        for (int i = 0; i < clampedStart && outIndex < steps; ++i, ++outIndex)
+            out[(size_t) outIndex] = scratch[(size_t) i];
+        outIndex += ov.insertLength;  // skip insert zone (already false)
+        for (int i = clampedStart; i < activeSteps && outIndex < steps; ++i, ++outIndex)
+            out[(size_t) outIndex] = scratch[(size_t) i];
     }
     else
     {
-        for (int i = 0; i < activeSteps && outIdx < steps; ++i, ++outIdx)
-            out[(size_t) outIdx] = scratch[(size_t) i];
+        for (int i = 0; i < activeSteps && outIndex < steps; ++i, ++outIndex)
+            out[(size_t) outIndex] = scratch[(size_t) i];
     }
 
     // Mute pre/post-pad: zero the leading/trailing run of the final pattern.

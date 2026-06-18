@@ -42,9 +42,9 @@ void migrateInsertSlotsV3(juce::ValueTree& tree, const juce::String& srcPrefix);
 void migrateMasterInsertSlotsV3(juce::ValueTree& tree, int slot);
 
 // Remap old modulator destination IDs (e.g. "insert.drive", "ks.note",
-// "voc.octave") to the new "insert.p1".."insert.p4" slots, per-algo. `algoIdx`
+// "voc.octave") to the new "insert.p1".."insert.p4" slots, per-algo. `algoIndex`
 // is the rhythm's resolved insert algorithm; assignments with no slot in the
 // new layout are dropped.
-void migrateModAssignmentsV3(juce::ValueTree& modsTree, int algoIdx);
+void migrateModAssignmentsV3(juce::ValueTree& modsTree, int algoIndex);
 
 } // namespace mu_pp_migrate

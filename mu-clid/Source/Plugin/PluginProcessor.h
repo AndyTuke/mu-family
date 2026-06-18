@@ -300,9 +300,9 @@ public:
     std::atomic<double> lastBeatPos      { 0.0 };  // most recent beat position (for UI playhead)
 
     // Snapshot accessor for UI panels (see Modulation/ModulationSnapshot.h for index enum).
-    float getModSnapshot(int rhythmIdx, int snapIdx) const noexcept
+    float getModSnapshot(int rhythmIndex, int snapIndex) const noexcept
     {
-        return modSnapshot[rhythmIdx][snapIdx].load();
+        return modSnapshot[rhythmIndex][snapIndex].load();
     }
 
     // UI accessor for the per-rhythm modulated euclid overrides — read by RhythmPanel +
@@ -314,12 +314,12 @@ public:
     // rhythm at startup drew no hits. Fall back to the rhythm's base gen values when no
     // modulation pass has touched the entry so `HitGenerator::getStepTypes(ov)` yields
     // the rhythm's actual pattern for unmodulated cases.
-    EuclidOverrides getModulatedEuclidOverrides(int rhythmIdx) const noexcept
+    EuclidOverrides getModulatedEuclidOverrides(int rhythmIndex) const noexcept
     {
-        if (rhythmIdx < 0 || rhythmIdx >= (int) lastEuclidOverrides.size()
-                          || rhythmIdx >= sequencer.getNumRhythms())
+        if (rhythmIndex < 0 || rhythmIndex >= (int) lastEuclidOverrides.size()
+                          || rhythmIndex >= sequencer.getNumRhythms())
             return {};
-        const Rhythm& r = sequencer.getRhythm(rhythmIdx);
+        const Rhythm& r = sequencer.getRhythm(rhythmIndex);
         if (r.modulationMatrix.getAssignments().empty())
         {
             EuclidOverrides ov;
@@ -336,7 +336,7 @@ public:
             fill(ov.c, r.genC);
             return ov;
         }
-        return lastEuclidOverrides[(size_t) rhythmIdx];
+        return lastEuclidOverrides[(size_t) rhythmIndex];
     }
 
     // GR-meter pointer for the per-voice compressor/limiter insert UI knob.

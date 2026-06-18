@@ -66,7 +66,7 @@ MixerOverlay::MixerOverlay(ProcessorBase& p, MixerEngine& m)
             if (isMixerRelevantParam(pid->getParameterID()))
                 proc.apvts.addParameterListener(pid->getParameterID(), this);
 
-    startTimerHz(30);
+    startTimerHz(mu_ui::kUiRefreshHz);
 }
 
 MixerOverlay::~MixerOverlay()
@@ -200,18 +200,18 @@ void MixerOverlay::wireFXRows()
 
         // Snapshot current algo params before switching so we can restore them if
         // the user cycles back.
-        const int oldIdx = proc.fxChain.effectSlot().getAlgorithmIndex();
-        if (oldIdx >= 0 && oldIdx < (int)algos.size())
+        const int oldIndex = proc.fxChain.effectSlot().getAlgorithmIndex();
+        if (oldIndex >= 0 && oldIndex < (int)algos.size())
         {
-            const auto& oldParams = algos[oldIdx].params;
-            auto& snap = effSnaps[oldIdx];
+            const auto& oldParams = algos[oldIndex].params;
+            auto& snap = effSnaps[oldIndex];
             float* pv[5] = { &snap.p0, &snap.p1, &snap.p2, &snap.p3, &snap.p4 };
             for (int i = 0; i < (int)oldParams.size() && i < 5; ++i)
             {
                 float norm = *proc.apvts.getRawParameterValue(kEffParamIds[i]);
                 *pv[i] = oldParams[i].minVal + norm * (oldParams[i].maxVal - oldParams[i].minVal);
             }
-            effSnapValid[oldIdx] = true;
+            effSnapValid[oldIndex] = true;
         }
 
         // force-sync the engine BEFORE writing APVTS. If APVTS already

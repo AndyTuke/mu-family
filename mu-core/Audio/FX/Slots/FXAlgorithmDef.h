@@ -32,7 +32,7 @@ struct FXAlgorithmRegistry
     static const std::vector<FXAlgorithmDef>& effectAlgorithms()
     {
         // Index 0: Chorus, 1: Flanger, 2: Phaser, 3: Echo
-        // Distortion algorithms moved to per-rhythm Drive stage in the voice chain.
+        // Distortion algorithms moved to per-channel Drive stage in the voice chain.
         static const std::vector<FXAlgorithmDef> s_defs = {
             { "chorus", "Chorus", "Modulation", {
                 { "rate",   "Rate",   0.1f, 8.0f, 1.0f, "Hz" },

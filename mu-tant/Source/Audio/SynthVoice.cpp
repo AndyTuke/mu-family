@@ -45,10 +45,10 @@ void VoiceEngine::setConfig(const VoiceConfig& c)
 
     // pitchOffsetSemis transposes the whole voice (0 in Free mode; the held-note
     // offset in Note mode) — added after toneToMidi so scale intervals are preserved.
-    const float midi1 = toneToMidi(cfg.scaleIdx, cfg.root, cfg.osc1Octave + kBaseOctave,
+    const float midi1 = toneToMidi(cfg.scaleIndex, cfg.root, cfg.osc1Octave + kBaseOctave,
                                    (float) cfg.osc1Semi, (float) cfg.osc1Fine)
                         + cfg.pitchOffsetSemis + cfg.osc1SemiMod;
-    const float midi2 = toneToMidi(cfg.scaleIdx, cfg.root, cfg.osc2Octave + kBaseOctave,
+    const float midi2 = toneToMidi(cfg.scaleIndex, cfg.root, cfg.osc2Octave + kBaseOctave,
                                    (float) cfg.osc2Semi, (float) cfg.osc2Fine)
                         + cfg.pitchOffsetSemis + cfg.osc2SemiMod;
     osc1.setFrequency(midiToFreq(midi1));

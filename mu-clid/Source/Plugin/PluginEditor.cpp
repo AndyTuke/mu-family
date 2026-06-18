@@ -80,9 +80,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
             r.colourIndex = chosen;
         }
         proc.addRhythm(r);
-        const int newIdx = proc.getNumRhythms() - 1;
-        proc.applyDefaultRhythm(newIdx);
-        selectRhythmAndRefresh(newIdx, /*fullSidebarRefresh=*/true, MixerRefresh::RefreshOnly);
+        const int newIndex = proc.getNumRhythms() - 1;
+        proc.applyDefaultRhythm(newIndex);
+        selectRhythmAndRefresh(newIndex, /*fullSidebarRefresh=*/true, MixerRefresh::RefreshOnly);
     };
 
     // ── RhythmPanel callbacks ───────────────────────────────────────────────
@@ -129,10 +129,10 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     rhythmPanel.onRhythmDeleted = [this](int idx)
     {
         proc.removeRhythm(idx);
-        const int newIdx = juce::jmax(0, juce::jmin(idx, proc.getNumRhythms() - 1));
+        const int newIndex = juce::jmax(0, juce::jmin(idx, proc.getNumRhythms() - 1));
         sidebar.refreshItems();
-        sidebar.setSelectedIndex(newIdx);
-        rhythmPanel.setRhythm(newIdx);
+        sidebar.setSelectedIndex(newIndex);
+        rhythmPanel.setRhythm(newIndex);
         if (isMixerVisible()) mixerOverlay.refresh();
     };
 

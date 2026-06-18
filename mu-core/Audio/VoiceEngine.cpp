@@ -85,22 +85,22 @@ void VoiceEngine::trigger(bool isAccented, bool tied)
     // if none, round-robin steal the oldest. In mono mode (voiceMono): every
     // hit forces slot 0 — gives classic mono-synth retrigger behaviour where
     // the previous voice is cut by the new attack.
-    int claimedIdx = 0;
+    int claimedIndex = 0;
     if (activeParams.voiceMono)
     {
         voices[0].trigger(fadeIn);
     }
     else
     {
-        claimedIdx = -1;
+        claimedIndex = -1;
         for (int i = 0; i < MaxVoices; ++i)
         {
-            if (!voices[(size_t) i].isActive()) { voices[(size_t) i].trigger(fadeIn); claimedIdx = i; break; }
+            if (!voices[(size_t) i].isActive()) { voices[(size_t) i].trigger(fadeIn); claimedIndex = i; break; }
         }
-        if (claimedIdx < 0)
+        if (claimedIndex < 0)
         {
-            claimedIdx = nextVoice;
-            voices[(size_t) claimedIdx].trigger(fadeIn);
+            claimedIndex = nextVoice;
+            voices[(size_t) claimedIndex].trigger(fadeIn);
             nextVoice = (nextVoice + 1) % MaxVoices;
         }
     }
@@ -118,7 +118,7 @@ void VoiceEngine::trigger(bool isAccented, bool tied)
     // mixes into tempBuffer and the env multiplies the post-filter signal before
     // the insert. Tied hits already returned above so env state carries across
     // contiguous pattern hits (pattern legato unchanged).
-    (void) claimedIdx;  // slot index no longer needed for env routing
+    (void) claimedIndex;  // slot index no longer needed for env routing
     ampEnv.reset();
     ampEnv.noteOn();
 

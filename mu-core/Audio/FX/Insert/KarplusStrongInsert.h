@@ -73,7 +73,7 @@ public:
     {
         // Slot 0 = Note 0..11 (int step), Slot 1 = Octave 0..3 (int step),
         // Slot 2 = Feedback 0..100 %, Slot 3 = LPF 20..20000 Hz (log).
-        const int   noteIdx = juce::jlimit(0, 11, (int) std::round(insertSlot(p, 0)));
+        const int   noteIndex = juce::jlimit(0, 11, (int) std::round(insertSlot(p, 0)));
         const int   octave  = juce::jlimit(0, 3,  (int) std::round(insertSlot(p, 1)));
         const float fbKnob  = juce::jlimit(0.0f, 1.0f, insertSlot(p, 2) / 100.0f);
         // Cubic curve: loopGain = 1 - (1 - fbKnob)^3, capped at 0.9999.
@@ -88,9 +88,9 @@ public:
         const float loopGain = juce::jmin(0.9999f, 1.0f - inv * inv * inv);
         smoothedGain.setTargetValue(loopGain);
 
-        // Pitch: SPN-anchored at C=32.7 Hz for Octave 0 (= SPN C1). `noteIdx` is the
+        // Pitch: SPN-anchored at C=32.7 Hz for Octave 0 (= SPN C1). `noteIndex` is the
         // chromatic 0..11 semitone index, used directly (C=0, C#=1, … B=11).
-        const float semitones = static_cast<float>(noteIdx + 12 * octave);
+        const float semitones = static_cast<float>(noteIndex + 12 * octave);
         const float targetFreq = kLowestFreq * std::pow(2.0f, semitones / 12.0f);
         smoothedFreq.setTargetValue(targetFreq);
 

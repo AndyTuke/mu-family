@@ -303,7 +303,7 @@ void MixerChannel::bindMaster(MixerEngine& engine, ProcessorBase* proc)
                     }
 
                     // Master insert doesn't ride the same RhythmPanel
-                    // inline-refresh path as the per-rhythm insert —
+                    // inline-refresh path as the per-channel insert —
                     // MixerOverlay's listener is a deferred apvtsDirty flag
                     // flushed by its 30 Hz timer, so the multi-write doesn't
                     // produce intermediate stale-algo UI states. drvChar is
@@ -350,7 +350,7 @@ void MixerChannel::bindReturnSends(juce::AudioProcessorValueTreeState& apvts,
 }
 
 //==============================================================================
-void MixerChannel::setSidechainSources(int ownIdx, const juce::StringArray& names)
+void MixerChannel::setSidechainSources(int ownIndex, const juce::StringArray& names)
 {
     if (!hasSidechainControls()) return;
     const int prevId = scSourceBox.getSelectedId();
@@ -358,7 +358,7 @@ void MixerChannel::setSidechainSources(int ownIdx, const juce::StringArray& name
     scSourceBox.addItem(juce::String::charToString(0x2014), 1);  // "—"
     for (int i = 0; i < names.size(); ++i)
     {
-        if (i == ownIdx) continue;
+        if (i == ownIndex) continue;
         const juce::String label = names[i].isEmpty() ? ("Ch " + juce::String(i + 1))
                                                       : names[i];
         scSourceBox.addItem(label, i + 2);  // ID = channel index + 2

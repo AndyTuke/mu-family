@@ -60,7 +60,7 @@ public:
         header.setShowReset(true);
         header.onReset = [this] { resetCurrentLane(); };
 
-        startTimerHz(30);   // modulator playhead
+        startTimerHz(mu_ui::kUiRefreshHz);   // modulator playhead
         setChannel(0);
     }
 

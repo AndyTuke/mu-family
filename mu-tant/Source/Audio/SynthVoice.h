@@ -17,7 +17,7 @@ namespace mu_tant
 struct VoiceConfig
 {
     int   root        = 0;     // 0..11 (C..B) — tonal centre, shared by both oscs
-    int   scaleIdx    = 0;     // index into kScales
+    int   scaleIndex    = 0;     // index into kScales
 
     // Per-oscillator pitch — all integer-stepped.
     //   octave : -3..+3 offset from the base octave

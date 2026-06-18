@@ -19,7 +19,7 @@ RhythmMiniVisual::RhythmMiniVisual(PluginProcessor& p, int index)
     lastSigC = r.genC.signature();
     lastSigValid = true;
 
-    startTimerHz(30);
+    startTimerHz(mu_ui::kUiRefreshHz);
 }
 
 void RhythmMiniVisual::resized()

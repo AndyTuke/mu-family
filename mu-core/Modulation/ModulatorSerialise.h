@@ -35,10 +35,10 @@ inline juce::var enumName(const char* const* table, int idx)
 inline int readEnumIndex(const juce::ValueTree& tree,
                          const juce::Identifier& propId,
                          const char* const* nameTable,
-                         int defaultIdx)
+                         int defaultIndex)
 {
     if (! tree.hasProperty(propId))
-        return defaultIdx;
+        return defaultIndex;
 
     const auto v = tree.getProperty(propId);
     if (v.isString())

@@ -374,11 +374,11 @@ void EuclideanPanel::bindModulationIndicators()
 
     // Euclid destinations: modParamValues are 0..1 proportions → normMode=true for all.
     // Arc clears when sequencer stops.
-    auto bind = [&](KnobWithLabel& k, const char* destId, int snapIdx)
+    auto bind = [&](KnobWithLabel& k, const char* destId, int snapIndex)
     {
         k.bindModulation(destId, mx,
-            [&proc = proc, ri = rhythmIndex, snapIdx]() -> float {
-                return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, snapIdx) : kNaN; },
+            [&proc = proc, ri = rhythmIndex, snapIndex]() -> float {
+                return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, snapIndex) : kNaN; },
             true);
     };
 
