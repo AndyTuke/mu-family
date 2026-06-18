@@ -87,6 +87,10 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px;
 .btn-dl.tant { background: var(--amber); color: #1A0E06; }
 .btn-dl.tant:hover { box-shadow: 0 0 22px var(--amber-glow); }
 .dl-sub { font-family: var(--ff-mono); font-size: 10px; color: var(--text3); margin-top: 8px; }
+.dl-os { margin-top: 10px; font-family: var(--ff-mono); font-size: 11px; color: var(--text3); }
+.dl-os .beta { color: var(--amber-b); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; border: 1px solid var(--amber); border-radius: 3px; padding: 2px 6px; margin-right: 8px; }
+.dl-os a { color: var(--accent-b); }
+.dl-os a:hover { text-decoration: underline; }
 
 /* ── NOTES ── */
 .dl-note { background: var(--bg2); border: 1px dashed var(--border2); border-radius: 10px; padding: 22px 28px; margin-top: 6px; }
@@ -194,11 +198,12 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
           <div class="dl-card clid">
             <div>
               <div class="dl-name"><span class="mu">μ</span>-clid<span class="dl-tag demo">Demo · Full</span></div>
-              <div class="dl-formats">8-track euclidean rhythm sequencer + sampler · VST3 · CLAP · Standalone · Windows 10/11</div>
+              <div class="dl-formats">8-track euclidean rhythm sequencer + sampler · VST3 · CLAP · Standalone · Windows · macOS · Linux</div>
               <div class="dl-meta"><span>Version <b data-version>v1.0.0.926</b></span><span data-asset="mu-Clid-Windows.zip">11.8 MB</span><span>Full-featured demo — single track, saving disabled. Add your licence key to unlock all 8 tracks and saving.</span></div>
             </div>
             <div class="dl-actions">
               <a class="btn-dl clid" href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Clid-Windows.zip">Download — Windows ↓</a>
+              <div class="dl-os"><span class="beta">Beta</span><a href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Clid-macOS.zip">macOS ↓</a> &nbsp;·&nbsp; <a href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Clid-Linux.zip">Linux ↓</a></div>
               <div class="dl-sub">No registration required · <a href="mu-clid-releases.html" style="color:var(--accent-b)">Release notes</a></div>
             </div>
           </div>
@@ -207,11 +212,12 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
           <div class="dl-card lite">
             <div>
               <div class="dl-name"><span class="mu">μ</span>-clid LITE<span class="dl-tag free">Free forever</span></div>
-              <div class="dl-formats">Single-track euclidean MIDI sequencer · VST3 · CLAP · Windows 10/11</div>
+              <div class="dl-formats">Single-track euclidean MIDI sequencer · VST3 · CLAP · Windows · macOS · Linux</div>
               <div class="dl-meta"><span>Version <b data-version>v1.0.0.926</b></span><span data-asset="mu-Clid-Lite-Windows.zip">6.9 MB</span><span>No time limit · No registration · Free forever</span></div>
             </div>
             <div class="dl-actions">
               <a class="btn-dl lite" href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Clid-Lite-Windows.zip">Download Free — Windows ↓</a>
+              <div class="dl-os"><span class="beta">Beta</span><a href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Clid-Lite-macOS.zip">macOS ↓</a> &nbsp;·&nbsp; <a href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Clid-Lite-Linux.zip">Linux ↓</a></div>
               <div class="dl-sub">Permanent install · <a href="mu-clid-releases.html" style="color:var(--cyan-b)">Release notes</a></div>
             </div>
           </div>
@@ -220,11 +226,12 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
           <div class="dl-card tant">
             <div>
               <div class="dl-name"><span class="mu">μ</span>-tant<span class="dl-tag demo">Demo · Full</span></div>
-              <div class="dl-formats">Wavetable drone synth · VST3 · CLAP · Standalone · Windows 10/11</div>
+              <div class="dl-formats">Wavetable drone synth · VST3 · CLAP · Standalone · Windows · macOS · Linux</div>
               <div class="dl-meta"><span>Version <b data-version>v1.0.0.926</b></span><span data-asset="mu-Tant-Windows.zip">11.0 MB</span><span>Full-featured demo — single voice, saving disabled. Add your licence key to unlock all 8 voices and saving.</span></div>
             </div>
             <div class="dl-actions">
               <a class="btn-dl tant" href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Tant-Windows.zip">Download — Windows ↓</a>
+              <div class="dl-os"><span class="beta">Beta</span><a href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Tant-macOS.zip">macOS ↓</a> &nbsp;·&nbsp; <a href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Tant-Linux.zip">Linux ↓</a></div>
               <div class="dl-sub">No registration required · <a href="mu-tant-releases.html" style="color:var(--amber-b)">Release notes</a></div>
             </div>
           </div>
@@ -232,20 +239,7 @@ footer { border-top: 1px solid var(--border); padding: 48px 0 36px; margin-top: 
         </div>
 
         <div class="dl-note" style="border-style: solid; border-color: var(--amber);">
-          <h3 style="color: var(--amber-b);">macOS &amp; Linux — Beta</h3>
-          <p><strong style="color: var(--text);">Beta version — please feed back any issues you have using these.</strong> Universal macOS (Apple Silicon + Intel) and Linux builds, version <span data-version>v1.0.0.926</span>. They're new, so anything you hit helps — email <a href="mailto:support@transwarp.me">support@transwarp.me</a>.</p>
-          <div style="display:grid; grid-template-columns:auto auto auto; gap:10px 20px; margin-top:16px; align-items:center; font-family:var(--ff-mono); font-size:12px; width:fit-content;">
-            <span style="color:var(--text2);">μ-clid</span>
-            <a href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Clid-macOS.zip" style="color:var(--accent-b);">macOS ↓</a>
-            <a href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Clid-Linux.zip" style="color:var(--accent-b);">Linux ↓</a>
-            <span style="color:var(--text2);">μ-clid LITE <span style="color:var(--cyan-b);">(free)</span></span>
-            <a href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Clid-Lite-macOS.zip" style="color:var(--accent-b);">macOS ↓</a>
-            <a href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Clid-Lite-Linux.zip" style="color:var(--accent-b);">Linux ↓</a>
-            <span style="color:var(--text2);">μ-tant</span>
-            <a href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Tant-macOS.zip" style="color:var(--accent-b);">macOS ↓</a>
-            <a href="https://github.com/AndyTuke/mu-family/releases/latest/download/mu-Tant-Linux.zip" style="color:var(--accent-b);">Linux ↓</a>
-          </div>
-          <p style="font-size:12px; color:var(--text3); margin-top:14px;">macOS isn't notarized yet — after unzipping, run <code>xattr -dr com.apple.quarantine</code> on the bundle (or right-click → Open) to get past Gatekeeper.</p>
+          <p style="margin:0;"><strong style="color: var(--amber-b);">macOS &amp; Linux are Beta.</strong> The macOS (Apple Silicon + Intel) and Linux builds are listed under each product above. They're new, so please report anything you hit — email <a href="mailto:support@transwarp.me">support@transwarp.me</a>. macOS isn't notarized yet: after unzipping, run <code>xattr -dr com.apple.quarantine</code> on the bundle (or right-click → Open) to get past Gatekeeper.</p>
         </div>
 
         <p class="dl-help">All downloads are <code>.zip</code> archives containing the VST3, CLAP (and Standalone where applicable). Unzip and copy the plugin into your system plugin folder. Already bought a licence? Open the plugin, click the demo banner, and paste your key to activate. Trouble installing? <a href="contact.html">Contact support</a>.</p>
