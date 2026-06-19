@@ -100,7 +100,8 @@ private:
         engine.prepare(device->getCurrentSampleRate(),
                        device->getCurrentBufferSizeSamples(),
                        engineTempo);
-        engine.setPlaying(true);
+        // Opening (or re-opening) a device must not dictate transport state — the
+        // app starts stopped and a device change mid-session preserves play/stop.
     }
 
     void audioDeviceStopped() override {}

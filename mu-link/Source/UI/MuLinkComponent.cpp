@@ -26,8 +26,8 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
     setLookAndFeel(&lnf);
     addAndMakeVisible(deviceSelector);
 
-    styleLabel(titleLabel,    "mu-link",                 juce::Justification::centredLeft, MuLookAndFeel::headingText, 26.0f, true);
-    styleLabel(subtitleLabel, "master clock  \xc2\xb7  audio bus", juce::Justification::centredLeft, MuLookAndFeel::labelText, 13.0f);
+    styleLabel(titleLabel,    juce::String(juce::CharPointer_UTF8("\xce\xbc-link")), juce::Justification::centredLeft, MuLookAndFeel::headingText, 26.0f, true);
+    styleLabel(subtitleLabel, juce::String(juce::CharPointer_UTF8("master clock  \xc2\xb7  audio bus")), juce::Justification::centredLeft, MuLookAndFeel::labelText, 13.0f);
     styleLabel(clientsHeading,"CONNECTED CLIENTS",       juce::Justification::centredLeft, MuLookAndFeel::labelText, 12.0f, true);
     addAndMakeVisible(titleLabel);
     addAndMakeVisible(subtitleLabel);
@@ -103,7 +103,7 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
     addAndMakeVisible(masterGain);
 
     // ── Scenes: trigger buttons + the selected scene's per-client (program, channel) cells ──
-    styleLabel(scenesHeading, "SCENES  \xc2\xb7  click to recall", juce::Justification::centredLeft,
+    styleLabel(scenesHeading, juce::String(juce::CharPointer_UTF8("SCENES  \xc2\xb7  click to recall")), juce::Justification::centredLeft,
                MuLookAndFeel::labelText, 12.0f, true);
     addAndMakeVisible(scenesHeading);
 
@@ -159,9 +159,9 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
     loadScenes();
     selectScene(0);
 
-    // Match the engine's initial state (it begins playing when a device opens).
+    // Start stopped — the user presses Play to run the master transport.
     server.setTempo(120.0);
-    server.setPlaying(true);
+    server.setPlaying(false);
 
     setSize(900, 740);
     startTimerHz(12);

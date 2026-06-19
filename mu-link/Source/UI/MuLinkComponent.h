@@ -39,7 +39,7 @@ private:
 
     juce::AudioDeviceSelectorComponent deviceSelector;
     juce::Label   titleLabel, subtitleLabel, clientsHeading;
-    juce::TextButton playButton { "Stop" };
+    juce::TextButton playButton { "Play" };
     juce::TextButton clockSourceButton { "Clock: Internal" };
     juce::Slider  tempoSlider;
     VUMeter       masterMeter;
@@ -79,7 +79,7 @@ private:
     void loadScenes();
     void saveScenes() const;
 
-    bool playing = true;
+    bool playing = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MuLinkComponent)
 };
