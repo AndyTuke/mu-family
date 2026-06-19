@@ -47,8 +47,10 @@ mu-link/Source/
 └── Tests/     TestMain + Ipc + SharedMemory (+child proc) + Server + Client                 ✅ 23/23 green
 ```
 
-Targets: `mu-link-tests` (juce_core only — the sacred clock/ring/summing/client logic,
-tested headless), `mu-link-server` (headless server), `mu-link-tone` (reference tone
+Targets: `mu-link-tests` (juce_core + juce_audio_basics — the sacred clock/ring/summing/client
+logic, tested headless; `juce_audio_basics` is needed because `ServerEngine` now embeds the
+shared mu-core `EqInsert` per-client EQ, which uses `AudioBuffer`/`SmoothedValue`), `mu-link-server`
+(headless server), `mu-link-tone` (reference tone
 client on `MuLinkClient`), `mu-link-harness` (headless audio verification — see below),
 and `mu-link` (the GUI app). Every target puts `mu-core` on its include path so
 `#include "Link/..."` resolves; none link the mu-core INTERFACE library.

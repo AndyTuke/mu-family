@@ -5,6 +5,7 @@
 #include "../Ipc/MuLinkServerMemory.h"
 #include "../Clock/TransportClock.h"
 #include "../Clock/MidiClockEstimator.h"
+#include "Audio/FX/Insert/EqInsert.h"   // mu-core: shared 3-band EQ insert (per-client strip)
 
 #include <algorithm>
 #include <atomic>
@@ -61,7 +62,11 @@ public:
             clientPan [i].store(0.0f, std::memory_order_relaxed);
             clientMute[i].store(0,    std::memory_order_relaxed);
             clientSolo[i].store(0,    std::memory_order_relaxed);
+            for (int b = 0; b < kEqBands; ++b)
+                clientEqParam[i][b].store(0.5f, std::memory_order_relaxed);   // 0.5 = flat (0 dB)
+            clientEqActive[i].store(0u, std::memory_order_relaxed);           // flat → EQ skipped
         }
+        eqVp.insertAlgo = 6;   // mu-core insert algo 6 = 3-Band EQ
     }
 
     // Bind the shared memory the server published into (server-owned). Must outlive the
@@ -85,6 +90,26 @@ public:
     bool  clientSoloed   (int slot) const noexcept { return validSlot(slot) && clientSolo[slot].load(std::memory_order_relaxed) != 0; }
     float masterGainValue()         const noexcept { return masterGainLevel.load(std::memory_order_relaxed); }
 
+    // Per-client 3-band EQ insert. `band` 0..3 = Low / Mid / Mid-Hz / High; `norm01` is the
+    // normalised knob value (0.5 = flat / 0 dB). A strip whose Low/Mid/High are all centred
+    // is flat → the audio thread skips the EQ entirely (bit-exact passthrough, zero CPU);
+    // Mid-Hz alone never changes flatness, so it doesn't arm the EQ.
+    static constexpr int kEqBands = 4;
+    void setClientEqParam(int slot, int band, float norm01) noexcept
+    {
+        if (! validSlot(slot) || band < 0 || band >= kEqBands) return;
+        clientEqParam[slot][band].store(std::clamp(norm01, 0.0f, 1.0f), std::memory_order_relaxed);
+        auto centred = [this, slot](int b)
+        { return std::fabs(clientEqParam[slot][b].load(std::memory_order_relaxed) - 0.5f) < 1.0e-4f; };
+        const bool flat = centred(0) && centred(1) && centred(3);
+        clientEqActive[slot].store(flat ? 0u : 1u, std::memory_order_relaxed);
+    }
+    float clientEqValue(int slot, int band) const noexcept
+    {
+        return (validSlot(slot) && band >= 0 && band < kEqBands)
+             ? clientEqParam[slot][band].load(std::memory_order_relaxed) : 0.5f;
+    }
+
     // Message-thread setup before streaming. Sizes the de-interleave scratch to the
     // device block + max channels; primes the clock at the device sample rate.
     void prepare(double sampleRate, int maxBlockSize, double tempoBpm)
@@ -93,6 +118,11 @@ public:
         clock.prepare(sr, tempoBpm);
         maxBlockFrames = std::max(1, maxBlockSize);
         scratch.assign((std::size_t) kMaxChannels * (std::size_t) maxBlockFrames, 0.0f);
+        // Per-client EQ DSP + de-interleave scratch (only used when a strip's EQ is armed).
+        for (int i = 0; i < kMaxClients; ++i)
+            clientEqInsert[i].prepare(sr, maxBlockFrames);
+        eqScratch.setSize(kMaxChannels, maxBlockFrames, false, false, true);
+        eqScratch.clear();
         for (auto& p : clientPeakLevel) p.store(0.0f, std::memory_order_relaxed);
         masterPeakLevel.store(0.0f, std::memory_order_relaxed);
 
@@ -233,16 +263,50 @@ public:
                 // Per-channel constants (source index + gain) are hoisted out of the sample
                 // loop — the inner loop is then a tight multiply-add on the audio thread.
                 float clientPk = 0.0f;
-                for (int ch = 0; ch < chans; ++ch)
+                if (clientEqActive[slot].load(std::memory_order_relaxed) != 0 && got > 0)
                 {
-                    const int   rch = ch < rc ? ch : rc - 1;
-                    const float g   = (ch == 1) ? gainR : gainL;
-                    float* const outCh = output[ch];
-                    for (int i = 0; i < got; ++i)
+                    // Armed EQ: de-interleave the client's frames (mono ring feeds every
+                    // channel), run the 3-band EQ in place, then sum the EQ'd output into
+                    // the master with the strip gain/pan + post-fader peak.
+                    for (int ch = 0; ch < chans; ++ch)
                     {
-                        const float v = tmp[(std::size_t) i * (std::size_t) rc + (std::size_t) rch] * g;
-                        outCh[i] += v;
-                        clientPk = std::max(clientPk, std::fabs(v));
+                        const int rch  = ch < rc ? ch : rc - 1;
+                        float*    dst  = eqScratch.getWritePointer(ch);
+                        for (int i = 0; i < got; ++i)
+                            dst[i] = tmp[(std::size_t) i * (std::size_t) rc + (std::size_t) rch];
+                    }
+                    for (int b = 0; b < kEqBands; ++b)
+                        eqVp.insertParam[b] = clientEqParam[slot][b].load(std::memory_order_relaxed);
+                    float grDummy = 0.0f;
+                    clientEqInsert[slot].process(eqScratch, got, chans, eqVp, grDummy);
+
+                    for (int ch = 0; ch < chans; ++ch)
+                    {
+                        const float  g     = (ch == 1) ? gainR : gainL;
+                        const float* src   = eqScratch.getReadPointer(ch);
+                        float* const outCh = output[ch];
+                        for (int i = 0; i < got; ++i)
+                        {
+                            const float v = src[i] * g;
+                            outCh[i] += v;
+                            clientPk = std::max(clientPk, std::fabs(v));
+                        }
+                    }
+                }
+                else
+                {
+                    // Flat strip (default): the original interleaved sum — bit-exact, no EQ cost.
+                    for (int ch = 0; ch < chans; ++ch)
+                    {
+                        const int   rch = ch < rc ? ch : rc - 1;
+                        const float g   = (ch == 1) ? gainR : gainL;
+                        float* const outCh = output[ch];
+                        for (int i = 0; i < got; ++i)
+                        {
+                            const float v = tmp[(std::size_t) i * (std::size_t) rc + (std::size_t) rch] * g;
+                            outCh[i] += v;
+                            clientPk = std::max(clientPk, std::fabs(v));
+                        }
                     }
                 }
                 clientPeakLevel[slot].store(clientPk, std::memory_order_relaxed);
@@ -309,6 +373,13 @@ private:
     std::atomic<std::uint32_t> clientMute[kMaxClients];
     std::atomic<std::uint32_t> clientSolo[kMaxClients];
     std::atomic<float>         masterGainLevel { 1.0f };
+
+    // Per-client 3-band EQ insert (message thread writes params, audio thread reads/runs).
+    std::atomic<float>         clientEqParam[kMaxClients][kEqBands];   // normalised, 0.5 = flat
+    std::atomic<std::uint32_t> clientEqActive[kMaxClients];           // 0 = flat (skip), 1 = armed
+    EqInsert                   clientEqInsert[kMaxClients];           // audio-thread DSP state
+    VoiceParams                eqVp;                                  // shared param carrier (algo 6)
+    juce::AudioBuffer<float>   eqScratch;                             // de-interleave buffer (EQ path)
 };
 
 } // namespace mu_link

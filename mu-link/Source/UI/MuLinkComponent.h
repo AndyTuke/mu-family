@@ -53,6 +53,8 @@ private:
         VUMeter        meter;
         juce::Label    name;
         juce::Slider   gain;
+        juce::Slider   eq[4];          // 3-band EQ insert: Low / Mid / Mid-Hz / High (vertical)
+        juce::Label    eqLabel[4];
         juce::TextButton mute { "M" }, solo { "S" };
         juce::ToggleButton sceneOn;        // is this client targeted by the selected scene?
         juce::Label        scenePc;        // editable program number 0-127

@@ -78,6 +78,8 @@ public:
     void setClientPan (int slot, float p) noexcept { engine.setClientPan(slot, p); }
     void setClientMute(int slot, bool m)  noexcept { engine.setClientMute(slot, m); }
     void setClientSolo(int slot, bool s)  noexcept { engine.setClientSolo(slot, s); }
+    void setClientEqParam(int slot, int band, float v) noexcept { engine.setClientEqParam(slot, band, v); }
+    float clientEqValue(int slot, int band) const noexcept { return engine.clientEqValue(slot, band); }
     void setMasterGain(float g)           noexcept { engine.setMasterGain(g); }
     float clientGainValue(int slot) const noexcept { return engine.clientGainValue(slot); }
     bool  clientMuted    (int slot) const noexcept { return engine.clientMuted(slot); }

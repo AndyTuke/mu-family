@@ -35,6 +35,7 @@ target_include_directories(mu-link-tests PRIVATE
 
 target_link_libraries(mu-link-tests PRIVATE
     juce::juce_core
+    juce::juce_audio_basics   # ServerEngine now embeds the mu-core EqInsert (AudioBuffer/SmoothedValue)
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags
 )

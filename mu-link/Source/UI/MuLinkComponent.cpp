@@ -92,6 +92,23 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
         strip.solo.setColour(juce::TextButton::buttonOnColourId, lnf.colour(MuLookAndFeel::knobLevel));
         strip.mute.onClick = [this, i] { server.setClientMute(i, clients[(size_t) i].mute.getToggleState()); };
         strip.solo.onClick = [this, i] { server.setClientSolo(i, clients[(size_t) i].solo.getToggleState()); };
+
+        // Per-client 3-band EQ insert — four small vertical knobs (Low / Mid / Mid-Hz / High).
+        // Normalised 0..1, 0.5 = flat; the server arms the EQ only when a band leaves centre.
+        static const char* const kEqNames[4] = { "Low", "Mid", "Hz", "High" };
+        for (int b = 0; b < 4; ++b)
+        {
+            auto& k = strip.eq[(size_t) b];
+            k.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+            k.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+            k.setRange(0.0, 1.0, 0.001);
+            k.setDoubleClickReturnValue(true, 0.5);   // double-click → flat
+            k.setValue(server.clientEqValue(i, b), juce::dontSendNotification);
+            k.onValueChange = [this, i, b] { server.setClientEqParam(i, b, (float) clients[(size_t) i].eq[(size_t) b].getValue()); };
+            addAndMakeVisible(k);
+            styleLabel(strip.eqLabel[(size_t) b], kEqNames[b], juce::Justification::centred, MuLookAndFeel::mutedText, 9.0f);
+            addAndMakeVisible(strip.eqLabel[(size_t) b]);
+        }
     }
 
     // Master gain knob, under the master meter.
@@ -163,7 +180,7 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
     server.setTempo(120.0);
     server.setPlaying(false);
 
-    setSize(900, 740);
+    setSize(900, 880);   // taller: the per-strip EQ stack needs the room
     startTimerHz(12);
 }
 
@@ -394,6 +411,17 @@ void MuLinkComponent::resized()
         strip.mute.setBounds(ctrl.removeFromLeft(bw));
         strip.solo.setBounds(ctrl.removeFromRight(bw));
         strip.gain.setBounds(col.removeFromBottom(knobH).reduced(6, 2));
+
+        // EQ stack above the gain knob: bands removed bottom-up so they read Low→High
+        // top-to-bottom. Each band is a tiny label over a rotary.
+        const int eqLabelH = 11, eqKnobH = 28;
+        for (int b = 3; b >= 0; --b)
+        {
+            auto band = col.removeFromBottom(eqLabelH + eqKnobH);
+            strip.eqLabel[(size_t) b].setBounds(band.removeFromTop(eqLabelH));
+            strip.eq[(size_t) b].setBounds(band.reduced(8, 0));
+        }
+
         strip.name.setBounds(col.removeFromBottom(labelH));
         strip.meter.setBounds(col.reduced(6, 0));
     }
