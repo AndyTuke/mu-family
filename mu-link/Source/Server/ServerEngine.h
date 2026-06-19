@@ -38,13 +38,16 @@ struct BlockStats
     std::uint64_t midiPulsesInBlock = 0;   // 24-ppqn pulses crossed during this block
 };
 
-// Master safety soft-clip. Bit-exact below the knee (~ -1.9 dBFS) and C1-continuous into a
+// Master safety soft-clip. Bit-exact below the knee (~ -0.9 dBFS) and C1-continuous into a
 // tanh knee that asymptotes to ±1.0, so the summed bus can NEVER hard-clip the device no
-// matter how hot a client — or the sum of several — gets. Normal-level program material
-// (peaking below the knee) passes through untouched.
+// matter how hot a client — or the sum of several — gets. The knee sits just below full
+// scale so normal-level program material (a single instrument near 0 dBFS) passes through
+// untouched; it only shapes genuine overs (e.g. several hot clients summed). A 0.8 knee
+// (-1.9 dBFS) was low enough to colour even one moderately-hot instrument → subtle harmonic
+// distortion; 0.9 keeps single-source playback transparent while still guaranteeing the cap.
 inline float masterSoftClip(float x) noexcept
 {
-    constexpr float t = 0.8f;                       // knee start; below this is unchanged
+    constexpr float t = 0.9f;                       // knee start; below this is unchanged
     const float a = std::fabs(x);
     if (a <= t) return x;
     const float shaped = t + (1.0f - t) * std::tanh((a - t) / (1.0f - t));
