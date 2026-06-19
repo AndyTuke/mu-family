@@ -214,6 +214,8 @@ void KnobWithLabel::bindModulation(const char*             destId,
     modLiveValue = std::move(liveValueFn);
     modNormMode  = normMode;
     hasModBind   = true;
+    lastModRevision   = -1;      // force a rescan against the (possibly new) matrix on next tick
+    modAssignedCached = false;
     if (!isTimerRunning()) startTimerHz(mu_ui::kUiRefreshHz);
 }
 
@@ -241,10 +243,25 @@ void KnobWithLabel::timerCallback()
 {
     if (hasModBind)
     {
-        bool assigned = false;
+        // The "is this destination modulated?" flag only changes when the matrix's
+        // assignment list does — re-scan it only when the revision moved, not every tick.
         if (modMatrix)
-            for (const auto& a : modMatrix->getAssignments())
-                if (a.destinationId == modDestId) { assigned = true; break; }
+        {
+            const int rev = modMatrix->assignmentsRevision();
+            if (rev != lastModRevision)
+            {
+                bool assigned = false;
+                for (const auto& a : modMatrix->getAssignments())
+                    if (a.destinationId == modDestId) { assigned = true; break; }
+                modAssignedCached = assigned;
+                lastModRevision   = rev;
+            }
+        }
+        else
+        {
+            modAssignedCached = false;
+        }
+        const bool assigned = modAssignedCached;
         setIsModulated(assigned);
         const float kNaN = std::numeric_limits<float>::quiet_NaN();
         const float live = (assigned && modLiveValue) ? modLiveValue() : kNaN;

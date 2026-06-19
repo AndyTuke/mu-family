@@ -107,7 +107,7 @@ void GrooveGrid::paint(juce::Graphics& g)
         {
             g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder).withAlpha(0.7f));
             g.setFont(juce::Font(juce::FontOptions(mu_ui::sf(9.0f))));
-            g.drawText(juce::String(s + 1), cell.toNearestInt(), juce::Justification::topLeft, false);
+            g.drawText(mu_ui::cachedIntLabel(s + 1), cell.toNearestInt(), juce::Justification::topLeft, false);
         }
     }
 }

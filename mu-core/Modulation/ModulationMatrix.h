@@ -44,6 +44,12 @@ public:
 
     const std::vector<ModulationAssignment>& getAssignments() const { return assignments; }
 
+    // Monotonic counter bumped on every structural change to the assignment list
+    // (add / remove → rebuildCache). The set of assigned destinations only changes
+    // when this does, so UI polling the "is this destination modulated?" flag can
+    // compare against a cached value and skip re-scanning the list when unchanged.
+    int assignmentsRevision() const noexcept { return revision; }
+
     // Register a product-specific destination's full-swing depth scale (the magnitude a
     // depth=100% × source=100% modulation adds, in the units the product seeds into
     // paramValues). mu-core knows only the generic `.prop` convention (scale 1.0) + the
@@ -64,6 +70,7 @@ public:
 
 private:
     std::vector<ModulationAssignment> assignments;
+    int revision = 0;   // bumped by rebuildCache() on every add/remove (see assignmentsRevision)
 
     // Pre-allocated work map reused each process() call to avoid heap allocation
     // on the audio thread.  process() is audio-thread-only, so this is safe.

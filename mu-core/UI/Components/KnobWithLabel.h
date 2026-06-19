@@ -82,6 +82,8 @@ private:
     std::string             modDestId;
     const ModulationMatrix* modMatrix    = nullptr;
     std::function<float()>  modLiveValue;
+    int                     lastModRevision   = -1;     // matrix revision the flag below was computed at
+    bool                    modAssignedCached = false;  // cached "is this destination modulated?"
 
     // when true, suppress onValueChanged dispatch from the slider's
     // onValueChange lambda. Set transiently inside setRange so JUCE's setRange

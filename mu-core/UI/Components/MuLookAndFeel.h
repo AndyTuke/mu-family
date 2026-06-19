@@ -1,12 +1,30 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <cmath>
+#include <vector>
 
 namespace mu_ui
 {
     // Shared UI repaint cadence (Hz) for animated components — VU/GR meters,
     // transport, sidebars, panels. One place to tune the family's frame rate.
     inline constexpr int kUiRefreshHz = 30;
+
+    // Cached small-integer label strings for paint() loops (step / bar numbers, etc.).
+    // juce::String always heap-allocates, so building one per number per frame churns the
+    // heap on every repaint; this returns a reference into a lazily-built table instead.
+    // Out-of-range (rare) returns an empty string rather than dangling.
+    inline const juce::String& cachedIntLabel(int n)
+    {
+        static const std::vector<juce::String> table = []
+        {
+            std::vector<juce::String> t;
+            t.reserve(1000);
+            for (int i = 0; i < 1000; ++i) t.emplace_back(juce::String(i));
+            return t;
+        }();
+        static const juce::String empty;
+        return (n >= 0 && n < (int) table.size()) ? table[(std::size_t) n] : empty;
+    }
 
     // Global UI scale factor. 1.0 = Medium baseline (the values stored in
     // MuLookAndFeel are Medium); 0.85 = Small; 1.15 = Large. Phase 3 will

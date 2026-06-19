@@ -747,7 +747,7 @@ void GatingDesigner::paint(juce::Graphics& g)
             const float cellOffset = (float)(absBar * subdivisionDenom) - viewStartBeat;
             const float x = gateRect.getX() + cw * cellOffset;
             if (x < gateRect.getX() - 1.0f || x > gateRect.getRight()) continue;
-            g.drawText(juce::String(absBar + 1),
+            g.drawText(mu_ui::cachedIntLabel(absBar + 1),
                        juce::Rectangle<float>(x + sf(4.0f), gateRect.getBottom() - sf(14.0f), sf(20.0f), sf(12.0f)),
                        juce::Justification::centredLeft, false);
         }

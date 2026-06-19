@@ -134,6 +134,8 @@ void ModulationMatrix::setCurve(const std::string& id, float curve)
 
 void ModulationMatrix::rebuildCache()
 {
+    ++revision;   // structural change — let UI know its cached "is assigned" flags are stale
+
     cachedSortOrder = getSortedOrder();
 
     const std::size_t n = assignments.size();
