@@ -49,3 +49,5 @@ tools/keys/
 
 # Discord bot credentials note (app ID + public key) — not for version control
 DiscordBot.md
+# Transient oversight-trigger marker (written by scripts/mu_build_hook.ps1)
+oversight-pending
