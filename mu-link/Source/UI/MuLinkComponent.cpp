@@ -180,7 +180,7 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
     server.setTempo(120.0);
     server.setPlaying(false);
 
-    setSize(900, 880);   // taller: the per-strip EQ stack needs the room
+    setSize(1040, 880);   // wider mixer (#1062); taller for the per-strip EQ stack
     startTimerHz(12);
 }
 
@@ -411,16 +411,22 @@ void MuLinkComponent::resized()
     // Mixer (full width): master pinned right, the eight client strips fill the rest.
     // Each strip top→bottom: name → EQ stack (High→Low) → fader + VU → mute/solo.
     auto meters = area.reduced(10, 8);
-    const int labelH = 18, ctrlH = 20, vuW = 14, vuGap = 4;
-    const int eqLabelH = 11, eqKnobH = 26;
+    const int labelH = 18, ctrlH = 20, vuW = 12, vuGap = 4, faderW = 26;
+    const int eqLabelH = 11, eqKnobH = 32;                  // EQ knobs one size up (#1061)
+    const int eqStackH = 4 * (eqLabelH + eqKnobH);
+    const int faderBottomGap = ctrlH + 4;                   // channel reserves mute/solo below the fader
 
+    // Master: reserve the same top (label + EQ-stack) and bottom (mute/solo) gaps as a client
+    // strip so the master fader spans the exact same band height as the channel faders (#1061).
     auto masterBlock = meters.removeFromRight(masterW);
     masterLabel.setBounds(masterBlock.removeFromTop(labelH));
+    masterBlock.removeFromTop(eqStackH);
+    masterBlock.removeFromBottom(faderBottomGap);
     {
-        auto fv = masterBlock.reduced(4, 2);
+        auto fv = masterBlock;
         masterMeter.setBounds(fv.removeFromRight(vuW));
         fv.removeFromRight(vuGap);
-        masterGain.setBounds(fv);
+        masterGain.setBounds(fv.withSizeKeepingCentre(faderW, fv.getHeight()));
     }
     meters.removeFromRight(14);
 
@@ -451,6 +457,6 @@ void MuLinkComponent::resized()
         auto fv = col;
         strip.meter.setBounds(fv.removeFromRight(vuW));
         fv.removeFromRight(vuGap);
-        strip.gain.setBounds(fv);
+        strip.gain.setBounds(fv.withSizeKeepingCentre(faderW, fv.getHeight()));
     }
 }
