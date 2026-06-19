@@ -8,6 +8,8 @@
 #include "UI/Components/VUMeter.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/DropdownSelect.h"
+#include "UI/SaveDialog.h"
+#include "UI/PresetBrowser.h"
 
 // MuLinkComponent — the mu-link window content (Stage L3).
 //
@@ -36,6 +38,19 @@ private:
     void togglePlay();
     void showOptions();        // opens the audio/MIDI device picker in a dialog
 
+    // ── Presets — full app state (mixer + scenes) saved as a .muLink XML preset ──
+    // Reuses the shared SaveDialog + PresetBrowser overlays for identical layout/display to
+    // the products. A preset captures everything: tempo, per-client gain/mute/solo + EQ,
+    // master gain, both master inserts, and all 8 scenes.
+    juce::ValueTree captureState() const;          // current UI/server/scene state → tree
+    void            applyState(const juce::ValueTree& state);   // tree → UI/server/scenes
+    juce::File      presetsDir() const;            // Documents/TDP/muLink/Presets
+    void            doSavePreset(const juce::String& name, const juce::String& desc,
+                                 const juce::String& category);
+    void            loadPresetFile(const juce::File& file);
+    void            showSaveDialog(bool show);
+    void            showPresetBrowser(bool show);
+
     mu_link::AudioServer& server;
     MuLookAndFeel         lnf;
 
@@ -45,6 +60,9 @@ private:
     bool showPresetNames = false;
     juce::TextButton playButton { "Play" };
     juce::TextButton clockSourceButton { "Clock: Internal" };
+    juce::TextButton saveButton { "Save" };
+    juce::TextButton browseButton { "Presets" };
+    juce::Label   presetNameLabel;        // shows the currently-loaded preset name
     juce::Slider  tempoSlider;
     VUMeter       masterMeter;
     juce::Label   masterLabel;
@@ -101,6 +119,11 @@ private:
     void saveScenes() const;
 
     bool playing = false;
+
+    // Preset overlays (shared mu-core components → identical layout to the products).
+    SaveDialog    saveDialog;
+    PresetBrowser presetBrowser;
+    juce::String  currentPresetName;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MuLinkComponent)
 };

@@ -134,6 +134,8 @@ target_sources(mu-link PRIVATE
     "${MU_CORE_DIR}/UI/Components/VUMeter.cpp"
     "${MU_CORE_DIR}/UI/Components/KnobWithLabel.cpp"   # master-insert knobs
     "${MU_CORE_DIR}/UI/Components/DropdownSelect.cpp"  # master-insert algo dropdowns
+    "${MU_CORE_DIR}/UI/SaveDialog.cpp"                 # shared preset save dialog
+    "${MU_CORE_DIR}/UI/PresetBrowser.cpp"              # shared preset browser
     "${MU_CORE_DIR}/Audio/InsertProcessor.cpp"         # ServerEngine master-bus inserts
 )
 
@@ -149,6 +151,7 @@ target_link_libraries(mu-link PRIVATE
     juce::juce_audio_devices
     juce::juce_audio_basics
     juce::juce_gui_extra
+    juce::juce_data_structures   # juce::ValueTree for the preset save/load
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags
 )

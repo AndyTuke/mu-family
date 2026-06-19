@@ -56,9 +56,20 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
     };
     addAndMakeVisible(clockSourceButton);
 
-    tempoSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    tempoSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 72, 22);
-    tempoSlider.setRange(20.0, 300.0, 0.1);
+    // Preset save / browse (same overlays as the products) + the loaded-preset name display.
+    saveButton.onClick   = [this] { showSaveDialog(true); };
+    browseButton.onClick = [this] { showPresetBrowser(true); };
+    addAndMakeVisible(saveButton);
+    addAndMakeVisible(browseButton);
+    styleLabel(presetNameLabel, juce::String(juce::CharPointer_UTF8("\xe2\x80\x94")),  // em-dash placeholder
+               juce::Justification::centredLeft, MuLookAndFeel::mutedText, 12.0f);
+    addAndMakeVisible(presetNameLabel);
+
+    // Tempo as a numeric value with up/down inc-dec arrows (steps 1 BPM).
+    tempoSlider.setSliderStyle(juce::Slider::IncDecButtons);
+    tempoSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 90, 22);
+    tempoSlider.setIncDecButtonsMode(juce::Slider::incDecButtonsDraggable_Vertical);
+    tempoSlider.setRange(20.0, 300.0, 1.0);
     tempoSlider.setValue(120.0, juce::dontSendNotification);
     tempoSlider.setTextValueSuffix(" BPM");
     tempoSlider.onValueChange = [this] { server.setTempo(tempoSlider.getValue()); };
@@ -208,6 +219,22 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
 
     loadScenes();
     selectScene(0);
+
+    // ── Preset overlays (shared mu-core components → identical to the products) ──
+    saveDialog.setShowEmbedSamples(false);   // mu-link has no per-preset samples
+    saveDialog.onSave = [this](const juce::String& name, const juce::String& desc,
+                               const juce::String& category, bool /*embed*/)
+    {
+        doSavePreset(name, desc, category);
+        showSaveDialog(false);
+    };
+    saveDialog.onCancel = [this] { showSaveDialog(false); };
+    addChildComponent(saveDialog);
+
+    presetBrowser.setFileExtension("muLink");
+    presetBrowser.onLoadPreset = [this](const juce::File& f) { loadPresetFile(f); };
+    presetBrowser.onClose      = [this] { showPresetBrowser(false); };
+    addChildComponent(presetBrowser);
 
     // Start stopped — the user presses Play to run the master transport.
     server.setTempo(120.0);
@@ -428,9 +455,15 @@ void MuLinkComponent::resized()
     transport.removeFromLeft(10);
     clockSourceButton.setBounds(transport.removeFromLeft(120));
     transport.removeFromLeft(14);
+    saveButton.setBounds(transport.removeFromLeft(70));
+    transport.removeFromLeft(6);
+    browseButton.setBounds(transport.removeFromLeft(84));
+    transport.removeFromLeft(12);
     optionsButton.setBounds(transport.removeFromRight(96));
     transport.removeFromRight(14);
-    tempoSlider.setBounds(transport);
+    tempoSlider.setBounds(transport.removeFromRight(150));
+    transport.removeFromRight(14);
+    presetNameLabel.setBounds(transport);   // loaded-preset name fills the middle gap
     area.removeFromTop(16);
 
     {
@@ -471,8 +504,8 @@ void MuLinkComponent::resized()
     // Mixer (full width): master pinned right, the eight client strips fill the rest.
     // Each strip top→bottom: name → EQ stack (High→Low) → fader + VU → mute/solo.
     auto meters = area.reduced(10, 8);
-    const int labelH = 18, ctrlH = 20, vuW = 12, vuGap = 4, faderW = 26;
-    const int eqLabelH = 11, eqKnobH = 32;                  // EQ knobs one size up (#1061)
+    const int labelH = 18, ctrlH = 20, vuW = 12, vuGap = 4, faderW = 18;   // slimmer faders
+    const int eqLabelH = 11, eqKnobH = 40;                  // larger EQ knobs
     const int eqStackH = 4 * (eqLabelH + eqKnobH);
     const int faderBottomGap = ctrlH + 4;                   // channel reserves mute/solo below the fader
 
@@ -541,4 +574,188 @@ void MuLinkComponent::resized()
         fv.removeFromRight(vuGap);
         strip.gain.setBounds(fv.withSizeKeepingCentre(faderW, fv.getHeight()));
     }
+
+    // Preset overlays: the browser covers the mixer/scenes area below the header; the save
+    // dialog is a full-window modal (paints its own dim + centred card).
+    {
+        auto browserArea = getLocalBounds().reduced(16);
+        browserArea.removeFromTop(138);   // header (54+8) + transport (40) + heading (16+20)
+        presetBrowser.setBounds(browserArea);
+    }
+    saveDialog.setBounds(getLocalBounds());
+}
+
+// ── Presets — full app state (mixer + scenes) ────────────────────────────────
+
+juce::File MuLinkComponent::presetsDir() const
+{
+    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+               .getChildFile("TDP").getChildFile("muLink").getChildFile("Presets");
+}
+
+juce::ValueTree MuLinkComponent::captureState() const
+{
+    // Everything in the app: tempo, master, per-client mixer + EQ, and all scenes.
+    juce::ValueTree state("MuLinkPreset");
+    state.setProperty("tempo", tempoSlider.getValue(), nullptr);
+
+    juce::ValueTree master("Master");
+    master.setProperty("gain", masterGain.getValue(), nullptr);
+    for (int w = 0; w < (int) masterIns.size(); ++w)
+    {
+        juce::ValueTree ins("Insert");
+        ins.setProperty("idx",  w, nullptr);
+        ins.setProperty("algo", masterIns[(size_t) w].algo.getSelectedId() - 1, nullptr);
+        for (int s = 0; s < 4; ++s)
+            ins.setProperty("p" + juce::String(s), server.masterInsertParam(w, s), nullptr);
+        master.appendChild(ins, nullptr);
+    }
+    state.appendChild(master, nullptr);
+
+    for (int i = 0; i < (int) clients.size(); ++i)
+    {
+        const auto& strip = clients[(size_t) i];
+        juce::ValueTree c("Client");
+        c.setProperty("idx",  i, nullptr);
+        c.setProperty("gain", strip.gain.getValue(), nullptr);
+        c.setProperty("mute", strip.mute.getToggleState(), nullptr);
+        c.setProperty("solo", strip.solo.getToggleState(), nullptr);
+        for (int b = 0; b < 4; ++b)
+            c.setProperty("eq" + juce::String(b), strip.eq[(size_t) b].getValue(), nullptr);
+        state.appendChild(c, nullptr);
+    }
+
+    juce::ValueTree scenesTree("Scenes");
+    for (int s = 0; s < kNumScenes; ++s)
+    {
+        juce::ValueTree sc("Scene");
+        sc.setProperty("idx", s, nullptr);
+        for (int i = 0; i < (int) clients.size(); ++i)
+        {
+            const auto& cell = scenes[(size_t) s][(size_t) i];
+            juce::ValueTree ce("Cell");
+            ce.setProperty("idx", i, nullptr);
+            ce.setProperty("on", cell.enabled, nullptr);
+            ce.setProperty("pc", cell.program, nullptr);
+            ce.setProperty("ch", cell.channel, nullptr);
+            sc.appendChild(ce, nullptr);
+        }
+        scenesTree.appendChild(sc, nullptr);
+    }
+    state.appendChild(scenesTree, nullptr);
+    return state;
+}
+
+void MuLinkComponent::applyState(const juce::ValueTree& state)
+{
+    // Apply via the UI controls (sendNotification) so each onValueChange/onClick routes the
+    // value to the server exactly as a user edit would — single write path, no duplication.
+    if (state.hasProperty("tempo"))
+        tempoSlider.setValue((double) state.getProperty("tempo"), juce::sendNotificationSync);
+
+    auto master = state.getChildWithName("Master");
+    if (master.isValid())
+    {
+        masterGain.setValue((double) master.getProperty("gain", 1.0), juce::sendNotificationSync);
+        for (int w = 0; w < (int) masterIns.size(); ++w)
+        {
+            auto ins = master.getChildWithProperty("idx", w);
+            if (! ins.isValid()) continue;
+            const int algo = (int) ins.getProperty("algo", 0);
+            server.setMasterInsertAlgo(w, algo);
+            for (int s = 0; s < 4; ++s)
+                server.setMasterInsertParam(w, s, (float) (double) ins.getProperty("p" + juce::String(s), 0.0));
+            // Set the dropdown silently, then rebind the knobs from the now-current server params.
+            masterIns[(size_t) w].algo.setSelectedId(algo + 1, juce::dontSendNotification);
+            configureMasterInsert(w);
+        }
+    }
+
+    for (int i = 0; i < (int) clients.size(); ++i)
+    {
+        auto c = state.getChildWithProperty("idx", i);   // direct Client children carry idx
+        if (! c.isValid() || ! c.hasType("Client")) continue;
+        auto& strip = clients[(size_t) i];
+        strip.gain.setValue((double) c.getProperty("gain", 1.0), juce::sendNotificationSync);
+        strip.mute.setToggleState((bool) c.getProperty("mute", false), juce::sendNotification);
+        strip.solo.setToggleState((bool) c.getProperty("solo", false), juce::sendNotification);
+        for (int b = 0; b < 4; ++b)
+            strip.eq[(size_t) b].setValue((double) c.getProperty("eq" + juce::String(b), 0.5),
+                                          juce::sendNotificationSync);
+    }
+
+    auto scenesTree = state.getChildWithName("Scenes");
+    if (scenesTree.isValid())
+    {
+        for (int s = 0; s < kNumScenes; ++s)
+        {
+            auto sc = scenesTree.getChildWithProperty("idx", s);
+            if (! sc.isValid()) continue;
+            for (int i = 0; i < (int) clients.size(); ++i)
+            {
+                auto ce = sc.getChildWithProperty("idx", i);
+                if (! ce.isValid()) continue;
+                auto& cell = scenes[(size_t) s][(size_t) i];
+                cell.enabled = (bool) ce.getProperty("on", false);
+                cell.program = juce::jlimit(0, 127, (int) ce.getProperty("pc", 0));
+                cell.channel = juce::jlimit(1, 16,  (int) ce.getProperty("ch", 9));
+            }
+        }
+        refreshSceneEditors();
+        saveScenes();
+    }
+}
+
+void MuLinkComponent::doSavePreset(const juce::String& name, const juce::String& desc,
+                                   const juce::String& category)
+{
+    auto state = captureState();
+    state.setProperty("presetCategory",    category, nullptr);   // read back by the browser
+    state.setProperty("presetDescription", desc,     nullptr);
+
+    auto dir = presetsDir();
+    dir.createDirectory();
+    auto file = dir.getChildFile(juce::File::createLegalFileName(name) + ".muLink");
+    if (auto xml = state.createXml())
+        xml->writeTo(file);
+
+    currentPresetName = name;
+    presetNameLabel.setText(name, juce::dontSendNotification);
+    presetNameLabel.setColour(juce::Label::textColourId, lnf.colour(MuLookAndFeel::valueText));
+}
+
+void MuLinkComponent::loadPresetFile(const juce::File& file)
+{
+    if (auto xml = juce::parseXML(file))
+    {
+        auto state = juce::ValueTree::fromXml(*xml);
+        if (state.hasType("MuLinkPreset"))
+        {
+            applyState(state);
+            currentPresetName = file.getFileNameWithoutExtension();
+            presetNameLabel.setText(currentPresetName, juce::dontSendNotification);
+            presetNameLabel.setColour(juce::Label::textColourId, lnf.colour(MuLookAndFeel::valueText));
+        }
+    }
+}
+
+void MuLinkComponent::showSaveDialog(bool show)
+{
+    if (show)
+    {
+        presetBrowser.refresh(presetsDir());                       // populate known categories
+        saveDialog.setKnownCategories(presetBrowser.getCategories());
+        saveDialog.setDefaultName(currentPresetName);
+        saveDialog.setBounds(getLocalBounds());
+    }
+    saveDialog.setVisible(show);
+    if (show) saveDialog.toFront(true);
+}
+
+void MuLinkComponent::showPresetBrowser(bool show)
+{
+    if (show)
+        presetBrowser.refresh(presetsDir());
+    presetBrowser.setVisible(show);
+    if (show) presetBrowser.toFront(true);
 }
