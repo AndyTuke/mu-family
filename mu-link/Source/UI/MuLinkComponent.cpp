@@ -14,17 +14,14 @@ namespace
 }
 
 MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
-    : server(serverToShow),
-      deviceSelector(serverToShow.audioDeviceManager(),
-                     0, 0,        // no audio inputs
-                     2, 2,        // stereo output
-                     true,        // MIDI input options (pick the external clock source)
-                     true,        // MIDI output selector (drives MIDI-clock-out)
-                     true,        // channels as stereo pairs
-                     false)       // show advanced options
+    : server(serverToShow)
 {
     setLookAndFeel(&lnf);
-    addAndMakeVisible(deviceSelector);
+
+    // Audio/MIDI device picker now lives behind the Options button (a dialog, like the
+    // synth standalones), freeing the main window for a full-width mixer.
+    optionsButton.onClick = [this] { showOptions(); };
+    addAndMakeVisible(optionsButton);
 
     styleLabel(titleLabel,    juce::String(juce::CharPointer_UTF8("\xce\xbc-link")), juce::Justification::centredLeft, MuLookAndFeel::headingText, 26.0f, true);
     styleLabel(subtitleLabel, juce::String(juce::CharPointer_UTF8("master clock  \xc2\xb7  audio bus")), juce::Justification::centredLeft, MuLookAndFeel::labelText, 13.0f);
@@ -72,11 +69,13 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
         styleLabel(strip.name, juce::String::charToString(0x2014), juce::Justification::centred, MuLookAndFeel::mutedText, 10.0f);
         addAndMakeVisible(strip.name);
 
-        // Per-client gain knob (linear 0–1.5, unity at 1.0).
-        strip.gain.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+        // Per-client gain — vertical fader (matches the standard app mixer), linear 0–1.5,
+        // unity at 1.0.
+        strip.gain.setSliderStyle(juce::Slider::LinearVertical);
         strip.gain.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
         strip.gain.setRange(0.0, 1.5, 0.01);
         strip.gain.setValue(1.0, juce::dontSendNotification);
+        strip.gain.setDoubleClickReturnValue(true, 1.0);   // double-click → unity
         strip.gain.onValueChange = [this, i] { server.setClientGain(i, (float) clients[(size_t) i].gain.getValue()); };
         addAndMakeVisible(strip.gain);
 
@@ -111,11 +110,12 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
         }
     }
 
-    // Master gain knob, under the master meter.
-    masterGain.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+    // Master gain — vertical fader beside the master meter (matches the standard app mixer).
+    masterGain.setSliderStyle(juce::Slider::LinearVertical);
     masterGain.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     masterGain.setRange(0.0, 1.5, 0.01);
     masterGain.setValue(1.0, juce::dontSendNotification);
+    masterGain.setDoubleClickReturnValue(true, 1.0);
     masterGain.onValueChange = [this] { server.setMasterGain((float) masterGain.getValue()); };
     addAndMakeVisible(masterGain);
 
@@ -195,6 +195,30 @@ void MuLinkComponent::togglePlay()
     playing = ! playing;
     server.setPlaying(playing);
     playButton.setButtonText(playing ? "Stop" : "Play");
+}
+
+void MuLinkComponent::showOptions()
+{
+    // Audio/MIDI device picker in a dialog (like the synth standalones). The dialog owns the
+    // selector; it binds to the live AudioDeviceManager so changes apply immediately.
+    auto selector = std::make_unique<juce::AudioDeviceSelectorComponent>(
+        server.audioDeviceManager(),
+        0, 0,        // no audio inputs
+        2, 2,        // stereo output
+        true,        // MIDI input (external clock source)
+        true,        // MIDI output (MIDI-clock-out port)
+        true,        // channels as stereo pairs
+        false);      // no advanced options
+    selector->setSize(380, 460);
+
+    juce::DialogWindow::LaunchOptions opts;
+    opts.content.setOwned(selector.release());
+    opts.dialogTitle                  = juce::String(juce::CharPointer_UTF8("\xce\xbc-link \xe2\x80\x94 Audio / MIDI Options"));
+    opts.dialogBackgroundColour       = lnf.colour(MuLookAndFeel::windowBackground);
+    opts.escapeKeyTriggersCloseButton = true;
+    opts.useNativeTitleBar            = true;
+    opts.resizable                    = false;
+    opts.launchAsync();
 }
 
 void MuLinkComponent::selectScene(int s)
@@ -325,9 +349,8 @@ void MuLinkComponent::paint(juce::Graphics& g)
 {
     g.fillAll(lnf.colour(MuLookAndFeel::windowBackground));
 
-    // Subtle panel behind the meter strip so it reads as a unit.
+    // Subtle panel behind the full-width mixer so it reads as a unit.
     auto area = getLocalBounds().reduced(16);
-    area.removeFromLeft(348 + 16);
     area.removeFromTop(54 + 8 + 40 + 16 + 20);
     g.setColour(lnf.colour(MuLookAndFeel::panelBackground));
     g.fillRoundedRectangle(area.toFloat(), 6.0f);
@@ -336,12 +359,9 @@ void MuLinkComponent::paint(juce::Graphics& g)
 void MuLinkComponent::resized()
 {
     auto area = getLocalBounds().reduced(16);
+    const int masterW = 60;
 
-    // Left: the device picker.
-    deviceSelector.setBounds(area.removeFromLeft(348));
-    area.removeFromLeft(16);
-
-    // Right column: header → transport → clients heading → meter strip.
+    // Header → transport → clients heading → full-width mixer.
     auto header = area.removeFromTop(54);
     titleLabel.setBounds(header.removeFromTop(34));
     subtitleLabel.setBounds(header);
@@ -352,12 +372,14 @@ void MuLinkComponent::resized()
     transport.removeFromLeft(10);
     clockSourceButton.setBounds(transport.removeFromLeft(120));
     transport.removeFromLeft(14);
+    optionsButton.setBounds(transport.removeFromRight(96));
+    transport.removeFromRight(14);
     tempoSlider.setBounds(transport);
     area.removeFromTop(16);
 
     clientsHeading.setBounds(area.removeFromTop(20));
 
-    // Scenes band pinned to the bottom; the meter strip fills the space between.
+    // Scenes band pinned to the bottom; the mixer fills the space between.
     auto scenesBand = area.removeFromBottom(108);
     scenesHeading.setBounds(scenesBand.removeFromTop(18));
     scenesBand.removeFromTop(4);
@@ -369,10 +391,10 @@ void MuLinkComponent::resized()
     }
     scenesBand.removeFromTop(6);
     {
-        // Per-client cells aligned under the meter columns: mirror the meters' 10 px
+        // Per-client cells aligned under the strip columns: mirror the mixer's 10 px
         // horizontal inset + the master block on the right, so the 8 cells line up.
         auto cellsRow = scenesBand.reduced(10, 0);
-        cellsRow.removeFromRight(56 + 14);
+        cellsRow.removeFromRight(masterW + 14);
         const int n = (int) clients.size();
         const int cw = juce::jmax(1, cellsRow.getWidth() / n);
         for (int i = 0; i < n; ++i)
@@ -386,17 +408,20 @@ void MuLinkComponent::resized()
     }
     area.removeFromBottom(12);
 
-    // Meter strip: master pinned right, the eight client meters fill the rest.
+    // Mixer (full width): master pinned right, the eight client strips fill the rest.
+    // Each strip top→bottom: name → EQ stack (High→Low) → fader + VU → mute/solo.
     auto meters = area.reduced(10, 8);
-    const int labelH = 18;
+    const int labelH = 18, ctrlH = 20, vuW = 14, vuGap = 4;
+    const int eqLabelH = 11, eqKnobH = 26;
 
-    // Each column, bottom-up: mute|solo row → gain knob → name → meter.
-    const int ctrlH = 20, knobH = 40;
-
-    auto masterBlock = meters.removeFromRight(56);
-    masterGain.setBounds(masterBlock.removeFromBottom(knobH).reduced(6, 2));
-    masterLabel.setBounds(masterBlock.removeFromBottom(labelH));
-    masterMeter.setBounds(masterBlock.reduced(10, 0));
+    auto masterBlock = meters.removeFromRight(masterW);
+    masterLabel.setBounds(masterBlock.removeFromTop(labelH));
+    {
+        auto fv = masterBlock.reduced(4, 2);
+        masterMeter.setBounds(fv.removeFromRight(vuW));
+        fv.removeFromRight(vuGap);
+        masterGain.setBounds(fv);
+    }
     meters.removeFromRight(14);
 
     const int n  = (int) clients.size();
@@ -404,25 +429,28 @@ void MuLinkComponent::resized()
     for (int i = 0; i < n; ++i)
     {
         auto& strip = clients[(size_t) i];
-        auto  col   = meters.removeFromLeft(cw);
+        auto  col   = meters.removeFromLeft(cw).reduced(3, 0);
 
+        strip.name.setBounds(col.removeFromTop(labelH));
+
+        // EQ stack: High at the top → Low at the bottom (b = 3 High … 0 Low).
+        for (int b = 3; b >= 0; --b)
+        {
+            auto band = col.removeFromTop(eqLabelH + eqKnobH);
+            strip.eqLabel[(size_t) b].setBounds(band.removeFromTop(eqLabelH));
+            strip.eq[(size_t) b].setBounds(band.withSizeKeepingCentre(eqKnobH, eqKnobH));
+        }
+
+        // Mute/solo pinned at the bottom; the fader + VU fill the middle.
         auto ctrl = col.removeFromBottom(ctrlH);
         const int bw = juce::jmax(1, ctrl.getWidth() / 2 - 2);
         strip.mute.setBounds(ctrl.removeFromLeft(bw));
         strip.solo.setBounds(ctrl.removeFromRight(bw));
-        strip.gain.setBounds(col.removeFromBottom(knobH).reduced(6, 2));
+        col.removeFromBottom(4);
 
-        // EQ stack above the gain knob: bands removed bottom-up so they read Low→High
-        // top-to-bottom. Each band is a tiny label over a rotary.
-        const int eqLabelH = 11, eqKnobH = 28;
-        for (int b = 3; b >= 0; --b)
-        {
-            auto band = col.removeFromBottom(eqLabelH + eqKnobH);
-            strip.eqLabel[(size_t) b].setBounds(band.removeFromTop(eqLabelH));
-            strip.eq[(size_t) b].setBounds(band.reduced(8, 0));
-        }
-
-        strip.name.setBounds(col.removeFromBottom(labelH));
-        strip.meter.setBounds(col.reduced(6, 0));
+        auto fv = col;
+        strip.meter.setBounds(fv.removeFromRight(vuW));
+        fv.removeFromRight(vuGap);
+        strip.gain.setBounds(fv);
     }
 }

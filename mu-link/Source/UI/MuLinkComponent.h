@@ -15,11 +15,10 @@
 // and VUMeter for the level meters — so it looks like a member of the family without
 // pulling in the plugin shell. (Documented deviation per the family-consistency rule.)
 //
-// Layout: JUCE's AudioDeviceSelectorComponent on the left (the runtime WASAPI/ASIO
-// picker + MIDI-clock-out port), and on the right the master transport (play/stop +
-// tempo — mu-link is always tempo master) above a mixer-style strip of the eight client
-// slots' meters plus the summed master. A timer polls the registry for live attach/
-// detach and keeps the MIDI-clock-out port in sync with the picker.
+// Layout: the master transport (play/stop + tempo — mu-link is always tempo master) above a
+// full-width mixer strip of the eight client slots (fader + VU + 3-band EQ) plus the summed
+// master. The runtime WASAPI/ASIO picker + MIDI-clock-out port lives behind an Options button
+// (a dialog, like the synth standalones). A timer polls the registry for live attach/detach.
 class MuLinkComponent : public juce::Component,
                         private juce::Timer
 {
@@ -33,12 +32,13 @@ public:
 private:
     void timerCallback() override;
     void togglePlay();
+    void showOptions();        // opens the audio/MIDI device picker in a dialog
 
     mu_link::AudioServer& server;
     MuLookAndFeel         lnf;
 
-    juce::AudioDeviceSelectorComponent deviceSelector;
     juce::Label   titleLabel, subtitleLabel, clientsHeading;
+    juce::TextButton optionsButton { "Options" };
     juce::TextButton playButton { "Play" };
     juce::TextButton clockSourceButton { "Clock: Internal" };
     juce::Slider  tempoSlider;
