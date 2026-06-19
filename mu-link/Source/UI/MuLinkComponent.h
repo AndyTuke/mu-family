@@ -41,6 +41,8 @@ private:
 
     juce::Label   titleLabel, subtitleLabel, clientsHeading;
     juce::TextButton optionsButton { "Options" };
+    juce::TextButton labelModeButton { "Show: Names" };   // toggles strip labels Names ⇄ Presets
+    bool showPresetNames = false;
     juce::TextButton playButton { "Play" };
     juce::TextButton clockSourceButton { "Clock: Internal" };
     juce::Slider  tempoSlider;

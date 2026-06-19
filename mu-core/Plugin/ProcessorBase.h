@@ -27,6 +27,7 @@
 
 #include <array>
 #include <atomic>
+#include <functional>
 #include <limits>
 #include <memory>
 
@@ -132,6 +133,12 @@ public:
     virtual juce::StringArray  loadCategoryList()                                  const { return {}; }
     virtual void               ensureCategoryInList(const juce::String& /*cat*/)         {}
     virtual bool               hasPendingFullPreset()                              const { return false; }
+
+    // Set by the standalone (mu-link bridge) so the product can publish its current full-preset
+    // name for display on the mu-link mixer. Null in plugin builds / when mu-link isn't wired.
+    // Products call publishPresetName(...) from their loadPreset override.
+    std::function<void(const juce::String&)> onPresetNameChanged;
+    void publishPresetName(const juce::String& name) { if (onPresetNameChanged) onPresetNameChanged(name); }
 
     // Content directory — where preset / sample-library / keybindings folders
     // live. Returned File can be invalid; the shell tolerates that.

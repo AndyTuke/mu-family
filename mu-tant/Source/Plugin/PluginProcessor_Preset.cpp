@@ -439,6 +439,8 @@ void PluginProcessor::loadPreset(const juce::File& file)
     {
         applyFullPresetTree(state);
     }
+
+    publishPresetName(file.getFileNameWithoutExtension());   // mu-link mixer display (#1065)
 }
 
 // Apply a full preset's APVTS state immediately (the shared commit path for the

@@ -124,12 +124,24 @@ public:
         if (config.muLinkName.isNotEmpty())
             if (auto* holderPtr = mainWindow->pluginHolder.get())
                 if (holderPtr->processor != nullptr)
+                {
                     muLinkBridge = mu_link::makeStandaloneBridge (
                         *mainWindow, *holderPtr->processor, holderPtr->player, config.muLinkName);
+
+                    // Let the product publish its current preset name to mu-link for display.
+                    if (auto* pb = dynamic_cast<ProcessorBase*> (holderPtr->processor.get()))
+                        pb->onPresetNameChanged = [b = muLinkBridge.get()] (const juce::String& n)
+                        { if (b != nullptr) b->setPresetName (n); };
+                }
     }
 
     void shutdown() override
     {
+        // Drop the preset-name hook before the bridge so a late preset load can't call a
+        // dangling bridge pointer during teardown.
+        if (mainWindow != nullptr && mainWindow->pluginHolder != nullptr)
+            if (auto* pb = dynamic_cast<ProcessorBase*> (mainWindow->pluginHolder->processor.get()))
+                pb->onPresetNameChanged = nullptr;
         muLinkBridge = nullptr;   // references the holder's processor + player — tear down first
         if (mainWindow != nullptr && mainWindow->pluginHolder != nullptr)
             mainWindow->pluginHolder->saveAudioDeviceState();

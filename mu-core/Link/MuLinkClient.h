@@ -7,6 +7,7 @@
 
 #include <functional>
 #include <vector>
+#include <cstring>
 
 // MuLinkClient — the product-facing mu-link client, shared by every standalone.
 //
@@ -90,6 +91,20 @@ public:
 
     bool isAttached()  const noexcept { return attached; }
     int  slotIndex()   const noexcept { return mem.claimedSlotIndex(); }
+
+    // Publish the client's current preset name into its registry slot (display-only; mu-link's
+    // UI shows it). No-op when detached. Call from the message thread on each preset load.
+    void setPresetName(const juce::String& name) noexcept
+    {
+        if (! attached) return;
+        const int slot = mem.claimedSlotIndex();
+        if (slot < 0) return;
+        auto& dst = mem.registry().slots[slot].presetName;
+        const auto utf8 = name.toRawUTF8();
+        const int n = juce::jmin((int) kMaxNameChars - 1, (int) std::strlen(utf8));
+        std::memcpy(dst, utf8, (size_t) n);
+        dst[n] = '\0';
+    }
 
     // The current master transport snapshot — for slaving the product's transport. Zeroed
     // when not attached.

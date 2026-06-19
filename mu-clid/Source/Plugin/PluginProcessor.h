@@ -241,7 +241,7 @@ public:
 
     void savePreset(const juce::String& n, const juce::String& d,
                     const juce::String& c, bool e = false) override { presetIO.savePreset(n, d, c, e); }
-    void loadPreset(const juce::File& f) override { presetIO.loadPreset(f); }
+    void loadPreset(const juce::File& f) override { presetIO.loadPreset(f); publishPresetName(f.getFileNameWithoutExtension()); }
     void saveRhythmPresetToFile(int ri, const juce::File& dest,
                                 bool emb = false, const juce::String& cat = {},
                                 const juce::String& desc = {})

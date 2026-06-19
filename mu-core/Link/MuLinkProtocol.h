@@ -20,7 +20,7 @@ namespace mu_link
 // Bump whenever the shared-memory layout changes incompatibly. A client whose version
 // doesn't match the server's refuses to attach (and falls back to its own audio device)
 // rather than reading a mismatched struct.
-inline constexpr std::uint32_t kProtocolVersion = 2;   // v2: per-client program-change control (scene switching)
+inline constexpr std::uint32_t kProtocolVersion = 3;   // v3: client publishes its current preset name
 
 inline constexpr int kMaxClients     = 8;     // family is ≤8 products in practice
 inline constexpr int kMaxChannels    = 2;     // stereo per client for now (see design §"channel layout")
@@ -137,6 +137,11 @@ struct ClientSlot
     std::atomic<std::uint32_t> pcEpoch    { 0 };   // bumped by the server on each targeted send
     std::atomic<std::uint32_t> pcProgram  { 0 };   // program number 0-127
     std::atomic<std::uint32_t> pcChannel  { 9 };   // MIDI channel 1-16 (9 = Ch-9 full-preset table)
+
+    // Client → server display string: the client's current full-preset name (filename without
+    // extension), set by the client on each preset load. Display-only — mu-link's UI reads it
+    // on its message-thread timer; a rare torn read just shows a stale frame, never unsafe.
+    char                       presetName[kMaxNameChars] { };
 };
 
 struct ClientRegistry

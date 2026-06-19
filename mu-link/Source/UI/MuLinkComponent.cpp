@@ -24,6 +24,14 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
     optionsButton.onClick = [this] { showOptions(); };
     addAndMakeVisible(optionsButton);
 
+    // Toggle the client strip labels between the instrument name and its current preset name.
+    labelModeButton.onClick = [this]
+    {
+        showPresetNames = ! showPresetNames;
+        labelModeButton.setButtonText(showPresetNames ? "Show: Presets" : "Show: Names");
+    };
+    addAndMakeVisible(labelModeButton);
+
     styleLabel(titleLabel,    juce::String(juce::CharPointer_UTF8("\xce\xbc-link")), juce::Justification::centredLeft, MuLookAndFeel::headingText, 26.0f, true);
     styleLabel(subtitleLabel, juce::String(juce::CharPointer_UTF8("master clock  \xc2\xb7  audio bus")), juce::Justification::centredLeft, MuLookAndFeel::labelText, 13.0f);
     styleLabel(clientsHeading,"CONNECTED CLIENTS",       juce::Justification::centredLeft, MuLookAndFeel::labelText, 12.0f, true);
@@ -356,7 +364,15 @@ void MuLinkComponent::timerCallback()
         auto& name = clients[(size_t) i].name;
         if (active)
         {
-            name.setText(juce::String(reg.slots[i].name), juce::dontSendNotification);
+            // Show the instrument name, or its current preset name when that mode is selected
+            // (fall back to the instrument name when the client hasn't published a preset yet).
+            juce::String shown(reg.slots[i].name);
+            if (showPresetNames)
+            {
+                const juce::String preset(reg.slots[i].presetName);
+                if (preset.isNotEmpty()) shown = preset;
+            }
+            name.setText(shown, juce::dontSendNotification);
             name.setColour(juce::Label::textColourId, lnf.colour(MuLookAndFeel::valueText));
         }
         else
@@ -417,7 +433,11 @@ void MuLinkComponent::resized()
     tempoSlider.setBounds(transport);
     area.removeFromTop(16);
 
-    clientsHeading.setBounds(area.removeFromTop(20));
+    {
+        auto headingRow = area.removeFromTop(20);
+        labelModeButton.setBounds(headingRow.removeFromRight(120));
+        clientsHeading.setBounds(headingRow);
+    }
 
     // Scenes band pinned to the bottom; the mixer fills the space between.
     auto scenesBand = area.removeFromBottom(108);

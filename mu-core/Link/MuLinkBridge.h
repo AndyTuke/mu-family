@@ -80,6 +80,14 @@ public:
 
     bool isConnected() const noexcept { return connected; }
 
+    // Publish the product's current preset name to mu-link (display-only). Cached so it
+    // survives a detach/re-attach (re-pushed in attachToMuLink). Call from the message thread.
+    void setPresetName(const juce::String& presetName)
+    {
+        lastPresetName = presetName;
+        if (connected) client.setPresetName(lastPresetName);
+    }
+
 private:
     void timerCallback() override
     {
@@ -129,6 +137,7 @@ private:
         connected  = true;
         lastGen    = client.transportGeneration();
         stallTicks = 0;
+        client.setPresetName(lastPresetName);   // re-publish into the freshly-claimed slot
         if (onConnectionChanged) onConnectionChanged(true);
     }
 
@@ -146,6 +155,7 @@ private:
     juce::AudioProcessor&       processor;
     juce::AudioProcessorPlayer& player;
     juce::String                name;
+    juce::String                lastPresetName;   // re-published on each (re)attach
     std::function<void(bool)>   onConnectionChanged;
 
     MuLinkClient   client;
