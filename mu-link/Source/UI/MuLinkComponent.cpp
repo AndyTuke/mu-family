@@ -1,4 +1,5 @@
 #include "MuLinkComponent.h"
+#include "UI/InsertSlotUi.h"   // mu_ui::configureKnobFromSlot — per-algo knob relabelling
 
 namespace
 {
@@ -119,6 +120,30 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
     masterGain.onValueChange = [this] { server.setMasterGain((float) masterGain.getValue()); };
     addAndMakeVisible(masterGain);
 
+    // Two master-bus inserts (like mu-clid / mu-tant). Dropdown ids = algoIndex + 1, alphabetised
+    // to mirror the products' InsertSubsection so the lists read identically.
+    for (int w = 0; w < (int) masterIns.size(); ++w)
+    {
+        auto& mi = masterIns[(size_t) w];
+        styleLabel(mi.title, "MASTER FX " + juce::String(w + 1), juce::Justification::centredLeft,
+                   MuLookAndFeel::labelText, 10.0f, true);
+        addAndMakeVisible(mi.title);
+
+        mi.algo.addItem("None",        1);  mi.algo.addItem("3-Band EQ",   7);
+        mi.algo.addItem("Bitcrusher",  5);  mi.algo.addItem("Clipper",     6);
+        mi.algo.addItem("Compressor",  8);  mi.algo.addItem("Fold",        4);
+        mi.algo.addItem("Hard Clip",   3);  mi.algo.addItem("Karplus",    12);
+        mi.algo.addItem("Limiter",     9);  mi.algo.addItem("Ring Mod",   10);
+        mi.algo.addItem("Soft Clip",   2);  mi.algo.addItem("Tape Sat",   11);
+        mi.algo.addItem("Vocoder",    13);  mi.algo.addItem("Vocoder St", 14);
+        mi.algo.setSelectedId(server.masterInsertAlgo(w) + 1, false);
+        mi.algo.onChange = [this, w](int) { configureMasterInsert(w); };
+        addAndMakeVisible(mi.algo);
+
+        for (auto& k : mi.p) addAndMakeVisible(k);
+        configureMasterInsert(w);
+    }
+
     // ── Scenes: trigger buttons + the selected scene's per-client (program, channel) cells ──
     styleLabel(scenesHeading, juce::String(juce::CharPointer_UTF8("SCENES  \xc2\xb7  click to recall")), juce::Justification::centredLeft,
                MuLookAndFeel::labelText, 12.0f, true);
@@ -180,7 +205,7 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
     server.setTempo(120.0);
     server.setPlaying(false);
 
-    setSize(1040, 880);   // wider mixer (#1062); taller for the per-strip EQ stack
+    setSize(1200, 880);   // mixer + master-insert column (#1062/#1063); tall for the EQ stack
     startTimerHz(12);
 }
 
@@ -219,6 +244,18 @@ void MuLinkComponent::showOptions()
     opts.useNativeTitleBar            = true;
     opts.resizable                    = false;
     opts.launchAsync();
+}
+
+void MuLinkComponent::configureMasterInsert(int which)
+{
+    auto& mi = masterIns[(size_t) which];
+    const int algo = mi.algo.getSelectedId() - 1;          // dropdown id = algoIndex + 1
+    server.setMasterInsertAlgo(which, algo);
+    // Relabel / range / value each of the 4 slot knobs from the per-algo config table; the
+    // write-back routes the normalised value to the server's master-insert atomic.
+    for (int s = 0; s < 4; ++s)
+        mu_ui::configureKnobFromSlot(mi.p[(size_t) s], algo, s, server.masterInsertParam(which, s),
+            [this, which, s](float nrm) { server.setMasterInsertParam(which, s, nrm); });
 }
 
 void MuLinkComponent::selectScene(int s)
@@ -360,6 +397,9 @@ void MuLinkComponent::resized()
 {
     auto area = getLocalBounds().reduced(16);
     const int masterW = 60;
+    const int insertColW = 150;   // master-insert column on the far right
+    const int insertGap  = 12;
+    const int masterArea = insertColW + insertGap + masterW + 14;   // reserved on the right
 
     // Header → transport → clients heading → full-width mixer.
     auto header = area.removeFromTop(54);
@@ -394,7 +434,7 @@ void MuLinkComponent::resized()
         // Per-client cells aligned under the strip columns: mirror the mixer's 10 px
         // horizontal inset + the master block on the right, so the 8 cells line up.
         auto cellsRow = scenesBand.reduced(10, 0);
-        cellsRow.removeFromRight(masterW + 14);
+        cellsRow.removeFromRight(masterArea);
         const int n = (int) clients.size();
         const int cw = juce::jmax(1, cellsRow.getWidth() / n);
         for (int i = 0; i < n; ++i)
@@ -415,6 +455,28 @@ void MuLinkComponent::resized()
     const int eqLabelH = 11, eqKnobH = 32;                  // EQ knobs one size up (#1061)
     const int eqStackH = 4 * (eqLabelH + eqKnobH);
     const int faderBottomGap = ctrlH + 4;                   // channel reserves mute/solo below the fader
+
+    // Master-insert column (far right): two stacked insert panels (dropdown + 2×2 knob grid).
+    auto insertCol = meters.removeFromRight(insertColW);
+    {
+        const int halfH = insertCol.getHeight() / 2;
+        for (int w = 0; w < (int) masterIns.size(); ++w)
+        {
+            auto& mi = masterIns[(size_t) w];
+            auto panel = insertCol.removeFromTop(halfH).reduced(6, 4);
+            mi.title.setBounds(panel.removeFromTop(16));
+            mi.algo.setBounds(panel.removeFromTop(26));
+            panel.removeFromTop(6);
+            auto top = panel.removeFromTop(panel.getHeight() / 2);
+            auto bot = panel;
+            const int kw = juce::jmax(1, top.getWidth() / 2);
+            mi.p[0].setBounds(top.removeFromLeft(kw).reduced(4));
+            mi.p[1].setBounds(top.reduced(4));
+            mi.p[2].setBounds(bot.removeFromLeft(kw).reduced(4));
+            mi.p[3].setBounds(bot.reduced(4));
+        }
+    }
+    meters.removeFromRight(insertGap);
 
     // Master: reserve the same top (label + EQ-stack) and bottom (mute/solo) gaps as a client
     // strip so the master fader spans the exact same band height as the channel faders (#1061).

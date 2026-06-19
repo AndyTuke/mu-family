@@ -80,6 +80,10 @@ public:
     void setClientSolo(int slot, bool s)  noexcept { engine.setClientSolo(slot, s); }
     void setClientEqParam(int slot, int band, float v) noexcept { engine.setClientEqParam(slot, band, v); }
     float clientEqValue(int slot, int band) const noexcept { return engine.clientEqValue(slot, band); }
+    void setMasterInsertAlgo(int which, int algo)   noexcept { engine.setMasterInsertAlgo(which, algo); }
+    void setMasterInsertParam(int which, int slot, float v) noexcept { engine.setMasterInsertParam(which, slot, v); }
+    int   masterInsertAlgo(int which)  const noexcept { return engine.masterInsertAlgo(which); }
+    float masterInsertParam(int which, int slot) const noexcept { return engine.masterInsertParam(which, slot); }
     void setMasterGain(float g)           noexcept { engine.setMasterGain(g); }
     float clientGainValue(int slot) const noexcept { return engine.clientGainValue(slot); }
     bool  clientMuted    (int slot) const noexcept { return engine.clientMuted(slot); }

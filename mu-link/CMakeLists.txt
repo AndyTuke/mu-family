@@ -24,6 +24,7 @@ target_sources(mu-link-tests PRIVATE
     Source/Tests/SharedMemoryTests.cpp
     Source/Tests/ServerTests.cpp
     Source/Tests/ClientTests.cpp
+    "${MU_CORE_DIR}/Audio/InsertProcessor.cpp"   # ServerEngine embeds two master-bus inserts
 )
 
 target_compile_features(mu-link-tests PRIVATE cxx_std_17)
@@ -47,6 +48,7 @@ juce_add_console_app(mu-link-server PRODUCT_NAME "mu-link-server")
 
 target_sources(mu-link-server PRIVATE
     Source/Server/ServerMain.cpp
+    "${MU_CORE_DIR}/Audio/InsertProcessor.cpp"   # ServerEngine embeds two master-bus inserts
 )
 
 target_compile_features(mu-link-server PRIVATE cxx_std_17)
@@ -96,6 +98,7 @@ juce_add_console_app(mu-link-harness PRODUCT_NAME "mu-link-harness")
 
 target_sources(mu-link-harness PRIVATE
     Source/Tools/HarnessMain.cpp
+    "${MU_CORE_DIR}/Audio/InsertProcessor.cpp"   # ServerEngine embeds two master-bus inserts
 )
 
 target_compile_features(mu-link-harness PRIVATE cxx_std_17)
@@ -129,6 +132,9 @@ target_sources(mu-link PRIVATE
     "${MU_CORE_DIR}/UI/Components/MuLookAndFeel.cpp"
     "${MU_CORE_DIR}/UI/Components/MuTheme.cpp"
     "${MU_CORE_DIR}/UI/Components/VUMeter.cpp"
+    "${MU_CORE_DIR}/UI/Components/KnobWithLabel.cpp"   # master-insert knobs
+    "${MU_CORE_DIR}/UI/Components/DropdownSelect.cpp"  # master-insert algo dropdowns
+    "${MU_CORE_DIR}/Audio/InsertProcessor.cpp"         # ServerEngine master-bus inserts
 )
 
 target_compile_features(mu-link PRIVATE cxx_std_17)

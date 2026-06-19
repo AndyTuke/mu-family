@@ -6,6 +6,8 @@
 #include "Server/AudioServer.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/VUMeter.h"
+#include "UI/Components/KnobWithLabel.h"
+#include "UI/Components/DropdownSelect.h"
 
 // MuLinkComponent — the mu-link window content (Stage L3).
 //
@@ -45,6 +47,21 @@ private:
     VUMeter       masterMeter;
     juce::Label   masterLabel;
     juce::Slider  masterGain;
+
+    // Two master-bus insert effects (like mu-clid / mu-tant): an algorithm dropdown + four
+    // self-relabelling slot knobs (driven by mu_ui::configureKnobFromSlot from the shared
+    // per-algo config table), wired to the server's master-insert atomics.
+    struct MasterInsert
+    {
+        juce::Label    title;
+        DropdownSelect algo;
+        KnobWithLabel  p[4] { { "P1", MuLookAndFeel::knobInsertPad },
+                              { "P2", MuLookAndFeel::knobInsertPad },
+                              { "P3", MuLookAndFeel::knobInsertPad },
+                              { "P4", MuLookAndFeel::knobInsertPad } };
+    };
+    std::array<MasterInsert, 2> masterIns;
+    void configureMasterInsert(int which);   // (re)bind the 4 knobs to the selected algorithm
 
     // One mixer strip per client slot: meter + name + gain knob + mute/solo, plus the
     // selected scene's per-client cell editor (enable + program + channel).

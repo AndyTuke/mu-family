@@ -9,7 +9,6 @@ Test pass/fail tracking lives in [tests.md](tests.md), not this backlog. Use thi
 | # | Description | Status | Fixed Build |
 |---|---|---|---|
 | 1065 | **[mu-link/feature] Attached instruments should be able to show the current preset name** (option alongside the device name — see #1064). Each connected client publishes its loaded preset name over the bus; the mu-link strip shows it (toggle/option between device name and preset name). Requires extending the IPC client info (`ClientSlot`/registry in [mu-core/Link/MuLinkProtocol.h](mu-core/Link/MuLinkProtocol.h)) so a client can publish its current preset name, the products' standalone setting it on preset load, and the mu-link UI displaying it. | 🔴 Open | — |
-| 1063 | **[mu-link/feature] Master strip gets two insert effects (like mu-clid / mu-tant).** Add two master insert slots to mu-link's summed bus, mirroring the products' master inserts (mu-core `InsertProcessor`/`mst_ins*` pattern) — UI on the master strip + RT processing on the master sum in `ServerEngine`. Note mu-link has no APVTS, so params are atomics (mirror the per-client EQ work in #1057). | 🔴 Open | — |
 ## 🟡 On Hold
 
 | # | Description | Status | Fixed Build |
@@ -18,6 +17,7 @@ Test pass/fail tracking lives in [tests.md](tests.md), not this backlog. Use thi
 ## ✅ Fixed
 
 | # | Description | Status | Fixed Build |
+| 1063 | **[mu-link/feature→done] Master strip gets two insert effects (like mu-clid / mu-tant).** Add two master insert slots to mu-link's summed bus, mirroring the products' master inserts (mu-core `InsertProcessor`/`mst_ins*` pattern) — UI on the master strip + RT processing on the master sum in `ServerEngine`. Note mu-link has no APVTS, so params are atomics (mirror the per-client EQ work in #1057). | ✅ Fixed | 935 |
 | 1064 | **[mu-link/verified] Attached instruments DO show their name.** Confirmed by inspection: each product's standalone passes its `muLinkName` ("mu-Clid" / "mu-Tant" / "mu-On") via `mu_standalone::App` → `makeStandaloneBridge` → `MuLinkClient::attach` → `claimSlot` → `reg.slots[i].name`, and `MuLinkComponent::timerCallback` displays `reg.slots[i].name` for active clients (em-dash when free). No code change. | ✅ Fixed | 934 |
 | 1062 | **[mu-link/UI→done] Mixer panel wider.** Widen the mu-link window / mixer so the strips have more room (especially with the master gaining two inserts, #1063). | ✅ Fixed | 934 |
 | 1061 | **[mu-link/UI→done] Mixer sizing tweaks.** Faders can be **smaller**; EQ knobs **one size up**; the **master fader should match the channel-fader height** (currently the master block lays out independently). Adjust the `resized()` constants in [MuLinkComponent.cpp](mu-link/Source/UI/MuLinkComponent.cpp). | ✅ Fixed | 934 |

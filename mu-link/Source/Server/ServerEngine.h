@@ -6,6 +6,7 @@
 #include "../Clock/TransportClock.h"
 #include "../Clock/MidiClockEstimator.h"
 #include "Audio/FX/Insert/EqInsert.h"   // mu-core: shared 3-band EQ insert (per-client strip)
+#include "Audio/InsertProcessor.h"      // mu-core: full insert-FX rack (two master-bus inserts)
 
 #include <algorithm>
 #include <atomic>
@@ -110,6 +111,28 @@ public:
              ? clientEqParam[slot][band].load(std::memory_order_relaxed) : 0.5f;
     }
 
+    // Two master-bus insert effects (like mu-clid / mu-tant's master inserts). `which` 0/1.
+    // `algo` is the mu-core insert algorithm index (0 = None → bypassed). Params are the four
+    // normalised 0..1 insert slots (de-normalised per-algo inside InsertProcessor).
+    static constexpr int kMasterInserts = 2;
+    void setMasterInsertAlgo(int which, int algo) noexcept
+    {
+        if (which < 0 || which >= kMasterInserts) return;
+        masterInsAlgo[which].store(juce::jlimit(0, InsertProcessor::kNumInsertAlgos - 1, algo), std::memory_order_relaxed);
+    }
+    void setMasterInsertParam(int which, int slot, float norm01) noexcept
+    {
+        if (which < 0 || which >= kMasterInserts || slot < 0 || slot >= VoiceParams::kInsertSlotCount) return;
+        masterInsParam[which][slot].store(std::clamp(norm01, 0.0f, 1.0f), std::memory_order_relaxed);
+    }
+    int   masterInsertAlgo(int which) const noexcept
+    { return (which >= 0 && which < kMasterInserts) ? masterInsAlgo[which].load(std::memory_order_relaxed) : 0; }
+    float masterInsertParam(int which, int slot) const noexcept
+    {
+        return (which >= 0 && which < kMasterInserts && slot >= 0 && slot < VoiceParams::kInsertSlotCount)
+             ? masterInsParam[which][slot].load(std::memory_order_relaxed) : 0.0f;
+    }
+
     // Message-thread setup before streaming. Sizes the de-interleave scratch to the
     // device block + max channels; primes the clock at the device sample rate.
     void prepare(double sampleRate, int maxBlockSize, double tempoBpm)
@@ -123,6 +146,7 @@ public:
             clientEqInsert[i].prepare(sr, maxBlockFrames);
         eqScratch.setSize(kMaxChannels, maxBlockFrames, false, false, true);
         eqScratch.clear();
+        for (auto& mi : masterInsert) mi.prepare(sr, maxBlockFrames);
         for (auto& p : clientPeakLevel) p.store(0.0f, std::memory_order_relaxed);
         masterPeakLevel.store(0.0f, std::memory_order_relaxed);
 
@@ -313,6 +337,22 @@ public:
             }
         }
 
+        // Master-bus insert effects (two slots, like the products' master inserts). Each runs
+        // in place on the summed bus when its algorithm isn't None (0). Wrapping `output`
+        // (already-summed device buffers) in an AudioBuffer is alloc-free — it just refers.
+        {
+            juce::AudioBuffer<float> masterBuf(output, chans, numFrames);
+            for (int w = 0; w < kMasterInserts; ++w)
+            {
+                const int algo = masterInsAlgo[w].load(std::memory_order_relaxed);
+                if (algo <= 0) continue;
+                masterVp.insertAlgo = algo;
+                for (int s = 0; s < VoiceParams::kInsertSlotCount; ++s)
+                    masterVp.insertParam[s] = masterInsParam[w][s].load(std::memory_order_relaxed);
+                masterInsert[w].process(masterBuf, numFrames, chans, masterVp);
+            }
+        }
+
         // Apply the master gain + safety soft-clip, then take the block peak for the meter.
         const float masterGain = masterGainLevel.load(std::memory_order_relaxed);
         float masterPk = 0.0f;
@@ -380,6 +420,12 @@ private:
     EqInsert                   clientEqInsert[kMaxClients];           // audio-thread DSP state
     VoiceParams                eqVp;                                  // shared param carrier (algo 6)
     juce::AudioBuffer<float>   eqScratch;                             // de-interleave buffer (EQ path)
+
+    // Two master-bus inserts (message thread writes params, audio thread reads/runs).
+    std::atomic<int>           masterInsAlgo[kMasterInserts] { };                       // 0 = None
+    std::atomic<float>         masterInsParam[kMasterInserts][VoiceParams::kInsertSlotCount] { };
+    InsertProcessor            masterInsert[kMasterInserts];          // audio-thread DSP state
+    VoiceParams                masterVp;                              // shared param carrier
 };
 
 } // namespace mu_link
