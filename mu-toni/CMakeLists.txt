@@ -99,6 +99,8 @@ juce_add_console_app(mu-toni-tests PRODUCT_NAME "mu-toni-tests")
 target_sources(mu-toni-tests PRIVATE
     Source/Tests/TestMain.cpp
     Source/Tests/ApvtsLayoutTests.cpp
+    Source/Tests/ArpeggiatorTests.cpp   # T1 — arp engine (Sequencer/Arpeggiator.h)
+    Source/Tests/AnalogueOscTests.cpp   # T2 — analogue oscillator (self-contained)
 )
 
 target_compile_features(mu-toni-tests PRIVATE cxx_std_17)

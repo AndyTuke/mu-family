@@ -60,6 +60,7 @@ private:
         int transportHeader = 0, bpmRowY = 0;
         int midiGroupHeader = 0;
         int midiClockHeader = 0, clockSourceRowY = 0, midiMessagesRowY = 0;
+        int quoteY = 0;   // Tony's in-joke credit line (the product's namesake)
     };
     LayoutY layout;
     void computeLayout();

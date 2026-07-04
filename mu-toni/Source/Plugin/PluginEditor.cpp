@@ -62,6 +62,12 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     sidebar.onChannelSelected = [this](int idx) { enginePanel.setLayer(idx); };
     sidebar.refreshItems();
 
+    // Engine-panel knob hovers/changes → shared StatusBar.
+    enginePanel.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
+    {
+        getStatusBar().showParam(name, val, MuLookAndFeel::colour(MuLookAndFeel::knobEuclidean));
+    };
+
     // Main area (sidebar + blank engine panel) + shared mixer overlay.
     setMainArea(&sidebar, &enginePanel);
     setMixerOverlay(&mixerOverlay);

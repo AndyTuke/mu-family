@@ -3,7 +3,9 @@
 #include "Plugin/ProcessorBase.h"        // mu-core base
 #include "Plugin/MixerFxParams.h"         // mu-core: shared global-FX / mixer APVTS layout
 #include "Plugin/MidiClockSync.h"         // mu-core: shared MIDI-clock slave
+#include "Sequencer/ArpVoiceRunner.h"     // per-voice arpeggiator + ToniVoice
 
+#include <array>
 #include <atomic>
 #include <memory>
 
@@ -104,7 +106,7 @@ public:
     juce::File   getContentDir()             const override;
     juce::File   getPresetsDir()             const override;
     juce::File   getPerSlotPresetDir()       const override;
-    juce::String getPerSlotPresetExtension() const override { return "muLayer"; }
+    juce::String getPerSlotPresetExtension() const override { return "muArp"; }
     juce::File   getFullPresetDir()          const override { return getPresetsDir(); }
     juce::String getFullPresetExtension()    const override { return "muToni"; }
 
@@ -112,6 +114,10 @@ protected:
     // No MIDI-PC preset loading yet.
     void applyMidiPresetSlot(int, const juce::File&) override {}
     void applyFullMidiPreset(const juce::File&)      override {}
+
+    // ── Arp/voice parameter cache (index into vp[voice][slot]) ────────────────
+    // Enum + suffix table live in the .cpp; count is needed here for the array.
+    static constexpr int kNumVoiceParams = 43;
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -121,8 +127,23 @@ private:
     void registerFxListeners();
     void syncAllFxParams();
 
-    // Silent per-channel render hook handed to the shared MixerEngine — clears the
-    // channel buffer (no engine yet). Captures only `this`.
+    // Cache the per-voice arp/voice/env raw parameter pointers (message thread).
+    void cacheVoiceParamPointers();
+    // Build a voice's ArpParams + ToniVoiceParams + step config from the cache.
+    void readVoice(int v, ArpParams& ap, ToniVoiceParams& vp, int& rateIdx, float& gate01, bool& midiTrig) const;
+    // Update the held-note stack from incoming MIDI; sets noteOnEdge if a new note landed.
+    void updateHeldNotes(const juce::MidiBuffer& midi, bool& noteOnEdge);
+
+    // Per-channel arp voice + its cached parameter pointers.
+    std::array<ArpVoiceRunner, kMaxChannels>                                      runners;
+    std::array<std::array<std::atomic<float>*, kNumVoiceParams>, kMaxChannels>    vp {};
+
+    // Root-by-MIDI held-note stack (newest on top) + per-block arp context.
+    std::array<int, 32> heldStack {};
+    int                 heldCount = 0;
+    ArpContext          arpCtx;
+
+    // Renders channel `ch` from its arp runner. Captures `this` (reads arpCtx).
     MixerEngine::RenderChannelFn renderChannelCb;
 
     std::atomic<bool>   playing { false };

@@ -126,6 +126,9 @@ void SettingsOverlay::computeLayout()
         layout.midiMessagesRowY = y;
         y += rowH;
     }
+
+    // Tony's line — the product namesake. Sits below all content as a quiet credit.
+    layout.quoteY = y + s(kGroupGap);
 }
 
 void SettingsOverlay::updateMidiSyncVisibility()
@@ -180,6 +183,14 @@ void SettingsOverlay::paintContent(juce::Graphics& g)
         drawGroupHeader(g, layout.midiGroupHeader,    "MIDI");
         drawSectionHeader(g, layout.midiClockHeader,  "MIDI Clock");
     }
+
+    // Tony's in-joke line — the μ-Toni namesake. Verbatim; "appagator" is the joke,
+    // never "corrected" to arpeggiator.
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(12.0f)).withStyle("Italic")));
+    g.drawText(juce::String(juce::CharPointer_UTF8("\xe2\x80\x9cIts an appagator, is it a powerful tool?\xe2\x80\x9d")),
+               layout.contentX, layout.quoteY, layout.contentW, mu_ui::s(kRowH),
+               juce::Justification::centredLeft, false);
 }
 
 } // namespace mu_toni
