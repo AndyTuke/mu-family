@@ -28,10 +28,14 @@ All five stages compile + link across the family (mu-toni Standalone + VST3 + CL
   bank (bank + FFT-mip + disk content isn't cross-product shareable yet). Lift the
   wavetable engine to mu-core later to get mu-tant's exact timbre.
 - **X-Mod** — not in the MVP voice (osc detune only). Add with the wavetable lift.
-- **Modulation** — the MVP reads params **directly from APVTS**, not yet via the
-  per-voice `ModulationMatrix`. So arp params are automatable (DAW) but the
-  "every param is a mod destination" wiring (`VoiceSlot` + `ModulatorPanel` +
-  `MuToniModDest.h`) is the next stage.
+- ~~Modulation~~ — **DONE (v1.0.945):** full modulation section wired identically
+  to the other products. Per-voice `VoiceSlot` (8 control sequences + matrix), the
+  shared `ModulatorPanel` as the engine panel's bottom band (rebinds per layer,
+  playhead-driven), `Modulation/MuToniModDest.h` (20 arp/voice/env destinations),
+  the engine resolves each voice's matrix via `mu_mod::resolveLane` each block
+  (proportion space, depth scale 1.0), and modulators persist in the APVTS state
+  (`MuToniMods` child). *Not unit-tested* (matrix needs mu-core linked into the
+  test target — exercised at runtime instead).
 - **Presets** — DAW state save/load works (APVTS); the `.muToni`/`.muArp` browser
   chrome + per-voice save are not yet wired.
 - **UI polish** — functional grid layout; a design-ui-family pass (bands, sizes,

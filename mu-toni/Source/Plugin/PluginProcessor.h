@@ -4,10 +4,15 @@
 #include "Plugin/MixerFxParams.h"         // mu-core: shared global-FX / mixer APVTS layout
 #include "Plugin/MidiClockSync.h"         // mu-core: shared MIDI-clock slave
 #include "Sequencer/ArpVoiceRunner.h"     // per-voice arpeggiator + ToniVoice
+#include "Sequencer/VoiceSlot.h"          // mu-core: per-voice control sequences + matrix
+#include "Modulation/LaneModulation.h"    // mu-core: mu_mod::resolveLane
+#include "Modulation/MuToniModDest.h"     // arp/voice modulation destinations
 
 #include <array>
 #include <atomic>
 #include <memory>
+#include <string_view>
+#include <unordered_map>
 
 // mu-Toni — scaffold.
 //
@@ -129,14 +134,27 @@ private:
 
     // Cache the per-voice arp/voice/env raw parameter pointers (message thread).
     void cacheVoiceParamPointers();
-    // Build a voice's ArpParams + ToniVoiceParams + step config from the cache.
-    void readVoice(int v, ArpParams& ap, ToniVoiceParams& vp, int& rateIdx, float& gate01, bool& midiTrig) const;
+    // Resolve a voice's modulation (matrix over its control sequences) then build its
+    // ArpParams + ToniVoiceParams + step config. Non-const: runs the matrix under try-lock.
+    void readVoice(int v, ArpParams& ap, ToniVoiceParams& vp, int& rateIdx, float& gate01, bool& midiTrig);
     // Update the held-note stack from incoming MIDI; sets noteOnEdge if a new note landed.
     void updateHeldNotes(const juce::MidiBuffer& midi, bool& noteOnEdge);
 
     // Per-channel arp voice + its cached parameter pointers.
     std::array<ArpVoiceRunner, kMaxChannels>                                      runners;
     std::array<std::array<std::atomic<float>*, kNumVoiceParams>, kMaxChannels>    vp {};
+
+    // ── Per-voice modulation (mu-core VoiceSlot + shared matrix) ───────────────
+    // Public so the UI ModulatorPanel can bind to the active voice's slot.
+public:
+    std::array<VoiceSlot, kMaxChannels> voiceSlots;
+private:
+    // Modulation-resolve inputs: parallel arrays for mu_mod::resolveLane.
+    std::array<const char*, kNumModDests>                                         modDestIds {};
+    std::array<juce::NormalisableRange<float>, kNumModDests>                       modDestRanges {};
+    std::array<std::array<std::atomic<float>*, kNumModDests>, kMaxChannels>        modDestAtoms {};
+    std::unordered_map<std::string_view, float>                                   modParamValues;
+    double                                                                        modBeat = 0.0;
 
     // Root-by-MIDI held-note stack (newest on top) + per-block arp context.
     std::array<int, 32> heldStack {};

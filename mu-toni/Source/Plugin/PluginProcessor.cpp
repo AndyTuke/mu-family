@@ -1,6 +1,7 @@
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/PluginEditor.h"
-#include "Plugin/HostTransport.h"   // mu-core: DAW / mu-link transport read
+#include "Plugin/HostTransport.h"          // mu-core: DAW / mu-link transport read
+#include "Modulation/ModulatorSerialise.h" // mu-core: modulator state save/load
 
 namespace mu_toni
 {
@@ -158,9 +159,22 @@ PluginProcessor::PluginProcessor()
     midiClockSync.setEnabled (appSettings->getBoolValue("midiSyncEnabled",  false));
     midiClockSync.setMessages(appSettings->getIntValue ("midiSyncMessages", 2));
 
+    registerDepthScales();               // register mu-toni mod-dest depth scales (1.0, proportion space)
     registerFxListeners();
     syncAllFxParams();   // JUCE doesn't fire parameterChanged on construction
     cacheVoiceParamPointers();
+}
+
+namespace
+{
+    // Maps each modulation destination (D_*) to its per-voice APVTS param slot (vpi::*).
+    // Order MUST match mu_toni::ModDestIndex / kModDestTable.
+    constexpr int kModDestVpSlot[kNumModDests] = {
+        vpi::dir, vpi::octs, vpi::inv, vpi::chord, vpi::root, vpi::roct, vpi::rate, vpi::gate, vpi::porta,
+        vpi::o1l, vpi::o2l, vpi::o2s, vpi::pw, vpi::noise,
+        vpi::cut, vpi::res, vpi::drv, vpi::feDep,
+        vpi::aeL, vpi::peDep,
+    };
 }
 
 void PluginProcessor::cacheVoiceParamPointers()
@@ -171,38 +185,57 @@ void PluginProcessor::cacheVoiceParamPointers()
             const juce::String id = "v" + juce::String(i) + "_" + vpi::suffix[k];
             vp[(size_t) i][(size_t) k] = (i < kNumChannels) ? apvts.getRawParameterValue(id) : nullptr;
         }
+
+    // Modulation-resolve inputs: ids + ranges (voice-independent) + per-voice atoms.
+    for (int k = 0; k < kNumModDests; ++k)
+    {
+        modDestIds[(size_t) k]    = kModDestTable[k].id;
+        modDestRanges[(size_t) k] = apvts.getParameterRange("v0_" + juce::String(vpi::suffix[kModDestVpSlot[k]]));
+        for (int i = 0; i < kMaxChannels; ++i)
+            modDestAtoms[(size_t) i][(size_t) k] = (i < kNumChannels) ? vp[(size_t) i][(size_t) kModDestVpSlot[k]]
+                                                                      : nullptr;
+        modParamValues[kModDestTable[k].id] = 0.0f;   // pre-size the map (no audio-thread alloc)
+    }
 }
 
 void PluginProcessor::readVoice(int v, ArpParams& ap, ToniVoiceParams& tv,
-                                int& rateIdx, float& gate01, bool& midiTrig) const
+                                int& rateIdx, float& gate01, bool& midiTrig)
 {
     const auto& p = vp[(size_t) v];
     auto g = [&](int slot) { return p[(size_t) slot] != nullptr ? p[(size_t) slot]->load() : 0.0f; };
 
-    ap.scale        = (int) g(vpi::scale);
-    ap.rootNote     = (int) g(vpi::root);
-    ap.rootOctave   = (int) g(vpi::roct);
-    ap.chord        = (int) g(vpi::chord);
-    ap.inversion    = (int) g(vpi::inv);
-    ap.octavesSpan  = (int) g(vpi::octs);
-    ap.direction    = g(vpi::dir);
-    ap.diatonicSnap = g(vpi::snap) > 0.5f;
+    // Resolve this voice's modulation matrix over its control sequences → out[] (param units).
+    // Modulated destinations come from out[]; everything else reads the raw param.
+    float out[kNumModDests];
+    mu_mod::resolveLane(&voiceSlots[(size_t) v], modBeat, kNumModDests,
+                        modDestIds.data(), modDestAtoms[(size_t) v].data(),
+                        modDestRanges.data(), modParamValues, out);
 
-    tv.osc1Shape = (int) g(vpi::o1w); tv.osc1Oct = (int) g(vpi::o1o); tv.osc1Fine = g(vpi::o1f); tv.osc1LevelDb = g(vpi::o1l);
-    tv.osc2Shape = (int) g(vpi::o2w); tv.osc2Oct = (int) g(vpi::o2o); tv.osc2Semi = g(vpi::o2s); tv.osc2Fine = g(vpi::o2f); tv.osc2LevelDb = g(vpi::o2l);
-    tv.pulseWidth = g(vpi::pw); tv.noiseLevelDb = g(vpi::noise);
-    tv.filterType = (int) g(vpi::ft); tv.cutoff = g(vpi::cut); tv.resonance = g(vpi::res); tv.drive = g(vpi::drv);
+    // Arp (integer dests round; direction/gate/porta continuous).
+    ap.scale        = (int) g(vpi::scale);                  // not modulated
+    ap.rootNote     = juce::roundToInt(out[D_root]);
+    ap.rootOctave   = juce::roundToInt(out[D_roct]);
+    ap.chord        = juce::roundToInt(out[D_chord]);
+    ap.inversion    = juce::roundToInt(out[D_inv]);
+    ap.octavesSpan  = juce::roundToInt(out[D_octs]);
+    ap.direction    = out[D_dir];
+    ap.diatonicSnap = g(vpi::snap) > 0.5f;                  // not modulated
 
-    tv.ampA = g(vpi::aeA); tv.ampD = g(vpi::aeD); tv.ampS = g(vpi::aeS); tv.ampR = g(vpi::aeR); tv.ampLevelDb = g(vpi::aeL);
-    tv.fA = g(vpi::feA); tv.fD = g(vpi::feD); tv.fS = g(vpi::feS); tv.fR = g(vpi::feR); tv.filterEnvDepth = g(vpi::feDep);
-    tv.pA = g(vpi::peA); tv.pD = g(vpi::peD); tv.pS = g(vpi::peS); tv.pR = g(vpi::peR); tv.pitchEnvDepth = g(vpi::peDep);
+    tv.osc1Shape = (int) g(vpi::o1w); tv.osc1Oct = (int) g(vpi::o1o); tv.osc1Fine = g(vpi::o1f); tv.osc1LevelDb = out[D_o1lvl];
+    tv.osc2Shape = (int) g(vpi::o2w); tv.osc2Oct = (int) g(vpi::o2o); tv.osc2Semi = out[D_o2semi]; tv.osc2Fine = g(vpi::o2f); tv.osc2LevelDb = out[D_o2lvl];
+    tv.pulseWidth = out[D_pw]; tv.noiseLevelDb = out[D_noise];
+    tv.filterType = (int) g(vpi::ft); tv.cutoff = out[D_cut]; tv.resonance = out[D_res]; tv.drive = out[D_drv];
 
-    tv.portamentoMs = g(vpi::porta);
+    tv.ampA = g(vpi::aeA); tv.ampD = g(vpi::aeD); tv.ampS = g(vpi::aeS); tv.ampR = g(vpi::aeR); tv.ampLevelDb = out[D_amp];
+    tv.fA = g(vpi::feA); tv.fD = g(vpi::feD); tv.fS = g(vpi::feS); tv.fR = g(vpi::feR); tv.filterEnvDepth = out[D_fenv];
+    tv.pA = g(vpi::peA); tv.pD = g(vpi::peD); tv.pS = g(vpi::peS); tv.pR = g(vpi::peR); tv.pitchEnvDepth = out[D_penv];
+
+    tv.portamentoMs = out[D_porta];
     tv.legato       = g(vpi::leg) > 0.5f;
     tv.pan          = 0.0f;   // pan handled by the mixer strip
 
-    rateIdx  = (int) g(vpi::rate);
-    gate01   = g(vpi::gate) * 0.01f;
+    rateIdx  = juce::roundToInt(out[D_rate]);
+    gate01   = out[D_gate] * 0.01f;
     midiTrig = g(vpi::trig) > 0.5f;
 }
 
@@ -343,6 +376,10 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     arpCtx.rootOverrideMidi = heldCount > 0 ? heldStack[(size_t) (heldCount - 1)] : -1;
     arpCtx.noteOnEdge       = noteOnEdge;
 
+    // Beat position for the modulation matrix (control-sequence playhead).
+    modBeat = host.hasPosition ? host.ppqPosition
+                               : internalBeatPos.load(std::memory_order_relaxed);
+
     // Push current parameters into each voice's arp runner.
     for (int i = 0; i < kNumChannels; ++i)
     {
@@ -375,7 +412,21 @@ juce::AudioProcessorEditor* PluginProcessor::createEditor()
 
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    if (auto xml = apvts.copyState().createXml())
+    auto state = apvts.copyState();
+
+    // Embed each voice's modulators (control sequences + matrix) as a "MuToniMods"
+    // child of the APVTS state. Remove any stale copy first so it can't accumulate.
+    state.removeChild(state.getChildWithName("MuToniMods"), nullptr);
+    juce::ValueTree mods("MuToniMods");
+    for (int v = 0; v < kNumChannels; ++v)
+    {
+        auto vt = mu_pp::serialiseModulators(voiceSlots[(size_t) v]);
+        vt.setProperty("voice", v, nullptr);
+        mods.addChild(vt, -1, nullptr);
+    }
+    state.addChild(mods, -1, nullptr);
+
+    if (auto xml = state.createXml())
         copyXmlToBinary(*xml, destData);
 }
 
@@ -384,8 +435,24 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
         if (xml->hasTagName(apvts.state.getType()))
         {
-            apvts.replaceState(juce::ValueTree::fromXml(*xml));
+            auto tree = juce::ValueTree::fromXml(*xml);
+            auto mods = tree.getChildWithName("MuToniMods");
+
+            apvts.replaceState(tree);
             syncAllFxParams();   // re-seed mixer/FX (unchanged values skip listeners)
+
+            // Restore each voice's modulators.
+            for (int v = 0; v < kNumChannels; ++v)
+                mu_pp::clearModulators(voiceSlots[(size_t) v]);
+            if (mods.isValid())
+                for (int c = 0; c < mods.getNumChildren(); ++c)
+                {
+                    auto child = mods.getChild(c);
+                    const int v = (int) child.getProperty("voice", -1);
+                    if (v >= 0 && v < kNumChannels)
+                        mu_pp::deserialiseModulators(child, voiceSlots[(size_t) v], {},
+                                                     [](const std::string& id) { return mu_toni::isValidModDest(id); });
+                }
         }
 }
 

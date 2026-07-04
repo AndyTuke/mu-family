@@ -2,9 +2,11 @@
   "permissions": {
     "allow": [
       "Bash",
+      "Bash(*)",
       "WebFetch",
       "WebSearch",
-      "PowerShell"
+      "PowerShell",
+      "PowerShell(*)"
     ]
   },
   "hooks": {

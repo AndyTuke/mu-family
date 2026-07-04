@@ -1,9 +1,11 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "Plugin/ProcessorBase.h"
+#include "Plugin/PluginProcessor.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/DropdownSelect.h"
+#include "UI/ModulatorPanel.h"
+#include "Modulation/MuToniModDest.h"
 #include "Audio/Scales.h"
 #include "Audio/Chords.h"
 #include "Audio/AnalogueOsc.h"
@@ -14,13 +16,14 @@ namespace mu_toni
 {
 
 // μ-Toni engine panel — the arpeggiator + analogue-voice controls for the
-// selected layer/voice. All controls bind to the v{N}_* APVTS params via
-// attachments; setLayer(idx) re-binds them to that voice. Grouped in bands:
-// Arp · Oscillators · Filter · Envelopes.
-class EnginePanel : public juce::Component
+// selected layer/voice, plus the shared modulator section (identical to the
+// other products) as the bottom band. All controls bind to the v{N}_* APVTS
+// params via attachments; setLayer(idx) re-binds them + the modulator panel.
+class EnginePanel : public juce::Component,
+                    private juce::Timer
 {
 public:
-    explicit EnginePanel(ProcessorBase& processor) : proc(processor)
+    explicit EnginePanel(PluginProcessor& processor) : proc(processor)
     {
         using LF = MuLookAndFeel;
 
@@ -77,7 +80,18 @@ public:
         addKnob("feDep", "Flt Env", LF::knobPostPad);
         addKnob("peDep", "Pch Env", LF::knobModulation);
 
+        // Shared modulator section (bottom band) — mu-core ModulatorPanel + mu-toni dests.
+        addAndMakeVisible(modulatorPanel);
+        modulatorPanel.setDestProvider(&modDestProvider);
+
         setLayer(0);
+        startTimerHz(30);   // drive the modulator playhead
+    }
+
+    ~EnginePanel() override
+    {
+        stopTimer();
+        modulatorPanel.setVoiceSlot(nullptr);   // unbind before the panel/slots die
     }
 
     void setLayer(int idx)
@@ -95,6 +109,7 @@ public:
             t.att = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
                 proc.apvts, v + t.suffix, *t.comp);
 
+        modulatorPanel.setVoiceSlot(&proc.voiceSlots[(size_t) currentLayer]);
         repaint();
     }
 
@@ -108,6 +123,11 @@ public:
     void resized() override
     {
         auto area = getLocalBounds().reduced(8);
+
+        // Bottom band: the shared modulator section (identical placement to the
+        // other products — full width below the engine controls).
+        modulatorPanel.setBounds(area.removeFromBottom(juce::jmax(200, area.getHeight() * 45 / 100)));
+        area.removeFromBottom(6);
 
         // Header row: choice controls + toggles.
         auto header = area.removeFromTop(48);
@@ -197,15 +217,20 @@ private:
                  "Comb+","AP12","Notch24","HP6","Peak","LoShf","HiShf","Comb-" };
     }
 
+    void timerCallback() override { modulatorPanel.setPlayheadBeat(proc.getInternalBeatPos()); }
+
 public:
     std::function<void(const juce::String&, const juce::String&)> onStatusUpdate;
 
 private:
-    ProcessorBase& proc;
+    PluginProcessor& proc;
     int currentLayer = 0;
     std::vector<KnobDef>   knobs;
     std::vector<ComboDef>  combos;
     std::vector<ToggleDef> toggles;
+
+    ::ModulatorPanel modulatorPanel;
+    ModDestProvider  modDestProvider = makeModDestProvider();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EnginePanel)
 };
