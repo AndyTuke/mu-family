@@ -5,110 +5,126 @@
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/ModulatorPanel.h"
+#include "UI/Voice/InsertSubsection.h"
 #include "Modulation/MuToniModDest.h"
 #include "Audio/Scales.h"
 #include "Audio/Chords.h"
 #include "Audio/AnalogueOsc.h"
+#include <array>
 #include <memory>
 #include <vector>
 
 namespace mu_toni
 {
 
-// μ-Toni engine panel — the arpeggiator + analogue-voice controls for the
-// selected layer/voice, plus the shared modulator section (identical to the
-// other products) as the bottom band. All controls bind to the v{N}_* APVTS
-// params via attachments; setLayer(idx) re-binds them + the modulator panel.
+// μ-Toni engine panel. The Pitch·Filter·Amp·Insert voice band replicates
+// mu-clid's VoiceSection exactly — fixed MuLookAndFeel constants (Size-2 knobs,
+// compact two-row sub-sections, section widths + dividers). Oscillator 1/2/Mix
+// (mu-toni's two-osc source) sits above; the Appergater band + shared modulator
+// section below. All sizes come from MuLookAndFeel — no arbitrary values.
 class EnginePanel : public juce::Component,
                     private juce::Timer
 {
 public:
-    explicit EnginePanel(PluginProcessor& processor) : proc(processor)
+    enum Group { G_OSC1, G_OSC2, G_MIX, G_PITCH, G_FILTER, G_AMP, G_INSERT, G_ARP, G_COUNT };
+
+    explicit EnginePanel(PluginProcessor& processor)
+        : proc(processor), insertSub(processor, "v")
     {
         using LF = MuLookAndFeel;
 
-        // Choice controls (AudioParameterInt-backed dropdowns).
-        addCombo("scale", "Scale", scaleItems());
-        addCombo("chord", "Chord", chordItems());
-        addCombo("rate",  "Rate",  rateItems());
-        addCombo("trig",  "Trigger", { "Loop", "MIDI" });
-        addCombo("o1w",   "Osc 1", waveItems());
-        addCombo("o2w",   "Osc 2", waveItems());
-        addCombo("ft",    "Filter", filterItems());
+        // ── Oscillators + Mix (mu-toni source section, boxed) ────────────────
+        addCombo(G_OSC1, "o1w", waveItems());
+        addKnob (G_OSC1, "o1o", "Oct",  LF::knobEuclidean);
+        addKnob (G_OSC1, "o1f", "Fine", LF::knobEuclidean);
+        addCombo(G_OSC2, "o2w", waveItems());
+        addKnob (G_OSC2, "o2o", "Oct",  LF::knobEuclidean);
+        addKnob (G_OSC2, "o2s", "Semi", LF::knobEuclidean);
+        addKnob (G_OSC2, "o2f", "Fine", LF::knobEuclidean);
+        addCombo(G_MIX, "ntype", { "White", "Pink" });
+        addKnob (G_MIX, "o1l",   "Osc 1", LF::knobLevel);
+        addKnob (G_MIX, "o2l",   "Osc 2", LF::knobLevel);
+        addKnob (G_MIX, "noise", "Noise", LF::knobLevel);
+        addKnob (G_MIX, "pw",    "PW",    LF::knobEuclidean);
 
-        // Toggles.
-        addToggle("leg",  "Legato");
-        addToggle("snap", "Snap");
+        // ── Pitch (target + envelope) ────────────────────────────────────────
+        addCombo(G_PITCH, "ptgt", { "Osc 1+2", "Osc 2" });
+        addKnob (G_PITCH, "peA", "A (ms)", LF::knobModulation);
+        addKnob (G_PITCH, "peD", "D (ms)", LF::knobModulation);
+        addKnob (G_PITCH, "peS", "S (%)",  LF::knobModulation);
+        addKnob (G_PITCH, "peR", "R (ms)", LF::knobModulation);
+        addKnob (G_PITCH, "peDep", "Depth", LF::knobModulation);
 
-        // Arp knobs (purple = sequencer).
-        addKnob("root",  "Root",      LF::knobEuclidean);
-        addKnob("roct",  "Octave",    LF::knobEuclidean);
-        addKnob("inv",   "Inversion", LF::knobEuclidean);
-        addKnob("octs",  "Octaves",   LF::knobEuclidean);
-        addKnob("dir",   "Direction", LF::knobEuclidean);
-        addKnob("gate",  "Gate",      LF::knobEuclidean);
-        addKnob("porta", "Glide",     LF::knobEuclidean);
+        // ── Filter (type + drive/cutoff/reso/lowcut, envelope) ───────────────
+        addCombo(G_FILTER, "ft", filterItems());
+        addKnob (G_FILTER, "drv",   "Drive",   LF::knobPostPad);
+        addKnob (G_FILTER, "cut",   "Cutoff",  LF::knobPostPad);
+        addKnob (G_FILTER, "res",   "Reso",    LF::knobPostPad);
+        addKnob (G_FILTER, "locut", "Low Cut", LF::knobPostPad);
+        addKnob (G_FILTER, "feA", "A (ms)", LF::knobPostPad);
+        addKnob (G_FILTER, "feD", "D (ms)", LF::knobPostPad);
+        addKnob (G_FILTER, "feS", "S (%)",  LF::knobPostPad);
+        addKnob (G_FILTER, "feR", "R (ms)", LF::knobPostPad);
+        addKnob (G_FILTER, "feDep", "Depth", LF::knobPostPad);
 
-        // Oscillator / mix knobs.
-        addKnob("o1o",   "O1 Oct",  LF::knobEuclidean);
-        addKnob("o1f",   "O1 Fine", LF::knobEuclidean);
-        addKnob("o1l",   "O1 Lvl",  LF::knobLevel);
-        addKnob("o2o",   "O2 Oct",  LF::knobEuclidean);
-        addKnob("o2s",   "O2 Semi", LF::knobEuclidean);
-        addKnob("o2f",   "O2 Fine", LF::knobEuclidean);
-        addKnob("o2l",   "O2 Lvl",  LF::knobLevel);
-        addKnob("pw",    "PW",      LF::knobEuclidean);
-        addKnob("noise", "Noise",   LF::knobLevel);
+        // ── Amp (level + FX sends, envelope). Sends bind to ch{N}_ params. ───
+        addKnob(G_AMP, "aeL",     "Level", LF::knobLevel);
+        addKnob(G_AMP, "sendEff", "Eff",   LF::knobFxSend, "ch");
+        addKnob(G_AMP, "sendDly", "Dly",   LF::knobFxSend, "ch");
+        addKnob(G_AMP, "sendRev", "Rev",   LF::knobFxSend, "ch");
+        addKnob(G_AMP, "aeA", "A (ms)", LF::knobLevel);
+        addKnob(G_AMP, "aeD", "D (ms)", LF::knobLevel);
+        addKnob(G_AMP, "aeS", "S (%)",  LF::knobLevel);
+        addKnob(G_AMP, "aeR", "R (ms)", LF::knobLevel);
 
-        // Filter knobs (teal).
-        addKnob("cut",   "Cutoff",  LF::knobPostPad);
-        addKnob("res",   "Reso",    LF::knobPostPad);
-        addKnob("drv",   "Drive",   LF::knobPostPad);
+        // ── Appergater (arpeggiator, boxed) ──────────────────────────────────
+        addCombo (G_ARP, "scale", scaleItems());
+        addCombo (G_ARP, "chord", chordItems());
+        addCombo (G_ARP, "rate",  rateItems());
+        addCombo (G_ARP, "trig",  { "Loop", "MIDI" });
+        addToggle(G_ARP, "leg",   "Legato");
+        addToggle(G_ARP, "snap",  "Snap");
+        addKnob  (G_ARP, "root",  "Root",      LF::knobEuclidean);
+        addKnob  (G_ARP, "roct",  "Octave",    LF::knobEuclidean);
+        addKnob  (G_ARP, "inv",   "Inversion", LF::knobEuclidean);
+        addKnob  (G_ARP, "octs",  "Octaves",   LF::knobEuclidean);
+        addKnob  (G_ARP, "dir",   "Direction", LF::knobEuclidean);
+        addKnob  (G_ARP, "gate",  "Gate",      LF::knobEuclidean);
+        addKnob  (G_ARP, "porta", "Glide",     LF::knobEuclidean);
 
-        // Amp ADSR (amber).
-        addKnob("aeA",   "Amp A",   LF::knobLevel);
-        addKnob("aeD",   "Amp D",   LF::knobLevel);
-        addKnob("aeS",   "Amp S",   LF::knobLevel);
-        addKnob("aeR",   "Amp R",   LF::knobLevel);
-        addKnob("aeL",   "Amp Lvl", LF::knobLevel);
+        addAndMakeVisible(insertSub);
+        insertSub.onStatusUpdate = [this](const juce::String& n, const juce::String& val)
+        { if (onStatusUpdate) onStatusUpdate(n, val); };
 
-        // Filter ADSR (teal) + pitch env depth.
-        addKnob("feA",   "Flt A",   LF::knobPostPad);
-        addKnob("feD",   "Flt D",   LF::knobPostPad);
-        addKnob("feS",   "Flt S",   LF::knobPostPad);
-        addKnob("feR",   "Flt R",   LF::knobPostPad);
-        addKnob("feDep", "Flt Env", LF::knobPostPad);
-        addKnob("peDep", "Pch Env", LF::knobModulation);
-
-        // Shared modulator section (bottom band) — mu-core ModulatorPanel + mu-toni dests.
         addAndMakeVisible(modulatorPanel);
         modulatorPanel.setDestProvider(&modDestProvider);
 
         setLayer(0);
-        startTimerHz(30);   // drive the modulator playhead
+        startTimerHz(30);
     }
 
     ~EnginePanel() override
     {
         stopTimer();
-        modulatorPanel.setVoiceSlot(nullptr);   // unbind before the panel/slots die
+        modulatorPanel.setVoiceSlot(nullptr);
     }
 
     void setLayer(int idx)
     {
         currentLayer = juce::jmax(0, idx);
-        const juce::String v = "v" + juce::String(currentLayer) + "_";
+        const juce::String n = juce::String(currentLayer);
 
         for (auto& k : knobs)
             k.att = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-                proc.apvts, v + k.suffix, k.comp->getSlider());
+                proc.apvts, k.prefix + n + "_" + k.suffix, k.comp->getSlider());
         for (auto& c : combos)
             c.att = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-                proc.apvts, v + c.suffix, c.comp->getComboBox());
+                proc.apvts, "v" + n + "_" + c.suffix, c.comp->getComboBox());
         for (auto& t : toggles)
             t.att = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
-                proc.apvts, v + t.suffix, *t.comp);
+                proc.apvts, "v" + n + "_" + t.suffix, *t.comp);
 
+        insertSub.setChannel(currentLayer);
         modulatorPanel.setVoiceSlot(&proc.voiceSlots[(size_t) currentLayer]);
         repaint();
     }
@@ -117,105 +133,202 @@ public:
 
     void paint(juce::Graphics& g) override
     {
-        g.fillAll(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
+        using Id = MuLookAndFeel::ColourIds;
+        using LF = MuLookAndFeel;
+        using mu_ui::s;
+        g.fillAll(MuLookAndFeel::colour(Id::panelBackground));
+
+        // Boxed sections (Osc 1/2/Mix + Appergater).
+        static const char* const boxTitles[] = { "Oscillator 1", "Oscillator 2", "Mix" };
+        g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
+        for (int i = 0; i < 3; ++i) g.drawRoundedRectangle(oscR[(size_t) i].toFloat().reduced(1.0f), 5.0f, 1.0f);
+        g.drawRoundedRectangle(arpR.toFloat().reduced(1.0f), 5.0f, 1.0f);
+        g.setColour(MuLookAndFeel::colour(Id::labelText));
+        g.setFont(juce::Font(juce::FontOptions(12.0f, juce::Font::bold)));
+        for (int i = 0; i < 3; ++i)
+            g.drawText(boxTitles[i], oscR[(size_t) i].reduced(8, 4).removeFromTop(15), juce::Justification::topLeft, false);
+        g.drawText("Appergater", arpR.reduced(8, 4).removeFromTop(15), juce::Justification::topLeft, false);
+
+        // Voice band — mu-clid style: centred section labels + 0.5px dividers.
+        const int X = voiceR.getX(), Y = voiceR.getY();
+        const int divW = LF::kVoiceDivW;
+        const int fltX = LF::kVoicePitchW + divW;
+        const int ampX = fltX + LF::kVoiceFilterW + divW;
+        const int insX = ampX + LF::kVoiceAmpW + divW;
+        g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
+        const float top = (float) Y + mu_ui::sf(6.0f), bot = (float) (Y + s(LF::kVoiceLabelH + LF::kVoiceSubH)) - mu_ui::sf(6.0f);
+        for (int dx : { LF::kVoicePitchW + divW / 2, fltX + LF::kVoiceFilterW + divW / 2, ampX + LF::kVoiceAmpW + divW / 2 })
+            g.drawLine((float) (X + s(dx)), top, (float) (X + s(dx)), bot, 0.5f);
+        g.setColour(MuLookAndFeel::colour(Id::mutedText));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(10.0f))));
+        auto lbl = [&](const char* t, int x, int w)
+        { g.drawText(t, X + s(x), Y, s(w), s(LF::kVoiceLabelH), juce::Justification::centred, false); };
+        lbl("PITCH",  0,    LF::kVoicePitchW);
+        lbl("FILTER", fltX, LF::kVoiceFilterW);
+        lbl("AMP",    ampX, LF::kVoiceAmpW);
+        lbl("INSERT", insX, LF::kVoiceInsertW);
     }
 
     void resized() override
     {
-        auto area = getLocalBounds().reduced(8);
+        using LF = MuLookAndFeel;
+        using mu_ui::s;
+        const int pad = s(8), gap = s(6);
+        auto area = getLocalBounds().reduced(pad);
+        area.removeFromBottom(pad);
 
-        // Bottom band: the shared modulator section (identical placement to the
-        // other products — full width below the engine controls).
-        modulatorPanel.setBounds(area.removeFromBottom(juce::jmax(200, area.getHeight() * 45 / 100)));
-        area.removeFromBottom(6);
+        // Osc row (boxed): box pad + title + dropdown + gap + one Size-2 knob row +
+        // a label gap so the knob label never touches the panel border, + box pad.
+        const int oscRowH = s(kBoxPad + LF::kVoiceLabelH + kDropdownH + LF::kVoiceGap
+                            + LF::kKnobSize2H + kLabelGap + kBoxPad);
+        auto oscRow = area.removeFromTop(oscRowH);
+        int ow = oscRow.getWidth();
+        oscR[0] = oscRow.removeFromLeft(ow * 33 / 100); oscRow.removeFromLeft(gap);
+        oscR[1] = oscRow.removeFromLeft(ow * 33 / 100); oscRow.removeFromLeft(gap);
+        oscR[2] = oscRow;
+        area.removeFromTop(gap);
 
-        // Header row: choice controls + toggles.
-        auto header = area.removeFromTop(48);
-        auto placeCombo = [&](const char* suffix, int w)
-        {
-            if (auto* c = findCombo(suffix)) c->setBounds(header.removeFromLeft(w).reduced(3, 10));
-        };
-        placeCombo("scale", 120); placeCombo("chord", 150); placeCombo("rate", 100);
-        placeCombo("trig", 90);   placeCombo("ft", 120);
-        placeCombo("o1w", 110);   placeCombo("o2w", 110);
-        for (auto& t : toggles) t.comp->setBounds(header.removeFromLeft(70).reduced(3, 12));
+        // Voice band (fixed mu-clid geometry).
+        voiceR = area.removeFromTop(s(LF::kVoiceLabelH + LF::kVoiceSubH));
+        area.removeFromTop(gap);
 
-        area.removeFromTop(6);
+        // Modulator at the bottom; Appergater fills the middle.
+        const int modH = juce::jmax(s(190), area.getHeight() * 42 / 100);
+        modulatorPanel.setBounds(area.removeFromBottom(modH));
+        area.removeFromBottom(gap);
+        arpR = area;
 
-        // Knob grid — wrap into rows.
-        const int cw = 66, ch = 66, gap = 2;
-        int x = area.getX(), y = area.getY();
-        for (auto& k : knobs)
-        {
-            if (x + cw > area.getRight()) { x = area.getX(); y += ch + gap; }
-            k.comp->setBounds(x, y, cw, ch);
-            x += cw + gap;
-        }
+        layoutBox(G_OSC1, oscR[0]);
+        layoutBox(G_OSC2, oscR[1]);
+        layoutBox(G_MIX,  oscR[2]);
+        layoutBox(G_ARP,  arpR);
+        layoutVoiceBand(voiceR);
     }
 
 private:
-    struct KnobDef   { std::unique_ptr<KnobWithLabel>  comp; juce::String suffix;
+    // Layout constants (unscaled; wrap in mu_ui::s at use). kDropdownH is the
+    // family-standard dropdown height; kLabelGap keeps a control label off the
+    // panel border (design-ui-family §"Control label gap").
+    static constexpr int kBoxPad    = 6;
+    static constexpr int kDropdownH = 24;
+    static constexpr int kLabelGap  = 6;
+
+    struct KnobDef   { std::unique_ptr<KnobWithLabel>  comp; juce::String suffix, prefix; int group;
                        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   att; };
-    struct ComboDef  { std::unique_ptr<DropdownSelect> comp; juce::String suffix;
+    struct ComboDef  { std::unique_ptr<DropdownSelect> comp; juce::String suffix; int group;
                        std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> att; };
-    struct ToggleDef { std::unique_ptr<juce::ToggleButton> comp; juce::String suffix;
+    struct ToggleDef { std::unique_ptr<juce::ToggleButton> comp; juce::String suffix; int group;
                        std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>   att; };
 
-    void addKnob(const char* suffix, const juce::String& label, MuLookAndFeel::ColourIds colour)
+    KnobWithLabel*  findKnob (const char* s) { for (auto& k : knobs)  if (k.suffix == s) return k.comp.get(); return nullptr; }
+    DropdownSelect* findCombo(const char* s) { for (auto& c : combos) if (c.suffix == s) return c.comp.get(); return nullptr; }
+
+    // Voice band: exact mu-clid VoiceSection geometry (Size-2 knobs, 2 rows).
+    void layoutVoiceBand(juce::Rectangle<int> rect)
+    {
+        using LF = MuLookAndFeel;
+        using mu_ui::s;
+        const int kW = LF::kKnobSize2W, rowH = LF::kKnobSize2H, fW = LF::kVoiceFilterColW;
+        const int row2 = rowH + LF::kVoiceGap, divW = LF::kVoiceDivW;
+        const int fltX = LF::kVoicePitchW + divW, ampX = fltX + LF::kVoiceFilterW + divW, insX = ampX + LF::kVoiceAmpW + divW;
+        const int X = rect.getX(), Y = rect.getY() + s(LF::kVoiceLabelH);
+
+        auto kb = [&](const char* suf, int sx, int col, int cw, bool bottom)
+        { if (auto* k = findKnob(suf)) k->setBounds(X + s(sx + col * cw), Y + (bottom ? s(row2) : 0), s(cw), s(rowH)); };
+        auto dd = [&](const char* suf, int sx, int spanCols, int cw)
+        { if (auto* c = findCombo(suf)) c->setBounds(X + s(sx), Y + s(rowH / 4), s(spanCols * cw), s(rowH / 2)); };
+
+        // Pitch — target (row 1) + A/D/S/R/Depth (row 2).
+        dd("ptgt", 0, 2, kW);
+        kb("peA", 0, 0, kW, true); kb("peD", 0, 1, kW, true); kb("peS", 0, 2, kW, true); kb("peR", 0, 3, kW, true); kb("peDep", 0, 4, kW, true);
+
+        // Filter — type (2 cols) + Drive/Cutoff/Reso/LowCut (row 1) + A/D/S/R/Depth (row 2).
+        dd("ft", fltX, 2, fW);
+        kb("drv", fltX, 2, fW, false); kb("cut", fltX, 3, fW, false); kb("res", fltX, 4, fW, false); kb("locut", fltX, 5, fW, false);
+        kb("feA", fltX, 0, fW, true); kb("feD", fltX, 1, fW, true); kb("feS", fltX, 2, fW, true); kb("feR", fltX, 3, fW, true); kb("feDep", fltX, 4, fW, true);
+
+        // Amp — Level + Eff/Dly/Rev sends (row 1) + A/D/S/R (row 2).
+        kb("aeL", ampX, 0, kW, false); kb("sendEff", ampX, 2, kW, false); kb("sendDly", ampX, 3, kW, false); kb("sendRev", ampX, 4, kW, false);
+        kb("aeA", ampX, 0, kW, true); kb("aeD", ampX, 1, kW, true); kb("aeS", ampX, 2, kW, true); kb("aeR", ampX, 3, kW, true);
+
+        // Insert — the shared subsection.
+        insertSub.setBounds(X + s(insX), Y, s(LF::kVoiceInsertW), s(LF::kVoiceSubH));
+    }
+
+    // Boxed section (Osc 1/2/Mix, Appergater): dropdowns/toggles on top, Size-2 knobs flow.
+    void layoutBox(int group, juce::Rectangle<int> rect)
+    {
+        using LF = MuLookAndFeel;
+        using mu_ui::s;
+        auto inner = rect.reduced(s(kBoxPad));
+        inner.removeFromBottom(s(kLabelGap));   // keep control labels off the panel border
+        inner.removeFromTop(s(LF::kVoiceLabelH));
+
+        bool hasTop = false;
+        for (auto& c : combos)  if (c.group == group) hasTop = true;
+        for (auto& t : toggles) if (t.group == group) hasTop = true;
+        if (hasTop)
+        {
+            auto top = inner.removeFromTop(s(kDropdownH));
+            for (auto& c : combos)
+                if (c.group == group) { c.comp->setBounds(top.removeFromLeft(s(108)).reduced(1)); top.removeFromLeft(s(4)); }
+            for (auto& t : toggles)
+                if (t.group == group) { t.comp->setBounds(top.removeFromLeft(s(64)).reduced(1)); top.removeFromLeft(s(4)); }
+            inner.removeFromTop(s(4));
+        }
+
+        const int kW = s(LF::kKnobSize2W), kH = s(LF::kKnobSize2H), gap = s(LF::kVoiceGap);
+        int x = inner.getX(), y = inner.getY();
+        for (auto& k : knobs)
+            if (k.group == group)
+            {
+                if (x + kW > inner.getRight()) { x = inner.getX(); y += kH + gap; }
+                k.comp->setBounds(x, y, kW, kH);
+                x += kW + gap;
+            }
+    }
+
+    void addKnob(int group, const char* suffix, const juce::String& label,
+                 MuLookAndFeel::ColourIds colour, const char* prefix = "v")
     {
         KnobDef d;
         d.comp = std::make_unique<KnobWithLabel>(label, colour);
-        d.suffix = suffix;
+        d.suffix = suffix; d.prefix = prefix; d.group = group;
         d.comp->onStatusUpdate = [this](const juce::String& n, const juce::String& val)
         { if (onStatusUpdate) onStatusUpdate(n, val); };
         addAndMakeVisible(*d.comp);
         knobs.push_back(std::move(d));
     }
 
-    void addCombo(const char* suffix, const juce::String& /*label*/, const juce::StringArray& items)
+    void addCombo(int group, const char* suffix, const juce::StringArray& items)
     {
         ComboDef d;
         d.comp = std::make_unique<DropdownSelect>();
-        d.suffix = suffix;
+        d.suffix = suffix; d.group = group;
         for (int i = 0; i < items.size(); ++i) d.comp->addItem(items[i], i + 1);
         addAndMakeVisible(*d.comp);
         combos.push_back(std::move(d));
     }
 
-    void addToggle(const char* suffix, const juce::String& label)
+    void addToggle(int group, const char* suffix, const juce::String& label)
     {
         ToggleDef d;
         d.comp = std::make_unique<juce::ToggleButton>(label);
-        d.suffix = suffix;
+        d.suffix = suffix; d.group = group;
         addAndMakeVisible(*d.comp);
         toggles.push_back(std::move(d));
     }
 
-    DropdownSelect* findCombo(const char* suffix)
-    {
-        for (auto& c : combos) if (c.suffix == suffix) return c.comp.get();
-        return nullptr;
-    }
-
     static juce::StringArray scaleItems()
-    {
-        juce::StringArray a; for (int i = 0; i < kNumScales; ++i) a.add(kScales[(size_t) i].name); return a;
-    }
+    { juce::StringArray a; for (int i = 0; i < kNumScales; ++i) a.add(kScales[(size_t) i].name); return a; }
     static juce::StringArray chordItems()
-    {
-        juce::StringArray a; for (int i = 0; i < kNumChords; ++i) a.add(kChords[(size_t) i].name); return a;
-    }
-    static juce::StringArray waveItems()   { return { "Sine", "Triangle", "Saw", "Square", "Pulse" }; }
+    { juce::StringArray a; for (int i = 0; i < kNumChords; ++i) a.add(kChords[(size_t) i].name); return a; }
+    static juce::StringArray waveItems() { return { "Sine", "Triangle", "Saw", "Square", "Pulse" }; }
     static juce::StringArray rateItems()
-    {
-        return { "1/4", "1/4.", "1/4T", "1/8", "1/8.", "1/8T",
-                 "1/16", "1/16.", "1/16T", "1/32", "1/32.", "1/32T" };
-    }
+    { return { "1/4","1/4.","1/4T","1/8","1/8.","1/8T","1/16","1/16.","1/16T","1/32","1/32.","1/32T" }; }
     static juce::StringArray filterItems()
-    {
-        return { "LP12","HP12","BP12","Notch","LP24","HP24","BP24","LP6",
-                 "Comb+","AP12","Notch24","HP6","Peak","LoShf","HiShf","Comb-" };
-    }
+    { return { "LP12","HP12","BP12","Notch","LP24","HP24","BP24","LP6",
+               "Comb+","AP12","Notch24","HP6","Peak","LoShf","HiShf","Comb-" }; }
 
     void timerCallback() override { modulatorPanel.setPlayheadBeat(proc.getInternalBeatPos()); }
 
@@ -228,7 +341,10 @@ private:
     std::vector<KnobDef>   knobs;
     std::vector<ComboDef>  combos;
     std::vector<ToggleDef> toggles;
+    std::array<juce::Rectangle<int>, 3> oscR;
+    juce::Rectangle<int> voiceR, arpR;
 
+    InsertSubsection insertSub;
     ::ModulatorPanel modulatorPanel;
     ModDestProvider  modDestProvider = makeModDestProvider();
 

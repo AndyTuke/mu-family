@@ -149,7 +149,19 @@ JUCE font. No external typeface dependency.
 |---|---|---|
 | Row internal padding | 4px | Between controls within a row |
 | Panel padding | 6px | Between panels |
+| Panel inner padding | 6px | Inside a bordered/boxed panel, between its edge and its content |
+| **Control label gap** | **≥6px** | **Between a control's label text and the enclosing panel's border** |
 | Separator line weight | 0.5px | All horizontal/vertical dividers |
+
+**Control label gap (mandatory).** A control label (the text under a
+`KnobWithLabel`, a dropdown caption, etc.) must **never touch or overflow the
+panel border** — always leave a small gap (≥6px, `kLabelGap`) between the lowest
+label and the enclosing panel's bottom edge. When a boxed section holds a row of
+knob cells, size the box to fully contain the cell height (`kKnobSize2H`) **plus**
+the label gap plus the inner padding, and reserve that gap at the bottom in
+`resized()` (e.g. `inner.removeFromBottom(s(kLabelGap))`) so a label can never
+render against the border. A label jammed against the frame reads as a layout
+bug — this is the family standard that prevents it.
 
 All layout constants live as `static constexpr int k…` in the component that owns them. No magic numbers in `resized()` or `paint()`.
 

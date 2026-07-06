@@ -14,16 +14,18 @@ namespace vpi
     enum
     {
         scale, root, roct, chord, inv, octs, dir, rate, gate, leg, porta, snap, trig,     // arp (13)
-        o1w, o1o, o1f, o1l, o2w, o2o, o2s, o2f, o2l, pw, noise, ft, cut, res, drv,          // voice (15)
-        aeA, aeD, aeS, aeR, aeL, feA, feD, feS, feR, feDep, peA, peD, peS, peR, peDep,      // envs (15)
+        o1w, o1o, o1f, o1l, o2w, o2o, o2s, o2f, o2l, pw, noise, ntype, ft, cut, res, drv, locut, // voice (17)
+        aeA, aeD, aeS, aeR, aeL, feA, feD, feS, feR, feDep, peA, peD, peS, peR, peDep, ptgt,      // envs (16)
+        drvChar, insP1, insP2, insP3, insP4,                                                     // insert (5)
         COUNT
     };
     static const char* const suffix[COUNT] = {
         "scale","root","roct","chord","inv","octs","dir","rate","gate","leg","porta","snap","trig",
-        "o1w","o1o","o1f","o1l","o2w","o2o","o2s","o2f","o2l","pw","noise","ft","cut","res","drv",
-        "aeA","aeD","aeS","aeR","aeL","feA","feD","feS","feR","feDep","peA","peD","peS","peR","peDep",
+        "o1w","o1o","o1f","o1l","o2w","o2o","o2s","o2f","o2l","pw","noise","ntype","ft","cut","res","drv","locut",
+        "aeA","aeD","aeS","aeR","aeL","feA","feD","feS","feR","feDep","peA","peD","peS","peR","peDep","ptgt",
+        "drvChar","insP1","insP2","insP3","insP4",
     };
-    static_assert(COUNT == 43, "vpi slot count must equal PluginProcessor::kNumVoiceParams");
+    static_assert(COUNT == 51, "vpi slot count must equal PluginProcessor::kNumVoiceParams");
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout()
@@ -98,10 +100,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         layout.add(std::make_unique<AudioParameterFloat>(pid("o2l"), lbl("Osc2 Level"), f(-60.0f, 6.0f, 0.1f), aud ? -3.0f : -60.0f));
         layout.add(std::make_unique<AudioParameterFloat>(pid("pw"),    lbl("Pulse Width"), f(0.05f, 0.95f, 0.001f), 0.5f));
         layout.add(std::make_unique<AudioParameterFloat>(pid("noise"), lbl("Noise Level"), f(-60.0f, 0.0f, 0.1f), -60.0f));
+        layout.add(std::make_unique<AudioParameterInt>  (pid("ntype"), lbl("Noise Type"), 0, 1, 0));    // 0=White
         layout.add(std::make_unique<AudioParameterInt>  (pid("ft"),  lbl("Filter Type"), 0, 15, 0));
         layout.add(std::make_unique<AudioParameterFloat>(pid("cut"), lbl("Cutoff"), cutR, 3000.0f));
         layout.add(std::make_unique<AudioParameterFloat>(pid("res"), lbl("Resonance"), f(0.0f, 0.99f, 0.001f), 0.3f));
         layout.add(std::make_unique<AudioParameterFloat>(pid("drv"), lbl("Drive"), f(0.0f, 1.0f, 0.001f), 0.0f));
+        { NormalisableRange<float> loR(0.0f, 1000.0f, 1.0f); loR.setSkewForCentre(200.0f);
+          layout.add(std::make_unique<AudioParameterFloat>(pid("locut"), lbl("Low Cut"), loR, 0.0f)); }
 
         // Amp / Filter / Pitch ADSR
         layout.add(std::make_unique<AudioParameterFloat>(pid("aeA"), lbl("Amp Attack"),  tf(), 0.004f));
@@ -119,6 +124,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         layout.add(std::make_unique<AudioParameterFloat>(pid("peS"), lbl("Pitch Sustain"), f(0.0f, 1.0f, 0.001f), 0.0f));
         layout.add(std::make_unique<AudioParameterFloat>(pid("peR"), lbl("Pitch Release"), tf(), 0.10f));
         layout.add(std::make_unique<AudioParameterFloat>(pid("peDep"), lbl("Pitch Env Depth"), f(-24.0f, 24.0f, 0.1f), 0.0f));
+        layout.add(std::make_unique<AudioParameterInt>  (pid("ptgt"),  lbl("Pitch Env Target"), 0, 1, 1));   // 1=Osc 2 only
+
+        // Insert effect (shared mu-core InsertProcessor) — same schema as mu-clid/mu-tant.
+        layout.add(std::make_unique<AudioParameterInt>  (pid("drvChar"), lbl("Insert Algo"), 0, InsertProcessor::kNumInsertAlgos - 1, 0));
+        layout.add(std::make_unique<AudioParameterFloat>(pid("insP1"), lbl("Insert P1"), f(0.0f, 1.0f, 0.0f), 0.0f));
+        layout.add(std::make_unique<AudioParameterFloat>(pid("insP2"), lbl("Insert P2"), f(0.0f, 1.0f, 0.0f), 0.0f));
+        layout.add(std::make_unique<AudioParameterFloat>(pid("insP3"), lbl("Insert P3"), f(0.0f, 1.0f, 0.0f), 0.0f));
+        layout.add(std::make_unique<AudioParameterFloat>(pid("insP4"), lbl("Insert P4"), f(0.0f, 1.0f, 0.0f), 0.0f));
     }
 
     // ── Shared global FX rack + returns + master (mu-core) ────────────────────
@@ -138,8 +151,12 @@ PluginProcessor::PluginProcessor()
     // buffer; the shared mixer applies the strip + master mix downstream.
     renderChannelCb = [this](int ch, juce::AudioBuffer<float>& buf, int n)
     {
-        if (ch >= 0 && ch < kMaxChannels) runners[(size_t) ch].render(buf, n, arpCtx);
-        else                              buf.clear();
+        if (ch >= 0 && ch < kMaxChannels)
+        {
+            runners[(size_t) ch].render(buf, n, arpCtx);
+            inserts[(size_t) ch].process(buf, n, buf.getNumChannels(), insCfg[(size_t) ch]);   // engine → insert → mixer
+        }
+        else buf.clear();
     };
 
     // Persistent settings file (UI scale + MIDI-clock prefs) — mirrors mu-tant.
@@ -223,12 +240,13 @@ void PluginProcessor::readVoice(int v, ArpParams& ap, ToniVoiceParams& tv,
 
     tv.osc1Shape = (int) g(vpi::o1w); tv.osc1Oct = (int) g(vpi::o1o); tv.osc1Fine = g(vpi::o1f); tv.osc1LevelDb = out[D_o1lvl];
     tv.osc2Shape = (int) g(vpi::o2w); tv.osc2Oct = (int) g(vpi::o2o); tv.osc2Semi = out[D_o2semi]; tv.osc2Fine = g(vpi::o2f); tv.osc2LevelDb = out[D_o2lvl];
-    tv.pulseWidth = out[D_pw]; tv.noiseLevelDb = out[D_noise];
-    tv.filterType = (int) g(vpi::ft); tv.cutoff = out[D_cut]; tv.resonance = out[D_res]; tv.drive = out[D_drv];
+    tv.pulseWidth = out[D_pw]; tv.noiseLevelDb = out[D_noise]; tv.noiseType = (int) g(vpi::ntype);
+    tv.filterType = (int) g(vpi::ft); tv.cutoff = out[D_cut]; tv.resonance = out[D_res]; tv.drive = out[D_drv]; tv.lowCutHz = g(vpi::locut);
 
     tv.ampA = g(vpi::aeA); tv.ampD = g(vpi::aeD); tv.ampS = g(vpi::aeS); tv.ampR = g(vpi::aeR); tv.ampLevelDb = out[D_amp];
     tv.fA = g(vpi::feA); tv.fD = g(vpi::feD); tv.fS = g(vpi::feS); tv.fR = g(vpi::feR); tv.filterEnvDepth = out[D_fenv];
     tv.pA = g(vpi::peA); tv.pD = g(vpi::peD); tv.pS = g(vpi::peS); tv.pR = g(vpi::peR); tv.pitchEnvDepth = out[D_penv];
+    tv.pitchEnvTarget = (int) g(vpi::ptgt);
 
     tv.portamentoMs = out[D_porta];
     tv.legato       = g(vpi::leg) > 0.5f;
@@ -237,6 +255,14 @@ void PluginProcessor::readVoice(int v, ArpParams& ap, ToniVoiceParams& tv,
     rateIdx  = juce::roundToInt(out[D_rate]);
     gate01   = out[D_gate] * 0.01f;
     midiTrig = g(vpi::trig) > 0.5f;
+
+    // Insert config (applied post-VCA in the render callback).
+    auto& ic = insCfg[(size_t) v];
+    ic.insertAlgo     = (int) g(vpi::drvChar);
+    ic.insertParam[0] = g(vpi::insP1);
+    ic.insertParam[1] = g(vpi::insP2);
+    ic.insertParam[2] = g(vpi::insP3);
+    ic.insertParam[3] = g(vpi::insP4);
 }
 
 void PluginProcessor::updateHeldNotes(const juce::MidiBuffer& midi, bool& noteOnEdge)
@@ -313,7 +339,10 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     fxChain.prepare(sampleRate, samplesPerBlock);
     for (int i = 0; i < kNumChannels; ++i)
+    {
         runners[(size_t) i].prepare(sampleRate, samplesPerBlock);
+        inserts[(size_t) i].prepare(sampleRate, samplesPerBlock);
+    }
 }
 
 bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const

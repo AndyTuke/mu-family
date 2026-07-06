@@ -23,12 +23,14 @@ struct ToniVoiceParams
     float osc1LevelDb = 0.0f,            osc2LevelDb = -3.0f;
     float pulseWidth  = 0.5f;                      // shared PW for Pulse shape
     float noiseLevelDb = -60.0f;                   // -60 dB ≡ off
+    int   noiseType    = 0;                        // 0 = White, 1 = Pink
 
     // Filter
     int   filterType = 0;                          // LP12
     float cutoff     = 4000.0f;
     float resonance  = 0.2f;
     float drive      = 0.0f;
+    float lowCutHz   = 0.0f;                        // 0 = off
 
     // Amp ADSR (seconds) + output level
     float ampA = 0.004f, ampD = 0.20f, ampS = 0.80f, ampR = 0.30f;
@@ -40,7 +42,8 @@ struct ToniVoiceParams
 
     // Pitch ADSR + depth (semitones, ±24) — 0 by default (inert)
     float pA = 0.004f, pD = 0.10f, pS = 0.0f, pR = 0.10f;
-    float pitchEnvDepth = 0.0f;
+    float pitchEnvDepth  = 0.0f;
+    int   pitchEnvTarget = 1;                      // 0 = Osc 1 + 2, 1 = Osc 2 only
 
     // Articulation
     float portamentoMs = 0.0f;
@@ -84,6 +87,7 @@ public:
         filter.setType(p.filterType);
         filter.setResonance(p.resonance);
         filter.setDrive(p.drive);
+        filter.setLowCut(p.lowCutHz);
 
         if (p.portamentoMs != lastPortaMs)
         {
@@ -134,9 +138,12 @@ public:
         const float baseMidi = pitchGlide.getCurrentValue();
         pitchGlide.skip(numSamples);
 
-        const float midi = baseMidi + params.pitchEnvDepth * envP;
-        osc1.setFrequency(midiToFreq(midi + osc1Semis));
-        osc2.setFrequency(midiToFreq(midi + osc2Semis));
+        // Pitch envelope → osc 2 only, or both oscillators (per pitchEnvTarget).
+        const float envPitch = params.pitchEnvDepth * envP;
+        const float m1 = baseMidi + osc1Semis + (params.pitchEnvTarget == 0 ? envPitch : 0.0f);
+        const float m2 = baseMidi + osc2Semis + envPitch;
+        osc1.setFrequency(midiToFreq(m1));
+        osc2.setFrequency(midiToFreq(m2));
 
         // Filter cutoff with envelope (depth in octaves), clamped to a safe range.
         const float cut = juce::jlimit(20.0f, (float) (0.45 * sr),
@@ -147,7 +154,7 @@ public:
         for (int i = 0; i < numSamples; ++i)
         {
             float s = osc1.render() * osc1Gain + osc2.render() * osc2Gain;
-            if (noiseGain > 0.0f) s += (rng.nextFloat() * 2.0f - 1.0f) * noiseGain;
+            if (noiseGain > 0.0f) s += renderNoise() * noiseGain;
             m[i] = s;
         }
 
@@ -173,6 +180,17 @@ private:
         pitchEnv.setParameters ({ params.pA,   params.pD,   params.pS,   params.pR   });
     }
 
+    // White or pink noise (Paul Kellet economy pink filter — cheap, stable).
+    float renderNoise() noexcept
+    {
+        const float white = rng.nextFloat() * 2.0f - 1.0f;
+        if (params.noiseType == 0) return white;
+        pb0 = 0.99765f * pb0 + white * 0.0990460f;
+        pb1 = 0.96300f * pb1 + white * 0.2965164f;
+        pb2 = 0.57000f * pb2 + white * 1.0526913f;
+        return (pb0 + pb1 + pb2 + white * 0.1848f) * 0.2f;
+    }
+
     static constexpr float kFilterEnvOctaves = 5.0f;
 
     double sr = 44100.0;
@@ -187,6 +205,7 @@ private:
 
     float targetMidi = 60.0f;
     float osc1Semis = 0.0f, osc2Semis = 0.0f;
+    float pb0 = 0.0f, pb1 = 0.0f, pb2 = 0.0f;   // pink-noise filter state
     float osc1Gain = 1.0f, osc2Gain = 0.7f, noiseGain = 0.0f, levelGain = 1.0f;
     float panL = 0.7071f, panR = 0.7071f;
     float lastPortaMs = -1.0f;

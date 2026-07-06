@@ -7,6 +7,7 @@
 #include "Sequencer/VoiceSlot.h"          // mu-core: per-voice control sequences + matrix
 #include "Modulation/LaneModulation.h"    // mu-core: mu_mod::resolveLane
 #include "Modulation/MuToniModDest.h"     // arp/voice modulation destinations
+#include "Audio/InsertProcessor.h"        // mu-core: shared per-voice insert FX
 
 #include <array>
 #include <atomic>
@@ -122,7 +123,7 @@ protected:
 
     // ── Arp/voice parameter cache (index into vp[voice][slot]) ────────────────
     // Enum + suffix table live in the .cpp; count is needed here for the array.
-    static constexpr int kNumVoiceParams = 43;
+    static constexpr int kNumVoiceParams = 51;
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -143,6 +144,12 @@ private:
     // Per-channel arp voice + its cached parameter pointers.
     std::array<ArpVoiceRunner, kMaxChannels>                                      runners;
     std::array<std::array<std::atomic<float>*, kNumVoiceParams>, kMaxChannels>    vp {};
+
+    // Per-channel insert effect (shared mu-core InsertProcessor), applied post-VCA
+    // in the render callback. insCfg holds each voice's algo + 4 slot params, set
+    // per block by readVoice.
+    std::array<InsertProcessor, kMaxChannels> inserts;
+    std::array<VoiceParams,      kMaxChannels> insCfg;
 
     // ── Per-voice modulation (mu-core VoiceSlot + shared matrix) ───────────────
     // Public so the UI ModulatorPanel can bind to the active voice's slot.
