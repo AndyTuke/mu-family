@@ -1,9 +1,8 @@
-# mu-toni — μ-family product scaffold.
+# mu-toni — μ-family generative arpeggiator mono-synth (freeware).
 #
-# The synth engine + sequencer are not yet defined; this target brings the shared
-# platform online (ProcessorBase + MixerEngine + FXChain + the shared editor shell
-# / sidebar / mixer) with a blank EnginePanel where the product-specific UI lands.
-# Shared audio/UI/ProcessorBase come from mu-core via the link.
+# The target combines the product's arp + voice engine with the shared platform
+# (ProcessorBase + MixerEngine + FXChain + the shared editor shell / sidebar /
+# mixer). Shared audio/UI/ProcessorBase come from mu-core via the link.
 
 # ── mu-Toni — Standalone + VST3 + CLAP ──────────────────────────────────────
 juce_add_plugin(mu-toni

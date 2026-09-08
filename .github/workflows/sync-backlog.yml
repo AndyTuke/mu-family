@@ -22,16 +22,16 @@ jobs:
 
             1. Run `gh issue list --state open --limit 200 --json number,title,url` to fetch all open GitHub issues.
             2. Read backlog.md.
-            3. Scan all rows across the Open, On Hold, and Fixed tables. For any row whose Description contains a reference like `[GH#N]`, record N — those GitHub issues are already imported and must be skipped.
+            3. Scan all rows across the Open, On Hold, and Closed tables. For any row whose Description contains a reference like `[GH#N]`, record N — those GitHub issues are already imported and must be skipped.
             4. Find the highest number used in the `#` column across all three tables. Call this MAX.
             5. For each GitHub issue NOT in the already-imported list:
                - MAX = MAX + 1
-               - Append a new row to the bottom of the Open table with:
+               - Insert a new row at the TOP of the Open table (highest number first — descending order) with:
                  - `#` column: MAX
                  - `Description`: the GitHub issue title, followed by ` ([GH#N](url))` where N is the GitHub issue number and url is the issue URL
                  - `Status`: `🔴 Open`
-                 - `Fixed Build`: `—`
-            6. Do NOT modify the On Hold or Fixed tables.
+                 - `Closed Build`: `—`
+            6. Do NOT modify the On Hold or Closed tables.
             7. Do NOT modify any existing rows in the Open table.
             8. If no new issues needed adding, exit without making any changes and do not open a PR.
             9. If changes were made, commit to a branch called `chore/sync-backlog` and open a PR titled "Sync backlog from issues" with a brief body listing which issues were added. If a PR on that branch already exists, push to update it instead of creating a new one.

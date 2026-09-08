@@ -90,7 +90,7 @@ Audio path performance:
   - `CLAUDE.md` referencing files / commands / stages that no longer exist or have moved (#364 missing design-doc entry).
   - Header docstrings describing parameters or behaviour the implementation no longer matches.
   - `// #NNN` comments referencing fixed issues whose context no longer applies.
-  - `backlog.md` policy violations (rows out of descending order; status mismatched with content; the always-Open/On-Hold/Fixed grouping broken — #350).
+  - `backlog.md` policy violations (rows out of descending order; status mismatched with content; the always-Open/On-Hold/Closed grouping broken — #350). Run [tests/scripts/check-backlog.ps1](../../tests/scripts/check-backlog.ps1) rather than eyeballing it.
 - **Stale comments** in source — the comment describes old behaviour, the code has moved on (#399).
 - **Dead code** — members always equal to their default; unused parameters; functions with no callers; flags toggled but never read.
 - **Const-correctness** — getters that should be `const`; references that should be `const&`; member functions that don't mutate state.

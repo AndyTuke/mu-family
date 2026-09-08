@@ -1,6 +1,6 @@
 # μ Family — UI Design System
 
-This document is the authoritative reference for the visual and interaction language shared across all μ (mu) plugins — currently **μ-Clid**, **μ-Tant**, **μ-On**, and the **μ-Toni** scaffold. Every new plugin in the family starts here. Plugin-specific layout docs (e.g. `design-ui.md` for μ-Clid) describe arrangement only — they defer to this document for every colour, size, and behaviour.
+This document is the authoritative reference for the visual and interaction language shared across all μ (mu) plugins — currently **μ-Clid**, **μ-Tant**, **μ-On**, and **μ-Toni**. Every new plugin in the family starts here. Plugin-specific layout docs (e.g. `design-ui.md` for μ-Clid) describe arrangement only — they defer to this document for every colour, size, and behaviour.
 
 ---
 

@@ -37,7 +37,7 @@ mu-clid/        μ-Clid + μ-Clid Lite source
 mu-tant/        μ-Tant source
 mu-link/        μ-link sync hub
 mu-on/          909-style groove sequencer — alpha, in development
-mu-toni/        Scaffolding (not yet in development)
+mu-toni/        μ-Toni source — generative arpeggiator mono-synth (freeware)
 docs/           Design documents
 site/           Marketing website (deployed to transwarp.me via Netlify)
 tests/          Cross-plugin listening-test pipeline

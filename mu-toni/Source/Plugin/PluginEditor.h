@@ -12,9 +12,9 @@ namespace mu_toni
 
 // mu-Toni editor: the shared mu-core shell (TransportBar / StatusBar / About /
 // overlays / window sizing / MuLookAndFeel) + the shared ChannelSidebar + shared
-// MixerOverlay, around a blank EnginePanel that marks where the product-specific
-// synth engine + sequencer UI will go. No bespoke shell or mixer code — that's
-// the whole point of the scaffold: the platform is "done", only the engine is TBD.
+// MixerOverlay, around the EnginePanel carrying the arp / osc / filter / env /
+// insert controls and the modulation band. No bespoke shell or mixer code — the
+// product supplies only the sidebar visual and the engine panel.
 class PluginEditor : public EditorShellBase
 {
 public:

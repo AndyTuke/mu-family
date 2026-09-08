@@ -50,9 +50,8 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         });
     getTransportBar().setLogoText(juce::String(juce::CharPointer_UTF8("\xce\xbc-Toni")));
 
-    // Per-layer mini-graphic for the shared sidebar (placeholder until the engine
-    // defines a real visual). Reorder/add stay unwired in the scaffold — the layer
-    // set is fixed until the engine lands.
+    // Per-layer mini-graphic for the shared sidebar (placeholder until a real arp
+    // visual is designed). Reorder/add stay unwired — the layer set is fixed.
     sidebar.createMiniVisual = [&p](int i) -> std::unique_ptr<juce::Component>
     {
         const auto col = MuLookAndFeel::channelPalette[

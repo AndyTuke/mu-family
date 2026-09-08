@@ -55,13 +55,14 @@ It's the "engine swap-point" pattern: same UX, same mixer, same modulation.
 | **Wavetable bank + oscillator** | mu-tant `WavetableBank` / `WavetableOscillator` | Same tables, same mip-mapping. |
 | **Modulation section** — LFOs + control sequences + `ModulationMatrix` | `mu-core` | Unchanged. The arp + envelope + portamento parameters register as **new destinations** (the mu-toni-specific modulation addition). |
 | **Mixer / FX rack** — channel strips, sends, sidechain, Effect/Delay/Reverb slots, master inserts, VU | `mu-core` `MixerEngine` + `MixerOverlay` + `mu_mixfx::addGlobalFxParams` | Standard mu mixer, unchanged. |
-| **Editor shell** — TransportBar, StatusBar, About, overlays, window sizing, `MuLookAndFeel`, `ChannelSidebar` | `mu-core` `EditorShellBase` | Already wired in the scaffold. |
+| **Editor shell** — TransportBar, StatusBar, About, overlays, window sizing, `MuLookAndFeel`, `ChannelSidebar` | `mu-core` `EditorShellBase` | Inherited unchanged — no bespoke shell code. |
 | **Preset system + MIDI program-change** | `mu-core` (`ProcessorBase` virtuals) | Standard, **same MIDI settings as mu-tant**. Extensions renamed to the arp's real noun — see below. μ-Toni **adds played-note input** on top (root + trigger) — the one MIDI departure, in [design-sequencer.md](design-sequencer.md) §"MIDI control". |
 
 **Net new code** lives under `mu-toni/Source/`: the arpeggiator engine
-(`Sequencer/`), the note-on/off + ADSR wiring into the wavetable voice, its
-editor panel (`UI/`, replacing the blank `EnginePanel`), the scale/chord tables,
-and the arp modulation-destination provider (`Modulation/`).
+(`Sequencer/Arpeggiator.h` + `ArpVoiceRunner.h`), the note-on/off + ADSR wiring
+into the voice (`Audio/ToniVoice.h`), its editor panel (`UI/EnginePanel.h`), the
+scale/chord tables (`Audio/Scales.h`, `Audio/Chords.h`), and the arp
+modulation-destination provider (`Modulation/MuToniModDest.h`).
 
 ---
 
@@ -82,14 +83,16 @@ Everything not in this table is identical to mu-tant.
 
 ---
 
-## Naming / file formats (provisional)
+## Naming / file formats
 
-The scaffold ships placeholders (`.muToni` full, `.muLayer` per-slot) pending
-the engine. Per the family consistency rule (per-slot preset = camelCase noun),
-rename the per-slot extension to the arp's real noun once settled — candidate
-**`.muArp`** (one arp configuration = one slot). Full preset stays **`.muToni`**.
-Wired via the `ProcessorBase` virtuals exactly as mu-tant wires `.muPattern` /
-`.muTant`.
+Settled and shipped: **`.muToni`** full preset, **`.muArp`** per-slot (one arp
+configuration = one voice slot), following the family consistency rule (per-slot
+preset = camelCase noun). Wired via the `ProcessorBase` virtuals exactly as
+mu-tant wires `.muPattern` / `.muTant`.
+
+The extensions and preset directories are live, but the **preset-browser chrome**
+(save/load UI) is not yet wired — `ProcessorBase`'s no-op save/load defaults still
+stand, so DAW state via the APVTS is currently the only persistence route.
 
 ---
 
@@ -162,8 +165,9 @@ demo/limited mode** — the full plugin is freely distributed.
   `ActivationStore`, `OnlineActivation`, `LemonSqueezyClient`, `MachineFingerprint`)
   and the shell's **Activation/licence UI** (`ActivationPanel`). No Lemon Squeezy
   product, no signing key, no `.muToni` licence gating.
-- The scaffold's `Source/License/LicenseKey.h` + the demo-gate pattern from
-  design-future.md (`-DMU_<PRODUCT>_DEMO`) are **not applied** to μ-Toni.
+- μ-Toni ships **no** `Source/License/LicenseKey.h` (unlike mu-clid / mu-tant —
+  the folder holds only `.gitkeep`), and the demo-gate pattern from
+  design-future.md (`-DMU_<PRODUCT>_DEMO`) is **not applied**.
 - **About panel** shows the normal product/version/credits but **no licence
   status / activate button**.
 - Everything else is standard: still builds Standalone + VST3 + CLAP, still ships

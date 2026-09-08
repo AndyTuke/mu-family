@@ -2,7 +2,7 @@
 
 This document covers the shared-code strategy for building additional plugins in the μ-family (mu-tant, mu-toni, mu-on, and future siblings) that reuse mu-clid's voice chain, modulation system, and mixer.
 
-**Siblings already built on this platform:** **mu-tant** (wavetable drone synth — per-voice oscillators + gater), **mu-on** (909 groove sequencer — five fixed engine lanes + a per-lane `ModulationMatrix` resolved through the shared `mu_mod::resolveLane` helper), and **mu-toni** (scaffold). Each supplies only its engine(s) + sequencer/trigger model and inherits `ProcessorBase`, `EditorShellBase`, the mixer/FX rack, and the modulation system unchanged.
+**Siblings already built on this platform:** **mu-tant** (wavetable drone synth — per-voice oscillators + gater), **mu-on** (909 groove sequencer — five fixed engine lanes + a per-lane `ModulationMatrix` resolved through the shared `mu_mod::resolveLane` helper), and **mu-toni** (generative arpeggiator mono-synth — a scale/chord note pool scanned by a deterministic skewed-triangle walk into a note-triggered voice, with a per-voice `ModulationMatrix`). Each supplies only its engine(s) + sequencer/trigger model and inherits `ProcessorBase`, `EditorShellBase`, the mixer/FX rack, and the modulation system unchanged.
 
 ---
 

@@ -8,7 +8,7 @@ Family-shared guidance for Claude Code working in this monorepo. **Product-speci
 mu-core/        Shared audio + FX + modulation + mixer UI + ProcessorBase + EditorShellBase (INTERFACE library)
 mu-clid/        Euclidean rhythm sequencer + sample trigger plugin (VST3 + CLAP + Standalone + Lite)
 mu-tant/        Wavetable drone synth — 8 voices, mixer, modulators, gate-pattern grid (VST3 + CLAP + Standalone)
-mu-toni/        Scaffolding only — Source/{Plugin,Sequencer,UI,Persistence,License,Tests}/
+mu-toni/        Generative arpeggiator mono-synth — scale/chord note pool, skewed-triangle scan, freeware (VST3 + CLAP + Standalone)
 mu-on/          909-style groove sequencer — Kick/Bass/Hat/Snare lanes, step grid, bass↔kick sidechain
 docs/           Family-shared design docs; product-specific docs under docs/<product>/
 tests/          Cross-plugin listening-test pipeline
@@ -57,7 +57,9 @@ Version: v1.0.103
 
 ## Backlog handling
 
-The backlog in `backlog.md` must always be grouped: **Open → On Hold → Fixed**. Within each group, items are ordered by issue number **descending** (highest first). Every backlog update must preserve this ordering. All code changes must be logged as backlog entries to maintain a complete development history.
+The backlog in `backlog.md` must always be grouped: **Open → On Hold → Closed**. Within each group, items are ordered by issue number **descending** (highest first). Every backlog update must preserve this ordering. All code changes must be logged as backlog entries to maintain a complete development history.
+
+The single resolved status is **`✅ Closed`** — never `Fixed` / `Audited` / `Verified` / `Done` or any other variant, whether the item was fixed, verified as already correct, or resolved by design. Structure is enforced by [tests/scripts/check-backlog.ps1](tests/scripts/check-backlog.ps1); run it after editing the backlog.
 
 ## Family-shared design documents
 

@@ -15,14 +15,13 @@
 #include <string_view>
 #include <unordered_map>
 
-// mu-Toni — scaffold.
+// mu-Toni — generative arpeggiator mono-synth.
 //
-// The product-specific synth engine + sequencer are NOT yet defined. This is the
-// minimal ProcessorBase subclass that brings the whole shared platform online:
-// the APVTS mixer/FX layout, the MixerEngine + FXChain, and a fixed set of
-// "layer" channels for the shared sidebar + MixerOverlay. processBlock routes a
-// silent render through the shared mixer (engine→insert→mixer path) so the mixer
-// is genuinely wired — there's just no sound source until the engine lands.
+// The ProcessorBase subclass owning the arp + voice engine and the shared
+// platform: the APVTS mixer/FX layout, the MixerEngine + FXChain, and a fixed set
+// of "layer" channels for the shared sidebar + MixerOverlay. Each layer runs an
+// independent mono arp (ArpVoiceRunner → ToniVoice), rendered through the shared
+// mixer via the processCoreBlock hook (engine→insert→mixer path).
 namespace mu_toni
 {
 
@@ -30,8 +29,8 @@ class PluginProcessor : public ProcessorBase,
                         public juce::AudioProcessorValueTreeState::Listener
 {
 public:
-    // Family parity: up to 8 channels/layers. The scaffold ships a fixed set;
-    // dynamic add/delete arrives with the engine.
+    // Family parity: up to 8 channels/layers. A fixed set ships for now; dynamic
+    // add/delete/reorder is still unwired (no addVoice/removeVoice).
     static constexpr int kMaxChannels = 8;
     static constexpr int kNumChannels = 4;   // placeholder layers shown in the shell
 
@@ -107,8 +106,8 @@ public:
     // ── Preset directories / extensions (per family file-format rule) ─────────
     // Save/load themselves stay on ProcessorBase's no-op defaults for now (preset
     // chrome is disabled in the editor); these satisfy the pure-virtuals + give
-    // the future preset I/O its home. Full = .muToni; per-layer = .muLayer (a
-    // neutral placeholder noun until the engine names its layer concept).
+    // the future preset I/O its home. Full = .muToni; per-slot = .muArp (one arp
+    // configuration = one voice slot).
     juce::File   getContentDir()             const override;
     juce::File   getPresetsDir()             const override;
     juce::File   getPerSlotPresetDir()       const override;
