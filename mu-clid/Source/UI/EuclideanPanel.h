@@ -38,7 +38,7 @@ public:
 
     // Left/right border inset inside the panel — used by LiteEditor to align
     // controls below the panel with the Steps knobs above.
-    static constexpr int kPanelInset = 4;
+    static constexpr int kPanelInset = MuLookAndFeel::kSpaceXS;
 
 private:
     using Id = MuLookAndFeel::ColourIds;
@@ -102,13 +102,13 @@ private:
 
     static constexpr int kLogicH  = 24;
     static constexpr int kSwitchH = 14;
-    static constexpr int kOuter   = 4;
+    static constexpr int kOuter   = MuLookAndFeel::kSpaceXS;
     static constexpr int kLabelH  = 10;
     // logic-row split — Logic dropdown | gap | Legato | gap | Mono. Three sub-panels
     // sized EQUALLY across the row; each control fills its sub-panel so pills spread
     // evenly via SegmentControl's natural width-distribution.
-    static constexpr int kLogicMP    = 4;    // matches the local `mP` used in placeRow
-    static constexpr int kLogicGapW  = 8;    // sub-panel divider between groups
+    static constexpr int kLogicMP    = MuLookAndFeel::kSpaceXS;    // matches the local `mP` used in placeRow
+    static constexpr int kLogicGapW  = MuLookAndFeel::kSpaceM;    // sub-panel divider between groups
     // Vertical offset (within the kLogicH band) that shifts the Logic-row buttons +
     // sub-panel rects DOWN so the visible gap above the rects equals the gap below them.
     // Pre-fix the band was top-aligned in the inter-row space, leaving 4 px above and
@@ -122,9 +122,9 @@ private:
     // kPadKnobGap is now the SINGLE inter-knob gap used for BOTH the Pre/Post
     // Pad pair AND the Insert pair, so their horizontal spacing matches (was
     // 24 for Pad but a full column width ~104 for Insert — too close vs too far).
-    static constexpr int kEucKnobGap   = 18;  // inter-knob gap between Steps/Hits/Rotate
-    static constexpr int kPadKnobGap   = 48;  // shared gap for the Pad pair AND the Insert pair
-    static constexpr int kPadInsertGap = 6;   // gap between Pad sub-panel and Insert sub-panel borders
+    static constexpr int kEucKnobGap   = MuLookAndFeel::kKnobGapRow;  // inter-knob gap between Steps/Hits/Rotate
+    static constexpr int kPadKnobGap   = MuLookAndFeel::kKnobGapPair;  // shared gap for the Pad pair AND the Insert pair
+    static constexpr int kPadInsertGap = MuLookAndFeel::kSpaceS;   // gap between Pad sub-panel and Insert sub-panel borders
     // Logic dropdown fitted width — just wide enough for the widest item ("B not A")
     // plus ComboBox chrome (~5 px left pad + ~20 px arrow).
     static constexpr int kLogicDropW   = 88;

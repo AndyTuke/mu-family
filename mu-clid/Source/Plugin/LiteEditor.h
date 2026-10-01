@@ -52,7 +52,7 @@ private:
     static constexpr int kStatusH      = 22;
     // Circle uses the family constant; kCircleMargin adds left inset so the
     // circle doesn't sit flush against the window edge.
-    static constexpr int kCircleMargin = 12;
+    static constexpr int kCircleMargin = MuLookAndFeel::kSpaceL;
     // kControlsH raised to fit Size 1 knobs (kKnobSize1H = 70) with 2 px top/bottom margin.
     static constexpr int kControlsH    = 74;
 

@@ -126,7 +126,7 @@ private:
     static constexpr int kHeaderH      = 28;
     static constexpr int kSampleBarH   = 22;
     static constexpr int kVoiceH       = 144;
-    static constexpr int kPanelPad     = 6;
+    static constexpr int kPanelPad     = MuLookAndFeel::kPanelPad;
     static constexpr int kModeSelectorW = 80;
     static constexpr int kIconBtnW     = 22;
     static constexpr int kPresetBtnW   = 38;

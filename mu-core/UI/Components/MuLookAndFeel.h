@@ -258,9 +258,24 @@ public:
     static constexpr int kModulatorPanelH = kChannelPanelH - kChannelHeaderH
                                           - kSampleBarH - kChannelTopH - kVoiceSectionH;        // 332
 
+    // ── Spacing scale ─────────────────────────────────────────────────────
+    // Gaps and padding belong to the design system rather than to whichever panel
+    // happens to need them, so every panel reaches for the same handful of values.
+    // These are the values already shipping — naming them here is a relocation, not
+    // a retune, so nothing moves on screen.
+    static constexpr int kSpaceXS = 4;    // panel outer inset, tool gaps, inter-row gaps
+    static constexpr int kSpaceS  = 6;    // panel padding, separation between sub-panel borders
+    static constexpr int kSpaceM  = 8;    // divider between control groups
+    static constexpr int kSpaceL  = 12;   // section margin
+
+    // Knob-cluster gaps. Role-specific rather than scale steps: both were tuned by
+    // eye so a row of knobs breathes and a labelled pair still reads as one pair.
+    static constexpr int kKnobGapRow  = 18;   // between knobs in a row (Steps / Hits / Rotate)
+    static constexpr int kKnobGapPair = 48;   // between the two knobs of a pair (Pre/Post Pad, Insert)
+
     // RhythmPanel applies a 7 px inset (kPanelPad + 1) when placing the four
     // big inner panels — these are the actual usable widths for layout math.
-    static constexpr int kPanelPad        = 6;
+    static constexpr int kPanelPad        = kSpaceS;
     static constexpr int kChannelInset     = kPanelPad + 1;                                     // 7
     static constexpr int kCircleInnerSize = kCircleSize     - 2 * kChannelInset;                // 274
     static constexpr int kEuclidInnerW    = kEuclidPanelW   - 2 * kChannelInset;                // 786
@@ -298,7 +313,7 @@ public:
     static constexpr int kVoiceInsertW    = 4 * kVoiceUnitW;                                   // 216
 
     // Per-knob cell dimensions inside each voice sub-panel.
-    static constexpr int kVoiceGap        = 4;
+    static constexpr int kVoiceGap        = kSpaceXS;
     static constexpr int kVoiceKnobCellH  = (kVoiceSubH - kVoiceGap) / 2;                      // 56
     static constexpr int kVoicePFAKnobW   = kVoiceUnitW;                                       // Size 2
     static constexpr int kVoiceInsertKnobW = kVoiceUnitW;                                      // Size 2
@@ -311,9 +326,9 @@ public:
     static constexpr int kMixerOverlayW    = kChannelPanelW;                                    // 1088
     static constexpr int kMixerOverlayH    = kChannelPanelH;                                    // 814
     static constexpr int kMixerHeaderH     = 22;
-    static constexpr int kMixerFXGap       = 6;
-    static constexpr int kMixerFXPad       = 6;
-    static constexpr int kMixerDivW        = 4;
+    static constexpr int kMixerFXGap       = kSpaceS;
+    static constexpr int kMixerFXPad       = kSpaceS;
+    static constexpr int kMixerDivW        = kSpaceXS;
     static constexpr int kMixerChanGap     = 3;
     static constexpr int kMixerMasterW     = 80;
     static constexpr int kMixerLabelPanelW = 38;

@@ -32,15 +32,16 @@
 // ── Geometry mirrored from mu-clid's EuclideanPanel ──────────────────────────
 namespace euclid
 {
-    // EuclideanPanel's own constants
+    // Gaps come from the design system's spacing scale; the rest are EuclideanPanel's
+    // own, mirrored here because it computes them inline.
     constexpr int kLogicH       = 24;
     constexpr int kSwitchH      = 14;
-    constexpr int kOuter        = 4;
     constexpr int kLabelH       = 10;
     constexpr int kLogicVOffset = 3;
-    constexpr int kEucKnobGap   = 18;
-    constexpr int kPadKnobGap   = 48;
-    constexpr int kPadInsertGap = 6;
+    constexpr int kOuter        = MuLookAndFeel::kSpaceXS;
+    constexpr int kEucKnobGap   = MuLookAndFeel::kKnobGapRow;
+    constexpr int kPadKnobGap   = MuLookAndFeel::kKnobGapPair;
+    constexpr int kPadInsertGap = MuLookAndFeel::kSpaceS;
 
     constexpr int w      = MuLookAndFeel::kEuclidInnerW;          // 786
     constexpr int innerW = w - 2 * kOuter;                        // 778

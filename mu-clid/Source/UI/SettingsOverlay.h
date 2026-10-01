@@ -111,5 +111,5 @@ private:
     static constexpr int kMasterVolW    = MuLookAndFeel::kKnobSize2W;
     static constexpr int kMasterVolH    = MuLookAndFeel::kKnobSize2H;
     static constexpr int kFolderBtnW    = 90;
-    static constexpr int kFolderBtnGap  = 8;
+    static constexpr int kFolderBtnGap  = MuLookAndFeel::kSpaceM;
 };

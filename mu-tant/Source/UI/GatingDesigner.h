@@ -96,11 +96,11 @@ private:
     static constexpr int kHdr1H    = 38;   // header row (holds size-3 rotary)
     static constexpr int kGridH    = 134;  // visual grid area
     static constexpr int kScrollH  = 10;   // horizontal scrollbar
-    static constexpr int kHdrInset = 6;
+    static constexpr int kHdrInset = MuLookAndFeel::kSpaceS;
     static constexpr int kDdW      = 88;   // Grid dropdown width
     static constexpr int kBarsW    = 52;   // Bars dropdown width (fits "16")
     static constexpr int kToolW    = 22;
-    static constexpr int kToolGap  = 4;
+    static constexpr int kToolGap  = MuLookAndFeel::kSpaceXS;
     static constexpr int kBtnW     = 54;   // shared width: Bypass / GATE / FILT / PITCH
     static constexpr int kGapKnobW = 32;   // gap rotary diameter (size-3)
     static constexpr int kGapTbW   = 46;   // gap textbox width (fits "100 %")

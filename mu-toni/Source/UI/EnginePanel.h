@@ -209,9 +209,9 @@ private:
     // Layout constants (unscaled; wrap in mu_ui::s at use). kDropdownH is the
     // family-standard dropdown height; kLabelGap keeps a control label off the
     // panel border (design-ui-family §"Control label gap").
-    static constexpr int kBoxPad    = 6;
+    static constexpr int kBoxPad    = MuLookAndFeel::kSpaceS;
     static constexpr int kDropdownH = 24;
-    static constexpr int kLabelGap  = 6;
+    static constexpr int kLabelGap  = MuLookAndFeel::kSpaceS;
 
     struct KnobDef   { std::unique_ptr<KnobWithLabel>  comp; juce::String suffix, prefix; int group;
                        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   att; };
