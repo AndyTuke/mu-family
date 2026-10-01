@@ -13,6 +13,7 @@ target_sources(ControlDesign PRIVATE
     "${MU_CORE_DIR}/UI/Components/MuLookAndFeel.cpp"
     "${MU_CORE_DIR}/UI/Components/MuTheme.cpp"
     "${MU_CORE_DIR}/UI/Components/KnobWithLabel.cpp"
+    "${MU_CORE_DIR}/UI/Components/SegmentControl.cpp"
 )
 
 target_compile_features(ControlDesign PRIVATE cxx_std_17)

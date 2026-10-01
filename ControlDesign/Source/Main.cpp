@@ -1,35 +1,20 @@
-// ControlDesign — a GUI sandbox for refining the family knob in isolation, without
-// rebuilding a whole product.
+// ControlDesign — a GUI sandbox for refining the family's controls in isolation,
+// without rebuilding a whole product.
 //
-// Every knob here is a real example pulled from a shipping panel — same label, same
-// category colour, same MuLookAndFeel::kKnobSize*, same range, value and value
-// formatter — drawn by the actual KnobWithLabel component every product instantiates.
-// So an edit to MuLookAndFeel::drawRotarySlider shows up here exactly as it will in
-// mu-clid, mu-tant, mu-toni, mu-on and mu-link.
+// Currently focused on **mu-clid's Pad / Insert sub-panels**: the two bordered boxes
+// that sit to the right of each Euclid row's Steps/Hits/Rotate block, plus the Legato
+// and Mono band between rows A and B.
 //
-// Coverage is one knob per size a colour is used at, per control type where a size
-// uses both, plus the overlay states and the whole category palette:
+// This is a 1:1 reproduction, not an impression. Every constant below is mirrored from
+// mu-clid's EuclideanPanel (resized() and paint()) and the section is rendered at
+// exactly the pixel size it occupies there — 538 x 266 — so anything judged here
+// transfers directly. The knobs are real KnobWithLabel instances at the real Size 3,
+// with the real ranges, and the toggles are real SegmentControls, so the label
+// ellipsis on "Insert Start" / "Insert Length" shows up exactly as it does in the app.
 //
-//   mu-clid, purple (knobEuclidean)
-//     Size 1, step   — Steps     (1..64 x1)        EuclideanPanel
-//     Size 1, smooth — Attack    (0..10s, skewed)  not a shipped combination
-//     Size 2, step   — Octave    (-3..3 x1)        Voice/PitchSubsection
-//     Size 2, smooth — Attack    (0..10s, skewed)  Voice/PitchSubsection
-//   mu-tant, green (knobPostPad)
-//     Size 1, smooth — Cutoff    (skewed, Hz)      not a shipped combination
-//     Size 2, smooth — Cutoff    (skewed, Hz)      VoicePanel Filter 1
-//   Small sizes
-//     Size 3 — mu-clid pad knobs (step), mixer strip (smooth)
-//     Size 4 — mixer sidechain envelope (smooth); the step case ships nowhere
-//
-// Knobs marked "not shipped" exist to judge the style at a size/type the products
-// don't currently use. mu-clid's purple is step-only at Size 1, and mu-tant's green
-// appears at Size 2 only, where all five filter knobs are continuous floats (their
-// ranges come from APVTS parameters, not setRange), so green has no step case.
-//
-// Installs a real MuLookAndFeel via setLookAndFeel() on the panel, as EditorShellBase
-// does for every product's editor — without it KnobWithLabel falls back to JUCE's
-// default LookAndFeel and draws nothing like the shipped knob.
+// **Mirrored constants — keep in sync with EuclideanPanel.** If that layout changes,
+// this one has to follow; there is no shared source for it, because the panel computes
+// its geometry inline.
 //
 //   Build:  cmake --build build --config Debug --target ControlDesign
 //   Run:    build/ControlDesign/ControlDesign_artefacts/Debug/ControlDesign.exe
@@ -38,283 +23,233 @@
 
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/MuLookAndFeel.h"
+#include "UI/Components/SegmentControl.h"
 
-#include <algorithm>
-#include <atomic>
-#include <cmath>
-#include <functional>
+#include <array>
 #include <memory>
 #include <vector>
 
-// juce::String reads a bare const char* in the system codepage, which mangles the
-// UTF-8 bytes in literals like an em dash or a middot; wrap them explicitly.
-static juce::String utf8(const char* s) { return juce::String(juce::CharPointer_UTF8(s)); }
-
-// The products' own value formatters, mirrored so each knob shows exactly the text it
-// shows in the app (the unit lives in the label, not the value). Without these JUCE's
-// raw float formatting takes over and we'd be judging something that never ships.
-//   mu-clid Voice/PitchSubsection + AmpSubsection + FilterSubsection: adsrValueStr
-static juce::String adsrValueText(double v)
+// ── Geometry mirrored from mu-clid's EuclideanPanel ──────────────────────────
+namespace euclid
 {
-    const double ms = std::max(1.0, v * 1000.0);
-    return ms < 1000.0 ? juce::String((int) std::round(ms))
-                       : juce::String(ms / 1000.0, 2);
+    // EuclideanPanel's own constants
+    constexpr int kLogicH       = 24;
+    constexpr int kSwitchH      = 14;
+    constexpr int kOuter        = 4;
+    constexpr int kLabelH       = 10;
+    constexpr int kLogicVOffset = 3;
+    constexpr int kEucKnobGap   = 18;
+    constexpr int kPadKnobGap   = 48;
+    constexpr int kPadInsertGap = 6;
+
+    constexpr int w      = MuLookAndFeel::kEuclidInnerW;          // 786
+    constexpr int innerW = w - 2 * kOuter;                        // 778
+    constexpr int innerH = MuLookAndFeel::kEuclidInnerH - 2 * kOuter;   // 266
+
+    constexpr int rowH  = (innerH - kLogicH) / 3;                 // 80
+    constexpr int ctrlH = rowH - kLabelH;                         // 70
+    constexpr int mP    = 4;
+
+    constexpr int eW        = MuLookAndFeel::kKnobSize1W;
+    constexpr int eucBlockW = eW * 3 + kEucKnobGap * 2;           // 240
+    constexpr int pW        = (innerW - eucBlockW) / 4;           // 134
+
+    constexpr int padX      = kOuter + eucBlockW;                 // 244
+    constexpr int padPanelW = pW * 2 - kPadInsertGap / 2;         // 265
+    constexpr int insX      = padX + pW * 2 + kPadInsertGap / 2;  // 515
+    constexpr int insPanelW = w - kOuter - insX;                  // 267
+
+    constexpr int knobH   = ctrlH - kSwitchH - 6;                 // 50
+    constexpr int insSw   = (pW < 56) ? pW : 56;
+    constexpr int insSwX  = insX + (insPanelW - insSw) / 2;
+
+    constexpr int padKnobW = MuLookAndFeel::kKnobSize3W;          // 36
+    constexpr int padKnobH = MuLookAndFeel::kKnobSize3H;          // 46
+    constexpr int padPairW = padKnobW * 2 + kPadKnobGap;          // 120
+
+    constexpr int prePadX  = padX + (padPanelW - padPairW) / 2;
+    constexpr int postPadX = prePadX + padKnobW + kPadKnobGap;
+    constexpr int padSwMax = (padPairW - 4) / 2;
+    constexpr int padSw    = padSwMax < 56 ? padSwMax : 56;
+    constexpr int preSwX   = prePadX  + (padKnobW - padSw) / 2;
+    constexpr int postSwX  = postPadX + (padKnobW - padSw) / 2;
+
+    constexpr int insStX  = insX + (insPanelW - padPairW) / 2;
+    constexpr int insLenX = insStX + padKnobW + kPadKnobGap;
+
+    // The three Euclid rows, as paint() positions them.
+    constexpr int rowOffsets[3] = { kOuter, kOuter + rowH + kLogicH, kOuter + 2 * rowH + kLogicH };
+
+    // The section this sandbox shows: everything from the Pad sub-panel's left edge to
+    // the Insert sub-panel's right edge, full panel height. Coordinates below are
+    // shifted left by kSectionX so the section sits at the window's origin.
+    constexpr int kSectionX = padX;                               // 244
+    constexpr int kSectionW = (w - kOuter) - padX;                // 538
+    constexpr int kSectionH = innerH;                             // 266
 }
 
-//   mu-tant PluginProcessor_APVTS: the flt_cut cutoffText attribute
-static juce::String cutoffValueText(double v)
-{
-    return v < 1000.0 ? juce::String((int) std::round(v))
-                      : juce::String(v / 1000.0, 1);
-}
-
-// One row: a title and description in the left label column, then a strip of knobs
-// laid out with even gaps and vertically centred, each captioned underneath.
-class KnobRow : public juce::Component
+// mu-clid's Pad and Insert sub-panels, at the size and spacing they ship at.
+class PadSection : public juce::Component
 {
 public:
-    KnobRow(juce::String rowName, juce::String rowDesc)
-        : name(std::move(rowName)), desc(std::move(rowDesc)) {}
-
-    // textFn, when given, is the product's own value formatter for this parameter.
-    // Whether a value is drawn at all, and where, is the style's decision — and
-    // stepped-vs-smooth is derived from the slider's interval — so neither is declared
-    // here; this mirrors what a product does and nothing more.
-    KnobWithLabel& addKnob(const juce::String& label, MuLookAndFeel::ColourIds colour,
-                           int w, int h, double lo, double hi, double step, double value,
-                           const juce::String& caption,
-                           std::function<juce::String(double)> textFn = nullptr)
+    PadSection()
     {
-        auto k = std::make_unique<KnobWithLabel>(label, colour);
-        k->setSize(w, h);
-        k->setRange(lo, hi, step);
-        k->setValue(value, juce::dontSendNotification);
-        if (textFn)
+        using namespace euclid;
+
+        for (int r = 0; r < kRows; ++r)
         {
-            k->getSlider().textFromValueFunction = textFn;
-            k->getSlider().setValue(value, juce::dontSendNotification);   // re-render with it
+            auto& row = rows[(size_t) r];
+            row.prePad   = addKnob("Pre Pad",       MuLookAndFeel::knobPrePad,    0, 12, 0);
+            row.postPad  = addKnob("Post Pad",      MuLookAndFeel::knobPostPad,   0, 12, 0);
+            row.insStart = addKnob("Insert Start",  MuLookAndFeel::knobInsertPad, 0, 63, 0);
+            row.insLen   = addKnob("Insert Length", MuLookAndFeel::knobInsertPad, 0,  8, 0);
+
+            row.preMode  = addSegment({ "Pad", "Mute" }, SegmentControl::ActiveStyle::Warning);
+            row.postMode = addSegment({ "Pad", "Mute" }, SegmentControl::ActiveStyle::Warning);
+            row.insMode  = addSegment({ "Pad", "Mute" }, SegmentControl::ActiveStyle::Warning);
         }
-        addAndMakeVisible(*k);
-        auto& ref = *k;
-        entries.push_back({ std::move(k), label, caption });
-        return ref;
+
+        legato = addSegment({ "Trig", "Leg" },  SegmentControl::ActiveStyle::General,
+                            SegmentControl::DrawStyle::Pills);
+        mono   = addSegment({ "Poly", "Mono" }, SegmentControl::ActiveStyle::Warning,
+                            SegmentControl::DrawStyle::Pills);
+
+        setSize(euclid::kSectionW, euclid::kSectionH);
     }
 
     void paint(juce::Graphics& g) override
     {
-        using Id = MuLookAndFeel::ColourIds;
-        auto label = getLocalBounds().removeFromLeft(kLabelW).reduced(14, 0);
-        g.setColour(MuLookAndFeel::colour(Id::headingText));
-        g.setFont(juce::Font(juce::FontOptions(13.0f, juce::Font::bold)));
-        g.drawText(name, label.removeFromTop(label.getHeight() / 2).withTrimmedTop(14),
-                   juce::Justification::bottomLeft, false);
+        using namespace euclid;
+        using mu_ui::s;
 
-        g.setColour(MuLookAndFeel::colour(Id::mutedText));
-        g.setFont(juce::Font(juce::FontOptions(11.0f)));
-        g.drawText(desc, label.withTrimmedBottom(14), juce::Justification::topLeft, false);
-    }
+        g.fillAll(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
 
-    // Outlines each knob's real bounds so anything drawn outside them reads at a
-    // glance, captions each knob, and flags labels that don't fit their knob's width —
-    // KnobWithLabel silently ellipsises those in the products, hiding exactly the
-    // problem worth catching, so the full label is redrawn unclipped in red.
-    void paintOverChildren(juce::Graphics& g) override
-    {
-        using mu_ui::sf;
+        // Sub-panel borders, in the channel's own colour at half alpha — the blue a
+        // fresh two-rhythm patch picks.
+        g.setColour(MuLookAndFeel::channelPalette[1].withAlpha(0.5f));
 
-        g.setColour(juce::Colours::white.withAlpha(0.25f));
-        for (auto& e : entries)
-            g.drawRect(e.knob->getBounds(), 1);
-
-        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
-        g.setFont(juce::Font(juce::FontOptions(10.0f)));
-        for (auto& e : entries)
+        for (int rowY : rowOffsets)
         {
-            if (e.caption.isEmpty()) continue;
-            auto b = e.knob->getBounds();
-            g.drawText(e.caption, b.withY(b.getBottom() + 4).withHeight(kCaptionH).expanded(26, 0),
-                       juce::Justification::centred, false);
+            const int cy = rowY + kLabelH;
+            g.drawRoundedRectangle((float) s(padX - kSectionX), (float) s(cy),
+                                   (float) s(padPanelW), (float) s(ctrlH) - 2.0f, 4.0f, 1.0f);
+            g.drawRoundedRectangle((float) s(insX - kSectionX), (float) s(cy),
+                                   (float) s(insPanelW), (float) s(ctrlH) - 2.0f, 4.0f, 1.0f);
         }
 
-        const juce::Font labelFont(juce::FontOptions{}.withHeight(sf(MuLookAndFeel::kKnobLabelFont)));
-        g.setFont(labelFont);
-
-        for (auto& e : entries)
-        {
-            const int textW = (int) juce::GlyphArrangement::getStringWidth(labelFont, e.label);
-            if (textW <= e.knob->getWidth())
-                continue;   // fits — the product's own rendering already shows it correctly
-
-            const int labelH = (int) sf((float) MuLookAndFeel::kKnobLabelH);
-            auto r = e.knob->getBounds();
-            auto textArea = juce::Rectangle<int>(r.getCentreX() - textW / 2 - 4,
-                                                 r.getBottom() - labelH, textW + 8, labelH);
-            g.setColour(juce::Colours::black.withAlpha(0.6f));
-            g.fillRect(textArea);
-            g.setColour(juce::Colour(0xffff5a4d));   // overflow warning — not a shipped token
-            g.drawText(e.label, textArea, juce::Justification::centred, false);
-        }
+        constexpr int rectY = kOuter + rowH + 2 + kLogicVOffset;
+        constexpr int rectH = kLogicH - 4;
+        g.drawRoundedRectangle((float) s(padX - kSectionX), (float) s(rectY),
+                               (float) s(padPanelW), (float) s(rectH), 4.0f, 1.0f);
+        g.drawRoundedRectangle((float) s(insX - kSectionX), (float) s(rectY),
+                               (float) s(insPanelW), (float) s(rectH), 4.0f, 1.0f);
     }
 
     void resized() override
     {
-        auto area = getLocalBounds();
-        area.removeFromLeft(kLabelW);
-        area.removeFromBottom(kCaptionH + 6);   // room for the captions
+        using namespace euclid;
+        using mu_ui::s;
 
-        const int gap = 40;
-        int totalW = 0;
-        for (auto& e : entries) totalW += e.knob->getWidth();
-        totalW += gap * juce::jmax(0, (int) entries.size() - 1);
-
-        int x = area.getX() + (area.getWidth() - totalW) / 2;
-        const int cy = area.getCentreY();
-
-        for (auto& e : entries)
+        for (int r = 0; r < kRows; ++r)
         {
-            e.knob->setTopLeftPosition(x, cy - e.knob->getHeight() / 2);
-            x += e.knob->getWidth() + gap;
+            auto& row = rows[(size_t) r];
+            const int cy = rowOffsets[r] + kLabelH;
+
+            row.prePad  ->setBounds(s(prePadX  - kSectionX), s(cy + mP), s(padKnobW), s(padKnobH));
+            row.postPad ->setBounds(s(postPadX - kSectionX), s(cy + mP), s(padKnobW), s(padKnobH));
+            row.insStart->setBounds(s(insStX   - kSectionX), s(cy + mP), s(padKnobW), s(padKnobH));
+            row.insLen  ->setBounds(s(insLenX  - kSectionX), s(cy + mP), s(padKnobW), s(padKnobH));
+
+            row.preMode ->setBounds(s(preSwX  - kSectionX), s(cy + knobH + 2), s(padSw), s(kSwitchH));
+            row.postMode->setBounds(s(postSwX - kSectionX), s(cy + knobH + 2), s(padSw), s(kSwitchH));
+            row.insMode ->setBounds(s(insSwX  - kSectionX), s(cy + knobH + 2), s(insSw), s(kSwitchH));
         }
+
+        // Legato aligns with the Pad sub-panel, Mono with the Insert sub-panel.
+        constexpr int rectY = kOuter + rowH + 2 + kLogicVOffset;
+        constexpr int rectH = kLogicH - 4;
+        legato->setBounds(s(padX - kSectionX) + s(4), s(rectY) + s(2),
+                          s(padPanelW) - s(8), s(rectH) - s(4));
+        mono  ->setBounds(s(insX - kSectionX) + s(4), s(rectY) + s(2),
+                          s(insPanelW) - s(8), s(rectH) - s(4));
     }
 
-    static constexpr int kLabelW   = 170;
-    static constexpr int kCaptionH = 13;
-
 private:
-    struct Entry
+    static constexpr int kRows = 3;   // Euclid A, Euclid B, Accent
+
+    struct Row
     {
-        std::unique_ptr<KnobWithLabel> knob;
-        juce::String label;
-        juce::String caption;   // size and control type
+        KnobWithLabel*  prePad   = nullptr;
+        KnobWithLabel*  postPad  = nullptr;
+        KnobWithLabel*  insStart = nullptr;
+        KnobWithLabel*  insLen   = nullptr;
+        SegmentControl* preMode  = nullptr;
+        SegmentControl* postMode = nullptr;
+        SegmentControl* insMode  = nullptr;
     };
 
-    juce::String name, desc;
-    std::vector<Entry> entries;
+    KnobWithLabel* addKnob(const juce::String& label, MuLookAndFeel::ColourIds colour,
+                           double lo, double hi, double value)
+    {
+        auto k = std::make_unique<KnobWithLabel>(label, colour);
+        k->setRange(lo, hi, 1);
+        k->setValue(value, juce::dontSendNotification);
+        addAndMakeVisible(*k);
+        auto* raw = k.get();
+        knobs.push_back(std::move(k));
+        return raw;
+    }
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(KnobRow)
+    SegmentControl* addSegment(std::initializer_list<juce::String> labels,
+                               SegmentControl::ActiveStyle style,
+                               SegmentControl::DrawStyle draw = SegmentControl::DrawStyle::Bar)
+    {
+        auto sc = std::make_unique<SegmentControl>(labels, style, draw);
+        addAndMakeVisible(*sc);
+        auto* raw = sc.get();
+        segments.push_back(std::move(sc));
+        return raw;
+    }
+
+    std::array<Row, kRows> rows;
+    SegmentControl* legato = nullptr;
+    SegmentControl* mono   = nullptr;
+
+    std::vector<std::unique_ptr<KnobWithLabel>>  knobs;
+    std::vector<std::unique_ptr<SegmentControl>> segments;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PadSection)
 };
 
+// Holds the section at its exact shipped size, centred on the window's background so
+// the borders aren't flush against the frame.
 class ControlDesignPanel : public juce::Component
 {
 public:
     ControlDesignPanel()
     {
-        using Id  = MuLookAndFeel::ColourIds;
-        using MLF = MuLookAndFeel;
-
         setLookAndFeel(&lookAndFeel);
-
-        auto clid = std::make_unique<KnobRow>(utf8("mu-clid \xe2\x80\x94 purple"), "knobEuclidean");
-        clid->addKnob("Steps", Id::knobEuclidean, MLF::kKnobSize1W, MLF::kKnobSize1H,
-                      1, 64, 1, 5, utf8("Size 1 \xc2\xb7 step"));
-        clid->addKnob("Attack (ms)", Id::knobEuclidean, MLF::kKnobSize1W, MLF::kKnobSize1H,
-                      0, 10, 0.001, 0.24, utf8("Size 1 \xc2\xb7 smooth (not shipped)"), adsrValueText);
-        clid->addKnob("Octave", Id::knobEuclidean, MLF::kKnobSize2W, MLF::kKnobSize2H,
-                      -3, 3, 1, 2, utf8("Size 2 \xc2\xb7 step"));
-        clid->addKnob("Attack (ms)", Id::knobEuclidean, MLF::kKnobSize2W, MLF::kKnobSize2H,
-                      0, 10, 0.001, 0.24, utf8("Size 2 \xc2\xb7 smooth"), adsrValueText);
-        addAndMakeVisible(*clid);
-        rows.push_back(std::move(clid));
-
-        auto tant = std::make_unique<KnobRow>(utf8("mu-tant \xe2\x80\x94 green"), "knobPostPad");
-        tant->addKnob("Cutoff (kHz)", Id::knobPostPad, MLF::kKnobSize1W, MLF::kKnobSize1H,
-                      20, 20000, 0.0, 8000, utf8("Size 1 \xc2\xb7 smooth (not shipped)"), cutoffValueText);
-        tant->addKnob("Cutoff (kHz)", Id::knobPostPad, MLF::kKnobSize2W, MLF::kKnobSize2H,
-                      20, 20000, 0.0, 8000, utf8("Size 2 \xc2\xb7 smooth"), cutoffValueText);
-        addAndMakeVisible(*tant);
-        rows.push_back(std::move(tant));
-
-        // The two small sizes, where the style is under the most pressure. Size 4 has no
-        // shipped step control — included anyway, to confirm the centred value stays
-        // suppressed rather than crowding the disc.
-        auto small = std::make_unique<KnobRow>(utf8("Small sizes"), "Size 3 + Size 4");
-        small->addKnob("Pre Pad", Id::knobPrePad, MLF::kKnobSize3W, MLF::kKnobSize3H,
-                       0, 16, 1, 3, utf8("Size 3 \xc2\xb7 step"));
-        small->addKnob("SC Amount", Id::knobPan, MLF::kKnobSize3W, MLF::kKnobSize3H,
-                       0, 100, 0.1, 62, utf8("Size 3 \xc2\xb7 smooth"));
-        small->addKnob("Steps", Id::knobEuclidean, MLF::kKnobSize4W, MLF::kKnobSize4H,
-                       1, 64, 1, 5, utf8("Size 4 \xc2\xb7 step (not shipped)"));
-        small->addKnob("Attack", Id::knobLevel, MLF::kKnobSize4W, MLF::kKnobSize4H,
-                       0, 10, 0.001, 0.24, utf8("Size 4 \xc2\xb7 smooth"), adsrValueText);
-        addAndMakeVisible(*small);
-        rows.push_back(std::move(small));
-
-        // The overlays KnobWithLabel paints over the rotary, which source their
-        // placement from the style's own geometry.
-        auto over = std::make_unique<KnobRow>(utf8("Overlays"), "drawn by KnobWithLabel");
-        over->addKnob("Cutoff", Id::knobPostPad, MLF::kKnobSize2W, MLF::kKnobSize2H,
-                      20, 20000, 0.0, 8000, utf8("mod ring"), cutoffValueText).setIsModulated(true);
-
-        auto& arc = over->addKnob("Cutoff", Id::knobPostPad, MLF::kKnobSize2W, MLF::kKnobSize2H,
-                                  20, 20000, 0.0, 8000, utf8("mod ring + live arc"), cutoffValueText);
-        arc.setIsModulated(true);
-        arc.setModulatedNorm(0.78f);
-
-        over->addKnob("Level", Id::knobLevel, MLF::kKnobSize2W, MLF::kKnobSize2H,
-                      -60, 6, 0.1, -6, utf8("GR arc")).setGRSource(&grLevel);
-        addAndMakeVisible(*over);
-        rows.push_back(std::move(over));
-
-        auto palette = std::make_unique<KnobRow>(utf8("Palette"), "every category colour, Size 2");
-        struct Swatch { const char* label; MuLookAndFeel::ColourIds colour; };
-        static constexpr Swatch swatches[] = {
-            { "Euclid",   Id::knobEuclidean }, { "Insert",   Id::knobInsertPad },
-            { "Level",    Id::knobLevel     }, { "FX Send",  Id::knobFxSend    },
-            { "Reverb",   Id::knobReverb    }, { "Pan",      Id::knobPan       },
-            { "Pre Pad",  Id::knobPrePad    }, { "Post Pad", Id::knobPostPad   },
-        };
-        for (auto& sw : swatches)
-            palette->addKnob(sw.label, sw.colour, MLF::kKnobSize2W, MLF::kKnobSize2H,
-                             0, 100, 1, 62, {});
-        addAndMakeVisible(*palette);
-        rows.push_back(std::move(palette));
-
-        setSize(980, 680);
+        addAndMakeVisible(section);
+        setSize(euclid::kSectionW + 2 * kMargin, euclid::kSectionH + 2 * kMargin);
     }
 
     ~ControlDesignPanel() override { setLookAndFeel(nullptr); }
 
     void paint(juce::Graphics& g) override
     {
-        using Id = MuLookAndFeel::ColourIds;
-        g.fillAll(MuLookAndFeel::colour(Id::windowBackground));
-
-        auto header = getLocalBounds().removeFromTop(kHeader).reduced(20, 0);
-        g.setColour(MuLookAndFeel::colour(Id::headingText));
-        g.setFont(juce::Font(juce::FontOptions(15.0f, juce::Font::bold)));
-        g.drawText(utf8("Control Design \xe2\x80\x94 the family knob"),
-                   header, juce::Justification::centredLeft, false);
-
-        g.setColour(MuLookAndFeel::colour(Id::mutedText));
-        g.setFont(juce::Font(juce::FontOptions(11.0f)));
-        g.drawText("real examples, drawn by MuLookAndFeel",
-                   header, juce::Justification::centredRight, false);
-
-        g.setColour(MuLookAndFeel::colour(Id::mutedText).withAlpha(0.25f));
-        const int rowH = (getHeight() - kHeader) / (int) rows.size();
-        for (size_t i = 1; i < rows.size(); ++i)
-            g.drawHorizontalLine(kHeader + (int) i * rowH, 20.0f, (float) getWidth() - 20.0f);
+        g.fillAll(MuLookAndFeel::colour(MuLookAndFeel::windowBackground));
     }
 
     void resized() override
     {
-        auto area = getLocalBounds();
-        area.removeFromTop(kHeader);
-        const int rowH = area.getHeight() / (int) rows.size();
-        for (auto& r : rows)
-            r->setBounds(area.removeFromTop(rowH));
+        section.setBounds(kMargin, kMargin, euclid::kSectionW, euclid::kSectionH);
     }
 
 private:
-    static constexpr int kHeader = 44;
+    static constexpr int kMargin = 16;
 
     MuLookAndFeel lookAndFeel;
-
-    // A fixed gain-reduction reading for the GR-arc example; KnobWithLabel polls it at
-    // 30 Hz, so it has to outlive the knob pointing at it.
-    std::atomic<float> grLevel { 0.45f };
-
-    std::vector<std::unique_ptr<KnobRow>> rows;
+    PadSection    section;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ControlDesignPanel)
 };
@@ -342,8 +277,8 @@ private:
         {
             setUsingNativeTitleBar(true);
             setContentOwned(new ControlDesignPanel(), true);
-            setResizable(true, true);
-            setResizeLimits(560, 380, 1400, 900);
+            // Fixed: the whole point is that the section matches mu-clid pixel for pixel.
+            setResizable(false, false);
             centreWithSize(getWidth(), getHeight());
             setVisible(true);
         }
