@@ -36,6 +36,8 @@
 #include "UI/Components/MuLookAndFeel.h"
 
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <cmath>
 #include <functional>
 #include <memory>
@@ -253,10 +255,12 @@ public:
     // component draws an empty string. (It must NOT be done by painting over that
     // region — the glow disc fills the dead zone, so an opaque patch slices the disc
     // and erases the position dot whenever the value sits low in the sweep.)
+    struct Pair { KnobWithLabel& shipped; KnobWithLabel& replacement; };
+
     // textFn, when given, is the product's own value formatter (the shipped knobs show
     // formatted text like "8.0" or "240", never JUCE's raw float), applied to the
     // shipped half only — the replacement's text is blanked either way.
-    void addPair(const juce::String& label, MuLookAndFeel::ColourIds colour,
+    Pair addPair(const juce::String& label, MuLookAndFeel::ColourIds colour,
                  int w, int h, double lo, double hi, double step, double value,
                  bool isStep, const juce::String& caption, juce::LookAndFeel& altLnf,
                  std::function<juce::String(double)> textFn = nullptr)
@@ -280,12 +284,34 @@ public:
             }
             addAndMakeVisible(*k);
             auto& ref = *k;
-            entries.push_back({ std::move(k), label, ! replacement, replacement ? juce::String() : caption });
+            entries.push_back({ std::move(k), label, ! replacement,
+                                replacement ? juce::String() : caption, 2 });
             return ref;
         };
 
-        make(false);   // shipped
-        make(true);    // replacement
+        auto& shipped     = make(false);
+        auto& replacement = make(true);
+        return { shipped, replacement };
+    }
+
+    // A single knob in the replacement style, with no shipped counterpart — for sweeps
+    // where the comparison is already established and only the new look is in question.
+    KnobWithLabel& addReplacementOnly(const juce::String& label, MuLookAndFeel::ColourIds colour,
+                                      int w, int h, double lo, double hi, double step,
+                                      double value, bool isStep, const juce::String& caption,
+                                      juce::LookAndFeel& altLnf)
+    {
+        auto k = std::make_unique<KnobWithLabel>(label, colour);
+        k->setSize(w, h);
+        k->setRange(lo, hi, step);
+        k->setValue(value, juce::dontSendNotification);
+        k->setLookAndFeel(&altLnf);
+        k->getSlider().getProperties().set("muShowCenterValue", isStep);
+        k->getSlider().textFromValueFunction = [](double) { return juce::String(); };
+        addAndMakeVisible(*k);
+        auto& ref = *k;
+        entries.push_back({ std::move(k), label, true, caption, 1 });
+        return ref;
     }
 
     void paint(juce::Graphics& g) override
@@ -316,13 +342,15 @@ public:
         for (auto& e : entries)
             g.drawRect(e.knob->getBounds(), 1);
 
-        // Pair captions, centred under the two knobs they describe.
+        // Captions, centred under the knob(s) they describe.
         g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
         g.setFont(juce::Font(juce::FontOptions(10.0f)));
-        for (size_t i = 0; i + 1 < entries.size(); ++i)
+        for (size_t i = 0; i < entries.size(); ++i)
         {
             if (entries[i].caption.isEmpty()) continue;
-            auto span = entries[i].knob->getBounds().getUnion(entries[i + 1].knob->getBounds());
+            auto span = entries[i].knob->getBounds();
+            for (int j = 1; j < entries[i].captionSpan && i + (size_t) j < entries.size(); ++j)
+                span = span.getUnion(entries[i + (size_t) j].knob->getBounds());
             g.drawText(entries[i].caption,
                        span.withY(span.getBottom() + 4).withHeight(kCaptionH).expanded(20, 0),
                        juce::Justification::centred, false);
@@ -379,11 +407,12 @@ private:
     {
         std::unique_ptr<KnobWithLabel> knob;
         juce::String label;
-        bool startsPair = false;   // the shipped half; the replacement follows it
-        juce::String caption;      // size + control type, drawn under the pair
+        bool startsGroup = false;  // first of a pair (or a lone knob): wide gap before it
+        juce::String caption;      // size + control type, drawn under the group
+        int captionSpan = 1;       // knobs the caption is centred across
     };
 
-    int gapBefore(size_t i) const { return entries[i].startsPair ? 48 : 10; }
+    int gapBefore(size_t i) const { return entries[i].startsGroup ? 48 : 10; }
 
     juce::String name, desc;
     std::vector<Entry> entries;
@@ -434,7 +463,65 @@ public:
         addAndMakeVisible(*tant);
         rows.push_back(std::move(tant));
 
-        setSize(980, 420);
+        // The two small sizes, where the style is under the most pressure: Size 3 is
+        // mu-clid's pad knobs (step) and the mixer strip (smooth), Size 4 is the mixer's
+        // sidechain envelope. Size 4 has no shipped step control — included anyway,
+        // because fitting a centred number into that disc is the hardest case there is.
+        auto small = std::make_unique<KnobRow>(utf8("Small sizes"), "Size 3 + Size 4");
+        small->addPair("Pre Pad", Id::knobPrePad, MuLookAndFeel::kKnobSize3W, MuLookAndFeel::kKnobSize3H,
+                       0, 16, 1, 3, true, utf8("Size 3 \xc2\xb7 step"), altLookAndFeel);
+        small->addPair("SC Amount", Id::knobPan, MuLookAndFeel::kKnobSize3W, MuLookAndFeel::kKnobSize3H,
+                       0, 100, 0.1, 62, false, utf8("Size 3 \xc2\xb7 smooth"), altLookAndFeel);
+        small->addPair("Steps", Id::knobEuclidean, MuLookAndFeel::kKnobSize4W, MuLookAndFeel::kKnobSize4H,
+                       1, 64, 1, 5, true, utf8("Size 4 \xc2\xb7 step (not shipped)"), altLookAndFeel);
+        small->addPair("Attack", Id::knobLevel, MuLookAndFeel::kKnobSize4W, MuLookAndFeel::kKnobSize4H,
+                       0, 10, 0.001, 0.24, false, utf8("Size 4 \xc2\xb7 smooth"), altLookAndFeel,
+                       adsrValueText);
+        addAndMakeVisible(*small);
+        rows.push_back(std::move(small));
+
+        // The overlays KnobWithLabel paints over the rotary. These are drawn by the
+        // component, NOT the LookAndFeel, against hard-coded sweep angles — so on the
+        // replacement they should sit off the new ring. That mismatch is the point of
+        // showing them here.
+        auto over = std::make_unique<KnobRow>(utf8("Overlays"), "drawn by KnobWithLabel");
+        auto modRing = over->addPair("Cutoff", Id::knobPostPad, MuLookAndFeel::kKnobSize2W, MuLookAndFeel::kKnobSize2H,
+                                     20, 20000, 0.0, 8000, false, utf8("mod ring"), altLookAndFeel, cutoffValueText);
+        modRing.shipped.setIsModulated(true);
+        modRing.replacement.setIsModulated(true);
+
+        auto modArc = over->addPair("Cutoff", Id::knobPostPad, MuLookAndFeel::kKnobSize2W, MuLookAndFeel::kKnobSize2H,
+                                    20, 20000, 0.0, 8000, false, utf8("mod ring + live arc"), altLookAndFeel, cutoffValueText);
+        modArc.shipped.setIsModulated(true);
+        modArc.replacement.setIsModulated(true);
+        modArc.shipped.setModulatedNorm(0.78f);
+        modArc.replacement.setModulatedNorm(0.78f);
+
+        auto gr = over->addPair("Level", Id::knobLevel, MuLookAndFeel::kKnobSize2W, MuLookAndFeel::kKnobSize2H,
+                                -60, 6, 0.1, -6, false, utf8("GR arc"), altLookAndFeel);
+        gr.shipped.setGRSource(&grLevel[0]);
+        gr.replacement.setGRSource(&grLevel[1]);
+        addAndMakeVisible(*over);
+        rows.push_back(std::move(over));
+
+        // Every category colour in the replacement style — the comparison is settled by
+        // now, so this asks only whether the glow holds up across the whole palette.
+        auto palette = std::make_unique<KnobRow>(utf8("Palette"), "replacement only, Size 2");
+        struct Swatch { const char* label; MuLookAndFeel::ColourIds colour; };
+        static constexpr Swatch swatches[] = {
+            { "Euclid",   Id::knobEuclidean }, { "Insert",  Id::knobInsertPad },
+            { "Level",    Id::knobLevel     }, { "FX Send", Id::knobFxSend    },
+            { "Reverb",   Id::knobReverb    }, { "Pan",     Id::knobPan       },
+            { "Pre Pad",  Id::knobPrePad    }, { "Post Pad",Id::knobPostPad   },
+        };
+        for (auto& sw : swatches)
+            palette->addReplacementOnly(sw.label, sw.colour,
+                                        MuLookAndFeel::kKnobSize2W, MuLookAndFeel::kKnobSize2H,
+                                        0, 100, 1, 62, false, {}, altLookAndFeel);
+        addAndMakeVisible(*palette);
+        rows.push_back(std::move(palette));
+
+        setSize(980, 680);
     }
 
     ~ControlDesignPanel() override { setLookAndFeel(nullptr); }
@@ -475,6 +562,11 @@ private:
 
     MuLookAndFeel lookAndFeel;
     GlowKnobLookAndFeel altLookAndFeel;
+
+    // Fixed gain-reduction readings for the GR-arc demo; KnobWithLabel polls these at
+    // 30 Hz, so they have to outlive the knobs pointed at them.
+    std::array<std::atomic<float>, 2> grLevel { { { 0.45f }, { 0.45f } } };
+
     std::vector<std::unique_ptr<KnobRow>> rows;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ControlDesignPanel)
