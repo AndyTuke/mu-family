@@ -168,6 +168,16 @@ MuLookAndFeel::MuLookAndFeel()
 }
 
 //==============================================================================
+// Matches drawRotarySlider below: same centre, same radius, same sweep.
+MuLookAndFeel::RotaryGeometry MuLookAndFeel::getRotaryGeometry(juce::Rectangle<int> sliderBounds) const
+{
+    const auto b = sliderBounds.toFloat();
+    return { b.getCentre(),
+             juce::jmin(b.getWidth(), b.getHeight()) * 0.5f - 2.0f,
+             kRotaryStartAngle,
+             kRotaryEndAngle };
+}
+
 void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h,
                                       float sliderPos, float startAngle, float endAngle,
                                       juce::Slider& slider)

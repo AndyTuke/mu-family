@@ -389,6 +389,20 @@ public:
     static constexpr float kRotaryStartAngle = juce::MathConstants<float>::pi * 1.2f;
     static constexpr float kRotaryEndAngle   = juce::MathConstants<float>::pi * 2.8f;
 
+    // Where a knob's annotations (modulation ring, live mod arc, GR arc) belong.
+    // KnobWithLabel draws those itself but must not assume where drawRotarySlider put
+    // the ring — a style that insets its ring would otherwise be annotated at the wrong
+    // radius. Whoever draws the rotary answers this, so the two cannot disagree.
+    struct RotaryGeometry
+    {
+        juce::Point<float> centre;
+        float              radius;      // the ring the annotations should hug
+        float              startAngle;
+        float              endAngle;
+    };
+
+    virtual RotaryGeometry getRotaryGeometry(juce::Rectangle<int> sliderBounds) const;
+
     // Voice subsection column width MUST equal Size 2 W so adjusting
     // kKnobCellPaddingX rescales both the cell AND the voice section unit in
     // lockstep. The constant is declared earlier in the class (so the

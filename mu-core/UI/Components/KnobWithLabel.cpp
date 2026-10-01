@@ -292,22 +292,43 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
     if (! isModulated && std::isnan(modulatedNorm) && grDisplay <= 0.005f) return;
 
     using mu_ui::sf;
-    const auto sb = slider.getBounds().toFloat();
-    const float cx = sb.getCentreX();
-    const float cy = sb.getCentreY();
-    const float radius = juce::jmin(sb.getWidth(), sb.getHeight()) * 0.5f - sf(2.0f);
-    constexpr float startAngle = MuLookAndFeel::kRotaryStartAngle;
-    constexpr float endAngle   = MuLookAndFeel::kRotaryEndAngle;
+
+    // Ask whoever draws the rotary where its ring is, rather than assuming. Any
+    // LookAndFeel that isn't ours falls back to the standard placement.
+    MuLookAndFeel::RotaryGeometry geo;
+    if (auto* mlf = dynamic_cast<MuLookAndFeel*>(&getLookAndFeel()))
+        geo = mlf->getRotaryGeometry(slider.getBounds());
+    else
+    {
+        const auto b = slider.getBounds().toFloat();
+        geo = { b.getCentre(), juce::jmin(b.getWidth(), b.getHeight()) * 0.5f - sf(2.0f),
+                MuLookAndFeel::kRotaryStartAngle, MuLookAndFeel::kRotaryEndAngle };
+    }
+
+    const float cx = geo.centre.x;
+    const float cy = geo.centre.y;
+    const float radius     = geo.radius;
+    const float startAngle = geo.startAngle;
+    const float endAngle   = geo.endAngle;
+
+    // Annotation offsets scale with the knob: a style that insets its ring can leave
+    // only a pixel or two of headroom at the smallest sizes, which fixed offsets
+    // would overrun.
+    const float ringOff = juce::jmax(sf(2.0f), radius * 0.08f);
+    const float arcR    = radius + juce::jmax(sf(4.0f), radius * 0.16f);
 
     const auto modCol = MuLookAndFeel::colour(MuLookAndFeel::indicatorModulationTint);
 
-    // Static "this knob is modulated" outer ring.
+    // Static "this knob is modulated" ring. Follows the rotary's own sweep rather
+    // than closing a full circle, so it doesn't cut across the dead zone.
     if (isModulated)
     {
-        const float outerOff = sf(2.0f);
+        const float r = radius + ringOff;
+        juce::Path ring;
+        ring.addCentredArc(cx, cy, r, r, 0.0f, startAngle, endAngle, true);
         g.setColour(modCol.withAlpha(0.55f));
-        g.drawEllipse(cx - radius - outerOff, cy - radius - outerOff,
-                      (radius + outerOff) * 2.0f, (radius + outerOff) * 2.0f, sf(1.2f));
+        g.strokePath(ring, juce::PathStrokeType(sf(1.2f), juce::PathStrokeType::curved,
+                                                juce::PathStrokeType::rounded));
     }
 
     // Live arc tracking the modulated value — originates at the knob's current
@@ -318,18 +339,27 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
     // sees the arc start at the LINEAR proportional position — which can be
     // far from the visible needle, so the arc draws "through" the needle
     // creating the illusion of an indicator on both sides.
+    // The arc reads as an amount added to or subtracted from the set value, so it is
+    // always anchored at the set position and the far end carries a tip marking the
+    // modulated position. Stroking alone can't convey that: the same pixels result
+    // whichever way round the two angles are, leaving add and subtract identical.
     if (! std::isnan(modulatedNorm))
     {
         const float setNorm = (float) slider.valueToProportionOfLength(slider.getValue());
         const float baseAngle = startAngle + setNorm        * (endAngle - startAngle);
         const float modAngle  = startAngle + modulatedNorm  * (endAngle - startAngle);
-        const float arcR = radius + sf(4.0f);
+
         juce::Path arc;
         arc.addCentredArc(cx, cy, arcR, arcR, 0.0f,
                           juce::jmin(baseAngle, modAngle), juce::jmax(baseAngle, modAngle), true);
         g.setColour(modCol.withAlpha(0.85f));
         g.strokePath(arc, juce::PathStrokeType(sf(1.5f), juce::PathStrokeType::curved,
                                                      juce::PathStrokeType::rounded));
+
+        const float tipR = juce::jmax(sf(1.6f), radius * 0.06f);
+        g.setColour(modCol);
+        g.fillEllipse(cx + arcR * std::sin(modAngle) - tipR,
+                      cy - arcR * std::cos(modAngle) - tipR, tipR * 2.0f, tipR * 2.0f);
     }
 
     // GR arc — orange arc sweeping from the max end (5 o'clock) backward
@@ -337,7 +367,6 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
     if (grDisplay > 0.005f)
     {
         const float grArcStart = endAngle - grDisplay * (endAngle - startAngle);
-        const float arcR = radius + sf(4.0f);
         juce::Path grArc;
         grArc.addCentredArc(cx, cy, arcR, arcR, 0.0f,
                             grArcStart, endAngle, true);

@@ -77,9 +77,19 @@ static juce::String cutoffValueText(double v)
 // as a fraction of the knob's own radius (never a fixed pixel count) so the dot and
 // ring glow never clip against the component edge at any knob size or sweep angle —
 // including right at the gap edges, where a fixed-pixel glow was clipping before.
-class GlowKnobLookAndFeel : public juce::LookAndFeel_V4
+class GlowKnobLookAndFeel : public MuLookAndFeel
 {
 public:
+    // The annotations KnobWithLabel paints (mod ring, live mod arc, GR arc) hug this
+    // ring, so report where it actually is — inset from the bounds, on this style's own
+    // sweep — rather than letting them assume the family's standard placement.
+    RotaryGeometry getRotaryGeometry(juce::Rectangle<int> sliderBounds) const override
+    {
+        const auto b = sliderBounds.toFloat();
+        const float outerR = juce::jmin(b.getWidth(), b.getHeight()) * 0.5f - 2.0f;
+        return { b.getCentre(), outerR * 0.82f, kStartAngle, kEndAngle };
+    }
+
     // 7 o'clock round through 12 back to 5 o'clock — a 300-degree sweep, 60-degree
     // gap at the bottom. Independent of the Slider's own (family-standard) rotary
     // parameters, which drawRotarySlider also receives but this style doesn't use.
