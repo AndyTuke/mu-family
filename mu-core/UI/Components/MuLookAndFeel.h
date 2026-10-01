@@ -379,6 +379,16 @@ public:
     static constexpr float kKnobValueFont = 8.0f;
     static constexpr int   kKnobValueH    = 11;   // value-text box height inside the rotary dead zone
 
+    // The family's rotary sweep — the single source of truth for every angle a knob
+    // is drawn against. KnobWithLabel pushes these onto its slider, so JUCE hands the
+    // same pair to drawRotarySlider, and its own overlays (mod ring, live mod arc, GR
+    // arc) read them here rather than restating them. Previously the overlays carried
+    // their own literals (pi*1.25 / pi*2.75) claiming to match juce::Slider's defaults,
+    // which are actually pi*1.2 / pi*2.8 — so every overlay sat 9 degrees inside the
+    // arc it was annotating. Values below are JUCE's, keeping the drawn arc unchanged.
+    static constexpr float kRotaryStartAngle = juce::MathConstants<float>::pi * 1.2f;
+    static constexpr float kRotaryEndAngle   = juce::MathConstants<float>::pi * 2.8f;
+
     // Voice subsection column width MUST equal Size 2 W so adjusting
     // kKnobCellPaddingX rescales both the cell AND the voice section unit in
     // lockstep. The constant is declared earlier in the class (so the

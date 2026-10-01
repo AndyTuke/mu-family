@@ -6,6 +6,11 @@ KnobWithLabel::KnobWithLabel(const juce::String& label,
 {
     slider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
     slider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    // State the sweep explicitly rather than inheriting JUCE's default, so the angle
+    // the rotary is drawn against and the one the overlays below use are the same
+    // constant and cannot drift apart.
+    slider.setRotaryParameters(MuLookAndFeel::kRotaryStartAngle,
+                               MuLookAndFeel::kRotaryEndAngle, true);
     // Scroll-wheel events from the DAW (timeline scroll during playback) would
     // otherwise change knob values on hover. Disable to prevent accidental edits.
     slider.setScrollWheelEnabled(false);
@@ -291,8 +296,8 @@ void KnobWithLabel::paintOverChildren(juce::Graphics& g)
     const float cx = sb.getCentreX();
     const float cy = sb.getCentreY();
     const float radius = juce::jmin(sb.getWidth(), sb.getHeight()) * 0.5f - sf(2.0f);
-    constexpr float startAngle = juce::MathConstants<float>::pi * 1.25f;  // matches juce::Slider rotary defaults
-    constexpr float endAngle   = juce::MathConstants<float>::pi * 2.75f;
+    constexpr float startAngle = MuLookAndFeel::kRotaryStartAngle;
+    constexpr float endAngle   = MuLookAndFeel::kRotaryEndAngle;
 
     const auto modCol = MuLookAndFeel::colour(MuLookAndFeel::indicatorModulationTint);
 
