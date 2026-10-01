@@ -168,74 +168,141 @@ MuLookAndFeel::MuLookAndFeel()
 }
 
 //==============================================================================
-// Matches drawRotarySlider below: same centre, same radius, same sweep.
+// Matches drawRotarySlider below: same centre, same ring, same sweep.
 MuLookAndFeel::RotaryGeometry MuLookAndFeel::getRotaryGeometry(juce::Rectangle<int> sliderBounds) const
 {
-    const auto b = sliderBounds.toFloat();
-    return { b.getCentre(),
-             juce::jmin(b.getWidth(), b.getHeight()) * 0.5f - 2.0f,
-             kRotaryStartAngle,
-             kRotaryEndAngle };
+    const auto  b      = sliderBounds.toFloat();
+    const float outerR = juce::jmin(b.getWidth(), b.getHeight()) * 0.5f - 2.0f;
+    return { b.getCentre(), outerR * kRotaryRingScale, kRotaryStartAngle, kRotaryEndAngle };
 }
 
-// In the dead zone at the bottom of the arc, for stepped and continuous alike.
+// Centred on the disc face, and only for a stepped control: a sweep's value is
+// approximate, so its position dot reports it alone. Suppressed on the smallest knobs,
+// where a legible digit would crowd the disc — their label carries the meaning instead.
 void MuLookAndFeel::drawKnobValueText(juce::Graphics& g, juce::Rectangle<int> sliderBounds,
-                                      const juce::String& text, bool /*isStepped*/) const
+                                      const juce::String& text, bool isStepped) const
 {
-    using mu_ui::s;
-    using mu_ui::sf;
+    const auto  b      = sliderBounds.toFloat();
+    const float outerR = juce::jmin(b.getWidth(), b.getHeight()) * 0.5f - 2.0f;
 
-    const auto  sb     = sliderBounds.toFloat();
-    const float radius = juce::jmin(sb.getWidth(), sb.getHeight()) * 0.5f - sf(2.0f);
-    const int   valueY = (int) (sb.getCentreY() + radius * 0.75f) - s(5);
+    if (! isStepped || outerR < kRotaryValueMinRadius)
+        return;
 
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(kKnobValueFont))));
+    const float faceR = outerR * kRotaryFaceScale;
     g.setColour(colour(valueText));
-    g.drawText(text, sliderBounds.getX(), valueY, sliderBounds.getWidth(), s(kKnobValueH),
-               juce::Justification::centred, true);
+    g.setFont(juce::Font(juce::FontOptions(juce::jmax(9.0f, outerR * 0.34f), juce::Font::bold)));
+    g.drawText(text, juce::Rectangle<float>(b.getCentreX() - faceR, b.getCentreY() - faceR,
+                                            faceR * 2.0f, faceR * 2.0f).toNearestInt(),
+               juce::Justification::centred, false);
 }
 
+// A raised disc lit from the top right, ringed by a glowing arc with a wedge removed
+// at the bottom, with the value marked by a single haloed dot. The family's sweep is
+// used rather than the angles passed in: every rotary in the family reads the same way
+// whether or not its slider carries custom rotary parameters.
+//
+// Every extent is a fraction of the knob's own radius, never a fixed pixel count, so
+// the glow stays inside the component at any of the four knob sizes and at any angle,
+// including hard against the ends of the sweep.
 void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h,
-                                      float sliderPos, float startAngle, float endAngle,
+                                      float sliderPos, float /*startAngle*/, float /*endAngle*/,
                                       juce::Slider& slider)
 {
-    const float cx = x + w * 0.5f;
-    const float cy = y + h * 0.5f;
-    const float radius = juce::jmin(w, h) * 0.5f - 2.0f;
-    const float trackWidth = juce::jmax(2.0f, radius * 0.12f);
-    const float angle = startAngle + sliderPos * (endAngle - startAngle);
+    const float cx     = x + w * 0.5f;
+    const float cy     = y + h * 0.5f;
+    const float outerR = juce::jmin(w, h) * 0.5f - 2.0f;
+    const float ringR  = outerR * kRotaryRingScale;
+    const float faceR  = outerR * kRotaryFaceScale;
+    const float angle  = kRotaryStartAngle + sliderPos * (kRotaryEndAngle - kRotaryStartAngle);
 
-    auto trackColour  = slider.findColour(juce::Slider::rotarySliderOutlineColourId);
-    auto fillColour   = slider.findColour(juce::Slider::rotarySliderFillColourId);
+    const auto accent = slider.findColour(juce::Slider::rotarySliderFillColourId);
 
-    // Background track
-    juce::Path bg;
-    bg.addCentredArc(cx, cy, radius, radius, 0.0f, startAngle, endAngle, true);
-    g.setColour(trackColour);
-    g.strokePath(bg, juce::PathStrokeType(trackWidth, juce::PathStrokeType::curved,
-                                           juce::PathStrokeType::rounded));
+    // Tick marks across the sweep, where there's room for them to stay distinct.
+    if (outerR >= 15.0f)
+    {
+        g.setColour(juce::Colours::white.withAlpha(0.18f));
+        constexpr int kTicks = 16;
+        for (int i = 0; i <= kTicks; ++i)
+        {
+            const float a = kRotaryStartAngle
+                          + (float) i / (float) kTicks * (kRotaryEndAngle - kRotaryStartAngle);
+            const juce::Point<float> p1(cx + outerR * 0.90f * std::sin(a), cy - outerR * 0.90f * std::cos(a));
+            const juce::Point<float> p2(cx + outerR * std::sin(a),         cy - outerR * std::cos(a));
+            g.drawLine({ p1, p2 }, 1.0f);
+        }
+    }
 
-    // Filled arc
-    juce::Path arc;
-    arc.addCentredArc(cx, cy, radius, radius, 0.0f, startAngle, angle, true);
-    g.setColour(fillColour);
-    g.strokePath(arc, juce::PathStrokeType(trackWidth, juce::PathStrokeType::curved,
-                                            juce::PathStrokeType::rounded));
+    // Disc face: cast shadow falling away from the light, then a radial gradient from
+    // the lit crown down to a shadowed rim.
+    juce::Path discPath;
+    discPath.addEllipse(cx - faceR, cy - faceR, faceR * 2.0f, faceR * 2.0f);
+    juce::DropShadow(juce::Colours::black.withAlpha(0.65f),
+                     (int) juce::jmax(2.0f, outerR * 0.18f),
+                     { -(int) (outerR * 0.06f), (int) (outerR * 0.09f) }).drawForPath(g, discPath);
 
-    // Centre dot
-    const float dotRadius = juce::jmax(2.0f, radius * 0.12f);
-    g.setColour(fillColour);
-    g.fillEllipse(cx - dotRadius, cy - dotRadius, dotRadius * 2.0f, dotRadius * 2.0f);
+    juce::ColourGradient faceGrad(juce::Colour(0xff3b2d47), cx + faceR * 0.42f, cy - faceR * 0.42f,
+                                  juce::Colour(0xff100c16), cx - faceR * 0.75f, cy + faceR * 0.85f, true);
+    faceGrad.addColour(0.35, juce::Colour(0xff2d2238));
+    faceGrad.addColour(0.70, juce::Colour(0xff1b1423));
+    g.setGradientFill(faceGrad);
+    g.fillPath(discPath);
 
-    // Pointer line
-    const float pointerLength = radius * 0.6f;
-    const float pointerWidth  = juce::jmax(1.5f, radius * 0.06f);
-    juce::Path pointer;
-    pointer.startNewSubPath(0.0f, -radius);
-    pointer.lineTo(0.0f, -(radius - pointerLength));
-    auto xf = juce::AffineTransform::rotation(angle).translated(cx, cy);
-    g.setColour(fillColour.brighter(0.3f));
-    g.strokePath(pointer, juce::PathStrokeType(pointerWidth), xf);
+    // Specular and occlusion as radial gradients clipped to the disc — a stroked arc
+    // has crisp sides and abrupt caps, which reads as a drawn line rather than light
+    // falling across a curved surface.
+    {
+        const juce::Graphics::ScopedSaveState state(g);
+        g.reduceClipRegion(discPath);
+
+        const float litX = cx + faceR * 0.50f, litY = cy - faceR * 0.50f, litR = faceR * 1.05f;
+        juce::ColourGradient spec(juce::Colours::white.withAlpha(0.20f), litX, litY,
+                                  juce::Colours::white.withAlpha(0.0f),  litX + litR, litY, true);
+        spec.addColour(0.45, juce::Colours::white.withAlpha(0.06f));
+        g.setGradientFill(spec);
+        g.fillEllipse(litX - litR, litY - litR, litR * 2.0f, litR * 2.0f);
+
+        const float shX = cx - faceR * 0.45f, shY = cy + faceR * 0.52f, shR = faceR * 0.95f;
+        juce::ColourGradient occl(juce::Colours::black.withAlpha(0.40f), shX, shY,
+                                  juce::Colours::black.withAlpha(0.0f),  shX + shR, shY, true);
+        g.setGradientFill(occl);
+        g.fillEllipse(shX - shR, shY - shR, shR * 2.0f, shR * 2.0f);
+    }
+
+    // Glowing ring — soft wide passes building to a crisp core line.
+    juce::Path ringPath;
+    ringPath.addCentredArc(cx, cy, ringR, ringR, 0.0f, kRotaryStartAngle, kRotaryEndAngle, true);
+    for (float i = 4.0f; i >= 1.0f; i -= 1.0f)
+    {
+        g.setColour(accent.withAlpha(0.10f));
+        g.strokePath(ringPath, juce::PathStrokeType(i * outerR * 0.09f,
+                                                    juce::PathStrokeType::curved,
+                                                    juce::PathStrokeType::rounded));
+    }
+    g.setColour(accent);
+    g.strokePath(ringPath, juce::PathStrokeType(juce::jmax(1.2f, outerR * 0.05f),
+                                                juce::PathStrokeType::curved,
+                                                juce::PathStrokeType::rounded));
+
+    // Position dot: the value indicator, with a smooth halo lighting the ring around it.
+    const float dotX = cx + ringR * std::sin(angle);
+    const float dotY = cy - ringR * std::cos(angle);
+    const float dotR = juce::jmax(2.0f, outerR * 0.065f);
+
+    const float haloR = dotR * 2.6f;
+    juce::ColourGradient halo(accent.withAlpha(0.55f), dotX, dotY,
+                              accent.withAlpha(0.0f),  dotX + haloR, dotY, true);
+    halo.addColour(0.35, accent.withAlpha(0.26f));
+    g.setGradientFill(halo);
+    g.fillEllipse(dotX - haloR, dotY - haloR, haloR * 2.0f, haloR * 2.0f);
+
+    const float bloomR = dotR * 1.8f;
+    juce::ColourGradient bloom(juce::Colours::white.withAlpha(0.40f), dotX, dotY,
+                               juce::Colours::white.withAlpha(0.0f),  dotX + bloomR, dotY, true);
+    g.setGradientFill(bloom);
+    g.fillEllipse(dotX - bloomR, dotY - bloomR, bloomR * 2.0f, bloomR * 2.0f);
+
+    g.setColour(juce::Colours::white);
+    g.fillEllipse(dotX - dotR, dotY - dotR, dotR * 2.0f, dotR * 2.0f);
 }
 
 void MuLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button,

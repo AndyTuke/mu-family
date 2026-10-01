@@ -379,15 +379,23 @@ public:
     static constexpr float kKnobValueFont = 8.0f;
     static constexpr int   kKnobValueH    = 11;   // value-text box height inside the rotary dead zone
 
-    // The family's rotary sweep — the single source of truth for every angle a knob
-    // is drawn against. KnobWithLabel pushes these onto its slider, so JUCE hands the
-    // same pair to drawRotarySlider, and its own overlays (mod ring, live mod arc, GR
-    // arc) read them here rather than restating them. Previously the overlays carried
-    // their own literals (pi*1.25 / pi*2.75) claiming to match juce::Slider's defaults,
-    // which are actually pi*1.2 / pi*2.8 — so every overlay sat 9 degrees inside the
-    // arc it was annotating. Values below are JUCE's, keeping the drawn arc unchanged.
-    static constexpr float kRotaryStartAngle = juce::MathConstants<float>::pi * 1.2f;
-    static constexpr float kRotaryEndAngle   = juce::MathConstants<float>::pi * 2.8f;
+    // The family's rotary sweep — the single source of truth for every angle a knob is
+    // drawn against. KnobWithLabel pushes these onto its slider so drag and draw agree,
+    // drawRotarySlider draws to them, and the overlays (mod ring, live mod arc, GR arc)
+    // read them here rather than restating them. 7 o'clock round through 12 back to
+    // 5 o'clock: a 300-degree sweep with a 60-degree wedge out of the bottom.
+    static constexpr float kRotaryStartAngle = (7.0f / 12.0f) * juce::MathConstants<float>::twoPi;
+    static constexpr float kRotaryEndAngle   = (5.0f / 12.0f) * juce::MathConstants<float>::twoPi
+                                             + juce::MathConstants<float>::twoPi;
+
+    // The glowing ring, and the disc inside it, as fractions of the rotary's radius.
+    static constexpr float kRotaryRingScale = 0.82f;
+    static constexpr float kRotaryFaceScale = 0.74f;
+
+    // Below this radius a centred value would crowd the disc, so it is left to the
+    // knob's label. Size 3 clears it; Size 4 does not, and nothing ships a stepped
+    // control that small.
+    static constexpr float kRotaryValueMinRadius = 12.0f;
 
     // Where a knob's annotations (modulation ring, live mod arc, GR arc) belong.
     // KnobWithLabel draws those itself but must not assume where drawRotarySlider put
