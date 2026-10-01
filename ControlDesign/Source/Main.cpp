@@ -88,11 +88,21 @@ namespace euclid
     constexpr int kSectionH = innerH;                             // 266
 }
 
-// mu-clid's Pad and Insert sub-panels, at the size and spacing they ship at.
+// mu-clid's Pad and Insert sub-panels.
+//
+// Shipped  — knob above its Pad/Mute switch. The switch row costs the bottom 16 px of
+//            the 68 px sub-panel, leaving 46 for the knob, which caps it at Size 3 (36
+//            wide) — too narrow for "Insert Start" / "Insert Length", hence the
+//            ellipsis.
+// Proposed — switch moved alongside the knob. That frees the full height, so the knobs
+//            go up to Size 2 (54 x 56): half again as much label width, and a
+//            noticeably larger target.
+enum class PadLayout { Shipped, Proposed };
+
 class PadSection : public juce::Component
 {
 public:
-    PadSection()
+    explicit PadSection(PadLayout l) : layout(l)
     {
         using namespace euclid;
 
@@ -155,14 +165,45 @@ public:
             auto& row = rows[(size_t) r];
             const int cy = rowOffsets[r] + kLabelH;
 
-            row.prePad  ->setBounds(s(prePadX  - kSectionX), s(cy + mP), s(padKnobW), s(padKnobH));
-            row.postPad ->setBounds(s(postPadX - kSectionX), s(cy + mP), s(padKnobW), s(padKnobH));
-            row.insStart->setBounds(s(insStX   - kSectionX), s(cy + mP), s(padKnobW), s(padKnobH));
-            row.insLen  ->setBounds(s(insLenX  - kSectionX), s(cy + mP), s(padKnobW), s(padKnobH));
+            if (layout == PadLayout::Shipped)
+            {
+                row.prePad  ->setBounds(s(prePadX  - kSectionX), s(cy + mP), s(padKnobW), s(padKnobH));
+                row.postPad ->setBounds(s(postPadX - kSectionX), s(cy + mP), s(padKnobW), s(padKnobH));
+                row.insStart->setBounds(s(insStX   - kSectionX), s(cy + mP), s(padKnobW), s(padKnobH));
+                row.insLen  ->setBounds(s(insLenX  - kSectionX), s(cy + mP), s(padKnobW), s(padKnobH));
 
-            row.preMode ->setBounds(s(preSwX  - kSectionX), s(cy + knobH + 2), s(padSw), s(kSwitchH));
-            row.postMode->setBounds(s(postSwX - kSectionX), s(cy + knobH + 2), s(padSw), s(kSwitchH));
-            row.insMode ->setBounds(s(insSwX  - kSectionX), s(cy + knobH + 2), s(insSw), s(kSwitchH));
+                row.preMode ->setBounds(s(preSwX  - kSectionX), s(cy + knobH + 2), s(padSw), s(kSwitchH));
+                row.postMode->setBounds(s(postSwX - kSectionX), s(cy + knobH + 2), s(padSw), s(kSwitchH));
+                row.insMode ->setBounds(s(insSwX  - kSectionX), s(cy + knobH + 2), s(insSw), s(kSwitchH));
+                continue;
+            }
+
+            // Proposed: each knob pairs with its switch side by side, so the knob owns
+            // the sub-panel's full height instead of sharing it with a switch row.
+            const int boxY   = cy;
+            const int knobY  = boxY + (ctrlH - 2 - kBigKnobH) / 2;
+            const int swY    = boxY + (ctrlH - 2 - kSwitchH) / 2;
+
+            // Pad panel: two [knob | switch] units, evenly spread.
+            constexpr int unitW = kBigKnobW + kUnitGap + padSw;
+            constexpr int padPairSpan = unitW * 2 + kUnitGap;
+            constexpr int padLeft = padX - kSectionX + (padPanelW - padPairSpan) / 2;
+
+            row.prePad  ->setBounds(s(padLeft), s(knobY), s(kBigKnobW), s(kBigKnobH));
+            row.preMode ->setBounds(s(padLeft + kBigKnobW + kUnitGap), s(swY), s(padSw), s(kSwitchH));
+
+            constexpr int unit2X = padLeft + unitW + kUnitGap;
+            row.postPad ->setBounds(s(unit2X), s(knobY), s(kBigKnobW), s(kBigKnobH));
+            row.postMode->setBounds(s(unit2X + kBigKnobW + kUnitGap), s(swY), s(padSw), s(kSwitchH));
+
+            // Insert panel: the pair shares one switch, so it sits to their right.
+            constexpr int insSpan  = kBigKnobW * 2 + kInsKnobGap + kUnitGap * 2 + insSw;
+            constexpr int insLeft  = insX - kSectionX + (insPanelW - insSpan) / 2;
+            constexpr int insLen2X = insLeft + kBigKnobW + kInsKnobGap;
+
+            row.insStart->setBounds(s(insLeft),  s(knobY), s(kBigKnobW), s(kBigKnobH));
+            row.insLen  ->setBounds(s(insLen2X), s(knobY), s(kBigKnobW), s(kBigKnobH));
+            row.insMode ->setBounds(s(insLen2X + kBigKnobW + kUnitGap * 2), s(swY), s(insSw), s(kSwitchH));
         }
 
         // Legato aligns with the Pad sub-panel, Mono with the Insert sub-panel.
@@ -176,6 +217,13 @@ public:
 
 private:
     static constexpr int kRows = 3;   // Euclid A, Euclid B, Accent
+
+    // Proposed layout: Size 2 is the largest that fits the sub-panel's 68 px once the
+    // switch row is gone (Size 1 is 70 tall and would need the row itself to grow).
+    static constexpr int kBigKnobW  = MuLookAndFeel::kKnobSize2W;   // 54
+    static constexpr int kBigKnobH  = MuLookAndFeel::kKnobSize2H;   // 56
+    static constexpr int kUnitGap   = 6;    // knob to its own switch
+    static constexpr int kInsKnobGap = 16;  // between the two insert knobs
 
     struct Row
     {
@@ -211,6 +259,7 @@ private:
         return raw;
     }
 
+    PadLayout layout;
     std::array<Row, kRows> rows;
     SegmentControl* legato = nullptr;
     SegmentControl* mono   = nullptr;
@@ -221,16 +270,18 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PadSection)
 };
 
-// Holds the section at its exact shipped size, centred on the window's background so
-// the borders aren't flush against the frame.
+// Both layouts stacked, each rendered at the exact size the section occupies in
+// mu-clid, so they can be compared without either being reinterpreted.
 class ControlDesignPanel : public juce::Component
 {
 public:
     ControlDesignPanel()
     {
         setLookAndFeel(&lookAndFeel);
-        addAndMakeVisible(section);
-        setSize(euclid::kSectionW + 2 * kMargin, euclid::kSectionH + 2 * kMargin);
+        addAndMakeVisible(shipped);
+        addAndMakeVisible(proposed);
+        setSize(euclid::kSectionW + 2 * kMargin,
+                euclid::kSectionH * 2 + kCaptionH * 2 + kMargin * 3);
     }
 
     ~ControlDesignPanel() override { setLookAndFeel(nullptr); }
@@ -238,18 +289,32 @@ public:
     void paint(juce::Graphics& g) override
     {
         g.fillAll(MuLookAndFeel::colour(MuLookAndFeel::windowBackground));
+
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
+        g.setFont(juce::Font(juce::FontOptions(11.0f)));
+        g.drawText("shipped - switch under the knob, Size 3",
+                   kMargin, shipped.getY() - kCaptionH, euclid::kSectionW, kCaptionH,
+                   juce::Justification::centredLeft, false);
+        g.drawText("proposed - switch alongside, Size 2",
+                   kMargin, proposed.getY() - kCaptionH, euclid::kSectionW, kCaptionH,
+                   juce::Justification::centredLeft, false);
     }
 
     void resized() override
     {
-        section.setBounds(kMargin, kMargin, euclid::kSectionW, euclid::kSectionH);
+        const int y1 = kMargin + kCaptionH;
+        shipped .setBounds(kMargin, y1, euclid::kSectionW, euclid::kSectionH);
+        const int y2 = y1 + euclid::kSectionH + kMargin + kCaptionH;
+        proposed.setBounds(kMargin, y2, euclid::kSectionW, euclid::kSectionH);
     }
 
 private:
-    static constexpr int kMargin = 16;
+    static constexpr int kMargin   = 16;
+    static constexpr int kCaptionH = 16;
 
     MuLookAndFeel lookAndFeel;
-    PadSection    section;
+    PadSection    shipped  { PadLayout::Shipped };
+    PadSection    proposed { PadLayout::Proposed };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ControlDesignPanel)
 };
