@@ -34,6 +34,19 @@ KnobWithLabel::KnobWithLabel(const juce::String& label,
     addAndMakeVisible(slider);
 }
 
+bool KnobWithLabel::isSteppedControl() const
+{
+    const double interval = slider.getInterval();
+    if (interval <= 0.0)
+        return false;   // continuous by construction
+
+    // 64 admits the widest stepped control the family ships (Hits, 0..64 by 1) while
+    // excluding fine-grained ranges that merely happen to carry an interval — Fine
+    // (-100..100 by 1) is 200 positions and reads as a sweep, not a counter.
+    const double positions = (slider.getMaximum() - slider.getMinimum()) / interval;
+    return positions > 0.0 && positions <= 64.0;
+}
+
 void KnobWithLabel::setRange(double min, double max, double step)
 {
     // JUCE's Slider::setRange clips the current value to the new range
@@ -195,18 +208,7 @@ void KnobWithLabel::paint(juce::Graphics& g)
                juce::Rectangle<int>(0, getHeight() - labelH, getWidth(), labelH),
                juce::Justification::centred, true);
 
-    // Value text in the dead zone (5–7 o'clock gap at the bottom of the arc)
-    const int   topPad  = s(MuLookAndFeel::kKnobTopPad);
-    const float sliderH = (float)(getHeight() - labelH - topPad);
-    const float radius  = juce::jmin((float)getWidth(), sliderH) * 0.5f - sf(2.0f);
-    const float cy      = (float)topPad + sliderH * 0.5f;
-    const int   valueY  = (int)(cy + radius * 0.75f) - s(5);
-
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuLookAndFeel::kKnobValueFont))));
-    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::valueText));
-    g.drawText(slider.getTextFromValue(slider.getValue()),
-               0, valueY, getWidth(), s(MuLookAndFeel::kKnobValueH),
-               juce::Justification::centred, true);
+    // Value text is drawn in paintOverChildren, after the rotary — see there.
 }
 
 void KnobWithLabel::bindModulation(const char*             destId,
@@ -288,6 +290,14 @@ void KnobWithLabel::timerCallback()
 
 void KnobWithLabel::paintOverChildren(juce::Graphics& g)
 {
+    // Value text. Drawn here rather than in paint() because paint() runs before the
+    // child slider does: a style that fills the area the text sits in would bury it.
+    // The text is ours, its placement is the style's.
+    if (auto* mlf = dynamic_cast<MuLookAndFeel*>(&getLookAndFeel()))
+        mlf->drawKnobValueText(g, slider.getBounds(),
+                               slider.getTextFromValue(slider.getValue()),
+                               isSteppedControl());
+
     // Modulation indicator ring and GR arc overlay.
     if (! isModulated && std::isnan(modulatedNorm) && grDisplay <= 0.005f) return;
 

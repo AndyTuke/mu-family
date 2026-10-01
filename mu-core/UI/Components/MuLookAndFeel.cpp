@@ -178,6 +178,23 @@ MuLookAndFeel::RotaryGeometry MuLookAndFeel::getRotaryGeometry(juce::Rectangle<i
              kRotaryEndAngle };
 }
 
+// In the dead zone at the bottom of the arc, for stepped and continuous alike.
+void MuLookAndFeel::drawKnobValueText(juce::Graphics& g, juce::Rectangle<int> sliderBounds,
+                                      const juce::String& text, bool /*isStepped*/) const
+{
+    using mu_ui::s;
+    using mu_ui::sf;
+
+    const auto  sb     = sliderBounds.toFloat();
+    const float radius = juce::jmin(sb.getWidth(), sb.getHeight()) * 0.5f - sf(2.0f);
+    const int   valueY = (int) (sb.getCentreY() + radius * 0.75f) - s(5);
+
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(kKnobValueFont))));
+    g.setColour(colour(valueText));
+    g.drawText(text, sliderBounds.getX(), valueY, sliderBounds.getWidth(), s(kKnobValueH),
+               juce::Justification::centred, true);
+}
+
 void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h,
                                       float sliderPos, float startAngle, float endAngle,
                                       juce::Slider& slider)

@@ -90,6 +90,25 @@ public:
         return { b.getCentre(), outerR * 0.82f, kStartAngle, kEndAngle };
     }
 
+    // A stepped control carries its number on the disc face, where the dead zone this
+    // style fills used to put it. A sweep's value is approximate, so the position dot
+    // reports it alone and no number is drawn.
+    void drawKnobValueText(juce::Graphics& g, juce::Rectangle<int> sliderBounds,
+                           const juce::String& text, bool isStepped) const override
+    {
+        if (! isStepped) return;
+
+        const auto  b      = sliderBounds.toFloat();
+        const float outerR = juce::jmin(b.getWidth(), b.getHeight()) * 0.5f - 2.0f;
+        const float faceR  = outerR * 0.74f;
+
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::valueText));
+        g.setFont(juce::Font(juce::FontOptions(juce::jmax(9.0f, outerR * 0.34f), juce::Font::bold)));
+        g.drawText(text, juce::Rectangle<float>(b.getCentreX() - faceR, b.getCentreY() - faceR,
+                                                faceR * 2.0f, faceR * 2.0f).toNearestInt(),
+                   juce::Justification::centred, false);
+    }
+
     // 7 o'clock round through 12 back to 5 o'clock — a 300-degree sweep, 60-degree
     // gap at the bottom. Independent of the Slider's own (family-standard) rotary
     // parameters, which drawRotarySlider also receives but this style doesn't use.
@@ -218,20 +237,6 @@ public:
 
         g.setColour(juce::Colours::white);
         g.fillEllipse(dotX - dotR, dotY - dotR, dotR * 2.0f, dotR * 2.0f);
-
-        // Optional value readout centred inside the disc — step-type controls only
-        // (flagged via a component property on the Slider), where the exact number is
-        // worth reading; sweeping controls stay dot-only. Formatted from the raw value
-        // rather than getTextFromValue, which the caller blanks to suppress
-        // KnobWithLabel's own dead-zone value text.
-        if ((bool) slider.getProperties().getWithDefault("muShowCenterValue", false))
-        {
-            g.setColour(MuLookAndFeel::colour(MuLookAndFeel::valueText));
-            g.setFont(juce::Font(juce::FontOptions(juce::jmax(9.0f, outerR * 0.34f), juce::Font::bold)));
-            g.drawText(juce::String((int) std::lround(slider.getValue())),
-                      juce::Rectangle<float>(cx - faceR, cy - faceR, faceR * 2.0f, faceR * 2.0f).toNearestInt(),
-                      juce::Justification::centred, false);
-        }
     }
 };
 
@@ -257,22 +262,16 @@ public:
     // control drawn by altLnf (the proposed replacement). Both get identical label,
     // colour, size, range and value, so the only difference on screen is the drawing.
     //
-    // isStep marks a discrete control, where the exact number is worth reading, from a
-    // smooth/continuous one, where it isn't. The replacement shows the value centred on
-    // its disc for step controls and stays dot-only for smooth ones, so on the
-    // replacement KnobWithLabel's own dead-zone value text is always suppressed: it has
-    // no flag for that, so the slider's textFromValueFunction is blanked and the
-    // component draws an empty string. (It must NOT be done by painting over that
-    // region — the glow disc fills the dead zone, so an opaque patch slices the disc
-    // and erases the position dot whenever the value sits low in the sweep.)
     struct Pair { KnobWithLabel& shipped; KnobWithLabel& replacement; };
 
-    // textFn, when given, is the product's own value formatter (the shipped knobs show
-    // formatted text like "8.0" or "240", never JUCE's raw float), applied to the
-    // shipped half only — the replacement's text is blanked either way.
+    // Whether the value is drawn, and where, is now the style's decision (via
+    // MuLookAndFeel::drawKnobValueText) and stepped-vs-smooth is derived from the
+    // slider's own interval — so neither is declared here. textFn, when given, is the
+    // product's own value formatter: shipped knobs show formatted text like "8.0" or
+    // "240", never JUCE's raw float, and both halves use it so they stay comparable.
     Pair addPair(const juce::String& label, MuLookAndFeel::ColourIds colour,
                  int w, int h, double lo, double hi, double step, double value,
-                 bool isStep, const juce::String& caption, juce::LookAndFeel& altLnf,
+                 const juce::String& caption, juce::LookAndFeel& altLnf,
                  std::function<juce::String(double)> textFn = nullptr)
     {
         auto make = [&](bool replacement) -> KnobWithLabel&
@@ -281,17 +280,13 @@ public:
             k->setSize(w, h);
             k->setRange(lo, hi, step);
             k->setValue(value, juce::dontSendNotification);
-            if (replacement)
-            {
-                k->setLookAndFeel(&altLnf);
-                k->getSlider().getProperties().set("muShowCenterValue", isStep);
-                k->getSlider().textFromValueFunction = [](double) { return juce::String(); };
-            }
-            else if (textFn)
+            if (textFn)
             {
                 k->getSlider().textFromValueFunction = textFn;
                 k->getSlider().setValue(value, juce::dontSendNotification);   // re-render with it
             }
+            if (replacement)
+                k->setLookAndFeel(&altLnf);
             addAndMakeVisible(*k);
             auto& ref = *k;
             entries.push_back({ std::move(k), label, ! replacement,
@@ -308,7 +303,7 @@ public:
     // where the comparison is already established and only the new look is in question.
     KnobWithLabel& addReplacementOnly(const juce::String& label, MuLookAndFeel::ColourIds colour,
                                       int w, int h, double lo, double hi, double step,
-                                      double value, bool isStep, const juce::String& caption,
+                                      double value, const juce::String& caption,
                                       juce::LookAndFeel& altLnf)
     {
         auto k = std::make_unique<KnobWithLabel>(label, colour);
@@ -316,8 +311,6 @@ public:
         k->setRange(lo, hi, step);
         k->setValue(value, juce::dontSendNotification);
         k->setLookAndFeel(&altLnf);
-        k->getSlider().getProperties().set("muShowCenterValue", isStep);
-        k->getSlider().textFromValueFunction = [](double) { return juce::String(); };
         addAndMakeVisible(*k);
         auto& ref = *k;
         entries.push_back({ std::move(k), label, true, caption, 1 });
@@ -448,14 +441,14 @@ public:
         auto clid = std::make_unique<KnobRow>(utf8("mu-clid \xe2\x80\x94 purple"),
                                               "knobEuclidean");
         clid->addPair("Steps",  Id::knobEuclidean, MuLookAndFeel::kKnobSize1W, MuLookAndFeel::kKnobSize1H,
-                      1, 64, 1, 5,      true,  utf8("Size 1 \xc2\xb7 step"),   altLookAndFeel);
+                      1, 64, 1, 5,      utf8("Size 1 \xc2\xb7 step"),   altLookAndFeel);
         clid->addPair("Attack (ms)", Id::knobEuclidean, MuLookAndFeel::kKnobSize1W, MuLookAndFeel::kKnobSize1H,
-                      0, 10, 0.001, 0.24, false, utf8("Size 1 \xc2\xb7 smooth (not shipped)"), altLookAndFeel,
+                      0, 10, 0.001, 0.24, utf8("Size 1 \xc2\xb7 smooth (not shipped)"), altLookAndFeel,
                       adsrValueText);
         clid->addPair("Octave", Id::knobEuclidean, MuLookAndFeel::kKnobSize2W, MuLookAndFeel::kKnobSize2H,
-                      -3, 3, 1, 2,      true,  utf8("Size 2 \xc2\xb7 step"),   altLookAndFeel);
+                      -3, 3, 1, 2,      utf8("Size 2 \xc2\xb7 step"),   altLookAndFeel);
         clid->addPair("Attack (ms)", Id::knobEuclidean, MuLookAndFeel::kKnobSize2W, MuLookAndFeel::kKnobSize2H,
-                      0, 10, 0.001, 0.24, false, utf8("Size 2 \xc2\xb7 smooth"), altLookAndFeel,
+                      0, 10, 0.001, 0.24, utf8("Size 2 \xc2\xb7 smooth"), altLookAndFeel,
                       adsrValueText);
         addAndMakeVisible(*clid);
         rows.push_back(std::move(clid));
@@ -465,10 +458,10 @@ public:
         auto tant = std::make_unique<KnobRow>(utf8("mu-tant \xe2\x80\x94 green"),
                                               "knobPostPad");
         tant->addPair("Cutoff (kHz)", Id::knobPostPad, MuLookAndFeel::kKnobSize1W, MuLookAndFeel::kKnobSize1H,
-                      20, 20000, 0.0, 8000, false, utf8("Size 1 \xc2\xb7 smooth (not shipped)"), altLookAndFeel,
+                      20, 20000, 0.0, 8000, utf8("Size 1 \xc2\xb7 smooth (not shipped)"), altLookAndFeel,
                       cutoffValueText);
         tant->addPair("Cutoff (kHz)", Id::knobPostPad, MuLookAndFeel::kKnobSize2W, MuLookAndFeel::kKnobSize2H,
-                      20, 20000, 0.0, 8000, false, utf8("Size 2 \xc2\xb7 smooth"), altLookAndFeel,
+                      20, 20000, 0.0, 8000, utf8("Size 2 \xc2\xb7 smooth"), altLookAndFeel,
                       cutoffValueText);
         addAndMakeVisible(*tant);
         rows.push_back(std::move(tant));
@@ -479,13 +472,13 @@ public:
         // because fitting a centred number into that disc is the hardest case there is.
         auto small = std::make_unique<KnobRow>(utf8("Small sizes"), "Size 3 + Size 4");
         small->addPair("Pre Pad", Id::knobPrePad, MuLookAndFeel::kKnobSize3W, MuLookAndFeel::kKnobSize3H,
-                       0, 16, 1, 3, true, utf8("Size 3 \xc2\xb7 step"), altLookAndFeel);
+                       0, 16, 1, 3, utf8("Size 3 \xc2\xb7 step"), altLookAndFeel);
         small->addPair("SC Amount", Id::knobPan, MuLookAndFeel::kKnobSize3W, MuLookAndFeel::kKnobSize3H,
-                       0, 100, 0.1, 62, false, utf8("Size 3 \xc2\xb7 smooth"), altLookAndFeel);
+                       0, 100, 0.1, 62, utf8("Size 3 \xc2\xb7 smooth"), altLookAndFeel);
         small->addPair("Steps", Id::knobEuclidean, MuLookAndFeel::kKnobSize4W, MuLookAndFeel::kKnobSize4H,
-                       1, 64, 1, 5, true, utf8("Size 4 \xc2\xb7 step (not shipped)"), altLookAndFeel);
+                       1, 64, 1, 5, utf8("Size 4 \xc2\xb7 step (not shipped)"), altLookAndFeel);
         small->addPair("Attack", Id::knobLevel, MuLookAndFeel::kKnobSize4W, MuLookAndFeel::kKnobSize4H,
-                       0, 10, 0.001, 0.24, false, utf8("Size 4 \xc2\xb7 smooth"), altLookAndFeel,
+                       0, 10, 0.001, 0.24, utf8("Size 4 \xc2\xb7 smooth"), altLookAndFeel,
                        adsrValueText);
         addAndMakeVisible(*small);
         rows.push_back(std::move(small));
@@ -496,19 +489,19 @@ public:
         // showing them here.
         auto over = std::make_unique<KnobRow>(utf8("Overlays"), "drawn by KnobWithLabel");
         auto modRing = over->addPair("Cutoff", Id::knobPostPad, MuLookAndFeel::kKnobSize2W, MuLookAndFeel::kKnobSize2H,
-                                     20, 20000, 0.0, 8000, false, utf8("mod ring"), altLookAndFeel, cutoffValueText);
+                                     20, 20000, 0.0, 8000, utf8("mod ring"), altLookAndFeel, cutoffValueText);
         modRing.shipped.setIsModulated(true);
         modRing.replacement.setIsModulated(true);
 
         auto modArc = over->addPair("Cutoff", Id::knobPostPad, MuLookAndFeel::kKnobSize2W, MuLookAndFeel::kKnobSize2H,
-                                    20, 20000, 0.0, 8000, false, utf8("mod ring + live arc"), altLookAndFeel, cutoffValueText);
+                                    20, 20000, 0.0, 8000, utf8("mod ring + live arc"), altLookAndFeel, cutoffValueText);
         modArc.shipped.setIsModulated(true);
         modArc.replacement.setIsModulated(true);
         modArc.shipped.setModulatedNorm(0.78f);
         modArc.replacement.setModulatedNorm(0.78f);
 
         auto gr = over->addPair("Level", Id::knobLevel, MuLookAndFeel::kKnobSize2W, MuLookAndFeel::kKnobSize2H,
-                                -60, 6, 0.1, -6, false, utf8("GR arc"), altLookAndFeel);
+                                -60, 6, 0.1, -6, utf8("GR arc"), altLookAndFeel);
         gr.shipped.setGRSource(&grLevel[0]);
         gr.replacement.setGRSource(&grLevel[1]);
         addAndMakeVisible(*over);
@@ -527,7 +520,7 @@ public:
         for (auto& sw : swatches)
             palette->addReplacementOnly(sw.label, sw.colour,
                                         MuLookAndFeel::kKnobSize2W, MuLookAndFeel::kKnobSize2H,
-                                        0, 100, 1, 62, false, {}, altLookAndFeel);
+                                        0, 100, 1, 62, {}, altLookAndFeel);
         addAndMakeVisible(*palette);
         rows.push_back(std::move(palette));
 

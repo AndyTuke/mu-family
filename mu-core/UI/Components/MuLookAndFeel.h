@@ -403,6 +403,13 @@ public:
 
     virtual RotaryGeometry getRotaryGeometry(juce::Rectangle<int> sliderBounds) const;
 
+    // Where a knob's value text goes. KnobWithLabel owns the text and decides whether
+    // the control is stepped; placing it is a style decision, so it lives here — a
+    // style that fills the rotary's dead zone has nowhere to put it and would
+    // otherwise have the text drawn straight through its own graphics.
+    virtual void drawKnobValueText(juce::Graphics&, juce::Rectangle<int> sliderBounds,
+                                   const juce::String& text, bool isStepped) const;
+
     // Voice subsection column width MUST equal Size 2 W so adjusting
     // kKnobCellPaddingX rescales both the cell AND the voice section unit in
     // lockstep. The constant is declared earlier in the class (so the

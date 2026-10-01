@@ -18,6 +18,12 @@ public:
 
     juce::Slider& getSlider() noexcept { return slider; }
 
+    // True when the range resolves to few enough discrete positions that the exact
+    // number is worth reading (Steps, Hits, Octave) rather than a continuous sweep
+    // whose value is approximate by nature (times, frequencies, levels). Derived from
+    // the slider's own interval, so no call site has to declare it.
+    bool isSteppedControl() const;
+
     void setRange(double min, double max, double step = 0.0);
     void setValue(double v, juce::NotificationType n = juce::dontSendNotification);
     double getValue() const;
