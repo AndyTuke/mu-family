@@ -31,10 +31,10 @@ private:
     KnobWithLabel pitchOctave { "Octave",      Id::knobEuclidean };
     KnobWithLabel pitchSemi   { "Semitone",   Id::knobEuclidean };
     KnobWithLabel pitchFine   { "Fine",       Id::knobEuclidean };
-    KnobWithLabel pitchAtk    { "Attack (ms)", Id::knobEuclidean };
-    KnobWithLabel pitchDec    { "Decay (ms)",  Id::knobEuclidean };
-    KnobWithLabel pitchSus    { "Sustain (%)", Id::knobEuclidean };
-    KnobWithLabel pitchRel    { "Release (ms)", Id::knobEuclidean };
+    KnobWithLabel pitchAtk    { "A", Id::knobEuclidean };
+    KnobWithLabel pitchDec    { "D",  Id::knobEuclidean };
+    KnobWithLabel pitchSus    { "S", Id::knobEuclidean };
+    KnobWithLabel pitchRel    { "R", Id::knobEuclidean };
     KnobWithLabel pitchDepth  { "Depth",      Id::knobEuclidean };
 
     void apvtsSet(const char* suffix, float v);

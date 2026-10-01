@@ -251,13 +251,6 @@ VoicePanel::VoicePanel(PluginProcessor& p)
         if (v < 1000.0) return juce::String((int)std::round(v));
         return juce::String(v / 1000.0, 2);
     };
-    fltLoCutKnob.onValueChanged = [this](double v) {
-        fltLoCutKnob.setLabel(v <= 0.0 ? "Low Cut" : (v < 1000.0 ? "Low Cut (Hz)" : "Low Cut (kHz)"));
-    };
-    fltCutKnob.onValueChanged = [this](double v)
-    {
-        fltCutKnob.setLabel(v < 1000.0 ? "Cutoff (Hz)" : "Cutoff (kHz)");
-    };
 
     // ── Filter 2 ────────────────────────────────────────────────────────────
     setupLabel(flt2TypeLabel, "Type");
@@ -271,12 +264,6 @@ VoicePanel::VoicePanel(PluginProcessor& p)
         if (v <= 0.0) return "Off";
         if (v < 1000.0) return juce::String((int)std::round(v));
         return juce::String(v / 1000.0, 2);
-    };
-    flt2LoCutKnob.onValueChanged = [this](double v) {
-        flt2LoCutKnob.setLabel(v <= 0.0 ? "Low Cut" : (v < 1000.0 ? "Low Cut (Hz)" : "Low Cut (kHz)"));
-    };
-    flt2CutKnob.onValueChanged = [this](double v) {
-        flt2CutKnob.setLabel(v < 1000.0 ? "Cutoff (Hz)" : "Cutoff (kHz)");
     };
 
     addAndMakeVisible(fltSeriesBtn);

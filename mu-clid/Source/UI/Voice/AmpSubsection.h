@@ -33,15 +33,15 @@ private:
     PluginProcessor& proc;
     int rhythmIndex = -1;
 
-    KnobWithLabel ampLevel   { "Level (dB)",   Id::knobLevel  };
+    KnobWithLabel ampLevel   { "Level",   Id::knobLevel  };
     KnobWithLabel ampSendEff { "Effect",       Id::knobFxSend };
     KnobWithLabel ampSendDly { "Delay",        Id::knobFxSend };
     KnobWithLabel ampSendRev { "Reverb",       Id::knobFxSend };
     KnobWithLabel ampAccent  { "Accent",       Id::knobLevel  };
-    KnobWithLabel ampAtk     { "Attack (ms)",  Id::knobLevel  };
-    KnobWithLabel ampDec     { "Decay (ms)",   Id::knobLevel  };
-    KnobWithLabel ampSus     { "Sustain (%)",  Id::knobLevel  };
-    KnobWithLabel ampRel     { "Release (ms)", Id::knobLevel  };
+    KnobWithLabel ampAtk     { "A",  Id::knobLevel  };
+    KnobWithLabel ampDec     { "D",   Id::knobLevel  };
+    KnobWithLabel ampSus     { "S",  Id::knobLevel  };
+    KnobWithLabel ampRel     { "R", Id::knobLevel  };
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();

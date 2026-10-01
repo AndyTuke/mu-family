@@ -20,10 +20,6 @@ static double parseAdsrTimeSec(const juce::String& s)
         return t.dropLastCharacters(1).trim().getDoubleValue();
     return t.getDoubleValue() / 1000.0;
 }
-static juce::String adsrLabelStr(const juce::String& name, double v)
-{
-    return name + (v < 1.0 ? " (ms)" : " (s)");
-}
 static juce::String adsrValueStr(double v)
 {
     double ms = std::max(1.0, v * 1000.0);
@@ -115,12 +111,6 @@ void AmpSubsection::wireCallbacks()
         k->getSlider().valueFromTextFunction = sendParse;
     }
 
-    // Set initial dynamic labels. Single-letter A/D/S/R — universally understood,
-    // gives the knob label room to render the unit suffix without ellipsis.
-    ampAtk.setLabel(adsrLabelStr("A", ampAtk.getValue()));
-    ampDec.setLabel(adsrLabelStr("D", ampDec.getValue()));
-    ampSus.setLabel("S (%)");
-    ampRel.setLabel(ampRel.getValue() >= 10.0 ? "R (s)" : adsrLabelStr("R", ampRel.getValue()));
 
     struct { KnobWithLabel* k; const char* name; } entries[] = {
         { &ampLevel,   "Amp Level"   }, { &ampSendEff, "Amp Send Effect" },
@@ -176,10 +166,10 @@ void AmpSubsection::wireCallbacks()
     // Slider value == APVTS value (Step 0) — no conversion in the lambdas.
     ampLevel.onValueChanged  = [this](double v) { apvtsSet("ampLvl",   (float)v); };
     ampAccent.onValueChanged = [this](double v) { apvtsSet("accentDb", (float)v); };
-    ampAtk.onValueChanged    = [this](double v) { apvtsSet("aEnvAtk",  (float)v); ampAtk.setLabel(adsrLabelStr("A", v)); };
-    ampDec.onValueChanged    = [this](double v) { apvtsSet("aEnvDec",  (float)v); ampDec.setLabel(adsrLabelStr("D", v)); };
+    ampAtk.onValueChanged    = [this](double v) { apvtsSet("aEnvAtk",  (float)v); };
+    ampDec.onValueChanged    = [this](double v) { apvtsSet("aEnvDec",  (float)v); };
     ampSus.onValueChanged    = [this](double v) { apvtsSet("aEnvSus",  (float)v); };
-    ampRel.onValueChanged    = [this](double v) { apvtsSet("aEnvRel",  (float)v); ampRel.setLabel(v >= 10.0 ? "R (s)" : adsrLabelStr("R", v)); };
+    ampRel.onValueChanged    = [this](double v) { apvtsSet("aEnvRel",  (float)v); };
 
     auto writeChannelSend = [this](const char* suffix, double v) {
         if (rhythmIndex < 0) return;
@@ -208,11 +198,9 @@ void AmpSubsection::loadFromRhythm()
 
     ampLevel.setValue(p.ampLevel,  dn);          // dB already (Step 0)
     ampAccent.setValue(p.accentDb, dn);          // dB already
-    ampAtk.setValue(p.ampEnvAtk,   dn); ampAtk.setLabel(adsrLabelStr("A", p.ampEnvAtk));
-    ampDec.setValue(p.ampEnvDec,   dn); ampDec.setLabel(adsrLabelStr("D", p.ampEnvDec));
-    ampSus.setValue(p.ampEnvSus * 100.0, dn);    // voiceParams stores 0..1; APVTS + slider are 0..100 (data-layer scaling)
+    ampAtk.setValue(p.ampEnvAtk,   dn);    ampDec.setValue(p.ampEnvDec,   dn);    ampSus.setValue(p.ampEnvSus * 100.0, dn);    // voiceParams stores 0..1; APVTS + slider are 0..100 (data-layer scaling)
     { const double relV = p.ampRelToEnd ? 10.0 : p.ampEnvRel;
-      ampRel.setValue(relV, dn); ampRel.setLabel(relV >= 10.0 ? "R (s)" : adsrLabelStr("R", relV)); }
+      ampRel.setValue(relV, dn); }
 
     const auto chPfx = "ch" + juce::String(rhythmIndex) + "_";
     auto load = [&](KnobWithLabel& k, const char* param) {
@@ -232,10 +220,10 @@ void AmpSubsection::refreshSuffix(const juce::String& suffix)
 
     if      (suffix == "ampLvl")   ampLevel .setValue(p.ampLevel,  dn);
     else if (suffix == "accentDb") ampAccent.setValue(p.accentDb,  dn);
-    else if (suffix == "aEnvAtk")  { ampAtk.setValue(p.ampEnvAtk, dn); ampAtk.setLabel(adsrLabelStr("A", p.ampEnvAtk)); }
-    else if (suffix == "aEnvDec")  { ampDec.setValue(p.ampEnvDec, dn); ampDec.setLabel(adsrLabelStr("D", p.ampEnvDec)); }
+    else if (suffix == "aEnvAtk")  { ampAtk.setValue(p.ampEnvAtk, dn); }
+    else if (suffix == "aEnvDec")  { ampDec.setValue(p.ampEnvDec, dn); }
     else if (suffix == "aEnvSus")  ampSus   .setValue(p.ampEnvSus * 100.0,                     dn);
-    else if (suffix == "aEnvRel")  { const double rv = p.ampRelToEnd ? 10.0 : p.ampEnvRel; ampRel.setValue(rv, dn); ampRel.setLabel(rv >= 10.0 ? "R (s)" : adsrLabelStr("R", rv)); }
+    else if (suffix == "aEnvRel")  { const double rv = p.ampRelToEnd ? 10.0 : p.ampEnvRel; ampRel.setValue(rv, dn); }
     else if (suffix == "sendEff" || suffix == "sendDly" || suffix == "sendRev")
     {
         const auto chPfx = "ch" + juce::String(rhythmIndex) + "_";

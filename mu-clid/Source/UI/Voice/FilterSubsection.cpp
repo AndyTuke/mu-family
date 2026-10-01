@@ -5,14 +5,6 @@
 #include "Audio/AlgorithmNames.h"   // mu_audio::populateFilterTypeDropdown
 
 namespace {
-static juce::String cutoffLabelStr(double hz)
-{
-    return hz < 1000.0 ? "Cutoff (Hz)" : "Cutoff (kHz)";
-}
-static juce::String adsrLabelStr(const juce::String& name, double v)
-{
-    return name + (v < 1.0 ? " (ms)" : " (s)");
-}
 static juce::String adsrValueStr(double v)
 {
     double ms = std::max(1.0, v * 1000.0);
@@ -109,7 +101,7 @@ void FilterSubsection::wireCallbacks()
     // Depth: slider runs in semitones (0..48); show as integer.
     filterDepth.getSlider().textFromValueFunction = [](double v) -> juce::String { return juce::String((int)std::round(v)); };
 
-    // Cutoff: number only; unit lives in the label.
+    // Cutoff: number only; the unit is shown in the status bar on hover.
     filterCutoff.getSlider().textFromValueFunction = [](double v) -> juce::String {
         if (v < 1000.0) return juce::String((int)std::round(v));
         return juce::String(v / 1000.0, 1);
@@ -121,13 +113,6 @@ void FilterSubsection::wireCallbacks()
         return t.getDoubleValue();
     };
 
-    // Set initial dynamic labels. Single-letter A/D/S/R — universally understood,
-    // gives the knob label room to render the unit suffix without ellipsis.
-    filterCutoff.setLabel(cutoffLabelStr(filterCutoff.getValue()));
-    filterAtk   .setLabel(adsrLabelStr("A", filterAtk.getValue()));
-    filterDec   .setLabel(adsrLabelStr("D", filterDec.getValue()));
-    filterSus   .setLabel("S (%)");
-    filterRel   .setLabel(adsrLabelStr("R", filterRel.getValue()));
 
     // Drive: display as integer 0-100.
     filterDrive.getSlider().textFromValueFunction = [](double v) -> juce::String {
@@ -191,13 +176,12 @@ void FilterSubsection::wireCallbacks()
     };
     filterCutoff.onValueChanged = [this](double v) {
         apvtsSet("fltCut", (float)v);
-        filterCutoff.setLabel(cutoffLabelStr(v));
     };
     filterRes   .onValueChanged = [this](double v) { apvtsSet("fltRes",  (float)v); };
-    filterAtk   .onValueChanged = [this](double v) { apvtsSet("fEnvAtk", (float)v); filterAtk.setLabel(adsrLabelStr("A", v)); };
-    filterDec   .onValueChanged = [this](double v) { apvtsSet("fEnvDec", (float)v); filterDec.setLabel(adsrLabelStr("D", v)); };
+    filterAtk   .onValueChanged = [this](double v) { apvtsSet("fEnvAtk", (float)v); };
+    filterDec   .onValueChanged = [this](double v) { apvtsSet("fEnvDec", (float)v); };
     filterSus   .onValueChanged = [this](double v) { apvtsSet("fEnvSus", (float)v); };
-    filterRel   .onValueChanged = [this](double v) { apvtsSet("fEnvRel", (float)v); filterRel.setLabel(adsrLabelStr("R", v)); };
+    filterRel   .onValueChanged = [this](double v) { apvtsSet("fEnvRel", (float)v); };
     filterDepth .onValueChanged = [this](double v) { apvtsSet("fEnvDep", (float)v); };
     filterLowCut.onValueChanged = [this](double v) { apvtsSet("fltLoCut", (float)v); };
     // Drive UI is 0..100; APVTS stores 0..1.
@@ -221,13 +205,9 @@ void FilterSubsection::loadFromRhythm()
 
     filterType  .setSelectedId(p.filterType + 1, false);
     filterCutoff.setValue(p.filterCutoff,           dn);
-    filterCutoff.setLabel(cutoffLabelStr(p.filterCutoff));
     filterRes   .setValue(p.filterRes,              dn);   // 0..0.99 fractional (Step 0)
-    filterAtk   .setValue(p.filterEnvAtk,           dn); filterAtk.setLabel(adsrLabelStr("A", p.filterEnvAtk));
-    filterDec   .setValue(p.filterEnvDec,           dn); filterDec.setLabel(adsrLabelStr("D", p.filterEnvDec));
-    filterSus   .setValue(p.filterEnvSus * 100.0,   dn);
-    filterRel   .setValue(p.filterEnvRel,           dn); filterRel.setLabel(adsrLabelStr("R", p.filterEnvRel));
-    filterDepth .setValue(p.filterEnvDepth, dn);            // semitones (Step 0)
+    filterAtk   .setValue(p.filterEnvAtk,           dn);    filterDec   .setValue(p.filterEnvDec,           dn);    filterSus   .setValue(p.filterEnvSus * 100.0,   dn);
+    filterRel   .setValue(p.filterEnvRel,           dn);    filterDepth .setValue(p.filterEnvDepth, dn);            // semitones (Step 0)
     filterLowCut.setValue(p.filterLowCutHz, dn);
     filterDrive .setValue(p.filterDrive * 100.0, dn);  // 0..1 → 0..100 display
 }
@@ -239,12 +219,12 @@ void FilterSubsection::refreshSuffix(const juce::String& suffix)
     constexpr auto dn = juce::dontSendNotification;
 
     if      (suffix == "fltType") filterType  .setSelectedId(p.filterType + 1, false);
-    else if (suffix == "fltCut")  { filterCutoff.setValue(p.filterCutoff, dn); filterCutoff.setLabel(cutoffLabelStr(p.filterCutoff)); }
+    else if (suffix == "fltCut")  { filterCutoff.setValue(p.filterCutoff, dn); }
     else if (suffix == "fltRes")  filterRes   .setValue(p.filterRes,             dn);
-    else if (suffix == "fEnvAtk") { filterAtk.setValue(p.filterEnvAtk, dn); filterAtk.setLabel(adsrLabelStr("A", p.filterEnvAtk)); }
-    else if (suffix == "fEnvDec") { filterDec.setValue(p.filterEnvDec, dn); filterDec.setLabel(adsrLabelStr("D", p.filterEnvDec)); }
+    else if (suffix == "fEnvAtk") { filterAtk.setValue(p.filterEnvAtk, dn); }
+    else if (suffix == "fEnvDec") { filterDec.setValue(p.filterEnvDec, dn); }
     else if (suffix == "fEnvSus") filterSus.setValue(p.filterEnvSus * 100.0, dn);
-    else if (suffix == "fEnvRel") { filterRel.setValue(p.filterEnvRel, dn); filterRel.setLabel(adsrLabelStr("R", p.filterEnvRel)); }
+    else if (suffix == "fEnvRel") { filterRel.setValue(p.filterEnvRel, dn); }
     else if (suffix == "fEnvDep") filterDepth .setValue(p.filterEnvDepth, dn);
     else if (suffix == "fltLoCut") filterLowCut.setValue(p.filterLowCutHz, dn);
     else if (suffix == "fltDrv")  filterDrive .setValue(p.filterDrive * 100.0, dn);

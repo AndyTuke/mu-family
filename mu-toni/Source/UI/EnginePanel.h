@@ -49,10 +49,10 @@ public:
 
         // ── Pitch (target + envelope) ────────────────────────────────────────
         addCombo(G_PITCH, "ptgt", { "Osc 1+2", "Osc 2" });
-        addKnob (G_PITCH, "peA", "A (ms)", LF::knobModulation);
-        addKnob (G_PITCH, "peD", "D (ms)", LF::knobModulation);
-        addKnob (G_PITCH, "peS", "S (%)",  LF::knobModulation);
-        addKnob (G_PITCH, "peR", "R (ms)", LF::knobModulation);
+        addKnob (G_PITCH, "peA", "A", LF::knobModulation);
+        addKnob (G_PITCH, "peD", "D", LF::knobModulation);
+        addKnob (G_PITCH, "peS", "S",  LF::knobModulation);
+        addKnob (G_PITCH, "peR", "R", LF::knobModulation);
         addKnob (G_PITCH, "peDep", "Depth", LF::knobModulation);
 
         // ── Filter (type + drive/cutoff/reso/lowcut, envelope) ───────────────
@@ -61,10 +61,10 @@ public:
         addKnob (G_FILTER, "cut",   "Cutoff",  LF::knobPostPad);
         addKnob (G_FILTER, "res",   "Reso",    LF::knobPostPad);
         addKnob (G_FILTER, "locut", "Low Cut", LF::knobPostPad);
-        addKnob (G_FILTER, "feA", "A (ms)", LF::knobPostPad);
-        addKnob (G_FILTER, "feD", "D (ms)", LF::knobPostPad);
-        addKnob (G_FILTER, "feS", "S (%)",  LF::knobPostPad);
-        addKnob (G_FILTER, "feR", "R (ms)", LF::knobPostPad);
+        addKnob (G_FILTER, "feA", "A", LF::knobPostPad);
+        addKnob (G_FILTER, "feD", "D", LF::knobPostPad);
+        addKnob (G_FILTER, "feS", "S",  LF::knobPostPad);
+        addKnob (G_FILTER, "feR", "R", LF::knobPostPad);
         addKnob (G_FILTER, "feDep", "Depth", LF::knobPostPad);
 
         // ── Amp (level + FX sends, envelope). Sends bind to ch{N}_ params. ───
@@ -72,10 +72,10 @@ public:
         addKnob(G_AMP, "sendEff", "Eff",   LF::knobFxSend, "ch");
         addKnob(G_AMP, "sendDly", "Dly",   LF::knobFxSend, "ch");
         addKnob(G_AMP, "sendRev", "Rev",   LF::knobFxSend, "ch");
-        addKnob(G_AMP, "aeA", "A (ms)", LF::knobLevel);
-        addKnob(G_AMP, "aeD", "D (ms)", LF::knobLevel);
-        addKnob(G_AMP, "aeS", "S (%)",  LF::knobLevel);
-        addKnob(G_AMP, "aeR", "R (ms)", LF::knobLevel);
+        addKnob(G_AMP, "aeA", "A", LF::knobLevel);
+        addKnob(G_AMP, "aeD", "D", LF::knobLevel);
+        addKnob(G_AMP, "aeS", "S",  LF::knobLevel);
+        addKnob(G_AMP, "aeR", "R", LF::knobLevel);
 
         // ── Appergater (arpeggiator, boxed) ──────────────────────────────────
         addCombo (G_ARP, "scale", scaleItems());

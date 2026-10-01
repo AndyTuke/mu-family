@@ -20,10 +20,6 @@ static double parseAdsrTimeSec(const juce::String& s)
         return t.dropLastCharacters(1).trim().getDoubleValue();
     return t.getDoubleValue() / 1000.0;
 }
-static juce::String adsrLabelStr(const juce::String& name, double v)
-{
-    return name + (v < 1.0 ? " (ms)" : " (s)");
-}
 static juce::String adsrValueStr(double v)
 {
     double ms = std::max(1.0, v * 1000.0);
@@ -80,12 +76,6 @@ void PitchSubsection::wireCallbacks()
         return s.trim().dropLastCharacters(s.endsWith("%") ? 1 : 0).trim().getDoubleValue();
     };
 
-    // Set initial dynamic labels. Single-letter A/D/S/R — universally understood,
-    // gives the knob label room to render the unit suffix without ellipsis.
-    pitchAtk.setLabel(adsrLabelStr("A", pitchAtk.getValue()));
-    pitchDec.setLabel(adsrLabelStr("D", pitchDec.getValue()));
-    pitchSus.setLabel("S (%)");
-    pitchRel.setLabel(adsrLabelStr("R", pitchRel.getValue()));
 
     struct { KnobWithLabel* k; const char* name; } entries[] = {
         { &pitchOctave, "Pitch Octave"   }, { &pitchSemi,  "Pitch Semitone" },
@@ -119,10 +109,10 @@ void PitchSubsection::wireCallbacks()
     pitchOctave.onValueChanged = [this](double v) { apvtsSet("pitchOct",  (float)v); };
     pitchSemi  .onValueChanged = [this](double v) { apvtsSet("pitchSemi", (float)v); };
     pitchFine  .onValueChanged = [this](double v) { apvtsSet("pitchFine", (float)v); };
-    pitchAtk   .onValueChanged = [this](double v) { apvtsSet("pEnvAtk",   (float)v); pitchAtk.setLabel(adsrLabelStr("A", v)); };
-    pitchDec   .onValueChanged = [this](double v) { apvtsSet("pEnvDec",   (float)v); pitchDec.setLabel(adsrLabelStr("D", v)); };
+    pitchAtk   .onValueChanged = [this](double v) { apvtsSet("pEnvAtk",   (float)v); };
+    pitchDec   .onValueChanged = [this](double v) { apvtsSet("pEnvDec",   (float)v); };
     pitchSus   .onValueChanged = [this](double v) { apvtsSet("pEnvSus",   (float)v); };
-    pitchRel   .onValueChanged = [this](double v) { apvtsSet("pEnvRel",   (float)v); pitchRel.setLabel(adsrLabelStr("R", v)); };
+    pitchRel   .onValueChanged = [this](double v) { apvtsSet("pEnvRel",   (float)v); };
     pitchDepth .onValueChanged = [this](double v) { apvtsSet("pEnvDep",   (float)v); };
 }
 
@@ -144,11 +134,8 @@ void PitchSubsection::loadFromRhythm()
     pitchOctave.setValue(p.pitchOctave,          dn);
     pitchSemi  .setValue(p.pitchSemitones,       dn);
     pitchFine  .setValue(p.pitchFine,            dn);
-    pitchAtk   .setValue(p.pitchEnvAtk,          dn); pitchAtk.setLabel(adsrLabelStr("A", p.pitchEnvAtk));
-    pitchDec   .setValue(p.pitchEnvDec,          dn); pitchDec.setLabel(adsrLabelStr("D", p.pitchEnvDec));
-    pitchSus   .setValue(p.pitchEnvSus * 100.0,  dn);
-    pitchRel   .setValue(p.pitchEnvRel,          dn); pitchRel.setLabel(adsrLabelStr("R", p.pitchEnvRel));
-    pitchDepth .setValue(p.pitchEnvDepth, dn);                     // semitones (Step 0)
+    pitchAtk   .setValue(p.pitchEnvAtk,          dn);    pitchDec   .setValue(p.pitchEnvDec,          dn);    pitchSus   .setValue(p.pitchEnvSus * 100.0,  dn);
+    pitchRel   .setValue(p.pitchEnvRel,          dn);    pitchDepth .setValue(p.pitchEnvDepth, dn);                     // semitones (Step 0)
 }
 
 void PitchSubsection::refreshSuffix(const juce::String& suffix)
@@ -160,10 +147,10 @@ void PitchSubsection::refreshSuffix(const juce::String& suffix)
     if      (suffix == "pitchOct")  pitchOctave.setValue(p.pitchOctave,         dn);
     else if (suffix == "pitchSemi") pitchSemi  .setValue(p.pitchSemitones,      dn);
     else if (suffix == "pitchFine") pitchFine  .setValue(p.pitchFine,           dn);
-    else if (suffix == "pEnvAtk")   { pitchAtk.setValue(p.pitchEnvAtk, dn); pitchAtk.setLabel(adsrLabelStr("A", p.pitchEnvAtk)); }
-    else if (suffix == "pEnvDec")   { pitchDec.setValue(p.pitchEnvDec, dn); pitchDec.setLabel(adsrLabelStr("D", p.pitchEnvDec)); }
+    else if (suffix == "pEnvAtk")   { pitchAtk.setValue(p.pitchEnvAtk, dn); }
+    else if (suffix == "pEnvDec")   { pitchDec.setValue(p.pitchEnvDec, dn); }
     else if (suffix == "pEnvSus")   pitchSus   .setValue(p.pitchEnvSus * 100.0, dn);
-    else if (suffix == "pEnvRel")   { pitchRel.setValue(p.pitchEnvRel, dn); pitchRel.setLabel(adsrLabelStr("R", p.pitchEnvRel)); }
+    else if (suffix == "pEnvRel")   { pitchRel.setValue(p.pitchEnvRel, dn); }
     else if (suffix == "pEnvDep")   pitchDepth .setValue(p.pitchEnvDepth, dn);
 }
 

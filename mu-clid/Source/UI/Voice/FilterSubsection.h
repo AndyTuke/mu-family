@@ -30,12 +30,12 @@ private:
     int rhythmIndex = -1;
 
     DropdownSelect filterType;
-    KnobWithLabel  filterCutoff { "Cutoff (kHz)", Id::knobPostPad };
+    KnobWithLabel  filterCutoff { "Cutoff", Id::knobPostPad };
     KnobWithLabel  filterRes    { "Resonance", Id::knobPostPad };
-    KnobWithLabel  filterAtk    { "Attack (ms)",  Id::knobPostPad };
-    KnobWithLabel  filterDec    { "Decay (ms)",   Id::knobPostPad };
-    KnobWithLabel  filterSus    { "Sustain (%)",  Id::knobPostPad };
-    KnobWithLabel  filterRel    { "Release (ms)", Id::knobPostPad };
+    KnobWithLabel  filterAtk    { "A",  Id::knobPostPad };
+    KnobWithLabel  filterDec    { "D",   Id::knobPostPad };
+    KnobWithLabel  filterSus    { "S",  Id::knobPostPad };
+    KnobWithLabel  filterRel    { "R", Id::knobPostPad };
     KnobWithLabel  filterDepth  { "Depth",     Id::knobPostPad };
     KnobWithLabel  filterLowCut { "Low Cut",   Id::knobPostPad };
     KnobWithLabel  filterDrive  { "Drive",     Id::knobPostPad };

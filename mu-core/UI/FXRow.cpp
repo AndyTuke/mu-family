@@ -247,7 +247,7 @@ void FXRow::rebuildKnobs(int algorithmIndex)
 
         if (param.units == "Hz")
         {
-            knob->setLabel(param.name + " (Hz)");
+            knob->setLabel(param.name);
             knob->getSlider().textFromValueFunction = [](double v) -> juce::String {
                 return fmtHzNum(v);
             };
@@ -269,7 +269,7 @@ void FXRow::rebuildKnobs(int algorithmIndex)
         }
         else if (param.units == "ms")
         {
-            knob->setLabel(param.name + " (ms)");
+            knob->setLabel(param.name);
             knob->getSlider().textFromValueFunction = [](double v) -> juce::String {
                 if (v < 1000.0) return juce::String((int)std::round(v));
                 return juce::String(v / 1000.0, 2);
