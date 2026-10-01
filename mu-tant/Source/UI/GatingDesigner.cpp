@@ -117,6 +117,7 @@ GatingDesigner::GatingDesigner()
     // ── Gap rotary (public, VoicePanel binds the APVTS attachment) ──────────
     gapSlider.setRange(0.0, 100.0, 1.0);
     gapSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    MuLookAndFeel::applyRotarySweep(gapSlider);
     gapSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, kGapTbW, 16);
     gapSlider.setTooltip("Gap: silence at the end of each envelope region (0-100 %)");
     gapSlider.onValueChange = [this] { setGap((float)(gapSlider.getValue() / 100.0)); };

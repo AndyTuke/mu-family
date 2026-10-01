@@ -33,6 +33,7 @@ void ParamKnobGrid::setSpecs(const std::vector<Spec>& specs)
         {
             ctl->knob = std::make_unique<juce::Slider>(juce::Slider::RotaryHorizontalVerticalDrag,
                                                        juce::Slider::NoTextBox);
+            MuLookAndFeel::applyRotarySweep(*ctl->knob);
             addAndMakeVisible(*ctl->knob);
             ctl->knobAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
                 apvts, spec.id, *ctl->knob);

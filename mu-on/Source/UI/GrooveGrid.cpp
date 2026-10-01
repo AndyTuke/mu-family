@@ -11,6 +11,7 @@ GrooveGrid::GrooveGrid(ProcessorBase& processor, StepPattern& patternToEdit)
     auto setupKnob = [this](juce::Slider& s, juce::Label& lab, const juce::String& text)
     {
         s.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+        MuLookAndFeel::applyRotarySweep(s);
         s.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
         addAndMakeVisible(s);
         lab.setText(text, juce::dontSendNotification);

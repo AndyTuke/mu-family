@@ -397,6 +397,15 @@ public:
     // control that small.
     static constexpr float kRotaryValueMinRadius = 12.0f;
 
+    // Point a plain juce::Slider's drag at the sweep the knob is drawn to. Without it
+    // the slider keeps JUCE's own defaults, so the angle it maps the mouse through
+    // disagrees with the ring the user sees. KnobWithLabel calls this for itself;
+    // the handful of rotaries built as bare Sliders need it too.
+    static void applyRotarySweep(juce::Slider& slider)
+    {
+        slider.setRotaryParameters(kRotaryStartAngle, kRotaryEndAngle, true);
+    }
+
     // Where a knob's annotations (modulation ring, live mod arc, GR arc) belong.
     // KnobWithLabel draws those itself but must not assume where drawRotarySlider put
     // the ring — a style that insets its ring would otherwise be annotated at the wrong

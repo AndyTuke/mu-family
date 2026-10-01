@@ -9,8 +9,7 @@ KnobWithLabel::KnobWithLabel(const juce::String& label,
     // State the sweep explicitly rather than inheriting JUCE's default, so the angle
     // the rotary is drawn against and the one the overlays below use are the same
     // constant and cannot drift apart.
-    slider.setRotaryParameters(MuLookAndFeel::kRotaryStartAngle,
-                               MuLookAndFeel::kRotaryEndAngle, true);
+    MuLookAndFeel::applyRotarySweep(slider);
     // Scroll-wheel events from the DAW (timeline scroll during playback) would
     // otherwise change knob values on hover. Disable to prevent accidental edits.
     slider.setScrollWheelEnabled(false);

@@ -119,6 +119,7 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
         {
             auto& k = strip.eq[(size_t) b];
             k.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+            MuLookAndFeel::applyRotarySweep(k);
             k.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
             k.setRange(0.0, 1.0, 0.001);
             k.setDoubleClickReturnValue(true, 0.5);   // double-click → flat

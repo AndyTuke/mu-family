@@ -11,6 +11,7 @@ BipolarSliderRow::BipolarSliderRow()
 
     // curve knob: rotary, bipolar with detent at 0.
     curveSlider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    MuLookAndFeel::applyRotarySweep(curveSlider);
     curveSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, s(34), s(18));
     curveSlider.setRange(-100.0, 100.0, 0.1);
     curveSlider.setValue(0.0, juce::dontSendNotification);
