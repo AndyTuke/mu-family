@@ -183,6 +183,7 @@ public:
     MuLinkBridge(juce::AudioProcessor&, juce::AudioProcessorPlayer&,
                  juce::String, std::function<void(bool)>) {}
     bool isConnected() const noexcept { return false; }
+    void setPresetName(const juce::String&) {}
 };
 
 #endif // _WIN32
