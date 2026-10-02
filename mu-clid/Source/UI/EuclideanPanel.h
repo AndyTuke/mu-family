@@ -119,7 +119,7 @@ private:
     static constexpr int kPadKnobGap   = MuLookAndFeel::kKnobGapPair;  // shared gap for the Pad pair AND the Insert pair
     static constexpr int kPadInsertGap = MuLookAndFeel::kSpaceS;   // gap between Pad sub-panel and Insert sub-panel borders
     // Pad / Insert sub-panels: each Pad/Mute slide switch sits beside its knob, so the
-    // knobs get the sub-panel's full height and run at Size 2.
+    // knobs get the sub-panel's full height and run at Size 1.
     static constexpr int kSwitchGap    = MuLookAndFeel::kSpaceS;      // knob to its own switch
     static constexpr int kInsKnobGap   = MuLookAndFeel::kKnobGapRow;  // between the two insert knobs
     // Column for the Legato / Mono switches, between the Euclid block and the Pad

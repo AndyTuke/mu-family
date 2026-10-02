@@ -451,18 +451,20 @@ void EuclideanPanel::resized()
     constexpr int insX      = padX + pW * 2 + kPadInsertGap / 2;
     constexpr int insPanelW = MuLookAndFeel::kEuclidInnerW - kOuter - insX;
 
-    // Pad and Insert sub-panels: Size 2 knobs, each Pad/Mute slide switch beside its
+    // Pad and Insert sub-panels: Size 1 knobs, each Pad/Mute slide switch beside its
     // knob, all centred vertically in the sub-panel's box (ctrlH - 2 tall, as painted).
-    constexpr int knobW  = MuLookAndFeel::kKnobSize2W;
-    constexpr int knobH  = MuLookAndFeel::kKnobSize2H;
+    constexpr int knobW  = MuLookAndFeel::kKnobSize1W;
+    constexpr int knobH  = MuLookAndFeel::kKnobSize1H;
     constexpr int swW    = MuLookAndFeel::kSlideSwitchW;
     constexpr int swH    = MuLookAndFeel::kSlideSwitchH;
     constexpr int knobDY = (ctrlH - 2 - knobH) / 2;
     constexpr int swDY   = (ctrlH - 2 - swH) / 2;
 
-    // Pad sub-panel: two [knob | switch] units side by side.
+    // Pad sub-panel: two [knob | switch] units side by side — at Size 1 this is within a
+    // few px of the sub-panel's width, so a wider knob or switch needs the panel to grow.
     constexpr int unitW    = knobW + kSwitchGap + swW;
     constexpr int padSpan  = unitW * 2 + kSwitchGap;
+    static_assert(padSpan <= padPanelW && knobH <= ctrlH - 2, "Pad knobs + switches overflow the sub-panel");
     constexpr int prePadX  = padX + (padPanelW - padSpan) / 2;
     constexpr int postPadX = prePadX + unitW + kSwitchGap;
 

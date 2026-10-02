@@ -354,13 +354,13 @@ public:
     // ── Canonical knob sizes ──────────────────────────────────────────────
     // Four buckets — every knob in the plugin picks one.
     //
-    //   Size 1 (largest) — Euclid Steps/Hits/Rotate; mixer FX-row knobs
+    //   Size 1 (largest) — Euclid Steps/Hits/Rotate and pad/insert controls
+    //                      (prePad/postPad/insStart/insLen); mixer FX-row knobs
     //                      (Effect / Delay / Reverb).
     //   Size 2           — Voice subsection (pitch/filter/amp/insert);
     //                      master insert effect controls.
-    //   Size 3           — Euclid pad/insert controls (prePad/postPad/
-    //                      insStart/insLen); mixer channel-strip knobs
-    //                      (sends / pan / sidechain Amount) except envelopes.
+    //   Size 3           — mixer channel-strip knobs (sends / pan /
+    //                      sidechain Amount) except envelopes.
     //   Size 4 (smallest)— Sidechain envelope knobs (Attack + Release).
     //
     // Each bucket specifies BOTH width and height. KnobWithLabel draws the
@@ -421,7 +421,7 @@ public:
     static constexpr float kRotaryValueMinRadius = 12.0f;
 
     // SlideSwitch: the whole control (track + labels beside it), and the track's
-    // width. 44 tall puts the disc's two rest positions level with a Size 2 knob's ring.
+    // width. 44 tall spans roughly a Size 1-2 knob's ring.
     static constexpr int   kSlideSwitchW      = 40;
     static constexpr int   kSlideSwitchH      = 44;
     static constexpr float kSlideSwitchTrackW = 10.0f;

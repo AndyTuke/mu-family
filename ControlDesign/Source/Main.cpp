@@ -96,8 +96,8 @@ namespace euclid
 //            wide) — too narrow for "Insert Start" / "Insert Length", hence the
 //            ellipsis.
 // Proposed — switch moved alongside the knob as a vertical slide switch (Pad up, Mute
-//            down). That frees the full height, so the knobs go up to Size 2 (54 x
-//            56): half again as much label width, and a noticeably larger target.
+//            down). That frees the full height, so the knobs go up to Size 1 (68 x
+//            70): nearly twice the label width, and a much larger target.
 enum class PadLayout { Shipped, Proposed };
 
 class PadSection : public juce::Component
@@ -211,10 +211,10 @@ public:
 private:
     static constexpr int kRows = 3;   // Euclid A, Euclid B, Accent
 
-    // Proposed layout: Size 2 is the largest that fits the sub-panel's 68 px once the
-    // switch row is gone (Size 1 is 70 tall and would need the row itself to grow).
-    static constexpr int kBigKnobW  = MuLookAndFeel::kKnobSize2W;   // 54
-    static constexpr int kBigKnobH  = MuLookAndFeel::kKnobSize2H;   // 56
+    // Proposed layout: Size 1 — with the logic band gone each row is 88 px, so the
+    // sub-panel's 76 px box takes a 70 px knob.
+    static constexpr int kBigKnobW  = MuLookAndFeel::kKnobSize1W;   // 68
+    static constexpr int kBigKnobH  = MuLookAndFeel::kKnobSize1H;   // 70
     static constexpr int kUnitGap    = MuLookAndFeel::kSpaceS;      // knob to its own switch
     static constexpr int kInsKnobGap = MuLookAndFeel::kKnobGapRow;  // between the two insert knobs
     static constexpr int kSlideW    = MuLookAndFeel::kSlideSwitchW;
@@ -298,7 +298,7 @@ public:
         g.drawText("shipped - switch under the knob, Size 3",
                    kMargin, shipped.getY() - kCaptionH, euclid::kSectionW, kCaptionH,
                    juce::Justification::centredLeft, false);
-        g.drawText("proposed - slide switch alongside, Size 2",
+        g.drawText("proposed - slide switch alongside, Size 1",
                    kMargin, proposed.getY() - kCaptionH, euclid::kSectionW, kCaptionH,
                    juce::Justification::centredLeft, false);
     }
