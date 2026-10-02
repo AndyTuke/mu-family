@@ -18,9 +18,8 @@ EuclideanPanel::EuclideanPanel(PluginProcessor& p) : proc(p)
     addAndMakeVisible(legatoCtrl);
     addAndMakeVisible(monoCtrl);
 
-    // Logic dropdown (replaced the 5-pill SegmentControl) — populated with
-    // 1-based IDs that map to APVTS "logic" param via id - 1.
-    addAndMakeVisible(logicCtrl);
+    // Logic dropdown — populated with 1-based IDs that map to APVTS "logic" via id - 1.
+    // Not added here: the host parents and places it (see getLogicControl).
     logicCtrl.addItem("OR",      1);
     logicCtrl.addItem("AND",     2);
     logicCtrl.addItem("XOR",     3);
@@ -434,7 +433,7 @@ void EuclideanPanel::resized()
     constexpr int innerW = MuLookAndFeel::kEuclidInnerW - 2 * kOuter;   // panel width minus its 4 px border
     constexpr int innerH = MuLookAndFeel::kEuclidInnerH - 2 * kOuter;
 
-    constexpr int rowH  = (innerH - kLogicH) / 3;
+    constexpr int rowH  = innerH / 3;
     constexpr int ctrlH = rowH - kLabelH;   // control zone within each row (below label)
 
     // Steps/Hits/Rotate render at Size 1 (canonical). kEucKnobGap
@@ -484,10 +483,11 @@ void EuclideanPanel::resized()
                         KnobWithLabel& insSt, KnobWithLabel& insLen,
                         SlideSwitch& insMode)
     {
-        const int cy = y + kLabelH;  // top of control zone (Medium space)
-        steps.setBounds  (s(kOuter),                          s(cy), s(eW), s(eH));
-        hits.setBounds   (s(kOuter + eW + kEucKnobGap),       s(cy), s(eW), s(eH));
-        rot.setBounds    (s(kOuter + (eW + kEucKnobGap) * 2), s(cy), s(eW), s(eH));
+        const int cy  = y + kLabelH;            // top of control zone (Medium space)
+        const int eCy = cy + (ctrlH - eH) / 2;  // Euclid knobs centred in it
+        steps.setBounds  (s(kOuter),                          s(eCy), s(eW), s(eH));
+        hits.setBounds   (s(kOuter + eW + kEucKnobGap),       s(eCy), s(eW), s(eH));
+        rot.setBounds    (s(kOuter + (eW + kEucKnobGap) * 2), s(eCy), s(eW), s(eH));
         prePad.setBounds     (s(prePadX),                       s(cy + knobDY), s(knobW), s(knobH));
         prePadMode.setBounds (s(prePadX + knobW + kSwitchGap),  s(cy + swDY),   s(swW),   s(swH));
         postPad.setBounds    (s(postPadX),                      s(cy + knobDY), s(knobW), s(knobH));
@@ -500,11 +500,6 @@ void EuclideanPanel::resized()
     int y = kOuter;
     placeRow(y, stepsA, hitsA, rotA, prePadA, postPadA, prePadModeA, postPadModeA, insertStA, insertLenA, insertModeA);
 
-    y += rowH;
-    // Logic band between Euclid A and B: the Logic dropdown, centred under the Euclid
-    // knob block. kLogicVOffset centres the band between the rows above and below.
-    logicCtrl.setBounds(s(kLogicDropX), s(y + 2 + kLogicVOffset + kLogicDropPad), s(kLogicDropW), s(kLogicDropH));
-
     // Legato over Mono, centred on the panel's height in the column before the Pad sub-panel.
     {
         constexpr int colX  = kOuter + eucBlockW + kModeColPad;
@@ -513,7 +508,7 @@ void EuclideanPanel::resized()
         monoCtrl  .setBounds(s(colX), s(pairY + swH + kModeSwGap), s(swW), s(swH));
     }
 
-    y += kLogicH;
+    y += rowH;
     placeRow(y, stepsB, hitsB, rotB, prePadB, postPadB, prePadModeB, postPadModeB, insertStB, insertLenB, insertModeB);
 
     y += rowH;
@@ -529,9 +524,9 @@ void EuclideanPanel::paint(juce::Graphics& g)
     constexpr int w      = MuLookAndFeel::kEuclidInnerW;
     constexpr int innerW = w - 2 * kOuter;
     constexpr int innerH = MuLookAndFeel::kEuclidInnerH - 2 * kOuter;
-    constexpr int rowH   = (innerH - kLogicH) / 3;
+    constexpr int rowH   = innerH / 3;
 
-    constexpr int rowOffsets[3] = { kOuter, kOuter + rowH + kLogicH, kOuter + 2 * rowH + kLogicH };
+    constexpr int rowOffsets[3] = { kOuter, kOuter + rowH, kOuter + 2 * rowH };
     const char* rowLabels[3]    = { "Euclid A", "Euclid B", "Accent" };
 
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(9.0f))));
@@ -560,15 +555,5 @@ void EuclideanPanel::paint(juce::Graphics& g)
         const int cy = rowY + kLabelH;
         g.drawRoundedRectangle((float) s(padX), (float) s(cy), (float) s(padPanelW), (float) s(ctrlH) - 2.0f, 4.0f, 1.0f);
         g.drawRoundedRectangle((float) s(insX), (float) s(cy), (float) s(insPanelW), (float) s(ctrlH) - 2.0f, 4.0f, 1.0f);
-    }
-
-    {
-        constexpr int rowY    = kOuter + rowH;
-        // Logic dropdown's border, kLogicDropPad outside it, in the band between Euclid A and B.
-        constexpr int rectY  = rowY + 2 + kLogicVOffset;
-        constexpr int rectH  = kLogicH - 4;
-
-        g.drawRoundedRectangle((float) s(kLogicDropX - kLogicDropPad), (float) s(rectY),
-                               (float) s(kLogicDropW + 2 * kLogicDropPad), (float) s(rectH), 4.0f, 1.0f);
     }
 }

@@ -34,6 +34,16 @@ public:
     // Bind all euclidean knobs to their modulation destinations for the current rhythm.
     void bindModulationIndicators();
 
+    // The Logic dropdown is wired here but placed by the host (beside the rhythm circle),
+    // so the three Euclid rows can share the panel's height equally. The host adds it as
+    // its own child and sizes it to kLogicDropW x kLogicDropH.
+    DropdownSelect& getLogicControl() noexcept { return logicCtrl; }
+
+    // Logic dropdown size: the narrowest that still fits the widest item ("B not A")
+    // beside the ComboBox chrome (6 px left pad + arrow, 24 px in all).
+    static constexpr int kLogicDropW = 72;
+    static constexpr int kLogicDropH = 16;
+
     void resized() override;
     void paint(juce::Graphics&) override;
 
@@ -95,18 +105,8 @@ private:
     KnobWithLabel insertLenC   { "Insert Length", Id::knobInsertPad };
     SlideSwitch    insertModeC  { "Pad", "Mute", Id::knobInsertPad };
 
-    static constexpr int kLogicH  = 24;
     static constexpr int kOuter   = MuLookAndFeel::kSpaceXS;
     static constexpr int kLabelH  = 10;
-    // logic-row split — Logic dropdown | gap | Legato | gap | Mono. Three sub-panels
-    // sized EQUALLY across the row; each control fills its sub-panel so pills spread
-    // evenly via SegmentControl's natural width-distribution.
-    static constexpr int kLogicGapW  = MuLookAndFeel::kSpaceM;    // sub-panel divider between groups
-    // Vertical offset (within the kLogicH band) that shifts the Logic-row buttons +
-    // sub-panel rects DOWN so the visible gap above the rects equals the gap below them.
-    // Pre-fix the band was top-aligned in the inter-row space, leaving 4 px above and
-    // 12 px below the rects — visibly uneven. Both pill Y and rect Y use this offset.
-    static constexpr int kLogicVOffset = 3;
 
     // Euclid-row spacing.
     // kEucKnobGap widened so Steps/Hits/Rotate breathe; growing the Euclid
@@ -127,14 +127,6 @@ private:
     static constexpr int kModeColPad   = MuLookAndFeel::kSpaceM;
     static constexpr int kModeColW     = kModeColPad * 2 + MuLookAndFeel::kSlideSwitchW;
     static constexpr int kModeSwGap    = MuLookAndFeel::kSpaceL;      // between the two switches
-    // Logic dropdown: the narrowest that still fits the widest item ("B not A") beside the
-    // ComboBox chrome (6 px left pad + arrow, 24 px in all), centred under the
-    // Steps/Hits/Rotate block. Its border rect sits kLogicDropPad outside it.
-    static constexpr int kLogicDropW   = 72;
-    static constexpr int kLogicDropH   = 16;
-    static constexpr int kLogicDropPad = 2;
-    static constexpr int kLogicDropX   = kOuter + (MuLookAndFeel::kKnobSize1W * 3 + kEucKnobGap * 2
-                                                   - kLogicDropW) / 2;
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();

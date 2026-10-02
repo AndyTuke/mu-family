@@ -72,6 +72,14 @@ LiteEditor::LiteEditor(PluginProcessor& p)
     addAndMakeVisible(noteSelector);
     addAndMakeVisible(noteSelectorLabel);
 
+    // Logic dropdown is wired by euclidPanel; Lite's circle has no free corner, so it
+    // sits at the end of the controls row instead.
+    logicLabel.setText("Logic", juce::dontSendNotification);
+    logicLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    logicLabel.setJustificationType(juce::Justification::centredRight);
+    addAndMakeVisible(logicLabel);
+    addAndMakeVisible(euclidPanel.getLogicControl());
+
     // Accent velocity knob — wired to lite_accentAmt APVTS parameter.
     accentKnob.setRange(0.0, 100.0, 1.0);
     {
@@ -206,6 +214,12 @@ void LiteEditor::resized()
     noteSelectorLabel.setBounds(controlsRow.removeFromLeft(labelW).withSizeKeepingCentre(labelW, s(22)));
     const int noteDropW = s(65);
     noteSelector.setBounds(controlsRow.removeFromLeft(noteDropW).withSizeKeepingCentre(noteDropW, s(24)));
+
+    controlsRow.removeFromLeft(s(MuLookAndFeel::kSpaceL));
+    const int logicLabelW = s(40);
+    logicLabel.setBounds(controlsRow.removeFromLeft(logicLabelW).withSizeKeepingCentre(logicLabelW, s(22)));
+    const int logicW = s(EuclideanPanel::kLogicDropW);
+    euclidPanel.getLogicControl().setBounds(controlsRow.removeFromLeft(logicW).withSizeKeepingCentre(logicW, s(24)));
 
     euclidPanel.setBounds(area);
     aboutPanel.setBounds(getLocalBounds());

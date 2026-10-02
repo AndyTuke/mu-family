@@ -238,6 +238,8 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     startTimerHz(mu_ui::kUiRefreshHz);
     addAndMakeVisible(circle);
     addAndMakeVisible(euclidPanel);
+    // Logic sits in the circle panel's corner, drawn over the circle's empty corner area.
+    addAndMakeVisible(euclidPanel.getLogicControl());
     addAndMakeVisible(voiceSection);
     addAndMakeVisible(modulatorPanel);
     modulatorPanel.setDestProvider(&modDestProvider);
@@ -771,6 +773,16 @@ void RhythmPanel::resized()
     const int rhythmInset = s(kPanelPad + 1);
     circle.setBounds        (circleRect.reduced(rhythmInset));
     euclidPanel.setBounds   (euclidRect.reduced(rhythmInset));
+
+    // Logic dropdown: bottom-right corner of the circle panel, just inside its border,
+    // where it clears the outer ring.
+    {
+        const int lw = s(EuclideanPanel::kLogicDropW);
+        const int lh = s(EuclideanPanel::kLogicDropH);
+        const int m  = s(MuLookAndFeel::kSpaceS);
+        euclidPanel.getLogicControl().setBounds(circleRect.getRight() - m - lw,
+                                                circleRect.getBottom() - m - lh, lw, lh);
+    }
     voiceSection.setBounds  (voiceRect.reduced(rhythmInset));
     modulatorPanel.setBounds(modRect.reduced(rhythmInset));
     rhythmSaveDialog.setBounds(getLocalBounds());

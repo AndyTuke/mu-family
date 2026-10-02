@@ -35,7 +35,6 @@ namespace euclid
 {
     // Gaps come from the design system's spacing scale; the rest are EuclideanPanel's
     // own, mirrored here because it computes them inline.
-    constexpr int kLogicH       = 24;
     constexpr int kSwitchH      = 14;
     constexpr int kLabelH       = 10;
     constexpr int kOuter        = MuLookAndFeel::kSpaceXS;
@@ -47,7 +46,7 @@ namespace euclid
     constexpr int innerW = w - 2 * kOuter;                        // 778
     constexpr int innerH = MuLookAndFeel::kEuclidInnerH - 2 * kOuter;   // 266
 
-    constexpr int rowH  = (innerH - kLogicH) / 3;                 // 80
+    constexpr int rowH  = innerH / 3;                             // 88
     constexpr int ctrlH = rowH - kLabelH;                         // 70
     constexpr int mP    = 4;
 
@@ -80,7 +79,7 @@ namespace euclid
     constexpr int insLenX = insStX + padKnobW + kPadKnobGap;
 
     // The three Euclid rows, as paint() positions them.
-    constexpr int rowOffsets[3] = { kOuter, kOuter + rowH + kLogicH, kOuter + 2 * rowH + kLogicH };
+    constexpr int rowOffsets[3] = { kOuter, kOuter + rowH, kOuter + 2 * rowH };
 
     // The section this sandbox shows: everything from the Pad sub-panel's left edge to
     // the Insert sub-panel's right edge, full panel height. Coordinates below are

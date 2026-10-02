@@ -43,6 +43,7 @@ private:
     DropdownSelect noteSelector;
     DropdownSelect sizeDropdown;
     juce::Label    noteSelectorLabel;
+    juce::Label    logicLabel;   // the Logic dropdown itself is euclidPanel's
     KnobWithLabel  accentKnob { "Accent", MuLookAndFeel::knobLevel };
 
     // Unscaled window dimensions — multiply by mu_ui::s() / mu_ui::scale at use.
