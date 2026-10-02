@@ -24,6 +24,7 @@
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/SegmentControl.h"
+#include "UI/Components/SlideSwitch.h"
 
 #include <array>
 #include <memory>
@@ -95,9 +96,9 @@ namespace euclid
 //            the 68 px sub-panel, leaving 46 for the knob, which caps it at Size 3 (36
 //            wide) — too narrow for "Insert Start" / "Insert Length", hence the
 //            ellipsis.
-// Proposed — switch moved alongside the knob. That frees the full height, so the knobs
-//            go up to Size 2 (54 x 56): half again as much label width, and a
-//            noticeably larger target.
+// Proposed — switch moved alongside the knob as a vertical slide switch (Pad up, Mute
+//            down). That frees the full height, so the knobs go up to Size 2 (54 x
+//            56): half again as much label width, and a noticeably larger target.
 enum class PadLayout { Shipped, Proposed };
 
 class PadSection : public juce::Component
@@ -115,9 +116,21 @@ public:
             row.insStart = addKnob("Insert Start",  MuLookAndFeel::knobInsertPad, 0, 63, 0);
             row.insLen   = addKnob("Insert Length", MuLookAndFeel::knobInsertPad, 0,  8, 0);
 
-            row.preMode  = addSegment({ "Pad", "Mute" }, SegmentControl::ActiveStyle::Warning);
-            row.postMode = addSegment({ "Pad", "Mute" }, SegmentControl::ActiveStyle::Warning);
-            row.insMode  = addSegment({ "Pad", "Mute" }, SegmentControl::ActiveStyle::Warning);
+            if (layout == PadLayout::Shipped)
+            {
+                row.preMode  = addSegment({ "Pad", "Mute" }, SegmentControl::ActiveStyle::Warning);
+                row.postMode = addSegment({ "Pad", "Mute" }, SegmentControl::ActiveStyle::Warning);
+                row.insMode  = addSegment({ "Pad", "Mute" }, SegmentControl::ActiveStyle::Warning);
+            }
+            else
+            {
+                // Each switch takes its knob's accent, so the pair reads as one unit.
+                row.preMode  = addSlide(MuLookAndFeel::knobPrePad);
+                auto* post   = addSlide(MuLookAndFeel::knobPostPad);
+                row.postMode = post;
+                row.insMode  = addSlide(MuLookAndFeel::knobInsertPad);
+                if (r == 1) post->setSelectedIndex(1);   // one shown in Mute so both ends can be judged
+            }
         }
 
         legato = addSegment({ "Trig", "Leg" },  SegmentControl::ActiveStyle::General,
@@ -183,28 +196,28 @@ public:
             // the sub-panel's full height instead of sharing it with a switch row.
             const int boxY   = cy;
             const int knobY  = boxY + (ctrlH - 2 - kBigKnobH) / 2;
-            const int swY    = boxY + (ctrlH - 2 - kSwitchH) / 2;
+            const int swY    = boxY + (ctrlH - 2 - kSlideH) / 2;
 
             // Pad panel: two [knob | switch] units, evenly spread.
-            constexpr int unitW = kBigKnobW + kUnitGap + padSw;
+            constexpr int unitW = kBigKnobW + kUnitGap + kSlideW;
             constexpr int padPairSpan = unitW * 2 + kUnitGap;
             constexpr int padLeft = padX - kSectionX + (padPanelW - padPairSpan) / 2;
 
             row.prePad  ->setBounds(s(padLeft), s(knobY), s(kBigKnobW), s(kBigKnobH));
-            row.preMode ->setBounds(s(padLeft + kBigKnobW + kUnitGap), s(swY), s(padSw), s(kSwitchH));
+            row.preMode ->setBounds(s(padLeft + kBigKnobW + kUnitGap), s(swY), s(kSlideW), s(kSlideH));
 
             constexpr int unit2X = padLeft + unitW + kUnitGap;
             row.postPad ->setBounds(s(unit2X), s(knobY), s(kBigKnobW), s(kBigKnobH));
-            row.postMode->setBounds(s(unit2X + kBigKnobW + kUnitGap), s(swY), s(padSw), s(kSwitchH));
+            row.postMode->setBounds(s(unit2X + kBigKnobW + kUnitGap), s(swY), s(kSlideW), s(kSlideH));
 
             // Insert panel: the pair shares one switch, so it sits to their right.
-            constexpr int insSpan  = kBigKnobW * 2 + kInsKnobGap + kUnitGap * 2 + insSw;
+            constexpr int insSpan  = kBigKnobW * 2 + kInsKnobGap + kUnitGap * 2 + kSlideW;
             constexpr int insLeft  = insX - kSectionX + (insPanelW - insSpan) / 2;
             constexpr int insLen2X = insLeft + kBigKnobW + kInsKnobGap;
 
             row.insStart->setBounds(s(insLeft),  s(knobY), s(kBigKnobW), s(kBigKnobH));
             row.insLen  ->setBounds(s(insLen2X), s(knobY), s(kBigKnobW), s(kBigKnobH));
-            row.insMode ->setBounds(s(insLen2X + kBigKnobW + kUnitGap * 2), s(swY), s(insSw), s(kSwitchH));
+            row.insMode ->setBounds(s(insLen2X + kBigKnobW + kUnitGap * 2), s(swY), s(kSlideW), s(kSlideH));
         }
 
         // Legato aligns with the Pad sub-panel, Mono with the Insert sub-panel.
@@ -223,8 +236,10 @@ private:
     // switch row is gone (Size 1 is 70 tall and would need the row itself to grow).
     static constexpr int kBigKnobW  = MuLookAndFeel::kKnobSize2W;   // 54
     static constexpr int kBigKnobH  = MuLookAndFeel::kKnobSize2H;   // 56
-    static constexpr int kUnitGap   = 6;    // knob to its own switch
-    static constexpr int kInsKnobGap = 16;  // between the two insert knobs
+    static constexpr int kUnitGap    = MuLookAndFeel::kSpaceS;      // knob to its own switch
+    static constexpr int kInsKnobGap = MuLookAndFeel::kKnobGapRow;  // between the two insert knobs
+    static constexpr int kSlideW    = MuLookAndFeel::kSlideSwitchW;
+    static constexpr int kSlideH    = MuLookAndFeel::kSlideSwitchH;
 
     struct Row
     {
@@ -232,9 +247,9 @@ private:
         KnobWithLabel*  postPad  = nullptr;
         KnobWithLabel*  insStart = nullptr;
         KnobWithLabel*  insLen   = nullptr;
-        SegmentControl* preMode  = nullptr;
-        SegmentControl* postMode = nullptr;
-        SegmentControl* insMode  = nullptr;
+        juce::Component* preMode  = nullptr;   // SegmentControl (shipped) or SlideSwitch
+        juce::Component* postMode = nullptr;
+        juce::Component* insMode  = nullptr;
     };
 
     KnobWithLabel* addKnob(const juce::String& label, MuLookAndFeel::ColourIds colour,
@@ -260,6 +275,15 @@ private:
         return raw;
     }
 
+    SlideSwitch* addSlide(MuLookAndFeel::ColourIds accent)
+    {
+        auto sw = std::make_unique<SlideSwitch>("Pad", "Mute", accent);
+        addAndMakeVisible(*sw);
+        auto* raw = sw.get();
+        slides.push_back(std::move(sw));
+        return raw;
+    }
+
     PadLayout layout;
     std::array<Row, kRows> rows;
     SegmentControl* legato = nullptr;
@@ -267,6 +291,7 @@ private:
 
     std::vector<std::unique_ptr<KnobWithLabel>>  knobs;
     std::vector<std::unique_ptr<SegmentControl>> segments;
+    std::vector<std::unique_ptr<SlideSwitch>>    slides;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PadSection)
 };
@@ -296,7 +321,7 @@ public:
         g.drawText("shipped - switch under the knob, Size 3",
                    kMargin, shipped.getY() - kCaptionH, euclid::kSectionW, kCaptionH,
                    juce::Justification::centredLeft, false);
-        g.drawText("proposed - switch alongside, Size 2",
+        g.drawText("proposed - slide switch alongside, Size 2",
                    kMargin, proposed.getY() - kCaptionH, euclid::kSectionW, kCaptionH,
                    juce::Justification::centredLeft, false);
     }

@@ -192,6 +192,14 @@ public:
                           float sliderPos, float startAngle, float endAngle,
                           juce::Slider&) override;
 
+    // Vertical two-position slide switch (SlideSwitch). position runs 0 = top to
+    // 1 = bottom and may sit between while the disc animates; selected is the end the
+    // switch is committed to, whose label lights in the accent.
+    virtual void drawSlideSwitch(juce::Graphics&, juce::Rectangle<float> bounds,
+                                 float position, juce::Colour accent,
+                                 const juce::String& topLabel, const juce::String& bottomLabel,
+                                 int selected, bool highlighted);
+
     // Text buttons
     void drawButtonBackground(juce::Graphics&, juce::Button&,
                               const juce::Colour& bg, bool over, bool down) override;
@@ -411,6 +419,12 @@ public:
     // knob's label. Size 3 clears it; Size 4 does not, and nothing ships a stepped
     // control that small.
     static constexpr float kRotaryValueMinRadius = 12.0f;
+
+    // SlideSwitch: the whole control (track + labels beside it), and the track's
+    // width. 44 tall puts the disc's two rest positions level with a Size 2 knob's ring.
+    static constexpr int   kSlideSwitchW      = 40;
+    static constexpr int   kSlideSwitchH      = 44;
+    static constexpr float kSlideSwitchTrackW = 10.0f;
 
     // Point a plain juce::Slider's drag at the sweep the knob is drawn to. Without it
     // the slider keeps JUCE's own defaults, so the angle it maps the mouse through

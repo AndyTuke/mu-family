@@ -305,6 +305,78 @@ void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int
     g.fillEllipse(dotX - dotR, dotY - dotR, dotR * 2.0f, dotR * 2.0f);
 }
 
+// Slide switch in the knob's language: a pill sunk into the panel, a small raised disc
+// in the knob-face purple, and the accent on the disc's ring and the active label.
+void MuLookAndFeel::drawSlideSwitch(juce::Graphics& g, juce::Rectangle<float> bounds,
+                                    float position, juce::Colour accent,
+                                    const juce::String& topLabel, const juce::String& bottomLabel,
+                                    int selected, bool highlighted)
+{
+    using mu_ui::sf;
+
+    const float tw = sf(kSlideSwitchTrackW);
+    const juce::Rectangle<float> tr(bounds.getX() + sf(2.0f), bounds.getY() + sf(3.0f),
+                                    tw, bounds.getHeight() - sf(6.0f));
+    const float thR  = tw * 0.5f + sf(1.0f);   // disc sits slightly proud of the track
+    const float yTop = tr.getY() + tw * 0.5f;
+    const float yBot = tr.getBottom() - tw * 0.5f;
+    const float cx   = tr.getCentreX();
+    const float cy   = yTop + position * (yBot - yTop);
+
+    // Track: darkest at the top lip, with a faint highlight where light catches the
+    // lower edge, plus a thin accent line so it reads as part of the same control.
+    juce::Path track;
+    track.addRoundedRectangle(tr, tw * 0.5f);
+    g.setGradientFill(juce::ColourGradient(juce::Colour(0xff07050a), cx, tr.getY(),
+                                           juce::Colour(0xff17121d), cx, tr.getBottom(), false));
+    g.fillPath(track);
+    g.setColour(juce::Colours::black.withAlpha(0.6f));
+    g.strokePath(track, juce::PathStrokeType(1.0f));
+    g.setColour(juce::Colours::white.withAlpha(0.07f));
+    g.drawLine(cx - tw * 0.3f, tr.getBottom() + 0.5f, cx + tw * 0.3f, tr.getBottom() + 0.5f, 1.0f);
+    g.setColour(accent.withAlpha(0.18f));
+    g.drawLine(cx, yTop, cx, yBot, juce::jmax(1.0f, tw * 0.18f));
+
+    // Disc: cast shadow, then the knob face's radial gradient lit from the top-right.
+    juce::Path disc;
+    disc.addEllipse(cx - thR, cy - thR, thR * 2.0f, thR * 2.0f);
+    juce::DropShadow(juce::Colours::black.withAlpha(0.7f), (int) juce::jmax(2.0f, thR * 0.6f),
+                     { -1, (int) juce::jmax(1.0f, thR * 0.3f) }).drawForPath(g, disc);
+
+    juce::ColourGradient face(juce::Colour(0xff4a3a58), cx + thR * 0.45f, cy - thR * 0.45f,
+                              juce::Colour(0xff100c16), cx - thR * 0.8f,  cy + thR * 0.9f, true);
+    face.addColour(0.4, juce::Colour(0xff2d2238));
+    g.setGradientFill(face);
+    g.fillPath(disc);
+
+    // Accent ring on the disc: soft halo passes building to a crisp core, as on the knob.
+    const float ringR = thR * 0.78f;
+    juce::Path ring;
+    ring.addEllipse(cx - ringR, cy - ringR, ringR * 2.0f, ringR * 2.0f);
+    const float glow = highlighted ? 0.22f : 0.14f;
+    for (float i = 3.0f; i >= 1.0f; i -= 1.0f)
+    {
+        g.setColour(accent.withAlpha(glow));
+        g.strokePath(ring, juce::PathStrokeType(i * thR * 0.22f));
+    }
+    g.setColour(accent);
+    g.strokePath(ring, juce::PathStrokeType(juce::jmax(1.0f, thR * 0.14f)));
+
+    // Labels level with each end: the selected one in the accent, the other dimmed.
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(kKnobLabelFont))));
+    const float lx = tr.getRight() + sf(5.0f);
+    const float lw = bounds.getRight() - lx;
+    const float lh = sf(12.0f);
+    const auto  dim = colour(labelText).withAlpha(0.55f);
+
+    g.setColour(selected == 0 ? accent : dim);
+    g.drawText(topLabel, juce::Rectangle<float>(lx, yTop - lh * 0.5f, lw, lh),
+               juce::Justification::centredLeft, false);
+    g.setColour(selected == 1 ? accent : dim);
+    g.drawText(bottomLabel, juce::Rectangle<float>(lx, yBot - lh * 0.5f, lw, lh),
+               juce::Justification::centredLeft, false);
+}
+
 void MuLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button,
                                           const juce::Colour& bg,
                                           bool isOver, bool isDown)

@@ -14,6 +14,7 @@ target_sources(ControlDesign PRIVATE
     "${MU_CORE_DIR}/UI/Components/MuTheme.cpp"
     "${MU_CORE_DIR}/UI/Components/KnobWithLabel.cpp"
     "${MU_CORE_DIR}/UI/Components/SegmentControl.cpp"
+    "${MU_CORE_DIR}/UI/Components/SlideSwitch.cpp"
 )
 
 target_compile_features(ControlDesign PRIVATE cxx_std_17)

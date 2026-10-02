@@ -11,10 +11,12 @@ EuclideanPanel::EuclideanPanel(PluginProcessor& p) : proc(p)
         addAndMakeVisible(k);
 
     for (auto* s : { &prePadModeA, &postPadModeA, &insertModeA,
-                     &legatoCtrl, &monoCtrl,
                      &prePadModeB, &postPadModeB, &insertModeB,
                      &prePadModeC, &postPadModeC, &insertModeC })
         addAndMakeVisible(s);
+
+    addAndMakeVisible(legatoCtrl);
+    addAndMakeVisible(monoCtrl);
 
     // Logic dropdown (replaced the 5-pill SegmentControl) — populated with
     // 1-based IDs that map to APVTS "logic" param via id - 1.
@@ -55,6 +57,18 @@ void EuclideanPanel::apvtsSet(const char* suffix, float v)
         p->setValueNotifyingHost(p->convertTo0to1(v));
 }
 
+// Pad keeps every hit: the zone becomes rests and the hits are redistributed over the
+// steps left. Mute keeps the pattern where it is and silences whatever lands in the zone.
+juce::String EuclideanPanel::padModeExplanation(PadZone zone, int modeIndex)
+{
+    const char* where = zone == PadZone::Start ? "at the start"
+                      : zone == PadZone::End   ? "at the end"
+                                               : "at Insert Start";
+    if (modeIndex == 1)
+        return juce::String("Mute - pattern spans every step; hits ") + where + " are silenced";
+    return juce::String("Pad - silent steps ") + where + "; all hits fit into the rest";
+}
+
 void EuclideanPanel::wireCallbacks()
 {
     auto notify = [this] { if (onPatternChanged) onPatternChanged(); };
@@ -89,19 +103,17 @@ void EuclideanPanel::wireCallbacks()
         apvtsSet("insLenA", (float)v);  notify();
         if (onStatusUpdate) onStatusUpdate("Euclid A Insert Length", juce::String((int)v));
     };
-    // status-bar coverage for segment toggles — mode text matches dropdown.
-    auto padModeLabel = [](int idx) { return idx == 1 ? juce::String("Mute") : juce::String("Pad"); };
-    prePadModeA.onChange = [this, notify, padModeLabel](int idx) {
+    prePadModeA.onChange = [this, notify](int idx) {
         apvtsSet("prePadModeA", idx == 1 ? 1.0f : 0.0f);  notify();
-        if (onStatusUpdate) onStatusUpdate("Euclid A Pre Pad Mode", padModeLabel(idx));
+        if (onStatusUpdate) onStatusUpdate("Euclid A Pre Pad Mode", padModeExplanation(PadZone::Start, idx));
     };
-    postPadModeA.onChange = [this, notify, padModeLabel](int idx) {
+    postPadModeA.onChange = [this, notify](int idx) {
         apvtsSet("postPadModeA", idx == 1 ? 1.0f : 0.0f);  notify();
-        if (onStatusUpdate) onStatusUpdate("Euclid A Post Pad Mode", padModeLabel(idx));
+        if (onStatusUpdate) onStatusUpdate("Euclid A Post Pad Mode", padModeExplanation(PadZone::End, idx));
     };
-    insertModeA.onChange = [this, notify, padModeLabel](int idx) {
+    insertModeA.onChange = [this, notify](int idx) {
         apvtsSet("insModeA", idx == 1 ? 1.0f : 0.0f);  notify();
-        if (onStatusUpdate) onStatusUpdate("Euclid A Insert Mode", padModeLabel(idx));
+        if (onStatusUpdate) onStatusUpdate("Euclid A Insert Mode", padModeExplanation(PadZone::Insert, idx));
     };
 
     // ── Legato ─────────────────────────────────────────────────────────
@@ -164,17 +176,17 @@ void EuclideanPanel::wireCallbacks()
         apvtsSet("insLenB", (float)v);  notify();
         if (onStatusUpdate) onStatusUpdate("Euclid B Insert Length", juce::String((int)v));
     };
-    prePadModeB.onChange = [this, notify, padModeLabel](int idx) {
+    prePadModeB.onChange = [this, notify](int idx) {
         apvtsSet("prePadModeB", idx == 1 ? 1.0f : 0.0f);  notify();
-        if (onStatusUpdate) onStatusUpdate("Euclid B Pre Pad Mode", padModeLabel(idx));
+        if (onStatusUpdate) onStatusUpdate("Euclid B Pre Pad Mode", padModeExplanation(PadZone::Start, idx));
     };
-    postPadModeB.onChange = [this, notify, padModeLabel](int idx) {
+    postPadModeB.onChange = [this, notify](int idx) {
         apvtsSet("postPadModeB", idx == 1 ? 1.0f : 0.0f);  notify();
-        if (onStatusUpdate) onStatusUpdate("Euclid B Post Pad Mode", padModeLabel(idx));
+        if (onStatusUpdate) onStatusUpdate("Euclid B Post Pad Mode", padModeExplanation(PadZone::End, idx));
     };
-    insertModeB.onChange = [this, notify, padModeLabel](int idx) {
+    insertModeB.onChange = [this, notify](int idx) {
         apvtsSet("insModeB", idx == 1 ? 1.0f : 0.0f);  notify();
-        if (onStatusUpdate) onStatusUpdate("Euclid B Insert Mode", padModeLabel(idx));
+        if (onStatusUpdate) onStatusUpdate("Euclid B Insert Mode", padModeExplanation(PadZone::Insert, idx));
     };
 
     // ── Euclid C (Accent) ─────────────────────────────────────────────────────
@@ -207,17 +219,17 @@ void EuclideanPanel::wireCallbacks()
         apvtsSet("insLenC", (float)v);  notify();
         if (onStatusUpdate) onStatusUpdate("Accent Insert Length", juce::String((int)v));
     };
-    prePadModeC.onChange = [this, notify, padModeLabel](int idx) {
+    prePadModeC.onChange = [this, notify](int idx) {
         apvtsSet("prePadModeC", idx == 1 ? 1.0f : 0.0f);  notify();
-        if (onStatusUpdate) onStatusUpdate("Accent Pre Pad Mode", padModeLabel(idx));
+        if (onStatusUpdate) onStatusUpdate("Accent Pre Pad Mode", padModeExplanation(PadZone::Start, idx));
     };
-    postPadModeC.onChange = [this, notify, padModeLabel](int idx) {
+    postPadModeC.onChange = [this, notify](int idx) {
         apvtsSet("postPadModeC", idx == 1 ? 1.0f : 0.0f);  notify();
-        if (onStatusUpdate) onStatusUpdate("Accent Post Pad Mode", padModeLabel(idx));
+        if (onStatusUpdate) onStatusUpdate("Accent Post Pad Mode", padModeExplanation(PadZone::End, idx));
     };
-    insertModeC.onChange = [this, notify, padModeLabel](int idx) {
+    insertModeC.onChange = [this, notify](int idx) {
         apvtsSet("insModeC", idx == 1 ? 1.0f : 0.0f);  notify();
-        if (onStatusUpdate) onStatusUpdate("Accent Insert Mode", padModeLabel(idx));
+        if (onStatusUpdate) onStatusUpdate("Accent Insert Mode", padModeExplanation(PadZone::Insert, idx));
     };
 }
 
@@ -279,7 +291,7 @@ void EuclideanPanel::refreshSuffix(const juce::String& suffix)
     if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
     const Rhythm& r = proc.getRhythm(rhythmIndex);
 
-    auto setMode = [](SegmentControl& sc, InsertMode m) {
+    auto setMode = [](SlideSwitch& sc, InsertMode m) {
         sc.setSelectedIndex(m == InsertMode::Mute ? 1 : 0);
     };
 
@@ -412,7 +424,6 @@ void EuclideanPanel::resized()
 
     constexpr int rowH  = (innerH - kLogicH) / 3;
     constexpr int ctrlH = rowH - kLabelH;   // control zone within each row (below label)
-    constexpr int mP    = 4;
 
     // Steps/Hits/Rotate render at Size 1 (canonical). kEucKnobGap
     // separates the three knobs visually; the whole block then defines where
@@ -429,30 +440,26 @@ void EuclideanPanel::resized()
     constexpr int insX      = padX + pW * 2 + kPadInsertGap / 2;
     constexpr int insPanelW = MuLookAndFeel::kEuclidInnerW - kOuter - insX;
 
-    constexpr int knobH    = ctrlH - kSwitchH - 6;
-    // Pad/Mute toggle width — fits the longest text ("MUTE") cleanly.
-    constexpr int insSw    = (pW < 56) ? pW : 56;
-    constexpr int insSwX   = insX + (insPanelW - insSw) / 2;
+    // Pad and Insert sub-panels: Size 2 knobs, each Pad/Mute slide switch beside its
+    // knob, all centred vertically in the sub-panel's box (ctrlH - 2 tall, as painted).
+    constexpr int knobW  = MuLookAndFeel::kKnobSize2W;
+    constexpr int knobH  = MuLookAndFeel::kKnobSize2H;
+    constexpr int swW    = MuLookAndFeel::kSlideSwitchW;
+    constexpr int swH    = MuLookAndFeel::kSlideSwitchH;
+    constexpr int knobDY = (ctrlH - 2 - knobH) / 2;
+    constexpr int swDY   = (ctrlH - 2 - swH) / 2;
 
-    // Pad knob pair: two Size-3 knobs centred inside the Pad sub-panel with
-    // kPadKnobGap between them. Mute toggles centre under each knob; padSw is
-    // capped so the two toggles never overlap.
-    constexpr int padKnobW      = MuLookAndFeel::kKnobSize3W;
-    constexpr int padKnobH      = MuLookAndFeel::kKnobSize3H;
-    constexpr int padPairW      = padKnobW * 2 + kPadKnobGap;
-    constexpr int prePadX       = padX + (padPanelW - padPairW) / 2;
-    constexpr int postPadX      = prePadX + padKnobW + kPadKnobGap;
-    constexpr int padSwMax      = (padPairW - 4) / 2;
-    constexpr int padSw         = padSwMax < 56 ? padSwMax : 56;
-    constexpr int preSw_x       = prePadX  + (padKnobW - padSw) / 2;
-    constexpr int postSw_x      = postPadX + (padKnobW - padSw) / 2;
+    // Pad sub-panel: two [knob | switch] units side by side.
+    constexpr int unitW    = knobW + kSwitchGap + swW;
+    constexpr int padSpan  = unitW * 2 + kSwitchGap;
+    constexpr int prePadX  = padX + (padPanelW - padSpan) / 2;
+    constexpr int postPadX = prePadX + unitW + kSwitchGap;
 
-    // Insert pair: centred inside the Insert sub-panel using the SAME pair
-    // geometry as the Pad pair (padPairW + kPadKnobGap), so the Pre/Post Pad
-    // spacing and the Insert spacing are identical. Previously the two insert
-    // knobs sat one-per-pW-column (~104 px apart) — far wider than the Pad pair.
-    constexpr int insStX  = insX + (insPanelW - padPairW) / 2;
-    constexpr int insLenX = insStX + padKnobW + kPadKnobGap;
+    // Insert sub-panel: the two knobs share one switch, placed to their right.
+    constexpr int insSpan = knobW * 2 + kInsKnobGap + kSwitchGap * 2 + swW;
+    constexpr int insStX  = insX + (insPanelW - insSpan) / 2;
+    constexpr int insLenX = insStX + knobW + kInsKnobGap;
+    constexpr int insSwX  = insLenX + knobW + kSwitchGap * 2;
 
     // Every literal/constant in setBounds wrapped in mu_ui::s() so toggling
     // the UI scale propagates uniformly. Identity at scale = 1.0.
@@ -461,21 +468,21 @@ void EuclideanPanel::resized()
     auto placeRow = [&](int y,
                         KnobWithLabel& steps, KnobWithLabel& hits, KnobWithLabel& rot,
                         KnobWithLabel& prePad, KnobWithLabel& postPad,
-                        SegmentControl& prePadMode, SegmentControl& postPadMode,
+                        SlideSwitch& prePadMode, SlideSwitch& postPadMode,
                         KnobWithLabel& insSt, KnobWithLabel& insLen,
-                        SegmentControl& insMode)
+                        SlideSwitch& insMode)
     {
         const int cy = y + kLabelH;  // top of control zone (Medium space)
         steps.setBounds  (s(kOuter),                          s(cy), s(eW), s(eH));
         hits.setBounds   (s(kOuter + eW + kEucKnobGap),       s(cy), s(eW), s(eH));
         rot.setBounds    (s(kOuter + (eW + kEucKnobGap) * 2), s(cy), s(eW), s(eH));
-        prePad.setBounds (s(prePadX),  s(cy + mP), s(padKnobW), s(padKnobH));
-        postPad.setBounds(s(postPadX), s(cy + mP), s(padKnobW), s(padKnobH));
-        prePadMode.setBounds (s(preSw_x),  s(cy + knobH + 2), s(padSw), s(kSwitchH));
-        postPadMode.setBounds(s(postSw_x), s(cy + knobH + 2), s(padSw), s(kSwitchH));
-        insSt.setBounds  (s(insStX),  s(cy + mP), s(padKnobW), s(padKnobH));
-        insLen.setBounds (s(insLenX), s(cy + mP), s(padKnobW), s(padKnobH));
-        insMode.setBounds(s(insSwX),       s(cy + knobH + 2), s(insSw), s(kSwitchH));
+        prePad.setBounds     (s(prePadX),                       s(cy + knobDY), s(knobW), s(knobH));
+        prePadMode.setBounds (s(prePadX + knobW + kSwitchGap),  s(cy + swDY),   s(swW),   s(swH));
+        postPad.setBounds    (s(postPadX),                      s(cy + knobDY), s(knobW), s(knobH));
+        postPadMode.setBounds(s(postPadX + knobW + kSwitchGap), s(cy + swDY),   s(swW),   s(swH));
+        insSt.setBounds  (s(insStX),  s(cy + knobDY), s(knobW), s(knobH));
+        insLen.setBounds (s(insLenX), s(cy + knobDY), s(knobW), s(knobH));
+        insMode.setBounds(s(insSwX),  s(cy + swDY),   s(swW),   s(swH));
     };
 
     int y = kOuter;
