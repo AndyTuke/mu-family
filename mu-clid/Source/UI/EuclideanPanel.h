@@ -61,17 +61,11 @@ private:
     KnobWithLabel insertLenA   { "Insert Length", Id::knobInsertPad };
     SlideSwitch    insertModeA  { "Pad", "Mute", Id::knobInsertPad };
 
-    // ── Legato + Logic ────────────────────────────────────────────────
-    // Pattern legato sits FIRST on the same row as the logic pills, separated
-    // by a sub-panel gap. Visually communicates that legato is a per-rhythm
-    // sequencer modifier distinct from the per-step logic-combination choice
-    // but shares the same horizontal real-estate.
-    SegmentControl legatoCtrl { {"Trig","Leg"},
-                                SegmentControl::ActiveStyle::General,
-                                SegmentControl::DrawStyle::Pills };
-    SegmentControl monoCtrl  { {"Poly","Mono"},
-                                SegmentControl::ActiveStyle::Warning,
-                                SegmentControl::DrawStyle::Pills };
+    // ── Rhythm voice behaviour + Logic ────────────────────────────────
+    // Legato and Mono are per-rhythm voice behaviour, not padding, so they live in their
+    // own column between the Euclid knobs and the Pad sub-panel, stacked one above the other.
+    SlideSwitch legatoCtrl { "Trig", "Leg",  Id::segmentActiveBorder  };
+    SlideSwitch monoCtrl   { "Poly", "Mono", Id::segmentWarningBorder };
     // Logic dropdown — was a 5-pill SegmentControl; pills crowded the row so
     // converted to a dropdown. IDs are 1-based (JUCE ComboBox convention)
     // and map to APVTS "logic" param via id - 1.
@@ -128,6 +122,11 @@ private:
     // knobs get the sub-panel's full height and run at Size 2.
     static constexpr int kSwitchGap    = MuLookAndFeel::kSpaceS;      // knob to its own switch
     static constexpr int kInsKnobGap   = MuLookAndFeel::kKnobGapRow;  // between the two insert knobs
+    // Column for the Legato / Mono switches, between the Euclid block and the Pad
+    // sub-panel; its width comes out of the Pad and Insert sub-panels.
+    static constexpr int kModeColPad   = MuLookAndFeel::kSpaceM;
+    static constexpr int kModeColW     = kModeColPad * 2 + MuLookAndFeel::kSlideSwitchW;
+    static constexpr int kModeSwGap    = MuLookAndFeel::kSpaceL;      // between the two switches
     // Logic dropdown: the narrowest that still fits the widest item ("B not A") beside the
     // ComboBox chrome (6 px left pad + arrow, 24 px in all), centred under the
     // Steps/Hits/Rotate block. Its border rect sits kLogicDropPad outside it.
@@ -142,6 +141,10 @@ private:
     void updateRangesA(int steps);
     void updateRangesB(int steps);
     void updateRangesC(int steps);
+
+    // Plain-English descriptions of the Legato / Mono choices for the status bar.
+    static juce::String legatoExplanation(int modeIndex);
+    static juce::String monoExplanation(int modeIndex);
 
     // Plain-English description of a Pad/Mute choice for the status bar.
     enum class PadZone { Start, End, Insert };

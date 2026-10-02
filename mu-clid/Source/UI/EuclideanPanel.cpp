@@ -69,6 +69,18 @@ juce::String EuclideanPanel::padModeExplanation(PadZone zone, int modeIndex)
     return juce::String("Pad - silent steps ") + where + "; all hits fit into the rest";
 }
 
+juce::String EuclideanPanel::legatoExplanation(int modeIndex)
+{
+    return modeIndex == 1 ? "Leg - back-to-back hits carry the envelopes on, playing as one note"
+                          : "Trig - every hit restarts the envelopes";
+}
+
+juce::String EuclideanPanel::monoExplanation(int modeIndex)
+{
+    return modeIndex == 1 ? "Mono - each hit cuts off the one before"
+                          : "Poly - each hit gets its own voice, so tails overlap";
+}
+
 void EuclideanPanel::wireCallbacks()
 {
     auto notify = [this] { if (onPatternChanged) onPatternChanged(); };
@@ -124,7 +136,7 @@ void EuclideanPanel::wireCallbacks()
     //                    waveform discontinuity at sample[0].
     legatoCtrl.onChange = [this, notify](int idx) {
         apvtsSet("patLeg", idx > 0 ? 1.0f : 0.0f);  notify();
-        if (onStatusUpdate) onStatusUpdate("Pattern Legato", idx > 0 ? "On" : "Off");
+        if (onStatusUpdate) onStatusUpdate("Pattern Legato", legatoExplanation(idx));
     };
 
     // Mono = polyphony cap. VoiceEngine::trigger forces voices[0] when active.
@@ -132,7 +144,7 @@ void EuclideanPanel::wireCallbacks()
     // single voice that exists in mono mode.
     monoCtrl.onChange = [this, notify](int idx) {
         apvtsSet("vMono", idx > 0 ? 1.0f : 0.0f);  notify();
-        if (onStatusUpdate) onStatusUpdate("Voice Mode", idx > 0 ? "Mono" : "Poly");
+        if (onStatusUpdate) onStatusUpdate("Voice Mode", monoExplanation(idx));
     };
 
     // ── Logic ─────────────────────────────────────────────────────────────────
@@ -432,8 +444,8 @@ void EuclideanPanel::resized()
     constexpr int eW    = MuLookAndFeel::kKnobSize1W;
     constexpr int eH    = MuLookAndFeel::kKnobSize1H;
     constexpr int eucBlockW = eW * 3 + kEucKnobGap * 2;
-    constexpr int pW    = (innerW - eucBlockW) / 4;
-    constexpr int padX  = kOuter + eucBlockW;
+    constexpr int pW    = (innerW - eucBlockW - kModeColW) / 4;
+    constexpr int padX  = kOuter + eucBlockW + kModeColW;
     // kPadInsertGap splits the Pad and Insert sub-panel borders so they
     // no longer share a pixel. Half the gap is taken from each side.
     constexpr int padPanelW = pW * 2 - kPadInsertGap / 2;
@@ -489,22 +501,16 @@ void EuclideanPanel::resized()
     placeRow(y, stepsA, hitsA, rotA, prePadA, postPadA, prePadModeA, postPadModeA, insertStA, insertLenA, insertModeA);
 
     y += rowH;
-    // Logic-row layout: each sub-panel aligns vertically with the column ABOVE it —
-    // Logic = Euclid knob block; Legato = Pad sub-panel; Mono = Insert sub-panel.
-    // So left and right edges of the logic-row borders line up with the corresponding
-    // boundaries in the Euclid row above. Vertical offset (kLogicVOffset) centres the
-    // band between the Pad rects above and below.
-    // The Logic dropdown is the exception: a compact control centred under the Euclid
-    // knob block rather than filling it.
-    {
-        constexpr int legatoX = padX;
-        constexpr int legatoW = padPanelW;            // matches Pad sub-panel rect above
-        constexpr int monoX_  = insX;
-        constexpr int monoW   = insPanelW;            // matches Insert sub-panel rect above
+    // Logic band between Euclid A and B: the Logic dropdown, centred under the Euclid
+    // knob block. kLogicVOffset centres the band between the rows above and below.
+    logicCtrl.setBounds(s(kLogicDropX), s(y + 2 + kLogicVOffset + kLogicDropPad), s(kLogicDropW), s(kLogicDropH));
 
-        logicCtrl .setBounds(s(kLogicDropX), s(y + 2 + kLogicVOffset + kLogicDropPad), s(kLogicDropW), s(kLogicDropH));
-        legatoCtrl.setBounds(s(legatoX), s(y + 3 + kLogicVOffset), s(legatoW), s(kLogicH - 6));
-        monoCtrl  .setBounds(s(monoX_),  s(y + 3 + kLogicVOffset), s(monoW),   s(kLogicH - 6));
+    // Legato over Mono, centred on the panel's height in the column before the Pad sub-panel.
+    {
+        constexpr int colX  = kOuter + eucBlockW + kModeColPad;
+        constexpr int pairY = kOuter + (innerH - (swH * 2 + kModeSwGap)) / 2;
+        legatoCtrl.setBounds(s(colX), s(pairY),                    s(swW), s(swH));
+        monoCtrl  .setBounds(s(colX), s(pairY + swH + kModeSwGap), s(swW), s(swH));
     }
 
     y += kLogicH;
@@ -542,8 +548,8 @@ void EuclideanPanel::paint(juce::Graphics& g)
     // Constants mirror resized() exactly — Euclid block + Pad/Insert split.
     constexpr int eW        = MuLookAndFeel::kKnobSize1W;
     constexpr int eucBlockW = eW * 3 + kEucKnobGap * 2;
-    constexpr int pW        = (innerW - eucBlockW) / 4;
-    constexpr int padX      = kOuter + eucBlockW;
+    constexpr int pW        = (innerW - eucBlockW - kModeColW) / 4;
+    constexpr int padX      = kOuter + eucBlockW + kModeColW;
     constexpr int padPanelW = pW * 2 - kPadInsertGap / 2;
     constexpr int insX      = padX + pW * 2 + kPadInsertGap / 2;
     constexpr int insPanelW = w - kOuter - insX;
@@ -558,18 +564,11 @@ void EuclideanPanel::paint(juce::Graphics& g)
 
     {
         constexpr int rowY    = kOuter + rowH;
-        // Logic-row sub-panel borders mirror the column boundaries of the Euclid row above:
-        //   Logic = centred under the Steps/Hits/Rotate block; Legato = Pad rect; Mono = Insert rect.
-        // Width/X values mirror the paint() Pad/Insert rect computation higher in this
-        // function so left + right edges line up pixel-for-pixel across rows.
+        // Logic dropdown's border, kLogicDropPad outside it, in the band between Euclid A and B.
         constexpr int rectY  = rowY + 2 + kLogicVOffset;
         constexpr int rectH  = kLogicH - 4;
 
         g.drawRoundedRectangle((float) s(kLogicDropX - kLogicDropPad), (float) s(rectY),
                                (float) s(kLogicDropW + 2 * kLogicDropPad), (float) s(rectH), 4.0f, 1.0f);
-        g.drawRoundedRectangle((float) s(padX),   (float) s(rectY),
-                               (float) s(padPanelW),  (float) s(rectH), 4.0f, 1.0f);
-        g.drawRoundedRectangle((float) s(insX),   (float) s(rectY),
-                               (float) s(insPanelW),  (float) s(rectH), 4.0f, 1.0f);
     }
 }

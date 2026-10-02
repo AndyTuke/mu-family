@@ -2,8 +2,8 @@
 // without rebuilding a whole product.
 //
 // Currently focused on **mu-clid's Pad / Insert sub-panels**: the two bordered boxes
-// that sit to the right of each Euclid row's Steps/Hits/Rotate block, plus the Legato
-// and Mono band between rows A and B.
+// that sit to the right of each Euclid row's Steps/Hits/Rotate block (and the
+// Legato / Mono switch column).
 //
 // This is a 1:1 reproduction, not an impression. Every constant below is mirrored from
 // mu-clid's EuclideanPanel (resized() and paint()) and the section is rendered at
@@ -38,7 +38,6 @@ namespace euclid
     constexpr int kLogicH       = 24;
     constexpr int kSwitchH      = 14;
     constexpr int kLabelH       = 10;
-    constexpr int kLogicVOffset = 3;
     constexpr int kOuter        = MuLookAndFeel::kSpaceXS;
     constexpr int kEucKnobGap   = MuLookAndFeel::kKnobGapRow;
     constexpr int kPadKnobGap   = MuLookAndFeel::kKnobGapPair;
@@ -54,9 +53,10 @@ namespace euclid
 
     constexpr int eW        = MuLookAndFeel::kKnobSize1W;
     constexpr int eucBlockW = eW * 3 + kEucKnobGap * 2;           // 240
-    constexpr int pW        = (innerW - eucBlockW) / 4;           // 134
+    constexpr int kModeColW = MuLookAndFeel::kSpaceM * 2 + MuLookAndFeel::kSlideSwitchW;   // 56
+    constexpr int pW        = (innerW - eucBlockW - kModeColW) / 4;   // 120
 
-    constexpr int padX      = kOuter + eucBlockW;                 // 244
+    constexpr int padX      = kOuter + eucBlockW + kModeColW;     // 300
     constexpr int padPanelW = pW * 2 - kPadInsertGap / 2;         // 265
     constexpr int insX      = padX + pW * 2 + kPadInsertGap / 2;  // 515
     constexpr int insPanelW = w - kOuter - insX;                  // 267
@@ -133,11 +133,6 @@ public:
             }
         }
 
-        legato = addSegment({ "Trig", "Leg" },  SegmentControl::ActiveStyle::General,
-                            SegmentControl::DrawStyle::Pills);
-        mono   = addSegment({ "Poly", "Mono" }, SegmentControl::ActiveStyle::Warning,
-                            SegmentControl::DrawStyle::Pills);
-
         setSize(euclid::kSectionW, euclid::kSectionH);
     }
 
@@ -160,13 +155,6 @@ public:
             g.drawRoundedRectangle((float) s(insX - kSectionX), (float) s(cy),
                                    (float) s(insPanelW), (float) s(ctrlH) - 2.0f, 4.0f, 1.0f);
         }
-
-        constexpr int rectY = kOuter + rowH + 2 + kLogicVOffset;
-        constexpr int rectH = kLogicH - 4;
-        g.drawRoundedRectangle((float) s(padX - kSectionX), (float) s(rectY),
-                               (float) s(padPanelW), (float) s(rectH), 4.0f, 1.0f);
-        g.drawRoundedRectangle((float) s(insX - kSectionX), (float) s(rectY),
-                               (float) s(insPanelW), (float) s(rectH), 4.0f, 1.0f);
     }
 
     void resized() override
@@ -219,14 +207,6 @@ public:
             row.insLen  ->setBounds(s(insLen2X), s(knobY), s(kBigKnobW), s(kBigKnobH));
             row.insMode ->setBounds(s(insLen2X + kBigKnobW + kUnitGap * 2), s(swY), s(kSlideW), s(kSlideH));
         }
-
-        // Legato aligns with the Pad sub-panel, Mono with the Insert sub-panel.
-        constexpr int rectY = kOuter + rowH + 2 + kLogicVOffset;
-        constexpr int rectH = kLogicH - 4;
-        legato->setBounds(s(padX - kSectionX) + s(4), s(rectY) + s(2),
-                          s(padPanelW) - s(8), s(rectH) - s(4));
-        mono  ->setBounds(s(insX - kSectionX) + s(4), s(rectY) + s(2),
-                          s(insPanelW) - s(8), s(rectH) - s(4));
     }
 
 private:
@@ -286,8 +266,6 @@ private:
 
     PadLayout layout;
     std::array<Row, kRows> rows;
-    SegmentControl* legato = nullptr;
-    SegmentControl* mono   = nullptr;
 
     std::vector<std::unique_ptr<KnobWithLabel>>  knobs;
     std::vector<std::unique_ptr<SegmentControl>> segments;
