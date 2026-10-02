@@ -18,11 +18,11 @@ CI checks out the pushed commit and reads `build_number.txt`. Commit + push the 
 
 ## 3. (b) GitHub release — all platforms via CI
 
-The repo is public, so macOS + Linux CI minutes are free — **always** publish a full cross-platform release. Dispatch the complete workflow (it builds Windows + macOS + Linux, packages the fixed-name zips the site links to, and creates/updates the GitHub Release `v1.0.0.NNN` from `build_number.txt`):
+The repo is public, so Linux CI minutes are free — **always** publish a full cross-platform release. Dispatch the complete workflow (it builds Windows + Linux, packages the fixed-name zips the site links to, and creates/updates the GitHub Release `v1.0.0.NNN` from `build_number.txt`):
 
 `gh workflow run release.yml --ref main`
 
-Then confirm it started: `gh run list --workflow=release.yml --limit 1`. (Do **not** hand-build zips or carry forward stale platform binaries — CI builds all three fresh.) `release.yml` is the only workflow dispatched as part of a release; `ci.yml` + `mac-validate.yml` still run only on explicit owner request, and none run on push.
+Then confirm it started: `gh run list --workflow=release.yml --limit 1`. (Do **not** hand-build zips or carry forward stale platform binaries — CI builds both fresh. **macOS is on hold** — no Apple signing certificate, so no Mac build ships; don't re-add it or dispatch `mac-validate.yml` unless the owner lifts the hold.) `release.yml` is the only workflow dispatched as part of a release; `ci.yml` + `mac-validate.yml` still run only on explicit owner request, and none run on push.
 
 ## 4. (c) Promote release notes + bump download page
 
@@ -34,4 +34,4 @@ For each affected product (`site/mu-clid-releases.html`, `site/mu-tant-releases.
 
 ## 5. Report
 
-Report the build number (from `BuildNumber.h`), the OneDrive deploy, the dispatched CI run URL, and the site push. End with the `## Release builds` artefact list. Note that the GitHub release assets appear once CI finishes (mac/linux take a few minutes).
+Report the build number (from `BuildNumber.h`), the OneDrive deploy, the dispatched CI run URL, and the site push. End with the `## Release builds` artefact list. Note that the GitHub release assets appear once CI finishes (Linux takes a few minutes).

@@ -1,14 +1,17 @@
 name: Release artifacts
 
-# Manual cross-platform release. Builds the mu-family plugins in RELEASE on Linux, macOS and
-# Windows, packages a per-platform demo zip on each runner (macOS uses `ditto` so bundle exec
-# bits / symlinks / ad-hoc signatures survive — see backlog #978), then a final `publish` job
+# Manual cross-platform release. Builds the mu-family plugins in RELEASE on Linux and Windows,
+# packages a per-platform demo zip on each runner, then a final `publish` job
 # collects all platform zips and creates/updates the GitHub Release. The fixed-name zips are
 # what the download site links to (releases/latest/download/<name>). Version comes from the
 # committed build_number.txt at the run's commit — pin/commit it before dispatching.
 #
 # Windows is also built + deployed locally with the installer; this workflow is the source of
-# the Mac/Linux (Beta) builds, which also get copied into the OneDrive TDP/Mac + TDP/Linux shares.
+# the Linux (Beta) builds.
+#
+# macOS is ON HOLD (owner decision, 2026-10-02): without an Apple code-signing certificate the
+# builds can't be notarized, so they aren't shipped. macos-latest is out of the matrix; the
+# macOS-only steps below are kept, dormant, so re-enabling is just adding it back.
 
 on:
   workflow_dispatch:
@@ -20,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest]   # macos-latest on hold — see header
 
     env:
       JUCE_PATH: ${{ github.workspace }}/JUCE
@@ -181,6 +184,6 @@ jobs:
           else
             gh release create "$tag" \
               --title "mu-family $tag" \
-              --notes "mu-family $tag — Windows release; macOS & Linux are Beta. Please report any issues." \
+              --notes "mu-family $tag — Windows release; Linux is Beta. macOS is on hold. Please report any issues." \
               dist/*.zip
           fi

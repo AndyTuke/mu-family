@@ -1,5 +1,9 @@
 name: macOS validate (on-demand)
 
+# ON HOLD (owner decision, 2026-10-02): macOS development is paused — no Apple code-signing
+# certificate, so nothing is shipped for Mac. Kept for when it resumes; don't dispatch it as
+# part of a release.
+#
 # Manual, cost-controlled macOS validation. macOS GitHub runners bill at 10x the
 # minute rate, so this is NOT on the every-push matrix (that's ci.yml, Linux+Windows).
 # Dispatch this when you're about to cut a release: it builds the universal Mac binaries,

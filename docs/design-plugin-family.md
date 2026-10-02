@@ -350,6 +350,10 @@ in an `APPLE` configure, so they're built/validated on the macOS CI runner (`auv
 never locally on Windows. Shipping AU to Mac users later needs Apple notarization +
 signing (the Apple side of #99).
 
+> **macOS is on hold** (owner decision, 2026-10-02): no Apple code-signing certificate, so
+> no Mac build is shipped and `release.yml` no longer runs a macOS runner. The `APPLE` / AU
+> plumbing above is kept intact so the work can resume without re-plumbing.
+
 ### Build-number policy (owner rules, [cmake/IncrementBuildNumber.cmake](../cmake/IncrementBuildNumber.cmake))
 
 1. A code change → a **Debug** build only. Every Debug build **increments the number by

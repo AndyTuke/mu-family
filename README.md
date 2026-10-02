@@ -1,6 +1,6 @@
 # μ-series — Transwarp Development Project
 
-Audio plugins and tools for Windows (macOS coming soon).
+Audio plugins and tools for Windows (Linux in beta; macOS on hold).
 
 | Product | Description | Format |
 |---|---|---|
