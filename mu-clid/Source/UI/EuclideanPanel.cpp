@@ -494,18 +494,15 @@ void EuclideanPanel::resized()
     // So left and right edges of the logic-row borders line up with the corresponding
     // boundaries in the Euclid row above. Vertical offset (kLogicVOffset) centres the
     // band between the Pad rects above and below.
-    // Logic width shrinks by kPadInsertGap so there's a visible gap to the Legato
-    // sub-panel on its right (Legato keeps the padX anchor to stay aligned with the
-    // Pad rect above; gap = same width as the Pad/Insert gap to keep visual rhythm).
+    // The Logic dropdown is the exception: a compact control centred under the Euclid
+    // knob block rather than filling it.
     {
-        constexpr int logicX  = kOuter;
-        constexpr int logicW  = kLogicDropW;  // fitted to widest item ("B not A")
         constexpr int legatoX = padX;
         constexpr int legatoW = padPanelW;            // matches Pad sub-panel rect above
         constexpr int monoX_  = insX;
         constexpr int monoW   = insPanelW;            // matches Insert sub-panel rect above
 
-        logicCtrl .setBounds(s(logicX),  s(y + 3 + kLogicVOffset), s(logicW),  s(kLogicH - 6));
+        logicCtrl .setBounds(s(kLogicDropX), s(y + 2 + kLogicVOffset + kLogicDropPad), s(kLogicDropW), s(kLogicDropH));
         legatoCtrl.setBounds(s(legatoX), s(y + 3 + kLogicVOffset), s(legatoW), s(kLogicH - 6));
         monoCtrl  .setBounds(s(monoX_),  s(y + 3 + kLogicVOffset), s(monoW),   s(kLogicH - 6));
     }
@@ -562,14 +559,14 @@ void EuclideanPanel::paint(juce::Graphics& g)
     {
         constexpr int rowY    = kOuter + rowH;
         // Logic-row sub-panel borders mirror the column boundaries of the Euclid row above:
-        //   Logic = Steps/Hits/Rotate block; Legato = Pad rect; Mono = Insert rect.
+        //   Logic = centred under the Steps/Hits/Rotate block; Legato = Pad rect; Mono = Insert rect.
         // Width/X values mirror the paint() Pad/Insert rect computation higher in this
         // function so left + right edges line up pixel-for-pixel across rows.
         constexpr int rectY  = rowY + 2 + kLogicVOffset;
         constexpr int rectH  = kLogicH - 4;
 
-        g.drawRoundedRectangle((float) s(kOuter), (float) s(rectY),
-                               (float) s(kLogicDropW), (float) s(rectH), 4.0f, 1.0f);
+        g.drawRoundedRectangle((float) s(kLogicDropX - kLogicDropPad), (float) s(rectY),
+                               (float) s(kLogicDropW + 2 * kLogicDropPad), (float) s(rectH), 4.0f, 1.0f);
         g.drawRoundedRectangle((float) s(padX),   (float) s(rectY),
                                (float) s(padPanelW),  (float) s(rectH), 4.0f, 1.0f);
         g.drawRoundedRectangle((float) s(insX),   (float) s(rectY),

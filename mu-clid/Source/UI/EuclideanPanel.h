@@ -128,9 +128,14 @@ private:
     // knobs get the sub-panel's full height and run at Size 2.
     static constexpr int kSwitchGap    = MuLookAndFeel::kSpaceS;      // knob to its own switch
     static constexpr int kInsKnobGap   = MuLookAndFeel::kKnobGapRow;  // between the two insert knobs
-    // Logic dropdown fitted width — just wide enough for the widest item ("B not A")
-    // plus ComboBox chrome (~5 px left pad + ~20 px arrow).
-    static constexpr int kLogicDropW   = 88;
+    // Logic dropdown: the narrowest that still fits the widest item ("B not A") beside the
+    // ComboBox chrome (6 px left pad + arrow, 24 px in all), centred under the
+    // Steps/Hits/Rotate block. Its border rect sits kLogicDropPad outside it.
+    static constexpr int kLogicDropW   = 72;
+    static constexpr int kLogicDropH   = 16;
+    static constexpr int kLogicDropPad = 2;
+    static constexpr int kLogicDropX   = kOuter + (MuLookAndFeel::kKnobSize1W * 3 + kEucKnobGap * 2
+                                                   - kLogicDropW) / 2;
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();
