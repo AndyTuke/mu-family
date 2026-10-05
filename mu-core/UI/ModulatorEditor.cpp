@@ -437,6 +437,12 @@ void ModulatorEditor::addTarget()
     unlockMod();
     rebuildRows();
     resized();
+    // Metal style shows one target at a time: bring the new one into view.
+    if (metal && ! rows.empty())
+    {
+        rowsViewport.setViewPosition(0, ((int) rows.size() - 1) * (kRowH + 2));
+        updateRowPager();
+    }
     repaint();
     if (onChange) onChange();
 }
@@ -444,6 +450,20 @@ void ModulatorEditor::addTarget()
 void ModulatorEditor::updateRowPager()
 {
     const int total = (int)rows.size();
+
+    // Metal style: one target shown; the stepper is always there, enabled where it can move.
+    if (metal)
+    {
+        const int cur = total > 0 ? juce::jlimit(0, total - 1, rowsViewport.getViewPositionY() / (kRowH + 2)) : -1;
+        rowPrevBtn  .setVisible(true);
+        rowNextBtn  .setVisible(true);
+        rowPageLabel.setVisible(true);
+        rowPrevBtn.setEnabled(cur > 0);
+        rowNextBtn.setEnabled(cur >= 0 && cur < total - 1);
+        rowPageLabel.setText(juce::String(cur + 1) + " / " + juce::String(total), juce::dontSendNotification);
+        return;
+    }
+
     const int viewH = rowsViewport.getHeight();
     const int rpp   = juce::jmax(1, viewH / (kRowH + 2));
     const bool multi = total > rpp;
@@ -618,6 +638,7 @@ void ModulatorEditor::setMetalStyle(bool m)
     const auto labelCol = MuLookAndFeel::colour(m ? MuLookAndFeel::labelText : MuLookAndFeel::mutedText);
     loopLabel.setColour(juce::Label::textColourId, labelCol);
     stepLabel.setColour(juce::Label::textColourId, labelCol);
+    rowPageLabel.setColour(juce::Label::textColourId, labelCol);
     resized();
     repaint();
 }
@@ -685,6 +706,29 @@ void ModulatorEditor::resized()
     // ── Assignment rows viewport ───────────────────────────────────────────────
     const int editorBottom = edY + edH + gap4;
     const int ix = m + pad, iw = w - 2 * (m + pad);   // inside the assignment box
+
+    if (metal)
+    {
+        // One target at a time: [row | "n / N" | up over down], the Add button below.
+        // Content height is aligned so the viewport's furthest position is the last row.
+        const int stepW = s(18);
+        const int readW = s(44);
+        const int rowW  = iw - readW - stepW - gap4 * 2;
+        const int addY  = h - m - pad - addBtnH;
+        const int rowY  = editorBottom + pad + juce::jmax(0, (addY - gap4 - editorBottom - pad - rowH) / 2);   // centred above Add
+        rowsViewport.setBounds(ix, rowY, rowW, rowH);
+        rowsBox.setSize(rowW, juce::jmax(rowH, ((int) rows.size() - 1) * (rowH + gap2) + rowH));
+        int ry = 0;
+        for (auto& row : rows) { row->setBounds(0, ry, rowW, rowH); ry += rowH + gap2; }
+
+        rowPageLabel.setBounds(ix + rowW + gap4, rowY, readW, rowH);
+        const int stX = ix + iw - stepW;
+        rowPrevBtn.setBounds(stX, rowY,            stepW, rowH / 2);
+        rowNextBtn.setBounds(stX, rowY + rowH / 2, stepW, rowH - rowH / 2);
+        addBtn.setBounds(ix, addY, iw, addBtnH);
+        updateRowPager();
+        return;
+    }
     const int viewH = juce::jmax(0, h - editorBottom - pagerH - addBtnH - gap4 - 2 * pad - m);
     rowsViewport.setBounds(ix, editorBottom + pad, iw, viewH);
 

@@ -149,5 +149,5 @@ void VoiceSection::paint(juce::Graphics& g)
     plate("PITCH",  0,    kPitchW);
     plate("FILTER", fltX, 6 * kFltW);
     plate("AMP",    ampX, kAmpW);
-    plate("INSERT", insX, kInsertW);
+    plate("EFFECTS", insX, kInsertW);
 }
