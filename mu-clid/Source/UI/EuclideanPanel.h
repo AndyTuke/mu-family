@@ -142,6 +142,11 @@ private:
                       KnobWithLabel& pre, KnobWithLabel& post,
                       KnobWithLabel& insSt, KnobWithLabel& insLen);
 
+    // Insert Start is stored relative to the Euclid section; the knob shows the absolute
+    // step the insert begins on, counted from 1. This is the shown-minus-stored offset
+    // for ring 0 / 1 / 2 (A / B / Accent).
+    int insertStartDisplayOffset(int ring) const;
+
     // Plain-English descriptions of the Legato / Mono choices for the status bar.
     static juce::String legatoExplanation(int modeIndex);
     static juce::String monoExplanation(int modeIndex);

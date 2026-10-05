@@ -35,15 +35,7 @@ KnobWithLabel::KnobWithLabel(const juce::String& label,
 
 bool KnobWithLabel::isSteppedControl() const
 {
-    const double interval = slider.getInterval();
-    if (interval <= 0.0)
-        return false;   // continuous by construction
-
-    // 64 admits the widest stepped control the family ships (Hits, 0..64 by 1) while
-    // excluding fine-grained ranges that merely happen to carry an interval — Fine
-    // (-100..100 by 1) is 200 positions and reads as a sweep, not a counter.
-    const double positions = (slider.getMaximum() - slider.getMinimum()) / interval;
-    return positions > 0.0 && positions <= 64.0;
+    return MuLookAndFeel::steppedSegments(slider) >= 0;   // same rule the ticks use
 }
 
 void KnobWithLabel::setRange(double min, double max, double step)

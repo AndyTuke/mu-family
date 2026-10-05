@@ -415,6 +415,19 @@ public:
     static constexpr float kRotaryRingScale = 0.82f;
     static constexpr float kRotaryFaceScale = 0.74f;
 
+    // A rotary is stepped when its interval leaves at most kMaxSteppedSegments steps across
+    // the range — 64 admits the widest stepped control the family ships (Hits, 0..64 by 1)
+    // while a fine-grained range that merely carries an interval (Fine, -100..100 by 1)
+    // still reads as a sweep. Returns the step count (0 for a range collapsed to one
+    // value), or -1 for a smooth control. Drives both the centred value and the ticks.
+    static constexpr int kMaxSteppedSegments = 64;
+    static int steppedSegments(const juce::Slider& slider) noexcept;
+
+    // Smooth knobs get a fixed tick count; stepped ones get one per position, thinned to
+    // every Nth when ticks would sit closer than kTickMinSpacing px along the ring.
+    static constexpr int   kSmoothTickCount = 16;
+    static constexpr float kTickMinSpacing  = 3.0f;
+
     // Below this radius a centred value would crowd the disc, so it is left to the
     // knob's label. Size 3 clears it; Size 4 does not, and nothing ships a stepped
     // control that small.

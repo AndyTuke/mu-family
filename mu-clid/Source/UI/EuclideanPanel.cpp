@@ -40,6 +40,18 @@ EuclideanPanel::EuclideanPanel(PluginProcessor& p) : proc(p)
 
     stepsA.setValue(8); stepsB.setValue(8); stepsC.setValue(8);
 
+    // Insert Start reads as a step number: the centred value, status bar and typed entry
+    // all go through these, so they agree.
+    for (auto [knob, ring] : { std::pair<KnobWithLabel*, int>{ &insertStA, 0 },
+                               std::pair<KnobWithLabel*, int>{ &insertStB, 1 },
+                               std::pair<KnobWithLabel*, int>{ &insertStC, 2 } })
+    {
+        knob->getSlider().textFromValueFunction = [this, ring](double v)
+        { return juce::String((int) std::lround(v) + insertStartDisplayOffset(ring)); };
+        knob->getSlider().valueFromTextFunction = [this, ring](const juce::String& t)
+        { return (double) (t.getIntValue() - insertStartDisplayOffset(ring)); };
+    }
+
     wireCallbacks();
 }
 
@@ -54,6 +66,15 @@ void EuclideanPanel::apvtsSet(const char* suffix, float v)
     }
     if (auto* p = it->second)
         p->setValueNotifyingHost(p->convertTo0to1(v));
+}
+
+int EuclideanPanel::insertStartDisplayOffset(int ring) const
+{
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return 1;
+    const Rhythm& r = proc.getRhythm(rhythmIndex);
+    const HitGenerator& g = ring == 0 ? r.genA : ring == 1 ? r.genB : r.genC;
+    const auto lay = g.clampLayout({ g.hits, g.rotate, g.prePad, g.postPad, g.insertStart, g.insertLength });
+    return (g.prePadMode == InsertMode::Pad ? lay.prePad : 0) + 1;   // a Pad-mode gap precedes the section
 }
 
 // Pad keeps every hit: the zone becomes rests and the hits are redistributed over the
@@ -108,7 +129,7 @@ void EuclideanPanel::wireCallbacks()
     };
     insertStA.onValueChanged = [this, notify](double v) {
         apvtsSet("insStA", (float)v);  notify();
-        if (onStatusUpdate) onStatusUpdate("Euclid A Insert Start", juce::String((int)v));
+        if (onStatusUpdate) onStatusUpdate("Euclid A Insert Start", insertStA.getSlider().getTextFromValue(v));
     };
     insertLenA.onValueChanged = [this, notify](double v) {
         apvtsSet("insLenA", (float)v);  updateRangesA();  notify();
@@ -181,7 +202,7 @@ void EuclideanPanel::wireCallbacks()
     };
     insertStB.onValueChanged = [this, notify](double v) {
         apvtsSet("insStB", (float)v);  notify();
-        if (onStatusUpdate) onStatusUpdate("Euclid B Insert Start", juce::String((int)v));
+        if (onStatusUpdate) onStatusUpdate("Euclid B Insert Start", insertStB.getSlider().getTextFromValue(v));
     };
     insertLenB.onValueChanged = [this, notify](double v) {
         apvtsSet("insLenB", (float)v);  updateRangesB();  notify();
@@ -224,7 +245,7 @@ void EuclideanPanel::wireCallbacks()
     };
     insertStC.onValueChanged = [this, notify](double v) {
         apvtsSet("insStC", (float)v);  notify();
-        if (onStatusUpdate) onStatusUpdate("Accent Insert Start", juce::String((int)v));
+        if (onStatusUpdate) onStatusUpdate("Accent Insert Start", insertStC.getSlider().getTextFromValue(v));
     };
     insertLenC.onValueChanged = [this, notify](double v) {
         apvtsSet("insLenC", (float)v);  updateRangesC();  notify();
@@ -380,6 +401,7 @@ void EuclideanPanel::updateRanges(const HitGenerator& g, const char* const (&sfx
     const auto [lo, hi] = HitGenerator::insertStartBounds(steps, lay.prePad, lay.postPad,
                                                           lay.insertLength, g.prePadMode);
     insSt.setRange(lo, hi, 1);
+    insSt.repaint();   // its shown step number depends on the pre-pad, not just its own value
 
     // Write back any stored value the layout pulled in, so the parameter matches what
     // plays and what the knob shows (a range change clamps the knob silently).

@@ -204,6 +204,15 @@ void MuLookAndFeel::drawKnobValueText(juce::Graphics& g, juce::Rectangle<int> sl
 // Every extent is a fraction of the knob's own radius, never a fixed pixel count, so
 // the glow stays inside the component at any of the four knob sizes and at any angle,
 // including hard against the ends of the sweep.
+int MuLookAndFeel::steppedSegments(const juce::Slider& slider) noexcept
+{
+    const double interval = slider.getInterval();
+    if (interval <= 0.0)
+        return -1;   // continuous by construction
+    const double segments = (slider.getMaximum() - slider.getMinimum()) / interval;
+    return segments <= (double) kMaxSteppedSegments ? (int) std::lround(juce::jmax(0.0, segments)) : -1;
+}
+
 void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int h,
                                       float sliderPos, float /*startAngle*/, float /*endAngle*/,
                                       juce::Slider& slider)
@@ -217,19 +226,33 @@ void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int
 
     const auto accent = slider.findColour(juce::Slider::rotarySliderFillColourId);
 
-    // Tick marks across the sweep, where there's room for them to stay distinct.
+    // Tick marks across the sweep, where there's room for them to stay distinct: one per
+    // position on a stepped control (every Nth if they'd crowd), a fixed set on a smooth one.
     if (outerR >= 15.0f)
     {
-        g.setColour(juce::Colours::white.withAlpha(0.18f));
-        constexpr int kTicks = 16;
-        for (int i = 0; i <= kTicks; ++i)
+        const float sweep    = kRotaryEndAngle - kRotaryStartAngle;
+        const int   stepped  = steppedSegments(slider);
+        const int   segments = stepped >= 0 ? stepped : kSmoothTickCount;
+        int stride = 1;
+        if (stepped > 0)
         {
-            const float a = kRotaryStartAngle
-                          + (float) i / (float) kTicks * (kRotaryEndAngle - kRotaryStartAngle);
+            const int fit = juce::jmax(1, (int) (sweep * outerR / kTickMinSpacing));
+            stride = (segments + fit - 1) / fit;
+        }
+
+        auto drawTick = [&](int i)
+        {
+            const float a = kRotaryStartAngle + (segments > 0 ? (float) i / (float) segments : 0.0f) * sweep;
             const juce::Point<float> p1(cx + outerR * 0.90f * std::sin(a), cy - outerR * 0.90f * std::cos(a));
             const juce::Point<float> p2(cx + outerR * std::sin(a),         cy - outerR * std::cos(a));
             g.drawLine({ p1, p2 }, 1.0f);
-        }
+        };
+
+        g.setColour(juce::Colours::white.withAlpha(0.18f));
+        for (int i = 0; i <= segments; i += stride)
+            drawTick(i);
+        if (segments % stride != 0)
+            drawTick(segments);   // always mark the end of the range
     }
 
     // Disc face: cast shadow falling away from the light, then a radial gradient from
