@@ -11,6 +11,12 @@ VoiceSection::VoiceSection(PluginProcessor& p)
     addAndMakeVisible(ampSub);
     addAndMakeVisible(insertSub);
 
+    // FX sends sit in the Insert panel's top row, right of a narrowed dropdown; added
+    // after insertSub so they're on top of it.
+    for (auto* k : ampSub.sendKnobs())
+        addAndMakeVisible(k);
+    insertSub.setAlgoColumns(kInsertCols - kSendCols);
+
     // Forward status updates from each subsection through our own callback.
     auto fwd = [this](const juce::String& n, const juce::String& v) {
         if (onStatusUpdate) onStatusUpdate(n, v);
@@ -84,7 +90,7 @@ void VoiceSection::resized()
     // Fixed Medium-baseline layout, wrapped in s() so the whole grid scales.
     // Pitch / Amp / Insert use the standard 54-px column (kVoiceUnitW).
     // Filter gets 6 narrower 50-px columns (kVoiceFilterColW) for the Drive knob.
-    // Total: 4×54 + 6×50 + 5×54 + 4×54 + 3×6 = 1020 px, leaving 54 px free at the right.
+    // Total: 4×54 + 6×50 + 4×54 + 6×54 + 3×6 = 1074 px (= available width exactly).
     using LF = MuLookAndFeel;
     using mu_ui::s;
     constexpr int divW   = LF::kVoiceDivW;
@@ -93,14 +99,20 @@ void VoiceSection::resized()
     constexpr int kFltW  = LF::kVoiceFilterColW;  // 50 — filter columns (6 of them)
     constexpr int subH   = LF::kVoiceSubH;
 
-    constexpr int fltX  = LF::kVoicePitchW + divW;            // 222
+    constexpr int fltX  = kPitchW + divW;            // 222
     constexpr int ampX  = fltX + 6 * kFltW + divW;            // 528
-    constexpr int insX  = ampX + LF::kVoiceAmpW + divW;       // 804
+    constexpr int insX  = ampX + kAmpW + divW;       // 750
 
-    pitchSub .setBounds(0,          s(labelH), s(LF::kVoicePitchW), s(subH));
+    pitchSub .setBounds(0,          s(labelH), s(kPitchW), s(subH));
     filterSub.setBounds(s(fltX),    s(labelH), s(6 * kFltW),        s(subH));
-    ampSub   .setBounds(s(ampX),    s(labelH), s(LF::kVoiceAmpW),   s(subH));
-    insertSub.setBounds(s(insX),    s(labelH), s(4 * kW),    s(subH));
+    ampSub   .setBounds(s(ampX),    s(labelH), s(kAmpW),   s(subH));
+    insertSub.setBounds(s(insX),    s(labelH), s(kInsertW), s(subH));
+
+    // FX sends: the Insert panel's last kSendCols columns, top row.
+    constexpr int sendX = insX + (kInsertCols - kSendCols) * kW;
+    int col = 0;
+    for (auto* k : ampSub.sendKnobs())
+        k->setBounds(s(sendX + col++ * kW), s(labelH), s(kW), s(LF::kKnobSize2H));
 }
 
 void VoiceSection::paint(juce::Graphics& g)
@@ -112,25 +124,24 @@ void VoiceSection::paint(juce::Graphics& g)
     const int h          = getHeight();
     constexpr int divW   = LF::kVoiceDivW;
     constexpr int labelH = LF::kVoiceLabelH;
-    constexpr int kW     = LF::kVoiceUnitW;
     constexpr int kFltW  = LF::kVoiceFilterColW;
 
     g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     const float kDivInset = mu_ui::sf(7.0f);
-    constexpr int fltX = LF::kVoicePitchW + divW;
+    constexpr int fltX = kPitchW + divW;
     constexpr int ampX = fltX + 6 * kFltW + divW;
-    constexpr int insX = ampX + LF::kVoiceAmpW + divW;
-    const float div1X = static_cast<float>(s(LF::kVoicePitchW) + s(divW) / 2);
+    constexpr int insX = ampX + kAmpW + divW;
+    const float div1X = static_cast<float>(s(kPitchW) + s(divW) / 2);
     const float div2X = static_cast<float>(s(fltX + 6 * kFltW) + s(divW) / 2);
-    const float div3X = static_cast<float>(s(ampX + LF::kVoiceAmpW) + s(divW) / 2);
+    const float div3X = static_cast<float>(s(ampX + kAmpW) + s(divW) / 2);
     g.drawLine(div1X, kDivInset, div1X, (float)h - kDivInset, 0.5f);
     g.drawLine(div2X, kDivInset, div2X, (float)h - kDivInset, 0.5f);
     g.drawLine(div3X, kDivInset, div3X, (float)h - kDivInset, 0.5f);
 
     g.setColour(MuLookAndFeel::colour(Id::mutedText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(10.0f))));
-    g.drawText("PITCH",  0,         0, s(LF::kVoicePitchW), s(labelH), juce::Justification::centred, false);
+    g.drawText("PITCH",  0,         0, s(kPitchW), s(labelH), juce::Justification::centred, false);
     g.drawText("FILTER", s(fltX),   0, s(6 * kFltW),        s(labelH), juce::Justification::centred, false);
-    g.drawText("AMP",    s(ampX),   0, s(LF::kVoiceAmpW),   s(labelH), juce::Justification::centred, false);
-    g.drawText("INSERT", s(insX),   0, s(4 * kW),    s(labelH), juce::Justification::centred, false);
+    g.drawText("AMP",    s(ampX),   0, s(kAmpW),   s(labelH), juce::Justification::centred, false);
+    g.drawText("INSERT", s(insX),   0, s(kInsertW), s(labelH), juce::Justification::centred, false);
 }

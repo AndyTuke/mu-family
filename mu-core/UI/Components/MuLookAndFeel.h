@@ -294,8 +294,10 @@ public:
     static constexpr int kModulatorInnerH = kModulatorPanelH - 2 * kChannelInset;               // 318
 
     // ── VoiceSection sub-panel widths ─────────────────────────────────────
-    // Layout: pitch = 4 × Size2-knob, filter = 6 narrow columns, amp = 5 × Size2,
-    // insert = 4 × Size2, separated by 3 × divW. Voice subsection cells are Size 2 — flowing from
+    // mu-Clid's VoiceSection lays out its own variant (see VoiceSection.h); these are the
+    // shared defaults the other products use.
+    // Layout: pitch / filter / amp = 5 × Size2-knob each, insert = 4 × Size2,
+    // separated by 3 × divW. Voice subsection cells are Size 2 — flowing from
     // kKnobSize2 below — so the canonical Size 2 knob width drives both the
     // per-knob cell and the parent sub-panel widths. Adjust kKnobSize2 to
     // grow/shrink every voice control + insert in lockstep.
@@ -308,14 +310,14 @@ public:
     static constexpr int kVoiceDivW       = 6;
     // The actual value comes from kVoiceUnitW_ at the bottom of the class —
     // declared here as a forward stub equal to the Size 2 width literal so
-    // dependent constants (kVoicePitchW = 4 * kVoiceUnitW etc.) work.
+    // dependent constants (kVoicePitchW = 5 * kVoiceUnitW etc.) work.
     static constexpr int kVoiceUnitW      = 54;   // = kKnobSize2W (Size 2 cell width)
     // Filter sub-section uses narrower columns (6 cols × 50 = 300 px) to make
     // room for the Drive knob while keeping pitch/amp/insert at the standard 54.
     static constexpr int kVoiceFilterColW = 50;
     static constexpr int kVoiceLabelH     = 14;
     static constexpr int kVoiceSubH       = kVoiceInnerH - kVoiceLabelH;                       // 116
-    static constexpr int kVoicePitchW     = 4 * kVoiceUnitW;                                   // 216 (Depth sits above R)
+    static constexpr int kVoicePitchW     = 5 * kVoiceUnitW;                                   // 270
     static constexpr int kVoiceFilterW    = 6 * kVoiceFilterColW;                              // 300 (6 cols)
     static constexpr int kVoiceAmpW       = 5 * kVoiceUnitW;                                   // 270
     static constexpr int kVoiceInsertW    = 4 * kVoiceUnitW;                                   // 216
@@ -473,7 +475,7 @@ public:
     // Voice subsection column width MUST equal Size 2 W so adjusting
     // kKnobCellPaddingX rescales both the cell AND the voice section unit in
     // lockstep. The constant is declared earlier in the class (so the
-    // dependent kVoicePitchW = 4 × kVoiceUnitW works at that point) — this
+    // dependent kVoicePitchW = 5 × kVoiceUnitW works at that point) — this
     // assert holds the contract.
     static_assert(kVoiceUnitW == kKnobSize2W,
                   "kVoiceUnitW must equal kKnobSize2W — update both together");

@@ -285,17 +285,13 @@ void AmpSubsection::resized()
     constexpr int row2Y = rowH + gap;
 
     using mu_ui::s;
-    // Row 1: Level / Accent / Effect / Delay / Reverb — Accent sits next to
-    // Level (both shape the amplitude per-hit) before the FX-send cluster.
+    // Row 1: Level / Accent (both shape the amplitude per hit). The FX sends are
+    // placed by the host, beside the insert dropdown.
     ampLevel  .setBounds(s(0 * kW), 0,        s(kW), s(rowH));
     ampAccent .setBounds(s(1 * kW), 0,        s(kW), s(rowH));
-    ampSendEff.setBounds(s(2 * kW), 0,        s(kW), s(rowH));
-    ampSendDly.setBounds(s(3 * kW), 0,        s(kW), s(rowH));
-    ampSendRev.setBounds(s(4 * kW), 0,        s(kW), s(rowH));
 
     ampAtk.setBounds(s(0 * kW), s(row2Y), s(kW), s(rowH));
     ampDec.setBounds(s(1 * kW), s(row2Y), s(kW), s(rowH));
     ampSus.setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));
     ampRel.setBounds(s(3 * kW), s(row2Y), s(kW), s(rowH));
-    // col 4 of row 2 left empty (was the env-legato pill, since removed).
 }

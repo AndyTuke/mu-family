@@ -2,6 +2,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <string_view>
 #include <unordered_map>
+#include <array>
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/MuLookAndFeel.h"
 
@@ -24,6 +25,10 @@ public:
     void setEffectSendLabel(const juce::String& name);
 
     void resized() override;
+
+    // The Effect / Delay / Reverb send knobs are wired here but placed by the host
+    // (VoiceSection puts them in the Insert panel's top row), which also parents them.
+    std::array<KnobWithLabel*, 3> sendKnobs() noexcept { return { &ampSendEff, &ampSendDly, &ampSendRev }; }
 
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
 

@@ -28,6 +28,16 @@ public:
     void paint(juce::Graphics&) override;
 
 private:
+    // mu-Clid's own voice-band layout (the shared MuLookAndFeel widths are the other
+    // products' defaults): Pitch has Depth above R (4 columns), Amp is Level / Accent over
+    // A / D / S / R (4), and Insert takes the FX sends beside a narrowed dropdown (6).
+    static constexpr int kCols       = MuLookAndFeel::kVoiceUnitW;
+    static constexpr int kPitchW     = 4 * kCols;                                          // 216
+    static constexpr int kAmpW       = 4 * kCols;                                          // 216
+    static constexpr int kInsertCols = 6;
+    static constexpr int kSendCols   = 3;   // Effect / Delay / Reverb, right of the insert dropdown
+    static constexpr int kInsertW    = kInsertCols * kCols;                                // 324
+
     PluginProcessor& proc;
     int              currentRhythm = -1;
 
