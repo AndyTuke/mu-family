@@ -209,6 +209,11 @@ public:
 
     // A sub-panel sitting slightly raised on a panel: its shadow, then its face. Draw every
     // sub-panel's shadow before any face so no shadow lands on a neighbouring box.
+    // Brushed grain plus diagonal reflection bands over `shape` (bounds `r`), lit from the
+    // top right: the metal finish shared by panels and raised sub-panels.
+    static void drawMetalFinish(juce::Graphics&, const juce::Path& shape, juce::Rectangle<float> r,
+                                float brush, float bands);
+
     static void drawRaisedSubPanelShadow(juce::Graphics&, juce::Rectangle<float> bounds,
                                          float cornerSize = 4.0f);
     static void drawRaisedSubPanel(juce::Graphics&, juce::Rectangle<float> bounds,

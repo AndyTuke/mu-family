@@ -460,6 +460,29 @@ static const juce::Image& brushedGrain(int w, int h)
     return img;
 }
 
+void MuLookAndFeel::drawMetalFinish(juce::Graphics& g, const juce::Path& shape,
+                                    juce::Rectangle<float> r, float brush, float bands)
+{
+    const auto& L = lighting();
+    const juce::Graphics::ScopedSaveState state(g);
+    g.reduceClipRegion(shape);
+    const auto ri = r.getSmallestIntegerContainer();
+    g.setOpacity(L.highlight(brush));
+    g.drawImageAt(brushedGrain(ri.getWidth(), ri.getHeight()), ri.getX(), ri.getY());
+    g.setOpacity(1.0f);
+
+    const float sheen = L.highlight(bands);
+    juce::ColourGradient grad(juce::Colours::white.withAlpha(0.0f), r.getTopRight(),
+                              juce::Colours::white.withAlpha(0.0f), r.getBottomLeft(), false);
+    grad.addColour(0.18, juce::Colours::white.withAlpha(sheen));
+    grad.addColour(0.34, juce::Colours::white.withAlpha(0.0f));
+    grad.addColour(0.55, juce::Colours::black.withAlpha(L.shadow(bands)));
+    grad.addColour(0.72, juce::Colours::white.withAlpha(sheen * 0.6f));
+    grad.addColour(0.88, juce::Colours::white.withAlpha(0.0f));
+    g.setGradientFill(grad);
+    g.fillRect(r);
+}
+
 void MuLookAndFeel::drawAccentPanel(juce::Graphics& g, juce::Rectangle<float> r,
                                     juce::Colour accent, float cornerSize)
 {
@@ -472,25 +495,7 @@ void MuLookAndFeel::drawAccentPanel(juce::Graphics& g, juce::Rectangle<float> r,
     g.fillPath(shape);
 
     // Metal: brushed grain plus soft diagonal reflection bands, lit from the top right.
-    {
-        const juce::Graphics::ScopedSaveState state(g);
-        g.reduceClipRegion(shape);
-        const auto ri = r.getSmallestIntegerContainer();
-        g.setOpacity(L.highlight(L.panelBrush));
-        g.drawImageAt(brushedGrain(ri.getWidth(), ri.getHeight()), ri.getX(), ri.getY());
-        g.setOpacity(1.0f);
-
-        const float sheen = L.highlight(L.panelSheen);
-        juce::ColourGradient bands(juce::Colours::white.withAlpha(0.0f), r.getTopRight(),
-                                   juce::Colours::white.withAlpha(0.0f), r.getBottomLeft(), false);
-        bands.addColour(0.18, juce::Colours::white.withAlpha(sheen));
-        bands.addColour(0.34, juce::Colours::white.withAlpha(0.0f));
-        bands.addColour(0.55, juce::Colours::black.withAlpha(L.shadow(L.panelSheen)));
-        bands.addColour(0.72, juce::Colours::white.withAlpha(sheen * 0.6f));
-        bands.addColour(0.88, juce::Colours::white.withAlpha(0.0f));
-        g.setGradientFill(bands);
-        g.fillRect(r);
-    }
+    drawMetalFinish(g, shape, r, L.panelBrush, L.panelSheen);
 
     // Highlight: a radial glow anchored on the top-right corner, clipped to the panel.
     {
@@ -536,6 +541,7 @@ void MuLookAndFeel::drawRaisedSubPanel(juce::Graphics& g, juce::Rectangle<float>
     g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(L.highlight(L.subPanelSheen)), r.getTopRight(),
                                            juce::Colours::transparentWhite, r.getBottomLeft(), false));
     g.fillPath(shape);
+    drawMetalFinish(g, shape, r, L.subPanelBrush, L.subPanelBands);
 
     // Bevelled edge: light top-right, shade bottom-left.
     juce::Path edge;

@@ -231,9 +231,17 @@ struct MuTheme
         float subPanelEdgeLight  = 0.22f;   // edge catching the light, top right
         float subPanelEdgeShade  = 0.35f;   // edge in shade, bottom left
         float subPanelOutline    = 0.5f;    // accent outline (not scaled by the masters)
+        float subPanelBrush      = 0.07f;   // brushed-metal grain on the face
+        float subPanelBands      = 0.05f;   // diagonal reflection bands on the face
 
         // Step ring (mu-Clid's RhythmCircle)
         float ringTrack          = 0.45f;   // recessed track under each ring
+        float ringBaseDarken     = 1.1f;    // opaque base under each ring: panel colour darkened by this
+        float ringLampOff        = 0.07f;   // unlit step: how much of its colour shows through the dark lens
+        float ringLampPad        = 0.38f;   // pad / insert steps: dimly lit
+        float ringLampOn         = 0.66f;   // hit steps: lit, but not bright
+        float ringLampHot        = 0.30f;   // brighter centre on a lit lamp (lens hot-spot)
+        float ringLampPlayhead   = 0.25f;   // extra brightness on the playhead step
         float ringHitGlow        = 0.22f;   // halo round hit steps (playhead × 1.8)
         float ringHitGlowWidth   = 0.22f;   //   halo stroke, fraction of ring width
         float ringBevelDark      = 0.32f;   // inner edge of each ring

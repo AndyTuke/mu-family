@@ -91,4 +91,5 @@ private:
                   RingCache& cache) const;
 
     static juce::Colour stepColour(StepType t, juce::Colour hitClr, bool isCurrent);
+    static juce::Colour ringBase();   // opaque base colour under every ring
 };
