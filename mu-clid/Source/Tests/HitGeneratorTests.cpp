@@ -171,6 +171,50 @@ public:
             for (int i = 0; i < 4; ++i)  expect (types[(size_t) i] == StepType::PrePad);
             for (int i = 4; i < 7; ++i)  expect (types[(size_t) i] == StepType::InsertPad);
         }
+
+        // ── The ring shows exactly as many hits as the Hits setting ──────────
+        beginTest ("Hit count in getStepTypes / getPattern equals Hits (capped to the Euclid section)");
+        {
+            int checked = 0, wrong = 0;
+            juce::String firstWrong;
+            for (int steps = 1; steps <= 24; ++steps)
+             for (int hits = 0; hits <= steps; ++hits)
+              for (int pre = 0; pre <= 3; ++pre)
+               for (int post = 0; post <= 3; ++post)
+                for (int len = 0; len <= 2; ++len)
+                 for (int modes = 0; modes < 8; ++modes)
+                 {
+                     HitGenerator h;
+                     h.steps = steps; h.hits = hits; h.prePad = pre; h.postPad = post;
+                     h.insertLength = len; h.insertStart = 1;
+                     h.prePadMode  = (modes & 1) ? InsertMode::Mute : InsertMode::Pad;
+                     h.postPadMode = (modes & 2) ? InsertMode::Mute : InsertMode::Pad;
+                     h.insertMode  = (modes & 4) ? InsertMode::Mute : InsertMode::Pad;
+
+                     const auto types = h.getStepTypes();
+                     const auto pat   = h.getPattern();
+                     int typeHits = 0, patHits = 0;
+                     for (auto t : types) typeHits += (t == StepType::Hit) ? 1 : 0;
+                     for (bool b : pat)   patHits  += b ? 1 : 0;
+
+                     // Pad-mode reserves shrink the Euclid section; Mute zones may silence hits.
+                     const auto lay = h.clampLayout({ hits, 0, pre, post, 1, len });
+                     const int active = steps - (h.prePadMode == InsertMode::Pad ? lay.prePad : 0)
+                                              - (h.postPadMode == InsertMode::Pad ? lay.postPad : 0)
+                                              - (h.insertMode == InsertMode::Pad ? lay.insertLength : 0);
+                     const int maxHits = std::min(hits, std::max(active, 0));
+                     ++checked;
+                     if (typeHits > maxHits || patHits > maxHits || typeHits != patHits
+                         || (int) types.size() != steps)
+                     {
+                         if (wrong++ == 0)
+                             firstWrong << "steps " << steps << " hits " << hits << " pre " << pre << " post " << post
+                                        << " len " << len << " modes " << modes << " -> types " << typeHits
+                                        << " pattern " << patHits << " size " << (int) types.size();
+                     }
+                 }
+            expect (wrong == 0, juce::String (wrong) + " of " + juce::String (checked) + " layouts wrong; first: " + firstWrong);
+        }
     }
 };
 
