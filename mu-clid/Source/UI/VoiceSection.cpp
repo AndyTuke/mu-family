@@ -138,10 +138,16 @@ void VoiceSection::paint(juce::Graphics& g)
     g.drawLine(div2X, kDivInset, div2X, (float)h - kDivInset, 0.5f);
     g.drawLine(div3X, kDivInset, div3X, (float)h - kDivInset, 0.5f);
 
-    g.setColour(MuLookAndFeel::colour(Id::mutedText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(10.0f))));
-    g.drawText("PITCH",  0,         0, s(kPitchW), s(labelH), juce::Justification::centred, false);
-    g.drawText("FILTER", s(fltX),   0, s(6 * kFltW),        s(labelH), juce::Justification::centred, false);
-    g.drawText("AMP",    s(ampX),   0, s(kAmpW),   s(labelH), juce::Justification::centred, false);
-    g.drawText("INSERT", s(insX),   0, s(kInsertW), s(labelH), juce::Justification::centred, false);
+    // Section names: a name plate centred over each subsection.
+    const float plateH = mu_ui::sf(kPlateH);
+    auto plate = [&](const char* name, int x, int w)
+    {
+        const float pw = MuLookAndFeel::namePlateWidth(name, plateH);
+        const float cx = (float) s(x) + (float) s(w) * 0.5f;
+        MuLookAndFeel::drawNamePlate(g, { cx - pw * 0.5f, ((float) s(labelH) - plateH) * 0.5f, pw, plateH }, name);
+    };
+    plate("PITCH",  0,    kPitchW);
+    plate("FILTER", fltX, 6 * kFltW);
+    plate("AMP",    ampX, kAmpW);
+    plate("INSERT", insX, kInsertW);
 }

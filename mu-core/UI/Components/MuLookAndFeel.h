@@ -188,6 +188,19 @@ public:
 
     MuLookAndFeel();
 
+    // Metal style (mu-Clid): every ComboBox under this LookAndFeel is drawn as an LCD and
+    // text labels are engraved into the metal. Off keeps the flat family look.
+    void setMetalStyle(bool m) noexcept { metalStyle = m; }
+    bool isMetalStyle() const noexcept  { return metalStyle; }
+    static bool isMetal(juce::Component& c);   // c's LookAndFeel is a MuLookAndFeel in metal style
+
+    // Text cut into the metal: a dark cut offset down-left, the lettering over it in `ink`.
+    static void drawEngravedText(juce::Graphics&, const juce::String& text, juce::Rectangle<int> area,
+                                 juce::Justification just, juce::Colour ink, bool ellipsis = true);
+
+    // Width a name plate needs for `text` at plate height `h` (text plus room for the screws).
+    static float namePlateWidth(const juce::String& text, float h);
+
     // Rotary slider
     void drawRotarySlider(juce::Graphics&, int x, int y, int w, int h,
                           float sliderPos, float startAngle, float endAngle,
@@ -220,6 +233,7 @@ public:
 
     // LCD window: glass (backlit from the centre in `lit` when `backlit`), then whatever is
     // shown on it, then its front (glare + recessed bezel). Shared by LCD tabs and dropdowns.
+    static bool lcdCombo(juce::ComboBox&);   // drawn as an LCD (its own flag, or metal style)
     static void drawLcdGlass(juce::Graphics&, juce::Rectangle<float> bounds, juce::Colour lit, bool backlit);
     static void drawLcdFront(juce::Graphics&, juce::Rectangle<float> bounds);
     static juce::Colour lcdLitColour();     // lettering colour on a lit LCD
@@ -536,4 +550,6 @@ public:
     // than the Size 3 bucket. Height stays at Size 3 H.
     static constexpr int kMixerStripKnobW = kMixerChanW;   // 73
     static constexpr int kMixerStripKnobH = kKnobSize3H;   // 46
+private:
+    bool metalStyle = false;
 };

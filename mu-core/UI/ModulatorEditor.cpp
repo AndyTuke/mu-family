@@ -614,6 +614,10 @@ void ModulatorEditor::setMetalStyle(bool m)
         dd->setLcdStyle(m);
     for (auto& row : rows)
         row->destCombo.setLcdStyle(m);
+    // Engraved labels need the normal label colour to read on the metal.
+    const auto labelCol = MuLookAndFeel::colour(m ? MuLookAndFeel::labelText : MuLookAndFeel::mutedText);
+    loopLabel.setColour(juce::Label::textColourId, labelCol);
+    stepLabel.setColour(juce::Label::textColourId, labelCol);
     resized();
     repaint();
 }
@@ -759,11 +763,17 @@ void ModulatorEditor::paint(juce::Graphics& g)
         const int textW     = juce::jmax(0, rightEdge - stepReadoutX);
         if (textW > 0)
         {
-            g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
             g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
-            g.drawText(juce::String(cs->getStepCount()) + " steps",
-                       stepReadoutX, m, textW, headerH,
-                       juce::Justification::centredLeft, false);
+            const juce::String readout = juce::String(cs->getStepCount()) + " steps";
+            const juce::Rectangle<int> area(stepReadoutX, m, textW, headerH);
+            if (metal)
+                MuLookAndFeel::drawEngravedText(g, readout, area, juce::Justification::centredLeft,
+                                                MuLookAndFeel::colour(MuLookAndFeel::labelText), false);
+            else
+            {
+                g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
+                g.drawText(readout, area, juce::Justification::centredLeft, false);
+            }
         }
     }
 }

@@ -539,6 +539,33 @@ void MuLookAndFeel::drawRecessedScreen(juce::Graphics& g, juce::Rectangle<float>
     }
 }
 
+bool MuLookAndFeel::isMetal(juce::Component& c)
+{
+    auto* mlf = dynamic_cast<MuLookAndFeel*>(&c.getLookAndFeel());
+    return mlf != nullptr && mlf->isMetalStyle();
+}
+
+bool MuLookAndFeel::lcdCombo(juce::ComboBox& box)
+{
+    return (bool) box.getProperties()["muLcd"] || isMetal(box);
+}
+
+void MuLookAndFeel::drawEngravedText(juce::Graphics& g, const juce::String& text, juce::Rectangle<int> area,
+                                     juce::Justification just, juce::Colour ink, bool ellipsis)
+{
+    const auto& L = lighting();
+    g.setColour(juce::Colours::black.withAlpha(L.shadow(L.engraveCut)));
+    g.drawText(text, area.toFloat().translated(-0.5f, 1.0f), just, ellipsis);
+    g.setColour(ink);
+    g.drawText(text, area, just, ellipsis);
+}
+
+float MuLookAndFeel::namePlateWidth(const juce::String& text, float h)
+{
+    const juce::Font f(juce::FontOptions{}.withHeight(h * 0.78f));
+    return juce::GlyphArrangement::getStringWidth(f, text) + h * 2.2f;
+}
+
 void MuLookAndFeel::drawLcdGlass(juce::Graphics& g, juce::Rectangle<float> r, juce::Colour lit, bool backlit)
 {
     const auto& L     = lighting();
@@ -692,7 +719,7 @@ void MuLookAndFeel::drawComboBox(juce::Graphics& g, int w, int h, bool /*isDown*
 {
     // LCD look (DropdownSelect::setLcdStyle): dark glass, lit arrow, glare and bezel; the
     // combo's own label draws the value over it in the lit colour.
-    if (box.getProperties()["muLcd"])
+    if (lcdCombo(box))
     {
         const juce::Rectangle<float> r(0.0f, 0.0f, (float) w, (float) h);
         drawLcdGlass(g, r, colour(segmentActiveBorder), false);
@@ -729,7 +756,8 @@ void MuLookAndFeel::drawComboBox(juce::Graphics& g, int w, int h, bool /*isDown*
 void MuLookAndFeel::positionComboBoxText(juce::ComboBox& box, juce::Label& label)
 {
     label.setBounds(6, 0, box.getWidth() - 24, box.getHeight());
-    label.setFont(box.getProperties()["muLcd"] ? lcdFont(11.0f) : juce::Font(juce::FontOptions{}.withHeight(12.0f)));
+    if (lcdCombo(box)) label.setColour(juce::Label::textColourId, lcdLitColour());
+    label.setFont(lcdCombo(box) ? lcdFont(11.0f) : juce::Font(juce::FontOptions{}.withHeight(12.0f)));
 }
 
 void MuLookAndFeel::drawLabel(juce::Graphics& g, juce::Label& label)
@@ -744,7 +772,17 @@ void MuLookAndFeel::drawLabel(juce::Graphics& g, juce::Label& label)
     {
         g.setColour(label.findColour(juce::Label::textColourId));
         g.setFont(label.getFont());
-        g.drawFittedText(label.getText(), label.getLocalBounds().reduced(2, 0),
-                         label.getJustificationType(), 1, 1.0f);
+
+        // Metal style: plain text labels are engraved into the metal. Labels with their own
+        // background (badges, banners) and a ComboBox's value (an LCD) stay flat.
+        const bool onMetal = metalStyle
+                          && label.findColour(juce::Label::backgroundColourId).isTransparent()
+                          && dynamic_cast<juce::ComboBox*>(label.getParentComponent()) == nullptr;
+        if (onMetal)
+            drawEngravedText(g, label.getText(), label.getLocalBounds().reduced(2, 0),
+                             label.getJustificationType(), label.findColour(juce::Label::textColourId));
+        else
+            g.drawFittedText(label.getText(), label.getLocalBounds().reduced(2, 0),
+                             label.getJustificationType(), 1, 1.0f);
     }
 }

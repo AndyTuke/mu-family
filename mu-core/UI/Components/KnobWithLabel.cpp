@@ -203,9 +203,12 @@ void KnobWithLabel::paint(juce::Graphics& g)
     // Label below knob
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuLookAndFeel::kKnobLabelFont))));
     g.setColour(MuLookAndFeel::colour(MuLookAndFeel::labelText));
-    g.drawText(labelText,
-               juce::Rectangle<int>(0, getHeight() - labelH, getWidth(), labelH),
-               juce::Justification::centred, true);
+    const juce::Rectangle<int> labelArea(0, getHeight() - labelH, getWidth(), labelH);
+    if (MuLookAndFeel::isMetal(*this))
+        MuLookAndFeel::drawEngravedText(g, labelText, labelArea, juce::Justification::centred,
+                                        MuLookAndFeel::colour(MuLookAndFeel::labelText));
+    else
+        g.drawText(labelText, labelArea, juce::Justification::centred, true);
 
     // Value text is drawn in paintOverChildren, after the rotary — see there.
 }

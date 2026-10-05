@@ -261,6 +261,9 @@ struct MuTheme
         float namePlateEngrave   = 0.70f;   // dark cut under the engraved lettering
         float namePlateScrew     = 0.45f;   // screw heads at each end
 
+        // Engraved text (labels cut into the metal, metal style)
+        float engraveCut         = 0.75f;   // dark cut offset down-left under the lettering
+
         // Step ring (mu-Clid's RhythmCircle)
         float ringTrack          = 0.45f;   // recessed track under each ring
         float ringBaseDarken     = 1.1f;    // opaque base under each ring: panel colour darkened by this
