@@ -226,6 +226,16 @@ void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int
 
     const auto accent = slider.findColour(juce::Slider::rotarySliderFillColourId);
 
+    // Body shadow: the whole knob casts a soft shadow down-left onto the panel.
+    {
+        juce::Path body;
+        body.addEllipse(cx - ringR, cy - ringR, ringR * 2.0f, ringR * 2.0f);
+        juce::DropShadow(juce::Colours::black.withAlpha(kKnobBodyShadowAlpha),
+                         (int) juce::jmax(2.0f, outerR * 0.14f),   // ring + blur + offset stay within
+                         { -(int) juce::jmax(1.0f, outerR * 0.06f), (int) juce::jmax(1.0f, outerR * 0.08f) })   // the rotary's bounds
+            .drawForPath(g, body);
+    }
+
     // Tick marks across the sweep, where there's room for them to stay distinct: one per
     // position on a stepped control (every Nth if they'd crowd), a fixed set on a smooth one.
     if (outerR >= 15.0f)
@@ -363,8 +373,9 @@ void MuLookAndFeel::drawSlideSwitch(juce::Graphics& g, juce::Rectangle<float> bo
     // Disc: cast shadow, then the knob face's radial gradient lit from the top-right.
     juce::Path disc;
     disc.addEllipse(cx - thR, cy - thR, thR * 2.0f, thR * 2.0f);
-    juce::DropShadow(juce::Colours::black.withAlpha(0.7f), (int) juce::jmax(2.0f, thR * 0.6f),
-                     { -1, (int) juce::jmax(1.0f, thR * 0.3f) }).drawForPath(g, disc);
+    juce::DropShadow(juce::Colours::black.withAlpha(0.8f), (int) juce::jmax(2.0f, thR * 0.7f),
+                     { -(int) juce::jmax(1.0f, thR * 0.3f), (int) juce::jmax(1.0f, thR * 0.4f) })
+        .drawForPath(g, disc);   // falls down-left, away from the top-right light
 
     juce::ColourGradient face(juce::Colour(0xff4a3a58), cx + thR * 0.45f, cy - thR * 0.45f,
                               juce::Colour(0xff100c16), cx - thR * 0.8f,  cy + thR * 0.9f, true);

@@ -383,27 +383,51 @@ void RhythmCircle::paint(juce::Graphics& g)
         g.fillRect(getLocalBounds());
     }
 
-    // ── Centre hub: a recessed well, with the trigger flash on top ──────────────
+    // ── Centre hub: a raised, embossed disc lit from the top right, flash on top ──
     if (innerLimit > 4.0f)
     {
-        const juce::Rectangle<float> well(cx - innerLimit, cy - innerLimit, innerLimit * 2.0f, innerLimit * 2.0f);
-        g.setColour(MuLookAndFeel::colour(Id::panelBackground).darker(0.35f));
-        g.fillEllipse(well);
+        const float hr = innerLimit * LF::kRingHubInset;
+        const juce::Rectangle<float> hub(cx - hr, cy - hr, hr * 2.0f, hr * 2.0f);
+        juce::Path hubPath;
+        hubPath.addEllipse(hub);
 
-        // Rim shadow under the near (top-right) wall, the far wall catching the light.
-        juce::ColourGradient rim(juce::Colours::transparentBlack, cx - innerLimit * 0.2f, cy + innerLimit * 0.2f,
-                                 juce::Colours::black.withAlpha(LF::kRingWellShadowAlpha),
-                                 cx - innerLimit * 0.2f + innerLimit * 1.25f, cy + innerLimit * 0.2f, true);
-        rim.addColour(0.6, juce::Colours::transparentBlack);
+        // Cast shadow, falling down-left.
+        juce::DropShadow(juce::Colours::black.withAlpha(LF::kRingHubShadowAlpha),
+                         (int) juce::jmax(3.0f, hr * 0.22f),
+                         { -(int) juce::jmax(1.0f, hr * 0.07f), (int) juce::jmax(1.0f, hr * 0.09f) })
+            .drawForPath(g, hubPath);
+
+        // Face: lit crown at the top right shading to the lower left.
+        const auto base = MuLookAndFeel::colour(Id::panelBackground);
+        juce::ColourGradient face(base.brighter(0.35f), cx + hr * 0.45f, cy - hr * 0.45f,
+                                  base.darker(0.45f),   cx - hr * 0.75f, cy + hr * 0.85f, true);
+        face.addColour(0.45, base.brighter(0.08f));
+        g.setGradientFill(face);
+        g.fillPath(hubPath);
+
+        // Specular highlight, clipped to the disc.
+        {
+            const juce::Graphics::ScopedSaveState state(g);
+            g.reduceClipRegion(hubPath);
+            const float lx = cx + hr * 0.45f, ly = cy - hr * 0.45f, lr = hr * 0.9f;
+            juce::ColourGradient spec(juce::Colours::white.withAlpha(LF::kRingHubSpecAlpha), lx, ly,
+                                      juce::Colours::transparentWhite, lx + lr, ly, true);
+            g.setGradientFill(spec);
+            g.fillEllipse(lx - lr, ly - lr, lr * 2.0f, lr * 2.0f);
+        }
+
+        // Rim: catches the light top-right, falls into shade bottom-left.
+        juce::ColourGradient rim(juce::Colours::white.withAlpha(LF::kRingHubRimAlpha), cx + hr * 0.7f, cy - hr * 0.7f,
+                                 juce::Colours::black.withAlpha(LF::kRingHubRimAlpha * 1.4f), cx - hr * 0.7f, cy + hr * 0.7f, false);
         g.setGradientFill(rim);
-        g.fillEllipse(well);
+        g.strokePath(hubPath, juce::PathStrokeType(juce::jmax(1.0f, hr * 0.025f)));
 
         if (hubAlpha > 0.0f)
         {
             juce::ColourGradient flash(rhythmColour.withAlpha(hubAlpha * LF::kRingHubFlashAlpha), cx, cy,
-                                       rhythmColour.withAlpha(0.0f), cx + innerLimit, cy, true);
+                                       rhythmColour.withAlpha(0.0f), cx + hr, cy, true);
             g.setGradientFill(flash);
-            g.fillEllipse(well);
+            g.fillPath(hubPath);
         }
     }
 }

@@ -456,8 +456,15 @@ public:
     static constexpr float kRingBevelLightAlpha = 0.10f;   // outer edge of each ring
     static constexpr float kRingLightAlpha      = 0.18f;   // top-right highlight
     static constexpr float kRingShadowAlpha     = 0.22f;   // bottom-left shade
-    static constexpr float kRingWellShadowAlpha = 0.55f;   // centre well's rim shadow
+    static constexpr float kRingHubInset        = 0.9f;    // hub radius, fraction of the space inside ring C
+    static constexpr float kRingHubShadowAlpha  = 0.6f;    // raised hub's cast shadow
+    static constexpr float kRingHubSpecAlpha    = 0.14f;   // hub specular highlight
+    static constexpr float kRingHubRimAlpha     = 0.22f;   // rim light (top right) / shade (bottom left)
     static constexpr float kRingHubFlashAlpha   = 0.35f;   // trigger flash, scaled by its decay
+
+    // Every rotary casts a soft shadow of its whole body onto the panel, down and to the
+    // left of the top-right light — the same direction as the disc's own shadow.
+    static constexpr float kKnobBodyShadowAlpha = 0.45f;
 
     // Below this radius a centred value would crowd the disc, so it is left to the
     // knob's label. Size 3 clears it; Size 4 does not, and nothing ships a stepped
