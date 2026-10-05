@@ -220,7 +220,11 @@ struct MuTheme
         float panelHighlight     = 0.20f;   // top-right glow
         float panelHighlightReach= 0.6f;    //   reach, fraction of the panel diagonal
         float panelHighlightMaxPx= 380.0f;  //   … capped at this many px
-        float panelOutlineWidth  = 2.0f;
+        float panelPaintWidth    = 3.0f;    // painted border band, centred on the panel edge (px)
+        float panelPaintOpacity  = 0.85f;   // paint coverage (not scaled by the masters)
+        float panelPaintGrain    = 0.10f;   // brushed grain showing through the paint
+        float panelPaintSheen    = 0.16f;   // top-right light on the paint
+        float panelPaintEdge     = 0.45f;   // darker line where the paint ends
         float panelSheen         = 0.05f;   // diagonal reflection bands (metallic)
         float panelBrush         = 0.06f;   // brushed-metal grain opacity
 
@@ -246,7 +250,7 @@ struct MuTheme
         // Step ring (mu-Clid's RhythmCircle)
         float ringTrack          = 0.45f;   // recessed track under each ring
         float ringBaseDarken     = 1.1f;    // opaque base under each ring: panel colour darkened by this
-        float ringLampOff        = 0.07f;   // unlit step: how much of its colour shows through the dark lens
+        float ringLampOff        = 0.0f;    // unlit step: how much of its colour shows through the dark lens
         float ringLampPad        = 0.38f;   // pad / insert steps: dimly lit
         float ringLampOn         = 0.66f;   // hit steps: lit, but not bright
         float ringLampHot        = 0.30f;   // brighter centre on a lit lamp (lens hot-spot)

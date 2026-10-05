@@ -162,7 +162,8 @@ juce::Colour RhythmCircle::stepColour(StepType t, juce::Colour hitClr, bool isCu
         case StepType::InsertPad: lampClr = MuLookAndFeel::colour(Id::ringInsertPad); lit = L.ringLampPad; break;
         default: break;
     }
-    if (isCurrent) lit = juce::jmin(1.0f, lit + L.ringLampPlayhead);
+    if (isCurrent && t != StepType::Empty)   // empty steps stay off, even under the playhead
+        lit = juce::jmin(1.0f, lit + L.ringLampPlayhead);
     return ringBase().interpolatedWith(lampClr, lit);
 }
 
@@ -250,7 +251,7 @@ void RhythmCircle::drawRing(juce::Graphics& g,
         }
 
         const auto lens = stepColour(pattern[i], hitClr, isCur);
-        if (pattern[i] == StepType::Empty && !isCur)
+        if (pattern[i] == StepType::Empty)
         {
             g.setColour(lens);   // unlit: a flat dark lens
             g.fillPath(seg, transform);

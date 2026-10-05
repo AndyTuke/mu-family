@@ -511,8 +511,19 @@ void MuLookAndFeel::drawAccentPanel(juce::Graphics& g, juce::Rectangle<float> r,
         g.fillRect(r);
     }
 
-    g.setColour(accent);
-    g.strokePath(shape, juce::PathStrokeType(L.panelOutlineWidth));
+    // Painted border: an accent band on the panel's edge, the metal's grain showing through
+    // the paint, lit from the top right, with a darker line where the paint ends.
+    juce::Path band;
+    juce::PathStrokeType(L.panelPaintWidth).createStrokedPath(band, shape);
+    const auto bandBounds = band.getBounds();
+    g.setColour(accent.withAlpha(L.panelPaintOpacity));
+    g.fillPath(band);
+    drawMetalFinish(g, band, bandBounds, L.panelPaintGrain, 0.0f);
+    g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(L.highlight(L.panelPaintSheen)), bandBounds.getTopRight(),
+                                           juce::Colours::black.withAlpha(L.shadow(L.panelPaintSheen)), bandBounds.getBottomLeft(), false));
+    g.fillPath(band);
+    g.setColour(accent.darker(0.6f).withAlpha(L.shadow(L.panelPaintEdge)));
+    g.strokePath(band, juce::PathStrokeType(0.6f));
 }
 
 void MuLookAndFeel::drawNamePlate(juce::Graphics& g, juce::Rectangle<float> r, const juce::String& text)
