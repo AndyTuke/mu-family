@@ -107,7 +107,20 @@ private:
     SlideSwitch    insertModeC  { "Pad", "Mute", Id::knobInsertPad };
 
     static constexpr int kOuter   = MuLookAndFeel::kSpaceXS;
-    static constexpr int kLabelH  = 10;
+
+    // Rows, top to bottom: [name plate | plate gap | raised boxes], kRowGap apart, with kOuter
+    // above the first and below the last, so the gaps between rows, between boxes and the
+    // panel margins all match. Any leftover pixel is split above and below.
+    static constexpr int kPlateH     = 11;
+    static constexpr int kPlateW     = 58;   // one width for all three plates
+    static constexpr int kPlateGap   = 2;
+    static constexpr int kRowGap     = MuLookAndFeel::kSpaceXS;
+    static constexpr int kRowsInnerH = MuLookAndFeel::kEuclidInnerH - 2 * kOuter;
+    static constexpr int kBoxH       = (kRowsInnerH - 3 * (kPlateH + kPlateGap) - 2 * kRowGap) / 3;
+    static constexpr int kRowPitch   = kPlateH + kPlateGap + kBoxH + kRowGap;
+    static constexpr int kRowsTop    = kOuter + (kRowsInnerH - (3 * kRowPitch - kRowGap)) / 2;
+    static constexpr int rowY(int i) { return kRowsTop + i * kRowPitch; }
+    static constexpr int boxY(int i) { return rowY(i) + kPlateH + kPlateGap; }
 
     // Euclid-row spacing.
     // kEucKnobGap widened so Steps/Hits/Rotate breathe; growing the Euclid
@@ -118,7 +131,7 @@ private:
     // 24 for Pad but a full column width ~104 for Insert — too close vs too far).
     static constexpr int kEucKnobGap   = MuLookAndFeel::kKnobGapRow;  // inter-knob gap between Steps/Hits/Rotate
     static constexpr int kPadKnobGap   = MuLookAndFeel::kKnobGapPair;  // shared gap for the Pad pair AND the Insert pair
-    static constexpr int kPadInsertGap = MuLookAndFeel::kSpaceS;   // gap between Pad sub-panel and Insert sub-panel borders
+    static constexpr int kPadInsertGap = kRowGap;   // gap between the boxes in a row, matching the gap between rows
     // Pad / Insert sub-panels: each Pad/Mute slide switch sits beside its knob, so the
     // knobs get the sub-panel's full height and run at Size 1.
     static constexpr int kSwitchGap    = MuLookAndFeel::kSpaceS;      // knob to its own switch

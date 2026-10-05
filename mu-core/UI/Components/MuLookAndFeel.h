@@ -214,6 +214,10 @@ public:
     static void drawMetalFinish(juce::Graphics&, const juce::Path& shape, juce::Rectangle<float> r,
                                 float brush, float bands);
 
+    // A small name plate fixed to a panel: raised dark face, bevelled edge, a screw head
+    // at each end and the text engraved in the middle, lit from the top right.
+    static void drawNamePlate(juce::Graphics&, juce::Rectangle<float> bounds, const juce::String& text);
+
     static void drawRaisedSubPanelShadow(juce::Graphics&, juce::Rectangle<float> bounds,
                                          float cornerSize = 4.0f);
     static void drawRaisedSubPanel(juce::Graphics&, juce::Rectangle<float> bounds,

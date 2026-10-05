@@ -493,9 +493,6 @@ void EuclideanPanel::resized()
     constexpr int innerW = MuLookAndFeel::kEuclidInnerW - 2 * kOuter;   // panel width minus its 4 px border
     constexpr int innerH = MuLookAndFeel::kEuclidInnerH - 2 * kOuter;
 
-    constexpr int rowH  = innerH / 3;
-    constexpr int ctrlH = rowH - kLabelH;   // control zone within each row (below label)
-
     // Steps/Hits/Rotate render at Size 1 (canonical). kEucKnobGap
     // separates the three knobs visually; the whole block then defines where
     // the Pad sub-panel begins, so the row's right-hand columns shrink to
@@ -513,19 +510,19 @@ void EuclideanPanel::resized()
     constexpr int insPanelW = MuLookAndFeel::kEuclidInnerW - kOuter - kModeColW - insX;
 
     // Pad and Insert sub-panels: Size 1 knobs, each Pad/Mute slide switch beside its
-    // knob, all centred vertically in the sub-panel's box (ctrlH - 2 tall, as painted).
+    // knob, all centred vertically in the sub-panel's box (kBoxH tall, as painted).
     constexpr int knobW  = MuLookAndFeel::kKnobSize1W;
     constexpr int knobH  = MuLookAndFeel::kKnobSize1H;
     constexpr int swW    = MuLookAndFeel::kSlideSwitchW;
     constexpr int swH    = MuLookAndFeel::kSlideSwitchH;
-    constexpr int knobDY = (ctrlH - 2 - knobH) / 2;
-    constexpr int swDY   = (ctrlH - 2 - swH) / 2;
+    constexpr int knobDY = (kBoxH - knobH) / 2;
+    constexpr int swDY   = (kBoxH - swH) / 2;
 
     // Pad sub-panel: two [knob | switch] units side by side — at Size 1 this is within a
     // few px of the sub-panel's width, so a wider knob or switch needs the panel to grow.
     constexpr int unitW    = knobW + kSwitchGap + swW;
     constexpr int padSpan  = unitW * 2 + kSwitchGap;
-    static_assert(padSpan <= padPanelW && knobH <= ctrlH - 2, "Pad knobs + switches overflow the sub-panel");
+    static_assert(padSpan <= padPanelW && knobH <= kBoxH, "Pad knobs + switches overflow the sub-panel");
     constexpr int prePadX  = padX + (padPanelW - padSpan) / 2;
     constexpr int postPadX = prePadX + unitW + kSwitchGap;
 
@@ -539,15 +536,15 @@ void EuclideanPanel::resized()
     // the UI scale propagates uniformly. Identity at scale = 1.0.
     using mu_ui::s;
 
-    auto placeRow = [&](int y,
+    auto placeRow = [&](int row,
                         KnobWithLabel& steps, KnobWithLabel& hits, KnobWithLabel& rot,
                         KnobWithLabel& prePad, KnobWithLabel& postPad,
                         SlideSwitch& prePadMode, SlideSwitch& postPadMode,
                         KnobWithLabel& insSt, KnobWithLabel& insLen,
                         SlideSwitch& insMode)
     {
-        const int cy  = y + kLabelH;            // top of control zone (Medium space)
-        const int eCy = cy + (ctrlH - eH) / 2;  // Euclid knobs centred in it
+        const int cy  = boxY(row);              // top of the row's boxes
+        const int eCy = cy + (kBoxH - eH) / 2;  // Euclid knobs centred in their box
         steps.setBounds  (s(kOuter),                          s(eCy), s(eW), s(eH));
         hits.setBounds   (s(kOuter + eW + kEucKnobGap),       s(eCy), s(eW), s(eH));
         rot.setBounds    (s(kOuter + (eW + kEucKnobGap) * 2), s(eCy), s(eW), s(eH));
@@ -560,8 +557,7 @@ void EuclideanPanel::resized()
         insMode.setBounds(s(insSwX),  s(cy + swDY),   s(swW),   s(swH));
     };
 
-    int y = kOuter;
-    placeRow(y, stepsA, hitsA, rotA, prePadA, postPadA, prePadModeA, postPadModeA, insertStA, insertLenA, insertModeA);
+    placeRow(0, stepsA, hitsA, rotA, prePadA, postPadA, prePadModeA, postPadModeA, insertStA, insertLenA, insertModeA);
 
     // Legato over Mono, centred on the panel's height in the column after the Insert sub-panel.
     {
@@ -571,11 +567,9 @@ void EuclideanPanel::resized()
         monoCtrl  .setBounds(s(colX), s(pairY + swH + kModeSwGap), s(swW), s(swH));
     }
 
-    y += rowH;
-    placeRow(y, stepsB, hitsB, rotB, prePadB, postPadB, prePadModeB, postPadModeB, insertStB, insertLenB, insertModeB);
+    placeRow(1, stepsB, hitsB, rotB, prePadB, postPadB, prePadModeB, postPadModeB, insertStB, insertLenB, insertModeB);
 
-    y += rowH;
-    placeRow(y, stepsC, hitsC, rotC, prePadC, postPadC, prePadModeC, postPadModeC, insertStC, insertLenC, insertModeC);
+    placeRow(2, stepsC, hitsC, rotC, prePadC, postPadC, prePadModeC, postPadModeC, insertStC, insertLenC, insertModeC);
 }
 
 void EuclideanPanel::paint(juce::Graphics& g)
@@ -586,16 +580,12 @@ void EuclideanPanel::paint(juce::Graphics& g)
     // Match resized()'s constants exactly — see Medium-baseline values in MuLookAndFeel.
     constexpr int w      = MuLookAndFeel::kEuclidInnerW;
     constexpr int innerW = w - 2 * kOuter;
-    constexpr int innerH = MuLookAndFeel::kEuclidInnerH - 2 * kOuter;
-    constexpr int rowH   = innerH / 3;
 
-    constexpr int rowOffsets[3] = { kOuter, kOuter + rowH, kOuter + 2 * rowH };
-    const char* rowLabels[3]    = { "Euclid A", "Euclid B", "Accent" };
-
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(9.0f))));
-    g.setColour(MuLookAndFeel::colour(Id::labelText));
+    // Row names: a name plate above each row's Euclid box, aligned to its left edge.
+    const char* rowLabels[3] = { "Euclid A", "Euclid B", "Accent" };
     for (int i = 0; i < 3; ++i)
-        g.drawText(rowLabels[i], s(kOuter), s(rowOffsets[i]), s(innerW), s(kLabelH), juce::Justification::centredLeft, false);
+        MuLookAndFeel::drawNamePlate(g, { (float) s(kOuter), (float) s(rowY(i)), (float) s(kPlateW), (float) s(kPlateH) },
+                                     rowLabels[i]);
 
     if (rhythmColour == juce::Colours::transparentBlack)
         return;
@@ -613,12 +603,11 @@ void EuclideanPanel::paint(juce::Graphics& g)
 
     // Each row: its Euclid knobs, Pad and Insert controls each in their own raised box.
     // All shadows first, then the faces, so no box's shadow falls on its neighbour.
-    constexpr int ctrlH = rowH - kLabelH;
     std::vector<juce::Rectangle<float>> boxes;
-    for (int rowY : rowOffsets)
+    for (int i = 0; i < 3; ++i)
     {
-        const int cy = rowY + kLabelH;
-        const float bh = (float) s(ctrlH) - 2.0f;
+        const int cy = boxY(i);
+        const float bh = (float) s(kBoxH);
         boxes.push_back({ (float) s(kOuter), (float) s(cy), (float) s(eucBlockW), bh });
         boxes.push_back({ (float) s(padX),   (float) s(cy), (float) s(padPanelW), bh });
         boxes.push_back({ (float) s(insX),   (float) s(cy), (float) s(insPanelW), bh });

@@ -234,6 +234,15 @@ struct MuTheme
         float subPanelBrush      = 0.07f;   // brushed-metal grain on the face
         float subPanelBands      = 0.05f;   // diagonal reflection bands on the face
 
+        // Name plates (drawNamePlate: small labels fixed to a panel, e.g. mu-Clid's Euclid rows)
+        float namePlateDarken    = 0.55f;   // face: panel colour darkened by this
+        float namePlateShadow    = 0.55f;   // cast shadow, down-left
+        float namePlateSheen     = 0.18f;   // face light from the top right
+        float namePlateEdgeLight = 0.28f;   // edge catching the light, top right
+        float namePlateEdgeShade = 0.45f;   // edge in shade, bottom left
+        float namePlateEngrave   = 0.70f;   // dark cut under the engraved lettering
+        float namePlateScrew     = 0.45f;   // screw heads at each end
+
         // Step ring (mu-Clid's RhythmCircle)
         float ringTrack          = 0.45f;   // recessed track under each ring
         float ringBaseDarken     = 1.1f;    // opaque base under each ring: panel colour darkened by this

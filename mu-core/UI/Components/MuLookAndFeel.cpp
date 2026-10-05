@@ -515,6 +515,49 @@ void MuLookAndFeel::drawAccentPanel(juce::Graphics& g, juce::Rectangle<float> r,
     g.strokePath(shape, juce::PathStrokeType(L.panelOutlineWidth));
 }
 
+void MuLookAndFeel::drawNamePlate(juce::Graphics& g, juce::Rectangle<float> r, const juce::String& text)
+{
+    const auto& L = lighting();
+    const float h = r.getHeight();
+    juce::Path shape;
+    shape.addRoundedRectangle(r, h * 0.22f);
+
+    // Cast shadow, falling down-left away from the top-right light.
+    juce::DropShadow(juce::Colours::black.withAlpha(L.shadow(L.namePlateShadow)),
+                     (int) juce::jmax(2.0f, h * 0.3f), { -1, 1 })
+        .drawForPath(g, shape);
+
+    // Face: dark enamel, lit at the top right.
+    const auto face = colour(panelBackground).darker(L.namePlateDarken);
+    g.setGradientFill(juce::ColourGradient(face.brighter(L.highlight(L.namePlateSheen)), r.getTopRight(),
+                                           face.darker(L.namePlateSheen), r.getBottomLeft(), false));
+    g.fillPath(shape);
+
+    // Bevelled edge: light top-right, shade bottom-left.
+    g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(L.highlight(L.namePlateEdgeLight)), r.getTopRight(),
+                                           juce::Colours::black.withAlpha(L.shadow(L.namePlateEdgeShade)), r.getBottomLeft(), false));
+    g.strokePath(shape, juce::PathStrokeType(1.0f));
+
+    // Screw heads: a small domed disc with a slot, one at each end.
+    const float sr = h * 0.14f;
+    for (float sx : { r.getX() + h * 0.42f, r.getRight() - h * 0.42f })
+    {
+        const float sy = r.getCentreY();
+        g.setGradientFill(juce::ColourGradient(colour(labelText).withAlpha(L.highlight(L.namePlateScrew)), sx + sr, sy - sr,
+                                               juce::Colours::black.withAlpha(L.shadow(L.namePlateScrew)), sx - sr, sy + sr, false));
+        g.fillEllipse(sx - sr, sy - sr, sr * 2.0f, sr * 2.0f);
+        g.setColour(juce::Colours::black.withAlpha(L.shadow(L.namePlateScrew)));
+        g.drawLine(sx - sr * 0.7f, sy + sr * 0.7f, sx + sr * 0.7f, sy - sr * 0.7f, 0.8f);
+    }
+
+    // Engraved text: a dark cut offset down-left, the lettering over it.
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(h * 0.78f)));
+    g.setColour(juce::Colours::black.withAlpha(L.shadow(L.namePlateEngrave)));
+    g.drawText(text, r.translated(-0.5f, 1.0f), juce::Justification::centred, false);
+    g.setColour(colour(labelText).brighter(0.25f));
+    g.drawText(text, r, juce::Justification::centred, false);
+}
+
 void MuLookAndFeel::drawRaisedSubPanelShadow(juce::Graphics& g, juce::Rectangle<float> r, float cornerSize)
 {
     const auto& L = lighting();
