@@ -73,7 +73,11 @@ void InsertSubsection::wireCallbacks()
 {
     for (auto* k : { &insertParam1, &insertParam2, &insertParam3, &insertParam4 })
         k->onStatusUpdate = [this](const juce::String& label, const juce::String& val) {
-            if (onStatusUpdate) onStatusUpdate("Insert " + label, val);
+            if (! onStatusUpdate) return;
+            // Prefix with the chosen effect's name when asked to (and one is chosen).
+            const juce::String algo = insertAlgo.getText();
+            const bool named = statusUsesAlgoName && currentAlgo() > 0 && algo.isNotEmpty();
+            onStatusUpdate((named ? algo : juce::String("Insert")) + " " + label, val);
         };
 
     insertAlgo.onChange = [this](int id)

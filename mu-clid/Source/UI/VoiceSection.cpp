@@ -16,6 +16,7 @@ VoiceSection::VoiceSection(PluginProcessor& p)
     for (auto* k : ampSub.sendKnobs())
         addAndMakeVisible(k);
     insertSub.setAlgoColumns(kInsertCols - kSendCols);
+    insertSub.setStatusUsesAlgorithmName(true);   // "Compressor Threshold", not "Insert Threshold"
 
     // Forward status updates from each subsection through our own callback.
     auto fwd = [this](const juce::String& n, const juce::String& v) {
