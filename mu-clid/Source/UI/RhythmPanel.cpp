@@ -243,6 +243,7 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     addAndMakeVisible(voiceSection);
     addAndMakeVisible(modulatorPanel);
     modulatorPanel.setDestProvider(&modDestProvider);
+    modulatorPanel.setOpaqueBackground(false);   // let the tinted panel show through
 
     // juce::Label provides bulletproof inline editing: handles single-click to edit,
     // Enter to commit, Escape to cancel, click-off to commit, focus management — all
@@ -688,9 +689,11 @@ void RhythmPanel::paint(juce::Graphics& g)
     g.setColour(MuLookAndFeel::colour(Id::panelBackground));
     g.fillAll();
 
-    // Header
-    juce::Colour col = currentColour();   // used below for the major panel outlines
-    // (Header colour dot + name border are drawn by the shared ChannelHeaderBar.)
+    // Panels wear the app colour; the rhythm's own colour is kept to the preset bar
+    // (its dot + name border are drawn by the shared ChannelHeaderBar).
+    const juce::Colour appCol = MuLookAndFeel::colour(Id::globalAccent);
+    for (auto r : { sampleRect, circleRect, euclidRect, voiceRect, modRect })
+        MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), appCol);
 
     // Sample bar — content inset from panel outline
     {
@@ -733,15 +736,6 @@ void RhythmPanel::paint(juce::Graphics& g)
         g.drawText("...", inner.getRight() - 24, inner.getY(), 24, inner.getHeight(),
                    juce::Justification::centred, false);
     }
-
-    // Major panel outlines — 2px in rhythm colour, rounded corners.
-    // Each rect is inset by 1px so adjacent panels have a consistent 2px gap.
-    g.setColour(col);
-    g.drawRoundedRectangle(sampleRect.reduced(2).toFloat(), 6.0f, 2.0f);
-    g.drawRoundedRectangle(circleRect.reduced(2).toFloat(), 6.0f, 2.0f);
-    g.drawRoundedRectangle(euclidRect.reduced(2).toFloat(), 6.0f, 2.0f);
-    g.drawRoundedRectangle(voiceRect.reduced(2).toFloat(),  6.0f, 2.0f);
-    g.drawRoundedRectangle(modRect.reduced(2).toFloat(),    6.0f, 2.0f);
 }
 
 void RhythmPanel::resized()

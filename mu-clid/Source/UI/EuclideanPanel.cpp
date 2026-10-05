@@ -599,7 +599,7 @@ void EuclideanPanel::paint(juce::Graphics& g)
     if (rhythmColour == juce::Colours::transparentBlack)
         return;
 
-    const juce::Colour minorCol = rhythmColour.withAlpha(0.5f);
+    const juce::Colour minorCol = MuLookAndFeel::colour(Id::globalAccent).withAlpha(0.5f);   // app colour
     g.setColour(minorCol);
 
     // Constants mirror resized() exactly — Euclid block + Pad/Insert split.

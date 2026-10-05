@@ -34,7 +34,12 @@ public:
     void resized() override;
     void paint(juce::Graphics& g) override;
 
+    // Off lets the host's panel styling show through behind the tab bar and gaps
+    // (mu-Clid's tinted panels). Default on: the panel paints its own background.
+    void setOpaqueBackground(bool shouldFill) { fillBackground = shouldFill; setOpaque(false); repaint(); }
+
 private:
+    bool fillBackground = true;
     VoiceSlot*             voiceSlot     = nullptr;
     const ModDestProvider* destProvider  = nullptr;
 

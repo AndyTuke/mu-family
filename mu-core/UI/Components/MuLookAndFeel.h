@@ -200,6 +200,12 @@ public:
                                  const juce::String& topLabel, const juce::String& bottomLabel,
                                  int selected, bool highlighted);
 
+    // A panel tinted with a product's accent colour: a faint wash of the accent, a soft
+    // highlight from the top-right corner (the knobs' light direction), and a 2 px accent
+    // outline. Products pass their own accent (mu-Clid: globalAccent).
+    static void drawAccentPanel(juce::Graphics&, juce::Rectangle<float> bounds,
+                                juce::Colour accent, float cornerSize = 6.0f);
+
     // Text buttons
     void drawButtonBackground(juce::Graphics&, juce::Button&,
                               const juce::Colour& bg, bool over, bool down) override;
@@ -430,6 +436,14 @@ public:
     static constexpr int   kSmoothTickCount = 16;
     static constexpr float kTickMinSpacing  = 3.0f;
     static constexpr float kTickAlpha       = 0.216f;   // white tick opacity
+
+    // drawAccentPanel: how strongly the accent washes the panel, how bright the top-right
+    // highlight starts, and how far it reaches (fraction of the panel diagonal, capped).
+    static constexpr float kPanelTintAlpha       = 0.045f;
+    static constexpr float kPanelHighlightAlpha  = 0.13f;
+    static constexpr float kPanelHighlightReach  = 0.6f;
+    static constexpr float kPanelHighlightMaxPx  = 380.0f;
+    static constexpr float kPanelOutlineWidth    = 2.0f;
 
     // Below this radius a centred value would crowd the disc, so it is left to the
     // knob's label. Size 3 clears it; Size 4 does not, and nothing ships a stepped

@@ -89,6 +89,7 @@ void ModulatorPanel::resized()
 
 void ModulatorPanel::paint(juce::Graphics& g)
 {
+    if (! fillBackground) return;
     g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
     g.fillAll();
 }

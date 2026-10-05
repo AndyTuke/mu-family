@@ -400,6 +400,34 @@ void MuLookAndFeel::drawSlideSwitch(juce::Graphics& g, juce::Rectangle<float> bo
                juce::Justification::centredLeft, false);
 }
 
+void MuLookAndFeel::drawAccentPanel(juce::Graphics& g, juce::Rectangle<float> r,
+                                    juce::Colour accent, float cornerSize)
+{
+    juce::Path shape;
+    shape.addRoundedRectangle(r, cornerSize);
+
+    // Wash: the accent at a whisper over whatever the panel sits on.
+    g.setColour(accent.withAlpha(kPanelTintAlpha));
+    g.fillPath(shape);
+
+    // Highlight: a radial glow anchored on the top-right corner, clipped to the panel.
+    {
+        const juce::Graphics::ScopedSaveState state(g);
+        g.reduceClipRegion(shape);
+        const auto  corner = r.getTopRight();
+        const float reach  = juce::jmin(std::hypot(r.getWidth(), r.getHeight()) * kPanelHighlightReach,
+                                        mu_ui::sf(kPanelHighlightMaxPx));
+        juce::ColourGradient glow(accent.withAlpha(kPanelHighlightAlpha), corner.x, corner.y,
+                                  accent.withAlpha(0.0f), corner.x - reach, corner.y, true);
+        glow.addColour(0.4, accent.withAlpha(kPanelHighlightAlpha * 0.35f));
+        g.setGradientFill(glow);
+        g.fillRect(r);
+    }
+
+    g.setColour(accent);
+    g.strokePath(shape, juce::PathStrokeType(kPanelOutlineWidth));
+}
+
 void MuLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button,
                                           const juce::Colour& bg,
                                           bool isOver, bool isDown)
