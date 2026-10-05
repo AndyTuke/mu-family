@@ -445,6 +445,20 @@ public:
     static constexpr float kPanelHighlightMaxPx  = 380.0f;
     static constexpr float kPanelOutlineWidth    = 2.0f;
 
+    // Step-ring shading (mu-Clid's RhythmCircle), in the knob's light from the top right:
+    // recessed track behind each ring, glow round hit steps (the playhead's brighter),
+    // a bevel across each ring's width, light / shadow over the whole ring, and a
+    // recessed centre well.
+    static constexpr float kRingTrackAlpha      = 0.45f;   // black under each ring
+    static constexpr float kRingHitGlowAlpha    = 0.22f;   // hit-step halo
+    static constexpr float kRingHitGlowWidth    = 0.22f;   // halo stroke, fraction of ring width
+    static constexpr float kRingBevelDarkAlpha  = 0.32f;   // inner edge of each ring
+    static constexpr float kRingBevelLightAlpha = 0.10f;   // outer edge of each ring
+    static constexpr float kRingLightAlpha      = 0.18f;   // top-right highlight
+    static constexpr float kRingShadowAlpha     = 0.22f;   // bottom-left shade
+    static constexpr float kRingWellShadowAlpha = 0.55f;   // centre well's rim shadow
+    static constexpr float kRingHubFlashAlpha   = 0.35f;   // trigger flash, scaled by its decay
+
     // Below this radius a centred value would crowd the disc, so it is left to the
     // knob's label. Size 3 clears it; Size 4 does not, and nothing ships a stepped
     // control that small.

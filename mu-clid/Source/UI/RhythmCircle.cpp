@@ -209,12 +209,43 @@ void RhythmCircle::drawRing(juce::Graphics& g,
     // (positive = clockwise on screen) so the playhead view matches the prior
     // `startOff = -rotOff` math without rebuilding geometry every frame.
     const auto transform = juce::AffineTransform::rotation(-rotOff, cx, cy);
+    using LF = MuLookAndFeel;
 
+    // Recessed track: the ring's whole annulus in shadow, so the gaps between steps read
+    // as grooves cut into the panel.
+    juce::Path annulus;
+    annulus.addCentredArc(cx, cy, outerR, outerR, 0.0f, 0.0f, juce::MathConstants<float>::twoPi, true);
+    annulus.addCentredArc(cx, cy, innerR, innerR, 0.0f, juce::MathConstants<float>::twoPi, 0.0f, false);
+    annulus.closeSubPath();
+    g.setColour(juce::Colours::black.withAlpha(LF::kRingTrackAlpha));
+    g.fillPath(annulus);
+
+    // Steps: hits get a soft halo first (stronger on the playhead), then every step's fill.
+    const float glowW = (outerR - innerR) * LF::kRingHitGlowWidth;
     for (int i = 0; i < N; ++i)
     {
         const bool isCur = (i == currentStep);
+        if (pattern[i] == StepType::Hit)
+        {
+            g.setColour(hitClr.withAlpha(LF::kRingHitGlowAlpha * (isCur ? 1.8f : 1.0f)));
+            g.strokePath(cache.stepPaths[(size_t) i], juce::PathStrokeType(glowW), transform);
+        }
         g.setColour(stepColour(pattern[i], hitClr, isCur));
         g.fillPath(cache.stepPaths[(size_t) i], transform);
+    }
+
+    // Bevel: darker at the ring's inner edge, a touch lighter at its outer edge, so the
+    // band reads as curved rather than flat.
+    {
+        const juce::Graphics::ScopedSaveState state(g);
+        g.reduceClipRegion(annulus);
+        const double inner = innerR / outerR;
+        juce::ColourGradient bevel(juce::Colours::black.withAlpha(LF::kRingBevelDarkAlpha), cx, cy,
+                                   juce::Colours::white.withAlpha(LF::kRingBevelLightAlpha), cx + outerR, cy, true);
+        bevel.addColour(inner, juce::Colours::black.withAlpha(LF::kRingBevelDarkAlpha));
+        bevel.addColour(inner + (1.0 - inner) * 0.55, juce::Colours::transparentBlack);
+        g.setGradientFill(bevel);
+        g.fillPath(annulus);
     }
 
     const float startOff = -rotOff;  // retained for the loop-point divider below
@@ -331,17 +362,48 @@ void RhythmCircle::paint(juce::Graphics& g)
         g.fillPath(pulse);
     }
 
-    // ── Centre fill (hub pulse under bg) ─────────────────────────────────────
+    using LF = MuLookAndFeel;
+
+    // ── Light over the whole ring area: top-right highlight, bottom-left shade ──
+    {
+        juce::Path rings;
+        rings.addEllipse(cx - aOuter, cy - aOuter, aOuter * 2.0f, aOuter * 2.0f);
+        const juce::Graphics::ScopedSaveState state(g);
+        g.reduceClipRegion(rings);
+        const float reach = aOuter * 1.25f;
+        juce::ColourGradient light(juce::Colours::white.withAlpha(LF::kRingLightAlpha),
+                                   cx + aOuter * 0.6f, cy - aOuter * 0.6f,
+                                   juce::Colours::transparentWhite, cx + aOuter * 0.6f + reach, cy - aOuter * 0.6f, true);
+        g.setGradientFill(light);
+        g.fillRect(getLocalBounds());
+        juce::ColourGradient shade(juce::Colours::black.withAlpha(LF::kRingShadowAlpha),
+                                   cx - aOuter * 0.65f, cy + aOuter * 0.65f,
+                                   juce::Colours::transparentBlack, cx - aOuter * 0.65f + reach, cy + aOuter * 0.65f, true);
+        g.setGradientFill(shade);
+        g.fillRect(getLocalBounds());
+    }
+
+    // ── Centre hub: a recessed well, with the trigger flash on top ──────────────
     if (innerLimit > 4.0f)
     {
+        const juce::Rectangle<float> well(cx - innerLimit, cy - innerLimit, innerLimit * 2.0f, innerLimit * 2.0f);
+        g.setColour(MuLookAndFeel::colour(Id::panelBackground).darker(0.35f));
+        g.fillEllipse(well);
+
+        // Rim shadow under the near (top-right) wall, the far wall catching the light.
+        juce::ColourGradient rim(juce::Colours::transparentBlack, cx - innerLimit * 0.2f, cy + innerLimit * 0.2f,
+                                 juce::Colours::black.withAlpha(LF::kRingWellShadowAlpha),
+                                 cx - innerLimit * 0.2f + innerLimit * 1.25f, cy + innerLimit * 0.2f, true);
+        rim.addColour(0.6, juce::Colours::transparentBlack);
+        g.setGradientFill(rim);
+        g.fillEllipse(well);
+
         if (hubAlpha > 0.0f)
         {
-            g.setColour(rhythmColour.withAlpha(hubAlpha));
-            g.fillEllipse(cx - innerLimit, cy - innerLimit,
-                          innerLimit * 2.0f, innerLimit * 2.0f);
+            juce::ColourGradient flash(rhythmColour.withAlpha(hubAlpha * LF::kRingHubFlashAlpha), cx, cy,
+                                       rhythmColour.withAlpha(0.0f), cx + innerLimit, cy, true);
+            g.setGradientFill(flash);
+            g.fillEllipse(well);
         }
-        g.setColour(MuLookAndFeel::colour(Id::panelBackground));
-        g.fillEllipse(cx - innerLimit, cy - innerLimit,
-                      innerLimit * 2.0f, innerLimit * 2.0f);
     }
 }
