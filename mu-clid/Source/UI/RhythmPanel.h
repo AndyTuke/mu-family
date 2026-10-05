@@ -123,7 +123,9 @@ private:
     juce::StringArray       knownRhythmCategories;
 
     // Fixed chrome heights/widths
-    static constexpr int kHeaderH      = 28;
+    static constexpr int kHeaderH      = 32;   // ChannelHeaderBar (28) + its rhythm-colour panel outline
+    static constexpr int kHeaderInsetY = 2;    // bar sits this far inside the outline, top and bottom
+    static constexpr int kHeaderInsetX = 4;
     static constexpr int kSampleBarH   = 22;
     static constexpr int kVoiceH       = 144;
     static constexpr int kPanelPad     = MuLookAndFeel::kPanelPad;

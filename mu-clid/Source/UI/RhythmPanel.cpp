@@ -458,6 +458,7 @@ void RhythmPanel::setRhythm(int index)
     {
         headerBar.setLayerName(juce::String(proc.getRhythm(index).name));
         headerBar.setColour(currentColour());
+        repaint();   // the preset-bar panel behind the header is drawn in the rhythm colour
         refreshRhythmPresets();
         euclidPanel.setRhythm(index);
         euclidPanel.setRhythmColour(currentColour());
@@ -689,8 +690,11 @@ void RhythmPanel::paint(juce::Graphics& g)
     g.setColour(MuLookAndFeel::colour(Id::panelBackground));
     g.fillAll();
 
-    // Panels wear the app colour; the rhythm's own colour is kept to the preset bar
-    // (its dot + name border are drawn by the shared ChannelHeaderBar).
+    // The preset bar is a panel in the rhythm's own colour (its dot + name border are
+    // drawn by the shared ChannelHeaderBar on top); every other panel wears the app colour.
+    using mu_ui::s;
+    MuLookAndFeel::drawAccentPanel(g, juce::Rectangle<int>(0, 0, getWidth(), s(kHeaderH)).reduced(2).toFloat(),
+                                   currentColour());
     const juce::Colour appCol = MuLookAndFeel::colour(Id::globalAccent);
     for (auto r : { sampleRect, circleRect, euclidRect, voiceRect, modRect })
         MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), appCol);
@@ -761,8 +765,8 @@ void RhythmPanel::resized()
     voiceRect  = { 0,       topY + topH, w,           voiH                    };
     modRect    = { 0,       modY,        w,           juce::jmax(0, h - modY) };
 
-    // Shared header bar spans the full header strip (lays out its own controls).
-    headerBar.setBounds(0, 0, w, hdrH);
+    // Shared header bar sits just inside its rhythm-colour panel outline (lays out its own controls).
+    headerBar.setBounds(juce::Rectangle<int>(0, 0, w, hdrH).reduced(s(kHeaderInsetX), s(kHeaderInsetY)));
 
     const int rhythmInset = s(kPanelPad + 1);
     circle.setBounds        (circleRect.reduced(rhythmInset));

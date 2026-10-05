@@ -439,8 +439,8 @@ public:
 
     // drawAccentPanel: how strongly the accent washes the panel, how bright the top-right
     // highlight starts, and how far it reaches (fraction of the panel diagonal, capped).
-    static constexpr float kPanelTintAlpha       = 0.045f;
-    static constexpr float kPanelHighlightAlpha  = 0.13f;
+    static constexpr float kPanelTintAlpha       = 0.07f;
+    static constexpr float kPanelHighlightAlpha  = 0.20f;
     static constexpr float kPanelHighlightReach  = 0.6f;
     static constexpr float kPanelHighlightMaxPx  = 380.0f;
     static constexpr float kPanelOutlineWidth    = 2.0f;
