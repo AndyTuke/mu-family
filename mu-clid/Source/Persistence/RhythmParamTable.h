@@ -76,13 +76,13 @@ struct RhythmParamDef
                         [](const Rhythm& r) -> float { return (float) r.gen##L.hits; },         ParamKind::Int },                                                                   \
     { "rot"   #L,       [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.rotate       = (int)v;                      pd = true; },                                                \
                         [](const Rhythm& r) -> float { return (float) r.gen##L.rotate; },       ParamKind::Int },                                                                   \
-    { "prePad" #L,      [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.prePad       = juce::jlimit(0, 12, (int)v); pd = true; },                                                \
+    { "prePad" #L,      [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.prePad       = juce::jlimit(0, HitGenerator::kMaxPrePad, (int)v); pd = true; },                                                \
                         [](const Rhythm& r) -> float { return (float) r.gen##L.prePad; },       ParamKind::Int },                                                                   \
-    { "postPad" #L,     [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.postPad      = juce::jlimit(0, 12, (int)v); pd = true; },                                                \
+    { "postPad" #L,     [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.postPad      = juce::jlimit(0, HitGenerator::kMaxPostPad, (int)v); pd = true; },                                                \
                         [](const Rhythm& r) -> float { return (float) r.gen##L.postPad; },      ParamKind::Int },                                                                   \
     { "insSt" #L,       [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.insertStart  = juce::jlimit(0, 63, (int)v); pd = true; },                                                \
                         [](const Rhythm& r) -> float { return (float) r.gen##L.insertStart; },  ParamKind::Int },                                                                   \
-    { "insLen" #L,      [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.insertLength = juce::jlimit(0,  8, (int)v); pd = true; },                                                \
+    { "insLen" #L,      [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.insertLength = juce::jlimit(0, HitGenerator::kMaxInsertLength, (int)v); pd = true; },                                                \
                         [](const Rhythm& r) -> float { return (float) r.gen##L.insertLength; }, ParamKind::Int },                                                                   \
     { "insMode" #L,     [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.insertMode   = v > 0.5f ? InsertMode::Mute : InsertMode::Pad; pd = true; },                              \
                         [](const Rhythm& r) -> float { return r.gen##L.insertMode  == InsertMode::Mute ? 1.0f : 0.0f; }, ParamKind::Bool },                                         \

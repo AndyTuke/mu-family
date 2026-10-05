@@ -427,6 +427,7 @@ public:
     // every Nth when ticks would sit closer than kTickMinSpacing px along the ring.
     static constexpr int   kSmoothTickCount = 16;
     static constexpr float kTickMinSpacing  = 3.0f;
+    static constexpr float kTickAlpha       = 0.216f;   // white tick opacity
 
     // Below this radius a centred value would crowd the disc, so it is left to the
     // knob's label. Size 3 clears it; Size 4 does not, and nothing ships a stepped

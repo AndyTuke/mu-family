@@ -33,9 +33,11 @@ struct EuclidGenOverrides
 class HitGenerator
 {
 public:
-    // Parameter maxima (the APVTS ranges are declared from these).
-    static constexpr int kMaxPrePad       = 12;
-    static constexpr int kMaxPostPad      = 12;
+    // Parameter maxima (the APVTS ranges are declared from these). Pre / Post Pad go to the
+    // largest padding budget (64 steps - 1); the per-rhythm budget below is the real limit.
+    static constexpr int kMaxSteps        = 64;
+    static constexpr int kMaxPrePad       = kMaxSteps - 1;
+    static constexpr int kMaxPostPad      = kMaxSteps - 1;
     static constexpr int kMaxInsertLength = 8;
 
     // Padding layout rules: Pre Pad + Post Pad + Insert Length leave at least one step

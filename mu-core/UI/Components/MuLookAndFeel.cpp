@@ -248,7 +248,7 @@ void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int
             g.drawLine({ p1, p2 }, 1.0f);
         };
 
-        g.setColour(juce::Colours::white.withAlpha(0.18f));
+        g.setColour(juce::Colours::white.withAlpha(kTickAlpha));
         for (int i = 0; i <= segments; i += stride)
             drawTick(i);
         if (segments % stride != 0)

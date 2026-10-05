@@ -58,12 +58,13 @@ public:
             expectWithinAbsoluteError (applyAndPush(def, 100.0f), 64.0f,  kTol, "100 clamps to 64");
         }
 
-        beginTest ("prePadA: clamps to [0, 12]");
+        beginTest ("prePadA: clamps to [0, 63]");
         {
             auto& def = find("prePadA");
             expectWithinAbsoluteError (applyAndPush(def, 0.0f),  0.0f,  kTol, "min");
-            expectWithinAbsoluteError (applyAndPush(def, 12.0f), 12.0f, kTol, "max");
-            expectWithinAbsoluteError (applyAndPush(def, 20.0f), 12.0f, kTol, "20 clamps to 12");
+            expectWithinAbsoluteError (applyAndPush(def, 20.0f), 20.0f, kTol, "20 passes (no longer capped at 12)");
+            expectWithinAbsoluteError (applyAndPush(def, 63.0f), 63.0f, kTol, "max");
+            expectWithinAbsoluteError (applyAndPush(def, 99.0f), 63.0f, kTol, "99 clamps to 63");
         }
 
         beginTest ("insStA: clamps to [0, 63]");

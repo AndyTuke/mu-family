@@ -66,7 +66,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
                                    : "R"       + juce::String(i + 1) + " ";
 
         // HitGen A
-        addI(p+"stepsA",   n+"Steps A",   1, 64, 8);
+        addI(p+"stepsA",   n+"Steps A",   1, HitGenerator::kMaxSteps, 8);
         addI(p+"hitsA",    n+"Hits A",    0, 64, 0);
         addI(p+"rotA",     n+"Rot A",   -32, 32, 0);
         addI(p+"prePadA",  n+"PrePad A",  0, HitGenerator::kMaxPrePad, 0);
@@ -77,7 +77,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addB(p+"prePadModeA", n+"PrePadMode A",  false);
         addB(p+"postPadModeA",n+"PostPadMode A", false);
         // HitGen B
-        addI(p+"stepsB",   n+"Steps B",   1, 64, 8);
+        addI(p+"stepsB",   n+"Steps B",   1, HitGenerator::kMaxSteps, 8);
         addI(p+"hitsB",    n+"Hits B",    0, 64, 0);
         addI(p+"rotB",     n+"Rot B",   -32, 32, 0);
         addI(p+"prePadB",  n+"PrePad B",  0, HitGenerator::kMaxPrePad, 0);
@@ -88,7 +88,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addB(p+"prePadModeB", n+"PrePadMode B",  false);
         addB(p+"postPadModeB",n+"PostPadMode B", false);
         // HitGen C
-        addI(p+"stepsC",   n+"Steps C",   1, 64, 8);
+        addI(p+"stepsC",   n+"Steps C",   1, HitGenerator::kMaxSteps, 8);
         addI(p+"hitsC",    n+"Hits C",    0, 64, 0);
         addI(p+"rotC",     n+"Rot C",   -32, 32, 0);
         addI(p+"prePadC",  n+"PrePad C",  0, HitGenerator::kMaxPrePad, 0);

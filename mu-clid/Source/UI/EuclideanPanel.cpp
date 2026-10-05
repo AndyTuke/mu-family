@@ -452,14 +452,17 @@ void EuclideanPanel::bindModulationIndicators()
     const auto* mx = &proc.getRhythm(rhythmIndex).modulationMatrix;
     static const float kNaN = std::numeric_limits<float>::quiet_NaN();
 
-    // Euclid destinations: modParamValues are 0..1 proportions → normMode=true for all.
-    // Arc clears when sequencer stops.
+    // Euclid destinations: hits / rotate / insert start report 0..1 proportions; the pads
+    // and insert length report actual steps, since their knob ranges follow the padding
+    // budget. Arc clears when sequencer stops.
     auto bind = [&](KnobWithLabel& k, const char* destId, int snapIndex)
     {
+        const juce::String id(destId);
+        const bool normMode = ! (id.endsWith("Pad") || id.endsWith("insLen"));
         k.bindModulation(destId, mx,
             [&proc = proc, ri = rhythmIndex, snapIndex]() -> float {
                 return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, snapIndex) : kNaN; },
-            true);
+            normMode);
     };
 
     bind(hitsA,      "euclid.a.hits",    kSnapEucAHits);
