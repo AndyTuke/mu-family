@@ -38,8 +38,13 @@ public:
     // (mu-Clid's tinted panels). Default on: the panel paints its own background.
     void setOpaqueBackground(bool shouldFill) { fillBackground = shouldFill; setOpaque(false); repaint(); }
 
+    // Metal style (mu-Clid): no background of its own, a gap under the tab bar, and the
+    // editors / matrix drawn as raised boxes on the host's metal panel.
+    void setMetalStyle(bool m);
+
 private:
     bool fillBackground = true;
+    bool metal          = false;
     VoiceSlot*             voiceSlot     = nullptr;
     const ModDestProvider* destProvider  = nullptr;
 

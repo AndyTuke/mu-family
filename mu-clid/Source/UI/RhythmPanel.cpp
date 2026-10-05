@@ -243,7 +243,7 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     addAndMakeVisible(voiceSection);
     addAndMakeVisible(modulatorPanel);
     modulatorPanel.setDestProvider(&modDestProvider);
-    modulatorPanel.setOpaqueBackground(false);   // let the tinted panel show through
+    modulatorPanel.setMetalStyle(true);   // raised boxes on the metal panel
 
     // juce::Label provides bulletproof inline editing: handles single-click to edit,
     // Enter to commit, Escape to cancel, click-off to commit, focus management — all

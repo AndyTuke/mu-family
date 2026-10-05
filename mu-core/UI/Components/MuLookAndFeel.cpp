@@ -526,6 +526,19 @@ void MuLookAndFeel::drawAccentPanel(juce::Graphics& g, juce::Rectangle<float> r,
     g.strokePath(band, juce::PathStrokeType(0.6f));
 }
 
+void MuLookAndFeel::drawRecessedScreen(juce::Graphics& g, juce::Rectangle<float> r)
+{
+    const auto& L = lighting();
+    // Soft inner shading: a few nested strokes, fading inward from the edge.
+    for (int i = 0; i < 4; ++i)
+    {
+        const float fade = 1.0f - (float) i / 4.0f;
+        g.setGradientFill(juce::ColourGradient(juce::Colours::black.withAlpha(L.shadow(L.screenBezelShade) * fade), r.getTopRight(),
+                                               juce::Colours::white.withAlpha(L.highlight(L.screenBezelLight) * fade), r.getBottomLeft(), false));
+        g.drawRect(r.reduced((float) i), 1.0f);
+    }
+}
+
 void MuLookAndFeel::drawNamePlate(juce::Graphics& g, juce::Rectangle<float> r, const juce::String& text)
 {
     const auto& L = lighting();

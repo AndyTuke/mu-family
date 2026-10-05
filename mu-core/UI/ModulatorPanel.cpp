@@ -23,6 +23,15 @@ ModulatorPanel::ModulatorPanel()
     };
 }
 
+void ModulatorPanel::setMetalStyle(bool m)
+{
+    metal = m;
+    if (m) setOpaqueBackground(false);
+    for (auto& e : editors) e.setMetalStyle(m);
+    matrixPanel.setMetalStyle(m);
+    resized();
+}
+
 void ModulatorPanel::showTab(int idx)
 {
     for (int i = 0; i < kNumMods; ++i)
@@ -82,7 +91,8 @@ void ModulatorPanel::resized()
     const int w = getWidth(), h = getHeight();
     const int tabH = s(kTabH);
     tabBar.setBounds(0, 0, w, tabH);
-    const juce::Rectangle<int> content(0, tabH, w, h - tabH);
+    const int gap = metal ? s(MuLookAndFeel::kSpaceXS) : 0;   // metal: the boxes' shadows need room
+    const juce::Rectangle<int> content(0, tabH + gap, w, h - tabH - gap);
     for (auto& e : editors) e.setBounds(content);
     matrixPanel.setBounds(content);
 }

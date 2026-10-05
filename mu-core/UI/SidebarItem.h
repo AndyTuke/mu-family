@@ -22,6 +22,11 @@ public:
     void setSelected(bool s);
     void setPendingSwap(bool p);
 
+    // Metal style: no fill of its own; the item's box (metalBox) is drawn raised by the
+    // ChannelSidebar behind it, and selection is the box outlined in the layer colour.
+    void setMetalStyle(bool m) { metal = m; resized(); repaint(); }
+    static juce::Rectangle<float> metalBox(juce::Rectangle<int> itemBounds);
+
     // Flash the hit-pulse ring (product calls this on a layer event, e.g. a
     // mu-clid step hit). No-op cost when idle.
     void pulse();
@@ -48,6 +53,7 @@ private:
     juce::Colour colour { juce::Colours::grey };
     bool         selected    = false;
     bool         pendingSwap = false;
+    bool         metal       = false;
     float        pulseAlpha  = 0.0f;
 
     juce::Point<int> mouseDownPos;

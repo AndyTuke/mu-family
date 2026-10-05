@@ -238,6 +238,13 @@ struct MuTheme
         float subPanelBrush      = 0.07f;   // brushed-metal grain on the face
         float subPanelBands      = 0.05f;   // diagonal reflection bands on the face
 
+        // Recessed screens (drawRecessedScreen: e.g. the modulator's LFO / step display)
+        float screenBezelShade   = 0.55f;   // inner edge in shade, top right
+        float screenBezelLight   = 0.16f;   // inner edge catching the light, bottom left
+
+        // Sidebar layer boxes (metal style)
+        float sidebarSelectedFill = 0.10f;  // layer-colour wash on the selected box
+
         // Name plates (drawNamePlate: small labels fixed to a panel, e.g. mu-Clid's Euclid rows)
         float namePlateDarken    = 0.55f;   // face: panel colour darkened by this
         float namePlateShadow    = 0.55f;   // cast shadow, down-left

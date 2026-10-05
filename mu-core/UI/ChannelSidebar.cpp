@@ -9,6 +9,19 @@ ChannelSidebar::ChannelSidebar(ProcessorBase& processor, const juce::String& add
     addAndMakeVisible(addButton);
 
     addButton.onClick = [this] { if (onAddChannel) onAddChannel(); };
+
+    // Metal style: every visible item's raised box, all shadows first, then the faces.
+    itemContainer.onPaint = [this](juce::Graphics& g)
+    {
+        if (! metal) return;
+        const auto appCol = MuLookAndFeel::colour(MuLookAndFeel::globalAccent);
+        for (auto& item : items)
+            if (item->isVisible())
+                MuLookAndFeel::drawRaisedSubPanelShadow(g, SidebarItem::metalBox(item->getBounds()));
+        for (auto& item : items)
+            if (item->isVisible())
+                MuLookAndFeel::drawRaisedSubPanel(g, SidebarItem::metalBox(item->getBounds()), appCol);
+    };
     startTimerHz(5);   // re-sync count + poll pending-swap + product animation tick
 }
 
@@ -33,6 +46,7 @@ void ChannelSidebar::refreshItems()
         item->setName(proc.getChannelName(i));
         item->setColour(colourFor(i));
         item->setSelected(i == selectedIndex);
+        item->setMetalStyle(metal);
         if (createMiniVisual) item->setMiniVisual(createMiniVisual(i));
 
         item->onSelected = [this](int idx)
@@ -105,11 +119,26 @@ void ChannelSidebar::pulseItem(int idx)
         items[(size_t) idx]->pulse();
 }
 
+void ChannelSidebar::setMetalStyle(bool m)
+{
+    metal = m;
+    for (auto& item : items) item->setMetalStyle(m);
+    resized();
+    repaint();
+    itemContainer.repaint();
+}
+
 void ChannelSidebar::paint(juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
     g.setColour(MuLookAndFeel::colour(Id::sidebarBackground));
     g.fillAll();
+    if (metal)
+    {
+        MuLookAndFeel::drawAccentPanel(g, getLocalBounds().reduced(2).toFloat(),
+                                       MuLookAndFeel::colour(Id::globalAccent));
+        return;
+    }
     g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawLine((float) (getWidth() - 1), 0.0f, (float) (getWidth() - 1), (float) getHeight(), 1.0f);
 }
@@ -247,15 +276,19 @@ void ChannelSidebar::resized()
     const bool showAdd = static_cast<bool>(onAddChannel);
     addButton.setVisible(showAdd);
 
+    // Metal style keeps the items and the Add button clear of the painted border.
+    const int top   = metal ? s(4) : 0;
+    const int edgeX = metal ? s(7) : s(4);
+    const int edgeY = metal ? s(7) : s(4);
     if (showAdd)
     {
-        const int addBtnY = h - ah - s(4);
-        addButton.setBounds(s(4), addBtnY, w - s(8), ah);
-        viewport.setBounds(0, 0, w, addBtnY - s(2));
+        const int addBtnY = h - ah - edgeY;
+        addButton.setBounds(edgeX, addBtnY, w - 2 * edgeX, ah);
+        viewport.setBounds(0, top, w, addBtnY - s(2) - top);
     }
     else
     {
-        viewport.setBounds(0, 0, w, h);
+        viewport.setBounds(0, top, w, h - 2 * top);
     }
 
     itemContainer.setSize(w, juce::jmax(1, (int) items.size() * ih));

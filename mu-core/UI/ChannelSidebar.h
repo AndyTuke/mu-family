@@ -27,6 +27,10 @@ public:
     // Flash a layer's hit-pulse ring — product drives this from its play state.
     void pulseItem(int idx);
 
+    // Metal style (mu-Clid): the sidebar is a metal panel with a painted border in the app
+    // colour, and each layer sits in its own raised box. Off keeps the flat family look.
+    void setMetalStyle(bool m);
+
     // ── Product hooks ─────────────────────────────────────────────────────────
     std::function<std::unique_ptr<juce::Component>(int)> createMiniVisual; // required
     std::function<void(int, int)> onSwapChannels;        // reorder (null = no reorder)
@@ -46,8 +50,17 @@ public:
 private:
     ProcessorBase& proc;
 
+    // Holds the items; in metal style it paints their raised boxes behind them, so each
+    // box's shadow falls across the gap below it rather than being clipped by its item.
+    struct ItemContainer : juce::Component
+    {
+        std::function<void(juce::Graphics&)> onPaint;
+        void paint(juce::Graphics& g) override { if (onPaint) onPaint(g); }
+    };
+
     juce::Viewport  viewport;
-    juce::Component itemContainer;
+    ItemContainer   itemContainer;
+    bool            metal = false;
     std::vector<std::unique_ptr<SidebarItem>> items;
     AddButton addButton;
     juce::ComponentAnimator animator;

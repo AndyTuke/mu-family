@@ -23,6 +23,9 @@ public:
     void resized() override;
     void paint(juce::Graphics& g) override;
 
+    // Metal style (mu-Clid): no fill of its own; the whole matrix sits in one raised box.
+    void setMetalStyle(bool m) { metal = m; resized(); repaint(); }
+
 private:
     VoiceSlot*             voiceSlot    = nullptr;
     const ModDestProvider* destProvider = nullptr;
@@ -58,6 +61,11 @@ private:
     static constexpr int kRowH    = 26;
     static constexpr int kAddBtnH = 28;
     static constexpr int kPagerH  = 20;
+
+    bool metal = false;
+    static constexpr int kMetalMargin = 2;   // room round the raised box for its shadow
+    static constexpr int kMetalPad    = 6;   // contents inset inside it
+    juce::Rectangle<int> contentArea() const;   // where header, pager, rows and Add go
 
     int  rowsPerPage() const;
     void updateMatPager();

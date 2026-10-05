@@ -627,92 +627,135 @@ void ModulatorEditor::resized()
     const int gap4   = s(4);
     const int gap8   = s(8);
 
-    int x = nameW;
-    modeDropdown.setBounds(x, 0, modeW, headerH); x += modeW + gap4;
-    polarityCtrl.setBounds(x, 0, polW,  headerH); x += polW + gap8;
-    loopLabel   .setBounds(x, 0, lbW,   headerH); x += lbW + gap2;
-    loopDropdown.setBounds(x, 0, ddW,   headerH); x += ddW + gap2;
-    loopMult    .setBounds(x, 0, nmW,   headerH); x += nmW + gap8;
+    // Metal style: margin round the raised boxes, controls padded inside them, and the
+    // header controls a little shorter so the header box shows above and below them.
+    const int m   = metal ? s(kMetalMargin) : 0;
+    const int pad = metal ? s(kMetalPad)    : 0;
+    const int hy  = metal ? m + s(3)          : 0;
+    const int hh  = metal ? headerH - s(6)    : headerH;
 
-    // Dice button — anchored top-right of the header row, square (headerH × headerH).
-    const int diceW = headerH;
-    const int diceX = w - diceW;
-    diceBtn.setBounds(diceX, 0, diceW, headerH);
+    int x = m + nameW;
+    modeDropdown.setBounds(x, hy, modeW, hh); x += modeW + gap4;
+    polarityCtrl.setBounds(x, hy, polW,  hh); x += polW + gap8;
+    loopLabel   .setBounds(x, hy, lbW,   hh); x += lbW + gap2;
+    loopDropdown.setBounds(x, hy, ddW,   hh); x += ddW + gap2;
+    loopMult    .setBounds(x, hy, nmW,   hh); x += nmW + gap8;
+
+    // Dice button — anchored top-right of the header row, square.
+    const int diceW = hh;
+    const int diceX = w - m - pad - diceW;
+    diceBtn.setBounds(diceX, hy, diceW, hh);
 
     // Step group (Stepped mode only) flows from the left, immediately after the
     // Loop group — left-justified with the other controls. Only the dice is
     // right-anchored; the step group sits well clear of it.
     if (stepDropdown.isVisible())
     {
-        stepLabel   .setBounds(x, 0, lbW, headerH); x += lbW + gap2;
-        stepDropdown.setBounds(x, 0, ddW, headerH); x += ddW + gap2;
-        stepMult    .setBounds(x, 0, nmW, headerH); x += nmW + gap8;
+        stepLabel   .setBounds(x, hy, lbW, hh); x += lbW + gap2;
+        stepDropdown.setBounds(x, hy, ddW, hh); x += ddW + gap2;
+        stepMult    .setBounds(x, hy, nmW, hh); x += nmW + gap8;
     }
     // The "N steps" readout (drawn in paint, Stepped mode) is left-justified here,
     // immediately after the step group's × multiplier.
     stepReadoutX = x;
 
     // ── LFO / Step editor ──────────────────────────────────────────────────────
-    lfoEditor .setBounds(0, headerH, w, editorH);
-    stepEditor.setBounds(0, headerH, w, editorH);
+    // Metal style: a gap between the header box and the display (taken from the display).
+    const int edY = metal ? m + headerH + gap4 : headerH;
+    const int edH = metal ? editorH - gap4     : editorH;
+    lfoEditor .setBounds(m, edY, w - 2 * m, edH);
+    stepEditor.setBounds(m, edY, w - 2 * m, edH);
 
     // ── Assignment rows viewport ───────────────────────────────────────────────
-    const int editorBottom = headerH + editorH + gap4;
-    const int viewH = juce::jmax(0, h - editorBottom - pagerH - addBtnH - gap4);
-    rowsViewport.setBounds(0, editorBottom, w, viewH);
+    const int editorBottom = edY + edH + gap4;
+    const int ix = m + pad, iw = w - 2 * (m + pad);   // inside the assignment box
+    const int viewH = juce::jmax(0, h - editorBottom - pagerH - addBtnH - gap4 - 2 * pad - m);
+    rowsViewport.setBounds(ix, editorBottom + pad, iw, viewH);
 
     const int contentH = juce::jmax(viewH, (int)rows.size() * (rowH + gap2));
-    rowsBox.setSize(w, contentH);
+    rowsBox.setSize(iw, contentH);
     int ry = 0;
-    for (auto& row : rows) { row->setBounds(0, ry, w, rowH); ry += rowH + gap2; }
+    for (auto& row : rows) { row->setBounds(0, ry, iw, rowH); ry += rowH + gap2; }
 
     // ── Pager row ─────────────────────────────────────────────────────────────
-    const int pagerY = editorBottom + viewH + gap2;
+    const int pagerY = editorBottom + pad + viewH + gap2;
     const int btnW   = s(20);
-    rowPrevBtn  .setBounds(0,          pagerY, btnW, pagerH);
-    rowPageLabel.setBounds(btnW + gap2,   pagerY, w - btnW * 2 - gap4, pagerH);
-    rowNextBtn  .setBounds(w - btnW,   pagerY, btnW, pagerH);
+    rowPrevBtn  .setBounds(ix,                   pagerY, btnW, pagerH);
+    rowPageLabel.setBounds(ix + btnW + gap2,     pagerY, iw - btnW * 2 - gap4, pagerH);
+    rowNextBtn  .setBounds(ix + iw - btnW,       pagerY, btnW, pagerH);
 
     // ── Add button ─────────────────────────────────────────────────────────────
-    addBtn.setBounds(0, h - addBtnH, w, addBtnH);
+    addBtn.setBounds(ix, h - m - pad - addBtnH, iw, addBtnH);
 
     updateRowPager();
+}
+
+juce::Rectangle<float> ModulatorEditor::metalHeaderBox() const
+{
+    const float m = mu_ui::sf((float) kMetalMargin);
+    return { m, m, (float) getWidth() - 2.0f * m, mu_ui::sf((float) kHeaderH) };
+}
+
+juce::Rectangle<float> ModulatorEditor::metalLowerBox() const
+{
+    const float m   = mu_ui::sf((float) kMetalMargin);
+    const float top = (float) lfoEditor.getBottom() + mu_ui::sf(4.0f);
+    return { m, top, (float) getWidth() - 2.0f * m, (float) getHeight() - m - top };
 }
 
 void ModulatorEditor::paint(juce::Graphics& g)
 {
     using mu_ui::s;
     using mu_ui::sf;
-    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
-    g.fillAll();
+    const auto appCol = MuLookAndFeel::colour(MuLookAndFeel::globalAccent);
+    if (metal)
+    {
+        // Header and assignment area as raised boxes: both shadows, then both faces.
+        MuLookAndFeel::drawRaisedSubPanelShadow(g, metalHeaderBox());
+        MuLookAndFeel::drawRaisedSubPanelShadow(g, metalLowerBox());
+        MuLookAndFeel::drawRaisedSubPanel(g, metalHeaderBox(), appCol);
+        MuLookAndFeel::drawRaisedSubPanel(g, metalLowerBox(), appCol);
+    }
+    else
+    {
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
+        g.fillAll();
+    }
 
+    const int m       = metal ? s(kMetalMargin) : 0;
     const int headerH = s(kHeaderH);
     const float dotSize = sf(8.0f);
 
     // Header: colour dot + modulator name
-    const float dotY = (headerH - dotSize) * 0.5f;
+    const float dotY = m + (headerH - dotSize) * 0.5f;
     g.setColour(modColour);
-    g.fillEllipse(sf(8.0f), dotY, dotSize, dotSize);
+    g.fillEllipse(m + sf(8.0f), dotY, dotSize, dotSize);
     g.setColour(MuLookAndFeel::colour(MuLookAndFeel::headingText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
     g.drawText("Mod " + juce::String::charToString(char('A' + modIndex)),
-               s(20), 0, s(54), headerH, juce::Justification::centredLeft, false);
+               m + s(20), m, s(54), headerH, juce::Justification::centredLeft, false);
 
     // Step count drawn left-justified immediately after the step group's ×
     // multiplier (Stepped mode only). Bounded on the right by the dice (right-
     // anchored at getWidth() - headerH, opaque fill) so it never underlaps it.
     if (cs && cs->mode == ControlSequence::Mode::Stepped)
     {
-        const int diceW     = headerH;       // dice is a headerH × headerH square
-        const int rightEdge = getWidth() - diceW - s(4);   // small gap before the dice
+        const int rightEdge = diceBtn.getX() - s(4);   // small gap before the dice
         const int textW     = juce::jmax(0, rightEdge - stepReadoutX);
         if (textW > 0)
         {
             g.setColour(MuLookAndFeel::colour(MuLookAndFeel::mutedText));
             g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
             g.drawText(juce::String(cs->getStepCount()) + " steps",
-                       stepReadoutX, 0, textW, headerH,
+                       stepReadoutX, m, textW, headerH,
                        juce::Justification::centredLeft, false);
         }
     }
+}
+
+void ModulatorEditor::paintOverChildren(juce::Graphics& g)
+{
+    // Metal style: the LFO / step display reads as a screen set into the panel.
+    if (metal)
+        MuLookAndFeel::drawRecessedScreen(g, lfoEditor.getBounds().toFloat());
 }

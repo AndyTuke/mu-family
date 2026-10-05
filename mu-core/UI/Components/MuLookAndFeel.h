@@ -214,6 +214,10 @@ public:
     static void drawMetalFinish(juce::Graphics&, const juce::Path& shape, juce::Rectangle<float> r,
                                 float brush, float bands);
 
+    // Bezel round a display set into the panel (drawn over it): the recess is shaded on
+    // its top-right inner edges and catches the light on its bottom-left ones.
+    static void drawRecessedScreen(juce::Graphics&, juce::Rectangle<float> bounds);
+
     // A small name plate fixed to a panel: raised dark face, bevelled edge, a screw head
     // at each end and the text engraved in the middle, lit from the top right.
     static void drawNamePlate(juce::Graphics&, juce::Rectangle<float> bounds, const juce::String& text);

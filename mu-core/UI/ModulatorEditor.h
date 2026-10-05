@@ -92,6 +92,11 @@ public:
 
     void resized() override;
     void paint(juce::Graphics& g) override;
+    void paintOverChildren(juce::Graphics& g) override;
+
+    // Metal style (mu-Clid): no fill of its own; the header and the assignment area are
+    // raised boxes on the host's metal panel and the LFO / step display is set into it.
+    void setMetalStyle(bool m) { metal = m; resized(); repaint(); }
 
 private:
     // Dice handler — randomise current modulator's values, leave structure.
@@ -174,6 +179,12 @@ private:
     juce::TextButton rowNextBtn { juce::String::charToString(0x25BC) }; // ▼
     juce::Label      rowPageLabel;
     AddButton addBtn { "Target" };
+
+    bool metal = false;
+    static constexpr int kMetalMargin = 2;   // room round the raised boxes for their shadows
+    static constexpr int kMetalPad    = 4;   // controls inset inside a raised box
+    juce::Rectangle<float> metalHeaderBox() const;
+    juce::Rectangle<float> metalLowerBox() const;
 
     static constexpr int kHeaderH = 28;
     static constexpr int kEditorH = 150;  // timing controls live in the header row

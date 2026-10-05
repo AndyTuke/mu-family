@@ -50,12 +50,19 @@ void SidebarItem::timerCallback()
         stopTimer();
 }
 
+juce::Rectangle<float> SidebarItem::metalBox(juce::Rectangle<int> b)
+{
+    // Clear of the sidebar's painted border at the sides, a small gap between boxes.
+    return b.toFloat().reduced(mu_ui::sf(7.0f), mu_ui::sf(3.0f));
+}
+
 juce::Rectangle<int> SidebarItem::badgeBounds() const
 {
     using mu_ui::s;
     const int badgeH = s(13);
     const int badgeW = s(28);
-    return { getWidth() - badgeW - s(3), s(3), badgeW, badgeH };
+    const int inset  = metal ? s(10) : s(3);
+    return { getWidth() - badgeW - inset, inset, badgeW, badgeH };
 }
 
 void SidebarItem::resized()
@@ -63,10 +70,12 @@ void SidebarItem::resized()
     using mu_ui::s;
     const int w          = getWidth();
     const int nameH      = s(14);
-    const int circleSize = juce::jmin(w - s(8), getHeight() - nameH - s(6));
+    const int top        = metal ? s(7) : s(4);   // metal: inside the raised box
+    const int circleSize = metal ? juce::jmin(w - s(20), getHeight() - nameH - s(12))
+                                 : juce::jmin(w - s(8),  getHeight() - nameH - s(6));
     const int circleX    = (w - circleSize) / 2;
     if (miniVisual != nullptr)
-        miniVisual->setBounds(circleX, s(4), juce::jmax(0, circleSize), juce::jmax(0, circleSize));
+        miniVisual->setBounds(circleX, top, juce::jmax(0, circleSize), juce::jmax(0, circleSize));
 }
 
 void SidebarItem::paint(juce::Graphics& g)
@@ -78,9 +87,21 @@ void SidebarItem::paint(juce::Graphics& g)
     const int w = getWidth();
     const int h = getHeight();
 
-    g.setColour(MuLookAndFeel::colour(selected ? Id::sidebarItemSelected
-                                               : Id::sidebarItemBackground));
-    g.fillRect(0, 0, w, h);
+    // Metal: the raised box is drawn behind by the sidebar; selection outlines it.
+    const auto box = metalBox(getLocalBounds());
+    if (! metal)
+    {
+        g.setColour(MuLookAndFeel::colour(selected ? Id::sidebarItemSelected
+                                                   : Id::sidebarItemBackground));
+        g.fillRect(0, 0, w, h);
+    }
+    else if (selected)
+    {
+        g.setColour(colour.withAlpha(MuLookAndFeel::lighting().sidebarSelectedFill));
+        g.fillRoundedRectangle(box, sf(4.0f));
+        g.setColour(colour);
+        g.drawRoundedRectangle(box, sf(4.0f), sf(1.5f));
+    }
 
     // Expanding pulse ring centred on the mini-graphic — fades + grows on a hit.
     if (pulseAlpha > 0.0f && miniVisual != nullptr)
@@ -99,7 +120,7 @@ void SidebarItem::paint(juce::Graphics& g)
     }
 
     // Right-edge tab line when selected.
-    if (selected)
+    if (selected && ! metal)
     {
         g.setColour(colour);
         const int tabW = s(3);
@@ -109,15 +130,17 @@ void SidebarItem::paint(juce::Graphics& g)
     // Name row below the mini-graphic.
     const int miniBottom = miniVisual != nullptr ? miniVisual->getBottom() : s(4);
     const int nameY      = miniBottom + s(2);
-    const int nameRowH   = h - nameY - s(2);
+    const int nameRowH   = (metal ? (int) box.getBottom() : h) - nameY - s(2);
+    const int nameX      = metal ? (int) box.getX() + s(4) : s(5);   // dot's left edge
     if (nameRowH > 0)
     {
         g.setColour(colour);
-        g.fillEllipse(sf(5.0f), (float) (nameY + (nameRowH - s(6)) / 2), sf(6.0f), sf(6.0f));
+        g.fillEllipse((float) nameX, (float) (nameY + (nameRowH - s(6)) / 2), sf(6.0f), sf(6.0f));
 
         g.setColour(MuLookAndFeel::colour(selected ? Id::valueText : Id::labelText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
-        g.drawText(name, s(14), nameY, w - s(18), nameRowH, juce::Justification::centredLeft, true);
+        g.drawText(name, nameX + s(9), nameY, w - nameX - s(9) - (metal ? s(9) : s(4)), nameRowH,
+                   juce::Justification::centredLeft, true);
     }
 
     // Pending hot-swap badge — orange pill, top-right, "SWP". Click cancels.
@@ -132,6 +155,7 @@ void SidebarItem::paint(juce::Graphics& g)
     }
 
     // Bottom separator.
+    if (metal) return;
     g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     g.drawLine(sf(4.0f), (float) (h - 1), (float) (w - s(4)), (float) (h - 1), 0.5f);
 }
