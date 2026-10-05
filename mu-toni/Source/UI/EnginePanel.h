@@ -238,9 +238,10 @@ private:
         auto dd = [&](const char* suf, int sx, int spanCols, int cw)
         { if (auto* c = findCombo(suf)) c->setBounds(X + s(sx), Y + s(rowH / 4), s(spanCols * cw), s(rowH / 2)); };
 
-        // Pitch — target (row 1) + A/D/S/R/Depth (row 2).
+        // Pitch — target + Depth above R (row 1) + A/D/S/R (row 2); four columns, as mu-Clid.
         dd("ptgt", 0, 2, kW);
-        kb("peA", 0, 0, kW, true); kb("peD", 0, 1, kW, true); kb("peS", 0, 2, kW, true); kb("peR", 0, 3, kW, true); kb("peDep", 0, 4, kW, true);
+        kb("peDep", 0, 3, kW, false);
+        kb("peA", 0, 0, kW, true); kb("peD", 0, 1, kW, true); kb("peS", 0, 2, kW, true); kb("peR", 0, 3, kW, true);
 
         // Filter — type (2 cols) + Drive/Cutoff/Reso/LowCut (row 1) + A/D/S/R/Depth (row 2).
         dd("ft", fltX, 2, fW);

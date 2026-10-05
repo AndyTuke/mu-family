@@ -190,18 +190,16 @@ void PitchSubsection::resized()
     constexpr int row2Y = rowH + gap;
 
     using mu_ui::s;
-    // Row 1: Octave / Semi / Fine — col 4 left empty (the per-envelope
-    // Leg pill was removed; envelope legato is governed solely by
-    // the hit-generator's pattern legato on EuclideanPanel's logic row).
+    // Row 1: Octave / Semi / Fine, then the envelope Depth in column 4, directly above
+    // Release, so the panel needs only four columns.
     pitchOctave.setBounds(s(0 * kW), 0,        s(kW), s(rowH));
     pitchSemi  .setBounds(s(1 * kW), 0,        s(kW), s(rowH));
     pitchFine  .setBounds(s(2 * kW), 0,        s(kW), s(rowH));
+    pitchDepth .setBounds(s(3 * kW), 0,        s(kW), s(rowH));
 
-    // Row 2 (envelope): A / D / S / R / Depth — the envelope depth control is
-    // logically part of the envelope cluster so it now sits adjacent to A/D/S/R.
+    // Row 2 (envelope): A / D / S / R.
     pitchAtk  .setBounds(s(0 * kW), s(row2Y), s(kW), s(rowH));
     pitchDec  .setBounds(s(1 * kW), s(row2Y), s(kW), s(rowH));
     pitchSus  .setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));
     pitchRel  .setBounds(s(3 * kW), s(row2Y), s(kW), s(rowH));
-    pitchDepth.setBounds(s(4 * kW), s(row2Y), s(kW), s(rowH));
 }
