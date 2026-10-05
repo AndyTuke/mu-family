@@ -194,6 +194,20 @@ public:
     bool isMetalStyle() const noexcept  { return metalStyle; }
     static bool isMetal(juce::Component& c);   // c's LookAndFeel is a MuLookAndFeel in metal style
 
+    // The product's own colour (mu-Clid purple, mu-Tant green): panel borders, raised-box
+    // outlines and LCD lettering use it. Unset = globalAccent, with LCDs in segmentActiveBorder.
+    void setAppAccent(juce::Colour c) noexcept { appAccentColour = c; hasAppAccent = true; }
+    static juce::Colour appAccent(juce::Component& c);
+    static juce::Colour lcdLitColour(juce::Component& c);
+
+    // Lamps: a lit indicator behind a dark lens. lampColour mixes `clr` into the opaque lamp
+    // base by `lit` (Lighting lampOff / lampDim / lampOn); drawLamp fills `shape` with that lens,
+    // brighter at `centre` where the light sits behind it.
+    static juce::Colour lampBase();
+    static juce::Colour lampColour(juce::Colour clr, float lit);
+    static void drawLamp(juce::Graphics&, const juce::Path& shape, const juce::AffineTransform&,
+                         juce::Colour lens, juce::Point<float> centre, float hotRadius);
+
     // Text cut into the metal: a dark cut offset down-left, the lettering over it in `ink`.
     static void drawEngravedText(juce::Graphics&, const juce::String& text, juce::Rectangle<int> area,
                                  juce::Justification just, juce::Colour ink, bool ellipsis = true);
@@ -550,6 +564,10 @@ public:
     // than the Size 3 bucket. Height stays at Size 3 H.
     static constexpr int kMixerStripKnobW = kMixerChanW;   // 73
     static constexpr int kMixerStripKnobH = kKnobSize3H;   // 46
+    static constexpr int kNamePlateH = 11;   // name plates (drawNamePlate): section and row names
+
 private:
-    bool metalStyle = false;
+    bool         metalStyle   = false;
+    bool         hasAppAccent = false;
+    juce::Colour appAccentColour;
 };

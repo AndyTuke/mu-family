@@ -30,6 +30,7 @@ public:
     // Metal style (mu-Clid): the sidebar is a metal panel with a painted border in the app
     // colour, and each layer sits in its own raised box. Off keeps the flat family look.
     void setMetalStyle(bool m);
+    void lookAndFeelChanged() override { setMetalStyle(MuLookAndFeel::isMetal(*this)); }
 
     // ── Product hooks ─────────────────────────────────────────────────────────
     std::function<std::unique_ptr<juce::Component>(int)> createMiniVisual; // required

@@ -767,7 +767,7 @@ void ModulatorEditor::paint(juce::Graphics& g)
 {
     using mu_ui::s;
     using mu_ui::sf;
-    const auto appCol = MuLookAndFeel::colour(MuLookAndFeel::globalAccent);
+    const auto appCol = MuLookAndFeel::appAccent(*this);
     if (metal)
     {
         // Header and assignment area as raised boxes: both shadows, then both faces.

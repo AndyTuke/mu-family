@@ -306,3 +306,40 @@ When the second plugin is started:
 5. Move `UI/Components/` and `FX/` verbatim — no API changes needed
 
 All existing ID values in `ColourIds` are frozen — never renumber them.
+
+---
+
+## 11. Metal Style (family standard)
+
+The look developed on mu-Clid in v1.1 (backlog #1099–#1118) is the **standard look for every mu-family app**. All of it lives in mu-core; a product turns it on with **one call** at the end of its editor constructor, once its children exist:
+
+```cpp
+setMetalStyle(true);                                   // mu-Clid: globalAccent purple
+setMetalStyle(true, juce::Colour(0xff3ddc84));         // e.g. mu-Tant: its own green
+```
+
+`EditorShellBase::setMetalStyle` sets the flag + app accent on the editor's `MuLookAndFeel` and sends a LookAndFeel change, so the shared components (`ChannelSidebar`, `ModulatorPanel` → `ModulatorEditor` / `ModMatrixPanel`) switch themselves in `lookAndFeelChanged()`. Products that have not opted in keep the flat look, untouched.
+
+**Rule: never hard-code depth.** Every shadow, highlight, tint and lamp strength is a field in `MuTheme::Lighting` (masters `shadowAmount` / `highlightAmount` scale them all). Colours come from `MuLookAndFeel` tokens or `MuLookAndFeel::appAccent(component)`.
+
+### Elements and where they come from
+
+| Element | Use for | mu-core API |
+|---|---|---|
+| **Metal panel** — tint + brushed grain + diagonal sheen + top-right glow, **painted border** in the accent | Every top-level panel. App accent everywhere; the layer (rhythm / voice) colour **only** on the per-layer preset bar | `MuLookAndFeel::drawAccentPanel(g, bounds, accent)` |
+| **Raised sub-panel** — cast shadow down-left, lit face with metal finish, bevelled edge | Groups of controls inside a panel (Euclid / Pad / Insert boxes, sidebar layers, modulator header + assignments) | `drawRaisedSubPanelShadow` then `drawRaisedSubPanel` — **draw every shadow before any face** so no shadow lands on a neighbour |
+| **Metal finish** | Custom surfaces that should match the panels | `drawMetalFinish(g, shape, bounds, brush, bands)` |
+| **Name plate** — small raised dark plate, screws, engraved text | Section / row names (PITCH, FILTER, Euclid A…). Same height everywhere | `drawNamePlate(g, bounds, text)`, `namePlateWidth(text, h)`, height `kNamePlateH` |
+| **Engraved text** | Plain labels on metal (automatic for `juce::Label` and knob labels in metal style) | `drawEngravedText(g, text, area, just, ink)` |
+| **LCD window** — dark glass, recessed bezel, glowing monospaced lettering, glare | Selectors: every ComboBox (automatic in metal style), tab bars (`SegmentControl::DrawStyle::Lcd`), readouts | `drawLcdGlass` / `drawLcdFront`, `lcdLitColour(component)`, `lcdFont(h)`; `DropdownSelect::setLcdStyle` for a one-off |
+| **Recessed screen** — inner shading, dark top-right / light bottom-left | Displays set into the panel (LFO / step editor) | `drawRecessedScreen(g, bounds)` |
+| **Lamp** — lit indicator behind a dark lens, hot-spot at the centre | Step / state indicators (ring steps, gate cells). Off = bare lamp base; only lit states glow | `lampColour(clr, lit)` with `Lighting::lampOff / lampDim / lampOn / lampPlayhead`, `drawLamp(...)`, `lampBase()` |
+| **Knobs & slide switches** — neumorphic dial / switch, cast shadow from a top-right light | All continuous / two-state controls | `KnobWithLabel`, `SlideSwitch` (shared, unchanged API) |
+
+### Conventions
+
+- **Light comes from the top right** — highlights top-right, shadows fall down-left, recesses are dark top-right.
+- **Even spacing** — the gap between raised boxes, between rows and to the panel edge is one token (`kSpaceXS` in mu-Clid's Euclid panel); plates sit 2 px above their boxes.
+- **Layer colour is identity, not decoration** — it marks the selected layer (sidebar outline) and the preset bar; panels stay in the app accent.
+- **One item at a time beats a scrolling list** in small areas — mu-Clid's modulation targets show one row with an `n / N` readout and an up/down stepper (metal-style `ModulatorEditor`).
+- Positioning stays app-specific; only the look is shared.

@@ -153,24 +153,23 @@ juce::Colour RhythmCircle::stepColour(StepType t, juce::Colour hitClr, bool isCu
     // Each step is a lamp behind a dark lens: its colour mixed into the opaque ring base by
     // how lit it is. Hits lit, pads dimly lit, empty steps off.
     juce::Colour lampClr = hitClr;
-    float lit = L.ringLampOff;
+    float lit = L.lampOff;
     switch (t)
     {
-        case StepType::Hit:       lit = L.ringLampOn; break;
-        case StepType::PrePad:    lampClr = MuLookAndFeel::colour(Id::ringPrePad);    lit = L.ringLampPad; break;
-        case StepType::PostPad:   lampClr = MuLookAndFeel::colour(Id::ringPostPad);   lit = L.ringLampPad; break;
-        case StepType::InsertPad: lampClr = MuLookAndFeel::colour(Id::ringInsertPad); lit = L.ringLampPad; break;
+        case StepType::Hit:       lit = L.lampOn; break;
+        case StepType::PrePad:    lampClr = MuLookAndFeel::colour(Id::ringPrePad);    lit = L.lampDim; break;
+        case StepType::PostPad:   lampClr = MuLookAndFeel::colour(Id::ringPostPad);   lit = L.lampDim; break;
+        case StepType::InsertPad: lampClr = MuLookAndFeel::colour(Id::ringInsertPad); lit = L.lampDim; break;
         default: break;
     }
     if (isCurrent && t != StepType::Empty)   // empty steps stay off, even under the playhead
-        lit = juce::jmin(1.0f, lit + L.ringLampPlayhead);
-    return ringBase().interpolatedWith(lampClr, lit);
+        lit = juce::jmin(1.0f, lit + L.lampPlayhead);
+    return MuLookAndFeel::lampColour(lampClr, lit);
 }
 
 juce::Colour RhythmCircle::ringBase()
 {
-    return MuLookAndFeel::colour(MuLookAndFeel::ColourIds::panelBackground)
-               .darker(MuLookAndFeel::lighting().ringBaseDarken);
+    return MuLookAndFeel::lampBase();
 }
 
 void RhythmCircle::RingCache::rebuild(float cx_, float cy_, float outerR_, float innerR_, int N)
@@ -261,10 +260,7 @@ void RhythmCircle::drawRing(juce::Graphics& g,
         // Lens centre in screen space (cached geometry is unrotated, step 0 at 12 o'clock).
         const float a = ((float) i + 0.5f) * stepAng;
         const auto c = juce::Point<float>(cx + midR * std::sin(a), cy - midR * std::cos(a)).transformedBy(transform);
-        juce::ColourGradient lamp(lens.brighter(L.highlight(L.ringLampHot)), c.x, c.y,
-                                  lens.darker(L.ringLampHot), c.x + hotR, c.y, true);
-        g.setGradientFill(lamp);
-        g.fillPath(seg, transform);
+        MuLookAndFeel::drawLamp(g, seg, transform, lens, c, hotR);
     }
 
     // Bevel: darker at the ring's inner edge, a touch lighter at its outer edge, so the
@@ -326,7 +322,7 @@ void RhythmCircle::paint(juce::Graphics& g)
     }
     else
     {
-        g.setColour(ringBase().interpolatedWith(MuLookAndFeel::colour(Id::ringEuclidA), MuLookAndFeel::lighting().ringLampOff));
+        g.setColour(MuLookAndFeel::lampColour(MuLookAndFeel::colour(Id::ringEuclidA), MuLookAndFeel::lighting().lampOff));
         juce::Path ring;
         ring.addCentredArc(cx, cy, aOuter, aOuter, 0.0f, 0.0f, juce::MathConstants<float>::twoPi, true);
         ring.addCentredArc(cx, cy, aInner, aInner, 0.0f, juce::MathConstants<float>::twoPi, 0.0f, false);
@@ -350,7 +346,7 @@ void RhythmCircle::paint(juce::Graphics& g)
         }
         else
         {
-            g.setColour(ringBase().interpolatedWith(MuLookAndFeel::colour(Id::ringEuclidB), MuLookAndFeel::lighting().ringLampOff));
+            g.setColour(MuLookAndFeel::lampColour(MuLookAndFeel::colour(Id::ringEuclidB), MuLookAndFeel::lighting().lampOff));
             juce::Path ring;
             ring.addCentredArc(cx, cy, bOuter, bOuter, 0.0f, 0.0f, juce::MathConstants<float>::twoPi, true);
             ring.addCentredArc(cx, cy, bInner, bInner, 0.0f, juce::MathConstants<float>::twoPi, 0.0f, false);

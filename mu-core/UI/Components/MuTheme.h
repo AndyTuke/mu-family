@@ -264,14 +264,16 @@ struct MuTheme
         // Engraved text (labels cut into the metal, metal style)
         float engraveCut         = 0.75f;   // dark cut offset down-left under the lettering
 
+        // Lamps (lampColour / drawLamp: lit step indicators behind a dark lens, e.g. mu-Clid's ring)
+        float lampBaseDarken     = 1.1f;    // opaque base under the lamps: panel colour darkened by this
+        float lampOff            = 0.0f;    // unlit: how much of its colour shows through the dark lens
+        float lampDim            = 0.38f;   // dimly lit (secondary steps, e.g. pads)
+        float lampOn             = 0.66f;   // lit, but not bright
+        float lampHot            = 0.30f;   // brighter centre on a lit lamp (lens hot-spot)
+        float lampPlayhead       = 0.25f;   // extra brightness on the playhead step
+
         // Step ring (mu-Clid's RhythmCircle)
         float ringTrack          = 0.45f;   // recessed track under each ring
-        float ringBaseDarken     = 1.1f;    // opaque base under each ring: panel colour darkened by this
-        float ringLampOff        = 0.0f;    // unlit step: how much of its colour shows through the dark lens
-        float ringLampPad        = 0.38f;   // pad / insert steps: dimly lit
-        float ringLampOn         = 0.66f;   // hit steps: lit, but not bright
-        float ringLampHot        = 0.30f;   // brighter centre on a lit lamp (lens hot-spot)
-        float ringLampPlayhead   = 0.25f;   // extra brightness on the playhead step
         float ringHitGlow        = 0.22f;   // halo round hit steps (playhead × 1.8)
         float ringHitGlowWidth   = 0.22f;   //   halo stroke, fraction of ring width
         float ringBevelDark      = 0.32f;   // inner edge of each ring

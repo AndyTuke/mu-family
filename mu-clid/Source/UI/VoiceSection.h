@@ -37,7 +37,7 @@ private:
     static constexpr int kInsertCols = 6;
     static constexpr int kSendCols   = 3;   // Effect / Delay / Reverb, right of the insert dropdown
     static constexpr int kInsertW    = kInsertCols * kCols;                                // 324
-    static constexpr float kPlateH   = 11.0f;   // section name plates, matching the Euclid row plates
+    static constexpr float kPlateH   = (float) MuLookAndFeel::kNamePlateH;   // section name plates
 
     PluginProcessor& proc;
     int              currentRhythm = -1;

@@ -545,6 +545,37 @@ bool MuLookAndFeel::isMetal(juce::Component& c)
     return mlf != nullptr && mlf->isMetalStyle();
 }
 
+juce::Colour MuLookAndFeel::appAccent(juce::Component& c)
+{
+    auto* mlf = dynamic_cast<MuLookAndFeel*>(&c.getLookAndFeel());
+    return (mlf != nullptr && mlf->hasAppAccent) ? mlf->appAccentColour : colour(globalAccent);
+}
+
+juce::Colour MuLookAndFeel::lcdLitColour(juce::Component& c)
+{
+    auto* mlf = dynamic_cast<MuLookAndFeel*>(&c.getLookAndFeel());
+    return (mlf != nullptr && mlf->hasAppAccent) ? mlf->appAccentColour.brighter(0.6f) : lcdLitColour();
+}
+
+juce::Colour MuLookAndFeel::lampBase()
+{
+    return colour(panelBackground).darker(lighting().lampBaseDarken);
+}
+
+juce::Colour MuLookAndFeel::lampColour(juce::Colour clr, float lit)
+{
+    return lampBase().interpolatedWith(clr, lit);
+}
+
+void MuLookAndFeel::drawLamp(juce::Graphics& g, const juce::Path& shape, const juce::AffineTransform& t,
+                             juce::Colour lens, juce::Point<float> centre, float hotRadius)
+{
+    const auto& L = lighting();
+    g.setGradientFill(juce::ColourGradient(lens.brighter(L.highlight(L.lampHot)), centre.x, centre.y,
+                                           lens.darker(L.lampHot), centre.x + hotRadius, centre.y, true));
+    g.fillPath(shape, t);
+}
+
 bool MuLookAndFeel::lcdCombo(juce::ComboBox& box)
 {
     return (bool) box.getProperties()["muLcd"] || isMetal(box);
@@ -728,7 +759,7 @@ void MuLookAndFeel::drawComboBox(juce::Graphics& g, int w, int h, bool /*isDown*
         const float arrowY = (h - arrowSize * 0.6f) * 0.5f;
         juce::Path arrow;
         arrow.addTriangle(arrowX, arrowY, arrowX + arrowSize, arrowY, arrowX + arrowSize * 0.5f, arrowY + arrowSize * 0.6f);
-        g.setColour(lcdLitColour());
+        g.setColour(lcdLitColour(box));
         g.fillPath(arrow);
         drawLcdFront(g, r);
         return;
@@ -756,7 +787,7 @@ void MuLookAndFeel::drawComboBox(juce::Graphics& g, int w, int h, bool /*isDown*
 void MuLookAndFeel::positionComboBoxText(juce::ComboBox& box, juce::Label& label)
 {
     label.setBounds(6, 0, box.getWidth() - 24, box.getHeight());
-    if (lcdCombo(box)) label.setColour(juce::Label::textColourId, lcdLitColour());
+    if (lcdCombo(box)) label.setColour(juce::Label::textColourId, lcdLitColour(box));
     label.setFont(lcdCombo(box) ? lcdFont(11.0f) : juce::Font(juce::FontOptions{}.withHeight(12.0f)));
 }
 

@@ -41,7 +41,7 @@ void DropdownSelect::setPlaceholderText(const juce::String& text)
 void DropdownSelect::setLcdStyle(bool lcd)
 {
     combo.getProperties().set("muLcd", lcd);
-    if (lcd) combo.setColour(juce::ComboBox::textColourId, MuLookAndFeel::lcdLitColour());
+    if (lcd) combo.setColour(juce::ComboBox::textColourId, MuLookAndFeel::lcdLitColour(combo));
     else     combo.removeColour(juce::ComboBox::textColourId);
     combo.lookAndFeelChanged();   // re-run positionComboBoxText for the font
     combo.repaint();

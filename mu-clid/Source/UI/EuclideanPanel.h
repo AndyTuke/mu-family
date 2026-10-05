@@ -111,7 +111,7 @@ private:
     // Rows, top to bottom: [name plate | plate gap | raised boxes], kRowGap apart, with kOuter
     // above the first and below the last, so the gaps between rows, between boxes and the
     // panel margins all match. Any leftover pixel is split above and below.
-    static constexpr int kPlateH     = 11;
+    static constexpr int kPlateH     = MuLookAndFeel::kNamePlateH;
     static constexpr int kPlateW     = 58;   // one width for all three plates
     static constexpr int kPlateGap   = 2;
     static constexpr int kRowGap     = MuLookAndFeel::kSpaceXS;

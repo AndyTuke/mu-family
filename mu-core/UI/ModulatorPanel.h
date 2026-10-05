@@ -41,6 +41,7 @@ public:
     // Metal style (mu-Clid): no background of its own, a gap under the tab bar, and the
     // editors / matrix drawn as raised boxes on the host's metal panel.
     void setMetalStyle(bool m);
+    void lookAndFeelChanged() override { setMetalStyle(MuLookAndFeel::isMetal(*this)); }
 
 private:
     bool fillBackground = true;

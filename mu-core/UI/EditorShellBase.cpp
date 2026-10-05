@@ -335,6 +335,14 @@ void EditorShellBase::setMixerOverlay(juce::Component* overlay)
     resized();
 }
 
+void EditorShellBase::setMetalStyle(bool metal, juce::Colour appAccent)
+{
+    lookAndFeel.setMetalStyle(metal);
+    if (! appAccent.isTransparent()) lookAndFeel.setAppAccent(appAccent);
+    sendLookAndFeelChange();   // shared components re-read the style in lookAndFeelChanged()
+    repaint();
+}
+
 void EditorShellBase::setSettingsOverlay(juce::Component* overlay)
 {
     if (settingsOverlay != nullptr) removeChildComponent(settingsOverlay);

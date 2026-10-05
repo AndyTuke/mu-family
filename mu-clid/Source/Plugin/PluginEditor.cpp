@@ -11,9 +11,6 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p)
 {
-    // mu-Clid's metal look: LCD dropdowns and engraved labels throughout the editor.
-    lookAndFeel.setMetalStyle(true);
-
     // ── Product chrome on shared overlays ───────────────────────────────────
     getAboutPanel().setProductInfo(
         juce::String(juce::CharPointer_UTF8("\xce\xbc")) + "-Clid",
@@ -171,6 +168,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // defaults rather than the restored values.
     mixerOverlay.loadFromAPVTS();
     clearPresetDirty();
+
+    // The family metal look, in mu-Clid's purple (globalAccent).
+    setMetalStyle(true);
 }
 
 PluginEditor::~PluginEditor()

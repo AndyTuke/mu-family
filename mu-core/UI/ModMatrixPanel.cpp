@@ -335,7 +335,7 @@ void ModMatrixPanel::paint(juce::Graphics& g)
     {
         const auto box = getLocalBounds().toFloat().reduced(sf((float) kMetalMargin));
         MuLookAndFeel::drawRaisedSubPanelShadow(g, box);
-        MuLookAndFeel::drawRaisedSubPanel(g, box, MuLookAndFeel::colour(MuLookAndFeel::globalAccent));
+        MuLookAndFeel::drawRaisedSubPanel(g, box, MuLookAndFeel::appAccent(*this));
     }
     else
     {

@@ -18,7 +18,5 @@ RhythmSidebar::RhythmSidebar(PluginProcessor& p)
     isPendingSwap       = [this](int i)        { return proc.hasPendingSwap(i); };
     onCancelPendingSwap = [this](int i)        { proc.cancelStagedSwap(i); };
 
-    setMetalStyle(true);   // metal panel, each rhythm in a raised box
-
     refreshItems();
 }

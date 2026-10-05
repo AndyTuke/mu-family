@@ -590,7 +590,7 @@ void EuclideanPanel::paint(juce::Graphics& g)
     if (rhythmColour == juce::Colours::transparentBlack)
         return;
 
-    const juce::Colour appCol = MuLookAndFeel::colour(Id::globalAccent);
+    const juce::Colour appCol = MuLookAndFeel::appAccent(*this);
 
     // Constants mirror resized() exactly — Euclid box + Pad / Insert split + switch column.
     constexpr int eW        = MuLookAndFeel::kKnobSize1W;

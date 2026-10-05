@@ -14,7 +14,7 @@ ChannelSidebar::ChannelSidebar(ProcessorBase& processor, const juce::String& add
     itemContainer.onPaint = [this](juce::Graphics& g)
     {
         if (! metal) return;
-        const auto appCol = MuLookAndFeel::colour(MuLookAndFeel::globalAccent);
+        const auto appCol = MuLookAndFeel::appAccent(*this);
         for (auto& item : items)
             if (item->isVisible())
                 MuLookAndFeel::drawRaisedSubPanelShadow(g, SidebarItem::metalBox(item->getBounds()));
@@ -136,7 +136,7 @@ void ChannelSidebar::paint(juce::Graphics& g)
     if (metal)
     {
         MuLookAndFeel::drawAccentPanel(g, getLocalBounds().reduced(2).toFloat(),
-                                       MuLookAndFeel::colour(Id::globalAccent));
+                                       MuLookAndFeel::appAccent(*this));
         return;
     }
     g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));

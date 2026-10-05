@@ -125,7 +125,7 @@ JUCE (via `JUCE_PATH`), Signalsmith Reverb, Monocypher, clap-juce-extensions, an
 
 ## UI values
 
-Knob colour coding, window sizing, and all layout constants are defined in [mu-core/UI/Components/MuLookAndFeel.h](mu-core/UI/Components/MuLookAndFeel.h). **Every shadow, highlight and tint strength lives in `MuTheme::Lighting`** ([mu-core/UI/Components/MuTheme.h](mu-core/UI/Components/MuTheme.h)) — with master `shadowAmount` / `highlightAmount` that scale them all for every product. Never hard-code an alpha for depth in drawing code; add a field there. Family-wide design notes in [docs/design-ui-family.md](docs/design-ui-family.md); product-specific layouts in `docs/<product>/design-ui.md`.
+Knob colour coding, window sizing, and all layout constants are defined in [mu-core/UI/Components/MuLookAndFeel.h](mu-core/UI/Components/MuLookAndFeel.h). **Every shadow, highlight and tint strength lives in `MuTheme::Lighting`** ([mu-core/UI/Components/MuTheme.h](mu-core/UI/Components/MuTheme.h)) — with master `shadowAmount` / `highlightAmount` that scale them all for every product. Never hard-code an alpha for depth in drawing code; add a field there. **The metal style is the family-standard look** — every app turns it on with one `setMetalStyle(true[, appAccent])` call at the end of its editor constructor; the elements (metal panels, raised boxes, name plates, LCD selectors, lamps, engraved labels) and their rules are in [docs/design-ui-family.md §11](docs/design-ui-family.md#11-metal-style-family-standard). Build new UI from those mu-core helpers, never one-off drawing. Family-wide design notes in [docs/design-ui-family.md](docs/design-ui-family.md); product-specific layouts in `docs/<product>/design-ui.md`.
 
 ## Development history
 

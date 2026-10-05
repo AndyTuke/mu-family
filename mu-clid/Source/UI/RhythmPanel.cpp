@@ -243,7 +243,6 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     addAndMakeVisible(voiceSection);
     addAndMakeVisible(modulatorPanel);
     modulatorPanel.setDestProvider(&modDestProvider);
-    modulatorPanel.setMetalStyle(true);   // raised boxes on the metal panel
 
     // juce::Label provides bulletproof inline editing: handles single-click to edit,
     // Enter to commit, Escape to cancel, click-off to commit, focus management — all
@@ -695,7 +694,7 @@ void RhythmPanel::paint(juce::Graphics& g)
     using mu_ui::s;
     MuLookAndFeel::drawAccentPanel(g, juce::Rectangle<int>(0, 0, getWidth(), s(kHeaderH)).reduced(2).toFloat(),
                                    currentColour());
-    const juce::Colour appCol = MuLookAndFeel::colour(Id::globalAccent);
+    const juce::Colour appCol = MuLookAndFeel::appAccent(*this);
     for (auto r : { sampleRect, circleRect, euclidRect, voiceRect, modRect })
         MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), appCol);
 

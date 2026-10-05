@@ -40,6 +40,12 @@ public:
     // Pass nullptr to hide the gear button (mu-tant has no settings yet).
     void setSettingsOverlay(juce::Component* overlay);
 
+    // The family's metal look (docs/design-ui-family.md §11): LCD dropdowns, engraved labels,
+    // and the shared sidebar / modulation section as raised boxes on metal panels. Call at the
+    // end of the product's constructor, once its children exist. `appAccent` is the product's
+    // colour; leave it transparent to keep globalAccent.
+    void setMetalStyle(bool metal, juce::Colour appAccent = juce::Colours::transparentBlack);
+
     // Direct access for the product to wire chrome (logo, About credits, etc.)
     // and additional callbacks.
     TransportBar&         getTransportBar()         { return transportBar; }
