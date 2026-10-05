@@ -600,8 +600,7 @@ void EuclideanPanel::paint(juce::Graphics& g)
     if (rhythmColour == juce::Colours::transparentBlack)
         return;
 
-    const juce::Colour minorCol = MuLookAndFeel::colour(Id::globalAccent).withAlpha(0.5f);   // app colour
-    g.setColour(minorCol);
+    const juce::Colour appCol = MuLookAndFeel::colour(Id::globalAccent);
 
     // Constants mirror resized() exactly — Euclid box + Pad / Insert split + switch column.
     constexpr int eW        = MuLookAndFeel::kKnobSize1W;
@@ -612,13 +611,18 @@ void EuclideanPanel::paint(juce::Graphics& g)
     constexpr int insX      = padX + pW * 2 + kPadInsertGap / 2;
     constexpr int insPanelW = w - kOuter - kModeColW - insX;
 
-    // Each row: its Euclid knobs, Pad and Insert controls each in their own box.
+    // Each row: its Euclid knobs, Pad and Insert controls each in their own raised box.
+    // All shadows first, then the faces, so no box's shadow falls on its neighbour.
     constexpr int ctrlH = rowH - kLabelH;
+    std::vector<juce::Rectangle<float>> boxes;
     for (int rowY : rowOffsets)
     {
         const int cy = rowY + kLabelH;
-        g.drawRoundedRectangle((float) s(kOuter), (float) s(cy), (float) s(eucBlockW), (float) s(ctrlH) - 2.0f, 4.0f, 1.0f);
-        g.drawRoundedRectangle((float) s(padX), (float) s(cy), (float) s(padPanelW), (float) s(ctrlH) - 2.0f, 4.0f, 1.0f);
-        g.drawRoundedRectangle((float) s(insX), (float) s(cy), (float) s(insPanelW), (float) s(ctrlH) - 2.0f, 4.0f, 1.0f);
+        const float bh = (float) s(ctrlH) - 2.0f;
+        boxes.push_back({ (float) s(kOuter), (float) s(cy), (float) s(eucBlockW), bh });
+        boxes.push_back({ (float) s(padX),   (float) s(cy), (float) s(padPanelW), bh });
+        boxes.push_back({ (float) s(insX),   (float) s(cy), (float) s(insPanelW), bh });
     }
+    for (const auto& b : boxes) MuLookAndFeel::drawRaisedSubPanelShadow(g, b);
+    for (const auto& b : boxes) MuLookAndFeel::drawRaisedSubPanel(g, b, appCol);
 }

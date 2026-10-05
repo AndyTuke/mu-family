@@ -221,6 +221,16 @@ struct MuTheme
         float panelHighlightReach= 0.6f;    //   reach, fraction of the panel diagonal
         float panelHighlightMaxPx= 380.0f;  //   … capped at this many px
         float panelOutlineWidth  = 2.0f;
+        float panelSheen         = 0.05f;   // diagonal reflection bands (metallic)
+        float panelBrush         = 0.06f;   // brushed-metal grain opacity
+
+        // Raised sub-panels (drawRaisedSubPanel — e.g. mu-Clid's Euclid / Pad / Insert boxes)
+        float subPanelShadow     = 0.55f;   // cast shadow, down-left
+        float subPanelFace       = 0.03f;   // face lift over the panel
+        float subPanelSheen      = 0.05f;   // face light from the top right
+        float subPanelEdgeLight  = 0.22f;   // edge catching the light, top right
+        float subPanelEdgeShade  = 0.35f;   // edge in shade, bottom left
+        float subPanelOutline    = 0.5f;    // accent outline (not scaled by the masters)
 
         // Step ring (mu-Clid's RhythmCircle)
         float ringTrack          = 0.45f;   // recessed track under each ring

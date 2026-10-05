@@ -1,3 +1,3 @@
 #pragma once
-#define BUILD_NUMBER 990
-#define MU_VERSION_STRING "1.1.0.990"
+#define BUILD_NUMBER 991
+#define MU_VERSION_STRING "1.1.0.991"

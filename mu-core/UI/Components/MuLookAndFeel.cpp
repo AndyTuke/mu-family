@@ -1,4 +1,5 @@
 #include "MuLookAndFeel.h"
+#include <map>
 #include "MuTheme.h"
 
 // every colour now lives in the MuTheme singleton (grouped by category for
@@ -430,6 +431,35 @@ void MuLookAndFeel::drawSlideSwitch(juce::Graphics& g, juce::Rectangle<float> bo
                juce::Justification::centredLeft, false);
 }
 
+// Brushed-metal grain: fine horizontal streaks with a per-scanline tone, generated once
+// per size from a fixed seed (same grain every run) and cached — panels behind animated
+// components repaint every frame, so the texture must not be rebuilt each time.
+static const juce::Image& brushedGrain(int w, int h)
+{
+    static std::map<std::pair<int, int>, juce::Image> cache;
+    auto& img = cache[{ w, h }];
+    if (img.isNull() && w > 0 && h > 0)
+    {
+        img = juce::Image(juce::Image::ARGB, w, h, true);
+        juce::Random rng(0x6d75);
+        juce::Image::BitmapData bd(img, juce::Image::BitmapData::writeOnly);
+        for (int y = 0; y < h; ++y)
+        {
+            const float row = rng.nextFloat() * 2.0f - 1.0f;   // each scanline's own tone
+            float streak = 0.0f;
+            for (int x = 0; x < w; ++x)
+            {
+                // Heavily smoothed noise along x stretches it into long horizontal streaks.
+                streak = streak * 0.93f + (rng.nextFloat() * 2.0f - 1.0f) * 0.07f;
+                const float v = juce::jlimit(-1.0f, 1.0f, row * 0.55f + streak * 4.0f);
+                bd.setPixelColour(x, y, v >= 0.0f ? juce::Colours::white.withAlpha(v)
+                                                  : juce::Colours::black.withAlpha(-v));
+            }
+        }
+    }
+    return img;
+}
+
 void MuLookAndFeel::drawAccentPanel(juce::Graphics& g, juce::Rectangle<float> r,
                                     juce::Colour accent, float cornerSize)
 {
@@ -440,6 +470,27 @@ void MuLookAndFeel::drawAccentPanel(juce::Graphics& g, juce::Rectangle<float> r,
     // Wash: the accent at a whisper over whatever the panel sits on.
     g.setColour(accent.withAlpha(L.panelTint));
     g.fillPath(shape);
+
+    // Metal: brushed grain plus soft diagonal reflection bands, lit from the top right.
+    {
+        const juce::Graphics::ScopedSaveState state(g);
+        g.reduceClipRegion(shape);
+        const auto ri = r.getSmallestIntegerContainer();
+        g.setOpacity(L.highlight(L.panelBrush));
+        g.drawImageAt(brushedGrain(ri.getWidth(), ri.getHeight()), ri.getX(), ri.getY());
+        g.setOpacity(1.0f);
+
+        const float sheen = L.highlight(L.panelSheen);
+        juce::ColourGradient bands(juce::Colours::white.withAlpha(0.0f), r.getTopRight(),
+                                   juce::Colours::white.withAlpha(0.0f), r.getBottomLeft(), false);
+        bands.addColour(0.18, juce::Colours::white.withAlpha(sheen));
+        bands.addColour(0.34, juce::Colours::white.withAlpha(0.0f));
+        bands.addColour(0.55, juce::Colours::black.withAlpha(L.shadow(L.panelSheen)));
+        bands.addColour(0.72, juce::Colours::white.withAlpha(sheen * 0.6f));
+        bands.addColour(0.88, juce::Colours::white.withAlpha(0.0f));
+        g.setGradientFill(bands);
+        g.fillRect(r);
+    }
 
     // Highlight: a radial glow anchored on the top-right corner, clipped to the panel.
     {
@@ -457,6 +508,44 @@ void MuLookAndFeel::drawAccentPanel(juce::Graphics& g, juce::Rectangle<float> r,
 
     g.setColour(accent);
     g.strokePath(shape, juce::PathStrokeType(L.panelOutlineWidth));
+}
+
+void MuLookAndFeel::drawRaisedSubPanelShadow(juce::Graphics& g, juce::Rectangle<float> r, float cornerSize)
+{
+    const auto& L = lighting();
+    juce::Path shape;
+    shape.addRoundedRectangle(r, cornerSize);
+    juce::DropShadow(juce::Colours::black.withAlpha(L.shadow(L.subPanelShadow)),
+                     (int) mu_ui::sf(6.0f), { -(int) mu_ui::sf(2.0f), (int) mu_ui::sf(3.0f) })
+        .drawForPath(g, shape);
+}
+
+// The face of a raised sub-panel: lifted a touch above the panel, lit from the top
+// right, its edge catching the light top-right and falling into shade bottom-left.
+void MuLookAndFeel::drawRaisedSubPanel(juce::Graphics& g, juce::Rectangle<float> r,
+                                       juce::Colour accent, float cornerSize)
+{
+    const auto& L = lighting();
+    juce::Path shape;
+    shape.addRoundedRectangle(r, cornerSize);
+
+    g.setColour(colour(panelBackground).brighter(0.08f).withAlpha(0.9f));
+    g.fillPath(shape);
+    g.setColour(juce::Colours::white.withAlpha(L.highlight(L.subPanelFace)));
+    g.fillPath(shape);
+    g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(L.highlight(L.subPanelSheen)), r.getTopRight(),
+                                           juce::Colours::transparentWhite, r.getBottomLeft(), false));
+    g.fillPath(shape);
+
+    // Bevelled edge: light top-right, shade bottom-left.
+    juce::Path edge;
+    edge.addRoundedRectangle(r.reduced(1.0f), juce::jmax(0.0f, cornerSize - 1.0f));
+    g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(L.highlight(L.subPanelEdgeLight)), r.getTopRight(),
+                                           juce::Colours::black.withAlpha(L.shadow(L.subPanelEdgeShade)), r.getBottomLeft(), false));
+    g.strokePath(edge, juce::PathStrokeType(1.5f));
+
+    g.setColour(accent.withAlpha(L.subPanelOutline));
+    g.strokePath(shape, juce::PathStrokeType(1.0f));
 }
 
 void MuLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button,

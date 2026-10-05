@@ -207,6 +207,13 @@ public:
     static void drawAccentPanel(juce::Graphics&, juce::Rectangle<float> bounds,
                                 juce::Colour accent, float cornerSize = 6.0f);
 
+    // A sub-panel sitting slightly raised on a panel: its shadow, then its face. Draw every
+    // sub-panel's shadow before any face so no shadow lands on a neighbouring box.
+    static void drawRaisedSubPanelShadow(juce::Graphics&, juce::Rectangle<float> bounds,
+                                         float cornerSize = 4.0f);
+    static void drawRaisedSubPanel(juce::Graphics&, juce::Rectangle<float> bounds,
+                                   juce::Colour accent, float cornerSize = 4.0f);
+
     // Text buttons
     void drawButtonBackground(juce::Graphics&, juce::Button&,
                               const juce::Colour& bg, bool over, bool down) override;
