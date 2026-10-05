@@ -601,9 +601,21 @@ void ModulatorEditor::rebuildRows()
             if (onChange) onChange();
         };
 
+        row->destCombo.setLcdStyle(metal);
         rows.push_back(std::move(row));
     }
     updateStepQuantization();
+}
+
+void ModulatorEditor::setMetalStyle(bool m)
+{
+    metal = m;
+    for (auto* dd : { &modeDropdown, &loopDropdown, &stepDropdown })
+        dd->setLcdStyle(m);
+    for (auto& row : rows)
+        row->destCombo.setLcdStyle(m);
+    resized();
+    repaint();
 }
 
 void ModulatorEditor::resized()
@@ -618,7 +630,7 @@ void ModulatorEditor::resized()
 
     // ── Single header row: [● Mod X painted] [mode] [polarity] [Loop dd mult] [Step dd mult] ──
     const int nameW  = s(68);
-    const int modeW  = s(78);
+    const int modeW  = metal ? s(92) : s(78);   // metal: the LCD font is monospaced, wider
     const int polW   = s(44);
     const int lbW    = s(30);   // "Loop" / "Step" label
     const int ddW    = s(58);   // note-value dropdown (fits "1/32T")
@@ -634,7 +646,7 @@ void ModulatorEditor::resized()
     const int hy  = metal ? m + s(3)          : 0;
     const int hh  = metal ? headerH - s(6)    : headerH;
 
-    int x = m + nameW;
+    int x = metal ? m + pad : nameW;   // metal: no name, the lit LCD tab shows the mod
     modeDropdown.setBounds(x, hy, modeW, hh); x += modeW + gap4;
     polarityCtrl.setBounds(x, hy, polW,  hh); x += polW + gap8;
     loopLabel   .setBounds(x, hy, lbW,   hh); x += lbW + gap2;
@@ -724,16 +736,19 @@ void ModulatorEditor::paint(juce::Graphics& g)
 
     const int m       = metal ? s(kMetalMargin) : 0;
     const int headerH = s(kHeaderH);
-    const float dotSize = sf(8.0f);
 
-    // Header: colour dot + modulator name
-    const float dotY = m + (headerH - dotSize) * 0.5f;
-    g.setColour(modColour);
-    g.fillEllipse(m + sf(8.0f), dotY, dotSize, dotSize);
-    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
-    g.drawText("Mod " + juce::String::charToString(char('A' + modIndex)),
-               m + s(20), m, s(54), headerH, juce::Justification::centredLeft, false);
+    // Header: colour dot + modulator name (flat style only; in metal the lit tab shows it).
+    if (! metal)
+    {
+        const float dotSize = sf(8.0f);
+        const float dotY = (headerH - dotSize) * 0.5f;
+        g.setColour(modColour);
+        g.fillEllipse(sf(8.0f), dotY, dotSize, dotSize);
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::headingText));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
+        g.drawText("Mod " + juce::String::charToString(char('A' + modIndex)),
+                   s(20), 0, s(54), headerH, juce::Justification::centredLeft, false);
+    }
 
     // Step count drawn left-justified immediately after the step group's ×
     // multiplier (Stepped mode only). Bounded on the right by the dice (right-

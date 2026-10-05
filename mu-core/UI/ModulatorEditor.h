@@ -96,7 +96,7 @@ public:
 
     // Metal style (mu-Clid): no fill of its own; the header and the assignment area are
     // raised boxes on the host's metal panel and the LFO / step display is set into it.
-    void setMetalStyle(bool m) { metal = m; resized(); repaint(); }
+    void setMetalStyle(bool m);
 
 private:
     // Dice handler — randomise current modulator's values, leave structure.

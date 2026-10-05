@@ -218,6 +218,13 @@ public:
     // its top-right inner edges and catches the light on its bottom-left ones.
     static void drawRecessedScreen(juce::Graphics&, juce::Rectangle<float> bounds);
 
+    // LCD window: glass (backlit from the centre in `lit` when `backlit`), then whatever is
+    // shown on it, then its front (glare + recessed bezel). Shared by LCD tabs and dropdowns.
+    static void drawLcdGlass(juce::Graphics&, juce::Rectangle<float> bounds, juce::Colour lit, bool backlit);
+    static void drawLcdFront(juce::Graphics&, juce::Rectangle<float> bounds);
+    static juce::Colour lcdLitColour();     // lettering colour on a lit LCD
+    static juce::Font   lcdFont(float height);
+
     // A small name plate fixed to a panel: raised dark face, bevelled edge, a screw head
     // at each end and the text engraved in the middle, lit from the top right.
     static void drawNamePlate(juce::Graphics&, juce::Rectangle<float> bounds, const juce::String& text);

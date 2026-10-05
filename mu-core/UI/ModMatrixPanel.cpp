@@ -285,6 +285,7 @@ void ModMatrixPanel::rebuildRows()
             if (onChange) onChange();
         };
 
+        row->destCombo.setLcdStyle(metal);
         matrixRows.push_back(std::move(row));
     }
     updateMatPager();

@@ -17,6 +17,9 @@ public:
     void clear();
     void setPlaceholderText(const juce::String& text);
 
+    // LCD look: dark glass with the value in glowing lettering (matches LCD tabs).
+    void setLcdStyle(bool lcd);
+
     // Returns the currently displayed item text (or empty if nothing selected).
     juce::String getText() const { return combo.getText(); }
 

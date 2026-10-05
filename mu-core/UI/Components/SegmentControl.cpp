@@ -47,28 +47,14 @@ void SegmentControl::paint(juce::Graphics& g)
         const auto& L     = MuLookAndFeel::lighting();
         const float gap   = sf(3.0f);
         const float cellW = ((float) getWidth() - gap * (float) (n - 1)) / (float) n;
-        const auto  glass = MuLookAndFeel::colour(Id::panelBackground).darker(L.lcdGlassDarken);
-        const juce::Font font(juce::FontOptions{}.withName(juce::Font::getDefaultMonospacedFontName())
-                                                 .withHeight(sf(12.0f)));
-        g.setFont(font);
+        g.setFont(MuLookAndFeel::lcdFont(sf(12.0f)));
 
         for (int i = 0; i < n; ++i)
         {
             const juce::Rectangle<float> cell((float) i * (cellW + gap), 0.0f, cellW, (float) getHeight());
             const bool active = (i == selectedIndex);
 
-            // Glass: backlit from the centre when active.
-            if (active)
-            {
-                juce::ColourGradient back(glass.interpolatedWith(activeBorder, L.lcdBacklight * 1.4f), cell.getCentreX(), cell.getCentreY(),
-                                          glass.interpolatedWith(activeBorder, L.lcdBacklight * 0.6f), cell.getX(), cell.getY(), true);
-                g.setGradientFill(back);
-            }
-            else
-            {
-                g.setColour(glass);
-            }
-            g.fillRect(cell);
+            MuLookAndFeel::drawLcdGlass(g, cell, activeBorder, active);   // backlit when selected
 
             // Lettering: lit with a soft glow, or a faint unlit ghost.
             const auto textArea = cell.toNearestInt();
@@ -85,11 +71,7 @@ void SegmentControl::paint(juce::Graphics& g)
             }
             g.drawText(options[(size_t) i], textArea, juce::Justification::centred, true);
 
-            // Glare across the glass from the top right, then the bezel round it.
-            g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(L.highlight(L.lcdGlare)), cell.getTopRight(),
-                                                   juce::Colours::transparentWhite, cell.getCentre(), false));
-            g.fillRect(cell);
-            MuLookAndFeel::drawRecessedScreen(g, cell);
+            MuLookAndFeel::drawLcdFront(g, cell);
         }
         return;
     }

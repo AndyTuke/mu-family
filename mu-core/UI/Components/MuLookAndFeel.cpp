@@ -539,6 +539,37 @@ void MuLookAndFeel::drawRecessedScreen(juce::Graphics& g, juce::Rectangle<float>
     }
 }
 
+void MuLookAndFeel::drawLcdGlass(juce::Graphics& g, juce::Rectangle<float> r, juce::Colour lit, bool backlit)
+{
+    const auto& L     = lighting();
+    const auto  glass = colour(panelBackground).darker(L.lcdGlassDarken);
+    if (backlit)
+        g.setGradientFill(juce::ColourGradient(glass.interpolatedWith(lit, L.lcdBacklight * 1.4f), r.getCentreX(), r.getCentreY(),
+                                               glass.interpolatedWith(lit, L.lcdBacklight * 0.6f), r.getX(), r.getY(), true));
+    else
+        g.setColour(glass);
+    g.fillRect(r);
+}
+
+void MuLookAndFeel::drawLcdFront(juce::Graphics& g, juce::Rectangle<float> r)
+{
+    const auto& L = lighting();
+    g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(L.highlight(L.lcdGlare)), r.getTopRight(),
+                                           juce::Colours::transparentWhite, r.getCentre(), false));
+    g.fillRect(r);
+    drawRecessedScreen(g, r);
+}
+
+juce::Colour MuLookAndFeel::lcdLitColour()
+{
+    return colour(segmentActiveBorder).brighter(0.6f);
+}
+
+juce::Font MuLookAndFeel::lcdFont(float height)
+{
+    return juce::Font(juce::FontOptions{}.withName(juce::Font::getDefaultMonospacedFontName()).withHeight(height));
+}
+
 void MuLookAndFeel::drawNamePlate(juce::Graphics& g, juce::Rectangle<float> r, const juce::String& text)
 {
     const auto& L = lighting();
@@ -657,8 +688,25 @@ void MuLookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& button,
 
 void MuLookAndFeel::drawComboBox(juce::Graphics& g, int w, int h, bool /*isDown*/,
                                   int /*bx*/, int /*by*/, int /*bw*/, int /*bh*/,
-                                  juce::ComboBox& /*box*/)
+                                  juce::ComboBox& box)
 {
+    // LCD look (DropdownSelect::setLcdStyle): dark glass, lit arrow, glare and bezel; the
+    // combo's own label draws the value over it in the lit colour.
+    if (box.getProperties()["muLcd"])
+    {
+        const juce::Rectangle<float> r(0.0f, 0.0f, (float) w, (float) h);
+        drawLcdGlass(g, r, colour(segmentActiveBorder), false);
+        const float arrowSize = h * 0.3f;
+        const float arrowX = w - arrowSize * 1.7f;
+        const float arrowY = (h - arrowSize * 0.6f) * 0.5f;
+        juce::Path arrow;
+        arrow.addTriangle(arrowX, arrowY, arrowX + arrowSize, arrowY, arrowX + arrowSize * 0.5f, arrowY + arrowSize * 0.6f);
+        g.setColour(lcdLitColour());
+        g.fillPath(arrow);
+        drawLcdFront(g, r);
+        return;
+    }
+
     auto bounds = juce::Rectangle<float>(0, 0, (float)w, (float)h).reduced(0.5f);
     g.setColour(colour(segmentInactiveBg));
     g.fillRoundedRectangle(bounds, 3.0f);
@@ -681,7 +729,7 @@ void MuLookAndFeel::drawComboBox(juce::Graphics& g, int w, int h, bool /*isDown*
 void MuLookAndFeel::positionComboBoxText(juce::ComboBox& box, juce::Label& label)
 {
     label.setBounds(6, 0, box.getWidth() - 24, box.getHeight());
-    label.setFont(juce::Font(juce::FontOptions{}.withHeight(12.0f)));
+    label.setFont(box.getProperties()["muLcd"] ? lcdFont(11.0f) : juce::Font(juce::FontOptions{}.withHeight(12.0f)));
 }
 
 void MuLookAndFeel::drawLabel(juce::Graphics& g, juce::Label& label)

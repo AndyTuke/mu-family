@@ -38,6 +38,15 @@ void DropdownSelect::setPlaceholderText(const juce::String& text)
     combo.setTextWhenNoChoicesAvailable(text);
 }
 
+void DropdownSelect::setLcdStyle(bool lcd)
+{
+    combo.getProperties().set("muLcd", lcd);
+    if (lcd) combo.setColour(juce::ComboBox::textColourId, MuLookAndFeel::lcdLitColour());
+    else     combo.removeColour(juce::ComboBox::textColourId);
+    combo.lookAndFeelChanged();   // re-run positionComboBoxText for the font
+    combo.repaint();
+}
+
 void DropdownSelect::resized()
 {
     combo.setBounds(getLocalBounds());

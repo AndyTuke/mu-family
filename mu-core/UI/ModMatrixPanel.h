@@ -24,7 +24,13 @@ public:
     void paint(juce::Graphics& g) override;
 
     // Metal style (mu-Clid): no fill of its own; the whole matrix sits in one raised box.
-    void setMetalStyle(bool m) { metal = m; resized(); repaint(); }
+    void setMetalStyle(bool m)
+    {
+        metal = m;
+        for (auto& row : matrixRows) row->destCombo.setLcdStyle(m);
+        resized();
+        repaint();
+    }
 
 private:
     VoiceSlot*             voiceSlot    = nullptr;
