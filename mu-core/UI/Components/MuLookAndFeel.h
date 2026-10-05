@@ -1,5 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "MuTheme.h"
 #include <cmath>
 #include <vector>
 
@@ -435,36 +436,13 @@ public:
     // every Nth when ticks would sit closer than kTickMinSpacing px along the ring.
     static constexpr int   kSmoothTickCount = 16;
     static constexpr float kTickMinSpacing  = 3.0f;
-    static constexpr float kTickAlpha       = 0.216f;   // white tick opacity
 
-    // drawAccentPanel: how strongly the accent washes the panel, how bright the top-right
-    // highlight starts, and how far it reaches (fraction of the panel diagonal, capped).
-    static constexpr float kPanelTintAlpha       = 0.07f;
-    static constexpr float kPanelHighlightAlpha  = 0.20f;
-    static constexpr float kPanelHighlightReach  = 0.6f;
-    static constexpr float kPanelHighlightMaxPx  = 380.0f;
-    static constexpr float kPanelOutlineWidth    = 2.0f;
+    // Shadow / highlight / tint strengths live in MuTheme::current().lighting — one place
+    // to tune depth across every product (with master shadow + highlight amounts).
+    static const MuTheme::Lighting& lighting() noexcept { return MuTheme::current().lighting; }
 
-    // Step-ring shading (mu-Clid's RhythmCircle), in the knob's light from the top right:
-    // recessed track behind each ring, glow round hit steps (the playhead's brighter),
-    // a bevel across each ring's width, light / shadow over the whole ring, and a
-    // recessed centre well.
-    static constexpr float kRingTrackAlpha      = 0.45f;   // black under each ring
-    static constexpr float kRingHitGlowAlpha    = 0.22f;   // hit-step halo
-    static constexpr float kRingHitGlowWidth    = 0.22f;   // halo stroke, fraction of ring width
-    static constexpr float kRingBevelDarkAlpha  = 0.32f;   // inner edge of each ring
-    static constexpr float kRingBevelLightAlpha = 0.10f;   // outer edge of each ring
-    static constexpr float kRingLightAlpha      = 0.18f;   // top-right highlight
-    static constexpr float kRingShadowAlpha     = 0.22f;   // bottom-left shade
-    static constexpr float kRingHubInset        = 0.9f;    // hub radius, fraction of the space inside ring C
-    static constexpr float kRingHubShadowAlpha  = 0.6f;    // raised hub's cast shadow
-    static constexpr float kRingHubSpecAlpha    = 0.14f;   // hub specular highlight
-    static constexpr float kRingHubRimAlpha     = 0.22f;   // rim light (top right) / shade (bottom left)
-    static constexpr float kRingHubFlashAlpha   = 0.35f;   // trigger flash, scaled by its decay
-
-    // Every rotary casts a soft shadow of its whole body onto the panel, down and to the
-    // left of the top-right light — the same direction as the disc's own shadow.
-    static constexpr float kKnobBodyShadowAlpha = 0.45f;
+    // Draw a knob's cast shadow under its ring (centre + ring radius from getRotaryGeometry).
+    static void drawKnobCastShadow(juce::Graphics& g, juce::Point<float> centre, float ringRadius);
 
     // Below this radius a centred value would crowd the disc, so it is left to the
     // knob's label. Size 3 clears it; Size 4 does not, and nothing ships a stepped
@@ -475,7 +453,7 @@ public:
     // width. 44 tall spans roughly a Size 1-2 knob's ring.
     static constexpr int   kSlideSwitchW      = 40;
     static constexpr int   kSlideSwitchH      = 44;
-    static constexpr float kSlideSwitchTrackW = 10.0f;
+    static constexpr float kSlideSwitchTrackW = 9.0f;
 
     // Point a plain juce::Slider's drag at the sweep the knob is drawn to. Without it
     // the slider keeps JUCE's own defaults, so the angle it maps the mouse through

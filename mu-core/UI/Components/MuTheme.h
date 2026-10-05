@@ -181,6 +181,66 @@ struct MuTheme
         juce::Colour accent            { 0xff7F77DD };  // purple
     } global;
 
+    // ── Lighting ──────────────────────────────────────────────────────────
+    // Every shadow, highlight and tint the family draws, in one place. The light comes
+    // from the top right. The two master amounts scale everything below them: raise
+    // shadowAmount for deeper shadows in every product, highlightAmount for brighter
+    // highlights / glows. Per-element values are the strengths at amount 1.0.
+    struct Lighting
+    {
+        float shadowAmount       = 1.0f;    // master scale on every shadow
+        float highlightAmount    = 1.0f;    // master scale on every highlight, specular and glow
+
+        // Knobs
+        float knobCastShadow     = 0.9f;    // whole knob's shadow onto the panel (KnobWithLabel)
+        float knobCastBlur       = 0.38f;   //   blur, fraction of ring radius
+        float knobCastOffset     = 0.18f;   //   down-left offset, fraction of ring radius
+        float knobBodyShadow     = 0.45f;   // shadow inside the rotary's own bounds (bare sliders too)
+        float knobDiscShadow     = 0.65f;   // the disc's shadow onto the ring
+        float knobOcclusion      = 0.40f;   // shade on the disc's lower left
+        float knobSpecular       = 0.20f;   // disc highlight at the top right
+        float knobSpecularMid    = 0.06f;
+        float knobRingGlow       = 0.10f;   // each soft pass of the glowing ring
+        float knobDotHalo        = 0.55f;   // halo round the position dot
+        float knobDotHaloMid     = 0.26f;
+        float knobDotBloom       = 0.40f;   // white bloom at the dot
+        float knobTicks          = 0.216f;  // white tick marks (not scaled by the masters)
+
+        // Slide switches
+        float switchShadow       = 0.75f;   // disc's soft shadow onto the panel
+        float switchContact      = 1.0f;    // disc's crisp contact shadow
+        float switchTrackShadow  = 0.6f;    // recessed track's edge
+        float switchTrackLip     = 0.07f;   // light catching the track's lower lip
+        float switchTrackGlow    = 0.18f;   // accent line down the track
+        float switchRingGlow     = 0.14f;   // disc ring glow (resting)
+        float switchRingGlowHover= 0.22f;   //   … and when hovered
+
+        // Panels (drawAccentPanel)
+        float panelTint          = 0.07f;   // accent wash (not scaled by the masters)
+        float panelHighlight     = 0.20f;   // top-right glow
+        float panelHighlightReach= 0.6f;    //   reach, fraction of the panel diagonal
+        float panelHighlightMaxPx= 380.0f;  //   … capped at this many px
+        float panelOutlineWidth  = 2.0f;
+
+        // Step ring (mu-Clid's RhythmCircle)
+        float ringTrack          = 0.45f;   // recessed track under each ring
+        float ringHitGlow        = 0.22f;   // halo round hit steps (playhead × 1.8)
+        float ringHitGlowWidth   = 0.22f;   //   halo stroke, fraction of ring width
+        float ringBevelDark      = 0.32f;   // inner edge of each ring
+        float ringBevelLight     = 0.10f;   // outer edge of each ring
+        float ringLight          = 0.18f;   // top-right highlight over the rings
+        float ringShade          = 0.22f;   // bottom-left shade over the rings
+        float ringHubInset       = 0.9f;    // hub radius, fraction of the space inside ring C
+        float ringHubShadow      = 0.6f;    // embossed hub's cast shadow
+        float ringHubSpecular    = 0.14f;
+        float ringHubRim         = 0.22f;   // rim light top-right / shade bottom-left
+        float ringHubFlash       = 0.35f;   // trigger flash (not scaled by the masters)
+
+        // Apply the master amounts.
+        float shadow   (float a) const noexcept { return juce::jlimit(0.0f, 1.0f, a * shadowAmount); }
+        float highlight(float a) const noexcept { return juce::jlimit(0.0f, 1.0f, a * highlightAmount); }
+    } lighting;
+
     // Mutable singleton.
     static MuTheme& current() noexcept;
 };

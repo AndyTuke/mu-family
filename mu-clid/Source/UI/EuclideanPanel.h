@@ -123,8 +123,8 @@ private:
     // knobs get the sub-panel's full height and run at Size 1.
     static constexpr int kSwitchGap    = MuLookAndFeel::kSpaceS;      // knob to its own switch
     static constexpr int kInsKnobGap   = MuLookAndFeel::kKnobGapRow;  // between the two insert knobs
-    // Column for the Legato / Mono switches, between the Euclid block and the Pad
-    // sub-panel; its width comes out of the Pad and Insert sub-panels.
+    // Column for the Legato / Mono switches, on the far right after the Insert sub-panel;
+    // its width comes out of the Pad and Insert sub-panels.
     static constexpr int kModeColPad   = MuLookAndFeel::kSpaceM;
     static constexpr int kModeColW     = kModeColPad * 2 + MuLookAndFeel::kSlideSwitchW;
     static constexpr int kModeSwGap    = MuLookAndFeel::kSpaceL;      // between the two switches

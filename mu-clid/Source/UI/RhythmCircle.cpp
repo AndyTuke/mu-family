@@ -210,6 +210,7 @@ void RhythmCircle::drawRing(juce::Graphics& g,
     // `startOff = -rotOff` math without rebuilding geometry every frame.
     const auto transform = juce::AffineTransform::rotation(-rotOff, cx, cy);
     using LF = MuLookAndFeel;
+    const auto& L = LF::lighting();
 
     // Recessed track: the ring's whole annulus in shadow, so the gaps between steps read
     // as grooves cut into the panel.
@@ -217,17 +218,17 @@ void RhythmCircle::drawRing(juce::Graphics& g,
     annulus.addCentredArc(cx, cy, outerR, outerR, 0.0f, 0.0f, juce::MathConstants<float>::twoPi, true);
     annulus.addCentredArc(cx, cy, innerR, innerR, 0.0f, juce::MathConstants<float>::twoPi, 0.0f, false);
     annulus.closeSubPath();
-    g.setColour(juce::Colours::black.withAlpha(LF::kRingTrackAlpha));
+    g.setColour(juce::Colours::black.withAlpha(L.shadow(L.ringTrack)));
     g.fillPath(annulus);
 
     // Steps: hits get a soft halo first (stronger on the playhead), then every step's fill.
-    const float glowW = (outerR - innerR) * LF::kRingHitGlowWidth;
+    const float glowW = (outerR - innerR) * L.ringHitGlowWidth;
     for (int i = 0; i < N; ++i)
     {
         const bool isCur = (i == currentStep);
         if (pattern[i] == StepType::Hit)
         {
-            g.setColour(hitClr.withAlpha(LF::kRingHitGlowAlpha * (isCur ? 1.8f : 1.0f)));
+            g.setColour(hitClr.withAlpha(L.highlight(L.ringHitGlow * (isCur ? 1.8f : 1.0f))));
             g.strokePath(cache.stepPaths[(size_t) i], juce::PathStrokeType(glowW), transform);
         }
         g.setColour(stepColour(pattern[i], hitClr, isCur));
@@ -240,9 +241,9 @@ void RhythmCircle::drawRing(juce::Graphics& g,
         const juce::Graphics::ScopedSaveState state(g);
         g.reduceClipRegion(annulus);
         const double inner = innerR / outerR;
-        juce::ColourGradient bevel(juce::Colours::black.withAlpha(LF::kRingBevelDarkAlpha), cx, cy,
-                                   juce::Colours::white.withAlpha(LF::kRingBevelLightAlpha), cx + outerR, cy, true);
-        bevel.addColour(inner, juce::Colours::black.withAlpha(LF::kRingBevelDarkAlpha));
+        juce::ColourGradient bevel(juce::Colours::black.withAlpha(L.shadow(L.ringBevelDark)), cx, cy,
+                                   juce::Colours::white.withAlpha(L.highlight(L.ringBevelLight)), cx + outerR, cy, true);
+        bevel.addColour(inner, juce::Colours::black.withAlpha(L.shadow(L.ringBevelDark)));
         bevel.addColour(inner + (1.0 - inner) * 0.55, juce::Colours::transparentBlack);
         g.setGradientFill(bevel);
         g.fillPath(annulus);
@@ -363,6 +364,7 @@ void RhythmCircle::paint(juce::Graphics& g)
     }
 
     using LF = MuLookAndFeel;
+    const auto& L = LF::lighting();
 
     // ── Light over the whole ring area: top-right highlight, bottom-left shade ──
     {
@@ -371,12 +373,12 @@ void RhythmCircle::paint(juce::Graphics& g)
         const juce::Graphics::ScopedSaveState state(g);
         g.reduceClipRegion(rings);
         const float reach = aOuter * 1.25f;
-        juce::ColourGradient light(juce::Colours::white.withAlpha(LF::kRingLightAlpha),
+        juce::ColourGradient light(juce::Colours::white.withAlpha(L.highlight(L.ringLight)),
                                    cx + aOuter * 0.6f, cy - aOuter * 0.6f,
                                    juce::Colours::transparentWhite, cx + aOuter * 0.6f + reach, cy - aOuter * 0.6f, true);
         g.setGradientFill(light);
         g.fillRect(getLocalBounds());
-        juce::ColourGradient shade(juce::Colours::black.withAlpha(LF::kRingShadowAlpha),
+        juce::ColourGradient shade(juce::Colours::black.withAlpha(L.shadow(L.ringShade)),
                                    cx - aOuter * 0.65f, cy + aOuter * 0.65f,
                                    juce::Colours::transparentBlack, cx - aOuter * 0.65f + reach, cy + aOuter * 0.65f, true);
         g.setGradientFill(shade);
@@ -386,13 +388,13 @@ void RhythmCircle::paint(juce::Graphics& g)
     // ── Centre hub: a raised, embossed disc lit from the top right, flash on top ──
     if (innerLimit > 4.0f)
     {
-        const float hr = innerLimit * LF::kRingHubInset;
+        const float hr = innerLimit * L.ringHubInset;
         const juce::Rectangle<float> hub(cx - hr, cy - hr, hr * 2.0f, hr * 2.0f);
         juce::Path hubPath;
         hubPath.addEllipse(hub);
 
         // Cast shadow, falling down-left.
-        juce::DropShadow(juce::Colours::black.withAlpha(LF::kRingHubShadowAlpha),
+        juce::DropShadow(juce::Colours::black.withAlpha(L.shadow(L.ringHubShadow)),
                          (int) juce::jmax(3.0f, hr * 0.22f),
                          { -(int) juce::jmax(1.0f, hr * 0.07f), (int) juce::jmax(1.0f, hr * 0.09f) })
             .drawForPath(g, hubPath);
@@ -410,21 +412,21 @@ void RhythmCircle::paint(juce::Graphics& g)
             const juce::Graphics::ScopedSaveState state(g);
             g.reduceClipRegion(hubPath);
             const float lx = cx + hr * 0.45f, ly = cy - hr * 0.45f, lr = hr * 0.9f;
-            juce::ColourGradient spec(juce::Colours::white.withAlpha(LF::kRingHubSpecAlpha), lx, ly,
+            juce::ColourGradient spec(juce::Colours::white.withAlpha(L.highlight(L.ringHubSpecular)), lx, ly,
                                       juce::Colours::transparentWhite, lx + lr, ly, true);
             g.setGradientFill(spec);
             g.fillEllipse(lx - lr, ly - lr, lr * 2.0f, lr * 2.0f);
         }
 
         // Rim: catches the light top-right, falls into shade bottom-left.
-        juce::ColourGradient rim(juce::Colours::white.withAlpha(LF::kRingHubRimAlpha), cx + hr * 0.7f, cy - hr * 0.7f,
-                                 juce::Colours::black.withAlpha(LF::kRingHubRimAlpha * 1.4f), cx - hr * 0.7f, cy + hr * 0.7f, false);
+        juce::ColourGradient rim(juce::Colours::white.withAlpha(L.highlight(L.ringHubRim)), cx + hr * 0.7f, cy - hr * 0.7f,
+                                 juce::Colours::black.withAlpha(L.shadow(L.ringHubRim * 1.4f)), cx - hr * 0.7f, cy + hr * 0.7f, false);
         g.setGradientFill(rim);
         g.strokePath(hubPath, juce::PathStrokeType(juce::jmax(1.0f, hr * 0.025f)));
 
         if (hubAlpha > 0.0f)
         {
-            juce::ColourGradient flash(rhythmColour.withAlpha(hubAlpha * LF::kRingHubFlashAlpha), cx, cy,
+            juce::ColourGradient flash(rhythmColour.withAlpha(hubAlpha * L.ringHubFlash), cx, cy,
                                        rhythmColour.withAlpha(0.0f), cx + hr, cy, true);
             g.setGradientFill(flash);
             g.fillPath(hubPath);

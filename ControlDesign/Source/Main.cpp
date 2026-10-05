@@ -53,12 +53,12 @@ namespace euclid
     constexpr int eW        = MuLookAndFeel::kKnobSize1W;
     constexpr int eucBlockW = eW * 3 + kEucKnobGap * 2;           // 240
     constexpr int kModeColW = MuLookAndFeel::kSpaceM * 2 + MuLookAndFeel::kSlideSwitchW;   // 56
-    constexpr int pW        = (innerW - eucBlockW - kModeColW) / 4;   // 120
+    constexpr int pW        = (innerW - eucBlockW - kPadInsertGap - kModeColW) / 4;   // 119
 
-    constexpr int padX      = kOuter + eucBlockW + kModeColW;     // 300
+    constexpr int padX      = kOuter + eucBlockW + kPadInsertGap; // 250
     constexpr int padPanelW = pW * 2 - kPadInsertGap / 2;         // 265
     constexpr int insX      = padX + pW * 2 + kPadInsertGap / 2;  // 515
-    constexpr int insPanelW = w - kOuter - insX;                  // 267
+    constexpr int insPanelW = w - kOuter - kModeColW - insX;      // 235
 
     constexpr int knobH   = ctrlH - kSwitchH - 6;                 // 50
     constexpr int insSw   = (pW < 56) ? pW : 56;

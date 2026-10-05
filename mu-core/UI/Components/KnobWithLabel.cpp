@@ -192,6 +192,14 @@ void KnobWithLabel::paint(juce::Graphics& g)
     using mu_ui::sf;
     const int labelH = s(MuLookAndFeel::kKnobLabelH);
 
+    // Cast shadow under the rotary (the child slider paints over it), falling down-left
+    // away from the top-right light. Drawn here because the cell has room round the dial.
+    if (auto* mlf = dynamic_cast<MuLookAndFeel*>(&getLookAndFeel()))
+    {
+        const auto geo = mlf->getRotaryGeometry(slider.getBounds());
+        MuLookAndFeel::drawKnobCastShadow(g, geo.centre, geo.radius);
+    }
+
     // Label below knob
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(MuLookAndFeel::kKnobLabelFont))));
     g.setColour(MuLookAndFeel::colour(MuLookAndFeel::labelText));

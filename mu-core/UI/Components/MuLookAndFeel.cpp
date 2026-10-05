@@ -204,6 +204,17 @@ void MuLookAndFeel::drawKnobValueText(juce::Graphics& g, juce::Rectangle<int> sl
 // Every extent is a fraction of the knob's own radius, never a fixed pixel count, so
 // the glow stays inside the component at any of the four knob sizes and at any angle,
 // including hard against the ends of the sweep.
+void MuLookAndFeel::drawKnobCastShadow(juce::Graphics& g, juce::Point<float> centre, float ringRadius)
+{
+    const auto& L = lighting();
+    juce::Path body;
+    body.addEllipse(centre.x - ringRadius, centre.y - ringRadius, ringRadius * 2.0f, ringRadius * 2.0f);
+    const int off = (int) juce::jmax(2.0f, ringRadius * L.knobCastOffset);
+    juce::DropShadow(juce::Colours::black.withAlpha(L.shadow(L.knobCastShadow)),
+                     (int) juce::jmax(4.0f, ringRadius * L.knobCastBlur), { -off, off + off / 3 })
+        .drawForPath(g, body);
+}
+
 int MuLookAndFeel::steppedSegments(const juce::Slider& slider) noexcept
 {
     const double interval = slider.getInterval();
@@ -225,12 +236,13 @@ void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int
     const float angle  = kRotaryStartAngle + sliderPos * (kRotaryEndAngle - kRotaryStartAngle);
 
     const auto accent = slider.findColour(juce::Slider::rotarySliderFillColourId);
+    const auto& L = lighting();
 
     // Body shadow: the whole knob casts a soft shadow down-left onto the panel.
     {
         juce::Path body;
         body.addEllipse(cx - ringR, cy - ringR, ringR * 2.0f, ringR * 2.0f);
-        juce::DropShadow(juce::Colours::black.withAlpha(kKnobBodyShadowAlpha),
+        juce::DropShadow(juce::Colours::black.withAlpha(L.shadow(L.knobBodyShadow)),
                          (int) juce::jmax(2.0f, outerR * 0.14f),   // ring + blur + offset stay within
                          { -(int) juce::jmax(1.0f, outerR * 0.06f), (int) juce::jmax(1.0f, outerR * 0.08f) })   // the rotary's bounds
             .drawForPath(g, body);
@@ -258,7 +270,7 @@ void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int
             g.drawLine({ p1, p2 }, 1.0f);
         };
 
-        g.setColour(juce::Colours::white.withAlpha(kTickAlpha));
+        g.setColour(juce::Colours::white.withAlpha(L.knobTicks));
         for (int i = 0; i <= segments; i += stride)
             drawTick(i);
         if (segments % stride != 0)
@@ -269,7 +281,7 @@ void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int
     // the lit crown down to a shadowed rim.
     juce::Path discPath;
     discPath.addEllipse(cx - faceR, cy - faceR, faceR * 2.0f, faceR * 2.0f);
-    juce::DropShadow(juce::Colours::black.withAlpha(0.65f),
+    juce::DropShadow(juce::Colours::black.withAlpha(L.shadow(L.knobDiscShadow)),
                      (int) juce::jmax(2.0f, outerR * 0.18f),
                      { -(int) (outerR * 0.06f), (int) (outerR * 0.09f) }).drawForPath(g, discPath);
 
@@ -288,14 +300,14 @@ void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int
         g.reduceClipRegion(discPath);
 
         const float litX = cx + faceR * 0.50f, litY = cy - faceR * 0.50f, litR = faceR * 1.05f;
-        juce::ColourGradient spec(juce::Colours::white.withAlpha(0.20f), litX, litY,
+        juce::ColourGradient spec(juce::Colours::white.withAlpha(L.highlight(L.knobSpecular)), litX, litY,
                                   juce::Colours::white.withAlpha(0.0f),  litX + litR, litY, true);
-        spec.addColour(0.45, juce::Colours::white.withAlpha(0.06f));
+        spec.addColour(0.45, juce::Colours::white.withAlpha(L.highlight(L.knobSpecularMid)));
         g.setGradientFill(spec);
         g.fillEllipse(litX - litR, litY - litR, litR * 2.0f, litR * 2.0f);
 
         const float shX = cx - faceR * 0.45f, shY = cy + faceR * 0.52f, shR = faceR * 0.95f;
-        juce::ColourGradient occl(juce::Colours::black.withAlpha(0.40f), shX, shY,
+        juce::ColourGradient occl(juce::Colours::black.withAlpha(L.shadow(L.knobOcclusion)), shX, shY,
                                   juce::Colours::black.withAlpha(0.0f),  shX + shR, shY, true);
         g.setGradientFill(occl);
         g.fillEllipse(shX - shR, shY - shR, shR * 2.0f, shR * 2.0f);
@@ -306,7 +318,7 @@ void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int
     ringPath.addCentredArc(cx, cy, ringR, ringR, 0.0f, kRotaryStartAngle, kRotaryEndAngle, true);
     for (float i = 4.0f; i >= 1.0f; i -= 1.0f)
     {
-        g.setColour(accent.withAlpha(0.10f));
+        g.setColour(accent.withAlpha(L.highlight(L.knobRingGlow)));
         g.strokePath(ringPath, juce::PathStrokeType(i * outerR * 0.09f,
                                                     juce::PathStrokeType::curved,
                                                     juce::PathStrokeType::rounded));
@@ -322,14 +334,14 @@ void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int
     const float dotR = juce::jmax(2.0f, outerR * 0.065f);
 
     const float haloR = dotR * 2.6f;
-    juce::ColourGradient halo(accent.withAlpha(0.55f), dotX, dotY,
+    juce::ColourGradient halo(accent.withAlpha(L.highlight(L.knobDotHalo)), dotX, dotY,
                               accent.withAlpha(0.0f),  dotX + haloR, dotY, true);
-    halo.addColour(0.35, accent.withAlpha(0.26f));
+    halo.addColour(0.35, accent.withAlpha(L.highlight(L.knobDotHaloMid)));
     g.setGradientFill(halo);
     g.fillEllipse(dotX - haloR, dotY - haloR, haloR * 2.0f, haloR * 2.0f);
 
     const float bloomR = dotR * 1.8f;
-    juce::ColourGradient bloom(juce::Colours::white.withAlpha(0.40f), dotX, dotY,
+    juce::ColourGradient bloom(juce::Colours::white.withAlpha(L.highlight(L.knobDotBloom)), dotX, dotY,
                                juce::Colours::white.withAlpha(0.0f),  dotX + bloomR, dotY, true);
     g.setGradientFill(bloom);
     g.fillEllipse(dotX - bloomR, dotY - bloomR, bloomR * 2.0f, bloomR * 2.0f);
@@ -346,9 +358,11 @@ void MuLookAndFeel::drawSlideSwitch(juce::Graphics& g, juce::Rectangle<float> bo
                                     int selected, bool highlighted)
 {
     using mu_ui::sf;
+    const auto& L = lighting();
 
     const float tw = sf(kSlideSwitchTrackW);
-    const juce::Rectangle<float> tr(bounds.getX() + sf(2.0f), bounds.getY() + sf(3.0f),
+    // Track inset from the left so the disc's down-left shadow has room on the panel.
+    const juce::Rectangle<float> tr(bounds.getX() + sf(4.0f), bounds.getY() + sf(3.0f),
                                     tw, bounds.getHeight() - sf(6.0f));
     const float thR  = tw * 0.5f + sf(1.0f);   // disc sits slightly proud of the track
     const float yTop = tr.getY() + tw * 0.5f;
@@ -363,19 +377,24 @@ void MuLookAndFeel::drawSlideSwitch(juce::Graphics& g, juce::Rectangle<float> bo
     g.setGradientFill(juce::ColourGradient(juce::Colour(0xff07050a), cx, tr.getY(),
                                            juce::Colour(0xff17121d), cx, tr.getBottom(), false));
     g.fillPath(track);
-    g.setColour(juce::Colours::black.withAlpha(0.6f));
+    g.setColour(juce::Colours::black.withAlpha(L.shadow(L.switchTrackShadow)));
     g.strokePath(track, juce::PathStrokeType(1.0f));
-    g.setColour(juce::Colours::white.withAlpha(0.07f));
+    g.setColour(juce::Colours::white.withAlpha(L.highlight(L.switchTrackLip)));
     g.drawLine(cx - tw * 0.3f, tr.getBottom() + 0.5f, cx + tw * 0.3f, tr.getBottom() + 0.5f, 1.0f);
-    g.setColour(accent.withAlpha(0.18f));
+    g.setColour(accent.withAlpha(L.highlight(L.switchTrackGlow)));
     g.drawLine(cx, yTop, cx, yBot, juce::jmax(1.0f, tw * 0.18f));
 
     // Disc: cast shadow, then the knob face's radial gradient lit from the top-right.
     juce::Path disc;
     disc.addEllipse(cx - thR, cy - thR, thR * 2.0f, thR * 2.0f);
-    juce::DropShadow(juce::Colours::black.withAlpha(0.8f), (int) juce::jmax(2.0f, thR * 0.7f),
-                     { -(int) juce::jmax(1.0f, thR * 0.3f), (int) juce::jmax(1.0f, thR * 0.4f) })
-        .drawForPath(g, disc);   // falls down-left, away from the top-right light
+    // Cast shadow, falling down-left away from the top-right light: a soft outer shadow
+    // that lands on the panel beside the near-black track, plus a crisp contact shadow.
+    juce::DropShadow(juce::Colours::black.withAlpha(L.shadow(L.switchShadow)), (int) juce::jmax(3.0f, thR * 0.75f),
+                     { -(int) juce::jmax(2.0f, thR * 0.45f), (int) juce::jmax(2.0f, thR * 0.6f) })
+        .drawForPath(g, disc);
+    juce::DropShadow(juce::Colours::black.withAlpha(L.shadow(L.switchContact)), (int) juce::jmax(2.0f, thR * 0.3f),
+                     { -(int) juce::jmax(1.0f, thR * 0.25f), (int) juce::jmax(1.0f, thR * 0.35f) })
+        .drawForPath(g, disc);
 
     juce::ColourGradient face(juce::Colour(0xff4a3a58), cx + thR * 0.45f, cy - thR * 0.45f,
                               juce::Colour(0xff100c16), cx - thR * 0.8f,  cy + thR * 0.9f, true);
@@ -387,7 +406,7 @@ void MuLookAndFeel::drawSlideSwitch(juce::Graphics& g, juce::Rectangle<float> bo
     const float ringR = thR * 0.78f;
     juce::Path ring;
     ring.addEllipse(cx - ringR, cy - ringR, ringR * 2.0f, ringR * 2.0f);
-    const float glow = highlighted ? 0.22f : 0.14f;
+    const float glow = L.highlight(highlighted ? L.switchRingGlowHover : L.switchRingGlow);
     for (float i = 3.0f; i >= 1.0f; i -= 1.0f)
     {
         g.setColour(accent.withAlpha(glow));
@@ -398,7 +417,7 @@ void MuLookAndFeel::drawSlideSwitch(juce::Graphics& g, juce::Rectangle<float> bo
 
     // Labels level with each end: the selected one in the accent, the other dimmed.
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(kKnobLabelFont))));
-    const float lx = tr.getRight() + sf(5.0f);
+    const float lx = tr.getRight() + sf(3.0f);
     const float lw = bounds.getRight() - lx;
     const float lh = sf(12.0f);
     const auto  dim = colour(labelText).withAlpha(0.55f);
@@ -414,11 +433,12 @@ void MuLookAndFeel::drawSlideSwitch(juce::Graphics& g, juce::Rectangle<float> bo
 void MuLookAndFeel::drawAccentPanel(juce::Graphics& g, juce::Rectangle<float> r,
                                     juce::Colour accent, float cornerSize)
 {
+    const auto& L = lighting();
     juce::Path shape;
     shape.addRoundedRectangle(r, cornerSize);
 
     // Wash: the accent at a whisper over whatever the panel sits on.
-    g.setColour(accent.withAlpha(kPanelTintAlpha));
+    g.setColour(accent.withAlpha(L.panelTint));
     g.fillPath(shape);
 
     // Highlight: a radial glow anchored on the top-right corner, clipped to the panel.
@@ -426,17 +446,17 @@ void MuLookAndFeel::drawAccentPanel(juce::Graphics& g, juce::Rectangle<float> r,
         const juce::Graphics::ScopedSaveState state(g);
         g.reduceClipRegion(shape);
         const auto  corner = r.getTopRight();
-        const float reach  = juce::jmin(std::hypot(r.getWidth(), r.getHeight()) * kPanelHighlightReach,
-                                        mu_ui::sf(kPanelHighlightMaxPx));
-        juce::ColourGradient glow(accent.withAlpha(kPanelHighlightAlpha), corner.x, corner.y,
+        const float reach  = juce::jmin(std::hypot(r.getWidth(), r.getHeight()) * L.panelHighlightReach,
+                                        mu_ui::sf(L.panelHighlightMaxPx));
+        juce::ColourGradient glow(accent.withAlpha(L.highlight(L.panelHighlight)), corner.x, corner.y,
                                   accent.withAlpha(0.0f), corner.x - reach, corner.y, true);
-        glow.addColour(0.4, accent.withAlpha(kPanelHighlightAlpha * 0.35f));
+        glow.addColour(0.4, accent.withAlpha(L.highlight(L.panelHighlight) * 0.35f));
         g.setGradientFill(glow);
         g.fillRect(r);
     }
 
     g.setColour(accent);
-    g.strokePath(shape, juce::PathStrokeType(kPanelOutlineWidth));
+    g.strokePath(shape, juce::PathStrokeType(L.panelOutlineWidth));
 }
 
 void MuLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& button,

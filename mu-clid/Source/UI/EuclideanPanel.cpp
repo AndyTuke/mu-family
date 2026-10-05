@@ -503,13 +503,14 @@ void EuclideanPanel::resized()
     constexpr int eW    = MuLookAndFeel::kKnobSize1W;
     constexpr int eH    = MuLookAndFeel::kKnobSize1H;
     constexpr int eucBlockW = eW * 3 + kEucKnobGap * 2;
-    constexpr int pW    = (innerW - eucBlockW - kModeColW) / 4;
-    constexpr int padX  = kOuter + eucBlockW + kModeColW;
+    // [Euclid box | gap | Pad box | gap | Insert box | Legato / Mono column]
+    constexpr int pW    = (innerW - eucBlockW - kPadInsertGap - kModeColW) / 4;
+    constexpr int padX  = kOuter + eucBlockW + kPadInsertGap;
     // kPadInsertGap splits the Pad and Insert sub-panel borders so they
     // no longer share a pixel. Half the gap is taken from each side.
     constexpr int padPanelW = pW * 2 - kPadInsertGap / 2;
     constexpr int insX      = padX + pW * 2 + kPadInsertGap / 2;
-    constexpr int insPanelW = MuLookAndFeel::kEuclidInnerW - kOuter - insX;
+    constexpr int insPanelW = MuLookAndFeel::kEuclidInnerW - kOuter - kModeColW - insX;
 
     // Pad and Insert sub-panels: Size 1 knobs, each Pad/Mute slide switch beside its
     // knob, all centred vertically in the sub-panel's box (ctrlH - 2 tall, as painted).
@@ -562,9 +563,9 @@ void EuclideanPanel::resized()
     int y = kOuter;
     placeRow(y, stepsA, hitsA, rotA, prePadA, postPadA, prePadModeA, postPadModeA, insertStA, insertLenA, insertModeA);
 
-    // Legato over Mono, centred on the panel's height in the column before the Pad sub-panel.
+    // Legato over Mono, centred on the panel's height in the column after the Insert sub-panel.
     {
-        constexpr int colX  = kOuter + eucBlockW + kModeColPad;
+        constexpr int colX  = insX + insPanelW + kModeColPad;
         constexpr int pairY = kOuter + (innerH - (swH * 2 + kModeSwGap)) / 2;
         legatoCtrl.setBounds(s(colX), s(pairY),                    s(swW), s(swH));
         monoCtrl  .setBounds(s(colX), s(pairY + swH + kModeSwGap), s(swW), s(swH));
@@ -602,19 +603,21 @@ void EuclideanPanel::paint(juce::Graphics& g)
     const juce::Colour minorCol = MuLookAndFeel::colour(Id::globalAccent).withAlpha(0.5f);   // app colour
     g.setColour(minorCol);
 
-    // Constants mirror resized() exactly — Euclid block + Pad/Insert split.
+    // Constants mirror resized() exactly — Euclid box + Pad / Insert split + switch column.
     constexpr int eW        = MuLookAndFeel::kKnobSize1W;
     constexpr int eucBlockW = eW * 3 + kEucKnobGap * 2;
-    constexpr int pW        = (innerW - eucBlockW - kModeColW) / 4;
-    constexpr int padX      = kOuter + eucBlockW + kModeColW;
+    constexpr int pW        = (innerW - eucBlockW - kPadInsertGap - kModeColW) / 4;
+    constexpr int padX      = kOuter + eucBlockW + kPadInsertGap;
     constexpr int padPanelW = pW * 2 - kPadInsertGap / 2;
     constexpr int insX      = padX + pW * 2 + kPadInsertGap / 2;
-    constexpr int insPanelW = w - kOuter - insX;
+    constexpr int insPanelW = w - kOuter - kModeColW - insX;
 
+    // Each row: its Euclid knobs, Pad and Insert controls each in their own box.
     constexpr int ctrlH = rowH - kLabelH;
     for (int rowY : rowOffsets)
     {
         const int cy = rowY + kLabelH;
+        g.drawRoundedRectangle((float) s(kOuter), (float) s(cy), (float) s(eucBlockW), (float) s(ctrlH) - 2.0f, 4.0f, 1.0f);
         g.drawRoundedRectangle((float) s(padX), (float) s(cy), (float) s(padPanelW), (float) s(ctrlH) - 2.0f, 4.0f, 1.0f);
         g.drawRoundedRectangle((float) s(insX), (float) s(cy), (float) s(insPanelW), (float) s(ctrlH) - 2.0f, 4.0f, 1.0f);
     }
