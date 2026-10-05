@@ -11,6 +11,8 @@ set(HEADER_FILE  "${ROOT_DIR}/mu-core/BuildNumber.h")
 
 file(READ "${COUNTER_FILE}" BUILD_NUMBER)
 string(STRIP "${BUILD_NUMBER}" BUILD_NUMBER)
+file(READ "${ROOT_DIR}/version.txt" VERSION_BASE)   # family major.minor, e.g. 1.1
+string(STRIP "${VERSION_BASE}" VERSION_BASE)
 
 # Versioning policy (owner rules):
 #   Debug   — EVERY Debug build increments by exactly 1. No time/session throttle:
@@ -42,22 +44,22 @@ else()
     set(BUMP_NOTE "debug — bumped to #${BUILD_NUMBER}")
 endif()
 
-# Runtime number for the in-app About panel.
+# Runtime number + full version string for the About panel and update banner.
 file(WRITE "${HEADER_FILE}"
-    "#pragma once\n#define BUILD_NUMBER ${BUILD_NUMBER}\n")
+    "#pragma once\n#define BUILD_NUMBER ${BUILD_NUMBER}\n#define MU_VERSION_STRING \"${VERSION_BASE}.0.${BUILD_NUMBER}\"\n")
 
 # ── Regenerate the Windows version resources from THIS (post-increment) number ──
 # The .rc is otherwise baked at configure time (before the build-time bump), which
 # left the Windows file-properties version one behind the About panel on Debug.
 # Regenerating here — with the *_rc_lib targets depending on increment_build_number —
 # makes Windows file properties == BuildNumber.h == About panel, every build.
-set(MUFAMILY_PLUGIN_VERSION "1.0.0.${BUILD_NUMBER}")
+set(MUFAMILY_PLUGIN_VERSION "${VERSION_BASE}.0.${BUILD_NUMBER}")
 string(REPLACE "." "," MUFAMILY_FILEVERSION "${MUFAMILY_PLUGIN_VERSION}")
 if(NOT DEFINED MUFAMILY_COPYRIGHT)
     string(TIMESTAMP _yr "%Y")
     set(MUFAMILY_COPYRIGHT "Copyright (c) ${_yr} Transwarp Development Project")
 endif()
-foreach(_n 1 2 3 4)
+foreach(_n 1 2 3 4 5 6)
     if(DEFINED RC${_n}_IN AND DEFINED RC${_n}_OUT AND EXISTS "${RC${_n}_IN}")
         configure_file("${RC${_n}_IN}" "${RC${_n}_OUT}" @ONLY NEWLINE_STYLE CRLF)
     endif()

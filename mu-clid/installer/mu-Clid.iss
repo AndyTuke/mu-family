@@ -11,7 +11,10 @@
 #endif
 
 #define MyAppName      "mu-Clid"
-#define MyAppVersion   "1.0." + BuildNum
+#ifndef VersionBase
+  #define VersionBase "1.1"
+#endif
+#define MyAppVersion   VersionBase + "." + BuildNum
 #define MyAppPublisher "Transwarp Development Project"
 #define MyAppExeName   "mu-Clid.exe"
 ; Paths are relative to mu-clid/installer/. Build output + content folder live

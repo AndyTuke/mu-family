@@ -13,7 +13,12 @@ if(APPLE AND NOT DEFINED CMAKE_OSX_ARCHITECTURES)
     set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "macOS universal build (arm64 + x86_64)")
 endif()
 
-project(mu-family VERSION 1.0.0)
+# Family major.minor lives in version.txt (single source — the build-number script,
+# installers, release packaging, CI tag and build-report hook all read it too).
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/version.txt" MUFAMILY_VERSION_BASE)
+string(STRIP "${MUFAMILY_VERSION_BASE}" MUFAMILY_VERSION_BASE)
+
+project(mu-family VERSION ${MUFAMILY_VERSION_BASE}.0)
 
 # ── mu-family monorepo umbrella ─────────────────────────────────────────────
 # This repo hosts the shared `mu-core` library plus one or more plugins built
@@ -50,16 +55,16 @@ option(MUFAMILY_DEPLOY_TESTERS "Deploy Release artefacts to the OneDrive tester 
 # ── Family-wide version metadata ────────────────────────────────────────────
 # Read the current build number at configure time so PLUGIN_VERSION in every
 # juce_add_plugin call reflects the real release number rather than the cmake
-# project fallback (1.0.0.0). Note: the build step increments build_number.txt
+# project fallback (<major>.<minor>.0.0). Note: the build step increments build_number.txt
 # *after* configure, so the version embedded in a first-session build is N (the
 # previous session's number); subsequent builds within the same session are exact.
-# This is accurate enough for tester identification and far better than 1.0.0.0.
+# This is accurate enough for tester identification and far better than x.y.0.0.
 file(READ "${CMAKE_SOURCE_DIR}/build_number.txt" MUFAMILY_BUILD_NUMBER)
 string(STRIP "${MUFAMILY_BUILD_NUMBER}" MUFAMILY_BUILD_NUMBER)
 string(TIMESTAMP MUFAMILY_YEAR "%Y")
-set(MUFAMILY_PLUGIN_VERSION "1.0.0.${MUFAMILY_BUILD_NUMBER}")
+set(MUFAMILY_PLUGIN_VERSION "${MUFAMILY_VERSION_BASE}.0.${MUFAMILY_BUILD_NUMBER}")
 set(MUFAMILY_COPYRIGHT "Copyright (c) ${MUFAMILY_YEAR} Transwarp Development Project")
-# Windows FILEVERSION uses comma-separated quads (1,0,0,846). The version
+# Windows FILEVERSION uses comma-separated quads (1,1,0,972). The version
 # string is already 4-part so a straight replace gives the right quad.
 string(REPLACE "." "," MUFAMILY_FILEVERSION "${MUFAMILY_PLUGIN_VERSION}")
 

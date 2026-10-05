@@ -3,9 +3,11 @@
 # so the installer filename matches the build number baked into the plugin.
 file(READ "${SOURCE_DIR}/build_number.txt" BUILD_NUM)
 string(STRIP "${BUILD_NUM}" BUILD_NUM)
+file(READ "${SOURCE_DIR}/version.txt" VERSION_BASE)
+string(STRIP "${VERSION_BASE}" VERSION_BASE)
 
 execute_process(
-    COMMAND "${ISCC_EXE}" "/DBuildNum=${BUILD_NUM}" "${SOURCE_DIR}/mu-clid/installer/mu-Clid.iss"
+    COMMAND "${ISCC_EXE}" "/DBuildNum=${BUILD_NUM}" "/DVersionBase=${VERSION_BASE}" "${SOURCE_DIR}/mu-clid/installer/mu-Clid.iss"
     WORKING_DIRECTORY "${SOURCE_DIR}/mu-clid/installer"
     RESULT_VARIABLE result
 )
@@ -28,8 +30,8 @@ endforeach()
 
 execute_process(
     COMMAND "${CMAKE_COMMAND}" -E copy
-        "${SOURCE_DIR}/build/installer/mu-Clid-Setup-v1.0.${BUILD_NUM}.exe"
-        "${DIST_DIR}/mu-Clid-Setup-v1.0.${BUILD_NUM}.exe"
+        "${SOURCE_DIR}/build/installer/mu-Clid-Setup-v${VERSION_BASE}.${BUILD_NUM}.exe"
+        "${DIST_DIR}/mu-Clid-Setup-v${VERSION_BASE}.${BUILD_NUM}.exe"
     RESULT_VARIABLE copy_result
 )
 if(NOT copy_result EQUAL 0)

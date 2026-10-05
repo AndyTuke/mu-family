@@ -32,6 +32,7 @@ $env:JUCE_PATH = "D:\JUCE"
 - **A code change → a Debug build only**, all products. Every Debug build **increments the number by exactly 1**. **Never bump `build_number.txt` manually.**
 - **Release builds only when the owner says so** — reuses the last Debug number, never increments; **Release ≤ last Debug** (a higher Release aborts with FATAL_ERROR — surface it, don't work around).
 - **Report the number read from `mu-core/BuildNumber.h` *after* the final build** — never an intermediate log value.
+- **Version = `<major>.<minor>` from [version.txt](version.txt) + the build number** — currently 1.1 (owner moved the family to 1.1 at the UI rework, build 972). Plugins/tags show `v1.1.0.NNN`, commits `v1.1.NNN`. The build number never resets on a major/minor bump (the Release ≤ Debug guard and the in-plugin update check rely on it). Change major/minor **only** by editing `version.txt`, and only when the owner says so.
 - **No GitHub Actions workflow runs on push — ever.** All workflows are `workflow_dispatch`-only; never re-add `push:`/`pull_request:` triggers, and nothing runs as a side-effect of a plain build/commit/push. **`release.yml` is the exception that IS dispatched as a standard step of every release** (`/release` step b) — the repo is public so Linux CI minutes are free, so a release always publishes a full cross-platform (Windows + Linux) GitHub release. `ci.yml` + `mac-validate.yml` still run only on explicit owner request.
 - **macOS is on hold for the foreseeable future** (owner decision, 2026-10-02) — without an Apple code-signing certificate the builds can't be notarized, so nothing ships for Mac. Keep the existing `APPLE`/AU code paths compiling-in-principle (don't delete them), but don't build, ship, advertise or spend effort on macOS until the owner lifts the hold.
 
@@ -45,7 +46,7 @@ New feature ideas live in [docs/design-future.md](docs/design-future.md) under *
 
 ## Git commit messages
 
-Every commit message must include three things: **Stage(s)** (e.g. `Stage 12`), **Issues closed** (each number + one-line description, e.g. `Closes #12: rhythm rename propagation`), and **Full version** (`v1.0.<build>` from `build_number.txt`). Example:
+Every commit message must include three things: **Stage(s)** (e.g. `Stage 12`), **Issues closed** (each number + one-line description, e.g. `Closes #12: rhythm rename propagation`), and **Full version** (`v1.1.<build>` from `build_number.txt`). Example:
 
 ```
 Stage 13: UI completions — Amp FX sends, intra-FX wiring verified
@@ -53,7 +54,7 @@ Stage 13: UI completions — Amp FX sends, intra-FX wiring verified
 Closes #17: Amp FX send knobs added to Voice Amp row
 Closes #22: Intra-FX APVTS wiring verified end-to-end
 
-Version: v1.0.103
+Version: v1.1.972
 ```
 
 ## Backlog handling

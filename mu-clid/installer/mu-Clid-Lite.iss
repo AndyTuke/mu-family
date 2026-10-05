@@ -10,7 +10,10 @@
 #endif
 
 #define MyAppName      "mu-Clid Lite"
-#define MyAppVersion   "1.0." + BuildNum
+#ifndef VersionBase
+  #define VersionBase "1.1"
+#endif
+#define MyAppVersion   VersionBase + "." + BuildNum
 #define MyAppPublisher "Transwarp Development Project"
 ; Paths relative to mu-clid/installer/. Build output lives at family root.
 #define SourceDir      "..\..\build\mu-clid\mu-clid-lite_artefacts\Release"

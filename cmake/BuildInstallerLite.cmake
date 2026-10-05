@@ -1,12 +1,14 @@
-# Builds mu-Clid-Lite-Setup-v1.0.<N>.exe using Inno Setup.
+# Builds mu-Clid-Lite-Setup-v<major>.<minor>.<N>.exe using Inno Setup.
 # Called via: cmake -P BuildInstallerLite.cmake
 
 file(READ "${SOURCE_DIR}/build_number.txt" BUILD_NUM)
 string(STRIP "${BUILD_NUM}" BUILD_NUM)
+file(READ "${SOURCE_DIR}/version.txt" VERSION_BASE)
+string(STRIP "${VERSION_BASE}" VERSION_BASE)
 
 execute_process(
     COMMAND "${ISCC_EXE}"
-            "/DBuildNum=${BUILD_NUM}"
+            "/DBuildNum=${BUILD_NUM}" "/DVersionBase=${VERSION_BASE}"
             "${SOURCE_DIR}/mu-clid/installer/mu-Clid-Lite.iss"
     RESULT_VARIABLE ISCC_RESULT
 )

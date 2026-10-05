@@ -31,7 +31,7 @@ Group block shape (if you must create one — match the existing order New → I
 </div>
 ```
 
-Do **not** create a new dated `v1.0.NNN` section — that promotion happens only at release time (see `/release`).
+Do **not** create a new dated `v1.1.NNN` section — that promotion happens only at release time (see `/release`).
 
 ## Finish
 

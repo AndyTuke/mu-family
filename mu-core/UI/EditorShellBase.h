@@ -126,7 +126,7 @@ protected:
     // Result is cached process-wide so it fetches at most once per process.
     void startVersionCheck();
     // Raises the upgrade banner for the given available build number (message thread).
-    void showUpgradeAvailable(int latestBuild);
+    void showUpgradeAvailable(const juce::String& latestTag);
     // The page opened when the upgrade banner is clicked.
     static constexpr const char* kDownloadUrl = "https://transwarp.me/download";
 

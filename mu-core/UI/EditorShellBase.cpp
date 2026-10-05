@@ -224,10 +224,10 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
     startVersionCheck();
 }
 
-void EditorShellBase::showUpgradeAvailable(int latestBuild)
+void EditorShellBase::showUpgradeAvailable(const juce::String& latestTag)
 {
-    const juce::String current   = "v1.0.0." + juce::String(BUILD_NUMBER);
-    const juce::String available = "v1.0.0." + juce::String(latestBuild);
+    const juce::String current   = "v" + juce::String(MU_VERSION_STRING);
+    const juce::String available = latestTag;   // the release's own tag, e.g. v1.1.0.972
     upgradeBanner.setText(
         juce::String::fromUTF8("Update available  \xe2\x80\x94  you have ") + current
             + juce::String::fromUTF8("  \xe2\x80\x94  ") + available
@@ -242,8 +242,9 @@ void EditorShellBase::showUpgradeAvailable(int latestBuild)
 void EditorShellBase::startVersionCheck()
 {
     // Ask GitHub for the "latest release" — the same endpoint the website's download
-    // page uses — parse the build number out of its tag (v1.0.0.NNN), and raise the
-    // upgrade banner if it beats our local BUILD_NUMBER.
+    // page uses — parse the build number out of its tag (vX.Y.0.NNN), and raise the
+    // upgrade banner if it beats our local BUILD_NUMBER. Only the build number is
+    // compared: it never resets across major/minor bumps, so it alone orders releases.
     //
     // The result is cached PROCESS-WIDE so we fetch at most once per process: reopening
     // the editor, or running many plugin instances in one DAW session, all share the
@@ -253,9 +254,10 @@ void EditorShellBase::startVersionCheck()
     //   -1 = not yet checked   0 = checked, nothing newer   >BUILD_NUMBER = newer build
     static std::atomic<int>  s_latestBuild  { -1 };
     static std::atomic<bool> s_fetchStarted { false };
+    static juce::String      s_latestTag;   // written before s_latestBuild's release-store
 
     const int cached = s_latestBuild.load(std::memory_order_acquire);
-    if (cached > BUILD_NUMBER) { showUpgradeAvailable(cached); return; }  // already known
+    if (cached > BUILD_NUMBER) { showUpgradeAvailable(s_latestTag); return; }  // already known
     if (cached >= 0)           return;                                    // already checked, none newer
     if (s_fetchStarted.exchange(true)) return;                           // a fetch is already in flight
 
@@ -268,22 +270,24 @@ void EditorShellBase::startVersionCheck()
         std::unique_ptr<juce::InputStream> stream(url.createInputStream(opts));
 
         int latestBuild = 0;   // 0 = nothing newer / fetch failed
+        juce::String tag;
         if (stream != nullptr)
         {
             const juce::var json = juce::JSON::parse(stream->readEntireStreamAsString());
-            const juce::String tag = json.getProperty("tag_name", {}).toString();  // e.g. "v1.0.0.920"
+            tag = json.getProperty("tag_name", {}).toString();   // e.g. "v1.1.0.972"
             if (tag.isNotEmpty())   // build number = final dot-separated segment
                 latestBuild = tag.fromLastOccurrenceOf(".", false, false).getIntValue();
         }
 
         // Cache the verdict for this process (clamp to 0 when nothing newer / failed).
+        if (latestBuild > BUILD_NUMBER) s_latestTag = tag;
         s_latestBuild.store(latestBuild > BUILD_NUMBER ? latestBuild : 0, std::memory_order_release);
         if (latestBuild <= BUILD_NUMBER) return;
 
-        juce::MessageManager::callAsync([safe, latestBuild]
+        juce::MessageManager::callAsync([safe, tag]
         {
             if (safe == nullptr) return;   // editor closed mid-check
-            safe->showUpgradeAvailable(latestBuild);
+            safe->showUpgradeAvailable(tag);
         });
     });
 }

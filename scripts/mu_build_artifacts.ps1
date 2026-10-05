@@ -31,8 +31,9 @@ $items = @(
     [pscustomobject]@{ Name='mu-Toni Standalone'; Path="$buildRoot\mu-toni\mu-toni_artefacts\{0}\Standalone\mu-Toni.exe"         }
 )
 
-$debugVer   = if ($debugNum)   { "v1.0.$debugNum" }   else { $null }
-$releaseVer = if ($releaseNum) { "v1.0.$releaseNum" } else { $null }
+$verBase    = (Get-Content -Raw (Join-Path $PSScriptRoot '..\version.txt')).Trim()   # family major.minor
+$debugVer   = if ($debugNum)   { "v$verBase.$debugNum" }   else { $null }
+$releaseVer = if ($releaseNum) { "v$verBase.$releaseNum" } else { $null }
 
 $debugLines   = if ($debugVer)   { $items | Where-Object { Test-Path ($_.Path -f 'Debug') }   | ForEach-Object { "- $($_.Name): $debugVer" } }
 $releaseLines = if ($releaseVer) { $items | Where-Object { Test-Path ($_.Path -f 'Release') } | ForEach-Object { "- $($_.Name): $releaseVer" } }

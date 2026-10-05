@@ -17,12 +17,12 @@ Build the mu-family. Default to **Debug** (a normal code change). Build **Releas
 ## If the exe shows a stale version (mu-tant especially)
 
 `cmake --build --target mu-tant` (the aggregate) rebuilds SharedCode.lib but may not relink the exes. Build the explicit format targets instead:
-`mu-tant_Standalone mu-tant_VST3 mu-tant_CLAP` (add `mu-tant-tests`). Windows file-properties version only refreshes on reconfigure — trust `BuildNumber.h` / the About panel (`v1.0.0.N`) as source of truth.
+`mu-tant_Standalone mu-tant_VST3 mu-tant_CLAP` (add `mu-tant-tests`). Windows file-properties version only refreshes on reconfigure — trust `BuildNumber.h` / the About panel (`v1.1.0.N`) as source of truth.
 
 ## Reporting
 
 - Read the number from `mu-core/BuildNumber.h` **after the final build** — never quote an intermediate build log (goes stale on rebuild).
-- Report "Debug clean at v1.0.NNN" or "Debug + Release clean at v1.0.NNN".
+- Report "Debug clean at v1.1.NNN" or "Debug + Release clean at v1.1.NNN".
 - End the response with the `## Debug builds` / `## Release builds` artefact list (the `mu_build_artifacts.ps1` hook injects it as additionalContext). Only list configs that exist on disk.
 
 ## After the build

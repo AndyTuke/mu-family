@@ -372,7 +372,7 @@ signing (the Apple side of #99).
 mu-toni, mu-link's exe via guarded POST_BUILDs; a plain Release stays local; Debug never
 deploys); (b) a zip built and uploaded to the GitHub "latest release" so website download
 links resolve; (c) **release notes promoted** — move accumulated "Next release · In
-testing" items into a new dated `v1.0.NNN` section in each affected product's notes
+testing" items into a new dated `v1.1.NNN` section in each affected product's notes
 (`site/mu-clid-releases.html`, `site/mu-tant-releases.html`), clear the In-Testing section,
 and bump the hardcoded version default in `site/download.html`.
 

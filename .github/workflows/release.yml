@@ -176,7 +176,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           build=$(tr -d '[:space:]' < build_number.txt)
-          tag="v1.0.0.$build"
+          base=$(tr -d '[:space:]' < version.txt)   # family major.minor
+          tag="v$base.0.$build"
           echo "Publishing $tag with:"; ls -1 dist
           # Create if new, otherwise upload/replace assets on the existing release.
           if gh release view "$tag" >/dev/null 2>&1; then

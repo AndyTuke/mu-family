@@ -10,6 +10,7 @@
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
+#include "BuildNumber.h"
 #include "Server/AudioServer.h"
 #include "UI/MuLinkComponent.h"
 
@@ -17,7 +18,7 @@ class MuLinkApplication : public juce::JUCEApplication
 {
 public:
     const juce::String getApplicationName() override    { return "mu-link"; }
-    const juce::String getApplicationVersion() override { return "1.0"; }
+    const juce::String getApplicationVersion() override { return MU_VERSION_STRING; }
     bool moreThanOneInstanceAllowed() override          { return false; }
 
     void initialise(const juce::String&) override
