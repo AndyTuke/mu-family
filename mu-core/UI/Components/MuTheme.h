@@ -242,6 +242,13 @@ struct MuTheme
         float screenBezelShade   = 0.55f;   // inner edge in shade, top right
         float screenBezelLight   = 0.16f;   // inner edge catching the light, bottom left
 
+        // LCD tabs (SegmentControl::DrawStyle::Lcd)
+        float lcdGlassDarken     = 0.85f;   // glass: panel colour darkened by this
+        float lcdBacklight       = 0.28f;   // active tab: glass tinted by the lit colour
+        float lcdGlow            = 0.35f;   // glow round the lit lettering
+        float lcdGhost           = 0.22f;   // unlit lettering, faintly visible through the glass
+        float lcdGlare           = 0.07f;   // glass glare from the top right
+
         // Sidebar layer boxes (metal style)
         float sidebarSelectedFill = 0.10f;  // layer-colour wash on the selected box
 

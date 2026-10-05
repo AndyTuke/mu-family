@@ -27,6 +27,7 @@ void ModulatorPanel::setMetalStyle(bool m)
 {
     metal = m;
     if (m) setOpaqueBackground(false);
+    tabBar.setDrawStyle(m ? SegmentControl::DrawStyle::Lcd : SegmentControl::DrawStyle::Bar);
     for (auto& e : editors) e.setMetalStyle(m);
     matrixPanel.setMetalStyle(m);
     resized();

@@ -4,12 +4,13 @@
 
 // 2–5 option toggle bar. Each segment is mutually exclusive.
 // activeStyle controls the colour of the selected segment.
-// drawStyle: Bar = single connected bar with dividers (default); Pills = individual rounded buttons.
+// drawStyle: Bar = single connected bar with dividers (default); Pills = individual rounded buttons;
+// Lcd = each option a small LCD window set into the panel, the selected one backlit.
 class SegmentControl : public juce::Component
 {
 public:
     enum class ActiveStyle { General, Positive, Warning };
-    enum class DrawStyle  { Bar, Pills };
+    enum class DrawStyle  { Bar, Pills, Lcd };
 
     std::function<void(int index)> onChange;
 
@@ -19,6 +20,7 @@ public:
 
     void setSelectedIndex(int index, bool notify = false);
     int  getSelectedIndex() const noexcept { return selectedIndex; }
+    void setDrawStyle(DrawStyle d) { drawStyle = d; repaint(); }
 
     void paint(juce::Graphics& g) override;
     void mouseDown(const juce::MouseEvent& e) override;

@@ -131,16 +131,26 @@ void SidebarItem::paint(juce::Graphics& g)
     const int miniBottom = miniVisual != nullptr ? miniVisual->getBottom() : s(4);
     const int nameY      = miniBottom + s(2);
     const int nameRowH   = (metal ? (int) box.getBottom() : h) - nameY - s(2);
-    const int nameX      = metal ? (int) box.getX() + s(4) : s(5);   // dot's left edge
     if (nameRowH > 0)
     {
-        g.setColour(colour);
-        g.fillEllipse((float) nameX, (float) (nameY + (nameRowH - s(6)) / 2), sf(6.0f), sf(6.0f));
+        // Metal: the name alone, centred in the box (the selected outline carries the colour).
+        // Flat: a colour dot, then the name.
+        if (metal)
+        {
+            g.setColour(MuLookAndFeel::colour(selected ? Id::valueText : Id::labelText));
+            g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
+            g.drawText(name, box.toNearestInt().withY(nameY).withHeight(nameRowH).reduced(s(4), 0),
+                       juce::Justification::centred, true);
+        }
+        else
+        {
+            g.setColour(colour);
+            g.fillEllipse(sf(5.0f), (float) (nameY + (nameRowH - s(6)) / 2), sf(6.0f), sf(6.0f));
 
-        g.setColour(MuLookAndFeel::colour(selected ? Id::valueText : Id::labelText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
-        g.drawText(name, nameX + s(9), nameY, w - nameX - s(9) - (metal ? s(9) : s(4)), nameRowH,
-                   juce::Justification::centredLeft, true);
+            g.setColour(MuLookAndFeel::colour(selected ? Id::valueText : Id::labelText));
+            g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(9.0f))));
+            g.drawText(name, s(14), nameY, w - s(18), nameRowH, juce::Justification::centredLeft, true);
+        }
     }
 
     // Pending hot-swap badge — orange pill, top-right, "SWP". Click cancels.
