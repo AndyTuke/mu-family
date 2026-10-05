@@ -87,7 +87,7 @@ void EuclideanPanel::wireCallbacks()
     // ── Euclid A ─────────────────────────────────────────────────────────────
     stepsA.onValueChanged = [this, notify](double v) {
         apvtsSet("stepsA", (float)v);
-        updateRangesA((int)v);  notify();
+        updateRangesA();  notify();
         if (onStatusUpdate) onStatusUpdate("Euclid A Steps", juce::String((int)v));
     };
     hitsA.onValueChanged = [this, notify](double v) {
@@ -99,11 +99,11 @@ void EuclideanPanel::wireCallbacks()
         if (onStatusUpdate) onStatusUpdate("Euclid A Rotate", juce::String((int)v));
     };
     prePadA.onValueChanged = [this, notify](double v) {
-        apvtsSet("prePadA", (float)v);  notify();
+        apvtsSet("prePadA", (float)v);  updateRangesA();  notify();
         if (onStatusUpdate) onStatusUpdate("Euclid A Pre Pad", juce::String((int)v));
     };
     postPadA.onValueChanged = [this, notify](double v) {
-        apvtsSet("postPadA", (float)v);  notify();
+        apvtsSet("postPadA", (float)v);  updateRangesA();  notify();
         if (onStatusUpdate) onStatusUpdate("Euclid A Post Pad", juce::String((int)v));
     };
     insertStA.onValueChanged = [this, notify](double v) {
@@ -111,11 +111,11 @@ void EuclideanPanel::wireCallbacks()
         if (onStatusUpdate) onStatusUpdate("Euclid A Insert Start", juce::String((int)v));
     };
     insertLenA.onValueChanged = [this, notify](double v) {
-        apvtsSet("insLenA", (float)v);  notify();
+        apvtsSet("insLenA", (float)v);  updateRangesA();  notify();
         if (onStatusUpdate) onStatusUpdate("Euclid A Insert Length", juce::String((int)v));
     };
     prePadModeA.onChange = [this, notify](int idx) {
-        apvtsSet("prePadModeA", idx == 1 ? 1.0f : 0.0f);  notify();
+        apvtsSet("prePadModeA", idx == 1 ? 1.0f : 0.0f);  updateRangesA();  notify();
         if (onStatusUpdate) onStatusUpdate("Euclid A Pre Pad Mode", padModeExplanation(PadZone::Start, idx));
     };
     postPadModeA.onChange = [this, notify](int idx) {
@@ -160,7 +160,7 @@ void EuclideanPanel::wireCallbacks()
     // ── Euclid B ─────────────────────────────────────────────────────────────
     stepsB.onValueChanged = [this, notify](double v) {
         apvtsSet("stepsB", (float)v);
-        updateRangesB((int)v);  notify();
+        updateRangesB();  notify();
         if (onStatusUpdate) onStatusUpdate("Euclid B Steps", juce::String((int)v));
     };
     hitsB.onValueChanged = [this, notify](double v) {
@@ -172,11 +172,11 @@ void EuclideanPanel::wireCallbacks()
         if (onStatusUpdate) onStatusUpdate("Euclid B Rotate", juce::String((int)v));
     };
     prePadB.onValueChanged = [this, notify](double v) {
-        apvtsSet("prePadB", (float)v);  notify();
+        apvtsSet("prePadB", (float)v);  updateRangesB();  notify();
         if (onStatusUpdate) onStatusUpdate("Euclid B Pre Pad", juce::String((int)v));
     };
     postPadB.onValueChanged = [this, notify](double v) {
-        apvtsSet("postPadB", (float)v);  notify();
+        apvtsSet("postPadB", (float)v);  updateRangesB();  notify();
         if (onStatusUpdate) onStatusUpdate("Euclid B Post Pad", juce::String((int)v));
     };
     insertStB.onValueChanged = [this, notify](double v) {
@@ -184,11 +184,11 @@ void EuclideanPanel::wireCallbacks()
         if (onStatusUpdate) onStatusUpdate("Euclid B Insert Start", juce::String((int)v));
     };
     insertLenB.onValueChanged = [this, notify](double v) {
-        apvtsSet("insLenB", (float)v);  notify();
+        apvtsSet("insLenB", (float)v);  updateRangesB();  notify();
         if (onStatusUpdate) onStatusUpdate("Euclid B Insert Length", juce::String((int)v));
     };
     prePadModeB.onChange = [this, notify](int idx) {
-        apvtsSet("prePadModeB", idx == 1 ? 1.0f : 0.0f);  notify();
+        apvtsSet("prePadModeB", idx == 1 ? 1.0f : 0.0f);  updateRangesB();  notify();
         if (onStatusUpdate) onStatusUpdate("Euclid B Pre Pad Mode", padModeExplanation(PadZone::Start, idx));
     };
     postPadModeB.onChange = [this, notify](int idx) {
@@ -203,7 +203,7 @@ void EuclideanPanel::wireCallbacks()
     // ── Euclid C (Accent) ─────────────────────────────────────────────────────
     stepsC.onValueChanged = [this, notify](double v) {
         apvtsSet("stepsC", (float)v);
-        updateRangesC((int)v);  notify();
+        updateRangesC();  notify();
         if (onStatusUpdate) onStatusUpdate("Accent Steps", juce::String((int)v));
     };
     hitsC.onValueChanged = [this, notify](double v) {
@@ -215,11 +215,11 @@ void EuclideanPanel::wireCallbacks()
         if (onStatusUpdate) onStatusUpdate("Accent Rotate", juce::String((int)v));
     };
     prePadC.onValueChanged = [this, notify](double v) {
-        apvtsSet("prePadC", (float)v);  notify();
+        apvtsSet("prePadC", (float)v);  updateRangesC();  notify();
         if (onStatusUpdate) onStatusUpdate("Accent Pre Pad", juce::String((int)v));
     };
     postPadC.onValueChanged = [this, notify](double v) {
-        apvtsSet("postPadC", (float)v);  notify();
+        apvtsSet("postPadC", (float)v);  updateRangesC();  notify();
         if (onStatusUpdate) onStatusUpdate("Accent Post Pad", juce::String((int)v));
     };
     insertStC.onValueChanged = [this, notify](double v) {
@@ -227,11 +227,11 @@ void EuclideanPanel::wireCallbacks()
         if (onStatusUpdate) onStatusUpdate("Accent Insert Start", juce::String((int)v));
     };
     insertLenC.onValueChanged = [this, notify](double v) {
-        apvtsSet("insLenC", (float)v);  notify();
+        apvtsSet("insLenC", (float)v);  updateRangesC();  notify();
         if (onStatusUpdate) onStatusUpdate("Accent Insert Length", juce::String((int)v));
     };
     prePadModeC.onChange = [this, notify](int idx) {
-        apvtsSet("prePadModeC", idx == 1 ? 1.0f : 0.0f);  notify();
+        apvtsSet("prePadModeC", idx == 1 ? 1.0f : 0.0f);  updateRangesC();  notify();
         if (onStatusUpdate) onStatusUpdate("Accent Pre Pad Mode", padModeExplanation(PadZone::Start, idx));
     };
     postPadModeC.onChange = [this, notify](int idx) {
@@ -258,6 +258,7 @@ void EuclideanPanel::loadFromRhythm()
     if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
     const Rhythm& r = proc.getRhythm(rhythmIndex);
 
+    updateRangesA();
     stepsA.setValue(r.genA.steps);   hitsA.setValue(r.genA.hits);
     rotA.setValue(r.genA.rotate);    prePadA.setValue(r.genA.prePad);
     postPadA.setValue(r.genA.postPad);
@@ -266,8 +267,8 @@ void EuclideanPanel::loadFromRhythm()
     prePadModeA.setSelectedIndex(r.genA.prePadMode   == InsertMode::Mute ? 1 : 0);
     postPadModeA.setSelectedIndex(r.genA.postPadMode == InsertMode::Mute ? 1 : 0);
     insertModeA.setSelectedIndex(r.genA.insertMode   == InsertMode::Mute ? 1 : 0);
-    updateRangesA(r.genA.steps);
 
+    updateRangesB();
     stepsB.setValue(r.genB.steps);   hitsB.setValue(r.genB.hits);
     rotB.setValue(r.genB.rotate);    prePadB.setValue(r.genB.prePad);
     postPadB.setValue(r.genB.postPad);
@@ -276,8 +277,8 @@ void EuclideanPanel::loadFromRhythm()
     prePadModeB.setSelectedIndex(r.genB.prePadMode   == InsertMode::Mute ? 1 : 0);
     postPadModeB.setSelectedIndex(r.genB.postPadMode == InsertMode::Mute ? 1 : 0);
     insertModeB.setSelectedIndex(r.genB.insertMode   == InsertMode::Mute ? 1 : 0);
-    updateRangesB(r.genB.steps);
 
+    updateRangesC();
     stepsC.setValue(r.genC.steps);   hitsC.setValue(r.genC.hits);
     rotC.setValue(r.genC.rotate);    prePadC.setValue(r.genC.prePad);
     postPadC.setValue(r.genC.postPad);
@@ -286,7 +287,6 @@ void EuclideanPanel::loadFromRhythm()
     prePadModeC.setSelectedIndex(r.genC.prePadMode   == InsertMode::Mute ? 1 : 0);
     postPadModeC.setSelectedIndex(r.genC.postPadMode == InsertMode::Mute ? 1 : 0);
     insertModeC.setSelectedIndex(r.genC.insertMode   == InsertMode::Mute ? 1 : 0);
-    updateRangesC(r.genC.steps);
 
     static const Logic logics[] = { Logic::OR, Logic::AND, Logic::XOR,
                                     Logic::AOnly, Logic::BOnly };
@@ -306,8 +306,13 @@ void EuclideanPanel::refreshSuffix(const juce::String& suffix)
         sc.setSelectedIndex(m == InsertMode::Mute ? 1 : 0);
     };
 
+    // A ring parameter can move another knob's limits, so re-fit that ring's ranges first.
+    if      (suffix.endsWithChar('A')) updateRangesA();
+    else if (suffix.endsWithChar('B')) updateRangesB();
+    else if (suffix.endsWithChar('C')) updateRangesC();
+
     // ── Ring A
-    if      (suffix == "stepsA")        { stepsA.setValue(r.genA.steps); updateRangesA(r.genA.steps); }
+    if      (suffix == "stepsA")          stepsA.setValue(r.genA.steps);
     else if (suffix == "hitsA")           hitsA.setValue(r.genA.hits);
     else if (suffix == "rotA")            rotA.setValue(r.genA.rotate);
     else if (suffix == "prePadA")         prePadA.setValue(r.genA.prePad);
@@ -318,7 +323,7 @@ void EuclideanPanel::refreshSuffix(const juce::String& suffix)
     else if (suffix == "postPadModeA")    setMode(postPadModeA, r.genA.postPadMode);
     else if (suffix == "insModeA")        setMode(insertModeA, r.genA.insertMode);
     // ── Ring B
-    else if (suffix == "stepsB")        { stepsB.setValue(r.genB.steps); updateRangesB(r.genB.steps); }
+    else if (suffix == "stepsB")          stepsB.setValue(r.genB.steps);
     else if (suffix == "hitsB")           hitsB.setValue(r.genB.hits);
     else if (suffix == "rotB")            rotB.setValue(r.genB.rotate);
     else if (suffix == "prePadB")         prePadB.setValue(r.genB.prePad);
@@ -329,7 +334,7 @@ void EuclideanPanel::refreshSuffix(const juce::String& suffix)
     else if (suffix == "postPadModeB")    setMode(postPadModeB, r.genB.postPadMode);
     else if (suffix == "insModeB")        setMode(insertModeB, r.genB.insertMode);
     // ── Ring C (Accent)
-    else if (suffix == "stepsC")        { stepsC.setValue(r.genC.steps); updateRangesC(r.genC.steps); }
+    else if (suffix == "stepsC")          stepsC.setValue(r.genC.steps);
     else if (suffix == "hitsC")           hitsC.setValue(r.genC.hits);
     else if (suffix == "rotC")            rotC.setValue(r.genC.rotate);
     else if (suffix == "prePadC")         prePadC.setValue(r.genC.prePad);
@@ -355,25 +360,55 @@ void EuclideanPanel::refreshSuffix(const juce::String& suffix)
         monoCtrl.setSelectedIndex(r.voiceParams.voiceMono ? 1 : 0);
 }
 
-void EuclideanPanel::updateRangesA(int steps)
+// Fit a ring's knob ranges to what its layout allows: Hits / Rotate track the step count,
+// the three pads share the Steps - 1 budget, and Insert Start stays between the pads.
+void EuclideanPanel::updateRanges(const HitGenerator& g, const char* const (&sfx)[4],
+                                  KnobWithLabel& hits, KnobWithLabel& rot,
+                                  KnobWithLabel& pre, KnobWithLabel& post,
+                                  KnobWithLabel& insSt, KnobWithLabel& insLen)
 {
-    hitsA.setRange(0, steps, 1);
-    rotA.setRange(0, juce::jmax(0, steps - 1), 1);   // full 0..steps-1 per design-sequencer.md
-    insertStA.setRange(0, juce::jmax(0, steps - 1), 1);
+    const int  steps  = g.steps;
+    const int  budget = HitGenerator::maxPadding(steps);
+    const auto lay    = g.clampLayout({ g.hits, g.rotate, g.prePad, g.postPad, g.insertStart, g.insertLength });
+
+    hits.setRange(0, steps, 1);
+    rot.setRange(0, juce::jmax(0, steps - 1), 1);   // full 0..steps-1 per design-sequencer.md
+    pre.setRange   (0, juce::jmin(HitGenerator::kMaxPrePad,       budget - lay.postPad - lay.insertLength), 1);
+    post.setRange  (0, juce::jmin(HitGenerator::kMaxPostPad,      budget - lay.prePad  - lay.insertLength), 1);
+    insLen.setRange(0, juce::jmin(HitGenerator::kMaxInsertLength, budget - lay.prePad  - lay.postPad),      1);
+
+    const auto [lo, hi] = HitGenerator::insertStartBounds(steps, lay.prePad, lay.postPad,
+                                                          lay.insertLength, g.prePadMode);
+    insSt.setRange(lo, hi, 1);
+
+    // Write back any stored value the layout pulled in, so the parameter matches what
+    // plays and what the knob shows (a range change clamps the knob silently).
+    const int raw[4]    = { g.prePad,   g.postPad,   g.insertLength,   g.insertStart   };
+    const int fitted[4] = { lay.prePad, lay.postPad, lay.insertLength, lay.insertStart };
+    for (int i = 0; i < 4; ++i)
+        if (raw[i] != fitted[i])
+            apvtsSet(sfx[i], (float) fitted[i]);
 }
 
-void EuclideanPanel::updateRangesB(int steps)
+void EuclideanPanel::updateRangesA()
 {
-    hitsB.setRange(0, steps, 1);
-    rotB.setRange(0, juce::jmax(0, steps - 1), 1);
-    insertStB.setRange(0, juce::jmax(0, steps - 1), 1);
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
+    static const char* const kSfx[4] = { "prePadA", "postPadA", "insLenA", "insStA" };
+    updateRanges(proc.getRhythm(rhythmIndex).genA, kSfx, hitsA, rotA, prePadA, postPadA, insertStA, insertLenA);
 }
 
-void EuclideanPanel::updateRangesC(int steps)
+void EuclideanPanel::updateRangesB()
 {
-    hitsC.setRange(0, steps, 1);
-    rotC.setRange(0, juce::jmax(0, steps - 1), 1);
-    insertStC.setRange(0, juce::jmax(0, steps - 1), 1);
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
+    static const char* const kSfx[4] = { "prePadB", "postPadB", "insLenB", "insStB" };
+    updateRanges(proc.getRhythm(rhythmIndex).genB, kSfx, hitsB, rotB, prePadB, postPadB, insertStB, insertLenB);
+}
+
+void EuclideanPanel::updateRangesC()
+{
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
+    static const char* const kSfx[4] = { "prePadC", "postPadC", "insLenC", "insStC" };
+    updateRanges(proc.getRhythm(rhythmIndex).genC, kSfx, hitsC, rotC, prePadC, postPadC, insertStC, insertLenC);
 }
 
 void EuclideanPanel::setRhythmColour(juce::Colour c)

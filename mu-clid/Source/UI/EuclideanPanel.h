@@ -7,6 +7,7 @@
 #include "UI/Components/SlideSwitch.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/MuLookAndFeel.h"
+#include "Sequencer/HitGenerator.h"
 
 namespace juce { class RangedAudioParameter; }
 class PluginProcessor;
@@ -130,9 +131,16 @@ private:
 
     void apvtsSet(const char* suffix, float v);
     void wireCallbacks();
-    void updateRangesA(int steps);
-    void updateRangesB(int steps);
-    void updateRangesC(int steps);
+    // Fit each ring's knob ranges to its current layout (step count, pad budget, insert
+    // bounds — see HitGenerator). Read from the rhythm, so call after the APVTS write.
+    void updateRangesA();
+    void updateRangesB();
+    void updateRangesC();
+    // sfx = the ring's APVTS suffixes { prePad, postPad, insLen, insSt } (string literals).
+    void updateRanges(const HitGenerator& g, const char* const (&sfx)[4],
+                      KnobWithLabel& hits, KnobWithLabel& rot,
+                      KnobWithLabel& pre, KnobWithLabel& post,
+                      KnobWithLabel& insSt, KnobWithLabel& insLen);
 
     // Plain-English descriptions of the Legato / Mono choices for the status bar.
     static juce::String legatoExplanation(int modeIndex);

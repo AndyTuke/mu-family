@@ -125,6 +125,52 @@ public:
                 expect (patHit == typeHit, "step " + juce::String(i) + " mismatch between getPattern and getStepTypes");
             }
         }
+
+        // ── Padding layout limits ────────────────────────────────────────────
+        beginTest ("Pads share a Steps - 1 budget, in priority order pre -> post -> insert");
+        {
+            HitGenerator h;
+            h.steps = 8;   // budget 7
+            const auto lay = h.clampLayout({ 3, 0, 5, 4, 0, 6 });
+            expectEquals (lay.prePad, 5);
+            expectEquals (lay.postPad, 2);
+            expectEquals (lay.insertLength, 0);
+            expectEquals (lay.prePad + lay.postPad + lay.insertLength, 7);
+        }
+
+        beginTest ("Over-budget pads still leave at least one Euclid step and keep the pattern length");
+        {
+            HitGenerator h;
+            h.steps = 4; h.hits = 4;
+            h.prePad = 12; h.postPad = 12; h.insertLength = 8;
+            const auto pat = h.getPattern();
+            expectEquals ((int) pat.size(), 4);
+            int hitCount = 0;
+            for (bool b : pat) hitCount += b ? 1 : 0;
+            expectEquals (hitCount, 1);   // pre-pad takes 3 of 4 steps; one Euclid step remains
+        }
+
+        beginTest ("Insert Start can't land in a Mute-mode pre-pad or run into the post-pad");
+        {
+            HitGenerator h;
+            h.steps = 16; h.prePadMode = InsertMode::Mute;
+            auto lay = h.clampLayout({ 0, 0, 4, 2, 1, 3 });
+            expectEquals (lay.insertStart, 4);            // pulled out of the 4-step pre gap
+            lay = h.clampLayout({ 0, 0, 4, 2, 15, 3 });
+            expectEquals (lay.insertStart, 16 - 2 - 3);   // insert ends where the post gap begins
+        }
+
+        beginTest ("Pad-mode pre-pad: Insert Start counts from the end of the gap");
+        {
+            HitGenerator h;
+            h.steps = 16;   // all Pad: Euclid section = 16 - 4 - 2 - 3 = 7 steps
+            const auto [lo, hi] = HitGenerator::insertStartBounds (16, 4, 2, 3, InsertMode::Pad);
+            expectEquals (lo, 0);
+            expectEquals (hi, 7);
+            const auto types = h.getStepTypes ({ 0, 0, 4, 2, 0, 3 });
+            for (int i = 0; i < 4; ++i)  expect (types[(size_t) i] == StepType::PrePad);
+            for (int i = 4; i < 7; ++i)  expect (types[(size_t) i] == StepType::InsertPad);
+        }
     }
 };
 

@@ -5,70 +5,13 @@
 
 std::vector<bool> HitGenerator::getPattern() const
 {
-    if (mute)
-        return std::vector<bool>(steps, false);
-
-    // Pad mode reserves steps from the euclidean distribution; Mute mode does not.
-    const int preReserve  = (prePadMode  == InsertMode::Pad) ? prePad  : 0;
-    const int postReserve = (postPadMode == InsertMode::Pad) ? postPad : 0;
-    const int clampedInsert = (insertMode == InsertMode::Pad) ? insertLength : 0;
-    int activeSteps = std::max(steps - preReserve - postReserve - clampedInsert, 0);
-
-    auto pattern = EuclideanGenerator::generate(activeSteps, hits);
-
-    if (rotate != 0 && activeSteps > 0)
-    {
-        int r = ((rotate % activeSteps) + activeSteps) % activeSteps;
-        if (r > 0)
-            std::rotate(pattern.begin(), pattern.begin() + r, pattern.end());
-    }
-
-    if (insertLength > 0)
-    {
-        int clampedStart = std::clamp(insertStart, 0, activeSteps);
-
-        if (insertMode == InsertMode::Pad)
-        {
-            pattern.insert(pattern.begin() + clampedStart, insertLength, false);
-        }
-        else
-        {
-            int zoneEnd = std::min(clampedStart + insertLength, activeSteps);
-            for (int i = clampedStart; i < zoneEnd; ++i)
-                pattern[i] = false;
-        }
-    }
-
-    // Pre-pad: Pad mode inserts silent steps (extends pattern); Mute mode silences the
-    // first prePad hits that euclidean placed in that zone.
-    if (prePadMode == InsertMode::Pad)
-    {
-        pattern.insert(pattern.begin(), prePad, false);
-    }
-    else
-    {
-        const int zone = std::min(prePad, (int)pattern.size());
-        for (int i = 0; i < zone; ++i)
-            pattern[i] = false;
-    }
-
-    // Post-pad: same distinction.
-    if (postPadMode == InsertMode::Pad)
-    {
-        pattern.insert(pattern.end(), postPad, false);
-    }
-    else
-    {
-        const int zone  = std::min(postPad, (int)pattern.size());
-        const int start = (int)pattern.size() - zone;
-        for (int i = start; i < (int)pattern.size(); ++i)
-            pattern[i] = false;
-    }
-
-    return pattern;
+    // Same result as the audio-thread path — one implementation of the layout rules.
+    std::vector<bool> out, scratch;
+    getPattern(EuclidGenOverrides{ hits, rotate, prePad, postPad, insertStart, insertLength }, out, scratch);
+    return out;
 }
 
-void HitGenerator::getPattern(const EuclidGenOverrides& ov,
+void HitGenerator::getPattern(const EuclidGenOverrides& requested,
                               std::vector<bool>& out,
                               std::vector<bool>& scratch) const
 {
@@ -88,6 +31,8 @@ void HitGenerator::getPattern(const EuclidGenOverrides& ov,
         out.assign((size_t) steps, false);
         return;
     }
+
+    const EuclidGenOverrides ov = clampLayout(requested);   // modulation / presets may overshoot
 
     const int preReserve    = (prePadMode  == InsertMode::Pad) ? ov.prePad       : 0;
     const int postReserve   = (postPadMode == InsertMode::Pad) ? ov.postPad      : 0;
@@ -152,10 +97,12 @@ std::vector<StepType> HitGenerator::getStepTypes() const
     return getStepTypes(EuclidGenOverrides{ hits, rotate, prePad, postPad, insertStart, insertLength });
 }
 
-std::vector<StepType> HitGenerator::getStepTypes(const EuclidGenOverrides& ov) const
+std::vector<StepType> HitGenerator::getStepTypes(const EuclidGenOverrides& requested) const
 {
     if (mute)
         return std::vector<StepType>(steps, StepType::Empty);
+
+    const EuclidGenOverrides ov = clampLayout(requested);   // ring shows what actually plays
 
     const int preReserve  = (prePadMode  == InsertMode::Pad) ? ov.prePad  : 0;
     const int postReserve = (postPadMode == InsertMode::Pad) ? ov.postPad : 0;

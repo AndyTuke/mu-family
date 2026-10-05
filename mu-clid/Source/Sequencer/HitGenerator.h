@@ -1,7 +1,9 @@
 #pragma once
 
 #include "EuclideanGenerator.h"
+#include <algorithm>
 #include <cstdint>   // uint8_t (StepType underlying type) — not transitively provided off-MSVC
+#include <utility>
 #include <vector>
 
 enum class InsertMode { Pad, Mute };
@@ -31,6 +33,39 @@ struct EuclidGenOverrides
 class HitGenerator
 {
 public:
+    // Parameter maxima (the APVTS ranges are declared from these).
+    static constexpr int kMaxPrePad       = 12;
+    static constexpr int kMaxPostPad      = 12;
+    static constexpr int kMaxInsertLength = 8;
+
+    // Padding layout rules: Pre Pad + Post Pad + Insert Length leave at least one step
+    // for the Euclid pattern, and the insert sits between the pre and post pads.
+    static int maxPadding(int steps) noexcept { return std::max(steps - 1, 0); }
+
+    // Allowed Insert Start range. Insert Start indexes the Euclid section: with a
+    // Pad-mode pre-pad that section already begins after the gap, while a Mute-mode
+    // pre-pad overlays it, so the gap has to be stepped over explicitly.
+    static std::pair<int, int> insertStartBounds(int steps, int pre, int post, int len,
+                                                 InsertMode preMode) noexcept
+    {
+        const int lo = (preMode == InsertMode::Mute) ? pre : 0;
+        const int hi = steps - post - len - (preMode == InsertMode::Pad ? pre : 0);
+        return { lo, std::max(lo, hi) };
+    }
+
+    // Clamp pad / insert values to the layout rules above, in priority order
+    // pre -> post -> insert length, then Insert Start into its bounds.
+    EuclidGenOverrides clampLayout(EuclidGenOverrides ov) const noexcept
+    {
+        const int budget = maxPadding(steps);
+        ov.prePad       = std::clamp(ov.prePad,       0, std::min(kMaxPrePad,       budget));
+        ov.postPad      = std::clamp(ov.postPad,      0, std::min(kMaxPostPad,      budget - ov.prePad));
+        ov.insertLength = std::clamp(ov.insertLength, 0, std::min(kMaxInsertLength, budget - ov.prePad - ov.postPad));
+        const auto [lo, hi] = insertStartBounds(steps, ov.prePad, ov.postPad, ov.insertLength, prePadMode);
+        ov.insertStart  = std::clamp(ov.insertStart, lo, hi);
+        return ov;
+    }
+
     int        steps        = 8;
     int        hits         = 0;
     int        rotate       = 0;
@@ -48,9 +83,10 @@ public:
 
     // Same as getPattern() but annotates each step with its type (hit, empty, pre/post/insert pad).
     std::vector<StepType> getStepTypes() const;
-    // Override-aware variant — uses ov's hits/rotate/prePad/postPad/insertStart/insertLength
-    // instead of the member values, so the UI can render the visually-modulated pattern.
-    std::vector<StepType> getStepTypes(const EuclidGenOverrides& ov) const;
+    // Override-aware variant — uses requested hits/rotate/prePad/postPad/insertStart/insertLength
+    // (clamped to the layout rules) instead of the member values, so the UI can render the
+    // visually-modulated pattern.
+    std::vector<StepType> getStepTypes(const EuclidGenOverrides& requested) const;
 
     // compact POD snapshot of every field that affects getPattern / getStepTypes
     // output. UI consumers (SidebarItem, RhythmCircle) poll this on a timer to detect
@@ -80,12 +116,12 @@ public:
     }
 
     // Stage B: non-allocating + override-aware variant. Writes the pattern into
-    // `out`, using `scratch` for the euclidean working buffer. The `ov` argument
-    // replaces hits/rotate/prePad/postPad/insertStart/insertLength on this generator
+    // `out`, using `scratch` for the euclidean working buffer. The `requested` values
+    // (clamped to the layout rules) replace hits/rotate/prePad/postPad/insertStart/insertLength on this generator
     // (member values untouched). `steps`, `mute`, and the three pad-mode flags stay on
     // the generator. Both buffers must be pre-reserved to ≥ steps capacity for fully
     // allocation-free operation on the audio thread.
-    void getPattern(const EuclidGenOverrides& ov,
+    void getPattern(const EuclidGenOverrides& requested,
                     std::vector<bool>& out,
                     std::vector<bool>& scratch) const;
 };
