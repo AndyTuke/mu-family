@@ -32,11 +32,22 @@ inline constexpr const char* kTransportMapName = "Local\\mu_link_transport_v1";
 inline constexpr const char* kRegistryMapName  = "Local\\mu_link_registry_v1";
 inline constexpr const char* kRingMapPrefix    = "Local\\mu_link_ring_v1_";  // + clientId
 
+// Appended to every map name. Empty in the products and mu-link itself; a test process
+// sets its own suffix so it can never open, or be opened by, a live mu-link bus.
+inline std::string& mapNameSuffix()
+{
+    static std::string suffix;
+    return suffix;
+}
+
+inline std::string transportMapName() { return std::string(kTransportMapName) + mapNameSuffix(); }
+inline std::string registryMapName()  { return std::string(kRegistryMapName)  + mapNameSuffix(); }
+
 // The named mapping for client `clientId`'s audio ring. Server and client derive the
 // same name from the registry-assigned id, so the client never has to be told it.
 inline std::string ringMapName(std::uint32_t clientId)
 {
-    return std::string(kRingMapPrefix) + std::to_string(clientId);
+    return std::string(kRingMapPrefix) + std::to_string(clientId) + mapNameSuffix();
 }
 
 // Default per-client ring geometry. The capacity is several audio blocks deep so the

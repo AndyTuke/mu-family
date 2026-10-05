@@ -108,8 +108,8 @@ public:
     // protocol version doesn't match (the client then falls back to its own device).
     bool open()
     {
-        transportRegion = SharedMemoryRegion::open(kTransportMapName, sizeof(TransportBlock));
-        registryRegion  = SharedMemoryRegion::open(kRegistryMapName,  sizeof(ClientRegistry));
+        transportRegion = SharedMemoryRegion::open(transportMapName(), sizeof(TransportBlock));
+        registryRegion  = SharedMemoryRegion::open(registryMapName(),  sizeof(ClientRegistry));
         if (! transportRegion.valid() || ! registryRegion.valid())
             return false;
         if (registry().protocolVersion.load(std::memory_order_acquire) != kProtocolVersion)

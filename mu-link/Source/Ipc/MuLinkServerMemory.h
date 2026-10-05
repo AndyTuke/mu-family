@@ -24,8 +24,8 @@ public:
     bool create()
     {
         bool freshTransport = false, freshRegistry = false;
-        transportRegion = SharedMemoryRegion::create(kTransportMapName, sizeof(TransportBlock), freshTransport);
-        registryRegion  = SharedMemoryRegion::create(kRegistryMapName,  sizeof(ClientRegistry), freshRegistry);
+        transportRegion = SharedMemoryRegion::create(transportMapName(), sizeof(TransportBlock), freshTransport);
+        registryRegion  = SharedMemoryRegion::create(registryMapName(),  sizeof(ClientRegistry), freshRegistry);
         if (! transportRegion.valid() || ! registryRegion.valid())
             return false;
 

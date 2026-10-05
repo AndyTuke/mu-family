@@ -12,6 +12,30 @@
 #include <cstring>
 #include <iostream>
 #include "ShmTestVectors.h"
+#include "Link/MuLinkProtocol.h"
+#include <cstdlib>   // _putenv_s / setenv
+#include <string>
+
+// Every shared-memory name this process uses gets a private suffix, so the tests can
+// never collide with a live mu-link bus (or a running product polling to attach). It's
+// passed to the --shm-child re-launch through the environment, which children inherit.
+static void isolateSharedMemoryNames()
+{
+    static const char* kEnv = "MU_LINK_TEST_MAP_SUFFIX";
+    const auto inherited = juce::SystemStats::getEnvironmentVariable(kEnv, {});
+    if (inherited.isNotEmpty())
+    {
+        mu_link::mapNameSuffix() = inherited.toStdString();
+        return;
+    }
+    const std::string suffix = "_test_" + juce::String::toHexString(juce::Random::getSystemRandom().nextInt64()).toStdString();
+    mu_link::mapNameSuffix() = suffix;
+#ifdef _WIN32
+    _putenv_s(kEnv, suffix.c_str());
+#else
+    setenv(kEnv, suffix.c_str(), 1);
+#endif
+}
 
 class StdoutLogger : public juce::Logger
 {
@@ -21,6 +45,8 @@ public:
 
 int main(int argc, char** argv)
 {
+    isolateSharedMemoryNames();
+
     // Child mode: the cross-process shared-memory test re-launches this exe with
     // --shm-child to act as a real mu-link client. Do the client work and exit with a
     // status the parent reads - do NOT run the unit-test suite (would recurse).
