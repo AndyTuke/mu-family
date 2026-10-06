@@ -271,6 +271,7 @@ struct MuTheme
         float lampOn             = 0.66f;   // lit, but not bright
         float lampHot            = 0.30f;   // brighter centre on a lit lamp (lens hot-spot)
         float lampPlayhead       = 0.25f;   // extra brightness on the playhead step
+        float lampBeat           = 0.06f;   // unlit beat-group start: a hint of colour to mark the beat
 
         // Step ring (mu-Clid's RhythmCircle)
         float ringTrack          = 0.45f;   // recessed track under each ring

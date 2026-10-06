@@ -131,12 +131,40 @@ public:
 
     int getLayer() const noexcept { return currentLayer; }
 
+    void lookAndFeelChanged() override { resized(); repaint(); }   // metal style widens the gaps
+
     void paint(juce::Graphics& g) override
     {
         using Id = MuLookAndFeel::ColourIds;
         using LF = MuLookAndFeel;
         using mu_ui::s;
         g.fillAll(MuLookAndFeel::colour(Id::panelBackground));
+
+        // Metal style: every boxed section a titled metal panel, the voice band and the
+        // modulators on metal panels with name plates over the voice sections.
+        if (MuLookAndFeel::isMetal(*this))
+        {
+            const auto accent = MuLookAndFeel::appAccent(*this);
+            static const char* const plateTitles[] = { "OSCILLATOR 1", "OSCILLATOR 2", "MIX" };
+            for (int i = 0; i < 3; ++i)
+                MuLookAndFeel::drawTitledPanel(g, oscR[(size_t) i].toFloat().reduced(2.0f), plateTitles[i], accent);
+            MuLookAndFeel::drawTitledPanel(g, arpR.toFloat().reduced(2.0f), "APPERGATER", accent);
+            MuLookAndFeel::drawAccentPanel(g, voiceR.expanded(s(6), s(2)).toFloat(), accent);
+            MuLookAndFeel::drawAccentPanel(g, modulatorPanel.getBounds().expanded(s(2)).toFloat(), accent);
+
+            const int VX = voiceR.getX(), VY = voiceR.getY();
+            const int vDivW = LF::kVoiceDivW;
+            const int vFltX = LF::kVoicePitchW + vDivW;
+            const int vAmpX = vFltX + LF::kVoiceFilterW + vDivW;
+            const int vInsX = vAmpX + LF::kVoiceAmpW + vDivW;
+            auto plate = [&](const char* t, int x, int w)
+            { MuLookAndFeel::drawCentredNamePlate(g, { (float) (VX + s(x)), (float) VY, (float) s(w), (float) s(LF::kVoiceLabelH) }, t); };
+            plate("PITCH",   0,     LF::kVoicePitchW);
+            plate("FILTER",  vFltX, LF::kVoiceFilterW);
+            plate("AMP",     vAmpX, LF::kVoiceAmpW);
+            plate("EFFECTS", vInsX, LF::kVoiceInsertW);
+            return;
+        }
 
         // Boxed sections (Osc 1/2/Mix + Appergater).
         static const char* const boxTitles[] = { "Oscillator 1", "Oscillator 2", "Mix" };
@@ -173,7 +201,8 @@ public:
     {
         using LF = MuLookAndFeel;
         using mu_ui::s;
-        const int pad = s(8), gap = s(6);
+        const int pad = s(8);
+        const int gap = MuLookAndFeel::isMetal(*this) ? s(10) : s(6);   // metal: room for the painted borders
         auto area = getLocalBounds().reduced(pad);
         area.removeFromBottom(pad);
 

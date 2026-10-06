@@ -32,6 +32,7 @@ private:
     void timerCallback() override;
     bool cellAt(juce::Point<int> p, int& track, int& step) const;
     juce::Rectangle<int> gridArea() const;
+    void paintMetal(juce::Graphics&, int track, int steps, juce::Colour col);
     juce::Rectangle<int> rowArea() const;
     juce::Colour trackColour(int t) const;
 

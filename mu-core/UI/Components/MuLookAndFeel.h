@@ -215,6 +215,12 @@ public:
     // Width a name plate needs for `text` at plate height `h` (text plus room for the screws).
     static float namePlateWidth(const juce::String& text, float h);
 
+    // A metal panel (drawAccentPanel) with its title on a name plate in the top-left corner.
+    static void drawTitledPanel(juce::Graphics&, juce::Rectangle<float> bounds,
+                                const juce::String& title, juce::Colour accent);
+    // A name plate sized to `text`, centred in `span` (e.g. a section's label row).
+    static void drawCentredNamePlate(juce::Graphics&, juce::Rectangle<float> span, const juce::String& text);
+
     // Rotary slider
     void drawRotarySlider(juce::Graphics&, int x, int y, int w, int h,
                           float sliderPos, float startAngle, float endAngle,

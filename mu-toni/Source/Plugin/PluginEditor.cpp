@@ -88,6 +88,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     enginePanel.setLayer(0);
     mixerOverlay.loadFromAPVTS();
     clearPresetDirty();
+
+    // The family metal look.
+    setMetalStyle(true);
 }
 
 } // namespace mu_toni

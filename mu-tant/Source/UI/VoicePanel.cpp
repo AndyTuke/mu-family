@@ -598,6 +598,23 @@ void VoicePanel::paint(juce::Graphics& g)
         (size_t)(proc.getChannelColourIndex(currentVoice) % MuLookAndFeel::kChannelPaletteSize)];
     const auto muted = MuLookAndFeel::colour(Id::mutedText);
 
+    // Metal style: preset bar in the voice colour, every section a metal panel in the app
+    // colour with its name on a plate, and the gate editor + modulators on metal panels.
+    if (MuLookAndFeel::isMetal(*this))
+    {
+        const auto accent = MuLookAndFeel::appAccent(*this);
+        MuLookAndFeel::drawAccentPanel(g, headerBar.getBounds().expanded(hdrPanelPad(), s(2)).toFloat().reduced(2.0f), voiceCol);
+        const std::pair<const juce::Rectangle<int>*, const char*> sections[] = {
+            { &osc1PanelR, "OSC 1" }, { &osc2PanelR, "OSC 2" }, { &noisePanelR, "NOISE" }, { &modNoisePanelR, "X-MOD" },
+            { &filterPanelR, "FILTER" }, { &insertPanelR, "EFFECTS" }, { &mixerPanelR, "MIXER" } };
+        for (const auto& [r, title] : sections)
+            if (! r->isEmpty())
+                MuLookAndFeel::drawTitledPanel(g, r->toFloat().reduced(2.0f), title, accent);
+        MuLookAndFeel::drawAccentPanel(g, gatingDesigner.getBounds().expanded(s(2)).toFloat(), accent);
+        MuLookAndFeel::drawAccentPanel(g, modulatorPanel.getBounds().expanded(s(2)).toFloat(), accent);
+        return;
+    }
+
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));
 
     // Panel styling: 2px rounded border in the per-voice palette colour, small
@@ -634,8 +651,11 @@ void VoicePanel::resized()
 
     // ── Shared header bar + Root / Scale row ────────────────────────────────
     const int barH = s(ChannelHeaderBar::kHeight);   // 28
-    headerBar.setBounds(0, 0, w, barH);
-    const int tonalY = barH + s(2);
+    // Metal style: the header sits inside its own painted preset-bar panel.
+    const int hdrX = MuLookAndFeel::isMetal(*this) ? s(4) : 0;
+    const int hdrY = MuLookAndFeel::isMetal(*this) ? s(2) : 0;
+    headerBar.setBounds(hdrX, hdrY, w - 2 * hdrX, barH);
+    const int tonalY = barH + 2 * hdrY + s(2);
     {
         const int labelW = s(44);
         int x = pad;
@@ -829,8 +849,10 @@ void VoicePanel::resized()
     }
 
     // ── Modulator panel — fills remaining height (minimum matches mu-clid) ───
+    // Metal style shows one target at a time, so the modulators fit a shorter area.
+    const int modMinH = MuLookAndFeel::isMetal(*this) ? s(280) : s(332);
     modulatorPanel.setBounds(pad, y, w - 2 * pad,
-                             juce::jmax(s(332), h - y - pad));
+                             juce::jmax(modMinH, h - y - pad));
 }
 
 // Item-ID ranges. Factory tables use 1..N (= APVTS index + 1). The Wavetables/

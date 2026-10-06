@@ -597,6 +597,21 @@ float MuLookAndFeel::namePlateWidth(const juce::String& text, float h)
     return juce::GlyphArrangement::getStringWidth(f, text) + h * 2.2f;
 }
 
+void MuLookAndFeel::drawTitledPanel(juce::Graphics& g, juce::Rectangle<float> r,
+                                    const juce::String& title, juce::Colour accent)
+{
+    drawAccentPanel(g, r, accent);
+    const float h = mu_ui::sf((float) kNamePlateH);
+    drawNamePlate(g, { r.getX() + mu_ui::sf(8.0f), r.getY() + mu_ui::sf(5.0f), namePlateWidth(title, h), h }, title);
+}
+
+void MuLookAndFeel::drawCentredNamePlate(juce::Graphics& g, juce::Rectangle<float> span, const juce::String& text)
+{
+    const float h = mu_ui::sf((float) kNamePlateH);
+    const float w = namePlateWidth(text, h);
+    drawNamePlate(g, { span.getCentreX() - w * 0.5f, span.getCentreY() - h * 0.5f, w, h }, text);
+}
+
 void MuLookAndFeel::drawLcdGlass(juce::Graphics& g, juce::Rectangle<float> r, juce::Colour lit, bool backlit)
 {
     const auto& L     = lighting();

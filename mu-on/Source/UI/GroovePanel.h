@@ -90,26 +90,49 @@ public:
 
     void resized() override
     {
+        // Metal style: each area sits inside its own metal panel, so children are inset.
+        const bool metal = MuLookAndFeel::isMetal(*this);
+        const int  in    = metal ? mu_ui::s(MuLookAndFeel::kChannelInset) : 0;
+
         auto r = getLocalBounds();
-        header.setBounds(r.removeFromTop(mu_ui::s(ChannelHeaderBar::kHeight)));
+        headerR = r.removeFromTop(mu_ui::s(ChannelHeaderBar::kHeight) + (metal ? mu_ui::s(4) : 0));
+        header.setBounds(metal ? headerR.reduced(mu_ui::s(4), mu_ui::s(2)) : headerR);
         r.removeFromTop(mu_ui::s(4));
 
         // Shared modulation module at the bottom (same footprint as the other products).
-        modPanel.setBounds(r.removeFromBottom(juce::jmax(mu_ui::s(220), juce::roundToInt(r.getHeight() * 0.42f))));
+        modR = r.removeFromBottom(juce::jmax(mu_ui::s(220), juce::roundToInt(r.getHeight() * 0.42f)));
+        modPanel.setBounds(modR.reduced(in));
         r.removeFromTop(mu_ui::s(4));
 
         // The selected lane's step editor sits just under the engine params; for the Rumble
         // lane the drawable bar-volume envelope takes the same slot instead.
         {
-            auto slot = r.removeFromBottom(mu_ui::s(kGridH));
+            slotR = r.removeFromBottom(mu_ui::s(kGridH) + 2 * in);
             r.removeFromBottom(mu_ui::s(4));
-            if (currentChannel == Rumble) rumbleEnvEditor.setBounds(slot);
-            else                          grid.setBounds(slot);
+            if (currentChannel == Rumble) rumbleEnvEditor.setBounds(slotR.reduced(in));
+            else                          grid.setBounds(slotR.reduced(in));
         }
 
         // Engine params fill what's left, directly under the header.
-        engine.setBounds(r);
+        engineR = r;
+        engine.setBounds(r.reduced(in));
     }
+
+    void paint(juce::Graphics& g) override
+    {
+        g.fillAll(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
+        if (! MuLookAndFeel::isMetal(*this)) return;
+
+        // Metal style: preset bar in the lane colour, every other area in the app colour.
+        const auto laneCol = MuLookAndFeel::channelPalette[(size_t) juce::jlimit(0, MuLookAndFeel::kChannelPaletteSize - 1,
+                                                                                  proc.getChannelColourIndex(currentChannel))];
+        const auto accent  = MuLookAndFeel::appAccent(*this);
+        MuLookAndFeel::drawAccentPanel(g, headerR.reduced(2).toFloat(), laneCol);
+        for (auto rr : { engineR, slotR, modR })
+            MuLookAndFeel::drawAccentPanel(g, rr.reduced(2).toFloat(), accent);
+    }
+
+    void lookAndFeelChanged() override { resized(); repaint(); }
 
 private:
     void timerCallback() override
@@ -146,6 +169,7 @@ private:
     std::array<ModDestProvider, kNumChannels> modProviders;
 
     static constexpr int kGridH = GrooveGrid::kStepEditorHeight;
+    juce::Rectangle<int> headerR, engineR, slotR, modR;   // panel areas (metal style)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GroovePanel)
 };

@@ -76,6 +76,8 @@ public:
 
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void lookAndFeelChanged() override { resized(); repaint(); }   // metal style changes the header inset
+    int  hdrPanelPad() const { return mu_ui::s(4); }   // preset-bar panel margin round the header (metal)
 
 private:
     PluginProcessor& proc;

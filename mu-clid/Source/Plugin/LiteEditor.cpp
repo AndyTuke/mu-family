@@ -138,6 +138,10 @@ LiteEditor::LiteEditor(PluginProcessor& p)
 
     // Window size respects current scale.
     setSize(mu_ui::s(kLiteW), mu_ui::s(kLiteH));
+
+    // The family metal look (LCD dropdowns, engraved labels, metal panel).
+    lookAndFeel.setMetalStyle(true);
+    sendLookAndFeelChange();
 }
 
 LiteEditor::~LiteEditor()
@@ -173,8 +177,11 @@ void LiteEditor::paint(juce::Graphics& g)
     // Window background behind transport and status bars.
     g.fillAll(MuLookAndFeel::colour(Id::windowBackground));
     // Content area matches full-plugin RhythmPanel background (#232322 panelBackground).
+    const auto content = getLocalBounds().withTrimmedTop(s(kTransportH)).withTrimmedBottom(s(kStatusH));
     g.setColour(MuLookAndFeel::colour(Id::panelBackground));
-    g.fillRect(getLocalBounds().withTrimmedTop(s(kTransportH)).withTrimmedBottom(s(kStatusH)));
+    g.fillRect(content);
+    if (MuLookAndFeel::isMetal(*this))
+        MuLookAndFeel::drawAccentPanel(g, content.reduced(2).toFloat(), MuLookAndFeel::appAccent(*this));
 }
 
 void LiteEditor::resized()

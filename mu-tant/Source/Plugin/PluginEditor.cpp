@@ -113,6 +113,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     voicePanel.setVoice(0);
     mixerOverlay.loadFromAPVTS();
     clearPresetDirty();
+
+    // The family metal look, in mu-Tant's green.
+    setMetalStyle(true, MuLookAndFeel::channelPalette[0]);
 }
 
 PluginEditor::~PluginEditor()

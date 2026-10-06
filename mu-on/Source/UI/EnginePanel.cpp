@@ -46,6 +46,15 @@ void EnginePanel::setChannel(int idx)
 void EnginePanel::paint(juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
+
+    // Metal style: the host's metal panel shows through; the title is a name plate.
+    if (MuLookAndFeel::isMetal(*this))
+    {
+        const float h = mu_ui::sf((float) MuLookAndFeel::kNamePlateH);
+        const auto  title = (proc.getChannelName(currentChannel) + " engine").toUpperCase();
+        MuLookAndFeel::drawNamePlate(g, { mu_ui::sf(8.0f), mu_ui::sf(6.0f), MuLookAndFeel::namePlateWidth(title, h), h }, title);
+        return;
+    }
     g.fillAll(MuLookAndFeel::colour(Id::panelBackground));
 
     const auto accent = MuLookAndFeel::channelPalette[

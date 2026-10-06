@@ -63,11 +63,17 @@ void GrooveGrid::resized()
 void GrooveGrid::paint(juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
-    g.fillAll(MuLookAndFeel::colour(Id::panelBackground));
 
     const int  t     = selectedTrack;          // single-lane editor: only the selected lane
     const int  steps = StepPattern::kNumSteps;
     const auto col   = trackColour(t);
+
+    if (MuLookAndFeel::isMetal(*this))
+    {
+        paintMetal(g, t, steps, col);
+        return;
+    }
+    g.fillAll(MuLookAndFeel::colour(Id::panelBackground));
 
     // Lane title above the step row.
     auto title = gridArea().removeFromTop(mu_ui::s(kTitleH));
@@ -109,6 +115,58 @@ void GrooveGrid::paint(juce::Graphics& g)
             g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder).withAlpha(0.7f));
             g.setFont(juce::Font(juce::FontOptions(mu_ui::sf(9.0f))));
             g.drawText(mu_ui::cachedIntLabel(s + 1), cell.toNearestInt(), juce::Justification::topLeft, false);
+        }
+    }
+}
+
+// Metal style: the lane name on a plate, each step a lamp behind a dark lens — on steps lit,
+// accents brighter at the centre, beat starts marked by a hint of colour; empty steps stay
+// dark even under the playhead (family lamp rule).
+void GrooveGrid::paintMetal(juce::Graphics& g, int t, int steps, juce::Colour col)
+{
+    const auto& L = MuLookAndFeel::lighting();
+    const auto  title  = (proc.getChannelName(t) + " steps").toUpperCase();
+    const float plateH = mu_ui::sf((float) MuLookAndFeel::kNamePlateH);
+    const auto  band   = gridArea().removeFromTop(mu_ui::s(kTitleH)).toFloat();
+    MuLookAndFeel::drawNamePlate(g, { band.getX(), band.getCentreY() - plateH * 0.5f,
+                                      MuLookAndFeel::namePlateWidth(title, plateH), plateH }, title);
+
+    auto row = rowArea();
+    const float cellW = row.getWidth() / (float) steps;
+    const float rowH  = (float) row.getHeight();
+    for (int s = 0; s < steps; ++s)
+    {
+        const juce::Rectangle<float> cell((float) row.getX() + s * cellW + 1.5f, (float) row.getY() + 1.5f,
+                                          cellW - 3.0f, rowH - 3.0f);
+        const bool on     = pattern.isOn(t, s);
+        const bool isBeat = (s % 4) == 0;
+        float lit = on ? L.lampOn : (isBeat ? L.lampBeat : L.lampOff);
+        if (on && s == playheadStep) lit = juce::jmin(1.0f, lit + L.lampPlayhead);
+
+        const auto lens = MuLookAndFeel::lampColour(col, lit);
+        juce::Path shape;
+        shape.addRoundedRectangle(cell, 3.0f);
+        if (on)
+        {
+            MuLookAndFeel::drawLamp(g, shape, {}, lens, cell.getCentre(), juce::jmax(cell.getWidth(), cell.getHeight()) * 0.6f);
+            if (pattern.isAccent(t, s))   // accent: a hotter centre
+            {
+                g.setColour(lens.brighter(L.lampHot * 2.0f));
+                g.fillRoundedRectangle(cell.reduced(cell.getWidth() * 0.30f, cell.getHeight() * 0.30f), 2.0f);
+            }
+        }
+        else
+        {
+            g.setColour(lens);
+            g.fillPath(shape);
+        }
+        MuLookAndFeel::drawRecessedScreen(g, cell);
+
+        if (isBeat)   // step number on the beat-group starts (1/5/9/13)
+        {
+            g.setFont(juce::Font(juce::FontOptions(mu_ui::sf(9.0f))));
+            MuLookAndFeel::drawEngravedText(g, mu_ui::cachedIntLabel(s + 1), cell.reduced(2.0f).toNearestInt(),
+                                            juce::Justification::topLeft, MuLookAndFeel::colour(MuLookAndFeel::labelText), false);
         }
     }
 }

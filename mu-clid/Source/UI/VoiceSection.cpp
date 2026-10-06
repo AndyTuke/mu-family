@@ -139,12 +139,9 @@ void VoiceSection::paint(juce::Graphics& g)
     g.drawLine(div3X, kDivInset, div3X, (float)h - kDivInset, 0.5f);
 
     // Section names: a name plate centred over each subsection.
-    const float plateH = mu_ui::sf(kPlateH);
     auto plate = [&](const char* name, int x, int w)
     {
-        const float pw = MuLookAndFeel::namePlateWidth(name, plateH);
-        const float cx = (float) s(x) + (float) s(w) * 0.5f;
-        MuLookAndFeel::drawNamePlate(g, { cx - pw * 0.5f, ((float) s(labelH) - plateH) * 0.5f, pw, plateH }, name);
+        MuLookAndFeel::drawCentredNamePlate(g, { (float) s(x), 0.0f, (float) s(w), (float) s(labelH) }, name);
     };
     plate("PITCH",  0,    kPitchW);
     plate("FILTER", fltX, 6 * kFltW);
