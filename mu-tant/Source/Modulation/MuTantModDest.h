@@ -4,7 +4,7 @@
 #include "UI/Components/DropdownSelect.h"
 #include "Audio/AlgorithmNames.h"         // mu-core: kInsertAlgorithmNames
 #include "Audio/InsertSlotConfig.h"        // mu-core: kInsertAlgoSlots / kInsertSlotCount
-#include "Modulation/ModulationMatrix.h"  // mu-core: registerDepthScale
+#include "Modulation/ModTarget.h"         // mu-core: the standard target row
 
 #include <array>
 #include <cstring>
@@ -16,7 +16,9 @@
 // Each entry has:
 //   - id:    the stable string ID used in saved assignments + the audio-thread
 //            paramValues map (e.g. "filter.cutoff", "osc1.pos").
-//   - alias: the human-friendly label shown in the destination dropdown.
+//   - label: the human-friendly label shown in the destination dropdown.
+//   - section / param: dropdown heading and the per-voice parameter it drives.
+// Depth is a percentage of that parameter's range (family standard, ModTarget.h).
 //
 // New destinations MUST be appended to the end. The 1-based dropdown indices
 // are persisted across UI sessions; saved .muTant assignments reference the
@@ -25,86 +27,54 @@
 namespace mu_tant
 {
 
-struct ModDest { const char* id; const char* alias; const char* section; };
+// One row per target: id, dropdown label, section, per-voice parameter (without the "v{N}_"
+// prefix). The family-standard row — see mu-core Modulation/ModTarget.h.
+using ModDest = mu_mod::ModTarget;
 
 inline constexpr ModDest kModDestTable[] = {
     // ── Pitch (osc1) ────────────────────────────────────────────────────────
-    { "osc1.octave",  "Osc1 Octave",   "Osc 1" },
-    { "osc1.semi",    "Osc1 Semi",     "Osc 1" },
-    { "osc1.fine",    "Osc1 Fine",     "Osc 1" },
-    { "osc1.pos",     "Osc1 Position", "Osc 1" },
-    { "osc1.penv.prop", "Pitch Env",   "Osc 1" },
+    { "osc1.octave",  "Osc1 Octave",   "Osc 1", "o1_oct" },
+    { "osc1.semi",    "Osc1 Semi",     "Osc 1", "o1_semi" },
+    { "osc1.fine",    "Osc1 Fine",     "Osc 1", "o1_fine" },
+    { "osc1.pos",     "Osc1 Position", "Osc 1", "o1_pos" },
+    { "osc1.penv.prop", "Pitch Env",   "Osc 1", "o1_penv_depth" },
     // ── Pitch (osc2) ────────────────────────────────────────────────────────
-    { "osc2.octave",  "Osc2 Octave",   "Osc 2" },
-    { "osc2.semi",    "Osc2 Semi",     "Osc 2" },
-    { "osc2.fine",    "Osc2 Fine",     "Osc 2" },
-    { "osc2.pos",     "Osc2 Position", "Osc 2" },
-    { "osc2.penv.prop", "Pitch Env",   "Osc 2" },
+    { "osc2.octave",  "Osc2 Octave",   "Osc 2", "o2_oct" },
+    { "osc2.semi",    "Osc2 Semi",     "Osc 2", "o2_semi" },
+    { "osc2.fine",    "Osc2 Fine",     "Osc 2", "o2_fine" },
+    { "osc2.pos",     "Osc2 Position", "Osc 2", "o2_pos" },
+    { "osc2.penv.prop", "Pitch Env",   "Osc 2", "o2_penv_depth" },
     // ── Cross-mod (2-lane bus model — mu-tant-xmod-design.md) ─────────────────
-    { "xmod.index",   "X-Mod Index",   "X-Mod" },
-    { "xmod.depth",   "X-Mod Depth",   "X-Mod" },
-    { "xmod.ssb",     "X-Mod SSB",     "X-Mod" },
+    { "xmod.index",   "X-Mod Index",   "X-Mod", "xmod_index" },
+    { "xmod.depth",   "X-Mod Depth",   "X-Mod", "xmod_depth" },
+    { "xmod.ssb",     "X-Mod SSB",     "X-Mod", "xmod_ssb" },
     // ── Levels ────────────────────────────────────────────────────────────────
-    { "osc1.level",   "Osc1 Level",    "Levels" },
-    { "osc2.level",   "Osc2 Level",    "Levels" },
-    { "noise.level",  "Noise Level",   "Levels" },
+    { "osc1.level",   "Osc1 Level",    "Levels", "o1_lvl" },
+    { "osc2.level",   "Osc2 Level",    "Levels", "o2_lvl" },
+    { "noise.level",  "Noise Level",   "Levels", "noise_lvl" },
     // ── Filter 1 (cutoff/resonance are shared mu-core dests; drive/lo-cut use the
     //    ".prop" proportion convention → depthScaleFor=1.0, no mu-core edit) ──────
-    { "filter.cutoff",     "Cutoff",     "Filter 1" },
-    { "filter.resonance",  "Resonance",  "Filter 1" },
-    { "filter.drive.prop", "Drive",      "Filter 1" },
-    { "filter.locut.prop", "Low Cut",    "Filter 1" },
-    { "filter.env.prop",   "Env Depth",  "Filter 1" },
+    { "filter.cutoff",     "Cutoff",     "Filter 1", "flt_cut" },
+    { "filter.resonance",  "Resonance",  "Filter 1", "flt_res" },
+    { "filter.drive.prop", "Drive",      "Filter 1", "flt_drv" },
+    { "filter.locut.prop", "Low Cut",    "Filter 1", "flt_lo_cut" },
+    { "filter.env.prop",   "Env Depth",  "Filter 1", "flt_env_depth" },
     // ── Filter 2 (proportion-space — ".prop" → depthScaleFor=1.0, no mu-core edit) ──
-    { "filter2.cutoff.prop",    "Cutoff",     "Filter 2" },
-    { "filter2.resonance.prop", "Resonance",  "Filter 2" },
-    { "filter2.drive.prop",     "Drive",      "Filter 2" },
-    { "filter2.locut.prop",     "Low Cut",    "Filter 2" },
-    { "filter2.env.prop",       "Env Depth",  "Filter 2" },
+    { "filter2.cutoff.prop",    "Cutoff",     "Filter 2", "flt2_cut" },
+    { "filter2.resonance.prop", "Resonance",  "Filter 2", "flt2_res" },
+    { "filter2.drive.prop",     "Drive",      "Filter 2", "flt2_drv" },
+    { "filter2.locut.prop",     "Low Cut",    "Filter 2", "flt2_lo_cut" },
+    { "filter2.env.prop",       "Env Depth",  "Filter 2", "flt2_env_depth" },
     // ── Amp ─────────────────────────────────────────────────────────────────
-    { "level",        "Level",         "Amp"    },
+    { "level",        "Level",         "Amp", "level" },
     // ── Insert (normalised 0..1 — same IDs as mu-clid so depthScaleFor=1.0) ──
-    { "insert.p1",    "Insert P1",     "Insert" },
-    { "insert.p2",    "Insert P2",     "Insert" },
-    { "insert.p3",    "Insert P3",     "Insert" },
-    { "insert.p4",    "Insert P4",     "Insert" },
+    { "insert.p1",    "Insert P1",     "Insert", "insP1" },
+    { "insert.p2",    "Insert P2",     "Insert", "insP2" },
+    { "insert.p3",    "Insert P3",     "Insert", "insP3" },
+    { "insert.p4",    "Insert P4",     "Insert", "insP4" },
 };
 
 inline constexpr int kModDestCount = (int) (sizeof(kModDestTable) / sizeof(kModDestTable[0]));
-
-// Register mu-tant's engine-specific destination depth scales with mu-core (so mu-core no
-// longer enumerates mu-tant param ids). Idempotent + thread-safe via call_once; call from
-// the PluginProcessor ctor so it runs once on the message thread before any audio reads the
-// scales.
-//
-// These dests are now routed through the shared mu_mod::resolveLane helper, which seeds each
-// in PROPORTION space (slider NormalisableRange → 0..1) and writes the modulated value back in
-// the param's own units — so every scale is 1.0 (a full-depth mod sweeps the whole range and
-// clamps at the rails, matching mu-on + the `.prop` convention). The previous display-unit
-// scales (osc=6/24/200/255, level=66) equalled each param's range width, so the modulation
-// magnitude is unchanged; only the rail-clamping is new. The registration still overrides the
-// mu-core 0..100 default of 100 (the ids don't end in `.prop`, so they need an explicit entry).
-// `filter.cutoff`/`filter.resonance` are shared mu-core dests (1.0 / 0.99) — left untouched here
-// so a co-loaded mu-clid keeps its scales; mu-tant's `.prop` dests need no entry.
-inline void registerDepthScales()
-{
-    static std::once_flag once;
-    std::call_once(once, []
-    {
-        // Every destination in the table is seeded as a proportion, so each one needs scale
-        // 1.0 — registered from the table itself so a new destination can't be missed (an
-        // unregistered id falls back to mu-core's 100 and runs 100x too strong). ".prop" ids
-        // already get 1.0; the shared filter.* dests keep mu-core's own scales.
-        for (const auto& d : kModDestTable)
-        {
-            const std::string_view id(d.id);
-            const bool isProp   = id.size() >= 5 && id.substr(id.size() - 5) == ".prop";
-            const bool isShared = id.substr(0, 7) == "filter.";
-            if (! isProp && ! isShared)
-                ModulationMatrix::registerDepthScale(d.id, 1.0f);
-        }
-    });
-}
 
 // Discrete units per direction for a destination, so a STEPPED modulator's editor snaps
 // the graphic to whole units (an octave = 3 steps up/down, a scale degree = 12). Continuous
@@ -171,7 +141,7 @@ inline ModDestProvider makeModDestProvider()
             {
                 // Use the per-algo slot label when available, otherwise the generic alias.
                 const int slot = i - (kModDestCount - 4);   // 0..3 for the 4 insert destinations
-                const char* label = kModDestTable[i].alias;
+                const char* label = kModDestTable[i].label;
                 if (driveChar > 0
                     && driveChar < (int) std::size(mu_audio::kInsertAlgorithmNames) - 1
                     && slot >= 0 && slot < mu_ui::kInsertSlotCount)
@@ -184,7 +154,7 @@ inline ModDestProvider makeModDestProvider()
             }
             else
             {
-                dd.addItem(kModDestTable[i].alias, i + 1);
+                dd.addItem(kModDestTable[i].label, i + 1);
             }
         }
     };

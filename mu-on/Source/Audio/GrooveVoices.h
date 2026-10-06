@@ -63,13 +63,13 @@ public:
             L.map.reserve((size_t) n);
             for (int i = 0; i < n; ++i)
             {
-                L.ids[(size_t) i]    = t[i].propId;
-                L.atoms[(size_t) i]  = apvts.getRawParameterValue(t[i].apvtsId);
-                // A null atom means the dest's apvtsId drifted from the layout — the engine
+                L.ids[(size_t) i]    = t[i].id;
+                L.atoms[(size_t) i]  = apvts.getRawParameterValue(t[i].param);
+                // A null atom means the target's param drifted from the layout — the engine
                 // would silently read a frozen range.start instead. Assert in debug.
                 jassert(L.atoms[(size_t) i] != nullptr);
-                L.ranges[(size_t) i] = apvts.getParameterRange(t[i].apvtsId);
-                L.map.emplace(std::string_view(t[i].propId), 0.0f);   // pre-insert → no audio-thread alloc
+                L.ranges[(size_t) i] = apvts.getParameterRange(t[i].param);
+                L.map.emplace(std::string_view(t[i].id), 0.0f);   // pre-insert → no audio-thread alloc
             }
         }
     }

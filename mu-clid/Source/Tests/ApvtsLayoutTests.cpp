@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include "../Persistence/RhythmParamTable.h"
 #include "../Persistence/PresetHelpers.h"
+#include "Modulation/ModulationDestinations.h"
 
 class ApvtsLayoutTest : public juce::UnitTest
 {
@@ -63,6 +64,14 @@ public:
         }
 
         // ── kRhythmParamDefs - AlgorithmIndex entries have non-null tables ────
+        beginTest ("Modulation targets: every live row names a real per-rhythm parameter");
+        {
+            for (const auto& t : ModDest::kTable)
+                if (t.param != nullptr)
+                    expect (mu_pp::findRhythmParamDef (t.param) != nullptr,
+                            juce::String ("target '") + t.id + "' names unknown parameter '" + t.param + "'");
+        }
+
         beginTest ("AlgorithmIndex params each have a non-null algorithm name table");
         {
             for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)

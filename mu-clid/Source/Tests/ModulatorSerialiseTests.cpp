@@ -17,6 +17,8 @@
 using mu_pp::serialiseModulators;
 using mu_pp::deserialiseModulators;
 using mu_pp::clearModulators;
+using mu_pp::kDepthUnitsProperty;
+using mu_pp::kDepthUnitsRange;
 
 class ModulatorSerialiseTest : public juce::UnitTest
 {
@@ -110,6 +112,46 @@ public:
             expect (juce::String(a2.destinationId) == "filter.cutoff", "destinationId");
             expectWithinAbsoluteError (a2.depth,  42.5f, 1e-4f, "depth");
             expectWithinAbsoluteError (a2.curve, -30.0f, 1e-4f, "curve");
+        }
+
+        beginTest ("Depth standard: old presets' pad modulation moves the same number of steps");
+        {
+            Rhythm old;
+            ModulationAssignment pad;  pad.id = "p"; pad.sourceId = "cs0_output"; pad.destinationId = "euclid.a.prePad"; pad.depth = 63.0f;
+            ModulationAssignment cut;  cut.id = "c"; cut.sourceId = "cs0_output"; cut.destinationId = "filter.cutoff";   cut.depth = 50.0f;
+            old.modulationMatrix.addAssignment (pad);
+            old.modulationMatrix.addAssignment (cut);
+
+            auto saved = serialiseModulators (old);
+            expect (saved.getProperty (kDepthUnitsProperty).toString() == kDepthUnitsRange, "new saves carry the depth-units marker");
+
+            // Without the marker the data predates the standard: pad depth was % of 12 steps.
+            auto legacy = saved.createCopy();
+            legacy.removeProperty (kDepthUnitsProperty, nullptr);
+            Rhythm loaded;
+            clearModulators (loaded);
+            deserialiseModulators (legacy, loaded);
+            for (const auto& a2 : loaded.modulationMatrix.getAssignments())
+            {
+                if (a2.destinationId == "euclid.a.prePad")
+                {
+                    const float oldSteps = 63.0f / 100.0f * 12.0f;          // 63% of the old 12-step swing
+                    const float newSteps = a2.depth / 100.0f * 63.0f;       // the upgraded depth, % of 0..63
+                    expectWithinAbsoluteError (newSteps, oldSteps, 1e-3f, "same number of steps after the upgrade");
+                }
+                else
+                {
+                    expectWithinAbsoluteError (a2.depth, 50.0f, 1e-4f, "other targets load unchanged");
+                }
+            }
+
+            // With the marker, nothing is rescaled.
+            Rhythm current;
+            clearModulators (current);
+            deserialiseModulators (saved, current);
+            for (const auto& a2 : current.modulationMatrix.getAssignments())
+                if (a2.destinationId == "euclid.a.prePad")
+                    expectWithinAbsoluteError (a2.depth, 63.0f, 1e-4f, "current-format depth untouched");
         }
 
         beginTest ("Invalid source/dest IDs are rejected with diagnostics");

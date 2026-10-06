@@ -176,7 +176,6 @@ PluginProcessor::PluginProcessor()
     midiClockSync.setEnabled (appSettings->getBoolValue("midiSyncEnabled",  false));
     midiClockSync.setMessages(appSettings->getIntValue ("midiSyncMessages", 2));
 
-    registerDepthScales();               // register mu-toni mod-dest depth scales (1.0, proportion space)
     registerFxListeners();
     syncAllFxParams();   // JUCE doesn't fire parameterChanged on construction
     cacheVoiceParamPointers();
@@ -184,14 +183,14 @@ PluginProcessor::PluginProcessor()
 
 namespace
 {
-    // Maps each modulation destination (D_*) to its per-voice APVTS param slot (vpi::*).
-    // Order MUST match mu_toni::ModDestIndex / kModDestTable.
-    constexpr int kModDestVpSlot[kNumModDests] = {
-        vpi::dir, vpi::octs, vpi::inv, vpi::chord, vpi::root, vpi::roct, vpi::rate, vpi::gate, vpi::porta,
-        vpi::o1l, vpi::o2l, vpi::o2s, vpi::pw, vpi::noise,
-        vpi::cut, vpi::res, vpi::drv, vpi::feDep,
-        vpi::aeL, vpi::peDep,
-    };
+    // The per-voice slot (vpi::*) a modulation target drives, found from its table param name.
+    int vpSlotFor(const char* param)
+    {
+        for (int k = 0; k < vpi::COUNT; ++k)
+            if (std::strcmp(vpi::suffix[k], param) == 0) return k;
+        jassertfalse;   // a table row names a parameter that does not exist
+        return 0;
+    }
 }
 
 void PluginProcessor::cacheVoiceParamPointers()
@@ -207,9 +206,9 @@ void PluginProcessor::cacheVoiceParamPointers()
     for (int k = 0; k < kNumModDests; ++k)
     {
         modDestIds[(size_t) k]    = kModDestTable[k].id;
-        modDestRanges[(size_t) k] = apvts.getParameterRange("v0_" + juce::String(vpi::suffix[kModDestVpSlot[k]]));
+        modDestRanges[(size_t) k] = apvts.getParameterRange("v0_" + juce::String(kModDestTable[k].param));
         for (int i = 0; i < kMaxChannels; ++i)
-            modDestAtoms[(size_t) i][(size_t) k] = (i < kNumChannels) ? vp[(size_t) i][(size_t) kModDestVpSlot[k]]
+            modDestAtoms[(size_t) i][(size_t) k] = (i < kNumChannels) ? vp[(size_t) i][(size_t) vpSlotFor(kModDestTable[k].param)]
                                                                       : nullptr;
         modParamValues[kModDestTable[k].id] = 0.0f;   // pre-size the map (no audio-thread alloc)
     }

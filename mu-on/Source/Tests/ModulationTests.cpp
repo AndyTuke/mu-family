@@ -1,6 +1,6 @@
 // Unit tests for mu-On's per-lane modulation wiring:
-//   • the generic ".prop" proportion-space scale rule (mu-core depthScaleFor) drives a
-//     full-depth mod across the whole 0..1 proportion (scale 1.0, not the 100 default),
+//   • depth is a percentage of the knob's range: a full-depth mod moves the whole 0..1
+//     proportion (the family standard, mu-core Modulation/ModTarget.h),
 //   • the per-lane MuOnModDest provider resolves dropdown ids <-> destination strings and
 //     rejects another lane's destinations,
 //   • a lane's modulators serialise/deserialise round-trip, dropping foreign destinations.
@@ -17,6 +17,7 @@
 #include "Modulation/ModulationAssignment.h"
 #include "Modulation/ModulatorSerialise.h"
 #include "Modulation/MuOnModDest.h"
+#include "Modulation/ModTargetChecks.h"   // mu-core: the family modulation-target checks
 
 using namespace mu_on;
 
@@ -48,14 +49,25 @@ public:
             expectWithinAbsoluteError(pv["k.tune.prop"], 1.25f, 0.001f);
         }
 
+        beginTest("every lane's targets: depth is a percentage of the knob's range");
+        {
+            juce::StringArray wrong;
+            wrong.addArray(mu_mod::checks::depthNotProportional(kKickDests));
+            wrong.addArray(mu_mod::checks::depthNotProportional(kBassDests));
+            wrong.addArray(mu_mod::checks::depthNotProportional(kHatDests));
+            wrong.addArray(mu_mod::checks::depthNotProportional(kSnareDests));
+            wrong.addArray(mu_mod::checks::depthNotProportional(kRumbleDests));
+            expect(wrong.isEmpty(), "targets whose depth isn't a % of range: " + wrong.joinIntoString(", "));
+        }
+
         beginTest("per-lane destination tables are lane-scoped");
         {
             // b.cut is the 3rd Bass destination (index 2) and backs the b_cut param.
             int n = 0;
             const ModDestEntry* bassT = destsForLane(Bass, n);
             expect(n >= 3);
-            expect(std::string(bassT[2].propId) == "b.cut.prop");
-            expect(std::string(bassT[2].apvtsId) == "b_cut");
+            expect(std::string(bassT[2].id) == "b.cut.prop");
+            expect(std::string(bassT[2].param) == "b_cut");
 
             // A Kick destination is not valid for the Bass lane, and vice-versa.
             expect(isValidLaneDest(Bass, "b.cut.prop"));
@@ -80,7 +92,7 @@ public:
                 expectEquals(n, (int) expected.size(),
                              "lane " + juce::String(lane) + " dest count");
                 for (int i = 0; i < n && i < (int) expected.size(); ++i)
-                    expect(std::string(t[i].propId) == expected[(size_t) i],
+                    expect(std::string(t[i].id) == expected[(size_t) i],
                            "lane " + juce::String(lane) + " dest[" + juce::String(i)
                                + "] == " + juce::String(expected[(size_t) i]));
             };

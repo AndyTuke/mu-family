@@ -13,70 +13,9 @@
 static constexpr auto kMetaPrefix = "assign_";
 static constexpr auto kMetaSuffix = "_depth";
 
-// ── Modulation destination depth-scale registry ───────────────────────────────
-// Formula (in process()): amount = srcVal [-100,+100] * depth [-100,+100] * scale * 0.0001
-// At depth=100%, srcVal=100%: amount = scale. `scale` is the max useful additive offset in
-// the units the product seeds into paramValues (the family "50% mod → 50% knob turn" rule).
-//
-// mu-core stays plugin-agnostic: it knows only (1) the generic `.prop` convention — any id
-// ending ".prop" carries a 0..1 proportion (scale 1.0), so the product seeds/writes back via
-// each slider's NormalisableRange and needs no entry here (mu-on uses this for everything);
-// (2) the shared voice/filter/insert vocabulary that mu-core's own VoiceEngine + filter +
-// InsertSubsection define (seeded below); (3) a 100 default for any 0..100 display dest.
-// Product-ENGINE-specific destinations (mu-tant `osc1.*`, mu-clid `euclid.*`/`ks.*`/`voc.*`)
-// are registered by each product at static-init via ModulationMatrix::registerDepthScale, so
-// the shared platform no longer enumerates plugin param ids.
-static std::unordered_map<std::string, float>& depthScaleRegistry()
-{
-    // Born with mu-core's shared voice/filter/insert scales; products append their own.
-    static std::unordered_map<std::string, float> registry = []
-    {
-        return std::unordered_map<std::string, float>{
-            // Proportion-space shared-voice dests (seed = slider proportion → scale 1.0).
-            { "filter.cutoff", 1.0f }, { "filter.lowCut", 1.0f },
-            { "amp.attack",   1.0f },  { "amp.decay",    1.0f },
-            { "fenv.attack",  1.0f },  { "fenv.decay",   1.0f },
-            // Additive-in-display shared-voice dests (scale = full slider range).
-            { "pitch.semitones", 24.0f }, { "pitch.octave", 72.0f },
-            { "fenv.depth", 48.0f },      { "pitch.envDepth", 24.0f },
-            { "accentDb", 12.0f },        { "amp.level", 66.0f },
-            { "filter.resonance", 0.99f },
-            // Shared insert slots — values stored NORMALISED 0..1, so a full-depth mod must
-            // span 0..1 → scale 1.0 (the default 100 would saturate them to a binary on/off).
-            { "insert.output", 24.0f }, { "insert.bits", 1.0f },
-            { "insert.p1", 1.0f }, { "insert.p2", 1.0f }, { "insert.p3", 1.0f }, { "insert.p4", 1.0f },
-        };
-    }();
-    return registry;
-}
-
-// Per-destination full-swing magnitude in the same units as paramValues. `.prop` → 1.0;
-// otherwise the registered scale (mu-core generics + product registrations); else 100.
-static float depthScaleFor(const std::string& destId)
-{
-    if (destId.size() >= 5 && destId.compare(destId.size() - 5, 5, ".prop") == 0)
-        return 1.0f;
-    const auto& registry = depthScaleRegistry();
-    const auto it = registry.find(destId);
-    return it != registry.end() ? it->second : 100.0f;   // 0-100 display-scale default
-}
-
-void ModulationMatrix::registerDepthScale(const std::string& destId, float scale)
-{
-    depthScaleRegistry()[destId] = scale;
-}
-
-// true for Hz-domain destinations where modulation must be multiplicative-in-
-// octaves rather than additive-in-Hz (so a fixed depth sweeps the same octave range
-// whether the base cutoff is 100 Hz or 10 kHz). Matches the filterEnvDepth model in
-// VoiceEngine: `cutoff * 2^(semis/12)`.
-static bool isLogHzDest(const std::string& destId)
-{
-    // Currently empty — filter.cutoff switched to proportion-space modulation. Function
-    // kept for future destinations that may want multiplicative-in-octaves behaviour.
-    (void) destId;
-    return false;
-}
+// Depth is a percentage of the target knob's range (family standard, Modulation/ModTarget.h):
+// every product seeds targets as their knob's 0..1 proportion, so the amount a depth=100%
+// x source=100% assignment adds is exactly 1.0 — no per-target scale factors.
 
 bool ModulationMatrix::isMetaSource(const std::string& src, std::string& outDepId)
 {
@@ -204,16 +143,8 @@ void ModulationMatrix::process(const std::vector<ControlSequence>& sequences,
                 const float bent     = std::pow(mag, k);
                 srcVal = (srcVal < 0.0f ? -bent : bent) * 100.0f;
             }
-            // Scale by the destination's full-swing magnitude so depth=100% × src=100%
-            // produces a musically meaningful sweep regardless of the param's units.
-            const float scale = depthScaleFor(a.destinationId);
-            const float amount = srcVal * a.depth * scale * 0.0001f;
-            if (isLogHzDest(a.destinationId))
-                // multiplicative in semitones — keeps a fixed depth sweeping
-                // the same number of octaves regardless of base cutoff.
-                dstIt->second *= std::pow(2.0f, amount / 12.0f);
-            else
-                dstIt->second += amount;
+            // Proportion of the knob's range: depth=100% × src=100% adds 1.0 (the whole range).
+            dstIt->second += srcVal * a.depth * 0.0001f;
         }
     }
 }

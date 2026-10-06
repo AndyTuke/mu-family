@@ -3,11 +3,9 @@
 #include "UI/ModulatorEditor.h"                     // mu-core: ModDestProvider
 #include "UI/Components/DropdownSelect.h"
 #include "Modulation/ModulationDestinations.h"      // mu-clid kTable
-#include "Modulation/ModulationMatrix.h"            // mu-core: registerDepthScale
 #include "Audio/InsertSlotConfig.h"                 // kInsertAlgoSlots
 #include "Audio/AlgorithmNames.h"                   // kInsertAlgorithmNames
 
-#include <mutex>
 #include <string>
 
 // mu-clid's modulation-destination provider — drives the ModulatorEditor /
@@ -20,33 +18,6 @@
 namespace mu_clid
 {
 
-// Register mu-clid's engine-specific destination depth scales with mu-core (so mu-core no
-// longer enumerates mu-clid param ids). Idempotent + thread-safe via call_once; call from
-// the PluginProcessor ctor so it runs once on the message thread before any audio reads the
-// scales. Euclid hits/rotate/insSt use scale 1.0 (seed/write-back convert via proportion).
-inline void registerDepthScales()
-{
-    static std::once_flag once;
-    std::call_once(once, []
-    {
-        using MM = ModulationMatrix;
-        MM::registerDepthScale("ks.note",   6.0f);
-        MM::registerDepthScale("ks.octave", 3.0f);
-        MM::registerDepthScale("voc.note",  6.0f);
-        MM::registerDepthScale("voc.octave", 4.0f);
-        MM::registerDepthScale("voc.unison", 6.0f);
-        for (const std::string ch : { "a", "b", "c" })
-        {
-            MM::registerDepthScale("euclid." + ch + ".prePad",  12.0f);
-            MM::registerDepthScale("euclid." + ch + ".postPad", 12.0f);
-            MM::registerDepthScale("euclid." + ch + ".insLen",   8.0f);
-            MM::registerDepthScale("euclid." + ch + ".hits",     1.0f);
-            MM::registerDepthScale("euclid." + ch + ".rotate",   1.0f);
-            MM::registerDepthScale("euclid." + ch + ".insSt",    1.0f);
-        }
-    });
-}
-
 inline ModDestProvider makeModDestProvider()
 {
     ModDestProvider p;
@@ -54,7 +25,7 @@ inline ModDestProvider makeModDestProvider()
     p.populate = [](DropdownSelect& dd, int driveChar, bool steppedMode)
     {
         // Helper: add item using the alias from kTable, with 1-based dropdown ID.
-        auto item = [&](int idx) { dd.addItem(ModDest::kTable[idx].alias, idx + 1); };
+        auto item = [&](int idx) { dd.addItem(ModDest::kTable[idx].label, idx + 1); };
 
         // ── Euclid A ──────────────────────────────────────────────────────────
         dd.addSectionHeading("Euclid A");

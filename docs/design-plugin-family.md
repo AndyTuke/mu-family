@@ -253,6 +253,27 @@ The shared visual identity (`MuLookAndFeel`) ensures a consistent look across al
 
 ---
 
+## Modulation targets — family standard
+
+**Rule: modulation depth is a percentage of the target knob's range.** 100% depth from a full-scale modulator moves the target across its whole knob range; 3.2% moves it 3.2%. Same in every product, for every target — no per-target units and no scale factors (owner decision, backlog #1122–#1124).
+
+**One table per product, the only place targets are defined.** Each row is a [`mu_mod::ModTarget`](../mu-core/Modulation/ModTarget.h): `id` (the name saved in presets — never change it once shipped), `label` (dropdown text), `section` (dropdown heading), `param` (the parameter it drives, without the per-channel prefix; `nullptr` = a reserved / retired slot kept so indices don't shift). New targets are **appended as one row**. The knob's own `NormalisableRange` supplies min / max / curve / step — nothing is restated elsewhere.
+
+| Product | Table | Resolve path |
+|---|---|---|
+| mu-Tant | `kModDestTable` — [MuTantModDest.h](../mu-tant/Source/Modulation/MuTantModDest.h) | `mu_mod::resolveLane` |
+| mu-Toni | `kModDestTable` — [MuToniModDest.h](../mu-toni/Source/Modulation/MuToniModDest.h) | `mu_mod::resolveLane` |
+| mu-On | one table per lane — [MuOnModDest.h](../mu-on/Source/Modulation/MuOnModDest.h) | `mu_mod::resolveLane` |
+| mu-Clid | `ModDest::kTable` — [ModulationDestinations.h](../mu-clid/Source/Modulation/ModulationDestinations.h) | hand-written seed / write-back in `PluginProcessor.cpp` (values come from per-rhythm state and step-count-dependent ranges), using the knob ranges in [ModulationSkew.h](../mu-clid/Source/Plugin/ModulationSkew.h) — the APVTS layout is built from the same constants |
+
+**How it works.** Each target is seeded into the `ModulationMatrix` as its knob's 0..1 proportion; the matrix adds `source% × depth% / 10000`; the product converts back through the knob's range (clamped at the ends; stepped targets rounded to whole steps by the product). Offset-style targets (mu-Clid's pitch octave / semitones) are seeded 0 and read back as an offset of the same proportion of the knob's range.
+
+**Preset data.** `serialiseModulators` writes `depthUnits="range"` on every `<Modulators>` tree. Data without it predates the standard; mu-Clid upgrades it on load (Pre / Post Pad depth was % of 12 steps → rescaled to % of 0..63, so old presets move the same number of steps). No other target's old units differed.
+
+**Enforced by:**
+- [`mu_mod::checks`](../mu-core/Modulation/ModTargetChecks.h) in each product's unit tests — every row names a real parameter; 10% depth moves each target exactly 10% of its range.
+- [tests/scripts/check-mod-targets.py](../tests/scripts/check-mod-targets.py) — fails if any code reintroduces per-target depth scales, defines its own target-row struct, or a product has no `ModTarget` table.
+
 ## Hot-swap (staged preset / layer swaps) — family pattern
 
 Both products load presets *while playing* without an audible glitch by **staging**

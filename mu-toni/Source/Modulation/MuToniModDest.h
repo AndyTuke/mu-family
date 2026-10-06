@@ -2,7 +2,7 @@
 
 #include "UI/ModulatorEditor.h"           // mu-core: ModDestProvider + wireTableModDestResolve
 #include "UI/Components/DropdownSelect.h"
-#include "Modulation/ModulationMatrix.h"  // mu-core: registerDepthScale
+#include "Modulation/ModTarget.h"         // mu-core: the standard target row
 
 #include <array>
 #include <string>
@@ -12,38 +12,40 @@
 // MuTantModDest.h: each destination maps a stable string `id` (used in saved
 // assignments + the audio-thread paramValues map) to a dropdown alias + section.
 // All dests are resolved through the shared mu_mod::resolveLane in PROPORTION
-// space, so every depth scale is 1.0 (full-depth mod sweeps the whole range).
+// space: depth is a percentage of the parameter's range (family standard).
 // Order MUST match the D_* enum below + the modDestRanges built in the processor.
 namespace mu_toni
 {
 
-struct ModDest { const char* id; const char* alias; const char* section; };
+// One row per target: id, dropdown label, section, per-voice parameter (without the "v{N}_"
+// prefix). The family-standard row — see mu-core Modulation/ModTarget.h.
+using ModDest = mu_mod::ModTarget;
 
 inline constexpr ModDest kModDestTable[] = {
     // ── Arpeggiator ───────────────────────────────────────────────────────────
-    { "arp.dir",    "Direction",  "Arp"    },
-    { "arp.octs",   "Octaves",    "Arp"    },
-    { "arp.inv",    "Inversion",  "Arp"    },
-    { "arp.chord",  "Chord",      "Arp"    },
-    { "arp.root",   "Root",       "Arp"    },
-    { "arp.roct",   "Root Octave","Arp"    },
-    { "arp.rate",   "Rate",       "Arp"    },
-    { "arp.gate",   "Gate Length","Arp"    },
-    { "arp.porta",  "Portamento", "Arp"    },
+    { "arp.dir",    "Direction",  "Arp", "dir" },
+    { "arp.octs",   "Octaves",    "Arp", "octs" },
+    { "arp.inv",    "Inversion",  "Arp", "inv" },
+    { "arp.chord",  "Chord",      "Arp", "chord" },
+    { "arp.root",   "Root",       "Arp", "root" },
+    { "arp.roct",   "Root Octave","Arp", "roct" },
+    { "arp.rate",   "Rate",       "Arp", "rate" },
+    { "arp.gate",   "Gate Length","Arp", "gate" },
+    { "arp.porta",  "Portamento", "Arp", "porta" },
     // ── Oscillators ───────────────────────────────────────────────────────────
-    { "osc1.level", "Osc1 Level", "Osc"    },
-    { "osc2.level", "Osc2 Level", "Osc"    },
-    { "osc2.semi",  "Osc2 Semi",  "Osc"    },
-    { "osc.pw",     "Pulse Width","Osc"    },
-    { "noise.level","Noise",      "Osc"    },
+    { "osc1.level", "Osc1 Level", "Osc", "o1l" },
+    { "osc2.level", "Osc2 Level", "Osc", "o2l" },
+    { "osc2.semi",  "Osc2 Semi",  "Osc", "o2s" },
+    { "osc.pw",     "Pulse Width","Osc", "pw" },
+    { "noise.level","Noise",      "Osc", "noise" },
     // ── Filter ────────────────────────────────────────────────────────────────
-    { "flt.cutoff", "Cutoff",     "Filter" },
-    { "flt.res",    "Resonance",  "Filter" },
-    { "flt.drive",  "Drive",      "Filter" },
-    { "flt.env",    "Env Depth",  "Filter" },
+    { "flt.cutoff", "Cutoff",     "Filter", "cut" },
+    { "flt.res",    "Resonance",  "Filter", "res" },
+    { "flt.drive",  "Drive",      "Filter", "drv" },
+    { "flt.env",    "Env Depth",  "Filter", "feDep" },
     // ── Envelopes ─────────────────────────────────────────────────────────────
-    { "amp.level",  "Amp Level",  "Amp"    },
-    { "pitch.env",  "Pitch Env",  "Pitch"  },
+    { "amp.level",  "Amp Level",  "Amp", "aeL" },
+    { "pitch.env",  "Pitch Env",  "Pitch", "peDep" },
 };
 
 // The out[] indices — MUST match kModDestTable order.
@@ -58,18 +60,6 @@ enum ModDestIndex
 
 static_assert((int) (sizeof(kModDestTable) / sizeof(kModDestTable[0])) == kNumModDests,
               "kModDestTable size must equal kNumModDests");
-
-// Register every dest with a full-swing depth scale of 1.0 (proportion space).
-// Idempotent + thread-safe; call once from the PluginProcessor ctor.
-inline void registerDepthScales()
-{
-    static std::once_flag once;
-    std::call_once(once, []
-    {
-        for (const auto& d : kModDestTable)
-            ModulationMatrix::registerDepthScale(d.id, 1.0f);
-    });
-}
 
 inline bool isValidModDest(const std::string& id)
 {
@@ -92,7 +82,7 @@ inline ModDestProvider makeModDestProvider()
                 currentSection = kModDestTable[i].section;
                 dd.addSectionHeading(currentSection);
             }
-            dd.addItem(kModDestTable[i].alias, i + 1);   // 1-based id = table index + 1
+            dd.addItem(kModDestTable[i].label, i + 1);   // 1-based id = table index + 1
         }
     };
 

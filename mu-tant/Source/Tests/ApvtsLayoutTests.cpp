@@ -16,6 +16,8 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Plugin/PluginProcessor.h"   // mu_tant::PluginProcessor::createParameterLayout
+#include "Modulation/MuTantModDest.h"
+#include "Modulation/ModTargetChecks.h"   // mu-core: the family modulation-target checks
 
 namespace
 {
@@ -137,6 +139,14 @@ public:
                 expectEquals (p->getNumSteps(), 7, "v0_o1_oct should expose 7 steps (-3..3)");
             if (auto* p = apvts.getParameter("rev_algo"))
                 expectEquals (p->getNumSteps(), 4, "rev_algo should expose 4 steps (Room/Hall/Plate/Spring)");
+        }
+
+        beginTest ("Modulation targets: every row drives a real parameter, depth = % of its range");
+        {
+            const auto missing = mu_mod::checks::missingParams(mu_tant::kModDestTable, apvts, "v0_");
+            expect (missing.isEmpty(), "targets with no parameter: " + missing.joinIntoString(", "));
+            const auto wrong = mu_mod::checks::depthNotProportional(mu_tant::kModDestTable);
+            expect (wrong.isEmpty(), "targets whose depth isn't a % of range: " + wrong.joinIntoString(", "));
         }
     }
 };

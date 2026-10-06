@@ -148,7 +148,6 @@ public:
             // proportions (0..1) - so every registered scale is 1.0 (not the old display-unit
             // 24). Verify the registration overrides mu-core's 0..100 default of 100: a full
             // depth+source mod adds exactly 1.0 to a proportion seed.
-            registerDepthScales();   // idempotent (call_once); normally the processor ctor calls it
 
             VoiceSlot slot;
             auto& cs = slot.controlSequences[0];
@@ -172,7 +171,6 @@ public:
 
         beginTest("X-Mod destinations are proportion-space: depth 3.2% moves the index 3.2% of its range");
         {
-            registerDepthScales();
             for (const char* dest : { "xmod.index", "xmod.depth", "xmod.ssb" })
             {
                 VoiceSlot slot;
@@ -201,7 +199,6 @@ public:
             // End-to-end check of the converged path: a full-depth unipolar mod on osc1.semi
             // (range -12..12) seeds the param's mid proportion and sweeps to the +12 rail,
             // clamped - the behaviour mu-tant's renderVoice now relies on via resolveLane.
-            registerDepthScales();
 
             VoiceSlot slot;
             auto& cs = slot.controlSequences[0];

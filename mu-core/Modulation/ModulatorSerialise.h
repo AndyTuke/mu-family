@@ -52,9 +52,16 @@ inline int readEnumIndex(const juce::ValueTree& tree,
 
 // Serialise all ControlSequences + ModulationMatrix assignments for `slot` into
 // a <Modulators> ValueTree subtree.
+// Marks modulator data saved under the family depth standard (depth = % of the target knob's
+// range, Modulation/ModTarget.h). Data without it predates the standard; a product whose old
+// depth units differed upgrades it on load (mu-Clid's pad targets).
+inline constexpr const char* kDepthUnitsProperty = "depthUnits";
+inline constexpr const char* kDepthUnitsRange    = "range";
+
 inline juce::ValueTree serialiseModulators(const VoiceSlot& slot)
 {
     juce::ValueTree mods("Modulators");
+    mods.setProperty(kDepthUnitsProperty, kDepthUnitsRange, nullptr);
 
     for (const auto& cs : slot.controlSequences)
     {

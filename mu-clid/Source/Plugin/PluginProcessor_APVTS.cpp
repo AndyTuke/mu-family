@@ -11,12 +11,17 @@
 
 #include "PluginProcessor.h"
 #include "PluginProcessor_Internal.h"
+#include "ModulationSkew.h"   // knob ranges shared with modulation (depth = % of range)
 #include "Audio/FX/Slots/FXAlgorithmDef.h"
 #include "Plugin/MixerFxParams.h"
 
 using mu_pp::kRhythmParamDefs;
 using mu_pp::kRhythmParamCount;
 using mu_pp::applyRhythmSuffix;
+
+// The pad / insert-length modulation ranges must equal the parameters' ranges.
+static_assert(mu_clid::mod_skew::kPad.hi == (float) HitGenerator::kMaxPrePad && HitGenerator::kMaxPrePad == HitGenerator::kMaxPostPad, "kPad must match the pad parameters");
+static_assert(mu_clid::mod_skew::kInsertLength.hi == (float) HitGenerator::kMaxInsertLength, "kInsertLength must match insLen");
 
 juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout()
 {
@@ -105,14 +110,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addI(p+"rstSt",  n+"Reset Steps", -1, 256, -1);  // -1 = free-running (nullopt)
         // Pitch — octave ±3, semi ±12 (±1 oct), fine ±100 cents (1 cent step).
         // Combined static max = ±4 octaves; clamped at the engine.
-        addI(p+"pitchOct",  n+"Pitch Oct",  -3,   3,  0);
-        addI(p+"pitchSemi", n+"Pitch Semi", -12,  12,  0);
+        addI(p+"pitchOct",  n+"Pitch Oct",  (int) mu_clid::mod_skew::kPitchOctave.lo, (int) mu_clid::mod_skew::kPitchOctave.hi, 0);
+        addI(p+"pitchSemi", n+"Pitch Semi", (int) mu_clid::mod_skew::kPitchSemi.lo,   (int) mu_clid::mod_skew::kPitchSemi.hi,   0);
         addI(p+"pitchFine", n+"Pitch Fine", -100, 100, 0);
         addAdsrT(p+"pEnvAtk", n+"P Env Atk", 0.0f);    // seconds (≈ legacy 0.0 × 0.03)
         addAdsrT(p+"pEnvDec", n+"P Env Dec", 0.03f);   //         (≈ legacy 1.0 × 0.03)
         addF     (p+"pEnvSus", n+"P Env Sus", 0.0f, 100.0f, 0.0f);   // sustain stays 0..100 %
         addAdsrT(p+"pEnvRel", n+"P Env Rel", 0.03f);   //         (≈ legacy 1.0 × 0.03)
-        addF(p+"pEnvDep",   n+"P Env Dep",  0.0f,  24.0f,  0.0f);
+        addF(p+"pEnvDep",   n+"P Env Dep",  mu_clid::mod_skew::kPitchEnvDepth.lo, mu_clid::mod_skew::kPitchEnvDepth.hi, 0.0f);
         // Filter
         addI(p+"fltType", n+"Filter Type", 0, 15, 0);  // 0-15: LP12/HP12/BP12/Notch/LP24/HP24/BP24/LP6/Comb+/AP12/Notch24/HP6/Peak/LoShf/HiShf/Comb-
         // log-skewed range. Skew 0.25 puts ~1.3 kHz at slider centre and
@@ -126,12 +131,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
                     if (v < 1000.0f) return juce::String(v, 1) + " Hz";
                     return juce::String(v / 1000.0f, 1) + " kHz";
                 })));
-        addF(p+"fltRes",  n+"Filter Res",   0.0f,    0.99f,    0.2f);
+        addF(p+"fltRes",  n+"Filter Res",   mu_clid::mod_skew::kResonance.lo, mu_clid::mod_skew::kResonance.hi, 0.2f);
         addAdsrT(p+"fEnvAtk", n+"F Env Atk", 0.03f);   // seconds (≈ legacy 1.0 × 0.03)
         addAdsrT(p+"fEnvDec", n+"F Env Dec", 0.09f);   //         (≈ legacy 3.0 × 0.03)
         addF     (p+"fEnvSus", n+"F Env Sus",  0.0f, 100.0f,  0.0f);   // sustain stays 0..100 %
         addAdsrT(p+"fEnvRel", n+"F Env Rel", 0.09f);   //         (≈ legacy 3.0 × 0.03)
-        addF(p+"fEnvDep", n+"F Env Dep",  0.0f,  48.0f,  0.0f);
+        addF(p+"fEnvDep", n+"F Env Dep",  mu_clid::mod_skew::kFenvDepth.lo, mu_clid::mod_skew::kFenvDepth.hi, 0.0f);
         // 4-pole high-pass that sits inline with the main filter. Skewed so most
         // of the knob travel lives in the audible low-end region (0–200 Hz).
         layout.add(std::make_unique<juce::AudioParameterFloat>(
@@ -147,12 +152,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         addF(p+"fltDrv", n+"Filter Drive", 0.0f, 1.0f, 0.0f);
         // Amp — level stored in dB (-60..+6), engine converts to gain at read.
         // Default 0 dB = unity gain.
-        addF(p+"ampLvl",  n+"Amp Level", -60.0f,   6.0f,  0.0f);
+        addF(p+"ampLvl",  n+"Amp Level", mu_clid::mod_skew::kAmpLevel.lo, mu_clid::mod_skew::kAmpLevel.hi, 0.0f);
         addAdsrT(p+"aEnvAtk", n+"A Env Atk", 0.005f);   // seconds
         addAdsrT(p+"aEnvDec", n+"A Env Dec", 0.3f);
         addF(p+"aEnvSus", n+"A Env Sus",  0.0f, 100.0f, 80.0f);   // sustain stays 0..100 %
         addAdsrT(p+"aEnvRel", n+"A Env Rel", 0.5f);
-        addF(p+"accentDb",  n+"Accent",     0.0f,  12.0f,  0.0f);
+        addF(p+"accentDb",  n+"Accent",     mu_clid::mod_skew::kAccent.lo, mu_clid::mod_skew::kAccent.hi, 0.0f);
         // Insert effect: algo selector + 4 generic Param slots stored as 0..1
         // normalised. Each algorithm's process() reads p.insertParam[N] and
         // converts to the actual value through mu_ui::normToActual using the

@@ -29,28 +29,7 @@ namespace
 
     // (isValidModDest moved to PluginProcessor_Preset.cpp — used only by preset I/O.)
 
-    // Modulation destinations in kModDestTable order, each paired with the per-voice APVTS
-    // base id whose NormalisableRange + atom back it. mu_mod::resolveLane seeds each dest in
-    // proportion space (range.convertTo0to1 of the atom) and writes the modulated value back
-    // in the param's own units. Order MUST match kModDestTable so saved-assignment ids line up
-    // with the map keys the matrix reads — the D_* enum below indexes the resolved `out` array.
-    struct TantModParam { const char* destId; const char* apvtsBase; };
-    constexpr TantModParam kTantModParams[] = {
-        { "osc1.octave", "o1_oct" }, { "osc1.semi", "o1_semi" }, { "osc1.fine", "o1_fine" }, { "osc1.pos", "o1_pos" }, { "osc1.penv.prop", "o1_penv_depth" },
-        { "osc2.octave", "o2_oct" }, { "osc2.semi", "o2_semi" }, { "osc2.fine", "o2_fine" }, { "osc2.pos", "o2_pos" }, { "osc2.penv.prop", "o2_penv_depth" },
-        { "xmod.index", "xmod_index" }, { "xmod.depth", "xmod_depth" }, { "xmod.ssb", "xmod_ssb" },
-        { "osc1.level", "o1_lvl" },  { "osc2.level", "o2_lvl" }, { "noise.level", "noise_lvl" },
-        { "filter.cutoff", "flt_cut" }, { "filter.resonance", "flt_res" },
-        { "filter.drive.prop", "flt_drv" }, { "filter.locut.prop", "flt_lo_cut" }, { "filter.env.prop", "flt_env_depth" },
-        { "filter2.cutoff.prop", "flt2_cut" }, { "filter2.resonance.prop", "flt2_res" },
-        { "filter2.drive.prop", "flt2_drv" }, { "filter2.locut.prop", "flt2_lo_cut" }, { "filter2.env.prop", "flt2_env_depth" },
-        { "level", "level" },
-        { "insert.p1", "insP1" }, { "insert.p2", "insP2" }, { "insert.p3", "insP3" }, { "insert.p4", "insP4" },
-    };
-    static_assert((int) std::size(kTantModParams) == kModDestCount,
-                  "kTantModParams must pair every kModDestTable destination 1:1");
-
-    // Index of each resolved value in the resolveLane `out` array (kTantModParams order).
+    // Index of each resolved value in the resolveLane `out` array (kModDestTable order).
     enum { D_o1Oct = 0, D_o1Semi, D_o1Fine, D_o1Pos, D_o1Penv,
            D_o2Oct, D_o2Semi, D_o2Fine, D_o2Pos, D_o2Penv,
            D_xmIndex, D_xmDepth, D_xmSsb, D_o1Lvl, D_o2Lvl, D_nzLvl,
@@ -58,30 +37,17 @@ namespace
            D_f2Cut, D_f2Res, D_f2Drv, D_f2LoCut, D_f2Env, D_level,
            D_insP1, D_insP2, D_insP3, D_insP4 };
 
-    // Compile-time integrity guard: pin kTantModParams' row order to kModDestTable (the
-    // persisted assignment ids) AND to the D_* indices, so a reorder/insert that would seed
-    // resolveLane with the wrong atom/range for a dest id fails to COMPILE rather than silently
-    // mis-routing modulation. A constexpr static_assert beats a runtime test here — the tables
-    // are file-local, and the check can never be forgotten or skipped.
+    // Compile-time guard: pin the D_* indices to the table rows, so an insert / reorder that
+    // would read the wrong resolved value for a target fails to COMPILE.
     constexpr bool cstrEq(const char* a, const char* b)
     {
         while (*a != '\0' && *a == *b) { ++a; ++b; }
         return *a == *b;
     }
-    constexpr bool tantModParamsAligned()
-    {
-        for (int i = 0; i < kModDestCount; ++i)
-            if (! cstrEq(kTantModParams[i].destId, kModDestTable[i].id))
-                return false;
-        return true;
-    }
-    static_assert(tantModParamsAligned(),
-                  "kTantModParams row order must match kModDestTable (saved-assignment ids)");
-    // Representative D_* ↔ destination pins (catch an enum/table desync independent of the loop).
-    static_assert(cstrEq(kTantModParams[D_o1Semi].destId, "osc1.semi"),     "D_o1Semi desync");
-    static_assert(cstrEq(kTantModParams[D_fCut].destId,   "filter.cutoff"), "D_fCut desync");
-    static_assert(cstrEq(kTantModParams[D_level].destId,  "level"),         "D_level desync");
-    static_assert(cstrEq(kTantModParams[D_insP4].destId,  "insert.p4"),     "D_insP4 desync");
+    static_assert(cstrEq(kModDestTable[D_o1Semi].id, "osc1.semi"),     "D_o1Semi desync");
+    static_assert(cstrEq(kModDestTable[D_fCut].id,   "filter.cutoff"), "D_fCut desync");
+    static_assert(cstrEq(kModDestTable[D_level].id,  "level"),         "D_level desync");
+    static_assert(cstrEq(kModDestTable[D_insP4].id,  "insert.p4"),     "D_insP4 desync");
 }
 
 
@@ -92,10 +58,6 @@ PluginProcessor::PluginProcessor()
                     createParameterLayout(),
                     juce::Identifier("MuTantState"))
 {
-    // Register mu-tant's modulation depth scales with mu-core before any audio runs
-    // (once, message thread) — keeps mu-core from enumerating mu-tant param ids.
-    registerDepthScales();
-
     // Persistent settings file (UI scale, future toggles).
     {
         juce::PropertiesFile::Options opts;
@@ -301,13 +263,13 @@ void PluginProcessor::cacheParamPointers()
     modParamValues.reserve((size_t) kNumModDests + 4);   // pre-size → no audio-thread rehash
     for (int i = 0; i < kNumModDests; ++i)
     {
-        modDestIds[(size_t) i]    = kTantModParams[i].destId;
-        modDestRanges[(size_t) i] = apvts.getParameterRange(voiceParamId(0, kTantModParams[i].apvtsBase));
-        modParamValues.emplace(std::string_view(kTantModParams[i].destId), 0.0f);   // pre-insert key
+        modDestIds[(size_t) i]    = kModDestTable[i].id;
+        modDestRanges[(size_t) i] = apvts.getParameterRange(voiceParamId(0, kModDestTable[i].param));
+        modParamValues.emplace(std::string_view(kModDestTable[i].id), 0.0f);   // pre-insert key
         for (int v = 0; v < kMaxVoices; ++v)
         {
             modDestAtoms[(size_t) v][(size_t) i] =
-                apvts.getRawParameterValue(voiceParamId(v, kTantModParams[i].apvtsBase));
+                apvts.getRawParameterValue(voiceParamId(v, kModDestTable[i].param));
             jassert(modDestAtoms[(size_t) v][(size_t) i] != nullptr);   // catch an apvtsBase drift
         }
     }
