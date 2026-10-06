@@ -159,24 +159,9 @@ PluginProcessor::PluginProcessor()
         else buf.clear();
     };
 
-    // Persistent settings file (UI scale + MIDI-clock prefs) — mirrors mu-tant.
-    {
-        juce::PropertiesFile::Options opts;
-        opts.applicationName     = "muToni";
-        opts.filenameSuffix      = "xml";
-        opts.folderName          = "TDP";
-        opts.osxLibrarySubFolder = "Application Support";
-        auto settingsFile = opts.getDefaultFile();
-        settingsFile.getParentDirectory().createDirectory();
-        appSettings = std::make_unique<juce::PropertiesFile>(settingsFile, opts);
-    }
-    uiScale = juce::jlimit(kUiScaleMedium, kUiScaleLarge,
-                           (float) appSettings->getDoubleValue("uiScale", (double) kUiScaleMedium));
-    // Restore persisted MIDI-clock-sync prefs (standalone external clock).
-    midiClockSync.setEnabled (appSettings->getBoolValue("midiSyncEnabled",  false));
-    midiClockSync.setMessages(appSettings->getIntValue ("midiSyncMessages", 2));
+    initAppSettings("muToni");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
-    registerFxListeners();
+    registerFxListeners(this);
     syncAllFxParams();   // JUCE doesn't fire parameterChanged on construction
     cacheVoiceParamPointers();
 }
@@ -294,36 +279,7 @@ void PluginProcessor::updateHeldNotes(const juce::MidiBuffer& midi, bool& noteOn
 
 PluginProcessor::~PluginProcessor()
 {
-    for (auto* p : getParameters())
-        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-        {
-            const juce::String id = rp->getParameterID();
-            if (id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id))
-                apvts.removeParameterListener(id, this);
-        }
-}
-
-void PluginProcessor::registerFxListeners()
-{
-    for (auto* p : getParameters())
-        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-        {
-            const juce::String id = rp->getParameterID();
-            if (id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id))
-                apvts.addParameterListener(id, this);
-        }
-}
-
-void PluginProcessor::syncAllFxParams()
-{
-    for (auto* p : getParameters())
-        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-        {
-            const juce::String id = rp->getParameterID();
-            if (id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id))
-                if (auto* a = apvts.getRawParameterValue(id))
-                    syncGlobalFxParam(id, a->load());
-        }
+    unregisterFxListeners(this);
 }
 
 void PluginProcessor::parameterChanged(const juce::String& id, float v)
@@ -442,17 +398,9 @@ void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
 
-    // Embed each voice's modulators (control sequences + matrix) as a "MuToniMods"
-    // child of the APVTS state. Remove any stale copy first so it can't accumulate.
+    // Each voice's modulators in the shared per-voice <VoiceData> (drop the pre-standard copy).
     state.removeChild(state.getChildWithName("MuToniMods"), nullptr);
-    juce::ValueTree mods("MuToniMods");
-    for (int v = 0; v < kNumChannels; ++v)
-    {
-        auto vt = mu_pp::serialiseModulators(voiceSlots[(size_t) v]);
-        vt.setProperty("voice", v, nullptr);
-        mods.addChild(vt, -1, nullptr);
-    }
-    state.addChild(mods, -1, nullptr);
+    mu_pp::writeChannelData(state, kNumChannels, [this](int v) -> VoiceSlot& { return voiceSlots[(size_t) v]; });
 
     if (auto xml = state.createXml())
         copyXmlToBinary(*xml, destData);
@@ -464,52 +412,34 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
         if (xml->hasTagName(apvts.state.getType()))
         {
             auto tree = juce::ValueTree::fromXml(*xml);
-            auto mods = tree.getChildWithName("MuToniMods");
+
+            // Sessions saved before the shared format kept modulators in <MuToniMods>, one
+            // <Modulators voice="N"> per voice: move them into the shared <VoiceData> shape.
+            if (auto legacy = tree.getChildWithName("MuToniMods"); legacy.isValid())
+            {
+                juce::ValueTree channels(mu_pp::kChannelDataTag);
+                for (int c = 0; c < legacy.getNumChildren(); ++c)
+                {
+                    juce::ValueTree node(mu_pp::kChannelNodeTag);
+                    node.setProperty("idx", legacy.getChild(c).getProperty("voice", -1), nullptr);
+                    node.addChild(legacy.getChild(c).createCopy(), -1, nullptr);
+                    channels.addChild(node, -1, nullptr);
+                }
+                tree.removeChild(legacy, nullptr);
+                tree.removeChild(tree.getChildWithName(mu_pp::kChannelDataTag), nullptr);
+                tree.addChild(channels, -1, nullptr);
+            }
 
             apvts.replaceState(tree);
             syncAllFxParams();   // re-seed mixer/FX (unchanged values skip listeners)
-
-            // Restore each voice's modulators.
-            for (int v = 0; v < kNumChannels; ++v)
-                mu_pp::clearModulators(voiceSlots[(size_t) v]);
-            if (mods.isValid())
-                for (int c = 0; c < mods.getNumChildren(); ++c)
-                {
-                    auto child = mods.getChild(c);
-                    const int v = (int) child.getProperty("voice", -1);
-                    if (v >= 0 && v < kNumChannels)
-                        mu_pp::deserialiseModulators(child, voiceSlots[(size_t) v], {},
-                                                     [](const std::string& id) { return mu_toni::isValidModDest(id); });
-                }
+            mu_pp::readChannelModulators(apvts.state, kNumChannels,
+                [this](int v) -> VoiceSlot& { return voiceSlots[(size_t) v]; },
+                [](int, const std::string& id) { return mu_toni::isValidModDest(id); });
         }
-}
-
-juce::File PluginProcessor::getContentDir() const
-{
-    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
-               .getChildFile("TDP").getChildFile("muToni");
 }
 
 juce::File PluginProcessor::getPresetsDir()       const { return getContentDir().getChildFile("Presets"); }
 juce::File PluginProcessor::getPerSlotPresetDir() const { return getContentDir().getChildFile("Arps"); }
-
-void PluginProcessor::setUiScale(float scale)
-{
-    ProcessorBase::setUiScale(scale);   // clamps + notifies the editor
-    if (appSettings != nullptr) { appSettings->setValue("uiScale", (double) getUiScale()); appSettings->saveIfNeeded(); }
-}
-
-void PluginProcessor::setMidiSyncEnabled(bool on)
-{
-    midiClockSync.setEnabled(on);
-    if (appSettings != nullptr) { appSettings->setValue("midiSyncEnabled", on); appSettings->saveIfNeeded(); }
-}
-
-void PluginProcessor::setMidiSyncMessages(int mode)
-{
-    midiClockSync.setMessages(mode);
-    if (appSettings != nullptr) { appSettings->setValue("midiSyncMessages", mode); appSettings->saveIfNeeded(); }
-}
 
 } // namespace mu_toni
 

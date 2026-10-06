@@ -68,6 +68,7 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiFullPresetsPanel.cpp"
     # Shared settings-overlay framework — header bar, content column, group/section headers.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/SettingsOverlayBase.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/StandardSettingsOverlay.cpp"
     # Shared transport "Master Loop" sub-pane — driven by ProcessorBase virtuals + mstrLoop param.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MasterLoopSection.cpp"
     # Shared modal overlays — product chrome supplied via setters.

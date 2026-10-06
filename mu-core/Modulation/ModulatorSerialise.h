@@ -233,4 +233,62 @@ inline void clearModulators(VoiceSlot& slot)
     slot.modLock.store(false, std::memory_order_release);
 }
 
+
+// ── Per-channel data in the host state (family standard) ─────────────────────
+// Every product embeds its channels' modulators in the APVTS state as
+//   <VoiceData> <Voice idx="N"> <Modulators .../> [product extras] </Voice> ... </VoiceData>
+// so copyState() carries them into the DAW session and full-preset files. Products with an
+// older shape convert it to this one before reading.
+inline constexpr const char* kChannelDataTag = "VoiceData";
+inline constexpr const char* kChannelNodeTag = "Voice";
+
+// Replace `state`'s <VoiceData> with one <Voice idx> per channel 0..numChannels-1 holding that
+// channel's modulators; `addExtras` (optional) appends the product's own data to each node.
+template <typename SlotAt>
+inline void writeChannelData(juce::ValueTree& state, int numChannels, SlotAt&& slotAt,
+                             const std::function<void(int, juce::ValueTree&)>& addExtras = {})
+{
+    state.removeChild(state.getChildWithName(kChannelDataTag), nullptr);
+    juce::ValueTree data(kChannelDataTag);
+    for (int ch = 0; ch < numChannels; ++ch)
+    {
+        juce::ValueTree node(kChannelNodeTag);
+        node.setProperty("idx", ch, nullptr);
+        node.addChild(serialiseModulators(slotAt(ch)), -1, nullptr);
+        if (addExtras) addExtras(ch, node);
+        data.addChild(node, -1, nullptr);
+    }
+    state.addChild(data, -1, nullptr);
+}
+
+// Channel `ch`'s <Voice> node in `state`, or an invalid tree if it has none.
+inline juce::ValueTree findChannelNode(const juce::ValueTree& state, int ch)
+{
+    const auto data = state.getChildWithName(kChannelDataTag);
+    for (int i = 0; i < data.getNumChildren(); ++i)
+    {
+        const auto node = data.getChild(i);
+        if (node.hasType(kChannelNodeTag) && (int) node.getProperty("idx", -1) == ch)
+            return node;
+    }
+    return {};
+}
+
+// Clear each channel's modulators and restore them from its node (a channel with no node
+// stays cleared, so an older / foreign state never leaves stale assignments behind).
+// `isValidDest(ch, id)` (optional) drops targets the channel doesn't have.
+template <typename SlotAt>
+inline void readChannelModulators(const juce::ValueTree& state, int numChannels, SlotAt&& slotAt,
+                                  const std::function<bool(int, const std::string&)>& isValidDest = {})
+{
+    for (int ch = 0; ch < numChannels; ++ch)
+    {
+        auto& slot = slotAt(ch);
+        clearModulators(slot);
+        ModIdValidator destCheck;
+        if (isValidDest) destCheck = [&isValidDest, ch](const std::string& id) { return isValidDest(ch, id); };
+        deserialiseModulators(findChannelNode(state, ch).getChildWithName("Modulators"), slot, {}, destCheck);
+    }
+}
+
 } // namespace mu_pp

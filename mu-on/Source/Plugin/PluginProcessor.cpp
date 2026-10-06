@@ -130,59 +130,15 @@ PluginProcessor::PluginProcessor()
     grooveVoices.setSlots(&voiceSlots);
     grooveVoices.cacheParams(apvts);
 
-    // Persistent settings file (UI scale + MIDI-clock prefs) — mirrors mu-tant.
-    {
-        juce::PropertiesFile::Options opts;
-        opts.applicationName     = "muOn";
-        opts.filenameSuffix      = "xml";
-        opts.folderName          = "TDP";
-        opts.osxLibrarySubFolder = "Application Support";
-        auto settingsFile = opts.getDefaultFile();
-        settingsFile.getParentDirectory().createDirectory();
-        appSettings = std::make_unique<juce::PropertiesFile>(settingsFile, opts);
-    }
-    uiScale = juce::jlimit(kUiScaleMedium, kUiScaleLarge,
-                           (float) appSettings->getDoubleValue("uiScale", (double) kUiScaleMedium));
-    // Restore persisted MIDI-clock-sync prefs (standalone external clock).
-    midiClockSync.setEnabled (appSettings->getBoolValue("midiSyncEnabled",  false));
-    midiClockSync.setMessages(appSettings->getIntValue ("midiSyncMessages", 2));
+    initAppSettings("muOn");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
-    registerFxListeners();
+    registerFxListeners(this);
     syncAllFxParams();   // JUCE doesn't fire parameterChanged on construction
 }
 
 PluginProcessor::~PluginProcessor()
 {
-    for (auto* p : getParameters())
-        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-        {
-            const juce::String id = rp->getParameterID();
-            if (id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id))
-                apvts.removeParameterListener(id, this);
-        }
-}
-
-void PluginProcessor::registerFxListeners()
-{
-    for (auto* p : getParameters())
-        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-        {
-            const juce::String id = rp->getParameterID();
-            if (id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id))
-                apvts.addParameterListener(id, this);
-        }
-}
-
-void PluginProcessor::syncAllFxParams()
-{
-    for (auto* p : getParameters())
-        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-        {
-            const juce::String id = rp->getParameterID();
-            if (id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id))
-                if (auto* a = apvts.getRawParameterValue(id))
-                    syncGlobalFxParam(id, a->load());
-        }
+    unregisterFxListeners(this);
 }
 
 void PluginProcessor::parameterChanged(const juce::String& id, float v)
@@ -345,64 +301,36 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 // carries them into the file/host state. Mirrors mu-tant's per-voice approach.
 void PluginProcessor::writeVoiceDataToState(juce::ValueTree& state)
 {
-    state.removeChild(state.getChildWithName("VoiceData"), nullptr);
-    juce::ValueTree vd("VoiceData");
-    for (int v = 0; v < kNumChannels; ++v)
-    {
-        juce::ValueTree lane("Lane");
-        lane.setProperty("idx", v, nullptr);
-        lane.addChild(mu_pp::serialiseModulators(voiceSlots[(size_t) v]), -1, nullptr);
-        vd.addChild(lane, -1, nullptr);
-    }
-    state.addChild(vd, -1, nullptr);
+    mu_pp::writeChannelData(state, kNumChannels, [this](int v) -> VoiceSlot& { return voiceSlots[(size_t) v]; });
 }
 
 // Clear then restore each lane's modulators. An absent <VoiceData> (older / foreign
 // state) leaves every lane cleared rather than carrying stale assignments.
 void PluginProcessor::readVoiceDataFromState(const juce::ValueTree& state)
 {
-    auto vd = state.getChildWithName("VoiceData");
-    for (int v = 0; v < kNumChannels; ++v)
+    // Sessions saved before the shared format called each lane's node <Lane>; read those too.
+    juce::ValueTree current = state;
+    if (auto vd = state.getChildWithName(mu_pp::kChannelDataTag); vd.isValid()
+        && vd.getChildWithName("Lane").isValid())
     {
-        mu_pp::clearModulators(voiceSlots[(size_t) v]);
-        juce::ValueTree lane;
-        for (int i = 0; i < vd.getNumChildren(); ++i)
-            if (vd.getChild(i).getType() == juce::Identifier("Lane")
-                && (int) vd.getChild(i).getProperty("idx", -1) == v)
-            { lane = vd.getChild(i); break; }
-
-        mu_pp::deserialiseModulators(lane.getChildWithName("Modulators"),
-                                     voiceSlots[(size_t) v], {},
-                                     [v](const std::string& id) { return isValidLaneDest(v, id); });
+        current = state.createCopy();
+        auto data = current.getChildWithName(mu_pp::kChannelDataTag);
+        for (int i = 0; i < data.getNumChildren(); ++i)
+            if (data.getChild(i).hasType("Lane"))
+            {
+                juce::ValueTree node(mu_pp::kChannelNodeTag);
+                node.copyPropertiesAndChildrenFrom(data.getChild(i), nullptr);
+                data.removeChild(i, nullptr);
+                data.addChild(node, i, nullptr);
+            }
     }
-}
-
-juce::File PluginProcessor::getContentDir() const
-{
-    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
-               .getChildFile("TDP").getChildFile("muOn");
+    mu_pp::readChannelModulators(current, kNumChannels,
+        [this](int v) -> VoiceSlot& { return voiceSlots[(size_t) v]; },
+        [](int v, const std::string& id) { return isValidLaneDest(v, id); });
 }
 
 juce::File PluginProcessor::getPresetsDir()       const { return getContentDir().getChildFile("Presets"); }
 juce::File PluginProcessor::getPerSlotPresetDir() const { return getContentDir().getChildFile("Tracks"); }
-
-void PluginProcessor::setUiScale(float scale)
-{
-    ProcessorBase::setUiScale(scale);   // clamps + notifies the editor
-    if (appSettings != nullptr) { appSettings->setValue("uiScale", (double) getUiScale()); appSettings->saveIfNeeded(); }
-}
-
-void PluginProcessor::setMidiSyncEnabled(bool on)
-{
-    midiClockSync.setEnabled(on);
-    if (appSettings != nullptr) { appSettings->setValue("midiSyncEnabled", on); appSettings->saveIfNeeded(); }
-}
-
-void PluginProcessor::setMidiSyncMessages(int mode)
-{
-    midiClockSync.setMessages(mode);
-    if (appSettings != nullptr) { appSettings->setValue("midiSyncMessages", mode); appSettings->saveIfNeeded(); }
-}
 
 } // namespace mu_on
 

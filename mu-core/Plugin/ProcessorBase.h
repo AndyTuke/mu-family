@@ -22,6 +22,7 @@
 #include "Persistence/MidiPresetMap.h"
 #include "Persistence/MidiFullPresetMap.h"
 #include "MuLimits.h"
+#include "Plugin/MidiClockSync.h"
 #include "License/MachineFingerprint.h"
 #include "License/OnlineActivation.h"   // OnlineActivationOutcome (decls only; .cpp is per-licensed-product)
 
@@ -116,11 +117,14 @@ public:
     virtual int    getMasterLoopSteps()       const        { return 0; }
     virtual int    getMasterLoopCurrentStep() const        { return 0; }
 
-    // MIDI clock sync (standalone).
-    virtual bool   getMidiSyncEnabled()     const          { return false; }
-    virtual int    getMidiSyncMessages()    const          { return 0; }
-    virtual double getMidiClockBpm()        const          { return 120.0; }
-    virtual bool   isMidiClockPlaying()     const          { return false; }
+    // MIDI clock sync (standalone) — shared by every product; the enable / messages choices
+    // are saved in the app settings file.
+    bool   getMidiSyncEnabled()  const { return midiClockSync.isEnabled(); }
+    int    getMidiSyncMessages() const { return midiClockSync.getMessages(); }
+    double getMidiClockBpm()     const { return midiClockSync.getBpm(); }
+    bool   isMidiClockPlaying()  const { return midiClockSync.isPlaying(); }
+    void   setMidiSyncEnabled(bool on);
+    void   setMidiSyncMessages(int mode);
 
     // Presets — directory, save/load, and the shared category list. Default
     // returns yield a usable "no presets yet" UI state in the transport bar.
@@ -140,9 +144,10 @@ public:
     std::function<void(const juce::String&)> onPresetNameChanged;
     void publishPresetName(const juce::String& name) { if (onPresetNameChanged) onPresetNameChanged(name); }
 
-    // Content directory — where preset / sample-library / keybindings folders
-    // live. Returned File can be invalid; the shell tolerates that.
-    virtual juce::File getContentDir() const { return {}; }
+    // Content directory — where preset / sample-library / keybindings folders live:
+    // Documents/TDP/<appName> (the name given to initAppSettings), or a folder the user
+    // picked (saved as "contentDir"). Invalid before initAppSettings; the shell tolerates that.
+    virtual juce::File getContentDir() const;
 
     // License gate — true by default so products without a licensing model get the
     // full editor instead of a demo banner. A licensed product overrides this to
@@ -182,19 +187,13 @@ public:
     juce::String licenseChallengeCode() const { return mu_core::MachineFingerprint::getShortCode(); }
 
     // ─── UI scale (Medium baseline, Large 1.25x) ─────────────────────────────
-    // Storage lives on the base so every plugin inherits the same scale handling
-    // out of the box. Derived classes typically override setUiScale to persist
-    // through their appSettings PropertiesFile before delegating to the base.
+    // Storage lives on the base so every plugin inherits the same scale handling; the choice
+    // is saved in the app settings file (saved before the change is announced, so a listener
+    // that re-reads the file sees the new value).
     static constexpr float kUiScaleMedium = 1.0f;
     static constexpr float kUiScaleLarge  = 1.25f;
-    virtual float getUiScale() const noexcept { return uiScale; }
-    virtual void  setUiScale(float scale)
-    {
-        const float clamped = juce::jlimit(kUiScaleMedium, kUiScaleLarge, scale);
-        if (uiScale == clamped) return;
-        uiScale = clamped;
-        if (onUiScaleChanged) onUiScaleChanged(clamped);
-    }
+    float getUiScale() const noexcept { return uiScale; }
+    void  setUiScale(float scale);
 
     // ─── Shell callbacks (message-thread, registered by the editor) ──────────
     // Editor MUST clear these in its dtor — processor can outlive the editor
@@ -283,9 +282,28 @@ protected:
     }
 
 protected:
-    // Backing storage for the default getUiScale / setUiScale. Derived classes
-    // typically also persist the value through their own appSettings file.
+    // Backing storage for getUiScale / setUiScale.
     float uiScale { kUiScaleMedium };
+
+    // ─── App settings (family standard) ──────────────────────────────────────
+    // The per-app settings file (<OS app data>/TDP/<appName>.xml) and the preferences every
+    // product keeps there: UI size and MIDI-clock sync. Call once, early in the product's
+    // constructor (before anything calls getContentDir); products read / write their own extra
+    // keys through appSettings.
+    void initAppSettings(const juce::String& appName);
+    std::unique_ptr<juce::PropertiesFile> appSettings;
+    juce::String  appName;
+    MidiClockSync midiClockSync;
+
+    // ─── Mixer / global-FX parameters ────────────────────────────────────────
+    // The channel-strip (ch{N}_*) and global FX ids synced to the engine via syncGlobalFxParam.
+    // Products listen to them (forwarding parameterChanged to syncGlobalFxParam) and push
+    // every current value once at construction / after a state restore, because JUCE fires
+    // no change for values that are already set.
+    static bool isFxParamId(const juce::String& id);
+    void registerFxListeners  (juce::AudioProcessorValueTreeState::Listener* listener);
+    void unregisterFxListeners(juce::AudioProcessorValueTreeState::Listener* listener);
+    void syncAllFxParams();
 
     // ─── VST3 sidechain bus type ─────────────────────────────────────────────
     // JUCE maps the first input bus to Vst::kMain by default. For mu-family

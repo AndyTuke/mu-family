@@ -39,21 +39,8 @@ PluginProcessor::PluginProcessor()
     // Register mu-clid's modulation depth scales with mu-core before any audio runs
     // (once, message thread) — keeps mu-core from enumerating mu-clid param ids.
 
-    // Initialise ApplicationProperties (needed by getContentDir/getPresetsDir).
-    {
-        juce::PropertiesFile::Options opts;
-        opts.applicationName     = "muClid";
-        opts.filenameSuffix      = "xml";
-        opts.folderName          = "TDP";
-        opts.osxLibrarySubFolder = "Application Support";
-        auto settingsFile = opts.getDefaultFile();
-        settingsFile.getParentDirectory().createDirectory();
-        appSettings = std::make_unique<juce::PropertiesFile>(settingsFile, opts);
-    }
+    initAppSettings("muClid");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
-    // Load MIDI sync settings.
-    midiClockSync.setEnabled (appSettings->getBoolValue("midiSyncEnabled",  false));
-    midiClockSync.setMessages(appSettings->getIntValue ("midiSyncMessages", 2));
     midiNoteMode.store(appSettings->getIntValue("midiNoteMode", 0), std::memory_order_relaxed);
 
     // Load MIDI program-change preset maps (each lives in its own JSON file
@@ -70,14 +57,6 @@ PluginProcessor::PluginProcessor()
     // Multi-bus output toggle (DAW). Default: on.
     multiBusEnabled.store(appSettings->getBoolValue("multiBusEnabled", true),
                           std::memory_order_relaxed);
-
-    // UI scale (Medium=1.0, Large=1.25). Persisted across plugin instances;
-    // the editor consults `getUiScale()` at ctor time so a fresh-open picks up
-    // the right scale BEFORE constructing children (fixes the cold-open scale bug).
-    {
-        const double stored = appSettings->getDoubleValue("uiScale", (double) kUiScaleMedium);
-        uiScale = juce::jlimit(kUiScaleMedium, kUiScaleLarge, (float) stored);
-    }
 
    #if !MUCLID_LITE_BUILD
     // Check license file — must run after appSettings so getContentDir() works.
@@ -1059,20 +1038,6 @@ void PluginProcessor::renameRhythm(int index, const juce::String& newName)
 }
 
 //==============================================================================
-void PluginProcessor::setMidiSyncEnabled(bool on)
-{
-    midiClockSync.setEnabled(on);
-    appSettings->setValue("midiSyncEnabled", on);
-    appSettings->saveIfNeeded();
-}
-
-void PluginProcessor::setMidiSyncMessages(int mode)
-{
-    midiClockSync.setMessages(mode);
-    appSettings->setValue("midiSyncMessages", mode);
-    appSettings->saveIfNeeded();
-}
-
 void PluginProcessor::setMidiNoteMode(int mode)
 {
     midiNoteMode.store(mode, std::memory_order_relaxed);
@@ -1093,20 +1058,6 @@ void PluginProcessor::setMultiBusEnabled(bool on)
     multiBusEnabled.store(on, std::memory_order_relaxed);
     appSettings->setValue("multiBusEnabled", on);
     appSettings->saveIfNeeded();
-}
-
-void PluginProcessor::setUiScale(float scale)
-{
-    const float clamped = juce::jlimit(kUiScaleMedium, kUiScaleLarge, scale);
-    if (uiScale == clamped) return;
-    // Persist before delegating — the base fires onUiScaleChanged after the
-    // store, so a listener that re-reads from appSettings sees the new value.
-    if (appSettings != nullptr)
-    {
-        appSettings->setValue("uiScale", (double) clamped);
-        appSettings->saveIfNeeded();
-    }
-    ProcessorBase::setUiScale(clamped);
 }
 
 bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -1173,18 +1124,6 @@ void PluginProcessor::handleAsyncUpdate()
 }
 
 //==============================================================================
-juce::File PluginProcessor::getContentDir() const
-{
-    if (appSettings != nullptr)
-    {
-        const juce::String stored = appSettings->getValue("contentDir");
-        if (stored.isNotEmpty())
-            return juce::File(stored);
-    }
-    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
-               .getChildFile("TDP").getChildFile("muClid");
-}
-
 juce::File PluginProcessor::getPresetsDir() const { return getContentDir().getChildFile("Presets"); }
 juce::File PluginProcessor::getRhythmsDir() const { return getContentDir().getChildFile("Rhythms"); }
 juce::File PluginProcessor::getSamplesDir() const { return getContentDir().getChildFile("Samples"); }

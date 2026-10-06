@@ -94,31 +94,12 @@ public:
     void   setMultiBusEnabled(bool on);
     bool   getMultiBusEnabled() const { return multiBusEnabled.load(std::memory_order_relaxed); }
 
-    // UI scale (Medium=1.0, Large=1.25). Persisted via appSettings. Editor reads
-    // at ctor time and applies to mu_ui::scale BEFORE constructing children so
-    // ctor-time fonts pick up the right size on a fresh open. Runtime
-    // changes go via setUiScale → onUiScaleChanged callback so the editor can
-    // resize + relayout live (with a "reopen for fonts" hint near the picker).
-    // kUiScaleMedium / kUiScaleLarge constants + onUiScaleChanged callback live
-    // on ProcessorBase; mu-clid's override persists through appSettings before
-    // delegating to the base.
-    void  setUiScale(float scale) override;
-    float getUiScale() const noexcept override { return uiScale; }
-
     static constexpr int kMasterBusIndex   = 0;
     static constexpr int kFirstDirectOutBus = 1;   // Out 1 = bus 1 ... Out 8 = bus 8
     static constexpr int kFXReturnsBusIndex = 9;
     static constexpr int kTotalBuses        = 10;
 
     static constexpr int kAutomatedRhythms  = mu_limits::kMaxAutomatedChannels;
-
-    // MIDI clock sync (standalone only).
-    void   setMidiSyncEnabled(bool on);
-    bool   getMidiSyncEnabled()  const override { return midiClockSync.isEnabled(); }
-    void   setMidiSyncMessages(int mode);
-    int    getMidiSyncMessages() const override { return midiClockSync.getMessages(); }
-    bool   isMidiClockPlaying()  const override { return midiClockSync.isPlaying(); }
-    double getMidiClockBpm()     const override { return midiClockSync.getBpm(); }
 
     // MIDI Note mode (plugin only). 0=Free (host transport drives play), 1=Note (Note On/Off drives play).
     void setMidiNoteMode(int mode);
@@ -206,7 +187,6 @@ public:
     void setSwapMode(SwapMode m) { swapModeAtomic.store((int)m, std::memory_order_relaxed); }
     SwapMode getSwapMode() const { return static_cast<SwapMode>(swapModeAtomic.load(std::memory_order_relaxed)); }
 
-    juce::File getContentDir() const override;
     juce::File getPresetsDir() const override;
     juce::File getRhythmsDir() const;
     juce::File getSamplesDir() const;
@@ -376,8 +356,6 @@ public:
 
 private:
 
-    std::unique_ptr<juce::PropertiesFile> appSettings;
-
     // now atomic — listeners can fire on the audio thread when a DAW runs
     // host automation, so the cross-thread read in syncRhythmParam needs proper
     // ordering. All set/clear pairs go through `mu_core::ScopedApvtsLoading` so
@@ -449,11 +427,6 @@ private:
     // Multi-bus output (DAW). Read by isBusesLayoutSupported at host scan-time;
     // persisted to appSettings so it survives across plugin instances.
     std::atomic<bool> multiBusEnabled { true };
-
-    // uiScale storage lives on ProcessorBase (shared family-wide). mu-clid's
-    // setUiScale override persists through appSettings before delegating up.
-
-    MidiClockSync midiClockSync;
 
     // Note mode state (audio thread writes, message thread reads getMidiNoteMode).
     std::atomic<int>    midiNoteMode    { 0 };   // 0=Free, 1=Note

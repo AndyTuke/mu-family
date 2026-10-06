@@ -1,4 +1,5 @@
 #include "Plugin/ProcessorBase.h"
+#include "Plugin/MixerFxParams.h"           // mu_mixfx::isGlobalFxParamId
 #include "Audio/FX/Slots/FXAlgorithmDef.h"   // FXAlgorithmRegistry
 #include "Audio/AlgorithmNames.h"             // mu_audio::kInsertAlgorithmCount
 #include <cstring>                            // std::strcmp — alloc-free suffix compare
@@ -85,6 +86,90 @@ void ProcessorBase::drainPendingMidiProgramChanges()
     for (int i = 0; i < size1; ++i) handle(pcQueue[(size_t)(start1 + i)]);
     for (int i = 0; i < size2; ++i) handle(pcQueue[(size_t)(start2 + i)]);
     pcFifo.finishedRead(ready);
+}
+
+void ProcessorBase::initAppSettings(const juce::String& name)
+{
+    appName = name;
+    juce::PropertiesFile::Options opts;
+    opts.applicationName     = name;
+    opts.filenameSuffix      = "xml";
+    opts.folderName          = "TDP";
+    opts.osxLibrarySubFolder = "Application Support";
+    auto settingsFile = opts.getDefaultFile();
+    settingsFile.getParentDirectory().createDirectory();
+    appSettings = std::make_unique<juce::PropertiesFile>(settingsFile, opts);
+
+    // Restore the shared preferences: a fresh open uses the last UI size + MIDI-clock choice.
+    uiScale = juce::jlimit(kUiScaleMedium, kUiScaleLarge,
+                           (float) appSettings->getDoubleValue("uiScale", (double) kUiScaleMedium));
+    midiClockSync.setEnabled (appSettings->getBoolValue("midiSyncEnabled",  false));
+    midiClockSync.setMessages(appSettings->getIntValue ("midiSyncMessages", 2));
+}
+
+juce::File ProcessorBase::getContentDir() const
+{
+    if (appSettings != nullptr)
+        if (const auto stored = appSettings->getValue("contentDir"); stored.isNotEmpty())
+            return juce::File(stored);
+    if (appName.isEmpty()) return {};
+    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+               .getChildFile("TDP").getChildFile(appName);
+}
+
+void ProcessorBase::setUiScale(float scale)
+{
+    const float clamped = juce::jlimit(kUiScaleMedium, kUiScaleLarge, scale);
+    if (uiScale == clamped) return;
+    if (appSettings != nullptr) { appSettings->setValue("uiScale", (double) clamped); appSettings->saveIfNeeded(); }
+    uiScale = clamped;
+    if (onUiScaleChanged) onUiScaleChanged(clamped);
+}
+
+void ProcessorBase::setMidiSyncEnabled(bool on)
+{
+    midiClockSync.setEnabled(on);
+    if (appSettings != nullptr) { appSettings->setValue("midiSyncEnabled", on); appSettings->saveIfNeeded(); }
+}
+
+void ProcessorBase::setMidiSyncMessages(int mode)
+{
+    midiClockSync.setMessages(mode);
+    if (appSettings != nullptr) { appSettings->setValue("midiSyncMessages", mode); appSettings->saveIfNeeded(); }
+}
+
+bool ProcessorBase::isFxParamId(const juce::String& id)
+{
+    return id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id);
+}
+
+// Walk every parameter, acting on the mixer / global-FX ones.
+void ProcessorBase::registerFxListeners(juce::AudioProcessorValueTreeState::Listener* listener)
+{
+    for (auto* p : getParameters())
+        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
+            if (isFxParamId(rp->getParameterID()))
+                apvts.addParameterListener(rp->getParameterID(), listener);
+}
+
+void ProcessorBase::unregisterFxListeners(juce::AudioProcessorValueTreeState::Listener* listener)
+{
+    for (auto* p : getParameters())
+        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
+            if (isFxParamId(rp->getParameterID()))
+                apvts.removeParameterListener(rp->getParameterID(), listener);
+}
+
+void ProcessorBase::syncAllFxParams()
+{
+    for (auto* p : getParameters())
+        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
+        {
+            const auto id = rp->getParameterID();
+            if (isFxParamId(id))
+                if (auto* a = apvts.getRawParameterValue(id))
+                    syncGlobalFxParam(id, a->load());
+        }
 }
 
 void ProcessorBase::syncGlobalFxParam(const juce::String& id, float v)

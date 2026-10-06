@@ -294,48 +294,31 @@ void PluginProcessor::restoreVoiceColours(const juce::String& csv)
 
 void PluginProcessor::writeVoiceDataToState()
 {
-    // Rebuild a fresh <VoiceData> child (drop any stale one) holding each active
-    // voice's modulators + gate, so apvts.copyState() carries them into the file.
-    apvts.state.removeChild(apvts.state.getChildWithName("VoiceData"), nullptr);
-
-    juce::ValueTree vd("VoiceData");
-    const int n = numVoices.load();
-    for (int v = 0; v < n; ++v)
-    {
-        juce::ValueTree voice("Voice");
-        voice.setProperty("idx", v, nullptr);
-        if (osc1UserPath[(size_t) v].isNotEmpty()) voice.setProperty("o1WtPath", osc1UserPath[(size_t) v], nullptr);
-        if (osc2UserPath[(size_t) v].isNotEmpty()) voice.setProperty("o2WtPath", osc2UserPath[(size_t) v], nullptr);
-        voice.addChild(mu_pp::serialiseModulators(voiceSlots[(size_t) v]),          -1, nullptr);
-        voice.addChild(serialiseGate(gatePatterns[(size_t) v]),                     -1, nullptr);
-        voice.addChild(serialiseGate(filterPatterns[(size_t) v], "FilterGate"),     -1, nullptr);
-        voice.addChild(serialiseGate(pitchPatterns[(size_t) v],  "PitchGate"),      -1, nullptr);
-        vd.addChild(voice, -1, nullptr);
-    }
-    apvts.state.addChild(vd, -1, nullptr);
+    // The shared per-voice <VoiceData> (modulators), plus mu-Tant's extras on each voice:
+    // user wavetable paths and the three gate patterns.
+    mu_pp::writeChannelData(apvts.state, numVoices.load(),
+        [this](int v) -> VoiceSlot& { return voiceSlots[(size_t) v]; },
+        [this](int v, juce::ValueTree& voice)
+        {
+            if (osc1UserPath[(size_t) v].isNotEmpty()) voice.setProperty("o1WtPath", osc1UserPath[(size_t) v], nullptr);
+            if (osc2UserPath[(size_t) v].isNotEmpty()) voice.setProperty("o2WtPath", osc2UserPath[(size_t) v], nullptr);
+            voice.addChild(serialiseGate(gatePatterns[(size_t) v]),                 -1, nullptr);
+            voice.addChild(serialiseGate(filterPatterns[(size_t) v], "FilterGate"), -1, nullptr);
+            voice.addChild(serialiseGate(pitchPatterns[(size_t) v],  "PitchGate"),  -1, nullptr);
+        });
 }
 
 void PluginProcessor::readVoiceDataFromState()
 {
-    // Clear the active voices first so loading a preset without <VoiceData> (older
-    // or foreign) yields a clean slate rather than stale modulators / gates.
-    auto vd = apvts.state.getChildWithName("VoiceData");
-
-    // Clear then restore each active voice. clearModulators is required because
-    // deserialiseModulators accumulates assignments; deserialiseGate self-clears.
-    // An absent <VoiceData> (older / foreign preset) leaves every voice cleared.
+    // Modulators via the shared reader (an absent <VoiceData> leaves every voice cleared),
+    // then each voice's mu-Tant extras — gates (deserialiseGate self-clears) + wavetables.
     const int n = numVoices.load();
+    mu_pp::readChannelModulators(apvts.state, n,
+        [this](int v) -> VoiceSlot& { return voiceSlots[(size_t) v]; },
+        [](int, const std::string& id) { return isValidModDest(id); });
     for (int v = 0; v < n; ++v)
     {
-        mu_pp::clearModulators(voiceSlots[(size_t) v]);
-        juce::ValueTree voice;
-        for (int i = 0; i < vd.getNumChildren(); ++i)
-            if (vd.getChild(i).getType() == juce::Identifier("Voice")
-                && (int) vd.getChild(i).getProperty("idx", -1) == v)
-            { voice = vd.getChild(i); break; }
-
-        mu_pp::deserialiseModulators(voice.getChildWithName("Modulators"),
-                                     voiceSlots[(size_t) v], {}, isValidModDest);
+        const auto voice = mu_pp::findChannelNode(apvts.state, v);
         const int maxCells = maxSteps(std::numeric_limits<int>::max());   // 16 in demo
         deserialiseGate(voice.getChildWithName("Gate"),       gatePatterns[(size_t) v],   maxCells);
         deserialiseGate(voice.getChildWithName("FilterGate"), filterPatterns[(size_t) v], maxCells);
@@ -370,12 +353,6 @@ void PluginProcessor::readVoiceDataFromState()
         resolveWt(voice.getProperty("o2WtPath", "").toString(), osc2UserPath, osc2UserIndex);
     }
     refreshAllPitchQuantFlags();   // modulators reloaded → refresh stepped-pitch flags
-}
-
-juce::File PluginProcessor::getContentDir() const
-{
-    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
-               .getChildFile("TDP").getChildFile("muTant");
 }
 
 juce::File PluginProcessor::getPresetsDir()     const { return getContentDir().getChildFile("Presets"); }

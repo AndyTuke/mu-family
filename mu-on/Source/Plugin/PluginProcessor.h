@@ -79,20 +79,6 @@ public:
     void   setInternalBpm(double bpm) override { internalBpm.store(juce::jlimit(20.0, 300.0, bpm), std::memory_order_relaxed); }
     double getInternalBeatPos() const override { return internalBeatPos.load(std::memory_order_relaxed); }
 
-    // Persist UI scale through appSettings (mirrors mu-tant) so a fresh open keeps size.
-    void setUiScale(float scale) override;
-
-    // ── MIDI clock sync (standalone) ──────────────────────────────────────────
-    // Slaves the sequencer beat/tempo to external MIDI clock via the shared mu-core
-    // MidiClockSync (standard synth feature). Setters persist to appSettings + drive
-    // the engine.
-    bool   getMidiSyncEnabled()  const override { return midiClockSync.isEnabled(); }
-    int    getMidiSyncMessages() const override { return midiClockSync.getMessages(); }
-    bool   isMidiClockPlaying()  const override { return midiClockSync.isPlaying(); }
-    double getMidiClockBpm()     const override { return midiClockSync.getBpm(); }
-    void   setMidiSyncEnabled(bool on);
-    void   setMidiSyncMessages(int mode);
-
     // ── ProcessorBase channel metadata (drives sidebar + mixer) ───────────────
     int          getNumChannels()              const override { return kNumChannels; }
     juce::String getChannelName(int idx)       const override
@@ -130,7 +116,6 @@ public:
 
     // ── Preset directories / extensions (per family file-format rule) ─────────
     // Full = .muOn; per-channel ("track" = one instrument lane) = .muTrack.
-    juce::File   getContentDir()             const override;
     juce::File   getPresetsDir()             const override;
     juce::File   getPerSlotPresetDir()       const override;
     juce::String getPerSlotPresetExtension() const override { return "muTrack"; }
@@ -144,9 +129,6 @@ protected:
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
-
-    void registerFxListeners();
-    void syncAllFxParams();
 
     // Per-lane modulator (de)serialise into a <VoiceData> child of the state tree
     // (mirrors mu-tant; rides the APVTS state alongside the <Pattern> grid).
@@ -175,13 +157,6 @@ private:
     std::atomic<double> internalBpm { 120.0 };
     double currentSampleRate = 44100.0;
     bool   wasPlaying = false;   // audio-thread only — detects the play→stop edge to silence voices
-
-    // Shared MIDI-clock slave (standalone). process() scans the MIDI buffer each block;
-    // when enabled + playing, processBlock slaves the sequencer beat/tempo to it.
-    MidiClockSync midiClockSync;
-
-    // Persistent app settings (UI scale + MIDI-clock prefs) — mirrors mu-tant.
-    std::unique_ptr<juce::PropertiesFile> appSettings;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

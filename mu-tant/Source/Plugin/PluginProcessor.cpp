@@ -58,25 +58,7 @@ PluginProcessor::PluginProcessor()
                     createParameterLayout(),
                     juce::Identifier("MuTantState"))
 {
-    // Persistent settings file (UI scale, future toggles).
-    {
-        juce::PropertiesFile::Options opts;
-        opts.applicationName     = "muTant";
-        opts.filenameSuffix      = "xml";
-        opts.folderName          = "TDP";
-        opts.osxLibrarySubFolder = "Application Support";
-        auto settingsFile = opts.getDefaultFile();
-        settingsFile.getParentDirectory().createDirectory();
-        appSettings = std::make_unique<juce::PropertiesFile>(settingsFile, opts);
-    }
-    // Restore persisted UI scale so a fresh open uses the last-selected size.
-    {
-        const double stored = appSettings->getDoubleValue("uiScale", (double) kUiScaleMedium);
-        uiScale = juce::jlimit(kUiScaleMedium, kUiScaleLarge, (float) stored);
-    }
-    // Restore persisted MIDI-clock-sync prefs (standalone external clock). Mirrors mu-clid.
-    midiClockSync.setEnabled (appSettings->getBoolValue("midiSyncEnabled",  false));
-    midiClockSync.setMessages(appSettings->getIntValue ("midiSyncMessages", 2));
+    initAppSettings("muTant");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
     // Restore persisted MIDI Note mode (0 = Free, 1 = Note). Seed the audio-thread
     // gate so a fresh open in Note mode starts silent (closed) until a note arrives.
@@ -157,43 +139,14 @@ PluginProcessor::PluginProcessor()
     // Mixer + FX state is listener-synced into mixerEngine/fxChain (channel strips,
     // sends, sidechain, returns, master, FX slots) — mirrors mu-clid. Seed it now
     // since JUCE doesn't fire parameterChanged on construction.
-    registerFxListeners();
+    registerFxListeners(this);
     syncAllFxParams();
 }
 
 PluginProcessor::~PluginProcessor()
 {
     cancelPendingUpdate();   // no hot-swap / MIDI drain fires into a half-destroyed processor
-    for (auto* p : getParameters())
-        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-        {
-            const juce::String id = rp->getParameterID();
-            if (id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id))
-                apvts.removeParameterListener(id, this);
-        }
-}
-
-void PluginProcessor::registerFxListeners()
-{
-    for (auto* p : getParameters())
-        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-        {
-            const juce::String id = rp->getParameterID();
-            if (id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id))
-                apvts.addParameterListener(id, this);
-        }
-}
-
-void PluginProcessor::syncAllFxParams()
-{
-    for (auto* p : getParameters())
-        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-        {
-            const juce::String id = rp->getParameterID();
-            if (id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id))
-                if (auto* a = apvts.getRawParameterValue(id))
-                    syncGlobalFxParam(id, a->load());
-        }
+    unregisterFxListeners(this);
 }
 
 void PluginProcessor::parameterChanged(const juce::String& id, float v)
@@ -1004,30 +957,6 @@ void PluginProcessor::resetVoiceSlot(int idx)
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────
-void PluginProcessor::setUiScale(float scale)
-{
-    const float clamped = juce::jlimit(kUiScaleMedium, kUiScaleLarge, scale);
-    if (uiScale == clamped) return;
-    if (appSettings != nullptr)
-    {
-        appSettings->setValue("uiScale", (double) clamped);
-        appSettings->saveIfNeeded();
-    }
-    ProcessorBase::setUiScale(clamped);
-}
-
-void PluginProcessor::setMidiSyncEnabled(bool on)
-{
-    midiClockSync.setEnabled(on);
-    if (appSettings != nullptr) { appSettings->setValue("midiSyncEnabled", on); appSettings->saveIfNeeded(); }
-}
-
-void PluginProcessor::setMidiSyncMessages(int mode)
-{
-    midiClockSync.setMessages(mode);
-    if (appSettings != nullptr) { appSettings->setValue("midiSyncMessages", mode); appSettings->saveIfNeeded(); }
-}
-
 void PluginProcessor::setMidiNoteMode(int mode)
 {
     midiNoteMode.store(mode, std::memory_order_relaxed);

@@ -157,16 +157,6 @@ public:
     SwapMode getSwapMode() const { return (SwapMode) swapModeAtomic.load(std::memory_order_relaxed); }
     void     setSwapMode(SwapMode m) { swapModeAtomic.store((int) m, std::memory_order_relaxed); }
 
-    // MIDI clock sync (standalone) — slaves the beat/tempo to external MIDI clock via the
-    // shared mu-core MidiClockSync. Overrides the ProcessorBase MIDI virtuals (standard
-    // synth feature). Setters persist to appSettings + drive the engine.
-    bool   getMidiSyncEnabled()  const override { return midiClockSync.isEnabled(); }
-    int    getMidiSyncMessages() const override { return midiClockSync.getMessages(); }
-    bool   isMidiClockPlaying()  const override { return midiClockSync.isPlaying(); }
-    double getMidiClockBpm()     const override { return midiClockSync.getBpm(); }
-    void   setMidiSyncEnabled(bool on);
-    void   setMidiSyncMessages(int mode);
-
     // MIDI Note mode (plugin DAW notes + standalone keyboard). Free = the drone runs
     // continuously (default). Note = gate + pitch-track — the drone sounds only while
     // a MIDI note is held, and the held note (last-note priority) sets the tonal centre.
@@ -223,7 +213,6 @@ public:
     bool         userWavetableMissing(int voice, int oscIndex) const; // path set but file gone
 
     // ── ProcessorBase preset wiring (per design-voice.md file formats) ────────
-    juce::File   getContentDir()             const override;
     juce::File   getPresetsDir()             const override;   // full presets live here
     juce::File   getPerSlotPresetDir()       const override;   // voice presets live here
     juce::String getPerSlotPresetExtension() const override { return "muPattern"; }
@@ -253,10 +242,6 @@ public:
     bool hasPendingFullPreset() const override { return hotSwapStager.hasFullPending(); }
     bool hasPendingSwap(int voice) const       { return hotSwapStager.hasVoicePending(voice); }
     void cancelStagedSwap(int voice)           { hotSwapStager.cancelVoice(voice); }
-
-    // Persist the UI scale selection (Medium / Large) so it survives a plugin
-    // close/reopen. Writes to appSettings before delegating to the base class.
-    void setUiScale(float scale) override;
 
     // License — checked once at startup; result is immutable thereafter. Release builds
     // require a valid license (no license → Demo); Debug builds (testers) run unlocked.
@@ -476,7 +461,6 @@ private:
 
     // Shared MIDI-clock slave (standalone). process() scans the MIDI buffer each block;
     // when enabled + playing, processBlock slaves the beat/tempo to it.
-    MidiClockSync midiClockSync;
     // Written in prepareToPlay (host suspends the audio thread first) — no atomic needed.
     double currentSampleRate = 44100.0;
 
@@ -539,12 +523,6 @@ private:
     // Register mixer/FX param listeners + run an initial engine sync (JUCE
     // doesn't fire parameterChanged on construction or for unchanged values, so
     // we seed mixerEngine/fxChain explicitly here + after a preset load).
-    void registerFxListeners();
-    void syncAllFxParams();
-
-    // Persistent user settings (UI scale, future BPM, etc.) — stored next to
-    // the content dir so settings survive plugin re-installs.
-    std::unique_ptr<juce::PropertiesFile> appSettings;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };
