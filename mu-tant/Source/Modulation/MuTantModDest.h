@@ -2,9 +2,8 @@
 
 #include "UI/ModulatorEditor.h"           // mu-core: ModDestProvider
 #include "UI/Components/DropdownSelect.h"
-#include "Audio/AlgorithmNames.h"         // mu-core: kInsertAlgorithmNames
-#include "Audio/InsertSlotConfig.h"        // mu-core: kInsertAlgoSlots / kInsertSlotCount
 #include "Modulation/ModTarget.h"         // mu-core: the standard target row
+#include "UI/ModTargetDropdown.h"        // mu-core: the shared destination-dropdown builder
 
 #include <array>
 #include <cstring>
@@ -102,61 +101,9 @@ inline ModDestProvider makeModDestProvider()
 
     p.populate = [](DropdownSelect& dd, int driveChar, bool steppedMode)
     {
-        // Walk the table once, opening a new section heading whenever the
-        // section string changes. Items use the table index + 1 as their
-        // 1-based dropdown ID so saved assignments can be reverse-resolved.
-        // The Insert section uses per-algo slot labels when an algo is active.
-        const char* currentSection = nullptr;
-        for (int i = 0; i < kModDestCount; ++i)
-        {
-            // In Smooth mode, omit stepped-only destinations (octave) — the IDs are the
-            // table index +1, so skipping an item leaves the others' IDs unchanged.
-            if (! steppedMode && isSteppedOnlyDest(kModDestTable[i].id)) continue;
-
-            const bool isInsert = (std::strcmp(kModDestTable[i].section, "Insert") == 0);
-
-            // No insert algorithm selected → hide the Insert section + its P1-P4 targets
-            // entirely (mirrors mu-clid, which only adds them when driveChar > 0).
-            if (isInsert && driveChar <= 0) continue;
-
-            if (currentSection == nullptr || std::strcmp(currentSection, kModDestTable[i].section) != 0)
-            {
-                currentSection = kModDestTable[i].section;
-                // For the Insert section: open with the algo name when one is active.
-                if (isInsert)
-                {
-                    if (driveChar > 0
-                        && driveChar < (int) std::size(mu_audio::kInsertAlgorithmNames) - 1)
-                        dd.addSectionHeading(mu_audio::kInsertAlgorithmNames[driveChar]);
-                    else
-                        dd.addSectionHeading("Insert");
-                }
-                else
-                {
-                    dd.addSectionHeading(currentSection);
-                }
-            }
-
-            if (isInsert)
-            {
-                // Use the per-algo slot label when available, otherwise the generic alias.
-                const int slot = i - (kModDestCount - 4);   // 0..3 for the 4 insert destinations
-                const char* label = kModDestTable[i].label;
-                if (driveChar > 0
-                    && driveChar < (int) std::size(mu_audio::kInsertAlgorithmNames) - 1
-                    && slot >= 0 && slot < mu_ui::kInsertSlotCount)
-                {
-                    const auto& sl = mu_ui::kInsertAlgoSlots[driveChar][slot];
-                    if (sl.label != nullptr) label = sl.label;
-                    else continue;   // hidden slot → skip
-                }
-                dd.addItem(label, i + 1);
-            }
-            else
-            {
-                dd.addItem(kModDestTable[i].label, i + 1);
-            }
-        }
+        // The shared builder; in Smooth mode stepped-only targets (octave) are omitted.
+        mu_mod::populateDropdown(dd, kModDestTable,
+            { driveChar, [steppedMode](const mu_mod::ModTarget& t) { return steppedMode || ! isSteppedOnlyDest(t.id); } });
     };
 
     wireTableModDestResolve(p,

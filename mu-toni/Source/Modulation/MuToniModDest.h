@@ -3,6 +3,7 @@
 #include "UI/ModulatorEditor.h"           // mu-core: ModDestProvider + wireTableModDestResolve
 #include "UI/Components/DropdownSelect.h"
 #include "Modulation/ModTarget.h"         // mu-core: the standard target row
+#include "UI/ModTargetDropdown.h"        // mu-core: the shared destination-dropdown builder
 
 #include <array>
 #include <string>
@@ -74,16 +75,7 @@ inline ModDestProvider makeModDestProvider()
 
     p.populate = [](DropdownSelect& dd, int /*driveChar*/, bool /*steppedMode*/)
     {
-        const char* currentSection = nullptr;
-        for (int i = 0; i < kNumModDests; ++i)
-        {
-            if (currentSection == nullptr || std::strcmp(currentSection, kModDestTable[i].section) != 0)
-            {
-                currentSection = kModDestTable[i].section;
-                dd.addSectionHeading(currentSection);
-            }
-            dd.addItem(kModDestTable[i].label, i + 1);   // 1-based id = table index + 1
-        }
+        mu_mod::populateDropdown(dd, kModDestTable);   // the shared builder
     };
 
     wireTableModDestResolve(p,

@@ -4,6 +4,7 @@
 #include "UI/Components/DropdownSelect.h"   // mu-core
 #include "Plugin/MuOnChannels.h"           // Channel enum
 #include "Modulation/ModTarget.h"         // mu-core: the standard target row
+#include "UI/ModTargetDropdown.h"        // mu-core: the shared destination-dropdown builder
 
 #include <cstddef>
 #include <cstring>
@@ -115,12 +116,10 @@ inline ModDestProvider makeModDestProvider(int lane)
 
     p.populate = [lane](DropdownSelect& dd, int /*driveChar*/, bool /*steppedMode*/)
     {
-        // mu-on's lane destinations are all continuous engine params (no octave/pitch
-        // dests yet), so there are no stepped-only entries to omit in Smooth mode.
+        // The shared builder over this lane's table (lane tables have no sections).
         int n = 0;
         const ModDestEntry* t = destsForLane(lane, n);
-        for (int i = 0; i < n; ++i)
-            dd.addItem(t[i].label, i + 1);   // 1-based id = table index + 1
+        mu_mod::populateDropdown(dd, t, n);
     };
 
     int count = 0;

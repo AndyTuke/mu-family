@@ -3,8 +3,7 @@
 #include "UI/ModulatorEditor.h"                     // mu-core: ModDestProvider
 #include "UI/Components/DropdownSelect.h"
 #include "Modulation/ModulationDestinations.h"      // mu-clid kTable
-#include "Audio/InsertSlotConfig.h"                 // kInsertAlgoSlots
-#include "Audio/AlgorithmNames.h"                   // kInsertAlgorithmNames
+#include "UI/ModTargetDropdown.h"                 // mu-core: the shared destination-dropdown builder
 
 #include <string>
 
@@ -24,71 +23,22 @@ inline ModDestProvider makeModDestProvider()
 
     p.populate = [](DropdownSelect& dd, int driveChar, bool steppedMode)
     {
-        // Helper: add item using the alias from kTable, with 1-based dropdown ID.
-        auto item = [&](int idx) { dd.addItem(ModDest::kTable[idx].label, idx + 1); };
-
-        // ── Euclid A ──────────────────────────────────────────────────────────
-        dd.addSectionHeading("Euclid A");
-        item(16);  item(17);  // Hits, Rotate
-        item(27);  item(28);  // Pre Pad, Post Pad
-        item(29);  item(30);  // Insert Start, Insert Length
-
-        // ── Euclid B ──────────────────────────────────────────────────────────
-        dd.addSectionHeading("Euclid B");
-        item(18);  item(19);
-        item(31);  item(32);
-        item(33);  item(34);
-
-        // ── Euclid C ──────────────────────────────────────────────────────────
-        dd.addSectionHeading("Euclid C");
-        item(22);  item(23);
-        item(35);  item(36);
-        item(37);  item(38);
-
-        // ── Pitch ─────────────────────────────────────────────────────────────
-        // pitch.octave: ±3 octaves full swing (scale=36 semitones).
-        // pitch.semitones: ±12 semitones full swing. Combined max ±48 st.
-        dd.addSectionHeading("Pitch");
-        if (steppedMode) item(20);  // Pitch Octave (±3 oct) — stepped-only (no smooth octave glide)
-        item(9);   // Pitch Semitones (±12 st)
-        item(24);  // Pitch Env Depth
-
-        // ── Filter ────────────────────────────────────────────────────────────
-        dd.addSectionHeading("Filter");
-        item(4);  item(5);   // Cutoff, Resonance
-        item(6);  item(7);  item(8);  // Env Attack, Decay, Depth
-        item(44);  // Low Cut
-
-        // ── Amp ───────────────────────────────────────────────────────────────
-        dd.addSectionHeading("Amp");
-        item(25);  // Amp Level
-        item(0);  item(1);  item(2);  // Attack, Decay, Sustain
-        // Amp Release (idx 3) is intentionally NOT a modulation target.
-        item(26);  // Accent
-
-        // ── Insert ────────────────────────────────────────────────────────────
-        // Post-Stage-36: the 4 insert.p1..p4 destinations cover every algorithm; the
-        // visible slots + their per-algo labels come from mu_ui::kInsertAlgoSlots.
-        // Items added here keep the SAME 1-based table ID (11..14) so saved
-        // assignments persist across algorithm changes — the dropdown text just
-        // re-labels them. Hidden slots (label == nullptr) are skipped.
-        if (driveChar > 0 && driveChar < (int) std::size(mu_audio::kInsertAlgorithmNames) - 1
-            && driveChar < 14)
-        {
-            const auto& slots = mu_ui::kInsertAlgoSlots[driveChar];
-            bool addedHeading = false;
-            for (int slot = 0; slot < mu_ui::kInsertSlotCount; ++slot)
-            {
-                if (slots[slot].label == nullptr) continue;
-                if (! addedHeading)
-                {
-                    dd.addSectionHeading(mu_audio::kInsertAlgorithmNames[driveChar]);
-                    addedHeading = true;
-                }
-                // ID = 10 + slot + 1 = 11..14 (1-based table index for insert.pN).
-                dd.addItem(slots[slot].label, 10 + slot + 1);
-            }
-        }
+        // The shared builder in mu-Clid's display order (kTable rows; headings come from each
+        // row's section): Euclid A / B / C, Pitch, Filter, Amp, then the active insert's slots.
+        // Pitch Octave is stepped-only (no smooth octave glide); Amp Release (row 3) is retired.
+        static const std::vector<int> kOrder = {
+            16, 17, 27, 28, 29, 30,          // Euclid A: Hits, Rotate, Pre Pad, Post Pad, Insert Start, Insert Length
+            18, 19, 31, 32, 33, 34,          // Euclid B
+            22, 23, 35, 36, 37, 38,          // Euclid C
+            20, 9, 24,                       // Pitch: Octave, Semitones, Env Depth
+            4, 5, 6, 7, 8, 44,               // Filter: Cutoff, Resonance, Env Attack / Decay / Depth, Low Cut
+            25, 0, 1, 2, 26,                 // Amp: Level, Attack, Decay, Sustain, Accent
+            10, 11, 12, 13,                  // Insert P1..P4 (labelled per active effect)
+        };
+        mu_mod::populateDropdown(dd, ModDest::kTable,
+            { driveChar,
+              [steppedMode](const mu_mod::ModTarget& t) { return steppedMode || std::strcmp(t.id, "pitch.octave") != 0; },
+              kOrder });
     };
 
     wireTableModDestResolve(p,
