@@ -18,6 +18,26 @@ Test pass/fail tracking lives in [tests.md](tests.md), not this backlog. Use thi
 
 |---|---|---|---|
 
+| 1143 | **[family/hot-swap] Unify hot-swap staging and give it to mu-Toni / mu-On.** mu-Clid (HotSwapStager) and mu-Tant (VoiceHotSwapStager) each have their own; mu-Toni and mu-On apply preset / program-change loads immediately, not at the loop end. Needs a design pass first: the loop-boundary rules differ (rhythm loops vs gate patterns vs arp / step grid). | 🔴 Open | — |
+
+| 1142 | **[family/ui] Shared voice band sections (Pitch / Filter / Amp).** mu-Clid has them as components (VoiceSection), mu-Toni rebuilds the layout by hand in EnginePanel, mu-Tant has its own. Share them like InsertSubsection, with a per-product parameter-name mapping (the three products name their params differently). Larger job. | 🔴 Open | — |
+
+| 1141 | **[family/editor] Lift repeated editor set-up into EditorShellBase.** Each editor repeats: mixer overlay status forwarding to the StatusBar, the shared credits list (JUCE / Signalsmith / clap-juce-extensions …) for the About panel, and similar boilerplate. Move the common parts into the shell; apps supply only what differs. | 🔴 Open | — |
+
+| 1140 | **[mu-on/link] Connect mu-On to mu-link.** mu-On's StandaloneApp passes an empty mu-link name `{}`; the other three pass their names, so mu-On can't follow mu-link's clock or show on its mixer. First check mu-On's transport handles the external clock (readHostTransport path), then pass its name. | 🔴 Open | — |
+
+| 1139 | **[mu-clid/presets] Review mu-Clid preset I/O against the shared helpers.** mu-Clid's PresetIO.cpp predates mu-core Persistence/PresetFiles.h and hasn't been checked against it. Move the parts that match (safe name, full-preset wrap / read, categories, layer params) onto the helpers; keep anything mu-Clid needs that the helpers don't do (embedded samples, rhythm-specific data) and note why. | 🔴 Open | — |
+
+| 1138 | **[mu-tant/ui] Voice panel uses the header bar's preset file list.** VoicePanel keeps its own voicePresetFiles vector + index → file mapping (refreshVoicePresetList / onPresetSelected). Switch to ChannelHeaderBar::setPresetFiles + onPresetFileChosen + showPresetFile, as mu-Toni and mu-On do. | 🔴 Open | — |
+
+| 1137 | **[family/editor] Shell uses the shared preset file-name helper.** EditorShellBase::doSavePreset rebuilds the saved file's path with its own copy of the name-cleaning code (replaceCharacters + "Preset" fallback). Use mu_pp::safePresetFileName (or have savePreset return the written file) so the top bar can never point at a different file from the one saved. | 🔴 Open | — |
+
+| 1136 | **[family/ui] Program-change table shows only the app's layer count.** MidiPresetsPanel always shows 8 channel toggles (std::array of 8); mu-Toni has 4 layers, mu-On 5. Extra channels are already ignored by the processor, but the table should show only the app's real count (getNumChannels / a ProcessorBase max-layers query; mu-Tant/mu-Clid keep 8). | 🔴 Open | — |
+
+| 1135 | **[family/editor] Shell wires the program-change buttons.** Every editor repeats `settingsOverlay.onMidiPresetsClicked / onFullPresetsClicked = { showSettings(false); showMidiPresets / showMidiFullPresets(true); }`. Have EditorShellBase do it when the registered settings overlay is a StandardSettingsOverlay, and delete the per-app lines. | 🔴 Open | — |
+
+| 1134 | **[family/processor] Program-change plumbing into ProcessorBase.** All four processors repeat the same code: inherit juce::AsyncUpdater, call scanMidiProgramChanges in processBlock → triggerAsyncUpdate, drain in handleAsyncUpdate, cancelPendingUpdate in the destructor. Move it into ProcessorBase (one call from processBlock, or done in processCoreBlock), keeping mu-Clid's and mu-Tant's handleAsyncUpdate hot-swap commits working. | 🔴 Open | — |
+
 
 ## 🟡 On Hold
 
@@ -26,6 +46,10 @@ Test pass/fail tracking lives in [tests.md](tests.md), not this backlog. Use thi
 | # | Description | Status | Closed Build |
 
 |---|---|---|---|
+
+| 1145 | **[mu-clid/modulation] Pad / Insert Length depth against the knob's current maximum?** Pre / Post Pad and Insert Length modulation depth is measured against the full 0–63 range, but what plays is limited to the knob's current maximum (clampLayout), so with few steps most of the depth range does nothing. Proposal: measure against the current maximum, with a preset re-upgrade. Waiting on the owner's decision. | 🟡 On Hold | — |
+
+| 1144 | **[mu-toni, mu-on/ui] App accent colours.** mu-Toni and mu-On use mu-Clid's purple as their metal-style accent (setMetalStyle(true) with no colour). Waiting on the owner to choose each app's colour; then one line per app. | 🟡 On Hold | — |
 
 | 1073 | **[mu-toni/follow-ups] Post-MVP enhancements — the deferred mu-tant voice-DSP port.** After the mu-toni MVP (#1072) these remain, deliberately deferred until the owner schedules them: (1) **wavetable oscillators = mu-tant's** — port `WavetableBank`/`WavetableOscillator`/`HilbertTransform` into `mu_toni::` (procedural factory bank via `synthFactoryFrame`, no shipped content) replacing the analogue PolyBLEP osc, with the real wavetable selector + Position knobs; (2) **Osc 2 cross-mod** (mu-tant 2-lane X-Mod — FM/PM/TZFM + Sync + Feedback / AM·RM·SSB) + **oscillator sync toggle**; (3) ~~preset-browser chrome for `.muToni`/`.muArp` save/load~~ — done in #1132; (4) minor: per-step velocity/accent, MIDI-in omni-vs-channel. Not started. | 🟡 On Hold | — |
 
