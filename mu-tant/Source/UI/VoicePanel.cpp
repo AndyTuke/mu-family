@@ -272,6 +272,7 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     // The GatingDesigner owns the Gap slider and Bypass button as children;
     // VoicePanel just creates the APVTS attachments per-voice in rebindAttachments.
     addAndMakeVisible(gatingDesigner);
+    if (! proc.isLicensed()) gatingDesigner.setMaxCells(proc.demoMaxSteps());   // demo: 16 steps
 
     // ── Insert effect (shared mu-core panel) ────────────────────────────────
     // mu-tant reads its insert params fresh from APVTS each block (no listener),

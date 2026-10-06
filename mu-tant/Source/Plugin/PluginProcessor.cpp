@@ -138,6 +138,12 @@ PluginProcessor::PluginProcessor()
         return o;
     };
 
+    // Demo: the default patterns (2 bars of 1/16) are shrunk to the 16-step cap too.
+    if (! isLicensed())
+        for (auto* pats : { &gatePatterns, &filterPatterns, &pitchPatterns })
+            for (auto& pat : *pats)
+                pat.limitToCells(demoMaxSteps());
+
     // MIDI program-change preset maps (Ch 1-8 → per-voice .muPattern, Ch 9 →
     // full .muTant preset). The scan/drain machinery + the editor panels live in
     // mu-core; we only point the maps at the plugin's settings dir + load them.
@@ -489,7 +495,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     //   • per-voice swap: OnMasterLoop (+ a loop set) → master loop; else the voice's
     //     own gate-pattern boundary (so a swap can't hang when no master loop exists).
     //   • full preset: master loop when one is defined, else voice 0's gate boundary.
-    const int    mlSteps         = mstrLoopPtr ? (int) mstrLoopPtr->load() * 16 : 0;
+    const int    mlSteps         = mstrLoopPtr ? juce::jmin((int) mstrLoopPtr->load() * 16, maxSteps(256)) : 0;
     const double masterLoopBeats = mlSteps > 0 ? (double) mlSteps / 4.0 : 0.0;
     const bool   onMasterLoop    = (swapModeAtomic.load(std::memory_order_relaxed) == 0)
                                    && masterLoopBeats > 0.0;

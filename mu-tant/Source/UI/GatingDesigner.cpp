@@ -149,8 +149,7 @@ GatingDesigner::GatingDesigner()
     pencilBtn.setToggleState(true, juce::dontSendNotification);
 
     // ── Pattern length dropdown (1-16 bars) ──────────────────────────────────
-    for (int b = 1; b <= GatePattern::kMaxPatternBars; ++b)
-        barsDropdown.addItem(juce::String(b), b);
+    rebuildBarsDropdown();
     barsDropdown.setSelectedId(2, false);
     barsDropdown.onChange = [this](int id) { if (id >= 1) setPatternBars(id); };
     addAndMakeVisible(barsDropdown);
@@ -194,13 +193,50 @@ void GatingDesigner::setSubdivision(int denominator)
     subdivDropdown.setSelectedId(idForDenom(denominator), false);
     if (auto* pat = getActivePattern())
         withLock(pat, [&] { pat->subdivision = static_cast<GatePattern::Subdivision>(denominator); });
+
+    // Demo cap: a finer grid may allow fewer bars — shorten the pattern to fit.
+    rebuildBarsDropdown();
+    if (auto* pat = getActivePattern())
+    {
+        if (pat->patternLengthBars > maxBarsFor(denominator)) setPatternBars(maxBarsFor(denominator));
+        else barsDropdown.setSelectedId(pat->patternLengthBars, false);
+    }
     markPathsDirty();
     repaint();
 }
 
+int GatingDesigner::maxBarsFor(int denom) const noexcept
+{
+    if (maxCells == std::numeric_limits<int>::max() || denom <= 0) return GatePattern::kMaxPatternBars;
+    return juce::jlimit(1, GatePattern::kMaxPatternBars, maxCells / denom);
+}
+
+void GatingDesigner::rebuildBarsDropdown()
+{
+    barsDropdown.clear();
+    for (int b = 1; b <= maxBarsFor(subdivisionDenom); ++b)
+        barsDropdown.addItem(juce::String(b), b);
+}
+
+void GatingDesigner::setMaxCells(int cells)
+{
+    maxCells = juce::jmax(1, cells);
+
+    // Grids finer than the cap are not offered (ids stay tied to kSubdivOptions).
+    subdivDropdown.clear();
+    for (int i = 0; i < kSubdivCount; ++i)
+        if (kSubdivOptions[i].denom <= maxCells)
+            subdivDropdown.addItem(kSubdivOptions[i].label, i + 1);
+    subdivDropdown.setSelectedId(idForDenom(subdivisionDenom), false);
+
+    rebuildBarsDropdown();
+    if (auto* pat = getActivePattern())
+        barsDropdown.setSelectedId(juce::jmin(pat->patternLengthBars, maxBarsFor(subdivisionDenom)), false);
+}
+
 void GatingDesigner::setPatternBars(int bars)
 {
-    bars = juce::jlimit(1, GatePattern::kMaxPatternBars, bars);
+    bars = juce::jlimit(1, maxBarsFor(subdivisionDenom), bars);
     barsDropdown.setSelectedId(bars, false);
 
     // Update all three patterns (they share the same temporal grid).

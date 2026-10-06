@@ -236,8 +236,9 @@ public:
     }
     // Activation record filename (online path), next to the offline .lic in the content dir.
     static constexpr const char* kActivationFilename = "muclid.activation";
-    // Demo limits the unlicensed editor to a single rhythm.
+    // Demo limits the unlicensed editor to a single rhythm of at most 16 steps.
     int demoMaxChannels() const override { return 1; }
+    int demoMaxSteps()    const override { return 16; }
 
     void savePreset(const juce::String& n, const juce::String& d,
                     const juce::String& c, bool e = false) override { presetIO.savePreset(n, d, c, e); }

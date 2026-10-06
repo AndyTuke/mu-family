@@ -204,6 +204,31 @@ public:
             expectWithinAbsoluteError(p.gateAt(8.0, 0.0f),  p.gateAt(0.0, 0.0f), 1e-4f, "beat 8 wraps to beat 0");
             expectWithinAbsoluteError(p.gateAt(16.0, 0.0f), p.gateAt(0.0, 0.0f), 1e-4f, "beat 16 wraps to beat 0");
         }
+
+        beginTest("limitToCells: the demo cap shrinks a pattern to 16 steps");
+        {
+            GatePattern p;   // 2 bars of 1/16 = 32 cells
+            GateEnvelope a; a.startCell = 4;  a.lengthCells = 4;
+            GateEnvelope b; b.startCell = 14; b.lengthCells = 6;   // runs past cell 16
+            GateEnvelope c; c.startCell = 20; c.lengthCells = 2;   // starts past cell 16
+            p.addEnvelope(a); p.addEnvelope(b); p.addEnvelope(c);
+            p.limitToCells(16);
+            expect(p.totalCells() == 16, "1/16 pattern cut to 1 bar = 16 cells");
+            expect(p.envelopes.size() == 2, "envelope starting past the end removed");
+            expect(p.envelopes.back().lengthCells == 2, "envelope running over the end clipped");
+
+            GatePattern q; q.subdivision = GatePattern::Subdivision::ThirtySecond;
+            q.limitToCells(16);
+            expect(q.subdivision == GatePattern::Subdivision::Sixteenth && q.totalCells() == 16,
+                   "1/32 drops to 1/16, 1 bar");
+
+            GatePattern r; r.subdivision = GatePattern::Subdivision::Quarter; r.patternLengthBars = 8;
+            r.limitToCells(16);
+            expect(r.patternLengthBars == 4 && r.totalCells() == 16, "1/4 keeps 4 bars = 16 cells");
+
+            GatePattern u; u.limitToCells(std::numeric_limits<int>::max());
+            expect(u.totalCells() == 32, "no cap leaves the pattern alone");
+        }
     }
 };
 

@@ -234,7 +234,7 @@ void PluginProcessor::parameterChanged(const juce::String& id, float v)
     // Master loop length
     if (id == "mstrLoop")
     {
-        sequencer.setMasterLoopSteps((int)v * 16);
+        sequencer.setMasterLoopSteps(juce::jmin((int)v * 16, maxSteps(256)));   // 0 = free; demo caps at 16
         return;
     }
 }

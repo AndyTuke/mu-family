@@ -209,9 +209,10 @@ void PluginProcessor::applyVoicePresetTree(int voice, const juce::ValueTree& tre
         mu_pp::deserialiseModulators(mods, voiceSlots[(size_t) voice], {}, isValidModDest);
     }
     refreshPitchQuantFlags(voice);   // assignments changed → refresh stepped-pitch flags
-    deserialiseGate(tree.getChildWithName("Gate"),       gatePatterns[(size_t) voice]);
-    deserialiseGate(tree.getChildWithName("FilterGate"), filterPatterns[(size_t) voice]);
-    deserialiseGate(tree.getChildWithName("PitchGate"),  pitchPatterns[(size_t) voice]);
+    const int maxCells = maxSteps(std::numeric_limits<int>::max());   // 16 in demo
+    deserialiseGate(tree.getChildWithName("Gate"),       gatePatterns[(size_t) voice],   maxCells);
+    deserialiseGate(tree.getChildWithName("FilterGate"), filterPatterns[(size_t) voice], maxCells);
+    deserialiseGate(tree.getChildWithName("PitchGate"),  pitchPatterns[(size_t) voice],  maxCells);
 
     // User wavetable paths → bank indices (missing file → clear to factory).
     auto loadWt = [this, voice](const juce::String& path,
@@ -335,9 +336,10 @@ void PluginProcessor::readVoiceDataFromState()
 
         mu_pp::deserialiseModulators(voice.getChildWithName("Modulators"),
                                      voiceSlots[(size_t) v], {}, isValidModDest);
-        deserialiseGate(voice.getChildWithName("Gate"),       gatePatterns[(size_t) v]);
-        deserialiseGate(voice.getChildWithName("FilterGate"), filterPatterns[(size_t) v]);
-        deserialiseGate(voice.getChildWithName("PitchGate"),  pitchPatterns[(size_t) v]);
+        const int maxCells = maxSteps(std::numeric_limits<int>::max());   // 16 in demo
+        deserialiseGate(voice.getChildWithName("Gate"),       gatePatterns[(size_t) v],   maxCells);
+        deserialiseGate(voice.getChildWithName("FilterGate"), filterPatterns[(size_t) v], maxCells);
+        deserialiseGate(voice.getChildWithName("PitchGate"),  pitchPatterns[(size_t) v],  maxCells);
 
         // User wavetable paths → resolve to bank indices (load the file if present).
         // A missing file keeps the path (UI shows "missing") but resolves to -1 so

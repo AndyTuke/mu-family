@@ -11,6 +11,7 @@
 
 #include <juce_data_structures/juce_data_structures.h>
 #include <thread>
+#include <limits>
 #include "Sequencer/GatePattern.h"
 
 namespace mu_tant
@@ -38,7 +39,9 @@ inline juce::ValueTree serialiseGate(const GatePattern& g, const char* tagName =
 // Restore a gate tree into `g` (clears + rebuilds). Accepts "Gate", "FilterGate",
 // and "PitchGate" tags. An invalid/absent tree clears the pattern to defaults.
 // Holds editLock around the rebuild so it is safe to call without an outer suspend.
-inline void deserialiseGate(const juce::ValueTree& t, GatePattern& g)
+// maxCells: the demo step cap (patterns are shrunk to fit); unlimited by default.
+inline void deserialiseGate(const juce::ValueTree& t, GatePattern& g,
+                            int maxCells = std::numeric_limits<int>::max())
 {
     const bool valid = t.isValid()
                     && (t.getType() == juce::Identifier("Gate")
@@ -90,6 +93,7 @@ inline void deserialiseGate(const juce::ValueTree& t, GatePattern& g)
         g.subdivision       = GatePattern::Subdivision::Sixteenth;
         g.patternLengthBars = 2;
     }
+    g.limitToCells(maxCells);
     g.resetGateCache();
     g.hasEnvelopes.store(!g.envelopes.empty(), std::memory_order_relaxed);
     g.editLock.store(false, std::memory_order_release);

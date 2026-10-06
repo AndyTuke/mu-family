@@ -152,6 +152,11 @@ void SequencerEngine::updatePattern(int index)
     while (!patternLock.compare_exchange_weak(expected, true, std::memory_order_acquire))
         expected = false;
 
+    // Demo cap: no generator is built with more steps than the cap allows.
+    const int cap = stepCap.load(std::memory_order_relaxed);
+    for (auto* gen : { &rhythms[index].genA, &rhythms[index].genB, &rhythms[index].genC })
+        gen->steps = juce::jmin(gen->steps, cap);
+
     cachedPatterns[index]  = rhythms[index].getCombinedPattern();
     cachedCPatterns[index] = rhythms[index].genC.getPattern();
     patternUpdated[index]  = true;

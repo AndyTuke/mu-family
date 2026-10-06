@@ -26,15 +26,16 @@ EuclideanPanel::EuclideanPanel(PluginProcessor& p) : proc(p)
     logicCtrl.addItem("A not B", 4);
     logicCtrl.addItem("B not A", 5);
 
-    stepsA.setRange(1, 64, 1);      hitsA.setRange(0, 64, 1);   rotA.setRange(0, 63, 1);
+    const int maxSteps = proc.maxSteps(HitGenerator::kMaxSteps);   // 16 in demo
+    stepsA.setRange(1, maxSteps, 1);      hitsA.setRange(0, 64, 1);   rotA.setRange(0, 63, 1);
     prePadA.setRange(0, 12, 1);     postPadA.setRange(0, 12, 1);
     insertStA.setRange(0, 63, 1);   insertLenA.setRange(0, 8, 1);
 
-    stepsB.setRange(1, 64, 1);      hitsB.setRange(0, 64, 1);   rotB.setRange(0, 63, 1);
+    stepsB.setRange(1, maxSteps, 1);      hitsB.setRange(0, 64, 1);   rotB.setRange(0, 63, 1);
     prePadB.setRange(0, 12, 1);     postPadB.setRange(0, 12, 1);
     insertStB.setRange(0, 63, 1);   insertLenB.setRange(0, 8, 1);
 
-    stepsC.setRange(1, 64, 1);      hitsC.setRange(0, 64, 1);   rotC.setRange(0, 63, 1);
+    stepsC.setRange(1, maxSteps, 1);      hitsC.setRange(0, 64, 1);   rotC.setRange(0, 63, 1);
     prePadC.setRange(0, 12, 1);     postPadC.setRange(0, 12, 1);
     insertStC.setRange(0, 63, 1);   insertLenC.setRange(0, 8, 1);
 

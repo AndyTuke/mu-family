@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <limits>
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "Sequencer/GatePattern.h"
@@ -45,6 +46,9 @@ public:
     void setGap(float gap01);
     void setLayer(GateLayer layer);
     void setPatternBars(int bars);
+
+    // Demo step cap: only grids and lengths of at most `cells` cells are offered.
+    void setMaxCells(int cells);
     GateLayer getLayer()     const noexcept { return currentLayer; }
     GateTool  selectedTool() const noexcept { return currentTool; }
     void setPlayhead(double beat01, bool visible);
@@ -76,6 +80,9 @@ private:
 
     // ── Pattern length (1-16 bars) ───────────────────────────────────────────
     DropdownSelect barsDropdown;
+    int  maxCells = std::numeric_limits<int>::max();
+    int  maxBarsFor(int denom) const noexcept;   // longest length allowed at this grid
+    void rebuildBarsDropdown();
 
     // ── Toolbox (Pencil, Eraser, Reverse — no Arrow) ─────────────────────────
     GateToolButton pencilBtn  { GateTool::Pencil };

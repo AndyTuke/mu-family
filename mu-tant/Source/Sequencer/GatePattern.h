@@ -96,6 +96,11 @@ public:
     // Total cells in the pattern given the current subdivision (patternLengthBars * denom).
     int totalCells() const noexcept;
 
+    // Shrink the pattern to at most `maxCells` cells (the demo step cap): a grid finer than
+    // the cap drops to 1/16, the length to the most whole bars that fit (at least 1), and
+    // envelopes past the new end are removed / clipped. Caller holds editLock.
+    void limitToCells(int maxCells);
+
     // The envelope whose region covers the given cell, or nullptr. Message- and
     // audio-thread safe (read-only linear scan).
     const GateEnvelope* envelopeAtCell(int cellIndex) const noexcept;

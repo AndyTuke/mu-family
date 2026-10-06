@@ -58,6 +58,22 @@ int GatePattern::totalCells() const noexcept
     return patternLengthBars * static_cast<int>(subdivision);
 }
 
+void GatePattern::limitToCells(int maxCells)
+{
+    if (maxCells <= 0 || totalCells() <= maxCells) return;
+    if ((int) subdivision > maxCells) subdivision = Subdivision::Sixteenth;
+    patternLengthBars = std::max(1, maxCells / (int) subdivision);
+
+    // Drop envelopes that start past the new end; clip those running over it.
+    const int end = totalCells();
+    envelopes.erase(std::remove_if(envelopes.begin(), envelopes.end(),
+                                   [end](const GateEnvelope& e) { return e.startCell >= end; }),
+                    envelopes.end());
+    for (auto& e : envelopes)
+        e.lengthCells = std::min(e.lengthCells, end - e.startCell);
+    hasEnvelopes.store(! envelopes.empty(), std::memory_order_relaxed);
+}
+
 const GateEnvelope* GatePattern::envelopeAtCell(int cellIndex) const noexcept
 {
     // Linear scan — typical patterns have <= 64 cells and few envelopes.

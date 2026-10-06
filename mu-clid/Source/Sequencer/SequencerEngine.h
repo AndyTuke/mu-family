@@ -56,6 +56,10 @@ public:
     int getPatternLength       (int r) const { return static_cast<int>(safePatterns[r].size()); }
 
     // Master loop length (0 = free-running, >0 = all rhythms reset to step 0 at this boundary).
+    // Highest Euclid step count a pattern is built with (the demo cap; 64 when licensed).
+    // updatePattern clamps each generator to it, so presets / automation can't exceed it.
+    void setStepCap(int cap) noexcept { stepCap.store(juce::jlimit(1, 64, cap), std::memory_order_relaxed); }
+
     void setMasterLoopSteps(int steps)
     {
         masterLoopSteps = juce::jlimit(0, 256, steps);
@@ -97,6 +101,8 @@ public:
     BlockResult processBlock(double beatPosition);
 
 private:
+    std::atomic<int> stepCap { 64 };
+
     std::vector<Rhythm>            rhythms;
 
     // Message-thread authoritative copies. Written under patternLock.

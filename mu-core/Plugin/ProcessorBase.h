@@ -154,6 +154,8 @@ public:
     // Default: no limit, so a licensed build — or a product with no demo tier —
     // is unrestricted. A product with a demo tier overrides this (e.g. 1).
     virtual int demoMaxChannels() const { return std::numeric_limits<int>::max(); }
+    // Max sequencer steps a pattern may have in demo (e.g. 16). Default: no limit.
+    virtual int demoMaxSteps() const { return std::numeric_limits<int>::max(); }
 
     // Single source for the shell/product UI to gate demo-restricted affordances:
     //   - canAddChannel:      is the add-rhythm/voice control allowed right now?
@@ -162,6 +164,8 @@ public:
     // in EditorShellBase; per-layer save is blocked in demo to match.
     bool canAddChannel()      const { return isLicensed() || getNumChannels() < demoMaxChannels(); }
     bool canSaveLayerPreset() const { return isLicensed(); }
+    //   - maxSteps:           a step-count limit of `fullMax`, cut to demoMaxSteps() in demo.
+    int  maxSteps(int fullMax) const  { return isLicensed() ? fullMax : juce::jmin(fullMax, demoMaxSteps()); }
 
     // ─── Online activation (Lemon Squeezy, Phase 1) ──────────────────────────
     // Licensed products set activateOnlineFn (a lambda calling mu_core::OnlineActivation,

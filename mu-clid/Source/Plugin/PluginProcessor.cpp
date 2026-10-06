@@ -93,10 +93,11 @@ PluginProcessor::PluginProcessor()
         onlineActivated.store(true, std::memory_order_relaxed);
     activateOnlineFn = [this](const juce::String& key) {
         auto o = mu_core::OnlineActivation::activate(getContentDir(), kActivationFilename, key);
-        if (o.ok) onlineActivated.store(true, std::memory_order_relaxed);
+        if (o.ok) { onlineActivated.store(true, std::memory_order_relaxed); sequencer.setStepCap(HitGenerator::kMaxSteps); }
         return o;
     };
    #endif
+    sequencer.setStepCap(maxSteps(HitGenerator::kMaxSteps));   // 16 in demo
 
     // Register listener for every parameter.
     for (auto* param : getParameters())

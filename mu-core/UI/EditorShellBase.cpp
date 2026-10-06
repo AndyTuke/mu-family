@@ -156,7 +156,7 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
         const bool licensed = processorRef.isLicensed();
         transportBar.setSaveEnabled(licensed);
 
-        demoBanner.setText(juce::String::fromUTF8("DEMO  \xe2\x80\x94  Save disabled  \xe2\x80\x94  Click here to activate and unlock all features"),
+        demoBanner.setText(juce::String::fromUTF8("DEMO  \xe2\x80\x94  1 track, 16 steps, save disabled  \xe2\x80\x94  Click here to activate and unlock all features"),
                            juce::dontSendNotification);
         demoBanner.setJustificationType(juce::Justification::centred);
         demoBanner.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
