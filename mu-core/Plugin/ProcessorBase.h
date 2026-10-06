@@ -149,10 +149,18 @@ public:
     // picked (saved as "contentDir"). Invalid before initAppSettings; the shell tolerates that.
     virtual juce::File getContentDir() const;
 
-    // License gate — true by default so products without a licensing model get the
-    // full editor instead of a demo banner. A licensed product overrides this to
-    // consult its LicenseManager result under MUFAMILY_REQUIRE_LICENSE (Release).
-    virtual bool isLicensed() const { return true; }
+    // License gate. A product with no licensing model (it never calls initLicensing) is always
+    // licensed, so it gets the full editor and no demo banner. A licensed product calls
+    // initLicensing; then a Release build is licensed when the offline signed .lic verifies OR
+    // the machine is online-activated, and a Debug / tester build always runs unlocked.
+    virtual bool isLicensed() const
+    {
+       #if MUFAMILY_REQUIRE_LICENSE
+        return ! licensingEnabled || offlineLicensed || isOnlineActivated();
+       #else
+        return true;
+       #endif
+    }
 
     // ─── Demo-mode caps (consulted ONLY when !isLicensed()) ──────────────────
     // Max "channels" (rhythms / voices / layers) the unlicensed editor allows.
@@ -294,6 +302,26 @@ protected:
     std::unique_ptr<juce::PropertiesFile> appSettings;
     juce::String  appName;
     MidiClockSync midiClockSync;
+
+    // ─── Licensing (licensed products only) ──────────────────────────────────
+    // A licensed product's identity: product id (the .lic `product=` field), licence file and
+    // 32-byte Ed25519 public key (in the content folder), and the online-activation record file.
+    struct LicensingConfig
+    {
+        const char*    productId;
+        const char*    licenceFile;
+        const uint8_t* publicKey;
+        const char*    activationFile;
+    };
+    // Check the offline licence + stored activation and wire activateOnlineFn. Call after
+    // initAppSettings (it needs getContentDir). Defined in License/ProductLicensing.h — include
+    // that only in a licensed product, which is the only kind that compiles the verifier.
+    void initLicensing(const LicensingConfig& config);
+    // Called after a successful online activation, OFF the message thread — e.g. to lift a
+    // demo cap the product applied at startup.
+    virtual void onActivated() {}
+    bool licensingEnabled = false;
+    bool offlineLicensed  = false;
 
     // ─── Mixer / global-FX parameters ────────────────────────────────────────
     // The channel-strip (ch{N}_*) and global FX ids synced to the engine via syncGlobalFxParam.

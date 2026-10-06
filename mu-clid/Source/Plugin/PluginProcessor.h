@@ -7,7 +7,6 @@
 #include "Audio/MidiOutputEngine.h"
 #include "Audio/FX/Slots/FXChain.h"
 #include "Audio/MixerEngine.h"
-#include "License/LicenseManager.h"   // mu-core: shared offline-license verifier
 #include "License/LicenseKey.h"       // product: mu-Clid id + filename + public key
 #include "MuLimits.h"
 #include "Modulation/ModulationSnapshot.h"
@@ -200,22 +199,13 @@ public:
     juce::File getPrimarySampleDir() const;
     void       setPrimarySampleDir(const juce::File& dir);
 
-    // License — checked once at startup; result is immutable thereafter. Release builds
-    // require a valid license (no license → Demo); Debug builds (testers) run unlocked.
-    mu_core::LicenseManager::Info licenseInfo;
-    bool isLicensed() const override
-    {
-       #if MUCLID_LITE_BUILD
-        return true;   // Lite is always licensed — no activation, no demo caps.
-       #elif MUFAMILY_REQUIRE_LICENSE
-        // Licensed if EITHER the offline signed .lic verifies OR the machine is online-activated.
-        return licenseInfo.status == mu_core::LicenseStatus::Licensed || isOnlineActivated();
-       #else
-        return true;   // Debug / tester build — full features, no license required
-       #endif
-    }
-    // Activation record filename (online path), next to the offline .lic in the content dir.
-    static constexpr const char* kActivationFilename = "muclid.activation";
+    // Licensing is shared (ProcessorBase::initLicensing). Lite is always licensed — no
+    // activation, no demo caps.
+   #if MUCLID_LITE_BUILD
+    bool isLicensed() const override { return true; }
+   #endif
+    // Activation lifts the 16-step demo cap straight away.
+    void onActivated() override { sequencer.setStepCap(HitGenerator::kMaxSteps); }
     // Demo limits the unlicensed editor to a single rhythm of at most 16 steps.
     int demoMaxChannels() const override { return 1; }
     int demoMaxSteps()    const override { return 16; }

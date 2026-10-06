@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "PluginProcessor_Internal.h"
 #include "Audio/InsertSlotConfig.h"
 #include "Plugin/ModulationSkew.h"  // proportion-space skew helpers (shared with test C5)
@@ -59,21 +60,9 @@ PluginProcessor::PluginProcessor()
                           std::memory_order_relaxed);
 
    #if !MUCLID_LITE_BUILD
-    // Check license file — must run after appSettings so getContentDir() works.
-    licenseInfo = mu_core::LicenseManager::check(getContentDir(),
-                                                 mu_clid::kLicenseProductId,
-                                                 mu_clid::kLicenseFilename,
-                                                 mu_clid::kLicensePublicKey);
-
-    // Online activation (Lemon Squeezy). Startup uses a LOCAL-only check so plugin load never
-    // blocks on the network; the overlay's activateOnlineFn does the real network activate.
-    if (mu_core::OnlineActivation::hasLocalActivation(getContentDir(), kActivationFilename))
-        onlineActivated.store(true, std::memory_order_relaxed);
-    activateOnlineFn = [this](const juce::String& key) {
-        auto o = mu_core::OnlineActivation::activate(getContentDir(), kActivationFilename, key);
-        if (o.ok) { onlineActivated.store(true, std::memory_order_relaxed); sequencer.setStepCap(HitGenerator::kMaxSteps); }
-        return o;
-    };
+    // Offline licence + online activation (shared; after initAppSettings for getContentDir).
+    initLicensing({ mu_clid::kLicenseProductId, mu_clid::kLicenseFilename,
+                    mu_clid::kLicensePublicKey, "muclid.activation" });
    #endif
     sequencer.setStepCap(maxSteps(HitGenerator::kMaxSteps));   // 16 in demo
 

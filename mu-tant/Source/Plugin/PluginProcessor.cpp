@@ -1,4 +1,5 @@
 #include "Plugin/PluginProcessor.h"
+#include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "Plugin/PluginEditor.h"
 #include "Audio/Scales.h"
 #include "Modulation/MuTantModDest.h"
@@ -66,21 +67,8 @@ PluginProcessor::PluginProcessor()
     lastNoteMode = midiNoteMode.load(std::memory_order_relaxed);
     noteGateGain = (lastNoteMode == 1) ? 0.0f : 1.0f;
 
-    // Check license file — after appSettings so getContentDir() resolves.
-    licenseInfo = mu_core::LicenseManager::check(getContentDir(),
-                                                 kLicenseProductId,
-                                                 kLicenseFilename,
-                                                 kLicensePublicKey);
-
-    // Online activation (Lemon Squeezy). Startup uses a LOCAL-only check so plugin load never
-    // blocks on the network; the overlay's activateOnlineFn does the real network activate.
-    if (mu_core::OnlineActivation::hasLocalActivation(getContentDir(), kActivationFilename))
-        onlineActivated.store(true, std::memory_order_relaxed);
-    activateOnlineFn = [this](const juce::String& key) {
-        auto o = mu_core::OnlineActivation::activate(getContentDir(), kActivationFilename, key);
-        if (o.ok) onlineActivated.store(true, std::memory_order_relaxed);
-        return o;
-    };
+    // Offline licence + online activation (shared; after initAppSettings for getContentDir).
+    initLicensing({ kLicenseProductId, kLicenseFilename, kLicensePublicKey, "mutant.activation" });
 
     // Demo: the default patterns (2 bars of 1/16) are shrunk to the 16-step cap too.
     if (! isLicensed())

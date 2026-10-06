@@ -12,7 +12,6 @@
 #include "Modulation/MuTantModSnap.h"
 #include "Plugin/VoiceHotSwapStager.h"       // mu-tant: preset hot-swap staging
 #include "Plugin/MidiClockSync.h"            // mu-core: shared MIDI-clock slave
-#include "License/LicenseManager.h"          // mu-core: shared offline-license verifier
 #include "License/LicenseKey.h"              // product: mu-Tant id + filename + public key
 
 #include <array>
@@ -243,20 +242,6 @@ public:
     bool hasPendingSwap(int voice) const       { return hotSwapStager.hasVoicePending(voice); }
     void cancelStagedSwap(int voice)           { hotSwapStager.cancelVoice(voice); }
 
-    // License — checked once at startup; result is immutable thereafter. Release builds
-    // require a valid license (no license → Demo); Debug builds (testers) run unlocked.
-    mu_core::LicenseManager::Info licenseInfo;
-    bool isLicensed() const override
-    {
-       #if MUFAMILY_REQUIRE_LICENSE
-        // Licensed if EITHER the offline signed .lic verifies OR the machine is online-activated.
-        return licenseInfo.status == mu_core::LicenseStatus::Licensed || isOnlineActivated();
-       #else
-        return true;   // Debug / tester build — full features, no license required
-       #endif
-    }
-    // Activation record filename (online path), next to the offline .lic in the content dir.
-    static constexpr const char* kActivationFilename = "mutant.activation";
     // Demo limits the unlicensed editor to a single voice whose patterns have at most 16 steps.
     int demoMaxChannels() const override { return 1; }
     int demoMaxSteps()    const override { return 16; }
