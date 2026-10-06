@@ -9,6 +9,7 @@
 #include <array>
 #include <cstring>
 #include <mutex>
+#include <string_view>
 
 // mu-tant's modulation-destination registry + provider.
 //
@@ -90,10 +91,18 @@ inline void registerDepthScales()
     static std::once_flag once;
     std::call_once(once, []
     {
-        for (const char* id : { "osc1.octave", "osc2.octave", "osc1.semi", "osc2.semi",
-                                "osc1.fine",   "osc2.fine",   "osc1.pos",  "osc2.pos",
-                                "osc1.level",  "osc2.level",  "noise.level", "level" })
-            ModulationMatrix::registerDepthScale(id, 1.0f);
+        // Every destination in the table is seeded as a proportion, so each one needs scale
+        // 1.0 — registered from the table itself so a new destination can't be missed (an
+        // unregistered id falls back to mu-core's 100 and runs 100x too strong). ".prop" ids
+        // already get 1.0; the shared filter.* dests keep mu-core's own scales.
+        for (const auto& d : kModDestTable)
+        {
+            const std::string_view id(d.id);
+            const bool isProp   = id.size() >= 5 && id.substr(id.size() - 5) == ".prop";
+            const bool isShared = id.substr(0, 7) == "filter.";
+            if (! isProp && ! isShared)
+                ModulationMatrix::registerDepthScale(d.id, 1.0f);
+        }
     });
 }
 

@@ -170,6 +170,32 @@ public:
                    "full depth+source adds the proportion-space scale (1.0), not the 100 default");
         }
 
+        beginTest("X-Mod destinations are proportion-space: depth 3.2% moves the index 3.2% of its range");
+        {
+            registerDepthScales();
+            for (const char* dest : { "xmod.index", "xmod.depth", "xmod.ssb" })
+            {
+                VoiceSlot slot;
+                auto& cs = slot.controlSequences[0];
+                cs.mode       = ControlSequence::Mode::Stepped;
+                cs.polarity   = ControlSequence::Polarity::Unipolar;
+                cs.stepValues = { 100.0f };
+                cs.loopNoteValue = NoteValue::Quarter; cs.loopNoteMod = NoteMod::None; cs.loopMultiplier = 1;
+                cs.stepNoteValue = NoteValue::Quarter; cs.stepNoteMod = NoteMod::None; cs.stepMultiplier = 1;
+
+                ModulationAssignment a;
+                a.id = "cs0_to_xmod"; a.sourceId = "cs0_output"; a.destinationId = dest; a.depth = 3.2f;
+                expect(slot.modulationMatrix.addAssignment(a), "matrix accepts the x-mod assignment");
+
+                std::unordered_map<std::string_view, float> pv;
+                for (int i = 0; i < kModDestCount; ++i) pv[kModDestTable[i].id] = 0.0f;
+                pv[dest] = 0.5f;
+                slot.modulationMatrix.process(slot.controlSequences, 0.0, pv);
+                expectWithinAbsoluteError(pv[dest], 0.532f, 1.0e-4f,
+                       juce::String(dest) + ": 3.2% depth adds 0.032 of the range, not 3.2 (the 100 default)");
+            }
+        }
+
         beginTest("resolveLane converges osc1.semi to its range rail (proportion-clamped)");
         {
             // End-to-end check of the converged path: a full-depth unipolar mod on osc1.semi
