@@ -29,7 +29,8 @@ namespace mu_on
 {
 
 class PluginProcessor : public ProcessorBase,
-                        public juce::AudioProcessorValueTreeState::Listener
+                        public juce::AudioProcessorValueTreeState::Listener,
+                        private juce::AsyncUpdater
 {
 public:
     // Family parity: the shared mixer/sidebar size to kMaxChannels; mu-On uses a fixed 4.
@@ -122,10 +123,38 @@ public:
     juce::File   getFullPresetDir()          const override { return getPresetsDir(); }
     juce::String getFullPresetExtension()    const override { return "muOn"; }
 
+    // Full-preset save/load — the editor shell drives the UI (preset bar, Save dialog, browser).
+    // A preset is the params + step grid + each lane's modulators + the Rumble envelope,
+    // wrapped with name / description / category.
+    void              savePreset(const juce::String& name, const juce::String& desc,
+                                 const juce::String& category, bool embedSamples) override;
+    void              loadPreset(const juce::File& file) override;
+    juce::StringArray loadCategoryList() const override;
+
+    // Per-track presets — a lane's engine params, its step row (Rumble: its envelope) and its
+    // modulators. A track preset belongs to the instrument it was saved from.
+    void                    saveTrackPreset(int lane, const juce::String& name);
+    void                    loadTrackPreset(int lane, const juce::File& file);
+    juce::Array<juce::File> trackPresetFiles(int lane) const;   // the presets for that lane
+    void                    resetTrack(int lane);                // engine params → defaults, modulators cleared
+
+    // Fired (message thread) after a program change loads a track preset, so the editor can
+    // refresh that lane. The editor MUST clear this in its destructor.
+    std::function<void(int lane)> onTrackPresetLoaded;
+
 protected:
-    // No MIDI-PC preset loading yet.
-    void applyMidiPresetSlot(int, const juce::File&) override {}
-    void applyFullMidiPreset(const juce::File&)      override {}
+    // MIDI program change (drained on the message thread): Ch 1-5 → that lane's track preset,
+    // Ch 9 → full preset. Applied immediately, then the editor is told to refresh.
+    void applyMidiPresetSlot(int slot, const juce::File& f) override
+    {
+        loadTrackPreset(slot, f);
+        if (onTrackPresetLoaded) onTrackPresetLoaded(slot);
+    }
+    void applyFullMidiPreset(const juce::File& f) override
+    {
+        loadPreset(f);
+        if (onPresetSwapCommitted) onPresetSwapCommitted();
+    }
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -134,6 +163,14 @@ private:
     // (mirrors mu-tant; rides the APVTS state alongside the <Pattern> grid).
     void writeVoiceDataToState(juce::ValueTree& state);
     void readVoiceDataFromState(const juce::ValueTree& state);
+
+    // State shared by the session save/restore and full presets (PluginProcessor_Preset.cpp).
+    juce::ValueTree     captureState();
+    void                applyStateTree(const juce::ValueTree& tree);
+    juce::ValueTree     serialiseRumbleEnv();
+    void                restoreRumbleEnv(const juce::ValueTree& env);
+    static juce::String lanePrefix(int lane);       // the lane's engine-param prefix (k_, b_, ...)
+    void                handleAsyncUpdate() override;   // drains queued program changes
 
     // Per-channel render hook handed to the shared MixerEngine — fills each lane's buffer
     // from its engine (Kick/Bass/Hat/Snare) via GrooveVoices.

@@ -54,16 +54,34 @@ public:
         pat.setProperty("tracks", kNumTracks, nullptr);
         pat.setProperty("steps",  kNumSteps,  nullptr);
         for (int t = 0; t < kNumTracks; ++t)
-        {
-            juce::ValueTree row("Track");
-            row.setProperty("i", t, nullptr);
-            juce::String on, ac;
-            for (int s = 0; s < kNumSteps; ++s) { on += isOn(t, s) ? '1' : '0'; ac += isAccent(t, s) ? '1' : '0'; }
-            row.setProperty("on", on, nullptr);
-            row.setProperty("accent", ac, nullptr);
-            pat.addChild(row, -1, nullptr);
-        }
+            pat.addChild(serialiseTrack(t), -1, nullptr);
         parent.addChild(pat, -1, nullptr);
+    }
+
+    // One track's row as a <Track i on accent> node (also what a track preset carries).
+    juce::ValueTree serialiseTrack(int t) const
+    {
+        juce::ValueTree row("Track");
+        row.setProperty("i", t, nullptr);
+        juce::String on, ac;
+        for (int s = 0; s < kNumSteps; ++s) { on += isOn(t, s) ? '1' : '0'; ac += isAccent(t, s) ? '1' : '0'; }
+        row.setProperty("on", on, nullptr);
+        row.setProperty("accent", ac, nullptr);
+        return row;
+    }
+
+    // Load a <Track> row into track `t` (its own "i" is ignored, so a row can move tracks).
+    // Steps the row doesn't cover are cleared.
+    void deserialiseTrack(int t, const juce::ValueTree& row)
+    {
+        if (t < 0 || t >= kNumTracks) return;
+        const juce::String on = row.getProperty("on").toString();
+        const juce::String ac = row.getProperty("accent").toString();
+        for (int s = 0; s < kNumSteps; ++s)
+        {
+            setOn    (t, s, s < on.length() && on[s] == '1');
+            setAccent(t, s, s < ac.length() && ac[s] == '1');
+        }
     }
 
     void deserialise(const juce::ValueTree& parent)
@@ -76,12 +94,7 @@ public:
         for (int i = 0; i < pat.getNumChildren(); ++i)
         {
             const auto row = pat.getChild(i);
-            const int t = (int) row.getProperty("i", -1);
-            if (t < 0 || t >= kNumTracks) continue;
-            const juce::String on = row.getProperty("on").toString();
-            const juce::String ac = row.getProperty("accent").toString();
-            for (int s = 0; s < kNumSteps && s < on.length(); ++s) setOn(t, s, on[s] == '1');
-            for (int s = 0; s < kNumSteps && s < ac.length(); ++s) setAccent(t, s, ac[s] == '1');
+            deserialiseTrack((int) row.getProperty("i", -1), row);
         }
     }
 

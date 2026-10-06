@@ -3,6 +3,7 @@
 #include "Modulation/MuTantModDest.h"
 #include "Modulation/ModulatorSerialise.h"   // mu-core: shared modulator (de)serialise
 #include "Sequencer/GatePatternSerialise.h"  // mu-tant: gate (de)serialise
+#include "Persistence/PresetFiles.h"         // mu-core: shared preset-file handling
 
 #include <thread>
 
@@ -32,22 +33,10 @@ void PluginProcessor::saveVoicePreset(int voice, const juce::String& name)
 {
     auto dir = getPerSlotPresetDir();
     dir.createDirectory();
-    juce::String safe = name.replaceCharacters("\\/:|*?<>\"", "_________");
-    if (safe.isEmpty()) safe = "Voice";
 
-    const juce::String prefix = juce::String("v") + juce::String(voice) + "_";
+    // The voice's params with voice-agnostic ids (normalised 0..1), so it loads into any slot.
     juce::XmlElement root("MuTantVoice");
-    for (auto* p : getParameters())
-        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-        {
-            const juce::String id = rp->getParameterID();
-            if (id.startsWith(prefix))
-            {
-                auto* e = root.createNewChildElement("p");
-                e->setAttribute("id", id.substring(prefix.length()));  // voice-agnostic base
-                e->setAttribute("v", (double) rp->getValue());         // normalised 0..1
-            }
-        }
+    mu_pp::writeLayerParams(root, *this, juce::String("v") + juce::String(voice) + "_");
 
     // User wavetable selections (paths) — carried alongside the params.
     if (osc1UserPath[(size_t) voice].isNotEmpty()) root.setAttribute("o1WtPath", osc1UserPath[(size_t) voice]);
@@ -64,7 +53,7 @@ void PluginProcessor::saveVoicePreset(int voice, const juce::String& name)
     if (auto pGate = serialiseGate(pitchPatterns[(size_t) voice], "PitchGate").createXml())
         root.addChildElement(pGate.release());
 
-    root.writeTo(dir.getChildFile(safe + "." + getPerSlotPresetExtension()));
+    root.writeTo(dir.getChildFile(mu_pp::safePresetFileName(name, "Voice") + "." + getPerSlotPresetExtension()));
 }
 
 void PluginProcessor::loadVoicePreset(int voice, const juce::File& file)
@@ -362,47 +351,27 @@ juce::File PluginProcessor::getWavetablesDir()  const { return getContentDir().g
 void PluginProcessor::savePreset(const juce::String& name, const juce::String& desc,
                                  const juce::String& category, bool /*embedSamples*/)
 {
-    auto dir = getPresetsDir();
-    dir.createDirectory();
-
-    juce::String safe = name.replaceCharacters("\\/:|*?<>\"", "_________");
-    if (safe.isEmpty()) safe = "Preset";
-
-    // Wrap the whole APVTS state with name / description / category metadata.
-    juce::XmlElement root("MuTantPreset");
-    root.setAttribute("name", name);
-    root.setAttribute("description", desc);
-    root.setAttribute("category", category);
+    // The whole APVTS state (with voice count, colours and per-voice data) wrapped with
+    // name / description / category metadata.
     apvts.state.setProperty("numVoices", numVoices.load(), nullptr);
     apvts.state.setProperty("voiceColours", serialiseVoiceColours(), nullptr);
     writeVoiceDataToState();
-    if (auto state = apvts.copyState().createXml())
-        root.addChildElement(state.release());
-
-    root.writeTo(dir.getChildFile(safe + "." + getFullPresetExtension()));
+    mu_pp::writeFullPreset(getPresetsDir(), getFullPresetExtension(), "MuTantPreset",
+                           name, desc, category, apvts.copyState());
 }
 
 void PluginProcessor::loadPreset(const juce::File& file)
 {
     if (! file.existsAsFile()) return;
 
-    auto xml = juce::XmlDocument::parse(file);
-    if (xml == nullptr)
-    {
-        if (onLoadError) onLoadError("Could not read \"" + file.getFileName() + "\"");
-        return;
-    }
-
     // Accept a wrapped MuTantPreset or a bare APVTS state element.
-    juce::XmlElement* stateXml = xml->hasTagName("MuTantPreset")
-                               ? xml->getChildByName(apvts.state.getType().toString())
-                               : xml.get();
-    if (stateXml == nullptr)
+    juce::String error;
+    auto state = mu_pp::readFullPreset(file, "MuTantPreset", apvts.state.getType(), error);
+    if (! state.isValid())
     {
-        if (onLoadError) onLoadError("Preset has no saved state");
+        if (onLoadError) onLoadError(error);
         return;
     }
-    auto state = juce::ValueTree::fromXml(*stateXml);
 
     // Hot-swap: while the transport is playing, stage the parsed state and commit
     // it at voice 0's next loop boundary (handleAsyncUpdate) so the switch is
@@ -419,7 +388,7 @@ void PluginProcessor::loadPreset(const juce::File& file)
         applyFullPresetTree(state);
     }
 
-    publishPresetName(file.getFileNameWithoutExtension());   // mu-link mixer display (#1065)
+    publishPresetName(file.getFileNameWithoutExtension());   // mu-link mixer display
 }
 
 // Apply a full preset's APVTS state immediately (the shared commit path for the
@@ -479,18 +448,7 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& stateIn)
 
 juce::StringArray PluginProcessor::loadCategoryList() const
 {
-    juce::StringArray cats;
-    auto dir = getPresetsDir();
-    if (dir.isDirectory())
-        for (const auto& f : dir.findChildFiles(juce::File::findFiles, false,
-                                                "*." + getFullPresetExtension()))
-            if (auto xml = juce::XmlDocument::parse(f))
-                if (xml->hasTagName("MuTantPreset"))
-                {
-                    const auto c = xml->getStringAttribute("category");
-                    if (c.isNotEmpty()) cats.addIfNotAlreadyThere(c);
-                }
-    return cats;
+    return mu_pp::readPresetCategories(getPresetsDir(), getFullPresetExtension(), "MuTantPreset");
 }
 
 } // namespace mu_tant

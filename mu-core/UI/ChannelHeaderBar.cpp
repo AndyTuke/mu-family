@@ -18,7 +18,11 @@ ChannelHeaderBar::ChannelHeaderBar()
     addAndMakeVisible(saveBtn);
 
     presetDD.setPlaceholderText(juce::String::fromUTF8("preset\xe2\x80\xa6"));
-    presetDD.onChange = [this](int id) { if (onPresetSelected) onPresetSelected(id); };
+    presetDD.onChange = [this](int id)
+    {
+        if (onPresetSelected) onPresetSelected(id);
+        if (onPresetFileChosen && id >= 1 && id <= presetFiles.size()) onPresetFileChosen(presetFiles[id - 1]);
+    };
     addAndMakeVisible(presetDD);
 }
 
@@ -32,6 +36,21 @@ void ChannelHeaderBar::setPresetItems(const juce::StringArray& names)
         presetDD.addItem(names[i], i + 1);   // 1-based ids
 }
 
+void ChannelHeaderBar::setPresetFiles(const juce::Array<juce::File>& files)
+{
+    presetFiles = files;
+    juce::StringArray names;
+    for (const auto& f : files) names.add(f.getFileNameWithoutExtension());
+    setPresetItems(names);
+}
+
+void ChannelHeaderBar::showPresetFile(const juce::File& file)
+{
+    presetDD.setSelectedId(presetFiles.indexOf(file) + 1, false);   // not in the list → 0 = none
+}
+
+void ChannelHeaderBar::setNameEditable(bool editable) { nameLabel.setEditable(editable, editable, false); }
+
 void ChannelHeaderBar::setSelectedPresetId(int id)             { presetDD.setSelectedId(id, false); }
 void ChannelHeaderBar::setPresetPlaceholder(const juce::String& t) { presetDD.setPlaceholderText(t); }
 void ChannelHeaderBar::setStagingBadge(bool show)             { if (staging != show) { staging = show; repaint(); } }
@@ -40,6 +59,13 @@ void ChannelHeaderBar::setShowReset(bool show)
 {
     showReset = show;
     resetBtn.setVisible(show);
+    resized();
+}
+
+void ChannelHeaderBar::setShowDelete(bool show)
+{
+    showDelete = show;
+    deleteBtn.setVisible(show);
     resized();
 }
 
@@ -66,7 +92,7 @@ void ChannelHeaderBar::resized()
     const int presetW   = s(kPresetBtnW);
 
     int x = rightEdge;
-    deleteBtn.setBounds(x - iconW, btnY, iconW, btnH);  x -= iconW + s(4);
+    if (showDelete) { deleteBtn.setBounds(x - iconW, btnY, iconW, btnH);  x -= iconW + s(4); }
     if (showReset) { resetBtn.setBounds(x - iconW, btnY, iconW, btnH);  x -= iconW + s(4); }
     saveBtn.setBounds(x - presetW, btnY, presetW, btnH);  x -= presetW + s(4);
 

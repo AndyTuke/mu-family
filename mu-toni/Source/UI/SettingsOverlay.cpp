@@ -7,6 +7,8 @@ namespace mu_toni
 SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     : StandardSettingsOverlay(p)
 {
+    addProgramChangeSection("Layer Presets", "Full Presets");   // Ch 1-4 → layers, Ch 9 → full
+
     // Tony's in-joke line — the μ-Toni namesake. Verbatim; "appagator" is the joke, never
     // "corrected" to arpeggiator. No heading: it sits below all the groups.
     addSection(Where::Group, { {}, kRowH, {}, [](juce::Graphics& g, const Rows& r)

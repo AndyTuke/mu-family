@@ -19,7 +19,12 @@ class PluginEditor : public EditorShellBase
 {
 public:
     explicit PluginEditor(PluginProcessor&);
-    ~PluginEditor() override = default;
+    ~PluginEditor() override;
+
+protected:
+    // Shell hooks: after a full preset loads (or New), re-read every panel from the state.
+    void onPresetLoaded(const juce::File& file) override;
+    void onPresetNew() override;
 
 private:
     PluginProcessor& proc;

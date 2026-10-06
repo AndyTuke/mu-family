@@ -279,6 +279,7 @@ void PluginProcessor::updateHeldNotes(const juce::MidiBuffer& midi, bool& noteOn
 
 PluginProcessor::~PluginProcessor()
 {
+    cancelPendingUpdate();
     unregisterFxListeners(this);
 }
 
@@ -320,6 +321,11 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // Preserve the DAW sidechain, then clear (shared — the SC input bus shares buffer
     // channels with the output, so a bare clear would wipe it).
     captureSidechainAndClear(buffer);
+
+    // MIDI program change → preset load: queue matching PCs (Ch 1-4 layer, Ch 9 full) for
+    // handleAsyncUpdate to load on the message thread.
+    if (scanMidiProgramChanges(midiMessages))
+        triggerAsyncUpdate();
 
     // External MIDI clock (standalone): scan the buffer + advance the clock estimate.
     // When enabled + playing it drives the tempo + play-state (transport bar reflects it).
@@ -396,13 +402,7 @@ juce::AudioProcessorEditor* PluginProcessor::createEditor()
 
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    auto state = apvts.copyState();
-
-    // Each voice's modulators in the shared per-voice <VoiceData> (drop the pre-standard copy).
-    state.removeChild(state.getChildWithName("MuToniMods"), nullptr);
-    mu_pp::writeChannelData(state, kNumChannels, [this](int v) -> VoiceSlot& { return voiceSlots[(size_t) v]; });
-
-    if (auto xml = state.createXml())
+    if (auto xml = captureState().createXml())
         copyXmlToBinary(*xml, destData);
 }
 
@@ -410,36 +410,8 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
         if (xml->hasTagName(apvts.state.getType()))
-        {
-            auto tree = juce::ValueTree::fromXml(*xml);
-
-            // Sessions saved before the shared format kept modulators in <MuToniMods>, one
-            // <Modulators voice="N"> per voice: move them into the shared <VoiceData> shape.
-            if (auto legacy = tree.getChildWithName("MuToniMods"); legacy.isValid())
-            {
-                juce::ValueTree channels(mu_pp::kChannelDataTag);
-                for (int c = 0; c < legacy.getNumChildren(); ++c)
-                {
-                    juce::ValueTree node(mu_pp::kChannelNodeTag);
-                    node.setProperty("idx", legacy.getChild(c).getProperty("voice", -1), nullptr);
-                    node.addChild(legacy.getChild(c).createCopy(), -1, nullptr);
-                    channels.addChild(node, -1, nullptr);
-                }
-                tree.removeChild(legacy, nullptr);
-                tree.removeChild(tree.getChildWithName(mu_pp::kChannelDataTag), nullptr);
-                tree.addChild(channels, -1, nullptr);
-            }
-
-            apvts.replaceState(tree);
-            syncAllFxParams();   // re-seed mixer/FX (unchanged values skip listeners)
-            mu_pp::readChannelModulators(apvts.state, kNumChannels,
-                [this](int v) -> VoiceSlot& { return voiceSlots[(size_t) v]; },
-                [](int, const std::string& id) { return mu_toni::isValidModDest(id); });
-        }
+            applyStateTree(juce::ValueTree::fromXml(*xml));
 }
-
-juce::File PluginProcessor::getPresetsDir()       const { return getContentDir().getChildFile("Presets"); }
-juce::File PluginProcessor::getPerSlotPresetDir() const { return getContentDir().getChildFile("Arps"); }
 
 } // namespace mu_toni
 

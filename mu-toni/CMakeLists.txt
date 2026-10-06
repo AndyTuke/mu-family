@@ -25,6 +25,7 @@ juce_add_plugin(mu-toni
 target_sources(mu-toni
     PRIVATE
         Source/Plugin/PluginProcessor.cpp
+        Source/Plugin/PluginProcessor_Preset.cpp
         Source/Plugin/PluginEditor.cpp
         Source/UI/SettingsOverlay.cpp
 )

@@ -29,6 +29,7 @@ juce_add_plugin(mu-on
 target_sources(mu-on
     PRIVATE
         Source/Plugin/PluginProcessor.cpp
+        Source/Plugin/PluginProcessor_Preset.cpp
         Source/Plugin/PluginEditor.cpp
         Source/Sequencer/GrooveSequencer.cpp
         Source/UI/GrooveGrid.cpp
@@ -120,6 +121,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/SequencerTests.cpp
     Source/Tests/EngineTests.cpp
     Source/Tests/ModulationTests.cpp
+    Source/Tests/PresetTests.cpp
     Source/Sequencer/GrooveSequencer.cpp
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/SamplePlayer.cpp"            # SampleChannel dependency
     "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"   # modulation tests

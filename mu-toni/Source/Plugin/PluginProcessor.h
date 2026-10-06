@@ -26,7 +26,8 @@ namespace mu_toni
 {
 
 class PluginProcessor : public ProcessorBase,
-                        public juce::AudioProcessorValueTreeState::Listener
+                        public juce::AudioProcessorValueTreeState::Listener,
+                        private juce::AsyncUpdater
 {
 public:
     // Family parity: up to 8 channels/layers. A fixed set ships for now; dynamic
@@ -90,21 +91,44 @@ public:
         return (idx >= 0 && idx < kMaxChannels) ? idx : 0;
     }
 
-    // ── Preset directories / extensions (per family file-format rule) ─────────
-    // Save/load themselves stay on ProcessorBase's no-op defaults for now (preset
-    // chrome is disabled in the editor); these satisfy the pure-virtuals + give
-    // the future preset I/O its home. Full = .muToni; per-slot = .muArp (one arp
-    // configuration = one voice slot).
+    // ── Presets (per family file-format rule) ─────────────────────────────────
+    // Full = .muToni (the whole state); per-layer = .muArp (one layer's arp + voice).
     juce::File   getPresetsDir()             const override;
     juce::File   getPerSlotPresetDir()       const override;
     juce::String getPerSlotPresetExtension() const override { return "muArp"; }
     juce::File   getFullPresetDir()          const override { return getPresetsDir(); }
     juce::String getFullPresetExtension()    const override { return "muToni"; }
 
+    // Full-preset save/load — the editor shell drives the UI (preset bar, Save dialog, browser).
+    // A preset is the params + every layer's modulators, wrapped with name / description / category.
+    void              savePreset(const juce::String& name, const juce::String& desc,
+                                 const juce::String& category, bool embedSamples) override;
+    void              loadPreset(const juce::File& file) override;
+    juce::StringArray loadCategoryList() const override;
+
+    // Per-layer presets — the layer's v{N}_ params + its modulators (loadable into any layer),
+    // and a reset back to defaults.
+    void saveLayerPreset(int layer, const juce::String& name);
+    void loadLayerPreset(int layer, const juce::File& file);
+    void resetLayer(int layer);
+
+    // Fired (message thread) after a program change loads a layer preset, so the editor can
+    // refresh that layer. The editor MUST clear this in its destructor.
+    std::function<void(int layer)> onLayerPresetLoaded;
+
 protected:
-    // No MIDI-PC preset loading yet.
-    void applyMidiPresetSlot(int, const juce::File&) override {}
-    void applyFullMidiPreset(const juce::File&)      override {}
+    // MIDI program change (drained on the message thread): Ch 1-4 → that layer's preset,
+    // Ch 9 → full preset. Applied immediately, then the editor is told to refresh.
+    void applyMidiPresetSlot(int slot, const juce::File& f) override
+    {
+        loadLayerPreset(slot, f);
+        if (onLayerPresetLoaded) onLayerPresetLoaded(slot);
+    }
+    void applyFullMidiPreset(const juce::File& f) override
+    {
+        loadPreset(f);
+        if (onPresetSwapCommitted) onPresetSwapCommitted();
+    }
 
     // ── Arp/voice parameter cache (index into vp[voice][slot]) ────────────────
     // Enum + suffix table live in the .cpp; count is needed here for the array.
@@ -112,6 +136,11 @@ protected:
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+
+    // State shared by the session save/restore and full presets (PluginProcessor_Preset.cpp).
+    juce::ValueTree captureState();
+    void            applyStateTree(juce::ValueTree tree);
+    void            handleAsyncUpdate() override;   // drains queued program changes
 
     // Register mixer/FX param listeners + run an initial engine sync (JUCE doesn't
     // fire parameterChanged on construction or for unchanged values).

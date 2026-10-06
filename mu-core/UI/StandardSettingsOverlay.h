@@ -57,6 +57,13 @@ public:
     // A field label in the standard style (for products' own rows).
     void makeFieldLabel(juce::Label& label, const juce::String& text);
 
+    // The MIDI Program Change section (after MIDI Clock): two buttons that open the shared
+    // program-change tables — Ch 1-8 → layer presets, Ch 9 → full presets. Products with
+    // presets call this once, at the point in their constructor where the section belongs.
+    void addProgramChangeSection(const juce::String& layerTableName, const juce::String& fullTableName);
+    std::function<void()> onMidiPresetsClicked;   // the editor opens showMidiPresets
+    std::function<void()> onFullPresetsClicked;   // the editor opens showMidiFullPresets
+
 protected:
     ProcessorBase& proc;
     const bool isStandalone;
@@ -71,6 +78,7 @@ private:
     juce::Label    clockSourceLabel, midiMessagesLabel;
     DropdownSelect clockSourceDropdown, midiMessagesDropdown;
     void updateMidiSyncVisibility();
+    juce::TextButton midiPresetsBtn, fullPresetsBtn;   // program-change tables (added on request)
 
     std::vector<Section> general, midiBefore, midiClock, midiAfter;
     struct GroupSection { juce::String group; Section section; };

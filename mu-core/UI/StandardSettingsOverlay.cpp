@@ -92,6 +92,21 @@ void StandardSettingsOverlay::makeFieldLabel(juce::Label& lbl, const juce::Strin
     addAndMakeVisible(lbl);
 }
 
+void StandardSettingsOverlay::addProgramChangeSection(const juce::String& layerTableName,
+                                                      const juce::String& fullTableName)
+{
+    midiPresetsBtn.setButtonText(layerTableName);
+    fullPresetsBtn.setButtonText(fullTableName);
+    midiPresetsBtn.onClick = [this] { if (onMidiPresetsClicked) onMidiPresetsClicked(); };
+    fullPresetsBtn.onClick = [this] { if (onFullPresetsClicked) onFullPresetsClicked(); };
+    addAndMakeVisible(midiPresetsBtn);
+    addAndMakeVisible(fullPresetsBtn);
+    addSection(Where::MidiAfterClock, { "MIDI Program Change", kRowH, [this](const Rows& r) {
+        const int btnW = s(180), gap = s(MuLookAndFeel::kSpaceM);
+        midiPresetsBtn.setBounds(r.labelX,              r.area.getY(), btnW, r.rowH);
+        fullPresetsBtn.setBounds(r.labelX + btnW + gap, r.area.getY(), btnW, r.rowH); } });
+}
+
 void StandardSettingsOverlay::addSection(Where where, Section section, const juce::String& group)
 {
     switch (where)

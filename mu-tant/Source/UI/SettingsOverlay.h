@@ -15,11 +15,6 @@ class SettingsOverlay : public mu_ui::StandardSettingsOverlay
 public:
     explicit SettingsOverlay(PluginProcessor& proc);
 
-    // Fired when the user opens a MIDI program-change table; the editor swaps in the shared
-    // mu-core overlay (showMidiPresets / showMidiFullPresets).
-    std::function<void()> onMidiPresetsClicked;   // Ch 1-8 → per-voice presets
-    std::function<void()> onFullPresetsClicked;   // Ch 9   → full presets
-
 private:
     PluginProcessor& product;
 
@@ -30,10 +25,6 @@ private:
     // Note mode (Free / Note) — shown in standalone and plugin (it works from a keyboard too).
     juce::Label    noteModeLabel;
     DropdownSelect noteModeDropdown;
-
-    // Program change — the tables are the shared mu-core overlays; these just open them.
-    juce::TextButton midiPresetsBtn { "Voice Presets" };
-    juce::TextButton fullPresetsBtn { "Full Presets" };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SettingsOverlay)
 };

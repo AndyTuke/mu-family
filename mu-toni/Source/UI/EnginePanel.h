@@ -5,6 +5,9 @@
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/ModulatorPanel.h"
+#include "UI/ChannelHeaderBar.h"          // mu-core: shared per-layer header (name / reset / presets / save)
+#include "UI/ConfirmDialog.h"             // mu-core: shared confirm / name dialogs
+#include "Persistence/PresetFiles.h"      // mu-core: listPresetFiles
 #include "UI/Voice/InsertSubsection.h"
 #include "Modulation/MuToniModDest.h"
 #include "Audio/Scales.h"
@@ -17,7 +20,8 @@
 namespace mu_toni
 {
 
-// μ-Toni engine panel. The Pitch·Filter·Amp·Insert voice band replicates
+// μ-Toni engine panel. The shared per-layer header bar sits on top (layer presets + reset).
+// The Pitch·Filter·Amp·Insert voice band replicates
 // mu-clid's VoiceSection exactly — fixed MuLookAndFeel constants (Size-2 knobs,
 // compact two-row sub-sections, section widths + dividers). Oscillator 1/2/Mix
 // (mu-toni's two-osc source) sits above; the Appergater band + shared modulator
@@ -99,6 +103,38 @@ public:
         addAndMakeVisible(modulatorPanel);
         modulatorPanel.setDestProvider(&modDestProvider);
 
+        // ── Shared per-layer header: fixed layers (no rename / delete), reset + layer presets ──
+        header.setShowDelete(false);
+        header.setNameEditable(false);
+        header.onReset = [this]
+        {
+            mu_ui::confirmAsync(this, "Reset Layer",
+                                "Reset \"" + proc.getChannelName(currentLayer) + "\" to defaults?\nThis cannot be undone.",
+                                "Reset", [this] { proc.resetLayer(currentLayer); setLayer(currentLayer); });
+        };
+        header.onPresetFileChosen = [this](const juce::File& f)
+        {
+            proc.loadLayerPreset(currentLayer, f);
+            setLayer(currentLayer);   // rebind so the modulators show the loaded state
+            header.showPresetFile(f);
+        };
+        header.setSaveEnabled(proc.canSaveLayerPreset());   // demo: per-layer save disabled
+        header.onSave = [this]
+        {
+            if (! proc.canSaveLayerPreset()) return;
+            juce::Component::SafePointer<EnginePanel> safe(this);
+            mu_ui::promptTextAsync(this, "Save Layer Preset", "Preset name:",
+                                   proc.getChannelName(currentLayer), "Save",
+                [safe](const juce::String& name)
+                {
+                    if (safe == nullptr || name.isEmpty()) return;
+                    safe->proc.saveLayerPreset(safe->currentLayer, name);
+                    safe->refreshPresetList();
+                });
+        };
+        addAndMakeVisible(header);
+        refreshPresetList();
+
         setLayer(0);
         startTimerHz(30);
     }
@@ -126,10 +162,20 @@ public:
 
         insertSub.setChannel(currentLayer);
         modulatorPanel.setVoiceSlot(&proc.voiceSlots[(size_t) currentLayer]);
+
+        header.setLayerName(proc.getChannelName(currentLayer));
+        header.setColour(layerColour());
+        header.setSelectedPresetId(0);
         repaint();
     }
 
     int getLayer() const noexcept { return currentLayer; }
+
+    // Rescan the layer-preset folder into the header's preset list (after a save).
+    void refreshPresetList()
+    {
+        header.setPresetFiles(mu_pp::listPresetFiles(proc.getPerSlotPresetDir(), proc.getPerSlotPresetExtension()));
+    }
 
     void lookAndFeelChanged() override { resized(); repaint(); }   // metal style widens the gaps
 
@@ -145,6 +191,7 @@ public:
         if (MuLookAndFeel::isMetal(*this))
         {
             const auto accent = MuLookAndFeel::appAccent(*this);
+            MuLookAndFeel::drawAccentPanel(g, headerR.reduced(2).toFloat(), layerColour());   // preset bar in the layer colour
             static const char* const plateTitles[] = { "OSCILLATOR 1", "OSCILLATOR 2", "MIX" };
             for (int i = 0; i < 3; ++i)
                 MuLookAndFeel::drawTitledPanel(g, oscR[(size_t) i].toFloat().reduced(2.0f), plateTitles[i], accent);
@@ -206,6 +253,12 @@ public:
         auto area = getLocalBounds().reduced(pad);
         area.removeFromBottom(pad);
 
+        // Shared per-layer header bar on top (inside its own metal panel in the metal style).
+        const bool metal = MuLookAndFeel::isMetal(*this);
+        headerR = area.removeFromTop(s(ChannelHeaderBar::kHeight) + (metal ? s(4) : 0));
+        header.setBounds(metal ? headerR.reduced(s(4), s(2)) : headerR);
+        area.removeFromTop(gap);
+
         // Osc row (boxed): box pad + title + dropdown + gap + one Size-2 knob row +
         // a label gap so the knob label never touches the panel border, + box pad.
         const int oscRowH = s(kBoxPad + LF::kVoiceLabelH + kDropdownH + LF::kVoiceGap
@@ -248,6 +301,12 @@ private:
                        std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> att; };
     struct ToggleDef { std::unique_ptr<juce::ToggleButton> comp; juce::String suffix; int group;
                        std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>   att; };
+
+    juce::Colour layerColour() const
+    {
+        return MuLookAndFeel::channelPalette[(size_t) (proc.getChannelColourIndex(currentLayer)
+                                                       % MuLookAndFeel::kChannelPaletteSize)];
+    }
 
     KnobWithLabel*  findKnob (const char* s) { for (auto& k : knobs)  if (k.suffix == s) return k.comp.get(); return nullptr; }
     DropdownSelect* findCombo(const char* s) { for (auto& c : combos) if (c.suffix == s) return c.comp.get(); return nullptr; }
@@ -371,7 +430,9 @@ private:
     std::vector<ComboDef>  combos;
     std::vector<ToggleDef> toggles;
     std::array<juce::Rectangle<int>, 3> oscR;
-    juce::Rectangle<int> voiceR, arpR;
+    juce::Rectangle<int> voiceR, arpR, headerR;
+
+    ChannelHeaderBar header;
 
     InsertSubsection insertSub;
     ::ModulatorPanel modulatorPanel;

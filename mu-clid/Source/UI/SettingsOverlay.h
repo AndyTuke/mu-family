@@ -13,8 +13,6 @@ class SettingsOverlay : public mu_ui::StandardSettingsOverlay
 {
 public:
     std::function<void()> onContentDirChanged;
-    std::function<void()> onMidiPresetsClicked;
-    std::function<void()> onFullPresetsClicked;
 
     explicit SettingsOverlay(PluginProcessor& proc);
 
@@ -31,10 +29,6 @@ private:
     // MIDI Note mode (plugin only): Free = host transport, Note = Note On/Off gated.
     juce::Label    midiModeLabel;
     DropdownSelect midiModeDropdown;
-
-    // Program-change tables (each button opens the shared mu-core overlay).
-    juce::TextButton midiPresetsBtn { "Rhythm Preset Table" };
-    juce::TextButton fullPresetsBtn { "Main Preset Table" };
 
     // Locations — the primary sample library (opened by default in the sample-load dialog)
     // and the content folder (factory + preset-linked material).

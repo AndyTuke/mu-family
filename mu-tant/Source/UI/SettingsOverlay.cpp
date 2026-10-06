@@ -34,14 +34,7 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
         noteModeDropdown.setBounds(r.ctrlX,  r.area.getY(), r.ctrlW,  r.rowH); } });
 
     // ── Program change (Ch 1-8 → voice presets, Ch 9 → full presets) ───────────
-    midiPresetsBtn.onClick = [this] { if (onMidiPresetsClicked) onMidiPresetsClicked(); };
-    fullPresetsBtn.onClick = [this] { if (onFullPresetsClicked) onFullPresetsClicked(); };
-    addAndMakeVisible(midiPresetsBtn);
-    addAndMakeVisible(fullPresetsBtn);
-    addSection(Where::MidiAfterClock, { "MIDI Program Change", kRowH, [this](const Rows& r) {
-        const int btnW = mu_ui::s(180), gap = mu_ui::s(8);
-        midiPresetsBtn.setBounds(r.labelX,              r.area.getY(), btnW, r.rowH);
-        fullPresetsBtn.setBounds(r.labelX + btnW + gap, r.area.getY(), btnW, r.rowH); } });
+    addProgramChangeSection("Voice Presets", "Full Presets");
 }
 
 } // namespace mu_tant

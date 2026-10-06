@@ -74,7 +74,16 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // Settings page (master vol + UI size + BPM + standalone MIDI Clock) behind the
     // gear button — registering it reveals the gear (hidden when null).
     settingsOverlay.onClose = [this] { showSettings(false); };
+    settingsOverlay.addProgramChangeSection("Track Presets", "Full Presets");   // Ch 1-5 → lanes, Ch 9 → full
+    settingsOverlay.onMidiPresetsClicked = [this] { showSettings(false); showMidiPresets(true); };
+    settingsOverlay.onFullPresetsClicked = [this] { showSettings(false); showMidiFullPresets(true); };
     setSettingsOverlay(&settingsOverlay);
+
+    // A program change loaded a track preset → refresh that lane if it's on screen.
+    proc.onTrackPresetLoaded = [this](int lane)
+    {
+        if (groovePanel.getChannel() == lane) groovePanel.setChannel(lane);
+    };
 
     mixerOverlay.onStatusUpdate = [this](const juce::String& name,
                                          const juce::String& val,
@@ -90,6 +99,23 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     // The family metal look.
     setMetalStyle(true);
+}
+
+PluginEditor::~PluginEditor()
+{
+    proc.onTrackPresetLoaded = nullptr;   // the processor can outlive the editor
+}
+
+void PluginEditor::onPresetLoaded(const juce::File&)
+{
+    sidebar.refreshItems();
+    groovePanel.setChannel(groovePanel.getChannel());   // re-read grid, envelope + modulators
+    mixerOverlay.loadFromAPVTS();
+}
+
+void PluginEditor::onPresetNew()
+{
+    onPresetLoaded({});
 }
 
 } // namespace mu_on

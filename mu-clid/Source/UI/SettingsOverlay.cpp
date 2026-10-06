@@ -44,15 +44,8 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
             midiModeDropdown.setBounds(r.ctrlX,  r.area.getY(), r.ctrlW,  r.rowH); } });
     }
 
-    // ── Program-change tables ──────────────────────────────────────────────────
-    midiPresetsBtn.onClick = [this] { if (onMidiPresetsClicked) onMidiPresetsClicked(); };
-    fullPresetsBtn.onClick = [this] { if (onFullPresetsClicked) onFullPresetsClicked(); };
-    addAndMakeVisible(midiPresetsBtn);
-    addAndMakeVisible(fullPresetsBtn);
-    addSection(Where::MidiAfterClock, { "MIDI Program Change", kRowH, [this](const Rows& r) {
-        const int btnW = mu_ui::s(180), gap = mu_ui::s(kFolderBtnGap);
-        midiPresetsBtn.setBounds(r.labelX,              r.area.getY(), btnW, r.rowH);
-        fullPresetsBtn.setBounds(r.labelX + btnW + gap, r.area.getY(), btnW, r.rowH); } });
+    // ── Program-change tables (the shared section) ─────────────────────────────
+    addProgramChangeSection("Rhythm Preset Table", "Main Preset Table");
 
     // ── Locations — the folder paths are primary content, so heading colour ────
     for (auto* l : { &sampleLibLabel, &contentFolderLabel })

@@ -21,10 +21,16 @@ public:
     // DropdownSelect API caller; here we take a flat name list + the file-index
     // mapping is the product's concern (onPresetSelected gives the dropdown id).
     void setPresetItems(const juce::StringArray& names);
+    // Or populate it from preset files (shown without extension); onPresetFileChosen then
+    // hands back the chosen file, so the product needn't keep its own index → file list.
+    void setPresetFiles(const juce::Array<juce::File>& files);
+    void showPresetFile(const juce::File& file);      // show `file` as the selected preset (no callback)
     void setSelectedPresetId(int id);                 // 1-based dropdown id, 0 = none
     void setPresetPlaceholder(const juce::String& t);
     void setStagingBadge(bool show);                  // optional hot-swap "SWP" pill
     void setShowReset(bool show);                     // some products may hide reset
+    void setShowDelete(bool show);                    // products with fixed layers hide delete
+    void setNameEditable(bool editable);              // fixed-name layers can't be renamed
     void setSaveEnabled(bool enabled);                // demo: per-layer save disabled when unlicensed
     void commitNameEdit();                            // commit any in-progress rename (call before switching layer)
 
@@ -34,6 +40,7 @@ public:
     std::function<void()>             onDelete;
     std::function<void()>             onSave;
     std::function<void(int id)>       onPresetSelected;   // 1-based dropdown id
+    std::function<void(const juce::File&)> onPresetFileChosen;   // with setPresetFiles
     std::function<void(juce::String)> onNameChanged;      // committed name edit
 
     void resized() override;
@@ -48,9 +55,11 @@ private:
     DropdownSelect   presetDD;
     juce::TextButton saveBtn   { "Save" };
 
+    juce::Array<juce::File> presetFiles;   // set by setPresetFiles
     juce::Colour colour { juce::Colours::grey };
     bool         staging   = false;
     bool         showReset = true;
+    bool         showDelete = true;
 
     static constexpr int kIconBtnW   = 22;
     static constexpr int kPresetBtnW = 38;

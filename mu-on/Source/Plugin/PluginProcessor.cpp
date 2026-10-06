@@ -138,6 +138,7 @@ PluginProcessor::PluginProcessor()
 
 PluginProcessor::~PluginProcessor()
 {
+    cancelPendingUpdate();
     unregisterFxListeners(this);
 }
 
@@ -174,6 +175,11 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // Preserve the DAW sidechain, then clear (shared — the SC input bus shares buffer
     // channels with the output, so a bare clear would wipe it).
     captureSidechainAndClear(buffer);
+
+    // MIDI program change → preset load: queue matching PCs (Ch 1-5 track, Ch 9 full) for
+    // handleAsyncUpdate to load on the message thread.
+    if (scanMidiProgramChanges(midiMessages))
+        triggerAsyncUpdate();
 
     // External MIDI clock (standalone): scan the buffer + advance the clock estimate. When
     // the Source is "MIDI In" the external clock is the sole transport authority — it drives
@@ -241,27 +247,7 @@ juce::AudioProcessorEditor* PluginProcessor::createEditor()
 
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    auto state = apvts.copyState();
-    stepPattern.serialise(state);    // ride the 909 grid along in the state tree
-    writeVoiceDataToState(state);    // + each lane's modulators
-
-    // Rumble bar-volume envelope — its curve points (read under the env lock).
-    state.removeChild(state.getChildWithName("RumbleEnv"), nullptr);
-    juce::ValueTree env("RumbleEnv");
-    {
-        bool e = false; while (! rumbleEnvLock.compare_exchange_strong(e, true, std::memory_order_acquire)) e = false;
-        for (const auto& p : rumbleEnv.curvePoints)
-        {
-            juce::ValueTree pt("P");
-            pt.setProperty("x", p.x, nullptr);
-            pt.setProperty("y", p.y, nullptr);
-            env.addChild(pt, -1, nullptr);
-        }
-        rumbleEnvLock.store(false, std::memory_order_release);
-    }
-    state.addChild(env, -1, nullptr);
-
-    if (auto xml = state.createXml())
+    if (auto xml = captureState().createXml())
         copyXmlToBinary(*xml, destData);
 }
 
@@ -269,32 +255,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
         if (xml->hasTagName(apvts.state.getType()))
-        {
-            apvts.replaceState(juce::ValueTree::fromXml(*xml));
-            stepPattern.deserialise(apvts.state);
-            readVoiceDataFromState(apvts.state);
-
-            // Rumble bar-volume envelope curve points.
-            if (auto env = apvts.state.getChildWithName("RumbleEnv"); env.isValid())
-            {
-                std::vector<ControlSequence::CurvePoint> pts;
-                for (int i = 0; i < env.getNumChildren(); ++i)
-                {
-                    const auto p = env.getChild(i);
-                    ControlSequence::CurvePoint cp;
-                    cp.x = (float) p.getProperty("x", 0.0f);
-                    cp.y = (float) p.getProperty("y", 0.0f);
-                    pts.push_back(cp);
-                }
-                if (pts.size() >= 2)
-                {
-                    bool e = false; while (! rumbleEnvLock.compare_exchange_strong(e, true, std::memory_order_acquire)) e = false;
-                    rumbleEnv.curvePoints = std::move(pts);
-                    rumbleEnvLock.store(false, std::memory_order_release);
-                }
-            }
-            syncAllFxParams();   // re-seed mixer/FX (unchanged values skip listeners)
-        }
+            applyStateTree(juce::ValueTree::fromXml(*xml));
 }
 
 // Rebuild a fresh <VoiceData> child holding each lane's modulators so copyState()

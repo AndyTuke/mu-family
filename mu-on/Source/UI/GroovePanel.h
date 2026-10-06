@@ -7,9 +7,9 @@
 #include "Modulation/MuOnModDest.h"
 
 #include "UI/ChannelHeaderBar.h"             // mu-core: shared per-layer header
+#include "UI/ConfirmDialog.h"                // mu-core: shared confirm / name dialogs
 #include "UI/ModulatorPanel.h"               // mu-core: shared modulator module
 #include "UI/Components/LFOEditor.h"          // mu-core: drawable smooth-curve editor
-#include "Modulation/ModulatorSerialise.h"   // mu-core: clearModulators
 #include "UI/Components/MuLookAndFeel.h"
 
 #include <array>
@@ -19,7 +19,7 @@ namespace mu_on
 {
 
 // Main work area — the family per-voice layout (mirrors mu-tant's VoicePanel), top→bottom:
-//   1. shared ChannelHeaderBar (lane name / reset)            ← identical across the family
+//   1. shared ChannelHeaderBar (lane name / reset / presets)  ← identical across the family
 //   2. the selected lane's engine params (EnginePanel)         ← "voice editing params above"
 //   3. the 909 step editor for the SELECTED lane (GrooveGrid)  ← single row, not the 4-lane grid
 //   4. the shared modulation module (mu-core ModulatorPanel)   ← same as every other module
@@ -55,10 +55,38 @@ public:
         for (int lane = 0; lane < kNumChannels; ++lane)
             modProviders[(size_t) lane] = makeModDestProvider(lane);
 
-        // Fixed lanes: no rename / delete / add. Reset clears the lane's engine params
-        // + modulators (mirrors mu-tant's per-voice reset); Save is deferred with preset I/O.
+        // Fixed lanes: no rename / delete / add. Reset clears the lane's engine params +
+        // modulators (mirrors mu-tant's per-voice reset); the preset list + Save are that
+        // lane's track presets.
         header.setShowReset(true);
-        header.onReset = [this] { resetCurrentLane(); };
+        header.setShowDelete(false);
+        header.setNameEditable(false);
+        header.onReset = [this]
+        {
+            mu_ui::confirmAsync(this, "Reset Track",
+                                "Reset \"" + proc.getChannelName(currentChannel) + "\" to defaults?\nThis cannot be undone.",
+                                "Reset", [this] { proc.resetTrack(currentChannel); setChannel(currentChannel); });
+        };
+        header.onPresetFileChosen = [this](const juce::File& f)
+        {
+            proc.loadTrackPreset(currentChannel, f);
+            setChannel(currentChannel);   // re-read the grid row / envelope + modulators
+            header.showPresetFile(f);
+        };
+        header.setSaveEnabled(proc.canSaveLayerPreset());   // demo: per-track save disabled
+        header.onSave = [this]
+        {
+            if (! proc.canSaveLayerPreset()) return;
+            juce::Component::SafePointer<GroovePanel> safe(this);
+            mu_ui::promptTextAsync(this, "Save Track Preset", "Preset name:",
+                                   proc.getChannelName(currentChannel), "Save",
+                [safe](const juce::String& name)
+                {
+                    if (safe == nullptr || name.isEmpty()) return;
+                    safe->proc.saveTrackPreset(safe->currentChannel, name);
+                    safe->refreshPresetList();
+                });
+        };
 
         startTimerHz(mu_ui::kUiRefreshHz);   // modulator playhead
         setChannel(0);
@@ -79,6 +107,7 @@ public:
         engine.setChannel(currentChannel);
 
         header.setLayerName(proc.getChannelName(currentChannel));
+        refreshPresetList();   // each lane lists only its own track presets
         header.setColour(MuLookAndFeel::channelPalette[
             (size_t) (proc.getChannelColourIndex(currentChannel) % MuLookAndFeel::kChannelPaletteSize)]);
 
@@ -134,6 +163,11 @@ public:
 
     void lookAndFeelChanged() override { resized(); repaint(); }
 
+    int getChannel() const noexcept { return currentChannel; }
+
+    // Rescan this lane's track presets into the header's preset list.
+    void refreshPresetList() { header.setPresetFiles(proc.trackPresetFiles(currentChannel)); }
+
 private:
     void timerCallback() override
     {
@@ -141,21 +175,6 @@ private:
         modPanel.setPlayheadBeat(beat);
         if (rumbleEnvEditor.isVisible())
             rumbleEnvEditor.setPlayheadPhase((float) (std::fmod(juce::jmax(0.0, beat), 4.0) / 4.0));
-    }
-
-    // Reset the selected lane: engine params → defaults, then clear its modulators and
-    // rebind the panel so the cleared state shows.
-    void resetCurrentLane()
-    {
-        static const char* kPrefix[kNumChannels] = { "k_", "b_", "h_", "s_", "r_" };
-        const juce::String prefix = kPrefix[(size_t) currentChannel];
-        for (auto* prm : proc.getParameters())
-            if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(prm))
-                if (rp->getParameterID().startsWith(prefix))
-                    rp->setValueNotifyingHost(rp->getDefaultValue());
-
-        mu_pp::clearModulators(proc.voiceSlot(currentChannel));
-        modPanel.setVoiceSlot(&proc.voiceSlot(currentChannel));   // refresh the now-empty slot
     }
 
     PluginProcessor& proc;
