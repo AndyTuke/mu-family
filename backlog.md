@@ -19,6 +19,8 @@ Test pass/fail tracking lives in [tests.md](tests.md), not this backlog. Use thi
 |---|---|---|---|
 
 
+
+
 ## 🟡 On Hold
 
 
@@ -42,6 +44,8 @@ Test pass/fail tracking lives in [tests.md](tests.md), not this backlog. Use thi
 | # | Description | Status | Closed Build |
 
 |---|---|---|---|
+
+| 1162 | **[mu-core/ui] Store the new metal / screw UI design centrally.** Owner request (2026-10-07): the screwed metal UI built up on mu-Clid (app paint colours, per-voice colours, raised sub-panels, panel / sub-panel / strip screws and their clearances, LCD sample bar, lamp-style modulation display, logic symbols, add buttons, evenly spread sidebar) is the new family UI design. Make sure every style choice (colours, sizes, strengths, clearances) lives in MuLookAndFeel / MuTheme::Lighting rather than in product code, and that the design is documented so the other apps can adopt it. **Done:** Audit of every file touched in the UI round: the remaining hard-coded style values moved into mu-core — MuLookAndFeel kScrewedPanelInset / kScrewedChannelGap (content clear of panel screws; replaces the `2 + kPanelScrewClear [- kChannelInset]` sums in mu-Clid's RhythmPanel / EuclideanPanel / VoiceSection), kSidebarFlatEdge / kSidebarMetalEdge / kSidebarMetalTop / kSidebarScrewedEdgeX / kSidebarScrewedItemX, lamp display kLampCellGap / kLampCellCorner / kLampCurveGlowW / kLampCurveW, LCD text kLcdTextH / kLcdNameTextH / kLcdTextPadX / kLcdBrowseW; MuTheme::Lighting lcdOwnLift / lcdAccentLift / lampHotSpotReach. No value changed (screenshot identical). docs/design-ui-family.md §11 now records the full design: strip screws, lamp displays, LCD text fields, add buttons, voice palette, sub-panels, screw clearances, dropdown edge gap, evenly spread sidebar, symbols for tight spaces, " - Debug" title. | ✅ Closed | 1050 |
 
 | 1161 | **[mu-clid/ui] Screws on the header + sample strips.** Owner request (2026-10-07): make the rhythm header's displays (name / preset selector / buttons) and the sample display a little narrower, to leave room for a single screw at each end of those two thin panels (vertically centred). **Done:** New MuLookAndFeel::drawStripScrews (one screw at each end of a thin strip, vertically centred, same size / inset as the panel screws). mu-Clid: with screws, the header bar is inset 2 + kPanelScrewClear from the strip ends and the sample LCD (RhythmPanel::sampleDisplayRect) a further kSpaceXS; RhythmPanel::paintOverChildren adds the strip screws for the header and sample strips. The sample LCD's browse mark is now "..." (the ellipsis glyph rendered as a low dash in the LCD font). hasScrews takes a const component. Screenshot-checked both ends of both strips. | ✅ Closed | 1049 |
 

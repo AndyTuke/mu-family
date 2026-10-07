@@ -286,10 +286,11 @@ void ChannelSidebar::resized()
     // Metal style keeps the items and the Add button clear of the painted border, and
     // with screws, clear of the corner screws above the first item / below the Add button.
     const bool screwed = metal && MuLookAndFeel::hasScrews(*this);
-    const int top   = screwed ? s(2 + MuLookAndFeel::kPanelScrewClear - 3)   /* metalBox insets 3 */ : metal ? s(4) : 0;
-    const int edgeX = screwed ? s(11) : metal ? s(7) : s(4);
-    const int itemX = screwed ? s(4) : 0;   // with screws the layer boxes are a little narrower too
-    const int edgeY = screwed ? s(2 + MuLookAndFeel::kPanelScrewClear) : metal ? s(7) : s(4);
+    using LF = MuLookAndFeel;
+    const int top   = screwed ? s(LF::kScrewedPanelInset - 3)   /* metalBox insets 3 */ : metal ? s(LF::kSidebarMetalTop) : 0;
+    const int edgeX = s(screwed ? LF::kSidebarScrewedEdgeX : metal ? LF::kSidebarMetalEdge : LF::kSidebarFlatEdge);
+    const int itemX = screwed ? s(LF::kSidebarScrewedItemX) : 0;   // with screws the layer boxes are a little narrower too
+    const int edgeY = s(screwed ? LF::kScrewedPanelInset : metal ? LF::kSidebarMetalEdge : LF::kSidebarFlatEdge);
     if (showAdd)
     {
         const int addBtnY = h - ah - edgeY;

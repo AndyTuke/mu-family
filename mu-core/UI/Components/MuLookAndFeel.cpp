@@ -585,9 +585,9 @@ juce::Colour MuLookAndFeel::lcdLitColour(juce::Component& c)
 {
     // A display lit in its own colour (DropdownSelect::setLcdColour) — e.g. a voice's.
     if (const auto* own = c.getProperties().getVarPointer("muLcdColour"))
-        return juce::Colour((juce::uint32) (juce::int64) *own).brighter(0.3f);
+        return juce::Colour((juce::uint32) (juce::int64) *own).brighter(lighting().lcdOwnLift);
     auto* mlf = dynamic_cast<MuLookAndFeel*>(&c.getLookAndFeel());
-    return (mlf != nullptr && mlf->hasAppAccent) ? mlf->appAccentColour.brighter(0.6f) : lcdLitColour();
+    return (mlf != nullptr && mlf->hasAppAccent) ? mlf->appAccentColour.brighter(lighting().lcdAccentLift) : lcdLitColour();
 }
 
 bool MuLookAndFeel::hasScrews(const juce::Component& c)

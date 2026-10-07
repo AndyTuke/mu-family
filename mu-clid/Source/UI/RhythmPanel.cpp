@@ -708,8 +708,9 @@ void RhythmPanel::paint(juce::Graphics& g)
         const auto inner = sampleDisplayRect().toFloat();
         const auto lit   = MuLookAndFeel::lcdLitColour(*this);
         MuLookAndFeel::drawLcdGlass(g, inner, lit, false);
-        g.setFont(MuLookAndFeel::lcdFont(mu_ui::sf(10.0f)));
-        const auto textR = inner.toNearestInt().withTrimmedLeft(s(6)).withTrimmedRight(s(28));
+        g.setFont(MuLookAndFeel::lcdFont(mu_ui::sf((float) MuLookAndFeel::kLcdTextH)));
+        const auto textR = inner.toNearestInt().withTrimmedLeft(s(MuLookAndFeel::kLcdTextPadX))
+                                                    .withTrimmedRight(s(MuLookAndFeel::kLcdBrowseW + MuLookAndFeel::kSpaceXS));
         if (missing)
         {
             g.setColour(MuLookAndFeel::colour(MuLookAndFeel::sampleBarMissingWarning));
@@ -727,7 +728,7 @@ void RhythmPanel::paint(juce::Graphics& g)
             g.drawText("drop sample here or click to browse", textR, juce::Justification::centredLeft, true);
         }
         g.setColour(lit);
-        g.drawText("...", inner.toNearestInt().removeFromRight(s(24)),   // browse
+        g.drawText("...", inner.toNearestInt().removeFromRight(s(MuLookAndFeel::kLcdBrowseW)),   // browse
                    juce::Justification::centred, false);
         MuLookAndFeel::drawLcdFront(g, inner);
         return;
@@ -797,7 +798,7 @@ void RhythmPanel::resized()
 
     // Shared header bar sits just inside its rhythm-colour panel outline (lays out its own controls).
     // With screws the bar is narrower, leaving a screw at each end of its strip.
-    const int hdrInsetX = MuLookAndFeel::hasScrews(*this) ? s(2 + MuLookAndFeel::kPanelScrewClear) : s(kHeaderInsetX);
+    const int hdrInsetX = MuLookAndFeel::hasScrews(*this) ? s(MuLookAndFeel::kScrewedPanelInset) : s(kHeaderInsetX);
     headerBar.setBounds(juce::Rectangle<int>(0, 0, w, hdrH).reduced(hdrInsetX, s(kHeaderInsetY)));
 
     const int rhythmInset = s(kPanelPad + 1);
@@ -812,14 +813,14 @@ void RhythmPanel::resized()
         // With screws it moves in from the corner, clear of the corner screw.
         const int m  = s(2 + MuLookAndFeel::kDropdownEdgeGap);   // clear of the 2 px border + a gap
         const int mx = MuLookAndFeel::hasScrews(*this)   // clear of the corner screw, with a gap
-                     ? s(2 + MuLookAndFeel::kPanelScrewClear + MuLookAndFeel::kDropdownEdgeGap) : m;
+                     ? s(MuLookAndFeel::kScrewedPanelInset + MuLookAndFeel::kDropdownEdgeGap) : m;
         euclidPanel.getLogicControl().setBounds(circleRect.getRight() - mx - lw,
                                                 circleRect.getBottom() - m - lh, lw, lh);
     }
     voiceSection.setBounds  (voiceRect.reduced(rhythmInset));
     // With screws the modulator section is a little narrower, so its tabs and boxes clear
     // the panel's corner screws.
-    const int modInsetX = MuLookAndFeel::hasScrews(*this) ? s(2 + MuLookAndFeel::kPanelScrewClear) : rhythmInset;
+    const int modInsetX = MuLookAndFeel::hasScrews(*this) ? s(MuLookAndFeel::kScrewedPanelInset) : rhythmInset;
     modulatorPanel.setBounds(modRect.reduced(modInsetX, rhythmInset));
     rhythmSaveDialog.setBounds(getLocalBounds());
 }
@@ -921,6 +922,6 @@ juce::Rectangle<int> RhythmPanel::headerRect() const
 juce::Rectangle<int> RhythmPanel::sampleDisplayRect() const
 {
     using mu_ui::s;
-    const int insetX = MuLookAndFeel::hasScrews(*this) ? s(2 + MuLookAndFeel::kPanelScrewClear + MuLookAndFeel::kSpaceXS) : 3;
+    const int insetX = MuLookAndFeel::hasScrews(*this) ? s(MuLookAndFeel::kScrewedPanelInset + MuLookAndFeel::kSpaceXS) : 3;
     return sampleRect.reduced(insetX, 3);
 }

@@ -212,9 +212,9 @@ void LFOEditor::paint(juce::Graphics& g)
             g.setColour(MuLookAndFeel::lampColour(curveClr, L.lampDim));
             g.fillPath(fill);
             g.setColour(curveClr.withAlpha(L.highlight(L.ringHitGlow)));
-            g.strokePath(curve, juce::PathStrokeType(mu_ui::sf(5.0f)));
+            g.strokePath(curve, juce::PathStrokeType(mu_ui::sf(MuLookAndFeel::kLampCurveGlowW)));
             g.setColour(MuLookAndFeel::lampColour(curveClr, L.lampOn).brighter(L.highlight(L.lampHot)));
-            g.strokePath(curve, juce::PathStrokeType(mu_ui::sf(1.8f)));
+            g.strokePath(curve, juce::PathStrokeType(mu_ui::sf(MuLookAndFeel::kLampCurveW)));
         }
         else
         {

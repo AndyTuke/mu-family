@@ -171,8 +171,8 @@ void StepEditor::paintLamps(juce::Graphics& g)
     for (int i = 0; i < n; ++i)
         if (playheadPhase * w >= cellL(i) && playheadPhase * w < cellR(i)) { current = i; break; }
 
-    const float gap    = juce::jmax(1.0f, mu_ui::sf(2.0f));
-    const float corner = mu_ui::sf(2.0f);
+    const float gap    = juce::jmax(1.0f, mu_ui::sf((float) MuLookAndFeel::kLampCellGap));
+    const float corner = mu_ui::sf((float) MuLookAndFeel::kLampCellCorner);
     for (int i = 0; i < n; ++i)
     {
         const auto cell = juce::Rectangle<float>(cellL(i) + gap * 0.5f, gap, cellR(i) - cellL(i) - gap, h - gap * 2.0f);
@@ -203,7 +203,7 @@ void StepEditor::paintLamps(juce::Graphics& g)
         const auto  lens = MuLookAndFeel::lampColour(barColour, juce::jmin(1.0f, on));
         juce::Path shape;
         shape.addRoundedRectangle(lit, corner);
-        MuLookAndFeel::drawLamp(g, shape, {}, lens, lit.getCentre(), juce::jmax(lit.getWidth(), lit.getHeight()) * 0.6f);
+        MuLookAndFeel::drawLamp(g, shape, {}, lens, lit.getCentre(), juce::jmax(lit.getWidth(), lit.getHeight()) * L.lampHotSpotReach);
     }
 
     // Bipolar: a faint centre line marks zero between the lenses.

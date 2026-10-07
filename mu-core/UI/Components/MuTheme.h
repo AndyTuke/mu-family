@@ -266,6 +266,8 @@ struct MuTheme
         float lcdGlow            = 0.35f;   // glow round the lit lettering
         float lcdGhost           = 0.22f;   // unlit lettering, faintly visible through the glass
         float lcdGlare           = 0.07f;   // glass glare from the top right
+        float lcdOwnLift         = 0.30f;   // lettering on a display lit in its own (voice) colour: that colour brightened by this
+        float lcdAccentLift      = 0.60f;   // lettering on an app-lit display: the app colour brightened by this
 
         // Sidebar layer boxes (metal style)
         float sidebarSelectedFill = 0.10f;  // layer-colour wash on the selected box
@@ -300,6 +302,7 @@ struct MuTheme
         float lampPlayhead       = 0.25f;   // extra brightness on the playhead step
         float lampBeat           = 0.06f;   // unlit beat-group start: a hint of colour to mark the beat
         float lampGapDarken      = 0.6f;    // lamp displays (step editor): gaps between lenses, base darkened by this
+        float lampHotSpotReach   = 0.60f;   // lamp displays: hot-spot radius, fraction of the lit lens's longer side
 
         // Step ring (mu-Clid's RhythmCircle)
         float ringTrack          = 0.45f;   // recessed track under each ring

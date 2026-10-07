@@ -603,7 +603,32 @@ public:
     static constexpr int kSubPanelScrewD    = 6;
     static constexpr int kSubPanelScrewInset= 5;
     // Horizontal inset that keeps a sub-panel's content clear of its corner screws.
-    static constexpr int kSubPanelScrewClear= kSubPanelScrewInset + kSubPanelScrewD / 2 + 2;   // name plates (drawNamePlate): section and row names
+    static constexpr int kSubPanelScrewClear= kSubPanelScrewInset + kSubPanelScrewD / 2 + 2;
+    // Content inset from a panel's bounds (its painted edge is 2 px in) that clears the corner screws;
+    // and the same measured from inside the standard channel inset, for content laid out within it.
+    static constexpr int kScrewedPanelInset = 2 + kPanelScrewClear;
+    static constexpr int kScrewedChannelGap = kScrewedPanelInset - kChannelInset;
+
+    // Channel sidebar edges: flat, metal, and metal with screws (items + Add button clear of them).
+    static constexpr int kSidebarFlatEdge     = 4;
+    static constexpr int kSidebarMetalEdge    = 7;
+    static constexpr int kSidebarMetalTop     = 4;
+    static constexpr int kSidebarScrewedEdgeX = 11;   // Add button in from the sides
+    static constexpr int kSidebarScrewedItemX = 4;    // layer boxes in from the sides
+
+    // Lamp displays (metal style step / LFO editor): lens spacing + corners, curve line widths.
+    static constexpr int   kLampCellGap    = 2;
+    static constexpr int   kLampCellCorner = 2;
+    static constexpr float kLampCurveGlowW = 5.0f;
+    static constexpr float kLampCurveW     = 1.8f;
+
+    // LCD text fields (metal style): lettering heights, side padding, the browse mark's width.
+    static constexpr int kLcdTextH     = 10;   // single-line readouts, e.g. a sample bar
+    static constexpr int kLcdNameTextH = 13;   // the channel name display in the header bar
+    static constexpr int kLcdTextPadX  = 6;
+    static constexpr int kLcdBrowseW   = 24;
+
+    // Name plates (drawNamePlate): section and row names
 
 private:
     bool         metalStyle   = false;

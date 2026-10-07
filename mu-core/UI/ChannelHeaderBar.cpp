@@ -41,8 +41,8 @@ void ChannelHeaderBar::lookAndFeelChanged()
     // Metal: the name is an LCD lit in the layer colour; flat: plain heading text.
     const bool metal = MuLookAndFeel::isMetal(*this);
     nameLabel.setColour(juce::Label::textColourId,
-                        metal ? colour.brighter(0.3f) : MuLookAndFeel::colour(MuLookAndFeel::headingText));
-    nameLabel.setFont(metal ? MuLookAndFeel::lcdFont(mu_ui::sf(13.0f))
+                        metal ? colour.brighter(MuLookAndFeel::lighting().lcdOwnLift) : MuLookAndFeel::colour(MuLookAndFeel::headingText));
+    nameLabel.setFont(metal ? MuLookAndFeel::lcdFont(mu_ui::sf((float) MuLookAndFeel::kLcdNameTextH))
                             : juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(15.0f))));
     repaint();
 }
