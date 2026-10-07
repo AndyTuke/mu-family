@@ -212,7 +212,7 @@ public:
     // Screws style: small cross-head screws in the corners of panels and sub-panels.
     // Opt-in per app (mu-Clid first); shared components check hasScrews(component).
     void setScrews(bool on) noexcept { screws = on; }
-    static bool hasScrews(juce::Component& c);
+    static bool hasScrews(const juce::Component& c);
 
     // A cross-head (Phillips) screw of diameter `d` at `centre`, lit from the top right.
     // `angle` turns the cross so a row of screws doesn't look stamped.
@@ -220,6 +220,8 @@ public:
     // A screw in each corner of a panel / raised sub-panel.
     static void drawPanelScrews(juce::Graphics&, juce::Rectangle<float> panel);
     static void drawSubPanelScrews(juce::Graphics&, juce::Rectangle<float> subPanel);
+    // A thin strip panel (too short for four): one screw at each end, vertically centred.
+    static void drawStripScrews(juce::Graphics&, juce::Rectangle<float> strip);
 
     // Lamps: a lit indicator behind a dark lens. lampColour mixes `clr` into the opaque lamp
     // base by `lit` (Lighting lampOff / lampDim / lampOn); drawLamp fills `shape` with that lens,

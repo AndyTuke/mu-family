@@ -590,7 +590,7 @@ juce::Colour MuLookAndFeel::lcdLitColour(juce::Component& c)
     return (mlf != nullptr && mlf->hasAppAccent) ? mlf->appAccentColour.brighter(0.6f) : lcdLitColour();
 }
 
-bool MuLookAndFeel::hasScrews(juce::Component& c)
+bool MuLookAndFeel::hasScrews(const juce::Component& c)
 {
     auto* mlf = dynamic_cast<MuLookAndFeel*>(&c.getLookAndFeel());
     return mlf != nullptr && mlf->metalStyle && mlf->screws;
@@ -647,6 +647,14 @@ static void drawCornerScrews(juce::Graphics& g, juce::Rectangle<float> r, float 
 void MuLookAndFeel::drawPanelScrews(juce::Graphics& g, juce::Rectangle<float> panel)
 {
     drawCornerScrews(g, panel, mu_ui::sf((float) kPanelScrewD), mu_ui::sf((float) kPanelScrewInset));
+}
+
+void MuLookAndFeel::drawStripScrews(juce::Graphics& g, juce::Rectangle<float> strip)
+{
+    const float d     = mu_ui::sf((float) kPanelScrewD);
+    const float inset = mu_ui::sf((float) kPanelScrewInset);
+    drawScrew(g, { strip.getX() + inset,     strip.getCentreY() }, d, 0.35f);
+    drawScrew(g, { strip.getRight() - inset, strip.getCentreY() }, d, 1.10f);
 }
 
 void MuLookAndFeel::drawSubPanelScrews(juce::Graphics& g, juce::Rectangle<float> subPanel)
