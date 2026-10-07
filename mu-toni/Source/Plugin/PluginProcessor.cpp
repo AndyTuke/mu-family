@@ -367,6 +367,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // Beat position for the modulation matrix (control-sequence playhead).
     modBeat = host.hasPosition ? host.ppqPosition
                                : internalBeatPos.load(std::memory_order_relaxed);
+    const double blockStartBeat = modBeat;   // the hot-swap bar-line test below
 
     // Push current parameters into each voice's arp runner.
     for (int i = 0; i < kNumChannels; ++i)
@@ -384,13 +385,20 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
                      nullptr, nullptr, nullptr, &renderChannelCb);
 
     // Advance the free-running transport while playing (drives the beat-pos UI).
+    const double blockBeats = (bpm / 60.0) / currentSampleRate * (double) numSamples;
     if (isPlaying)
-    {
-        const double beatsPerSample = (bpm / 60.0) / currentSampleRate;
-        internalBeatPos.store(internalBeatPos.load(std::memory_order_relaxed)
-                              + beatsPerSample * (double) numSamples,
+        internalBeatPos.store(internalBeatPos.load(std::memory_order_relaxed) + blockBeats,
                               std::memory_order_relaxed);
-    }
+
+    // Hot-swap: flag staged presets whose bar line passed in this block (or the transport stopped).
+    transportRunning.store(isPlaying, std::memory_order_relaxed);
+    const bool atBar = mu_hotswap::boundaryReached(isPlaying, swapWasPlaying, blockStartBeat,
+                                                   blockStartBeat + (isPlaying ? blockBeats : 0.0),
+                                                   mu_hotswap::kBarBeats);
+    swapWasPlaying = isPlaying;
+    bool flagged = hotSwap.flagFullIfReady(atBar);
+    for (int i = 0; i < kNumChannels; ++i) flagged |= hotSwap.flagIfReady(i, atBar);
+    if (flagged) triggerAsyncUpdate();
 }
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()

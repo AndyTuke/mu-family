@@ -89,13 +89,20 @@ void PluginProcessor::loadPreset(const juce::File& file)
 {
     if (! file.existsAsFile()) return;
     juce::String error;
-    const auto state = mu_pp::readFullPreset(file, kFullPresetTag, apvts.state.getType(), error);
+    auto state = mu_pp::readFullPreset(file, kFullPresetTag, apvts.state.getType(), error);
     if (! state.isValid())
     {
         if (onLoadError) onLoadError(error);
         return;
     }
-    applyStateTree(state);
+    // While playing, stage it for the pattern's wrap (commitDeferredWork); while stopped, apply now.
+    if (transportRunning.load(std::memory_order_relaxed))
+        hotSwap.stageFull(std::move(state));
+    else
+    {
+        for (int i = 0; i < kNumChannels; ++i) hotSwap.cancel(i);   // nothing staged may land on top
+        applyStateTree(state);
+    }
     publishPresetName(file.getFileNameWithoutExtension());   // mu-link mixer display
 }
 
@@ -139,7 +146,20 @@ void PluginProcessor::loadTrackPreset(int lane, const juce::File& file)
         return;
     }
 
-    const auto tree = juce::ValueTree::fromXml(*xml);
+    // While playing, stage it for the pattern's wrap (commitDeferredWork); while stopped, apply now.
+    auto tree = juce::ValueTree::fromXml(*xml);
+    if (transportRunning.load(std::memory_order_relaxed))
+        hotSwap.stage(lane, std::move(tree));
+    else
+    {
+        hotSwap.cancel(lane);
+        applyTrackTree(lane, tree);
+    }
+}
+
+// Apply a parsed track preset (the stopped load and the pattern-wrap commit), then tell the editor.
+void PluginProcessor::applyTrackTree(int lane, const juce::ValueTree& tree)
+{
     mu_pp::applyLayerParams(tree, apvts, lanePrefix(lane));
     if (lane < kNumStepLanes) stepPattern.deserialiseTrack(lane, tree.getChildWithName("Track"));
     else                      restoreRumbleEnv(tree.getChildWithName("RumbleEnv"));
@@ -148,6 +168,17 @@ void PluginProcessor::loadTrackPreset(int lane, const juce::File& file)
     mu_pp::clearModulators(slot);
     mu_pp::deserialiseModulators(tree.getChildWithName("Modulators"), slot, {},
                                  [lane](const std::string& id) { return isValidLaneDest(lane, id); });
+    if (onTrackPresetLoaded) onTrackPresetLoaded(lane);
+}
+
+// Commit the hot-swaps that reached the pattern wrap: the full preset first (it supersedes the
+// per-lane swaps), then each flagged lane.
+void PluginProcessor::commitDeferredWork()
+{
+    if (hotSwap.consumeFull([this](juce::ValueTree& t) { applyStateTree(t); }) && onPresetSwapCommitted)
+        onPresetSwapCommitted();
+    for (int i = 0; i < kNumChannels; ++i)
+        hotSwap.consume(i, [this, i](juce::ValueTree& t) { applyTrackTree(i, t); });
 }
 
 // The track presets saved from `lane` (a preset belongs to the instrument it was saved from).
@@ -165,6 +196,7 @@ juce::Array<juce::File> PluginProcessor::trackPresetFiles(int lane) const
 void PluginProcessor::resetTrack(int lane)
 {
     if (lane < 0 || lane >= kNumChannels) return;
+    hotSwap.cancel(lane);   // a staged swap would re-fill what we're resetting
     mu_pp::applyLayerParams({}, apvts, lanePrefix(lane));
     mu_pp::clearModulators(voiceSlots[(size_t) lane]);
 }

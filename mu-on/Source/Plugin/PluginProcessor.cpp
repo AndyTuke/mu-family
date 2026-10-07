@@ -235,6 +235,21 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     processCoreBlock(buffer, nullptr, kNumChannels, numSamples, bpm,
                      nullptr, nullptr, nullptr, &renderChannelCb);
 
+    // Hot-swap: flag staged presets whose pattern wrap (one bar) passed in this block, or the
+    // transport stopped. When the beat comes from outside, the next block's start stands in for
+    // this block's end, so the block's own span is estimated from the tempo.
+    {
+        const double blockBeats = (bpm / 60.0) / currentSampleRate * (double) numSamples;
+        transportRunning.store(isPlaying, std::memory_order_relaxed);
+        const bool atBar = mu_hotswap::boundaryReached(isPlaying, swapWasPlaying, beatStart,
+                                                       beatStart + (isPlaying ? blockBeats : 0.0),
+                                                       mu_hotswap::kBarBeats);
+        swapWasPlaying = isPlaying;
+        bool flagged = hotSwap.flagFullIfReady(atBar);
+        for (int i = 0; i < kNumChannels; ++i) flagged |= hotSwap.flagIfReady(i, atBar);
+        if (flagged) triggerAsyncUpdate();
+    }
+
     // Advance the transport beat. When slaved to the host / mu-link or external MIDI clock the
     // beat comes from outside each block, so mirror it into internalBeatPos (no separate
     // advance) — the internal transport then resumes seamlessly if the source goes away.

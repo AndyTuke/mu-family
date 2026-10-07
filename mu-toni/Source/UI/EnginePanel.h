@@ -9,6 +9,7 @@
 #include "UI/ConfirmDialog.h"             // mu-core: shared confirm / name dialogs
 #include "Persistence/PresetFiles.h"      // mu-core: listPresetFiles
 #include "UI/Voice/InsertSubsection.h"
+#include "UI/Voice/VoiceBand.h"            // mu-core: shared voice band (mu-Clid layout)
 #include "Modulation/MuToniModDest.h"
 #include "Audio/Scales.h"
 #include "Audio/Chords.h"
@@ -21,11 +22,10 @@ namespace mu_toni
 {
 
 // μ-Toni engine panel. The shared per-layer header bar sits on top (layer presets + reset).
-// The Pitch·Filter·Amp·Insert voice band replicates
-// mu-clid's VoiceSection exactly — fixed MuLookAndFeel constants (Size-2 knobs,
-// compact two-row sub-sections, section widths + dividers). Oscillator 1/2/Mix
-// (mu-toni's two-osc source) sits above; the Appergater band + shared modulator
-// section below. All sizes come from MuLookAndFeel — no arbitrary values.
+// The Pitch·Filter·Amp·Effects voice band is the shared mu-core VoiceBand (mu-Clid's layout),
+// its sections built from this panel's controls. Oscillator 1/2/Mix (mu-toni's two-osc
+// source) sits above; the Appergater band + shared modulator section below. All sizes come
+// from MuLookAndFeel / VoiceBand — no arbitrary values.
 class EnginePanel : public juce::Component,
                     private juce::Timer
 {
@@ -96,7 +96,27 @@ public:
         addKnob  (G_ARP, "gate",  "Gate",      LF::knobEuclidean);
         addKnob  (G_ARP, "porta", "Glide",     LF::knobEuclidean);
 
-        addAndMakeVisible(insertSub);
+        // ── Voice band: mu-Clid's layout, the sections built from the controls above ──
+        // Pitch: target over two columns, Depth above R; A / D / S / R below.
+        pitchBox.place(*findCombo("ptgt"), 0, 0, 2, true);
+        pitchBox.place(*findKnob("peDep"), 0, 3);
+        // Filter: type over two columns, then Drive / Cutoff / Reso / Low Cut; A / D / S / R / Depth below.
+        filterBox.place(*findCombo("ft"), 0, 0, 2, true);
+        // Amp: Level over A / D / S / R; the FX sends sit in the Effects box.
+        ampBox.place(*findKnob("aeL"), 0, 0);
+        {
+            const char* const pitchEnv[]  = { "peA", "peD", "peS", "peR" };
+            const char* const filterRow[] = { "drv", "cut", "res", "locut" };
+            const char* const filterEnv[] = { "feA", "feD", "feS", "feR", "feDep" };
+            const char* const ampEnv[]    = { "aeA", "aeD", "aeS", "aeR" };
+            for (int i = 0; i < 4; ++i) pitchBox .place(*findKnob(pitchEnv[i]),  1, i);
+            for (int i = 0; i < 4; ++i) filterBox.place(*findKnob(filterRow[i]), 0, i + 2);
+            for (int i = 0; i < 5; ++i) filterBox.place(*findKnob(filterEnv[i]), 1, i);
+            for (int i = 0; i < 4; ++i) ampBox   .place(*findKnob(ampEnv[i]),    1, i);
+        }
+        voiceBand.setSections(pitchBox, filterBox, ampBox, insertSub,
+                              { findKnob("sendEff"), findKnob("sendDly"), findKnob("sendRev") });
+        addAndMakeVisible(voiceBand);
         insertSub.onStatusUpdate = [this](const juce::String& n, const juce::String& val)
         { if (onStatusUpdate) onStatusUpdate(n, val); };
 
@@ -202,9 +222,8 @@ public:
             const auto accent = MuLookAndFeel::appAccent(*this);
             for (auto r : { headerR, srcR, voicePanelR, arpPanelR, modR })
                 MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), accent);
+            // (the voice band draws its own section boxes)
             MuLookAndFeel::drawSections(g, *this, { { oscR[0], "OSCILLATOR 1" }, { oscR[1], "OSCILLATOR 2" }, { oscR[2], "MIX" },
-                                                    { voiceBoxR[0], "PITCH" }, { voiceBoxR[1], "FILTER" },
-                                                    { voiceBoxR[2], "AMP" }, { voiceBoxR[3], "EFFECTS" },
                                                     { arpR, "APPERGATER" } }, accent);
             return;
         }
@@ -220,24 +239,6 @@ public:
             g.drawText(boxTitles[i], oscR[(size_t) i].reduced(8, 4).removeFromTop(15), juce::Justification::topLeft, false);
         g.drawText("Appergater", arpR.reduced(8, 4).removeFromTop(15), juce::Justification::topLeft, false);
 
-        // Voice band — mu-clid style: centred section labels + 0.5px dividers.
-        const int X = voiceR.getX(), Y = voiceR.getY();
-        const int divW = LF::kVoiceDivW;
-        const int fltX = LF::kVoicePitchW + divW;
-        const int ampX = fltX + LF::kVoiceFilterW + divW;
-        const int insX = ampX + LF::kVoiceAmpW + divW;
-        g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
-        const float top = (float) Y + mu_ui::sf(6.0f), bot = (float) (Y + s(LF::kVoiceLabelH + LF::kVoiceSubH)) - mu_ui::sf(6.0f);
-        for (int dx : { LF::kVoicePitchW + divW / 2, fltX + LF::kVoiceFilterW + divW / 2, ampX + LF::kVoiceAmpW + divW / 2 })
-            g.drawLine((float) (X + s(dx)), top, (float) (X + s(dx)), bot, 0.5f);
-        g.setColour(MuLookAndFeel::colour(Id::mutedText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(10.0f))));
-        auto lbl = [&](const char* t, int x, int w)
-        { g.drawText(t, X + s(x), Y, s(w), s(LF::kVoiceLabelH), juce::Justification::centred, false); };
-        lbl("PITCH",  0,    LF::kVoicePitchW);
-        lbl("FILTER", fltX, LF::kVoiceFilterW);
-        lbl("AMP",    ampX, LF::kVoiceAmpW);
-        lbl("INSERT", insX, LF::kVoiceInsertW);
     }
 
     void resized() override
@@ -268,8 +269,9 @@ public:
         oscR[2] = oscRow;
         area.removeFromTop(gap);
 
-        // Voice band (fixed mu-clid geometry).
-        voiceR = area.removeFromTop(s(LF::kVoiceLabelH + LF::kVoiceSubH));
+        // Voice band (the shared mu-Clid geometry).
+        voiceR = area.removeFromTop(s(VoiceBand::kHeight));
+        voiceBand.setBounds(voiceR);
         area.removeFromTop(gap);
 
         // Modulator at the bottom; Appergater fills the middle.
@@ -282,7 +284,6 @@ public:
         layoutBox(G_OSC2, oscR[1]);
         layoutBox(G_MIX,  oscR[2]);
         layoutBox(G_ARP,  arpR);
-        layoutVoiceBand(voiceR, false);
     }
 
 private:
@@ -316,10 +317,10 @@ private:
             oscR[2] = { oscR[1].getRight() + boxGap, y, w - padX - (oscR[1].getRight() + boxGap), boxH };
         }
 
-        // Voice band (mu-Clid geometry: plate band + two knob rows).
-        voicePanelR = { 0, srcR.getBottom(), w, padY + s(LF::kVoiceLabelH + LF::kVoiceSubH) + padY };
-        voiceR      = voicePanelR.reduced(padX, padY);
-        layoutVoiceBand(voiceR, true);
+        // Voice band (the shared mu-Clid band, inside the standard channel inset as in mu-Clid).
+        voicePanelR = { 0, srcR.getBottom(), w, padY + s(VoiceBand::kHeight) + padY };
+        voiceR      = voicePanelR.reduced(s(LF::kChannelInset));
+        voiceBand.setBounds(voiceR);
 
         // Appergater, one box.
         arpPanelR = { 0, voicePanelR.getBottom(), w, padY + plateH + boxH + padY };
@@ -357,50 +358,6 @@ private:
 
     KnobWithLabel*  findKnob (const char* s) { for (auto& k : knobs)  if (k.suffix == s) return k.comp.get(); return nullptr; }
     DropdownSelect* findCombo(const char* s) { for (auto& c : combos) if (c.suffix == s) return c.comp.get(); return nullptr; }
-
-    // Voice band: mu-clid VoiceSection geometry (Size-2 knobs, 2 rows). Boxed (metal style):
-    // each section a raised box — Amp four columns wide (its sends close up beside Level),
-    // dropdowns kept off the box edges, and Effects taking the rest of the width.
-    void layoutVoiceBand(juce::Rectangle<int> rect, bool boxed)
-    {
-        using LF = MuLookAndFeel;
-        using mu_ui::s;
-        const int kW = LF::kKnobSize2W, rowH = LF::kKnobSize2H, fW = LF::kVoiceFilterColW;
-        const int row2 = rowH + LF::kVoiceGap, divW = LF::kVoiceDivW;
-        const int ampW = boxed ? 4 * kW : LF::kVoiceAmpW;
-        const int fltX = LF::kVoicePitchW + divW, ampX = fltX + LF::kVoiceFilterW + divW, insX = ampX + ampW + divW;
-        const int insW = boxed ? juce::roundToInt((float) rect.getWidth() / mu_ui::scale) - insX : LF::kVoiceInsertW;
-        const int send = boxed ? 1 : 2;   // first send column
-        const int dg   = boxed ? LF::kDropdownEdgeGap : 0;
-        const int X = rect.getX(), Y = rect.getY() + s(LF::kVoiceLabelH);
-
-        voiceBoxR[0] = { X,             Y, s(LF::kVoicePitchW),  s(LF::kVoiceSubH) };
-        voiceBoxR[1] = { X + s(fltX),   Y, s(LF::kVoiceFilterW), s(LF::kVoiceSubH) };
-        voiceBoxR[2] = { X + s(ampX),   Y, s(ampW),              s(LF::kVoiceSubH) };
-        voiceBoxR[3] = { X + s(insX),   Y, s(insW),              s(LF::kVoiceSubH) };
-
-        auto kb = [&](const char* suf, int sx, int col, int cw, bool bottom)
-        { if (auto* k = findKnob(suf)) k->setBounds(X + s(sx + col * cw), Y + (bottom ? s(row2) : 0), s(cw), s(rowH)); };
-        auto dd = [&](const char* suf, int sx, int spanCols, int cw)
-        { if (auto* c = findCombo(suf)) c->setBounds(X + s(sx + dg), Y + s(rowH / 4), s(spanCols * cw - 2 * dg), s(rowH / 2)); };
-
-        // Pitch — target (row 1) + A/D/S/R/Depth (row 2).
-        dd("ptgt", 0, 2, kW);
-        kb("peA", 0, 0, kW, true); kb("peD", 0, 1, kW, true); kb("peS", 0, 2, kW, true); kb("peR", 0, 3, kW, true); kb("peDep", 0, 4, kW, true);
-
-        // Filter — type (2 cols) + Drive/Cutoff/Reso/LowCut (row 1) + A/D/S/R/Depth (row 2).
-        dd("ft", fltX, 2, fW);
-        kb("drv", fltX, 2, fW, false); kb("cut", fltX, 3, fW, false); kb("res", fltX, 4, fW, false); kb("locut", fltX, 5, fW, false);
-        kb("feA", fltX, 0, fW, true); kb("feD", fltX, 1, fW, true); kb("feS", fltX, 2, fW, true); kb("feR", fltX, 3, fW, true); kb("feDep", fltX, 4, fW, true);
-
-        // Amp — Level + Eff/Dly/Rev sends (row 1) + A/D/S/R (row 2).
-        kb("aeL", ampX, 0, kW, false); kb("sendEff", ampX, send, kW, false); kb("sendDly", ampX, send + 1, kW, false); kb("sendRev", ampX, send + 2, kW, false);
-        kb("aeA", ampX, 0, kW, true); kb("aeD", ampX, 1, kW, true); kb("aeS", ampX, 2, kW, true); kb("aeR", ampX, 3, kW, true);
-
-        // Insert — the shared subsection.
-        insertSub.setBounds(voiceBoxR[3]);
-        insertSub.setAlgoWidth(insW);
-    }
 
     // Boxed section (Osc 1/2/Mix, Appergater): dropdowns/toggles on top, Size-2 knobs flow.
     void layoutBox(int group, juce::Rectangle<int> rect)
@@ -480,7 +437,11 @@ private:
     { return { "LP12","HP12","BP12","Notch","LP24","HP24","BP24","LP6",
                "Comb+","AP12","Notch24","HP6","Peak","LoShf","HiShf","Comb-" }; }
 
-    void timerCallback() override { modulatorPanel.setPlayheadBeat(proc.getInternalBeatPos()); }
+    void timerCallback() override
+    {
+        modulatorPanel.setPlayheadBeat(proc.getInternalBeatPos());
+        header.setStagingBadge(proc.hasPendingSwap(currentLayer));   // "SWP" while a layer preset waits for the bar line
+    }
 
 public:
     std::function<void(const juce::String&, const juce::String&)> onStatusUpdate;
@@ -493,13 +454,17 @@ private:
     std::vector<ToggleDef> toggles;
     std::array<juce::Rectangle<int>, 3> oscR;
     juce::Rectangle<int> voiceR, arpR, headerR;
-    // Metal style: the panels, and the voice band's four section boxes.
+    // Metal style: the panels.
     juce::Rectangle<int> srcR, voicePanelR, arpPanelR, modR;
-    std::array<juce::Rectangle<int>, 4> voiceBoxR;
 
     ChannelHeaderBar header;
 
     InsertSubsection insertSub;
+    // The voice band and its Pitch / Filter / Amp sections (built from the controls above).
+    VoiceBandSection pitchBox  { 4, VoiceBand::kCols };
+    VoiceBandSection filterBox { 6, VoiceBand::kFilterColW };
+    VoiceBandSection ampBox    { 4, VoiceBand::kCols };
+    VoiceBand        voiceBand;
     ::ModulatorPanel modulatorPanel;
     ModDestProvider  modDestProvider = makeModDestProvider();
 

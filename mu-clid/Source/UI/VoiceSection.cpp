@@ -6,16 +6,9 @@
 VoiceSection::VoiceSection(PluginProcessor& p)
     : proc(p), pitchSub(p), filterSub(p), ampSub(p), insertSub(p, "r")
 {
-    addAndMakeVisible(pitchSub);
-    addAndMakeVisible(filterSub);
-    addAndMakeVisible(ampSub);
-    addAndMakeVisible(insertSub);
-
-    // FX sends sit in the Insert panel's top row, right of a narrowed dropdown; added
-    // after insertSub so they're on top of it.
-    for (auto* k : ampSub.sendKnobs())
-        addAndMakeVisible(k);
-    insertSub.setAlgoWidth(kSendsX);   // the effect dropdown takes the space left of the sends
+    // The FX sends are wired by AmpSubsection but sit in the Effects box (VoiceBand places them).
+    const auto sends = ampSub.sendKnobs();
+    setSections(pitchSub, filterSub, ampSub, insertSub, { sends[0], sends[1], sends[2] });
 
     // Forward status updates from each subsection through our own callback.
     auto fwd = [this](const juce::String& n, const juce::String& v) {
@@ -83,88 +76,4 @@ void VoiceSection::refreshSuffix(const juce::String& suffix)
     filterSub.refreshSuffix(suffix);
     ampSub   .refreshSuffix(suffix);
     insertSub.refreshSuffix(suffix);
-}
-
-void VoiceSection::resized()
-{
-    // Fixed Medium-baseline layout, wrapped in s() so the whole grid scales.
-    // Pitch / Amp / Insert use the standard 54-px column (kVoiceUnitW).
-    // Filter gets 6 narrower 50-px columns (kVoiceFilterColW) for the Drive knob.
-    // Total: 7 (left gap) + 4×54 + 6×50 + 4×54 + 308 (Effects box) + 3×6 = 1065 px, leaving
-    // the right end short of the voice panel's corner screw.
-    using LF = MuLookAndFeel;
-    using mu_ui::s;
-    constexpr int divW   = LF::kVoiceDivW;
-    constexpr int labelH = LF::kVoiceLabelH;
-    constexpr int kFltW  = LF::kVoiceFilterColW;  // 50 — filter columns (6 of them)
-    constexpr int subH   = LF::kVoiceSubH;
-
-    constexpr int pitX  = kLeftGap;                  // 7
-    constexpr int fltX  = pitX + kPitchW + divW;     // 229
-    constexpr int ampX  = fltX + 6 * kFltW + divW;   // 535
-    constexpr int insX  = ampX + kAmpW + divW;       // 757
-
-    pitchSub .setBounds(s(pitX),    s(labelH), s(kPitchW), s(subH));
-    filterSub.setBounds(s(fltX),    s(labelH), s(6 * kFltW),        s(subH));
-    ampSub   .setBounds(s(ampX),    s(labelH), s(kAmpW),   s(subH));
-    insertSub.setBounds(s(insX),    s(labelH), s(kEffectsW), s(subH));
-
-    // FX sends: kSendCols slightly narrower columns, right-aligned in the Effects box's top
-    // row; the effect dropdown takes the space to their left.
-    constexpr int sendX = insX + kSendsX;
-    int col = 0;
-    for (auto* k : ampSub.sendKnobs())
-        k->setBounds(s(sendX + col++ * kSendColW), s(labelH), s(kSendColW), s(LF::kKnobSize2H));
-}
-
-void VoiceSection::paint(juce::Graphics& g)
-{
-    using Id = MuLookAndFeel::ColourIds;
-    using LF = MuLookAndFeel;
-    using mu_ui::s;
-
-    const int h          = getHeight();
-    constexpr int divW   = LF::kVoiceDivW;
-    constexpr int labelH = LF::kVoiceLabelH;
-    constexpr int kFltW  = LF::kVoiceFilterColW;
-
-    constexpr int pitX = kLeftGap;
-    constexpr int fltX = pitX + kPitchW + divW;
-    constexpr int ampX = fltX + 6 * kFltW + divW;
-    constexpr int insX = ampX + kAmpW + divW;
-
-    if (MuLookAndFeel::isMetal(*this))
-    {
-        // Metal: each subsection in its own raised box (all shadows first, then the faces),
-        // its name plate just above it.
-        const juce::Rectangle<float> boxes[] = { pitchSub.getBounds().toFloat(), filterSub.getBounds().toFloat(),
-                                                 ampSub.getBounds().toFloat(),   insertSub.getBounds().toFloat() };
-        const auto appCol = MuLookAndFeel::appAccent(*this);
-        for (const auto& b : boxes) MuLookAndFeel::drawRaisedSubPanelShadow(g, b);
-        for (const auto& b : boxes) MuLookAndFeel::drawRaisedSubPanel(g, b, appCol);
-        if (MuLookAndFeel::hasScrews(*this))
-            for (const auto& b : boxes) MuLookAndFeel::drawSubPanelScrews(g, b);
-    }
-    else
-    {
-        // Flat: thin dividers between the subsections.
-        g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
-        const float kDivInset = mu_ui::sf(7.0f);
-        const float div1X = static_cast<float>(s(pitX + kPitchW) + s(divW) / 2);
-        const float div2X = static_cast<float>(s(fltX + 6 * kFltW) + s(divW) / 2);
-        const float div3X = static_cast<float>(s(ampX + kAmpW) + s(divW) / 2);
-        g.drawLine(div1X, kDivInset, div1X, (float)h - kDivInset, 0.5f);
-        g.drawLine(div2X, kDivInset, div2X, (float)h - kDivInset, 0.5f);
-        g.drawLine(div3X, kDivInset, div3X, (float)h - kDivInset, 0.5f);
-    }
-
-    // Section names: a name plate centred over each subsection.
-    auto plate = [&](const char* name, int x, int w)
-    {
-        MuLookAndFeel::drawCentredNamePlate(g, { (float) s(x), 0.0f, (float) s(w), (float) s(labelH) }, name);
-    };
-    plate("PITCH",  pitX, kPitchW);
-    plate("FILTER", fltX, 6 * kFltW);
-    plate("AMP",    ampX, kAmpW);
-    plate("EFFECTS", insX, kEffectsW);
 }

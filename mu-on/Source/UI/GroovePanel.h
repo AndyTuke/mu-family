@@ -229,6 +229,7 @@ private:
     {
         const double beat = proc.getInternalBeatPos();
         modPanel.setPlayheadBeat(beat);
+        header.setStagingBadge(proc.hasPendingSwap(currentChannel));   // "SWP" while a track preset waits for the wrap
         if (rumbleEnvEditor.isVisible())
             rumbleEnvEditor.setPlayheadPhase((float) (std::fmod(juce::jmax(0.0, beat), 4.0) / 4.0));
     }

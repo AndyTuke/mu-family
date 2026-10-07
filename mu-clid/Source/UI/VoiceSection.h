@@ -4,12 +4,13 @@
 #include "Voice/FilterSubsection.h"
 #include "Voice/AmpSubsection.h"
 #include "UI/Voice/InsertSubsection.h"   // shared mu-core insert panel
+#include "UI/Voice/VoiceBand.h"          // shared mu-core voice band layout + drawing
 
 class PluginProcessor;
 
-// Four-column two-row voice chain panel: Pitch | Filter | Amp | Insert.
-// Layout shell — owns the four subsections and draws the dividers + column labels.
-class VoiceSection : public juce::Component
+// mu-Clid's voice chain: the shared VoiceBand (Pitch | Filter | Amp | Effects layout + drawing)
+// filled with mu-Clid's subsections, which bind to the selected rhythm.
+class VoiceSection : public VoiceBand
 {
 public:
     explicit VoiceSection(PluginProcessor& p);
@@ -24,30 +25,7 @@ public:
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
     std::function<void(int insertAlgo)> onInsertAlgorithmChanged;
 
-    void resized() override;
-    void paint(juce::Graphics&) override;
-
 private:
-    // mu-Clid's own voice-band layout (the shared MuLookAndFeel widths are the other
-    // products' defaults): Pitch has Depth above R (4 columns), Amp is Level / Accent over
-    // A / D / S / R (4), and Insert takes the FX sends beside a narrowed dropdown (6).
-    static constexpr int kCols       = MuLookAndFeel::kVoiceUnitW;
-    static constexpr int kPitchW     = 4 * kCols;                                          // 216
-    static constexpr int kAmpW       = 4 * kCols;                                          // 216
-    static constexpr int kInsertCols = 6;
-    static constexpr int kSendCols   = 3;   // Effect / Delay / Reverb, right of the insert dropdown
-    static constexpr int kInsertW    = kInsertCols * kCols;                                // 324
-    // The send knobs close up a little so the Effects box ends short of the voice panel's
-    // bottom-right corner screw.
-    static constexpr int kSendColW   = kCols - 3;                                          // 51
-    // The whole band starts kLeftGap in, so the Pitch box clears the voice panel's
-    // bottom-left corner screw (screw reach, less the RhythmPanel inset round this
-    // component); the Effects box gives up that width.
-    static constexpr int kLeftGap    = MuLookAndFeel::kScrewedChannelGap;   // 7
-    static constexpr int kEffectsW   = kInsertW - kSendCols * (kCols - kSendColW) - kLeftGap;   // 308
-    static constexpr int kSendsX     = kEffectsW - kSendCols * kSendColW;   // sends, right-aligned in the box
-    static constexpr float kPlateH   = (float) MuLookAndFeel::kNamePlateH;   // section name plates
-
     PluginProcessor& proc;
     int              currentRhythm = -1;
 

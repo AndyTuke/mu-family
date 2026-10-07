@@ -3,19 +3,21 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "Sequencer/Rhythm.h"
 #include "Audio/VoiceEngine.h"
+#include "Plugin/HotSwap.h"   // mu-core: the shared staging state
 #include <array>
 #include <atomic>
 #include <memory>
 
 class PluginProcessor;
 
-// Encapsulates all hot-swap staging machinery: the per-rhythm pending-swap state,
-// the audio-thread boundary detection, and the message-thread commit pass.
+// mu-Clid's hot-swap machinery: the shared mu-core stager holding pre-built rhythms (per
+// rhythm + one full preset), mu-Clid's boundary rule (master loop / each rhythm's own loop), and
+// the message-thread commit pass.
 //
-// Threading contract (preserved from PluginProcessor):
-//   - pendingSwaps[] is written on the message thread (stage / cancelPendingIfAny /
-//     cancelStagedSwap) and read atomically by the audio thread (checkBoundaries).
-//   - processSwaps() runs on the message thread under suspendProcessing + rhythmsLock.
+// Threading contract (mu_hotswap::Stager):
+//   - Payloads are written on the message thread (stage / cancel) and committed there
+//     (processSwaps, under suspendProcessing); the audio thread touches only the flags
+//     (checkBoundaries).
 //   - No lock is held during stage() — the isReady store-release is the barrier.
 class HotSwapStager
 {
@@ -69,28 +71,15 @@ public:
     void processSwaps();
 
 private:
-    struct PendingRhythmSwap
+    // One rhythm's staged swap, pre-built at stage time.
+    struct PendingRhythm
     {
-        Rhythm                       pendingRhythm;
-        juce::String                 pendingSamplePath;
-        std::unique_ptr<VoiceEngine> pendingVoice;
-        std::atomic<bool> isReady         { false };
-        std::atomic<bool> boundaryReached { false };
-
-        PendingRhythmSwap() = default;
-        PendingRhythmSwap(const PendingRhythmSwap&) = delete;
-        PendingRhythmSwap& operator=(const PendingRhythmSwap&) = delete;
+        Rhythm                       rhythm;
+        juce::String                 samplePath;
+        std::unique_ptr<VoiceEngine> voice;
     };
 
-    std::array<PendingRhythmSwap, kMaxRhythms> pendingSwaps;
-
-    // Full-preset deferral. pendingPreset is written/read only on the message thread
-    // (stageFullPreset / processSwaps); the audio thread touches only the two atomic
-    // flags, so the payload needs no lock. Same store-release / load-acquire handshake
-    // as the per-rhythm swaps above.
-    PreparedFullPreset pendingPreset;
-    std::atomic<bool>  presetReady           { false };
-    std::atomic<bool>  presetBoundaryReached { false };
+    mu_hotswap::Stager<PendingRhythm, PreparedFullPreset, kMaxRhythms> stager;
 
     PluginProcessor& proc_;
 };

@@ -71,7 +71,14 @@ void PluginProcessor::loadPreset(const juce::File& file)
         if (onLoadError) onLoadError(error);
         return;
     }
-    applyStateTree(state);
+    // While playing, stage it for the next bar line (commitDeferredWork); while stopped, apply now.
+    if (transportRunning.load(std::memory_order_relaxed))
+        hotSwap.stageFull(std::move(state));
+    else
+    {
+        for (int i = 0; i < kNumChannels; ++i) hotSwap.cancel(i);   // nothing staged may land on top
+        applyStateTree(state);
+    }
     publishPresetName(file.getFileNameWithoutExtension());   // mu-link mixer display
 }
 
@@ -103,19 +110,44 @@ void PluginProcessor::loadLayerPreset(int layer, const juce::File& file)
         if (onLoadError) onLoadError("Could not read \"" + file.getFileName() + "\"");
         return;
     }
-    const auto tree = juce::ValueTree::fromXml(*xml);
+    // While playing, stage it for the next bar line (commitDeferredWork); while stopped, apply now.
+    auto tree = juce::ValueTree::fromXml(*xml);
+    if (transportRunning.load(std::memory_order_relaxed))
+        hotSwap.stage(layer, std::move(tree));
+    else
+    {
+        hotSwap.cancel(layer);
+        applyLayerTree(layer, tree);
+    }
+}
+
+// Apply a parsed layer preset (the stopped load and the bar-line commit), then tell the editor.
+void PluginProcessor::applyLayerTree(int layer, const juce::ValueTree& tree)
+{
     mu_pp::applyLayerParams(tree, apvts, layerPrefix(layer));
 
     auto& slot = voiceSlots[(size_t) layer];
     mu_pp::clearModulators(slot);
     mu_pp::deserialiseModulators(tree.getChildWithName("Modulators"), slot, {},
                                  [](const std::string& id) { return mu_toni::isValidModDest(id); });
+    if (onLayerPresetLoaded) onLayerPresetLoaded(layer);
+}
+
+// Commit the hot-swaps that reached their bar line: the full preset first (it supersedes the
+// per-layer swaps), then each flagged layer.
+void PluginProcessor::commitDeferredWork()
+{
+    if (hotSwap.consumeFull([this](juce::ValueTree& t) { applyStateTree(t); }) && onPresetSwapCommitted)
+        onPresetSwapCommitted();
+    for (int i = 0; i < kNumChannels; ++i)
+        hotSwap.consume(i, [this, i](juce::ValueTree& t) { applyLayerTree(i, t); });
 }
 
 // Reset a layer: its params back to their defaults and its modulators cleared.
 void PluginProcessor::resetLayer(int layer)
 {
     if (layer < 0 || layer >= kNumChannels) return;
+    hotSwap.cancel(layer);   // a staged swap would re-fill what we're resetting
     mu_pp::applyLayerParams({}, apvts, layerPrefix(layer));
     mu_pp::clearModulators(voiceSlots[(size_t) layer]);
 }

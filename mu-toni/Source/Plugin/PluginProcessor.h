@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Plugin/HotSwap.h"   // mu-core: preset hot-swap staging
 #include "Plugin/ProcessorBase.h"        // mu-core base
 #include "Plugin/MixerFxParams.h"         // mu-core: shared global-FX / mixer APVTS layout
 #include "Plugin/MidiClockSync.h"         // mu-core: shared MIDI-clock slave
@@ -112,23 +113,27 @@ public:
     void loadLayerPreset(int layer, const juce::File& file);
     void resetLayer(int layer);
 
-    // Fired (message thread) after a program change loads a layer preset, so the editor can
-    // refresh that layer. The editor MUST clear this in its destructor.
+    // Fired (message thread) once a layer preset is applied — at once, or at the bar line when
+    // it was staged while playing — so the editor can refresh that layer. The editor MUST clear
+    // this in its destructor.
     std::function<void(int layer)> onLayerPresetLoaded;
+
+    // Hot-swap: a preset loaded while the transport runs is staged and applied at the next bar
+    // line (or at once when playback stops); loaded while stopped, it applies at once.
+    bool hasPendingFullPreset() const override { return hotSwap.hasFullPending(); }
+    bool hasPendingSwap(int layer) const       { return hotSwap.hasPending(layer); }
 
 protected:
     // MIDI program change (drained on the message thread): Ch 1-4 → that layer's preset,
-    // Ch 9 → full preset. Applied immediately, then the editor is told to refresh.
-    void applyMidiPresetSlot(int slot, const juce::File& f) override
-    {
-        loadLayerPreset(slot, f);
-        if (onLayerPresetLoaded) onLayerPresetLoaded(slot);
-    }
+    // Ch 9 → full preset, each through the same hot-swap path as a load from the UI.
+    void applyMidiPresetSlot(int slot, const juce::File& f) override { loadLayerPreset(slot, f); }
     void applyFullMidiPreset(const juce::File& f) override
     {
         loadPreset(f);
-        if (onPresetSwapCommitted) onPresetSwapCommitted();
+        if (! hotSwap.hasFullPending() && onPresetSwapCommitted) onPresetSwapCommitted();
     }
+    // Commit the staged swaps that reached their bar line (message thread).
+    void commitDeferredWork() override;
 
     // ── Arp/voice parameter cache (index into vp[voice][slot]) ────────────────
     // Enum + suffix table live in the .cpp; count is needed here for the array.
@@ -184,6 +189,13 @@ private:
 
     std::atomic<bool>   playing { false };
     std::atomic<double> internalBeatPos { 0.0 };
+
+    // Hot-swap staging: parsed preset trees per layer + one full preset. transportRunning is the
+    // audio thread's play state (host, MIDI clock or internal), read when a load decides to stage.
+    void applyLayerTree(int layer, const juce::ValueTree& tree);
+    mu_hotswap::Stager<juce::ValueTree, juce::ValueTree, kNumChannels> hotSwap;
+    std::atomic<bool> transportRunning { false };
+    bool              swapWasPlaying = false;   // audio thread only — the play→stop edge
     std::atomic<double> internalBpm { 120.0 };
     double currentSampleRate = 44100.0;
 
