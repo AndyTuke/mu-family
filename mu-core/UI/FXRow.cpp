@@ -97,33 +97,6 @@ void FXRow::setKnobsVisible(bool visible)
     repaint();
 }
 
-void FXRow::setShowSizeDemo(bool show)
-{
-    showSizeDemo = show;
-
-    if (show && sizeDemoKnobs[0] == nullptr)
-    {
-        // Create four sample knobs, one per canonical Size bucket. Labels
-        // "Size 1".."Size 4" carry the bucket identity into the StatusBar
-        // and the visible knob label below each circle.
-        const juce::String labels[4] = { "Size 1", "Size 2", "Size 3", "Size 4" };
-        for (int i = 0; i < 4; ++i)
-        {
-            sizeDemoKnobs[(size_t) i] = std::make_unique<KnobWithLabel>(
-                labels[i], MuLookAndFeel::knobPan);
-            sizeDemoKnobs[(size_t) i]->setRange(0.0, 100.0, 1.0);
-            sizeDemoKnobs[(size_t) i]->setValue(50.0, juce::dontSendNotification);
-            addAndMakeVisible(*sizeDemoKnobs[(size_t) i]);
-        }
-    }
-
-    for (auto& k : sizeDemoKnobs)
-        if (k != nullptr) k->setVisible(show);
-
-    resized();
-    repaint();
-}
-
 void FXRow::resized()
 {
     // Every literal pixel value goes through mu_ui::s() so toggling the UI
@@ -157,56 +130,31 @@ void FXRow::resized()
             x += knobW;
         }
     }
-
-    // Size-demo cluster — anchored to the RIGHT end of the row so it sits in
-    // the otherwise-empty space after the algorithm knobs. Each knob renders
-    // at its bucket's actual W × H, vertically centred in the row. Order is
-    // Size 1 → Size 4 left-to-right with a small gap between.
-    if (showSizeDemo)
-    {
-        const int demoGap = s(6);
-        const int sizes[4][2] = {
-            { MuLookAndFeel::kKnobSize1W, MuLookAndFeel::kKnobSize1H },
-            { MuLookAndFeel::kKnobSize2W, MuLookAndFeel::kKnobSize2H },
-            { MuLookAndFeel::kKnobSize3W, MuLookAndFeel::kKnobSize3H },
-            { MuLookAndFeel::kKnobSize4W, MuLookAndFeel::kKnobSize4H },
-        };
-
-        int totalW = 0;
-        for (int i = 0; i < 4; ++i) totalW += s(sizes[i][0]);
-        totalW += demoGap * 3;
-
-        int dx = getWidth() - s(kPadding) - totalW;
-        for (int i = 0; i < 4; ++i)
-        {
-            const int kw = s(sizes[i][0]);
-            const int kh = s(sizes[i][1]);
-            const int ky = (h - kh) / 2;
-            const juce::Rectangle<int> bounds { dx, ky, kw, kh };
-            sizeDemoBounds[(size_t) i] = bounds;
-            if (sizeDemoKnobs[(size_t) i] != nullptr)
-                sizeDemoKnobs[(size_t) i]->setBounds(bounds);
-            dx += kw + demoGap;
-        }
-    }
 }
 
 void FXRow::paint(juce::Graphics& g)
 {
-    // Row background
-    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
-    g.fillRect(getLocalBounds());
-
-    // Bottom separator line
-    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::segmentInactiveBorder));
-    g.drawLine(0.0f, static_cast<float>(getHeight() - 1),
-               static_cast<float>(getWidth()), static_cast<float>(getHeight() - 1), 0.5f);
-
-    // Slot name label
-    const int nameX = kPadding + kToggleW + kPadding;
+    // Metal style: the row sits in a raised box the mixer paints behind it, its name engraved.
+    const bool metal = MuLookAndFeel::isMetal(*this);
+    const int  nameX = kPadding + kToggleW + kPadding;
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::labelText));
-    g.drawText(slotName, nameX, 0, kNameW, getHeight(), juce::Justification::centredLeft);
+    if (metal)
+    {
+        MuLookAndFeel::drawEngravedText(g, slotName, { nameX, 0, kNameW, getHeight() },
+                                        juce::Justification::centredLeft,
+                                        MuLookAndFeel::colour(MuLookAndFeel::labelText), false);
+    }
+    else
+    {
+        // Row background, bottom separator line, slot name.
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
+        g.fillRect(getLocalBounds());
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::segmentInactiveBorder));
+        g.drawLine(0.0f, static_cast<float>(getHeight() - 1),
+                   static_cast<float>(getWidth()), static_cast<float>(getHeight() - 1), 0.5f);
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::labelText));
+        g.drawText(slotName, nameX, 0, kNameW, getHeight(), juce::Justification::centredLeft);
+    }
 
     // Dim overlay when disabled
     if (!isEnabled)
@@ -215,16 +163,6 @@ void FXRow::paint(juce::Graphics& g)
         g.fillRect(getLocalBounds());
     }
 
-    // Size-demo outlines — bright cyan-teal rectangle around each demo knob's
-    // actual bounds so the rendered cell W × H per bucket is visible at a
-    // glance. Drawn last so the disabled-row dim overlay doesn't grey them out.
-    if (showSizeDemo)
-    {
-        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::knobPrePad));
-        for (const auto& r : sizeDemoBounds)
-            if (!r.isEmpty())
-                g.drawRect(r, 1);
-    }
 }
 
 void FXRow::rebuildKnobs(int algorithmIndex)

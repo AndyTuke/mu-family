@@ -243,19 +243,30 @@ void DelayRow::resized()
 
 void DelayRow::paint(juce::Graphics& g)
 {
-    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
-    g.fillRect(getLocalBounds());
-
-    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::segmentInactiveBorder));
-    g.drawLine(0.0f, static_cast<float>(getHeight() - 1),
-               static_cast<float>(getWidth()), static_cast<float>(getHeight() - 1), 0.5f);
+    // Metal style: the row sits in a raised box the mixer paints behind it, its name engraved.
+    const bool metal = MuLookAndFeel::isMetal(*this);
+    if (! metal)
+    {
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
+        g.fillRect(getLocalBounds());
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::segmentInactiveBorder));
+        g.drawLine(0.0f, static_cast<float>(getHeight() - 1),
+                   static_cast<float>(getWidth()), static_cast<float>(getHeight() - 1), 0.5f);
+    }
 
     if (showHeader)
     {
         const int nameX = kPad + kToggleW + kPad;
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::labelText));
-        g.drawText("Delay", nameX, 0, kNameW, getHeight(), juce::Justification::centredLeft);
+        if (metal)
+            MuLookAndFeel::drawEngravedText(g, "Delay", { nameX, 0, kNameW, getHeight() },
+                                            juce::Justification::centredLeft,
+                                            MuLookAndFeel::colour(MuLookAndFeel::labelText), false);
+        else
+        {
+            g.setColour(MuLookAndFeel::colour(MuLookAndFeel::labelText));
+            g.drawText("Delay", nameX, 0, kNameW, getHeight(), juce::Justification::centredLeft);
+        }
     }
 
     if (!isEnabled)

@@ -178,14 +178,6 @@ void MixerOverlay::wireFXRows()
     effectRow.setEnabled(eff.isEnabled());
     effectRow.setSelectedAlgorithm(eff.getAlgorithmIndex());
 
-#if JUCE_DEBUG
-    // Debug visual — Size 1..4 knob demo at the right end of the Effect row
-    // so the user can compare the four canonical knob size buckets at a
-    // glance. Each knob is outlined at its actual rendered bounds. Only
-    // compiled into Debug builds; Release ships without the demo cluster.
-    effectRow.setShowSizeDemo(true);
-#endif
-
     effectRow.onEnabledChanged = [this](bool e) {
         if (auto* p = proc.apvts.getParameter("eff_en"))
             p->setValueNotifyingHost(e ? 1.0f : 0.0f);
@@ -700,15 +692,26 @@ void MixerOverlay::resized()
     const int masterActualW = juce::jmax(masterTotalW, w - x);
     masterChannel.setBounds(x, hdrH, masterActualW, stripH);
 
-    // FX rows below the channel strips
+    // FX rows below the channel strips. Metal style: each row in a raised box inset clear of
+    // the rack panel's corner screws, the row's own content moved in clear of the box's screws.
+    stripsPanelR = { 0, hdrH, w, stripH };
+    fxPanelR     = { 0, hdrH + stripH, w, fxAreaH };
+    const bool metal  = MuLookAndFeel::isMetal(*this);
+    const int  rowX   = metal ? s(MuLookAndFeel::kScrewedPanelInset) : fxPad;
+    const int  rowW   = w - 2 * rowX;
+    const int  inX    = metal ? juce::jmax(0, s(MuLookAndFeel::kSubPanelScrewClear) - s(FXRow::kPadding)) : 0;
+    const int  inY    = metal ? s(2) : 0;
     int fy = hdrH + stripH + fxPad;
+    for (auto& box : fxRowBoxR)
+    {
+        box = { rowX, fy, rowW, fxRowH };
+        fy += fxRowH + fxGap;
+    }
     const int fxHeaderW = s(FXRow::kHeaderWidth);
-    effectRow.setBounds(fxPad, fy, w - fxPad * 2, fxRowH);
-    echoRow.setBounds(fxPad + fxHeaderW, fy,
-                      juce::jmax(0, w - fxPad * 2 - fxHeaderW), fxRowH);
-    fy += fxRowH + fxGap;
-    delayRow .setBounds(fxPad, fy, w - fxPad * 2, fxRowH);  fy += fxRowH + fxGap;
-    reverbRow.setBounds(fxPad, fy, w - fxPad * 2, fxRowH);
+    effectRow.setBounds(fxRowBoxR[0].reduced(inX, inY));
+    echoRow  .setBounds(fxRowBoxR[0].reduced(inX, inY).withTrimmedLeft(fxHeaderW));
+    delayRow .setBounds(fxRowBoxR[1].reduced(inX, inY));
+    reverbRow.setBounds(fxRowBoxR[2].reduced(inX, inY));
 }
 
 void MixerOverlay::propagateMeterMode(VUMeter::MeterMode m)
@@ -720,9 +723,93 @@ void MixerOverlay::propagateMeterMode(VUMeter::MeterMode m)
     masterChannel.setMeterMode(m);
 }
 
+void MixerOverlay::paintMetal(juce::Graphics& g)
+{
+    using mu_ui::s;
+    g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
+    g.fillAll();
+
+    // The strips and the FX rack each on a metal panel in the app colour.
+    const auto accent = MuLookAndFeel::appAccent(*this);
+    for (auto r : { stripsPanelR, fxPanelR })
+        MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), accent);
+
+    // An engraved groove: a dark line with a light one just below / right of it.
+    const auto& L = MuLookAndFeel::lighting();
+    auto grooveH = [&](int y, int x1, int x2)
+    {
+        g.setColour(juce::Colours::black.withAlpha(L.shadow(L.ringTrack)));
+        g.fillRect(x1, y, x2 - x1, 1);
+        g.setColour(juce::Colours::white.withAlpha(L.highlight(L.lampHot) * 0.3f));
+        g.fillRect(x1, y + 1, x2 - x1, 1);
+    };
+    auto grooveV = [&](int x, int y1, int y2)
+    {
+        g.setColour(juce::Colours::black.withAlpha(L.shadow(L.ringTrack)));
+        g.fillRect(x, y1, 1, y2 - y1);
+        g.setColour(juce::Colours::white.withAlpha(L.highlight(L.lampHot) * 0.3f));
+        g.fillRect(x + 1, y1, 1, y2 - y1);
+    };
+
+    // Strip sections: labels engraved on the label panel, a groove across the strips above each.
+    if (! rhythmChannels.empty())
+    {
+        auto* refCh = rhythmChannels[0].get();
+        const int chY = stripsPanelR.getY();
+        const int lw  = s(kLabelPanelW);
+        const int x2  = stripsPanelR.getRight() - s(2);
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+        auto section = [&](const juce::String& text, juce::Rectangle<int> b)
+        {
+            if (b.isEmpty()) return;
+            grooveH(chY + b.getY(), lw, x2);
+            if (b.getHeight() < 14) return;
+            // Label rotated 90° CCW, centred in its band.
+            const juce::Rectangle<int> r { 0, chY + b.getY(), lw, b.getHeight() };
+            g.saveState();
+            g.addTransform(juce::AffineTransform::rotation(-juce::MathConstants<float>::halfPi,
+                                                           (float) r.getCentreX(), (float) r.getCentreY()));
+            MuLookAndFeel::drawEngravedText(g, text,
+                juce::Rectangle<int>(r.getCentreX() - r.getHeight() / 2, r.getCentreY() - r.getWidth() / 2,
+                                     r.getHeight(), r.getWidth()),
+                juce::Justification::centred, MuLookAndFeel::colour(MuLookAndFeel::labelText), false);
+            g.restoreState();
+        };
+        section("Side Chain", refCh->getSidechainPaneBounds());
+        section("Sends",      refCh->getSendsPaneBounds());
+        section("Levels",     refCh->getFaderPaneBounds());
+        if (! refCh->getOutBusBounds().isEmpty())
+            section("Output", refCh->getOutBusBounds());
+    }
+
+    // Grooves between the channels, the returns and the master.
+    const int y1 = stripsPanelR.getY() + s(4), y2 = stripsPanelR.getBottom() - s(4);
+    grooveV(lastDivX1 + s(kDivW) / 2, y1, y2);
+    grooveV(lastDivX2 + s(kDivW) / 2, y1, y2);
+
+    // FX rows: raised boxes (shadows first, then faces), with corner screws.
+    for (const auto& b : fxRowBoxR)
+        MuLookAndFeel::drawRaisedSubPanelShadow(g, b.toFloat());
+    for (const auto& b : fxRowBoxR)
+    {
+        MuLookAndFeel::drawRaisedSubPanel(g, b.toFloat(), accent);
+        if (MuLookAndFeel::hasScrews(*this))
+            MuLookAndFeel::drawSubPanelScrews(g, b.toFloat());
+    }
+}
+
+void MixerOverlay::paintOverChildren(juce::Graphics& g)
+{
+    if (! MuLookAndFeel::isMetal(*this) || ! MuLookAndFeel::hasScrews(*this)) return;
+    for (auto r : { stripsPanelR, fxPanelR })
+        MuLookAndFeel::drawPanelScrews(g, r.reduced(2).toFloat());
+}
+
 void MixerOverlay::paint(juce::Graphics& g)
 {
     using mu_ui::sf;
+    if (MuLookAndFeel::isMetal(*this)) { paintMetal(g); return; }
+
     g.setColour(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
     g.fillAll();
 

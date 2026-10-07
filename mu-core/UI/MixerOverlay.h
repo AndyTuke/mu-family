@@ -10,6 +10,7 @@
 #include <atomic>
 #include <vector>
 #include <memory>
+#include <array>
 
 // Full mixer view: rhythm channel strips | Effect/Delay/Reverb returns | Master
 // + three FX rows (Effect, Delay, Reverb) below the strips.
@@ -40,6 +41,8 @@ public:
 
     void resized() override;
     void paint(juce::Graphics&) override;
+    void paintOverChildren(juce::Graphics&) override;   // metal style: panel screws over the content
+    void lookAndFeelChanged() override { resized(); repaint(); }   // metal style changes the layout
 
 private:
     ProcessorBase& proc;
@@ -72,6 +75,11 @@ private:
     int lastFXAreaH = 278;
     int lastFXRowH  = 82;
     int lastStripH  = 400;
+
+    // Metal style, set by resized(): the strips and FX-rack panels and each FX row's raised box.
+    juce::Rectangle<int> stripsPanelR, fxPanelR;
+    std::array<juce::Rectangle<int>, 3> fxRowBoxR;
+    void paintMetal(juce::Graphics&);
 
     SegmentControl meterModeCtrl { {"Peak", "VU", "K-12", "K-14"} };
 
