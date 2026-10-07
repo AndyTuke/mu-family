@@ -118,8 +118,22 @@ namespace ModDest
         { "_reserved.voc.unison","(reserved)", nullptr, nullptr },
         // ── T5 follow-up (idx 44+) ─────────────────────────────────────────────
         { "filter.lowCut",       "Filter Low Cut", "Filter", "fltLoCut" },
+        // ── Mixer strip (idx 45–48): pan + FX sends — the mixer channel's ch{N}_ params ─
+        { "amp.pan",          "Pan", "Amp", "pan" },
+        { "send.effect",      "Effect Send", "Effects", "sendEff" },
+        { "send.delay",       "Delay Send", "Effects", "sendDly" },
+        { "send.reverb",      "Reverb Send", "Effects", "sendRev" },
     };
     static constexpr int kTableSize = (int)(sizeof(kTable) / sizeof(kTable[0]));
+
+    // True for a target that drives the mixer channel (ch{N}_ pan / sends) rather than a
+    // per-rhythm r{N}_ parameter.
+    inline bool isMixerStripParam(const char* param) noexcept
+    {
+        for (const char* s : { "pan", "sendEff", "sendDly", "sendRev" })
+            if (std::strcmp(param, s) == 0) return true;
+        return false;
+    }
 
     // validate that `destId` resolves to a known destination. Returns the
     // dropdown alias (for diagnostic messages) when found, nullptr otherwise.

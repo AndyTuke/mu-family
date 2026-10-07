@@ -64,10 +64,10 @@ public:
         }
 
         // ── kRhythmParamDefs - AlgorithmIndex entries have non-null tables ────
-        beginTest ("Modulation targets: every live row names a real per-rhythm parameter");
+        beginTest ("Modulation targets: every live row names a real per-rhythm (or mixer-strip) parameter");
         {
             for (const auto& t : ModDest::kTable)
-                if (t.param != nullptr)
+                if (t.param != nullptr && ! ModDest::isMixerStripParam (t.param))
                     expect (mu_pp::findRhythmParamDef (t.param) != nullptr,
                             juce::String ("target '") + t.id + "' names unknown parameter '" + t.param + "'");
         }

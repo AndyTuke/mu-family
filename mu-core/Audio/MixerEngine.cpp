@@ -214,7 +214,7 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         }
 
         applyPanGain(buf, ch.level.load(std::memory_order_relaxed),
-                          ch.pan.load(std::memory_order_relaxed), numSamples);
+                          ChannelState::effective(ch.pan, ch.panMod), numSamples);
         channelPeaks[r].store(peakOf(buf, numSamples));
 
         const int bus = ch.outputBus.load(std::memory_order_relaxed);  // 0 = master, 1..8 = direct out
@@ -225,9 +225,9 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                 for (int c = 0; c < numOutCh; ++c)
                     output.addFrom(c, 0, buf, c, 0, numSamples);
 
-            const float sEff = ch.sendEffect.load(std::memory_order_relaxed);
-            const float sDly = ch.sendDelay.load(std::memory_order_relaxed);
-            const float sRev = ch.sendReverb.load(std::memory_order_relaxed);
+            const float sEff = ChannelState::effective(ch.sendEffect, ch.sendEffectMod);
+            const float sDly = ChannelState::effective(ch.sendDelay,  ch.sendDelayMod);
+            const float sRev = ChannelState::effective(ch.sendReverb, ch.sendReverbMod);
             if (sEff > 0.0f)
                 for (int c = 0; c < numOutCh; ++c)
                     effectSendBuf.addFrom(c, 0, buf, c, 0, numSamples, sEff);

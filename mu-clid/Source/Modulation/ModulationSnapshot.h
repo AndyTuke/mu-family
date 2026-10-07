@@ -26,5 +26,7 @@ enum ModSnapIdx : int
     // T5 follow-up — new mod destinations introduced after audit.
     kSnapFilterLowCut,
     kSnapPitchOctave,
+    // Mixer strip: pan (-1..+1) and the three FX sends (0..1), actual values.
+    kSnapPan, kSnapSendEff, kSnapSendDly, kSnapSendRev,
     kSnapCount
 };

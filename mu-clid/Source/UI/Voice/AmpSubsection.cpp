@@ -30,7 +30,7 @@ static juce::String adsrValueStr(double v)
 
 AmpSubsection::AmpSubsection(PluginProcessor& p) : proc(p)
 {
-    for (auto* k : { &ampLevel, &ampSendEff, &ampSendDly, &ampSendRev, &ampAccent,
+    for (auto* k : { &ampLevel, &ampSendEff, &ampSendDly, &ampSendRev, &ampAccent, &ampPan,
                      &ampAtk, &ampDec, &ampSus, &ampRel })
         addAndMakeVisible(k);
 
@@ -42,6 +42,9 @@ AmpSubsection::AmpSubsection(PluginProcessor& p) : proc(p)
     ampSendDly.setRange(0.0, 1.0, 0.01);    ampSendDly.setValue(0.0);
     ampSendRev.setRange(0.0, 1.0, 0.01);    ampSendRev.setValue(0.0);
     ampAccent .setRange(0.0, 12.0, 0.1);    ampAccent .setValue(0.0);
+    // Pan as on the mixer strip: -1 (L) … +1 (R), no value text on the knob.
+    ampPan    .setRange(-1.0, 1.0, 0.01);   ampPan    .setValue(0.0);
+    ampPan.getSlider().textFromValueFunction = [](double) { return juce::String(); };
     ampAtk    .setRange(0.0, 10.0,  0.001); ampAtk .setValue(0.005); ampAtk.getSlider().setSkewFactor(0.3);
     ampDec    .setRange(0.0, 10.0,  0.001); ampDec .setValue(0.3);   ampDec.getSlider().setSkewFactor(0.3);
     ampSus    .setRange(0.0, 100.0, 0.1);   ampSus .setValue(80.0);
@@ -147,6 +150,11 @@ void AmpSubsection::wireCallbacks()
         const double v = ampRel.getValue();
         if (onStatusUpdate) onStatusUpdate("Amp Release", v >= 10.0 ? "End" : formatAdsrTimeSec(v));
     };
+    ampPan.onStatusUpdate = [this](const juce::String&, const juce::String&) {
+        const int v = (int) std::round(ampPan.getValue() * 100.0);
+        if (onStatusUpdate) onStatusUpdate("Pan", v == 0 ? juce::String("C")
+                                                         : (v < 0 ? "L " : "R ") + juce::String(std::abs(v)));
+    };
     ampAccent.onStatusUpdate = [this](const juce::String&, const juce::String&) {
         if (onStatusUpdate) onStatusUpdate("Amp Accent", juce::String(ampAccent.getValue(), 1) + " dB");
     };
@@ -179,6 +187,7 @@ void AmpSubsection::wireCallbacks()
     ampSendEff.onValueChanged = [writeChannelSend](double v) { writeChannelSend("sendEff", v); };
     ampSendDly.onValueChanged = [writeChannelSend](double v) { writeChannelSend("sendDly", v); };
     ampSendRev.onValueChanged = [writeChannelSend](double v) { writeChannelSend("sendRev", v); };
+    ampPan    .onValueChanged = [writeChannelSend](double v) { writeChannelSend("pan",     v); };
 }
 
 void AmpSubsection::setRhythm(int ri)
@@ -210,6 +219,7 @@ void AmpSubsection::loadFromRhythm()
     load(ampSendEff, "sendEff");
     load(ampSendDly, "sendDly");
     load(ampSendRev, "sendRev");
+    load(ampPan,     "pan");
 }
 
 void AmpSubsection::refreshSuffix(const juce::String& suffix)
@@ -224,14 +234,15 @@ void AmpSubsection::refreshSuffix(const juce::String& suffix)
     else if (suffix == "aEnvDec")  { ampDec.setValue(p.ampEnvDec, dn); }
     else if (suffix == "aEnvSus")  ampSus   .setValue(p.ampEnvSus * 100.0,                     dn);
     else if (suffix == "aEnvRel")  { const double rv = p.ampRelToEnd ? 10.0 : p.ampEnvRel; ampRel.setValue(rv, dn); }
-    else if (suffix == "sendEff" || suffix == "sendDly" || suffix == "sendRev")
+    else if (suffix == "sendEff" || suffix == "sendDly" || suffix == "sendRev" || suffix == "pan")
     {
         const auto chPfx = "ch" + juce::String(rhythmIndex) + "_";
         if (auto* raw = proc.apvts.getRawParameterValue(chPfx + suffix))
         {
             if      (suffix == "sendEff") ampSendEff.setValue(*raw, dn);
             else if (suffix == "sendDly") ampSendDly.setValue(*raw, dn);
-            else                          ampSendRev.setValue(*raw, dn);
+            else if (suffix == "sendRev") ampSendRev.setValue(*raw, dn);
+            else                          ampPan    .setValue(*raw, dn);
         }
     }
 }
@@ -240,7 +251,8 @@ void AmpSubsection::bindModulationIndicators()
 {
     if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms())
     {
-        for (auto* k : { &ampAtk, &ampDec, &ampSus, &ampLevel, &ampAccent })
+        for (auto* k : { &ampAtk, &ampDec, &ampSus, &ampLevel, &ampAccent,
+                         &ampPan, &ampSendEff, &ampSendDly, &ampSendRev })
             k->clearModBinding();
         return;
     }
@@ -267,6 +279,15 @@ void AmpSubsection::bindModulationIndicators()
     ampAccent.bindModulation("accentDb", mx,
         [&proc = proc, ri = rhythmIndex]() -> float {
             return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapAccent) : kNaN; });
+    // Mixer strip: pan + FX sends — snap stores the actual value (pan -1..+1, sends 0..1).
+    struct { KnobWithLabel* k; const char* dest; ModSnapIdx snap; } strip[] = {
+        { &ampPan,     "amp.pan",     kSnapPan     }, { &ampSendEff, "send.effect", kSnapSendEff },
+        { &ampSendDly, "send.delay",  kSnapSendDly }, { &ampSendRev, "send.reverb", kSnapSendRev },
+    };
+    for (auto& e : strip)
+        e.k->bindModulation(e.dest, mx,
+            [&proc = proc, ri = rhythmIndex, snap = e.snap]() -> float {
+                return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, snap) : kNaN; });
     // ampRel: Release is not a modulation target — leave unbound.
 }
 
@@ -285,10 +306,11 @@ void AmpSubsection::resized()
     constexpr int row2Y = rowH + gap;
 
     using mu_ui::s;
-    // Row 1: Level / Accent (both shape the amplitude per hit). The FX sends are
-    // placed by the host, beside the insert dropdown.
+    // Row 1: Level / Accent (both shape the amplitude per hit), Pan top right. The FX
+    // sends are placed by the host, beside the insert dropdown.
     ampLevel  .setBounds(s(0 * kW), 0,        s(kW), s(rowH));
     ampAccent .setBounds(s(1 * kW), 0,        s(kW), s(rowH));
+    ampPan    .setBounds(s(3 * kW), 0,        s(kW), s(rowH));
 
     ampAtk.setBounds(s(0 * kW), s(row2Y), s(kW), s(rowH));
     ampDec.setBounds(s(1 * kW), s(row2Y), s(kW), s(rowH));

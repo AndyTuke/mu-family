@@ -20,6 +20,8 @@ juce_add_plugin(mu-toni
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     VERSION         "${MUFAMILY_PLUGIN_VERSION}"
     COMPANY_COPYRIGHT "${MUFAMILY_COPYRIGHT}"
+    ICON_BIG   "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
+    ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
 )
 
 target_sources(mu-toni

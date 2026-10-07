@@ -16,7 +16,10 @@
 //   label   — the destination-dropdown text
 //   section — the dropdown heading it sits under (nullptr = no heading)
 //   param   — the parameter it drives: its id without the product's per-channel prefix
-//             (nullptr for a reserved / retired slot kept so table indices don't shift)
+//             (nullptr for a reserved / retired slot kept so table indices don't shift).
+//             Mixer-strip targets (pan, FX sends) name the mixer channel's parameter
+//             (ch{N}_pan, ch{N}_sendEff, ...) by its suffix; the product applies them through
+//             the MixerEngine channel's per-block modulation overrides.
 // New targets are appended as one row.
 namespace mu_mod
 {

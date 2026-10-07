@@ -98,6 +98,9 @@ Amp envelope is the SINGLE ADSR `ampEnv` ([VoiceEngine.h:93-104](../../mu-core/A
 | Env Sustain      | 0–100     | %    | `aEnvSus`    |
 | Env Release      | 0–10      | s    | `aEnvRel`    |
 | Accent           | 0–12      | dB   | `accentDb`   |
+| Pan              | −1..+1    | L/R  | `ch{N}_pan` (the mixer strip's — same parameter) |
+
+**Pan + FX sends in the voice band**: the Amp box's Pan knob and the Effects box's Effect / Delay / Reverb sends are the mixer channel strip's own parameters (`ch{N}_pan`, `ch{N}_sendEff` / `sendDly` / `sendRev`), so the voice band and the mixer always agree. All four are modulation targets (`amp.pan`, `send.effect`, `send.delay`, `send.reverb`): the per-rhythm modulation pass seeds them from the mixer channel and hands the modulated values to the mixer for the block through `MixerEngine::ChannelState`'s `panMod` / `send*Mod` overrides (NaN = unmodulated), so the knobs and saved values are untouched.
 
 **Release-to-end mode**: setting Release to its max (10 s in storage) flips `ampRelToEnd = true`. In that mode the env is NOT note-off'd on retire; the sample plays through to its natural end at the current env level. `isFullyDrained` switches to a voices-only drain criterion in this mode ([VoiceEngine.cpp:265-273](../../mu-core/Audio/VoiceEngine.cpp#L265-L273)).
 

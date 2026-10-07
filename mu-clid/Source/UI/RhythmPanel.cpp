@@ -50,8 +50,9 @@ const char* const kVoiceSuffixes[] = {
     "drvChar", "drvDrv", "drvOut", "drvDit", "drvTon", "eqMidGain", "drvBits", "drvRate"
 };
 
-// Send knob params — use ch{ri}_ prefix (shared with mixer channel strip).
-const char* const kSendSuffixes[] = { "sendEff", "sendDly", "sendRev" };
+// Mixer-strip params shown in the voice band (FX sends + pan) — ch{ri}_ prefix, shared with
+// the mixer channel strip.
+const char* const kSendSuffixes[] = { "sendEff", "sendDly", "sendRev", "pan" };
 
 } // namespace
 

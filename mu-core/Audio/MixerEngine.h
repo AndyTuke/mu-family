@@ -1,4 +1,6 @@
 #pragma once
+#include <cmath>
+#include <limits>
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <atomic>
 #include <functional>
@@ -68,6 +70,20 @@ public:
         std::atomic<float> sendEffect { 0.0f };
         std::atomic<float> sendDelay  { 0.0f };
         std::atomic<float> sendReverb { 0.0f };
+        // Modulated pan / sends for the current block, written by the product's modulation pass
+        // (kNoMod = not modulated: use the values above). Never saved — the parameters keep the
+        // knob positions.
+        static constexpr float kNoMod = std::numeric_limits<float>::quiet_NaN();
+        std::atomic<float> panMod        { kNoMod };
+        std::atomic<float> sendEffectMod { kNoMod };
+        std::atomic<float> sendDelayMod  { kNoMod };
+        std::atomic<float> sendReverbMod { kNoMod };
+        // The value to use this block: the modulated one when set, else the knob's.
+        static float effective(const std::atomic<float>& base, const std::atomic<float>& mod) noexcept
+        {
+            const float m = mod.load(std::memory_order_relaxed);
+            return std::isnan(m) ? base.load(std::memory_order_relaxed) : m;
+        }
         std::atomic<bool>  mute       { false };
         std::atomic<bool>  solo       { false };
         // Sidechain ducking
@@ -88,6 +104,10 @@ public:
             sendEffect.store(o.sendEffect.load(std::memory_order_relaxed), std::memory_order_relaxed);
             sendDelay.store(o.sendDelay.load(std::memory_order_relaxed), std::memory_order_relaxed);
             sendReverb.store(o.sendReverb.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            panMod.store(o.panMod.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            sendEffectMod.store(o.sendEffectMod.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            sendDelayMod.store(o.sendDelayMod.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            sendReverbMod.store(o.sendReverbMod.load(std::memory_order_relaxed), std::memory_order_relaxed);
             mute.store(o.mute.load(std::memory_order_relaxed), std::memory_order_relaxed);
             solo.store(o.solo.load(std::memory_order_relaxed), std::memory_order_relaxed);
             sidechainSource.store(o.sidechainSource.load(std::memory_order_relaxed), std::memory_order_relaxed);
@@ -106,6 +126,8 @@ public:
             sendEffect.store(0.0f, std::memory_order_relaxed);
             sendDelay.store(0.0f, std::memory_order_relaxed);
             sendReverb.store(0.0f, std::memory_order_relaxed);
+            for (auto* m : { &panMod, &sendEffectMod, &sendDelayMod, &sendReverbMod })
+                m->store(kNoMod, std::memory_order_relaxed);
             mute.store(false, std::memory_order_relaxed);
             solo.store(false, std::memory_order_relaxed);
             sidechainSource.store(-1, std::memory_order_relaxed);
@@ -216,6 +238,10 @@ public:
         swapF(a.sendEffect,         b.sendEffect);
         swapF(a.sendDelay,          b.sendDelay);
         swapF(a.sendReverb,         b.sendReverb);
+        swapF(a.panMod,             b.panMod);
+        swapF(a.sendEffectMod,      b.sendEffectMod);
+        swapF(a.sendDelayMod,       b.sendDelayMod);
+        swapF(a.sendReverbMod,      b.sendReverbMod);
         swapB(a.mute,               b.mute);
         swapB(a.solo,               b.solo);
         swapI(a.sidechainSource,    b.sidechainSource);

@@ -93,7 +93,9 @@ PluginProcessor::PluginProcessor()
                               "euclid.b.insSt", "euclid.b.insLen",
                               "euclid.c.hits", "euclid.c.rotate",
                               "euclid.c.prePad", "euclid.c.postPad",
-                              "euclid.c.insSt", "euclid.c.insLen" })
+                              "euclid.c.insSt", "euclid.c.insLen",
+                              "filter.lowCut",
+                              "amp.pan", "send.effect", "send.delay", "send.reverb" })
         modParamValues[key] = 0.0f;
 
     // Add default rhythm (16 steps, 4 hits) and sync its state to APVTS.
@@ -612,7 +614,25 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
             modParamValues["euclid.c.insSt"]   = (float) rhythm.genC.insertStart  / (float) juce::jmax(1, stepsC_seed - 1);
             modParamValues["euclid.c.insLen"]  = propOf(rhythm.genC.insertLength, padMaxC.insertLength);
 
+            // Mixer strip: pan + FX sends, seeded from the mixer channel as proportions of
+            // their knobs (pan -1..+1 → 0..1; sends are 0..1 already).
+            auto& strip = mixerEngine.channels[(size_t) r];
+            modParamValues["amp.pan"]     = (strip.pan.load(std::memory_order_relaxed) + 1.0f) * 0.5f;
+            modParamValues["send.effect"] = strip.sendEffect.load(std::memory_order_relaxed);
+            modParamValues["send.delay"]  = strip.sendDelay.load(std::memory_order_relaxed);
+            modParamValues["send.reverb"] = strip.sendReverb.load(std::memory_order_relaxed);
+
             rhythm.modulationMatrix.process(rhythm.controlSequences, beatPos, modParamValues);
+
+            // Hand the modulated strip values to the mixer for this block.
+            const float modPan = juce::jlimit(-1.0f, 1.0f, modParamValues["amp.pan"] * 2.0f - 1.0f);
+            const float modEff = juce::jlimit(0.0f, 1.0f, modParamValues["send.effect"]);
+            const float modDly = juce::jlimit(0.0f, 1.0f, modParamValues["send.delay"]);
+            const float modRev = juce::jlimit(0.0f, 1.0f, modParamValues["send.reverb"]);
+            strip.panMod       .store(modPan, std::memory_order_relaxed);
+            strip.sendEffectMod.store(modEff, std::memory_order_relaxed);
+            strip.sendDelayMod .store(modDly, std::memory_order_relaxed);
+            strip.sendReverbMod.store(modRev, std::memory_order_relaxed);
 
             rhythm.modLock.store(false, std::memory_order_release);
 
@@ -674,6 +694,11 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
                 // sums it with pitch.semitones into pitchMod). To show the arc on the pitchOctave knob (range -4..+4
                 // octaves, linear), store base octave value + offset/12. UI uses setModulatedActual.
                 snap[kSnapPitchOctave] .store(modParams.pitchOctave + modParamValues["pitch.octave"] * kPitchOctave.width());
+                // Mixer strip: the actual pan (-1..+1) and send (0..1) values.
+                snap[kSnapPan]         .store(modPan);
+                snap[kSnapSendEff]     .store(modEff);
+                snap[kSnapSendDly]     .store(modDly);
+                snap[kSnapSendRev]     .store(modRev);
                 // Euclid pattern destinations:
                 //   hits/rotate/insSt: proportion-space mod (modParamValues already holds 0..1
                 //     slider proportion). snap stores the proportion directly — UI uses
@@ -762,6 +787,14 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
             lastEuclidOverrides[r].c.insertStart  = juce::jlimit(0, stepsC_wb - 1,    modPropToSteps("euclid.c.insSt", stepsC_wb - 1));
             lastEuclidOverrides[r].c.insertLength = modPropToSteps("euclid.c.insLen", padMaxC.insertLength);
         }
+    }
+
+    // No modulation this block: the mixer uses the strip's own pan / sends.
+    if (! runModulationPass)
+    {
+        auto& strip = mixerEngine.channels[(size_t) r];
+        for (auto* m : { &strip.panMod, &strip.sendEffectMod, &strip.sendDelayMod, &strip.sendReverbMod })
+            m->store(MixerEngine::ChannelState::kNoMod, std::memory_order_relaxed);
     }
 
     // Stage B: trigger pattern recompute when integer-rounded overrides changed

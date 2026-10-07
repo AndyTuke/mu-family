@@ -43,6 +43,8 @@ private:
     KnobWithLabel ampSendDly { "Delay",        Id::knobFxSend };
     KnobWithLabel ampSendRev { "Reverb",       Id::knobFxSend };
     KnobWithLabel ampAccent  { "Accent",       Id::knobLevel  };
+    // The mixer strip's pan (same ch{N}_pan parameter), so the two knobs move together.
+    KnobWithLabel ampPan     { "Pan",          Id::knobPan    };
     KnobWithLabel ampAtk     { "A",  Id::knobLevel  };
     KnobWithLabel ampDec     { "D",   Id::knobLevel  };
     KnobWithLabel ampSus     { "S",  Id::knobLevel  };
