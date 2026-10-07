@@ -184,6 +184,7 @@ private:
     bool metal = false;
     static constexpr int kMetalMargin = 2;   // room round the raised boxes for their shadows
     static constexpr int kMetalPad    = 4;   // controls inset inside a raised box
+    static constexpr int kMetalAssignMaxH = 96;   // tallest the one-row assignment box grows; beyond it the display takes the height
     juce::Rectangle<float> metalHeaderBox() const;
     juce::Rectangle<float> metalLowerBox() const;
 

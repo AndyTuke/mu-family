@@ -8,22 +8,10 @@ namespace mu_on
 GrooveGrid::GrooveGrid(ProcessorBase& processor, StepPattern& patternToEdit)
     : proc(processor), pattern(patternToEdit)
 {
-    auto setupKnob = [this](juce::Slider& s, juce::Label& lab, const juce::String& text)
-    {
-        s.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-        MuLookAndFeel::applyRotarySweep(s);
-        s.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-        addAndMakeVisible(s);
-        lab.setText(text, juce::dontSendNotification);
-        lab.setJustificationType(juce::Justification::centred);
-        lab.setFont(juce::Font(juce::FontOptions(mu_ui::sf(12.0f))));
-        addAndMakeVisible(lab);
-    };
-    setupKnob(swingSlider,  swingLabel,  "Swing");
-    setupKnob(accentSlider, accentLabel, "Accent");
-
-    swingAtt  = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(proc.apvts, "seq_swing",  swingSlider);
-    accentAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(proc.apvts, "seq_accent", accentSlider);
+    addAndMakeVisible(swingKnob);
+    addAndMakeVisible(accentKnob);
+    swingAtt  = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(proc.apvts, "seq_swing",  swingKnob.getSlider());
+    accentAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(proc.apvts, "seq_accent", accentKnob.getSlider());
 
     startTimerHz(mu_ui::kUiRefreshHz);   // playhead
 }
@@ -39,25 +27,30 @@ juce::Rectangle<int> GrooveGrid::gridArea() const
     return getLocalBounds().withTrimmedTop(mu_ui::s(kHeaderH)).reduced(mu_ui::s(8));
 }
 
-// The cell row for the selected lane (gridArea minus the lane-title band).
+// The cell row for the selected lane: flat, gridArea minus the lane-title band; metal, inside
+// the steps box, clear of its corner screws.
 juce::Rectangle<int> GrooveGrid::rowArea() const
 {
+    using LF = MuLookAndFeel;
+    if (LF::isMetal(*this))
+        return getLocalBounds().withTrimmedLeft(mu_ui::s(kGrooveBoxW + LF::kVoiceDivW))
+                               .reduced(mu_ui::s(LF::kSubPanelScrewClear), mu_ui::s(LF::kSpaceS));
     return gridArea().withTrimmedTop(mu_ui::s(kTitleH));
 }
 
 void GrooveGrid::resized()
 {
-    auto header = getLocalBounds().removeFromTop(mu_ui::s(kHeaderH)).reduced(mu_ui::s(8), mu_ui::s(4));
-    const int knobW = mu_ui::s(54);
-    auto place = [&](juce::Slider& s, juce::Label& lab)
+    // Metal: Swing / Accent centred in the Groove box; flat: a strip along the top.
+    auto header = MuLookAndFeel::isMetal(*this)
+                ? getLocalBounds().removeFromLeft(mu_ui::s(kGrooveBoxW)).reduced(mu_ui::s(MuLookAndFeel::kSubPanelScrewClear), 0)
+                                  .withSizeKeepingCentre(mu_ui::s(kGrooveBoxW - 2 * MuLookAndFeel::kSubPanelScrewClear), mu_ui::s(kHeaderH))
+                : getLocalBounds().removeFromTop(mu_ui::s(kHeaderH)).reduced(mu_ui::s(8), mu_ui::s(4));
+    const int knobW = mu_ui::s(MuLookAndFeel::kKnobSize2W);
+    for (auto* k : { &swingKnob, &accentKnob })
     {
-        auto col = header.removeFromLeft(knobW);
-        lab.setBounds(col.removeFromBottom(mu_ui::s(14)));
-        s.setBounds(col);
-        header.removeFromLeft(mu_ui::s(8));
-    };
-    place(swingSlider, swingLabel);
-    place(accentSlider, accentLabel);
+        k->setBounds(header.removeFromLeft(knobW));
+        header.removeFromLeft(mu_ui::s(MuLookAndFeel::kSpaceS));
+    }
 }
 
 void GrooveGrid::paint(juce::Graphics& g)
@@ -119,17 +112,12 @@ void GrooveGrid::paint(juce::Graphics& g)
     }
 }
 
-// Metal style: the lane name on a plate, each step a lamp behind a dark lens — on steps lit,
-// accents brighter at the centre, beat starts marked by a hint of colour; empty steps stay
-// dark even under the playhead (family lamp rule).
+// Metal style (the host draws the boxes and their name plates): each step a lamp behind a
+// dark lens — on steps lit, accents brighter at the centre, beat starts marked by a hint of
+// colour; empty steps stay dark even under the playhead (family lamp rule).
 void GrooveGrid::paintMetal(juce::Graphics& g, int t, int steps, juce::Colour col)
 {
     const auto& L = MuLookAndFeel::lighting();
-    const auto  title  = (proc.getChannelName(t) + " steps").toUpperCase();
-    const float plateH = mu_ui::sf((float) MuLookAndFeel::kNamePlateH);
-    const auto  band   = gridArea().removeFromTop(mu_ui::s(kTitleH)).toFloat();
-    MuLookAndFeel::drawNamePlate(g, { band.getX(), band.getCentreY() - plateH * 0.5f,
-                                      MuLookAndFeel::namePlateWidth(title, plateH), plateH }, title);
 
     auto row = rowArea();
     const float cellW = row.getWidth() / (float) steps;

@@ -47,14 +47,9 @@ void EnginePanel::paint(juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
 
-    // Metal style: the host's metal panel shows through; the title is a name plate.
+    // Metal style: the host's raised box shows through, named on its plate by the host.
     if (MuLookAndFeel::isMetal(*this))
-    {
-        const float h = mu_ui::sf((float) MuLookAndFeel::kNamePlateH);
-        const auto  title = (proc.getChannelName(currentChannel) + " engine").toUpperCase();
-        MuLookAndFeel::drawNamePlate(g, { mu_ui::sf(8.0f), mu_ui::sf(6.0f), MuLookAndFeel::namePlateWidth(title, h), h }, title);
         return;
-    }
     g.fillAll(MuLookAndFeel::colour(Id::panelBackground));
 
     const auto accent = MuLookAndFeel::channelPalette[
@@ -68,8 +63,11 @@ void EnginePanel::paint(juce::Graphics& g)
 
 void EnginePanel::resized()
 {
-    // Header occupies the top 28 px (drawn in paint); the shared grid fills the rest.
-    grid.setBounds(getLocalBounds().withTrimmedTop(mu_ui::s(28)).reduced(mu_ui::s(8), mu_ui::s(4)));
+    // Metal: the grid fills the host's box. Flat: the header takes the top 28 px (drawn in paint).
+    if (MuLookAndFeel::isMetal(*this))
+        grid.setBounds(getLocalBounds());
+    else
+        grid.setBounds(getLocalBounds().withTrimmedTop(mu_ui::s(28)).reduced(mu_ui::s(8), mu_ui::s(4)));
 }
 
 } // namespace mu_on

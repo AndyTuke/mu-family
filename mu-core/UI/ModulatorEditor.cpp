@@ -700,10 +700,12 @@ void ModulatorEditor::resized()
 
     // ── LFO / Step editor ──────────────────────────────────────────────────────
     // Metal style: a gap between the header box and the display (taken from the display).
-    // In a short panel the display gives way so the assignment box (one row + Add) still fits.
+    // In a short panel the display gives way so the assignment box (one row + Add) still fits;
+    // in a tall one the display takes the spare height so the assignment box stays compact.
     const int edY = metal ? m + headerH + gap4 : headerH;
     const int lowerMinH = 2 * pad + rowH + gap4 + addBtnH + m;
-    const int edH = metal ? juce::jlimit(s(60), editorH - gap4, h - edY - gap4 - lowerMinH)
+    const int edH = metal ? juce::jmax(juce::jlimit(s(60), editorH - gap4, h - edY - gap4 - lowerMinH),
+                                       h - edY - gap4 - s(kMetalAssignMaxH))
                           : editorH;
     lfoEditor .setBounds(m, edY, w - 2 * m, edH);
     stepEditor.setBounds(m, edY, w - 2 * m, edH);

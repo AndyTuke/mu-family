@@ -119,8 +119,9 @@ public:
 
     void resized() override
     {
-        // Metal style: each area sits inside its own metal panel, so children are inset.
-        const bool metal = MuLookAndFeel::isMetal(*this);
+        if (MuLookAndFeel::isMetal(*this)) { layoutMetal(); return; }
+
+        const bool metal = false;
         const int  in    = metal ? mu_ui::s(MuLookAndFeel::kChannelInset) : 0;
 
         auto r = getLocalBounds();
@@ -152,11 +153,25 @@ public:
         g.fillAll(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
         if (! MuLookAndFeel::isMetal(*this)) return;
 
-        // Metal style: every area painted in the app colour.
-        const auto accent  = MuLookAndFeel::appAccent(*this);
-        MuLookAndFeel::drawAccentPanel(g, headerR.reduced(2).toFloat(), accent);   // the header bar lights its displays in the lane colour
-        for (auto rr : { engineR, slotR, modR })
+        // Metal style: every panel painted in the app colour (the header bar lights its displays
+        // in the lane colour), each section in a raised box named on a plate above it.
+        const auto accent = MuLookAndFeel::appAccent(*this);
+        for (auto rr : { headerR, engineR, slotR, modR })
             MuLookAndFeel::drawAccentPanel(g, rr.reduced(2).toFloat(), accent);
+        const auto lane = proc.getChannelName(currentChannel).toUpperCase();
+        if (currentChannel == Rumble)
+            MuLookAndFeel::drawSections(g, *this, { { engineBoxR, lane + " ENGINE" }, { stepsBoxR, lane + " ENVELOPE" } }, accent);
+        else
+            MuLookAndFeel::drawSections(g, *this, { { engineBoxR, lane + " ENGINE" }, { grooveBoxR, "GROOVE" },
+                                                    { stepsBoxR, lane + " STEPS" } }, accent);
+    }
+
+    void paintOverChildren(juce::Graphics& g) override
+    {
+        if (! MuLookAndFeel::hasScrews(*this)) return;
+        for (auto rr : { engineR, slotR, modR })
+            MuLookAndFeel::drawPanelScrews(g, rr.reduced(2).toFloat());
+        MuLookAndFeel::drawStripScrews(g, headerR.reduced(2).toFloat());   // the thin preset strip
     }
 
     void lookAndFeelChanged() override { resized(); repaint(); }
@@ -167,6 +182,49 @@ public:
     void refreshPresetList() { header.setPresetFiles(proc.trackPresetFiles(currentChannel)); }
 
 private:
+    // Metal style, as mu-Clid: panels edge to edge — preset strip, engine, steps, modulators —
+    // content inset clear of the panels' corner screws, each section a raised box with its name
+    // plate in the band above it. The engine box holds one row of the lane's controls (the
+    // widest lane fits one row); the steps panel holds Groove (Swing / Accent) + the lane's
+    // steps, or for Rumble its envelope, in a box of the same size so the layout never jumps.
+    void layoutMetal()
+    {
+        using LF = MuLookAndFeel;
+        using mu_ui::s;
+        const int w = getWidth(), h = getHeight();
+        const int padX   = s(LF::kScrewedPanelInset);   // content in from a panel's sides
+        const int padY   = s(LF::kChannelInset);        //   … and from its top / bottom
+        const int plateH = s(LF::kSectionPlateH);       // name plate band above each box
+        const int clear  = s(LF::kSubPanelScrewClear);  // content in from a box's sides
+
+        headerR = { 0, 0, w, s(ChannelHeaderBar::kHeight) + s(4) };
+        header.setBounds(headerR.reduced(LF::hasScrews(*this) ? padX : s(4), s(2)));
+
+        const int engineBoxH = s(mu_ui::ParamKnobGrid::kCellH + 2 * LF::kSpaceS);
+        engineR    = { 0, headerR.getBottom(), w, padY + plateH + engineBoxH + padY };
+        engineBoxR = { padX, engineR.getY() + padY + plateH, w - 2 * padX, engineBoxH };
+        engine.setBounds(engineBoxR.reduced(clear, s(LF::kSpaceS)));
+
+        const int boxH = s(GrooveGrid::kBoxH);
+        slotR = { 0, engineR.getBottom(), w, padY + plateH + boxH + padY };
+        const juce::Rectangle<int> slotBoxes(padX, slotR.getY() + padY + plateH, w - 2 * padX, boxH);
+        if (currentChannel == Rumble)
+        {
+            grooveBoxR = {};
+            stepsBoxR  = slotBoxes;
+            rumbleEnvEditor.setBounds(stepsBoxR.reduced(clear, s(LF::kSpaceS)));
+        }
+        else
+        {
+            grooveBoxR = slotBoxes.withWidth(s(GrooveGrid::kGrooveBoxW));
+            stepsBoxR  = slotBoxes.withTrimmedLeft(grooveBoxR.getWidth() + s(LF::kVoiceDivW));
+            grid.setBounds(slotBoxes);
+        }
+
+        modR = { 0, slotR.getBottom(), w, juce::jmax(s(220), h - slotR.getBottom()) };
+        modPanel.setBounds(modR.reduced(padX, padY));
+    }
+
     void timerCallback() override
     {
         const double beat = proc.getInternalBeatPos();
@@ -187,6 +245,7 @@ private:
 
     static constexpr int kGridH = GrooveGrid::kStepEditorHeight;
     juce::Rectangle<int> headerR, engineR, slotR, modR;   // panel areas (metal style)
+    juce::Rectangle<int> engineBoxR, grooveBoxR, stepsBoxR; // raised section boxes (metal style)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GroovePanel)
 };

@@ -2,6 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "UI/Components/MuLookAndFeel.h"
 
 #include <memory>
 #include <vector>
@@ -29,6 +30,10 @@ public:
     void setSpecs(const std::vector<Spec>& specs);
 
     void resized() override;
+
+    // One row of cells (unscaled): name label over a Size-2 knob, plus a small gap.
+    static constexpr int kLabelH = 13;
+    static constexpr int kCellH  = kLabelH + MuLookAndFeel::kKnobSize2H + 4;
 
 private:
     struct Control

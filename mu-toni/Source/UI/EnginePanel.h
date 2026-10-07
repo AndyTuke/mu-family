@@ -177,7 +177,15 @@ public:
         header.setPresetFiles(mu_pp::listPresetFiles(proc.getPerSlotPresetDir(), proc.getPerSlotPresetExtension()));
     }
 
-    void lookAndFeelChanged() override { resized(); repaint(); }   // metal style widens the gaps
+    void lookAndFeelChanged() override { resized(); repaint(); }   // metal style / screws change the layout
+
+    void paintOverChildren(juce::Graphics& g) override
+    {
+        if (! MuLookAndFeel::hasScrews(*this)) return;
+        for (auto r : { srcR, voicePanelR, arpPanelR, modR })
+            MuLookAndFeel::drawPanelScrews(g, r.reduced(2).toFloat());
+        MuLookAndFeel::drawStripScrews(g, headerR.reduced(2).toFloat());   // the thin preset strip
+    }
 
     void paint(juce::Graphics& g) override
     {
@@ -186,30 +194,18 @@ public:
         using mu_ui::s;
         g.fillAll(MuLookAndFeel::colour(Id::panelBackground));
 
-        // Metal style: every boxed section a titled metal panel, the voice band and the
-        // modulators on metal panels with name plates over the voice sections.
+        // Metal style: the preset strip, source, voice band, Appergater and modulators each on
+        // a metal panel (the header bar lights its displays in the layer colour); every section
+        // in a raised box with its name plate above it.
         if (MuLookAndFeel::isMetal(*this))
         {
             const auto accent = MuLookAndFeel::appAccent(*this);
-            MuLookAndFeel::drawAccentPanel(g, headerR.reduced(2).toFloat(), accent);   // the header bar lights its displays in the layer colour
-            static const char* const plateTitles[] = { "OSCILLATOR 1", "OSCILLATOR 2", "MIX" };
-            for (int i = 0; i < 3; ++i)
-                MuLookAndFeel::drawTitledPanel(g, oscR[(size_t) i].toFloat().reduced(2.0f), plateTitles[i], accent);
-            MuLookAndFeel::drawTitledPanel(g, arpR.toFloat().reduced(2.0f), "APPERGATER", accent);
-            MuLookAndFeel::drawAccentPanel(g, voiceR.expanded(s(6), s(2)).toFloat(), accent);
-            MuLookAndFeel::drawAccentPanel(g, modulatorPanel.getBounds().expanded(s(2)).toFloat(), accent);
-
-            const int VX = voiceR.getX(), VY = voiceR.getY();
-            const int vDivW = LF::kVoiceDivW;
-            const int vFltX = LF::kVoicePitchW + vDivW;
-            const int vAmpX = vFltX + LF::kVoiceFilterW + vDivW;
-            const int vInsX = vAmpX + LF::kVoiceAmpW + vDivW;
-            auto plate = [&](const char* t, int x, int w)
-            { MuLookAndFeel::drawCentredNamePlate(g, { (float) (VX + s(x)), (float) VY, (float) s(w), (float) s(LF::kVoiceLabelH) }, t); };
-            plate("PITCH",   0,     LF::kVoicePitchW);
-            plate("FILTER",  vFltX, LF::kVoiceFilterW);
-            plate("AMP",     vAmpX, LF::kVoiceAmpW);
-            plate("EFFECTS", vInsX, LF::kVoiceInsertW);
+            for (auto r : { headerR, srcR, voicePanelR, arpPanelR, modR })
+                MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), accent);
+            MuLookAndFeel::drawSections(g, *this, { { oscR[0], "OSCILLATOR 1" }, { oscR[1], "OSCILLATOR 2" }, { oscR[2], "MIX" },
+                                                    { voiceBoxR[0], "PITCH" }, { voiceBoxR[1], "FILTER" },
+                                                    { voiceBoxR[2], "AMP" }, { voiceBoxR[3], "EFFECTS" },
+                                                    { arpR, "APPERGATER" } }, accent);
             return;
         }
 
@@ -246,6 +242,8 @@ public:
 
     void resized() override
     {
+        if (MuLookAndFeel::isMetal(*this)) { layoutMetal(); return; }
+
         using LF = MuLookAndFeel;
         using mu_ui::s;
         const int pad = s(8);
@@ -284,10 +282,59 @@ public:
         layoutBox(G_OSC2, oscR[1]);
         layoutBox(G_MIX,  oscR[2]);
         layoutBox(G_ARP,  arpR);
-        layoutVoiceBand(voiceR);
+        layoutVoiceBand(voiceR, false);
     }
 
 private:
+    // Metal style, as mu-Clid: panels edge to edge — preset strip, source (Osc 1 / Osc 2 / Mix),
+    // voice band, Appergater, modulators — content inset clear of the panels' corner screws,
+    // each section a raised box with its name plate in the band above it.
+    void layoutMetal()
+    {
+        using LF = MuLookAndFeel;
+        using mu_ui::s;
+        const int w = getWidth(), h = getHeight();
+        const int padX   = s(LF::kScrewedPanelInset);   // content in from a panel's sides
+        const int padY   = s(LF::kChannelInset);        //   … and from its top / bottom
+        const int plateH = s(LF::kSectionPlateH);       // name plate band above each box
+        const int boxGap = s(LF::kVoiceDivW);
+
+        // Preset strip — with screws the header is narrower, leaving a screw at each end.
+        headerR = { 0, 0, w, s(ChannelHeaderBar::kHeight) + s(4) };
+        header.setBounds(headerR.reduced(LF::hasScrews(*this) ? padX : s(4), s(2)));
+
+        // Source boxes and the Appergater box: a dropdown row over a Size-2 knob row.
+        const int boxH = s(2 * kBoxPad + kDropdownH + LF::kVoiceGap + LF::kKnobSize2H + kLabelGap);
+
+        // Source: Osc 1 | Osc 2 | Mix in equal thirds.
+        srcR = { 0, headerR.getBottom(), w, padY + plateH + boxH + padY };
+        {
+            const int y  = srcR.getY() + padY + plateH;
+            const int bw = (w - 2 * padX - 2 * boxGap) / 3;
+            oscR[0] = { padX, y, bw, boxH };
+            oscR[1] = { padX + bw + boxGap, y, bw, boxH };
+            oscR[2] = { oscR[1].getRight() + boxGap, y, w - padX - (oscR[1].getRight() + boxGap), boxH };
+        }
+
+        // Voice band (mu-Clid geometry: plate band + two knob rows).
+        voicePanelR = { 0, srcR.getBottom(), w, padY + s(LF::kVoiceLabelH + LF::kVoiceSubH) + padY };
+        voiceR      = voicePanelR.reduced(padX, padY);
+        layoutVoiceBand(voiceR, true);
+
+        // Appergater, one box.
+        arpPanelR = { 0, voicePanelR.getBottom(), w, padY + plateH + boxH + padY };
+        arpR      = { padX, arpPanelR.getY() + padY + plateH, w - 2 * padX, boxH };
+
+        // Modulators take the rest.
+        modR = { 0, arpPanelR.getBottom(), w, juce::jmax(s(190) + 2 * padY, h - arpPanelR.getBottom()) };
+        modulatorPanel.setBounds(modR.reduced(padX, padY));
+
+        layoutBox(G_OSC1, oscR[0]);
+        layoutBox(G_OSC2, oscR[1]);
+        layoutBox(G_MIX,  oscR[2]);
+        layoutBox(G_ARP,  arpR);
+    }
+
     // Layout constants (unscaled; wrap in mu_ui::s at use). kDropdownH is the
     // family-standard dropdown height; kLabelGap keeps a control label off the
     // panel border (design-ui-family §"Control label gap").
@@ -311,20 +358,31 @@ private:
     KnobWithLabel*  findKnob (const char* s) { for (auto& k : knobs)  if (k.suffix == s) return k.comp.get(); return nullptr; }
     DropdownSelect* findCombo(const char* s) { for (auto& c : combos) if (c.suffix == s) return c.comp.get(); return nullptr; }
 
-    // Voice band: exact mu-clid VoiceSection geometry (Size-2 knobs, 2 rows).
-    void layoutVoiceBand(juce::Rectangle<int> rect)
+    // Voice band: mu-clid VoiceSection geometry (Size-2 knobs, 2 rows). Boxed (metal style):
+    // each section a raised box — Amp four columns wide (its sends close up beside Level),
+    // dropdowns kept off the box edges, and Effects taking the rest of the width.
+    void layoutVoiceBand(juce::Rectangle<int> rect, bool boxed)
     {
         using LF = MuLookAndFeel;
         using mu_ui::s;
         const int kW = LF::kKnobSize2W, rowH = LF::kKnobSize2H, fW = LF::kVoiceFilterColW;
         const int row2 = rowH + LF::kVoiceGap, divW = LF::kVoiceDivW;
-        const int fltX = LF::kVoicePitchW + divW, ampX = fltX + LF::kVoiceFilterW + divW, insX = ampX + LF::kVoiceAmpW + divW;
+        const int ampW = boxed ? 4 * kW : LF::kVoiceAmpW;
+        const int fltX = LF::kVoicePitchW + divW, ampX = fltX + LF::kVoiceFilterW + divW, insX = ampX + ampW + divW;
+        const int insW = boxed ? juce::roundToInt((float) rect.getWidth() / mu_ui::scale) - insX : LF::kVoiceInsertW;
+        const int send = boxed ? 1 : 2;   // first send column
+        const int dg   = boxed ? LF::kDropdownEdgeGap : 0;
         const int X = rect.getX(), Y = rect.getY() + s(LF::kVoiceLabelH);
+
+        voiceBoxR[0] = { X,             Y, s(LF::kVoicePitchW),  s(LF::kVoiceSubH) };
+        voiceBoxR[1] = { X + s(fltX),   Y, s(LF::kVoiceFilterW), s(LF::kVoiceSubH) };
+        voiceBoxR[2] = { X + s(ampX),   Y, s(ampW),              s(LF::kVoiceSubH) };
+        voiceBoxR[3] = { X + s(insX),   Y, s(insW),              s(LF::kVoiceSubH) };
 
         auto kb = [&](const char* suf, int sx, int col, int cw, bool bottom)
         { if (auto* k = findKnob(suf)) k->setBounds(X + s(sx + col * cw), Y + (bottom ? s(row2) : 0), s(cw), s(rowH)); };
         auto dd = [&](const char* suf, int sx, int spanCols, int cw)
-        { if (auto* c = findCombo(suf)) c->setBounds(X + s(sx), Y + s(rowH / 4), s(spanCols * cw), s(rowH / 2)); };
+        { if (auto* c = findCombo(suf)) c->setBounds(X + s(sx + dg), Y + s(rowH / 4), s(spanCols * cw - 2 * dg), s(rowH / 2)); };
 
         // Pitch — target (row 1) + A/D/S/R/Depth (row 2).
         dd("ptgt", 0, 2, kW);
@@ -336,11 +394,12 @@ private:
         kb("feA", fltX, 0, fW, true); kb("feD", fltX, 1, fW, true); kb("feS", fltX, 2, fW, true); kb("feR", fltX, 3, fW, true); kb("feDep", fltX, 4, fW, true);
 
         // Amp — Level + Eff/Dly/Rev sends (row 1) + A/D/S/R (row 2).
-        kb("aeL", ampX, 0, kW, false); kb("sendEff", ampX, 2, kW, false); kb("sendDly", ampX, 3, kW, false); kb("sendRev", ampX, 4, kW, false);
+        kb("aeL", ampX, 0, kW, false); kb("sendEff", ampX, send, kW, false); kb("sendDly", ampX, send + 1, kW, false); kb("sendRev", ampX, send + 2, kW, false);
         kb("aeA", ampX, 0, kW, true); kb("aeD", ampX, 1, kW, true); kb("aeS", ampX, 2, kW, true); kb("aeR", ampX, 3, kW, true);
 
         // Insert — the shared subsection.
-        insertSub.setBounds(X + s(insX), Y, s(LF::kVoiceInsertW), s(LF::kVoiceSubH));
+        insertSub.setBounds(voiceBoxR[3]);
+        insertSub.setAlgoWidth(insW);
     }
 
     // Boxed section (Osc 1/2/Mix, Appergater): dropdowns/toggles on top, Size-2 knobs flow.
@@ -348,9 +407,12 @@ private:
     {
         using LF = MuLookAndFeel;
         using mu_ui::s;
-        auto inner = rect.reduced(s(kBoxPad));
+        // Metal style: the title sits on a plate above the box and content keeps clear of the
+        // box's corner screws; flat: the title is drawn inside.
+        const bool metal = MuLookAndFeel::isMetal(*this);
+        auto inner = metal ? rect.reduced(s(LF::kSubPanelScrewClear), s(kBoxPad)) : rect.reduced(s(kBoxPad));
         inner.removeFromBottom(s(kLabelGap));   // keep control labels off the panel border
-        inner.removeFromTop(s(LF::kVoiceLabelH));
+        if (! metal) inner.removeFromTop(s(LF::kVoiceLabelH));
 
         bool hasTop = false;
         for (auto& c : combos)  if (c.group == group) hasTop = true;
@@ -431,6 +493,9 @@ private:
     std::vector<ToggleDef> toggles;
     std::array<juce::Rectangle<int>, 3> oscR;
     juce::Rectangle<int> voiceR, arpR, headerR;
+    // Metal style: the panels, and the voice band's four section boxes.
+    juce::Rectangle<int> srcR, voicePanelR, arpPanelR, modR;
+    std::array<juce::Rectangle<int>, 4> voiceBoxR;
 
     ChannelHeaderBar header;
 

@@ -22,6 +22,7 @@ public:
 
     void paint(juce::Graphics&) override;
     void resized() override;
+    void lookAndFeelChanged() override { resized(); repaint(); }
 
 private:
     ProcessorBase&      proc;

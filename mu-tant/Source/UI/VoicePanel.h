@@ -76,8 +76,8 @@ public:
 
     void paint(juce::Graphics& g) override;
     void resized() override;
-    void lookAndFeelChanged() override { resized(); repaint(); }   // metal style changes the header inset
-    int  hdrPanelPad() const { return mu_ui::s(4); }   // preset-bar panel margin round the header (metal)
+    void paintOverChildren(juce::Graphics& g) override;   // panel screws, over the content
+    void lookAndFeelChanged() override { resized(); repaint(); }   // metal style / screws change the layout
 
 private:
     PluginProcessor& proc;
@@ -228,6 +228,8 @@ private:
     // Sub-panel geometry — populated by resized(), consumed by paint() for the
     // bordered sub-panels + their titles so layout + decoration stay in sync.
     juce::Rectangle<int> osc1PanelR, osc2PanelR, modNoisePanelR, filterPanelR, noisePanelR, mixerPanelR, insertPanelR;
+    // Metal style: the panels — preset strip, voice (sections + Root / Scale), gate editor, modulators.
+    juce::Rectangle<int> headerStripR, voiceR, gateR, modR;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VoicePanel)
 };

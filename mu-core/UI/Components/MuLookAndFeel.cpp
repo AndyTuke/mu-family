@@ -545,7 +545,7 @@ void MuLookAndFeel::drawRecessedScreen(juce::Graphics& g, juce::Rectangle<float>
     }
 }
 
-bool MuLookAndFeel::isMetal(juce::Component& c)
+bool MuLookAndFeel::isMetal(const juce::Component& c)
 {
     auto* mlf = dynamic_cast<MuLookAndFeel*>(&c.getLookAndFeel());
     return mlf != nullptr && mlf->isMetalStyle();
@@ -708,6 +708,22 @@ void MuLookAndFeel::drawTitledPanel(juce::Graphics& g, juce::Rectangle<float> r,
     drawAccentPanel(g, r, accent);
     const float h = mu_ui::sf((float) kNamePlateH);
     drawNamePlate(g, { r.getX() + mu_ui::sf(8.0f), r.getY() + mu_ui::sf(5.0f), namePlateWidth(title, h), h }, title);
+}
+
+void MuLookAndFeel::drawSections(juce::Graphics& g, const juce::Component& owner,
+                                 std::initializer_list<Section> sections, juce::Colour accent)
+{
+    for (const auto& sec : sections) drawRaisedSubPanelShadow(g, sec.box.toFloat());
+    for (const auto& sec : sections) drawRaisedSubPanel(g, sec.box.toFloat(), accent);
+    const bool screwed = hasScrews(owner);
+    const float band   = mu_ui::sf((float) kSectionPlateH);
+    for (const auto& sec : sections)
+    {
+        const auto b = sec.box.toFloat();
+        if (screwed) drawSubPanelScrews(g, b);
+        if (sec.name.isNotEmpty())
+            drawCentredNamePlate(g, { b.getX(), b.getY() - band, b.getWidth(), band }, sec.name);
+    }
 }
 
 void MuLookAndFeel::drawCentredNamePlate(juce::Graphics& g, juce::Rectangle<float> span, const juce::String& text)

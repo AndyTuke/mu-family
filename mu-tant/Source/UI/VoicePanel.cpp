@@ -586,20 +586,17 @@ void VoicePanel::paint(juce::Graphics& g)
         (size_t)(proc.getChannelColourIndex(currentVoice) % MuLookAndFeel::kChannelPaletteSize)];
     const auto muted = MuLookAndFeel::colour(Id::mutedText);
 
-    // Metal style: the preset bar and every section a metal panel painted in the app
-    // colour (the header bar lights its displays in the voice colour), sections named on a plate, and the gate editor + modulators on metal panels.
+    // Metal style: the preset strip, the voice, the gate editor and the modulators each on a
+    // metal panel painted in the app colour (the header bar lights its displays in the voice
+    // colour); the voice's sections in raised boxes, each named on a plate above it.
     if (MuLookAndFeel::isMetal(*this))
     {
         const auto accent = MuLookAndFeel::appAccent(*this);
-        MuLookAndFeel::drawAccentPanel(g, headerBar.getBounds().expanded(hdrPanelPad(), s(2)).toFloat().reduced(2.0f), accent);
-        const std::pair<const juce::Rectangle<int>*, const char*> sections[] = {
-            { &osc1PanelR, "OSC 1" }, { &osc2PanelR, "OSC 2" }, { &noisePanelR, "NOISE" }, { &modNoisePanelR, "X-MOD" },
-            { &filterPanelR, "FILTER" }, { &insertPanelR, "EFFECTS" }, { &mixerPanelR, "MIXER" } };
-        for (const auto& [r, title] : sections)
-            if (! r->isEmpty())
-                MuLookAndFeel::drawTitledPanel(g, r->toFloat().reduced(2.0f), title, accent);
-        MuLookAndFeel::drawAccentPanel(g, gatingDesigner.getBounds().expanded(s(2)).toFloat(), accent);
-        MuLookAndFeel::drawAccentPanel(g, modulatorPanel.getBounds().expanded(s(2)).toFloat(), accent);
+        for (auto r : { headerStripR, voiceR, gateR, modR })
+            MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), accent);
+        MuLookAndFeel::drawSections(g, *this, { { osc1PanelR, "OSC 1" }, { osc2PanelR, "OSC 2" }, { noisePanelR, "NOISE" },
+                                                { modNoisePanelR, "X-MOD" }, { filterPanelR, "FILTER" },
+                                                { insertPanelR, "EFFECTS" }, { mixerPanelR, "MIXER" } }, accent);
         return;
     }
 
@@ -625,13 +622,29 @@ void VoicePanel::paint(juce::Graphics& g)
     panel(mixerPanelR,    "MIXER");
 }
 
+void VoicePanel::paintOverChildren(juce::Graphics& g)
+{
+    if (! MuLookAndFeel::hasScrews(*this)) return;
+    for (auto r : { voiceR, gateR, modR })
+        MuLookAndFeel::drawPanelScrews(g, r.reduced(2).toFloat());
+    MuLookAndFeel::drawStripScrews(g, headerStripR.reduced(2).toFloat());   // the thin preset strip
+}
+
 void VoicePanel::resized()
 {
     using mu_ui::s;
+    using LF = MuLookAndFeel;
     const int w = getWidth();
     const int h = getHeight();
 
-    const int pad = s(12);
+    // Metal style lays the voice out as mu-Clid does: panels edge to edge, content inset clear
+    // of their corner screws, each section a raised box with its name plate in a band above it.
+    const bool metal   = LF::isMetal(*this);
+    const bool screwed = LF::hasScrews(*this);
+    const int pad      = metal ? s(LF::kScrewedPanelInset) : s(12);
+    const int inset    = metal ? s(LF::kChannelInset) : 0;                 // content in from a panel's top / bottom
+    const int plateH   = metal ? s(LF::kSectionPlateH) + s(2) : 0;       // name plate band above each box
+    const int boxClear = metal ? s(LF::kSubPanelScrewClear) : s(6);      // content in from a box's sides
     const int gap = s(8);
     const int ddH = s(24);
     const int s2W = s(MuLookAndFeel::kKnobSize2W);   // 54
@@ -639,11 +652,13 @@ void VoicePanel::resized()
 
     // ── Shared header bar + Root / Scale row ────────────────────────────────
     const int barH = s(ChannelHeaderBar::kHeight);   // 28
-    // Metal style: the header sits inside its own painted preset-bar panel.
-    const int hdrX = MuLookAndFeel::isMetal(*this) ? s(4) : 0;
-    const int hdrY = MuLookAndFeel::isMetal(*this) ? s(2) : 0;
+    // Metal style: the header sits inside its own painted preset strip (with screws, narrower,
+    // leaving a screw at each end).
+    const int hdrX = screwed ? s(LF::kScrewedPanelInset) : metal ? s(4) : 0;
+    const int hdrY = metal ? s(2) : 0;
+    headerStripR = { 0, 0, w, barH + 2 * hdrY };
     headerBar.setBounds(hdrX, hdrY, w - 2 * hdrX, barH);
-    const int tonalY = barH + 2 * hdrY + s(2);
+    const int tonalY = headerStripR.getBottom() + (metal ? inset : s(2));
     {
         const int labelW = s(44);
         int x = pad;
@@ -652,7 +667,7 @@ void VoicePanel::resized()
         scaleLabel   .setBounds(x, tonalY, labelW, ddH);   x += labelW + s(4);
         scaleDropdown.setBounds(x, tonalY, s(100),  ddH);
     }
-    const int contentTop = tonalY + ddH + gap;   // top of all sub-panels
+    const int contentTop = tonalY + ddH + (metal ? plateH : gap);   // top of all sub-panels
 
     // ── Column geometry ─────────────────────────────────────────────────────
     // Mixer column (far right, spans Row A + Row B): one knob wide, three knobs tall.
@@ -664,7 +679,7 @@ void VoicePanel::resized()
     // Insert column (right of rowsW, left of Mixer, spans Row B only):
     const int insSubW  = s(4 * MuLookAndFeel::kKnobSize2W);        // 216
     const int insSubH  = s(2 * MuLookAndFeel::kKnobSize2H + MuLookAndFeel::kVoiceGap);  // 116
-    const int insTitleH = s(14);
+    const int insTitleH = metal ? 0 : s(14);   // flat: room for the title drawn inside
     const int insColW  = insSubW + s(20);     // 236
     const int insColX  = leftRight - insColW; // 646
     const int rowsW    = insColX - gap - pad; // 626 — shared by Row A osc zone and Row B X-Mod/Filter
@@ -692,7 +707,7 @@ void VoicePanel::resized()
         // Osc 1 (the "OSC 1" panel title sits in the top-left corner above this row).
         osc1PanelR = { pad, contentTop, oscW, rowAH };
         {
-            const int knobsX = pad + oscW - knobsW - s(6);
+            const int knobsX = pad + oscW - knobsW - boxClear;
             const int wtX    = pad + wtInset;
             osc1WaveDropdown.setBounds(wtX, waveY, juce::jmax(s(40), knobsX - wtX - wtInset), ddH);
             int x = knobsX;
@@ -704,7 +719,7 @@ void VoicePanel::resized()
         const int osc2X = pad + oscW + gap;
         osc2PanelR = { osc2X, contentTop, oscW, rowAH };
         {
-            const int knobsX = osc2X + oscW - knobsW - s(6);
+            const int knobsX = osc2X + oscW - knobsW - boxClear;
             const int wtX    = osc2X + wtInset;
             osc2WaveDropdown.setBounds(wtX, waveY, juce::jmax(s(40), knobsX - wtX - wtInset), ddH);
             int x = knobsX;
@@ -714,14 +729,14 @@ void VoicePanel::resized()
 
         // Noise section (type dropdown; level is in the Mixer column)
         const int noiseX      = pad + oscW + gap + oscW + gap;
-        const int noiseTitleW = s(42);   // clear space for "NOISE" panel label in paint()
+        const int noiseTitleW = metal ? s(8) : s(42);   // flat: clear space for the "NOISE" title drawn inside
         noisePanelR = { noiseX, contentTop, noiseW, rowAH };
         noiseTypeLabel.setBounds(0, 0, 0, 0);   // title drawn by paint(), label hidden
         noiseTypeDropdown.setBounds(noiseX + noiseTitleW, waveY, noiseW - noiseTitleW - s(8), ddH);
     }
 
     // ── Row B: X-Mod | Filter (no Level) | Insert ───────────────────────────
-    const int rowBY = contentTop + rowAH + gap;   // top of Row B
+    const int rowBY = contentTop + rowAH + (metal ? plateH : gap);   // top of Row B
     {
 
         // X-Mod panel — two horizontal lanes (one per row). Each lane: knob, then a mode
@@ -730,11 +745,11 @@ void VoicePanel::resized()
         const int xmodW = s(248);
         modNoisePanelR = { pad, rowBY, xmodW, rowBH };
         {
-            const int titleH = s(14);                       // room for the "X-MOD" panel title
+            const int titleH = metal ? 0 : s(14);           // flat: room for the "X-MOD" title drawn inside
             const int rowH   = (rowBH - titleH) / 2;        // two equal lane rows
             const int row1Y  = rowBY + titleH;
             const int row2Y  = row1Y + rowH;
-            const int innerX = pad + s(6);
+            const int innerX = pad + boxClear;
             const int segW   = s(96);                       // 3-segment mode switch
             const int togW   = s(32);
 
@@ -783,7 +798,7 @@ void VoicePanel::resized()
             const int xStart     = serBtnX + serBtnD + s(8);
             const int knobGap    = s(2);
             // Dropdown width fills remaining space: filterX+filterW - xStart - 5×s2W - 4×knobGap
-            const int fullTypeDdW = (filterX + filterW) - xStart - 5 * s2W - 4 * knobGap;
+            const int fullTypeDdW = (filterX + filterW - (metal ? boxClear : 0)) - xStart - 5 * s2W - 4 * knobGap;
 
             // Type labels hidden — the dropdown content is self-explanatory.
             fltTypeLabel .setBounds(0, 0, 0, 0);
@@ -816,7 +831,7 @@ void VoicePanel::resized()
 
     // ── Mixer column — spans Row A + Row B, knobs stacked vertically ──────────
     {
-        const int spanH   = rowAH + gap + rowBH;
+        const int spanH   = rowBY + rowBH - contentTop;
         mixerPanelR = { mixerX, contentTop, mixerW, spanH };
         const int knobX   = mixerX + (mixerW - s2W) / 2;
         const int stackH  = 3 * s2H + 2 * gap;
@@ -828,19 +843,27 @@ void VoicePanel::resized()
         }
     }
 
+    voiceR = { 0, headerStripR.getBottom(), w, rowBY + rowBH + inset - headerStripR.getBottom() };
+
     // ── Gating designer — full width ─────────────────────────────────────────
-    int y = rowBY + rowBH + gap;
+    int y = rowBY + rowBH + (metal ? inset : gap);
     {
         const int gateH = s(38 + 134 + 10 + 4);   // 186 — kHdr1H + kGridH + kScrollH + border
-        gatingDesigner.setBounds(pad, y, w - 2 * pad, gateH);
-        y += gateH + gap;
+        gateR = { 0, y, w, gateH + 2 * inset };
+        gatingDesigner.setBounds(metal ? gateR.reduced(pad, inset) : juce::Rectangle<int>(pad, y, w - 2 * pad, gateH));
+        y = metal ? gateR.getBottom() : y + gateH + gap;
     }
 
     // ── Modulator panel — fills remaining height (minimum matches mu-clid) ───
     // Metal style shows one target at a time, so the modulators fit a shorter area.
-    const int modMinH = MuLookAndFeel::isMetal(*this) ? s(280) : s(332);
-    modulatorPanel.setBounds(pad, y, w - 2 * pad,
-                             juce::jmax(modMinH, h - y - pad));
+    const int modMinH = metal ? s(280) : s(332);
+    if (metal)
+    {
+        modR = { 0, y, w, juce::jmax(modMinH + 2 * inset, h - y) };
+        modulatorPanel.setBounds(modR.reduced(pad, inset));
+    }
+    else
+        modulatorPanel.setBounds(pad, y, w - 2 * pad, juce::jmax(modMinH, h - y - pad));
 }
 
 // Item-ID ranges. Factory tables use 1..N (= APVTS index + 1). The Wavetables/

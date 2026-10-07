@@ -197,7 +197,7 @@ public:
     // text labels are engraved into the metal. Off keeps the flat family look.
     void setMetalStyle(bool m) noexcept { metalStyle = m; }
     bool isMetalStyle() const noexcept  { return metalStyle; }
-    static bool isMetal(juce::Component& c);   // c's LookAndFeel is a MuLookAndFeel in metal style
+    static bool isMetal(const juce::Component& c);   // c's LookAndFeel is a MuLookAndFeel in metal style
 
     // The product's own colour (mu-Clid purple, mu-Tant green): panel borders, raised-box
     // outlines and LCD lettering use it. Unset = globalAccent, with LCDs in segmentActiveBorder.
@@ -290,6 +290,13 @@ public:
                                          float cornerSize = 4.0f);
     static void drawRaisedSubPanel(juce::Graphics&, juce::Rectangle<float> bounds,
                                    juce::Colour accent, float cornerSize = 4.0f);
+
+    // A panel's sections, each in a raised sub-panel: every shadow first, then the faces, the
+    // corner screws (screws style) and each name plate centred in the kSectionPlateH band
+    // just above its box. An empty name draws no plate.
+    struct Section { juce::Rectangle<int> box; juce::String name; };
+    static void drawSections(juce::Graphics&, const juce::Component& owner,
+                             std::initializer_list<Section> sections, juce::Colour accent);
 
     // Text buttons
     void drawButtonBackground(juce::Graphics&, juce::Button&,
@@ -608,6 +615,8 @@ public:
     // and the same measured from inside the standard channel inset, for content laid out within it.
     static constexpr int kScrewedPanelInset = 2 + kPanelScrewClear;
     static constexpr int kScrewedChannelGap = kScrewedPanelInset - kChannelInset;
+    // The band above a raised section box that holds its name plate (drawSections).
+    static constexpr int kSectionPlateH     = kVoiceLabelH;
 
     // Channel sidebar edges: flat, metal, and metal with screws (items + Add button clear of them).
     static constexpr int kSidebarFlatEdge     = 4;

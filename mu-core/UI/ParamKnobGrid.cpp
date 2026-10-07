@@ -52,26 +52,28 @@ void ParamKnobGrid::resized()
     // Knobs are drawn at one of the family's standard sizes (Size 2 — the per-channel
     // default used across mu-clid/mu-tant), not stretched to the cell. The grid fits as many
     // standard cells per row as the width allows, then wraps.
-    const int labelH = s(13);
+    const int labelH = s(kLabelH);
     const int knobW  = s(MuLookAndFeel::kKnobSize2W);
     const int knobH  = s(MuLookAndFeel::kKnobSize2H);
     const int comboH = s(24);
     const int cellW  = knobW + s(6);
-    const int cellH  = labelH + knobH + s(4);
+    const int cellH  = s(kCellH);
 
-    const int n      = (int) controls.size();
-    const int perRow = juce::jlimit(1, n, juce::jmax(1, area.getWidth() / cellW));
-
-    for (int i = 0; i < n; ++i)
+    // Flow the cells left to right, wrapping at the width. A selector takes two cells so its
+    // text fits (the metal style's LCD lettering is wider than one knob).
+    int x = area.getX(), y = area.getY();
+    for (auto& ctl : controls)
     {
-        const int r = i / perRow, c = i % perRow;
-        juce::Rectangle<int> cell(area.getX() + c * cellW, area.getY() + r * cellH, cellW, cellH);
-        controls[(size_t) i]->name.setBounds(cell.removeFromTop(labelH));
+        const int cw = ctl->combo ? 2 * cellW : cellW;
+        if (x > area.getX() && x + cw > area.getRight()) { x = area.getX(); y += cellH; }
+        juce::Rectangle<int> cell(x, y, cw, cellH);
+        x += cw;
+        ctl->name.setBounds(cell.removeFromTop(labelH));
         // Centre the standard-size control in the remaining cell.
-        if (controls[(size_t) i]->combo)
-            controls[(size_t) i]->combo->setBounds(cell.withSizeKeepingCentre(knobW, comboH));
-        else if (controls[(size_t) i]->knob)
-            controls[(size_t) i]->knob->setBounds(cell.withSizeKeepingCentre(knobW, knobH));
+        if (ctl->combo)
+            ctl->combo->setBounds(cell.withSizeKeepingCentre(cw - 2 * s(MuLookAndFeel::kDropdownEdgeGap), comboH));
+        else if (ctl->knob)
+            ctl->knob->setBounds(cell.withSizeKeepingCentre(knobW, knobH));
     }
 }
 

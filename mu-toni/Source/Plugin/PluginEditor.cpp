@@ -83,6 +83,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     // The family metal look.
     setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appBlue));
+    setScrews(true);
 }
 
 PluginEditor::~PluginEditor()
