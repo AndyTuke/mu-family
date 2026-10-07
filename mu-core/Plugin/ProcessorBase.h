@@ -105,13 +105,22 @@ public:
     // implementations; mu-tant currently inherits the defaults for everything
     // except whatever it has implemented.
 
-    // Internal transport (TransportBar play/BPM controls; standalone-only DAWs
-    // typically defer to the host playhead instead).
-    virtual bool   isInternalPlaying()      const          { return false; }
-    virtual void   toggleInternalPlay()                    {}
-    virtual double getInternalBpm()         const          { return 120.0; }
-    virtual void   setInternalBpm(double /*bpm*/)          {}
-    virtual double getInternalBeatPos()     const          { return 0.0; }
+    // Internal transport (TransportBar play / BPM controls): a free-running clock each product
+    // advances in processBlock while no host / MIDI clock drives it. Stopping resets the beat.
+    virtual bool   isInternalPlaying()      const { return internalPlaying.load(std::memory_order_relaxed); }
+    virtual void   toggleInternalPlay()
+    {
+        const bool now = ! internalPlaying.load(std::memory_order_relaxed);
+        internalPlaying.store(now, std::memory_order_relaxed);
+        if (! now) internalBeatPos.store(0.0, std::memory_order_relaxed);   // restart patterns cleanly
+    }
+    virtual double getInternalBpm()         const { return internalBpm.load(std::memory_order_relaxed); }
+    virtual void   setInternalBpm(double bpm)     { internalBpm.store(juce::jlimit(20.0, 300.0, bpm), std::memory_order_relaxed); }
+    virtual double getInternalBeatPos()     const { return internalBeatPos.load(std::memory_order_relaxed); }
+
+    // The family bus layout: at most one sidechain input (stereo or disabled) and a stereo
+    // main output. Products with extra output buses (mu-Clid's multi-out) override it.
+    bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
 
     // Master loop — the global loop the shared mu-core MasterLoopSection displays
     // (and which products may use to gate preset/program-change swap timing). The
@@ -243,6 +252,13 @@ public:
     // + the product's `ch{i}_*` strip). Handles: `ch{i}_*`, `ret_*`, `mstr_lvl/pan`,
     // `mst_ins*`, `eff_*`, `eff2*`, `dly_*`, `rev_*`, `echo_*`. Unrecognised IDs no-op.
     void syncGlobalFxParam(const juce::String& id, float v);
+
+protected:
+    // Internal transport state. Written by the UI (play / BPM) and the audio thread (beat
+    // advance); relaxed atomics — each is a lone published value.
+    std::atomic<bool>   internalPlaying { false };
+    std::atomic<double> internalBeatPos { 0.0 };
+    std::atomic<double> internalBpm     { 120.0 };
 
 protected:
     // Deferred message-thread work first (product hot-swap commits), then program changes.

@@ -6,7 +6,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <cmath>
 #include "Audio/SynthVoice.h"
-#include "Audio/WavetableBank.h"
+#include "Audio/Wavetable/WavetableBank.h"
 
 namespace
 {

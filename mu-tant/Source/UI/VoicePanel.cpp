@@ -90,14 +90,6 @@ namespace
             d.addItem(kScales[(size_t) i].name, i + 1);
     }
 
-    void populateXmodModes(DropdownSelect& d)
-    {
-        d.addItem("Off",  1);
-        d.addItem("FM",   2);
-        d.addItem("AM",   3);
-        d.addItem("Ring", 4);
-    }
-
     void populateFilterTypes(DropdownSelect& d)
     {
         // Use the family-canonical display order from mu-core — same order as
@@ -251,10 +243,6 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     };
 
     // ── Filter 2 ────────────────────────────────────────────────────────────
-    setupLabel(flt2TypeLabel, "Type");
-    populateFilterTypes(flt2TypeDropdown);
-    addAndMakeVisible(flt2TypeDropdown);
-
     flt2DrvKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
         return juce::String((int)std::round(v * 100.0));
     };

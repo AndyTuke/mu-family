@@ -113,4 +113,47 @@ inline bool isGlobalFxParamId(const juce::String& id)
         || id == "mstr_lvl" || id == "mstr_pan" || id.startsWith("mst_ins");
 }
 
+// Per-strip defaults and ID style for addChannelStripParams.
+struct ChannelStripOptions
+{
+    int   versionHint = 1;        // parameter version hint (mu-Clid's strips predate hints: 0)
+    bool  continuous  = false;    // ranges without a snapping interval (mu-Clid's reference layout)
+    int   scSrc       = 0;        // sidechain source default: 0 = off, 1..8 = ch0..7, 9 = external
+    float scAmt       = 0.0f;     // sidechain amount default
+    float scRel       = 100.0f;   // sidechain release default (ms)
+};
+
+// One mixer channel strip's parameters — level / pan / mute / solo, the three FX sends,
+// sidechain and output bus — under `prefix` (e.g. "ch3_"), named "<namePrefix>Level" etc.
+// The shared MixerChannel binds to these ids; ProcessorBase::syncGlobalFxParam syncs them.
+inline void addChannelStripParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout,
+                                  const juce::String& prefix, const juce::String& namePrefix,
+                                  const ChannelStripOptions& o = {})
+{
+    auto range = [&o](float lo, float hi, float step)
+    { return juce::NormalisableRange<float>(lo, hi, o.continuous ? 0.0f : step); };
+    auto addF = [&](const char* id, const char* name, float lo, float hi, float step, float def)
+    { layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID { prefix + id, o.versionHint },
+                                                             namePrefix + name, range(lo, hi, step), def)); };
+    auto addB = [&](const char* id, const char* name)
+    { layout.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID { prefix + id, o.versionHint },
+                                                            namePrefix + name, false)); };
+    auto addI = [&](const char* id, const char* name, int lo, int hi, int def)
+    { layout.add(std::make_unique<juce::AudioParameterInt>(juce::ParameterID { prefix + id, o.versionHint },
+                                                           namePrefix + name, lo, hi, def)); };
+
+    addF("lvl",     "Level",      0.0f,    1.0f, 0.001f, 1.0f);   // 0 dB default
+    addF("pan",     "Pan",       -1.0f,    1.0f, 0.001f, 0.0f);
+    addB("mute",    "Mute");
+    addB("solo",    "Solo");
+    addF("sendEff", "Send Eff",   0.0f,    1.0f, 0.001f, 0.0f);
+    addF("sendDly", "Send Dly",   0.0f,    1.0f, 0.001f, 0.0f);
+    addF("sendRev", "Send Rev",   0.0f,    1.0f, 0.001f, 0.0f);
+    addI("scSrc",   "SC Src",     0, 9, o.scSrc);
+    addF("scAmt",   "SC Amount",  0.0f,    1.0f, 0.001f, o.scAmt);
+    addF("scAtk",   "SC Attack",  1.0f,  500.0f, 0.1f,   5.0f);
+    addF("scRel",   "SC Release", 10.0f, 2000.0f, 1.0f,  o.scRel);
+    addI("outBus",  "Output Bus", 0, 8, 0);                     // 0 = master mix, 1..8 = direct out
+}
+
 } // namespace mu_mixfx

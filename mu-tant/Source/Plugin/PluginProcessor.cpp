@@ -142,18 +142,6 @@ void PluginProcessor::parameterChanged(const juce::String& id, float v)
         syncGlobalFxParam(id, v);
 }
 
-bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
-{
-    // Sidechain input: at most one, must be stereo or disabled.
-    const auto& ins = layouts.inputBuses;
-    if (ins.size() > 1) return false;
-    if (ins.size() == 1 && ins.getReference(0) != juce::AudioChannelSet::stereo()
-                        && ins.getReference(0) != juce::AudioChannelSet::disabled())
-        return false;
-    // Main output: must be stereo.
-    return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
-}
-
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     currentSampleRate = sampleRate;
@@ -311,7 +299,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     if (wrapperType != wrapperType_Standalone)
     {
         if (ht.bpm > 0.0) bpm = ht.bpm;
-        playing.store(ht.playing, std::memory_order_relaxed);   // UI timer reads this
+        internalPlaying.store(ht.playing, std::memory_order_relaxed);   // UI timer reads this
         blkPlaying = ht.playing;
     }
     else if (ht.hasPosition)
@@ -320,7 +308,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         // ceiling the internal transport uses) so the gate + hot-swap boundary see positions
         // exactly as they do free-running — only the SOURCE of the beat changes.
         if (ht.bpm > 0.0) bpm = ht.bpm;
-        playing.store(ht.playing, std::memory_order_relaxed);
+        internalPlaying.store(ht.playing, std::memory_order_relaxed);
         blkPlaying = ht.playing;
         slaved     = true;
         slavedBeat = std::fmod(ht.ppqPosition, (double) GatePattern::kMaxPatternBars * 4.0);
@@ -330,14 +318,14 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         // Slaved to external MIDI clock (standalone, MIDI-in). Same bounded beat space as the
         // others — only the SOURCE of the beat changes (mu-link takes priority above when attached).
         bpm = midiClockSync.getBpm();
-        playing.store(true, std::memory_order_relaxed);
+        internalPlaying.store(true, std::memory_order_relaxed);
         blkPlaying = true;
         slaved     = true;
         slavedBeat = std::fmod(midiClockBeat, (double) GatePattern::kMaxPatternBars * 4.0);
     }
     else
     {
-        blkPlaying = playing.load(std::memory_order_relaxed);
+        blkPlaying = internalPlaying.load(std::memory_order_relaxed);
     }
 
     blkBeatStart      = slaved ? slavedBeat : internalBeatPos.load(std::memory_order_relaxed);

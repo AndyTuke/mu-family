@@ -7,8 +7,8 @@
 #include <vector>
 #include <cmath>
 #include "Audio/Scales.h"
-#include "Audio/WavetableBank.h"
-#include "Audio/WavetableOscillator.h"
+#include "Audio/Wavetable/WavetableBank.h"        // mu-core
+#include "Audio/Wavetable/WavetableOscillator.h"
 
 class SynthDSPTest : public juce::UnitTest
 {
@@ -18,6 +18,7 @@ public:
     void runTest() override
     {
         using namespace mu_tant;
+        using namespace mu_wavetable;
 
         beginTest ("scale-quantised pitch lands on the right MIDI notes");
         {

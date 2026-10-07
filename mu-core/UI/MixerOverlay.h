@@ -65,7 +65,6 @@ private:
     static constexpr int kFXPad     = 6;
     static constexpr int kDivW      = 4;
     static constexpr int kChanGap   = 3;
-    static constexpr int kMasterW   = 80;  // strip only; component is kMasterW + MixerChannel::kInsertPanelW
     static constexpr int kLabelPanelW = 38; // narrow panel left of channels with section row labels
 
     // Cached layout values updated each resized() call — read by paint().

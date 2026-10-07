@@ -6,7 +6,7 @@
 #include "Modulation/LaneModulation.h"       // mu-core: shared range-based per-lane resolve
 #include "Sequencer/GatePattern.h"           // mu-tant: per-voice gate pattern
 #include "Audio/SynthVoice.h"                // mu-tant voice
-#include "Audio/WavetableBank.h"
+#include "Audio/Wavetable/WavetableBank.h"   // mu-core
 #include "Audio/InsertProcessor.h"           // mu-core: shared per-voice insert FX
 
 #include "Modulation/MuTantModSnap.h"
@@ -87,7 +87,6 @@ public:
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
-    bool isBusesLayoutSupported(const BusesLayout&) const override;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
@@ -118,20 +117,6 @@ public:
     // the gater is CLOSED — so the voice is silent on load (gateModeFor: !playing →
     // Silence). To audition the raw oscillator drone, bypass the gater (gate_bypass →
     // Pass). While playing the beat advances and the gate engine chops per the pattern.
-    bool   isInternalPlaying()  const override { return playing.load(std::memory_order_relaxed); }
-    void   toggleInternalPlay() override
-    {
-        const bool now = !playing.load(std::memory_order_relaxed);
-        playing.store(now, std::memory_order_relaxed);
-        if (!now)
-        {
-            // Reset beat position on stop so pattern loops restart cleanly.
-            internalBeatPos.store(0.0, std::memory_order_relaxed);
-        }
-    }
-    double getInternalBpm()     const override { return internalBpm.load(std::memory_order_relaxed); }
-    void   setInternalBpm(double bpm) override { internalBpm.store(juce::jlimit(20.0, 300.0, bpm), std::memory_order_relaxed); }
-    double getInternalBeatPos() const override { return internalBeatPos.load(std::memory_order_relaxed); }
 
     // Master loop — length from the mstrLoop param (0 = free; 1..16 → 16..256 steps),
     // live step derived from the free-running beat (4 steps/beat = 16 steps/bar, same
@@ -405,16 +390,6 @@ private:
     // stepped pitch snaps to semitones, smooth glides.
     std::array<std::atomic<bool>, kMaxVoices> osc1SemiStepped {};
     std::array<std::atomic<bool>, kMaxVoices> osc2SemiStepped {};
-
-    // Internal transport. `playing` gates the beat advance; `internalBeatPos`
-    // is the song position in beats (quarter notes) that drives modulator
-    // evaluation + the gate engine + the gating-grid playhead. All atomic: the UI
-    // reads/writes them off the message thread while the audio thread reads them
-    // (internalBpm is written by setInternalBpm from the BPM box and read every
-    // block for beatsPerSample — relaxed is fine, each is a lone published value).
-    std::atomic<bool>   playing { false };
-    std::atomic<double> internalBeatPos { 0.0 };
-    std::atomic<double> internalBpm { 120.0 };
 
     // Master-loop length param pointer, cached for RT-safe reads (no per-block
     // string lookup) in processBlock. Set in cacheParamPointers().

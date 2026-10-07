@@ -186,20 +186,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         const juce::String n = (i < kAutomatedRhythms)
                                    ? "Rhythm " + juce::String(i + 1) + " Ch "
                                    : "Ch"      + juce::String(i + 1) + " ";
-        addF(c+"lvl",     n+"Level",      0.0f, 1.0f,  1.0f);  // 0 dB default
-        addF(c+"pan",     n+"Pan",       -1.0f, 1.0f,  0.0f);
-        addB(c+"mute",    n+"Mute",      false);
-        addB(c+"solo",    n+"Solo",      false);
-        addF(c+"sendEff", n+"Send Eff",  0.0f, 1.0f,  0.0f);
-        addF(c+"sendDly", n+"Send Dly",  0.0f, 1.0f,  0.0f);
-        addF(c+"sendRev", n+"Send Rev",  0.0f, 1.0f,  0.0f);
-        // Sidechain
-        addI(c+"scSrc",   n+"SC Src",    0, 9,     0);  // 0=off, 1-8=ch1-ch8, 9=ext DAW bus
-        addF(c+"scAmt",   n+"SC Amount", 0.0f, 1.0f, 0.0f);
-        addF(c+"scAtk",   n+"SC Attack", 1.0f, 500.0f, 5.0f);
-        addF(c+"scRel",   n+"SC Release",10.0f, 2000.0f, 100.0f);
-        // Multi-bus output routing: 0 = Master mix, 1..8 = direct out to Bus 1..8.
-        addI(c+"outBus",  n+"Output Bus",0, 8,     0);
+        // mu-Clid's strips keep their original ids (no version hint) and continuous ranges.
+        mu_mixfx::ChannelStripOptions opts;
+        opts.versionHint = 0;
+        opts.continuous  = true;
+        mu_mixfx::addChannelStripParams(layout, c, n, opts);
     }
 
     // ── Master loop length — product-specific (sequencer master loop) ─────────

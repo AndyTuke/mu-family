@@ -325,3 +325,15 @@ void ProcessorBase::processCoreBlock(juce::AudioBuffer<float>&                ma
     mixerEngine.processBlock(masterBus, numVoices, voices, fxChain, numSamples,
                              directOuts, fxReturnsOut, retired, renderChannel);
 }
+
+bool ProcessorBase::isBusesLayoutSupported(const BusesLayout& layouts) const
+{
+    // Sidechain input: at most one, stereo or disabled.
+    const auto& ins = layouts.inputBuses;
+    if (ins.size() > 1) return false;
+    if (ins.size() == 1 && ins.getReference(0) != juce::AudioChannelSet::stereo()
+                        && ins.getReference(0) != juce::AudioChannelSet::disabled())
+        return false;
+    // Main output: stereo.
+    return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
+}

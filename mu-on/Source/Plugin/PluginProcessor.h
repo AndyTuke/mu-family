@@ -47,7 +47,6 @@ public:
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
-    bool isBusesLayoutSupported(const BusesLayout&) const override;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
@@ -66,19 +65,6 @@ public:
 
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
-
-    // ── Internal transport (TransportBar play/BPM) ────────────────────────────
-    // Free-running clock; the sequencer reads the beat to advance its steps.
-    bool   isInternalPlaying()  const override { return playing.load(std::memory_order_relaxed); }
-    void   toggleInternalPlay() override
-    {
-        const bool now = !playing.load(std::memory_order_relaxed);
-        playing.store(now, std::memory_order_relaxed);
-        if (!now) internalBeatPos.store(0.0, std::memory_order_relaxed);
-    }
-    double getInternalBpm()     const override { return internalBpm.load(std::memory_order_relaxed); }
-    void   setInternalBpm(double bpm) override { internalBpm.store(juce::jlimit(20.0, 300.0, bpm), std::memory_order_relaxed); }
-    double getInternalBeatPos() const override { return internalBeatPos.load(std::memory_order_relaxed); }
 
     // ── ProcessorBase channel metadata (drives sidebar + mixer) ───────────────
     int          getNumChannels()              const override { return kNumChannels; }
@@ -193,9 +179,6 @@ private:
     std::atomic<float>* seqSwingParam  = nullptr;
     std::atomic<float>* seqAccentParam = nullptr;
 
-    std::atomic<bool>   playing { false };
-    std::atomic<double> internalBeatPos { 0.0 };
-    std::atomic<double> internalBpm { 120.0 };
     double currentSampleRate = 44100.0;
     bool   wasPlaying = false;   // audio-thread only — detects the play→stop edge to silence voices
 

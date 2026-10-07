@@ -68,18 +68,7 @@ public:
     void getStateInformation(juce::MemoryBlock& d) override { presetIO.getStateInformation(d); }
     void setStateInformation(const void* d, int s) override { presetIO.setStateInformation(d, s); }
 
-    // internalPlaying / internalBeatPos are touched by both audio (write) and
-    // message thread (read + clear). std::atomic<> with relaxed ordering — no other
-    // memory is published through them, so relaxed is sufficient.
-    void   toggleInternalPlay() override
-    {
-        const bool nowPlaying = !internalPlaying.load(std::memory_order_relaxed);
-        internalPlaying.store(nowPlaying, std::memory_order_relaxed);
-        if (!nowPlaying) internalBeatPos.store(0.0, std::memory_order_relaxed);
-    }
-    bool   isInternalPlaying()   const override { return internalPlaying.load(std::memory_order_relaxed); }
-    void   setInternalBpm(double bpm)  override { internalBpm.store(juce::jlimit(20.0, 300.0, bpm), std::memory_order_relaxed); }
-    double getInternalBpm()      const override { return internalBpm.load(std::memory_order_relaxed); }
+    // Internal transport comes from ProcessorBase; the UI beat follows the MIDI clock when synced.
     double getInternalBeatPos()  const override
     {
         if (midiClockSync.isEnabled() && midiClockSync.isPlaying())
@@ -472,9 +461,6 @@ private:
     friend class HotSwapStager;
 
     // atomic for safe cross-thread access (audio writes, UI reads + clears).
-    std::atomic<bool>   internalPlaying   { false };
-    std::atomic<double> internalBeatPos   { 0.0 };
-    std::atomic<double> internalBpm       { 120.0 };  // written by message thread, read by audio thread
     // Written in prepareToPlay; read in processBlock. JUCE calls prepareToPlay
     // while the audio thread is suspended by the host, so these fields are never
     // concurrently read and written — no atomic needed.

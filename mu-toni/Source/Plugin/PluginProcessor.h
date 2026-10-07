@@ -46,7 +46,6 @@ public:
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
-    bool isBusesLayoutSupported(const BusesLayout&) const override;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
@@ -65,20 +64,6 @@ public:
 
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
-
-    // ── Internal transport (TransportBar play/BPM) ────────────────────────────
-    // Free-running clock so the shell's play button + BPM box are live. Nothing
-    // consumes the beat yet — the engine/sequencer will.
-    bool   isInternalPlaying()  const override { return playing.load(std::memory_order_relaxed); }
-    void   toggleInternalPlay() override
-    {
-        const bool now = !playing.load(std::memory_order_relaxed);
-        playing.store(now, std::memory_order_relaxed);
-        if (!now) internalBeatPos.store(0.0, std::memory_order_relaxed);
-    }
-    double getInternalBpm()     const override { return internalBpm.load(std::memory_order_relaxed); }
-    void   setInternalBpm(double bpm) override { internalBpm.store(juce::jlimit(20.0, 300.0, bpm), std::memory_order_relaxed); }
-    double getInternalBeatPos() const override { return internalBeatPos.load(std::memory_order_relaxed); }
 
     // ── ProcessorBase channel metadata (drives sidebar + mixer) ───────────────
     int          getNumChannels()              const override { return kNumChannels; }
@@ -189,8 +174,6 @@ private:
     // Renders channel `ch` from its arp runner. Captures `this` (reads arpCtx).
     MixerEngine::RenderChannelFn renderChannelCb;
 
-    std::atomic<bool>   playing { false };
-    std::atomic<double> internalBeatPos { 0.0 };
 
     // Hot-swap staging: parsed preset trees per layer + one full preset. transportRunning is the
     // audio thread's play state (host, MIDI clock or internal), read when a load decides to stage.
@@ -198,7 +181,6 @@ private:
     mu_hotswap::Stager<juce::ValueTree, juce::ValueTree, kNumChannels> hotSwap;
     std::atomic<bool> transportRunning { false };
     bool              swapWasPlaying = false;   // audio thread only — the play→stop edge
-    std::atomic<double> internalBpm { 120.0 };
     double currentSampleRate = 44100.0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)

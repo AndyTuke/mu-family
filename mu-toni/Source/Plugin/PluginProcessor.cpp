@@ -45,18 +45,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     {
         const String c = "ch" + String(i) + "_";
         const String n = "Layer " + String(i + 1) + " Ch ";
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"lvl",  1}, n+"Level", f(0.0f, 1.0f, 0.001f), 1.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"pan",  1}, n+"Pan",   f(-1.0f, 1.0f, 0.001f), 0.0f));
-        layout.add(std::make_unique<AudioParameterBool> (ParameterID{c+"mute", 1}, n+"Mute",  false));
-        layout.add(std::make_unique<AudioParameterBool> (ParameterID{c+"solo", 1}, n+"Solo",  false));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"sendEff", 1}, n+"Send Eff", f(0.0f, 1.0f, 0.001f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"sendDly", 1}, n+"Send Dly", f(0.0f, 1.0f, 0.001f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"sendRev", 1}, n+"Send Rev", f(0.0f, 1.0f, 0.001f), 0.0f));
-        layout.add(std::make_unique<AudioParameterInt>  (ParameterID{c+"scSrc",   1}, n+"SC Src",  0, 9, 0));  // 0=off, 1-8=ch0-ch7, 9=ext DAW bus
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"scAmt",   1}, n+"SC Amount", f(0.0f, 1.0f, 0.001f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"scAtk",   1}, n+"SC Attack", f(1.0f, 500.0f, 0.1f), 5.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"scRel",   1}, n+"SC Release", f(10.0f, 2000.0f, 1.0f), 100.0f));
-        layout.add(std::make_unique<AudioParameterInt>  (ParameterID{c+"outBus",  1}, n+"Output Bus", 0, 8, 0));
+        mu_mixfx::addChannelStripParams(layout, c, n);
     }
 
     // ── Per-voice arpeggiator + analogue voice + envelopes (v{N}_*) ───────────
@@ -346,18 +335,6 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     }
 }
 
-bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
-{
-    // Sidechain input: at most one, must be stereo or disabled.
-    const auto& ins = layouts.inputBuses;
-    if (ins.size() > 1) return false;
-    if (ins.size() == 1 && ins.getReference(0) != juce::AudioChannelSet::stereo()
-                        && ins.getReference(0) != juce::AudioChannelSet::disabled())
-        return false;
-    // Main output: must be stereo.
-    return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
-}
-
 void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
@@ -390,12 +367,12 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     {
         bpm       = midiClockSync.getBpm();
         isPlaying = true;
-        playing.store(true, std::memory_order_relaxed);   // UI play button reflects the clock
+        internalPlaying.store(true, std::memory_order_relaxed);   // UI play button reflects the clock
     }
     else
     {
         bpm       = internalBpm.load(std::memory_order_relaxed);
-        isPlaying = playing.load(std::memory_order_relaxed);
+        isPlaying = internalPlaying.load(std::memory_order_relaxed);
     }
 
     // Root-by-MIDI / trigger: update the held-note stack from incoming notes.

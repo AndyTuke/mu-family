@@ -28,22 +28,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         // Bass + Rumble pre-wire their sidechain SOURCE to the Kick (bass ducks the kick out of
         // the box; Rumble exposes it for optional kick-pumping — amount left at 0 by default).
         const bool fromKick = isBass || (i == Rumble);
-        const int   scSrcDefault = fromKick ? (Kick + 1) : 0;   // param 1..8 = ch0..7; +1 maps Kick→1
-        const float scAmtDefault = isBass ? 0.4f : 0.0f;
-        const float scRelDefault = isBass ? 120.0f : 100.0f;
-
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"lvl",  1}, n+"Level", f(0.0f, 1.0f, 0.001f), 1.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"pan",  1}, n+"Pan",   f(-1.0f, 1.0f, 0.001f), 0.0f));
-        layout.add(std::make_unique<AudioParameterBool> (ParameterID{c+"mute", 1}, n+"Mute",  false));
-        layout.add(std::make_unique<AudioParameterBool> (ParameterID{c+"solo", 1}, n+"Solo",  false));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"sendEff", 1}, n+"Send Eff", f(0.0f, 1.0f, 0.001f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"sendDly", 1}, n+"Send Dly", f(0.0f, 1.0f, 0.001f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"sendRev", 1}, n+"Send Rev", f(0.0f, 1.0f, 0.001f), 0.0f));
-        layout.add(std::make_unique<AudioParameterInt>  (ParameterID{c+"scSrc",   1}, n+"SC Src",  0, 9, scSrcDefault));  // 0=off, 1-8=ch0-7, 9=ext
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"scAmt",   1}, n+"SC Amount", f(0.0f, 1.0f, 0.001f), scAmtDefault));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"scAtk",   1}, n+"SC Attack", f(1.0f, 500.0f, 0.1f), 5.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(ParameterID{c+"scRel",   1}, n+"SC Release", f(10.0f, 2000.0f, 1.0f), scRelDefault));
-        layout.add(std::make_unique<AudioParameterInt>  (ParameterID{c+"outBus",  1}, n+"Output Bus", 0, 8, 0));
+        mu_mixfx::ChannelStripOptions opts;
+        opts.scSrc = fromKick ? (Kick + 1) : 0;   // param 1..8 = ch0..7; +1 maps Kick→1
+        opts.scAmt = isBass ? 0.4f : 0.0f;
+        opts.scRel = isBass ? 120.0f : 100.0f;
+        mu_mixfx::addChannelStripParams(layout, c, n, opts);
     }
 
     // ── Sequencer (global groove controls) ────────────────────────────────────
@@ -157,16 +146,6 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     fxChain.prepare(sampleRate, samplesPerBlock);
 }
 
-bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
-{
-    const auto& ins = layouts.inputBuses;
-    if (ins.size() > 1) return false;
-    if (ins.size() == 1 && ins.getReference(0) != juce::AudioChannelSet::stereo()
-                        && ins.getReference(0) != juce::AudioChannelSet::disabled())
-        return false;
-    return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
-}
-
 void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
@@ -193,20 +172,20 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     const bool externalBeat = host.hasPosition || clockEnabled;
     double bpm       = internalBpm.load(std::memory_order_relaxed);
     double beatStart = internalBeatPos.load(std::memory_order_relaxed);
-    bool   isPlaying = playing.load(std::memory_order_relaxed);
+    bool   isPlaying = internalPlaying.load(std::memory_order_relaxed);
     if (host.hasPosition)
     {
         isPlaying = host.playing;
         if (host.bpm > 0.0) bpm = host.bpm;
         beatStart = host.ppqPosition;
-        playing.store(isPlaying, std::memory_order_relaxed);   // UI play button mirrors the host / mu-link
+        internalPlaying.store(isPlaying, std::memory_order_relaxed);   // UI play button mirrors the host / mu-link
     }
     else if (clockEnabled)
     {
         isPlaying = midiClockSync.isPlaying();
         if (midiClockSync.getBpm() > 0.0) bpm = midiClockSync.getBpm();
         beatStart = midiClockBeat;
-        playing.store(isPlaying, std::memory_order_relaxed);   // UI play button mirrors the external transport
+        internalPlaying.store(isPlaying, std::memory_order_relaxed);   // UI play button mirrors the external transport
     }
 
     // Refresh engine params from the APVTS, then clock the 909 sequencer for this block
