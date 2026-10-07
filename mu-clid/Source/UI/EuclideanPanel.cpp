@@ -20,11 +20,10 @@ EuclideanPanel::EuclideanPanel(PluginProcessor& p) : proc(p)
 
     // Logic dropdown — populated with 1-based IDs that map to APVTS "logic" via id - 1.
     // Not added here: the host parents and places it (see getLogicControl).
-    logicCtrl.addItem("OR",      1);
-    logicCtrl.addItem("AND",     2);
-    logicCtrl.addItem("XOR",     3);
-    logicCtrl.addItem("A not B", 4);
-    logicCtrl.addItem("B not A", 5);
+    // Shown as the standard logic symbols (∨ or, ∧ and, ⊕ xor, ¬ not) so they fit the
+    // small LCD; the status bar spells each one out.
+    for (int i = 0; i < kNumLogicModes; ++i)
+        logicCtrl.addItem(juce::String(juce::CharPointer_UTF8(kLogicSymbols[i])), i + 1);
 
     const int maxSteps = proc.maxSteps(HitGenerator::kMaxSteps);   // 16 in demo
     stepsA.setRange(1, maxSteps, 1);      hitsA.setRange(0, 64, 1);   rotA.setRange(0, 63, 1);
@@ -171,12 +170,13 @@ void EuclideanPanel::wireCallbacks()
     // ── Logic ─────────────────────────────────────────────────────────────────
     // DropdownSelect fires onChange with the 1-based ComboBox ID — convert to
     // the 0-based index used by the APVTS "logic" param.
-    static const char* const logicNames[] = { "OR", "AND", "XOR", "A not B", "B not A" };
+    static const char* const logicNames[kNumLogicModes] = { "OR", "AND", "XOR", "A not B", "B not A" };
     logicCtrl.onChange = [this, notify](int id) {
         const int idx = id - 1;
         apvtsSet("logic", (float)idx);  notify();
-        if (onStatusUpdate && idx >= 0 && idx < 5)
-            onStatusUpdate("Logic", juce::String(logicNames[idx]));
+        if (onStatusUpdate && idx >= 0 && idx < kNumLogicModes)
+            onStatusUpdate("Logic", juce::String(juce::CharPointer_UTF8(kLogicSymbols[idx]))
+                                        + " (" + logicNames[idx] + ")");
     };
 
     // ── Euclid B ─────────────────────────────────────────────────────────────

@@ -25,7 +25,11 @@ public:
     {
         server = std::make_unique<mu_link::AudioServer>();
         server->start();                       // creates the bus + opens the default device
+       #if JUCE_DEBUG
+        mainWindow = std::make_unique<MainWindow>(getApplicationName() + " - Debug", *server);   // marks a Debug build
+       #else
         mainWindow = std::make_unique<MainWindow>(getApplicationName(), *server);
+       #endif
     }
 
     void shutdown() override

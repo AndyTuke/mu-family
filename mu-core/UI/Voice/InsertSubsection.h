@@ -38,7 +38,10 @@ public:
 
     // How many knob columns the algorithm dropdown spans (default 4). A product that puts
     // other controls on the top row beside it — the voice band's FX sends — narrows it.
-    void setAlgoColumns(int cols) { algoColumns = cols; resized(); }
+    void setAlgoColumns(int cols) { algoColumns = cols; algoWidth = 0; resized(); }
+    // Or the dropdown's area as an exact width (unscaled px), when the space beside it
+    // isn't a whole number of knob columns.
+    void setAlgoWidth(int px) { algoWidth = px; resized(); }
 
     std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
     std::function<void(int insertAlgo)> onInsertAlgorithmChanged;
@@ -57,6 +60,7 @@ private:
     juce::String   prefix;          // e.g. "r" / "v"
     int            channelIndex = -1;
     int            algoColumns  = 4;
+    int            algoWidth    = 0;   // > 0 overrides algoColumns
 
     float insertSnapshots     [mu_ui::kInsertAlgoCount][mu_ui::kInsertSlotCount] = {{0.0f}};
     bool  insertSnapshotValid [mu_ui::kInsertAlgoCount] = {};

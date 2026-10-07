@@ -97,6 +97,17 @@ public:
     }
 
     const juce::String getApplicationName()    override { return config.displayName; }
+
+    // Title-bar text: the app name, marked " - Debug" in Debug builds so one can't be
+    // mistaken for a Release build.
+    juce::String windowTitle() const
+    {
+       #if JUCE_DEBUG
+        return config.displayName + " - Debug";
+       #else
+        return config.displayName;
+       #endif
+    }
     const juce::String getApplicationVersion() override { return JucePlugin_VersionString; }
     bool moreThanOneInstanceAllowed()          override { return true; }
     void anotherInstanceStarted (const juce::String&) override {}
@@ -110,7 +121,7 @@ public:
             false);
 
         mainWindow = std::make_unique<CloseConfirmWindow> (
-            getApplicationName(),
+            windowTitle(),
             juce::LookAndFeel::getDefaultLookAndFeel().findColour (
                 juce::ResizableWindow::backgroundColourId),
             std::move (holder),

@@ -42,6 +42,10 @@ public:
 
     // Logic dropdown size: the narrowest that still fits the widest item ("B not A")
     // beside the ComboBox chrome (6 px left pad + arrow, 24 px in all).
+    // Logic modes (APVTS "logic" index order) as logic symbols: A∨B, A∧B, A⊕B, A∧¬B, B∧¬A.
+    static constexpr int kNumLogicModes = 5;
+    static constexpr const char* kLogicSymbols[kNumLogicModes] = {
+        "A \xe2\x88\xa8 B", "A \xe2\x88\xa7 B", "A \xe2\x8a\x95 B", "A\xe2\x88\xa7\xc2\xac" "B", "B\xe2\x88\xa7\xc2\xac" "A" };
     static constexpr int kLogicDropW = 64;
     static constexpr int kLogicDropH = 15;
 

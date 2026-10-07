@@ -40,7 +40,12 @@ private:
     // The send knobs close up a little so the Effects box ends short of the voice panel's
     // bottom-right corner screw.
     static constexpr int kSendColW   = kCols - 3;                                          // 51
-    static constexpr int kEffectsW   = kInsertW - kSendCols * (kCols - kSendColW);         // 315
+    // The whole band starts kLeftGap in, so the Pitch box clears the voice panel's
+    // bottom-left corner screw (screw reach, less the RhythmPanel inset round this
+    // component); the Effects box gives up that width.
+    static constexpr int kLeftGap    = 2 + MuLookAndFeel::kPanelScrewClear - (MuLookAndFeel::kPanelPad + 1);   // 7
+    static constexpr int kEffectsW   = kInsertW - kSendCols * (kCols - kSendColW) - kLeftGap;   // 308
+    static constexpr int kSendsX     = kEffectsW - kSendCols * kSendColW;   // sends, right-aligned in the box
     static constexpr float kPlateH   = (float) MuLookAndFeel::kNamePlateH;   // section name plates
 
     PluginProcessor& proc;

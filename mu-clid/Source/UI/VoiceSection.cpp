@@ -15,7 +15,7 @@ VoiceSection::VoiceSection(PluginProcessor& p)
     // after insertSub so they're on top of it.
     for (auto* k : ampSub.sendKnobs())
         addAndMakeVisible(k);
-    insertSub.setAlgoColumns(kInsertCols - kSendCols);
+    insertSub.setAlgoWidth(kSendsX);   // the effect dropdown takes the space left of the sends
 
     // Forward status updates from each subsection through our own callback.
     auto fwd = [this](const juce::String& n, const juce::String& v) {
@@ -90,26 +90,28 @@ void VoiceSection::resized()
     // Fixed Medium-baseline layout, wrapped in s() so the whole grid scales.
     // Pitch / Amp / Insert use the standard 54-px column (kVoiceUnitW).
     // Filter gets 6 narrower 50-px columns (kVoiceFilterColW) for the Drive knob.
-    // Total: 4×54 + 6×50 + 4×54 + 6×54 + 3×6 = 1074 px (= available width exactly).
+    // Total: 7 (left gap) + 4×54 + 6×50 + 4×54 + 308 (Effects box) + 3×6 = 1065 px, leaving
+    // the right end short of the voice panel's corner screw.
     using LF = MuLookAndFeel;
     using mu_ui::s;
     constexpr int divW   = LF::kVoiceDivW;
     constexpr int labelH = LF::kVoiceLabelH;
-    constexpr int kW     = LF::kVoiceUnitW;       // 54 — pitch / amp / insert columns
     constexpr int kFltW  = LF::kVoiceFilterColW;  // 50 — filter columns (6 of them)
     constexpr int subH   = LF::kVoiceSubH;
 
-    constexpr int fltX  = kPitchW + divW;            // 222
-    constexpr int ampX  = fltX + 6 * kFltW + divW;            // 528
-    constexpr int insX  = ampX + kAmpW + divW;       // 750
+    constexpr int pitX  = kLeftGap;                  // 7
+    constexpr int fltX  = pitX + kPitchW + divW;     // 229
+    constexpr int ampX  = fltX + 6 * kFltW + divW;   // 535
+    constexpr int insX  = ampX + kAmpW + divW;       // 757
 
-    pitchSub .setBounds(0,          s(labelH), s(kPitchW), s(subH));
+    pitchSub .setBounds(s(pitX),    s(labelH), s(kPitchW), s(subH));
     filterSub.setBounds(s(fltX),    s(labelH), s(6 * kFltW),        s(subH));
     ampSub   .setBounds(s(ampX),    s(labelH), s(kAmpW),   s(subH));
     insertSub.setBounds(s(insX),    s(labelH), s(kEffectsW), s(subH));
 
-    // FX sends: the Insert panel's last kSendCols (slightly narrower) columns, top row.
-    constexpr int sendX = insX + (kInsertCols - kSendCols) * kW;
+    // FX sends: kSendCols slightly narrower columns, right-aligned in the Effects box's top
+    // row; the effect dropdown takes the space to their left.
+    constexpr int sendX = insX + kSendsX;
     int col = 0;
     for (auto* k : ampSub.sendKnobs())
         k->setBounds(s(sendX + col++ * kSendColW), s(labelH), s(kSendColW), s(LF::kKnobSize2H));
@@ -126,7 +128,8 @@ void VoiceSection::paint(juce::Graphics& g)
     constexpr int labelH = LF::kVoiceLabelH;
     constexpr int kFltW  = LF::kVoiceFilterColW;
 
-    constexpr int fltX = kPitchW + divW;
+    constexpr int pitX = kLeftGap;
+    constexpr int fltX = pitX + kPitchW + divW;
     constexpr int ampX = fltX + 6 * kFltW + divW;
     constexpr int insX = ampX + kAmpW + divW;
 
@@ -147,7 +150,7 @@ void VoiceSection::paint(juce::Graphics& g)
         // Flat: thin dividers between the subsections.
         g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
         const float kDivInset = mu_ui::sf(7.0f);
-        const float div1X = static_cast<float>(s(kPitchW) + s(divW) / 2);
+        const float div1X = static_cast<float>(s(pitX + kPitchW) + s(divW) / 2);
         const float div2X = static_cast<float>(s(fltX + 6 * kFltW) + s(divW) / 2);
         const float div3X = static_cast<float>(s(ampX + kAmpW) + s(divW) / 2);
         g.drawLine(div1X, kDivInset, div1X, (float)h - kDivInset, 0.5f);
@@ -160,7 +163,7 @@ void VoiceSection::paint(juce::Graphics& g)
     {
         MuLookAndFeel::drawCentredNamePlate(g, { (float) s(x), 0.0f, (float) s(w), (float) s(labelH) }, name);
     };
-    plate("PITCH",  0,    kPitchW);
+    plate("PITCH",  pitX, kPitchW);
     plate("FILTER", fltX, 6 * kFltW);
     plate("AMP",    ampX, kAmpW);
     plate("EFFECTS", insX, kEffectsW);
