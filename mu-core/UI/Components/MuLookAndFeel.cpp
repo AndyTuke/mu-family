@@ -590,6 +590,70 @@ juce::Colour MuLookAndFeel::lcdLitColour(juce::Component& c)
     return (mlf != nullptr && mlf->hasAppAccent) ? mlf->appAccentColour.brighter(0.6f) : lcdLitColour();
 }
 
+bool MuLookAndFeel::hasScrews(juce::Component& c)
+{
+    auto* mlf = dynamic_cast<MuLookAndFeel*>(&c.getLookAndFeel());
+    return mlf != nullptr && mlf->metalStyle && mlf->screws;
+}
+
+void MuLookAndFeel::drawScrew(juce::Graphics& g, juce::Point<float> centre, float d, float angle)
+{
+    const auto& L    = lighting();
+    const float r    = d * 0.5f;
+    const auto  head = juce::Rectangle<float>(d, d).withCentre(centre);
+
+    // Cast shadow, falling down-left away from the top-right light.
+    g.setColour(juce::Colours::black.withAlpha(L.shadow(L.screwShadow)));
+    g.fillEllipse(head.translated(-r * 0.3f, r * 0.4f).expanded(r * 0.12f));
+
+    // Domed steel head: lit at the top right, in shade at the bottom left, dark rim.
+    g.setColour(colour(labelText).darker(L.screwSteelDarken));
+    g.fillEllipse(head);
+    g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(L.highlight(L.screwHeadLight)), head.getTopRight(),
+                                           juce::Colours::black.withAlpha(L.shadow(L.screwHeadShade)), head.getBottomLeft(), false));
+    g.fillEllipse(head);
+    g.setColour(juce::Colours::black.withAlpha(L.shadow(L.screwRim)));
+    g.drawEllipse(head, juce::jmax(0.6f, d * 0.08f));
+
+    // Cross recess: light catching its lower-left edge, then the dark cut over it.
+    const float arm   = r * 0.62f;
+    const float thick = juce::jmax(1.0f, d * 0.2f);
+    juce::Path cross;
+    for (float a : { angle, angle + juce::MathConstants<float>::halfPi })
+    {
+        const juce::Point<float> v(std::cos(a) * arm, std::sin(a) * arm);
+        cross.startNewSubPath(centre - v);
+        cross.lineTo(centre + v);
+    }
+    const juce::PathStrokeType stroke(thick, juce::PathStrokeType::mitered, juce::PathStrokeType::butt);
+    g.setColour(juce::Colours::white.withAlpha(L.highlight(L.screwSlotLight)));
+    g.strokePath(cross, stroke, juce::AffineTransform::translation(-0.5f, 0.5f));
+    g.setColour(juce::Colours::black.withAlpha(L.shadow(L.screwSlot)));
+    g.strokePath(cross, stroke);
+}
+
+// A screw `inset` in from each corner of `r`, each cross turned a little differently.
+static void drawCornerScrews(juce::Graphics& g, juce::Rectangle<float> r, float d, float inset)
+{
+    const float angles[4] = { 0.35f, 1.10f, 0.75f, 0.15f };
+    const juce::Point<float> corners[4] = { { r.getX() + inset,     r.getY() + inset },
+                                            { r.getRight() - inset, r.getY() + inset },
+                                            { r.getRight() - inset, r.getBottom() - inset },
+                                            { r.getX() + inset,     r.getBottom() - inset } };
+    for (int i = 0; i < 4; ++i)
+        MuLookAndFeel::drawScrew(g, corners[i], d, angles[i]);
+}
+
+void MuLookAndFeel::drawPanelScrews(juce::Graphics& g, juce::Rectangle<float> panel)
+{
+    drawCornerScrews(g, panel, mu_ui::sf((float) kPanelScrewD), mu_ui::sf((float) kPanelScrewInset));
+}
+
+void MuLookAndFeel::drawSubPanelScrews(juce::Graphics& g, juce::Rectangle<float> subPanel)
+{
+    drawCornerScrews(g, subPanel, mu_ui::sf((float) kSubPanelScrewD), mu_ui::sf((float) kSubPanelScrewInset));
+}
+
 juce::Colour MuLookAndFeel::lampBase()
 {
     return colour(panelBackground).darker(lighting().lampBaseDarken);

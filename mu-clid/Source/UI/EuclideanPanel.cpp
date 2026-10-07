@@ -615,4 +615,6 @@ void EuclideanPanel::paint(juce::Graphics& g)
     }
     for (const auto& b : boxes) MuLookAndFeel::drawRaisedSubPanelShadow(g, b);
     for (const auto& b : boxes) MuLookAndFeel::drawRaisedSubPanel(g, b, appCol);
+    if (MuLookAndFeel::hasScrews(*this))
+        for (const auto& b : boxes) MuLookAndFeel::drawSubPanelScrews(g, b);
 }

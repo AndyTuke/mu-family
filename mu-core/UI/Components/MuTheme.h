@@ -279,6 +279,15 @@ struct MuTheme
         float namePlateEngrave   = 0.70f;   // dark cut under the engraved lettering
         float namePlateScrew     = 0.45f;   // screw heads at each end
 
+        // Cross-head screws (drawScrew: panel and sub-panel corners, screws style)
+        float screwSteelDarken   = 0.35f;   // head: label grey darkened by this (brushed steel)
+        float screwShadow        = 0.55f;   // cast shadow, down-left
+        float screwHeadLight     = 0.45f;   // domed head lit at the top right
+        float screwHeadShade     = 0.55f;   //   … falling into shade bottom-left
+        float screwRim           = 0.50f;   // dark rim round the head
+        float screwSlot          = 0.80f;   // the cross recess
+        float screwSlotLight     = 0.25f;   // light catching the recess's lower-left edge
+
         // Engraved text (labels cut into the metal, metal style)
         float engraveCut         = 0.75f;   // dark cut offset down-left under the lettering
 

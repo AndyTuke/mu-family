@@ -778,6 +778,9 @@ void ModulatorEditor::paint(juce::Graphics& g)
         MuLookAndFeel::drawRaisedSubPanelShadow(g, metalLowerBox());
         MuLookAndFeel::drawRaisedSubPanel(g, metalHeaderBox(), appCol);
         MuLookAndFeel::drawRaisedSubPanel(g, metalLowerBox(), appCol);
+        if (MuLookAndFeel::hasScrews(*this))
+            for (const auto& b : { metalHeaderBox(), metalLowerBox() })
+                MuLookAndFeel::drawSubPanelScrews(g, b);
     }
     else
     {

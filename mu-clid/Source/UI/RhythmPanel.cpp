@@ -859,3 +859,12 @@ void RhythmPanel::timerCallback()
             refreshCircle();
     }
 }
+
+// Screws in the corners of the full-height panels, set into the painted border over any
+// content that reaches the corner (the thin header + sample strips have no room for them).
+void RhythmPanel::paintOverChildren(juce::Graphics& g)
+{
+    if (! MuLookAndFeel::hasScrews(*this)) return;
+    for (auto r : { circleRect, euclidRect, voiceRect, modRect })
+        MuLookAndFeel::drawPanelScrews(g, r.reduced(2).toFloat());
+}

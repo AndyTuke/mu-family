@@ -368,6 +368,13 @@ void EditorShellBase::setProductIdentity(const juce::String& displayName, const 
         activationPanel.setProductName(displayName);
 }
 
+void EditorShellBase::setScrews(bool on)
+{
+    lookAndFeel.setScrews(on);
+    sendLookAndFeelChange();
+    repaint();
+}
+
 void EditorShellBase::setSettingsOverlay(juce::Component* overlay)
 {
     if (settingsOverlay != nullptr) removeChildComponent(settingsOverlay);

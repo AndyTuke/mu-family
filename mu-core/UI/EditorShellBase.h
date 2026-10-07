@@ -50,6 +50,8 @@ public:
     // end of the product's constructor, once its children exist. `appAccent` is the product's
     // colour; leave it transparent to keep globalAccent.
     void setMetalStyle(bool metal, juce::Colour appAccent = juce::Colours::transparentBlack);
+    // Screws style (metal only): cross-head screws in the corners of panels and sub-panels.
+    void setScrews(bool on);
 
     // Direct access for the product to wire chrome (logo, About credits, etc.)
     // and additional callbacks.

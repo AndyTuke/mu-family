@@ -126,17 +126,34 @@ void VoiceSection::paint(juce::Graphics& g)
     constexpr int labelH = LF::kVoiceLabelH;
     constexpr int kFltW  = LF::kVoiceFilterColW;
 
-    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
-    const float kDivInset = mu_ui::sf(7.0f);
     constexpr int fltX = kPitchW + divW;
     constexpr int ampX = fltX + 6 * kFltW + divW;
     constexpr int insX = ampX + kAmpW + divW;
-    const float div1X = static_cast<float>(s(kPitchW) + s(divW) / 2);
-    const float div2X = static_cast<float>(s(fltX + 6 * kFltW) + s(divW) / 2);
-    const float div3X = static_cast<float>(s(ampX + kAmpW) + s(divW) / 2);
-    g.drawLine(div1X, kDivInset, div1X, (float)h - kDivInset, 0.5f);
-    g.drawLine(div2X, kDivInset, div2X, (float)h - kDivInset, 0.5f);
-    g.drawLine(div3X, kDivInset, div3X, (float)h - kDivInset, 0.5f);
+
+    if (MuLookAndFeel::isMetal(*this))
+    {
+        // Metal: each subsection in its own raised box (all shadows first, then the faces),
+        // its name plate just above it.
+        const juce::Rectangle<float> boxes[] = { pitchSub.getBounds().toFloat(), filterSub.getBounds().toFloat(),
+                                                 ampSub.getBounds().toFloat(),   insertSub.getBounds().toFloat() };
+        const auto appCol = MuLookAndFeel::appAccent(*this);
+        for (const auto& b : boxes) MuLookAndFeel::drawRaisedSubPanelShadow(g, b);
+        for (const auto& b : boxes) MuLookAndFeel::drawRaisedSubPanel(g, b, appCol);
+        if (MuLookAndFeel::hasScrews(*this))
+            for (const auto& b : boxes) MuLookAndFeel::drawSubPanelScrews(g, b);
+    }
+    else
+    {
+        // Flat: thin dividers between the subsections.
+        g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
+        const float kDivInset = mu_ui::sf(7.0f);
+        const float div1X = static_cast<float>(s(kPitchW) + s(divW) / 2);
+        const float div2X = static_cast<float>(s(fltX + 6 * kFltW) + s(divW) / 2);
+        const float div3X = static_cast<float>(s(ampX + kAmpW) + s(divW) / 2);
+        g.drawLine(div1X, kDivInset, div1X, (float)h - kDivInset, 0.5f);
+        g.drawLine(div2X, kDivInset, div2X, (float)h - kDivInset, 0.5f);
+        g.drawLine(div3X, kDivInset, div3X, (float)h - kDivInset, 0.5f);
+    }
 
     // Section names: a name plate centred over each subsection.
     auto plate = [&](const char* name, int x, int w)

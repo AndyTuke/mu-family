@@ -144,6 +144,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     // The family metal look, in mu-Clid's purple (globalAccent).
     setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appPurple));
+    setScrews(true);   // mu-Clid first; the other apps follow
 }
 
 PluginEditor::~PluginEditor()

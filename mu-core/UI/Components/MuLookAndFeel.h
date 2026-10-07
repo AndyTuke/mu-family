@@ -209,6 +209,18 @@ public:
     static juce::Colour paintColour(juce::Colour accent);
     static juce::Colour lcdLitColour(juce::Component& c);
 
+    // Screws style: small cross-head screws in the corners of panels and sub-panels.
+    // Opt-in per app (mu-Clid first); shared components check hasScrews(component).
+    void setScrews(bool on) noexcept { screws = on; }
+    static bool hasScrews(juce::Component& c);
+
+    // A cross-head (Phillips) screw of diameter `d` at `centre`, lit from the top right.
+    // `angle` turns the cross so a row of screws doesn't look stamped.
+    static void drawScrew(juce::Graphics&, juce::Point<float> centre, float d, float angle);
+    // A screw in each corner of a panel / raised sub-panel.
+    static void drawPanelScrews(juce::Graphics&, juce::Rectangle<float> panel);
+    static void drawSubPanelScrews(juce::Graphics&, juce::Rectangle<float> subPanel);
+
     // Lamps: a lit indicator behind a dark lens. lampColour mixes `clr` into the opaque lamp
     // base by `lit` (Lighting lampOff / lampDim / lampOn); drawLamp fills `shape` with that lens,
     // brighter at `centre` where the light sits behind it.
@@ -577,10 +589,17 @@ public:
     // than the Size 3 bucket. Height stays at Size 3 H.
     static constexpr int kMixerStripKnobW = kMixerChanW;   // 73
     static constexpr int kMixerStripKnobH = kKnobSize3H;   // 46
-    static constexpr int kNamePlateH = 11;   // name plates (drawNamePlate): section and row names
+    static constexpr int kNamePlateH = 11;
+    // Cross-head screws in panel / sub-panel corners (screws style): head diameter and
+    // the distance from the panel edge to the screw's centre.
+    static constexpr int kPanelScrewD       = 7;
+    static constexpr int kPanelScrewInset   = 4;   // centred on the painted border band, clear of the content
+    static constexpr int kSubPanelScrewD    = 6;
+    static constexpr int kSubPanelScrewInset= 5;   // name plates (drawNamePlate): section and row names
 
 private:
     bool         metalStyle   = false;
+    bool         screws       = false;
     bool         hasAppAccent = false;
     juce::Colour appAccentColour;
 };

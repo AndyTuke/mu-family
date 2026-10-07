@@ -21,6 +21,10 @@ ChannelSidebar::ChannelSidebar(ProcessorBase& processor, const juce::String& add
         for (auto& item : items)
             if (item->isVisible())
                 MuLookAndFeel::drawRaisedSubPanel(g, SidebarItem::metalBox(item->getBounds()), appCol);
+        if (MuLookAndFeel::hasScrews(*this))
+            for (auto& item : items)
+                if (item->isVisible())
+                    MuLookAndFeel::drawSubPanelScrews(g, SidebarItem::metalBox(item->getBounds()));
     };
     startTimerHz(5);   // re-sync count + poll pending-swap + product animation tick
 }
@@ -145,6 +149,10 @@ void ChannelSidebar::paint(juce::Graphics& g)
 
 void ChannelSidebar::paintOverChildren(juce::Graphics& g)
 {
+    // Panel screws over the items, set into the painted border.
+    if (metal && MuLookAndFeel::hasScrews(*this))
+        MuLookAndFeel::drawPanelScrews(g, getLocalBounds().reduced(2).toFloat());
+
     if (dragPhase != DragPhase::Dragging) return;
 
     const int viewX = viewport.getX();
