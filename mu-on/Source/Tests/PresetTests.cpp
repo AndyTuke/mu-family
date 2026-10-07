@@ -54,6 +54,13 @@ public:
         const auto dir = juce::File::getSpecialLocation(juce::File::tempDirectory)
                              .getChildFile("mu-on-preset-tests-" + juce::String(juce::Time::currentTimeMillis()));
 
+        beginTest("safe preset file name: each unsafe character becomes '_', dots are kept, empty → fallback");
+        {
+            expectEquals(mu_pp::safePresetFileName("a\\b/c:d|e*f?g<h>i\"j", "X"), juce::String("a_b_c_d_e_f_g_h_i_j"));
+            expectEquals(mu_pp::safePresetFileName("Kick 1.5", "X"), juce::String("Kick 1.5"));
+            expectEquals(mu_pp::safePresetFileName("", "Rhythm"), juce::String("Rhythm"));
+        }
+
         beginTest("full preset round-trips its state and metadata; categories are listed once");
         {
             juce::ValueTree state("MuOnState");

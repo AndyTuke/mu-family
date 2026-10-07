@@ -2,6 +2,7 @@
 #include "SampleBrowser.h"
 #include "UI/ConfirmDialog.h"   // shared themed confirm dialogs (mu_ui::confirmAsync)
 #include "UI/OverlayHost.h"     // shared dimmed in-editor overlay host (sample browser)
+#include "Persistence/PresetFiles.h"   // mu_pp::safePresetFileName
 
 #include <string_view>
 #include <unordered_set>
@@ -304,8 +305,8 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
             return;
         }
 
-        juce::String safeName = name.replaceCharacters("\\/:|*?<>\"", "_");
-        juce::File destFile   = destDir.getChildFile(safeName).withFileExtension(".muRhythm");
+        // Append the extension rather than withFileExtension, which would cut a dotted name ("Kick 1.5").
+        juce::File destFile = destDir.getChildFile(mu_pp::safePresetFileName(name, "Rhythm") + ".muRhythm");
 
         if (destFile.existsAsFile())
         {
@@ -660,8 +661,7 @@ void RhythmPanel::saveRhythmPreset()
     }
     else
     {
-        defaultName = juce::String(proc.getRhythm(currentRhythmIndex).name)
-                          .replaceCharacters("\\/:|*?<>\"", "_");
+        defaultName = mu_pp::safePresetFileName(juce::String(proc.getRhythm(currentRhythmIndex).name), {});
     }
 
     setKnownCategories(proc.loadCategoryList());

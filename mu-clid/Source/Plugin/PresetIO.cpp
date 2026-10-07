@@ -4,6 +4,7 @@
 #include "Persistence/PresetHelpers.h"      // writeKindedProperty, readKindedPropertyAsActualV2, kGlobalParamDefs
 #include "Persistence/PresetMigrations.h"   // v3 insert/master/mod-assignment migrations
 #include "Persistence/ModulatorSerialise.h" // serialiseModulators, deserialiseModulators, clearModulators
+#include "Persistence/PresetFiles.h"        // mu_pp::safePresetFileName
 #include "UI/Components/MuLookAndFeel.h" // kChannelPaletteSize
 #include <limits>               // std::numeric_limits for NaN sentinel
 
@@ -24,6 +25,12 @@ using mu_pp::readEnumIndex;
 using mu_pp_migrate::migrateInsertSlotsV3;       // moved to PresetMigrations
 using mu_pp_migrate::migrateMasterInsertSlotsV3;
 using mu_pp_migrate::migrateModAssignmentsV3;
+
+// mu-Clid shares only the file-name rule with mu-core's PresetFiles helpers. Its on-disk
+// format predates them and must keep loading: presetName / presetCategory properties on
+// the root (not name / category), per-rhythm values written as actual kinded values
+// (not normalised <p> rows), embedded sample data, atomic writes, and a categories.txt
+// list that keeps user categories even when no preset uses them yet.
 
 // serialiseModulators / deserialiseModulators / clearModulators are defined
 // as inline functions in ModulatorSerialise.h (brought in via the using
@@ -670,9 +677,8 @@ void PresetIO::savePreset(const juce::String& name,
     auto dir = proc_.getPresetsDir();
     dir.createDirectory();
 
-    juce::String safeName = name.replaceCharacters("\\/:|*?<>\"", "_________");
-    if (safeName.isEmpty()) safeName = "Preset";
-    atomicReplaceWithText(dir.getChildFile(safeName + ".muClid"), root.toXmlString(), proc_.onLoadError);
+    atomicReplaceWithText(dir.getChildFile(mu_pp::safePresetFileName(name, "Preset") + ".muClid"),
+                          root.toXmlString(), proc_.onLoadError);
 }
 
 // ── PresetIO::loadPreset helpers ────────────────────────────────────────────
