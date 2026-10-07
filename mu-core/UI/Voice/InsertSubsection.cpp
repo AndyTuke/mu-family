@@ -227,7 +227,9 @@ void InsertSubsection::resized()
     constexpr int gap  = LF::kVoiceGap;
     const int row2Y = rowH + gap;
 
-    insertAlgo.setBounds(0, s(rowH / 4), s(algoColumns * kW), s(rowH / 2));
+    // The dropdown keeps a gap from the box edge on both sides.
+    constexpr int dg = LF::kDropdownEdgeGap;
+    insertAlgo.setBounds(s(dg), s(rowH / 4), s(algoColumns * kW - 2 * dg), s(rowH / 2));
     insertParam1.setBounds(s(0 * kW), s(row2Y), s(kW), s(rowH));
     insertParam2.setBounds(s(1 * kW), s(row2Y), s(kW), s(rowH));
     insertParam3.setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));

@@ -776,7 +776,7 @@ void RhythmPanel::resized()
         const int lw = s(EuclideanPanel::kLogicDropW);
         const int lh = s(EuclideanPanel::kLogicDropH);
         // With screws it moves in from the corner, clear of the corner screw.
-        const int m  = s(MuLookAndFeel::kSpaceS);
+        const int m  = s(2 + MuLookAndFeel::kDropdownEdgeGap);   // clear of the 2 px border + a gap
         const int mx = MuLookAndFeel::hasScrews(*this) ? s(2 + MuLookAndFeel::kPanelScrewClear) : m;
         euclidPanel.getLogicControl().setBounds(circleRect.getRight() - mx - lw,
                                                 circleRect.getBottom() - m - lh, lw, lh);

@@ -37,6 +37,10 @@ private:
     static constexpr int kInsertCols = 6;
     static constexpr int kSendCols   = 3;   // Effect / Delay / Reverb, right of the insert dropdown
     static constexpr int kInsertW    = kInsertCols * kCols;                                // 324
+    // The send knobs close up a little so the Effects box ends short of the voice panel's
+    // bottom-right corner screw.
+    static constexpr int kSendColW   = kCols - 3;                                          // 51
+    static constexpr int kEffectsW   = kInsertW - kSendCols * (kCols - kSendColW);         // 315
     static constexpr float kPlateH   = (float) MuLookAndFeel::kNamePlateH;   // section name plates
 
     PluginProcessor& proc;

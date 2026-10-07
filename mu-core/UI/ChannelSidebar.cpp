@@ -288,7 +288,8 @@ void ChannelSidebar::resized()
     // with screws, clear of the corner screws above the first item / below the Add button.
     const bool screwed = metal && MuLookAndFeel::hasScrews(*this);
     const int top   = screwed ? s(2 + MuLookAndFeel::kPanelScrewClear - 3)   /* metalBox insets 3 */ : metal ? s(4) : 0;
-    const int edgeX = metal ? s(7) : s(4);
+    const int edgeX = screwed ? s(11) : metal ? s(7) : s(4);
+    const int itemX = screwed ? s(4) : 0;   // with screws the layer boxes are a little narrower too
     const int edgeY = screwed ? s(2 + MuLookAndFeel::kPanelScrewClear) : metal ? s(7) : s(4);
     if (showAdd)
     {
@@ -304,7 +305,7 @@ void ChannelSidebar::resized()
     itemContainer.setSize(w, juce::jmax(1, (int) items.size() * ih));
 
     for (int i = 0; i < (int) items.size(); ++i)
-        items[(size_t) i]->setBounds(0, i * ih, w, ih);
+        items[(size_t) i]->setBounds(itemX, i * ih, w - 2 * itemX, ih);
 }
 
 void ChannelSidebar::timerCallback()

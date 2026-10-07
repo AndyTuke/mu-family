@@ -106,13 +106,13 @@ void VoiceSection::resized()
     pitchSub .setBounds(0,          s(labelH), s(kPitchW), s(subH));
     filterSub.setBounds(s(fltX),    s(labelH), s(6 * kFltW),        s(subH));
     ampSub   .setBounds(s(ampX),    s(labelH), s(kAmpW),   s(subH));
-    insertSub.setBounds(s(insX),    s(labelH), s(kInsertW), s(subH));
+    insertSub.setBounds(s(insX),    s(labelH), s(kEffectsW), s(subH));
 
-    // FX sends: the Insert panel's last kSendCols columns, top row.
+    // FX sends: the Insert panel's last kSendCols (slightly narrower) columns, top row.
     constexpr int sendX = insX + (kInsertCols - kSendCols) * kW;
     int col = 0;
     for (auto* k : ampSub.sendKnobs())
-        k->setBounds(s(sendX + col++ * kW), s(labelH), s(kW), s(LF::kKnobSize2H));
+        k->setBounds(s(sendX + col++ * kSendColW), s(labelH), s(kSendColW), s(LF::kKnobSize2H));
 }
 
 void VoiceSection::paint(juce::Graphics& g)
@@ -163,5 +163,5 @@ void VoiceSection::paint(juce::Graphics& g)
     plate("PITCH",  0,    kPitchW);
     plate("FILTER", fltX, 6 * kFltW);
     plate("AMP",    ampX, kAmpW);
-    plate("EFFECTS", insX, kInsertW);
+    plate("EFFECTS", insX, kEffectsW);
 }

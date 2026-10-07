@@ -42,8 +42,8 @@ public:
 
     // Logic dropdown size: the narrowest that still fits the widest item ("B not A")
     // beside the ComboBox chrome (6 px left pad + arrow, 24 px in all).
-    static constexpr int kLogicDropW = 72;
-    static constexpr int kLogicDropH = 16;
+    static constexpr int kLogicDropW = 64;
+    static constexpr int kLogicDropH = 15;
 
     void resized() override;
     void paint(juce::Graphics&) override;

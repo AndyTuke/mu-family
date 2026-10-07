@@ -279,7 +279,8 @@ void FilterSubsection::resized()
 
     using mu_ui::s;
     // Row 1: Type (2 cols) / Drive / Cutoff / Resonance / Low Cut — audio flow order.
-    filterType  .setBounds(s(0 * kW), s(rowH / 4),     s(2 * kW), s(rowH / 2));
+    constexpr int dg = MuLookAndFeel::kDropdownEdgeGap;   // gap from the box edge and the Drive knob
+    filterType  .setBounds(s(dg),     s(rowH / 4),     s(2 * kW - 2 * dg), s(rowH / 2));
     filterDrive .setBounds(s(2 * kW), 0,                s(kW),     s(rowH));
     filterCutoff.setBounds(s(3 * kW), 0,                s(kW),     s(rowH));
     filterRes   .setBounds(s(4 * kW), 0,                s(kW),     s(rowH));

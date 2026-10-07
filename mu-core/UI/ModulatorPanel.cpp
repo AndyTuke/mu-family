@@ -91,7 +91,12 @@ void ModulatorPanel::resized()
     using mu_ui::s;
     const int w = getWidth(), h = getHeight();
     const int tabH = s(kTabH);
-    tabBar.setBounds(0, 0, w, tabH);
+    // With screws the tabs are a little smaller — in from the sides and a touch shorter —
+    // so they don't crowd the panel's corner screws.
+    if (MuLookAndFeel::hasScrews(*this))
+        tabBar.setBounds(juce::Rectangle<int>(0, 0, w, tabH).reduced(s(MuLookAndFeel::kSpaceS), s(2)));
+    else
+        tabBar.setBounds(0, 0, w, tabH);
     const int gap = metal ? s(MuLookAndFeel::kSpaceXS) : 0;   // metal: the boxes' shadows need room
     const juce::Rectangle<int> content(0, tabH + gap, w, h - tabH - gap);
     for (auto& e : editors) e.setBounds(content);

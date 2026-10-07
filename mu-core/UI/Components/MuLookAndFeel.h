@@ -371,6 +371,7 @@ public:
     // RhythmPanel applies a 7 px inset (kPanelPad + 1) when placing the four
     // big inner panels — these are the actual usable widths for layout math.
     static constexpr int kPanelPad        = kSpaceS;
+    static constexpr int kDropdownEdgeGap = kSpaceS;   // space between a dropdown and the edge of its box / panel
     static constexpr int kChannelInset     = kPanelPad + 1;                                     // 7
     static constexpr int kCircleInnerSize = kCircleSize     - 2 * kChannelInset;                // 274
     static constexpr int kEuclidInnerW    = kEuclidPanelW   - 2 * kChannelInset;                // 786
