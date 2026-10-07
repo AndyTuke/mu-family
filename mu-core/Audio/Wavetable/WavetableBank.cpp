@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <algorithm>
 
-namespace mu_tant
+namespace mu_wavetable
 {
 
 static constexpr double kPi    = 3.14159265358979323846;
@@ -376,4 +376,4 @@ float WavetableBank::frameSample(int t, double inc, int frame, float phase01) co
     return fr[i0] + frac * (fr[i1] - fr[i0]);
 }
 
-} // namespace mu_tant
+} // namespace mu_wavetable

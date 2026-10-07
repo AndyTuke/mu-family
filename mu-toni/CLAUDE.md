@@ -16,7 +16,7 @@ The editor inherits `mu-core/UI/EditorShellBase.h`, so TransportBar, StatusBar, 
 
 - **`mu_toni::PluginProcessor : ProcessorBase`** ([Source/Plugin/PluginProcessor.{h,cpp}](Source/Plugin/PluginProcessor.cpp)) — 43-param/voice APVTS plus `mu_mixfx::addGlobalFxParams` + per-layer `ch{N}_` strips; renders through the shared `MixerEngine` (engine → insert → mixer) via the `processCoreBlock` hook; free-running internal transport driving the TransportBar.
 - **Arp engine** — [Sequencer/Arpeggiator.h](Source/Sequencer/Arpeggiator.h) (pool derivation + skewed-triangle scan, pure and unit-tested) and [Sequencer/ArpVoiceRunner.h](Source/Sequencer/ArpVoiceRunner.h) (arp clock → voice note-on/off). Tables in [Audio/Scales.h](Source/Audio/Scales.h) and [Audio/Chords.h](Source/Audio/Chords.h) (~35 chords, absolute intervals, tier-grouped).
-- **Voice** — [Audio/ToniVoice.h](Source/Audio/ToniVoice.h) + [Audio/AnalogueOsc.h](Source/Audio/AnalogueOsc.h) (PolyBLEP).
+- **Voice** — [Audio/ToniVoice.h](Source/Audio/ToniVoice.h): mu-Tant's wavetable oscillators + 2-lane X-Mod + sync, shared from mu-core ([Audio/Wavetable/](../mu-core/Audio/Wavetable/) — `WavetableBank`, `XModOscPair`).
 - **Per-voice modulation** — `VoiceSlot` (8 control sequences + `ModulationMatrix`) with the shared mu-core `ModulatorPanel` as the engine panel's bottom band; [Modulation/MuToniModDest.h](Source/Modulation/MuToniModDest.h) registers 20 arp/voice/env destinations, resolved per block through `mu_mod::resolveLane`. Persists in the APVTS state as the `MuToniMods` child.
 - **`mu_toni::PluginEditor : EditorShellBase`** — shared shell + `ChannelSidebar` + a populated [UI/EnginePanel.h](Source/UI/EnginePanel.h) (arp / osc / filter / env / insert, APVTS-attached shared widgets) + `MixerOverlay`. No bespoke shell or mixer code.
 - **MIDI note input** — root note selectable by played note (latest note-on wins, held-note fallback stack); Loop vs MIDI-triggered run mode. μ-Toni is the first family member to consume played notes.
@@ -34,7 +34,7 @@ The editor inherits `mu-core/UI/EditorShellBase.h`, so TransportBar, StatusBar, 
 - **Fixed 4 "Layer" channels** — `kNumChannels = 4` of `kMaxChannels = 8` ([PluginProcessor.h:35-36](Source/Plugin/PluginProcessor.h#L35)). Dynamic add/delete/reorder is unwired (no `addVoice`/`removeVoice`), so **the sidebar Add button is inert**; the design calls for 1–8 independent mono arps, default 1.
 - **Preset save/load chrome** — the extensions and directories exist, but save/load stay on `ProcessorBase`'s no-op defaults and the browser chrome is disabled in the editor. DAW state via the APVTS works.
 - **MIDI-PC preset hooks stubbed** — `applyMidiPresetSlot` / `applyFullMidiPreset` are empty overrides.
-- **Oscillators are analogue PolyBLEP, not mu-tant wavetables** — the design targets mu-tant's `WavetableBank` / `WavetableOscillator` + 2-lane X-Mod + osc sync; that port is deferred (see the On Hold backlog entry).
+- **Oscillators are mu-Tant's wavetables** (procedural factory bank, no shipped content) with the same 2-lane X-Mod + sync, via the shared mu-core `XModOscPair`; param ids match mu-Tant's (`o1_wt`, `o1_pos`, `xmod_*`, `sync`).
 - **UI is a functional grid** pending a `design-ui-family` polish pass.
 
 ### Conventions in force

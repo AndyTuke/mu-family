@@ -137,7 +137,7 @@ protected:
 
     // ── Arp/voice parameter cache (index into vp[voice][slot]) ────────────────
     // Enum + suffix table live in the .cpp; count is needed here for the array.
-    static constexpr int kNumVoiceParams = 51;
+    static constexpr int kNumVoiceParams = 59;
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -159,6 +159,8 @@ private:
 
     // Per-channel arp voice + its cached parameter pointers.
     std::array<ArpVoiceRunner, kMaxChannels>                                      runners;
+    mu_wavetable::WavetableBank bank;                        // the oscillators' wavetables (factory set)
+    std::atomic<float>*         midiInChParam = nullptr;     // MIDI In channel (0 = Omni)
     std::array<std::array<std::atomic<float>*, kNumVoiceParams>, kMaxChannels>    vp {};
 
     // Per-channel insert effect (shared mu-core InsertProcessor), applied post-VCA

@@ -13,7 +13,7 @@
 #include "Modulation/MuToniModDest.h"
 #include "Audio/Scales.h"
 #include "Audio/Chords.h"
-#include "Audio/AnalogueOsc.h"
+#include "Audio/Wavetable/WavetableBank.h"   // mu-core: the wavetable names
 #include <array>
 #include <memory>
 #include <vector>
@@ -30,26 +30,35 @@ class EnginePanel : public juce::Component,
                     private juce::Timer
 {
 public:
-    enum Group { G_OSC1, G_OSC2, G_MIX, G_PITCH, G_FILTER, G_AMP, G_INSERT, G_ARP, G_COUNT };
+    enum Group { G_OSC1, G_OSC2, G_XMOD, G_MIX, G_PITCH, G_FILTER, G_AMP, G_INSERT, G_ARP, G_COUNT };
 
     explicit EnginePanel(PluginProcessor& processor)
         : proc(processor), insertSub(processor, "v")
     {
         using LF = MuLookAndFeel;
 
-        // ── Oscillators + Mix (mu-toni source section, boxed) ────────────────
-        addCombo(G_OSC1, "o1w", waveItems());
-        addKnob (G_OSC1, "o1o", "Oct",  LF::knobEuclidean);
-        addKnob (G_OSC1, "o1f", "Fine", LF::knobEuclidean);
-        addCombo(G_OSC2, "o2w", waveItems());
-        addKnob (G_OSC2, "o2o", "Oct",  LF::knobEuclidean);
-        addKnob (G_OSC2, "o2s", "Semi", LF::knobEuclidean);
-        addKnob (G_OSC2, "o2f", "Fine", LF::knobEuclidean);
+        // ── Oscillators, X-Mod + Mix (mu-toni source section, boxed) ─────────
+        addCombo(G_OSC1, "o1_wt",  waveItems());
+        addKnob (G_OSC1, "o1o",    "Oct",  LF::knobEuclidean);
+        addKnob (G_OSC1, "o1f",    "Fine", LF::knobEuclidean);
+        addKnob (G_OSC1, "o1_pos", "Pos",  LF::knobEuclidean);
+        addCombo(G_OSC2, "o2_wt",  waveItems());
+        addKnob (G_OSC2, "o2o",    "Oct",  LF::knobEuclidean);
+        addKnob (G_OSC2, "o2s",    "Semi", LF::knobEuclidean);
+        addKnob (G_OSC2, "o2f",    "Fine", LF::knobEuclidean);
+        addKnob (G_OSC2, "o2_pos", "Pos",  LF::knobEuclidean);
+        // Cross-mod (Osc 2 → Osc 1): Lane A mode + Index, Sync, Feedback; Lane B mode + Depth, SSB shift.
+        addCombo (G_XMOD, "xmod_phaseMode", { "FM", "PM", "TZFM" });
+        addCombo (G_XMOD, "xmod_ampMode",   { "AM", "RM", "SSB" });
+        addToggle(G_XMOD, "sync",           "Sync");
+        addToggle(G_XMOD, "xmod_fdbk",      "Fdbk");
+        addKnob  (G_XMOD, "xmod_index", "Index", LF::knobEuclidean);
+        addKnob  (G_XMOD, "xmod_depth", "Depth", LF::knobEuclidean);
+        addKnob  (G_XMOD, "xmod_ssb",   "Shift", LF::knobEuclidean);
         addCombo(G_MIX, "ntype", { "White", "Pink" });
         addKnob (G_MIX, "o1l",   "Osc 1", LF::knobLevel);
         addKnob (G_MIX, "o2l",   "Osc 2", LF::knobLevel);
         addKnob (G_MIX, "noise", "Noise", LF::knobLevel);
-        addKnob (G_MIX, "pw",    "PW",    LF::knobEuclidean);
 
         // ── Pitch (target + envelope) ────────────────────────────────────────
         addCombo(G_PITCH, "ptgt", { "Osc 1+2", "Osc 2" });
@@ -223,19 +232,20 @@ public:
             for (auto r : { headerR, srcR, voicePanelR, arpPanelR, modR })
                 MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), accent);
             // (the voice band draws its own section boxes)
-            MuLookAndFeel::drawSections(g, *this, { { oscR[0], "OSCILLATOR 1" }, { oscR[1], "OSCILLATOR 2" }, { oscR[2], "MIX" },
+            MuLookAndFeel::drawSections(g, *this, { { oscR[0], "OSCILLATOR 1" }, { oscR[1], "OSCILLATOR 2" },
+                                                    { oscR[2], "X-MOD" }, { oscR[3], "MIX" },
                                                     { arpR, "APPERGATER" } }, accent);
             return;
         }
 
-        // Boxed sections (Osc 1/2/Mix + Appergater).
-        static const char* const boxTitles[] = { "Oscillator 1", "Oscillator 2", "Mix" };
+        // Boxed sections (Osc 1/2, X-Mod, Mix + Appergater).
+        static const char* const boxTitles[] = { "Oscillator 1", "Oscillator 2", "X-Mod", "Mix" };
         g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
-        for (int i = 0; i < 3; ++i) g.drawRoundedRectangle(oscR[(size_t) i].toFloat().reduced(1.0f), 5.0f, 1.0f);
+        for (int i = 0; i < 4; ++i) g.drawRoundedRectangle(oscR[(size_t) i].toFloat().reduced(1.0f), 5.0f, 1.0f);
         g.drawRoundedRectangle(arpR.toFloat().reduced(1.0f), 5.0f, 1.0f);
         g.setColour(MuLookAndFeel::colour(Id::labelText));
         g.setFont(juce::Font(juce::FontOptions(12.0f, juce::Font::bold)));
-        for (int i = 0; i < 3; ++i)
+        for (int i = 0; i < 4; ++i)
             g.drawText(boxTitles[i], oscR[(size_t) i].reduced(8, 4).removeFromTop(15), juce::Justification::topLeft, false);
         g.drawText("Appergater", arpR.reduced(8, 4).removeFromTop(15), juce::Justification::topLeft, false);
 
@@ -263,10 +273,7 @@ public:
         const int oscRowH = s(kBoxPad + LF::kVoiceLabelH + kDropdownH + LF::kVoiceGap
                             + LF::kKnobSize2H + kLabelGap + kBoxPad);
         auto oscRow = area.removeFromTop(oscRowH);
-        int ow = oscRow.getWidth();
-        oscR[0] = oscRow.removeFromLeft(ow * 33 / 100); oscRow.removeFromLeft(gap);
-        oscR[1] = oscRow.removeFromLeft(ow * 33 / 100); oscRow.removeFromLeft(gap);
-        oscR[2] = oscRow;
+        layoutSourceRow(oscRow, gap);
         area.removeFromTop(gap);
 
         // Voice band (the shared mu-Clid geometry).
@@ -280,13 +287,40 @@ public:
         area.removeFromBottom(gap);
         arpR = area;
 
-        layoutBox(G_OSC1, oscR[0]);
-        layoutBox(G_OSC2, oscR[1]);
-        layoutBox(G_MIX,  oscR[2]);
+        for (int i = 0; i < 4; ++i) layoutBox(kSourceGroups[i], oscR[(size_t) i]);
         layoutBox(G_ARP,  arpR);
     }
 
 private:
+    static constexpr Group kSourceGroups[4] = { G_OSC1, G_OSC2, G_XMOD, G_MIX };
+
+    // Unscaled width a boxed section's controls need: its top row (dropdowns + toggles) or its
+    // knob row, whichever is wider (the widths layoutBox uses).
+    int sourceContentW(int group) const
+    {
+        int top = 0, row = 0;
+        for (auto& c : combos)  if (c.group == group) top += kBoxComboW  + kBoxGap;
+        for (auto& t : toggles) if (t.group == group) top += kBoxToggleW + kBoxGap;
+        for (auto& k : knobs)   if (k.group == group) row += MuLookAndFeel::kKnobSize2W + MuLookAndFeel::kVoiceGap;
+        return juce::jmax(top, row);
+    }
+
+    // The source row: Osc 1 | Osc 2 | X-Mod | Mix, each as wide as its controls need plus an
+    // equal share of what's left.
+    void layoutSourceRow(juce::Rectangle<int> row, int gap)
+    {
+        using mu_ui::s;
+        const int pad = MuLookAndFeel::isMetal(*this) ? MuLookAndFeel::kSubPanelScrewClear : kBoxPad;
+        int need[4], total = 0;
+        for (int i = 0; i < 4; ++i) { need[i] = s(sourceContentW(kSourceGroups[i]) + 2 * pad); total += need[i]; }
+        const int spare = juce::jmax(0, row.getWidth() - total - 3 * gap) / 4;
+        for (int i = 0; i < 4; ++i)
+        {
+            oscR[(size_t) i] = (i == 3) ? row : row.removeFromLeft(need[i] + spare);
+            if (i < 3) row.removeFromLeft(gap);
+        }
+    }
+
     // Metal style, as mu-Clid: panels edge to edge — preset strip, source (Osc 1 / Osc 2 / Mix),
     // voice band, Appergater, modulators — content inset clear of the panels' corner screws,
     // each section a raised box with its name plate in the band above it.
@@ -307,15 +341,9 @@ private:
         // Source boxes and the Appergater box: a dropdown row over a Size-2 knob row.
         const int boxH = s(2 * kBoxPad + kDropdownH + LF::kVoiceGap + LF::kKnobSize2H + kLabelGap);
 
-        // Source: Osc 1 | Osc 2 | Mix in equal thirds.
+        // Source: Osc 1 | Osc 2 | X-Mod | Mix, each sized to its controls.
         srcR = { 0, headerR.getBottom(), w, padY + plateH + boxH + padY };
-        {
-            const int y  = srcR.getY() + padY + plateH;
-            const int bw = (w - 2 * padX - 2 * boxGap) / 3;
-            oscR[0] = { padX, y, bw, boxH };
-            oscR[1] = { padX + bw + boxGap, y, bw, boxH };
-            oscR[2] = { oscR[1].getRight() + boxGap, y, w - padX - (oscR[1].getRight() + boxGap), boxH };
-        }
+        layoutSourceRow({ padX, srcR.getY() + padY + plateH, w - 2 * padX, boxH }, boxGap);
 
         // Voice band (the shared mu-Clid band, inside the standard channel inset as in mu-Clid).
         voicePanelR = { 0, srcR.getBottom(), w, padY + s(VoiceBand::kHeight) + padY };
@@ -330,9 +358,7 @@ private:
         modR = { 0, arpPanelR.getBottom(), w, juce::jmax(s(190) + 2 * padY, h - arpPanelR.getBottom()) };
         modulatorPanel.setBounds(modR.reduced(padX, padY));
 
-        layoutBox(G_OSC1, oscR[0]);
-        layoutBox(G_OSC2, oscR[1]);
-        layoutBox(G_MIX,  oscR[2]);
+        for (int i = 0; i < 4; ++i) layoutBox(kSourceGroups[i], oscR[(size_t) i]);
         layoutBox(G_ARP,  arpR);
     }
 
@@ -342,6 +368,10 @@ private:
     static constexpr int kBoxPad    = MuLookAndFeel::kSpaceS;
     static constexpr int kDropdownH = 24;
     static constexpr int kLabelGap  = MuLookAndFeel::kSpaceS;
+    // A boxed section's top row: dropdown / toggle widths and the gap after each.
+    static constexpr int kBoxComboW  = 108;
+    static constexpr int kBoxToggleW = 64;
+    static constexpr int kBoxGap     = MuLookAndFeel::kSpaceXS;
 
     struct KnobDef   { std::unique_ptr<KnobWithLabel>  comp; juce::String suffix, prefix; int group;
                        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   att; };
@@ -371,16 +401,21 @@ private:
         inner.removeFromBottom(s(kLabelGap));   // keep control labels off the panel border
         if (! metal) inner.removeFromTop(s(LF::kVoiceLabelH));
 
-        bool hasTop = false;
-        for (auto& c : combos)  if (c.group == group) hasTop = true;
-        for (auto& t : toggles) if (t.group == group) hasTop = true;
-        if (hasTop)
+        int nCombos = 0, nToggles = 0, nKnobs = 0;
+        for (auto& c : combos)  if (c.group == group) ++nCombos;
+        for (auto& t : toggles) if (t.group == group) ++nToggles;
+        for (auto& k : knobs)   if (k.group == group) ++nKnobs;
+        if (nCombos + nToggles > 0)
         {
+            // A lone selector (e.g. the wavetable) stretches to the knob row so its name fits.
+            const int comboW = (nCombos == 1 && nToggles == 0)
+                             ? juce::jmax(kBoxComboW, nKnobs * (LF::kKnobSize2W + LF::kVoiceGap) - LF::kVoiceGap)
+                             : kBoxComboW;
             auto top = inner.removeFromTop(s(kDropdownH));
             for (auto& c : combos)
-                if (c.group == group) { c.comp->setBounds(top.removeFromLeft(s(108)).reduced(1)); top.removeFromLeft(s(4)); }
+                if (c.group == group) { c.comp->setBounds(top.removeFromLeft(s(comboW)).reduced(1)); top.removeFromLeft(s(kBoxGap)); }
             for (auto& t : toggles)
-                if (t.group == group) { t.comp->setBounds(top.removeFromLeft(s(64)).reduced(1)); top.removeFromLeft(s(4)); }
+                if (t.group == group) { t.comp->setBounds(top.removeFromLeft(s(kBoxToggleW)).reduced(1)); top.removeFromLeft(s(kBoxGap)); }
             inner.removeFromTop(s(4));
         }
 
@@ -430,7 +465,7 @@ private:
     { juce::StringArray a; for (int i = 0; i < kNumScales; ++i) a.add(kScales[(size_t) i].name); return a; }
     static juce::StringArray chordItems()
     { juce::StringArray a; for (int i = 0; i < kNumChords; ++i) a.add(kChords[(size_t) i].name); return a; }
-    static juce::StringArray waveItems() { return { "Sine", "Triangle", "Saw", "Square", "Pulse" }; }
+    static juce::StringArray waveItems() { return mu_wavetable::WavetableBank::factoryTableNames(); }
     static juce::StringArray rateItems()
     { return { "1/4","1/4.","1/4T","1/8","1/8.","1/8T","1/16","1/16.","1/16T","1/32","1/32.","1/32T" }; }
     static juce::StringArray filterItems()
@@ -452,7 +487,7 @@ private:
     std::vector<KnobDef>   knobs;
     std::vector<ComboDef>  combos;
     std::vector<ToggleDef> toggles;
-    std::array<juce::Rectangle<int>, 3> oscR;
+    std::array<juce::Rectangle<int>, 4> oscR;   // Osc 1, Osc 2, X-Mod, Mix
     juce::Rectangle<int> voiceR, arpR, headerR;
     // Metal style: the panels.
     juce::Rectangle<int> srcR, voicePanelR, arpPanelR, modR;

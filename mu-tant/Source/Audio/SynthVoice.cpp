@@ -4,39 +4,21 @@
 namespace mu_tant
 {
 
-// X-Mod index scaling (mu-tant-xmod-design.md):
-//   PM: index 1.0 → up to 2 cycles (~4π rad) of phase displacement — "DX-style" depth.
-//   FM/TZFM: index 1.0 → up to an 8× frequency-modulation ratio.
-//   Feedback: a conservative fixed phase depth (feedback FM turns chaotic fast).
-static constexpr float kPmScale = 2.0f;
-static constexpr float kFmRatio = 8.0f;
-static constexpr float kFbScale = 0.3f;
-// One-pole smoothing time for the continuous X-Mod controls (index / depth / SSB shift),
-// so sweeping a knob — or a per-block mode change — ramps instead of zippering/clicking.
-static constexpr float kXModSmoothMs = 5.0f;
-
 void VoiceEngine::prepare(double sampleRate, int blockSize)
 {
     sr = sampleRate > 0 ? sampleRate : 44100.0;
-    osc1.prepare(sr);
-    osc2.prepare(sr);
+    oscs.prepare(sr);
     filter1.prepare(sr, blockSize, 1);
     filter1.reset();
     filter2.prepare(sr, blockSize, 1);
     filter2.reset();
-    hilbert.reset();
-    lastA    = 0.0f;
-    ssbCos   = 1.0f;
-    ssbSin   = 0.0f;
-    indexSm  = depthSm = ssbHzSm = 0.0f;
     mono .setSize(1, blockSize, false, false, true);  mono .clear();
     mono2.setSize(1, blockSize, false, false, true);  mono2.clear();
 }
 
 void VoiceEngine::setBank(const WavetableBank* b) noexcept
 {
-    osc1.setBank(b);
-    osc2.setBank(b);
+    oscs.setBank(b);
 }
 
 void VoiceEngine::setConfig(const VoiceConfig& c)
@@ -51,13 +33,13 @@ void VoiceEngine::setConfig(const VoiceConfig& c)
     const float midi2 = toneToMidi(cfg.scaleIndex, cfg.root, cfg.osc2Octave + kBaseOctave,
                                    (float) cfg.osc2Semi, (float) cfg.osc2Fine)
                         + cfg.pitchOffsetSemis + cfg.osc2SemiMod;
-    osc1.setFrequency(midiToFreq(midi1));
-    osc2.setFrequency(midiToFreq(midi2));
+    oscs.osc1.setFrequency(midiToFreq(midi1));
+    oscs.osc2.setFrequency(midiToFreq(midi2));
     // Position is a 0..255 frame index; normalise to the osc's 0..1 scan input.
-    osc1.setPosition(cfg.osc1Pos / 255.0f);
-    osc2.setPosition(cfg.osc2Pos / 255.0f);
-    osc1.setTable(cfg.osc1Wavetable);
-    osc2.setTable(cfg.osc2Wavetable);
+    oscs.osc1.setPosition(cfg.osc1Pos / 255.0f);
+    oscs.osc2.setPosition(cfg.osc2Pos / 255.0f);
+    oscs.osc1.setTable(cfg.osc1Wavetable);
+    oscs.osc2.setTable(cfg.osc2Wavetable);
 
     filter1.setType(cfg.filterType);
     filter1.setCutoff(cfg.filterCutoff);
@@ -85,98 +67,20 @@ void VoiceEngine::process(juce::AudioBuffer<float>& out, int numSamples)
     float* m = mono.getWritePointer(0);
     const auto noiseType = static_cast<NoiseGen::Type>(cfg.noiseType);
 
-    // 2-lane X-Mod (mu-tant-xmod-design.md). Lane A (phase/index) and Lane B
-    // (amplitude/multiply) run in parallel; the mode within each lane is mutually
-    // exclusive. Continuous controls smooth per-sample toward their target.
-    const int   phaseMode = cfg.xmodPhaseMode;        // 0 FM, 1 PM, 2 TZFM
-    const bool  fdbk      = cfg.xmodFeedback;
-    const int   ampMode   = cfg.xmodAmpMode;          // 0 Mult, 1 SSB
-    const float idxTgt    = juce::jlimit(0.0f, 1.0f, cfg.xmodIndex);
-    const float depTgt    = juce::jlimit(-1.0f, 1.0f, cfg.xmodDepth);
-    const float ssbTgt    = cfg.xmodSsbHz;
-    const float smCoef    = 1.0f - std::exp(-1.0f / (kXModSmoothMs * 0.001f * (float) sr));
-
-    // SSB uses a recursive complex rotator instead of a per-sample cos/sin: smooth the
-    // shift frequency at block rate, derive the per-sample rotation increment once (one
-    // cos/sin pair per block), then advance the phasor with 4 mults/sample and renormalise
-    // once at block end. ssbHz smoothing moves to block rate (shift changes are slow).
-    float rotC = 1.0f, rotS = 0.0f;
-    if (ampMode == 2)
-    {
-        ssbHzSm += (ssbTgt - ssbHzSm) * juce::jmin(1.0f, smCoef * (float) ns);
-        const double omega = juce::MathConstants<double>::twoPi * (double) ssbHzSm / sr;
-        rotC = (float) std::cos(omega);
-        rotS = (float) std::sin(omega);
-    }
-
+    // Osc 1 + Osc 2 through the shared 2-lane X-Mod (Lane A phase / index, Lane B amplitude),
+    // then the per-source levels + noise into the mono work buffer.
+    mu_wavetable::XModSettings xm;
+    xm.phaseMode = cfg.xmodPhaseMode;  xm.index = cfg.xmodIndex;  xm.sync    = cfg.sync;
+    xm.feedback  = cfg.xmodFeedback;   xm.ampMode = cfg.xmodAmpMode; xm.depth = cfg.xmodDepth;
+    xm.ssbHz     = cfg.xmodSsbHz;
+    oscs.beginBlock(xm, ns);
     for (int i = 0; i < ns; ++i)
     {
-        indexSm += (idxTgt - indexSm) * smCoef;
-        depthSm += (depTgt - depthSm) * smCoef;
-
-        // Modulator (osc2) renders first; feedback FM phase-mods it with osc1's prev output.
-        const float b = osc2.render(fdbk ? kFbScale * lastA : 0.0f);
-
-        // Lane A — carrier (osc1) phase/index bus.
-        float a;
-        if (phaseMode == 1)                          // PM: displace osc1's read phase
-        {
-            a = osc1.render(indexSm * b * kPmScale);
-        }
-        else                                         // FM / TZFM: scale osc1's increment
-        {
-            double incMul = 1.0 + (double) (indexSm * kFmRatio) * b;
-            if (phaseMode == 0) incMul = juce::jmax(0.0, incMul);   // FM clamps ≥ 0 (no through-zero)
-            a = osc1.render(0.0f, incMul);
-        }
-
-        // Hard sync: osc1 wrap resets osc2 phase (takes effect next sample).
-        if (cfg.sync && osc1.justWrapped())
-            osc2.resetPhase();
-
-        lastA = a;                                   // feedback tap = raw carrier output
-
-        // Lane B — amplitude/multiply bus (mode: 0 AM, 1 RM, 2 SSB).
-        if (ampMode == 2)
-        {
-            // SSB / frequency shift: shift every partial of the carrier by ssbHz. Take the
-            // analytic signal (Hilbert) and multiply by the running complex phasor (cos/sin
-            // of the shift), keep the real part → one sideband. Advance the phasor by the
-            // per-block rotation increment (sign of the shift sets up/down).
-            const auto q = hilbert.process(a);
-            a = q.re * ssbCos - q.im * ssbSin;
-            const float nc = ssbCos * rotC - ssbSin * rotS;
-            ssbSin         = ssbCos * rotS + ssbSin * rotC;
-            ssbCos         = nc;
-        }
-        else if (depthSm != 0.0f)
-        {
-            // AM keeps the carrier (classic amplitude mod); RM crossfades dry → ring so the
-            // carrier is suppressed at full depth. Depth is bipolar (centre = off; sign flips
-            // the modulator phase).
-            if (ampMode == 0)                       // AM
-            {
-                a *= 1.0f + depthSm * b;
-            }
-            else                                    // RM
-            {
-                const float k   = std::abs(depthSm);
-                const float sgn = depthSm < 0.0f ? -1.0f : 1.0f;
-                a = a * (1.0f - k) + sgn * (a * b) * k;
-            }
-        }
-
+        const auto o = oscs.next();
         const float n = noise.render(noiseType);
-        m[i] = (a * osc1Gain + b * osc2Gain + n * noiseGain) * gain;
+        m[i] = (o.carrier * osc1Gain + o.modulator * osc2Gain + n * noiseGain) * gain;
     }
-
-    // Renormalise the SSB phasor once per block to counter slow magnitude drift from the
-    // recursive rotation (keeps |phasor| = 1 without a per-sample sqrt).
-    if (ampMode == 2)
-    {
-        const float mag = std::sqrt(ssbCos * ssbCos + ssbSin * ssbSin);
-        if (mag > 1.0e-6f) { ssbCos /= mag; ssbSin /= mag; }
-    }
+    oscs.endBlock();
 
     // Dual filter — series or parallel.
     if (cfg.filterSeries)

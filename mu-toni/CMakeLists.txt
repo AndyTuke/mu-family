@@ -117,7 +117,9 @@ target_sources(mu-toni-tests PRIVATE
     Source/Tests/TestMain.cpp
     Source/Tests/ApvtsLayoutTests.cpp
     Source/Tests/ArpeggiatorTests.cpp   # T1 — arp engine (Sequencer/Arpeggiator.h)
-    Source/Tests/AnalogueOscTests.cpp   # T2 — analogue oscillator (self-contained)
+    Source/Tests/ToniVoiceTests.cpp     # T2 — wavetable voice + X-Mod render
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/MultiModeFilter.cpp"
 )
 
 target_compile_features(mu-toni-tests PRIVATE cxx_std_17)
@@ -136,6 +138,7 @@ target_link_libraries(mu-toni-tests PRIVATE
     juce::juce_graphics
     juce::juce_gui_basics
     juce::juce_dsp
+    juce::juce_audio_formats   # WavetableBank WAV loader
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags
 )

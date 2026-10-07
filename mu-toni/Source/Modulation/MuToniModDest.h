@@ -37,8 +37,13 @@ inline constexpr ModDest kModDestTable[] = {
     { "osc1.level", "Osc1 Level", "Osc", "o1l" },
     { "osc2.level", "Osc2 Level", "Osc", "o2l" },
     { "osc2.semi",  "Osc2 Semi",  "Osc", "o2s" },
-    { "osc.pw",     "Pulse Width","Osc", "pw" },
+    { "osc1.pos",   "Osc1 Position", "Osc", "o1_pos" },
+    { "osc2.pos",   "Osc2 Position", "Osc", "o2_pos" },
     { "noise.level","Noise",      "Osc", "noise" },
+    // ── Cross-mod (mu-Tant's ids) ─────────────────────────────────────────────
+    { "xmod.index", "X-Mod Index", "X-Mod", "xmod_index" },
+    { "xmod.depth", "X-Mod Depth", "X-Mod", "xmod_depth" },
+    { "xmod.ssb",   "X-Mod SSB",   "X-Mod", "xmod_ssb" },
     // ── Filter ────────────────────────────────────────────────────────────────
     { "flt.cutoff", "Cutoff",     "Filter", "cut" },
     { "flt.res",    "Resonance",  "Filter", "res" },
@@ -53,7 +58,8 @@ inline constexpr ModDest kModDestTable[] = {
 enum ModDestIndex
 {
     D_dir, D_octs, D_inv, D_chord, D_root, D_roct, D_rate, D_gate, D_porta,
-    D_o1lvl, D_o2lvl, D_o2semi, D_pw, D_noise,
+    D_o1lvl, D_o2lvl, D_o2semi, D_o1pos, D_o2pos, D_noise,
+    D_xmIdx, D_xmDep, D_xmSsb,
     D_cut, D_res, D_drv, D_fenv,
     D_amp, D_penv,
     kNumModDests

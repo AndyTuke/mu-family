@@ -14,18 +14,22 @@ namespace vpi
     enum
     {
         scale, root, roct, chord, inv, octs, dir, rate, gate, leg, porta, snap, trig,     // arp (13)
-        o1w, o1o, o1f, o1l, o2w, o2o, o2s, o2f, o2l, pw, noise, ntype, ft, cut, res, drv, locut, // voice (17)
+        o1wt, o1o, o1f, o1pos, o1l, o2wt, o2o, o2s, o2f, o2pos, o2l,                            // oscillators (11)
+        xmPh, xmIdx, sync, xmFb, xmAm, xmDep, xmSsb,                                              // cross-mod (7)
+        noise, ntype, ft, cut, res, drv, locut,                                                  // noise + filter (7)
         aeA, aeD, aeS, aeR, aeL, feA, feD, feS, feR, feDep, peA, peD, peS, peR, peDep, ptgt,      // envs (16)
         drvChar, insP1, insP2, insP3, insP4,                                                     // insert (5)
         COUNT
     };
     static const char* const suffix[COUNT] = {
         "scale","root","roct","chord","inv","octs","dir","rate","gate","leg","porta","snap","trig",
-        "o1w","o1o","o1f","o1l","o2w","o2o","o2s","o2f","o2l","pw","noise","ntype","ft","cut","res","drv","locut",
+        "o1_wt","o1o","o1f","o1_pos","o1l","o2_wt","o2o","o2s","o2f","o2_pos","o2l",
+        "xmod_phaseMode","xmod_index","sync","xmod_fdbk","xmod_ampMode","xmod_depth","xmod_ssb",
+        "noise","ntype","ft","cut","res","drv","locut",
         "aeA","aeD","aeS","aeR","aeL","feA","feD","feS","feR","feDep","peA","peD","peS","peR","peDep","ptgt",
         "drvChar","insP1","insP2","insP3","insP4",
     };
-    static_assert(COUNT == 51, "vpi slot count must equal PluginProcessor::kNumVoiceParams");
+    static_assert(COUNT == 59, "vpi slot count must equal PluginProcessor::kNumVoiceParams");
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout()
@@ -88,17 +92,34 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         layout.add(std::make_unique<AudioParameterBool> (pid("snap"),  lbl("Diatonic Snap"), false));
         layout.add(std::make_unique<AudioParameterInt>  (pid("trig"),  lbl("Trigger"), 0, 1, 0));     // 0=Loop
 
-        // Oscillators / filter
-        layout.add(std::make_unique<AudioParameterInt>  (pid("o1w"), lbl("Osc1 Wave"), 0, 4, 2));     // Saw
-        layout.add(std::make_unique<AudioParameterInt>  (pid("o1o"), lbl("Osc1 Octave"), -3, 3, 0));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("o1f"), lbl("Osc1 Fine"), f(-100.0f, 100.0f, 1.0f), 0.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("o1l"), lbl("Osc1 Level"), f(-60.0f, 6.0f, 0.1f), aud ? 0.0f : -60.0f));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("o2w"), lbl("Osc2 Wave"), 0, 4, 2));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("o2o"), lbl("Osc2 Octave"), -3, 3, 0));
-        layout.add(std::make_unique<AudioParameterInt>  (pid("o2s"), lbl("Osc2 Semi"), -12, 12, 0));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("o2f"), lbl("Osc2 Fine"), f(-100.0f, 100.0f, 1.0f), 7.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("o2l"), lbl("Osc2 Level"), f(-60.0f, 6.0f, 0.1f), aud ? -3.0f : -60.0f));
-        layout.add(std::make_unique<AudioParameterFloat>(pid("pw"),    lbl("Pulse Width"), f(0.05f, 0.95f, 0.001f), 0.5f));
+        // Oscillators — mu-Tant's wavetable oscs: a table from the shared bank + its scan
+        // position (frame 0..255), defaulting to Basic Shapes' saw.
+        const int maxWt = juce::jmax(0, mu_wavetable::WavetableBank::factoryTableNames().size() - 1);
+        layout.add(std::make_unique<AudioParameterInt>  (pid("o1_wt"),  lbl("Osc1 Wavetable"), 0, maxWt, 0));
+        layout.add(std::make_unique<AudioParameterInt>  (pid("o1o"),    lbl("Osc1 Octave"), -3, 3, 0));
+        layout.add(std::make_unique<AudioParameterFloat>(pid("o1f"),    lbl("Osc1 Fine"), f(-100.0f, 100.0f, 1.0f), 0.0f));
+        layout.add(std::make_unique<AudioParameterInt>  (pid("o1_pos"), lbl("Osc1 Position"), 0, 255, kSawPosition));
+        layout.add(std::make_unique<AudioParameterFloat>(pid("o1l"),    lbl("Osc1 Level"), f(-60.0f, 6.0f, 0.1f), aud ? 0.0f : -60.0f));
+        layout.add(std::make_unique<AudioParameterInt>  (pid("o2_wt"),  lbl("Osc2 Wavetable"), 0, maxWt, 0));
+        layout.add(std::make_unique<AudioParameterInt>  (pid("o2o"),    lbl("Osc2 Octave"), -3, 3, 0));
+        layout.add(std::make_unique<AudioParameterInt>  (pid("o2s"),    lbl("Osc2 Semi"), -12, 12, 0));
+        layout.add(std::make_unique<AudioParameterFloat>(pid("o2f"),    lbl("Osc2 Fine"), f(-100.0f, 100.0f, 1.0f), 7.0f));
+        layout.add(std::make_unique<AudioParameterInt>  (pid("o2_pos"), lbl("Osc2 Position"), 0, 255, kSawPosition));
+        layout.add(std::make_unique<AudioParameterFloat>(pid("o2l"),    lbl("Osc2 Level"), f(-60.0f, 6.0f, 0.1f), aud ? -3.0f : -60.0f));
+
+        // Cross-mod — mu-Tant's 2-lane model (same ids + ranges): Lane A index + mode + Sync +
+        // Feedback; Lane B bipolar depth + mode, with the SSB shift in Hz.
+        layout.add(std::make_unique<AudioParameterChoice>(pid("xmod_phaseMode"), lbl("X-Mod Phase Mode"), StringArray{ "FM", "PM", "TZFM" }, 1));
+        layout.add(std::make_unique<AudioParameterFloat> (pid("xmod_index"),     lbl("X-Mod Index"), f(0.0f, 100.0f, 1.0f), 0.0f));
+        layout.add(std::make_unique<AudioParameterBool>  (pid("sync"),           lbl("Osc Sync"), false));
+        layout.add(std::make_unique<AudioParameterBool>  (pid("xmod_fdbk"),      lbl("X-Mod Feedback"), false));
+        layout.add(std::make_unique<AudioParameterChoice>(pid("xmod_ampMode"),   lbl("X-Mod Amp Mode"), StringArray{ "AM", "RM", "SSB" }, 0));
+        layout.add(std::make_unique<AudioParameterFloat> (pid("xmod_depth"),     lbl("X-Mod Depth"), f(-100.0f, 100.0f, 1.0f), 0.0f));
+        layout.add(std::make_unique<AudioParameterFloat> (pid("xmod_ssb"),       lbl("X-Mod SSB Shift"), f(-2000.0f, 2000.0f, 1.0f), 0.0f,
+                    AudioParameterFloatAttributes().withStringFromValueFunction(
+                        [](float v, int) -> juce::String { return juce::String((int) std::round(v)) + " Hz"; })));
+
+        // Noise / filter
         layout.add(std::make_unique<AudioParameterFloat>(pid("noise"), lbl("Noise Level"), f(-60.0f, 0.0f, 0.1f), -60.0f));
         layout.add(std::make_unique<AudioParameterInt>  (pid("ntype"), lbl("Noise Type"), 0, 1, 0));    // 0=White
         layout.add(std::make_unique<AudioParameterInt>  (pid("ft"),  lbl("Filter Type"), 0, 15, 0));
@@ -134,6 +155,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         layout.add(std::make_unique<AudioParameterFloat>(pid("insP4"), lbl("Insert P4"), f(0.0f, 1.0f, 0.0f), 0.0f));
     }
 
+    // ── MIDI in: which channel's notes drive the arps (Omni = any) ─────────────
+    {
+        StringArray chans { "Omni" };
+        for (int c = 1; c <= 16; ++c) chans.add(String(c));
+        layout.add(std::make_unique<AudioParameterChoice>(ParameterID{ "midiInCh", 1 }, "MIDI In Channel", chans, 0));
+    }
+
     // ── Shared global FX rack + returns + master (mu-core) ────────────────────
     mu_mixfx::addGlobalFxParams(layout);
 
@@ -160,6 +188,11 @@ PluginProcessor::PluginProcessor()
     };
 
     initAppSettings("muToni");   // settings file + saved UI size / MIDI clock (ProcessorBase)
+
+    // The shared wavetable bank (procedural factory set), read by every voice's oscillators.
+    bank.loadFactoryBank();
+    for (auto& r : runners) r.setBank(&bank);
+    midiInChParam = apvts.getRawParameterValue("midiInCh");
 
     registerFxListeners(this);
     syncAllFxParams();   // JUCE doesn't fire parameterChanged on construction
@@ -222,9 +255,19 @@ void PluginProcessor::readVoice(int v, ArpParams& ap, ToniVoiceParams& tv,
     ap.direction    = out[D_dir];
     ap.diatonicSnap = g(vpi::snap) > 0.5f;                  // not modulated
 
-    tv.osc1Shape = (int) g(vpi::o1w); tv.osc1Oct = (int) g(vpi::o1o); tv.osc1Fine = g(vpi::o1f); tv.osc1LevelDb = out[D_o1lvl];
-    tv.osc2Shape = (int) g(vpi::o2w); tv.osc2Oct = (int) g(vpi::o2o); tv.osc2Semi = out[D_o2semi]; tv.osc2Fine = g(vpi::o2f); tv.osc2LevelDb = out[D_o2lvl];
-    tv.pulseWidth = out[D_pw]; tv.noiseLevelDb = out[D_noise]; tv.noiseType = (int) g(vpi::ntype);
+    tv.osc1Table = (int) g(vpi::o1wt); tv.osc1Oct = (int) g(vpi::o1o); tv.osc1Fine = g(vpi::o1f); tv.osc1Pos = out[D_o1pos]; tv.osc1LevelDb = out[D_o1lvl];
+    tv.osc2Table = (int) g(vpi::o2wt); tv.osc2Oct = (int) g(vpi::o2o); tv.osc2Semi = out[D_o2semi]; tv.osc2Fine = g(vpi::o2f);
+    tv.osc2Pos   = out[D_o2pos]; tv.osc2LevelDb = out[D_o2lvl];
+    tv.noiseLevelDb = out[D_noise]; tv.noiseType = (int) g(vpi::ntype);
+
+    // Cross-mod (index / depth are 0..100 / ±100 knobs → 0..1 / ±1).
+    tv.xmod.phaseMode = (int) g(vpi::xmPh);
+    tv.xmod.index     = out[D_xmIdx] * 0.01f;
+    tv.xmod.sync      = g(vpi::sync) > 0.5f;
+    tv.xmod.feedback  = g(vpi::xmFb) > 0.5f;
+    tv.xmod.ampMode   = (int) g(vpi::xmAm);
+    tv.xmod.depth     = out[D_xmDep] * 0.01f;
+    tv.xmod.ssbHz     = out[D_xmSsb];
     tv.filterType = (int) g(vpi::ft); tv.cutoff = out[D_cut]; tv.resonance = out[D_res]; tv.drive = out[D_drv]; tv.lowCutHz = g(vpi::locut);
 
     tv.ampA = g(vpi::aeA); tv.ampD = g(vpi::aeD); tv.ampS = g(vpi::aeS); tv.ampR = g(vpi::aeR); tv.ampLevelDb = out[D_amp];
@@ -263,9 +306,12 @@ void PluginProcessor::updateHeldNotes(const juce::MidiBuffer& midi, bool& noteOn
             }
     };
 
+    // MIDI In channel: Omni takes every channel's notes, else only that channel's.
+    const int inCh = midiInChParam != nullptr ? juce::roundToInt(midiInChParam->load()) : 0;
     for (const auto meta : midi)
     {
         const auto m = meta.getMessage();
+        if (inCh > 0 && m.getChannel() != inCh) continue;
         if (m.isNoteOn())
         {
             removeNote(m.getNoteNumber());

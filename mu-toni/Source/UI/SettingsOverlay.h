@@ -14,6 +14,11 @@ class SettingsOverlay : public mu_ui::StandardSettingsOverlay
 public:
     explicit SettingsOverlay(PluginProcessor& proc);
 
+private:
+    juce::Label    midiInLabel;
+    DropdownSelect midiInDropdown;   // MIDI In channel: Omni or 1-16
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> midiInAtt;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SettingsOverlay)
 };
 

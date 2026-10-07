@@ -24,9 +24,9 @@ All five stages compile + link across the family (mu-toni Standalone + VST3 + CL
 
 ### MVP deviations from the design (follow-ups, logged)
 
-- **Oscillator** — self-contained analogue PolyBLEP osc, *not* mu-tant's wavetable
-  bank (bank + FFT-mip + disk content isn't cross-product shareable yet). Lift the
-  wavetable engine to mu-core later to get mu-tant's exact timbre.
+- **Oscillator** — MVP shipped a self-contained analogue PolyBLEP osc; replaced (backlog
+  #1073) by mu-Tant's wavetable engine, lifted to mu-core (`Audio/Wavetable/`: bank,
+  oscillator, Hilbert, `XModOscPair`) so both products share mu-Tant's exact timbre.
 - **X-Mod** — not in the MVP voice (osc detune only). Add with the wavetable lift.
 - ~~Modulation~~ — **DONE (v1.0.945):** full modulation section wired identically
   to the other products. Per-voice `VoiceSlot` (8 control sequences + matrix), the

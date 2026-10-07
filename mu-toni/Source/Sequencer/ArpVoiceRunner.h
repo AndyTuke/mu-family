@@ -45,6 +45,7 @@ public:
     }
 
     void setVoiceParams(const ToniVoiceParams& p) { voice.setParams(p); legatoOn = p.legato; }
+    void setBank(const mu_wavetable::WavetableBank* b) noexcept { voice.setBank(b); }
     void setArp(const ArpParams& p)               { arp = p; }
     void setStep(int rateIdx, float gate01, bool midiTrig)
     {

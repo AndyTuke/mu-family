@@ -1,27 +1,32 @@
 #pragma once
 
 #include <juce_audio_basics/juce_audio_basics.h>
-#include "Audio/MultiModeFilter.h"   // mu-core (reused unchanged)
-#include "AnalogueOsc.h"
-#include "Scales.h"                    // midiToFreq
+#include "Audio/MultiModeFilter.h"          // mu-core (reused unchanged)
+#include "Audio/Wavetable/XModOscPair.h"   // mu-core: wavetable oscs + 2-lane X-Mod (shared with mu-Tant)
+#include "Scales.h"                           // midiToFreq
 
-// μ-Toni MVP voice — a note-triggered analogue-style mono synth.
-//   Osc1 + Osc2 (+ noise) → MultiModeFilter → Amp VCA → (caller adds insert)
+// μ-Toni voice — a note-triggered wavetable mono synth (mu-Tant's oscillators + X-Mod).
+//   Osc1 + Osc2 (cross-modulated) (+ noise) → MultiModeFilter → Amp VCA → (caller adds insert)
 // Amp / Filter / Pitch ADSR (juce::ADSR), portamento glide, legato tie.
 // The arpeggiator drives noteOn/noteOnLegato/noteOff; the voice renders into a
 // stereo buffer. See docs/mu-toni/design-sequencer.md.
 namespace mu_toni
 {
 
+// Basic Shapes' saw: its scan runs sine → triangle → saw → square, so 2/3 of the way (frame 170
+// of 0..255) — the default, so a fresh patch sounds as the analogue saw did.
+inline constexpr int kSawPosition = 170;
+
 struct ToniVoiceParams
 {
-    // Osc 1 / Osc 2
-    int   osc1Shape = AnalogueOsc::Saw,  osc2Shape = AnalogueOsc::Saw;
+    // Osc 1 / Osc 2 — a wavetable from the shared bank and its scan position (frame 0..255).
+    int   osc1Table = 0,                 osc2Table = 0;
+    float osc1Pos   = (float) kSawPosition, osc2Pos = (float) kSawPosition;
     int   osc1Oct   = 0,                 osc2Oct   = 0;
     float osc2Semi  = 0.0f;                        // osc2 semitone detune
     float osc1Fine  = 0.0f,              osc2Fine  = 7.0f;   // cents (slight detune = fat)
     float osc1LevelDb = 0.0f,            osc2LevelDb = -3.0f;
-    float pulseWidth  = 0.5f;                      // shared PW for Pulse shape
+    mu_wavetable::XModSettings xmod;               // Osc 2 → Osc 1 cross-mod + sync
     float noiseLevelDb = -60.0f;                   // -60 dB ≡ off
     int   noiseType    = 0;                        // 0 = White, 1 = Pink
 
@@ -55,10 +60,12 @@ struct ToniVoiceParams
 class ToniVoice
 {
 public:
+    void setBank(const mu_wavetable::WavetableBank* b) noexcept { oscs.setBank(b); }
+
     void prepare(double sampleRate, int blockSize)
     {
         sr = sampleRate > 0 ? sampleRate : 44100.0;
-        osc1.prepare(sr); osc2.prepare(sr);
+        oscs.prepare(sr);
         filter.prepare(sr, blockSize, 1);
         ampEnv.setSampleRate(sr); filterEnv.setSampleRate(sr); pitchEnv.setSampleRate(sr);
         mono.setSize(1, blockSize, false, false, true);
@@ -69,8 +76,9 @@ public:
     void setParams(const ToniVoiceParams& p)
     {
         params = p;
-        osc1.setShape(p.osc1Shape); osc2.setShape(p.osc2Shape);
-        osc1.setPulseWidth(p.pulseWidth); osc2.setPulseWidth(p.pulseWidth);
+        oscs.osc1.setTable(p.osc1Table);  oscs.osc2.setTable(p.osc2Table);
+        oscs.osc1.setPosition(p.osc1Pos / 255.0f);
+        oscs.osc2.setPosition(p.osc2Pos / 255.0f);
 
         osc1Semis = (float) p.osc1Oct * 12.0f + p.osc1Fine * 0.01f;
         osc2Semis = (float) p.osc2Oct * 12.0f + p.osc2Semi + p.osc2Fine * 0.01f;
@@ -104,7 +112,7 @@ public:
     {
         targetMidi = (float) midiNote;
         pitchGlide.setCurrentAndTargetValue(targetMidi);
-        osc1.resetPhase(); osc2.resetPhase();
+        oscs.osc1.resetPhase(); oscs.osc2.resetPhase();
         ampEnv.noteOn(); filterEnv.noteOn(); pitchEnv.noteOn();
     }
 
@@ -142,21 +150,25 @@ public:
         const float envPitch = params.pitchEnvDepth * envP;
         const float m1 = baseMidi + osc1Semis + (params.pitchEnvTarget == 0 ? envPitch : 0.0f);
         const float m2 = baseMidi + osc2Semis + envPitch;
-        osc1.setFrequency(midiToFreq(m1));
-        osc2.setFrequency(midiToFreq(m2));
+        oscs.osc1.setFrequency(midiToFreq(m1));
+        oscs.osc2.setFrequency(midiToFreq(m2));
 
         // Filter cutoff with envelope (depth in octaves), clamped to a safe range.
         const float cut = juce::jlimit(20.0f, (float) (0.45 * sr),
                                        params.cutoff * std::pow(2.0f, params.filterEnvDepth * envF * kFilterEnvOctaves));
         filter.setCutoff(cut);
 
+        // Osc 1 (carrier) + Osc 2 (modulator) through the 2-lane X-Mod, plus noise.
         float* m = mono.getWritePointer(0);
+        oscs.beginBlock(params.xmod, numSamples);
         for (int i = 0; i < numSamples; ++i)
         {
-            float s = osc1.render() * osc1Gain + osc2.render() * osc2Gain;
+            const auto o = oscs.next();
+            float s = o.carrier * osc1Gain + o.modulator * osc2Gain;
             if (noiseGain > 0.0f) s += renderNoise() * noiseGain;
             m[i] = s;
         }
+        oscs.endBlock();
 
         filter.process(mono, numSamples, 1);
 
@@ -196,7 +208,7 @@ private:
     double sr = 44100.0;
     ToniVoiceParams params;
 
-    AnalogueOsc osc1, osc2;
+    mu_wavetable::XModOscPair oscs;   // Osc 1 (carrier) + Osc 2 (modulator)
     juce::Random rng;
     MultiModeFilter filter;
     juce::ADSR ampEnv, filterEnv, pitchEnv;

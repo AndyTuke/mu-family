@@ -56,7 +56,6 @@ target_sources(mu-tant
         Source/UI/GatingDesigner.cpp
         Source/UI/SettingsOverlay.cpp
         Source/Sequencer/GatePattern.cpp
-        Source/Audio/WavetableBank.cpp
         Source/Audio/SynthVoice.cpp
         # Offline-license verifier lives in mu-core (shared); compiled here + monocypher.c.
         "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
@@ -187,8 +186,8 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/HotSwapBoundaryTests.cpp  # hot-swap boundary predicates + stager handshake (#880/#883)
     Source/UI/GatingDesigner.cpp
     Source/Sequencer/GatePattern.cpp
-    Source/Audio/WavetableBank.cpp
     Source/Audio/SynthVoice.cpp
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"
     # Editor-free APVTS layout factory — lets the ApvtsLayout test exercise the
     # real createParameterLayout() without pulling in PluginEditor/UI (#721).
     Source/Plugin/PluginProcessor_APVTS.cpp

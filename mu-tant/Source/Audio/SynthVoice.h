@@ -1,10 +1,8 @@
 #pragma once
 
 #include <juce_audio_basics/juce_audio_basics.h>
-#include "WavetableOscillator.h"
-#include "WavetableBank.h"
-#include "HilbertTransform.h"
-#include "Audio/MultiModeFilter.h"   // mu-core (reused unchanged)
+#include "Audio/Wavetable/XModOscPair.h"   // mu-core: wavetable oscs + 2-lane X-Mod (shared with mu-Toni)
+#include "Audio/MultiModeFilter.h"          // mu-core (reused unchanged)
 
 // mu-tant per-layer voice (design-voice.md "Per-slot voice chain").
 //   Osc1 + Osc2 --(FM / Sync)--> mix --> Filter --> out (to caller)
@@ -13,6 +11,10 @@
 // by the caller (PluginProcessor::renderVoice) after process() returns.
 namespace mu_tant
 {
+
+using mu_wavetable::WavetableBank;
+using mu_wavetable::Wavetable;
+using mu_wavetable::WavetableOscillator;
 
 struct VoiceConfig
 {
@@ -121,20 +123,13 @@ public:
     void process(juce::AudioBuffer<float>& out, int numSamples);
 
 private:
-    WavetableOscillator      osc1, osc2;
+    mu_wavetable::XModOscPair oscs;   // Osc 1 (carrier) + Osc 2 (modulator) with the 2-lane X-Mod
     NoiseGen                 noise;
     MultiModeFilter          filter1, filter2;
-    HilbertTransform         hilbert;          // quadrature split for SSB frequency-shift
     VoiceConfig              cfg;
     juce::AudioBuffer<float> mono;    // primary 1-channel work buffer
     juce::AudioBuffer<float> mono2;   // second buffer for parallel filter path
     double                   sr   = 44100.0;
-    float                    lastA    = 0.0f;  // osc1 prev output (feedback FM z^-1)
-    float                    ssbCos   = 1.0f;   // SSB shift phasor (recursive rotator)
-    float                    ssbSin   = 0.0f;
-    float                    indexSm  = 0.0f;   // smoothed Lane A index (anti-zipper/click)
-    float                    depthSm  = 0.0f;   // smoothed Lane B depth
-    float                    ssbHzSm  = 0.0f;   // smoothed SSB shift (Hz)
     float                    gain = 1.0f;
     float                    osc1Gain = 1.0f;
     float                    osc2Gain = 0.5f;

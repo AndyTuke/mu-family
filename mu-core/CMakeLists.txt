@@ -96,6 +96,8 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/Voice/InsertSubsection.cpp"
     # Shared voice band (Pitch / Filter / Amp / Effects layout + drawing) and its cell-grid section.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/Voice/VoiceBand.cpp"
+    # Shared wavetable bank (mip-mapped tables + procedural factory set) — mu-Tant, mu-Toni.
+    "${CMAKE_CURRENT_SOURCE_DIR}/Audio/Wavetable/WavetableBank.cpp"
 )
 
 # Consumers can `#include "Audio/VoiceEngine.h"` etc. — same path namespace as
