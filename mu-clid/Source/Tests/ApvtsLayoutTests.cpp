@@ -72,6 +72,17 @@ public:
                             juce::String ("target '") + t.id + "' names unknown parameter '" + t.param + "'");
         }
 
+        beginTest ("Modulation targets: every live row is in the destination dropdown");
+        {
+            for (int i = 0; i < ModDest::kTableSize; ++i)
+            {
+                if (ModDest::kTable[i].param == nullptr) continue;
+                const bool listed = std::find (std::begin (ModDest::kDropdownOrder), std::end (ModDest::kDropdownOrder), i)
+                                    != std::end (ModDest::kDropdownOrder);
+                expect (listed, juce::String ("target '") + ModDest::kTable[i].id + "' is missing from kDropdownOrder");
+            }
+        }
+
         beginTest ("AlgorithmIndex params each have a non-null algorithm name table");
         {
             for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)

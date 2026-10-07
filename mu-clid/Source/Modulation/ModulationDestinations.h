@@ -126,6 +126,21 @@ namespace ModDest
     };
     static constexpr int kTableSize = (int)(sizeof(kTable) / sizeof(kTable[0]));
 
+    // The destination dropdown's display order (kTable indices; headings come from each row's
+    // section): Euclid A / B / C, Pitch, Filter, Amp, the active insert's slots, then the FX
+    // sends. Every live row must appear here (checked by the tests) — a new target is appended
+    // to kTable AND placed here.
+    inline const int kDropdownOrder[] = {
+        16, 17, 27, 28, 29, 30,          // Euclid A: Hits, Rotate, Pre Pad, Post Pad, Insert Start, Insert Length
+        18, 19, 31, 32, 33, 34,          // Euclid B
+        22, 23, 35, 36, 37, 38,          // Euclid C
+        20, 9, 24,                       // Pitch: Octave, Semitones, Env Depth
+        4, 5, 6, 7, 8, 44,               // Filter: Cutoff, Resonance, Env Attack / Decay / Depth, Low Cut
+        25, 0, 1, 2, 26, 45,             // Amp: Level, Attack, Decay, Sustain, Accent, Pan
+        10, 11, 12, 13,                  // Insert P1..P4 (labelled per active effect)
+        46, 47, 48,                      // Effects: Effect / Delay / Reverb Send
+    };
+
     // True for a target that drives the mixer channel (ch{N}_ pan / sends) rather than a
     // per-rhythm r{N}_ parameter.
     inline bool isMixerStripParam(const char* param) noexcept
