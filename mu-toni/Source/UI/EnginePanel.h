@@ -1,4 +1,5 @@
 #pragma once
+#include "UI/ParamChoices.h"   // mu-core: selector items from choice parameters
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Plugin/PluginProcessor.h"
 #include "UI/Components/MuLookAndFeel.h"
@@ -48,8 +49,8 @@ public:
         addKnob (G_OSC2, "o2f",    "Fine", LF::knobEuclidean);
         addKnob (G_OSC2, "o2_pos", "Pos",  LF::knobEuclidean);
         // Cross-mod (Osc 2 → Osc 1): Lane A mode + Index, Sync, Feedback; Lane B mode + Depth, SSB shift.
-        addCombo (G_XMOD, "xmod_phaseMode", { "FM", "PM", "TZFM" });
-        addCombo (G_XMOD, "xmod_ampMode",   { "AM", "RM", "SSB" });
+        addCombo (G_XMOD, "xmod_phaseMode", mu_ui::choiceNames(proc.apvts, "v0_xmod_phaseMode"));
+        addCombo (G_XMOD, "xmod_ampMode",   mu_ui::choiceNames(proc.apvts, "v0_xmod_ampMode"));
         addToggle(G_XMOD, "sync",           "Sync");
         addToggle(G_XMOD, "xmod_fdbk",      "Fdbk");
         addKnob  (G_XMOD, "xmod_index", "Index", LF::knobEuclidean);

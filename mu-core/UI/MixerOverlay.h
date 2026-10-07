@@ -88,6 +88,11 @@ private:
     void wireReturns();
     void wireFXRows();
     void updateEffectSendLabels();
+    // Delay and Echo rows share one control set, on the "dly_" / "echo_" parameters.
+    void wireDelayRow(DelayRow& row, const juce::String& prefix);
+    void loadDelayRow(DelayRow& row, const juce::String& prefix);
+    void loadEffectParams();   // effect row knobs from eff_p0..4, in the active algorithm's range
+    void loadReverbParams();   // reverb row knobs from rev_*
     void refreshSidechainSources();
 
     // juce::AudioProcessorValueTreeState::Listener — sets dirty flag for deferred reload.

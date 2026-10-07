@@ -9,6 +9,20 @@ static const juce::String kEffParamIds[5] = {
     "eff_p0", "eff_p1", "eff_p2", "eff_p3", "eff_p4"
 };
 
+// The sync denominators the Delay / Echo `*_syncDenom` choice indexes: 0..3 → 1/32 .. 1/4.
+static constexpr int kSyncDenoms[] = { 32, 16, 8, 4 };
+
+// Reverb row knob id → its APVTS parameter (matching ranges, so values pass straight through).
+static const std::pair<const char*, const char*> kRevParamMap[] = {
+    { "size",      "rev_size" },
+    { "predelay",  "rev_pre"  },
+    { "diffusion", "rev_diff" },
+    { "damp",      "rev_damp" },
+    { "mod",       "rev_mod"  },
+    { "dirt",      "rev_dirt" },
+};
+
+
 // only subscribe to APVTS IDs that actually affect the mixer view.
 // Previously this class registered as a listener for *every* parameter in the
 // tree (hundreds across all rhythms / voices / mods) and set apvtsDirty on any
@@ -273,67 +287,13 @@ void MixerOverlay::wireFXRows()
     // Load current algo param values into FX row knobs. Skip when the product
     // doesn't define eff_pN — the row renders with its defaults.
     if (proc.apvts.getParameter(kEffParamIds[0]) != nullptr)
-    {
-        int ai = eff.getAlgorithmIndex();
-        const auto& algos = FXAlgorithmRegistry::effectAlgorithms();
-        if (ai < (int)algos.size())
-        {
-            const auto& params = algos[ai].params;
-            for (int i = 0; i < (int)params.size() && i < 5; ++i)
-            {
-                if (auto* raw = proc.apvts.getRawParameterValue(kEffParamIds[i]))
-                {
-                    float norm   = *raw;
-                    float actual = params[i].minVal + norm * (params[i].maxVal - params[i].minVal);
-                    effectRow.setParamValue(params[i].id, actual);
-                }
-            }
-        }
-    }
+        loadEffectParams();
 
     // ── Delay row ────────────────────────────────────────────────────────────
     delayRow.setEnabled(dly.isEnabled());
     delayRow.setSyncMode(dly.getTimeMode() == DelaySlot::TimeMode::Sync);
 
-    delayRow.onEnabledChanged = [this](bool e) {
-        if (auto* p = proc.apvts.getParameter("dly_en"))
-            p->setValueNotifyingHost(e ? 1.0f : 0.0f);
-    };
-    delayRow.onSyncChanged = [this](bool sync) {
-        if (auto* p = proc.apvts.getParameter("dly_mode"))
-            p->setValueNotifyingHost(sync ? 1.0f : 0.0f);
-    };
-    delayRow.onSyncParamChanged = [this](int denom, bool dotted, bool triplet, int count) {
-        // Map denominator value to index: 32→0, 16→1, 8→2, 4→3
-        static const int denoms[] = { 32, 16, 8, 4 };
-        int idx = 3;
-        for (int i = 0; i < 4; ++i)
-            if (denoms[i] == denom) { idx = i; break; }
-        if (auto* p = proc.apvts.getParameter("dly_syncDenom"))
-            p->setValueNotifyingHost(p->convertTo0to1((float)idx));
-        if (auto* p = proc.apvts.getParameter("dly_syncDot"))
-            p->setValueNotifyingHost(dotted ? 1.0f : 0.0f);
-        if (auto* p = proc.apvts.getParameter("dly_syncTrip"))
-            p->setValueNotifyingHost(triplet ? 1.0f : 0.0f);
-        if (auto* p = proc.apvts.getParameter("dly_count"))
-            p->setValueNotifyingHost(p->convertTo0to1((float)count));
-    };
-    delayRow.onFreeMsChanged = [this](float ms) {
-        if (auto* p = proc.apvts.getParameter("dly_ms"))
-            p->setValueNotifyingHost(p->convertTo0to1(ms));
-    };
-    delayRow.onFeedbackChanged = [this](float v) {
-        if (auto* p = proc.apvts.getParameter("dly_fb"))
-            p->setValueNotifyingHost(p->convertTo0to1(v));
-    };
-    delayRow.onSpreadChanged = [this](float v) {
-        if (auto* p = proc.apvts.getParameter("dly_spread"))
-            p->setValueNotifyingHost(p->convertTo0to1(v));
-    };
-    delayRow.onDirtChanged = [this](float v) {
-        if (auto* p = proc.apvts.getParameter("dly_dirt"))
-            p->setValueNotifyingHost(p->convertTo0to1(v));
-    };
+    wireDelayRow(delayRow, "dly_");
 
     // ── Reverb row ───────────────────────────────────────────────────────────
     reverbRow.setEnabled(rev.isEnabled());
@@ -369,17 +329,8 @@ void MixerOverlay::wireFXRows()
         pushP("rev_mod",  rev.getMod());
     };
 
-    // Reverb params map directly to APVTS (matching ranges, no normalization needed).
-    static const std::pair<const char*, const char*> revParamMap[] = {
-        { "size",      "rev_size" },
-        { "predelay",  "rev_pre"  },
-        { "diffusion", "rev_diff" },
-        { "damp",      "rev_damp" },
-        { "mod",       "rev_mod"  },
-        { "dirt",      "rev_dirt" },
-    };
     reverbRow.onParamChanged = [this](const juce::String& id, float v) {
-        for (auto& [pid, apid] : revParamMap)
+        for (auto& [pid, apid] : kRevParamMap)
         {
             if (id == pid)
             {
@@ -396,44 +347,7 @@ void MixerOverlay::wireFXRows()
     echoRow.setEnabled(echo.isEnabled());
     echoRow.setSyncMode(echo.getTimeMode() == DelaySlot::TimeMode::Sync);
 
-    echoRow.onEnabledChanged = [this](bool e) {
-        if (auto* p = proc.apvts.getParameter("echo_en"))
-            p->setValueNotifyingHost(e ? 1.0f : 0.0f);
-    };
-    echoRow.onSyncChanged = [this](bool sync) {
-        if (auto* p = proc.apvts.getParameter("echo_mode"))
-            p->setValueNotifyingHost(sync ? 1.0f : 0.0f);
-    };
-    echoRow.onSyncParamChanged = [this](int denom, bool dotted, bool triplet, int count) {
-        static const int denoms[] = { 32, 16, 8, 4 };
-        int idx = 3;
-        for (int i = 0; i < 4; ++i)
-            if (denoms[i] == denom) { idx = i; break; }
-        if (auto* p = proc.apvts.getParameter("echo_syncDenom"))
-            p->setValueNotifyingHost(p->convertTo0to1((float)idx));
-        if (auto* p = proc.apvts.getParameter("echo_syncDot"))
-            p->setValueNotifyingHost(dotted ? 1.0f : 0.0f);
-        if (auto* p = proc.apvts.getParameter("echo_syncTrip"))
-            p->setValueNotifyingHost(triplet ? 1.0f : 0.0f);
-        if (auto* p = proc.apvts.getParameter("echo_count"))
-            p->setValueNotifyingHost(p->convertTo0to1((float)count));
-    };
-    echoRow.onFreeMsChanged   = [this](float ms) {
-        if (auto* p = proc.apvts.getParameter("echo_ms"))
-            p->setValueNotifyingHost(p->convertTo0to1(ms));
-    };
-    echoRow.onFeedbackChanged = [this](float v) {
-        if (auto* p = proc.apvts.getParameter("echo_fb"))
-            p->setValueNotifyingHost(p->convertTo0to1(v));
-    };
-    echoRow.onSpreadChanged   = [this](float v) {
-        if (auto* p = proc.apvts.getParameter("echo_spread"))
-            p->setValueNotifyingHost(p->convertTo0to1(v));
-    };
-    echoRow.onDirtChanged     = [this](float v) {
-        if (auto* p = proc.apvts.getParameter("echo_dirt"))
-            p->setValueNotifyingHost(p->convertTo0to1(v));
-    };
+    wireDelayRow(echoRow, "echo_");
 
     // Set initial row visibility based on current algorithm.
     {
@@ -446,19 +360,75 @@ void MixerOverlay::wireFXRows()
     // Set initial send labels on rhythm channels to match the current algorithm.
     updateEffectSendLabels();
 
-    // Load current reverb param values into row knobs.
+    loadReverbParams();
+}
+
+void MixerOverlay::wireDelayRow(DelayRow& row, const juce::String& prefix)
+{
+    // Every control writes its `<prefix>*` parameter (Delay = "dly_", Echo = "echo_").
+    auto set = [this, prefix](const char* id, float norm)
     {
-        int ai = rev.getAlgorithmIndex();
-        const auto& algos = FXAlgorithmRegistry::reverbAlgorithms();
-        if (ai < (int)algos.size())
-        {
-            for (auto& [pid, apid] : revParamMap)
-            {
-                if (auto* raw = proc.apvts.getRawParameterValue(apid))
-                    reverbRow.setParamValue(pid, *raw);
-            }
-        }
-    }
+        if (auto* p = proc.apvts.getParameter(prefix + id))
+            p->setValueNotifyingHost(norm);
+    };
+    auto setActual = [this, prefix](const char* id, float v)
+    {
+        if (auto* p = proc.apvts.getParameter(prefix + id))
+            p->setValueNotifyingHost(p->convertTo0to1(v));
+    };
+    row.onEnabledChanged   = [set](bool e)    { set("en",   e    ? 1.0f : 0.0f); };
+    row.onSyncChanged      = [set](bool sync) { set("mode", sync ? 1.0f : 0.0f); };
+    row.onSyncParamChanged = [set, setActual](int denom, bool dotted, bool triplet, int count)
+    {
+        int idx = 3;
+        for (int i = 0; i < 4; ++i)
+            if (kSyncDenoms[i] == denom) { idx = i; break; }
+        setActual("syncDenom", (float) idx);
+        set("syncDot",  dotted  ? 1.0f : 0.0f);
+        set("syncTrip", triplet ? 1.0f : 0.0f);
+        setActual("count", (float) count);
+    };
+    row.onFreeMsChanged   = [setActual](float ms) { setActual("ms",     ms); };
+    row.onFeedbackChanged = [setActual](float v)  { setActual("fb",     v); };
+    row.onSpreadChanged   = [setActual](float v)  { setActual("spread", v); };
+    row.onDirtChanged     = [setActual](float v)  { setActual("dirt",   v); };
+}
+
+void MixerOverlay::loadDelayRow(DelayRow& row, const juce::String& prefix)
+{
+    auto& apvts = proc.apvts;
+    auto get = [&](const char* id) { return apvts.getRawParameterValue(prefix + id)->load(); };
+    row.setEnabled(get("en") > 0.5f, juce::dontSendNotification);
+    const bool syncMode = get("mode") > 0.5f;
+    row.setSyncMode(syncMode);
+    if (syncMode)
+        row.setSyncParams(kSyncDenoms[juce::jlimit(0, 3, (int) get("syncDenom"))],
+                          get("syncDot") > 0.5f, get("syncTrip") > 0.5f, (int) get("count"));
+    else
+        row.setFreeMs(get("ms"));
+    row.setFeedback(get("fb"));
+    row.setSpread  (get("spread"));
+    row.setDirt    (get("dirt"));
+}
+
+void MixerOverlay::loadEffectParams()
+{
+    // eff_pN hold 0..1; the row shows the active algorithm's own range.
+    const auto& algos = FXAlgorithmRegistry::effectAlgorithms();
+    const int ai = proc.fxChain.effectSlot().getAlgorithmIndex();
+    if (ai < 0 || ai >= (int) algos.size()) return;
+    const auto& params = algos[(size_t) ai].params;
+    for (int i = 0; i < (int) params.size() && i < 5; ++i)
+        if (auto* raw = proc.apvts.getRawParameterValue(kEffParamIds[i]))
+            effectRow.setParamValue(params[(size_t) i].id,
+                params[(size_t) i].minVal + raw->load() * (params[(size_t) i].maxVal - params[(size_t) i].minVal));
+}
+
+void MixerOverlay::loadReverbParams()
+{
+    for (auto& [pid, apid] : kRevParamMap)
+        if (auto* raw = proc.apvts.getRawParameterValue(apid))
+            reverbRow.setParamValue(pid, *raw);
 }
 
 void MixerOverlay::loadFromAPVTS()
@@ -531,93 +501,28 @@ void MixerOverlay::loadFromAPVTS()
     if (eff.getAlgorithmIndex() != effAlgoFromApvts)
         eff.setAlgorithm(effAlgoFromApvts);   // defensive resync
     effectRow.setSelectedAlgorithm(effAlgoFromApvts, juce::dontSendNotification);
-    {
-        const auto& algos = FXAlgorithmRegistry::effectAlgorithms();
-        int ai = eff.getAlgorithmIndex();
-        if (ai < (int)algos.size())
-        {
-            const auto& params = algos[ai].params;
-            for (int i = 0; i < (int)params.size() && i < 5; ++i)
-            {
-                float norm = *apvts.getRawParameterValue(kEffParamIds[i]);
-                effectRow.setParamValue(params[i].id,
-                    params[i].minVal + norm * (params[i].maxVal - params[i].minVal));
-            }
-        }
-    }
+    loadEffectParams();
 
-    // Echo row visibility and state
+    // Echo row: shown instead of the effect's knobs when the effect is Echo. Re-lay out only
+    // when that visibility actually changes, not on every parameter tick.
     {
-        const bool isEcho = (eff.getAlgorithmIndex() == EffectSlot::kEchoAlgoIndex);
+        const bool isEcho  = (eff.getAlgorithmIndex() == EffectSlot::kEchoAlgoIndex);
+        const bool changed = isEcho != echoRow.isVisible();
         effectRow.setKnobsVisible(!isEcho);
         echoRow  .setVisible(isEcho);
         if (isEcho)
-        {
-            echoRow.setEnabled(*apvts.getRawParameterValue("echo_en") > 0.5f,
-                               juce::dontSendNotification);
-            const bool syncMode = *apvts.getRawParameterValue("echo_mode") > 0.5f;
-            echoRow.setSyncMode(syncMode);
-            if (syncMode)
-            {
-                static const int denoms[] = { 32, 16, 8, 4 };
-                int  idx  = juce::jlimit(0, 3, (int)*apvts.getRawParameterValue("echo_syncDenom"));
-                bool dot  = *apvts.getRawParameterValue("echo_syncDot")  > 0.5f;
-                bool trip = *apvts.getRawParameterValue("echo_syncTrip") > 0.5f;
-                int  cnt  = (int)*apvts.getRawParameterValue("echo_count");
-                echoRow.setSyncParams(denoms[idx], dot, trip, cnt);
-            }
-            else
-            {
-                echoRow.setFreeMs(*apvts.getRawParameterValue("echo_ms"));
-            }
-            echoRow.setFeedback(*apvts.getRawParameterValue("echo_fb"));
-            echoRow.setSpread  (*apvts.getRawParameterValue("echo_spread"));
-            echoRow.setDirt    (*apvts.getRawParameterValue("echo_dirt"));
-        }
-        resized();
+            loadDelayRow(echoRow, "echo_");
+        if (changed)
+            resized();
     }
 
-    // Delay row
-    delayRow.setEnabled(*apvts.getRawParameterValue("dly_en") > 0.5f,
-                        juce::dontSendNotification);
-    {
-        const bool syncMode = *apvts.getRawParameterValue("dly_mode") > 0.5f;
-        delayRow.setSyncMode(syncMode);
-        if (syncMode)
-        {
-            static const int denoms[] = { 32, 16, 8, 4 };
-            int  idx  = juce::jlimit(0, 3, (int)*apvts.getRawParameterValue("dly_syncDenom"));
-            bool dot  = *apvts.getRawParameterValue("dly_syncDot")  > 0.5f;
-            bool trip = *apvts.getRawParameterValue("dly_syncTrip") > 0.5f;
-            int  cnt  = (int)*apvts.getRawParameterValue("dly_count");
-            delayRow.setSyncParams(denoms[idx], dot, trip, cnt);
-        }
-        else
-        {
-            delayRow.setFreeMs(*apvts.getRawParameterValue("dly_ms"));
-        }
-        delayRow.setFeedback(*apvts.getRawParameterValue("dly_fb"));
-        delayRow.setSpread  (*apvts.getRawParameterValue("dly_spread"));
-        delayRow.setDirt    (*apvts.getRawParameterValue("dly_dirt"));
-    }
+    loadDelayRow(delayRow, "dly_");
 
     // Reverb row
     reverbRow.setEnabled(*apvts.getRawParameterValue("rev_en") > 0.5f,
                          juce::dontSendNotification);
     reverbRow.setSelectedAlgorithm(rev.getAlgorithmIndex(), juce::dontSendNotification);
-    {
-        static const std::pair<const char*, const char*> revParamMap[] = {
-            { "size",      "rev_size" },
-            { "predelay",  "rev_pre"  },
-            { "diffusion", "rev_diff" },
-            { "damp",      "rev_damp" },
-            { "mod",       "rev_mod"  },
-            { "dirt",      "rev_dirt" },
-        };
-        for (auto& [pid, apid] : revParamMap)
-            if (auto* raw = apvts.getRawParameterValue(apid))
-                reverbRow.setParamValue(pid, *raw);
-    }
+    loadReverbParams();
 
     updateEffectSendLabels();
 }

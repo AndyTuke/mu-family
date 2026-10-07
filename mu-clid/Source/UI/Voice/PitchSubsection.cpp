@@ -1,32 +1,8 @@
 #include "PitchSubsection.h"
 #include "Plugin/PluginProcessor.h"
+#include "ValueFormat.h"   // mu-core: shared value text
 #include "Modulation/ModulationSnapshot.h"
 #include "Sequencer/Rhythm.h"
-
-namespace {
-static juce::String formatAdsrTimeSec(double v)
-{
-    double ms = std::max(1.0, v * 1000.0);
-    if (ms < 1000.0)
-        return juce::String((int)std::round(ms)) + " ms";
-    return juce::String(ms / 1000.0, 2) + " s";
-}
-static double parseAdsrTimeSec(const juce::String& s)
-{
-    auto t = s.trim().toLowerCase();
-    if (t.endsWith("ms"))
-        return t.dropLastCharacters(2).trim().getDoubleValue() / 1000.0;
-    if (t.endsWith("s"))
-        return t.dropLastCharacters(1).trim().getDoubleValue();
-    return t.getDoubleValue() / 1000.0;
-}
-static juce::String adsrValueStr(double v)
-{
-    double ms = std::max(1.0, v * 1000.0);
-    return (ms < 1000.0) ? juce::String((int)std::round(ms))
-                         : juce::String(ms / 1000.0, 2);
-}
-} // namespace
 
 PitchSubsection::PitchSubsection(PluginProcessor& p) : proc(p)
 {
@@ -66,8 +42,8 @@ void PitchSubsection::wireCallbacks()
 {
     for (auto* k : { &pitchAtk, &pitchDec, &pitchRel })
     {
-        k->getSlider().textFromValueFunction = [](double v) { return adsrValueStr(v); };
-        k->getSlider().valueFromTextFunction = [](const juce::String& s) { return parseAdsrTimeSec(s); };
+        k->getSlider().textFromValueFunction = [](double v) { return mu_fmt::time(v, false); };
+        k->getSlider().valueFromTextFunction = [](const juce::String& s) { return mu_fmt::parseTime(s); };
     }
     pitchSus.getSlider().textFromValueFunction = [](double v) -> juce::String {
         return juce::String((int)std::round(v));
@@ -93,17 +69,17 @@ void PitchSubsection::wireCallbacks()
 
     // Per-knob status bar overrides: re-add unit since the value display no longer shows it.
     pitchAtk.onStatusUpdate = [this](const juce::String&, const juce::String&) {
-        if (onStatusUpdate) onStatusUpdate("Pitch Attack", formatAdsrTimeSec(pitchAtk.getValue()));
+        if (onStatusUpdate) onStatusUpdate("Pitch Attack", mu_fmt::time(pitchAtk.getValue()));
     };
     pitchDec.onStatusUpdate = [this](const juce::String&, const juce::String&) {
-        if (onStatusUpdate) onStatusUpdate("Pitch Decay", formatAdsrTimeSec(pitchDec.getValue()));
+        if (onStatusUpdate) onStatusUpdate("Pitch Decay", mu_fmt::time(pitchDec.getValue()));
     };
     pitchSus.onStatusUpdate = [this](const juce::String&, const juce::String&) {
         if (onStatusUpdate) onStatusUpdate("Pitch Sustain",
             juce::String((int)std::round(pitchSus.getValue())) + "%");
     };
     pitchRel.onStatusUpdate = [this](const juce::String&, const juce::String&) {
-        if (onStatusUpdate) onStatusUpdate("Pitch Release", formatAdsrTimeSec(pitchRel.getValue()));
+        if (onStatusUpdate) onStatusUpdate("Pitch Release", mu_fmt::time(pitchRel.getValue()));
     };
 
     pitchOctave.onValueChanged = [this](double v) { apvtsSet("pitchOct",  (float)v); };

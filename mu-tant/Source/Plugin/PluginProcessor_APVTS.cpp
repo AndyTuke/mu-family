@@ -5,6 +5,7 @@
 // whole PluginEditor/UI tree into a console app. Mirrors mu-clid's
 // PluginProcessor_APVTS.cpp split.
 
+#include "ValueFormat.h"   // mu-core: shared value text
 #include "Plugin/PluginProcessor.h"
 #include "Audio/Scales.h"        // kScales (scaleNames)
 #include "Audio/AlgorithmNames.h" // mu-core: kFilterTypeNames (shared canonical list)
@@ -85,11 +86,8 @@ namespace
         // slider-side formatter would be clobbered on every voice rebind.
         NormalisableRange<float> cutoff(20.0f, 20000.0f);
         cutoff.setSkewForCentre(640.0f);
-        auto cutoffText = [](float v, int) -> String {
-            return v < 1000.0f ? String((int) std::round(v))
-                               : String(v / 1000.0f, 1);
-        };
-        auto resText = [](float v, int) -> String { return String((int) std::round(v * 100.0f)); };
+        auto cutoffText = [](float v, int) { return mu_fmt::freq(v, false, 1); };   // the knob label carries the unit
+        auto resText    = [](float v, int) { return mu_fmt::percent(v); };
         // AudioParameterInt(0..15): stores the algorithm index directly (same
         // normalisation as AudioParameterChoice(16) — both map 0..15 over 0..1).
         // The UI dropdown uses mu_audio::populateFilterTypeDropdown (item ID = index+1)
@@ -102,15 +100,11 @@ namespace
                     AudioParameterFloatAttributes().withStringFromValueFunction(resText)));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_drv"), 1}, label("Filter Drive"), f(0.0f, 1.0f, 0.01f), 0.0f,
                     AudioParameterFloatAttributes().withStringFromValueFunction(
-                        [](float v, int) -> juce::String { return juce::String((int)std::round(v * 100.0f)); })));
+                        [](float v, int) { return mu_fmt::percent(v); })));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_lo_cut"), 1}, label("Low Cut"),
                     juce::NormalisableRange<float>(0.0f, 1000.0f, 0.0f, 0.35f), 0.0f,
                     AudioParameterFloatAttributes().withStringFromValueFunction(
-                        [](float v, int) -> juce::String {
-                            if (v <= 0.0f)   return "Off";
-                            if (v < 1000.0f) return juce::String((int)std::round(v)) + " Hz";
-                            return juce::String(v / 1000.0f, 2) + " kHz";
-                        })));
+                        [](float v, int) { return mu_fmt::lowCut(v); })));
 
         // Filter 1 envelope depth.
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt_env_depth"), 1}, label("Filter Env Depth"), f(-1.0f, 1.0f, 0.01f), 1.0f));
@@ -124,15 +118,11 @@ namespace
                     AudioParameterFloatAttributes().withStringFromValueFunction(resText)));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt2_drv"), 1}, label("F2 Drive"), f(0.0f, 1.0f, 0.01f), 0.0f,
                     AudioParameterFloatAttributes().withStringFromValueFunction(
-                        [](float v, int) -> juce::String { return juce::String((int)std::round(v * 100.0f)); })));
+                        [](float v, int) { return mu_fmt::percent(v); })));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt2_lo_cut"), 1}, label("F2 Low Cut"),
                     juce::NormalisableRange<float>(0.0f, 1000.0f, 0.0f, 0.35f), 0.0f,
                     AudioParameterFloatAttributes().withStringFromValueFunction(
-                        [](float v, int) -> juce::String {
-                            if (v <= 0.0f)   return "Off";
-                            if (v < 1000.0f) return juce::String((int)std::round(v)) + " Hz";
-                            return juce::String(v / 1000.0f, 2) + " kHz";
-                        })));
+                        [](float v, int) { return mu_fmt::lowCut(v); })));
         layout.add(std::make_unique<AudioParameterFloat>(ParameterID{id("flt2_env_depth"), 1}, label("F2 Env Depth"), f(-1.0f, 1.0f, 0.01f), 0.0f));
 
         // Series (true) / Parallel (false) routing for the two filters.

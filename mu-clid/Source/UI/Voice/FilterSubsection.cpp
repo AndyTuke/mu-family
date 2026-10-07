@@ -1,33 +1,9 @@
 #include "FilterSubsection.h"
 #include "Plugin/PluginProcessor.h"
+#include "ValueFormat.h"   // mu-core: shared value text
 #include "Modulation/ModulationSnapshot.h"
 #include "Sequencer/Rhythm.h"
 #include "Audio/AlgorithmNames.h"   // mu_audio::populateFilterTypeDropdown
-
-namespace {
-static juce::String adsrValueStr(double v)
-{
-    double ms = std::max(1.0, v * 1000.0);
-    return (ms < 1000.0) ? juce::String((int)std::round(ms))
-                         : juce::String(ms / 1000.0, 2);
-}
-static juce::String formatAdsrTimeSec(double v)
-{
-    double ms = std::max(1.0, v * 1000.0);
-    if (ms < 1000.0)
-        return juce::String((int)std::round(ms)) + " ms";
-    return juce::String(ms / 1000.0, 2) + " s";
-}
-static double parseAdsrTimeSec(const juce::String& s)
-{
-    auto t = s.trim().toLowerCase();
-    if (t.endsWith("ms"))
-        return t.dropLastCharacters(2).trim().getDoubleValue() / 1000.0;
-    if (t.endsWith("s"))
-        return t.dropLastCharacters(1).trim().getDoubleValue();
-    return t.getDoubleValue() / 1000.0;
-}
-} // namespace
 
 FilterSubsection::FilterSubsection(PluginProcessor& p) : proc(p)
 {
@@ -81,8 +57,8 @@ void FilterSubsection::wireCallbacks()
     // Value display: number only. valueFromText still accepts "ms"/"s" suffixes for typed input.
     for (auto* k : { &filterAtk, &filterDec, &filterRel })
     {
-        k->getSlider().textFromValueFunction = [](double v) { return adsrValueStr(v); };
-        k->getSlider().valueFromTextFunction = [](const juce::String& s) { return parseAdsrTimeSec(s); };
+        k->getSlider().textFromValueFunction = [](double v) { return mu_fmt::time(v, false); };
+        k->getSlider().valueFromTextFunction = [](const juce::String& s) { return mu_fmt::parseTime(s); };
     }
     // Sustain: 0-100, no unit in value.
     filterSus.getSlider().textFromValueFunction = [](double v) -> juce::String {
@@ -138,36 +114,25 @@ void FilterSubsection::wireCallbacks()
     // Per-knob status bar overrides: re-add unit since the value display no longer shows it.
     filterCutoff.onStatusUpdate = [this](const juce::String&, const juce::String&) {
         const double v = filterCutoff.getValue();
-        const juce::String fmt = (v < 1000.0) ? juce::String((int)std::round(v)) + " Hz"
-                                               : juce::String(v / 1000.0, 1) + " kHz";
-        if (onStatusUpdate) onStatusUpdate("Filter Cutoff", fmt);
+        if (onStatusUpdate) onStatusUpdate("Filter Cutoff", mu_fmt::freq(v, true, 1));
     };
     filterAtk.onStatusUpdate = [this](const juce::String&, const juce::String&) {
-        if (onStatusUpdate) onStatusUpdate("Filter Envelope Attack", formatAdsrTimeSec(filterAtk.getValue()));
+        if (onStatusUpdate) onStatusUpdate("Filter Envelope Attack", mu_fmt::time(filterAtk.getValue()));
     };
     filterDec.onStatusUpdate = [this](const juce::String&, const juce::String&) {
-        if (onStatusUpdate) onStatusUpdate("Filter Envelope Decay", formatAdsrTimeSec(filterDec.getValue()));
+        if (onStatusUpdate) onStatusUpdate("Filter Envelope Decay", mu_fmt::time(filterDec.getValue()));
     };
     filterSus.onStatusUpdate = [this](const juce::String&, const juce::String&) {
         if (onStatusUpdate) onStatusUpdate("Filter Envelope Sustain",
             juce::String((int)std::round(filterSus.getValue())) + "%");
     };
     filterRel.onStatusUpdate = [this](const juce::String&, const juce::String&) {
-        if (onStatusUpdate) onStatusUpdate("Filter Envelope Release", formatAdsrTimeSec(filterRel.getValue()));
+        if (onStatusUpdate) onStatusUpdate("Filter Envelope Release", mu_fmt::time(filterRel.getValue()));
     };
     // Low Cut value display: "Off" when 0, else integer Hz / 1dp kHz.
-    filterLowCut.getSlider().textFromValueFunction = [](double v) -> juce::String {
-        if (v <= 0.0)   return "Off";
-        if (v < 1000.0) return juce::String((int)std::round(v));
-        return juce::String(v / 1000.0, 2);
-    };
+    filterLowCut.getSlider().textFromValueFunction = [](double v) { return mu_fmt::lowCut(v, false); };
     filterLowCut.onStatusUpdate = [this](const juce::String&, const juce::String&) {
-        const double v = filterLowCut.getValue();
-        const juce::String fmt = v <= 0.0
-                                   ? juce::String("Off")
-                                   : (v < 1000.0 ? juce::String((int)std::round(v)) + " Hz"
-                                                  : juce::String(v / 1000.0, 2) + " kHz");
-        if (onStatusUpdate) onStatusUpdate("Filter Low Cut", fmt);
+        if (onStatusUpdate) onStatusUpdate("Filter Low Cut", mu_fmt::lowCut(filterLowCut.getValue()));
     };
 
     filterType.onChange = [this](int id) {

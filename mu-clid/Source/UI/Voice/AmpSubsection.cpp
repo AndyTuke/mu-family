@@ -1,32 +1,8 @@
 #include "AmpSubsection.h"
 #include "Plugin/PluginProcessor.h"
+#include "ValueFormat.h"   // mu-core: shared value text
 #include "Modulation/ModulationSnapshot.h"
 #include "Sequencer/Rhythm.h"
-
-namespace {
-static juce::String formatAdsrTimeSec(double v)
-{
-    double ms = std::max(1.0, v * 1000.0);
-    if (ms < 1000.0)
-        return juce::String((int)std::round(ms)) + " ms";
-    return juce::String(ms / 1000.0, 2) + " s";
-}
-static double parseAdsrTimeSec(const juce::String& s)
-{
-    auto t = s.trim().toLowerCase();
-    if (t.endsWith("ms"))
-        return t.dropLastCharacters(2).trim().getDoubleValue() / 1000.0;
-    if (t.endsWith("s"))
-        return t.dropLastCharacters(1).trim().getDoubleValue();
-    return t.getDoubleValue() / 1000.0;
-}
-static juce::String adsrValueStr(double v)
-{
-    double ms = std::max(1.0, v * 1000.0);
-    return (ms < 1000.0) ? juce::String((int)std::round(ms))
-                         : juce::String(ms / 1000.0, 2);
-}
-} // namespace
 
 AmpSubsection::AmpSubsection(PluginProcessor& p) : proc(p)
 {
@@ -81,16 +57,16 @@ void AmpSubsection::wireCallbacks()
 
     for (auto* k : { &ampAtk, &ampDec })
     {
-        k->getSlider().textFromValueFunction = [](double v) { return adsrValueStr(v); };
-        k->getSlider().valueFromTextFunction = [](const juce::String& s) { return parseAdsrTimeSec(s); };
+        k->getSlider().textFromValueFunction = [](double v) { return mu_fmt::time(v, false); };
+        k->getSlider().valueFromTextFunction = [](const juce::String& s) { return mu_fmt::parseTime(s); };
     }
     ampRel.getSlider().textFromValueFunction = [](double v) -> juce::String {
         if (v >= 10.0) return "End";
-        return adsrValueStr(v);
+        return mu_fmt::time(v, false);
     };
     ampRel.getSlider().valueFromTextFunction = [](const juce::String& s) -> double {
         if (s.trim().equalsIgnoreCase("end")) return 10.0;
-        return parseAdsrTimeSec(s);
+        return mu_fmt::parseTime(s);
     };
     ampSus.getSlider().textFromValueFunction = [](double v) -> juce::String {
         return juce::String((int)std::round(v));
@@ -137,10 +113,10 @@ void AmpSubsection::wireCallbacks()
         if (onStatusUpdate) onStatusUpdate("Amp Level", fmt);
     };
     ampAtk.onStatusUpdate = [this](const juce::String&, const juce::String&) {
-        if (onStatusUpdate) onStatusUpdate("Amp Attack", formatAdsrTimeSec(ampAtk.getValue()));
+        if (onStatusUpdate) onStatusUpdate("Amp Attack", mu_fmt::time(ampAtk.getValue()));
     };
     ampDec.onStatusUpdate = [this](const juce::String&, const juce::String&) {
-        if (onStatusUpdate) onStatusUpdate("Amp Decay", formatAdsrTimeSec(ampDec.getValue()));
+        if (onStatusUpdate) onStatusUpdate("Amp Decay", mu_fmt::time(ampDec.getValue()));
     };
     ampSus.onStatusUpdate = [this](const juce::String&, const juce::String&) {
         if (onStatusUpdate) onStatusUpdate("Amp Sustain",
@@ -148,7 +124,7 @@ void AmpSubsection::wireCallbacks()
     };
     ampRel.onStatusUpdate = [this](const juce::String&, const juce::String&) {
         const double v = ampRel.getValue();
-        if (onStatusUpdate) onStatusUpdate("Amp Release", v >= 10.0 ? "End" : formatAdsrTimeSec(v));
+        if (onStatusUpdate) onStatusUpdate("Amp Release", v >= 10.0 ? "End" : mu_fmt::time(v));
     };
     ampPan.onStatusUpdate = [this](const juce::String&, const juce::String&) {
         const int v = (int) std::round(ampPan.getValue() * 100.0);

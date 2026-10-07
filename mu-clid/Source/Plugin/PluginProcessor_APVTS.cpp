@@ -14,6 +14,7 @@
 #include "ModulationSkew.h"   // knob ranges shared with modulation (depth = % of range)
 #include "Audio/FX/Slots/FXAlgorithmDef.h"
 #include "Plugin/MixerFxParams.h"
+#include "ValueFormat.h"   // mu-core: shared value text
 
 using mu_pp::kRhythmParamDefs;
 using mu_pp::kRhythmParamCount;
@@ -143,11 +144,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
             p+"fltLoCut", n+"Filter Low Cut",
             juce::NormalisableRange<float>(0.0f, 1000.0f, 0.0f, 0.35f), 0.0f,
             juce::AudioParameterFloatAttributes().withStringFromValueFunction(
-                [](float v, int) -> juce::String {
-                    if (v <= 0.0f)     return juce::String("Off");
-                    if (v < 1000.0f)   return juce::String((int)std::round(v)) + " Hz";
-                    return juce::String(v / 1000.0f, 2) + " kHz";
-                })));
+                [](float v, int) { return mu_fmt::lowCut(v); })));
         // Pre-filter valve saturation depth. 0 = bypass, 1 = full warmth.
         addF(p+"fltDrv", n+"Filter Drive", 0.0f, 1.0f, 0.0f);
         // Amp — level stored in dB (-60..+6), engine converts to gain at read.

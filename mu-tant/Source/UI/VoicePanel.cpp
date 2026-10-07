@@ -6,6 +6,8 @@
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/ConfirmDialog.h"   // mu-core shared confirm dialogs
 #include "Modulation/MuTantModSnap.h"
+#include "ValueFormat.h"   // mu-core: shared value text
+#include "UI/ParamChoices.h"  // mu-core: selector items from choice parameters
 
 namespace mu_tant
 {
@@ -72,18 +74,6 @@ void FilterRoutingButton::paintButton(juce::Graphics& g, bool highlighted, bool)
 }
 namespace
 {
-    juce::StringArray rootNames()
-    {
-        return { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-    }
-
-    void populateRoots(DropdownSelect& d)
-    {
-        const auto names = rootNames();
-        for (int i = 0; i < names.size(); ++i)
-            d.addItem(names[i], i + 1);
-    }
-
     void populateScales(DropdownSelect& d)
     {
         for (int i = 0; i < (int) kScales.size(); ++i)
@@ -95,12 +85,6 @@ namespace
         // Use the family-canonical display order from mu-core — same order as
         // mu-clid's FilterSubsection. Item ID = algorithm index + 1.
         mu_audio::populateFilterTypeDropdown([&d](const char* n, int id) { d.addItem(n, id); });
-    }
-
-    void populateNoiseTypes(DropdownSelect& d)
-    {
-        d.addItem("White", 1);
-        d.addItem("Pink",  2);
     }
 }
 
@@ -165,7 +149,7 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     // ── Tonal centre (shared — bound once) ──────────────────────────────────
     setupLabel(rootLabel,  "Root");
     setupLabel(scaleLabel, "Scale");
-    populateRoots(rootDropdown);
+    mu_ui::addChoiceItems(rootDropdown, apvts, "root");   // items from the parameter's choices
     populateScales(scaleDropdown);
     addAndMakeVisible(rootDropdown);
     addAndMakeVisible(scaleDropdown);
@@ -219,7 +203,7 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     };
 
     setupLabel(noiseTypeLabel, "Noise");
-    populateNoiseTypes(noiseTypeDropdown);
+    mu_ui::addChoiceItems(noiseTypeDropdown, apvts, PluginProcessor::voiceParamId(0, "noise_type"));
     addAndMakeVisible(noiseTypeDropdown);
 
     setupLabel(fltTypeLabel,  "Type");
@@ -233,24 +217,12 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     // createParameterLayout) so the SliderAttachment can't clobber it. The
     // cutoff value reads as a bare number (Hz / kHz), so carry the unit in the
     // knob label, switching it as the value crosses 1 kHz — matching mu-clid.
-    fltDrvKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
-        return juce::String((int)std::round(v * 100.0));
-    };
-    fltLoCutKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
-        if (v <= 0.0) return "Off";
-        if (v < 1000.0) return juce::String((int)std::round(v));
-        return juce::String(v / 1000.0, 2);
-    };
+    fltDrvKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::percent(v); };
+    fltLoCutKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::lowCut(v, false); };
 
     // ── Filter 2 ────────────────────────────────────────────────────────────
-    flt2DrvKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
-        return juce::String((int)std::round(v * 100.0));
-    };
-    flt2LoCutKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
-        if (v <= 0.0) return "Off";
-        if (v < 1000.0) return juce::String((int)std::round(v));
-        return juce::String(v / 1000.0, 2);
-    };
+    flt2DrvKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::percent(v); };
+    flt2LoCutKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::lowCut(v, false); };
 
     addAndMakeVisible(fltSeriesBtn);
 
