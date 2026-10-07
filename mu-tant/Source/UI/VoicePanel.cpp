@@ -596,7 +596,7 @@ void VoicePanel::paint(juce::Graphics& g)
             MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), accent);
         MuLookAndFeel::drawSections(g, *this, { { osc1PanelR, "OSC 1" }, { osc2PanelR, "OSC 2" }, { noisePanelR, "NOISE" },
                                                 { modNoisePanelR, "X-MOD" }, { filterPanelR, "FILTER" },
-                                                { insertPanelR, "EFFECTS" }, { mixerPanelR, "MIXER" } }, accent);
+                                                { insertPanelR, "EFFECTS" } }, accent);
         return;
     }
 
@@ -619,7 +619,6 @@ void VoicePanel::paint(juce::Graphics& g)
     panel(modNoisePanelR, "X-MOD");
     panel(filterPanelR,   "FILTER");
     panel(insertPanelR,   "INSERT");
-    panel(mixerPanelR,    "MIXER");
 }
 
 void VoicePanel::paintOverChildren(juce::Graphics& g)
@@ -670,13 +669,10 @@ void VoicePanel::resized()
     const int contentTop = tonalY + ddH + (metal ? plateH : gap);   // top of all sub-panels
 
     // ── Column geometry ─────────────────────────────────────────────────────
-    // Mixer column (far right, spans Row A + Row B): one knob wide, three knobs tall.
-    const int mixerW  = s(MuLookAndFeel::kKnobSize2W + 20);   // ~74
-    const int mixerX  = w - pad - mixerW;
-    // Left region (up to Mixer):
-    const int leftRight = mixerX - gap;
-    const int leftW     = leftRight - pad;    // 870 at default window width
-    // Insert column (right of rowsW, left of Mixer, spans Row B only):
+    // The rows span the panel; each source's level sits in its own box.
+    const int leftRight = w - pad;
+    const int leftW     = leftRight - pad;
+    // Insert column (right of rowsW, at the right edge, spans Row B only):
     const int insSubW  = s(4 * MuLookAndFeel::kKnobSize2W);        // 216
     const int insSubH  = s(2 * MuLookAndFeel::kKnobSize2H + MuLookAndFeel::kVoiceGap);  // 116
     const int insTitleH = metal ? 0 : s(14);   // flat: room for the title drawn inside
@@ -694,14 +690,16 @@ void VoicePanel::resized()
     // ── Row A: Osc 1 | Osc 2 | Noise (side by side, using full leftW) ───────
     // Osc panels extend across the Insert column zone since Insert is Row B only.
     {
-        const int noiseW    = s(170);
-        const int oscW      = (leftW - noiseW - 2 * gap) / 2;   // ≈ 342
+        // Noise box: a short type selector ("White" / "Pink") with the level knob to its right.
+        const int noiseDdW  = s(76);
+        const int noiseW    = boxClear + noiseDdW + s(6) + s2W + boxClear;
+        const int oscW      = (leftW - noiseW - 2 * gap) / 2;
         const int rowY      = contentTop + s(4);
         const int waveY     = rowY + (s2H - ddH) / 2;
 
-        // 5 pitch / scan knobs are right-aligned in each panel; the wavetable
+        // 5 pitch / scan knobs and the level are right-aligned in each panel; the wavetable
         // dropdown fills the space to their left and grows with the panel width.
-        const int knobsW  = 5 * s2W + 4 * s(2);
+        const int knobsW  = 6 * s2W + 5 * s(2);
         const int wtInset = s(8);   // keep the dropdown clear of the panel border + knobs
 
         // Osc 1 (the "OSC 1" panel title sits in the top-left corner above this row).
@@ -711,7 +709,7 @@ void VoicePanel::resized()
             const int wtX    = pad + wtInset;
             osc1WaveDropdown.setBounds(wtX, waveY, juce::jmax(s(40), knobsX - wtX - wtInset), ddH);
             int x = knobsX;
-            for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PenvDepthKnob, &o1PosKnob })
+            for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PenvDepthKnob, &o1PosKnob, &osc1LevelKnob })
             { k->setBounds(x, rowY, s2W, s2H);  x += s2W + s(2); }
         }
 
@@ -723,16 +721,16 @@ void VoicePanel::resized()
             const int wtX    = osc2X + wtInset;
             osc2WaveDropdown.setBounds(wtX, waveY, juce::jmax(s(40), knobsX - wtX - wtInset), ddH);
             int x = knobsX;
-            for (auto* k : { &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PenvDepthKnob, &o2PosKnob })
+            for (auto* k : { &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PenvDepthKnob, &o2PosKnob, &osc2LevelKnob })
             { k->setBounds(x, rowY, s2W, s2H);  x += s2W + s(2); }
         }
 
-        // Noise section (type dropdown; level is in the Mixer column)
-        const int noiseX      = pad + oscW + gap + oscW + gap;
-        const int noiseTitleW = metal ? s(8) : s(42);   // flat: clear space for the "NOISE" title drawn inside
+        // Noise section — type selector, then the level knob at the right-hand end.
+        const int noiseX = leftRight - noiseW;
         noisePanelR = { noiseX, contentTop, noiseW, rowAH };
         noiseTypeLabel.setBounds(0, 0, 0, 0);   // title drawn by paint(), label hidden
-        noiseTypeDropdown.setBounds(noiseX + noiseTitleW, waveY, noiseW - noiseTitleW - s(8), ddH);
+        noiseTypeDropdown.setBounds(noiseX + boxClear, waveY, noiseDdW, ddH);
+        noiseLevelKnob.setBounds(noiseX + noiseW - boxClear - s2W, rowY, s2W, s2H);
     }
 
     // ── Row B: X-Mod | Filter (no Level) | Insert ───────────────────────────
@@ -826,20 +824,6 @@ void VoicePanel::resized()
             const int subX = insColX + (insColW - insSubW) / 2;
             const int subY = rowBY + insTitleH + (rowBH - insTitleH - insSubH) / 2;
             insertSub.setBounds(subX, subY, insSubW, insSubH);
-        }
-    }
-
-    // ── Mixer column — spans Row A + Row B, knobs stacked vertically ──────────
-    {
-        const int spanH   = rowBY + rowBH - contentTop;
-        mixerPanelR = { mixerX, contentTop, mixerW, spanH };
-        const int knobX   = mixerX + (mixerW - s2W) / 2;
-        const int stackH  = 3 * s2H + 2 * gap;
-        int ky = contentTop + (spanH - stackH) / 2;
-        for (auto* k : { &osc1LevelKnob, &osc2LevelKnob, &noiseLevelKnob })
-        {
-            k->setBounds(knobX, ky, s2W, s2H);
-            ky += s2H + gap;
         }
     }
 

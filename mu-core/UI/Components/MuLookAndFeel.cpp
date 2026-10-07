@@ -239,7 +239,7 @@ void MuLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w, int
     const float faceR  = outerR * kRotaryFaceScale;
     const float angle  = kRotaryStartAngle + sliderPos * (kRotaryEndAngle - kRotaryStartAngle);
 
-    const auto accent = slider.findColour(juce::Slider::rotarySliderFillColourId);
+    const auto accent = knobColour(slider);
     const auto& L = lighting();
 
     // Body shadow: the whole knob casts a soft shadow down-left onto the panel.
@@ -555,6 +555,23 @@ juce::Colour MuLookAndFeel::appAccent(juce::Component& c)
 {
     auto* mlf = dynamic_cast<MuLookAndFeel*>(&c.getLookAndFeel());
     return (mlf != nullptr && mlf->hasAppAccent) ? mlf->appAccentColour : colour(globalAccent);
+}
+
+namespace { const juce::Identifier kAppColourKnobs { "muAppColourKnobs" }; }
+
+void MuLookAndFeel::useAppColourKnobs(juce::Component& root)
+{
+    root.getProperties().set(kAppColourKnobs, true);
+}
+
+juce::Colour MuLookAndFeel::knobColour(const juce::Slider& slider) const
+{
+    // Inside a marked main page, the app colour wins over the knob's category colour.
+    if (metalStyle && hasAppAccent)
+        for (auto* c = slider.getParentComponent(); c != nullptr; c = c->getParentComponent())
+            if (c->getProperties().contains(kAppColourKnobs))
+                return appAccentColour;
+    return slider.findColour(juce::Slider::rotarySliderFillColourId);
 }
 
 void MuLookAndFeel::setAppAccent(juce::Colour c)

@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <thread>
+#include <utility>
 
 namespace mu_tant
 {
@@ -679,29 +680,43 @@ void GatingDesigner::paint(juce::Graphics& g)
     using mu_ui::sf;
     using Id = MuLookAndFeel::ColourIds;
 
-    // Header row background.
-    const int hdrH = s(kHdr1H);
-    g.setColour(MuLookAndFeel::colour(Id::panelBackground));
-    g.fillRect(0, 0, getWidth(), hdrH);
+    // Metal style: the header is a raised box with engraved labels and the grid a lamp screen
+    // set into the panel, like the modulator's header and display.
+    const bool metal = MuLookAndFeel::isMetal(*this);
+    const auto& light = MuLookAndFeel::lighting();
 
-    // "Gap" label painted just before the gap rotary. Position mirrors resized():
-    // Bypass(kBtnW) + layers(3 × kBtnW) + tools(3 × kToolW) + gaps.
-    const int afterLeftBtns = s(kHdrInset) + 4 * s(kBtnW) + 3 * s(4) + s(6);
-    const int afterTools    = afterLeftBtns + 3 * (s(kToolW) + s(kToolGap)) + s(6);
-    g.setColour(MuLookAndFeel::colour(Id::labelText));
+    // Header row: a raised box (metal) or a flat strip, with the "Gap" and "Bars" labels.
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.5f))));
-    g.drawText("Gap", afterTools, 0, s(26), hdrH, juce::Justification::centredLeft, false);
+    if (metal)
+    {
+        const auto box = headerBox();
+        MuLookAndFeel::drawRaisedSubPanelShadow(g, box);
+        MuLookAndFeel::drawRaisedSubPanel(g, box, MuLookAndFeel::appAccent(*this));
+        if (MuLookAndFeel::hasScrews(*this))
+            MuLookAndFeel::drawSubPanelScrews(g, box);
+        for (const auto& [text, area] : { std::pair<const char*, juce::Rectangle<int>> { "Gap", gapLabelR },
+                                          { "Bars", barsLabelR } })
+            MuLookAndFeel::drawEngravedText(g, text, area, juce::Justification::centredLeft,
+                                            MuLookAndFeel::colour(Id::labelText), false);
+    }
+    else
+    {
+        g.setColour(MuLookAndFeel::colour(Id::panelBackground));
+        g.fillRect(0, 0, getWidth(), s(kHdr1H));
+        g.setColour(MuLookAndFeel::colour(Id::labelText));
+        g.drawText("Gap",  gapLabelR,  juce::Justification::centredLeft, false);
+        g.drawText("Bars", barsLabelR, juce::Justification::centredLeft, false);
+    }
 
-    // "Bars" label painted immediately left of the bars dropdown.
-    g.drawText("Bars", barsDropdown.getX() - s(26), 0, s(26), hdrH,
-               juce::Justification::centredLeft, false);
-
-    // Gate grid.
+    // Gate grid: a dark lamp base (metal) or the flat inactive fill.
     const auto gateRect = gridBounds();
-    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBg));
+    g.setColour(metal ? MuLookAndFeel::lampBase() : MuLookAndFeel::colour(Id::segmentInactiveBg));
     g.fillRect(gateRect);
-    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawRect(gateRect, 1.0f);
+    if (! metal)
+    {
+        g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
+        g.drawRect(gateRect, 1.0f);
+    }
 
     // Subdivision gridlines — rendered in view-coordinate space.
     const float cw = viewCellW();
@@ -733,12 +748,27 @@ void GatingDesigner::paint(juce::Graphics& g)
         const auto edge = col.withAlpha(alpha);
         const auto& envs = pat->envelopes;
         const int  n    = juce::jmin((int)paths.size(), (int)envs.size());
+        // Each envelope: metal lights it like the modulator display (dim area, glowing lit
+        // outline); the ghost layer stays a faint reference. Flat: a tinted fill and edge.
+        const bool lit = metal && showHandles;
         for (int ei = 0; ei < n; ++ei)
         {
             const auto& p = paths[(size_t)ei];
             if (p.isEmpty()) continue;
-            g.setColour(fill); g.fillPath(p);
-            g.setColour(edge); g.strokePath(p, juce::PathStrokeType(1.0f));
+            if (lit)
+            {
+                g.setColour(MuLookAndFeel::lampColour(col, light.lampDim));
+                g.fillPath(p);
+                g.setColour(col.withAlpha(light.highlight(light.ringHitGlow)));
+                g.strokePath(p, juce::PathStrokeType(sf(MuLookAndFeel::kLampCurveGlowW)));
+                g.setColour(MuLookAndFeel::lampColour(col, light.lampOn).brighter(light.highlight(light.lampHot)));
+                g.strokePath(p, juce::PathStrokeType(sf(MuLookAndFeel::kLampCurveW)));
+            }
+            else
+            {
+                g.setColour(fill); g.fillPath(p);
+                g.setColour(edge); g.strokePath(p, juce::PathStrokeType(1.0f));
+            }
         }
         if (showHandles)
         {
@@ -806,6 +836,16 @@ void GatingDesigner::paint(juce::Graphics& g)
         } // viewRelFrac in range
     }
 
+    // Metal style: the grid reads as a screen set into the panel.
+    if (metal)
+        MuLookAndFeel::drawRecessedScreen(g, gateRect);
+}
+
+juce::Rectangle<float> GatingDesigner::headerBox() const noexcept
+{
+    // Clear of the panel edge for its shadow, and a little above the grid's screen.
+    const float m = mu_ui::sf(2.0f);
+    return { m, m, (float) getWidth() - 2.0f * m, (float) mu_ui::s(kHdr1H) - 2.0f * m - mu_ui::sf(2.0f) };
 }
 
 void GatingDesigner::setPlayhead(double beat01, bool visible)
@@ -827,29 +867,37 @@ void GatingDesigner::resized()
     const int gridY  = hdrH;
     const int gridH  = s(kGridH);
     const int scrollY = gridY + gridH;
+    // Metal: the controls sit inside the header's raised box, clear of its corner screws.
+    const bool metal  = MuLookAndFeel::isMetal(*this);
+    const auto box    = headerBox().toNearestInt();
+    const int  inset  = metal ? (MuLookAndFeel::hasScrews(*this) ? s(MuLookAndFeel::kSubPanelScrewClear)
+                                                                 : s(MuLookAndFeel::kSpaceXS)) + box.getX()
+                              : s(kHdrInset);
     const int toolW   = s(kToolW);
     const int toolGap = s(kToolGap);
-    const int toolY   = (hdrH - toolW) / 2;
+    const int toolY   = metal ? box.getCentreY() - toolW / 2 : (hdrH - toolW) / 2;
     const int ddW     = s(kDdW);
-    const int ddH     = hdrH - s(2);
+    const int ddY     = metal ? box.getY() + s(4) : s(1);
+    const int ddH     = metal ? box.getHeight() - s(8) : hdrH - s(2);
 
     // ── Scrollbar ─────────────────────────────────────────────────────────────
     scrollBar.setBounds(0, scrollY, w, s(kScrollH));
 
     // ── Right-anchored controls ────────────────────────────────────────────────
     // "Grid" label + subdivision dropdown at far right.
-    subdivDropdown.setBounds(w - ddW - s(kHdrInset),         s(1), ddW,   ddH);
-    subdivLabel   .setBounds(w - ddW - s(kHdrInset) - s(40), s(1), s(36), ddH);
+    subdivDropdown.setBounds(w - ddW - inset,         ddY, ddW,   ddH);
+    subdivLabel   .setBounds(w - ddW - inset - s(40), ddY, s(36), ddH);
 
-    // "Bars" dropdown immediately left of the Grid controls.
-    const int barsGroupRight = w - ddW - s(kHdrInset) - s(40) - s(6);
+    // "Bars" dropdown immediately left of the Grid controls, its label painted before it.
+    const int barsGroupRight = w - ddW - inset - s(40) - s(6);
     const int barsDropX = barsGroupRight - s(kBarsW);
-    barsDropdown.setBounds(barsDropX, s(1), s(kBarsW), ddH);
+    barsDropdown.setBounds(barsDropX, ddY, s(kBarsW), ddH);
+    barsLabelR = { barsDropX - s(kLabelW), ddY, s(kLabelW), ddH };
 
     // ── Left-anchored controls (left→right) ────────────────────────────────────
     // [Bypass][GATE][FILT][PITCH] — all same width kBtnW | [✏][⌫][⟺] | Gap ●
     const int btnW = s(kBtnW);
-    int lx = s(kHdrInset);
+    int lx = inset;
     bypassButton .setBounds(lx, toolY, btnW, toolW); lx += btnW + s(4);
     gaterLayerBtn .setBounds(lx, toolY, btnW, toolW); lx += btnW + s(4);
     filterLayerBtn.setBounds(lx, toolY, btnW, toolW); lx += btnW + s(4);
@@ -864,8 +912,12 @@ void GatingDesigner::resized()
     lx += s(6);
 
     // Gap: "Gap" label painted, then rotary.
-    lx += s(26);   // painted "Gap" label width
-    gapSlider.setBounds(lx, (hdrH - s(kGapKnobW)) / 2, s(kGapKnobW) + s(kGapTbW), s(kGapKnobW));
+    gapLabelR = { lx, ddY, s(kLabelW), ddH };
+    lx += s(kLabelW);
+    // Metal: the rotary shrinks to fit inside the header box.
+    const int gapD = metal ? juce::jmin(s(kGapKnobW), box.getHeight() - s(4)) : s(kGapKnobW);
+    const int gapY = metal ? box.getCentreY() - gapD / 2 : (hdrH - gapD) / 2;
+    gapSlider.setBounds(lx, gapY, gapD + s(kGapTbW), gapD);
     lx += s(kGapKnobW) + s(kGapTbW) + s(10);
 }
 

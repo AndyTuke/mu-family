@@ -111,6 +111,12 @@ private:
     static constexpr int kBtnW     = 54;   // shared width: Bypass / GATE / FILT / PITCH
     static constexpr int kGapKnobW = 32;   // gap rotary diameter (size-3)
     static constexpr int kGapTbW   = 46;   // gap textbox width (fits "100 %")
+    static constexpr int kLabelW   = 26;   // painted "Gap" / "Bars" label width
+
+    // Painted label areas, set by resized() so paint() draws them where the controls sit.
+    juce::Rectangle<int> gapLabelR, barsLabelR;
+    // Metal style: the header row is a raised box (with its controls inside) above the grid.
+    juce::Rectangle<float> headerBox() const noexcept;
 
     // ── Playhead ─────────────────────────────────────────────────────────────
     double playheadBeat01  = 0.0;

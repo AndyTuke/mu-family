@@ -142,11 +142,11 @@ private:
     void bindAmpDepthKnob(bool ssbMode);
     int  currentAmpMode = 0;   // cached so a mode change can rebind the depth knob
 
-    // ── Mixer levels (osc1 / osc2 / noise — Size-2 knobs, horizontal MIXER row
-    //    under the NOISE panel) + noise type (in its own NOISE panel) ─────────
-    KnobWithLabel  osc1LevelKnob  { "Osc 1", MuLookAndFeel::knobLevel };
-    KnobWithLabel  osc2LevelKnob  { "Osc 2", MuLookAndFeel::knobLevel };
-    KnobWithLabel  noiseLevelKnob { "Noise", MuLookAndFeel::knobLevel };
+    // ── Source levels — each at the right-hand end of its own box (Osc 1 / Osc 2 / Noise),
+    //    the noise type selector to the left of the noise level ─────────────────
+    KnobWithLabel  osc1LevelKnob  { "Level", MuLookAndFeel::knobLevel };
+    KnobWithLabel  osc2LevelKnob  { "Level", MuLookAndFeel::knobLevel };
+    KnobWithLabel  noiseLevelKnob { "Level", MuLookAndFeel::knobLevel };
     juce::Label    noiseTypeLabel;
     DropdownSelect noiseTypeDropdown;
     std::unique_ptr<APVTS::SliderAttachment>   osc1LevelAttachment;
@@ -227,7 +227,7 @@ private:
 
     // Sub-panel geometry — populated by resized(), consumed by paint() for the
     // bordered sub-panels + their titles so layout + decoration stay in sync.
-    juce::Rectangle<int> osc1PanelR, osc2PanelR, modNoisePanelR, filterPanelR, noisePanelR, mixerPanelR, insertPanelR;
+    juce::Rectangle<int> osc1PanelR, osc2PanelR, modNoisePanelR, filterPanelR, noisePanelR, insertPanelR;
     // Metal style: the panels — preset strip, voice (sections + Root / Scale), gate editor, modulators.
     juce::Rectangle<int> headerStripR, voiceR, gateR, modR;
 

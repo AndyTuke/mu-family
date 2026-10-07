@@ -205,6 +205,9 @@ public:
     // colours and the global (mixer) accent follow it, so nothing stays in the family purple.
     void setAppAccent(juce::Colour c);
     static juce::Colour appAccent(juce::Component& c);
+    // An app's main page: every knob under `root` is drawn in the app colour (metal style with
+    // an app colour set) instead of its own category colour. The editor shell marks the main panel.
+    static void useAppColourKnobs(juce::Component& root);
     // `accent` as it looks painted on the metal: dull, dark and washed out (Lighting::paint*).
     static juce::Colour paintColour(juce::Colour accent);
     static juce::Colour lcdLitColour(juce::Component& c);
@@ -645,4 +648,6 @@ private:
     bool         screws       = false;
     bool         hasAppAccent = false;
     juce::Colour appAccentColour;
+    // The colour a knob is drawn in: the app colour on a main page (useAppColourKnobs), else its own.
+    juce::Colour knobColour(const juce::Slider&) const;
 };

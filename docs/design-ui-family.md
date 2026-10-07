@@ -9,7 +9,7 @@ This document is the authoritative reference for the visual and interaction lang
 | Principle | Meaning in practice |
 |---|---|
 | **Dark and precise** | Near-black backgrounds, high-contrast text/values, thin separator lines at 0.5px |
-| **Colour carries meaning** | Every knob colour maps to a functional category — don't use colour decoratively |
+| **Colour carries meaning** | Every knob colour maps to a functional category — don't use colour decoratively. Exception: an app's main page draws all its knobs in the app colour (§11) |
 | **StatusBar-first feedback** | Parameter names + values go through the StatusBar (one consistent model — never a tooltip for a value). Tooltips are used **sparingly**, only as a one-line hint on icon-only buttons and a few non-obvious controls (layer reset/delete, modulator randomise, the bipolar curve slider) where there's no room for a label |
 | **Full words everywhere** | No label abbreviations. "Attack" not "ATK", "Frequency" not "Freq" |
 | **Controls are consistent** | Use the shared component library. Never build a one-off version of a standard control |
@@ -350,7 +350,7 @@ setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));   // mu-On
 - **Light comes from the top right** — highlights top-right, shadows fall down-left, recesses are dark top-right.
 - **Even spacing** — the gap between raised boxes, between rows and to the panel edge is one token (`kSpaceXS` in mu-Clid's Euclid panel); plates sit 2 px above their boxes.
 - **Voice colour is identity, not decoration** — it lights the voice's sidebar icon (+ selected outline) and the header bar's name display + preset selector (`ChannelHeaderBar::setColour`, `DropdownSelect::setLcdColour`); panels stay in the app paint.
-- **Knob colours stay functional** (pitch purple, filter teal, amp orange …) in every app — they are not the app colour.
+- **Main-page knobs are the app colour.** Every knob on an app's main page (the panel the shell gets from `setMainArea`) is drawn in the app colour — `MuLookAndFeel::useAppColourKnobs`, applied by `EditorShellBase`, overrides the knob's own category colour. Knobs elsewhere (the mixer overlay, settings) keep their functional category colours (pitch purple, filter teal, amp orange …).
 - **One item at a time beats a scrolling list** in small areas — mu-Clid's modulation targets show one row with an `n / N` readout and an up/down stepper (metal-style `ModulatorEditor`).
 - **Voice colours** come from `channelPalette` (Red, Cyan, Orange, Magenta, Lime, Rose, Silver, Copper) — none of them an app primary, so a voice never reads as the app colour.
 - **Sub-panels group a panel's sections** — e.g. mu-Clid's voice band puts Pitch / Filter / Amp / Effects each in a raised sub-panel.

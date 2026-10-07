@@ -157,14 +157,14 @@ Bullet "SSB — single-sideband frequency shift: the Depth knob becomes a shift 
 P "Switching a lane's mode keeps the knob value, so you can audition FM/PM/TZFM (or AM/RM/SSB) as a smooth A/B."
 
 H2 "Noise"
-P "A separate noise source (White or Pink) mixes in via the NOISE panel. The noise type dropdown is in the NOISE panel; the noise level knob is in the MIXER panel."
+P "A separate noise source (White or Pink) mixes in via the NOISE panel. The NOISE panel holds the noise type dropdown and, to its right, the noise Level knob."
 
 # ── 10. Source Mixer ──────────────────────────────────────────────────────────
 H1 "10. Source Mixer"
-P "The MIXER panel sets the balance of the three sound sources before they reach the filters:"
-Bullet "Osc 1 — level of oscillator 1 (dB)"
-Bullet "Osc 2 — level of oscillator 2 (dB)"
-Bullet "Noise — level of the noise source (dB; default -60 dB, off)"
+P "Each sound source has its own Level knob at the right-hand end of its panel, setting the balance before the filters:"
+Bullet "OSC 1 Level — level of oscillator 1 (dB)"
+Bullet "OSC 2 Level — level of oscillator 2 (dB)"
+Bullet "NOISE Level — level of the noise source (dB; default -60 dB, off)"
 P "The voice's overall output level into its mixer channel is set by the channel fader in the mixer overlay (and is available as the Level modulation destination)."
 
 # ── 11. Dual Filter ───────────────────────────────────────────────────────────

@@ -319,6 +319,8 @@ void EditorShellBase::setMainArea(juce::Component* newSidebar, juce::Component* 
     mainPanel = newMainPanel;
     if (sidebar != nullptr)   addAndMakeVisible(*sidebar);
     if (mainPanel != nullptr) addAndMakeVisible(*mainPanel);
+    // The main page's knobs take the app colour (the mixer and other overlays keep theirs).
+    if (mainPanel != nullptr) MuLookAndFeel::useAppColourKnobs(*mainPanel);
     resized();
 }
 
