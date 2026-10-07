@@ -30,6 +30,10 @@ public:
     void setSpecs(const std::vector<Spec>& specs);
 
     void resized() override;
+    void mouseEnter(const juce::MouseEvent&) override;   // a control under the mouse reports its value
+
+    // Fired with the control's label + current value text when a control is hovered or changed.
+    std::function<void(const juce::String& name, const juce::String& value)> onStatusUpdate;
 
     // One row of cells (unscaled): name label over a Size-2 knob, plus a small gap.
     static constexpr int kLabelH = 13;
@@ -45,6 +49,8 @@ private:
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   knobAtt;
         std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> comboAtt;
     };
+
+    void reportStatus(const Control&) const;
 
     juce::AudioProcessorValueTreeState&   apvts;
     std::vector<std::unique_ptr<Control>> controls;

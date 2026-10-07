@@ -38,6 +38,11 @@ public:
     void setMainArea(juce::Component* sidebar, juce::Component* mainPanel);
     // A mu-core MixerOverlay also gets its status messages forwarded to the StatusBar.
     void setMixerOverlay(juce::Component* overlay);
+
+    // Show a panel's controls on the status bar (name + value, when hovered or turned): every
+    // shared knob (KnobWithLabel), insert subsection and knob grid under `root` that has no
+    // status handler of its own. Call once the panel's children exist.
+    void forwardKnobStatus(juce::Component& root);
     // Pass nullptr to hide the gear button (mu-tant has no settings yet).
     void setSettingsOverlay(juce::Component* overlay);
 

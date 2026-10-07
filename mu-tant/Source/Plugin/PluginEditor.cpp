@@ -98,6 +98,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // The family metal look, in mu-Tant's green.
     setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appGreen));
     setScrews(true);
+
+    // Every control on the main panel shows its name + value on the status bar.
+    forwardKnobStatus(voicePanel);
 }
 
 PluginEditor::~PluginEditor()

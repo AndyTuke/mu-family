@@ -84,6 +84,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // The family metal look.
     setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));
     setScrews(true);
+
+    // Every control on the main panel shows its name + value on the status bar.
+    forwardKnobStatus(groovePanel);
 }
 
 PluginEditor::~PluginEditor()

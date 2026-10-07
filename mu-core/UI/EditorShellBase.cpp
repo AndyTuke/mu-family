@@ -1,4 +1,7 @@
 #include "EditorShellBase.h"
+#include "UI/Components/KnobWithLabel.h"
+#include "UI/Voice/InsertSubsection.h"
+#include "UI/ParamKnobGrid.h"
 #include "BuildNumber.h"        // BUILD_NUMBER — local version for the upgrade check
 #include "UI/ConfirmDialog.h"   // shared themed confirm/prompt dialogs (mu_ui::confirmAsync)
 #include "UI/StandardSettingsOverlay.h" // wires its program-change buttons
@@ -317,6 +320,29 @@ void EditorShellBase::setMainArea(juce::Component* newSidebar, juce::Component* 
     if (sidebar != nullptr)   addAndMakeVisible(*sidebar);
     if (mainPanel != nullptr) addAndMakeVisible(*mainPanel);
     resized();
+}
+
+void EditorShellBase::forwardKnobStatus(juce::Component& root)
+{
+    auto show = [this](const juce::String& name, const juce::String& val) { statusBar.showParam(name, val); };
+    // Walk the panel's tree; a component that reports its own status needn't be searched inside.
+    for (auto* c : root.getChildren())
+    {
+        if (auto* k = dynamic_cast<KnobWithLabel*>(c))
+        {
+            if (! k->onStatusUpdate) k->onStatusUpdate = show;
+        }
+        else if (auto* ins = dynamic_cast<InsertSubsection*>(c))
+        {
+            if (! ins->onStatusUpdate) ins->onStatusUpdate = show;
+        }
+        else if (auto* grid = dynamic_cast<mu_ui::ParamKnobGrid*>(c))
+        {
+            if (! grid->onStatusUpdate) grid->onStatusUpdate = show;
+        }
+        else
+            forwardKnobStatus(*c);
+    }
 }
 
 void EditorShellBase::setMixerOverlay(juce::Component* overlay)

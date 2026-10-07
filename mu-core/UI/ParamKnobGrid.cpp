@@ -28,6 +28,8 @@ void ParamKnobGrid::setSpecs(const std::vector<Spec>& specs)
             addAndMakeVisible(*ctl->combo);
             ctl->comboAtt = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
                 apvts, spec.id, *ctl->combo);
+            ctl->combo->onChange = [this, c = ctl.get()] { reportStatus(*c); };
+            ctl->combo->addMouseListener(this, false);
         }
         else
         {
@@ -37,6 +39,8 @@ void ParamKnobGrid::setSpecs(const std::vector<Spec>& specs)
             addAndMakeVisible(*ctl->knob);
             ctl->knobAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
                 apvts, spec.id, *ctl->knob);
+            ctl->knob->onValueChange = [this, c = ctl.get()] { reportStatus(*c); };
+            ctl->knob->addMouseListener(this, false);
         }
         controls.push_back(std::move(ctl));
     }
@@ -75,6 +79,20 @@ void ParamKnobGrid::resized()
         else if (ctl->knob)
             ctl->knob->setBounds(cell.withSizeKeepingCentre(knobW, knobH));
     }
+}
+
+void ParamKnobGrid::mouseEnter(const juce::MouseEvent& e)
+{
+    for (const auto& ctl : controls)
+        if (e.eventComponent == ctl->knob.get() || e.eventComponent == ctl->combo.get())
+            reportStatus(*ctl);
+}
+
+void ParamKnobGrid::reportStatus(const Control& ctl) const
+{
+    if (! onStatusUpdate) return;
+    if (ctl.knob)       onStatusUpdate(ctl.label, ctl.knob->getTextFromValue(ctl.knob->getValue()));
+    else if (ctl.combo) onStatusUpdate(ctl.label, ctl.combo->getText());
 }
 
 } // namespace mu_ui
