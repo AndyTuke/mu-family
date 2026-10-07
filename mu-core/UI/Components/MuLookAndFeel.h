@@ -632,7 +632,7 @@ public:
     static constexpr float kLampCurveW     = 1.8f;
 
     // LCD text fields (metal style): lettering heights, side padding, the browse mark's width.
-    static constexpr int kLcdTextH     = 10;   // single-line readouts, e.g. a sample bar
+    static constexpr int kLcdTextH     = 11;   // selectors (ComboBox LCDs) and single-line readouts, e.g. a sample bar
     static constexpr int kLcdNameTextH = 13;   // the channel name display in the header bar
     static constexpr int kLcdTextPadX  = 6;
     static constexpr int kLcdBrowseW   = 24;

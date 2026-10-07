@@ -678,8 +678,7 @@ void RhythmPanel::mouseDown(const juce::MouseEvent& e)
 {
     // Name editing is handled by nameLabel (a child component); we no longer need
     // the manual nameRect hit-test here.
-    const juce::Rectangle<int> sampleBar { 0, kHeaderH, getWidth(), kSampleBarH };
-    if (sampleBar.contains(e.getPosition()))
+    if (sampleRect.contains(e.getPosition()))   // the laid-out (scaled) sample strip
         loadSample();
 }
 
