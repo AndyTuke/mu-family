@@ -53,7 +53,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         }
         if (proc.getNumRhythms() >= SequencerEngine::MaxRhythms) return;
         Rhythm r;
-        r.name        = "<unnamed>";
+        r.name        = ("Rhythm " + juce::String(proc.getNumRhythms() + 1)).toStdString();   // the slot keeps it through the default-rhythm load
         // Pick the first palette index not already used by an existing rhythm.
         {
             constexpr int N = MuLookAndFeel::kChannelPaletteSize;
@@ -127,7 +127,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     if (proc.getNumRhythms() == 0)
     {
         Rhythm r;
-        r.name        = "<unnamed>";
+        r.name        = "Rhythm 1";
         r.colourIndex = 0;
         proc.addRhythm(r);
         sidebar.refreshItems();

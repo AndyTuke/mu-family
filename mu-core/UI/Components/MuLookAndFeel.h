@@ -372,6 +372,7 @@ public:
     // big inner panels — these are the actual usable widths for layout math.
     static constexpr int kPanelPad        = kSpaceS;
     static constexpr int kDropdownEdgeGap = kSpaceS;   // space between a dropdown and the edge of its box / panel
+    static constexpr int kAddButtonW      = 110;       // "+ Target" / "+ Assignment" (metal: a normal button, centred)
     static constexpr int kChannelInset     = kPanelPad + 1;                                     // 7
     static constexpr int kCircleInnerSize = kCircleSize     - 2 * kChannelInset;                // 274
     static constexpr int kEuclidInnerW    = kEuclidPanelW   - 2 * kChannelInset;                // 786

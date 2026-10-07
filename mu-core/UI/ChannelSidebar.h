@@ -69,6 +69,11 @@ private:
     int selectedIndex = 0;
 
     static constexpr int kItemH   = 80;
+    // Item layout from resized(): the gap above, between and below the items (equal, so a
+    // full sidebar is evenly distributed top to bottom; capped so a few items stay near the
+    // top), and the side inset. Every item position / drop index goes through itemBounds.
+    int itemGap = 0, itemInsetX = 0;
+    juce::Rectangle<int> itemBounds(int i) const;
     static constexpr int kAddBtnH = 34;
 
     enum class DragPhase { Idle, Dragging };

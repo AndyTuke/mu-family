@@ -730,7 +730,9 @@ void ModulatorEditor::resized()
         const int stX = ix + iw - stepW;
         rowPrevBtn.setBounds(stX, rowY,            stepW, rowH / 2);
         rowNextBtn.setBounds(stX, rowY + rowH / 2, stepW, rowH - rowH / 2);
-        addBtn.setBounds(ix, addY, iw, addBtnH);
+        // A normal-width button, centred under the row.
+        const int addW = juce::jmin(iw, s(MuLookAndFeel::kAddButtonW));
+        addBtn.setBounds(ix + (iw - addW) / 2, addY, addW, addBtnH);
         updateRowPager();
         return;
     }

@@ -2,22 +2,17 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "MuLookAndFeel.h"
 
-// Dashed-border "+ label" button. Click opens caller-supplied PopupMenu.
-class AddButton : public juce::Component
+// "+ label" button (add a layer / target / assignment). In metal style it is drawn like
+// every other family button (MuLookAndFeel button look); flat style keeps a dashed border.
+// Callers set `onClick` (juce::Button's) — e.g. to open a PopupMenu.
+class AddButton : public juce::TextButton
 {
 public:
-    std::function<void()> onClick;
-
     explicit AddButton(const juce::String& label);
 
-    void paint(juce::Graphics& g) override;
-    void mouseDown(const juce::MouseEvent& e) override;
-    void mouseEnter(const juce::MouseEvent& e) override;
-    void mouseExit(const juce::MouseEvent& e) override;
     // Dim + drop the pointing-hand cursor when disabled (e.g. demo channel cap reached).
     void enablementChanged() override;
 
-private:
-    juce::String labelText;
-    bool hovered = false;
+protected:
+    void paintButton(juce::Graphics&, bool isOver, bool isDown) override;
 };

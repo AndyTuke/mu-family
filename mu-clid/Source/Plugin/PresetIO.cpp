@@ -158,13 +158,13 @@ static bool atomicReplaceWithText(const juce::File& destFile, const juce::String
 }
 
 //==============================================================================
-void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file)
+void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file, bool keepIdentity)
 {
     if (rhythmIndex < 0 || rhythmIndex >= proc_.sequencer.getNumRhythms()) return;
 
     if (!proc_.sequencerPlaying.load())
     {
-        applyRhythmPreset(file, rhythmIndex);
+        applyRhythmPreset(file, rhythmIndex, keepIdentity);
         return;
     }
 
@@ -222,13 +222,17 @@ void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file)
     // Name and colour. Prefer presetName (matches dropdown / filename) over
     // r0_name — older presets carry a short historical r0_name (e.g. "Kick"
     // inside "Kick Accents.muRhythm") which loses the user-facing context.
-    auto presetNameVal = state.getProperty("presetName");
-    auto rhythmNameVal = state.getProperty("r0_name");
-    if (presetNameVal.isString() && presetNameVal.toString().isNotEmpty())
-        newRhythm.name = presetNameVal.toString().toStdString();
-    else if (rhythmNameVal.isString() && rhythmNameVal.toString().isNotEmpty())
-        newRhythm.name = rhythmNameVal.toString().toStdString();
-    newRhythm.colourIndex = (int)state.getProperty("r0_colour", newRhythm.colourIndex);
+    // A settings reset (keepIdentity) leaves the slot's own name + colour in place.
+    if (! keepIdentity)
+    {
+        auto presetNameVal = state.getProperty("presetName");
+        auto rhythmNameVal = state.getProperty("r0_name");
+        if (presetNameVal.isString() && presetNameVal.toString().isNotEmpty())
+            newRhythm.name = presetNameVal.toString().toStdString();
+        else if (rhythmNameVal.isString() && rhythmNameVal.toString().isNotEmpty())
+            newRhythm.name = rhythmNameVal.toString().toStdString();
+        newRhythm.colourIndex = (int)state.getProperty("r0_colour", newRhythm.colourIndex);
+    }
 
     // deserialise modulators from the preset. Mirrors the applyRhythmPreset
     // (stopped-state) path so hot-swap preset loads carry the preset's LFOs / step
@@ -449,7 +453,7 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFil
     atomicReplaceWithText(destFile, state.toXmlString(), proc_.onLoadError);
 }
 
-bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex)
+bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex, bool keepIdentity)
 {
     if (!file.existsAsFile())
     {
@@ -483,14 +487,18 @@ bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex)
     // and the filename); the older `r0_name` carries the slot's short
     // historical name (e.g. "Kick" inside the "Kick Accents" preset).
     // Prefer presetName, fall back to r0_name when the file is missing one.
+    // A settings reset (keepIdentity) leaves the slot's own name + colour in place.
     Rhythm& r = proc_.sequencer.getRhythm(targetIndex);
-    auto presetNameVal = state.getProperty("presetName");
-    auto rhythmNameVal = state.getProperty("r0_name");
-    if (presetNameVal.isString() && presetNameVal.toString().isNotEmpty())
-        r.name = presetNameVal.toString().toStdString();
-    else if (rhythmNameVal.isString() && rhythmNameVal.toString().isNotEmpty())
-        r.name = rhythmNameVal.toString().toStdString();
-    r.colourIndex = (int)state.getProperty("r0_colour", r.colourIndex);
+    if (! keepIdentity)
+    {
+        auto presetNameVal = state.getProperty("presetName");
+        auto rhythmNameVal = state.getProperty("r0_name");
+        if (presetNameVal.isString() && presetNameVal.toString().isNotEmpty())
+            r.name = presetNameVal.toString().toStdString();
+        else if (rhythmNameVal.isString() && rhythmNameVal.toString().isNotEmpty())
+            r.name = rhythmNameVal.toString().toStdString();
+        r.colourIndex = (int)state.getProperty("r0_colour", r.colourIndex);
+    }
 
     // In .muRhythm the sample *path* is "r0_sample" but the embedded blob fields
     // are unprefixed ("sampleData" / "sampleName").
@@ -516,19 +524,9 @@ bool PresetIO::applyDefaultRhythm(int rhythmIndex)
     if (!f.existsAsFile()) return false;
 
     // "Default rhythm" is a sequencer / voice settings reset — NOT an identity
-    // change. Colour is per-slot identity (cyclic next-in-palette assigned by
-    // PluginEditor when the slot is added). Save the colour, apply preset,
-    // restore the colour so a user-saved _default.muRhythm carrying an
-    // r0_colour attribute doesn't clobber the slot's intended visual identity.
-    // Stopped path is synchronous — restore immediately. Playing path stages
-    // into a pending Rhythm copy; the commit later replaces the live rhythm
-    // wholesale, so the restore needs to happen via the swap commit hook in
-    // PluginProcessor — see onRhythmHotSwapCommitted handling there.
-    const int savedColour = proc_.sequencer.getRhythm(rhythmIndex).colourIndex;
-    const bool wasPlaying = proc_.sequencerPlaying.load();
-    stageRhythmPreset(rhythmIndex, f);
-    if (! wasPlaying)
-        proc_.sequencer.getRhythm(rhythmIndex).colourIndex = savedColour;
+    // change: the slot keeps its name and colour (assigned when it was added), on the
+    // stopped (immediate) and playing (staged) paths alike.
+    stageRhythmPreset(rhythmIndex, f, /*keepIdentity*/ true);
     return true;
 }
 

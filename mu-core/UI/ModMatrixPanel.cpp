@@ -324,7 +324,9 @@ void ModMatrixPanel::resized()
     }
 
     // Empty-state hint text lands at rowsStart + 8, add button at bottom
-    addBtn.setBounds(ox, oy + h - addBtnH, w, addBtnH);
+    // Metal: a normal-width button, centred; flat: the full-width dashed strip.
+    const int addW = metal ? juce::jmin(w, s(MuLookAndFeel::kAddButtonW)) : w;
+    addBtn.setBounds(ox + (w - addW) / 2, oy + h - addBtnH, addW, addBtnH);
 }
 
 void ModMatrixPanel::paint(juce::Graphics& g)

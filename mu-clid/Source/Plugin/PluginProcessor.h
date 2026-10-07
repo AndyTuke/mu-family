@@ -158,7 +158,7 @@ public:
 
     // Hot-swap staging: stages a rhythm preset for atomic commit at the next loop boundary.
     // If the sequencer is not playing, applies the preset immediately instead.
-    void stageRhythmPreset(int ri, const juce::File& f)  { presetIO.stageRhythmPreset(ri, f); }
+    void stageRhythmPreset(int ri, const juce::File& f, bool keepIdentity = false)  { presetIO.stageRhythmPreset(ri, f, keepIdentity); }
     void cancelStagedSwap (int ri)                        { hotSwapStager.cancelStagedSwap(ri); }
     bool hasPendingSwap   (int ri) const                  { return hotSwapStager.hasPendingSwap(ri); }
     bool hasPendingFullPreset() const override            { return hotSwapStager.hasPendingFullPreset(); }

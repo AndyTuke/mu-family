@@ -81,15 +81,13 @@ void ChannelSidebar::refreshItems()
 void ChannelSidebar::layoutItems(bool animate, int newItemIndex)
 {
     using mu_ui::s;
-    const int w  = itemContainer.getWidth();
-    const int ih = s(kItemH);
     for (int i = 0; i < (int) items.size(); ++i)
     {
-        const juce::Rectangle<int> target(0, i * ih, w, ih);
+        const auto target = itemBounds(i);
         if (animate && i == newItemIndex)
         {
             items[(size_t) i]->setAlpha(0.0f);
-            items[(size_t) i]->setBounds(0, (i + 1) * ih, w, ih);
+            items[(size_t) i]->setBounds(itemBounds(i + 1));
             animator.animateComponent(items[(size_t) i].get(), target, 1.0f, 120, false, 0.0, 1.0);
         }
         else if (animate)
@@ -161,7 +159,7 @@ void ChannelSidebar::paintOverChildren(juce::Graphics& g)
 
     if (dragTargetIndex >= 0)
     {
-        const int lineY = viewY + dragTargetIndex * kItemH - scrollY;
+        const int lineY = viewY + itemBounds(dragTargetIndex).getY() - itemGap / 2 - scrollY;
         if (lineY >= viewY - 1 && lineY <= viewY + viewport.getHeight())
         {
             g.setColour(juce::Colours::white);
@@ -222,7 +220,8 @@ void ChannelSidebar::onItemDragEnd(int sourceIndex, const juce::MouseEvent&)
 int ChannelSidebar::computeTargetIndex(int containerLocalY) const
 {
     if (items.empty()) return 0;
-    return juce::jlimit(0, (int) items.size() - 1, containerLocalY / kItemH);
+    const int pitch = itemBounds(1).getY() - itemBounds(0).getY();
+    return juce::jlimit(0, (int) items.size() - 1, (containerLocalY - itemGap / 2) / juce::jmax(1, pitch));
 }
 
 void ChannelSidebar::commitDrag()
@@ -302,10 +301,23 @@ void ChannelSidebar::resized()
         viewport.setBounds(0, top, w, h - 2 * top);
     }
 
-    itemContainer.setSize(w, juce::jmax(1, (int) items.size() * ih));
+    // Spread the items evenly: equal gaps above, between and below them, capped so a few
+    // items stay grouped near the top. If they don't fit, no gap — the viewport scrolls.
+    const int n     = (int) items.size();
+    const int spare = viewport.getHeight() - n * ih;
+    itemGap    = spare > 0 ? juce::jmin(spare / (n + 1), s(kItemH / 4)) : 0;
+    itemInsetX = itemX;
+    itemContainer.setSize(w, juce::jmax(1, n * (ih + itemGap) + itemGap));
 
-    for (int i = 0; i < (int) items.size(); ++i)
-        items[(size_t) i]->setBounds(itemX, i * ih, w - 2 * itemX, ih);
+    for (int i = 0; i < n; ++i)
+        items[(size_t) i]->setBounds(itemBounds(i));
+}
+
+juce::Rectangle<int> ChannelSidebar::itemBounds(int i) const
+{
+    using mu_ui::s;
+    const int ih = s(kItemH);
+    return { itemInsetX, itemGap + i * (ih + itemGap), itemContainer.getWidth() - 2 * itemInsetX, ih };
 }
 
 void ChannelSidebar::timerCallback()

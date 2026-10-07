@@ -15,7 +15,9 @@ public:
     explicit PresetIO(PluginProcessor& proc) : proc_(proc) {}
 
     // Hot-swap staging: loads a preset file and stages it via HotSwapStager.
-    void stageRhythmPreset(int rhythmIndex, const juce::File& file);
+    // keepIdentity: the slot keeps its name + colour (a settings reset such as the default
+    // rhythm, rather than loading a named preset into it).
+    void stageRhythmPreset(int rhythmIndex, const juce::File& file, bool keepIdentity = false);
 
     // Preset category list.
     juce::StringArray loadCategoryList() const;
@@ -26,7 +28,7 @@ public:
                                 bool embedSample = false,
                                 const juce::String& category = {},
                                 const juce::String& description = {});
-    bool applyRhythmPreset(const juce::File& file, int rhythmIndex);
+    bool applyRhythmPreset(const juce::File& file, int rhythmIndex, bool keepIdentity = false);
     bool applyDefaultRhythm(int rhythmIndex);
     void loadDefaultPreset();
 
