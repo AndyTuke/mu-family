@@ -1,3 +1,4 @@
+#include "UI/PresetDropdown.h"   // shared preset scan + selector fill
 #include "TransportBar.h"
 
 static const juce::String kPlay = juce::String(juce::CharPointer_UTF8("\xe2\x96\xb6"));
@@ -233,60 +234,8 @@ void TransportBar::updatePositionLabel()
 
 void TransportBar::populatePresetDropdown()
 {
-    presetFiles.clear();
-    presetDropdown.clear();
-
-    auto dir = proc.getPresetsDir();
-    if (!dir.isDirectory()) return;
-
-    const juce::String wildcard = "*." + proc.getFullPresetExtension();
-
-    struct Entry { juce::File file; juce::String name, category; };
-    std::vector<Entry> entries;
-
-    for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, wildcard))
-    {
-        if (f.getFileNameWithoutExtension().equalsIgnoreCase("_default")) continue;
-        Entry e { f, f.getFileNameWithoutExtension(), "Uncategorised" };
-        if (auto xml = juce::parseXML(f))
-        {
-            auto state = juce::ValueTree::fromXml(*xml);
-            juce::String cat = state.getProperty("presetCategory", "").toString();
-            if (cat.isNotEmpty() && cat != "All" && cat != "Uncategorised")
-                e.category = cat;
-        }
-        entries.push_back(std::move(e));
-    }
-
-    // Sort: named categories alphabetically, "Uncategorised" last, name within category.
-    std::sort(entries.begin(), entries.end(), [](const Entry& a, const Entry& b) {
-        const bool aU = (a.category == "Uncategorised");
-        const bool bU = (b.category == "Uncategorised");
-        if (aU != bU) return bU;  // uncategorised goes last
-        const int cc = a.category.compareIgnoreCase(b.category);
-        return cc != 0 ? cc < 0 : a.name.compareIgnoreCase(b.name) < 0;
-    });
-
-    // Determine whether there are multiple distinct categories.
-    bool multiCat = false;
-    if (!entries.empty())
-    {
-        const auto& first = entries.front().category;
-        for (const auto& e : entries)
-            if (e.category.compareIgnoreCase(first) != 0) { multiCat = true; break; }
-    }
-
-    juce::String currentCat;
-    for (const auto& e : entries)
-    {
-        if (multiCat && e.category != currentCat)
-        {
-            currentCat = e.category;
-            presetDropdown.addSectionHeading(currentCat);
-        }
-        presetFiles.push_back(e.file);
-        presetDropdown.addItem(e.name, (int)presetFiles.size());
-    }
+    mu_ui::fillPresetDropdown(presetDropdown, presetFiles,
+                              mu_pp::listPresetsByCategory(proc.getPresetsDir(), proc.getFullPresetExtension()));
 }
 
 void TransportBar::refreshPresets()

@@ -8,52 +8,8 @@
 #include "Modulation/MuClidModDest.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/MuLookAndFeel.h"
+#include "UI/SaveDialog.h"
 #include "Plugin/PluginProcessor.h"
-
-//==============================================================================
-// Lightweight modal card for saving a rhythm preset: name + category + embed-samples toggle.
-class RhythmSaveDialog : public juce::Component
-{
-public:
-    std::function<void(const juce::String& name,
-                       const juce::String& desc,
-                       const juce::String& category,
-                       bool embed)> onSave;
-    std::function<void()> onCancel;
-
-    void setDefaultName(const juce::String& n) { nameEditor.setText(n, false); }
-    void setDefaultDescription(const juce::String& d) { pendingDefaultDesc = d; }
-    void setDefaultCategory(const juce::String& cat) { pendingDefaultCategory = cat; }
-    void setDefaultEmbed(bool embed) { pendingDefaultEmbed = embed; }
-    void setKnownCategories(const juce::StringArray& cats);
-    juce::String resolveCategory() const;
-    bool isSaveAsDefault() const { return saveAsDefaultToggle.getToggleState(); }
-
-    RhythmSaveDialog();
-    void paint(juce::Graphics&) override;
-    void resized() override;
-    void mouseDown(const juce::MouseEvent&) override;
-    void visibilityChanged() override;
-
-private:
-    juce::TextEditor   nameEditor;
-    juce::TextEditor   descEditor;
-    DropdownSelect     categoryDropdown;
-    juce::TextEditor   newCategoryEditor;
-    juce::ToggleButton embedToggle        { "Embed sample in file" };
-    juce::ToggleButton saveAsDefaultToggle { "Save as Default" };
-    juce::TextButton   saveBtn   { "Save" };
-    juce::TextButton   cancelBtn { "Cancel" };
-    juce::StringArray  knownCategories;
-    juce::String       pendingDefaultCategory;
-    juce::String       pendingDefaultDesc;
-    bool               pendingDefaultEmbed = false;
-
-    void updateDefaultModeState();
-
-    static constexpr int kCardW = 320;
-    static constexpr int kCardH = 240;
-};
 
 // Full rhythm editor panel. Layout (top to bottom):
 //   Header bar | Sample bar | [RhythmCircle | EuclideanPanel] | VoiceSection | ModulatorPanel
@@ -121,7 +77,7 @@ private:
     ChannelHeaderBar headerBar;
     DropdownSelect&  rhythmPresetDropdown = headerBar.getPresetDropdown();
     juce::File lastBrowseDir;
-    RhythmSaveDialog    rhythmSaveDialog;
+    SaveDialog          saveDialog;   // mu-core: the shared save card
 
     std::vector<juce::File> rhythmPresetFiles;
     juce::File              loadedRhythmPresetFile;

@@ -1,3 +1,4 @@
+#include "UI/PresetDropdown.h"   // mu-core: shared preset scan + selector fill
 #include "RhythmPanel.h"
 #include "SampleBrowser.h"
 #include "UI/ConfirmDialog.h"   // shared themed confirm dialogs (mu_ui::confirmAsync)
@@ -57,182 +58,6 @@ const char* const kSendSuffixes[] = { "sendEff", "sendDly", "sendRev", "pan" };
 } // namespace
 
 //==============================================================================
-// RhythmSaveDialog implementation
-
-RhythmSaveDialog::RhythmSaveDialog()
-{
-    nameEditor.setTextToShowWhenEmpty("Preset name", juce::Colours::grey);
-    nameEditor.setFont(juce::Font(juce::FontOptions{}.withHeight(13.0f)));
-    addAndMakeVisible(nameEditor);
-
-    descEditor.setTextToShowWhenEmpty("Description (optional)", juce::Colours::grey);
-    descEditor.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-    addAndMakeVisible(descEditor);
-
-    // Populate with just "Uncategorised" + "New..." until setKnownCategories() is called.
-    setKnownCategories({});
-    categoryDropdown.onChange = [this](int id) {
-        const bool isNew = (id == knownCategories.size() + 2);
-        newCategoryEditor.setVisible(isNew);
-        if (isNew) newCategoryEditor.grabKeyboardFocus();
-        resized();
-    };
-    addAndMakeVisible(categoryDropdown);
-
-    newCategoryEditor.setTextToShowWhenEmpty("New category name", juce::Colours::grey);
-    newCategoryEditor.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-    newCategoryEditor.setVisible(false);
-    addAndMakeVisible(newCategoryEditor);
-
-    addAndMakeVisible(embedToggle);
-
-    saveAsDefaultToggle.onClick = [this] { updateDefaultModeState(); };
-    addAndMakeVisible(saveAsDefaultToggle);
-
-    saveBtn.onClick = [this]
-    {
-        const auto name = nameEditor.getText().trim();
-        if (!isSaveAsDefault() && name.isEmpty()) return;
-        if (onSave) onSave(name, descEditor.getText().trim(),
-                           resolveCategory(), embedToggle.getToggleState());
-    };
-    cancelBtn.onClick = [this] { if (onCancel) onCancel(); };
-    addAndMakeVisible(saveBtn);
-    addAndMakeVisible(cancelBtn);
-}
-
-void RhythmSaveDialog::updateDefaultModeState()
-{
-    const bool isDefault = saveAsDefaultToggle.getToggleState();
-    nameEditor        .setEnabled(!isDefault);
-    descEditor        .setEnabled(!isDefault);
-    categoryDropdown  .setEnabled(!isDefault);
-    newCategoryEditor .setEnabled(!isDefault);
-    resized();
-}
-
-void RhythmSaveDialog::setKnownCategories(const juce::StringArray& cats)
-{
-    knownCategories = cats;
-    categoryDropdown.clear();
-    categoryDropdown.addItem("Uncategorised", 1);
-    for (int i = 0; i < cats.size(); ++i)
-        categoryDropdown.addItem(cats[i], i + 2);
-    categoryDropdown.addItem("New...", cats.size() + 2);
-    categoryDropdown.setSelectedId(1, false);
-    newCategoryEditor.setVisible(false);
-    newCategoryEditor.clear();
-}
-
-juce::String RhythmSaveDialog::resolveCategory() const
-{
-    const int id    = categoryDropdown.getSelectedId();
-    const int newId = knownCategories.size() + 2;
-    if (id == newId)
-    {
-        const auto t = newCategoryEditor.getText().trim();
-        return t.isNotEmpty() ? t : juce::String();
-    }
-    if (id >= 2 && id - 2 < knownCategories.size())
-        return knownCategories[id - 2];
-    return {};   // "Uncategorised" → empty = no category in preset XML
-}
-
-void RhythmSaveDialog::visibilityChanged()
-{
-    if (isVisible())
-    {
-        if (pendingDefaultDesc.isNotEmpty())
-        {
-            descEditor.setText(pendingDefaultDesc, false);
-            pendingDefaultDesc.clear();
-        }
-        else
-        {
-            descEditor.clear();
-        }
-
-        embedToggle.setToggleState(pendingDefaultEmbed, juce::dontSendNotification);
-        pendingDefaultEmbed = false;
-
-        categoryDropdown.setSelectedId(1, false);
-        if (pendingDefaultCategory.isNotEmpty())
-        {
-            for (int i = 0; i < knownCategories.size(); ++i)
-            {
-                if (knownCategories[i].equalsIgnoreCase(pendingDefaultCategory))
-                {
-                    categoryDropdown.setSelectedId(i + 2, false);
-                    break;
-                }
-            }
-            pendingDefaultCategory.clear();
-        }
-        newCategoryEditor.setVisible(false);
-        newCategoryEditor.clear();
-        saveAsDefaultToggle.setToggleState(false, juce::dontSendNotification);
-        updateDefaultModeState();
-        nameEditor.grabKeyboardFocus();
-    }
-}
-
-void RhythmSaveDialog::mouseDown(const juce::MouseEvent& e)
-{
-    const int cardX = (getWidth()  - kCardW) / 2;
-    const int cardY = (getHeight() - kCardH) / 2;
-    const juce::Rectangle<int> card { cardX, cardY, kCardW, kCardH };
-    if (!card.contains(e.getPosition()))
-        if (onCancel) onCancel();
-}
-
-void RhythmSaveDialog::resized()
-{
-    const int cardX  = (getWidth()  - kCardW) / 2;
-    const int cardY  = (getHeight() - kCardH) / 2;
-    const int pad    = 20;
-    const int fieldW = kCardW - pad * 2;
-    const bool isDefault = saveAsDefaultToggle.getToggleState();
-
-    int y = cardY + 40;
-    nameEditor       .setBounds(cardX + pad, y, fieldW, 26);  y += 32;
-    descEditor       .setBounds(cardX + pad, y, fieldW, 24);  y += 30;
-    categoryDropdown .setBounds(cardX + pad, y, fieldW, 24);  y += 28;
-    if (newCategoryEditor.isVisible() && !isDefault)
-    {
-        newCategoryEditor.setBounds(cardX + pad, y, fieldW, 22);  y += 26;
-    }
-    embedToggle        .setBounds(cardX + pad,              y, fieldW / 2, 22);
-    saveAsDefaultToggle.setBounds(cardX + pad + fieldW / 2, y, fieldW / 2, 22);
-
-    const int btnW = 80;
-    const int btnY = cardY + kCardH - 36;
-    cancelBtn.setBounds(cardX + pad,                    btnY, btnW, 26);
-    saveBtn  .setBounds(cardX + kCardW - pad - btnW,    btnY, btnW, 26);
-}
-
-void RhythmSaveDialog::paint(juce::Graphics& g)
-{
-    using Id = MuLookAndFeel::ColourIds;
-
-    g.setColour(MuLookAndFeel::colour(Id::backgroundModalDim));
-    g.fillAll();
-
-    const int cardX = (getWidth()  - kCardW) / 2;
-    const int cardY = (getHeight() - kCardH) / 2;
-
-    g.setColour(MuLookAndFeel::colour(Id::panelBackground));
-    g.fillRoundedRectangle((float)cardX, (float)cardY, (float)kCardW, (float)kCardH, 8.0f);
-
-    g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
-    g.drawRoundedRectangle((float)cardX, (float)cardY, (float)kCardW, (float)kCardH, 8.0f, 1.0f);
-
-    g.setColour(MuLookAndFeel::colour(Id::headingText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(14.0f)));
-    g.drawText("Save Rhythm Preset", cardX + 20, cardY + 12, kCardW - 40, 20,
-               juce::Justification::centredLeft, false);
-}
-
-//==============================================================================
 RhythmPanel::RhythmPanel(PluginProcessor& p)
     : proc(p), euclidPanel(p), voiceSection(p),
       modDestProvider(mu_clid::makeModDestProvider([this] { return effectSendName; }))
@@ -284,25 +109,29 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     };
     addAndMakeVisible(headerBar);
 
-    addAndMakeVisible(rhythmSaveDialog);
-    rhythmSaveDialog.setVisible(false);
-    rhythmSaveDialog.onCancel = [this] { rhythmSaveDialog.setVisible(false); };
-    rhythmSaveDialog.onSave = [this](const juce::String& name,
+    // The shared save card, worded for a rhythm preset (no logo → the compact card).
+    saveDialog.setTitle("Save Rhythm Preset");
+    saveDialog.setEmbedLabel("Embed sample in file");
+    addAndMakeVisible(saveDialog);
+    saveDialog.setVisible(false);
+    saveDialog.onCancel = [this] { saveDialog.setVisible(false); };
+    saveDialog.onSave = [this](const juce::String& name,
                                       const juce::String& desc,
-                                      const juce::String& category, bool embed)
+                                      const juce::String& chosenCategory, bool embed)
     {
         if (currentRhythmIndex < 0) return;
+        const juce::String category = chosenCategory == "Uncategorised" ? juce::String() : chosenCategory;
 
         juce::File destDir = proc.getRhythmsDir().isDirectory()
                                  ? proc.getRhythmsDir()
                                  : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
 
-        if (rhythmSaveDialog.isSaveAsDefault())
+        if (saveDialog.isSaveAsDefault())
         {
             proc.saveRhythmPresetToFile(currentRhythmIndex,
                                         destDir.getChildFile("_default.muRhythm"),
                                         embed, {}, {});
-            rhythmSaveDialog.setVisible(false);
+            saveDialog.setVisible(false);
             return;
         }
 
@@ -320,7 +149,7 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
                     safeThis->proc.saveRhythmPresetToFile(safeThis->currentRhythmIndex,
                                                           destFile, embed, category, desc);
                     safeThis->loadedRhythmPresetFile = destFile;
-                    safeThis->rhythmSaveDialog.setVisible(false);
+                    safeThis->saveDialog.setVisible(false);
                     safeThis->refreshRhythmPresets();
                     for (int i = 0; i < (int)safeThis->rhythmPresetFiles.size(); ++i)
                     {
@@ -339,7 +168,7 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
         proc.ensureCategoryInList(category);
         proc.saveRhythmPresetToFile(currentRhythmIndex, destFile, embed, category, desc);
         loadedRhythmPresetFile = destFile;
-        rhythmSaveDialog.setVisible(false);
+        saveDialog.setVisible(false);
         refreshRhythmPresets();
         for (int i = 0; i < (int)rhythmPresetFiles.size(); ++i)
         {
@@ -574,71 +403,20 @@ void RhythmPanel::loadSample()
 
 void RhythmPanel::refreshRhythmPresets()
 {
-    rhythmPresetFiles.clear();
-    rhythmPresetDropdown.clear();
+    const auto entries = mu_pp::listPresetsByCategory(proc.getRhythmsDir(), "muRhythm");
+    mu_ui::fillPresetDropdown(rhythmPresetDropdown, rhythmPresetFiles, entries);
 
-    const juce::File rhythmsDir = proc.getRhythmsDir().isDirectory()
-                                      ? proc.getRhythmsDir()
-                                      : juce::File();
-    if (rhythmsDir.isDirectory())
-    {
-        struct Entry { juce::File file; juce::String name, category; };
-        std::vector<Entry> entries;
-
-        for (const auto& f : rhythmsDir.findChildFiles(juce::File::findFiles, false, "*.muRhythm"))
-        {
-            if (f.getFileNameWithoutExtension().equalsIgnoreCase("_default")) continue;
-            Entry e { f, f.getFileNameWithoutExtension(), "Uncategorised" };
-            if (auto xml = juce::parseXML(f))
-            {
-                auto state = juce::ValueTree::fromXml(*xml);
-                juce::String cat = state.getProperty("presetCategory", "").toString();
-                if (cat.isNotEmpty() && cat != "All" && cat != "Uncategorised")
-                    e.category = cat;
-            }
-            entries.push_back(std::move(e));
-        }
-
-        std::sort(entries.begin(), entries.end(), [](const Entry& a, const Entry& b) {
-            const bool aU = (a.category == "Uncategorised");
-            const bool bU = (b.category == "Uncategorised");
-            if (aU != bU) return bU;
-            const int cc = a.category.compareIgnoreCase(b.category);
-            return cc != 0 ? cc < 0 : a.name.compareIgnoreCase(b.name) < 0;
-        });
-
-        bool multiCat = false;
-        if (!entries.empty())
-        {
-            const auto& first = entries.front().category;
-            for (const auto& e : entries)
-                if (e.category.compareIgnoreCase(first) != 0) { multiCat = true; break; }
-        }
-
-        // Collect unique non-uncategorised categories for getKnownCategories()
-        knownRhythmCategories.clear();
-        for (const auto& e : entries)
-            if (e.category != "Uncategorised" && !knownRhythmCategories.contains(e.category))
-                knownRhythmCategories.add(e.category);
-        knownRhythmCategories.sort(false);
-
-        juce::String currentCat;
-        for (const auto& e : entries)
-        {
-            if (multiCat && e.category != currentCat)
-            {
-                currentCat = e.category;
-                rhythmPresetDropdown.addSectionHeading(currentCat);
-            }
-            rhythmPresetFiles.push_back(e.file);
-            rhythmPresetDropdown.addItem(e.name, (int)rhythmPresetFiles.size());
-        }
-    }
+    // The named categories in use, for getKnownCategories().
+    knownRhythmCategories.clear();
+    for (const auto& e : entries)
+        if (e.category != "Uncategorised")
+            knownRhythmCategories.addIfNotAlreadyThere(e.category);
+    knownRhythmCategories.sort(false);
 }
 
 void RhythmPanel::setKnownCategories(const juce::StringArray& cats)
 {
-    rhythmSaveDialog.setKnownCategories(cats);
+    saveDialog.setKnownCategories(cats);
 }
 
 void RhythmPanel::saveRhythmPreset()
@@ -666,12 +444,12 @@ void RhythmPanel::saveRhythmPreset()
     }
 
     setKnownCategories(proc.loadCategoryList());
-    rhythmSaveDialog.setDefaultName(defaultName);
-    rhythmSaveDialog.setDefaultDescription(defaultDesc);
-    rhythmSaveDialog.setDefaultCategory(defaultCat);
-    rhythmSaveDialog.setDefaultEmbed(defaultEmbed);
-    rhythmSaveDialog.setVisible(true);
-    rhythmSaveDialog.toFront(true);
+    saveDialog.setDefaultName(defaultName);
+    saveDialog.setDefaultDescription(defaultDesc);
+    saveDialog.setDefaultCategory(defaultCat);
+    saveDialog.setDefaultEmbed(defaultEmbed);
+    saveDialog.setVisible(true);
+    saveDialog.toFront(true);
 }
 
 void RhythmPanel::mouseDown(const juce::MouseEvent& e)
@@ -822,7 +600,7 @@ void RhythmPanel::resized()
     // the panel's corner screws.
     const int modInsetX = MuLookAndFeel::hasScrews(*this) ? s(MuLookAndFeel::kScrewedPanelInset) : rhythmInset;
     modulatorPanel.setBounds(modRect.reduced(modInsetX, rhythmInset));
-    rhythmSaveDialog.setBounds(getLocalBounds());
+    saveDialog.setBounds(getLocalBounds());
 }
 
 //==============================================================================

@@ -20,11 +20,14 @@ public:
     // Product-supplied chrome.
     void setLogoImage(const juce::Image& image);
     void setShowEmbedSamples(bool show);
+    void setTitle(const juce::String& t)       { title = t; repaint(); }            // default "Save Preset"
+    void setEmbedLabel(const juce::String& t)  { embedSamplesToggle.setButtonText(t); }
 
     // Call before showing to populate the category dropdown with known categories.
     void setKnownCategories(const juce::StringArray& cats);
     // Pre-fill the name editor when the dialog next becomes visible.
     void setDefaultName(const juce::String& name) { pendingDefaultName = name; }
+    void setDefaultDescription(const juce::String& d) { pendingDefaultDesc = d; }
     // Pre-select category and embed state when the dialog next becomes visible.
     void setDefaultCategory(const juce::String& cat) { pendingDefaultCategory = cat; }
     void setDefaultEmbed(bool embed) { pendingDefaultEmbed = embed; }
@@ -48,6 +51,8 @@ private:
 
     juce::StringArray  knownCategories;
     juce::String       pendingDefaultName;
+    juce::String       pendingDefaultDesc;
+    juce::String       title { "Save Preset" };
     juce::String       pendingDefaultCategory;
     bool               pendingDefaultEmbed = false;
     bool               showEmbedSamples = true;
@@ -56,7 +61,11 @@ private:
     void updateDefaultModeState();
 
     juce::String resolveCategory() const;
+    // The card: shorter, with the title at the top, when there is no logo.
+    juce::Rectangle<int> cardBounds() const;
 
     static constexpr int kCardW = 360;
     static constexpr int kCardH = 360;
+    static constexpr int kLogoBandH  = 116;   // header band holding the 96 px logo + padding
+    static constexpr int kTitleBandH = 44;    // header band holding just the title (no logo)
 };

@@ -106,7 +106,8 @@ void SaveDialog::visibilityChanged()
         {
             nameEditor.clear();
         }
-        descEditor.clear();
+        descEditor.setText(pendingDefaultDesc, false);
+        pendingDefaultDesc.clear();
         categoryDropdown.setSelectedId(1, false);
         if (pendingDefaultCategory.isNotEmpty())
         {
@@ -141,32 +142,27 @@ void SaveDialog::updateDefaultModeState()
     resized();
 }
 
-void SaveDialog::mouseDown(const juce::MouseEvent& e)
+juce::Rectangle<int> SaveDialog::cardBounds() const
 {
     using mu_ui::s;
-    const int w = getWidth();
-    const int h = getHeight();
     const int cardW = s(kCardW);
-    const int cardH = s(kCardH);
-    const int cardX = (w - cardW) / 2;
-    const int cardY = (h - cardH) / 2;
-    const juce::Rectangle<int> card { cardX, cardY, cardW, cardH };
+    const int cardH = s(kCardH) - (logoImage.isValid() ? 0 : s(kLogoBandH - kTitleBandH));
+    return { (getWidth() - cardW) / 2, (getHeight() - cardH) / 2, cardW, cardH };
+}
 
-    if (!card.contains(e.getPosition()))
+void SaveDialog::mouseDown(const juce::MouseEvent& e)
+{
+    if (! cardBounds().contains(e.getPosition()))
         if (onCancel) onCancel();
 }
 
 void SaveDialog::resized()
 {
     using mu_ui::s;
-    const int w = getWidth();
-    const int h = getHeight();
-    const int cardW = s(kCardW);
-    const int cardH = s(kCardH);
-    const int cardX = (w - cardW) / 2;
-    const int cardY = (h - cardH) / 2;
+    const auto card  = cardBounds();
+    const int  cardW = card.getWidth(), cardH = card.getHeight(), cardX = card.getX(), cardY = card.getY();
 
-    int y = cardY + s(116);  // leave room for 96px logo + padding
+    int y = cardY + s(logoImage.isValid() ? kLogoBandH : kTitleBandH);   // below the logo / title
     const int fieldW = cardW - s(48);
     const int fieldX = cardX + s(24);
 
@@ -208,14 +204,10 @@ void SaveDialog::paint(juce::Graphics& g)
 
     mu_ui::fillModalDim(g);
 
-    const int w = getWidth();
-    const int h = getHeight();
-    const int cardW = s(kCardW);
-    const int cardH = s(kCardH);
-    const int cardX = (w - cardW) / 2;
-    const int cardY = (h - cardH) / 2;
+    const auto card  = cardBounds();
+    const int  cardW = card.getWidth(), cardX = card.getX(), cardY = card.getY();
 
-    mu_ui::paintModalCard(g, { cardX, cardY, cardW, cardH });
+    mu_ui::paintModalCard(g, card);
 
     // Logo on the right side of the header, title on the left
     if (logoImage.isValid())
@@ -226,6 +218,11 @@ void SaveDialog::paint(juce::Graphics& g)
     }
     g.setColour(MuLookAndFeel::colour(Id::headingText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(14.0f))));
-    g.drawText("Save Preset", cardX + s(120), cardY + s(40), cardW - s(136), s(20),
-               juce::Justification::centredLeft, false);
+    // Title beside the logo, or along the top when there is none.
+    if (logoImage.isValid())
+        g.drawText(title, cardX + s(120), cardY + s(40), cardW - s(136), s(20),
+                   juce::Justification::centredLeft, false);
+    else
+        g.drawText(title, cardX + s(24), cardY + s(14), cardW - s(48), s(20),
+                   juce::Justification::centredLeft, false);
 }

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <algorithm>
+#include <vector>
 
 // Shared preset-file handling for every mu product. A full preset is the product's whole
 // state tree wrapped in a root element carrying name / description / category; a layer
@@ -24,6 +26,37 @@ inline juce::Array<juce::File> listPresetFiles(const juce::File& dir, const juce
         files = dir.findChildFiles(juce::File::findFiles, false, "*." + ext);
     files.sort();
     return files;
+}
+
+// A preset file as a selector lists it: display name and category ("Uncategorised" when none).
+struct PresetEntry { juce::File file; juce::String name, category; };
+
+// The presets in `dir` with extension `ext` (not `_default`), each with the `presetCategory` it
+// was saved under — sorted by category (named ones alphabetically, "Uncategorised" last), then name.
+inline std::vector<PresetEntry> listPresetsByCategory(const juce::File& dir, const juce::String& ext)
+{
+    std::vector<PresetEntry> entries;
+    if (! dir.isDirectory()) return entries;
+    for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*." + ext))
+    {
+        if (f.getFileNameWithoutExtension().equalsIgnoreCase("_default")) continue;
+        PresetEntry e { f, f.getFileNameWithoutExtension(), "Uncategorised" };
+        if (auto xml = juce::parseXML(f))
+        {
+            const auto cat = juce::ValueTree::fromXml(*xml).getProperty("presetCategory", "").toString();
+            if (cat.isNotEmpty() && cat != "All" && cat != "Uncategorised")
+                e.category = cat;
+        }
+        entries.push_back(std::move(e));
+    }
+    std::sort(entries.begin(), entries.end(), [](const PresetEntry& a, const PresetEntry& b)
+    {
+        const bool aU = a.category == "Uncategorised", bU = b.category == "Uncategorised";
+        if (aU != bU) return bU;   // uncategorised last
+        const int cc = a.category.compareIgnoreCase(b.category);
+        return cc != 0 ? cc < 0 : a.name.compareIgnoreCase(b.name) < 0;
+    });
+    return entries;
 }
 
 // Write a full preset (`state` wrapped in <rootTag name description category>) to

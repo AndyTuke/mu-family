@@ -64,6 +64,7 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Persistence/MidiFullPresetMap.cpp"
     # Shared preset browser + MIDI PC editor panels.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/PresetBrowser.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiPresetListPanel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiPresetsPanel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiFullPresetsPanel.cpp"
     # Shared settings-overlay framework — header bar, content column, group/section headers.
