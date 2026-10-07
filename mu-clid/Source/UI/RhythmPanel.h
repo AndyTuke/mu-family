@@ -130,7 +130,7 @@ private:
     static constexpr int kHeaderH      = 32;   // ChannelHeaderBar (28) + its rhythm-colour panel outline
     static constexpr int kHeaderInsetY = 2;    // bar sits this far inside the outline, top and bottom
     static constexpr int kHeaderInsetX = 4;
-    static constexpr int kSampleBarH   = 28;   // as tall as the header bar, so the sample LCD reads like the preset display
+    static constexpr int kSampleBarH   = kHeaderH;   // the same strip as the header, so the sample LCD reads like the preset display
     static constexpr int kVoiceH       = 144;
     static constexpr int kPanelPad     = MuLookAndFeel::kPanelPad;
     static constexpr int kModeSelectorW = 80;

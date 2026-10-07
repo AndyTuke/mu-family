@@ -103,7 +103,7 @@ void ChannelHeaderBar::resized()
 {
     using mu_ui::s;
     const int h         = getHeight();
-    const int btnH      = s(20);
+    const int btnH      = s(MuLookAndFeel::kStripDisplayH);
     const int btnY      = (h - btnH) / 2;
     const int rightEdge = getWidth() - s(4);
     const int iconW     = s(kIconBtnW);

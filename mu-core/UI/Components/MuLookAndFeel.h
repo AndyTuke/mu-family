@@ -636,6 +636,7 @@ public:
     static constexpr int kLcdNameTextH = 13;   // the channel name display in the header bar
     static constexpr int kLcdTextPadX  = 6;
     static constexpr int kLcdBrowseW   = 24;
+    static constexpr int kStripDisplayH = 20;   // a display / button in a thin strip (header bar, sample strip), centred
 
     // Name plates (drawNamePlate): section and row names
 

@@ -923,5 +923,7 @@ juce::Rectangle<int> RhythmPanel::sampleDisplayRect() const
 {
     using mu_ui::s;
     const int insetX = MuLookAndFeel::hasScrews(*this) ? s(MuLookAndFeel::kScrewedPanelInset + MuLookAndFeel::kSpaceXS) : 3;
-    return sampleRect.reduced(insetX, 3);
+    // As tall as the header's displays, centred in the strip.
+    return sampleRect.reduced(insetX, 0).withSizeKeepingCentre(sampleRect.getWidth() - 2 * insetX,
+                                                                 s(MuLookAndFeel::kStripDisplayH));
 }
