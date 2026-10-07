@@ -2,6 +2,7 @@
 #include "BuildNumber.h"        // BUILD_NUMBER — local version for the upgrade check
 #include "UI/ConfirmDialog.h"   // shared themed confirm/prompt dialogs (mu_ui::confirmAsync)
 #include "UI/StandardSettingsOverlay.h" // wires its program-change buttons
+#include "UI/MixerOverlay.h"            // forwards its status messages
 #include "Persistence/PresetFiles.h" // mu_pp::safePresetFileName — the name rule the processors use
 
 EditorShellBase::EditorShellBase(ProcessorBase& proc)
@@ -326,6 +327,9 @@ void EditorShellBase::setMixerOverlay(juce::Component* overlay)
     {
         addChildComponent(*mixerOverlay);
         transportBar.setShowMixerToggle(true);
+        if (auto* mixer = dynamic_cast<MixerOverlay*>(overlay))
+            mixer->onStatusUpdate = [this](const juce::String& name, const juce::String& val, juce::Colour col)
+            { statusBar.showParam(name, val, col); };
     }
     else
     {
@@ -340,6 +344,23 @@ void EditorShellBase::setMetalStyle(bool metal, juce::Colour appAccent)
     if (! appAccent.isTransparent()) lookAndFeel.setAppAccent(appAccent);
     sendLookAndFeelChange();   // shared components re-read the style in lookAndFeelChanged()
     repaint();
+}
+
+void EditorShellBase::setProductIdentity(const juce::String& displayName, const juce::StringArray& extraCredits)
+{
+    // Third-party code every product ships (Monocypher only with the licence verifier).
+    const auto credit = [](const char* utf8) { return juce::String(juce::CharPointer_UTF8(utf8)); };
+    juce::StringArray credits { credit("JUCE \xe2\x80\x94 Proprietary (JUCE 7 license)"),
+                                credit("Signalsmith Reverb \xe2\x80\x94 MIT") };
+    if (processorRef.hasLicensing())
+        credits.add(credit("Monocypher \xe2\x80\x94 BSD-2-Clause"));
+    credits.add(credit("clap-juce-extensions \xe2\x80\x94 MIT"));
+    credits.addArray(extraCredits);
+
+    aboutPanel.setProductInfo(displayName, credits);
+    transportBar.setLogoText(displayName);
+    if (processorRef.hasLicensing())
+        activationPanel.setProductName(displayName);
 }
 
 void EditorShellBase::setSettingsOverlay(juce::Component* overlay)

@@ -139,7 +139,6 @@ PluginProcessor::PluginProcessor()
 
 PluginProcessor::~PluginProcessor()
 {
-    cancelPendingUpdate();
     unregisterFxListeners(this);
 }
 
@@ -179,8 +178,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 
     // MIDI program change → preset load: queue matching PCs (Ch 1-5 track, Ch 9 full) for
     // handleAsyncUpdate to load on the message thread.
-    if (scanMidiProgramChanges(midiMessages))
-        triggerAsyncUpdate();
+    queueMidiProgramChanges(midiMessages);
 
     // External MIDI clock (standalone): scan the buffer + advance the clock estimate. When
     // the Source is "MIDI In" the external clock is the sole transport authority — it drives

@@ -120,12 +120,6 @@ void PluginProcessor::resetLayer(int layer)
     mu_pp::clearModulators(voiceSlots[(size_t) layer]);
 }
 
-// Program changes queued on the audio thread are loaded here, on the message thread.
-void PluginProcessor::handleAsyncUpdate()
-{
-    drainPendingMidiProgramChanges();
-}
-
 juce::File PluginProcessor::getPresetsDir()       const { return getContentDir().getChildFile("Presets"); }
 juce::File PluginProcessor::getPerSlotPresetDir() const { return getContentDir().getChildFile("Arps"); }
 

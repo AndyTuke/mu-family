@@ -36,9 +36,14 @@ public:
     // Product calls these in its constructor before children render. The shell
     // takes pointers, not ownership; the product owns the component instances.
     void setMainArea(juce::Component* sidebar, juce::Component* mainPanel);
+    // A mu-core MixerOverlay also gets its status messages forwarded to the StatusBar.
     void setMixerOverlay(juce::Component* overlay);
     // Pass nullptr to hide the gear button (mu-tant has no settings yet).
     void setSettingsOverlay(juce::Component* overlay);
+
+    // The product's name on the shared chrome: transport logo, About panel (the family's
+    // third-party credits plus `extraCredits`) and, for a licensed product, the activation panel.
+    void setProductIdentity(const juce::String& displayName, const juce::StringArray& extraCredits = {});
 
     // The family's metal look (docs/design-ui-family.md §11): LCD dropdowns, engraved labels,
     // and the shared sidebar / modulation section as raised boxes on metal panels. Call at the

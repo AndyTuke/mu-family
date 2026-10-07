@@ -141,7 +141,6 @@ PluginProcessor::PluginProcessor()
 
 PluginProcessor::~PluginProcessor()
 {
-    cancelPendingUpdate();
     for (auto* param : getParameters())
         if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
             apvts.removeParameterListener(p->getParameterID(), this);
@@ -361,8 +360,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     // MIDI program change → preset load. Scan + FIFO + drain all live on
     // ProcessorBase (mu-core). The virtuals applyMidiPresetSlot / applyFullMidiPreset
     // below dispatch to the mu-clid-specific stageRhythmPreset / loadPreset.
-    if (scanMidiProgramChanges(midiMessages))
-        triggerAsyncUpdate();
+    queueMidiProgramChanges(midiMessages);
 
     double beatPos = 0.0;
     bool   playing = false;
@@ -1101,15 +1099,11 @@ void PluginProcessor::stopSamplePreview()                        { samplePreview
 //==============================================================================
 // Hot-swap: stage a rhythm preset for atomic commit at the next loop boundary.
 // or a MIDI program change was queued.
-void PluginProcessor::handleAsyncUpdate()
+void PluginProcessor::commitDeferredWork()
 {
     // Drain retired engines + commit pending swaps (both sides of the hot-swap lifecycle).
+    // ProcessorBase then drains the MIDI program-change queue.
     hotSwapStager.processSwaps();
-
-    // Drain MIDI program-change queue → dispatch via the virtual hooks. The
-    // base method calls applyMidiPresetSlot / applyFullMidiPreset for each
-    // queued event; our overrides stage a rhythm preset or load a full preset.
-    drainPendingMidiProgramChanges();
 }
 
 //==============================================================================

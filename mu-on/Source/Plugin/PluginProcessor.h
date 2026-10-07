@@ -29,8 +29,7 @@ namespace mu_on
 {
 
 class PluginProcessor : public ProcessorBase,
-                        public juce::AudioProcessorValueTreeState::Listener,
-                        private juce::AsyncUpdater
+                        public juce::AudioProcessorValueTreeState::Listener
 {
 public:
     // Family parity: the shared mixer/sidebar size to kMaxChannels; mu-On uses a fixed 4.
@@ -171,7 +170,6 @@ private:
     juce::ValueTree     serialiseRumbleEnv();
     void                restoreRumbleEnv(const juce::ValueTree& env);
     static juce::String lanePrefix(int lane);       // the lane's engine-param prefix (k_, b_, ...)
-    void                handleAsyncUpdate() override;   // drains queued program changes
 
     // Per-channel render hook handed to the shared MixerEngine — fills each lane's buffer
     // from its engine (Kick/Bass/Hat/Snare) via GrooveVoices.

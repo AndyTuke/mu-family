@@ -26,8 +26,7 @@ namespace mu_toni
 {
 
 class PluginProcessor : public ProcessorBase,
-                        public juce::AudioProcessorValueTreeState::Listener,
-                        private juce::AsyncUpdater
+                        public juce::AudioProcessorValueTreeState::Listener
 {
 public:
     // Family parity: up to 8 channels/layers. A fixed set ships for now; dynamic
@@ -141,7 +140,6 @@ private:
     // State shared by the session save/restore and full presets (PluginProcessor_Preset.cpp).
     juce::ValueTree captureState();
     void            applyStateTree(juce::ValueTree tree);
-    void            handleAsyncUpdate() override;   // drains queued program changes
 
     // Register mixer/FX param listeners + run an initial engine sync (JUCE doesn't
     // fire parameterChanged on construction or for unchanged values).

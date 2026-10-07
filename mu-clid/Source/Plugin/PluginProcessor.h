@@ -20,8 +20,7 @@
 #include <unordered_map>
 
 class PluginProcessor : public ProcessorBase,
-                        private juce::AudioProcessorValueTreeState::Listener,
-                        private juce::AsyncUpdater
+                        private juce::AudioProcessorValueTreeState::Listener
 {
 public:
     // Controls when a staged rhythm preset is committed to the live slot.
@@ -323,7 +322,7 @@ private:
 
     std::atomic<int> swapModeAtomic { 0 }; // 0 = OnMasterLoop, 1 = OnRhythmLoop; read by HotSwapStager
 
-    void handleAsyncUpdate() override;
+    void commitDeferredWork() override;   // hot-swap engine retire + swap commits
 
     // ProcessorBase MIDI PC hooks — dispatched from drainPendingMidiProgramChanges.
     void applyMidiPresetSlot(int slot, const juce::File& f) override

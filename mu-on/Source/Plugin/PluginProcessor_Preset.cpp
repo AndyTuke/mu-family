@@ -169,10 +169,4 @@ void PluginProcessor::resetTrack(int lane)
     mu_pp::clearModulators(voiceSlots[(size_t) lane]);
 }
 
-// Program changes queued on the audio thread are loaded here, on the message thread.
-void PluginProcessor::handleAsyncUpdate()
-{
-    drainPendingMidiProgramChanges();
-}
-
 } // namespace mu_on

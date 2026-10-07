@@ -68,8 +68,7 @@ struct VoiceRingBuffer
 };
 
 class PluginProcessor : public ProcessorBase,
-                        public juce::AudioProcessorValueTreeState::Listener,
-                        public juce::AsyncUpdater
+                        public juce::AudioProcessorValueTreeState::Listener
 {
 public:
     // Family parity with mu-clid (max 8 rhythms / 8 voices / 8 channels).
@@ -108,10 +107,10 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
-    // Message-thread: commit any hot-swap that reached its loop boundary, then
-    // drain the MIDI program-change queue. Triggered from processBlock via
-    // triggerAsyncUpdate() when the audio thread flags a boundary / a PC arrives.
-    void handleAsyncUpdate() override;
+    // Message-thread: commit any hot-swap that reached its loop boundary (ProcessorBase
+    // then drains the MIDI program-change queue). Triggered from processBlock via
+    // triggerAsyncUpdate() when the audio thread flags a boundary.
+    void commitDeferredWork() override;
 
     // ── Internal transport (drives the gate engine + the gating timeline) ─────
     // mu-tant has no host-sync sequencer; the transport bar's play button starts

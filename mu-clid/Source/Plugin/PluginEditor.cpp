@@ -12,19 +12,10 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       settingsOverlay(p)
 {
     // ── Product chrome on shared overlays ───────────────────────────────────
-    getAboutPanel().setProductInfo(
-        juce::String(juce::CharPointer_UTF8("\xce\xbc")) + "-Clid",
-        juce::StringArray {
-            juce::String(juce::CharPointer_UTF8("JUCE \xe2\x80\x94 Proprietary (JUCE 7 license)")),
-            juce::String(juce::CharPointer_UTF8("Signalsmith Reverb \xe2\x80\x94 MIT")),
-            juce::String(juce::CharPointer_UTF8("Monocypher \xe2\x80\x94 BSD-2-Clause")),
-            juce::String(juce::CharPointer_UTF8("clap-juce-extensions \xe2\x80\x94 MIT")),
-            juce::String(juce::CharPointer_UTF8("Bj\xc3\xb6rklund algorithm \xe2\x80\x94 public domain")),
-        });
-    getActivationPanel().setProductName(juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid")));
+    setProductIdentity(juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid")),
+                       juce::StringArray { juce::String(juce::CharPointer_UTF8("Bj\xc3\xb6rklund algorithm \xe2\x80\x94 public domain")) });
     getSaveDialog().setLogoImage(juce::ImageCache::getFromMemory(BinaryData::muclid_png,
                                                                   BinaryData::muclid_pngSize));
-    getTransportBar().setLogoText(juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid")));
     getTransportBar().setLoopSection(&masterLoop, MasterLoopSection::kWidth);
     masterLoop.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
     {
@@ -89,13 +80,6 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     rhythmPanel.onStatusUpdate = [this](const juce::String& name,
                                         const juce::String& val,
                                         juce::Colour col)
-    {
-        getStatusBar().showParam(name, val, col);
-    };
-
-    mixerOverlay.onStatusUpdate = [this](const juce::String& name,
-                                          const juce::String& val,
-                                          juce::Colour col)
     {
         getStatusBar().showParam(name, val, col);
     };

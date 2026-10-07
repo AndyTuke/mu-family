@@ -46,7 +46,8 @@
 // MixerOverlay) take a `ProcessorBase*` instead of forward-declaring each
 // plugin's concrete `PluginProcessor` type — eliminates the layering
 // violation that previously had mu-core including mu-clid headers.
-class ProcessorBase : public juce::AudioProcessor
+class ProcessorBase : public juce::AudioProcessor,
+                      protected juce::AsyncUpdater   // audio thread → message thread hand-off
 #if MU_CORE_HAS_CLAP
                     , public clap_juce_extensions::clap_juce_audio_processor_capabilities
 #endif
@@ -55,7 +56,7 @@ public:
     ProcessorBase(const BusesProperties& props,
                   juce::AudioProcessorValueTreeState::ParameterLayout layout,
                   const juce::Identifier& stateTreeType = juce::Identifier("MuFamilyState"));
-    ~ProcessorBase() override = default;
+    ~ProcessorBase() override { cancelPendingUpdate(); }
 
     // Public so UI panels (MixerOverlay, FXRow, MixerChannel, etc.) can access
     // them directly — matches the layout PluginProcessor had before extraction.
@@ -156,6 +157,7 @@ public:
     // licensed, so it gets the full editor and no demo banner. A licensed product calls
     // initLicensing; then a Release build is licensed when the offline signed .lic verifies OR
     // the machine is online-activated, and a Debug / tester build always runs unlocked.
+    bool hasLicensing() const noexcept { return licensingEnabled; }   // initLicensing was called
     virtual bool isLicensed() const
     {
        #if MUFAMILY_REQUIRE_LICENSE
@@ -215,19 +217,24 @@ public:
     std::function<void()>                            onPresetSwapCommitted;
     std::function<void(float)>                       onUiScaleChanged;
 
+    // Audio-thread: call once per processBlock. Queues the block's program changes
+    // (scanMidiProgramChanges) and, if any, schedules the message-thread drain that
+    // loads them via applyMidiPresetSlot / applyFullMidiPreset.
+    void queueMidiProgramChanges(const juce::MidiBuffer& midi)
+    {
+        if (scanMidiProgramChanges(midi))
+            triggerAsyncUpdate();
+    }
+
     // Audio-thread: scans incoming MIDI for program-change messages on
     // channels 1-8 (per-slot map, gated by `midiPresetMap.getChannelMask()`)
     // and channel 9 (full-preset map, gated by `midiFullPresetMap.isEnabled()`).
     // Each matching PC is enqueued into the lock-free FIFO. Returns true if
-    // any PCs were enqueued — caller should then `triggerAsyncUpdate()`
-    // (the AsyncUpdater is owned by the derived processor; ProcessorBase
-    // doesn't inherit it so the derived class keeps full control of its
-    // async lifecycle for hot-swap etc.).
+    // any PCs were enqueued. Products call queueMidiProgramChanges instead.
     bool scanMidiProgramChanges(const juce::MidiBuffer& midi);
 
     // Message-thread: drains the FIFO and dispatches each event via the
-    // applyMidiPresetSlot / applyFullMidiPreset virtuals. Call from the
-    // derived processor's handleAsyncUpdate().
+    // applyMidiPresetSlot / applyFullMidiPreset virtuals. Run by handleAsyncUpdate.
     void drainPendingMidiProgramChanges();
 
     // Maps a shared global-FX / return / master / channel-strip APVTS parameter
@@ -238,6 +245,18 @@ public:
     void syncGlobalFxParam(const juce::String& id, float v);
 
 protected:
+    // Deferred message-thread work first (product hot-swap commits), then program changes.
+    void handleAsyncUpdate() final
+    {
+        commitDeferredWork();
+        drainPendingMidiProgramChanges();
+    }
+
+    // Message-thread work the audio thread asked for with triggerAsyncUpdate()
+    // (e.g. hot-swap commits at a loop boundary). Runs before queued program
+    // changes are loaded. Default: nothing.
+    virtual void commitDeferredWork() {}
+
     virtual void applyMidiPresetSlot(int slot, const juce::File& f) = 0;
     virtual void applyFullMidiPreset(const juce::File& f)            = 0;
 

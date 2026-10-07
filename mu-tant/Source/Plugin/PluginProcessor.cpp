@@ -133,7 +133,6 @@ PluginProcessor::PluginProcessor()
 
 PluginProcessor::~PluginProcessor()
 {
-    cancelPendingUpdate();   // no hot-swap / MIDI drain fires into a half-destroyed processor
     unregisterFxListeners(this);
 }
 
@@ -284,8 +283,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // MIDI program-change → preset load. Enqueue matching PCs (Ch 1-8 per-voice,
     // Ch 9 full) into the lock-free FIFO; handleAsyncUpdate drains them. Done
     // before the voicesTryLock so PCs aren't dropped during a voice add/remove.
-    if (scanMidiProgramChanges(midiMessages))
-        triggerAsyncUpdate();
+    queueMidiProgramChanges(midiMessages);
 
     // Note mode (gate + pitch-track): scan note on/off into the held-note stack so
     // renderVoice can pitch-track the held note. The amplitude gate is applied to the
@@ -847,7 +845,7 @@ void PluginProcessor::resetVoice(int idx)
     refreshPitchQuantFlags(idx);               // modulators cleared → flags off
 }
 
-void PluginProcessor::handleAsyncUpdate()
+void PluginProcessor::commitDeferredWork()
 {
     // Commit any hot-swap that reached its loop boundary. The full preset commits
     // first (it supersedes per-voice swaps), then each flagged per-voice swap.
@@ -863,10 +861,6 @@ void PluginProcessor::handleAsyncUpdate()
             applyVoicePresetTree(v, tree);
             if (onVoiceHotSwapCommitted) onVoiceHotSwapCommitted(v);
         }
-
-    // Drain the MIDI program-change queue → applyMidiPresetSlot / applyFullMidiPreset
-    // (which themselves hot-swap: stage while playing, apply while stopped).
-    drainPendingMidiProgramChanges();
 }
 
 void PluginProcessor::loadUserWavetable(int voice, int oscIndex, const juce::File& file)

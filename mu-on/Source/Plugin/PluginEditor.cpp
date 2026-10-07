@@ -38,14 +38,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p)
 {
-    getAboutPanel().setProductInfo(
-        juce::String(juce::CharPointer_UTF8("\xce\xbc-On")),
-        juce::StringArray {
-            juce::String(juce::CharPointer_UTF8("JUCE \xe2\x80\x94 Proprietary (JUCE 7 license)")),
-            juce::String(juce::CharPointer_UTF8("Signalsmith Reverb \xe2\x80\x94 MIT")),
-            juce::String(juce::CharPointer_UTF8("clap-juce-extensions \xe2\x80\x94 MIT")),
-        });
-    getTransportBar().setLogoText(juce::String(juce::CharPointer_UTF8("\xce\xbc-On")));
+    setProductIdentity(juce::String(juce::CharPointer_UTF8("\xce\xbc-On")));
 
     // Per-channel sidebar glyph (Kick/Bass/Hat/Snare initial in the lane colour).
     sidebar.createMiniVisual = [&p](int i) -> std::unique_ptr<juce::Component>
@@ -82,12 +75,6 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         if (groovePanel.getChannel() == lane) groovePanel.setChannel(lane);
     };
 
-    mixerOverlay.onStatusUpdate = [this](const juce::String& name,
-                                         const juce::String& val,
-                                         juce::Colour col)
-    {
-        getStatusBar().showParam(name, val, col);
-    };
 
     sidebar.setSelectedIndex(0);
     groovePanel.setChannel(0);
