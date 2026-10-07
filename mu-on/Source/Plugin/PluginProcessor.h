@@ -113,10 +113,10 @@ public:
     // Full-preset save/load — the editor shell drives the UI (preset bar, Save dialog, browser).
     // A preset is the params + step grid + each lane's modulators + the Rumble envelope,
     // wrapped with name / description / category.
-    void              savePreset(const juce::String& name, const juce::String& desc,
-                                 const juce::String& category, bool embedSamples) override;
-    void              loadPreset(const juce::File& file) override;
-    juce::StringArray loadCategoryList() const override;
+    // Full presets: the standard ProcessorBase save / load / categories, under <MuOnPreset>.
+    const char*     getFullPresetTag() const override { return "MuOnPreset"; }
+    juce::ValueTree captureFullPreset() override { return captureState(); }
+    void            useLoadedFullPreset(juce::ValueTree state) override;
 
     // Per-track presets — a lane's engine params, its step row (Rumble: its envelope) and its
     // modulators. A track preset belongs to the instrument it was saved from.

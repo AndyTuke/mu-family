@@ -348,36 +348,21 @@ juce::File PluginProcessor::getPresetsDir()     const { return getContentDir().g
 juce::File PluginProcessor::getPerSlotPresetDir() const { return getContentDir().getChildFile("Voices"); }
 juce::File PluginProcessor::getWavetablesDir()  const { return getContentDir().getChildFile("Wavetables"); }
 
-void PluginProcessor::savePreset(const juce::String& name, const juce::String& desc,
-                                 const juce::String& category, bool /*embedSamples*/)
+// A full preset: the whole APVTS state with the voice count, colours and per-voice data.
+juce::ValueTree PluginProcessor::captureFullPreset()
 {
-    // The whole APVTS state (with voice count, colours and per-voice data) wrapped with
-    // name / description / category metadata.
     apvts.state.setProperty("numVoices", numVoices.load(), nullptr);
     apvts.state.setProperty("voiceColours", serialiseVoiceColours(), nullptr);
     writeVoiceDataToState();
-    mu_pp::writeFullPreset(getPresetsDir(), getFullPresetExtension(), "MuTantPreset",
-                           name, desc, category, apvts.copyState());
+    return apvts.copyState();
 }
 
-void PluginProcessor::loadPreset(const juce::File& file)
+// Hot-swap: while the transport is playing, stage the parsed state and commit it at voice 0's
+// next loop boundary (handleAsyncUpdate) so the switch is musically seamless; while stopped,
+// apply immediately. Wavetables referenced by the staged state are pre-loaded into the bank now
+// so the boundary commit does no disk I/O.
+void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 {
-    if (! file.existsAsFile()) return;
-
-    // Accept a wrapped MuTantPreset or a bare APVTS state element.
-    juce::String error;
-    auto state = mu_pp::readFullPreset(file, "MuTantPreset", apvts.state.getType(), error);
-    if (! state.isValid())
-    {
-        if (onLoadError) onLoadError(error);
-        return;
-    }
-
-    // Hot-swap: while the transport is playing, stage the parsed state and commit
-    // it at voice 0's next loop boundary (handleAsyncUpdate) so the switch is
-    // musically seamless; while stopped, apply immediately. Wavetables referenced
-    // by the staged state are pre-loaded into the bank now so the boundary commit
-    // does no disk I/O.
     if (isInternalPlaying())
     {
         preloadWavetablesFromState(state);
@@ -387,8 +372,6 @@ void PluginProcessor::loadPreset(const juce::File& file)
     {
         applyFullPresetTree(state);
     }
-
-    publishPresetName(file.getFileNameWithoutExtension());   // mu-link mixer display
 }
 
 // Apply a full preset's APVTS state immediately (the shared commit path for the
@@ -444,11 +427,6 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& stateIn)
     restoreVoiceColours(apvts.state.getProperty("voiceColours", "").toString());
     readVoiceDataFromState();
     syncAllFxParams();   // re-seed mixer/FX engine state (unchanged values skip listeners)
-}
-
-juce::StringArray PluginProcessor::loadCategoryList() const
-{
-    return mu_pp::readPresetCategories(getPresetsDir(), getFullPresetExtension(), "MuTantPreset");
 }
 
 } // namespace mu_tant

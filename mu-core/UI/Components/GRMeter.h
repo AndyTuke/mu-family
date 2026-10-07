@@ -43,6 +43,7 @@ private:
 
     void timerCallback() override
     {
+        if (! isShowing()) return;   // mixer hidden — nothing to animate
         const float incoming = getGR ? getGR() : 0.0f;
         const float prev = displayGR;
         displayGR = (incoming > displayGR)

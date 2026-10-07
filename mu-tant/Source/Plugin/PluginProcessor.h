@@ -206,10 +206,10 @@ public:
     // Full-preset save/load — the editor shell drives the UI (TransportBar
     // dropdown + Save dialog + Preset browser) and calls these. A preset is the
     // whole APVTS state wrapped with name/description/category metadata.
-    void              savePreset(const juce::String& name, const juce::String& desc,
-                                 const juce::String& category, bool embedSamples) override;
-    void              loadPreset(const juce::File& file) override;
-    juce::StringArray loadCategoryList() const override;
+    // Full presets: the standard ProcessorBase save / load / categories, under <MuTantPreset>.
+    const char*     getFullPresetTag() const override { return "MuTantPreset"; }
+    juce::ValueTree captureFullPreset() override;
+    void            useLoadedFullPreset(juce::ValueTree state) override;
 
     // Fired (message thread, from handleAsyncUpdate) after a per-voice hot-swap
     // commit finishes, so the editor can refresh that voice's panel + sidebar +

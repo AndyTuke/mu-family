@@ -166,7 +166,7 @@ public:
         refreshPresetList();
 
         setLayer(0);
-        startTimerHz(30);
+        startTimerHz(mu_ui::kUiRefreshHz);
     }
 
     ~EnginePanel() override

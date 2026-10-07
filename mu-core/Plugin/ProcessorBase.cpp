@@ -1,5 +1,6 @@
 #include "Plugin/ProcessorBase.h"
 #include "Plugin/MixerFxParams.h"           // mu_mixfx::isGlobalFxParamId
+#include "Persistence/PresetFiles.h"         // mu_pp full-preset files
 #include "Audio/FX/Slots/FXAlgorithmDef.h"   // FXAlgorithmRegistry
 #include "Audio/AlgorithmNames.h"             // mu_audio::kInsertAlgorithmCount
 #include <cstring>                            // std::strcmp — alloc-free suffix compare
@@ -336,4 +337,34 @@ bool ProcessorBase::isBusesLayoutSupported(const BusesLayout& layouts) const
         return false;
     // Main output: stereo.
     return layouts.getMainOutputChannelSet() == juce::AudioChannelSet::stereo();
+}
+
+void ProcessorBase::savePreset(const juce::String& name, const juce::String& desc,
+                               const juce::String& category, bool /*embedSamples*/)
+{
+    if (const char* tag = getFullPresetTag())
+        mu_pp::writeFullPreset(getPresetsDir(), getFullPresetExtension(), tag,
+                               name, desc, category, captureFullPreset());
+}
+
+void ProcessorBase::loadPreset(const juce::File& file)
+{
+    const char* tag = getFullPresetTag();
+    if (tag == nullptr || ! file.existsAsFile()) return;
+    juce::String error;
+    auto state = mu_pp::readFullPreset(file, tag, apvts.state.getType(), error);
+    if (! state.isValid())
+    {
+        if (onLoadError) onLoadError(error);
+        return;
+    }
+    useLoadedFullPreset(std::move(state));
+    publishPresetName(file.getFileNameWithoutExtension());   // mu-link mixer display
+}
+
+juce::StringArray ProcessorBase::loadCategoryList() const
+{
+    const char* tag = getFullPresetTag();
+    return tag != nullptr ? mu_pp::readPresetCategories(getPresetsDir(), getFullPresetExtension(), tag)
+                          : juce::StringArray();
 }

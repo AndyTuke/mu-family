@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Modulation/ModulationDestinations.h"   // ModDest::kTableSize (modSlot)
+#include <array>
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "Plugin/ProcessorBase.h"
 #include "Sequencer/SequencerEngine.h"
@@ -390,6 +392,12 @@ private:
     // Modulation pass for one rhythm: snapshot voiceParams, run the matrix,
     // snapshot for the UI live-arc, write modulated values + euclid overrides back.
     void applyRhythmModulation(int r, double beatPos);
+    // applyRhythmModulation's phases (all audio thread, under the rhythm's modLock up to phase 3).
+    struct StripMod { float pan, effect, delay, reverb; };   // modulated mixer-strip values
+    void     seedModulation(int r, const Rhythm& rhythm, const VoiceParams& modParams);
+    StripMod applyStripModulation(int r);
+    void     publishModSnapshot(int r, const Rhythm& rhythm, const VoiceParams& modParams, const StripMod& stripMod);
+    void     writeBackModulation(int r, const Rhythm& rhythm, VoiceParams& modParams);
     // Effective BPM for tempo-synced FX: host playhead > MIDI clock > internal.
     double deriveEffectiveBpm();
     // Gather output buses, run the core mixer/voice render, mix the sample
@@ -421,6 +429,9 @@ private:
     // guarantees the view stays valid for the lifetime of the map entry. ModulationMatrix's
     // `find(a.destinationId)` still works because std::string converts implicitly.
     std::unordered_map<std::string_view, float> modParamValues;
+    // modParamValues' value for each ModDest::kTable index, resolved once in the constructor.
+    std::array<float*, ModDest::kTableSize> modSlot {};
+    float& mv(int destIndex) noexcept { jassert(modSlot[(size_t) destIndex] != nullptr); return *modSlot[(size_t) destIndex]; }
 
     // per-rhythm modulated euclid pattern overrides — written by the audio thread
     // after ModulationMatrix::process(). Used by the audio-thread pattern recompute path

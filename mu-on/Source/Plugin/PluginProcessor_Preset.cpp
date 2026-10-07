@@ -13,7 +13,6 @@ namespace mu_on
 
 namespace
 {
-    constexpr const char* kFullPresetTag  = "MuOnPreset";
     constexpr const char* kTrackPresetTag = "MuOnTrack";
 
     // Each lane's engine params share a prefix; a track preset holds the lane's set.
@@ -79,24 +78,10 @@ void PluginProcessor::applyStateTree(const juce::ValueTree& tree)
     syncAllFxParams();   // re-seed mixer/FX (unchanged values skip listeners)
 }
 
-void PluginProcessor::savePreset(const juce::String& name, const juce::String& desc,
-                                 const juce::String& category, bool /*embedSamples*/)
+// While playing, stage a loaded full preset for the pattern's wrap (commitDeferredWork); while
+// stopped, apply it now.
+void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 {
-    mu_pp::writeFullPreset(getPresetsDir(), getFullPresetExtension(), kFullPresetTag,
-                           name, desc, category, captureState());
-}
-
-void PluginProcessor::loadPreset(const juce::File& file)
-{
-    if (! file.existsAsFile()) return;
-    juce::String error;
-    auto state = mu_pp::readFullPreset(file, kFullPresetTag, apvts.state.getType(), error);
-    if (! state.isValid())
-    {
-        if (onLoadError) onLoadError(error);
-        return;
-    }
-    // While playing, stage it for the pattern's wrap (commitDeferredWork); while stopped, apply now.
     if (transportRunning.load(std::memory_order_relaxed))
         hotSwap.stageFull(std::move(state));
     else
@@ -104,12 +89,6 @@ void PluginProcessor::loadPreset(const juce::File& file)
         for (int i = 0; i < kNumChannels; ++i) hotSwap.cancel(i);   // nothing staged may land on top
         applyStateTree(state);
     }
-    publishPresetName(file.getFileNameWithoutExtension());   // mu-link mixer display
-}
-
-juce::StringArray PluginProcessor::loadCategoryList() const
-{
-    return mu_pp::readPresetCategories(getPresetsDir(), getFullPresetExtension(), kFullPresetTag);
 }
 
 // A track preset: the lane's engine params, its step row (or the Rumble envelope) and its

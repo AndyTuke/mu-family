@@ -11,7 +11,6 @@ namespace mu_toni
 
 namespace
 {
-    constexpr const char* kFullPresetTag  = "MuToniPreset";
     constexpr const char* kLayerPresetTag = "MuToniLayer";
 
     juce::String layerPrefix(int layer) { return "v" + juce::String(layer) + "_"; }
@@ -54,24 +53,10 @@ juce::ValueTree PluginProcessor::captureState()
     return state;
 }
 
-void PluginProcessor::savePreset(const juce::String& name, const juce::String& desc,
-                                 const juce::String& category, bool /*embedSamples*/)
+// While playing, stage a loaded full preset for the next bar line (commitDeferredWork); while
+// stopped, apply it now.
+void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 {
-    mu_pp::writeFullPreset(getPresetsDir(), getFullPresetExtension(), kFullPresetTag,
-                           name, desc, category, captureState());
-}
-
-void PluginProcessor::loadPreset(const juce::File& file)
-{
-    if (! file.existsAsFile()) return;
-    juce::String error;
-    auto state = mu_pp::readFullPreset(file, kFullPresetTag, apvts.state.getType(), error);
-    if (! state.isValid())
-    {
-        if (onLoadError) onLoadError(error);
-        return;
-    }
-    // While playing, stage it for the next bar line (commitDeferredWork); while stopped, apply now.
     if (transportRunning.load(std::memory_order_relaxed))
         hotSwap.stageFull(std::move(state));
     else
@@ -79,12 +64,6 @@ void PluginProcessor::loadPreset(const juce::File& file)
         for (int i = 0; i < kNumChannels; ++i) hotSwap.cancel(i);   // nothing staged may land on top
         applyStateTree(state);
     }
-    publishPresetName(file.getFileNameWithoutExtension());   // mu-link mixer display
-}
-
-juce::StringArray PluginProcessor::loadCategoryList() const
-{
-    return mu_pp::readPresetCategories(getPresetsDir(), getFullPresetExtension(), kFullPresetTag);
 }
 
 // A layer preset: the layer's params (prefix-free ids, so it loads into any layer) + its modulators.

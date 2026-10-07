@@ -87,10 +87,10 @@ public:
 
     // Full-preset save/load — the editor shell drives the UI (preset bar, Save dialog, browser).
     // A preset is the params + every layer's modulators, wrapped with name / description / category.
-    void              savePreset(const juce::String& name, const juce::String& desc,
-                                 const juce::String& category, bool embedSamples) override;
-    void              loadPreset(const juce::File& file) override;
-    juce::StringArray loadCategoryList() const override;
+    // Full presets: the standard ProcessorBase save / load / categories, under <MuToniPreset>.
+    const char*     getFullPresetTag() const override { return "MuToniPreset"; }
+    juce::ValueTree captureFullPreset() override { return captureState(); }
+    void            useLoadedFullPreset(juce::ValueTree state) override;
 
     // Per-layer presets — the layer's v{N}_ params + its modulators (loadable into any layer),
     // and a reset back to defaults.

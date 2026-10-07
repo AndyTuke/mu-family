@@ -139,15 +139,22 @@ public:
     void   setMidiSyncEnabled(bool on);
     void   setMidiSyncMessages(int mode);
 
-    // Presets — directory, save/load, and the shared category list. Default
-    // returns yield a usable "no presets yet" UI state in the transport bar.
+    // Presets — directory, save/load, and the shared category list. A product that names its
+    // full-preset root tag (getFullPresetTag) gets the standard save / load / category list:
+    // save writes captureFullPreset() wrapped with name / description / category; load reads it
+    // (reporting errors through onLoadError), hands the tree to useLoadedFullPreset (stage it while
+    // playing, apply it while stopped) and publishes the name. With no tag these do nothing and
+    // the product overrides them (mu-Clid's PresetIO).
     virtual juce::File         getPresetsDir()                                     const { return {}; }
-    virtual void               loadPreset(const juce::File& /*file*/)                    {}
-    virtual void               savePreset(const juce::String& /*name*/,
-                                           const juce::String& /*desc*/,
-                                           const juce::String& /*cat*/,
-                                           bool /*embedSamples*/)                        {}
-    virtual juce::StringArray  loadCategoryList()                                  const { return {}; }
+    virtual void               loadPreset(const juce::File& file);
+    virtual void               savePreset(const juce::String& name,
+                                           const juce::String& desc,
+                                           const juce::String& cat,
+                                           bool embedSamples);
+    virtual juce::StringArray  loadCategoryList()                                  const;
+    virtual const char*        getFullPresetTag()                                  const { return nullptr; }
+    virtual juce::ValueTree    captureFullPreset()                                       { return apvts.copyState(); }
+    virtual void               useLoadedFullPreset(juce::ValueTree /*state*/)            {}
     virtual void               ensureCategoryInList(const juce::String& /*cat*/)         {}
     virtual bool               hasPendingFullPreset()                              const { return false; }
 

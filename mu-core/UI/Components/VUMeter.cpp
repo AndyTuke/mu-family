@@ -31,6 +31,7 @@ float VUMeter::redDb() const noexcept
 
 void VUMeter::timerCallback()
 {
+    if (! isShowing()) return;   // mixer hidden — no ballistics or repaints until it is shown
     const float incoming = getLevel ? getLevel() : 0.0f;
     const float inDb     = linToDb(incoming);
 

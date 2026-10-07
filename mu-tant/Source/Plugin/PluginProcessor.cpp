@@ -101,14 +101,6 @@ PluginProcessor::PluginProcessor()
     cacheParamPointers();        // resolve all APVTS atomics once (audio thread reads these)
     refreshAllPitchQuantFlags(); // seed the stepped-pitch flags (default state has no modulators)
 
-    // Pre-allocate modParamValues entries once so the audio-thread map
-    // never allocates — keys live in static storage (the kModDestTable string
-    // literals), making string_view safe for the lifetime of the entries.
-    modParamValues.reserve((size_t) kModDestCount);
-    for (int i = 0; i < kModDestCount; ++i)
-        modParamValues[kModDestTable[i].id] = 0.0f;
-    // Insert slot keys use the same IDs as mu-clid (handled by depthScaleFor).
-    // Pre-allocated above via kModDestTable; this comment documents the intent.
 
     // Render hook for the shared MixerEngine — captures only `this`, so no
     // per-block std::function construction (which would allocate). The per-block

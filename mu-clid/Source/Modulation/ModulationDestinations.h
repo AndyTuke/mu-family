@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstring>
 #include <string>
+#include <string_view>
 #include "Modulation/ModTarget.h"   // mu-core: the standard target row
 
 // canonical modulation source / destination registry, lifted out of
@@ -32,7 +33,7 @@ namespace ModDest
     // Depth is a percentage of that parameter's range.
     using Dest = mu_mod::ModTarget;
 
-    inline const Dest kTable[] = {
+    inline constexpr Dest kTable[] = {
         // ── Amp (idx 0–3) ─────────────────────────────────────────────────────
         { "amp.attack",       "Amp Attack", "Amp", "aEnvAtk" },
         { "amp.decay",        "Amp Decay", "Amp", "aEnvDec" },
@@ -125,6 +126,15 @@ namespace ModDest
         { "send.reverb",      "Reverb Send", "Effects", "sendRev" },
     };
     static constexpr int kTableSize = (int)(sizeof(kTable) / sizeof(kTable[0]));
+
+    // The kTable index of destination `id` (-1 if absent) — constexpr, so a named constant
+    // resolves at compile time and the audio thread indexes instead of hashing the id.
+    constexpr int indexOf(std::string_view id) noexcept
+    {
+        for (int i = 0; i < kTableSize; ++i)
+            if (std::string_view(kTable[i].id) == id) return i;
+        return -1;
+    }
 
     // The destination dropdown's display order (kTable indices; headings come from each row's
     // section): Euclid A / B / C, Pitch, Filter, Amp, the active insert's slots, then the FX
