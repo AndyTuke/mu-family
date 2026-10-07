@@ -175,6 +175,13 @@ protected:
     void valueTreeChildRemoved  (juce::ValueTree&, juce::ValueTree&, int)     override { presetDirty.store(true, std::memory_order_relaxed); }
 
 private:
+    // The constructor in parts.
+    void wireTransportBar();
+    void wireOverlays();
+    void setupBanners();
+    void setupWindowSize();
+    void loadPresetFromUi(const juce::File& f);
+
     // Internal: actually run the save against the processor + refresh chrome.
     void doSavePreset(const juce::String& name, const juce::String& desc,
                       const juce::String& category, bool embedSamples);

@@ -77,6 +77,14 @@ public:
     void paint(juce::Graphics&) override;
 
 private:
+    // Construction and layout in parts (constructor / resized()).
+    void addSidechainControls();
+    void addInsertControls();
+    int  layoutSidechain(int stripW, int nameBottom);    // returns the section's height
+    int  layoutSends(int stripW, int sendY);             // returns the fader's top
+    void layoutFaderAndButtons(int stripW, int faderY);
+    void layoutInsertPanel(int stripW, int insW, int nameBottom);
+
     // Shared by bindChannel / bindReturn: level, pan, mute, solo + sidechain controls.
     void bindStripToApvts(ProcessorBase* proc, const juce::String& prefix);
     template <typename State> void bindStripToState(State& state);

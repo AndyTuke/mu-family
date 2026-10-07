@@ -63,63 +63,71 @@ MixerChannel::MixerChannel(Type t, const juce::String& name, juce::Colour col)
     }
 
     if (hasSidechainControls())
-    {
-        scSourceBox.addItem(juce::String::charToString(0x2014), 1); // "—"
-        scSourceBox.setSelectedId(1, juce::dontSendNotification);
-        addAndMakeVisible(scSourceBox);
-
-        auto noVal = [](double) { return juce::String(); };
-
-        scAmount.setRange(0.0, 100.0, 1.0);
-        scAmount.setValue(0.0);
-        scAmount.getSlider().textFromValueFunction = noVal;
-        addAndMakeVisible(scAmount);
-
-        scAttack.setRange(1.0, 500.0, 1.0);
-        scAttack.getSlider().setSkewFactorFromMidPoint(22.0);
-        scAttack.setValue(5.0);
-        scAttack.getSlider().textFromValueFunction = noVal;
-        addAndMakeVisible(scAttack);
-
-        scRelease.setRange(10.0, 2000.0, 1.0);
-        scRelease.getSlider().setSkewFactorFromMidPoint(141.0);
-        scRelease.setValue(100.0);
-        scRelease.getSlider().textFromValueFunction = noVal;
-        addAndMakeVisible(scRelease);
-    }
+        addSidechainControls();
 
     if (hasInsert())
-    {
-        auto addInsertCombo = [](juce::ComboBox& box) {
-            box.addItem("None",        1);
-            box.addItem("3-Band EQ",   7);
-            box.addItem("Bitcrusher",  5);
-            box.addItem("Clipper",     6);
-            box.addItem("Compressor",  8);
-            box.addItem("Fold",        4);
-            box.addItem("Hard Clip",   3);
-            box.addItem("Karplus",    12);
-            box.addItem("Limiter",     9);
-            box.addItem("Ring Mod",   10);
-            box.addItem("Soft Clip",   2);
-            box.addItem("Tape Sat",   11);
-            box.addItem("Vocoder",    13);
-            box.addItem("Vocoder St", 14);
-            box.setSelectedId(1, juce::dontSendNotification);
-        };
-        addInsertCombo(insCharBox);
-        addInsertCombo(insCharBox2);
-        addAndMakeVisible(insCharBox);
-        addAndMakeVisible(insCharBox2);
+        addInsertControls();
+}
 
-        // Just register the 8 generic Param knobs (4 per master slot) as
-        // children. Their range / label / formatter / callbacks are populated
-        // each time configureInsertAlgorithm runs — driven by the per-algo
-        // config table in mu_ui::kInsertAlgoSlots.
-        for (auto* k : { &insParam1, &insParam2, &insParam3, &insParam4,
-                         &insParam1_2, &insParam2_2, &insParam3_2, &insParam4_2 })
-            addAndMakeVisible(*k);
-    }
+// The sidechain source selector and amount / attack / release knobs (values show in the status bar).
+void MixerChannel::addSidechainControls()
+{
+    scSourceBox.addItem(juce::String::charToString(0x2014), 1); // "—"
+    scSourceBox.setSelectedId(1, juce::dontSendNotification);
+    addAndMakeVisible(scSourceBox);
+
+    auto noVal = [](double) { return juce::String(); };
+
+    scAmount.setRange(0.0, 100.0, 1.0);
+    scAmount.setValue(0.0);
+    scAmount.getSlider().textFromValueFunction = noVal;
+    addAndMakeVisible(scAmount);
+
+    scAttack.setRange(1.0, 500.0, 1.0);
+    scAttack.getSlider().setSkewFactorFromMidPoint(22.0);
+    scAttack.setValue(5.0);
+    scAttack.getSlider().textFromValueFunction = noVal;
+    addAndMakeVisible(scAttack);
+
+    scRelease.setRange(10.0, 2000.0, 1.0);
+    scRelease.getSlider().setSkewFactorFromMidPoint(141.0);
+    scRelease.setValue(100.0);
+    scRelease.getSlider().textFromValueFunction = noVal;
+    addAndMakeVisible(scRelease);
+}
+
+// The master's two insert slots: algorithm selectors and the 8 slot knobs.
+void MixerChannel::addInsertControls()
+{
+    auto addInsertCombo = [](juce::ComboBox& box) {
+        box.addItem("None",        1);
+        box.addItem("3-Band EQ",   7);
+        box.addItem("Bitcrusher",  5);
+        box.addItem("Clipper",     6);
+        box.addItem("Compressor",  8);
+        box.addItem("Fold",        4);
+        box.addItem("Hard Clip",   3);
+        box.addItem("Karplus",    12);
+        box.addItem("Limiter",     9);
+        box.addItem("Ring Mod",   10);
+        box.addItem("Soft Clip",   2);
+        box.addItem("Tape Sat",   11);
+        box.addItem("Vocoder",    13);
+        box.addItem("Vocoder St", 14);
+        box.setSelectedId(1, juce::dontSendNotification);
+    };
+    addInsertCombo(insCharBox);
+    addInsertCombo(insCharBox2);
+    addAndMakeVisible(insCharBox);
+    addAndMakeVisible(insCharBox2);
+
+    // Just register the 8 generic Param knobs (4 per master slot) as
+    // children. Their range / label / formatter / callbacks are populated
+    // each time configureInsertAlgorithm runs — driven by the per-algo
+    // config table in mu_ui::kInsertAlgoSlots.
+    for (auto* k : { &insParam1, &insParam2, &insParam3, &insParam4,
+                     &insParam1_2, &insParam2_2, &insParam3_2, &insParam4_2 })
+        addAndMakeVisible(*k);
 }
 
 //==============================================================================
@@ -147,19 +155,26 @@ void MixerChannel::resized()
     // channels. Sections that don't apply to a channel simply don't render
     // their controls — the slot stays empty.
     using mu_ui::s;
-    const int w      = getWidth();
-    const int h      = getHeight();
 
     // Master: right portion is the insert panel; everything else uses the strip width.
     const int insW   = hasInsert() ? s(kInsertPanelW) : 0;
-    const int stripW = w - insW;
+    const int stripW = getWidth() - insW;
 
-    // Name area total Y: top padding + name pill + bottom padding. Symmetric
-    // so the rhythm-colour pill border has equal breathing room above and
-    // below.
+    // Name area total Y: top padding + name pill + bottom padding (equal room round the pill).
     const int nameBottom = s(kNamePadding * 2 + kNameH);
 
-    // ── Sidechain section — slot always reserved for vertical alignment ──
+    const int scH    = layoutSidechain(stripW, nameBottom);
+    const int faderY = layoutSends(stripW, nameBottom + scH);
+    layoutFaderAndButtons(stripW, faderY);
+    if (hasInsert())
+        layoutInsertPanel(stripW, insW, nameBottom);
+}
+
+// The sidechain section: source selector, amount, attack / release. Its slot is reserved on
+// every strip so the sections below align across the mixer. Returns the slot's height.
+int MixerChannel::layoutSidechain(int stripW, int nameBottom)
+{
+    using mu_ui::s;
     const int scH = s(kSidechainH);
     scSourceBox.setVisible(hasSidechainControls());
     scAmount   .setVisible(hasSidechainControls());
@@ -191,8 +206,14 @@ void MixerChannel::resized()
         sidechainPaneBounds = {};
     }
 
-    // ── Sends + pan — fixed Medium-baseline height ───────────────────────────
-    const int sendY  = nameBottom + scH;
+    return scH;
+}
+
+// The sends (a return can't send to itself) and pan, at the mixer-strip knob size, from sendY.
+// Returns the fader's top.
+int MixerChannel::layoutSends(int stripW, int sendY)
+{
+    using mu_ui::s;
     const int spH   = s(kSendsAreaH);
     const int sendH = s(kSendKnobH);
     const int faderY = sendY + spH;
@@ -224,7 +245,15 @@ void MixerChannel::resized()
                                       : juce::Rectangle<int>{};
     }
 
-    // ── Fader + VU + GR ───────────────────────────────────────────────────────
+    return faderY;
+}
+
+// Fader, GR and VU meters, then the bottom-anchored output bus, dB readout and mute / solo.
+// Their slots are reserved on every strip so pan / fader / mute align across channel types.
+void MixerChannel::layoutFaderAndButtons(int stripW, int faderY)
+{
+    using mu_ui::s;
+    const int h = getHeight();
     // Bottom-anchored sections always reserve their slot so pan/fader/mute
     // align across channel types. Master (no mute/solo) and returns (no
     // outBus) still leave the slot empty — controls just hide.
@@ -258,75 +287,80 @@ void MixerChannel::resized()
 
     faderPaneBounds = { 1, faderY - 2, stripW - 2, h - faderY + 1 };
 
-    // ── Insert panels (Master channel, right of strip) — two slots stacked top/bottom ─
-    if (hasInsert())
+}
+
+// The master's insert column, right of the strip: two slots stacked, each a rotated
+// "Main Insert N" label (painted), the algorithm selector and its knobs.
+void MixerChannel::layoutInsertPanel(int stripW, int insW, int nameBottom)
+{
+    using mu_ui::s;
+    const int h = getHeight();
+    // Reserve a narrow strip on the LEFT of the insert column for the
+    // rotated "Main Insert 1/2" labels (drawn in paint()). Dropdown +
+    // knobs occupy the remaining horizontal width. Removes the previous
+    // horizontal name-label row, recovering ~22 px vertical so the four
+    // EQ knobs fit inside each slot.
+    const int pad     = s(4);
+    const int labelW  = s(kInsertLabelW);
+    const int ipX     = stripW + labelW + pad;
+    const int ipW     = insW - labelW - 2 * pad;
+    const int insTop  = nameBottom;
+    const int insH    = h - insTop - pad;
+    const int halfH   = insH / 2;
+    insertMidY = insTop + halfH;
+
+    // No horizontal title row — title is rotated and lives in the labelW strip.
+    const int slot1CharY = insTop + pad;
+    const int slot2CharY = insertMidY + pad;
+
+    auto layoutSlot = [&](int charBoxY, int endY,
+                           juce::ComboBox& charBox,
+                           KnobWithLabel& p1, KnobWithLabel& p2,
+                           KnobWithLabel& p3, KnobWithLabel& p4)
     {
-        // Reserve a narrow strip on the LEFT of the insert column for the
-        // rotated "Main Insert 1/2" labels (drawn in paint()). Dropdown +
-        // knobs occupy the remaining horizontal width. Removes the previous
-        // horizontal name-label row, recovering ~22 px vertical so the four
-        // EQ knobs fit inside each slot.
-        const int pad     = s(4);
-        const int labelW  = s(kInsertLabelW);
-        const int ipX     = stripW + labelW + pad;
-        const int ipW     = insW - labelW - 2 * pad;
-        const int insTop  = nameBottom;
-        const int insH    = h - insTop - pad;
-        const int halfH   = insH / 2;
-        insertMidY = insTop + halfH;
+        charBox.setBounds(ipX, charBoxY, ipW, s(kInsCharH));
+        const int ky = charBoxY + s(kInsCharH) + 2;
+        (void) endY;
 
-        // No horizontal title row — title is rotated and lives in the labelW strip.
-        const int slot1CharY = insTop + pad;
-        const int slot2CharY = insertMidY + pad;
+        const int s2W = s(MuLookAndFeel::kKnobSize2W);
+        const int s2H = s(MuLookAndFeel::kKnobSize2H);
 
-        auto layoutSlot = [&](int charBoxY, int endY,
-                               juce::ComboBox& charBox,
-                               KnobWithLabel& p1, KnobWithLabel& p2,
-                               KnobWithLabel& p3, KnobWithLabel& p4)
+        if (charBox.getSelectedId() == 7) // EQ: stacked top→bottom = P4 / P2 / P3 / P1
         {
-            charBox.setBounds(ipX, charBoxY, ipW, s(kInsCharH));
-            const int ky = charBoxY + s(kInsCharH) + 2;
-            (void) endY;
+            const int knobX = ipX + (ipW - s2W) / 2;  // centre horizontally
+            // Frequency-descending: P4(High dB) / P2(Mid dB) / P3(Mid Hz) / P1(Low dB)
+            KnobWithLabel* const eqOrder[] = { &p4, &p2, &p3, &p1 };
+            for (int i = 0; i < 4; ++i)
+                eqOrder[i]->setBounds(knobX, ky + i * s2H, s2W, s2H);
+        }
+        else
+        {
+            // Pack the visible slots into a 2×2 grid; centre any odd last knob.
+            KnobWithLabel* vis[4];
+            int nVis = 0;
+            for (auto* k : { &p1, &p2, &p3, &p4 })
+                if (k->isVisible()) vis[nVis++] = k;
 
-            const int s2W = s(MuLookAndFeel::kKnobSize2W);
-            const int s2H = s(MuLookAndFeel::kKnobSize2H);
-
-            if (charBox.getSelectedId() == 7) // EQ: stacked top→bottom = P4 / P2 / P3 / P1
+            if (nVis > 0)
             {
-                const int knobX = ipX + (ipW - s2W) / 2;  // centre horizontally
-                // Frequency-descending: P4(High dB) / P2(Mid dB) / P3(Mid Hz) / P1(Low dB)
-                KnobWithLabel* const eqOrder[] = { &p4, &p2, &p3, &p1 };
-                for (int i = 0; i < 4; ++i)
-                    eqOrder[i]->setBounds(knobX, ky + i * s2H, s2W, s2H);
-            }
-            else
-            {
-                // Pack the visible slots into a 2×2 grid; centre any odd last knob.
-                KnobWithLabel* vis[4];
-                int nVis = 0;
-                for (auto* k : { &p1, &p2, &p3, &p4 })
-                    if (k->isVisible()) vis[nVis++] = k;
-
-                if (nVis > 0)
+                const int halfW = ipW / 2;
+                const int halfKnobX = (halfW - s2W) / 2;
+                for (int i = 0; i < nVis; ++i)
                 {
-                    const int halfW = ipW / 2;
-                    const int halfKnobX = (halfW - s2W) / 2;
-                    for (int i = 0; i < nVis; ++i)
-                    {
-                        const bool isLastOdd = (i == nVis - 1) && (nVis % 2 == 1);
-                        const int kx = isLastOdd
-                                       ? ipX + (ipW - s2W) / 2
-                                       : ipX + (i % 2) * halfW + halfKnobX;
-                        vis[i]->setBounds(kx, ky + (i / 2) * s2H, s2W, s2H);
-                    }
+                    const bool isLastOdd = (i == nVis - 1) && (nVis % 2 == 1);
+                    const int kx = isLastOdd
+                                   ? ipX + (ipW - s2W) / 2
+                                   : ipX + (i % 2) * halfW + halfKnobX;
+                    vis[i]->setBounds(kx, ky + (i / 2) * s2H, s2W, s2H);
                 }
             }
-        };
+        }
+    };
 
-        layoutSlot(slot1CharY, insertMidY,  insCharBox,  insParam1,   insParam2,   insParam3,   insParam4);
-        layoutSlot(slot2CharY, h - pad,     insCharBox2, insParam1_2, insParam2_2, insParam3_2, insParam4_2);
-    }
+    layoutSlot(slot1CharY, insertMidY,  insCharBox,  insParam1,   insParam2,   insParam3,   insParam4);
+    layoutSlot(slot2CharY, h - pad,     insCharBox2, insParam1_2, insParam2_2, insParam3_2, insParam4_2);
 }
+
 void MixerChannel::setEffectSendLabel(const juce::String& name)
 {
     sendEffect.setLabel(name);

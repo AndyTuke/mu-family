@@ -35,18 +35,44 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
     addChildComponent(midiFullPresetsPanel);
     addAndMakeVisible(statusBar);
 
+    wireTransportBar();
+    wireOverlays();
+    setupBanners();
+    setupWindowSize();
+
+    isStandalone = processorRef.wrapperType == juce::AudioProcessor::wrapperType_Standalone;
+    loadKeybindings();
+    if (isStandalone)
+    {
+        setWantsKeyboardFocus(true);
+        addKeyListener(this);
+        needsFocusGrab = true;
+    }
+
+    processorRef.apvts.state.addListener(this);
+    presetDirty = false;
+
+    startVersionCheck();
+}
+
+// A full preset chosen in the transport selector or the preset browser: load it and show it.
+void EditorShellBase::loadPresetFromUi(const juce::File& f)
+{
+    processorRef.loadPreset(f);
+    transportBar.setLoadedPreset(f);
+    presetDirty = false;
+    onPresetLoaded(f);
+}
+
+// Transport bar: mixer / settings / about toggles, preset select / save / new, status.
+void EditorShellBase::wireTransportBar()
+{
     // ── TransportBar callbacks ──────────────────────────────────────────────
     transportBar.onMixerToggle  = [this] { showMixer(!mixerVisible); };
     transportBar.onLogoClicked  = [this] { showAbout(true); };
     transportBar.onSettingsToggle = [this] { showSettings(!settingsVisible); };
 
-    transportBar.onPresetSelected = [this](const juce::File& f)
-    {
-        processorRef.loadPreset(f);
-        transportBar.setLoadedPreset(f);
-        presetDirty = false;
-        onPresetLoaded(f);
-    };
+    transportBar.onPresetSelected = [this](const juce::File& f) { loadPresetFromUi(f); };
 
     transportBar.onSavePreset = [this]
     {
@@ -76,7 +102,12 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
         pendingQuitCallback = std::move(quitCallback);
         showSaveDialog(true);
     };
+}
 
+// The overlays (About, Activation, Save, preset browser, MIDI panels) and the processor's
+// load-error / swap-committed notifications.
+void EditorShellBase::wireOverlays()
+{
     // ── About panel ─────────────────────────────────────────────────────────
     aboutPanel.onDismiss = [this] { showAbout(false); };
 
@@ -127,13 +158,7 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
 
     // ── Preset browser ──────────────────────────────────────────────────────
     presetBrowser.setFileExtension(processorRef.getFullPresetExtension());
-    presetBrowser.onLoadPreset = [this](const juce::File& f)
-    {
-        processorRef.loadPreset(f);
-        transportBar.setLoadedPreset(f);
-        presetDirty = false;
-        onPresetLoaded(f);
-    };
+    presetBrowser.onLoadPreset = [this](const juce::File& f) { loadPresetFromUi(f); };
     presetBrowser.onClose = [this] { showPresetBrowser(false); };
 
     midiPresetsPanel.onClose     = [this] { showMidiPresets(false);     showSettings(true); };
@@ -152,7 +177,12 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
     {
         onPresetLoaded(transportBar.getLoadedPresetFile());
     };
+}
 
+// The demo banner (unlicensed; click to activate) and the upgrade banner (shown when the
+// version check finds a newer release; click to download).
+void EditorShellBase::setupBanners()
+{
     // ── Demo banner ─────────────────────────────────────────────────────────
     {
         using Id = MuLookAndFeel::ColourIds;
@@ -192,7 +222,11 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
         upgradeBanner.addMouseListener(this, false);
         upgradeBanner.setMouseCursor(juce::MouseCursor::PointingHandCursor);
     }
+}
 
+// Fixed window size from the UI scale, re-applied when the scale changes in settings.
+void EditorShellBase::setupWindowSize()
+{
     // ── Window sizing ───────────────────────────────────────────────────────
     setResizable(false, false);
     setSize(mu_ui::s(MuLookAndFeel::kWindowWidth), mu_ui::s(MuLookAndFeel::kWindowHeight));
@@ -211,20 +245,6 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
             self->repaint();
         }
     };
-
-    isStandalone = processorRef.wrapperType == juce::AudioProcessor::wrapperType_Standalone;
-    loadKeybindings();
-    if (isStandalone)
-    {
-        setWantsKeyboardFocus(true);
-        addKeyListener(this);
-        needsFocusGrab = true;
-    }
-
-    processorRef.apvts.state.addListener(this);
-    presetDirty = false;
-
-    startVersionCheck();
 }
 
 void EditorShellBase::showUpgradeAvailable(const juce::String& latestTag)

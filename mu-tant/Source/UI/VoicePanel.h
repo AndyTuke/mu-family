@@ -211,6 +211,14 @@ private:
     void refreshHeader();              // name + colour + preset list for the active voice
     void refreshVoicePresetList();
 
+    // The constructor in parts, top of the panel to bottom.
+    void addLabel(juce::Label& l, const juce::String& text);
+    void setupHeader();
+    void setupTonalCentre();
+    void setupSourceControls();
+    void setupFilterControls();
+    void setupGateInsertAndModulators();
+
     void rebindAttachments();
     void bindModulationIndicators();
 
@@ -230,6 +238,16 @@ private:
     juce::Rectangle<int> osc1PanelR, osc2PanelR, modNoisePanelR, filterPanelR, noisePanelR, insertPanelR;
     // Metal style: the panels — preset strip, voice (sections + Root / Scale), gate editor, modulators.
     juce::Rectangle<int> headerStripR, voiceR, gateR, modR;
+
+    // resized() in parts: the shared measures, then each band top to bottom.
+    struct Grid { bool metal, screwed; int w, h, pad, inset, plateH, boxClear, gap, ddH, s2W, s2H, right; };
+    Grid layoutGrid() const;
+    int  layoutHeader(const Grid& g);                                  // returns the section boxes' top
+    void layoutSourceRow(const Grid& g, int top, int rowH);            // Osc 1 | Osc 2 | Noise
+    void layoutShapingRow(const Grid& g, int top, int rowH);           // X-Mod | Filter | Effects
+    void layoutXMod(const Grid& g, juce::Rectangle<int> box);
+    void layoutFilter(const Grid& g, juce::Rectangle<int> box);
+    void layoutGateAndModulators(const Grid& g, int top);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VoicePanel)
 };

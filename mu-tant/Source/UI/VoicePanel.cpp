@@ -93,16 +93,25 @@ VoicePanel::VoicePanel(PluginProcessor& p)
       insertSub(p, "v"),
       modDestProvider(makeModDestProvider())
 {
-    auto& apvts = proc.apvts;
+    setupHeader();
+    setupTonalCentre();
+    setupSourceControls();
+    setupFilterControls();
+    setupGateInsertAndModulators();
+}
 
-    auto setupLabel = [this](juce::Label& l, const juce::String& text)
-    {
-        l.setText(text, juce::dontSendNotification);
-        l.setJustificationType(juce::Justification::centredRight);
-        l.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-        addAndMakeVisible(l);
-    };
+// A right-aligned field label in the panel's label font.
+void VoicePanel::addLabel(juce::Label& l, const juce::String& text)
+{
+    l.setText(text, juce::dontSendNotification);
+    l.setJustificationType(juce::Justification::centredRight);
+    l.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
+    addAndMakeVisible(l);
+}
 
+// The shared header bar: delete / reset (confirmed first), preset load and save.
+void VoicePanel::setupHeader()
+{
     // ── Shared per-layer header bar (name / reset / delete / preset / save) ──
     // Reset + delete confirm first (shared mu-core dialog), matching mu-clid.
     headerBar.onDelete = [this]
@@ -145,17 +154,27 @@ VoicePanel::VoicePanel(PluginProcessor& p)
             });
     };
     addAndMakeVisible(headerBar);
+}
+
+// Root + scale: global parameters, bound once.
+void VoicePanel::setupTonalCentre()
+{
+    auto& apvts = proc.apvts;
 
     // ── Tonal centre (shared — bound once) ──────────────────────────────────
-    setupLabel(rootLabel,  "Root");
-    setupLabel(scaleLabel, "Scale");
+    addLabel(rootLabel,  "Root");
+    addLabel(scaleLabel, "Scale");
     mu_ui::addChoiceItems(rootDropdown, apvts, "root");   // items from the parameter's choices
     populateScales(scaleDropdown);
     addAndMakeVisible(rootDropdown);
     addAndMakeVisible(scaleDropdown);
     rootAttachment  = std::make_unique<APVTS::ComboBoxAttachment>(apvts, "root",  rootDropdown.getComboBox());
     scaleAttachment = std::make_unique<APVTS::ComboBoxAttachment>(apvts, "scale", scaleDropdown.getComboBox());
+}
 
+// Oscillator, X-Mod and level controls — added once, rebound per voice in rebindAttachments.
+void VoicePanel::setupSourceControls()
+{
     // ── Per-voice controls (added once, rebound per-voice) ──────────────────
     for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PosKnob, &o1PenvDepthKnob,
                      &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PosKnob, &o2PenvDepthKnob,
@@ -201,13 +220,19 @@ VoicePanel::VoicePanel(PluginProcessor& p)
             p->setValueNotifyingHost(p->convertTo0to1((float) idx));
         bindAmpDepthKnob(idx == 2);   // SSB → bind Depth knob to the shift param
     };
+}
 
-    setupLabel(noiseTypeLabel, "Noise");
+// Noise type and the two filters (type selectors wired manually, see rebindAttachments).
+void VoicePanel::setupFilterControls()
+{
+    auto& apvts = proc.apvts;
+
+    addLabel(noiseTypeLabel, "Noise");
     mu_ui::addChoiceItems(noiseTypeDropdown, apvts, PluginProcessor::voiceParamId(0, "noise_type"));
     addAndMakeVisible(noiseTypeDropdown);
 
-    setupLabel(fltTypeLabel,  "Type");
-    setupLabel(flt2TypeLabel, "Type");
+    addLabel(fltTypeLabel,  "Type");
+    addLabel(flt2TypeLabel, "Type");
     populateFilterTypes(fltTypeDropdown);
     populateFilterTypes(flt2TypeDropdown);
     addAndMakeVisible(fltTypeDropdown);
@@ -225,7 +250,11 @@ VoicePanel::VoicePanel(PluginProcessor& p)
     flt2LoCutKnob.getSlider().textFromValueFunction = [](double v) { return mu_fmt::lowCut(v, false); };
 
     addAndMakeVisible(fltSeriesBtn);
+}
 
+// Gate editor, insert effect, modulators; then the first bind and the UI timer.
+void VoicePanel::setupGateInsertAndModulators()
+{
     // ── Gating designer (Gap slider + Bypass button are inside it) ──────────
     // The GatingDesigner owns the Gap slider and Bypass button as children;
     // VoicePanel just creates the APVTS attachments per-voice in rebindAttachments.
@@ -589,225 +618,211 @@ void VoicePanel::paintOverChildren(juce::Graphics& g)
     MuLookAndFeel::drawStripScrews(g, headerStripR.reduced(2).toFloat());   // the thin preset strip
 }
 
-void VoicePanel::resized()
+// The measures every layout helper shares. Metal style lays the voice out as mu-Clid does:
+// panels edge to edge, content inset clear of their corner screws, each section a raised box
+// with its name plate in a band above it.
+VoicePanel::Grid VoicePanel::layoutGrid() const
 {
     using mu_ui::s;
     using LF = MuLookAndFeel;
-    const int w = getWidth();
-    const int h = getHeight();
+    Grid g;
+    g.metal    = LF::isMetal(*this);
+    g.screwed  = LF::hasScrews(*this);
+    g.w        = getWidth();
+    g.h        = getHeight();
+    g.pad      = g.metal ? s(LF::kScrewedPanelInset) : s(12);
+    g.inset    = g.metal ? s(LF::kChannelInset) : 0;                 // content in from a panel's top / bottom
+    g.plateH   = g.metal ? s(LF::kSectionPlateH) + s(2) : 0;       // name plate band above each box
+    g.boxClear = g.metal ? s(LF::kSubPanelScrewClear) : s(6);      // content in from a box's sides
+    g.gap      = s(8);
+    g.ddH      = s(24);
+    g.s2W      = s(LF::kKnobSize2W);   // 54
+    g.s2H      = s(LF::kKnobSize2H);   // 56
+    g.right    = g.w - g.pad;          // the rows span the panel
+    return g;
+}
 
-    // Metal style lays the voice out as mu-Clid does: panels edge to edge, content inset clear
-    // of their corner screws, each section a raised box with its name plate in a band above it.
-    const bool metal   = LF::isMetal(*this);
-    const bool screwed = LF::hasScrews(*this);
-    const int pad      = metal ? s(LF::kScrewedPanelInset) : s(12);
-    const int inset    = metal ? s(LF::kChannelInset) : 0;                 // content in from a panel's top / bottom
-    const int plateH   = metal ? s(LF::kSectionPlateH) + s(2) : 0;       // name plate band above each box
-    const int boxClear = metal ? s(LF::kSubPanelScrewClear) : s(6);      // content in from a box's sides
-    const int gap = s(8);
-    const int ddH = s(24);
-    const int s2W = s(MuLookAndFeel::kKnobSize2W);   // 54
-    const int s2H = s(MuLookAndFeel::kKnobSize2H);   // 56
+void VoicePanel::resized()
+{
+    using mu_ui::s;
+    const auto g = layoutGrid();
 
-    // ── Shared header bar + Root / Scale row ────────────────────────────────
+    // Row A (Osc 1 | Osc 2 | Noise) at natural knob height; Row B (X-Mod | Filter | Effects)
+    // tall enough for the two filter rows.
+    const int contentTop = layoutHeader(g);
+    const int rowAH = g.s2H + s(8);       // 64
+    const int rowBH = 2 * g.s2H + s(32);  // 144
+    layoutSourceRow(g, contentTop, rowAH);
+    const int rowBY = contentTop + rowAH + (g.metal ? g.plateH : g.gap);
+    layoutShapingRow(g, rowBY, rowBH);
+
+    voiceR = { 0, headerStripR.getBottom(), g.w, rowBY + rowBH + g.inset - headerStripR.getBottom() };
+    layoutGateAndModulators(g, rowBY + rowBH + (g.metal ? g.inset : g.gap));
+}
+
+// The shared header bar (in its own preset strip in metal style, a screw at each end) and the
+// Root / Scale row under it. Returns the top of the section boxes.
+int VoicePanel::layoutHeader(const Grid& g)
+{
+    using mu_ui::s;
+    using LF = MuLookAndFeel;
     const int barH = s(ChannelHeaderBar::kHeight);   // 28
-    // Metal style: the header sits inside its own painted preset strip (with screws, narrower,
-    // leaving a screw at each end).
-    const int hdrX = screwed ? s(LF::kScrewedPanelInset) : metal ? s(4) : 0;
-    const int hdrY = metal ? s(2) : 0;
-    headerStripR = { 0, 0, w, barH + 2 * hdrY };
-    headerBar.setBounds(hdrX, hdrY, w - 2 * hdrX, barH);
-    const int tonalY = headerStripR.getBottom() + (metal ? inset : s(2));
+    const int hdrX = g.screwed ? s(LF::kScrewedPanelInset) : g.metal ? s(4) : 0;
+    const int hdrY = g.metal ? s(2) : 0;
+    headerStripR = { 0, 0, g.w, barH + 2 * hdrY };
+    headerBar.setBounds(hdrX, hdrY, g.w - 2 * hdrX, barH);
+
+    const int tonalY = headerStripR.getBottom() + (g.metal ? g.inset : s(2));
+    const int labelW = s(44);
+    int x = g.pad;
+    rootLabel    .setBounds(x, tonalY, labelW, g.ddH);   x += labelW + s(4);
+    rootDropdown .setBounds(x, tonalY, s(56),   g.ddH);  x += s(56)  + s(12);
+    scaleLabel   .setBounds(x, tonalY, labelW, g.ddH);   x += labelW + s(4);
+    scaleDropdown.setBounds(x, tonalY, s(100),  g.ddH);
+    return tonalY + g.ddH + (g.metal ? g.plateH : g.gap);
+}
+
+// Row A: Osc 1 | Osc 2 | Noise side by side across the full width. Each osc box right-aligns its
+// five pitch / scan knobs and its level, the wavetable selector taking the space to their left;
+// the noise box is a short type selector with its level knob to the right.
+void VoicePanel::layoutSourceRow(const Grid& g, int top, int rowH)
+{
+    using mu_ui::s;
+    const int pad = g.pad, gap = g.gap, ddH = g.ddH, s2W = g.s2W, s2H = g.s2H, boxClear = g.boxClear;
+    const int leftW    = g.right - pad;
+    const int noiseDdW = s(76);
+    const int noiseW   = boxClear + noiseDdW + s(6) + s2W + boxClear;
+    const int oscW     = (leftW - noiseW - 2 * gap) / 2;
+    const int rowY     = top + s(4);
+    const int waveY    = rowY + (s2H - ddH) / 2;
+    const int knobsW   = 6 * s2W + 5 * s(2);
+    const int wtInset  = s(8);   // keep the dropdown clear of the panel border + knobs
+
+    // One oscillator box at x: selector, then the knobs right-aligned.
+    auto layoutOsc = [&](int x0, juce::Rectangle<int>& panelR, DropdownSelect& wave,
+                         std::initializer_list<KnobWithLabel*> knobs)
     {
-        const int labelW = s(44);
-        int x = pad;
-        rootLabel    .setBounds(x, tonalY, labelW, ddH);   x += labelW + s(4);
-        rootDropdown .setBounds(x, tonalY, s(56),   ddH);  x += s(56)  + s(12);
-        scaleLabel   .setBounds(x, tonalY, labelW, ddH);   x += labelW + s(4);
-        scaleDropdown.setBounds(x, tonalY, s(100),  ddH);
-    }
-    const int contentTop = tonalY + ddH + (metal ? plateH : gap);   // top of all sub-panels
+        panelR = { x0, top, oscW, rowH };
+        const int knobsX = x0 + oscW - knobsW - boxClear;
+        const int wtX    = x0 + wtInset;
+        wave.setBounds(wtX, waveY, juce::jmax(s(40), knobsX - wtX - wtInset), ddH);
+        int x = knobsX;
+        for (auto* k : knobs) { k->setBounds(x, rowY, s2W, s2H);  x += s2W + s(2); }
+    };
+    layoutOsc(pad, osc1PanelR, osc1WaveDropdown,
+              { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PenvDepthKnob, &o1PosKnob, &osc1LevelKnob });
+    layoutOsc(pad + oscW + gap, osc2PanelR, osc2WaveDropdown,
+              { &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PenvDepthKnob, &o2PosKnob, &osc2LevelKnob });
 
-    // ── Column geometry ─────────────────────────────────────────────────────
-    // The rows span the panel; each source's level sits in its own box.
-    const int leftRight = w - pad;
-    const int leftW     = leftRight - pad;
-    // Insert column (right of rowsW, at the right edge, spans Row B only):
-    const int insSubW  = s(4 * MuLookAndFeel::kKnobSize2W);        // 216
-    const int insSubH  = s(2 * MuLookAndFeel::kKnobSize2H + MuLookAndFeel::kVoiceGap);  // 116
-    const int insTitleH = metal ? 0 : s(14);   // flat: room for the title drawn inside
-    const int insColW  = insSubW + s(20);     // 236
-    const int insColX  = leftRight - insColW; // 646
-    const int rowsW    = insColX - gap - pad; // 626 — shared by Row A osc zone and Row B X-Mod/Filter
+    const int noiseX = g.right - noiseW;
+    noisePanelR = { noiseX, top, noiseW, rowH };
+    noiseTypeLabel.setBounds(0, 0, 0, 0);   // title drawn by paint(), label hidden
+    noiseTypeDropdown.setBounds(noiseX + boxClear, waveY, noiseDdW, ddH);
+    noiseLevelKnob.setBounds(noiseX + noiseW - boxClear - s2W, rowY, s2W, s2H);
+}
 
-    // ── Row heights ──────────────────────────────────────────────────────────
-    // Row A: Osc 1 | Osc 2 | Noise side-by-side — natural knob height.
-    const int rowAH = s2H + s(8);   // 64
-    // Row B: height for two filter rows + vertical padding. The Series/Parallel toggle
-    // sits at the left edge between the rows, so it doesn't add to the height requirement.
-    const int rowBH = 2 * s2H + s(32);              // 2×56 + 32 = 144px
+// Row B: X-Mod | Filter | Effects (the insert, at the right edge).
+void VoicePanel::layoutShapingRow(const Grid& g, int top, int rowH)
+{
+    using mu_ui::s;
+    const int insSubW = s(4 * MuLookAndFeel::kKnobSize2W);                               // 216
+    const int insSubH = s(2 * MuLookAndFeel::kKnobSize2H + MuLookAndFeel::kVoiceGap);    // 116
+    const int insColW = insSubW + s(20);                                                 // 236
+    const int insColX = g.right - insColW;
+    const int xmodW   = s(248);
 
-    // ── Row A: Osc 1 | Osc 2 | Noise (side by side, using full leftW) ───────
-    // Osc panels extend across the Insert column zone since Insert is Row B only.
+    layoutXMod(g, { g.pad, top, xmodW, rowH });
+    const int filterX = g.pad + xmodW + g.gap;
+    layoutFilter(g, { filterX, top, insColX - g.gap - filterX, rowH });
+
+    // Insert, centred in its box (flat style leaves room for the title drawn inside).
+    insertPanelR = { insColX, top, insColW, rowH };
+    const int insTitleH = g.metal ? 0 : s(14);
+    insertSub.setBounds(insColX + (insColW - insSubW) / 2,
+                        top + insTitleH + (rowH - insTitleH - insSubH) / 2, insSubW, insSubH);
+}
+
+// X-Mod: two lanes, one per row — Lane A: Index knob, phase mode, Sync + Feedback; Lane B: Depth
+// knob, amp mode.
+void VoicePanel::layoutXMod(const Grid& g, juce::Rectangle<int> box)
+{
+    using mu_ui::s;
+    modNoisePanelR = box;
+    const int titleH = g.metal ? 0 : s(14);           // flat: room for the "X-MOD" title drawn inside
+    const int rowH   = (box.getHeight() - titleH) / 2;
+    const int row1Y  = box.getY() + titleH;
+    const int row2Y  = row1Y + rowH;
+    const int innerX = box.getX() + g.boxClear;
+    const int segW   = s(96);                         // 3-segment mode switch
+    const int togW   = s(32);
+
+    // Place a lane's knob + mode segment; returns the segment's right edge.
+    auto layoutLane = [&](int rowY, KnobWithLabel& knob, SegmentControl& seg) -> int
     {
-        // Noise box: a short type selector ("White" / "Pink") with the level knob to its right.
-        const int noiseDdW  = s(76);
-        const int noiseW    = boxClear + noiseDdW + s(6) + s2W + boxClear;
-        const int oscW      = (leftW - noiseW - 2 * gap) / 2;
-        const int rowY      = contentTop + s(4);
-        const int waveY     = rowY + (s2H - ddH) / 2;
+        knob.setBounds(innerX, rowY + (rowH - g.s2H) / 2, g.s2W, g.s2H);
+        const int segX = innerX + g.s2W + s(8);
+        seg.setBounds(segX, rowY + (rowH - g.ddH) / 2, segW, g.ddH);
+        return segX + segW;
+    };
+    const int seg1R = layoutLane(row1Y, xmodIndexKnob, phaseModeCtrl);
+    const int togY  = row1Y + (rowH - g.ddH) / 2;
+    syncButton.setBounds(seg1R + s(8),               togY, togW, g.ddH);
+    fdbkButton.setBounds(seg1R + s(8) + togW + s(3), togY, togW, g.ddH);
+    layoutLane(row2Y, xmodDepthKnob, ampModeCtrl);
+}
 
-        // 5 pitch / scan knobs and the level are right-aligned in each panel; the wavetable
-        // dropdown fills the space to their left and grows with the panel width.
-        const int knobsW  = 6 * s2W + 5 * s(2);
-        const int wtInset = s(8);   // keep the dropdown clear of the panel border + knobs
+// Filter: the Series / Parallel button at the left edge, then two rows (Filter 1, Filter 2) of
+// type selector + five knobs, the selector taking the remaining width.
+void VoicePanel::layoutFilter(const Grid& g, juce::Rectangle<int> box)
+{
+    using mu_ui::s;
+    filterPanelR = box;
+    const int rowH       = g.s2H;
+    const int twoRowsH   = 2 * rowH + s(8);
+    const int row1Y      = box.getY() + (box.getHeight() - twoRowsH) / 2;   // rows centred in the box
+    const int row2Y      = row1Y + rowH + s(8);
 
-        // Osc 1 (the "OSC 1" panel title sits in the top-left corner above this row).
-        osc1PanelR = { pad, contentTop, oscW, rowAH };
-        {
-            const int knobsX = pad + oscW - knobsW - boxClear;
-            const int wtX    = pad + wtInset;
-            osc1WaveDropdown.setBounds(wtX, waveY, juce::jmax(s(40), knobsX - wtX - wtInset), ddH);
-            int x = knobsX;
-            for (auto* k : { &o1OctKnob, &o1SemiKnob, &o1FineKnob, &o1PenvDepthKnob, &o1PosKnob, &osc1LevelKnob })
-            { k->setBounds(x, rowY, s2W, s2H);  x += s2W + s(2); }
-        }
+    const int serBtnD = s(30);
+    const int serBtnX = box.getX() + s(8);
+    fltSeriesBtn.setBounds(serBtnX, box.getY() + (box.getHeight() - serBtnD) / 2, serBtnD, serBtnD);
 
-        // Osc 2
-        const int osc2X = pad + oscW + gap;
-        osc2PanelR = { osc2X, contentTop, oscW, rowAH };
-        {
-            const int knobsX = osc2X + oscW - knobsW - boxClear;
-            const int wtX    = osc2X + wtInset;
-            osc2WaveDropdown.setBounds(wtX, waveY, juce::jmax(s(40), knobsX - wtX - wtInset), ddH);
-            int x = knobsX;
-            for (auto* k : { &o2OctKnob, &o2SemiKnob, &o2FineKnob, &o2PenvDepthKnob, &o2PosKnob, &osc2LevelKnob })
-            { k->setBounds(x, rowY, s2W, s2H);  x += s2W + s(2); }
-        }
+    const int xStart  = serBtnX + serBtnD + s(8);
+    const int knobGap = s(2);
+    const int typeW   = (box.getRight() - (g.metal ? g.boxClear : 0)) - xStart - 5 * g.s2W - 4 * knobGap;
 
-        // Noise section — type selector, then the level knob at the right-hand end.
-        const int noiseX = leftRight - noiseW;
-        noisePanelR = { noiseX, contentTop, noiseW, rowAH };
-        noiseTypeLabel.setBounds(0, 0, 0, 0);   // title drawn by paint(), label hidden
-        noiseTypeDropdown.setBounds(noiseX + boxClear, waveY, noiseDdW, ddH);
-        noiseLevelKnob.setBounds(noiseX + noiseW - boxClear - s2W, rowY, s2W, s2H);
-    }
+    // Type labels hidden — the dropdown content is self-explanatory.
+    fltTypeLabel .setBounds(0, 0, 0, 0);
+    flt2TypeLabel.setBounds(0, 0, 0, 0);
 
-    // ── Row B: X-Mod | Filter (no Level) | Insert ───────────────────────────
-    const int rowBY = contentTop + rowAH + (metal ? plateH : gap);   // top of Row B
+    auto layoutRow = [&](int rowY, DropdownSelect& type, std::initializer_list<KnobWithLabel*> knobs)
     {
+        int x = xStart;
+        type.setBounds(x, rowY + (rowH - g.ddH) / 2, typeW, g.ddH);  x += typeW + knobGap;
+        for (auto* k : knobs) { k->setBounds(x, rowY, g.s2W, g.s2H);  x += g.s2W + knobGap; }
+    };
+    layoutRow(row1Y, fltTypeDropdown,  { &fltDrvKnob,  &fltCutKnob,  &fltResKnob,  &fltEnvDepthKnob,  &fltLoCutKnob });
+    layoutRow(row2Y, flt2TypeDropdown, { &flt2DrvKnob, &flt2CutKnob, &flt2ResKnob, &flt2EnvDepthKnob, &flt2LoCutKnob });
+}
 
-        // X-Mod panel — two horizontal lanes (one per row). Each lane: knob, then a mode
-        // SegmentControl, then (Lane A only) the Sync + Feedback toggles. Widened so the
-        // lanes read left-to-right; the Filter panel's type dropdowns shrink to suit.
-        const int xmodW = s(248);
-        modNoisePanelR = { pad, rowBY, xmodW, rowBH };
-        {
-            const int titleH = metal ? 0 : s(14);           // flat: room for the "X-MOD" title drawn inside
-            const int rowH   = (rowBH - titleH) / 2;        // two equal lane rows
-            const int row1Y  = rowBY + titleH;
-            const int row2Y  = row1Y + rowH;
-            const int innerX = pad + boxClear;
-            const int segW   = s(96);                       // 3-segment mode switch
-            const int togW   = s(32);
+// The gate editor (full width, fixed height) and the modulators filling the rest (metal style
+// shows one target at a time, so the modulators fit a shorter minimum).
+void VoicePanel::layoutGateAndModulators(const Grid& g, int y)
+{
+    using mu_ui::s;
+    const int gateH = s(38 + 134 + 10 + 4);   // 186 — kHdr1H + kGridH + kScrollH + border
+    gateR = { 0, y, g.w, gateH + 2 * g.inset };
+    gatingDesigner.setBounds(g.metal ? gateR.reduced(g.pad, g.inset)
+                                     : juce::Rectangle<int>(g.pad, y, g.w - 2 * g.pad, gateH));
+    y = g.metal ? gateR.getBottom() : y + gateH + g.gap;
 
-            // Place a lane's knob + mode segment; returns the segment's right edge.
-            auto layoutLane = [&](int rowY, KnobWithLabel& knob, SegmentControl& seg) -> int
-            {
-                knob.setBounds(innerX, rowY + (rowH - s2H) / 2, s2W, s2H);
-                const int segX = innerX + s2W + s(8);
-                seg.setBounds(segX, rowY + (rowH - ddH) / 2, segW, ddH);
-                return segX + segW;
-            };
-
-            // Lane A — Index knob, Phase mode (FM/PM/TZFM), Sync + Feedback toggles.
-            const int seg1R = layoutLane(row1Y, xmodIndexKnob, phaseModeCtrl);
-            const int togY  = row1Y + (rowH - ddH) / 2;
-            syncButton.setBounds(seg1R + s(8),                togY, togW, ddH);
-            fdbkButton.setBounds(seg1R + s(8) + togW + s(3),  togY, togW, ddH);
-
-            // Lane B — Depth knob, Amp mode (AM/RM/SSB).
-            layoutLane(row2Y, xmodDepthKnob, ampModeCtrl);
-        }
-
-        // Filter panel — two rows (Filter 1 + Filter 2) with Series/Parallel toggle.
-        const int filterX      = pad + xmodW + gap;
-        const int filterTitleW = s(30);
-        const int filterW      = rowsW - xmodW - gap;
-        filterPanelR = { filterX, rowBY, filterW, rowBH };
-        {
-            // Each row: type_dd + 5×s2W knobs, the dropdown taking the remaining width.
-            const int rowH = s2H;
-            // Two filter rows, vertically centred in rowBH.
-            const int twoRowsH   = 2 * rowH + s(8);
-            const int rowsStartY = rowBY + (rowBH - twoRowsH) / 2;
-            const int row1Y = rowsStartY;
-            const int row2Y = row1Y + rowH + s(8);
-
-            // Series/Parallel round button — at the left edge of the panel (just inside
-            // the border, below the "FILTER" title), vertically centred between the rows.
-            juce::ignoreUnused(filterTitleW);
-            const int serBtnD = s(30);
-            const int serBtnX = filterX + s(8);
-            const int serBtnY = rowBY + (rowBH - serBtnD) / 2;
-            fltSeriesBtn.setBounds(serBtnX, serBtnY, serBtnD, serBtnD);
-
-            // Controls start after the button.
-            const int xStart     = serBtnX + serBtnD + s(8);
-            const int knobGap    = s(2);
-            // Dropdown width fills remaining space: filterX+filterW - xStart - 5×s2W - 4×knobGap
-            const int fullTypeDdW = (filterX + filterW - (metal ? boxClear : 0)) - xStart - 5 * s2W - 4 * knobGap;
-
-            // Type labels hidden — the dropdown content is self-explanatory.
-            fltTypeLabel .setBounds(0, 0, 0, 0);
-            flt2TypeLabel.setBounds(0, 0, 0, 0);
-
-            // Filter 1 row
-            {
-                int x = xStart;
-                fltTypeDropdown.setBounds(x, row1Y + (rowH - ddH) / 2, fullTypeDdW, ddH); x += fullTypeDdW + knobGap;
-                for (auto* k : { &fltDrvKnob, &fltCutKnob, &fltResKnob, &fltEnvDepthKnob, &fltLoCutKnob })
-                    { k->setBounds(x, row1Y, s2W, s2H); x += s2W + knobGap; }
-            }
-            // Filter 2 row
-            {
-                int x = xStart;
-                flt2TypeDropdown.setBounds(x, row2Y + (rowH - ddH) / 2, fullTypeDdW, ddH); x += fullTypeDdW + knobGap;
-                for (auto* k : { &flt2DrvKnob, &flt2CutKnob, &flt2ResKnob, &flt2EnvDepthKnob, &flt2LoCutKnob })
-                    { k->setBounds(x, row2Y, s2W, s2H); x += s2W + knobGap; }
-            }
-        }
-
-        // Insert panel (Row B only, same height as Row B)
-        insertPanelR = { insColX, rowBY, insColW, rowBH };
-        {
-            const int subX = insColX + (insColW - insSubW) / 2;
-            const int subY = rowBY + insTitleH + (rowBH - insTitleH - insSubH) / 2;
-            insertSub.setBounds(subX, subY, insSubW, insSubH);
-        }
-    }
-
-    voiceR = { 0, headerStripR.getBottom(), w, rowBY + rowBH + inset - headerStripR.getBottom() };
-
-    // ── Gating designer — full width ─────────────────────────────────────────
-    int y = rowBY + rowBH + (metal ? inset : gap);
+    const int modMinH = g.metal ? s(280) : s(332);
+    if (g.metal)
     {
-        const int gateH = s(38 + 134 + 10 + 4);   // 186 — kHdr1H + kGridH + kScrollH + border
-        gateR = { 0, y, w, gateH + 2 * inset };
-        gatingDesigner.setBounds(metal ? gateR.reduced(pad, inset) : juce::Rectangle<int>(pad, y, w - 2 * pad, gateH));
-        y = metal ? gateR.getBottom() : y + gateH + gap;
-    }
-
-    // ── Modulator panel — fills remaining height (minimum matches mu-clid) ───
-    // Metal style shows one target at a time, so the modulators fit a shorter area.
-    const int modMinH = metal ? s(280) : s(332);
-    if (metal)
-    {
-        modR = { 0, y, w, juce::jmax(modMinH + 2 * inset, h - y) };
-        modulatorPanel.setBounds(modR.reduced(pad, inset));
+        modR = { 0, y, g.w, juce::jmax(modMinH + 2 * g.inset, g.h - y) };
+        modulatorPanel.setBounds(modR.reduced(g.pad, g.inset));
     }
     else
-        modulatorPanel.setBounds(pad, y, w - 2 * pad, juce::jmax(modMinH, h - y - pad));
+        modulatorPanel.setBounds(g.pad, y, g.w - 2 * g.pad, juce::jmax(modMinH, g.h - y - g.pad));
 }
 
 // Item-ID ranges. Factory tables use 1..N (= APVTS index + 1). The Wavetables/
