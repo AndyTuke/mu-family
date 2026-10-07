@@ -210,7 +210,6 @@ private:
     ChannelHeaderBar headerBar;
     void refreshHeader();              // name + colour + preset list for the active voice
     void refreshVoicePresetList();
-    std::vector<juce::File> voicePresetFiles;   // dropdown id (1-based) → file
 
     void rebindAttachments();
     void bindModulationIndicators();

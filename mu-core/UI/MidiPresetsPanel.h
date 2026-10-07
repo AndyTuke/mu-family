@@ -7,7 +7,7 @@ class ProcessorBase;
 
 // Full-area overlay panel that lets the user assign per-slot preset files to
 // the 128 MIDI program-change slots and toggle which channels (1-8) are
-// active. Stores changes directly into ProcessorBase::midiPresetMap (which
+// active (only the product's own channels are shown). Stores changes directly into ProcessorBase::midiPresetMap (which
 // persists to JSON on every edit). File extension + browser root directory
 // come from the consuming plugin via virtuals on ProcessorBase.
 class MidiPresetsPanel : public juce::Component,
@@ -31,6 +31,7 @@ private:
 
     juce::TextButton                  closeBtn { "Close" };
     std::array<juce::ToggleButton, 8> channelToggles;
+    int                               numToggles;   // the product's channel count (≤ 8)
     juce::ListBox                     listBox;
 
     // in-app preset browser overlay shown when the user clicks Browse on a

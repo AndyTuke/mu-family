@@ -72,6 +72,9 @@ public:
     // UI calls these to label channel strips, populate sidechain-source
     // dropdowns, etc., without needing to know what a channel actually IS.
     virtual int         getNumChannels()              const = 0;
+    // The most channels the product can ever have (1..8) — sizes the program-change
+    // channel table. Products with a fixed layer count return that count.
+    virtual int         getMaxChannels()              const { return 8; }
     virtual juce::String getChannelName(int idx)       const = 0;
     virtual int         getChannelColourIndex(int idx) const = 0;
 

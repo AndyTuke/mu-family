@@ -137,18 +137,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     };
 
     // ── Settings overlay ────────────────────────────────────────────────────
-    settingsOverlay.onClose = [this] { showSettings(false); };
     settingsOverlay.onContentDirChanged = [this] { getTransportBar().refreshPresets(); };
-    settingsOverlay.onMidiPresetsClicked = [this]
-    {
-        showSettings(false);
-        showMidiPresets(true);
-    };
-    settingsOverlay.onFullPresetsClicked = [this]
-    {
-        showSettings(false);
-        showMidiFullPresets(true);
-    };
 
     // ── Startup ─────────────────────────────────────────────────────────────
     if (proc.getNumRhythms() == 0)

@@ -1,6 +1,8 @@
 #include "EditorShellBase.h"
 #include "BuildNumber.h"        // BUILD_NUMBER — local version for the upgrade check
 #include "UI/ConfirmDialog.h"   // shared themed confirm/prompt dialogs (mu_ui::confirmAsync)
+#include "UI/StandardSettingsOverlay.h" // wires its program-change buttons
+#include "Persistence/PresetFiles.h" // mu_pp::safePresetFileName — the name rule the processors use
 
 EditorShellBase::EditorShellBase(ProcessorBase& proc)
     // Apply the stored UI scale BEFORE any child component is constructed.
@@ -101,10 +103,7 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
             return;
         }
 
-        juce::String safeName = name.replaceCharacters("\\/:|*?<>\"", "_________");
-        if (safeName.isEmpty()) safeName = "Preset";
-        const juce::File destFile = processorRef.getPresetsDir()
-                                                .getChildFile(safeName + "." + processorRef.getFullPresetExtension());
+        const juce::File destFile = fullPresetFileFor(name);
 
         if (destFile.existsAsFile())
         {
@@ -349,6 +348,16 @@ void EditorShellBase::setSettingsOverlay(juce::Component* overlay)
     settingsOverlay = overlay;
     if (settingsOverlay != nullptr)
         addChildComponent(*settingsOverlay);
+
+    // Standard overlay chrome: close returns to the main view; the program-change
+    // buttons swap the settings page for the matching program-change table.
+    if (auto* base = dynamic_cast<mu_ui::SettingsOverlayBase*>(overlay))
+        base->onClose = [this] { showSettings(false); };
+    if (auto* standard = dynamic_cast<mu_ui::StandardSettingsOverlay*>(overlay))
+    {
+        standard->onMidiPresetsClicked = [this] { showSettings(false); showMidiPresets(true); };
+        standard->onFullPresetsClicked = [this] { showSettings(false); showMidiFullPresets(true); };
+    }
     // TransportBar's gear button stays visible regardless — if there's no
     // settings overlay, clicking it is a no-op (onSettingsToggle does nothing
     // useful). Products that want to hide the gear entirely can call
@@ -548,16 +557,19 @@ void EditorShellBase::showSaveDialog(bool show)
     saveDialog.toFront(false);
 }
 
+juce::File EditorShellBase::fullPresetFileFor(const juce::String& name) const
+{
+    return processorRef.getPresetsDir().getChildFile(mu_pp::safePresetFileName(name, "Preset")
+                                                     + "." + processorRef.getFullPresetExtension());
+}
+
 void EditorShellBase::doSavePreset(const juce::String& name, const juce::String& desc,
                                    const juce::String& category, bool embedSamples)
 {
     processorRef.savePreset(name, desc, category, embedSamples);
     processorRef.ensureCategoryInList(category);
     transportBar.refreshPresets();
-    juce::String safeName = name.replaceCharacters("\\/:|*?<>\"", "_________");
-    if (safeName.isEmpty()) safeName = "Preset";
-    const juce::File saved = processorRef.getPresetsDir()
-                                          .getChildFile(safeName + "." + processorRef.getFullPresetExtension());
+    const juce::File saved = fullPresetFileFor(name);
     transportBar.setLoadedPreset(saved);
     presetDirty = false;
     onCategoriesRefreshed(processorRef.loadCategoryList());

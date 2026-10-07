@@ -167,4 +167,6 @@ private:
     void doSavePreset(const juce::String& name, const juce::String& desc,
                       const juce::String& category, bool embedSamples);
     void doNewPreset();
+    // The full-preset file the processor writes for `name` (shared name-cleaning rule).
+    juce::File fullPresetFileFor(const juce::String& name) const;
 };

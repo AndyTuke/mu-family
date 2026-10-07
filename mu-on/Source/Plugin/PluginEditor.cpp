@@ -73,10 +73,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     // Settings page (master vol + UI size + BPM + standalone MIDI Clock) behind the
     // gear button — registering it reveals the gear (hidden when null).
-    settingsOverlay.onClose = [this] { showSettings(false); };
     settingsOverlay.addProgramChangeSection("Track Presets", "Full Presets");   // Ch 1-5 → lanes, Ch 9 → full
-    settingsOverlay.onMidiPresetsClicked = [this] { showSettings(false); showMidiPresets(true); };
-    settingsOverlay.onFullPresetsClicked = [this] { showSettings(false); showMidiFullPresets(true); };
     setSettingsOverlay(&settingsOverlay);
 
     // A program change loaded a track preset → refresh that lane if it's on screen.

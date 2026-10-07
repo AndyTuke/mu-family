@@ -2,7 +2,7 @@
 #include "Plugin/ProcessorBase.h"
 
 MidiPresetsPanel::MidiPresetsPanel(ProcessorBase& p)
-    : proc(p)
+    : proc(p), numToggles(juce::jlimit(1, 8, p.getMaxChannels()))
 {
     closeBtn.onClick = [this] { if (onClose) onClose(); };
     addAndMakeVisible(closeBtn);
@@ -38,7 +38,7 @@ MidiPresetsPanel::MidiPresetsPanel(ProcessorBase& p)
 void MidiPresetsPanel::wireChannelToggles()
 {
     const auto mask = proc.midiPresetMap.getChannelMask();
-    for (int i = 0; i < 8; ++i)
+    for (int i = 0; i < numToggles; ++i)
     {
         auto& btn = channelToggles[(size_t) i];
         btn.setButtonText("Ch " + juce::String(i + 1));
@@ -158,7 +158,7 @@ void MidiPresetsPanel::resized()
     const int chRowY      = headerH + pad;
     const int totalToggleW = w - pad * 2;
     const int toggleW      = totalToggleW / 8;
-    for (int i = 0; i < 8; ++i)
+    for (int i = 0; i < numToggles; ++i)
         channelToggles[(size_t) i].setBounds(pad + i * toggleW, chRowY,
                                              toggleW - s(6), chRowH);
 
@@ -195,7 +195,8 @@ void MidiPresetsPanel::paint(juce::Graphics& g)
 
     g.setColour(MuLookAndFeel::colour(Id::mutedText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(10.0f))));
-    g.drawText(juce::String::fromUTF8(u8"MIDI channel N (1-8) → slot N-1;  program number = preset index"),
+    g.drawText("MIDI channel N (1-" + juce::String(numToggles)
+                   + juce::String::fromUTF8(u8") → slot N-1;  program number = preset index"),
                pad, headerH + pad + chRowH + s(2), getWidth() - pad * 2, hintH,
                juce::Justification::centredLeft, false);
 }

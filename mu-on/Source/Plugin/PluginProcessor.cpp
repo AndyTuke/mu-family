@@ -1,5 +1,6 @@
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/PluginEditor.h"
+#include "Plugin/HostTransport.h"          // mu-core: DAW / mu-link transport read
 #include "Modulation/MuOnModDest.h"
 #include "Modulation/ModulatorSerialise.h"   // mu-core: shared modulator (de)serialise
 
@@ -188,10 +189,21 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     const double midiClockBeat = midiClockSync.process(midiMessages, numSamples, currentSampleRate);
     const bool   clockEnabled  = wrapperType == wrapperType_Standalone && midiClockSync.isEnabled();
 
+    // Transport priority: DAW host / mu-link master (via injected playhead) > external
+    // MIDI clock (standalone) > the internal free-running transport.
+    const auto host = mu_core::readHostTransport(getPlayHead());
+    const bool externalBeat = host.hasPosition || clockEnabled;
     double bpm       = internalBpm.load(std::memory_order_relaxed);
     double beatStart = internalBeatPos.load(std::memory_order_relaxed);
     bool   isPlaying = playing.load(std::memory_order_relaxed);
-    if (clockEnabled)
+    if (host.hasPosition)
+    {
+        isPlaying = host.playing;
+        if (host.bpm > 0.0) bpm = host.bpm;
+        beatStart = host.ppqPosition;
+        playing.store(isPlaying, std::memory_order_relaxed);   // UI play button mirrors the host / mu-link
+    }
+    else if (clockEnabled)
     {
         isPlaying = midiClockSync.isPlaying();
         if (midiClockSync.getBpm() > 0.0) bpm = midiClockSync.getBpm();
@@ -225,10 +237,10 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     processCoreBlock(buffer, nullptr, kNumChannels, numSamples, bpm,
                      nullptr, nullptr, nullptr, &renderChannelCb);
 
-    // Advance the transport beat. When slaved to external MIDI clock the beat comes from
-    // the clock each block, so mirror it into internalBeatPos (no separate advance) — the
-    // internal transport then resumes seamlessly if the clock is later disabled.
-    if (clockEnabled)
+    // Advance the transport beat. When slaved to the host / mu-link or external MIDI clock the
+    // beat comes from outside each block, so mirror it into internalBeatPos (no separate
+    // advance) — the internal transport then resumes seamlessly if the source goes away.
+    if (externalBeat)
     {
         internalBeatPos.store(beatStart, std::memory_order_relaxed);
     }

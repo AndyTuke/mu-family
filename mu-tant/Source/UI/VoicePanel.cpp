@@ -1,4 +1,5 @@
 ﻿#include "VoicePanel.h"
+#include "Persistence/PresetFiles.h"   // mu_pp::listPresetFiles
 #include "Plugin/PluginProcessor.h"
 #include "Audio/Scales.h"
 #include "Audio/AlgorithmNames.h"   // mu-core: kFilterTypeNames (shared canonical list)
@@ -145,14 +146,11 @@ VoicePanel::VoicePanel(PluginProcessor& p)
             setVoice(currentVoice);           // re-sync knobs / gate / modulators
         });
     };
-    headerBar.onPresetSelected = [this](int id)
+    headerBar.onPresetFileChosen = [this](const juce::File& f)
     {
-        const int i = id - 1;
-        if (i >= 0 && i < (int) voicePresetFiles.size())
-        {
-            proc.loadVoicePreset(currentVoice, voicePresetFiles[(size_t) i]);
-            setVoice(currentVoice);
-        }
+        proc.loadVoicePreset(currentVoice, f);
+        setVoice(currentVoice);           // re-sync knobs / gate / modulators to the loaded voice
+        headerBar.showPresetFile(f);
     };
     headerBar.setSaveEnabled(proc.canSaveLayerPreset());   // demo: per-layer save disabled
     headerBar.onSave = [this]
@@ -574,17 +572,7 @@ void VoicePanel::refreshHeader()
 
 void VoicePanel::refreshVoicePresetList()
 {
-    voicePresetFiles.clear();
-    juce::StringArray names;
-    const auto dir = proc.getPerSlotPresetDir();
-    if (dir.isDirectory())
-        for (const auto& f : dir.findChildFiles(juce::File::findFiles, false,
-                                                "*." + proc.getPerSlotPresetExtension()))
-        {
-            voicePresetFiles.push_back(f);
-            names.add(f.getFileNameWithoutExtension());
-        }
-    headerBar.setPresetItems(names);
+    headerBar.setPresetFiles(mu_pp::listPresetFiles(proc.getPerSlotPresetDir(), proc.getPerSlotPresetExtension()));
 }
 
 void VoicePanel::paint(juce::Graphics& g)

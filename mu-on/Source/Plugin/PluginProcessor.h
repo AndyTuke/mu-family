@@ -82,6 +82,7 @@ public:
 
     // ── ProcessorBase channel metadata (drives sidebar + mixer) ───────────────
     int          getNumChannels()              const override { return kNumChannels; }
+    int          getMaxChannels()              const override { return kNumChannels; }
     juce::String getChannelName(int idx)       const override
     {
         switch (idx) { case Kick: return "Kick"; case Bass: return "Bass";
