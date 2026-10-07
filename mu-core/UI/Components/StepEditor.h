@@ -36,6 +36,7 @@ public:
     void mouseDrag(const juce::MouseEvent& e) override;
 
 private:
+    void paintLamps(juce::Graphics& g);   // metal style: the rings' lamp display
     std::vector<float> steps;
     juce::Colour barColour { MuLookAndFeel::colour(MuLookAndFeel::stepEditorBar) };
     float playheadPhase = 0.0f;

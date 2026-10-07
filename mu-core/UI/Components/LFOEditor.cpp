@@ -171,12 +171,19 @@ void LFOEditor::paint(juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
 
-    g.setColour(MuLookAndFeel::colour(Id::lfoEditorBackground));
+    // Metal style: the rhythm rings' lamp display — dark lamp base, the area under the curve
+    // dimly lit, the curve itself a lit line with a soft glow.
+    const bool lamps = MuLookAndFeel::isMetal(*this);
+    const auto& L    = MuLookAndFeel::lighting();
+    const auto curveClr = MuLookAndFeel::colour(Id::lfoEditorCurve);
+
+    g.setColour(lamps ? MuLookAndFeel::lampBase() : MuLookAndFeel::colour(Id::lfoEditorBackground));
     g.fillAll();
 
     // Zero/baseline line
     const float zeroY = unipolar ? (float)getHeight() : toScreen(0.0f, 0.0f).y;
-    g.setColour(MuLookAndFeel::colour(Id::lfoEditorZeroLine));
+    g.setColour(lamps ? juce::Colours::black.withAlpha(L.shadow(L.ringTrack))
+                      : MuLookAndFeel::colour(Id::lfoEditorZeroLine));
     g.drawHorizontalLine((int)zeroY, 0.0f, (float)getWidth());
 
     if (points.size() >= 2)
@@ -199,12 +206,25 @@ void LFOEditor::paint(juce::Graphics& g)
         fill.lineTo((float)getWidth(), zeroY);
         fill.lineTo(0.0f, zeroY);
         fill.closeSubPath();
-        g.setColour(MuLookAndFeel::colour(Id::lfoEditorCurveFill));
-        g.fillPath(fill);
+        if (lamps)
+        {
+            // Dimly lit area, then a glow round the lit curve line.
+            g.setColour(MuLookAndFeel::lampColour(curveClr, L.lampDim));
+            g.fillPath(fill);
+            g.setColour(curveClr.withAlpha(L.highlight(L.ringHitGlow)));
+            g.strokePath(curve, juce::PathStrokeType(mu_ui::sf(5.0f)));
+            g.setColour(MuLookAndFeel::lampColour(curveClr, L.lampOn).brighter(L.highlight(L.lampHot)));
+            g.strokePath(curve, juce::PathStrokeType(mu_ui::sf(1.8f)));
+        }
+        else
+        {
+            g.setColour(MuLookAndFeel::colour(Id::lfoEditorCurveFill));
+            g.fillPath(fill);
 
-        // Curve line
-        g.setColour(MuLookAndFeel::colour(Id::lfoEditorCurve));
-        g.strokePath(curve, juce::PathStrokeType(mu_ui::sf(1.5f)));
+            // Curve line
+            g.setColour(curveClr);
+            g.strokePath(curve, juce::PathStrokeType(mu_ui::sf(1.5f)));
+        }
     }
 
     // Control points

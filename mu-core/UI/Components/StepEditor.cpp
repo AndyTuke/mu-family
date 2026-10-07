@@ -79,10 +79,16 @@ void StepEditor::paint(juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
 
+    const int n = (int)steps.size();
+    if (MuLookAndFeel::isMetal(*this))
+    {
+        paintLamps(g);
+        return;
+    }
+
     g.setColour(MuLookAndFeel::colour(Id::stepEditorBackground));
     g.fillAll();
 
-    const int n = (int)steps.size();
     if (n == 0) return;
 
     const float w = (float)getWidth();
@@ -140,6 +146,72 @@ void StepEditor::paint(juce::Graphics& g)
     const float phX = playheadPhase * (float)getWidth();
     g.setColour(juce::Colours::white.withAlpha(0.5f));
     g.drawVerticalLine((int)phX, 0.0f, h);
+}
+
+// Metal style: the display of lamps the rhythm rings use — each step a lens over the dark
+// lamp base, lit (with a hot spot) as far as its value reaches; the step under the playhead
+// lit brighter, as on the ring.
+void StepEditor::paintLamps(juce::Graphics& g)
+{
+    const auto& L = MuLookAndFeel::lighting();
+    g.fillAll(MuLookAndFeel::lampBase().darker(L.lampGapDarken));   // the gaps between lenses
+
+    const int n = (int)steps.size();
+    if (n == 0) return;
+
+    const float w = (float)getWidth();
+    const float h = (float)getHeight();
+    const bool tiled = (stepFraction > 0.0f && stepFraction < 1.0f);
+    auto cellL = [&](int i){ return (tiled ? (float)i * stepFraction : (float)i / (float)n) * w; };
+    auto cellR = [&](int i){ return (tiled ? juce::jmin(1.0f, (float)(i + 1) * stepFraction)
+                                           : (float)(i + 1) / (float)n) * w; };
+
+    // Which step the playhead is in (the cells tile left to right).
+    int current = -1;
+    for (int i = 0; i < n; ++i)
+        if (playheadPhase * w >= cellL(i) && playheadPhase * w < cellR(i)) { current = i; break; }
+
+    const float gap    = juce::jmax(1.0f, mu_ui::sf(2.0f));
+    const float corner = mu_ui::sf(2.0f);
+    for (int i = 0; i < n; ++i)
+    {
+        const auto cell = juce::Rectangle<float>(cellL(i) + gap * 0.5f, gap, cellR(i) - cellL(i) - gap, h - gap * 2.0f);
+        if (cell.getWidth() <= 0.0f) continue;
+
+        // Unlit lens: the whole cell.
+        g.setColour(MuLookAndFeel::lampColour(barColour, L.lampOff));
+        g.fillRoundedRectangle(cell, corner);
+
+        // Lit part: up from the bottom (unipolar) or out from the centre (bipolar).
+        const float v = steps[(size_t)i];
+        juce::Rectangle<float> lit;
+        if (unipolar)
+        {
+            const float litH = juce::jmax(0.0f, v) / 100.0f * cell.getHeight();
+            lit = cell.withTop(cell.getBottom() - litH);
+        }
+        else
+        {
+            const float mid  = cell.getCentreY();
+            const float litH = std::abs(v) / 200.0f * cell.getHeight();
+            lit = v >= 0.0f ? juce::Rectangle<float>(cell.getX(), mid - litH, cell.getWidth(), litH)
+                            : juce::Rectangle<float>(cell.getX(), mid, cell.getWidth(), litH);
+        }
+        if (lit.getHeight() < 0.5f) continue;
+
+        const float on   = L.lampOn + (i == current ? L.lampPlayhead : 0.0f);
+        const auto  lens = MuLookAndFeel::lampColour(barColour, juce::jmin(1.0f, on));
+        juce::Path shape;
+        shape.addRoundedRectangle(lit, corner);
+        MuLookAndFeel::drawLamp(g, shape, {}, lens, lit.getCentre(), juce::jmax(lit.getWidth(), lit.getHeight()) * 0.6f);
+    }
+
+    // Bipolar: a faint centre line marks zero between the lenses.
+    if (! unipolar)
+    {
+        g.setColour(juce::Colours::black.withAlpha(L.shadow(L.ringTrack)));
+        g.drawHorizontalLine((int)(h * 0.5f), 0.0f, w);
+    }
 }
 
 void StepEditor::mouseDown(const juce::MouseEvent& e)

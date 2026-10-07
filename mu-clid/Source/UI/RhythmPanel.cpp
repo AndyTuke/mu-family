@@ -698,13 +698,45 @@ void RhythmPanel::paint(juce::Graphics& g)
         MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), appCol);
 
     // Sample bar — content inset from panel outline
+    const juce::String sampleName = proc.getSampleName(currentRhythmIndex);
+    const bool         missing    = proc.isSampleMissing(currentRhythmIndex);
+    if (MuLookAndFeel::isMetal(*this))
+    {
+        // Metal: an LCD — the file name in lit lettering, a missing sample lit in amber,
+        // the empty-slot hint as faint unlit lettering, then the glass's glare + bezel.
+        const auto& L    = MuLookAndFeel::lighting();
+        const auto inner = sampleRect.reduced(3).toFloat();
+        const auto lit   = MuLookAndFeel::lcdLitColour(*this);
+        MuLookAndFeel::drawLcdGlass(g, inner, lit, false);
+        g.setFont(MuLookAndFeel::lcdFont(mu_ui::sf(10.0f)));
+        const auto textR = inner.toNearestInt().withTrimmedLeft(s(6)).withTrimmedRight(s(28));
+        if (missing)
+        {
+            g.setColour(MuLookAndFeel::colour(MuLookAndFeel::sampleBarMissingWarning));
+            g.drawText("Missing: " + sampleName + juce::String::fromUTF8("  \xe2\x80\x94  click to find"),
+                       textR, juce::Justification::centredLeft, true);
+        }
+        else if (sampleName.isNotEmpty())
+        {
+            g.setColour(lit);
+            g.drawText(sampleName, textR, juce::Justification::centredLeft, true);
+        }
+        else
+        {
+            g.setColour(lit.withAlpha(L.lcdGhost));
+            g.drawText("drop sample here or click to browse", textR, juce::Justification::centredLeft, true);
+        }
+        g.setColour(lit);
+        g.drawText(juce::String::fromUTF8("\xe2\x80\xa6"), inner.toNearestInt().removeFromRight(s(24)),
+                   juce::Justification::centred, false);
+        MuLookAndFeel::drawLcdFront(g, inner);
+        return;
+    }
     {
         const auto inner = sampleRect.reduced(3);
         g.setColour(MuLookAndFeel::colour(Id::sampleBarBackground));
         g.fillRect(inner);
 
-        const juce::String sampleName = proc.getSampleName(currentRhythmIndex);
-        const bool         missing    = proc.isSampleMissing(currentRhythmIndex);
         if (missing)
         {
             // Linked sample referenced by a preset could not be found at its recorded
@@ -777,7 +809,8 @@ void RhythmPanel::resized()
         const int lh = s(EuclideanPanel::kLogicDropH);
         // With screws it moves in from the corner, clear of the corner screw.
         const int m  = s(2 + MuLookAndFeel::kDropdownEdgeGap);   // clear of the 2 px border + a gap
-        const int mx = MuLookAndFeel::hasScrews(*this) ? s(2 + MuLookAndFeel::kPanelScrewClear) : m;
+        const int mx = MuLookAndFeel::hasScrews(*this)   // clear of the corner screw, with a gap
+                     ? s(2 + MuLookAndFeel::kPanelScrewClear + MuLookAndFeel::kDropdownEdgeGap) : m;
         euclidPanel.getLogicControl().setBounds(circleRect.getRight() - mx - lw,
                                                 circleRect.getBottom() - m - lh, lw, lh);
     }
