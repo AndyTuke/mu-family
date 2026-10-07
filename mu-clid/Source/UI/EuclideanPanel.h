@@ -107,6 +107,9 @@ private:
     SlideSwitch    insertModeC  { "Pad", "Mute", Id::knobInsertPad };
 
     static constexpr int kOuter   = MuLookAndFeel::kSpaceXS;
+    // Left margin: wider than kOuter so the boxes and plates clear the panel's corner screws
+    // (screw reach from the panel edge, less the RhythmPanel inset round this component).
+    static constexpr int kOuterL  = juce::jmax(kOuter, 2 + MuLookAndFeel::kPanelScrewClear - (MuLookAndFeel::kPanelPad + 1));
 
     // Rows, top to bottom: [name plate | plate gap | raised boxes], kRowGap apart, with kOuter
     // above the first and below the last, so the gaps between rows, between boxes and the

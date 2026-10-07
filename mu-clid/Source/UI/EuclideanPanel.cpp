@@ -491,7 +491,7 @@ void EuclideanPanel::bindModulationIndicators()
 void EuclideanPanel::resized()
 {
     // Fixed Medium-baseline layout — see MuLookAndFeel for the constants.
-    constexpr int innerW = MuLookAndFeel::kEuclidInnerW - 2 * kOuter;   // panel width minus its 4 px border
+    constexpr int innerW = MuLookAndFeel::kEuclidInnerW - kOuterL - kOuter;   // panel width minus its borders
     constexpr int innerH = MuLookAndFeel::kEuclidInnerH - 2 * kOuter;
 
     // Steps/Hits/Rotate render at Size 1 (canonical). kEucKnobGap
@@ -503,7 +503,7 @@ void EuclideanPanel::resized()
     constexpr int eucBlockW = eW * 3 + kEucKnobGap * 2;
     // [Euclid box | gap | Pad box | gap | Insert box | Legato / Mono column]
     constexpr int pW    = (innerW - eucBlockW - kPadInsertGap - kModeColW) / 4;
-    constexpr int padX  = kOuter + eucBlockW + kPadInsertGap;
+    constexpr int padX  = kOuterL + eucBlockW + kPadInsertGap;
     // kPadInsertGap splits the Pad and Insert sub-panel borders so they
     // no longer share a pixel. Half the gap is taken from each side.
     constexpr int padPanelW = pW * 2 - kPadInsertGap / 2;
@@ -546,9 +546,9 @@ void EuclideanPanel::resized()
     {
         const int cy  = boxY(row);              // top of the row's boxes
         const int eCy = cy + (kBoxH - eH) / 2;  // Euclid knobs centred in their box
-        steps.setBounds  (s(kOuter),                          s(eCy), s(eW), s(eH));
-        hits.setBounds   (s(kOuter + eW + kEucKnobGap),       s(eCy), s(eW), s(eH));
-        rot.setBounds    (s(kOuter + (eW + kEucKnobGap) * 2), s(eCy), s(eW), s(eH));
+        steps.setBounds  (s(kOuterL),                          s(eCy), s(eW), s(eH));
+        hits.setBounds   (s(kOuterL + eW + kEucKnobGap),       s(eCy), s(eW), s(eH));
+        rot.setBounds    (s(kOuterL + (eW + kEucKnobGap) * 2), s(eCy), s(eW), s(eH));
         prePad.setBounds     (s(prePadX),                       s(cy + knobDY), s(knobW), s(knobH));
         prePadMode.setBounds (s(prePadX + knobW + kSwitchGap),  s(cy + swDY),   s(swW),   s(swH));
         postPad.setBounds    (s(postPadX),                      s(cy + knobDY), s(knobW), s(knobH));
@@ -580,12 +580,12 @@ void EuclideanPanel::paint(juce::Graphics& g)
 
     // Match resized()'s constants exactly — see Medium-baseline values in MuLookAndFeel.
     constexpr int w      = MuLookAndFeel::kEuclidInnerW;
-    constexpr int innerW = w - 2 * kOuter;
+    constexpr int innerW = w - kOuterL - kOuter;
 
     // Row names: a name plate above each row's Euclid box, aligned to its left edge.
     const char* rowLabels[3] = { "Euclid A", "Euclid B", "Accent" };
     for (int i = 0; i < 3; ++i)
-        MuLookAndFeel::drawNamePlate(g, { (float) s(kOuter), (float) s(rowY(i)), (float) s(kPlateW), (float) s(kPlateH) },
+        MuLookAndFeel::drawNamePlate(g, { (float) s(kOuterL), (float) s(rowY(i)), (float) s(kPlateW), (float) s(kPlateH) },
                                      rowLabels[i]);
 
     if (rhythmColour == juce::Colours::transparentBlack)
@@ -597,7 +597,7 @@ void EuclideanPanel::paint(juce::Graphics& g)
     constexpr int eW        = MuLookAndFeel::kKnobSize1W;
     constexpr int eucBlockW = eW * 3 + kEucKnobGap * 2;
     constexpr int pW        = (innerW - eucBlockW - kPadInsertGap - kModeColW) / 4;
-    constexpr int padX      = kOuter + eucBlockW + kPadInsertGap;
+    constexpr int padX      = kOuterL + eucBlockW + kPadInsertGap;
     constexpr int padPanelW = pW * 2 - kPadInsertGap / 2;
     constexpr int insX      = padX + pW * 2 + kPadInsertGap / 2;
     constexpr int insPanelW = w - kOuter - kModeColW - insX;
@@ -609,7 +609,7 @@ void EuclideanPanel::paint(juce::Graphics& g)
     {
         const int cy = boxY(i);
         const float bh = (float) s(kBoxH);
-        boxes.push_back({ (float) s(kOuter), (float) s(cy), (float) s(eucBlockW), bh });
+        boxes.push_back({ (float) s(kOuterL), (float) s(cy), (float) s(eucBlockW), bh });
         boxes.push_back({ (float) s(padX),   (float) s(cy), (float) s(padPanelW), bh });
         boxes.push_back({ (float) s(insX),   (float) s(cy), (float) s(insPanelW), bh });
     }

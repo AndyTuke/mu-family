@@ -670,8 +670,10 @@ void ModulatorEditor::resized()
     const int pad = metal ? s(kMetalPad)    : 0;
     const int hy  = metal ? m + s(3)          : 0;
     const int hh  = metal ? headerH - s(6)    : headerH;
+    // Left / right inset inside the boxes: wider with screws, so they stay visible.
+    const int padX = metal && MuLookAndFeel::hasScrews(*this) ? s(MuLookAndFeel::kSubPanelScrewClear) : pad;
 
-    int x = metal ? m + pad : nameW;   // metal: no name, the lit LCD tab shows the mod
+    int x = metal ? m + padX : nameW;   // metal: no name, the lit LCD tab shows the mod
     modeDropdown.setBounds(x, hy, modeW, hh); x += modeW + gap4;
     polarityCtrl.setBounds(x, hy, polW,  hh); x += polW + gap8;
     loopLabel   .setBounds(x, hy, lbW,   hh); x += lbW + gap2;
@@ -680,7 +682,7 @@ void ModulatorEditor::resized()
 
     // Dice button — anchored top-right of the header row, square.
     const int diceW = hh;
-    const int diceX = w - m - pad - diceW;
+    const int diceX = w - m - padX - diceW;
     diceBtn.setBounds(diceX, hy, diceW, hh);
 
     // Step group (Stepped mode only) flows from the left, immediately after the
@@ -708,7 +710,7 @@ void ModulatorEditor::resized()
 
     // ── Assignment rows viewport ───────────────────────────────────────────────
     const int editorBottom = edY + edH + gap4;
-    const int ix = m + pad, iw = w - 2 * (m + pad);   // inside the assignment box
+    const int ix = m + padX, iw = w - 2 * (m + padX);   // inside the assignment box
 
     if (metal)
     {

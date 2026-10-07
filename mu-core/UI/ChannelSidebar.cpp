@@ -284,10 +284,12 @@ void ChannelSidebar::resized()
     const bool showAdd = static_cast<bool>(onAddChannel);
     addButton.setVisible(showAdd);
 
-    // Metal style keeps the items and the Add button clear of the painted border.
-    const int top   = metal ? s(4) : 0;
+    // Metal style keeps the items and the Add button clear of the painted border, and
+    // with screws, clear of the corner screws above the first item / below the Add button.
+    const bool screwed = metal && MuLookAndFeel::hasScrews(*this);
+    const int top   = screwed ? s(2 + MuLookAndFeel::kPanelScrewClear - 3)   /* metalBox insets 3 */ : metal ? s(4) : 0;
     const int edgeX = metal ? s(7) : s(4);
-    const int edgeY = metal ? s(7) : s(4);
+    const int edgeY = screwed ? s(2 + MuLookAndFeel::kPanelScrewClear) : metal ? s(7) : s(4);
     if (showAdd)
     {
         const int addBtnY = h - ah - edgeY;

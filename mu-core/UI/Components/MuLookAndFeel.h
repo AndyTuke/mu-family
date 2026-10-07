@@ -593,9 +593,13 @@ public:
     // Cross-head screws in panel / sub-panel corners (screws style): head diameter and
     // the distance from the panel edge to the screw's centre.
     static constexpr int kPanelScrewD       = 7;
-    static constexpr int kPanelScrewInset   = 4;   // centred on the painted border band, clear of the content
+    static constexpr int kPanelScrewInset   = 7;   // just inside the painted border
+    // Distance from a panel's drawn edge that content must keep to clear its corner screws.
+    static constexpr int kPanelScrewClear   = kPanelScrewInset + kPanelScrewD / 2 + 2;
     static constexpr int kSubPanelScrewD    = 6;
-    static constexpr int kSubPanelScrewInset= 5;   // name plates (drawNamePlate): section and row names
+    static constexpr int kSubPanelScrewInset= 5;
+    // Horizontal inset that keeps a sub-panel's content clear of its corner screws.
+    static constexpr int kSubPanelScrewClear= kSubPanelScrewInset + kSubPanelScrewD / 2 + 2;   // name plates (drawNamePlate): section and row names
 
 private:
     bool         metalStyle   = false;

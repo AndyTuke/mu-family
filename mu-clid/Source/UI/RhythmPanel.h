@@ -82,6 +82,7 @@ public:
 
     void paint(juce::Graphics&) override;
     void paintOverChildren(juce::Graphics&) override;
+    void lookAndFeelChanged() override { resized(); repaint(); }   // screws style moves some content in
     void resized() override;
     void mouseDown(const juce::MouseEvent&) override;
 

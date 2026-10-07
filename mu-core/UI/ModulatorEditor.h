@@ -91,6 +91,7 @@ public:
     void setPlayheadBeat(double beat);
 
     void resized() override;
+    void lookAndFeelChanged() override { resized(); repaint(); }   // screws style widens the box insets
     void paint(juce::Graphics& g) override;
     void paintOverChildren(juce::Graphics& g) override;
 

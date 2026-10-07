@@ -775,12 +775,17 @@ void RhythmPanel::resized()
     {
         const int lw = s(EuclideanPanel::kLogicDropW);
         const int lh = s(EuclideanPanel::kLogicDropH);
+        // With screws it moves in from the corner, clear of the corner screw.
         const int m  = s(MuLookAndFeel::kSpaceS);
-        euclidPanel.getLogicControl().setBounds(circleRect.getRight() - m - lw,
+        const int mx = MuLookAndFeel::hasScrews(*this) ? s(2 + MuLookAndFeel::kPanelScrewClear) : m;
+        euclidPanel.getLogicControl().setBounds(circleRect.getRight() - mx - lw,
                                                 circleRect.getBottom() - m - lh, lw, lh);
     }
     voiceSection.setBounds  (voiceRect.reduced(rhythmInset));
-    modulatorPanel.setBounds(modRect.reduced(rhythmInset));
+    // With screws the modulator section is a little narrower, so its tabs and boxes clear
+    // the panel's corner screws.
+    const int modInsetX = MuLookAndFeel::hasScrews(*this) ? s(2 + MuLookAndFeel::kPanelScrewClear) : rhythmInset;
+    modulatorPanel.setBounds(modRect.reduced(modInsetX, rhythmInset));
     rhythmSaveDialog.setBounds(getLocalBounds());
 }
 
