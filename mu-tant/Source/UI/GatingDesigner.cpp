@@ -1,3 +1,4 @@
+#include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "GatingDesigner.h"
 
 #include <cmath>
@@ -452,19 +453,10 @@ void GatingDesigner::withLock(GatePattern* pat, Fn&& fn)
     // block (~10 ms at 48 kHz/512), we cap the spin at 1000 yields and give up
     // if we can't acquire. The next drag/click event will retry; the missed edit
     // is imperceptible at typical mouse-event rates (60+ Hz).
-    constexpr int kMaxSpins = 1000;
-    for (int i = 0; i < kMaxSpins; ++i)
-    {
-        bool expected = false;
-        if (pat->editLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
-        {
-            fn();
-            pat->editLock.store(false, std::memory_order_release);
-            return;
-        }
-        std::this_thread::yield();
-    }
-    // Contention too long — skip this frame rather than stall the message thread.
+    if (! mu_core::spinLockFor(pat->editLock, 1000))
+        return;   // contention too long — skip this frame rather than stall the message thread
+    fn();
+    mu_core::spinUnlock(pat->editLock);
 }
 
 // ── Path cache ────────────────────────────────────────────────────────────────

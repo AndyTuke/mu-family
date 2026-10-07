@@ -1,3 +1,4 @@
+#include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "SequencerEngine.h"
 
 #include <algorithm>
@@ -46,9 +47,7 @@ void SequencerEngine::removeRhythm(int index)
 {
     if (index < 0 || index >= (int)rhythms.size()) return;
 
-    bool expected = false;
-    while (!patternLock.compare_exchange_weak(expected, true, std::memory_order_acquire))
-        expected = false;
+    mu_core::spinLock(patternLock);
 
     rhythms.erase        (rhythms.begin()         + index);
     cachedPatterns.erase (cachedPatterns.begin()  + index);
@@ -71,7 +70,7 @@ void SequencerEngine::removeRhythm(int index)
     lastAccentStepIndex[newN] = 0;
     wasLastStepHit[newN]      = false;
 
-    patternLock.store(false, std::memory_order_release);
+    mu_core::spinUnlock(patternLock);
 }
 
 Rhythm& SequencerEngine::getRhythm(int index)
@@ -126,9 +125,7 @@ void SequencerEngine::swapRhythmSlots(int i, int j)
     const int n = (int)rhythms.size();
     if (i < 0 || j < 0 || i >= n || j >= n) return;
 
-    bool expected = false;
-    while (!patternLock.compare_exchange_weak(expected, true, std::memory_order_acquire))
-        expected = false;
+    mu_core::spinLock(patternLock);
 
     std::swap(rhythms[i],         rhythms[j]);
     std::swap(cachedPatterns[i],  cachedPatterns[j]);
@@ -143,14 +140,12 @@ void SequencerEngine::swapRhythmSlots(int i, int j)
     patternUpdated[i] = true;
     patternUpdated[j] = true;
 
-    patternLock.store(false, std::memory_order_release);
+    mu_core::spinUnlock(patternLock);
 }
 
 void SequencerEngine::updatePattern(int index)
 {
-    bool expected = false;
-    while (!patternLock.compare_exchange_weak(expected, true, std::memory_order_acquire))
-        expected = false;
+    mu_core::spinLock(patternLock);
 
     // Demo cap: no generator is built with more steps than the cap allows.
     const int cap = stepCap.load(std::memory_order_relaxed);
@@ -162,7 +157,7 @@ void SequencerEngine::updatePattern(int index)
     patternUpdated[index]  = true;
     // lastStepIndex preserved — processBlock will absorb the current step without firing
 
-    patternLock.store(false, std::memory_order_release);
+    mu_core::spinUnlock(patternLock);
 }
 
 bool SequencerEngine::tryUpdatePatternFromModulation(int index, const EuclidOverrides& ov)
@@ -175,8 +170,7 @@ bool SequencerEngine::tryUpdatePatternFromModulation(int index, const EuclidOver
     // freshly-cached base, and the next modulation tick will re-modulate from there.
     if (index < 0 || index >= (int) rhythms.size()) return false;
 
-    bool expected = false;
-    if (!patternLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+    if (!mu_core::trySpinLock(patternLock))
         return false;   // message thread holds the lock — retry next block
 
     const Rhythm& rhy = rhythms[index];
@@ -191,7 +185,7 @@ bool SequencerEngine::tryUpdatePatternFromModulation(int index, const EuclidOver
     if (newLen  > 0 && lastStepIndex[index]       >= newLen)  lastStepIndex[index]       %= newLen;
     if (newCLen > 0 && lastAccentStepIndex[index] >= newCLen) lastAccentStepIndex[index] %= newCLen;
 
-    patternLock.store(false, std::memory_order_release);
+    mu_core::spinUnlock(patternLock);
     return true;
 }
 
@@ -221,8 +215,7 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
     // If patternLock is held by the message thread, skip this block's snapshot — safePatterns
     // from the previous block will be used, avoiding any blocking or data race.
     {
-        bool expected = false;
-        if (patternLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+        if (mu_core::trySpinLock(patternLock))
         {
             for (int r = 0; r < numRhythms; ++r)
             {
@@ -254,7 +247,7 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                         lastAccentStepIndex[r] = effectiveStep % (int)safeCPatterns[r].size();
                 }
             }
-            patternLock.store(false, std::memory_order_release);
+            mu_core::spinUnlock(patternLock);
         }
     }
 

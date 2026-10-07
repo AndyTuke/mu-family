@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "Sequencer/VoiceSlot.h"
 
 #include <juce_audio_basics/juce_audio_basics.h>
@@ -34,11 +35,10 @@ inline void resolveLane(VoiceSlot* slot, double beat, int count,
 
     if (slot != nullptr)
     {
-        bool expected = false;
-        if (slot->modLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+        if (mu_core::trySpinLock(slot->modLock))
         {
             slot->modulationMatrix.process(slot->controlSequences, beat, map);
-            slot->modLock.store(false, std::memory_order_release);
+            mu_core::spinUnlock(slot->modLock);
         }
     }
 

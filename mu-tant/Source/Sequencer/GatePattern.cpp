@@ -1,3 +1,4 @@
+#include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "GatePattern.h"
 
 #include <algorithm>
@@ -236,8 +237,7 @@ void applyGateBlock(GatePattern& pattern, float* left, float* right, int numSamp
 
     // Envelope — tryLock so a concurrent UI edit can't tear the envelope vector
     // mid-read. On contention, leave the block as-is (a brief, edit-time blip).
-    bool expected = false;
-    if (pattern.editLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+    if (mu_core::trySpinLock(pattern.editLock))
     {
         pattern.resetGateCache();
         for (int i = 0; i < numSamples; ++i)
@@ -251,7 +251,7 @@ void applyGateBlock(GatePattern& pattern, float* left, float* right, int numSamp
             if (left)  left[i]  *= g;
             if (right) right[i] *= g;
         }
-        pattern.editLock.store(false, std::memory_order_release);
+        mu_core::spinUnlock(pattern.editLock);
     }
 }
 

@@ -5,6 +5,57 @@
 #include "MixerChannel.h"
 #include "Plugin/ProcessorBase.h"
 #include "Audio/InsertSlotConfig.h"
+// The controls every strip with a fader shares — level, pan, mute, solo and the sidechain —
+// writing their `<prefix>*` parameters through APVTS.
+void MixerChannel::bindStripToApvts(ProcessorBase* proc, const juce::String& prefix)
+{
+    auto write = [proc, prefix](const char* id, float actual)
+    {
+        if (auto* p = proc->apvts.getParameter(prefix + id))
+            p->setValueNotifyingHost(p->convertTo0to1(actual));
+    };
+    fader.onValueChange = [write, this] {
+        const auto v = (float) fader.getValue();
+        write("lvl", v);
+        updateDbLabel(v);
+    };
+    panKnob.onValueChanged = [write](double v) { write("pan", (float) v); };
+    muteBtn.onClick = [write, this] { write("mute", muteBtn.getToggleState() ? 1.0f : 0.0f); };
+    soloBtn.onClick = [write, this] { write("solo", soloBtn.getToggleState() ? 1.0f : 0.0f); };
+    if (! hasSidechainControls()) return;
+    scSourceBox.onChange = [write, this] {
+        const int id = scSourceBox.getSelectedId();   // 1 = none, 2..9 = ch0..ch7 → param 0 / 1..8
+        write("scSrc", (float) (id <= 1 ? 0 : id - 1));
+        if (onStatusUpdate) onStatusUpdate(channelName + " Sidechain", scSourceBox.getText(), channelColour);
+    };
+    scAmount.onValueChanged  = [write](double v) { write("scAmt", (float) v / 100.0f); };
+    scAttack.onValueChanged  = [write](double v) { write("scAtk", (float) v); };
+    scRelease.onValueChanged = [write](double v) { write("scRel", (float) v); };
+}
+
+// The same controls writing straight into the engine state (no processor: tests / previews).
+template <typename State>
+void MixerChannel::bindStripToState(State& state)
+{
+    fader.onValueChange = [&state, this] {
+        const float lv = (float) fader.getValue();
+        state.level.store(lv, std::memory_order_relaxed);
+        updateDbLabel(lv);
+    };
+    panKnob.onValueChanged = [&state](double v) { state.pan.store((float) v, std::memory_order_relaxed); };
+    muteBtn.onClick = [&state, this] { state.mute.store(muteBtn.getToggleState(), std::memory_order_relaxed); };
+    soloBtn.onClick = [&state, this] { state.solo.store(soloBtn.getToggleState(), std::memory_order_relaxed); };
+    if (! hasSidechainControls()) return;
+    scSourceBox.onChange = [&state, this] {
+        const int id = scSourceBox.getSelectedId();
+        state.sidechainSource.store(id <= 1 ? -1 : id - 2, std::memory_order_relaxed);
+        if (onStatusUpdate) onStatusUpdate(channelName + " Sidechain", scSourceBox.getText(), channelColour);
+    };
+    scAmount.onValueChanged  = [&state](double v) { state.sidechainAmount.store   ((float) v / 100.0f, std::memory_order_relaxed); };
+    scAttack.onValueChanged  = [&state](double v) { state.sidechainAttackMs.store ((float) v,          std::memory_order_relaxed); };
+    scRelease.onValueChanged = [&state](double v) { state.sidechainReleaseMs.store((float) v,          std::memory_order_relaxed); };
+}
+
 void MixerChannel::bindChannel(MixerEngine::ChannelState& state, std::atomic<float>& peak,
                                ProcessorBase* proc, const juce::String& prefix,
                                std::atomic<float>* grAtomic)
@@ -19,16 +70,7 @@ void MixerChannel::bindChannel(MixerEngine::ChannelState& state, std::atomic<flo
 
     if (proc)
     {
-        fader.onValueChange = [proc, prefix, this] {
-            auto v = (float)fader.getValue();
-            if (auto* p = proc->apvts.getParameter(prefix + "lvl"))
-                p->setValueNotifyingHost(p->convertTo0to1(v));
-            updateDbLabel(v);
-        };
-        panKnob.onValueChanged    = [proc, prefix](double v) {
-            if (auto* p = proc->apvts.getParameter(prefix + "pan"))
-                p->setValueNotifyingHost(p->convertTo0to1((float)v));
-        };
+        bindStripToApvts(proc, prefix);
         sendEffect.onValueChanged = [proc, prefix](double v) {
             if (auto* p = proc->apvts.getParameter(prefix + "sendEff"))
                 p->setValueNotifyingHost(p->convertTo0to1((float)v));
@@ -41,14 +83,6 @@ void MixerChannel::bindChannel(MixerEngine::ChannelState& state, std::atomic<flo
             if (auto* p = proc->apvts.getParameter(prefix + "sendRev"))
                 p->setValueNotifyingHost(p->convertTo0to1((float)v));
         };
-        muteBtn.onClick = [proc, prefix, this] {
-            if (auto* p = proc->apvts.getParameter(prefix + "mute"))
-                p->setValueNotifyingHost(muteBtn.getToggleState() ? 1.0f : 0.0f);
-        };
-        soloBtn.onClick = [proc, prefix, this] {
-            if (auto* p = proc->apvts.getParameter(prefix + "solo"))
-                p->setValueNotifyingHost(soloBtn.getToggleState() ? 1.0f : 0.0f);
-        };
         if (hasOutputBus())
         {
             outBusBox.setSelectedId(state.outputBus + 1, juce::dontSendNotification);
@@ -59,29 +93,9 @@ void MixerChannel::bindChannel(MixerEngine::ChannelState& state, std::atomic<flo
                 if (onStatusUpdate) onStatusUpdate(channelName + " Output", outBusBox.getText(), channelColour);
             };
         }
-        // Sidechain controls write through APVTS
         if (hasSidechainControls())
         {
-            scSourceBox.onChange = [proc, prefix, this] {
-                int id = scSourceBox.getSelectedId();   // 1=none, 2-9=ch0-ch7
-                int apvtsVal = (id <= 1) ? 0 : (id - 1);
-                if (auto* p = proc->apvts.getParameter(prefix + "scSrc"))
-                    p->setValueNotifyingHost(p->convertTo0to1((float)apvtsVal));
-                if (onStatusUpdate) onStatusUpdate(channelName + " Sidechain", scSourceBox.getText(), channelColour);
-            };
-            scAmount.onValueChanged = [proc, prefix](double v) {
-                if (auto* p = proc->apvts.getParameter(prefix + "scAmt"))
-                    p->setValueNotifyingHost(p->convertTo0to1((float)v / 100.0f));
-            };
-            scAttack.onValueChanged = [proc, prefix](double v) {
-                if (auto* p = proc->apvts.getParameter(prefix + "scAtk"))
-                    p->setValueNotifyingHost(p->convertTo0to1((float)v));
-            };
-            scRelease.onValueChanged = [proc, prefix](double v) {
-                if (auto* p = proc->apvts.getParameter(prefix + "scRel"))
-                    p->setValueNotifyingHost(p->convertTo0to1((float)v));
-            };
-            // Load current values so knobs reflect saved state on re-bind
+            // Load the sidechain's current values so knobs reflect saved state on re-bind
             if (auto* p = proc->apvts.getRawParameterValue(prefix + "scAmt"))
                 scAmount.setValue(*p * 100.0, juce::dontSendNotification);
             if (auto* p = proc->apvts.getRawParameterValue(prefix + "scAtk"))
@@ -92,17 +106,10 @@ void MixerChannel::bindChannel(MixerEngine::ChannelState& state, std::atomic<flo
     }
     else
     {
-        fader.onValueChange = [&state, this] {
-            const float lv = (float)fader.getValue();
-            state.level.store(lv, std::memory_order_relaxed);
-            updateDbLabel(lv);
-        };
-        panKnob.onValueChanged    = [&state](double v) { state.pan.store        ((float)v, std::memory_order_relaxed); };
+        bindStripToState(state);
         sendEffect.onValueChanged = [&state](double v) { state.sendEffect.store ((float)v, std::memory_order_relaxed); };
         sendDelay.onValueChanged  = [&state](double v) { state.sendDelay.store  ((float)v, std::memory_order_relaxed); };
         sendReverb.onValueChanged = [&state](double v) { state.sendReverb.store ((float)v, std::memory_order_relaxed); };
-        muteBtn.onClick = [&state, this] { state.mute.store(muteBtn.getToggleState(), std::memory_order_relaxed); };
-        soloBtn.onClick = [&state, this] { state.solo.store(soloBtn.getToggleState(), std::memory_order_relaxed); };
         if (hasOutputBus())
         {
             outBusBox.setSelectedId(state.outputBus + 1, juce::dontSendNotification);
@@ -113,14 +120,6 @@ void MixerChannel::bindChannel(MixerEngine::ChannelState& state, std::atomic<flo
         }
         if (hasSidechainControls())
         {
-            scSourceBox.onChange    = [&state, this] {
-                int id = scSourceBox.getSelectedId();
-                state.sidechainSource.store((id <= 1) ? -1 : (id - 2), std::memory_order_relaxed);
-                if (onStatusUpdate) onStatusUpdate(channelName + " Sidechain", scSourceBox.getText(), channelColour);
-            };
-            scAmount.onValueChanged  = [&state](double v) { state.sidechainAmount.store   ((float)v / 100.0f, std::memory_order_relaxed); };
-            scAttack.onValueChanged  = [&state](double v) { state.sidechainAttackMs.store ((float)v,          std::memory_order_relaxed); };
-            scRelease.onValueChanged = [&state](double v) { state.sidechainReleaseMs.store((float)v,          std::memory_order_relaxed); };
             scAmount.setValue(state.sidechainAmount * 100.0, juce::dontSendNotification);
             scAttack.setValue(state.sidechainAttackMs,       juce::dontSendNotification);
             scRelease.setValue(state.sidechainReleaseMs,     juce::dontSendNotification);
@@ -151,68 +150,11 @@ void MixerChannel::bindReturn(MixerEngine::ReturnState& state, std::atomic<float
 
     if (proc)
     {
-        fader.onValueChange = [proc, prefix, this] {
-            auto v = (float)fader.getValue();
-            if (auto* p = proc->apvts.getParameter(prefix + "lvl"))
-                p->setValueNotifyingHost(p->convertTo0to1(v));
-            updateDbLabel(v);
-        };
-        panKnob.onValueChanged = [proc, prefix](double v) {
-            if (auto* p = proc->apvts.getParameter(prefix + "pan"))
-                p->setValueNotifyingHost(p->convertTo0to1((float)v));
-        };
-        muteBtn.onClick = [proc, prefix, this] {
-            if (auto* p = proc->apvts.getParameter(prefix + "mute"))
-                p->setValueNotifyingHost(muteBtn.getToggleState() ? 1.0f : 0.0f);
-        };
-        soloBtn.onClick = [proc, prefix, this] {
-            if (auto* p = proc->apvts.getParameter(prefix + "solo"))
-                p->setValueNotifyingHost(soloBtn.getToggleState() ? 1.0f : 0.0f);
-        };
-        if (hasSidechainControls())
-        {
-            scSourceBox.onChange = [proc, prefix, this] {
-                int id = scSourceBox.getSelectedId();   // 1=none, 2-9=ch0-ch7
-                int apvtsVal = (id <= 1) ? 0 : (id - 1);
-                if (auto* p = proc->apvts.getParameter(prefix + "scSrc"))
-                    p->setValueNotifyingHost(p->convertTo0to1((float)apvtsVal));
-                if (onStatusUpdate) onStatusUpdate(channelName + " Sidechain", scSourceBox.getText(), channelColour);
-            };
-            scAmount.onValueChanged = [proc, prefix](double v) {
-                if (auto* p = proc->apvts.getParameter(prefix + "scAmt"))
-                    p->setValueNotifyingHost(p->convertTo0to1((float)v / 100.0f));
-            };
-            scAttack.onValueChanged = [proc, prefix](double v) {
-                if (auto* p = proc->apvts.getParameter(prefix + "scAtk"))
-                    p->setValueNotifyingHost(p->convertTo0to1((float)v));
-            };
-            scRelease.onValueChanged = [proc, prefix](double v) {
-                if (auto* p = proc->apvts.getParameter(prefix + "scRel"))
-                    p->setValueNotifyingHost(p->convertTo0to1((float)v));
-            };
-        }
+        bindStripToApvts(proc, prefix);
     }
     else
     {
-        fader.onValueChange = [&state, this] {
-            const float lv = (float)fader.getValue();
-            state.level.store(lv, std::memory_order_relaxed);
-            updateDbLabel(lv);
-        };
-        panKnob.onValueChanged = [&state](double v) { state.pan.store((float)v, std::memory_order_relaxed); };
-        muteBtn.onClick = [&state, this] { state.mute.store(muteBtn.getToggleState(), std::memory_order_relaxed); };
-        soloBtn.onClick = [&state, this] { state.solo.store(soloBtn.getToggleState(), std::memory_order_relaxed); };
-        if (hasSidechainControls())
-        {
-            scSourceBox.onChange    = [&state, this] {
-                int id = scSourceBox.getSelectedId();
-                state.sidechainSource.store((id <= 1) ? -1 : (id - 2), std::memory_order_relaxed);
-                if (onStatusUpdate) onStatusUpdate(channelName + " Sidechain", scSourceBox.getText(), channelColour);
-            };
-            scAmount.onValueChanged  = [&state](double v) { state.sidechainAmount.store   ((float)v / 100.0f, std::memory_order_relaxed); };
-            scAttack.onValueChanged  = [&state](double v) { state.sidechainAttackMs.store ((float)v,          std::memory_order_relaxed); };
-            scRelease.onValueChanged = [&state](double v) { state.sidechainReleaseMs.store((float)v,          std::memory_order_relaxed); };
-        }
+        bindStripToState(state);
     }
 
     vuMeter.getLevel = [&peak] { return peak.load(); };

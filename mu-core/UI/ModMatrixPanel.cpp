@@ -1,3 +1,4 @@
+#include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "ModMatrixPanel.h"
 #include <thread>
 
@@ -13,20 +14,14 @@ namespace
     // Callers MUST check the return value: only call unlockMods on true return.
     [[nodiscard]] inline bool lockMods(VoiceSlot& s)
     {
-        bool expected = false;
-        for (int i = 0; i < 1000; ++i)
-        {
-            if (s.modLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
-                return true;
-            expected = false;
-            std::this_thread::yield();
-        }
+        if (mu_core::spinLockFor(s.modLock, 1000))
+            return true;
         jassertfalse; // could not acquire — caller must skip mutation
         return false;
     }
     inline void unlockMods(VoiceSlot& s) noexcept
     {
-        s.modLock.store(false, std::memory_order_release);
+        mu_core::spinUnlock(s.modLock);
     }
 }
 

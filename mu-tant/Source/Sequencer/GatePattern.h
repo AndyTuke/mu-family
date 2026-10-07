@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include <atomic>
 #include <cstdint>
 #include <thread>
@@ -148,22 +149,11 @@ public:
         // only briefly around single-envelope mutations; 1000 yields covers any
         // contention comfortably. If not acquired by the cap, skip the copy —
         // the source pattern remains unchanged and the caller can retry.
-        {
-            constexpr int kMaxSpins = 1000;
-            bool acquired = false;
-            for (int i = 0; i < kMaxSpins; ++i)
-            {
-                bool expected = false;
-                if (other.editLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
-                    { acquired = true; break; }
-                std::this_thread::yield();
-            }
-            if (!acquired) return;
-        }
+        if (! mu_core::spinLockFor(other.editLock, 1000)) return;
         subdivision       = other.subdivision;
         patternLengthBars = other.patternLengthBars;
         envelopes         = other.envelopes;
-        other.editLock.store(false, std::memory_order_release);
+        mu_core::spinUnlock(other.editLock);
 
         hasEnvelopes.store(!envelopes.empty(), std::memory_order_relaxed);
         gateLevel   = 0.0f;

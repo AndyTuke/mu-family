@@ -1,3 +1,4 @@
+#include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "Plugin/PluginProcessor.h"
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "Plugin/PluginEditor.h"
@@ -505,8 +506,7 @@ void PluginProcessor::applyFilterEnvelope(int v, VoiceConfig& cfg, int numSample
                             ? (float) ((double) juce::jmax(1, numSamples)
                                        / ((double) GatePattern::kMinAttackMs * 0.001 * currentSampleRate))
                             : 1.0f;
-        bool fExpected = false;
-        if (fPat.editLock.compare_exchange_strong(fExpected, true, std::memory_order_acquire))
+        if (mu_core::trySpinLock(fPat.editLock))
         {
             fPat.resetGateCache();
             const float target   = fPat.gateAt(blkBeatStart, 0.0f);
@@ -529,7 +529,7 @@ void PluginProcessor::applyFilterEnvelope(int v, VoiceConfig& cfg, int numSample
             const float modProp2  = juce::jlimit(0.0f, 1.0f, baseProp2 + depth2 * fPat.filterLevel);
             cfg.filter2Cutoff = juce::jlimit(20.0f, 20000.0f, tantCutoffFromProp(modProp2));
 
-            fPat.editLock.store(false, std::memory_order_release);
+            mu_core::spinUnlock(fPat.editLock);
         }
         // On lock contention: use un-modulated cutoffs (edit-time blip)
     }
@@ -546,8 +546,7 @@ void PluginProcessor::applyPitchEnvelope(int v, VoiceConfig& cfg)
     auto& pPat = pitchPatterns[(size_t) v];
     if (blkPlaying && pPat.hasEnvelopes.load(std::memory_order_relaxed))
     {
-        bool pExpected = false;
-        if (pPat.editLock.compare_exchange_strong(pExpected, true, std::memory_order_acquire))
+        if (mu_core::trySpinLock(pPat.editLock))
         {
             pPat.resetGateCache();
             const float envLevel = pPat.gateAt(blkBeatStart, 0.0f);
@@ -558,7 +557,7 @@ void PluginProcessor::applyPitchEnvelope(int v, VoiceConfig& cfg)
             // Fractional semitone offset — the envelope sweeps smoothly (no semitone stepping).
             cfg.osc1SemiMod += d1 * envLevel;
             cfg.osc2SemiMod += d2 * envLevel;
-            pPat.editLock.store(false, std::memory_order_release);
+            mu_core::spinUnlock(pPat.editLock);
         }
     }
 }

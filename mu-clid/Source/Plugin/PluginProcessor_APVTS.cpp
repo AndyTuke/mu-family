@@ -9,6 +9,7 @@
 // live in PluginProcessor_Internal.h since the Preset TU needs them too.
 // Global param IDs live in kGlobalParamDefs (PresetHelpers.h).
 
+#include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "PluginProcessor.h"
 #include "PluginProcessor_Internal.h"
 #include "ModulationSkew.h"   // knob ranges shared with modulation (depth = % of range)
@@ -246,11 +247,9 @@ void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float 
     // modulation seed copy can't observe a torn write. Spin until acquired
     // (audio side holds it for nanoseconds at a time).
     {
-        bool expected = false;
-        while (! r.voiceParamsLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
-            expected = false;
+        mu_core::spinLock(r.voiceParamsLock);
         applyRhythmSuffix(suffix, v, r, patternDirty, voiceDirty);
-        r.voiceParamsLock.store(false, std::memory_order_release);
+        mu_core::spinUnlock(r.voiceParamsLock);
     }
 
     if (!apvtsLoading.load(std::memory_order_acquire))
@@ -286,11 +285,9 @@ void PluginProcessor::forceSyncRhythmFromAPVTS(int ri)
     {
         if (auto* raw = apvts.getRawParameterValue(prefix + kRhythmParamDefs[j].suffix))
         {
-            bool expected = false;
-            while (! r.voiceParamsLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
-                expected = false;
+            mu_core::spinLock(r.voiceParamsLock);
             applyRhythmSuffix(kRhythmParamDefs[j].suffix, raw->load(), r, patternDirty, voiceDirty);
-            r.voiceParamsLock.store(false, std::memory_order_release);
+            mu_core::spinUnlock(r.voiceParamsLock);
         }
     }
 

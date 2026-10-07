@@ -1,3 +1,4 @@
+#include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "PluginProcessor.h"
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "PluginProcessor_Internal.h"
@@ -511,11 +512,9 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
     // can't interleave a torn write. Held for ~struct-copy time only.
     VoiceParams modParams;
     {
-        bool expected = false;
-        while (! rhythm.voiceParamsLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
-            expected = false;
+        mu_core::spinLock(rhythm.voiceParamsLock);
         modParams = rhythm.voiceParams;
-        rhythm.voiceParamsLock.store(false, std::memory_order_release);
+        mu_core::spinUnlock(rhythm.voiceParamsLock);
     }
 
     // gate the modulation pass on "matrix has assignments now, OR had
@@ -532,8 +531,7 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
 
     if (runModulationPass)
     {
-        bool expected = false;
-        if (rhythm.modLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
+        if (mu_core::trySpinLock(rhythm.modLock))
         {
             // PROPORTION-SPACE modulation for skewed-slider destinations:
             // additive-in-display-units modulation on a skewed slider gives
@@ -634,7 +632,7 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
             strip.sendDelayMod .store(modDly, std::memory_order_relaxed);
             strip.sendReverbMod.store(modRev, std::memory_order_relaxed);
 
-            rhythm.modLock.store(false, std::memory_order_release);
+            mu_core::spinUnlock(rhythm.modLock);
 
             // Snapshot pre-normalised values for the UI live-arc indicator.
             {

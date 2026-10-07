@@ -60,6 +60,42 @@ void MixerEngine::applyPanGain(juce::AudioBuffer<float>& buf,
     if (buf.getNumChannels() > 1) buf.applyGain(1, 0, numSamples, gR);
 }
 
+namespace
+{
+// A channel is heard unless muted, or another channel is soloed and it isn't.
+bool isAudible(const MixerEngine::ChannelState& ch, bool anySolo) noexcept
+{
+    return ! ch.mute.load(std::memory_order_relaxed)
+        && ! (anySolo && ! ch.solo.load(std::memory_order_relaxed));
+}
+
+// Threshold-triggered sidechain duck: the envelope attacks to 1 while the source is above the
+// noise floor and releases to 0 when it is silent; the target is scaled by 1 - amount x envelope.
+// (Raw amplitude following ducked typical samples by under 1 dB.) Returns the peak reduction.
+float applySidechainDuck(const float* srcL, const float* srcR, bool sourceActive,
+                         float* tgtL, float* tgtR, int numSamples, float amount,
+                         float attackMs, float releaseMs, double sampleRate, float& env) noexcept
+{
+    constexpr float kScThreshold = 0.001f;   // about -60 dBFS post-trim
+    const float sr  = (float) sampleRate;
+    const float atk = attackMs  > 0.0f ? std::exp(-1.0f / (attackMs  * 0.001f * sr)) : 0.0f;
+    const float rel = releaseMs > 0.0f ? std::exp(-1.0f / (releaseMs * 0.001f * sr)) : 0.0f;
+    float peakGR = 0.0f;
+    for (int i = 0; i < numSamples; ++i)
+    {
+        const float srcLvl = sourceActive ? juce::jmax(std::abs(srcL[i]), std::abs(srcR[i])) : 0.0f;
+        const float target = srcLvl > kScThreshold ? 1.0f : 0.0f;
+        env = target > env ? atk * env + (1.0f - atk) * target
+                           : rel * env + (1.0f - rel) * target;
+        const float gr = amount * env;
+        peakGR = juce::jmax(peakGR, gr);
+        tgtL[i] *= 1.0f - gr;
+        if (tgtR != nullptr) tgtR[i] *= 1.0f - gr;
+    }
+    return peakGR;
+}
+} // namespace
+
 void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                                 int                          numActiveChannels,
                                 std::unique_ptr<VoiceEngine>* voices,
@@ -148,14 +184,6 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         if (!isExt && (src < 0 || src >= numActiveChannels || src == r)) continue;
         if  (isExt && extScL == nullptr) continue;
 
-        const float sr_f = (float)sampleRate;
-        const float scAtk = ch.sidechainAttackMs.load(std::memory_order_relaxed);
-        const float scRel = ch.sidechainReleaseMs.load(std::memory_order_relaxed);
-        const float atk  = (scAtk  > 0.0f)
-                         ? std::exp(-1.0f / (scAtk  * 0.001f * sr_f)) : 0.0f;
-        const float rel  = (scRel > 0.0f)
-                         ? std::exp(-1.0f / (scRel * 0.001f * sr_f)) : 0.0f;
-
         const float* srcL = isExt ? extScL : channelBufs[src].getReadPointer(0);
         const float* srcR = isExt ? extScR
                           : (channelBufs[src].getNumChannels() > 1
@@ -163,32 +191,12 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
         float* tgtL = channelBufs[r].getWritePointer(0);
         float* tgtR = channelBufs[r].getNumChannels() > 1
                     ? channelBufs[r].getWritePointer(1) : nullptr;
-
-        // Threshold-triggered: envelope attacks to 1.0 when source exceeds noise floor,
-        // releases to 0 when silent. Raw amplitude following produced negligible gain
-        // reduction for typical samples (−18 dBFS kick → <1 dB duck at 100% amount).
-        constexpr float kScThreshold = 0.001f; // ≈ −60 dBFS post-trim
         // External DAW sidechain always active; internal respects mute/solo state.
-        const bool srcMute = channels[src].mute.load(std::memory_order_relaxed);
-        const bool srcSolo = channels[src].solo.load(std::memory_order_relaxed);
-        const bool sourceActive = isExt ? true : (!srcMute && !(anySolo && !srcSolo));
-        float peakGR = 0.0f;
-        for (int i = 0; i < numSamples; ++i)
-        {
-            const float srcLvl = sourceActive
-                               ? juce::jmax(std::abs(srcL[i]), std::abs(srcR[i]))
-                               : 0.0f;
-            const float target = (srcLvl > kScThreshold) ? 1.0f : 0.0f;
-            scEnv[r] = (target > scEnv[r])
-                     ? atk * scEnv[r] + (1.0f - atk) * target
-                     : rel * scEnv[r] + (1.0f - rel) * target;
-
-            const float gain = 1.0f - scAmt * scEnv[r];
-            peakGR = juce::jmax(peakGR, scAmt * scEnv[r]);
-            tgtL[i] *= gain;
-            if (tgtR) tgtR[i] *= gain;
-        }
-        sidechainGR[r].store(peakGR);
+        const bool sourceActive = isExt || isAudible(channels[src], anySolo);
+        sidechainGR[r].store(applySidechainDuck(srcL, srcR, sourceActive, tgtL, tgtR, numSamples, scAmt,
+                                                ch.sidechainAttackMs.load(std::memory_order_relaxed),
+                                                ch.sidechainReleaseMs.load(std::memory_order_relaxed),
+                                                sampleRate, scEnv[r]));
     }
 
     // Phase 3: pan/gain, route to output bus, FX sends, peak capture.
@@ -296,14 +304,6 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
             continue;
         }
 
-        const float sr_f = (float)sampleRate;
-        const float scAtk = ret.sidechainAttackMs.load(std::memory_order_relaxed);
-        const float scRel = ret.sidechainReleaseMs.load(std::memory_order_relaxed);
-        const float atk  = (scAtk > 0.0f)
-                         ? std::exp(-1.0f / (scAtk  * 0.001f * sr_f)) : 0.0f;
-        const float rel  = (scRel > 0.0f)
-                         ? std::exp(-1.0f / (scRel * 0.001f * sr_f)) : 0.0f;
-
         auto& retBuf = (ri == 0) ? effectSendBuf
                      : (ri == 1) ? delaySendBuf
                                  : reverbSendBuf;
@@ -314,27 +314,11 @@ void MixerEngine::processBlock(juce::AudioBuffer<float>&    output,
                              ? channelBufs[src].getReadPointer(1) : srcL);
         float* tgtL = retBuf.getWritePointer(0);
         float* tgtR = retBuf.getNumChannels() > 1 ? retBuf.getWritePointer(1) : nullptr;
-
-        constexpr float kScThreshold = 0.001f;
-        const bool srcMute = channels[src].mute.load(std::memory_order_relaxed);
-        const bool srcSolo = channels[src].solo.load(std::memory_order_relaxed);
-        const bool sourceActive = isExt ? true : (!srcMute && !(anySolo && !srcSolo));
-        float peakGR = 0.0f;
-        for (int i = 0; i < numSamples; ++i)
-        {
-            const float srcLvl = sourceActive
-                               ? juce::jmax(std::abs(srcL[i]), std::abs(srcR[i]))
-                               : 0.0f;
-            const float target = (srcLvl > kScThreshold) ? 1.0f : 0.0f;
-            scRetEnv[ri] = (target > scRetEnv[ri])
-                         ? atk * scRetEnv[ri] + (1.0f - atk) * target
-                         : rel * scRetEnv[ri] + (1.0f - rel) * target;
-            const float gain = 1.0f - scAmt * scRetEnv[ri];
-            peakGR = juce::jmax(peakGR, scAmt * scRetEnv[ri]);
-            tgtL[i] *= gain;
-            if (tgtR) tgtR[i] *= gain;
-        }
-        returnSidechainGR[ri].store(peakGR);
+        const bool sourceActive = isExt || isAudible(channels[src], anySolo);
+        returnSidechainGR[ri].store(applySidechainDuck(srcL, srcR, sourceActive, tgtL, tgtR, numSamples, scAmt,
+                                                       ret.sidechainAttackMs.load(std::memory_order_relaxed),
+                                                       ret.sidechainReleaseMs.load(std::memory_order_relaxed),
+                                                       sampleRate, scRetEnv[ri]));
     }
 
     // Re-check after processSends: echo feedback may have produced output even with no

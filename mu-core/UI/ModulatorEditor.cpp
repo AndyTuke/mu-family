@@ -1,3 +1,4 @@
+#include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "ModulatorEditor.h"
 
 //==============================================================================
@@ -207,15 +208,13 @@ void ModulatorEditor::setDestProvider(const ModDestProvider* p)
 void ModulatorEditor::lockMod()
 {
     if (!rhythmModLock) return;
-    bool expected = false;
-    while (!rhythmModLock->compare_exchange_weak(expected, true, std::memory_order_acquire))
-        expected = false;
+    mu_core::spinLock(*rhythmModLock);
 }
 
 void ModulatorEditor::unlockMod()
 {
     if (rhythmModLock)
-        rhythmModLock->store(false, std::memory_order_release);
+        mu_core::spinUnlock(*rhythmModLock);
 }
 
 void ModulatorEditor::randomiseValues()

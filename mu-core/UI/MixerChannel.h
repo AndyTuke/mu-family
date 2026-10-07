@@ -77,6 +77,10 @@ public:
     void paint(juce::Graphics&) override;
 
 private:
+    // Shared by bindChannel / bindReturn: level, pan, mute, solo + sidechain controls.
+    void bindStripToApvts(ProcessorBase* proc, const juce::String& prefix);
+    template <typename State> void bindStripToState(State& state);
+
     using Id = MuLookAndFeel::ColourIds;
 
     Type         channelType;

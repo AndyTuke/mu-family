@@ -9,6 +9,7 @@
 //   FilterGate  — filter-envelope pattern
 //   PitchGate   — pitch-envelope pattern
 
+#include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include <juce_data_structures/juce_data_structures.h>
 #include <thread>
 #include <limits>
@@ -52,18 +53,7 @@ inline void deserialiseGate(const juce::ValueTree& t, GatePattern& g,
     // editLock for at most one block (~10 ms); 1000 yields covers that comfortably.
     // If still contended after the cap (scheduler anomaly), leave the pattern
     // unchanged and return — the preset gate data stays at its previous value.
-    {
-        constexpr int kMaxSpins = 1000;
-        bool acquired = false;
-        for (int i = 0; i < kMaxSpins; ++i)
-        {
-            bool expected = false;
-            if (g.editLock.compare_exchange_strong(expected, true, std::memory_order_acquire))
-            { acquired = true; break; }
-            std::this_thread::yield();
-        }
-        if (!acquired) return;
-    }
+    if (! mu_core::spinLockFor(g.editLock, 1000)) return;
 
     g.envelopes.clear();
     if (valid)
@@ -96,7 +86,7 @@ inline void deserialiseGate(const juce::ValueTree& t, GatePattern& g,
     g.limitToCells(maxCells);
     g.resetGateCache();
     g.hasEnvelopes.store(!g.envelopes.empty(), std::memory_order_relaxed);
-    g.editLock.store(false, std::memory_order_release);
+    mu_core::spinUnlock(g.editLock);
 }
 
 } // namespace mu_tant

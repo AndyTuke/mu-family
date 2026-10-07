@@ -278,7 +278,6 @@ void LFOEditor::mouseDown(const juce::MouseEvent& e)
 
     dragIndex = hitTest(pos);
     const int midpointHit      = (dragIndex < 0) ? hitMidpoint(pos) : -1;
-    const int hoverSegmentIndex = (dragIndex < 0 && midpointHit < 0) ? hitSegment(pos) : -1;
 
     if (dragIndex < 0 && midpointHit >= 0)
     {
@@ -291,32 +290,10 @@ void LFOEditor::mouseDown(const juce::MouseEvent& e)
         return;
     }
 
-    if (dragIndex < 0 && hoverSegmentIndex < 0)
+    if (dragIndex < 0)
     {
-        // Add a new point
-        auto logPos = fromScreen(pos.x, pos.y);
-        if (!e.mods.isAltDown())
-            logPos.x = snapX(logPos.x);
-
-        ControlSequence::CurvePoint newPt;
-        newPt.x = logPos.x;
-        newPt.y = logPos.y;
-        newPt.hasBezierHandle = true;
-        newPt.handleY = 0.0f;
-
-        // Insert in sorted x order (keep first and last anchored)
-        auto it = std::lower_bound(points.begin(), points.end(), newPt,
-            [](const ControlSequence::CurvePoint& a, const ControlSequence::CurvePoint& b)
-            { return a.x < b.x; });
-        int insertPos = (int)(it - points.begin());
-        insertPos = juce::jlimit(1, (int)points.size() - 1, insertPos);
-        points.insert(points.begin() + insertPos, newPt);
-        dragIndex = insertPos;
-        notifyChanged();
-    }
-    else if (dragIndex < 0 && hoverSegmentIndex >= 0)
-    {
-        // Add a new point on the hovered segment.
+        // Add a new point — on empty space or on the hovered segment alike — at the click
+        // (x snapped to the grid unless Alt is held), kept in x order between the fixed ends.
         auto logPos = fromScreen(pos.x, pos.y);
         if (!e.mods.isAltDown())
             logPos.x = snapX(logPos.x);
@@ -330,8 +307,7 @@ void LFOEditor::mouseDown(const juce::MouseEvent& e)
         auto it = std::lower_bound(points.begin(), points.end(), newPt,
             [](const ControlSequence::CurvePoint& a, const ControlSequence::CurvePoint& b)
             { return a.x < b.x; });
-        int insertPos = (int)(it - points.begin());
-        insertPos = juce::jlimit(1, (int)points.size() - 1, insertPos);
+        const int insertPos = juce::jlimit(1, (int)points.size() - 1, (int)(it - points.begin()));
         points.insert(points.begin() + insertPos, newPt);
         dragIndex = insertPos;
         notifyChanged();

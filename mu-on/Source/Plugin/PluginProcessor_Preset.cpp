@@ -1,3 +1,4 @@
+#include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "Plugin/PluginProcessor.h"
 #include "Modulation/MuOnModDest.h"           // isValidLaneDest
 #include "Modulation/ModulatorSerialise.h"    // mu-core: modulator (de)serialise
@@ -28,7 +29,7 @@ juce::String PluginProcessor::lanePrefix(int lane)
 juce::ValueTree PluginProcessor::serialiseRumbleEnv()
 {
     juce::ValueTree env("RumbleEnv");
-    bool e = false; while (! rumbleEnvLock.compare_exchange_strong(e, true, std::memory_order_acquire)) e = false;
+    mu_core::spinLock(rumbleEnvLock);
     for (const auto& p : rumbleEnv.curvePoints)
     {
         juce::ValueTree pt("P");
@@ -36,7 +37,7 @@ juce::ValueTree PluginProcessor::serialiseRumbleEnv()
         pt.setProperty("y", p.y, nullptr);
         env.addChild(pt, -1, nullptr);
     }
-    rumbleEnvLock.store(false, std::memory_order_release);
+    mu_core::spinUnlock(rumbleEnvLock);
     return env;
 }
 
@@ -53,9 +54,9 @@ void PluginProcessor::restoreRumbleEnv(const juce::ValueTree& env)
         pts.push_back(cp);
     }
     if (pts.size() < 2) return;
-    bool e = false; while (! rumbleEnvLock.compare_exchange_strong(e, true, std::memory_order_acquire)) e = false;
+    mu_core::spinLock(rumbleEnvLock);
     rumbleEnv.curvePoints = std::move(pts);
-    rumbleEnvLock.store(false, std::memory_order_release);
+    mu_core::spinUnlock(rumbleEnvLock);
 }
 
 // The params + step grid + each lane's modulators + the Rumble envelope (session and full preset).

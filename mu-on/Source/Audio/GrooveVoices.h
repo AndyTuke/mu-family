@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Plugin/MuOnChannels.h"   // Channel enum
 #include "Audio/KickEngine.h"
@@ -106,11 +107,10 @@ public:
         // on contention with a UI edit, reuse the last value. evaluate() returns 0..100.
         if (rumbleEnvCs != nullptr && rumbleEnvLock != nullptr)
         {
-            bool expected = false;
-            if (rumbleEnvLock->compare_exchange_strong(expected, true, std::memory_order_acquire))
+            if (mu_core::trySpinLock(*rumbleEnvLock))
             {
                 lastRumbleEnv = juce::jlimit(0.0f, 1.0f, rumbleEnvCs->evaluate(beat) * 0.01f);
-                rumbleEnvLock->store(false, std::memory_order_release);
+                mu_core::spinUnlock(*rumbleEnvLock);
             }
         }
         rumble.setBarEnvLevel(lastRumbleEnv);

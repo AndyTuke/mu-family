@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Plugin/PluginProcessor.h"
 #include "UI/GrooveGrid.h"
@@ -45,10 +46,9 @@ public:
         rumbleEnvEditor.onChange = [this](const std::vector<ControlSequence::CurvePoint>& pts)
         {
             auto& lock = proc.rumbleEnvLockRef();
-            bool e = false;
-            while (! lock.compare_exchange_strong(e, true, std::memory_order_acquire)) e = false;
+            mu_core::spinLock(lock);
             proc.rumbleEnvelope().curvePoints = pts;
-            lock.store(false, std::memory_order_release);
+            mu_core::spinUnlock(lock);
         };
         addChildComponent(rumbleEnvEditor);   // shown only for the Rumble lane
 
