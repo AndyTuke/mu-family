@@ -46,6 +46,7 @@ Test pass/fail tracking lives in [tests.md](tests.md), not this backlog. Use thi
 | # | Description | Status | Closed Build |
 
 |---|---|---|---|
+| 1174 | **[mu-clid/mod] Effect send target named after the effect.** Owner request (2026-10-07): the modulation destination for the effect send reads "Effect Send" — show the name of the mixer's current effect instead (e.g. "Chorus Send"), as the Amp send knob already does, and keep it in step when the effect changes. **Done:** the shared destination-list builder (mu_mod::populateDropdown) takes the effect bus's current effect name and labels the sendEff target "<effect> Send" (e.g. "Phaser Send"); mu-Clid's provider reads it from RhythmPanel, which rebuilds the modulator dropdowns when the mixer's effect changes (same path that relabels the Amp send knob). Screenshot-checked. | ✅ Closed | 1080 |
 
 | 1173 | **[mu-clid/ui] Sample display too tall for its strip.** Owner feedback (2026-10-07, screenshot): after #1171 the sample name LCD nearly fills the strip — give it the same margin inside its strip as the header's name / preset displays have. **Done:** The sample strip is now the same as the header strip (kSampleBarH = kHeaderH, 32 px) and its LCD is as tall as the header's displays, centred — new shared MuLookAndFeel::kStripDisplayH (20; ChannelHeaderBar's controls use it too, replacing a literal), so both strips have the same display height and margins. Screenshot-checked side by side. | ✅ Closed | 1078 |
 

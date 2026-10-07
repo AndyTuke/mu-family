@@ -92,9 +92,9 @@ public:
     void filesDropped(const juce::StringArray& files, int x, int y) override;
     void setPresetDropLeft(int) noexcept {}   // no-op: the shared header bar self-lays-out
 
-    // Forwarder: PluginEditor calls this on mixer-effect-algorithm change so
-    // the voice-section Amp "Effect" send knob label tracks the mixer.
-    void setVoiceEffectSendLabel(const juce::String& name) { voiceSection.setEffectSendLabel(name); }
+    // PluginEditor calls this on mixer-effect-algorithm change so the voice-section
+    // Amp "Effect" send knob and the effect-send modulation target track the mixer.
+    void setVoiceEffectSendLabel(const juce::String& name);
 
 private:
     PluginProcessor& proc;
@@ -113,6 +113,7 @@ private:
     // populate logic and is passed into modulatorPanel so the mu-core panel
     // stays product-agnostic.
     ModDestProvider modDestProvider;
+    juce::String    effectSendName;   // mixer effect bus's current effect — names the effect-send target
 
     // Shared per-layer header bar (name / reset / delete / preset / save).
     // `rhythmPresetDropdown` aliases the bar's dropdown so the existing

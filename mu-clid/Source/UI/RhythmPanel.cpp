@@ -235,7 +235,7 @@ void RhythmSaveDialog::paint(juce::Graphics& g)
 //==============================================================================
 RhythmPanel::RhythmPanel(PluginProcessor& p)
     : proc(p), euclidPanel(p), voiceSection(p),
-      modDestProvider(mu_clid::makeModDestProvider())
+      modDestProvider(mu_clid::makeModDestProvider([this] { return effectSendName; }))
 {
     startTimerHz(mu_ui::kUiRefreshHz);
     addAndMakeVisible(circle);
@@ -926,4 +926,14 @@ juce::Rectangle<int> RhythmPanel::sampleDisplayRect() const
     // As tall as the header's displays, centred in the strip.
     return sampleRect.reduced(insetX, 0).withSizeKeepingCentre(sampleRect.getWidth() - 2 * insetX,
                                                                  s(MuLookAndFeel::kStripDisplayH));
+}
+
+void RhythmPanel::setVoiceEffectSendLabel(const juce::String& name)
+{
+    voiceSection.setEffectSendLabel(name);
+    if (name == effectSendName) return;
+
+    // Rebuild the destination dropdowns so the effect-send target carries the new name.
+    effectSendName = name;
+    modulatorPanel.setDestProvider(&modDestProvider);
 }

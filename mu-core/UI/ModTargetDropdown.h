@@ -16,6 +16,7 @@
 //   - a section heading whenever the section changes; reserved rows (param == nullptr) skipped
 //   - the shared insert slots (insert.p1..p4) appear only when an insert effect is active,
 //     labelled with that effect's slot names under the effect's name (hidden slots omitted)
+//   - the mixer's effect send (sendEff) is labelled with the effect bus's current effect
 namespace mu_mod
 {
 
@@ -24,6 +25,7 @@ struct DropdownOptions
     int                                   insertAlgo = 0;   // active insert effect (0 = none)
     std::function<bool(const ModTarget&)> show;             // optional extra filter (e.g. stepped-only targets)
     std::vector<int>                      order;            // display order of row indices (empty = table order)
+    juce::String                          effectSendName;   // effect bus's current effect ("" = keep the table label)
 };
 
 inline void populateDropdown(DropdownSelect& dd, const ModTarget* table, int count,
@@ -40,7 +42,7 @@ inline void populateDropdown(DropdownSelect& dd, const ModTarget* table, int cou
         const auto& t = table[i];
         if (t.param == nullptr || (options.show && ! options.show(t))) return;
 
-        const char*  label   = t.label;
+        juce::String label   = t.label;
         juce::String heading = t.section != nullptr ? t.section : "";
         if (std::strncmp(t.id, "insert.p", 8) == 0)
         {
@@ -51,6 +53,8 @@ inline void populateDropdown(DropdownSelect& dd, const ModTarget* table, int cou
             label   = sl.label;
             heading = mu_audio::kInsertAlgorithmNames[options.insertAlgo];
         }
+        else if (options.effectSendName.isNotEmpty() && std::strcmp(t.param, "sendEff") == 0)
+            label = options.effectSendName + " Send";
 
         if (heading.isNotEmpty() && (first || heading != currentHeading))
             dd.addSectionHeading(heading);

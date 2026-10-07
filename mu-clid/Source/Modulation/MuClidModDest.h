@@ -17,11 +17,12 @@
 namespace mu_clid
 {
 
-inline ModDestProvider makeModDestProvider()
+// `effectName` returns the mixer effect bus's current effect, which names the effect-send target.
+inline ModDestProvider makeModDestProvider(std::function<juce::String()> effectName)
 {
     ModDestProvider p;
 
-    p.populate = [](DropdownSelect& dd, int driveChar, bool steppedMode)
+    p.populate = [effectName](DropdownSelect& dd, int driveChar, bool steppedMode)
     {
         // The shared builder in mu-Clid's display order (ModDest::kDropdownOrder).
         // Pitch Octave is stepped-only (no smooth octave glide); Amp Release (row 3) is retired.
@@ -29,7 +30,8 @@ inline ModDestProvider makeModDestProvider()
         mu_mod::populateDropdown(dd, ModDest::kTable,
             { driveChar,
               [steppedMode](const mu_mod::ModTarget& t) { return steppedMode || std::strcmp(t.id, "pitch.octave") != 0; },
-              kOrder });
+              kOrder,
+              effectName ? effectName() : juce::String() });
     };
 
     wireTableModDestResolve(p,
