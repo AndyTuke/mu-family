@@ -123,6 +123,100 @@ static juce::File resolveSamplePath(const juce::String& storedPath, const juce::
     return juce::File(storedPath);
 }
 
+// Where a preset rhythm's sample comes from. An embedded sample (base64 `data` + its `name`) is
+// written to a temp file; otherwise the stored path is resolved against the Samples folder,
+// falling back to the file name there when an absolute path has moved.
+struct PresetSample
+{
+    enum class Kind { None, BadEmbed, Embedded, Found, Moved, Missing };
+    Kind         kind = Kind::None;
+    juce::File   file;           // what to load (Embedded / Found / Moved)
+    juce::String rememberPath;   // the sample path the slot records
+    juce::String fileName;       // the stored sample's file name, for messages
+    bool         relative = false;   // Missing: the stored path was relative (not in the Samples folder)
+};
+
+static PresetSample resolvePresetSample(const juce::String& data, const juce::String& name,
+                                        const juce::String& storedPath, const juce::File& samplesDir)
+{
+    PresetSample r;
+    if (data.isNotEmpty() && name.isNotEmpty())
+    {
+        juce::MemoryBlock mb;
+        { juce::MemoryOutputStream mos(mb, false); juce::Base64::convertFromBase64(mos, data); }
+        auto tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("muClid_samples");
+        tempDir.createDirectory();
+        const auto tempFile = tempDir.getChildFile(name);
+        if (mb.getSize() == 0 || ! tempFile.replaceWithData(mb.getData(), mb.getSize()))
+        {
+            r.kind = PresetSample::Kind::BadEmbed;
+            return r;
+        }
+        r.kind = PresetSample::Kind::Embedded;
+        r.file = tempFile;
+        r.rememberPath = tempFile.getFullPathName();
+        return r;
+    }
+    if (storedPath.isEmpty()) return r;   // Kind::None — the rhythm has no sample
+
+    const juce::File f = resolveSamplePath(storedPath, samplesDir);
+    r.fileName = f.getFileName();
+    if (f.existsAsFile())
+    {
+        r.kind = PresetSample::Kind::Found;
+        r.file = f;
+        r.rememberPath = f.getFullPathName();
+    }
+    else if (juce::File::isAbsolutePath(storedPath))
+    {
+        const juce::File fallback = samplesDir.getChildFile(f.getFileName());
+        if (fallback.existsAsFile())
+        {
+            r.kind = PresetSample::Kind::Moved;
+            r.file = fallback;
+            r.rememberPath = fallback.getFullPathName();
+        }
+        else
+        {
+            r.kind = PresetSample::Kind::Missing;
+            r.rememberPath = storedPath;
+        }
+    }
+    else
+    {
+        r.kind = PresetSample::Kind::Missing;
+        r.relative = true;
+        r.rememberPath = f.getFullPathName();
+    }
+    return r;
+}
+
+// Load a resolved sample into `voice` (clearing it when there is none) and tell the user about
+// a moved — and, when `reportMissing`, a missing — sample; `context` is appended to the moved
+// note (e.g. " (rhythm 3)"). Returns the path the slot records.
+static juce::String applyPresetSample(const PresetSample& smp, VoiceEngine& voice,
+                                      const std::function<void(const juce::String&)>& onError,
+                                      bool reportMissing, const juce::String& context = {})
+{
+    using Kind = PresetSample::Kind;
+    if (smp.kind == Kind::Embedded || smp.kind == Kind::Found || smp.kind == Kind::Moved)
+        voice.loadFile(smp.file);
+    else if (smp.kind != Kind::BadEmbed)
+        voice.clearSample();
+
+    if (onError)
+    {
+        if (smp.kind == Kind::Moved)
+            onError("Sample '" + smp.fileName + "' not at original path, loaded from content folder instead"
+                    + context + ".");
+        else if (smp.kind == Kind::Missing && reportMissing)
+            onError("Sample '" + smp.fileName
+                    + juce::String::fromUTF8(smp.relative ? "' missing from content folder \xe2\x80\x94 rhythm loaded without audio."
+                                                          : "' missing \xe2\x80\x94 rhythm loaded without audio."));
+    }
+    return smp.rememberPath;
+}
+
 // When the sample path is inside the Samples content folder, return a path
 // relative to that folder (e.g. "kicks/kick.wav") so presets are
 // machine-agnostic. Otherwise return absPath unchanged.
@@ -157,6 +251,39 @@ static bool atomicReplaceWithText(const juce::File& destFile, const juce::String
     return true;
 }
 
+
+// A rhythm preset file's state, or an invalid tree after reporting why (missing, unparseable,
+// not a preset, or a legacy v0 / v1 preset — only v2 presets load).
+juce::ValueTree PresetIO::readRhythmPresetFile(const juce::File& file) const
+{
+    auto fail = [this, &file](const juce::String& why)
+    {
+        if (proc_.onLoadError) proc_.onLoadError(why + file.getFileName());
+        return juce::ValueTree();
+    };
+    if (! file.existsAsFile()) return fail("File missing: ");
+    auto xml = juce::parseXML(file);
+    if (! xml) return fail("Could not parse: ");
+    auto state = juce::ValueTree::fromXml(*xml);
+    if (! state.isValid()) return fail("Invalid preset: ");
+    if (! requireSupportedPresetVersion(state, file.getFileName(), proc_.onLoadError))
+        return {};
+    return state;
+}
+
+// The preset's identity onto `r`: its name — `presetName` (matches the dropdown entry and the
+// file name) over the older `r0_name`, the slot's short historical name — and its colour.
+void PresetIO::applyPresetIdentity(const juce::ValueTree& state, Rhythm& r)
+{
+    auto presetNameVal = state.getProperty("presetName");
+    auto rhythmNameVal = state.getProperty("r0_name");
+    if (presetNameVal.isString() && presetNameVal.toString().isNotEmpty())
+        r.name = presetNameVal.toString().toStdString();
+    else if (rhythmNameVal.isString() && rhythmNameVal.toString().isNotEmpty())
+        r.name = rhythmNameVal.toString().toStdString();
+    r.colourIndex = (int) state.getProperty("r0_colour", r.colourIndex);
+}
+
 //==============================================================================
 void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file, bool keepIdentity)
 {
@@ -168,23 +295,8 @@ void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file, bool k
         return;
     }
 
-    if (!file.existsAsFile())
-    {
-        if (proc_.onLoadError) proc_.onLoadError("File missing: " + file.getFileName());
-        return;
-    }
-    auto xml = juce::parseXML(file);
-    if (!xml)
-    {
-        if (proc_.onLoadError) proc_.onLoadError("Could not parse: " + file.getFileName());
-        return;
-    }
-    auto state = juce::ValueTree::fromXml(*xml);
-    if (!state.isValid())
-    {
-        if (proc_.onLoadError) proc_.onLoadError("Invalid preset: " + file.getFileName());
-        return;
-    }
+    auto state = readRhythmPresetFile(file);
+    if (! state.isValid()) return;
 
     // Cancel any existing staged swap before overwriting.
     proc_.hotSwapStager.cancelPendingIfAny(rhythmIndex);
@@ -192,12 +304,6 @@ void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file, bool k
     // Start from the current rhythm and apply the preset on top (matching applyRhythmPreset).
     Rhythm newRhythm = proc_.sequencer.getRhythm(rhythmIndex);
     const juce::String paramPrefix = "r" + juce::String(rhythmIndex) + "_";
-
-    // Stage 35 / cleanup: only v2 presets are supported. Legacy (v0/v1) presets
-    // are refused at the entry point with a clear proc_.onLoadError; the user is
-    // expected to hand-upgrade them via the dev. Keeps the loader simple.
-    if (! requireSupportedPresetVersion(state, file.getFileName(), proc_.onLoadError))
-        return;
 
     // Stage 36 v3 migration: collapse old named insert fields → insP1..4
     // (algo-aware, runs BEFORE the field-apply loop so the new fields are
@@ -224,15 +330,7 @@ void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file, bool k
     // inside "Kick Accents.muRhythm") which loses the user-facing context.
     // A settings reset (keepIdentity) leaves the slot's own name + colour in place.
     if (! keepIdentity)
-    {
-        auto presetNameVal = state.getProperty("presetName");
-        auto rhythmNameVal = state.getProperty("r0_name");
-        if (presetNameVal.isString() && presetNameVal.toString().isNotEmpty())
-            newRhythm.name = presetNameVal.toString().toStdString();
-        else if (rhythmNameVal.isString() && rhythmNameVal.toString().isNotEmpty())
-            newRhythm.name = rhythmNameVal.toString().toStdString();
-        newRhythm.colourIndex = (int)state.getProperty("r0_colour", newRhythm.colourIndex);
-    }
+        applyPresetIdentity(state, newRhythm);
 
     // deserialise modulators from the preset. Mirrors the applyRhythmPreset
     // (stopped-state) path so hot-swap preset loads carry the preset's LFOs / step
@@ -266,69 +364,11 @@ void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file, bool k
     newVoice->prepareToPlay(proc_.currentSampleRate, proc_.currentBlockSize);
     newVoice->setParams(newRhythm.voiceParams);
 
-    juce::String samplePath;
-    // Embedded sample takes priority over path-based load — mirrors
-    // applyRhythmPreset's policy. Without this branch, hot-swapping a preset
-    // that was saved with embedSample=true (so r0_sample is empty by design,
-    // and the bytes live in <sampleData>) silently lands with no audio.
-    juce::String encodedData = state.getProperty("sampleData").toString();
-    if (encodedData.isNotEmpty())
-    {
-        juce::MemoryOutputStream mos;
-        if (juce::Base64::convertFromBase64(mos, encodedData) && mos.getDataSize() > 0)
-        {
-            juce::String sampleName = state.getProperty("sampleName", "embedded").toString();
-            juce::File tmp = juce::File::getSpecialLocation(juce::File::tempDirectory)
-                                 .getChildFile("muclid_" + sampleName);
-            if (tmp.replaceWithData(mos.getData(), mos.getDataSize()))
-            {
-                newVoice->loadFile(tmp);
-                samplePath = tmp.getFullPathName();
-            }
-        }
-    }
-    else
-    {
-        juce::String storedPath = state.getProperty("r0_sample").toString();
-        if (storedPath.isNotEmpty())
-        {
-            const juce::File samplesDir = proc_.getSamplesDir();
-            juce::File sf = resolveSamplePath(storedPath, samplesDir);
-            if (sf.existsAsFile())
-            {
-                newVoice->loadFile(sf);
-                samplePath = sf.getFullPathName();
-            }
-            else if (juce::File::isAbsolutePath(storedPath))
-            {
-                // Absolute path failed — try filename-only fallback in Samples folder.
-                juce::File fallback = samplesDir.getChildFile(sf.getFileName());
-                if (fallback.existsAsFile())
-                {
-                    newVoice->loadFile(fallback);
-                    samplePath = fallback.getFullPathName();
-                    if (proc_.onLoadError)
-                        proc_.onLoadError("Sample '" + sf.getFileName()
-                                    + "' not at original path, loaded from content folder instead.");
-                }
-                else
-                {
-                    samplePath = storedPath;
-                    if (proc_.onLoadError)
-                        proc_.onLoadError("Sample '" + sf.getFileName()
-                                    + juce::String::fromUTF8("' missing \xe2\x80\x94 rhythm loaded without audio."));
-                }
-            }
-            else
-            {
-                // Relative path, not found in Samples folder.
-                samplePath = sf.getFullPathName();
-                if (proc_.onLoadError)
-                    proc_.onLoadError("Sample '" + sf.getFileName()
-                                + juce::String::fromUTF8("' missing from content folder \xe2\x80\x94 rhythm loaded without audio."));
-            }
-        }
-    }
+    // The preset's sample (embedded first, else its stored path), loaded into the pending engine.
+    const auto smp = resolvePresetSample(state.getProperty("sampleData").toString(),
+                                         state.getProperty("sampleName", "embedded").toString(),
+                                         state.getProperty("r0_sample").toString(), proc_.getSamplesDir());
+    const juce::String samplePath = applyPresetSample(smp, *newVoice, proc_.onLoadError, true);
 
     // Commit the staged data via HotSwapStager.
     proc_.hotSwapStager.stage(rhythmIndex, std::move(newRhythm), std::move(newVoice), samplePath);
@@ -455,26 +495,8 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFil
 
 bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex, bool keepIdentity)
 {
-    if (!file.existsAsFile())
-    {
-        if (proc_.onLoadError) proc_.onLoadError("File missing: " + file.getFileName());
-        return false;
-    }
-    auto xml = juce::parseXML(file);
-    if (!xml)
-    {
-        if (proc_.onLoadError) proc_.onLoadError("Could not parse: " + file.getFileName());
-        return false;
-    }
-    auto state = juce::ValueTree::fromXml(*xml);
-    if (!state.isValid())
-    {
-        if (proc_.onLoadError) proc_.onLoadError("Invalid preset: " + file.getFileName());
-        return false;
-    }
-    // v2-only: legacy presets refused at the entry point.
-    if (! requireSupportedPresetVersion(state, file.getFileName(), proc_.onLoadError))
-        return false;
+    const auto state = readRhythmPresetFile(file);
+    if (! state.isValid()) return false;
 
     // Load only sequencer-page state — mixer settings stay attached to the slot.
     // Older rhythm preset files may include "ch_*" properties; those are simply
@@ -490,15 +512,7 @@ bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex, bool k
     // A settings reset (keepIdentity) leaves the slot's own name + colour in place.
     Rhythm& r = proc_.sequencer.getRhythm(targetIndex);
     if (! keepIdentity)
-    {
-        auto presetNameVal = state.getProperty("presetName");
-        auto rhythmNameVal = state.getProperty("r0_name");
-        if (presetNameVal.isString() && presetNameVal.toString().isNotEmpty())
-            r.name = presetNameVal.toString().toStdString();
-        else if (rhythmNameVal.isString() && rhythmNameVal.toString().isNotEmpty())
-            r.name = rhythmNameVal.toString().toStdString();
-        r.colourIndex = (int)state.getProperty("r0_colour", r.colourIndex);
-    }
+        applyPresetIdentity(state, r);
 
     // In .muRhythm the sample *path* is "r0_sample" but the embedded blob fields
     // are unprefixed ("sampleData" / "sampleName").
@@ -793,71 +807,13 @@ void PresetIO::restoreRhythmSample(int i, const juce::ValueTree& tree,
     // maintains loadedSamplePaths. (Mirrors the null guard in forceSyncRhythmFromAPVTS.)
     if (! proc_.voiceEngines[i]) return;
 
-    const juce::String sampleData = tree.getProperty(juce::Identifier(sampleDataProp)).toString();
-    const juce::String sampleName = tree.getProperty(juce::Identifier(sampleNameProp)).toString();
-    const juce::String samplePath = tree.getProperty(juce::Identifier(samplePathProp)).toString();
-
-    if (sampleData.isNotEmpty() && sampleName.isNotEmpty())
-    {
-        juce::MemoryBlock mb;
-        {
-            juce::MemoryOutputStream mos(mb, false);
-            juce::Base64::convertFromBase64(mos, sampleData);
-        }
-        if (mb.getSize() > 0)
-        {
-            juce::File tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory)
-                                     .getChildFile("muClid_samples");
-            tempDir.createDirectory();
-            juce::File tempFile = tempDir.getChildFile(sampleName);
-            if (tempFile.replaceWithData(mb.getData(), mb.getSize()))
-            {
-                proc_.voiceEngines[i]->loadFile(tempFile);
-                proc_.loadedSamplePaths.set(i, tempFile.getFullPathName());
-            }
-        }
-        return;
-    }
-
-    if (samplePath.isEmpty())
-    {
-        // Preset rhythm has no sample at all — wipe any stale sample on this slot.
-        proc_.voiceEngines[i]->clearSample();
-        proc_.loadedSamplePaths.set(i, juce::String());
-        return;
-    }
-
-    const juce::File samplesDir = proc_.getSamplesDir();
-    juce::File f = resolveSamplePath(samplePath, samplesDir);
-    if (f.existsAsFile())
-    {
-        proc_.voiceEngines[i]->loadFile(f);
-        proc_.loadedSamplePaths.set(i, f.getFullPathName());
-    }
-    else if (juce::File::isAbsolutePath(samplePath))
-    {
-        juce::File fallback = samplesDir.getChildFile(f.getFileName());
-        if (fallback.existsAsFile())
-        {
-            proc_.voiceEngines[i]->loadFile(fallback);
-            proc_.loadedSamplePaths.set(i, fallback.getFullPathName());
-            if (proc_.onLoadError)
-                proc_.onLoadError("Sample '" + f.getFileName()
-                            + "' not at original path, loaded from content folder instead (rhythm "
-                            + juce::String(i + 1) + ").");
-        }
-        else
-        {
-            proc_.voiceEngines[i]->clearSample();
-            proc_.loadedSamplePaths.set(i, samplePath);
-        }
-    }
-    else
-    {
-        // Relative path, not found in Samples folder.
-        proc_.voiceEngines[i]->clearSample();
-        proc_.loadedSamplePaths.set(i, f.getFullPathName());
-    }
+    const auto smp = resolvePresetSample(tree.getProperty(juce::Identifier(sampleDataProp)).toString(),
+                                         tree.getProperty(juce::Identifier(sampleNameProp)).toString(),
+                                         tree.getProperty(juce::Identifier(samplePathProp)).toString(),
+                                         proc_.getSamplesDir());
+    if (smp.kind == PresetSample::Kind::BadEmbed) return;   // unreadable embedded data: leave the slot as it is
+    proc_.loadedSamplePaths.set(i, applyPresetSample(smp, *proc_.voiceEngines[i], proc_.onLoadError, false,
+                                                     " (rhythm " + juce::String(i + 1) + ")"));
 }
 
 void PresetIO::restoreGlobalState(const juce::ValueTree& root)
@@ -950,70 +906,11 @@ static void prepareRhythmSlotFromTree(const juce::ValueTree& rTreeIn,
     outVoice->prepareToPlay(sampleRate, blockSize);
     outVoice->setParams(r.voiceParams);
 
-    // Sample: embedded blob takes priority, else stored path (mirrors restoreRhythmSample).
-    const juce::String sampleData = rTree.getProperty("sampleData").toString();
-    const juce::String sampleName = rTree.getProperty("sampleName").toString();
-    if (sampleData.isNotEmpty() && sampleName.isNotEmpty())
-    {
-        juce::MemoryBlock mb;
-        { juce::MemoryOutputStream mos(mb, false); juce::Base64::convertFromBase64(mos, sampleData); }
-        if (mb.getSize() > 0)
-        {
-            juce::File tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory)
-                                     .getChildFile("muClid_samples");
-            tempDir.createDirectory();
-            juce::File tempFile = tempDir.getChildFile(sampleName);
-            if (tempFile.replaceWithData(mb.getData(), mb.getSize()))
-            {
-                outVoice->loadFile(tempFile);
-                outSamplePath = tempFile.getFullPathName();
-            }
-        }
-    }
-    else
-    {
-        const juce::String storedPath = rTree.getProperty("sample").toString();
-        if (storedPath.isEmpty())
-        {
-            outVoice->clearSample();
-        }
-        else
-        {
-            juce::File f = resolveSamplePath(storedPath, samplesDir);
-            if (f.existsAsFile())
-            {
-                outVoice->loadFile(f);
-                outSamplePath = f.getFullPathName();
-            }
-            else if (juce::File::isAbsolutePath(storedPath))
-            {
-                juce::File fallback = samplesDir.getChildFile(f.getFileName());
-                if (fallback.existsAsFile())
-                {
-                    outVoice->loadFile(fallback);
-                    outSamplePath = fallback.getFullPathName();
-                    if (onLoadError)
-                        onLoadError("Sample '" + f.getFileName()
-                                    + "' not at original path, loaded from content folder instead.");
-                }
-                else
-                {
-                    outVoice->clearSample();
-                    outSamplePath = storedPath;
-                    if (onLoadError)
-                        onLoadError("Sample '" + f.getFileName() + juce::String::fromUTF8("' missing \xe2\x80\x94 rhythm loaded without audio."));
-                }
-            }
-            else
-            {
-                outVoice->clearSample();
-                outSamplePath = f.getFullPathName();
-                if (onLoadError)
-                    onLoadError("Sample '" + f.getFileName()
-                                + juce::String::fromUTF8("' missing from content folder \xe2\x80\x94 rhythm loaded without audio."));
-            }
-        }
-    }
+    // Sample: embedded blob takes priority, else the stored path.
+    const auto smp = resolvePresetSample(rTree.getProperty("sampleData").toString(),
+                                         rTree.getProperty("sampleName").toString(),
+                                         rTree.getProperty("sample").toString(), samplesDir);
+    outSamplePath = applyPresetSample(smp, *outVoice, onLoadError, true);
 
     outRhythm = std::move(r);
 }

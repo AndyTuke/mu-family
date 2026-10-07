@@ -55,6 +55,10 @@ public:
     void setStateInformation(const void* data, int sizeInBytes);
 
 private:
+    // Shared by the stopped (applyRhythmPreset) and playing (stageRhythmPreset) rhythm-preset loads.
+    juce::ValueTree readRhythmPresetFile(const juce::File& file) const;
+    static void     applyPresetIdentity(const juce::ValueTree& state, Rhythm& r);
+
     PluginProcessor& proc_;
 
     // Helpers extracted from loadPreset / applyRhythmPreset / restoreStateFromTree

@@ -46,6 +46,9 @@ target_sources(mu-clid
     PRIVATE
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginProcessor_APVTS.cpp
+        Source/Plugin/PluginProcessor_Modulation.cpp
+        Source/Plugin/PluginProcessor_Rhythms.cpp
+        Source/Plugin/PluginProcessor_Content.cpp
         Source/Plugin/PresetIO.cpp
         Source/Plugin/PresetIO_HostState.cpp
         Source/Persistence/PresetMigrations.cpp
@@ -259,6 +262,9 @@ target_sources(mu-clid-lite
     PRIVATE
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginProcessor_APVTS.cpp
+        Source/Plugin/PluginProcessor_Modulation.cpp
+        Source/Plugin/PluginProcessor_Rhythms.cpp
+        Source/Plugin/PluginProcessor_Content.cpp
         Source/Plugin/PresetIO.cpp
         Source/Plugin/PresetIO_HostState.cpp
         Source/Persistence/PresetMigrations.cpp
