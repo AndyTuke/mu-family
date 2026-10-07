@@ -585,28 +585,32 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
             // hits/rotate/insSt use PROPORTION-SPACE modulation because their
             // slider ranges depend on the current step count — proportion-space gives
             // 100%-mod = 100%-knob-turn regardless of step count. prePad/postPad/insLen are
-            // proportions of their parameters' fixed ranges (0..63 / 0..8 steps).
+            // likewise proportions of their knobs' current ranges (HitGenerator::padKnobMaxima).
             const int stepsA_seed = juce::jmax(1, rhythm.genA.steps);
             const int stepsB_seed = juce::jmax(1, rhythm.genB.steps);
             const int stepsC_seed = juce::jmax(1, rhythm.genC.steps);
+            const auto padMaxA = rhythm.genA.padKnobMaxima();
+            const auto padMaxB = rhythm.genB.padKnobMaxima();
+            const auto padMaxC = rhythm.genC.padKnobMaxima();
+            auto propOf = [](int v, int max) { return max > 0 ? (float) v / (float) max : 0.0f; };
             modParamValues["euclid.a.hits"]    = (float) rhythm.genA.hits         / (float) stepsA_seed;
             modParamValues["euclid.a.rotate"]  = (float) rhythm.genA.rotate       / (float) juce::jmax(1, stepsA_seed - 1);
-            modParamValues["euclid.a.prePad"]  = kPad.prop((float) rhythm.genA.prePad);
-            modParamValues["euclid.a.postPad"] = kPad.prop((float) rhythm.genA.postPad);
+            modParamValues["euclid.a.prePad"]  = propOf(rhythm.genA.prePad,       padMaxA.prePad);
+            modParamValues["euclid.a.postPad"] = propOf(rhythm.genA.postPad,      padMaxA.postPad);
             modParamValues["euclid.a.insSt"]   = (float) rhythm.genA.insertStart  / (float) juce::jmax(1, stepsA_seed - 1);
-            modParamValues["euclid.a.insLen"]  = kInsertLength.prop((float) rhythm.genA.insertLength);
+            modParamValues["euclid.a.insLen"]  = propOf(rhythm.genA.insertLength, padMaxA.insertLength);
             modParamValues["euclid.b.hits"]    = (float) rhythm.genB.hits         / (float) stepsB_seed;
             modParamValues["euclid.b.rotate"]  = (float) rhythm.genB.rotate       / (float) juce::jmax(1, stepsB_seed - 1);
-            modParamValues["euclid.b.prePad"]  = kPad.prop((float) rhythm.genB.prePad);
-            modParamValues["euclid.b.postPad"] = kPad.prop((float) rhythm.genB.postPad);
+            modParamValues["euclid.b.prePad"]  = propOf(rhythm.genB.prePad,       padMaxB.prePad);
+            modParamValues["euclid.b.postPad"] = propOf(rhythm.genB.postPad,      padMaxB.postPad);
             modParamValues["euclid.b.insSt"]   = (float) rhythm.genB.insertStart  / (float) juce::jmax(1, stepsB_seed - 1);
-            modParamValues["euclid.b.insLen"]  = kInsertLength.prop((float) rhythm.genB.insertLength);
+            modParamValues["euclid.b.insLen"]  = propOf(rhythm.genB.insertLength, padMaxB.insertLength);
             modParamValues["euclid.c.hits"]    = (float) rhythm.genC.hits         / (float) stepsC_seed;
             modParamValues["euclid.c.rotate"]  = (float) rhythm.genC.rotate       / (float) juce::jmax(1, stepsC_seed - 1);
-            modParamValues["euclid.c.prePad"]  = kPad.prop((float) rhythm.genC.prePad);
-            modParamValues["euclid.c.postPad"] = kPad.prop((float) rhythm.genC.postPad);
+            modParamValues["euclid.c.prePad"]  = propOf(rhythm.genC.prePad,       padMaxC.prePad);
+            modParamValues["euclid.c.postPad"] = propOf(rhythm.genC.postPad,      padMaxC.postPad);
             modParamValues["euclid.c.insSt"]   = (float) rhythm.genC.insertStart  / (float) juce::jmax(1, stepsC_seed - 1);
-            modParamValues["euclid.c.insLen"]  = kInsertLength.prop((float) rhythm.genC.insertLength);
+            modParamValues["euclid.c.insLen"]  = propOf(rhythm.genC.insertLength, padMaxC.insertLength);
 
             rhythm.modulationMatrix.process(rhythm.controlSequences, beatPos, modParamValues);
 
@@ -674,30 +678,29 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
                 //   hits/rotate/insSt: proportion-space mod (modParamValues already holds 0..1
                 //     slider proportion). snap stores the proportion directly — UI uses
                 //     setModulatedNorm.
-                //   prePad/postPad/insLen: additive-in-step-units on knobs whose range follows
-                //     the padding budget, so snap stores the actual step value — UI uses
-                //     setModulatedActual and maps it onto the knob's current range.
+                //   prePad/postPad/insLen: proportions of the knob's current range; snap
+                //     stores the actual step value — UI uses setModulatedActual and maps it
+                //     onto that range.
                 auto prop = [](float v) { return juce::jlimit(0.0f, 1.0f, v); };
-                auto act  = [](float v) { return juce::jmax(0.0f, kPad.value(v)); };
-                auto actLen = [](float v) { return kInsertLength.value(v); };
+                auto act  = [](float v, int max) { return juce::jlimit(0.0f, 1.0f, v) * (float) max; };
                 snap[kSnapEucAHits]    .store(prop(modParamValues["euclid.a.hits"]));
                 snap[kSnapEucARotate]  .store(prop(modParamValues["euclid.a.rotate"]));
-                snap[kSnapEucAPrePad]  .store(act(modParamValues["euclid.a.prePad"]));
-                snap[kSnapEucAPostPad] .store(act(modParamValues["euclid.a.postPad"]));
+                snap[kSnapEucAPrePad]  .store(act(modParamValues["euclid.a.prePad"],  padMaxA.prePad));
+                snap[kSnapEucAPostPad] .store(act(modParamValues["euclid.a.postPad"], padMaxA.postPad));
                 snap[kSnapEucAInsSt]   .store(prop(modParamValues["euclid.a.insSt"]));
-                snap[kSnapEucAInsLen]  .store(actLen(modParamValues["euclid.a.insLen"]));
+                snap[kSnapEucAInsLen]  .store(act(modParamValues["euclid.a.insLen"],  padMaxA.insertLength));
                 snap[kSnapEucBHits]    .store(prop(modParamValues["euclid.b.hits"]));
                 snap[kSnapEucBRotate]  .store(prop(modParamValues["euclid.b.rotate"]));
-                snap[kSnapEucBPrePad]  .store(act(modParamValues["euclid.b.prePad"]));
-                snap[kSnapEucBPostPad] .store(act(modParamValues["euclid.b.postPad"]));
+                snap[kSnapEucBPrePad]  .store(act(modParamValues["euclid.b.prePad"],  padMaxB.prePad));
+                snap[kSnapEucBPostPad] .store(act(modParamValues["euclid.b.postPad"], padMaxB.postPad));
                 snap[kSnapEucBInsSt]   .store(prop(modParamValues["euclid.b.insSt"]));
-                snap[kSnapEucBInsLen]  .store(actLen(modParamValues["euclid.b.insLen"]));
+                snap[kSnapEucBInsLen]  .store(act(modParamValues["euclid.b.insLen"],  padMaxB.insertLength));
                 snap[kSnapEucCHits]    .store(prop(modParamValues["euclid.c.hits"]));
                 snap[kSnapEucCRotate]  .store(prop(modParamValues["euclid.c.rotate"]));
-                snap[kSnapEucCPrePad]  .store(act(modParamValues["euclid.c.prePad"]));
-                snap[kSnapEucCPostPad] .store(act(modParamValues["euclid.c.postPad"]));
+                snap[kSnapEucCPrePad]  .store(act(modParamValues["euclid.c.prePad"],  padMaxC.prePad));
+                snap[kSnapEucCPostPad] .store(act(modParamValues["euclid.c.postPad"], padMaxC.postPad));
                 snap[kSnapEucCInsSt]   .store(prop(modParamValues["euclid.c.insSt"]));
-                snap[kSnapEucCInsLen]  .store(actLen(modParamValues["euclid.c.insLen"]));
+                snap[kSnapEucCInsLen]  .store(act(modParamValues["euclid.c.insLen"],  padMaxC.insertLength));
             }
 
             // Write modulated values back, clamping to safe ranges. Proportion-space
@@ -732,34 +735,32 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
 
             // Stage A: write modulated euclid values back to the per-rhythm
             // overrides snapshot. hits/rotate/insSt are proportions of the current step
-            // count; prePad/postPad/insLen are proportions of their fixed parameter ranges.
+            // count; prePad/postPad/insLen are proportions of their knobs' current ranges.
             // Both convert back to whole steps.
             auto modPropToSteps = [&](const char* key, int steps) {
                 return juce::roundToInt(juce::jlimit(0.0f, 1.0f, modParamValues[key]) * (float) steps);
             };
-            auto modPad = [&](const char* key) { return juce::roundToInt(kPad.value(modParamValues[key])); };
-            auto modLen = [&](const char* key) { return juce::roundToInt(kInsertLength.value(modParamValues[key])); };
             const int stepsA_wb = juce::jmax(1, rhythm.genA.steps);
             const int stepsB_wb = juce::jmax(1, rhythm.genB.steps);
             const int stepsC_wb = juce::jmax(1, rhythm.genC.steps);
             lastEuclidOverrides[r].a.hits         = juce::jlimit(0, stepsA_wb,        modPropToSteps("euclid.a.hits",  stepsA_wb));
             lastEuclidOverrides[r].a.rotate       = juce::jlimit(0, stepsA_wb - 1,    modPropToSteps("euclid.a.rotate", stepsA_wb - 1));
-            lastEuclidOverrides[r].a.prePad       = juce::jlimit(0, HitGenerator::kMaxPrePad, modPad("euclid.a.prePad"));
-            lastEuclidOverrides[r].a.postPad      = juce::jlimit(0, HitGenerator::kMaxPostPad, modPad("euclid.a.postPad"));
+            lastEuclidOverrides[r].a.prePad       = modPropToSteps("euclid.a.prePad", padMaxA.prePad);
+            lastEuclidOverrides[r].a.postPad      = modPropToSteps("euclid.a.postPad", padMaxA.postPad);
             lastEuclidOverrides[r].a.insertStart  = juce::jlimit(0, stepsA_wb - 1,    modPropToSteps("euclid.a.insSt", stepsA_wb - 1));
-            lastEuclidOverrides[r].a.insertLength = juce::jlimit(0, HitGenerator::kMaxInsertLength, modLen("euclid.a.insLen"));
+            lastEuclidOverrides[r].a.insertLength = modPropToSteps("euclid.a.insLen", padMaxA.insertLength);
             lastEuclidOverrides[r].b.hits         = juce::jlimit(0, stepsB_wb,        modPropToSteps("euclid.b.hits",  stepsB_wb));
             lastEuclidOverrides[r].b.rotate       = juce::jlimit(0, stepsB_wb - 1,    modPropToSteps("euclid.b.rotate", stepsB_wb - 1));
-            lastEuclidOverrides[r].b.prePad       = juce::jlimit(0, HitGenerator::kMaxPrePad, modPad("euclid.b.prePad"));
-            lastEuclidOverrides[r].b.postPad      = juce::jlimit(0, HitGenerator::kMaxPostPad, modPad("euclid.b.postPad"));
+            lastEuclidOverrides[r].b.prePad       = modPropToSteps("euclid.b.prePad", padMaxB.prePad);
+            lastEuclidOverrides[r].b.postPad      = modPropToSteps("euclid.b.postPad", padMaxB.postPad);
             lastEuclidOverrides[r].b.insertStart  = juce::jlimit(0, stepsB_wb - 1,    modPropToSteps("euclid.b.insSt", stepsB_wb - 1));
-            lastEuclidOverrides[r].b.insertLength = juce::jlimit(0, HitGenerator::kMaxInsertLength, modLen("euclid.b.insLen"));
+            lastEuclidOverrides[r].b.insertLength = modPropToSteps("euclid.b.insLen", padMaxB.insertLength);
             lastEuclidOverrides[r].c.hits         = juce::jlimit(0, stepsC_wb,        modPropToSteps("euclid.c.hits",  stepsC_wb));
             lastEuclidOverrides[r].c.rotate       = juce::jlimit(0, stepsC_wb - 1,    modPropToSteps("euclid.c.rotate", stepsC_wb - 1));
-            lastEuclidOverrides[r].c.prePad       = juce::jlimit(0, HitGenerator::kMaxPrePad, modPad("euclid.c.prePad"));
-            lastEuclidOverrides[r].c.postPad      = juce::jlimit(0, HitGenerator::kMaxPostPad, modPad("euclid.c.postPad"));
+            lastEuclidOverrides[r].c.prePad       = modPropToSteps("euclid.c.prePad", padMaxC.prePad);
+            lastEuclidOverrides[r].c.postPad      = modPropToSteps("euclid.c.postPad", padMaxC.postPad);
             lastEuclidOverrides[r].c.insertStart  = juce::jlimit(0, stepsC_wb - 1,    modPropToSteps("euclid.c.insSt", stepsC_wb - 1));
-            lastEuclidOverrides[r].c.insertLength = juce::jlimit(0, HitGenerator::kMaxInsertLength, modLen("euclid.c.insLen"));
+            lastEuclidOverrides[r].c.insertLength = modPropToSteps("euclid.c.insLen", padMaxC.insertLength);
         }
     }
 

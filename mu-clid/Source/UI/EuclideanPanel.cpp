@@ -390,14 +390,14 @@ void EuclideanPanel::updateRanges(const HitGenerator& g, const char* const (&sfx
                                   KnobWithLabel& insSt, KnobWithLabel& insLen)
 {
     const int  steps  = g.steps;
-    const int  budget = HitGenerator::maxPadding(steps);
     const auto lay    = g.clampLayout({ g.hits, g.rotate, g.prePad, g.postPad, g.insertStart, g.insertLength });
+    const auto padMax = g.padKnobMaxima();
 
     hits.setRange(0, steps, 1);
     rot.setRange(0, juce::jmax(0, steps - 1), 1);   // full 0..steps-1 per design-sequencer.md
-    pre.setRange   (0, juce::jmin(HitGenerator::kMaxPrePad,       budget - lay.postPad - lay.insertLength), 1);
-    post.setRange  (0, juce::jmin(HitGenerator::kMaxPostPad,      budget - lay.prePad  - lay.insertLength), 1);
-    insLen.setRange(0, juce::jmin(HitGenerator::kMaxInsertLength, budget - lay.prePad  - lay.postPad),      1);
+    pre.setRange   (0, padMax.prePad,       1);
+    post.setRange  (0, padMax.postPad,      1);
+    insLen.setRange(0, padMax.insertLength, 1);
 
     const auto [lo, hi] = HitGenerator::insertStartBounds(steps, lay.prePad, lay.postPad,
                                                           lay.insertLength, g.prePadMode);

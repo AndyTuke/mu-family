@@ -12,9 +12,17 @@
 
 namespace mu_pp {
 
+// Marks mu-Clid modulator data whose Pre / Post Pad and Insert Length depths are measured
+// against the knob's current maximum (HitGenerator::padKnobMaxima) rather than the full
+// 0..63 / 0..8 parameter range.
+inline constexpr const char* kPadDepthUnitsProperty = "padDepthUnits";
+inline constexpr const char* kPadDepthUnitsKnobMax  = "knobMax";
+
 inline juce::ValueTree serialiseModulators(const Rhythm& r)
 {
-    return serialiseModulators(static_cast<const VoiceSlot&>(r));
+    auto mods = serialiseModulators(static_cast<const VoiceSlot&>(r));
+    mods.setProperty(kPadDepthUnitsProperty, kPadDepthUnitsKnobMax, nullptr);
+    return mods;
 }
 
 // Modulator data saved before the family depth standard measured Pre Pad / Post Pad depth
@@ -39,9 +47,47 @@ inline juce::ValueTree upgradeModDepthsToRangeStandard(const juce::ValueTree& mo
     return upgraded;
 }
 
+// Modulator data saved before pad depths followed the knob's current maximum measured them
+// against the full parameter range (0..63 steps for the pads, 0..8 for Insert Length).
+// Rescale by fullRange / currentMax — from `r`'s already-loaded Euclid layout — so an old
+// preset modulates by the same number of steps; clamped to ±100%, which was as far as the
+// old depth could push the pattern anyway. A knob with no room (max 0) keeps its depth.
+inline juce::ValueTree upgradePadDepthsToKnobMax(const juce::ValueTree& mods, const Rhythm& r)
+{
+    if (! mods.isValid() || mods.getProperty(kPadDepthUnitsProperty).toString() == kPadDepthUnitsKnobMax)
+        return mods;
+
+    auto upgraded = mods.createCopy();
+    for (int i = 0; i < upgraded.getNumChildren(); ++i)
+    {
+        auto node = upgraded.getChild(i);
+        const auto dest = node.getProperty("dest").toString();
+        if (! dest.startsWith("euclid.")) continue;
+
+        // Ring letter → generator; target suffix → full range + current knob maximum.
+        const juce::juce_wchar ring = dest[7];
+        const HitGenerator* gen = ring == 'a' ? &r.genA : ring == 'b' ? &r.genB : ring == 'c' ? &r.genC : nullptr;
+        if (gen == nullptr) continue;
+        const auto max = gen->padKnobMaxima();
+        int fullRange = 0, knobMax = 0;
+        if      (dest.endsWith(".prePad"))  { fullRange = HitGenerator::kMaxPrePad;       knobMax = max.prePad; }
+        else if (dest.endsWith(".postPad")) { fullRange = HitGenerator::kMaxPostPad;      knobMax = max.postPad; }
+        else if (dest.endsWith(".insLen"))  { fullRange = HitGenerator::kMaxInsertLength; knobMax = max.insertLength; }
+        if (fullRange == 0 || knobMax == 0) continue;
+
+        const double depth = (double) node.getProperty("depth") * fullRange / knobMax;
+        node.setProperty("depth", juce::jlimit(-100.0, 100.0, depth), nullptr);
+    }
+    upgraded.setProperty(kPadDepthUnitsProperty, kPadDepthUnitsKnobMax, nullptr);
+    return upgraded;
+}
+
+// Every load path calls this after the rhythm's Euclid values are in place, so the
+// pad-depth upgrade sees the layout the preset plays with.
 inline juce::StringArray deserialiseModulators(const juce::ValueTree& mods, Rhythm& r)
 {
-    return deserialiseModulators(upgradeModDepthsToRangeStandard(mods), static_cast<VoiceSlot&>(r),
+    return deserialiseModulators(upgradePadDepthsToKnobMax(upgradeModDepthsToRangeStandard(mods), r),
+                                 static_cast<VoiceSlot&>(r),
         [](const std::string& id) { return ModDest::isValidSourceId(id); },
         [](const std::string& id) { return ModDest::isValidDestinationId(id); });
 }

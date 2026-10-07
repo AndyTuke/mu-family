@@ -150,6 +150,26 @@ public:
             expectEquals (hitCount, 1);   // pre-pad takes 3 of 4 steps; one Euclid step remains
         }
 
+        beginTest ("Pad knob maxima: each knob reaches what the budget leaves after the other two");
+        {
+            HitGenerator h;
+            h.steps = 16; h.prePad = 4; h.postPad = 3; h.insertLength = 2;   // budget 15
+            auto m = h.padKnobMaxima();
+            expectEquals (m.prePad, 10);        // 15 - 3 - 2
+            expectEquals (m.postPad, 9);        // 15 - 4 - 2
+            expectEquals (m.insertLength, 8);   // min(8, 15 - 4 - 3)
+
+            h.steps = 4; h.prePad = 12; h.postPad = 12; h.insertLength = 8;   // over budget: pre takes all 3
+            m = h.padKnobMaxima();
+            expectEquals (m.prePad, 3);
+            expectEquals (m.postPad, 0);
+            expectEquals (m.insertLength, 0);
+
+            h.steps = 1;   // no padding budget at all
+            m = h.padKnobMaxima();
+            expectEquals (m.prePad + m.postPad + m.insertLength, 0);
+        }
+
         beginTest ("Insert Start can't land in a Mute-mode pre-pad or run into the post-pad");
         {
             HitGenerator h;

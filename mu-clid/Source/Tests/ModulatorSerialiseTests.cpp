@@ -13,6 +13,7 @@
 #include <juce_data_structures/juce_data_structures.h>
 #include "Sequencer/Rhythm.h"
 #include "../Persistence/ModulatorSerialise.h"
+#include <map>
 
 using mu_pp::serialiseModulators;
 using mu_pp::deserialiseModulators;
@@ -116,42 +117,60 @@ public:
 
         beginTest ("Depth standard: old presets' pad modulation moves the same number of steps");
         {
+            // A 16-step ring A with Post Pad 3 and Insert Length 2: the Pre Pad knob reaches
+            // 15 - 3 - 2 = 10 steps, Insert Length reaches min(8, 15 - 3) = 8.
+            auto layout = [] (Rhythm& r) { r.genA.steps = 16; r.genA.postPad = 3; r.genA.insertLength = 2; };
             Rhythm old;
-            ModulationAssignment pad;  pad.id = "p"; pad.sourceId = "cs0_output"; pad.destinationId = "euclid.a.prePad"; pad.depth = 63.0f;
+            layout (old);
+            ModulationAssignment pad;  pad.id = "p"; pad.sourceId = "cs0_output"; pad.destinationId = "euclid.a.prePad"; pad.depth = 30.0f;
+            ModulationAssignment len;  len.id = "l"; len.sourceId = "cs0_output"; len.destinationId = "euclid.a.insLen"; len.depth = 25.0f;
             ModulationAssignment cut;  cut.id = "c"; cut.sourceId = "cs0_output"; cut.destinationId = "filter.cutoff";   cut.depth = 50.0f;
             old.modulationMatrix.addAssignment (pad);
+            old.modulationMatrix.addAssignment (len);
             old.modulationMatrix.addAssignment (cut);
+            expectEquals (old.genA.padKnobMaxima().prePad, 10);
+            expectEquals (old.genA.padKnobMaxima().insertLength, 8);
 
             auto saved = serialiseModulators (old);
             expect (saved.getProperty (kDepthUnitsProperty).toString() == kDepthUnitsRange, "new saves carry the depth-units marker");
+            expect (saved.getProperty (mu_pp::kPadDepthUnitsProperty).toString() == mu_pp::kPadDepthUnitsKnobMax,
+                    "new saves carry the pad-depth marker");
 
-            // Without the marker the data predates the standard: pad depth was % of 12 steps.
+            // Load `mods` into a rhythm with the same layout; return each assignment's depth.
+            auto loadDepths = [&] (const juce::ValueTree& mods)
+            {
+                Rhythm loaded;
+                layout (loaded);
+                clearModulators (loaded);
+                deserialiseModulators (mods, loaded);
+                std::map<std::string, float> depths;
+                for (const auto& a2 : loaded.modulationMatrix.getAssignments())
+                    depths[a2.destinationId] = a2.depth;
+                return depths;
+            };
+
+            // Pre-standard data (no markers): pad depth was % of 12 steps, Insert Length % of 8.
             auto legacy = saved.createCopy();
             legacy.removeProperty (kDepthUnitsProperty, nullptr);
-            Rhythm loaded;
-            clearModulators (loaded);
-            deserialiseModulators (legacy, loaded);
-            for (const auto& a2 : loaded.modulationMatrix.getAssignments())
-            {
-                if (a2.destinationId == "euclid.a.prePad")
-                {
-                    const float oldSteps = 63.0f / 100.0f * 12.0f;          // 63% of the old 12-step swing
-                    const float newSteps = a2.depth / 100.0f * 63.0f;       // the upgraded depth, % of 0..63
-                    expectWithinAbsoluteError (newSteps, oldSteps, 1e-3f, "same number of steps after the upgrade");
-                }
-                else
-                {
-                    expectWithinAbsoluteError (a2.depth, 50.0f, 1e-4f, "other targets load unchanged");
-                }
-            }
+            legacy.removeProperty (mu_pp::kPadDepthUnitsProperty, nullptr);
+            auto d = loadDepths (legacy);
+            expectWithinAbsoluteError (d["euclid.a.prePad"] / 100.0f * 10.0f, 0.30f * 12.0f, 1e-3f, "pre-standard pad: same steps");
+            expectWithinAbsoluteError (d["euclid.a.insLen"] / 100.0f * 8.0f,  0.25f * 8.0f,  1e-3f, "pre-standard insert length: same steps");
+            expectWithinAbsoluteError (d["filter.cutoff"], 50.0f, 1e-4f, "other targets load unchanged");
 
-            // With the marker, nothing is rescaled.
-            Rhythm current;
-            clearModulators (current);
-            deserialiseModulators (saved, current);
-            for (const auto& a2 : current.modulationMatrix.getAssignments())
-                if (a2.destinationId == "euclid.a.prePad")
-                    expectWithinAbsoluteError (a2.depth, 63.0f, 1e-4f, "current-format depth untouched");
+            // Full-range data (depthUnits only): pad depth was % of 0..63 → 30% = 18.9 steps,
+            // more than the knob's 10, so it upgrades to the whole knob (100%).
+            auto fullRange = saved.createCopy();
+            fullRange.removeProperty (mu_pp::kPadDepthUnitsProperty, nullptr);
+            d = loadDepths (fullRange);
+            expectWithinAbsoluteError (d["euclid.a.prePad"], 100.0f, 1e-3f, "full-range pad depth past the knob clamps to 100%");
+            expectWithinAbsoluteError (d["euclid.a.insLen"], 25.0f, 1e-3f, "insert length: 0..8 is already the knob range here");
+            expectWithinAbsoluteError (d["filter.cutoff"], 50.0f, 1e-4f, "other targets load unchanged");
+
+            // Current data: nothing is rescaled.
+            d = loadDepths (saved);
+            expectWithinAbsoluteError (d["euclid.a.prePad"], 30.0f, 1e-4f, "current-format depth untouched");
+            expectWithinAbsoluteError (d["euclid.a.insLen"], 25.0f, 1e-4f, "current-format depth untouched");
         }
 
         beginTest ("Invalid source/dest IDs are rejected with diagnostics");

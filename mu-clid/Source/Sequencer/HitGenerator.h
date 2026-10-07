@@ -68,6 +68,18 @@ public:
         return ov;
     }
 
+    // How far each pad knob can turn with the other two where they are — the knob ranges,
+    // and the range Pre / Post Pad and Insert Length modulation depth is measured against.
+    struct PadKnobMaxima { int prePad = 0, postPad = 0, insertLength = 0; };
+    PadKnobMaxima padKnobMaxima() const noexcept
+    {
+        const int  budget = maxPadding(steps);
+        const auto lay    = clampLayout({ hits, rotate, prePad, postPad, insertStart, insertLength });
+        return { std::max(0, std::min(kMaxPrePad,       budget - lay.postPad - lay.insertLength)),
+                 std::max(0, std::min(kMaxPostPad,      budget - lay.prePad  - lay.insertLength)),
+                 std::max(0, std::min(kMaxInsertLength, budget - lay.prePad  - lay.postPad)) };
+    }
+
     int        steps        = 8;
     int        hits         = 0;
     int        rotate       = 0;
