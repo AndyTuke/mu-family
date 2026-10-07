@@ -13,6 +13,7 @@ RhythmMiniVisual::RhythmMiniVisual(PluginProcessor& p, int index)
     miniCircle.setPatterns(r.genA.getStepTypes(), r.genB.getStepTypes(), r.genC.getStepTypes());
     miniCircle.setPlayState(&proc.rhythmPlayState[rhythmIndex], &proc.beatFraction,
                             &proc.sequencerPlaying, colour);
+    miniCircle.setSingleColour(colour);   // the sidebar icon shows the rhythm's own colour
 
     lastSigA = r.genA.signature();
     lastSigB = r.genB.signature();

@@ -45,6 +45,8 @@ public:
 
     void resized() override;
     void paint(juce::Graphics&) override;
+    void paintOverChildren(juce::Graphics&) override;
+    void lookAndFeelChanged() override;
 
     static constexpr int kHeight = 28;
 
@@ -54,6 +56,8 @@ private:
     juce::TextButton deleteBtn { juce::String::charToString(0x2715) };  // ✕
     DropdownSelect   presetDD;
     juce::TextButton saveBtn   { "Save" };
+
+    juce::Rectangle<float> nameDisplayBounds() const;   // the name's LCD (metal style)
 
     juce::Array<juce::File> presetFiles;   // set by setPresetFiles
     juce::Colour colour { juce::Colours::grey };

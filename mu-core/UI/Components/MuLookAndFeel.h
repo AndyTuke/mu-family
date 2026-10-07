@@ -172,6 +172,11 @@ public:
                                                // that aren't per-channel (mixer overlay,
                                                // global FX rows). Sequencer page uses the
                                                // current rhythm colour for the same role.
+        // App primary colours — each app passes one to setMetalStyle.
+        appPurple               = 0x100000d3,
+        appGreen                = 0x100000d4,
+        appBlue                 = 0x100000d5,
+        appYellow               = 0x100000d6,
 
         // ── Modulator label colours A–H ───────────────────────────────────
         // Named tokens for the per-modulator label palette so that all colour
@@ -196,8 +201,12 @@ public:
 
     // The product's own colour (mu-Clid purple, mu-Tant green): panel borders, raised-box
     // outlines and LCD lettering use it. Unset = globalAccent, with LCDs in segmentActiveBorder.
-    void setAppAccent(juce::Colour c) noexcept { appAccentColour = c; hasAppAccent = true; }
+    // Also makes it the app's selection colour: the theme's active segment / tab / button
+    // colours and the global (mixer) accent follow it, so nothing stays in the family purple.
+    void setAppAccent(juce::Colour c);
     static juce::Colour appAccent(juce::Component& c);
+    // `accent` as it looks painted on the metal: dull, dark and washed out (Lighting::paint*).
+    static juce::Colour paintColour(juce::Colour accent);
     static juce::Colour lcdLitColour(juce::Component& c);
 
     // Lamps: a lit indicator behind a dark lens. lampColour mixes `clr` into the opaque lamp
@@ -284,11 +293,9 @@ public:
     // Static palette helpers
     static juce::Colour colour(ColourIds id) noexcept;
 
-    // Fixed 8-colour palette for the 8 rhythm slots — Green / Red / Blue /
-    // Yellow / Brown / Orange / Cyan / Silver. Index matches creation order
-    // (rhythm 0 → palette[0]). Global / mixer accents use `globalAccent`
-    // (purple) instead — it's reserved out of this palette deliberately so a
-    // purple rhythm and a purple mixer border never collide visually.
+    // Fixed 8-colour voice palette (Red / Cyan / Orange / Magenta / Lime / Rose / Silver /
+    // Copper), index = the voice's colour index. The app primaries (appPurple / appGreen /
+    // appBlue / appYellow) are kept out of it so a voice highlight never matches the paint.
     static constexpr int kChannelPaletteSize = 8;
     static const juce::Colour channelPalette[kChannelPaletteSize];
 

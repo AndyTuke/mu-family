@@ -4,6 +4,7 @@ ChannelHeaderBar::ChannelHeaderBar()
 {
     nameLabel.setJustificationType(juce::Justification::centredLeft);
     nameLabel.setEditable(true, true, false);    // single- or double-click to rename (matches mu-clid)
+    nameLabel.getProperties().set("muLcd", true); // drawn on the name LCD, not engraved
     nameLabel.setColour(juce::Label::textColourId, MuLookAndFeel::colour(MuLookAndFeel::headingText));
     nameLabel.onTextChange = [this] { if (onNameChanged) onNameChanged(nameLabel.getText()); };
     addAndMakeVisible(nameLabel);
@@ -27,7 +28,24 @@ ChannelHeaderBar::ChannelHeaderBar()
 }
 
 void ChannelHeaderBar::setLayerName(const juce::String& n) { nameLabel.setText(n, juce::dontSendNotification); }
-void ChannelHeaderBar::setColour(juce::Colour c)           { colour = c; repaint(); }
+void ChannelHeaderBar::setColour(juce::Colour c)
+{
+    colour = c;
+    presetDD.setLcdColour(c);   // the preset selector lights in the layer colour
+    lookAndFeelChanged();       // name display: lit lettering in metal style
+    repaint();
+}
+
+void ChannelHeaderBar::lookAndFeelChanged()
+{
+    // Metal: the name is an LCD lit in the layer colour; flat: plain heading text.
+    const bool metal = MuLookAndFeel::isMetal(*this);
+    nameLabel.setColour(juce::Label::textColourId,
+                        metal ? colour.brighter(0.3f) : MuLookAndFeel::colour(MuLookAndFeel::headingText));
+    nameLabel.setFont(metal ? MuLookAndFeel::lcdFont(mu_ui::sf(13.0f))
+                            : juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(15.0f))));
+    repaint();
+}
 
 void ChannelHeaderBar::setPresetItems(const juce::StringArray& names)
 {
@@ -100,7 +118,7 @@ void ChannelHeaderBar::resized()
     const int nameW  = s(120);
     const int ddLeft = s(kNameX) + nameW + s(8);
     presetDD.setBounds(ddLeft, btnY, juce::jmax(s(80), x - s(4) - ddLeft), btnH);
-    nameLabel.setBounds(s(kNameX), s(2), nameW, h - s(4));
+    nameLabel.setBounds(s(kNameX), btnY, nameW, btnH);   // same row as the preset selector
 }
 
 void ChannelHeaderBar::paint(juce::Graphics& g)
@@ -109,10 +127,14 @@ void ChannelHeaderBar::paint(juce::Graphics& g)
     using mu_ui::s; using mu_ui::sf;
     const int h = getHeight();
 
-    // Colour dot + a rounded border round the name box, both in the layer colour.
+    // Colour dot in the layer colour. Metal: the name sits on an LCD backlit in that colour
+    // (its glare + bezel go on top in paintOverChildren); flat: a rounded border round it.
     g.setColour(colour);
     g.fillEllipse((float) s(kDotX), (h - s(10)) * 0.5f, (float) s(10), (float) s(10));
-    g.drawRoundedRectangle(nameLabel.getBounds().toFloat().reduced(1.0f), sf(4.0f), sf(1.5f));
+    if (MuLookAndFeel::isMetal(*this))
+        MuLookAndFeel::drawLcdGlass(g, nameDisplayBounds(), colour, true);
+    else
+        g.drawRoundedRectangle(nameLabel.getBounds().toFloat().reduced(1.0f), sf(4.0f), sf(1.5f));
 
     // Optional pending hot-swap "SWP" pill on the preset dropdown (mu-clid).
     if (staging)
@@ -126,4 +148,17 @@ void ChannelHeaderBar::paint(juce::Graphics& g)
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(8.0f))));
         g.drawText("SWP", bx, by, bw, bh, juce::Justification::centred, false);
     }
+}
+
+juce::Rectangle<float> ChannelHeaderBar::nameDisplayBounds() const
+{
+    // Same height and row as the preset selector, so the two displays line up.
+    return nameLabel.getBounds().toFloat().withY((float) presetDD.getY())
+                                         .withHeight((float) presetDD.getHeight());
+}
+
+void ChannelHeaderBar::paintOverChildren(juce::Graphics& g)
+{
+    if (MuLookAndFeel::isMetal(*this))
+        MuLookAndFeel::drawLcdFront(g, nameDisplayBounds());
 }

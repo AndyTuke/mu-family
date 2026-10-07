@@ -317,12 +317,12 @@ void RhythmCircle::paint(juce::Graphics& g)
     if (!patternA.empty())
     {
         drawRing(g, patternA, cx, cy, aOuter, aInner,
-                 MuLookAndFeel::colour(Id::ringEuclidA), stepA, rotAngleA,
+                 ringColour(Id::ringEuclidA), stepA, rotAngleA,
                  ringCaches[0]);
     }
     else
     {
-        g.setColour(MuLookAndFeel::lampColour(MuLookAndFeel::colour(Id::ringEuclidA), MuLookAndFeel::lighting().lampOff));
+        g.setColour(MuLookAndFeel::lampColour(ringColour(Id::ringEuclidA), MuLookAndFeel::lighting().lampOff));
         juce::Path ring;
         ring.addCentredArc(cx, cy, aOuter, aOuter, 0.0f, 0.0f, juce::MathConstants<float>::twoPi, true);
         ring.addCentredArc(cx, cy, aInner, aInner, 0.0f, juce::MathConstants<float>::twoPi, 0.0f, false);
@@ -341,12 +341,12 @@ void RhythmCircle::paint(juce::Graphics& g)
         if (!patternB.empty())
         {
             drawRing(g, patternB, cx, cy, bOuter, bInner,
-                     MuLookAndFeel::colour(Id::ringEuclidB), stepB, rotAngleB,
+                     ringColour(Id::ringEuclidB), stepB, rotAngleB,
                      ringCaches[1]);
         }
         else
         {
-            g.setColour(MuLookAndFeel::lampColour(MuLookAndFeel::colour(Id::ringEuclidB), MuLookAndFeel::lighting().lampOff));
+            g.setColour(MuLookAndFeel::lampColour(ringColour(Id::ringEuclidB), MuLookAndFeel::lighting().lampOff));
             juce::Path ring;
             ring.addCentredArc(cx, cy, bOuter, bOuter, 0.0f, 0.0f, juce::MathConstants<float>::twoPi, true);
             ring.addCentredArc(cx, cy, bInner, bInner, 0.0f, juce::MathConstants<float>::twoPi, 0.0f, false);
@@ -363,7 +363,7 @@ void RhythmCircle::paint(juce::Graphics& g)
         if (cInner > 0.0f)
         {
             drawRing(g, patternC, cx, cy, cOuter, cInner,
-                     MuLookAndFeel::colour(Id::ringEuclidC), -1, rotAngleC,
+                     ringColour(Id::ringEuclidC), -1, rotAngleC,
                      ringCaches[2]);
             innerLimit = cInner - ringGap;
         }

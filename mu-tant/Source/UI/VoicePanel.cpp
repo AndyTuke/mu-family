@@ -45,8 +45,8 @@ void FilterRoutingButton::timerCallback()
 void FilterRoutingButton::paintButton(juce::Graphics& g, bool highlighted, bool)
 {
     const auto r = getLocalBounds().toFloat().reduced(1.5f);
-    // Family purple — rendered at all times regardless of Series/Parallel state.
-    const auto accent = MuLookAndFeel::colour(MuLookAndFeel::knobEuclidean);
+    // The app colour — rendered at all times regardless of Series/Parallel state.
+    const auto accent = MuLookAndFeel::appAccent(*this);
     g.setColour(highlighted ? accent.brighter(0.25f) : accent.withAlpha(0.9f));
     g.fillEllipse(r);
     g.setColour(accent.brighter(0.4f));
@@ -586,12 +586,12 @@ void VoicePanel::paint(juce::Graphics& g)
         (size_t)(proc.getChannelColourIndex(currentVoice) % MuLookAndFeel::kChannelPaletteSize)];
     const auto muted = MuLookAndFeel::colour(Id::mutedText);
 
-    // Metal style: preset bar in the voice colour, every section a metal panel in the app
-    // colour with its name on a plate, and the gate editor + modulators on metal panels.
+    // Metal style: the preset bar and every section a metal panel painted in the app
+    // colour (the header bar lights its displays in the voice colour), sections named on a plate, and the gate editor + modulators on metal panels.
     if (MuLookAndFeel::isMetal(*this))
     {
         const auto accent = MuLookAndFeel::appAccent(*this);
-        MuLookAndFeel::drawAccentPanel(g, headerBar.getBounds().expanded(hdrPanelPad(), s(2)).toFloat().reduced(2.0f), voiceCol);
+        MuLookAndFeel::drawAccentPanel(g, headerBar.getBounds().expanded(hdrPanelPad(), s(2)).toFloat().reduced(2.0f), accent);
         const std::pair<const juce::Rectangle<int>*, const char*> sections[] = {
             { &osc1PanelR, "OSC 1" }, { &osc2PanelR, "OSC 2" }, { &noisePanelR, "NOISE" }, { &modNoisePanelR, "X-MOD" },
             { &filterPanelR, "FILTER" }, { &insertPanelR, "EFFECTS" }, { &mixerPanelR, "MIXER" } };

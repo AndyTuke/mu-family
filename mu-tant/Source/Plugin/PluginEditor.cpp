@@ -96,7 +96,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     clearPresetDirty();
 
     // The family metal look, in mu-Tant's green.
-    setMetalStyle(true, MuLookAndFeel::channelPalette[0]);
+    setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appGreen));
 }
 
 PluginEditor::~PluginEditor()

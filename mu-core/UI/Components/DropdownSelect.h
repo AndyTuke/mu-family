@@ -19,6 +19,9 @@ public:
 
     // LCD look: dark glass with the value in glowing lettering (matches LCD tabs).
     void setLcdStyle(bool lcd);
+    // Light the LCD in `c` instead of the app colour (backlit glass + lettering) — e.g. a
+    // voice's own colour on its preset selector. Transparent = back to the app colour.
+    void setLcdColour(juce::Colour c);
 
     // Returns the currently displayed item text (or empty if nothing selected).
     juce::String getText() const { return combo.getText(); }

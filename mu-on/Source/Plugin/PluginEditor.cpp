@@ -82,7 +82,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     clearPresetDirty();
 
     // The family metal look.
-    setMetalStyle(true);
+    setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));
 }
 
 PluginEditor::~PluginEditor()

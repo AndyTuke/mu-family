@@ -26,10 +26,18 @@ public:
                       const std::atomic<bool>*            playing,
                       juce::Colour                         colour);
 
+    // Draw all three rings in `c` (the sidebar's mini icon, lit in the rhythm's colour)
+    // instead of the Euclid A / B / Accent colours. Transparent = the ring colours.
+    void setSingleColour(juce::Colour c) { singleColour = c; repaint(); }
+
     void paint(juce::Graphics&) override;
     void timerCallback() override;
 
 private:
+    juce::Colour singleColour;   // transparent → per-ring colours
+    juce::Colour ringColour(MuLookAndFeel::ColourIds id) const
+    { return singleColour.isTransparent() ? MuLookAndFeel::colour(id) : singleColour; }
+
     std::vector<StepType> patternA, patternB, patternC;
 
     // Non-owning pointers to PluginProcessor atomics

@@ -47,6 +47,16 @@ void DropdownSelect::setLcdStyle(bool lcd)
     combo.repaint();
 }
 
+void DropdownSelect::setLcdColour(juce::Colour c)
+{
+    if (c.isTransparent()) combo.getProperties().remove("muLcdColour");
+    else                   combo.getProperties().set("muLcdColour", (juce::int64) c.getARGB());
+    if (MuLookAndFeel::lcdCombo(combo))
+        combo.setColour(juce::ComboBox::textColourId, MuLookAndFeel::lcdLitColour(combo));
+    combo.lookAndFeelChanged();   // positionComboBoxText re-colours the value label
+    combo.repaint();
+}
+
 void DropdownSelect::resized()
 {
     combo.setBounds(getLocalBounds());

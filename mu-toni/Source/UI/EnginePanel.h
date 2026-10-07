@@ -191,7 +191,7 @@ public:
         if (MuLookAndFeel::isMetal(*this))
         {
             const auto accent = MuLookAndFeel::appAccent(*this);
-            MuLookAndFeel::drawAccentPanel(g, headerR.reduced(2).toFloat(), layerColour());   // preset bar in the layer colour
+            MuLookAndFeel::drawAccentPanel(g, headerR.reduced(2).toFloat(), accent);   // the header bar lights its displays in the layer colour
             static const char* const plateTitles[] = { "OSCILLATOR 1", "OSCILLATOR 2", "MIX" };
             for (int i = 0; i < 3; ++i)
                 MuLookAndFeel::drawTitledPanel(g, oscR[(size_t) i].toFloat().reduced(2.0f), plateTitles[i], accent);

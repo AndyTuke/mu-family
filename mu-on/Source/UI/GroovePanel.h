@@ -152,11 +152,9 @@ public:
         g.fillAll(MuLookAndFeel::colour(MuLookAndFeel::panelBackground));
         if (! MuLookAndFeel::isMetal(*this)) return;
 
-        // Metal style: preset bar in the lane colour, every other area in the app colour.
-        const auto laneCol = MuLookAndFeel::channelPalette[(size_t) juce::jlimit(0, MuLookAndFeel::kChannelPaletteSize - 1,
-                                                                                  proc.getChannelColourIndex(currentChannel))];
+        // Metal style: every area painted in the app colour.
         const auto accent  = MuLookAndFeel::appAccent(*this);
-        MuLookAndFeel::drawAccentPanel(g, headerR.reduced(2).toFloat(), laneCol);
+        MuLookAndFeel::drawAccentPanel(g, headerR.reduced(2).toFloat(), accent);   // the header bar lights its displays in the lane colour
         for (auto rr : { engineR, slotR, modR })
             MuLookAndFeel::drawAccentPanel(g, rr.reduced(2).toFloat(), accent);
     }

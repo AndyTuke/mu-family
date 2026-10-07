@@ -255,11 +255,11 @@ These apply to all mu plugins uniformly.
 
 ---
 
-## 8. Rhythm Colour Palette
+## 8. Voice Colour Palette
 
-30 colours shared across all plugins that use rhythm slots. Index into `MuLookAndFeel::rhythmPalette[30]`. The palette provides enough variety for 8 active rhythms with visually distinct colours.
+Every app gives each voice (mu-Clid rhythm, mu-Tant voice, mu-Toni layer, mu-On track) its own colour from `MuLookAndFeel::channelPalette[8]`: **Red, Cyan, Orange, Magenta, Lime, Rose, Silver, Copper**, indexed by the voice's colour index. The four app primaries (purple, green, blue, yellow — §11) are deliberately left out, so a voice's highlight never blends into its app's painted panels.
 
-Plugins that do not use rhythm slots ignore this palette.
+The voice colour lights the voice's icon in the left sidebar (and its selected outline), and the header bar's **name display** and **preset selector** (both LCDs backlit in it). Everything else is in the app colour.
 
 ---
 
@@ -314,9 +314,13 @@ All existing ID values in `ColourIds` are frozen — never renumber them.
 The look developed on mu-Clid in v1.1 (backlog #1099–#1118) is the **standard look for every mu-family app**. All of it lives in mu-core; a product turns it on with **one call** at the end of its editor constructor, once its children exist:
 
 ```cpp
-setMetalStyle(true);                                   // mu-Clid: globalAccent purple
-setMetalStyle(true, juce::Colour(0xff3ddc84));         // e.g. mu-Tant: its own green
+setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appPurple));   // mu-Clid
+setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appGreen));    // mu-Tant
+setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appBlue));     // mu-Toni
+setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));   // mu-On
 ```
+
+**Each app has one primary colour** (tokens `appPurple / appGreen / appBlue / appYellow`, values in `MuTheme::AppPrimaries`). The panels show it **painted on the metal — dull, dark and washed out**, never as a neon glow: `MuLookAndFeel::paintColour(accent)` desaturates and darkens it (`Lighting::paintSaturation / paintBrightness`), and panels take a coat of that paint with the brushed grain showing through (`paintCoat`) plus a slightly lighter painted edge (`paintEdgeLift`). The bright primary is kept for things that light up: LCD lettering and the selected state of segments, tabs and toggle buttons (`setAppAccent` points the theme's active-segment colours and the global accent at it, so no family purple is left over).
 
 `EditorShellBase::setMetalStyle` sets the flag + app accent on the editor's `MuLookAndFeel` and sends a LookAndFeel change, so the shared components (`ChannelSidebar`, `ModulatorPanel` → `ModulatorEditor` / `ModMatrixPanel`) switch themselves in `lookAndFeelChanged()`. Products that have not opted in keep the flat look, untouched.
 
@@ -326,7 +330,7 @@ setMetalStyle(true, juce::Colour(0xff3ddc84));         // e.g. mu-Tant: its own 
 
 | Element | Use for | mu-core API |
 |---|---|---|
-| **Metal panel** — tint + brushed grain + diagonal sheen + top-right glow, **painted border** in the accent | Every top-level panel. App accent everywhere; the layer (rhythm / voice) colour **only** on the per-layer preset bar | `MuLookAndFeel::drawAccentPanel(g, bounds, accent)` |
+| **Metal panel** — a coat of the app colour's paint + brushed grain + diagonal sheen + top-right glow, **painted border** a touch lighter | Every top-level panel, the per-voice preset bar included — always the app colour | `MuLookAndFeel::drawAccentPanel(g, bounds, appAccent)` |
 | **Raised sub-panel** — cast shadow down-left, lit face with metal finish, bevelled edge | Groups of controls inside a panel (Euclid / Pad / Insert boxes, sidebar layers, modulator header + assignments) | `drawRaisedSubPanelShadow` then `drawRaisedSubPanel` — **draw every shadow before any face** so no shadow lands on a neighbour |
 | **Metal finish** | Custom surfaces that should match the panels | `drawMetalFinish(g, shape, bounds, brush, bands)` |
 | **Name plate** — small raised dark plate, screws, engraved text | Section / row names (PITCH, FILTER, Euclid A…). Same height everywhere | `drawNamePlate(g, bounds, text)`, `namePlateWidth(text, h)`, height `kNamePlateH` |
@@ -340,6 +344,7 @@ setMetalStyle(true, juce::Colour(0xff3ddc84));         // e.g. mu-Tant: its own 
 
 - **Light comes from the top right** — highlights top-right, shadows fall down-left, recesses are dark top-right.
 - **Even spacing** — the gap between raised boxes, between rows and to the panel edge is one token (`kSpaceXS` in mu-Clid's Euclid panel); plates sit 2 px above their boxes.
-- **Layer colour is identity, not decoration** — it marks the selected layer (sidebar outline) and the preset bar; panels stay in the app accent.
+- **Voice colour is identity, not decoration** — it lights the voice's sidebar icon (+ selected outline) and the header bar's name display + preset selector (`ChannelHeaderBar::setColour`, `DropdownSelect::setLcdColour`); panels stay in the app paint.
+- **Knob colours stay functional** (pitch purple, filter teal, amp orange …) in every app — they are not the app colour.
 - **One item at a time beats a scrolling list** in small areas — mu-Clid's modulation targets show one row with an `n / N` readout and an up/down stepper (metal-style `ModulatorEditor`).
 - Positioning stays app-specific; only the look is shared.

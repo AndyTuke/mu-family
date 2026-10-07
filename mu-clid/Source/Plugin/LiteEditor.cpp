@@ -141,6 +141,7 @@ LiteEditor::LiteEditor(PluginProcessor& p)
 
     // The family metal look (LCD dropdowns, engraved labels, metal panel).
     lookAndFeel.setMetalStyle(true);
+    lookAndFeel.setAppAccent(MuLookAndFeel::colour(MuLookAndFeel::appPurple));
     sendLookAndFeelChange();
 }
 

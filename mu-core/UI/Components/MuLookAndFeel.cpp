@@ -111,6 +111,10 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
         case mixerInactiveNameBg:     return t.mixer.inactiveNameBg;
         // Global / non-rhythm accent (mixer borders, etc.)
         case globalAccent:            return t.global.accent;
+        case appPurple:               return t.apps.purple;
+        case appGreen:                return t.apps.green;
+        case appBlue:                 return t.apps.blue;
+        case appYellow:               return t.apps.yellow;
         // Modulator label colours A–H (reuse the ring/knob theme fields by intent)
         case modLabelA:               return t.rings.modA;
         case modLabelB:               return t.rings.modB;
@@ -126,19 +130,18 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
     }
 }
 
-// Fixed 8-colour palette indexed by channel (rhythm in mu-clid, layer in mu-tant).
-// Order matches the slot index — slot 0 is Green, slot 1 is Blue, etc. Purple is
-// intentionally absent (reserved for the global / mixer accent — see
-// MuTheme::Global::accent) so a channel border and a mixer border never share a hue.
+// Fixed 8-colour voice palette indexed by channel (rhythm / voice / layer / track).
+// The four app primaries (purple, green, blue, yellow — MuTheme::AppPrimaries) are left
+// out, so a voice's highlight never blends into its app's painted panels.
 const juce::Colour MuLookAndFeel::channelPalette[MuLookAndFeel::kChannelPaletteSize] = {
-    juce::Colour(0xff4ADC8E),   // 0 Green
-    juce::Colour(0xff378ADD),   // 1 Blue
-    juce::Colour(0xffEF9F27),   // 2 Yellow / amber
-    juce::Colour(0xff8B6B4A),   // 3 Brown
-    juce::Colour(0xffD85A30),   // 4 Orange / coral
-    juce::Colour(0xff2BB5C5),   // 5 Cyan
-    juce::Colour(0xffB8B8B0),   // 6 Silver grey
-    juce::Colour(0xffE24B4A),   // 7 Red (moved to last so a fresh 2-rhythm patch picks Blue, not Red)
+    juce::Colour(0xffE5484D),   // 0 Red
+    juce::Colour(0xff2EC4C9),   // 1 Cyan
+    juce::Colour(0xffF28C28),   // 2 Orange
+    juce::Colour(0xffD04FC8),   // 3 Magenta
+    juce::Colour(0xffA6D63A),   // 4 Lime
+    juce::Colour(0xffF07CA6),   // 5 Rose
+    juce::Colour(0xffC9CCD1),   // 6 Silver
+    juce::Colour(0xffB87445),   // 7 Copper
 };
 
 MuLookAndFeel::MuLookAndFeel()
@@ -489,9 +492,10 @@ void MuLookAndFeel::drawAccentPanel(juce::Graphics& g, juce::Rectangle<float> r,
     const auto& L = lighting();
     juce::Path shape;
     shape.addRoundedRectangle(r, cornerSize);
+    const auto paint = paintColour(accent);
 
-    // Wash: the accent at a whisper over whatever the panel sits on.
-    g.setColour(accent.withAlpha(L.panelTint));
+    // Coat: the app colour painted thinly over the metal — dull and dark, not a glow.
+    g.setColour(paint.withAlpha(L.paintCoat));
     g.fillPath(shape);
 
     // Metal: brushed grain plus soft diagonal reflection bands, lit from the top right.
@@ -504,25 +508,27 @@ void MuLookAndFeel::drawAccentPanel(juce::Graphics& g, juce::Rectangle<float> r,
         const auto  corner = r.getTopRight();
         const float reach  = juce::jmin(std::hypot(r.getWidth(), r.getHeight()) * L.panelHighlightReach,
                                         mu_ui::sf(L.panelHighlightMaxPx));
-        juce::ColourGradient glow(accent.withAlpha(L.highlight(L.panelHighlight)), corner.x, corner.y,
-                                  accent.withAlpha(0.0f), corner.x - reach, corner.y, true);
-        glow.addColour(0.4, accent.withAlpha(L.highlight(L.panelHighlight) * 0.35f));
+        const auto  light  = paint.brighter(1.0f);
+        juce::ColourGradient glow(light.withAlpha(L.highlight(L.panelHighlight)), corner.x, corner.y,
+                                  light.withAlpha(0.0f), corner.x - reach, corner.y, true);
+        glow.addColour(0.4, light.withAlpha(L.highlight(L.panelHighlight) * 0.35f));
         g.setGradientFill(glow);
         g.fillRect(r);
     }
 
-    // Painted border: an accent band on the panel's edge, the metal's grain showing through
-    // the paint, lit from the top right, with a darker line where the paint ends.
+    // Painted border: a band of the same paint, a touch lighter, on the panel's edge, the
+    // metal's grain showing through, lit from the top right, darker where the paint ends.
     juce::Path band;
     juce::PathStrokeType(L.panelPaintWidth).createStrokedPath(band, shape);
     const auto bandBounds = band.getBounds();
-    g.setColour(accent.withAlpha(L.panelPaintOpacity));
+    const auto edgePaint = paint.brighter(L.paintEdgeLift);
+    g.setColour(edgePaint.withAlpha(L.panelPaintOpacity));
     g.fillPath(band);
     drawMetalFinish(g, band, bandBounds, L.panelPaintGrain, 0.0f);
     g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(L.highlight(L.panelPaintSheen)), bandBounds.getTopRight(),
                                            juce::Colours::black.withAlpha(L.shadow(L.panelPaintSheen)), bandBounds.getBottomLeft(), false));
     g.fillPath(band);
-    g.setColour(accent.darker(0.6f).withAlpha(L.shadow(L.panelPaintEdge)));
+    g.setColour(edgePaint.darker(0.6f).withAlpha(L.shadow(L.panelPaintEdge)));
     g.strokePath(band, juce::PathStrokeType(0.6f));
 }
 
@@ -551,8 +557,35 @@ juce::Colour MuLookAndFeel::appAccent(juce::Component& c)
     return (mlf != nullptr && mlf->hasAppAccent) ? mlf->appAccentColour : colour(globalAccent);
 }
 
+void MuLookAndFeel::setAppAccent(juce::Colour c)
+{
+    appAccentColour = c;
+    hasAppAccent    = true;
+
+    // The theme is per plugin binary, so this only recolours this app.
+    auto& t = MuTheme::current();
+    t.segments.activeBorder = c;
+    t.segments.activeBg     = c.withMultipliedSaturation(lighting().selectedSaturation)
+                               .withMultipliedBrightness(lighting().selectedBrightness);
+    t.global.accent         = c;
+    // Refresh the LookAndFeel defaults the constructor took from the old theme colours.
+    setColour(juce::TextButton::buttonOnColourId, t.segments.activeBg);
+    for (auto id : { (int) juce::TextButton::textColourOnId, (int) juce::PopupMenu::highlightedTextColourId })
+        setColour(id, c);
+}
+
+juce::Colour MuLookAndFeel::paintColour(juce::Colour accent)
+{
+    const auto& L = lighting();
+    return accent.withSaturation(accent.getSaturation() * L.paintSaturation)
+                 .withBrightness(accent.getBrightness() * L.paintBrightness);
+}
+
 juce::Colour MuLookAndFeel::lcdLitColour(juce::Component& c)
 {
+    // A display lit in its own colour (DropdownSelect::setLcdColour) — e.g. a voice's.
+    if (const auto* own = c.getProperties().getVarPointer("muLcdColour"))
+        return juce::Colour((juce::uint32) (juce::int64) *own).brighter(0.3f);
     auto* mlf = dynamic_cast<MuLookAndFeel*>(&c.getLookAndFeel());
     return (mlf != nullptr && mlf->hasAppAccent) ? mlf->appAccentColour.brighter(0.6f) : lcdLitColour();
 }
@@ -721,7 +754,7 @@ void MuLookAndFeel::drawRaisedSubPanel(juce::Graphics& g, juce::Rectangle<float>
                                            juce::Colours::black.withAlpha(L.shadow(L.subPanelEdgeShade)), r.getBottomLeft(), false));
     g.strokePath(edge, juce::PathStrokeType(1.5f));
 
-    g.setColour(accent.withAlpha(L.subPanelOutline));
+    g.setColour(paintColour(accent).brighter(L.paintEdgeLift).withAlpha(L.subPanelOutline));
     g.strokePath(shape, juce::PathStrokeType(1.0f));
 }
 
@@ -768,7 +801,8 @@ void MuLookAndFeel::drawComboBox(juce::Graphics& g, int w, int h, bool /*isDown*
     if (lcdCombo(box))
     {
         const juce::Rectangle<float> r(0.0f, 0.0f, (float) w, (float) h);
-        drawLcdGlass(g, r, colour(segmentActiveBorder), false);
+        const bool ownColour = box.getProperties().contains("muLcdColour");   // backlit in it
+        drawLcdGlass(g, r, ownColour ? lcdLitColour(box) : colour(segmentActiveBorder), ownColour);
         const float arrowSize = h * 0.3f;
         const float arrowX = w - arrowSize * 1.7f;
         const float arrowY = (h - arrowSize * 0.6f) * 0.5f;
@@ -820,9 +854,11 @@ void MuLookAndFeel::drawLabel(juce::Graphics& g, juce::Label& label)
         g.setFont(label.getFont());
 
         // Metal style: plain text labels are engraved into the metal. Labels with their own
-        // background (badges, banners) and a ComboBox's value (an LCD) stay flat.
+        // background (badges, banners), a ComboBox's value and labels shown on an LCD
+        // ("muLcd" property, e.g. the header bar's name display) stay flat.
         const bool onMetal = metalStyle
                           && label.findColour(juce::Label::backgroundColourId).isTransparent()
+                          && ! (bool) label.getProperties()["muLcd"]
                           && dynamic_cast<juce::ComboBox*>(label.getParentComponent()) == nullptr;
         if (onMetal)
             drawEngravedText(g, label.getText(), label.getLocalBounds().reduced(2, 0),

@@ -689,12 +689,11 @@ void RhythmPanel::paint(juce::Graphics& g)
     g.setColour(MuLookAndFeel::colour(Id::panelBackground));
     g.fillAll();
 
-    // The preset bar is a panel in the rhythm's own colour (its dot + name border are
-    // drawn by the shared ChannelHeaderBar on top); every other panel wears the app colour.
+    // Every panel, the preset bar included, is painted in the app colour; the shared
+    // ChannelHeaderBar lights its name + preset displays in the rhythm's own colour.
     using mu_ui::s;
-    MuLookAndFeel::drawAccentPanel(g, juce::Rectangle<int>(0, 0, getWidth(), s(kHeaderH)).reduced(2).toFloat(),
-                                   currentColour());
     const juce::Colour appCol = MuLookAndFeel::appAccent(*this);
+    MuLookAndFeel::drawAccentPanel(g, juce::Rectangle<int>(0, 0, getWidth(), s(kHeaderH)).reduced(2).toFloat(), appCol);
     for (auto r : { sampleRect, circleRect, euclidRect, voiceRect, modRect })
         MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), appCol);
 

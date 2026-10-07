@@ -91,7 +91,7 @@ public:
     // Distinct palette entries per instrument lane.
     int          getChannelColourIndex(int idx) const override
     {
-        static constexpr int kColours[kNumChannels] = { 0, 2, 5, 7, 4 };  // Kick/Bass/Hat/Snare/Rumble
+        static constexpr int kColours[kNumChannels] = { 0, 2, 1, 3, 4 };  // Kick red / Bass orange / Hat cyan / Snare magenta / Rumble lime
         return (idx >= 0 && idx < kNumChannels) ? kColours[idx] : 0;
     }
 

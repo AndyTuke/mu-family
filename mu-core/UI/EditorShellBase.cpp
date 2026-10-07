@@ -341,7 +341,12 @@ void EditorShellBase::setMixerOverlay(juce::Component* overlay)
 void EditorShellBase::setMetalStyle(bool metal, juce::Colour appAccent)
 {
     lookAndFeel.setMetalStyle(metal);
-    if (! appAccent.isTransparent()) lookAndFeel.setAppAccent(appAccent);
+    if (! appAccent.isTransparent())
+    {
+        lookAndFeel.setAppAccent(appAccent);
+        upgradeBanner.setColour(juce::Label::backgroundColourId,   // set before the app colour existed
+                                MuLookAndFeel::colour(MuLookAndFeel::segmentActiveBg));
+    }
     sendLookAndFeelChange();   // shared components re-read the style in lookAndFeelChanged()
     repaint();
 }

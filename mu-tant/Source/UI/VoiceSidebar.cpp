@@ -94,8 +94,8 @@ namespace
             const float cx = b.getCentreX(), cy = b.getCentreY();
             const float maxR = std::min(b.getWidth(), b.getHeight()) * 0.5f;
 
-            // Background disc — faint presence even when silent.
-            g.setColour(colour.withAlpha(0.10f));
+            // Background disc — the voice colour shows even when silent.
+            g.setColour(colour.withAlpha(0.18f));
             g.fillEllipse(cx - maxR, cy - maxR, maxR * 2.0f, maxR * 2.0f);
 
             // Each band is a separate stroked ring so bands are visually independent.
@@ -110,7 +110,7 @@ namespace
             {
                 // Centre radius of this ring.
                 const float r     = (float)(band + 1) * bandStep - strokeW * 0.5f;
-                const float alpha = juce::jlimit(0.0f, 0.90f, 0.06f + bands[band] * 0.84f);
+                const float alpha = juce::jlimit(0.0f, 0.90f, 0.14f + bands[band] * 0.76f);
                 g.setColour(colour.withAlpha(alpha));
                 juce::Path ring;
                 ring.addEllipse(cx - r, cy - r, r * 2.0f, r * 2.0f);
@@ -118,8 +118,8 @@ namespace
             }
 
             // Outer border.
-            g.setColour(colour.withAlpha(0.40f));
-            g.drawEllipse(b.reduced(0.5f), 1.0f);
+            g.setColour(colour.withAlpha(0.85f));
+            g.drawEllipse(b.reduced(0.75f), 1.5f);
         }
 
         juce::Colour              colour;

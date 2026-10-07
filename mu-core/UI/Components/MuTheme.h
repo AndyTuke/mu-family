@@ -181,6 +181,17 @@ struct MuTheme
         juce::Colour accent            { 0xff7F77DD };  // purple
     } global;
 
+    // ── App primary colours ───────────────────────────────────────────────
+    // Each app picks one (setMetalStyle); panels show it painted on the metal
+    // (Lighting::paint*), LCD lettering lit in it. Kept out of the voice palette.
+    struct AppPrimaries
+    {
+        juce::Colour purple            { 0xff7F77DD };
+        juce::Colour green             { 0xff4ADC8E };
+        juce::Colour blue              { 0xff3D8BEB };
+        juce::Colour yellow            { 0xffF2C53D };
+    } apps;
+
     // ── Lighting ──────────────────────────────────────────────────────────
     // Every shadow, highlight and tint the family draws, in one place. The light comes
     // from the top right. The two master amounts scale everything below them: raise
@@ -215,8 +226,15 @@ struct MuTheme
         float switchRingGlow     = 0.14f;   // disc ring glow (resting)
         float switchRingGlowHover= 0.22f;   //   … and when hovered
 
+        // Paint: the app colour as it looks painted on metal (paintColour) — dull, dark, washed out.
+        float paintSaturation    = 0.60f;   // app colour's saturation scaled by this
+        float paintBrightness    = 0.55f;   //   … and its brightness
+        float paintCoat          = 0.45f;   // panel face: paint over the dark base (not scaled by the masters)
+        float paintEdgeLift      = 0.35f;   // painted border band a touch lighter than the face
+        float selectedSaturation = 1.0f;    // selected segment / button fill: app colour's saturation × this
+        float selectedBrightness = 0.52f;   //   … and brightness × this (the old purple pair's ratio)
+
         // Panels (drawAccentPanel)
-        float panelTint          = 0.07f;   // accent wash (not scaled by the masters)
         float panelHighlight     = 0.20f;   // top-right glow
         float panelHighlightReach= 0.6f;    //   reach, fraction of the panel diagonal
         float panelHighlightMaxPx= 380.0f;  //   … capped at this many px
