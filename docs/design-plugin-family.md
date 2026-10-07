@@ -141,6 +141,12 @@ The `mu-core` INTERFACE library (introduced in Stage 33) holds everything shared
 | `mu_fmt` value text | `mu-core/ValueFormat.h` | One formatter set (`time` / `parseTime` / `freq` / `lowCut` / `percent`) for parameter text, knob text and status-bar text — never re-write a formatter in a product |
 | `mu_ui::choiceNames` / `addChoiceItems` | `mu-core/UI/ParamChoices.h` | Fill a selector from its `AudioParameterChoice`, so the shown list can't drift from the stored one |
 | Spin lock helpers | `mu-core/Audio/SpinLock.h` | `mu_core::trySpinLock` (audio thread), `spinLock` / `spinLockFor(n)` (message thread), `spinUnlock`, `ScopedSpinLock` — on any `std::atomic<bool>` / `CopyableSpinLock` flag; never hand-roll a `compare_exchange` loop |
+| Filter families | `mu-core/Audio/Filters/FilterFamilies.h` | `SvfFilter12<type>`, `LadderFilter24<mode>`, `StereoBiquadFilter<setCoefficients>`, `CombFeedbackFilter<sign>` — a new filter of an existing family is a one-line class |
+| Selector lists | `mu-core/Audio/AlgorithmNames.h` | `populateFilterTypeDropdown` / `populateInsertAlgoDropdown` — every filter / insert selector uses them (display order + ids in one place) |
+| Preset lists | `mu-core/Persistence/PresetFiles.h`, `mu-core/UI/PresetDropdown.h` | `mu_pp::listPresetsByCategory` + `mu_ui::fillPresetDropdown` — the category-sorted preset selector (transport bar, layer header) |
+| `SaveDialog` | `mu-core/UI/SaveDialog.h` | The one save card (`setTitle` / `setEmbedLabel` / `setDefaultDescription`; compact without a logo) — layer presets use it too |
+| `MidiPresetListPanel` | `mu-core/UI/MidiPresetListPanel.{h,cpp}` | Shared body of the MIDI program-change panels (128-row list, Browse / Clear); subclasses supply map access + top-row controls |
+| Standard full presets | `ProcessorBase` (`getFullPresetTag` / `captureFullPreset` / `useLoadedFullPreset`) | Save / load / category list for any product naming its preset tag; mu-Clid keeps PresetIO |
 | `ModalDialog` + `ConfirmDialog` | `mu-core/UI/ModalDialog.{h,cpp}` + `ConfirmDialog.h` | Themed in-editor modal dialog (replaces `juce::AlertWindow`) + the `mu_ui::messageAsync`/`confirmAsync`/`promptTextAsync`/`confirmQuitAsync` builders (each takes an editor-anchor `Component*`). One shared implementation so every prompt matches; extensible via an injected content component. |
 
 ### Product-specific components (under `<product>/Source/`)
