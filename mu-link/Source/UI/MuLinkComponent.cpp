@@ -1,4 +1,5 @@
 #include "MuLinkComponent.h"
+#include "Audio/AlgorithmNames.h"   // mu-core: insert-algorithm selector list
 #include "UI/InsertSlotUi.h"   // mu_ui::configureKnobFromSlot — per-algo knob relabelling
 
 namespace
@@ -14,11 +15,42 @@ namespace
     }
 }
 
+// The mixer's layout measures, shared by layoutScenes (cell alignment) and the mixer helpers.
+namespace mixerlayout
+{
+    constexpr int kMasterW       = 60;
+    constexpr int kInsertColW    = 150;   // master-insert column on the far right
+    constexpr int kInsertGap     = 12;
+    constexpr int kMasterArea    = kInsertColW + kInsertGap + kMasterW + 14;   // reserved on the right
+    constexpr int kLabelH        = 18, kCtrlH = 20, kVuW = 12, kVuGap = 4, kFaderW = 18;
+    constexpr int kEqLabelH      = 11, kEqKnobH = 40;
+    constexpr int kEqStackH      = 4 * (kEqLabelH + kEqKnobH);
+    constexpr int kFaderBottomGap = kCtrlH + 4;   // a strip reserves mute / solo below the fader
+}
+
 MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
     : server(serverToShow)
 {
     setLookAndFeel(&lnf);
 
+    addHeaderControls();
+    addTransportControls();
+    addClientStrips();
+    addMasterSection();
+    addSceneControls();
+    addPresetOverlays();
+
+    // Start stopped — the user presses Play to run the master transport.
+    server.setTempo(120.0);
+    server.setPlaying(false);
+
+    setSize(1200, 880);   // mixer + master-insert column; tall for the EQ stack
+    startTimerHz(12);
+}
+
+// Options, the label-mode toggle and the title / subtitle / clients heading.
+void MuLinkComponent::addHeaderControls()
+{
     // Audio/MIDI device picker now lives behind the Options button (a dialog, like the
     // synth standalones), freeing the main window for a full-width mixer.
     optionsButton.onClick = [this] { showOptions(); };
@@ -38,7 +70,11 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
     addAndMakeVisible(titleLabel);
     addAndMakeVisible(subtitleLabel);
     addAndMakeVisible(clientsHeading);
+}
 
+// Play, clock source, preset save / browse + name, tempo.
+void MuLinkComponent::addTransportControls()
+{
     // Transport.
     playButton.onClick = [this] { togglePlay(); };
     addAndMakeVisible(playButton);
@@ -74,7 +110,11 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
     tempoSlider.setTextValueSuffix(" BPM");
     tempoSlider.onValueChange = [this] { server.setTempo(tempoSlider.getValue()); };
     addAndMakeVisible(tempoSlider);
+}
 
+// The master meter and each client strip: meter, name, gain fader, mute / solo, 3-band EQ.
+void MuLinkComponent::addClientStrips()
+{
     // Meters — eight client slots + the summed master.
     masterMeter.getLevel = [this] { return server.masterPeak(); };
     addAndMakeVisible(masterMeter);
@@ -130,7 +170,11 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
             addAndMakeVisible(strip.eqLabel[(size_t) b]);
         }
     }
+}
 
+// The master gain fader and the two master-bus inserts.
+void MuLinkComponent::addMasterSection()
+{
     // Master gain — vertical fader beside the master meter (matches the standard app mixer).
     masterGain.setSliderStyle(juce::Slider::LinearVertical);
     masterGain.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
@@ -149,13 +193,7 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
                    MuLookAndFeel::labelText, 10.0f, true);
         addAndMakeVisible(mi.title);
 
-        mi.algo.addItem("None",        1);  mi.algo.addItem("3-Band EQ",   7);
-        mi.algo.addItem("Bitcrusher",  5);  mi.algo.addItem("Clipper",     6);
-        mi.algo.addItem("Compressor",  8);  mi.algo.addItem("Fold",        4);
-        mi.algo.addItem("Hard Clip",   3);  mi.algo.addItem("Karplus",    12);
-        mi.algo.addItem("Limiter",     9);  mi.algo.addItem("Ring Mod",   10);
-        mi.algo.addItem("Soft Clip",   2);  mi.algo.addItem("Tape Sat",   11);
-        mi.algo.addItem("Vocoder",    13);  mi.algo.addItem("Vocoder St", 14);
+        mu_audio::populateInsertAlgoDropdown([&mi](const char* n, int id) { mi.algo.addItem(n, id); });
         mi.algo.setSelectedId(server.masterInsertAlgo(w) + 1, false);
         mi.algo.onChange = [this, w](int) { configureMasterInsert(w); };
         addAndMakeVisible(mi.algo);
@@ -163,7 +201,11 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
         for (auto& k : mi.p) addAndMakeVisible(k);
         configureMasterInsert(w);
     }
+}
 
+// The scene buttons and each client's scene cell (on, program, channel); loads the scenes.
+void MuLinkComponent::addSceneControls()
+{
     // ── Scenes: trigger buttons + the selected scene's per-client (program, channel) cells ──
     styleLabel(scenesHeading, juce::String(juce::CharPointer_UTF8("SCENES  \xc2\xb7  click to recall")), juce::Justification::centredLeft,
                MuLookAndFeel::labelText, 12.0f, true);
@@ -220,7 +262,11 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
 
     loadScenes();
     selectScene(0);
+}
 
+// The shared preset save dialog and browser.
+void MuLinkComponent::addPresetOverlays()
+{
     // ── Preset overlays (shared mu-core components → identical to the products) ──
     saveDialog.setShowEmbedSamples(false);   // mu-link has no per-preset samples
     saveDialog.onSave = [this](const juce::String& name, const juce::String& desc,
@@ -236,13 +282,6 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow)
     presetBrowser.onLoadPreset = [this](const juce::File& f) { loadPresetFile(f); };
     presetBrowser.onClose      = [this] { showPresetBrowser(false); };
     addChildComponent(presetBrowser);
-
-    // Start stopped — the user presses Play to run the master transport.
-    server.setTempo(120.0);
-    server.setPlaying(false);
-
-    setSize(1200, 880);   // mixer + master-insert column (#1062/#1063); tall for the EQ stack
-    startTimerHz(12);
 }
 
 MuLinkComponent::~MuLinkComponent()
@@ -439,13 +478,28 @@ void MuLinkComponent::paint(juce::Graphics& g)
 
 void MuLinkComponent::resized()
 {
+    // Header → transport → clients heading; the scenes band pinned to the bottom; the mixer
+    // fills the space between.
     auto area = getLocalBounds().reduced(16);
-    const int masterW = 60;
-    const int insertColW = 150;   // master-insert column on the far right
-    const int insertGap  = 12;
-    const int masterArea = insertColW + insertGap + masterW + 14;   // reserved on the right
+    layoutHeaderAndTransport(area);
+    layoutScenes(area.removeFromBottom(108));
+    area.removeFromBottom(12);
+    layoutMixer(area.reduced(10, 8));
 
-    // Header → transport → clients heading → full-width mixer.
+    // Preset overlays: the browser covers the mixer/scenes area below the header; the save
+    // dialog is a full-window modal (paints its own dim + centred card).
+    {
+        auto browserArea = getLocalBounds().reduced(16);
+        browserArea.removeFromTop(138);   // header (54+8) + transport (40) + heading (16+20)
+        presetBrowser.setBounds(browserArea);
+    }
+    saveDialog.setBounds(getLocalBounds());
+}
+
+// Title + subtitle, the transport row (play, clock, save / browse, preset name, tempo, options)
+// and the clients heading — each taken off the top of `area`.
+void MuLinkComponent::layoutHeaderAndTransport(juce::Rectangle<int>& area)
+{
     auto header = area.removeFromTop(54);
     titleLabel.setBounds(header.removeFromTop(34));
     subtitleLabel.setBounds(header);
@@ -467,85 +521,87 @@ void MuLinkComponent::resized()
     presetNameLabel.setBounds(transport);   // loaded-preset name fills the middle gap
     area.removeFromTop(16);
 
-    {
-        auto headingRow = area.removeFromTop(20);
-        labelModeButton.setBounds(headingRow.removeFromRight(120));
-        clientsHeading.setBounds(headingRow);
-    }
+    auto headingRow = area.removeFromTop(20);
+    labelModeButton.setBounds(headingRow.removeFromRight(120));
+    clientsHeading.setBounds(headingRow);
+}
 
-    // Scenes band pinned to the bottom; the mixer fills the space between.
-    auto scenesBand = area.removeFromBottom(108);
-    scenesHeading.setBounds(scenesBand.removeFromTop(18));
-    scenesBand.removeFromTop(4);
+// The scenes band: heading, the scene buttons, then each client's (on, program, channel) cell
+// under its strip column.
+void MuLinkComponent::layoutScenes(juce::Rectangle<int> band)
+{
+    scenesHeading.setBounds(band.removeFromTop(18));
+    band.removeFromTop(4);
     {
-        auto btnRow = scenesBand.removeFromTop(28);
+        auto btnRow = band.removeFromTop(28);
         const int sbw = juce::jmax(1, btnRow.getWidth() / kNumScenes);
         for (int s = 0; s < kNumScenes; ++s)
             sceneButtons[(size_t) s].setBounds(btnRow.removeFromLeft(sbw).reduced(3, 2));
     }
-    scenesBand.removeFromTop(6);
-    {
-        // Per-client cells aligned under the strip columns: mirror the mixer's 10 px
-        // horizontal inset + the master block on the right, so the 8 cells line up.
-        auto cellsRow = scenesBand.reduced(10, 0);
-        cellsRow.removeFromRight(masterArea);
-        const int n = (int) clients.size();
-        const int cw = juce::jmax(1, cellsRow.getWidth() / n);
-        for (int i = 0; i < n; ++i)
-        {
-            auto cell = cellsRow.removeFromLeft(cw).reduced(3, 0);
-            clients[(size_t) i].sceneOn.setBounds(cell.removeFromTop(20));
-            const int half = juce::jmax(1, cell.getWidth() / 2 - 1);
-            clients[(size_t) i].scenePc.setBounds(cell.removeFromLeft(half));
-            clients[(size_t) i].sceneCh.setBounds(cell.removeFromRight(half));
-        }
-    }
-    area.removeFromBottom(12);
+    band.removeFromTop(6);
 
-    // Mixer (full width): master pinned right, the eight client strips fill the rest.
-    // Each strip top→bottom: name → EQ stack (High→Low) → fader + VU → mute/solo.
-    auto meters = area.reduced(10, 8);
-    const int labelH = 18, ctrlH = 20, vuW = 12, vuGap = 4, faderW = 18;   // slimmer faders
-    const int eqLabelH = 11, eqKnobH = 40;                  // larger EQ knobs
-    const int eqStackH = 4 * (eqLabelH + eqKnobH);
-    const int faderBottomGap = ctrlH + 4;                   // channel reserves mute/solo below the fader
-
-    // Master-insert column (far right): two stacked insert panels (dropdown + 2×2 knob grid).
-    auto insertCol = meters.removeFromRight(insertColW);
+    // Cells aligned under the strip columns: mirror the mixer's 10 px horizontal inset + the
+    // master block on the right, so the 8 cells line up.
+    auto cellsRow = band.reduced(10, 0);
+    cellsRow.removeFromRight(mixerlayout::kMasterArea);
+    const int n  = (int) clients.size();
+    const int cw = juce::jmax(1, cellsRow.getWidth() / n);
+    for (int i = 0; i < n; ++i)
     {
-        const int halfH = insertCol.getHeight() / 2;
-        for (int w = 0; w < (int) masterIns.size(); ++w)
-        {
-            auto& mi = masterIns[(size_t) w];
-            auto panel = insertCol.removeFromTop(halfH).reduced(6, 4);
-            mi.title.setBounds(panel.removeFromTop(16));
-            mi.algo.setBounds(panel.removeFromTop(26));
-            panel.removeFromTop(6);
-            auto top = panel.removeFromTop(panel.getHeight() / 2);
-            auto bot = panel;
-            const int kw = juce::jmax(1, top.getWidth() / 2);
-            mi.p[0].setBounds(top.removeFromLeft(kw).reduced(4));
-            mi.p[1].setBounds(top.reduced(4));
-            mi.p[2].setBounds(bot.removeFromLeft(kw).reduced(4));
-            mi.p[3].setBounds(bot.reduced(4));
-        }
+        auto cell = cellsRow.removeFromLeft(cw).reduced(3, 0);
+        clients[(size_t) i].sceneOn.setBounds(cell.removeFromTop(20));
+        const int half = juce::jmax(1, cell.getWidth() / 2 - 1);
+        clients[(size_t) i].scenePc.setBounds(cell.removeFromLeft(half));
+        clients[(size_t) i].sceneCh.setBounds(cell.removeFromRight(half));
     }
-    meters.removeFromRight(insertGap);
+}
 
-    // Master: reserve the same top (label + EQ-stack) and bottom (mute/solo) gaps as a client
-    // strip so the master fader spans the exact same band height as the channel faders (#1061).
-    auto masterBlock = meters.removeFromRight(masterW);
-    masterLabel.setBounds(masterBlock.removeFromTop(labelH));
-    masterBlock.removeFromTop(eqStackH);
-    masterBlock.removeFromBottom(faderBottomGap);
-    {
-        auto fv = masterBlock;
-        masterMeter.setBounds(fv.removeFromRight(vuW));
-        fv.removeFromRight(vuGap);
-        masterGain.setBounds(fv.withSizeKeepingCentre(faderW, fv.getHeight()));
-    }
+// The full-width mixer: the master-insert column far right, then the master fader, then the
+// eight client strips filling the rest.
+void MuLinkComponent::layoutMixer(juce::Rectangle<int> meters)
+{
+    using namespace mixerlayout;
+    layoutMasterInserts(meters.removeFromRight(kInsertColW));
+    meters.removeFromRight(kInsertGap);
+
+    // Master: the same top (label + EQ stack) and bottom (mute / solo) gaps as a client strip,
+    // so its fader spans the same band as the channel faders.
+    auto masterBlock = meters.removeFromRight(kMasterW);
+    masterLabel.setBounds(masterBlock.removeFromTop(kLabelH));
+    masterBlock.removeFromTop(kEqStackH);
+    masterBlock.removeFromBottom(kFaderBottomGap);
+    masterMeter.setBounds(masterBlock.removeFromRight(kVuW));
+    masterBlock.removeFromRight(kVuGap);
+    masterGain.setBounds(masterBlock.withSizeKeepingCentre(kFaderW, masterBlock.getHeight()));
     meters.removeFromRight(14);
 
+    layoutClientStrips(meters);
+}
+
+// Two stacked master-insert panels: title, algorithm selector, 2×2 knob grid.
+void MuLinkComponent::layoutMasterInserts(juce::Rectangle<int> col)
+{
+    const int halfH = col.getHeight() / 2;
+    for (auto& mi : masterIns)
+    {
+        auto panel = col.removeFromTop(halfH).reduced(6, 4);
+        mi.title.setBounds(panel.removeFromTop(16));
+        mi.algo.setBounds(panel.removeFromTop(26));
+        panel.removeFromTop(6);
+        auto top = panel.removeFromTop(panel.getHeight() / 2);
+        auto bot = panel;
+        const int kw = juce::jmax(1, top.getWidth() / 2);
+        mi.p[0].setBounds(top.removeFromLeft(kw).reduced(4));
+        mi.p[1].setBounds(top.reduced(4));
+        mi.p[2].setBounds(bot.removeFromLeft(kw).reduced(4));
+        mi.p[3].setBounds(bot.reduced(4));
+    }
+}
+
+// Each client strip top → bottom: name, EQ stack (High → Low), fader + VU, mute / solo.
+void MuLinkComponent::layoutClientStrips(juce::Rectangle<int> meters)
+{
+    using namespace mixerlayout;
     const int n  = (int) clients.size();
     const int cw = juce::jmax(1, meters.getWidth() / n);
     for (int i = 0; i < n; ++i)
@@ -553,37 +609,27 @@ void MuLinkComponent::resized()
         auto& strip = clients[(size_t) i];
         auto  col   = meters.removeFromLeft(cw).reduced(3, 0);
 
-        strip.name.setBounds(col.removeFromTop(labelH));
+        strip.name.setBounds(col.removeFromTop(kLabelH));
 
         // EQ stack: High at the top → Low at the bottom (b = 3 High … 0 Low).
         for (int b = 3; b >= 0; --b)
         {
-            auto band = col.removeFromTop(eqLabelH + eqKnobH);
-            strip.eqLabel[(size_t) b].setBounds(band.removeFromTop(eqLabelH));
-            strip.eq[(size_t) b].setBounds(band.withSizeKeepingCentre(eqKnobH, eqKnobH));
+            auto band = col.removeFromTop(kEqLabelH + kEqKnobH);
+            strip.eqLabel[(size_t) b].setBounds(band.removeFromTop(kEqLabelH));
+            strip.eq[(size_t) b].setBounds(band.withSizeKeepingCentre(kEqKnobH, kEqKnobH));
         }
 
         // Mute/solo pinned at the bottom; the fader + VU fill the middle.
-        auto ctrl = col.removeFromBottom(ctrlH);
+        auto ctrl = col.removeFromBottom(kCtrlH);
         const int bw = juce::jmax(1, ctrl.getWidth() / 2 - 2);
         strip.mute.setBounds(ctrl.removeFromLeft(bw));
         strip.solo.setBounds(ctrl.removeFromRight(bw));
         col.removeFromBottom(4);
 
-        auto fv = col;
-        strip.meter.setBounds(fv.removeFromRight(vuW));
-        fv.removeFromRight(vuGap);
-        strip.gain.setBounds(fv.withSizeKeepingCentre(faderW, fv.getHeight()));
+        strip.meter.setBounds(col.removeFromRight(kVuW));
+        col.removeFromRight(kVuGap);
+        strip.gain.setBounds(col.withSizeKeepingCentre(kFaderW, col.getHeight()));
     }
-
-    // Preset overlays: the browser covers the mixer/scenes area below the header; the save
-    // dialog is a full-window modal (paints its own dim + centred card).
-    {
-        auto browserArea = getLocalBounds().reduced(16);
-        browserArea.removeFromTop(138);   // header (54+8) + transport (40) + heading (16+20)
-        presetBrowser.setBounds(browserArea);
-    }
-    saveDialog.setBounds(getLocalBounds());
 }
 
 // ── Presets — full app state (mixer + scenes) ────────────────────────────────

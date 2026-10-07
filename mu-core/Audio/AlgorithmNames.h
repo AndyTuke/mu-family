@@ -219,4 +219,20 @@ inline void populateFilterTypeDropdown(AddItemFn&& addItem)
     addItem("Lo Shf", 14);  addItem("Hi Shf",  15);
 }
 
+// Fill an insert-algorithm selector in the family's display order (alphabetical, None first),
+// shared by the voice insert, the master inserts and mu-link's master FX. Item ID = algorithm
+// index + 1 (kInsertAlgorithmNames order). Call as:
+//   mu_audio::populateInsertAlgoDropdown([&d](const char* n, int id){ d.addItem(n, id); });
+template <typename AddItemFn>
+inline void populateInsertAlgoDropdown(AddItemFn&& addItem)
+{
+    addItem("None",        1);  addItem("3-Band EQ",   7);
+    addItem("Bitcrusher",  5);  addItem("Clipper",     6);
+    addItem("Compressor",  8);  addItem("Fold",        4);
+    addItem("Hard Clip",   3);  addItem("Karplus",    12);
+    addItem("Limiter",     9);  addItem("Ring Mod",   10);
+    addItem("Soft Clip",   2);  addItem("Tape Sat",   11);
+    addItem("Vocoder",    13);  addItem("Vocoder St", 14);
+}
+
 } // namespace mu_audio

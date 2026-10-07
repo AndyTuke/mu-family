@@ -4,6 +4,7 @@
 // (its only consumer).
 
 #include "MixerChannel.h"
+#include "Audio/AlgorithmNames.h"   // mu-core: insert-algorithm selector list
 #include "Plugin/ProcessorBase.h"
 #include <cmath>
 
@@ -100,20 +101,7 @@ void MixerChannel::addSidechainControls()
 void MixerChannel::addInsertControls()
 {
     auto addInsertCombo = [](juce::ComboBox& box) {
-        box.addItem("None",        1);
-        box.addItem("3-Band EQ",   7);
-        box.addItem("Bitcrusher",  5);
-        box.addItem("Clipper",     6);
-        box.addItem("Compressor",  8);
-        box.addItem("Fold",        4);
-        box.addItem("Hard Clip",   3);
-        box.addItem("Karplus",    12);
-        box.addItem("Limiter",     9);
-        box.addItem("Ring Mod",   10);
-        box.addItem("Soft Clip",   2);
-        box.addItem("Tape Sat",   11);
-        box.addItem("Vocoder",    13);
-        box.addItem("Vocoder St", 14);
+        mu_audio::populateInsertAlgoDropdown([&box](const char* n, int id) { box.addItem(n, id); });
         box.setSelectedId(1, juce::dontSendNotification);
     };
     addInsertCombo(insCharBox);

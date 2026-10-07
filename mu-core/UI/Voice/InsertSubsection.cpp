@@ -1,4 +1,5 @@
 #include "InsertSubsection.h"
+#include "Audio/AlgorithmNames.h"   // mu-core: insert-algorithm selector list
 #include "Plugin/ProcessorBase.h"
 #include "Audio/InsertProcessor.h"
 #include "Audio/InsertSlotConfig.h"
@@ -12,20 +13,7 @@ InsertSubsection::InsertSubsection(ProcessorBase& processor, juce::String channe
     : proc(processor), prefix(std::move(channelPrefix))
 {
     // Alphabetical UX order; dropdown id = canonical algo index + 1.
-    insertAlgo.addItem("None",        1);    // algo 0
-    insertAlgo.addItem("3-Band EQ",   7);    // algo 6
-    insertAlgo.addItem("Bitcrusher",  5);    // algo 4
-    insertAlgo.addItem("Clipper",     6);    // algo 5
-    insertAlgo.addItem("Compressor",  8);    // algo 7
-    insertAlgo.addItem("Fold",        4);    // algo 3
-    insertAlgo.addItem("Hard Clip",   3);    // algo 2
-    insertAlgo.addItem("Karplus",    12);    // algo 11
-    insertAlgo.addItem("Limiter",     9);    // algo 8
-    insertAlgo.addItem("Ring Mod",   10);    // algo 9
-    insertAlgo.addItem("Soft Clip",   2);    // algo 1
-    insertAlgo.addItem("Tape Sat",   11);    // algo 10
-    insertAlgo.addItem("Vocoder",    13);    // algo 12
-    insertAlgo.addItem("Vocoder St", 14);    // algo 13
+    mu_audio::populateInsertAlgoDropdown([this](const char* n, int id) { insertAlgo.addItem(n, id); });
     insertAlgo.setSelectedId(1, false);
     addAndMakeVisible(insertAlgo);
 

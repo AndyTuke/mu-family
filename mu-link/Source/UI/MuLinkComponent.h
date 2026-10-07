@@ -34,6 +34,19 @@ public:
     void resized() override;
 
 private:
+    // Construction and layout in parts.
+    void addHeaderControls();
+    void addTransportControls();
+    void addClientStrips();
+    void addMasterSection();
+    void addSceneControls();
+    void addPresetOverlays();
+    void layoutHeaderAndTransport(juce::Rectangle<int>& area);
+    void layoutScenes(juce::Rectangle<int> band);
+    void layoutMixer(juce::Rectangle<int> meters);
+    void layoutMasterInserts(juce::Rectangle<int> col);
+    void layoutClientStrips(juce::Rectangle<int> meters);
+
     void timerCallback() override;
     void togglePlay();
     void showOptions();        // opens the audio/MIDI device picker in a dialog
