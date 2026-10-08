@@ -168,6 +168,19 @@ public:
     void               loadStartupDefault() { if (! skipAutoLoadDefault) loadDefaultPreset(); }
     inline static bool skipAutoLoadDefault = false;
 
+    // Per-slot (layer) presets — one rhythm / voice / layer / lane. The shared header bar and the
+    // MIDI program-change slots drive these; the product implements save / load / reset. A load
+    // while playing is staged for the slot's boundary (hasPendingSwap until it lands).
+    // onSlotPresetCommitted fires on the message thread once a slot preset has been applied, so
+    // the editor can refresh what APVTS attachments don't cover. The editor must clear it in its
+    // destructor (the processor can outlive the editor).
+    virtual juce::Array<juce::File> slotPresetFiles(int slot) const;   // default: every file in the per-slot dir
+    virtual void saveSlotPreset(int /*slot*/, const juce::String& /*name*/) {}
+    virtual void loadSlotPreset(int /*slot*/, const juce::File& /*file*/)   {}
+    virtual void resetSlot(int /*slot*/)                                    {}
+    virtual bool hasPendingSwap(int /*slot*/) const                         { return false; }
+    std::function<void(int slot)> onSlotPresetCommitted;
+
     // Set by the standalone (mu-link bridge) so the product can publish its current full-preset
     // name for display on the mu-link mixer. Null in plugin builds / when mu-link isn't wired.
     // Products call publishPresetName(...) from their loadPreset override.
@@ -264,8 +277,8 @@ public:
     void drainPendingMidiProgramChanges();
 
     // Maps a shared global-FX / return / master / channel-strip APVTS parameter
-    // to fxChain + mixerEngine state. Products route the matching IDs here from
-    // their parameterChanged (the param set is declared by mu_mixfx::addGlobalFxParams
+    // to fxChain + mixerEngine state; the base's FX listener (startFxParamSync) routes
+    // every matching ID here (the param set is declared by mu_mixfx::addGlobalFxParams
     // + the product's `ch{i}_*` strip). Handles: `ch{i}_*`, `ret_*`, `mstr_lvl/pan`,
     // `mst_ins*`, `eff_*`, `eff2*`, `dly_*`, `rev_*`, `echo_*`. Unrecognised IDs no-op.
     void syncGlobalFxParam(const juce::String& id, float v);
@@ -290,7 +303,7 @@ protected:
     // changes are loaded. Default: nothing.
     virtual void commitDeferredWork() {}
 
-    virtual void applyMidiPresetSlot(int slot, const juce::File& f) = 0;
+    virtual void applyMidiPresetSlot(int slot, const juce::File& f) { loadSlotPreset(slot, f); }
     virtual void applyFullMidiPreset(const juce::File& f)            = 0;
 
     // Number of active "channels" (rhythms / voices / whatever) — used to

@@ -3,6 +3,7 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <functional>
 #include <utility>
 
 // Loop-boundary preset hot-swap, shared by every product. While the transport plays, a loaded
@@ -168,6 +169,75 @@ private:
 
     std::array<Slot<SlotPayload>, (size_t) N> slots;
     Slot<FullPayload>                         full;
+};
+
+// The whole bar-line hot-swap for a product whose presets are one payload type for both full
+// presets and slot presets (a parsed state tree) and whose swap point is a fixed loop length
+// (mu-Toni's arp bar, mu-On's pattern wrap). The product supplies how to apply each; this owns
+// the stage-or-apply decision, the commit order and the audio thread's boundary flagging.
+template <typename Payload, int N>
+class BarLineSwapper
+{
+public:
+    using ApplyFull = std::function<void(Payload&)>;
+    using ApplySlot = std::function<void(int, Payload&)>;
+
+    // Set once in the owner's constructor (message thread).
+    void setAppliers(ApplyFull full, ApplySlot slot) { applyFull = std::move(full); applySlot = std::move(slot); }
+
+    // ── Message thread ───────────────────────────────────────────────────────
+    // While the transport runs, stage for the next boundary; while stopped, apply now (dropping
+    // anything still staged that would otherwise land on top).
+    void useFull(Payload&& p)
+    {
+        if (running.load(std::memory_order_relaxed)) { stager.stageFull(std::move(p)); return; }
+        stager.cancelFull();
+        for (int i = 0; i < N; ++i) stager.cancel(i);
+        applyFull(p);
+    }
+
+    void useSlot(int i, Payload&& p)
+    {
+        if (running.load(std::memory_order_relaxed)) { stager.stage(i, std::move(p)); return; }
+        stager.cancel(i);
+        applySlot(i, p);
+    }
+
+    void cancel(int i)                    { stager.cancel(i); }
+    bool hasPending(int i) const noexcept { return stager.hasPending(i); }
+    bool hasFullPending() const noexcept  { return stager.hasFullPending(); }
+
+    // Commit what reached its boundary: the full preset first (it supersedes the slot swaps), then
+    // each flagged slot. Returns true when a full preset was committed.
+    bool commit()
+    {
+        const bool full = stager.consumeFull([this](Payload& p) { applyFull(p); });
+        for (int i = 0; i < N; ++i)
+            stager.consume(i, [this, i](Payload& p) { applySlot(i, p); });
+        return full;
+    }
+
+    // ── Audio thread ─────────────────────────────────────────────────────────
+    // Record the play state and flag staged swaps whose loop point passed in this block (or the
+    // transport just stopped). Returns true when something was flagged: trigger the async commit.
+    bool flagBoundaries(bool isPlaying, double blockStartBeat, double blockBeats,
+                        double loopBeats = kBarBeats) noexcept
+    {
+        running.store(isPlaying, std::memory_order_relaxed);
+        const bool atLoop = boundaryReached(isPlaying, wasPlaying, blockStartBeat,
+                                            blockStartBeat + (isPlaying ? blockBeats : 0.0), loopBeats);
+        wasPlaying = isPlaying;
+        bool flagged = stager.flagFullIfReady(atLoop);
+        for (int i = 0; i < N; ++i) flagged |= stager.flagIfReady(i, atLoop);
+        return flagged;
+    }
+
+private:
+    Stager<Payload, Payload, N> stager;
+    ApplyFull                   applyFull;
+    ApplySlot                   applySlot;
+    std::atomic<bool>           running    { false };   // audio thread's play state, read when a load decides
+    bool                        wasPlaying = false;     // audio thread only — the play→stop edge
 };
 
 } // namespace mu_hotswap

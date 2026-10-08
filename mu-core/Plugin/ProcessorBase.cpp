@@ -358,6 +358,11 @@ juce::File ProcessorBase::getPresetsDir() const
     return content == juce::File() ? juce::File() : content.getChildFile("Presets");
 }
 
+juce::Array<juce::File> ProcessorBase::slotPresetFiles(int /*slot*/) const
+{
+    return mu_pp::listPresetFiles(getPerSlotPresetDir(), getPerSlotPresetExtension());
+}
+
 juce::File ProcessorBase::getDefaultPresetFile() const
 {
     return getPresetsDir().getChildFile("_default." + getFullPresetExtension());

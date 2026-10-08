@@ -120,7 +120,7 @@ public:
     // If the sequencer is not playing, applies the preset immediately instead.
     void stageRhythmPreset(int ri, const juce::File& f, bool keepIdentity = false)  { presetIO.stageRhythmPreset(ri, f, keepIdentity); }
     void cancelStagedSwap (int ri)                        { hotSwapStager.cancelStagedSwap(ri); }
-    bool hasPendingSwap   (int ri) const                  { return hotSwapStager.hasPendingSwap(ri); }
+    bool hasPendingSwap   (int ri) const override         { return hotSwapStager.hasPendingSwap(ri); }
     bool hasPendingFullPreset() const override            { return hotSwapStager.hasPendingFullPreset(); }
     int  getMasterLoopSteps() const override              { return sequencer.getMasterLoopSteps(); }
     int  getMasterLoopCurrentStep() const override        { return sequencer.getMasterLoopCurrentStep(); }
@@ -132,16 +132,13 @@ public:
     // on the calling thread. No-op when nothing is pending.
     void flushPendingAsyncUpdates() { handleUpdateNowIfNeeded(); }
 
-    // fired (on the message thread, from handleAsyncUpdate) after a hot-swap
-    // commit finishes. The editor uses this to refresh non-APVTS UI state — name
-    // label, sample bar, colour-tinted bits — that pushRhythmToAPVTS doesn't cover
-    // because those fields aren't APVTS parameters. Editor MUST clear this in its
-    // destructor: the processor can outlive the editor (DAW close-window-keep-
-    // plugin), and a swap commit firing into a destroyed editor is a UAF.
-    // onPresetSwapCommitted + onLoadError + onUiScaleChanged live on ProcessorBase
-    // since every plugin's shell handles them identically; onRhythmHotSwapCommitted
-    // stays here because "rhythm" is mu-clid-specific.
-    std::function<void(int rhythmIndex)> onRhythmHotSwapCommitted;
+    // A rhythm hot-swap commit fires ProcessorBase::onSlotPresetCommitted: the editor refreshes
+    // the non-APVTS UI state (name label, sample bar, colour-tinted bits) pushRhythmToAPVTS can't.
+
+    // ProcessorBase slot-preset API: a rhythm preset into rhythm `ri`.
+    void saveSlotPreset(int ri, const juce::String& name) override;
+    void loadSlotPreset(int ri, const juce::File& f) override { stageRhythmPreset(ri, f); }
+    void resetSlot(int ri) override                           { rhythms.reset(ri); }
     void setSwapMode(SwapMode m) { swapModeAtomic.store((int)m, std::memory_order_relaxed); }
     SwapMode getSwapMode() const { return static_cast<SwapMode>(swapModeAtomic.load(std::memory_order_relaxed)); }
 
@@ -273,8 +270,6 @@ private:
     void commitDeferredWork() override;   // hot-swap engine retire + swap commits
 
     // ProcessorBase MIDI PC hooks — dispatched from drainPendingMidiProgramChanges.
-    void applyMidiPresetSlot(int slot, const juce::File& f) override
-        { stageRhythmPreset(slot, f); }
     void applyFullMidiPreset(const juce::File& f) override
         { loadPreset(f); }
 

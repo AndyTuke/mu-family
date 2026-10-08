@@ -57,17 +57,11 @@ juce::ValueTree PluginProcessor::captureState()
 // stopped, apply it now.
 void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 {
-    if (transportRunning.load(std::memory_order_relaxed))
-        hotSwap.stageFull(std::move(state));
-    else
-    {
-        for (int i = 0; i < kNumChannels; ++i) hotSwap.cancel(i);   // nothing staged may land on top
-        applyStateTree(state);
-    }
+    hotSwap.useFull(std::move(state));
 }
 
 // A layer preset: the layer's params (prefix-free ids, so it loads into any layer) + its modulators.
-void PluginProcessor::saveLayerPreset(int layer, const juce::String& name)
+void PluginProcessor::saveSlotPreset(int layer, const juce::String& name)
 {
     if (layer < 0 || layer >= kNumChannels) return;
     auto dir = getPerSlotPresetDir();
@@ -81,7 +75,7 @@ void PluginProcessor::saveLayerPreset(int layer, const juce::String& name)
                               onLoadError);
 }
 
-void PluginProcessor::loadLayerPreset(int layer, const juce::File& file)
+void PluginProcessor::loadSlotPreset(int layer, const juce::File& file)
 {
     if (layer < 0 || layer >= kNumChannels || ! file.existsAsFile()) return;
     auto xml = juce::XmlDocument::parse(file);
@@ -91,14 +85,7 @@ void PluginProcessor::loadLayerPreset(int layer, const juce::File& file)
         return;
     }
     // While playing, stage it for the next bar line (commitDeferredWork); while stopped, apply now.
-    auto tree = juce::ValueTree::fromXml(*xml);
-    if (transportRunning.load(std::memory_order_relaxed))
-        hotSwap.stage(layer, std::move(tree));
-    else
-    {
-        hotSwap.cancel(layer);
-        applyLayerTree(layer, tree);
-    }
+    hotSwap.useSlot(layer, juce::ValueTree::fromXml(*xml));
 }
 
 // Apply a parsed layer preset (the stopped load and the bar-line commit), then tell the editor.
@@ -110,21 +97,19 @@ void PluginProcessor::applyLayerTree(int layer, const juce::ValueTree& tree)
     mu_pp::clearModulators(slot);
     mu_pp::deserialiseModulators(tree.getChildWithName("Modulators"), slot, {},
                                  [](const std::string& id) { return mu_toni::isValidModDest(id); });
-    if (onLayerPresetLoaded) onLayerPresetLoaded(layer);
+    if (onSlotPresetCommitted) onSlotPresetCommitted(layer);
 }
 
 // Commit the hot-swaps that reached their bar line: the full preset first (it supersedes the
 // per-layer swaps), then each flagged layer.
 void PluginProcessor::commitDeferredWork()
 {
-    if (hotSwap.consumeFull([this](juce::ValueTree& t) { applyStateTree(t); }) && onPresetSwapCommitted)
+    if (hotSwap.commit() && onPresetSwapCommitted)
         onPresetSwapCommitted();
-    for (int i = 0; i < kNumChannels; ++i)
-        hotSwap.consume(i, [this, i](juce::ValueTree& t) { applyLayerTree(i, t); });
 }
 
 // Reset a layer: its params back to their defaults and its modulators cleared.
-void PluginProcessor::resetLayer(int layer)
+void PluginProcessor::resetSlot(int layer)
 {
     if (layer < 0 || layer >= kNumChannels) return;
     hotSwap.cancel(layer);   // a staged swap would re-fill what we're resetting

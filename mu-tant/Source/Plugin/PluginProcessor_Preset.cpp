@@ -29,7 +29,7 @@ namespace
     }
 }
 
-void PluginProcessor::saveVoicePreset(int voice, const juce::String& name)
+void PluginProcessor::saveSlotPreset(int voice, const juce::String& name)
 {
     auto dir = getPerSlotPresetDir();
     dir.createDirectory();
@@ -57,7 +57,7 @@ void PluginProcessor::saveVoicePreset(int voice, const juce::String& name)
                               onLoadError);
 }
 
-void PluginProcessor::loadVoicePreset(int voice, const juce::File& file)
+void PluginProcessor::loadSlotPreset(int voice, const juce::File& file)
 {
     if (voice < 0 || voice >= kMaxVoices || ! file.existsAsFile()) return;
     auto xml = juce::XmlDocument::parse(file);

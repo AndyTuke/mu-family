@@ -184,6 +184,8 @@ PluginProcessor::PluginProcessor()
     midiInChParam = apvts.getRawParameterValue("midiInCh");
 
     cacheVoiceParamPointers();
+    hotSwap.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },
+                        [this](int i, juce::ValueTree& t) { applyLayerTree(i, t); });
     startFxParamSync();     // mixer / FX params → mixerEngine + fxChain (ProcessorBase)
     loadStartupDefault();   // restore a saved _default preset (skipped by render mode)
 }
@@ -403,14 +405,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
                               std::memory_order_relaxed);
 
     // Hot-swap: flag staged presets whose bar line passed in this block (or the transport stopped).
-    transportRunning.store(isPlaying, std::memory_order_relaxed);
-    const bool atBar = mu_hotswap::boundaryReached(isPlaying, swapWasPlaying, blockStartBeat,
-                                                   blockStartBeat + (isPlaying ? blockBeats : 0.0),
-                                                   mu_hotswap::kBarBeats);
-    swapWasPlaying = isPlaying;
-    bool flagged = hotSwap.flagFullIfReady(atBar);
-    for (int i = 0; i < kNumChannels; ++i) flagged |= hotSwap.flagIfReady(i, atBar);
-    if (flagged) triggerAsyncUpdate();
+    if (hotSwap.flagBoundaries(isPlaying, blockStartBeat, blockBeats))
+        triggerAsyncUpdate();
 }
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()

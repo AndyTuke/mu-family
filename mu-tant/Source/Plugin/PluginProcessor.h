@@ -171,7 +171,7 @@ public:
     int  addVoice();
     void removeVoice(int idx);
     void swapVoices(int a, int b);   // reorder (drag in the sidebar)
-    void resetVoice(int idx);        // reset a voice to defaults (keeps its colour)
+    void resetSlot(int idx) override;   // reset a voice to defaults (keeps its colour)
     // Recompute the cached stepped-pitch flags for one voice / all voices. Call on the
     // message thread whenever a voice's modulators change (editor edit, preset load,
     // voice add/remove/swap/reset); the audio thread reads the flags lock-free.
@@ -181,8 +181,8 @@ public:
     // Per-voice ("layer") presets — the voice's `v{N}_*` subtree saved/loaded as
     // a `.muPattern` file (voice-agnostic base IDs, so a preset loads into any
     // slot). Mirrors mu-clid's per-rhythm preset I/O.
-    void saveVoicePreset(int voice, const juce::String& name);
-    void loadVoicePreset(int voice, const juce::File& file);
+    void saveSlotPreset(int voice, const juce::String& name) override;
+    void loadSlotPreset(int voice, const juce::File& file) override;
 
     // ── User wavetable import (per oscillator) ───────────────────────────────
     // Load a Serum/Vital .wav into the shared bank (dedup by path) and point the
@@ -206,19 +206,14 @@ public:
     juce::ValueTree captureFullPreset() override;
     void            useLoadedFullPreset(juce::ValueTree state) override;
 
-    // Fired (message thread, from handleAsyncUpdate) after a per-voice hot-swap
-    // commit finishes, so the editor can refresh that voice's panel + sidebar +
-    // wavetable dropdowns (state the APVTS round-trip doesn't cover by itself).
-    // Full-preset commits use ProcessorBase::onPresetSwapCommitted. The editor
-    // MUST clear this in its destructor: the processor can outlive the editor
-    // (DAW close-window-keep-plugin), and a swap firing into a dead editor is a UAF.
-    std::function<void(int voice)> onVoiceHotSwapCommitted;
+    // A per-voice hot-swap commit fires ProcessorBase::onSlotPresetCommitted (the editor refreshes
+    // that voice's panel, sidebar and wavetable dropdowns); full presets fire onPresetSwapCommitted.
 
     // Hot-swap staging queries — drive the shared "SWP" badges (TransportBar for a
     // pending full preset, ChannelSidebar for a pending per-voice swap) + cancel.
     // Mirrors mu-clid. Polled by the UI timers.
     bool hasPendingFullPreset() const override { return hotSwapStager.hasFullPending(); }
-    bool hasPendingSwap(int voice) const       { return hotSwapStager.hasVoicePending(voice); }
+    bool hasPendingSwap(int voice) const override { return hotSwapStager.hasVoicePending(voice); }
     void cancelStagedSwap(int voice)           { hotSwapStager.cancelVoice(voice); }
 
     // Demo limits the unlicensed editor to a single voice whose patterns have at most 16 steps.
@@ -259,7 +254,6 @@ protected:
     // per-voice preset into the matching slot; Ch 9 → full preset. Both entry
     // points hot-swap (stage at the loop boundary when playing, apply immediately
     // when stopped).
-    void applyMidiPresetSlot(int slot, const juce::File& f) override { loadVoicePreset(slot, f); }
     void applyFullMidiPreset(const juce::File& f)           override { loadPreset(f); }
 
 private:
@@ -458,7 +452,7 @@ private:
     void readVoiceDataFromState();
 
     // ── Preset hot-swap (full / per-voice) ─────────────────────────
-    // loadPreset / loadVoicePreset stage the parsed tree when the transport is
+    // loadPreset / loadSlotPreset stage the parsed tree when the transport is
     // playing (commit at the loop boundary) and apply immediately when stopped.
     // The apply bodies are factored out so the boundary commit (handleAsyncUpdate)
     // and the immediate path share one code path.

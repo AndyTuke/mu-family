@@ -8,6 +8,8 @@
 
 #include <juce_core/juce_core.h>
 #include "Plugin/HotSwapBoundary.h"
+#include "Plugin/HotSwap.h"   // mu-core: BarLineSwapper
+#include <vector>
 
 class HotSwapBoundaryTest : public juce::UnitTest
 {
@@ -48,6 +50,52 @@ public:
             expect (! fullPresetBoundaryReached (/*hasMaster*/ false, /*master*/ false, /*mask*/ 0x02), "does NOT fire when only rhythm 1 wraps");
             expect (! fullPresetBoundaryReached (/*hasMaster*/ false, /*master*/ true,  /*mask*/ 0x00),
                 "free-running ignores masterLoopWrapped - that signal is meaningless without a master loop (the free-running trap)");
+        }
+
+        // ── mu-core BarLineSwapper (mu-Toni / mu-On bar-line hot-swap) ──────────────
+        // Payload = int, so the log records which apply ran with what.
+        struct Log { std::vector<juce::String> events; };
+        auto makeSwapper = [](Log& log, mu_hotswap::BarLineSwapper<int, 4>& sw)
+        {
+            sw.setAppliers([&log](int& v)         { log.events.push_back("full " + juce::String(v)); },
+                           [&log](int i, int& v)  { log.events.push_back("slot" + juce::String(i) + " " + juce::String(v)); });
+        };
+
+        beginTest ("BarLineSwapper: stopped loads apply at once");
+        {
+            Log log; mu_hotswap::BarLineSwapper<int, 4> sw; makeSwapper(log, sw);
+            sw.useSlot(2, 7);
+            sw.useFull(9);
+            expect (log.events.size() == 2 && log.events[0] == "slot2 7" && log.events[1] == "full 9", "applied immediately, in order");
+            expect (! sw.hasPending(2) && ! sw.hasFullPending(), "nothing left staged");
+        }
+
+        beginTest ("BarLineSwapper: playing loads wait for the bar line, full first");
+        {
+            Log log; mu_hotswap::BarLineSwapper<int, 4> sw; makeSwapper(log, sw);
+            expect (! sw.flagBoundaries(true, 0.0, 0.5), "playing, mid-bar: nothing to flag");
+            sw.useSlot(1, 3);
+            expect (sw.hasPending(1) && log.events.empty(), "staged, not applied");
+            expect (! sw.flagBoundaries(true, 1.0, 0.5), "no bar line in [1.0, 1.5)");
+            expect (! sw.commit() && log.events.empty(), "commit before the boundary does nothing");
+            sw.useFull(5);
+            expect (! sw.hasPending(1), "a staged full preset drops the slot swap");
+            sw.useSlot(0, 4);
+            expect (sw.flagBoundaries(true, 3.75, 0.5), "bar line at beat 4 flags");
+            expect (sw.commit(), "commit reports the full preset");
+            expect (log.events.size() == 2 && log.events[0] == "full 5" && log.events[1] == "slot0 4", "full then slot");
+        }
+
+        beginTest ("BarLineSwapper: stopping commits what is staged; cancel drops it");
+        {
+            Log log; mu_hotswap::BarLineSwapper<int, 4> sw; makeSwapper(log, sw);
+            sw.flagBoundaries(true, 0.0, 0.5);
+            sw.useSlot(3, 8);
+            sw.useSlot(2, 6);
+            sw.cancel(2);
+            expect (sw.flagBoundaries(false, 0.5, 0.5), "the play->stop edge flags at once");
+            sw.commit();
+            expect (log.events.size() == 1 && log.events[0] == "slot3 8", "only the uncancelled slot lands");
         }
     }
 };

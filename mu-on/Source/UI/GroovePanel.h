@@ -15,6 +15,7 @@
 
 #include <array>
 #include <cmath>
+#include "UI/SlotPresetHeader.h"   // mu-core: shared per-slot preset header wiring
 
 namespace mu_on
 {
@@ -61,32 +62,12 @@ public:
         header.setShowReset(true);
         header.setShowDelete(false);
         header.setNameEditable(false);
-        header.onReset = [this]
-        {
-            mu_ui::confirmAsync(this, "Reset Track",
-                                "Reset \"" + proc.getChannelName(currentChannel) + "\" to defaults?\nThis cannot be undone.",
-                                "Reset", [this] { proc.resetTrack(currentChannel); setChannel(currentChannel); });
-        };
-        header.onPresetFileChosen = [this](const juce::File& f)
-        {
-            proc.loadTrackPreset(currentChannel, f);
-            setChannel(currentChannel);   // re-read the grid row / envelope + modulators
-            header.showPresetFile(f);
-        };
-        header.setSaveEnabled(proc.canSaveLayerPreset());   // demo: per-track save disabled
-        header.onSave = [this]
-        {
-            if (! proc.canSaveLayerPreset()) return;
-            juce::Component::SafePointer<GroovePanel> safe(this);
-            mu_ui::promptTextAsync(this, "Save Track Preset", "Preset name:",
-                                   proc.getChannelName(currentChannel), "Save",
-                [safe](const juce::String& name)
-                {
-                    if (safe == nullptr || name.isEmpty()) return;
-                    safe->proc.saveTrackPreset(safe->currentChannel, name);
-                    safe->refreshPresetList();
-                });
-        };
+        // Reset / preset load / save: the shared per-slot wiring (mu-core SlotPresetHeader).
+        mu_ui::wireSlotPresetHeader(header, *this, proc,
+            { "Track",
+              [this] { return currentChannel; },
+              [this] { setChannel(currentChannel); },   // re-read the grid row / envelope + modulators
+              {} });
 
         startTimerHz(mu_ui::kUiRefreshHz);   // modulator playhead
         setChannel(0);
@@ -179,7 +160,7 @@ public:
     int getChannel() const noexcept { return currentChannel; }
 
     // Rescan this lane's track presets into the header's preset list.
-    void refreshPresetList() { header.setPresetFiles(proc.trackPresetFiles(currentChannel)); }
+    void refreshPresetList() { mu_ui::refreshSlotPresetList(header, proc, currentChannel); }
 
 private:
     // Metal style, as mu-Clid: panels edge to edge — preset strip, engine, steps, modulators —

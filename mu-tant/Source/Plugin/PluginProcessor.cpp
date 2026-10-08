@@ -799,7 +799,7 @@ void PluginProcessor::swapVoices(int a, int b)
     refreshPitchQuantFlags(b);
 }
 
-void PluginProcessor::resetVoice(int idx)
+void PluginProcessor::resetSlot(int idx)
 {
     const juce::ScopedLock sl(voicesLock);
     if (idx < 0 || idx >= numVoices.load()) return;
@@ -824,7 +824,7 @@ void PluginProcessor::commitDeferredWork()
         if (hotSwapStager.takeVoice(v, tree))
         {
             applyVoicePresetTree(v, tree);
-            if (onVoiceHotSwapCommitted) onVoiceHotSwapCommitted(v);
+            if (onSlotPresetCommitted) onSlotPresetCommitted(v);
         }
 }
 

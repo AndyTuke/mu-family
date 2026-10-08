@@ -10,7 +10,7 @@ namespace mu_tant
 
 // mu-tant's preset hot-swap staging: the shared mu-core stager holding parsed preset trees
 // (per voice + one full preset), plus mu-tant's boundary rule. The apply (replaceState /
-// readVoiceDataFromState / loadVoicePreset body) lives in PluginProcessor, which drains committed
+// readVoiceDataFromState / loadSlotPreset body) lives in PluginProcessor, which drains committed
 // swaps from here, so the staging logic stays unit-testable on its own. Threading as
 // mu_hotswap::Stager: trees on the message thread only, the audio thread touches only the flags.
 class VoiceHotSwapStager

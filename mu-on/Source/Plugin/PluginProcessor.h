@@ -115,25 +115,20 @@ public:
 
     // Per-track presets — a lane's engine params, its step row (Rumble: its envelope) and its
     // modulators. A track preset belongs to the instrument it was saved from.
-    void                    saveTrackPreset(int lane, const juce::String& name);
-    void                    loadTrackPreset(int lane, const juce::File& file);
-    juce::Array<juce::File> trackPresetFiles(int lane) const;   // the presets for that lane
-    void                    resetTrack(int lane);                // engine params → defaults, modulators cleared
-
-    // Fired (message thread) once a track preset is applied — at once, or at the pattern's wrap
-    // when it was staged while playing — so the editor can refresh that lane. The editor MUST
-    // clear this in its destructor.
-    std::function<void(int lane)> onTrackPresetLoaded;
+    // (ProcessorBase slot API.)
+    void                    saveSlotPreset(int lane, const juce::String& name) override;
+    void                    loadSlotPreset(int lane, const juce::File& file) override;
+    juce::Array<juce::File> slotPresetFiles(int lane) const override;   // the presets for that lane
+    void                    resetSlot(int lane) override;                // engine params → defaults, modulators cleared
 
     // Hot-swap: a preset loaded while the transport runs is staged and applied when the 16-step
     // pattern wraps (every bar, or at once when playback stops); loaded while stopped, at once.
-    bool hasPendingFullPreset() const override { return hotSwap.hasFullPending(); }
-    bool hasPendingSwap(int lane) const        { return hotSwap.hasPending(lane); }
+    bool hasPendingFullPreset() const override   { return hotSwap.hasFullPending(); }
+    bool hasPendingSwap(int lane) const override { return hotSwap.hasPending(lane); }
 
 protected:
     // MIDI program change (drained on the message thread): Ch 1-5 → that lane's track preset,
     // Ch 9 → full preset, each through the same hot-swap path as a load from the UI.
-    void applyMidiPresetSlot(int slot, const juce::File& f) override { loadTrackPreset(slot, f); }
     void applyFullMidiPreset(const juce::File& f) override
     {
         loadPreset(f);
@@ -177,12 +172,9 @@ private:
     double currentSampleRate = 44100.0;
     bool   wasPlaying = false;   // audio-thread only — detects the play→stop edge to silence voices
 
-    // Hot-swap staging: parsed preset trees per lane + one full preset. transportRunning is the
-    // audio thread's play state (host, MIDI clock or internal), read when a load decides to stage.
+    // Hot-swap: parsed preset trees per lane + one full preset, committed at the pattern wrap.
     void applyTrackTree(int lane, const juce::ValueTree& tree);
-    mu_hotswap::Stager<juce::ValueTree, juce::ValueTree, kNumChannels> hotSwap;
-    std::atomic<bool> transportRunning { false };
-    bool              swapWasPlaying = false;   // audio thread only — the play→stop edge
+    mu_hotswap::BarLineSwapper<juce::ValueTree, kNumChannels> hotSwap;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

@@ -87,26 +87,20 @@ public:
     juce::ValueTree captureFullPreset() override { return captureState(); }
     void            useLoadedFullPreset(juce::ValueTree state) override;
 
-    // Per-layer presets — the layer's v{N}_ params + its modulators (loadable into any layer),
-    // and a reset back to defaults.
-    void saveLayerPreset(int layer, const juce::String& name);
-    void loadLayerPreset(int layer, const juce::File& file);
-    void resetLayer(int layer);
-
-    // Fired (message thread) once a layer preset is applied — at once, or at the bar line when
-    // it was staged while playing — so the editor can refresh that layer. The editor MUST clear
-    // this in its destructor.
-    std::function<void(int layer)> onLayerPresetLoaded;
+    // Per-layer presets (ProcessorBase slot API) — the layer's v{N}_ params + its modulators
+    // (loadable into any layer), and a reset back to defaults.
+    void saveSlotPreset(int layer, const juce::String& name) override;
+    void loadSlotPreset(int layer, const juce::File& file) override;
+    void resetSlot(int layer) override;
 
     // Hot-swap: a preset loaded while the transport runs is staged and applied at the next bar
     // line (or at once when playback stops); loaded while stopped, it applies at once.
-    bool hasPendingFullPreset() const override { return hotSwap.hasFullPending(); }
-    bool hasPendingSwap(int layer) const       { return hotSwap.hasPending(layer); }
+    bool hasPendingFullPreset() const override  { return hotSwap.hasFullPending(); }
+    bool hasPendingSwap(int layer) const override { return hotSwap.hasPending(layer); }
 
 protected:
     // MIDI program change (drained on the message thread): Ch 1-4 → that layer's preset,
     // Ch 9 → full preset, each through the same hot-swap path as a load from the UI.
-    void applyMidiPresetSlot(int slot, const juce::File& f) override { loadLayerPreset(slot, f); }
     void applyFullMidiPreset(const juce::File& f) override
     {
         loadPreset(f);
@@ -170,12 +164,9 @@ private:
     MixerEngine::RenderChannelFn renderChannelCb;
 
 
-    // Hot-swap staging: parsed preset trees per layer + one full preset. transportRunning is the
-    // audio thread's play state (host, MIDI clock or internal), read when a load decides to stage.
+    // Hot-swap: parsed preset trees per layer + one full preset, committed at the bar line.
     void applyLayerTree(int layer, const juce::ValueTree& tree);
-    mu_hotswap::Stager<juce::ValueTree, juce::ValueTree, kNumChannels> hotSwap;
-    std::atomic<bool> transportRunning { false };
-    bool              swapWasPlaying = false;   // audio thread only — the play→stop edge
+    mu_hotswap::BarLineSwapper<juce::ValueTree, kNumChannels> hotSwap;
     double currentSampleRate = 44100.0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)

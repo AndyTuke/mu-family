@@ -102,7 +102,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         if (isMixerVisible()) mixerOverlay.refresh();
     };
 
-    proc.onRhythmHotSwapCommitted = [this](int r)
+    proc.onSlotPresetCommitted = [this](int r)
     {
         if (r == rhythmPanel.getCurrentRhythmIndex())
             rhythmPanel.setRhythm(r);
@@ -152,7 +152,7 @@ PluginEditor::~PluginEditor()
     // Clear product-owned processor callbacks before teardown — same UAF
     // contract as the shell base's destructor.
     proc.apvts.removeParameterListener("eff_algo", this);
-    proc.onRhythmHotSwapCommitted = nullptr;
+    proc.onSlotPresetCommitted = nullptr;
 }
 
 void PluginEditor::selectRhythmAndRefresh(int idx,

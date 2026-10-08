@@ -82,18 +82,12 @@ void PluginProcessor::applyStateTree(const juce::ValueTree& tree)
 // stopped, apply it now.
 void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 {
-    if (transportRunning.load(std::memory_order_relaxed))
-        hotSwap.stageFull(std::move(state));
-    else
-    {
-        for (int i = 0; i < kNumChannels; ++i) hotSwap.cancel(i);   // nothing staged may land on top
-        applyStateTree(state);
-    }
+    hotSwap.useFull(std::move(state));
 }
 
 // A track preset: the lane's engine params, its step row (or the Rumble envelope) and its
 // modulators. It belongs to one instrument, so it records which lane it came from.
-void PluginProcessor::saveTrackPreset(int lane, const juce::String& name)
+void PluginProcessor::saveSlotPreset(int lane, const juce::String& name)
 {
     if (lane < 0 || lane >= kNumChannels) return;
     auto dir = getPerSlotPresetDir();
@@ -111,7 +105,7 @@ void PluginProcessor::saveTrackPreset(int lane, const juce::String& name)
                               onLoadError);
 }
 
-void PluginProcessor::loadTrackPreset(int lane, const juce::File& file)
+void PluginProcessor::loadSlotPreset(int lane, const juce::File& file)
 {
     if (lane < 0 || lane >= kNumChannels || ! file.existsAsFile()) return;
     auto xml = juce::XmlDocument::parse(file);
@@ -128,14 +122,7 @@ void PluginProcessor::loadTrackPreset(int lane, const juce::File& file)
     }
 
     // While playing, stage it for the pattern's wrap (commitDeferredWork); while stopped, apply now.
-    auto tree = juce::ValueTree::fromXml(*xml);
-    if (transportRunning.load(std::memory_order_relaxed))
-        hotSwap.stage(lane, std::move(tree));
-    else
-    {
-        hotSwap.cancel(lane);
-        applyTrackTree(lane, tree);
-    }
+    hotSwap.useSlot(lane, juce::ValueTree::fromXml(*xml));
 }
 
 // Apply a parsed track preset (the stopped load and the pattern-wrap commit), then tell the editor.
@@ -149,21 +136,19 @@ void PluginProcessor::applyTrackTree(int lane, const juce::ValueTree& tree)
     mu_pp::clearModulators(slot);
     mu_pp::deserialiseModulators(tree.getChildWithName("Modulators"), slot, {},
                                  [lane](const std::string& id) { return isValidLaneDest(lane, id); });
-    if (onTrackPresetLoaded) onTrackPresetLoaded(lane);
+    if (onSlotPresetCommitted) onSlotPresetCommitted(lane);
 }
 
 // Commit the hot-swaps that reached the pattern wrap: the full preset first (it supersedes the
 // per-lane swaps), then each flagged lane.
 void PluginProcessor::commitDeferredWork()
 {
-    if (hotSwap.consumeFull([this](juce::ValueTree& t) { applyStateTree(t); }) && onPresetSwapCommitted)
+    if (hotSwap.commit() && onPresetSwapCommitted)
         onPresetSwapCommitted();
-    for (int i = 0; i < kNumChannels; ++i)
-        hotSwap.consume(i, [this, i](juce::ValueTree& t) { applyTrackTree(i, t); });
 }
 
 // The track presets saved from `lane` (a preset belongs to the instrument it was saved from).
-juce::Array<juce::File> PluginProcessor::trackPresetFiles(int lane) const
+juce::Array<juce::File> PluginProcessor::slotPresetFiles(int lane) const
 {
     juce::Array<juce::File> files;
     for (const auto& f : mu_pp::listPresetFiles(getPerSlotPresetDir(), getPerSlotPresetExtension()))
@@ -174,7 +159,7 @@ juce::Array<juce::File> PluginProcessor::trackPresetFiles(int lane) const
 }
 
 // Reset a lane: its engine params back to defaults and its modulators cleared.
-void PluginProcessor::resetTrack(int lane)
+void PluginProcessor::resetSlot(int lane)
 {
     if (lane < 0 || lane >= kNumChannels) return;
     hotSwap.cancel(lane);   // a staged swap would re-fill what we're resetting

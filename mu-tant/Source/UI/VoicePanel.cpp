@@ -8,6 +8,7 @@
 #include "Modulation/MuTantModSnap.h"
 #include "ValueFormat.h"   // mu-core: shared value text
 #include "UI/ParamChoices.h"  // mu-core: selector items from choice parameters
+#include "UI/SlotPresetHeader.h"   // mu-core: shared per-slot preset header wiring
 
 namespace mu_tant
 {
@@ -121,38 +122,12 @@ void VoicePanel::setupHeader()
         mu_ui::confirmAsync(this, "Delete Voice", "Delete \"" + name + "\"?\nThis cannot be undone.",
                             "Delete", [this] { if (onDeleteVoice) onDeleteVoice(); });
     };
-    headerBar.onReset  = [this]
-    {
-        const juce::String name = proc.getChannelName(currentVoice);
-        mu_ui::confirmAsync(this, "Reset Voice", "Reset \"" + name + "\" to defaults?\nThis cannot be undone.",
-                            "Reset", [this]
-        {
-            proc.resetVoice(currentVoice);
-            setVoice(currentVoice);           // re-sync knobs / gate / modulators
-        });
-    };
-    headerBar.onPresetFileChosen = [this](const juce::File& f)
-    {
-        proc.loadVoicePreset(currentVoice, f);
-        setVoice(currentVoice);           // re-sync knobs / gate / modulators to the loaded voice
-        headerBar.showPresetFile(f);
-    };
-    headerBar.setSaveEnabled(proc.canSaveLayerPreset());   // demo: per-layer save disabled
-    headerBar.onSave = [this]
-    {
-        if (! proc.canSaveLayerPreset()) return;
-        juce::Component::SafePointer<VoicePanel> safe(this);
-        mu_ui::promptTextAsync(this, "Save Voice Preset", "Preset name:",
-                               "Voice " + juce::String(currentVoice + 1), "Save",
-            [safe](const juce::String& name)
-            {
-                if (safe != nullptr && name.isNotEmpty())
-                {
-                    safe->proc.saveVoicePreset(safe->currentVoice, name);
-                    safe->refreshVoicePresetList();
-                }
-            });
-    };
+    // Reset / preset load / save: the shared per-slot wiring (mu-core SlotPresetHeader).
+    mu_ui::wireSlotPresetHeader(headerBar, *this, proc,
+        { "Voice",
+          [this] { return currentVoice; },
+          [this] { setVoice(currentVoice); },                                 // re-sync knobs / gate / modulators
+          [](int v) { return "Voice " + juce::String(v + 1); } });
     addAndMakeVisible(headerBar);
 }
 
@@ -561,7 +536,7 @@ void VoicePanel::refreshHeader()
 
 void VoicePanel::refreshVoicePresetList()
 {
-    headerBar.setPresetFiles(mu_pp::listPresetFiles(proc.getPerSlotPresetDir(), proc.getPerSlotPresetExtension()));
+    mu_ui::refreshSlotPresetList(headerBar, proc, currentVoice);
 }
 
 void VoicePanel::paint(juce::Graphics& g)

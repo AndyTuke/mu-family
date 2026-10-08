@@ -122,6 +122,8 @@ PluginProcessor::PluginProcessor()
 
     initAppSettings("muOn");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
+    hotSwap.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },
+                        [this](int i, juce::ValueTree& t) { applyTrackTree(i, t); });
     startFxParamSync();     // mixer / FX params → mixerEngine + fxChain (ProcessorBase)
     loadStartupDefault();   // restore a saved _default preset (skipped by render mode)
 }
@@ -208,14 +210,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // this block's end, so the block's own span is estimated from the tempo.
     {
         const double blockBeats = (bpm / 60.0) / currentSampleRate * (double) numSamples;
-        transportRunning.store(isPlaying, std::memory_order_relaxed);
-        const bool atBar = mu_hotswap::boundaryReached(isPlaying, swapWasPlaying, beatStart,
-                                                       beatStart + (isPlaying ? blockBeats : 0.0),
-                                                       mu_hotswap::kBarBeats);
-        swapWasPlaying = isPlaying;
-        bool flagged = hotSwap.flagFullIfReady(atBar);
-        for (int i = 0; i < kNumChannels; ++i) flagged |= hotSwap.flagIfReady(i, atBar);
-        if (flagged) triggerAsyncUpdate();
+        if (hotSwap.flagBoundaries(isPlaying, beatStart, blockBeats))
+            triggerAsyncUpdate();
     }
 
     // Advance the transport beat. When slaved to the host / mu-link or external MIDI clock the

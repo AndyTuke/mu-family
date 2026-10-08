@@ -1,4 +1,5 @@
 #include "EnginePanel.h"
+#include "UI/SlotPresetHeader.h"   // mu-core: shared per-slot preset header wiring
 
 namespace mu_toni
 {
@@ -136,32 +137,12 @@ void EnginePanel::setupHeaderAndModulators()
     // ── Shared per-layer header: fixed layers (no rename / delete), reset + layer presets ──
     header.setShowDelete(false);
     header.setNameEditable(false);
-    header.onReset = [this]
-    {
-        mu_ui::confirmAsync(this, "Reset Layer",
-                            "Reset \"" + proc.getChannelName(currentLayer) + "\" to defaults?\nThis cannot be undone.",
-                            "Reset", [this] { proc.resetLayer(currentLayer); setLayer(currentLayer); });
-    };
-    header.onPresetFileChosen = [this](const juce::File& f)
-    {
-        proc.loadLayerPreset(currentLayer, f);
-        setLayer(currentLayer);   // rebind so the modulators show the loaded state
-        header.showPresetFile(f);
-    };
-    header.setSaveEnabled(proc.canSaveLayerPreset());   // demo: per-layer save disabled
-    header.onSave = [this]
-    {
-        if (! proc.canSaveLayerPreset()) return;
-        juce::Component::SafePointer<EnginePanel> safe(this);
-        mu_ui::promptTextAsync(this, "Save Layer Preset", "Preset name:",
-                               proc.getChannelName(currentLayer), "Save",
-            [safe](const juce::String& name)
-            {
-                if (safe == nullptr || name.isEmpty()) return;
-                safe->proc.saveLayerPreset(safe->currentLayer, name);
-                safe->refreshPresetList();
-            });
-    };
+    // Reset / preset load / save: the shared per-slot wiring (mu-core SlotPresetHeader).
+    mu_ui::wireSlotPresetHeader(header, *this, proc,
+        { "Layer",
+          [this] { return currentLayer; },
+          [this] { setLayer(currentLayer); },   // rebind so the modulators show the loaded state
+          {} });
     addAndMakeVisible(header);
     refreshPresetList();
 
@@ -196,7 +177,7 @@ void EnginePanel::setLayer(int idx)
 // Rescan the layer-preset folder into the header's preset list (after a save).
 void EnginePanel::refreshPresetList()
 {
-    header.setPresetFiles(mu_pp::listPresetFiles(proc.getPerSlotPresetDir(), proc.getPerSlotPresetExtension()));
+    mu_ui::refreshSlotPresetList(header, proc, currentLayer);
 }
 
 void EnginePanel::paintOverChildren(juce::Graphics& g)

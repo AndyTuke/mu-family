@@ -7,6 +7,7 @@
 #include "Plugin/ModulationSkew.h"     // proportion-space skew helpers (shared with test C5)
 #include "Modulation/MuClidModDest.h"  // mu-clid modulation targets
 #include "Sequencer/Rhythm.h"
+#include "Persistence/PresetFiles.h"   // mu_pp::safePresetFileName
 
 juce::File PluginProcessor::getRhythmsDir() const { return getContentDir().getChildFile("Rhythms"); }
 juce::File PluginProcessor::getSamplesDir() const { return getContentDir().getChildFile("Samples"); }
@@ -30,4 +31,10 @@ void PluginProcessor::ensureContentFoldersExist()
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new PluginProcessor();
+}
+
+// A named rhythm preset in the Rhythms folder (path-linked sample, no category / description).
+void PluginProcessor::saveSlotPreset(int ri, const juce::String& name)
+{
+    saveRhythmPresetToFile(ri, getRhythmsDir().getChildFile(mu_pp::safePresetFileName(name, "Rhythm") + ".muRhythm"));
 }
