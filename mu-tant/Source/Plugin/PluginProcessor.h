@@ -448,7 +448,7 @@ private:
     // loses every modulator assignment + drawn gate envelope. write/read cover the
     // active voices for full-state + full-preset paths; the per-voice (.muPattern)
     // path serialises one voice's modulators + gate alongside its params.
-    void writeVoiceDataToState();
+    void writeVoiceDataToState(juce::ValueTree& state);
     void readVoiceDataFromState();
 
     // ── Preset hot-swap (full / per-voice) ─────────────────────────

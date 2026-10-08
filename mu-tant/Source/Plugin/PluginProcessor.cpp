@@ -666,10 +666,7 @@ juce::AudioProcessorEditor* PluginProcessor::createEditor()
 
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    apvts.state.setProperty("numVoices", numVoices.load(), nullptr);
-    apvts.state.setProperty("voiceColours", serialiseVoiceColours(), nullptr);
-    writeVoiceDataToState();
-    if (auto xml = apvts.copyState().createXml())
+    if (auto xml = captureFullPreset().createXml())
         copyXmlToBinary(*xml, destData);
 }
 

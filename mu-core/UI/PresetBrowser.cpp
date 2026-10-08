@@ -1,4 +1,5 @@
 #include "PresetBrowser.h"
+#include "Persistence/PresetMeta.h"   // mu-core: preset metadata (root tag only)
 
 PresetBrowser::PresetBrowser()
 {
@@ -36,12 +37,9 @@ void PresetBrowser::refresh(const juce::File& dir)
             info.file = f;
             info.name = f.getFileNameWithoutExtension();
 
-            if (auto xml = juce::parseXML(f))
-            {
-                auto state = juce::ValueTree::fromXml(*xml);
-                info.category    = state.getProperty("presetCategory",    "All").toString();
-                info.description = state.getProperty("presetDescription", "").toString();
-            }
+            const auto meta = mu_pp::readPresetMeta(f);
+            info.category    = meta.category.isNotEmpty() ? meta.category : juce::String("All");
+            info.description = meta.description;
 
             allPresets.push_back(std::move(info));
         }

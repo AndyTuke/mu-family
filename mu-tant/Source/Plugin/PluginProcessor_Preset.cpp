@@ -282,11 +282,11 @@ void PluginProcessor::restoreVoiceColours(const juce::String& csv)
         voiceColourIndex[(size_t) i] = juce::jlimit(0, kMaxVoices - 1, toks[i].getIntValue());
 }
 
-void PluginProcessor::writeVoiceDataToState()
+void PluginProcessor::writeVoiceDataToState(juce::ValueTree& state)
 {
     // The shared per-voice <VoiceData> (modulators), plus mu-Tant's extras on each voice:
     // user wavetable paths and the three gate patterns.
-    mu_pp::writeChannelData(apvts.state, numVoices.load(),
+    mu_pp::writeChannelData(state, numVoices.load(),
         [this](int v) -> VoiceSlot& { return voiceSlots[(size_t) v]; },
         [this](int v, juce::ValueTree& voice)
         {
@@ -348,13 +348,15 @@ void PluginProcessor::readVoiceDataFromState()
 juce::File PluginProcessor::getPerSlotPresetDir() const { return getContentDir().getChildFile("Voices"); }
 juce::File PluginProcessor::getWavetablesDir()  const { return getContentDir().getChildFile("Wavetables"); }
 
-// A full preset: the whole APVTS state with the voice count, colours and per-voice data.
+// A full preset / host session: a copy of the APVTS state with the voice count, colours and
+// per-voice data added. Built on the copy so a host save never mutates the live tree.
 juce::ValueTree PluginProcessor::captureFullPreset()
 {
-    apvts.state.setProperty("numVoices", numVoices.load(), nullptr);
-    apvts.state.setProperty("voiceColours", serialiseVoiceColours(), nullptr);
-    writeVoiceDataToState();
-    return apvts.copyState();
+    auto state = apvts.copyState();
+    state.setProperty("numVoices", numVoices.load(), nullptr);
+    state.setProperty("voiceColours", serialiseVoiceColours(), nullptr);
+    writeVoiceDataToState(state);
+    return state;
 }
 
 // Hot-swap: while the transport is playing, stage the parsed state and commit it at voice 0's

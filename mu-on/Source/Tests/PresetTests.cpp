@@ -1,5 +1,5 @@
 // Preset-file coverage: the shared mu-core helpers (full preset write / read, categories,
-// a layer's prefixed params) and mu-On's per-track step-row round-trip. Like the other
+// preset metadata, a layer's prefixed params) and mu-On's per-track step-row round-trip. Like the other
 // tests it uses a minimal headless AudioProcessor, not the full PluginProcessor.
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -76,6 +76,12 @@ public:
             expectEquals(mu_pp::readPresetCategories(dir, "muOn", "MuOnPreset").joinIntoString(","), juce::String("Drums"));
             expectEquals(mu_pp::listPresetFiles(dir, "muOn").size(), 2);
 
+            // The dropdown lister reads the wrapper's category (not mu-Clid's presetCategory key).
+            const auto listed = mu_pp::listPresetsByCategory(dir, "muOn");
+            expectEquals((int) listed.size(), 2);
+            expectEquals(listed[0].category, juce::String("Drums"));
+            expectEquals(mu_pp::readPresetMeta(f).description, juce::String("d"));
+
             mu_pp::readFullPreset(f, "MuOnPreset", "SomeOtherState", error);
             expect(error.isNotEmpty(), "a preset for another product's state is refused");
         }
@@ -100,6 +106,71 @@ public:
             juce::ValueTree state("MuOnState");
             expect(mu_pp::writeFullPreset(blocker, "muOn", "MuOnPreset", "X", "", "", state, [](const juce::String&) {})
                        == juce::File(), "writeFullPreset returns an empty File on failure");
+        }
+
+        beginTest("preset metadata: both file shapes, entities, prolog; huge values skipped; a re-save is re-read");
+        {
+            juce::ValueTree state("MuOnState");
+            const auto wrapped = mu_pp::writeFullPreset(dir, "muOn", "MuOnPreset", "Amp", "a <b> & \"c\"", "Bass & Low", state);
+            auto meta = mu_pp::readPresetMeta(wrapped);
+            expectEquals(meta.rootTag, juce::String("MuOnPreset"));
+            expectEquals(meta.category, juce::String("Bass & Low"));
+            expectEquals(meta.description, juce::String("a <b> & \"c\""));
+
+            // mu-Clid's shape: root properties, a comment in the prolog, single quotes, and an
+            // embedded sample far longer than any kept value.
+            const auto clid = dir.getChildFile("Kick.muRhythm");
+            const juce::String blob = juce::String::repeatedString("QUJD", 5000);
+            clid.replaceWithText("<?xml version=\"1.0\"?>\n<!-- saved -> by test -->\n"
+                                 "<MuClidRhythm presetName=\"Kick\" presetCategory=\"Kicks\" presetEmbedSamples=\"1\" "
+                                 "sampleData=\"" + blob + "\" lane='Kick'><Modulators/></MuClidRhythm>");
+            meta = mu_pp::readPresetMeta(clid);
+            expectEquals(meta.rootTag, juce::String("MuClidRhythm"));
+            expectEquals(meta.category, juce::String("Kicks"));
+            expect(meta.embedSamples, "presetEmbedSamples read");
+            expectEquals(meta.attribute("lane"), juce::String("Kick"));
+            expect(meta.attributes.count("sampleData") == 0, "the embedded sample is not kept");
+
+            // Re-saving with a new category is picked up on the next read.
+            clid.replaceWithText("<MuClidRhythm presetCategory=\"Snares and more\"/>");
+            expectEquals(mu_pp::readPresetMeta(clid).category, juce::String("Snares and more"));
+
+            const auto junk = dir.getChildFile("Junk.muOn");
+            junk.replaceWithText("not xml at all");
+            expect(! mu_pp::readPresetMeta(junk).isValid(), "a non-XML file has no metadata");
+            expect(! mu_pp::readPresetMeta(dir.getChildFile("Missing.muOn")).isValid(), "a missing file has no metadata");
+            clid.deleteFile();
+            junk.deleteFile();
+            wrapped.deleteFile();
+        }
+
+        beginTest("layer params: each parameter is written once, unchanged ones not at all");
+        {
+            StubProcessor proc;
+            juce::AudioProcessorValueTreeState apvts(proc, nullptr, "S", stubLayout());
+            apvts.getParameter("k_tune")->setValueNotifyingHost(0.9f);
+
+            struct Counter : juce::AudioProcessorParameter::Listener
+            {
+                int writes = 0;
+                void parameterValueChanged(int, float) override { ++writes; }
+                void parameterGestureChanged(int, bool) override {}
+            } tune, dec;
+            apvts.getParameter("k_tune")->addListener(&tune);
+            apvts.getParameter("k_dec")->addListener(&dec);
+
+            juce::ValueTree tree("MuOnTrack");
+            juce::ValueTree row("p");
+            row.setProperty("id", "tune", nullptr);
+            row.setProperty("v", 0.3, nullptr);
+            tree.appendChild(row, nullptr);
+            mu_pp::applyLayerParams(tree, apvts, "k_");
+
+            expectWithinAbsoluteError(apvts.getParameter("k_tune")->getValue(), 0.3f, 1e-4f);
+            expectEquals(tune.writes, 1);   // straight to the file value — no detour via the default
+            expectEquals(dec.writes, 0);    // already at its default
+            apvts.getParameter("k_tune")->removeListener(&tune);
+            apvts.getParameter("k_dec")->removeListener(&dec);
         }
 
         beginTest("layer params: written prefix-free, applied to another prefix, others reset");

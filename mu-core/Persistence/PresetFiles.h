@@ -1,8 +1,10 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "Persistence/PresetMeta.h"   // preset metadata read from the root tag only
 #include <algorithm>
 #include <functional>
+#include <map>
 #include <vector>
 
 // Shared preset-file handling for every mu product. A full preset is the product's whole
@@ -56,8 +58,14 @@ inline juce::Array<juce::File> listPresetFiles(const juce::File& dir, const juce
 // A preset file as a selector lists it: display name and category ("Uncategorised" when none).
 struct PresetEntry { juce::File file; juce::String name, category; };
 
-// The presets in `dir` with extension `ext` (not `_default`), each with the `presetCategory` it
-// was saved under — sorted by category (named ones alphabetically, "Uncategorised" last), then name.
+// True for a real category name (not empty, nor the "All" / "Uncategorised" placeholders).
+inline bool isNamedCategory(const juce::String& cat)
+{
+    return cat.isNotEmpty() && cat != "All" && cat != "Uncategorised";
+}
+
+// The presets in `dir` with extension `ext` (not `_default`), each with the category it was saved
+// under — sorted by category (named ones alphabetically, "Uncategorised" last), then name.
 inline std::vector<PresetEntry> listPresetsByCategory(const juce::File& dir, const juce::String& ext)
 {
     std::vector<PresetEntry> entries;
@@ -66,12 +74,9 @@ inline std::vector<PresetEntry> listPresetsByCategory(const juce::File& dir, con
     {
         if (f.getFileNameWithoutExtension().equalsIgnoreCase("_default")) continue;
         PresetEntry e { f, f.getFileNameWithoutExtension(), "Uncategorised" };
-        if (auto xml = juce::parseXML(f))
-        {
-            const auto cat = juce::ValueTree::fromXml(*xml).getProperty("presetCategory", "").toString();
-            if (cat.isNotEmpty() && cat != "All" && cat != "Uncategorised")
-                e.category = cat;
-        }
+        const auto cat = readPresetMeta(f).category;
+        if (isNamedCategory(cat))
+            e.category = cat;
         entries.push_back(std::move(e));
     }
     std::sort(entries.begin(), entries.end(), [](const PresetEntry& a, const PresetEntry& b)
@@ -117,18 +122,17 @@ inline juce::ValueTree readFullPreset(const juce::File& file, const juce::String
     return juce::ValueTree::fromXml(*stateXml);
 }
 
-// The categories used by the full presets in `dir` (first-seen order, no duplicates).
+// The named categories used by the full presets in `dir` (first-seen order, no duplicates).
 inline juce::StringArray readPresetCategories(const juce::File& dir, const juce::String& ext,
                                               const juce::String& rootTag)
 {
     juce::StringArray cats;
     for (const auto& f : listPresetFiles(dir, ext))
-        if (auto xml = juce::XmlDocument::parse(f))
-            if (xml->hasTagName(rootTag))
-            {
-                const auto c = xml->getStringAttribute("category");
-                if (c.isNotEmpty()) cats.addIfNotAlreadyThere(c);
-            }
+    {
+        const auto meta = readPresetMeta(f);
+        if (meta.rootTag == rootTag && isNamedCategory(meta.category))
+            cats.addIfNotAlreadyThere(meta.category);
+    }
     return cats;
 }
 
@@ -149,22 +153,32 @@ inline void writeLayerParams(juce::XmlElement& root, juce::AudioProcessor& proc,
 }
 
 // Apply a layer preset's <p id v> rows to the parameters `prefix` + id. Parameters the
-// file doesn't mention go back to their defaults, so an older preset loads cleanly.
+// file doesn't mention go back to their defaults, so an older preset loads cleanly. Each
+// parameter is written once with its final value (and not at all when it already holds it),
+// so a bar-line commit never exposes a transient default to the audio thread.
 inline void applyLayerParams(const juce::ValueTree& tree, juce::AudioProcessorValueTreeState& apvts,
                              const juce::String& prefix)
 {
-    for (auto* p : apvts.processor.getParameters())
-        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-            if (rp->getParameterID().startsWith(prefix))
-                rp->setValueNotifyingHost(rp->getDefaultValue());
-
+    // The file's normalised value per prefix-free id.
+    std::map<juce::String, float> fileValues;
     for (int i = 0; i < tree.getNumChildren(); ++i)
     {
         const auto row = tree.getChild(i);
-        if (! row.hasType("p")) continue;
-        if (auto* rp = apvts.getParameter(prefix + row.getProperty("id").toString()))
-            rp->setValueNotifyingHost((float) (double) row.getProperty("v"));
+        if (row.hasType("p"))
+            fileValues[row.getProperty("id").toString()] = (float) (double) row.getProperty("v");
     }
+
+    // Every layer parameter: the file's value, else its default.
+    for (auto* p : apvts.processor.getParameters())
+        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
+        {
+            const auto id = rp->getParameterID();
+            if (! id.startsWith(prefix)) continue;
+            const auto it = fileValues.find(id.substring(prefix.length()));
+            const float target = it != fileValues.end() ? it->second : rp->getDefaultValue();
+            if (rp->getValue() != target)
+                rp->setValueNotifyingHost(target);
+        }
 }
 
 } // namespace mu_pp

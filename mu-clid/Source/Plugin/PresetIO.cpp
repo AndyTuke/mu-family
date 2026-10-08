@@ -370,13 +370,9 @@ juce::StringArray PresetIO::loadCategoryList() const
     auto scan = [&](const juce::File& dir, const juce::String& ext) {
         for (const auto& f : dir.findChildFiles(juce::File::findFiles, false, "*." + ext))
         {
-            if (auto xml = juce::parseXML(f))
-            {
-                auto s = juce::ValueTree::fromXml(*xml);
-                juce::String cat = s.getProperty("presetCategory", "").toString();
-                if (cat.isNotEmpty() && cat != "All" && !cats.contains(cat, false))
-                    cats.add(cat);
-            }
+            const auto cat = mu_pp::readPresetMeta(f).category;
+            if (cat.isNotEmpty() && cat != "All" && !cats.contains(cat, false))
+                cats.add(cat);
         }
     };
     scan(proc_.getPresetsDir(), "muClid");

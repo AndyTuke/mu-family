@@ -152,9 +152,11 @@ juce::Array<juce::File> PluginProcessor::slotPresetFiles(int lane) const
 {
     juce::Array<juce::File> files;
     for (const auto& f : mu_pp::listPresetFiles(getPerSlotPresetDir(), getPerSlotPresetExtension()))
-        if (auto xml = juce::XmlDocument::parse(f))
-            if (xml->hasTagName(kTrackPresetTag) && xml->getStringAttribute("lane") == getChannelName(lane))
-                files.add(f);
+    {
+        const auto meta = mu_pp::readPresetMeta(f);
+        if (meta.rootTag == kTrackPresetTag && meta.attribute("lane") == getChannelName(lane))
+            files.add(f);
+    }
     return files;
 }
 

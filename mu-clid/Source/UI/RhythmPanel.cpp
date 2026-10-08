@@ -3,7 +3,7 @@
 #include "SampleBrowser.h"
 #include "UI/ConfirmDialog.h"   // shared themed confirm dialogs (mu_ui::confirmAsync)
 #include "UI/OverlayHost.h"     // shared dimmed in-editor overlay host (sample browser)
-#include "Persistence/PresetFiles.h"   // mu_pp::safePresetFileName
+#include "Persistence/PresetFiles.h"   // mu_pp::safePresetFileName, readPresetMeta
 
 #include <string_view>
 #include <unordered_set>
@@ -430,13 +430,10 @@ void RhythmPanel::saveRhythmPreset()
     if (loadedRhythmPresetFile.existsAsFile())
     {
         defaultName = loadedRhythmPresetFile.getFileNameWithoutExtension();
-        if (auto xml = juce::parseXML(loadedRhythmPresetFile))
-        {
-            auto s = juce::ValueTree::fromXml(*xml);
-            defaultCat   = s.getProperty("presetCategory",    "").toString();
-            defaultDesc  = s.getProperty("presetDescription", "").toString();
-            defaultEmbed = (int)s.getProperty("presetEmbedSamples", 0) != 0;
-        }
+        const auto meta = mu_pp::readPresetMeta(loadedRhythmPresetFile);
+        defaultCat   = meta.category;
+        defaultDesc  = meta.description;
+        defaultEmbed = meta.embedSamples;
     }
     else
     {

@@ -6,7 +6,7 @@
 #include "UI/ConfirmDialog.h"   // shared themed confirm/prompt dialogs (mu_ui::confirmAsync)
 #include "UI/StandardSettingsOverlay.h" // wires its program-change buttons
 #include "UI/MixerOverlay.h"            // forwards its status messages
-#include "Persistence/PresetFiles.h" // mu_pp::safePresetFileName — the name rule the processors use
+#include "Persistence/PresetFiles.h" // mu_pp::safePresetFileName (the processors' name rule), readPresetMeta
 
 EditorShellBase::EditorShellBase(ProcessorBase& proc)
     // Apply the stored UI scale BEFORE any child component is constructed.
@@ -626,12 +626,9 @@ void EditorShellBase::showSaveDialog(bool show)
         if (loaded.existsAsFile())
         {
             saveDialog.setDefaultName(loaded.getFileNameWithoutExtension());
-            if (auto xml = juce::parseXML(loaded))
-            {
-                auto state = juce::ValueTree::fromXml(*xml);
-                saveDialog.setDefaultCategory(state.getProperty("presetCategory",    "").toString());
-                saveDialog.setDefaultEmbed   ((int)state.getProperty("presetEmbedSamples", 0) != 0);
-            }
+            const auto meta = mu_pp::readPresetMeta(loaded);
+            saveDialog.setDefaultCategory(meta.category);
+            saveDialog.setDefaultEmbed   (meta.embedSamples);
         }
     }
     saveDialog.setVisible(show);
