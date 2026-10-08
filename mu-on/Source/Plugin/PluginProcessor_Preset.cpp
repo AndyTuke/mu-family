@@ -24,11 +24,15 @@ juce::String PluginProcessor::lanePrefix(int lane)
     return kLanePrefix[(size_t) juce::jlimit(0, kNumChannels - 1, lane)];
 }
 
-// The Rumble bar-volume envelope's curve points as a <RumbleEnv> node (read under its lock).
+// The Rumble volume envelope — its length (note value × multiplier, as a modulator's Loop) and
+// curve points — as a <RumbleEnv> node (read under its lock).
 juce::ValueTree PluginProcessor::serialiseRumbleEnv()
 {
     juce::ValueTree env("RumbleEnv");
     mu_core::spinLock(rumbleEnvLock);
+    env.setProperty("loopNV",   mu_pp::enumName(mu_audio::kNoteValueNames, (int) rumbleEnv.loopNoteValue), nullptr);
+    env.setProperty("loopMod",  mu_pp::enumName(mu_audio::kNoteModNames,   (int) rumbleEnv.loopNoteMod),   nullptr);
+    env.setProperty("loopMult", rumbleEnv.loopMultiplier, nullptr);
     for (const auto& p : rumbleEnv.curvePoints)
     {
         juce::ValueTree pt("P");
@@ -40,7 +44,8 @@ juce::ValueTree PluginProcessor::serialiseRumbleEnv()
     return env;
 }
 
-// Restore the Rumble envelope from a <RumbleEnv> node (fewer than two points → unchanged).
+// Restore the Rumble envelope from a <RumbleEnv> node (fewer than two points → unchanged). A node
+// saved before the envelope had a length is one bar, as it always was.
 void PluginProcessor::restoreRumbleEnv(const juce::ValueTree& env)
 {
     std::vector<ControlSequence::CurvePoint> pts;
@@ -54,7 +59,10 @@ void PluginProcessor::restoreRumbleEnv(const juce::ValueTree& env)
     }
     if (pts.size() < 2) return;
     mu_core::spinLock(rumbleEnvLock);
-    rumbleEnv.curvePoints = std::move(pts);
+    rumbleEnv.curvePoints    = std::move(pts);
+    rumbleEnv.loopNoteValue  = (NoteValue) mu_pp::readEnumIndex(env, "loopNV",  mu_audio::kNoteValueNames, (int) NoteValue::Quarter);
+    rumbleEnv.loopNoteMod    = (NoteMod)   mu_pp::readEnumIndex(env, "loopMod", mu_audio::kNoteModNames,   (int) NoteMod::None);
+    rumbleEnv.loopMultiplier = juce::jmax(1, (int) env.getProperty("loopMult", 4));
     mu_core::spinUnlock(rumbleEnvLock);
 }
 

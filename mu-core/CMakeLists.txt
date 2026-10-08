@@ -42,6 +42,7 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/SegmentControl.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/SlideSwitch.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/NudgeInput.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/NoteLengthControl.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/DropdownSelect.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/StepEditor.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/LFOEditor.cpp"

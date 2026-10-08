@@ -1,4 +1,5 @@
 #pragma once
+#include "UI/Components/NoteLengthControl.h"   // mu-core: Loop / Step length row
 #include <atomic>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "UI/Components/SegmentControl.h"
@@ -119,14 +120,8 @@ private:
     SegmentControl polarityCtrl{ {"Uni","Bi"} };
     LFOEditor      lfoEditor;
     StepEditor     stepEditor;
-    DropdownSelect loopDropdown;
-    juce::Label    loopLabel;
-    // explicit fromUTF8 so the "×" glyph decodes correctly. The implicit
-    // char* → juce::String conversion was rendering as garbled Latin-1 pairs.
-    NudgeInput     loopMult { juce::String::fromUTF8("\xc3\x97"), 1, 16, 1 };
-    DropdownSelect stepDropdown;
-    juce::Label    stepLabel;
-    NudgeInput     stepMult { juce::String::fromUTF8("\xc3\x97"), 1, 16, 1 };
+    NoteLengthControl loopLength { "Loop" };   // the modulator's cycle length (mu-core shared control)
+    NoteLengthControl stepLength { "Step" };   // a step's length (Stepped mode)
     // Square header button drawing the die glyph (⚀) large + centred on an
     // opaque panel-coloured fill — legible at header height, and the opaque
     // fill stops any control underlapping the header from peeping through.

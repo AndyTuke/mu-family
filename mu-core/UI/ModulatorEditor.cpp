@@ -1,53 +1,7 @@
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "ModulatorEditor.h"
 
-//==============================================================================
-// Note value lookup table for timing dropdowns (id = index + 1)
-namespace {
-struct NoteEntry { NoteValue nv; NoteMod mod; const char* label; };
-static constexpr NoteEntry kNoteEntries[] = {
-    { NoteValue::Whole,        NoteMod::None,    "1"     },
-    { NoteValue::Half,         NoteMod::None,    "1/2"   },
-    { NoteValue::Quarter,      NoteMod::None,    "1/4"   },
-    { NoteValue::Eighth,       NoteMod::None,    "1/8"   },
-    { NoteValue::Sixteenth,    NoteMod::None,    "1/16"  },
-    { NoteValue::ThirtySecond, NoteMod::None,    "1/32"  },
-    { NoteValue::Whole,        NoteMod::Triplet, "1T"    },
-    { NoteValue::Half,         NoteMod::Triplet, "1/2T"  },
-    { NoteValue::Quarter,      NoteMod::Triplet, "1/4T"  },
-    { NoteValue::Eighth,       NoteMod::Triplet, "1/8T"  },
-    { NoteValue::Sixteenth,    NoteMod::Triplet, "1/16T" },
-    { NoteValue::ThirtySecond, NoteMod::Triplet, "1/32T" },
-    { NoteValue::Whole,        NoteMod::Dotted,  "1."    },
-    { NoteValue::Half,         NoteMod::Dotted,  "1/2."  },
-    { NoteValue::Quarter,      NoteMod::Dotted,  "1/4."  },
-    { NoteValue::Eighth,       NoteMod::Dotted,  "1/8."  },
-    { NoteValue::Sixteenth,    NoteMod::Dotted,  "1/16." },
-    { NoteValue::ThirtySecond, NoteMod::Dotted,  "1/32." },
-};
-static constexpr int kNoteEntryCount = (int)(sizeof(kNoteEntries) / sizeof(kNoteEntries[0]));
 
-static int noteToId(NoteValue nv, NoteMod mod)
-{
-    for (int i = 0; i < kNoteEntryCount; ++i)
-        if (kNoteEntries[i].nv == nv && kNoteEntries[i].mod == mod)
-            return i + 1;
-    return 3; // fallback: 1/4
-}
-
-static void idToNote(int id, NoteValue& nv, NoteMod& mod)
-{
-    int i = id - 1;
-    if (i >= 0 && i < kNoteEntryCount) { nv = kNoteEntries[i].nv; mod = kNoteEntries[i].mod; }
-    else                               { nv = NoteValue::Quarter;  mod = NoteMod::None;       }
-}
-
-static void populateNoteDropdown(DropdownSelect& dd)
-{
-    for (int i = 0; i < kNoteEntryCount; ++i)
-        dd.addItem(kNoteEntries[i].label, i + 1);
-}
-} // namespace
 
 //==============================================================================
 ModulatorEditor::AssignmentRow::AssignmentRow(const std::string& assignId, int driveChar,
@@ -107,30 +61,9 @@ ModulatorEditor::ModulatorEditor()
     addAndMakeVisible(stepEditor);
 
     // Loop timing row
-    loopLabel.setText("Loop", juce::dontSendNotification);
-    loopLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
-    loopLabel.setJustificationType(juce::Justification::centredRight);
-    loopLabel.setColour(juce::Label::textColourId,
-                        MuLookAndFeel::colour(MuLookAndFeel::mutedText));
-    populateNoteDropdown(loopDropdown);
-    loopMult.setShowStepButtons(false);
-    loopMult.setLabelInline(true);
-    addAndMakeVisible(loopLabel);
-    addAndMakeVisible(loopDropdown);
-    addAndMakeVisible(loopMult);
-
-    // Step timing row — Stepped mode only
-    stepLabel.setText("Step", juce::dontSendNotification);
-    stepLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
-    stepLabel.setJustificationType(juce::Justification::centredRight);
-    stepLabel.setColour(juce::Label::textColourId,
-                        MuLookAndFeel::colour(MuLookAndFeel::mutedText));
-    populateNoteDropdown(stepDropdown);
-    stepMult.setShowStepButtons(false);
-    stepMult.setLabelInline(true);
-    addAndMakeVisible(stepLabel);
-    addAndMakeVisible(stepDropdown);
-    addAndMakeVisible(stepMult);
+    // Loop + step timing — the shared length rows (the step row matters in Stepped mode).
+    addAndMakeVisible(loopLength);
+    addAndMakeVisible(stepLength);
 
     // Dice — randomises the modulator's values (stepValues / curvePoints.y)
     // without changing its mode, polarity, loop / step timing or node count.
@@ -282,10 +215,8 @@ void ModulatorEditor::loadFromCS()
     }
 
     lfoEditor.setStepFraction((float) cs->getStepFraction());
-    loopDropdown.setSelectedId(noteToId(cs->loopNoteValue, cs->loopNoteMod));
-    loopMult.setValue(cs->loopMultiplier);
-    stepDropdown.setSelectedId(noteToId(cs->stepNoteValue, cs->stepNoteMod));
-    stepMult.setValue(cs->stepMultiplier);
+    loopLength.setLength(cs->loopNoteValue, cs->loopNoteMod, cs->loopMultiplier);
+    stepLength.setLength(cs->stepNoteValue, cs->stepNoteMod, cs->stepMultiplier);
 }
 
 void ModulatorEditor::syncStepValues()
@@ -347,50 +278,26 @@ void ModulatorEditor::wireHeader()
 
 void ModulatorEditor::wireTiming()
 {
-    loopDropdown.onChange = [this](int id)
+    loopLength.onChange = [this](NoteValue nv, NoteMod mod, int mult)
     {
         if (!cs) return;
-        NoteValue nv; NoteMod mod;
-        idToNote(id, nv, mod);
         lockMod();
-        cs->loopNoteValue = nv;
-        cs->loopNoteMod   = mod;
+        cs->loopNoteValue  = nv;
+        cs->loopNoteMod    = mod;
+        cs->loopMultiplier = mult;
         if (cs->mode == ControlSequence::Mode::Stepped) syncStepValues();
         lfoEditor.setStepFraction((float) cs->getStepFraction());
         unlockMod();
         repaint();
         if (onChange) onChange();
     };
-    loopMult.onChange = [this](int v)
+    stepLength.onChange = [this](NoteValue nv, NoteMod mod, int mult)
     {
         if (!cs) return;
         lockMod();
-        cs->loopMultiplier = v;
-        if (cs->mode == ControlSequence::Mode::Stepped) syncStepValues();
-        lfoEditor.setStepFraction((float) cs->getStepFraction());
-        unlockMod();
-        repaint();
-        if (onChange) onChange();
-    };
-    stepDropdown.onChange = [this](int id)
-    {
-        if (!cs) return;
-        NoteValue nv; NoteMod mod;
-        idToNote(id, nv, mod);
-        lockMod();
-        cs->stepNoteValue = nv;
-        cs->stepNoteMod   = mod;
-        syncStepValues();
-        lfoEditor.setStepFraction((float) cs->getStepFraction());
-        unlockMod();
-        repaint();
-        if (onChange) onChange();
-    };
-    stepMult.onChange = [this](int v)
-    {
-        if (!cs) return;
-        lockMod();
-        cs->stepMultiplier = v;
+        cs->stepNoteValue  = nv;
+        cs->stepNoteMod    = mod;
+        cs->stepMultiplier = mult;
         syncStepValues();
         lfoEditor.setStepFraction((float) cs->getStepFraction());
         unlockMod();
@@ -629,14 +536,13 @@ void ModulatorEditor::rebuildRows()
 void ModulatorEditor::setMetalStyle(bool m)
 {
     metal = m;
-    for (auto* dd : { &modeDropdown, &loopDropdown, &stepDropdown })
-        dd->setLcdStyle(m);
+    modeDropdown.setLcdStyle(m);
+    loopLength.setMetalStyle(m);
+    stepLength.setMetalStyle(m);
     for (auto& row : rows)
         row->destCombo.setLcdStyle(m);
     // Engraved labels need the normal label colour to read on the metal.
     const auto labelCol = MuLookAndFeel::colour(m ? MuLookAndFeel::labelText : MuLookAndFeel::mutedText);
-    loopLabel.setColour(juce::Label::textColourId, labelCol);
-    stepLabel.setColour(juce::Label::textColourId, labelCol);
     rowPageLabel.setColour(juce::Label::textColourId, labelCol);
     resized();
     repaint();
@@ -656,9 +562,7 @@ void ModulatorEditor::resized()
     const int nameW  = s(68);
     const int modeW  = metal ? s(92) : s(78);   // metal: the LCD font is monospaced, wider
     const int polW   = s(44);
-    const int lbW    = s(30);   // "Loop" / "Step" label
-    const int ddW    = s(58);   // note-value dropdown (fits "1/32T")
-    const int nmW    = s(46);   // nudge "× N"
+    const int lenW   = s(NoteLengthControl::kWidth);   // "Loop" / "Step" label + note value + × N
     const int gap2   = s(2);
     const int gap4   = s(4);
     const int gap8   = s(8);
@@ -675,9 +579,7 @@ void ModulatorEditor::resized()
     int x = metal ? m + padX : nameW;   // metal: no name, the lit LCD tab shows the mod
     modeDropdown.setBounds(x, hy, modeW, hh); x += modeW + gap4;
     polarityCtrl.setBounds(x, hy, polW,  hh); x += polW + gap8;
-    loopLabel   .setBounds(x, hy, lbW,   hh); x += lbW + gap2;
-    loopDropdown.setBounds(x, hy, ddW,   hh); x += ddW + gap2;
-    loopMult    .setBounds(x, hy, nmW,   hh); x += nmW + gap8;
+    loopLength.setBounds(x, hy, lenW, hh); x += lenW + gap8;
 
     // Dice button — anchored top-right of the header row, square.
     const int diceW = hh;
@@ -687,11 +589,9 @@ void ModulatorEditor::resized()
     // Step group (Stepped mode only) flows from the left, immediately after the
     // Loop group — left-justified with the other controls. Only the dice is
     // right-anchored; the step group sits well clear of it.
-    if (stepDropdown.isVisible())
+    if (stepLength.isVisible())
     {
-        stepLabel   .setBounds(x, hy, lbW, hh); x += lbW + gap2;
-        stepDropdown.setBounds(x, hy, ddW, hh); x += ddW + gap2;
-        stepMult    .setBounds(x, hy, nmW, hh); x += nmW + gap8;
+        stepLength.setBounds(x, hy, lenW, hh); x += lenW + gap8;
     }
     // The "N steps" readout (drawn in paint, Stepped mode) is left-justified here,
     // immediately after the step group's × multiplier.

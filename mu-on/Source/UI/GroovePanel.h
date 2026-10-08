@@ -11,6 +11,7 @@
 #include "UI/ConfirmDialog.h"                // mu-core: shared confirm / name dialogs
 #include "UI/ModulatorPanel.h"               // mu-core: shared modulator module
 #include "UI/Components/LFOEditor.h"          // mu-core: drawable smooth-curve editor
+#include "UI/Components/NoteLengthControl.h"  // mu-core: the Loop-style length row
 #include "UI/Components/MuLookAndFeel.h"
 
 #include <array>
@@ -53,6 +54,19 @@ public:
         };
         addChildComponent(rumbleEnvEditor);   // shown only for the Rumble lane
 
+        // The envelope's length — the same control as a modulator's Loop.
+        rumbleLength.onChange = [this](NoteValue nv, NoteMod mod, int mult)
+        {
+            auto& lock = proc.rumbleEnvLockRef();
+            mu_core::spinLock(lock);
+            auto& env = proc.rumbleEnvelope();
+            env.loopNoteValue  = nv;
+            env.loopNoteMod    = mod;
+            env.loopMultiplier = mult;
+            mu_core::spinUnlock(lock);
+        };
+        addChildComponent(rumbleLength);
+
         for (int lane = 0; lane < kNumChannels; ++lane)
             modProviders[(size_t) lane] = makeModDestProvider(lane);
 
@@ -83,8 +97,9 @@ public:
         const bool hasSteps = currentChannel < kNumStepLanes;
         grid.setVisible(hasSteps);
         rumbleEnvEditor.setVisible(currentChannel == Rumble);
+        rumbleLength.setVisible(currentChannel == Rumble);
         if (hasSteps) grid.setSelectedTrack(currentChannel);
-        if (currentChannel == Rumble) rumbleEnvEditor.setPoints(proc.rumbleEnvelope().curvePoints);
+        if (currentChannel == Rumble) showRumbleEnvelope();
         engine.setChannel(currentChannel);
 
         header.setLayerName(proc.getChannelName(currentChannel));
@@ -120,7 +135,7 @@ public:
         {
             slotR = r.removeFromBottom(mu_ui::s(kGridH) + 2 * in);
             r.removeFromBottom(mu_ui::s(4));
-            if (currentChannel == Rumble) rumbleEnvEditor.setBounds(slotR.reduced(in));
+            if (currentChannel == Rumble) layoutRumble(slotR.reduced(in));
             else                          grid.setBounds(slotR.reduced(in));
         }
 
@@ -193,7 +208,7 @@ private:
         {
             grooveBoxR = {};
             stepsBoxR  = slotBoxes;
-            rumbleEnvEditor.setBounds(stepsBoxR.reduced(clear, s(LF::kSpaceS)));
+            layoutRumble(stepsBoxR.reduced(clear, s(LF::kSpaceS)));
         }
         else
         {
@@ -212,7 +227,29 @@ private:
         modPanel.setPlayheadBeat(beat);
         header.setStagingBadge(proc.hasPendingSwap(currentChannel));   // "SWP" while a track preset waits for the wrap
         if (rumbleEnvEditor.isVisible())
-            rumbleEnvEditor.setPlayheadPhase((float) (std::fmod(juce::jmax(0.0, beat), 4.0) / 4.0));
+        {
+            const double len = juce::jmax(1.0e-6, proc.rumbleEnvelope().getLoopLengthBeats());
+            rumbleEnvEditor.setPlayheadPhase((float) (std::fmod(juce::jmax(0.0, beat), len) / len));
+        }
+    }
+
+    // The Rumble box: the Loop (length) row at the top left, the envelope beside it at full height.
+    void layoutRumble(juce::Rectangle<int> r)
+    {
+        using mu_ui::s;
+        rumbleLength.setMetalStyle(MuLookAndFeel::isMetal(*this));
+        auto lengthColumn = r.removeFromLeft(s(NoteLengthControl::kWidth));
+        rumbleLength.setBounds(lengthColumn.removeFromTop(s(NoteLengthControl::kHeight)));
+        r.removeFromLeft(s(MuLookAndFeel::kSpaceS));
+        rumbleEnvEditor.setBounds(r);
+    }
+
+    // Load the processor's envelope (points + length) into the editor and the Length row.
+    void showRumbleEnvelope()
+    {
+        const auto& env = proc.rumbleEnvelope();
+        rumbleEnvEditor.setPoints(env.curvePoints);
+        rumbleLength.setLength(env.loopNoteValue, env.loopNoteMod, env.loopMultiplier);
     }
 
     PluginProcessor& proc;
@@ -221,7 +258,8 @@ private:
     ChannelHeaderBar header;
     EnginePanel      engine;
     GrooveGrid       grid;
-    LFOEditor        rumbleEnvEditor;   // drawable bar-volume envelope (Rumble lane only)
+    LFOEditor        rumbleEnvEditor;   // drawable volume envelope (Rumble lane only)
+    NoteLengthControl rumbleLength { "Loop" };     // its length — the same control as a modulator's Loop
     ModulatorPanel   modPanel;
     std::array<ModDestProvider, kNumChannels> modProviders;
 
