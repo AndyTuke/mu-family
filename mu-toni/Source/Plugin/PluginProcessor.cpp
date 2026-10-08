@@ -183,9 +183,9 @@ PluginProcessor::PluginProcessor()
     for (auto& r : runners) r.setBank(&bank);
     midiInChParam = apvts.getRawParameterValue("midiInCh");
 
-    registerFxListeners(this);
-    syncAllFxParams();   // JUCE doesn't fire parameterChanged on construction
     cacheVoiceParamPointers();
+    startFxParamSync();     // mixer / FX params → mixerEngine + fxChain (ProcessorBase)
+    loadStartupDefault();   // restore a saved _default preset (skipped by render mode)
 }
 
 namespace
@@ -310,17 +310,6 @@ void PluginProcessor::updateHeldNotes(const juce::MidiBuffer& midi, bool& noteOn
         else if (m.isNoteOff())          removeNote(m.getNoteNumber());
         else if (m.isAllNotesOff() || m.isAllSoundOff()) heldCount = 0;
     }
-}
-
-PluginProcessor::~PluginProcessor()
-{
-    unregisterFxListeners(this);
-}
-
-void PluginProcessor::parameterChanged(const juce::String& id, float v)
-{
-    if (id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id))
-        syncGlobalFxParam(id, v);
 }
 
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)

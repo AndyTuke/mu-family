@@ -67,10 +67,12 @@ PluginProcessor::PluginProcessor()
    #endif
     sequencer.setStepCap(maxSteps(HitGenerator::kMaxSteps));   // 16 in demo
 
-    // Register listener for every parameter.
+    // Listen to the product parameters (rhythm + mstrLoop); mixer / FX ids are synced by ProcessorBase.
     for (auto* param : getParameters())
         if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
-            apvts.addParameterListener(p->getParameterID(), this);
+            if (! isFxParamId(p->getParameterID()))
+                apvts.addParameterListener(p->getParameterID(), this);
+    startFxParamSync();
 
     // Pre-populate modulation param map so lookups never allocate on the audio thread.
     modParamValues.reserve(50);
@@ -132,13 +134,9 @@ PluginProcessor::PluginProcessor()
     }
 
 #if !MUCLID_LITE_BUILD
-    // Ensure user content folders exist and load the default preset if present.
-    // Render mode (`--render` CLI) sets `skipAutoLoadDefault` to bypass this so
-    // each test starts from a clean single-rhythm state rather than whatever
-    // the user has saved as their personal default.
+    // Ensure user content folders exist and restore the saved default preset (skipped by render mode).
     ensureContentFoldersExist();
-    if (! skipAutoLoadDefault)
-        loadDefaultPreset();
+    loadStartupDefault();
 #endif
 }
 
@@ -146,7 +144,8 @@ PluginProcessor::~PluginProcessor()
 {
     for (auto* param : getParameters())
         if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
-            apvts.removeParameterListener(p->getParameterID(), this);
+            if (! isFxParamId(p->getParameterID()))
+                apvts.removeParameterListener(p->getParameterID(), this);
 }
 
 //==============================================================================

@@ -213,18 +213,7 @@ void PluginProcessor::parameterChanged(const juce::String& id, float v)
         syncRhythmParam(id[1] - '0', id.substring(3), v);
         return;
     }
-    // Shared global-FX / return / master / channel-strip params → mu-core sync
-    // (the set declared by mu_mixfx::addGlobalFxParams + the ch{i}_ rhythm strips).
-    // mstrLoop is excluded — it has no underscore at [4] so "mstr_" won't match —
-    // and is handled below as a product-specific sequencer param.
-    if (id.startsWith("eff_") || id.startsWith("rev_") || id.startsWith("dly_") ||
-        id.startsWith("eff2") || id.startsWith("dly2") || id.startsWith("echo_") ||
-        id.startsWith("ch")   || id.startsWith("ret_") || id.startsWith("mstr_") ||
-        id.startsWith("mst_ins"))
-    {
-        syncGlobalFxParam(id, v);
-        return;
-    }
+    // (Mixer / global-FX ids never reach here: ProcessorBase's own listener syncs them.)
     // Master loop length
     if (id == "mstrLoop")
     {

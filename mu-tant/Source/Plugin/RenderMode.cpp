@@ -23,7 +23,9 @@ int execute(const Args& args)
     // passes through (gateModeFor: bypassed → Pass). Without this the gate is closed when
     // the transport is stopped AND when playing an empty pattern, so the render would be
     // silent — this gives guaranteed non-silent audio with no preset / sample dependency.
+    PluginProcessor::skipAutoLoadDefault = true;   // start from the factory state, not the user's default
     PluginProcessor proc;
+    PluginProcessor::skipAutoLoadDefault = false;
 
     proc.onLoadError = [](const juce::String& m)
     { std::fputs(("mu-tant render: load: " + m + "\n").toRawUTF8(), stderr); std::fflush(stderr); };

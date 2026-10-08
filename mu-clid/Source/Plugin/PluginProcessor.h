@@ -145,7 +145,6 @@ public:
     void setSwapMode(SwapMode m) { swapModeAtomic.store((int)m, std::memory_order_relaxed); }
     SwapMode getSwapMode() const { return static_cast<SwapMode>(swapModeAtomic.load(std::memory_order_relaxed)); }
 
-    juce::File getPresetsDir() const override;
     juce::File getRhythmsDir() const;
     juce::File getSamplesDir() const;
     void setContentDir(const juce::File& dir);
@@ -175,13 +174,9 @@ public:
     void ensureCategoryInList(const juce::String& c) override { presetIO.ensureCategoryInList(c); }
     bool applyRhythmPreset(const juce::File& f, int ri) { return presetIO.applyRhythmPreset(f, ri); }
     bool applyDefaultRhythm(int ri)              { return presetIO.applyDefaultRhythm(ri); }
-    void loadDefaultPreset()                     { presetIO.loadDefaultPreset(); }
+    // _default.muClid, falling back to a single-rhythm _default.muRhythm (PresetIO).
+    void loadDefaultPreset() override            { presetIO.loadDefaultPreset(); }
 
-    // Set true before constructing a PluginProcessor to skip the ctor's
-    // automatic `loadDefaultPreset` call. Used by the headless render path
-    // (Source/Plugin/RenderMode.cpp) so listening tests aren't perturbed by
-    // whatever the user has saved as their personal `_default.muClid`.
-    inline static bool skipAutoLoadDefault = false;
 
     SequencerEngine sequencer;
     // Fixed-size arrays so the audio thread never races with a vector reallocation
@@ -293,7 +288,6 @@ public:
     // mu-clid editor (preset browser) can read them through a PluginProcessor&.
     juce::File   getPerSlotPresetDir()       const override { return getRhythmsDir(); }
     juce::String getPerSlotPresetExtension() const override { return "muRhythm"; }
-    juce::File   getFullPresetDir()          const override { return getPresetsDir(); }
     juce::String getFullPresetExtension()    const override { return "muClid"; }
 
 private:

@@ -132,7 +132,6 @@ void PluginProcessor::resetLayer(int layer)
     mu_pp::clearModulators(voiceSlots[(size_t) layer]);
 }
 
-juce::File PluginProcessor::getPresetsDir()       const { return getContentDir().getChildFile("Presets"); }
 juce::File PluginProcessor::getPerSlotPresetDir() const { return getContentDir().getChildFile("Arps"); }
 
 } // namespace mu_toni

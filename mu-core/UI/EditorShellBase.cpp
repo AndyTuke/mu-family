@@ -666,8 +666,7 @@ void EditorShellBase::doSavePreset(const juce::String& name, const juce::String&
 
 void EditorShellBase::doNewPreset()
 {
-    const juce::File defaultFile = processorRef.getPresetsDir()
-                                                .getChildFile(juce::String("_default.") + processorRef.getFullPresetExtension());
+    const juce::File defaultFile = processorRef.getDefaultPresetFile();
     if (!defaultFile.existsAsFile())
     {
         statusBar.showParam("New", "No default preset saved \xe2\x80\x94 use Save \xe2\x86\x92 Save as Default first",

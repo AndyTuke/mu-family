@@ -26,8 +26,7 @@
 namespace mu_toni
 {
 
-class PluginProcessor : public ProcessorBase,
-                        public juce::AudioProcessorValueTreeState::Listener
+class PluginProcessor : public ProcessorBase
 {
 public:
     // Family parity: up to 8 channels/layers. A fixed set ships for now; dynamic
@@ -36,11 +35,9 @@ public:
     static constexpr int kNumChannels = 4;   // placeholder layers shown in the shell
 
     PluginProcessor();
-    ~PluginProcessor() override;
 
     // Mixer / FX params (channel strips + global FX) drive mixerEngine + fxChain
     // via the shared ProcessorBase::syncGlobalFxParam, kept in sync by this listener.
-    void parameterChanged(const juce::String& id, float v) override;
 
     // ── AudioProcessor ───────────────────────────────────────────────────────
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
@@ -79,10 +76,8 @@ public:
 
     // ── Presets (per family file-format rule) ─────────────────────────────────
     // Full = .muToni (the whole state); per-layer = .muArp (one layer's arp + voice).
-    juce::File   getPresetsDir()             const override;
     juce::File   getPerSlotPresetDir()       const override;
     juce::String getPerSlotPresetExtension() const override { return "muArp"; }
-    juce::File   getFullPresetDir()          const override { return getPresetsDir(); }
     juce::String getFullPresetExtension()    const override { return "muToni"; }
 
     // Full-preset save/load — the editor shell drives the UI (preset bar, Save dialog, browser).

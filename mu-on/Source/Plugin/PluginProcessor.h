@@ -29,19 +29,16 @@
 namespace mu_on
 {
 
-class PluginProcessor : public ProcessorBase,
-                        public juce::AudioProcessorValueTreeState::Listener
+class PluginProcessor : public ProcessorBase
 {
 public:
     // Family parity: the shared mixer/sidebar size to kMaxChannels; mu-On uses a fixed 4.
     static constexpr int kMaxChannels = 8;
 
     PluginProcessor();
-    ~PluginProcessor() override;
 
     // Mixer / FX params (channel strips + global FX) drive mixerEngine + fxChain via
     // the shared ProcessorBase::syncGlobalFxParam, kept in sync by this listener.
-    void parameterChanged(const juce::String& id, float v) override;
 
     // ── AudioProcessor ───────────────────────────────────────────────────────
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
@@ -104,10 +101,8 @@ public:
 
     // ── Preset directories / extensions (per family file-format rule) ─────────
     // Full = .muOn; per-channel ("track" = one instrument lane) = .muTrack.
-    juce::File   getPresetsDir()             const override;
     juce::File   getPerSlotPresetDir()       const override;
     juce::String getPerSlotPresetExtension() const override { return "muTrack"; }
-    juce::File   getFullPresetDir()          const override { return getPresetsDir(); }
     juce::String getFullPresetExtension()    const override { return "muOn"; }
 
     // Full-preset save/load — the editor shell drives the UI (preset bar, Save dialog, browser).

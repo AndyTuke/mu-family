@@ -122,19 +122,8 @@ PluginProcessor::PluginProcessor()
 
     initAppSettings("muOn");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
-    registerFxListeners(this);
-    syncAllFxParams();   // JUCE doesn't fire parameterChanged on construction
-}
-
-PluginProcessor::~PluginProcessor()
-{
-    unregisterFxListeners(this);
-}
-
-void PluginProcessor::parameterChanged(const juce::String& id, float v)
-{
-    if (id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id))
-        syncGlobalFxParam(id, v);
+    startFxParamSync();     // mixer / FX params → mixerEngine + fxChain (ProcessorBase)
+    loadStartupDefault();   // restore a saved _default preset (skipped by render mode)
 }
 
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -294,7 +283,6 @@ void PluginProcessor::readVoiceDataFromState(const juce::ValueTree& state)
         [](int v, const std::string& id) { return isValidLaneDest(v, id); });
 }
 
-juce::File PluginProcessor::getPresetsDir()       const { return getContentDir().getChildFile("Presets"); }
 juce::File PluginProcessor::getPerSlotPresetDir() const { return getContentDir().getChildFile("Tracks"); }
 
 } // namespace mu_on

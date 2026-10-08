@@ -144,21 +144,26 @@ bool ProcessorBase::isFxParamId(const juce::String& id)
     return id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id);
 }
 
-// Walk every parameter, acting on the mixer / global-FX ones.
-void ProcessorBase::registerFxListeners(juce::AudioProcessorValueTreeState::Listener* listener)
+ProcessorBase::~ProcessorBase()
 {
-    for (auto* p : getParameters())
-        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-            if (isFxParamId(rp->getParameterID()))
-                apvts.addParameterListener(rp->getParameterID(), listener);
+    cancelPendingUpdate();
+    if (fxParamListener != nullptr)
+        for (auto* p : getParameters())
+            if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
+                if (isFxParamId(rp->getParameterID()))
+                    apvts.removeParameterListener(rp->getParameterID(), fxParamListener.get());
 }
 
-void ProcessorBase::unregisterFxListeners(juce::AudioProcessorValueTreeState::Listener* listener)
+// Listen to every mixer / global-FX parameter, then seed the engines from the current values.
+void ProcessorBase::startFxParamSync()
 {
+    jassert(fxParamListener == nullptr);   // once per processor
+    fxParamListener = std::make_unique<FxParamListener>(*this);
     for (auto* p : getParameters())
         if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
             if (isFxParamId(rp->getParameterID()))
-                apvts.removeParameterListener(rp->getParameterID(), listener);
+                apvts.addParameterListener(rp->getParameterID(), fxParamListener.get());
+    syncAllFxParams();   // JUCE doesn't fire parameterChanged on construction
 }
 
 void ProcessorBase::syncAllFxParams()
@@ -345,6 +350,24 @@ void ProcessorBase::savePreset(const juce::String& name, const juce::String& des
     if (const char* tag = getFullPresetTag())
         mu_pp::writeFullPreset(getPresetsDir(), getFullPresetExtension(), tag,
                                name, desc, category, captureFullPreset(), onLoadError);
+}
+
+juce::File ProcessorBase::getPresetsDir() const
+{
+    const auto content = getContentDir();
+    return content == juce::File() ? juce::File() : content.getChildFile("Presets");
+}
+
+juce::File ProcessorBase::getDefaultPresetFile() const
+{
+    return getPresetsDir().getChildFile("_default." + getFullPresetExtension());
+}
+
+void ProcessorBase::loadDefaultPreset()
+{
+    const auto f = getDefaultPresetFile();
+    if (f.existsAsFile())
+        loadPreset(f);
 }
 
 void ProcessorBase::loadPreset(const juce::File& file)

@@ -345,7 +345,6 @@ void PluginProcessor::readVoiceDataFromState()
     refreshAllPitchQuantFlags();   // modulators reloaded → refresh stepped-pitch flags
 }
 
-juce::File PluginProcessor::getPresetsDir()     const { return getContentDir().getChildFile("Presets"); }
 juce::File PluginProcessor::getPerSlotPresetDir() const { return getContentDir().getChildFile("Voices"); }
 juce::File PluginProcessor::getWavetablesDir()  const { return getContentDir().getChildFile("Wavetables"); }
 

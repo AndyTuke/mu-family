@@ -117,22 +117,8 @@ PluginProcessor::PluginProcessor()
             buf.clear();
     };
 
-    // Mixer + FX state is listener-synced into mixerEngine/fxChain (channel strips,
-    // sends, sidechain, returns, master, FX slots) — mirrors mu-clid. Seed it now
-    // since JUCE doesn't fire parameterChanged on construction.
-    registerFxListeners(this);
-    syncAllFxParams();
-}
-
-PluginProcessor::~PluginProcessor()
-{
-    unregisterFxListeners(this);
-}
-
-void PluginProcessor::parameterChanged(const juce::String& id, float v)
-{
-    if (id.startsWith("ch") || mu_mixfx::isGlobalFxParamId(id))
-        syncGlobalFxParam(id, v);
+    startFxParamSync();     // mixer / FX params → mixerEngine + fxChain (ProcessorBase)
+    loadStartupDefault();   // restore a saved _default preset (skipped by render mode)
 }
 
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)

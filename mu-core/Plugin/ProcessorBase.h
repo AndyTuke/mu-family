@@ -56,7 +56,7 @@ public:
     ProcessorBase(const BusesProperties& props,
                   juce::AudioProcessorValueTreeState::ParameterLayout layout,
                   const juce::Identifier& stateTreeType = juce::Identifier("MuFamilyState"));
-    ~ProcessorBase() override { cancelPendingUpdate(); }
+    ~ProcessorBase() override;
 
     // Public so UI panels (MixerOverlay, FXRow, MixerChannel, etc.) can access
     // them directly — matches the layout PluginProcessor had before extraction.
@@ -94,7 +94,7 @@ public:
 
     virtual juce::File   getPerSlotPresetDir()       const = 0;
     virtual juce::String getPerSlotPresetExtension() const = 0;
-    virtual juce::File   getFullPresetDir()          const = 0;
+    virtual juce::File   getFullPresetDir()          const { return getPresetsDir(); }
     virtual juce::String getFullPresetExtension()    const = 0;
 
     // ─── Shell-facing API (overridden by each plugin) ────────────────────────
@@ -145,7 +145,8 @@ public:
     // (reporting errors through onLoadError), hands the tree to useLoadedFullPreset (stage it while
     // playing, apply it while stopped) and publishes the name. With no tag these do nothing and
     // the product overrides them (mu-Clid's PresetIO).
-    virtual juce::File         getPresetsDir()                                     const { return {}; }
+    // Full presets live in <content dir>/Presets in every product.
+    virtual juce::File         getPresetsDir()                                     const;
     virtual void               loadPreset(const juce::File& file);
     virtual void               savePreset(const juce::String& name,
                                            const juce::String& desc,
@@ -157,6 +158,15 @@ public:
     virtual void               useLoadedFullPreset(juce::ValueTree /*state*/)            {}
     virtual void               ensureCategoryInList(const juce::String& /*cat*/)         {}
     virtual bool               hasPendingFullPreset()                              const { return false; }
+
+    // Default preset: <presets>/_default.<ext>, written by the shell's "Save as Default". Each
+    // product calls loadStartupDefault() at the end of its constructor so a saved default is
+    // restored on launch (a host session restore then replaces it). Render mode sets
+    // skipAutoLoadDefault first so headless renders start from the factory state.
+    juce::File         getDefaultPresetFile() const;
+    virtual void       loadDefaultPreset();
+    void               loadStartupDefault() { if (! skipAutoLoadDefault) loadDefaultPreset(); }
+    inline static bool skipAutoLoadDefault = false;
 
     // Set by the standalone (mu-link bridge) so the product can publish its current full-preset
     // name for display on the mu-link mixer. Null in plugin builds / when mu-link isn't wired.
@@ -370,12 +380,12 @@ protected:
 
     // ─── Mixer / global-FX parameters ────────────────────────────────────────
     // The channel-strip (ch{N}_*) and global FX ids synced to the engine via syncGlobalFxParam.
-    // Products listen to them (forwarding parameterChanged to syncGlobalFxParam) and push
-    // every current value once at construction / after a state restore, because JUCE fires
-    // no change for values that are already set.
+    // Each product calls startFxParamSync() once at the end of its constructor: the base then
+    // listens to every FX id (the listener is removed in the base destructor) and seeds the
+    // engines from the current values. After a state restore, products call syncAllFxParams()
+    // because JUCE fires no change for values that are already set.
     static bool isFxParamId(const juce::String& id);
-    void registerFxListeners  (juce::AudioProcessorValueTreeState::Listener* listener);
-    void unregisterFxListeners(juce::AudioProcessorValueTreeState::Listener* listener);
+    void startFxParamSync();
     void syncAllFxParams();
 
     // ─── VST3 sidechain bus type ─────────────────────────────────────────────
@@ -418,6 +428,16 @@ private:
     static constexpr int kPCFifoSize = mu_limits::kProgramChangeFifoSize;
     juce::AbstractFifo                          pcFifo { kPCFifoSize };
     std::array<ProgramChangeEvent, kPCFifoSize> pcQueue {};
+
+private:
+    // Forwards mixer / global-FX parameter changes to syncGlobalFxParam (see startFxParamSync).
+    struct FxParamListener : juce::AudioProcessorValueTreeState::Listener
+    {
+        explicit FxParamListener(ProcessorBase& o) : owner(o) {}
+        void parameterChanged(const juce::String& id, float v) override { owner.syncGlobalFxParam(id, v); }
+        ProcessorBase& owner;
+    };
+    std::unique_ptr<FxParamListener> fxParamListener;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ProcessorBase)
 };

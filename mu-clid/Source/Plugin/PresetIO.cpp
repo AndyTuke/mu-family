@@ -525,7 +525,7 @@ bool PresetIO::applyDefaultRhythm(int rhythmIndex)
 
 void PresetIO::loadDefaultPreset()
 {
-    juce::File f = proc_.getPresetsDir().getChildFile("_default.muClid");
+    juce::File f = proc_.getDefaultPresetFile();
     if (f.existsAsFile())
     {
         loadPreset(f);

@@ -8,7 +8,6 @@
 #include "Modulation/MuClidModDest.h"  // mu-clid modulation targets
 #include "Sequencer/Rhythm.h"
 
-juce::File PluginProcessor::getPresetsDir() const { return getContentDir().getChildFile("Presets"); }
 juce::File PluginProcessor::getRhythmsDir() const { return getContentDir().getChildFile("Rhythms"); }
 juce::File PluginProcessor::getSamplesDir() const { return getContentDir().getChildFile("Samples"); }
 

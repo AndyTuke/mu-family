@@ -67,21 +67,18 @@ struct VoiceRingBuffer
     std::atomic<int>         writeHead { 0 };
 };
 
-class PluginProcessor : public ProcessorBase,
-                        public juce::AudioProcessorValueTreeState::Listener
+class PluginProcessor : public ProcessorBase
 {
 public:
     // Family parity with mu-clid (max 8 rhythms / 8 voices / 8 channels).
     static constexpr int kMaxVoices = 8;
 
     PluginProcessor();
-    ~PluginProcessor() override;
 
     // Mixer / FX params (channel strips + global FX) drive mixerEngine + fxChain
     // via the shared ProcessorBase::syncGlobalFxParam, kept in sync by this
     // listener (mirrors mu-clid). Voice-engine params (v{N}_*) are read per-block
     // via cached pointers instead, so they're not listened to here.
-    void parameterChanged(const juce::String& id, float v) override;
 
     // ── AudioProcessor ───────────────────────────────────────────────────────
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
@@ -196,10 +193,8 @@ public:
     bool         userWavetableMissing(int voice, int oscIndex) const; // path set but file gone
 
     // ── ProcessorBase preset wiring (per design-voice.md file formats) ────────
-    juce::File   getPresetsDir()             const override;   // full presets live here
     juce::File   getPerSlotPresetDir()       const override;   // voice presets live here
     juce::String getPerSlotPresetExtension() const override { return "muPattern"; }
-    juce::File   getFullPresetDir()          const override { return getPresetsDir(); }
     juce::String getFullPresetExtension()    const override { return "muTant"; }
     juce::File   getWavetablesDir()          const;            // user/factory .wav wavetables live here
 
