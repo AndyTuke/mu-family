@@ -127,6 +127,8 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group improved">
           <h3>Improved</h3>
           <ul>
+            <li>Presets and saved projects now store each setting's real value (and choices by name), so a future update that changes a knob's range can't shift a saved sound. Older presets and projects still load as before. <span class="ref">(1237)</span></li>
+            <li>Presets and projects saved with this test build won't open correctly in earlier builds &mdash; keep a copy if you go back to an older version. <span class="ref">(1237)</span></li>
             <li>The preset list and the Save dialog open faster, especially with lots of presets or presets that carry embedded samples. <span class="ref">(1234)</span></li>
             <li>The mixer page starts to take on the metal look: the channel strips and the effects rack sit on screwed metal panels, and each effect row is in its own raised box. The knob-size test knobs are gone. <span class="ref">(1181, 1182)</span></li>
             <li>Every knob on the main page is now μ-Clid purple. <span class="ref">(1178)</span></li>
@@ -160,6 +162,7 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group fixed">
           <h3>Fixed</h3>
           <ul>
+            <li>Loading a rhythm preset saved before some settings existed now puts those settings to their defaults, instead of keeping the previous rhythm's values. <span class="ref">(1237)</span></li>
             <li>When following external MIDI clock, the tempo is now right from the first beat after Start — it used to run fast (or at the previous tempo) for about a beat. <span class="ref">(1232)</span></li>
             <li>If a preset can't be saved (for example a full disk or a read-only folder) you now get an error message instead of nothing, and an interrupted save can no longer leave a half-written preset. <span class="ref">(1230)</span></li>
             <li>New rhythms are named "Rhythm 2", "Rhythm 3" … instead of "_default". <span class="ref">(1156)</span></li>
