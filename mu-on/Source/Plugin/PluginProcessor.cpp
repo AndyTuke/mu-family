@@ -122,6 +122,7 @@ PluginProcessor::PluginProcessor()
 
     initAppSettings("muOn");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
+    initLaneState();        // the lane layout every preset / session save and load uses
     hotSwap.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },
                         [this](int i, juce::ValueTree& t) { applyTrackTree(i, t); });
     startFxParamSync();     // mixer / FX params → mixerEngine + fxChain (ProcessorBase)
@@ -244,40 +245,9 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
         if (xml->hasTagName(apvts.state.getType()))
-            applyStateTree(juce::ValueTree::fromXml(*xml));
+            applyStateTree(toLaneState(juce::ValueTree::fromXml(*xml)));   // host restore — always immediate
 }
 
-// Rebuild a fresh <VoiceData> child holding each lane's modulators so copyState()
-// carries them into the file/host state. Mirrors mu-tant's per-voice approach.
-void PluginProcessor::writeVoiceDataToState(juce::ValueTree& state)
-{
-    mu_pp::writeChannelData(state, kNumChannels, [this](int v) -> VoiceSlot& { return voiceSlots[(size_t) v]; });
-}
-
-// Clear then restore each lane's modulators. An absent <VoiceData> (older / foreign
-// state) leaves every lane cleared rather than carrying stale assignments.
-void PluginProcessor::readVoiceDataFromState(const juce::ValueTree& state)
-{
-    // Sessions saved before the shared format called each lane's node <Lane>; read those too.
-    juce::ValueTree current = state;
-    if (auto vd = state.getChildWithName(mu_pp::kChannelDataTag); vd.isValid()
-        && vd.getChildWithName("Lane").isValid())
-    {
-        current = state.createCopy();
-        auto data = current.getChildWithName(mu_pp::kChannelDataTag);
-        for (int i = 0; i < data.getNumChildren(); ++i)
-            if (data.getChild(i).hasType("Lane"))
-            {
-                juce::ValueTree node(mu_pp::kChannelNodeTag);
-                node.copyPropertiesAndChildrenFrom(data.getChild(i), nullptr);
-                data.removeChild(i, nullptr);
-                data.addChild(node, i, nullptr);
-            }
-    }
-    mu_pp::readChannelModulators(current, kNumChannels,
-        [this](int v) -> VoiceSlot& { return voiceSlots[(size_t) v]; },
-        [](int v, const std::string& id) { return isValidLaneDest(v, id); });
-}
 
 juce::File PluginProcessor::getPerSlotPresetDir() const { return getContentDir().getChildFile("Tracks"); }
 

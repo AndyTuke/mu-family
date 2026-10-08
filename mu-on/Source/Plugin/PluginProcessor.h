@@ -140,14 +140,12 @@ protected:
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
-    // Per-lane modulator (de)serialise into a <VoiceData> child of the state tree
-    // (mirrors mu-tant; rides the APVTS state alongside the <Pattern> grid).
-    void writeVoiceDataToState(juce::ValueTree& state);
-    void readVoiceDataFromState(const juce::ValueTree& state);
-
-    // State shared by the session save/restore and full presets (PluginProcessor_Preset.cpp).
-    juce::ValueTree     captureState();
-    void                applyStateTree(const juce::ValueTree& tree);
+    // State shared by the session save/restore and full presets (PluginProcessor_Preset.cpp):
+    // the composed state (mu-core SlotState) of the globals + every lane's node.
+    void                initLaneState();
+    juce::ValueTree     captureState() { return captureComposedState(); }
+    juce::ValueTree     toLaneState(const juce::ValueTree& tree) const;
+    void                applyStateTree(const juce::ValueTree& state);
     juce::ValueTree     serialiseRumbleEnv();
     void                restoreRumbleEnv(const juce::ValueTree& env);
     static juce::String lanePrefix(int lane);       // the lane's engine-param prefix (k_, b_, ...)

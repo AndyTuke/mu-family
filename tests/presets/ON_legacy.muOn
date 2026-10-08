@@ -1,0 +1,243 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<MuOnPreset name="Legacy" description="Listening test: pre-format-2 state (APVTS dump + VoiceData)" category="test">
+  <MuOnState>
+    <PARAM id="ch0_lvl" value="1.0" />
+    <PARAM id="ch0_pan" value="0.0" />
+    <PARAM id="ch0_mute" value="0.0" />
+    <PARAM id="ch0_solo" value="0.0" />
+    <PARAM id="ch0_sendEff" value="0.0" />
+    <PARAM id="ch0_sendDly" value="0.0" />
+    <PARAM id="ch0_sendRev" value="0.0" />
+    <PARAM id="ch0_scSrc" value="0.0" />
+    <PARAM id="ch0_scAmt" value="0.0" />
+    <PARAM id="ch0_scAtk" value="5.0" />
+    <PARAM id="ch0_scRel" value="100.0" />
+    <PARAM id="ch0_outBus" value="0.0" />
+    <PARAM id="ch1_lvl" value="1.0" />
+    <PARAM id="ch1_pan" value="0.0" />
+    <PARAM id="ch1_mute" value="0.0" />
+    <PARAM id="ch1_solo" value="0.0" />
+    <PARAM id="ch1_sendEff" value="0.0" />
+    <PARAM id="ch1_sendDly" value="0.0" />
+    <PARAM id="ch1_sendRev" value="0.0" />
+    <PARAM id="ch1_scSrc" value="1.0" />
+    <PARAM id="ch1_scAmt" value="0.4000000059604645" />
+    <PARAM id="ch1_scAtk" value="5.0" />
+    <PARAM id="ch1_scRel" value="120.0" />
+    <PARAM id="ch1_outBus" value="0.0" />
+    <PARAM id="ch2_lvl" value="1.0" />
+    <PARAM id="ch2_pan" value="0.0" />
+    <PARAM id="ch2_mute" value="0.0" />
+    <PARAM id="ch2_solo" value="0.0" />
+    <PARAM id="ch2_sendEff" value="0.0" />
+    <PARAM id="ch2_sendDly" value="0.0" />
+    <PARAM id="ch2_sendRev" value="0.0" />
+    <PARAM id="ch2_scSrc" value="0.0" />
+    <PARAM id="ch2_scAmt" value="0.0" />
+    <PARAM id="ch2_scAtk" value="5.0" />
+    <PARAM id="ch2_scRel" value="100.0" />
+    <PARAM id="ch2_outBus" value="0.0" />
+    <PARAM id="ch3_lvl" value="1.0" />
+    <PARAM id="ch3_pan" value="0.0" />
+    <PARAM id="ch3_mute" value="0.0" />
+    <PARAM id="ch3_solo" value="0.0" />
+    <PARAM id="ch3_sendEff" value="0.0" />
+    <PARAM id="ch3_sendDly" value="0.0" />
+    <PARAM id="ch3_sendRev" value="0.0" />
+    <PARAM id="ch3_scSrc" value="0.0" />
+    <PARAM id="ch3_scAmt" value="0.0" />
+    <PARAM id="ch3_scAtk" value="5.0" />
+    <PARAM id="ch3_scRel" value="100.0" />
+    <PARAM id="ch3_outBus" value="0.0" />
+    <PARAM id="ch4_lvl" value="1.0" />
+    <PARAM id="ch4_pan" value="0.0" />
+    <PARAM id="ch4_mute" value="0.0" />
+    <PARAM id="ch4_solo" value="0.0" />
+    <PARAM id="ch4_sendEff" value="0.0" />
+    <PARAM id="ch4_sendDly" value="0.0" />
+    <PARAM id="ch4_sendRev" value="0.0" />
+    <PARAM id="ch4_scSrc" value="1.0" />
+    <PARAM id="ch4_scAmt" value="0.0" />
+    <PARAM id="ch4_scAtk" value="5.0" />
+    <PARAM id="ch4_scRel" value="100.0" />
+    <PARAM id="ch4_outBus" value="0.0" />
+    <PARAM id="seq_swing" value="0.0" />
+    <PARAM id="seq_accent" value="1.0" />
+    <PARAM id="eff_algo" value="0.0" />
+    <PARAM id="eff_en" value="1.0" />
+    <PARAM id="eff_p0" value="0.5" />
+    <PARAM id="eff_p1" value="0.5" />
+    <PARAM id="eff_p2" value="0.5" />
+    <PARAM id="eff_p3" value="0.5" />
+    <PARAM id="eff_p4" value="0.5" />
+    <PARAM id="dly_en" value="1.0" />
+    <PARAM id="dly_mode" value="1.0" />
+    <PARAM id="dly_ms" value="250.0" />
+    <PARAM id="dly_syncDenom" value="2.0" />
+    <PARAM id="dly_syncDot" value="1.0" />
+    <PARAM id="dly_syncTrip" value="0.0" />
+    <PARAM id="dly_count" value="1.0" />
+    <PARAM id="dly_fb" value="0.300000011920929" />
+    <PARAM id="dly_spread" value="0.0" />
+    <PARAM id="dly_dirt" value="0.0" />
+    <PARAM id="rev_algo" value="1.0" />
+    <PARAM id="rev_en" value="1.0" />
+    <PARAM id="rev_lvl" value="1.0" />
+    <PARAM id="rev_size" value="0.75" />
+    <PARAM id="rev_pre" value="25.0" />
+    <PARAM id="rev_diff" value="0.800000011920929" />
+    <PARAM id="rev_damp" value="0.300000011920929" />
+    <PARAM id="rev_mod" value="0.1500000059604645" />
+    <PARAM id="rev_dirt" value="0.0" />
+    <PARAM id="eff2dly" value="0.0" />
+    <PARAM id="eff2rev" value="0.0" />
+    <PARAM id="dly2rev" value="0.0" />
+    <PARAM id="echo_en" value="1.0" />
+    <PARAM id="echo_mode" value="0.0" />
+    <PARAM id="echo_ms" value="250.0" />
+    <PARAM id="echo_syncDenom" value="2.0" />
+    <PARAM id="echo_syncDot" value="0.0" />
+    <PARAM id="echo_syncTrip" value="0.0" />
+    <PARAM id="echo_count" value="1.0" />
+    <PARAM id="echo_fb" value="0.449999988079071" />
+    <PARAM id="echo_spread" value="0.0" />
+    <PARAM id="echo_dirt" value="0.0" />
+    <PARAM id="ret_eff_lvl" value="0.75" />
+    <PARAM id="ret_eff_pan" value="0.0" />
+    <PARAM id="ret_eff_mute" value="0.0" />
+    <PARAM id="ret_eff_solo" value="0.0" />
+    <PARAM id="ret_eff_scSrc" value="0.0" />
+    <PARAM id="ret_eff_scAmt" value="0.0" />
+    <PARAM id="ret_eff_scAtk" value="5.0" />
+    <PARAM id="ret_eff_scRel" value="100.0" />
+    <PARAM id="ret_dly_lvl" value="0.75" />
+    <PARAM id="ret_dly_pan" value="0.0" />
+    <PARAM id="ret_dly_mute" value="0.0" />
+    <PARAM id="ret_dly_solo" value="0.0" />
+    <PARAM id="ret_dly_scSrc" value="0.0" />
+    <PARAM id="ret_dly_scAmt" value="0.0" />
+    <PARAM id="ret_dly_scAtk" value="5.0" />
+    <PARAM id="ret_dly_scRel" value="100.0" />
+    <PARAM id="ret_rev_lvl" value="0.75" />
+    <PARAM id="ret_rev_pan" value="0.0" />
+    <PARAM id="ret_rev_mute" value="0.0" />
+    <PARAM id="ret_rev_solo" value="0.0" />
+    <PARAM id="ret_rev_scSrc" value="0.0" />
+    <PARAM id="ret_rev_scAmt" value="0.0" />
+    <PARAM id="ret_rev_scAtk" value="5.0" />
+    <PARAM id="ret_rev_scRel" value="100.0" />
+    <PARAM id="mstr_lvl" value="1.0" />
+    <PARAM id="mstr_pan" value="0.0" />
+    <PARAM id="mst_insChar" value="0.0" />
+    <PARAM id="mst_insP1" value="0.0" />
+    <PARAM id="mst_insP2" value="0.0" />
+    <PARAM id="mst_insP3" value="0.0" />
+    <PARAM id="mst_insP4" value="0.0" />
+    <PARAM id="mst_ins2Char" value="0.0" />
+    <PARAM id="mst_ins2P1" value="0.0" />
+    <PARAM id="mst_ins2P2" value="0.0" />
+    <PARAM id="mst_ins2P3" value="0.0" />
+    <PARAM id="mst_ins2P4" value="0.0" />
+    <PARAM id="k_tune" value="50.0" />
+    <PARAM id="k_ptch" value="220.0" />
+    <PARAM id="k_pdec" value="50.0" />
+    <PARAM id="k_adec" value="180.0" />
+    <PARAM id="k_drive" value="0.2000000029802322" />
+    <PARAM id="b_wave" value="0.0" />
+    <PARAM id="b_sub" value="0.5" />
+    <PARAM id="b_tune" value="41.20000076293945" />
+    <PARAM id="b_cut" value="600.0" />
+    <PARAM id="b_res" value="0.2000000029802322" />
+    <PARAM id="b_env" value="0.4000000059604645" />
+    <PARAM id="b_edec" value="180.0" />
+    <PARAM id="b_atk" value="2.0" />
+    <PARAM id="b_dec" value="200.0" />
+    <PARAM id="b_sus" value="0.0" />
+    <PARAM id="b_drive" value="0.2000000029802322" />
+    <PARAM id="h_tune" value="0.7" />
+    <PARAM id="h_dec" value="0.6" />
+    <PARAM id="s_tune" value="0.0" />
+    <PARAM id="s_dec" value="160.0" />
+    <PARAM id="r_drive" value="0.4000000059604645" />
+    <PARAM id="r_d1" value="0.5" />
+    <PARAM id="r_d2" value="0.3500000238418579" />
+    <PARAM id="r_d3" value="0.25" />
+    <PARAM id="r_size" value="0.7000000476837158" />
+    <PARAM id="r_revmix" value="0.5" />
+    <PARAM id="r_revlp" value="1200.0" />
+    <PARAM id="r_cut" value="800.0" />
+    <PARAM id="r_res" value="0.2000000029802322" />
+    <VoiceData>
+      <Voice idx="0">
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+        </Modulators>
+      </Voice>
+      <Voice idx="1">
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+        </Modulators>
+      </Voice>
+      <Voice idx="2">
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+        </Modulators>
+      </Voice>
+      <Voice idx="3">
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+        </Modulators>
+      </Voice>
+      <Voice idx="4">
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+        </Modulators>
+      </Voice>
+    </VoiceData>
+    <Pattern tracks="4" steps="16">
+      <Track i="0" on="0000000000000000" accent="0000000000000000" />
+      <Track i="1" on="0000000000000000" accent="0000000000000000" />
+      <Track i="2" on="1010101010101010" accent="0000000000000000" />
+      <Track i="3" on="0000000000000000" accent="0000000000000000" />
+    </Pattern>
+    <RumbleEnv>
+      <P x="0.0" y="1.0" />
+      <P x="1.0" y="1.0" />
+    </RumbleEnv>
+  </MuOnState>
+</MuOnPreset>

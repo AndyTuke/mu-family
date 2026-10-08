@@ -1,0 +1,24 @@
+{
+  "test": "ON_roundtrip",
+  "product": "mu-on",
+  "description": "mu-On composed-state round trip: a pre-format-2 full preset (APVTS dump + VoiceData, the grid as one root <Pattern> with only the hat lane stepping, the Rumble envelope at the root) loads through the legacy rebuild, is saved in the composed format, and the re-render from that save must be sample-identical.",
+  "render": {
+    "preset": "tests/presets/ON_legacy.muOn",
+    "play": true,
+    "roundtrip": true,
+    "seconds": 3.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "only_the_hat_plays",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [0.5, 3.0],
+      "min": -45,
+      "max": -25,
+      "comment": "the old root <Pattern> reached the lanes: just the hat steps (the factory groove measures ~-12 dB)"
+    }
+  ]
+}

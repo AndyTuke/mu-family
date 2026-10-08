@@ -4,8 +4,8 @@
 #include "Modulation/ModulatorSerialise.h"    // mu-core: modulator (de)serialise
 #include "Persistence/PresetFiles.h"          // mu-core: shared preset-file handling
 
-// mu-On preset I/O: full presets (.muOn), per-track presets (.muTrack), and the state
-// capture / apply shared by the host session and full presets. Split out of
+// mu-On preset I/O on the family composed state (mu-core SlotState): full presets (.muOn),
+// per-track presets (.muTrack) and host sessions all build / apply the same lane node. Split out of
 // PluginProcessor.cpp to mirror mu-Tant's PluginProcessor_Preset.cpp.
 
 namespace mu_on
@@ -58,51 +58,95 @@ void PluginProcessor::restoreRumbleEnv(const juce::ValueTree& env)
     mu_core::spinUnlock(rumbleEnvLock);
 }
 
-// The params + step grid + each lane's modulators + the Rumble envelope (session and full preset).
-juce::ValueTree PluginProcessor::captureState()
+// Describe the lanes once (ctor): each lane's engine params, its step row (the Rumble lane: its
+// bar-volume envelope) and its modulators. Every track preset, full preset and host session is
+// built and applied from this.
+void PluginProcessor::initLaneState()
 {
-    auto state = apvts.copyState();
-    stepPattern.serialise(state);
-    writeVoiceDataToState(state);
-    state.removeChild(state.getChildWithName("RumbleEnv"), nullptr);
-    state.addChild(serialiseRumbleEnv(), -1, nullptr);
-    return state;
+    juce::StringArray prefixes;
+    for (int l = 0; l < kNumChannels; ++l) prefixes.add(lanePrefix(l));
+    initSlotState(prefixes,
+        { [this](int l, juce::ValueTree& node)
+          {
+              node.appendChild(l < kNumStepLanes ? stepPattern.serialiseTrack(l) : serialiseRumbleEnv(), nullptr);
+              node.appendChild(mu_pp::serialiseModulators(voiceSlots[(size_t) l]), nullptr);
+          },
+          [this](int l, const juce::ValueTree& node)
+          {
+              // An absent <Track> clears the lane's steps; an absent envelope keeps the current one.
+              if (l < kNumStepLanes) stepPattern.deserialiseTrack(l, node.getChildWithName("Track"));
+              else                   restoreRumbleEnv(node.getChildWithName("RumbleEnv"));
+
+              auto& slot = voiceSlots[(size_t) l];
+              mu_pp::clearModulators(slot);
+              mu_pp::deserialiseModulators(node.getChildWithName("Modulators"), slot, {},
+                                           [l](const std::string& id) { return isValidLaneDest(l, id); });
+          } });
 }
 
-void PluginProcessor::applyStateTree(const juce::ValueTree& tree)
+// Any saved state (host session or full preset, either format) in the composed shape. Older
+// states kept the grid as one <Pattern> and the envelope at the root (each moves into its lane),
+// and the oldest called each lane's modulator node <Lane>.
+juce::ValueTree PluginProcessor::toLaneState(const juce::ValueTree& tree) const
 {
-    apvts.replaceState(tree);
-    stepPattern.deserialise(apvts.state);
-    readVoiceDataFromState(apvts.state);
-    restoreRumbleEnv(apvts.state.getChildWithName("RumbleEnv"));
+    juce::ValueTree source = tree;
+    if (auto vd = tree.getChildWithName(mu_pp::kChannelDataTag); vd.isValid() && vd.getChildWithName("Lane").isValid())
+    {
+        source = tree.createCopy();
+        auto data = source.getChildWithName(mu_pp::kChannelDataTag);
+        for (int i = 0; i < data.getNumChildren(); ++i)
+            if (data.getChild(i).hasType("Lane"))
+            {
+                juce::ValueTree node(mu_pp::kChannelNodeTag);
+                node.copyPropertiesAndChildrenFrom(data.getChild(i), nullptr);
+                data.removeChild(i, nullptr);
+                data.addChild(node, i, nullptr);
+            }
+    }
+
+    return toComposedState(source, [](const juce::ValueTree& child, juce::ValueTree& composed)
+    {
+        if (child.hasType("Pattern"))
+        {
+            for (int i = 0; i < child.getNumChildren(); ++i)
+                if (const auto row = child.getChild(i); row.hasType("Track"))
+                    if (auto node = mu_pp::findSlotNode(composed, (int) row.getProperty("i", -1)); node.isValid())
+                        node.appendChild(row.createCopy(), nullptr);
+        }
+        else if (child.hasType("RumbleEnv"))
+        {
+            if (auto node = mu_pp::findSlotNode(composed, kNumStepLanes); node.isValid())
+                node.appendChild(child.createCopy(), nullptr);
+        }
+    });
+}
+
+// Apply a composed state (host restore, full-preset load or its pattern-wrap commit), then
+// re-seed the mixer / FX engines.
+void PluginProcessor::applyStateTree(const juce::ValueTree& state)
+{
+    applyComposedState(state);
     syncAllFxParams();   // re-seed mixer/FX (unchanged values skip listeners)
 }
 
 // While playing, stage a loaded full preset for the pattern's wrap (commitDeferredWork); while
-// stopped, apply it now.
+// stopped, apply it now. Converted to the composed shape here, so the commit does no parsing.
 void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 {
-    hotSwap.useFull(std::move(state));
+    hotSwap.useFull(toLaneState(state));
 }
 
-// A track preset: the lane's engine params, its step row (or the Rumble envelope) and its
-// modulators. It belongs to one instrument, so it records which lane it came from.
+// A track preset: the lane's node (engine param rows, step row or envelope, modulators). It
+// belongs to one instrument, so it records which lane it came from.
 void PluginProcessor::saveSlotPreset(int lane, const juce::String& name)
 {
     if (lane < 0 || lane >= kNumChannels) return;
-    auto dir = getPerSlotPresetDir();
-    dir.createDirectory();
-
-    juce::XmlElement root(kTrackPresetTag);
-    root.setAttribute("lane", getChannelName(lane));
-    mu_pp::writeLayerParams(root, *this, lanePrefix(lane));
-    auto pattern = lane < kNumStepLanes ? stepPattern.serialiseTrack(lane) : serialiseRumbleEnv();
-    if (auto xml = pattern.createXml()) root.addChildElement(xml.release());
-    if (auto mods = mu_pp::serialiseModulators(voiceSlots[(size_t) lane]).createXml())
-        root.addChildElement(mods.release());
-    mu_pp::writeXmlAtomically(root, dir.getChildFile(mu_pp::safePresetFileName(name, getChannelName(lane))
-                                                     + "." + getPerSlotPresetExtension()),
-                              onLoadError);
+    auto node = captureSlotNode(lane, kTrackPresetTag);
+    node.setProperty("lane", getChannelName(lane), nullptr);
+    if (auto xml = node.createXml())
+        mu_pp::writeXmlAtomically(*xml, getPerSlotPresetDir().getChildFile(mu_pp::safePresetFileName(name, getChannelName(lane))
+                                                                           + "." + getPerSlotPresetExtension()),
+                                  onLoadError);
 }
 
 void PluginProcessor::loadSlotPreset(int lane, const juce::File& file)
@@ -125,17 +169,10 @@ void PluginProcessor::loadSlotPreset(int lane, const juce::File& file)
     hotSwap.useSlot(lane, juce::ValueTree::fromXml(*xml));
 }
 
-// Apply a parsed track preset (the stopped load and the pattern-wrap commit), then tell the editor.
+// Apply a lane node (the stopped load and the pattern-wrap commit), then tell the editor.
 void PluginProcessor::applyTrackTree(int lane, const juce::ValueTree& tree)
 {
-    mu_pp::applyLayerParams(tree, apvts, lanePrefix(lane));
-    if (lane < kNumStepLanes) stepPattern.deserialiseTrack(lane, tree.getChildWithName("Track"));
-    else                      restoreRumbleEnv(tree.getChildWithName("RumbleEnv"));
-
-    auto& slot = voiceSlots[(size_t) lane];
-    mu_pp::clearModulators(slot);
-    mu_pp::deserialiseModulators(tree.getChildWithName("Modulators"), slot, {},
-                                 [lane](const std::string& id) { return isValidLaneDest(lane, id); });
+    applySlotNode(lane, tree);
     if (onSlotPresetCommitted) onSlotPresetCommitted(lane);
 }
 
@@ -160,12 +197,13 @@ juce::Array<juce::File> PluginProcessor::slotPresetFiles(int lane) const
     return files;
 }
 
-// Reset a lane: its engine params back to defaults and its modulators cleared.
+// Reset a lane: its engine params back to defaults and its modulators cleared. The step row
+// and the Rumble envelope are kept — a reset is a sound reset, not a pattern wipe.
 void PluginProcessor::resetSlot(int lane)
 {
     if (lane < 0 || lane >= kNumChannels) return;
     hotSwap.cancel(lane);   // a staged swap would re-fill what we're resetting
-    mu_pp::applyLayerParams({}, apvts, lanePrefix(lane));
+    slotLayout.applyParams({}, lane);
     mu_pp::clearModulators(voiceSlots[(size_t) lane]);
 }
 
