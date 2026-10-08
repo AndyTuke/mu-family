@@ -617,9 +617,9 @@ void RhythmPanel::commitNameFromLabel(const juce::String& rawName)
         headerBar.setLayerName(newName);
     }
 
-    // route through PluginProcessor::renameRhythm so the write happens under
+    // route through RhythmManager::rename so the write happens under
     // rhythmsLock instead of a raw message-thread mutation of the Rhythm struct.
-    proc.renameRhythm(currentRhythmIndex, newName);
+    proc.rhythms.rename(currentRhythmIndex, newName);
     if (onRhythmRenamed) onRhythmRenamed();
 }
 
@@ -636,9 +636,9 @@ void RhythmPanel::confirmReset()
         {
             if (safeThis != nullptr && idx >= 0 && idx < safeThis->proc.getNumRhythms())
             {
-                // PluginProcessor::resetRhythm owns the concurrency dance
+                // RhythmManager::reset owns the concurrency dance
                 // (suspendProcessing + rhythmsLock). No more UI-thread spin on modLock.
-                safeThis->proc.resetRhythm(idx);
+                safeThis->proc.rhythms.reset(idx);
                 safeThis->setRhythm(idx);
             }
         });

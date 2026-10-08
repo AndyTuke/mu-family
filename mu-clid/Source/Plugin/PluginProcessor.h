@@ -13,6 +13,7 @@
 #include "MuLimits.h"
 #include "Modulation/ModulationSnapshot.h"
 #include "SampleLibrary.h"
+#include "RhythmManager.h"
 #include "Plugin/MidiClockSync.h"   // shared mu-core MIDI-clock slave
 #include "PresetIO.h"
 #include "HotSwapStager.h"
@@ -93,17 +94,9 @@ public:
     void setMidiNoteMode(int mode);
     int  getMidiNoteMode() const { return midiNoteMode.load(std::memory_order_relaxed); }
 
-    void    addRhythm    (const Rhythm& r);
-    void    removeRhythm (int index);
-    bool    swapRhythms  (int i, int j);
-    // reset rhythm to defaults preserving name + colour. Uses suspendProcessing
-    // + rhythmsLock so the message thread doesn't spin on modLock while the audio
-    // thread holds it. Same concurrency pattern as removeRhythm / swapRhythmSlots.
-    void    resetRhythm  (int index);
-    // rename rhythm under rhythmsLock — no audio-thread reads of name today,
-    // but the lock is the project's canonical "message thread mutates Rhythm" pattern
-    // and avoids the UI-thread modLock spin if a future MIDI/PC matcher reads name.
-    void    renameRhythm (int index, const juce::String& newName);
+    // Rhythm-slot add / remove / swap / reset / rename.
+    RhythmManager rhythms { *this };
+
     Rhythm& getRhythm    (int index)       { return sequencer.getRhythm(index); }
     const Rhythm& getRhythm(int index) const { return sequencer.getRhythm(index); }
     int     getNumRhythms() const          { return sequencer.getNumRhythms(); }
@@ -192,7 +185,7 @@ public:
 
     SequencerEngine sequencer;
     // Fixed-size arrays so the audio thread never races with a vector reallocation
-    // caused by addRhythm/removeRhythm on the message thread.  numActiveRhythms is
+    // caused by RhythmManager add / remove on the message thread.  numActiveRhythms is
     // the authoritative count; processBlock reads it atomically once per block.
     std::array<std::unique_ptr<VoiceEngine>, SequencerEngine::MaxRhythms> voiceEngines;
     std::array<MidiOutputEngine,             SequencerEngine::MaxRhythms> midiEngines;
@@ -428,7 +421,6 @@ private:
     // apvtsLoading-guarded multi-writes.
     void pushMixerChannelToAPVTS(int idx);
     void swapAPVTSForRhythms(int i, int j);
-    void resetPlayState(int idx);
     void restoreStateFromTree(const juce::ValueTree& s) { presetIO.restoreStateFromTree(s); }
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -439,6 +431,7 @@ private:
     friend class PresetIO;
     friend class HotSwapStager;
     friend class SampleLibrary;
+    friend class RhythmManager;
 
     // atomic for safe cross-thread access (audio writes, UI reads + clears).
     // Written in prepareToPlay; read in processBlock. JUCE calls prepareToPlay

@@ -59,7 +59,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
 
     // Guard the live-state mutation below (sequencer resize, voiceEngine
     // rebuild, per-rhythm sample swaps + pattern rebuilds) with suspendProcessing +
-    // rhythmsLock, matching SampleLibrary::load / swapRhythms / the prestaged commit.
+    // rhythmsLock, matching SampleLibrary::load / RhythmManager::swap / the prestaged commit.
     // Without it the audio thread can tear-read voiceEngines or a half-swapped sample
     // buffer when a host restores project state on a live plugin. suspendProcessing
     // alone is not enough — it doesn't block an in-flight processBlock; rhythmsLock

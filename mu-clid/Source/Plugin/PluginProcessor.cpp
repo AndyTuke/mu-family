@@ -600,6 +600,21 @@ void PluginProcessor::setMultiBusEnabled(bool on)
     appSettings->saveIfNeeded();
 }
 
+void PluginProcessor::setMidiNoteMode(int mode)
+{
+    midiNoteMode.store(mode, std::memory_order_relaxed);
+    if (mode == 0)
+    {
+        // Switching back to Free: clear any held-note state so the next Free-mode
+        // block doesn't see stale noteModePlaying = true from a prior Note session.
+        midiHeldNotes  .store(0,     std::memory_order_relaxed);
+        noteModePlaying.store(false, std::memory_order_relaxed);
+        noteModeBeatPos.store(0.0,   std::memory_order_relaxed);
+    }
+    appSettings->setValue("midiNoteMode", mode);
+    appSettings->saveIfNeeded();
+}
+
 bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
 #if MUCLID_LITE_BUILD

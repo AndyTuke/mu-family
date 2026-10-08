@@ -14,7 +14,7 @@ RhythmSidebar::RhythmSidebar(PluginProcessor& p)
     };
 
     // mu-clid reorder + hot-swap semantics (mu-tant leaves these null).
-    onSwapChannels      = [this](int a, int b) { proc.swapRhythms(a, b); };
+    onSwapChannels      = [this](int a, int b) { proc.rhythms.swap(a, b); };
     isPendingSwap       = [this](int i)        { return proc.hasPendingSwap(i); };
     onCancelPendingSwap = [this](int i)        { proc.cancelStagedSwap(i); };
 

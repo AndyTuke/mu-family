@@ -70,7 +70,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
             }
             r.colourIndex = chosen;
         }
-        proc.addRhythm(r);
+        proc.rhythms.add(r);
         const int newIndex = proc.getNumRhythms() - 1;
         proc.applyDefaultRhythm(newIndex);
         selectRhythmAndRefresh(newIndex, /*fullSidebarRefresh=*/true, MixerRefresh::RefreshOnly);
@@ -112,7 +112,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     rhythmPanel.onRhythmDeleted = [this](int idx)
     {
-        proc.removeRhythm(idx);
+        proc.rhythms.remove(idx);
         const int newIndex = juce::jmax(0, juce::jmin(idx, proc.getNumRhythms() - 1));
         sidebar.refreshItems();
         sidebar.setSelectedIndex(newIndex);
@@ -129,7 +129,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         Rhythm r;
         r.name        = "Rhythm 1";
         r.colourIndex = 0;
-        proc.addRhythm(r);
+        proc.rhythms.add(r);
         sidebar.refreshItems();
     }
 
