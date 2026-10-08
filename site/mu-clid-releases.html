@@ -127,6 +127,7 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group improved">
           <h3>Improved</h3>
           <ul>
+            <li>The plugin window uses less CPU: knobs, step editors and animations only redraw when something on screen actually changes, and hidden panels stop animating. <span class="ref">(1242)</span></li>
             <li>In a DAW, the DAW&rsquo;s transport is now always in charge &mdash; mu-Clid&rsquo;s own Play button no longer starts it while the DAW is stopped. <span class="ref">(1188)</span></li>
             <li>With MIDI clock sync on in the standalone, the clock&rsquo;s Start and Stop now control playback fully &mdash; its Stop stops the app even if you pressed Play. <span class="ref">(1188)</span></li>
             <li>Presets and saved projects now store each setting's real value (and choices by name), so a future update that changes a knob's range can't shift a saved sound. Older presets and projects still load as before. <span class="ref">(1237)</span></li>
