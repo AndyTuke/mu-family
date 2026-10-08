@@ -22,8 +22,7 @@ void PluginProcessor::addRhythm(const Rhythm& r)
         sequencer.addRhythm(r);
         numActiveRhythms.store(sequencer.getNumRhythms(), std::memory_order_release);
     }
-    if (ri < loadedSamplePaths.size())
-        loadedSamplePaths.set(ri, juce::String());
+    samples.clearPath(ri);
     {
         mu_core::ScopedApvtsLoading guard(apvtsLoading);
         pushRhythmToAPVTS(ri);
@@ -67,9 +66,7 @@ bool PluginProcessor::swapRhythms(int i, int j)
         resetPlayState(i);
         resetPlayState(j);
 
-        juce::String tmp = loadedSamplePaths[i];
-        loadedSamplePaths.set(i, loadedSamplePaths[j]);
-        loadedSamplePaths.set(j, tmp);
+        samples.swapPaths(i, j);
 
         // Re-translate sidechain source indices BEFORE the channel swap, so any
         // channel referring to the swapped slots keeps pointing at the same logical

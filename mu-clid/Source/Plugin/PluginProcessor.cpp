@@ -72,10 +72,6 @@ PluginProcessor::PluginProcessor()
         if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
             apvts.addParameterListener(p->getParameterID(), this);
 
-    // Initialise sample-path slots.
-    for (int i = 0; i < SequencerEngine::MaxRhythms; ++i)
-        loadedSamplePaths.add(juce::String());
-
     // Pre-populate modulation param map so lookups never allocate on the audio thread.
     modParamValues.reserve(50);
     for (const char* key : { "amp.attack", "amp.decay", "amp.sustain",  // amp.release retired
@@ -203,13 +199,13 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
     fxChain.prepare(sampleRate, samplesPerBlock);
     mixerEngine.prepare(sampleRate, samplesPerBlock);
-    samplePreview.prepare(samplesPerBlock, sampleRate);
+    samples.prepare(samplesPerBlock, sampleRate);
 #endif
 }
 
 void PluginProcessor::releaseResources()
 {
-    samplePreview.releaseResources();
+    samples.releaseResources();
 }
 
 void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
@@ -577,7 +573,7 @@ void PluginProcessor::renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::M
                      buffer.getNumSamples(), effectiveBpm, &directPtrs, fxRetPtr,
                      &retiredDesc);
 
-    samplePreview.mixInto(masterBus, buffer.getNumSamples());
+    samples.mixPreviewInto(masterBus, buffer.getNumSamples());
 
     for (int r = 0; r < numRhythms; ++r)
         midiEngines[r].processBlock(midiMessages, buffer.getNumSamples());

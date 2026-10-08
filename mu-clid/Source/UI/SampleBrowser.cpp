@@ -25,7 +25,7 @@ SampleBrowserContent::SampleBrowserContent(PluginProcessor& proc,
     sourceToggle.onChange = [this](int idx)
     {
         const juce::File target = (idx == 1) ? this->proc.getSamplesDir()
-                                             : this->proc.getPrimarySampleDir();
+                                             : this->proc.samples.getPrimarySampleDir();
         if (target.isDirectory())
             browser.setRoot(target);
     };
@@ -37,14 +37,14 @@ SampleBrowserContent::SampleBrowserContent(PluginProcessor& proc,
     };
     cancelBtn.onClick = [this]
     {
-        this->proc.stopSamplePreview();
+        this->proc.samples.stopPreview();
         if (onDismiss) onDismiss();
     };
 
     setSize(mu_ui::s(560), mu_ui::s(470));
 }
 
-SampleBrowserContent::~SampleBrowserContent() { proc.stopSamplePreview(); }
+SampleBrowserContent::~SampleBrowserContent() { proc.samples.stopPreview(); }
 
 void SampleBrowserContent::resized()
 {
@@ -65,14 +65,14 @@ void SampleBrowserContent::selectionChanged()
 {
     const auto f = browser.getSelectedFile(0);
     if (f.existsAsFile())
-        proc.startSamplePreview(f);
+        proc.samples.startPreview(f);
 }
 
 void SampleBrowserContent::fileDoubleClicked(const juce::File& f) { commit(f); }
 
 void SampleBrowserContent::commit(const juce::File& f)
 {
-    proc.stopSamplePreview();
+    proc.samples.stopPreview();
     onChosen(f);
     if (onDismiss) onDismiss();
 }

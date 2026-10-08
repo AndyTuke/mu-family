@@ -151,7 +151,7 @@ void HotSwapStager::processSwaps()
                 }
 
                 proc_.sequencer.getRhythm(r) = std::move(sw.rhythm);
-                proc_.loadedSamplePaths.set(r, sw.samplePath);
+                proc_.samples.setPath(r, sw.samplePath);
                 proc_.sequencer.updatePattern(r);
                 proc_.sequencer.resetStepTrackingForSwap(r);
             });

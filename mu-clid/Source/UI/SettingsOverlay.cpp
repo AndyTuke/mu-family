@@ -59,21 +59,21 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     browseSampleLibBtn.onClick = [this]
     {
         juce::Component::SafePointer<SettingsOverlay> safe(this);
-        fileChooser = std::make_unique<juce::FileChooser>("Choose primary sample library...", product.getPrimarySampleDir());
+        fileChooser = std::make_unique<juce::FileChooser>("Choose primary sample library...", product.samples.getPrimarySampleDir());
         fileChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
             [safe](const juce::FileChooser& fc)
             {
                 if (! safe) return;
                 if (auto result = fc.getResult(); result.isDirectory())
                 {
-                    safe->product.setPrimarySampleDir(result);
+                    safe->product.samples.setPrimarySampleDir(result);
                     safe->updateSampleLibLabel();
                 }
             });
     };
     resetSampleLibBtn.onClick = [this]
     {
-        product.setPrimarySampleDir(juce::File());   // clears the override → OS Music folder
+        product.samples.setPrimarySampleDir(juce::File());   // clears the override → OS Music folder
         updateSampleLibLabel();
     };
     browseContentFolderBtn.onClick = [this]
@@ -124,5 +124,5 @@ void SettingsOverlay::updateFolderLabel()
 
 void SettingsOverlay::updateSampleLibLabel()
 {
-    sampleLibLabel.setText(product.getPrimarySampleDir().getFullPathName(), juce::dontSendNotification);
+    sampleLibLabel.setText(product.samples.getPrimarySampleDir().getFullPathName(), juce::dontSendNotification);
 }

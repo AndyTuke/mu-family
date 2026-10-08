@@ -356,7 +356,7 @@ void RhythmPanel::filesDropped(const juce::StringArray& files, int, int)
         juce::File file(f);
         if (file.existsAsFile() && currentRhythmIndex >= 0)
         {
-            proc.loadSampleForRhythm(currentRhythmIndex, file);
+            proc.samples.load(currentRhythmIndex, file);
             repaint();
             return;
         }
@@ -373,7 +373,7 @@ void RhythmPanel::loadSample()
     // back where they were if they're working through a library subfolder.
     // The Content/Samples folder is still one click away via the in-dialog
     // Library/Content toggle.
-    const juce::File primaryLib = proc.getPrimarySampleDir();
+    const juce::File primaryLib = proc.samples.getPrimarySampleDir();
     const juce::File startDir = lastBrowseDir.isDirectory()
                                     ? lastBrowseDir
                                     : (primaryLib.isDirectory()
@@ -392,7 +392,7 @@ void RhythmPanel::loadSample()
         {
             if (safeThis == nullptr) return;
             safeThis->lastBrowseDir = f.getParentDirectory();
-            safeThis->proc.loadSampleForRhythm(rhythmIndex, f);
+            safeThis->proc.samples.load(rhythmIndex, f);
             safeThis->repaint();
         });
 
@@ -476,8 +476,8 @@ void RhythmPanel::paint(juce::Graphics& g)
         MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), appCol);
 
     // Sample bar — content inset from panel outline
-    const juce::String sampleName = proc.getSampleName(currentRhythmIndex);
-    const bool         missing    = proc.isSampleMissing(currentRhythmIndex);
+    const juce::String sampleName = proc.samples.getSampleName(currentRhythmIndex);
+    const bool         missing    = proc.samples.isSampleMissing(currentRhythmIndex);
     if (MuLookAndFeel::isMetal(*this))
     {
         // Metal: an LCD — the file name in lit lettering, a missing sample lit in amber,

@@ -54,6 +54,7 @@ target_sources(mu-clid
         Source/Persistence/PresetMigrations.cpp
         Source/Plugin/HotSwapStager.cpp
         Source/Plugin/SamplePreview.cpp
+        Source/Plugin/SampleLibrary.cpp
         Source/Plugin/PluginEditor.cpp
         Source/Sequencer/EuclideanGenerator.cpp
         Source/Sequencer/HitGenerator.cpp
@@ -270,6 +271,7 @@ target_sources(mu-clid-lite
         Source/Persistence/PresetMigrations.cpp
         Source/Plugin/HotSwapStager.cpp
         Source/Plugin/SamplePreview.cpp
+        Source/Plugin/SampleLibrary.cpp
         Source/Plugin/LiteEditor.cpp
         Source/Sequencer/EuclideanGenerator.cpp
         Source/Sequencer/HitGenerator.cpp

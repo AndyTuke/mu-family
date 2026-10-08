@@ -431,7 +431,7 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFil
     // points into %TEMP%/muClid_samples/), force-embed so we never write the
     // ephemeral temp path as `r0_sample`. The temp file would not survive an
     // OS reboot, so any later load would lose the sample.
-    if (isEmbeddedSampleTempPath(proc_.loadedSamplePaths[rhythmIndex]) && ! embedSample)
+    if (isEmbeddedSampleTempPath(proc_.samples.path(rhythmIndex)) && ! embedSample)
     {
         embedSample = true;
         if (proc_.onLoadError)
@@ -451,7 +451,7 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFil
     state.setProperty("r0_sample",
                       embedSample
                           ? juce::String()
-                          : toRelativeSamplePath(proc_.loadedSamplePaths[rhythmIndex], proc_.getSamplesDir()),
+                          : toRelativeSamplePath(proc_.samples.path(rhythmIndex), proc_.getSamplesDir()),
                       nullptr);
 
     // Rhythm presets store ONLY proc_.sequencer-page state (Euclidean params, voice chain,
@@ -473,7 +473,7 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFil
 
     if (embedSample)
     {
-        const juce::String path = proc_.loadedSamplePaths[rhythmIndex];
+        const juce::String path = proc_.samples.path(rhythmIndex);
         if (path.isNotEmpty())
         {
             juce::File f(path);
@@ -598,7 +598,7 @@ void PresetIO::savePreset(const juce::String& name,
     {
         for (int i = 0; i < n; ++i)
         {
-            if (isEmbeddedSampleTempPath(proc_.loadedSamplePaths[i]))
+            if (isEmbeddedSampleTempPath(proc_.samples.path(i)))
             {
                 embedSamples = true;
                 if (proc_.onLoadError)
@@ -624,9 +624,9 @@ void PresetIO::savePreset(const juce::String& name,
         // drop the temp-dir path; the embedded sampleData child below
         // will carry the actual bytes.
         rTree.setProperty("sample",
-                          isEmbeddedSampleTempPath(proc_.loadedSamplePaths[i])
+                          isEmbeddedSampleTempPath(proc_.samples.path(i))
                               ? juce::String()
-                              : toRelativeSamplePath(proc_.loadedSamplePaths[i], proc_.getSamplesDir()),
+                              : toRelativeSamplePath(proc_.samples.path(i), proc_.getSamplesDir()),
                           nullptr);
 
         // Stage 35: v2 writes per the param's ParamKind — actual values for
@@ -650,7 +650,7 @@ void PresetIO::savePreset(const juce::String& name,
 
         if (embedSamples)
         {
-            const juce::String path = proc_.loadedSamplePaths[i];
+            const juce::String path = proc_.samples.path(i);
             if (path.isNotEmpty())
             {
                 juce::File f(path);
@@ -715,8 +715,7 @@ void PresetIO::resizeRhythmArrays(int n)
             // slot doesn't retain stale fader/sidechain/sample data from the
             // pre-load session.
             proc_.mixerEngine.channels[i].reset();
-            if (i < proc_.loadedSamplePaths.size())
-                proc_.loadedSamplePaths.set(i, juce::String());
+            proc_.samples.clearPath(i);
         }
     }
     else
@@ -804,7 +803,7 @@ void PresetIO::restoreRhythmSample(int i, const juce::ValueTree& tree,
 {
     // The Lite (MIDI-effect) build has no sample-playback engine on this slot, so there's
     // nothing to load a sample into — bail before any voiceEngines[i] deref. The caller
-    // maintains loadedSamplePaths. (Mirrors the null guard in forceSyncRhythmFromAPVTS.)
+    // maintains the sample paths. (Mirrors the null guard in forceSyncRhythmFromAPVTS.)
     if (! proc_.voiceEngines[i]) return;
 
     const auto smp = resolvePresetSample(tree.getProperty(juce::Identifier(sampleDataProp)).toString(),
@@ -812,7 +811,7 @@ void PresetIO::restoreRhythmSample(int i, const juce::ValueTree& tree,
                                          tree.getProperty(juce::Identifier(samplePathProp)).toString(),
                                          proc_.getSamplesDir());
     if (smp.kind == PresetSample::Kind::BadEmbed) return;   // unreadable embedded data: leave the slot as it is
-    proc_.loadedSamplePaths.set(i, applyPresetSample(smp, *proc_.voiceEngines[i], proc_.onLoadError, false,
+    proc_.samples.setPath(i, applyPresetSample(smp, *proc_.voiceEngines[i], proc_.onLoadError, false,
                                                      " (rhythm " + juce::String(i + 1) + ")"));
 }
 
@@ -1026,7 +1025,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
         }
 
         proc_.sequencer.getRhythm(i) = std::move(prepared.rhythms[(size_t) i]);
-        proc_.loadedSamplePaths.set(i, prepared.samplePaths[(size_t) i]);
+        proc_.samples.setPath(i, prepared.samplePaths[(size_t) i]);
         // Prepare MIDI engines for freshly-grown slots; existing slots keep theirs.
         if (i >= oldN && proc_.currentSampleRate > 0 && proc_.currentBlockSize > 0)
             proc_.midiEngines[(size_t) i].prepare(proc_.currentSampleRate, proc_.currentBlockSize);
@@ -1040,7 +1039,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
         proc_.voiceEngines[(size_t) i].reset();
         proc_.midiEngines[(size_t) i] = MidiOutputEngine{};
         proc_.mixerEngine.channels[(size_t) i].reset();
-        proc_.loadedSamplePaths.set(i, juce::String());
+        proc_.samples.setPath(i, juce::String());
     }
 
     if (n > oldN)

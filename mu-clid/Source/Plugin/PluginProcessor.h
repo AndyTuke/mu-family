@@ -12,7 +12,7 @@
 #include "License/LicenseKey.h"       // product: mu-Clid id + filename + public key
 #include "MuLimits.h"
 #include "Modulation/ModulationSnapshot.h"
-#include "SamplePreview.h"
+#include "SampleLibrary.h"
 #include "Plugin/MidiClockSync.h"   // shared mu-core MIDI-clock slave
 #include "PresetIO.h"
 #include "HotSwapStager.h"
@@ -32,7 +32,6 @@ public:
     // one. Layout is supplied via createParameterLayout() when the base ctor
     // runs. PluginProcessor's own members below may reference apvts; they
     // initialize after the base, so the reference is safe.
-    juce::StringArray                  loadedSamplePaths;  // [MaxRhythms]
 
     PluginProcessor();
     ~PluginProcessor() override;
@@ -121,31 +120,8 @@ public:
     }
     void    updatePattern (int index)      { sequencer.updatePattern(index); }
 
-    void loadSampleForRhythm(int rhythmIndex, const juce::File& file);
-
-    // Sample preview — plays a file through the master output without assigning it.
-    // Safe to call from the message thread at any time.
-    void startSamplePreview(const juce::File& file);
-    void stopSamplePreview();
-
-    juce::String getSampleName(int rhythmIndex) const
-    {
-        if (rhythmIndex < 0 || rhythmIndex >= loadedSamplePaths.size()) return {};
-        const auto& path = loadedSamplePaths[rhythmIndex];
-        return path.isEmpty() ? juce::String() : juce::File(path).getFileName();
-    }
-
-    // True when the rhythm has a sample path recorded but the voice engine couldn't
-    // load it (e.g. preset was saved with a linked sample whose file was later moved
-    // or deleted). The RhythmPanel sample bar uses this to show a "missing — click
-    // to find" affordance instead of silently leaving the slot empty.
-    bool isSampleMissing(int rhythmIndex) const
-    {
-        if (rhythmIndex < 0 || rhythmIndex >= loadedSamplePaths.size()) return false;
-        if (loadedSamplePaths[rhythmIndex].isEmpty()) return false;
-        if (rhythmIndex >= (int)voiceEngines.size() || !voiceEngines[rhythmIndex]) return true;
-        return !voiceEngines[rhythmIndex]->hasSample();
-    }
+    // Per-rhythm sample paths, load / missing queries, preview player and primary sample folder.
+    SampleLibrary samples { *this };
 
     // Hot-swap staging: stages a rhythm preset for atomic commit at the next loop boundary.
     // If the sequencer is not playing, applies the preset immediately instead.
@@ -181,13 +157,6 @@ public:
     juce::File getSamplesDir() const;
     void setContentDir(const juce::File& dir);
     void ensureContentFoldersExist();
-
-    // user-configurable personal sample library. Distinct from the
-    // content / My Documents folder (which hosts factory + preset-linked
-    // material). Default when unset = OS user Music dir. setPrimarySampleDir(
-    // juce::File{}) clears the override and reverts to that default.
-    juce::File getPrimarySampleDir() const;
-    void       setPrimarySampleDir(const juce::File& dir);
 
     // Licensing is shared (ProcessorBase::initLicensing). Lite is always licensed — no
     // activation, no demo caps.
@@ -464,12 +433,12 @@ private:
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
-    SamplePreview  samplePreview;
     PresetIO       presetIO      { *this };
     HotSwapStager  hotSwapStager { *this };
 
     friend class PresetIO;
     friend class HotSwapStager;
+    friend class SampleLibrary;
 
     // atomic for safe cross-thread access (audio writes, UI reads + clears).
     // Written in prepareToPlay; read in processBlock. JUCE calls prepareToPlay

@@ -42,7 +42,7 @@ static void populateStateTree(juce::ValueTree& state, int numRhythms,
 void PresetIO::getStateInformation(juce::MemoryBlock& destData)
 {
     auto state = proc_.apvts.copyState();
-    populateStateTree(state, proc_.sequencer.getNumRhythms(), proc_.sequencer, proc_.loadedSamplePaths);
+    populateStateTree(state, proc_.sequencer.getNumRhythms(), proc_.sequencer, proc_.samples.paths());
     juce::MemoryOutputStream(destData, true).writeString(state.toXmlString());
 }
 
@@ -59,7 +59,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
 
     // Guard the live-state mutation below (sequencer resize, voiceEngine
     // rebuild, per-rhythm sample swaps + pattern rebuilds) with suspendProcessing +
-    // rhythmsLock, matching loadSampleForRhythm / swapRhythms / the prestaged commit.
+    // rhythmsLock, matching SampleLibrary::load / swapRhythms / the prestaged commit.
     // Without it the audio thread can tear-read voiceEngines or a half-swapped sample
     // buffer when a host restores project state on a live plugin. suspendProcessing
     // alone is not enough — it doesn't block an in-flight processBlock; rhythmsLock
@@ -149,7 +149,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
         proc_.forceSyncRhythmFromAPVTS(i);
 
         // Host-state format prefixes every sample-related property with "r{i}_".
-        proc_.loadedSamplePaths.set(i, state.getProperty(slotPrefix + "sample").toString());
+        proc_.samples.setPath(i, state.getProperty(slotPrefix + "sample").toString());
         restoreRhythmSample(i, state,
                              slotPrefix + "sample",
                              slotPrefix + "sampleData",
