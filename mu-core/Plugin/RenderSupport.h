@@ -28,13 +28,14 @@ namespace mu_core::render_mode
         bool       valid      = false;
     };
 
-    // Extract the value following `--flag`, removing both tokens. Empty if absent.
+    // Extract the value following `--flag`, removing both tokens. Empty if absent. A quoted
+    // value (a path with spaces) is unquoted — the tokenizer keeps the quotes.
     inline juce::String takeFlagValue (juce::StringArray& tokens, const juce::String& flag)
     {
         const int idx = tokens.indexOf (flag);
         if (idx < 0 || idx + 1 >= tokens.size())
             return {};
-        const juce::String value = tokens[idx + 1];
+        const juce::String value = tokens[idx + 1].unquoted();
         tokens.remove (idx + 1);
         tokens.remove (idx);
         return value;

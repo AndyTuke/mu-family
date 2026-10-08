@@ -1,5 +1,6 @@
 {
   "test": "mutant_drone",
+  "product": "mu-tant",
   "description": "mu-Tant headless render smoke. mu-Tant is a wavetable synth: at default the transport is stopped, which holds the gate fully open, so the oscillators drone — guaranteed non-silent audio with NO preset and NO sample dependency. Used by mac-validate.yml to prove the Mac build actually produces sound, host- and content-independently. Rendered via `mu-Tant --render --out <wav> --seconds 4`.",
   "render": {
     "seconds": 4.0,

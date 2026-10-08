@@ -19,83 +19,86 @@ tests/
 │   └── A1.json … A9.json         -- swap-boundary + modulation suite
 ├── scripts/
 │   ├── analyse.py            -- WAV in, pass/fail out
-│   ├── run-listening-tests.py -- orchestrator: build product + render + analyse
+│   ├── run-listening-tests.py -- orchestrator: render (per product) + analyse
 │   └── check-build-artifacts.py -- C6: µ-name + build-number guard (no audio)
 └── _out/                     -- rendered WAVs + scratch (gitignored)
 ```
 
-The render-mode plumbing lives in [Source/Plugin/RenderMode.{h,cpp}](../Source/Plugin/RenderMode.cpp);
-test presets themselves live in the content folder (`$MUCLID_CONTENT_DIR/Rhythms/T*.muRhythm`)
-alongside user-facing presets, so they appear in the GUI's preset dropdown
-under the `test` category and can be opened by hand for ad-hoc listening too.
+The render mode is shared by every product: it lives in mu-core
+([Plugin/ProductRender.h](../mu-core/Plugin/ProductRender.h), driven from the standalone shell
+[Plugin/StandaloneShell.h](../mu-core/Plugin/StandaloneShell.h)) and uses only the ProcessorBase
+preset API, so mu-Clid, mu-Tant, mu-Toni and mu-On all take the same flags. Content-folder test
+presets live under each product's content folder (e.g. `$MUCLID_CONTENT_DIR/Rhythms/T*.muRhythm`,
+`TDP/muTant/Presets/*.muTant`); hand-written ones live in [tests/presets](presets).
 
 ## Running
 
 ```bash
-# Make sure the standalone is built (Debug is faster to iterate, Release is what testers see)
+# Make sure the standalones are built (Debug is faster to iterate, Release is what testers see)
 cmake --build build --config Debug
 
-# Run the full suite
+# Run the full suite (every product)
 python tests/scripts/run-listening-tests.py --config Debug
 
-# Run a single test
+# One product, or a single test
+python tests/scripts/run-listening-tests.py --config Debug --product mu-toni
 python tests/scripts/run-listening-tests.py --config Debug --filter T12
 
 # Manual single-step: render + analyse separately
-build/mu-clid_artefacts/Debug/Standalone/<plugin>.exe \
-    --render --out tests/_out/T12.wav \
-    --preset "$MUCLID_CONTENT_DIR/Rhythms/T12.muRhythm" \
-    --seconds 1.5
+build/mu-clid/mu-clid_artefacts/Debug/Standalone/<plugin>.exe     --render --out tests/_out/T12.wav     --preset "$MUCLID_CONTENT_DIR/Rhythms/T12.muRhythm"     --seconds 1.5
 python tests/scripts/analyse.py tests/_out/T12.wav tests/expectations/T12.json
 ```
 
-Set `MUCLID_CONTENT_DIR` if your content folder isn't the default
-(`D:\OneDrive\Documents\TDP\muClid`).
+Content roots default to `D:\OneDrive\Documents\TDP\<muClid|muTant|muToni|muOn>`; set
+`MU_CONTENT_ROOT` to move the `TDP` folder, or `MUCLID_CONTENT_DIR` for mu-Clid alone. The summary
+counts PASS / FAIL / SKIP separately (a product whose standalone isn't built is a SKIP), and the
+runner exits non-zero only on a FAIL.
 
 ## Render mode
 
-`<standalone>.exe --render --out <wav> [flags]` runs headless: no GUI, no
-audio device. Skips the `_default.muClid` auto-load so every test starts
-from a fresh single-rhythm default. Flags:
+`<standalone>.exe --render --out <wav> [flags]` runs headless: no GUI, no audio device. The
+processor is built as a Standalone and skips the saved `_default` preset, so every render starts
+from the product's factory state. Flags (same for every product):
 
 | Flag            | Default | Description                                       |
 |-----------------|---------|---------------------------------------------------|
 | `--out`         | (req'd) | Output WAV path                                   |
-| `--preset`      | none    | `.muRhythm` (single-rhythm) or `.muClid` (session) |
+| `--preset`      | none    | A full preset (`.muClid` / `.muTant` / `.muToni` / `.muOn`) or a slot preset (`.muRhythm` / `.muPattern` / `.muArp` / `.muTrack`) |
+| `--preset-slot` | 0       | Which slot a slot `--preset` loads into           |
 | `--seconds`     | 4.0     | Render duration                                   |
 | `--samplerate`  | 48000   | Render sample rate                                |
 | `--blocksize`   | 512     | Process block size                                |
-| `--swap-preset` | none    | A 2nd preset loaded mid-render (full-preset hot-swap test) |
+| `--play` / `--no-play` | product | Start the internal transport (default: on; mu-Tant: on only with a `--preset`) |
+| `--swap-preset` | none    | A 2nd full preset loaded mid-render (full-preset hot-swap test) |
 | `--swap-at`     | none    | When (seconds) to load `--swap-preset`; needs both flags |
-| `--swap-rhythm-preset` | none | A `.muRhythm` staged onto one slot mid-render (per-rhythm hot-swap) |
-| `--swap-rhythm-slot`   | 0    | Which slot `--swap-rhythm-preset` targets |
-| `--swap-rhythm-at`     | none | When (seconds) to stage the per-rhythm swap; needs preset + at |
+| `--swap-slot-preset` | none | A slot preset staged onto one slot mid-render (per-slot hot-swap) |
+| `--swap-slot`        | 0    | Which slot `--swap-slot-preset` targets |
+| `--swap-slot-at`     | none | When (seconds) to stage the slot swap; needs preset + at |
 | `--midi-program`        | none | Program number to inject as a channel-9 PC (seeds the full-preset map) |
 | `--midi-program-preset` | none | Preset the injected program maps to |
 | `--midi-program-at`     | none | When (seconds) to inject the program change; needs all three |
 
-`--swap-preset`/`--swap-at` load a second preset partway through the render while
-the sequencer is playing, exercising the real deferred / prestaged / tail-out
-full-preset hot-swap path (the swap commits at the next loop point, not at the
-flag time). See `tests/expectations/TS_swap.json` (free-running) and `A1.json`
-(master-loop boundary) for worked examples.
+mu-Clid's original `--swap-rhythm-preset` / `--swap-rhythm-slot` / `--swap-rhythm-at` spellings
+are aliases of the `--swap-slot-*` flags (and `swap_rhythm_*` of `swap_slot_*` in the JSON).
 
-`--swap-rhythm-*` stages a single `.muRhythm` onto one slot via the per-rhythm
-hot-swap path (`stageRhythmPreset`), distinct from the full-preset load — see
-`A9.json`. `--midi-program-*` seeds the channel-9 full-preset map then injects a
-MIDI program change mid-render, exercising the MIDI-PC → preset trigger path end
-to end — see `A2.json`.
+`--swap-preset`/`--swap-at` load a second preset partway through the render while the transport
+plays, exercising the real deferred full-preset hot-swap path (the swap commits at the next loop
+point / bar line, not at the flag time). See `TS_swap.json` and `A1.json` (mu-Clid), `TONI_swap.json`
+and `ON_swap.json` (the shared bar-line swapper).
+
+`--swap-slot-*` stages a single slot preset via the product's per-slot hot-swap path — see `A9.json`
+(mu-Clid) and `TONI_slot_swap.json`. `--midi-program-*` seeds the channel-9 full-preset map then
+injects a MIDI program change mid-render, exercising the MIDI-PC → preset trigger path end to end —
+see `A2.json`. With no `--preset`, mu-Tant bypasses voice 0's gate and stays stopped so the raw
+oscillator drone passes (`mutant_drone.json`, the content-independent audio smoke).
 
 Output is 24-bit stereo WAV, written via `juce::WavAudioFormat`.
 
 ## Auto-load in GUI mode
 
-On normal GUI launch (no `--render`), the standalone auto-loads the first of:
-
-1. `<content>/Presets/_default.muClid` -- a full session.
-2. `<content>/Rhythms/_default.muRhythm` -- a single rhythm applied to slot 0.
-
-Dropping a `_default.muRhythm` into the content folder lets you iterate on a
+On normal GUI launch (no `--render`), every product restores `<content>/Presets/_default.<ext>`
+(written by Save → Save as Default). mu-Clid falls back to `<content>/Rhythms/_default.muRhythm`
+(a single rhythm applied to slot 0) — dropping one into the content folder lets you iterate on a
 test case without clicking through the preset browser.
 
 ## Expectations JSON
@@ -103,9 +106,10 @@ test case without clicking through the preset browser.
 ```json
 {
   "test": "T12",
+  "product": "mu-clid",                 // optional; mu-clid when absent
   "description": "Karplus rings past env idle.",
   "render": {
-    "preset": "Rhythms/T12.muRhythm",   // resolved under $MUCLID_CONTENT_DIR, else repo root
+    "preset": "Rhythms/T12.muRhythm",   // optional; resolved under the product's content root, else repo root
     "seconds": 1.5,
     "sample_rate": 48000,
     "block_size": 512

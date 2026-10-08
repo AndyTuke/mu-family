@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MuOnPreset name="Silent" description="Listening test: master level at 0 (silence once committed)." category="test">
+  <MuOnState><PARAM id="mstr_lvl" value="0.0"/></MuOnState>
+</MuOnPreset>

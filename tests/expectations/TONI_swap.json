@@ -1,0 +1,36 @@
+{
+  "test": "TONI_swap",
+  "product": "mu-toni",
+  "description": "mu-Toni full-preset hot-swap (shared BarLineSwapper): factory state plays from 0 s; a silent full preset (master level 0) is loaded at 0.5 s while playing. It must stage and commit at the 2.0 s bar line, not at once.",
+  "render": {
+    "swap_preset": "tests/presets/TONI_silent.muToni",
+    "swap_at": 0.5,
+    "seconds": 4.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "still_playing_before_bar_line",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [
+        0.6,
+        1.9
+      ],
+      "min": -30,
+      "comment": "the swap requested at 0.5 s did NOT apply at once — it waits for the bar line"
+    },
+    {
+      "name": "silent_after_bar_line",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [
+        2.5,
+        4.0
+      ],
+      "max": -90,
+      "comment": "after the bar-line commit (2.0 s at 120 BPM) the swapped-in state is silent"
+    }
+  ]
+}

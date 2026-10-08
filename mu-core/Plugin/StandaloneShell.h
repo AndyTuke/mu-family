@@ -12,6 +12,7 @@
 // product symbol. JucePlugin_Name / JucePlugin_VersionString resolve in the product TU.
 
 #include "Plugin/ProcessorBase.h"        // mu-core: onSaveAndQuit hook
+#include "Plugin/ProductRender.h"        // mu-core: the shared headless --render mode
 #include "Link/MuLinkStandalone.h"        // mu-core: makeStandaloneBridge (header-only)
 #include "UI/ConfirmDialog.h"             // mu-core: mu_ui::confirmQuitAsync (themed dialog)
 
@@ -74,7 +75,8 @@ private:
 };
 
 // The standalone application. Products construct it with their display name + mu-link client
-// name; everything else (settings file, window, bridge wiring, shutdown order) is shared.
+// name; everything else (settings file, window, bridge wiring, headless --render, shutdown
+// order) is shared.
 class App : public juce::JUCEApplication
 {
 public:
@@ -112,8 +114,25 @@ public:
     bool moreThanOneInstanceAllowed()          override { return true; }
     void anotherInstanceStarted (const juce::String&) override {}
 
-    void initialise (const juce::String&) override
+protected:
+    // Render hooks: adjust the freshly built processor before a render (default nothing), and
+    // whether the internal transport starts when neither --play nor --no-play is given.
+    virtual void prepareRender (ProcessorBase&, const mu_core::render_mode::ProductArgs&) {}
+    virtual bool renderPlaysByDefault (const mu_core::render_mode::ProductArgs&) const { return true; }
+
+public:
+    void initialise (const juce::String& commandLine) override
     {
+        // Headless render (listening tests / CI smoke): `--render --out <wav> [...]` renders
+        // offline with no window or audio device, then quits.
+        const auto renderArgs = mu_core::render_mode::parseProduct (commandLine, renderName().toRawUTF8());
+        if (renderArgs.valid)
+        {
+            setApplicationReturnValue (runRender (renderArgs));
+            quit();
+            return;
+        }
+
         auto holder = std::make_unique<juce::StandalonePluginHolder> (
             appProperties.getUserSettings(),
             false, juce::String{}, nullptr,
@@ -169,6 +188,32 @@ public:
     }
 
 private:
+    // Lower-case product name for render log lines ("mu-clid render: ...").
+    juce::String renderName() const
+    {
+        return (config.muLinkName.isNotEmpty() ? config.muLinkName : juce::String ("mu")).toLowerCase();
+    }
+
+    // Build a fresh processor (skipping the user's saved default preset) and render it.
+    int runRender (const mu_core::render_mode::ProductArgs& args)
+    {
+        const auto name = renderName();
+        ProcessorBase::skipAutoLoadDefault = true;
+        // Built as a Standalone (like the real window) so wrapperType-dependent transport code
+        // takes the standalone path, not the "in a host with no playhead" one.
+        auto processor = juce::createPluginFilterOfType (juce::AudioProcessor::wrapperType_Standalone);
+        ProcessorBase::skipAutoLoadDefault = false;
+
+        auto* proc = dynamic_cast<ProcessorBase*> (processor.get());
+        if (proc == nullptr)
+        {
+            mu_core::render_mode::reportError (name.toRawUTF8(), "the plugin is not a mu-family processor");
+            return 4;
+        }
+        prepareRender (*proc, args);
+        return mu_core::render_mode::runProduct (*proc, args, name.toRawUTF8(), renderPlaysByDefault (args));
+    }
+
     Config config;
     juce::ApplicationProperties             appProperties;
     std::unique_ptr<CloseConfirmWindow>     mainWindow;

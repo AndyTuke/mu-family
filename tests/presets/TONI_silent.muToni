@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MuToniPreset name="Silent" description="Listening test: master level at 0 (silence once committed)." category="test">
+  <MuToniState><PARAM id="mstr_lvl" value="0.0"/></MuToniState>
+</MuToniPreset>

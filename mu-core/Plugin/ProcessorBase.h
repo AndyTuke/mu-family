@@ -159,6 +159,11 @@ public:
     virtual void               ensureCategoryInList(const juce::String& /*cat*/)         {}
     virtual bool               hasPendingFullPreset()                              const { return false; }
 
+    // Headless render: the render loop never returns to the message loop, so triggerAsyncUpdate()
+    // is never serviced. Call after each processBlock so deferred work (hot-swap commits, MIDI
+    // program changes) runs on the calling thread. No-op when nothing is pending.
+    void flushPendingAsyncUpdates() { handleUpdateNowIfNeeded(); }
+
     // Default preset: <presets>/_default.<ext>, written by the shell's "Save as Default". Each
     // product calls loadStartupDefault() at the end of its constructor so a saved default is
     // restored on launch (a host session restore then replaces it). Render mode sets

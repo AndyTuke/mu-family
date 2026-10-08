@@ -1,0 +1,37 @@
+{
+  "test": "TONI_slot_swap",
+  "product": "mu-toni",
+  "description": "mu-Toni layer-preset hot-swap: a layer preset with both oscillator levels at minimum is staged onto layer 0 (the audible factory layer) at 0.5 s. It must wait for the 2.0 s bar line, then silence the layer.",
+  "render": {
+    "swap_slot_preset": "tests/presets/TONI_mute_layer.muArp",
+    "swap_slot": 0,
+    "swap_slot_at": 0.5,
+    "seconds": 4.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "still_playing_before_bar_line",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [
+        0.6,
+        1.9
+      ],
+      "min": -30,
+      "comment": "the swap requested at 0.5 s did NOT apply at once — it waits for the bar line"
+    },
+    {
+      "name": "silent_after_bar_line",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [
+        2.5,
+        4.0
+      ],
+      "max": -90,
+      "comment": "after the bar-line commit (2.0 s at 120 BPM) the swapped-in state is silent"
+    }
+  ]
+}

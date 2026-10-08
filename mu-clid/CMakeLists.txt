@@ -130,7 +130,6 @@ target_link_libraries(mu-clid
 target_compile_definitions(mu-clid_Standalone PRIVATE JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
 target_sources(mu-clid_Standalone PRIVATE
     Source/Plugin/StandaloneApp.cpp
-    Source/Plugin/RenderMode.cpp
 )
 
 # ── Build-number increment (runs every build; Debug bumps, Release reuses) ────

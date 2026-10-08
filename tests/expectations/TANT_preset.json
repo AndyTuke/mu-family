@@ -1,0 +1,24 @@
+{
+  "test": "TANT_preset",
+  "product": "mu-tant",
+  "description": "mu-Tant renders a factory full preset headlessly (shared --render --preset, transport playing): the preset's gated voices are audible.",
+  "render": {
+    "preset": "Presets/Acid Cellar.muTant",
+    "seconds": 4.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "preset_is_audible",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [
+        0.5,
+        3.5
+      ],
+      "min": -60,
+      "comment": "the loaded preset plays its gate patterns; a silent clip means the preset or the transport didn't load"
+    }
+  ]
+}

@@ -1,9 +1,8 @@
-// Standalone app for mu-Tant — the window, close prompt, and mu-link bridge are the shared
-// mu-core standalone shell (mu_standalone::App), so they're identical across the family.
+// Standalone app for mu-Tant — the window, close prompt, mu-link bridge and headless `--render`
+// mode are the shared mu-core standalone shell (mu_standalone::App), identical across the family.
 // Activated by JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1 on the Standalone target.
 
 #include "PluginProcessor.h"            // product TU context (JucePlugin_* macros, createPluginFilter)
-#include "Plugin/RenderMode.h"           // headless --render (guaranteed-audio drone for mac-validate)
 #include "Plugin/StandaloneShell.h"      // mu-core: shared standalone window + app
 
 class MuTantApp : public mu_standalone::App
@@ -11,18 +10,20 @@ class MuTantApp : public mu_standalone::App
 public:
     MuTantApp() : mu_standalone::App ({ juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Tant")), "mu-Tant" }) {}
 
-    void initialise (const juce::String& commandLine) override
+protected:
+    // With no --preset, the render is the family's guaranteed-audio smoke: bypass voice 0's gate so
+    // the raw oscillator drone passes with the transport stopped (no preset / sample dependency).
+    void prepareRender (ProcessorBase& proc, const mu_core::render_mode::ProductArgs& args) override
     {
-        // Headless render mode. `--render --out <out.wav> --seconds N` skips GUI startup,
-        // renders the drone offline, then quits. Anything else falls through to the shared path.
-        const auto renderArgs = mu_tant::render_mode::parse (commandLine);
-        if (renderArgs.valid)
-        {
-            setApplicationReturnValue (mu_tant::render_mode::execute (renderArgs));
-            quit();
-            return;
-        }
-        mu_standalone::App::initialise (commandLine);   // shared window + mu-link bridge
+        if (args.presetFile == juce::File{})
+            if (auto* p = proc.apvts.getParameter ("v0_gate_bypass"))
+                p->setValueNotifyingHost (1.0f);
+    }
+
+    // A preset render plays its gate patterns; the drone smoke stays stopped.
+    bool renderPlaysByDefault (const mu_core::render_mode::ProductArgs& args) const override
+    {
+        return args.presetFile != juce::File{};
     }
 };
 

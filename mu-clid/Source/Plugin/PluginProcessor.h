@@ -125,13 +125,6 @@ public:
     int  getMasterLoopSteps() const override              { return sequencer.getMasterLoopSteps(); }
     int  getMasterLoopCurrentStep() const override        { return sequencer.getMasterLoopCurrentStep(); }
 
-    // Headless/offline render helper. The render loop drives processBlock directly
-    // and never returns to JUCE's message dispatch loop, so triggerAsyncUpdate()
-    // would never be serviced. Call this after each processBlock so deferred work
-    // (staged preset-swap commit, MIDI program-change handling) runs synchronously
-    // on the calling thread. No-op when nothing is pending.
-    void flushPendingAsyncUpdates() { handleUpdateNowIfNeeded(); }
-
     // A rhythm hot-swap commit fires ProcessorBase::onSlotPresetCommitted: the editor refreshes
     // the non-APVTS UI state (name label, sample bar, colour-tinted bits) pushRhythmToAPVTS can't.
 

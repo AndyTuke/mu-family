@@ -57,8 +57,8 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MixerOverlay.cpp"
     # Shared plugin scaffolding
     "${CMAKE_CURRENT_SOURCE_DIR}/Plugin/ProcessorBase.cpp"
-    # RenderMode.cpp is consumed by each plugin's Standalone target rather than
-    # the shared INTERFACE — needs JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP context.
+    # The headless --render mode is header-only (Plugin/ProductRender.h), compiled
+    # into each Standalone target through Plugin/StandaloneShell.h.
     # Persistence — MIDI PC preset maps (per-slot ch 1-8 + full-preset ch 9).
     "${CMAKE_CURRENT_SOURCE_DIR}/Persistence/MidiPresetMap.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Persistence/MidiFullPresetMap.cpp"
