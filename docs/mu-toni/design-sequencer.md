@@ -57,6 +57,7 @@ The arp is defined by a small parameter set. Confirmed so far:
 | **Gate Length** | 1 – 100 % of step — **modulation target** | How long each note holds before **note-off → ADSR Release**. `<100%` = staccato with a gap; **`100%` + Legato = tie/slide** (see "Articulation"). Mod dest `arp.gateLen` → per-step slides/accents. |
 | **Legato** | voice on/off — **modulation target** | When on, a **100%-gate** note **ties** to the next (no amp retrigger); this is also the only condition under which **glide is heard**. Synth-voice param, mod dest `arp.legato`. See "Articulation". |
 | **Portamento** (Glide) | 0 … ~500 ms — **modulation target** | Glide **time** (analogue-style ms) the pitch slews between tied notes. Heard **only** on legato (100%-gate) transitions. Mod dest `arp.portaTime`. See "Articulation". |
+| **Accent** (+ Acc Steps + the pattern row) | 0 – 100 % · 1 – 16 steps · one on/off cell per step — Accent is a **modulation target** (`arp.accent`) | A repeating accent pattern over the arp's steps: an accented step plays up to **+6 dB** louder with its filter up to **one octave** brighter (303-style), scaled by Accent. In Loop mode the pattern position follows the beat, so accents lock to the bar; in MIDI-trigger mode it counts from the key press. Params `v{N}_acc` / `accLen` / `accPat` (bit i = step i+1). |
 | _more_ | 🔲 TBD | Owner: further controls (candidates under "Anticipated further controls"). |
 
 All of the above are **APVTS parameters** and **modulation destinations**
@@ -523,7 +524,7 @@ Placeholder list for the owner's "more to add" — to be confirmed, not yet
 designed:
 
 - **Swing / humanise**, **step probability**, **rest pattern**.
-- **Velocity / accent** (per-step accent into the amp envelope / level).
+- ~~**Velocity / accent**~~ — **done as an accent pattern** (owner decision 2026-10-08; see the Accent row above). Played-note velocity and a separate velocity lane were not taken (Amp Level is already a modulation target).
 
 *Explicitly ruled out:* **strum / stack** (μ-Toni is strictly monophonic — the
 chord only selects the pool) and a **dedicated chord timeline** (the modulator
@@ -627,8 +628,7 @@ The core design is settled after the grilling pass. Only fine-tuning left:
    (1–4), Inversion max (±4), default patch values.
 2. **MIDI-in channel** — omni vs. a selectable channel for the played-note input
    (leaning omni).
-3. **Velocity/accent** — whether played-note velocity (and a per-step accent mod)
-   feeds the amp envelope / level (leaning yes, cheap).
+3. ~~**Velocity/accent**~~ — resolved: a per-layer **accent pattern** (no played-note velocity).
 
 **Resolved (this design + the grilling pass):**
 - ~~Direction~~ — **skewed-triangle scan**: `fUp=(Dir+100)/200`, +100 up-arp /

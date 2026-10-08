@@ -26,6 +26,25 @@ inline double rateBeats(int idx) noexcept
     return b;
 }
 
+// A layer's accent: a repeating on/off pattern over the arp's steps (bit i = step i+1), its length
+// and how much an accented step lifts. In loop mode the pattern position follows the beat (so
+// accents lock to the bar); in MIDI-trigger mode it counts from the key press.
+struct ArpAccent
+{
+    static constexpr int kMaxSteps = 16;
+    unsigned pattern = 1;
+    int      length  = 4;
+    float    amount  = 0.0f;   // 0..1
+
+    // The accent of step `step` (0 when that position of the pattern is off).
+    float at(int step) const noexcept
+    {
+        const int len = length < 1 ? 1 : (length > kMaxSteps ? kMaxSteps : length);
+        const int pos = ((step % len) + len) % len;
+        return ((pattern >> pos) & 1u) != 0u ? amount : 0.0f;
+    }
+};
+
 // Per-block context, set once by processBlock and shared by every runner.
 struct ArpContext
 {
@@ -51,6 +70,8 @@ public:
     void setVoiceParams(const ToniVoiceParams& p) { voice.setParams(p); legatoOn = p.legato; }
     void setBank(const mu_wavetable::WavetableBank* b) noexcept { voice.setBank(b); }
     void setArp(const ArpParams& p)               { arp = p; }
+    void setAccent(const ArpAccent& a) noexcept { accent = a; }
+
     void setStep(int rateIdx, float gate01, bool midiTrig)
     {
         rateIndex   = rateIdx;
@@ -173,9 +194,11 @@ private:
         ++firedCount;
         ++stepIndex;
 
-        const bool tie = legatoOn && gateLen >= 0.99f;   // 100 % gate + legato → tie/slide
-        if (legatoOn && prevTied) voice.noteOnLegato(midi);   // glide, no retrigger
-        else                      voice.noteOn(midi);
+        const bool tie   = legatoOn && gateLen >= 0.99f;   // 100 % gate + legato → tie/slide
+        const bool glide = legatoOn && prevTied;
+        voice.setAccent(accent.at(lastFiredStep), glide);
+        if (glide) voice.noteOnLegato(midi);   // glide, no retrigger
+        else       voice.noteOn(midi);
 
         noteHeld    = true;
         tiedOut     = tie;
@@ -185,6 +208,7 @@ private:
 
     ToniVoice voice;
     ArpParams arp;
+    ArpAccent accent;
     int    rateIndex   = 6;      // 1/16
     float  gateLen     = 0.5f;
     bool   legatoOn    = false;

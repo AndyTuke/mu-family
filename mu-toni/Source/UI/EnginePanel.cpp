@@ -98,6 +98,50 @@ void EnginePanel::addArpControls()
     addKnob  (G_ARP, "dir",   "Direction", LF::knobEuclidean);
     addKnob  (G_ARP, "gate",  "Gate",      LF::knobEuclidean);
     addKnob  (G_ARP, "porta", "Glide",     LF::knobEuclidean);
+    addKnob  (G_ARP, "acc",    "Accent",   LF::knobEuclidean);
+    addKnob  (G_ARP, "accLen", "Acc Steps", LF::knobEuclidean);
+
+    // The accent pattern: the shared step editor as on/off cells (two levels), one per step,
+    // written into the layer's accPat bits.
+    accentSteps.setUnipolar(true);
+    accentSteps.setQuantization(2);
+    accentSteps.onStepChanged = [this](int step, float value) { setAccentStep(step, value > 50.0f); };
+    addAndMakeVisible(accentSteps);
+}
+
+// Turn accent step `step` on / off in the current layer's pattern.
+void EnginePanel::setAccentStep(int step, bool on)
+{
+    if (step < 0 || step >= ArpAccent::kMaxSteps) return;
+    auto* p = proc.apvts.getParameter("v" + juce::String(currentLayer) + "_accPat");
+    if (p == nullptr) return;
+    const int was = (int) p->convertFrom0to1(p->getValue());
+    const int now = on ? (was | (1 << step)) : (was & ~(1 << step));
+    if (now == was) return;
+    p->beginChangeGesture();
+    p->setValueNotifyingHost(p->convertTo0to1((float) now));
+    p->endChangeGesture();
+}
+
+// Show the current layer's accent pattern (only when it changed) and where the arp is in it.
+void EnginePanel::refreshAccentSteps()
+{
+    const juce::String pre = "v" + juce::String(currentLayer) + "_";
+    auto value = [this, &pre](const char* s) { auto* a = proc.apvts.getRawParameterValue(pre + s); return a != nullptr ? a->load() : 0.0f; };
+    const int len = juce::jlimit(1, ArpAccent::kMaxSteps, (int) value("accLen"));
+    const int pat = (int) value("accPat");
+    if (len != shownAccentLen || pat != shownAccentPat)
+    {
+        shownAccentLen = len;
+        shownAccentPat = pat;
+        std::vector<float> cells((size_t) len);
+        for (int i = 0; i < len; ++i) cells[(size_t) i] = ((pat >> i) & 1) != 0 ? 100.0f : 0.0f;
+        accentSteps.setSteps(cells);
+    }
+    // Loop mode: the arp's step follows the beat, so its place in the pattern does too.
+    const long long step = (long long) std::floor(proc.getInternalBeatPos() / rateBeats((int) value("rate")));
+    accentSteps.setPlayheadPhase((float) (((step % len) + len) % len) / (float) len);
+    accentSteps.setBarColour(layerColour());
 }
 
 // The shared voice band (mu-Clid's layout), its sections built from the controls above.
@@ -166,6 +210,8 @@ void EnginePanel::setLayer(int idx)
             proc.apvts, "v" + n + "_" + t.suffix, *t.comp);
 
     insertSub.setChannel(currentLayer);
+    shownAccentLen = shownAccentPat = -1;   // redraw the new layer's accent pattern
+    refreshAccentSteps();
     modulatorPanel.setVoiceSlot(&proc.voiceSlots[(size_t) currentLayer]);
 
     header.setLayerName(proc.getChannelName(currentLayer));
@@ -376,6 +422,10 @@ void EnginePanel::layoutBox(int group, juce::Rectangle<int> rect)
             k.comp->setBounds(x, y, kW, kH);
             x += kW + gap;
         }
+
+    // The Appergater's accent pattern takes the rest of its knob row.
+    if (group == G_ARP)
+        accentSteps.setBounds(x + gap, y, juce::jmax(0, inner.getRight() - x - gap), kH - s(kLabelGap));
 }
 
 void EnginePanel::addCombo(int group, const char* suffix, const juce::StringArray& items)
@@ -400,6 +450,7 @@ void EnginePanel::addToggle(int group, const char* suffix, const juce::String& l
 void EnginePanel::timerCallback()
 {
     modulatorPanel.setPlayheadBeat(proc.getInternalBeatPos());
+    refreshAccentSteps();
     header.setStagingBadge(proc.hasPendingSwap(currentLayer));   // "SWP" while a layer preset waits for the bar line
 }
 

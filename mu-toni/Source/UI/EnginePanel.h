@@ -7,6 +7,7 @@
 #include "UI/Components/DropdownSelect.h"
 #include "UI/ModulatorPanel.h"
 #include "UI/ChannelHeaderBar.h"          // mu-core: shared per-layer header (name / reset / presets / save)
+#include "UI/Components/StepEditor.h"     // mu-core: the accent pattern cells
 #include "UI/ConfirmDialog.h"             // mu-core: shared confirm / name dialogs
 #include "Persistence/PresetFiles.h"      // mu-core: listPresetFiles
 #include "UI/Voice/InsertSubsection.h"
@@ -61,6 +62,8 @@ private:
     void addSourceControls();
     void addVoiceControls();
     void addArpControls();
+    void setAccentStep(int step, bool on);   // write one accent cell into the layer's pattern
+    void refreshAccentSteps();               // show the layer's pattern + the arp's place in it
     void buildVoiceBand();
     void setupHeaderAndModulators();
 
@@ -149,6 +152,9 @@ private:
     juce::Rectangle<int> srcR, voicePanelR, arpPanelR, modR;
 
     ChannelHeaderBar header;
+
+    StepEditor accentSteps;                       // the Appergater's accent pattern (on/off cells)
+    int shownAccentLen = -1, shownAccentPat = -1; // what accentSteps shows (redrawn on change)
 
     InsertSubsection insertSub;
     // The voice band and its Pitch / Filter / Amp sections (built from the controls above).

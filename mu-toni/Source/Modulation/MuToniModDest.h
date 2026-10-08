@@ -52,6 +52,7 @@ inline constexpr ModDest kModDestTable[] = {
     // ── Envelopes ─────────────────────────────────────────────────────────────
     { "amp.level",  "Amp Level",  "Amp", "aeL" },
     { "pitch.env",  "Pitch Env",  "Pitch", "peDep" },
+    { "arp.accent", "Accent",     "Arp", "acc" },
 };
 
 // The out[] indices — MUST match kModDestTable order.
@@ -62,6 +63,7 @@ enum ModDestIndex
     D_xmIdx, D_xmDep, D_xmSsb,
     D_cut, D_res, D_drv, D_fenv,
     D_amp, D_penv,
+    D_acc,
     kNumModDests
 };
 

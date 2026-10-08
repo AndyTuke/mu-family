@@ -1,4 +1,4 @@
-// mu-toni arp runner tests — step timing. In loop mode the steps sit on the transport's beat grid
+// mu-toni arp runner tests — step timing and accents. In loop mode the steps sit on the transport's beat grid
 // (so the arp locks to a host's bars and lands on the same step after a jump); in MIDI-trigger
 // mode the pattern restarts at each key press.
 
@@ -76,6 +76,49 @@ public:
             double beat = 1.1 + kBps * kBlock;
             while (r.lastStep() != 5 && guard++ < 50) { r.render(buf, kBlock, playingAt(beat)); beat += kBps * kBlock; }
             expectEquals(r.lastStep(), 5);
+        }
+
+        beginTest("Accent pattern: bit i accents step i of each repeat; length wraps it");
+        {
+            ArpAccent a; a.pattern = 0b0101; a.length = 4; a.amount = 0.8f;
+            expectEquals(a.at(0), 0.8f);   expectEquals(a.at(1), 0.0f);
+            expectEquals(a.at(2), 0.8f);   expectEquals(a.at(3), 0.0f);
+            expectEquals(a.at(4), 0.8f);   // the pattern repeats every `length` steps
+            expectEquals(a.at(-2), 0.8f);  // and holds for steps before the start (a pre-roll)
+            a.length = 1;
+            expectEquals(a.at(7), 0.8f);   // length 1: only bit 0 counts, every step
+        }
+
+        // Each step's peak over a run of 1/16 steps with the given accent (loop mode, from beat 0).
+        auto stepPeaks = [&](const ArpAccent& accent, int numSteps)
+        {
+            ArpVoiceRunner r; makeRunner(r, false);
+            r.setAccent(accent);
+            std::vector<float> peaks((size_t) numSteps, 0.0f);
+            double beat = 0.0;
+            for (long long sample = 0; sample < (long long) (numSteps * kStepSamples); sample += kBlock)
+            {
+                r.render(buf, kBlock, playingAt(beat));
+                // Only blocks wholly inside one step count (a block holding the next step's start doesn't).
+                const int step = (int) ((double) sample / kStepSamples);
+                if (step < numSteps && (double) (sample + kBlock) <= (double) (step + 1) * kStepSamples)
+                    peaks[(size_t) step] = juce::jmax(peaks[(size_t) step], buf.getMagnitude(0, 0, kBlock));
+                beat += kBps * kBlock;
+            }
+            return peaks;
+        };
+
+        beginTest("Accent: an accented step plays louder; Accent 0 changes nothing");
+        {
+            ArpAccent on; on.pattern = 0b01; on.length = 2; on.amount = 1.0f;   // every other step
+            const auto accented = stepPeaks(on, 8);
+            for (int k = 2; k + 1 < 8; k += 2)   // skip the first pair (the voice's first attack)
+                expectGreaterThan(accented[(size_t) k], accented[(size_t) k + 1] * 1.5f);
+
+            ArpAccent off = on; off.amount = 0.0f;
+            const auto plain = stepPeaks(off, 8);
+            for (int k = 2; k + 1 < 8; k += 2)
+                expectWithinAbsoluteError(plain[(size_t) k] / juce::jmax(1.0e-6f, plain[(size_t) k + 1]), 1.0f, 0.15f);
         }
 
         beginTest("MIDI-trigger mode: a key press restarts the pattern at step 0 on its block");

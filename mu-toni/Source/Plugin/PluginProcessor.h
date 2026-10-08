@@ -111,7 +111,7 @@ protected:
 
     // ── Arp/voice parameter cache (index into vp[voice][slot]) ────────────────
     // Enum + suffix table live in the .cpp; count is needed here for the array.
-    static constexpr int kNumVoiceParams = 59;
+    static constexpr int kNumVoiceParams = 62;
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -130,7 +130,8 @@ private:
     void cacheVoiceParamPointers();
     // Resolve a voice's modulation (matrix over its control sequences) then build its
     // ArpParams + ToniVoiceParams + step config. Non-const: runs the matrix under try-lock.
-    void readVoice(int v, ArpParams& ap, ToniVoiceParams& vp, int& rateIdx, float& gate01, bool& midiTrig);
+    void readVoice(int v, ArpParams& ap, ToniVoiceParams& vp, int& rateIdx, float& gate01, bool& midiTrig,
+                   ArpAccent& accent);
     // Update the held-note stack from incoming MIDI; sets noteOnEdge if a new note landed.
     void updateHeldNotes(const juce::MidiBuffer& midi, bool& noteOnEdge);
 

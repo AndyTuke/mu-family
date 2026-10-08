@@ -70,6 +70,7 @@ public:
         ampEnv.setSampleRate(sr); filterEnv.setSampleRate(sr); pitchEnv.setSampleRate(sr);
         mono.setSize(1, blockSize, false, false, true);
         pitchGlide.reset(sr, 0.0);
+        accentLevel.reset(sr, 0.005);   // a tied (legato) note's accent change glides, no click
         applyEnvParams();
     }
 
@@ -125,6 +126,16 @@ public:
 
     void noteOff() { ampEnv.noteOff(); filterEnv.noteOff(); pitchEnv.noteOff(); }
 
+    // The accent of the note about to start, 0..1 (303-style): up to kAccentDb louder and its
+    // filter up to kAccentOctaves brighter. `glide` (a tied note) moves to it smoothly; otherwise
+    // the new note starts at it.
+    void setAccent(float accent01, bool glide)
+    {
+        const float a = juce::jlimit(0.0f, 1.0f, accent01);
+        if (glide) accentLevel.setTargetValue(a);
+        else       accentLevel.setCurrentAndTargetValue(a);
+    }
+
     void reset()
     {
         ampEnv.reset(); filterEnv.reset(); pitchEnv.reset();
@@ -158,8 +169,10 @@ public:
         oscs.osc2.setFrequency(midiToFreq(m2));
 
         // Filter cutoff with envelope (depth in octaves), clamped to a safe range.
+        const float accentNow = accentLevel.getCurrentValue();
         const float cut = juce::jlimit(20.0f, (float) (0.45 * sr),
-                                       params.cutoff * std::pow(2.0f, params.filterEnvDepth * envF * kFilterEnvOctaves));
+                                       params.cutoff * std::pow(2.0f, params.filterEnvDepth * envF * kFilterEnvOctaves
+                                                                      + accentNow * kAccentOctaves));
         filter.setCutoff(cut);
 
         // Osc 1 (carrier) + Osc 2 (modulator) through the 2-lane X-Mod, plus noise.
@@ -181,7 +194,7 @@ public:
         const float lg = panL * levelGain, rg = panR * levelGain;
         for (int i = 0; i < numSamples; ++i)
         {
-            const float a = ampEnv.getNextSample();
+            const float a = ampEnv.getNextSample() * (1.0f + (kAccentGainMax - 1.0f) * accentLevel.getNextValue());
             const float v = m[i] * a;
             L[i] += v * lg;
             R[i] += v * rg;
@@ -208,6 +221,9 @@ private:
     }
 
     static constexpr float kFilterEnvOctaves = 5.0f;
+    static constexpr float kAccentDb         = 6.0f;                 // full accent: +6 dB …
+    static constexpr float kAccentGainMax    = 1.9952623f;           //   … as a gain (10^(6/20))
+    static constexpr float kAccentOctaves    = 1.0f;                 // … and the filter an octave up
 
     double sr = 44100.0;
     ToniVoiceParams params;
@@ -217,6 +233,7 @@ private:
     MultiModeFilter filter;
     juce::ADSR ampEnv, filterEnv, pitchEnv;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> pitchGlide;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> accentLevel;   // 0..1, the playing note's accent
     juce::AudioBuffer<float> mono;
 
     float targetMidi = 60.0f;

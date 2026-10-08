@@ -20,6 +20,7 @@ namespace vpi
         noise, ntype, ft, cut, res, drv, locut,                                                  // noise + filter (7)
         aeA, aeD, aeS, aeR, aeL, feA, feD, feS, feR, feDep, peA, peD, peS, peR, peDep, ptgt,      // envs (16)
         drvChar, insP1, insP2, insP3, insP4,                                                     // insert (5)
+        acc, accLen, accPat,                                                                     // accent (3)
         COUNT
     };
     static const char* const suffix[COUNT] = {
@@ -29,8 +30,9 @@ namespace vpi
         "noise","ntype","ft","cut","res","drv","locut",
         "aeA","aeD","aeS","aeR","aeL","feA","feD","feS","feR","feDep","peA","peD","peS","peR","peDep","ptgt",
         "drvChar","insP1","insP2","insP3","insP4",
+        "acc","accLen","accPat",
     };
-    static_assert(COUNT == 59, "vpi slot count must equal PluginProcessor::kNumVoiceParams");
+    static_assert(COUNT == 62, "vpi slot count must equal PluginProcessor::kNumVoiceParams");
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout()
@@ -81,6 +83,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
         layout.add(std::make_unique<AudioParameterFloat>(pid("porta"), lbl("Portamento"), f(0.0f, 500.0f, 1.0f), 0.0f));
         layout.add(std::make_unique<AudioParameterBool> (pid("snap"),  lbl("Diatonic Snap"), false));
         layout.add(std::make_unique<AudioParameterInt>  (pid("trig"),  lbl("Trigger"), 0, 1, 0));     // 0=Loop
+        // Accent: a repeating on/off pattern over the arp's steps (bit i = step i+1 accented),
+        // its length, and how much an accented step lifts (louder + a brighter filter).
+        layout.add(std::make_unique<AudioParameterFloat>(pid("acc"),    lbl("Accent"), f(0.0f, 100.0f, 1.0f), 0.0f));
+        layout.add(std::make_unique<AudioParameterInt>  (pid("accLen"), lbl("Accent Steps"), 1, ArpAccent::kMaxSteps, 4));
+        layout.add(std::make_unique<AudioParameterInt>  (pid("accPat"), lbl("Accent Pattern"), 0, (1 << ArpAccent::kMaxSteps) - 1, 1));
 
         // Oscillators — mu-Tant's wavetable oscs: a table from the shared bank + its scan
         // position (frame 0..255), defaulting to Basic Shapes' saw.
@@ -226,7 +233,7 @@ void PluginProcessor::cacheVoiceParamPointers()
 }
 
 void PluginProcessor::readVoice(int v, ArpParams& ap, ToniVoiceParams& tv,
-                                int& rateIdx, float& gate01, bool& midiTrig)
+                                int& rateIdx, float& gate01, bool& midiTrig, ArpAccent& accent)
 {
     const auto& p = vp[(size_t) v];
     auto g = [&](int slot) { return p[(size_t) slot] != nullptr ? p[(size_t) slot]->load() : 0.0f; };
@@ -275,6 +282,10 @@ void PluginProcessor::readVoice(int v, ArpParams& ap, ToniVoiceParams& tv,
     rateIdx  = juce::roundToInt(out[D_rate]);
     gate01   = out[D_gate] * 0.01f;
     midiTrig = g(vpi::trig) > 0.5f;
+
+    accent.amount  = out[D_acc] * 0.01f;
+    accent.length  = (int) g(vpi::accLen);
+    accent.pattern = (unsigned) juce::jmax(0, (int) g(vpi::accPat));
 
     // Insert config (applied post-VCA in the render callback).
     auto& ic = insCfg[(size_t) v];
@@ -374,7 +385,9 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     for (int i = 0; i < kNumChannels; ++i)
     {
         ArpParams ap; ToniVoiceParams tv; int rateIdx = 6; float gate01 = 0.5f; bool midiTrig = false;
-        readVoice(i, ap, tv, rateIdx, gate01, midiTrig);
+        ArpAccent accent;
+        readVoice(i, ap, tv, rateIdx, gate01, midiTrig, accent);
+        runners[(size_t) i].setAccent(accent);
         runners[(size_t) i].setArp(ap);
         runners[(size_t) i].setVoiceParams(tv);
         runners[(size_t) i].setStep(rateIdx, gate01, midiTrig);
