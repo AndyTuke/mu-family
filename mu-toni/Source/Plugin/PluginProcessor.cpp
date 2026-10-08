@@ -184,6 +184,7 @@ PluginProcessor::PluginProcessor()
     midiInChParam = apvts.getRawParameterValue("midiInCh");
 
     cacheVoiceParamPointers();
+    initLayerState();       // the layer layout every preset / session save and load uses
     hotSwap.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },
                         [this](int i, juce::ValueTree& t) { applyLayerTree(i, t); });
     startFxParamSync();     // mixer / FX params → mixerEngine + fxChain (ProcessorBase)
@@ -424,7 +425,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
         if (xml->hasTagName(apvts.state.getType()))
-            applyStateTree(juce::ValueTree::fromXml(*xml));
+            applyStateTree(toLayerState(juce::ValueTree::fromXml(*xml)));   // host restore — always immediate
 }
 
 } // namespace mu_toni

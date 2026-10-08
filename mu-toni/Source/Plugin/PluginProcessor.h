@@ -116,9 +116,12 @@ protected:
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
-    // State shared by the session save/restore and full presets (PluginProcessor_Preset.cpp).
-    juce::ValueTree captureState();
-    void            applyStateTree(juce::ValueTree tree);
+    // State shared by the session save/restore and full presets (PluginProcessor_Preset.cpp):
+    // the composed state (mu-core SlotState) of the globals + every layer's node.
+    void            initLayerState();
+    juce::ValueTree captureState() { return captureComposedState(); }
+    juce::ValueTree toLayerState(const juce::ValueTree& tree) const;
+    void            applyStateTree(const juce::ValueTree& state);
 
     // Register mixer/FX param listeners + run an initial engine sync (JUCE doesn't
     // fire parameterChanged on construction or for unchanged values).

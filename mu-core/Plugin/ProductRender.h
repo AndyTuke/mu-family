@@ -12,6 +12,8 @@
 //   --swap-slot-preset <file> --swap-slot N --swap-slot-at <s>   slot preset staged mid-render
 //   --midi-program P --midi-program-preset <file> --midi-program-at <s>   ch-9 program change
 //   --play / --no-play                       start the internal transport (product default otherwise)
+//   --save-preset <file>                     after the start preset loads, save the state as a full
+//                                            preset at <file> (the listening tests' round trip)
 //
 // mu-Clid's original --swap-rhythm-preset / --swap-rhythm-slot / --swap-rhythm-at spellings are
 // accepted as aliases. Header-only and Standalone-target-only, like RenderSupport.h.
@@ -34,6 +36,8 @@ namespace mu_core::render_mode
         double     midiProgramAtSeconds = -1.0;
 
         int        play = -1;   // -1 = product default, 0 = --no-play, 1 = --play
+
+        juce::File savePresetFile;
     };
 
     // The value of the first of `flags` present (each removed from `tokens`).
@@ -68,6 +72,7 @@ namespace mu_core::render_mode
         const auto midiProg    = takeFlagValue(tokens, "--midi-program");
         const auto midiProgPre = takeFlagValue(tokens, "--midi-program-preset");
         const auto midiProgAt  = takeFlagValue(tokens, "--midi-program-at");
+        const auto savePreset  = takeFlagValue(tokens, "--save-preset");
         if (tokens.contains("--play"))    { a.play = 1; tokens.removeString("--play"); }
         if (tokens.contains("--no-play")) { a.play = 0; tokens.removeString("--no-play"); }
 
@@ -79,6 +84,7 @@ namespace mu_core::render_mode
         if (swapPreset.isNotEmpty())  a.swapPresetFile    = cwd.getChildFile(swapPreset);
         if (swapSlotF.isNotEmpty())   a.swapSlotFile      = cwd.getChildFile(swapSlotF);
         if (midiProgPre.isNotEmpty()) a.midiProgramPreset = cwd.getChildFile(midiProgPre);
+        if (savePreset.isNotEmpty())  a.savePresetFile    = cwd.getChildFile(savePreset);
         if (presetSlot.isNotEmpty())  a.presetSlot           = presetSlot.getIntValue();
         if (swapAt.isNotEmpty())      a.swapAtSeconds        = swapAt.getDoubleValue();
         if (swapSlot.isNotEmpty())    a.swapSlot             = swapSlot.getIntValue();
@@ -119,12 +125,19 @@ namespace mu_core::render_mode
     // product's transport choice when neither --play nor --no-play is given.
     inline int runProduct(ProcessorBase& proc, const ProductArgs& args, const char* product, bool playByDefault)
     {
-        // Phase 1: surface load errors, load the requested preset, seed the ch-9 program map.
+        // Phase 1: surface load errors, load the requested preset (saving it back if asked), seed the
+        // ch-9 program map.
         proc.onLoadError = [product](const juce::String& m)
         { std::fputs((juce::String(product) + " render: load: " + m + "\n").toRawUTF8(), stderr); std::fflush(stderr); };
 
         if (args.presetFile != juce::File{} && ! loadPresetByExtension(proc, args.presetFile, args.presetSlot, product))
             return 2;
+
+        if (args.savePresetFile != juce::File{} && ! proc.saveFullPresetTo(args.savePresetFile))
+        {
+            reportError(product, "could not save preset: " + args.savePresetFile.getFullPathName());
+            return 2;
+        }
 
         if (args.midiProgramAtSeconds >= 0.0)
         {

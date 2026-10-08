@@ -1,0 +1,31 @@
+{
+  "test": "TONI_roundtrip",
+  "product": "mu-toni",
+  "description": "mu-Toni composed-state round trip: a pre-format-2 full preset (APVTS dump + VoiceData; layer 1 cutoff 300 Hz, layers 2-4 muted, a modulator on layer 1) loads through the legacy rebuild, is saved in the composed format, and the re-render from that save must be sample-identical.",
+  "render": {
+    "preset": "tests/presets/TONI_legacy.muToni",
+    "play": true,
+    "roundtrip": true,
+    "seconds": 3.0,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "audible",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [0.5, 3.0],
+      "min": -30,
+      "comment": "the loaded preset plays"
+    },
+    {
+      "name": "old_values_applied",
+      "metric": "spectral_centroid",
+      "channel": "any",
+      "t_window": [0.5, 3.0],
+      "max_hz": 1900,
+      "comment": "the old file's dark layer-1 filter + muted layers took effect (the factory state measures ~2550 Hz)"
+    }
+  ]
+}

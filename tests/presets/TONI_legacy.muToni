@@ -1,0 +1,414 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<MuToniPreset name="Legacy" description="Listening test: pre-format-2 state (APVTS dump + VoiceData)" category="test">
+  <MuToniState>
+    <PARAM id="ch0_lvl" value="1.0" />
+    <PARAM id="ch0_pan" value="0.0" />
+    <PARAM id="ch0_mute" value="0.0" />
+    <PARAM id="ch0_solo" value="0.0" />
+    <PARAM id="ch0_sendEff" value="0.0" />
+    <PARAM id="ch0_sendDly" value="0.0" />
+    <PARAM id="ch0_sendRev" value="0.0" />
+    <PARAM id="ch0_scSrc" value="0.0" />
+    <PARAM id="ch0_scAmt" value="0.0" />
+    <PARAM id="ch0_scAtk" value="5.0" />
+    <PARAM id="ch0_scRel" value="100.0" />
+    <PARAM id="ch0_outBus" value="0.0" />
+    <PARAM id="ch1_lvl" value="1.0" />
+    <PARAM id="ch1_pan" value="0.0" />
+    <PARAM id="ch1_mute" value="1" />
+    <PARAM id="ch1_solo" value="0.0" />
+    <PARAM id="ch1_sendEff" value="0.0" />
+    <PARAM id="ch1_sendDly" value="0.0" />
+    <PARAM id="ch1_sendRev" value="0.0" />
+    <PARAM id="ch1_scSrc" value="0.0" />
+    <PARAM id="ch1_scAmt" value="0.0" />
+    <PARAM id="ch1_scAtk" value="5.0" />
+    <PARAM id="ch1_scRel" value="100.0" />
+    <PARAM id="ch1_outBus" value="0.0" />
+    <PARAM id="ch2_lvl" value="1.0" />
+    <PARAM id="ch2_pan" value="0.0" />
+    <PARAM id="ch2_mute" value="1" />
+    <PARAM id="ch2_solo" value="0.0" />
+    <PARAM id="ch2_sendEff" value="0.0" />
+    <PARAM id="ch2_sendDly" value="0.0" />
+    <PARAM id="ch2_sendRev" value="0.0" />
+    <PARAM id="ch2_scSrc" value="0.0" />
+    <PARAM id="ch2_scAmt" value="0.0" />
+    <PARAM id="ch2_scAtk" value="5.0" />
+    <PARAM id="ch2_scRel" value="100.0" />
+    <PARAM id="ch2_outBus" value="0.0" />
+    <PARAM id="ch3_lvl" value="1.0" />
+    <PARAM id="ch3_pan" value="0.0" />
+    <PARAM id="ch3_mute" value="1" />
+    <PARAM id="ch3_solo" value="0.0" />
+    <PARAM id="ch3_sendEff" value="0.0" />
+    <PARAM id="ch3_sendDly" value="0.0" />
+    <PARAM id="ch3_sendRev" value="0.0" />
+    <PARAM id="ch3_scSrc" value="0.0" />
+    <PARAM id="ch3_scAmt" value="0.0" />
+    <PARAM id="ch3_scAtk" value="5.0" />
+    <PARAM id="ch3_scRel" value="100.0" />
+    <PARAM id="ch3_outBus" value="0.0" />
+    <PARAM id="midiInCh" value="0.0" />
+    <PARAM id="eff_algo" value="0.0" />
+    <PARAM id="eff_en" value="1.0" />
+    <PARAM id="eff_p0" value="0.5" />
+    <PARAM id="eff_p1" value="0.5" />
+    <PARAM id="eff_p2" value="0.5" />
+    <PARAM id="eff_p3" value="0.5" />
+    <PARAM id="eff_p4" value="0.5" />
+    <PARAM id="dly_en" value="1.0" />
+    <PARAM id="dly_mode" value="1.0" />
+    <PARAM id="dly_ms" value="250.0" />
+    <PARAM id="dly_syncDenom" value="2.0" />
+    <PARAM id="dly_syncDot" value="1.0" />
+    <PARAM id="dly_syncTrip" value="0.0" />
+    <PARAM id="dly_count" value="1.0" />
+    <PARAM id="dly_fb" value="0.300000011920929" />
+    <PARAM id="dly_spread" value="0.0" />
+    <PARAM id="dly_dirt" value="0.0" />
+    <PARAM id="rev_algo" value="1.0" />
+    <PARAM id="rev_en" value="1.0" />
+    <PARAM id="rev_lvl" value="1.0" />
+    <PARAM id="rev_size" value="0.75" />
+    <PARAM id="rev_pre" value="25.0" />
+    <PARAM id="rev_diff" value="0.800000011920929" />
+    <PARAM id="rev_damp" value="0.300000011920929" />
+    <PARAM id="rev_mod" value="0.1500000059604645" />
+    <PARAM id="rev_dirt" value="0.0" />
+    <PARAM id="eff2dly" value="0.0" />
+    <PARAM id="eff2rev" value="0.0" />
+    <PARAM id="dly2rev" value="0.0" />
+    <PARAM id="echo_en" value="1.0" />
+    <PARAM id="echo_mode" value="0.0" />
+    <PARAM id="echo_ms" value="250.0" />
+    <PARAM id="echo_syncDenom" value="2.0" />
+    <PARAM id="echo_syncDot" value="0.0" />
+    <PARAM id="echo_syncTrip" value="0.0" />
+    <PARAM id="echo_count" value="1.0" />
+    <PARAM id="echo_fb" value="0.449999988079071" />
+    <PARAM id="echo_spread" value="0.0" />
+    <PARAM id="echo_dirt" value="0.0" />
+    <PARAM id="ret_eff_lvl" value="0.75" />
+    <PARAM id="ret_eff_pan" value="0.0" />
+    <PARAM id="ret_eff_mute" value="0.0" />
+    <PARAM id="ret_eff_solo" value="0.0" />
+    <PARAM id="ret_eff_scSrc" value="0.0" />
+    <PARAM id="ret_eff_scAmt" value="0.0" />
+    <PARAM id="ret_eff_scAtk" value="5.0" />
+    <PARAM id="ret_eff_scRel" value="100.0" />
+    <PARAM id="ret_dly_lvl" value="0.75" />
+    <PARAM id="ret_dly_pan" value="0.0" />
+    <PARAM id="ret_dly_mute" value="0.0" />
+    <PARAM id="ret_dly_solo" value="0.0" />
+    <PARAM id="ret_dly_scSrc" value="0.0" />
+    <PARAM id="ret_dly_scAmt" value="0.0" />
+    <PARAM id="ret_dly_scAtk" value="5.0" />
+    <PARAM id="ret_dly_scRel" value="100.0" />
+    <PARAM id="ret_rev_lvl" value="0.75" />
+    <PARAM id="ret_rev_pan" value="0.0" />
+    <PARAM id="ret_rev_mute" value="0.0" />
+    <PARAM id="ret_rev_solo" value="0.0" />
+    <PARAM id="ret_rev_scSrc" value="0.0" />
+    <PARAM id="ret_rev_scAmt" value="0.0" />
+    <PARAM id="ret_rev_scAtk" value="5.0" />
+    <PARAM id="ret_rev_scRel" value="100.0" />
+    <PARAM id="mstr_lvl" value="1.0" />
+    <PARAM id="mstr_pan" value="0.0" />
+    <PARAM id="mst_insChar" value="0.0" />
+    <PARAM id="mst_insP1" value="0.0" />
+    <PARAM id="mst_insP2" value="0.0" />
+    <PARAM id="mst_insP3" value="0.0" />
+    <PARAM id="mst_insP4" value="0.0" />
+    <PARAM id="mst_ins2Char" value="0.0" />
+    <PARAM id="mst_ins2P1" value="0.0" />
+    <PARAM id="mst_ins2P2" value="0.0" />
+    <PARAM id="mst_ins2P3" value="0.0" />
+    <PARAM id="mst_ins2P4" value="0.0" />
+    <PARAM id="v0_scale" value="1.0" />
+    <PARAM id="v0_root" value="0.0" />
+    <PARAM id="v0_roct" value="4.0" />
+    <PARAM id="v0_chord" value="5" />
+    <PARAM id="v0_inv" value="0.0" />
+    <PARAM id="v0_octs" value="2.0" />
+    <PARAM id="v0_dir" value="100.0" />
+    <PARAM id="v0_rate" value="4" />
+    <PARAM id="v0_gate" value="50.0" />
+    <PARAM id="v0_leg" value="0.0" />
+    <PARAM id="v0_porta" value="0.0" />
+    <PARAM id="v0_snap" value="0.0" />
+    <PARAM id="v0_trig" value="0.0" />
+    <PARAM id="v0_o1_wt" value="0.0" />
+    <PARAM id="v0_o1o" value="0.0" />
+    <PARAM id="v0_o1f" value="0.0" />
+    <PARAM id="v0_o1_pos" value="60" />
+    <PARAM id="v0_o1l" value="0.0" />
+    <PARAM id="v0_o2_wt" value="0.0" />
+    <PARAM id="v0_o2o" value="0.0" />
+    <PARAM id="v0_o2s" value="0.0" />
+    <PARAM id="v0_o2f" value="7.0" />
+    <PARAM id="v0_o2_pos" value="170.0" />
+    <PARAM id="v0_o2l" value="-3.0" />
+    <PARAM id="v0_xmod_phaseMode" value="1.0" />
+    <PARAM id="v0_xmod_index" value="0.0" />
+    <PARAM id="v0_sync" value="0.0" />
+    <PARAM id="v0_xmod_fdbk" value="0.0" />
+    <PARAM id="v0_xmod_ampMode" value="0.0" />
+    <PARAM id="v0_xmod_depth" value="0.0" />
+    <PARAM id="v0_xmod_ssb" value="0.0" />
+    <PARAM id="v0_noise" value="-60.0" />
+    <PARAM id="v0_ntype" value="0.0" />
+    <PARAM id="v0_ft" value="0.0" />
+    <PARAM id="v0_cut" value="300" />
+    <PARAM id="v0_res" value="0.300000011920929" />
+    <PARAM id="v0_drv" value="0.0" />
+    <PARAM id="v0_locut" value="0.0" />
+    <PARAM id="v0_aeA" value="0.004000000189989805" />
+    <PARAM id="v0_aeD" value="0.4" />
+    <PARAM id="v0_aeS" value="0.5" />
+    <PARAM id="v0_aeR" value="0.1500000059604645" />
+    <PARAM id="v0_aeL" value="0.0" />
+    <PARAM id="v0_feA" value="0.004000000189989805" />
+    <PARAM id="v0_feD" value="0.2000000178813934" />
+    <PARAM id="v0_feS" value="0.0" />
+    <PARAM id="v0_feR" value="0.2000000178813934" />
+    <PARAM id="v0_feDep" value="0.3000000715255737" />
+    <PARAM id="v0_peA" value="0.004000000189989805" />
+    <PARAM id="v0_peD" value="0.1000000089406967" />
+    <PARAM id="v0_peS" value="0.0" />
+    <PARAM id="v0_peR" value="0.1000000089406967" />
+    <PARAM id="v0_peDep" value="0.0" />
+    <PARAM id="v0_ptgt" value="1.0" />
+    <PARAM id="v0_drvChar" value="0.0" />
+    <PARAM id="v0_insP1" value="0.0" />
+    <PARAM id="v0_insP2" value="0.0" />
+    <PARAM id="v0_insP3" value="0.0" />
+    <PARAM id="v0_insP4" value="0.0" />
+    <PARAM id="v1_scale" value="1.0" />
+    <PARAM id="v1_root" value="0.0" />
+    <PARAM id="v1_roct" value="4.0" />
+    <PARAM id="v1_chord" value="3.0" />
+    <PARAM id="v1_inv" value="0.0" />
+    <PARAM id="v1_octs" value="2.0" />
+    <PARAM id="v1_dir" value="100.0" />
+    <PARAM id="v1_rate" value="6.0" />
+    <PARAM id="v1_gate" value="50.0" />
+    <PARAM id="v1_leg" value="0.0" />
+    <PARAM id="v1_porta" value="0.0" />
+    <PARAM id="v1_snap" value="0.0" />
+    <PARAM id="v1_trig" value="0.0" />
+    <PARAM id="v1_o1_wt" value="0.0" />
+    <PARAM id="v1_o1o" value="0.0" />
+    <PARAM id="v1_o1f" value="0.0" />
+    <PARAM id="v1_o1_pos" value="170.0" />
+    <PARAM id="v1_o1l" value="-6" />
+    <PARAM id="v1_o2_wt" value="0.0" />
+    <PARAM id="v1_o2o" value="0.0" />
+    <PARAM id="v1_o2s" value="0.0" />
+    <PARAM id="v1_o2f" value="7.0" />
+    <PARAM id="v1_o2_pos" value="170.0" />
+    <PARAM id="v1_o2l" value="-60.0" />
+    <PARAM id="v1_xmod_phaseMode" value="1.0" />
+    <PARAM id="v1_xmod_index" value="0.0" />
+    <PARAM id="v1_sync" value="0.0" />
+    <PARAM id="v1_xmod_fdbk" value="0.0" />
+    <PARAM id="v1_xmod_ampMode" value="0.0" />
+    <PARAM id="v1_xmod_depth" value="0.0" />
+    <PARAM id="v1_xmod_ssb" value="0.0" />
+    <PARAM id="v1_noise" value="-60.0" />
+    <PARAM id="v1_ntype" value="0.0" />
+    <PARAM id="v1_ft" value="0.0" />
+    <PARAM id="v1_cut" value="3000.0" />
+    <PARAM id="v1_res" value="0.300000011920929" />
+    <PARAM id="v1_drv" value="0.0" />
+    <PARAM id="v1_locut" value="0.0" />
+    <PARAM id="v1_aeA" value="0.004000000189989805" />
+    <PARAM id="v1_aeD" value="0.1500000059604645" />
+    <PARAM id="v1_aeS" value="0.5" />
+    <PARAM id="v1_aeR" value="0.1500000059604645" />
+    <PARAM id="v1_aeL" value="0.0" />
+    <PARAM id="v1_feA" value="0.004000000189989805" />
+    <PARAM id="v1_feD" value="0.2000000178813934" />
+    <PARAM id="v1_feS" value="0.0" />
+    <PARAM id="v1_feR" value="0.2000000178813934" />
+    <PARAM id="v1_feDep" value="0.3000000715255737" />
+    <PARAM id="v1_peA" value="0.004000000189989805" />
+    <PARAM id="v1_peD" value="0.1000000089406967" />
+    <PARAM id="v1_peS" value="0.0" />
+    <PARAM id="v1_peR" value="0.1000000089406967" />
+    <PARAM id="v1_peDep" value="0.0" />
+    <PARAM id="v1_ptgt" value="1.0" />
+    <PARAM id="v1_drvChar" value="0.0" />
+    <PARAM id="v1_insP1" value="0.0" />
+    <PARAM id="v1_insP2" value="0.0" />
+    <PARAM id="v1_insP3" value="0.0" />
+    <PARAM id="v1_insP4" value="0.0" />
+    <PARAM id="v2_scale" value="1.0" />
+    <PARAM id="v2_root" value="0.0" />
+    <PARAM id="v2_roct" value="4.0" />
+    <PARAM id="v2_chord" value="3.0" />
+    <PARAM id="v2_inv" value="0.0" />
+    <PARAM id="v2_octs" value="2.0" />
+    <PARAM id="v2_dir" value="100.0" />
+    <PARAM id="v2_rate" value="6.0" />
+    <PARAM id="v2_gate" value="50.0" />
+    <PARAM id="v2_leg" value="0.0" />
+    <PARAM id="v2_porta" value="0.0" />
+    <PARAM id="v2_snap" value="0.0" />
+    <PARAM id="v2_trig" value="0.0" />
+    <PARAM id="v2_o1_wt" value="0.0" />
+    <PARAM id="v2_o1o" value="0.0" />
+    <PARAM id="v2_o1f" value="0.0" />
+    <PARAM id="v2_o1_pos" value="170.0" />
+    <PARAM id="v2_o1l" value="-60.0" />
+    <PARAM id="v2_o2_wt" value="0.0" />
+    <PARAM id="v2_o2o" value="0.0" />
+    <PARAM id="v2_o2s" value="0.0" />
+    <PARAM id="v2_o2f" value="7.0" />
+    <PARAM id="v2_o2_pos" value="170.0" />
+    <PARAM id="v2_o2l" value="-60.0" />
+    <PARAM id="v2_xmod_phaseMode" value="1.0" />
+    <PARAM id="v2_xmod_index" value="0.0" />
+    <PARAM id="v2_sync" value="0.0" />
+    <PARAM id="v2_xmod_fdbk" value="0.0" />
+    <PARAM id="v2_xmod_ampMode" value="0.0" />
+    <PARAM id="v2_xmod_depth" value="0.0" />
+    <PARAM id="v2_xmod_ssb" value="0.0" />
+    <PARAM id="v2_noise" value="-60.0" />
+    <PARAM id="v2_ntype" value="0.0" />
+    <PARAM id="v2_ft" value="0.0" />
+    <PARAM id="v2_cut" value="3000.0" />
+    <PARAM id="v2_res" value="0.300000011920929" />
+    <PARAM id="v2_drv" value="0.0" />
+    <PARAM id="v2_locut" value="0.0" />
+    <PARAM id="v2_aeA" value="0.004000000189989805" />
+    <PARAM id="v2_aeD" value="0.1500000059604645" />
+    <PARAM id="v2_aeS" value="0.5" />
+    <PARAM id="v2_aeR" value="0.1500000059604645" />
+    <PARAM id="v2_aeL" value="0.0" />
+    <PARAM id="v2_feA" value="0.004000000189989805" />
+    <PARAM id="v2_feD" value="0.2000000178813934" />
+    <PARAM id="v2_feS" value="0.0" />
+    <PARAM id="v2_feR" value="0.2000000178813934" />
+    <PARAM id="v2_feDep" value="0.3000000715255737" />
+    <PARAM id="v2_peA" value="0.004000000189989805" />
+    <PARAM id="v2_peD" value="0.1000000089406967" />
+    <PARAM id="v2_peS" value="0.0" />
+    <PARAM id="v2_peR" value="0.1000000089406967" />
+    <PARAM id="v2_peDep" value="0.0" />
+    <PARAM id="v2_ptgt" value="1.0" />
+    <PARAM id="v2_drvChar" value="0.0" />
+    <PARAM id="v2_insP1" value="0.0" />
+    <PARAM id="v2_insP2" value="0.0" />
+    <PARAM id="v2_insP3" value="0.0" />
+    <PARAM id="v2_insP4" value="0.0" />
+    <PARAM id="v3_scale" value="1.0" />
+    <PARAM id="v3_root" value="0.0" />
+    <PARAM id="v3_roct" value="4.0" />
+    <PARAM id="v3_chord" value="3.0" />
+    <PARAM id="v3_inv" value="0.0" />
+    <PARAM id="v3_octs" value="2.0" />
+    <PARAM id="v3_dir" value="100.0" />
+    <PARAM id="v3_rate" value="6.0" />
+    <PARAM id="v3_gate" value="50.0" />
+    <PARAM id="v3_leg" value="0.0" />
+    <PARAM id="v3_porta" value="0.0" />
+    <PARAM id="v3_snap" value="0.0" />
+    <PARAM id="v3_trig" value="0.0" />
+    <PARAM id="v3_o1_wt" value="0.0" />
+    <PARAM id="v3_o1o" value="0.0" />
+    <PARAM id="v3_o1f" value="0.0" />
+    <PARAM id="v3_o1_pos" value="170.0" />
+    <PARAM id="v3_o1l" value="-60.0" />
+    <PARAM id="v3_o2_wt" value="0.0" />
+    <PARAM id="v3_o2o" value="0.0" />
+    <PARAM id="v3_o2s" value="0.0" />
+    <PARAM id="v3_o2f" value="7.0" />
+    <PARAM id="v3_o2_pos" value="170.0" />
+    <PARAM id="v3_o2l" value="-60.0" />
+    <PARAM id="v3_xmod_phaseMode" value="1.0" />
+    <PARAM id="v3_xmod_index" value="0.0" />
+    <PARAM id="v3_sync" value="0.0" />
+    <PARAM id="v3_xmod_fdbk" value="0.0" />
+    <PARAM id="v3_xmod_ampMode" value="0.0" />
+    <PARAM id="v3_xmod_depth" value="0.0" />
+    <PARAM id="v3_xmod_ssb" value="0.0" />
+    <PARAM id="v3_noise" value="-60.0" />
+    <PARAM id="v3_ntype" value="0.0" />
+    <PARAM id="v3_ft" value="0.0" />
+    <PARAM id="v3_cut" value="3000.0" />
+    <PARAM id="v3_res" value="0.300000011920929" />
+    <PARAM id="v3_drv" value="0.0" />
+    <PARAM id="v3_locut" value="0.0" />
+    <PARAM id="v3_aeA" value="0.004000000189989805" />
+    <PARAM id="v3_aeD" value="0.1500000059604645" />
+    <PARAM id="v3_aeS" value="0.5" />
+    <PARAM id="v3_aeR" value="0.1500000059604645" />
+    <PARAM id="v3_aeL" value="0.0" />
+    <PARAM id="v3_feA" value="0.004000000189989805" />
+    <PARAM id="v3_feD" value="0.2000000178813934" />
+    <PARAM id="v3_feS" value="0.0" />
+    <PARAM id="v3_feR" value="0.2000000178813934" />
+    <PARAM id="v3_feDep" value="0.3000000715255737" />
+    <PARAM id="v3_peA" value="0.004000000189989805" />
+    <PARAM id="v3_peD" value="0.1000000089406967" />
+    <PARAM id="v3_peS" value="0.0" />
+    <PARAM id="v3_peR" value="0.1000000089406967" />
+    <PARAM id="v3_peDep" value="0.0" />
+    <PARAM id="v3_ptgt" value="1.0" />
+    <PARAM id="v3_drvChar" value="0.0" />
+    <PARAM id="v3_insP1" value="0.0" />
+    <PARAM id="v3_insP2" value="0.0" />
+    <PARAM id="v3_insP3" value="0.0" />
+    <PARAM id="v3_insP4" value="0.0" />
+    <VoiceData>
+      <Voice idx="0">
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1">
+            <Step v="0.0" />
+            <Step v="0.8" />
+            <Step v="0.3" />
+            <Step v="1.0" />
+          </Seq>
+          <Asgn id="a0" src="cs0_output" dest="flt.cutoff" depth="10" curve="0" />
+        </Modulators>
+      </Voice>
+      <Voice idx="1">
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+        </Modulators>
+      </Voice>
+      <Voice idx="2">
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+        </Modulators>
+      </Voice>
+      <Voice idx="3">
+        <Modulators depthUnits="range">
+          <Seq id="cs0" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs1" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs2" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs3" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs4" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs5" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs6" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+          <Seq id="cs7" mode="Stepped" polarity="Unipolar" loopNV="Whole" loopMod="None" loopMult="1" stepNV="Sixteenth" stepMod="None" stepMult="1" />
+        </Modulators>
+      </Voice>
+    </VoiceData>
+  </MuToniState>
+</MuToniPreset>

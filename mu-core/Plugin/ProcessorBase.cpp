@@ -352,6 +352,15 @@ void ProcessorBase::savePreset(const juce::String& name, const juce::String& des
                                name, desc, category, captureFullPreset(), onLoadError);
 }
 
+bool ProcessorBase::saveFullPresetTo(const juce::File& file)
+{
+    const char* tag = getFullPresetTag();
+    if (tag == nullptr) return false;
+    return mu_pp::writeFullPreset(file.getParentDirectory(), getFullPresetExtension(), tag,
+                                  file.getFileNameWithoutExtension(), {}, {}, captureFullPreset(), onLoadError)
+           != juce::File();
+}
+
 juce::File ProcessorBase::getPresetsDir() const
 {
     const auto content = getContentDir();

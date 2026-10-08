@@ -21,6 +21,7 @@
 #include "Audio/VoiceEngine.h"
 #include "Persistence/MidiPresetMap.h"
 #include "Persistence/MidiFullPresetMap.h"
+#include "Persistence/SlotState.h"   // composed slot / full / host state (format 2)
 #include "MuLimits.h"
 #include "Plugin/MidiClockSync.h"
 #include "License/MachineFingerprint.h"
@@ -158,6 +159,9 @@ public:
     virtual void               useLoadedFullPreset(juce::ValueTree /*state*/)            {}
     virtual void               ensureCategoryInList(const juce::String& /*cat*/)         {}
     virtual bool               hasPendingFullPreset()                              const { return false; }
+    // Write the current state as a full preset at exactly `file` (headless render --save-preset).
+    // Default: the standard wrapped preset; false (after onLoadError) when it can't be written.
+    virtual bool               saveFullPresetTo(const juce::File& file);
 
     // Headless render: the render loop never returns to the message loop, so triggerAsyncUpdate()
     // is never serviced. Call after each processBlock so deferred work (hot-swap commits, MIDI
@@ -287,6 +291,30 @@ public:
     // + the product's `ch{i}_*` strip). Handles: `ch{i}_*`, `ret_*`, `mstr_lvl/pan`,
     // `mst_ins*`, `eff_*`, `eff2*`, `dly_*`, `rev_*`, `echo_*`. Unrecognised IDs no-op.
     void syncGlobalFxParam(const juce::String& id, float v);
+
+protected:
+    // Composed state (Persistence/SlotState.h, format 2) — the slot unit every product saves and
+    // loads. A product describes its slots once in its constructor (each slot's param prefix + its
+    // non-parameter data), then layer presets, full presets and host sessions all go through these,
+    // so a slot is written and applied by the same code wherever it appears.
+    void initSlotState(const juce::StringArray& slotPrefixes, mu_pp::SlotExtras extras)
+    {
+        slotLayout = mu_pp::SlotLayout(*this, slotPrefixes);
+        slotExtras = std::move(extras);
+    }
+    juce::ValueTree captureComposedState()           { return mu_pp::captureState(apvts.state.getType(), slotLayout, slotExtras); }
+    void            applyComposedState(const juce::ValueTree& state) { mu_pp::applyState(state, slotLayout, slotExtras); }
+    juce::ValueTree captureSlotNode(int slot, const juce::Identifier& type) { return mu_pp::captureSlot(slotLayout, slotExtras, slot, type); }
+    void            applySlotNode(int slot, const juce::ValueTree& node)    { mu_pp::applySlot(slotLayout, slotExtras, slot, node); }
+    // A state in the composed shape: an older APVTS-dump state is rebuilt (`otherChild` receives
+    // the product's older root children); a composed one is returned as is.
+    juce::ValueTree toComposedState(const juce::ValueTree& state,
+                                    const std::function<void(const juce::ValueTree&, juce::ValueTree&)>& otherChild = {}) const
+    {
+        return mu_pp::composeLegacyState(state, slotLayout, otherChild);
+    }
+    mu_pp::SlotLayout slotLayout;
+    mu_pp::SlotExtras slotExtras;
 
 protected:
     // Internal transport state. Written by the UI (play / BPM) and the audio thread (beat

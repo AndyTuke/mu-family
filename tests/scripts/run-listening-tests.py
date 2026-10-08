@@ -28,6 +28,7 @@ OUTPUT_DIR = REPO_ROOT / 'tests' / '_out'
 
 PRODUCTS = ('mu-clid', 'mu-tant', 'mu-toni', 'mu-on')
 CONTENT_FOLDER = {'mu-clid': 'muClid', 'mu-tant': 'muTant', 'mu-toni': 'muToni', 'mu-on': 'muOn'}
+FULL_PRESET_EXT = {'mu-clid': 'muClid', 'mu-tant': 'muTant', 'mu-toni': 'muToni', 'mu-on': 'muOn'}
 TDP_ROOT = Path(os.environ.get('MU_CONTENT_ROOT', r'D:\OneDrive\Documents\TDP'))
 
 
@@ -74,12 +75,31 @@ def resolve_preset(rel: str, product: str) -> Path | None:
     return None
 
 
+def wav_max_difference(a: Path, b: Path) -> float:
+    """The largest per-sample difference between two renders, in 24-bit LSBs (inf when their
+    shapes differ). Integer WAV data is scaled to full scale first, whatever its container width."""
+    import numpy as np
+    from scipy.io import wavfile
+    ra, xa = wavfile.read(a)
+    rb, xb = wavfile.read(b)
+    if ra != rb or xa.shape != xb.shape:
+        return float('inf')
+    def full_scale(x):
+        return x.astype(np.float64) / (np.iinfo(x.dtype).max + 1.0) if np.issubdtype(x.dtype, np.integer) else x.astype(np.float64)
+    return float(np.max(np.abs(full_scale(xa) - full_scale(xb)))) * 2 ** 23 if xa.size else 0.0
+
+
 def run_one(test_name: str, spec: dict, spec_path: Path, exe: Path, product: str, verbose: bool) -> str:
-    """Render + analyse one test. Returns 'pass' or 'fail'."""
+    """Render + analyse one test. Returns 'pass' or 'fail'.
+
+    With render.roundtrip the start state is also saved as a full preset (--save-preset) and the
+    test is rendered a second time from that file: both renders must be sample-identical, which
+    proves the save / load round trip (including an older-format start preset) loses nothing."""
     render = spec.get('render', {})
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     wav = OUTPUT_DIR / f'{test_name}.wav'
+    roundtrip_preset = OUTPUT_DIR / f'{test_name}_roundtrip.{FULL_PRESET_EXT[product]}'
     cmd = [
         str(exe),
         '--render', '--out', str(wav),
@@ -105,6 +125,10 @@ def run_one(test_name: str, spec: dict, spec_path: Path, exe: Path, product: str
 
     if 'play' in render:
         cmd += ['--play' if render['play'] else '--no-play']
+
+    if render.get('roundtrip'):
+        roundtrip_preset.unlink(missing_ok=True)
+        cmd += ['--save-preset', str(roundtrip_preset)]
 
     # Optional mid-render full-preset swap (deferred to its boundary). Both keys required.
     if render.get('swap_preset') is not None and render.get('swap_at') is not None:
@@ -152,7 +176,39 @@ def run_one(test_name: str, spec: dict, spec_path: Path, exe: Path, product: str
     sys.stdout.write(res.stdout)
     if res.stderr:
         sys.stderr.write(res.stderr)
-    return 'pass' if res.returncode == 0 else 'fail'
+    if res.returncode != 0:
+        return 'fail'
+    if render.get('roundtrip'):
+        return run_roundtrip(test_name, cmd, wav, roundtrip_preset, verbose)
+    return 'pass'
+
+
+def run_roundtrip(test_name: str, cmd: list, wav: Path, saved: Path, verbose: bool) -> str:
+    """Render again from the saved preset (in place of the start preset); the two must match."""
+    if not saved.exists():
+        print(f'[{test_name}] ROUNDTRIP FAILED: no preset saved at {saved}')
+        return 'fail'
+    cmd2 = list(cmd)
+    for flag in ('--preset', '--preset-slot', '--save-preset'):
+        while flag in cmd2:
+            i = cmd2.index(flag)
+            del cmd2[i:i + 2]
+    wav2 = OUTPUT_DIR / f'{test_name}_roundtrip.wav'
+    cmd2[cmd2.index('--out') + 1] = str(wav2)
+    cmd2 += ['--preset', str(saved)]
+    if verbose:
+        print(f'[{test_name}] $ {" ".join(cmd2)}')
+    res = subprocess.run(cmd2, capture_output=True, text=True)
+    if res.returncode != 0:
+        print(f'[{test_name}] ROUNDTRIP RENDER FAILED (exit {res.returncode})')
+        if res.stderr:
+            print(res.stderr)
+        return 'fail'
+    diff = wav_max_difference(wav, wav2)
+    ok = diff <= 1.0   # identical at 24 bits, allowing one LSB
+    verdict = 'PASS' if ok else 'FAIL'
+    print(f'  [{verdict}] roundtrip_identical: max sample difference {diff:g} (24-bit LSBs)')
+    return 'pass' if ok else 'fail'
 
 
 def main(argv) -> int:

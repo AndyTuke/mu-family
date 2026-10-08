@@ -122,6 +122,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/EngineTests.cpp
     Source/Tests/ModulationTests.cpp
     Source/Tests/PresetTests.cpp
+    Source/Tests/SlotStateTests.cpp
     Source/Sequencer/GrooveSequencer.cpp
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/SamplePlayer.cpp"            # SampleChannel dependency
     "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"   # modulation tests
