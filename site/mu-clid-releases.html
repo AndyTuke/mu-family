@@ -159,6 +159,8 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group fixed">
           <h3>Fixed</h3>
           <ul>
+            <li>When following external MIDI clock, the tempo is now right from the first beat after Start — it used to run fast (or at the previous tempo) for about a beat. <span class="ref">(1232)</span></li>
+            <li>If a preset can't be saved (for example a full disk or a read-only folder) you now get an error message instead of nothing, and an interrupted save can no longer leave a half-written preset. <span class="ref">(1230)</span></li>
             <li>New rhythms are named "Rhythm 2", "Rhythm 3" … instead of "_default". <span class="ref">(1156)</span></li>
             <li>Saving a rhythm preset whose name has a dot or a symbol (such as "Kick 1.5" or "A:B") now keeps the whole name. <span class="ref">(1146)</span></li>
             <li>Modulating Pre Pad, Post Pad or Insert Length now works like Hits and Rotate: 100% depth sweeps the knob across its whole current range, however many steps the ring has (Pre / Post Pad used to stop at 12). Existing presets are converted automatically so they sound the same. <span class="ref">(1123, 1145)</span></li>
