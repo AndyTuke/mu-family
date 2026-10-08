@@ -21,15 +21,54 @@ void StepEditor::setStepCount(int count)
 
 void StepEditor::setBarColour(juce::Colour c)
 {
+    if (c == barColour) return;
     barColour = c;
     repaint();
 }
 
+// Repaint only what the playhead changes: in the metal look the lit step's old and new
+// cells (and only when the step changes), otherwise the strips under the old and new line.
 void StepEditor::setPlayheadPhase(float phase)
 {
-    if (std::abs(phase - playheadPhase) < 1.0f / juce::jmax(1, getWidth())) return;
+    const float oldPhase = playheadPhase;
     playheadPhase = phase;
-    repaint();
+
+    if (MuLookAndFeel::isMetal(*this))
+    {
+        const int oldStep = stepAtPhase(oldPhase);
+        const int newStep = stepAtPhase(phase);
+        if (oldStep == newStep) return;
+        for (int i : { oldStep, newStep })
+            if (i >= 0)
+                repaint(juce::Rectangle<float>(cellEdge(i), 0.0f, cellEdge(i + 1) - cellEdge(i), (float) getHeight())
+                            .getSmallestIntegerContainer());
+        return;
+    }
+
+    const int oldX = (int) (oldPhase * (float) getWidth());
+    const int newX = (int) (phase    * (float) getWidth());
+    if (oldX == newX) return;
+    repaint(oldX - 1, 0, 3, getHeight());
+    repaint(newX - 1, 0, 3, getHeight());
+}
+
+// Left edge (px) of cell i; i == count gives the right edge of the last cell. Cells tile by
+// the step fraction with a narrower partial final cell when set, else equal 1/n cells —
+// matching the audio (evaluateStepped) and the smooth editor's grid.
+float StepEditor::cellEdge(int i) const
+{
+    const int  n     = juce::jmax(1, (int) steps.size());
+    const bool tiled = (stepFraction > 0.0f && stepFraction < 1.0f);
+    return (tiled ? juce::jmin(1.0f, (float) i * stepFraction) : (float) i / (float) n) * (float) getWidth();
+}
+
+// The step the playhead is in at this phase, or -1 when there are no steps.
+int StepEditor::stepAtPhase(float phase) const
+{
+    const float x = phase * (float) getWidth();
+    for (int i = 0; i < (int) steps.size(); ++i)
+        if (x >= cellEdge(i) && x < cellEdge(i + 1)) return i;
+    return -1;
 }
 
 int StepEditor::hitStepIndex(int x) const
@@ -91,15 +130,10 @@ void StepEditor::paint(juce::Graphics& g)
 
     if (n == 0) return;
 
-    const float w = (float)getWidth();
     const float h = (float)getHeight();
 
-    // Cell boundaries: tile by the step fraction with a narrower partial final cell when set,
-    // else equal 1/n cells. Matches the audio (evaluateStepped) + the smooth editor's grid.
-    const bool tiled = (stepFraction > 0.0f && stepFraction < 1.0f);
-    auto cellL = [&](int i){ return (tiled ? (float)i * stepFraction : (float)i / (float)n) * w; };
-    auto cellR = [&](int i){ return (tiled ? juce::jmin(1.0f, (float)(i + 1) * stepFraction)
-                                           : (float)(i + 1) / (float)n) * w; };
+    auto cellL = [&](int i){ return cellEdge(i); };
+    auto cellR = [&](int i){ return cellEdge(i + 1); };
     auto barW  = [&](int i){ return juce::jmax(1.0f, cellR(i) - cellL(i) - 2.0f); };
 
     // Grid dividers at each internal cell boundary
@@ -161,15 +195,9 @@ void StepEditor::paintLamps(juce::Graphics& g)
 
     const float w = (float)getWidth();
     const float h = (float)getHeight();
-    const bool tiled = (stepFraction > 0.0f && stepFraction < 1.0f);
-    auto cellL = [&](int i){ return (tiled ? (float)i * stepFraction : (float)i / (float)n) * w; };
-    auto cellR = [&](int i){ return (tiled ? juce::jmin(1.0f, (float)(i + 1) * stepFraction)
-                                           : (float)(i + 1) / (float)n) * w; };
-
-    // Which step the playhead is in (the cells tile left to right).
-    int current = -1;
-    for (int i = 0; i < n; ++i)
-        if (playheadPhase * w >= cellL(i) && playheadPhase * w < cellR(i)) { current = i; break; }
+    auto cellL = [&](int i){ return cellEdge(i); };
+    auto cellR = [&](int i){ return cellEdge(i + 1); };
+    const int current = stepAtPhase(playheadPhase);
 
     const float gap    = juce::jmax(1.0f, mu_ui::sf((float) MuLookAndFeel::kLampCellGap));
     const float corner = mu_ui::sf((float) MuLookAndFeel::kLampCellCorner);

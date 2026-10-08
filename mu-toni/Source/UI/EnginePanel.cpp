@@ -126,10 +126,18 @@ void EnginePanel::setAccentStep(int step, bool on)
 // Show the current layer's accent pattern (only when it changed) and where the arp is in it.
 void EnginePanel::refreshAccentSteps()
 {
-    const juce::String pre = "v" + juce::String(currentLayer) + "_";
-    auto value = [this, &pre](const char* s) { auto* a = proc.apvts.getRawParameterValue(pre + s); return a != nullptr ? a->load() : 0.0f; };
-    const int len = juce::jlimit(1, ArpAccent::kMaxSteps, (int) value("accLen"));
-    const int pat = (int) value("accPat");
+    // Look the layer's parameters up once per layer, not every tick.
+    if (accentParamsLayer != currentLayer)
+    {
+        const juce::String pre = "v" + juce::String(currentLayer) + "_";
+        accLenParam  = proc.apvts.getRawParameterValue(pre + "accLen");
+        accPatParam  = proc.apvts.getRawParameterValue(pre + "accPat");
+        arpRateParam = proc.apvts.getRawParameterValue(pre + "rate");
+        accentParamsLayer = currentLayer;
+    }
+    auto value = [](const std::atomic<float>* a) { return a != nullptr ? a->load() : 0.0f; };
+    const int len = juce::jlimit(1, ArpAccent::kMaxSteps, (int) value(accLenParam));
+    const int pat = (int) value(accPatParam);
     if (len != shownAccentLen || pat != shownAccentPat)
     {
         shownAccentLen = len;
@@ -139,7 +147,7 @@ void EnginePanel::refreshAccentSteps()
         accentSteps.setSteps(cells);
     }
     // Loop mode: the arp's step follows the beat, so its place in the pattern does too.
-    const long long step = (long long) std::floor(proc.getInternalBeatPos() / rateBeats((int) value("rate")));
+    const long long step = (long long) std::floor(proc.getInternalBeatPos() / rateBeats((int) value(arpRateParam)));
     accentSteps.setPlayheadPhase((float) (((step % len) + len) % len) / (float) len);
     accentSteps.setBarColour(layerColour());
 }

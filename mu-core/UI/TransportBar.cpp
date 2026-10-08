@@ -216,7 +216,8 @@ void TransportBar::updatePositionLabel()
 
     if (!gotPos)
     {
-        posLabel.setText("---", juce::dontSendNotification);
+        if (shownPos != -1) posLabel.setText("---", juce::dontSendNotification);
+        shownPos = -1;
         return;
     }
 
@@ -228,6 +229,10 @@ void TransportBar::updatePositionLabel()
     int bar        = totalBeats / beatsPerBar + 1;
     int beat       = totalBeats % beatsPerBar + 1;
 
+    // Rebuild the text only when the shown sixteenth changes, not on every tick.
+    const int pos = (bar * beatsPerBar + beat) * subsPerBeat + sub;
+    if (pos == shownPos) return;
+    shownPos = pos;
     posLabel.setText(juce::String(bar) + "." + juce::String(beat) + "." + juce::String(sub),
                      juce::dontSendNotification);
 }

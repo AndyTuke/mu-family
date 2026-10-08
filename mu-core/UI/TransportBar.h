@@ -76,6 +76,7 @@ private:
     NudgeInput       bpmInput { "BPM", 20, 300, 120 };
 
     juce::Label      posLabel;
+    int              shownPos = -2;   // bar/beat/sixteenth the label shows; -1 = "---"
     DropdownSelect   presetDropdown;
     juce::Label      presetStagingBadge;   // "SWP" pill shown on a pending full-preset hot-swap
     juce::TextButton newBtn   { "New" };

@@ -44,6 +44,8 @@ private:
     int   quantizeLevels = 0;
     float stepFraction  = 0.0f;   // step/loop; 0 or ≥1 → equal 1/count cells
 
+    float cellEdge(int i) const;
+    int   stepAtPhase(float phase) const;
     int hitStepIndex(int x) const;
     float yToValue(int y) const;
     void applyAt(int x, int y);

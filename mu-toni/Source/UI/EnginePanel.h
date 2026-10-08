@@ -155,6 +155,10 @@ private:
 
     StepEditor accentSteps;                       // the Appergater's accent pattern (on/off cells)
     int shownAccentLen = -1, shownAccentPat = -1; // what accentSteps shows (redrawn on change)
+    int accentParamsLayer = -1;                    // layer the three pointers below were looked up for
+    std::atomic<float>* accLenParam  = nullptr;
+    std::atomic<float>* accPatParam  = nullptr;
+    std::atomic<float>* arpRateParam = nullptr;
 
     InsertSubsection insertSub;
     // The voice band and its Pitch / Filter / Amp sections (built from the controls above).

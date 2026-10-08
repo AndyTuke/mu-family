@@ -53,7 +53,7 @@ namespace
 
         void timerCallback() override
         {
-            if (!ringBuffer) return;
+            if (!ringBuffer || !isShowing()) return;   // no FFT while the sidebar is hidden
 
             // Read the most-recent kFftSize samples from the ring buffer.
             ringBuffer->read(fftData.data(), kFftSize);

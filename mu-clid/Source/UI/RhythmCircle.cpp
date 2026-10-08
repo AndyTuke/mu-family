@@ -65,6 +65,8 @@ void RhythmCircle::triggerHitPulse(int combinedStep, int stepsA)
 
 void RhythmCircle::timerCallback()
 {
+    if (! isShowing()) return;   // panel hidden — the rings catch up on the first tick once shown
+
     bool dirty = false;
 
     // ── Read play state ──────────────────────────────────────────────────────

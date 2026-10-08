@@ -77,7 +77,11 @@ void KnobWithLabel::setModulatedNorm(float norm01)
 {
     if (! std::isnan(norm01))
         norm01 = juce::jlimit(0.0f, 1.0f, norm01);
-    if (modulatedNorm != norm01 && ! (std::isnan(modulatedNorm) && std::isnan(norm01)))
+    // Repaint only when the ring moves visibly (or appears / disappears): a live modulated
+    // value changes a little every tick, and each repaint redraws the whole knob.
+    const bool wasShown = ! std::isnan(modulatedNorm);
+    const bool nowShown = ! std::isnan(norm01);
+    if (wasShown != nowShown || (nowShown && std::abs(norm01 - modulatedNorm) >= kModRepaintStep))
     {
         modulatedNorm = norm01;
         repaint();
@@ -250,6 +254,8 @@ void KnobWithLabel::setGRSource(const std::atomic<float>* gr)
 
 void KnobWithLabel::timerCallback()
 {
+    if (! isShowing()) return;   // panel hidden — the ring + GR arc catch up when it is shown
+
     if (hasModBind)
     {
         // The "is this destination modulated?" flag only changes when the matrix's

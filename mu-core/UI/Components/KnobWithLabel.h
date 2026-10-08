@@ -99,6 +99,7 @@ private:
     const std::atomic<float>* grSource  = nullptr;
     float                      grDisplay = 0.0f;
     static constexpr float     kGRRelease = 0.85f;
+    static constexpr float     kModRepaintStep = 0.002f;   // ≈0.5° of the sweep — smallest visible ring move
 
     std::unique_ptr<juce::TextEditor> inlineEditor;
 

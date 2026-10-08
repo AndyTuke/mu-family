@@ -538,6 +538,12 @@ public:
     // Draw a knob's cast shadow under its ring (centre + ring radius from getRotaryGeometry).
     static void drawKnobCastShadow(juce::Graphics& g, juce::Point<float> centre, float ringRadius);
 
+    // A juce::DropShadow under an ellipse, its blurred mask cached: the mask depends only on the
+    // ellipse's size + sub-pixel position, the blur and the offset, so every knob of one size
+    // shares it instead of rendering and blurring a fresh image on each paint.
+    static void drawEllipseShadow(juce::Graphics& g, juce::Rectangle<float> ellipse,
+                                  juce::Colour colour, int radius, juce::Point<int> offset);
+
     // Below this radius a centred value would crowd the disc, so it is left to the
     // knob's label. Size 3 clears it; Size 4 does not, and nothing ships a stepped
     // control that small.
@@ -644,6 +650,7 @@ public:
     // Name plates (drawNamePlate): section and row names
 
 private:
+    std::shared_ptr<void> shadowMaskCache;   // keeps drawEllipseShadow's cache alive while any look-and-feel exists
     bool         metalStyle   = false;
     bool         screws       = false;
     bool         hasAppAccent = false;

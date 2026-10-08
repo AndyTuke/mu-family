@@ -195,7 +195,16 @@ void GrooveGrid::timerCallback()
 {
     const int step = proc.isInternalPlaying()
                         ? GrooveSequencer::currentStep(proc.getInternalBeatPos()) : -1;
-    if (step != playheadStep) { playheadStep = step; repaint(); }
+    if (step == playheadStep) return;
+
+    // Repaint only the cells the playhead left and entered, not the whole grid.
+    const auto  row   = rowArea();
+    const float cellW = row.getWidth() / (float) StepPattern::kNumSteps;
+    for (int s : { playheadStep, step })
+        if (s >= 0)
+            repaint(juce::Rectangle<float>((float) row.getX() + s * cellW, (float) row.getY(), cellW, (float) row.getHeight())
+                        .getSmallestIntegerContainer());
+    playheadStep = step;
 }
 
 } // namespace mu_on
