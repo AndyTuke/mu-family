@@ -199,6 +199,12 @@ void EnginePanel::setLayer(int idx)
     currentLayer = juce::jmax(0, idx);
     const juce::String n = juce::String(currentLayer);
 
+    // Drop every old binding first: a new attachment sets its control to the new layer's value,
+    // and a still-live old one would write that value back into the previous layer.
+    for (auto& k : knobs)   k.att.reset();
+    for (auto& c : combos)  c.att.reset();
+    for (auto& t : toggles) t.att.reset();
+
     for (auto& k : knobs)
         k.att = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
             proc.apvts, k.prefix + n + "_" + k.suffix, k.comp->getSlider());
