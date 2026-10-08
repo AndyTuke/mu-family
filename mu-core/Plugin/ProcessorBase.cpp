@@ -344,7 +344,7 @@ void ProcessorBase::savePreset(const juce::String& name, const juce::String& des
 {
     if (const char* tag = getFullPresetTag())
         mu_pp::writeFullPreset(getPresetsDir(), getFullPresetExtension(), tag,
-                               name, desc, category, captureFullPreset());
+                               name, desc, category, captureFullPreset(), onLoadError);
 }
 
 void ProcessorBase::loadPreset(const juce::File& file)

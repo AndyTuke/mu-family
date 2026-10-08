@@ -1,21 +1,21 @@
 #pragma once
 
 #include <juce_audio_devices/juce_audio_devices.h>
-#include <array>
 #include <atomic>
+#include "Plugin/MidiClockTempo.h"   // mu-core: the shared tempo PLL
 
 // MIDI clock sync state machine — a SHARED, plugin-agnostic mu-core component
 // (lifted from mu-clid so every synth product slaves to external MIDI clock the
 // same way). Pure JUCE + atomics, no product symbols.
 //
 // Audio thread calls process() each block; it scans the MidiBuffer for real-time
-// messages (0xF8 clock tick, 0xFA/FB/FC start/continue/stop), maintains a 24-slot
-// ring buffer of inter-tick intervals for BPM estimation, and returns the
+// messages (0xF8 clock tick, 0xFA/FB/FC start/continue/stop), feeds each tick to the
+// shared MidiClockTempo estimator (the same one mu-link uses), and returns the
 // start-of-block beat position.
 //
 // All cross-thread reads (isEnabled, isPlaying, getBpm, getBeatPosUI) are backed by
 // atomics and safe to call from the message thread. The audio-thread-only fields
-// (beatPos_, ringHead_, etc.) must not be accessed from any other thread.
+// (beatPos_, sampleClock_, tempo_) must not be accessed from any other thread.
 class MidiClockSync
 {
 public:
@@ -50,8 +50,8 @@ public:
         const bool doTransport = (messages_.load(std::memory_order_relaxed) != 0);
 
         const double blockBeatPos = beatPos_;
-        int prevTickSo = 0;
 
+        // Walk the block's real-time messages: transport changes, then tempo + beat per tick.
         for (const auto& msgRef : midi)
         {
             const auto& m = msgRef.getMessage();
@@ -64,35 +64,23 @@ public:
                 if (b == 0xFA)
                 {
                     beatPos_ = 0.0;
-                    ringCount_ = 0;  samplesSinceLastTick_ = 0;
-                    prevTickSo = 0;
+                    tempo_.restartInterval();
                     isPlaying_.store(true);
                 }
-                else if (b == 0xFB) { isPlaying_.store(true); }
+                else if (b == 0xFB) { tempo_.restartInterval(); isPlaying_.store(true); }
                 else if (b == 0xFC) { isPlaying_.store(false); }
             }
 
             if (doTick && b == 0xF8)
             {
-                const int interval = samplesSinceLastTick_ + (so - prevTickSo);
-                if (ringCount_ > 0 && interval > 10)
-                {
-                    tickIntervals_[ringHead_] = interval;
-                    ringHead_ = (ringHead_ + 1) % 24;
-                    if (ringCount_ < 24) ++ringCount_;
-                    double sum = 0.0;
-                    for (int i = 0; i < ringCount_; ++i) sum += tickIntervals_[i];
-                    bpmEst_.store(juce::jlimit(20.0, 300.0,
-                        60.0 * sampleRate / ((sum / ringCount_) * 24.0)));
-                }
-                else if (ringCount_ == 0) { ++ringCount_; }
-                samplesSinceLastTick_ = 0;
-                prevTickSo = so;
+                // Pulses are timestamped on the audio sample clock (sample-accurate within the block).
+                if (tempo_.onPulse((double) (sampleClock_ + so) / sampleRate))
+                    bpmEst_.store(juce::jlimit(20.0, 300.0, tempo_.bpm()));
                 beatPos_ += 1.0 / 24.0;
             }
         }
 
-        samplesSinceLastTick_ += numSamples - prevTickSo;
+        sampleClock_ += numSamples;
         beatPosUI_.store(beatPos_, std::memory_order_relaxed);
         return blockBeatPos;
     }
@@ -106,9 +94,7 @@ private:
     std::atomic<double> beatPosUI_ { 0.0 };
 
     // Audio-thread-only state.
-    double beatPos_              = 0.0;
-    int    samplesSinceLastTick_ = 0;
-    std::array<int, 24> tickIntervals_ {};
-    int    ringHead_   = 0;
-    int    ringCount_  = 0;
+    double                  beatPos_     = 0.0;
+    juce::int64             sampleClock_ = 0;   // samples processed while enabled (pulse timestamps)
+    mu_core::MidiClockTempo tempo_;             // shared family tempo estimator
 };

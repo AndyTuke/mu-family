@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include "Plugin/MidiClockTempo.h"   // mu-core: the shared tempo PLL
 
 // MidiClockEstimator — turns an incoming MIDI clock stream into a smooth tempo + transport
 // state that mu-link's sample-accurate master clock can follow (L7, external-clock slave).
@@ -25,22 +26,8 @@ public:
     // One MIDI Clock pulse (0xF8) arrived at `timestampSeconds` (monotonic).
     void onClockPulse(double timestampSeconds) noexcept
     {
-        if (haveLast)
-        {
-            const double interval = timestampSeconds - lastTimestamp;
-            if (interval > 1.0e-5)
-            {
-                const double inst = 60.0 / (24.0 * interval);   // 24 ppqn → BPM
-                if (inst >= kMinBpm && inst <= kMaxBpm)
-                {
-                    estBpm = (estBpm <= 0.0) ? inst                      // seed on first valid
-                                             : estBpm + kAlpha * (inst - estBpm);   // smooth
-                    bpmOut.store(estBpm, std::memory_order_relaxed);
-                }
-            }
-        }
-        lastTimestamp = timestampSeconds;
-        haveLast      = true;
+        if (tempo.onPulse(timestampSeconds))
+            bpmOut.store(tempo.bpm(), std::memory_order_relaxed);
         pulseCounter.fetch_add(1, std::memory_order_relaxed);   // liveness tick (stall detection)
     }
 
@@ -48,12 +35,12 @@ public:
     {
         running.store(true,  std::memory_order_relaxed);
         resetRequest.store(true, std::memory_order_release);
-        haveLast = false;       // next pulse re-seeds the interval
+        tempo.restartInterval();   // next pulse re-seeds the interval
     }
     void onContinue() noexcept  // 0xFB — resume without resetting position
     {
         running.store(true, std::memory_order_relaxed);
-        haveLast = false;
+        tempo.restartInterval();
     }
     void onStop() noexcept      // 0xFC
     {
@@ -74,14 +61,8 @@ public:
     bool consumeReset() noexcept { return resetRequest.exchange(false, std::memory_order_acq_rel); }
 
 private:
-    static constexpr double kAlpha  = 0.1;     // tempo-PLL smoothing (jitter rejection)
-    static constexpr double kMinBpm = 20.0;
-    static constexpr double kMaxBpm = 400.0;
-
-    // MIDI-thread state.
-    double lastTimestamp = 0.0;
-    double estBpm        = 0.0;
-    bool   haveLast      = false;
+    // MIDI-thread state: the shared family tempo estimator.
+    mu_core::MidiClockTempo tempo;
 
     // Cross-thread outputs.
     std::atomic<double>        bpmOut       { 0.0 };

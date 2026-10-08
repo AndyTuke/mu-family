@@ -80,6 +80,28 @@ public:
             expect(error.isNotEmpty(), "a preset for another product's state is refused");
         }
 
+        beginTest("atomic save: replaces an existing preset whole; a failed write reports and keeps the old file");
+        {
+            const auto f = dir.getChildFile("Atomic.muOn");
+            expect(mu_pp::replaceFileAtomically(f, "first"), "first write");
+            expect(mu_pp::replaceFileAtomically(f, "second"), "overwrite");
+            expectEquals(f.loadFileAsString(), juce::String("second"));
+            expect(! f.getSiblingFile("Atomic.muOn.tmp").existsAsFile(), "no temp file left behind");
+
+            // A parent that is a file, not a folder, can never be written: the failure is reported.
+            const auto blocker = dir.getChildFile("NotAFolder");
+            blocker.replaceWithText("x");
+            juce::String reported;
+            const bool ok = mu_pp::replaceFileAtomically(blocker.getChildFile("P.muOn"), "y",
+                                                         [&](const juce::String& m) { reported = m; });
+            expect(! ok, "write into an impossible path fails");
+            expect(reported.contains("P.muOn"), "failure names the file: " + reported);
+
+            juce::ValueTree state("MuOnState");
+            expect(mu_pp::writeFullPreset(blocker, "muOn", "MuOnPreset", "X", "", "", state, [](const juce::String&) {})
+                       == juce::File(), "writeFullPreset returns an empty File on failure");
+        }
+
         beginTest("layer params: written prefix-free, applied to another prefix, others reset");
         {
             StubProcessor proc;

@@ -2,6 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <algorithm>
+#include <functional>
 #include <vector>
 
 // Shared preset-file handling for every mu product. A full preset is the product's whole
@@ -10,6 +11,30 @@
 // v normalised 0..1) plus whatever product children the caller adds (modulators, patterns).
 namespace mu_pp
 {
+
+// Reports a save / load problem to the user (the processor's onLoadError).
+using ErrorFn = std::function<void(const juce::String&)>;
+
+// Writes `text` to `dest` atomically: a sibling temp file, then a rename over the target, so a
+// full disk / crash / antivirus lock mid-write never leaves a truncated preset — either the new
+// bytes land in full or the old file stays. Reports failure through `onError`.
+inline bool replaceFileAtomically(const juce::File& dest, const juce::String& text, const ErrorFn& onError = {})
+{
+    dest.getParentDirectory().createDirectory();
+    juce::TemporaryFile tmp(dest);
+    if (! tmp.getFile().replaceWithText(text) || ! tmp.overwriteTargetFileWithTemporary())
+    {
+        if (onError) onError("Could not save \"" + dest.getFileName() + "\" (disk full or folder read-only?)");
+        return false;
+    }
+    return true;
+}
+
+// An XML element written to `dest` through replaceFileAtomically.
+inline bool writeXmlAtomically(const juce::XmlElement& xml, const juce::File& dest, const ErrorFn& onError = {})
+{
+    return replaceFileAtomically(dest, xml.toString(), onError);
+}
 
 // A preset name made safe for a file name; empty → `fallback`.
 inline juce::String safePresetFileName(const juce::String& name, const juce::String& fallback)
@@ -60,12 +85,12 @@ inline std::vector<PresetEntry> listPresetsByCategory(const juce::File& dir, con
 }
 
 // Write a full preset (`state` wrapped in <rootTag name description category>) to
-// dir/<safe name>.<ext>. Returns the file written.
+// dir/<safe name>.<ext>. Returns the file written, or an empty File after reporting a failure.
 inline juce::File writeFullPreset(const juce::File& dir, const juce::String& ext, const juce::String& rootTag,
                                   const juce::String& name, const juce::String& desc,
-                                  const juce::String& category, const juce::ValueTree& state)
+                                  const juce::String& category, const juce::ValueTree& state,
+                                  const ErrorFn& onError = {})
 {
-    dir.createDirectory();
     juce::XmlElement root(rootTag);
     root.setAttribute("name", name);
     root.setAttribute("description", desc);
@@ -73,8 +98,7 @@ inline juce::File writeFullPreset(const juce::File& dir, const juce::String& ext
     if (auto xml = state.createXml())
         root.addChildElement(xml.release());
     const auto file = dir.getChildFile(safePresetFileName(name, "Preset") + "." + ext);
-    root.writeTo(file);
-    return file;
+    return writeXmlAtomically(root, file, onError) ? file : juce::File();
 }
 
 // Read a full preset's state tree (a wrapped <rootTag> or a bare state element of

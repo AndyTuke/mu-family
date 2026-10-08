@@ -1,4 +1,5 @@
 #include "MidiFullPresetMap.h"
+#include "PresetFiles.h"   // mu_pp::replaceFileAtomically
 
 void MidiFullPresetMap::setStorageFile(juce::File f)
 {
@@ -73,5 +74,5 @@ void MidiFullPresetMap::save() const
         presets.add(paths[(size_t) i]);
     obj->setProperty("presets", presets);
 
-    storageFile.replaceWithText(juce::JSON::toString(json, true));
+    mu_pp::replaceFileAtomically(storageFile, juce::JSON::toString(json, true));
 }

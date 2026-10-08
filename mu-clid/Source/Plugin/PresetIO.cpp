@@ -4,7 +4,7 @@
 #include "Persistence/PresetHelpers.h"      // writeKindedProperty, readKindedPropertyAsActualV2, kGlobalParamDefs
 #include "Persistence/PresetMigrations.h"   // v3 insert/master/mod-assignment migrations
 #include "Persistence/ModulatorSerialise.h" // serialiseModulators, deserialiseModulators, clearModulators
-#include "Persistence/PresetFiles.h"        // mu_pp::safePresetFileName
+#include "Persistence/PresetFiles.h"        // mu_pp::safePresetFileName + replaceFileAtomically
 #include "UI/Components/MuLookAndFeel.h" // kChannelPaletteSize
 #include <limits>               // std::numeric_limits for NaN sentinel
 
@@ -229,27 +229,6 @@ static juce::String toRelativeSamplePath(const juce::String& absPath, const juce
     return absPath;
 }
 
-// write `text` to `destFile` atomically. Goes via a sibling juce::TemporaryFile
-// so a power-loss / crash / antivirus interruption mid-write cannot corrupt the
-// destination — either the new bytes land in full or the original (if it existed)
-// stays intact. Wraps the previous `destFile.replaceWithText(text)` call sites.
-// Reports failures via proc_.onLoadError (best we can do — the disk is in trouble).
-static bool atomicReplaceWithText(const juce::File& destFile, const juce::String& text,
-                                  const std::function<void(const juce::String&)>& onLoadError)
-{
-    juce::TemporaryFile tmp(destFile);
-    if (! tmp.getFile().replaceWithText(text))
-    {
-        if (onLoadError) onLoadError("Could not write temp file for: " + destFile.getFileName());
-        return false;
-    }
-    if (! tmp.overwriteTargetFileWithTemporary())
-    {
-        if (onLoadError) onLoadError("Could not rename temp file over: " + destFile.getFileName());
-        return false;
-    }
-    return true;
-}
 
 
 // A rhythm preset file's state, or an invalid tree after reporting why (missing, unparseable,
@@ -416,7 +395,7 @@ void PresetIO::ensureCategoryInList(const juce::String& cat)
     {
         cats.add(cat);
         cats.sort(false);
-        atomicReplaceWithText(proc_.getPresetsDir().getChildFile("categories.txt"),
+        mu_pp::replaceFileAtomically(proc_.getPresetsDir().getChildFile("categories.txt"),
                               cats.joinIntoString("\n"), proc_.onLoadError);
     }
 }
@@ -490,7 +469,7 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFil
         }
     }
 
-    atomicReplaceWithText(destFile, state.toXmlString(), proc_.onLoadError);
+    mu_pp::replaceFileAtomically(destFile, state.toXmlString(), proc_.onLoadError);
 }
 
 bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex, bool keepIdentity)
@@ -689,7 +668,7 @@ void PresetIO::savePreset(const juce::String& name,
     auto dir = proc_.getPresetsDir();
     dir.createDirectory();
 
-    atomicReplaceWithText(dir.getChildFile(mu_pp::safePresetFileName(name, "Preset") + ".muClid"),
+    mu_pp::replaceFileAtomically(dir.getChildFile(mu_pp::safePresetFileName(name, "Preset") + ".muClid"),
                           root.toXmlString(), proc_.onLoadError);
 }
 

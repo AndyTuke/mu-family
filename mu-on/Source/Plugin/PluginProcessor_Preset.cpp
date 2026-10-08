@@ -106,8 +106,9 @@ void PluginProcessor::saveTrackPreset(int lane, const juce::String& name)
     if (auto xml = pattern.createXml()) root.addChildElement(xml.release());
     if (auto mods = mu_pp::serialiseModulators(voiceSlots[(size_t) lane]).createXml())
         root.addChildElement(mods.release());
-    root.writeTo(dir.getChildFile(mu_pp::safePresetFileName(name, getChannelName(lane))
-                                  + "." + getPerSlotPresetExtension()));
+    mu_pp::writeXmlAtomically(root, dir.getChildFile(mu_pp::safePresetFileName(name, getChannelName(lane))
+                                                     + "." + getPerSlotPresetExtension()),
+                              onLoadError);
 }
 
 void PluginProcessor::loadTrackPreset(int lane, const juce::File& file)

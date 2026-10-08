@@ -77,7 +77,8 @@ void PluginProcessor::saveLayerPreset(int layer, const juce::String& name)
     mu_pp::writeLayerParams(root, *this, layerPrefix(layer));
     if (auto mods = mu_pp::serialiseModulators(voiceSlots[(size_t) layer]).createXml())
         root.addChildElement(mods.release());
-    root.writeTo(dir.getChildFile(mu_pp::safePresetFileName(name, "Layer") + "." + getPerSlotPresetExtension()));
+    mu_pp::writeXmlAtomically(root, dir.getChildFile(mu_pp::safePresetFileName(name, "Layer") + "." + getPerSlotPresetExtension()),
+                              onLoadError);
 }
 
 void PluginProcessor::loadLayerPreset(int layer, const juce::File& file)

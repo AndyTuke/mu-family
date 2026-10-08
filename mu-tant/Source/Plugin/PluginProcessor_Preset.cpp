@@ -53,7 +53,8 @@ void PluginProcessor::saveVoicePreset(int voice, const juce::String& name)
     if (auto pGate = serialiseGate(pitchPatterns[(size_t) voice], "PitchGate").createXml())
         root.addChildElement(pGate.release());
 
-    root.writeTo(dir.getChildFile(mu_pp::safePresetFileName(name, "Voice") + "." + getPerSlotPresetExtension()));
+    mu_pp::writeXmlAtomically(root, dir.getChildFile(mu_pp::safePresetFileName(name, "Voice") + "." + getPerSlotPresetExtension()),
+                              onLoadError);
 }
 
 void PluginProcessor::loadVoicePreset(int voice, const juce::File& file)
