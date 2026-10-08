@@ -65,6 +65,36 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
 }
 
 //==============================================================================
+void HotSwapStager::installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceEngine>&& voice,
+                                  const juce::String& samplePath)
+{
+    // Retire-then-swap: the old engine continues rendering its in-flight tail from a retired slot.
+    auto oldEngine = std::move(proc_.voiceEngines[(size_t) r]);
+    proc_.voiceEngines[(size_t) r] = std::move(voice);
+
+    if (oldEngine)
+    {
+        // Must happen BEFORE placement so the engine is already in its
+        // released / filter-reset state when the next audio block picks it up.
+        oldEngine->markRetired();
+
+        bool placed = false;
+        for (auto& slot : proc_.retiredVoiceEngines[(size_t) r])
+            if (! slot) { slot = std::move(oldEngine); placed = true; break; }
+        if (! placed)
+        {
+            // All retired slots full — spam-swap back-pressure: force-cut slot 0.
+            proc_.retiredVoiceEngines[(size_t) r][0] = std::move(oldEngine);
+            proc_.retiredReadyForCleanup[(size_t) r][0].store(false, std::memory_order_release);
+        }
+    }
+
+    proc_.sequencer.getRhythm(r) = std::move(rhythm);
+    proc_.samples.setPath(r, samplePath);
+    proc_.sequencer.updatePattern(r);
+    proc_.sequencer.resetStepTrackingForSwap(r);
+}
+
 void HotSwapStager::processSwaps()
 {
     // Drain retired-engine cleanup flags. Audio thread store-releases the per-slot
@@ -120,40 +150,7 @@ void HotSwapStager::processSwaps()
             const int r = readyRhythms[(size_t)idx];
             stager.consume(r, [&](PendingRhythm& sw)
             {
-                // Stage 34 Step 3: retire-then-swap. Old engine continues rendering its
-                // in-flight sample / amp envelope tail from a retired slot.
-                auto oldEngine = std::move(proc_.voiceEngines[(size_t)r]);
-                proc_.voiceEngines[(size_t)r] = std::move(sw.voice);
-
-                if (oldEngine)
-                {
-                    // Must happen BEFORE placement so the engine is already in its
-                    // released / filter-reset state when the next audio block picks it up.
-                    oldEngine->markRetired();
-
-                    bool placed = false;
-                    for (auto& slot : proc_.retiredVoiceEngines[(size_t)r])
-                    {
-                        if (!slot)
-                        {
-                            slot = std::move(oldEngine);
-                            placed = true;
-                            break;
-                        }
-                    }
-                    if (!placed)
-                    {
-                        // All retired slots full — spam-swap back-pressure: force-cut slot 0.
-                        proc_.retiredVoiceEngines[(size_t)r][0] = std::move(oldEngine);
-                        proc_.retiredReadyForCleanup[(size_t)r][0]
-                            .store(false, std::memory_order_release);
-                    }
-                }
-
-                proc_.sequencer.getRhythm(r) = std::move(sw.rhythm);
-                proc_.samples.setPath(r, sw.samplePath);
-                proc_.sequencer.updatePattern(r);
-                proc_.sequencer.resetStepTrackingForSwap(r);
+                installRhythm(r, std::move(sw.rhythm), std::move(sw.voice), sw.samplePath);
             });
         }
         proc_.suspendProcessing(false);

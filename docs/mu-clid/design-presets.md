@@ -2,7 +2,7 @@
 
 ## Plugin State
 
-- Full state stored in APVTS `ValueTree` — serialised by JUCE `getStateInformation` / `setStateInformation`
+- Host session (`getStateInformation` / `setStateInformation`) = the `.muClid` full-preset tree (sample paths, not embedded data) + `<SessionParams>` rows for every parameter that tree doesn't carry (inactive rhythm slots, anything outside the preset tables). It restores through the same rhythm build + commit as a full preset; sessions saved before this (the APVTS dump + `r{i}_` properties) still restore through `restoreStateFromTree`. See [design-plugin-family.md § Slot state](../design-plugin-family.md#slot-state-presets--sessions--family-standard).
 - Each rhythm lives in its own ValueTree subtree — enables per-rhythm preset save/load and hot-swap
 - **Hot-swap** (loading a preset/rhythm while playing → committed seamlessly at the next loop boundary) is documented in full in [design-hotswap.md](design-hotswap.md)
 - DAW project save/restore is automatic — full state restored on project open, samples reloaded immediately

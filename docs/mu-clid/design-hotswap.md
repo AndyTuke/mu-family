@@ -138,22 +138,25 @@ decides whether per-rhythm swaps wait for the master loop or each rhythm's own l
 
 ## 6. Per-rhythm swap walk-through (`stageRhythmPreset`)
 
-1. Not playing → `applyRhythmPreset(file, r)` immediately, return.
+1. Not playing → `applyRhythmPreset(file, r)`: the same prepared rhythm installed at once
+   (`installRhythm` under suspend + `rhythmsLock`, then `pushRhythmToAPVTS`), return.
 2. Parse + validate the `.muRhythm` (`requireSupportedPresetVersion` — **v2 only**;
    legacy v0/v1 are refused with a clear `onLoadError`).
-3. Migrate in place: `migrateInsertSlotsV3` (named insert fields → `insP1..4`),
-   `migrateModAssignmentsV3` (old destination IDs → `insert.p1..4`).
-4. Build `newRhythm` from the *current* rhythm with the preset's params applied on
-   top (`kRhythmParamDefs` loop), then name / colour, then `deserialiseModulators`.
-5. Build the new `VoiceEngine` (sample disk load) — the expensive part, done here.
-6. `cancelPendingIfAny(r)` then `stage(r, move(rhythm), move(voice), samplePath)`.
+3. `prepareRhythm(state, "r0_", …)` — the one rhythm build, shared with the full preset:
+   migrate in place (`migrateInsertSlotsV3`, `migrateModAssignmentsV3`), the preset's params
+   onto a **default** rhythm (what it lacks is the default), name / colour (kept from the slot
+   on a `keepIdentity` reset), `deserialiseModulators`, then the new `VoiceEngine` with its
+   sample loaded — the expensive part, done here.
+4. `cancelPendingIfAny(r)` then `stage(r, move(rhythm), move(voice), samplePath)`; the boundary
+   commit (`processSwaps`) installs it through the same `installRhythm`.
 
 ---
 
 ## 7. Full-preset swap walk-through (`loadPreset`)
 
-1. Parse → `root`. A **non-`MuClidPreset`** root is host/project state (the
-   `getStateInformation` format) → `restoreStateFromTree` (not a hot-swap).
+1. Parse → `root`. A **non-`MuClidPreset`** root is an older host/project state (the
+   pre-format-2 APVTS dump) → `restoreStateFromTree` (not a hot-swap). Current sessions are
+   `MuClidPreset` trees and restore through the same build + commit (`restoreSession`).
 2. `buildPreparedFullPreset(root, …)` — build **every** `Rhythm` + `VoiceEngine` +
    sample off the audio thread into a `PreparedFullPreset { rhythms[], voices[],
    samplePaths[], tree }`.

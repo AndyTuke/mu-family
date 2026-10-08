@@ -58,22 +58,7 @@ static void writeParamPropertyV2(juce::ValueTree& tree,
 
 // readKindedPropertyAsActualV2 is now inline in PresetHelpers.h — see using declaration above.
 
-// Per-rhythm read wrapper. v2-only: caller must have already verified
-// presetVersion via requireSupportedPresetVersion before reaching here.
-// `param` is unused but kept on the signature for symmetry with the global
-// reader and so future format changes can fall back to APVTS-range-aware
-// conversion without a signature churn.
-static float readParamPropertyAsActual(const juce::ValueTree& tree,
-                                        const juce::String& propName,
-                                        const juce::RangedAudioParameter& /*param*/,
-                                        const mu_pp::RhythmParamDef& def)
-{
-    if (! tree.hasProperty(propName))
-        return std::numeric_limits<float>::quiet_NaN();
-    return readKindedPropertyAsActualV2(tree, propName, def.kind, def.algorithmNames);
-}
-
-// Global-state read wrapper. v2-only (see readParamPropertyAsActual above).
+// Global-state read wrapper (v2): NaN when the tree lacks the property.
 static float readGlobalPropertyAsActual(const juce::ValueTree& tree,
                                          const juce::String& propName,
                                          const juce::RangedAudioParameter& /*param*/,
@@ -268,89 +253,33 @@ void PresetIO::stageRhythmPreset(int rhythmIndex, const juce::File& file, bool k
 {
     if (rhythmIndex < 0 || rhythmIndex >= proc_.sequencer.getNumRhythms()) return;
 
-    if (!proc_.sequencerPlaying.load())
+    // Stopped: install at once. Playing: the same prepared rhythm waits for its loop boundary.
+    if (! proc_.sequencerPlaying.load())
     {
         applyRhythmPreset(file, rhythmIndex, keepIdentity);
         return;
     }
+    auto prepared = prepareRhythmPreset(file, rhythmIndex, keepIdentity);
+    if (! prepared.voice) return;
+    proc_.hotSwapStager.cancelPendingIfAny(rhythmIndex);   // a newer swap supersedes a pending one
+    proc_.hotSwapStager.stage(rhythmIndex, std::move(prepared.rhythm), std::move(prepared.voice), prepared.samplePath);
+}
 
-    auto state = readRhythmPresetFile(file);
-    if (! state.isValid()) return;
-
-    // Cancel any existing staged swap before overwriting.
-    proc_.hotSwapStager.cancelPendingIfAny(rhythmIndex);
-
-    // Start from the current rhythm and apply the preset on top (matching applyRhythmPreset).
-    Rhythm newRhythm = proc_.sequencer.getRhythm(rhythmIndex);
-    const juce::String paramPrefix = "r" + juce::String(rhythmIndex) + "_";
-
-    // Stage 36 v3 migration: collapse old named insert fields → insP1..4
-    // (algo-aware, runs BEFORE the field-apply loop so the new fields are
-    // present when restoreRhythmAPVTSParams iterates kRhythmParamDefs).
-    migrateInsertSlotsV3(state, "r0_");
-
-    for (int i = 0; i < kRhythmParamCount; ++i)
+// A .muRhythm prepared for slot `rhythmIndex` (no voice when the file can't be read).
+// keepIdentity: the slot keeps its own name + colour (a settings reset, not a named preset).
+PresetIO::PreparedRhythm PresetIO::prepareRhythmPreset(const juce::File& file, int rhythmIndex, bool keepIdentity)
+{
+    const auto state = readRhythmPresetFile(file);
+    if (! state.isValid()) return {};
+    auto prepared = prepareRhythm(state, "r0_", proc_.currentSampleRate, proc_.currentBlockSize,
+                                  proc_.getSamplesDir(), proc_.onLoadError, file.getFileName());
+    if (keepIdentity)
     {
-        const auto& def = kRhythmParamDefs[i];
-        const juce::String propName = "r0_" + juce::String(def.suffix);
-        if (auto* param = proc_.apvts.getParameter(paramPrefix + def.suffix))
-        {
-            const float actualVal = readParamPropertyAsActual(state, propName, *param, def);
-            if (! std::isnan(actualVal))
-            {
-                bool pd = false, vd = false;
-                applyRhythmSuffix(def.suffix, actualVal, newRhythm, pd, vd);
-            }
-        }
+        const Rhythm& current = proc_.sequencer.getRhythm(rhythmIndex);
+        prepared.rhythm.name        = current.name;
+        prepared.rhythm.colourIndex = current.colourIndex;
     }
-
-    // Name and colour. Prefer presetName (matches dropdown / filename) over
-    // r0_name — older presets carry a short historical r0_name (e.g. "Kick"
-    // inside "Kick Accents.muRhythm") which loses the user-facing context.
-    // A settings reset (keepIdentity) leaves the slot's own name + colour in place.
-    if (! keepIdentity)
-        applyPresetIdentity(state, newRhythm);
-
-    // deserialise modulators from the preset. Mirrors the applyRhythmPreset
-    // (stopped-state) path so hot-swap preset loads carry the preset's LFOs / step
-    // sequences / matrix assignments instead of inheriting the previous rhythm's.
-    // Stage 36: translate old `insert.drive` / `ks.note` / `voc.*` destination IDs
-    // to the new `insert.p1`..`insert.p4` slots before deserialiseModulators
-    // validates them (otherwise they'd be silently dropped as unknown destinations).
-    if (auto mods = state.getChildWithName("Modulators"); mods.isValid())
-    {
-        const int algoIdxForMig = mu_audio::indexFromName(
-            mu_audio::kInsertAlgorithmNames,
-            state.getProperty("r0_drvChar").toString());
-        migrateModAssignmentsV3(mods, algoIdxForMig);
-
-        clearModulators(newRhythm);
-        auto dropped = deserialiseModulators(mods, newRhythm);
-        if (! dropped.isEmpty() && proc_.onLoadError)
-            proc_.onLoadError("Dropped " + juce::String(dropped.size())
-                        + " modulator assignment(s) from " + file.getFileName()
-                        + ": " + dropped.joinIntoString("; "));
-    }
-
-    // Prepare the pending voice engine and prime it with the preset's VoiceParams.
-    // Without this, the swap commit (handleAsyncUpdate) hands the audio thread a
-    // fresh VoiceEngine whose default VoiceParams (filterType=0/LP12, driveChar=0,
-    // default ADSRs) get applied on the first process(); pushRhythmToAPVTS that
-    // follows the swap runs under proc_.apvtsLoading=true which intentionally skips the
-    // engine sync in syncRhythmParam. Result: hot-swapped rhythm plays with the
-    // previous rhythm's filter/drive sound until the user touches any knob.
-    auto newVoice = std::make_unique<VoiceEngine>();
-    newVoice->prepareToPlay(proc_.currentSampleRate, proc_.currentBlockSize);
-    newVoice->setParams(newRhythm.voiceParams);
-
-    // The preset's sample (embedded first, else its stored path), loaded into the pending engine.
-    const auto smp = resolvePresetSample(state.getProperty("sampleData").toString(),
-                                         state.getProperty("sampleName", "embedded").toString(),
-                                         state.getProperty("r0_sample").toString(), proc_.getSamplesDir());
-    const juce::String samplePath = applyPresetSample(smp, *newVoice, proc_.onLoadError, true);
-
-    // Commit the staged data via HotSwapStager.
-    proc_.hotSwapStager.stage(rhythmIndex, std::move(newRhythm), std::move(newVoice), samplePath);
+    return prepared;
 }
 
 //==============================================================================
@@ -468,36 +397,26 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFil
     mu_pp::replaceFileAtomically(destFile, state.toXmlString(), proc_.onLoadError);
 }
 
+// Load a .muRhythm into a slot at once: the same prepared rhythm and the same install as the
+// loop-boundary swap, then the rhythm pushed to APVTS so the knobs follow. Only sequencer-page
+// state loads — the slot's mixer settings stay with the slot.
 bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex, bool keepIdentity)
 {
-    const auto state = readRhythmPresetFile(file);
-    if (! state.isValid()) return false;
+    if (targetIndex < 0 || targetIndex >= proc_.sequencer.getNumRhythms()) return false;
+    auto prepared = prepareRhythmPreset(file, targetIndex, keepIdentity);
+    if (! prepared.voice) return false;
 
-    // Load only sequencer-page state — mixer settings stay attached to the slot.
-    // Older rhythm preset files may include "ch_*" properties; those are simply
-    // ignored (we don't call restoreRhythmChannelParams here).
-    restoreRhythmAPVTSParams (targetIndex, state, /*srcPropPrefix*/ "r0_");
-    restoreRhythmModulators  (targetIndex, state);
+    proc_.hotSwapStager.cancelPendingIfAny(targetIndex);
+    proc_.suspendProcessing(true);
+    {
+        const juce::ScopedLock sl(proc_.rhythmsLock);
+        proc_.hotSwapStager.installRhythm(targetIndex, std::move(prepared.rhythm), std::move(prepared.voice),
+                                          prepared.samplePath);
+    }
+    proc_.suspendProcessing(false);
 
-    // Name + colour (not APVTS-backed). For a per-rhythm preset, the
-    // user-facing identity is the `presetName` (matches the dropdown entry
-    // and the filename); the older `r0_name` carries the slot's short
-    // historical name (e.g. "Kick" inside the "Kick Accents" preset).
-    // Prefer presetName, fall back to r0_name when the file is missing one.
-    // A settings reset (keepIdentity) leaves the slot's own name + colour in place.
-    Rhythm& r = proc_.sequencer.getRhythm(targetIndex);
-    if (! keepIdentity)
-        applyPresetIdentity(state, r);
-
-    // In .muRhythm the sample *path* is "r0_sample" but the embedded blob fields
-    // are unprefixed ("sampleData" / "sampleName").
-    restoreRhythmSample(targetIndex, state, "r0_sample", "sampleData", "sampleName");
-
-    // force-sync APVTS → Rhythm so freshly-defaulted slots (after a shrink/grow
-    // cycle) get their fields repopulated even when JUCE skips the
-    // parameterChanged listener because incoming values match the already-
-    // stored APVTS values.
-    proc_.forceSyncRhythmFromAPVTS(targetIndex);
+    mu_core::ScopedApvtsLoading guard(proc_.apvtsLoading);
+    proc_.pushRhythmToAPVTS(targetIndex);
     return true;
 }
 
@@ -564,14 +483,23 @@ void PresetIO::savePreset(const juce::String& name,
                                  const juce::String& category,
                                  bool embedSamples)
 {
-    const int n = proc_.sequencer.getNumRhythms();
+    writeFullPresetFile(proc_.getPresetsDir().getChildFile(mu_pp::safePresetFileName(name, "Preset") + ".muClid"),
+                        name, description, category, embedSamples);
+}
 
-    // if any rhythm's sample currently lives in our embedded-decode temp
-    // dir, force-embed the whole preset. The temp file is ephemeral; writing
-    // its path as `sample` would silently break the preset on next load.
+bool PresetIO::saveFullPresetTo(const juce::File& file)
+{
+    return writeFullPresetFile(file, file.getFileNameWithoutExtension(), {}, {}, false);
+}
+
+// A full preset written to `file`. A sample that lives in the embedded-decode temp dir forces
+// embedding: the temp file is ephemeral, so writing its path would break the preset on next load.
+bool PresetIO::writeFullPresetFile(const juce::File& file, const juce::String& name, const juce::String& description,
+                                   const juce::String& category, bool embedSamples)
+{
     if (! embedSamples)
     {
-        for (int i = 0; i < n; ++i)
+        for (int i = 0; i < proc_.sequencer.getNumRhythms(); ++i)
         {
             if (isEmbeddedSampleTempPath(proc_.samples.path(i)))
             {
@@ -582,7 +510,18 @@ void PresetIO::savePreset(const juce::String& name,
             }
         }
     }
+    return mu_pp::replaceFileAtomically(file, buildFullPresetTree(name, description, category, embedSamples, false)
+                                                  .toXmlString(),
+                                        proc_.onLoadError);
+}
 
+// The .muClid tree: every active rhythm (its sequencer-page params, name, colour, sample, mixer
+// strip and modulators) plus the global FX / mixer state. A session (forSession) is the same
+// tree, keeping temp-dir sample paths.
+juce::ValueTree PresetIO::buildFullPresetTree(const juce::String& name, const juce::String& description,
+                                              const juce::String& category, bool embedSamples, bool forSession)
+{
+    const int n = proc_.sequencer.getNumRhythms();
     juce::ValueTree root("MuClidPreset");
     root.setProperty("presetName",         name,                 nullptr);
     root.setProperty("presetDescription",  description,          nullptr);
@@ -596,11 +535,11 @@ void PresetIO::savePreset(const juce::String& name,
         juce::ValueTree rTree("Rhythm");
         rTree.setProperty("name",   juce::String(r.name), nullptr);
         rTree.setProperty("colour", r.colourIndex,         nullptr);
-        // drop the temp-dir path; the embedded sampleData child below
-        // will carry the actual bytes.
+        // A preset drops a temp-dir path (the embedded sampleData below carries the bytes); a
+        // session keeps it, as the decoded file outlives the project reload.
         rTree.setProperty("sample",
                           isEmbeddedSampleTempPath(proc_.samples.path(i))
-                              ? juce::String()
+                              ? (forSession ? proc_.samples.path(i) : juce::String())
                               : toRelativeSamplePath(proc_.samples.path(i), proc_.getSamplesDir()),
                           nullptr);
 
@@ -661,11 +600,7 @@ void PresetIO::savePreset(const juce::String& name,
     }
     root.addChild(globalTree, -1, nullptr);
 
-    auto dir = proc_.getPresetsDir();
-    dir.createDirectory();
-
-    mu_pp::replaceFileAtomically(dir.getChildFile(mu_pp::safePresetFileName(name, "Preset") + ".muClid"),
-                          root.toXmlString(), proc_.onLoadError);
+    return root;
 }
 
 // ── PresetIO::loadPreset helpers ────────────────────────────────────────────
@@ -673,63 +608,6 @@ void PresetIO::savePreset(const juce::String& name,
 // loadPreset itself is a sequence of named steps; each step lives in one of the
 // helpers below. All run on the message thread under a single
 // mu_core::ScopedApvtsLoading guard scoped to the caller.
-
-void PresetIO::resizeRhythmArrays(int n)
-{
-    proc_.sequencer.setNumRhythms(n);
-
-    const int oldN = proc_.numActiveRhythms.load(std::memory_order_acquire);
-    if (n < oldN)
-    {
-        proc_.numActiveRhythms.store(n, std::memory_order_release);
-        for (int i = n; i < oldN; ++i)
-        {
-            proc_.voiceEngines[i].reset();
-            proc_.midiEngines[i] = MidiOutputEngine{};
-            // Wipe mixer channel state and sample-path memory so the now-inactive
-            // slot doesn't retain stale fader/sidechain/sample data from the
-            // pre-load session.
-            proc_.mixerEngine.channels[i].reset();
-            proc_.samples.clearPath(i);
-        }
-    }
-    else
-    {
-        for (int i = oldN; i < n; ++i)
-        {
-            proc_.voiceEngines[i] = std::make_unique<VoiceEngine>();
-            if (proc_.currentSampleRate > 0 && proc_.currentBlockSize > 0)
-            {
-                proc_.voiceEngines[i]->prepareToPlay(proc_.currentSampleRate, proc_.currentBlockSize);
-                proc_.midiEngines[i].prepare(proc_.currentSampleRate, proc_.currentBlockSize);
-            }
-        }
-        proc_.numActiveRhythms.store(n, std::memory_order_release);
-    }
-}
-
-void PresetIO::restoreRhythmAPVTSParams(int apvtsSlot, const juce::ValueTree& rTree,
-                                         const juce::String& srcPropPrefix)
-{
-    // Stage 36 v3 migration runs on a copy so the caller's tree is untouched.
-    // Order matters: v3 insert-slot migration consumes the old field names that
-    // the v2 EQ-encoding migration also touches, so the order doesn't matter
-    // (each is a no-op if the new slots are already present).
-    juce::ValueTree migrated = rTree.createCopy();
-    migrateInsertSlotsV3(migrated, srcPropPrefix);
-
-    const juce::String dstPrefix = "r" + juce::String(apvtsSlot) + "_";
-    for (int j = 0; j < kRhythmParamCount; ++j)
-    {
-        const auto& def = kRhythmParamDefs[j];
-        if (auto* param = proc_.apvts.getParameter(dstPrefix + def.suffix))
-        {
-            const float actualVal = readParamPropertyAsActual(migrated, srcPropPrefix + def.suffix, *param, def);
-            if (! std::isnan(actualVal))
-                param->setValueNotifyingHost(param->convertTo0to1(actualVal));
-        }
-    }
-}
 
 void PresetIO::restoreRhythmChannelParams(int apvtsSlot, const juce::ValueTree& rTree)
 {
@@ -741,34 +619,6 @@ void PresetIO::restoreRhythmChannelParams(int apvtsSlot, const juce::ValueTree& 
             if (auto* param = proc_.apvts.getParameter(dstChPrefix + kChannelSuffixes[j]))
                 param->setValueNotifyingHost((float)rTree.getProperty(chPropId));
     }
-}
-
-void PresetIO::restoreRhythmModulators(int i, const juce::ValueTree& rTree)
-{
-    // Opt-in: legacy .muClid files (no Modulators child per rhythm) leave the
-    // rhythm's existing in-memory state in place — avoids accidental destruction.
-    auto rMods = rTree.getChildWithName("Modulators");
-    if (! rMods.isValid()) return;
-
-    // Stage 36: translate old insert.* / ks.* / voc.* destination IDs to the
-    // new insert.p1..p4 slots BEFORE deserialiseModulators validates them.
-    // Algorithm-aware — drvChar in the rTree (or empty fallback in the full
-    // MuClidPreset where Rhythm children don't carry the prefix).
-    juce::ValueTree migratedMods = rMods.createCopy();
-    const juce::String charProp = rTree.hasProperty("drvChar") ? "drvChar"
-                                                                : "r0_drvChar";
-    const int algoIdxForMig = mu_audio::indexFromName(
-        mu_audio::kInsertAlgorithmNames,
-        rTree.getProperty(charProp).toString());
-    migrateModAssignmentsV3(migratedMods, algoIdxForMig);
-
-    Rhythm& r = proc_.sequencer.getRhythm(i);
-    clearModulators(r);
-    auto dropped = deserialiseModulators(migratedMods, r);
-    if (! dropped.isEmpty() && proc_.onLoadError)
-        proc_.onLoadError("Dropped " + juce::String(dropped.size())
-                    + " modulator assignment(s) on rhythm " + juce::String(i + 1)
-                    + ": " + dropped.joinIntoString("; "));
 }
 
 void PresetIO::restoreRhythmSample(int i, const juce::ValueTree& tree,
@@ -822,78 +672,84 @@ void PresetIO::restoreGlobalState(const juce::ValueTree& root)
     }
 }
 
-// ── Prestaging (playing path) ───────────────────────────────────────────────
+// ── Rhythm preparation ──────────────────────────────────────────────────────
 //
-// Build a fully-prepared Rhythm + VoiceEngine from one .muClid <Rhythm> child,
-// entirely off the audio thread. Mirrors the per-rhythm hot-swap build in
-// stageRhythmPreset, but starts from a default Rhythm and reads the unprefixed
-// (.muClid) property names. The expensive bits — sample decode / disk load and
-// VoiceEngine::prepareToPlay — happen here at stage time so the loop-boundary
-// commit is glitch-free.
-static void prepareRhythmSlotFromTree(const juce::ValueTree& rTreeIn,
-                                      double sampleRate, int blockSize,
-                                      const juce::File& samplesDir,
-                                      const std::function<void(const juce::String&)>& onLoadError,
-                                      Rhythm& outRhythm,
-                                      std::unique_ptr<VoiceEngine>& outVoice,
-                                      juce::String& outSamplePath)
+// One rhythm built off the audio thread from a preset node — a .muRhythm root (properties
+// prefixed "r0_") or a .muClid <Rhythm> child (unprefixed). It starts from a default Rhythm, so
+// whatever the node doesn't carry is the default (as in every product); then its modulators and
+// a primed VoiceEngine with the node's sample loaded. The expensive bits — sample decode / disk
+// load and VoiceEngine::prepareToPlay — happen here, so every install (stopped load, loop-boundary
+// swap, full preset, session) is just in-memory moves.
+PresetIO::PreparedRhythm PresetIO::prepareRhythm(const juce::ValueTree& nodeIn, const juce::String& prefix,
+                                                 double sampleRate, int blockSize, const juce::File& samplesDir,
+                                                 const std::function<void(const juce::String&)>& onLoadError,
+                                                 const juce::String& source)
 {
-    Rhythm r;  // default; preset values applied on top
+    PreparedRhythm out;
+    Rhythm& r = out.rhythm;
 
-    // v3 insert-slot migration (algo-aware) on a copy. .muClid Rhythm children use
-    // unprefixed property names, so srcPrefix is "".
-    juce::ValueTree rTree = rTreeIn.createCopy();
-    migrateInsertSlotsV3(rTree, "");
+    // v3 insert-slot migration (algo-aware) on a copy, before the params are read.
+    juce::ValueTree node = nodeIn.createCopy();
+    migrateInsertSlotsV3(node, prefix);
 
+    // Sequencer-page params: each one the node carries, onto the default.
     for (int j = 0; j < kRhythmParamCount; ++j)
     {
         const auto& def = kRhythmParamDefs[j];
-        const juce::String propName = juce::String(def.suffix);
-        if (! rTree.hasProperty(propName)) continue;
-        const float actualVal = readKindedPropertyAsActualV2(rTree, propName, def.kind, def.algorithmNames);
+        const juce::String propName = prefix + def.suffix;
+        if (! node.hasProperty(propName)) continue;
+        const float actualVal = readKindedPropertyAsActualV2(node, propName, def.kind, def.algorithmNames);
         if (std::isnan(actualVal)) continue;
         bool pd = false, vd = false;
         applyRhythmSuffix(def.suffix, actualVal, r, pd, vd);
     }
 
-    // Name + colour (Rhythm-struct fields, not APVTS-backed).
-    auto nameVal = rTree.getProperty("name");
-    if (nameVal.isString() && nameVal.toString().isNotEmpty())
-        r.name = nameVal.toString().toStdString();
-    r.colourIndex = (int) rTree.getProperty("colour", r.colourIndex);
+    // Name + colour: a .muClid child's own; a .muRhythm's presetName (matches the dropdown entry
+    // and the file name) over its older, shorter r0_name.
+    if (prefix.isEmpty())
+    {
+        const auto nameVal = node.getProperty("name");
+        if (nameVal.isString() && nameVal.toString().isNotEmpty())
+            r.name = nameVal.toString().toStdString();
+        r.colourIndex = (int) node.getProperty("colour", r.colourIndex);
+    }
+    else
+    {
+        applyPresetIdentity(node, r);
+    }
 
-    // Modulators. Translate legacy destination IDs before deserialising, same as
-    // the per-rhythm hot-swap path.
-    if (auto mods = rTree.getChildWithName("Modulators"); mods.isValid())
+    // Modulators, with old insert.* / ks.* / voc.* destination ids translated first.
+    if (auto mods = node.getChildWithName("Modulators"); mods.isValid())
     {
         const int algoIndex = mu_audio::indexFromName(mu_audio::kInsertAlgorithmNames,
-                                                    rTree.getProperty("drvChar").toString());
+                                                    node.getProperty(prefix + "drvChar").toString());
         migrateModAssignmentsV3(mods, algoIndex);
         clearModulators(r);
         auto dropped = deserialiseModulators(mods, r);
         if (! dropped.isEmpty() && onLoadError)
-            onLoadError("Dropped " + juce::String(dropped.size()) + " modulator assignment(s).");
+            onLoadError("Dropped " + juce::String(dropped.size()) + " modulator assignment(s) from "
+                        + source + ": " + dropped.joinIntoString("; "));
     }
 
-    // Build + prime the voice engine off the audio thread.
-    outVoice = std::make_unique<VoiceEngine>();
-    outVoice->prepareToPlay(sampleRate, blockSize);
-    outVoice->setParams(r.voiceParams);
+    // The voice engine, built and primed with the rhythm's VoiceParams off the audio thread.
+    out.voice = std::make_unique<VoiceEngine>();
+    out.voice->prepareToPlay(sampleRate, blockSize);
+    out.voice->setParams(r.voiceParams);
 
-    // Sample: embedded blob takes priority, else the stored path.
-    const auto smp = resolvePresetSample(rTree.getProperty("sampleData").toString(),
-                                         rTree.getProperty("sampleName").toString(),
-                                         rTree.getProperty("sample").toString(), samplesDir);
-    outSamplePath = applyPresetSample(smp, *outVoice, onLoadError, true);
-
-    outRhythm = std::move(r);
+    // Sample: embedded blob first, else the stored path.
+    const auto smp = resolvePresetSample(node.getProperty("sampleData").toString(),
+                                         node.getProperty("sampleName", "embedded").toString(),
+                                         node.getProperty(prefix + "sample").toString(), samplesDir);
+    out.samplePath = applyPresetSample(smp, *out.voice, onLoadError, true);
+    return out;
 }
 
-// Build the whole prepared payload from a parsed MuClidPreset root.
+// Build the whole prepared payload from a parsed MuClidPreset root (at most `maxRhythms` rhythms:
+// an unlicensed build activates no more than its demo cap).
 static HotSwapStager::PreparedFullPreset
 buildPreparedFullPreset(const juce::ValueTree& root, double sampleRate, int blockSize,
                         const juce::File& samplesDir,
-                        const std::function<void(const juce::String&)>& onLoadError)
+                        const std::function<void(const juce::String&)>& onLoadError, int maxRhythms)
 {
     HotSwapStager::PreparedFullPreset out;
     out.tree = root;
@@ -901,20 +757,30 @@ buildPreparedFullPreset(const juce::ValueTree& root, double sampleRate, int bloc
     int n = 0;
     for (int ci = 0; ci < root.getNumChildren(); ++ci)
         if (root.getChild(ci).getType() == juce::Identifier("Rhythm")) ++n;
-    n = juce::jlimit(1, SequencerEngine::MaxRhythms, n);
+    n = juce::jlimit(1, juce::jmin(maxRhythms, (int) SequencerEngine::MaxRhythms), n);
     out.numRhythms = n;
 
+    // Prepare each <Rhythm> child into its slot.
     int idx = 0;
     for (int ci = 0; ci < root.getNumChildren() && idx < n; ++ci)
     {
         auto rTree = root.getChild(ci);
         if (rTree.getType() != juce::Identifier("Rhythm")) continue;
         const int i = idx++;
-        prepareRhythmSlotFromTree(rTree, sampleRate, blockSize, samplesDir, onLoadError,
-                                  out.rhythms[(size_t) i], out.voices[(size_t) i],
-                                  out.samplePaths[(size_t) i]);
+        auto prepared = PresetIO::prepareRhythm(rTree, {}, sampleRate, blockSize, samplesDir, onLoadError,
+                                                "rhythm " + juce::String(i + 1));
+        out.rhythms[(size_t) i]     = std::move(prepared.rhythm);
+        out.voices[(size_t) i]      = std::move(prepared.voice);
+        out.samplePaths[(size_t) i] = prepared.samplePath;
     }
     return out;
+}
+
+HotSwapStager::PreparedFullPreset PresetIO::prepareFullPreset(const juce::ValueTree& root) const
+{
+    return buildPreparedFullPreset(root, proc_.currentSampleRate, proc_.currentBlockSize, proc_.getSamplesDir(),
+                                   proc_.onLoadError,
+                                   proc_.isLicensed() ? (int) SequencerEngine::MaxRhythms : proc_.demoMaxChannels());
 }
 
 void PresetIO::loadPreset(const juce::File& file)
@@ -947,9 +813,7 @@ void PresetIO::loadPreset(const juce::File& file)
     // build + same commit code — only the trigger differs, so stopped and playing loads
     // are identical by construction (no divergent second path) and the stopped
     // load is glitch-free with its sample disk I/O done off the rhythmsLock.
-    auto prepared = buildPreparedFullPreset(root, proc_.currentSampleRate,
-                                            proc_.currentBlockSize, proc_.getSamplesDir(),
-                                            proc_.onLoadError);
+    auto prepared = prepareFullPreset(root);
     if (proc_.sequencerPlaying.load())
         proc_.hotSwapStager.stageFullPreset(std::move(prepared));
     else
@@ -979,36 +843,16 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
 
     for (int i = 0; i < n; ++i)
     {
-        // Retire-then-swap (mirrors HotSwapStager::processSwaps): the outgoing
-        // engine is parked in a retired slot + marked released so it keeps
-        // rendering its sample tail / amp-envelope release while the new preset
-        // plays, instead of being hard-cut. Grown slots have no old engine.
-        auto oldEngine = std::move(proc_.voiceEngines[(size_t) i]);
-        proc_.voiceEngines[(size_t) i] = std::move(prepared.voices[(size_t) i]);
-        if (oldEngine)
-        {
-            oldEngine->markRetired();
-            bool placed = false;
-            for (auto& slot : proc_.retiredVoiceEngines[(size_t) i])
-                if (! slot) { slot = std::move(oldEngine); placed = true; break; }
-            if (! placed)
-            {
-                // All retired slots full — force-cut slot 0 (spam-swap back-pressure).
-                proc_.retiredVoiceEngines[(size_t) i][0] = std::move(oldEngine);
-                proc_.retiredReadyForCleanup[(size_t) i][0].store(false, std::memory_order_release);
-            }
-        }
-
-        proc_.sequencer.getRhythm(i) = std::move(prepared.rhythms[(size_t) i]);
-        proc_.samples.setPath(i, prepared.samplePaths[(size_t) i]);
+        // The shared install: the outgoing engine retires and keeps rendering its tail while the
+        // new preset plays, instead of being hard-cut. Grown slots have no old engine.
+        proc_.hotSwapStager.installRhythm(i, std::move(prepared.rhythms[(size_t) i]),
+                                          std::move(prepared.voices[(size_t) i]), prepared.samplePaths[(size_t) i]);
         // Prepare MIDI engines for freshly-grown slots; existing slots keep theirs.
         if (i >= oldN && proc_.currentSampleRate > 0 && proc_.currentBlockSize > 0)
             proc_.midiEngines[(size_t) i].prepare(proc_.currentSampleRate, proc_.currentBlockSize);
-        proc_.sequencer.updatePattern(i);
-        proc_.sequencer.resetStepTrackingForSwap(i);
     }
 
-    // Tear down slots that are no longer active (shrink case) — mirrors resizeRhythmArrays.
+    // Tear down slots that are no longer active (shrink case).
     for (int i = n; i < oldN; ++i)
     {
         proc_.voiceEngines[(size_t) i].reset();

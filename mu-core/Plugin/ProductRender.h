@@ -14,6 +14,8 @@
 //   --play / --no-play                       start the internal transport (product default otherwise)
 //   --save-preset <file>                     after the start preset loads, save the state as a full
 //                                            preset at <file> (the listening tests' round trip)
+//   --save-state <file> / --state <file>     write / restore the host session (getStateInformation /
+//                                            setStateInformation) — the session round trip
 //
 // mu-Clid's original --swap-rhythm-preset / --swap-rhythm-slot / --swap-rhythm-at spellings are
 // accepted as aliases. Header-only and Standalone-target-only, like RenderSupport.h.
@@ -38,6 +40,7 @@ namespace mu_core::render_mode
         int        play = -1;   // -1 = product default, 0 = --no-play, 1 = --play
 
         juce::File savePresetFile;
+        juce::File saveStateFile, stateFile;
     };
 
     // The value of the first of `flags` present (each removed from `tokens`).
@@ -73,6 +76,8 @@ namespace mu_core::render_mode
         const auto midiProgPre = takeFlagValue(tokens, "--midi-program-preset");
         const auto midiProgAt  = takeFlagValue(tokens, "--midi-program-at");
         const auto savePreset  = takeFlagValue(tokens, "--save-preset");
+        const auto saveState   = takeFlagValue(tokens, "--save-state");
+        const auto state       = takeFlagValue(tokens, "--state");
         if (tokens.contains("--play"))    { a.play = 1; tokens.removeString("--play"); }
         if (tokens.contains("--no-play")) { a.play = 0; tokens.removeString("--no-play"); }
 
@@ -85,6 +90,8 @@ namespace mu_core::render_mode
         if (swapSlotF.isNotEmpty())   a.swapSlotFile      = cwd.getChildFile(swapSlotF);
         if (midiProgPre.isNotEmpty()) a.midiProgramPreset = cwd.getChildFile(midiProgPre);
         if (savePreset.isNotEmpty())  a.savePresetFile    = cwd.getChildFile(savePreset);
+        if (saveState.isNotEmpty())   a.saveStateFile     = cwd.getChildFile(saveState);
+        if (state.isNotEmpty())       a.stateFile         = cwd.getChildFile(state);
         if (presetSlot.isNotEmpty())  a.presetSlot           = presetSlot.getIntValue();
         if (swapAt.isNotEmpty())      a.swapAtSeconds        = swapAt.getDoubleValue();
         if (swapSlot.isNotEmpty())    a.swapSlot             = swapSlot.getIntValue();
@@ -130,8 +137,31 @@ namespace mu_core::render_mode
         proc.onLoadError = [product](const juce::String& m)
         { std::fputs((juce::String(product) + " render: load: " + m + "\n").toRawUTF8(), stderr); std::fflush(stderr); };
 
+        // A saved host session first (as a DAW restores a project), then any preset on top.
+        if (args.stateFile != juce::File{})
+        {
+            juce::MemoryBlock session;
+            if (! args.stateFile.loadFileAsData(session))
+            {
+                reportError(product, "could not read session: " + args.stateFile.getFullPathName());
+                return 2;
+            }
+            proc.setStateInformation(session.getData(), (int) session.getSize());
+        }
+
         if (args.presetFile != juce::File{} && ! loadPresetByExtension(proc, args.presetFile, args.presetSlot, product))
             return 2;
+
+        if (args.saveStateFile != juce::File{})
+        {
+            juce::MemoryBlock session;
+            proc.getStateInformation(session);
+            if (! args.saveStateFile.replaceWithData(session.getData(), session.getSize()))
+            {
+                reportError(product, "could not save session: " + args.saveStateFile.getFullPathName());
+                return 2;
+            }
+        }
 
         if (args.savePresetFile != juce::File{} && ! proc.saveFullPresetTo(args.savePresetFile))
         {

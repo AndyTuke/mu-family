@@ -441,15 +441,13 @@ private:
     juce::String serialiseVoiceColours() const;
     void         restoreVoiceColours(const juce::String& csv);
 
-    // Per-voice modulator (ControlSequences + ModulationMatrix) + gate-pattern
-    // persistence. These live OUTSIDE the APVTS parameters (in voiceSlots /
-    // gatePatterns), so they're serialised into a <VoiceData> child of the APVTS
-    // state tree on save and restored on load — otherwise a saved patch silently
-    // loses every modulator assignment + drawn gate envelope. write/read cover the
-    // active voices for full-state + full-preset paths; the per-voice (.muPattern)
-    // path serialises one voice's modulators + gate alongside its params.
-    void writeVoiceDataToState(juce::ValueTree& state);
-    void readVoiceDataFromState();
+    // Composed state (mu-core SlotState): the voice layout every save / load uses, a voice's
+    // non-parameter data (modulators, gates, user wavetables — they live outside APVTS) from its
+    // node, and any saved state rebuilt in the composed shape with old X-Mod data migrated.
+    void            initVoiceState();
+    void            applyVoiceExtras(int v, const juce::ValueTree& node);
+    void            resolveUserWavetable(const juce::String& path, juce::String& storedPath, std::atomic<int>& index);
+    juce::ValueTree toVoiceState(const juce::ValueTree& tree) const;
 
     // ── Preset hot-swap (full / per-voice) ─────────────────────────
     // loadPreset / loadSlotPreset stage the parsed tree when the transport is
@@ -460,12 +458,12 @@ private:
     // Previous block's play state (audio-thread only) — drives the playing→stopped
     // edge that commits a staged swap on stop.
     bool wasPlaying = false;
-    void applyFullPresetTree (const juce::ValueTree& state);          // replaceState + voice data + FX
-    void applyVoicePresetTree(int voice, const juce::ValueTree& tree); // .muPattern body, from a tree
+    void applyFullPresetTree (const juce::ValueTree& state);          // composed state + voice count / colours + FX
+    void applyVoicePresetTree(int voice, const juce::ValueTree& tree); // one voice node (.muPattern body)
     // Warm the wavetable bank (dedup-by-path) for every user wavetable referenced
     // by a staged tree, so the boundary commit does no disk I/O. Lock-safe vs the
     // audio thread (bank append under voicesLock).
-    void preloadWavetablesFromState(const juce::ValueTree& state);     // full: walk <VoiceData>
+    void preloadWavetablesFromState(const juce::ValueTree& state);     // full: walk the voice <Slot>s
     void preloadWavetablesFromVoiceTree(const juce::ValueTree& voiceTree); // per-voice: o1/o2WtPath
 
     // Register mixer/FX param listeners + run an initial engine sync (JUCE

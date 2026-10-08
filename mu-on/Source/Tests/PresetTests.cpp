@@ -1,5 +1,5 @@
 // Preset-file coverage: the shared mu-core helpers (full preset write / read, categories,
-// preset metadata, a layer's prefixed params) and mu-On's per-track step-row round-trip. Like the other
+// preset metadata, atomic saves) and mu-On's per-track step-row round-trip. Like the other
 // tests it uses a minimal headless AudioProcessor, not the full PluginProcessor.
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -142,56 +142,6 @@ public:
             clid.deleteFile();
             junk.deleteFile();
             wrapped.deleteFile();
-        }
-
-        beginTest("layer params: each parameter is written once, unchanged ones not at all");
-        {
-            StubProcessor proc;
-            juce::AudioProcessorValueTreeState apvts(proc, nullptr, "S", stubLayout());
-            apvts.getParameter("k_tune")->setValueNotifyingHost(0.9f);
-
-            struct Counter : juce::AudioProcessorParameter::Listener
-            {
-                int writes = 0;
-                void parameterValueChanged(int, float) override { ++writes; }
-                void parameterGestureChanged(int, bool) override {}
-            } tune, dec;
-            apvts.getParameter("k_tune")->addListener(&tune);
-            apvts.getParameter("k_dec")->addListener(&dec);
-
-            juce::ValueTree tree("MuOnTrack");
-            juce::ValueTree row("p");
-            row.setProperty("id", "tune", nullptr);
-            row.setProperty("v", 0.3, nullptr);
-            tree.appendChild(row, nullptr);
-            mu_pp::applyLayerParams(tree, apvts, "k_");
-
-            expectWithinAbsoluteError(apvts.getParameter("k_tune")->getValue(), 0.3f, 1e-4f);
-            expectEquals(tune.writes, 1);   // straight to the file value — no detour via the default
-            expectEquals(dec.writes, 0);    // already at its default
-            apvts.getParameter("k_tune")->removeListener(&tune);
-            apvts.getParameter("k_dec")->removeListener(&dec);
-        }
-
-        beginTest("layer params: written prefix-free, applied to another prefix, others reset");
-        {
-            StubProcessor proc;
-            juce::AudioProcessorValueTreeState apvts(proc, nullptr, "S", stubLayout());
-            apvts.getParameter("k_tune")->setValueNotifyingHost(0.9f);
-            apvts.getParameter("b_tune")->setValueNotifyingHost(0.1f);
-
-            juce::XmlElement root("MuOnTrack");
-            mu_pp::writeLayerParams(root, proc, "k_");
-            expectEquals(root.getNumChildElements(), 2);   // k_tune + k_dec only
-            expectEquals(root.getChildElement(0)->getStringAttribute("id"), juce::String("tune"));
-
-            apvts.getParameter("k_dec")->setValueNotifyingHost(0.7f);
-            mu_pp::applyLayerParams(juce::ValueTree::fromXml(root), apvts, "b_");
-            expectWithinAbsoluteError(apvts.getParameter("b_tune")->getValue(), 0.9f, 1e-4f);
-
-            mu_pp::applyLayerParams({}, apvts, "k_");   // empty tree = reset to defaults
-            expectWithinAbsoluteError(apvts.getParameter("k_dec")->getValue(), 0.2f, 1e-4f);
-            expectWithinAbsoluteError(apvts.getParameter("b_tune")->getValue(), 0.9f, 1e-4f);   // other lane untouched
         }
 
         beginTest("a track row moves between tracks and clears what it doesn't cover");

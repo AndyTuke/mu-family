@@ -95,7 +95,8 @@ The standard mu platform is everything in `mu-core/`. New products link `mu-core
 - `UI/MixerChannel`, `UI/MixerOverlay`, `UI/FXRow`, `UI/DelayRow` — shared mixer + FX panels.
 - `UI/ChannelSidebar` + `UI/SidebarItem` — the shared left "layers" sidebar (select / add / delete / drag-reorder). Reads channel metadata from `ProcessorBase::getNumChannels/getChannelName/getChannelColourIndex`. The per-layer mini-graphic (and its animation) is the only product-specific part, injected via `createMiniVisual` (mu-clid → `RhythmMiniVisual` wrapping a `RhythmCircle`; mu-tant → a voice glyph). Reorder + hot-swap semantics are product hooks (`onSwapChannels`, `isPendingSwap`, `onCancelPendingSwap`) wired by each product to its own stager (every product implements hot-swap on the shared `mu_hotswap::Stager` — see [Hot-swap](#hot-swap-staged-preset--layer-swaps-family-pattern) below). Add/delete is driven by the product (`onAddChannel` + a panel delete button → `addVoice`/`removeVoice` in mu-tant, `rhythms.add`/`rhythms.remove` (`RhythmManager`) in mu-clid).
 - `UI/ChannelHeaderBar` — the shared per-layer header (colour dot · editable name · reset · delete · per-layer preset dropdown · Save). `UI/SlotPresetHeader.h` (`mu_ui::wireSlotPresetHeader` + `refreshSlotPresetList`) wires its reset (confirmed) / preset load / save (name prompt) to the ProcessorBase slot-preset API, so panels only add delete / rename where they have them Products with fixed layers (mu-Toni, mu-On) hide delete and rename (`setShowDelete(false)`, `setNameEditable(false)`); `setPresetFiles` + `onPresetFileChosen` fill the list from files and hand back the chosen one.
-- `Persistence/PresetFiles.h` (`mu_pp`) — shared preset-file handling: safe file names, write / read a full preset (the state tree wrapped in `<Mu…Preset name description category>`), the category list, listing preset files, and a layer's params as `<p id v>` rows with the layer prefix stripped (`writeLayerParams` / `applyLayerParams`, which resets params the file doesn't mention and writes each param once). Products add their own children (modulators, patterns) to layer presets.
+- `Persistence/PresetFiles.h` (`mu_pp`) — shared preset-file handling: safe file names, atomic writes, listing preset files, the category list, and write / read a full preset (the state tree wrapped in `<Mu…Preset name description category>`). The state inside — layer nodes, globals, the composed state — is `Persistence/SlotState.h`.
+- `Persistence/SlotState.h` (`mu_pp`) — the composed slot state every product saves and loads (see [Slot state](#slot-state-presets--sessions--family-standard)): `SlotLayout`, `SlotExtras`, `captureSlot` / `applySlot`, `captureState` / `applyState`, `composeLegacyState`; wrapped by `ProcessorBase::initSlotState` and its capture / apply helpers.
 - `Persistence/PresetMeta.h` (`mu_pp::readPresetMeta`) — a preset's root tag + root attributes (category, description, embed flag, e.g. mu-On's `lane`) read from the opening tag only, never the body. It understands both file shapes (the wrapper's `category` / `description` attributes and mu-Clid's `presetCategory` / `presetDescription`). Every preset list reads files through it — never `parseXML` a whole folder.
 - `UI/StandardSettingsOverlay::addProgramChangeSection(layerTable, fullTable)` — the shared MIDI Program Change section (buttons opening the shared program-change tables). Every product with presets calls it; MIDI program changes are queued on the audio thread (`scanMidiProgramChanges` → `triggerAsyncUpdate`) and loaded in `handleAsyncUpdate` (`drainPendingMidiProgramChanges`).
 - `UI/Voice/VoiceBand` — the shared voice band (mu-Clid's layout): Pitch | Filter | Amp | Effects in raised boxes, the FX sends right-aligned in the Effects box beside a narrowed insert dropdown. Products supply the four section components (binding stays product-side); `VoiceBandSection` builds a section from controls a product already owns (two Size-2 rows, `place(control, row, col, span, dropdown)`). Used by mu-Clid (`VoiceSection` subclasses it) and mu-Toni (`EnginePanel`); mu-Tant's voice panel is a different structure and stays product-side.
@@ -296,6 +297,48 @@ The shared visual identity (`MuLookAndFeel`) ensures a consistent look across al
 **Enforced by:**
 - [`mu_mod::checks`](../mu-core/Modulation/ModTargetChecks.h) in each product's unit tests — every row names a real parameter; 10% depth moves each target exactly 10% of its range.
 - [tests/scripts/check-mod-targets.py](../tests/scripts/check-mod-targets.py) — fails if any code reintroduces per-target depth scales, defines its own target-row struct, or a product has no `ModTarget` table.
+
+## Slot state (presets & sessions) — family standard
+
+**A slot — one rhythm / voice / layer / lane — is one unit**, written and applied by the same
+code wherever it appears: as a layer preset, inside a full preset, and inside the host session.
+
+```
+layer preset   <ProductLayerTag> rows + extras </ProductLayerTag>
+full preset    <MuXxxPreset name description category>
+                 <MuXxxState format="2" …product root properties…>
+                   <Globals> rows for every parameter outside the slots </Globals>
+                   <Slots> <Slot idx="0"> rows + extras </Slot> … </Slots>
+                 </MuXxxState>
+host session   the same <MuXxxState format="2"> tree
+```
+
+- **Rows** are `<p id="…" x="…"/>`: the id without the slot's prefix (so a slot loads into any
+  slot) and the **actual** value, plus `c="…"` — the choice name — for a choice parameter. A range
+  or choice-list change can't silently move a saved value. Rows written before format 2
+  (normalised `v="…"`) still read.
+- **Missing means default.** A parameter a node doesn't carry goes back to its default, and
+  absent extras clear (no modulators, an empty gate), so a sparse or older file never leaves the
+  previous slot's data behind. Each parameter is written once, and not at all when unchanged.
+- **Extras** — a product's non-parameter slot data (modulators, gates, step rows, wavetable
+  paths) — are one `SlotExtras` write / apply pair, declared once in the product constructor via
+  `ProcessorBase::initSlotState(prefixes, extras)`.
+- **Older states** (the APVTS dump of `<PARAM>`s + a `<VoiceData>` of `<Voice idx>` nodes) are
+  rebuilt by `composeLegacyState` before anything applies them, so stopped loads, hot-swap commits
+  and host restores share one apply path. Product-specific old shapes (mu-On's root `<Pattern>`,
+  mu-Toni's `<MuToniMods>`, mu-Tant's pre-2-lane X-Mod rows) move into their slots in the product's
+  `to…State` step. A `<PARAM>` without a value means its default, as `replaceState` read it.
+- **mu-Clid** keeps its own (already actual-value, kinded) file shapes — `.muRhythm` and the
+  `<Rhythm>` children of `.muClid` — but follows the same rule: one `PresetIO::prepareRhythm`
+  builds a rhythm from either shape (defaults for what it lacks), one `HotSwapStager::installRhythm`
+  installs it (stopped load, loop-boundary swap, full preset), and the host session is the `.muClid`
+  tree plus `<SessionParams>` rows for every parameter that tree doesn't carry.
+- **Verification:** the listening tests' `roundtrip` / `session_roundtrip` options re-render from a
+  saved preset / session and require sample-identical audio (`*_roundtrip` tests, one per product,
+  each starting from an older-format file where one exists).
+
+Files saved by this format don't load correctly in builds before it (the older readers expect the
+APVTS dump).
 
 ## Hot-swap (staged preset / layer swaps) — family pattern
 

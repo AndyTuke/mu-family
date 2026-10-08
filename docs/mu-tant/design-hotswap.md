@@ -33,7 +33,7 @@ mu-tant is **APVTS-centric**, not engine-object-centric:
 | | mu-clid | mu-tant |
 |---|---|---|
 | Payload | pre-built `Rhythm` + `VoiceEngine` (+ sample) | parsed `juce::ValueTree` (the APVTS state / `.muPattern`) |
-| Commit mechanism | `std::move` engine into slot + retire old | `apvts.replaceState` + `readVoiceDataFromState` |
+| Commit mechanism | `std::move` engine into slot + retire old (`installRhythm`) | apply the composed state / voice node (`applyComposedState` / `applySlotNode`, mu-core SlotState) |
 | Commit isolation | `suspendProcessing` + `rhythmsLock` (µs, work pre-built) | **no blanket lock** — relies on the audio render's existing fine-grained locks |
 | Outgoing-voice tail | **retire-then-swap**: old `VoiceEngine` plays out its sample/release tail | **none** — oscillators are continuous (free-running drones), there is no note tail to preserve, so the new params simply take over |
 | Boundary | master loop / per-rhythm wrap (`swapMode`) | full → voice 0's gate wrap; per-voice → that voice's gate wrap |
@@ -120,7 +120,7 @@ every structure they touch is independently guarded by a lock the render respect
 
 | Structure mutated at commit | Guard | Audio render respects it via |
 |---|---|---|
-| APVTS params (`replaceState`, `setValueNotifyingHost`) | per-param `std::atomic<float>` | cached `getRawParameterValue` atomic reads |
+| APVTS params (`setValueNotifyingHost`, once per changed param) | per-param `std::atomic<float>` | cached `getRawParameterValue` atomic reads |
 | Gate / filter / pitch patterns (`deserialiseGate`) | `GatePattern.editLock` (spin) | `applyGateBlock` tryLock → passthrough on contention |
 | Modulators (`deserialise/clearModulators`) | `VoiceSlot.modLock` (spin) | `applyModulation` tryLock → skip on contention |
 | Wavetable index (`findByPath` resolve) | none needed — **lock-free** | preloaded at stage; commit only reads |
@@ -157,8 +157,9 @@ microseconds at *stage*, never at commit.
 + `stageVoice`, else `applyVoicePresetTree`).
 
 **Commit** (`handleAsyncUpdate`, message thread, triggered from `processBlock`):
-1. `takeFull` → `applyFullPresetTree` (`replaceState` + `numVoices` + colours +
-   `readVoiceDataFromState` + `syncAllFxParams`) → fire `onPresetSwapCommitted`.
+1. `takeFull` → `applyFullPresetTree` (`applyComposedState` — globals + every voice node —
+   then `numVoices` + colours + `syncAllFxParams`) → fire `onPresetSwapCommitted`. The staged
+   tree was already rebuilt in the composed shape (and X-Mod-migrated) by `toVoiceState` at load.
 2. `takeVoice(v)` for each flagged voice → `applyVoicePresetTree` → fire
    `onSlotPresetCommitted(v)`.
 3. `drainPendingMidiProgramChanges()` (ch 1-8 → `loadSlotPreset`, ch 9 →

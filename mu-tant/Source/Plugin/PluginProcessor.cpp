@@ -99,6 +99,7 @@ PluginProcessor::PluginProcessor()
     }
 
     cacheParamPointers();        // resolve all APVTS atomics once (audio thread reads these)
+    initVoiceState();            // the voice layout every preset / session save and load uses
     refreshAllPitchQuantFlags(); // seed the stepped-pitch flags (default state has no modulators)
 
 
@@ -677,7 +678,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
     // params detach. Only apply a tree tagged as our own state type.
     if (auto xml = getXmlFromBinary(data, sizeInBytes))
         if (xml->hasTagName(apvts.state.getType()))
-            applyFullPresetTree(juce::ValueTree::fromXml(*xml));   // host state restore — always immediate
+            applyFullPresetTree(toVoiceState(juce::ValueTree::fromXml(*xml)));   // host state restore — always immediate
 }
 
 // ── Dynamic voice management ─────────────────────────────────────────────────

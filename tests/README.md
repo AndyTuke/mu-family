@@ -77,6 +77,9 @@ from the product's factory state. Flags (same for every product):
 | `--midi-program`        | none | Program number to inject as a channel-9 PC (seeds the full-preset map) |
 | `--midi-program-preset` | none | Preset the injected program maps to |
 | `--midi-program-at`     | none | When (seconds) to inject the program change; needs all three |
+| `--save-preset`  | none | After the start preset loads, save the state as a full preset at this path |
+| `--save-state`   | none | After the start preset loads, write the host session (`getStateInformation`) here |
+| `--state`        | none | Restore a host session (`setStateInformation`) before any `--preset` |
 
 mu-Clid's original `--swap-rhythm-preset` / `--swap-rhythm-slot` / `--swap-rhythm-at` spellings
 are aliases of the `--swap-slot-*` flags (and `swap_rhythm_*` of `swap_slot_*` in the JSON).
@@ -116,6 +119,9 @@ test case without clicking through the preset browser.
     // optional full-preset swap test:
     //   "swap_preset": "tests/presets/TS2.muClid",  // repo-local preset
     //   "swap_at": 2.0                               // seconds; loaded mid-render
+    // optional round trips (re-render from what was saved; must be sample-identical):
+    //   "roundtrip": true,          // via a saved full preset (--save-preset → --preset)
+    //   "session_roundtrip": true   // via the host session (--save-state → --state)
   },
   "assertions": [
     {

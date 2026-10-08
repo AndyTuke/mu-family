@@ -125,6 +125,33 @@ public:
             expectEquals(colour[0], 0);                                        // extras reset too
         }
 
+        beginTest("apply: each parameter is written once, an unchanged one not at all");
+        {
+            setActual(apvts, "a_cut", 5000.0f);
+            setActual(apvts, "a_on", 1.0f);   // its default
+            struct Counter : juce::AudioProcessorParameter::Listener
+            {
+                int writes = 0;
+                void parameterValueChanged(int, float) override { ++writes; }
+                void parameterGestureChanged(int, bool) override {}
+            } cut, on;
+            apvts.getParameter("a_cut")->addListener(&cut);
+            apvts.getParameter("a_on")->addListener(&on);
+
+            juce::ValueTree node("TestLayer");
+            juce::ValueTree row(mu_pp::kRowTag);
+            row.setProperty("id", "cut", nullptr);
+            row.setProperty("x", 300.0, nullptr);
+            node.appendChild(row, nullptr);
+            layout.applyParams(node, 0);
+
+            expectWithinAbsoluteError(actual(apvts, "a_cut"), 300.0f, 0.5f);
+            expectEquals(cut.writes, 1);   // straight to the file value — no detour via the default
+            expectEquals(on.writes, 0);    // already at its default
+            apvts.getParameter("a_cut")->removeListener(&cut);
+            apvts.getParameter("a_on")->removeListener(&on);
+        }
+
         beginTest("full state: globals + every slot round-trip; an empty node resets a slot");
         {
             setActual(apvts, "level", -12.0f);
@@ -162,6 +189,10 @@ public:
             param("b_wave", 1.0);
             param("level", -3.0);
             param("gone_param", 1.0);   // a parameter the product no longer has
+            juce::ValueTree noValue("PARAM");   // APVTS writes these for params it never set
+            noValue.setProperty("id", "seq_swing", nullptr);
+            legacy.appendChild(noValue, nullptr);
+            setActual(apvts, "seq_swing", 0.7f);
             juce::ValueTree data(mu_pp::kChannelDataTag), voice(mu_pp::kChannelNodeTag);
             voice.setProperty("idx", 1, nullptr);
             voice.setProperty("colour", 7, nullptr);
@@ -186,6 +217,7 @@ public:
             expectWithinAbsoluteError(actual(apvts, "a_cut"), 777.0f, 0.5f);
             expectWithinAbsoluteError(actual(apvts, "b_wave"), 1.0f, 1e-4f);
             expectWithinAbsoluteError(actual(apvts, "level"), -3.0f, 1e-3f);
+            expectWithinAbsoluteError(actual(apvts, "seq_swing"), 0.0f, 1e-4f);   // value-less → default, not 0-by-accident
             expectEquals(colour[1], 7);
         }
     }

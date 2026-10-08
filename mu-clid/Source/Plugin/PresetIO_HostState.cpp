@@ -1,4 +1,6 @@
-// PresetIO host-state I/O — DAW project / plugin-state serialise + restore.
+// PresetIO host-state I/O — DAW project / plugin-state serialise + restore. A session is the
+// .muClid full-preset tree (+ rows for the parameters it doesn't carry); sessions saved before
+// that (the APVTS dump + r{i}_ properties) still restore through restoreStateFromTree.
 //
 // Partial class: these are PresetIO members declared in PresetIO.h, split out
 // of PresetIO.cpp so the preset save / .muClid load path and the
@@ -11,39 +13,73 @@
 #include "PluginProcessor.h"
 #include "PluginProcessor_Internal.h"
 #include "Persistence/ModulatorSerialise.h" // serialiseModulators, deserialiseModulators, clearModulators
-#include "Persistence/PresetMigrations.h"   // kCurrentStateFormatVersion, migrateLegacyHostState
+#include "Persistence/PresetMigrations.h"   // migrateLegacyHostState
 #include "UI/Components/MuLookAndFeel.h" // kChannelPaletteSize
+#include "Persistence/PresetHelpers.h"   // kGlobalParamDefs
+#include "Persistence/RhythmParamTable.h"   // kRhythmParamDefs
+#include <set>
 
 using mu_pp::serialiseModulators;
 using mu_pp::deserialiseModulators;
 using mu_pp::clearModulators;
-using mu_pp_migrate::kCurrentStateFormatVersion;
 using mu_pp_migrate::migrateLegacyHostState;
+using mu_pp::kRhythmParamDefs;
+using mu_pp::kRhythmParamCount;
+using mu_pp::kChannelSuffixes;
 
-static void populateStateTree(juce::ValueTree& state, int numRhythms,
-                              SequencerEngine& seq, const juce::StringArray& samplePaths)
+// A session's rows for every parameter its .muClid tree doesn't carry — the inactive rhythm
+// slots' params and anything outside the preset tables — so a project restores every parameter.
+static const juce::Identifier kSessionParamsTag { "SessionParams" };
+
+static juce::ValueTree uncoveredParamRows(juce::AudioProcessor& proc, int numRhythms)
 {
-    state.setProperty("formatVersion", kCurrentStateFormatVersion, nullptr);
-    state.setProperty("numRhythms", numRhythms, nullptr);
+    // The ids the .muClid tree already writes: each active rhythm's table params + mixer strip,
+    // and the global defs.
+    std::set<juce::String> covered;
     for (int i = 0; i < numRhythms; ++i)
     {
-        const Rhythm& r = seq.getRhythm(i);
-        state.setProperty("r" + juce::String(i) + "_name",   juce::String(r.name),   nullptr);
-        state.setProperty("r" + juce::String(i) + "_colour", r.colourIndex,           nullptr);
-        state.setProperty("r" + juce::String(i) + "_sample", samplePaths[i],          nullptr);
-
-        // per-rhythm modulator state as a child of the APVTS state tree.
-        auto mods = serialiseModulators(r);
-        mods.setProperty("rhythmIdx", i, nullptr);
-        state.addChild(mods, -1, nullptr);
+        const juce::String r = "r" + juce::String(i) + "_", ch = "ch" + juce::String(i) + "_";
+        for (int j = 0; j < kRhythmParamCount; ++j)  covered.insert(r + kRhythmParamDefs[j].suffix);
+        for (int j = 0; kChannelSuffixes[j] != nullptr; ++j) covered.insert(ch + kChannelSuffixes[j]);
     }
+    for (int i = 0; i < mu_pp::kGlobalParamDefCount; ++i) covered.insert(mu_pp::kGlobalParamDefs[i].id);
+
+    juce::ValueTree rows(kSessionParamsTag);
+    for (auto* p : proc.getParameters())
+        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
+            if (covered.count(rp->getParameterID()) == 0)
+                mu_pp::appendParamRow(rows, *rp, rp->getParameterID());
+    return rows;
 }
 
+// The host session: the same .muClid tree a full preset saves (temp-dir sample paths kept, no
+// embedded data) plus the rows for every other parameter. Restored by the same prepare + commit
+// as a full preset (restoreSession).
 void PresetIO::getStateInformation(juce::MemoryBlock& destData)
 {
-    auto state = proc_.apvts.copyState();
-    populateStateTree(state, proc_.sequencer.getNumRhythms(), proc_.sequencer, proc_.samples.paths());
-    juce::MemoryOutputStream(destData, true).writeString(state.toXmlString());
+    auto root = buildFullPresetTree({}, {}, {}, false, true);
+    root.appendChild(uncoveredParamRows(proc_, proc_.sequencer.getNumRhythms()), nullptr);
+    juce::MemoryOutputStream(destData, true).writeString(root.toXmlString());
+}
+
+void PresetIO::restoreSession(const juce::ValueTree& root)
+{
+    // A host restore applies at once (the project is loading, not a live swap), through the
+    // full-preset prepare + commit; then the rows for the parameters the tree doesn't carry.
+    auto prepared = prepareFullPreset(root);
+    commitStagedFullPreset(prepared);
+
+    const auto rows = root.getChildWithName(kSessionParamsTag);
+    for (int i = 0; i < rows.getNumChildren(); ++i)
+    {
+        const auto row = rows.getChild(i);
+        if (auto* p = proc_.apvts.getParameter(row.getProperty("id").toString()))
+        {
+            float v = 0.0f;
+            if (mu_pp::readRowValue(row, *p, v) && p->getValue() != v)
+                p->setValueNotifyingHost(v);
+        }
+    }
 }
 
 void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
@@ -165,7 +201,7 @@ void PresetIO::setStateInformation(const void* data, int sizeInBytes)
     // on every launch — JUCE's auto-saved "filterState" should NOT override it.
     // The host (DAW) path still needs setStateInformation to restore project
     // state, so this override only fires when running standalone.
-    if (proc_.wrapperType == juce::AudioProcessor::wrapperType_Standalone)
+    if (proc_.wrapperType == juce::AudioProcessor::wrapperType_Standalone && ! ProcessorBase::skipAutoLoadDefault)
     {
         const juce::File defaultPreset = proc_.getPresetsDir().getChildFile("_default.muClid");
         if (defaultPreset.existsAsFile())
@@ -178,8 +214,11 @@ void PresetIO::setStateInformation(const void* data, int sizeInBytes)
 
     if (auto xml = juce::parseXML(juce::String::fromUTF8((const char*)data, sizeInBytes)))
     {
+        // Sessions are .muClid trees; older ones (the APVTS dump + r{i}_ properties) keep their reader.
         auto state = juce::ValueTree::fromXml(*xml);
-        if (state.isValid())
+        if (state.hasType("MuClidPreset"))
+            restoreSession(state);
+        else if (state.isValid())
             restoreStateFromTree(state);
         else if (proc_.onLoadError)
             proc_.onLoadError("Host state restore failed: invalid tree");

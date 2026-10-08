@@ -14,6 +14,21 @@ class PresetIO
 public:
     explicit PresetIO(PluginProcessor& proc) : proc_(proc) {}
 
+    // One rhythm prepared off the audio thread, ready to install into a slot.
+    struct PreparedRhythm
+    {
+        Rhythm                       rhythm;
+        std::unique_ptr<VoiceEngine> voice;   // null when the preset couldn't be read
+        juce::String                 samplePath;
+    };
+
+    // Build a rhythm from a preset node: a .muRhythm root (prefix "r0_") or a .muClid <Rhythm>
+    // child (no prefix). Defaults for what the node lacks; `source` names it in load messages.
+    static PreparedRhythm prepareRhythm(const juce::ValueTree& node, const juce::String& prefix,
+                                        double sampleRate, int blockSize, const juce::File& samplesDir,
+                                        const std::function<void(const juce::String&)>& onLoadError,
+                                        const juce::String& source);
+
     // Hot-swap staging: loads a preset file and stages it via HotSwapStager.
     // keepIdentity: the slot keeps its name + colour (a settings reset such as the default
     // rhythm, rather than loading a named preset into it).
@@ -35,6 +50,7 @@ public:
     // Full project preset I/O.
     void savePreset(const juce::String& name, const juce::String& description,
                     const juce::String& category, bool embedSamples);
+    bool saveFullPresetTo(const juce::File& file);   // headless render --save-preset
 
     // Entry point for a full preset / host-state file. Parses, then routes by type:
     // a .muclid full preset is pre-built off the audio thread and committed via
@@ -57,6 +73,17 @@ public:
 private:
     // Shared by the stopped (applyRhythmPreset) and playing (stageRhythmPreset) rhythm-preset loads.
     juce::ValueTree readRhythmPresetFile(const juce::File& file) const;
+    PreparedRhythm  prepareRhythmPreset(const juce::File& file, int rhythmIndex, bool keepIdentity);
+    HotSwapStager::PreparedFullPreset prepareFullPreset(const juce::ValueTree& root) const;
+
+    // The .muClid tree (shared by preset files and the host session) and its atomic write.
+    juce::ValueTree buildFullPresetTree(const juce::String& name, const juce::String& description,
+                                        const juce::String& category, bool embedSamples, bool forSession);
+    bool            writeFullPresetFile(const juce::File& file, const juce::String& name,
+                                        const juce::String& description, const juce::String& category,
+                                        bool embedSamples);
+    // A session (a .muClid tree + every parameter it doesn't carry) restored at once.
+    void            restoreSession(const juce::ValueTree& root);
     static void     applyPresetIdentity(const juce::ValueTree& state, Rhythm& r);
 
     PluginProcessor& proc_;
@@ -66,15 +93,7 @@ private:
     // the message thread under a single mu_core::ScopedApvtsLoading guard managed
     // by the caller.
 
-    // Resize the sequencer + voice/MIDI/mixer arrays to `n` active rhythms.
-    // Pre: `n` already clamped to [1, MaxRhythms]. Post: numActiveRhythms == n.
-    void resizeRhythmArrays(int n);
 
-    // Restore the APVTS rhythm-param block for slot `apvtsSlot` from `rTree`.
-    // `srcPropPrefix` is prepended to each property name when reading from the
-    // tree (e.g. "" for .muClid per-rhythm subtree, "r0_" for .muRhythm root).
-    void restoreRhythmAPVTSParams(int apvtsSlot, const juce::ValueTree& rTree,
-                                   const juce::String& srcPropPrefix);
 
     // Restore the channel-strip params for slot `apvtsSlot`. Only relevant for
     // the .muClid format — legacy .muRhythm `ch_*` properties are intentionally
@@ -91,9 +110,6 @@ private:
                               const juce::String& sampleDataProp,
                               const juce::String& sampleNameProp);
 
-    // Deserialise the optional <Modulators> child for slot `i`. No-op if absent
-    // (legacy presets leave the rhythm's in-memory modulators intact).
-    void restoreRhythmModulators(int i, const juce::ValueTree& rTree);
 
     // Restore the <GlobalState> child if present (mixer + FX algorithm params).
     void restoreGlobalState(const juce::ValueTree& root);

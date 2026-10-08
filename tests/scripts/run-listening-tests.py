@@ -100,6 +100,7 @@ def run_one(test_name: str, spec: dict, spec_path: Path, exe: Path, product: str
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     wav = OUTPUT_DIR / f'{test_name}.wav'
     roundtrip_preset = OUTPUT_DIR / f'{test_name}_roundtrip.{FULL_PRESET_EXT[product]}'
+    session_file = OUTPUT_DIR / f'{test_name}_session.bin'
     cmd = [
         str(exe),
         '--render', '--out', str(wav),
@@ -129,6 +130,9 @@ def run_one(test_name: str, spec: dict, spec_path: Path, exe: Path, product: str
     if render.get('roundtrip'):
         roundtrip_preset.unlink(missing_ok=True)
         cmd += ['--save-preset', str(roundtrip_preset)]
+    if render.get('session_roundtrip'):
+        session_file.unlink(missing_ok=True)
+        cmd += ['--save-state', str(session_file)]
 
     # Optional mid-render full-preset swap (deferred to its boundary). Both keys required.
     if render.get('swap_preset') is not None and render.get('swap_at') is not None:
@@ -178,24 +182,27 @@ def run_one(test_name: str, spec: dict, spec_path: Path, exe: Path, product: str
         sys.stderr.write(res.stderr)
     if res.returncode != 0:
         return 'fail'
-    if render.get('roundtrip'):
-        return run_roundtrip(test_name, cmd, wav, roundtrip_preset, verbose)
+    if render.get('roundtrip') and run_roundtrip(test_name, cmd, wav, roundtrip_preset, '--preset', verbose) != 'pass':
+        return 'fail'
+    if render.get('session_roundtrip') and run_roundtrip(test_name, cmd, wav, session_file, '--state', verbose) != 'pass':
+        return 'fail'
     return 'pass'
 
 
-def run_roundtrip(test_name: str, cmd: list, wav: Path, saved: Path, verbose: bool) -> str:
-    """Render again from the saved preset (in place of the start preset); the two must match."""
+def run_roundtrip(test_name: str, cmd: list, wav: Path, saved: Path, load_flag: str, verbose: bool) -> str:
+    """Render again from the saved preset / session (`load_flag` <saved>, in place of the start
+    preset); the two renders must match."""
     if not saved.exists():
-        print(f'[{test_name}] ROUNDTRIP FAILED: no preset saved at {saved}')
+        print(f'[{test_name}] ROUNDTRIP FAILED: nothing saved at {saved}')
         return 'fail'
     cmd2 = list(cmd)
-    for flag in ('--preset', '--preset-slot', '--save-preset'):
+    for flag in ('--preset', '--preset-slot', '--save-preset', '--save-state'):
         while flag in cmd2:
             i = cmd2.index(flag)
             del cmd2[i:i + 2]
-    wav2 = OUTPUT_DIR / f'{test_name}_roundtrip.wav'
+    wav2 = OUTPUT_DIR / f'{test_name}_{load_flag.strip("-")}_roundtrip.wav'
     cmd2[cmd2.index('--out') + 1] = str(wav2)
-    cmd2 += ['--preset', str(saved)]
+    cmd2 += [load_flag, str(saved)]
     if verbose:
         print(f'[{test_name}] $ {" ".join(cmd2)}')
     res = subprocess.run(cmd2, capture_output=True, text=True)
@@ -207,7 +214,7 @@ def run_roundtrip(test_name: str, cmd: list, wav: Path, saved: Path, verbose: bo
     diff = wav_max_difference(wav, wav2)
     ok = diff <= 1.0   # identical at 24 bits, allowing one LSB
     verdict = 'PASS' if ok else 'FAIL'
-    print(f'  [{verdict}] roundtrip_identical: max sample difference {diff:g} (24-bit LSBs)')
+    print(f'  [{verdict}] {load_flag.strip("-")}_roundtrip_identical: max sample difference {diff:g} (24-bit LSBs)')
     return 'pass' if ok else 'fail'
 
 

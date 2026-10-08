@@ -66,6 +66,13 @@ public:
     // Returns true if triggerAsyncUpdate() should be called.
     bool checkBoundaries(int numRhythms, bool masterLoopWrapped, int rhythmLoopWrapMask);
 
+    // Install a prepared rhythm into slot `r`: the outgoing engine retires (it keeps rendering its
+    // sample tail / amp release from a retired slot), the rhythm, engine and sample path move in and
+    // the pattern rebuilds. The one swap behind the loop-boundary commit, the stopped load and the
+    // full-preset commit. Caller holds suspendProcessing (and rhythmsLock where needed); the
+    // APVTS push follows outside the suspend.
+    void installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceEngine>&& voice, const juce::String& samplePath);
+
     // Message-thread: drain retired-engine cleanup + commit all flagged swaps.
     // Called from PluginProcessor::handleAsyncUpdate.
     void processSwaps();

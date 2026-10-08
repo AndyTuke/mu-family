@@ -198,11 +198,12 @@ private:
     int runRender (const mu_core::render_mode::ProductArgs& args)
     {
         const auto name = renderName();
+        // Renders start from the factory state, and a --state session restores as a host would —
+        // so the saved _default stays out for the whole (one-shot) render process.
         ProcessorBase::skipAutoLoadDefault = true;
         // Built as a Standalone (like the real window) so wrapperType-dependent transport code
         // takes the standalone path, not the "in a host with no playhead" one.
         auto processor = juce::createPluginFilterOfType (juce::AudioProcessor::wrapperType_Standalone);
-        ProcessorBase::skipAutoLoadDefault = false;
 
         auto* proc = dynamic_cast<ProcessorBase*> (processor.get());
         if (proc == nullptr)

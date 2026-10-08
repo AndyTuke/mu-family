@@ -49,7 +49,7 @@ inline bool readRowValue(const juce::ValueTree& row, juce::RangedAudioParameter&
         const int idx = choice->choices.indexOf(row.getProperty("c").toString());
         if (idx >= 0) { normalised = p.convertTo0to1((float) idx); return true; }
     }
-    if (row.hasProperty("x"))
+    if (row.hasProperty("x") && ! row.getProperty("x").isVoid())
     {
         const auto x = (float) (double) row.getProperty("x");
         if (! std::isfinite(x)) return false;
@@ -64,6 +64,17 @@ inline bool readRowValue(const juce::ValueTree& row, juce::RangedAudioParameter&
         return true;
     }
     return false;
+}
+
+// A row for `p` under `rowId`, appended to `node`: its actual value, plus its choice name.
+inline void appendParamRow(juce::ValueTree& node, juce::RangedAudioParameter& p, const juce::String& rowId)
+{
+    juce::ValueTree row(kRowTag);
+    row.setProperty("id", rowId, nullptr);
+    row.setProperty("x", p.convertFrom0to1(p.getValue()), nullptr);
+    if (auto* choice = dynamic_cast<juce::AudioParameterChoice*>(&p))
+        row.setProperty("c", choice->getCurrentChoiceName(), nullptr);
+    node.appendChild(row, nullptr);
 }
 
 // The product's split of its parameters into slots (by id prefix) and globals (the rest), built once
@@ -106,14 +117,7 @@ public:
     void writeParams(juce::ValueTree& node, int slot) const
     {
         for (const auto& e : group(slot))
-        {
-            juce::ValueTree row(kRowTag);
-            row.setProperty("id", e.rowId, nullptr);
-            row.setProperty("x", e.param->convertFrom0to1(e.param->getValue()), nullptr);
-            if (auto* choice = dynamic_cast<juce::AudioParameterChoice*>(e.param))
-                row.setProperty("c", choice->getCurrentChoiceName(), nullptr);
-            node.appendChild(row, nullptr);
-        }
+            appendParamRow(node, *e.param, e.rowId);
     }
 
     // `node`'s rows onto `slot` (-1 = globals). Each parameter is written once — to its row's value,
@@ -241,6 +245,9 @@ inline juce::ValueTree composeLegacyState(const juce::ValueTree& legacy, const S
         const auto child = legacy.getChild(i);
         if (child.hasType("PARAM"))
         {
+            // A PARAM with no value (APVTS leaves these for params it never set) means the
+            // default, as replaceState read it — leave it out so the apply defaults it.
+            if (! child.hasProperty("value")) continue;
             const auto id = child.getProperty("id").toString();
             const int s = layout.slotOf(id);
             juce::ValueTree row(kRowTag);

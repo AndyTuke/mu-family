@@ -11,8 +11,8 @@ namespace mu_tant
 // (per voice + one full preset), plus mu-tant's boundary rule. mu-tant has no master loop of its
 // own: the transport beat advances freely and each voice's gate pattern wraps at its own length,
 // so a staged swap defers to a reference pattern wrap — voice 0's for a full preset, the voice's
-// own for a per-voice preset (or the master loop when one is set). The apply (replaceState /
-// readVoiceDataFromState / loadSlotPreset body) lives in PluginProcessor, which drains committed
+// own for a per-voice preset (or the master loop when one is set). The apply (applyFullPresetTree /
+// applyVoicePresetTree, on the composed voice nodes) lives in PluginProcessor, which drains committed
 // swaps from here, so the staging logic stays unit-testable on its own. Threading as
 // mu_hotswap::Stager: trees on the message thread only, the audio thread touches only the flags.
 class VoiceHotSwapStager

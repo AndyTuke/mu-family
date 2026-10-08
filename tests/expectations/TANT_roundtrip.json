@@ -1,0 +1,27 @@
+{
+  "test": "TANT_roundtrip",
+  "product": "mu-tant",
+  "description": "mu-Tant composed-state round trip: a factory preset saved before the X-Mod redesign (APVTS dump + VoiceData, old xmod_fm / _am / _ring params) loads through the legacy rebuild + X-Mod migration, is saved in the composed format, and the re-render from that save must be sample-identical. The host session (getStateInformation \u2192 setStateInformation) must round-trip identically too.",
+  "render": {
+    "preset": "Presets/To and Fro.muTant",
+    "play": true,
+    "roundtrip": true,
+    "seconds": 4.0,
+    "sample_rate": 48000,
+    "block_size": 512,
+    "session_roundtrip": true
+  },
+  "assertions": [
+    {
+      "name": "preset_is_audible",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [
+        0.5,
+        3.5
+      ],
+      "min": -60,
+      "comment": "the migrated preset plays"
+    }
+  ]
+}

@@ -4,13 +4,11 @@
 #include "Persistence/PresetMeta.h"   // preset metadata read from the root tag only
 #include <algorithm>
 #include <functional>
-#include <map>
 #include <vector>
 
-// Shared preset-file handling for every mu product. A full preset is the product's whole
-// state tree wrapped in a root element carrying name / description / category; a layer
-// preset holds one layer's parameters as <p id v> rows (id without the layer's prefix,
-// v normalised 0..1) plus whatever product children the caller adds (modulators, patterns).
+// Shared preset-file handling for every mu product: safe file names, atomic writes, listing, and
+// a full preset — the product's state tree wrapped in a root element carrying name / description /
+// category. What goes inside (a layer node, the composed state) is Persistence/SlotState.h.
 namespace mu_pp
 {
 
@@ -134,51 +132,6 @@ inline juce::StringArray readPresetCategories(const juce::File& dir, const juce:
             cats.addIfNotAlreadyThere(meta.category);
     }
     return cats;
-}
-
-// Add a <p id v> row to `root` for every parameter whose id starts with `prefix`.
-inline void writeLayerParams(juce::XmlElement& root, juce::AudioProcessor& proc, const juce::String& prefix)
-{
-    for (auto* p : proc.getParameters())
-        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-        {
-            const auto id = rp->getParameterID();
-            if (id.startsWith(prefix))
-            {
-                auto* e = root.createNewChildElement("p");
-                e->setAttribute("id", id.substring(prefix.length()));
-                e->setAttribute("v", (double) rp->getValue());
-            }
-        }
-}
-
-// Apply a layer preset's <p id v> rows to the parameters `prefix` + id. Parameters the
-// file doesn't mention go back to their defaults, so an older preset loads cleanly. Each
-// parameter is written once with its final value (and not at all when it already holds it),
-// so a bar-line commit never exposes a transient default to the audio thread.
-inline void applyLayerParams(const juce::ValueTree& tree, juce::AudioProcessorValueTreeState& apvts,
-                             const juce::String& prefix)
-{
-    // The file's normalised value per prefix-free id.
-    std::map<juce::String, float> fileValues;
-    for (int i = 0; i < tree.getNumChildren(); ++i)
-    {
-        const auto row = tree.getChild(i);
-        if (row.hasType("p"))
-            fileValues[row.getProperty("id").toString()] = (float) (double) row.getProperty("v");
-    }
-
-    // Every layer parameter: the file's value, else its default.
-    for (auto* p : apvts.processor.getParameters())
-        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-        {
-            const auto id = rp->getParameterID();
-            if (! id.startsWith(prefix)) continue;
-            const auto it = fileValues.find(id.substring(prefix.length()));
-            const float target = it != fileValues.end() ? it->second : rp->getDefaultValue();
-            if (rp->getValue() != target)
-                rp->setValueNotifyingHost(target);
-        }
 }
 
 } // namespace mu_pp
