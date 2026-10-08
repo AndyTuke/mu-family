@@ -23,8 +23,48 @@ void LFOEditor::setPoints(const std::vector<ControlSequence::CurvePoint>& pts)
 
 void LFOEditor::setPlayheadPhase(float phase)
 {
+    // Repaint only the strips under the old and new playhead line, and only when it moved a pixel.
+    const int w    = getWidth();
+    const int oldX = (int) (playheadPhase * (float) w);
+    const int newX = (int) (phase * (float) w);
     playheadPhase = phase;
-    repaint();
+    if (newX == oldX) return;
+    repaint(oldX - 1, 0, 3, getHeight());
+    repaint(newX - 1, 0, 3, getHeight());
+}
+
+const juce::Path& LFOEditor::curvePath()
+{
+    // Field-wise compare of the anchors the path was built from (a handful of points).
+    auto samePoints = [this]
+    {
+        if (cachedPoints.size() != points.size()) return false;
+        for (size_t i = 0; i < points.size(); ++i)
+        {
+            const auto& a = points[i];
+            const auto& b = cachedPoints[i];
+            if (a.x != b.x || a.y != b.y || a.hasBezierHandle != b.hasBezierHandle
+                || a.handleX != b.handleX || a.handleY != b.handleY)
+                return false;
+        }
+        return true;
+    };
+
+    if (isDraggingSegment)   // the bend preview changes every drag event — build it fresh
+    {
+        cachedCurve = buildCurvePath();
+        cachedW = -1;        // invalidate so the next normal paint rebuilds
+        return cachedCurve;
+    }
+    if (cachedW != getWidth() || cachedH != getHeight() || cachedUnipolar != unipolar || ! samePoints())
+    {
+        cachedCurve    = buildCurvePath();
+        cachedPoints   = points;
+        cachedW        = getWidth();
+        cachedH        = getHeight();
+        cachedUnipolar = unipolar;
+    }
+    return cachedCurve;
 }
 
 juce::Point<float> LFOEditor::toScreen(float x, float y) const
@@ -199,7 +239,7 @@ void LFOEditor::paint(juce::Graphics& g)
                 g.drawVerticalLine((int)(k * stepFraction * w), 0.0f, (float)getHeight());
         }
 
-        auto curve = buildCurvePath();
+        const auto& curve = curvePath();
 
         // Fill under curve (from curve to zero/baseline)
         juce::Path fill = curve;

@@ -284,15 +284,13 @@ void VoicePanel::timerCallback()
     // Sync filter-type dropdown from APVTS so DAW automation is reflected in the UI.
     // The dropdown uses manual wiring (no ComboBoxAttachment) so there is no automatic
     // reverse path from APVTS changes to the displayed value.
-    if (auto* raw = proc.apvts.getRawParameterValue(
-            PluginProcessor::voiceParamId(currentVoice, "flt_type")))
+    if (auto* raw = fltTypeParam)
     {
         const int apvtsAlgo = juce::jlimit(0, 15, (int) raw->load());
         if (fltTypeDropdown.getSelectedId() != apvtsAlgo + 1)
             fltTypeDropdown.setSelectedId(apvtsAlgo + 1, false);
     }
-    if (auto* raw = proc.apvts.getRawParameterValue(
-            PluginProcessor::voiceParamId(currentVoice, "flt2_type")))
+    if (auto* raw = flt2TypeParam)
     {
         const int apvtsAlgo = juce::jlimit(0, 15, (int) raw->load());
         if (flt2TypeDropdown.getSelectedId() != apvtsAlgo + 1)
@@ -302,17 +300,17 @@ void VoicePanel::timerCallback()
     // Sync the wavetable dropdowns' factory selection from APVTS (preset / automation).
     // A loaded user table overrides the factory index, so leave its item selected.
     const int maxWt = juce::jmax(0, WavetableBank::factoryTableNames().size() - 1);
-    auto syncWt = [&](DropdownSelect& dd, int osc, const char* pid)
+    auto syncWt = [&](DropdownSelect& dd, int osc, std::atomic<float>* raw)
     {
         if (proc.userWavetablePath(currentVoice, osc).isNotEmpty()) return;
-        if (auto* raw = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentVoice, pid)))
+        if (raw != nullptr)
         {
             const int idx = juce::jlimit(0, maxWt, (int) raw->load());
             if (dd.getSelectedId() != idx + 1) dd.setSelectedId(idx + 1, false);
         }
     };
-    syncWt(osc1WaveDropdown, 0, "o1_wt");
-    syncWt(osc2WaveDropdown, 1, "o2_wt");
+    syncWt(osc1WaveDropdown, 0, o1WtParam);
+    syncWt(osc2WaveDropdown, 1, o2WtParam);
 }
 
 void VoicePanel::setVoice(int voiceIndex)
@@ -353,6 +351,11 @@ void VoicePanel::setVoice(int voiceIndex)
 
 void VoicePanel::rebindAttachments()
 {
+    fltTypeParam  = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentVoice, "flt_type"));
+    flt2TypeParam = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentVoice, "flt2_type"));
+    o1WtParam     = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentVoice, "o1_wt"));
+    o2WtParam     = proc.apvts.getRawParameterValue(PluginProcessor::voiceParamId(currentVoice, "o2_wt"));
+
     auto& apvts = proc.apvts;
     auto id = [this](const char* base) {
         return PluginProcessor::voiceParamId(currentVoice, base);

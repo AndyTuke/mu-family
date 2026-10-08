@@ -67,4 +67,13 @@ private:
     int hitTest(juce::Point<float> screen) const;
     void notifyChanged();
     juce::Path buildCurvePath() const;
+
+    // The curve path as last built, rebuilt only when what it depends on changed (the points,
+    // the size or the polarity) — the 30 Hz playhead repaints reuse it. Not cached while a
+    // segment-bend drag previews its quadratic.
+    const juce::Path& curvePath();
+    juce::Path                               cachedCurve;
+    std::vector<ControlSequence::CurvePoint> cachedPoints;
+    int                                      cachedW = -1, cachedH = -1;
+    bool                                     cachedUnipolar = false;
 };

@@ -1,4 +1,5 @@
 #include "VoiceSidebar.h"
+#include <array>
 #include "Plugin/PluginProcessor.h"
 #include "UI/Components/MuLookAndFeel.h"
 
@@ -37,6 +38,19 @@ namespace
         ~VoiceSpectrumGlyph() override { stopTimer(); }
 
     private:
+        // The kFftSize-point Hann window, computed once and shared by every voice's glyph.
+        static const std::array<float, kFftSize>& hannWindow()
+        {
+            static const auto table = []
+            {
+                std::array<float, kFftSize> w {};
+                for (int i = 0; i < kFftSize; ++i)
+                    w[(size_t) i] = 0.5f * (1.0f - std::cos(juce::MathConstants<float>::twoPi * (float) i / (float) (kFftSize - 1)));
+                return w;
+            }();
+            return table;
+        }
+
         void timerCallback() override
         {
             if (!ringBuffer) return;
@@ -44,10 +58,10 @@ namespace
             // Read the most-recent kFftSize samples from the ring buffer.
             ringBuffer->read(fftData.data(), kFftSize);
 
-            // Apply a Hann window to reduce spectral leakage.
+            // Apply a Hann window to reduce spectral leakage (table built once for every glyph).
+            const auto& window = hannWindow();
             for (int i = 0; i < kFftSize; ++i)
-                fftData[i] *= 0.5f * (1.0f - std::cos(
-                    juce::MathConstants<float>::twoPi * (float) i / (float)(kFftSize - 1)));
+                fftData[i] *= window[(size_t) i];
 
             // Zero the imaginary half before the in-place transform.
             std::fill(fftData.begin() + kFftSize, fftData.end(), 0.0f);

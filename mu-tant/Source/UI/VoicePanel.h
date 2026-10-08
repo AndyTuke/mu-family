@@ -220,6 +220,13 @@ private:
     void setupGateInsertAndModulators();
 
     void rebindAttachments();
+
+    // The current voice's manually-wired selector params, resolved on each rebind so the 30 Hz
+    // timer reads them without building id strings / hash lookups (automation reverse sync).
+    std::atomic<float>* fltTypeParam  = nullptr;
+    std::atomic<float>* flt2TypeParam = nullptr;
+    std::atomic<float>* o1WtParam     = nullptr;
+    std::atomic<float>* o2WtParam     = nullptr;
     void bindModulationIndicators();
 
     // Wavetable selector dropdowns: rebuilt per voice (factory names + an optional

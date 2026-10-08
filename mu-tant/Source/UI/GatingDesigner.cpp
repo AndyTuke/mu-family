@@ -815,18 +815,11 @@ void GatingDesigner::paint(juce::Graphics& g)
     // Playhead — convert pattern-relative beat01 to view-relative pixel position.
     // beat01 is fraction of the full pattern length; the view shows kViewBars at offset viewStartBar.
     if (playheadVisible && cw > 0.0f)
-    {
-        const auto* activePat = getActivePattern();
-        const int patBars = (activePat != nullptr) ? activePat->patternLengthBars : kViewBars;
-        const float absoluteBar = (float)(playheadBeat01 * patBars);
-        const float viewRelFrac = (absoluteBar - (float)viewStartBar) / (float)kViewBars;
-        if (viewRelFrac >= 0.0f && viewRelFrac <= 1.0f)
+        if (const auto x = playheadX(playheadBeat01))
         {
-        const float x = gateRect.getX() + gateRect.getWidth() * viewRelFrac;
-        g.setColour(MuLookAndFeel::colour(Id::textBright).withAlpha(0.9f));
-        g.fillRect(x - sf(0.5f), gateRect.getY(), sf(1.5f), gateRect.getHeight());
-        } // viewRelFrac in range
-    }
+            g.setColour(MuLookAndFeel::colour(Id::textBright).withAlpha(0.9f));
+            g.fillRect(*x - sf(0.5f), gateRect.getY(), sf(1.5f), gateRect.getHeight());
+        }
 
     // Metal style: the grid reads as a screen set into the panel.
     if (metal)
@@ -844,9 +837,35 @@ void GatingDesigner::setPlayhead(double beat01, bool visible)
 {
     const bool changed = (visible != playheadVisible)
                       || (visible && std::abs(beat01 - playheadBeat01) > 0.0005);
-    playheadBeat01 = beat01;
+    if (! changed) return;
+
+    // Repaint only the strips under the old and the new line, not the whole grid + envelopes.
+    auto repaintLineAt = [this](bool shown, double b01)
+    {
+        if (! shown) return;
+        if (const auto x = playheadX(b01))
+        {
+            const auto grid = gridBounds();
+            repaint(juce::Rectangle<float>(*x - mu_ui::sf(2.0f), grid.getY(), mu_ui::sf(4.0f), grid.getHeight())
+                        .getSmallestIntegerContainer());
+        }
+    };
+    repaintLineAt(playheadVisible, playheadBeat01);
+    playheadBeat01  = beat01;
     playheadVisible = visible;
-    if (changed) repaint();
+    repaintLineAt(playheadVisible, playheadBeat01);
+}
+
+// The playhead's x for a pattern-relative position, or nothing when it is outside the view
+// (beat01 is a fraction of the whole pattern; the view shows kViewBars from viewStartBar).
+std::optional<float> GatingDesigner::playheadX(double beat01) const
+{
+    const auto* activePat = getActivePattern();
+    const int patBars = (activePat != nullptr) ? activePat->patternLengthBars : kViewBars;
+    const float viewRelFrac = ((float) (beat01 * patBars) - (float) viewStartBar) / (float) kViewBars;
+    if (viewRelFrac < 0.0f || viewRelFrac > 1.0f) return std::nullopt;
+    const auto grid = gridBounds();
+    return grid.getX() + grid.getWidth() * viewRelFrac;
 }
 
 // ── Resized ───────────────────────────────────────────────────────────────────

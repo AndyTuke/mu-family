@@ -2,6 +2,7 @@
 
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "Audio/MultiModeFilter.h"   // mu-core
+#include "Audio/ExpDecay.h"          // mu-core: one-multiply exponential decay
 #include <cmath>
 
 // BassEngine — a deep monophonic bass: a main oscillator (sine / saw / square) plus a
@@ -42,7 +43,7 @@ public:
         envDepth = juce::jlimit(0.0f, 1.0f, env_);
         filterEnvInv = 1.0f / juce::jmax(1.0f, edecMs * 0.001f * (float) sampleRate);
         atkInv   = 1.0f / juce::jmax(1.0f, atkMs * 0.001f * (float) sampleRate);
-        decInv   = 1.0f / juce::jmax(1.0f, decMs * 0.001f * (float) sampleRate);
+        decayEnv.setTimeConstant(decMs * 0.001f * (float) sampleRate);
         sustain  = juce::jlimit(0.0f, 1.0f, sus_);
         filter.setResonance(juce::jlimit(0.0f, 1.0f, res));
         filter.setDrive(juce::jlimit(0.0f, 1.0f, drv));
@@ -69,14 +70,14 @@ public:
         for (int i = 0; i < n; ++i)
         {
             // Sample-accurate onset: a step landing mid-block starts the voice at its offset.
-            if (restart && i >= pendingOnset) { active = true; phase = 0.0f; subPhase = 0.0f; t = 0.0f; amp = 0.0f; vel = pendingVel; restart = false; }
+            if (restart && i >= pendingOnset) { active = true; phase = 0.0f; subPhase = 0.0f; t = 0.0f; amp = 0.0f; vel = pendingVel; restart = false; decayEnv.reset(1.0f); }
 
             float s = 0.0f;
             if (active)
             {
                 // Amp env: linear attack to 1, exponential decay toward the sustain floor.
                 if (t < attackSamples()) amp = t * atkInv;
-                else                     amp = sustain + (1.0f - sustain) * std::exp(-(t - attackSamples()) * decInv);
+                else                     amp = sustain + (1.0f - sustain) * decayEnv.next();   // decay starts after the attack
                 amp *= vel;
 
                 const float main = osc(phase, wave);
@@ -114,7 +115,8 @@ private:
     double sampleRate = 44100.0;
     int    wave = Sine;
     float  rootFreq = 41.2f, sub = 0.5f, baseCut = 600.0f, envDepth = 0.4f;
-    float  filterEnvInv = 0.004f, atkInv = 0.2f, decInv = 0.004f, sustain = 0.0f;
+    float  filterEnvInv = 0.004f, atkInv = 0.2f, sustain = 0.0f;
+    mu_core::ExpDecay decayEnv;   // amp decay toward the sustain floor
     float  phase = 0.0f, subPhase = 0.0f, t = 0.0f, amp = 0.0f, vel = 1.0f, pendingVel = 1.0f;
     int    pendingOnset = 0;
     bool   active = false, restart = false;

@@ -1,4 +1,5 @@
 #pragma once
+#include <optional>
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <limits>
@@ -119,6 +120,7 @@ private:
     juce::Rectangle<float> headerBox() const noexcept;
 
     // ── Playhead ─────────────────────────────────────────────────────────────
+    std::optional<float> playheadX(double beat01) const;   // playhead line x, if in view
     double playheadBeat01  = 0.0;
     bool   playheadVisible = false;
 

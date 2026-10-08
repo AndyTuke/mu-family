@@ -32,7 +32,7 @@ public:
     void setParams(float tuneSemitones, float decayMs) noexcept
     {
         ratio    = std::pow(2.0, (double) tuneSemitones / 12.0);
-        decayInv = 1.0f / juce::jmax(1.0f, decayMs * 0.001f * (float) sampleRate);
+        gateEnv.setTimeConstant(decayMs * 0.001f * (float) sampleRate);
     }
 
     void trigger(float velocity, int onset = 0) noexcept { player.trigger(); restart = true; pendingVel = velocity; pendingOnset = juce::jmax(0, onset); }
@@ -45,7 +45,7 @@ public:
         // A step landing mid-block starts the sample + gate at its sample offset; 0 on
         // continuation blocks (the player just keeps streaming from sample 0 of the block).
         int onset = 0;
-        if (restart) { t = 0.0f; vel = pendingVel; active = true; restart = false; onset = juce::jmin(pendingOnset, n - 1); }
+        if (restart) { gateEnv.reset(pendingVel); active = true; restart = false; onset = juce::jmin(pendingOnset, n - 1); }
 
         // Pull the one-shot into the mono scratch (SamplePlayer ADDS, so clear first).
         scratch.clear();
@@ -66,8 +66,7 @@ public:
             float g = 0.0f;
             if (active)
             {
-                g = std::exp(-t * decayInv) * vel;
-                t += 1.0f;
+                g = gateEnv.next();   // starts at the velocity
                 if (g < 1.0e-4f && ! player.isActive()) active = false;
             }
             const float s = src[i] * g;
@@ -114,7 +113,8 @@ private:
     juce::AudioBuffer<float> sampleBuf, scratch;
     std::vector<double>      ratios;
     double sampleRate = 44100.0, ratio = 1.0, filledRatio = -1.0;
-    float  decayInv = 0.01f, t = 0.0f, vel = 1.0f, pendingVel = 1.0f;
+    float  pendingVel = 1.0f;
+    mu_core::ExpDecay gateEnv;   // the gate's exponential decay
     int    pendingOnset = 0;
     bool   active = false, restart = false;
 };

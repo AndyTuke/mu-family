@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_basics/juce_audio_basics.h>
+#include "Audio/ExpDecay.h"   // mu-core: one-multiply exponential decay
 #include <cmath>
 
 // KickEngine — a synthesized 909-style kick: a sine body with an exponential PITCH
@@ -21,8 +22,8 @@ public:
     {
         baseFreq = baseHz;
         pitchAmt = pitchAmtHz;
-        pitchInv = 1.0f / juce::jmax(1.0f, pitchDecMs * 0.001f * (float) sampleRate);
-        ampInv   = 1.0f / juce::jmax(1.0f, ampDecMs   * 0.001f * (float) sampleRate);
+        pitchEnv.setTimeConstant(pitchDecMs * 0.001f * (float) sampleRate);
+        ampEnv  .setTimeConstant(ampDecMs   * 0.001f * (float) sampleRate);
         drive    = juce::jlimit(0.0f, 1.0f, drv);
     }
 
@@ -37,14 +38,19 @@ public:
         for (int i = 0; i < n; ++i)
         {
             // Sample-accurate onset: a step landing mid-block starts the voice at its offset.
-            if (restart && i >= pendingOnset) { active = true; phase = 0.0f; t = 0.0f; vel = pendingVel; restart = false; }
+            if (restart && i >= pendingOnset)
+            {
+                active = true; phase = 0.0f; t = 0.0f; restart = false;
+                pitchEnv.reset(1.0f);
+                ampEnv.reset(pendingVel);
+            }
 
             float s = 0.0f;
             if (active)
             {
-                const float pEnv = std::exp(-t * pitchInv);
+                const float pEnv = pitchEnv.next();
                 const float freq = baseFreq + pitchAmt * pEnv;
-                const float aEnv = std::exp(-t * ampInv) * vel;
+                const float aEnv = ampEnv.next();   // starts at the velocity
                 s = std::sin(phase) * aEnv;
                 if (drive > 0.0f) s = std::tanh(s * (1.0f + drive * 4.0f)) / (1.0f + drive * 0.5f);
 
@@ -61,8 +67,9 @@ private:
     static constexpr float twoPi = 6.28318530718f;
 
     double sampleRate = 44100.0;
-    float  baseFreq = 50.0f, pitchAmt = 220.0f, pitchInv = 0.01f, ampInv = 0.002f, drive = 0.2f;
-    float  phase = 0.0f, t = 0.0f, vel = 1.0f, pendingVel = 1.0f;
+    float  baseFreq = 50.0f, pitchAmt = 220.0f, drive = 0.2f;
+    float  phase = 0.0f, t = 0.0f, pendingVel = 1.0f;
+    mu_core::ExpDecay pitchEnv, ampEnv;   // pitch sweep (start tune → base) and amp decay
     int    pendingOnset = 0;
     bool   active = false, restart = false;
 };
