@@ -209,7 +209,7 @@ the swap point.** Instead:
    `cancelStagedSwap` between the audio thread flagging it and this handler running);
    then under **one** `suspendProcessing` retire-then-swap each; then, outside the
    suspend and under one `ScopedApvtsLoading` guard, `pushRhythmToAPVTS(r)` +
-   `onRhythmHotSwapCommitted(r)`.
+   `onSlotPresetCommitted(r)` (the shared ProcessorBase callback).
 3. **Full-preset commit.** If `presetBoundaryReached`, clear the flags,
    `commitStagedFullPreset(pendingPreset)`, release the payload, fire
    `onPresetSwapCommitted()`.
@@ -223,7 +223,7 @@ the swap point.** Instead:
 - **`ChannelSidebar`** shows a per-slot staging badge — it polls the product's
   `isPendingSwap(r)` (→ `hasPendingSwap(r)`) and offers cancel via
   `onCancelPendingSwap(r)` (→ `cancelStagedSwap(r)`).
-- After a commit, `onRhythmHotSwapCommitted(r)` / `onPresetSwapCommitted()` fire on
+- After a commit, `onSlotPresetCommitted(r)` / `onPresetSwapCommitted()` fire on
   the message thread so the editor can refresh **non-APVTS** UI state (name label,
   sample bar, colour). The editor **must clear these callbacks in its destructor** —
   the processor can outlive the editor (DAW close-window-keep-plugin), and a commit
@@ -231,10 +231,11 @@ the swap point.** Instead:
 
 ---
 
-## 11. Offline render (`RenderMode`)
+## 11. Offline render (the shared `--render`)
 
 The offline render loop never yields to JUCE's message loop, so `triggerAsyncUpdate`
-would never be serviced. `RenderMode` calls `proc.flushPendingAsyncUpdates()`
+would never be serviced. The shared render (mu-core `ProductRender.h`) calls
+`ProcessorBase::flushPendingAsyncUpdates()`
 (`handleUpdateNowIfNeeded`) after each `processBlock` so a staged swap commits
 synchronously on the render thread. (Live standalone/plugin pump the message loop
 normally, so they don't need this.)
@@ -245,10 +246,10 @@ normally, so they don't need this.)
 
 - **Cancel race:** a swap cancelled between the audio thread setting `boundaryReached`
   and `processSwaps` running is skipped (the `isReady`-cleared check).
-- **Structural rhythm edits cancel pending per-rhythm swaps.** `addRhythm` /
-  `removeRhythm` / `swapRhythms` / `resetRhythm` renumber or clear slots by index, so
+- **Structural rhythm edits cancel pending per-rhythm swaps.** `RhythmManager::add` /
+  `remove` / `swap` / `reset` (`proc.rhythms`) renumber or clear slots by index, so
   a staged per-rhythm swap (keyed by index) would land on the wrong slot — they call
-  `hotSwapStager.cancelPendingIfAny(...)` for the affected slots (`removeRhythm`
+  `hotSwapStager.cancelPendingIfAny(...)` for the affected slots (`remove`
   cancels all, since the down-shift renumbers everything). A staged **full** preset is
   index-independent (it replaces every slot at commit) and is left to win.
 - **Full supersedes per-rhythm:** `stageFullPreset` cancels all pending per-rhythm

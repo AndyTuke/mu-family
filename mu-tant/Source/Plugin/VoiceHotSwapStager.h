@@ -1,15 +1,17 @@
 #pragma once
 
 #include <juce_data_structures/juce_data_structures.h>
-#include "Plugin/HotSwap.h"            // mu-core: the shared staging state
-#include "Plugin/HotSwapBoundary.h"
+#include "Plugin/HotSwap.h"            // mu-core: the shared staging state + loop-wrap predicates
 #include <array>
 
 namespace mu_tant
 {
 
 // mu-tant's preset hot-swap staging: the shared mu-core stager holding parsed preset trees
-// (per voice + one full preset), plus mu-tant's boundary rule. The apply (replaceState /
+// (per voice + one full preset), plus mu-tant's boundary rule. mu-tant has no master loop of its
+// own: the transport beat advances freely and each voice's gate pattern wraps at its own length,
+// so a staged swap defers to a reference pattern wrap — voice 0's for a full preset, the voice's
+// own for a per-voice preset (or the master loop when one is set). The apply (replaceState /
 // readVoiceDataFromState / loadSlotPreset body) lives in PluginProcessor, which drains committed
 // swaps from here, so the staging logic stays unit-testable on its own. Threading as
 // mu_hotswap::Stager: trees on the message thread only, the audio thread touches only the flags.
@@ -41,9 +43,9 @@ public:
         bool any = false;
         const int n = juce::jlimit(0, kMaxVoices, numActiveVoices);
         for (int v = 0; v < n; ++v)
-            any |= stager.flagIfReady(v, hotswap::swapBoundaryReached(playing, wasPlaying, oldPos, newPos,
+            any |= stager.flagIfReady(v, mu_hotswap::boundaryReached(playing, wasPlaying, oldPos, newPos,
                                                                        voicePatBeats[(size_t) v]));
-        any |= stager.flagFullIfReady(hotswap::swapBoundaryReached(playing, wasPlaying, oldPos, newPos, fullPatBeats));
+        any |= stager.flagFullIfReady(mu_hotswap::boundaryReached(playing, wasPlaying, oldPos, newPos, fullPatBeats));
         return any;
     }
 

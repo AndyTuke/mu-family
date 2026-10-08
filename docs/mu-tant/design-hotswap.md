@@ -19,7 +19,7 @@ in [../mu-clid/design-hotswap.md](../mu-clid/design-hotswap.md). This doc covers
 | Flavour | Trigger | Boundary | Entry point |
 |---|---|---|---|
 | **Full preset** (`.muTant`) | preset dropdown / MIDI PC ch 9 | **voice 0's** gate-pattern wrap | `PluginProcessor::loadPreset` |
-| **Per-voice** (`.muPattern`) | `ChannelHeaderBar` / MIDI PC ch 1-8 | **that voice's own** gate-pattern wrap | `PluginProcessor::loadVoicePreset` |
+| **Per-voice** (`.muPattern`) | `ChannelHeaderBar` / MIDI PC ch 1-8 | **that voice's own** gate-pattern wrap | `PluginProcessor::loadSlotPreset` |
 
 Stopped → applied immediately. Playing → staged + committed at the boundary.
 Same apply code for both triggers (`applyFullPresetTree` / `applyVoicePresetTree`).
@@ -57,9 +57,9 @@ across a swap, mu-clid's retire-then-swap (see its doc §8) is the pattern to po
 
 | File | Role |
 |---|---|
-| [Source/Plugin/HotSwapBoundary.h](../../mu-tant/Source/Plugin/HotSwapBoundary.h) | Pure boundary predicates (`mu_tant::hotswap::patternWrapped` / `swapBoundaryReached`) — unit-testable without a processor. |
+| [mu-core/Plugin/HotSwap.h](../../mu-core/Plugin/HotSwap.h) | The shared pure boundary predicates (`mu_hotswap::loopWrapped` / `boundaryReached`) — unit-testable without a processor. |
 | [Source/Plugin/VoiceHotSwapStager.h](../../mu-tant/Source/Plugin/VoiceHotSwapStager.h) | Header-only staging state machine: per-voice pending slots + one full-preset slot, the store-release/load-acquire handshake, `checkBoundaries` (audio) + `take*` (message). `ValueTree` payload, **no `PluginProcessor` coupling**. |
-| [Source/Plugin/PluginProcessor.cpp](../../mu-tant/Source/Plugin/PluginProcessor.cpp) | `loadPreset`/`loadVoicePreset` (stage-or-apply), `applyFullPresetTree`/`applyVoicePresetTree` (commit bodies), `preloadWavetablesFrom*`, `handleAsyncUpdate` (commit drain), boundary check in `processBlock`. |
+| [Source/Plugin/PluginProcessor.cpp](../../mu-tant/Source/Plugin/PluginProcessor.cpp) | `loadPreset`/`loadSlotPreset` (stage-or-apply), `applyFullPresetTree`/`applyVoicePresetTree` (commit bodies), `preloadWavetablesFrom*`, `handleAsyncUpdate` (commit drain), boundary check in `processBlock`. |
 | [Source/Audio/WavetableBank.{h,cpp}](../../mu-tant/Source/Audio/WavetableBank.h) | `findByPath` (lock-free resolve), `decodeFile` (off-lock decode) + `appendTable` (locked append) — the two-phase load that keeps the swap real-time-safe. |
 | [Source/Tests/HotSwapBoundaryTests.cpp](../../mu-tant/Source/Tests/HotSwapBoundaryTests.cpp) | Predicate + stager handshake tests. |
 
@@ -100,8 +100,8 @@ musical loop). The boundary is computed on the **raw pre-ceiling** advanced posi
 so the loop-index test holds for pattern lengths that don't divide 64:
 
 ```cpp
-patternWrapped(oldPos, newPos, patBeats)   // floor(newPos/patBeats) != floor(oldPos/patBeats)
-swapBoundaryReached(playing, wasPlaying, oldPos, newPos, patBeats)
+loopWrapped(oldPos, newPos, patBeats)      // floor(newPos/patBeats) != floor(oldPos/patBeats)
+boundaryReached(playing, wasPlaying, oldPos, newPos, patBeats)
 //   playing            → commit on a reference-pattern wrap
 //   playing→stopped    → commit immediately (apply-on-stop; gate closed, glitch-free)
 //   stopped (no edge)  → never (a stopped stage is applied immediately at stage time)
@@ -153,15 +153,15 @@ microseconds at *stage*, never at commit.
 2. If `isInternalPlaying()`: `preloadWavetablesFromState` (decode off-lock + append)
    then `hotSwapStager.stageFull(move(tree))`. Else `applyFullPresetTree(tree)` now.
 
-`loadVoicePreset` is the same shape for one voice (`preloadWavetablesFromVoiceTree`
+`loadSlotPreset` is the same shape for one voice (`preloadWavetablesFromVoiceTree`
 + `stageVoice`, else `applyVoicePresetTree`).
 
 **Commit** (`handleAsyncUpdate`, message thread, triggered from `processBlock`):
 1. `takeFull` → `applyFullPresetTree` (`replaceState` + `numVoices` + colours +
    `readVoiceDataFromState` + `syncAllFxParams`) → fire `onPresetSwapCommitted`.
 2. `takeVoice(v)` for each flagged voice → `applyVoicePresetTree` → fire
-   `onVoiceHotSwapCommitted(v)`.
-3. `drainPendingMidiProgramChanges()` (ch 1-8 → `loadVoicePreset`, ch 9 →
+   `onSlotPresetCommitted(v)`.
+3. `drainPendingMidiProgramChanges()` (ch 1-8 → `loadSlotPreset`, ch 9 →
    `loadPreset` — themselves stage-or-apply).
 
 `stageFull` cancels all pending per-voice swaps (a full preset replaces every voice).
@@ -174,7 +174,7 @@ The shell calls `onPresetLoaded` **synchronously** right after `loadPreset`
 ([EditorShellBase.cpp](../../mu-core/UI/EditorShellBase.cpp) `onPresetSelected`),
 which for a *staged* swap runs against pre-swap state. So the commit re-triggers the
 refresh: `onPresetSwapCommitted` → editor re-runs `onPresetLoaded({})`;
-`onVoiceHotSwapCommitted(v)` → refresh that voice's sidebar glyph + (if shown) re-bind
+`onSlotPresetCommitted(v)` → refresh that voice's sidebar glyph + (if shown) re-bind
 the panel (knobs + wavetable dropdowns, the #879 class of stale-UI bug). **The editor
 clears both callbacks in its destructor** — the processor can outlive the editor
 (DAW close-window-keep-plugin), and a commit firing into a dead editor is a UAF.

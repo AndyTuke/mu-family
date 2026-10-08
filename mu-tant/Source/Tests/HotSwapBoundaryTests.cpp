@@ -1,12 +1,12 @@
 // mu-tant hot-swap staging tests - the pure loop-boundary predicates
-// (HotSwapBoundary.h) and the VoiceHotSwapStager store-release/load-acquire
+// (mu-core HotSwap.h, as mu-tant uses them) and the VoiceHotSwapStager store-release/load-acquire
 // handshake. No PluginProcessor needed: this is the regression guard for the
 // swap-defer decision (wrap detection incl. non-divisor pattern lengths,
 // apply-on-stop, supersede, and per-voice vs full-preset boundaries).
 
 #include <juce_data_structures/juce_data_structures.h>
 #include <array>
-#include "Plugin/HotSwapBoundary.h"
+#include "Plugin/HotSwap.h"   // mu-core: the shared loop-wrap predicates
 #include "Plugin/VoiceHotSwapStager.h"
 
 class HotSwapBoundaryTest : public juce::UnitTest
@@ -17,37 +17,37 @@ public:
     void runTest() override
     {
         using namespace mu_tant;
-        using namespace mu_tant::hotswap;
+        using namespace mu_hotswap;
 
-        beginTest("patternWrapped: loop-index crossing");
+        beginTest("loopWrapped: loop-index crossing");
         {
             // 8-beat pattern. No wrap within a loop, wrap when the index advances.
-            expect(! patternWrapped(0.0, 1.0, 8.0),  "no wrap mid-loop");
-            expect(! patternWrapped(7.0, 7.9, 8.0),  "no wrap approaching the boundary");
-            expect(  patternWrapped(7.9, 8.1, 8.0),  "wrap crossing 8.0");
-            expect(  patternWrapped(15.9, 16.1, 8.0), "wrap crossing the 2nd loop point");
-            expect(! patternWrapped(8.0, 8.0, 8.0),  "zero-length block never wraps");
-            expect(! patternWrapped(1.0, 2.0, 0.0),  "non-positive patBeats -> never");
+            expect(! loopWrapped(0.0, 1.0, 8.0),  "no wrap mid-loop");
+            expect(! loopWrapped(7.0, 7.9, 8.0),  "no wrap approaching the boundary");
+            expect(  loopWrapped(7.9, 8.1, 8.0),  "wrap crossing 8.0");
+            expect(  loopWrapped(15.9, 16.1, 8.0), "wrap crossing the 2nd loop point");
+            expect(! loopWrapped(8.0, 8.0, 8.0),  "zero-length block never wraps");
+            expect(! loopWrapped(1.0, 2.0, 0.0),  "non-positive patBeats -> never");
         }
 
-        beginTest("patternWrapped: non-divisor lengths (12, 20 beats) work pre-ceiling");
+        beginTest("loopWrapped: non-divisor lengths (12, 20 beats) work pre-ceiling");
         {
             // 12-beat pattern does not divide the 64-beat transport ceiling; the
             // predicate runs on the RAW advanced position so it still detects the wrap.
-            expect(  patternWrapped(11.9, 12.1, 12.0), "12-beat wrap detected");
-            expect(! patternWrapped(12.1, 13.0, 12.0), "no spurious wrap after crossing");
-            expect(  patternWrapped(59.9, 60.1, 20.0), "20-beat wrap at 60 (3rd loop)");
+            expect(  loopWrapped(11.9, 12.1, 12.0), "12-beat wrap detected");
+            expect(! loopWrapped(12.1, 13.0, 12.0), "no spurious wrap after crossing");
+            expect(  loopWrapped(59.9, 60.1, 20.0), "20-beat wrap at 60 (3rd loop)");
         }
 
-        beginTest("swapBoundaryReached: playing / stop-edge / stopped");
+        beginTest("boundaryReached: playing / stop-edge / stopped");
         {
             // Playing: commit only on a reference-pattern wrap.
-            expect(! swapBoundaryReached(true,  true,  0.0, 1.0, 8.0),  "playing, no wrap -> wait");
-            expect(  swapBoundaryReached(true,  true,  7.9, 8.1, 8.0),  "playing, wrap -> commit");
+            expect(! boundaryReached(true,  true,  0.0, 1.0, 8.0),  "playing, no wrap -> wait");
+            expect(  boundaryReached(true,  true,  7.9, 8.1, 8.0),  "playing, wrap -> commit");
             // Stop edge: commit immediately regardless of position.
-            expect(  swapBoundaryReached(false, true,  3.0, 3.0, 8.0),  "playing->stopped edge -> commit");
+            expect(  boundaryReached(false, true,  3.0, 3.0, 8.0),  "playing->stopped edge -> commit");
             // Stopped, no edge: never (a stopped stage applies immediately at stage time).
-            expect(! swapBoundaryReached(false, false, 0.0, 0.0, 8.0),  "stopped, no edge -> never");
+            expect(! boundaryReached(false, false, 0.0, 0.0, 8.0),  "stopped, no edge -> never");
         }
 
         beginTest("Stager: full-preset swap commits at voice-0 boundary");

@@ -71,8 +71,9 @@ The standard mu platform is everything in `mu-core/`. New products link `mu-core
   resources/               icon set, logo
   installer/               Inno Setup .iss
   Source/
-    Plugin/                PluginProcessor (inherits ProcessorBase), PluginEditor, PresetIO,
-                           HotSwapStager, StandaloneApp, RenderMode, BuildNumber.h
+    Plugin/                PluginProcessor (inherits ProcessorBase), PluginEditor, StandaloneApp
+                           (a thin mu_standalone::App — the window, mu-link bridge and headless
+                           --render are shared), product hot-swap / preset glue
     Sequencer/             Product-specific sequencer (replaces mu-clid's Rhythm/HitGenerator/
                            SequencerEngine/EuclideanGenerator)
     UI/                    Product-specific panels — sidebars, main panels, voice subsections.
@@ -92,8 +93,8 @@ The standard mu platform is everything in `mu-core/`. New products link `mu-core
 - `Modulation/ModulationMatrix` + `Sequencer/ControlSequence` — modulation system. Product's slot type inherits `Sequencer/VoiceSlot`. `Modulation/ModulatorSerialise.h` is the shared (de)serialise for a `VoiceSlot`'s ControlSequences + matrix assignments (products inject their own source/dest ID validators).
 - `UI/Components/` — every standard widget (knob, dropdown, segment, step editor, LFO editor, VU meter, status bar).
 - `UI/MixerChannel`, `UI/MixerOverlay`, `UI/FXRow`, `UI/DelayRow` — shared mixer + FX panels.
-- `UI/ChannelSidebar` + `UI/SidebarItem` — the shared left "layers" sidebar (select / add / delete / drag-reorder). Reads channel metadata from `ProcessorBase::getNumChannels/getChannelName/getChannelColourIndex`. The per-layer mini-graphic (and its animation) is the only product-specific part, injected via `createMiniVisual` (mu-clid → `RhythmMiniVisual` wrapping a `RhythmCircle`; mu-tant → a voice glyph). Reorder + hot-swap semantics are product hooks (`onSwapChannels`, `isPendingSwap`, `onCancelPendingSwap`) wired by each product to its own stager (every product implements hot-swap on the shared `mu_hotswap::Stager` — see [Hot-swap](#hot-swap-staged-preset--layer-swaps-family-pattern) below). Add/delete is driven by the product (`onAddChannel` + a panel delete button → `addVoice`/`removeVoice` in mu-tant, `addRhythm`/`removeRhythm` in mu-clid).
-- `UI/ChannelHeaderBar` — the shared per-layer header (colour dot · editable name · reset · delete · per-layer preset dropdown · Save). Product wires the callbacks to its own reset / delete / preset / rename semantics Products with fixed layers (mu-Toni, mu-On) hide delete and rename (`setShowDelete(false)`, `setNameEditable(false)`); `setPresetFiles` + `onPresetFileChosen` fill the list from files and hand back the chosen one.
+- `UI/ChannelSidebar` + `UI/SidebarItem` — the shared left "layers" sidebar (select / add / delete / drag-reorder). Reads channel metadata from `ProcessorBase::getNumChannels/getChannelName/getChannelColourIndex`. The per-layer mini-graphic (and its animation) is the only product-specific part, injected via `createMiniVisual` (mu-clid → `RhythmMiniVisual` wrapping a `RhythmCircle`; mu-tant → a voice glyph). Reorder + hot-swap semantics are product hooks (`onSwapChannels`, `isPendingSwap`, `onCancelPendingSwap`) wired by each product to its own stager (every product implements hot-swap on the shared `mu_hotswap::Stager` — see [Hot-swap](#hot-swap-staged-preset--layer-swaps-family-pattern) below). Add/delete is driven by the product (`onAddChannel` + a panel delete button → `addVoice`/`removeVoice` in mu-tant, `rhythms.add`/`rhythms.remove` (`RhythmManager`) in mu-clid).
+- `UI/ChannelHeaderBar` — the shared per-layer header (colour dot · editable name · reset · delete · per-layer preset dropdown · Save). `UI/SlotPresetHeader.h` (`mu_ui::wireSlotPresetHeader` + `refreshSlotPresetList`) wires its reset (confirmed) / preset load / save (name prompt) to the ProcessorBase slot-preset API, so panels only add delete / rename where they have them Products with fixed layers (mu-Toni, mu-On) hide delete and rename (`setShowDelete(false)`, `setNameEditable(false)`); `setPresetFiles` + `onPresetFileChosen` fill the list from files and hand back the chosen one.
 - `Persistence/PresetFiles.h` (`mu_pp`) — shared preset-file handling: safe file names, write / read a full preset (the state tree wrapped in `<Mu…Preset name description category>`), the category list, listing preset files, and a layer's params as `<p id v>` rows with the layer prefix stripped (`writeLayerParams` / `applyLayerParams`, which resets params the file doesn't mention). Products add their own children (modulators, patterns) to layer presets.
 - `UI/StandardSettingsOverlay::addProgramChangeSection(layerTable, fullTable)` — the shared MIDI Program Change section (buttons opening the shared program-change tables). Every product with presets calls it; MIDI program changes are queued on the audio thread (`scanMidiProgramChanges` → `triggerAsyncUpdate`) and loaded in `handleAsyncUpdate` (`drainPendingMidiProgramChanges`).
 - `UI/Voice/VoiceBand` — the shared voice band (mu-Clid's layout): Pitch | Filter | Amp | Effects in raised boxes, the FX sends right-aligned in the Effects box beside a narrowed insert dropdown. Products supply the four section components (binding stays product-side); `VoiceBandSection` builds a section from controls a product already owns (two Size-2 rows, `place(control, row, col, span, dropdown)`). Used by mu-Clid (`VoiceSection` subclasses it) and mu-Toni (`EnginePanel`); mu-Tant's voice panel is a different structure and stays product-side.
@@ -122,7 +123,7 @@ The `mu-core` INTERFACE library (introduced in Stage 33) holds everything shared
 | Component | File(s) | Notes |
 |---|---|---|
 | `ProcessorBase` | `mu-core/Plugin/ProcessorBase.{h,cpp}` | Abstract base; owns apvts + fxChain + mixerEngine + `processCoreBlock()` + MIDI-PC preset plumbing + `syncGlobalFxParam()` (maps a mixer/FX/return/master/`ch{N}_` APVTS id → fxChain/mixerEngine state; prefix-routes to per-family helpers); also the internal transport (`internalPlaying` / `internalBpm` / `internalBeatPos` + the play / BPM overrides) and the family bus layout (`isBusesLayoutSupported`: one optional stereo sidechain in, stereo out) |
-| `MixerFxParams` | `mu-core/Plugin/MixerFxParams.h` | `mu_mixfx::addGlobalFxParams(layout)` declares the shared global-FX / return / master param set (`eff_`/`dly_`/`rev_`/`eff2*`/`echo_`/`ret_*`/`mstr_lvl`/`mstr_pan`/`mst_ins*`) the MixerOverlay/FXRow/DelayRow bind to. **Strips:** `mu_mixfx::addChannelStripParams(layout, "ch{N}_", name, options)` declares each channel strip's 12 params (options: version hint / continuous ranges for mu-clid's legacy ids, per-product sidechain defaults); the product adds only its own globals (e.g. mu-clid `mstrLoop`). **Sync contract:** the product registers a `parameterChanged` listener and routes these ids to `ProcessorBase::syncGlobalFxParam` (both mu-clid + mu-tant) |
+| `MixerFxParams` | `mu-core/Plugin/MixerFxParams.h` | `mu_mixfx::addGlobalFxParams(layout)` declares the shared global-FX / return / master param set (`eff_`/`dly_`/`rev_`/`eff2*`/`echo_`/`ret_*`/`mstr_lvl`/`mstr_pan`/`mst_ins*`) the MixerOverlay/FXRow/DelayRow bind to. **Strips:** `mu_mixfx::addChannelStripParams(layout, "ch{N}_", name, options)` declares each channel strip's 12 params (options: version hint / continuous ranges for mu-clid's legacy ids, per-product sidechain defaults); the product adds only its own globals (e.g. mu-clid `mstrLoop`). **Sync contract:** each product calls `ProcessorBase::startFxParamSync()` once at the end of its constructor — the base listens to every mixer / FX id, routes changes to `syncGlobalFxParam` and seeds the engines; a product's own listener (mu-clid's rhythm params) skips those ids |
 | `VoiceEngine` | `mu-core/Audio/VoiceEngine.{h,cpp}` | Per-slot voice chain; no PluginProcessor dependency |
 | `MixerEngine` | `mu-core/Audio/MixerEngine.{h,cpp}` | Channel strips / sends / sidechain / returns / master; optional per-channel render hook (`RenderChannelFn`) |
 | `InsertProcessor` | `mu-core/Audio/InsertProcessor.{h,cpp}` | Parameterised entirely via `VoiceParams` |
@@ -135,7 +136,13 @@ The `mu-core` INTERFACE library (introduced in Stage 33) holds everything shared
 | `ChannelHeaderBar` | `mu-core/UI/` | Shared per-layer header (name / reset / delete / preset / save) |
 | `VoiceBand` / `VoiceBandSection` | `mu-core/UI/Voice/` | Shared voice band layout + drawing (Pitch / Filter / Amp / Effects) |
 | `InsertSubsection` | `mu-core/UI/Voice/` | Shared insert-effect voice subsection (channel-prefix bound) |
-| `mu_hotswap::Stager` | `mu-core/Plugin/HotSwap.h` | Shared hot-swap staging state + loop-wrap predicates |
+| `mu_hotswap::Stager` / `BarLineSwapper` | `mu-core/Plugin/HotSwap.h` | Shared hot-swap staging state + loop-wrap predicates; `BarLineSwapper<Payload, N>` is the whole bar-line driver (stage-or-apply, commit, audio-thread flagging) for a product with one payload type and a fixed loop (mu-Toni, mu-On) |
+| Per-slot preset API | `ProcessorBase` (`slotPresetFiles` / `saveSlotPreset` / `loadSlotPreset` / `resetSlot` / `hasPendingSwap` + `onSlotPresetCommitted`) | One name for a layer's preset save / load / reset in every product; MIDI program-change slots load through it (`applyMidiPresetSlot` default) |
+| Default preset at launch | `ProcessorBase` (`getDefaultPresetFile` / `loadDefaultPreset` / `loadStartupDefault` / `skipAutoLoadDefault`) | Every product restores `<presets>/_default.<ext>` at the end of its constructor; render mode skips it |
+| Headless render | `mu-core/Plugin/ProductRender.h` + `StandaloneShell.h` | `--render` for every product (preset / swap / slot swap / MIDI PC / play flags) on the ProcessorBase preset API; products override only `prepareRender` / `renderPlaysByDefault` |
+| MIDI-clock tempo | `mu-core/Plugin/MidiClockTempo.h` | The one tempo PLL (jitter-rejecting) used by `MidiClockSync` and mu-link's `MidiClockEstimator` |
+| Atomic file writes | `mu-core/Persistence/PresetFiles.h` | `mu_pp::replaceFileAtomically` / `writeXmlAtomically` (temp + rename, failure reported) — every preset / map save goes through them |
+| `ExpDecay` | `mu-core/Audio/ExpDecay.h` | One-multiply exponential decay envelope — use it instead of `std::exp` per sample |
 | `ModulatorPanel`, `ModMatrixPanel`, `ModulatorEditor` | `mu-core/UI/` | Shared modulator UI (take `VoiceSlot&` + a product `ModDestProvider`) |
 | `EditorShellBase`, `TransportBar`, `AboutPanel`, `SaveDialog`, `PresetBrowser`, MIDI-preset panels | `mu-core/UI/` | Shared editor shell + chrome |
 | `mu_fmt` value text | `mu-core/ValueFormat.h` | One formatter set (`time` / `parseTime` / `freq` / `lowCut` / `percent`) for parameter text, knob text and status-bar text — never re-write a formatter in a product |
@@ -153,7 +160,8 @@ The `mu-core` INTERFACE library (introduced in Stage 33) holds everything shared
 
 | Component | Why specific |
 |---|---|
-| mu-clid `SequencerEngine` | Euclidean pattern generation, rhythm slot management |
+| mu-clid `SequencerEngine` | Euclidean pattern generation |
+| mu-clid `RhythmManager` (`proc.rhythms`), `SampleLibrary` (`proc.samples`) | Rhythm-slot add / remove / swap / reset / rename; per-rhythm sample paths, preview and the primary sample folder — collaborators the processor owns |
 | mu-clid `Rhythm : VoiceSlot` | Adds `HitGenerator genA/B/C` (Euclidean) on top of the shared `VoiceSlot` |
 | mu-clid `HitGenerator`, `EuclideanGenerator` | Euclidean algorithm |
 | mu-clid `EuclideanPanel`, `RhythmPanel`, `RhythmCircle`, `RhythmMiniVisual`, `RhythmSidebar`, `VoiceSection` | Euclidean / sample-trigger engine UI (`RhythmSidebar` is a thin `ChannelSidebar` subclass) |
@@ -310,8 +318,8 @@ boundary, and the apply.
 | | mu-clid | mu-tant | mu-toni | mu-on |
 |---|---|---|---|---|
 | Deep-dive doc | [mu-clid/design-hotswap.md](mu-clid/design-hotswap.md) | — (this section) | — | — |
-| Stager | `HotSwapStager` → `Stager<PendingRhythm, PreparedFullPreset, 8>` (`Rhythm` + `VoiceEngine` + sample path) | `VoiceHotSwapStager` → `Stager<ValueTree, ValueTree, 8>` | `Stager<ValueTree, ValueTree, 4>` in `PluginProcessor` | `Stager<ValueTree, ValueTree, 5>` in `PluginProcessor` |
-| Boundary predicates | `HotSwapBoundary.h` (`mu_clid::hotswap`) | `HotSwapBoundary.h` (`mu_tant::hotswap`, wraps the shared ones) | shared `boundaryReached` | shared `boundaryReached` |
+| Stager | `HotSwapStager` → `Stager<PendingRhythm, PreparedFullPreset, 8>` (`Rhythm` + `VoiceEngine` + sample path) | `VoiceHotSwapStager` → `Stager<ValueTree, ValueTree, 8>` | `BarLineSwapper<ValueTree, 4>` | `BarLineSwapper<ValueTree, 5>` |
+| Boundary predicates | `HotSwapBoundary.h` (`mu_clid::hotswap`) | shared `loopWrapped` / `boundaryReached` | shared (inside `BarLineSwapper`) | shared (inside `BarLineSwapper`) |
 | Reference boundary | master loop / per-rhythm wrap (`swapMode`) | full preset → voice 0's gate-pattern wrap; per-voice → that voice's own wrap (master loop when set) | every bar (the arp has no loop of its own) | the 16-step pattern wrap = every bar |
 | Staged when | sequencer playing | internal transport playing | the audio thread's play state (host, MIDI clock or internal) | the audio thread's play state (host, MIDI clock or internal) |
 | Commit isolation | `suspendProcessing` + `rhythmsLock`, microseconds (heavy work pre-built at stage) | **no blanket lock** — relies on the audio render's existing fine-grained locks | same as mu-tant | same as mu-tant |
@@ -351,8 +359,7 @@ boundary, and the apply.
    build, and never installs a partial payload. (This also makes a future background
    decode safe with no extra machinery.)
 7. **Editor refresh after commit** via `ProcessorBase::onPresetSwapCommitted` (full)
-   and a product per-layer callback (`onRhythmHotSwapCommitted` /
-   `onVoiceHotSwapCommitted`) — the shell calls `onPresetLoaded` *synchronously*
+   and `ProcessorBase::onSlotPresetCommitted(slot)` (per layer, every product) — the shell calls `onPresetLoaded` *synchronously*
    after `loadPreset`, which for a staged swap runs against pre-swap state, so the
    commit must re-trigger the refresh. **Clear the callbacks in the editor dtor**
    (processor outlives editor → UAF).

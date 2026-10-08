@@ -20,7 +20,8 @@ Release build of `mu-clid_Standalone` triggers the OneDrive post-build deploy to
 mu-clid/Source/
 ├── Plugin/           PluginProcessor, PluginEditor (extends EditorShellBase),
 │                     PresetIO + PresetIO_HostState, HotSwapStager + HotSwapBoundary,
-│                     ModulationSkew, RenderMode, StandaloneApp, LiteEditor, SamplePreview
+│                     RhythmManager (proc.rhythms), SampleLibrary + SamplePreview
+│                     (proc.samples), ModulationSkew, StandaloneApp, LiteEditor
 ├── Sequencer/        Rhythm, HitGenerator, SequencerEngine, EuclideanGenerator
 ├── UI/               Euclidean panels + VoiceSection (Pitch/Filter/Amp
 │                     subsections; the Insert subsection + the ModulatorPanel /

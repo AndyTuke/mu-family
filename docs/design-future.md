@@ -25,7 +25,7 @@ For shipped features see [DevelopmentHistory.md](DevelopmentHistory.md).
 
 Expose the headless render pipeline (introduced for the listening-test harness) as a user-facing "File → Bounce…" dialog in the standalone. User picks duration, sample rate, output file → gets a WAV of the currently-loaded patch playing for N seconds. Useful for sample-pack workflows where the user wants to commit a pattern to disk without round-tripping through a DAW.
 
-- **Foundation in place:** [mu-clid/Source/Plugin/RenderMode.{h,cpp}](../mu-clid/Source/Plugin/RenderMode.h) already drives `processBlock` headlessly and writes WAV via `juce::WavAudioFormat`. The CLI path (`--render`) bypasses the GUI; the user-facing version reuses `RenderMode::execute` from a dialog instead of from `JUCEApplication::initialise`.
+- **Foundation in place:** [mu-core/Plugin/ProductRender.h](../mu-core/Plugin/ProductRender.h) already drives `processBlock` headlessly for every product and writes WAV via `juce::WavAudioFormat`. The CLI path (`--render`) bypasses the GUI; the user-facing version reuses `mu_core::render_mode::runProduct` from a dialog instead of from `JUCEApplication::initialise`.
 - **Suggested implementation:** new `BounceDialog` modal in the standalone's menu bar. Form fields — filename (default `<preset name>_bounced.wav`), duration (default 8 s), sample rate (default current device rate), tail length (extra silence past playback to capture FX tails). On confirm: temporarily pause the live transport, call `RenderMode::execute` against a fresh PluginProcessor seeded from the current APVTS state, write the WAV, resume.
 - **Plugin / standalone parity question:** does the VST3/CLAP plugin also expose Bounce? Probably no — most DAWs have their own bounce/render workflow; a plugin offering a competing one is confusing. Standalone-only is the right scope.
 - **Family reuse:** the dialog code can live in `mu-core/UI/` so every product inherits Bounce automatically (each plugin's own `RenderMode`, or the shared render path, plugs into the same dialog). Only mu-clid has a `RenderMode` today; generalising it to mu-core is the prerequisite.
@@ -36,7 +36,7 @@ A separate distribution binary with full plugin functionality but reduced limits
 
 - Cap at 2 rhythms (vs 8 in full version)
 - Disable Save (Load still allowed so users can audition shared patches)
-- Built from same source via CMake option `-DMU_CLID_DEMO=ON` defining a preprocessor flag; gates `addRhythm` past 2 and disables Save buttons in the UI
+- Built from same source via CMake option `-DMU_CLID_DEMO=ON` defining a preprocessor flag; gates `rhythms.add` past 2 and disables Save buttons in the UI
 - About-panel "Demo" badge
 - If pursued, generalise the gate to a family pattern (`-DMU_<PRODUCT>_DEMO`) so siblings get demos the same way.
 
