@@ -119,6 +119,7 @@ target_sources(mu-toni-tests PRIVATE
     Source/Tests/ApvtsLayoutTests.cpp
     Source/Tests/ArpeggiatorTests.cpp   # T1 — arp engine (Sequencer/Arpeggiator.h)
     Source/Tests/ToniVoiceTests.cpp     # T2 — wavetable voice + X-Mod render
+    Source/Tests/ArpRunnerTests.cpp     # T3 — arp step timing (beat grid / MIDI trigger)
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/MultiModeFilter.cpp"
 )

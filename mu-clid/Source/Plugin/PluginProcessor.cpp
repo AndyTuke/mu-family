@@ -1,5 +1,6 @@
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "PluginProcessor.h"
+#include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "PluginProcessor_Internal.h"
 #include "Audio/InsertSlotConfig.h"
@@ -264,27 +265,14 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 //==============================================================================
 PluginProcessor::BlockTransport PluginProcessor::computeLiteTransport(int numSamples)
 {
-    double beatPos = 0.0;
-    bool   playing = false;
-
-    if (auto* ph = getPlayHead())
-    {
-        if (auto pos = ph->getPosition())
-        {
-            playing = pos->getIsPlaying();
-            if (auto ppq = pos->getPpqPosition())
-                beatPos = *ppq;
-        }
-    }
-    if (!playing && internalPlaying.load(std::memory_order_relaxed))
-    {
-        playing = true;
-        const double pos = internalBeatPos.load(std::memory_order_relaxed);
-        beatPos = pos;
-        internalBeatPos.store(pos + (juce::jmax(1, numSamples) / currentSampleRate)
-                                  * (internalBpm.load(std::memory_order_relaxed) / 60.0),
-                              std::memory_order_relaxed);
-    }
+    // The family transport rule (mu-core TransportResolver): Lite runs in a host, so play, tempo
+    // and beat follow it (its own transport only when a host gives no position at all).
+    const auto t = mu_core::resolveTransport(mu_core::readHostTransport(getPlayHead()),
+                                             wrapperType == wrapperType_Standalone, midiClockSync, 0.0,
+                                             { internalPlaying, internalBpm, internalBeatPos },
+                                             juce::jmax(1, numSamples), currentSampleRate);
+    const bool   playing = t.playing;
+    const double beatPos = t.startBeat;
 
     sequencerPlaying.store(playing);
     lastBeatPos.store(beatPos);
@@ -420,33 +408,14 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     }
     else
     {
-        // Free mode (default): host transport drives play, with MIDI clock and
-        // internal transport as fallbacks (existing behaviour).
-        if (auto* ph = getPlayHead())
-        {
-            if (auto pos = ph->getPosition())
-            {
-                playing = pos->getIsPlaying();
-                if (auto ppq = pos->getPpqPosition())
-                    beatPos = *ppq;
-            }
-        }
-
-        if (!playing && midiClockSync.isEnabled()
-                     && wrapperType == wrapperType_Standalone
-                     && (midiClockSync.isPlaying() || internalPlaying.load(std::memory_order_relaxed)))
-        {
-            playing = true;
-            beatPos = midiClockBlockBeatPos;
-        }
-        else if (!playing && internalPlaying.load(std::memory_order_relaxed))
-        {
-            playing  = true;
-            const double pos = internalBeatPos.load(std::memory_order_relaxed);
-            beatPos  = pos;
-            internalBeatPos.store(pos + (buffer.getNumSamples() / currentSampleRate) * (internalBpm.load(std::memory_order_relaxed) / 60.0),
-                                  std::memory_order_relaxed);
-        }
+        // Free mode (default): the family transport rule (mu-core TransportResolver) — the host /
+        // mu-link position, else (standalone) external MIDI clock, else the own transport.
+        const auto t = mu_core::resolveTransport(mu_core::readHostTransport(getPlayHead()), ! isPlugin,
+                                                 midiClockSync, midiClockBlockBeatPos,
+                                                 { internalPlaying, internalBpm, internalBeatPos },
+                                                 buffer.getNumSamples(), currentSampleRate);
+        playing = t.playing;
+        beatPos = t.startBeat;
     }
 
     // detect transport stop→start edge and reset the sequencer's wrap detector

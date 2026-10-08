@@ -1,5 +1,6 @@
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "Plugin/PluginProcessor.h"
+#include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "Plugin/PluginEditor.h"
 #include "Audio/Scales.h"
@@ -258,58 +259,24 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // final mix after the render (applyNoteModeGate). No-op in Free mode.
     scanNoteMode(midiMessages);
 
-    // External MIDI clock (standalone): scan the buffer + advance the clock estimate. Returns
-    // the start-of-block beat (0 when disabled); the transport derivation below slaves to it.
+    // This block's transport — the family rule (mu-core TransportResolver): the host / mu-link
+    // position, else (standalone) external MIDI clock, else the own transport. Its beat is
+    // wrapped into mu-Tant's bounded beat space (the longest gate pattern, 64 beats) so the gates
+    // and the hot-swap boundary see positions exactly as they do free-running; only the SOURCE of
+    // the beat changes. Snapshotted into the per-block members the render hook reads. No voice
+    // data here, so this runs OUTSIDE the render lock: the transport keeps advancing even while a
+    // preset hot-swap commits on the message thread (no transport freeze).
+    constexpr double kMaxPatBeats = (double) GatePattern::kMaxPatternBars * 4.0;   // 64
     const double midiClockBeat = midiClockSync.process(midiMessages, numSamples, currentSampleRate);
-
-    // Per-block transport snapshot for the render hook (audio-thread-only members, read by
-    // renderVoice). Family standard (mu-core HostTransport): consult the playhead first.
-    //   • Plugin: host drives play + BPM (mu-Tant keeps its own free-running beat, by design).
-    //   • Standalone + mu-link: the injected MuLinkPlayHead supplies a beat POSITION → slave
-    //     the beat to it (phase-locked to the mu-link master clock).
-    //   • Standalone, free-running: no playhead → the internal play button drives.
-    // No voice data here, so this — and the beat advance + hot-swap boundary check at the end —
-    // run OUTSIDE the render lock: the transport keeps advancing even while a preset hot-swap
-    // commits on the message thread (no transport freeze).
-    double bpm = internalBpm.load(std::memory_order_relaxed);
-    const auto ht = mu_core::readHostTransport(getPlayHead());
-
-    bool   slaved     = false;
-    double slavedBeat = 0.0;
-    if (wrapperType != wrapperType_Standalone)
-    {
-        if (ht.bpm > 0.0) bpm = ht.bpm;
-        internalPlaying.store(ht.playing, std::memory_order_relaxed);   // UI timer reads this
-        blkPlaying = ht.playing;
-    }
-    else if (ht.hasPosition)
-    {
-        // Slaved to mu-link. Wrap the master ppq into mu-Tant's bounded beat space (the same
-        // ceiling the internal transport uses) so the gate + hot-swap boundary see positions
-        // exactly as they do free-running — only the SOURCE of the beat changes.
-        if (ht.bpm > 0.0) bpm = ht.bpm;
-        internalPlaying.store(ht.playing, std::memory_order_relaxed);
-        blkPlaying = ht.playing;
-        slaved     = true;
-        slavedBeat = std::fmod(ht.ppqPosition, (double) GatePattern::kMaxPatternBars * 4.0);
-    }
-    else if (midiClockSync.isEnabled() && midiClockSync.isPlaying())
-    {
-        // Slaved to external MIDI clock (standalone, MIDI-in). Same bounded beat space as the
-        // others — only the SOURCE of the beat changes (mu-link takes priority above when attached).
-        bpm = midiClockSync.getBpm();
-        internalPlaying.store(true, std::memory_order_relaxed);
-        blkPlaying = true;
-        slaved     = true;
-        slavedBeat = std::fmod(midiClockBeat, (double) GatePattern::kMaxPatternBars * 4.0);
-    }
-    else
-    {
-        blkPlaying = internalPlaying.load(std::memory_order_relaxed);
-    }
-
-    blkBeatStart      = slaved ? slavedBeat : internalBeatPos.load(std::memory_order_relaxed);
-    blkBeatsPerSample = (bpm / 60.0) / currentSampleRate;
+    const auto   transport     = mu_core::resolveTransport(mu_core::readHostTransport(getPlayHead()),
+                                                           wrapperType == wrapperType_Standalone,
+                                                           midiClockSync, midiClockBeat,
+                                                           { internalPlaying, internalBpm, internalBeatPos },
+                                                           numSamples, currentSampleRate, kMaxPatBeats);
+    const double bpm  = transport.bpm;
+    blkPlaying        = transport.playing;
+    blkBeatStart      = transport.startBeat;
+    blkBeatsPerSample = transport.beatsPerSample;
 
     // Render → gate → insert → mixer through the shared path (engine→insert→mixer).
     // Guarded by a try-lock ONLY against a voice add/remove data shift (the message
@@ -341,20 +308,10 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // the ramp still tracks). No-op in Free mode.
     applyNoteModeGate(buffer, numSamples);
 
-    // Advance the transport beat. Wrap at the maximum pattern length (64 beats =
-    // 16 bars in 4/4) to keep floating-point precision bounded. Each GatePattern
-    // wraps internally at its own patternLengthBars; the global counter just needs a
-    // ceiling. Runs unconditionally (atomics only) so the transport never freezes.
+    // The block's beat span for the boundary test: the RAW (pre-wrap) end, so the loop-index test
+    // holds for pattern lengths that don't divide 64. (The resolver already advanced the counter.)
     const double oldPos    = blkBeatStart;
-    double       newPosRaw = oldPos;   // pre-ceiling advanced position for boundary detection
-    if (blkPlaying)
-    {
-        newPosRaw = oldPos + blkBeatsPerSample * (double) numSamples;
-        double pos = newPosRaw;
-        constexpr double kMaxPatBeats = (double) GatePattern::kMaxPatternBars * 4.0; // 64
-        if (pos >= kMaxPatBeats) pos -= kMaxPatBeats;
-        internalBeatPos.store(pos, std::memory_order_relaxed);
-    }
+    const double newPosRaw = oldPos + transport.blockBeats;
 
     // Hot-swap boundary check: a staged preset commits when its reference loop wraps
     // (or on the playing→stopped edge). Uses the RAW pre-ceiling position so the

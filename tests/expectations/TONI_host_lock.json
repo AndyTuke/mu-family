@@ -1,0 +1,29 @@
+{
+  "test": "TONI_host_lock",
+  "product": "mu-toni",
+  "description": "Family transport rule — mu-Toni follows a host position: the render runs as if in a playing host whose timeline starts at beat 0.125 (mid-sixteenth, 120 BPM). The arp's steps sit on the host's beat grid, so the first note waits for beat 0.25 (62.5 ms) instead of firing at once.",
+  "render": {
+    "host_start_beat": 0.125,
+    "seconds": 0.6,
+    "sample_rate": 48000,
+    "block_size": 512
+  },
+  "assertions": [
+    {
+      "name": "silent_before_the_grid_step",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [0.0, 0.055],
+      "max": -70,
+      "comment": "nothing plays between the host's start (beat 0.125) and the next sixteenth"
+    },
+    {
+      "name": "note_on_the_grid_step",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [0.07, 0.3],
+      "min": -40,
+      "comment": "the first step lands at beat 0.25 (62.5 ms)"
+    }
+  ]
+}

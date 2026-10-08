@@ -131,13 +131,13 @@ bridge.
   `#include`d **only** by `mu-toni/Source/Plugin/StandaloneApp.cpp` — so VST3/CLAP
   never compile it and a plugin can never attach. Never add mu-link hooks to the
   shared `PluginProcessor` beyond the playhead consult below.
-- **Transport slaving:** `processBlock` reads the playhead via
-  `mu_core::readHostTransport()` (carries `hasPosition`/`ppqPosition`). In
-  **standalone** it slaves the beat to `ppqPosition` when present (mu-link
-  attached) and free-runs the internal transport otherwise — plugin and
-  free-running-standalone behaviour byte-identical. This is a **one-liner-per-
-  product** hook; μ-Toni just adds it (design-future.md lists mu-toni as
-  not-yet-wired).
+- **Transport:** `processBlock` takes play, tempo and beat from the family rule,
+  `mu_core::resolveTransport` (a DAW's or mu-link's position, else MIDI clock in
+  standalone, else the internal transport — see
+  [design-plugin-family.md § Transport rule](../design-plugin-family.md#transport-rule--family-standard)).
+  In loop mode the arp's steps sit on that beat grid (step k at beat k × the step
+  length, fired on its exact sample), so the arp locks to a DAW's bars and a loop /
+  locate lands on the same step and note; MIDI-trigger mode restarts at each key press.
 - **Audio bus:** mu-link sums the **post-mixer** `processBlock` output, so the
   arp/synth engine is irrelevant to the bus path — μ-Toni contributes its master
   output like any client.

@@ -134,7 +134,11 @@ public:
     bool isActive() const noexcept { return ampEnv.isActive(); }
 
     // Renders and ADDS the voice into `out` (stereo). numSamples ≤ prepared block.
-    void process(juce::AudioBuffer<float>& out, int numSamples)
+    void process(juce::AudioBuffer<float>& out, int numSamples) { process(out, 0, numSamples); }
+
+    // The same into out[startSample, startSample + numSamples) — a span of a block, so a step or
+    // a note-off can land on its exact sample.
+    void process(juce::AudioBuffer<float>& out, int startSample, int numSamples)
     {
         if (! ampEnv.isActive() || numSamples <= 0) return;
 
@@ -172,8 +176,8 @@ public:
 
         filter.process(mono, numSamples, 1);
 
-        float* L = out.getWritePointer(0);
-        float* R = out.getNumChannels() > 1 ? out.getWritePointer(1) : L;
+        float* L = out.getWritePointer(0) + startSample;
+        float* R = (out.getNumChannels() > 1 ? out.getWritePointer(1) : out.getWritePointer(0)) + startSample;
         const float lg = panL * levelGain, rg = panR * levelGain;
         for (int i = 0; i < numSamples; ++i)
         {

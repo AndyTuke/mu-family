@@ -1,4 +1,5 @@
 #include "Plugin/PluginProcessor.h"
+#include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
 #include "Plugin/PluginEditor.h"
 #include "Plugin/HostTransport.h"          // mu-core: DAW / mu-link transport read
 #include "Modulation/MuOnModDest.h"
@@ -151,34 +152,17 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // handleAsyncUpdate to load on the message thread.
     queueMidiProgramChanges(midiMessages);
 
-    // External MIDI clock (standalone): scan the buffer + advance the clock estimate. When
-    // the Source is "MIDI In" the external clock is the sole transport authority — it drives
-    // tempo, beat AND play/stop (MIDI Start/Stop), overriding the internal play button. The
-    // clock beat is monotonic between Starts, so it feeds the sequencer like the internal one.
+    // This block's transport — the family rule (mu-core TransportResolver): the host / mu-link
+    // position, else (standalone) external MIDI clock, else the own transport.
     const double midiClockBeat = midiClockSync.process(midiMessages, numSamples, currentSampleRate);
-    const bool   clockEnabled  = wrapperType == wrapperType_Standalone && midiClockSync.isEnabled();
-
-    // Transport priority: DAW host / mu-link master (via injected playhead) > external
-    // MIDI clock (standalone) > the internal free-running transport.
-    const auto host = mu_core::readHostTransport(getPlayHead());
-    const bool externalBeat = host.hasPosition || clockEnabled;
-    double bpm       = internalBpm.load(std::memory_order_relaxed);
-    double beatStart = internalBeatPos.load(std::memory_order_relaxed);
-    bool   isPlaying = internalPlaying.load(std::memory_order_relaxed);
-    if (host.hasPosition)
-    {
-        isPlaying = host.playing;
-        if (host.bpm > 0.0) bpm = host.bpm;
-        beatStart = host.ppqPosition;
-        internalPlaying.store(isPlaying, std::memory_order_relaxed);   // UI play button mirrors the host / mu-link
-    }
-    else if (clockEnabled)
-    {
-        isPlaying = midiClockSync.isPlaying();
-        if (midiClockSync.getBpm() > 0.0) bpm = midiClockSync.getBpm();
-        beatStart = midiClockBeat;
-        internalPlaying.store(isPlaying, std::memory_order_relaxed);   // UI play button mirrors the external transport
-    }
+    const auto   transport     = mu_core::resolveTransport(mu_core::readHostTransport(getPlayHead()),
+                                                           wrapperType == wrapperType_Standalone,
+                                                           midiClockSync, midiClockBeat,
+                                                           { internalPlaying, internalBpm, internalBeatPos },
+                                                           numSamples, currentSampleRate);
+    const double bpm       = transport.bpm;
+    const double beatStart = transport.startBeat;
+    const bool   isPlaying = transport.playing;
 
     // Refresh engine params from the APVTS, then clock the 909 sequencer for this block
     // (before the render so a step's engine is armed for this same block). Each fired lane
@@ -209,25 +193,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // Hot-swap: flag staged presets whose pattern wrap (one bar) passed in this block, or the
     // transport stopped. When the beat comes from outside, the next block's start stands in for
     // this block's end, so the block's own span is estimated from the tempo.
-    {
-        const double blockBeats = (bpm / 60.0) / currentSampleRate * (double) numSamples;
-        if (hotSwap.flagBoundaries(isPlaying, beatStart, blockBeats))
-            triggerAsyncUpdate();
-    }
-
-    // Advance the transport beat. When slaved to the host / mu-link or external MIDI clock the
-    // beat comes from outside each block, so mirror it into internalBeatPos (no separate
-    // advance) — the internal transport then resumes seamlessly if the source goes away.
-    if (externalBeat)
-    {
-        internalBeatPos.store(beatStart, std::memory_order_relaxed);
-    }
-    else if (isPlaying)
-    {
-        const double beatsPerSample = (bpm / 60.0) / currentSampleRate;
-        internalBeatPos.store(beatStart + beatsPerSample * (double) numSamples,
-                              std::memory_order_relaxed);
-    }
+    if (hotSwap.flagBoundaries(isPlaying, beatStart, transport.beatsPerSample * (double) numSamples))
+        triggerAsyncUpdate();
 }
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()

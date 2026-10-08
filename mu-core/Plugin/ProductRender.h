@@ -14,6 +14,8 @@
 //   --play / --no-play                       start the internal transport (product default otherwise)
 //   --save-preset <file>                     after the start preset loads, save the state as a full
 //                                            preset at <file> (the listening tests' round trip)
+//   --host-start-beat <b> [--host-bpm <t>]   run as if in a playing host whose timeline starts at beat
+//                                            <b> (the family transport rule's host path)
 //   --save-state <file> / --state <file>     write / restore the host session (getStateInformation /
 //                                            setStateInformation) — the session round trip
 //
@@ -41,6 +43,9 @@ namespace mu_core::render_mode
 
         juce::File savePresetFile;
         juce::File saveStateFile, stateFile;
+
+        double hostStartBeat = -1.0;   // < 0 = no simulated host
+        double hostBpm       = 120.0;
     };
 
     // The value of the first of `flags` present (each removed from `tokens`).
@@ -78,6 +83,8 @@ namespace mu_core::render_mode
         const auto savePreset  = takeFlagValue(tokens, "--save-preset");
         const auto saveState   = takeFlagValue(tokens, "--save-state");
         const auto state       = takeFlagValue(tokens, "--state");
+        const auto hostStart   = takeFlagValue(tokens, "--host-start-beat");
+        const auto hostBpm     = takeFlagValue(tokens, "--host-bpm");
         if (tokens.contains("--play"))    { a.play = 1; tokens.removeString("--play"); }
         if (tokens.contains("--no-play")) { a.play = 0; tokens.removeString("--no-play"); }
 
@@ -92,6 +99,8 @@ namespace mu_core::render_mode
         if (savePreset.isNotEmpty())  a.savePresetFile    = cwd.getChildFile(savePreset);
         if (saveState.isNotEmpty())   a.saveStateFile     = cwd.getChildFile(saveState);
         if (state.isNotEmpty())       a.stateFile         = cwd.getChildFile(state);
+        if (hostStart.isNotEmpty())   a.hostStartBeat     = hostStart.getDoubleValue();
+        if (hostBpm.isNotEmpty())     a.hostBpm           = hostBpm.getDoubleValue();
         if (presetSlot.isNotEmpty())  a.presetSlot           = presetSlot.getIntValue();
         if (swapAt.isNotEmpty())      a.swapAtSeconds        = swapAt.getDoubleValue();
         if (swapSlot.isNotEmpty())    a.swapSlot             = swapSlot.getIntValue();
@@ -126,6 +135,24 @@ namespace mu_core::render_mode
         }
         return true;
     }
+
+    // A playing host's playhead for --host-start-beat: its timeline starts at `startBeat` and runs
+    // at `bpm`; the render loop tells it where each block starts.
+    struct SimulatedHostPlayHead : juce::AudioPlayHead
+    {
+        double startBeat = 0.0, bpm = 120.0, sampleRate = 48000.0;
+        juce::int64 samplePos = 0;
+
+        juce::Optional<PositionInfo> getPosition() const override
+        {
+            PositionInfo info;
+            info.setIsPlaying(true);
+            info.setBpm(bpm);
+            info.setTimeInSamples(samplePos);
+            info.setPpqPosition(startBeat + (double) samplePos / sampleRate * bpm / 60.0);
+            return info;
+        }
+    };
 
     // Run the render on a constructed processor (the caller sets ProcessorBase::skipAutoLoadDefault
     // before constructing it, so renders start from the factory state). `playByDefault` is the
@@ -188,6 +215,16 @@ namespace mu_core::render_mode
         juce::AudioBuffer<float> captured(outChannels, totalSamples);
         captured.clear();
 
+        // A simulated host, when asked for, supplies the transport (it outranks the own one).
+        SimulatedHostPlayHead hostPlayHead;
+        if (args.hostStartBeat >= 0.0)
+        {
+            hostPlayHead.startBeat  = args.hostStartBeat;
+            hostPlayHead.bpm        = args.hostBpm;
+            hostPlayHead.sampleRate = args.sampleRate;
+            proc.setPlayHead(&hostPlayHead);
+        }
+
         // Phase 3: render, firing each mid-render action once when its time is reached.
         auto atSample = [&](double s) { return s >= 0.0 ? (int) std::round(s * args.sampleRate) : -1; };
         const int swapAt = atSample(args.swapAtSeconds), slotAt = atSample(args.swapSlotAtSeconds),
@@ -202,6 +239,7 @@ namespace mu_core::render_mode
 
         auto beforeBlock = [&](int written, juce::MidiBuffer& midi)
         {
+            hostPlayHead.samplePos = written;
             if (swapAt >= 0 && ! swapDone && written >= swapAt)
             {
                 proc.loadPreset(args.swapPresetFile);   // stages; commits at the next boundary
@@ -234,6 +272,7 @@ namespace mu_core::render_mode
         };
 
         renderLoop(proc, args, captured, outChannels, beforeBlock, afterBlock);
+        proc.setPlayHead(nullptr);
 
         proc.releaseResources();
         return writeWav(args, captured, outChannels, product);

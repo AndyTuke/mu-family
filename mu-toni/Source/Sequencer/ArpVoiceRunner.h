@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+
 #include "Audio/ToniVoice.h"
 #include "Sequencer/Arpeggiator.h"
 #include <climits>
@@ -33,6 +35,8 @@ struct ArpContext
     int    rootOverrideMidi = -1;   // latest held MIDI note (root-by-MIDI), or −1
     bool   anyNoteHeld     = false;
     bool   noteOnEdge      = false; // a fresh note-on landed this block
+    double startBeat       = 0.0;   // the transport beat at the block's first sample
+    double beatsPerSample  = 0.0;
 };
 
 class ArpVoiceRunner
@@ -63,41 +67,97 @@ public:
         bool run = ctx.playing;
         if (midiTrigger) run = run && ctx.anyNoteHeld;
 
-        // Restart the pattern cleanly on a trigger edge / on transport start.
-        if (midiTrigger && ctx.noteOnEdge)  { stepIndex = 0; stepCounter = 0; prevTied = false; }
-        if (! midiTrigger && run && ! wasRunning) { stepCounter = 0; }
+        const bool started = run && ! wasRunning;
         wasRunning = run;
+
+        if (! run)
+        {
+            if (noteHeld) { voice.noteOff(); noteHeld = false; }
+            voice.process(buf, n);   // the release tail
+            return;
+        }
 
         const double spb = sampleRate * 60.0 / (ctx.bpm > 0.0 ? ctx.bpm : 120.0);
         const int    samplesPerStep = juce::jmax(1, (int) (spb * rateBeats(rateIndex)));
 
-        if (run)
-        {
-            if (noteHeld && ! tiedOut)
-            {
-                gateCounter -= n;
-                if (gateCounter <= 0) { voice.noteOff(); noteHeld = false; }
-            }
-
-            stepCounter -= n;
-            if (stepCounter <= 0)
-            {
-                stepCounter += samplesPerStep;
-                fireStep(ctx, samplesPerStep);
-            }
-        }
-        else if (noteHeld)
-        {
-            voice.noteOff();
-            noteHeld = false;
-        }
-
-        voice.process(buf, n);
+        if (midiTrigger)
+            renderTriggered(buf, n, ctx, samplesPerStep);
+        else
+            renderOnGrid(buf, n, ctx, started, samplesPerStep);
     }
 
     bool isActive() const noexcept { return voice.isActive(); }
 
+    // The last step fired: its number in the pattern, and its sample offset in the block that fired it.
+    int lastStep()       const noexcept { return lastFiredStep; }
+    int lastStepOffset() const noexcept { return lastFiredOffset; }
+    int stepsFired()     const noexcept { return firedCount; }
+
 private:
+    // MIDI-trigger mode: the pattern restarts at each key press and counts its own steps from there.
+    void renderTriggered(juce::AudioBuffer<float>& buf, int n, const ArpContext& ctx, int samplesPerStep)
+    {
+        if (ctx.noteOnEdge) { stepIndex = 0; stepCounter = 0; prevTied = false; }
+        int pos = 0;
+        while (stepCounter < n)
+        {
+            const int at = juce::jmax(pos, stepCounter);
+            renderSpan(buf, pos, at);
+            pos = at;
+            lastFiredOffset = at;
+            fireStep(ctx, samplesPerStep);
+            stepCounter += samplesPerStep;
+        }
+        renderSpan(buf, pos, n);
+        stepCounter -= n;
+    }
+
+    // Loop mode: steps sit on the beat grid — step k starts at beat k × the step length — so the
+    // arp locks to the host's bars, and a loop or a position jump lands on the same step (and note).
+    // A start, a rate change or a jump in the beat re-finds the next step.
+    void renderOnGrid(juce::AudioBuffer<float>& buf, int n, const ArpContext& ctx, bool started, int samplesPerStep)
+    {
+        const double stepBeats = rateBeats(rateIndex);
+        const double bps       = ctx.beatsPerSample;
+        const double endBeat   = ctx.startBeat + bps * (double) n;
+        if (started || stepBeats != gridStepBeats || std::abs(ctx.startBeat - expectedBeat) > 0.5 * stepBeats)
+        {
+            gridStepBeats = stepBeats;
+            nextStep      = (long long) std::ceil(ctx.startBeat / stepBeats - 1.0e-9);
+        }
+        expectedBeat = endBeat;
+
+        // Fire each step whose beat falls inside this block, at its sample.
+        int pos = 0;
+        while (bps > 0.0 && (double) nextStep * stepBeats < endBeat)
+        {
+            const int at = juce::jlimit(pos, n - 1,
+                                        (int) std::ceil(((double) nextStep * stepBeats - ctx.startBeat) / bps - 1.0e-9));
+            renderSpan(buf, pos, at);
+            pos = at;
+            stepIndex = (int) (nextStep % (1LL << 30));   // the note-pool position follows the beat
+            lastFiredOffset = at;
+            fireStep(ctx, samplesPerStep);
+            ++nextStep;
+        }
+        renderSpan(buf, pos, n);
+    }
+
+    // Render buf[from, to), ending a gated note on its exact sample.
+    void renderSpan(juce::AudioBuffer<float>& buf, int from, int to)
+    {
+        while (from < to)
+        {
+            int len = to - from;
+            const bool gateEnds = noteHeld && ! tiedOut && gateCounter <= len;
+            if (gateEnds) len = juce::jmax(0, gateCounter);
+            voice.process(buf, from, len);
+            from += len;
+            if (noteHeld && ! tiedOut) gateCounter -= len;
+            if (gateEnds) { voice.noteOff(); noteHeld = false; }
+        }
+    }
+
     void fireStep(const ArpContext& ctx, int samplesPerStep)
     {
         ArpParams p = arp;
@@ -109,6 +169,8 @@ private:
         }
 
         const int midi = stepMidi(p, stepIndex);
+        lastFiredStep = stepIndex;
+        ++firedCount;
         ++stepIndex;
 
         const bool tie = legatoOn && gateLen >= 0.99f;   // 100 % gate + legato → tie/slide
@@ -136,6 +198,15 @@ private:
     bool tiedOut     = false;
     bool prevTied    = false;
     bool wasRunning  = false;
+
+    int  lastFiredStep   = -1;
+    int  lastFiredOffset = -1;
+    int  firedCount      = 0;
+
+    // Beat-grid stepping (loop mode).
+    long long nextStep      = 0;
+    double    gridStepBeats = 0.0;
+    double    expectedBeat  = 0.0;
 };
 
 } // namespace mu_toni

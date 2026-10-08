@@ -127,6 +127,12 @@ def run_one(test_name: str, spec: dict, spec_path: Path, exe: Path, product: str
     if 'play' in render:
         cmd += ['--play' if render['play'] else '--no-play']
 
+    # Optional simulated host: a playing timeline starting at host_start_beat (host_bpm, default 120).
+    if render.get('host_start_beat') is not None:
+        cmd += ['--host-start-beat', str(render['host_start_beat'])]
+        if render.get('host_bpm') is not None:
+            cmd += ['--host-bpm', str(render['host_bpm'])]
+
     if render.get('roundtrip'):
         roundtrip_preset.unlink(missing_ok=True)
         cmd += ['--save-preset', str(roundtrip_preset)]

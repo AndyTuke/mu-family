@@ -547,7 +547,7 @@ code is small** (the arp math + note-on/off wiring + a mod-dest provider).
 | Per-voice modulation container | **mu-core** [`VoiceSlot`](../../mu-core/Sequencer/VoiceSlot.h) (`ControlSequence`×N + `ModulationMatrix`) | reuse (as mu-tant does) |
 | Modulation matrix + control sequences | **mu-core** `ModulationMatrix` / `ControlSequence` | reuse |
 | Mixer + FX rack + master | **mu-core** `MixerEngine` + `mu_mixfx::addGlobalFxParams` | reuse |
-| Transport / clock (host · internal · mu-link) | **mu-core** `HostTransport` / `readHostTransport()` + `MuLinkBridge` | reuse |
+| Transport / clock (host · internal · mu-link · MIDI clock) | **mu-core** `resolveTransport` (TransportResolver.h) + `MuLinkBridge` | reuse |
 | PC→preset | **mu-core** `MidiPresetMap` / `MidiFullPresetMap` + `scanMidiProgramChanges` | reuse |
 | **Arpeggiator** (pool → triangle-scan → step→note), **note-on/off + gate length + Legato tie**, **portamento slew**, **MIDI note-in** (root + trigger) | — | **NEW (mu-toni)** |
 

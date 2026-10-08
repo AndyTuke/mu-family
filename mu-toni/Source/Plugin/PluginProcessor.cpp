@@ -1,4 +1,5 @@
 #include "Plugin/PluginProcessor.h"
+#include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
 #include "Plugin/PluginEditor.h"
 #include "Plugin/HostTransport.h"          // mu-core: DAW / mu-link transport read
 #include "Modulation/ModulatorSerialise.h" // mu-core: modulator state save/load
@@ -340,32 +341,17 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // handleAsyncUpdate to load on the message thread.
     queueMidiProgramChanges(midiMessages);
 
-    // External MIDI clock (standalone): scan the buffer + advance the clock estimate.
-    // When enabled + playing it drives the tempo + play-state (transport bar reflects it).
-    midiClockSync.process(midiMessages, numSamples, currentSampleRate);
-    const bool clockSlaved = wrapperType == wrapperType_Standalone
-                             && midiClockSync.isEnabled() && midiClockSync.isPlaying();
-    // Transport priority: DAW host / mu-link master (via injected playhead) > external
-    // MIDI clock (standalone) > the internal free-running transport.
-    const auto host = mu_core::readHostTransport(getPlayHead());
-    double bpm;
-    bool   isPlaying;
-    if (host.hasPosition)
-    {
-        isPlaying = host.playing;
-        bpm       = host.bpm > 0.0 ? host.bpm : internalBpm.load(std::memory_order_relaxed);
-    }
-    else if (clockSlaved)
-    {
-        bpm       = midiClockSync.getBpm();
-        isPlaying = true;
-        internalPlaying.store(true, std::memory_order_relaxed);   // UI play button reflects the clock
-    }
-    else
-    {
-        bpm       = internalBpm.load(std::memory_order_relaxed);
-        isPlaying = internalPlaying.load(std::memory_order_relaxed);
-    }
+    // This block's transport — the family rule (mu-core TransportResolver): the host / mu-link
+    // position, else (standalone) external MIDI clock, else the own transport. The arp steps and
+    // the modulators both run on its beat.
+    const double midiClockBeat = midiClockSync.process(midiMessages, numSamples, currentSampleRate);
+    const auto   transport     = mu_core::resolveTransport(mu_core::readHostTransport(getPlayHead()),
+                                                           wrapperType == wrapperType_Standalone,
+                                                           midiClockSync, midiClockBeat,
+                                                           { internalPlaying, internalBpm, internalBeatPos },
+                                                           numSamples, currentSampleRate);
+    const double bpm       = transport.bpm;
+    const bool   isPlaying = transport.playing;
 
     // Root-by-MIDI / trigger: update the held-note stack from incoming notes.
     bool noteOnEdge = false;
@@ -378,11 +364,11 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     arpCtx.anyNoteHeld      = heldCount > 0;
     arpCtx.rootOverrideMidi = heldCount > 0 ? heldStack[(size_t) (heldCount - 1)] : -1;
     arpCtx.noteOnEdge       = noteOnEdge;
+    arpCtx.startBeat        = transport.startBeat;
+    arpCtx.beatsPerSample   = transport.beatsPerSample;
 
     // Beat position for the modulation matrix (control-sequence playhead).
-    modBeat = host.hasPosition ? host.ppqPosition
-                               : internalBeatPos.load(std::memory_order_relaxed);
-    const double blockStartBeat = modBeat;   // the hot-swap bar-line test below
+    modBeat = transport.startBeat;
 
     // Push current parameters into each voice's arp runner.
     for (int i = 0; i < kNumChannels; ++i)
@@ -399,14 +385,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     processCoreBlock(buffer, nullptr, kNumChannels, numSamples, bpm,
                      nullptr, nullptr, nullptr, &renderChannelCb);
 
-    // Advance the free-running transport while playing (drives the beat-pos UI).
-    const double blockBeats = (bpm / 60.0) / currentSampleRate * (double) numSamples;
-    if (isPlaying)
-        internalBeatPos.store(internalBeatPos.load(std::memory_order_relaxed) + blockBeats,
-                              std::memory_order_relaxed);
-
     // Hot-swap: flag staged presets whose bar line passed in this block (or the transport stopped).
-    if (hotSwap.flagBoundaries(isPlaying, blockStartBeat, blockBeats))
+    if (hotSwap.flagBoundaries(isPlaying, transport.startBeat, transport.beatsPerSample * (double) numSamples))
         triggerAsyncUpdate();
 }
 

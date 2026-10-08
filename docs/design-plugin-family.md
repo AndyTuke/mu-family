@@ -141,6 +141,7 @@ The `mu-core` INTERFACE library (introduced in Stage 33) holds everything shared
 | `mu_hotswap::Stager` / `BarLineSwapper` | `mu-core/Plugin/HotSwap.h` | Shared hot-swap staging state + loop-wrap predicates; `BarLineSwapper<Payload, N>` is the whole bar-line driver (stage-or-apply, commit, audio-thread flagging) for a product with one payload type and a fixed loop (mu-Toni, mu-On) |
 | Per-slot preset API | `ProcessorBase` (`slotPresetFiles` / `saveSlotPreset` / `loadSlotPreset` / `resetSlot` / `hasPendingSwap` + `onSlotPresetCommitted`) | One name for a layer's preset save / load / reset in every product; MIDI program-change slots load through it (`applyMidiPresetSlot` default) |
 | Default preset at launch | `ProcessorBase` (`getDefaultPresetFile` / `loadDefaultPreset` / `loadStartupDefault` / `skipAutoLoadDefault`) | Every product restores `<presets>/_default.<ext>` at the end of its constructor; render mode skips it |
+| Transport rule | `mu-core/Plugin/TransportResolver.h` | `mu_core::resolveTransport` — where every product's block play state, tempo and beat come from (see [Transport rule](#transport-rule--family-standard)) |
 | Headless render | `mu-core/Plugin/ProductRender.h` + `StandaloneShell.h` | `--render` for every product (preset / swap / slot swap / MIDI PC / play flags) on the ProcessorBase preset API; products override only `prepareRender` / `renderPlaysByDefault` |
 | MIDI-clock tempo | `mu-core/Plugin/MidiClockTempo.h` | The one tempo PLL (jitter-rejecting) used by `MidiClockSync` and mu-link's `MidiClockEstimator` |
 | Atomic file writes | `mu-core/Persistence/PresetFiles.h` | `mu_pp::replaceFileAtomically` / `writeXmlAtomically` (temp + rename, failure reported) — every preset / map save goes through them |
@@ -339,6 +340,25 @@ host session   the same <MuXxxState format="2"> tree
 
 Files saved by this format don't load correctly in builds before it (the older readers expect the
 APVTS dump).
+
+## Transport rule — family standard
+
+Every product's `processBlock` takes its play state, tempo and beat from one call,
+`mu_core::resolveTransport` ([mu-core/Plugin/TransportResolver.h](../mu-core/Plugin/TransportResolver.h)):
+
+1. **A playhead with a position** — a DAW host, or mu-link through its injected playhead: play,
+   tempo **and beat** all follow it. Patterns, gates and arp steps lock to the host's bars, and a
+   DAW loop or locate lands on the matching step.
+2. **A host that gives no position:** play and tempo follow the host; the beat runs on.
+3. **Standalone with MIDI clock sync on:** the clock owns play / stop, tempo and beat.
+4. **Otherwise** the product's own transport (its Play button, BPM field and beat counter).
+
+Whenever the source is outside (1–3) the Play button mirrors it, and the internal beat counter
+carries the beat on (the UI's position, and where the own transport resumes). Inside a DAW the
+own Play button does nothing — the host is in charge. A product may bound its beat space
+(mu-Tant wraps at its longest gate pattern, 64 beats). Product-specific play modes that aren't a
+transport — mu-Clid's and mu-Tant's MIDI Note mode, mu-Toni's MIDI-trigger arp — sit on top. The
+headless render's `--host-start-beat` simulates rule 1 (`TONI_host_lock`).
 
 ## Hot-swap (staged preset / layer swaps) — family pattern
 
