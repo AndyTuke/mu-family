@@ -103,7 +103,7 @@ Client-side bus glue lives in **`mu-core/Link/MuLinkClient.*`** (shared by all p
 1. **Audio transport model** → **Shared-memory local bus** (mu-products only). No kernel driver.
 2. **Hardware backend** → **Support several, pick at runtime** — WASAPI (exclusive/shared) + ASIO via JUCE's `AudioDeviceManager` device picker. (ASIO only if the user installs the ASIO SDK; otherwise WASAPI exclusive is the low-latency default.)
 3. **Client↔server coupling** → **Async double-buffered rings** (click-resistant). Underrun → silence + log, never a pop on the master.
-4. **Clock outputs** → internal sample-accurate transport bus **+ MIDI-clock OUT** to outboard gear. **No Ableton Link** (avoids the GPL/proprietary licence).
+4. **Clock outputs** → internal sample-accurate transport bus **+ MIDI-clock OUT** to outboard gear. **No Ableton Link** (avoids the GPL/proprietary licence). *Superseded 2026-10-09: a Link peer is now planned, behind the same licence question — see [../design-ableton-link.md](../design-ableton-link.md).*
 5. **Clock source (amended, L7)** → mu-link is master **or** slaves to **external MIDI clock**, chosen by a manual GUI toggle (Internal / Ext MIDI). Slaving does **not** compromise sample-accuracy: incoming MIDI clock feeds a **tempo PLL** (smoothed estimate, jitter-rejected) that sets the transport's *tempo* only — the hardware word clock stays the timebase, so clients + MIDI-clock-OUT remain rock solid. This refines the original "master-only" intent: raw MIDI clock is never the timebase, just the tempo *reference* when slaved.
 
 ### Secondary decisions (resolved)

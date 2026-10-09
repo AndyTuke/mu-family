@@ -67,6 +67,30 @@ Run multiple μ-family standalones and have them share a clock + summing bus for
 - **Already live:** mu-clid and mu-tant standalones consult `mu_core::readHostTransport()` and slave their beat to the mu-link clock when attached (the bridge is the header-only `mu-core/Link/MuLinkBridge.h`, compiled only into each `StandaloneApp.cpp`). mu-on / mu-toni are not yet bridge-wired (the hook is a one-liner per product when they are).
 - **Remaining gaps:** the Win32 shared-memory audio server + GUI; bridge-wiring the remaining siblings; and plugin-mode sync (mu-link is standalone-only by design — in a DAW the host owns the clock, so there is nothing to add).
 
+### 🔵 Ableton Link (planned)
+
+Join an Ableton Link session so the family stays in time with other musicians' laptops and apps (tempo, bar phase and start / stop, no master needed). **Planned by the owner (2026-10-09)** and gated on a licence decision — Link is GPLv2+ or a paid proprietary licence. The full plan, with the staged work, is [design-ableton-link.md](design-ableton-link.md). Shape: `mu-link` becomes a Link peer (a third clock source) and bridges Link to MIDI clock out; standalones without mu-link get a `Link` source in the shared `TransportResolver`; all behind a CMake option so licence-free builds stay possible.
+
+- **Do the MIDI sync groundwork first** (backlog #1261, #1260, #1259, #1253, #1256, #1254, #1258, #1251): Link would expose every timing flaw in the current clock path.
+- **Later idea — Link Audio** (new in Link 4.x): share audio channels between Link peers, for example a layer streamed into another Link app. It cannot be used at the same time as plain Link; look at it once Link itself is in.
+### 🟡 One framework, one instance — combine the engines in one place
+
+**The idea:** the four apps are already one framework wearing four faces. The mixer, FX, transport, modulation engine, preset logic, hot-swap, MIDI handling and editor shell are all shared `mu-core` code. The only things that differ per product are the **sound engine** and the **sequencer** (the pair a layer is made of). The aim is to make that literal: **a single instance (one plugin / one standalone) that can hold layers of any engine type side by side** — for example a mu-Tant drone layer, a mu-On kick layer, a mu-Toni arp layer and a mu-Clid rhythm layer in one session, through one mixer, on one transport, with one preset.
+
+- **Why:** one window, one clock, one set of presets for a whole live rig, without running four apps and a bus (mu-link would remain for combining separate apps and outboard gear). Every shared improvement (sync fixes, preset format, mixer) lands once and reaches every engine.
+- **Groundwork already in place:** `mu-core` owns `ProcessorBase`, `EditorShellBase`, the mixer and FX chain, the transport resolver, the modulation matrix and the composed slot state (one layer = one saved unit, so a layer preset is already engine-shaped, not product-shaped). The engine swap-point pattern in [design-plugin-family.md](design-plugin-family.md) is the intended seam. Variable 1–8 layers with a central add / reorder / delete (backlog #1240) and a per-layer engine selector (#1241) are the first steps toward it.
+- **The shape of it (owner, 2026-10-09):** `Layer` is the parent class; each product's layer type derives from it (mu-Clid and mu-Tant `Rhythm`, mu-Toni `Arp`, mu-On `Track`) and adds only its sequencer data and engine binding. Today only mu-Clid's `Rhythm` derives from the existing base (`VoiceSlot`); the other three keep parallel arrays. See [design-naming.md](design-naming.md).
+- **What stands in the way (why 🟡):** parameter ids are prefixed per product and layer count is fixed in places (`kNumChannels`); each product's `Source/` tree, state layout and editor panels assume a single engine type; the sequencer and engine are paired inside each product rather than registered as a pluggable layer type; modulation targets are per-product tables (`mu_mod::ModTarget`). A layer-type registry (engine + sequencer + panel + param table + modulation targets) would be the central piece.
+- **Direction for current work:** put anything generic in `mu-core`, name product-specific code under the product namespace, and do not add new per-product copies of shared behaviour (the family consistency rule). The standalone products would stay as presets of the combined instance (one layer type each) rather than separate code.
+- Open questions for when this is scheduled: how a session's layers are limited (CPU, 8 layers), how per-engine sequencer panels share the main panel, licensing / freeware boundaries between mu-Toni (freeware) and the licensed products, and whether the combined instance is a fifth product or a mode of an existing one.
+
+### 🟢 Standard UI sizing across the family
+
+**The aspiration:** every app has the same panel sizing in the layout — the same preset strip, main panel, modulator panel and mixer heights and proportions — so mu-Clid, mu-Tant, mu-Toni and mu-On line up when placed side by side, and a layer, a sidebar or a modulator panel is the same size wherever it appears.
+
+- Owner intention (2026-10-07, looking at mu-Clid and mu-Tant side by side). Currently parked **On Hold** as backlog #1172 — the owner will schedule it; do not attempt it before then.
+- Fits with the one-framework idea above: a shared sizing contract lives in `MuLookAndFeel` / the editor shell (no per-product layout constants), and each product supplies only its main-panel content.
+
 ---
 
 ## Release & distribution (deferred until public release)
