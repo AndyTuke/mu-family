@@ -104,7 +104,7 @@ jobs:
           "$exe"
 
       - name: mu-core boundary check
-        run: python tests/scripts/check-core-boundary.py
+        run: pwsh tests/scripts/check-core-boundary.ps1
 
       # Headless VST3 validation (pluginval). Phase 1: Windows only, hard gate at strictness 5.
       # The script auto-downloads pluginval and validates whatever product VST3s were built in

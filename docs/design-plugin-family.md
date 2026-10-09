@@ -297,7 +297,7 @@ The shared visual identity (`MuLookAndFeel`) ensures a consistent look across al
 
 **Enforced by:**
 - [`mu_mod::checks`](../mu-core/Modulation/ModTargetChecks.h) in each product's unit tests — every row names a real parameter; 10% depth moves each target exactly 10% of its range.
-- [tests/scripts/check-mod-targets.py](../tests/scripts/check-mod-targets.py) — fails if any code reintroduces per-target depth scales, defines its own target-row struct, or a product has no `ModTarget` table.
+- [tests/scripts/check-mod-targets.ps1](../tests/scripts/check-mod-targets.ps1) — fails if any code reintroduces per-target depth scales, defines its own target-row struct, or a product has no `ModTarget` table.
 
 ## Slot state (presets & sessions) — family standard
 

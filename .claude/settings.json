@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/post_build_todo.py"
+            "command": "powershell -NonInteractive -File \".claude/hooks/post_build_todo.ps1\""
           },
           {
             "type": "command",

@@ -20,7 +20,7 @@ tests/
 ├── scripts/
 │   ├── analyse.py            -- WAV in, pass/fail out
 │   ├── run-listening-tests.py -- orchestrator: render (per product) + analyse
-│   └── check-build-artifacts.py -- C6: µ-name + build-number guard (no audio)
+│   └── check-build-artifacts.ps1 -- C6: µ-name + build-number guard (no audio)
 └── _out/                     -- rendered WAVs + scratch (gitignored)
 ```
 
@@ -262,8 +262,8 @@ non-zero on any failure.
 
 **C6** is a separate post-build script (no audio, no test exe):
 
-```bash
-python tests/scripts/check-build-artifacts.py --config Release
+```powershell
+pwsh tests/scripts/check-build-artifacts.ps1 -Config Release
 ```
 
 It scans the built VST3/CLAP/Standalone binaries (mu-clid + Lite) for the UTF-8

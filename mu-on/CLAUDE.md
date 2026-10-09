@@ -58,7 +58,7 @@ land when preset I/O / licensing do).
 | [docs/mu-on/design-sequencer.md](../docs/mu-on/design-sequencer.md) | StepPattern model, clocking/swing/accent, the grid UI, future pattern chaining. |
 
 ## Conventions in force
-- All product symbols under `mu_on::` (boundary check `tests/scripts/check-core-boundary.py` catches mu-core regressions).
+- All product symbols under `mu_on::` (boundary check `tests/scripts/check-core-boundary.ps1` catches mu-core regressions).
 - Full preset `.muOn`; per-lane `.muTrack`. Content dir `Documents/TDP/muOn` (`Presets/` + `Tracks/`).
 - Engine params are APVTS floats/choices (automate + persist + bind to knobs); the step pattern is a ValueTree child, not APVTS params.
 - Audio thread never allocates: engine buffers in `prepare`, params via cached atomic pointers.

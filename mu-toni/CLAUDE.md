@@ -39,7 +39,7 @@ The editor inherits `mu-core/UI/EditorShellBase.h`, so TransportBar, StatusBar, 
 
 ### Conventions in force
 
-- All product symbols under the `mu_toni::` namespace (boundary check `tests/scripts/check-core-boundary.py` catches mu-core regressions).
+- All product symbols under the `mu_toni::` namespace (boundary check `tests/scripts/check-core-boundary.ps1` catches mu-core regressions).
 - `Source/` follows the family `{Plugin, Sequencer, UI, Persistence, License, Tests}` layout, **plus** `Audio/` and `Modulation/` for the engine and its mod-destination provider. `Persistence/` and `License/` are currently placeholders (`.gitkeep` only).
 - Builds tick the shared family build counter (`add_dependencies(mu-toni increment_build_number)`).
 
