@@ -3,7 +3,7 @@
 # The backlog is the project's development history and is written by three independent
 # authors: this repo's sessions, the owner by hand, and the sync-backlog CI workflow. The
 # CLAUDE.md rules that keep it readable (grouped Open -> On Hold -> Closed, descending
-# within each group, one resolved status) are prose, so nothing caught the drift that had
+# within On Hold and Closed, Open in development order, one resolved status) are prose, so nothing caught the drift that had
 # accumulated by v1.0.950: two transposed rows, a pair stranded eight places out of order,
 # five different "done" spellings, and — worst — two of the three tables missing their
 # delimiter row, which silently stops GitHub rendering them as tables at all.
@@ -12,7 +12,8 @@
 #   1. Sections     — Open / On Hold / Closed all present, exactly once, in that order.
 #   2. Tables       — each section has a header row followed immediately by a delimiter
 #                     row, and no orphan delimiter is stranded mid-table.
-#   3. Order        — issue numbers strictly descending within each section.
+#   3. Order        — issue numbers strictly descending within On Hold and Closed (Open is in
+#                     recommended development order, so it is exempt).
 #   4. Duplicates   — an issue number appears once across the whole file.
 #   5. Status       — the Status cell matches its section (Closed rows say "Closed", not
 #                     "Fixed" / "Audited" / "Verified" / any other variant).
@@ -134,7 +135,7 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
         $sectionRowCount[$currentSection]++
 
         # 3. Descending order within the section.
-        if ($null -ne $prevNumber -and $number -ge $prevNumber) {
+        if ($currentSection -ne 'Open' -and $null -ne $prevNumber -and $number -ge $prevNumber) {
             Add-Violation $lineNo "#$number follows #$prevNumber - not descending within '$currentSection'"
         }
         $prevNumber = $number

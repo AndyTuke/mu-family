@@ -90,7 +90,7 @@ Audio path performance:
   - `CLAUDE.md` referencing files / commands / stages that no longer exist or have moved (#364 missing design-doc entry).
   - Header docstrings describing parameters or behaviour the implementation no longer matches.
   - `// #NNN` comments referencing fixed issues whose context no longer applies.
-  - `backlog.md` policy violations (rows out of descending order; status mismatched with content; the always-Open/On-Hold/Closed grouping broken — #350). Run [tests/scripts/check-backlog.ps1](../../tests/scripts/check-backlog.ps1) rather than eyeballing it.
+  - `backlog.md` policy violations (On Hold / Closed rows out of descending order; status mismatched with content; the always-Open/On-Hold/Closed grouping broken — #350). Run [tests/scripts/check-backlog.ps1](../../tests/scripts/check-backlog.ps1) rather than eyeballing it.
 - **Stale comments** in source — the comment describes old behaviour, the code has moved on (#399).
 - **Dead code** — members always equal to their default; unused parameters; functions with no callers; flags toggled but never read.
 - **Const-correctness** — getters that should be `const`; references that should be `const&`; member functions that don't mutate state.
@@ -123,7 +123,7 @@ For each finding, write a Backlog Open row with this anatomy:
 - File:line refs MUST use the project's markdown link format: `[Source/file.cpp:NN](Source/file.cpp#LNN)`. The IDE renders these clickable.
 - Each row is ONE discrete finding. If two issues share a root cause but have different fixes, split into two consecutive numbers.
 - Use the next sequential whole numbers — NEVER suffix notation (`#178a` / `#178b`).
-- Insert in descending order at the top of the Open section (highest number first).
+- Insert at the top of the Open section (highest number first); Open is otherwise in recommended development order.
 - Search the existing Open section before writing — if a finding is already logged under a different number, don't duplicate it.
 
 ## Output to the user

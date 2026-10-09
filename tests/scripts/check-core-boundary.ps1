@@ -42,9 +42,10 @@ function Get-RepoRelativePath([string]$full) {
     return $full.Replace('\', '/')
 }
 
-$includePlugin = [regex]'#\s*include\s*[<"][^">]*\bmu-(clid|tant|toni)\b'
-$pluginNs      = [regex]'\bmu_(clid|tant|toni)::'
-$blockComment  = [regex]'(?s)/\*.*?\*/'
+$includePlugin  = [regex]'#\s*include\s*[<"][^">]*\bmu-(clid|tant|toni|on)\b'
+$pluginNs       = [regex]'\bmu_(clid|tant|toni|on)::'
+$includeControl = [regex]'#\s*include\s*[<"][^">]*\bmu-control\b'
+$blockComment   = [regex]'(?s)/\*.*?\*/'
 
 # Blank a block comment but keep its newlines, so line numbers after it stay accurate.
 $blankBlock = [System.Text.RegularExpressions.MatchEvaluator] {
@@ -52,32 +53,51 @@ $blankBlock = [System.Text.RegularExpressions.MatchEvaluator] {
     $m.Value -replace '[^\r\n]+', ''
 }
 
-$files = Get-ChildItem -LiteralPath $Path -Recurse -File -Include '*.h', '*.cpp' | Sort-Object FullName
+# Libraries to guard. mu-control (controller drivers, planned) sits above mu-core: it may use mu-core
+# but, like mu-core, must not depend on a plugin; mu-core must never depend on it. It is scanned
+# only once the folder exists, and never when -Path points at one tree.
+$roots = @(@{ Name = 'mu-core'; Dir = $Path; ForbidControl = $true })
+if ($PSBoundParameters.ContainsKey('Path') -eq $false) {
+    $controlDir = Join-Path $repoRoot 'mu-control'
+    if (Test-Path -LiteralPath $controlDir -PathType Container) {
+        $roots += @{ Name = 'mu-control'; Dir = $controlDir; ForbidControl = $false }
+    }
+}
+
+$total = 0
 $fails = 0
 
-# Scan every mu-core source line for a plugin include or a plugin namespace reference.
-foreach ($file in $files) {
-    $text    = [System.IO.File]::ReadAllText($file.FullName)
-    $cleaned = $blockComment.Replace($text, $blankBlock) -replace '//.*', ''
-    $rel     = Get-RepoRelativePath $file.FullName
+# Scan every library source line for a plugin include, a plugin namespace, or (mu-core only) a mu-control include.
+foreach ($root in $roots) {
+    $files = Get-ChildItem -LiteralPath $root.Dir -Recurse -File -Include '*.h', '*.cpp' | Sort-Object FullName
+    $total += $files.Count
+    foreach ($file in $files) {
+        $text    = [System.IO.File]::ReadAllText($file.FullName)
+        $cleaned = $blockComment.Replace($text, $blankBlock) -replace '//.*', ''
+        $rel     = Get-RepoRelativePath $file.FullName
 
-    $lineNo = 0
-    foreach ($line in ($cleaned -split "\r?\n")) {
-        $lineNo++
-        $snippet = $line.Trim()
-        if ($snippet.Length -gt 90) { $snippet = $snippet.Substring(0, 90) }
+        $lineNo = 0
+        foreach ($line in ($cleaned -split "\r?\n")) {
+            $lineNo++
+            $snippet = $line.Trim()
+            if ($snippet.Length -gt 90) { $snippet = $snippet.Substring(0, 90) }
 
-        if ($includePlugin.IsMatch($line)) {
-            if (-not $Quiet) { Write-Host "  [FAIL] ${rel}:${lineNo} — mu-core includes a plugin header: $snippet" }
-            $fails++
-        }
-        if ($pluginNs.IsMatch($line)) {
-            if (-not $Quiet) { Write-Host "  [FAIL] ${rel}:${lineNo} — mu-core references a plugin namespace: $snippet" }
-            $fails++
+            if ($includePlugin.IsMatch($line)) {
+                if (-not $Quiet) { Write-Host "  [FAIL] ${rel}:${lineNo} — $($root.Name) includes a plugin header: $snippet" }
+                $fails++
+            }
+            if ($pluginNs.IsMatch($line)) {
+                if (-not $Quiet) { Write-Host "  [FAIL] ${rel}:${lineNo} — $($root.Name) references a plugin namespace: $snippet" }
+                $fails++
+            }
+            if ($root.ForbidControl -and $includeControl.IsMatch($line)) {
+                if (-not $Quiet) { Write-Host "  [FAIL] ${rel}:${lineNo} — mu-core includes mu-control (the dependency must be mu-control -> mu-core): $snippet" }
+                $fails++
+            }
         }
     }
 }
 
 $status = if ($fails -eq 0) { 'PASS' } else { 'FAIL' }
-Write-Host "check-core-boundary: $status ($($files.Count) mu-core files, $fails violation(s))"
+Write-Host "check-core-boundary: $status ($total library files, $fails violation(s))"
 exit $(if ($fails -eq 0) { 0 } else { 1 })

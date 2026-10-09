@@ -24,6 +24,10 @@ Related: the family consistency rule in [CLAUDE.md](../CLAUDE.md), and the platf
 | **Channel** | The mixer strip only (`MixerChannel`, `ChannelState`). One layer feeds one channel. | a layer |
 | **Slot** | An FX or insert slot only (`DelaySlot`, `EffectSlot`, `FXSlotBase`, insert slots). | a layer |
 | **Voice** | One polyphonic voice *inside* an engine (`ToniVoice`, `SynthVoice`). | a layer |
+| **Preset** | A saved full state of one product: up to 8 layers with their mixer, FX and modulation (`.muClid`, `.muTant`, ...). | a layer preset |
+| **Layer preset** | One layer's saved state (`.muRhythm`, `.muPattern`, ...). | a full preset |
+| **Performance** (proposed) | A list of up to 8 pointers to presets for a gig; the new top level (backlog #1279). ✔ owner | a preset |
+| **Clip** ✔ owner | One of 8 stored states of a layer that a controller pad launches, as in Ableton Live and Bitwig; plays until another is chosen; pads never write presets (backlog #1277). "Slot" stays for FX / insert slots only. | an audio clip, an FX slot |
 
 ### Derived layer types ✔ owner (2026-10-09)
 
@@ -32,22 +36,21 @@ Each product's layer is a subclass of `Layer`, named for what that product's lay
 | Product | Layer type | Adds to `Layer` |
 |---|---|---|
 | mu-Clid | `Rhythm` | Euclidean generators, sample binding |
-| mu-Tant | `Rhythm` | gate / filter / pitch patterns, wavetable |
+| mu-Tant | `Pattern` | gate / filter / pitch patterns, wavetable |
 | mu-Toni | `Arp` | scale / chord pool, scan, accent pattern |
 | mu-On | `Track` | step rows, lane engine selection |
 
 Notes on these names:
 
-- **mu-Tant is `Rhythm`** (owner: "mu-Tant is all about rhythms"). Its code currently calls a layer a
-  *voice*; that word is kept only for a polyphonic voice inside an engine (`SynthVoice`). Choosing
-  `Rhythm` also removes the clash with `GatePattern` (mu-Tant) and `StepPattern` (mu-On), which stay as
-  the names of sequencer data.
-- **mu-Clid and mu-Tant now share the name `Rhythm`.** They are different types (Euclidean generators
-  versus gate patterns), so they live as `mu_clid::Rhythm` and `mu_tant::Rhythm`; this is only clean
-  once mu-Clid is in its namespace. In a combined instance the layer-type registry needs distinct
-  ids (for example `clid.rhythm`, `tant.rhythm`), and the layer-preset extension `.muRhythm` belongs to
-  mu-Clid today, so mu-Tant's saved layers (`.muPattern`) need a distinct extension when the saved-data
-  names are aligned (§3).
+- **mu-Tant is `Pattern`** (owner, 2026-10-09). It matches the layer files it already saves
+  (`.muPattern`), and it keeps every product's layer type name unique (`Rhythm`, `Pattern`, `Arp`, `Track`),
+  so the layer-type registry and the preset extensions never collide. (An earlier note considered `Rhythm`
+  for mu-Tant; it was dropped because mu-Clid already owns that name and `.muRhythm`.) Its code currently
+  calls a layer a *voice*; that word is kept only for a polyphonic voice inside an engine (`SynthVoice`).
+- **`Pattern` next to `GatePattern` and `StepPattern`.** mu-Tant's `GatePattern` (and its filter / pitch
+  patterns) become *members* of its `Pattern` layer, and mu-On's `StepPattern` belongs to a different
+  product and namespace, so there is no clash; it just reads as "a Pattern holds Patterns". If that proves
+  confusing, rename the members (`GateLane`, say) rather than the layer.
 - **mu-On is `Track`** (owner); its extension is already `.muTrack`. The code mixes lane / channel /
   track today and collapses to Track.
 
@@ -151,7 +154,7 @@ slot state already stores ids without their prefix, so layer data is prefix-agno
 | Members | Trailing `_` in seven classes (mu-Clid helpers, `MidiClockSync`, `VocoderInsert`). |
 | Enums | plain `enum` in mu-Toni (3), mu-On (3), mu-Tant (2). |
 | Folders | Missing from the standard eight: mu-Clid has no `Audio`; mu-On has no `License` or `Persistence`. mu-Tant and mu-Toni `Persistence/` hold only `.gitkeep`. mu-Clid `Plugin/` holds `RhythmManager`, `SampleLibrary`, `SamplePreview`, `PresetIO`, `HotSwap*`, `ModulationSkew` that belong in `Audio/`, `Persistence/` and `Modulation/`. |
-| Saved data | Four param-id schemes; layer-preset extension and folder nouns disagree (mu-Tant: `.muPattern` in `Voices/`); once mu-Tant's layer is `Rhythm` its extension must not collide with mu-Clid's `.muRhythm`. |
+| Saved data | Four param-id schemes; layer-preset extension and folder nouns disagree (mu-Tant: `.muPattern` in `Voices/`); mu-Tant's `.muPattern` already matches its `Pattern` layer type. |
 
 ---
 
@@ -167,7 +170,7 @@ C++ identifier changes never touch saved files; the data renames at the end do.
 3. **Overlay / Panel renames** for the shell screens; shared `LayerPanel` / `LayerSidebar` in `mu-core`. Backlog #1266.
 4. **`VoiceSlot` → `Layer`**, then hoist the shared per-layer data into it product by product
    (mu-Tant and mu-Toni first — they have the parallel arrays); `Slot*` persistence types → `Layer*`. Backlog #1265.
-5. **Derived layer types** (mu-Tant `Rhythm`, mu-Toni `Arp`, mu-On `Track`; mu-Clid's `Rhythm` already
+5. **Derived layer types** (mu-Tant `Pattern`, mu-Toni `Arp`, mu-On `Track`; mu-Clid's `Rhythm` already
    exists) replace the parallel arrays; sequencer role names (`<X>Sequencer`) follow. Backlog #1264.
 6. **Saved-data names** — only with the combined instance, with migrations. Backlog #1263 (On Hold).
 
@@ -178,8 +181,6 @@ Each step: Debug build + unit tests + the round-trip listening tests on the buil
 
 ## 6. Open questions
 
-- mu-Clid and mu-Tant both call their layer `Rhythm`. Confirm they are meant to stay two separate types
-  (as written above) rather than one shared `Rhythm`, and how mu-Tant's saved layers are told apart from
-  mu-Clid's (extension, or an engine tag inside the file).
+
 - Is the shared `Layer` polymorphic, or a table of registered layer types?
 - Do the ~130 global `mu-core` types move into `mu_*` namespaces, or stay as the shared "house" types?

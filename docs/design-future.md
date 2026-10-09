@@ -59,6 +59,8 @@ Generic CC → APVTS-parameter mapping so a hardware controller can drive any pl
 - **No foundation in place yet.** *(An earlier `ControlSequence::InputSource::MIDI_CC` / `midiCCNumber` data-model stub was removed in a later modulation refactor — this would be built fresh.)*
 - **Wiring needed:** read incoming CC values in `processBlock`, hold a CC→param-id map (MIDI-learn or a settings table), and either drive the `APVTS` parameter directly or feed values into the `paramValues` map that `ModulationMatrix::process()` reads from.
 - Belongs in `mu-core` (shared `processBlock`/modulation path) so all products inherit it.
+- **Performance level (proposed, owner 2026-10-09):** a list of 8 pointers to presets (each up to 8 layers, each layer 8 clips) for playing live; a performance is the natural container for the one-instance rig below. See [design-launchpad.md](design-launchpad.md).
+- **First user: the Novation Launchpad X** (owner's controller, for playing live). Its full MIDI implementation, a proposed performance layout and the risks are in [design-launchpad.md](design-launchpad.md); backlog #1274-#1279 and #1281.
 
 ### 🟡 Inter-plugin sync — see **mu-link**
 
@@ -79,10 +81,19 @@ Join an Ableton Link session so the family stays in time with other musicians' l
 
 - **Why:** one window, one clock, one set of presets for a whole live rig, without running four apps and a bus (mu-link would remain for combining separate apps and outboard gear). Every shared improvement (sync fixes, preset format, mixer) lands once and reaches every engine.
 - **Groundwork already in place:** `mu-core` owns `ProcessorBase`, `EditorShellBase`, the mixer and FX chain, the transport resolver, the modulation matrix and the composed slot state (one layer = one saved unit, so a layer preset is already engine-shaped, not product-shaped). The engine swap-point pattern in [design-plugin-family.md](design-plugin-family.md) is the intended seam. Variable 1–8 layers with a central add / reorder / delete (backlog #1240) and a per-layer engine selector (#1241) are the first steps toward it.
-- **The shape of it (owner, 2026-10-09):** `Layer` is the parent class; each product's layer type derives from it (mu-Clid and mu-Tant `Rhythm`, mu-Toni `Arp`, mu-On `Track`) and adds only its sequencer data and engine binding. Today only mu-Clid's `Rhythm` derives from the existing base (`VoiceSlot`); the other three keep parallel arrays. See [design-naming.md](design-naming.md).
+- **The shape of it (owner, 2026-10-09):** `Layer` is the parent class; each product's layer type derives from it (mu-Clid `Rhythm`, mu-Tant `Pattern`, mu-Toni `Arp`, mu-On `Track`) and adds only its sequencer data and engine binding. Today only mu-Clid's `Rhythm` derives from the existing base (`VoiceSlot`); the other three keep parallel arrays. See [design-naming.md](design-naming.md).
 - **What stands in the way (why 🟡):** parameter ids are prefixed per product and layer count is fixed in places (`kNumChannels`); each product's `Source/` tree, state layout and editor panels assume a single engine type; the sequencer and engine are paired inside each product rather than registered as a pluggable layer type; modulation targets are per-product tables (`mu_mod::ModTarget`). A layer-type registry (engine + sequencer + panel + param table + modulation targets) would be the central piece.
 - **Direction for current work:** put anything generic in `mu-core`, name product-specific code under the product namespace, and do not add new per-product copies of shared behaviour (the family consistency rule). The standalone products would stay as presets of the combined instance (one layer type each) rather than separate code.
 - Open questions for when this is scheduled: how a session's layers are limited (CPU, 8 layers), how per-engine sequencer panels share the main panel, licensing / freeware boundaries between mu-Toni (freeware) and the licensed products, and whether the combined instance is a fifth product or a mode of an existing one.
+
+### 🟡 Android tablet app (standalone only, simplest scope)
+
+Run the family on an Android tablet. **Scope (owner, 2026-10-09): standalone only, no MIDI, no mu-link, no licence, keep it simple.** Start with mu-Toni (freeware, light), as a spike on one real tablet to measure latency and CPU. See backlog #1282.
+
+- **Why 🟡:** the code is portable JUCE C++, so the engines, FX, modulation and sequencers carry over, but the editor is a fixed 1170×870 desktop layout built for mouse hover and right-click. **The UI is the main work**: first a fit-to-screen scale of the existing layout (enough for the spike), then touch-sized controls, no right-click or hover dependence, and a tablet layout driven by the standard sizing below.
+- **Smaller items:** an Android app target (the plugin targets do not apply; no VST3 or CLAP there), keeping audio alive when the screen locks, a file picker and storage for presets and samples, the licence path compiled out, and a JUCE licence check for mobile.
+- **Fit with the other ideas:** Android has no inter-app audio or shared MIDI, so one combined instance (above) suits it better than four apps. Sync, if ever wanted there, would be Ableton Link (Android is supported), not `mu-link`.
+- **Rule for current work:** keep new shared UI code free of desktop-only assumptions (mouse-only input, hard-coded pixel sizes).
 
 ### 🟢 Standard UI sizing across the family
 
