@@ -27,5 +27,5 @@ Build the mu-family. Default to **Debug** (a normal code change). Build **Releas
 
 ## After the build
 
-- Fix any compiler warnings the warning-scan hook logged to backlog.
+- Hand any compiler warnings the warning-scan hook reported to the `backlog-administrator` agent to log; then fix open issues it briefs you on (it hands over the tasks, up to 5).
 - If the build fixed/improved anything **user-facing**, run `/notes` to add the In-Testing one-liner and push the site.

@@ -4,7 +4,7 @@ Stage and commit the current changes with a properly-formatted mu-family commit 
 
 1. `git status` + `git diff` (and `git diff --staged`) to see what changed.
 2. Read `build_number.txt` for the current build number → version is `v1.1.<build>`.
-3. Identify which backlog items this work closes — read `backlog.md` and match the changes to issue numbers/descriptions.
+3. Identify which backlog items this work closes — ask the `backlog-administrator` agent (it reads `backlog.md`; you do not edit it) to match the changes to issue numbers/descriptions.
 
 ## Message format (mandatory — see CLAUDE.md)
 
@@ -39,4 +39,4 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
 
 ## After
 
-Update `backlog.md` so any items closed by this commit move to the **Fixed** group (descending order preserved).
+Hand the `backlog-administrator` agent the issues this commit closes and the build number read from `mu-core/BuildNumber.h`, so it moves them to the **✅ Closed** group (descending order preserved) and runs `check-backlog.ps1`. Do not edit `backlog.md` yourself. If the agent changes the file, include that change in a follow-up commit and push.

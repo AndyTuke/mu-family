@@ -41,13 +41,46 @@ $env:JUCE_PATH = "D:\JUCE"
 
 **Release notes on EVERY build (not just releases):** whenever a build fixes or improves anything **user-facing**, run `/notes` ([.claude/commands/notes.md](.claude/commands/notes.md)) to add a plain-English one-liner to the **"Next release · In testing"** section of each affected product's release-notes page, then commit + push the site. The In-Testing section is public and must always be current so users can see what's coming in the next version.
 
-After every build, read [backlog.md](backlog.md) and fix open (unchecked) issues immediately, without asking, up to a maximum of 5 issues. Prioritise issues related to the current stage.
+**The `backlog-administrator` agent ([.claude/agents/backlog-administrator.md](.claude/agents/backlog-administrator.md)) is the only writer of [backlog.md](backlog.md)** (owner rule, 2026-10-09). Nothing else — the main conversation, other agents, slash commands, hooks — edits it directly; they hand the change to the agent, which applies the ordering and format rules and runs `check-backlog.ps1`. It also hands tasks out: ask it for the next task (or a named issue) and it returns a brief with the steps, files, docs to read, blockers and done criteria.
 
-After every response, if any issues in `backlog.md` have changed status or new issues have been added, update `backlog.md` immediately to reflect the current state and ensure items are ordered correctly.
+After every build, ask the `backlog-administrator` for the open issues and fix them immediately, without asking, up to a maximum of 5 issues. Prioritise issues related to the current stage.
+
+After every response, if any issues in `backlog.md` have changed status or new issues have been added, hand the changes to the `backlog-administrator` immediately so the file reflects the current state and stays correctly ordered.
 
 New feature ideas live in [docs/design-future.md](docs/design-future.md) under **Unscheduled Ideas**. Ask the user before implementing any of them.
 
 **Standing check on ALL work (owner rule):** before and while making any change — code, design, docs, backlog — read [docs/design-future.md](docs/design-future.md) and ask *"am I making these ideas easier or harder?"* — in particular the one-framework / one-instance direction (shared `mu-core`, only the sound engine and sequencer differ per product) and the standard UI sizing. Prefer the change that moves toward them (generic code in `mu-core`, no new per-product copies of shared behaviour, no new per-product layout constants); if a change must make one harder, say so and why before doing it.
+
+**The `user-documentation-author` agent ([.claude/agents/user-documentation-author.md](.claude/agents/user-documentation-author.md)) owns the user manuals** (`docs/<product>/create_manual.ps1` and the `.docx` it generates) and keeps them current (owner rule, 2026-10-09). After any user-facing change, hand it what changed so the manual is updated in the same commit as the code. It is separate from `/notes`, which owns the release-notes pages.
+
+**The `test-steward` agent ([.claude/agents/test-steward.md](.claude/agents/test-steward.md)) owns testing** — unit tests, the listening-test pipeline, [tests.md](tests.md) and pass/fail status — and writes the tests for fixes and for DSP findings; it never changes product source. **The `architecture-steward` agent ([.claude/agents/architecture-steward.md](.claude/agents/architecture-steward.md)) owns platform structure** — what goes in `mu-core` vs a product vs `mu-control`, naming, folder layout, the family docs and the standing `design-future` check — and rules before structural or cross-plugin work (owner rule, 2026-10-09).
+
+### Agent precedence
+
+Six agents each own one area and are the final word in it; none edits another's files:
+
+| Agent | Final say on | Writes |
+|---|---|---|
+| `backlog-administrator` | `backlog.md` content, order, status; task hand-over | `backlog.md` only |
+| `ux-controller` | look, feel, design docs | UI design docs |
+| `architecture-steward` | structure, naming, placement, family docs | architecture and naming docs |
+| `dsp-controller` | real-time safety and DSP correctness (a **Blocked** verdict stops the change) | nothing (read-only) |
+| `test-steward` | what is tested and its recorded status | tests, `tests/**`, `tests.md` |
+| `user-documentation-author` | user manuals | manual scripts and `.docx` |
+| main conversation | the code, and the owner's instructions | source |
+
+**Call the agents without asking** (owner rule, 2026-10-09). The main conversation invokes them on its own whenever their trigger applies, and does not ask the owner for permission first:
+
+- `backlog-administrator`: any backlog change, any task hand-over, after every build and response (batch the changes into one call).
+- `ux-controller`: before UI work and for any design question the docs don't settle.
+- `architecture-steward`: before structural, cross-plugin or naming decisions.
+- `dsp-controller`: on every new or changed audio-path code, before building or committing.
+- `test-steward`: when a fix, feature or DSP finding needs a test, and before a release.
+- `user-documentation-author`: after any user-facing change.
+
+Run independent agents in parallel. Report their outcomes to the owner briefly; only owner decisions an agent hands up are asked about.
+
+On a conflict: the owner overrides everything; the `dsp-controller` wins on anything that runs on the audio thread; the `architecture-steward` wins on where code lives and what it is called; the `ux-controller` wins on what the user sees. Anything an agent finds outside its own area goes to the main conversation, which hands it to the owner of that area.
 
 ## Git commit messages
 
@@ -92,6 +125,8 @@ The single resolved status is **`✅ Closed`** — never `Fixed` / `Audited` / `
 
 ## Critical architectural rules (family-wide)
 
+**The `dsp-controller` agent ([.claude/agents/dsp-controller.md](.claude/agents/dsp-controller.md)) reviews every DSP / audio-thread implementation** (owner rule, 2026-10-09) for efficiency, real-time safety, race conditions and other errors. Run it on any new or changed DSP code before it is built or committed; a **Blocked** verdict must be fixed first. It is read-only: it reports, the main conversation fixes.
+
 These hold for everything in `mu-core` and every product that links it. Product-specific rules live in each product's CLAUDE.md.
 
 - **Everything in APVTS** — if a parameter isn't in the ValueTree it won't save. All parameters wire through APVTS.
@@ -133,6 +168,8 @@ Never override `getSlider().onValueChange` directly — it replaces both callbac
 JUCE (via `JUCE_PATH`), Signalsmith Reverb, Monocypher, clap-juce-extensions, and the planned SoundTouch/RubberBand time-stretch engines — full table with licences in [docs/design-plugin-family.md](docs/design-plugin-family.md#third-party-libraries).
 
 ## UI values
+
+**The `ux-controller` agent ([.claude/agents/ux-controller.md](.claude/agents/ux-controller.md)) owns look, feel and design and all the design documentation** (owner rule, 2026-10-09). It arbitrates every design choice the coding needs: before UI work, or when a design question comes up that the docs don't settle, ask it for a ruling (it returns the tokens, sizes, components and states to use, and records the decision in the docs). Design docs ([docs/design-ui-family.md](docs/design-ui-family.md), `docs/<product>/design-ui.md`) are edited by it, not ad hoc. It does not write code or edit the backlog.
 
 Knob colour coding, window sizing, and all layout constants are defined in [mu-core/UI/Components/MuLookAndFeel.h](mu-core/UI/Components/MuLookAndFeel.h). **Every shadow, highlight and tint strength lives in `MuTheme::Lighting`** ([mu-core/UI/Components/MuTheme.h](mu-core/UI/Components/MuTheme.h)) — with master `shadowAmount` / `highlightAmount` that scale them all for every product. Never hard-code an alpha for depth in drawing code; add a field there. **The metal style is the family-standard look** — every app turns it on with one `setMetalStyle(true[, appAccent])` call at the end of its editor constructor; the elements (metal panels, raised boxes, name plates, LCD selectors, lamps, engraved labels) and their rules are in [docs/design-ui-family.md §11](docs/design-ui-family.md#11-metal-style-family-standard). Build new UI from those mu-core helpers, never one-off drawing. Family-wide design notes in [docs/design-ui-family.md](docs/design-ui-family.md); product-specific layouts in `docs/<product>/design-ui.md`.
 

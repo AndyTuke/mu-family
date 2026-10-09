@@ -1,9 +1,5 @@
-Read backlog.md to find the current highest issue number, then add a new Open issue at the top of the `## 🔴 Open` section for the following bug report: $ARGUMENTS
+Delegate to the `backlog-administrator` agent (Agent tool, subagent_type `backlog-administrator`) to add a new Open issue for the following bug report: $ARGUMENTS
 
-Rules:
-- Row format: `| <next number> | <description> | 🔴 Open | — |`
-- The new issue number must be one higher than the current highest number anywhere in backlog.md
-- Insert at the top of the Open section (new items start on top until they are ranked into development order)
-- One discrete issue per row; if the bug has multiple independent sub-bugs, split into separate numbered rows — use the next sequential whole numbers (e.g. if 283 is the highest, use 284, 285, …). Never use suffix notation like #282a, #282b
-- Do not alter any other content
-- Do not ask for confirmation
+Do not edit `backlog.md` yourself; the agent is the only thing that writes to it. Give it the bug report verbatim plus any file:line references or context from this conversation, and tell it this is a bug (`[area/topic]` title, finding, fix, and what is unverified). It applies the numbering, placement (top of Open), row-format and one-issue-per-row rules, runs `check-backlog.ps1`, and returns the issue number(s) it created.
+
+Do not ask for confirmation. Relay the new issue number(s) to the user.
