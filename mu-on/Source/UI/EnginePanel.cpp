@@ -29,18 +29,11 @@ namespace
     }
 }
 
-EnginePanel::EnginePanel(ProcessorBase& processor) : proc(processor), grid(processor.apvts)
+EnginePanel::EnginePanel(ProcessorBase& processor, int lane)
+    : proc(processor), currentChannel(lane), grid(processor.apvts)
 {
     addAndMakeVisible(grid);
     grid.setSpecs(specsFor(currentChannel));
-}
-
-void EnginePanel::setChannel(int idx)
-{
-    if (idx == currentChannel) return;
-    currentChannel = idx;
-    grid.setSpecs(specsFor(currentChannel));
-    repaint();
 }
 
 void EnginePanel::paint(juce::Graphics& g)

@@ -29,6 +29,9 @@ public:
     // Size-2 dimensions and wrap to fit the width.
     void setSpecs(const std::vector<Spec>& specs);
 
+    // The width (pixels) the controls need on a single row — a selector takes two cells.
+    int getPreferredWidth() const;
+
     void resized() override;
     void mouseEnter(const juce::MouseEvent&) override;   // a control under the mouse reports its value
 

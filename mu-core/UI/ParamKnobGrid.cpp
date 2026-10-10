@@ -47,6 +47,15 @@ void ParamKnobGrid::setSpecs(const std::vector<Spec>& specs)
     resized();
 }
 
+int ParamKnobGrid::getPreferredWidth() const
+{
+    const int cellW = mu_ui::s(MuLookAndFeel::kKnobSize2W) + mu_ui::s(6);
+    int w = 0;
+    for (const auto& ctl : controls)
+        w += ctl->combo ? 2 * cellW : cellW;
+    return w;
+}
+
 void ParamKnobGrid::resized()
 {
     using mu_ui::s;

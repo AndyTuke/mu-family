@@ -49,6 +49,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         return std::make_unique<ChannelGlyph>(col, name.substring(0, 1));
     };
     sidebar.onChannelSelected = [this](int idx) { groovePanel.setChannel(idx); };
+    groovePanel.onLaneClicked = [this](int lane) { sidebar.setSelectedIndex(lane); groovePanel.setChannel(lane); };
     // Pulse a lane in the sidebar when the sequencer fires it (polled ~5 Hz; the grid's
     // own 30 Hz playhead is the primary timing feedback).
     sidebar.onAnimationTick = [this]

@@ -23,20 +23,24 @@ namespace mu_on
 
 // Main work area — the family per-voice layout (mirrors mu-tant's VoicePanel), top→bottom:
 //   1. shared ChannelHeaderBar (lane name / reset / presets)  ← identical across the family
-//   2. the selected lane's engine params (EnginePanel)         ← "voice editing params above"
+//   2. every lane's engine params at once (one EnginePanel box each, flowed over as many rows as fit)
 //   3. the 909 step editor for the SELECTED lane (GrooveGrid)  ← single row, not the 4-lane grid
 //   4. the shared modulation module (mu-core ModulatorPanel)   ← same as every other module
-// setChannel() forwards the sidebar selection to all four and rebinds the modulator panel
-// to that lane's Layer + destination provider. A 30 Hz timer drives the modulator playhead.
+// setChannel() forwards the sidebar selection to the step editor and rebinds the modulator panel
+// to that lane's Layer + destination provider; the selected lane's engine box is outlined. A 30 Hz timer drives the modulator playhead.
 class GroovePanel : public juce::Component,
                     private juce::Timer
 {
 public:
     explicit GroovePanel(PluginProcessor& p)
-        : proc(p), grid(p, p.pattern()), engine(p)
+        : proc(p), grid(p, p.pattern())
     {
         addAndMakeVisible(header);
-        addAndMakeVisible(engine);
+        for (int lane = 0; lane < kNumChannels; ++lane)
+        {
+            engines[(size_t) lane] = std::make_unique<EnginePanel>(p, lane);
+            addAndMakeVisible(*engines[(size_t) lane]);
+        }
         addAndMakeVisible(grid);
         addAndMakeVisible(modPanel);
 
@@ -100,7 +104,6 @@ public:
         rumbleLength.setVisible(currentChannel == Rumble);
         if (hasSteps) grid.setSelectedTrack(currentChannel);
         if (currentChannel == Rumble) showRumbleEnvelope();
-        engine.setChannel(currentChannel);
 
         header.setLayerName(proc.getChannelName(currentChannel));
         refreshPresetList();   // each lane lists only its own track presets
@@ -113,36 +116,7 @@ public:
         repaint();
     }
 
-    void resized() override
-    {
-        if (MuLookAndFeel::isMetal(*this)) { layoutMetal(); return; }
-
-        const bool metal = false;
-        const int  in    = metal ? mu_ui::s(MuLookAndFeel::kChannelInset) : 0;
-
-        auto r = getLocalBounds();
-        headerR = r.removeFromTop(mu_ui::s(ChannelHeaderBar::kHeight) + (metal ? mu_ui::s(4) : 0));
-        header.setBounds(metal ? headerR.reduced(mu_ui::s(4), mu_ui::s(2)) : headerR);
-        r.removeFromTop(mu_ui::s(4));
-
-        // Shared modulation module at the bottom (same footprint as the other products).
-        modR = r.removeFromBottom(juce::jmax(mu_ui::s(220), juce::roundToInt(r.getHeight() * 0.42f)));
-        modPanel.setBounds(modR.reduced(in));
-        r.removeFromTop(mu_ui::s(4));
-
-        // The selected lane's step editor sits just under the engine params; for the Rumble
-        // lane the drawable bar-volume envelope takes the same slot instead.
-        {
-            slotR = r.removeFromBottom(mu_ui::s(kGridH) + 2 * in);
-            r.removeFromBottom(mu_ui::s(4));
-            if (currentChannel == Rumble) layoutRumble(slotR.reduced(in));
-            else                          grid.setBounds(slotR.reduced(in));
-        }
-
-        // Engine params fill what's left, directly under the header.
-        engineR = r;
-        engine.setBounds(r.reduced(in));
-    }
+    void resized() override { layoutMetal(); }
 
     void paint(juce::Graphics& g) override
     {
@@ -154,13 +128,32 @@ public:
         const auto accent = MuLookAndFeel::appAccent(*this);
         for (auto rr : { headerR, engineR, slotR, modR })
             MuLookAndFeel::drawAccentPanel(g, rr.reduced(2).toFloat(), accent);
+        for (int l = 0; l < kNumChannels; ++l)
+            MuLookAndFeel::drawSections(g, *this, { { engineBoxes[(size_t) l], proc.getChannelName(l).toUpperCase() } }, accent);
+
+        // The selected lane (the one whose steps are below) is outlined in its colour.
+        g.setColour(MuLookAndFeel::channelPalette[(size_t) (proc.getChannelColourIndex(currentChannel) % MuLookAndFeel::kChannelPaletteSize)]);
+        g.drawRoundedRectangle(engineBoxes[(size_t) currentChannel].toFloat().expanded(1.0f), 4.0f, 1.5f);
+
         const auto lane = proc.getChannelName(currentChannel).toUpperCase();
         if (currentChannel == Rumble)
-            MuLookAndFeel::drawSections(g, *this, { { engineBoxR, lane + " ENGINE" }, { stepsBoxR, lane + " ENVELOPE" } }, accent);
+            MuLookAndFeel::drawSections(g, *this, { { stepsBoxR, lane + " ENVELOPE" } }, accent);
         else
-            MuLookAndFeel::drawSections(g, *this, { { engineBoxR, lane + " ENGINE" }, { grooveBoxR, "GROOVE" },
-                                                    { stepsBoxR, lane + " STEPS" } }, accent);
+            MuLookAndFeel::drawSections(g, *this, { { grooveBoxR, "GROOVE" }, { stepsBoxR, lane + " STEPS" } }, accent);
     }
+
+    // A click on a lane's engine box (its plate or the gaps between knobs) selects that lane.
+    void mouseDown(const juce::MouseEvent& e) override
+    {
+        for (int l = 0; l < kNumChannels; ++l)
+            if (engineBoxes[(size_t) l].expanded(0, mu_ui::s(MuLookAndFeel::kSectionPlateH)).contains(e.getPosition()))
+            {
+                if (onLaneClicked) onLaneClicked(l);
+                return;
+            }
+    }
+
+    std::function<void(int)> onLaneClicked;   // the editor points the sidebar at the clicked lane
 
     void paintOverChildren(juce::Graphics& g) override
     {
@@ -196,10 +189,21 @@ private:
         headerR = { 0, 0, w, s(ChannelHeaderBar::kHeight) + s(4) };
         header.setBounds(headerR.reduced(LF::hasScrews(*this) ? padX : s(4), s(2)));
 
+        // Every lane's engine box, flowed left to right in sidebar order and wrapped to the next
+        // row when the next box would overrun the panel; each is as wide as its controls need.
         const int engineBoxH = s(mu_ui::ParamKnobGrid::kCellH + 2 * LF::kSpaceS);
-        engineR    = { 0, headerR.getBottom(), w, padY + plateH + engineBoxH + padY };
-        engineBoxR = { padX, engineR.getY() + padY + plateH, w - 2 * padX, engineBoxH };
-        engine.setBounds(engineBoxR.reduced(clear, s(LF::kSpaceS)));
+        const int gap        = s(LF::kVoiceDivW);
+        const int rowH       = plateH + engineBoxH;
+        int x = padX, row = 0;
+        for (int l = 0; l < kNumChannels; ++l)
+        {
+            const int bw = engines[(size_t) l]->getPreferredWidth() + 2 * clear;
+            if (x > padX && x + bw > w - padX) { x = padX; ++row; }
+            engineBoxes[(size_t) l] = { x, headerR.getBottom() + padY + row * (rowH + padY) + plateH, bw, engineBoxH };
+            engines[(size_t) l]->setBounds(engineBoxes[(size_t) l].reduced(clear, s(LF::kSpaceS)));
+            x += bw + gap;
+        }
+        engineR = { 0, headerR.getBottom(), w, padY + (row + 1) * (rowH + padY) };
 
         const int boxH = s(GrooveGrid::kBoxH);
         slotR = { 0, engineR.getBottom(), w, padY + plateH + boxH + padY };
@@ -256,7 +260,7 @@ private:
     int currentChannel = 0;
 
     ChannelHeaderBar header;
-    EnginePanel      engine;
+    std::array<std::unique_ptr<EnginePanel>, kNumChannels> engines;   // one box per lane, all visible
     GrooveGrid       grid;
     LFOEditor        rumbleEnvEditor;   // drawable volume envelope (Rumble lane only)
     NoteLengthControl rumbleLength { "Loop" };     // its length — the same control as a modulator's Loop
@@ -265,7 +269,8 @@ private:
 
     static constexpr int kGridH = GrooveGrid::kStepEditorHeight;
     juce::Rectangle<int> headerR, engineR, slotR, modR;   // panel areas (metal style)
-    juce::Rectangle<int> engineBoxR, grooveBoxR, stepsBoxR; // raised section boxes (metal style)
+    std::array<juce::Rectangle<int>, kNumChannels> engineBoxes;   // each lane's raised engine box
+    juce::Rectangle<int> grooveBoxR, stepsBoxR;                   // the selected lane's Groove + steps boxes
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GroovePanel)
 };

@@ -402,6 +402,8 @@ setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));   // mu-On
 
 ## Design rulings
 
+- 2026-10-10 — mu-On: one lane at a time or all five at once? My Lane Rack ruling (no sidebar, five strips, MOD toggle, `Lighting::laneMutedDim`) is SUPERSEDED by the owner: keep the lane sidebar (selection chooses the step row / Rumble envelope, Groove box, modulators); all five ENGINE boxes shown at once in one metal panel, each at `ParamKnobGrid::getPreferredWidth`, flowed in sidebar order and wrapped (3 rows at 1088 wide); selected lane's box outlined in its lane colour; clicking a box selects the lane. No new tokens. See [mu-on/design-ui.md](mu-on/design-ui.md) section 1.
+
 - 2026-10-10 — MIDI clock locked / lost indicator in the TransportBar? A new shared `StatusLamp` (round lamp + "Clock" label) between BPM and position, standalone with clock sync on; amber dim / green / red bright; new token `indicatorFault`, size `kStatusLampD`; BPM field unchanged. Changed §3.5, §5, §9, §11.
 - 2026-10-10 — Fractional BPM (match a track at 127.5)? One decimal, always shown ("120.0"); arrows 1.0, Shift+click 0.1; text entry parses decimals and clamps; MIDI-clock display rounded to 0.1; `NudgeInput` gains a generic decimals mode (integer users unchanged); TransportBar `kBpmW` 72 to 80; mu-link slider interval 0.1 with one-decimal text. Changed §6.4, §7.
 - 2026-10-10 — Sync offset, nudge, tap tempo, time signature (standalone)? Tap (internal clock) takes the Clock-lamp slot; Nudge -/+ (hold = -/+4 %) sits right of the position field; Sync offset (-50..+250 ms, positive = plays earlier, default 0) and Time signature (dropdown, display/metronome only) go in Settings; keys `syncOffsetMs`, `timeSigNumerator`, `timeSigDenominator`. Changed new §6.5, §7.
