@@ -121,6 +121,7 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group improved">
           <h3>Improved</h3>
           <ul>
+            <li>In a DAW, the transport display (play button and bar position) now follows the DAW more reliably, including while the plugin is bypassed. <span class="ref">(1243)</span></li>
             <li>The plugin window uses less CPU: knobs, step editors and animations only redraw when something on screen actually changes, and hidden panels stop animating. <span class="ref">(1242)</span></li>
             <li>In a DAW, the gate patterns now line up with the DAW&rsquo;s bars and follow its loop and position jumps (they used to run from wherever they started). <span class="ref">(1188)</span></li>
             <li>With MIDI clock sync on in the standalone, the clock&rsquo;s Start and Stop now control playback fully &mdash; its Stop stops the app even if you pressed Play. <span class="ref">(1188)</span></li>
@@ -144,6 +145,7 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group fixed">
           <h3>Fixed</h3>
           <ul>
+            <li>MIDI clock sync in the standalone: with Messages set to &ldquo;Clock only&rdquo; the Play button now starts the app (it used to stay stopped), and with &ldquo;Transport&rdquo; the app now plays at its own BPM instead of sitting on the first step. <span class="ref">(1261)</span></li>
             <li>Loading a voice preset saved before some settings existed now puts those settings to their defaults, instead of keeping the previous voice's values. <span class="ref">(1237)</span></li>
             <li>Presets are grouped under their categories in the preset list again, the preset browser shows each preset's category and description, and Save fills in the current preset's category. <span class="ref">(1233)</span></li>
             <li>A preset saved with Save → Save as Default is now restored when μ-Tant opens, as in μ-Clid. <span class="ref">(1231)</span></li>
