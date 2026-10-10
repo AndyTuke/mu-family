@@ -121,7 +121,7 @@ public:
     int  getMasterLoopCurrentStep() const override        { return sequencer.getMasterLoopCurrentStep(); }
 
     // A rhythm hot-swap commit fires ProcessorBase::onSlotPresetCommitted: the editor refreshes
-    // the non-APVTS UI state (name label, sample bar, colour-tinted bits) pushRhythmToAPVTS can't.
+    // the non-APVTS UI state (name label, sample bar, colour-tinted bits) pushRhythmToApvts can't.
 
     // ProcessorBase slot-preset API: a rhythm preset into rhythm `ri`.
     void saveSlotPreset(int ri, const juce::String& name) override;
@@ -296,7 +296,7 @@ public:
     // multi-write sequence in a `mu_core::ScopedApvtsLoading` guard so the
     // intermediate APVTS state stays invisible to listeners (RhythmPanel's
     // refreshSuffix in particular). Caller is responsible for any post-guard
-    // engine resync — see `forceSyncRhythmFromAPVTS` for the canonical pattern.
+    // engine resync — see `forceSyncRhythmFromApvts` for the canonical pattern.
     std::atomic<bool>& getApvtsLoadingFlag() noexcept { return apvtsLoading; }
 
     // Public so the insert-algo-change UI flow can re-sync engine state after
@@ -304,7 +304,7 @@ public:
     // setParams was suppressed under the guard, so VoiceEngine's pendingParams
     // would otherwise lag a block. Iterates kRhythmParamDefs to populate
     // r.voiceParams from current APVTS, then calls updatePattern + setParams.
-    void forceSyncRhythmFromAPVTS(int ri);
+    void forceSyncRhythmFromApvts(int ri);
 private:
 
     // ── processBlock phases (full + Lite paths) ──────────────────────────
@@ -391,12 +391,12 @@ private:
     void syncRhythmParam(int ri, const juce::String& suffix, float v);
     // FX / return / master / channel-strip params route to the shared
     // ProcessorBase::syncGlobalFxParam (mu-core) — see the backlog.
-    void pushRhythmToAPVTS(int ri);
-    // forceSyncRhythmFromAPVTS lifted to the public section above so UI
+    void pushRhythmToApvts(int ri);
+    // forceSyncRhythmFromApvts lifted to the public section above so UI
     // orchestrators (insert-algo dropdown) can call it after their own
     // apvtsLoading-guarded multi-writes.
-    void pushMixerChannelToAPVTS(int idx);
-    void swapAPVTSForRhythms(int i, int j);
+    void pushMixerChannelToApvts(int idx);
+    void swapApvtsForRhythms(int i, int j);
     void restoreStateFromTree(const juce::ValueTree& s) { presetIO.restoreStateFromTree(s); }
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

@@ -5,13 +5,13 @@
 // Before this header, renaming a single param ID (e.g. `drvChar` → `insChar`)
 // required updating five stringly-typed sites in lock-step: the APVTS
 // declaration, the kRhythmSuffixes table, applyRhythmSuffix's if/else chain,
-// pushRhythmToAPVTS's set() chain, and any UI binding. No compile-time check
+// pushRhythmToApvts's set() chain, and any UI binding. No compile-time check
 // kept them aligned.
 //
 // This table pairs each suffix with the (rhythm → APVTS value) and
 // (APVTS value → rhythm) transformations so they stay co-located. The
 // previously-separate kRhythmSuffixes list now derives from this table by
-// iteration; applyRhythmSuffix and pushRhythmToAPVTS both consume it.
+// iteration; applyRhythmSuffix and pushRhythmToApvts both consume it.
 //
 // Each entry's value semantics match the prior hand-written code exactly:
 // integer suffixes round through `(int)v`, ADSR sustains scale 0..100 ↔ 0..1
@@ -54,7 +54,7 @@ struct RhythmParamDef
     // syncing voiceParams to the VoiceEngine.
     void  (*apply)(float v, Rhythm& r, bool& patternDirty, bool& voiceDirty);
     // Read the current display-scale value from a Rhythm. Used by
-    // pushRhythmToAPVTS to mirror the in-memory state to APVTS after a
+    // pushRhythmToApvts to mirror the in-memory state to APVTS after a
     // hot-swap commit / preset load.
     float (*push)(const Rhythm& r);
     // Stage 35: param type + algorithm name table (for AlgorithmIndex kinds).

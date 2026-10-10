@@ -177,7 +177,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
         // repopulate freshly-defaulted Rhythm fields even when JUCE skips listener
         // callbacks because the APVTS values didn't change. Internally calls
         // updatePattern + proc.voiceEngines[i]->setParams.
-        proc.forceSyncRhythmFromAPVTS(i);
+        proc.forceSyncRhythmFromApvts(i);
 
         // Host-state format prefixes every sample-related property with "r{i}_".
         proc.samples.setPath(i, state.getProperty(slotPrefix + "sample").toString());

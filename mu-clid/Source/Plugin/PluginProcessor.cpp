@@ -133,7 +133,7 @@ PluginProcessor::PluginProcessor()
 
     {
         mu_core::ScopedApvtsLoading guard(apvtsLoading);
-        pushRhythmToAPVTS(0);
+        pushRhythmToApvts(0);
     }
 
 #if !MUCLID_LITE_BUILD

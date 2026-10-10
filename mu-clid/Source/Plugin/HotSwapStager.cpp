@@ -163,7 +163,7 @@ void HotSwapStager::processSwaps()
         for (int idx = 0; idx < readyCount; ++idx)
         {
             const int r = readyRhythms[(size_t)idx];
-            proc.pushRhythmToAPVTS(r);
+            proc.pushRhythmToApvts(r);
             if (proc.onSlotPresetCommitted)
                 proc.onSlotPresetCommitted(r);
         }

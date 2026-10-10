@@ -52,7 +52,7 @@ struct Layer
     // message-thread writes and audio-thread reads.
     mutable CopyableSpinLock modLock;
     // Spin-lock protecting `voiceParams` from concurrent message-thread writes
-    // (via syncRhythmParam / forceSyncRhythmFromAPVTS / preset apply) and
+    // (via syncRhythmParam / forceSyncRhythmFromApvts / preset apply) and
     // audio-thread reads (the modulation-seed `VoiceParams modParams = ...`
     // copy in processBlock). Without this the struct copy could interleave
     // word-aligned scalar reads with concurrent writes; benign on x86 by

@@ -1,9 +1,9 @@
 // partial-class TU split from PluginProcessor.cpp. Contains:
 // - createParameterLayout (the big APVTS layout factory)
 // - parameterChanged dispatcher
-// - syncRhythmParam / forceSyncRhythmFromAPVTS (FX/mixer route to mu-core's
+// - syncRhythmParam / forceSyncRhythmFromApvts (FX/mixer route to mu-core's
 //   ProcessorBase::syncGlobalFxParam — see the backlog)
-// - pushRhythmToAPVTS / pushMixerChannelToAPVTS / swapAPVTSForRhythms
+// - pushRhythmToApvts / pushMixerChannelToApvts / swapApvtsForRhythms
 //
 // Shared helpers (kChannelSuffixes, applyRhythmSuffix, adsrTime, adsrSus)
 // live in PluginProcessor_Internal.h since the Preset TU needs them too.
@@ -253,7 +253,7 @@ void PluginProcessor::syncRhythmParam(int ri, const juce::String& suffix, float 
 // values, so a freshly-constructed Rhythm object at a regrown slot would never get
 // its data populated and would play with default `hits=0` patterns (silent) and
 // default voice params.
-void PluginProcessor::forceSyncRhythmFromAPVTS(int ri)
+void PluginProcessor::forceSyncRhythmFromApvts(int ri)
 {
     if (ri < 0 || ri >= SequencerEngine::MaxRhythms) return;
     if (ri >= sequencer.getNumRhythms()) return;
@@ -287,7 +287,7 @@ void PluginProcessor::forceSyncRhythmFromAPVTS(int ri)
 // ProcessorBase::syncGlobalFxParam (mu-core), matching mu-tant. See the backlog.
 
 //==============================================================================
-void PluginProcessor::pushRhythmToAPVTS(int ri)
+void PluginProcessor::pushRhythmToApvts(int ri)
 {
     if (ri < 0 || ri >= sequencer.getNumRhythms()) return;
     const Rhythm& r = sequencer.getRhythm(ri);
@@ -311,7 +311,7 @@ void PluginProcessor::pushRhythmToAPVTS(int ri)
     }
 }
 
-void PluginProcessor::pushMixerChannelToAPVTS(int idx)
+void PluginProcessor::pushMixerChannelToApvts(int idx)
 {
     if (idx < 0 || idx >= SequencerEngine::MaxRhythms) return;
     const auto& ch = mixerEngine.channels[idx];
@@ -340,17 +340,17 @@ void PluginProcessor::pushMixerChannelToAPVTS(int idx)
     set(px+"outBus",  (float)ch.outputBus);
 }
 
-void PluginProcessor::swapAPVTSForRhythms(int i, int j)
+void PluginProcessor::swapApvtsForRhythms(int i, int j)
 {
     mu_core::ScopedApvtsLoading guard(apvtsLoading);
-    pushRhythmToAPVTS(i);
-    pushRhythmToAPVTS(j);
+    pushRhythmToApvts(i);
+    pushRhythmToApvts(j);
     // Push every active channel: not just i and j, because sidechain source
     // indices on OTHER channels may have been re-translated by the swap
     // (any channel pointing at i now points at j, and vice versa).
     const int n = numActiveRhythms.load(std::memory_order_acquire);
     for (int c = 0; c < n; ++c)
-        pushMixerChannelToAPVTS(c);
+        pushMixerChannelToApvts(c);
 }
 
 } // namespace mu_clid

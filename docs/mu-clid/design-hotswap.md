@@ -80,7 +80,7 @@ handleAsyncUpdate()
     suspendProcessing(true) + rhythmsLock
     std::move pending → live slots
     suspendProcessing(false)
-    pushRhythmToAPVTS + onCommitted cb
+    pushRhythmToApvts + onCommitted cb
 ```
 
 - `pendingSwaps[]` / `pendingPreset` are written on the message thread (stage /
@@ -139,7 +139,7 @@ decides whether per-rhythm swaps wait for the master loop or each rhythm's own l
 ## 6. Per-rhythm swap walk-through (`stageRhythmPreset`)
 
 1. Not playing → `applyRhythmPreset(file, r)`: the same prepared rhythm installed at once
-   (`installRhythm` under suspend + `rhythmsLock`, then `pushRhythmToAPVTS`), return.
+   (`installRhythm` under suspend + `rhythmsLock`, then `pushRhythmToApvts`), return.
 2. Parse + validate the `.muRhythm` (`requireSupportedPresetVersion` — **v2 only**;
    legacy v0/v1 are refused with a clear `onLoadError`).
 3. `prepareRhythm(state, "r0_", …)` — the one rhythm build, shared with the full preset:
@@ -175,7 +175,7 @@ decides whether per-rhythm swaps wait for the master loop or each rhythm's own l
 - Release `rhythmsLock`, `suspendProcessing(false)`.
 - **APVTS finalize** outside the suspend, under `ScopedApvtsLoading` (so the
   `parameterChanged` listener skips the engine re-sync and can't clobber the
-  freshly-installed voice): `pushRhythmToAPVTS` per rhythm + channel / global params
+  freshly-installed voice): `pushRhythmToApvts` per rhythm + channel / global params
   from the parsed tree.
 
 ---
@@ -211,7 +211,7 @@ the swap point.** Instead:
    whose `boundaryReached` is set (skip any whose `isReady` was cleared by
    `cancelStagedSwap` between the audio thread flagging it and this handler running);
    then under **one** `suspendProcessing` retire-then-swap each; then, outside the
-   suspend and under one `ScopedApvtsLoading` guard, `pushRhythmToAPVTS(r)` +
+   suspend and under one `ScopedApvtsLoading` guard, `pushRhythmToApvts(r)` +
    `onSlotPresetCommitted(r)` (the shared ProcessorBase callback).
 3. **Full-preset commit.** If `presetBoundaryReached`, clear the flags,
    `commitStagedFullPreset(pendingPreset)`, release the payload, fire

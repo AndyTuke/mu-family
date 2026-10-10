@@ -23,7 +23,7 @@ void RhythmManager::add(const Rhythm& r)
     proc.samples.clearPath(ri);
     {
         mu_core::ScopedApvtsLoading guard(proc.apvtsLoading);
-        proc.pushRhythmToAPVTS(ri);
+        proc.pushRhythmToApvts(ri);
     }
 }
 
@@ -87,7 +87,7 @@ bool RhythmManager::swap(int i, int j)
     }
     proc.suspendProcessing(false);
 
-    proc.swapAPVTSForRhythms(i, j);
+    proc.swapApvtsForRhythms(i, j);
     return true;
 }
 

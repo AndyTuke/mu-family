@@ -51,7 +51,7 @@ VoiceSection::VoiceSection(PluginProcessor& p)
         mu_core::ScopedApvtsLoading guard(proc.getApvtsLoadingFlag());
         fn();
         if (currentRhythm >= 0 && currentRhythm < proc.getNumRhythms())
-            proc.forceSyncRhythmFromAPVTS(currentRhythm);
+            proc.forceSyncRhythmFromApvts(currentRhythm);
     };
 }
 

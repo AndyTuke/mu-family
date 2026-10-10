@@ -376,7 +376,7 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
 {
     Rhythm& rhythm = sequencer.getRhythm(r);
     // Snapshot voiceParams under voiceParamsLock so a concurrent
-    // message-thread apply (syncRhythmParam / forceSyncRhythmFromAPVTS)
+    // message-thread apply (syncRhythmParam / forceSyncRhythmFromApvts)
     // can't interleave a torn write. Held for ~struct-copy time only.
     VoiceParams modParams;
     {

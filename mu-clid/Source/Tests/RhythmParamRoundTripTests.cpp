@@ -11,7 +11,7 @@
 // of typo would silently corrupt every preset save -> load cycle.
 //
 // Why this test matters: before the table consolidation, applyRhythmSuffix's if/else chain and
-// pushRhythmToAPVTS's set() chain were two independent hand-written
+// pushRhythmToApvts's set() chain were two independent hand-written
 // implementations of the same suffix dispatch. They were vulnerable to drift.
 // The table consolidation made them share code, but only this test
 // proves the shared code is correct.

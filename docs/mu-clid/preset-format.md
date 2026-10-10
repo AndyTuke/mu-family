@@ -177,7 +177,7 @@ These are the invariants the format relies on for forward compatibility:
 3. **Algorithm names are append-only.** The dispatch-table index can move
    freely; the user-facing name string must not.
 4. **`kRhythmParamDefs` is the single source of truth** for per-rhythm
-   parameter wiring. APVTS layout, applyRhythmSuffix, pushRhythmToAPVTS,
+   parameter wiring. APVTS layout, applyRhythmSuffix, pushRhythmToApvts,
    and the v2 preset reader / writer all consume it.
 5. **Modulation source / destination IDs are validated on load** (#437) —
    stale IDs report via `onLoadError` instead of dangling silently.

@@ -416,7 +416,7 @@ bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex, bool k
     proc.suspendProcessing(false);
 
     mu_core::ScopedApvtsLoading guard(proc.apvtsLoading);
-    proc.pushRhythmToAPVTS(targetIndex);
+    proc.pushRhythmToApvts(targetIndex);
     return true;
 }
 
@@ -622,7 +622,7 @@ void PresetIO::restoreRhythmSample(int i, const juce::ValueTree& tree,
 {
     // The Lite (MIDI-effect) build has no sample-playback engine on this slot, so there's
     // nothing to load a sample into — bail before any voiceEngines[i] deref. The caller
-    // maintains the sample paths. (Mirrors the null guard in forceSyncRhythmFromAPVTS.)
+    // maintains the sample paths. (Mirrors the null guard in forceSyncRhythmFromApvts.)
     if (! proc.voiceEngines[i]) return;
 
     const auto smp = resolvePresetSample(tree.getProperty(juce::Identifier(sampleDataProp)).toString(),
@@ -878,7 +878,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
         auto rTree = root.getChild(ci);
         if (rTree.getType() != juce::Identifier("Rhythm")) continue;
         const int i = rhythmIndex++;
-        proc.pushRhythmToAPVTS(i);
+        proc.pushRhythmToApvts(i);
         restoreRhythmChannelParams(i, rTree);
     }
     restoreGlobalState(root);
