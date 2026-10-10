@@ -667,6 +667,26 @@ int PluginProcessor::addVoice()
     return n;
 }
 
+// Re-point every sidechain source parameter (the channel strips' ch{N}_scSrc and the three return
+// strips) through `remap(paramValue)`. The parameter is 0 = off, 1..8 = channel 0..7, 9 = the
+// external bus; a structural edit renumbers the voices, so a strip must follow its source's new slot.
+void PluginProcessor::remapSidechainSources(const std::function<int(int)>& remap)
+{
+    auto remapOne = [this, &remap](const juce::String& id)
+    {
+        if (auto* p = apvts.getParameter(id))
+        {
+            const int v  = juce::roundToInt(p->convertFrom0to1(p->getValue()));
+            const int nv = juce::jlimit(0, 9, remap(v));
+            if (nv != v) p->setValueNotifyingHost(p->convertTo0to1((float) nv));
+        }
+    };
+    for (int c = 0; c < kMaxVoices; ++c)
+        remapOne("ch" + juce::String(c) + "_scSrc");
+    for (const char* ret : { "ret_eff_scSrc", "ret_dly_scSrc", "ret_rev_scSrc" })
+        remapOne(ret);
+}
+
 void PluginProcessor::removeVoice(int idx)
 {
     const juce::ScopedLock sl(voicesLock);
@@ -678,6 +698,10 @@ void PluginProcessor::removeVoice(int idx)
     // staged FULL preset is index-independent: it replaces the whole state at commit,
     // so it stays and simply wins.)
     for (int v = 0; v < kMaxVoices; ++v) hotSwapStager.cancelVoice(v);
+
+    // Strips that ducked from the removed voice now duck from nothing; the others follow their
+    // voice down (translated BEFORE the shift copies the strips' parameters).
+    remapSidechainSources([idx](int v) { return mu_mix::sidechainParamAfterRemove(v, idx, mu_limits::kMaxLayers); });
 
     // Shift every higher voice down one slot — APVTS values + gate + modulators.
     for (int d = idx; d < n - 1; ++d)
@@ -705,6 +729,10 @@ void PluginProcessor::swapVoices(int a, int b)
     // misdirect them, so drop both.
     hotSwapStager.cancelVoice(a);
     hotSwapStager.cancelVoice(b);
+
+    // A strip that ducked from one swapped voice now ducks from the other (translated BEFORE the
+    // strips' parameters swap, so each strip's own source moves with it).
+    remapSidechainSources([a, b](int v) { return mu_mix::sidechainParamAfterSwap(v, a, b, mu_limits::kMaxLayers); });
 
     auto swapPrefix = [this](const juce::String& pa, const juce::String& pb)
     {

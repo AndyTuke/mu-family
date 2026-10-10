@@ -403,6 +403,7 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/ModulationSkewTests.cpp       # C5 (proportion-space skew round-trips)
     Source/Tests/MidiClockSyncTests.cpp      # shared MIDI-clock slave (tempo estimate, step-exact beat)
     Source/Tests/TransportResolverTests.cpp    # family transport rule: host / MIDI-clock modes / own
+    Source/Tests/SidechainRemapTests.cpp       # sidechain sources follow their layer through remove / swap
     Source/Tests/BarPositionTests.cpp          # host meter + bar start → bar.beat.sixteenth
     Source/Tests/EmbeddedSampleTests.cpp       # preset samples: FLAC round trip is sample-identical
     Source/Tests/Mp3FormatTests.cpp            # MP3 samples open and decode (same define as the plugin)

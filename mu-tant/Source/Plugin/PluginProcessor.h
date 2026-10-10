@@ -171,6 +171,7 @@ public:
     int  addVoice();
     void removeVoice(int idx);
     void swapVoices(int a, int b);   // reorder (drag in the sidebar)
+    void remapSidechainSources(const std::function<int(int)>& remap);   // re-point scSrc after a renumbering
     void resetSlot(int idx) override;   // reset a voice to defaults (keeps its colour)
     // Recompute the cached stepped-pitch flags for one voice / all voices. Call on the
     // message thread whenever a voice's modulators change (editor edit, preset load,

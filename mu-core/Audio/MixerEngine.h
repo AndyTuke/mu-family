@@ -8,6 +8,7 @@
 #include "InsertProcessor.h"
 #include "VoiceParams.h"
 #include "MuLimits.h"
+#include "SidechainRemap.h"
 
 class VoiceEngine;
 class FXChain;
@@ -249,6 +250,26 @@ public:
         swapF(a.sidechainAttackMs,  b.sidechainAttackMs);
         swapF(a.sidechainReleaseMs, b.sidechainReleaseMs);
         swapI(a.outputBus,          b.outputBus);
+    }
+
+    // A layer was removed at `removed` and the ones above are about to shift down: re-point every
+    // sidechain source (channel strips and the three return strips). Call BEFORE the strips shift.
+    void renumberSidechainsAfterRemove(int removed) noexcept
+    {
+        for (auto& c : channels)
+            c.sidechainSource.store(mu_mix::sidechainAfterRemove(c.sidechainSource.load(std::memory_order_relaxed), removed, MaxChannels), std::memory_order_relaxed);
+        for (auto& r : returns)
+            r.sidechainSource.store(mu_mix::sidechainAfterRemove(r.sidechainSource.load(std::memory_order_relaxed), removed, MaxChannels), std::memory_order_relaxed);
+    }
+
+    // Layers `a` and `b` are about to swap strips: re-point every sidechain source that named either.
+    // Call BEFORE the strips swap.
+    void renumberSidechainsAfterSwap(int a, int b) noexcept
+    {
+        for (auto& c : channels)
+            c.sidechainSource.store(mu_mix::sidechainAfterSwap(c.sidechainSource.load(std::memory_order_relaxed), a, b, MaxChannels), std::memory_order_relaxed);
+        for (auto& r : returns)
+            r.sidechainSource.store(mu_mix::sidechainAfterSwap(r.sidechainSource.load(std::memory_order_relaxed), a, b, MaxChannels), std::memory_order_relaxed);
     }
 
     // Reset the sidechain envelope follower state for one channel slot. Called

@@ -67,16 +67,10 @@ bool RhythmManager::swap(int i, int j)
 
         proc.samples.swapPaths(i, j);
 
-        // Re-translate sidechain source indices BEFORE the channel swap, so any
-        // channel referring to the swapped slots keeps pointing at the same logical
+        // Re-translate sidechain source indices (channel and return strips) BEFORE the channel
+        // swap, so any strip referring to the swapped slots keeps pointing at the same logical
         // rhythm after the swap.
-        for (int c = 0; c < n; ++c)
-        {
-            auto& src = proc.mixerEngine.channels[c].sidechainSource;
-            const int s = src.load(std::memory_order_relaxed);
-            if      (s == i) src.store(j, std::memory_order_relaxed);
-            else if (s == j) src.store(i, std::memory_order_relaxed);
-        }
+        proc.mixerEngine.renumberSidechainsAfterSwap(i, j);
 
         proc.mixerEngine.swapChannelState(i, j);
 
@@ -109,6 +103,9 @@ void RhythmManager::remove(int index)
         const juce::ScopedLock sl(proc.rhythmsLock);
         proc.numActiveRhythms.store(newN, std::memory_order_release);
         proc.sequencer.removeRhythm(index);
+        // The strips above shift down, so re-point every sidechain source first: a strip that ducked
+        // from the deleted rhythm now ducks from nothing; the rest follow their rhythm down.
+        proc.mixerEngine.renumberSidechainsAfterRemove(index);
         for (int i = index; i < newN; ++i)
         {
             proc.voiceEngines[i] = std::move(proc.voiceEngines[i + 1]);
