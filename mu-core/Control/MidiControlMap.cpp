@@ -19,7 +19,7 @@ void MidiControlMap::republish()
     for (size_t i = 0; i < dirty.size(); ++i)   // every slot, so a stale flag past the new size cannot fire later
     {
         latest[i].store(0.0f, std::memory_order_relaxed);
-        dirty[i].store(false, std::memory_order_relaxed);
+        dirty[i].store(0, std::memory_order_relaxed);
     }
     for (size_t i = 0; i < mappings.size(); ++i)
     {
@@ -30,7 +30,7 @@ void MidiControlMap::republish()
     epochCounter.fetch_add(1, std::memory_order_acq_rel);   // even: settled
 }
 
-int MidiControlMap::add(const Mapping& m)
+int MidiControlMap::add(const MidiMapping& m)
 {
     if (m.channel < 1 || m.channel > 16 || m.number < 0 || m.number > 127 || m.action.type == ControlActionType::None)
         return -1;
@@ -83,10 +83,10 @@ int MidiControlMap::size() const
     return (int) mappings.size();
 }
 
-Mapping MidiControlMap::get(int index) const
+MidiMapping MidiControlMap::get(int index) const
 {
     const juce::ScopedLock sl(lock);
-    return (index >= 0 && index < (int) mappings.size()) ? mappings[(size_t) index] : Mapping {};
+    return (index >= 0 && index < (int) mappings.size()) ? mappings[(size_t) index] : MidiMapping {};
 }
 
 void MidiControlMap::setQuantise(Quantise q)
@@ -129,7 +129,7 @@ void MidiControlMap::load()
     if (auto* arr = obj->getProperty("mappings").getArray())
         for (const auto& v : *arr)
         {
-            Mapping m;
+            MidiMapping m;
             m.isNote          = v.getProperty("type", "cc").toString() == "note";
             m.channel         = juce::jlimit(1, 16, (int) v.getProperty("channel", 1));
             m.number          = juce::jlimit(0, 127, (int) v.getProperty("number", 0));

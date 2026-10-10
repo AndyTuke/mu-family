@@ -89,6 +89,20 @@ def wav_max_difference(a: Path, b: Path) -> float:
     return float(np.max(np.abs(full_scale(xa) - full_scale(xb)))) * 2 ** 23 if xa.size else 0.0
 
 
+# A render is seconds of audio; one that runs this long is hung (a stuck render once stalled the
+# whole suite). It is killed and counts as that test's failure; the suite carries on.
+RENDER_TIMEOUT_SECONDS = 180
+
+
+def run_render(cmd: list, label: str):
+    """Run one render with a timeout; returns the CompletedProcess, or None after a timeout."""
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=RENDER_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        print(f'{label} RENDER HUNG: no result after {RENDER_TIMEOUT_SECONDS} s, killed')
+        return None
+
+
 def run_one(test_name: str, spec: dict, spec_path: Path, exe: Path, product: str, verbose: bool) -> str:
     """Render + analyse one test. Returns 'pass' or 'fail'.
 
@@ -180,7 +194,9 @@ def run_one(test_name: str, spec: dict, spec_path: Path, exe: Path, product: str
     if verbose:
         print(f'[{test_name}] $ {" ".join(cmd)}')
 
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    res = run_render(cmd, f'[{test_name}]')
+    if res is None:
+        return 'fail'
     if res.returncode != 0:
         print(f'[{test_name}] RENDER FAILED (exit {res.returncode})')
         if res.stderr:
@@ -219,7 +235,9 @@ def run_roundtrip(test_name: str, cmd: list, wav: Path, saved: Path, load_flag: 
     cmd2 += [load_flag, str(saved)]
     if verbose:
         print(f'[{test_name}] $ {" ".join(cmd2)}')
-    res = subprocess.run(cmd2, capture_output=True, text=True)
+    res = run_render(cmd2, f'[{test_name}]')
+    if res is None:
+        return 'fail'
     if res.returncode != 0:
         print(f'[{test_name}] ROUNDTRIP RENDER FAILED (exit {res.returncode})')
         if res.stderr:
@@ -234,7 +252,8 @@ def run_roundtrip(test_name: str, cmd: list, wav: Path, saved: Path, load_flag: 
 
 def main(argv) -> int:
     parser = argparse.ArgumentParser(description='Run the mu-family listening-test suite')
-    parser.add_argument('--config', default='Release', choices=['Debug', 'Release'])
+    parser.add_argument('--config', required=True, choices=['Debug', 'Release'],
+                        help='Which build to render with — required, so a stale build is never used silently')
     parser.add_argument('--filter', default=None,
                         help='Only run tests whose name contains this substring')
     parser.add_argument('--product', default=None, choices=PRODUCTS,
@@ -242,6 +261,7 @@ def main(argv) -> int:
     parser.add_argument('--verbose', action='store_true')
     args = parser.parse_args(argv)
 
+    print(f'config: {args.config}')
     print(f'expectations: {EXPECTATIONS_DIR}')
     print()
 

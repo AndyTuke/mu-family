@@ -41,6 +41,8 @@ presets live under each product's content folder (e.g. `$MUCLID_CONTENT_DIR/Rhyt
 # Make sure the standalones are built (Debug is faster to iterate, Release is what testers see)
 cmake --build build --config Debug
 
+# `--config` is required (a stale build is never rendered silently); a render that hangs for
+# 180 s is killed and fails its test, and the suite carries on.
 # Run the full suite (every product)
 python tests/scripts/run-listening-tests.py --config Debug
 

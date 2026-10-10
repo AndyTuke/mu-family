@@ -139,6 +139,11 @@ class.
   sequencer data and generators; `Modulation/` the product's modulation-target table and snapshot;
   `Persistence/` preset and state (de)serialisation and migrations; `License/` licensing glue; `UI/` the
   panels, overlays and sidebars; `Tests/` the unit tests.
+- `mu-core/` folders are by role: `Audio, Control, License, Link, Modulation, Persistence, Plugin,
+  Sequencer, UI`. `Control/` (checked 2026-10-10) holds the device-independent controller-input engine;
+  its names follow the standard (file = class, `mu_core` namespace, neutral terms, no product names).
+  Remark: the struct `mu_core::Mapping` in `MidiControlMap.h` is too generic for a namespace shared by
+  the whole core; rename it `MidiMapping` the next time that file is touched.
 - `Plugin/` holds only the processor (and its `PluginProcessor_<Aspect>.cpp` parts), the editor and the
   standalone entry. Engine, sampler and preset code belongs in `Audio/` and `Persistence/`.
 - The processor splits as `PluginProcessor_<Aspect>.cpp` with a fixed aspect set:

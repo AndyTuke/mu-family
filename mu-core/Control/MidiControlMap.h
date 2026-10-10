@@ -17,7 +17,7 @@
 namespace mu_core
 {
 
-struct Mapping
+struct MidiMapping
 {
     bool          isNote  = false;   // false = control change
     int           channel = 1;       // 1..16
@@ -38,11 +38,11 @@ public:
     void save() const;
 
     // Message-thread edits. add() replaces a mapping from the same source; returns its index (-1 if full).
-    int     add(const Mapping& m);
+    int     add(const MidiMapping& m);
     void    remove(int index);
     void    clear();
     int     size() const;
-    Mapping get(int index) const;
+    MidiMapping get(int index) const;
 
     // App-wide quantise for actions whose own setting is Default.
     Quantise getQuantise() const noexcept { return (Quantise) globalQuantise.load(std::memory_order_relaxed); }
@@ -70,8 +70,10 @@ public:
     uint32_t epoch() const noexcept { return epochCounter.load(std::memory_order_acquire); }
 
     // Latest knob value per mapping (audio -> message thread), coalescing a sweep to one write.
-    std::array<std::atomic<float>, kMaxMappings> latest {};
-    std::array<std::atomic<bool>,  kMaxMappings> dirty  {};
+    // `dirty` holds 0 (nothing new) or the epoch it was written in plus one, so a flag set just
+    // before an edit is recognised as stale and ignored rather than firing a different mapping.
+    std::array<std::atomic<float>,    kMaxMappings> latest {};
+    std::array<std::atomic<uint32_t>, kMaxMappings> dirty  {};
 
 private:
     static size_t slot(bool isNote, int channel, int number) noexcept { return (size_t) (((isNote ? 1 : 0) * 16 + (channel - 1)) * 128 + number); }
@@ -79,7 +81,7 @@ private:
 
     juce::File                    storageFile;
     mutable juce::CriticalSection lock;
-    std::vector<Mapping>          mappings;
+    std::vector<MidiMapping>          mappings;
 
     std::array<std::atomic<int16_t>, 2 * 16 * 128> lookup {};
     std::array<std::atomic<uint32_t>, kMaxMappings> flags {};

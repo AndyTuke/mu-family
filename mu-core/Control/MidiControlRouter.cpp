@@ -134,7 +134,7 @@ bool MidiControlRouter::process(juce::MidiBuffer& midi) noexcept
                 if (map.typeOf(idx) == ControlActionType::Parameter)
                 {
                     map.latest[(size_t) idx].store(s.value, std::memory_order_relaxed);
-                    map.dirty[(size_t) idx].store(true, std::memory_order_release);
+                    map.dirty[(size_t) idx].store(epoch + 1, std::memory_order_release);
                     wake = true;
                 }
                 else if (s.press)   // a button acts on its press, not its release
@@ -163,7 +163,7 @@ void MidiControlRouter::drain(ControlSink& sink)
 
     // Knobs: the latest value of each mapping that moved since the last drain.
     for (int i = 0, n = map.size(); i < n; ++i)
-        if (map.dirty[(size_t) i].exchange(false, std::memory_order_acquire))
+        if (map.dirty[(size_t) i].exchange(0, std::memory_order_acquire) == epoch + 1)
         {
             const auto m = map.get(i);
             if (m.action.type != ControlActionType::Parameter) continue;

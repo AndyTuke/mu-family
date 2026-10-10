@@ -21,13 +21,13 @@ public:
         bool perform(const ControlAction& a) override { got.push_back(a); return true; }
     };
 
-    static Mapping cc(int ch, int num, ControlAction a)
+    static MidiMapping cc(int ch, int num, ControlAction a)
     {
-        Mapping m; m.isNote = false; m.channel = ch; m.number = num; m.action = a; return m;
+        MidiMapping m; m.isNote = false; m.channel = ch; m.number = num; m.action = a; return m;
     }
-    static Mapping note(int ch, int num, ControlAction a)
+    static MidiMapping note(int ch, int num, ControlAction a)
     {
-        Mapping m; m.isNote = true; m.channel = ch; m.number = num; m.action = a; return m;
+        MidiMapping m; m.isNote = true; m.channel = ch; m.number = num; m.action = a; return m;
     }
     static ControlAction param(const char* id)
     {
