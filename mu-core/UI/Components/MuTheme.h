@@ -163,6 +163,7 @@ struct MuTheme
         juce::Colour grTint            { 0xffff6633 };  // orange GR arc on compressor/limiter
         juce::Colour grMeterBg         { 0xff111111 };  // GRMeter strip background
         juce::Colour grMeterBar        { 0xaa7799cc };  // semi-transparent blue-grey bar
+        juce::Colour fault             { 0xffE24B4A };  // status lamp: a fault (clock lost)
     } indicators;
 
     // ── Mixer overlay extras ──────────────────────────────────────────────

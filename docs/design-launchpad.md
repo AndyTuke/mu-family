@@ -209,7 +209,7 @@ when #1276 starts, not before, so there is no empty target.
 |---|---|
 | The **action vocabulary** (launch clip, mute, select layer, transport, panic, preset prev / next). | The **driver interface** and the Launchpad X driver (and later others). |
 | A **control sink** interface that `ProcessorBase` and the layers implement, so actions reach them. | The **surface description**, the saved **mapping** and the **surface model**. |
-| A read-only **"what to show"** interface (playing, queued and muted clips, layer colours, beat). | Opening the MIDI ports, and sending lights on a timer from the message thread. |
+| A read-only **"what to show"** interface (playing, queued and muted clips, layer colours, beat). | Opening the MIDI ports, and sending lights on a timer from the message thread (directly, not through mu-core's `TimedMidiOut`; a driver that also sends MIDI clock lends its port to one, see [Device MIDI output](design-plugin-family.md#device-midi-output--family-standard)). |
 | The generic **MIDI CC / note to parameter mapping** (#1275): any MIDI-in feature needs it, it is not device-specific. | |
 
 Why separate: (1) it is **optional per build**, since controllers need OS MIDI ports that a plugin inside a DAW may not

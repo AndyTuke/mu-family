@@ -205,6 +205,60 @@ public:
             expectEquals (t.startBeat, 0.5, "a locate while playing is ignored");
         }
 
+        beginTest ("A lost clock holds the transport stopped until pulses return");
+        {
+            MidiClockSync clock;
+            clock.setEnabled(true);
+            clock.setMessages(2);
+            Own own;
+            block(clock, own);
+            expect (clock.getClockState() == MidiClockSync::ClockState::Waiting, "waiting before the first pulse");
+
+            // 120 BPM: a pulse every 1000 samples, so one per 10 ms block on average.
+            auto t = block(clock, own, msgs({ 0xFA, 0xF8 }));
+            for (int b = 0; b < 20; ++b) t = block(clock, own, msgs({ 0xF8 }));
+            expect (t.playing && clock.getClockState() == MidiClockSync::ClockState::Locked, "locked and playing");
+
+            for (int b = 0; b < 20; ++b) t = block(clock, own);   // 200 ms of silence: still inside the window
+            expect (t.playing, "a short gap is not a loss");
+            for (int b = 0; b < 10; ++b) t = block(clock, own);   // 300 ms
+            expect (! t.playing, "lost: stopped");
+            expect (clock.getClockState() == MidiClockSync::ClockState::Lost);
+
+            t = block(clock, own, msgs({ 0xF8 }));
+            expect (t.playing && clock.getClockState() == MidiClockSync::ClockState::Locked,
+                    "pulses back while the master still runs: playing again");
+        }
+
+        beginTest ("Silence after a Stop is waiting, and a Start restarts the loss timer");
+        {
+            MidiClockSync clock;
+            clock.setEnabled(true);
+            clock.setMessages(2);
+            Own own;
+            auto t = block(clock, own, msgs({ 0xFA, 0xF8 }));
+            for (int b = 0; b < 10; ++b) t = block(clock, own, msgs({ 0xF8 }));
+            t = block(clock, own, msgs({ 0xFC }));
+            for (int b = 0; b < 50; ++b) t = block(clock, own);   // the master goes quiet while stopped
+            expect (clock.getClockState() == MidiClockSync::ClockState::Waiting, "stopped and quiet: waiting, not lost");
+
+            t = block(clock, own, msgs({ 0xFA }));                // Start, first pulse in the next block
+            expect (t.playing, "the Start block plays");
+            t = block(clock, own, msgs({ 0xF8 }));
+            expect (t.playing && clock.getClockState() == MidiClockSync::ClockState::Locked);
+        }
+
+        beginTest ("Transport only: no clock pulses is not a loss");
+        {
+            MidiClockSync clock;
+            clock.setEnabled(true);
+            clock.setMessages(1);
+            Own own;
+            auto t = block(clock, own, msgs({ 0xFA }));
+            for (int b = 0; b < 60; ++b) t = block(clock, own);
+            expect (t.playing, "transport-only plays on with no pulses");
+        }
+
         beginTest ("Own transport: nothing outside touches the Play button");
         {
             MidiClockSync clock;   // sync off

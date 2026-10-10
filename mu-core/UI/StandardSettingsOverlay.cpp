@@ -66,9 +66,9 @@ StandardSettingsOverlay::StandardSettingsOverlay(ProcessorBase& p, Options optio
         addAndMakeVisible(clockSourceDropdown);
 
         makeFieldLabel(midiMessagesLabel, "Messages");
-        midiMessagesDropdown.addItem("Clock only", 1);
-        midiMessagesDropdown.addItem("Transport",  2);
-        midiMessagesDropdown.addItem("Both",       3);
+        midiMessagesDropdown.addItem("Clock only",        1);
+        midiMessagesDropdown.addItem("Transport only",    2);
+        midiMessagesDropdown.addItem("Clock + Transport", 3);
         midiMessagesDropdown.setSelectedId(proc.getMidiSyncMessages() + 1, false);
         midiMessagesDropdown.onChange = [this](int id) { proc.setMidiSyncMessages(id - 1); };
         addAndMakeVisible(midiMessagesDropdown);

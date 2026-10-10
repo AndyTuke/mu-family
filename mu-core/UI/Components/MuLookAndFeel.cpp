@@ -117,6 +117,7 @@ juce::Colour MuLookAndFeel::colour(ColourIds id) noexcept
         case appGreen:                return t.apps.green;
         case appBlue:                 return t.apps.blue;
         case appYellow:               return t.apps.yellow;
+        case indicatorFault:          return t.indicators.fault;
         // Modulator label colours A–H (reuse the ring/knob theme fields by intent)
         case modLabelA:               return t.rings.modA;
         case modLabelB:               return t.rings.modB;

@@ -173,6 +173,7 @@ public:
     int    getMidiSyncMessages() const { return midiClockSync.getMessages(); }
     double getMidiClockBpm()     const { return midiClockSync.getBpm(); }
     bool   isMidiClockPlaying()  const { return midiClockSync.isPlaying(); }
+    MidiClockSync::ClockState getMidiClockState() const { return midiClockSync.getClockState(); }
     void   setMidiSyncEnabled(bool on);
     void   setMidiSyncMessages(int mode);
     // Sets MIDI clock sync for this process only, without saving it (the headless render uses it so

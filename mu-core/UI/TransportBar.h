@@ -4,6 +4,7 @@
 #include "UI/Components/NudgeInput.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/MuLookAndFeel.h"
+#include "UI/Components/StatusLamp.h"
 
 // Shared mu-family transport bar — play / BPM / position / preset dropdown /
 // new / save / gear / mixer toggle. Plugin-agnostic: takes ProcessorBase, reads
@@ -76,6 +77,9 @@ private:
     NudgeInput       bpmInput { "BPM", 20, 300, 120 };
 
     juce::Label      posLabel;
+    StatusLamp       clockLamp;              // MIDI clock locked / lost (standalone, ticks modes)
+    bool             clockShown = false;
+    MidiClockSync::ClockState shownClockState = MidiClockSync::ClockState::Off;
     int              shownPos = -2;   // bar/beat/sixteenth the label shows; -1 = "---"
     DropdownSelect   presetDropdown;
     juce::Label      presetStagingBadge;   // "SWP" pill shown on a pending full-preset hot-swap
@@ -88,6 +92,7 @@ private:
     static constexpr int kPlayW      = 36;   // wider for clarity
     static constexpr int kBpmW       = 72;   // inline "BPM" label + value + arrows
     static constexpr int kPosW       = 56;
+    static constexpr int kClockW     = 44;   // MIDI clock lamp + label
     static constexpr int kPresetW    = 240;  // wider preset dropdown
     static constexpr int kNewW       = 36;
     static constexpr int kSaveW      = 44;
@@ -103,6 +108,7 @@ private:
 
     void timerCallback() override;
     void refreshPlayBtn();
+    void refreshClockLamp();   // the MIDI clock lamp's colour + status from the watchdog state
     void updatePositionLabel();
     void populatePresetDropdown();
 };

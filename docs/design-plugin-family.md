@@ -144,6 +144,7 @@ The `mu-core` INTERFACE library (introduced in Stage 33) holds everything shared
 | Transport rule | `mu-core/Plugin/TransportResolver.h` | `mu_core::resolveTransport` — where every product's block play state, tempo and beat come from (see [Transport rule](#transport-rule--family-standard)) |
 | Headless render | `mu-core/Plugin/ProductRender.h` + `StandaloneShell.h` | `--render` for every product (preset / swap / slot swap / MIDI PC / play flags) on the ProcessorBase preset API; products override only `prepareRender` / `renderPlaysByDefault` |
 | MIDI-clock tempo | `mu-core/Plugin/MidiClockTempo.h` | The one tempo PLL (jitter-rejecting) used by `MidiClockSync` and mu-link's `MidiClockEstimator` |
+| Timed MIDI out | `mu-core/Plugin/TimedMidiOut.h` | `mu_core::TimedMidiOut` — lock-free queue of time-stamped short MIDI messages plus a sender thread that sends each when due, to a port it never owns. Used by mu-link's `MidiClockOut` and `MuLinkBridge` (see [Device MIDI output](#device-midi-output--family-standard)) |
 | Atomic file writes | `mu-core/Persistence/PresetFiles.h` | `mu_pp::replaceFileAtomically` / `writeXmlAtomically` (temp + rename, failure reported) — every preset / map save goes through them |
 | `ExpDecay` | `mu-core/Audio/ExpDecay.h` | One-multiply exponential decay envelope — use it instead of `std::exp` per sample |
 | `ModulatorPanel`, `ModMatrixPanel`, `ModulatorEditor` | `mu-core/UI/` | Shared modulator UI (take `VoiceSlot&` + a product `ModDestProvider`) |
@@ -359,6 +360,60 @@ own Play button does nothing — the host is in charge. A product may bound its 
 (mu-Tant wraps at its longest gate pattern, 64 beats). Product-specific play modes that aren't a
 transport — mu-Clid's and mu-Tant's MIDI Note mode, mu-Toni's MIDI-trigger arp — sit on top. The
 headless render's `--host-start-beat` simulates rule 1 (`TONI_host_lock`).
+
+## Device MIDI output — family standard
+
+Decided 2026-10-10. This covers any MIDI that the family sends to an OS MIDI port itself, outside a
+host's `processBlock` MIDI buffer. A plugin (VST3 / CLAP) never does this: its MIDI out goes into the
+`MidiBuffer` for the host to route.
+
+**One timed sender: `mu_core::TimedMidiOut`** ([mu-core/Plugin/TimedMidiOut.h](../mu-core/Plugin/TimedMidiOut.h)).
+It lives next to `MidiClockTempo.h` and, like that file, it is **header-only and not in mu-core's INTERFACE
+source list**. That is required, not just tidy: mu-link includes mu-core headers without linking the
+INTERFACE library, and plugin builds that don't include the header don't get its thread or
+`juce_audio_devices` code.
+
+- **Producer (one thread per instance, real-time safe):** `push(dueMs, bytes, size)` and
+  `pushBuffer(midi, blockStartMs, sampleRate)` stamp short messages (1–3 bytes) with a
+  `Time::getMillisecondCounterHiRes` due time and push them to a fixed-size SPSC FIFO. No locks, no
+  allocation, nothing queued while no port is set; SysEx and anything longer than 3 bytes is dropped, and
+  so is a message when the FIFO is full.
+- **Sender:** its own `juce::Thread` (real-time priority, falling back to highest) wakes about every
+  millisecond and sends what is due with `sendMessageNow`. `sendDue(nowMs, send)` is the step itself, so
+  tests drive it without a thread (`startSender = false`, `armForTest()`).
+- **Port:** `setOutput(juce::MidiOutput*)` takes a **non-owning** pointer (message thread), swapped under
+  a lock that the sender holds while it sends. `setOutput(nullptr)` returns only after any send in progress
+  ends; after that the caller may delete the port.
+- What it does **not** do: choose devices, open ports, filter or encode messages. Callers own the meaning
+  of the bytes (clock encoding, echo filtering, real-time byte stripping).
+
+**Port ownership rule.** A MIDI port has **exactly one owner at a time**, and `TimedMidiOut` is never it.
+- The owner is the `AudioDeviceManager` (the user's chosen default output) or **standalone-only code**:
+  the header-only standalone files in mu-core (`Link/MuLinkBridge.h`, `Plugin/StandaloneShell.h`), mu-link's
+  app, and `mu-control`'s drivers. Nothing in mu-core's INTERFACE source list, and never `ProcessorBase`,
+  opens an OS MIDI port.
+- Before deleting the port it lent out, an owner calls `setOutput(nullptr)` on every sender using it.
+  mu-link does this by borrowing the manager's port across `audioDeviceStopped` and
+  `audioDeviceAboutToStart`, which is safe because it always has an audio device open.
+- **Who owns the port while an app is attached to mu-link:** `MuLinkBridge`. The app may have no audio
+  device open, so it can't rely on those callbacks, and the manager can delete or replace its default port
+  at any time (for example when the user changes it in Settings). So the bridge opens its own
+  `std::unique_ptr<juce::MidiOutput>` with `MidiOutput::openDevice(deviceManager.getDefaultMidiOutputIdentifier())`
+  on the message thread when it attaches. It frees the manager's handle first, because Windows MIDI ports
+  are often single-client (design-launchpad R2). It follows Settings changes as a `ChangeListener` on the
+  manager. On detach it stops the bus render (`client.detach()`), calls `setOutput(nullptr)`, closes its
+  port and hands the identifier back to the manager. The user's saved MIDI-out choice must survive quitting
+  while attached.
+- Lead time: the bus renders ahead of what is heard, so each event is stamped
+  `nowMs + (leadFrames + samplePosition) * 1000 / sampleRate`. `leadFrames` is the render lead that
+  `MuLinkClient` reports.
+
+**Controllers (`mu-control`).** Pad LEDs are sent from the message thread on a timer
+([design-launchpad.md §3.2a](design-launchpad.md#32a-where-the-code-lives-a-separate-mu-control-library-owner-deferred-to-this-recommendation-2026-10-09)).
+They have no due time, and much of the traffic is SysEx, so they **do not go through `TimedMidiOut`**. A
+driver owns its controller's port and sends directly. If MIDI clock is sent to a controller (so Launchpad
+flashing and pulsing follow the beat), the driver lends its port to a `TimedMidiOut` like any other owner.
+This doesn't change where anything lives: `mu-control` uses mu-core, never the reverse.
 
 ## Hot-swap (staged preset / layer swaps) — family pattern
 

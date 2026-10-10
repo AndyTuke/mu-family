@@ -82,6 +82,11 @@ inline BlockTransport resolveTransport(const HostTransport& host, bool isStandal
         t.playOutside = clock.transportDrives();
         t.beatOutside = clock.ticksDrive();
         t.playing     = t.playOutside ? clock.isPlaying() : internal.playing.load(std::memory_order_relaxed);
+        // A lost clock holds the transport stopped (owner rule) until pulses return. In Clock only
+        // the Play button keeps its state; with transport messages on it mirrors the held stop.
+        // Either way play resumes with the clock.
+        if (clock.isLost())
+            t.playing = false;
         if (t.beatOutside)
         {
             t.bpm       = clock.getBpm() > 0.0 ? clock.getBpm() : ownBpm;

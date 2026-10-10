@@ -28,6 +28,10 @@ TransportBar::TransportBar(ProcessorBase& p)
         bpmInput.setShowStepButtons(false);
         bpmInput.setLabelInline(true);
         addAndMakeVisible(bpmInput);
+
+        clockLamp.setLabel("Clock");
+        clockLamp.onStatusUpdate = [this](const juce::String& n, const juce::String& v) { if (onStatusUpdate) onStatusUpdate(n, v); };
+        addChildComponent(clockLamp);   // shown while MIDI clock ticks drive the transport
     }
 
     posLabel.setJustificationType(juce::Justification::centred);
@@ -140,11 +144,54 @@ void TransportBar::timerCallback()
 
         const bool midiTransport = proc.getMidiSyncEnabled() && proc.getMidiSyncMessages() != 0;
         playBtn.setEnabled(!midiTransport);
+
+        // The clock lamp shows while the clock's ticks drive the transport; re-lay out only when
+        // it appears or goes.
+        if (midiClockBpm != clockShown)
+        {
+            clockShown = midiClockBpm;
+            clockLamp.setVisible(clockShown);
+            resized();
+        }
+        if (clockShown) refreshClockLamp();
     }
 
     // Show the staging badge while a full-preset hot-swap is queued for the loop point.
     if (showPresetControls)
         presetStagingBadge.setVisible(proc.hasPendingFullPreset());
+}
+
+void TransportBar::refreshClockLamp()
+{
+    using Id = MuLookAndFeel::ColourIds;
+    using State = MidiClockSync::ClockState;
+    const auto& L = MuLookAndFeel::lighting();
+    const auto state = proc.getMidiClockState();
+
+    juce::String status;
+    switch (state)
+    {
+        case State::Locked:
+            clockLamp.setState(MuLookAndFeel::colour(Id::segmentPositiveBorder), L.lampOn);
+            status = "Locked at " + juce::String(juce::roundToInt(proc.getMidiClockBpm())) + " BPM";
+            break;
+        case State::Lost:
+            clockLamp.setState(MuLookAndFeel::colour(Id::indicatorFault), juce::jmin(1.0f, L.lampOn + L.lampPlayhead));
+            status = "Lost, transport stopped";
+            break;
+        case State::Waiting:
+        case State::Off:
+        default:
+            clockLamp.setState(MuLookAndFeel::colour(Id::segmentWarningBorder), L.lampDim);
+            status = "Waiting for clock";
+            break;
+    }
+    clockLamp.setStatus("MIDI Clock", status);
+
+    // A lost clock is announced once, without hover, so a dead cable shows on stage.
+    if (state == State::Lost && shownClockState != State::Lost && onStatusUpdate)
+        onStatusUpdate("MIDI Clock", status);
+    shownClockState = state;
 }
 
 void TransportBar::refreshPlayBtn()
@@ -328,6 +375,11 @@ void TransportBar::resized()
     {
         bpmInput.setBounds(x, btnY, s(kBpmW), btnH);
         x += s(kBpmW) + gap;
+        if (clockShown)
+        {
+            clockLamp.setBounds(x, btnY, s(kClockW), btnH);
+            x += s(kClockW) + gap;
+        }
     }
 
     posLabel.setBounds(x, btnY, s(kPosW), btnH);

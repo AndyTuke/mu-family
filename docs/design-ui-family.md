@@ -104,6 +104,14 @@ Three states: **General** (default), **Positive** (confirmation/on), **Warning**
 | `vuMeterPeakHold` | `#FFFFFF` |
 | `vuMeterBackground` | `#111110` |
 
+**Status lamps** (`StatusLamp`, §11) — a state is told by colour and lamp strength, never by colour alone (the status bar names it):
+
+| State meaning | Colour token | Lamp strength (`MuTheme::Lighting`) |
+|---|---|---|
+| Waiting / pending | `segmentWarningBorder` `#EF9F27` amber | `lampDim` |
+| OK / locked | `segmentPositiveBorder` `#1D9E75` green | `lampOn` |
+| Fault / lost | `indicatorFault` `#E24B4A` red (`MuTheme::Indicators::fault`) | `lampOn + lampPlayhead` (brightest, draws the eye) |
+
 **StatusBar / AddButton / SampleBar:** see `MuLookAndFeel.h` for full token list — not repeated here.
 
 ---
@@ -140,6 +148,7 @@ JUCE font. No external typeface dependency.
 | `VUMeter` | 10px | fills fader height | Always right-adjacent to fader, no gap |
 | `StatusBar` | full width | 20px | Bottom chrome |
 | `TransportBar` | full width | 36px | Top chrome |
+| `StatusLamp` (lamp + label) | lamp `kStatusLampD` 8px + `kSpaceXS` + label width | lamp centred in the row | Label 11pt (row label). In the TransportBar its slot is `TransportBar::kClockW` 44px |
 | Mixer fader cap | — | 200px max | `kFaderMaxH`; minimum 40px |
 | Mixer channel strip / sends / FX rows | proportional | proportional | Sizes are computed from the available `MixerOverlay` bounds in `resized()` rather than fixed pixel constants (Stage 32). Send knob height tracks pan knob height; channel widths scale to fit 8 rhythm + 3 return + master within the strip area. |
 
@@ -278,7 +287,7 @@ Each plugin customises the shared base with:
 | Per-voice modulator panel | Shared `mu-core/UI/ModulatorPanel` (+ `ModMatrixPanel` / `ModulatorEditor`) | Bind with `setVoiceSlot(&slot)` (a `VoiceSlot&`) + `setDestProvider(&provider)` (the product's `ModDestProvider` listing its destination ids/labels). Drive the playhead via `setPlayheadBeat`. If the voice has an insert, keep `setInsertAlgorithm` in sync (see the InsertSubsection row). Do NOT re-implement the modulator UI per product — only the `ModDestProvider` is product-specific. |
 | Mixer / FX rack params | Shared `mu_mixfx::addGlobalFxParams` (`mu-core/Plugin/MixerFxParams.h`) | The MixerOverlay / FXRow / DelayRow bind to a fixed id set (`eff_`/`dly_`/`rev_`/`eff2*`/`echo_`/`ret_*`/`mstr_lvl`/`mstr_pan`/`mst_ins*`). Declare them via this helper (don't hand-roll the layout); the product adds only its own `ch{N}_` strips + product globals. Route their `parameterChanged` to `ProcessorBase::syncGlobalFxParam`. |
 | Modal dialogs / prompts | Shared `mu-core/UI/ModalDialog` + builders in `mu-core/UI/ConfirmDialog.h` | **The themed replacement for `juce::AlertWindow`** — an in-editor overlay card (dim backdrop + centred rounded `panelBackground` card + icon/title + body + right-aligned button row), matching the SaveDialog look. Use the one-line builders: `mu_ui::messageAsync` / `confirmAsync` (warning + confirm) / `promptTextAsync` (single text field) / `confirmQuitAsync` (Cancel/Save/Close). **Each takes an `anchor` `Component*`** (any component in the editor — pass `this`; standalone quit passes the window); the dialog hosts itself over the enclosing `AudioProcessorEditor`, self-owns, and Esc/click-outside = cancel. For a richer dialog construct a `mu_ui::ModalDialog` directly and inject a content component via `.content(...)`. Do **NOT** build a one-off `juce::AlertWindow`. |
-| TransportBar controls | Plugin-specific layout | Standard chrome (play, BPM, preset, mixer) always present; plugin-specific additions to the right |
+| TransportBar controls | Plugin-specific layout | Standard chrome (play, BPM, preset, mixer) always present; plugin-specific additions to the right. **MIDI clock lamp** (standalone, shared): a `StatusLamp` labelled "Clock" between the BPM field and the position readout, inside the transport pane, present only while Settings → MIDI Clock → Source = MIDI In **and** Messages is not "Transport only" (the same test that disables the BPM field). Waiting (no pulses yet) = amber dim, Locked = green, Lost = red bright. Hover → status bar "MIDI Clock" with "Waiting for clock" / "Locked at 120 BPM" / "Lost, transport stopped"; entering Lost also posts that line once without hover. Lost holds until pulses return (→ Locked). The BPM field stays disabled and keeps the last clock tempo in every state; no tooltip |
 
 ---
 
@@ -343,6 +352,7 @@ setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));   // mu-On
 | **LCD text field** — an LCD window holding one line of lit lettering, a browse mark ("...") at the right; warnings lit amber, empty hints as unlit ghost lettering | Readouts such as mu-Clid's sample bar; the header bar's channel name | `drawLcdGlass` / `drawLcdFront`, `lcdFont(kLcdTextH)`, `kLcdTextPadX / kLcdBrowseW`, `Lighting::lcdGhost`; name display `kLcdNameTextH` |
 | **Add buttons** — "+ Rhythm", "+ Target", "+ Assignment" are real buttons (the family button look) | Adding a channel / target / assignment. Sidebar's is full width; the modulator's are `kAddButtonW` wide and centred | `AddButton` (a `juce::TextButton`; flat style keeps the dashed border) |
 | **Lamp** — lit indicator behind a dark lens, hot-spot at the centre | Step / state indicators (ring steps, gate cells). Off = bare lamp base; only lit states glow | `lampColour(clr, lit)` with `Lighting::lampOff / lampDim / lampOn / lampPlayhead`, `drawLamp(...)`, `lampBase()` |
+| **Status lamp** — one round lamp (lamp-base disc, lens 1 px inside it, hot-spot at the centre) with a label beside it, engraved in metal style | A live state that must be visible at a glance (the TransportBar's MIDI clock lamp). Colours / strengths per §3.5 status lamps; label and status-bar text name the state | `StatusLamp` (`mu-core/UI/Components/StatusLamp.h`): `setLabel`, `setState(colour, lit)`, `onStatusUpdate` on hover; draws with `lampBase()` / `lampColour` / `drawLamp`, diameter `kStatusLampD`, hot-spot `kStatusLampD × lampHotSpotReach` |
 | **Knobs & slide switches** — neumorphic dial / switch, cast shadow from a top-right light | All continuous / two-state controls | `KnobWithLabel`, `SlideSwitch` (shared, unchanged API) |
 
 ### Conventions
@@ -363,3 +373,9 @@ setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));   // mu-On
 - **Panel structure (every app)** — panels sit edge to edge, each drawn `reduced(2)` so a thin gap shows between them: a thin **preset strip** (the shared header bar, a screw at each end), then the app's **main panels**, each holding raised **sections**, then the **modulator panel** at the bottom. Section boxes sit `kScrewedPanelInset` in from a panel's sides and `kChannelInset` from its top / bottom; panel screws are drawn in the panel owner's `paintOverChildren`. Spare height goes to the modulator panel, where the display takes it (the one-row assignment box stops growing at `ModulatorEditor::kMetalAssignMaxH`).
 - **Selectors in a knob grid take two cells** (`ParamKnobGrid`) so their LCD lettering fits.
 - Positioning stays app-specific; only the look is shared.
+
+---
+
+## Design rulings
+
+- 2026-10-10 — MIDI clock locked / lost indicator in the TransportBar? A new shared `StatusLamp` (round lamp + "Clock" label) between BPM and position, standalone with clock sync on; amber dim / green / red bright; new token `indicatorFault`, size `kStatusLampD`; BPM field unchanged. Changed §3.5, §5, §9, §11.

@@ -44,6 +44,12 @@ public:
     double getBpm()       const { return bpmEst_.load(); }   // 0 = no estimate yet (no pulses seen)
     double getBeatPosUI() const { return beatPosUI_.load(std::memory_order_relaxed); }
 
+    // Clock health for the UI: Waiting = sync on but no pulse heard yet; Locked = pulses arriving;
+    // Lost = pulses stopped (cable pulled, master gone) — the transport is held stopped until
+    // they return. Only judged while the ticks drive (Messages = Clock only / Clock + Transport).
+    enum class ClockState { Off, Waiting, Locked, Lost };
+    ClockState getClockState() const { return (ClockState) clockState_.load(std::memory_order_relaxed); }
+
     // ── Audio thread ─────────────────────────────────────────────────────
     // Scans midi for real-time messages; updates internal state; returns the
     // start-of-block beat position (0.0 if sync is disabled).
@@ -51,7 +57,17 @@ public:
     {
         startedInBlock_ = locatedInBlock_ = false;
         if (!enabled_.load(std::memory_order_relaxed))
+        {
+            wasEnabled_ = lost_ = false;
+            clockState_.store((int) ClockState::Off, std::memory_order_relaxed);
             return 0.0;
+        }
+        if (! wasEnabled_)   // just switched on: nothing heard yet
+        {
+            wasEnabled_ = true;
+            heardPulse_ = false;
+            samplesSincePulse_ = 0;
+        }
 
         // One Messages-mode snapshot per block, shared with the resolver, so a UI change can't
         // land between the two.
@@ -60,6 +76,12 @@ public:
         blockTransport_ = mode != 0;
         const bool doTick      = blockTicks_;
         const bool doTransport = blockTransport_;
+        if (doTick && ! wasTicks_)   // ticks just started driving: judge the clock afresh
+        {
+            heardPulse_ = false;
+            samplesSincePulse_ = 0;
+        }
+        wasTicks_ = doTick;
 
         // The song position this block starts from; a Start or Song Position Pointer moves it.
         juce::int64 blockStartPulses = pulses_;
@@ -93,8 +115,9 @@ public:
                     startedInBlock_ = true;
                     tempo_.restartInterval();
                     isPlaying_.store(true);
+                    samplesSincePulse_ = -so;         // give the master time to send its first pulse
                 }
-                else if (b == 0xFB) { tempo_.restartInterval(); isPlaying_.store(true); }
+                else if (b == 0xFB) { tempo_.restartInterval(); isPlaying_.store(true); samplesSincePulse_ = -so; }
                 else if (b == 0xFC) { isPlaying_.store(false); }
             }
 
@@ -108,8 +131,26 @@ public:
                 // mode so switching Messages mode mid-play keeps the master's position.
                 if (!doTransport || isPlaying_.load())
                     ++pulses_;
+                heardPulse_ = true;
+                samplesSincePulse_ = -so;   // counted from this pulse; the block's length is added below
             }
         }
+
+        // Clock-loss watchdog (ticks modes): no pulse for 4 pulse periods at the estimated tempo,
+        // and never less than 250 ms, means the clock is lost.
+        samplesSincePulse_ += numSamples;
+        const double bpm        = bpmEst_.load();
+        const double pulseSecs  = bpm > 0.0 ? 60.0 / (bpm * 24.0) : 0.125;
+        const double lossSecs   = juce::jmax(0.25, 4.0 * pulseSecs);
+        // Many masters stop sending clock while stopped, so silence after a Stop is waiting, not lost.
+        const bool gap         = heardPulse_ && (double) samplesSincePulse_ > lossSecs * sampleRate;
+        const bool masterIdle  = doTransport && ! isPlaying_.load();
+        lost_ = doTick && gap && ! masterIdle;
+        const auto state = ! doTick                     ? ClockState::Waiting   // not judged in Transport only
+                         : lost_                        ? ClockState::Lost
+                         : heardPulse_ && ! gap         ? ClockState::Locked
+                                                        : ClockState::Waiting;
+        clockState_.store((int) state, std::memory_order_relaxed);
 
         sampleClock_ += numSamples;
         beatPosUI_.store(beatOf(pulses_), std::memory_order_relaxed);
@@ -123,6 +164,7 @@ public:
     bool transportDrives() const { return blockTransport_; }
     bool startedInBlock()  const { return startedInBlock_; }
     bool locatedInBlock()  const { return locatedInBlock_; }
+    bool isLost()          const { return lost_; }   // the watchdog's verdict for this block
 
 private:
     // Cross-thread atomics.
@@ -131,6 +173,7 @@ private:
     std::atomic<bool>   isPlaying_ { false };
     std::atomic<double> bpmEst_    { 0.0 };   // 0 = no estimate yet
     std::atomic<double> beatPosUI_ { 0.0 };
+    std::atomic<int>    clockState_ { (int) ClockState::Off };
 
     // Audio-thread-only state.
     // The beat is derived from an integer pulse count (24 per quarter note) rather than summed
@@ -139,6 +182,11 @@ private:
     juce::int64             pulses_      = 0;   // song position in clock pulses (Start = 0, SPP = sixteenths * 6)
     bool                    startedInBlock_ = false;
     bool                    locatedInBlock_ = false;
+    bool                    wasEnabled_ = false;       // watchdog: sync was on last block
+    bool                    wasTicks_   = false;       // watchdog: ticks drove last block
+    bool                    heardPulse_ = false;       // watchdog: a pulse arrived since sync went on
+    bool                    lost_       = false;       // watchdog: this block's verdict
+    juce::int64             samplesSincePulse_ = 0;
     bool                    blockTicks_     = true;    // Messages mode snapshot (default 2 = both)
     bool                    blockTransport_ = true;
     juce::int64             sampleClock_ = 0;   // samples processed while enabled (pulse timestamps)

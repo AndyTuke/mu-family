@@ -178,6 +178,9 @@ public:
         appBlue                 = 0x100000d5,
         appYellow               = 0x100000d6,
 
+        // Status lamps: a fault (e.g. MIDI clock lost) — its own red, not the VU clip red.
+        indicatorFault          = 0x100000d7,
+
         // ── Modulator label colours A–H ───────────────────────────────────
         // Named tokens for the per-modulator label palette so that all colour
         // values live here — no inline `juce::Colour(0xFF...)` in component code.
@@ -639,6 +642,7 @@ public:
     static constexpr int   kLampCellCorner = 2;
     static constexpr float kLampCurveGlowW = 5.0f;
     static constexpr float kLampCurveW     = 1.8f;
+    static constexpr int   kStatusLampD    = 8;      // StatusLamp disc diameter
 
     // LCD text fields (metal style): lettering heights, side padding, the browse mark's width.
     static constexpr int kLcdTextH     = 11;   // selectors (ComboBox LCDs) and single-line readouts, e.g. a sample bar

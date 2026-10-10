@@ -92,7 +92,7 @@ mu-link/
     ├── Plugin/        (App entry + main window; standalone only — no plugin formats)
     ├── Server/        AudioServer (HW callback, summing), ClientRegistry, TransportClock
     ├── Ipc/           SharedMemoryBus, AudioRing (SPSC), TransportBlock, handshake/discovery
-    ├── Clock/         MidiClockOut bridge, (optional) AbletonLink peer
+    ├── Clock/         MidiClockOut (clock encoding over mu-core's TimedMidiOut), (optional) AbletonLink peer
     ├── UI/            EditorShellBase-based window: connected clients, levels, master tempo, device picker
     └── Tests/         ring-buffer SPSC tests, transport-advance tests, underrun handling
 ```
