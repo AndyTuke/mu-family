@@ -2,6 +2,7 @@
 
 #include <juce_data_structures/juce_data_structures.h>
 #include "Plugin/HotSwap.h"            // mu-core: the shared staging state + loop-wrap predicates
+#include "MuLimits.h"                  // mu-core: the family layer cap
 #include <array>
 
 namespace mu_tant
@@ -18,7 +19,7 @@ namespace mu_tant
 class VoiceHotSwapStager
 {
 public:
-    static constexpr int kMaxVoices = 8;
+    static constexpr int kMaxVoices = mu_limits::kMaxChannels;   // the family layer cap
 
     // ── Message thread: staging ──────────────────────────────────────────────
     // Per-voice (.muPattern) preset for voice `v`, superseding any swap pending on that slot.

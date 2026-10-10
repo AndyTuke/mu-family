@@ -71,7 +71,7 @@ class PluginProcessor : public ProcessorBase
 {
 public:
     // Family parity with mu-clid (max 8 rhythms / 8 voices / 8 channels).
-    static constexpr int kMaxVoices = 8;
+    static constexpr int kMaxVoices = mu_limits::kMaxChannels;   // the family layer cap
 
     PluginProcessor();
 

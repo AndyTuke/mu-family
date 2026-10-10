@@ -33,7 +33,7 @@ class PluginProcessor : public ProcessorBase
 {
 public:
     // Family parity: the shared mixer/sidebar size to kMaxChannels; mu-On uses a fixed 4.
-    static constexpr int kMaxChannels = 8;
+    static constexpr int kMaxChannels = mu_limits::kMaxChannels;   // the family layer cap
 
     PluginProcessor();
 

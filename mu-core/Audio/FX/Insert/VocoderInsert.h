@@ -51,7 +51,7 @@
 class VocoderInsert : public InsertAlgorithmBase
 {
 public:
-    explicit VocoderInsert(bool stereo = false) : stereo_(stereo) {}
+    explicit VocoderInsert(bool stereo = false) : isStereo(stereo) {}
 
     void prepare(double sampleRate, int /*blockSize*/) override
     {
@@ -215,7 +215,7 @@ public:
             }
 
             // ── 20-band vocode ─────────────────────────────────────────
-            if (stereo_)
+            if (isStereo)
             {
                 // Stereo: separate L/R analysis, shared synthesis per band.
                 const float inL = (nChClamped > 0) ? buf.getReadPointer(0)[i] : 0.0f;
@@ -282,7 +282,7 @@ private:
     // Detune spread D(N) in cents per Unison position.
     static constexpr float kUnisonSpreadCents [7] = { 0.0f, 8.0f, 16.0f, 24.0f, 32.0f, 40.0f, 50.0f };
 
-    bool stereo_ = false;
+    bool isStereo = false;
 
     double currentSampleRate = 44100.0;
 
@@ -290,7 +290,7 @@ private:
     // Mono analysis path.
     std::array<BiquadFilter, kNumBands> analysisBp;
     std::array<float,        kNumBands> envelope { };
-    // Stereo analysis path (stereo_ == true only).
+    // Stereo analysis path (isStereo only).
     std::array<BiquadFilter, kNumBands> analysisBpL;
     std::array<BiquadFilter, kNumBands> analysisBpR;
     std::array<float,        kNumBands> envelopeL { };

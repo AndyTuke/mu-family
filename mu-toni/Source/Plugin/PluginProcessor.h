@@ -31,7 +31,7 @@ class PluginProcessor : public ProcessorBase
 public:
     // Family parity: up to 8 channels/layers. A fixed set ships for now; dynamic
     // add/delete/reorder is still unwired (no addVoice/removeVoice).
-    static constexpr int kMaxChannels = 8;
+    static constexpr int kMaxChannels = mu_limits::kMaxChannels;   // the family layer cap
     static constexpr int kNumChannels = 4;   // placeholder layers shown in the shell
 
     PluginProcessor();
