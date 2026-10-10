@@ -158,7 +158,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     const auto   transport     = mu_core::resolveTransport(pollHostTransport(),
                                                            wrapperType == wrapperType_Standalone,
                                                            midiClockSync, midiClockBeat,
-                                                           { internalPlaying, internalBpm, internalBeatPos },
+                                                           { internalPlaying, internalBpm, internalBeatPos, &nudgePhaseBeats, &nudgeDirection, &appliedSyncOffsetBeats },
                                                            numSamples, currentSampleRate, 0.0, getSyncOffsetMs());
     const double bpm       = transport.bpm;
     const double beatStart = transport.startBeat;

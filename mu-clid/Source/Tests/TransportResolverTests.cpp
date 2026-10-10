@@ -6,6 +6,7 @@
 #include <juce_core/juce_core.h>
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "Plugin/TransportResolver.h"
+#include "Plugin/TapTempo.h"
 class TransportResolverTest : public juce::UnitTest
 {
 public:
@@ -289,33 +290,55 @@ public:
         beginTest ("Sync offset: under MIDI clock the beat is advanced by offset x tempo, not elsewhere");
         {
             // A settled 120 BPM clock (a pulse every 1000 samples at 48 kHz).
-            auto settled = [](MidiClockSync& clock, Own& own)
-            {
-                clock.setEnabled(true);
-                clock.setMessages(2);
-                block(clock, own, msgs({ 0xFA }));
-                for (int b = 0; b < 200; ++b)
-                {
-                    juce::MidiBuffer m;
-                    m.addEvent(juce::MidiMessage((juce::uint8) 0xF8), (b * 480) % 1000 < 480 ? (b * 480) % 1000 : 0);
-                    clock.process(m, kBlock, kSr);   // keep the tempo estimate alive
-                }
-            };
             MidiClockSync clock;
             Own own;
-            settled(clock, own);
+            clock.setEnabled(true);
+            clock.setMessages(2);
+            block(clock, own, msgs({ 0xFA }));
+            for (int b = 0; b < 200; ++b)
+            {
+                juce::MidiBuffer m;
+                m.addEvent(juce::MidiMessage((juce::uint8) 0xF8), (b * 480) % 1000 < 480 ? (b * 480) % 1000 : 0);
+                clock.process(m, kBlock, kSr);   // keep the tempo estimate alive
+            }
             const double clockBeat = clock.process(juce::MidiBuffer(), kBlock, kSr);
             const double bpm = clock.getBpm();
             expect (bpm > 100.0, "tempo estimate settled");
 
+            std::atomic<double> applied { 0.0 }, phase { 0.0 };
+            std::atomic<int> dir { 0 };
             auto resolve = [&](double offsetMs)
             {
-                return mu_core::resolveTransport({}, true, clock, clockBeat, own.ref(), kBlock, kSr, 0.0, offsetMs);
+                mu_core::InternalTransport it { own.playing, own.bpm, own.beat, &phase, &dir, &applied };
+                return mu_core::resolveTransport({}, true, clock, clockBeat, it, kBlock, kSr, 0.0, offsetMs);
             };
             const auto base = resolve(0.0);
+
+            // Once the offset has settled the block starts that many ms (x tempo) earlier on the beat.
+            applied.store(25.0 * bpm / 60000.0);
             expectWithinAbsoluteError (resolve(25.0).startBeat - base.startBeat, 25.0 * bpm / 60000.0, 1.0e-9, "+25 ms plays earlier");
+            applied.store(-10.0 * bpm / 60000.0);
             expectWithinAbsoluteError (resolve(-10.0).startBeat - base.startBeat, -10.0 * bpm / 60000.0, 1.0e-9, "negative plays later");
-            expectEquals (resolve(25.0).blockBeats, base.blockBeats, "the block's span is unchanged");
+
+            // A change while playing ramps in: each block moves by at most a tenth of its span, and
+            // consecutive blocks stay contiguous (the end of one is the start of the next).
+            applied.store(0.0);
+            double prevEnd = -1.0, worstGap = 0.0, worstStep = 0.0, prevApplied = 0.0;
+            for (int b = 0; b < 60; ++b)
+            {
+                juce::MidiBuffer m;
+                if ((b * 480) % 1000 < 480) m.addEvent(juce::MidiMessage((juce::uint8) 0xF8), (b * 480) % 1000);
+                const double beat = clock.process(m, kBlock, kSr);   // the clock moves on, as in real blocks
+                mu_core::InternalTransport it { own.playing, own.bpm, own.beat, &phase, &dir, &applied };
+                const auto t2 = mu_core::resolveTransport({}, true, clock, beat, it, kBlock, kSr, 0.0, 100.0);
+                if (prevEnd >= 0.0) worstGap = juce::jmax(worstGap, std::abs(t2.startBeat - prevEnd));
+                worstStep = juce::jmax(worstStep, std::abs(applied.load() - prevApplied) / juce::jmax(1.0e-9, t2.blockBeats));
+                prevApplied = applied.load();
+                prevEnd = t2.startBeat + t2.blockBeats;
+            }
+            expect (applied.load() > 0.0, "the offset ramps in");
+            expectLessOrEqual (worstStep, 0.11, "no block moves the offset by more than ~10 % of its span");
+            expectLessOrEqual (worstGap, 1.0e-9, "no jump while the offset ramps");
 
             // Own transport and a host are untouched by the offset.
             MidiClockSync off;                                   // sync off: the own transport drives
@@ -326,7 +349,126 @@ public:
             const auto b2 = mu_core::resolveTransport({}, true, off, 0.0, own2.ref(), kBlock, kSr, 0.0, 100.0);
             expectEquals (a.startBeat, b2.startBeat, "own transport ignores the offset");
         }
+        beginTest ("Tap tempo: needs two taps, averages the last four intervals, resets after a pause");
+        {
+            mu_core::TapTempo tap;
+            double bpm = 0.0;
+            expect (! tap.tap(10.0, bpm), "one tap is not a tempo");
+            expect (tap.tap(10.5, bpm));
+            expectWithinAbsoluteError (bpm, 120.0, 1.0e-9, "0.5 s apart = 120 BPM");
+            tap.tap(11.0, bpm); tap.tap(11.5, bpm);
+            expectWithinAbsoluteError (bpm, 120.0, 1.0e-9);
+            tap.tap(12.1, bpm);   // one sloppy tap: intervals .5 .5 .5 .6 → average 0.525 s
+            expectWithinAbsoluteError (bpm, 114.3, 1.0e-9, "averaged and rounded to a tenth");
 
+            mu_core::TapTempo fast;
+            fast.tap(0.0, bpm); fast.tap(0.05, bpm);
+            expectWithinAbsoluteError (bpm, 300.0, 1.0e-9, "clamped to the family maximum");
+            mu_core::TapTempo slow;
+            slow.tap(0.0, bpm); slow.tap(1.9, bpm);
+            expectWithinAbsoluteError (bpm, 31.6, 1.0e-9, "just inside the pause limit: 60/1.9");
+
+            mu_core::TapTempo pause;
+            pause.tap(0.0, bpm);
+            expect (! pause.tap(3.0, bpm), "a 3 s gap is a new first tap, not a 20 BPM tempo");
+            expect (pause.tap(3.5, bpm));
+            expectWithinAbsoluteError (bpm, 120.0, 1.0e-9);
+        }
+
+        beginTest ("Nudge: the own clock runs 4 % slower / faster while held, exactly set when released");
+        {
+            MidiClockSync off;                                  // sync off: the own transport drives
+            Own own;
+            own.playing = true;
+            own.bpm     = 120.0;
+            std::atomic<int>    dir { 0 };
+            std::atomic<double> phase { 0.0 };
+            auto resolve = [&]
+            {
+                mu_core::InternalTransport it { own.playing, own.bpm, own.beat, &phase, &dir };
+                return mu_core::resolveTransport({}, true, off, 0.0, it, kBlock, kSr);
+            };
+            expectEquals (resolve().bpm, 120.0, "released: the set tempo");
+            dir = +1;  expectWithinAbsoluteError (resolve().bpm, 120.0 * 1.04, 1.0e-9, "held +: 4 % faster");
+            dir = -1;  expectWithinAbsoluteError (resolve().bpm, 120.0 * 0.96, 1.0e-9, "held -: 4 % slower");
+            dir = 0;   expectEquals (resolve().bpm, 120.0, "released again: exactly the set tempo");
+            expectEquals (own.bpm.load(), 120.0, "the BPM field's value never changed");
+        }
+
+        beginTest ("Nudge under MIDI clock: the held bend shifts the groove, stays contiguous, and a Start clears it");
+        {
+            MidiClockSync clock;
+            clock.setEnabled(true);
+            clock.setMessages(2);
+            Own own;
+            std::atomic<int>    dir { 0 };
+            std::atomic<double> phase { 0.0 }, applied { 0.0 };
+            auto resolve = [&](juce::MidiBuffer midi)
+            {
+                const double beat = clock.process(midi, kBlock, kSr);
+                mu_core::InternalTransport it { own.playing, own.bpm, own.beat, &phase, &dir, &applied };
+                return mu_core::resolveTransport({}, true, clock, beat, it, kBlock, kSr);
+            };
+            auto pulses = [&](int b)
+            {
+                juce::MidiBuffer m;
+                if ((b * 480) % 1000 < 480) m.addEvent(juce::MidiMessage((juce::uint8) 0xF8), (b * 480) % 1000);
+                return m;
+            };
+            resolve(msgs({ 0xFA }));
+            for (int b = 0; b < 100; ++b) resolve(pulses(b));
+            expectEquals (phase.load(), 0.0, "no nudge, no shift");
+
+            // Hold + for 10 blocks, then - for 10, then release: every block starts where the last ended.
+            double prevEnd = -1.0, worstGap = 0.0;
+            double sumDelta = 0.0;
+            for (int b = 0; b < 30; ++b)
+            {
+                dir = b < 10 ? +1 : (b < 20 ? -1 : 0);
+                const auto t = resolve(pulses(100 + b));
+                if (prevEnd >= 0.0) worstGap = juce::jmax(worstGap, std::abs(t.startBeat - prevEnd));
+                prevEnd = t.startBeat + t.blockBeats;
+                sumDelta = phase.load();
+            }
+            expectLessOrEqual (worstGap, 1.0e-9, "held nudging leaves no gap or overlap between blocks");
+            expectWithinAbsoluteError (sumDelta, 0.0, 0.003, "10 blocks faster then 10 slower roughly cancel");
+
+            dir = +1;
+            for (int b = 0; b < 10; ++b) resolve(pulses(130 + b));
+            dir = 0;
+            expect (phase.load() > 0.0, "held + shifts the groove ahead");
+            const double kept = phase.load();
+            resolve(pulses(140));
+            expectEquals (phase.load(), kept, "released: the shift stays");
+
+            resolve(msgs({ 0xFA }));
+            expectEquals (phase.load(), 0.0, "a Start clears it");
+        }
+
+        beginTest ("Nudge slower right after a Start never replays beat 0");
+        {
+            MidiClockSync clock;
+            clock.setEnabled(true);
+            clock.setMessages(2);
+            Own own;
+            std::atomic<int>    dir { -1 };   // slow nudge held from the start
+            std::atomic<double> phase { 0.0 }, applied { 0.0 };
+            double prevEnd = 0.0, worstOverlap = 0.0, minStart = 1.0e9;
+            for (int b = 0; b < 60; ++b)
+            {
+                juce::MidiBuffer m;
+                if (b == 0) m.addEvent(juce::MidiMessage((juce::uint8) 0xFA), 0);
+                if ((b * 480) % 1000 < 480) m.addEvent(juce::MidiMessage((juce::uint8) 0xF8), (b * 480) % 1000);
+                const double beat = clock.process(m, kBlock, kSr);
+                mu_core::InternalTransport it { own.playing, own.bpm, own.beat, &phase, &dir, &applied };
+                const auto t = mu_core::resolveTransport({}, true, clock, beat, it, kBlock, kSr, 0.0, -20.0);
+                minStart = juce::jmin(minStart, t.startBeat);
+                if (b > 0) worstOverlap = juce::jmax(worstOverlap, prevEnd - t.startBeat);
+                prevEnd = t.startBeat + t.blockBeats;
+            }
+            expectGreaterOrEqual (minStart, 0.0, "the beat is never negative");
+            expectLessOrEqual (worstOverlap, 1.0e-9, "no block starts before the previous one ended");
+        }
         beginTest ("Transport only: no clock pulses is not a loss");
         {
             MidiClockSync clock;

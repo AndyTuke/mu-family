@@ -270,7 +270,7 @@ PluginProcessor::BlockTransport PluginProcessor::computeLiteTransport(int numSam
     // and beat follow it (its own transport only when a host gives no position at all).
     const auto t = mu_core::resolveTransport(pollHostTransport(),
                                              wrapperType == wrapperType_Standalone, midiClockSync, 0.0,
-                                             { internalPlaying, internalBpm, internalBeatPos },
+                                             { internalPlaying, internalBpm, internalBeatPos, &nudgePhaseBeats, &nudgeDirection, &appliedSyncOffsetBeats },
                                              juce::jmax(1, numSamples), currentSampleRate);
     const bool   playing = t.playing;
     const double beatPos = t.startBeat;
@@ -414,7 +414,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
         // mu-link position, else (standalone) external MIDI clock, else the own transport.
         const auto t = mu_core::resolveTransport(host, ! isPlugin,
                                                  midiClockSync, midiClockBlockBeatPos,
-                                                 { internalPlaying, internalBpm, internalBeatPos },
+                                                 { internalPlaying, internalBpm, internalBeatPos, &nudgePhaseBeats, &nudgeDirection, &appliedSyncOffsetBeats },
                                                  buffer.getNumSamples(), currentSampleRate, 0.0, getSyncOffsetMs());
         playing = t.playing;
         beatPos = t.startBeat;

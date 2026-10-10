@@ -343,6 +343,126 @@ host session   the same <MuXxxState format="2"> tree
 Files saved by this format don't load correctly in builds before it (the older readers expect the
 APVTS dump).
 
+## Layer ownership and structural edits — family standard
+
+Ruled 2026-10-10 (Architecture Steward) for backlog #1264 / #1265. Naming and the derived types are in
+[design-naming.md](design-naming.md); this is the contract and the staged plan. The design is decided
+throughout; the stages marked **O** also wait for owner decisions on behaviour or UX.
+
+### The contract
+
+1. **Capacity is fixed, the count is runtime.** Parameters, mixer channels and the `LayerLayout` are
+   declared for `mu_limits::kMaxLayers` (8) once, at construction. Adding a layer *activates* slot `n`;
+   it never allocates parameters. (mu-Toni and mu-On must therefore declare all 8 layers' parameters
+   before they can go variable; that is additive and needs no migration for mu-Toni, see Stage 6.)
+2. **Dispatch is virtual on `Layer`.** Hooks, all called once per layer per block or per edit, never
+   per sample: `typeId()` (an int from the product's enum), `writeExtras(ValueTree&) const` /
+   `applyExtras(const ValueTree&)` (the product's `LayerExtras`; absent children clear), `resetToDefaults()`
+   (keeps `name` and `colourIndex`), `onMoved(newIndex)` (reset play state, envelopes, sidechain
+   followers), `insertGainReduction()` (the GR meter pointer, `nullptr` when none) and, last, `render(...)`.
+   The base implementations handle the modulators through the shared `ModulatorSerialise` with
+   virtual `isValidSource` / `isValidDest` validators, which also removes the derived-to-base overload
+   trap in [design-naming.md §3](design-naming.md#namespaces). A **registry** (`LayerTypeInfo`: id, name,
+   param prefix, preset extension, mod-target table, `create`) is added only when two layer types can
+   share one instance; it constructs and describes layers and never dispatches.
+3. **`ProcessorBase` owns the layers**: `std::array<std::unique_ptr<Layer>, kMaxLayers> layers`,
+   `std::atomic<int> numLayers`, `juce::CriticalSection layersLock`. A product supplies
+   `createLayer(typeId)` and typed accessors (`getPattern(i)` = `layerAs<Pattern>(i)`, which asserts
+   `typeId`). `getNumChannels()` is `numLayers`. Slot `i` of `layers`, of the mixer, and of the
+   parameter prefix list are the same index.
+4. **`Layer` stays data-light.** Its members stay `voiceParams`, `controlSequences`, `modulationMatrix`,
+   `modLock`, `voiceParamsLock`, `name`, `colourIndex`; it gains the virtuals above and a message-thread-only
+   clip bank (`std::array<juce::ValueTree, 8>`, one composed slot node each, never read by the audio
+   thread; the clip-launch design is #1277). It does **not** hold `InsertProcessor`: `Rhythm` is copied by
+   value today and mu-Clid's insert lives in its `VoiceEngine` so a retired engine keeps its tail. mu-Tant
+   and mu-Toni compose a `mu_core::InsertStage { InsertProcessor proc; VoiceParams cfg; }` member
+   into `Pattern` / `Arp` (replacing the `inserts` and `insCfg` arrays); `Rhythm` overrides
+   `insertGainReduction()` to return its engine's. Anything a layer owns moves with it when the pointer moves.
+5. **Audio-thread rules.**
+   - The audio thread takes `ScopedTryLock(layersLock)` once per block. On failure it renders silence for
+     that block but **still advances the transport and boundary detection** (hot-swap principle 4). It reads
+     `numLayers` once (acquire) and uses `layers[i].get()` only inside the lock; it never keeps a `Layer*`
+     across blocks, never allocates, never destroys a layer.
+   - The message thread holds `layersLock` only for pointer moves, count changes and mixer-channel
+     state moves (microseconds). Constructing, `prepareToPlay`-ing and **destroying** a layer happen outside
+     the lock, on the message thread: a removed layer's `unique_ptr` is moved to a local and released after
+     unlocking. A layer is published by `layers[n] = std::move(fresh); numLayers.store(n + 1, release)`
+     inside the lock.
+   - The in-layer spin-locks (`modLock`, `voiceParamsLock`, a product's `GatePattern.editLock`) are unchanged
+     and still nest inside `layersLock`, never the other way round.
+   - `layersLock` guards the *set of layers* only. mu-Tant's `voicesLock` also guards the wavetable bank
+     append; when it becomes `layersLock` the bank gets its own `bankLock`, so a wavetable import never
+     blocks a layer edit and the reverse.
+   - Hot-swap commits still go through each layer's own fine-grained locks (`applyExtras` is the apply);
+     they do not take `layersLock`, so principle 3 of [Hot-swap](#hot-swap-staged-preset--layer-swaps-family-pattern) holds.
+6. **Structural edits are one routine in `ProcessorBase`, message thread only**
+   (`addLayer`, `removeLayer`, `swapLayers`, `resetLayer`), in this order:
+   1. Cancel the affected pending per-layer swaps (add: the new slot; swap: both; remove: all; reset: that one),
+      through `Stager::cancel`. A staged full preset is left to win.
+   2. `suspendProcessing(true)`; it is not a barrier, `layersLock` is.
+   3. Build and prepare the new layer (add) before locking.
+   4. Under `layersLock`: pointer moves (`std::swap` / shift down by `std::move`), the mixer-channel state
+      move (`swapChannelState` / `copyFrom` / `reset`), the **sidechain-source re-translation on every
+      structural edit** (today only `RhythmManager::swap` does it; check that `remove` and the other
+      products do), `resetSidechainEnv` for moved slots, `numLayers`, then `Layer::onMoved` for each moved layer.
+   5. Unlock, then move the **parameter values** by slot, inside the `ScopedApvtsLoading` guard and still
+      suspended, so no block ever pairs a moved layer with unmoved parameters. For products where the APVTS
+      is the truth (Tant, Toni, On): `LayerLayout::writeParams(node, from)` then `applyParams(node, to)`
+      (the rows carry no prefix, so a slot loads into any slot; a missing row = default, which is how a new or
+      vacated slot is cleared). mu-Clid, whose `Rhythm` is the truth for the Euclidean params, keeps pushing
+      from the layer (`pushRhythmToApvts`) through a `syncSlotParams(slot)` hook. This is the one allowed difference.
+   6. `suspendProcessing(false)`; destroy any removed layer; set `colourIndex` (first unused palette entry,
+      the mu-Clid / mu-Tant rule, hoisted into the base); fire `onLayersChanged` for the shell.
+   The last layer cannot be removed; the demo cap uses `canAddChannel()` as today.
+7. **Retired layers do not fade yet.** A removed layer is cut at the next block (as today in mu-Clid and mu-Tant).
+   mu-Clid's per-engine retire-tail and mu-Tant's count-reducing preset fade stay inside the product
+   layer; a generic `Layer` tail is not in scope.
+
+### Why virtual and not a table
+
+A table of function pointers re-implements the vtable and still needs a base type to hold the shared
+data. The hooks are all per-layer, so the call cost is nothing. What a vtable cannot do is create a
+layer from a name read out of a file and list the types in a menu, and that is all the registry is for.
+It stays out until the combined instance needs it, so there is exactly one place (the base class) where a layer's
+behaviour is described. Typed access by `static_cast` after a `typeId` assert keeps product code as
+readable as `getRhythm(i)` is today.
+
+### Stages (each: one product at a time, Debug build, unit tests, round-trip listening tests; macOS untouched)
+
+M = mechanical (unattended is safe), S = supervised (audio thread / lock change: run the listening tests
+on the build PC), O = needs the owner.
+
+| # | Kind | What | Exact content | Guard |
+|---|---|---|---|---|
+| 1 | M | Derived types as value members, no behaviour change | **Tant**: `Pattern : Layer` holds `gate`, `filter`, `pitch` (`GatePattern`), `ring` (`VoiceRingBuffer`), `snap[]`, `InsertStage`, the retiring state, the user-wavetable path / index per oscillator, the voice engine pointer; `std::array<Pattern, 8> patterns` replaces `voiceSlots`, `gatePatterns`, `filterPatterns`, `pitchPatterns`, `voiceRingBuffers`, `voiceSnap`, `inserts`, `retiring`, `voiceColourIndex`, `osc*User*`. `Pattern::copyFrom(const Pattern&)` replaces the `copyDataFrom` calls. **Toni**: `Arp : Layer` holds `ArpVoiceRunner`, `InsertStage`, `vp` pointers, `modDestAtoms`; replaces `runners`, `inserts`, `insCfg`, `vp`, `modDestAtoms`, `voiceSlots`. **On**: `Track : Layer` holds the trigger counter and the lane id; the shared `StepPattern` grid, `GrooveVoices` and the Rumble envelope stay in the processor for now (they are one object across lanes, not four). **Clid**: nothing; `Rhythm` already derives. | Each product's unit tests; its `*_roundtrip` (sample-identical); `check-core-boundary` |
+| 2 | M | `ProcessorBase::getLayer(int)` accessor (virtual, returns the product's value-array slot) | Default `getChannelName` / `getChannelColourIndex` come from `Layer::name` / `colourIndex`, built with the names the products show today ("Voice N" for mu-Tant, "Layer N" for mu-Toni, lane names for mu-On, the rhythm name for mu-Clid), so nothing visible changes; the editors' `voiceSlots[sel]` / `voiceSlot(lane)` become `getLayer(sel)`; the GR-meter pointer helpers (`getInsertGRPtr`, `getInsertGRReductionPtr`) become `getLayer(i)->insertGainReduction()` | unit tests; boundary check; build all four |
+| 3 | M | Persistence virtuals | `Layer::writeExtras` / `applyExtras` (base: modulators); each product's `LayerExtras` lambdas become the virtual overrides on `Pattern` / `Arp` / `Track`; `initSlotState(prefixes)` builds the `LayerExtras` that calls `getLayer(slot)`. mu-Clid keeps `PresetIO` shapes and gains nothing here. | `MuTantPersistTests`, `ModulatorSerialiseTests`, `PresetRoundTripTests`, `PresetXMLRoundTripTests`, `TONI_roundtrip`, `ON_roundtrip`, `TANT_roundtrip` |
+| 4 | S | Ownership moves to `ProcessorBase` | The `layers` array, `numLayers`, `layersLock`, `createLayer`, `layerAs<T>`; Tant first (its `numVoices` / `voicesLock` become these, `bankLock` split out), then Toni and On at a constant count (4 / 5) with the try-lock added so a later edit is safe; the product's `addVoice` etc. still exist and now move pointers instead of copying data. | as stage 3, plus a new `LayerOwnershipTests` (construct, publish, destroy off-lock) and a listening render with structural edits scripted mid-play |
+| 5 | S | Central edits and the generic stager | `addLayer` / `removeLayer` / `swapLayers` / `resetLayer` per the contract; `RhythmManager` and Tant's three functions become thin wrappers or disappear; a `Stager<ValueTree, ValueTree, 8>` in the base for the three products whose payload is a tree (`Layer::applyExtras` is the apply); mu-Clid keeps its `PendingRhythm` stager. | new `LayerStructureTests`: fill to 8, remove the middle, swap ends, reset; assert parameter values, colour, mixer channel, sidechain source and pending-swap cancel all follow; a two-thread stress test (message thread edits while a loop calls `processBlock`, no allocation, no crash); every `*_roundtrip` and the hot-swap listening tests (`swap`, `slot swap`) |
+| 6 | O | Variable layers in mu-Toni (#1240) and mu-On (#1241); the clip bank (#1277) | See owner decisions below. The clip bank is `Layer::clips`: a clip is a composed slot node (Stage 3 makes a layer loadable from one), launching it is a staged layer swap (Stage 5), and a pad never writes a preset. | tests per feature, written with the decisions |
+| 7 | S | mu-Clid into the container | `Rhythm` gains `VoiceEngine`, `MidiOutputEngine`, play state, retired engines, sample path, modulated-euclid overrides and the modulation previous-state flags (replacing the `std::array`s indexed by rhythm in `PluginProcessor` and `SequencerEngine`); `SequencerEngine` takes `Rhythm&` from the base instead of a `std::vector<Rhythm>`; `Rhythm` becomes non-copyable, with `resetToDefaults()` replacing `r = Rhythm{}` and `add(const Rhythm&)` taking a built `unique_ptr<Rhythm>`; `rhythmsLock` becomes `layersLock`. Highest risk of the plan (about 1580 uses, the Lite build, the retire-tail). | `mu-clid-tests` (build the target explicitly, it is not in ALL), `CLID_roundtrip`, the retire-tail and hot-swap listening tests, Lite build |
+| 8 | O | Registry and `Layer::render` | With the combined instance and the saved-data renames (#1263). Until then the mixer's `RenderChannelFn` stays product-side. | with that work |
+
+Stages 1-3 are order-independent between products (any product can go first). From stage 4 on, do Tant first
+(it already has the dynamic count and the lock), then Toni, On, and Clid last.
+
+### Owner decisions for Stage 6
+
+- **mu-On (#1241):** its parameters are prefixed by *lane type* (`k_ b_ h_ s_ r_`), not by index. A variable
+  count with a per-layer engine selector needs index-based prefixes, which is a saved-data rename (#1263, on
+  hold). Options: (a) mu-On stays five fixed lanes and only gains `Track` and the clip bank (no migration;
+  recommended until #1263); (b) index prefixes with a migration, done with #1263. The stage 5 edit code works
+  for both.
+- **mu-Toni (#1240):** `kNumChannels` is 4 today. Going to 8 adds layers 5-8 parameters (additive, old sessions
+  load with the new layers at defaults) and changes the host's automation list; confirm the default count for a
+  fresh instance and the demo cap (mu-Toni is freeware, so likely none).
+- **Both:** the add / delete / reorder UI (it is the shared `ChannelSidebar`, so it is a visible change for the
+  freeware and licensed products alike) and whether delete fades or cuts (item 7 says cut).
+
+For the combined instance (design-future): none of the above blocks it, and nothing here closes it off. The
+registry adds `typeId` -> `LayerTypeInfo`; the saved `Slot` node gains a `type` attribute (absent = the
+product's own type); the prefix lists become per-type; `layerAs<T>` already asserts the type.
+
 ## Transport rule — family standard
 
 Every product's `processBlock` takes its play state, tempo and beat from one call,

@@ -191,6 +191,9 @@ public:
         numerator = packed >> 8;  denominator = packed & 0xFF;
     }
     void   setTimeSignature(int numerator, int denominator);
+
+    // Nudge buttons (standalone): -1 slower, +1 faster while held, 0 released (both held = 0).
+    void   setNudgeDirection(int direction) { nudgeDirection.store(juce::jlimit(-1, 1, direction), std::memory_order_relaxed); }
     // Sets MIDI clock sync for this process only, without saving it (the headless render uses it so
     // a render never depends on the user's saved choice).
     void   setMidiSyncForSession(bool on, int mode) { midiClockSync.setMessages(mode); midiClockSync.setEnabled(on); }
@@ -378,6 +381,9 @@ protected:
     std::atomic<double> internalBeatPos { 0.0 };
     std::atomic<double> internalBpm     { 120.0 };
     std::atomic<int>    syncOffsetMs    { 0 };
+    std::atomic<int>    nudgeDirection  { 0 };     // UI → audio: -1 / 0 / +1 while a nudge button is held
+    std::atomic<double> nudgePhaseBeats { 0.0 };   // audio thread: the nudge shift accumulated under MIDI clock
+    std::atomic<double> appliedSyncOffsetBeats { 0.0 };   // audio thread: the sync offset applied so far (it ramps)
     std::atomic<int>    timeSignature   { (4 << 8) | 4 };   // numerator << 8 | denominator, one value so it can't tear
 
     // Reads the host playhead for this block and publishes it for the UI. Call it from

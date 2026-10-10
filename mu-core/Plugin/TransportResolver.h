@@ -40,12 +40,22 @@ struct BlockTransport
     bool   beatFromOutside() const noexcept { return beatOutside; }
 };
 
+// How far the Nudge buttons bend the groove while held (percent of the tempo).
+inline constexpr double kNudgeBendPercent = 4.0;
+
 // The product's own transport state (its atomics, shared with the UI).
 struct InternalTransport
 {
     std::atomic<bool>&   playing;
     std::atomic<double>& bpm;
     std::atomic<double>& beatPos;
+
+    // Nudge (standalone): the UI sets the direction (-1 slower, 0, +1 faster) while a button is held.
+    // The own clock simply runs that much slower / faster; under MIDI clock the held bend accumulates
+    // as a phase shift (beats) that stays until the next Start, since the clock itself sets the tempo.
+    std::atomic<double>*    nudgePhase     = nullptr;
+    const std::atomic<int>* nudgeDirection = nullptr;
+    std::atomic<double>*    offsetApplied  = nullptr;   // the sync offset (beats) applied so far; it ramps to its target
 };
 
 // Resolve this block's transport and advance the internal beat counter past it. Audio thread,
@@ -58,7 +68,9 @@ inline BlockTransport resolveTransport(const HostTransport& host, bool isStandal
 {
     BlockTransport t;
     bool relocated = false;   // the clock moved the own beat this block (store it even while stopped)
-    const double ownBpm = internal.bpm.load(std::memory_order_relaxed);
+    const int    nudgeDir = internal.nudgeDirection != nullptr ? internal.nudgeDirection->load(std::memory_order_relaxed) : 0;
+    const double bend     = 1.0 + (double) nudgeDir * kNudgeBendPercent / 100.0;
+    const double ownBpm   = internal.bpm.load(std::memory_order_relaxed) * bend;   // the own clock, nudged
 
     // Pick the source (the family rule above).
     if (host.hasPosition)
@@ -110,11 +122,6 @@ inline BlockTransport resolveTransport(const HostTransport& host, bool isStandal
         t.startBeat = internal.beatPos.load(std::memory_order_relaxed);
     }
 
-    // Sync offset: under an external MIDI clock the app plays `syncOffsetMs` earlier than the clock says,
-    // to cancel the audio output latency (positive = earlier). The block's span is unchanged.
-    if (t.source == BlockTransport::Source::MidiClock && t.beatOutside)
-        t.startBeat = std::max(0.0, t.startBeat + syncOffsetMs * t.bpm / 60000.0);
-
     // Bound the beat space (a host position can be any size, or negative in a pre-roll).
     auto wrap = [wrapBeats](double b)
     {
@@ -138,6 +145,54 @@ inline BlockTransport resolveTransport(const HostTransport& host, bool isStandal
         t.beatsPerSample = t.blockBeats / (double) numSamples;
     }
 
+    // Under an external MIDI clock two shifts ride on the clock's beat:
+    //  - Sync offset: the app plays `syncOffsetMs` earlier than the clock says, to cancel the audio
+    //    output latency (positive = earlier). A change mid-play ramps in at no more than 10 % of the
+    //    block's span per block, so no sequencer sees a jump.
+    //  - Nudge: while a nudge button is held the groove bends by kNudgeBendPercent; the bend
+    //    accumulates as a phase shift that stays until the next Start (the clock owns the tempo).
+    // Both are applied as a change of the block's SPAN, never as a jump, so the next block starts exactly
+    // where this one ended. A Start restarts both cleanly.
+    if (t.source == BlockTransport::Source::MidiClock && t.beatOutside)
+    {
+        const double span       = t.blockBeats;                         // what the clock's beat model moved
+        const double wantOffset = syncOffsetMs * t.bpm / 60000.0;
+        double phase   = internal.nudgePhase    != nullptr ? internal.nudgePhase->load(std::memory_order_relaxed)    : 0.0;
+        double applied = internal.offsetApplied != nullptr ? internal.offsetApplied->load(std::memory_order_relaxed) : 0.0;
+        if (clock.startedInBlock()) { phase = 0.0; applied = wantOffset; }
+
+        const double startShift = phase + applied;
+        double nudgeDelta = 0.0, offsetStep = 0.0;
+        if (t.playing && span > 0.0)
+        {
+            nudgeDelta = (double) nudgeDir * kNudgeBendPercent / 100.0 * span;
+            offsetStep = std::clamp(wantOffset - applied, -0.1 * span, 0.1 * span);
+        }
+        else
+            applied = wantOffset;                                       // stopped: no span to ramp over
+        phase   += nudgeDelta;
+        applied += offsetStep;
+        if (internal.nudgePhase    != nullptr) internal.nudgePhase->store(phase, std::memory_order_relaxed);
+        if (internal.offsetApplied != nullptr) internal.offsetApplied->store(applied, std::memory_order_relaxed);
+
+        const double shiftedStart = t.startBeat + startShift;
+        const double shiftedEnd   = shiftedStart + span + nudgeDelta + offsetStep;
+        // Right after a Start a late (negative) shift can put the start before beat 0: play only the
+        // part from beat 0 on, so beat 0 is never replayed block after block.
+        t.startBeat  = std::max(0.0, shiftedStart);
+        t.blockBeats = t.playing ? std::max(0.0, shiftedEnd - t.startBeat) : 0.0;
+        if (numSamples > 0 && t.playing)
+            t.beatsPerSample = t.blockBeats / (double) numSamples;
+        t.startBeat  = wrap(t.startBeat);
+    }
+    else
+    {
+        // Off MIDI clock the shifts are spent.
+        if (internal.nudgePhase != nullptr && internal.nudgePhase->load(std::memory_order_relaxed) != 0.0)
+            internal.nudgePhase->store(0.0, std::memory_order_relaxed);
+        if (internal.offsetApplied != nullptr && internal.offsetApplied->load(std::memory_order_relaxed) != 0.0)
+            internal.offsetApplied->store(0.0, std::memory_order_relaxed);
+    }
     // Mirror an outside transport into the Play button, and carry the beat on past this block. A
     // stopped own transport leaves the counter alone (the UI may be resetting it).
     if (t.playOutside)

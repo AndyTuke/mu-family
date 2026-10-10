@@ -71,15 +71,29 @@ layer in separate parallel arrays on the processor:
 | mu-Toni | `voiceSlots`, `runners`, `inserts`, `insCfg` |
 | mu-On | `voiceSlots` (engines and step data live elsewhere) |
 
-**Target.** `Layer` (renamed from `Layer`) owns everything every layer has, and a product's
-derived type adds only its sequencer data and its engine binding. Candidates to move into `Layer`:
-the insert processor and its config (duplicated in mu-Tant and mu-Toni), the persistence hooks
-(`LayerExtras`-style write / apply), hot-swap staging state, and the mixer-channel binding. A layer
-add / reorder / delete in `mu-core` then works on `Layer` and never needs product code.
+**Target.** A product's derived type (`Rhythm`, `Pattern`, `Arp`, `Track`) holds everything that
+layer has, including what the parallel arrays hold today, and `mu-core` adds / reorders / deletes
+layers through the `Layer` base without product code.
 
-Open: virtual dispatch vs a registered layer-type table (see the layer-type registry in
-design-future.md); who owns layers (`vector<unique_ptr<Layer>>`); the audio-thread rules (no
-allocation, locks) a polymorphic layer must keep.
+**Ruling (Architecture Steward, 2026-10-10; owner decisions marked).** The full contract, the staged
+plan and the test per stage are in [design-plugin-family.md, Layer ownership and structural
+edits](design-plugin-family.md#layer-ownership-and-structural-edits--family-standard). In short:
+
+- **Dispatch: virtual functions on `Layer`, plus a registry that only constructs.** Per-layer
+  behaviour is virtual, called once per layer per block or per edit, never per sample
+  (`typeId`, `writeExtras` / `applyExtras`, `resetToDefaults`, `onMoved`, `insertGainReduction`,
+  later `render`). A registered layer-type table (`id`, name, param prefix, preset extension, mod-target
+  table, `create`) is added only when a second layer type can share one instance; it creates and
+  describes layers, it does not dispatch.
+- **Ownership: `ProcessorBase` owns the layers**, in a fixed-capacity `std::array<std::unique_ptr<Layer>,
+  mu_limits::kMaxLayers>` with an atomic count and one lock. Never a `std::vector`.
+- **`Layer` stays data-light.** It keeps what it has (`voiceParams`, control sequences, matrix, the two
+  locks, `name`, `colourIndex`) and gains virtuals and the message-thread-only clip bank. Shared
+  sub-objects (the insert stage) are composed members from `mu-core`, not base-class data, so `Rhythm`
+  stays cheap and the engine, insert and gates travel with the layer when it moves.
+- **What stays product-side:** the sequencer data, the engine, the product's `ModTarget` table, its
+  param table and prefixes, its editor panels, and (until a second type shares an instance) the typed
+  accessor (`getRhythm(i)`, `getPattern(i)`).
 
 ---
 
@@ -176,10 +190,22 @@ C++ identifier changes never touch saved files; the data renames at the end do.
 2. **mu-Clid into `mu_clid`** — done (build 1190). Lesson recorded as the overload rule in §3 Namespaces.
    Backlog #1262.
 3. **Overlay / Panel renames** for the shell screens; shared `LayerPanel` / `LayerSidebar` in `mu-core`. Backlog #1266.
-4. **`Layer` → `Layer`**, then hoist the shared per-layer data into it product by product
-   (mu-Tant and mu-Toni first — they have the parallel arrays); `Slot*` persistence types → `Layer*`. Backlog #1265.
+4. **`VoiceSlot` → `Layer`** (done, backlog #1265 step 1). The hoist into `Layer` (backlog #1265 steps
+   2-3) and the derived types (step 5) are one sequence, listed under step 5: derived types as plain
+   value members first, then the shared hooks, then ownership, then central structural edits. Each
+   stage is one commit per product, with the unit tests and the round-trip listening tests between stages.
 5. **Derived layer types** (mu-Tant `Pattern`, mu-Toni `Arp`, mu-On `Track`; mu-Clid's `Rhythm` already
    exists) replace the parallel arrays; sequencer role names (`<X>Sequencer`) follow. Backlog #1264.
+   The stages (M = mechanical, can run unattended; S = supervised, touches the audio thread or a
+   lock, run with listening tests on the build PC; O = needs the owner):
+   1. **M** derived types as value members, parallel arrays folded in (Tant, Toni, On).
+   2. **M** `ProcessorBase::getLayer(i)` accessor and the generic channel name / colour / modulator-panel use of it.
+   3. **M** persistence virtuals `writeExtras` / `applyExtras`; `initSlotState` takes only the prefixes.
+   4. **S** ownership moves into `ProcessorBase` (array of `unique_ptr<Layer>`, count, `layersLock`).
+   5. **S** central `addLayer` / `removeLayer` / `swapLayers` / `resetLayer`; generic hot-swap stager.
+   6. **O** variable layer count in mu-Toni (backlog #1240) and mu-On (#1241), the clip bank (#1277).
+   7. **S** mu-Clid's `Rhythm` takes its engine, MIDI engine, play state and samples as members and moves into the container.
+   8. **O**, with the combined instance and #1263: the layer-type registry and `Layer::render`.
 6. **Saved-data names** — only with the combined instance, with migrations. Backlog #1263 (On Hold).
 
 Separately, the **standard `Source/` layout** (eight folders in every instrument product): folders created
@@ -190,5 +216,6 @@ Each step: Debug build + unit tests + the round-trip listening tests on the buil
 ## 6. Open questions
 
 
-- Is the shared `Layer` polymorphic, or a table of registered layer types?
+- Is the shared `Layer` polymorphic, or a table of registered layer types? **Settled 2026-10-10:**
+  polymorphic (virtual hooks), with a registry that only creates and describes layer types (§2).
 - Do the ~130 global `mu-core` types move into `mu_*` namespaces, or stay as the shared "house" types?

@@ -32,6 +32,39 @@ TransportBar::TransportBar(ProcessorBase& p)
         bpmInput.setLabelInline(true);
         addAndMakeVisible(bpmInput);
 
+        // Tap tempo (internal clock only): triggered on mouse DOWN so the press time is the beat.
+        tapBtn.setTriggeredOnMouseDown(true);
+        tapBtn.setTooltip("Tap tempo");
+        tapBtn.onClick = [this]
+        {
+            double bpm = 0.0;
+            if (tapTempo.tap(juce::Time::getMillisecondCounterHiRes() * 0.001, bpm))
+            {
+                proc.setInternalBpm(bpm);
+                bpmInput.setValueD(bpm);
+                if (onStatusUpdate) onStatusUpdate("BPM", juce::String(bpm, MuLookAndFeel::kBpmDecimals));
+            }
+        };
+        tapBtn.onStateChange = [this] { if (tapBtn.isOver() && onStatusUpdate) onStatusUpdate("Tap", "tap the beat to set the tempo"); };
+        addAndMakeVisible(tapBtn);
+
+        // Nudge: hold to bend the groove, release to return to exactly the set tempo.
+        nudgeSlowBtn.setTooltip("Nudge slower (hold)");
+        nudgeFastBtn.setTooltip("Nudge faster (hold)");
+        const juce::String bendText = juce::String(juce::roundToInt(mu_core::kNudgeBendPercent)) + "%";
+        nudgeSlowBtn.onStateChange = [this, bendText]
+        {
+            updateNudge();
+            if (nudgeSlowBtn.isOver() && onStatusUpdate) onStatusUpdate("Nudge", "hold to slow the groove " + bendText);
+        };
+        nudgeFastBtn.onStateChange = [this, bendText]
+        {
+            updateNudge();
+            if (nudgeFastBtn.isOver() && onStatusUpdate) onStatusUpdate("Nudge", "hold to speed up the groove " + bendText);
+        };
+        addAndMakeVisible(nudgeSlowBtn);
+        addAndMakeVisible(nudgeFastBtn);
+
         clockLamp.setLabel("Clock");
         clockLamp.onStatusUpdate = [this](const juce::String& n, const juce::String& v) { if (onStatusUpdate) onStatusUpdate(n, v); };
         addChildComponent(clockLamp);   // shown while MIDI clock ticks drive the transport
@@ -88,6 +121,7 @@ TransportBar::TransportBar(ProcessorBase& p)
 
 TransportBar::~TransportBar()
 {
+    proc.setNudgeDirection(0);   // a held nudge must not outlive the bar
     stopTimer();
 }
 
@@ -148,20 +182,21 @@ void TransportBar::timerCallback()
         const bool midiTransport = proc.getMidiSyncEnabled() && proc.getMidiSyncMessages() != 0;
         playBtn.setEnabled(!midiTransport);
 
-        // The clock lamp shows while the clock's ticks drive the transport; re-lay out only when
-        // it appears or goes.
-        if (midiClockBpm != clockShown)
-        {
-            clockShown = midiClockBpm;
-            clockLamp.setVisible(clockShown);
-            resized();
-        }
+        // The shared slot: the clock lamp while the clock's ticks drive the transport, else Tap.
+        clockShown = midiClockBpm;
+        clockLamp.setVisible(clockShown);
+        tapBtn.setVisible(! clockShown);
         if (clockShown) refreshClockLamp();
     }
 
     // Show the staging badge while a full-preset hot-swap is queued for the loop point.
     if (showPresetControls)
         presetStagingBadge.setVisible(proc.hasPendingFullPreset());
+}
+
+void TransportBar::updateNudge()
+{
+    proc.setNudgeDirection((nudgeFastBtn.isDown() ? 1 : 0) - (nudgeSlowBtn.isDown() ? 1 : 0));   // both = no bend
 }
 
 void TransportBar::refreshClockLamp()
@@ -379,15 +414,22 @@ void TransportBar::resized()
     {
         bpmInput.setBounds(x, btnY, s(kBpmW), btnH);
         x += s(kBpmW) + gap;
-        if (clockShown)
-        {
-            clockLamp.setBounds(x, btnY, s(kClockW), btnH);
-            x += s(kClockW) + gap;
-        }
+        tapBtn   .setBounds(x, btnY, s(kClockW), btnH);   // Tap and the lamp share the slot
+        clockLamp.setBounds(x, btnY, s(kClockW), btnH);
+        x += s(kClockW) + gap;
     }
 
     posLabel.setBounds(x, btnY, s(kPosW), btnH);
-    x += s(kPosW) + padIn;
+    x += s(kPosW);
+    if (isStandalone)
+    {
+        x += gap;
+        nudgeSlowBtn.setBounds(x, btnY, s(kNudgeW), btnH);
+        x += s(kNudgeW) + s(kNudgeGap);
+        nudgeFastBtn.setBounds(x, btnY, s(kNudgeW), btnH);
+        x += s(kNudgeW);
+    }
+    x += padIn;
 
     transportPaneBounds = { tpOuterX, inset, x - tpOuterX, h - 2 * inset };
 
