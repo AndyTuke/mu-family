@@ -44,6 +44,10 @@ public:
                                               int numFrames, const TransportSnapshot& transport)>;
     void onRender(RenderCallback cb) { renderCb = std::move(cb); }
 
+    // Inside the render callback: how many frames are already queued ahead of the block being
+    // rendered, i.e. how long before it is heard (the render lead). Producer thread only.
+    int renderLeadFrames() const noexcept { return currentLead; }
+
     // Try to attach to a running mu-link. `numChannels` is recorded in the registry
     // (informational). Returns false if mu-link isn't running, the protocol version
     // mismatches, or every slot is taken — the product then runs on its own device.
@@ -174,6 +178,7 @@ private:
                 // slaved sequencer's bar position lands where mu-link will play this block.
                 TransportSnapshot snap = readTransport(mem.transport());
                 const std::uint64_t buffered = (std::uint64_t) ring.readAvailable();
+                currentLead = (int) buffered;
                 snap.samplePos += buffered;
                 const double projSr = snap.sampleRate != 0 ? (double) snap.sampleRate : 48000.0;
                 snap.ppqPosition += ((double) buffered / projSr) * (snap.tempoBpm / 60.0);
@@ -201,6 +206,7 @@ private:
 
     MuLinkClientMemory mem;
     RenderCallback     renderCb;
+    int                currentLead  = 0;   // producer thread: frames queued ahead of the block in render
     bool               attached     = false;
     int                ringChannels = kMaxChannels;
     std::uint32_t      lastPcEpoch  = 0;   // last scene PC epoch seen (pollProgramChange)

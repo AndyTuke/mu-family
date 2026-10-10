@@ -5,6 +5,7 @@
 
 #include "Link/MuLinkClient.h"
 #include "Link/MuLinkPlayHead.h"
+#include "Plugin/TimedMidiOut.h"   // mu-core: MIDI out sent when the bus plays it
 
 #include <functional>
 
@@ -31,7 +32,7 @@ namespace mu_link
 
 #ifdef _WIN32
 
-class MuLinkBridge : private juce::Timer
+class MuLinkBridge : private juce::Timer, private juce::ChangeListener
 {
 public:
     // `processor` + `devicePlayer` + `appDeviceManager` are owned by the StandalonePluginHolder and
@@ -49,9 +50,9 @@ public:
           onConnectionChanged(std::move(onConnectionChangedCb))
     {
         // Producer-thread render: publish mu-link's (consume-time projected) transport into
-        // our playhead, then render the block through the real processor with the app's MIDI in.
-        // MIDI out is not sent while on the bus yet: the bus renders ~one ring ahead of what is
-        // heard, so it needs a timed sender first.
+        // our playhead, then render the block through the real processor with the app's MIDI in,
+        // and queue the MIDI it produces to go out when mu-link plays the block (the bus renders
+        // up to one ring ahead of what is heard).
         scratchMidi.ensureSize(2048);   // so MIDI in / an injected program change rarely allocate on the bus thread
 
         client.onRender([this] (float* const* output, int numChannels, int numFrames,
@@ -67,10 +68,30 @@ public:
             // the product's existing scanMidiProgramChanges picks it up → preset hot-swap. Polled
             // on the producer thread only, so lastPcEpoch needs no synchronisation.
             int pcProgram = 0, pcChannel = 9;
-            if (client.pollProgramChange(pcProgram, pcChannel))
+            const bool pcInjected = client.pollProgramChange(pcProgram, pcChannel);
+            if (pcInjected)
                 scratchMidi.addEvent(juce::MidiMessage::programChange(pcChannel, pcProgram), 0);
 
             processor.processBlock(buffer, scratchMidi);
+
+            // MIDI out: only a product that makes MIDI (others leave their input in the buffer, which
+            // would echo it), never system / real-time bytes (no clock feedback loop through
+            // mu-link), and never mu-link's scene change, which was meant for this app.
+            if (processor.producesMidi() && midiOut.isActive() && t.sampleRate != 0)
+            {
+                const double sr = (double) t.sampleRate;
+                const double dueStartMs = juce::Time::getMillisecondCounterHiRes()
+                                        + client.renderLeadFrames() * 1000.0 / sr;
+                for (const auto meta : scratchMidi)
+                {
+                    if (meta.numBytes < 1 || meta.data[0] >= 0xF0) continue;
+                    if (meta.samplePosition == 0 && meta.numBytes == 2 && pcInjected
+                        && meta.data[0] == (juce::uint8) (0xC0 | ((pcChannel - 1) & 0x0F))
+                        && meta.data[1] == (juce::uint8) (pcProgram & 0x7F))
+                        continue;
+                    midiOut.push(dueStartMs + meta.samplePosition * 1000.0 / sr, meta.data, meta.numBytes);
+                }
+            }
         });
 
         startTimer(500);   // poll for mu-link appearing / disappearing
@@ -140,6 +161,8 @@ private:
         // MIDI in follows the bus now: the local player no longer has a processor to feed.
         midiIn.reset((double) snap.sampleRate);
         deviceManager.addMidiInputDeviceCallback({}, &midiIn);
+        takeMidiOutPort(deviceManager.getDefaultMidiOutputIdentifier());
+        deviceManager.addChangeListener(this);   // follow a MIDI-out change in Settings while attached
         client.start();
 
         connected  = true;
@@ -153,12 +176,62 @@ private:
     {
         client.detach();                              // joins the producer thread first
         deviceManager.removeMidiInputDeviceCallback({}, &midiIn);
+        deviceManager.removeChangeListener(this);
+        returnMidiOutPort();
         processor.setPlayHead(nullptr);               // back to the internal standalone transport
         player.setProcessor(&processor);              // local device drives again (re-prepares)
 
         connected  = false;
         stallTicks = 0;
         if (onConnectionChanged) onConnectionChanged(false);
+    }
+
+    // MIDI out port while attached: the bridge owns it (the family one-owner rule). The app may
+    // have no audio device open, and the device manager can replace its port without any callback
+    // the bridge would see, so the bridge takes the port from the manager (Windows ports are often
+    // single-client), opens its own, and hands it back on detach.
+    void takeMidiOutPort(const juce::String& identifier)
+    {
+        if (identifier.isEmpty()) return;
+        outPortId = identifier;
+        deviceManager.setDefaultMidiOutputDevice({});   // free the manager's handle first
+        outPort = juce::MidiOutput::openDevice(identifier);
+        if (processor.producesMidi()) midiOut.start();   // the sender only runs for a MIDI-making app
+        midiOut.setOutput(outPort.get());
+    }
+
+    // Release the bridge's port: queued notes are dropped, so silence the gear first (notes whose
+    // note-off was still queued would hang otherwise).
+    void releaseOutPort()
+    {
+        midiOut.setOutput(nullptr);                   // waits out a send in progress
+        if (outPort != nullptr)
+            for (int ch = 1; ch <= 16; ++ch)
+            {
+                outPort->sendMessageNow(juce::MidiMessage::controllerEvent(ch, 64, 0));   // sustain off
+                outPort->sendMessageNow(juce::MidiMessage::allNotesOff(ch));
+            }
+        outPort.reset();
+    }
+
+    void returnMidiOutPort()
+    {
+        releaseOutPort();
+        if (outPortId.isNotEmpty())
+            deviceManager.setDefaultMidiOutputDevice(outPortId);   // the user's choice, back where it was
+        outPortId = {};
+    }
+
+    // Settings changed while attached: a newly chosen MIDI output moves to the bridge too. An empty
+    // choice is ours (we cleared the manager's port) or the user's "none" — they can't be told
+    // apart, so "none" is not honoured while attached; the old choice returns on detach.
+    void changeListenerCallback(juce::ChangeBroadcaster*) override
+    {
+        if (! connected) return;
+        const auto id = deviceManager.getDefaultMidiOutputIdentifier();
+        if (id.isEmpty() || id == outPortId) return;
+        releaseOutPort();
+        takeMidiOutPort(id);
     }
 
     juce::AudioProcessor&       processor;
@@ -169,9 +242,12 @@ private:
     std::function<void(bool)>   onConnectionChanged;
 
     juce::MidiMessageCollector midiIn;              // the app's MIDI inputs → the bus render
+    mu_core::TimedMidiOut      midiOut { false };   // the bus render's MIDI → the app's MIDI out (started on attach)
+    std::unique_ptr<juce::MidiOutput> outPort;      // owned while attached
+    juce::String               outPortId;           // the user's MIDI out, handed back on detach
     MuLinkClient   client;
     MuLinkPlayHead playHead;
-    juce::MidiBuffer scratchMidi;   // processBlock's MIDI in on the bus (its MIDI out is discarded)
+    juce::MidiBuffer scratchMidi;   // processBlock's MIDI in + out on the bus
 
     bool          connected  = false;
     std::uint64_t lastGen    = 0;

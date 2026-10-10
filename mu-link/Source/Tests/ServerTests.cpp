@@ -276,6 +276,32 @@ public:
             expect(st.numPulseOffsets > 0 && std::abs(st.pulseOffsets[0] - 1000) <= 1, "next pulse (55) one pulse period later");
         }
 
+        beginTest("TimedMidiOut: a block is stamped by sample position; long messages are dropped");
+        {
+            mu_core::TimedMidiOut out(false);
+            juce::MidiBuffer block;
+            block.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100), 480);
+            block.addEvent(juce::MidiMessage::noteOff(1, 60), 960);
+            const juce::uint8 sysex[] = { 0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7 };
+            block.addEvent(sysex, (int) sizeof(sysex), 0);
+
+            out.pushBuffer(block, 1000.0, 48000.0);
+            std::vector<std::pair<juce::MidiMessage, double>> sent;
+            out.sendDue(1.0e12, [&](const juce::MidiMessage& m, double due) { sent.push_back({ m, due }); });
+            expect(sent.empty(), "nothing queued with no port");
+
+            out.armForTest();
+            out.pushBuffer(block, 1000.0, 48000.0);
+            out.sendDue(1.0e12, [&](const juce::MidiMessage& m, double due) { sent.push_back({ m, due }); });
+            expectEquals((int) sent.size(), 2, "the SysEx is dropped");
+            if (sent.size() == 2)
+            {
+                expect(sent[0].first.isNoteOn() && sent[1].first.isNoteOff());
+                expectWithinAbsoluteError(sent[0].second, 1010.0, 1.0e-9);
+                expectWithinAbsoluteError(sent[1].second, 1020.0, 1.0e-9);
+            }
+        }
+
         beginTest("MIDI clock out keeps transport messages ahead of the block's pulses");
         {
             MidiClockOut clockOut(false);
