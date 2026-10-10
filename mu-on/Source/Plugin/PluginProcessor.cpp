@@ -180,7 +180,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
                           {
                               grooveVoices.trigger(track, vel, off);
                               if (track >= 0 && track < kNumChannels)
-                                  triggers[(size_t) track].fetch_add(1, std::memory_order_relaxed);
+                                  voiceSlots[(size_t) track].triggers.fetch_add(1, std::memory_order_relaxed);
                           });
     }
 

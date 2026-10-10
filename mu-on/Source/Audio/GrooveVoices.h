@@ -7,7 +7,7 @@
 #include "Audio/BassEngine.h"
 #include "Audio/SampleChannel.h"
 #include "Audio/RumbleEngine.h"
-#include "Sequencer/Layer.h"   // mu-core: per-lane ControlSequences + ModulationMatrix
+#include "Sequencer/Track.h"   // mu-On lane layer (mu-core Layer + trigger counter)
 #include "Modulation/LaneModulation.h"   // mu-core: shared range-based per-lane resolve
 #include "Modulation/MuOnModDest.h"
 
@@ -42,7 +42,7 @@ public:
     }
 
     // The processor owns the per-lane modulation slots; we read them on the audio thread.
-    void setSlots(std::array<Layer, kNumChannels>* s) noexcept { slots = s; }
+    void setSlots(std::array<mu_on::Track, kNumChannels>* s) noexcept { slots = s; }
 
     // The Rumble lane's drawable bar-volume envelope (owned by the processor). Evaluated each
     // block under its try-lock; the message thread edits it while drawing.
@@ -182,7 +182,7 @@ private:
     RumbleEngine  rumble;
     juce::AudioBuffer<float> kickFeed;   // stash of the kick render → Rumble input
 
-    std::array<Layer, kNumChannels>* slots = nullptr;
+    std::array<mu_on::Track, kNumChannels>* slots = nullptr;
     const std::atomic<float>*            bWave = nullptr;
     double                               blkBeat = 0.0;
 
