@@ -2,7 +2,7 @@
 
 #include "Modulation/ModTarget.h"
 #include "Modulation/ModulationMatrix.h"
-#include "Sequencer/VoiceSlot.h"
+#include "Sequencer/Layer.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <string>
@@ -35,7 +35,7 @@ juce::StringArray depthNotProportional(const ModTarget (&table)[N])
     for (const auto& t : table)
     {
         if (t.param == nullptr) continue;
-        VoiceSlot slot;
+        Layer slot;
         auto& cs = slot.controlSequences[0];
         cs.mode       = ControlSequence::Mode::Stepped;
         cs.polarity   = ControlSequence::Polarity::Unipolar;

@@ -5,7 +5,7 @@
 #include "Plugin/MixerFxParams.h"         // mu-core: shared global-FX / mixer APVTS layout
 #include "Plugin/MidiClockSync.h"         // mu-core: shared MIDI-clock slave
 #include "Sequencer/ArpVoiceRunner.h"     // per-voice arpeggiator + ToniVoice
-#include "Sequencer/VoiceSlot.h"          // mu-core: per-voice control sequences + matrix
+#include "Sequencer/Layer.h"          // mu-core: per-voice control sequences + matrix
 #include "Modulation/LaneModulation.h"    // mu-core: mu_mod::resolveLane
 #include "Modulation/MuToniModDest.h"     // arp/voice modulation destinations
 #include "Audio/InsertProcessor.h"        // mu-core: shared per-voice insert FX
@@ -31,7 +31,7 @@ class PluginProcessor : public ProcessorBase
 public:
     // Family parity: up to 8 channels/layers. A fixed set ships for now; dynamic
     // add/delete/reorder is still unwired (no addVoice/removeVoice).
-    static constexpr int kMaxChannels = mu_limits::kMaxChannels;   // the family layer cap
+    static constexpr int kMaxChannels = mu_limits::kMaxLayers;   // the family layer cap
     static constexpr int kNumChannels = 4;   // placeholder layers shown in the shell
 
     PluginProcessor();
@@ -117,7 +117,7 @@ private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
     // State shared by the session save/restore and full presets (PluginProcessor_Preset.cpp):
-    // the composed state (mu-core SlotState) of the globals + every layer's node.
+    // the composed state (mu-core LayerState) of the globals + every layer's node.
     void            initLayerState();
     juce::ValueTree captureState() { return captureComposedState(); }
     juce::ValueTree toLayerState(const juce::ValueTree& tree) const;
@@ -147,10 +147,10 @@ private:
     std::array<InsertProcessor, kMaxChannels> inserts;
     std::array<VoiceParams,      kMaxChannels> insCfg;
 
-    // ── Per-voice modulation (mu-core VoiceSlot + shared matrix) ───────────────
+    // ── Per-voice modulation (mu-core Layer + shared matrix) ───────────────
     // Public so the UI ModulatorPanel can bind to the active voice's slot.
 public:
-    std::array<VoiceSlot, kMaxChannels> voiceSlots;
+    std::array<Layer, kMaxChannels> voiceSlots;
 private:
     // Modulation-resolve inputs: parallel arrays for mu_mod::resolveLane.
     std::array<const char*, kNumModDests>                                         modDestIds {};

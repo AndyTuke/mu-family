@@ -1,11 +1,11 @@
 #pragma once
 
-#include "Modulation/ModulatorSerialise.h"      // mu-core generic (VoiceSlot-based, namespace mu_pp)
+#include "Modulation/ModulatorSerialise.h"      // mu-core generic (Layer-based, namespace mu_pp)
 #include "Sequencer/Rhythm.h"
 #include "Modulation/ModulationDestinations.h"
 
 // μ-Clid adapter over the shared mu-core modulator (de)serialise. The generic
-// implementation lives in mu-core and operates on the VoiceSlot base; these
+// implementation lives in mu-core and operates on the Layer base; these
 // thin Rhythm& forwarders inject μ-Clid's ModDest source/destination validators
 // so existing call sites + tests (which pass `Rhythm`) are unchanged. enumName /
 // readEnumIndex are re-exported from mu-core via the include above (mu_pp::).
@@ -20,7 +20,7 @@ inline constexpr const char* kPadDepthUnitsKnobMax  = "knobMax";
 
 inline juce::ValueTree serialiseModulators(const Rhythm& r)
 {
-    auto mods = serialiseModulators(static_cast<const VoiceSlot&>(r));
+    auto mods = serialiseModulators(static_cast<const Layer&>(r));
     mods.setProperty(kPadDepthUnitsProperty, kPadDepthUnitsKnobMax, nullptr);
     return mods;
 }
@@ -87,14 +87,14 @@ inline juce::ValueTree upgradePadDepthsToKnobMax(const juce::ValueTree& mods, co
 inline juce::StringArray deserialiseModulators(const juce::ValueTree& mods, Rhythm& r)
 {
     return deserialiseModulators(upgradePadDepthsToKnobMax(upgradeModDepthsToRangeStandard(mods), r),
-                                 static_cast<VoiceSlot&>(r),
+                                 static_cast<Layer&>(r),
         [](const std::string& id) { return ModDest::isValidSourceId(id); },
         [](const std::string& id) { return ModDest::isValidDestinationId(id); });
 }
 
 inline void clearModulators(Rhythm& r)
 {
-    clearModulators(static_cast<VoiceSlot&>(r));
+    clearModulators(static_cast<Layer&>(r));
 }
 
 } // namespace mu_pp

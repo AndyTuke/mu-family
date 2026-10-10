@@ -5,7 +5,7 @@
 #include "UI/Components/BipolarSliderRow.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "ModulatorEditor.h"
-#include "Sequencer/VoiceSlot.h"
+#include "Sequencer/Layer.h"
 
 // Overview of all modulation assignments across all ControlSequences in a voice slot.
 class ModMatrixPanel : public juce::Component
@@ -13,7 +13,7 @@ class ModMatrixPanel : public juce::Component
 public:
     ModMatrixPanel();
 
-    void setVoiceSlot(VoiceSlot* slot);
+    void setVoiceSlot(Layer* slot);
     void setInsertAlgorithm(int driveChar);
     void setDestProvider(const ModDestProvider* p);
     void refresh();
@@ -33,7 +33,7 @@ public:
     }
 
 private:
-    VoiceSlot*             voiceSlot    = nullptr;
+    Layer*             voiceSlot    = nullptr;
     const ModDestProvider* destProvider = nullptr;
 
     struct MatrixRow : public juce::Component

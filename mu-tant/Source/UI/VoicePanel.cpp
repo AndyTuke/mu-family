@@ -8,7 +8,7 @@
 #include "Modulation/MuTantModSnap.h"
 #include "ValueFormat.h"   // mu-core: shared value text
 #include "UI/ParamChoices.h"  // mu-core: selector items from choice parameters
-#include "UI/SlotPresetHeader.h"   // mu-core: shared per-slot preset header wiring
+#include "UI/LayerPresetHeader.h"   // mu-core: shared per-slot preset header wiring
 
 namespace mu_tant
 {
@@ -122,7 +122,7 @@ void VoicePanel::setupHeader()
         mu_ui::confirmAsync(this, "Delete Voice", "Delete \"" + name + "\"?\nThis cannot be undone.",
                             "Delete", [this] { if (onDeleteVoice) onDeleteVoice(); });
     };
-    // Reset / preset load / save: the shared per-slot wiring (mu-core SlotPresetHeader).
+    // Reset / preset load / save: the shared per-slot wiring (mu-core LayerPresetHeader).
     mu_ui::wireSlotPresetHeader(headerBar, *this, proc,
         { "Voice",
           [this] { return currentVoice; },

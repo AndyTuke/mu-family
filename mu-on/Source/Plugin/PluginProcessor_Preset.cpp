@@ -4,7 +4,7 @@
 #include "Modulation/ModulatorSerialise.h"    // mu-core: modulator (de)serialise
 #include "Persistence/PresetFiles.h"          // mu-core: shared preset-file handling
 
-// mu-On preset I/O on the family composed state (mu-core SlotState): full presets (.muOn),
+// mu-On preset I/O on the family composed state (mu-core LayerState): full presets (.muOn),
 // per-track presets (.muTrack) and host sessions all build / apply the same lane node. Split out of
 // PluginProcessor.cpp to mirror mu-Tant's PluginProcessor_Preset.cpp.
 

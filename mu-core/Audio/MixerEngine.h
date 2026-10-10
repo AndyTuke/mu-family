@@ -31,8 +31,8 @@ struct RetiredVoices
 class MixerEngine
 {
 public:
-    // One mixer channel per layer — must equal mu_limits::kMaxChannels.
-    static constexpr int MaxChannels = mu_limits::kMaxChannels;
+    // One mixer channel per layer — must equal mu_limits::kMaxLayers.
+    static constexpr int MaxChannels = mu_limits::kMaxLayers;
 
     // Optional per-channel render hook. When supplied, Phase 1 invokes it to fill
     // channel r's buffer (channel index, target buffer, sample count) INSTEAD of

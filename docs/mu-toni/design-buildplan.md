@@ -29,7 +29,7 @@ All five stages compile + link across the family (mu-toni Standalone + VST3 + CL
   oscillator, Hilbert, `XModOscPair`) so both products share mu-Tant's exact timbre.
 - **X-Mod** — not in the MVP voice (osc detune only). Add with the wavetable lift.
 - ~~Modulation~~ — **DONE (v1.0.945):** full modulation section wired identically
-  to the other products. Per-voice `VoiceSlot` (8 control sequences + matrix), the
+  to the other products. Per-voice `Layer` (8 control sequences + matrix), the
   shared `ModulatorPanel` as the engine panel's bottom band (rebinds per layer,
   playhead-driven), `Modulation/MuToniModDest.h` (20 arp/voice/env destinations),
   the engine resolves each voice's matrix via `mu_mod::resolveLane` each block
@@ -50,7 +50,7 @@ happens at the first runnable checkpoint (end of T3) and each stage after.
   clean). Scales/Chords are copied into mu-toni (can't include mu-tant across
   products); centralise to mu-core later only if a sibling needs them.
 - **Reuse** (no re-invention): `MultiModeFilter`, `InsertProcessor`,
-  `VoiceParams`/`juce::ADSR`, `VoiceSlot`, `ModulationMatrix`, `MixerEngine`,
+  `VoiceParams`/`juce::ADSR`, `Layer`, `ModulationMatrix`, `MixerEngine`,
   `ProcessorBase::processCoreBlock`, all shared UI widgets, `MidiPresetMap`.
 - **Arp = post-modulation reader**: the engine reads chord/root/direction/gate/
   ADSR values from the `ModulationMatrix` output, not raw APVTS (family rule).

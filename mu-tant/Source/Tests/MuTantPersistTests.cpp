@@ -1,5 +1,5 @@
 // mu-tant modulator-persistence tests - exercises the shared mu-core modulator
-// (de)serialise (mu_pp) the way mu-tant uses it: a VoiceSlot's
+// (de)serialise (mu_pp) the way mu-tant uses it: a Layer's
 // ControlSequences + ModulationMatrix assignments round-trip through a ValueTree
 // with mu-tant's destination validator. Guards against the silent loss the
 // fix addressed.
@@ -7,7 +7,7 @@
 #include <juce_core/juce_core.h>
 #include <juce_data_structures/juce_data_structures.h>
 #include <string>
-#include "Sequencer/VoiceSlot.h"
+#include "Sequencer/Layer.h"
 #include "Sequencer/ControlSequence.h"
 #include "Modulation/ModulationMatrix.h"
 #include "Modulation/ModulationAssignment.h"
@@ -32,7 +32,7 @@ public:
 
         beginTest("stepped CS + matrix assignment round-trip through serialise/deserialise");
         {
-            VoiceSlot src;
+            Layer src;
             auto& cs = src.controlSequences[0];
             cs.mode          = ControlSequence::Mode::Stepped;
             cs.polarity      = ControlSequence::Polarity::Unipolar;
@@ -47,7 +47,7 @@ public:
             const auto tree = mu_pp::serialiseModulators(src);
             expect(tree.isValid() && tree.getType() == juce::Identifier("Modulators"), "tree valid");
 
-            VoiceSlot dst;
+            Layer dst;
             mu_pp::clearModulators(dst);
             const auto dropped = mu_pp::deserialiseModulators(tree, dst, {}, destValid);
             expect(dropped.isEmpty(), "nothing dropped");
@@ -71,7 +71,7 @@ public:
 
         beginTest("smooth-mode curve points round-trip");
         {
-            VoiceSlot src;
+            Layer src;
             auto& cs = src.controlSequences[1];
             cs.mode = ControlSequence::Mode::Smooth;
             cs.curvePoints = { { 0.0f,  0.0f, false, 0.0f, 0.0f },
@@ -79,7 +79,7 @@ public:
                                { 1.0f, -1.0f, false, 0.0f, 0.0f } };
 
             const auto tree = mu_pp::serialiseModulators(src);
-            VoiceSlot dst;
+            Layer dst;
             mu_pp::clearModulators(dst);
             mu_pp::deserialiseModulators(tree, dst, {}, destValid);
 
@@ -92,13 +92,13 @@ public:
 
         beginTest("deserialise drops an assignment to an unknown destination");
         {
-            VoiceSlot src;
+            Layer src;
             ModulationAssignment a;
             a.id = "asg1"; a.sourceId = "cs0"; a.destinationId = "bogus.dest"; a.depth = 0.5f;
             src.modulationMatrix.addAssignment(a);
 
             const auto tree = mu_pp::serialiseModulators(src);
-            VoiceSlot dst;
+            Layer dst;
             mu_pp::clearModulators(dst);
             const auto dropped = mu_pp::deserialiseModulators(tree, dst, {}, destValid);
             expect(! dropped.isEmpty(), "bogus dest reported dropped");
@@ -107,7 +107,7 @@ public:
 
         beginTest("clearModulators empties step/curve data + assignments");
         {
-            VoiceSlot s;
+            Layer s;
             s.controlSequences[0].stepValues = { 1.0f, 2.0f, 3.0f };
             s.controlSequences[2].curvePoints = { { 0.0f, 0.5f, false, 0.0f, 0.0f } };
             ModulationAssignment a; a.id = "x"; a.sourceId = "cs0"; a.destinationId = "level"; a.depth = 1.0f;
@@ -121,7 +121,7 @@ public:
 
         beginTest("deserialise of an invalid/empty tree is a safe no-op");
         {
-            VoiceSlot dst;
+            Layer dst;
             const auto dropped = mu_pp::deserialiseModulators(juce::ValueTree{}, dst, {}, destValid);
             expect(dropped.isEmpty(), "no work, no drops");
         }

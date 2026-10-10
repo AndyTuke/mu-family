@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
-#include "Sequencer/VoiceSlot.h"
+#include "Sequencer/Layer.h"
 
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <atomic>
@@ -19,7 +19,7 @@
 // parallel arrays of length `count`; `out` must hold `count` floats.
 namespace mu_mod {
 
-inline void resolveLane(VoiceSlot* slot, double beat, int count,
+inline void resolveLane(Layer* slot, double beat, int count,
                         const char* const* ids,
                         const std::atomic<float>* const* atoms,
                         const juce::NormalisableRange<float>* ranges,

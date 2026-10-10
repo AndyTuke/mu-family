@@ -73,7 +73,7 @@ class ModulatorEditor : public juce::Component
 public:
     ModulatorEditor();
 
-    // modLock must be the VoiceSlot::modLock for the owning slot.
+    // modLock must be the Layer::modLock for the owning slot.
     // All mutations to cs/matrix are performed under this lock.
     void setData(ControlSequence* cs, ModulationMatrix* matrix, juce::Colour modColour, int index,
                  std::atomic<bool>* modLock = nullptr);
@@ -111,9 +111,9 @@ private:
     juce::Colour           modColour;
     int                    modIndex      = 0;
 
-    // Acquire VoiceSlot::modLock (spin). Call before any mutation of cs or matrix.
+    // Acquire Layer::modLock (spin). Call before any mutation of cs or matrix.
     void lockMod();
-    // Release VoiceSlot::modLock.
+    // Release Layer::modLock.
     void unlockMod();
 
     DropdownSelect modeDropdown;    // Smooth / Stepped

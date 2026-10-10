@@ -4,11 +4,11 @@
 #include "Modulation/ModulatorSerialise.h"   // mu-core: shared modulator (de)serialise
 #include "Sequencer/GatePatternSerialise.h"  // mu-tant: gate (de)serialise
 #include "Persistence/PresetFiles.h"         // mu-core: shared preset-file handling
-#include "Persistence/SlotState.h"           // mu-core: composed slot state
+#include "Persistence/LayerState.h"           // mu-core: composed slot state
 
 #include <thread>
 
-// Preset / per-voice I/O on the family composed state (mu-core SlotState): a voice is one node —
+// Preset / per-voice I/O on the family composed state (mu-core LayerState): a voice is one node —
 // its v{N}_ param rows, user wavetable paths, three gate patterns and modulators — written and
 // applied by the same code for a .muPattern, a .muTant and a host session. Plus voice colours and
 // the best-effort X-Mod preset migration. Split out of PluginProcessor.cpp

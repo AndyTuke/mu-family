@@ -8,7 +8,7 @@
 #include <string_view>
 #include "Modulation/MuTantModDest.h"
 #include "Modulation/LaneModulation.h"       // mu-core: mu_mod::resolveLane (converged routing)
-#include "Sequencer/VoiceSlot.h"
+#include "Sequencer/Layer.h"
 #include "Sequencer/ControlSequence.h"
 #include "Modulation/ModulationMatrix.h"
 #include "Modulation/ModulationAssignment.h"
@@ -66,10 +66,10 @@ public:
         }
 
         // ── Per-voice ControlSequence + ModulationMatrix integration ────────
-        beginTest("VoiceSlot default-constructs with 8 named ControlSequences");
+        beginTest("Layer default-constructs with 8 named ControlSequences");
         {
-            VoiceSlot slot;
-            expect((int) slot.controlSequences.size() == VoiceSlot::MaxControlSequences,
+            Layer slot;
+            expect((int) slot.controlSequences.size() == Layer::MaxControlSequences,
                    "slot has MaxControlSequences entries");
             for (int i = 0; i < (int) slot.controlSequences.size(); ++i)
             {
@@ -81,7 +81,7 @@ public:
 
         beginTest("modulation matrix routes a stepped CS to filter.cutoff");
         {
-            VoiceSlot slot;
+            Layer slot;
             // Configure cs0 as a single-step Stepped CS with value 50 (unipolar).
             // At phase 0 the stepped evaluator outputs the first step value.
             auto& cs = slot.controlSequences[0];
@@ -118,7 +118,7 @@ public:
             // Filter 2 uses the generic proportion-space convention: a destination id
             // ending in ".prop" gets depthScaleFor = 1.0, so full depth (100) x full
             // source (100) adds exactly 1.0 to the seeded 0..1 proportion.
-            VoiceSlot slot;
+            Layer slot;
             auto& cs = slot.controlSequences[0];
             cs.mode       = ControlSequence::Mode::Stepped;
             cs.polarity   = ControlSequence::Polarity::Unipolar;
@@ -149,7 +149,7 @@ public:
             // 24). Verify the registration overrides mu-core's 0..100 default of 100: a full
             // depth+source mod adds exactly 1.0 to a proportion seed.
 
-            VoiceSlot slot;
+            Layer slot;
             auto& cs = slot.controlSequences[0];
             cs.mode       = ControlSequence::Mode::Stepped;
             cs.polarity   = ControlSequence::Polarity::Unipolar;
@@ -173,7 +173,7 @@ public:
         {
             for (const char* dest : { "xmod.index", "xmod.depth", "xmod.ssb" })
             {
-                VoiceSlot slot;
+                Layer slot;
                 auto& cs = slot.controlSequences[0];
                 cs.mode       = ControlSequence::Mode::Stepped;
                 cs.polarity   = ControlSequence::Polarity::Unipolar;
@@ -200,7 +200,7 @@ public:
             // (range -12..12) seeds the param's mid proportion and sweeps to the +12 rail,
             // clamped - the behaviour mu-tant's renderVoice now relies on via resolveLane.
 
-            VoiceSlot slot;
+            Layer slot;
             auto& cs = slot.controlSequences[0];
             cs.mode       = ControlSequence::Mode::Stepped;
             cs.polarity   = ControlSequence::Polarity::Unipolar;
@@ -225,7 +225,7 @@ public:
 
         beginTest("modulation matrix is a no-op when no assignments exist");
         {
-            VoiceSlot slot;
+            Layer slot;
             std::unordered_map<std::string_view, float> pv;
             pv["level"] = -6.0f;
             pv["filter.cutoff"] = 800.0f;
@@ -239,7 +239,7 @@ public:
             // Meta-modulation source format is "assign_{id}_depth" - assignment B
             // sources assignment A's depth, and assignment A sources B's depth.
             // The second add must be rejected.
-            VoiceSlot slot;
+            Layer slot;
             ModulationAssignment a;
             a.id = "a";
             a.sourceId = "cs0_output";

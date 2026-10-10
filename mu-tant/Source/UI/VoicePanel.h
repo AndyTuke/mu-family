@@ -70,7 +70,7 @@ public:
     void clearModulatorSlot() { modulatorPanel.setVoiceSlot(nullptr); }
 
     // Clear raw ModulationMatrix pointers from all KnobWithLabel mod-binding arcs.
-    // Call before resetVoiceSlot / removeVoice destroys the VoiceSlot so the
+    // Call before resetVoiceSlot / removeVoice destroys the Layer so the
     // 30 Hz timer cannot dereference freed matrix memory.
     void clearAllModBindings();
 
@@ -201,7 +201,7 @@ private:
     std::unique_ptr<APVTS::ButtonAttachment> gateBypassAttachment;
 
     // ── Modulator section (mu-core ModulatorPanel + mu-tant destinations) ──
-    // Rebound to the current voice's VoiceSlot whenever setVoice() runs.
+    // Rebound to the current voice's Layer whenever setVoice() runs.
     ::ModulatorPanel modulatorPanel;
     ModDestProvider  modDestProvider;
 

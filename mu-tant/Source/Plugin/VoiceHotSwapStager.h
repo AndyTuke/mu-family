@@ -19,7 +19,7 @@ namespace mu_tant
 class VoiceHotSwapStager
 {
 public:
-    static constexpr int kMaxVoices = mu_limits::kMaxChannels;   // the family layer cap
+    static constexpr int kMaxVoices = mu_limits::kMaxLayers;   // the family layer cap
 
     // ── Message thread: staging ──────────────────────────────────────────────
     // Per-voice (.muPattern) preset for voice `v`, superseding any swap pending on that slot.

@@ -194,8 +194,8 @@ with more buttons uses fewer pages):
 A surface with no edge buttons, or a smaller grid, gets fewer actions at once or more pages; the surface description
 (§3.1) lets the shared code decide.
 **Naming note.** The launchable thing is a **Clip** ✔ owner, as in Ableton Live and Bitwig. This also removes the clash
-with "slot", which the code already uses for FX / insert slots (`FXSlotBase`, `DelaySlot`), the composed `SlotState`,
-`VoiceSlot` (the layer base, renamed by backlog #1265) and the per-layer index inside the hot-swap `Stager`; those keep
+with "slot", which the code already uses for FX / insert slots (`FXSlotBase`, `DelaySlot`), the composed `LayerState`,
+`Layer` (the layer base, renamed by backlog #1265) and the per-layer index inside the hot-swap `Stager`; those keep
 the word. No code type called `Clip` exists today (the only hits are the clipper insert and the VU clip indicator, which
 are unrelated); the `Layer` and `Clip` names should be settled together when #1265 is done. A *clip* is a stored state
 of one layer, so it is not an audio clip.

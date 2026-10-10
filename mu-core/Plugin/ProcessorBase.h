@@ -21,7 +21,7 @@
 #include "Audio/VoiceEngine.h"
 #include "Persistence/MidiPresetMap.h"
 #include "Persistence/MidiFullPresetMap.h"
-#include "Persistence/SlotState.h"   // composed slot / full / host state (format 2)
+#include "Persistence/LayerState.h"   // composed slot / full / host state (format 2)
 #include "MuLimits.h"
 #include "Plugin/HostTransport.h"
 #include "Plugin/MidiClockSync.h"
@@ -333,13 +333,13 @@ public:
     void syncGlobalFxParam(const juce::String& id, float v);
 
 protected:
-    // Composed state (Persistence/SlotState.h, format 2) — the slot unit every product saves and
+    // Composed state (Persistence/LayerState.h, format 2) — the slot unit every product saves and
     // loads. A product describes its slots once in its constructor (each slot's param prefix + its
     // non-parameter data), then layer presets, full presets and host sessions all go through these,
     // so a slot is written and applied by the same code wherever it appears.
-    void initSlotState(const juce::StringArray& slotPrefixes, mu_pp::SlotExtras extras)
+    void initSlotState(const juce::StringArray& slotPrefixes, mu_pp::LayerExtras extras)
     {
-        slotLayout = mu_pp::SlotLayout(*this, slotPrefixes);
+        slotLayout = mu_pp::LayerLayout(*this, slotPrefixes);
         slotExtras = std::move(extras);
     }
     juce::ValueTree captureComposedState()           { return mu_pp::captureState(apvts.state.getType(), slotLayout, slotExtras); }
@@ -353,8 +353,8 @@ protected:
     {
         return mu_pp::composeLegacyState(state, slotLayout, otherChild);
     }
-    mu_pp::SlotLayout slotLayout;
-    mu_pp::SlotExtras slotExtras;
+    mu_pp::LayerLayout slotLayout;
+    mu_pp::LayerExtras slotExtras;
 
 protected:
     // Internal transport state. Written by the UI (play / BPM) and the audio thread (beat

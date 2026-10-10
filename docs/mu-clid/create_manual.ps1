@@ -395,6 +395,11 @@ Bullet "Launch mu-link, then launch mu-Clid standalone — in either order. With
 Bullet "mu-Clid's audio now plays through mu-link's output device, summed with any other connected mu apps. mu-Clid appears as a channel in mu-link's client strip with its own level, pan, mute, and solo."
 Bullet "mu-Clid's transport follows mu-link: mu-link is the tempo master, and its Play/Stop and tempo drive mu-Clid. Use mu-link's transport (not mu-Clid's) while connected."
 Bullet "Quit mu-link and mu-Clid instantly reverts to its own audio device and internal transport — no restart needed."
+H2 "MIDI While Connected"
+Bullet "MIDI in  —  the keyboards and controllers you enabled in the standalone's MIDI settings still reach mu-Clid while it is connected, so program changes still load presets. For now they arrive roughly a sixth of a second late. Incoming MIDI clock is not followed while connected, because mu-link sets the tempo; to sync to external gear, connect its clock to mu-link instead."
+Bullet "MIDI out  —  mu-Clid's MIDI output keeps going to the MIDI output chosen in the standalone's MIDI settings while it is connected. It is timed to line up with what you hear from mu-link and with mu-link's MIDI clock out."
+Bullet "While connected, mu-Clid holds that MIDI output port itself. You can switch to a different port in the MIDI settings and it follows, but choosing none has no effect until mu-link disconnects."
+Bullet "When mu-link disconnects, mu-Clid sends all-notes-off to the MIDI output so no notes hang on your gear, then hands the port back to the standalone's MIDI settings."
 P "This lets you run mu-Clid, mu-Tant, and other mu standalones together, perfectly in sync and mixed to a single output — and lets mu-link slave the whole rig to an external MIDI clock from a drum machine or DAW. See the mu-link User Manual for the full picture."
 
 # ── 19. Technical Specifications ──────────────────────────────────────────────

@@ -4,14 +4,14 @@
 #include <functional>
 #include <string>
 #include <thread>
-#include "Sequencer/VoiceSlot.h"
+#include "Sequencer/Layer.h"
 #include "Modulation/ModulationAssignment.h"
 #include "Audio/AlgorithmNames.h"
 
 // Generic modulator serialisation — the per-slot ControlSequences +
 // ModulationMatrix assignments are mu-core types, so the (de)serialise lives in
 // mu-core and every product shares it (no duplication). It operates on the
-// shared VoiceSlot base; a product passes its own source/destination ID
+// shared Layer base; a product passes its own source/destination ID
 // validators (mu-clid → ModDest::, mu-tant → its kModDestTable) so invalid
 // assignments are dropped per-product. Pass empty validators to skip the check
 // (the ModulationMatrix still rejects cycles / overflow on add).
@@ -58,7 +58,7 @@ inline int readEnumIndex(const juce::ValueTree& tree,
 inline constexpr const char* kDepthUnitsProperty = "depthUnits";
 inline constexpr const char* kDepthUnitsRange    = "range";
 
-inline juce::ValueTree serialiseModulators(const VoiceSlot& slot)
+inline juce::ValueTree serialiseModulators(const Layer& slot)
 {
     juce::ValueTree mods("Modulators");
     mods.setProperty(kDepthUnitsProperty, kDepthUnitsRange, nullptr);
@@ -113,7 +113,7 @@ inline juce::ValueTree serialiseModulators(const VoiceSlot& slot)
 // Deserialise a <Modulators> ValueTree into `slot`. `isValidSource`/`isValidDest`
 // (if set) gate each assignment; empty validators skip the check. Returns a list
 // of dropped-assignment descriptions (empty on success).
-inline juce::StringArray deserialiseModulators(const juce::ValueTree& mods, VoiceSlot& slot,
+inline juce::StringArray deserialiseModulators(const juce::ValueTree& mods, Layer& slot,
                                                const ModIdValidator& isValidSource = {},
                                                const ModIdValidator& isValidDest   = {})
 {
@@ -216,7 +216,7 @@ inline juce::StringArray deserialiseModulators(const juce::ValueTree& mods, Voic
 
 // Clear all CS step/curve data + matrix assignments before a deserialise so
 // successive preset loads don't accumulate state.
-inline void clearModulators(VoiceSlot& slot)
+inline void clearModulators(Layer& slot)
 {
     while (slot.modLock.exchange(true, std::memory_order_acquire))
         std::this_thread::yield();
@@ -235,7 +235,7 @@ inline void clearModulators(VoiceSlot& slot)
 
 
 // ── Pre-format-2 per-channel data ────────────────────────────────────────────
-// States saved before the composed slot state (Persistence/SlotState.h) kept each channel's
+// States saved before the composed slot state (Persistence/LayerState.h) kept each channel's
 // modulators in the APVTS state as
 //   <VoiceData> <Voice idx="N"> <Modulators .../> [product extras] </Voice> ... </VoiceData>
 // mu_pp::composeLegacyState moves each <Voice> into its slot; these name that old shape.

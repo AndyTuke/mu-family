@@ -58,10 +58,10 @@ Notes on these names:
 
 ## 2. The Layer parent class
 
-**Today.** `VoiceSlot` ([mu-core/Sequencer/VoiceSlot.h](../mu-core/Sequencer/VoiceSlot.h)) is the intended
+**Today.** `Layer` ([mu-core/Sequencer/Layer.h](../mu-core/Sequencer/Layer.h)) is the intended
 parent: it holds `voiceParams`, the `controlSequences`, the `modulationMatrix`, the two spin-locks,
 `name` and `colourIndex`. But only mu-Clid's `Rhythm` actually derives from it (`class Rhythm : public
-VoiceSlot`). The other three products keep a plain `VoiceSlot` in an array and store the rest of each
+Layer`). The other three products keep a plain `Layer` in an array and store the rest of each
 layer in separate parallel arrays on the processor:
 
 | Product | Per-layer data, held in arrays indexed by layer |
@@ -71,10 +71,10 @@ layer in separate parallel arrays on the processor:
 | mu-Toni | `voiceSlots`, `runners`, `inserts`, `insCfg` |
 | mu-On | `voiceSlots` (engines and step data live elsewhere) |
 
-**Target.** `Layer` (renamed from `VoiceSlot`) owns everything every layer has, and a product's
+**Target.** `Layer` (renamed from `Layer`) owns everything every layer has, and a product's
 derived type adds only its sequencer data and its engine binding. Candidates to move into `Layer`:
 the insert processor and its config (duplicated in mu-Tant and mu-Toni), the persistence hooks
-(`SlotExtras`-style write / apply), hot-swap staging state, and the mixer-channel binding. A layer
+(`LayerExtras`-style write / apply), hot-swap staging state, and the mixer-channel binding. A layer
 add / reorder / delete in `mu-core` then works on `Layer` and never needs product code.
 
 Open: virtual dispatch vs a registered layer-type table (see the layer-type registry in
@@ -143,13 +143,13 @@ slot state already stores ids without their prefix, so layer data is prefix-agno
 | Area | Finding |
 |---|---|
 | Layer noun | Rhythm (mu-Clid, ~1580 uses), Voice (mu-Tant, ~820), Layer (mu-Toni), Lane / Channel / Track (mu-On). |
-| Parent class | Only `Rhythm` derives from `VoiceSlot`; the others use parallel arrays (§2). |
+| Parent class | Only `Rhythm` derives from `Layer`; the others use parallel arrays (§2). |
 | mu-core vocabulary | `kMaxChannels` is the layer cap; core types say both `Voice*` and `Channel*`; "Slot" has three meanings (11 types). |
 | Namespaces | mu-Clid: all but one of 46 types are global; also stray namespaces `md`, `ModDest`, `mu_pp_migrate`. |
 | Overlay vs Panel | Done at build 1172: `AboutOverlay`, `ActivationOverlay`, `MidiPresetsOverlay`, `MidiFullPresetsOverlay` (were `…Panel`). Still open: whether `SaveDialog` and `PresetBrowser` become overlays too or stay named exceptions (owner). |
 | Main sound panel | `VoiceSection` (mu-Clid), `VoicePanel` (mu-Tant), `EnginePanel` (mu-Toni, mu-On), `VoiceBand` (core). |
 | Sequencer names | `SequencerEngine`, `GatePattern`, `Arpeggiator` + `ArpVoiceRunner`, `GrooveSequencer` — no shared role. |
-| Capacity constants | `kMaxRhythms` (mu-Clid) still stands alone. mu-Tant's two `kMaxVoices` and mu-Toni / mu-On's `kMaxChannels` now read `mu_limits::kMaxChannels` (build 1171). |
+| Capacity constants | `kMaxRhythms` (mu-Clid) still stands alone. mu-Tant's two `kMaxVoices` and mu-Toni / mu-On's `kMaxChannels` now read `mu_limits::kMaxLayers` (build 1171). |
 | Acronyms | `…APVTS` function names in mu-Clid vs `…Apvts` elsewhere. |
 | Members | Trailing `_` in seven classes (mu-Clid helpers, `MidiClockSync`, `VocoderInsert`). |
 | Enums | plain `enum` in mu-Toni (3), mu-On (3), mu-Tant (2). |
@@ -168,7 +168,7 @@ C++ identifier changes never touch saved files; the data renames at the end do.
 2. **mu-Clid into `mu_clid`** — the largest mechanical rename; do on the build PC, one file group at a
    time, after the sync fixes that touch the same files. Backlog #1262.
 3. **Overlay / Panel renames** for the shell screens; shared `LayerPanel` / `LayerSidebar` in `mu-core`. Backlog #1266.
-4. **`VoiceSlot` → `Layer`**, then hoist the shared per-layer data into it product by product
+4. **`Layer` → `Layer`**, then hoist the shared per-layer data into it product by product
    (mu-Tant and mu-Toni first — they have the parallel arrays); `Slot*` persistence types → `Layer*`. Backlog #1265.
 5. **Derived layer types** (mu-Tant `Pattern`, mu-Toni `Arp`, mu-On `Track`; mu-Clid's `Rhythm` already
    exists) replace the parallel arrays; sequencer role names (`<X>Sequencer`) follow. Backlog #1264.

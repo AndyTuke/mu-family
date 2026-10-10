@@ -2,7 +2,7 @@
 
 #include "Plugin/ProcessorBase.h"            // mu-core base
 #include "Plugin/MixerFxParams.h"            // mu-core: shared global-FX/mixer APVTS layout
-#include "Sequencer/VoiceSlot.h"             // mu-core: per-voice modulator data container
+#include "Sequencer/Layer.h"             // mu-core: per-voice modulator data container
 #include "Modulation/LaneModulation.h"       // mu-core: shared range-based per-lane resolve
 #include "Sequencer/GatePattern.h"           // mu-tant: per-voice gate pattern
 #include "Audio/SynthVoice.h"                // mu-tant voice
@@ -71,7 +71,7 @@ class PluginProcessor : public ProcessorBase
 {
 public:
     // Family parity with mu-clid (max 8 rhythms / 8 voices / 8 channels).
-    static constexpr int kMaxVoices = mu_limits::kMaxChannels;   // the family layer cap
+    static constexpr int kMaxVoices = mu_limits::kMaxLayers;   // the family layer cap
 
     PluginProcessor();
 
@@ -295,7 +295,7 @@ private:
     void   applyPitchEnvelope (int v, VoiceConfig& cfg);
     // True if a Stepped ControlSequence is assigned to `destId` — those snap pitch to
     // semitones (melodies); smooth sources + the envelope glide.
-    bool   pitchDestHasSteppedSource(const VoiceSlot& slot, const char* destId) const;
+    bool   pitchDestHasSteppedSource(const Layer& slot, const char* destId) const;
     bool   blkPlaying        = false;
     double blkBeatStart      = 0.0;
     double blkBeatsPerSample = 0.0;
@@ -330,7 +330,7 @@ public:
     // Per-voice modulator data — 8 ControlSequences + ModulationMatrix + modLock
     // per voice. Public so the UI (ModulatorPanel) can pass a pointer to the
     // currently-edited voice's slot.
-    std::array<VoiceSlot, kMaxVoices> voiceSlots;
+    std::array<Layer, kMaxVoices> voiceSlots;
 
     // Per-voice drawable gate pattern. Public so GatingDesigner can mutate it.
     std::array<GatePattern, kMaxVoices> gatePatterns;
@@ -441,7 +441,7 @@ private:
     juce::String serialiseVoiceColours() const;
     void         restoreVoiceColours(const juce::String& csv);
 
-    // Composed state (mu-core SlotState): the voice layout every save / load uses, a voice's
+    // Composed state (mu-core LayerState): the voice layout every save / load uses, a voice's
     // non-parameter data (modulators, gates, user wavetables — they live outside APVTS) from its
     // node, and any saved state rebuilt in the composed shape with old X-Mod data migrated.
     void            initVoiceState();

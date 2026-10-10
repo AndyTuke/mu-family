@@ -498,7 +498,7 @@ void PluginProcessor::applyPitchEnvelope(int v, VoiceConfig& cfg)
     }
 }
 
-bool PluginProcessor::pitchDestHasSteppedSource(const VoiceSlot& slot, const char* destId) const
+bool PluginProcessor::pitchDestHasSteppedSource(const Layer& slot, const char* destId) const
 {
     // A pitch destination is "stepped" if any assigned source is a Stepped ControlSequence.
     // Allocation-free: compares sourceId ("csN_output") against each CS id without building
@@ -732,7 +732,7 @@ void PluginProcessor::swapVoices(int a, int b)
     { const int t1 = osc1UserIndex[(size_t) a].load(); osc1UserIndex[(size_t) a].store(osc1UserIndex[(size_t) b].load()); osc1UserIndex[(size_t) b].store(t1); }
     { const int t2 = osc2UserIndex[(size_t) a].load(); osc2UserIndex[(size_t) a].store(osc2UserIndex[(size_t) b].load()); osc2UserIndex[(size_t) b].store(t2); }
 
-    const VoiceSlot tmpSlot = voiceSlots[(size_t) a];
+    const Layer tmpSlot = voiceSlots[(size_t) a];
     voiceSlots[(size_t) a] = voiceSlots[(size_t) b];
     voiceSlots[(size_t) b] = tmpSlot;
 
@@ -853,7 +853,7 @@ void PluginProcessor::resetVoiceSlot(int idx)
     gatePatterns[(size_t) idx].copyDataFrom(GatePattern{});
     filterPatterns[(size_t) idx].copyDataFrom(GatePattern{});
     pitchPatterns[(size_t) idx].copyDataFrom(GatePattern{});
-    voiceSlots[(size_t) idx] = VoiceSlot{};
+    voiceSlots[(size_t) idx] = Layer{};
     osc1UserPath[(size_t) idx].clear(); osc1UserIndex[(size_t) idx].store(-1);
     osc2UserPath[(size_t) idx].clear(); osc2UserIndex[(size_t) idx].store(-1);
 }

@@ -12,14 +12,14 @@ namespace
     // stalling the message thread for a full audio block on contention — matches
     // the GatingDesigner::withLock and GatePattern::copyDataFrom patterns.
     // Callers MUST check the return value: only call unlockMods on true return.
-    [[nodiscard]] inline bool lockMods(VoiceSlot& s)
+    [[nodiscard]] inline bool lockMods(Layer& s)
     {
         if (mu_core::spinLockFor(s.modLock, 1000))
             return true;
         jassertfalse; // could not acquire — caller must skip mutation
         return false;
     }
-    inline void unlockMods(VoiceSlot& s) noexcept
+    inline void unlockMods(Layer& s) noexcept
     {
         mu_core::spinUnlock(s.modLock);
     }
@@ -94,7 +94,7 @@ ModMatrixPanel::ModMatrixPanel()
     {
         if (!voiceSlot) return;
         juce::PopupMenu menu;
-        for (int i = 0; i < VoiceSlot::MaxControlSequences; ++i)
+        for (int i = 0; i < Layer::MaxControlSequences; ++i)
             menu.addItem(i + 1, "Mod " + juce::String::charToString('A' + i));
         menu.showMenuAsync(juce::PopupMenu::Options{}, [this](int result)
         {
@@ -121,7 +121,7 @@ ModMatrixPanel::ModMatrixPanel()
     };
 }
 
-void ModMatrixPanel::setVoiceSlot(VoiceSlot* slot)
+void ModMatrixPanel::setVoiceSlot(Layer* slot)
 {
     voiceSlot = slot;
     rebuildRows();

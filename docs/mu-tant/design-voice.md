@@ -2,7 +2,7 @@
 
 Implemented design. Reflects the shipped voice chain; update when DSP changes.
 
-Family rules apply: read [design-plugin-family.md](../design-plugin-family.md) for the platform contract (`mu-core` boundary, `ProcessorBase`, `VoiceSlot`) before changing any structural decision below.
+Family rules apply: read [design-plugin-family.md](../design-plugin-family.md) for the platform contract (`mu-core` boundary, `ProcessorBase`, `Layer`) before changing any structural decision below.
 
 ---
 

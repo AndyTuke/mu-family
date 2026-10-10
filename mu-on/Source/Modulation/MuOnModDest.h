@@ -97,7 +97,7 @@ inline const ModDestEntry* destsForLane(int lane, int& count) noexcept
 }
 
 // True if `id` is a valid destination for `lane` — used to drop foreign assignments
-// on preset load (each VoiceSlot belongs to one lane).
+// on preset load (each Layer belongs to one lane).
 inline bool isValidLaneDest(int lane, const std::string& id) noexcept
 {
     int n = 0;

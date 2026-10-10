@@ -2,7 +2,7 @@
 #include "Modulation/ModulatorSerialise.h"   // mu-core: modulator (de)serialise + per-voice session data
 #include "Persistence/PresetFiles.h"         // mu-core: shared preset-file handling
 
-// mu-Toni preset I/O on the family composed state (mu-core SlotState): full presets (.muToni),
+// mu-Toni preset I/O on the family composed state (mu-core LayerState): full presets (.muToni),
 // per-layer presets (.muArp), host sessions and layer reset all build / apply the same layer node. Split out of PluginProcessor.cpp to
 // mirror mu-Tant's PluginProcessor_Preset.cpp. These are all PluginProcessor:: members.
 

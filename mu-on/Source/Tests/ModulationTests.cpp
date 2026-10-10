@@ -11,7 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "Sequencer/VoiceSlot.h"
+#include "Sequencer/Layer.h"
 #include "Sequencer/ControlSequence.h"
 #include "Modulation/ModulationMatrix.h"
 #include "Modulation/ModulationAssignment.h"
@@ -107,7 +107,7 @@ public:
 
         beginTest("modulator serialise round-trip drops foreign-lane destinations");
         {
-            VoiceSlot src;
+            Layer src;
             ModulationAssignment good;  good.id = "g"; good.sourceId = "cs0_output"; good.destinationId = "s.dec.prop";  good.depth = 50.0f;
             ModulationAssignment alien; alien.id = "x"; alien.sourceId = "cs1_output"; alien.destinationId = "k.tune.prop"; alien.depth = 30.0f;
             expect(src.modulationMatrix.addAssignment(good));
@@ -115,7 +115,7 @@ public:
 
             auto tree = mu_pp::serialiseModulators(src);
 
-            VoiceSlot dst;
+            Layer dst;
             mu_pp::deserialiseModulators(tree, dst, {},
                                          [](const std::string& id) { return isValidLaneDest(Snare, id); });
 

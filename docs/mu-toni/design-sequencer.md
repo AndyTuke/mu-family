@@ -545,7 +545,7 @@ code is small** (the arp math + note-on/off wiring + a mod-dest provider).
 | Filter | **mu-core** `MultiModeFilter` | reuse |
 | Insert FX | **mu-core** `InsertProcessor` + algo set | reuse |
 | **Amp / Filter / Pitch ADSR** | **mu-core** `juce::ADSR` + [`VoiceParams`](../../mu-core/Audio/VoiceParams.h) env fields (as mu-clid's `VoiceEngine`) | reuse the pattern; **wire into the wavetable voice** |
-| Per-voice modulation container | **mu-core** [`VoiceSlot`](../../mu-core/Sequencer/VoiceSlot.h) (`ControlSequence`×N + `ModulationMatrix`) | reuse (as mu-tant does) |
+| Per-voice modulation container | **mu-core** [`Layer`](../../mu-core/Sequencer/Layer.h) (`ControlSequence`×N + `ModulationMatrix`) | reuse (as mu-tant does) |
 | Modulation matrix + control sequences | **mu-core** `ModulationMatrix` / `ControlSequence` | reuse |
 | Mixer + FX rack + master | **mu-core** `MixerEngine` + `mu_mixfx::addGlobalFxParams` | reuse |
 | Transport / clock (host · internal · mu-link · MIDI clock) | **mu-core** `resolveTransport` (TransportResolver.h) + `MuLinkBridge` | reuse |

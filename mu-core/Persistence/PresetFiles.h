@@ -8,7 +8,7 @@
 
 // Shared preset-file handling for every mu product: safe file names, atomic writes, listing, and
 // a full preset — the product's state tree wrapped in a root element carrying name / description /
-// category. What goes inside (a layer node, the composed state) is Persistence/SlotState.h.
+// category. What goes inside (a layer node, the composed state) is Persistence/LayerState.h.
 namespace mu_pp
 {
 

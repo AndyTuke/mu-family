@@ -33,11 +33,11 @@ struct CopyableSpinLock
 // Base struct shared by all mu-family voice slots.
 // Rhythm (mu-clid) extends this with Euclidean hit generators.
 // Future mu-tant voice types extend it with their own trigger data.
-struct VoiceSlot
+struct Layer
 {
     static constexpr int MaxControlSequences = mu_limits::kMaxControlSequences;
 
-    VoiceSlot()
+    Layer()
     {
         controlSequences.resize(MaxControlSequences);
         for (int i = 0; i < MaxControlSequences; ++i)

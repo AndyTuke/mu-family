@@ -8,7 +8,7 @@
 #include "Sequencer/StepPattern.h"
 #include "Sequencer/GrooveSequencer.h"
 #include "Audio/GrooveVoices.h"
-#include "Sequencer/VoiceSlot.h"   // mu-core: per-lane modulation slot
+#include "Sequencer/Layer.h"   // mu-core: per-lane modulation slot
 
 #include <array>
 #include <atomic>
@@ -33,7 +33,7 @@ class PluginProcessor : public ProcessorBase
 {
 public:
     // Family parity: the shared mixer/sidebar size to kMaxChannels; mu-On uses a fixed 4.
-    static constexpr int kMaxChannels = mu_limits::kMaxChannels;   // the family layer cap
+    static constexpr int kMaxChannels = mu_limits::kMaxLayers;   // the family layer cap
 
     PluginProcessor();
 
@@ -91,7 +91,7 @@ public:
     // Per-lane modulation slot (ControlSequences + ModulationMatrix) — the editor's
     // shared ModulatorPanel binds to the selected lane's slot; the audio thread reads
     // it via GrooveVoices each block.
-    VoiceSlot& voiceSlot(int lane) noexcept { return voiceSlots[(size_t) juce::jlimit(0, kNumChannels - 1, lane)]; }
+    Layer& voiceSlot(int lane) noexcept { return voiceSlots[(size_t) juce::jlimit(0, kNumChannels - 1, lane)]; }
     // Per-channel trigger counter — bumped on the audio thread when the sequencer fires
     // that lane; the editor polls it to pulse the sidebar lane. Read-only for the editor.
     int triggerCount(int ch) const noexcept
@@ -141,7 +141,7 @@ private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
     // State shared by the session save/restore and full presets (PluginProcessor_Preset.cpp):
-    // the composed state (mu-core SlotState) of the globals + every lane's node.
+    // the composed state (mu-core LayerState) of the globals + every lane's node.
     void                initLaneState();
     juce::ValueTree     captureState() { return captureComposedState(); }
     juce::ValueTree     toLaneState(const juce::ValueTree& tree) const;
@@ -158,7 +158,7 @@ private:
     StepPattern     stepPattern;
     GrooveSequencer sequencer { stepPattern };
     GrooveVoices    grooveVoices;                              // the four instrument engines
-    std::array<VoiceSlot, kNumChannels> voiceSlots;            // per-lane modulation (ControlSequences + matrix)
+    std::array<Layer, kNumChannels> voiceSlots;            // per-lane modulation (ControlSequences + matrix)
     ControlSequence  rumbleEnv;                                // Rumble lane drawable bar-volume envelope
     CopyableSpinLock rumbleEnvLock;                            // guards rumbleEnv (msg edit ↔ audio eval)
     std::array<std::atomic<int>, kNumChannels> triggers { };   // per-lane trigger counter (UI pulse)

@@ -90,6 +90,11 @@ Bullet "Launch mu-link, then launch any mu standalone app (mu-Clid, mu-Tant, …
 Bullet "Within about a second the app detects mu-link and attaches. The app's title bar shows 'mu-link connected', and it appears as a named strip in mu-link's meter section."
 Bullet "From then on the app's audio is summed into mu-link's output, and its transport follows mu-link's master clock."
 Bullet "Quit mu-link and every app instantly reverts to its own audio device and internal clock — no restart needed."
+H2 "MIDI in Connected Apps"
+Bullet "MIDI in  —  each app still hears the keyboards and controllers enabled in its own MIDI settings while connected, so program changes still load its presets. For now they arrive roughly a sixth of a second late. An app does not follow MIDI clock while connected; mu-link sets the tempo, so connect external clock to mu-link."
+Bullet "MIDI out  —  only mu-Clid makes MIDI; mu-Tant, mu-Toni and mu-On send none. While connected, mu-Clid's MIDI output goes to the MIDI output chosen in mu-Clid's own MIDI settings, timed to line up with mu-link's audio and with mu-link's MIDI clock out."
+Bullet "While connected, mu-Clid holds that MIDI output port itself: choosing none in its MIDI settings has no effect until mu-link disconnects. On disconnect it sends all-notes-off to the port and hands it back to the app."
+P "mu-link's own MIDI output, chosen in Audio Setup, carries only MIDI clock and transport messages (see MIDI Clock Out). Give mu-Clid a different MIDI output port, because many Windows MIDI ports can be opened by only one application at a time."
 P "Only the STANDALONE version of each app connects. The VST3 and CLAP plug-in versions are never affected — inside a DAW the host already owns the clock and audio device, so a plug-in never attaches to mu-link."
 P "Up to eight apps can be connected at once. If an app is closed or crashes, mu-link automatically frees its strip after a moment."
 

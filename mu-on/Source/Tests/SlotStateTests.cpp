@@ -1,9 +1,9 @@
-// The family composed state (mu-core Persistence/SlotState.h): param rows, slot nodes, full
+// The family composed state (mu-core Persistence/LayerState.h): param rows, slot nodes, full
 // states and the rebuild of older APVTS-dump states. A minimal headless processor with two
 // slots (a_ / b_) and globals stands in for a product.
 
 #include <juce_audio_processors/juce_audio_processors.h>
-#include "Persistence/SlotState.h"
+#include "Persistence/LayerState.h"
 
 namespace
 {
@@ -67,11 +67,11 @@ public:
     {
         SlotStubProcessor proc;
         juce::AudioProcessorValueTreeState apvts(proc, nullptr, "StubState", slotLayout());
-        const mu_pp::SlotLayout layout(proc, { "a_", "b_" });
+        const mu_pp::LayerLayout layout(proc, { "a_", "b_" });
 
         // Extras stand-in: one "colour" property per slot, reset to 0 when a node lacks it.
         std::array<int, 2> colour { 0, 0 };
-        const mu_pp::SlotExtras extras {
+        const mu_pp::LayerExtras extras {
             [&](int s, juce::ValueTree& n) { n.setProperty("colour", colour[(size_t) s], nullptr); },
             [&](int s, const juce::ValueTree& n) { colour[(size_t) s] = (int) n.getProperty("colour", 0); } };
 

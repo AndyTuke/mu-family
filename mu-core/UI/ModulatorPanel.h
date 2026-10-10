@@ -4,7 +4,7 @@
 #include "UI/Components/MuLookAndFeel.h"
 #include "ModulatorEditor.h"
 #include "ModMatrixPanel.h"
-#include "Sequencer/VoiceSlot.h"
+#include "Sequencer/Layer.h"
 #include "MuLimits.h"
 
 // Container panel: tab bar (Mod A–H + Matrix) + content area.
@@ -18,7 +18,7 @@ public:
     ModulatorPanel();
 
     // Bind to a voice slot. Pointer ownership stays with the caller.
-    void setVoiceSlot(VoiceSlot* slot);
+    void setVoiceSlot(Layer* slot);
     // For products that switch the per-voice insert algorithm dynamically (mu-clid).
     // Products that don't have algo-switching just leave this at 0.
     void setInsertAlgorithm(int driveChar);
@@ -46,14 +46,14 @@ public:
 private:
     bool fillBackground = true;
     bool metal          = false;
-    VoiceSlot*             voiceSlot     = nullptr;
+    Layer*             voiceSlot     = nullptr;
     const ModDestProvider* destProvider  = nullptr;
 
     SegmentControl tabBar { {"A","B","C","D","E","F","G","H","Matrix"},
                             SegmentControl::ActiveStyle::General,
                             SegmentControl::DrawStyle::Bar };
 
-    // Must equal VoiceSlot::MaxControlSequences — one tab per ControlSequence.
+    // Must equal Layer::MaxControlSequences — one tab per ControlSequence.
     static constexpr int kNumMods = mu_limits::kMaxControlSequences;
     ModulatorEditor  editors[kNumMods];
     ModMatrixPanel   matrixPanel;

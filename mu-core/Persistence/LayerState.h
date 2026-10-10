@@ -20,7 +20,7 @@
 // the ACTUAL value, plus c="…" (the choice name) for a choice parameter — a range or choice-list
 // change can't silently shift a saved value. Rows written before format 2 (normalised v="…") still
 // read. A product's non-parameter slot data (modulators, gates, step rows, samples) is its
-// SlotExtras pair. Older full states (the APVTS dump + <VoiceData>) are rebuilt in this shape by
+// LayerExtras pair. Older full states (the APVTS dump + <VoiceData>) are rebuilt in this shape by
 // composeLegacyState before they're applied, so every load runs one apply path.
 namespace mu_pp
 {
@@ -34,7 +34,7 @@ constexpr int kComposedStateFormat = 2;
 // A product's non-parameter slot data: `write` adds it to a slot node; `apply` restores it from
 // one — clearing whatever an absent child stands for, so a sparse or older node never leaves the
 // previous slot's data behind.
-struct SlotExtras
+struct LayerExtras
 {
     std::function<void(int slot, juce::ValueTree& node)>       write;
     std::function<void(int slot, const juce::ValueTree& node)> apply;
@@ -79,12 +79,12 @@ inline void appendParamRow(juce::ValueTree& node, juce::RangedAudioParameter& p,
 
 // The product's split of its parameters into slots (by id prefix) and globals (the rest), built once
 // after the parameters exist. Message thread only.
-class SlotLayout
+class LayerLayout
 {
 public:
-    SlotLayout() = default;
+    LayerLayout() = default;
 
-    SlotLayout(juce::AudioProcessor& proc, const juce::StringArray& slotPrefixes)
+    LayerLayout(juce::AudioProcessor& proc, const juce::StringArray& slotPrefixes)
         : prefixes(slotPrefixes), slots((size_t) slotPrefixes.size())
     {
         // Sort every ranged parameter into its slot's group, or the globals.
@@ -152,7 +152,7 @@ private:
 };
 
 // One slot as a node of `type` (the product's layer-preset tag, or kSlotTag inside a state).
-inline juce::ValueTree captureSlot(const SlotLayout& layout, const SlotExtras& extras, int slot,
+inline juce::ValueTree captureSlot(const LayerLayout& layout, const LayerExtras& extras, int slot,
                                    const juce::Identifier& type)
 {
     juce::ValueTree node(type);
@@ -161,7 +161,7 @@ inline juce::ValueTree captureSlot(const SlotLayout& layout, const SlotExtras& e
     return node;
 }
 
-inline void applySlot(const SlotLayout& layout, const SlotExtras& extras, int slot, const juce::ValueTree& node)
+inline void applySlot(const LayerLayout& layout, const LayerExtras& extras, int slot, const juce::ValueTree& node)
 {
     layout.applyParams(node, slot);
     if (extras.apply) extras.apply(slot, node);
@@ -183,8 +183,8 @@ inline juce::ValueTree findSlotNode(const juce::ValueTree& state, int slot)
 }
 
 // The globals + every slot as a composed state of `stateType`; the product adds its root properties.
-inline juce::ValueTree captureState(const juce::Identifier& stateType, const SlotLayout& layout,
-                                    const SlotExtras& extras)
+inline juce::ValueTree captureState(const juce::Identifier& stateType, const LayerLayout& layout,
+                                    const LayerExtras& extras)
 {
     juce::ValueTree state(stateType);
     state.setProperty("format", kComposedStateFormat, nullptr);
@@ -205,7 +205,7 @@ inline juce::ValueTree captureState(const juce::Identifier& stateType, const Slo
 }
 
 // Apply a composed state: the globals, then every slot (a slot the state lacks is reset).
-inline void applyState(const juce::ValueTree& state, const SlotLayout& layout, const SlotExtras& extras)
+inline void applyState(const juce::ValueTree& state, const LayerLayout& layout, const LayerExtras& extras)
 {
     layout.applyParams(state.getChildWithName(kGlobalsTag), -1);
     for (int s = 0; s < layout.numSlots(); ++s)
@@ -217,7 +217,7 @@ inline void applyState(const juce::ValueTree& state, const SlotLayout& layout, c
 // stripped) or the globals, each Voice node's properties and children move into its slot, and the
 // root properties are kept. Every other root child goes to `otherChild(child, composed)` (a
 // product's older extras, e.g. a whole-pattern node). A composed state is returned unchanged.
-inline juce::ValueTree composeLegacyState(const juce::ValueTree& legacy, const SlotLayout& layout,
+inline juce::ValueTree composeLegacyState(const juce::ValueTree& legacy, const LayerLayout& layout,
                                           const std::function<void(const juce::ValueTree&, juce::ValueTree&)>& otherChild = {})
 {
     if (isComposedState(legacy)) return legacy;

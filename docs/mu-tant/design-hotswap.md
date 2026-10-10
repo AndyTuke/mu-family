@@ -33,7 +33,7 @@ mu-tant is **APVTS-centric**, not engine-object-centric:
 | | mu-clid | mu-tant |
 |---|---|---|
 | Payload | pre-built `Rhythm` + `VoiceEngine` (+ sample) | parsed `juce::ValueTree` (the APVTS state / `.muPattern`) |
-| Commit mechanism | `std::move` engine into slot + retire old (`installRhythm`) | apply the composed state / voice node (`applyComposedState` / `applySlotNode`, mu-core SlotState) |
+| Commit mechanism | `std::move` engine into slot + retire old (`installRhythm`) | apply the composed state / voice node (`applyComposedState` / `applySlotNode`, mu-core LayerState) |
 | Commit isolation | `suspendProcessing` + `rhythmsLock` (µs, work pre-built) | **no blanket lock** — relies on the audio render's existing fine-grained locks |
 | Outgoing-voice tail | **retire-then-swap**: old `VoiceEngine` plays out its sample/release tail | **none** — oscillators are continuous (free-running drones), there is no note tail to preserve, so the new params simply take over |
 | Boundary | master loop / per-rhythm wrap (`swapMode`) | full → voice 0's gate wrap; per-voice → that voice's gate wrap |
@@ -122,7 +122,7 @@ every structure they touch is independently guarded by a lock the render respect
 |---|---|---|
 | APVTS params (`setValueNotifyingHost`, once per changed param) | per-param `std::atomic<float>` | cached `getRawParameterValue` atomic reads |
 | Gate / filter / pitch patterns (`deserialiseGate`) | `GatePattern.editLock` (spin) | `applyGateBlock` tryLock → passthrough on contention |
-| Modulators (`deserialise/clearModulators`) | `VoiceSlot.modLock` (spin) | `applyModulation` tryLock → skip on contention |
+| Modulators (`deserialise/clearModulators`) | `Layer.modLock` (spin) | `applyModulation` tryLock → skip on contention |
 | Wavetable index (`findByPath` resolve) | none needed — **lock-free** | preloaded at stage; commit only reads |
 | `numVoices` | `std::atomic<int>` | read once per block |
 | Mixer / FX (`syncAllFxParams`) | same path as live automation | already concurrent-safe |

@@ -1,5 +1,5 @@
 #include "EnginePanel.h"
-#include "UI/SlotPresetHeader.h"   // mu-core: shared per-slot preset header wiring
+#include "UI/LayerPresetHeader.h"   // mu-core: shared per-slot preset header wiring
 
 namespace mu_toni
 {
@@ -189,7 +189,7 @@ void EnginePanel::setupHeaderAndModulators()
     // ── Shared per-layer header: fixed layers (no rename / delete), reset + layer presets ──
     header.setShowDelete(false);
     header.setNameEditable(false);
-    // Reset / preset load / save: the shared per-slot wiring (mu-core SlotPresetHeader).
+    // Reset / preset load / save: the shared per-slot wiring (mu-core LayerPresetHeader).
     mu_ui::wireSlotPresetHeader(header, *this, proc,
         { "Layer",
           [this] { return currentLayer; },

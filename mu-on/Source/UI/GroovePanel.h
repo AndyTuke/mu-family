@@ -16,7 +16,7 @@
 
 #include <array>
 #include <cmath>
-#include "UI/SlotPresetHeader.h"   // mu-core: shared per-slot preset header wiring
+#include "UI/LayerPresetHeader.h"   // mu-core: shared per-slot preset header wiring
 
 namespace mu_on
 {
@@ -27,7 +27,7 @@ namespace mu_on
 //   3. the 909 step editor for the SELECTED lane (GrooveGrid)  ← single row, not the 4-lane grid
 //   4. the shared modulation module (mu-core ModulatorPanel)   ← same as every other module
 // setChannel() forwards the sidebar selection to all four and rebinds the modulator panel
-// to that lane's VoiceSlot + destination provider. A 30 Hz timer drives the modulator playhead.
+// to that lane's Layer + destination provider. A 30 Hz timer drives the modulator playhead.
 class GroovePanel : public juce::Component,
                     private juce::Timer
 {
@@ -76,7 +76,7 @@ public:
         header.setShowReset(true);
         header.setShowDelete(false);
         header.setNameEditable(false);
-        // Reset / preset load / save: the shared per-slot wiring (mu-core SlotPresetHeader).
+        // Reset / preset load / save: the shared per-slot wiring (mu-core LayerPresetHeader).
         mu_ui::wireSlotPresetHeader(header, *this, proc,
             { "Track",
               [this] { return currentChannel; },

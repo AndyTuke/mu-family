@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Sequencer/VoiceSlot.h"
+#include "Sequencer/Layer.h"
 #include "HitGenerator.h"
 
 #include <optional>
@@ -16,7 +16,7 @@ struct EuclidOverrides
     bool operator!=(const EuclidOverrides& o) const noexcept { return !(*this == o); }
 };
 
-class Rhythm : public VoiceSlot
+class Rhythm : public Layer
 {
 public:
     HitGenerator        genA;
