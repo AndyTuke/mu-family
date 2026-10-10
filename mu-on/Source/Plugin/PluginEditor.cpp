@@ -71,7 +71,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     setSettingsOverlay(&settingsOverlay);
 
     // A program change loaded a track preset → refresh that lane if it's on screen.
-    proc.onSlotPresetCommitted = [this](int lane)
+    proc.onLayerPresetCommitted = [this](int lane)
     {
         if (groovePanel.getChannel() == lane) groovePanel.setChannel(lane);
     };
@@ -92,7 +92,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
 PluginEditor::~PluginEditor()
 {
-    proc.onSlotPresetCommitted = nullptr;   // the processor can outlive the editor
+    proc.onLayerPresetCommitted = nullptr;   // the processor can outlive the editor
 }
 
 void PluginEditor::onPresetLoaded(const juce::File&)

@@ -103,8 +103,8 @@ namespace
 void PluginProcessor::initVoiceState()
 {
     juce::StringArray prefixes;
-    for (int v = 0; v < kMaxVoices; ++v) prefixes.add(voicePrefix(v));
-    initSlotState(prefixes);
+    for (int v = 0; v < mu_limits::kMaxLayers; ++v) prefixes.add(voicePrefix(v));
+    initLayerState(prefixes);
 }
 
 // A voice's non-parameter data onto its node.
@@ -165,7 +165,7 @@ void PluginProcessor::resolveUserWavetable(const juce::String& path, juce::Strin
 juce::ValueTree PluginProcessor::toVoiceState(const juce::ValueTree& tree) const
 {
     auto state = toComposedState(tree);
-    auto slots = state.getChildWithName(mu_pp::kSlotsTag);
+    auto slots = state.getChildWithName(mu_pp::kLayersTag);
     for (int i = 0; i < slots.getNumChildren(); ++i)
     {
         auto node = slots.getChild(i);
@@ -175,18 +175,18 @@ juce::ValueTree PluginProcessor::toVoiceState(const juce::ValueTree& tree) const
 }
 
 // A .muPattern: the voice's node (prefix-free param rows + its extras), so it loads into any voice.
-void PluginProcessor::saveSlotPreset(int voice, const juce::String& name)
+void PluginProcessor::saveLayerPreset(int voice, const juce::String& name)
 {
-    if (voice < 0 || voice >= kMaxVoices) return;
-    if (auto xml = captureSlotNode(voice, "MuTantVoice").createXml())
-        mu_pp::writeXmlAtomically(*xml, getPerSlotPresetDir().getChildFile(mu_pp::safePresetFileName(name, "Voice")
-                                                                           + "." + getPerSlotPresetExtension()),
+    if (voice < 0 || voice >= mu_limits::kMaxLayers) return;
+    if (auto xml = captureLayerNode(voice, "MuTantVoice").createXml())
+        mu_pp::writeXmlAtomically(*xml, getLayerPresetDir().getChildFile(mu_pp::safePresetFileName(name, "Voice")
+                                                                           + "." + getLayerPresetExtension()),
                                   onLoadError);
 }
 
-void PluginProcessor::loadSlotPreset(int voice, const juce::File& file)
+void PluginProcessor::loadLayerPreset(int voice, const juce::File& file)
 {
-    if (voice < 0 || voice >= kMaxVoices || ! file.existsAsFile()) return;
+    if (voice < 0 || voice >= mu_limits::kMaxLayers || ! file.existsAsFile()) return;
     auto xml = juce::XmlDocument::parse(file);
     if (xml == nullptr || ! xml->hasTagName("MuTantVoice"))
     {
@@ -214,8 +214,8 @@ void PluginProcessor::loadSlotPreset(int voice, const juce::File& file)
 // back to its default, as in every product.
 void PluginProcessor::applyVoicePresetTree(int voice, const juce::ValueTree& tree)
 {
-    if (voice < 0 || voice >= kMaxVoices) return;
-    applySlotNode(voice, tree);
+    if (voice < 0 || voice >= mu_limits::kMaxLayers) return;
+    applyLayerNode(voice, tree);
 }
 
 // Warm the wavetable bank (dedup-by-path, append under voicesLock) for the user
@@ -244,7 +244,7 @@ void PluginProcessor::preloadWavetablesFromVoiceTree(const juce::ValueTree& voic
 // Same, for a full preset: each voice's <Slot> carries o1WtPath / o2WtPath.
 void PluginProcessor::preloadWavetablesFromState(const juce::ValueTree& state)
 {
-    const auto slots = state.getChildWithName(mu_pp::kSlotsTag);
+    const auto slots = state.getChildWithName(mu_pp::kLayersTag);
     for (int i = 0; i < slots.getNumChildren(); ++i)
         preloadWavetablesFromVoiceTree(slots.getChild(i));
 }
@@ -252,7 +252,7 @@ void PluginProcessor::preloadWavetablesFromState(const juce::ValueTree& state)
 juce::String PluginProcessor::serialiseVoiceColours() const
 {
     juce::String s;
-    for (int i = 0; i < kMaxVoices; ++i)
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         s += (i ? "," : "") + juce::String(voiceColourIndex[(size_t) i]);
     return s;
 }
@@ -261,11 +261,11 @@ void PluginProcessor::restoreVoiceColours(const juce::String& csv)
 {
     if (csv.isEmpty()) return;
     const auto toks = juce::StringArray::fromTokens(csv, ",", "");
-    for (int i = 0; i < kMaxVoices && i < toks.size(); ++i)
-        voiceColourIndex[(size_t) i] = juce::jlimit(0, kMaxVoices - 1, toks[i].getIntValue());
+    for (int i = 0; i < mu_limits::kMaxLayers && i < toks.size(); ++i)
+        voiceColourIndex[(size_t) i] = juce::jlimit(0, mu_limits::kMaxLayers - 1, toks[i].getIntValue());
 }
 
-juce::File PluginProcessor::getPerSlotPresetDir() const { return getContentDir().getChildFile("Voices"); }
+juce::File PluginProcessor::getLayerPresetDir() const { return getContentDir().getChildFile("Voices"); }
 juce::File PluginProcessor::getWavetablesDir()  const { return getContentDir().getChildFile("Wavetables"); }
 
 // A full preset / host session: the composed state (globals + every voice's node) with the voice
@@ -311,7 +311,7 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
     // Demo cap: an unlicensed build activates at most demoMaxChannels() voices. The other
     // voices' params/data still load but stay inactive (getNumChannels() == numVoices).
     const int oldN = numVoices.load(std::memory_order_relaxed);
-    int nv = juce::jlimit(1, kMaxVoices, (int) state.getProperty("numVoices", 1));
+    int nv = juce::jlimit(1, mu_limits::kMaxLayers, (int) state.getProperty("numVoices", 1));
     if (! isLicensed())
         nv = juce::jmin(nv, demoMaxChannels());
 

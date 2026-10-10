@@ -69,7 +69,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     setSettingsOverlay(&settingsOverlay);
 
     // A program change loaded a layer preset → refresh that layer if it's on screen.
-    proc.onSlotPresetCommitted = [this](int layer)
+    proc.onLayerPresetCommitted = [this](int layer)
     {
         if (enginePanel.getLayer() == layer) enginePanel.setLayer(layer);
     };
@@ -91,7 +91,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
 PluginEditor::~PluginEditor()
 {
-    proc.onSlotPresetCommitted = nullptr;   // the processor can outlive the editor
+    proc.onLayerPresetCommitted = nullptr;   // the processor can outlive the editor
 }
 
 void PluginEditor::onPresetLoaded(const juce::File&)

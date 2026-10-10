@@ -17,7 +17,7 @@ public:
     // file extension to scan for (without the dot). Call BEFORE refresh().
     // Consumers should always set this explicitly — the empty default scans
     // no files. Each consuming plugin's preset extension comes from its
-    // ProcessorBase virtuals (getPerSlotPresetExtension / getFullPresetExtension).
+    // ProcessorBase virtuals (getLayerPresetExtension / getFullPresetExtension).
     void setFileExtension(juce::StringRef extWithoutDot) { fileExtension = extWithoutDot; }
 
     // Rescan presets folder.

@@ -5,7 +5,7 @@
 #include "Plugin/ProcessorBase.h"
 
 // Wires a ChannelHeaderBar's reset / preset dropdown / Save to the processor's per-slot preset
-// API (ProcessorBase::resetSlot / loadSlotPreset / saveSlotPreset / slotPresetFiles), so every
+// API (ProcessorBase::resetSlot / loadLayerPreset / saveLayerPreset / slotPresetFiles), so every
 // product's layer panel behaves the same: Reset asks first, a chosen preset loads (staged while
 // playing) and shows as selected, Save prompts for a name and re-lists the slot's presets.
 namespace mu_ui
@@ -48,7 +48,7 @@ inline void wireSlotPresetHeader(ChannelHeaderBar& header, juce::Component& owne
 
     header.onPresetFileChosen = [hdr, p, cfg](const juce::File& f)
     {
-        p->loadSlotPreset(cfg.currentSlot(), f);
+        p->loadLayerPreset(cfg.currentSlot(), f);
         cfg.resync();               // re-bind so the panel shows the loaded state
         hdr->showPresetFile(f);
     };
@@ -63,7 +63,7 @@ inline void wireSlotPresetHeader(ChannelHeaderBar& header, juce::Component& owne
             [safe, hdr, p, slot](const juce::String& name)
             {
                 if (safe == nullptr || name.isEmpty()) return;
-                p->saveSlotPreset(slot, name);
+                p->saveLayerPreset(slot, name);
                 refreshSlotPresetList(*hdr, *p, slot);
             });
     };

@@ -29,7 +29,7 @@ public:
 };
 
 // Per slot: a 20..20000 Hz cutoff, a choice and a bool; globals: a level and a swing.
-juce::AudioProcessorValueTreeState::ParameterLayout slotLayout()
+juce::AudioProcessorValueTreeState::ParameterLayout layerLayout()
 {
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
     for (const char* pre : { "a_", "b_" })
@@ -66,7 +66,7 @@ public:
     void runTest() override
     {
         SlotStubProcessor proc;
-        juce::AudioProcessorValueTreeState apvts(proc, nullptr, "StubState", slotLayout());
+        juce::AudioProcessorValueTreeState apvts(proc, nullptr, "StubState", layerLayout());
         const mu_pp::LayerLayout layout(proc, { "a_", "b_" });
 
         // Extras stand-in: one "colour" property per slot, reset to 0 when a node lacks it.
@@ -77,7 +77,7 @@ public:
 
         beginTest("layout: params split by slot prefix, the rest global");
         {
-            expectEquals(layout.numSlots(), 2);
+            expectEquals(layout.numLayers(), 2);
             expectEquals(layout.numParams(0), 3);
             expectEquals(layout.numParams(1), 3);
             expectEquals(layout.numParams(-1), 2);
@@ -91,13 +91,13 @@ public:
             setActual(apvts, "a_wave", 2.0f);   // Square
             setActual(apvts, "a_on", 0.0f);
             colour[0] = 5;
-            const auto node = mu_pp::captureSlot(layout, extras, 0, "TestLayer");
+            const auto node = mu_pp::captureLayer(layout, extras, 0, "TestLayer");
 
             const auto cut = node.getChildWithProperty("id", "cut");
             expectWithinAbsoluteError((float) (double) cut.getProperty("x"), 4321.0f, 0.5f);
             expectEquals(node.getChildWithProperty("id", "wave").getProperty("c").toString(), juce::String("Square"));
 
-            mu_pp::applySlot(layout, extras, 1, node);
+            mu_pp::applyLayer(layout, extras, 1, node);
             expectWithinAbsoluteError(actual(apvts, "b_cut"), 4321.0f, 0.5f);
             expectWithinAbsoluteError(actual(apvts, "b_wave"), 2.0f, 1e-4f);
             expectWithinAbsoluteError(actual(apvts, "b_on"), 0.0f, 1e-4f);
@@ -118,7 +118,7 @@ public:
             node.appendChild(cut, nullptr);
 
             setActual(apvts, "a_on", 0.0f);
-            mu_pp::applySlot(layout, extras, 0, node);
+            mu_pp::applyLayer(layout, extras, 0, node);
             expectWithinAbsoluteError(actual(apvts, "a_wave"), 1.0f, 1e-4f);
             expectWithinAbsoluteError(apvts.getParameter("a_cut")->getValue(), 0.5f, 1e-4f);
             expectWithinAbsoluteError(actual(apvts, "a_on"), 1.0f, 1e-4f);   // not in the node → default
@@ -169,7 +169,7 @@ public:
             expectEquals(colour[0], 3);
             expectEquals(colour[1], 4);
 
-            mu_pp::applySlot(layout, extras, 1, {});
+            mu_pp::applyLayer(layout, extras, 1, {});
             expectWithinAbsoluteError(actual(apvts, "b_cut"), 1000.0f, 0.5f);
             expectEquals(colour[1], 0);
         }
@@ -207,7 +207,7 @@ public:
             expect(mu_pp::isComposedState(composed), "rebuilt as format 2");
             expectEquals((int) composed.getProperty("numVoices"), 2);
             expectEquals(others, 1);   // only the unknown child is handed back
-            const auto slot1 = mu_pp::findSlotNode(composed, 1);
+            const auto slot1 = mu_pp::findLayerNode(composed, 1);
             expectEquals((int) slot1.getProperty("colour"), 7);
             expect(slot1.getChildWithName("Modulators").isValid(), "voice children move into the slot");
             expect(mu_pp::composeLegacyState(composed, layout) == composed, "a composed state passes through");

@@ -33,7 +33,7 @@ The editor inherits `mu-core/UI/EditorShellBase.h`, so TransportBar, StatusBar, 
 
 - **Fixed 4 "Layer" channels** — `kNumChannels = 4` of `kMaxChannels = 8` ([PluginProcessor.h:35-36](Source/Plugin/PluginProcessor.h#L35)). Dynamic add/delete/reorder is unwired (no `addVoice`/`removeVoice`), so **the sidebar Add button is inert**; the design calls for 1–8 independent mono arps, default 1.
 - **Preset save/load chrome** — the extensions and directories exist, but save/load stay on `ProcessorBase`'s no-op defaults and the browser chrome is disabled in the editor. DAW state via the APVTS works.
-- **MIDI-PC preset hooks stubbed** — `applyMidiPresetSlot` / `applyFullMidiPreset` are empty overrides.
+- **MIDI-PC preset hooks stubbed** — `applyMidiPresetLayer` / `applyFullMidiPreset` are empty overrides.
 - **Oscillators are mu-Tant's wavetables** (procedural factory bank, no shipped content) with the same 2-lane X-Mod + sync, via the shared mu-core `XModOscPair`; param ids match mu-Tant's (`o1_wt`, `o1_pos`, `xmod_*`, `sync`).
 - **UI is a functional grid** pending a `design-ui-family` polish pass.
 

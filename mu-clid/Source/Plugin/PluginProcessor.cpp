@@ -350,7 +350,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
             : 0.0;
 
     // MIDI program change → preset load. Scan + FIFO + drain all live on
-    // ProcessorBase (mu-core). The virtuals applyMidiPresetSlot / applyFullMidiPreset
+    // ProcessorBase (mu-core). The virtuals applyMidiPresetLayer / applyFullMidiPreset
     // below dispatch to the mu-clid-specific stageRhythmPreset / loadPreset.
     queueMidiProgramChanges(midiMessages);
 

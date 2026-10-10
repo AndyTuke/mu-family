@@ -259,7 +259,7 @@ What mu-tant **reuses from mu-core** (no duplication):
 - `ModulationMatrix`, `ControlSequence` (LFOs / step / draw modulators)
 - `MuLookAndFeel`, all shared widgets
 - The headless `--render` mode (one shared implementation, mu-core `ProductRender.h`; mu-Tant only overrides the no-preset drone hooks)
-- **MIDI program-change path** — channel mask, async FIFO, drain, `MidiPresetMap` + `MidiFullPresetMap` storage, plus the matching `MidiPresetsOverlay` / `MidiFullPresetsOverlay` UI. **Lifted into mu-core in #660** — mu-tant just implements the four virtuals (`getPerSlotPresetDir/Extension`, `getFullPresetDir/Extension`) and the apply hooks. PC ch 1–8 picks a pattern per slot; ch 9 picks a full preset.
+- **MIDI program-change path** — channel mask, async FIFO, drain, `MidiPresetMap` + `MidiFullPresetMap` storage, plus the matching `MidiPresetsOverlay` / `MidiFullPresetsOverlay` UI. **Lifted into mu-core in #660** — mu-tant just implements the four virtuals (`getLayerPresetDir/Extension`, `getFullPresetDir/Extension`) and the apply hooks. PC ch 1–8 picks a pattern per slot; ch 9 picks a full preset.
 
 ---
 
@@ -271,7 +271,7 @@ What mu-tant **reuses from mu-core** (no duplication):
 | Full preset (all 8 slots + mixer + FX) | `.muTant` | PC ch 9. Also: preset dropdown in the transport bar. |
 
 Wired into the ProcessorBase virtuals from #660:
-- `getPerSlotPresetExtension()` → `"muPattern"`
+- `getLayerPresetExtension()` → `"muPattern"`
 - `getFullPresetExtension()`    → `"muTant"`
 
 ### Hot-swap timing

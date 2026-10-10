@@ -315,7 +315,7 @@ void VoicePanel::timerCallback()
 
 void VoicePanel::setVoice(int voiceIndex)
 {
-    voiceIndex = juce::jlimit(0, PluginProcessor::kMaxVoices - 1, voiceIndex);
+    voiceIndex = juce::jlimit(0, mu_limits::kMaxLayers - 1, voiceIndex);
 
     // Rebuild the APVTS attachments only when the voice actually changes (or on
     // the very first bind). The pattern + modulator-slot pointers are (re)bound

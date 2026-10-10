@@ -42,7 +42,7 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 namespace mu_clid {
 
 // A named rhythm preset in the Rhythms folder (path-linked sample, no category / description).
-void PluginProcessor::saveSlotPreset(int ri, const juce::String& name)
+void PluginProcessor::saveLayerPreset(int ri, const juce::String& name)
 {
     saveRhythmPresetToFile(ri, getRhythmsDir().getChildFile(mu_pp::safePresetFileName(name, "Rhythm") + ".muRhythm"));
 }

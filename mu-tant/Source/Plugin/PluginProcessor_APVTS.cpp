@@ -179,7 +179,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     // Voices stay free-running — this is a global loop, not coupled to any gate-pattern length.
     layout.add(std::make_unique<AudioParameterInt>(ParameterID{"mstrLoop", 1}, "Master Loop", 0, 16, 0));
 
-    for (int v = 0; v < kMaxVoices; ++v)
+    for (int v = 0; v < mu_limits::kMaxLayers; ++v)
         addVoiceParams(layout, v);
 
     // ── Mixer channel strips (12 params × 8 channels) — matches the shared
@@ -187,7 +187,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     //    FX sends (sendEff/Dly/Rev) + sidechain + output bus. The send/sidechain
     //    params + the global FX rack (below) make the shared MixerOverlay fully
     //    functional; sync flows through ProcessorBase::syncGlobalFxParam.
-    for (int i = 0; i < kMaxVoices; ++i)
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
     {
         const String c = "ch" + String(i) + "_";
         const String n = "Voice " + String(i + 1) + " Ch ";

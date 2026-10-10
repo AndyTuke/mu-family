@@ -26,8 +26,8 @@ namespace mu_pp
 {
 
 inline const juce::Identifier kGlobalsTag { "Globals" };
-inline const juce::Identifier kSlotsTag   { "Slots" };
-inline const juce::Identifier kSlotTag    { "Slot" };
+inline const juce::Identifier kLayersTag   { "Slots" };
+inline const juce::Identifier kLayerTag    { "Slot" };
 inline const juce::Identifier kRowTag     { "p" };
 constexpr int kComposedStateFormat = 2;
 
@@ -84,8 +84,8 @@ class LayerLayout
 public:
     LayerLayout() = default;
 
-    LayerLayout(juce::AudioProcessor& proc, const juce::StringArray& slotPrefixes)
-        : prefixes(slotPrefixes), slots((size_t) slotPrefixes.size())
+    LayerLayout(juce::AudioProcessor& proc, const juce::StringArray& layerPrefixes)
+        : prefixes(layerPrefixes), slots((size_t) layerPrefixes.size())
     {
         // Sort every ranged parameter into its slot's group, or the globals.
         for (auto* raw : proc.getParameters())
@@ -98,7 +98,7 @@ public:
             }
     }
 
-    int numSlots() const noexcept { return prefixes.size(); }
+    int numLayers() const noexcept { return prefixes.size(); }
     int numParams(int slot) const { return (int) group(slot).size(); }
 
     // The slot whose prefix `id` carries (-1 = a global), and `id` without it.
@@ -151,8 +151,8 @@ private:
     std::vector<Entry>               globals;
 };
 
-// One slot as a node of `type` (the product's layer-preset tag, or kSlotTag inside a state).
-inline juce::ValueTree captureSlot(const LayerLayout& layout, const LayerExtras& extras, int slot,
+// One slot as a node of `type` (the product's layer-preset tag, or kLayerTag inside a state).
+inline juce::ValueTree captureLayer(const LayerLayout& layout, const LayerExtras& extras, int slot,
                                    const juce::Identifier& type)
 {
     juce::ValueTree node(type);
@@ -161,7 +161,7 @@ inline juce::ValueTree captureSlot(const LayerLayout& layout, const LayerExtras&
     return node;
 }
 
-inline void applySlot(const LayerLayout& layout, const LayerExtras& extras, int slot, const juce::ValueTree& node)
+inline void applyLayer(const LayerLayout& layout, const LayerExtras& extras, int slot, const juce::ValueTree& node)
 {
     layout.applyParams(node, slot);
     if (extras.apply) extras.apply(slot, node);
@@ -173,11 +173,11 @@ inline bool isComposedState(const juce::ValueTree& state)
 }
 
 // Slot `slot`'s node in a composed state (invalid when it has none).
-inline juce::ValueTree findSlotNode(const juce::ValueTree& state, int slot)
+inline juce::ValueTree findLayerNode(const juce::ValueTree& state, int slot)
 {
-    const auto slots = state.getChildWithName(kSlotsTag);
+    const auto slots = state.getChildWithName(kLayersTag);
     for (int i = 0; i < slots.getNumChildren(); ++i)
-        if (const auto node = slots.getChild(i); node.hasType(kSlotTag) && (int) node.getProperty("idx", -1) == slot)
+        if (const auto node = slots.getChild(i); node.hasType(kLayerTag) && (int) node.getProperty("idx", -1) == slot)
             return node;
     return {};
 }
@@ -193,10 +193,10 @@ inline juce::ValueTree captureState(const juce::Identifier& stateType, const Lay
     layout.writeParams(globals, -1);
     state.appendChild(globals, nullptr);
 
-    juce::ValueTree slots(kSlotsTag);
-    for (int s = 0; s < layout.numSlots(); ++s)
+    juce::ValueTree slots(kLayersTag);
+    for (int s = 0; s < layout.numLayers(); ++s)
     {
-        auto node = captureSlot(layout, extras, s, kSlotTag);
+        auto node = captureLayer(layout, extras, s, kLayerTag);
         node.setProperty("idx", s, nullptr);
         slots.appendChild(node, nullptr);
     }
@@ -208,8 +208,8 @@ inline juce::ValueTree captureState(const juce::Identifier& stateType, const Lay
 inline void applyState(const juce::ValueTree& state, const LayerLayout& layout, const LayerExtras& extras)
 {
     layout.applyParams(state.getChildWithName(kGlobalsTag), -1);
-    for (int s = 0; s < layout.numSlots(); ++s)
-        applySlot(layout, extras, s, findSlotNode(state, s));
+    for (int s = 0; s < layout.numLayers(); ++s)
+        applyLayer(layout, extras, s, findLayerNode(state, s));
 }
 
 // A pre-format-2 state — the APVTS dump (<PARAM id value>, actual values) + a <VoiceData> of
@@ -227,11 +227,11 @@ inline juce::ValueTree composeLegacyState(const juce::ValueTree& legacy, const L
         state.setProperty(legacy.getPropertyName(i), legacy.getProperty(legacy.getPropertyName(i)), nullptr);
     state.setProperty("format", kComposedStateFormat, nullptr);
 
-    juce::ValueTree globals(kGlobalsTag), slots(kSlotsTag);
+    juce::ValueTree globals(kGlobalsTag), slots(kLayersTag);
     std::vector<juce::ValueTree> slotNodes;
-    for (int s = 0; s < layout.numSlots(); ++s)
+    for (int s = 0; s < layout.numLayers(); ++s)
     {
-        juce::ValueTree node(kSlotTag);
+        juce::ValueTree node(kLayerTag);
         node.setProperty("idx", s, nullptr);
         slotNodes.push_back(node);
         slots.appendChild(node, nullptr);
@@ -261,7 +261,7 @@ inline juce::ValueTree composeLegacyState(const juce::ValueTree& legacy, const L
             {
                 const auto voice = child.getChild(v);
                 const int s = (int) voice.getProperty("idx", -1);
-                if (! voice.hasType(kChannelNodeTag) || s < 0 || s >= layout.numSlots()) continue;
+                if (! voice.hasType(kChannelNodeTag) || s < 0 || s >= layout.numLayers()) continue;
                 auto& node = slotNodes[(size_t) s];
                 for (int p = 0; p < voice.getNumProperties(); ++p)
                     if (const auto name = voice.getPropertyName(p); name != juce::Identifier("idx"))

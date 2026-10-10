@@ -218,7 +218,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 }
 
 
-juce::File PluginProcessor::getPerSlotPresetDir() const { return getContentDir().getChildFile("Tracks"); }
+juce::File PluginProcessor::getLayerPresetDir() const { return getContentDir().getChildFile("Tracks"); }
 
 } // namespace mu_on
 

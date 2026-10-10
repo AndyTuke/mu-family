@@ -57,7 +57,7 @@ public:
             st.stageFull(std::move(tree));
             expect(st.hasFullPending(), "full preset staged");
 
-            std::array<double, VoiceHotSwapStager::kMaxVoices> patBeats {};
+            std::array<double, mu_limits::kMaxLayers> patBeats {};
             patBeats.fill(8.0);
             const double fullPat = 8.0; // voice 0's pattern
 
@@ -82,7 +82,7 @@ public:
             st.stageVoice(1, std::move(v1));
 
             // Voice 0 has an 8-beat pattern; voice 1 has a 4-beat pattern.
-            std::array<double, VoiceHotSwapStager::kMaxVoices> patBeats {};
+            std::array<double, mu_limits::kMaxLayers> patBeats {};
             patBeats.fill(8.0);
             patBeats[1] = 4.0;
 
@@ -103,7 +103,7 @@ public:
             juce::ValueTree b("Voice"); b.setProperty("gen", 2, nullptr);
             st.stageVoice(0, std::move(b));     // supersedes a
 
-            std::array<double, VoiceHotSwapStager::kMaxVoices> patBeats {}; patBeats.fill(8.0);
+            std::array<double, mu_limits::kMaxLayers> patBeats {}; patBeats.fill(8.0);
             st.checkBoundaries(1, true, true, 7.9, 8.1, patBeats, 8.0);
             juce::ValueTree out;
             expect(st.takeVoice(0, out), "voice swap takeable");
@@ -121,7 +121,7 @@ public:
         {
             VoiceHotSwapStager st;
             juce::ValueTree v("Voice"); st.stageVoice(0, std::move(v));
-            std::array<double, VoiceHotSwapStager::kMaxVoices> patBeats {}; patBeats.fill(8.0);
+            std::array<double, mu_limits::kMaxLayers> patBeats {}; patBeats.fill(8.0);
             // playing->stopped with no wrap: still flagged via the stop edge.
             expect(st.checkBoundaries(1, /*playing*/false, /*wasPlaying*/true,
                                       2.0, 2.0, patBeats, 8.0),

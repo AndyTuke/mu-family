@@ -176,7 +176,7 @@ PluginProcessor::PluginProcessor()
     // buffer; the shared mixer applies the strip + master mix downstream.
     renderChannelCb = [this](int ch, juce::AudioBuffer<float>& buf, int n)
     {
-        if (ch >= 0 && ch < kMaxChannels)
+        if (ch >= 0 && ch < mu_limits::kMaxLayers)
         {
             layers[(size_t) ch].runner.render(buf, n, arpCtx);
             layers[(size_t) ch].insert.process(buf, n, buf.getNumChannels(), layers[(size_t) ch].insertCfg);   // engine → insert → mixer
@@ -192,7 +192,7 @@ PluginProcessor::PluginProcessor()
     midiInChParam = apvts.getRawParameterValue("midiInCh");
 
     cacheVoiceParamPointers();
-    initLayerState();       // the layer layout every preset / session save and load uses
+    setupLayerState();       // the layer layout every preset / session save and load uses
     hotSwap.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },
                         [this](int i, juce::ValueTree& t) { applyLayerTree(i, t); });
     startFxParamSync();     // mixer / FX params → mixerEngine + fxChain (ProcessorBase)
@@ -213,7 +213,7 @@ namespace
 
 void PluginProcessor::cacheVoiceParamPointers()
 {
-    for (int i = 0; i < kMaxChannels; ++i)
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         for (int k = 0; k < kNumVoiceParams; ++k)
         {
             const juce::String id = "v" + juce::String(i) + "_" + vpi::suffix[k];
@@ -225,7 +225,7 @@ void PluginProcessor::cacheVoiceParamPointers()
     {
         modDestIds[(size_t) k]    = kModDestTable[k].id;
         modDestRanges[(size_t) k] = apvts.getParameterRange("v0_" + juce::String(kModDestTable[k].param));
-        for (int i = 0; i < kMaxChannels; ++i)
+        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
             modDestAtoms[(size_t) i][(size_t) k] = (i < kNumChannels) ? vp[(size_t) i][(size_t) vpSlotFor(kModDestTable[k].param)]
                                                                       : nullptr;
         modParamValues[kModDestTable[k].id] = 0.0f;   // pre-size the map (no audio-thread alloc)

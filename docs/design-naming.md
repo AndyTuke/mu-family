@@ -128,6 +128,9 @@ edits](design-plugin-family.md#layer-ownership-and-structural-edits--family-stan
 New layer UI is `LayerPanel` / `LayerSidebar` in `mu-core`; a product supplies content, not a copy of the
 class.
 
+**Named exceptions ✔ owner (2026-10-10):** `SaveDialog` and `PresetBrowser` (both `mu-core/UI`) keep their
+names. They are modal pop-ups, not `OverlayHost` screens, so the `Overlay` role does not apply.
+
 ### Files and folders
 - File name = class name. One main class per file.
 - **Identical `Source/` layout in every instrument product ✔ owner (2026-10-09):** mu-Clid, mu-Tant, mu-Toni
@@ -173,10 +176,11 @@ slot state already stores ids without their prefix, so layer data is prefix-agno
 | Parent class | Only `Rhythm` derives from `Layer`; the others use parallel arrays (§2). |
 | mu-core vocabulary | `kMaxChannels` is the layer cap; core types say both `Voice*` and `Channel*`; "Slot" has three meanings (11 types). |
 | Namespaces | Done at build 1190: mu-Clid is entirely in `mu_clid` (the Rhythm modulator adapters, preset and param tables and `PluginProcessor_Internal` helpers left `mu_pp`; `mu_pp_migrate` is `mu_clid::migrate`; `md` and `ModDest` nest in `mu_clid`). Only `createPluginFilter` and `StandaloneApp.cpp` stay global. |
-| Overlay vs Panel | Done at build 1172: `AboutOverlay`, `ActivationOverlay`, `MidiPresetsOverlay`, `MidiFullPresetsOverlay` (were `…Panel`). Still open: whether `SaveDialog` and `PresetBrowser` become overlays too or stay named exceptions (owner). |
+| Overlay vs Panel | Done at build 1172: `AboutOverlay`, `ActivationOverlay`, `MidiPresetsOverlay`, `MidiFullPresetsOverlay` (were `…Panel`). **`SaveDialog` and `PresetBrowser` stay as named exceptions ✔ owner (2026-10-10):** they are modal pop-ups owned by the shell, not `OverlayHost` screens, and their names are already stable across the family; do not rename them. Still open: the shared `LayerPanel` / `LayerSidebar` (waits on the layer-plan stages 4-5). |
 | Main sound panel | `VoiceSection` (mu-Clid), `VoicePanel` (mu-Tant), `EnginePanel` (mu-Toni, mu-On), `VoiceBand` (core). |
 | Sequencer names | `SequencerEngine`, `GatePattern`, `Arpeggiator` + `ArpVoiceRunner`, `GrooveSequencer` — no shared role. |
-| Capacity constants | mu-Clid's `kMaxRhythms` survives only as a one-line alias of `mu_limits::kMaxLayers` in `HotSwapStager.h`; drop it for `mu_limits::kMaxLayers` directly (open). mu-Tant's two `kMaxVoices` and mu-Toni / mu-On's `kMaxChannels` now read `mu_limits::kMaxLayers` (build 1171). |
+| Capacity constants | mu-Clid's `kMaxRhythms` alias is gone (build 1195). mu-Tant's two `kMaxVoices` and mu-Toni / mu-On's `kMaxChannels` read `mu_limits::kMaxLayers` (build 1171) but are still redeclared product-side; replace with `mu_limits::kMaxLayers` directly (mu-On's is unused, delete it). The `kMaxChannels` in `mu-core/Link/` is the stereo ring width, an unrelated constant: leave it. |
+| `Slot` in layer APIs | `ProcessorBase` and `mu_pp` use "slot" for a layer (`initSlotState`, `slotLayer`, `saveSlotPreset`, `voiceSlots`, ...). Rename to `Layer` per §1; the XML tags `Slots` / `Slot` and `idx` are saved data and stay. Plan: see the rename list under migration step 5. |
 | Acronyms | `…APVTS` function names in mu-Clid vs `…Apvts` elsewhere. |
 | Members | Trailing `_` in seven classes (mu-Clid helpers, `MidiClockSync`, `VocoderInsert`). |
 | Enums | plain `enum` in mu-Toni (3), mu-On (3), mu-Tant (2). |
@@ -211,6 +215,21 @@ C++ identifier changes never touch saved files; the data renames at the end do.
    6. **O** variable layer count in mu-Toni (backlog #1240) and mu-On (#1241), the clip bank (#1277).
    7. **S** mu-Clid's `Rhythm` takes its engine, MIDI engine, play state and samples as members and moves into the container.
    8. **O**, with the combined instance and #1263: the layer-type registry and `Layer::render`.
+   **"Slot" to "Layer" in C++ APIs (Architecture Steward, 2026-10-10).** Do now (pure identifiers, word-bounded
+   search/replace, `mu_pp` and `ProcessorBase` first, then each product): `initSlotState` → `initLayerState`
+   (first rename mu-Toni's own `initLayerState()` wrapper, which would hide it), `slotLayout` → `layerLayout`,
+   `slotExtras` → `layerExtras`, `captureSlotNode` / `applySlotNode` → `captureLayerNode` / `applyLayerNode`,
+   `mu_pp::captureSlot` / `applySlot` / `findSlotNode` / `numSlots` / `kSlotTag` / `kSlotsTag` →
+   `captureLayer` / `applyLayer` / `findLayerNode` / `numLayers` / `kLayerTag` / `kLayersTag` (the tag
+   strings `"Slot"`, `"Slots"`, `"idx"` stay), `saveSlotPreset` / `loadSlotPreset` → `saveLayerPreset` /
+   `loadLayerPreset`, `onSlotPresetCommitted` → `onLayerPresetCommitted`, `getPerSlotPresetDir` /
+   `Extension` → `getLayerPresetDir` / `Extension`, `applyMidiPresetSlot` → `applyMidiPresetLayer`, the
+   product-local `kMaxChannels` / `kMaxVoices` → `mu_limits::kMaxLayers`. Defer: `resetSlot` (becomes the
+   central `resetLayer` in stage 5), `slotLayer` (disappears with stage 4 ownership), `voiceSlots` and the
+   `voiceSlot(i)` accessors (replaced by the derived-type members in stage 1). Keep:
+   `captureComposedState` / `applyComposedState` / `toComposedState` ("composed" is not "slot"; the plain
+   names `captureState` / `applyState` are taken by the products' own wrappers, and renaming onto them makes
+   mu-Toni and mu-On recurse into themselves).
 6. **Saved-data names** — only with the combined instance, with migrations. Backlog #1263 (On Hold).
 
 Separately, the **standard `Source/` layout** (eight folders in every instrument product): folders created

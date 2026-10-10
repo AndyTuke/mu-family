@@ -91,7 +91,7 @@ PluginProcessor::PluginProcessor()
     }
 
     bank.loadFactoryBank();      // multi-table, mip-mapped factory wavetable bank
-    for (int v = 0; v < kMaxVoices; ++v)
+    for (int v = 0; v < mu_limits::kMaxLayers; ++v)
     {
         voices[(size_t) v] = std::make_unique<VoiceEngine>();
         voices[(size_t) v]->setBank(&bank);
@@ -146,7 +146,7 @@ void PluginProcessor::cacheParamPointers()
     globalPtrs.scale   = P("scale");
     mstrLoopPtr        = P("mstrLoop");   // master-loop length, read RT-safely in processBlock
 
-    for (int v = 0; v < kMaxVoices; ++v)
+    for (int v = 0; v < mu_limits::kMaxLayers; ++v)
     {
         auto vid = [v](const char* base) { return voiceParamId(v, base); };
         auto& p = voicePtrs[(size_t) v];
@@ -174,7 +174,7 @@ void PluginProcessor::cacheParamPointers()
         modDestIds[(size_t) i]    = kModDestTable[i].id;
         modDestRanges[(size_t) i] = apvts.getParameterRange(voiceParamId(0, kModDestTable[i].param));
         modParamValues.emplace(std::string_view(kModDestTable[i].id), 0.0f);   // pre-insert key
-        for (int v = 0; v < kMaxVoices; ++v)
+        for (int v = 0; v < mu_limits::kMaxLayers; ++v)
         {
             modDestAtoms[(size_t) v][(size_t) i] =
                 apvts.getRawParameterValue(voiceParamId(v, kModDestTable[i].param));
@@ -293,7 +293,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
             // Extend the rendered channel count to cover any voices still fading out
             // from a count-reducing swap, so the mixer keeps mixing their tail.
             int renderCount = numActiveVoices;
-            for (int v = numActiveVoices; v < kMaxVoices; ++v)
+            for (int v = numActiveVoices; v < mu_limits::kMaxLayers; ++v)
                 if (retiring[(size_t) v].samplesLeft.load(std::memory_order_acquire) > 0)
                     renderCount = v + 1;
 
@@ -326,8 +326,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     const bool   onMasterLoop    = (swapModeAtomic.load(std::memory_order_relaxed) == 0)
                                    && masterLoopBeats > 0.0;
 
-    std::array<double, VoiceHotSwapStager::kMaxVoices> voicePatBeats {};
-    for (int v = 0; v < VoiceHotSwapStager::kMaxVoices; ++v)
+    std::array<double, mu_limits::kMaxLayers> voicePatBeats {};
+    for (int v = 0; v < mu_limits::kMaxLayers; ++v)
     {
         const double gateBeats = (double) voiceSlots[(size_t) v].gate.patternLengthBars * 4.0;
         voicePatBeats[(size_t) v] = onMasterLoop ? masterLoopBeats : gateBeats;
@@ -521,7 +521,7 @@ bool PluginProcessor::pitchDestHasSteppedSource(const Layer& slot, const char* d
 
 void PluginProcessor::refreshPitchQuantFlags(int v)
 {
-    if (v < 0 || v >= kMaxVoices) return;
+    if (v < 0 || v >= mu_limits::kMaxLayers) return;
     // Message-thread only (after any modulator mutation); the audio thread reads the
     // resulting atomics lock-free. Reading the assignments here is safe: the message
     // thread is the sole writer and the mutation has already completed.
@@ -532,7 +532,7 @@ void PluginProcessor::refreshPitchQuantFlags(int v)
 
 void PluginProcessor::refreshAllPitchQuantFlags()
 {
-    for (int v = 0; v < kMaxVoices; ++v) refreshPitchQuantFlags(v);
+    for (int v = 0; v < mu_limits::kMaxLayers; ++v) refreshPitchQuantFlags(v);
 }
 
 // One voice's full chain into the channel buffer: modulation → engine → gate →
@@ -642,13 +642,13 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 int PluginProcessor::firstUnusedColourIndex() const
 {
     const int n = numVoices.load();
-    std::array<bool, kMaxVoices> used { };
+    std::array<bool, mu_limits::kMaxLayers> used { };
     for (int i = 0; i < n; ++i)
     {
         const int c = voiceColourIndex[(size_t) i];
-        if (c >= 0 && c < kMaxVoices) used[(size_t) c] = true;
+        if (c >= 0 && c < mu_limits::kMaxLayers) used[(size_t) c] = true;
     }
-    for (int c = 0; c < kMaxVoices; ++c)
+    for (int c = 0; c < mu_limits::kMaxLayers; ++c)
         if (! used[(size_t) c]) return c;
     return 0;
 }
@@ -657,7 +657,7 @@ int PluginProcessor::addVoice()
 {
     const juce::ScopedLock sl(voicesLock);
     const int n = numVoices.load();
-    if (n >= kMaxVoices) return -1;
+    if (n >= mu_limits::kMaxLayers) return -1;
     hotSwapStager.cancelVoice(n);                   // the new slot must carry no stale staged swap
     resetVoiceSlot(n);                              // fresh defaults for the new slot
     voiceColourIndex[(size_t) n] = firstUnusedColourIndex();   // allocate its palette colour
@@ -681,7 +681,7 @@ void PluginProcessor::remapSidechainSources(const std::function<int(int)>& remap
             if (nv != v) p->setValueNotifyingHost(p->convertTo0to1((float) nv));
         }
     };
-    for (int c = 0; c < kMaxVoices; ++c)
+    for (int c = 0; c < mu_limits::kMaxLayers; ++c)
         remapOne("ch" + juce::String(c) + "_scSrc");
     for (const char* ret : { "ret_eff_scSrc", "ret_dly_scSrc", "ret_rev_scSrc" })
         remapOne(ret);
@@ -697,7 +697,7 @@ void PluginProcessor::removeVoice(int idx)
     // hot-swap (keyed by index) would land on the wrong slot — drop them all. (A
     // staged FULL preset is index-independent: it replaces the whole state at commit,
     // so it stays and simply wins.)
-    for (int v = 0; v < kMaxVoices; ++v) hotSwapStager.cancelVoice(v);
+    for (int v = 0; v < mu_limits::kMaxLayers; ++v) hotSwapStager.cancelVoice(v);
 
     // Strips that ducked from the removed voice now duck from nothing; the others follow their
     // voice down (translated BEFORE the shift copies the strips' parameters).
@@ -780,17 +780,17 @@ void PluginProcessor::commitDeferredWork()
         applyFullPresetTree(tree);
         if (onPresetSwapCommitted) onPresetSwapCommitted();
     }
-    for (int v = 0; v < kMaxVoices; ++v)
+    for (int v = 0; v < mu_limits::kMaxLayers; ++v)
         if (hotSwapStager.takeVoice(v, tree))
         {
             applyVoicePresetTree(v, tree);
-            if (onSlotPresetCommitted) onSlotPresetCommitted(v);
+            if (onLayerPresetCommitted) onLayerPresetCommitted(v);
         }
 }
 
 void PluginProcessor::loadUserWavetable(int voice, int oscIndex, const juce::File& file)
 {
-    if (voice < 0 || voice >= kMaxVoices || ! file.existsAsFile()) return;
+    if (voice < 0 || voice >= mu_limits::kMaxLayers || ! file.existsAsFile()) return;
     int idx;
     {
         const juce::ScopedLock sl(voicesLock);   // bank append must exclude the audio thread
@@ -804,14 +804,14 @@ void PluginProcessor::loadUserWavetable(int voice, int oscIndex, const juce::Fil
 
 void PluginProcessor::clearUserWavetable(int voice, int oscIndex)
 {
-    if (voice < 0 || voice >= kMaxVoices) return;
+    if (voice < 0 || voice >= mu_limits::kMaxLayers) return;
     if (oscIndex == 0) { voiceSlots[(size_t) voice].osc1UserPath.clear(); voiceSlots[(size_t) voice].osc1UserIndex.store(-1); }
     else             { voiceSlots[(size_t) voice].osc2UserPath.clear(); voiceSlots[(size_t) voice].osc2UserIndex.store(-1); }
 }
 
 juce::String PluginProcessor::userWavetablePath(int voice, int oscIndex) const
 {
-    if (voice < 0 || voice >= kMaxVoices) return {};
+    if (voice < 0 || voice >= mu_limits::kMaxLayers) return {};
     return (oscIndex == 0) ? voiceSlots[(size_t) voice].osc1UserPath : voiceSlots[(size_t) voice].osc2UserPath;
 }
 

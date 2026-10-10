@@ -9,7 +9,7 @@ namespace
 }
 
 MidiPresetsOverlay::MidiPresetsOverlay(ProcessorBase& p)
-    : MidiPresetListPanel(p, p.getPerSlotPresetExtension(), "MIDI Program Change Presets",
+    : MidiPresetListPanel(p, p.getLayerPresetExtension(), "MIDI Program Change Presets",
                           "MIDI channel N (1-" + juce::String(channelCount(p))
                               + juce::String::fromUTF8(u8") → slot N-1;  program number = preset index")),
       numToggles(channelCount(p))
@@ -36,7 +36,7 @@ MidiPresetsOverlay::MidiPresetsOverlay(ProcessorBase& p)
 juce::String MidiPresetsOverlay::slotPath(int row) const                      { return proc.midiPresetMap.getPresetPath(row); }
 void         MidiPresetsOverlay::setSlotPath(int row, const juce::File& f)    { proc.midiPresetMap.setPresetPath(row, f); }
 void         MidiPresetsOverlay::clearSlot(int row)                           { proc.midiPresetMap.clearPreset(row); }
-juce::File   MidiPresetsOverlay::presetDir() const                            { return proc.getPerSlotPresetDir(); }
+juce::File   MidiPresetsOverlay::presetDir() const                            { return proc.getLayerPresetDir(); }
 
 void MidiPresetsOverlay::layoutTopRow(juce::Rectangle<int> row)
 {

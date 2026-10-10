@@ -143,11 +143,11 @@ namespace mu_core::render_mode
         }
         const auto ext = f.getFileExtension().toLowerCase();
         if (ext == "." + proc.getFullPresetExtension().toLowerCase())         proc.loadPreset(f);
-        else if (ext == "." + proc.getPerSlotPresetExtension().toLowerCase()) proc.loadSlotPreset(slot, f);
+        else if (ext == "." + proc.getLayerPresetExtension().toLowerCase()) proc.loadLayerPreset(slot, f);
         else
         {
             reportError(product, "unrecognised preset extension: " + ext + " (expected ."
-                        + proc.getFullPresetExtension() + " or ." + proc.getPerSlotPresetExtension() + ")");
+                        + proc.getFullPresetExtension() + " or ." + proc.getLayerPresetExtension() + ")");
             return false;
         }
         return true;
@@ -293,7 +293,7 @@ namespace mu_core::render_mode
             }
             if (slotAt >= 0 && ! slotDone && written >= slotAt)
             {
-                proc.loadSlotPreset(args.swapSlot, args.swapSlotFile);
+                proc.loadLayerPreset(args.swapSlot, args.swapSlotFile);
                 slotDone = true;
                 log("slot-" + juce::String(args.swapSlot) + " swap to " + args.swapSlotFile.getFileName() + " staged", written);
             }

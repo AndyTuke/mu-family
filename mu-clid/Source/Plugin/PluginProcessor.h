@@ -122,12 +122,12 @@ public:
     int  getMasterLoopSteps() const override              { return sequencer.getMasterLoopSteps(); }
     int  getMasterLoopCurrentStep() const override        { return sequencer.getMasterLoopCurrentStep(); }
 
-    // A rhythm hot-swap commit fires ProcessorBase::onSlotPresetCommitted: the editor refreshes
+    // A rhythm hot-swap commit fires ProcessorBase::onLayerPresetCommitted: the editor refreshes
     // the non-APVTS UI state (name label, sample bar, colour-tinted bits) pushRhythmToApvts can't.
 
     // ProcessorBase slot-preset API: a rhythm preset into rhythm `ri`.
-    void saveSlotPreset(int ri, const juce::String& name) override;
-    void loadSlotPreset(int ri, const juce::File& f) override { stageRhythmPreset(ri, f); }
+    void saveLayerPreset(int ri, const juce::String& name) override;
+    void loadLayerPreset(int ri, const juce::File& f) override { stageRhythmPreset(ri, f); }
     void resetSlot(int ri) override                           { rhythms.reset(ri); }
     void setSwapMode(SwapMode m) { swapModeAtomic.store((int)m, std::memory_order_relaxed); }
     SwapMode getSwapMode() const { return static_cast<SwapMode>(swapModeAtomic.load(std::memory_order_relaxed)); }
@@ -272,8 +272,8 @@ public:
     // Per-slot + full preset directories / extensions. Public so the shared
     // MIDI editor panels (`MidiPresetsOverlay` / `MidiFullPresetsOverlay`) and the
     // mu-clid editor (preset browser) can read them through a PluginProcessor&.
-    juce::File   getPerSlotPresetDir()       const override { return getRhythmsDir(); }
-    juce::String getPerSlotPresetExtension() const override { return "muRhythm"; }
+    juce::File   getLayerPresetDir()       const override { return getRhythmsDir(); }
+    juce::String getLayerPresetExtension() const override { return "muRhythm"; }
     juce::String getFullPresetExtension()    const override { return "muClid"; }
 
 private:

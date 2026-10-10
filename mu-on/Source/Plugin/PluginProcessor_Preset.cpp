@@ -93,7 +93,7 @@ void PluginProcessor::initLaneState()
 {
     juce::StringArray prefixes;
     for (int l = 0; l < kNumChannels; ++l) prefixes.add(lanePrefix(l));
-    initSlotState(prefixes);
+    initLayerState(prefixes);
 }
 
 // Any saved state (host session or full preset, either format) in the composed shape. Older
@@ -122,12 +122,12 @@ juce::ValueTree PluginProcessor::toLaneState(const juce::ValueTree& tree) const
         {
             for (int i = 0; i < child.getNumChildren(); ++i)
                 if (const auto row = child.getChild(i); row.hasType("Track"))
-                    if (auto node = mu_pp::findSlotNode(composed, (int) row.getProperty("i", -1)); node.isValid())
+                    if (auto node = mu_pp::findLayerNode(composed, (int) row.getProperty("i", -1)); node.isValid())
                         node.appendChild(row.createCopy(), nullptr);
         }
         else if (child.hasType("RumbleEnv"))
         {
-            if (auto node = mu_pp::findSlotNode(composed, kNumStepLanes); node.isValid())
+            if (auto node = mu_pp::findLayerNode(composed, kNumStepLanes); node.isValid())
                 node.appendChild(child.createCopy(), nullptr);
         }
     });
@@ -150,18 +150,18 @@ void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 
 // A track preset: the lane's node (engine param rows, step row or envelope, modulators). It
 // belongs to one instrument, so it records which lane it came from.
-void PluginProcessor::saveSlotPreset(int lane, const juce::String& name)
+void PluginProcessor::saveLayerPreset(int lane, const juce::String& name)
 {
     if (lane < 0 || lane >= kNumChannels) return;
-    auto node = captureSlotNode(lane, kTrackPresetTag);
+    auto node = captureLayerNode(lane, kTrackPresetTag);
     node.setProperty("lane", getChannelName(lane), nullptr);
     if (auto xml = node.createXml())
-        mu_pp::writeXmlAtomically(*xml, getPerSlotPresetDir().getChildFile(mu_pp::safePresetFileName(name, getChannelName(lane))
-                                                                           + "." + getPerSlotPresetExtension()),
+        mu_pp::writeXmlAtomically(*xml, getLayerPresetDir().getChildFile(mu_pp::safePresetFileName(name, getChannelName(lane))
+                                                                           + "." + getLayerPresetExtension()),
                                   onLoadError);
 }
 
-void PluginProcessor::loadSlotPreset(int lane, const juce::File& file)
+void PluginProcessor::loadLayerPreset(int lane, const juce::File& file)
 {
     if (lane < 0 || lane >= kNumChannels || ! file.existsAsFile()) return;
     auto xml = juce::XmlDocument::parse(file);
@@ -184,8 +184,8 @@ void PluginProcessor::loadSlotPreset(int lane, const juce::File& file)
 // Apply a lane node (the stopped load and the pattern-wrap commit), then tell the editor.
 void PluginProcessor::applyTrackTree(int lane, const juce::ValueTree& tree)
 {
-    applySlotNode(lane, tree);
-    if (onSlotPresetCommitted) onSlotPresetCommitted(lane);
+    applyLayerNode(lane, tree);
+    if (onLayerPresetCommitted) onLayerPresetCommitted(lane);
 }
 
 // Commit the hot-swaps that reached the pattern wrap: the full preset first (it supersedes the
@@ -200,7 +200,7 @@ void PluginProcessor::commitDeferredWork()
 juce::Array<juce::File> PluginProcessor::slotPresetFiles(int lane) const
 {
     juce::Array<juce::File> files;
-    for (const auto& f : mu_pp::listPresetFiles(getPerSlotPresetDir(), getPerSlotPresetExtension()))
+    for (const auto& f : mu_pp::listPresetFiles(getLayerPresetDir(), getLayerPresetExtension()))
     {
         const auto meta = mu_pp::readPresetMeta(f);
         if (meta.rootTag == kTrackPresetTag && meta.attribute("lane") == getChannelName(lane))
@@ -215,7 +215,7 @@ void PluginProcessor::resetSlot(int lane)
 {
     if (lane < 0 || lane >= kNumChannels) return;
     hotSwap.cancel(lane);   // a staged swap would re-fill what we're resetting
-    slotLayout.applyParams({}, lane);
+    layerLayout.applyParams({}, lane);
     mu_pp::clearModulators(voiceSlots[(size_t) lane]);
 }
 

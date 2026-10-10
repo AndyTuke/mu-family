@@ -29,7 +29,6 @@ class PluginProcessor : public ProcessorBase
 public:
     // Family parity: up to 8 channels/layers. A fixed set ships for now; dynamic
     // add/delete/reorder is still unwired (no addVoice/removeVoice).
-    static constexpr int kMaxChannels = mu_limits::kMaxLayers;   // the family layer cap
     static constexpr int kNumChannels = 4;   // placeholder layers shown in the shell
 
     PluginProcessor();
@@ -71,13 +70,13 @@ public:
     }
     int          getChannelColourIndex(int idx) const override
     {
-        return (idx >= 0 && idx < kMaxChannels) ? idx : 0;
+        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? idx : 0;
     }
 
     // ── Presets (per family file-format rule) ─────────────────────────────────
     // Full = .muToni (the whole state); per-layer = .muArp (one layer's arp + voice).
-    juce::File   getPerSlotPresetDir()       const override;
-    juce::String getPerSlotPresetExtension() const override { return "muArp"; }
+    juce::File   getLayerPresetDir()       const override;
+    juce::String getLayerPresetExtension() const override { return "muArp"; }
     juce::String getFullPresetExtension()    const override { return "muToni"; }
 
     // Full-preset save/load — the editor shell drives the UI (preset bar, Save dialog, browser).
@@ -89,8 +88,8 @@ public:
 
     // Per-layer presets (ProcessorBase slot API) — the layer's v{N}_ params + its modulators
     // (loadable into any layer), and a reset back to defaults.
-    void saveSlotPreset(int layer, const juce::String& name) override;
-    void loadSlotPreset(int layer, const juce::File& file) override;
+    void saveLayerPreset(int layer, const juce::String& name) override;
+    void loadLayerPreset(int layer, const juce::File& file) override;
     void resetSlot(int layer) override;
 
     // Hot-swap: a preset loaded while the transport runs is staged and applied at the next bar
@@ -118,7 +117,7 @@ private:
 
     // State shared by the session save/restore and full presets (PluginProcessor_Preset.cpp):
     // the composed state (mu-core LayerState) of the globals + every layer's node.
-    void            initLayerState();
+    void            setupLayerState();
     juce::ValueTree captureState() { return captureComposedState(); }
     juce::ValueTree toLayerState(const juce::ValueTree& tree) const;
     void            applyStateTree(const juce::ValueTree& state);
@@ -137,17 +136,17 @@ private:
 
     mu_wavetable::WavetableBank bank;                        // the oscillators' wavetables (factory set)
     std::atomic<float>*         midiInChParam = nullptr;     // MIDI In channel (0 = Omni)
-    std::array<std::array<std::atomic<float>*, kNumVoiceParams>, kMaxChannels>    vp {};
+    std::array<std::array<std::atomic<float>*, kNumVoiceParams>, mu_limits::kMaxLayers>    vp {};
 
     // The layers: each is a mu-core Layer (name, colour, modulation) with its arp voice and insert
     // effect. Public so the UI ModulatorPanel can bind to the active layer.
 public:
-    std::array<Arp, kMaxChannels> layers;
+    std::array<Arp, mu_limits::kMaxLayers> layers;
 private:
     // Modulation-resolve inputs: parallel arrays for mu_mod::resolveLane.
     std::array<const char*, kNumModDests>                                         modDestIds {};
     std::array<juce::NormalisableRange<float>, kNumModDests>                       modDestRanges {};
-    std::array<std::array<std::atomic<float>*, kNumModDests>, kMaxChannels>        modDestAtoms {};
+    std::array<std::array<std::atomic<float>*, kNumModDests>, mu_limits::kMaxLayers>        modDestAtoms {};
     std::unordered_map<std::string_view, float>                                   modParamValues;
     double                                                                        modBeat = 0.0;
 

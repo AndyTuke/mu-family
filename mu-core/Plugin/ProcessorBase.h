@@ -95,15 +95,15 @@ public:
     // duplication. The plugin-specific bits are exposed as virtuals:
     //   - The per-slot preset directory + file extension (for the editor UI).
     //   - The full-preset directory + file extension (for the editor UI).
-    //   - applyMidiPresetSlot / applyFullMidiPreset — how this plugin actually
+    //   - applyMidiPresetLayer / applyFullMidiPreset — how this plugin actually
     //     loads the file (mu-clid stages a rhythm preset / defers a full
     //     preset to the loop point; mu-tant will define its own semantics).
     // Public so the shared MIDI editor panels can read/write directly.
     MidiPresetMap     midiPresetMap;
     MidiFullPresetMap midiFullPresetMap;
 
-    virtual juce::File   getPerSlotPresetDir()       const = 0;
-    virtual juce::String getPerSlotPresetExtension() const = 0;
+    virtual juce::File   getLayerPresetDir()       const = 0;
+    virtual juce::String getLayerPresetExtension() const = 0;
     virtual juce::File   getFullPresetDir()          const { return getPresetsDir(); }
     virtual juce::String getFullPresetExtension()    const = 0;
 
@@ -245,15 +245,15 @@ public:
     // Per-slot (layer) presets — one rhythm / voice / layer / lane. The shared header bar and the
     // MIDI program-change slots drive these; the product implements save / load / reset. A load
     // while playing is staged for the slot's boundary (hasPendingSwap until it lands).
-    // onSlotPresetCommitted fires on the message thread once a slot preset has been applied, so
+    // onLayerPresetCommitted fires on the message thread once a slot preset has been applied, so
     // the editor can refresh what APVTS attachments don't cover. The editor must clear it in its
     // destructor (the processor can outlive the editor).
     virtual juce::Array<juce::File> slotPresetFiles(int slot) const;   // default: every file in the per-slot dir
-    virtual void saveSlotPreset(int /*slot*/, const juce::String& /*name*/) {}
-    virtual void loadSlotPreset(int /*slot*/, const juce::File& /*file*/)   {}
+    virtual void saveLayerPreset(int /*slot*/, const juce::String& /*name*/) {}
+    virtual void loadLayerPreset(int /*slot*/, const juce::File& /*file*/)   {}
     virtual void resetSlot(int /*slot*/)                                    {}
     virtual bool hasPendingSwap(int /*slot*/) const                         { return false; }
-    std::function<void(int slot)> onSlotPresetCommitted;
+    std::function<void(int slot)> onLayerPresetCommitted;
 
     // Set by the standalone (mu-link bridge) so the product can publish its current full-preset
     // name for display on the mu-link mixer. Null in plugin builds / when mu-link isn't wired.
@@ -333,7 +333,7 @@ public:
     // Audio-thread: call once per processBlock, before the engine reads the MIDI. Queues the
     // block's program changes (scanMidiProgramChanges) and the CC / notes the control map claims
     // (those are taken out of `midi`), and schedules the message-thread drain that loads / performs
-    // them via applyMidiPresetSlot / applyFullMidiPreset / perform.
+    // them via applyMidiPresetLayer / applyFullMidiPreset / perform.
     void queueMidiProgramChanges(juce::MidiBuffer& midi)
     {
         const bool presets = scanMidiProgramChanges(midi);
@@ -363,7 +363,7 @@ public:
     bool scanMidiProgramChanges(const juce::MidiBuffer& midi);
 
     // Message-thread: drains the FIFO and dispatches each event via the
-    // applyMidiPresetSlot / applyFullMidiPreset virtuals. Run by handleAsyncUpdate.
+    // applyMidiPresetLayer / applyFullMidiPreset virtuals. Run by handleAsyncUpdate.
     void drainPendingMidiProgramChanges();
 
     // Maps a shared global-FX / return / master / channel-strip APVTS parameter
@@ -381,25 +381,25 @@ protected:
     // The layer behind persistence slot `i`: every declared slot, active or not, so a state with
     // more layers than are live still loads (and saves) their data. Defaults to getLayer.
     virtual Layer* slotLayer(int i) { return getLayer(i); }
-    void initSlotState(const juce::StringArray& slotPrefixes)
+    void initLayerState(const juce::StringArray& layerPrefixes)
     {
-        slotLayout = mu_pp::LayerLayout(*this, slotPrefixes);
-        slotExtras = { [this](int slot, juce::ValueTree& node)       { if (auto* l = slotLayer(slot)) l->writeExtras(node); },
+        layerLayout = mu_pp::LayerLayout(*this, layerPrefixes);
+        layerExtras = { [this](int slot, juce::ValueTree& node)       { if (auto* l = slotLayer(slot)) l->writeExtras(node); },
                        [this](int slot, const juce::ValueTree& node) { if (auto* l = slotLayer(slot)) l->applyExtras(node); } };
     }
-    juce::ValueTree captureComposedState()           { return mu_pp::captureState(apvts.state.getType(), slotLayout, slotExtras); }
-    void            applyComposedState(const juce::ValueTree& state) { mu_pp::applyState(state, slotLayout, slotExtras); }
-    juce::ValueTree captureSlotNode(int slot, const juce::Identifier& type) { return mu_pp::captureSlot(slotLayout, slotExtras, slot, type); }
-    void            applySlotNode(int slot, const juce::ValueTree& node)    { mu_pp::applySlot(slotLayout, slotExtras, slot, node); }
+    juce::ValueTree captureComposedState()           { return mu_pp::captureState(apvts.state.getType(), layerLayout, layerExtras); }
+    void            applyComposedState(const juce::ValueTree& state) { mu_pp::applyState(state, layerLayout, layerExtras); }
+    juce::ValueTree captureLayerNode(int slot, const juce::Identifier& type) { return mu_pp::captureLayer(layerLayout, layerExtras, slot, type); }
+    void            applyLayerNode(int slot, const juce::ValueTree& node)    { mu_pp::applyLayer(layerLayout, layerExtras, slot, node); }
     // A state in the composed shape: an older APVTS-dump state is rebuilt (`otherChild` receives
     // the product's older root children); a composed one is returned as is.
     juce::ValueTree toComposedState(const juce::ValueTree& state,
                                     const std::function<void(const juce::ValueTree&, juce::ValueTree&)>& otherChild = {}) const
     {
-        return mu_pp::composeLegacyState(state, slotLayout, otherChild);
+        return mu_pp::composeLegacyState(state, layerLayout, otherChild);
     }
-    mu_pp::LayerLayout slotLayout;
-    mu_pp::LayerExtras slotExtras;
+    mu_pp::LayerLayout layerLayout;
+    mu_pp::LayerExtras layerExtras;
 
 protected:
     // Internal transport state. Written by the UI (play / BPM) and the audio thread (beat
@@ -450,7 +450,7 @@ protected:
     // changes are loaded. Default: nothing.
     virtual void commitDeferredWork() {}
 
-    virtual void applyMidiPresetSlot(int slot, const juce::File& f) { loadSlotPreset(slot, f); }
+    virtual void applyMidiPresetLayer(int slot, const juce::File& f) { loadLayerPreset(slot, f); }
     virtual void applyFullMidiPreset(const juce::File& f)            = 0;
 
     // Number of active "channels" (rhythms / voices / whatever) — used to

@@ -212,7 +212,7 @@ the swap point.** Instead:
    `cancelStagedSwap` between the audio thread flagging it and this handler running);
    then under **one** `suspendProcessing` retire-then-swap each; then, outside the
    suspend and under one `ScopedApvtsLoading` guard, `pushRhythmToApvts(r)` +
-   `onSlotPresetCommitted(r)` (the shared ProcessorBase callback).
+   `onLayerPresetCommitted(r)` (the shared ProcessorBase callback).
 3. **Full-preset commit.** If `presetBoundaryReached`, clear the flags,
    `commitStagedFullPreset(pendingPreset)`, release the payload, fire
    `onPresetSwapCommitted()`.
@@ -226,7 +226,7 @@ the swap point.** Instead:
 - **`ChannelSidebar`** shows a per-slot staging badge — it polls the product's
   `isPendingSwap(r)` (→ `hasPendingSwap(r)`) and offers cancel via
   `onCancelPendingSwap(r)` (→ `cancelStagedSwap(r)`).
-- After a commit, `onSlotPresetCommitted(r)` / `onPresetSwapCommitted()` fire on
+- After a commit, `onLayerPresetCommitted(r)` / `onPresetSwapCommitted()` fire on
   the message thread so the editor can refresh **non-APVTS** UI state (name label,
   sample bar, colour). The editor **must clear these callbacks in its destructor** —
   the processor can outlive the editor (DAW close-window-keep-plugin), and a commit

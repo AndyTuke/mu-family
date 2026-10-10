@@ -18,11 +18,11 @@ namespace
 
 // Describe the layers once (ctor): each layer's v{N}_ param prefix (its modulators save through Arp). Every layer
 // preset, full preset and host session is built and applied from this.
-void PluginProcessor::initLayerState()
+void PluginProcessor::setupLayerState()
 {
     juce::StringArray prefixes;
     for (int l = 0; l < kNumChannels; ++l) prefixes.add(layerPrefix(l));
-    initSlotState(prefixes);
+    initLayerState(prefixes);
 }
 
 // Any saved state (host session or full preset, either format) in the composed shape. Sessions
@@ -36,7 +36,7 @@ juce::ValueTree PluginProcessor::toLayerState(const juce::ValueTree& tree) const
         for (int c = 0; c < child.getNumChildren(); ++c)
         {
             const auto mods = child.getChild(c);
-            auto node = mu_pp::findSlotNode(composed, (int) mods.getProperty("voice", -1));
+            auto node = mu_pp::findLayerNode(composed, (int) mods.getProperty("voice", -1));
             if (node.isValid() && ! node.getChildWithName("Modulators").isValid())
                 node.appendChild(mods.createCopy(), nullptr);
         }
@@ -59,16 +59,16 @@ void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 }
 
 // A layer preset: the layer's node (prefix-free param rows + modulators), so it loads into any layer.
-void PluginProcessor::saveSlotPreset(int layer, const juce::String& name)
+void PluginProcessor::saveLayerPreset(int layer, const juce::String& name)
 {
     if (layer < 0 || layer >= kNumChannels) return;
-    if (auto xml = captureSlotNode(layer, kLayerPresetTag).createXml())
-        mu_pp::writeXmlAtomically(*xml, getPerSlotPresetDir().getChildFile(mu_pp::safePresetFileName(name, "Layer")
-                                                                           + "." + getPerSlotPresetExtension()),
+    if (auto xml = captureLayerNode(layer, kLayerPresetTag).createXml())
+        mu_pp::writeXmlAtomically(*xml, getLayerPresetDir().getChildFile(mu_pp::safePresetFileName(name, "Layer")
+                                                                           + "." + getLayerPresetExtension()),
                                   onLoadError);
 }
 
-void PluginProcessor::loadSlotPreset(int layer, const juce::File& file)
+void PluginProcessor::loadLayerPreset(int layer, const juce::File& file)
 {
     if (layer < 0 || layer >= kNumChannels || ! file.existsAsFile()) return;
     auto xml = juce::XmlDocument::parse(file);
@@ -84,8 +84,8 @@ void PluginProcessor::loadSlotPreset(int layer, const juce::File& file)
 // Apply a layer node (the stopped load and the bar-line commit), then tell the editor.
 void PluginProcessor::applyLayerTree(int layer, const juce::ValueTree& tree)
 {
-    applySlotNode(layer, tree);
-    if (onSlotPresetCommitted) onSlotPresetCommitted(layer);
+    applyLayerNode(layer, tree);
+    if (onLayerPresetCommitted) onLayerPresetCommitted(layer);
 }
 
 // Commit the hot-swaps that reached their bar line: the full preset first (it supersedes the
@@ -101,9 +101,9 @@ void PluginProcessor::resetSlot(int layer)
 {
     if (layer < 0 || layer >= kNumChannels) return;
     hotSwap.cancel(layer);   // a staged swap would re-fill what we're resetting
-    applySlotNode(layer, {});
+    applyLayerNode(layer, {});
 }
 
-juce::File PluginProcessor::getPerSlotPresetDir() const { return getContentDir().getChildFile("Arps"); }
+juce::File PluginProcessor::getLayerPresetDir() const { return getContentDir().getChildFile("Arps"); }
 
 } // namespace mu_toni

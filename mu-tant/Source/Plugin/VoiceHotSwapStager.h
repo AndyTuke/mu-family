@@ -19,7 +19,6 @@ namespace mu_tant
 class VoiceHotSwapStager
 {
 public:
-    static constexpr int kMaxVoices = mu_limits::kMaxLayers;   // the family layer cap
 
     // ── Message thread: staging ──────────────────────────────────────────────
     // Per-voice (.muPattern) preset for voice `v`, superseding any swap pending on that slot.
@@ -38,11 +37,11 @@ public:
     //   fullPatBeats     = voice 0's gate-pattern length in beats (full-preset ref)
     bool checkBoundaries(int numActiveVoices, bool playing, bool wasPlaying,
                          double oldPos, double newPos,
-                         const std::array<double, kMaxVoices>& voicePatBeats,
+                         const std::array<double, mu_limits::kMaxLayers>& voicePatBeats,
                          double fullPatBeats) noexcept
     {
         bool any = false;
-        const int n = juce::jlimit(0, kMaxVoices, numActiveVoices);
+        const int n = juce::jlimit(0, mu_limits::kMaxLayers, numActiveVoices);
         for (int v = 0; v < n; ++v)
             any |= stager.flagIfReady(v, mu_hotswap::boundaryReached(playing, wasPlaying, oldPos, newPos,
                                                                        voicePatBeats[(size_t) v]));
@@ -63,7 +62,7 @@ public:
     }
 
 private:
-    mu_hotswap::Stager<juce::ValueTree, juce::ValueTree, kMaxVoices> stager;
+    mu_hotswap::Stager<juce::ValueTree, juce::ValueTree, mu_limits::kMaxLayers> stager;
 };
 
 } // namespace mu_tant

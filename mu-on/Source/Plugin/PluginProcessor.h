@@ -32,8 +32,6 @@ namespace mu_on
 class PluginProcessor : public ProcessorBase
 {
 public:
-    // Family parity: the shared mixer/sidebar size to kMaxChannels; mu-On uses a fixed 4.
-    static constexpr int kMaxChannels = mu_limits::kMaxLayers;   // the family layer cap
 
     PluginProcessor();
 
@@ -103,8 +101,8 @@ public:
 
     // ── Preset directories / extensions (per family file-format rule) ─────────
     // Full = .muOn; per-channel ("track" = one instrument lane) = .muTrack.
-    juce::File   getPerSlotPresetDir()       const override;
-    juce::String getPerSlotPresetExtension() const override { return "muTrack"; }
+    juce::File   getLayerPresetDir()       const override;
+    juce::String getLayerPresetExtension() const override { return "muTrack"; }
     juce::String getFullPresetExtension()    const override { return "muOn"; }
 
     // Full-preset save/load — the editor shell drives the UI (preset bar, Save dialog, browser).
@@ -118,8 +116,8 @@ public:
     // Per-track presets — a lane's engine params, its step row (Rumble: its envelope) and its
     // modulators. A track preset belongs to the instrument it was saved from.
     // (ProcessorBase slot API.)
-    void                    saveSlotPreset(int lane, const juce::String& name) override;
-    void                    loadSlotPreset(int lane, const juce::File& file) override;
+    void                    saveLayerPreset(int lane, const juce::String& name) override;
+    void                    loadLayerPreset(int lane, const juce::File& file) override;
     juce::Array<juce::File> slotPresetFiles(int lane) const override;   // the presets for that lane
     void                    resetSlot(int lane) override;                // engine params → defaults, modulators cleared
 

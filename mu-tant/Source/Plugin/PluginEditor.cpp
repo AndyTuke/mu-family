@@ -37,7 +37,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // at the loop boundary (after the shell's synchronous onPresetLoaded has
     // already run against the pre-swap state), so re-run the refresh here.
     proc.onPresetSwapCommitted = [this] { onPresetLoaded({}); };
-    proc.onSlotPresetCommitted = [this](int v)
+    proc.onLayerPresetCommitted = [this](int v)
     {
         voiceSidebar.refreshItems();              // glyph / colour may have changed
         if (voicePanel.getVoice() == v)
@@ -108,7 +108,7 @@ PluginEditor::~PluginEditor()
     // The processor can outlive the editor (DAW close-window-keep-plugin); clear
     // the hot-swap callbacks so a boundary commit can't fire into a dead editor.
     proc.onPresetSwapCommitted   = nullptr;
-    proc.onSlotPresetCommitted = nullptr;
+    proc.onLayerPresetCommitted = nullptr;
 }
 
 void PluginEditor::onPresetLoaded(const juce::File&)

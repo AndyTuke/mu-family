@@ -33,8 +33,6 @@ namespace mu_tant
 class PluginProcessor : public ProcessorBase
 {
 public:
-    // Family parity with mu-clid (max 8 rhythms / 8 voices / 8 channels).
-    static constexpr int kMaxVoices = mu_limits::kMaxLayers;   // the family layer cap
 
     PluginProcessor();
 
@@ -110,13 +108,13 @@ public:
     // ── ProcessorBase channel metadata ───────────────────────────────────────
     // mu-tant manages a dynamic set of voices ("layers") exactly like mu-clid's
     // rhythms — there are no inactive voices, only the ones that exist. The
-    // count is `numVoices` (1..kMaxVoices); add/delete adjust it.
+    // count is `numVoices` (1..mu_limits::kMaxLayers); add/delete adjust it.
     int          getNumChannels()              const override { return numVoices.load(std::memory_order_relaxed); }
     Layer*       getLayer(int i) override { return (i >= 0 && i < getNumChannels()) ? &voiceSlots[(size_t) i] : nullptr; }
     using ProcessorBase::getLayer;
     juce::String getChannelName(int idx)       const override
     {
-        return (idx >= 0 && idx < kMaxVoices) ? juce::String("Voice ") + juce::String(idx + 1)
+        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? juce::String("Voice ") + juce::String(idx + 1)
                                               : juce::String();
     }
     // Each voice carries an allocated palette-colour index (mu-clid's rule:
@@ -124,7 +122,7 @@ public:
     // so layers are distinctly + stably coloured.
     int          getChannelColourIndex(int idx) const override
     {
-        return (idx >= 0 && idx < kMaxVoices) ? voiceColourIndex[(size_t) idx] : 0;
+        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? voiceColourIndex[(size_t) idx] : 0;
     }
 
     // ── Dynamic voice management (message-thread; mirrors mu-clid add/delete) ──
@@ -147,8 +145,8 @@ public:
     // Per-voice ("layer") presets — the voice's `v{N}_*` subtree saved/loaded as
     // a `.muPattern` file (voice-agnostic base IDs, so a preset loads into any
     // slot). Mirrors mu-clid's per-rhythm preset I/O.
-    void saveSlotPreset(int voice, const juce::String& name) override;
-    void loadSlotPreset(int voice, const juce::File& file) override;
+    void saveLayerPreset(int voice, const juce::String& name) override;
+    void loadLayerPreset(int voice, const juce::File& file) override;
 
     // ── User wavetable import (per oscillator) ───────────────────────────────
     // Load a Serum/Vital .wav into the shared bank (dedup by path) and point the
@@ -159,8 +157,8 @@ public:
     bool         userWavetableMissing(int voice, int oscIndex) const; // path set but file gone
 
     // ── ProcessorBase preset wiring (per design-voice.md file formats) ────────
-    juce::File   getPerSlotPresetDir()       const override;   // voice presets live here
-    juce::String getPerSlotPresetExtension() const override { return "muPattern"; }
+    juce::File   getLayerPresetDir()       const override;   // voice presets live here
+    juce::String getLayerPresetExtension() const override { return "muPattern"; }
     juce::String getFullPresetExtension()    const override { return "muTant"; }
     juce::File   getWavetablesDir()          const;            // user/factory .wav wavetables live here
 
@@ -172,7 +170,7 @@ public:
     juce::ValueTree captureFullPreset() override;
     void            useLoadedFullPreset(juce::ValueTree state) override;
 
-    // A per-voice hot-swap commit fires ProcessorBase::onSlotPresetCommitted (the editor refreshes
+    // A per-voice hot-swap commit fires ProcessorBase::onLayerPresetCommitted (the editor refreshes
     // that voice's panel, sidebar and wavetable dropdowns); full presets fire onPresetSwapCommitted.
 
     // Hot-swap staging queries — drive the shared "SWP" badges (TransportBar for a
@@ -204,14 +202,14 @@ public:
     // Points at the per-voice insert's atomic reduction value; null when oob.
     const std::atomic<float>* getInsertGRPtr(int voice) const noexcept
     {
-        if (voice < 0 || voice >= kMaxVoices) return nullptr;
+        if (voice < 0 || voice >= mu_limits::kMaxLayers) return nullptr;
         return &inserts[(size_t) voice].grReduction;
     }
 
     // Modulation snapshot accessor for VoicePanel knob live-arc indicators.
     float getTantSnap(int voice, int snapIndex) const noexcept
     {
-        if (voice < 0 || voice >= kMaxVoices) return 0.0f;
+        if (voice < 0 || voice >= mu_limits::kMaxLayers) return 0.0f;
         return voiceSnap[(size_t) voice][(size_t) snapIndex].load();
     }
 
@@ -242,7 +240,7 @@ private:
         std::atomic<float> *level, *gateGap, *gateBypass;
         std::atomic<float> *drvChar, *insP1, *insP2, *insP3, *insP4;
     };
-    std::array<VoicePtrs, kMaxVoices> voicePtrs {};
+    std::array<VoicePtrs, mu_limits::kMaxLayers> voicePtrs {};
     struct GlobalPtrs { std::atomic<float> *root, *scale; } globalPtrs {};
     void cacheParamPointers();
 
@@ -267,11 +265,11 @@ private:
     double blkBeatsPerSample = 0.0;
 
     WavetableBank                                          bank;
-    std::array<std::unique_ptr<VoiceEngine>, kMaxVoices>   voices;
+    std::array<std::unique_ptr<VoiceEngine>, mu_limits::kMaxLayers>   voices;
     // Per-voice insert effect (shared mu-core InsertProcessor) — runs after the
     // gate, before the pan/sum into the mixer (engine → insert → mixer, the
     // family-wide signal flow). Mirrors mu-clid's per-rhythm insert.
-    std::array<InsertProcessor,              kMaxVoices>   inserts;
+    std::array<InsertProcessor,              mu_limits::kMaxLayers>   inserts;
 
     // ── Retire-tail for count-reducing full-preset swaps ──────────────────────
     // A committed full preset with fewer voices would hard-cut the dropped voices
@@ -289,21 +287,21 @@ private:
         int                 insAlgo = 0;       // OLD insert algo + params, so the insert
         std::array<float,4> insP {};           // tail (e.g. a reverb the new preset drops) fades too
     };
-    std::array<RetiringVoice, kMaxVoices> retiring {};
+    std::array<RetiringVoice, mu_limits::kMaxLayers> retiring {};
     int retireRampSamples() const { return juce::jmax(1, (int) (currentSampleRate * 0.025)); }
 
 public:
     // Per-voice modulator data — 8 ControlSequences + ModulationMatrix + modLock
     // per voice. Public so the UI (ModulatorPanel) can pass a pointer to the
     // currently-edited voice's slot.
-    std::array<Pattern, kMaxVoices> voiceSlots;
+    std::array<Pattern, mu_limits::kMaxLayers> voiceSlots;
     // (each voice's gate / filter / pitch envelopes, user wavetables and level tap live in its Pattern)
 
 private:
     // Per-voice modulated-value snapshots — written by the audio thread in
     // renderVoice() after the matrix runs; read by VoicePanel at ~30 Hz via
     // getTantSnap() to drive live-arc indicators on bound knobs.
-    std::array<std::atomic<float>, mu_tant::kTantSnapCount> voiceSnap[kMaxVoices];
+    std::array<std::atomic<float>, mu_tant::kTantSnapCount> voiceSnap[mu_limits::kMaxLayers];
 
     // Pre-allocated modulation paramValues map — reused every block to avoid
     // audio-thread allocation. Keys match the strings in MuTantModDest::kModDestTable.
@@ -323,7 +321,7 @@ private:
     static constexpr int kNumModDests = 31;   // == mu_tant::kModDestCount (asserted in the .cpp)
     std::array<const char*, kNumModDests>                    modDestIds   {};
     std::array<juce::NormalisableRange<float>, kNumModDests> modDestRanges{};
-    std::array<std::array<const std::atomic<float>*, kNumModDests>, kMaxVoices> modDestAtoms{};
+    std::array<std::array<const std::atomic<float>*, kNumModDests>, mu_limits::kMaxLayers> modDestAtoms{};
 
     // Master-loop length param pointer, cached for RT-safe reads (no per-block
     // string lookup) in processBlock. Set in cacheParamPointers().
@@ -357,12 +355,12 @@ private:
     // Written in prepareToPlay (host suspends the audio thread first) — no atomic needed.
     double currentSampleRate = 44100.0;
 
-    // Number of existing voices (layers), 1..kMaxVoices. Audio thread reads it
+    // Number of existing voices (layers), 1..mu_limits::kMaxLayers. Audio thread reads it
     // atomically; add/removeVoice mutate it on the message thread under voicesLock.
     std::atomic<int> numVoices { 1 };
     // Per-voice palette-colour index (0..7). Default identity; addVoice assigns
     // the first-unused colour, remove/swap shift it so colour follows the voice.
-    std::array<int, kMaxVoices> voiceColourIndex { { 0, 1, 2, 3, 4, 5, 6, 7 } };
+    std::array<int, mu_limits::kMaxLayers> voiceColourIndex { { 0, 1, 2, 3, 4, 5, 6, 7 } };
     int firstUnusedColourIndex() const;   // lowest palette index not used by an active voice
     // Guards the voice count + the per-voice data shift during add/remove against
     // the audio thread. processBlock takes a ScopedTryLock and silences the block
@@ -380,7 +378,7 @@ private:
     juce::String serialiseVoiceColours() const;
     void         restoreVoiceColours(const juce::String& csv);
 
-    Layer* slotLayer(int i) override { return (i >= 0 && i < kMaxVoices) ? &voiceSlots[(size_t) i] : nullptr; }
+    Layer* slotLayer(int i) override { return (i >= 0 && i < mu_limits::kMaxLayers) ? &voiceSlots[(size_t) i] : nullptr; }
     friend struct Pattern;   // its persistence hooks hand over to the voice-extras members below
     // Composed state (mu-core LayerState): the voice layout every save / load uses, a voice's
     // non-parameter data (modulators, gates, user wavetables — they live outside APVTS) from its
@@ -393,7 +391,7 @@ private:
     juce::ValueTree toVoiceState(const juce::ValueTree& tree) const;
 
     // ── Preset hot-swap (full / per-voice) ─────────────────────────
-    // loadPreset / loadSlotPreset stage the parsed tree when the transport is
+    // loadPreset / loadLayerPreset stage the parsed tree when the transport is
     // playing (commit at the loop boundary) and apply immediately when stopped.
     // The apply bodies are factored out so the boundary commit (handleAsyncUpdate)
     // and the immediate path share one code path.

@@ -82,7 +82,7 @@ void ProcessorBase::drainPendingMidiProgramChanges()
         if (! midiPresetMap.hasPreset(ev.presetIndex))   return;
         const juce::File f { midiPresetMap.getPresetPath(ev.presetIndex) };
         if (f.existsAsFile())
-            applyMidiPresetSlot(ev.slot, f);
+            applyMidiPresetLayer(ev.slot, f);
     };
     for (int i = 0; i < size1; ++i) handle(pcQueue[(size_t)(start1 + i)]);
     for (int i = 0; i < size2; ++i) handle(pcQueue[(size_t)(start2 + i)]);
@@ -437,7 +437,7 @@ juce::File ProcessorBase::getPresetsDir() const
 
 juce::Array<juce::File> ProcessorBase::slotPresetFiles(int /*slot*/) const
 {
-    return mu_pp::listPresetFiles(getPerSlotPresetDir(), getPerSlotPresetExtension());
+    return mu_pp::listPresetFiles(getLayerPresetDir(), getLayerPresetExtension());
 }
 
 juce::File ProcessorBase::getDefaultPresetFile() const
