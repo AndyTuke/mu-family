@@ -87,6 +87,83 @@ public:
             expectEquals((int) mem.registry().slots[0].active.load(), 0);   // slot freed
         }
 
+        beginTest("the producer holds its target depth instead of filling the ring");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            MuLinkClient client;
+            client.onRender([] (float* const*, int, int, const TransportSnapshot&) {});
+            expect(client.attach("depth", 2), "attach failed");
+            expectEquals(client.getTargetDepthFrames(), MuLinkClient::kDefaultTargetDepthFrames);
+
+            client.setTargetDepthFrames(2048);
+            expect(waitForFrames(mem, 0, 2048, 3000), "never reached the target depth");
+            juce::Thread::sleep(120);   // it must stop there, not run on to the ring's capacity
+            expectEquals(mem.ring(0).readAvailable(), 2048);
+
+            client.setTargetDepthFrames(4096);
+            expect(waitForFrames(mem, 0, 4096, 3000), "never reached the raised depth");
+            juce::Thread::sleep(120);
+            expectEquals(mem.ring(0).readAvailable(), 4096);
+
+            client.setTargetDepthFrames(1000000);   // absurd: clamped to what the ring can hold
+            juce::Thread::sleep(300);
+            expect(mem.ring(0).readAvailable() <= kRingCapacityFrames, "ring overfilled");
+            expect(mem.ring(0).readAvailable() >= kRingCapacityFrames - 1024, "clamped depth should be near the capacity");
+
+            client.setTargetDepthFrames(0);         // nonsense below the floor: still renders
+            expect(client.getTargetDepthFrames() >= 512, "depth below one render chunk");
+            client.setTargetDepthFrames(-5);
+            expect(client.getTargetDepthFrames() >= 512, "negative depth accepted");
+            client.detach();
+        }
+
+        // Informational (set MU_LATENCY_MEASURE=1): real-time underruns against render depth, to pick the
+        // default. A server thread consumes 512-frame blocks on the 48 kHz clock; the client renders with a
+        // fixed cost plus an occasional slow chunk. The numbers are logged, not asserted.
+        if (juce::SystemStats::getEnvironmentVariable("MU_LATENCY_MEASURE", {}).isNotEmpty())
+        {
+            beginTest("measure: underruns against render depth (real time)");
+            for (const int depth : { 1024, 2048, 4096 })   // 1024 = two server blocks, the floor
+                for (const double slowMs : { 12.0, 30.0, 60.0 })
+                {
+                    MuLinkServerMemory mem;
+                    expect(mem.create(), "server memory failed");
+                    ServerEngine engine;
+                    engine.attachMemory(&mem);
+                    engine.prepare(48000.0, 512, 120.0);
+                    engine.setPlaying(true);
+
+                    std::atomic<int> chunk { 0 };
+                    MuLinkClient client;
+                    client.onRender([&] (float* const* out, int ch, int frames, const TransportSnapshot&)
+                    {
+                        const int k = chunk.fetch_add(1);
+                        const double costMs = (slowMs > 0.0 && k % 40 == 7) ? slowMs : 2.0;   // a slow chunk every 40th
+                        const auto until = juce::Time::getMillisecondCounterHiRes() + costMs;
+                        while (juce::Time::getMillisecondCounterHiRes() < until) {}
+                        for (int c = 0; c < ch; ++c) for (int i = 0; i < frames; ++i) out[c][i] = 0.1f;
+                    });
+                    client.setTargetDepthFrames(depth);
+                    expect(client.attach("measure", 2), "attach failed");
+
+                    OutBuf out(2, 512);
+                    long long underruns = 0;
+                    juce::Thread::sleep(400);   // let the ring fill before the device starts
+                    const double blockMs = 512.0 * 1000.0 / 48000.0;
+                    auto next = juce::Time::getMillisecondCounterHiRes();
+                    for (int b = 0; b < 140; ++b)   // ≈ 1.5 s
+                    {
+                        underruns += engine.renderBlock(out.data(), 2, 512).underrunFrames;
+                        next += blockMs;
+                        while (juce::Time::getMillisecondCounterHiRes() < next) juce::Thread::sleep(1);
+                    }
+                    client.detach();
+                    logMessage("  depth " + juce::String(depth) + " frames (" + juce::String(depth / 48.0, 1)
+                               + " ms), slow chunk " + juce::String(slowMs, 0) + " ms: underrun frames = " + juce::String(underruns));
+                }
+        }
+
         beginTest("a detached slot can be re-claimed by a new client");
         {
             MuLinkServerMemory mem;

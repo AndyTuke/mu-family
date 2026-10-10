@@ -48,6 +48,20 @@ public:
     // rendered, i.e. how long before it is heard (the render lead). Producer thread only.
     int renderLeadFrames() const noexcept { return currentLead; }
 
+    // How far ahead of the server this client keeps its ring filled, in frames. The deeper it is,
+    // the safer against a late render and the later Stop, mutes, knob moves and preset changes are
+    // heard (lead ≈ depth). Never less than two server blocks (the server reads a block at a time),
+    // and never more than the ring holds. Any thread; takes effect on the next fill pass.
+    // Measured (ClientTests, MU_LATENCY_MEASURE=1): a depth rides out a render stall about as long as
+    // itself — 1024 fails a 30 ms stall, 2048 a 60 ms one, 4096 survives both. 4096 (≈ 85 ms at 48 kHz,
+    // half the old full-ring lead) is the safe default until mu-link offers a Latency choice.
+    static constexpr int kDefaultTargetDepthFrames = 4096;
+    void setTargetDepthFrames(int frames) noexcept
+    {
+        targetDepth.store(juce::jlimit(kRenderChunk, kRingCapacityFrames - kRenderChunk, frames), std::memory_order_relaxed);
+    }
+    int  getTargetDepthFrames() const noexcept     { return targetDepth.load(std::memory_order_relaxed); }
+
     // Try to attach to a running mu-link. `numChannels` is recorded in the registry
     // (informational). Returns false if mu-link isn't running, the protocol version
     // mismatches, or every slot is taken — the product then runs on its own device.
@@ -149,10 +163,13 @@ public:
 
 private:
     static constexpr int kRenderChunk = 512;   // frames rendered per fill pass
+    // Top up only when at least this many frames are missing, so the product is rendered in useful
+    // chunks rather than in slivers of whatever was consumed since the last pass.
+    static constexpr int kMinFill = 256;
 
-    // Producer loop: keep the ring full. Each pass renders into per-channel scratch via
-    // onRender, interleaves to the ring layout, and writes whatever free space allows;
-    // then bumps the heartbeat and briefly waits. Running ahead by up to the ring depth.
+    // Producer loop: keep the ring filled to the target depth. Each pass renders into per-channel
+    // scratch via onRender, interleaves to the ring layout, and writes up to the missing frames;
+    // then bumps the heartbeat and briefly waits.
     void run() override
     {
         AudioRingView ring = mem.ring();
@@ -165,10 +182,23 @@ private:
 
         while (! threadShouldExit())
         {
-            int space = ring.writeAvailable();
-            while (space > 0 && ! threadShouldExit())
+            for (;;)
             {
-                const int n = juce::jmin(space, kRenderChunk);
+                if (threadShouldExit()) break;
+
+                // The depth to hold: the requested target, but at least two server blocks (it
+                // reads a block at a time) and never more than the ring holds.
+                TransportSnapshot snap = readTransport(mem.transport());
+                const int serverBlock = (int) juce::jmin(snap.blockSize, (std::uint32_t) 4096);   // shared memory: don't trust it blindly
+                const int depth = juce::jmin(juce::jmax(targetDepth.load(std::memory_order_relaxed), 2 * serverBlock),
+                                             kRingCapacityFrames - kRenderChunk);
+                const int buffered = ring.readAvailable();
+                const int missing = depth - buffered;
+                if (missing < kMinFill)
+                    break;   // filled to the target depth (to within a sliver — see kMinFill)
+                const int n = juce::jmin(juce::jmin(missing, ring.writeAvailable()), kRenderChunk);
+                if (n <= 0)
+                    break;
 
                 // Consume-time transport: this look-ahead block plays AFTER everything
                 // already queued, so project the master position forward by the buffered
@@ -176,10 +206,8 @@ private:
                 // the block carries the position at which mu-link will actually play it.
                 // Project BOTH the sample position and the musical (ppq) position so the
                 // slaved sequencer's bar position lands where mu-link will play this block.
-                TransportSnapshot snap = readTransport(mem.transport());
-                const std::uint64_t buffered = (std::uint64_t) ring.readAvailable();
-                currentLead = (int) buffered;
-                snap.samplePos += buffered;
+                currentLead = buffered;
+                snap.samplePos += (std::uint64_t) buffered;
                 const double projSr = snap.sampleRate != 0 ? (double) snap.sampleRate : 48000.0;
                 snap.ppqPosition += ((double) buffered / projSr) * (snap.tempoBpm / 60.0);
 
@@ -194,11 +222,9 @@ private:
                         interleaved[(std::size_t) i * (std::size_t) rc + (std::size_t) c] = chanPtrs[(std::size_t) c][i];
 
                 const int wrote = ring.writeFrames(interleaved.data(), n);
-                space -= wrote;
                 if (wrote < n)
                     break;   // ring full for now
             }
-
             mem.bumpHeartbeat();
             wait(2);          // ~2 ms between fills (woken early by notify() on detach)
         }
@@ -207,6 +233,7 @@ private:
     MuLinkClientMemory mem;
     RenderCallback     renderCb;
     int                currentLead  = 0;   // producer thread: frames queued ahead of the block in render
+    std::atomic<int>   targetDepth  { kDefaultTargetDepthFrames };   // see setTargetDepthFrames
     bool               attached     = false;
     int                ringChannels = kMaxChannels;
     std::uint32_t      lastPcEpoch  = 0;   // last scene PC epoch seen (pollProgramChange)

@@ -55,7 +55,7 @@ Pic "mu-link window: device picker on the left, transport and clock controls, an
 # ── 2. The Concept ───────────────────────────────────────────────────────────
 H1 "2. How It Works"
 P "Running two standalone audio apps at once normally means two separate connections to your soundcard, each with its own clock — which drift apart over time and cannot share one output cleanly. mu-link solves this the way professional audio systems do: it owns the one hardware output, and the apps send their audio to it through a fast shared-memory connection on the same machine."
-P "Because mu-link owns the device, the soundcard's own clock becomes the single master clock for everything. Every connected app renders exactly in step with it, so there is no drift and no jitter — the sync is sample-accurate. The apps each render slightly ahead into a buffer, so a momentary hiccup in one app can never click or glitch the others."
+P "Because mu-link owns the device, the soundcard's own clock becomes the single master clock for everything. Every connected app renders exactly in step with it, so there is no drift and no jitter — the sync is sample-accurate. The apps each render slightly ahead into a buffer, so a momentary hiccup in one app can never click or glitch the others. If a connected app crackles, reduce its load (for example, use a lighter preset)."
 P "mu-link is NOT a system-wide virtual sound card or audio driver. It only connects mu-family apps, by design — that keeps it simple, reliable, and driver-free."
 
 # ── 3. Installation ──────────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ Bullet "Within about a second the app detects mu-link and attaches. The app's ti
 Bullet "From then on the app's audio is summed into mu-link's output, and its transport follows mu-link's master clock."
 Bullet "Quit mu-link and every app instantly reverts to its own audio device and internal clock — no restart needed."
 H2 "MIDI in Connected Apps"
-Bullet "MIDI in  —  each app still hears the keyboards and controllers enabled in its own MIDI settings while connected, so program changes still load its presets. For now they arrive roughly a sixth of a second late. An app does not follow MIDI clock while connected; mu-link sets the tempo, so connect external clock to mu-link."
+Bullet "MIDI in  —  each app still hears the keyboards and controllers enabled in its own MIDI settings while connected, so program changes still load its presets. For now they arrive roughly 85 milliseconds late, which is under a tenth of a second. An app does not follow MIDI clock while connected; mu-link sets the tempo, so connect external clock to mu-link."
 Bullet "MIDI out  —  only mu-Clid makes MIDI; mu-Tant, mu-Toni and mu-On send none. While connected, mu-Clid's MIDI output goes to the MIDI output chosen in mu-Clid's own MIDI settings, timed to line up with mu-link's audio and with mu-link's MIDI clock out."
 Bullet "While connected, mu-Clid holds that MIDI output port itself: choosing none in its MIDI settings has no effect until mu-link disconnects. On disconnect it sends all-notes-off to the port and hands it back to the app."
 P "mu-link's own MIDI output, chosen in Audio Setup, carries only MIDI clock and transport messages (see MIDI Clock Out). Give mu-Clid a different MIDI output port, because many Windows MIDI ports can be opened by only one application at a time."

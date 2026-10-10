@@ -285,7 +285,7 @@ Bullet "Launch mu-link, then launch mu-Tant standalone — in either order. With
 Bullet "mu-Tant's audio now plays through mu-link's output device, summed with any other connected mu apps, and appears as a channel in mu-link's client strip with its own level, pan, mute, and solo."
 Bullet "mu-Tant's gate and modulators follow mu-link's clock: mu-link is the tempo master, and its Play/Stop and tempo drive mu-Tant. Use mu-link's transport (not mu-Tant's) while connected."
 Bullet "Quit mu-link and mu-Tant instantly reverts to its own audio device and internal transport — no restart needed."
-Bullet "MIDI in  —  the controllers you enabled in the standalone's MIDI settings still reach mu-Tant while it is connected, so program changes still load presets. For now they arrive roughly a sixth of a second late. Incoming MIDI clock is not followed while connected, because mu-link sets the tempo; to sync to external gear, connect its clock to mu-link instead."
+Bullet "MIDI in  —  the controllers you enabled in the standalone's MIDI settings still reach mu-Tant while it is connected, so program changes still load presets. For now they arrive roughly 85 milliseconds late, which is under a tenth of a second. Incoming MIDI clock is not followed while connected, because mu-link sets the tempo; to sync to external gear, connect its clock to mu-link instead."
 P "This lets you run mu-Tant, mu-Clid, and other mu standalones together, perfectly in sync and mixed to a single output — and lets mu-link slave the whole rig to an external MIDI clock. See the mu-link User Manual for the full picture."
 
 # ── 19. Signal Flow ───────────────────────────────────────────────────────────
