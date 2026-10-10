@@ -7,6 +7,29 @@
 #include "Control/MidiControlMap.h"
 #include "Control/MidiControlRouter.h"
 
+#include <atomic>
+#include <cstdlib>
+#include <new>
+#include <thread>
+
+// Counts heap allocations made by a thread that has switched counting on, so a test can prove
+// that a call allocates nothing. Replacing the global operator new affects the whole test binary,
+// but only the counting thread's allocations are recorded.
+namespace
+{
+    thread_local bool         gCountAllocations = false;
+    thread_local std::size_t  gAllocations      = 0;
+}
+
+void* operator new(std::size_t n)
+{
+    if (gCountAllocations) ++gAllocations;
+    if (void* p = std::malloc(n == 0 ? 1 : n)) return p;
+    throw std::bad_alloc();
+}
+void operator delete(void* p) noexcept { std::free(p); }
+void operator delete(void* p, std::size_t) noexcept { std::free(p); }
+
 using namespace mu_core;
 
 class MidiControlTest : public juce::UnitTest
@@ -381,6 +404,134 @@ public:
             expectEquals(midi.getNumEvents(), 1);                              // the release stays in the block
             bool isNote = false; int ch = 0, num = 0;
             expect(map.takeLearned(isNote, ch, num) && isNote && num == 51, "should learn the press, not the release");
+        }
+
+        beginTest("router: process allocates nothing, with claimed and unclaimed messages in a big block");
+        {
+            MidiControlMap map;
+            for (int n = 0; n < 64; n += 2) map.add(cc(1, n, param("p")));          // even CCs are mapped
+            map.add(note(1, 36, act(ControlActionType::MuteLayer, 1)));
+            MidiControlRouter router(map);
+            router.noteBlock(playingBlock(0.0, 0.1), 4.0);
+
+            // A block the size a host might hand over, with half its CCs claimed.
+            auto makeBlock = []
+            {
+                juce::MidiBuffer b;
+                b.ensureSize(16384);
+                for (int i = 0; i < 100; ++i)
+                {
+                    b.addEvent(juce::MidiMessage::controllerEvent(1, i % 64, 40), i);
+                    if (i % 10 == 0) b.addEvent(juce::MidiMessage::noteOn(1, 36, (juce::uint8) 90), i);
+                    if (i % 10 == 5) b.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 90), i);
+                }
+                return b;
+            };
+
+            std::size_t total = 0;
+            for (int rep = 0; rep < 50; ++rep)
+            {
+                auto block = makeBlock();
+                router.noteBlock(playingBlock(rep * 0.1, 0.1), 4.0);
+                gAllocations = 0; gCountAllocations = true;
+                router.process(block);
+                gCountAllocations = false;
+                total += gAllocations;
+                // The unclaimed notes (60) and odd CCs stay; the claimed ones are gone.
+                bool leftover = false;
+                for (const auto meta : block)
+                {
+                    const auto m = meta.getMessage();
+                    if (m.isController() && m.getControllerNumber() % 2 == 0 && m.getControllerNumber() < 64) leftover = true;
+                    if (m.isNoteOn() && m.getNoteNumber() == 36) leftover = true;
+                }
+                expect(! leftover, "a claimed message stayed in the block");
+                Recorder rec; router.drain(rec);
+            }
+            expectEquals((int) total, 0);
+        }
+
+        beginTest("router: quantise timing holds for every block size");
+        {
+            for (const double len : { 0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0 })
+                for (const double pressAt : { 5.05, 5.5, 5.98, 7.2, 8.0 })
+                {
+                    MidiControlMap map;
+                    map.setQuantise(Quantise::Bar);
+                    map.add(cc(1, 1, act(ControlActionType::MuteLayer, 0)));
+                    MidiControlRouter router(map);
+                    Recorder rec;
+
+                    // Run contiguous blocks up to the press, press, then run on until it is handed over.
+                    double start = 0.0;
+                    for (; start + len <= pressAt; start += len)
+                        router.noteBlock(playingBlock(start, len), 4.0);
+                    const double pressEnd = start;                       // where the last block ended
+                    auto press = pressOf(1);
+                    router.process(press); router.drain(rec);
+
+                    const double boundary = std::ceil(pressEnd / 4.0 - 1.0e-9) * 4.0;
+                    double firedStart = -1.0;
+                    if (! rec.got.empty()) firedStart = pressEnd;
+                    for (int guard = 0; firedStart < 0.0 && guard < 100000; ++guard, start += len)
+                    {
+                        router.noteBlock(playingBlock(start, len), 4.0);
+                        juce::MidiBuffer none; router.process(none); router.drain(rec);
+                        if (! rec.got.empty()) firedStart = start;
+                    }
+                    // Never more than two blocks early (the upcoming block leads into it), never after it.
+                    const bool ok = firedStart >= boundary - 2.0 * len - 1.0e-6 && firedStart <= boundary + 1.0e-6;
+                    expect(ok, "block " + juce::String(len) + ", press at " + juce::String(pressAt)
+                               + ": handed over at " + juce::String(firedStart) + ", boundary " + juce::String(boundary));
+                }
+        }
+
+        beginTest("router: editing the table while messages arrive never performs the wrong thing");
+        {
+            MidiControlMap map;
+            MidiControlRouter router(map);
+            std::atomic<bool> stop { false };
+
+            // The editor: constantly adds and removes parameter mappings named after their CC number.
+            std::thread editor([&]
+            {
+                juce::Random rng(7);
+                while (! stop.load())
+                {
+                    const int n = 1 + rng.nextInt(8);
+                    if (rng.nextBool()) map.add(cc(1, n, param(("cc" + juce::String(n)).toRawUTF8())));
+                    else                map.remove(rng.nextInt(juce::jmax(1, map.size())));
+                }
+            });
+
+            // The audio thread and the message thread: feed CC 1..8, drain, check every action.
+            int wrong = 0, performed = 0;
+            struct Check : ControlSink
+            {
+                int& wrong; int& performed;
+                Check(int& w, int& p) : wrong(w), performed(p) {}
+                bool perform(const ControlAction& a) override
+                {
+                    ++performed;
+                    if (a.type != ControlActionType::Parameter || ! a.paramId.startsWith("cc")) ++wrong;
+                    else { const int n = a.paramId.substring(2).getIntValue(); if (n < 1 || n > 8) ++wrong; }
+                    return true;
+                }
+            } check(wrong, performed);
+
+            const auto until = juce::Time::getMillisecondCounter() + 500;
+            while (juce::Time::getMillisecondCounter() < until)
+            {
+                juce::MidiBuffer midi;
+                for (int n = 1; n <= 8; ++n) midi.addEvent(juce::MidiMessage::controllerEvent(1, n, 77), n);
+                router.noteBlock(playingBlock(0.0, 0.1), 4.0);
+                router.process(midi);
+                router.drain(check);
+            }
+            stop = true;
+            editor.join();
+            expectEquals(wrong, 0);
+            expect(performed > 0, "nothing was performed at all");
         }
 
         beginTest("action names round trip and unknown names are none");
