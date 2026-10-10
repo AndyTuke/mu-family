@@ -27,7 +27,7 @@ The editor inherits `mu-core/UI/EditorShellBase.h`, so TransportBar, StatusBar, 
 
 ### Freeware — the License subsystem is unused by design
 
-μ-Toni ships with **no purchase, licence key, activation, or demo mode**. The mu-core License subsystem (`LicenseManager`, `ActivationStore`, `OnlineActivation`, `LemonSqueezyClient`) and the shell's `ActivationPanel` are deliberately not wired, `Source/License/` holds only `.gitkeep` (no `LicenseKey.h`, unlike mu-clid / mu-tant), and the About panel shows no licence status. This is a settled design decision, **not** an unfinished task — don't "fix" it by adding licence gating.
+μ-Toni ships with **no purchase, licence key, activation, or demo mode**. The mu-core License subsystem (`LicenseManager`, `ActivationStore`, `OnlineActivation`, `LemonSqueezyClient`) and the shell's `ActivationOverlay` are deliberately not wired, `Source/License/` holds only `.gitkeep` (no `LicenseKey.h`, unlike mu-clid / mu-tant), and the About panel shows no licence status. This is a settled design decision, **not** an unfinished task — don't "fix" it by adding licence gating.
 
 ### Current placeholders / not yet wired
 

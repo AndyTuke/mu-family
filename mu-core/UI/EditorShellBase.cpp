@@ -20,19 +20,19 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
                                                         proc.getUiScale()), &proc)),
       processorRef(proc),
       transportBar(proc),
-      activationPanel(proc),
-      midiPresetsPanel(proc),
-      midiFullPresetsPanel(proc)
+      activationOverlay(proc),
+      midiPresetsOverlay(proc),
+      midiFullPresetsOverlay(proc)
 {
     setLookAndFeel(&lookAndFeel);
 
     addAndMakeVisible(transportBar);
-    addChildComponent(aboutPanel);
-    addChildComponent(activationPanel);
+    addChildComponent(aboutOverlay);
+    addChildComponent(activationOverlay);
     addChildComponent(saveDialog);
     addChildComponent(presetBrowser);
-    addChildComponent(midiPresetsPanel);
-    addChildComponent(midiFullPresetsPanel);
+    addChildComponent(midiPresetsOverlay);
+    addChildComponent(midiFullPresetsOverlay);
     addAndMakeVisible(statusBar);
 
     wireTransportBar();
@@ -109,11 +109,11 @@ void EditorShellBase::wireTransportBar()
 void EditorShellBase::wireOverlays()
 {
     // ── About panel ─────────────────────────────────────────────────────────
-    aboutPanel.onDismiss = [this] { showAbout(false); };
+    aboutOverlay.onDismiss = [this] { showAbout(false); };
 
     // ── Activation overlay (non-blocking — Demo until activated) ──────────────
-    activationPanel.onDismiss   = [this] { showActivation(false); };
-    activationPanel.onActivated = [this]
+    activationOverlay.onDismiss   = [this] { showActivation(false); };
+    activationOverlay.onActivated = [this]
     {
         // License state just flipped (online-activated) — drop the demo banner + relayout.
         // Demo-cap affordances (add button etc.) re-sync via their own refresh timers.
@@ -161,8 +161,8 @@ void EditorShellBase::wireOverlays()
     presetBrowser.onLoadPreset = [this](const juce::File& f) { loadPresetFromUi(f); };
     presetBrowser.onClose = [this] { showPresetBrowser(false); };
 
-    midiPresetsPanel.onClose     = [this] { showMidiPresets(false);     showSettings(true); };
-    midiFullPresetsPanel.onClose = [this] { showMidiFullPresets(false); showSettings(true); };
+    midiPresetsOverlay.onClose     = [this] { showMidiPresets(false);     showSettings(true); };
+    midiFullPresetsOverlay.onClose = [this] { showMidiFullPresets(false); showSettings(true); };
 
     // Surface preset / state-load failures to the user.
     processorRef.onLoadError = [this](const juce::String& msg)
@@ -410,10 +410,10 @@ void EditorShellBase::setProductIdentity(const juce::String& displayName, const 
     credits.add(credit("clap-juce-extensions \xe2\x80\x94 MIT"));
     credits.addArray(extraCredits);
 
-    aboutPanel.setProductInfo(displayName, credits);
+    aboutOverlay.setProductInfo(displayName, credits);
     transportBar.setLogoText(displayName);
     if (processorRef.hasLicensing())
-        activationPanel.setProductName(displayName);
+        activationOverlay.setProductName(displayName);
 }
 
 void EditorShellBase::setScrews(bool on)
@@ -509,18 +509,18 @@ void EditorShellBase::hideAllOverlays()
     if (mixerOverlay)      animator.cancelAnimation(mixerOverlay, true);
     if (settingsOverlay)   animator.cancelAnimation(settingsOverlay, true);
     animator.cancelAnimation(&presetBrowser, true);
-    animator.cancelAnimation(&midiPresetsPanel, true);
-    animator.cancelAnimation(&midiFullPresetsPanel, true);
+    animator.cancelAnimation(&midiPresetsOverlay, true);
+    animator.cancelAnimation(&midiFullPresetsOverlay, true);
 
     auto setOne = [](juce::Component* c) { if (c) { c->setAlpha(1.0f); c->setVisible(false); } };
     setOne(mixerOverlay);
     setOne(settingsOverlay);
-    aboutPanel.setVisible(false);
-    activationPanel.setVisible(false);
+    aboutOverlay.setVisible(false);
+    activationOverlay.setVisible(false);
     saveDialog.setVisible(false);
     presetBrowser.setVisible(false);
-    midiPresetsPanel.setVisible(false);
-    midiFullPresetsPanel.setVisible(false);
+    midiPresetsOverlay.setVisible(false);
+    midiFullPresetsOverlay.setVisible(false);
 
     mixerVisible           = false;
     transportBar.setMixerActive(false);
@@ -585,15 +585,15 @@ void EditorShellBase::showMixer(bool show)
 void EditorShellBase::showAbout(bool show)
 {
     aboutVisible = show;
-    aboutPanel.setVisible(show);
-    aboutPanel.toFront(false);
+    aboutOverlay.setVisible(show);
+    aboutOverlay.toFront(false);
 }
 
 void EditorShellBase::showActivation(bool show)
 {
     activationVisible = show;
-    activationPanel.setVisible(show);
-    activationPanel.toFront(true);
+    activationOverlay.setVisible(show);
+    activationOverlay.toFront(true);
 }
 
 void EditorShellBase::mouseDown(const juce::MouseEvent& e)
@@ -721,12 +721,12 @@ void EditorShellBase::showMidiPresets(bool show)
         hideAllOverlays();
         midiPresetsVisible = true;
         if (mainPanel) mainPanel->setVisible(false);
-        midiPresetsPanel.setVisible(true);
+        midiPresetsOverlay.setVisible(true);
     }
     else
     {
         midiPresetsVisible = false;
-        midiPresetsPanel.setVisible(false);
+        midiPresetsOverlay.setVisible(false);
         if (mainPanel) mainPanel->setVisible(true);   // opening any overlay cleared the mixer (hideAllOverlays) → always return to main
     }
 }
@@ -738,12 +738,12 @@ void EditorShellBase::showMidiFullPresets(bool show)
         hideAllOverlays();
         midiFullPresetsVisible = true;
         if (mainPanel) mainPanel->setVisible(false);
-        midiFullPresetsPanel.setVisible(true);
+        midiFullPresetsOverlay.setVisible(true);
     }
     else
     {
         midiFullPresetsVisible = false;
-        midiFullPresetsPanel.setVisible(false);
+        midiFullPresetsOverlay.setVisible(false);
         if (mainPanel) mainPanel->setVisible(true);   // opening any overlay cleared the mixer (hideAllOverlays) → always return to main
     }
 }
@@ -775,12 +775,12 @@ void EditorShellBase::resized()
     if (mixerOverlay)    mixerOverlay   ->setBounds(mainArea);
     if (settingsOverlay) settingsOverlay->setBounds(mainArea);
     presetBrowser   .setBounds(mainArea);
-    midiPresetsPanel.setBounds(mainArea);
-    midiFullPresetsPanel.setBounds(mainArea);
+    midiPresetsOverlay.setBounds(mainArea);
+    midiFullPresetsOverlay.setBounds(mainArea);
 
     // Modal overlays span the full editor area
-    aboutPanel.setBounds(getLocalBounds());
-    activationPanel.setBounds(getLocalBounds());
+    aboutOverlay.setBounds(getLocalBounds());
+    activationOverlay.setBounds(getLocalBounds());
     saveDialog.setBounds(getLocalBounds());
 
     // Stack the banners just above the status bar (upgrade on top, demo below).

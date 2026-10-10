@@ -66,16 +66,16 @@ target_sources(mu-core INTERFACE
     # Shared preset browser + MIDI PC editor panels.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/PresetBrowser.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiPresetListPanel.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiPresetsPanel.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiFullPresetsPanel.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiPresetsOverlay.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiFullPresetsOverlay.cpp"
     # Shared settings-overlay framework — header bar, content column, group/section headers.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/SettingsOverlayBase.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/StandardSettingsOverlay.cpp"
     # Shared transport "Master Loop" sub-pane — driven by ProcessorBase virtuals + mstrLoop param.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MasterLoopSection.cpp"
     # Shared modal overlays — product chrome supplied via setters.
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/AboutPanel.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/ActivationPanel.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/AboutOverlay.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/ActivationOverlay.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/SaveDialog.cpp"
     # Shared themed modal dialog (replaces juce::AlertWindow) + its convenience builders.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/ModalDialog.cpp"

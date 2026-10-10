@@ -5,12 +5,12 @@
 // Modal "About" overlay shared across the mu-family. Each product passes its
 // display name + third-party credits via setProductInfo() before showing.
 // Click outside the card → onDismiss fires.
-class AboutPanel : public juce::Component
+class AboutOverlay : public juce::Component
 {
 public:
     std::function<void()> onDismiss;
 
-    AboutPanel();
+    AboutOverlay();
 
     void setProductInfo(const juce::String& displayName,
                         const juce::StringArray& credits);

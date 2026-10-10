@@ -4,7 +4,7 @@
 #include "UI/Components/MuLookAndFeel.h"
 
 // Family modal-card chrome — the single source of truth for the dimmed backdrop + the
-// centred rounded card used by every modal overlay (ModalDialog, SaveDialog, AboutPanel).
+// centred rounded card used by every modal overlay (ModalDialog, SaveDialog, AboutOverlay).
 // Keeps the dim colour / corner radius / border consistent so a look change is one edit.
 namespace mu_ui {
 

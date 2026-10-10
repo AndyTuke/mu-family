@@ -1,8 +1,8 @@
-#include "ActivationPanel.h"
+#include "ActivationOverlay.h"
 #include "UI/ModalCard.h"
 #include "UI/Components/MuLookAndFeel.h"
 
-ActivationPanel::ActivationPanel (ProcessorBase& proc)
+ActivationOverlay::ActivationOverlay (ProcessorBase& proc)
     : processorRef (proc)
 {
     keyLabel.setText ("License key", juce::dontSendNotification);
@@ -24,7 +24,7 @@ ActivationPanel::ActivationPanel (ProcessorBase& proc)
     addAndMakeVisible (statusLabel);
 }
 
-juce::Rectangle<int> ActivationPanel::cardBounds() const
+juce::Rectangle<int> ActivationOverlay::cardBounds() const
 {
     using mu_ui::s;
     const int cardW = s (kCardW);
@@ -32,7 +32,7 @@ juce::Rectangle<int> ActivationPanel::cardBounds() const
     return { (getWidth() - cardW) / 2, (getHeight() - cardH) / 2, cardW, cardH };
 }
 
-void ActivationPanel::setStatus (const juce::String& text, bool error)
+void ActivationOverlay::setStatus (const juce::String& text, bool error)
 {
     using Id = MuLookAndFeel::ColourIds;
     statusLabel.setColour (juce::Label::textColourId,
@@ -40,7 +40,7 @@ void ActivationPanel::setStatus (const juce::String& text, bool error)
     statusLabel.setText (text, juce::dontSendNotification);
 }
 
-void ActivationPanel::activatePressed()
+void ActivationOverlay::activatePressed()
 {
     const auto key = keyEditor.getText().trim();
     if (key.isEmpty())          { setStatus ("Enter the license key from your purchase email.", true); return; }
@@ -50,7 +50,7 @@ void ActivationPanel::activatePressed()
     setStatus ("Contacting the activation server\xe2\x80\xa6", false);
 
     auto fn = processorRef.activateOnlineFn;            // copy (safe to use off-thread)
-    juce::Component::SafePointer<ActivationPanel> safe (this);
+    juce::Component::SafePointer<ActivationOverlay> safe (this);
 
     juce::Thread::launch ([safe, fn, key]
     {
@@ -66,13 +66,13 @@ void ActivationPanel::activatePressed()
     });
 }
 
-void ActivationPanel::mouseDown (const juce::MouseEvent& e)
+void ActivationOverlay::mouseDown (const juce::MouseEvent& e)
 {
     if (! cardBounds().contains (e.getPosition()))
         if (onDismiss) onDismiss();
 }
 
-void ActivationPanel::resized()
+void ActivationOverlay::resized()
 {
     using mu_ui::s;
     auto card = cardBounds();
@@ -90,7 +90,7 @@ void ActivationPanel::resized()
     closeBtn.setBounds (card.getX() + card.getWidth() - s (84), card.getBottom() - s (40), s (60), s (28));
 }
 
-void ActivationPanel::paint (juce::Graphics& g)
+void ActivationOverlay::paint (juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
     using mu_ui::s;

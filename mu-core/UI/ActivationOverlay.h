@@ -7,10 +7,10 @@
 // path: paste the Lemon Squeezy key → activate against this machine's fingerprint (off the
 // message thread). Offline path: shows the machine "challenge" code to send the owner for a
 // signed `.lic`. Click outside the card → dismiss.
-class ActivationPanel : public juce::Component
+class ActivationOverlay : public juce::Component
 {
 public:
-    explicit ActivationPanel (ProcessorBase& proc);
+    explicit ActivationOverlay (ProcessorBase& proc);
 
     void setProductName (const juce::String& name) { productName = name; repaint(); }
 
@@ -38,5 +38,5 @@ private:
     static constexpr int kCardW = 460;
     static constexpr int kCardH = 340;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ActivationPanel)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ActivationOverlay)
 };

@@ -163,7 +163,7 @@ demo/limited mode** — the full plugin is freely distributed.
 
 - **Not used:** the mu-core **License** subsystem (`LicenseManager`,
   `ActivationStore`, `OnlineActivation`, `LemonSqueezyClient`, `MachineFingerprint`)
-  and the shell's **Activation/licence UI** (`ActivationPanel`). No Lemon Squeezy
+  and the shell's **Activation/licence UI** (`ActivationOverlay`). No Lemon Squeezy
   product, no signing key, no `.muToni` licence gating.
 - μ-Toni ships **no** `Source/License/LicenseKey.h` (unlike mu-clid / mu-tant —
   the folder holds only `.gitkeep`), and the demo-gate pattern from

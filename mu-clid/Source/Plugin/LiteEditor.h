@@ -10,7 +10,7 @@
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/KnobWithLabel.h"
-#include "UI/AboutPanel.h"
+#include "UI/AboutOverlay.h"
 
 // Simplified editor for the mu-Clid Lite MIDI-effect build.
 // Shows TransportBar + RhythmCircle + EuclideanPanel; no sidebar, voice section, or mixer.
@@ -39,7 +39,7 @@ private:
     RhythmCircle      rhythmCircle;
     EuclideanPanel euclidPanel;
     StatusBar      statusBar;
-    AboutPanel     aboutPanel;
+    AboutOverlay     aboutOverlay;
     DropdownSelect noteSelector;
     DropdownSelect sizeDropdown;
     juce::Label    noteSelectorLabel;

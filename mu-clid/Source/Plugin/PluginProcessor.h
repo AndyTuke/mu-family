@@ -266,7 +266,7 @@ private:
 
 public:
     // Per-slot + full preset directories / extensions. Public so the shared
-    // MIDI editor panels (`MidiPresetsPanel` / `MidiFullPresetsPanel`) and the
+    // MIDI editor panels (`MidiPresetsOverlay` / `MidiFullPresetsOverlay`) and the
     // mu-clid editor (preset browser) can read them through a PluginProcessor&.
     juce::File   getPerSlotPresetDir()       const override { return getRhythmsDir(); }
     juce::String getPerSlotPresetExtension() const override { return "muRhythm"; }

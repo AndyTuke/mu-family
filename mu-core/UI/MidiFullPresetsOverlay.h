@@ -3,11 +3,11 @@
 
 // MIDI program change on channel 9 → full presets: the 128 slots of
 // ProcessorBase::midiFullPresetMap (persisted to JSON on every edit) plus the feature's
-// on / off toggle. Parallel to MidiPresetsPanel, which handles the per-slot map on channels 1-8.
-class MidiFullPresetsPanel : public MidiPresetListPanel
+// on / off toggle. Parallel to MidiPresetsOverlay, which handles the per-slot map on channels 1-8.
+class MidiFullPresetsOverlay : public MidiPresetListPanel
 {
 public:
-    explicit MidiFullPresetsPanel(ProcessorBase& proc);
+    explicit MidiFullPresetsOverlay(ProcessorBase& proc);
 
 protected:
     juce::String slotPath(int row) const override;

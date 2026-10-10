@@ -1,4 +1,4 @@
-#include "MidiPresetsPanel.h"
+#include "MidiPresetsOverlay.h"
 #include "Plugin/ProcessorBase.h"
 
 static_assert(MidiPresetMap::NumSlots == 128, "the list shows one row per MIDI program (MidiPresetListPanel)");
@@ -8,7 +8,7 @@ namespace
     int channelCount(const ProcessorBase& p) { return juce::jlimit(1, 8, p.getMaxChannels()); }
 }
 
-MidiPresetsPanel::MidiPresetsPanel(ProcessorBase& p)
+MidiPresetsOverlay::MidiPresetsOverlay(ProcessorBase& p)
     : MidiPresetListPanel(p, p.getPerSlotPresetExtension(), "MIDI Program Change Presets",
                           "MIDI channel N (1-" + juce::String(channelCount(p))
                               + juce::String::fromUTF8(u8") → slot N-1;  program number = preset index")),
@@ -33,12 +33,12 @@ MidiPresetsPanel::MidiPresetsPanel(ProcessorBase& p)
     }
 }
 
-juce::String MidiPresetsPanel::slotPath(int row) const                      { return proc.midiPresetMap.getPresetPath(row); }
-void         MidiPresetsPanel::setSlotPath(int row, const juce::File& f)    { proc.midiPresetMap.setPresetPath(row, f); }
-void         MidiPresetsPanel::clearSlot(int row)                           { proc.midiPresetMap.clearPreset(row); }
-juce::File   MidiPresetsPanel::presetDir() const                            { return proc.getPerSlotPresetDir(); }
+juce::String MidiPresetsOverlay::slotPath(int row) const                      { return proc.midiPresetMap.getPresetPath(row); }
+void         MidiPresetsOverlay::setSlotPath(int row, const juce::File& f)    { proc.midiPresetMap.setPresetPath(row, f); }
+void         MidiPresetsOverlay::clearSlot(int row)                           { proc.midiPresetMap.clearPreset(row); }
+juce::File   MidiPresetsOverlay::presetDir() const                            { return proc.getPerSlotPresetDir(); }
 
-void MidiPresetsPanel::layoutTopRow(juce::Rectangle<int> row)
+void MidiPresetsOverlay::layoutTopRow(juce::Rectangle<int> row)
 {
     // Eight equal columns, whatever the product's channel count.
     const int toggleW = row.getWidth() / 8;

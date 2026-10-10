@@ -155,7 +155,7 @@ mu-clid/
 
 ├── SettingsOverlay.h/.cpp
 
-└── AboutPanel.h/.cpp
+└── AboutOverlay.h/.cpp
 
 **3.2 Critical Architectural Rules**
 
@@ -617,7 +617,7 @@ virtual void process(juce::AudioBuffer\<float\>& buffer) = 0;
   SettingsOverlay       juce::Component               Full settings page. Scrollable
                                                       single page with sections.
 
-  AboutPanel            juce::Component               Version, company, links,
+  AboutOverlay            juce::Component               Version, company, links,
                                                       credits. Opened by clicking
                                                       logo.
 
@@ -1609,7 +1609,7 @@ for that rhythm.
               meters                 VUMeter
 
   10          Transport bar,         TransportBar, PresetBrowser, SaveDialog,
-              presets, settings,     SettingsOverlay, AboutPanel
+              presets, settings,     SettingsOverlay, AboutOverlay
               about                  
 
   11          Polish --- animations, StatusBar, all UI refinements, ring arc

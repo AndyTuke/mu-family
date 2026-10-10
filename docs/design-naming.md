@@ -146,10 +146,10 @@ slot state already stores ids without their prefix, so layer data is prefix-agno
 | Parent class | Only `Rhythm` derives from `VoiceSlot`; the others use parallel arrays (§2). |
 | mu-core vocabulary | `kMaxChannels` is the layer cap; core types say both `Voice*` and `Channel*`; "Slot" has three meanings (11 types). |
 | Namespaces | mu-Clid: all but one of 46 types are global; also stray namespaces `md`, `ModDest`, `mu_pp_migrate`. |
-| Overlay vs Panel | `AboutPanel`, `ActivationPanel`, `MidiPresetsPanel`, `MidiFullPresetsPanel` are overlays; `SaveDialog`, `PresetBrowser` too. |
+| Overlay vs Panel | Done at build 1172: `AboutOverlay`, `ActivationOverlay`, `MidiPresetsOverlay`, `MidiFullPresetsOverlay` (were `…Panel`). Still open: whether `SaveDialog` and `PresetBrowser` become overlays too or stay named exceptions (owner). |
 | Main sound panel | `VoiceSection` (mu-Clid), `VoicePanel` (mu-Tant), `EnginePanel` (mu-Toni, mu-On), `VoiceBand` (core). |
 | Sequencer names | `SequencerEngine`, `GatePattern`, `Arpeggiator` + `ArpVoiceRunner`, `GrooveSequencer` — no shared role. |
-| Capacity constants | `kMaxRhythms`, `kMaxVoices` (twice in mu-Tant), `kMaxChannels` (redeclared in mu-Toni and mu-On) beside `mu_limits::kMaxChannels`. |
+| Capacity constants | `kMaxRhythms` (mu-Clid) still stands alone. mu-Tant's two `kMaxVoices` and mu-Toni / mu-On's `kMaxChannels` now read `mu_limits::kMaxChannels` (build 1171). |
 | Acronyms | `…APVTS` function names in mu-Clid vs `…Apvts` elsewhere. |
 | Members | Trailing `_` in seven classes (mu-Clid helpers, `MidiClockSync`, `VocoderInsert`). |
 | Enums | plain `enum` in mu-Toni (3), mu-On (3), mu-Tant (2). |

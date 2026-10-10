@@ -6,12 +6,12 @@
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/StatusBar.h"
 #include "UI/TransportBar.h"
-#include "UI/AboutPanel.h"
-#include "UI/ActivationPanel.h"
+#include "UI/AboutOverlay.h"
+#include "UI/ActivationOverlay.h"
 #include "UI/SaveDialog.h"
 #include "UI/PresetBrowser.h"
-#include "UI/MidiPresetsPanel.h"
-#include "UI/MidiFullPresetsPanel.h"
+#include "UI/MidiPresetsOverlay.h"
+#include "UI/MidiFullPresetsOverlay.h"
 
 // EditorShellBase — shared editor shell for every mu-family plugin.
 //
@@ -62,12 +62,12 @@ public:
     // and additional callbacks.
     TransportBar&         getTransportBar()         { return transportBar; }
     StatusBar&            getStatusBar()            { return statusBar; }
-    AboutPanel&           getAboutPanel()           { return aboutPanel; }
-    ActivationPanel&      getActivationPanel()      { return activationPanel; }
+    AboutOverlay&           getAboutPanel()           { return aboutOverlay; }
+    ActivationOverlay&      getActivationPanel()      { return activationOverlay; }
     SaveDialog&           getSaveDialog()           { return saveDialog; }
     PresetBrowser&        getPresetBrowser()        { return presetBrowser; }
-    MidiPresetsPanel&     getMidiPresetsPanel()     { return midiPresetsPanel; }
-    MidiFullPresetsPanel& getMidiFullPresetsPanel() { return midiFullPresetsPanel; }
+    MidiPresetsOverlay&     getMidiPresetsPanel()     { return midiPresetsOverlay; }
+    MidiFullPresetsOverlay& getMidiFullPresetsPanel() { return midiFullPresetsOverlay; }
 
     // Overlay control — used by the shell's own callbacks and by the product
     // when it needs to drive overlay state from its own panels.
@@ -120,12 +120,12 @@ protected:
 
     MuLookAndFeel        lookAndFeel;
     TransportBar         transportBar;
-    AboutPanel           aboutPanel;
-    ActivationPanel      activationPanel;
+    AboutOverlay           aboutOverlay;
+    ActivationOverlay      activationOverlay;
     SaveDialog           saveDialog;
     PresetBrowser        presetBrowser;
-    MidiPresetsPanel     midiPresetsPanel;
-    MidiFullPresetsPanel midiFullPresetsPanel;
+    MidiPresetsOverlay     midiPresetsOverlay;
+    MidiFullPresetsOverlay midiFullPresetsOverlay;
     StatusBar            statusBar;
     juce::Label          demoBanner;
     juce::Label          upgradeBanner;   // shown when a newer release is available online

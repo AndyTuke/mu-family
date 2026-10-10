@@ -152,7 +152,7 @@ PluginProcessor::~PluginProcessor()
 //==============================================================================
 const juce::String PluginProcessor::getName() const
 {
-    // UTF-8 Greek lowercase mu (μ, U+03BC) prefix — matches the AboutPanel
+    // UTF-8 Greek lowercase mu (μ, U+03BC) prefix — matches the AboutOverlay
     // logo and the user-facing branding everywhere else in the UI.
 #if MUCLID_LITE_BUILD
     return juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid Lite"));

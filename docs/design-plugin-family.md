@@ -147,7 +147,7 @@ The `mu-core` INTERFACE library (introduced in Stage 33) holds everything shared
 | Atomic file writes | `mu-core/Persistence/PresetFiles.h` | `mu_pp::replaceFileAtomically` / `writeXmlAtomically` (temp + rename, failure reported) — every preset / map save goes through them |
 | `ExpDecay` | `mu-core/Audio/ExpDecay.h` | One-multiply exponential decay envelope — use it instead of `std::exp` per sample |
 | `ModulatorPanel`, `ModMatrixPanel`, `ModulatorEditor` | `mu-core/UI/` | Shared modulator UI (take `VoiceSlot&` + a product `ModDestProvider`) |
-| `EditorShellBase`, `TransportBar`, `AboutPanel`, `SaveDialog`, `PresetBrowser`, MIDI-preset panels | `mu-core/UI/` | Shared editor shell + chrome |
+| `EditorShellBase`, `TransportBar`, `AboutOverlay`, `SaveDialog`, `PresetBrowser`, MIDI-preset panels | `mu-core/UI/` | Shared editor shell + chrome |
 | `mu_fmt` value text | `mu-core/ValueFormat.h` | One formatter set (`time` / `parseTime` / `freq` / `lowCut` / `percent`) for parameter text, knob text and status-bar text — never re-write a formatter in a product |
 | `mu_ui::choiceNames` / `addChoiceItems` | `mu-core/UI/ParamChoices.h` | Fill a selector from its `AudioParameterChoice`, so the shown list can't drift from the stored one |
 | Spin lock helpers | `mu-core/Audio/SpinLock.h` | `mu_core::trySpinLock` (audio thread), `spinLock` / `spinLockFor(n)` (message thread), `spinUnlock`, `ScopedSpinLock` — on any `std::atomic<bool>` / `CopyableSpinLock` flag; never hand-roll a `compare_exchange` loop |

@@ -1,14 +1,14 @@
-#include "AboutPanel.h"
+#include "AboutOverlay.h"
 #include "BuildNumber.h"
 #include "UI/ModalCard.h"   // shared dim + card chrome
 
-AboutPanel::AboutPanel()
+AboutOverlay::AboutOverlay()
 {
     closeBtn.onClick = [this] { if (onDismiss) onDismiss(); };
     addAndMakeVisible(closeBtn);
 }
 
-void AboutPanel::setProductInfo(const juce::String& displayName,
+void AboutOverlay::setProductInfo(const juce::String& displayName,
                                 const juce::StringArray& credits)
 {
     productName    = displayName;
@@ -16,7 +16,7 @@ void AboutPanel::setProductInfo(const juce::String& displayName,
     repaint();
 }
 
-void AboutPanel::mouseDown(const juce::MouseEvent& e)
+void AboutOverlay::mouseDown(const juce::MouseEvent& e)
 {
     using mu_ui::s;
     const int w = getWidth();
@@ -31,7 +31,7 @@ void AboutPanel::mouseDown(const juce::MouseEvent& e)
         if (onDismiss) onDismiss();
 }
 
-void AboutPanel::resized()
+void AboutOverlay::resized()
 {
     using mu_ui::s;
     const int w = getWidth();
@@ -44,7 +44,7 @@ void AboutPanel::resized()
     closeBtn.setBounds(cardX + cardW / 2 - s(36), cardY + cardH - s(40), s(72), s(28));
 }
 
-void AboutPanel::paint(juce::Graphics& g)
+void AboutOverlay::paint(juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
     using mu_ui::s;

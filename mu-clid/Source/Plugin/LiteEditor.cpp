@@ -25,7 +25,7 @@ LiteEditor::LiteEditor(PluginProcessor& p)
     addAndMakeVisible(euclidPanel);
     addAndMakeVisible(statusBar);
 
-    aboutPanel.setProductInfo(
+    aboutOverlay.setProductInfo(
         juce::String(juce::CharPointer_UTF8("\xce\xbc")) + "-Clid Lite",
         juce::StringArray {
             juce::String(juce::CharPointer_UTF8("JUCE \xe2\x80\x94 Proprietary (JUCE 7 license)")),
@@ -33,12 +33,12 @@ LiteEditor::LiteEditor(PluginProcessor& p)
             juce::String(juce::CharPointer_UTF8("clap-juce-extensions \xe2\x80\x94 MIT")),
             juce::String(juce::CharPointer_UTF8("Bj\xc3\xb6rklund algorithm \xe2\x80\x94 public domain")),
         });
-    aboutPanel.onDismiss = [this] { aboutPanel.setVisible(false); };
-    addChildComponent(aboutPanel);
+    aboutOverlay.onDismiss = [this] { aboutOverlay.setVisible(false); };
+    addChildComponent(aboutOverlay);
     transportBar.onLogoClicked = [this]
     {
-        aboutPanel.setVisible(true);
-        aboutPanel.toFront(false);
+        aboutOverlay.setVisible(true);
+        aboutOverlay.toFront(false);
     };
 
     if (proc.getNumRhythms() > 0)
@@ -230,7 +230,7 @@ void LiteEditor::resized()
     euclidPanel.getLogicControl().setBounds(controlsRow.removeFromLeft(logicW).withSizeKeepingCentre(logicW, s(24)));
 
     euclidPanel.setBounds(area);
-    aboutPanel.setBounds(getLocalBounds());
+    aboutOverlay.setBounds(getLocalBounds());
 }
 
 void LiteEditor::refreshCircle()
