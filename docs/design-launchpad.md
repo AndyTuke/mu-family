@@ -283,14 +283,29 @@ in a dim room or on stage, and the dim levels all need checking on the device (b
 
 | # | Risk | Why it matters |
 |---|---|---|
-| R1 | **Programmer mode is sticky.** The manual says Setup is disabled until we switch back; a crash leaves the device in our mode. | Send Live mode on shutdown, on a clean plugin unload, and offer a "release controller" button. Find out whether a power cycle also resets it (the manual does not say). |
-| R2 | **Windows MIDI ports are often single-client.** If a DAW or another app has the Launchpad open, we cannot open it. Windows MIDI Services (newer Windows 11) allows several clients. | Likely means the standalone (or one combined instance) owns the controller; a plugin in a DAW may not get the port. It also explains why running four apps at once cannot each use the pad: another point for one instance. |
-| R3 | **Which port is which.** DAW vs MIDI port naming differs on Windows. | Match by name and let the user choose; read back after connecting. |
-| R4 | **LED traffic.** One lighting SysEx per tick is small; polyphonic aftertouch is not. | Batch LED updates, default aftertouch off. |
-| R5 | **Plugin form.** In a DAW the plugin gets pad notes only if the DAW routes them, and cannot light pads unless it opens the output itself (see R2). | Standalone first; plugin support after a hardware check. |
+| R1 | **Programmer mode is sticky.** *Checked 2026-10-10: a USB power cycle does reset it to Live.* The manual says Setup is disabled until we switch back; a crash leaves the device in our mode. | Send Live mode on shutdown, on a clean plugin unload, and offer a "release controller" button. Still send Live on clean exit; a crash is cleared by unplugging. |
+| R2 | **Windows MIDI ports are often single-client.** *Checked 2026-10-10: not a problem with Windows MIDI Services; legacy WinMM and a DAW holding the ports untested.* If a DAW or another app has the Launchpad open, we cannot open it. Windows MIDI Services (newer Windows 11) allows several clients. | Likely means the standalone (or one combined instance) owns the controller; a plugin in a DAW may not get the port. It also explains why running four apps at once cannot each use the pad: another point for one instance. |
+| R3 | **Which port is which.** *Checked 2026-10-10: see Hardware findings; input and output roles are split across the two pairs.* DAW vs MIDI port naming differs on Windows. | Match by name and let the user choose; read back after connecting. |
+| R4 | **LED traffic.** *Checked 2026-10-10: polyphonic aftertouch is ON by default in Programmer mode (about 100 messages/s per pressed pad); the driver must switch it off.* One lighting SysEx per tick is small; polyphonic aftertouch is not. | Batch LED updates, default aftertouch off. |
+| R5 | **Plugin form.** *Checked 2026-10-10: shared ports work between two processes on this machine; DAW-held ports untested.* In a DAW the plugin gets pad notes only if the DAW routes them, and cannot light pads unless it opens the output itself (see R2). | Standalone first; plugin support after a hardware check. |
 | R6 | **Switching a whole preset live.** Loading eight layers of samples, wavetables and FX in one go can stall or click, and FX tails and held voices must not be cut off. | Use the existing full-preset hot-swap (parsed off the audio thread, committed at the bar); check on the build PC that FX tails and held voices survive the commit. Measure the load time of the largest preset on the build PC before promising a bar-accurate switch. |
 | R7 | **Preloading a performance.** Holding all 8 presets ready to switch costs memory and CPU for 64 layers. | Preload only the next likely preset (neighbour or chosen) and load the rest on demand; set a memory budget and show a "loading" state on the button. |
-| R8 | **Colours differ between screen and pad.** The palette picture is not the real LED output, and some hues (orange, silver, brown) shift. | Pick the eight colours on the real device, check dim levels, and keep the choice in one shared table with a per-driver hue map (§3.2b). |
+| R8 | **Colours differ between screen and pad.** *Open: owner-attended comparison still to do (feeds #1281).* The palette picture is not the real LED output, and some hues (orange, silver, brown) shift. | Pick the eight colours on the real device, check dim levels, and keep the choice in one shared table with a per-driver hue map (§3.2b). |
+
+### 3.5 Hardware findings (Launchpad X on the build PC, 2026-10-10)
+
+From a throwaway JUCE 9.0.3 probe on Windows 11 with Windows MIDI Services running (MidiSrv.exe).
+
+- **Ports (R3).** Inputs "LPX MIDI" and "MIDIIN2 (LPX MIDI)"; outputs "LPX MIDI" and "MIDIOUT2 (LPX MIDI)". The first pair answers the device inquiry `F0 7E 7F 06 01 F7` with `F0 7E 00 06 02 00 20 29 03 01 00 00 00 04 02 02 F7` (manufacturer 00 20 29, family 03 01, firmware 00 00 04 02 02) and takes the layout read (`...0C 00`) and the mode switches. **Pad and button input arrives on the second input, "MIDIIN2 (LPX MIDI)", not the first.**
+- **Mode (R1).** Programmer mode `F0 00 20 29 02 0C 0E 01 F7` works and reads back 01; Live (`...0E 00`) restores. The mode does not survive a USB power cycle (read back Live).
+- **Input.** Pad note = 10*row + col (bottom row 11-18 seen). Press = note-on with velocity (64-115 seen); release = note-on velocity 0 (JUCE reports a note-off). Edge buttons are CC on channel 1, press 127 and release 0: top row CC 91-98, right column CC 19, 29, ... 89.
+- **Aftertouch (R4).** Polyphonic aftertouch is on by default in Programmer mode. `F0 00 20 29 02 0C 0B 02 01 F7` turns it off (none seen afterwards); the driver must send it.
+- **Lighting.** Static (channel 1), flashing (channel 2) and pulsing (channel 3) note-on lighting on pads 11/12/13 with palette 5/21/45 showed red, green flash and blue pulse; confirmed by eye. The all-pad lighting SysEx (`...0C 03 ...`) and RGB lighting are not yet tested.
+- **Sharing (R2, R5).** Two processes opened the same input and output pair at once without failure, so a plugin-hosted driver beside a standalone one is feasible here. A WinMM-only machine was not tested.
+
+**Still open:** the R8 colour and dim comparison (owner-attended); the all-pad lighting SysEx and RGB test; behaviour with a DAW holding the ports.
+
+**Recommendation:** the `LaunchpadXDriver` opens the first output pair for commands and lighting, listens on the second input for pads and buttons (match by name, let the user override), sends Programmer mode and aftertouch-off on connect, and Live on clean exit.
 
 ## 4. Order of work (all on the build PC; the owner said nothing is coded today)
 
