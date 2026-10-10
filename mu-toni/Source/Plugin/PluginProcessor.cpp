@@ -178,8 +178,8 @@ PluginProcessor::PluginProcessor()
     {
         if (ch >= 0 && ch < kMaxChannels)
         {
-            runners[(size_t) ch].render(buf, n, arpCtx);
-            inserts[(size_t) ch].process(buf, n, buf.getNumChannels(), insCfg[(size_t) ch]);   // engine → insert → mixer
+            layers[(size_t) ch].runner.render(buf, n, arpCtx);
+            layers[(size_t) ch].insert.process(buf, n, buf.getNumChannels(), layers[(size_t) ch].insertCfg);   // engine → insert → mixer
         }
         else buf.clear();
     };
@@ -188,7 +188,7 @@ PluginProcessor::PluginProcessor()
 
     // The shared wavetable bank (procedural factory set), read by every voice's oscillators.
     bank.loadFactoryBank();
-    for (auto& r : runners) r.setBank(&bank);
+    for (auto& l : layers) l.runner.setBank(&bank);
     midiInChParam = apvts.getRawParameterValue("midiInCh");
 
     cacheVoiceParamPointers();
@@ -241,7 +241,7 @@ void PluginProcessor::readVoice(int v, ArpParams& ap, ToniVoiceParams& tv,
     // Resolve this voice's modulation matrix over its control sequences → out[] (param units).
     // Modulated destinations come from out[]; everything else reads the raw param.
     float out[kNumModDests];
-    mu_mod::resolveLane(&voiceSlots[(size_t) v], modBeat, kNumModDests,
+    mu_mod::resolveLane(&layers[(size_t) v], modBeat, kNumModDests,
                         modDestIds.data(), modDestAtoms[(size_t) v].data(),
                         modDestRanges.data(), modParamValues, out);
 
@@ -288,7 +288,7 @@ void PluginProcessor::readVoice(int v, ArpParams& ap, ToniVoiceParams& tv,
     accent.pattern = (unsigned) juce::jmax(0, (int) g(vpi::accPat));
 
     // Insert config (applied post-VCA in the render callback).
-    auto& ic = insCfg[(size_t) v];
+    auto& ic = layers[(size_t) v].insertCfg;
     ic.insertAlgo     = (int) g(vpi::drvChar);
     ic.insertParam[0] = g(vpi::insP1);
     ic.insertParam[1] = g(vpi::insP2);
@@ -334,8 +334,8 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     fxChain.prepare(sampleRate, samplesPerBlock);
     for (int i = 0; i < kNumChannels; ++i)
     {
-        runners[(size_t) i].prepare(sampleRate, samplesPerBlock);
-        inserts[(size_t) i].prepare(sampleRate, samplesPerBlock);
+        layers[(size_t) i].runner.prepare(sampleRate, samplesPerBlock);
+        layers[(size_t) i].insert.prepare(sampleRate, samplesPerBlock);
     }
 }
 
@@ -387,10 +387,10 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         ArpParams ap; ToniVoiceParams tv; int rateIdx = 6; float gate01 = 0.5f; bool midiTrig = false;
         ArpAccent accent;
         readVoice(i, ap, tv, rateIdx, gate01, midiTrig, accent);
-        runners[(size_t) i].setAccent(accent);
-        runners[(size_t) i].setArp(ap);
-        runners[(size_t) i].setVoiceParams(tv);
-        runners[(size_t) i].setStep(rateIdx, gate01, midiTrig);
+        layers[(size_t) i].runner.setAccent(accent);
+        layers[(size_t) i].runner.setArp(ap);
+        layers[(size_t) i].runner.setVoiceParams(tv);
+        layers[(size_t) i].runner.setStep(rateIdx, gate01, midiTrig);
     }
 
     // Render each arp voice → mixer through the shared path (engine → insert →

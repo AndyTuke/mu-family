@@ -4,11 +4,9 @@
 #include "Plugin/ProcessorBase.h"        // mu-core base
 #include "Plugin/MixerFxParams.h"         // mu-core: shared global-FX / mixer APVTS layout
 #include "Plugin/MidiClockSync.h"         // mu-core: shared MIDI-clock slave
-#include "Sequencer/ArpVoiceRunner.h"     // per-voice arpeggiator + ToniVoice
-#include "Sequencer/Layer.h"          // mu-core: per-voice control sequences + matrix
+#include "Sequencer/Arp.h"                // mu-Toni layer: Layer + arp voice + insert
 #include "Modulation/LaneModulation.h"    // mu-core: mu_mod::resolveLane
 #include "Modulation/MuToniModDest.h"     // arp/voice modulation destinations
-#include "Audio/InsertProcessor.h"        // mu-core: shared per-voice insert FX
 
 #include <array>
 #include <atomic>
@@ -135,22 +133,14 @@ private:
     // Update the held-note stack from incoming MIDI; sets noteOnEdge if a new note landed.
     void updateHeldNotes(const juce::MidiBuffer& midi, bool& noteOnEdge);
 
-    // Per-channel arp voice + its cached parameter pointers.
-    std::array<ArpVoiceRunner, kMaxChannels>                                      runners;
     mu_wavetable::WavetableBank bank;                        // the oscillators' wavetables (factory set)
     std::atomic<float>*         midiInChParam = nullptr;     // MIDI In channel (0 = Omni)
     std::array<std::array<std::atomic<float>*, kNumVoiceParams>, kMaxChannels>    vp {};
 
-    // Per-channel insert effect (shared mu-core InsertProcessor), applied post-VCA
-    // in the render callback. insCfg holds each voice's algo + 4 slot params, set
-    // per block by readVoice.
-    std::array<InsertProcessor, kMaxChannels> inserts;
-    std::array<VoiceParams,      kMaxChannels> insCfg;
-
-    // ── Per-voice modulation (mu-core Layer + shared matrix) ───────────────
-    // Public so the UI ModulatorPanel can bind to the active voice's slot.
+    // The layers: each is a mu-core Layer (name, colour, modulation) with its arp voice and insert
+    // effect. Public so the UI ModulatorPanel can bind to the active layer.
 public:
-    std::array<Layer, kMaxChannels> voiceSlots;
+    std::array<Arp, kMaxChannels> layers;
 private:
     // Modulation-resolve inputs: parallel arrays for mu_mod::resolveLane.
     std::array<const char*, kNumModDests>                                         modDestIds {};

@@ -24,10 +24,10 @@ void PluginProcessor::initLayerState()
     for (int l = 0; l < kNumChannels; ++l) prefixes.add(layerPrefix(l));
     initSlotState(prefixes,
         { [this](int l, juce::ValueTree& node)
-          { node.appendChild(mu_pp::serialiseModulators(voiceSlots[(size_t) l]), nullptr); },
+          { node.appendChild(mu_pp::serialiseModulators(layers[(size_t) l]), nullptr); },
           [this](int l, const juce::ValueTree& node)
           {
-              auto& slot = voiceSlots[(size_t) l];
+              auto& slot = layers[(size_t) l];
               mu_pp::clearModulators(slot);
               mu_pp::deserialiseModulators(node.getChildWithName("Modulators"), slot, {},
                                            [](const std::string& id) { return mu_toni::isValidModDest(id); });

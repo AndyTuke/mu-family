@@ -226,7 +226,7 @@ void EnginePanel::setLayer(int idx)
     insertSub.setChannel(currentLayer);
     shownAccentLen = shownAccentPat = -1;   // redraw the new layer's accent pattern
     refreshAccentSteps();
-    modulatorPanel.setVoiceSlot(&proc.voiceSlots[(size_t) currentLayer]);
+    modulatorPanel.setVoiceSlot(&proc.layers[(size_t) currentLayer]);
 
     header.setLayerName(proc.getChannelName(currentLayer));
     header.setColour(layerColour());
