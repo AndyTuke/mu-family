@@ -121,6 +121,8 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group improved">
           <h3>Improved</h3>
           <ul>
+            <li>MIDI clock sync in the standalone is much tighter: the beat now follows the external clock smoothly instead of in steps, so patterns and gates line up with a hardware master within a fraction of a millisecond (they could land up to a clock tick late, about 20 ms at 120 BPM, and wobble with the clock). The first clock after Start now counts as the downbeat, as the MIDI spec says. <span class="ref">(1259)</span></li>
+            <li>μ-Link slaved to an external MIDI clock now keeps its grid on the master&rsquo;s downbeat instead of keeping whatever offset it started with and slowly creeping. <span class="ref">(1257)</span></li>
             <li>MIDI clock sync in the standalone: a new &ldquo;Clock&rdquo; lamp in the transport bar shows whether the clock is coming in (amber = waiting, green = locked, red = lost). If the clock stops arriving while playing (a pulled cable, say) the app stops instead of running on, and carries on when the clock comes back. <span class="ref">(1252)</span></li>
             <li>The MIDI clock &ldquo;Messages&rdquo; choices are now named &ldquo;Clock only&rdquo;, &ldquo;Transport only&rdquo; and &ldquo;Clock + Transport&rdquo;. They work as before. <span class="ref">(1291)</span></li>
             <li>With μ-Link connected, the standalone now hears your MIDI keyboard and controllers (it used to ignore MIDI while connected). For now there is a noticeable delay of about a sixth of a second while connected. <span class="ref">(1255)</span></li>
