@@ -1,5 +1,7 @@
 #include "SamplePreview.h"
 
+namespace mu_clid {
+
 SamplePreview::SamplePreview()
 {
     formatManager.registerBasicFormats();
@@ -46,3 +48,5 @@ void SamplePreview::mixInto(juce::AudioBuffer<float>& masterBus, int numSamples)
         masterBus.addFrom(ch, 0, scratchBuffer,
                           ch % scratchBuffer.getNumChannels(), 0, numSamples, 0.7f);
 }
+
+} // namespace mu_clid

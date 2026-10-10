@@ -19,13 +19,8 @@
 #include "Persistence/RhythmParamTable.h"   // kRhythmParamDefs
 #include <set>
 
-using mu_pp::serialiseModulators;
-using mu_pp::deserialiseModulators;
-using mu_pp::clearModulators;
-using mu_pp_migrate::migrateLegacyHostState;
-using mu_pp::kRhythmParamDefs;
-using mu_pp::kRhythmParamCount;
-using mu_pp::kChannelSuffixes;
+namespace mu_clid {
+using mu_clid::migrate::migrateLegacyHostState;
 
 // A session's rows for every parameter its .muClid tree doesn't carry — the inactive rhythm
 // slots' params and anything outside the preset tables — so a project restores every parameter.
@@ -42,7 +37,7 @@ static juce::ValueTree uncoveredParamRows(juce::AudioProcessor& proc, int numRhy
         for (int j = 0; j < kRhythmParamCount; ++j)  covered.insert(r + kRhythmParamDefs[j].suffix);
         for (int j = 0; kChannelSuffixes[j] != nullptr; ++j) covered.insert(ch + kChannelSuffixes[j]);
     }
-    for (int i = 0; i < mu_pp::kGlobalParamDefCount; ++i) covered.insert(mu_pp::kGlobalParamDefs[i].id);
+    for (int i = 0; i < mu_clid::kGlobalParamDefCount; ++i) covered.insert(mu_clid::kGlobalParamDefs[i].id);
 
     juce::ValueTree rows(kSessionParamsTag);
     for (auto* p : proc.getParameters())
@@ -228,3 +223,5 @@ void PresetIO::setStateInformation(const void* data, int sizeInBytes)
         proc_.onLoadError("Host state restore failed: could not parse XML");
     }
 }
+
+} // namespace mu_clid

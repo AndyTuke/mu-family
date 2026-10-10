@@ -16,6 +16,8 @@
 #include "Audio/AlgorithmNames.h"
 #include "Modulation/ModulationDestinations.h"
 
+using namespace mu_clid;
+
 class InsertAlgoTableTest : public juce::UnitTest
 {
 public:

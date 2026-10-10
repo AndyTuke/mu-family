@@ -5,6 +5,8 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <vector>
 
+namespace mu_clid {
+
 struct BlockResult
 {
     int  firedMask          = 0;  // bit N set = rhythm N fired a hit this block
@@ -136,3 +138,5 @@ private:
     // Pre-reserved to 256 in ctor so the non-allocating pattern overloads never alloc.
     std::vector<bool> scratchPatA, scratchPatB, scratchEuclid, scratchEuclidC;
 };
+
+} // namespace mu_clid

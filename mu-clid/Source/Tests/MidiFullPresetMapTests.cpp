@@ -7,7 +7,6 @@
 
 #include <juce_data_structures/juce_data_structures.h>
 #include "Persistence/MidiFullPresetMap.h"
-
 class MidiFullPresetMapTest : public juce::UnitTest
 {
 public:

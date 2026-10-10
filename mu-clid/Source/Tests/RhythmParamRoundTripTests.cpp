@@ -19,6 +19,8 @@
 #include <juce_core/juce_core.h>
 #include "../Persistence/RhythmParamTable.h"
 
+using namespace mu_clid;
+
 class RhythmParamRoundTripTest : public juce::UnitTest
 {
 public:
@@ -28,9 +30,9 @@ public:
     {
         beginTest ("Every kRhythmParamDefs entry round-trips a representative value");
 
-        for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
+        for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
         {
-            const auto& def = mu_pp::kRhythmParamDefs[i];
+            const auto& def = mu_clid::kRhythmParamDefs[i];
             const juce::String suffix (def.suffix);
 
             // Pick a test value that makes sense for the suffix. We use the
@@ -40,7 +42,7 @@ public:
             // which is also the default - distinguishes "really wrote" from
             // "uninitialised"). For everything else we use 1.0.
             float testValue = 1.0f;
-            if (def.kind == mu_pp::ParamKind::AlgorithmIndex)
+            if (def.kind == mu_clid::ParamKind::AlgorithmIndex)
                 testValue = 1.0f;   // index 1 - first non-None entry for both insert and filter
 
             // Some suffixes have their own clamp ranges in apply() - e.g.

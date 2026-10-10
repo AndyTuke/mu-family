@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <numeric>
 
+namespace mu_clid {
+
 std::vector<bool> Rhythm::getCombinedPattern() const
 {
     auto patA = genA.getPattern();
@@ -82,3 +84,5 @@ void Rhythm::getCombinedPattern(const EuclidOverrides& ov,
         }
     }
 }
+
+} // namespace mu_clid

@@ -5,6 +5,8 @@
 #include "Plugin/PluginProcessor_Internal.h"   // mu_core::ScopedApvtsLoading
 #include "Sequencer/Rhythm.h"
 
+namespace mu_clid {
+
 void RhythmManager::add(const Rhythm& r)
 {
     int ri = proc_.sequencer.getNumRhythms();
@@ -155,3 +157,5 @@ void RhythmManager::rename(int index, const juce::String& newName)
     const juce::ScopedLock sl(proc_.rhythmsLock);
     proc_.sequencer.getRhythm(index).name = newName.toStdString();
 }
+
+} // namespace mu_clid

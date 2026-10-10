@@ -27,7 +27,7 @@
 #include "Sequencer/Rhythm.h"
 #include "Audio/AlgorithmNames.h"   // Stage 35: kInsertAlgorithmNames / kFilterTypeNames
 
-namespace mu_pp {
+namespace mu_clid {
 
 // Convert 0–100 UI scale → 0–1 amplitude for ADSR Sustain. Mirrors the helper
 // declared at the top of PluginProcessor_Internal.h; duplicated here so this
@@ -216,4 +216,4 @@ inline const RhythmParamDef* findRhythmParamDef(const juce::String& suffix) noex
 
 #undef MU_HITGEN_ENTRIES
 
-} // namespace mu_pp
+} // namespace mu_clid

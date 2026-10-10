@@ -6,6 +6,8 @@
 #include <juce_core/juce_core.h>
 #include "Sequencer/HitGenerator.h"
 
+using namespace mu_clid;
+
 class HitGeneratorTest : public juce::UnitTest
 {
 public:

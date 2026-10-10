@@ -11,6 +11,8 @@
 #include "Plugin/HotSwap.h"   // mu-core: BarLineSwapper
 #include <vector>
 
+using namespace mu_clid;
+
 class HotSwapBoundaryTest : public juce::UnitTest
 {
 public:

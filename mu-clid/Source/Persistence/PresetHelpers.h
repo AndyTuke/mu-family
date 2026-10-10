@@ -8,7 +8,7 @@
 // and the test suite. Header-only so tests can #include without pulling in the
 // full PluginProcessor include chain.
 
-namespace mu_pp {
+namespace mu_clid {
 
 // Write a float `actualValue` into `tree` under `propName` in the v2 format
 // appropriate for ParamKind:
@@ -154,4 +154,4 @@ inline const GlobalParamDef kGlobalParamDefs[] = {
 
 inline constexpr int kGlobalParamDefCount = (int)(sizeof(kGlobalParamDefs) / sizeof(kGlobalParamDefs[0]));
 
-} // namespace mu_pp
+} // namespace mu_clid

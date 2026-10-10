@@ -1,5 +1,7 @@
 #include "RhythmMiniVisual.h"
 
+namespace mu_clid {
+
 RhythmMiniVisual::RhythmMiniVisual(PluginProcessor& p, int index)
     : proc(p), rhythmIndex(index)
 {
@@ -58,3 +60,5 @@ void RhythmMiniVisual::timerCallback()
                                r.genC.getStepTypes(ov.c));
     }
 }
+
+} // namespace mu_clid

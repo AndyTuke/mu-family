@@ -5,7 +5,9 @@
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/Components/MuLookAndFeel.h"
 
+
 namespace juce { class RangedAudioParameter; }
+namespace mu_clid {
 class PluginProcessor;
 
 class PitchSubsection : public juce::Component
@@ -44,3 +46,5 @@ private:
     // parameter pointer, keyed by `const char*` suffix literal.
     std::unordered_map<std::string_view, juce::RangedAudioParameter*> paramPtrCache;
 };
+
+} // namespace mu_clid

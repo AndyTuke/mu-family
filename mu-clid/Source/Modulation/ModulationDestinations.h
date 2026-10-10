@@ -6,6 +6,8 @@
 #include <string_view>
 #include "Modulation/ModTarget.h"   // mu-core: the standard target row
 
+namespace mu_clid {
+
 // canonical modulation source / destination registry, lifted out of
 // UI/ModulatorEditor.h so non-UI code (specifically the preset deserialiser
 // in PluginProcessor_Preset.cpp) can validate `<Asgn>` entries against the
@@ -200,3 +202,5 @@ namespace ModDest
         return false;
     }
 }
+
+} // namespace mu_clid

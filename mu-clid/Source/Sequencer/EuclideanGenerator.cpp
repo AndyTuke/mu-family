@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+namespace mu_clid {
+
 std::vector<bool> EuclideanGenerator::generate(int steps, int hits)
 {
     std::vector<bool> pattern;
@@ -29,3 +31,5 @@ void EuclideanGenerator::generate(int steps, int hits, std::vector<bool>& out)
         }
     }
 }
+
+} // namespace mu_clid

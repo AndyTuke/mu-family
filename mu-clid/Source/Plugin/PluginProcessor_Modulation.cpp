@@ -10,6 +10,8 @@
 #include "Modulation/MuClidModDest.h"  // mu-clid modulation targets
 #include "Sequencer/Rhythm.h"
 
+namespace mu_clid {
+
 #if ! MUCLID_LITE_BUILD
 
 // Each modulation destination this file reads or writes, as its ModDest::kTable index (compile
@@ -436,3 +438,5 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
 }
 
 #endif // ! MUCLID_LITE_BUILD
+
+} // namespace mu_clid

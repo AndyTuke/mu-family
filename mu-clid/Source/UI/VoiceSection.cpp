@@ -3,6 +3,8 @@
 #include "Sequencer/Rhythm.h"
 #include "Persistence/ScopedApvtsLoading.h"
 
+namespace mu_clid {
+
 VoiceSection::VoiceSection(PluginProcessor& p)
     : proc(p), pitchSub(p), filterSub(p), ampSub(p), insertSub(p, "r")
 {
@@ -77,3 +79,5 @@ void VoiceSection::refreshSuffix(const juce::String& suffix)
     ampSub   .refreshSuffix(suffix);
     insertSub.refreshSuffix(suffix);
 }
+
+} // namespace mu_clid

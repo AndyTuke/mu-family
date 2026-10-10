@@ -3,6 +3,8 @@
 #include "Modulation/ModulationSnapshot.h"
 #include <limits>
 
+namespace mu_clid {
+
 EuclideanPanel::EuclideanPanel(PluginProcessor& p) : proc(p)
 {
     for (auto* k : { &stepsA, &hitsA, &rotA, &prePadA, &postPadA, &insertStA, &insertLenA,
@@ -618,3 +620,5 @@ void EuclideanPanel::paint(juce::Graphics& g)
     if (MuLookAndFeel::hasScrews(*this))
         for (const auto& b : boxes) MuLookAndFeel::drawSubPanelScrews(g, b);
 }
+
+} // namespace mu_clid

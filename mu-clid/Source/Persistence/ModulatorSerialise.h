@@ -8,9 +8,9 @@
 // implementation lives in mu-core and operates on the Layer base; these
 // thin Rhythm& forwarders inject μ-Clid's ModDest source/destination validators
 // so existing call sites + tests (which pass `Rhythm`) are unchanged. enumName /
-// readEnumIndex are re-exported from mu-core via the include above (mu_pp::).
+// readEnumIndex stay in mu-core's mu_pp (the Layer-based serialise there is what these forward to).
 
-namespace mu_pp {
+namespace mu_clid {
 
 // Marks mu-Clid modulator data whose Pre / Post Pad and Insert Length depths are measured
 // against the knob's current maximum (HitGenerator::padKnobMaxima) rather than the full
@@ -20,7 +20,7 @@ inline constexpr const char* kPadDepthUnitsKnobMax  = "knobMax";
 
 inline juce::ValueTree serialiseModulators(const Rhythm& r)
 {
-    auto mods = serialiseModulators(static_cast<const Layer&>(r));
+    auto mods = mu_pp::serialiseModulators(static_cast<const Layer&>(r));
     mods.setProperty(kPadDepthUnitsProperty, kPadDepthUnitsKnobMax, nullptr);
     return mods;
 }
@@ -31,7 +31,7 @@ inline juce::ValueTree serialiseModulators(const Rhythm& r)
 // mu-Clid target's old units already equalled its knob range, so it loads unchanged.
 inline juce::ValueTree upgradeModDepthsToRangeStandard(const juce::ValueTree& mods)
 {
-    if (! mods.isValid() || mods.getProperty(kDepthUnitsProperty).toString() == kDepthUnitsRange)
+    if (! mods.isValid() || mods.getProperty(mu_pp::kDepthUnitsProperty).toString() == mu_pp::kDepthUnitsRange)
         return mods;
 
     constexpr float kOldPadSteps = 12.0f, kPadRangeSteps = 63.0f;
@@ -43,7 +43,7 @@ inline juce::ValueTree upgradeModDepthsToRangeStandard(const juce::ValueTree& mo
         if (dest.startsWith("euclid.") && (dest.endsWith(".prePad") || dest.endsWith(".postPad")))
             node.setProperty("depth", (double) node.getProperty("depth") * kOldPadSteps / kPadRangeSteps, nullptr);
     }
-    upgraded.setProperty(kDepthUnitsProperty, kDepthUnitsRange, nullptr);
+    upgraded.setProperty(mu_pp::kDepthUnitsProperty, mu_pp::kDepthUnitsRange, nullptr);
     return upgraded;
 }
 
@@ -86,7 +86,7 @@ inline juce::ValueTree upgradePadDepthsToKnobMax(const juce::ValueTree& mods, co
 // pad-depth upgrade sees the layout the preset plays with.
 inline juce::StringArray deserialiseModulators(const juce::ValueTree& mods, Rhythm& r)
 {
-    return deserialiseModulators(upgradePadDepthsToKnobMax(upgradeModDepthsToRangeStandard(mods), r),
+    return mu_pp::deserialiseModulators(upgradePadDepthsToKnobMax(upgradeModDepthsToRangeStandard(mods), r),
                                  static_cast<Layer&>(r),
         [](const std::string& id) { return ModDest::isValidSourceId(id); },
         [](const std::string& id) { return ModDest::isValidDestinationId(id); });
@@ -94,7 +94,7 @@ inline juce::StringArray deserialiseModulators(const juce::ValueTree& mods, Rhyt
 
 inline void clearModulators(Rhythm& r)
 {
-    clearModulators(static_cast<Layer&>(r));
+    mu_pp::clearModulators(static_cast<Layer&>(r));
 }
 
-} // namespace mu_pp
+} // namespace mu_clid

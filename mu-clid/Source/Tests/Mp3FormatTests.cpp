@@ -3,7 +3,6 @@
 // memory from silent MPEG-1 Layer III frames (no encoder or sample file needed).
 
 #include <juce_audio_formats/juce_audio_formats.h>
-
 class Mp3FormatTest : public juce::UnitTest
 {
 public:

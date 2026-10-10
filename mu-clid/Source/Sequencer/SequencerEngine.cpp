@@ -3,6 +3,8 @@
 
 #include <algorithm>
 
+namespace mu_clid {
+
 SequencerEngine::SequencerEngine()
 {
     lastStepIndex.fill(-1);
@@ -332,3 +334,5 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
 
     return result;
 }
+
+} // namespace mu_clid

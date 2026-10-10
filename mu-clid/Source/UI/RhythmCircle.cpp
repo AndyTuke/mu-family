@@ -1,5 +1,7 @@
 #include "RhythmCircle.h"
 
+namespace mu_clid {
+
 namespace
 {
     // Animation timing — all derived from a single timer Hz so the durations
@@ -463,3 +465,5 @@ void RhythmCircle::paint(juce::Graphics& g)
         }
     }
 }
+
+} // namespace mu_clid

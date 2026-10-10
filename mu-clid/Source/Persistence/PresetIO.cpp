@@ -9,23 +9,12 @@
 #include "UI/Components/MuLookAndFeel.h" // kChannelPaletteSize
 #include <limits>               // std::numeric_limits for NaN sentinel
 
-using mu_pp::kRhythmParamDefs;
-using mu_pp::kRhythmParamCount;
-using mu_pp::kChannelSuffixes;
-using mu_pp::applyRhythmSuffix;
-using mu_pp::kCurrentPresetVersion;
-using mu_pp::writeKindedProperty;
-using mu_pp::readKindedPropertyAsActualV2;
-using mu_pp::kGlobalParamDefs;
-using mu_pp::kGlobalParamDefCount;
-using mu_pp::serialiseModulators;
-using mu_pp::deserialiseModulators;
-using mu_pp::clearModulators;
+namespace mu_clid {
 using mu_pp::enumName;
 using mu_pp::readEnumIndex;
-using mu_pp_migrate::migrateInsertSlotsV3;       // moved to PresetMigrations
-using mu_pp_migrate::migrateMasterInsertSlotsV3;
-using mu_pp_migrate::migrateModAssignmentsV3;
+using mu_clid::migrate::migrateInsertSlotsV3;       // moved to PresetMigrations
+using mu_clid::migrate::migrateMasterInsertSlotsV3;
+using mu_clid::migrate::migrateModAssignmentsV3;
 
 // mu-Clid shares only the file-name rule with mu-core's PresetFiles helpers. Its on-disk
 // format predates them and must keep loading: presetName / presetCategory properties on
@@ -51,7 +40,7 @@ using mu_pp_migrate::migrateModAssignmentsV3;
 static void writeParamPropertyV2(juce::ValueTree& tree,
                                  const juce::String& propName,
                                  const juce::RangedAudioParameter& param,
-                                 const mu_pp::RhythmParamDef& def)
+                                 const mu_clid::RhythmParamDef& def)
 {
     const float actual = param.convertFrom0to1(param.getValue());
     writeKindedProperty(tree, propName, actual, def.kind, def.algorithmNames);
@@ -63,7 +52,7 @@ static void writeParamPropertyV2(juce::ValueTree& tree,
 static float readGlobalPropertyAsActual(const juce::ValueTree& tree,
                                          const juce::String& propName,
                                          const juce::RangedAudioParameter& /*param*/,
-                                         const mu_pp::GlobalParamDef& def)
+                                         const mu_clid::GlobalParamDef& def)
 {
     if (! tree.hasProperty(propName))
         return std::numeric_limits<float>::quiet_NaN();
@@ -594,9 +583,9 @@ juce::ValueTree PresetIO::buildFullPresetTree(const juce::String& name, const ju
     // eff_algo / rev_algo / mst_insChar / mst_ins2Char emit their stable algorithm
     // name string; bool params emit "true"/"false"; the rest emit actual values.
     juce::ValueTree globalTree("GlobalState");
-    for (int i = 0; i < mu_pp::kGlobalParamDefCount; ++i)
+    for (int i = 0; i < mu_clid::kGlobalParamDefCount; ++i)
     {
-        const auto& def = mu_pp::kGlobalParamDefs[i];
+        const auto& def = mu_clid::kGlobalParamDefs[i];
         if (auto* param = proc_.apvts.getParameter(def.id))
         {
             const float actual = param->convertFrom0to1(param->getValue());
@@ -664,9 +653,9 @@ void PresetIO::restoreGlobalState(const juce::ValueTree& root)
         migrateMasterInsertSlotsV3(migrated, 1);
         migrateMasterInsertSlotsV3(migrated, 2);
 
-        for (int gi = 0; gi < mu_pp::kGlobalParamDefCount; ++gi)
+        for (int gi = 0; gi < mu_clid::kGlobalParamDefCount; ++gi)
         {
-            const auto& def = mu_pp::kGlobalParamDefs[gi];
+            const auto& def = mu_clid::kGlobalParamDefs[gi];
             if (auto* param = proc_.apvts.getParameter(def.id))
             {
                 const float actualVal = readGlobalPropertyAsActual(migrated, juce::String(def.id),
@@ -894,3 +883,5 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     }
     restoreGlobalState(root);
 }
+
+} // namespace mu_clid

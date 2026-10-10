@@ -5,6 +5,8 @@
 #include "Sequencer/Rhythm.h"
 #include "Audio/AlgorithmNames.h"   // mu_audio::populateFilterTypeDropdown
 
+namespace mu_clid {
+
 FilterSubsection::FilterSubsection(PluginProcessor& p) : proc(p)
 {
     // Canonical family-wide filter display order (LP/BP/HP family → Notch → AP → Comb → EQ).
@@ -258,3 +260,5 @@ void FilterSubsection::resized()
     filterRel   .setBounds(s(3 * kW), s(row2Y), s(kW), s(rowH));
     filterDepth .setBounds(s(4 * kW), s(row2Y), s(kW), s(rowH));
 }
+
+} // namespace mu_clid

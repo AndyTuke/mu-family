@@ -6,6 +6,8 @@
 #include "UI/Voice/InsertSubsection.h"   // shared mu-core insert panel
 #include "UI/Voice/VoiceBand.h"          // shared mu-core voice band layout + drawing
 
+namespace mu_clid {
+
 class PluginProcessor;
 
 // mu-Clid's voice chain: the shared VoiceBand (Pitch | Filter | Amp | Effects layout + drawing)
@@ -34,3 +36,5 @@ private:
     AmpSubsection    ampSub;
     InsertSubsection insertSub;
 };
+
+} // namespace mu_clid

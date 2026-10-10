@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <numeric>
 
+namespace mu_clid {
+
 std::vector<bool> HitGenerator::getPattern() const
 {
     // Same result as the audio-thread path — one implementation of the layout rules.
@@ -173,3 +175,5 @@ std::vector<StepType> HitGenerator::getStepTypes(const EuclidGenOverrides& reque
 
     return result;
 }
+
+} // namespace mu_clid

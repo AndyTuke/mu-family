@@ -6,6 +6,8 @@
 #include <utility>
 #include <vector>
 
+namespace mu_clid {
+
 enum class InsertMode { Pad, Mute };
 
 // Per-step type for the ring display, distinguishing hits from pad types.
@@ -139,3 +141,5 @@ public:
                     std::vector<bool>& out,
                     std::vector<bool>& scratch) const;
 };
+
+} // namespace mu_clid

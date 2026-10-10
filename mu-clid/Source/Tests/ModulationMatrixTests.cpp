@@ -6,7 +6,6 @@
 
 #include <juce_core/juce_core.h>
 #include "Modulation/ModulationMatrix.h"
-
 static ModulationAssignment makeAssign(const std::string& id,
                                        const std::string& src,
                                        const std::string& dest)

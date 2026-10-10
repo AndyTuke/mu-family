@@ -1,5 +1,7 @@
 #include "SampleBrowser.h"
 
+namespace mu_clid {
+
 SampleBrowserContent::SampleBrowserContent(PluginProcessor& proc,
                                             const juce::File& startDir,
                                             std::function<void(const juce::File&)> onChosen)
@@ -76,3 +78,5 @@ void SampleBrowserContent::commit(const juce::File& f)
     onChosen(f);
     if (onDismiss) onDismiss();
 }
+
+} // namespace mu_clid

@@ -5,6 +5,8 @@
 #include "Plugin/PluginProcessor.h"
 #include <array>
 
+namespace mu_clid {
+
 // Concentric ring display showing euclidean hit patterns.
 // Ring A (purple) is outermost, Ring B (coral) second, Ring C (amber, dashed) innermost.
 // During playback, all rings rotate so the current step sits at 12 o'clock.
@@ -101,3 +103,5 @@ private:
     static juce::Colour stepColour(StepType t, juce::Colour hitClr, bool isCurrent);
     static juce::Colour ringBase();   // opaque base colour under every ring
 };
+
+} // namespace mu_clid

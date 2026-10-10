@@ -6,7 +6,9 @@
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/MuLookAndFeel.h"
 
+
 namespace juce { class RangedAudioParameter; }
+namespace mu_clid {
 class PluginProcessor;
 
 class FilterSubsection : public juce::Component
@@ -45,3 +47,5 @@ private:
 
     std::unordered_map<std::string_view, juce::RangedAudioParameter*> paramPtrCache;
 };
+
+} // namespace mu_clid

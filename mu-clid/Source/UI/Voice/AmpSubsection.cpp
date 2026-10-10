@@ -4,6 +4,8 @@
 #include "Modulation/ModulationSnapshot.h"
 #include "Sequencer/Rhythm.h"
 
+namespace mu_clid {
+
 AmpSubsection::AmpSubsection(PluginProcessor& p) : proc(p)
 {
     for (auto* k : { &ampLevel, &ampSendEff, &ampSendDly, &ampSendRev, &ampAccent, &ampPan,
@@ -293,3 +295,5 @@ void AmpSubsection::resized()
     ampSus.setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));
     ampRel.setBounds(s(3 * kW), s(row2Y), s(kW), s(rowH));
 }
+
+} // namespace mu_clid

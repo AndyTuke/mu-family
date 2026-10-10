@@ -11,6 +11,8 @@
 #include "UI/SaveDialog.h"
 #include "Plugin/PluginProcessor.h"
 
+namespace mu_clid {
+
 // Full rhythm editor panel. Layout (top to bottom):
 //   Header bar | Sample bar | [RhythmCircle | EuclideanPanel] | VoiceSection | ModulatorPanel
 class RhythmPanel : public juce::Component,
@@ -114,3 +116,5 @@ private:
     void registerRhythmListeners(int ri);
     void deregisterRhythmListeners(int ri);
 };
+
+} // namespace mu_clid

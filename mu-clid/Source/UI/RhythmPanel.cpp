@@ -8,6 +8,8 @@
 #include <string_view>
 #include <unordered_set>
 
+namespace mu_clid {
+
 namespace {
 
 // Euclidean panel params — all use r{ri}_ prefix.
@@ -712,3 +714,5 @@ void RhythmPanel::setVoiceEffectSendLabel(const juce::String& name)
     effectSendName = name;
     modulatorPanel.setDestProvider(&modDestProvider);
 }
+
+} // namespace mu_clid

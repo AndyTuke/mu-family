@@ -1,6 +1,8 @@
 #include "RhythmSidebar.h"
 #include "Plugin/PluginProcessor.h"
 
+namespace mu_clid {
+
 RhythmSidebar::RhythmSidebar(PluginProcessor& p)
     : ChannelSidebar(p, "Rhythm"), proc(p)
 {
@@ -20,3 +22,5 @@ RhythmSidebar::RhythmSidebar(PluginProcessor& p)
 
     refreshItems();
 }
+
+} // namespace mu_clid

@@ -10,6 +10,8 @@
 #include <juce_core/juce_core.h>
 #include "Modulation/ModulationSkew.h"
 
+using namespace mu_clid;
+
 class ModulationSkewTest : public juce::UnitTest
 {
 public:

@@ -17,7 +17,6 @@
 #include "Audio/InsertProcessor.h"
 #include "Audio/MultiModeFilter.h"
 #include "Audio/FX/Slots/FXAlgorithmDef.h"
-
 using mu_audio::countNames;
 using mu_audio::kInsertAlgorithmNames;
 using mu_audio::kFilterTypeNames;

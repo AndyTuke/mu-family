@@ -9,6 +9,8 @@
 #include "Sequencer/Rhythm.h"
 #include "Persistence/PresetFiles.h"   // mu_pp::safePresetFileName
 
+namespace mu_clid {
+
 juce::File PluginProcessor::getRhythmsDir() const { return getContentDir().getChildFile("Rhythms"); }
 juce::File PluginProcessor::getSamplesDir() const { return getContentDir().getChildFile("Samples"); }
 
@@ -28,13 +30,21 @@ void PluginProcessor::ensureContentFoldersExist()
     getRhythmsDir().createDirectory();
     getSamplesDir().createDirectory();
 }
+
+} // namespace mu_clid
+
+// The JUCE plugin factory is the one entry point that stays at global scope.
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
-    return new PluginProcessor();
+    return new mu_clid::PluginProcessor();
 }
+
+namespace mu_clid {
 
 // A named rhythm preset in the Rhythms folder (path-linked sample, no category / description).
 void PluginProcessor::saveSlotPreset(int ri, const juce::String& name)
 {
     saveRhythmPresetToFile(ri, getRhythmsDir().getChildFile(mu_pp::safePresetFileName(name, "Rhythm") + ".muRhythm"));
 }
+
+} // namespace mu_clid

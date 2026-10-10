@@ -8,6 +8,8 @@
 #include "UI/MixerOverlay.h"
 #include "UI/SettingsOverlay.h"
 
+namespace mu_clid {
+
 // μ-Clid editor: extends the shared mu-core shell with rhythm-specific
 // components (sidebar, RhythmPanel, MixerOverlay, SettingsOverlay) and the
 // rhythm-set refresh wiring that drives them after preset loads / hot-swaps.
@@ -55,3 +57,5 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };
+
+} // namespace mu_clid

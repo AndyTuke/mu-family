@@ -27,9 +27,7 @@
 #include "../Persistence/RhythmParamTable.h"
 #include "../Persistence/PresetHelpers.h"
 
-using mu_pp::ParamKind;
-using mu_pp::writeKindedProperty;
-using mu_pp::readKindedPropertyAsActualV2;
+using namespace mu_clid;
 
 class PresetXMLRoundTripTest : public juce::UnitTest
 {
@@ -50,9 +48,9 @@ public:
 
             // Pass 1: populate a Rhythm with test values and serialise.
             Rhythm r1;
-            for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
+            for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
             {
-                const auto& def = mu_pp::kRhythmParamDefs[i];
+                const auto& def = mu_clid::kRhythmParamDefs[i];
                 bool pd = false, vd = false;
 
                 // Choose a test value that every apply() will accept without clamping
@@ -70,9 +68,9 @@ public:
 
             // Pass 2: deserialise into a fresh Rhythm.
             Rhythm r2;
-            for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
+            for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
             {
-                const auto& def = mu_pp::kRhythmParamDefs[i];
+                const auto& def = mu_clid::kRhythmParamDefs[i];
                 const juce::String propName = juce::String(kPrefix) + def.suffix;
 
                 const float readBack = readKindedPropertyAsActualV2(
@@ -83,9 +81,9 @@ public:
             }
 
             // Pass 3: compare push() values - they must match.
-            for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
+            for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
             {
-                const auto& def = mu_pp::kRhythmParamDefs[i];
+                const auto& def = mu_clid::kRhythmParamDefs[i];
                 const float original  = def.push(r1);
                 const float recovered = def.push(r2);
                 expectWithinAbsoluteError(recovered, original, kTol,
@@ -98,9 +96,9 @@ public:
         // ── Bool params: "true"/"false" encoding preserved ────────────────────
         beginTest ("Bool params: 0.0 and 1.0 survive as distinct XML values");
         {
-            for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
+            for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
             {
-                const auto& def = mu_pp::kRhythmParamDefs[i];
+                const auto& def = mu_clid::kRhythmParamDefs[i];
                 if (def.kind != ParamKind::Bool) continue;
                 const juce::String s (def.suffix);
 
@@ -124,9 +122,9 @@ public:
         // ── AlgorithmIndex params: name-string encoding preserved ─────────────
         beginTest ("AlgorithmIndex params: written as name strings, read back correctly");
         {
-            for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
+            for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
             {
-                const auto& def = mu_pp::kRhythmParamDefs[i];
+                const auto& def = mu_clid::kRhythmParamDefs[i];
                 if (def.kind != ParamKind::AlgorithmIndex) continue;
                 if (def.algorithmNames == nullptr) continue;
 
@@ -150,10 +148,10 @@ public:
         // ── rstSt sentinel: -1 (free-running) survives XML codec ─────────────
         beginTest ("rstSt: sentinel -1 (free-running) survives XML round-trip");
         {
-            const mu_pp::RhythmParamDef* rstStDef = nullptr;
-            for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
-                if (juce::String(mu_pp::kRhythmParamDefs[i].suffix) == "rstSt")
-                    rstStDef = &mu_pp::kRhythmParamDefs[i];
+            const mu_clid::RhythmParamDef* rstStDef = nullptr;
+            for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
+                if (juce::String(mu_clid::kRhythmParamDefs[i].suffix) == "rstSt")
+                    rstStDef = &mu_clid::kRhythmParamDefs[i];
 
             if (rstStDef != nullptr)
             {
@@ -175,10 +173,10 @@ public:
         // ── aEnvRel sentinel: 10.0 (play-to-end) survives XML codec ──────────
         beginTest ("aEnvRel: sentinel 10.0 (play-to-end) survives XML round-trip");
         {
-            const mu_pp::RhythmParamDef* relDef = nullptr;
-            for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
-                if (juce::String(mu_pp::kRhythmParamDefs[i].suffix) == "aEnvRel")
-                    relDef = &mu_pp::kRhythmParamDefs[i];
+            const mu_clid::RhythmParamDef* relDef = nullptr;
+            for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
+                if (juce::String(mu_clid::kRhythmParamDefs[i].suffix) == "aEnvRel")
+                    relDef = &mu_clid::kRhythmParamDefs[i];
 
             if (relDef != nullptr)
             {

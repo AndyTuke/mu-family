@@ -2,6 +2,8 @@
 
 #include <juce_core/juce_core.h>
 
+namespace mu_clid {
+
 class PluginProcessor;
 class Rhythm;
 
@@ -29,3 +31,5 @@ private:
 
     PluginProcessor& proc_;
 };
+
+} // namespace mu_clid

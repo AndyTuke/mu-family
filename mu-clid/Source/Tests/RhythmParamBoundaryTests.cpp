@@ -15,6 +15,8 @@
 #include "../Persistence/RhythmParamTable.h"
 #include "Audio/AlgorithmNames.h"
 
+using namespace mu_clid;
+
 class RhythmParamBoundaryTest : public juce::UnitTest
 {
 public:
@@ -24,19 +26,19 @@ public:
     {
         constexpr float kTol = 1e-4f;
 
-        auto applyAndPush = [](const mu_pp::RhythmParamDef& def, float in) -> float {
+        auto applyAndPush = [](const mu_clid::RhythmParamDef& def, float in) -> float {
             Rhythm r;
             bool pd = false, vd = false;
             def.apply(in, r, pd, vd);
             return def.push(r);
         };
 
-        auto find = [](const char* suffix) -> const mu_pp::RhythmParamDef& {
-            for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
-                if (juce::String(mu_pp::kRhythmParamDefs[i].suffix) == suffix)
-                    return mu_pp::kRhythmParamDefs[i];
+        auto find = [](const char* suffix) -> const mu_clid::RhythmParamDef& {
+            for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
+                if (juce::String(mu_clid::kRhythmParamDefs[i].suffix) == suffix)
+                    return mu_clid::kRhythmParamDefs[i];
             jassertfalse;
-            return mu_pp::kRhythmParamDefs[0];
+            return mu_clid::kRhythmParamDefs[0];
         };
 
         // ── HitGen integer clamps ─────────────────────────────────────────────
@@ -195,10 +197,10 @@ public:
         // ── Bool params ───────────────────────────────────────────────────────
         beginTest ("All Bool params: 0.0 and 1.0 round-trip exactly");
         {
-            for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
+            for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
             {
-                const auto& def = mu_pp::kRhythmParamDefs[i];
-                if (def.kind != mu_pp::ParamKind::Bool) continue;
+                const auto& def = mu_clid::kRhythmParamDefs[i];
+                if (def.kind != mu_clid::ParamKind::Bool) continue;
                 const juce::String s (def.suffix);
                 expectWithinAbsoluteError (applyAndPush(def, 0.0f), 0.0f, kTol, s + " Bool 0 round-trip");
                 expectWithinAbsoluteError (applyAndPush(def, 1.0f), 1.0f, kTol, s + " Bool 1 round-trip");

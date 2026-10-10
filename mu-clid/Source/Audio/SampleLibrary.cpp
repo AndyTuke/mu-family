@@ -1,6 +1,8 @@
 #include "SampleLibrary.h"
 #include "Plugin/PluginProcessor.h"
 
+namespace mu_clid {
+
 SampleLibrary::SampleLibrary(PluginProcessor& p) : proc_(p)
 {
     // One path slot per possible rhythm, so index writes never grow the array.
@@ -57,3 +59,5 @@ void SampleLibrary::setPrimarySampleDir(const juce::File& dir)
                                 dir == juce::File{} ? juce::String{} : dir.getFullPathName());
     proc_.appSettings->saveIfNeeded();
 }
+
+} // namespace mu_clid

@@ -2,7 +2,7 @@
 #include "Audio/AlgorithmNames.h"    // mu_audio::indexFromName, kInsertAlgorithmNames
 #include "Audio/InsertSlotConfig.h"  // mu_ui::actualToNorm
 
-namespace mu_pp_migrate
+namespace mu_clid::migrate
 {
 
 void migrateLegacyHostState(juce::ValueTree& state)
@@ -273,4 +273,4 @@ void migrateModAssignmentsV3(juce::ValueTree& modsTree, int algoIndex)
     }
 }
 
-} // namespace mu_pp_migrate
+} // namespace mu_clid::migrate

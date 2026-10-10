@@ -2,6 +2,8 @@
 
 #include "UI/StandardSettingsOverlay.h"   // mu-core: the family-standard settings page
 
+namespace mu_clid {
+
 class PluginProcessor;
 
 // mu-Clid's settings page: the family standard (master volume, UI size, standalone MIDI
@@ -47,3 +49,5 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SettingsOverlay)
 };
+
+} // namespace mu_clid

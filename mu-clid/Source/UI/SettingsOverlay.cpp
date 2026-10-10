@@ -1,6 +1,8 @@
 #include "SettingsOverlay.h"
 #include "Plugin/PluginProcessor.h"
 
+namespace mu_clid {
+
 SettingsOverlay::SettingsOverlay(PluginProcessor& p)
     : StandardSettingsOverlay(p, { /*showTransport*/ false }), product(p)
 {
@@ -126,3 +128,5 @@ void SettingsOverlay::updateSampleLibLabel()
 {
     sampleLibLabel.setText(product.samples.getPrimarySampleDir().getFullPathName(), juce::dontSendNotification);
 }
+
+} // namespace mu_clid

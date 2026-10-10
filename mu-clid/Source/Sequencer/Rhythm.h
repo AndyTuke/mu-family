@@ -5,6 +5,8 @@
 
 #include <optional>
 
+namespace mu_clid {
+
 enum class Logic { OR, AND, XOR, AOnly, BOnly };
 
 // per-rhythm bundle of modulated euclid overrides for genA / genB / genC.
@@ -44,3 +46,5 @@ public:
                             std::vector<bool>& patB,
                             std::vector<bool>& euclidScratch) const;
 };
+
+} // namespace mu_clid

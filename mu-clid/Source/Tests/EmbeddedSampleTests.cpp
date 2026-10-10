@@ -4,6 +4,8 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 #include "Persistence/EmbeddedSample.h"
 
+using namespace mu_clid;
+
 class EmbeddedSampleTest : public juce::UnitTest
 {
 public:

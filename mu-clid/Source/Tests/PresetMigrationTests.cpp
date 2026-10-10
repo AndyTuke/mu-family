@@ -14,6 +14,8 @@
 #include "Audio/InsertSlotConfig.h"   // mu_ui::actualToNorm
 #include "Audio/AlgorithmNames.h"     // algorithm index reference
 
+using namespace mu_clid;
+
 class PresetMigrationTest : public juce::UnitTest
 {
 public:
@@ -38,7 +40,7 @@ public:
             t.setProperty ("r0_drvDit",  0.5,     nullptr);
             t.setProperty ("r0_drvTon",  5000.0,  nullptr);
 
-            mu_pp_migrate::migrateInsertSlotsV3 (t, "r0_");
+            mu_clid::migrate::migrateInsertSlotsV3 (t, "r0_");
 
             expectWithinAbsoluteError (prop (t, "r0_insP1"), mu_ui::actualToNorm (8.0f,     algo, 0), 1e-4f, "bits -> p1");
             expectWithinAbsoluteError (prop (t, "r0_insP2"), mu_ui::actualToNorm (24000.0f, algo, 1), 1e-4f, "rate -> p2");
@@ -56,7 +58,7 @@ public:
             t.setProperty ("r0_drvOut", 0.5,    nullptr);
             t.setProperty ("r0_drvTon", 8000.0, nullptr);
 
-            mu_pp_migrate::migrateInsertSlotsV3 (t, "r0_");
+            mu_clid::migrate::migrateInsertSlotsV3 (t, "r0_");
 
             expectWithinAbsoluteError (prop (t, "r0_insP1"), mu_ui::actualToNorm (0.7f,    algo, 0), 1e-4f, "drive -> p1");
             expectWithinAbsoluteError (prop (t, "r0_insP2"), mu_ui::actualToNorm (0.5f,    algo, 1), 1e-4f, "output -> p2");
@@ -71,7 +73,7 @@ public:
             t.setProperty ("r0_drvBits", 8.0,   nullptr);
             t.setProperty ("r0_insP1",   0.123, nullptr);   // a v3 slot is already present
 
-            mu_pp_migrate::migrateInsertSlotsV3 (t, "r0_");
+            mu_clid::migrate::migrateInsertSlotsV3 (t, "r0_");
 
             expectWithinAbsoluteError (prop (t, "r0_insP1"), 0.123f, 1e-6f,
                 "must not overwrite an existing v3 slot");
@@ -80,7 +82,7 @@ public:
         beginTest ("C1: migrateInsertSlotsV3 no-ops when there is nothing to migrate");
         {
             juce::ValueTree t ("Rhythm");   // no drvChar
-            mu_pp_migrate::migrateInsertSlotsV3 (t, "r0_");
+            mu_clid::migrate::migrateInsertSlotsV3 (t, "r0_");
             expect (! t.hasProperty ("r0_insP1"), "no insert slots created from an empty tree");
         }
 
@@ -100,7 +102,7 @@ public:
             add ("r0_fltCut",  800.0);   // non-ADSR -> unchanged
             add ("global_x",   100.0);   // non-r{0-7}_ -> unchanged
 
-            mu_pp_migrate::migrateLegacyHostState (s);
+            mu_clid::migrate::migrateLegacyHostState (s);
 
             auto val = [&s] (const char* id) -> float
             {
@@ -115,20 +117,20 @@ public:
             expectWithinAbsoluteError (val ("r0_fltCut"),  800.0f, 1e-4f, "non-ADSR param untouched");
             expectWithinAbsoluteError (val ("global_x"),   100.0f, 1e-4f, "non-rhythm param untouched");
             expectEquals ((int) s.getProperty ("formatVersion"),
-                          mu_pp_migrate::kCurrentStateFormatVersion,
+                          mu_clid::migrate::kCurrentStateFormatVersion,
                           "formatVersion bumped to current after migration");
         }
 
         beginTest ("C2: migrateLegacyHostState is a no-op on already-current state");
         {
             juce::ValueTree s ("PARAMETERS");
-            s.setProperty ("formatVersion", mu_pp_migrate::kCurrentStateFormatVersion, nullptr);
+            s.setProperty ("formatVersion", mu_clid::migrate::kCurrentStateFormatVersion, nullptr);
             juce::ValueTree p ("PARAM");
             p.setProperty ("id", "r0_aEnvAtk", nullptr);
             p.setProperty ("value", 5.0, nullptr);   // already in seconds
             s.addChild (p, -1, nullptr);
 
-            mu_pp_migrate::migrateLegacyHostState (s);
+            mu_clid::migrate::migrateLegacyHostState (s);
 
             expectWithinAbsoluteError ((float) (double) s.getChild (0).getProperty ("value"), 5.0f, 1e-6f,
                 "current-version state must not be rescaled");

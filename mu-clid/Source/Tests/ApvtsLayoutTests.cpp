@@ -12,6 +12,8 @@
 #include "../Persistence/PresetHelpers.h"
 #include "Modulation/ModulationDestinations.h"
 
+using namespace mu_clid;
+
 class ApvtsLayoutTest : public juce::UnitTest
 {
 public:
@@ -23,25 +25,25 @@ public:
         beginTest ("kRhythmParamDefs - all suffixes are unique");
         {
             std::unordered_map<std::string, int> seen;
-            for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
+            for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
             {
-                const std::string s = mu_pp::kRhythmParamDefs[i].suffix;
+                const std::string s = mu_clid::kRhythmParamDefs[i].suffix;
                 auto it = seen.find(s);
                 if (it != seen.end())
                     expect (false, "Duplicate rhythm param suffix '" + s + "' at indices "
                           + std::to_string(it->second) + " and " + std::to_string(i));
                 seen[s] = i;
             }
-            expectEquals ((int)seen.size(), mu_pp::kRhythmParamCount,
-                "Expected " + juce::String(mu_pp::kRhythmParamCount) + " unique suffixes");
+            expectEquals ((int)seen.size(), mu_clid::kRhythmParamCount,
+                "Expected " + juce::String(mu_clid::kRhythmParamCount) + " unique suffixes");
         }
 
         // ── kRhythmParamDefs - no empty suffixes ──────────────────────────────
         beginTest ("kRhythmParamDefs - no entry has an empty suffix");
         {
-            for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
+            for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
             {
-                const juce::String s (mu_pp::kRhythmParamDefs[i].suffix);
+                const juce::String s (mu_clid::kRhythmParamDefs[i].suffix);
                 expect (s.isNotEmpty(),
                         "Empty suffix at kRhythmParamDefs[" + juce::String(i) + "]");
             }
@@ -51,16 +53,16 @@ public:
         beginTest ("kGlobalParamDefs - all IDs are unique");
         {
             std::unordered_map<std::string, int> seen;
-            for (int i = 0; i < mu_pp::kGlobalParamDefCount; ++i)
+            for (int i = 0; i < mu_clid::kGlobalParamDefCount; ++i)
             {
-                const std::string s = mu_pp::kGlobalParamDefs[i].id;
+                const std::string s = mu_clid::kGlobalParamDefs[i].id;
                 auto it = seen.find(s);
                 if (it != seen.end())
                     expect (false, "Duplicate global param ID '" + s + "' at indices "
                           + std::to_string(it->second) + " and " + std::to_string(i));
                 seen[s] = i;
             }
-            expectEquals ((int)seen.size(), mu_pp::kGlobalParamDefCount);
+            expectEquals ((int)seen.size(), mu_clid::kGlobalParamDefCount);
         }
 
         // ── kRhythmParamDefs - AlgorithmIndex entries have non-null tables ────
@@ -68,7 +70,7 @@ public:
         {
             for (const auto& t : ModDest::kTable)
                 if (t.param != nullptr && ! ModDest::isMixerStripParam (t.param))
-                    expect (mu_pp::findRhythmParamDef (t.param) != nullptr,
+                    expect (mu_clid::findRhythmParamDef (t.param) != nullptr,
                             juce::String ("target '") + t.id + "' names unknown parameter '" + t.param + "'");
         }
 
@@ -85,10 +87,10 @@ public:
 
         beginTest ("AlgorithmIndex params each have a non-null algorithm name table");
         {
-            for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
+            for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
             {
-                const auto& def = mu_pp::kRhythmParamDefs[i];
-                if (def.kind == mu_pp::ParamKind::AlgorithmIndex)
+                const auto& def = mu_clid::kRhythmParamDefs[i];
+                if (def.kind == mu_clid::ParamKind::AlgorithmIndex)
                     expect (def.algorithmNames != nullptr,
                             juce::String("AlgorithmIndex param '") + def.suffix
                             + "' has null name table");

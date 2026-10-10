@@ -2,6 +2,8 @@
 #include "Audio/FX/Slots/FXAlgorithmDef.h"
 #include <BinaryData.h>
 
+namespace mu_clid {
+
 PluginEditor::PluginEditor(PluginProcessor& p)
     : EditorShellBase(p),
       proc(p),
@@ -221,3 +223,5 @@ void PluginEditor::syncVoiceEffectSendLabel()
                               : juce::String("Effect");
     rhythmPanel.setVoiceEffectSendLabel(name);
 }
+
+} // namespace mu_clid

@@ -22,6 +22,8 @@
 #include <vector>
 #include <unordered_map>
 
+namespace mu_clid {
+
 class PluginProcessor : public ProcessorBase,
                         private juce::AudioProcessorValueTreeState::Listener
 {
@@ -424,3 +426,5 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };
+
+} // namespace mu_clid

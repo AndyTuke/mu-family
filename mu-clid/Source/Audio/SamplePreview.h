@@ -2,6 +2,8 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
+namespace mu_clid {
+
 // Encapsulates the sample-preview player used by the file browser (SampleBrowserContent).
 // Routes a decoded audio file through a transport and mixes it at 0.7x into whatever
 // master bus buffer is passed to mixInto(). Completely message-thread-owned for start/stop;
@@ -27,3 +29,5 @@ private:
     std::unique_ptr<juce::AudioFormatReaderSource>    source;
     juce::AudioBuffer<float>                          scratchBuffer;
 };
+
+} // namespace mu_clid

@@ -5,6 +5,8 @@
 #include "Sequencer/HitGenerator.h"
 #include "Plugin/PluginProcessor.h"
 
+namespace mu_clid {
+
 // mu-clid's per-layer sidebar graphic — the mini RhythmCircle bound to a rhythm.
 // It is the product-specific Component injected into the shared mu-core
 // SidebarItem (which owns the surrounding chrome). Polls the rhythm's pattern +
@@ -35,3 +37,5 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RhythmMiniVisual)
 };
+
+} // namespace mu_clid

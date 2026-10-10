@@ -3,6 +3,8 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "Plugin/HotSwapStager.h"   // HotSwapStager::PreparedFullPreset (commit payload)
 
+namespace mu_clid {
+
 class PluginProcessor;
 
 // Encapsulates all preset save/load logic extracted from PluginProcessor.
@@ -114,3 +116,5 @@ private:
     // Restore the <GlobalState> child if present (mixer + FX algorithm params).
     void restoreGlobalState(const juce::ValueTree& root);
 };
+
+} // namespace mu_clid

@@ -8,12 +8,7 @@
 #include <juce_data_structures/juce_data_structures.h>
 #include "../Persistence/PresetHelpers.h"
 
-using mu_pp::ParamKind;
-using mu_pp::writeKindedProperty;
-using mu_pp::readKindedPropertyAsActualV2;
-using mu_pp::kGlobalParamDefs;
-using mu_pp::kGlobalParamDefCount;
-using mu_pp::GlobalParamDef;
+using namespace mu_clid;
 
 class GlobalParamDefsTest : public juce::UnitTest
 {

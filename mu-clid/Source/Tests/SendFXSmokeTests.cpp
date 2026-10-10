@@ -14,7 +14,6 @@
 #include "Audio/FX/Slots/EffectSlot.h"
 #include "Audio/FX/Slots/DelaySlot.h"
 #include "Audio/FX/Slots/ReverbSlot.h"
-
 class SendFXSmokeTest : public juce::UnitTest
 {
 public:

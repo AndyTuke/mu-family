@@ -16,6 +16,8 @@
 
 #include <thread>   // std::this_thread::yield in modulator deserialise lock-spin
 
+namespace mu_clid {
+
 // Declare one stereo sidechain input (disabled by default; DAW enables when the user
 // wires an external signal) + 10 stereo output buses: Master (always enabled),
 // Out 1..8 + FX Returns (disabled by default, matching pre-multi-bus behaviour).
@@ -614,3 +616,5 @@ void PluginProcessor::commitDeferredWork()
 }
 
 //==============================================================================
+
+} // namespace mu_clid

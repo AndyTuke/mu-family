@@ -24,7 +24,6 @@
 #include "Audio/Filters/LowShelfFilter.h"
 #include "Audio/Filters/HighShelfFilter.h"
 #include "Audio/Filters/CombMinusFilter.h"
-
 class FilterDSPSmokeTest : public juce::UnitTest
 {
 public:

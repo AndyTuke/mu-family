@@ -3,6 +3,8 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "SamplePreview.h"
 
+namespace mu_clid {
+
 class PluginProcessor;
 
 // mu-Clid's per-rhythm sample bookkeeping: the sample path each rhythm slot plays, the
@@ -51,3 +53,5 @@ private:
     juce::StringArray paths_;
     SamplePreview     preview_;
 };
+
+} // namespace mu_clid

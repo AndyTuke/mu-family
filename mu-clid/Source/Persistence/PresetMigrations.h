@@ -11,7 +11,7 @@
 // in the pre-distribution era. A tree already in the current format is
 // detected and left untouched by each function's early-out, so re-running is a
 // no-op.
-namespace mu_pp_migrate
+namespace mu_clid::migrate
 {
 
 // Host-state format version. Bump whenever the on-disk schema changes in a way
@@ -47,4 +47,4 @@ void migrateMasterInsertSlotsV3(juce::ValueTree& tree, int slot);
 // new layout are dropped.
 void migrateModAssignmentsV3(juce::ValueTree& modsTree, int algoIndex);
 
-} // namespace mu_pp_migrate
+} // namespace mu_clid::migrate

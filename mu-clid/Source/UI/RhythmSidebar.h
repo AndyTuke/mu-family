@@ -2,6 +2,8 @@
 #include "UI/ChannelSidebar.h"
 #include "RhythmMiniVisual.h"
 
+namespace mu_clid {
+
 class PluginProcessor;
 
 // mu-clid's left sidebar IS the shared mu-core ChannelSidebar, configured with a
@@ -23,3 +25,5 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RhythmSidebar)
 };
+
+} // namespace mu_clid

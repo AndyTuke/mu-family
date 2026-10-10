@@ -17,9 +17,7 @@
 #include "Plugin/MixerFxParams.h"
 #include "ValueFormat.h"   // mu-core: shared value text
 
-using mu_pp::kRhythmParamDefs;
-using mu_pp::kRhythmParamCount;
-using mu_pp::applyRhythmSuffix;
+namespace mu_clid {
 
 // The pad / insert-length modulation ranges must equal the parameters' ranges.
 static_assert(mu_clid::mod_skew::kPad.hi == (float) HitGenerator::kMaxPrePad && HitGenerator::kMaxPrePad == HitGenerator::kMaxPostPad, "kPad must match the pad parameters");
@@ -306,9 +304,9 @@ void PluginProcessor::pushRhythmToAPVTS(int ri)
     // the Rhythm — semantics match the prior code exactly (HitGen ints become
     // floats; ADSR sustain scales 0..1 → 0..100; aEnvRel reflects the
     // ampRelToEnd sentinel; bool fields write 0.0 / 1.0).
-    for (int i = 0; i < mu_pp::kRhythmParamCount; ++i)
+    for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
     {
-        const auto& def = mu_pp::kRhythmParamDefs[i];
+        const auto& def = mu_clid::kRhythmParamDefs[i];
         set(px + def.suffix, def.push(r));
     }
 }
@@ -354,3 +352,5 @@ void PluginProcessor::swapAPVTSForRhythms(int i, int j)
     for (int c = 0; c < n; ++c)
         pushMixerChannelToAPVTS(c);
 }
+
+} // namespace mu_clid

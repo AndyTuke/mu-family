@@ -2,6 +2,8 @@
 
 #include <vector>
 
+namespace mu_clid {
+
 class EuclideanGenerator
 {
 public:
@@ -14,3 +16,5 @@ public:
     // pre-reserves to 256 to guarantee in-place.
     static void generate(int steps, int hits, std::vector<bool>& out);
 };
+
+} // namespace mu_clid

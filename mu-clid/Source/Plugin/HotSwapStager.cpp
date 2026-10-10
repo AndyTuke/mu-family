@@ -5,6 +5,8 @@
 #include "MuLimits.h"
 #include "Sequencer/SequencerEngine.h"
 
+namespace mu_clid {
+
 //==============================================================================
 void HotSwapStager::cancelPendingIfAny(int rhythmIndex)
 {
@@ -177,3 +179,5 @@ void HotSwapStager::processSwaps()
         && proc_.onPresetSwapCommitted)
         proc_.onPresetSwapCommitted();
 }
+
+} // namespace mu_clid

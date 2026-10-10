@@ -9,7 +9,9 @@
 #include "UI/Components/MuLookAndFeel.h"
 #include "Sequencer/HitGenerator.h"
 
+
 namespace juce { class RangedAudioParameter; }
+namespace mu_clid {
 class PluginProcessor;
 
 // Euclidean controls for one rhythm.
@@ -182,3 +184,5 @@ private:
     // tick of every knob — saw ~50-200ns per tick × 60 Hz × N visible knobs.
     std::unordered_map<std::string_view, juce::RangedAudioParameter*> paramPtrCache;
 };
+
+} // namespace mu_clid

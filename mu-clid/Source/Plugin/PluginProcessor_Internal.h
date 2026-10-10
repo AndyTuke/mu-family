@@ -12,7 +12,7 @@
 #include "Audio/AlgorithmNames.h" // kEffectAlgorithmNames / kReverbAlgorithmNames / kInsertAlgorithmNames
 #include "Persistence/PresetHelpers.h"        // writeKindedProperty, readKindedPropertyAsActualV2, GlobalParamDef, kGlobalParamDefs
 
-namespace mu_pp {
+namespace mu_clid {
 
 // ── ADSR display-scale converters ────────────────────────────────────────────
 // Convert 0–100 UI scale → 0..3 s for ADSR time params.
@@ -69,4 +69,4 @@ inline void applyRhythmSuffix(const juce::String& suffix, float v, Rhythm& r,
         def->apply(v, r, patternDirty, voiceDirty);
 }
 
-} // namespace mu_pp
+} // namespace mu_clid

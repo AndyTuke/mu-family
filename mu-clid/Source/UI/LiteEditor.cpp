@@ -1,6 +1,8 @@
 #include "LiteEditor.h"
 #include "Sequencer/Rhythm.h"
 
+namespace mu_clid {
+
 LiteEditor::LiteEditor(PluginProcessor& p)
     // Apply stored scale before any child component constructs — same pattern as EditorShellBase.
     : AudioProcessorEditor((mu_ui::scale = juce::jlimit(ProcessorBase::kUiScaleMedium,
@@ -247,3 +249,5 @@ juce::String LiteEditor::midiNoteName(int note)
     static const char* names[] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
     return juce::String(names[note % 12]) + juce::String(note / 12 - 1);
 }
+
+} // namespace mu_clid

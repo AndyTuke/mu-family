@@ -12,6 +12,8 @@
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/AboutOverlay.h"
 
+namespace mu_clid {
+
 // Simplified editor for the mu-Clid Lite MIDI-effect build.
 // Shows TransportBar + RhythmCircle + EuclideanPanel; no sidebar, voice section, or mixer.
 class LiteEditor : public juce::AudioProcessorEditor,
@@ -62,3 +64,5 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LiteEditor)
 };
+
+} // namespace mu_clid

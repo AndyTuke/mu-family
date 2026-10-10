@@ -1,5 +1,7 @@
 #pragma once
 
+namespace mu_clid {
+
 // Per-destination modulated-value snapshot indices.
 // Written by the audio thread (PluginProcessor::processBlock) after
 // ModulationMatrix::process(); read by UI panels at ~30 Hz to drive the
@@ -30,3 +32,5 @@ enum ModSnapIdx : int
     kSnapPan, kSnapSendEff, kSnapSendDly, kSnapSendRev,
     kSnapCount
 };
+
+} // namespace mu_clid

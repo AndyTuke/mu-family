@@ -15,9 +15,7 @@
 #include "../Persistence/ModulatorSerialise.h"
 #include <map>
 
-using mu_pp::serialiseModulators;
-using mu_pp::deserialiseModulators;
-using mu_pp::clearModulators;
+using namespace mu_clid;
 using mu_pp::kDepthUnitsProperty;
 using mu_pp::kDepthUnitsRange;
 
@@ -133,7 +131,7 @@ public:
 
             auto saved = serialiseModulators (old);
             expect (saved.getProperty (kDepthUnitsProperty).toString() == kDepthUnitsRange, "new saves carry the depth-units marker");
-            expect (saved.getProperty (mu_pp::kPadDepthUnitsProperty).toString() == mu_pp::kPadDepthUnitsKnobMax,
+            expect (saved.getProperty (mu_clid::kPadDepthUnitsProperty).toString() == mu_clid::kPadDepthUnitsKnobMax,
                     "new saves carry the pad-depth marker");
 
             // Load `mods` into a rhythm with the same layout; return each assignment's depth.
@@ -152,7 +150,7 @@ public:
             // Pre-standard data (no markers): pad depth was % of 12 steps, Insert Length % of 8.
             auto legacy = saved.createCopy();
             legacy.removeProperty (kDepthUnitsProperty, nullptr);
-            legacy.removeProperty (mu_pp::kPadDepthUnitsProperty, nullptr);
+            legacy.removeProperty (mu_clid::kPadDepthUnitsProperty, nullptr);
             auto d = loadDepths (legacy);
             expectWithinAbsoluteError (d["euclid.a.prePad"] / 100.0f * 10.0f, 0.30f * 12.0f, 1e-3f, "pre-standard pad: same steps");
             expectWithinAbsoluteError (d["euclid.a.insLen"] / 100.0f * 8.0f,  0.25f * 8.0f,  1e-3f, "pre-standard insert length: same steps");
@@ -161,7 +159,7 @@ public:
             // Full-range data (depthUnits only): pad depth was % of 0..63 → 30% = 18.9 steps,
             // more than the knob's 10, so it upgrades to the whole knob (100%).
             auto fullRange = saved.createCopy();
-            fullRange.removeProperty (mu_pp::kPadDepthUnitsProperty, nullptr);
+            fullRange.removeProperty (mu_clid::kPadDepthUnitsProperty, nullptr);
             d = loadDepths (fullRange);
             expectWithinAbsoluteError (d["euclid.a.prePad"], 100.0f, 1e-3f, "full-range pad depth past the knob clamps to 100%");
             expectWithinAbsoluteError (d["euclid.a.insLen"], 25.0f, 1e-3f, "insert length: 0..8 is already the knob range here");

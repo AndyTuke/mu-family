@@ -4,6 +4,8 @@
 #include "UI/Components/SegmentControl.h"
 #include "UI/Components/MuLookAndFeel.h"
 
+namespace mu_clid {
+
 // Custom file browser used for sample loading so the user can audition files
 // before committing to a slot. Launched inside a DialogWindow (modal) from
 // RhythmPanel::loadSample(). Self-contained — no access to RhythmPanel internals.
@@ -41,3 +43,5 @@ private:
 
     void commit(const juce::File& f);
 };
+
+} // namespace mu_clid

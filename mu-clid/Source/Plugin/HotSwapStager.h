@@ -8,6 +8,8 @@
 #include <atomic>
 #include <memory>
 
+namespace mu_clid {
+
 class PluginProcessor;
 
 // mu-Clid's hot-swap machinery: the shared mu-core stager holding pre-built rhythms (per
@@ -90,3 +92,5 @@ private:
 
     PluginProcessor& proc_;
 };
+
+} // namespace mu_clid

@@ -27,7 +27,6 @@
 #include "Audio/FX/Insert/VocoderInsert.h"
 #include "Audio/VoiceParams.h"
 #include "Audio/InsertSlotConfig.h"
-
 static float rmsOf(const juce::AudioBuffer<float>& buf, int ns)
 {
     float sum = 0.0f;

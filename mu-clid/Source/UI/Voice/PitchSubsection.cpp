@@ -4,6 +4,8 @@
 #include "Modulation/ModulationSnapshot.h"
 #include "Sequencer/Rhythm.h"
 
+namespace mu_clid {
+
 PitchSubsection::PitchSubsection(PluginProcessor& p) : proc(p)
 {
     for (auto* k : { &pitchOctave, &pitchSemi, &pitchFine,
@@ -179,3 +181,5 @@ void PitchSubsection::resized()
     pitchSus  .setBounds(s(2 * kW), s(row2Y), s(kW), s(rowH));
     pitchRel  .setBounds(s(3 * kW), s(row2Y), s(kW), s(rowH));
 }
+
+} // namespace mu_clid
