@@ -105,9 +105,13 @@ void MuLinkComponent::addTransportControls()
     tempoSlider.setSliderStyle(juce::Slider::IncDecButtons);
     tempoSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 90, 22);
     tempoSlider.setIncDecButtonsMode(juce::Slider::incDecButtonsDraggable_Vertical);
-    tempoSlider.setRange(20.0, 300.0, 1.0);
+    tempoSlider.setRange(20.0, 300.0, 0.1);   // one decimal, as the apps' BPM fields
     tempoSlider.setValue(120.0, juce::dontSendNotification);
-    tempoSlider.setTextValueSuffix(" BPM");
+    tempoSlider.textFromValueFunction = [] (double v) { return juce::String(v, 1) + " BPM"; };
+    tempoSlider.valueFromTextFunction = [] (const juce::String& t)
+    {
+        return t.replaceCharacter(',', '.').retainCharacters("0123456789.").getDoubleValue();
+    };
     tempoSlider.onValueChange = [this] { server.setTempo(tempoSlider.getValue()); };
     addAndMakeVisible(tempoSlider);
 }

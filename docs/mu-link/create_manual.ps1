@@ -115,7 +115,7 @@ Pic "Meter strip with several app channels (gain, M, S) and the Master strip."
 H1 "8. The Master Clock"
 P "mu-link is the tempo master for everything connected to it. Its Play / Stop button and tempo drive every connected app's sequencer, gate, and modulators in lockstep."
 Bullet "Play / Stop — starts and stops the whole rig together. Stop holds the position; the next Play carries on from there."
-Bullet "Tempo — the master BPM. While mu-link is the clock source (Internal), set it here; every connected app follows."
+Bullet "Tempo — the master BPM, 20.0 to 300.0 in steps of 0.1 (drag or use the arrows), shown for example as 127.5 BPM. While mu-link is the clock source (Internal), set it here; every connected app follows."
 P "Because the clock is derived from the audio device, it is sample-accurate — connected apps stay perfectly aligned with no drift, however long you play."
 
 # ── 9. External MIDI Clock Sync ───────────────────────────────────────────────
@@ -126,7 +126,7 @@ Bullet "In Audio Setup, enable the MIDI input port that carries the external clo
 Bullet "Set the clock-source toggle in the transport row to Ext MIDI (it reads 'Clock: Internal' by default; click to switch to 'Clock: Ext MIDI')."
 Bullet "Start your external device. mu-link follows its tempo, and its Start / Stop / Continue messages drive mu-link's transport."
 P "mu-link also follows Song Position Pointer messages while the external device is stopped. Move the external playhead, press Continue, and the whole rig picks up from the new position."
-P "While slaved, the tempo field shows the detected BPM and is read-only, and the local Play / Stop is driven by the incoming clock."
+P "While slaved, the tempo field shows the detected BPM to a tenth and is read-only, and mu-link keeps its beats on the external device's downbeat, and the local Play / Stop is driven by the incoming clock."
 H2 "Why It Stays Rock Solid"
 P "Raw MIDI clock is slightly jittery, so mu-link never uses it directly as its timebase. Instead it measures the incoming clock and smooths it into a stable tempo estimate, then drives its own sample-accurate audio clock at that tempo. The connected apps see the same clean, drift-free transport they always do — they never inherit MIDI jitter. The result is tight external sync without sacrificing timing stability."
 

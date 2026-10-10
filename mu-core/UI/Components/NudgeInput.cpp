@@ -1,22 +1,45 @@
 #include "NudgeInput.h"
 
 NudgeInput::NudgeInput(const juce::String& lbl, int minV, int maxV, int defaultV)
-    : label(lbl), minVal(minV), maxVal(maxV), currentValue(defaultV)
+    : label(lbl), minVal(minV), maxVal(maxV), value(defaultV)
 {
 }
 
 void NudgeInput::setValue(int v, bool notify)
 {
-    v = juce::jlimit(minVal, maxVal, v);
-    if (v == currentValue) return;
-    currentValue = v;
-    repaint();
-    if (notify && onChange) onChange(currentValue);
+    setValueD((double) v, notify);
 }
 
-void NudgeInput::nudge(int delta)
+void NudgeInput::setDecimals(int n)
 {
-    setValue(currentValue + delta * stepSize, true);
+    decimals = juce::jlimit(0, 3, n);
+    setValueD(value);   // re-round to the new precision
+    repaint();
+}
+
+void NudgeInput::setValueD(double v, bool notify)
+{
+    // Round to the shown precision and clamp; an unchanged value neither repaints nor notifies,
+    // so a jittery source (a clock estimate) doesn't flicker the display.
+    const double scale = std::pow(10.0, decimals);
+    v = juce::jlimit(minVal, maxVal, std::round(v * scale) / scale);
+    if (v == value) return;
+    value = v;
+    repaint();
+    if (! notify) return;
+    if (decimals > 0 && onChangeD) onChangeD(value);
+    else if (onChange)             onChange((int) std::lround(value));
+}
+
+juce::String NudgeInput::valueText() const
+{
+    return decimals > 0 ? juce::String(value, decimals) : juce::String((int) std::lround(value));
+}
+
+void NudgeInput::nudge(int direction, bool fine)
+{
+    const double step = fine ? fineStep : (showStepBtns ? (double) stepSize : baseStep);
+    setValueD(value + direction * step, true);
 }
 
 void NudgeInput::resized()
@@ -66,13 +89,13 @@ void NudgeInput::paint(juce::Graphics& g)
         g.drawText(label, lblArea, juce::Justification::centred, false);
         g.setColour(MuLookAndFeel::colour(Id::valueText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(13.0f))));
-        g.drawText(juce::String(currentValue), valArea, juce::Justification::centred, false);
+        g.drawText(valueText(), valArea, juce::Justification::centred, false);
     }
     else
     {
         g.setColour(MuLookAndFeel::colour(Id::valueText));
         g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(13.0f))));
-        g.drawText(juce::String(currentValue), displayBounds, juce::Justification::centred, false);
+        g.drawText(valueText(), displayBounds, juce::Justification::centred, false);
     }
 
     // Label below display
@@ -151,8 +174,8 @@ void NudgeInput::mouseDown(const juce::MouseEvent& e)
 {
     switch (getZone(e.getPosition()))
     {
-        case HitZone::Up:    nudge(+1); break;
-        case HitZone::Down:  nudge(-1); break;
+        case HitZone::Up:    nudge(+1, e.mods.isShiftDown()); break;
+        case HitZone::Down:  nudge(-1, e.mods.isShiftDown()); break;
         case HitZone::Step1:  stepSize = 1;  repaint(); break;
         case HitZone::Step5:  stepSize = 5;  repaint(); break;
         case HitZone::Step10: stepSize = 10; repaint(); break;
@@ -170,7 +193,7 @@ void NudgeInput::showEditor()
 {
     auto* editor = new juce::TextEditor();
     editor->setBounds(displayBounds);
-    editor->setText(juce::String(currentValue));
+    editor->setText(valueText());
     editor->selectAll();
     addAndMakeVisible(editor);
     editor->grabKeyboardFocus();
@@ -189,11 +212,13 @@ void NudgeInput::showEditor()
     {
         if (*dismissed) return;
         *dismissed = true;
-        const int v = editor->getText().getIntValue();
+        // "BPM 127,5" style text: keep digits, '.' and '-' ; ',' counts as '.'. No digits = cancel.
+        const auto text = editor->getText().replaceCharacter(',', '.').retainCharacters("0123456789.-");
         if (auto* self = safeThis.getComponent())
         {
             self->removeChildComponent(editor);
-            self->setValue(v, true);
+            if (text.containsAnyOf("0123456789"))
+                self->setValueD(text.getDoubleValue(), true);
         }
         juce::MessageManager::callAsync([editor] { delete editor; });
     };

@@ -183,6 +183,7 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/SendFXSmokeTests.cpp      # FX-slot DSP smoke, ported from mu-clid
     Source/Tests/PluginTransportTests.cpp  # host-playhead→gate contract (gate follows host transport)
     Source/Tests/HotSwapBoundaryTests.cpp  # hot-swap boundary predicates + stager handshake
+    Source/Tests/NudgeInputTests.cpp       # shared mu-core NudgeInput: whole numbers and the BPM decimals mode
     Source/UI/GatingDesigner.cpp
     Source/Sequencer/GatePattern.cpp
     Source/Audio/SynthVoice.cpp
@@ -201,6 +202,7 @@ target_sources(mu-tant-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/DelaySlot.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/ReverbSlot.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/DropdownSelect.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/NudgeInput.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/MuLookAndFeel.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/MuTheme.cpp"
 )

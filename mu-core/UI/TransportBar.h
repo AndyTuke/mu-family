@@ -90,7 +90,7 @@ private:
 
     static constexpr int kLogoW      = 88;
     static constexpr int kPlayW      = 36;   // wider for clarity
-    static constexpr int kBpmW       = 72;   // inline "BPM" label + value + arrows
+    static constexpr int kBpmW       = 80;   // inline "BPM" label + "127.5" + arrows
     static constexpr int kPosW       = 56;
     static constexpr int kClockW     = 44;   // MIDI clock lamp + label
     static constexpr int kPresetW    = 240;  // wider preset dropdown

@@ -644,6 +644,11 @@ public:
     static constexpr float kLampCurveW     = 1.8f;
     static constexpr int   kStatusLampD    = 8;      // StatusLamp disc diameter
 
+    // Tempo (BPM) fields: one decimal everywhere; an arrow click steps a whole BPM, Shift a tenth.
+    static constexpr int    kBpmDecimals = 1;
+    static constexpr double kBpmStep     = 1.0;
+    static constexpr double kBpmFineStep = 0.1;
+
     // LCD text fields (metal style): lettering heights, side padding, the browse mark's width.
     static constexpr int kLcdTextH     = 11;   // selectors (ComboBox LCDs) and single-line readouts, e.g. a sample bar
     static constexpr int kLcdNameTextH = 13;   // the channel name display in the header bar

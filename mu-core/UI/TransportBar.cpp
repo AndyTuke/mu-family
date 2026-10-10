@@ -20,10 +20,13 @@ TransportBar::TransportBar(ProcessorBase& p)
 
     if (isStandalone)
     {
-        bpmInput.setValue((int)proc.getInternalBpm());
-        bpmInput.onChange = [this](int v) {
-            proc.setInternalBpm((double)v);
-            if (onStatusUpdate) onStatusUpdate("BPM", juce::String(v));
+        bpmInput.setDecimals(MuLookAndFeel::kBpmDecimals);
+        bpmInput.setStep(MuLookAndFeel::kBpmStep);
+        bpmInput.setFineStep(MuLookAndFeel::kBpmFineStep);
+        bpmInput.setValueD(proc.getInternalBpm());
+        bpmInput.onChangeD = [this](double v) {
+            proc.setInternalBpm(v);
+            if (onStatusUpdate) onStatusUpdate("BPM", juce::String(v, MuLookAndFeel::kBpmDecimals));
         };
         bpmInput.setShowStepButtons(false);
         bpmInput.setLabelInline(true);
@@ -139,7 +142,7 @@ void TransportBar::timerCallback()
     {
         const bool midiClockBpm = proc.getMidiSyncEnabled() && proc.getMidiSyncMessages() != 1;
         if (midiClockBpm && proc.getMidiClockBpm() > 0.0)   // 0 = no clock heard yet: keep the field's value
-            bpmInput.setValue((int)std::round(proc.getMidiClockBpm()));
+            bpmInput.setValueD(proc.getMidiClockBpm());
         bpmInput.setEnabled(!midiClockBpm);
 
         const bool midiTransport = proc.getMidiSyncEnabled() && proc.getMidiSyncMessages() != 0;
@@ -173,7 +176,7 @@ void TransportBar::refreshClockLamp()
     {
         case State::Locked:
             clockLamp.setState(MuLookAndFeel::colour(Id::segmentPositiveBorder), L.lampOn);
-            status = "Locked at " + juce::String(juce::roundToInt(proc.getMidiClockBpm())) + " BPM";
+            status = "Locked at " + juce::String(proc.getMidiClockBpm(), MuLookAndFeel::kBpmDecimals) + " BPM";
             break;
         case State::Lost:
             clockLamp.setState(MuLookAndFeel::colour(Id::indicatorFault), juce::jmin(1.0f, L.lampOn + L.lampPlayhead));

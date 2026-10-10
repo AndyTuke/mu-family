@@ -47,8 +47,11 @@ StandardSettingsOverlay::StandardSettingsOverlay(ProcessorBase& p, Options optio
     if (options.showTransport)
     {
         makeFieldLabel(bpmLabel, "Tempo");
-        bpmInput.setValue((int) proc.getInternalBpm());
-        bpmInput.onChange = [this](int v) { proc.setInternalBpm((double) v); };
+        bpmInput.setDecimals(MuLookAndFeel::kBpmDecimals);
+        bpmInput.setStep(MuLookAndFeel::kBpmStep);
+        bpmInput.setFineStep(MuLookAndFeel::kBpmFineStep);
+        bpmInput.setValueD(proc.getInternalBpm());
+        bpmInput.onChangeD = [this](double v) { proc.setInternalBpm(v); };
         addAndMakeVisible(bpmInput);
         general.push_back({ "Transport", kRowH, [this](const Rows& r) {
             bpmLabel.setBounds(r.labelX, r.area.getY(), r.labelW, r.rowH);

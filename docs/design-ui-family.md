@@ -245,6 +245,8 @@ slider.setNumDecimalPlacesToDisplay(1);
 slider.setNumDecimalPlacesToDisplay(0);
 ```
 
+**Tempo (BPM):** one decimal, always shown (`120.0`, `127.5`) so the field never changes width or jumps between formats. Range 20.0–300.0, resolution 0.1. Entry accepts `127.5`, `127,5`, `127.5 BPM`; the value is rounded to 0.1 and clamped to range; text with no digits cancels the edit. The ▲/▼ arrows step 1.0 and keep the fraction (127.5 becomes 128.5); Shift+click on an arrow steps 0.1. The MIDI-clock-driven display (field disabled) shows the clock estimate rounded to 0.1. Status bar and "Locked at" text use the same one-decimal form (`127.5 BPM`). Constants `kBpmDecimals = 1`, `kBpmStep = 1.0`, `kBpmFineStep = 0.1` live in `MuLookAndFeel`. mu-link's tempo slider also shows and accepts one decimal (its arrows step 0.1 until mu-link adopts the mu-core `NudgeInput`).
+
 ---
 
 ## 7. Interaction Patterns
@@ -259,6 +261,7 @@ These apply to all mu plugins uniformly.
 | Double-click then Enter | Confirm typed value |
 | Ctrl+click knob | Reset to default |
 | Knob hover (`mouseEnter`) | Fire `onStatusUpdate` immediately — status bar shows name + value |
+| NudgeInput arrow click | Step by the field's step; Shift+click steps by the fine step (BPM: 1.0 / 0.1) |
 | SegmentControl click | Select segment, fire `onChange(index)` |
 | Delete rhythm | Confirmation popup with rhythm name, red-tinted button |
 
@@ -379,3 +382,4 @@ setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));   // mu-On
 ## Design rulings
 
 - 2026-10-10 — MIDI clock locked / lost indicator in the TransportBar? A new shared `StatusLamp` (round lamp + "Clock" label) between BPM and position, standalone with clock sync on; amber dim / green / red bright; new token `indicatorFault`, size `kStatusLampD`; BPM field unchanged. Changed §3.5, §5, §9, §11.
+- 2026-10-10 — Fractional BPM (match a track at 127.5)? One decimal, always shown ("120.0"); arrows 1.0, Shift+click 0.1; text entry parses decimals and clamps; MIDI-clock display rounded to 0.1; `NudgeInput` gains a generic decimals mode (integer users unchanged); TransportBar `kBpmW` 72 to 80; mu-link slider interval 0.1 with one-decimal text. Changed §6.4, §7.
