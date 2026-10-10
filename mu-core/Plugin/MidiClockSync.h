@@ -15,7 +15,7 @@
 //
 // All cross-thread reads (isEnabled, isPlaying, getBpm, getBeatPosUI) are backed by
 // atomics and safe to call from the message thread. The audio-thread-only fields
-// (pulses_, sampleClock_, tempo_, startedInBlock_, blockTicks_, blockTransport_) must not be accessed from any other thread.
+// (pulses_, sampleClock_, tempo_, startedInBlock_, locatedInBlock_, blockTicks_, blockTransport_) must not be accessed from any other thread.
 class MidiClockSync
 {
 public:
@@ -49,7 +49,7 @@ public:
     // start-of-block beat position (0.0 if sync is disabled).
     double process(const juce::MidiBuffer& midi, int numSamples, double sampleRate)
     {
-        startedInBlock_ = false;
+        startedInBlock_ = locatedInBlock_ = false;
         if (!enabled_.load(std::memory_order_relaxed))
             return 0.0;
 
@@ -61,12 +61,26 @@ public:
         const bool doTick      = blockTicks_;
         const bool doTransport = blockTransport_;
 
-        const double blockBeatPos = beatOf(pulses_);
+        // The song position this block starts from; a Start or Song Position Pointer moves it.
+        juce::int64 blockStartPulses = pulses_;
 
         // Walk the block's real-time messages: transport changes, then tempo + beat per tick.
         for (const auto& msgRef : midi)
         {
             const auto& m = msgRef.getMessage();
+
+            // Song Position Pointer (F2 lsb msb): the master located to a sixteenth (= 6 pulses).
+            // Only valid while stopped (MIDI spec); the next Continue plays from there.
+            if (m.getRawDataSize() == 3 && m.getRawData()[0] == 0xF2)
+            {
+                if (doTransport && ! isPlaying_.load())
+                {
+                    const int sixteenths = (m.getRawData()[1] & 0x7F) | ((m.getRawData()[2] & 0x7F) << 7);
+                    pulses_ = blockStartPulses = (juce::int64) sixteenths * 6;
+                    locatedInBlock_ = true;
+                }
+                continue;
+            }
             if (m.getRawDataSize() != 1) continue;
             const juce::uint8 b  = m.getRawData()[0];
             const int         so = msgRef.samplePosition;
@@ -75,7 +89,7 @@ public:
             {
                 if (b == 0xFA)
                 {
-                    pulses_ = 0;
+                    pulses_ = blockStartPulses = 0;   // a Start restarts the song from bar 1
                     startedInBlock_ = true;
                     tempo_.restartInterval();
                     isPlaying_.store(true);
@@ -99,16 +113,16 @@ public:
 
         sampleClock_ += numSamples;
         beatPosUI_.store(beatOf(pulses_), std::memory_order_relaxed);
-        // A Start restarts the song: the block plays from bar 1, not from the pre-Start count.
-        return startedInBlock_ ? 0.0 : blockBeatPos;
+        return beatOf(blockStartPulses);
     }
 
     // Audio thread, after process(): this block's Messages-mode snapshot — ticks give tempo +
     // beat, transport messages (Start / Continue / Stop) give play state — and whether a Start
-    // (0xFA) arrived in it.
+    // (0xFA) or a Song Position Pointer (0xF2) moved the song position in it.
     bool ticksDrive()      const { return blockTicks_; }
     bool transportDrives() const { return blockTransport_; }
     bool startedInBlock()  const { return startedInBlock_; }
+    bool locatedInBlock()  const { return locatedInBlock_; }
 
 private:
     // Cross-thread atomics.
@@ -122,8 +136,9 @@ private:
     // The beat is derived from an integer pulse count (24 per quarter note) rather than summed
     // 1/24 steps, so it lands exactly on every step boundary and never drifts.
     static double beatOf(juce::int64 pulses) { return (double) pulses / 24.0; }
-    juce::int64             pulses_      = 0;   // clock pulses since the last Start
+    juce::int64             pulses_      = 0;   // song position in clock pulses (Start = 0, SPP = sixteenths * 6)
     bool                    startedInBlock_ = false;
+    bool                    locatedInBlock_ = false;
     bool                    blockTicks_     = true;    // Messages mode snapshot (default 2 = both)
     bool                    blockTransport_ = true;
     juce::int64             sampleClock_ = 0;   // samples processed while enabled (pulse timestamps)

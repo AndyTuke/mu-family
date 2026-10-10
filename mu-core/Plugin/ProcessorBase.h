@@ -124,6 +124,20 @@ public:
     // Host transport as last seen by processBlock, for the UI (TransportBar). The UI must never
     // call getPlayHead() itself: the playhead is only valid on the audio thread during a block.
     bool isHostPlaying() const { return hostPlaying.load(std::memory_order_relaxed); }
+    // Host meter (4/4 when the host gives none) and current bar start; false = no bar start.
+    void getHostTimeSignature(int& numerator, int& denominator) const
+    {
+        const int packed = hostTimeSig.load(std::memory_order_relaxed);
+        numerator   = packed >> 8;
+        denominator = packed & 0xFF;
+    }
+    bool getHostBarStartPpq(double& ppq) const
+    {
+        const double v = hostBarStart.load(std::memory_order_relaxed);
+        if (std::isnan(v)) return false;
+        ppq = v;
+        return true;
+    }
     // Host beat position in quarter notes; false when the host supplied none.
     bool getHostPpqPosition(double& ppq) const
     {
@@ -356,6 +370,10 @@ protected:
         hostPlaying.store(t.playing, std::memory_order_relaxed);
         hostPpq.store(t.hasPosition ? t.ppqPosition : std::numeric_limits<double>::quiet_NaN(),
                       std::memory_order_relaxed);
+        hostTimeSig.store((juce::jlimit(1, 255, t.timeSigNumerator) << 8) | juce::jlimit(1, 255, t.timeSigDenominator),
+                          std::memory_order_relaxed);
+        hostBarStart.store(t.hasBarStart ? t.barStartPpq : std::numeric_limits<double>::quiet_NaN(),
+                           std::memory_order_relaxed);
         return t;
     }
 
@@ -364,6 +382,8 @@ private:
     // per atomic so the UI never sees a torn position/has-position pair.
     std::atomic<bool>   hostPlaying { false };
     std::atomic<double> hostPpq     { std::numeric_limits<double>::quiet_NaN() };
+    std::atomic<int>    hostTimeSig { (4 << 8) | 4 };   // numerator << 8 | denominator, one value so it can't tear
+    std::atomic<double> hostBarStart { std::numeric_limits<double>::quiet_NaN() };
     static_assert(std::atomic<double>::is_always_lock_free, "the UI reads atomic<double> transport values");
 protected:
     // Deferred message-thread work first (product hot-swap commits), then program changes.

@@ -169,6 +169,42 @@ public:
             expectEquals (t.bpm, 100.0, "no estimate yet, so the BPM field's tempo");
         }
 
+        beginTest ("Song Position Pointer: a locate while stopped, then Continue, plays from there");
+        {
+            auto spp = [](int sixteenths)
+            {
+                juce::MidiBuffer m;
+                m.addEvent(juce::MidiMessage::songPositionPointer(sixteenths), 0);
+                return m;
+            };
+            for (const int mode : { 2, 1 })
+            {
+                MidiClockSync clock;
+                clock.setEnabled(true);
+                clock.setMessages(mode);
+                Own own;
+                const auto label = "mode " + juce::String(mode);
+                block(clock, own, msgs({ 0xFA, 0xF8, 0xF8, 0xF8 }));
+                block(clock, own, msgs({ 0xFC }));
+                auto t = block(clock, own, spp(16));        // locate to beat 4 while stopped
+                expect (! t.playing, label + ": still stopped after the locate");
+                expectEquals (t.startBeat, 4.0, label + ": the locate block sits at the new position");
+                t = block(clock, own, msgs({ 0xFB }));       // Continue
+                expect (t.playing, label + ": Continue plays");
+                expectEquals (t.startBeat, 4.0, label + ": Continue resumes at the located beat");
+            }
+
+            MidiClockSync clock;
+            clock.setEnabled(true);
+            clock.setMessages(2);
+            Own own;
+            juce::MidiBuffer run = msgs({ 0xFA });
+            for (int i = 0; i < 12; ++i) run.addEvent(juce::MidiMessage((juce::uint8) 0xF8), 1 + i);
+            block(clock, own, run);
+            const auto t = block(clock, own, spp(64));
+            expectEquals (t.startBeat, 0.5, "a locate while playing is ignored");
+        }
+
         beginTest ("Own transport: nothing outside touches the Play button");
         {
             MidiClockSync clock;   // sync off

@@ -190,10 +190,15 @@ void TransportBar::updatePositionLabel()
 {
     double beatPos = 0.0;
     bool   gotPos  = false;
+    int    num = 4, den = 4;          // the standalone runs in 4/4
+    double barStart = 0.0;
+    bool   hasBarStart = false;
 
     if (!isStandalone)
     {
         gotPos = proc.getHostPpqPosition(beatPos);
+        proc.getHostTimeSignature(num, den);
+        hasBarStart = proc.getHostBarStartPpq(barStart);
     }
     else
     {
@@ -208,19 +213,13 @@ void TransportBar::updatePositionLabel()
         return;
     }
 
-    const int beatsPerBar = 4;
-    const int subsPerBeat = 4;
+    const auto p = mu_core::barPositionOf(beatPos, num, den, hasBarStart, barStart);
 
-    int totalBeats = (int)beatPos;
-    int sub        = (int)((beatPos - totalBeats) * subsPerBeat) + 1;
-    int bar        = totalBeats / beatsPerBar + 1;
-    int beat       = totalBeats % beatsPerBar + 1;
-
-    // Rebuild the text only when the shown sixteenth changes, not on every tick.
-    const int pos = (bar * beatsPerBar + beat) * subsPerBeat + sub;
+    // Rebuild the text only when the shown position changes, not on every tick.
+    const int pos = (p.bar * 64 + p.beat) * 16 + p.sub;
     if (pos == shownPos) return;
     shownPos = pos;
-    posLabel.setText(juce::String(bar) + "." + juce::String(beat) + "." + juce::String(sub),
+    posLabel.setText(juce::String(p.bar) + "." + juce::String(p.beat) + "." + juce::String(p.sub),
                      juce::dontSendNotification);
 }
 

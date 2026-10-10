@@ -20,16 +20,17 @@ namespace mu_link
 
 // Build the bridge with the connected-title behaviour: while attached to mu-link the window's
 // title gains a "  •  mu-link connected" suffix; on detach it reverts to the base title.
-// `window` + `processor` + `player` must outlive the returned bridge (owned by the app).
+// `window` + `processor` + `player` + `deviceManager` must outlive the returned bridge (owned by the app).
 inline std::unique_ptr<MuLinkBridge> makeStandaloneBridge(juce::Component& window,
                                                           juce::AudioProcessor& processor,
                                                           juce::AudioProcessorPlayer& player,
+                                                          juce::AudioDeviceManager& deviceManager,
                                                           const juce::String& displayName)
 {
     juce::Component::SafePointer<juce::Component> safeWin(&window);
     const juce::String baseTitle = window.getName();
 
-    return std::make_unique<MuLinkBridge>(processor, player, displayName,
+    return std::make_unique<MuLinkBridge>(processor, player, deviceManager, displayName,
         [safeWin, baseTitle](bool connected) mutable
         {
             if (safeWin != nullptr)

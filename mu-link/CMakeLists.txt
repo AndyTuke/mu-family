@@ -8,7 +8,7 @@
 #
 # Targets (see docs/mu-link/design-mulink.md §6 build stages):
 #   • mu-link-tests  — console UnitTests: IPC foundation + ServerEngine + MuLinkClient.
-#                      juce_core only, headless, with a real child process for the
+#                      juce_core + audio_basics/devices, headless, with a real child process for the
 #                      cross-process shared-memory round-trip.
 #   • mu-link-server — runnable headless audio server (owns the HW device, sums clients).
 #   • mu-link-tone   — reference tone client, built on mu-core MuLinkClient.
@@ -37,6 +37,7 @@ target_include_directories(mu-link-tests PRIVATE
 target_link_libraries(mu-link-tests PRIVATE
     juce::juce_core
     juce::juce_audio_basics   # ServerEngine now embeds the mu-core EqInsert (AudioBuffer/SmoothedValue)
+    juce::juce_audio_devices  # MidiClockOut (the sample-accurate MIDI clock sender)
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags
 )

@@ -34,21 +34,25 @@ namespace mu_link
 class MuLinkBridge : private juce::Timer
 {
 public:
-    // `processor` + `devicePlayer` are owned by the StandalonePluginHolder and must outlive
-    // the bridge. `displayName` is what mu-link shows in its client list. `onConnectionChanged`
-    // fires on the message thread when attach/detach happens.
+    // `processor` + `devicePlayer` + `appDeviceManager` are owned by the StandalonePluginHolder and
+    // must outlive the bridge. `displayName` is what mu-link shows in its client list.
+    // `onConnectionChanged` fires on the message thread when attach/detach happens.
     MuLinkBridge(juce::AudioProcessor& processorToBridge,
                  juce::AudioProcessorPlayer& devicePlayer,
+                 juce::AudioDeviceManager& appDeviceManager,
                  juce::String displayName,
                  std::function<void(bool)> onConnectionChangedCb)
         : processor(processorToBridge),
           player(devicePlayer),
+          deviceManager(appDeviceManager),
           name(std::move(displayName)),
           onConnectionChanged(std::move(onConnectionChangedCb))
     {
         // Producer-thread render: publish mu-link's (consume-time projected) transport into
-        // our playhead, then render the block through the real processor. MIDI out discarded.
-        scratchMidi.ensureSize(256);   // so an injected program-change never allocates on the bus thread
+        // our playhead, then render the block through the real processor with the app's MIDI in.
+        // MIDI out is not sent while on the bus yet: the bus renders ~one ring ahead of what is
+        // heard, so it needs a timed sender first.
+        scratchMidi.ensureSize(2048);   // so MIDI in / an injected program change rarely allocate on the bus thread
 
         client.onRender([this] (float* const* output, int numChannels, int numFrames,
                                 const TransportSnapshot& t)
@@ -56,6 +60,7 @@ public:
             playHead.setSnapshot(t);
             juce::AudioBuffer<float> buffer(const_cast<float**>(output), numChannels, numFrames);
             scratchMidi.clear();
+            midiIn.removeNextBlockOfMessages(scratchMidi, numFrames);   // the app's enabled MIDI inputs
 
             // Scene switching: mu-link can target a program change at THIS client (clients share
             // MIDI channels, so it addresses us by slot). Inject it into the processor's MIDI so
@@ -132,6 +137,9 @@ private:
         processor.setPlayHead(&playHead);
         processor.setRateAndBufferSizeDetails((double) snap.sampleRate, kRenderBlockMax);
         processor.prepareToPlay((double) snap.sampleRate, kRenderBlockMax);
+        // MIDI in follows the bus now: the local player no longer has a processor to feed.
+        midiIn.reset((double) snap.sampleRate);
+        deviceManager.addMidiInputDeviceCallback({}, &midiIn);
         client.start();
 
         connected  = true;
@@ -144,6 +152,7 @@ private:
     void detachFromMuLink()
     {
         client.detach();                              // joins the producer thread first
+        deviceManager.removeMidiInputDeviceCallback({}, &midiIn);
         processor.setPlayHead(nullptr);               // back to the internal standalone transport
         player.setProcessor(&processor);              // local device drives again (re-prepares)
 
@@ -154,13 +163,15 @@ private:
 
     juce::AudioProcessor&       processor;
     juce::AudioProcessorPlayer& player;
+    juce::AudioDeviceManager&   deviceManager;
     juce::String                name;
     juce::String                lastPresetName;   // re-published on each (re)attach
     std::function<void(bool)>   onConnectionChanged;
 
+    juce::MidiMessageCollector midiIn;              // the app's MIDI inputs → the bus render
     MuLinkClient   client;
     MuLinkPlayHead playHead;
-    juce::MidiBuffer scratchMidi;   // processBlock's MIDI out, discarded on the bus
+    juce::MidiBuffer scratchMidi;   // processBlock's MIDI in on the bus (its MIDI out is discarded)
 
     bool          connected  = false;
     std::uint64_t lastGen    = 0;
@@ -180,7 +191,7 @@ private:
 class MuLinkBridge
 {
 public:
-    MuLinkBridge(juce::AudioProcessor&, juce::AudioProcessorPlayer&,
+    MuLinkBridge(juce::AudioProcessor&, juce::AudioProcessorPlayer&, juce::AudioDeviceManager&,
                  juce::String, std::function<void(bool)>) {}
     bool isConnected() const noexcept { return false; }
     void setPresetName(const juce::String&) {}

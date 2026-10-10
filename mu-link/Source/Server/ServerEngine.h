@@ -36,6 +36,17 @@ struct BlockStats
     int           underrunFrames    = 0;   // summed missing frames across clients this block
     int           reapedClients     = 0;   // slots reaped this block (died without detaching)
     std::uint64_t midiPulsesInBlock = 0;   // 24-ppqn pulses crossed during this block
+
+    // Frame offset within the block of each pulse crossed, for sample-accurate clock out. Only the
+    // first 64 are stored (enough for 300 BPM at a 16384-frame block); any more belong at the block end.
+    static constexpr int kMaxPulseOffsets = 64;
+    int pulseOffsets[kMaxPulseOffsets] {};
+    int numPulseOffsets = 0;
+
+    // MIDI transport bytes for clock out, due at the block's first frame before its pulses:
+    // FA F8 (Start + the beat-0 pulse), F2 lsb msb FB F8 (Song Position + Continue + that pulse), or FC (Stop).
+    std::uint8_t transportBytes[5] {};
+    int numTransportBytes = 0;
 };
 
 // Master safety soft-clip. Bit-exact below the knee (~ -0.9 dBFS) and C1-continuous into a
@@ -141,7 +152,16 @@ public:
     void prepare(double sampleRate, int maxBlockSize, double tempoBpm)
     {
         sr = sampleRate > 0.0 ? sampleRate : 48000.0;
+        // A re-prepare (device or MIDI-out change mid-session) keeps the song position.
+        const double keepBeats = clock.beats();
         clock.prepare(sr, tempoBpm);
+        if (tempoBpm > 0.0) tempoRequest.store(tempoBpm, std::memory_order_relaxed);
+        if (preparedOnce)
+        {
+            clock.locate(keepBeats);
+            wasPlaying = false;   // a new port / device gets Song Position + Continue on the next block
+        }
+        preparedOnce = true;
         maxBlockFrames = std::max(1, maxBlockSize);
         scratch.assign((std::size_t) kMaxChannels * (std::size_t) maxBlockFrames, 0.0f);
         // Per-client EQ DSP + de-interleave scratch (only used when a strip's EQ is armed).
@@ -166,9 +186,11 @@ public:
         for (int i = 0; i < kMaxClients; ++i) { lastHeartbeat[i] = 0; staleFrames[i] = 0; }
     }
 
-    void setTempo(double bpm) noexcept   { clock.setTempo(bpm); }
-    void setPlaying(bool playing) noexcept { clock.setPlaying(playing); }
-    void rewind() noexcept               { clock.rewind(); }
+    // Message thread: requests the audio thread applies at the next block start (internal clock).
+    void setTempo(double bpm) noexcept   { if (bpm > 0.0) tempoRequest.store(bpm, std::memory_order_relaxed); }
+    void setPlaying(bool playing) noexcept { playRequest.store(playing, std::memory_order_relaxed); }
+    // Message thread: the rewind happens at the next block start, on the audio thread.
+    void rewind() noexcept               { rewindRequest.store(true, std::memory_order_release); }
 
     const TransportClock& transportClock() const noexcept { return clock; }
 
@@ -198,10 +220,20 @@ public:
         // External MIDI clock (slave): follow the smoothed tempo + transport BEFORE we
         // publish/advance, so the master rides the external clock yet stays sample-accurate
         // (the frame counter is still the timebase; only its tempo tracks the estimate).
-        if (clockSource.load(std::memory_order_relaxed) == ClockSource::ExternalMidi && midiClock != nullptr)
+        const bool external = clockSource.load(std::memory_order_relaxed) == ClockSource::ExternalMidi && midiClock != nullptr;
+        if (external)
         {
+            // Read the run state first (acquire): a Start / Song Position that set it is then
+            // guaranteed visible to the consumes below, so it lands in this block, not the next.
+            const bool extRunning = midiClock->isRunning();
+            // The estimator keeps only the later of a locate and a Start, so the order here is free.
+            if (double located = 0.0; midiClock->consumeLocate(located))
+                clock.locate(located);
             if (midiClock->consumeReset())
+            {
                 clock.rewind();
+                rewoundInBlock = true;
+            }
 
             // Stall watchdog: track whether the pulse count is still advancing. A source that
             // stopped sending 0xF8 without a 0xFC freezes it → treat the clock as lost (stop)
@@ -214,8 +246,55 @@ public:
             const double extBpm = midiClock->bpm();
             if (extBpm > 0.0 && extAlive)
                 clock.setTempo(extBpm);
-            clock.setPlaying(midiClock->isRunning() && extAlive);
+            clock.setPlaying(extRunning && extAlive);
         }
+        else
+        {
+            // Internal master: the UI's play / tempo requests, applied once per block so the whole
+            // block (snapshot, transport out, advance) sees one state.
+            clock.setTempo(tempoRequest.load(std::memory_order_relaxed));
+            clock.setPlaying(playRequest.load(std::memory_order_relaxed));
+        }
+
+        // A rewind from the UI lands here, between blocks.
+        if (rewindRequest.exchange(false, std::memory_order_acq_rel))
+        {
+            clock.rewind();
+            rewoundInBlock = true;
+        }
+
+        // MIDI transport out for this block's play-state change, decided before the snapshot so
+        // clients and outboard gear restart on the same beat. A start from the top (or a rewind
+        // while playing) is Start + the beat-0 pulse. A resume elsewhere first moves the clock back
+        // to the sixteenth it is in (MIDI's resolution; a sub-sixteenth step while stopped is
+        // inaudible), then sends Song Position + Continue + that sixteenth's pulse. Positions past
+        // sixteenth 16383 (beat ~4096) can't be expressed in MIDI and are clamped.
+        const bool playingNow = clock.isPlaying();
+        if (playingNow && (! wasPlaying || rewoundInBlock))
+        {
+            if (clock.beats() <= 0.0)
+            {
+                stats.transportBytes[stats.numTransportBytes++] = 0xFA;
+                stats.transportBytes[stats.numTransportBytes++] = 0xF8;
+            }
+            else
+            {
+                const double snapped    = std::floor(clock.beats() * 4.0 + 1.0e-9);
+                const int    sixteenths = (int) std::clamp(snapped, 0.0, 16383.0);   // MIDI's limit (bytes only)
+                clock.locate(snapped / 4.0);
+                stats.transportBytes[stats.numTransportBytes++] = 0xF2;
+                stats.transportBytes[stats.numTransportBytes++] = (std::uint8_t) (sixteenths & 0x7F);
+                stats.transportBytes[stats.numTransportBytes++] = (std::uint8_t) (sixteenths >> 7);
+                stats.transportBytes[stats.numTransportBytes++] = 0xFB;
+                stats.transportBytes[stats.numTransportBytes++] = 0xF8;
+            }
+        }
+        else if (! playingNow && wasPlaying)
+        {
+            stats.transportBytes[stats.numTransportBytes++] = 0xFC;
+        }
+        wasPlaying     = playingNow;
+        rewoundInBlock = false;
 
         // Publish the start-of-block transport so clients align the block they render ahead.
         if (mem != nullptr)
@@ -368,10 +447,22 @@ public:
             }
         masterPeakLevel.store(masterPk, std::memory_order_relaxed);
 
-        // Advance the master by this block and report how many MIDI-clock pulses it crossed.
-        const std::uint64_t before = clock.pulsesElapsed(24);
+        // Advance the master by this block and report how many MIDI-clock pulses it crossed, and
+        // where: the beat runs linearly across the block, so pulse k lands at the first frame whose
+        // beat reaches k / 24.
+
+        const std::uint64_t before    = clock.pulsesElapsed(24);
+        const double        startBeat = clock.beats();
         clock.advance(numFrames);
         stats.midiPulsesInBlock = clock.pulsesElapsed(24) - before;
+        // The rate advance() actually used (exact even if the tempo was changed mid-callback).
+        const double beatsPerFrame = numFrames > 0 ? (clock.beats() - startBeat) / numFrames : 0.0;
+        for (std::uint64_t k = before + 1; k <= before + stats.midiPulsesInBlock; ++k)
+        {
+            const double frame = beatsPerFrame > 0.0 ? std::ceil(((double) k / 24.0 - startBeat) / beatsPerFrame) : 0.0;
+            if (stats.numPulseOffsets == BlockStats::kMaxPulseOffsets) break;   // the rest go at the block end
+            stats.pulseOffsets[stats.numPulseOffsets++] = (int) std::clamp(frame, 0.0, (double) (numFrames - 1));
+        }
         return stats;
     }
 
@@ -399,6 +490,12 @@ private:
 
     // External-MIDI stall watchdog (audio-thread only).
     std::uint64_t lastExtPulseCount       = 0;
+    bool          preparedOnce            = false;   // a later prepare keeps the song position
+    bool          wasPlaying              = false;   // audio thread: last block's play state (transport out)
+    bool          rewoundInBlock          = false;   // audio thread: the clock was rewound this block
+    std::atomic<bool> rewindRequest       { false }; // UI → audio thread
+    std::atomic<bool> playRequest         { false }; // UI → audio thread (internal clock)
+    std::atomic<double> tempoRequest      { 120.0 }; // UI → audio thread (internal clock)
     std::uint64_t extStaleFrames          = 0;
     std::uint64_t extStaleThresholdFrames = 0;
     std::atomic<float>  clientPeakLevel[kMaxClients];   // latest per-block peak, per slot

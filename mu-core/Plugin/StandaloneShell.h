@@ -156,7 +156,8 @@ public:
                 if (holderPtr->processor != nullptr)
                 {
                     muLinkBridge = mu_link::makeStandaloneBridge (
-                        *mainWindow, *holderPtr->processor, holderPtr->player, config.muLinkName);
+                        *mainWindow, *holderPtr->processor, holderPtr->player, holderPtr->deviceManager,
+                        config.muLinkName);
 
                     // Let the product publish its current preset name to mu-link for display.
                     if (auto* pb = dynamic_cast<ProcessorBase*> (holderPtr->processor.get()))

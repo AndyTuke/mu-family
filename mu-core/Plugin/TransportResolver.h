@@ -56,6 +56,7 @@ inline BlockTransport resolveTransport(const HostTransport& host, bool isStandal
                                        int numSamples, double sampleRate, double wrapBeats = 0.0)
 {
     BlockTransport t;
+    bool relocated = false;   // the clock moved the own beat this block (store it even while stopped)
     const double ownBpm = internal.bpm.load(std::memory_order_relaxed);
 
     // Pick the source (the family rule above).
@@ -88,9 +89,11 @@ inline BlockTransport resolveTransport(const HostTransport& host, bool isStandal
         }
         else
         {
-            // Transport only: the own tempo and beat, restarted from bar 1 by the clock's Start.
+            // Transport only: the own tempo and beat, moved by the clock's Start (bar 1) or Song
+            // Position Pointer.
             t.bpm       = ownBpm;
-            t.startBeat = clock.startedInBlock() ? 0.0 : internal.beatPos.load(std::memory_order_relaxed);
+            relocated   = clock.startedInBlock() || clock.locatedInBlock();
+            t.startBeat = relocated ? clockBlockBeat : internal.beatPos.load(std::memory_order_relaxed);
         }
     }
     else
@@ -116,7 +119,7 @@ inline BlockTransport resolveTransport(const HostTransport& host, bool isStandal
     // stopped own transport leaves the counter alone (the UI may be resetting it).
     if (t.playOutside)
         internal.playing.store(t.playing, std::memory_order_relaxed);
-    if (t.playing || t.beatFromOutside())
+    if (t.playing || t.beatFromOutside() || relocated)
         internal.beatPos.store(wrap(t.startBeat + t.blockBeats), std::memory_order_relaxed);
     return t;
 }

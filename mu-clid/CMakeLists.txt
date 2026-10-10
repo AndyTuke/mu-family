@@ -403,6 +403,8 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/ModulationSkewTests.cpp       # C5 (proportion-space skew round-trips)
     Source/Tests/MidiClockSyncTests.cpp      # shared MIDI-clock slave (tempo estimate, step-exact beat)
     Source/Tests/TransportResolverTests.cpp    # family transport rule: host / MIDI-clock modes / own
+    Source/Tests/BarPositionTests.cpp          # host meter + bar start → bar.beat.sixteenth
+    Source/Tests/Mp3FormatTests.cpp            # MP3 samples open and decode (same define as the plugin)
     Source/Persistence/PresetMigrations.cpp    # under test by C1/C2
     Source/Sequencer/HitGenerator.cpp
     Source/Sequencer/EuclideanGenerator.cpp
@@ -432,6 +434,7 @@ target_link_libraries(mu-clid-tests PRIVATE
     juce::juce_events
     juce::juce_audio_basics
     juce::juce_audio_processors
+    juce::juce_audio_formats
     juce::juce_dsp
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags
@@ -439,6 +442,7 @@ target_link_libraries(mu-clid-tests PRIVATE
 )
 
 target_compile_definitions(mu-clid-tests PRIVATE
+    JUCE_USE_MP3AUDIOFORMAT=1   # as the plugin targets, so the MP3 test checks what ships
     JUCE_USE_CURL=0
     JUCE_WEB_BROWSER=0
 )

@@ -5,7 +5,7 @@
 
 // MidiClockInput — the thin JUCE adapter between a live MIDI input and MidiClockEstimator
 // (L7). Registered on the AudioDeviceManager as a MIDI-input callback; it parses the realtime
-// bytes (clock / start / continue / stop) and forwards them to the pure estimator, stamping
+// bytes (clock / start / continue / stop / song position) and forwards them to the pure estimator, stamping
 // each pulse with a monotonic hi-res time so the tempo estimate doesn't depend on platform
 // MIDI timestamps. All the logic lives in the estimator (which is unit-tested headless); this
 // class is just the wiring, so it stays in mu-link where the audio modules are available.
@@ -28,6 +28,8 @@ public:
             est.onContinue();
         else if (m.isMidiStop())
             est.onStop();
+        else if (m.isSongPositionPointer())
+            est.onSongPosition(m.getSongPositionPointerMidiBeat());
     }
 
 private:

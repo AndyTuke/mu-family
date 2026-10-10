@@ -10,7 +10,7 @@
 // AudioServer — owns the one hardware output device and runs the single audio callback
 // that drives the whole mu-link bus. It is a thin shell: each callback it hands the
 // device's output buffer to ServerEngine (publish transport → sum client rings → advance
-// clock) and emits this block's MIDI-clock pulses. All the sacred, lock-free real-time
+// clock) and queues this block's MIDI-clock pulses at their frame offsets. All the sacred, lock-free real-time
 // work lives in ServerEngine; this class only manages device lifetime + wiring.
 //
 // Backend is runtime-selectable through the standard JUCE AudioDeviceManager (WASAPI
@@ -90,9 +90,8 @@ public:
     bool  clientSoloed   (int slot) const noexcept { return engine.clientSoloed(slot); }
     float masterGainValue()         const noexcept { return engine.masterGainValue(); }
 
-    void setTempo(double bpm) noexcept           { engine.setTempo(bpm); }
+    void setTempo(double bpm) noexcept           { engineTempo = bpm; engine.setTempo(bpm); }   // kept for a re-prepare
     void setPlaying(bool shouldPlay) noexcept    { engine.setPlaying(shouldPlay); }
-    void setMidiClockOutput(juce::MidiOutput* o) noexcept { midiClock.setOutput(o); }
 
     // Clock source (L7): Internal (master) or ExternalMidi (slave to incoming MIDI clock).
     void        setClockSource(ClockSource s) noexcept { engine.setClockSource(s); }
@@ -103,22 +102,30 @@ public:
 private:
     void audioDeviceAboutToStart(juce::AudioIODevice* device) override
     {
-        engine.prepare(device->getCurrentSampleRate(),
+        deviceSampleRate = device->getCurrentSampleRate();
+        engine.prepare(deviceSampleRate,
                        device->getCurrentBufferSizeSamples(),
                        engineTempo);
+        // MIDI clock out follows the picker's default output. The device manager only swaps that
+        // port between audioDeviceStopped() and here, so this is the safe point to pick it up.
+        midiClock.setOutput(deviceManager.getDefaultMidiOutput());
         // Opening (or re-opening) a device must not dictate transport state — the
         // app starts stopped and a device change mid-session preserves play/stop.
     }
 
-    void audioDeviceStopped() override {}
+    void audioDeviceStopped() override { midiClock.setOutput(nullptr); }   // the port may be closed next
 
     void audioDeviceIOCallbackWithContext(const float* const* /*inputs*/, int /*numInputs*/,
                                           float* const* outputChannelData, int numOutputChannels,
                                           int numSamples,
                                           const juce::AudioIODeviceCallbackContext& /*context*/) override
     {
+        // Stamp the block at callback entry so render time doesn't move the clock pulses.
+        const double blockStartMs = juce::Time::getMillisecondCounterHiRes();
         const BlockStats stats = engine.renderBlock(outputChannelData, numOutputChannels, numSamples);
-        midiClock.emit(stats.midiPulsesInBlock);
+        midiClock.emit(blockStartMs, stats.transportBytes, stats.numTransportBytes,
+                       stats.pulseOffsets, stats.numPulseOffsets,
+                       (int) stats.midiPulsesInBlock, numSamples, deviceSampleRate);
     }
 
     juce::AudioDeviceManager deviceManager;
@@ -127,6 +134,7 @@ private:
     MidiClockOut             midiClock;
     MidiClockInput           midiClockInput;
     double                   engineTempo = 120.0;
+    double                   deviceSampleRate = 48000.0;
     bool                     started     = false;
 };
 

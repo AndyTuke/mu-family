@@ -8,6 +8,7 @@
 #include "../Server/ServerEngine.h"
 #include "../Ipc/MuLinkServerMemory.h"
 #include "../Clock/MidiClockEstimator.h"
+#include "../Clock/MidiClockOut.h"
 #include "Link/MuLinkSharedMemory.h"
 
 #ifdef _WIN32
@@ -166,6 +167,173 @@ public:
             // Next identical block crosses the next 24 pulses.
             st = engine.renderBlock(out.data(), 2, 24000);
             expectEquals((int) st.midiPulsesInBlock, 24);
+        }
+
+        beginTest("MIDI-clock pulses carry evenly spaced frame offsets across blocks");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            engine.prepare(48000.0, 2048, 120.0);
+            engine.setPlaying(true);
+
+            // 120 BPM at 48 kHz = one pulse every 1000 frames; 2048-frame blocks put pulses at
+            // different offsets in each block and leave some blocks with only two.
+            OutputBuffers out(2, 2048);
+            std::vector<juce::int64> at;
+            for (int b = 0; b < 40; ++b)
+            {
+                const auto st = engine.renderBlock(out.data(), 2, 2048);
+                expectEquals(st.numPulseOffsets, (int) st.midiPulsesInBlock, "every pulse has an offset");
+                for (int i = 0; i < st.numPulseOffsets; ++i)
+                    at.push_back((juce::int64) b * 2048 + st.pulseOffsets[i]);
+            }
+            expect(at.size() >= 80, "pulses crossed");
+            int uneven = 0;
+            for (size_t i = 1; i < at.size(); ++i)
+                if (std::abs((at[i] - at[i - 1]) - 1000) > 1) ++uneven;
+            expectEquals(uneven, 0, "pulse spacing off the 1000-frame grid");
+            expect(std::abs(at.front() - 1000) <= 1, "first pulse one pulse period after start");
+        }
+
+        beginTest("MIDI clock out sends each pulse when it is due, in order");
+        {
+            MidiClockOut clockOut(false);   // no sender thread: the test is the only reader
+            std::vector<double> sentAt;
+            auto sink = [&](const juce::MidiMessage& m, double due) { expect(m.isMidiClock()); sentAt.push_back(due); };
+            const int offsets[] = { 0, 480, 960 };
+
+            clockOut.emit(100.0, nullptr, 0, offsets, 3, 3, 1024, 48000.0);
+            clockOut.sendDue(1.0e12, sink);
+            expect(sentAt.empty(), "nothing is queued while no port is set");
+
+            clockOut.armForTest();
+            clockOut.emit(100.0, nullptr, 0, offsets, 3, 4, 1024, 48000.0);   // 4 pulses, only 3 offsets stored
+            clockOut.sendDue(99.0, sink);
+            expect(sentAt.empty(), "nothing is due before the block starts");
+            clockOut.sendDue(110.0, sink);
+            expectEquals((int) sentAt.size(), 2, "only the pulses due by 10 ms are sent");
+            clockOut.sendDue(1.0e12, sink);
+            expectEquals((int) sentAt.size(), 4);
+            if (sentAt.size() == 4)
+            {
+                expectWithinAbsoluteError(sentAt[1] - sentAt[0], 10.0, 1.0e-6);
+                expectWithinAbsoluteError(sentAt[2] - sentAt[1], 10.0, 1.0e-6);
+                expectWithinAbsoluteError(sentAt[3], 100.0 + 1023 * 1000.0 / 48000.0, 1.0e-6, "overflow pulse at the block's last frame");
+            }
+        }
+
+        beginTest("MIDI transport out: Start + beat-0 pulse, Stop, Song Position + Continue, rewind");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            engine.prepare(48000.0, 6000, 120.0);   // 6000 frames = 0.25 beat at 120 BPM
+            OutputBuffers out(2, 6000);
+            auto bytes = [](const BlockStats& st) { return std::vector<int>(st.transportBytes, st.transportBytes + st.numTransportBytes); };
+
+            auto st = engine.renderBlock(out.data(), 2, 6000);
+            expect(bytes(st).empty(), "stopped: nothing sent");
+
+            engine.setPlaying(true);
+            st = engine.renderBlock(out.data(), 2, 6000);
+            expect(bytes(st) == std::vector<int>({ 0xFA, 0xF8 }), "play from the top: Start then the beat-0 pulse");
+            for (int b = 0; b < 8; ++b) engine.renderBlock(out.data(), 2, 6000);   // now at beat 2.25
+
+            engine.setPlaying(false);
+            st = engine.renderBlock(out.data(), 2, 6000);
+            expect(bytes(st) == std::vector<int>({ 0xFC }), "Stop");
+
+            engine.setPlaying(true);
+            st = engine.renderBlock(out.data(), 2, 6000);
+            expect(bytes(st) == std::vector<int>({ 0xF2, 9, 0, 0xFB, 0xF8 }), "resume at beat 2.25: SPP 9 sixteenths, Continue, that pulse");
+
+            engine.rewind();
+            st = engine.renderBlock(out.data(), 2, 6000);
+            expect(bytes(st) == std::vector<int>({ 0xFA, 0xF8 }), "a rewind while playing restarts the slaves");
+        }
+
+        beginTest("MIDI transport out: a resume off the sixteenth grid restarts everyone on the sixteenth");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            engine.prepare(48000.0, 5520, 120.0);   // 5520 frames = 0.23 beat at 120 BPM
+            OutputBuffers out(2, 5520);
+            engine.setPlaying(true);
+            for (int b = 0; b < 10; ++b) engine.renderBlock(out.data(), 2, 5520);   // beat 2.30
+            engine.setPlaying(false);
+            engine.renderBlock(out.data(), 2, 5520);
+            engine.setPlaying(true);
+            const auto st = engine.renderBlock(out.data(), 2, 5520);
+            const std::vector<int> b(st.transportBytes, st.transportBytes + st.numTransportBytes);
+            expect(b == std::vector<int>({ 0xF2, 9, 0, 0xFB, 0xF8 }), "SPP 9 (beat 2.25), Continue, pulse 54");
+            expectWithinAbsoluteError(readTransport(mem.transport()).ppqPosition, 2.25, 1.0e-9,
+                                      "clients restart on the same sixteenth as the slaves");
+            expect(st.numPulseOffsets > 0 && std::abs(st.pulseOffsets[0] - 1000) <= 1, "next pulse (55) one pulse period later");
+        }
+
+        beginTest("MIDI clock out keeps transport messages ahead of the block's pulses");
+        {
+            MidiClockOut clockOut(false);
+            clockOut.armForTest();
+            const std::uint8_t transport[] = { 0xF2, 9, 0, 0xFB };
+            const int offsets[] = { 100 };
+            clockOut.emit(0.0, transport, 4, offsets, 1, 1, 512, 48000.0);
+            std::vector<juce::MidiMessage> sent;
+            clockOut.sendDue(1.0e12, [&](const juce::MidiMessage& m, double) { sent.push_back(m); });
+            expectEquals((int) sent.size(), 3);
+            if (sent.size() == 3)
+            {
+                expect(sent[0].isSongPositionPointer() && sent[0].getSongPositionPointerMidiBeat() == 9, "SPP first");
+                expect(sent[1].isMidiContinue(), "then Continue");
+                expect(sent[2].isMidiClock(), "then the pulse");
+            }
+        }
+
+        beginTest("a re-prepare (device or MIDI-out change) keeps the tempo and song position");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            engine.prepare(48000.0, 512, 120.0);
+            engine.setPlaying(true);
+            OutputBuffers out(2, 512);
+            for (int b = 0; b < 40; ++b) engine.renderBlock(out.data(), 2, 512);   // beat 0.853
+            engine.setTempo(140.0);
+            engine.renderBlock(out.data(), 2, 512);                                 // beat 0.880
+            engine.prepare(48000.0, 512, 120.0);   // the device restart passes the stored start tempo
+            engine.setTempo(140.0);                // AudioServer passes its kept tempo; the UI's stands
+            const auto st = engine.renderBlock(out.data(), 2, 512);
+            const auto t = readTransport(mem.transport());
+            expectWithinAbsoluteError(t.ppqPosition, 0.75, 1.0e-9, "position kept, snapped to its sixteenth");
+            expectWithinAbsoluteError(t.tempoBpm, 140.0, 1.0e-9, "tempo kept");
+            expect(st.numTransportBytes == 5 && st.transportBytes[0] == 0xF2 && st.transportBytes[3] == 0xFB,
+                   "the new port is located and continued");
+        }
+
+        beginTest("external MIDI clock: a Song Position then a Start in one block starts from the top");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            MidiClockEstimator est;
+            engine.attachMidiClock(&est);
+            engine.setClockSource(ClockSource::ExternalMidi);
+            engine.prepare(48000.0, 512, 120.0);
+            OutputBuffers out(2, 512);
+            est.onSongPosition(64);
+            est.onStart();
+            double tm = 0.0;
+            for (int i = 0; i < 3; ++i) { est.onClockPulse(tm); tm += 0.5 / 24.0; }
+            const auto st = engine.renderBlock(out.data(), 2, 512);
+            expectWithinAbsoluteError(readTransport(mem.transport()).ppqPosition, 0.0, 1.0e-9, "Start wins");
+            expect(st.numTransportBytes == 2 && st.transportBytes[0] == 0xFA, "Start sent");
         }
 
         beginTest("reaps a client whose heartbeat freezes (died without detaching)");
@@ -359,6 +527,32 @@ public:
             // stall watchdog stops the transport rather than coasting forever at last tempo.
             for (int b = 0; b < 60; ++b) engine.renderBlock(out.data(), 2, 512);   // ≈ 0.64 s
             expectEquals((int) readTransport(mem.transport()).playing, 0, "stalled external clock should stop the transport");
+        }
+
+        beginTest("external MIDI clock: a Song Position Pointer while stopped locates the transport");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            MidiClockEstimator est;
+            engine.attachMidiClock(&est);
+            engine.setClockSource(ClockSource::ExternalMidi);
+            engine.prepare(48000.0, 512, 120.0);
+            OutputBuffers out(2, 512);
+
+            est.onStart();
+            est.onStop();
+            est.onSongPosition(16);                              // sixteenth 16 = beat 4
+            engine.renderBlock(out.data(), 2, 512);
+            expectWithinAbsoluteError(readTransport(mem.transport()).ppqPosition, 4.0, 1.0e-9, "located to beat 4");
+
+            est.onContinue();
+            est.onSongPosition(32);                              // while running: ignored
+            double t = 0.0;
+            for (int i = 0; i < 4; ++i) { est.onClockPulse(t); t += 0.5 / 24.0; }
+            engine.renderBlock(out.data(), 2, 512);
+            expectWithinAbsoluteError(readTransport(mem.transport()).ppqPosition, 4.0, 1.0e-9, "Continue resumes from the locate");
         }
     }
 };

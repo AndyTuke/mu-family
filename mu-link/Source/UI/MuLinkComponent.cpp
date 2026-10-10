@@ -449,9 +449,6 @@ void MuLinkComponent::timerCallback()
         }
     }
 
-    // Keep MIDI-clock-out routed to whatever the picker has selected (none → no-op).
-    server.setMidiClockOutput(server.audioDeviceManager().getDefaultMidiOutput());
-
     // In external-MIDI-clock mode the tempo + transport are driven by the incoming clock,
     // so reflect them read-only and lock out the user controls; restore them in internal mode.
     const bool external = server.clockSourceMode() == mu_link::ClockSource::ExternalMidi;

@@ -27,6 +27,13 @@ public:
     void setTempo(double tempoBpm) noexcept { if (tempoBpm > 0.0) bpm = tempoBpm; }
     void setPlaying(bool shouldPlay) noexcept { playing = shouldPlay; }
     void rewind() noexcept { samplePos = 0; beatPos = 0.0; }
+    // Jump to a musical position (an external Song Position Pointer); the sample position moves
+    // to where that beat falls at the current tempo.
+    void locate(double beats) noexcept
+    {
+        beatPos   = beats > 0.0 ? beats : 0.0;
+        samplePos = (std::uint64_t) std::llround(beatPos * 60.0 / bpm * sampleRate);
+    }
 
     // Advance the master position by one audio block. No-op while stopped, so a paused
     // transport holds its exact sample position. Beats are ACCUMULATED at the tempo in
