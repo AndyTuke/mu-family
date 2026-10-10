@@ -5,6 +5,7 @@
 #include "Persistence/PresetMigrations.h"   // v3 insert/master/mod-assignment migrations
 #include "Persistence/ModulatorSerialise.h" // serialiseModulators, deserialiseModulators, clearModulators
 #include "Persistence/PresetFiles.h"        // mu_pp::safePresetFileName + replaceFileAtomically
+#include "Persistence/EmbeddedSample.h"     // embedded samples: FLAC or raw file bytes
 #include "UI/Components/MuLookAndFeel.h" // kChannelPaletteSize
 #include <limits>               // std::numeric_limits for NaN sentinel
 
@@ -121,8 +122,24 @@ struct PresetSample
     bool         relative = false;   // Missing: the stored path was relative (not in the Samples folder)
 };
 
+// Embed sample file `f` in a preset node: sampleData (base64), sampleName, and for a FLAC-encoded
+// sample sampleDataCodec + sampleDataBits (see Persistence/EmbeddedSample.h).
+static void embedSampleInto(juce::ValueTree& node, const juce::File& f)
+{
+    const auto e = mu_clid::embedded_sample::encode(f);
+    if (e.data.getSize() == 0) return;
+    node.setProperty("sampleData", juce::Base64::toBase64(e.data.getData(), e.data.getSize()), nullptr);
+    node.setProperty("sampleName", f.getFileName(), nullptr);
+    if (e.codec.isNotEmpty())
+    {
+        node.setProperty("sampleDataCodec", e.codec, nullptr);
+        node.setProperty("sampleDataBits", e.bits, nullptr);
+    }
+}
+
 static PresetSample resolvePresetSample(const juce::String& data, const juce::String& name,
-                                        const juce::String& storedPath, const juce::File& samplesDir)
+                                        const juce::String& storedPath, const juce::File& samplesDir,
+                                        const juce::String& codec = {}, int bits = 0)
 {
     PresetSample r;
     if (data.isNotEmpty() && name.isNotEmpty())
@@ -132,7 +149,7 @@ static PresetSample resolvePresetSample(const juce::String& data, const juce::St
         auto tempDir = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("muClid_samples");
         tempDir.createDirectory();
         const auto tempFile = tempDir.getChildFile(name);
-        if (mb.getSize() == 0 || ! tempFile.replaceWithData(mb.getData(), mb.getSize()))
+        if (! mu_clid::embedded_sample::decodeTo(mb, codec, bits, tempFile))
         {
             r.kind = PresetSample::Kind::BadEmbed;
             return r;
@@ -383,13 +400,7 @@ void PresetIO::saveRhythmPresetToFile(int rhythmIndex, const juce::File& destFil
             juce::File f(path);
             if (f.existsAsFile())
             {
-                juce::MemoryBlock mb;
-                if (f.loadFileAsData(mb) && mb.getSize() > 0)
-                {
-                    state.setProperty("sampleData",
-                                      juce::Base64::toBase64(mb.getData(), mb.getSize()), nullptr);
-                    state.setProperty("sampleName", f.getFileName(), nullptr);
-                }
+                embedSampleInto(state, f);
             }
         }
     }
@@ -570,13 +581,7 @@ juce::ValueTree PresetIO::buildFullPresetTree(const juce::String& name, const ju
                 juce::File f(path);
                 if (f.existsAsFile())
                 {
-                    juce::MemoryBlock mb;
-                    if (f.loadFileAsData(mb) && mb.getSize() > 0)
-                    {
-                        rTree.setProperty("sampleData",
-                                           juce::Base64::toBase64(mb.getData(), mb.getSize()), nullptr);
-                        rTree.setProperty("sampleName", f.getFileName(), nullptr);
-                    }
+                    embedSampleInto(rTree, f);
                 }
             }
         }
@@ -634,7 +639,9 @@ void PresetIO::restoreRhythmSample(int i, const juce::ValueTree& tree,
     const auto smp = resolvePresetSample(tree.getProperty(juce::Identifier(sampleDataProp)).toString(),
                                          tree.getProperty(juce::Identifier(sampleNameProp)).toString(),
                                          tree.getProperty(juce::Identifier(samplePathProp)).toString(),
-                                         proc_.getSamplesDir());
+                                         proc_.getSamplesDir(),
+                                         tree.getProperty(juce::Identifier(sampleDataProp + "Codec")).toString(),
+                                         (int) tree.getProperty(juce::Identifier(sampleDataProp + "Bits"), 0));
     if (smp.kind == PresetSample::Kind::BadEmbed) return;   // unreadable embedded data: leave the slot as it is
     proc_.samples.setPath(i, applyPresetSample(smp, *proc_.voiceEngines[i], proc_.onLoadError, false,
                                                      " (rhythm " + juce::String(i + 1) + ")"));
@@ -739,7 +746,9 @@ PresetIO::PreparedRhythm PresetIO::prepareRhythm(const juce::ValueTree& nodeIn, 
     // Sample: embedded blob first, else the stored path.
     const auto smp = resolvePresetSample(node.getProperty("sampleData").toString(),
                                          node.getProperty("sampleName", "embedded").toString(),
-                                         node.getProperty(prefix + "sample").toString(), samplesDir);
+                                         node.getProperty(prefix + "sample").toString(), samplesDir,
+                                         node.getProperty("sampleDataCodec").toString(),
+                                         (int) node.getProperty("sampleDataBits", 0));
     out.samplePath = applyPresetSample(smp, *out.voice, onLoadError, true);
     return out;
 }
