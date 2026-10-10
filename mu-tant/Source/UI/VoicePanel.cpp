@@ -275,7 +275,7 @@ void VoicePanel::timerCallback()
     // for the gating-grid playhead. Pattern length may be 1..16 bars.
     const bool   playing = proc.isInternalPlaying();
     const double beat    = proc.getInternalBeatPos();
-    const auto* gPat = &proc.gatePatterns[(size_t) currentVoice];
+    const auto* gPat = &proc.voiceSlots[(size_t) currentVoice].gate;
     const double patBeats = (double) gPat->patternLengthBars * 4.0;
     const double beat01  = (patBeats > 0.0) ? std::fmod(beat, patBeats) / patBeats : 0.0;
     gatingDesigner.setPlayhead(beat01, playing);
@@ -335,9 +335,9 @@ void VoicePanel::setVoice(int voiceIndex)
     bindModulationIndicators();
 
     modulatorPanel.setVoiceSlot(&proc.voiceSlots[(size_t) currentVoice]);
-    gatingDesigner.setPattern(&proc.gatePatterns[(size_t) currentVoice]);
-    gatingDesigner.setFilterPattern(&proc.filterPatterns[(size_t) currentVoice]);
-    gatingDesigner.setPitchPattern(&proc.pitchPatterns[(size_t) currentVoice]);
+    gatingDesigner.setPattern(&proc.voiceSlots[(size_t) currentVoice].gate);
+    gatingDesigner.setFilterPattern(&proc.voiceSlots[(size_t) currentVoice].filterGate);
+    gatingDesigner.setPitchPattern(&proc.voiceSlots[(size_t) currentVoice].pitchGate);
     insertSub.setChannel(currentVoice);   // reloads algo + slot knobs from APVTS
     // setChannel → configureInsertAlgorithm fires insertSub.onInsertAlgorithmChanged,
     // which re-labels the modulator insert destinations for this voice's algo.

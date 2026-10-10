@@ -74,9 +74,9 @@ PluginProcessor::PluginProcessor()
 
     // Demo: the default patterns (2 bars of 1/16) are shrunk to the 16-step cap too.
     if (! isLicensed())
-        for (auto* pats : { &gatePatterns, &filterPatterns, &pitchPatterns })
-            for (auto& pat : *pats)
-                pat.limitToCells(demoMaxSteps());
+        for (auto& slot : voiceSlots)
+            for (auto* pat : { &slot.gate, &slot.filterGate, &slot.pitchGate })
+                pat->limitToCells(demoMaxSteps());
 
     // MIDI program-change preset maps (Ch 1-8 → per-voice .muPattern, Ch 9 →
     // full .muTant preset). The scan/drain machinery + the editor panels live in
@@ -95,8 +95,6 @@ PluginProcessor::PluginProcessor()
     {
         voices[(size_t) v] = std::make_unique<VoiceEngine>();
         voices[(size_t) v]->setBank(&bank);
-        osc1UserIndex[(size_t) v].store(-1);   // no user wavetable → factory selection
-        osc2UserIndex[(size_t) v].store(-1);
     }
 
     cacheParamPointers();        // resolve all APVTS atomics once (audio thread reads these)
@@ -204,8 +202,8 @@ VoiceConfig PluginProcessor::readConfig(int voiceIndex) const
     // Wavetable: a loaded user table (resolved bank index) overrides the factory
     // o{1,2}_wt selection; -1 → use the factory index.
     {
-        const int u1 = osc1UserIndex[(size_t) voiceIndex].load();
-        const int u2 = osc2UserIndex[(size_t) voiceIndex].load();
+        const int u1 = voiceSlots[(size_t) voiceIndex].osc1UserIndex.load();
+        const int u2 = voiceSlots[(size_t) voiceIndex].osc2UserIndex.load();
         c.osc1Wavetable = (u1 >= 0) ? u1 : (int) p.o1Wt->load();
         c.osc2Wavetable = (u2 >= 0) ? u2 : (int) p.o2Wt->load();
     }
@@ -331,12 +329,12 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     std::array<double, VoiceHotSwapStager::kMaxVoices> voicePatBeats {};
     for (int v = 0; v < VoiceHotSwapStager::kMaxVoices; ++v)
     {
-        const double gateBeats = (double) gatePatterns[(size_t) v].patternLengthBars * 4.0;
+        const double gateBeats = (double) voiceSlots[(size_t) v].gate.patternLengthBars * 4.0;
         voicePatBeats[(size_t) v] = onMasterLoop ? masterLoopBeats : gateBeats;
     }
     const double fullPatBeats = masterLoopBeats > 0.0
                                 ? masterLoopBeats
-                                : (double) gatePatterns[0].patternLengthBars * 4.0;
+                                : (double) voiceSlots[0].gate.patternLengthBars * 4.0;
     if (hotSwapStager.checkBoundaries(numVoices.load(std::memory_order_relaxed),
                                       blkPlaying, wasPlaying,
                                       oldPos, newPosRaw, voicePatBeats, fullPatBeats))
@@ -373,8 +371,8 @@ void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
     {
         const float o1Base = (float) voicePtrs[(size_t) v].o1Semi->load();
         const float o2Base = (float) voicePtrs[(size_t) v].o2Semi->load();
-        const bool  o1Stepped = osc1SemiStepped[(size_t) v].load(std::memory_order_relaxed);
-        const bool  o2Stepped = osc2SemiStepped[(size_t) v].load(std::memory_order_relaxed);
+        const bool  o1Stepped = voiceSlots[(size_t) v].osc1SemiStepped.load(std::memory_order_relaxed);
+        const bool  o2Stepped = voiceSlots[(size_t) v].osc2SemiStepped.load(std::memory_order_relaxed);
         if (o1Stepped) { cfg.osc1Semi = juce::roundToInt(out[D_o1Semi]); cfg.osc1SemiMod = 0.0f; }
         else           { cfg.osc1Semi = juce::roundToInt(o1Base);        cfg.osc1SemiMod = out[D_o1Semi] - o1Base; }
         if (o2Stepped) { cfg.osc2Semi = juce::roundToInt(out[D_o2Semi]); cfg.osc2SemiMod = 0.0f; }
@@ -433,7 +431,7 @@ void PluginProcessor::applyFilterEnvelope(int v, VoiceConfig& cfg, int numSample
     // envelope value 0 → no change from base; 1 at depth=1 → fully open.
     // Apply the same kMinAttackMs rise-limiting as the gate to prevent clicks
     // when gate and filter envelopes are out of sync.
-    auto& fPat = filterPatterns[(size_t) v];
+    auto& fPat = voiceSlots[(size_t) v].filterGate;
     if (blkPlaying && fPat.hasEnvelopes.load(std::memory_order_relaxed))
     {
         // The filter cutoff is a per-BLOCK value, so the de-click slew (a per-sample
@@ -481,7 +479,7 @@ void PluginProcessor::applyPitchEnvelope(int v, VoiceConfig& cfg)
 {
     // Pitch pattern envelope value (0..1) × depth (±24 semitones) shifts
     // osc1/osc2 pitch before VoiceEngine processes it this block.
-    auto& pPat = pitchPatterns[(size_t) v];
+    auto& pPat = voiceSlots[(size_t) v].pitchGate;
     if (blkPlaying && pPat.hasEnvelopes.load(std::memory_order_relaxed))
     {
         if (mu_core::trySpinLock(pPat.editLock))
@@ -528,8 +526,8 @@ void PluginProcessor::refreshPitchQuantFlags(int v)
     // resulting atomics lock-free. Reading the assignments here is safe: the message
     // thread is the sole writer and the mutation has already completed.
     const auto& slot = voiceSlots[(size_t) v];
-    osc1SemiStepped[(size_t) v].store(pitchDestHasSteppedSource(slot, "osc1.semi"), std::memory_order_relaxed);
-    osc2SemiStepped[(size_t) v].store(pitchDestHasSteppedSource(slot, "osc2.semi"), std::memory_order_relaxed);
+    voiceSlots[(size_t) v].osc1SemiStepped.store(pitchDestHasSteppedSource(slot, "osc1.semi"), std::memory_order_relaxed);
+    voiceSlots[(size_t) v].osc2SemiStepped.store(pitchDestHasSteppedSource(slot, "osc2.semi"), std::memory_order_relaxed);
 }
 
 void PluginProcessor::refreshAllPitchQuantFlags()
@@ -569,7 +567,7 @@ void PluginProcessor::renderVoice(int v, juce::AudioBuffer<float>& buf, int numS
     const bool  gateBypass = vp.gateBypass->load() > 0.5f;
     float* gl = buf.getWritePointer(0);
     float* gr = buf.getNumChannels() > 1 ? buf.getWritePointer(1) : nullptr;
-    applyGateBlock(gatePatterns[(size_t) v], gl, gr, numSamples, gateGap, gateBypass,
+    applyGateBlock(voiceSlots[(size_t) v].gate, gl, gr, numSamples, gateGap, gateBypass,
                    blkPlaying, blkBeatStart, blkBeatsPerSample, currentSampleRate);
 
     // Use modulated insert param values (modulation may have adjusted them).
@@ -582,7 +580,7 @@ void PluginProcessor::renderVoice(int v, juce::AudioBuffer<float>& buf, int numS
     inserts[(size_t) v].process(buf, numSamples, buf.getNumChannels(), ip);
 
     // Feed the sidebar spectrum glyph — capture post-insert audio on the audio thread.
-    voiceRingBuffers[(size_t) v].write(buf, numSamples);
+    voiceSlots[(size_t) v].ring.write(buf, numSamples);
 }
 
 void PluginProcessor::renderRetiringVoice(int v, juce::AudioBuffer<float>& buf, int numSamples)
@@ -710,10 +708,7 @@ void PluginProcessor::removeVoice(int idx)
     {
         copyVoiceParams(d + 1, d);
         voiceColourIndex[(size_t) d] = voiceColourIndex[(size_t) (d + 1)];   // colour follows the voice
-        voiceSlots[(size_t) d] = voiceSlots[(size_t) (d + 1)];          // CopyableSpinLock-safe
-        gatePatterns[(size_t) d].copyDataFrom(gatePatterns[(size_t) (d + 1)]);
-        filterPatterns[(size_t) d].copyDataFrom(filterPatterns[(size_t) (d + 1)]);
-        pitchPatterns[(size_t) d].copyDataFrom(pitchPatterns[(size_t) (d + 1)]);
+        voiceSlots[(size_t) d] = voiceSlots[(size_t) (d + 1)];          // modulators + envelopes + user wavetables follow the voice
     }
     resetVoiceSlot(n - 1);                          // clear the vacated top slot
     numVoices.store(n - 1);
@@ -756,30 +751,10 @@ void PluginProcessor::swapVoices(int a, int b)
     swapPrefix("ch" + juce::String(a) + "_", "ch" + juce::String(b) + "_");
 
     std::swap(voiceColourIndex[(size_t) a], voiceColourIndex[(size_t) b]);   // colour follows the voice
-    // User-wavetable selection follows the voice too.
-    std::swap(osc1UserPath[(size_t) a], osc1UserPath[(size_t) b]);
-    std::swap(osc2UserPath[(size_t) a], osc2UserPath[(size_t) b]);
-    { const int t1 = osc1UserIndex[(size_t) a].load(); osc1UserIndex[(size_t) a].store(osc1UserIndex[(size_t) b].load()); osc1UserIndex[(size_t) b].store(t1); }
-    { const int t2 = osc2UserIndex[(size_t) a].load(); osc2UserIndex[(size_t) a].store(osc2UserIndex[(size_t) b].load()); osc2UserIndex[(size_t) b].store(t2); }
-
+    // Modulators, envelopes and the user-wavetable choice swap with the voice.
     const Pattern tmpSlot = voiceSlots[(size_t) a];
     voiceSlots[(size_t) a] = voiceSlots[(size_t) b];
     voiceSlots[(size_t) b] = tmpSlot;
-
-    GatePattern tmpGate;
-    tmpGate.copyDataFrom(gatePatterns[(size_t) a]);
-    gatePatterns[(size_t) a].copyDataFrom(gatePatterns[(size_t) b]);
-    gatePatterns[(size_t) b].copyDataFrom(tmpGate);
-
-    GatePattern tmpFilter;
-    tmpFilter.copyDataFrom(filterPatterns[(size_t) a]);
-    filterPatterns[(size_t) a].copyDataFrom(filterPatterns[(size_t) b]);
-    filterPatterns[(size_t) b].copyDataFrom(tmpFilter);
-
-    GatePattern tmpPitch;
-    tmpPitch.copyDataFrom(pitchPatterns[(size_t) a]);
-    pitchPatterns[(size_t) a].copyDataFrom(pitchPatterns[(size_t) b]);
-    pitchPatterns[(size_t) b].copyDataFrom(tmpPitch);
     refreshPitchQuantFlags(a);   // the two slots' modulators swapped
     refreshPitchQuantFlags(b);
 }
@@ -823,21 +798,21 @@ void PluginProcessor::loadUserWavetable(int voice, int oscIndex, const juce::Fil
     }
     if (idx < 0) { if (onLoadError) onLoadError("Could not load wavetable \"" + file.getFileName() + "\""); return; }
     const juce::String path = file.getFullPathName();
-    if (oscIndex == 0) { osc1UserPath[(size_t) voice] = path; osc1UserIndex[(size_t) voice].store(idx); }
-    else             { osc2UserPath[(size_t) voice] = path; osc2UserIndex[(size_t) voice].store(idx); }
+    if (oscIndex == 0) { voiceSlots[(size_t) voice].osc1UserPath = path; voiceSlots[(size_t) voice].osc1UserIndex.store(idx); }
+    else             { voiceSlots[(size_t) voice].osc2UserPath = path; voiceSlots[(size_t) voice].osc2UserIndex.store(idx); }
 }
 
 void PluginProcessor::clearUserWavetable(int voice, int oscIndex)
 {
     if (voice < 0 || voice >= kMaxVoices) return;
-    if (oscIndex == 0) { osc1UserPath[(size_t) voice].clear(); osc1UserIndex[(size_t) voice].store(-1); }
-    else             { osc2UserPath[(size_t) voice].clear(); osc2UserIndex[(size_t) voice].store(-1); }
+    if (oscIndex == 0) { voiceSlots[(size_t) voice].osc1UserPath.clear(); voiceSlots[(size_t) voice].osc1UserIndex.store(-1); }
+    else             { voiceSlots[(size_t) voice].osc2UserPath.clear(); voiceSlots[(size_t) voice].osc2UserIndex.store(-1); }
 }
 
 juce::String PluginProcessor::userWavetablePath(int voice, int oscIndex) const
 {
     if (voice < 0 || voice >= kMaxVoices) return {};
-    return (oscIndex == 0) ? osc1UserPath[(size_t) voice] : osc2UserPath[(size_t) voice];
+    return (oscIndex == 0) ? voiceSlots[(size_t) voice].osc1UserPath : voiceSlots[(size_t) voice].osc2UserPath;
 }
 
 bool PluginProcessor::userWavetableMissing(int voice, int oscIndex) const
@@ -862,8 +837,8 @@ void PluginProcessor::copyVoiceParams(int src, int dst)
     shift("v"  + juce::String(src) + "_", "v"  + juce::String(dst) + "_");
     shift("ch" + juce::String(src) + "_", "ch" + juce::String(dst) + "_");
     // User-wavetable selection copies with the voice (same bank index, already loaded).
-    osc1UserPath[(size_t) dst] = osc1UserPath[(size_t) src]; osc1UserIndex[(size_t) dst].store(osc1UserIndex[(size_t) src].load());
-    osc2UserPath[(size_t) dst] = osc2UserPath[(size_t) src]; osc2UserIndex[(size_t) dst].store(osc2UserIndex[(size_t) src].load());
+    voiceSlots[(size_t) dst].osc1UserPath = voiceSlots[(size_t) src].osc1UserPath; voiceSlots[(size_t) dst].osc1UserIndex.store(voiceSlots[(size_t) src].osc1UserIndex.load());
+    voiceSlots[(size_t) dst].osc2UserPath = voiceSlots[(size_t) src].osc2UserPath; voiceSlots[(size_t) dst].osc2UserIndex.store(voiceSlots[(size_t) src].osc2UserIndex.load());
 }
 
 void PluginProcessor::resetVoiceSlot(int idx)
@@ -880,12 +855,7 @@ void PluginProcessor::resetVoiceSlot(int idx)
     };
     resetPrefix("v"  + juce::String(idx) + "_");
     resetPrefix("ch" + juce::String(idx) + "_");
-    gatePatterns[(size_t) idx].copyDataFrom(GatePattern{});
-    filterPatterns[(size_t) idx].copyDataFrom(GatePattern{});
-    pitchPatterns[(size_t) idx].copyDataFrom(GatePattern{});
-    voiceSlots[(size_t) idx] = Pattern{};
-    osc1UserPath[(size_t) idx].clear(); osc1UserIndex[(size_t) idx].store(-1);
-    osc2UserPath[(size_t) idx].clear(); osc2UserIndex[(size_t) idx].store(-1);
+    voiceSlots[(size_t) idx] = Pattern{};   // modulators, the three envelopes and the user wavetables back to defaults
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────

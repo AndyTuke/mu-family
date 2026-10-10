@@ -30,43 +30,6 @@
 namespace mu_tant
 {
 
-// Lock-free audio-to-UI ring buffer — written by the audio thread in renderVoice()
-// after the insert, read by VoiceSpectrumGlyph at 30 Hz to drive the sidebar animation.
-// kSize must be a power of 2 (enables fast bit-mask indexing).
-struct VoiceRingBuffer
-{
-    static constexpr int kSize = 1024;   // ~21 ms at 48 kHz
-
-    // Audio thread: mono-mix buf and append n frames.
-    void write(const juce::AudioBuffer<float>& buf, int n) noexcept
-    {
-        const int nCh  = buf.getNumChannels();
-        const float sc = nCh > 0 ? 1.0f / (float) nCh : 0.0f;
-        int head = writeHead.load(std::memory_order_relaxed);
-        for (int i = 0; i < n; ++i)
-        {
-            float s = 0.0f;
-            for (int c = 0; c < nCh; ++c)
-                s += buf.getSample(c, i);
-            data[(size_t)(head & (kSize - 1))] = s * sc;
-            ++head;
-        }
-        writeHead.store(head, std::memory_order_release);
-    }
-
-    // UI thread: copy the most-recent n samples into out[].
-    void read(float* out, int n) const noexcept
-    {
-        const int head  = writeHead.load(std::memory_order_acquire);
-        const int start = head - n;
-        for (int i = 0; i < n; ++i)
-            out[i] = data[(size_t)((start + i) & (kSize - 1))];
-    }
-
-    std::array<float, kSize> data {};
-    std::atomic<int>         writeHead { 0 };
-};
-
 class PluginProcessor : public ProcessorBase
 {
 public:
@@ -334,22 +297,7 @@ public:
     // per voice. Public so the UI (ModulatorPanel) can pass a pointer to the
     // currently-edited voice's slot.
     std::array<Pattern, kMaxVoices> voiceSlots;
-
-    // Per-voice drawable gate pattern. Public so GatingDesigner can mutate it.
-    std::array<GatePattern, kMaxVoices> gatePatterns;
-
-    // Per-voice filter envelope pattern. Same drawable model as gatePatterns but
-    // modulates filter cutoff (0=20 Hz, 1=base cutoff) instead of amplitude.
-    std::array<GatePattern, kMaxVoices> filterPatterns;
-
-    // Per-voice pitch envelope pattern. Envelope value (0..1) × depth (±24 st)
-    // adds semitones to osc1/osc2 pitch on each block.
-    std::array<GatePattern, kMaxVoices> pitchPatterns;
-
-    // Per-voice post-insert audio ring buffers — written by the audio thread in
-    // renderVoice() after the insert; read by VoiceSpectrumGlyph at 30 Hz for
-    // the sidebar spectrum animation.
-    std::array<VoiceRingBuffer, kMaxVoices> voiceRingBuffers;
+    // (each voice's gate / filter / pitch envelopes, user wavetables and level tap live in its Pattern)
 
 private:
     // Per-voice modulated-value snapshots — written by the audio thread in
@@ -376,12 +324,6 @@ private:
     std::array<const char*, kNumModDests>                    modDestIds   {};
     std::array<juce::NormalisableRange<float>, kNumModDests> modDestRanges{};
     std::array<std::array<const std::atomic<float>*, kNumModDests>, kMaxVoices> modDestAtoms{};
-
-    // Per voice: does a Stepped CS drive osc{1,2}.semi? Computed on the message thread when
-    // modulators change (refreshPitchQuantFlags), read lock-free by the audio thread —
-    // stepped pitch snaps to semitones, smooth glides.
-    std::array<std::atomic<bool>, kMaxVoices> osc1SemiStepped {};
-    std::array<std::atomic<bool>, kMaxVoices> osc2SemiStepped {};
 
     // Master-loop length param pointer, cached for RT-safe reads (no per-block
     // string lookup) in processBlock. Set in cacheParamPointers().
@@ -421,12 +363,6 @@ private:
     // Per-voice palette-colour index (0..7). Default identity; addVoice assigns
     // the first-unused colour, remove/swap shift it so colour follows the voice.
     std::array<int, kMaxVoices> voiceColourIndex { { 0, 1, 2, 3, 4, 5, 6, 7 } };
-    // Per-voice user-imported wavetable path (one per oscillator) — the source of
-    // truth, following the voice through swap/save like voiceColourIndex. The
-    // atomic resolved bank index is what the audio thread reads each block;
-    // -1 = no user table → fall back to the factory o{1,2}_wt selection.
-    std::array<juce::String, kMaxVoices>     osc1UserPath, osc2UserPath;
-    std::array<std::atomic<int>, kMaxVoices> osc1UserIndex, osc2UserIndex;
     int firstUnusedColourIndex() const;   // lowest palette index not used by an active voice
     // Guards the voice count + the per-voice data shift during add/remove against
     // the audio thread. processBlock takes a ScopedTryLock and silences the block

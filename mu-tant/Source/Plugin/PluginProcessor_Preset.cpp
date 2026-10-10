@@ -110,12 +110,12 @@ void PluginProcessor::initVoiceState()
 // A voice's non-parameter data onto its node.
 void PluginProcessor::writeVoiceExtras(int v, juce::ValueTree& node) const
 {
-    if (osc1UserPath[(size_t) v].isNotEmpty()) node.setProperty("o1WtPath", osc1UserPath[(size_t) v], nullptr);
-    if (osc2UserPath[(size_t) v].isNotEmpty()) node.setProperty("o2WtPath", osc2UserPath[(size_t) v], nullptr);
+    if (voiceSlots[(size_t) v].osc1UserPath.isNotEmpty()) node.setProperty("o1WtPath", voiceSlots[(size_t) v].osc1UserPath, nullptr);
+    if (voiceSlots[(size_t) v].osc2UserPath.isNotEmpty()) node.setProperty("o2WtPath", voiceSlots[(size_t) v].osc2UserPath, nullptr);
     node.appendChild(mu_pp::serialiseModulators(voiceSlots[(size_t) v]),                 nullptr);
-    node.appendChild(serialiseGate(gatePatterns[(size_t) v]),                 nullptr);
-    node.appendChild(serialiseGate(filterPatterns[(size_t) v], "FilterGate"), nullptr);
-    node.appendChild(serialiseGate(pitchPatterns[(size_t) v],  "PitchGate"),  nullptr);
+    node.appendChild(serialiseGate(voiceSlots[(size_t) v].gate),                 nullptr);
+    node.appendChild(serialiseGate(voiceSlots[(size_t) v].filterGate, "FilterGate"), nullptr);
+    node.appendChild(serialiseGate(voiceSlots[(size_t) v].pitchGate,  "PitchGate"),  nullptr);
 }
 
 void Pattern::writeExtras(juce::ValueTree& node) const { owner.ptr->writeVoiceExtras(owner.ptr->voiceOf(*this), node); }
@@ -131,12 +131,12 @@ void PluginProcessor::applyVoiceExtras(int v, const juce::ValueTree& node)
     refreshPitchQuantFlags(v);   // assignments changed → refresh stepped-pitch flags
 
     const int maxCells = maxSteps(std::numeric_limits<int>::max());   // 16 in demo
-    deserialiseGate(node.getChildWithName("Gate"),       gatePatterns[(size_t) v],   maxCells);
-    deserialiseGate(node.getChildWithName("FilterGate"), filterPatterns[(size_t) v], maxCells);
-    deserialiseGate(node.getChildWithName("PitchGate"),  pitchPatterns[(size_t) v],  maxCells);
+    deserialiseGate(node.getChildWithName("Gate"),       voiceSlots[(size_t) v].gate,   maxCells);
+    deserialiseGate(node.getChildWithName("FilterGate"), voiceSlots[(size_t) v].filterGate, maxCells);
+    deserialiseGate(node.getChildWithName("PitchGate"),  voiceSlots[(size_t) v].pitchGate,  maxCells);
 
-    resolveUserWavetable(node.getProperty("o1WtPath").toString(), osc1UserPath[(size_t) v], osc1UserIndex[(size_t) v]);
-    resolveUserWavetable(node.getProperty("o2WtPath").toString(), osc2UserPath[(size_t) v], osc2UserIndex[(size_t) v]);
+    resolveUserWavetable(node.getProperty("o1WtPath").toString(), voiceSlots[(size_t) v].osc1UserPath, voiceSlots[(size_t) v].osc1UserIndex);
+    resolveUserWavetable(node.getProperty("o2WtPath").toString(), voiceSlots[(size_t) v].osc2UserPath, voiceSlots[(size_t) v].osc2UserIndex);
 }
 
 // A user wavetable path → its bank index. A missing file keeps the path (the UI shows "missing")
