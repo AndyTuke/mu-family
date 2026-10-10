@@ -30,6 +30,11 @@ public:
     // caller advances the transport itself; this only emits triggers.
     void process(double beatStart, int numSamples, double bpm, const TriggerFn& fire);
 
+    // The same, for a block whose rate is given directly (beats per sample). Under MIDI clock the
+    // transport hands each block the exact span the clock's beat model moved, which is not always
+    // tempo x length; using it keeps consecutive blocks contiguous so no step falls in a gap.
+    void processSpan(double beatStart, int numSamples, double beatsPerSample, const TriggerFn& fire);
+
     // Local step (0..15) the playhead sits in for a given beat — for the UI grid.
     static int currentStep(double beat) noexcept
     {

@@ -88,18 +88,22 @@ public:
 
         beginTest ("Beat position advances one beat per 24 pulses");
         {
+            // The first clock after Start is tick 0, so 48 clocks reach 47/24 beats; the UI beat
+            // then runs on at the tempo to the end of the last block (at most one block further).
             MidiClockSync sync;
             sync.setEnabled(true);
             Feeder f { sync };
             f.run(120.0, 48, true);
-            expectWithinAbsoluteError (sync.getBeatPosUI(), 2.0, 1.0e-9, "48 pulses = 2 beats");
+            const double lastPulse = 47.0 / 24.0, blockBeats = kBlock / kSr * 2.0;
+            expectGreaterOrEqual (sync.getBeatPosUI(), lastPulse - 0.005, "not behind the last clock");
+            expectLessOrEqual    (sync.getBeatPosUI(), lastPulse + blockBeats + 0.005, "no further than a block past it");
         }
 
         beginTest ("Block-start beat tracks the true clock beat, steady and with jitter");
         {
             // Ground truth: the master's beat at each block start is the time since Start in
-            // beats. The pulse-counted beat may lag it by up to one pulse, never more, and never
-            // runs backwards.
+            // beats (the first clock, at the Start, is tick 0). The continuous beat must follow it
+            // closely once the tempo estimate has settled, and never run backwards.
             for (const int jitter : { 0, 40 })
             {
                 MidiClockSync sync;
@@ -107,7 +111,7 @@ public:
                 const double bpm = 123.0;
                 const double tick = kSr * 60.0 / (bpm * 24.0);
                 juce::int64 n = 0, blockStart = 0;
-                double prev = -1.0, worst = 0.0;
+                double prev = -1.0, worst = 0.0, worstSettled = 0.0;
                 bool backwards = false;
                 for (int b = 0; b < 2000; ++b, blockStart += kBlock)
                 {
@@ -125,33 +129,34 @@ public:
                     if (beat < prev) backwards = true;
                     prev  = beat;
                     worst = juce::jmax(worst, std::abs(truth - beat));
+                    if (b >= 40) worstSettled = juce::jmax(worstSettled, std::abs(truth - beat));
                 }
                 const auto label = "jitter " + juce::String(jitter);
+                logMessage ("  " + label + ": worst beat error " + juce::String(worst, 5) + ", settled " + juce::String(worstSettled, 5));
                 expect (! backwards, label + ": block-start beat went backwards");
-                // One pulse plus the pulse the Start lands on (the current tick-0 convention).
-                expectLessOrEqual (worst, 2.0 / 24.0 + 1.0e-9, label + ": beat error vs the master");
+                expectLessOrEqual (worst, 1.0 / 24.0, label + ": beat error vs the master, from the first block");
+                expectLessOrEqual (worstSettled, jitter == 0 ? 0.0005 : 0.005, label + ": beat error vs the master once settled");
             }
         }
 
         beginTest ("Every 16th boundary lands exactly on its step over 4 bars");
         {
-            // Summing 1/24 per pulse drifts below the boundary and the step floor fires a pulse
-            // late; the beat must be exact so pulse 6k gives step k.
+            // A clock on the first sample of a block puts that block's start exactly on the pulse's
+            // beat: pulse index 6k is step k. Summing 1/24 per pulse used to drift below the boundary
+            // so the step floor fired a pulse late; the sequencers' 1e-9 step tolerance covers the rest.
             MidiClockSync sync;
             sync.setEnabled(true);
-            juce::MidiBuffer start;
-            start.addEvent(juce::MidiMessage(0xFA), 0);
-            sync.process(start, kBlock, kSr);
             int wrong = 0;
-            for (int p = 1; p <= 4 * 4 * 24; ++p)
+            for (int p = 0; p < 4 * 4 * 24; ++p)
             {
-                juce::MidiBuffer tick;
-                tick.addEvent(juce::MidiMessage(0xF8), 0);
-                sync.process(tick, kBlock, kSr);
-                const int step = (int) (sync.getBeatPosUI() / 0.25);
+                juce::MidiBuffer block;
+                if (p == 0) block.addEvent(juce::MidiMessage((juce::uint8) 0xFA), 0);
+                block.addEvent(juce::MidiMessage((juce::uint8) 0xF8), 0);
+                const double beat = sync.process(block, kBlock, kSr);
+                const int step = (int) ((beat + 1.0e-9) / 0.25);
                 if (step != p / 6) ++wrong;
             }
-            expectEquals (wrong, 0, "pulses that floored to the wrong 16th step");
+            expectEquals (wrong, 0, "blocks that put the pulse on the wrong 16th step");
         }
     }
 };

@@ -27,6 +27,16 @@ public:
     void setTempo(double tempoBpm) noexcept { if (tempoBpm > 0.0) bpm = tempoBpm; }
     void setPlaying(bool shouldPlay) noexcept { playing = shouldPlay; }
     void rewind() noexcept { samplePos = 0; beatPos = 0.0; }
+    // Move the position by a small amount (an external-clock phase correction) without a jump.
+    void nudge(double dBeats) noexcept
+    {
+        const double target = beatPos + dBeats;
+        const double newBeat = target > 0.0 ? target : 0.0;
+        const double dSamples = (newBeat - beatPos) * 60.0 / bpm * sampleRate;
+        beatPos = newBeat;
+        const double sp = (double) samplePos + dSamples;
+        samplePos = sp > 0.0 ? (std::uint64_t) std::llround(sp) : 0;
+    }
     // Jump to a musical position (an external Song Position Pointer); the sample position moves
     // to where that beat falls at the current tempo.
     void locate(double beats) noexcept

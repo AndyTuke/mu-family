@@ -120,6 +120,18 @@ inline BlockTransport resolveTransport(const HostTransport& host, bool isStandal
     t.beatsPerSample = sampleRate > 0.0 ? (t.bpm / 60.0) / sampleRate : 0.0;
     t.blockBeats     = t.playing ? t.beatsPerSample * (double) numSamples : 0.0;
 
+    // Under MIDI clock the block spans exactly what the clock's beat model moved: its end beat
+    // is where the next block starts, so consecutive blocks are contiguous (a phase correction
+    // can't make one overlap the last), and the in-block rate is that span per sample.
+    if (t.source == BlockTransport::Source::MidiClock && t.beatOutside && t.playing && numSamples > 0)
+    {
+        // A jump (the clock snapped after a long gap or a loop) is capped at twice the nominal span,
+        // so the sequencers don't fire a whole backlog in one block.
+        const double nominalSpan = t.beatsPerSample * (double) numSamples;
+        t.blockBeats     = std::clamp(clock.getBlockEndBeat() - clockBlockBeat, 0.0, 2.0 * nominalSpan);
+        t.beatsPerSample = t.blockBeats / (double) numSamples;
+    }
+
     // Mirror an outside transport into the Play button, and carry the beat on past this block. A
     // stopped own transport leaves the counter alone (the UI may be resetting it).
     if (t.playOutside)

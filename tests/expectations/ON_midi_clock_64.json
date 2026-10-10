@@ -1,0 +1,40 @@
+{
+  "test": "ON_midi_clock_64",
+  "product": "mu-on",
+  "description": "MIDI clock slave (mu-on): external clock at 120 BPM runs from t=0 with +/-24 samples of jitter per pulse and sends Start at 0.5 s (Messages = both). The own Play is on, but the clock owns play, so nothing sounds until the Start; after it the pattern plays from bar 1. Guards the clock path end to end (Start edge, pulse-counted beat, resolver). Rendered in 64-sample blocks: the continuous beat must not stumble at block edges (a gate or step crossed twice).",
+  "render": {
+    "preset": "tests/presets/ON_legacy.muOn",
+    "play": true,
+    "midi_clock": 120,
+    "midi_clock_start": 0.5,
+    "midi_clock_jitter": 24,
+    "midi_clock_mode": 2,
+    "seconds": 1.5,
+    "sample_rate": 48000,
+    "block_size": 64
+  },
+  "assertions": [
+    {
+      "name": "silent_until_start",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [
+        0.0,
+        0.48
+      ],
+      "max": -70,
+      "comment": "clock pulses while stopped must not start the pattern"
+    },
+    {
+      "name": "plays_after_start",
+      "metric": "rms_dbfs",
+      "channel": "any",
+      "t_window": [
+        0.5,
+        1.5
+      ],
+      "min": -60,
+      "comment": "the Start begins playback"
+    }
+  ]
+}

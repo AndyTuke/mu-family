@@ -77,7 +77,7 @@ public:
             expect (t.playing, "Start plays");
             expect (own.playing.load(), "Play button mirrors the clock");
             t = block(clock, own);
-            expectEquals (t.startBeat, 0.25, "6 pulses = one 16th");
+            expectEquals (t.startBeat, 5.0 / 24.0, "six clocks, the first being tick 0, reach pulse 5");
             t = block(clock, own, msgs({ 0xFC }));
             t = block(clock, own);
             expect (! t.playing, "Stop stops");
@@ -95,7 +95,7 @@ public:
             t = block(clock, own, msgs({ 0xFA }));    // a Start is ignored in this mode
             expect (t.playing, "Play button is not overwritten by the clock");
             expect (own.playing.load(), "Play button stays on");
-            expectEquals (t.startBeat, 0.25, "beat from the ticks, Start ignored");
+            expectEquals (t.startBeat, 5.0 / 24.0, "beat from the ticks (six clocks, the first being tick 0), Start ignored");
             own.playing = false;
             t = block(clock, own);
             expect (! t.playing, "the Play button stops it");
@@ -155,7 +155,7 @@ public:
             block(clock, own, run);
             clock.setMessages(2);
             const auto t = block(clock, own);
-            expectEquals (t.startBeat, 2.0, "48 pulses counted while ticks were off");
+            expectEquals (t.startBeat, 47.0 / 24.0, "48 clocks counted while ticks were off (the first being tick 0)");
         }
 
         beginTest ("Ticks mode with no clock heard yet: tempo falls back to the BPM field");
@@ -202,7 +202,7 @@ public:
             for (int i = 0; i < 12; ++i) run.addEvent(juce::MidiMessage((juce::uint8) 0xF8), 1 + i);
             block(clock, own, run);
             const auto t = block(clock, own, spp(64));
-            expectEquals (t.startBeat, 0.5, "a locate while playing is ignored");
+            expectEquals (t.startBeat, 11.0 / 24.0, "a locate while playing is ignored (12 clocks seen, the first being tick 0)");
         }
 
         beginTest ("A lost clock holds the transport stopped until pulses return");
@@ -246,6 +246,45 @@ public:
             expect (t.playing, "the Start block plays");
             t = block(clock, own, msgs({ 0xF8 }));
             expect (t.playing && clock.getClockState() == MidiClockSync::ClockState::Locked);
+        }
+
+        beginTest ("Small blocks under a jittery clock: the beat never runs backwards or overlaps");
+        {
+            // A sequencer evaluates positions across each block edge (mu-Tant's gates per sample from
+            // the block's start beat), so a block must not start before the previous one's end.
+            for (const int blockSize : { 32, 64, 480 })
+            {
+                MidiClockSync clock;
+                clock.setEnabled(true);
+                clock.setMessages(2);
+                const double tick = 1000.0;                               // 120 BPM at 48 kHz
+                juce::int64 n = 0, start = 0;
+                double prevStart = -1.0, prevEnd = -1.0, worstOverlap = 0.0;
+                bool backwards = false;
+                for (int b = 0; b < 6000; ++b, start += blockSize)
+                {
+                    juce::MidiBuffer midi;
+                    if (b == 0) midi.addEvent(juce::MidiMessage((juce::uint8) 0xFA), 0);
+                    for (;; ++n)
+                    {
+                        const int j = (int) ((n * 7919) % 81) - 40;       // +/- 40 samples of jitter
+                        const juce::int64 at = juce::jmax<juce::int64>(0, (juce::int64) (n * tick) + j);
+                        if (at >= start + blockSize) break;
+                        midi.addEvent(juce::MidiMessage((juce::uint8) 0xF8), (int) juce::jmax<juce::int64>(0, at - start));
+                    }
+                    const double s = clock.process(midi, blockSize, kSr);
+                    if (b > 60)
+                    {
+                        if (s < prevStart) backwards = true;
+                        worstOverlap = juce::jmax(worstOverlap, prevEnd - s);
+                    }
+                    prevStart = s;
+                    prevEnd   = clock.getBlockEndBeat();   // where the next block starts, exactly
+                }
+                const auto label = "block " + juce::String(blockSize);
+                expect (! backwards, label + ": a block started before the previous one");
+                expectLessOrEqual (worstOverlap, 1.0e-12, label + ": overlap with the previous block's end");
+            }
         }
 
         beginTest ("Transport only: no clock pulses is not a loss");

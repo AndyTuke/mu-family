@@ -6,10 +6,15 @@ namespace mu_on
 
 void GrooveSequencer::process(double beatStart, int numSamples, double bpm, const TriggerFn& fire)
 {
-    if (numSamples <= 0 || bpm <= 0.0 || ! fire) return;
+    if (bpm <= 0.0) return;
+    processSpan(beatStart, numSamples, (bpm / 60.0) / sampleRate, fire);
+}
 
-    const double beatsPerSample = (bpm / 60.0) / sampleRate;
-    const double beatEnd        = beatStart + beatsPerSample * (double) numSamples;
+void GrooveSequencer::processSpan(double beatStart, int numSamples, double beatsPerSample, const TriggerFn& fire)
+{
+    if (numSamples <= 0 || beatsPerSample <= 0.0 || ! fire) return;
+
+    const double beatEnd = beatStart + beatsPerSample * (double) numSamples;
 
     // Resync if the transport jumped (host scrub / a missed reset) so we never burst-fire
     // a long backlog: snap nextGlobalStep to just before the current block.

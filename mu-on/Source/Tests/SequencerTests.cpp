@@ -29,6 +29,38 @@ public:
 
     void runTest() override
     {
+        beginTest("blocks with unequal spans (a MIDI clock being phase-corrected) fire every sixteenth exactly once");
+        {
+            // Each block advances the beat by its own span (tempo x length +/- 12 %), and the next block
+            // starts exactly where it ended. Using the span keeps the blocks contiguous: no step falls in
+            // a gap (dropped) or in two blocks (doubled).
+            StepPattern p;
+            for (int s = 0; s < StepPattern::kNumSteps; ++s) p.setOn(2, s, true);   // a hat on every sixteenth
+            GrooveSequencer seq(p);
+            seq.prepare(48000.0);
+            seq.reset();
+
+            juce::Random rng(99);
+            const double nominal = 126.0 / 60.0 / 48000.0;
+            double beat = 0.0;
+            std::vector<int> fired(64, 0);   // fires of the hat per global sixteenth
+            for (int b = 0; b < 20000 && beat < 15.99; ++b)
+            {
+                const int n = 64;
+                const double bps = nominal * (0.88 + 0.24 * rng.nextDouble());
+                const double blockStart = beat;
+                seq.processSpan(beat, n, bps, [&](int track, float, int offset)
+                {
+                    // The step this hit belongs to, from the beat it was placed at in the block.
+                    if (track == 2) ++fired[(size_t) juce::jlimit(0, 63, (int) std::lround((blockStart + offset * bps) / 0.25))];
+                });
+                beat += bps * n;
+            }
+            int wrong = 0;
+            for (int s = 0; s < 60; ++s) if (fired[(size_t) s] != 1) ++wrong;   // the sixteenths before beat ~15
+            expectEquals(wrong, 0, "sixteenths that fired zero or several times");
+        }
+
         beginTest("beat -> step mapping wraps every 16 steps (4 beats)");
         {
             expectEquals(GrooveSequencer::currentStep(0.0),  0);

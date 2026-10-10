@@ -247,6 +247,26 @@ public:
             if (extBpm > 0.0 && extAlive)
                 clock.setTempo(extBpm);
             clock.setPlaying(extRunning && extAlive);
+
+            // Phase servo: the tempo estimate only fixes the RATE, so alone the grid keeps whatever
+            // offset it started with and creeps with estimate noise and clock differences. The
+            // master's clock count is its position: slew the frame-clock beat toward it. The last
+            // clock is on average half a pulse old when read, so aim half a pulse past it. The step
+            // per block is capped well under the beat the block advances, so the beat stays monotone.
+            const std::int64_t songPulse = midiClock->songPulse();
+            if (extRunning && extAlive && extBpm > 0.0 && songPulse >= 0 && clock.isPlaying() && ! rewoundInBlock)
+            {
+                const double target = ((double) songPulse + 0.5) / 24.0;
+                const double err    = target - clock.beats();
+                if (std::abs(err) > 1.0)
+                    clock.locate(target);                           // far off (a missed locate): jump
+                else
+                {
+                    const double blockBeats = clock.tempo() / 60.0 * (double) numFrames / sr;
+                    const double gain       = 1.0 - std::exp(-(double) numFrames / (kPhaseServoSeconds * sr));
+                    clock.nudge(std::clamp(gain * err, -0.1 * blockBeats, 0.1 * blockBeats));
+                }
+            }
         }
         else
         {
@@ -490,6 +510,7 @@ private:
 
     // External-MIDI stall watchdog (audio-thread only).
     std::uint64_t lastExtPulseCount       = 0;
+    static constexpr double kPhaseServoSeconds = 0.5;   // external-clock phase servo time constant
     bool          preparedOnce            = false;   // a later prepare keeps the song position
     bool          wasPlaying              = false;   // audio thread: last block's play state (transport out)
     bool          rewoundInBlock          = false;   // audio thread: the clock was rewound this block

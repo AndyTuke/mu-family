@@ -175,7 +175,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     {
         sequencer.setSwing (seqSwingParam  ? seqSwingParam->load()  : 0.0f);
         sequencer.setAccentVelocity(seqAccentParam ? seqAccentParam->load() : 1.0f);
-        sequencer.process(beatStart, numSamples, bpm,
+        sequencer.processSpan(beatStart, numSamples, transport.beatsPerSample,
                           [this](int track, float vel, int off)
                           {
                               grooveVoices.trigger(track, vel, off);

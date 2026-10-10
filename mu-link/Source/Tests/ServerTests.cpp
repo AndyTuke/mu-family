@@ -10,6 +10,7 @@
 #include "../Clock/MidiClockEstimator.h"
 #include "../Clock/MidiClockOut.h"
 #include "Link/MuLinkSharedMemory.h"
+#include "Plugin/MidiClockSync.h"   // mu-core: the receiver the round-trip test feeds
 
 #ifdef _WIN32
 
@@ -276,6 +277,45 @@ public:
             expect(st.numPulseOffsets > 0 && std::abs(st.pulseOffsets[0] - 1000) <= 1, "next pulse (55) one pulse period later");
         }
 
+        beginTest("external MIDI clock: the phase servo holds the grid on the master despite a tempo-estimate bias");
+        {
+            constexpr int kBlockFrames = 512;
+            constexpr double kRate = 48000.0;
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            MidiClockEstimator est;
+            engine.attachMidiClock(&est);
+            engine.setClockSource(ClockSource::ExternalMidi);
+            engine.prepare(kRate, kBlockFrames, 120.0);
+            OutputBuffers out(2, kBlockFrames);
+
+            // A 120 BPM master (a clock every 20.83 ms, the first, at t = 0, being tick 0). The
+            // estimator is fed timestamps compressed by 0.1 % with +/- 0.5 ms of jitter, so its
+            // tempo reads about 0.1 % fast: integrating that alone drifts 0.002 beat a second.
+            const double pulsePeriod = 60.0 / (120.0 * 24.0);
+            est.onStart();
+            long n = 0;
+            double worstSettled = 0.0, worst = 0.0;
+            const int numBlocks = (int) (120.0 * kRate / kBlockFrames);   // two minutes
+            for (int b = 0; b < numBlocks; ++b)
+            {
+                const double blockStart = (double) b * kBlockFrames / kRate;
+                for (; (double) n * pulsePeriod <= blockStart; ++n)
+                {
+                    const double jitter = (((n * 7919) % 101) - 50) * 1.0e-5;          // +/- 0.5 ms
+                    est.onClockPulse((double) n * pulsePeriod * 0.999 + jitter);
+                }
+                engine.renderBlock(out.data(), 2, kBlockFrames);
+                const double err = std::abs(readTransport(mem.transport()).ppqPosition - blockStart * 2.0);
+                if (b > 0) worst = juce::jmax(worst, err);
+                if (blockStart > 10.0) worstSettled = juce::jmax(worstSettled, err);
+            }
+            logMessage("  phase servo: worst error " + juce::String(worst, 5) + " beat, settled " + juce::String(worstSettled, 5));
+            expectLessOrEqual(worstSettled, 0.01, "the grid stays on the master (unservoed it would be 0.24 beat out)");
+        }
+
         beginTest("TimedMidiOut: a block is stamped by sample position; long messages are dropped");
         {
             mu_core::TimedMidiOut out(false);
@@ -300,6 +340,67 @@ public:
                 expectWithinAbsoluteError(sent[0].second, 1010.0, 1.0e-9);
                 expectWithinAbsoluteError(sent[1].second, 1020.0, 1.0e-9);
             }
+        }
+
+        beginTest("Round trip: mu-link's clock out into MidiClockSync gives the server's beat after Start and Continue");
+        {
+            constexpr int kBlockFrames = 512;
+            constexpr double kRate = 48000.0;
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            engine.prepare(kRate, kBlockFrames, 126.0);
+            MidiClockOut clockOut(false);
+            clockOut.armForTest();
+            OutputBuffers out(2, kBlockFrames);
+
+            // Run the server: play from the top, stop at block 120, resume (off the sixteenth grid)
+            // at block 130, 120 more blocks. Record each block's published beat and queue its MIDI.
+            std::vector<double> serverBeat;
+            const int numBlocks = 250;
+            for (int b = 0; b < numBlocks; ++b)
+            {
+                if (b == 0)   engine.setPlaying(true);
+                if (b == 120) engine.setPlaying(false);
+                if (b == 130) engine.setPlaying(true);
+                const auto st = engine.renderBlock(out.data(), 2, kBlockFrames);
+                serverBeat.push_back(readTransport(mem.transport()).ppqPosition);
+                clockOut.emit((double) b * kBlockFrames * 1000.0 / kRate, st.transportBytes, st.numTransportBytes,
+                              st.pulseOffsets, st.numPulseOffsets, (int) st.midiPulsesInBlock, kBlockFrames, kRate);
+            }
+
+            // Bucket the sent messages into the receiver's blocks by their due sample.
+            std::vector<juce::MidiBuffer> blocks((size_t) numBlocks);
+            clockOut.sendDue(1.0e12, [&](const juce::MidiMessage& m, double dueMs)
+            {
+                const auto sample = (juce::int64) std::llround(dueMs * kRate / 1000.0);
+                const auto idx = (size_t) (sample / kBlockFrames);
+                if (idx < blocks.size()) blocks[idx].addEvent(m, (int) (sample % kBlockFrames));
+            });
+
+            // Feed the receiver and compare its block-start beat with the server's.
+            MidiClockSync sync;
+            sync.setEnabled(true);
+            sync.setMessages(2);
+            double worstStart = 0.0, worstSettled = 0.0, atStart = -1.0, atResume = -1.0;
+            for (int b = 0; b < numBlocks; ++b)
+            {
+                const double beat = sync.process(blocks[(size_t) b], kBlockFrames, kRate);
+                if (b == 0)   atStart  = beat - serverBeat[0];
+                if (b == 130) atResume = beat - serverBeat[130];
+                if (b < 120 || b > 135)   // while stopped the server holds its beat; compare the playing blocks
+                {
+                    const double err = std::abs(beat - serverBeat[(size_t) b]);
+                    worstStart = juce::jmax(worstStart, err);
+                    if (b >= 20 && (b < 120 || b >= 150)) worstSettled = juce::jmax(worstSettled, err);
+                }
+            }
+            logMessage("  round trip: worst beat error " + juce::String(worstStart, 5) + ", settled " + juce::String(worstSettled, 5));
+            expectWithinAbsoluteError(atStart,  0.0, 1.0e-9, "after Start the receiver is on the server's beat (tick 0)");
+            expectWithinAbsoluteError(atResume, 0.0, 1.0e-9, "after Continue the receiver is on the located beat");
+            expectLessOrEqual(worstSettled, 0.002, "settled beat error between server and receiver");
+            expectLessOrEqual(worstStart, 1.0 / 24.0, "beat error from the first block");
         }
 
         beginTest("MIDI clock out keeps transport messages ahead of the block's pulses");

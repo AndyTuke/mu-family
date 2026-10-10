@@ -29,11 +29,15 @@ public:
         if (tempo.onPulse(timestampSeconds))
             bpmOut.store(tempo.bpm(), std::memory_order_relaxed);
         pulseCounter.fetch_add(1, std::memory_order_relaxed);   // liveness tick (stall detection)
+        // The master's song position moves only while it plays (MIDI spec).
+        if (running.load(std::memory_order_acquire))
+            songPulseIndex.fetch_add(1, std::memory_order_relaxed);
     }
 
     void onStart() noexcept     // 0xFA — play from the top
     {
         locateRequest.store(false, std::memory_order_relaxed);   // a Start overrides an earlier locate
+        songPulseIndex.store(-1, std::memory_order_relaxed);     // the next clock is tick 0
         resetRequest.store(true, std::memory_order_relaxed);
         running.store(true, std::memory_order_release);   // last: publishes the reset with it
         tempo.restartInterval();   // next pulse re-seeds the interval
@@ -54,6 +58,7 @@ public:
         if (running.load(std::memory_order_relaxed))
             return;
         resetRequest.store(false, std::memory_order_relaxed);   // a later locate overrides an earlier Start
+        songPulseIndex.store((std::int64_t) sixteenths * 6 - 1, std::memory_order_relaxed);   // the next clock is that position
         locateBeats.store(sixteenths / 4.0, std::memory_order_relaxed);
         locateRequest.store(true, std::memory_order_release);
     }
@@ -67,6 +72,11 @@ public:
     // advancing the engine treats the external clock as lost rather than playing forever at
     // the frozen tempo. The frame counter stays the timebase, so detection lives server-side.
     std::uint64_t pulseCount() const noexcept { return pulseCounter.load(std::memory_order_relaxed); }
+
+    // The master's song position as a pulse index: the index of the LAST clock received since the
+    // last Start / locate (the first clock after Start is 0), or -1 when none has arrived yet.
+    // The audio thread slews its frame-clock beat toward it so the grid cannot drift or creep.
+    std::int64_t songPulse() const noexcept { return songPulseIndex.load(std::memory_order_relaxed); }
 
     // True exactly once after each Start, so the consumer can rewind the transport to 0.
     bool consumeReset() noexcept { return resetRequest.exchange(false, std::memory_order_acq_rel); }
@@ -91,6 +101,7 @@ private:
     std::atomic<bool>          locateRequest { false };
     std::atomic<double>        locateBeats   { 0.0 };
     std::atomic<std::uint64_t> pulseCounter { 0 };   // liveness; see pulseCount()
+    std::atomic<std::int64_t>  songPulseIndex { -1 }; // see songPulse()
 };
 
 } // namespace mu_link

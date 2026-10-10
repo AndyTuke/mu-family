@@ -44,6 +44,9 @@ public:
     // Forget the previous pulse (Start / Continue): the next pulse only re-seeds the interval.
     void restartInterval() noexcept { haveLast = false; }
 
+    // Forget the tempo as well (sync switched off and on again): the next two pulses re-seed it.
+    void reset() noexcept { haveLast = false; estBpm = 0.0; }
+
     // Smoothed tempo, or 0 before the first valid interval.
     double bpm() const noexcept { return estBpm; }
 
