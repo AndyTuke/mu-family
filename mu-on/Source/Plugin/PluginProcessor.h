@@ -65,6 +65,8 @@ public:
 
     // ── ProcessorBase channel metadata (drives sidebar + mixer) ───────────────
     int          getNumChannels()              const override { return kNumChannels; }
+    Layer*       getLayer(int i) override { return (i >= 0 && i < kNumChannels) ? &voiceSlots[(size_t) i] : nullptr; }
+    using ProcessorBase::getLayer;
     int          getMaxChannels()              const override { return kNumChannels; }
     juce::String getChannelName(int idx)       const override
     {

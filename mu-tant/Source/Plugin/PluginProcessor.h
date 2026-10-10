@@ -149,6 +149,8 @@ public:
     // rhythms — there are no inactive voices, only the ones that exist. The
     // count is `numVoices` (1..kMaxVoices); add/delete adjust it.
     int          getNumChannels()              const override { return numVoices.load(std::memory_order_relaxed); }
+    Layer*       getLayer(int i) override { return (i >= 0 && i < getNumChannels()) ? &voiceSlots[(size_t) i] : nullptr; }
+    using ProcessorBase::getLayer;
     juce::String getChannelName(int idx)       const override
     {
         return (idx >= 0 && idx < kMaxVoices) ? juce::String("Voice ") + juce::String(idx + 1)

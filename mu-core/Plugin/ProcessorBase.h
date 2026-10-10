@@ -23,6 +23,7 @@
 #include "Persistence/MidiFullPresetMap.h"
 #include "Persistence/LayerState.h"   // composed slot / full / host state (format 2)
 #include "MuLimits.h"
+#include "Sequencer/Layer.h"
 #include "Plugin/HostTransport.h"
 #include "Plugin/MidiClockSync.h"
 #include "License/MachineFingerprint.h"
@@ -76,6 +77,9 @@ public:
     // UI calls these to label channel strips, populate sidechain-source
     // dropdowns, etc., without needing to know what a channel actually IS.
     virtual int         getNumChannels()              const = 0;
+    // Layer `i` (name, colour, modulation) or nullptr when `i` is out of range. Message thread only.
+    virtual Layer*       getLayer(int i) = 0;
+    const Layer*         getLayer(int i) const { return const_cast<ProcessorBase*>(this)->getLayer(i); }
     // The most channels the product can ever have (1..8) — sizes the program-change
     // channel table. Products with a fixed layer count return that count.
     virtual int         getMaxChannels()              const { return 8; }
