@@ -60,7 +60,7 @@ nested under a `Rhythm` child.
 The list of suffixes is the canonical [`mu_clid::kRhythmParamDefs[]`](../../mu-clid/Source/Persistence/RhythmParamTable.h)
 table. The table is the single source of truth — adding a new per-rhythm
 parameter means adding one entry there + one APVTS-layout entry in
-[`createParameterLayout`](../Source/PluginProcessor_APVTS.cpp). Every preset
+[`createParameterLayout`](../../mu-clid/Source/Plugin/PluginProcessor_APVTS.cpp). Every preset
 save / load / sync path iterates this single table.
 
 ### Parameter kinds (v2)
@@ -76,11 +76,11 @@ is serialised:
 | `AlgorithmIndex`    | stable algorithm name from name table          | `r0_drvChar="Bitcrusher"`            |
 
 For `AlgorithmIndex` kinds the name tables live in
-[Source/Audio/AlgorithmNames.h](../Source/Audio/AlgorithmNames.h). The two
+[Source/Audio/AlgorithmNames.h](../../mu-core/Audio/AlgorithmNames.h). The two
 tables there are `kInsertAlgorithmNames` (driveChar 0..13) and
 `kFilterTypeNames` (filterType 0..15). Effect / Reverb algorithm IDs come
 from `FXAlgorithmRegistry` in
-[Source/FX/FXAlgorithmDef.h](../Source/FX/FXAlgorithmDef.h) but are not yet
+[Source/FX/FXAlgorithmDef.h](../../mu-core/Audio/FX/Slots/FXAlgorithmDef.h) but are not yet
 written as names (they're still integer-indexed — Stage 35 followup).
 
 ### Algorithm-name rules
@@ -113,7 +113,7 @@ The `<Modulators>` subtree contains:
 - `<Asgn id="..." src="..." dest="..." depth="..." curve="..."/>` — one
   per modulation assignment. `src` is a CS output (`cs0_output`) or another
   assignment's depth (`assign_{id}_depth`); `dest` is a destination ID from
-  the [Modulation/ModulationDestinations.h](../Source/Modulation/ModulationDestinations.h)
+  the [Modulation/ModulationDestinations.h](../../mu-clid/Source/Modulation/ModulationDestinations.h)
   table.
 
 On load, source / destination IDs are validated against the live registry
@@ -142,7 +142,7 @@ via `onLoadError` rather than silently no-op'd.
   but without the `r0_` prefix).
 - `GlobalState` child carries FX / mixer state — the IDs in
   `mu_clid::kGlobalParams` from
-  [PluginProcessor_Internal.h](../Source/PluginProcessor_Internal.h).
+  [PluginProcessor_Internal.h](../../mu-clid/Source/Plugin/PluginProcessor_Internal.h).
 - In v2 these are written as actual de-normalised values. Algorithm-name
   strings for `mst_insChar` / `mst_ins2Char` / `eff_algo` / `rev_algo` are
   not yet emitted — those write as integer indices. A Stage 35 followup

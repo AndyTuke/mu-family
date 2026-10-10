@@ -60,7 +60,7 @@ across a swap, mu-clid's retire-then-swap (see its doc §8) is the pattern to po
 | [mu-core/Plugin/HotSwap.h](../../mu-core/Plugin/HotSwap.h) | The shared pure boundary predicates (`mu_hotswap::loopWrapped` / `boundaryReached`) — unit-testable without a processor. |
 | [Source/Plugin/VoiceHotSwapStager.h](../../mu-tant/Source/Plugin/VoiceHotSwapStager.h) | Header-only staging state machine: per-voice pending slots + one full-preset slot, the store-release/load-acquire handshake, `checkBoundaries` (audio) + `take*` (message). `ValueTree` payload, **no `PluginProcessor` coupling**. |
 | [Source/Plugin/PluginProcessor.cpp](../../mu-tant/Source/Plugin/PluginProcessor.cpp) | `loadPreset`/`loadSlotPreset` (stage-or-apply), `applyFullPresetTree`/`applyVoicePresetTree` (commit bodies), `preloadWavetablesFrom*`, `handleAsyncUpdate` (commit drain), boundary check in `processBlock`. |
-| [Source/Audio/WavetableBank.{h,cpp}](../../mu-tant/Source/Audio/WavetableBank.h) | `findByPath` (lock-free resolve), `decodeFile` (off-lock decode) + `appendTable` (locked append) — the two-phase load that keeps the swap real-time-safe. |
+| [Source/Audio/WavetableBank.{h,cpp}](../../mu-core/Audio/Wavetable/WavetableBank.h) | `findByPath` (lock-free resolve), `decodeFile` (off-lock decode) + `appendTable` (locked append) — the two-phase load that keeps the swap real-time-safe. |
 | [Source/Tests/HotSwapBoundaryTests.cpp](../../mu-tant/Source/Tests/HotSwapBoundaryTests.cpp) | Predicate + stager handshake tests. |
 
 `PluginProcessor` is a `juce::AsyncUpdater`; the audio thread `triggerAsyncUpdate()`s
