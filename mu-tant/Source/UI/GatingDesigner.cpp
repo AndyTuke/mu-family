@@ -233,7 +233,7 @@ void GatingDesigner::setMaxCells(int cells)
 
     rebuildBarsDropdown();
     if (auto* pat = getActivePattern())
-        barsDropdown.setSelectedId(juce::jmin(pat->patternLengthBars, maxBarsFor(subdivisionDenom)), false);
+        barsDropdown.setSelectedId(juce::jmin(pat->patternLengthBars.load(), maxBarsFor(subdivisionDenom)), false);
 }
 
 void GatingDesigner::setPatternBars(int bars)
@@ -272,7 +272,7 @@ void GatingDesigner::setPatternBars(int bars)
 void GatingDesigner::updateScrollRange()
 {
     auto* pat = getActivePattern();
-    const int bars = (pat != nullptr) ? pat->patternLengthBars : kViewBars;
+    const int bars = (pat != nullptr) ? pat->patternLengthBars.load() : kViewBars;
     const double total = (double) bars;
     const double view  = (double) kViewBars;
     scrollBar.setRangeLimits(0.0, total);
@@ -284,7 +284,7 @@ void GatingDesigner::updateScrollRange()
 void GatingDesigner::setViewStart(double bar)
 {
     auto* pat = getActivePattern();
-    const int bars = (pat != nullptr) ? pat->patternLengthBars : kViewBars;
+    const int bars = (pat != nullptr) ? pat->patternLengthBars.load() : kViewBars;
     const double maxStart = (double) juce::jmax(0, bars - kViewBars);
     viewStartBar = juce::jlimit(0.0, maxStart, bar);
     scrollBar.setCurrentRange(viewStartBar, (double) kViewBars, juce::dontSendNotification);
@@ -861,7 +861,7 @@ void GatingDesigner::setPlayhead(double beat01, bool visible)
 std::optional<float> GatingDesigner::playheadX(double beat01) const
 {
     const auto* activePat = getActivePattern();
-    const int patBars = (activePat != nullptr) ? activePat->patternLengthBars : kViewBars;
+    const int patBars = (activePat != nullptr) ? activePat->patternLengthBars.load() : kViewBars;
     const float viewRelFrac = ((float) (beat01 * patBars) - (float) viewStartBar) / (float) kViewBars;
     if (viewRelFrac < 0.0f || viewRelFrac > 1.0f) return std::nullopt;
     const auto grid = gridBounds();

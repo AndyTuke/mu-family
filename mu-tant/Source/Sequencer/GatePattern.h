@@ -71,7 +71,7 @@ public:
 
     // Mutable pattern length (1..kMaxPatternBars bars). Written by the UI;
     // read by the audio thread inside gateAt (always under editLock).
-    int patternLengthBars = 2;
+    std::atomic<int> patternLengthBars { 2 };
 
     // Minimum gate-open time. A "0 attack" envelope opens instantly (0→1), which
     // clicks; the gater slew-limits the RISING edge so the gate can't open faster
@@ -151,7 +151,7 @@ public:
         // return false — the source pattern remains unchanged and the caller can retry.
         if (! mu_core::spinLockFor(other.editLock, 1000)) return false;
         subdivision       = other.subdivision;
-        patternLengthBars = other.patternLengthBars;
+        patternLengthBars.store(other.patternLengthBars.load());
         envelopes         = other.envelopes;
         mu_core::spinUnlock(other.editLock);
 

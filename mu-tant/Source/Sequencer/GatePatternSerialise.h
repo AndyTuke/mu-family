@@ -22,7 +22,7 @@ inline juce::ValueTree serialiseGate(const GatePattern& g, const char* tagName =
 {
     juce::ValueTree t(tagName);
     t.setProperty("subdiv",  (int) g.subdivision,       nullptr);
-    t.setProperty("bars",    g.patternLengthBars,        nullptr);
+    t.setProperty("bars",    g.patternLengthBars.load(),        nullptr);
     for (const auto& e : g.envelopes)
     {
         juce::ValueTree env("Env");
