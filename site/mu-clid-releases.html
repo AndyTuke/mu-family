@@ -127,6 +127,10 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group improved">
           <h3>Improved</h3>
           <ul>
+            <li>With μ-Link connected, the standalone now hears your MIDI keyboard and controllers (it used to ignore MIDI while connected). For now there is a noticeable delay of about a sixth of a second while connected. <span class="ref">(1255)</span></li>
+            <li>In a DAW, the transport bar now counts bars and beats in the song&rsquo;s time signature (3/4, 7/8 and so on) and lines up with pickup bars. <span class="ref">(1251)</span></li>
+            <li>MIDI clock sync in the standalone now follows Song Position Pointer: when your hardware sequencer jumps to a new point and continues, the app continues from the same point. <span class="ref">(1258)</span></li>
+            <li>μ-Link&rsquo;s MIDI clock output is now evenly spaced (it used to arrive in bursts) and also sends Start, Stop, Continue and song position, so outboard gear follows play, stop and rewind. Changing μ-Link&rsquo;s MIDI output while playing no longer resets the tempo or position. <span class="ref">(1254, 1258)</span></li>
             <li>In a DAW, the transport display (play button and bar position) now follows the DAW more reliably, including while the plugin is bypassed. <span class="ref">(1243)</span></li>
             <li>The plugin window uses less CPU: knobs, step editors and animations only redraw when something on screen actually changes, and hidden panels stop animating. <span class="ref">(1242)</span></li>
             <li>In a DAW, the DAW&rsquo;s transport is now always in charge &mdash; mu-Clid&rsquo;s own Play button no longer starts it while the DAW is stopped. <span class="ref">(1188)</span></li>
