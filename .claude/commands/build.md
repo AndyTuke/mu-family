@@ -2,6 +2,7 @@ Build the mu-family. Default to **Debug** (a normal code change). Build **Releas
 
 ## Sequence
 
+0. **Source checks first:** `pwsh tests/scripts/check-comment-refs.ps1 -Quiet` (no backlog numbers in source comments). A FAIL is fixed before building — reword the comment, keep the reason, drop the number.
 1. **Reconfigure first, always:** `cmake -B build` (fast ~2s; regenerates icon.ico, versioninfo.rc, and the build-number RC bake — skipping it ships stale artefacts).
 2. **Debug** (any code change, all products): `cmake --build build --config Debug`
 3. **Full build** (only if asked — "full" or "release"): `cmake --build build --config Debug && cmake --build build --config Release`

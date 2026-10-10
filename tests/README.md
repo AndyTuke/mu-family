@@ -20,7 +20,11 @@ tests/
 ├── scripts/
 │   ├── analyse.py            -- WAV in, pass/fail out
 │   ├── run-listening-tests.py -- orchestrator: render (per product) + analyse
-│   └── check-build-artifacts.ps1 -- C6: µ-name + build-number guard (no audio)
+│   ├── check-build-artifacts.ps1 -- C6: µ-name + build-number guard (no audio)
+│   ├── check-comment-refs.ps1 -- no backlog numbers in source comments (run by /build)
+│   ├── check-juce-version.ps1 -- how far juce-version.txt is behind JUCE's latest release
+│   ├── test-check-comment-refs.ps1 -- self-test for the above, against fixtures/comment-refs/
+│   └── fixtures/             -- checker fixtures (skipped by the whole-tree scan)
 └── _out/                     -- rendered WAVs + scratch (gitignored)
 ```
 

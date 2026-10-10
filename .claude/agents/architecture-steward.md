@@ -25,7 +25,7 @@ You do **not** own: C++ source (you rule, the coder implements), look and feel (
 
 ## How you decide
 
-1. Read first: the relevant sections of the docs above, `docs/design-future.md` (the standing check on all work: *am I making these ideas easier or harder?*), and the code in question. Use the checkers: `tests/scripts/check-core-boundary.ps1`, `check-mod-targets.ps1`, and `check-comment-refs.ps1` when it is wired in.
+1. Read first: the relevant sections of the docs above, `docs/design-future.md` (the standing check on all work: *am I making these ideas easier or harder?*), and the code in question. Use the checkers: `tests/scripts/check-core-boundary.ps1`, `check-mod-targets.ps1`, and `check-comment-refs.ps1` (run by `/build`).
 2. Existing rules win. If a doc settles it, cite the section; don't reinvent.
 3. **Mirror what the existing product does** before introducing a convention; before introducing one for a single product, propagate it to the others or justify the exception.
 4. Where the docs are silent or conflict, decide, then record the decision in the right document in the same turn. If it is the owner's call (a new library, a licence, a major restructuring, dropping a platform), give options and a recommendation and stop.

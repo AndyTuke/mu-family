@@ -34,11 +34,16 @@ jobs:
         with:
           submodules: recursive   # ThirdParty/{clap-juce-extensions,signalsmith-*} are submodules
 
-      - name: Checkout JUCE 8.0.12
+      - name: Read JUCE pin
+        id: juce
+        shell: bash
+        run: echo "version=$(tr -d '[:space:]' < juce-version.txt)" >> "$GITHUB_OUTPUT"   # single pin, also checked by CMake
+
+      - name: Checkout JUCE ${{ steps.juce.outputs.version }}
         uses: actions/checkout@v4
         with:
           repository: juce-framework/JUCE
-          ref: 8.0.12
+          ref: ${{ steps.juce.outputs.version }}
           path: JUCE
 
       - name: Set up Python

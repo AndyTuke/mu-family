@@ -25,7 +25,8 @@
 #
 # Scanned: .h .hpp .cpp .cc .c .mm .cmake CMakeLists.txt .ps1 .yml .yaml .py. Skipped (matched on
 # the path relative to the scan root, at any depth): build, build-*, cmake-build*, ThirdParty,
-# JUCE, _deps, node_modules, .git, _out, archive. So ANY directory named build is skipped.
+# JUCE, _deps, node_modules, .git, _out, archive, fixtures. So ANY directory named build is skipped;
+# fixtures holds the checker's own deliberate violations (see test-check-comment-refs.ps1).
 #
 # Known limits:
 #   - `ref-ok` only covers its own comment segment: in `/* #15 */ // ref-ok` the block comment is
@@ -290,7 +291,7 @@ public static class CommentLexer
 # Directories never scanned (build output, vendored / third-party code, VCS). Matched against the
 # path RELATIVE to the scan root, so a checkout that itself sits under a folder called build/ or
 # archive/ is still scanned.
-$skipDir = [regex]'(?i)(^|/)(build|build-[^/]*|cmake-build[^/]*|ThirdParty|JUCE|_deps|node_modules|\.git|_out|archive)/'
+$skipDir = [regex]'(?i)(^|/)(build|build-[^/]*|cmake-build[^/]*|ThirdParty|JUCE|_deps|node_modules|\.git|_out|archive|fixtures)/'
 $exts    = @('.h', '.hpp', '.cpp', '.cc', '.c', '.mm', '.cmake', '.ps1', '.yml', '.yaml', '.py')
 
 # Path relative to the scan root, forward slashes (used for the skip test).

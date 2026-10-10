@@ -178,17 +178,17 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/ControlSequenceTests.cpp
     Source/Tests/SynthVoiceTests.cpp
     Source/Tests/MuTantPersistTests.cpp
-    Source/Tests/PresetRoundTripTests.cpp  # gate serialise round-trip + tool ops (#791)
-    Source/Tests/ApvtsLayoutTests.cpp      # real createParameterLayout coverage (#721)
-    Source/Tests/SendFXSmokeTests.cpp      # FX-slot DSP smoke, ported from mu-clid (#721)
-    Source/Tests/PluginTransportTests.cpp  # host-playhead→gate contract; regression guard for #837
-    Source/Tests/HotSwapBoundaryTests.cpp  # hot-swap boundary predicates + stager handshake (#880/#883)
+    Source/Tests/PresetRoundTripTests.cpp  # gate serialise round-trip + tool ops
+    Source/Tests/ApvtsLayoutTests.cpp      # real createParameterLayout coverage
+    Source/Tests/SendFXSmokeTests.cpp      # FX-slot DSP smoke, ported from mu-clid
+    Source/Tests/PluginTransportTests.cpp  # host-playhead→gate contract (gate follows host transport)
+    Source/Tests/HotSwapBoundaryTests.cpp  # hot-swap boundary predicates + stager handshake
     Source/UI/GatingDesigner.cpp
     Source/Sequencer/GatePattern.cpp
     Source/Audio/SynthVoice.cpp
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"
     # Editor-free APVTS layout factory — lets the ApvtsLayout test exercise the
-    # real createParameterLayout() without pulling in PluginEditor/UI (#721).
+    # real createParameterLayout() without pulling in PluginEditor/UI.
     Source/Plugin/PluginProcessor_APVTS.cpp
     # mu-core .cpps the modulator + gating + insert + voice + layout/FX tests depend
     # on (the console-app target doesn't share JUCE-plugin context, so it can't link
@@ -218,7 +218,7 @@ target_include_directories(mu-tant-tests PRIVATE
 target_link_libraries(mu-tant-tests PRIVATE
     juce::juce_core
     juce::juce_audio_basics
-    juce::juce_audio_processors    # APVTS + AudioProcessor for the layout coverage test (#721)
+    juce::juce_audio_processors    # APVTS + AudioProcessor for the layout coverage test
     juce::juce_data_structures
     juce::juce_events
     juce::juce_graphics

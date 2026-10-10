@@ -123,8 +123,8 @@ target_link_libraries(mu-clid
         juce::juce_recommended_warning_flags
 )
 
-# Standalone-only: custom app class with close confirmation dialog (#167) plus headless
-# --render CLI for the listening-test pipeline (#649). The mu-link bridge (#899/#902) is now
+# Standalone-only: custom app class with close confirmation dialog plus headless
+# --render CLI for the listening-test pipeline. The mu-link bridge is now
 # the shared header-only mu-core/Link/MuLinkBridge.h — included ONLY by StandaloneApp.cpp, so
 # VST3/CLAP never compile it and a plugin can never attach.
 target_compile_definitions(mu-clid_Standalone PRIVATE JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1)
@@ -373,7 +373,7 @@ add_custom_target(mu-clid-lite-zip ALL
 )
 add_dependencies(mu-clid-lite-zip mu-clid-lite_VST3 mu-clid-lite_CLAP increment_build_number)
 
-# ── mu-clid-tests — data-layer regression tests (#442) ──────────────────────
+# ── mu-clid-tests — data-layer regression tests ────────────────────────────
 # Console executable that runs every juce::UnitTest defined in Source/Tests/.
 # Built on-demand only — not in the default ALL build.
 juce_add_console_app(mu-clid-tests

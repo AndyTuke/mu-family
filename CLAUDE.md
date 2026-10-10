@@ -25,7 +25,7 @@ JUCE is not vendored. Set `JUCE_PATH` to a local JUCE checkout before configurin
 $env:JUCE_PATH = "D:\JUCE"
 ```
 
-**JUCE is kept up to date (owner rule, 2026-10-09).** The family tracks the latest stable JUCE release rather than staying on an old one. The version is pinned in **one place** that CMake and every CI workflow read (backlog #1249), so a bump is a one-line edit and local builds cannot drift from CI. To bump: read JUCE's `BREAKING_CHANGES.md` between the old and new version, grep the tree for each affected API, bump the pin, then run the unit tests, the round-trip listening tests and pluginval on the build PC. When writing code, use current JUCE APIs and do not build on deprecated ones. Version in use: JUCE 8.0.12 today; 9.0.3 is queued (#1246).
+**JUCE is kept up to date (owner rule, 2026-10-09).** The family tracks the latest stable JUCE release rather than staying on an old one. The version is pinned in **one place**, [juce-version.txt](juce-version.txt): every CI workflow checks out that tag and configure fails if the local `JUCE_PATH` checkout differs, so a bump is a one-line edit and local builds cannot drift from CI. To bump: read JUCE's `BREAKING_CHANGES.md` between the old and new version, grep the tree for each affected API, bump the pin, then run the unit tests, the round-trip listening tests and pluginval on the build PC. When writing code, use current JUCE APIs and do not build on deprecated ones. Version in use: JUCE 8.0.12 today; 9.0.3 is queued (#1246). `pwsh tests/scripts/check-juce-version.ps1` reports how far the pin is behind the latest release.
 
 ## Build workflow
 
@@ -147,7 +147,7 @@ These hold for everything in `mu-core` and every product that links it. Product-
 
 ## Code style (mandatory)
 
-- **No backlog issue numbers in comments.** Writing `// #123`, `// fix for #123`, `// added in #xxx`, or any other backlog reference in source code is forbidden. Backlog context belongs in commit messages and PR descriptions. Comments rot out of sync with the backlog and a stale `#NNN` reference is worse than no reference.
+- **No backlog issue numbers in comments.** Enforced by `tests/scripts/check-comment-refs.ps1` (run as step 0 of `/build`; `ref-ok` in the comment marks a legitimate `#N`). Writing `// #123`, `// fix for #123`, `// added in #xxx`, or any other backlog reference in source code is forbidden. Backlog context belongs in commit messages and PR descriptions. Comments rot out of sync with the backlog and a stale `#NNN` reference is worse than no reference.
 - **Comments must help Andy read and understand the code.** Concise, clear, and focused on the *why* and *what* (not the *how*, which the code itself shows).
   - **Loops** — comment the purpose of the loop. What is it doing as a whole? (`// Apply per-voice modulation across all active rhythms.`)
   - **Algorithms** — comment what the algorithm does, and cite the source if it's not obvious (`// ADAA tanh — Reiss & Stefanidis 2016`, `// Signalsmith FDN reverb`, `// Karplus-Strong delay-line feedback loop`). A reader should be able to look up the reference if they want to dig deeper.

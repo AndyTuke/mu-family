@@ -8,7 +8,7 @@ cmake_minimum_required(VERSION 3.22)
 # Set BEFORE project() so the architectures are honoured during toolchain setup.
 # Guarded by NOT DEFINED so a local dev build can override for speed, e.g.
 #     cmake -B build -DCMAKE_OSX_ARCHITECTURES=arm64
-# No-op off Apple. (Signing/notarization to clear Gatekeeper is separate — #99.)
+# No-op off Apple. (Signing/notarization to clear Gatekeeper is a separate step.)
 if(APPLE AND NOT DEFINED CMAKE_OSX_ARCHITECTURES)
     set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "macOS universal build (arm64 + x86_64)")
 endif()
@@ -44,6 +44,17 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 # JUCE and CLAP plugin extensions are shared across every plugin in the family.
 add_subdirectory($ENV{JUCE_PATH} JUCE)
 add_subdirectory(ThirdParty/clap-juce-extensions)
+
+# JUCE version guard: the checkout at JUCE_PATH must match the single pin in juce-version.txt
+# (the CI workflows check out that same pin), so a local build can never drift from CI.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/juce-version.txt" MUFAMILY_JUCE_PIN)
+string(STRIP "${MUFAMILY_JUCE_PIN}" MUFAMILY_JUCE_PIN)
+get_directory_property(MUFAMILY_JUCE_FOUND DIRECTORY "$ENV{JUCE_PATH}" DEFINITION JUCE_VERSION)
+if(NOT MUFAMILY_JUCE_FOUND VERSION_EQUAL MUFAMILY_JUCE_PIN)
+    message(FATAL_ERROR "JUCE at $ENV{JUCE_PATH} is ${MUFAMILY_JUCE_FOUND} but juce-version.txt pins ${MUFAMILY_JUCE_PIN}. "
+                        "Check out the pinned JUCE tag, or bump the pin (see CLAUDE.md, 'JUCE is kept up to date').")
+endif()
+message(STATUS "JUCE ${MUFAMILY_JUCE_FOUND} (matches juce-version.txt)")
 
 # Tester-deploy kill-switch. OFF by default so NO build (Debug or Release, and
 # regardless of any runner that forces a Release pass) can push artefacts to the

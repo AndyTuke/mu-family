@@ -9,7 +9,7 @@ name: macOS validate (on-demand)
 # Dispatch this when you're about to cut a release: it builds the universal Mac binaries,
 # proves they're arm64+x86_64, validates them headlessly (pluginval + auval), renders the
 # mu-Clid A-suite to WAVs, and uploads an evidence pack you download and inspect BEFORE
-# sending anything to testers. It does NOT sign/notarize (that's #99) — testers still need
+# sending anything to testers. It does NOT sign/notarize (separate, needs an Apple certificate) — testers still need
 # the `xattr -dr com.apple.quarantine` strip until then.
 
 on:
@@ -33,11 +33,16 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Checkout JUCE 8.0.12
+      - name: Read JUCE pin
+        id: juce
+        shell: bash
+        run: echo "version=$(tr -d '[:space:]' < juce-version.txt)" >> "$GITHUB_OUTPUT"   # single pin, also checked by CMake
+
+      - name: Checkout JUCE ${{ steps.juce.outputs.version }}
         uses: actions/checkout@v4
         with:
           repository: juce-framework/JUCE
-          ref: 8.0.12
+          ref: ${{ steps.juce.outputs.version }}
           path: JUCE
 
       - name: Set up Python

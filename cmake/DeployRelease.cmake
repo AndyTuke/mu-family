@@ -17,7 +17,7 @@ endif()
 
 message(STATUS "Deploying ${PRODUCT_FILENAME} Release artifacts to: ${DIST_WIN}")
 
-# #428: capture RESULT on each copy so a locked destination (testers running
+# Capture RESULT on each copy so a locked destination (testers running
 # the standalone, antivirus scanning, OneDrive sync mid-upload) downgrades
 # the failure from "abort the build" to a warning. The artefact files
 # themselves are still produced under build/<product>_artefacts/Release/ —
