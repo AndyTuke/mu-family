@@ -172,6 +172,7 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/ModulatorTests.cpp
     Source/Tests/GatingDesignerTests.cpp
     Source/Tests/GatePatternTests.cpp
+    Source/Tests/PatternTests.cpp
     Source/Tests/GateStageTests.cpp
     Source/Tests/InsertStageTests.cpp
     Source/Tests/ScalesTests.cpp

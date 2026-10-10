@@ -50,9 +50,11 @@ struct Pattern : Layer
 private:
     void copyVoiceData(const Pattern& o)
     {
-        gate.copyDataFrom(o.gate);
-        filterGate.copyDataFrom(o.filterGate);
-        pitchGate.copyDataFrom(o.pitchGate);
+        // A skipped copy (the source envelope was being edited for too long) would leave stale data.
+        [[maybe_unused]] const bool copied = gate.copyDataFrom(o.gate)
+                                           & filterGate.copyDataFrom(o.filterGate)
+                                           & pitchGate.copyDataFrom(o.pitchGate);
+        jassert(copied);
         osc1UserPath = o.osc1UserPath;
         osc2UserPath = o.osc2UserPath;
         osc1UserIndex.store(o.osc1UserIndex.load());

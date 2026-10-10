@@ -856,6 +856,15 @@ void PluginProcessor::resetVoiceSlot(int idx)
     resetPrefix("v"  + juce::String(idx) + "_");
     resetPrefix("ch" + juce::String(idx) + "_");
     voiceSlots[(size_t) idx] = Pattern{};   // modulators, the three envelopes and the user wavetables back to defaults
+
+    // The demo's step cap applies to a fresh voice's envelopes too (the constructor capped only the first eight).
+    if (! isLicensed())
+        for (auto* pat : { &voiceSlots[(size_t) idx].gate, &voiceSlots[(size_t) idx].filterGate, &voiceSlots[(size_t) idx].pitchGate })
+            if (mu_core::spinLockFor(pat->editLock, 1000))
+            {
+                pat->limitToCells(demoMaxSteps());
+                mu_core::spinUnlock(pat->editLock);
+            }
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────

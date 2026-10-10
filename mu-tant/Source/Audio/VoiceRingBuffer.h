@@ -19,7 +19,8 @@ struct VoiceRingBuffer
     {
         const int nCh  = buf.getNumChannels();
         const float sc = nCh > 0 ? 1.0f / (float) nCh : 0.0f;
-        int head = writeHead.load(std::memory_order_relaxed);
+        // Unsigned, so the running count wraps by definition rather than overflowing.
+        unsigned head = (unsigned) writeHead.load(std::memory_order_relaxed);
         for (int i = 0; i < n; ++i)
         {
             float s = 0.0f;
@@ -28,16 +29,16 @@ struct VoiceRingBuffer
             data[(size_t)(head & (kSize - 1))] = s * sc;
             ++head;
         }
-        writeHead.store(head, std::memory_order_release);
+        writeHead.store((int) head, std::memory_order_release);
     }
 
     // UI thread: copy the most-recent n samples into out[].
     void read(float* out, int n) const noexcept
     {
-        const int head  = writeHead.load(std::memory_order_acquire);
-        const int start = head - n;
+        const unsigned head  = (unsigned) writeHead.load(std::memory_order_acquire);
+        const unsigned start = head - (unsigned) n;
         for (int i = 0; i < n; ++i)
-            out[i] = data[(size_t)((start + i) & (kSize - 1))];
+            out[i] = data[(size_t)((start + (unsigned) i) & (kSize - 1))];
     }
 
     std::array<float, kSize> data {};

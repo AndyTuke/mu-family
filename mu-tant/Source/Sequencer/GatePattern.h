@@ -143,13 +143,13 @@ public:
     // (e.g. user drawing on voice N while voice N is being removed). GatePattern
     // can't be copy/move-assigned directly because of the embedded std::atomic
     // editLock.
-    void copyDataFrom(const GatePattern& other) noexcept
+    bool copyDataFrom(const GatePattern& other) noexcept
     {
         // Capped spin matching GatingDesigner::withLock. The UI holds editLock
         // only briefly around single-envelope mutations; 1000 yields covers any
-        // contention comfortably. If not acquired by the cap, skip the copy —
-        // the source pattern remains unchanged and the caller can retry.
-        if (! mu_core::spinLockFor(other.editLock, 1000)) return;
+        // contention comfortably. If not acquired by the cap, skip the copy and
+        // return false — the source pattern remains unchanged and the caller can retry.
+        if (! mu_core::spinLockFor(other.editLock, 1000)) return false;
         subdivision       = other.subdivision;
         patternLengthBars = other.patternLengthBars;
         envelopes         = other.envelopes;
@@ -159,6 +159,7 @@ public:
         gateLevel   = 0.0f;
         filterLevel = 1.0f;
         resetGateCache();
+        return true;
     }
 
     // Spin-lock guarding envelope mutation (UI thread) vs gate reads (audio
