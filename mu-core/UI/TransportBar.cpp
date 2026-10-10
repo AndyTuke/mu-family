@@ -170,10 +170,7 @@ void TransportBar::refreshPlayBtn()
         // Reflect DAW transport state via icon + colour (matches standalone:
         // ▶ play → ■ stop while the host plays); button is non-interactive in
         // plugin mode — the host owns transport, so this is display-only.
-        bool dawPlaying = false;
-        if (auto* ph = proc.getPlayHead())
-            if (auto pos = ph->getPosition())
-                dawPlaying = pos->getIsPlaying();
+        const bool dawPlaying = proc.isHostPlaying();
 
         playBtn.setButtonText(dawPlaying ? kStop : kPlay);
         if (dawPlaying)
@@ -196,17 +193,7 @@ void TransportBar::updatePositionLabel()
 
     if (!isStandalone)
     {
-        if (auto* ph = proc.getPlayHead())
-        {
-            if (auto pos = ph->getPosition())
-            {
-                if (auto ppq = pos->getPpqPosition())
-                {
-                    beatPos = *ppq;
-                    gotPos  = true;
-                }
-            }
-        }
+        gotPos = proc.getHostPpqPosition(beatPos);
     }
     else
     {

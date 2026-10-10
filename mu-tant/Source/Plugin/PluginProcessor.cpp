@@ -268,7 +268,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // preset hot-swap commits on the message thread (no transport freeze).
     constexpr double kMaxPatBeats = (double) GatePattern::kMaxPatternBars * 4.0;   // 64
     const double midiClockBeat = midiClockSync.process(midiMessages, numSamples, currentSampleRate);
-    const auto   transport     = mu_core::resolveTransport(mu_core::readHostTransport(getPlayHead()),
+    const auto   transport     = mu_core::resolveTransport(pollHostTransport(),
                                                            wrapperType == wrapperType_Standalone,
                                                            midiClockSync, midiClockBeat,
                                                            { internalPlaying, internalBpm, internalBeatPos },

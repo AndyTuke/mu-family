@@ -356,7 +356,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // position, else (standalone) external MIDI clock, else the own transport. The arp steps and
     // the modulators both run on its beat.
     const double midiClockBeat = midiClockSync.process(midiMessages, numSamples, currentSampleRate);
-    const auto   transport     = mu_core::resolveTransport(mu_core::readHostTransport(getPlayHead()),
+    const auto   transport     = mu_core::resolveTransport(pollHostTransport(),
                                                            wrapperType == wrapperType_Standalone,
                                                            midiClockSync, midiClockBeat,
                                                            { internalPlaying, internalBpm, internalBeatPos },

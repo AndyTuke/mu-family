@@ -254,7 +254,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     for (int r = 0; r < numRhythms; ++r)
         applyRhythmModulation(r, beatPos);
 
-    const double effectiveBpm = deriveEffectiveBpm();
+    const double effectiveBpm = deriveEffectiveBpm(transport.hostBpm);
     renderAudioBuses(buffer, midiMessages, numRhythms, effectiveBpm);
 #endif
 }
@@ -267,7 +267,7 @@ PluginProcessor::BlockTransport PluginProcessor::computeLiteTransport(int numSam
 {
     // The family transport rule (mu-core TransportResolver): Lite runs in a host, so play, tempo
     // and beat follow it (its own transport only when a host gives no position at all).
-    const auto t = mu_core::resolveTransport(mu_core::readHostTransport(getPlayHead()),
+    const auto t = mu_core::resolveTransport(pollHostTransport(),
                                              wrapperType == wrapperType_Standalone, midiClockSync, 0.0,
                                              { internalPlaying, internalBpm, internalBeatPos },
                                              juce::jmax(1, numSamples), currentSampleRate);
@@ -358,6 +358,9 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     const int  noteMode = midiNoteMode.load(std::memory_order_relaxed);
     const bool isPlugin = (wrapperType != wrapperType_Standalone);
 
+    // Read (and publish for the UI) the host transport once per block, whatever the mode.
+    const auto host = pollHostTransport();
+
     if (noteMode == 1 && isPlugin)
     {
         // Note mode: scan Note On/Off to gate play state. First Note On resets
@@ -397,10 +400,8 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
             // Use host BPM when available so tempo-synced FX tracks the DAW;
             // fall back to the internal transport BPM (set via the BPM field).
             double bpm = internalBpm.load(std::memory_order_relaxed);
-            if (auto* ph = getPlayHead())
-                if (auto phPos = ph->getPosition())
-                    if (auto hostBpm = phPos->getBpm())
-                        bpm = *hostBpm;
+            if (host.bpm > 0.0)
+                bpm = host.bpm;
             noteModeBeatPos.store(
                 pos + (buffer.getNumSamples() / currentSampleRate) * (bpm / 60.0),
                 std::memory_order_relaxed);
@@ -410,7 +411,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     {
         // Free mode (default): the family transport rule (mu-core TransportResolver) — the host /
         // mu-link position, else (standalone) external MIDI clock, else the own transport.
-        const auto t = mu_core::resolveTransport(mu_core::readHostTransport(getPlayHead()), ! isPlugin,
+        const auto t = mu_core::resolveTransport(host, ! isPlugin,
                                                  midiClockSync, midiClockBlockBeatPos,
                                                  { internalPlaying, internalBpm, internalBeatPos },
                                                  buffer.getNumSamples(), currentSampleRate);
@@ -429,7 +430,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     sequencerPlaying.store(playing);
     lastBeatPos.store(beatPos);
 
-    return { playing, beatPos };
+    return { playing, beatPos, host.bpm };
 }
 
 void PluginProcessor::advanceSequencer(int numRhythms, double beatPos)
@@ -472,17 +473,14 @@ void PluginProcessor::advanceSequencer(int numRhythms, double beatPos)
     }
 }
 
-double PluginProcessor::deriveEffectiveBpm()
+double PluginProcessor::deriveEffectiveBpm(double hostBpm)
 {
-    // Effective BPM for tempo-synced FX (Delay, Echo): host playhead takes priority
-    // in DAW mode, MIDI clock estimate when locked in standalone, otherwise the
-    // internal transport. Previously this always used internalBpm, so DAW-hosted
-    // sessions saw the delay always tempo-synced to 120 regardless of host tempo.
+    // Effective BPM for tempo-synced FX (Delay, Echo): host tempo (this block's playhead read,
+    // 0 = none) takes priority in DAW mode, MIDI clock estimate when locked in standalone,
+    // otherwise the internal transport.
     double effectiveBpm = internalBpm.load(std::memory_order_relaxed);
-    if (auto* ph = getPlayHead())
-        if (auto pos = ph->getPosition())
-            if (auto hostBpm = pos->getBpm())
-                effectiveBpm = *hostBpm;
+    if (hostBpm > 0.0)
+        effectiveBpm = hostBpm;
     if (midiClockSync.isEnabled()
         && wrapperType == wrapperType_Standalone
         && midiClockSync.isPlaying())

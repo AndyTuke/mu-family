@@ -23,12 +23,14 @@
 #include "Persistence/MidiFullPresetMap.h"
 #include "Persistence/SlotState.h"   // composed slot / full / host state (format 2)
 #include "MuLimits.h"
+#include "Plugin/HostTransport.h"
 #include "Plugin/MidiClockSync.h"
 #include "License/MachineFingerprint.h"
 #include "License/OnlineActivation.h"   // OnlineActivationOutcome (decls only; .cpp is per-licensed-product)
 
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -119,10 +121,30 @@ public:
     virtual void   setInternalBpm(double bpm)     { internalBpm.store(juce::jlimit(20.0, 300.0, bpm), std::memory_order_relaxed); }
     virtual double getInternalBeatPos()     const { return internalBeatPos.load(std::memory_order_relaxed); }
 
+    // Host transport as last seen by processBlock, for the UI (TransportBar). The UI must never
+    // call getPlayHead() itself: the playhead is only valid on the audio thread during a block.
+    bool isHostPlaying() const { return hostPlaying.load(std::memory_order_relaxed); }
+    // Host beat position in quarter notes; false when the host supplied none.
+    bool getHostPpqPosition(double& ppq) const
+    {
+        const double v = hostPpq.load(std::memory_order_relaxed);
+        if (std::isnan(v)) return false;
+        ppq = v;
+        return true;
+    }
+
     // The family bus layout: at most one sidechain input (stereo or disabled) and a stereo
     // main output. Products with extra output buses (mu-Clid's multi-out) override it.
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
 
+    // A host bypass still publishes the host transport, so the TransportBar keeps following
+    // the DAW while the plugin is bypassed.
+    using juce::AudioProcessor::processBlockBypassed;
+    void processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override
+    {
+        pollHostTransport();
+        juce::AudioProcessor::processBlockBypassed(buffer, midi);
+    }
     // Master loop — the global loop the shared mu-core MasterLoopSection displays
     // (and which products may use to gate preset/program-change swap timing). The
     // length lives in the `mstrLoop` APVTS param (0 = free; 1..16 → 16..256 steps,
@@ -323,6 +345,23 @@ protected:
     std::atomic<double> internalBeatPos { 0.0 };
     std::atomic<double> internalBpm     { 120.0 };
 
+    // Reads the host playhead for this block and publishes it for the UI. Call it from
+    // processBlock in place of mu_core::readHostTransport(getPlayHead()) — audio thread only.
+    mu_core::HostTransport pollHostTransport()
+    {
+        const auto t = mu_core::readHostTransport(getPlayHead());
+        hostPlaying.store(t.playing, std::memory_order_relaxed);
+        hostPpq.store(t.hasPosition ? t.ppqPosition : std::numeric_limits<double>::quiet_NaN(),
+                      std::memory_order_relaxed);
+        return t;
+    }
+
+private:
+    // Host transport published by pollHostTransport(); NaN position = none supplied. One value
+    // per atomic so the UI never sees a torn position/has-position pair.
+    std::atomic<bool>   hostPlaying { false };
+    std::atomic<double> hostPpq     { std::numeric_limits<double>::quiet_NaN() };
+    static_assert(std::atomic<double>::is_always_lock_free, "the UI reads atomic<double> transport values");
 protected:
     // Deferred message-thread work first (product hot-swap commits), then program changes.
     void handleAsyncUpdate() final

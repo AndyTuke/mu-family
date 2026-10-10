@@ -316,7 +316,7 @@ private:
     // processBlock is decomposed into private helpers invoked in order on the
     // audio thread. None allocate or take locks beyond processBlock's own
     // rhythmsLock ScopedTryLock.
-    struct BlockTransport { bool playing; double beatPos; };
+    struct BlockTransport { bool playing; double beatPos; double hostBpm = 0.0; };   // hostBpm 0 = host gave none
 #if MUCLID_LITE_BUILD
     // Lite MIDI-only path: read playhead / internal transport, publish
     // sequencerPlaying + lastBeatPos.
@@ -343,8 +343,8 @@ private:
     StripMod applyStripModulation(int r);
     void     publishModSnapshot(int r, const Rhythm& rhythm, const VoiceParams& modParams, const StripMod& stripMod);
     void     writeBackModulation(int r, const Rhythm& rhythm, VoiceParams& modParams);
-    // Effective BPM for tempo-synced FX: host playhead > MIDI clock > internal.
-    double deriveEffectiveBpm();
+    // Effective BPM for tempo-synced FX: host tempo > MIDI clock > internal.
+    double deriveEffectiveBpm(double hostBpm);
     // Gather output buses, run the core mixer/voice render, mix the sample
     // preview, and emit per-rhythm MIDI.
     void renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
