@@ -141,7 +141,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // Sync mixer UI from APVTS — in standalone, state is restored before the editor
     // is created, so without this call the scSourceBox and other controls would show
     // defaults rather than the restored values.
-    mixerOverlay.loadFromAPVTS();
+    mixerOverlay.loadFromApvts();
     clearPresetDirty();
 
     // The family metal look, in mu-Clid's purple (globalAccent).
@@ -170,7 +170,7 @@ void PluginEditor::selectRhythmAndRefresh(int idx,
         if (mixerRefresh != MixerRefresh::Skip)
             mixerOverlay.refresh();
         if (mixerRefresh == MixerRefresh::FullReload)
-            mixerOverlay.loadFromAPVTS();
+            mixerOverlay.loadFromApvts();
     }
 }
 

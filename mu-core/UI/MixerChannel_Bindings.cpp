@@ -1,5 +1,5 @@
 // partial-class TU split from MixerChannel.cpp. Contains the four bind* methods
-// plus helpers that only run during binding (setSidechainSources, loadFromAPVTS).
+// plus helpers that only run during binding (setSidechainSources, loadFromApvts).
 // MixerChannel_Insert.cpp holds configureInsertAlgorithm.
 
 #include "MixerChannel.h"
@@ -165,7 +165,7 @@ void MixerChannel::bindReturn(MixerEngine::ReturnState& state, std::atomic<float
 
 void MixerChannel::bindMaster(MixerEngine& engine, ProcessorBase* proc)
 {
-    masterInsertProc = proc;   // keep knob lambdas alive across loadFromAPVTS rebinds
+    masterInsertProc = proc;   // keep knob lambdas alive across loadFromApvts rebinds
     fader.setValue(engine.masterLevel.load(std::memory_order_relaxed), juce::dontSendNotification);
     panKnob.setValue(engine.masterPan.load(std::memory_order_relaxed), juce::dontSendNotification);
 
@@ -315,7 +315,7 @@ void MixerChannel::setSidechainSources(int ownIndex, const juce::StringArray& na
 }
 
 //==============================================================================
-void MixerChannel::loadFromAPVTS(juce::AudioProcessorValueTreeState& apvts,
+void MixerChannel::loadFromApvts(juce::AudioProcessorValueTreeState& apvts,
                                   const juce::String& prefix)
 {
     if (hasInsert())

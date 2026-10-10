@@ -26,7 +26,7 @@ static const std::pair<const char*, const char*> kRevParamMap[] = {
 // only subscribe to APVTS IDs that actually affect the mixer view.
 // Previously this class registered as a listener for *every* parameter in the
 // tree (hundreds across all rhythms / voices / mods) and set apvtsDirty on any
-// change — each loadFromAPVTS then rebuilt every channel strip. Risk: feedback
+// change — each loadFromApvts then rebuilt every channel strip. Risk: feedback
 // storm via the universal listener every time a rhythm knob moved.
 static bool isMixerRelevantParam(const juce::String& id) noexcept
 {
@@ -102,13 +102,13 @@ void MixerOverlay::visibilityChanged()
     // exchange so a parameterChanged firing between the read and the clear
     // is preserved for the next tick instead of being silently dropped.
     if (isVisible() && apvtsDirty.exchange(false, std::memory_order_acq_rel))
-        loadFromAPVTS();
+        loadFromApvts();
 }
 
 void MixerOverlay::timerCallback()
 {
     if (isVisible() && apvtsDirty.exchange(false, std::memory_order_acq_rel))
-        loadFromAPVTS();
+        loadFromApvts();
 }
 
 void MixerOverlay::buildChannels()
@@ -431,7 +431,7 @@ void MixerOverlay::loadReverbParams()
             reverbRow.setParamValue(pid, *raw);
 }
 
-void MixerOverlay::loadFromAPVTS()
+void MixerOverlay::loadFromApvts()
 {
     auto& apvts = proc.apvts;
 
@@ -442,7 +442,7 @@ void MixerOverlay::loadFromAPVTS()
     // buildChannels() (which sets these) only runs on refresh(), gated on mixer
     // visibility — so a preset / host-state load that changes the channel count
     // while the mixer is hidden would leave stale dim overlays + names when it's
-    // next shown. loadFromAPVTS runs on visibilityChanged + preset reload, so
+    // next shown. loadFromApvts runs on visibilityChanged + preset reload, so
     // refreshing here makes the colouring track the count regardless of when it changed.
     const auto& palette = MuLookAndFeel::channelPalette;
     for (int r = 0; r < (int)rhythmChannels.size(); ++r)
@@ -458,15 +458,15 @@ void MixerOverlay::loadFromAPVTS()
     for (int r = 0; r < numActive && r < (int)rhythmChannels.size(); ++r)
     {
         const juce::String prefix = "ch" + juce::String(r) + "_";
-        rhythmChannels[r]->loadFromAPVTS(apvts, prefix);
+        rhythmChannels[r]->loadFromApvts(apvts, prefix);
     }
-    effectReturn .loadFromAPVTS(apvts, "ret_eff_");
-    delayReturn  .loadFromAPVTS(apvts, "ret_dly_");
-    reverbReturn .loadFromAPVTS(apvts, "ret_rev_");
-    masterChannel.loadFromAPVTS(apvts, "mstr_");
+    effectReturn .loadFromApvts(apvts, "ret_eff_");
+    delayReturn  .loadFromApvts(apvts, "ret_dly_");
+    reverbReturn .loadFromApvts(apvts, "ret_rev_");
+    masterChannel.loadFromApvts(apvts, "mstr_");
 
     // Intra-FX routing sends (eff2dly, eff2rev, dly2rev) are stored outside the
-    // ret_*_ prefix scheme so loadFromAPVTS can't find them via the prefix. Refresh
+    // ret_*_ prefix scheme so loadFromApvts can't find them via the prefix. Refresh
     // the return strip send knobs explicitly so they track preset loads and automation.
     if (auto* p = apvts.getRawParameterValue("eff2dly")) effectReturn.setDelaySendValue(*p);
     if (auto* p = apvts.getRawParameterValue("eff2rev")) effectReturn.setRevSendValue(*p);

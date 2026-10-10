@@ -34,7 +34,7 @@ private:
     juce::Label    loopStepLabel;
 
     void timerCallback() override;
-    void syncLoopDropdownFromAPVTS();
+    void syncLoopDropdownFromApvts();
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
     // Last values shown in loopStepLabel — the timer only rebuilds the string when

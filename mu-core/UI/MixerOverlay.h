@@ -37,7 +37,7 @@ public:
     void refresh();
 
     // Reload all FX-row and mixer-channel UI from current APVTS values.
-    void loadFromAPVTS();
+    void loadFromApvts();
 
     void resized() override;
     void paint(juce::Graphics&) override;

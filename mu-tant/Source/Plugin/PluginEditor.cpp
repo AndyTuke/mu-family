@@ -92,7 +92,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     voiceSidebar.setSelectedIndex(0);
     voicePanel.setVoice(0);
-    mixerOverlay.loadFromAPVTS();
+    mixerOverlay.loadFromApvts();
     clearPresetDirty();
 
     // The family metal look, in mu-Tant's green.
@@ -116,7 +116,7 @@ void PluginEditor::onPresetLoaded(const juce::File&)
     voiceSidebar.refreshItems();
     voiceSidebar.setSelectedIndex(0);
     voicePanel.setVoice(0);         // re-reads insert algo + slot knobs from APVTS
-    mixerOverlay.loadFromAPVTS();
+    mixerOverlay.loadFromApvts();
 }
 
 void PluginEditor::onPresetNew()
@@ -124,7 +124,7 @@ void PluginEditor::onPresetNew()
     voiceSidebar.refreshItems();
     voiceSidebar.setSelectedIndex(0);
     voicePanel.setVoice(0);
-    mixerOverlay.loadFromAPVTS();
+    mixerOverlay.loadFromApvts();
 }
 
 } // namespace mu_tant

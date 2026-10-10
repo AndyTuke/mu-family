@@ -26,7 +26,7 @@ MasterLoopSection::MasterLoopSection(ProcessorBase& p)
 
     loopStepLabel.setJustificationType(juce::Justification::centredLeft);
     loopStepLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-    syncLoopDropdownFromAPVTS();
+    syncLoopDropdownFromApvts();
     addAndMakeVisible(loopStepLabel);
 
     // Catch host automation of mstrLoop so the dropdown / step label stay in
@@ -41,7 +41,7 @@ MasterLoopSection::~MasterLoopSection()
     stopTimer();
 }
 
-void MasterLoopSection::syncLoopDropdownFromAPVTS()
+void MasterLoopSection::syncLoopDropdownFromApvts()
 {
     const int paramVal = (int) proc.apvts.getRawParameterValue("mstrLoop")->load();
     loopStepLabel.setVisible(paramVal > 0);
@@ -55,7 +55,7 @@ void MasterLoopSection::parameterChanged(const juce::String& parameterID, float 
     // host automation can fire on the audio thread; juce::Slider / DropdownSelect
     // state isn't safe to mutate off the message thread.
     juce::Component::SafePointer<MasterLoopSection> safe(this);
-    auto refresh = [safe] { if (auto* self = safe.getComponent()) self->syncLoopDropdownFromAPVTS(); };
+    auto refresh = [safe] { if (auto* self = safe.getComponent()) self->syncLoopDropdownFromApvts(); };
     if (juce::MessageManager::getInstance()->isThisTheMessageThread())
         refresh();
     else
@@ -72,7 +72,7 @@ void MasterLoopSection::timerCallback()
     {
         const int paramVal = (int) param->load();
         if (loopDropdown.getSelectedId() != paramVal + 1)
-            syncLoopDropdownFromAPVTS();
+            syncLoopDropdownFromApvts();
     }
 
     if (loopStepLabel.isVisible())

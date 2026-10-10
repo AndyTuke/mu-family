@@ -38,7 +38,7 @@ void MixerChannel::configureInsertAlgorithm(int charId, int slot, ProcessorBase*
     }
     knobs[1]->setGRSource(nullptr);   // P2 carries the GR meter for comp/limiter
 
-    // master insert may be reconfigured from loadFromAPVTS with proc=nullptr
+    // master insert may be reconfigured from loadFromApvts with proc=nullptr
     // (the dropdown value comes from APVTS, knob lambdas use the stored
     // masterInsertProc handle so the user can still drive the engine).
     ProcessorBase* const knobProc = masterInsertProc;

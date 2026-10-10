@@ -51,7 +51,7 @@ public:
     // ownChannelIndex is excluded (pass -1 for return channels to include all rhythm channels).
     void setSidechainSources(int ownChannelIndex, const juce::StringArray& channelNames);
 
-    // Update the intra-FX send knob display values directly. Used by MixerOverlay::loadFromAPVTS
+    // Update the intra-FX send knob display values directly. Used by MixerOverlay::loadFromApvts
     // to refresh eff2dly / eff2rev / dly2rev into the return strips; those params live outside
     // the ret_*_ prefix scheme and can't be found by the usual prefix-based reload.
     void setDelaySendValue(float v) { sendDelay .setValue(v, juce::dontSendNotification); }
@@ -64,7 +64,7 @@ public:
     juce::Rectangle<int> getOutBusBounds()        const { return outBusBox.getBounds(); }
 
     // Reload UI from APVTS after external state change (e.g. preset load).
-    void loadFromAPVTS(juce::AudioProcessorValueTreeState& apvts,
+    void loadFromApvts(juce::AudioProcessorValueTreeState& apvts,
                        const juce::String& prefix);
 
     void setEffectSendLabel(const juce::String& name);
@@ -143,11 +143,11 @@ private:
 
     // Configure knob labels/ranges/callbacks for the selected algorithm on one insert slot.
     // slot=0 → first insert (mst_ins*), slot=1 → second insert (mst_ins2*).
-    // proc non-null = write char param to APVTS; null = skip (called from loadFromAPVTS).
+    // proc non-null = write char param to APVTS; null = skip (called from loadFromApvts).
     void configureInsertAlgorithm(int charId, int slot, ProcessorBase* proc);
 
     // Captured by bindMaster so configureInsertAlgorithm's knob callbacks can
-    // write to APVTS even when re-invoked from loadFromAPVTS with proc=nullptr.
+    // write to APVTS even when re-invoked from loadFromApvts with proc=nullptr.
     ProcessorBase* masterInsertProc = nullptr;
 
     bool hasSends()            const { return channelType == Type::Channel

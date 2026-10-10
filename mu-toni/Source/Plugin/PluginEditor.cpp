@@ -78,7 +78,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     sidebar.setSelectedIndex(0);
     enginePanel.setLayer(0);
-    mixerOverlay.loadFromAPVTS();
+    mixerOverlay.loadFromApvts();
     clearPresetDirty();
 
     // The family metal look.
@@ -98,7 +98,7 @@ void PluginEditor::onPresetLoaded(const juce::File&)
 {
     sidebar.refreshItems();
     enginePanel.setLayer(enginePanel.getLayer());   // rebind knobs + modulators to the loaded state
-    mixerOverlay.loadFromAPVTS();
+    mixerOverlay.loadFromApvts();
 }
 
 void PluginEditor::onPresetNew()
