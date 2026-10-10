@@ -123,6 +123,7 @@ PluginProcessor::PluginProcessor()
 
     initAppSettings("muOn");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
+    for (auto& t : voiceSlots) t.owner.ptr = this;
     initLaneState();        // the lane layout every preset / session save and load uses
     hotSwap.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },
                         [this](int i, juce::ValueTree& t) { applyTrackTree(i, t); });

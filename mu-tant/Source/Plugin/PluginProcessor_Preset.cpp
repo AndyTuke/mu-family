@@ -96,26 +96,30 @@ namespace
     }
 }
 
-// Describe the voices once (ctor): each voice's v{N}_ params, user wavetable paths, gate / filter /
-// pitch envelopes and modulators. Every .muPattern, .muTant and host session builds and applies
-// a voice from this. A voice's colour is its slot's identity, not part of its sound, so it stays
+// Describe the voices once (ctor): each voice's v{N}_ param prefix; its user wavetable paths, gate /
+// filter / pitch envelopes and modulators save through Pattern.
+// Every .muPattern, .muTant and host session builds and applies a voice from this. A voice's colour is its slot's identity, not part of its sound, so it stays
 // with the full state (voiceColours) rather than the voice node.
 void PluginProcessor::initVoiceState()
 {
     juce::StringArray prefixes;
     for (int v = 0; v < kMaxVoices; ++v) prefixes.add(voicePrefix(v));
-    initSlotState(prefixes,
-        { [this](int v, juce::ValueTree& node)
-          {
-              if (osc1UserPath[(size_t) v].isNotEmpty()) node.setProperty("o1WtPath", osc1UserPath[(size_t) v], nullptr);
-              if (osc2UserPath[(size_t) v].isNotEmpty()) node.setProperty("o2WtPath", osc2UserPath[(size_t) v], nullptr);
-              node.appendChild(mu_pp::serialiseModulators(voiceSlots[(size_t) v]), nullptr);
-              node.appendChild(serialiseGate(gatePatterns[(size_t) v]),                 nullptr);
-              node.appendChild(serialiseGate(filterPatterns[(size_t) v], "FilterGate"), nullptr);
-              node.appendChild(serialiseGate(pitchPatterns[(size_t) v],  "PitchGate"),  nullptr);
-          },
-          [this](int v, const juce::ValueTree& node) { applyVoiceExtras(v, node); } });
+    initSlotState(prefixes);
 }
+
+// A voice's non-parameter data onto its node.
+void PluginProcessor::writeVoiceExtras(int v, juce::ValueTree& node) const
+{
+    if (osc1UserPath[(size_t) v].isNotEmpty()) node.setProperty("o1WtPath", osc1UserPath[(size_t) v], nullptr);
+    if (osc2UserPath[(size_t) v].isNotEmpty()) node.setProperty("o2WtPath", osc2UserPath[(size_t) v], nullptr);
+    node.appendChild(mu_pp::serialiseModulators(voiceSlots[(size_t) v]),                 nullptr);
+    node.appendChild(serialiseGate(gatePatterns[(size_t) v]),                 nullptr);
+    node.appendChild(serialiseGate(filterPatterns[(size_t) v], "FilterGate"), nullptr);
+    node.appendChild(serialiseGate(pitchPatterns[(size_t) v],  "PitchGate"),  nullptr);
+}
+
+void Pattern::writeExtras(juce::ValueTree& node) const { owner.ptr->writeVoiceExtras(owner.ptr->voiceOf(*this), node); }
+void Pattern::applyExtras(const juce::ValueTree& node) { owner.ptr->applyVoiceExtras(owner.ptr->voiceOf(*this), node); }
 
 // A voice's non-parameter data from its node. Absent children clear (an invalid tree empties a
 // gate / the modulators); per-pattern spinlocks and modLock guard the audio thread, so no

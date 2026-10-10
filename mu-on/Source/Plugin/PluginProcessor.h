@@ -140,6 +140,8 @@ protected:
     void commitDeferredWork() override;
 
 private:
+    friend struct Track;   // its persistence hooks read the step row and Rumble envelope
+    int laneOf(const Track& t) const noexcept;   // a lane's index from its Track
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
     // State shared by the session save/restore and full presets (PluginProcessor_Preset.cpp):

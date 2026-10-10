@@ -357,12 +357,16 @@ public:
 protected:
     // Composed state (Persistence/LayerState.h, format 2) — the slot unit every product saves and
     // loads. A product describes its slots once in its constructor (each slot's param prefix + its
-    // non-parameter data), then layer presets, full presets and host sessions all go through these,
+    // non-parameter data, which each Layer saves and loads through its writeExtras / applyExtras), then layer presets, full presets and host sessions all go through these,
     // so a slot is written and applied by the same code wherever it appears.
-    void initSlotState(const juce::StringArray& slotPrefixes, mu_pp::LayerExtras extras)
+    // The layer behind persistence slot `i`: every declared slot, active or not, so a state with
+    // more layers than are live still loads (and saves) their data. Defaults to getLayer.
+    virtual Layer* slotLayer(int i) { return getLayer(i); }
+    void initSlotState(const juce::StringArray& slotPrefixes)
     {
         slotLayout = mu_pp::LayerLayout(*this, slotPrefixes);
-        slotExtras = std::move(extras);
+        slotExtras = { [this](int slot, juce::ValueTree& node)       { if (auto* l = slotLayer(slot)) l->writeExtras(node); },
+                       [this](int slot, const juce::ValueTree& node) { if (auto* l = slotLayer(slot)) l->applyExtras(node); } };
     }
     juce::ValueTree captureComposedState()           { return mu_pp::captureState(apvts.state.getType(), slotLayout, slotExtras); }
     void            applyComposedState(const juce::ValueTree& state) { mu_pp::applyState(state, slotLayout, slotExtras); }

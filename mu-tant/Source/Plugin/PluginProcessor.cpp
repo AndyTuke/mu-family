@@ -100,6 +100,7 @@ PluginProcessor::PluginProcessor()
     }
 
     cacheParamPointers();        // resolve all APVTS atomics once (audio thread reads these)
+    for (auto& p : voiceSlots) p.owner.ptr = this;
     initVoiceState();            // the voice layout every preset / session save and load uses
     refreshAllPitchQuantFlags(); // seed the stepped-pitch flags (default state has no modulators)
 

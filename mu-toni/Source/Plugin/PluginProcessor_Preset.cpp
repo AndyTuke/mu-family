@@ -16,22 +16,13 @@ namespace
     juce::String layerPrefix(int layer) { return "v" + juce::String(layer) + "_"; }
 }
 
-// Describe the layers once (ctor): each layer's v{N}_ params + its modulators. Every layer
+// Describe the layers once (ctor): each layer's v{N}_ param prefix (its modulators save through Arp). Every layer
 // preset, full preset and host session is built and applied from this.
 void PluginProcessor::initLayerState()
 {
     juce::StringArray prefixes;
     for (int l = 0; l < kNumChannels; ++l) prefixes.add(layerPrefix(l));
-    initSlotState(prefixes,
-        { [this](int l, juce::ValueTree& node)
-          { node.appendChild(mu_pp::serialiseModulators(layers[(size_t) l]), nullptr); },
-          [this](int l, const juce::ValueTree& node)
-          {
-              auto& slot = layers[(size_t) l];
-              mu_pp::clearModulators(slot);
-              mu_pp::deserialiseModulators(node.getChildWithName("Modulators"), slot, {},
-                                           [](const std::string& id) { return mu_toni::isValidModDest(id); });
-          } });
+    initSlotState(prefixes);
 }
 
 // Any saved state (host session or full preset, either format) in the composed shape. Sessions

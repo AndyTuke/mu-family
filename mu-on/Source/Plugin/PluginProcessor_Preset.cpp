@@ -66,30 +66,34 @@ void PluginProcessor::restoreRumbleEnv(const juce::ValueTree& env)
     mu_core::spinUnlock(rumbleEnvLock);
 }
 
-// Describe the lanes once (ctor): each lane's engine params, its step row (the Rumble lane: its
-// bar-volume envelope) and its modulators. Every track preset, full preset and host session is
-// built and applied from this.
+int PluginProcessor::laneOf(const Track& t) const noexcept { return (int) (&t - voiceSlots.data()); }
+
+void Track::writeExtras(juce::ValueTree& node) const
+{
+    const int l = owner.ptr->laneOf(*this);
+    node.appendChild(l < kNumStepLanes ? owner.ptr->stepPattern.serialiseTrack(l) : owner.ptr->serialiseRumbleEnv(), nullptr);
+    Layer::writeExtras(node);
+}
+
+bool Track::isValidDest(const std::string& id) const { return isValidLaneDest(owner.ptr->laneOf(*this), id); }
+
+void Track::applyExtras(const juce::ValueTree& node)
+{
+    // An absent <Track> clears the lane's steps; an absent envelope keeps the current one.
+    const int l = owner.ptr->laneOf(*this);
+    if (l < kNumStepLanes) owner.ptr->stepPattern.deserialiseTrack(l, node.getChildWithName("Track"));
+    else                   owner.ptr->restoreRumbleEnv(node.getChildWithName("RumbleEnv"));
+    Layer::applyExtras(node);
+}
+
+// Describe the lanes once (ctor): each lane's param prefix; its step row (the Rumble lane: its
+// bar-volume envelope) and modulators save through Track. Every track preset, full preset and host
+// session is built and applied from this.
 void PluginProcessor::initLaneState()
 {
     juce::StringArray prefixes;
     for (int l = 0; l < kNumChannels; ++l) prefixes.add(lanePrefix(l));
-    initSlotState(prefixes,
-        { [this](int l, juce::ValueTree& node)
-          {
-              node.appendChild(l < kNumStepLanes ? stepPattern.serialiseTrack(l) : serialiseRumbleEnv(), nullptr);
-              node.appendChild(mu_pp::serialiseModulators(voiceSlots[(size_t) l]), nullptr);
-          },
-          [this](int l, const juce::ValueTree& node)
-          {
-              // An absent <Track> clears the lane's steps; an absent envelope keeps the current one.
-              if (l < kNumStepLanes) stepPattern.deserialiseTrack(l, node.getChildWithName("Track"));
-              else                   restoreRumbleEnv(node.getChildWithName("RumbleEnv"));
-
-              auto& slot = voiceSlots[(size_t) l];
-              mu_pp::clearModulators(slot);
-              mu_pp::deserialiseModulators(node.getChildWithName("Modulators"), slot, {},
-                                           [l](const std::string& id) { return isValidLaneDest(l, id); });
-          } });
+    initSlotState(prefixes);
 }
 
 // Any saved state (host session or full preset, either format) in the composed shape. Older

@@ -444,11 +444,15 @@ private:
     juce::String serialiseVoiceColours() const;
     void         restoreVoiceColours(const juce::String& csv);
 
+    Layer* slotLayer(int i) override { return (i >= 0 && i < kMaxVoices) ? &voiceSlots[(size_t) i] : nullptr; }
+    friend struct Pattern;   // its persistence hooks hand over to the voice-extras members below
     // Composed state (mu-core LayerState): the voice layout every save / load uses, a voice's
     // non-parameter data (modulators, gates, user wavetables — they live outside APVTS) from its
     // node, and any saved state rebuilt in the composed shape with old X-Mod data migrated.
     void            initVoiceState();
+    void            writeVoiceExtras(int v, juce::ValueTree& node) const;
     void            applyVoiceExtras(int v, const juce::ValueTree& node);
+    int             voiceOf(const Pattern& p) const noexcept { return (int) (&p - voiceSlots.data()); }
     void            resolveUserWavetable(const juce::String& path, juce::String& storedPath, std::atomic<int>& index);
     juce::ValueTree toVoiceState(const juce::ValueTree& tree) const;
 

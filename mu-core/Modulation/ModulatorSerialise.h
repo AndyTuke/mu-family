@@ -243,3 +243,16 @@ inline constexpr const char* kChannelDataTag = "VoiceData";
 inline constexpr const char* kChannelNodeTag = "Voice";
 
 } // namespace mu_pp
+
+// Layer's base persistence hooks: the modulators, gated by the layer's own destination validator.
+inline void Layer::writeExtras(juce::ValueTree& node) const
+{
+    node.appendChild(mu_pp::serialiseModulators(*this), nullptr);
+}
+
+inline void Layer::applyExtras(const juce::ValueTree& node)
+{
+    mu_pp::clearModulators(*this);
+    mu_pp::deserialiseModulators(node.getChildWithName("Modulators"), *this, {},
+                                 [this](const std::string& id) { return isValidDest(id); });
+}

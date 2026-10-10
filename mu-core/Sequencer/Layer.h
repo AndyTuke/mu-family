@@ -5,6 +5,8 @@
 #include "Audio/VoiceParams.h"
 #include "MuLimits.h"
 
+#include <juce_data_structures/juce_data_structures.h>
+
 #include <atomic>
 #include <string>
 #include <vector>
@@ -30,12 +32,30 @@ struct CopyableSpinLock
         { return v.compare_exchange_strong(expected, desired, mo); }
 };
 
+// A non-owning pointer to the owning processor that a layer copy never carries over: assigning one
+// layer over another (remove / swap / reset) must keep the destination's own link.
+template <class T>
+struct OwnerLink
+{
+    T* ptr = nullptr;
+
+    OwnerLink() = default;
+    OwnerLink(const OwnerLink&) noexcept {}
+    OwnerLink& operator=(const OwnerLink&) noexcept { return *this; }
+};
+
 // Base struct shared by all mu-family voice slots.
 // Rhythm (mu-clid) extends this with Euclidean hit generators.
 // Future mu-tant voice types extend it with their own trigger data.
 struct Layer
 {
     static constexpr int MaxControlSequences = mu_limits::kMaxControlSequences;
+
+    virtual ~Layer() = default;
+    Layer(const Layer&)            = default;
+    Layer& operator=(const Layer&) = default;
+    Layer(Layer&&)                 = default;
+    Layer& operator=(Layer&&)      = default;
 
     Layer()
     {
@@ -62,4 +82,15 @@ struct Layer
 
     std::string name        = "<unnamed>";
     int         colourIndex = 0;   // index into MuLookAndFeel::channelPalette (8 colours)
+
+    // Persistence hooks (message thread; defined in Modulation/ModulatorSerialise.h). `writeExtras`
+    // adds the layer's non-parameter data to its slot node; `applyExtras` restores it, clearing
+    // whatever an absent child stands for. The base handles the modulators, gated by `isValidDest`;
+    // a product overrides to add its own data (and calls the base first).
+    virtual void writeExtras(juce::ValueTree& node) const;
+    virtual void applyExtras(const juce::ValueTree& node);
+    virtual bool isValidDest(const std::string& id) const { juce::ignoreUnused(id); return true; }
 };
+
+// The base persistence hooks need the modulator (de)serialiser, which itself takes a Layer.
+#include "Modulation/ModulatorSerialise.h"

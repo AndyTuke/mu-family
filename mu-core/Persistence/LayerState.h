@@ -20,7 +20,7 @@
 // the ACTUAL value, plus c="…" (the choice name) for a choice parameter — a range or choice-list
 // change can't silently shift a saved value. Rows written before format 2 (normalised v="…") still
 // read. A product's non-parameter slot data (modulators, gates, step rows, samples) is its
-// LayerExtras pair. Older full states (the APVTS dump + <VoiceData>) are rebuilt in this shape by
+// Layer::writeExtras / applyExtras (carried here as a LayerExtras pair). Older full states (the APVTS dump + <VoiceData>) are rebuilt in this shape by
 // composeLegacyState before they're applied, so every load runs one apply path.
 namespace mu_pp
 {
