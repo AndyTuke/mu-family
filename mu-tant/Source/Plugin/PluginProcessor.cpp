@@ -760,7 +760,7 @@ void PluginProcessor::swapVoices(int a, int b)
     { const int t1 = osc1UserIndex[(size_t) a].load(); osc1UserIndex[(size_t) a].store(osc1UserIndex[(size_t) b].load()); osc1UserIndex[(size_t) b].store(t1); }
     { const int t2 = osc2UserIndex[(size_t) a].load(); osc2UserIndex[(size_t) a].store(osc2UserIndex[(size_t) b].load()); osc2UserIndex[(size_t) b].store(t2); }
 
-    const Layer tmpSlot = voiceSlots[(size_t) a];
+    const Pattern tmpSlot = voiceSlots[(size_t) a];
     voiceSlots[(size_t) a] = voiceSlots[(size_t) b];
     voiceSlots[(size_t) b] = tmpSlot;
 
@@ -881,7 +881,7 @@ void PluginProcessor::resetVoiceSlot(int idx)
     gatePatterns[(size_t) idx].copyDataFrom(GatePattern{});
     filterPatterns[(size_t) idx].copyDataFrom(GatePattern{});
     pitchPatterns[(size_t) idx].copyDataFrom(GatePattern{});
-    voiceSlots[(size_t) idx] = Layer{};
+    voiceSlots[(size_t) idx] = Pattern{};
     osc1UserPath[(size_t) idx].clear(); osc1UserIndex[(size_t) idx].store(-1);
     osc2UserPath[(size_t) idx].clear(); osc2UserIndex[(size_t) idx].store(-1);
 }

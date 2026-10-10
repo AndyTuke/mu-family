@@ -2,7 +2,7 @@
 
 #include "Plugin/ProcessorBase.h"            // mu-core base
 #include "Plugin/MixerFxParams.h"            // mu-core: shared global-FX/mixer APVTS layout
-#include "Sequencer/Layer.h"             // mu-core: per-voice modulator data container
+#include "Sequencer/Pattern.h"           // mu-Tant layer type (derives mu-core Layer)
 #include "Modulation/LaneModulation.h"       // mu-core: shared range-based per-lane resolve
 #include "Sequencer/GatePattern.h"           // mu-tant: per-voice gate pattern
 #include "Audio/SynthVoice.h"                // mu-tant voice
@@ -331,7 +331,7 @@ public:
     // Per-voice modulator data — 8 ControlSequences + ModulationMatrix + modLock
     // per voice. Public so the UI (ModulatorPanel) can pass a pointer to the
     // currently-edited voice's slot.
-    std::array<Layer, kMaxVoices> voiceSlots;
+    std::array<Pattern, kMaxVoices> voiceSlots;
 
     // Per-voice drawable gate pattern. Public so GatingDesigner can mutate it.
     std::array<GatePattern, kMaxVoices> gatePatterns;
