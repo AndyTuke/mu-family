@@ -57,8 +57,7 @@ Step counts above 64 per ring. The sequencer engine is not the bottleneck — `S
 Generic CC → APVTS-parameter mapping so a hardware controller can drive any plugin knob. Distinct from MIDI program change → preset (already done family-wide via the shared `MidiPresetMap`).
 
 - **No foundation in place yet.** *(An earlier `ControlSequence::InputSource::MIDI_CC` / `midiCCNumber` data-model stub was removed in a later modulation refactor — this would be built fresh.)*
-- **Wiring needed:** read incoming CC values in `processBlock`, hold a CC→param-id map (MIDI-learn or a settings table), and either drive the `APVTS` parameter directly or feed values into the `paramValues` map that `ModulationMatrix::process()` reads from.
-- Belongs in `mu-core` (shared `processBlock`/modulation path) so all products inherit it.
+- **Ruled 2026-10-10** (full detail: [design-plugin-family.md, MIDI control mapping](design-plugin-family.md#midi-control-mapping--family-standard-ruled-2026-10-10)): the CC sets the **APVTS base value** (gesture-safe, on the message thread; the audio thread only coalesces and queues, never writes a parameter), not the `ModulationMatrix` input. The map is one global per-user file per product (not in the preset), targets by parameter id, in `mu-core/Control/` with a device-independent `ControlAction` vocabulary shared with `mu-control`. Quantise (off / beat / bar, default bar) applies to mute, solo and stop only.
 - **Performance level (proposed, owner 2026-10-09):** a list of 8 pointers to presets (each up to 8 layers, each layer 8 clips) for playing live; a performance is the natural container for the one-instance rig below. See [design-launchpad.md](design-launchpad.md).
 - **First user: the Novation Launchpad X** (owner's controller, for playing live). Its full MIDI implementation, a proposed performance layout and the risks are in [design-launchpad.md](design-launchpad.md); backlog #1274-#1279 and #1281.
 

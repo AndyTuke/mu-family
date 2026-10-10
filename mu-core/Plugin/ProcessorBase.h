@@ -21,6 +21,8 @@
 #include "Audio/VoiceEngine.h"
 #include "Persistence/MidiPresetMap.h"
 #include "Persistence/MidiFullPresetMap.h"
+#include "Control/MidiControlRouter.h"   // MIDI CC / note -> actions (map, learn, audio hand-off)
+#include "Control/ParamGestureHold.h"
 #include "Persistence/LayerState.h"   // composed slot / full / host state (format 2)
 #include "MuLimits.h"
 #include "Sequencer/Layer.h"
@@ -51,6 +53,7 @@
 // plugin's concrete `PluginProcessor` type — eliminates the layering
 // violation that previously had mu-core including mu-clid headers.
 class ProcessorBase : public juce::AudioProcessor,
+                      public mu_core::ControlSink,   // performs the family control actions (MIDI map, surfaces)
                       protected juce::AsyncUpdater   // audio thread → message thread hand-off
 #if MU_CORE_HAS_CLAP
                     , public clap_juce_extensions::clap_juce_audio_processor_capabilities
@@ -327,14 +330,30 @@ public:
     std::function<void()>                            onPresetSwapCommitted;
     std::function<void(float)>                       onUiScaleChanged;
 
-    // Audio-thread: call once per processBlock. Queues the block's program changes
-    // (scanMidiProgramChanges) and, if any, schedules the message-thread drain that
-    // loads them via applyMidiPresetSlot / applyFullMidiPreset.
-    void queueMidiProgramChanges(const juce::MidiBuffer& midi)
+    // Audio-thread: call once per processBlock, before the engine reads the MIDI. Queues the
+    // block's program changes (scanMidiProgramChanges) and the CC / notes the control map claims
+    // (those are taken out of `midi`), and schedules the message-thread drain that loads / performs
+    // them via applyMidiPresetSlot / applyFullMidiPreset / perform.
+    void queueMidiProgramChanges(juce::MidiBuffer& midi)
     {
-        if (scanMidiProgramChanges(midi))
+        const bool presets = scanMidiProgramChanges(midi);
+        const bool control = midiControlRouter.process(midi);
+        if (presets || control)
             triggerAsyncUpdate();
     }
+
+    // Audio-thread: call right after the block's transport is resolved, so the next block's
+    // quantised control actions (mute / solo / stop on the beat or bar) know where the beat is.
+    void noteBlockTransport(const mu_core::BlockTransport& t) noexcept
+    {
+        int num = 4, den = 4;
+        getHostTimeSignature(num, den);
+        midiControlRouter.noteBlock(t, num > 0 && den > 0 ? (double) num * 4.0 / (double) den : 4.0);
+    }
+
+    // The MIDI control map (CC / note -> action) and its performer. UI and settings reach it here.
+    mu_core::MidiControlMap& getMidiControlMap() noexcept { return midiControlMap; }
+    bool perform(const mu_core::ControlAction& action) override;
 
     // Audio-thread: scans incoming MIDI for program-change messages on
     // channels 1-8 (per-slot map, gated by `midiPresetMap.getChannelMask()`)
@@ -423,6 +442,7 @@ protected:
     {
         commitDeferredWork();
         drainPendingMidiProgramChanges();
+        midiControlRouter.drain(*this);
     }
 
     // Message-thread work the audio thread asked for with triggerAsyncUpdate()
@@ -568,6 +588,11 @@ private:
     static constexpr int kPCFifoSize = mu_limits::kProgramChangeFifoSize;
     juce::AbstractFifo                          pcFifo { kPCFifoSize };
     std::array<ProgramChangeEvent, kPCFifoSize> pcQueue {};
+
+    // MIDI control mapping: the saved table, the audio hand-off and the gesture-holding writer.
+    mu_core::MidiControlMap    midiControlMap;
+    mu_core::MidiControlRouter midiControlRouter { midiControlMap };
+    mu_core::ParamGestureHold  gestureHold;
 
 private:
     // Forwards mixer / global-FX parameter changes to syncGlobalFxParam (see startFxParamSync).

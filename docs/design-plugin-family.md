@@ -536,6 +536,71 @@ driver owns its controller's port and sends directly. If MIDI clock is sent to a
 flashing and pulsing follow the beat), the driver lends its port to a `TimedMidiOut` like any other owner.
 This doesn't change where anything lives: `mu-control` uses mu-core, never the reverse.
 
+## MIDI control mapping — family standard (ruled 2026-10-10)
+
+The generic "a MIDI CC / note drives something" layer (backlog #1275). It lives in `mu-core/Control/` (new folder; it holds
+only what [design-launchpad.md §3.2a](design-launchpad.md#32a-where-the-code-lives-a-separate-mu-control-library-owner-deferred-to-this-recommendation-2026-10-09)
+keeps in `mu-core`), namespace `mu_core`, one main class per file:
+
+| File | Role |
+|---|---|
+| `Control/ControlAction.h` | The device-independent action vocabulary: `enum class ControlActionType` + `struct ControlAction { type; int layer; juce::String paramId; float value; Quantise quantise; }`. Persisted by **stable string name**, never by the enum integer. |
+| `Control/ControlSink.h` | `struct ControlSink { virtual bool perform(const ControlAction&) = 0; }` — message thread only. `ProcessorBase` implements it; `mu-control` surface models call it too, so a MIDI message and a Launchpad pad end in the same place. |
+| `Control/MidiControlMap.{h,cpp}` | The saved table: `MidiMapping { source (CC / Note, channel 0 = omni, number), action, min, max, invert, quantise override }`, edit / MIDI-learn / load / save, and the audio-thread lookup table. |
+| `Control/MidiControlRouter.{h,cpp}` | The audio-to-message hand-off (below). A member of `ProcessorBase`, called once per block like `queueMidiProgramChanges`. |
+
+**Vocabulary now:** `Parameter` (knob-to-parameter), `TransportToggle`, `TransportPlay`, `TransportStop`, `MuteLayer`,
+`SoloLayer`. **Declared, unimplemented (`perform` returns false):** `SelectLayer`, `LaunchClip`, `PresetNext`,
+`PresetPrev`, `Panic`. Mute and solo are not new engine paths: they resolve to the layer's strip `mute` / `solo`
+parameter and take the `Parameter` route.
+
+**1. Parameter writes go to the APVTS parameter, not the ModulationMatrix.** The CC sets the knob's *base value* through
+`RangedAudioParameter::beginChangeGesture / setValueNotifyingHost / endChangeGesture` (a gesture is held open until
+about 300 ms after the last CC for that mapping, so a host records one automation stroke). The matrix keeps reading
+the base value and adds modulation on top, so "ModulationMatrix is the single reader" holds and a CC never competes
+with a `ControlSequence`. Feeding the matrix would leave the knob, the saved state and host automation unmoved.
+
+**2. The audio thread never writes a parameter.** `setValueNotifyingHost` runs every APVTS listener synchronously
+(`startFxParamSync` → `syncGlobalFxParam`, attachments, the host wrapper), none of which is real-time safe. The audio
+thread only (a) looks the message up in a fixed `std::array<std::atomic<int16_t>, 2 * 16 * 128>` (kind, channel,
+number → mapping index, or -1; the message thread rewrites it on every edit), (b) for a **knob** mapping stores the
+latest value in `std::atomic<float> latest[kMaxMappings]` and sets a dirty bit (a 127-step sweep coalesces to one write
+and cannot overflow a queue), (c) for an **action** mapping pushes `{mapping, value, dueSample}` into a
+`juce::AbstractFifo` (exactly `pcFifo`'s pattern), then `triggerAsyncUpdate()`. The message-thread drain
+(`handleAsyncUpdate`, beside `drainPendingMidiProgramChanges`) resolves `apvts.getParameter(paramId)` and performs.
+Mapped messages are **removed from the block's `MidiBuffer`** (the scan takes it non-const and runs before the engine
+reads notes), so a mapped pad does not also play a note. `kMaxMappings = 512`; MIDI learn is one packed
+`std::atomic<uint32_t>` the audio thread fills with the first message seen while learn is armed.
+Sample offsets are carried in the event but **not used for v1 parameter or action application**: both land
+on the message thread, so exactness below one block is unreachable by design. Escape hatch if a measured need
+appears: the audio thread applies mute / transport atomics itself at the offset. Do not do it speculatively.
+
+**3. Persistence: one global per-user file per product, not part of the preset.** `<settingsDir>/<appName>_midiControl.json`,
+beside `…_midiPresets.json`, with the same `setStorageFile` / `load` / auto-save-on-edit shape as `MidiPresetMap`.
+Reasons: the map describes the player's hardware, not the song; a full-preset hot-swap must never remap the pads under
+the player's hands; a shared preset must not carry someone else's CC numbers; it is the model the family already has for
+program changes. Parameter targets are stored by **parameter id string** and resolved at drain time, so a layer that was
+added or removed leaves an *unresolved* row (shown greyed in the editor, never an error, never a dangling pointer) that
+works again when the id reappears. Layer actions store the layer **index** (the 0-based position), resolved against the
+live layer count. The file carries a `version`; parameter ids are saved data (design-naming) and a prefix change needs a migration of this
+file too. A later "export / import map" is a file copy and needs no format change.
+
+**4. Quantise is a global setting with a per-mapping override.** `enum class Quantise { Default, Off, Beat, Bar }` on
+the mapping; a global `Off / Beat / Bar` in the app settings (default **Bar**) fills `Default`. It applies to
+`MuteLayer`, `SoloLayer` and `TransportStop`. It never applies to `Parameter` (knobs are continuous),
+to `TransportPlay` / `TransportToggle` starting from stop (nothing to align to), nor to preset or clip changes (the hot-swap
+`Stager` already waits for its own loop / bar boundary; quantising twice is wrong). The audio thread decides: while
+the resolved transport is not playing, or `Off`, the action is due at once; otherwise the next boundary beat is
+`ceil(startBeat / q) * q` (q = 1 beat, or the bar length from `getHostTimeSignature`, 4/4 when none), computed from the
+`BlockTransport` that `mu_core::resolveTransport` returned for this block (so it follows host, mu-link, MIDI clock or
+internal, whichever won the rule). Due within this block → it is queued with `dueSample`; later → it waits in a
+fixed 32-entry audio-thread-owned pending list and is released in the block that contains the boundary. A transport
+press never bypasses the resolver: `TransportPlay` / `TransportStop` / `TransportToggle` are no-ops when `BlockTransport::playOutside`
+is true.
+
+Do not: add a MIDI-learn table per product; write parameters from `processBlock`; store the map in the preset; give an action
+its own persistence integer; put the map in `mu-control` (it needs no device).
+
 ## Hot-swap (staged preset / layer swaps) — family pattern
 
 Every product loads presets *while playing* without an audible glitch by **staging**

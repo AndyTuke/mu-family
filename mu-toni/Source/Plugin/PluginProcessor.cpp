@@ -361,6 +361,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
                                                            midiClockSync, midiClockBeat,
                                                            { internalPlaying, internalBpm, internalBeatPos, &nudgePhaseBeats, &nudgeDirection, &appliedSyncOffsetBeats },
                                                            numSamples, currentSampleRate, 0.0, getSyncOffsetMs());
+    noteBlockTransport(transport);   // lets the next block's quantised control actions find the beat
     const double bpm       = transport.bpm;
     const bool   isPlaying = transport.playing;
 

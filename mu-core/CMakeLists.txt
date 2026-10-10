@@ -63,6 +63,9 @@ target_sources(mu-core INTERFACE
     # into each Standalone target through Plugin/StandaloneShell.h.
     # Persistence — MIDI PC preset maps (per-slot ch 1-8 + full-preset ch 9).
     "${CMAKE_CURRENT_SOURCE_DIR}/Persistence/MidiPresetMap.cpp"
+    # MIDI control mapping (CC / note -> family actions): the saved map + the audio-thread router.
+    "${CMAKE_CURRENT_SOURCE_DIR}/Control/MidiControlMap.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Control/MidiControlRouter.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Persistence/MidiFullPresetMap.cpp"
     # Shared preset browser + MIDI PC editor panels.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/PresetBrowser.cpp"

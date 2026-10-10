@@ -403,6 +403,7 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/ModulationSkewTests.cpp       # C5 (proportion-space skew round-trips)
     Source/Tests/MidiClockSyncTests.cpp      # shared MIDI-clock slave (tempo estimate, step-exact beat)
     Source/Tests/TransportResolverTests.cpp    # family transport rule: host / MIDI-clock modes / own
+    Source/Tests/MidiControlTests.cpp          # MIDI control map: learn, quantise, hand-off
     Source/Tests/SidechainRemapTests.cpp       # sidechain sources follow their layer through remove / swap
     Source/Tests/BarPositionTests.cpp          # host meter + bar start → bar.beat.sixteenth
     Source/Tests/EmbeddedSampleTests.cpp       # preset samples: FLAC round trip is sample-identical
@@ -419,6 +420,8 @@ target_sources(mu-clid-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Persistence/MidiFullPresetMap.cpp"   # under test by C4
+    "${CMAKE_SOURCE_DIR}/mu-core/Control/MidiControlMap.cpp"          # under test by the MIDI control tests
+    "${CMAKE_SOURCE_DIR}/mu-core/Control/MidiControlRouter.cpp"
 )
 
 target_compile_features(mu-clid-tests PRIVATE cxx_std_17)

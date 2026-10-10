@@ -105,7 +105,7 @@ configuration could be a nice extra later (set the Launchpad's own scale from mu
 | Need | Today | Gap |
 |---|---|---|
 | Receive pad notes | Every product's `processBlock` already gets a `MidiBuffer` (mu-Toni and mu-Tant play held notes). | Pads would play notes as a keyboard only; nothing maps a pad to *mute layer 3*, *start*, *next preset*. |
-| Map a control to an action or knob | Only Program Change to preset (`MidiPresetMap`, `MidiFullPresetMap`). | **No CC / note to parameter mapping** (design-future: "MIDI CC remote control", 🟡). This is the main missing piece. |
+| Map a control to an action or knob | Only Program Change to preset (`MidiPresetMap`, `MidiFullPresetMap`). | **No CC / note to parameter mapping** (design-future: "MIDI CC remote control", 🟡). This is the main missing piece. Ruled 2026-10-10 in [design-plugin-family.md](design-plugin-family.md#midi-control-mapping--family-standard-ruled-2026-10-10): `mu-core/Control/`, writes the APVTS base value from the message thread, global per-user file. |
 | Send lights back | `MidiOutputEngine` sends 20 ms notes for mu-Clid MIDI-output mode. | **No controller output.** Lights need a MIDI output to the Launchpad, plus SysEx. |
 | Clock to the device | `mu-link` has `MidiClockOut` (with known issues, backlog #1254, #1258). | Needed so pulsing / flashing follows the song; fix the clock out first. |
 | Transport buttons | `mu_core::resolveTransport` (Host > HostTempo > MidiClock > Internal). | A pad must go through the resolver, not around it (a Start press must do nothing when a host owns the clock). |
@@ -126,6 +126,12 @@ slots into by supplying one small driver:
 A different surface then costs one driver plus (if its geometry differs) one default mapping. Nothing above the driver
 changes, and no app changes. This is the same shape as the engine swap point in
 [design-plugin-family.md](design-plugin-family.md): a stable interface in `mu-core`, the variable part behind it.
+
+**Two mappings, one destination (ruled 2026-10-10).** The MIDI-message table (CC / note → action, #1275) is in `mu-core`
+(`MidiControlMap`) and is global per user, not in the preset. The Launchpad's *surface mapping* (grid cell → action)
+is in `mu-control` and produces the same `ControlAction` values. Both end in `ControlSink::perform` on the message thread, so
+a pad and a hardware knob share one set of actions, quantise and transport rules. A driver never writes a
+parameter itself. A Launchpad in Programmer mode that arrives as MIDI notes may simply use the `mu-core` table.
 
 Actions are the family's own vocabulary, defined once: **launch clip (layer, index)**, **select layer**, **mute /
 solo layer**, **transport (play, stop, tap)**, **preset prev / next**, **panic**, **modifier (shift)**, and a generic

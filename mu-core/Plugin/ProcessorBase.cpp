@@ -89,6 +89,47 @@ void ProcessorBase::drainPendingMidiProgramChanges()
     pcFifo.finishedRead(ready);
 }
 
+// Performs one control action (message thread): a knob / button parameter, the transport, or a
+// layer's mute / solo. Returns false for actions not supported yet or whose target is gone.
+bool ProcessorBase::perform(const mu_core::ControlAction& a)
+{
+    using T = mu_core::ControlActionType;
+
+    // The layer strip's own mute / solo parameter, flipped.
+    auto flipStrip = [this, &a](const char* rest)
+    {
+        if (a.layer < 0 || a.layer >= getNumChannels()) return false;
+        auto* p = apvts.getParameter("ch" + juce::String(a.layer) + "_" + rest);
+        if (p == nullptr) return false;
+        gestureHold.set(*p, p->getValue() > 0.5f ? 0.0f : 1.0f);
+        return true;
+    };
+
+    switch (a.type)
+    {
+        case T::Parameter:
+        {
+            auto* p = apvts.getParameter(a.paramId);
+            if (p == nullptr) return false;   // the parameter is gone: the mapping stays, unresolved
+            gestureHold.set(*p, a.value);
+            return true;
+        }
+        case T::MuteLayer:       return flipStrip("mute");
+        case T::SoloLayer:       return flipStrip("solo");
+        case T::TransportToggle:
+            if (midiControlRouter.playIsOutside()) return false;   // the host / clock owns play
+            toggleInternalPlay();
+            return true;
+        case T::TransportPlay:
+        case T::TransportStop:
+            if (midiControlRouter.playIsOutside()) return false;
+            if (isInternalPlaying() != (a.type == T::TransportPlay))
+                toggleInternalPlay();
+            return true;
+        default:                 return false;   // select layer, clips, presets, panic: later
+    }
+}
+
 void ProcessorBase::initAppSettings(const juce::String& name)
 {
     appName = name;
@@ -100,6 +141,10 @@ void ProcessorBase::initAppSettings(const juce::String& name)
     auto settingsFile = opts.getDefaultFile();
     settingsFile.getParentDirectory().createDirectory();
     appSettings = std::make_unique<juce::PropertiesFile>(settingsFile, opts);
+
+    // The MIDI control map is per user and per product, beside the settings file.
+    midiControlMap.setStorageFile(settingsFile.getParentDirectory().getChildFile(name + "_midiControl.json"));
+    midiControlMap.load();
 
     // Restore the shared preferences: a fresh open uses the last UI size + MIDI-clock choice.
     uiScale = juce::jlimit(kUiScaleMedium, kUiScaleLarge,

@@ -274,6 +274,7 @@ PluginProcessor::BlockTransport PluginProcessor::computeLiteTransport(int numSam
                                              juce::jmax(1, numSamples), currentSampleRate);
     const bool   playing = t.playing;
     const double beatPos = t.startBeat;
+    noteBlockTransport(t);
 
     sequencerPlaying.store(playing);
     lastBeatPos.store(beatPos);
@@ -403,6 +404,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
             // must use fetch_add on a tick accumulator to avoid a load+store race.
             const double pos = noteModeBeatPos.load(std::memory_order_relaxed);
             beatPos = pos;
+            noteBlockTransport({});   // note mode runs its own clock: quantised control actions fire at once
             noteModeBeatPos.store(
                 pos + (buffer.getNumSamples() / currentSampleRate) * (bpm / 60.0),
                 std::memory_order_relaxed);
@@ -419,6 +421,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
         playing = t.playing;
         beatPos = t.startBeat;
         bpm     = t.bpm;
+        noteBlockTransport(t);   // lets the next block's quantised control actions find the beat
     }
 
     // detect transport stop→start edge and reset the sequencer's wrap detector
