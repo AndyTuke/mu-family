@@ -57,7 +57,7 @@ historical (a single rhythm preset isn't indexed); inside `.muClid` files,
 the same suffixes appear *without* a `r0_` prefix because they're already
 nested under a `Rhythm` child.
 
-The list of suffixes is the canonical [`mu_pp::kRhythmParamDefs[]`](../Source/RhythmParamTable.h)
+The list of suffixes is the canonical [`mu_clid::kRhythmParamDefs[]`](../../mu-clid/Source/Persistence/RhythmParamTable.h)
 table. The table is the single source of truth — adding a new per-rhythm
 parameter means adding one entry there + one APVTS-layout entry in
 [`createParameterLayout`](../Source/PluginProcessor_APVTS.cpp). Every preset
@@ -141,7 +141,7 @@ via `onLoadError` rather than silently no-op'd.
 - `Rhythm` children carry per-rhythm state (same suffixes as `MuClidRhythm`
   but without the `r0_` prefix).
 - `GlobalState` child carries FX / mixer state — the IDs in
-  `mu_pp::kGlobalParams` from
+  `mu_clid::kGlobalParams` from
   [PluginProcessor_Internal.h](../Source/PluginProcessor_Internal.h).
 - In v2 these are written as actual de-normalised values. Algorithm-name
   strings for `mst_insChar` / `mst_ins2Char` / `eff_algo` / `rev_algo` are

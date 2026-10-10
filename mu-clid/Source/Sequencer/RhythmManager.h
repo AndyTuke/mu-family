@@ -16,7 +16,7 @@ class Rhythm;
 class RhythmManager
 {
 public:
-    explicit RhythmManager(PluginProcessor& p) : proc_(p) {}
+    explicit RhythmManager(PluginProcessor& p) : proc(p) {}
 
     void add   (const Rhythm& r);
     void remove(int index);
@@ -29,7 +29,7 @@ public:
 private:
     void resetPlayState(int index);
 
-    PluginProcessor& proc_;
+    PluginProcessor& proc;
 };
 
 } // namespace mu_clid

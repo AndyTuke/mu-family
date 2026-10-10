@@ -49,7 +49,7 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
                                     int rhythmLoopWrapMask)
 {
     // Per-rhythm swaps: the master loop point, or each rhythm's own loop (Hot-swap timing).
-    const int mode = proc_.swapModeAtomic.load(std::memory_order_relaxed);
+    const int mode = proc.swapModeAtomic.load(std::memory_order_relaxed);
     bool needAsync = false;
     for (int r = 0; r < numRhythms; ++r)
         needAsync |= stager.flagIfReady(r, mu_clid::hotswap::perRhythmBoundaryReached(mode, r, masterLoopWrapped,
@@ -60,7 +60,7 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
     // boundary). When free-running (mstrLoop=0, the default), there is no master
     // loop to wrap, so fall back to rhythm 0's loop — otherwise the swap would
     // hang forever waiting for a boundary that never comes.
-    const bool hasMasterLoop = proc_.sequencer.getMasterLoopSteps() > 0;
+    const bool hasMasterLoop = proc.sequencer.getMasterLoopSteps() > 0;
     needAsync |= stager.flagFullIfReady(mu_clid::hotswap::fullPresetBoundaryReached(hasMasterLoop, masterLoopWrapped,
                                                                                    rhythmLoopWrapMask));
     return needAsync;
@@ -71,8 +71,8 @@ void HotSwapStager::installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceE
                                   const juce::String& samplePath)
 {
     // Retire-then-swap: the old engine continues rendering its in-flight tail from a retired slot.
-    auto oldEngine = std::move(proc_.voiceEngines[(size_t) r]);
-    proc_.voiceEngines[(size_t) r] = std::move(voice);
+    auto oldEngine = std::move(proc.voiceEngines[(size_t) r]);
+    proc.voiceEngines[(size_t) r] = std::move(voice);
 
     if (oldEngine)
     {
@@ -81,20 +81,20 @@ void HotSwapStager::installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceE
         oldEngine->markRetired();
 
         bool placed = false;
-        for (auto& slot : proc_.retiredVoiceEngines[(size_t) r])
+        for (auto& slot : proc.retiredVoiceEngines[(size_t) r])
             if (! slot) { slot = std::move(oldEngine); placed = true; break; }
         if (! placed)
         {
             // All retired slots full — spam-swap back-pressure: force-cut slot 0.
-            proc_.retiredVoiceEngines[(size_t) r][0] = std::move(oldEngine);
-            proc_.retiredReadyForCleanup[(size_t) r][0].store(false, std::memory_order_release);
+            proc.retiredVoiceEngines[(size_t) r][0] = std::move(oldEngine);
+            proc.retiredReadyForCleanup[(size_t) r][0].store(false, std::memory_order_release);
         }
     }
 
-    proc_.sequencer.getRhythm(r) = std::move(rhythm);
-    proc_.samples.setPath(r, samplePath);
-    proc_.sequencer.updatePattern(r);
-    proc_.sequencer.resetStepTrackingForSwap(r);
+    proc.sequencer.getRhythm(r) = std::move(rhythm);
+    proc.samples.setPath(r, samplePath);
+    proc.sequencer.updatePattern(r);
+    proc.sequencer.resetStepTrackingForSwap(r);
 }
 
 void HotSwapStager::processSwaps()
@@ -106,7 +106,7 @@ void HotSwapStager::processSwaps()
     // the engine when the unique_ptr is yanked.
     // Empty-fast-path: skip the suspend cost when no engines need cleanup.
     bool anyCleanupNeeded = false;
-    for (auto& slotArr : proc_.retiredReadyForCleanup)
+    for (auto& slotArr : proc.retiredReadyForCleanup)
     {
         for (auto& flag : slotArr)
             if (flag.load(std::memory_order_acquire)) { anyCleanupNeeded = true; break; }
@@ -117,27 +117,27 @@ void HotSwapStager::processSwaps()
         std::array<std::unique_ptr<VoiceEngine>,
                    SequencerEngine::MaxRhythms * mu_limits::kMaxRetiredVoiceEngines> orphans;
         int orphanCount = 0;
-        proc_.suspendProcessing(true);
-        for (int r = 0; r < (int)proc_.retiredReadyForCleanup.size(); ++r)
+        proc.suspendProcessing(true);
+        for (int r = 0; r < (int)proc.retiredReadyForCleanup.size(); ++r)
         {
             for (int i = 0; i < mu_limits::kMaxRetiredVoiceEngines; ++i)
             {
-                if (!proc_.retiredReadyForCleanup[(size_t)r][(size_t)i]
+                if (!proc.retiredReadyForCleanup[(size_t)r][(size_t)i]
                         .load(std::memory_order_acquire))
                     continue;
                 orphans[(size_t)orphanCount++] =
-                    std::move(proc_.retiredVoiceEngines[(size_t)r][(size_t)i]);
-                proc_.retiredReadyForCleanup[(size_t)r][(size_t)i]
+                    std::move(proc.retiredVoiceEngines[(size_t)r][(size_t)i]);
+                proc.retiredReadyForCleanup[(size_t)r][(size_t)i]
                     .store(false, std::memory_order_release);
             }
         }
-        proc_.suspendProcessing(false);
+        proc.suspendProcessing(false);
         // `orphans` destructs at scope exit — fully off the audio thread.
     }
 
     // Two-pass to suspend audio ONCE per call: collect all ready slots, then swap
     // them under one suspend, then do post-commit APVTS push + UI callback outside it.
-    const int n = proc_.numActiveRhythms.load(std::memory_order_acquire);
+    const int n = proc.numActiveRhythms.load(std::memory_order_acquire);
     std::array<int, SequencerEngine::MaxRhythms> readyRhythms {};
     int readyCount = 0;
     for (int r = 0; r < n; ++r)
@@ -146,7 +146,7 @@ void HotSwapStager::processSwaps()
 
     if (readyCount > 0)
     {
-        proc_.suspendProcessing(true);
+        proc.suspendProcessing(true);
         for (int idx = 0; idx < readyCount; ++idx)
         {
             const int r = readyRhythms[(size_t)idx];
@@ -155,17 +155,17 @@ void HotSwapStager::processSwaps()
                 installRhythm(r, std::move(sw.rhythm), std::move(sw.voice), sw.samplePath);
             });
         }
-        proc_.suspendProcessing(false);
+        proc.suspendProcessing(false);
 
         // Post-commit: APVTS push + editor refresh. One guard for the whole batch
         // so every panel's parameterChanged sees apvtsLoading=true.
-        mu_core::ScopedApvtsLoading guard(proc_.apvtsLoading);
+        mu_core::ScopedApvtsLoading guard(proc.apvtsLoading);
         for (int idx = 0; idx < readyCount; ++idx)
         {
             const int r = readyRhythms[(size_t)idx];
-            proc_.pushRhythmToAPVTS(r);
-            if (proc_.onSlotPresetCommitted)
-                proc_.onSlotPresetCommitted(r);
+            proc.pushRhythmToAPVTS(r);
+            if (proc.onSlotPresetCommitted)
+                proc.onSlotPresetCommitted(r);
         }
     }
 
@@ -175,9 +175,9 @@ void HotSwapStager::processSwaps()
     // lifting (parse, voice build, sample load) happened at stage time, so the
     // commit is just fast in-memory moves under suspend + an APVTS finalize.
     // (consumeFull releases the pre-built voices + tree afterwards.)
-    if (stager.consumeFull([this](PreparedFullPreset& p) { proc_.presetIO.commitStagedFullPreset(p); })
-        && proc_.onPresetSwapCommitted)
-        proc_.onPresetSwapCommitted();
+    if (stager.consumeFull([this](PreparedFullPreset& p) { proc.presetIO.commitStagedFullPreset(p); })
+        && proc.onPresetSwapCommitted)
+        proc.onPresetSwapCommitted();
 }
 
 } // namespace mu_clid

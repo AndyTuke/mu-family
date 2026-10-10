@@ -18,20 +18,23 @@ Release build of `mu-clid_Standalone` triggers the OneDrive post-build deploy to
 
 ```
 mu-clid/Source/
-├── Plugin/           PluginProcessor, PluginEditor (extends EditorShellBase),
-│                     PresetIO + PresetIO_HostState, HotSwapStager + HotSwapBoundary,
-│                     RhythmManager (proc.rhythms), SampleLibrary + SamplePreview
-│                     (proc.samples), ModulationSkew, StandaloneApp, LiteEditor
-├── Sequencer/        Rhythm, HitGenerator, SequencerEngine, EuclideanGenerator
+├── Plugin/           PluginProcessor (+ _APVTS / _Content / _Modulation / _Internal), PluginEditor
+│                     (extends EditorShellBase), HotSwapStager + HotSwapBoundary, StandaloneApp
+├── Audio/            SampleLibrary + SamplePreview (proc.samples)
+├── Sequencer/        Rhythm, HitGenerator, SequencerEngine, EuclideanGenerator,
+│                     RhythmManager (proc.rhythms)
+├── Modulation/       ModulationDestinations (ModDest::kTable), ModulationSnapshot, ModulationSkew
 ├── UI/               Euclidean panels + VoiceSection (Pitch/Filter/Amp
 │                     subsections; the Insert subsection + the ModulatorPanel /
 │                     ModMatrixPanel / ModulatorEditor / MixerOverlay are shared
 │                     from mu-core), RhythmCircle, RhythmMiniVisual, RhythmSidebar,
-│                     RhythmPanel, SampleBrowser, SettingsOverlay, MasterLoopSection
-├── Persistence/      PresetMigrations + helpers
+│                     RhythmPanel, SampleBrowser, SettingsOverlay, MasterLoopSection, LiteEditor
+├── Persistence/      PresetIO + PresetIO_HostState, PresetMigrations, RhythmParamTable + helpers
 ├── License/          LicenseChecker
 └── Tests/            juce::UnitTest suite
 ```
+
+All mu-Clid code is in namespace `mu_clid` (migrations in `mu_clid::migrate`); only `createPluginFilter` and `StandaloneApp.cpp` glue are global. `ScopedApvtsLoading` lives in `mu-core/Persistence` (`mu_core`).
 
 The editor shell (TransportBar, About, Save, PresetBrowser, MIDI-preset panels, StatusBar, demo banner, overlay state machine, layout, keybindings) lives in `mu-core/UI/EditorShellBase.h` — `PluginEditor` extends it and supplies sidebar (`RhythmSidebar`) + main panel (`RhythmPanel`) + mixer overlay + settings overlay.
 

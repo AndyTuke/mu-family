@@ -86,9 +86,17 @@ allocation, locks) a polymorphic layer must keep.
 ## 3. Rules
 
 ### Namespaces
-- Every product type lives in `mu_<product>` (`mu_tant`, `mu_toni`, `mu_on`, `mu_clid`). mu-Tant, mu-Toni
-  and mu-On comply; **mu-Clid does not** (see §4).
-- Product code never goes inside a `mu-core` namespace (mu-Clid defines functions in `mu_pp`).
+- Every product type lives in `mu_<product>` (`mu_tant`, `mu_toni`, `mu_on`, `mu_clid`). All four comply
+  (mu-Clid since build 1190); only `createPluginFilter()` and `StandaloneApp.cpp` glue stay global.
+- Product helpers that were once namespaced by area nest in the product namespace (`mu_clid::migrate`,
+  `mu_clid::md`, `mu_clid::ModDest`).
+- Product code never goes inside a `mu-core` namespace.
+- **Overload rule:** when a product adapter overloads a core function (e.g. `serialiseModulators(const
+  Rhythm&)` beside core's `Layer` version) and is moved from the core namespace into the product namespace,
+  every call into the core version must now be qualified (`mu_pp::serialiseModulators(...)`) and any stale
+  `using mu_pp::name;` line must be re-pointed or removed. Otherwise a `Rhythm` silently binds to the `Layer`
+  overload (derived-to-base) and compiles without error. After such a move, grep the product for unqualified
+  calls to the name.
 - `mu-core` uses `mu_core`, `mu_ui`, `mu_audio`, `mu_mod`, `mu_pp`, `mu_link`, … by area. The ~130
   `mu-core` types that are still global (filters, UI components) are left alone for now.
 - `createPluginFilter()` stays global (JUCE requires it).
@@ -145,15 +153,15 @@ slot state already stores ids without their prefix, so layer data is prefix-agno
 | Layer noun | Rhythm (mu-Clid, ~1580 uses), Voice (mu-Tant, ~820), Layer (mu-Toni), Lane / Channel / Track (mu-On). |
 | Parent class | Only `Rhythm` derives from `Layer`; the others use parallel arrays (§2). |
 | mu-core vocabulary | `kMaxChannels` is the layer cap; core types say both `Voice*` and `Channel*`; "Slot" has three meanings (11 types). |
-| Namespaces | mu-Clid: all but one of 46 types are global; also stray namespaces `md`, `ModDest`, `mu_pp_migrate`. |
+| Namespaces | Done at build 1190: mu-Clid is entirely in `mu_clid` (the Rhythm modulator adapters, preset and param tables and `PluginProcessor_Internal` helpers left `mu_pp`; `mu_pp_migrate` is `mu_clid::migrate`; `md` and `ModDest` nest in `mu_clid`). Only `createPluginFilter` and `StandaloneApp.cpp` stay global. |
 | Overlay vs Panel | Done at build 1172: `AboutOverlay`, `ActivationOverlay`, `MidiPresetsOverlay`, `MidiFullPresetsOverlay` (were `…Panel`). Still open: whether `SaveDialog` and `PresetBrowser` become overlays too or stay named exceptions (owner). |
 | Main sound panel | `VoiceSection` (mu-Clid), `VoicePanel` (mu-Tant), `EnginePanel` (mu-Toni, mu-On), `VoiceBand` (core). |
 | Sequencer names | `SequencerEngine`, `GatePattern`, `Arpeggiator` + `ArpVoiceRunner`, `GrooveSequencer` — no shared role. |
-| Capacity constants | `kMaxRhythms` (mu-Clid) still stands alone. mu-Tant's two `kMaxVoices` and mu-Toni / mu-On's `kMaxChannels` now read `mu_limits::kMaxLayers` (build 1171). |
+| Capacity constants | mu-Clid's `kMaxRhythms` survives only as a one-line alias of `mu_limits::kMaxLayers` in `HotSwapStager.h`; drop it for `mu_limits::kMaxLayers` directly (open). mu-Tant's two `kMaxVoices` and mu-Toni / mu-On's `kMaxChannels` now read `mu_limits::kMaxLayers` (build 1171). |
 | Acronyms | `…APVTS` function names in mu-Clid vs `…Apvts` elsewhere. |
 | Members | Trailing `_` in seven classes (mu-Clid helpers, `MidiClockSync`, `VocoderInsert`). |
 | Enums | plain `enum` in mu-Toni (3), mu-On (3), mu-Tant (2). |
-| Folders | Missing from the standard eight: mu-Clid has no `Audio`; mu-On has no `License` or `Persistence`. mu-Tant and mu-Toni `Persistence/` hold only `.gitkeep`. mu-Clid `Plugin/` holds `RhythmManager`, `SampleLibrary`, `SamplePreview`, `PresetIO`, `HotSwap*`, `ModulationSkew` that belong in `Audio/`, `Persistence/` and `Modulation/`. |
+| Folders | Done at build 1187: mu-Clid now has all eight (`SamplePreview` + `SampleLibrary` in `Audio/`, `RhythmManager` in `Sequencer/`, `PresetIO` + `PresetIO_HostState` in `Persistence/`, `ModulationSkew` in `Modulation/`, `LiteEditor` in `UI/`; `HotSwapStager` / `HotSwapBoundary` stay in `Plugin/` like mu-Tant's stager). Still open: mu-On has no `License` or `Persistence`; mu-Tant and mu-Toni `Persistence/` hold only `.gitkeep`. |
 | Saved data | Four param-id schemes; layer-preset extension and folder nouns disagree (mu-Tant: `.muPattern` in `Voices/`); mu-Tant's `.muPattern` already matches its `Pattern` layer type. |
 
 ---
@@ -165,8 +173,8 @@ C++ identifier changes never touch saved files; the data renames at the end do.
 1. **Cosmetic, any product, any time:** trailing `_` → none; plain `enum` → `enum class`; `…APVTS` →
    `…Apvts`; drop the redeclared `kMax*` in favour of `mu_limits`. (Do the `MidiClockSync` one while
    rewriting it for the sync work.) Backlog #1267.
-2. **mu-Clid into `mu_clid`** — the largest mechanical rename; do on the build PC, one file group at a
-   time, after the sync fixes that touch the same files. Backlog #1262.
+2. **mu-Clid into `mu_clid`** — done (build 1190). Lesson recorded as the overload rule in §3 Namespaces.
+   Backlog #1262.
 3. **Overlay / Panel renames** for the shell screens; shared `LayerPanel` / `LayerSidebar` in `mu-core`. Backlog #1266.
 4. **`Layer` → `Layer`**, then hoist the shared per-layer data into it product by product
    (mu-Tant and mu-Toni first — they have the parallel arrays); `Slot*` persistence types → `Layer*`. Backlog #1265.
@@ -174,8 +182,8 @@ C++ identifier changes never touch saved files; the data renames at the end do.
    exists) replace the parallel arrays; sequencer role names (`<X>Sequencer`) follow. Backlog #1264.
 6. **Saved-data names** — only with the combined instance, with migrations. Backlog #1263 (On Hold).
 
-Separately, the **standard `Source/` layout** (eight folders in every instrument product) is created now
-for the empty ones and completed by moving the misplaced files. Backlog #1268.
+Separately, the **standard `Source/` layout** (eight folders in every instrument product): folders created
+and mu-Clid's misplaced files moved (build 1187); mu-On's missing folders remain. Backlog #1268.
 
 Each step: Debug build + unit tests + the round-trip listening tests on the build PC before the next.
 

@@ -24,7 +24,6 @@ class PluginProcessor;
 class HotSwapStager
 {
 public:
-    static constexpr int kMaxRhythms = 8; // = mu_limits::kMaxLayers
 
     // A full .muClid preset pre-built off the audio thread, ready to swap in at the
     // next loop boundary. The expensive work (parsing, per-slot VoiceEngine build +
@@ -34,13 +33,13 @@ public:
     struct PreparedFullPreset
     {
         int numRhythms = 0;
-        std::array<Rhythm, kMaxRhythms>                       rhythms     {};
-        std::array<std::unique_ptr<VoiceEngine>, kMaxRhythms> voices      {};
-        std::array<juce::String, kMaxRhythms>                 samplePaths {};
+        std::array<Rhythm, mu_limits::kMaxLayers>                       rhythms     {};
+        std::array<std::unique_ptr<VoiceEngine>, mu_limits::kMaxLayers> voices      {};
+        std::array<juce::String, mu_limits::kMaxLayers>                 samplePaths {};
         juce::ValueTree                                       tree;
     };
 
-    explicit HotSwapStager(PluginProcessor& proc) : proc_(proc) {}
+    explicit HotSwapStager(PluginProcessor& proc) : proc(proc) {}
 
     // Message-thread: cancel any existing staged swap for a slot without bounds check.
     // Called from PresetIO::stageRhythmPreset before overwriting a pending swap.
@@ -88,9 +87,9 @@ private:
         std::unique_ptr<VoiceEngine> voice;
     };
 
-    mu_hotswap::Stager<PendingRhythm, PreparedFullPreset, kMaxRhythms> stager;
+    mu_hotswap::Stager<PendingRhythm, PreparedFullPreset, mu_limits::kMaxLayers> stager;
 
-    PluginProcessor& proc_;
+    PluginProcessor& proc;
 };
 
 } // namespace mu_clid

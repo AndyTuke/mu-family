@@ -9,12 +9,12 @@ class PluginProcessor;
 
 // Encapsulates all preset save/load logic extracted from PluginProcessor.
 // Declared as friend of PluginProcessor so it can access private members
-// (apvts, sequencer, voiceEngines, pendingSwaps, etc.) via proc_.
+// (apvts, sequencer, voiceEngines, pendingSwaps, etc.) via proc.
 // PluginProcessor keeps thin public delegates to the methods below.
 class PresetIO
 {
 public:
-    explicit PresetIO(PluginProcessor& proc) : proc_(proc) {}
+    explicit PresetIO(PluginProcessor& proc) : proc(proc) {}
 
     // One rhythm prepared off the audio thread, ready to install into a slot.
     struct PreparedRhythm
@@ -88,7 +88,7 @@ private:
     void            restoreSession(const juce::ValueTree& root);
     static void     applyPresetIdentity(const juce::ValueTree& state, Rhythm& r);
 
-    PluginProcessor& proc_;
+    PluginProcessor& proc;
 
     // Helpers extracted from loadPreset / applyRhythmPreset / restoreStateFromTree
     // so each top-level function reads as a sequence of named steps. All run on
