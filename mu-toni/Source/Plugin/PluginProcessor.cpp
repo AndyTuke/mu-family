@@ -360,7 +360,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
                                                            wrapperType == wrapperType_Standalone,
                                                            midiClockSync, midiClockBeat,
                                                            { internalPlaying, internalBpm, internalBeatPos },
-                                                           numSamples, currentSampleRate);
+                                                           numSamples, currentSampleRate, 0.0, getSyncOffsetMs());
     const double bpm       = transport.bpm;
     const bool   isPlaying = transport.playing;
 

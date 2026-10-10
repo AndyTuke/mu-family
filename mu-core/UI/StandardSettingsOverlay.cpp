@@ -43,19 +43,53 @@ StandardSettingsOverlay::StandardSettingsOverlay(ProcessorBase& p, Options optio
                  "(reopen the plugin for label fonts to fully rescale)",
                  r.ctrlX, r.area.getRight() - r.ctrlX); } });
 
-    // ── Transport — internal free-running BPM.
-    if (options.showTransport)
+    // ── Transport — internal free-running BPM (where a product shows it here) and, in the
+    //    standalone, the meter the bar.beat display counts in. Pattern lengths stay four beats a bar.
+    const bool showMeter = isStandalone;
+    if (options.showTransport || showMeter)
     {
-        makeFieldLabel(bpmLabel, "Tempo");
-        bpmInput.setDecimals(MuLookAndFeel::kBpmDecimals);
-        bpmInput.setStep(MuLookAndFeel::kBpmStep);
-        bpmInput.setFineStep(MuLookAndFeel::kBpmFineStep);
-        bpmInput.setValueD(proc.getInternalBpm());
-        bpmInput.onChangeD = [this](double v) { proc.setInternalBpm(v); };
-        addAndMakeVisible(bpmInput);
-        general.push_back({ "Transport", kRowH, [this](const Rows& r) {
-            bpmLabel.setBounds(r.labelX, r.area.getY(), r.labelW, r.rowH);
-            bpmInput.setBounds(r.ctrlX,  r.area.getY(), s(90),    r.rowH); } });
+        if (options.showTransport)
+        {
+            makeFieldLabel(bpmLabel, "Tempo");
+            bpmInput.setDecimals(MuLookAndFeel::kBpmDecimals);
+            bpmInput.setStep(MuLookAndFeel::kBpmStep);
+            bpmInput.setFineStep(MuLookAndFeel::kBpmFineStep);
+            bpmInput.setValueD(proc.getInternalBpm());
+            bpmInput.onChangeD = [this](double v) { proc.setInternalBpm(v); };
+            addAndMakeVisible(bpmInput);
+        }
+        if (showMeter)
+        {
+            makeFieldLabel(timeSigLabel, "Time signature");
+            static const std::pair<int, int> kMeters[] = { {2,4}, {3,4}, {4,4}, {5,4}, {6,4}, {7,4}, {5,8}, {6,8}, {7,8}, {9,8}, {12,8} };
+            int current = 3, num = 4, den = 4;
+            proc.getTimeSignature(num, den);
+            for (int i = 0; i < (int) std::size(kMeters); ++i)
+            {
+                timeSigDropdown.addItem(juce::String(kMeters[i].first) + "/" + juce::String(kMeters[i].second), i + 1);
+                if (kMeters[i].first == num && kMeters[i].second == den) current = i + 1;
+            }
+            timeSigDropdown.setSelectedId(current, false);
+            timeSigDropdown.onChange = [this](int id)
+            {
+                if (id >= 1 && id <= (int) std::size(kMeters))
+                    proc.setTimeSignature(kMeters[id - 1].first, kMeters[id - 1].second);
+            };
+            addAndMakeVisible(timeSigDropdown);
+        }
+        const bool tempo = options.showTransport;
+        general.push_back({ "Transport", (tempo && showMeter) ? 2 * kRowH + kRowGap : kRowH, [this, tempo, showMeter](const Rows& r) {
+            if (tempo)
+            {
+                bpmLabel.setBounds(r.labelX, r.area.getY(), r.labelW, r.rowH);
+                bpmInput.setBounds(r.ctrlX,  r.area.getY(), s(90),    r.rowH);
+            }
+            if (showMeter)
+            {
+                const int y = r.area.getY() + (tempo ? r.rowH + s(kRowGap) : 0);
+                timeSigLabel   .setBounds(r.labelX, y, r.labelW, r.rowH);
+                timeSigDropdown.setBounds(r.ctrlX,  y, s(90),    r.rowH);
+            } } });
     }
 
     // ── MIDI Clock (standalone only) — slave the beat / tempo to external MIDI clock.
@@ -75,14 +109,27 @@ StandardSettingsOverlay::StandardSettingsOverlay(ProcessorBase& p, Options optio
         midiMessagesDropdown.setSelectedId(proc.getMidiSyncMessages() + 1, false);
         midiMessagesDropdown.onChange = [this](int id) { proc.setMidiSyncMessages(id - 1); };
         addAndMakeVisible(midiMessagesDropdown);
+
+        // Sync offset: positive = the app plays earlier than the clock says (enter the audio output
+        // latency, about 20-40 ms on WASAPI). Arrows step 1 ms, Shift+click 10.
+        makeFieldLabel(syncOffsetLabel, "Sync offset (ms)");
+        syncOffsetInput.setShowSign(true);
+        syncOffsetInput.setStep(1.0);
+        syncOffsetInput.setFineStep(10.0);
+        syncOffsetInput.setValue(proc.getSyncOffsetMs());
+        syncOffsetInput.onChange = [this](int ms) { proc.setSyncOffsetMs(ms); };
+        addAndMakeVisible(syncOffsetInput);
         updateMidiSyncVisibility();
 
-        midiClock.push_back({ "MIDI Clock", 2 * kRowH + kRowGap, [this](const Rows& r) {
+        midiClock.push_back({ "MIDI Clock", 3 * kRowH + 2 * kRowGap, [this](const Rows& r) {
             const int y2 = r.area.getY() + r.rowH + s(kRowGap);
+            const int y3 = y2 + r.rowH + s(kRowGap);
             clockSourceLabel    .setBounds(r.labelX, r.area.getY(), r.labelW, r.rowH);
             clockSourceDropdown .setBounds(r.ctrlX,  r.area.getY(), r.ctrlW,  r.rowH);
             midiMessagesLabel   .setBounds(r.labelX, y2,            r.labelW, r.rowH);
-            midiMessagesDropdown.setBounds(r.ctrlX,  y2,            r.ctrlW,  r.rowH); } });
+            midiMessagesDropdown.setBounds(r.ctrlX,  y2,            r.ctrlW,  r.rowH);
+            syncOffsetLabel     .setBounds(r.labelX, y3,            r.labelW, r.rowH);
+            syncOffsetInput     .setBounds(r.ctrlX,  y3,            s(90),    r.rowH); } });
     }
 }
 
@@ -123,10 +170,12 @@ void StandardSettingsOverlay::addSection(Where where, Section section, const juc
 
 void StandardSettingsOverlay::updateMidiSyncVisibility()
 {
-    // The Messages row only matters when MIDI-clock input is selected.
+    // The Messages and Sync offset rows only matter when MIDI-clock input is selected.
     const bool on = proc.getMidiSyncEnabled();
     midiMessagesLabel   .setVisible(on);
     midiMessagesDropdown.setVisible(on);
+    syncOffsetLabel     .setVisible(on);
+    syncOffsetInput     .setVisible(on);
 }
 
 void StandardSettingsOverlay::layoutContent()

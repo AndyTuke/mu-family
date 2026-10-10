@@ -176,6 +176,21 @@ public:
     MidiClockSync::ClockState getMidiClockState() const { return midiClockSync.getClockState(); }
     void   setMidiSyncEnabled(bool on);
     void   setMidiSyncMessages(int mode);
+
+    // Sync offset (standalone, saved in the app settings): how many ms the app plays EARLIER than the
+    // external clock says, to cancel the audio output latency. Applied to the resolved beat under MIDI clock.
+    static constexpr int kSyncOffsetMinMs = -50, kSyncOffsetMaxMs = 250;
+    int    getSyncOffsetMs() const { return syncOffsetMs.load(std::memory_order_relaxed); }
+    void   setSyncOffsetMs(int ms);
+
+    // The standalone transport's meter (saved): changes the displayed bar.beat.sixteenth only, patterns
+    // stay four beats a bar. A plugin reads the host's meter instead.
+    void   getTimeSignature(int& numerator, int& denominator) const
+    {
+        const int packed = timeSignature.load(std::memory_order_relaxed);
+        numerator = packed >> 8;  denominator = packed & 0xFF;
+    }
+    void   setTimeSignature(int numerator, int denominator);
     // Sets MIDI clock sync for this process only, without saving it (the headless render uses it so
     // a render never depends on the user's saved choice).
     void   setMidiSyncForSession(bool on, int mode) { midiClockSync.setMessages(mode); midiClockSync.setEnabled(on); }
@@ -362,6 +377,8 @@ protected:
     std::atomic<bool>   internalPlaying { false };
     std::atomic<double> internalBeatPos { 0.0 };
     std::atomic<double> internalBpm     { 120.0 };
+    std::atomic<int>    syncOffsetMs    { 0 };
+    std::atomic<int>    timeSignature   { (4 << 8) | 4 };   // numerator << 8 | denominator, one value so it can't tear
 
     // Reads the host playhead for this block and publishes it for the UI. Call it from
     // processBlock in place of mu_core::readHostTransport(getPlayHead()) — audio thread only.

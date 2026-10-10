@@ -286,6 +286,47 @@ public:
             }
         }
 
+        beginTest ("Sync offset: under MIDI clock the beat is advanced by offset x tempo, not elsewhere");
+        {
+            // A settled 120 BPM clock (a pulse every 1000 samples at 48 kHz).
+            auto settled = [](MidiClockSync& clock, Own& own)
+            {
+                clock.setEnabled(true);
+                clock.setMessages(2);
+                block(clock, own, msgs({ 0xFA }));
+                for (int b = 0; b < 200; ++b)
+                {
+                    juce::MidiBuffer m;
+                    m.addEvent(juce::MidiMessage((juce::uint8) 0xF8), (b * 480) % 1000 < 480 ? (b * 480) % 1000 : 0);
+                    clock.process(m, kBlock, kSr);   // keep the tempo estimate alive
+                }
+            };
+            MidiClockSync clock;
+            Own own;
+            settled(clock, own);
+            const double clockBeat = clock.process(juce::MidiBuffer(), kBlock, kSr);
+            const double bpm = clock.getBpm();
+            expect (bpm > 100.0, "tempo estimate settled");
+
+            auto resolve = [&](double offsetMs)
+            {
+                return mu_core::resolveTransport({}, true, clock, clockBeat, own.ref(), kBlock, kSr, 0.0, offsetMs);
+            };
+            const auto base = resolve(0.0);
+            expectWithinAbsoluteError (resolve(25.0).startBeat - base.startBeat, 25.0 * bpm / 60000.0, 1.0e-9, "+25 ms plays earlier");
+            expectWithinAbsoluteError (resolve(-10.0).startBeat - base.startBeat, -10.0 * bpm / 60000.0, 1.0e-9, "negative plays later");
+            expectEquals (resolve(25.0).blockBeats, base.blockBeats, "the block's span is unchanged");
+
+            // Own transport and a host are untouched by the offset.
+            MidiClockSync off;                                   // sync off: the own transport drives
+            Own own2;
+            own2.playing = true;
+            const auto a = mu_core::resolveTransport({}, true, off, 0.0, own2.ref(), kBlock, kSr, 0.0, 0.0);
+            own2.beat = 0.0;
+            const auto b2 = mu_core::resolveTransport({}, true, off, 0.0, own2.ref(), kBlock, kSr, 0.0, 100.0);
+            expectEquals (a.startBeat, b2.startBeat, "own transport ignores the offset");
+        }
+
         beginTest ("Transport only: no clock pulses is not a loss");
         {
             MidiClockSync clock;

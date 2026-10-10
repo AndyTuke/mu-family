@@ -249,6 +249,25 @@ slider.setNumDecimalPlacesToDisplay(0);
 
 ---
 
+## 6.5 Transport Timing Controls (standalone)
+
+Performance gestures live in the TransportBar; set-and-forget values live in the Settings overlay. Host builds (VST3/CLAP) show none of these: the host owns tempo, meter and latency compensation.
+
+**Transport pane order (standalone):** `[play] [BPM] [Tap or Clock lamp] [position] [nudge - +]`. The Tap button and the Clock lamp share one slot (`kClockW` 44px) because they are mutually exclusive: internal clock shows Tap, a MIDI-clock source shows the lamp.
+
+| Control | Where | Component | Spec |
+|---|---|---|---|
+| **Tap tempo** | TransportBar, the lamp slot, internal clock only (hidden under MIDI clock) | `juce::TextButton` "Tap", metal button helper, 44px wide, same height as the BPM field | Averages the last 4 intervals (needs 2 taps); a gap over 2 s starts a new count; result rounded to 0.1 and clamped 20.0–300.0 via the BPM path. Status bar: `Tap — tap the beat to set the tempo`. Tooltip: "Tap tempo". |
+| **Nudge** | TransportBar, right of the position field, standalone always (internal or MIDI clock) | Two `juce::TextButton`s "-" (slower) and "+" (faster), `kNudgeW` 22px each, 2px apart, momentary | While held the tempo (internal) or the resolved beat rate (MIDI clock) is scaled by -/+ `kNudgeBendPercent` = 4 %; on release it returns to exactly 1.0 (no accumulated change to the BPM field). The BPM field does not change. Both held = no bend. Status bar: `Nudge — hold to slow the groove 4%` / `speed up the groove 4%`. Tooltips: "Nudge slower (hold)", "Nudge faster (hold)". |
+| **Sync offset** | Settings overlay, MIDI group, in the MIDI Clock section as a third row after Messages; shown only while Source = MIDI In (always in mu-link) | `NudgeInput` (integer mode), row label "Sync offset" | Range -50 to +250 ms, step 1, Shift+click 10, default 0. Positive = the app plays earlier (it anticipates the master by N ms; enter your audio output latency, about 20-40 ms on WASAPI). Shown signed (`+25`); status bar `Sync offset: +25 ms (plays earlier)`. Applied by advancing the resolved beat by `offset * bpm / 60000` beats. |
+| **Time signature** | Settings overlay, General, "Transport" section (standalone only; for products that hide the tempo row the section holds only this row) | `DropdownSelect`, row label "Time signature" | Items: 2/4, 3/4, 4/4, 5/4, 6/4, 7/4, 5/8, 6/8, 7/8, 9/8, 12/8. Default 4/4. Display and metronome grid only: pattern lengths and hot-swap points stay 4 beats a bar. Numerator = beats per bar; a beat is a quarter note in x/4 and an eighth in x/8; position reads `bar.beat.sixteenth` with 4 sixteenths per beat in x/4 and 2 in x/8. The downbeat gets the accent in the bar grid. Plugin builds show the host meter read-only in the position tooltip, no control. |
+
+**Persistence (family-wide app settings via `ProcessorBase`, beside the MIDI-clock choice):** `syncOffsetMs` (int), `timeSigNumerator` (int), `timeSigDenominator` (int). Nudge percent and tap are not stored. mu-link mirrors Sync offset (same key, same range); it has no tap or nudge.
+
+Constants: `kSyncOffsetMin/Max/Default` (-50/250/0) beside `kBpm*` in `MuLookAndFeel`; `kNudgeBendPercent` (4) in the clock-sync code (behaviour, not drawing); `TransportBar::kNudgeW` 22 and the tap button reusing `kClockW`.
+
+---
+
 ## 7. Interaction Patterns
 
 These apply to all mu plugins uniformly.
@@ -262,6 +281,8 @@ These apply to all mu plugins uniformly.
 | Ctrl+click knob | Reset to default |
 | Knob hover (`mouseEnter`) | Fire `onStatusUpdate` immediately — status bar shows name + value |
 | NudgeInput arrow click | Step by the field's step; Shift+click steps by the fine step (BPM: 1.0 / 0.1) |
+| Nudge button hold (standalone) | Bend tempo -/+4 % while pressed, exact return on release (§6.5) |
+| Tap button | Set internal tempo from tap intervals (§6.5) |
 | SegmentControl click | Select segment, fire `onChange(index)` |
 | Delete rhythm | Confirmation popup with rhythm name, red-tinted button |
 
@@ -383,4 +404,5 @@ setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));   // mu-On
 
 - 2026-10-10 — MIDI clock locked / lost indicator in the TransportBar? A new shared `StatusLamp` (round lamp + "Clock" label) between BPM and position, standalone with clock sync on; amber dim / green / red bright; new token `indicatorFault`, size `kStatusLampD`; BPM field unchanged. Changed §3.5, §5, §9, §11.
 - 2026-10-10 — Fractional BPM (match a track at 127.5)? One decimal, always shown ("120.0"); arrows 1.0, Shift+click 0.1; text entry parses decimals and clamps; MIDI-clock display rounded to 0.1; `NudgeInput` gains a generic decimals mode (integer users unchanged); TransportBar `kBpmW` 72 to 80; mu-link slider interval 0.1 with one-decimal text. Changed §6.4, §7.
+- 2026-10-10 — Sync offset, nudge, tap tempo, time signature (standalone)? Tap (internal clock) takes the Clock-lamp slot; Nudge -/+ (hold = -/+4 %) sits right of the position field; Sync offset (-50..+250 ms, positive = plays earlier, default 0) and Time signature (dropdown, display/metronome only) go in Settings; keys `syncOffsetMs`, `timeSigNumerator`, `timeSigDenominator`. Changed new §6.5, §7.
 - 2026-10-10 — Tooltips: sparingly, or none anywhere? Sparingly: §1 stands (one-line hints on icon-only buttons and a few non-obvious controls, via the shell's single TooltipWindow, 700 ms); never a name or value, which stay in the StatusBar. Matches the code. Changed §6 StatusBar line; §10 mu_ui list now names StatusLamp and NudgeInput decimals mode.

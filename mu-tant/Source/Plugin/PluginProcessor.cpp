@@ -272,7 +272,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
                                                            wrapperType == wrapperType_Standalone,
                                                            midiClockSync, midiClockBeat,
                                                            { internalPlaying, internalBpm, internalBeatPos },
-                                                           numSamples, currentSampleRate, kMaxPatBeats);
+                                                           numSamples, currentSampleRate, kMaxPatBeats, getSyncOffsetMs());
     const double bpm  = transport.bpm;
     blkPlaying        = transport.playing;
     blkBeatStart      = transport.startBeat;

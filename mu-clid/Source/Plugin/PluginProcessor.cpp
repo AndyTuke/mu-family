@@ -415,7 +415,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
         const auto t = mu_core::resolveTransport(host, ! isPlugin,
                                                  midiClockSync, midiClockBlockBeatPos,
                                                  { internalPlaying, internalBpm, internalBeatPos },
-                                                 buffer.getNumSamples(), currentSampleRate);
+                                                 buffer.getNumSamples(), currentSampleRate, 0.0, getSyncOffsetMs());
         playing = t.playing;
         beatPos = t.startBeat;
         bpm     = t.bpm;

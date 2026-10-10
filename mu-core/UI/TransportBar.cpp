@@ -240,7 +240,7 @@ void TransportBar::updatePositionLabel()
 {
     double beatPos = 0.0;
     bool   gotPos  = false;
-    int    num = 4, den = 4;          // the standalone runs in 4/4
+    int    num = 4, den = 4;          // the standalone counts in the meter chosen in Settings
     double barStart = 0.0;
     bool   hasBarStart = false;
 
@@ -254,6 +254,7 @@ void TransportBar::updatePositionLabel()
     {
         beatPos = proc.getInternalBeatPos();
         gotPos  = true;
+        proc.getTimeSignature(num, den);
     }
 
     if (!gotPos)

@@ -33,7 +33,8 @@ void NudgeInput::setValueD(double v, bool notify)
 
 juce::String NudgeInput::valueText() const
 {
-    return decimals > 0 ? juce::String(value, decimals) : juce::String((int) std::lround(value));
+    const auto text = decimals > 0 ? juce::String(value, decimals) : juce::String((int) std::lround(value));
+    return showSign && value > 0.0 ? "+" + text : text;
 }
 
 void NudgeInput::nudge(int direction, bool fine)

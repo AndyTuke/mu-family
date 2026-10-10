@@ -106,6 +106,8 @@ void ProcessorBase::initAppSettings(const juce::String& name)
                            (float) appSettings->getDoubleValue("uiScale", (double) kUiScaleMedium));
     midiClockSync.setEnabled (appSettings->getBoolValue("midiSyncEnabled",  false));
     midiClockSync.setMessages(appSettings->getIntValue ("midiSyncMessages", 2));
+    syncOffsetMs.store(juce::jlimit(kSyncOffsetMinMs, kSyncOffsetMaxMs, appSettings->getIntValue("syncOffsetMs", 0)));
+    setTimeSignature(appSettings->getIntValue("timeSigNumerator", 4), appSettings->getIntValue("timeSigDenominator", 4));
 }
 
 juce::File ProcessorBase::getContentDir() const
@@ -137,6 +139,27 @@ void ProcessorBase::setMidiSyncMessages(int mode)
 {
     midiClockSync.setMessages(mode);
     if (appSettings != nullptr) { appSettings->setValue("midiSyncMessages", mode); appSettings->saveIfNeeded(); }
+}
+
+void ProcessorBase::setSyncOffsetMs(int ms)
+{
+    ms = juce::jlimit(kSyncOffsetMinMs, kSyncOffsetMaxMs, ms);
+    syncOffsetMs.store(ms, std::memory_order_relaxed);
+    if (appSettings != nullptr) { appSettings->setValue("syncOffsetMs", ms); appSettings->saveIfNeeded(); }
+}
+
+void ProcessorBase::setTimeSignature(int numerator, int denominator)
+{
+    // x/4 and x/8 only (the beat is a quarter or an eighth), 1..16 beats a bar.
+    denominator = denominator == 8 ? 8 : 4;
+    numerator   = juce::jlimit(1, 16, numerator);
+    timeSignature.store((numerator << 8) | denominator, std::memory_order_relaxed);
+    if (appSettings != nullptr)
+    {
+        appSettings->setValue("timeSigNumerator", numerator);
+        appSettings->setValue("timeSigDenominator", denominator);
+        appSettings->saveIfNeeded();
+    }
 }
 
 bool ProcessorBase::isFxParamId(const juce::String& id)

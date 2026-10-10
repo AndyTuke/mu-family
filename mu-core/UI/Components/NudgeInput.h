@@ -23,6 +23,9 @@ public:
     double getValueD() const noexcept { return value; }
     // A plain arrow click steps by `step` (when the step buttons are hidden); Shift+click by `fine`.
     void   setStep(double step)     { baseStep = step; }
+    // Show a leading + on positive values (an offset: +25).
+    void   setShowSign(bool show)   { showSign = show; repaint(); }
+    juce::String valueText() const;   // what the display shows (also the text editor's start text)
     void   setFineStep(double fine) { fineStep = fine; }
     // When false: hides step-size (1/5/10) buttons; if the label string is non-empty,
     // it is drawn in the space below the value display instead.
@@ -41,6 +44,7 @@ private:
     juce::String label;
     double minVal, maxVal, value;
     int    decimals  = 0;
+    bool   showSign  = false;
     double baseStep  = 1.0;    // arrow step when the step buttons are hidden
     double fineStep  = 1.0;    // Shift+arrow step
     int stepSize   = 1;
@@ -50,7 +54,6 @@ private:
     enum class HitZone { None, Up, Down, Step1, Step5, Step10, Display };
     HitZone getZone(juce::Point<int> p) const;
     void nudge(int direction, bool fine);
-    juce::String valueText() const;
     void showEditor();
 
     juce::Rectangle<int> upArrowBounds, downArrowBounds;

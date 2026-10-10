@@ -53,7 +53,8 @@ struct InternalTransport
 inline BlockTransport resolveTransport(const HostTransport& host, bool isStandalone,
                                        const MidiClockSync& clock, double clockBlockBeat,
                                        InternalTransport internal,
-                                       int numSamples, double sampleRate, double wrapBeats = 0.0)
+                                       int numSamples, double sampleRate, double wrapBeats = 0.0,
+                                       double syncOffsetMs = 0.0)
 {
     BlockTransport t;
     bool relocated = false;   // the clock moved the own beat this block (store it even while stopped)
@@ -108,6 +109,11 @@ inline BlockTransport resolveTransport(const HostTransport& host, bool isStandal
         t.bpm       = ownBpm;
         t.startBeat = internal.beatPos.load(std::memory_order_relaxed);
     }
+
+    // Sync offset: under an external MIDI clock the app plays `syncOffsetMs` earlier than the clock says,
+    // to cancel the audio output latency (positive = earlier). The block's span is unchanged.
+    if (t.source == BlockTransport::Source::MidiClock && t.beatOutside)
+        t.startBeat = std::max(0.0, t.startBeat + syncOffsetMs * t.bpm / 60000.0);
 
     // Bound the beat space (a host position can be any size, or negative in a pre-roll).
     auto wrap = [wrapBeats](double b)

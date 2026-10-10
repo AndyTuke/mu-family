@@ -75,7 +75,9 @@ private:
     SegmentControl uiSizeCtrl { { "Medium", "Large" } };
     juce::Label    bpmLabel;
     NudgeInput     bpmInput { "BPM", 20, 300, 120 };
-    juce::Label    clockSourceLabel, midiMessagesLabel;
+    juce::Label    clockSourceLabel, midiMessagesLabel, syncOffsetLabel, timeSigLabel;
+    NudgeInput     syncOffsetInput { "ms", ProcessorBase::kSyncOffsetMinMs, ProcessorBase::kSyncOffsetMaxMs, 0 };
+    DropdownSelect timeSigDropdown;
     DropdownSelect clockSourceDropdown, midiMessagesDropdown;
     void updateMidiSyncVisibility();
     juce::TextButton midiPresetsBtn, fullPresetsBtn;   // program-change tables (added on request)

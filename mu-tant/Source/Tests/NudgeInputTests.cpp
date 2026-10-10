@@ -44,6 +44,17 @@ public:
             expectEquals(intCalls, 0, "the int callback stays quiet in decimals mode");
         }
 
+        beginTest("Signed display for an offset: + on positive values only");
+        {
+            NudgeInput n("ms", -50, 250, 0);
+            n.setShowSign(true);
+            n.setValue(25);   expectEquals(n.valueText(), juce::String("+25"));
+            n.setValue(0);    expectEquals(n.valueText(), juce::String("0"));
+            n.setValue(-12);  expectEquals(n.valueText(), juce::String("-12"));
+            NudgeInput plain("x", 0, 10, 3);
+            expectEquals(plain.valueText(), juce::String("3"), "no sign unless asked");
+        }
+
         beginTest("Decimals mode: arrow click steps a whole BPM and keeps the fraction, Shift a tenth");
         {
             NudgeInput n("BPM", 20, 300, 120);
