@@ -16,7 +16,7 @@ namespace mu_on
 class SampleChannel
 {
 public:
-    enum Kind { HiHat = 0, Snare = 1 };
+    enum class Kind { HiHat, Snare };
 
     void prepare(double sr, int maxBlock, Kind k)
     {
@@ -80,9 +80,9 @@ private:
         const int len = (int) (0.3 * sampleRate);   // 300 ms one-shot
         sampleBuf.setSize(1, len);
         auto* d = sampleBuf.getWritePointer(0);
-        juce::Random rng(k == HiHat ? 0x4a7 : 0x5b2);
+        juce::Random rng(k == Kind::HiHat ? 0x4a7 : 0x5b2);
 
-        if (k == HiHat)
+        if (k == Kind::HiHat)
         {
             // Bright noise: high-passed (first difference) white noise with a fast decay.
             float prev = 0.0f;

@@ -60,7 +60,7 @@ public:
         beginTest("SampleChannel (hat): silent until triggered, then sounds and decays");
         {
             SampleChannel hat;
-            hat.prepare(sr, n, SampleChannel::HiHat);
+            hat.prepare(sr, n, SampleChannel::Kind::HiHat);
             hat.setParams(0.0f, 60.0f);
 
             juce::AudioBuffer<float> buf(2, n);
@@ -93,7 +93,7 @@ public:
         beginTest("SampleChannel: sample-accurate onset - silent before the offset, sounds after");
         {
             SampleChannel hat;
-            hat.prepare(sr, n, SampleChannel::HiHat);
+            hat.prepare(sr, n, SampleChannel::Kind::HiHat);
             hat.setParams(0.0f, 60.0f);
 
             const int off = n / 2;

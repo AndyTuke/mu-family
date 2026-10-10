@@ -34,8 +34,8 @@ public:
     {
         kick.prepare(sr);
         bass.prepare(sr, maxBlock);
-        hat.prepare(sr, maxBlock, SampleChannel::HiHat);
-        snare.prepare(sr, maxBlock, SampleChannel::Snare);
+        hat.prepare(sr, maxBlock, SampleChannel::Kind::HiHat);
+        snare.prepare(sr, maxBlock, SampleChannel::Kind::Snare);
         rumble.prepare(sr, maxBlock);
         kickFeed.setSize(2, juce::jmax(1, maxBlock));   // stash of the kick render → Rumble input
         kickFeed.clear();
