@@ -12,10 +12,10 @@
 #include "License/LicenseKey.h"       // product: mu-Clid id + filename + public key
 #include "MuLimits.h"
 #include "Modulation/ModulationSnapshot.h"
-#include "SampleLibrary.h"
-#include "RhythmManager.h"
+#include "Audio/SampleLibrary.h"
+#include "Sequencer/RhythmManager.h"
 #include "Plugin/MidiClockSync.h"   // shared mu-core MIDI-clock slave
-#include "PresetIO.h"
+#include "Persistence/PresetIO.h"
 #include "HotSwapStager.h"
 
 #include <memory>

@@ -47,14 +47,14 @@ target_sources(mu-clid
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginProcessor_APVTS.cpp
         Source/Plugin/PluginProcessor_Modulation.cpp
-        Source/Plugin/RhythmManager.cpp
+        Source/Sequencer/RhythmManager.cpp
         Source/Plugin/PluginProcessor_Content.cpp
-        Source/Plugin/PresetIO.cpp
-        Source/Plugin/PresetIO_HostState.cpp
+        Source/Persistence/PresetIO.cpp
+        Source/Persistence/PresetIO_HostState.cpp
         Source/Persistence/PresetMigrations.cpp
         Source/Plugin/HotSwapStager.cpp
-        Source/Plugin/SamplePreview.cpp
-        Source/Plugin/SampleLibrary.cpp
+        Source/Audio/SamplePreview.cpp
+        Source/Audio/SampleLibrary.cpp
         Source/Plugin/PluginEditor.cpp
         Source/Sequencer/EuclideanGenerator.cpp
         Source/Sequencer/HitGenerator.cpp
@@ -263,15 +263,15 @@ target_sources(mu-clid-lite
         Source/Plugin/PluginProcessor.cpp
         Source/Plugin/PluginProcessor_APVTS.cpp
         Source/Plugin/PluginProcessor_Modulation.cpp
-        Source/Plugin/RhythmManager.cpp
+        Source/Sequencer/RhythmManager.cpp
         Source/Plugin/PluginProcessor_Content.cpp
-        Source/Plugin/PresetIO.cpp
-        Source/Plugin/PresetIO_HostState.cpp
+        Source/Persistence/PresetIO.cpp
+        Source/Persistence/PresetIO_HostState.cpp
         Source/Persistence/PresetMigrations.cpp
         Source/Plugin/HotSwapStager.cpp
-        Source/Plugin/SamplePreview.cpp
-        Source/Plugin/SampleLibrary.cpp
-        Source/Plugin/LiteEditor.cpp
+        Source/Audio/SamplePreview.cpp
+        Source/Audio/SampleLibrary.cpp
+        Source/UI/LiteEditor.cpp
         Source/Sequencer/EuclideanGenerator.cpp
         Source/Sequencer/HitGenerator.cpp
         Source/Sequencer/Rhythm.cpp

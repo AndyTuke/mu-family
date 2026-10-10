@@ -4,10 +4,10 @@
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "PluginProcessor_Internal.h"
 #include "Audio/InsertSlotConfig.h"
-#include "Plugin/ModulationSkew.h"  // proportion-space skew helpers (shared with test C5)
+#include "Modulation/ModulationSkew.h"  // proportion-space skew helpers (shared with test C5)
 #include "Modulation/MuClidModDest.h"  // mu-clid modulation targets
 #if MUCLID_LITE_BUILD
-#include "LiteEditor.h"
+#include "UI/LiteEditor.h"
 #else
 #include "PluginEditor.h"
 #endif

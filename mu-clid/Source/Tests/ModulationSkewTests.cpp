@@ -8,7 +8,7 @@
 // seed from the write-back (which would shift every modulated value).
 
 #include <juce_core/juce_core.h>
-#include "Plugin/ModulationSkew.h"
+#include "Modulation/ModulationSkew.h"
 
 class ModulationSkewTest : public juce::UnitTest
 {

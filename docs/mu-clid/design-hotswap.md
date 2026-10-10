@@ -54,7 +54,7 @@ short `suspendProcessing` window.
 |---|---|
 | [mu-clid/Source/Plugin/HotSwapStager.h/.cpp](../../mu-clid/Source/Plugin/HotSwapStager.h) | The staging state machine: per-rhythm pending slots + one full-preset pending slot, the store-release/load-acquire handshake, `checkBoundaries` (audio thread) and `processSwaps` (message thread). |
 | [mu-clid/Source/Plugin/HotSwapBoundary.h](../../mu-clid/Source/Plugin/HotSwapBoundary.h) | **Pure** loop-boundary predicates (no processor dependency) so the defer decision is unit-testable. |
-| [mu-clid/Source/Plugin/PresetIO.cpp](../../mu-clid/Source/Plugin/PresetIO.cpp) | `stageRhythmPreset`, `loadPreset`, `buildPreparedFullPreset`, `commitStagedFullPreset` — the build + apply bodies. |
+| [mu-clid/Source/Persistence/PresetIO.cpp](../../mu-clid/Source/Persistence/PresetIO.cpp) | `stageRhythmPreset`, `loadPreset`, `buildPreparedFullPreset`, `commitStagedFullPreset` — the build + apply bodies. |
 | [mu-clid/Source/Plugin/PluginProcessor.cpp](../../mu-clid/Source/Plugin/PluginProcessor.cpp) | Boundary detection in `advanceSequencer` → `checkBoundaries` → `triggerAsyncUpdate`; `handleAsyncUpdate` → `processSwaps`. |
 | [mu-clid/Source/Sequencer/SequencerEngine.h](../../mu-clid/Source/Sequencer/SequencerEngine.h) | Emits `BlockResult { rhythmLoopWrapMask, masterLoopWrapped }` and owns the wrap detector. |
 | [mu-core/Audio/MixerEngine.cpp](../../mu-core/Audio/MixerEngine.cpp) | Renders **retired** voice engines (the swap tail) + flags them drained. |

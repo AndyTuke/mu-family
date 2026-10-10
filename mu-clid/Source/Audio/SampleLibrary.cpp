@@ -1,5 +1,5 @@
 #include "SampleLibrary.h"
-#include "PluginProcessor.h"
+#include "Plugin/PluginProcessor.h"
 
 SampleLibrary::SampleLibrary(PluginProcessor& p) : proc_(p)
 {

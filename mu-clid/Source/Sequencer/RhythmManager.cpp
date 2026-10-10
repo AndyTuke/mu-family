@@ -1,8 +1,8 @@
 // RhythmManager — rhythm-slot add / remove / swap / reset / rename (message thread).
 
 #include "RhythmManager.h"
-#include "PluginProcessor.h"
-#include "PluginProcessor_Internal.h"   // mu_core::ScopedApvtsLoading
+#include "Plugin/PluginProcessor.h"
+#include "Plugin/PluginProcessor_Internal.h"   // mu_core::ScopedApvtsLoading
 #include "Sequencer/Rhythm.h"
 
 void RhythmManager::add(const Rhythm& r)

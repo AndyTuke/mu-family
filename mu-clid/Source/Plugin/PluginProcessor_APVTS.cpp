@@ -12,7 +12,7 @@
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "PluginProcessor.h"
 #include "PluginProcessor_Internal.h"
-#include "ModulationSkew.h"   // knob ranges shared with modulation (depth = % of range)
+#include "Modulation/ModulationSkew.h"   // knob ranges shared with modulation (depth = % of range)
 #include "Audio/FX/Slots/FXAlgorithmDef.h"
 #include "Plugin/MixerFxParams.h"
 #include "ValueFormat.h"   // mu-core: shared value text

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
-#include "PluginProcessor.h"
+#include "Plugin/PluginProcessor.h"
 #include "UI/TransportBar.h"
 #include "UI/MasterLoopSection.h"
 #include "UI/RhythmCircle.h"

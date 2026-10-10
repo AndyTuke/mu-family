@@ -6,7 +6,7 @@
 #include "PluginProcessor_Internal.h"
 #include "Audio/SpinLock.h"            // mu-core: spin lock helpers
 #include "Audio/InsertSlotConfig.h"
-#include "Plugin/ModulationSkew.h"     // proportion-space skew helpers (shared with test C5)
+#include "Modulation/ModulationSkew.h"     // proportion-space skew helpers (shared with test C5)
 #include "Modulation/MuClidModDest.h"  // mu-clid modulation targets
 #include "Sequencer/Rhythm.h"
 

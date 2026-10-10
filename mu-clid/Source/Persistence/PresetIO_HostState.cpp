@@ -10,8 +10,8 @@
 // helpers (restoreRhythmSample etc.) and loadPreset stay in PresetIO.cpp and
 // are reached here as ordinary cross-TU method calls.
 #include "PresetIO.h"
-#include "PluginProcessor.h"
-#include "PluginProcessor_Internal.h"
+#include "Plugin/PluginProcessor.h"
+#include "Plugin/PluginProcessor_Internal.h"
 #include "Persistence/ModulatorSerialise.h" // serialiseModulators, deserialiseModulators, clearModulators
 #include "Persistence/PresetMigrations.h"   // migrateLegacyHostState
 #include "UI/Components/MuLookAndFeel.h" // kChannelPaletteSize

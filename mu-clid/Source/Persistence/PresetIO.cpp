@@ -1,6 +1,6 @@
 #include "PresetIO.h"
-#include "PluginProcessor.h"
-#include "PluginProcessor_Internal.h"
+#include "Plugin/PluginProcessor.h"
+#include "Plugin/PluginProcessor_Internal.h"
 #include "Persistence/PresetHelpers.h"      // writeKindedProperty, readKindedPropertyAsActualV2, kGlobalParamDefs
 #include "Persistence/PresetMigrations.h"   // v3 insert/master/mod-assignment migrations
 #include "Persistence/ModulatorSerialise.h" // serialiseModulators, deserialiseModulators, clearModulators
