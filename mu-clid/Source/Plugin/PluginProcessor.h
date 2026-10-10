@@ -70,13 +70,6 @@ public:
     void getStateInformation(juce::MemoryBlock& d) override { presetIO.getStateInformation(d); }
     void setStateInformation(const void* d, int s) override { presetIO.setStateInformation(d, s); }
 
-    // Internal transport comes from ProcessorBase; the UI beat follows the MIDI clock when synced.
-    double getInternalBeatPos()  const override
-    {
-        if (midiClockSync.isEnabled() && midiClockSync.isPlaying())
-            return midiClockSync.getBeatPosUI();
-        return internalBeatPos.load(std::memory_order_relaxed);
-    }
 
     // Multi-bus output (DAW only). Toggle is read at host scan-time; toggling at runtime
     // requires the host to rescan/reload the plugin to pick up the new bus configuration.
@@ -316,7 +309,7 @@ private:
     // processBlock is decomposed into private helpers invoked in order on the
     // audio thread. None allocate or take locks beyond processBlock's own
     // rhythmsLock ScopedTryLock.
-    struct BlockTransport { bool playing; double beatPos; double hostBpm = 0.0; };   // hostBpm 0 = host gave none
+    struct BlockTransport { bool playing; double beatPos; double bpm = 120.0; };   // bpm = the block's tempo (host > MIDI clock ticks > BPM field)
 #if MUCLID_LITE_BUILD
     // Lite MIDI-only path: read playhead / internal transport, publish
     // sequencerPlaying + lastBeatPos.
@@ -343,8 +336,6 @@ private:
     StripMod applyStripModulation(int r);
     void     publishModSnapshot(int r, const Rhythm& rhythm, const VoiceParams& modParams, const StripMod& stripMod);
     void     writeBackModulation(int r, const Rhythm& rhythm, VoiceParams& modParams);
-    // Effective BPM for tempo-synced FX: host tempo > MIDI clock > internal.
-    double deriveEffectiveBpm(double hostBpm);
     // Gather output buses, run the core mixer/voice render, mix the sample
     // preview, and emit per-rhythm MIDI.
     void renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,

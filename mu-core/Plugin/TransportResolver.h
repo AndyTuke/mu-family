@@ -11,11 +11,14 @@
 //   1. A playhead with a POSITION (a DAW host, or mu-link through its injected playhead):
 //      play, tempo and beat all follow it.
 //   2. Inside a host that gives no position: play + tempo follow the host; the beat runs on.
-//   3. Standalone with MIDI clock sync on: the clock owns play / stop, tempo and beat.
+//   3. Standalone with MIDI clock sync on: each half follows its Messages setting — play / stop
+//      from the clock's Start / Continue / Stop when transport messages are on (else the Play
+//      button), tempo and beat from the clock ticks when ticks are on (else the BPM field, with
+//      the own beat restarted at each Start).
 //   4. Otherwise the product's own transport (its Play button, BPM field and beat counter).
 //
-// Whenever the source is outside (1–3) the Play button mirrors it, and the internal beat counter
-// carries the beat on, so the UI position is live and the own transport resumes seamlessly if
+// Whenever play comes from outside the Play button mirrors it, and whenever the beat does the
+// internal beat counter carries it on, so the UI position is live and the own transport resumes seamlessly if
 // the source goes away. A product may bound its beat space (`wrapBeats`, e.g. mu-Tant's longest
 // pattern) — the block's start beat and the stored counter are then wrapped into it.
 namespace mu_core
@@ -26,13 +29,15 @@ struct BlockTransport
     enum class Source { Host, HostTempo, MidiClock, Internal };
 
     Source source         = Source::Internal;
+    bool   playOutside    = false;   // play state came from the host / clock, not the Play button
+    bool   beatOutside    = false;   // beat came from the host / clock, not the own counter
     bool   playing        = false;
     double bpm            = 120.0;
     double startBeat      = 0.0;   // the beat at this block's first sample
     double beatsPerSample = 0.0;
     double blockBeats     = 0.0;   // beats this block spans (0 while stopped)
 
-    bool   beatFromOutside() const noexcept { return source == Source::Host || source == Source::MidiClock; }
+    bool   beatFromOutside() const noexcept { return beatOutside; }
 };
 
 // The product's own transport state (its atomics, shared with the UI).
@@ -57,6 +62,7 @@ inline BlockTransport resolveTransport(const HostTransport& host, bool isStandal
     if (host.hasPosition)
     {
         t.source    = BlockTransport::Source::Host;
+        t.playOutside = t.beatOutside = true;
         t.playing   = host.playing;
         t.bpm       = host.bpm > 0.0 ? host.bpm : ownBpm;
         t.startBeat = host.ppqPosition;
@@ -64,16 +70,28 @@ inline BlockTransport resolveTransport(const HostTransport& host, bool isStandal
     else if (! isStandalone)
     {
         t.source    = BlockTransport::Source::HostTempo;
+        t.playOutside = true;
         t.playing   = host.playing;
         t.bpm       = host.bpm > 0.0 ? host.bpm : ownBpm;
         t.startBeat = internal.beatPos.load(std::memory_order_relaxed);
     }
     else if (clock.isEnabled())
     {
-        t.source    = BlockTransport::Source::MidiClock;
-        t.playing   = clock.isPlaying();
-        t.bpm       = clock.getBpm() > 0.0 ? clock.getBpm() : ownBpm;
-        t.startBeat = clockBlockBeat;
+        t.source      = BlockTransport::Source::MidiClock;
+        t.playOutside = clock.transportDrives();
+        t.beatOutside = clock.ticksDrive();
+        t.playing     = t.playOutside ? clock.isPlaying() : internal.playing.load(std::memory_order_relaxed);
+        if (t.beatOutside)
+        {
+            t.bpm       = clock.getBpm() > 0.0 ? clock.getBpm() : ownBpm;
+            t.startBeat = clockBlockBeat;
+        }
+        else
+        {
+            // Transport only: the own tempo and beat, restarted from bar 1 by the clock's Start.
+            t.bpm       = ownBpm;
+            t.startBeat = clock.startedInBlock() ? 0.0 : internal.beatPos.load(std::memory_order_relaxed);
+        }
     }
     else
     {
@@ -96,7 +114,7 @@ inline BlockTransport resolveTransport(const HostTransport& host, bool isStandal
 
     // Mirror an outside transport into the Play button, and carry the beat on past this block. A
     // stopped own transport leaves the counter alone (the UI may be resetting it).
-    if (t.source != BlockTransport::Source::Internal)
+    if (t.playOutside)
         internal.playing.store(t.playing, std::memory_order_relaxed);
     if (t.playing || t.beatFromOutside())
         internal.beatPos.store(wrap(t.startBeat + t.blockBeats), std::memory_order_relaxed);

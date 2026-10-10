@@ -202,7 +202,10 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
     // during pre-roll or REW-past-zero; without this, `globalStep` is negative,
     // `effectiveStep` stays negative even after the modulo (signed-int %), and
     // `pattern[stepIndex]` then indexes OOB → undefined behaviour.
-    const auto globalStep    = std::max(0, static_cast<int>(beatPosition / StepLengthBeats));
+    // The 1e-9 tolerance stops a beat that is a rounding hair below a step boundary (host ppq,
+    // summed tempo maths) from flooring to the previous step and firing a block late.
+    constexpr double kStepEpsilon = 1e-9;
+    const auto globalStep    = std::max(0, static_cast<int>(beatPosition / StepLengthBeats + kStepEpsilon));
     const int  effectiveStep = (masterLoopSteps > 0) ? (globalStep % masterLoopSteps) : globalStep;
     masterLoopCurrentStep.store(masterLoopSteps > 0 ? effectiveStep : 0, std::memory_order_relaxed);
 

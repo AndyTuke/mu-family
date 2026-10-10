@@ -94,6 +94,27 @@ public:
             f.run(120.0, 48, true);
             expectWithinAbsoluteError (sync.getBeatPosUI(), 2.0, 1.0e-9, "48 pulses = 2 beats");
         }
+
+        beginTest ("Every 16th boundary lands exactly on its step over 4 bars");
+        {
+            // Summing 1/24 per pulse drifts below the boundary and the step floor fires a pulse
+            // late; the beat must be exact so pulse 6k gives step k.
+            MidiClockSync sync;
+            sync.setEnabled(true);
+            juce::MidiBuffer start;
+            start.addEvent(juce::MidiMessage(0xFA), 0);
+            sync.process(start, kBlock, kSr);
+            int wrong = 0;
+            for (int p = 1; p <= 4 * 4 * 24; ++p)
+            {
+                juce::MidiBuffer tick;
+                tick.addEvent(juce::MidiMessage(0xF8), 0);
+                sync.process(tick, kBlock, kSr);
+                const int step = (int) (sync.getBeatPosUI() / 0.25);
+                if (step != p / 6) ++wrong;
+            }
+            expectEquals (wrong, 0, "pulses that floored to the wrong 16th step");
+        }
     }
 };
 

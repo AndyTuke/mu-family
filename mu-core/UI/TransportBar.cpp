@@ -134,7 +134,7 @@ void TransportBar::timerCallback()
     if (isStandalone)
     {
         const bool midiClockBpm = proc.getMidiSyncEnabled() && proc.getMidiSyncMessages() != 1;
-        if (midiClockBpm)
+        if (midiClockBpm && proc.getMidiClockBpm() > 0.0)   // 0 = no clock heard yet: keep the field's value
             bpmInput.setValue((int)std::round(proc.getMidiClockBpm()));
         bpmInput.setEnabled(!midiClockBpm);
 

@@ -254,8 +254,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     for (int r = 0; r < numRhythms; ++r)
         applyRhythmModulation(r, beatPos);
 
-    const double effectiveBpm = deriveEffectiveBpm(transport.hostBpm);
-    renderAudioBuses(buffer, midiMessages, numRhythms, effectiveBpm);
+    renderAudioBuses(buffer, midiMessages, numRhythms, transport.bpm);
 #endif
 }
 
@@ -354,6 +353,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
 
     double beatPos = 0.0;
     bool   playing = false;
+    double bpm     = internalBpm.load(std::memory_order_relaxed);   // this block's tempo (FX sync)
 
     const int  noteMode = midiNoteMode.load(std::memory_order_relaxed);
     const bool isPlugin = (wrapperType != wrapperType_Standalone);
@@ -389,6 +389,10 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
             }
         }
 
+        // Use host BPM when available so tempo-synced FX track the DAW, else the BPM field.
+        if (host.bpm > 0.0)
+            bpm = host.bpm;
+
         playing = noteModePlaying.load(std::memory_order_relaxed);
         if (playing)
         {
@@ -397,11 +401,6 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
             // must use fetch_add on a tick accumulator to avoid a load+store race.
             const double pos = noteModeBeatPos.load(std::memory_order_relaxed);
             beatPos = pos;
-            // Use host BPM when available so tempo-synced FX tracks the DAW;
-            // fall back to the internal transport BPM (set via the BPM field).
-            double bpm = internalBpm.load(std::memory_order_relaxed);
-            if (host.bpm > 0.0)
-                bpm = host.bpm;
             noteModeBeatPos.store(
                 pos + (buffer.getNumSamples() / currentSampleRate) * (bpm / 60.0),
                 std::memory_order_relaxed);
@@ -417,6 +416,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
                                                  buffer.getNumSamples(), currentSampleRate);
         playing = t.playing;
         beatPos = t.startBeat;
+        bpm     = t.bpm;
     }
 
     // detect transport stop→start edge and reset the sequencer's wrap detector
@@ -430,7 +430,7 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     sequencerPlaying.store(playing);
     lastBeatPos.store(beatPos);
 
-    return { playing, beatPos, host.bpm };
+    return { playing, beatPos, bpm };
 }
 
 void PluginProcessor::advanceSequencer(int numRhythms, double beatPos)
@@ -473,20 +473,6 @@ void PluginProcessor::advanceSequencer(int numRhythms, double beatPos)
     }
 }
 
-double PluginProcessor::deriveEffectiveBpm(double hostBpm)
-{
-    // Effective BPM for tempo-synced FX (Delay, Echo): host tempo (this block's playhead read,
-    // 0 = none) takes priority in DAW mode, MIDI clock estimate when locked in standalone,
-    // otherwise the internal transport.
-    double effectiveBpm = internalBpm.load(std::memory_order_relaxed);
-    if (hostBpm > 0.0)
-        effectiveBpm = hostBpm;
-    if (midiClockSync.isEnabled()
-        && wrapperType == wrapperType_Standalone
-        && midiClockSync.isPlaying())
-        effectiveBpm = midiClockSync.getBpm();
-    return effectiveBpm;
-}
 
 void PluginProcessor::renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
                                        int numRhythms, double effectiveBpm)
