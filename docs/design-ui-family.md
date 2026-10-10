@@ -206,7 +206,7 @@ Used only for enable/disable toggles on FX/Delay/Reverb rows. Size 36×22px. Sta
 
 ### StatusBar
 
-One global StatusBar per plugin. All controls report to it — no tooltips anywhere in the UI. `onStatusUpdate(name, valueString)` fires on `mouseEnter` (hover) and on value change.
+One global StatusBar per plugin. All controls report to it; a tooltip never carries a parameter name or value. The only tooltips are the one-line hints allowed in §1 (icon-only buttons and a few non-obvious controls), shown by the single `juce::TooltipWindow` the editor shell owns (700 ms delay). `onStatusUpdate(name, valueString)` fires on `mouseEnter` (hover) and on value change.
 
 ---
 
@@ -300,7 +300,7 @@ The following modules are candidates for extraction into a shared library once a
 
 | Module | Contents | Status in mu-clid |
 |---|---|---|
-| `mu_ui` | `MuLookAndFeel`, all `UI/Components/` (KnobWithLabel, DropdownSelect, SegmentControl, NudgeInput, NoteLengthControl, AddButton, VUMeter, StatusBar, StepEditor, LFOEditor) | In `Source/UI/Components/` |
+| `mu_ui` | `MuLookAndFeel`, all `UI/Components/` (KnobWithLabel, DropdownSelect, SegmentControl, NudgeInput (integer, or decimals mode for fractional values such as BPM), StatusLamp (lamp + label state indicator), NoteLengthControl, AddButton, VUMeter, StatusBar, StepEditor, LFOEditor) | In `Source/UI/Components/` |
 | `mu_fx` | `FXSlotBase`, `FXAlgorithmDef`, `EffectSlot`, `DelaySlot`, `ReverbSlot`, `FXChain`, all 8 effect algorithms, `OversampledProcessor` | In `Source/FX/` |
 | `mu_modulation` | `ControlSequence`, `ModulationMatrix`, modulator editors | In `Source/Modulation/` |
 | `mu_voice` | `VoiceEngine`, `SamplePlayer`, `VoiceChain`, `TimeStretcherBase` | In `Source/Audio/` (voice-related) |
@@ -383,3 +383,4 @@ setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));   // mu-On
 
 - 2026-10-10 — MIDI clock locked / lost indicator in the TransportBar? A new shared `StatusLamp` (round lamp + "Clock" label) between BPM and position, standalone with clock sync on; amber dim / green / red bright; new token `indicatorFault`, size `kStatusLampD`; BPM field unchanged. Changed §3.5, §5, §9, §11.
 - 2026-10-10 — Fractional BPM (match a track at 127.5)? One decimal, always shown ("120.0"); arrows 1.0, Shift+click 0.1; text entry parses decimals and clamps; MIDI-clock display rounded to 0.1; `NudgeInput` gains a generic decimals mode (integer users unchanged); TransportBar `kBpmW` 72 to 80; mu-link slider interval 0.1 with one-decimal text. Changed §6.4, §7.
+- 2026-10-10 — Tooltips: sparingly, or none anywhere? Sparingly: §1 stands (one-line hints on icon-only buttons and a few non-obvious controls, via the shell's single TooltipWindow, 700 ms); never a name or value, which stay in the StatusBar. Matches the code. Changed §6 StatusBar line; §10 mu_ui list now names StatusLamp and NudgeInput decimals mode.
