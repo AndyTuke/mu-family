@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 $word = New-Object -ComObject Word.Application
 $word.Visible = $false
 $doc = $word.Documents.Add()
