@@ -133,6 +133,14 @@ def run_one(test_name: str, spec: dict, spec_path: Path, exe: Path, product: str
         if render.get('host_bpm') is not None:
             cmd += ['--host-bpm', str(render['host_bpm'])]
 
+    # Optional external MIDI clock: pulses from t=0 at midi_clock BPM, Start at midi_clock_start.
+    if render.get('midi_clock') is not None:
+        cmd += ['--midi-clock', str(render['midi_clock'])]
+        for key, flag in (('midi_clock_start', '--midi-clock-start'), ('midi_clock_jitter', '--midi-clock-jitter'),
+                          ('midi_clock_mode', '--midi-clock-mode')):
+            if render.get(key) is not None:
+                cmd += [flag, str(render[key])]
+
     if render.get('roundtrip'):
         roundtrip_preset.unlink(missing_ok=True)
         cmd += ['--save-preset', str(roundtrip_preset)]

@@ -95,6 +95,44 @@ public:
             expectWithinAbsoluteError (sync.getBeatPosUI(), 2.0, 1.0e-9, "48 pulses = 2 beats");
         }
 
+        beginTest ("Block-start beat tracks the true clock beat, steady and with jitter");
+        {
+            // Ground truth: the master's beat at each block start is the time since Start in
+            // beats. The pulse-counted beat may lag it by up to one pulse, never more, and never
+            // runs backwards.
+            for (const int jitter : { 0, 40 })
+            {
+                MidiClockSync sync;
+                sync.setEnabled(true);
+                const double bpm = 123.0;
+                const double tick = kSr * 60.0 / (bpm * 24.0);
+                juce::int64 n = 0, blockStart = 0;
+                double prev = -1.0, worst = 0.0;
+                bool backwards = false;
+                for (int b = 0; b < 2000; ++b, blockStart += kBlock)
+                {
+                    juce::MidiBuffer midi;
+                    if (b == 0) midi.addEvent(juce::MidiMessage((juce::uint8) 0xFA), 0);
+                    for (;; ++n)
+                    {
+                        const int j = jitter == 0 ? 0 : (int) ((n * 7919) % (2 * jitter + 1)) - jitter;
+                        const juce::int64 at = juce::jmax<juce::int64>(0, (juce::int64) std::llround((double) n * tick) + j);
+                        if (at >= blockStart + kBlock) break;
+                        midi.addEvent(juce::MidiMessage((juce::uint8) 0xF8), (int) (at - blockStart));
+                    }
+                    const double beat  = sync.process(midi, kBlock, kSr);
+                    const double truth = (double) blockStart / tick / 24.0;
+                    if (beat < prev) backwards = true;
+                    prev  = beat;
+                    worst = juce::jmax(worst, std::abs(truth - beat));
+                }
+                const auto label = "jitter " + juce::String(jitter);
+                expect (! backwards, label + ": block-start beat went backwards");
+                // One pulse plus the pulse the Start lands on (the current tick-0 convention).
+                expectLessOrEqual (worst, 2.0 / 24.0 + 1.0e-9, label + ": beat error vs the master");
+            }
+        }
+
         beginTest ("Every 16th boundary lands exactly on its step over 4 bars");
         {
             // Summing 1/24 per pulse drifts below the boundary and the step floor fires a pulse

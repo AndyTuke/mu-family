@@ -161,6 +161,9 @@ public:
     bool   isMidiClockPlaying()  const { return midiClockSync.isPlaying(); }
     void   setMidiSyncEnabled(bool on);
     void   setMidiSyncMessages(int mode);
+    // Sets MIDI clock sync for this process only, without saving it (the headless render uses it so
+    // a render never depends on the user's saved choice).
+    void   setMidiSyncForSession(bool on, int mode) { midiClockSync.setMessages(mode); midiClockSync.setEnabled(on); }
 
     // Presets — directory, save/load, and the shared category list. A product that names its
     // full-preset root tag (getFullPresetTag) gets the standard save / load / category list:

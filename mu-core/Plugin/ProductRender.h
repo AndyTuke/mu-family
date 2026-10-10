@@ -18,6 +18,10 @@
 //                                            <b> (the family transport rule's host path)
 //   --save-state <file> / --state <file>     write / restore the host session (getStateInformation /
 //                                            setStateInformation) — the session round trip
+//   --midi-clock <bpm> [--midi-clock-start <s> --midi-clock-jitter <samples> --midi-clock-mode <0|1|2>]
+//                                            feed external MIDI clock (F8 from t=0, Start at the first
+//                                            pulse at or after <s>; mode = Messages: 0 clock only,
+//                                            1 transport, 2 both). Without it MIDI sync is always off.
 //
 // mu-Clid's original --swap-rhythm-preset / --swap-rhythm-slot / --swap-rhythm-at spellings are
 // accepted as aliases. Header-only and Standalone-target-only, like RenderSupport.h.
@@ -46,6 +50,11 @@ namespace mu_core::render_mode
 
         double hostStartBeat = -1.0;   // < 0 = no simulated host
         double hostBpm       = 120.0;
+
+        double midiClockBpm     = 0.0;   // <= 0 = no MIDI clock
+        double midiClockStartAt = 0.0;   // seconds
+        int    midiClockJitter  = 0;     // +/- samples per pulse (deterministic)
+        int    midiClockMode    = 2;
     };
 
     // The value of the first of `flags` present (each removed from `tokens`).
@@ -85,6 +94,10 @@ namespace mu_core::render_mode
         const auto state       = takeFlagValue(tokens, "--state");
         const auto hostStart   = takeFlagValue(tokens, "--host-start-beat");
         const auto hostBpm     = takeFlagValue(tokens, "--host-bpm");
+        const auto clockBpm    = takeFlagValue(tokens, "--midi-clock");
+        const auto clockStart  = takeFlagValue(tokens, "--midi-clock-start");
+        const auto clockJitter = takeFlagValue(tokens, "--midi-clock-jitter");
+        const auto clockMode   = takeFlagValue(tokens, "--midi-clock-mode");
         if (tokens.contains("--play"))    { a.play = 1; tokens.removeString("--play"); }
         if (tokens.contains("--no-play")) { a.play = 0; tokens.removeString("--no-play"); }
 
@@ -101,6 +114,10 @@ namespace mu_core::render_mode
         if (state.isNotEmpty())       a.stateFile         = cwd.getChildFile(state);
         if (hostStart.isNotEmpty())   a.hostStartBeat     = hostStart.getDoubleValue();
         if (hostBpm.isNotEmpty())     a.hostBpm           = hostBpm.getDoubleValue();
+        if (clockBpm.isNotEmpty())    a.midiClockBpm      = clockBpm.getDoubleValue();
+        if (clockStart.isNotEmpty())  a.midiClockStartAt  = clockStart.getDoubleValue();
+        if (clockJitter.isNotEmpty()) a.midiClockJitter   = clockJitter.getIntValue();
+        if (clockMode.isNotEmpty())   a.midiClockMode     = juce::jlimit(0, 2, clockMode.getIntValue());
         if (presetSlot.isNotEmpty())  a.presetSlot           = presetSlot.getIntValue();
         if (swapAt.isNotEmpty())      a.swapAtSeconds        = swapAt.getDoubleValue();
         if (swapSlot.isNotEmpty())    a.swapSlot             = swapSlot.getIntValue();
@@ -204,6 +221,9 @@ namespace mu_core::render_mode
         }
 
         // Phase 2: prepare and start the internal transport (the standalone has no host transport).
+        // MIDI clock sync follows --midi-clock only, never the user's saved setting.
+        const bool midiClock = args.midiClockBpm > 0.0;
+        proc.setMidiSyncForSession(midiClock, args.midiClockMode);
         proc.setPlayConfigDetails(0, 2, args.sampleRate, args.blockSize);
         proc.prepareToPlay(args.sampleRate, args.blockSize);
         const bool play = args.play < 0 ? playByDefault : args.play == 1;
@@ -237,9 +257,34 @@ namespace mu_core::render_mode
             std::fflush(stderr);
         };
 
+        // MIDI clock source for --midi-clock: pulse n at n * tickSamples (+ a deterministic jitter),
+        // Start just before the first pulse at or after --midi-clock-start.
+        const double tickSamples = midiClock ? args.sampleRate * 60.0 / (args.midiClockBpm * 24.0) : 0.0;
+        const juce::int64 startPulse = midiClock ? (juce::int64) std::ceil(args.midiClockStartAt * args.sampleRate / tickSamples - 1.0e-9) : 0;
+        juce::int64 nextPulse = 0;
+        auto pulseAt = [&](juce::int64 n)
+        {
+            const int j = args.midiClockJitter == 0 ? 0
+                        : (int) ((n * 7919) % (2 * args.midiClockJitter + 1)) - args.midiClockJitter;
+            return juce::jmax<juce::int64>(0, (juce::int64) std::llround((double) n * tickSamples) + j);
+        };
+        if (midiClock)
+            log("MIDI clock " + juce::String(args.midiClockBpm, 2) + " BPM, Start", (int) pulseAt(startPulse));
+
         auto beforeBlock = [&](int written, juce::MidiBuffer& midi)
         {
             hostPlayHead.samplePos = written;
+            // Queue every clock pulse (and the Start) that falls inside this block.
+            if (midiClock)
+            {
+                const int ns = juce::jmin(args.blockSize, totalSamples - written);
+                for (juce::int64 at = pulseAt(nextPulse); at < written + ns; at = pulseAt(++nextPulse))
+                {
+                    const int offset = (int) juce::jlimit<juce::int64>(0, ns - 1, at - written);
+                    if (nextPulse == startPulse) midi.addEvent(juce::MidiMessage((juce::uint8) 0xFA), offset);
+                    midi.addEvent(juce::MidiMessage((juce::uint8) 0xF8), offset);
+                }
+            }
             if (swapAt >= 0 && ! swapDone && written >= swapAt)
             {
                 proc.loadPreset(args.swapPresetFile);   // stages; commits at the next boundary

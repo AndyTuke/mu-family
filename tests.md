@@ -33,6 +33,7 @@ Each `tests/expectations/T<N>.json` pairs a `.muRhythm` preset with a list of pa
 | TANT_roundtrip | **[μ-Tant composed-state round trip]** Factory preset `Presets/To and Fro.muTant` (saved before the X-Mod redesign). **Expected**: audible after the legacy rebuild + X-Mod migration, and preset + session re-renders sample-identical. | ✅ Pass | 1130 |
 | CLID_roundtrip | **[μ-Clid preset / session round trip]** `tests/presets/A3_filter.muClid` through the shared rhythm prepare + install. **Expected**: preset and session (`.muClid` tree + `<SessionParams>`) re-renders sample-identical. | ✅ Pass | 1130 |
 | TONI_host_lock | **[Family transport rule — host position]** mu-Toni rendered as if in a playing host whose timeline starts at beat 0.125 (`--host-start-beat`). **Expected**: silent until beat 0.25, then the first arp note — the steps sit on the host's beat grid (the old free-running arp fired at once). | ✅ Pass | 1145 |
+| CLID_midi_clock / TANT_midi_clock / TONI_midi_clock / ON_midi_clock | **[MIDI clock slave — every product]** External clock at 120 BPM from t=0 with +/-24 samples of jitter, Start at 0.5 s, Messages = both, own Play on (`--midi-clock`). **Expected**: silent until the Start (clock pulses while stopped don't play), then the pattern plays. | ✅ Pass | 1161 |
 | mutant_drone | **[μ-Tant audio smoke]** No preset: voice 0's gate bypassed, transport stopped — the raw oscillator drone must be audible (content-independent; used by mac-validate). | ✅ Pass | 1117 |
 
 Test presets ship under `<contentDir>/Rhythms/T<N>.muRhythm` (category `test`) so they appear in the regular preset dropdown for manual auditioning.
@@ -70,6 +71,8 @@ cmake --build build --target mu-clid-tests --config Release && build/mu-clid/mu-
 | MIDI full-preset map | `MidiFullPresetMapTests.cpp` |
 | Hot-swap boundary timing | `HotSwapBoundaryTests.cpp` |
 | Modulation skew (proportion ↔ display) | `ModulationSkewTests.cpp` |
+| MIDI clock slave (shared mu-core): tempo estimate, block-start beat vs ground truth (steady + jitter), step-exact 16ths | `MidiClockSyncTests.cpp` |
+| Family transport rule (shared mu-core): host / no-position host / the three MIDI-clock Messages modes / own transport, Start from bar 1, mid-play mode switch | `TransportResolverTests.cpp` |
 
 **Current status:** 140/140 tests pass at v1.0.708.
 

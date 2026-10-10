@@ -85,6 +85,7 @@ from the product's factory state. Flags (same for every product):
 | `--save-preset`  | none | After the start preset loads, save the state as a full preset at this path |
 | `--save-state`   | none | After the start preset loads, write the host session (`getStateInformation`) here |
 | `--state`        | none | Restore a host session (`setStateInformation`) before any `--preset` |
+| `--midi-clock`   | none | Feed external MIDI clock at this BPM: pulses from t=0, Start at the first pulse at or after `--midi-clock-start` (s, default 0); `--midi-clock-jitter` (+/- samples per pulse) and `--midi-clock-mode` (Messages: 0 clock only, 1 transport, 2 both; default 2). Without it a render always has MIDI sync off, whatever the user's saved setting. JSON keys: `midi_clock`, `midi_clock_start`, `midi_clock_jitter`, `midi_clock_mode` |
 
 mu-Clid's original `--swap-rhythm-preset` / `--swap-rhythm-slot` / `--swap-rhythm-at` spellings
 are aliases of the `--swap-slot-*` flags (and `swap_rhythm_*` of `swap_slot_*` in the JSON).
