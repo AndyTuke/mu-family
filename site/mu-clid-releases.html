@@ -182,6 +182,7 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group fixed">
           <h3>Fixed</h3>
           <ul>
+            <li>Deleting or re-ordering rhythms (mu-Clid) or voices (mu-Tant) no longer leaves a channel ducking from the wrong one: sidechain sources now follow their rhythm / voice, and a channel that ducked from a deleted one stops ducking. <span class="ref">(1308)</span></li>
             <li>MIDI clock sync in the standalone: with Messages set to &ldquo;Clock only&rdquo; the Play button now starts the app (it used to stay stopped), and with &ldquo;Transport only&rdquo; the app now plays at its own BPM instead of sitting on the first step. <span class="ref">(1261)</span></li>
             <li>Under MIDI clock, many steps used to play a fraction late (one clock tick, about 20 ms at 120 BPM); they now land exactly on time. <span class="ref">(1260)</span></li>
             <li>Loading a rhythm preset saved before some settings existed now puts those settings to their defaults, instead of keeping the previous rhythm's values. <span class="ref">(1237)</span></li>
