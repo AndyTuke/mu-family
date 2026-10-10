@@ -127,6 +127,7 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group improved">
           <h3>Improved</h3>
           <ul>
+            <li>Presets that carry their samples inside them are now much smaller (often 40&ndash;60 %): the sample is stored losslessly compressed and comes back bit-for-bit identical. Older presets still load. <span class="ref">(1248)</span></li>
             <li>With μ-Link connected, the standalone now hears your MIDI keyboard and controllers (it used to ignore MIDI while connected). For now there is a noticeable delay of about a sixth of a second while connected. <span class="ref">(1255)</span></li>
             <li>In a DAW, the transport bar now counts bars and beats in the song&rsquo;s time signature (3/4, 7/8 and so on) and lines up with pickup bars. <span class="ref">(1251)</span></li>
             <li>MIDI clock sync in the standalone now follows Song Position Pointer: when your hardware sequencer jumps to a new point and continues, the app continues from the same point. <span class="ref">(1258)</span></li>
