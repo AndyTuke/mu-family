@@ -2,6 +2,7 @@
 #include "SequencerEngine.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace mu_clid {
 
@@ -11,6 +12,7 @@ SequencerEngine::SequencerEngine()
     lastAccentStepIndex.fill(0);
     wasLastStepHit.fill(false);
     stepSounded.fill(false);
+    soundedFrom.fill(-1);
     rhythms.reserve(MaxRhythms);
     cachedPatterns.reserve(MaxRhythms);
     cachedCPatterns.reserve(MaxRhythms);
@@ -46,6 +48,9 @@ void SequencerEngine::addRhythm(const Rhythm& r)
     updatePattern((int)rhythms.size() - 1);
 }
 
+// Lock contract: the caller holds the processor's rhythmsLock with processing suspended. The audio-owned
+// arrays below are written under patternLock only, which the audio thread merely try-locks, so without
+// that outer exclusion they would race processBlock.
 void SequencerEngine::removeRhythm(int index)
 {
     if (index < 0 || index >= (int)rhythms.size()) return;
@@ -71,6 +76,7 @@ void SequencerEngine::removeRhythm(int index)
         pendingKind[i]         = pendingKind[i + 1];
         cachedOrigin[i]        = cachedOrigin[i + 1];
         cachedEpoch[i]         = cachedEpoch[i + 1];
+        soundedFrom[i]         = soundedFrom[i + 1];
         boundaryEff[(size_t) i].store(boundaryEff[(size_t) i + 1].load(std::memory_order_relaxed), std::memory_order_relaxed);
     }
     safePatterns[newN].clear();
@@ -81,6 +87,7 @@ void SequencerEngine::removeRhythm(int index)
     stepSounded[newN]         = false;
     phaseOrigin[newN]         = 0;
     pendingKind[newN]         = kNone;
+    soundedFrom[newN]         = -1;
     boundaryEff[(size_t) newN].store(0, std::memory_order_relaxed);
 
     // A pending reorder holds its partner's slot index in cachedOrigin; slots after the removed one
@@ -90,6 +97,11 @@ void SequencerEngine::removeRhythm(int index)
         if (pendingKind[i] != kAdoptFrom) continue;
         if (cachedOrigin[i] == index)     pendingKind[i] = kNone;
         else if (cachedOrigin[i] > index) --cachedOrigin[i];
+    }
+    for (int i = 0; i < newN; ++i)
+    {
+        if (soundedFrom[i] == index)     soundedFrom[i] = -1;
+        else if (soundedFrom[i] > index) --soundedFrom[i];
     }
 
     mu_core::spinUnlock(patternLock);
@@ -140,11 +152,13 @@ void SequencerEngine::setNumRhythms(int n)
             stepSounded[i]         = false;
             phaseOrigin[i]         = 0;
             pendingKind[i]         = kNone;
+            soundedFrom[i]         = -1;
             boundaryEff[(size_t) i].store(0, std::memory_order_relaxed);
         }
     }
 }
 
+// Lock contract as removeRhythm: callers hold rhythmsLock with processing suspended.
 void SequencerEngine::swapRhythmSlots(int i, int j)
 {
     if (i == j) return;
@@ -174,6 +188,9 @@ void SequencerEngine::swapRhythmSlots(int i, int j)
     std::swap(cachedEpoch[i],  cachedEpoch[j]);
     if (pendingKind[i] == kNone) { pendingKind[i] = kAdoptFrom; cachedOrigin[i] = j; }
     if (pendingKind[j] == kNone) { pendingKind[j] = kAdoptFrom; cachedOrigin[j] = i; }
+    std::swap(soundedFrom[i], soundedFrom[j]);
+    if (soundedFrom[i] < 0) soundedFrom[i] = j;
+    if (soundedFrom[j] < 0) soundedFrom[j] = i;
 
     mu_core::spinUnlock(patternLock);
 }
@@ -186,6 +203,7 @@ void SequencerEngine::rebuildCachedLocked(int index)
         gen->steps = juce::jmin(gen->steps, cap);
 
     cachedPatterns[index]  = rhythms[index].getCombinedPattern();
+    ensureMinPatternLength(cachedPatterns[index]);
     cachedCPatterns[index] = rhythms[index].genC.getPattern();
     patternUpdated[index]  = true;
 }
@@ -226,6 +244,7 @@ bool SequencerEngine::tryUpdatePatternFromModulation(int index, const EuclidOver
     const int oldLen  = (int) safePatterns[index].size();
     const int oldCLen = (int) safeCPatterns[index].size();
     rhy.getCombinedPattern(ov, safePatterns[index], scratchPatA, scratchPatB, scratchEuclid);
+    ensureMinPatternLength(safePatterns[index]);
     rhy.genC.getPattern(ov.c, safeCPatterns[index], scratchEuclidC);
 
     // Re-clamp lastStepIndex / lastAccentStepIndex against the new pattern lengths so
@@ -266,8 +285,10 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
     // `pattern[stepIndex]` then indexes OOB → undefined behaviour.
     // The 1e-9 tolerance stops a beat that is a rounding hair below a step boundary (host ppq,
     // summed tempo maths) from flooring to the previous step and firing a block late.
-    constexpr double kStepEpsilon = 1e-9;
-    const auto globalStep    = std::max(0, static_cast<int>(beatPosition / StepLengthBeats + kStepEpsilon));
+    // A NaN or infinite host position would make the double-to-int cast undefined: hold the last good one.
+    if (std::isfinite(beatPosition)) lastGoodBeat = beatPosition;
+    else                             beatPosition = lastGoodBeat;
+    const int globalStep     = beatToStep(beatPosition);
     // One read of the loop length for the whole block, so a concurrent change cannot split it.
     const int  loopSteps     = masterLoopSteps.load(std::memory_order_relaxed);
     const int  effectiveStep = (loopSteps > 0) ? (globalStep % loopSteps) : globalStep;
@@ -332,6 +353,7 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
         {
             // Phases as they stood before this pass, for slots that adopt a partner's after a reorder.
             const auto adoptedOrigins = phaseOrigin;
+            const auto adoptedSounded = stepSounded;
             for (int r = 0; r < numRhythms; ++r)
             {
                 if (patternUpdated[r])
@@ -343,6 +365,15 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                     safePatterns[r].assign(cachedPatterns[r].begin(),  cachedPatterns[r].end());
                     safeCPatterns[r].assign(cachedCPatterns[r].begin(), cachedCPatterns[r].end());
                     patternUpdated[r] = false;
+
+                    // After a reorder the pattern now here played in another slot: take that slot's "did the
+                    // step sound" (audio-owned, so it is copied here rather than swapped with the slots). Done
+                    // for every pending kind, so a swap start committed right after a reorder sees it too.
+                    if (soundedFrom[r] >= 0)
+                    {
+                        stepSounded[r] = adoptedSounded[(size_t) soundedFrom[r]];
+                        soundedFrom[r] = -1;
+                    }
 
                     // A hot-swap start: the new pattern's step 0 sits on the swap's loop boundary.
                     // A commit landing in a step the old pattern already played absorbs that step

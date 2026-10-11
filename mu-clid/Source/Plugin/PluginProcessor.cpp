@@ -309,12 +309,13 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     // so the first block after restart can't emit a false masterLoopWrapped from
     // a stale lastEffectiveStep.
     {
-        const bool wasPlaying = sequencerPlaying.load();
-        // A backward jump of a running transport (host loop, locate) would otherwise read as a
-        // master-loop wrap and commit a staged hot-swap before the real boundary; one that lands on a
-        // master-loop boundary is a real wrap and is left for the detector to report.
-        if (playing && (!wasPlaying || SequencerEngine::isBackwardBeatJump(lastBeatPos.load(), beatPos,
-                                                                   sequencer.getMasterLoopSteps())))
+        // A running transport that dips back less than a step is held in place rather than reset; a real
+        // backward jump resets the detector so it cannot read as a master-loop wrap and commit a staged
+        // hot-swap early (see SequencerEngine::resolveBlockBeat).
+        const auto resolved = SequencerEngine::resolveBlockBeat(lastBeatPos.load(), beatPos, playing,
+                                                                sequencerPlaying.load(), sequencer.getMasterLoopSteps());
+        beatPos = resolved.beat;
+        if (resolved.resetWrap)
             sequencer.resetWrapDetector();
     }
     sequencerPlaying.store(playing);

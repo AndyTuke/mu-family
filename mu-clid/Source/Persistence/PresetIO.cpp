@@ -855,19 +855,24 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
             proc.midiEngines[(size_t) i].prepare(proc.currentSampleRate, proc.currentBlockSize);
     }
 
-    // Tear down slots that are no longer active (shrink case).
+    // Tear down slots that are no longer active (shrink case). The voice engine is parked for a free
+    // after the lock; the MIDI engine and mixer channel are plain values / atomics that the audio thread
+    // reads, so they reset here without freeing anything; the sample path is message-thread only and is
+    // cleared after the lock, so its string free never sits under it.
     for (int i = n; i < oldN; ++i)
     {
         shrunkEngines[(size_t) i] = std::move(proc.voiceEngines[(size_t) i]);
         proc.midiEngines[(size_t) i] = MidiOutputEngine{};
         proc.mixerEngine.channels[(size_t) i].reset();
-        proc.samples.setPath(i, juce::String());
     }
 
     if (n > oldN)
         proc.numActiveRhythms.store(n, std::memory_order_release);  // grow: publish after slots ready
     }   // release rhythmsLock before resuming
     proc.suspendProcessing(false);
+
+    for (int i = n; i < oldN; ++i)
+        proc.samples.clearPath(i);
 
     // ── APVTS / mixer / global finalize (message-thread, no I/O) ───────────────
     // The Rhythm + VoiceEngine are already live. Push the moved-in Rhythm into

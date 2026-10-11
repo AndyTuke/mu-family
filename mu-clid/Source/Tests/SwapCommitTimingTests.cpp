@@ -5,6 +5,7 @@
 
 #include <juce_core/juce_core.h>
 #include <atomic>
+#include <limits>
 #include <thread>
 #include "Sequencer/SequencerEngine.h"
 #include "Plugin/HotSwap.h"
@@ -449,24 +450,174 @@ public:
             expect(  SequencerEngine::isBackwardBeatJump(4.01, 3.99, 4), "a sub-step dip onto a boundary still resets");
         }
 
-        beginTest("A sub-step dip across a step line is not a master wrap");
+        beginTest("A sub-step dip is held in place: no reset, no wrap, a real jump still resets");
         {
             SequencerEngine e;
             e.addRhythm(rhythmOf(4, 16));
             e.setMasterLoopSteps(16);
-            double prev = 0.0;
-            int wraps = 0;
+            double last = 0.0;
+            bool   was  = false;
+            int wraps = 0, resets = 0;
             const auto play = [&](double b)
             {
-                if (SequencerEngine::isBackwardBeatJump(prev, b, e.getMasterLoopSteps())) e.resetWrapDetector();
-                prev = b;
-                if (e.processBlock(b).masterLoopWrapped) ++wraps;
+                const auto r = SequencerEngine::resolveBlockBeat(last, b, true, was, e.getMasterLoopSteps());
+                if (r.resetWrap) { e.resetWrapDetector(); ++resets; }
+                last = r.beat;
+                was  = true;
+                if (e.processBlock(r.beat).masterLoopWrapped) ++wraps;
+                return r.beat;
             };
             for (int s = 0; s < 6; ++s) play(beat(s));
+            const int startResets = resets;                // the first block is a transport start
             play(beat(6) + 0.01);
-            play(beat(6) - 0.04);                          // a nudge dips back across the step line
+            expectEquals(play(beat(6) - 0.04), beat(6) + 0.01, "the dip across the step line is held at the old position");
             play(beat(7));
             expectEquals(wraps, 0, "the dip must not report a wrap");
+            expectEquals(resets, startResets, "and must not reset the wrap detector");
+            play(beat(2));                                 // a real locate back, more than a step
+            expectEquals(resets, startResets + 1, "a real jump still resets");
+        }
+
+        beginTest("A 0.04-beat dip fires exactly one trigger per step, with or without a master loop");
+        for (int loop : { 0, 16 })
+            for (bool dipAcrossStep : { false, true })
+            {
+                SequencerEngine e;
+                e.addRhythm(rhythmOf(8, 8));               // every step is a hit
+                e.setMasterLoopSteps(loop);
+                double last = 0.0;
+                bool   was  = false;
+                int fires = 0;
+                const auto play = [&](double b)
+                {
+                    const auto r = SequencerEngine::resolveBlockBeat(last, b, true, was, e.getMasterLoopSteps());
+                    if (r.resetWrap) e.resetWrapDetector();
+                    last = r.beat;
+                    was  = true;
+                    if (fired(e.processBlock(r.beat))) ++fires;
+                };
+                // Blocks of 0.05 beat over 3 beats (steps 0 to 11), with a 0.04-beat nudge dip every 0.5 beat:
+                // landing on a step line (so the dip crosses it) or two blocks later (so it stays inside a step).
+                const int dipAt = dipAcrossStep ? 0 : 2;
+                int blocks = 0;
+                for (double b = 0.0; b < 3.0 - 1e-9; b += 0.05, ++blocks)
+                {
+                    play(b);
+                    if (blocks > 0 && blocks % 10 == dipAt)
+                        play(b - 0.04);
+                }
+                expectEquals(fires, 12, juce::String("one trigger per step across the dips, loop ") + juce::String(loop)
+                                         + (dipAcrossStep ? " crossing" : " inside"));
+            }
+
+        beginTest("A reorder then a same-step swap-start commit reads the moved pattern's stepSounded");
+        for (bool commitBeforeAudioSeesSwap : { false, true })
+        {
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(8, 8));                   // slot 0: sounds on every step
+            e.addRhythm(restOnZero(3, 8));                 // slot 1: step 0 (effective step 8) is a rest
+            for (int s = 0; s <= 8; ++s) e.processBlock(beat(s));
+            e.swapRhythmSlots(0, 1);                       // slot 0 now holds the rest pattern, slot 1 the hits
+            if (! commitBeforeAudioSeesSwap)
+                e.processBlock(beat(8) + 0.02);            // the audio thread absorbs the reorder first
+            commit(e, rhythmOf(4, 8), 8);                  // slot 0: a new pattern, a hit on its step 0
+            const auto r = e.processBlock(beat(8) + 0.05);
+            expect((r.firedMask & 1) != 0, "slot 0's old pattern was resting on this step, so the new downbeat fires");
+            // Slot 1 holds the pattern that did sound this step: a swap start there is absorbed.
+            e.requestSwapStart(1, 8);
+            const auto r1 = e.processBlock(beat(8) + 0.10);
+            expect((r1.firedMask & 2) == 0, "slot 1's old pattern sounded this step, so the new one starts on the next");
+        }
+
+        beginTest("Swapping a pair twice leaves each pattern with its own phase and sounded flag");
+        {
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(8, 8));
+            e.addRhythm(restOnZero(3, 8));
+            for (int s = 0; s <= 8; ++s) e.processBlock(beat(s));
+            e.swapRhythmSlots(0, 1);
+            e.swapRhythmSlots(0, 1);                       // back where they were before the audio thread looked
+            e.processBlock(beat(8) + 0.02);
+            e.requestSwapStart(0, 8);
+            const auto r = e.processBlock(beat(8) + 0.05);
+            expect((r.firedMask & 1) == 0, "slot 0 still holds the pattern that sounded: the swap start is absorbed");
+            for (int s = 9; s < 12; ++s)
+                expect(fired(e.processBlock(beat(s))), "and it plays on");
+        }
+
+        beginTest("Three slots reordered in a chain each keep their own phase");
+        {
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(0, 8));                   // A: silent
+            e.addRhythm(rhythmOf(0, 8));                   // B: silent
+            e.addRhythm(singleHitAt(0, 8));                // C: one hit on its step 0
+            for (int s = 0; s < 10; ++s) e.processBlock(beat(s));
+            e.requestSwapStart(2, 3);                      // C's step 0 falls on effective steps 3, 11, ...
+            e.processBlock(beat(10));
+            e.swapRhythmSlots(0, 1);
+            e.swapRhythmSlots(1, 2);                       // C moves 2 -> 1 and A, B shuffle around it
+            e.processBlock(beat(10) + 0.05);
+            const auto r = e.processBlock(beat(11));
+            expect((r.firedMask & 2) != 0, "C, now in slot 1, still has its step 0 on effective step 11");
+            expect((r.firedMask & 5) == 0, "the silent patterns stay silent");
+        }
+
+        beginTest("A one-step pattern still sounds on every step");
+        {
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(1, 1));
+            expectEquals((int) e.getRhythm(0).getCombinedPattern().size(), 1, "the generators really build one step");
+            int fires = 0;
+            for (int s = 0; s < 6; ++s)
+                if (fired(e.processBlock(beat(s)))) ++fires;
+            expectEquals(fires, 6, "each step plays");
+            expectEquals(e.getPatternLength(0), 2, "the walk is given two steps to advance over");
+
+            // The modulation recompute builds the one-step pattern too.
+            SequencerEngine m;
+            m.addRhythm(rhythmOf(1, 1));
+            for (int s = 0; s < 3; ++s) m.processBlock(beat(s));
+            EuclidOverrides ov;
+            ov.a.hits = 1; ov.b.hits = 0; ov.c.hits = 0;
+            expect(m.tryUpdatePatternFromModulation(0, ov));
+            expectEquals(m.getPatternLength(0), 2, "the recompute pads a one-step result as well");
+            int mf = 0;
+            for (int s = 3; s < 8; ++s)
+                if (fired(m.processBlock(beat(s)))) ++mf;
+            expectEquals(mf, 5, "and it keeps sounding");
+
+            // Reset Steps of 1 is the other way to a one-step cycle.
+            SequencerEngine q;
+            Rhythm r = rhythmOf(8, 8);
+            r.resetSteps = 1;
+            q.addRhythm(r);
+            int qf = 0;
+            for (int s = 0; s < 5; ++s)
+                if (fired(q.processBlock(beat(s)))) ++qf;
+            expectEquals(qf, 5, "a one-step Reset Steps cycle sounds every step");
+        }
+
+        beginTest("A non-finite or enormous host position is handled without a bad cast");
+        {
+            const double nan = std::numeric_limits<double>::quiet_NaN();
+            const double inf = std::numeric_limits<double>::infinity();
+            expect(! SequencerEngine::isBackwardBeatJump(nan, 4.0), "NaN previous");
+            expect(! SequencerEngine::isBackwardBeatJump(4.0, nan), "NaN landing");
+            expect(! SequencerEngine::isBackwardBeatJump(inf, 0.0), "infinite previous");
+            expect(! SequencerEngine::isBackwardBeatJump(0.0, -inf), "negative infinity");
+            expectEquals(SequencerEngine::beatToStep(nan), 0);
+            expectEquals(SequencerEngine::beatToStep(inf), 0);
+            expectEquals(SequencerEngine::beatToStep(1e300), 1 << 30, "an enormous position is clamped");
+            expectEquals(SequencerEngine::beatToStep(-5.0), 0);
+            expectEquals(SequencerEngine::resolveBlockBeat(3.0, nan, true, true, 0).beat, 3.0, "the last good position is kept");
+            expectEquals(SequencerEngine::resolveBlockBeat(nan, inf, false, false, 0).beat, 0.0, "no history at all falls back to 0");
+
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(8, 8));
+            for (int s = 0; s <= 5; ++s) e.processBlock(beat(s));
+            expect(! fired(e.processBlock(nan)), "a NaN block holds the last position: nothing replays");
+            expect(! fired(e.processBlock(inf)), "and so does infinity");
+            expect(fired(e.processBlock(beat(6))), "the next real block plays its step");
         }
 
         beginTest("Swap requests racing the audio thread are safe");

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <cstdint>
 #include <vector>
 
@@ -35,6 +36,9 @@ public:
     SequencerEngine();
 
     // Rhythm management — call from the message thread only.
+    // removeRhythm and swapRhythmSlots write audio-owned per-slot state (phase, step history) under
+    // patternLock alone: the caller must hold the processor's rhythmsLock (so processBlock is not
+    // running) and have processing suspended, or those writes race the audio thread.
     void    addRhythm    (const Rhythm& r);
     void    removeRhythm (int index);
     Rhythm& getRhythm    (int index);
@@ -53,7 +57,8 @@ public:
     // Resize all rhythm vectors to n — used during state loading to pre-expand or trim.
     void setNumRhythms(int n);
 
-    // Swap two rhythm slots atomically with respect to the audio thread.
+    // Swap two rhythm slots atomically with respect to the audio thread. Same lock contract as
+    // removeRhythm: callers hold rhythmsLock with processing suspended.
     void swapRhythmSlots(int i, int j);
 
     // UI read-only accessors (safe to call from message thread after processBlock).
@@ -79,6 +84,19 @@ public:
     // after a transport restart cannot see a false wrap. A request flag, safe from any thread.
     void resetWrapDetector() { wrapResetRequested.store(true, std::memory_order_release); }
 
+    // The step a beat position falls in (0 for negative or non-finite input). The 1e-9 tolerance stops a
+    // beat that is a rounding hair below a step boundary from flooring to the previous step, and the
+    // clamp keeps the double-to-int cast defined for any host value.
+    static int beatToStep(double beat) noexcept
+    {
+        constexpr double kStepEpsilon = 1e-9;
+        constexpr double kMaxStep     = 1073741824.0;   // 2^30 steps, far beyond any real song
+        if (! std::isfinite(beat))
+            return 0;
+        const double step = std::floor(beat / StepLengthBeats + kStepEpsilon);
+        return step <= 0.0 ? 0 : static_cast<int>(std::min(step, kMaxStep));
+    }
+
     // True when the playhead moved back to an earlier step between two blocks of a running
     // transport (a host loop jump, a locate, or a nudge dipping across a step line): to the wrap
     // detector a lower step looks like a master-loop wrap, so the caller resets it. Steps are
@@ -87,13 +105,36 @@ public:
     // master-loop boundary is left alone: that is a genuine wrap, which a staged swap needs to see.
     static bool isBackwardBeatJump(double previousBeat, double beat, int loopSteps = 0) noexcept
     {
-        constexpr double kStepEpsilon = 1e-9;
-        const int prevStep = std::max(0, static_cast<int>(previousBeat / StepLengthBeats + kStepEpsilon));
-        const int landing  = std::max(0, static_cast<int>(beat / StepLengthBeats + kStepEpsilon));
+        // A non-finite position has no step: report no jump rather than cast it.
+        if (! std::isfinite(previousBeat) || ! std::isfinite(beat))
+            return false;
+        const int prevStep = beatToStep(previousBeat);
+        const int landing  = beatToStep(beat);
         if (landing >= prevStep)
             return false;
         const bool realJump = beat < previousBeat - StepLengthBeats;
         return ! (realJump && loopSteps > 0 && landing % loopSteps == 0);
+    }
+
+    // What the transport code does with each block's start position (audio thread, allocation-free):
+    //  - a non-finite host position carries on from the last good one;
+    //  - a running transport that moved back by less than a step (a nudge, a sync-offset change, a tiny
+    //    locate) is held where it was: resetting there would zero the swapped patterns' phase origins and
+    //    could retrigger the step, while holding keeps one trigger per step;
+    //  - a transport that just started, or a real backward jump, asks for a wrap-detector reset
+    //    (isBackwardBeatJump leaves one that lands on a master-loop boundary alone: that is a real wrap).
+    struct BlockBeat { double beat; bool resetWrap; };
+    static BlockBeat resolveBlockBeat(double lastBeat, double beat, bool running, bool wasRunning, int loopSteps) noexcept
+    {
+        if (! std::isfinite(beat))
+            beat = std::isfinite(lastBeat) ? lastBeat : 0.0;
+        if (! running)
+            return { beat, false };
+        if (! wasRunning)
+            return { beat, true };
+        if (std::isfinite(lastBeat) && beat < lastBeat && beat >= lastBeat - StepLengthBeats)
+            return { lastBeat, false };
+        return { beat, isBackwardBeatJump(lastBeat, beat, loopSteps) };
     }
 
     // Message thread, after a hot-swap commit (and on loading a preset at once): rebuild slot r's
@@ -164,6 +205,9 @@ private:
     std::array<uint8_t,  MaxRhythms> pendingKind  { };
     std::array<int,      MaxRhythms> cachedOrigin { };
     std::array<uint32_t, MaxRhythms> cachedEpoch  { };
+    // After a reorder: the slot whose stepSounded this slot's pattern played in (-1 = none). Kept apart
+    // from pendingKind so a swap start committed right after a reorder still carries it.
+    std::array<int,      MaxRhythms> soundedFrom  { };
 
     // Audio thread writes (relaxed): the effective step where each slot's pattern last wrapped to
     // its step 0, and the id of the step counter run (bumped whenever the counter restarts or wraps).
@@ -171,6 +215,15 @@ private:
     std::atomic<uint32_t> frameEpoch { 0 };
 
     void rebuildCachedLocked(int index);
+
+    // The step walk advances only when the step index changes, so a one-step pattern would sound once
+    // and never again. Tiling [x] to [x, x] keeps the same rhythm and gives the walk a step to advance.
+    // Non-allocating on the audio path (the buffers are reserved to 256).
+    static void ensureMinPatternLength(std::vector<bool>& pattern)
+    {
+        if (pattern.size() == 1)
+            pattern.push_back(pattern.front());
+    }
     static int floorMod(int a, int n) noexcept { const int m = a % n; return m < 0 ? m + n : m; }
     // Atomic because host automation can set the loop length off the audio thread.
     std::atomic<int> masterLoopSteps { 0 };
@@ -178,6 +231,7 @@ private:
     // Audio-thread private (never touched by another thread): the previous block's effective step and
     // loop length, for master-loop wrap detection. -1 = no history.
     int lastEffectiveStep = -1;
+    double lastGoodBeat   = 0.0;   // last finite host position, used when a block arrives with NaN / inf
     int lastLoopSteps     = 0;
     std::atomic<bool> wrapResetRequested { false };
 
