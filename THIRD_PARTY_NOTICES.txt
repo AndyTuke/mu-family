@@ -5,8 +5,9 @@ The Transwarp Development Project mu-family audio plug-ins (mu-Clid, mu-Clid
 Lite, mu-Tant, mu-On, mu-Toni) and the mu-link companion application incorporate
 the third-party components listed below. Each is used under its own licence,
 reproduced here to satisfy those licences' attribution requirements. The
-mu-family source code itself is proprietary and is NOT covered by these
-licences — see LICENSE.
+mu-family source code itself is Copyright (c) 2026 Transwarp Development
+Project and is licensed under the GNU General Public License, version 3 —
+see LICENSE. All components below are compatible with that licence.
 
 Components referenced in the roadmap but NOT currently compiled into or shipped
 with the products (SoundTouch — LGPL; Rubber Band — GPL/commercial) are not
@@ -17,8 +18,15 @@ listed here; their notices and obligations must be added if/when integrated.
 JUCE  —  https://juce.com
 ================================================================================
 This product is built with the JUCE framework, Copyright (c) Raw Material
-Software Limited, used under the terms of the applicable JUCE licence
-(see https://juce.com). "JUCE" is a trademark of Raw Material Software Limited.
+Software Limited, used under the terms of the GNU Affero General Public
+License, version 3 (AGPLv3), one of the two licences JUCE is offered under.
+The mu-family source is GPLv3; GPLv3 section 13 permits combining it with
+AGPLv3 code, and the AGPLv3 terms govern the JUCE portion of a combined binary
+(source of the whole is published, which satisfies them). See https://juce.com.
+"JUCE" is a trademark of Raw Material Software Limited.
+
+The VST3 SDK bundled inside JUCE is Copyright (c) 2025 Steinberg Media
+Technologies GmbH, under the MIT Licence (compatible with GPLv3).
 
 
 ================================================================================

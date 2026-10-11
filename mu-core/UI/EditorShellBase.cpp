@@ -403,7 +403,7 @@ void EditorShellBase::setProductIdentity(const juce::String& displayName, const 
 {
     // Third-party code every product ships (Monocypher only with the licence verifier).
     const auto credit = [](const char* utf8) { return juce::String(juce::CharPointer_UTF8(utf8)); };
-    juce::StringArray credits { credit("JUCE \xe2\x80\x94 Proprietary (JUCE 7 license)"),
+    juce::StringArray credits { credit("JUCE \xe2\x80\x94 AGPLv3"),
                                 credit("Signalsmith Reverb \xe2\x80\x94 MIT") };
     if (processorRef.hasLicensing())
         credits.add(credit("Monocypher \xe2\x80\x94 BSD-2-Clause"));
