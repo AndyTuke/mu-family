@@ -40,43 +40,43 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"seq_accent", 1}, "Accent", f(0.0f, 1.0f, 0.001f), 1.0f));
 
     // ── Kick engine (synthesis) ───────────────────────────────────────────────
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"k_tune",  1}, "Kick Tune",       f(30.0f, 120.0f, 0.1f), 50.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"k_ptch",  1}, "Kick Pitch Amt",  f(0.0f, 600.0f, 1.0f), 220.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"k_pdec",  1}, "Kick Pitch Decay",f(5.0f, 200.0f, 0.1f), 50.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"k_adec",  1}, "Kick Decay",      f(20.0f, 800.0f, 1.0f), 180.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"k_drive", 1}, "Kick Drive",      f(0.0f, 1.0f, 0.001f), 0.2f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Kick, "tune"),  1}, "Kick Tune",       f(30.0f, 120.0f, 0.1f), 50.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Kick, "ptch"),  1}, "Kick Pitch Amt",  f(0.0f, 600.0f, 1.0f), 220.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Kick, "pdec"),  1}, "Kick Pitch Decay",f(5.0f, 200.0f, 0.1f), 50.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Kick, "adec"),  1}, "Kick Decay",      f(20.0f, 800.0f, 1.0f), 180.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Kick, "drive"), 1}, "Kick Drive",      f(0.0f, 1.0f, 0.001f), 0.2f));
 
     // ── Bass engine (deep synth — the focus) ──────────────────────────────────
-    layout.add(std::make_unique<AudioParameterChoice>(ParameterID{"b_wave", 1}, "Bass Wave", juce::StringArray{ "Sine", "Saw", "Square" }, 0));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_sub",   1}, "Bass Sub",        f(0.0f, 1.0f, 0.001f), 0.5f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_tune",  1}, "Bass Tune",       f(20.0f, 120.0f, 0.1f), 41.2f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_cut",   1}, "Bass Cutoff",     f(40.0f, 4000.0f, 1.0f), 600.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_res",   1}, "Bass Resonance",  f(0.0f, 1.0f, 0.001f), 0.2f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_env",   1}, "Bass Filter Env", f(0.0f, 1.0f, 0.001f), 0.4f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_edec",  1}, "Bass Env Decay",  f(10.0f, 1000.0f, 1.0f), 180.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_atk",   1}, "Bass Attack",     f(0.5f, 200.0f, 0.1f), 2.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_dec",   1}, "Bass Decay",      f(20.0f, 1500.0f, 1.0f), 200.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_sus",   1}, "Bass Sustain",    f(0.0f, 1.0f, 0.001f), 0.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"b_drive", 1}, "Bass Drive",      f(0.0f, 1.0f, 0.001f), 0.2f));
+    layout.add(std::make_unique<AudioParameterChoice>(ParameterID{layerParamId(Bass, "wave"), 1}, "Bass Wave", juce::StringArray{ "Sine", "Saw", "Square" }, 0));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Bass, "sub"),   1}, "Bass Sub",        f(0.0f, 1.0f, 0.001f), 0.5f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Bass, "tune"),  1}, "Bass Tune",       f(20.0f, 120.0f, 0.1f), 41.2f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Bass, "cut"),   1}, "Bass Cutoff",     f(40.0f, 4000.0f, 1.0f), 600.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Bass, "res"),   1}, "Bass Resonance",  f(0.0f, 1.0f, 0.001f), 0.2f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Bass, "env"),   1}, "Bass Filter Env", f(0.0f, 1.0f, 0.001f), 0.4f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Bass, "edec"),  1}, "Bass Env Decay",  f(10.0f, 1000.0f, 1.0f), 180.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Bass, "atk"),   1}, "Bass Attack",     f(0.5f, 200.0f, 0.1f), 2.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Bass, "dec"),   1}, "Bass Decay",      f(20.0f, 1500.0f, 1.0f), 200.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Bass, "sus"),   1}, "Bass Sustain",    f(0.0f, 1.0f, 0.001f), 0.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Bass, "drive"), 1}, "Bass Drive",      f(0.0f, 1.0f, 0.001f), 0.2f));
 
     // ── Hat / Snare (sample channels) ─────────────────────────────────────────
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"h_tune", 1}, "Hat Tune",   f(-12.0f, 12.0f, 0.1f), 0.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"h_dec",  1}, "Hat Decay",  f(10.0f, 400.0f, 1.0f), 60.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"s_tune", 1}, "Snare Tune", f(-12.0f, 12.0f, 0.1f), 0.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"s_dec",  1}, "Snare Decay",f(20.0f, 600.0f, 1.0f), 160.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Hat, "tune"), 1}, "Hat Tune",   f(-12.0f, 12.0f, 0.1f), 0.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Hat, "dec"),  1}, "Hat Decay",  f(10.0f, 400.0f, 1.0f), 60.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Snare, "tune"), 1}, "Snare Tune", f(-12.0f, 12.0f, 0.1f), 0.0f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Snare, "dec"),  1}, "Snare Decay",f(20.0f, 600.0f, 1.0f), 160.0f));
 
     // ── Rumble engine (processes the Kick feed: drive → delays → reverb → env → filter) ──
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_drive", 1}, "Rumble Drive",   f(0.0f, 1.0f, 0.001f), 0.4f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_d1",    1}, "Rumble 1/16",    f(0.0f, 1.0f, 0.001f), 0.5f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_d2",    1}, "Rumble 2/16",    f(0.0f, 1.0f, 0.001f), 0.35f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_d3",    1}, "Rumble 3/16",    f(0.0f, 1.0f, 0.001f), 0.25f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_size",  1}, "Rumble Rev Size",f(0.0f, 1.0f, 0.001f), 0.7f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_revmix",1}, "Rumble Rev Mix", f(0.0f, 1.0f, 0.001f), 0.5f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_revlp", 1}, "Rumble Rev LP",
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Rumble, "drive"), 1}, "Rumble Drive",   f(0.0f, 1.0f, 0.001f), 0.4f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Rumble, "d1"),    1}, "Rumble 1/16",    f(0.0f, 1.0f, 0.001f), 0.5f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Rumble, "d2"),    1}, "Rumble 2/16",    f(0.0f, 1.0f, 0.001f), 0.35f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Rumble, "d3"),    1}, "Rumble 3/16",    f(0.0f, 1.0f, 0.001f), 0.25f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Rumble, "size"),  1}, "Rumble Rev Size",f(0.0f, 1.0f, 0.001f), 0.7f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Rumble, "revmix"),1}, "Rumble Rev Mix", f(0.0f, 1.0f, 0.001f), 0.5f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Rumble, "revlp"), 1}, "Rumble Rev LP",
                 juce::NormalisableRange<float>(200.0f, 18000.0f, 1.0f, 0.3f), 1200.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_cut",   1}, "Rumble Cutoff",
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Rumble, "cut"),   1}, "Rumble Cutoff",
                 juce::NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 800.0f));
-    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{"r_res",   1}, "Rumble Resonance",f(0.0f, 1.0f, 0.001f), 0.2f));
+    layout.add(std::make_unique<AudioParameterFloat>(ParameterID{layerParamId(Rumble, "res"),   1}, "Rumble Resonance",f(0.0f, 1.0f, 0.001f), 0.2f));
 
     // ── Shared global FX rack + returns + master (mu-core) ────────────────────
     mu_mixfx::addGlobalFxParams(layout);

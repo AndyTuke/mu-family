@@ -5,7 +5,7 @@ namespace mu_toni
 {
 
 EnginePanel::EnginePanel(PluginProcessor& processor)
-    : proc(processor), insertSub(processor, "v")
+    : proc(processor), insertSub(processor, kLayerParamLetter)
 {
     addSourceControls();
     addVoiceControls();
@@ -30,8 +30,8 @@ void EnginePanel::addSourceControls()
     addKnob (G_OSC2, "o2f",    "Fine", LF::knobEuclidean);
     addKnob (G_OSC2, "o2_pos", "Pos",  LF::knobEuclidean);
     // Cross-mod (Osc 2 → Osc 1): Lane A mode + Index, Sync, Feedback; Lane B mode + Depth, SSB shift.
-    addCombo (G_XMOD, "xmod_phaseMode", mu_ui::choiceNames(proc.apvts, "v0_xmod_phaseMode"));
-    addCombo (G_XMOD, "xmod_ampMode",   mu_ui::choiceNames(proc.apvts, "v0_xmod_ampMode"));
+    addCombo (G_XMOD, "xmod_phaseMode", mu_ui::choiceNames(proc.apvts, layerParamId(0, "xmod_phaseMode")));
+    addCombo (G_XMOD, "xmod_ampMode",   mu_ui::choiceNames(proc.apvts, layerParamId(0, "xmod_ampMode")));
     addToggle(G_XMOD, "sync",           "Sync");
     addToggle(G_XMOD, "xmod_fdbk",      "Fdbk");
     addKnob  (G_XMOD, "xmod_index", "Index", LF::knobEuclidean);
@@ -113,7 +113,7 @@ void EnginePanel::addArpControls()
 void EnginePanel::setAccentStep(int step, bool on)
 {
     if (step < 0 || step >= ArpAccent::kMaxSteps) return;
-    auto* p = proc.apvts.getParameter("v" + juce::String(currentLayer) + "_accPat");
+    auto* p = proc.apvts.getParameter(layerParamId(currentLayer, "accPat"));
     if (p == nullptr) return;
     const int was = (int) p->convertFrom0to1(p->getValue());
     const int now = on ? (was | (1 << step)) : (was & ~(1 << step));
@@ -129,7 +129,7 @@ void EnginePanel::refreshAccentSteps()
     // Look the layer's parameters up once per layer, not every tick.
     if (accentParamsLayer != currentLayer)
     {
-        const juce::String pre = "v" + juce::String(currentLayer) + "_";
+        const juce::String pre = layerParamPrefix(currentLayer);
         accLenParam  = proc.apvts.getRawParameterValue(pre + "accLen");
         accPatParam  = proc.apvts.getRawParameterValue(pre + "accPat");
         arpRateParam = proc.apvts.getRawParameterValue(pre + "rate");
@@ -205,7 +205,6 @@ void EnginePanel::setupHeaderAndModulators()
 void EnginePanel::setLayer(int idx)
 {
     currentLayer = juce::jmax(0, idx);
-    const juce::String n = juce::String(currentLayer);
 
     // Drop every old binding first: a new attachment sets its control to the new layer's value,
     // and a still-live old one would write that value back into the previous layer.
@@ -215,13 +214,13 @@ void EnginePanel::setLayer(int idx)
 
     for (auto& k : knobs)
         k.att = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-            proc.apvts, k.prefix + n + "_" + k.suffix, k.comp->getSlider());
+            proc.apvts, layerParamId(k.prefix, currentLayer, k.suffix), k.comp->getSlider());
     for (auto& c : combos)
         c.att = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-            proc.apvts, "v" + n + "_" + c.suffix, c.comp->getComboBox());
+            proc.apvts, layerParamId(currentLayer, c.suffix), c.comp->getComboBox());
     for (auto& t : toggles)
         t.att = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
-            proc.apvts, "v" + n + "_" + t.suffix, *t.comp);
+            proc.apvts, layerParamId(currentLayer, t.suffix), *t.comp);
 
     insertSub.setChannel(currentLayer);
     shownAccentLen = shownAccentPat = -1;   // redraw the new layer's accent pattern

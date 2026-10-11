@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Plugin/ProcessorBase.h"        // mu-core base
+#include "Plugin/LayerParamIds.h"        // layerParamPrefix / layerParamId
 #include "Plugin/MixerFxParams.h"         // mu-core: shared global-FX / mixer APVTS layout
 #include "Plugin/MidiClockSync.h"         // mu-core: shared MIDI-clock slave
 #include "Sequencer/Arp.h"                // mu-Toni layer: Layer + arp voice + insert

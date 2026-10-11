@@ -63,7 +63,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
 
     for (int i = 0; i < kNumChannels; ++i)
     {
-        const String v = "v" + String(i) + "_";
+        const String v = layerParamPrefix(i);
         auto pid = [&](const char* s) { return ParameterID{ v + s, 1 }; };
         auto lbl = [&](const char* s) { return "V" + String(i + 1) + " " + s; };
         const bool aud = (i == 0);   // only voice 1 audible on a fresh patch
@@ -225,7 +225,7 @@ void PluginProcessor::cacheVoiceParamPointers()
     for (int i = 0; i < mu_limits::kMaxLayers; ++i)
         for (int k = 0; k < kNumVoiceParams; ++k)
         {
-            const juce::String id = "v" + juce::String(i) + "_" + vpi::suffix[k];
+            const juce::String id = layerParamId(i, vpi::suffix[k]);
             vp[(size_t) i][(size_t) k] = (i < kNumChannels) ? apvts.getRawParameterValue(id) : nullptr;
         }
 
@@ -233,7 +233,7 @@ void PluginProcessor::cacheVoiceParamPointers()
     for (int k = 0; k < kNumModDests; ++k)
     {
         modDestIds[(size_t) k]    = kModDestTable[k].id;
-        modDestRanges[(size_t) k] = apvts.getParameterRange("v0_" + juce::String(kModDestTable[k].param));
+        modDestRanges[(size_t) k] = apvts.getParameterRange(layerParamId(0, kModDestTable[k].param));
         for (int i = 0; i < mu_limits::kMaxLayers; ++i)
             modDestAtoms[(size_t) i][(size_t) k] = (i < kNumChannels) ? vp[(size_t) i][(size_t) vpSlotFor(kModDestTable[k].param)]
                                                                       : nullptr;

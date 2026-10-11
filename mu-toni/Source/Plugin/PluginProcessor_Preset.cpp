@@ -13,7 +13,6 @@ namespace
 {
     constexpr const char* kLayerPresetTag = "MuToniLayer";
 
-    juce::String layerPrefix(int layer) { return "v" + juce::String(layer) + "_"; }
 }
 
 // Describe the layers once (ctor): each layer's v{N}_ param prefix (its modulators save through Arp). Every layer
@@ -21,7 +20,7 @@ namespace
 void PluginProcessor::setupLayerState()
 {
     juce::StringArray prefixes;
-    for (int l = 0; l < kNumChannels; ++l) prefixes.add(layerPrefix(l));
+    for (int l = 0; l < kNumChannels; ++l) prefixes.add(layerParamPrefix(l));
     initLayerState(prefixes);
 }
 

@@ -109,7 +109,7 @@ private:
     void layoutBox(int group, juce::Rectangle<int> rect);
 
     void addKnob(int group, const char* suffix, const juce::String& label,
-                 MuLookAndFeel::ColourIds colour, const char* prefix = "v")
+                 MuLookAndFeel::ColourIds colour, const char* prefix = kLayerParamLetter)
     {
         KnobDef d;
         d.comp = std::make_unique<KnobWithLabel>(label, colour);

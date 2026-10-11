@@ -13,17 +13,17 @@ namespace
     {
         switch (channel)
         {
-            case Kick:  return { {"k_tune","Tune"}, {"k_ptch","Pitch"}, {"k_pdec","P.Dec"}, {"k_adec","Decay"}, {"k_drive","Drive"} };
+            case Kick:  return { {layerParamId(Kick,"tune"),"Tune"}, {layerParamId(Kick,"ptch"),"Pitch"}, {layerParamId(Kick,"pdec"),"P.Dec"}, {layerParamId(Kick,"adec"),"Decay"}, {layerParamId(Kick,"drive"),"Drive"} };
             // Bass also exposes its sidechain-to-Kick controls (the key interaction):
             // Duck depth + envelope — small Duck = smooth, large = pumping.
-            case Bass:  return { {"b_wave","Wave"}, {"b_tune","Tune"}, {"b_sub","Sub"}, {"b_cut","Cutoff"}, {"b_res","Reso"},
-                                 {"b_env","F.Env"}, {"b_edec","E.Dec"}, {"b_atk","Atk"}, {"b_dec","Dec"}, {"b_sus","Sus"}, {"b_drive","Drive"},
+            case Bass:  return { {layerParamId(Bass,"wave"),"Wave"}, {layerParamId(Bass,"tune"),"Tune"}, {layerParamId(Bass,"sub"),"Sub"}, {layerParamId(Bass,"cut"),"Cutoff"}, {layerParamId(Bass,"res"),"Reso"},
+                                 {layerParamId(Bass,"env"),"F.Env"}, {layerParamId(Bass,"edec"),"E.Dec"}, {layerParamId(Bass,"atk"),"Atk"}, {layerParamId(Bass,"dec"),"Dec"}, {layerParamId(Bass,"sus"),"Sus"}, {layerParamId(Bass,"drive"),"Drive"},
                                  {"ch1_scAmt","Duck"}, {"ch1_scAtk","D.Atk"}, {"ch1_scRel","D.Rel"} };
-            case Hat:   return { {"h_tune","Tune"}, {"h_dec","Decay"} };
-            case Snare: return { {"s_tune","Tune"}, {"s_dec","Decay"} };
+            case Hat:   return { {layerParamId(Hat,"tune"),"Tune"}, {layerParamId(Hat,"dec"),"Decay"} };
+            case Snare: return { {layerParamId(Snare,"tune"),"Tune"}, {layerParamId(Snare,"dec"),"Decay"} };
             // Rumble processes the Kick feed: input drive → 3 delay taps → reverb → filter.
-            case Rumble: return { {"r_drive","Drive"}, {"r_d1","1/16"}, {"r_d2","2/16"}, {"r_d3","3/16"},
-                                  {"r_size","Rv Size"}, {"r_revmix","Rv Mix"}, {"r_revlp","Rv LP"}, {"r_cut","Cutoff"}, {"r_res","Reso"} };
+            case Rumble: return { {layerParamId(Rumble,"drive"),"Drive"}, {layerParamId(Rumble,"d1"),"1/16"}, {layerParamId(Rumble,"d2"),"2/16"}, {layerParamId(Rumble,"d3"),"3/16"},
+                                  {layerParamId(Rumble,"size"),"Rv Size"}, {layerParamId(Rumble,"revmix"),"Rv Mix"}, {layerParamId(Rumble,"revlp"),"Rv LP"}, {layerParamId(Rumble,"cut"),"Cutoff"}, {layerParamId(Rumble,"res"),"Reso"} };
             default:    return {};
         }
     }

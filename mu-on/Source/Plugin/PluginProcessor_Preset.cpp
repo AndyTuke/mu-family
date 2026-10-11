@@ -14,14 +14,6 @@ namespace mu_on
 namespace
 {
     constexpr const char* kTrackPresetTag = "MuOnTrack";
-
-    // Each lane's engine params share a prefix; a track preset holds the lane's set.
-    constexpr const char* kLanePrefix[kNumChannels] = { "k_", "b_", "h_", "s_", "r_" };
-}
-
-juce::String PluginProcessor::lanePrefix(int lane)
-{
-    return kLanePrefix[(size_t) juce::jlimit(0, kNumChannels - 1, lane)];
 }
 
 // The Rumble volume envelope — its length (note value × multiplier, as a modulator's Loop) and
@@ -97,7 +89,7 @@ void Track::applyExtras(const juce::ValueTree& node)
 void PluginProcessor::initLaneState()
 {
     juce::StringArray prefixes;
-    for (int l = 0; l < kNumChannels; ++l) prefixes.add(lanePrefix(l));
+    for (int l = 0; l < kNumChannels; ++l) prefixes.add(layerParamPrefix(l));
     initLayerState(prefixes);
 }
 

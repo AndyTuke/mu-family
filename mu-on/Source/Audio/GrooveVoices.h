@@ -56,7 +56,7 @@ public:
     // Cache engine param pointers + per-lane modulation tables once (after the APVTS exists).
     void cacheParams(juce::AudioProcessorValueTreeState& apvts)
     {
-        bWave = apvts.getRawParameterValue("b_wave");   // choice — not a mod destination
+        bWave = apvts.getRawParameterValue(layerParamId(Bass, "wave"));   // choice — not a mod destination
         jassert(bWave != nullptr);   // catch an id drift from the APVTS layout (debug)
 
         for (int lane = 0; lane < kNumChannels; ++lane)

@@ -145,7 +145,6 @@ private:
     void                applyStateTree(const juce::ValueTree& state);
     juce::ValueTree     serialiseRumbleEnv();
     void                restoreRumbleEnv(const juce::ValueTree& env);
-    static juce::String lanePrefix(int lane);       // the lane's engine-param prefix (k_, b_, ...)
 
     // Per-channel render hook handed to the shared MixerEngine — fills each lane's buffer
     // from its engine (Kick/Bass/Hat/Snare) via GrooveVoices.
