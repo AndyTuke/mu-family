@@ -39,6 +39,8 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/FX/Slots/ReverbSlot.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/FX/Slots/FXChain.cpp"
     # Shared UI components
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/EuclideanPanel.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/RhythmCircle.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/MuLookAndFeel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/MuTheme.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/Components/BipolarSliderRow.cpp"

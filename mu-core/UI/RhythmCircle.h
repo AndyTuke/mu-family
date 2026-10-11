@@ -1,11 +1,12 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "UI/Components/MuLookAndFeel.h"
-#include "Sequencer/GeneratorAliases.h"
+#include "Sequencer/EuclideanGenerator.h"
+#include "Sequencer/HitGenerator.h"
 #include "Sequencer/RhythmPlayState.h"
 #include <array>
 
-namespace mu_clid {
+namespace mu_ui {
 
 // Concentric ring display showing euclidean hit patterns.
 // Ring A (purple) is outermost, Ring B (coral) second, Ring C (amber, dashed) innermost.
@@ -17,13 +18,13 @@ public:
     RhythmCircle();
     ~RhythmCircle() override;
 
-    void setPatterns(const std::vector<StepType>& patA,
-                     const std::vector<StepType>& patB,
-                     const std::vector<StepType>& patC = {});
+    void setPatterns(const std::vector<mu_core::StepType>& patA,
+                     const std::vector<mu_core::StepType>& patB,
+                     const std::vector<mu_core::StepType>& patC = {});
 
     // Connect to PluginProcessor play-state atomics for self-driven animation.
     // state is non-const so we can update lastHitCount tracking.
-    void setPlayState(RhythmPlayState*  state,
+    void setPlayState(mu_core::RhythmPlayState*  state,
                       const std::atomic<float>*          beatFrac,
                       const std::atomic<bool>*            playing,
                       juce::Colour                         colour);
@@ -40,10 +41,10 @@ private:
     juce::Colour ringColour(MuLookAndFeel::ColourIds id) const
     { return singleColour.isTransparent() ? MuLookAndFeel::colour(id) : singleColour; }
 
-    std::vector<StepType> patternA, patternB, patternC;
+    std::vector<mu_core::StepType> patternA, patternB, patternC;
 
     // Non-owning pointers to PluginProcessor atomics
-    RhythmPlayState*       playState     = nullptr;
+    mu_core::RhythmPlayState*       playState     = nullptr;
     const std::atomic<float>*              beatFracAtom  = nullptr;
     const std::atomic<bool>*               isPlayingAtom = nullptr;
     juce::Colour                            rhythmColour;
@@ -92,7 +93,7 @@ private:
     mutable std::array<RingCache, 3> ringCaches;
 
     void drawRing(juce::Graphics& g,
-                  const std::vector<StepType>& pattern,
+                  const std::vector<mu_core::StepType>& pattern,
                   float cx, float cy,
                   float outerR, float innerR,
                   juce::Colour hitClr,
@@ -100,8 +101,8 @@ private:
                   float rotOff,
                   RingCache& cache) const;
 
-    static juce::Colour stepColour(StepType t, juce::Colour hitClr, bool isCurrent);
+    static juce::Colour stepColour(mu_core::StepType t, juce::Colour hitClr, bool isCurrent);
     static juce::Colour ringBase();   // opaque base colour under every ring
 };
 
-} // namespace mu_clid
+} // namespace mu_ui

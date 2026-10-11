@@ -7,13 +7,24 @@
 #include "UI/Components/SlideSwitch.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/MuLookAndFeel.h"
-#include "Sequencer/GeneratorAliases.h"
+#include "Sequencer/EuclideanGenerator.h"
+#include "Sequencer/HitGenerator.h"
 #include "Sequencer/Rhythm.h"
 #include "Plugin/ProcessorBase.h"   // mu-core: the parameter tree and the layer accessors
 
 
 namespace juce { class RangedAudioParameter; }
-namespace mu_clid {
+namespace mu_ui {
+
+// The Euclid knobs that can show a live modulation arc, in the order the panel reports them to its
+// modulationSnapshot callback. A product maps these onto its own snapshot table.
+enum EuclidSnap : int
+{
+    kEucAHits, kEucARotate, kEucAPrePad, kEucAPostPad, kEucAInsSt, kEucAInsLen,
+    kEucBHits, kEucBRotate, kEucBPrePad, kEucBPostPad, kEucBInsSt, kEucBInsLen,
+    kEucCHits, kEucCRotate, kEucCPrePad, kEucCPostPad, kEucCInsSt, kEucCInsLen,
+    kEucSnapCount
+};
 
 // Euclidean controls for one rhythm.
 // Routes all mutations through APVTS; fires onPatternChanged for UI refresh only.
@@ -31,7 +42,7 @@ public:
 
     // The live modulated value (0..1 snapshot) of one Euclid knob, or NaN for none. A product with
     // modulation supplies it before bindModulationIndicators; without it the knobs show no live arc.
-    std::function<float(int rhythmIndex, int snapIndex)> modulationSnapshot;
+    std::function<float(int rhythmIndex, int snapIndex)> modulationSnapshot;   // snapIndex is an EuclidSnap
     void loadFromRhythm();
 
     // refresh a single control identified by its APVTS suffix (e.g. "stepsB",
@@ -70,7 +81,7 @@ private:
     int rhythmIndex = -1;
 
     // The rhythm being edited, or null when the index is out of range.
-    const Rhythm* currentRhythm() const;
+    const mu_core::Rhythm* currentRhythm() const;
 
     juce::Colour rhythmColour { juce::Colours::transparentBlack };
 
@@ -167,7 +178,7 @@ private:
     void updateRangesB();
     void updateRangesC();
     // sfx = the ring's APVTS suffixes { prePad, postPad, insLen, insSt } (string literals).
-    void updateRanges(const HitGenerator& g, const char* const (&sfx)[4],
+    void updateRanges(const mu_core::HitGenerator& g, const char* const (&sfx)[4],
                       KnobWithLabel& hits, KnobWithLabel& rot,
                       KnobWithLabel& pre, KnobWithLabel& post,
                       KnobWithLabel& insSt, KnobWithLabel& insLen);
@@ -193,4 +204,4 @@ private:
     std::unordered_map<std::string_view, juce::RangedAudioParameter*> paramPtrCache;
 };
 
-} // namespace mu_clid
+} // namespace mu_ui

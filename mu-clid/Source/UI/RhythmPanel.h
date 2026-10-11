@@ -1,7 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "RhythmCircle.h"
-#include "EuclideanPanel.h"
+#include "EuclidPanelAliases.h"
 #include "VoiceSection.h"
 #include "UI/ChannelHeaderBar.h"
 #include "UI/ModulatorPanel.h"

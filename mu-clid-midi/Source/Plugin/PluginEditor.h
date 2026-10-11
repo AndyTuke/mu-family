@@ -4,8 +4,8 @@
 #include "Plugin/PluginProcessor.h"
 #include "UI/TransportBar.h"
 #include "UI/MasterLoopSection.h"
-#include "UI/RhythmCircle.h"      // mu-Clid's, shared until the Euclid panels move to mu-core
-#include "UI/EuclideanPanel.h"    // mu-Clid's, shared until the Euclid panels move to mu-core
+#include "UI/RhythmCircle.h"      // mu-core
+#include "UI/EuclideanPanel.h"    // mu-core
 #include "UI/Components/StatusBar.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/DropdownSelect.h"
@@ -38,8 +38,8 @@ private:
 
     TransportBar        transportBar;
     MasterLoopSection   masterLoop;
-    mu_clid::RhythmCircle    rhythmCircle;
-    mu_clid::EuclideanPanel  euclidPanel;
+    mu_ui::RhythmCircle    rhythmCircle;
+    mu_ui::EuclideanPanel  euclidPanel;
     StatusBar      statusBar;
     AboutOverlay     aboutOverlay;
     DropdownSelect noteSelector;

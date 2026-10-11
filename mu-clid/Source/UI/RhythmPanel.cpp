@@ -185,7 +185,7 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     // The Euclid knobs' live modulation arcs read the processor's snapshot while the sequencer plays.
     euclidPanel.modulationSnapshot = [this](int ri, int snapIndex)
     {
-        return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, snapIndex)
+        return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, kSnapEucAHits + snapIndex)   // EuclidSnap is the offset into the Euclid run
                                             : std::numeric_limits<float>::quiet_NaN();
     };
 

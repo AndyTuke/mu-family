@@ -1,6 +1,6 @@
 #include "RhythmCircle.h"
 
-namespace mu_clid {
+namespace mu_ui {
 
 namespace
 {
@@ -28,9 +28,9 @@ RhythmCircle::~RhythmCircle()
     stopTimer();
 }
 
-void RhythmCircle::setPatterns(const std::vector<StepType>& patA,
-                                const std::vector<StepType>& patB,
-                                const std::vector<StepType>& patC)
+void RhythmCircle::setPatterns(const std::vector<mu_core::StepType>& patA,
+                                const std::vector<mu_core::StepType>& patB,
+                                const std::vector<mu_core::StepType>& patC)
 {
     patternA = patA;
     patternB = patB;
@@ -38,7 +38,7 @@ void RhythmCircle::setPatterns(const std::vector<StepType>& patA,
     repaint();
 }
 
-void RhythmCircle::setPlayState(RhythmPlayState*  state,
+void RhythmCircle::setPlayState(mu_core::RhythmPlayState*  state,
                                  const std::atomic<float>*          beatFrac,
                                  const std::atomic<bool>*            playing,
                                  juce::Colour                         colour)
@@ -150,7 +150,7 @@ void RhythmCircle::timerCallback()
 }
 
 //==============================================================================
-juce::Colour RhythmCircle::stepColour(StepType t, juce::Colour hitClr, bool isCurrent)
+juce::Colour RhythmCircle::stepColour(mu_core::StepType t, juce::Colour hitClr, bool isCurrent)
 {
     using Id = MuLookAndFeel::ColourIds;
     const auto& L = MuLookAndFeel::lighting();
@@ -160,13 +160,13 @@ juce::Colour RhythmCircle::stepColour(StepType t, juce::Colour hitClr, bool isCu
     float lit = L.lampOff;
     switch (t)
     {
-        case StepType::Hit:       lit = L.lampOn; break;
-        case StepType::PrePad:    lampClr = MuLookAndFeel::colour(Id::ringPrePad);    lit = L.lampDim; break;
-        case StepType::PostPad:   lampClr = MuLookAndFeel::colour(Id::ringPostPad);   lit = L.lampDim; break;
-        case StepType::InsertPad: lampClr = MuLookAndFeel::colour(Id::ringInsertPad); lit = L.lampDim; break;
+        case mu_core::StepType::Hit:       lit = L.lampOn; break;
+        case mu_core::StepType::PrePad:    lampClr = MuLookAndFeel::colour(Id::ringPrePad);    lit = L.lampDim; break;
+        case mu_core::StepType::PostPad:   lampClr = MuLookAndFeel::colour(Id::ringPostPad);   lit = L.lampDim; break;
+        case mu_core::StepType::InsertPad: lampClr = MuLookAndFeel::colour(Id::ringInsertPad); lit = L.lampDim; break;
         default: break;
     }
-    if (isCurrent && t != StepType::Empty)   // empty steps stay off, even under the playhead
+    if (isCurrent && t != mu_core::StepType::Empty)   // empty steps stay off, even under the playhead
         lit = juce::jmin(1.0f, lit + L.lampPlayhead);
     return MuLookAndFeel::lampColour(lampClr, lit);
 }
@@ -203,7 +203,7 @@ void RhythmCircle::RingCache::rebuild(float cx_, float cy_, float outerR_, float
 }
 
 void RhythmCircle::drawRing(juce::Graphics& g,
-                              const std::vector<StepType>& pattern,
+                              const std::vector<mu_core::StepType>& pattern,
                               float cx, float cy,
                               float outerR, float innerR,
                               juce::Colour hitClr,
@@ -247,14 +247,14 @@ void RhythmCircle::drawRing(juce::Graphics& g,
     {
         const bool isCur = (i == currentStep);
         const auto& seg  = cache.stepPaths[(size_t) i];
-        if (pattern[i] == StepType::Hit)
+        if (pattern[i] == mu_core::StepType::Hit)
         {
             g.setColour(hitClr.withAlpha(L.highlight(L.ringHitGlow * (isCur ? 1.8f : 1.0f))));
             g.strokePath(seg, juce::PathStrokeType(glowW), transform);
         }
 
         const auto lens = stepColour(pattern[i], hitClr, isCur);
-        if (pattern[i] == StepType::Empty)
+        if (pattern[i] == mu_core::StepType::Empty)
         {
             g.setColour(lens);   // unlit: a flat dark lens
             g.fillPath(seg, transform);
@@ -466,4 +466,4 @@ void RhythmCircle::paint(juce::Graphics& g)
     }
 }
 
-} // namespace mu_clid
+} // namespace mu_ui

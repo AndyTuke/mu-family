@@ -210,7 +210,7 @@ void PluginEditor::resized()
 
     // Indent by EuclideanPanel's border inset so the accent knob's left edge
     // aligns with the Steps knobs above.
-    controlsRow.removeFromLeft(s(mu_clid::EuclideanPanel::kPanelInset));
+    controlsRow.removeFromLeft(s(mu_ui::EuclideanPanel::kPanelInset));
 
     const int knobW = s(MuLookAndFeel::kKnobSize1W);
     const int knobH = s(MuLookAndFeel::kKnobSize1H);
@@ -226,7 +226,7 @@ void PluginEditor::resized()
     controlsRow.removeFromLeft(s(MuLookAndFeel::kSpaceL));
     const int logicLabelW = s(40);
     logicLabel.setBounds(controlsRow.removeFromLeft(logicLabelW).withSizeKeepingCentre(logicLabelW, s(22)));
-    const int logicW = s(mu_clid::EuclideanPanel::kLogicDropW);
+    const int logicW = s(mu_ui::EuclideanPanel::kLogicDropW);
     euclidPanel.getLogicControl().setBounds(controlsRow.removeFromLeft(logicW).withSizeKeepingCentre(logicW, s(24)));
 
     euclidPanel.setBounds(area);

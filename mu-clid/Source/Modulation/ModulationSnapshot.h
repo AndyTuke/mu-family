@@ -1,5 +1,7 @@
 #pragma once
 
+#include "UI/EuclideanPanel.h"   // mu_ui::EuclidSnap, pinned to the kSnapEuc* run below
+
 namespace mu_clid {
 
 // Per-destination modulated-value snapshot indices.
@@ -32,5 +34,13 @@ enum ModSnapIdx : int
     kSnapPan, kSnapSendEff, kSnapSendDly, kSnapSendRev,
     kSnapCount
 };
+
+// The Euclid panel reports its knobs as an offset into the kSnapEuc* run: the 18 entries must stay
+// contiguous and in the panel's order.
+static_assert(kSnapEucAHits + mu_ui::EuclidSnap::kEucAInsLen == kSnapEucAInsLen);
+static_assert(kSnapEucAHits + mu_ui::EuclidSnap::kEucBHits   == kSnapEucBHits);
+static_assert(kSnapEucAHits + mu_ui::EuclidSnap::kEucCHits   == kSnapEucCHits);
+static_assert(kSnapEucAHits + mu_ui::EuclidSnap::kEucCInsLen == kSnapEucCInsLen);
+static_assert(mu_ui::EuclidSnap::kEucSnapCount == 18);
 
 } // namespace mu_clid

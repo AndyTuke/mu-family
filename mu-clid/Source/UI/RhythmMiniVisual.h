@@ -1,6 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "RhythmCircle.h"
+#include "EuclidPanelAliases.h"
 #include "Sequencer/Rhythm.h"
 #include "Sequencer/GeneratorAliases.h"
 #include "Plugin/PluginProcessor.h"

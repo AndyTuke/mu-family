@@ -1,8 +1,7 @@
 #include "EuclideanPanel.h"
-#include "Modulation/ModulationSnapshot.h"
 #include <limits>
 
-namespace mu_clid {
+namespace mu_ui {
 
 EuclideanPanel::EuclideanPanel(ProcessorBase& p) : proc(p)
 {
@@ -26,7 +25,7 @@ EuclideanPanel::EuclideanPanel(ProcessorBase& p) : proc(p)
     for (int i = 0; i < kNumLogicModes; ++i)
         logicCtrl.addItem(juce::String(juce::CharPointer_UTF8(kLogicSymbols[i])), i + 1);
 
-    const int maxSteps = HitGenerator::kMaxSteps;
+    const int maxSteps = mu_core::HitGenerator::kMaxSteps;
     stepsA.setRange(1, maxSteps, 1);      hitsA.setRange(0, 64, 1);   rotA.setRange(0, 63, 1);
     prePadA.setRange(0, 12, 1);     postPadA.setRange(0, 12, 1);
     insertStA.setRange(0, 63, 1);   insertLenA.setRange(0, 8, 1);
@@ -69,20 +68,20 @@ void EuclideanPanel::apvtsSet(const char* suffix, float v)
         p->setValueNotifyingHost(p->convertTo0to1(v));
 }
 
-const Rhythm* EuclideanPanel::currentRhythm() const
+const mu_core::Rhythm* EuclideanPanel::currentRhythm() const
 {
     if (rhythmIndex < 0 || rhythmIndex >= proc.getNumChannels()) return nullptr;
-    return static_cast<const Rhythm*>(proc.getLayer(rhythmIndex));   // every layer of a Euclid product is a Rhythm
+    return static_cast<const mu_core::Rhythm*>(proc.getLayer(rhythmIndex));   // every layer of a Euclid product is a Rhythm
 }
 
 int EuclideanPanel::insertStartDisplayOffset(int ring) const
 {
-    const Rhythm* rp = currentRhythm();
+    const mu_core::Rhythm* rp = currentRhythm();
     if (rp == nullptr) return 1;
-    const Rhythm& r = *rp;
-    const HitGenerator& g = ring == 0 ? r.genA : ring == 1 ? r.genB : r.genC;
+    const mu_core::Rhythm& r = *rp;
+    const mu_core::HitGenerator& g = ring == 0 ? r.genA : ring == 1 ? r.genB : r.genC;
     const auto lay = g.clampLayout({ g.hits, g.rotate, g.prePad, g.postPad, g.insertStart, g.insertLength });
-    return (g.prePadMode == InsertMode::Pad ? lay.prePad : 0) + 1;   // a Pad-mode gap precedes the section
+    return (g.prePadMode == mu_core::InsertMode::Pad ? lay.prePad : 0) + 1;   // a Pad-mode gap precedes the section
 }
 
 // Pad keeps every hit: the zone becomes rests and the hits are redistributed over the
@@ -285,9 +284,9 @@ void EuclideanPanel::setRhythm(int ri)
 
 void EuclideanPanel::loadFromRhythm()
 {
-    const Rhythm* rp = currentRhythm();
+    const mu_core::Rhythm* rp = currentRhythm();
     if (rp == nullptr) return;
-    const Rhythm& r = *rp;
+    const mu_core::Rhythm& r = *rp;
 
     updateRangesA();
     stepsA.setValue(r.genA.steps);   hitsA.setValue(r.genA.hits);
@@ -295,9 +294,9 @@ void EuclideanPanel::loadFromRhythm()
     postPadA.setValue(r.genA.postPad);
     insertStA.setValue(r.genA.insertStart);
     insertLenA.setValue(r.genA.insertLength);
-    prePadModeA.setSelectedIndex(r.genA.prePadMode   == InsertMode::Mute ? 1 : 0);
-    postPadModeA.setSelectedIndex(r.genA.postPadMode == InsertMode::Mute ? 1 : 0);
-    insertModeA.setSelectedIndex(r.genA.insertMode   == InsertMode::Mute ? 1 : 0);
+    prePadModeA.setSelectedIndex(r.genA.prePadMode   == mu_core::InsertMode::Mute ? 1 : 0);
+    postPadModeA.setSelectedIndex(r.genA.postPadMode == mu_core::InsertMode::Mute ? 1 : 0);
+    insertModeA.setSelectedIndex(r.genA.insertMode   == mu_core::InsertMode::Mute ? 1 : 0);
 
     updateRangesB();
     stepsB.setValue(r.genB.steps);   hitsB.setValue(r.genB.hits);
@@ -305,9 +304,9 @@ void EuclideanPanel::loadFromRhythm()
     postPadB.setValue(r.genB.postPad);
     insertStB.setValue(r.genB.insertStart);
     insertLenB.setValue(r.genB.insertLength);
-    prePadModeB.setSelectedIndex(r.genB.prePadMode   == InsertMode::Mute ? 1 : 0);
-    postPadModeB.setSelectedIndex(r.genB.postPadMode == InsertMode::Mute ? 1 : 0);
-    insertModeB.setSelectedIndex(r.genB.insertMode   == InsertMode::Mute ? 1 : 0);
+    prePadModeB.setSelectedIndex(r.genB.prePadMode   == mu_core::InsertMode::Mute ? 1 : 0);
+    postPadModeB.setSelectedIndex(r.genB.postPadMode == mu_core::InsertMode::Mute ? 1 : 0);
+    insertModeB.setSelectedIndex(r.genB.insertMode   == mu_core::InsertMode::Mute ? 1 : 0);
 
     updateRangesC();
     stepsC.setValue(r.genC.steps);   hitsC.setValue(r.genC.hits);
@@ -315,12 +314,12 @@ void EuclideanPanel::loadFromRhythm()
     postPadC.setValue(r.genC.postPad);
     insertStC.setValue(r.genC.insertStart);
     insertLenC.setValue(r.genC.insertLength);
-    prePadModeC.setSelectedIndex(r.genC.prePadMode   == InsertMode::Mute ? 1 : 0);
-    postPadModeC.setSelectedIndex(r.genC.postPadMode == InsertMode::Mute ? 1 : 0);
-    insertModeC.setSelectedIndex(r.genC.insertMode   == InsertMode::Mute ? 1 : 0);
+    prePadModeC.setSelectedIndex(r.genC.prePadMode   == mu_core::InsertMode::Mute ? 1 : 0);
+    postPadModeC.setSelectedIndex(r.genC.postPadMode == mu_core::InsertMode::Mute ? 1 : 0);
+    insertModeC.setSelectedIndex(r.genC.insertMode   == mu_core::InsertMode::Mute ? 1 : 0);
 
-    static const Logic logics[] = { Logic::OR, Logic::AND, Logic::XOR,
-                                    Logic::AOnly, Logic::BOnly };
+    static const mu_core::Logic logics[] = { mu_core::Logic::OR, mu_core::Logic::AND, mu_core::Logic::XOR,
+                                    mu_core::Logic::AOnly, mu_core::Logic::BOnly };
     for (int i = 0; i < 5; i++)
         if (r.logic == logics[i]) { logicCtrl.setSelectedId(i + 1); break; }
 
@@ -330,12 +329,12 @@ void EuclideanPanel::loadFromRhythm()
 
 void EuclideanPanel::refreshSuffix(const juce::String& suffix)
 {
-    const Rhythm* rp = currentRhythm();
+    const mu_core::Rhythm* rp = currentRhythm();
     if (rp == nullptr) return;
-    const Rhythm& r = *rp;
+    const mu_core::Rhythm& r = *rp;
 
-    auto setMode = [](SlideSwitch& sc, InsertMode m) {
-        sc.setSelectedIndex(m == InsertMode::Mute ? 1 : 0);
+    auto setMode = [](SlideSwitch& sc, mu_core::InsertMode m) {
+        sc.setSelectedIndex(m == mu_core::InsertMode::Mute ? 1 : 0);
     };
 
     // A ring parameter can move another knob's limits, so re-fit that ring's ranges first.
@@ -379,8 +378,8 @@ void EuclideanPanel::refreshSuffix(const juce::String& suffix)
     // ── Logic
     else if (suffix == "logic")
     {
-        static const Logic logics[] = { Logic::OR, Logic::AND, Logic::XOR,
-                                        Logic::AOnly, Logic::BOnly };
+        static const mu_core::Logic logics[] = { mu_core::Logic::OR, mu_core::Logic::AND, mu_core::Logic::XOR,
+                                        mu_core::Logic::AOnly, mu_core::Logic::BOnly };
         for (int i = 0; i < 5; i++)
             if (r.logic == logics[i]) { logicCtrl.setSelectedId(i + 1); break; }
     }
@@ -394,7 +393,7 @@ void EuclideanPanel::refreshSuffix(const juce::String& suffix)
 
 // Fit a ring's knob ranges to what its layout allows: Hits / Rotate track the step count,
 // the three pads share the Steps - 1 budget, and Insert Start stays between the pads.
-void EuclideanPanel::updateRanges(const HitGenerator& g, const char* const (&sfx)[4],
+void EuclideanPanel::updateRanges(const mu_core::HitGenerator& g, const char* const (&sfx)[4],
                                   KnobWithLabel& hits, KnobWithLabel& rot,
                                   KnobWithLabel& pre, KnobWithLabel& post,
                                   KnobWithLabel& insSt, KnobWithLabel& insLen)
@@ -409,7 +408,7 @@ void EuclideanPanel::updateRanges(const HitGenerator& g, const char* const (&sfx
     post.setRange  (0, padMax.postPad,      1);
     insLen.setRange(0, padMax.insertLength, 1);
 
-    const auto [lo, hi] = HitGenerator::insertStartBounds(steps, lay.prePad, lay.postPad,
+    const auto [lo, hi] = mu_core::HitGenerator::insertStartBounds(steps, lay.prePad, lay.postPad,
                                                           lay.insertLength, g.prePadMode);
     insSt.setRange(lo, hi, 1);
     insSt.repaint();   // its shown step number depends on the pre-pad, not just its own value
@@ -425,7 +424,7 @@ void EuclideanPanel::updateRanges(const HitGenerator& g, const char* const (&sfx
 
 void EuclideanPanel::updateRangesA()
 {
-    const Rhythm* rp = currentRhythm();
+    const mu_core::Rhythm* rp = currentRhythm();
     if (rp == nullptr) return;
     static const char* const kSfx[4] = { "prePadA", "postPadA", "insLenA", "insStA" };
     updateRanges(rp->genA, kSfx, hitsA, rotA, prePadA, postPadA, insertStA, insertLenA);
@@ -433,7 +432,7 @@ void EuclideanPanel::updateRangesA()
 
 void EuclideanPanel::updateRangesB()
 {
-    const Rhythm* rp = currentRhythm();
+    const mu_core::Rhythm* rp = currentRhythm();
     if (rp == nullptr) return;
     static const char* const kSfx[4] = { "prePadB", "postPadB", "insLenB", "insStB" };
     updateRanges(rp->genB, kSfx, hitsB, rotB, prePadB, postPadB, insertStB, insertLenB);
@@ -441,7 +440,7 @@ void EuclideanPanel::updateRangesB()
 
 void EuclideanPanel::updateRangesC()
 {
-    const Rhythm* rp = currentRhythm();
+    const mu_core::Rhythm* rp = currentRhythm();
     if (rp == nullptr) return;
     static const char* const kSfx[4] = { "prePadC", "postPadC", "insLenC", "insStC" };
     updateRanges(rp->genC, kSfx, hitsC, rotC, prePadC, postPadC, insertStC, insertLenC);
@@ -455,7 +454,7 @@ void EuclideanPanel::setRhythmColour(juce::Colour c)
 
 void EuclideanPanel::bindModulationIndicators()
 {
-    const Rhythm* rp = currentRhythm();
+    const mu_core::Rhythm* rp = currentRhythm();
     if (rp == nullptr)
     {
         for (auto* k : { &hitsA, &rotA, &prePadA, &postPadA, &insertStA, &insertLenA,
@@ -480,26 +479,26 @@ void EuclideanPanel::bindModulationIndicators()
             normMode);
     };
 
-    bind(hitsA,      "euclid.a.hits",    kSnapEucAHits);
-    bind(rotA,       "euclid.a.rotate",  kSnapEucARotate);
-    bind(prePadA,    "euclid.a.prePad",  kSnapEucAPrePad);
-    bind(postPadA,   "euclid.a.postPad", kSnapEucAPostPad);
-    bind(insertStA,  "euclid.a.insSt",   kSnapEucAInsSt);
-    bind(insertLenA, "euclid.a.insLen",  kSnapEucAInsLen);
+    bind(hitsA,      "euclid.a.hits",    EuclidSnap::kEucAHits);
+    bind(rotA,       "euclid.a.rotate",  EuclidSnap::kEucARotate);
+    bind(prePadA,    "euclid.a.prePad",  EuclidSnap::kEucAPrePad);
+    bind(postPadA,   "euclid.a.postPad", EuclidSnap::kEucAPostPad);
+    bind(insertStA,  "euclid.a.insSt",   EuclidSnap::kEucAInsSt);
+    bind(insertLenA, "euclid.a.insLen",  EuclidSnap::kEucAInsLen);
 
-    bind(hitsB,      "euclid.b.hits",    kSnapEucBHits);
-    bind(rotB,       "euclid.b.rotate",  kSnapEucBRotate);
-    bind(prePadB,    "euclid.b.prePad",  kSnapEucBPrePad);
-    bind(postPadB,   "euclid.b.postPad", kSnapEucBPostPad);
-    bind(insertStB,  "euclid.b.insSt",   kSnapEucBInsSt);
-    bind(insertLenB, "euclid.b.insLen",  kSnapEucBInsLen);
+    bind(hitsB,      "euclid.b.hits",    EuclidSnap::kEucBHits);
+    bind(rotB,       "euclid.b.rotate",  EuclidSnap::kEucBRotate);
+    bind(prePadB,    "euclid.b.prePad",  EuclidSnap::kEucBPrePad);
+    bind(postPadB,   "euclid.b.postPad", EuclidSnap::kEucBPostPad);
+    bind(insertStB,  "euclid.b.insSt",   EuclidSnap::kEucBInsSt);
+    bind(insertLenB, "euclid.b.insLen",  EuclidSnap::kEucBInsLen);
 
-    bind(hitsC,      "euclid.c.hits",    kSnapEucCHits);
-    bind(rotC,       "euclid.c.rotate",  kSnapEucCRotate);
-    bind(prePadC,    "euclid.c.prePad",  kSnapEucCPrePad);
-    bind(postPadC,   "euclid.c.postPad", kSnapEucCPostPad);
-    bind(insertStC,  "euclid.c.insSt",   kSnapEucCInsSt);
-    bind(insertLenC, "euclid.c.insLen",  kSnapEucCInsLen);
+    bind(hitsC,      "euclid.c.hits",    EuclidSnap::kEucCHits);
+    bind(rotC,       "euclid.c.rotate",  EuclidSnap::kEucCRotate);
+    bind(prePadC,    "euclid.c.prePad",  EuclidSnap::kEucCPrePad);
+    bind(postPadC,   "euclid.c.postPad", EuclidSnap::kEucCPostPad);
+    bind(insertStC,  "euclid.c.insSt",   EuclidSnap::kEucCInsSt);
+    bind(insertLenC, "euclid.c.insLen",  EuclidSnap::kEucCInsLen);
 }
 
 void EuclideanPanel::resized()
@@ -633,4 +632,4 @@ void EuclideanPanel::paint(juce::Graphics& g)
         for (const auto& b : boxes) MuLookAndFeel::drawSubPanelScrews(g, b);
 }
 
-} // namespace mu_clid
+} // namespace mu_ui

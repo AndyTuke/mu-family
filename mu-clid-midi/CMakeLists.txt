@@ -4,8 +4,8 @@
 # BUNDLE_ID / CLAP_ID com.transwarp.mu-clid-lite, state id MuClidState) so existing DAW projects keep
 # finding it; only the folder, target and display name are new.
 #
-# Known exception: Rhythm, SequencerEngine, EuclideanPanel and RhythmCircle still live in mu-clid/
-# (they move to mu-core with the layer container) and are compiled here from there. See CLAUDE.md.
+# Nothing is compiled from mu-clid/ any more (the shared sequencer and Euclid panels live in mu-core);
+# the mu-clid/Source include path below goes in the next stage. See CLAUDE.md.
 
 set(MU_CLID_SOURCE "${CMAKE_SOURCE_DIR}/mu-clid/Source")
 
@@ -50,9 +50,6 @@ target_sources(mu-clid-midi
         Source/Sequencer/MidiRhythmCore.cpp
         Source/Plugin/PluginEditor.cpp
         Source/Persistence/SessionState.cpp
-        # Shared with mu-Clid until EuclideanPanel / RhythmCircle move to mu-core.
-        "${MU_CLID_SOURCE}/UI/EuclideanPanel.cpp"
-        "${MU_CLID_SOURCE}/UI/RhythmCircle.cpp"
 )
 
 # This product's Source/ first, so its own Plugin/PluginProcessor.h wins over mu-Clid's of the same
