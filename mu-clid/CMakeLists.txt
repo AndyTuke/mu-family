@@ -223,6 +223,7 @@ add_custom_command(TARGET mu-clid_Standalone POST_BUILD
 # ── mu-clid-tests — data-layer regression tests ────────────────────────────
 # Console executable that runs every juce::UnitTest defined in Source/Tests/.
 # Built on-demand only — not in the default ALL build.
+include("${CMAKE_SOURCE_DIR}/mu-core/cmake/ProcessorTestSources.cmake")
 juce_add_console_app(mu-clid-tests
     PRODUCT_NAME "mu-clid-tests"
 )
@@ -253,14 +254,25 @@ target_sources(mu-clid-tests PRIVATE
     # Pull in mu-core .cpp's the tests need (they can't link mu-core directly
     # because the INTERFACE library propagates sources via target_sources, and
     # the console-app target doesn't share JUCE-plugin context).
-    "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/EffectSlot.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/DelaySlot.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/ReverbSlot.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/Persistence/MidiFullPresetMap.cpp"   # under test by C4
-    "${CMAKE_SOURCE_DIR}/mu-core/Control/MidiControlMap.cpp"          # under test by the MIDI control tests
-    "${CMAKE_SOURCE_DIR}/mu-core/Control/MidiControlRouter.cpp"
+    # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked), its
+    # collaborators and the licence glue, so tests construct the product class itself.
+    Source/Tests/ProcessorSeamTests.cpp
+    Source/Plugin/PluginProcessor.cpp
+    Source/Plugin/PluginProcessor_APVTS.cpp
+    Source/Plugin/PluginProcessor_Modulation.cpp
+    Source/Plugin/PluginProcessor_Content.cpp
+    Source/Sequencer/RhythmManager.cpp
+    Source/Persistence/PresetIO.cpp
+    Source/Persistence/PresetIO_HostState.cpp
+    Source/Plugin/HotSwapStager.cpp
+    Source/Audio/SamplePreview.cpp
+    Source/Audio/SampleLibrary.cpp
+    "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/License/OnlineActivation.cpp"
+    "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
+    # The mu-core .cpps behind ProcessorBase (the console target can't link mu-core directly).
+    ${MU_CORE_PROCESSOR_TEST_SOURCES}
 )
 
 target_compile_features(mu-clid-tests PRIVATE cxx_std_17)
@@ -270,10 +282,14 @@ target_include_directories(mu-clid-tests PRIVATE
     "${CMAKE_SOURCE_DIR}/mu-core"
     "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
     "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+    "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"   # LicenseManager
 )
 
 target_link_libraries(mu-clid-tests PRIVATE
     juce::juce_core
+    juce::juce_graphics
+    juce::juce_gui_basics
+    juce::juce_audio_utils   # AudioTransportSource (SamplePreview)
     juce::juce_data_structures
     juce::juce_events
     juce::juce_audio_basics

@@ -9,8 +9,8 @@
 // Run:    build/mu-clid-tests_artefacts/Release/mu-clid-tests.exe
 // Exit:   0 on success, non-zero if any test reported a failure.
 //
-// Scope: DATA-LAYER tests only - no PluginProcessor / MessageManager / audio-
-// thread setup. The point is to catch drift in:
+// Scope: data-layer tests, plus the real PluginProcessor built headless
+// (createEditor lives in PluginEditor.cpp, which is not linked). The point is to catch drift in:
 //   - kRhythmParamDefs apply/push lambda pairs
 //   - writeKindedProperty / readKindedPropertyAsActualV2 round-trip
 //   - serialiseModulators / deserialiseModulators round-trip
@@ -19,6 +19,7 @@
 // Fast (<1s), deterministic, no host dependency.
 
 #include <juce_core/juce_core.h>
+#include <juce_gui_basics/juce_gui_basics.h>
 #include <cstdio>
 #include <iostream>
 
@@ -34,18 +35,18 @@ public:
     }
 };
 
-int main(int, char**)
+int main(int argc, char** argv)
 {
+    // ProcessorBase starts a message-thread poll timer, which needs a message manager.
+    juce::ScopedJuceInitialiser_GUI juceInit;
+
     StdoutLogger logger;
     juce::Logger::setCurrentLogger(&logger);
 
-    // Data-layer tests don't need MessageManager / GUI init. If future tests
-    // ever instantiate PluginProcessor or any UI Component, add
-    // juce_gui_basics to the test target's link libs and bring back
-    // juce::ScopedJuceInitialiser_GUI here.
     juce::UnitTestRunner runner;
     runner.setAssertOnFailure(false);   // Print failures, don't trap into a debugger.
-    runner.runAllTests();
+    if (argc > 1) runner.runTestsInCategory(argv[1]);   // optional: run only one category
+    else          runner.runAllTests();
 
     int totalFailures = 0;
     for (int i = 0; i < runner.getNumResults(); ++i)

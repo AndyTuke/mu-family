@@ -31,7 +31,11 @@ struct MuToniProcessorSeamTests : juce::UnitTest
         TempStorage storage;
         ExposedPluginProcessor p;
         const int n = p.numLayers.load();
-        expect(n >= 1, "at least one layer");
+        expectEquals(n, 4, "four live arps");
+        expectEquals(p.getNumChannels(), 4);
+        expect(p.getLayer(4) == nullptr && p.getLayer(-1) == nullptr, "no layer above the live count or below zero");
+        for (int i = 4; i < mu_limits::kMaxLayers; ++i)
+            expect(p.layers[(size_t) i] != nullptr, "spare slot " + juce::String(i) + " stays allocated");
         std::set<const void*> seen;
         for (int i = 0; i < juce::jmin(n, 4); ++i)
         {

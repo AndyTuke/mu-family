@@ -40,6 +40,8 @@ struct MuOnProcessorSeamTests : juce::UnitTest
             seen.insert(&p.voiceSlot(i));
         }
         expectEquals((int) seen.size(), (int) mu_on::kNumChannels, "five distinct tracks");
+        expectEquals(p.getNumChannels(), (int) mu_on::kNumChannels);
+        expect(p.getLayer((int) mu_on::kNumChannels) == nullptr && p.getLayer(-1) == nullptr, "no layer above the count or below zero");
 
         beginTest("laneOf(voiceSlot(i)) == i for every lane (seen through the Track persistence hook)");
         for (int i = 0; i < mu_on::kNumChannels; ++i)
