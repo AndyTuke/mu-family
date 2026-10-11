@@ -276,7 +276,7 @@ Wired into the ProcessorBase virtuals from #660:
 
 ### Hot-swap timing
 
-Pattern loads (PC ch 1–8 or UI) **defer to the loop point**, same mechanism as mu-clid's rhythm hot-swap (#653 staged-prebuild + commit-at-boundary). Mu-tant reuses the `HotSwapStager` machinery — the prepared-pattern payload is mu-tant-specific (oscillator state + gate pattern + modulator state) but the staging lifecycle is identical.
+Pattern loads (PC ch 1–8 or UI) **defer to the loop point**, same mechanism as mu-clid's rhythm hot-swap (#653 staged-prebuild + commit-at-boundary). Mu-tant stages through the shared `ProcessorBase::layerSwapper` (`mu_hotswap::LayerSwapper`, mu-core) — the prepared-pattern payload is mu-tant-specific (oscillator state + gate pattern + modulator state) but the staging lifecycle is identical.
 
 This is also what makes the **"on staged-for-change only"** envelope option work — the gate engine reads the same `hasPendingPreset()` flag the stager exposes.
 

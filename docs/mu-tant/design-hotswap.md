@@ -205,9 +205,9 @@ The central `ProcessorBase::addLayer` / `removeLayer` / `swapLayers` / `resetLay
 `addVoice` / `removeVoice` / `swapVoices` / `resetVoice`) shift/swap/reset per-voice
 data by **index**, so they **cancel pending per-voice staged swaps** (through `cancelPendingSwap`) that the renumber
 would misdirect:
-- `removeVoice` / (down-shift renumbers everything from `idx`) → cancel **all** voice swaps.
-- `swapVoices(a,b)` → cancel `a` + `b`.
-- `resetVoice(idx)` / `addVoice` (new slot) → cancel that slot.
+- `removeLayer` (down-shift renumbers everything from `idx`) → cancel **all** layer swaps.
+- `swapLayers(a,b)` → cancel `a` + `b`.
+- `resetLayer(idx)` / `addLayer` (new slot) → cancel that slot.
 
 A staged **full** preset is *index-independent* (it replaces the whole state at
 commit), so it is left pending and simply wins. (Same invariant + fix in mu-clid —

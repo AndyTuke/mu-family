@@ -229,7 +229,7 @@ C++ identifier changes never touch saved files; the data renames at the end do.
    2. **M** `ProcessorBase::getLayer(i)` accessor and the generic channel name / colour / modulator-panel use of it.
    3. **M** persistence virtuals `writeExtras` / `applyExtras`; `initSlotState` takes only the prefixes.
    4. **S** ownership moves into `ProcessorBase` (array of `unique_ptr<Layer>`, count, `layersLock`).
-   5. **S** central `addLayer` / `removeLayer` / `swapLayers` / `resetLayer`; generic hot-swap stager.
+   5. **S** central `addLayer` / `removeLayer` / `swapLayers` / `resetLayer`; generic hot-swap stager. **Done** (part 1 commit a41c5fd; part 2 commit 8a8be28, `LayerSwapper` in `ProcessorBase`; mu-Clid's own stager remains until stage 7).
    6. **O** variable layer count in mu-Toni (backlog #1240) and mu-On (#1241), the clip bank (#1277).
    7. **S** mu-Clid's `Rhythm` takes its engine, MIDI engine, play state and samples as members and moves into the container.
    8. **O**, with the combined instance and #1263: the layer-type registry and `Layer::render`.

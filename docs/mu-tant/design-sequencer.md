@@ -186,4 +186,4 @@ aligned visually.
 
 ## Deferred (not yet implemented)
 
-- **Pattern hot-swap staging** (reuse mu-clid's `HotSwapStager`).
+- **Pattern hot-swap staging** (the shared `ProcessorBase::layerSwapper`, `mu_hotswap::LayerSwapper`).
