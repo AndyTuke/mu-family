@@ -14,6 +14,7 @@
 #include "Modulation/ModulationSnapshot.h"
 #include "Audio/SampleLibrary.h"
 #include "Sequencer/RhythmManager.h"
+#include "Sequencer/RhythmPlayState.h"
 #include "Plugin/MidiClockSync.h"   // shared mu-core MIDI-clock slave
 #include "Persistence/PresetIO.h"
 #include "HotSwapStager.h"
@@ -53,14 +54,7 @@ public:
     //   - DAW (VST3/CLAP): program-change → preset hot-swap.
     bool acceptsMidi() const override { return true; }
     bool producesMidi() const override { return true; }
-    bool isMidiEffect() const override
-    {
-#if MUCLID_LITE_BUILD
-        return true;
-#else
-        return false;
-#endif
-    }
+    bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override;
 
     int getNumPrograms() override;
@@ -137,8 +131,6 @@ public:
     void setContentDir(const juce::File& dir);
     void ensureContentFoldersExist();
 
-    // Licensing is shared (ProcessorBase::initLicensing); the Lite build never calls it, so it has
-    // no licence state and shows no support prompt.
     void savePreset(const juce::String& n, const juce::String& d,
                     const juce::String& c, bool e = false) override { presetIO.savePreset(n, d, c, e); }
     void loadPreset(const juce::File& f) override { presetIO.loadPreset(f); publishPresetName(f.getFileNameWithoutExtension()); }
@@ -181,16 +173,7 @@ public:
                SequencerEngine::MaxRhythms> retiredReadyForCleanup;
 
     // Play-state atomics: written by audio thread, read by UI at 30 Hz.
-    struct RhythmPlayState
-    {
-        std::atomic<int>  currentStep   { 0 };
-        std::atomic<int>  currentStepC  { 0 }; // effectiveStep % stepsC — independent of combined-pattern length
-        std::atomic<int>  patternLength { 1 };
-        std::atomic<int>  stepsA        { 1 }; // individual ring step counts for per-ring rotation
-        std::atomic<int>  stepsB        { 1 };
-        std::atomic<int>  stepsC        { 1 };
-        std::atomic<int>  hitCount      { 0 };     // monotonic counter — audio thread increments per hit, UI tracks lastSeen (avoids one-shot-flag race between RhythmCircle + SidebarItem)
-    };
+    using RhythmPlayState = mu_clid::RhythmPlayState;
     std::array<RhythmPlayState, SequencerEngine::MaxRhythms> rhythmPlayState;
     std::atomic<float>  beatFraction     { 0.0f }; // fractional position within the current 1/16 step
     std::atomic<bool>   sequencerPlaying { false };
@@ -300,21 +283,11 @@ public:
     void forceSyncRhythmFromApvts(int ri);
 private:
 
-    // ── processBlock phases (full + Lite paths) ──────────────────────────
+    // ── processBlock phases ──────────────────────────────────────────────
     // processBlock is decomposed into private helpers invoked in order on the
     // audio thread. None allocate or take locks beyond processBlock's own
     // rhythmsLock ScopedTryLock.
     struct BlockTransport { bool playing; double beatPos; double bpm = 120.0; };   // bpm = the block's tempo (host > MIDI clock ticks > BPM field)
-#if MUCLID_LITE_BUILD
-    // Lite MIDI-only path: read playhead / internal transport, publish
-    // sequencerPlaying + lastBeatPos.
-    BlockTransport computeLiteTransport(int numSamples);
-    // Step the sequencer, compute accent velocities, dispatch MIDI triggers,
-    // update play-state atomics, and flush midiEngines. Called unconditionally
-    // (handles the playing/stopped branch internally).
-    void advanceLiteSequencer(int numRhythms, bool playing, double beatPos,
-                              juce::MidiBuffer& midi, int numSamples);
-#else
     // Scan MIDI clock + program changes, read the playhead / clock / internal
     // transport, reset the wrap detector on a stop->start edge, and publish
     // sequencerPlaying + lastBeatPos.
@@ -335,7 +308,6 @@ private:
     // preview, and emit per-rhythm MIDI.
     void renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages,
                           int numRhythms, double effectiveBpm);
-#endif
 
     // suspendProcessing() sets a flag but does NOT block until the current
     // processBlock callback finishes. rhythmsLock provides the missing barrier.
@@ -408,14 +380,6 @@ private:
     // concurrently read and written — no atomic needed.
     double currentSampleRate = 44100.0;
     int    currentBlockSize  = 512;
-
-#if MUCLID_LITE_BUILD
-    // Cached APVTS atomic pointers for the LITE build's per-block reads.
-    // Resolved once at construction (after APVTS layout is registered) so
-    // processBlock doesn't pay a hash lookup + literal-string materialise per call.
-    std::atomic<float>* liteMidiNotePtr  = nullptr;
-    std::atomic<float>* liteAccentAmtPtr = nullptr;
-#endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

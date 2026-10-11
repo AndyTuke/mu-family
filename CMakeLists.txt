@@ -21,17 +21,16 @@ string(STRIP "${MUFAMILY_VERSION_BASE}" MUFAMILY_VERSION_BASE)
 project(mu-family VERSION ${MUFAMILY_VERSION_BASE}.0)
 
 # ── mu-family monorepo umbrella ─────────────────────────────────────────────
-# This repo hosts the shared `mu-core` library plus one or more plugins built
-# on top of it. Today: mu-clid + mu-clid-lite. Future siblings (mu-tant,
-# mu-toni) are scaffolded under their own subdirectories with placeholder
-# CMakeLists.txt but are NOT yet wired into the build — uncomment their
-# add_subdirectory line below once their Source/ trees are real.
+# This repo hosts the shared `mu-core` library plus the plugins built on top of it
+# (one add_subdirectory each, below).
 #
 # Layout:
 #   mu-core/             shared audio/FX/modulation/UI source set + ProcessorBase
-#   mu-clid/             Euclidean rhythm sequencer plugin (full + Lite variants)
-#   mu-tant/             scaffolding only — Source/ tree empty
-#   mu-toni/             scaffolding only — Source/ tree empty
+#   mu-clid/             Euclidean rhythm sequencer + sample trigger plugin
+#   mu-clid-midi/        mu-Clid MIDI: the single-rhythm Euclidean MIDI effect (the former mu-Clid Lite)
+#   mu-tant/             wavetable drone synth
+#   mu-toni/             generative arpeggiator mono-synth
+#   mu-on/               909-style groove sequencer
 #   tools/               shared dev tools (license keygen etc.)
 #   tests/               cross-plugin listening-test pipeline (analyse.py, runners)
 #   cmake/               shared cmake helpers (build-number increment, installer)
@@ -129,6 +128,7 @@ endif()
 # ── Subdirectories ──────────────────────────────────────────────────────────
 add_subdirectory(mu-core)
 add_subdirectory(mu-clid)
+add_subdirectory(mu-clid-midi) # mu-Clid MIDI: Euclidean MIDI effect (VST3 + CLAP); needs mu-clid's increment_build_number target
 add_subdirectory(mu-tant)     # wavetable drone synth (Standalone + VST3 + CLAP)
 add_subdirectory(mu-toni)     # generative arpeggiator mono-synth, freeware (Standalone + VST3 + CLAP)
 add_subdirectory(mu-on)       # 909-style groove sequencer: Kick/Bass/Hat/Snare (Standalone + VST3 + CLAP)

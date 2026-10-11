@@ -1,9 +1,10 @@
-#include "LiteEditor.h"
+#include "Plugin/PluginEditor.h"
+#include "Plugin/ParameterLayout.h"
 #include "Sequencer/Rhythm.h"
 
-namespace mu_clid {
+namespace mu_clid_midi {
 
-LiteEditor::LiteEditor(PluginProcessor& p)
+PluginEditor::PluginEditor(PluginProcessor& p)
     // Apply stored scale before any child component constructs — same pattern as EditorShellBase.
     : AudioProcessorEditor((mu_ui::scale = juce::jlimit(ProcessorBase::kUiScaleMedium,
                                                         ProcessorBase::kUiScaleLarge,
@@ -14,8 +15,8 @@ LiteEditor::LiteEditor(PluginProcessor& p)
 {
     setLookAndFeel(&lookAndFeel);
 
-    // Lite build: keep the master-loop section but drop the preset / mixer
-    // chrome (MIDI-effect, no preset library + no mixer overlay).
+    // Keep the master-loop section but drop the preset / mixer chrome (a MIDI effect has no
+    // preset library and no mixer overlay).
     transportBar.setLogoText(juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid MIDI")));
     transportBar.setLoopSection(&masterLoop, MasterLoopSection::kWidth);
     transportBar.setShowPresetControls(false);
@@ -43,10 +44,9 @@ LiteEditor::LiteEditor(PluginProcessor& p)
         aboutOverlay.toFront(false);
     };
 
-    if (proc.getNumRhythms() > 0)
     {
         const juce::Colour colour { 0xff7F77DD };
-        rhythmCircle.setPlayState(&proc.rhythmPlayState[0],
+        rhythmCircle.setPlayState(&proc.rhythmPlayState,
                                   &proc.beatFraction,
                                   &proc.sequencerPlaying,
                                   colour);
@@ -59,13 +59,13 @@ LiteEditor::LiteEditor(PluginProcessor& p)
     for (int n = 0; n < 128; ++n)
         noteSelector.addItem(midiNoteName(n), n + 1); // DropdownSelect id = note + 1
     {
-        const int initNote = (int)proc.apvts.getRawParameterValue("lite_midiNote")->load();
+        const int initNote = (int)proc.apvts.getRawParameterValue(kMidiNoteId)->load();
         noteSelector.setSelectedId(initNote + 1, false);
     }
     noteSelector.onChange = [this](int id)
     {
         const int note = id - 1;
-        if (auto* param = proc.apvts.getParameter("lite_midiNote"))
+        if (auto* param = proc.apvts.getParameter(kMidiNoteId))
             param->setValueNotifyingHost(param->convertTo0to1((float)note));
     };
     noteSelectorLabel.setText("MIDI Note", juce::dontSendNotification);
@@ -74,7 +74,7 @@ LiteEditor::LiteEditor(PluginProcessor& p)
     addAndMakeVisible(noteSelector);
     addAndMakeVisible(noteSelectorLabel);
 
-    // Logic dropdown is wired by euclidPanel; Lite's circle has no free corner, so it
+    // Logic dropdown is wired by euclidPanel; the circle has no free corner here, so it
     // sits at the end of the controls row instead.
     logicLabel.setText("Logic", juce::dontSendNotification);
     logicLabel.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
@@ -82,15 +82,15 @@ LiteEditor::LiteEditor(PluginProcessor& p)
     addAndMakeVisible(logicLabel);
     addAndMakeVisible(euclidPanel.getLogicControl());
 
-    // Accent velocity knob — wired to lite_accentAmt APVTS parameter.
+    // Accent velocity knob, wired to the accent parameter.
     accentKnob.setRange(0.0, 100.0, 1.0);
     {
-        const float initAmt = proc.apvts.getRawParameterValue("lite_accentAmt")->load();
+        const float initAmt = proc.apvts.getRawParameterValue(kAccentAmtId)->load();
         accentKnob.setValue(initAmt, juce::dontSendNotification);
     }
     accentKnob.onValueChanged = [this](double v)
     {
-        if (auto* p = proc.apvts.getParameter("lite_accentAmt"))
+        if (auto* p = proc.apvts.getParameter(kAccentAmtId))
             p->setValueNotifyingHost(p->convertTo0to1((float)v));
     };
     accentKnob.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
@@ -105,10 +105,9 @@ LiteEditor::LiteEditor(PluginProcessor& p)
         statusBar.showParam(name, value);
     };
 
-    // Catch host automation of the Lite-only params so the dropdown + accent
-    // knob track DAW automation lanes.
-    proc.apvts.addParameterListener("lite_midiNote",  this);
-    proc.apvts.addParameterListener("lite_accentAmt", this);
+    // Catch host automation of the note and accent params so the dropdown + knob track DAW automation lanes.
+    proc.apvts.addParameterListener(kMidiNoteId,  this);
+    proc.apvts.addParameterListener(kAccentAmtId, this);
 
     // Size dropdown — Normal / Large, right-aligned in the transport bar row.
     sizeDropdown.addItem("Normal", 1);
@@ -125,13 +124,13 @@ LiteEditor::LiteEditor(PluginProcessor& p)
     addAndMakeVisible(sizeDropdown);
 
     // React to scale changes (from size dropdown or external trigger).
-    juce::Component::SafePointer<LiteEditor> safeThis(this);
+    juce::Component::SafePointer<PluginEditor> safeThis(this);
     proc.onUiScaleChanged = [safeThis](float scale)
     {
         if (auto* self = safeThis.getComponent())
         {
             mu_ui::scale = scale;
-            self->setSize(mu_ui::s(kLiteW), mu_ui::s(kLiteH));
+            self->setSize(mu_ui::s(kWindowW), mu_ui::s(kWindowH));
             self->sendLookAndFeelChange();
             self->resized();
             self->repaint();
@@ -139,7 +138,7 @@ LiteEditor::LiteEditor(PluginProcessor& p)
     };
 
     // Window size respects current scale.
-    setSize(mu_ui::s(kLiteW), mu_ui::s(kLiteH));
+    setSize(mu_ui::s(kWindowW), mu_ui::s(kWindowH));
 
     // The family metal look (LCD dropdowns, engraved labels, metal panel).
     lookAndFeel.setMetalStyle(true);
@@ -147,24 +146,24 @@ LiteEditor::LiteEditor(PluginProcessor& p)
     sendLookAndFeelChange();
 }
 
-LiteEditor::~LiteEditor()
+PluginEditor::~PluginEditor()
 {
     proc.onUiScaleChanged = nullptr;
-    proc.apvts.removeParameterListener("lite_accentAmt", this);
-    proc.apvts.removeParameterListener("lite_midiNote",  this);
+    proc.apvts.removeParameterListener(kAccentAmtId, this);
+    proc.apvts.removeParameterListener(kMidiNoteId,  this);
     setLookAndFeel(nullptr);
 }
 
-void LiteEditor::parameterChanged(const juce::String& parameterID, float newValue)
+void PluginEditor::parameterChanged(const juce::String& parameterID, float newValue)
 {
-    juce::Component::SafePointer<LiteEditor> safe(this);
+    juce::Component::SafePointer<PluginEditor> safe(this);
     auto refresh = [safe, parameterID, newValue]
     {
         auto* self = safe.getComponent();
         if (! self) return;
-        if (parameterID == "lite_midiNote")
+        if (parameterID == kMidiNoteId)
             self->noteSelector.setSelectedId((int) newValue + 1, false);
-        else if (parameterID == "lite_accentAmt")
+        else if (parameterID == kAccentAmtId)
             self->accentKnob.setValue((double) newValue, juce::dontSendNotification);
     };
     if (juce::MessageManager::getInstance()->isThisTheMessageThread())
@@ -173,7 +172,7 @@ void LiteEditor::parameterChanged(const juce::String& parameterID, float newValu
         juce::MessageManager::callAsync(std::move(refresh));
 }
 
-void LiteEditor::paint(juce::Graphics& g)
+void PluginEditor::paint(juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
     using mu_ui::s;
@@ -187,7 +186,7 @@ void LiteEditor::paint(juce::Graphics& g)
         MuLookAndFeel::drawAccentPanel(g, content.reduced(2).toFloat(), MuLookAndFeel::appAccent(*this));
 }
 
-void LiteEditor::resized()
+void PluginEditor::resized()
 {
     using mu_ui::s;
     auto area = getLocalBounds();
@@ -212,7 +211,7 @@ void LiteEditor::resized()
 
     // Indent by EuclideanPanel's border inset so the accent knob's left edge
     // aligns with the Steps knobs above.
-    controlsRow.removeFromLeft(s(EuclideanPanel::kPanelInset));
+    controlsRow.removeFromLeft(s(mu_clid::EuclideanPanel::kPanelInset));
 
     const int knobW = s(MuLookAndFeel::kKnobSize1W);
     const int knobH = s(MuLookAndFeel::kKnobSize1H);
@@ -228,26 +227,25 @@ void LiteEditor::resized()
     controlsRow.removeFromLeft(s(MuLookAndFeel::kSpaceL));
     const int logicLabelW = s(40);
     logicLabel.setBounds(controlsRow.removeFromLeft(logicLabelW).withSizeKeepingCentre(logicLabelW, s(22)));
-    const int logicW = s(EuclideanPanel::kLogicDropW);
+    const int logicW = s(mu_clid::EuclideanPanel::kLogicDropW);
     euclidPanel.getLogicControl().setBounds(controlsRow.removeFromLeft(logicW).withSizeKeepingCentre(logicW, s(24)));
 
     euclidPanel.setBounds(area);
     aboutOverlay.setBounds(getLocalBounds());
 }
 
-void LiteEditor::refreshCircle()
+void PluginEditor::refreshCircle()
 {
-    if (proc.getNumRhythms() == 0) return;
-    const Rhythm& r = proc.getRhythm(0);
+    const mu_clid::Rhythm& r = proc.getRhythm();
     rhythmCircle.setPatterns(r.genA.getStepTypes(),
                              r.genB.getStepTypes(),
                              r.genC.getStepTypes());
 }
 
-juce::String LiteEditor::midiNoteName(int note)
+juce::String PluginEditor::midiNoteName(int note)
 {
     static const char* names[] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
     return juce::String(names[note % 12]) + juce::String(note / 12 - 1);
 }
 
-} // namespace mu_clid
+} // namespace mu_clid_midi

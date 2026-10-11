@@ -4,24 +4,24 @@
 #include "Plugin/PluginProcessor.h"
 #include "UI/TransportBar.h"
 #include "UI/MasterLoopSection.h"
-#include "UI/RhythmCircle.h"
-#include "UI/EuclideanPanel.h"
+#include "UI/RhythmCircle.h"      // mu-Clid's, shared until the Euclid panels move to mu-core
+#include "UI/EuclideanPanel.h"    // mu-Clid's, shared until the Euclid panels move to mu-core
 #include "UI/Components/StatusBar.h"
 #include "UI/Components/MuLookAndFeel.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/AboutOverlay.h"
 
-namespace mu_clid {
+namespace mu_clid_midi {
 
-// Simplified editor for the mu-Clid MIDI (MIDI-effect) build.
-// Shows TransportBar + RhythmCircle + EuclideanPanel; no sidebar, voice section, or mixer.
-class LiteEditor : public juce::AudioProcessorEditor,
-                   public juce::AudioProcessorValueTreeState::Listener
+// The mu-Clid MIDI editor: TransportBar + RhythmCircle + EuclideanPanel, with the MIDI note and
+// accent controls. No sidebar, voice section or mixer.
+class PluginEditor : public juce::AudioProcessorEditor,
+                     public juce::AudioProcessorValueTreeState::Listener
 {
 public:
-    explicit LiteEditor(PluginProcessor&);
-    ~LiteEditor() override;
+    explicit PluginEditor(PluginProcessor&);
+    ~PluginEditor() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -36,10 +36,10 @@ private:
 
     MuLookAndFeel lookAndFeel;
 
-    TransportBar      transportBar;
-    MasterLoopSection masterLoop;
-    RhythmCircle      rhythmCircle;
-    EuclideanPanel euclidPanel;
+    TransportBar        transportBar;
+    MasterLoopSection   masterLoop;
+    mu_clid::RhythmCircle    rhythmCircle;
+    mu_clid::EuclideanPanel  euclidPanel;
     StatusBar      statusBar;
     AboutOverlay     aboutOverlay;
     DropdownSelect noteSelector;
@@ -49,8 +49,8 @@ private:
     KnobWithLabel  accentKnob { "Accent", MuLookAndFeel::knobLevel };
 
     // Unscaled window dimensions — multiply by mu_ui::s() / mu_ui::scale at use.
-    static constexpr int kLiteW        = 1110;
-    static constexpr int kLiteH        = 420;
+    static constexpr int kWindowW      = 1110;
+    static constexpr int kWindowH      = 420;
     static constexpr int kTransportH   = 40;
     static constexpr int kStatusH      = 22;
     // Circle uses the family constant; kCircleMargin adds left inset so the
@@ -62,7 +62,7 @@ private:
     void refreshCircle();
     static juce::String midiNoteName(int note);
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LiteEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginEditor)
 };
 
-} // namespace mu_clid
+} // namespace mu_clid_midi

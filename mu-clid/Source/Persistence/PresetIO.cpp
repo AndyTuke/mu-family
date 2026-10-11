@@ -620,9 +620,8 @@ void PresetIO::restoreRhythmSample(int i, const juce::ValueTree& tree,
                                     const juce::String& sampleDataProp,
                                     const juce::String& sampleNameProp)
 {
-    // The Lite (MIDI-effect) build has no sample-playback engine on this slot, so there's
-    // nothing to load a sample into — bail before any voiceEngines[i] deref. The caller
-    // maintains the sample paths. (Mirrors the null guard in forceSyncRhythmFromApvts.)
+    // A slot without an engine has nothing to load a sample into. (Mirrors the null guard
+    // in forceSyncRhythmFromApvts.)
     if (! proc.voiceEngines[i]) return;
 
     const auto smp = resolvePresetSample(tree.getProperty(juce::Identifier(sampleDataProp)).toString(),

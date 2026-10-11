@@ -2,7 +2,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "UI/Components/MuLookAndFeel.h"
 #include "Sequencer/GeneratorAliases.h"
-#include "Plugin/PluginProcessor.h"
+#include "Sequencer/RhythmPlayState.h"
 #include <array>
 
 namespace mu_clid {
@@ -23,7 +23,7 @@ public:
 
     // Connect to PluginProcessor play-state atomics for self-driven animation.
     // state is non-const so we can update lastHitCount tracking.
-    void setPlayState(PluginProcessor::RhythmPlayState*  state,
+    void setPlayState(RhythmPlayState*  state,
                       const std::atomic<float>*          beatFrac,
                       const std::atomic<bool>*            playing,
                       juce::Colour                         colour);
@@ -43,7 +43,7 @@ private:
     std::vector<StepType> patternA, patternB, patternC;
 
     // Non-owning pointers to PluginProcessor atomics
-    PluginProcessor::RhythmPlayState*       playState     = nullptr;
+    RhythmPlayState*       playState     = nullptr;
     const std::atomic<float>*              beatFracAtom  = nullptr;
     const std::atomic<bool>*               isPlayingAtom = nullptr;
     juce::Colour                            rhythmColour;

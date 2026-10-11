@@ -1,11 +1,10 @@
 #include "EuclideanPanel.h"
-#include "Plugin/PluginProcessor.h"
 #include "Modulation/ModulationSnapshot.h"
 #include <limits>
 
 namespace mu_clid {
 
-EuclideanPanel::EuclideanPanel(PluginProcessor& p) : proc(p)
+EuclideanPanel::EuclideanPanel(ProcessorBase& p) : proc(p)
 {
     for (auto* k : { &stepsA, &hitsA, &rotA, &prePadA, &postPadA, &insertStA, &insertLenA,
                      &stepsB, &hitsB, &rotB, &prePadB, &postPadB, &insertStB, &insertLenB,
@@ -70,10 +69,17 @@ void EuclideanPanel::apvtsSet(const char* suffix, float v)
         p->setValueNotifyingHost(p->convertTo0to1(v));
 }
 
+const Rhythm* EuclideanPanel::currentRhythm() const
+{
+    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumChannels()) return nullptr;
+    return static_cast<const Rhythm*>(proc.getLayer(rhythmIndex));   // every layer of a Euclid product is a Rhythm
+}
+
 int EuclideanPanel::insertStartDisplayOffset(int ring) const
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return 1;
-    const Rhythm& r = proc.getRhythm(rhythmIndex);
+    const Rhythm* rp = currentRhythm();
+    if (rp == nullptr) return 1;
+    const Rhythm& r = *rp;
     const HitGenerator& g = ring == 0 ? r.genA : ring == 1 ? r.genB : r.genC;
     const auto lay = g.clampLayout({ g.hits, g.rotate, g.prePad, g.postPad, g.insertStart, g.insertLength });
     return (g.prePadMode == InsertMode::Pad ? lay.prePad : 0) + 1;   // a Pad-mode gap precedes the section
@@ -279,8 +285,9 @@ void EuclideanPanel::setRhythm(int ri)
 
 void EuclideanPanel::loadFromRhythm()
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
-    const Rhythm& r = proc.getRhythm(rhythmIndex);
+    const Rhythm* rp = currentRhythm();
+    if (rp == nullptr) return;
+    const Rhythm& r = *rp;
 
     updateRangesA();
     stepsA.setValue(r.genA.steps);   hitsA.setValue(r.genA.hits);
@@ -323,8 +330,9 @@ void EuclideanPanel::loadFromRhythm()
 
 void EuclideanPanel::refreshSuffix(const juce::String& suffix)
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
-    const Rhythm& r = proc.getRhythm(rhythmIndex);
+    const Rhythm* rp = currentRhythm();
+    if (rp == nullptr) return;
+    const Rhythm& r = *rp;
 
     auto setMode = [](SlideSwitch& sc, InsertMode m) {
         sc.setSelectedIndex(m == InsertMode::Mute ? 1 : 0);
@@ -417,23 +425,26 @@ void EuclideanPanel::updateRanges(const HitGenerator& g, const char* const (&sfx
 
 void EuclideanPanel::updateRangesA()
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
+    const Rhythm* rp = currentRhythm();
+    if (rp == nullptr) return;
     static const char* const kSfx[4] = { "prePadA", "postPadA", "insLenA", "insStA" };
-    updateRanges(proc.getRhythm(rhythmIndex).genA, kSfx, hitsA, rotA, prePadA, postPadA, insertStA, insertLenA);
+    updateRanges(rp->genA, kSfx, hitsA, rotA, prePadA, postPadA, insertStA, insertLenA);
 }
 
 void EuclideanPanel::updateRangesB()
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
+    const Rhythm* rp = currentRhythm();
+    if (rp == nullptr) return;
     static const char* const kSfx[4] = { "prePadB", "postPadB", "insLenB", "insStB" };
-    updateRanges(proc.getRhythm(rhythmIndex).genB, kSfx, hitsB, rotB, prePadB, postPadB, insertStB, insertLenB);
+    updateRanges(rp->genB, kSfx, hitsB, rotB, prePadB, postPadB, insertStB, insertLenB);
 }
 
 void EuclideanPanel::updateRangesC()
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms()) return;
+    const Rhythm* rp = currentRhythm();
+    if (rp == nullptr) return;
     static const char* const kSfx[4] = { "prePadC", "postPadC", "insLenC", "insStC" };
-    updateRanges(proc.getRhythm(rhythmIndex).genC, kSfx, hitsC, rotC, prePadC, postPadC, insertStC, insertLenC);
+    updateRanges(rp->genC, kSfx, hitsC, rotC, prePadC, postPadC, insertStC, insertLenC);
 }
 
 void EuclideanPanel::setRhythmColour(juce::Colour c)
@@ -444,7 +455,8 @@ void EuclideanPanel::setRhythmColour(juce::Colour c)
 
 void EuclideanPanel::bindModulationIndicators()
 {
-    if (rhythmIndex < 0 || rhythmIndex >= proc.getNumRhythms())
+    const Rhythm* rp = currentRhythm();
+    if (rp == nullptr)
     {
         for (auto* k : { &hitsA, &rotA, &prePadA, &postPadA, &insertStA, &insertLenA,
                          &hitsB, &rotB, &prePadB, &postPadB, &insertStB, &insertLenB,
@@ -452,7 +464,7 @@ void EuclideanPanel::bindModulationIndicators()
             k->clearModBinding();
         return;
     }
-    const auto* mx = &proc.getRhythm(rhythmIndex).modulationMatrix;
+    const auto* mx = &rp->modulationMatrix;
     static const float kNaN = std::numeric_limits<float>::quiet_NaN();
 
     // Euclid destinations: hits / rotate / insert start report 0..1 proportions; the pads
@@ -463,8 +475,8 @@ void EuclideanPanel::bindModulationIndicators()
         const juce::String id(destId);
         const bool normMode = ! (id.endsWith("Pad") || id.endsWith("insLen"));
         k.bindModulation(destId, mx,
-            [&proc = proc, ri = rhythmIndex, snapIndex]() -> float {
-                return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, snapIndex) : kNaN; },
+            [this, ri = rhythmIndex, snapIndex]() -> float {
+                return modulationSnapshot ? modulationSnapshot(ri, snapIndex) : kNaN; },
             normMode);
     };
 

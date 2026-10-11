@@ -6,11 +6,7 @@
 #include "Audio/InsertSlotConfig.h"
 #include "Modulation/ModulationSkew.h"  // proportion-space skew helpers (shared with test C5)
 #include "Modulation/MuClidModDest.h"  // mu-clid modulation targets
-#if MUCLID_LITE_BUILD
-#include "UI/LiteEditor.h"
-#else
 #include "PluginEditor.h"
-#endif
 #include "Sequencer/Rhythm.h"
 #include "Audio/FX/Slots/FXAlgorithmDef.h"
 
@@ -22,9 +18,6 @@ namespace mu_clid {
 // wires an external signal) + 10 stereo output buses: Master (always enabled),
 // Out 1..8 + FX Returns (disabled by default, matching pre-multi-bus behaviour).
 PluginProcessor::PluginProcessor()
-#if MUCLID_LITE_BUILD
-    : ProcessorBase(BusesProperties(), createParameterLayout(), juce::Identifier("MuClidState"))
-#else
     : ProcessorBase(BusesProperties()
           .withInput ("Sidechain",   juce::AudioChannelSet::stereo(), false)
           .withOutput("Master",      juce::AudioChannelSet::stereo(), true)
@@ -39,7 +32,6 @@ PluginProcessor::PluginProcessor()
           .withOutput("FX Returns",  juce::AudioChannelSet::stereo(), false),
           createParameterLayout(),
           juce::Identifier("MuClidState"))
-#endif
 {
     // Register mu-clid's modulation depth scales with mu-core before any audio runs
     // (once, message thread) — keeps mu-core from enumerating mu-clid param ids.
@@ -63,11 +55,9 @@ PluginProcessor::PluginProcessor()
     multiBusEnabled.store(appSettings->getBoolValue("multiBusEnabled", true),
                           std::memory_order_relaxed);
 
-   #if !MUCLID_LITE_BUILD
     // Offline licence + online activation (shared; after initAppSettings for getContentDir).
     initLicensing({ mu_clid::kLicenseProductId, mu_clid::kLicenseFilename,
                     mu_clid::kLicensePublicKey, "muclid.activation", mu_clid::kCheckoutUrl });
-   #endif
     sequencer.setStepCap(HitGenerator::kMaxSteps);
 
     // Listen to the product parameters (rhythm + mstrLoop); mixer / FX ids are synced by ProcessorBase.
@@ -110,37 +100,24 @@ PluginProcessor::PluginProcessor()
     defaultRhythm.genA.steps = 16;
     defaultRhythm.genA.hits  = 4;
     sequencer.addRhythm(defaultRhythm);
-#if !MUCLID_LITE_BUILD
     voiceEngines[0] = std::make_unique<VoiceEngine>();
-#endif
     // Stage 34 Step 2: C++17 std::atomic<bool> default ctor leaves the value
     // indeterminate. Initialise every retired-cleanup flag to false so the
     // audio thread + drain block never observe a spurious "ready" state on an
-    // empty slot. Unconditional (outside the LITE guard) so Lite's handle-
-    // AsyncUpdate path can't read an indeterminate atomic either. Retired
-    // slots stay null and flags stay false until Step 3 wires retire-on-swap.
+    // empty slot. Retired slots stay null and flags stay false until a swap retires an engine.
     for (auto& slotArr : retiredReadyForCleanup)
         for (auto& flag : slotArr)
             flag.store(false, std::memory_order_relaxed);
     numActiveRhythms.store(1, std::memory_order_release);
-
-#if MUCLID_LITE_BUILD
-    // Cache LITE-only APVTS atomic pointers so processBlock doesn't pay a per-block
-    // hash lookup + StringRef materialise for these two reads.
-    liteMidiNotePtr  = apvts.getRawParameterValue("lite_midiNote");
-    liteAccentAmtPtr = apvts.getRawParameterValue("lite_accentAmt");
-#endif
 
     {
         mu_core::ScopedApvtsLoading guard(apvtsLoading);
         pushRhythmToApvts(0);
     }
 
-#if !MUCLID_LITE_BUILD
     // Ensure user content folders exist and restore the saved default preset (skipped by render mode).
     ensureContentFoldersExist();
     loadStartupDefault();
-#endif
 }
 
 PluginProcessor::~PluginProcessor()
@@ -156,11 +133,7 @@ const juce::String PluginProcessor::getName() const
 {
     // UTF-8 Greek lowercase mu (μ, U+03BC) prefix — matches the AboutOverlay
     // logo and the user-facing branding everywhere else in the UI.
-#if MUCLID_LITE_BUILD
-    return juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid MIDI"));
-#else
     return juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid"));
-#endif
 }
 double PluginProcessor::getTailLengthSeconds() const
 {
@@ -185,12 +158,9 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     const int n = numActiveRhythms.load(std::memory_order_acquire);
     for (int i = 0; i < n; ++i)
     {
-#if !MUCLID_LITE_BUILD
         voiceEngines[i]->prepareToPlay(sampleRate, samplesPerBlock);
-#endif
         midiEngines[i].prepare(sampleRate, samplesPerBlock);
     }
-#if !MUCLID_LITE_BUILD
     // Stage 34: re-prepare any populated retired engines too so a mid-stream
     // sample-rate or block-size change doesn't leave a tail-out engine
     // operating on stale buffer sizing. No-op in Step 2 (all slots null).
@@ -202,7 +172,6 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     fxChain.prepare(sampleRate, samplesPerBlock);
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     samples.prepare(samplesPerBlock, sampleRate);
-#endif
 }
 
 void PluginProcessor::releaseResources()
@@ -217,20 +186,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
     // Preserve the DAW sidechain, then clear (shared — the SC input bus shares buffer
     // channels with the master output, so a bare clear would wipe it → no ducking /
-    // dead GR). No-op in the Lite build (no buses); the mixer keeps a private copy.
+    // dead GR). The mixer keeps a private copy.
     captureSidechainAndClear(buffer);
-
-#if MUCLID_LITE_BUILD
-    // Lite mode: MIDI-only sequencing, no audio processing.
-    const auto transport = computeLiteTransport(buffer.getNumSamples());
-
-    const juce::ScopedTryLock rLock(rhythmsLock);
-    if (!rLock.isLocked()) return;
-    const int numRhythms = numActiveRhythms.load(std::memory_order_acquire);
-
-    advanceLiteSequencer(numRhythms, transport.playing, transport.beatPos,
-                         midiMessages, buffer.getNumSamples());
-#else
 
     const BlockTransport transport = deriveTransport(buffer, midiMessages);
     const bool   playing = transport.playing;
@@ -257,85 +214,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         applyRhythmModulation(r, beatPos);
 
     renderAudioBuses(buffer, midiMessages, numRhythms, transport.bpm);
-#endif
 }
 
-#if MUCLID_LITE_BUILD
-//==============================================================================
-// Lite processBlock helpers.
-//==============================================================================
-PluginProcessor::BlockTransport PluginProcessor::computeLiteTransport(int numSamples)
-{
-    // The family transport rule (mu-core TransportResolver): Lite runs in a host, so play, tempo
-    // and beat follow it (its own transport only when a host gives no position at all).
-    const auto t = mu_core::resolveTransport(pollHostTransport(),
-                                             wrapperType == wrapperType_Standalone, midiClockSync, 0.0,
-                                             { internalPlaying, internalBpm, internalBeatPos, &nudgePhaseBeats, &nudgeDirection, &appliedSyncOffsetBeats },
-                                             juce::jmax(1, numSamples), currentSampleRate);
-    const bool   playing = t.playing;
-    const double beatPos = t.startBeat;
-    noteBlockTransport(t);
-
-    sequencerPlaying.store(playing);
-    lastBeatPos.store(beatPos);
-    return { playing, beatPos };
-}
-
-void PluginProcessor::advanceLiteSequencer(int numRhythms, bool playing, double beatPos,
-                                            juce::MidiBuffer& midi, int numSamples)
-{
-    if (playing)
-    {
-        const auto blockResult = sequencer.processBlock(beatPos);
-        const int   midiNote  = (int) liteMidiNotePtr->load();
-        const float accentAmt = liteAccentAmtPtr->load();
-
-        // Bottom half (0–50): accented ramps 100→127, non-accented stays 100.
-        // Top half  (50–100): accented stays 127, non-accented ramps 100→75.
-        float accentedVel, normalVel;
-        if (accentAmt <= 50.0f)
-        {
-            const float t = accentAmt / 50.0f;
-            accentedVel = (100.0f + t * 27.0f) / 127.0f;
-            normalVel   =  100.0f               / 127.0f;
-        }
-        else
-        {
-            const float t = (accentAmt - 50.0f) / 50.0f;
-            accentedVel = 1.0f;
-            normalVel   = (100.0f - t * 25.0f)  / 127.0f;
-        }
-
-        for (int r = 0; r < numRhythms; ++r)
-        {
-            if (blockResult.firedMask & (1 << r))
-            {
-                const bool isAccented = (blockResult.accentMask & (1 << r)) != 0;
-                midiEngines[r].trigger(midi, 0, midiNote, 1,
-                                       isAccented ? accentedVel : normalVel);
-                rhythmPlayState[r].hitCount.store(rhythmPlayState[r].hitCount.load() + 1);
-            }
-        }
-
-        const float frac = static_cast<float>(
-            std::fmod(beatPos / SequencerEngine::StepLengthBeats, 1.0));
-        beatFraction.store(frac);
-        for (int r = 0; r < numRhythms; ++r)
-        {
-            rhythmPlayState[r].currentStep  .store(sequencer.getLastStepIndex(r));
-            rhythmPlayState[r].currentStepC .store(sequencer.getLastAccentStepIndex(r));
-            rhythmPlayState[r].patternLength.store(sequencer.getPatternLength(r));
-            const Rhythm& rhy = sequencer.getRhythm(r);
-            rhythmPlayState[r].stepsA.store(juce::jmax(1, rhy.genA.steps));
-            rhythmPlayState[r].stepsB.store(juce::jmax(1, rhy.genB.steps));
-            rhythmPlayState[r].stepsC.store(juce::jmax(1, rhy.genC.steps));
-        }
-    }
-    for (int r = 0; r < numRhythms; ++r)
-        midiEngines[r].processBlock(midi, juce::jmax(1, numSamples));
-}
-
-#else
 //==============================================================================
 // processBlock phases. Behaviour-preserving extraction of the full-build
 // audio-thread path; called in order from processBlock under its rhythmsLock.
@@ -535,18 +415,13 @@ void PluginProcessor::renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::M
     for (int r = 0; r < numRhythms; ++r)
         midiEngines[r].processBlock(midiMessages, buffer.getNumSamples());
 }
-#endif // MUCLID_LITE_BUILD
 
 //==============================================================================
 bool PluginProcessor::hasEditor() const { return true; }
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()
 {
-#if MUCLID_LITE_BUILD
-    return new LiteEditor(*this);
-#else
     return new PluginEditor(*this);
-#endif
 }
 
 //==============================================================================
@@ -574,11 +449,6 @@ void PluginProcessor::setMidiNoteMode(int mode)
 
 bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
-#if MUCLID_LITE_BUILD
-    // MIDI effect: no audio buses.
-    return layouts.getMainInputChannelSet()  == juce::AudioChannelSet::disabled()
-        && layouts.getMainOutputChannelSet() == juce::AudioChannelSet::disabled();
-#else
     // Sidechain input bus: at most one, must be stereo or disabled.
     const auto& ins = layouts.inputBuses;
     if (ins.size() > 1) return false;
@@ -607,7 +477,6 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
         return false;
 
     return true;
-#endif
 }
 
 //==============================================================================

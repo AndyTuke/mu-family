@@ -38,7 +38,7 @@ void RhythmCircle::setPatterns(const std::vector<StepType>& patA,
     repaint();
 }
 
-void RhythmCircle::setPlayState(PluginProcessor::RhythmPlayState*  state,
+void RhythmCircle::setPlayState(RhythmPlayState*  state,
                                  const std::atomic<float>*          beatFrac,
                                  const std::atomic<bool>*            playing,
                                  juce::Colour                         colour)

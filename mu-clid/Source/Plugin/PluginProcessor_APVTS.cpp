@@ -16,6 +16,7 @@
 #include "Audio/FX/Slots/FXAlgorithmDef.h"
 #include "Plugin/MixerFxParams.h"
 #include "ValueFormat.h"   // mu-core: shared value text
+#include "Sequencer/EuclidParamLayout.h"   // mu-core: the Euclid parameter set
 
 namespace mu_clid {
 
@@ -70,44 +71,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
                                    ? "Rhythm " + juce::String(i + 1) + " "
                                    : "R"       + juce::String(i + 1) + " ";
 
-        // HitGen A
-        addI(p+"stepsA",   n+"Steps A",   1, HitGenerator::kMaxSteps, 8);
-        addI(p+"hitsA",    n+"Hits A",    0, 64, 0);
-        addI(p+"rotA",     n+"Rot A",   -32, 32, 0);
-        addI(p+"prePadA",  n+"PrePad A",  0, HitGenerator::kMaxPrePad, 0);
-        addI(p+"postPadA", n+"PostPad A", 0, HitGenerator::kMaxPostPad, 0);
-        addI(p+"insStA",   n+"InsSt A",   0, 63, 0);
-        addI(p+"insLenA",  n+"InsLen A",  0, HitGenerator::kMaxInsertLength, 0);
-        addB(p+"insModeA",    n+"InsMode A",     false);
-        addB(p+"prePadModeA", n+"PrePadMode A",  false);
-        addB(p+"postPadModeA",n+"PostPadMode A", false);
-        // HitGen B
-        addI(p+"stepsB",   n+"Steps B",   1, HitGenerator::kMaxSteps, 8);
-        addI(p+"hitsB",    n+"Hits B",    0, 64, 0);
-        addI(p+"rotB",     n+"Rot B",   -32, 32, 0);
-        addI(p+"prePadB",  n+"PrePad B",  0, HitGenerator::kMaxPrePad, 0);
-        addI(p+"postPadB", n+"PostPad B", 0, HitGenerator::kMaxPostPad, 0);
-        addI(p+"insStB",   n+"InsSt B",   0, 63, 0);
-        addI(p+"insLenB",  n+"InsLen B",  0, HitGenerator::kMaxInsertLength, 0);
-        addB(p+"insModeB",    n+"InsMode B",     false);
-        addB(p+"prePadModeB", n+"PrePadMode B",  false);
-        addB(p+"postPadModeB",n+"PostPadMode B", false);
-        // HitGen C
-        addI(p+"stepsC",   n+"Steps C",   1, HitGenerator::kMaxSteps, 8);
-        addI(p+"hitsC",    n+"Hits C",    0, 64, 0);
-        addI(p+"rotC",     n+"Rot C",   -32, 32, 0);
-        addI(p+"prePadC",  n+"PrePad C",  0, HitGenerator::kMaxPrePad, 0);
-        addI(p+"postPadC", n+"PostPad C", 0, HitGenerator::kMaxPostPad, 0);
-        addI(p+"insStC",   n+"InsSt C",   0, 63, 0);
-        addI(p+"insLenC",  n+"InsLen C",  0, HitGenerator::kMaxInsertLength, 0);
-        addB(p+"insModeC",    n+"InsMode C",     false);
-        addB(p+"prePadModeC", n+"PrePadMode C",  false);
-        addB(p+"postPadModeC",n+"PostPadMode C", false);
-        // Logic
-        addI(p+"logic",  n+"Logic",        0,   4,   0);
-        addB(p+"patLeg", n+"Pattern Legato", false);
-        addB(p+"vMono",  n+"Voice Mono", false);  // true = polyphony capped at 1 voice
-        addI(p+"rstSt",  n+"Reset Steps", -1, 256, -1);  // -1 = free-running (nullopt)
+        // HitGen A / B / C, logic, legato, mono and reset steps: the Euclid set shared with mu-Clid MIDI.
+        mu_core::addEuclidParams(layout, p, n);
         // Pitch — octave ±3, semi ±12 (±1 oct), fine ±100 cents (1 cent step).
         // Combined static max = ±4 octaves; clamped at the engine.
         addI(p+"pitchOct",  n+"Pitch Oct",  (int) mu_clid::mod_skew::kPitchOctave.lo, (int) mu_clid::mod_skew::kPitchOctave.hi, 0);
@@ -193,11 +158,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParam
     // mstr_lvl / mstr_pan / mst_ins* + the ret_ return strips are declared by
     // mu_mixfx::addGlobalFxParams above; mstrLoop is mu-clid-only.
     addI("mstrLoop",    "Master Loop",      0,       16,       0);      // 0=free, 1-16 → 16-256 steps
-
-#if MUCLID_LITE_BUILD
-    addI("lite_midiNote",   "MIDI Note", 0, 127, 36);
-    addF("lite_accentAmt",  "Accent",    0.0f, 100.0f, 0.0f);
-#endif
 
     return layout;
 }

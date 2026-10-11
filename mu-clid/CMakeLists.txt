@@ -3,8 +3,7 @@
 # Plugin-specific sources live under Source/. Shared audio/UI infrastructure
 # is linked in via mu-core (defined in the family-root CMakeLists).
 
-# Binary resources (logo PNG). Both mu-clid and mu-clid-lite share this target
-# since Lite is a build variant that keeps the same visual identity.
+# Binary resources (logo PNG).
 juce_add_binary_data(mu-clid-resources
     SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/mu-clid.png"
 )
@@ -29,7 +28,7 @@ juce_add_plugin(mu-clid
     ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/Icon.png"
 )
 
-# Custom VERSIONINFO with Greek μ in description (shared by full + Lite). Windows-only —
+# Custom VERSIONINFO with Greek μ in description. Windows-only —
 # the .rc + the JUCE `<target>_rc_lib` resource target only exist on Windows.
 if(WIN32)
     configure_file(
@@ -79,8 +78,7 @@ target_sources(mu-clid
 # monocypher is vendored third-party crypto. Silence MSVC C4244 (a benign u64→u32
 # narrowing in its Argon2 block-index math — the value is bounded well within u32)
 # at the build level rather than patching upstream source, so our /W4 build stays
-# warning-clean without diverging from the vendor file. Applies to mu-clid only
-# (mu-clid-lite omits the license stack and never compiles monocypher.c).
+# warning-clean without diverging from the vendor file.
 if(MSVC)
     set_source_files_properties(
         "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
@@ -139,8 +137,8 @@ add_custom_target(increment_build_number ALL
             "-DMUFAMILY_COPYRIGHT=${MUFAMILY_COPYRIGHT}"
             "-DRC1_IN=${CMAKE_SOURCE_DIR}/mu-clid/resources/versioninfo.rc.in"
             "-DRC1_OUT=${CMAKE_BINARY_DIR}/mu-clid/versioninfo.rc"
-            "-DRC2_IN=${CMAKE_SOURCE_DIR}/mu-clid/resources/versioninfo-lite.rc.in"
-            "-DRC2_OUT=${CMAKE_BINARY_DIR}/mu-clid/versioninfo-lite.rc"
+            "-DRC2_IN=${CMAKE_SOURCE_DIR}/mu-clid-midi/resources/versioninfo.rc.in"
+            "-DRC2_OUT=${CMAKE_BINARY_DIR}/mu-clid-midi/versioninfo.rc"
             "-DRC3_IN=${CMAKE_SOURCE_DIR}/mu-tant/resources/versioninfo.rc.in"
             "-DRC3_OUT=${CMAKE_BINARY_DIR}/mu-tant/versioninfo.rc"
             "-DRC4_IN=${CMAKE_SOURCE_DIR}/mu-toni/resources/versioninfo.rc.in"
@@ -156,7 +154,6 @@ add_custom_target(increment_build_number ALL
 add_dependencies(mu-clid increment_build_number)
 # The resource lib must compile the FRESHLY regenerated .rc (post-increment number),
 # so depend on the increment target — otherwise Windows file properties lag by one on Debug.
-# (mu-clid-lite_rc_lib gets the same dependency after the Lite target is defined below.)
 if(WIN32)
     add_dependencies(mu-clid_rc_lib increment_build_number)
 endif()
@@ -222,152 +219,6 @@ add_custom_command(TARGET mu-clid_Standalone POST_BUILD
     VERBATIM
 )
 
-
-# ── mu-Clid MIDI — single-rhythm MIDI-effect VST3/CLAP ──────────────────────
-juce_add_plugin(mu-clid-lite
-    COMPANY_NAME "Transwarp Development Project"
-    BUNDLE_ID "com.transwarp.mu-clid-lite"
-    PLUGIN_MANUFACTURER_CODE TDP1
-    PLUGIN_CODE MCLt
-    FORMATS VST3 ${MUFAMILY_AU_FORMAT}   # AU on macOS only (family rule); Lite has no Standalone
-    PRODUCT_NAME "mu-Clid MIDI"
-    PLUGIN_NAME  "μ-Clid MIDI"
-    IS_SYNTH FALSE
-    NEEDS_MIDI_INPUT FALSE
-    NEEDS_MIDI_OUTPUT TRUE
-    IS_MIDI_EFFECT TRUE
-    EDITOR_WANTS_KEYBOARD_FOCUS FALSE
-    VERSION         "${MUFAMILY_PLUGIN_VERSION}"
-    COMPANY_COPYRIGHT "${MUFAMILY_COPYRIGHT}"
-    ICON_BIG   "${CMAKE_CURRENT_SOURCE_DIR}/resources/Icon.png"
-    ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/Icon.png"
-)
-
-if(WIN32)
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/resources/versioninfo-lite.rc.in"
-        "${CMAKE_CURRENT_BINARY_DIR}/versioninfo-lite.rc"
-        @ONLY
-        NEWLINE_STYLE CRLF
-    )
-    target_compile_definitions(mu-clid-lite        PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo-lite.rc\"")
-    target_compile_definitions(mu-clid-lite_rc_lib PRIVATE "JUCE_USER_DEFINED_RC_FILE=\"${CMAKE_CURRENT_BINARY_DIR}/versioninfo-lite.rc\"")
-    # Compile the freshly regenerated .rc (post-increment number) — see increment_build_number above.
-    add_dependencies(mu-clid-lite_rc_lib increment_build_number)
-endif()
-
-target_sources(mu-clid-lite
-    PRIVATE
-        Source/Plugin/PluginProcessor.cpp
-        Source/Plugin/PluginProcessor_APVTS.cpp
-        Source/Plugin/PluginProcessor_Modulation.cpp
-        Source/Sequencer/RhythmManager.cpp
-        Source/Plugin/PluginProcessor_Content.cpp
-        Source/Persistence/PresetIO.cpp
-        Source/Persistence/PresetIO_HostState.cpp
-        Source/Persistence/PresetMigrations.cpp
-        Source/Plugin/HotSwapStager.cpp
-        Source/Audio/SamplePreview.cpp
-        Source/Audio/SampleLibrary.cpp
-        Source/UI/LiteEditor.cpp
-        Source/Sequencer/Rhythm.cpp
-        Source/Sequencer/SequencerEngine.cpp
-        Source/UI/RhythmCircle.cpp
-        Source/UI/EuclideanPanel.cpp
-)
-
-target_include_directories(mu-clid-lite
-    PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/Source"
-    SYSTEM PRIVATE
-        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
-        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
-        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"
-)
-
-target_compile_definitions(mu-clid-lite
-    PUBLIC
-        JUCE_WEB_BROWSER=0
-        JUCE_USE_CURL=0
-        JUCE_VST3_CAN_REPLACE_VST2=0
-        JUCE_USE_MP3AUDIOFORMAT=1
-        MUCLID_LITE_BUILD=1
-)
-
-target_link_libraries(mu-clid-lite
-    PRIVATE
-        mu-core
-        mu-clid-resources
-        juce::juce_audio_utils
-        juce::juce_dsp
-        juce::juce_gui_basics
-        juce::juce_gui_extra
-        juce::juce_audio_formats
-    PUBLIC
-        juce::juce_recommended_config_flags
-        juce::juce_recommended_lto_flags
-        juce::juce_recommended_warning_flags
-)
-
-add_dependencies(mu-clid-lite increment_build_number)
-
-if(ISCC_EXE)
-    add_custom_target(mu-clid-lite_installer ALL
-        COMMAND "${CMAKE_COMMAND}"
-                "-DISCC_EXE=${ISCC_EXE}"
-                "-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
-                "-DBUILD_DIR=${CMAKE_BINARY_DIR}"
-                "-DCMAKE_COMMAND=${CMAKE_COMMAND}"
-                -P "${CMAKE_SOURCE_DIR}/cmake/BuildInstallerLite.cmake"
-        COMMENT "Building mu-Clid MIDI installer"
-        VERBATIM
-    )
-    add_dependencies(mu-clid-lite_installer mu-clid-lite mu-clid-lite_VST3 mu-clid-lite_CLAP)
-endif()
-
-clap_juce_extensions_plugin(TARGET mu-clid-lite
-    CLAP_ID "com.transwarp.mu-clid-lite"
-    CLAP_FEATURES midi-effect)
-
-# mu-Clid MIDI tester deploys — guarded by MUFAMILY_DEPLOY_TESTERS (OFF default).
-if(MUFAMILY_DEPLOY_TESTERS)
-add_custom_command(TARGET mu-clid-lite_VST3 POST_BUILD
-    COMMAND "${CMAKE_COMMAND}"
-            "-DCONFIG=$<CONFIG>"
-            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/VST3/mu-Clid MIDI.vst3"
-            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/CLAP/mu-Clid MIDI.clap"
-            "-DDIST_WIN=${MUFAMILY_WIN_DIST}"
-            -P "${CMAKE_SOURCE_DIR}/cmake/DeployReleaseLite.cmake"
-    COMMENT "Deploying mu-Clid MIDI VST3 to OneDrive (Debug skipped)"
-    VERBATIM
-)
-add_custom_command(TARGET mu-clid-lite_CLAP POST_BUILD
-    COMMAND "${CMAKE_COMMAND}"
-            "-DCONFIG=$<CONFIG>"
-            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/VST3/mu-Clid MIDI.vst3"
-            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/CLAP/mu-Clid MIDI.clap"
-            "-DDIST_WIN=${MUFAMILY_WIN_DIST}"
-            -P "${CMAKE_SOURCE_DIR}/cmake/DeployReleaseLite.cmake"
-    COMMENT "Deploying mu-Clid MIDI CLAP to OneDrive (Debug skipped)"
-    VERBATIM
-)
-endif()
-
-# Package mu-Clid MIDI Release zip (VST3 + CLAP, no Standalone). A dedicated custom
-# target (rather than POST_BUILD) lets us declare explicit deps on both format targets.
-add_custom_target(mu-clid-lite-zip ALL
-    COMMAND "${CMAKE_COMMAND}"
-            "-DCONFIG=$<CONFIG>"
-            "-DPRODUCT=mu-Clid-MIDI"
-            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/VST3/mu-Clid MIDI.vst3"
-            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/CLAP/mu-Clid MIDI.clap"
-            "-DDIST_DIR=${CMAKE_BINARY_DIR}/dist"
-            "-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
-            -P "${CMAKE_SOURCE_DIR}/cmake/PackageRelease.cmake"
-    COMMENT "Packaging mu-Clid MIDI Release zip"
-    VERBATIM
-)
-add_dependencies(mu-clid-lite-zip mu-clid-lite_VST3 mu-clid-lite_CLAP increment_build_number)
 
 # ── mu-clid-tests — data-layer regression tests ────────────────────────────
 # Console executable that runs every juce::UnitTest defined in Source/Tests/.

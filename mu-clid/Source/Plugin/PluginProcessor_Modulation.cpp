@@ -12,8 +12,6 @@
 
 namespace mu_clid {
 
-#if ! MUCLID_LITE_BUILD
-
 // Each modulation destination this file reads or writes, as its ModDest::kTable index (compile
 // time). applyRhythmModulation reaches the values through modSlot[] — no per-block key hashing.
 namespace md
@@ -436,7 +434,5 @@ void PluginProcessor::applyRhythmModulation(int r, double beatPos)
     if (runModulationPass && voiceEngines[r])
         voiceEngines[r]->setActiveParams(modParams);
 }
-
-#endif // ! MUCLID_LITE_BUILD
 
 } // namespace mu_clid

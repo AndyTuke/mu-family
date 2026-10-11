@@ -5,6 +5,7 @@
 #include "UI/OverlayHost.h"     // shared dimmed in-editor overlay host (sample browser)
 #include "Persistence/PresetFiles.h"   // mu_pp::safePresetFileName, readPresetMeta
 
+#include <limits>
 #include <string_view>
 #include <unordered_set>
 
@@ -179,6 +180,13 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
                 break;
             }
         }
+    };
+
+    // The Euclid knobs' live modulation arcs read the processor's snapshot while the sequencer plays.
+    euclidPanel.modulationSnapshot = [this](int ri, int snapIndex)
+    {
+        return proc.sequencerPlaying.load() ? proc.getModSnapshot(ri, snapIndex)
+                                            : std::numeric_limits<float>::quiet_NaN();
     };
 
     euclidPanel.onPatternChanged = [this]
