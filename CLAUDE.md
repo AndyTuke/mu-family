@@ -43,7 +43,7 @@ $env:JUCE_PATH = "D:\JUCE"
 
 **The `backlog-administrator` agent ([.claude/agents/backlog-administrator.md](.claude/agents/backlog-administrator.md)) is the only writer of [backlog.md](backlog.md)** (owner rule, 2026-10-09). Nothing else — the main conversation, other agents, slash commands, hooks — edits it directly; they hand the change to the agent, which applies the ordering and format rules and runs `check-backlog.ps1`. It also hands tasks out: ask it for the next task (or a named issue) and it returns a brief with the steps, files, docs to read, blockers and done criteria.
 
-After every build, ask the `backlog-administrator` for the open issues and fix them immediately, without asking, up to a maximum of 5 issues. Prioritise issues related to the current stage.
+After every build, ask the `backlog-administrator` for the open issues and fix them immediately, without asking, up to a maximum of 10 issues. Prioritise issues related to the current stage.
 
 After every response, if any issues in `backlog.md` have changed status or new issues have been added, hand the changes to the `backlog-administrator` immediately so the file reflects the current state and stays correctly ordered.
 

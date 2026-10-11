@@ -48,7 +48,7 @@ When asked for the next task (or a named issue), do not edit the file; read it a
 - **Done when:** the acceptance points, tests to add, and the commit message fields (Stage, `Closes #N: ...`, version) the commit will need.
 - **Open questions** for the owner, if the row is ambiguous.
 
-Pick the topmost Open item unless told otherwise, and respect the limit of at most 5 issues per post-build pass. Never start implementing; implementation belongs to the main conversation.
+Pick the topmost Open item unless told otherwise, and respect the limit of at most 10 issues per post-build pass. Never start implementing; implementation belongs to the main conversation.
 
 ## Report format
 
