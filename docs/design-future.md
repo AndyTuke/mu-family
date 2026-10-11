@@ -32,6 +32,8 @@ Expose the headless render pipeline (introduced for the listening-test harness) 
 
 ### 🟢 Demo build (mu-clid)
 
+**Dropped 2026-10-11:** the apps are now free and fully functional when unlicensed, so no demo build or demo gate is wanted; see [design-plugin-family.md](design-plugin-family.md#licensing-and-the-support-prompt--family-standard-ruled-2026-10-11). The text below is kept only as history.
+
 A separate distribution binary with full plugin functionality but reduced limits, for shareware-style trials. **Distinct from `mu-clid-lite`** (which is a permanent single-rhythm MIDI-only product, not a demo).
 
 - Cap at 2 rhythms (vs 8 in full version)

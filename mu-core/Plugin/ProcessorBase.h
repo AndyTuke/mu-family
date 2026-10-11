@@ -30,6 +30,7 @@
 #include "Plugin/MidiClockSync.h"
 #include "License/MachineFingerprint.h"
 #include "License/OnlineActivation.h"   // OnlineActivationOutcome (decls only; .cpp is per-licensed-product)
+#include "License/SupportPromptPolicy.h"   // isSupporter / when the support prompt shows
 
 #include <array>
 #include <atomic>
@@ -253,6 +254,19 @@ public:
     //   - maxSteps:           a step-count limit of `fullMax`, cut to demoMaxSteps() in demo.
     int  maxSteps(int fullMax) const  { return isLicensed() ? fullMax : juce::jmin(fullMax, demoMaxSteps()); }
 
+    // ─── Supporter state + the support prompt ────────────────────────────────
+    // A supporter holds a valid key (offline .lic or online activation). Unlike isLicensed() this
+    // is the same in Debug and Release, and it gates only the polite support prompt and About.
+    bool isSupporter() const noexcept
+    {
+        return mu_core::support_prompt::isSupporter(licensingEnabled, offlineLicensed, isOnlineActivated());
+    }
+    // Where the prompt's "Pay what you like" button opens (empty when the product supplies none).
+    juce::String getCheckoutUrl() const { return checkoutUrl; }
+    // "Don't show this again": kept in the app settings file, not APVTS, so it is never in a preset.
+    bool isSupportPromptHidden() const { return mu_core::support_prompt::isHidden(appSettings.get()); }
+    void setSupportPromptHidden(bool hidden) { mu_core::support_prompt::setHidden(appSettings.get(), hidden); }
+
     // ─── Online activation (Lemon Squeezy, Phase 1) ──────────────────────────
     // Licensed products set activateOnlineFn (a lambda calling mu_core::OnlineActivation,
     // compiled into the product) and flip onlineActivated at startup + on success. The
@@ -460,6 +474,7 @@ protected:
         const char*    licenceFile;
         const uint8_t* publicKey;
         const char*    activationFile;
+        const char*    checkoutUrl = nullptr;   // pay-what-you-want page the support prompt opens
     };
     // Check the offline licence + stored activation and wire activateOnlineFn. Call after
     // initAppSettings (it needs getContentDir). Defined in License/ProductLicensing.h — include
@@ -470,6 +485,7 @@ protected:
     virtual void onActivated() {}
     bool licensingEnabled = false;
     bool offlineLicensed  = false;
+    juce::String checkoutUrl;
 
     // ─── Mixer / global-FX parameters ────────────────────────────────────────
     // The channel-strip (ch{N}_*) and global FX ids synced to the engine via syncGlobalFxParam.

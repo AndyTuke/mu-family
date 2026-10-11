@@ -70,7 +70,7 @@ PluginProcessor::PluginProcessor()
     noteGateGain = (lastNoteMode == 1) ? 0.0f : 1.0f;
 
     // Offline licence + online activation (shared; after initAppSettings for getContentDir).
-    initLicensing({ kLicenseProductId, kLicenseFilename, kLicensePublicKey, "mutant.activation" });
+    initLicensing({ kLicenseProductId, kLicenseFilename, kLicensePublicKey, "mutant.activation", kCheckoutUrl });
 
     // Demo: the default patterns (2 bars of 1/16) are shrunk to the 16-step cap too.
     if (! isLicensed())

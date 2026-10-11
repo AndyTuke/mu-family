@@ -10,6 +10,7 @@
 inline void ProcessorBase::initLicensing(const LicensingConfig& config)
 {
     licensingEnabled = true;
+    checkoutUrl = config.checkoutUrl != nullptr ? config.checkoutUrl : "";
 
     // Offline signed .lic in the content folder — checked once; the result is fixed thereafter.
     offlineLicensed = mu_core::LicenseManager::check(getContentDir(), config.productId,

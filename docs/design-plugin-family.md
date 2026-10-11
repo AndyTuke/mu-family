@@ -415,7 +415,7 @@ throughout; the stages marked **O** also wait for owner decisions on behaviour o
       from the layer (`pushRhythmToApvts`) through a `syncSlotParams(slot)` hook. This is the one allowed difference.
    6. `suspendProcessing(false)`; destroy any removed layer; set `colourIndex` (first unused palette entry,
       the mu-Clid / mu-Tant rule, hoisted into the base); fire `onLayersChanged` for the shell.
-   The last layer cannot be removed; the demo cap uses `canAddChannel()` as today.
+   The last layer cannot be removed; there is no demo cap any more (retired 2026-10-11; see "Licensing and the support prompt").
 7. **Retired layers do not fade yet.** A removed layer is cut at the next block (as today in mu-Clid and mu-Tant).
    mu-Clid's per-engine retire-tail and mu-Tant's count-reducing preset fade stay inside the product
    layer; a generic `Layer` tail is not in scope.
@@ -683,6 +683,55 @@ Both products implement this (mu-clid `cancelPendingIfAny`, mu-tant
 `ProcessorBase::hasPendingFullPreset()`; `ChannelSidebar` shows a per-layer badge
 from the product's `isPendingSwap(i)` / cancels via `onCancelPendingSwap(i)`. A
 product only has to override/​wire those.
+
+---
+
+## Licensing and the support prompt — family standard (ruled 2026-10-11)
+
+**Owner decision.** The source is GPLv3. The apps are free, pay-what-you-want on Lemon Squeezy (minimum £0, suggested £20). An unlicensed copy is **fully functional**: no track, step, save or preset limits, no demo banner, no Lite build. Instead it shows one polite support dialog per session. A licence key still exists and still activates (a key marks a supporter, and unlocks nothing). mu-Toni (freeware) and mu-On (no licensing) never call `initLicensing`, so they never show the dialog.
+
+### What is deleted, what is kept
+
+| Delete | Keep |
+|---|---|
+| `ProcessorBase::demoMaxChannels`, `demoMaxSteps`, `canAddChannel`, `canSaveLayerPreset`, `maxSteps` (and their callers: `ChannelSidebar`, `MasterLoopSection`, `LayerPresetHeader`, both `PluginEditor` add-channel checks, `EuclideanPanel`, `RhythmPanel`, `VoicePanel`, `GatingDesigner::setMaxCells` use, the tant `limitToCells` demo calls, the preset-load clamps in `PresetIO*` and `PluginProcessor_Preset`, the sequencer `setStepCap`) | `LicenseManager`, `OnlineActivation`, `LemonSqueezyClient`, `ActivationStore`, `MachineFingerprint`, `initLicensing`, `ActivationOverlay`, `activateOnlineFn`, the `.lic` offline path, the license tool |
+| `EditorShellBase::demoBanner`, `kDemoBannerH`, the banner click route, the banner layout rows | `upgradeBanner` and the version check |
+| The save gate in `transportBar.onSavePreset`, `setSaveEnabled(licensed)` calls | The `StatusBar` is no longer given "Demo limited ..." messages (delete those two) |
+| `MUFAMILY_REQUIRE_LICENSE` as a feature gate (see below) | |
+| mu-Clid Lite: `MUCLID_LITE_BUILD` and every `#if` on it, `LiteEditor`, the `mu-clid-lite` target, `BuildInstallerLite.cmake`, `DeployReleaseLite.cmake`, Lite lines in `PackageRelease.cmake` and `release.yml` | |
+
+`isLicensed()` goes too. It is replaced by `bool isSupporter() const` (offline `.lic` valid OR online-activated), which is true or false identically in Debug and Release. Nothing in the audio or editor path may branch on it except the support prompt and the About/Activation text.
+
+### Where it lives
+
+- **`mu-core/UI/SupportOverlay.{h,cpp}`**, a sibling of `ActivationOverlay` (same non-blocking card, click outside dismisses, same `MuLookAndFeel` tokens; the `ux-controller` rules the look and wording). The shell owns it as a member, wired in `wireOverlays()`, shown through a `showSupport(bool)` that joins the overlay state machine. Card content: a short thank-you and what the money does, the pay-what-you-want line, a **Support (opens the checkout page)** button, an **Enter a key** button that calls `showActivation(true)`, a **Not now** button, and a **Don't show this again** tick box.
+- **`mu-core/License/SupportPromptPolicy.h`**, juce_core-only and header-only, the testable decision: `shouldShow(hasLicensing, isSupporter, hiddenForever, shownThisProcess)`. It is true only for a licensing product, not a supporter, not hidden for ever, and not yet shown in this process.
+- **Once per session** means once per process: a function-local `inline std::atomic<bool>` in the policy header, set when the card is shown. A DAW project with twenty instances shows it once. The shell shows it from `parentHierarchyChanged()` the first time the editor is on screen (so a headless instance never prompts), deferred by a short `callAfterDelay` so it never competes with plugin load.
+- **Persistence of "don't show again":** the product's own settings file (`ProcessorBase::appSettings`, key `supportPromptHidden`, bool), through two small `ProcessorBase` accessors in the style of `setUiScale`: `bool isSupportPromptHidden() const` and `void setSupportPromptHidden(bool)` (writes and `saveIfNeeded()`). Per user and per product, not in APVTS, because it is a user preference and must not travel inside a preset or a project. A supporter never sees the prompt, so the key is only written by the tick box.
+- **Checkout URL plumbing:** a field on `ProcessorBase::LicensingConfig`, `const char* checkoutUrl`, supplied by each licensed product from its `Source/License/LicenseKey.h` (`kCheckoutUrl`), exposed as `ProcessorBase::getCheckoutUrl()`. This sits with the rest of the product's licensing identity and spares every editor an extra setter call; `ActivationOverlay` gets a "Get a key" link from the same accessor. Values today: mu-Clid `https://transwarp.lemonsqueezy.com/checkout/buy/ba9e6fba-f65d-4b09-87d8-5a6b295c84c2`, mu-Tant `https://transwarp.lemonsqueezy.com/checkout/buy/b2dd23a7-cd2c-48b2-baa5-8fdda3aa7576` (the same links the website uses). mu-core never names either.
+- **Link, not a payment form.** The button opens the checkout in the browser (`juce::URL::launchInDefaultBrowser`). The plugin handles no money and no card data.
+- A permanent entry point stays after the banner goes: the About panel shows "Support mu-X" and "Enter a key" buttons (supporters see "Thank you"), so the dialog is never the only route.
+
+### `MUFAMILY_REQUIRE_LICENSE` after this change
+
+It no longer gates features, so its Debug-bypass meaning disappears. Remove it from the root `CMakeLists.txt`. Debug and Release behave the same, which is what makes the dialog testable in a Debug build (below). The `LicenseManager.h` header comment is rewritten with the macro.
+
+### Testing
+
+- **Unit (mu-core-tests):** `SupportPromptPolicyTests.cpp` covers every input combination of `shouldShow` and the once-per-process flag (the flag is reset through a test-only `resetForTests()`). A second test builds `TestProcessorCore` over a temp `PropertiesFile` and checks `setSupportPromptHidden` round-trips through the settings file, and that `isSupporter()` is true after `onlineActivated` is set and false otherwise.
+- **Manual / Debug:** with no key a Debug build now shows the prompt on first open (the Debug bypass is gone), so it is exercised on every tester run. To see it again after "don't show again", delete the `supportPromptHidden` line from `%APPDATA%\TDP\<app>.xml`, or run with the env var `MU_SUPPORT_PROMPT=reset` (read once in `initLicensing`, Debug-only, clears the key). To see the supporter path, activate with the verified £0 key.
+- **Regression:** the existing unit and round-trip tests must show no behavioural change in a licensed state; the full-preset save and an 8-track, 64-step preset must work with no key present (add one such case to each of mu-clid-tests and mu-tant-tests, replacing any test that asserts the demo clamp, for example `limitToCells`, which can stay as a pure `GatePattern` function test or go with the feature).
+
+### Staged order (each stage buildable and independently shippable)
+
+1. **Policy and persistence (additive).** `SupportPromptPolicy.h`, `isSupporter()`, `isSupportPromptHidden/Set`, `checkoutUrl` in `LicensingConfig` and both `LicenseKey.h` files, `mu-core-tests` for the above. Nothing visible changes.
+2. **SupportOverlay and shell wiring.** The overlay, `showSupport`, first-show trigger, About buttons, "Get a key" link. The old demo banner and caps still exist, so this stage is visible but harmless. `ux-controller` rules the card first.
+3. **Remove caps.** Delete the `ProcessorBase` cap API and every caller listed above, the demo status messages, the save gate, the preset-load clamps, the tant demo `limitToCells`; replace `isLicensed()` calls with nothing (or `isSupporter()` in About). Update tests. This is the one large edit, still product by product if wanted: mu-Tant, then mu-Clid.
+4. **Remove the banner and the macro.** `demoBanner`, its layout, click route; `MUFAMILY_REQUIRE_LICENSE`; header comments.
+5. **Retire mu-Clid Lite.** Last because it is the widest change: every `MUCLID_LITE_BUILD` guard and file above, installer and deploy scripts, `release.yml`, the site download list, `design-naming.md` audit mention of `LiteEditor`. Owner confirmed in the list of things to retire; note it also removes the only MIDI-effect variant, so say so in the release notes.
+6. **Docs and site.** Rewrite the licensing lines of both manuals (`user-documentation-author`), `/notes`, the site buy buttons and pricing (separate site task), and the CLAUDE.md wording below.
+
+Each stage ends in a Debug build and the unit tests; stages 3 to 5 also run the round-trip listening tests and pluginval on the build PC.
 
 ---
 

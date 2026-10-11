@@ -7,6 +7,7 @@ target_sources(mu-core-tests PRIVATE
     TestMain.cpp
     HostTransportPublishTests.cpp
     LayerAccessTests.cpp
+    SupportPromptPolicyTests.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../Modulation/ModulationMatrix.cpp"   # pulled in by Layer.h
     "${CMAKE_CURRENT_SOURCE_DIR}/../Sequencer/ControlSequence.cpp"     # pulled in by Layer.h
 )

@@ -66,7 +66,7 @@ PluginProcessor::PluginProcessor()
    #if !MUCLID_LITE_BUILD
     // Offline licence + online activation (shared; after initAppSettings for getContentDir).
     initLicensing({ mu_clid::kLicenseProductId, mu_clid::kLicenseFilename,
-                    mu_clid::kLicensePublicKey, "muclid.activation" });
+                    mu_clid::kLicensePublicKey, "muclid.activation", mu_clid::kCheckoutUrl });
    #endif
     sequencer.setStepCap(maxSteps(HitGenerator::kMaxSteps));   // 16 in demo
 
