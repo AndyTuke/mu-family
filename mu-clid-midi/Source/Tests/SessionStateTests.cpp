@@ -53,6 +53,13 @@ public:
         return root;
     }
 
+    // The default (de-normalised) value of a parameter in the product's layout.
+    static float defaultOf(const juce::String& id)
+    {
+        tests::StubProcessor fresh;
+        return fresh.actual(id);
+    }
+
     void runTest() override
     {
         beginTest("A session round-trips through text");
@@ -98,6 +105,90 @@ public:
             juce::String error;
             expect(session::restoreFromXmlString(tree.toXmlString(), b.apvts, error), error);
             expectEquals(b.actual("r0_stepsB"), 9.0f);
+        }
+
+        beginTest("A Lite session restored onto a non-default instance resets what it does not carry");
+        {
+            tests::StubProcessor p;
+            p.setActual("r0_stepsB", 9.0f);
+            p.setActual("r0_hitsB", 4.0f);
+            p.setActual("lite_midiNote", 100.0f);
+            p.setActual("mstrLoop", 7.0f);
+            p.setActual("r0_stepsA", 30.0f);
+
+            juce::String error;
+            expect(session::restoreFromXmlString(liteSession().toXmlString(), p.apvts, error), error);
+            expectEquals(p.actual("r0_stepsA"), 12.0f);        // carried by the session
+            expectEquals(p.actual("lite_midiNote"), 40.0f);    // carried by a row
+            expectEquals(p.actual("mstrLoop"), 2.0f);
+            expectEquals(p.actual("r0_stepsB"), defaultOf("r0_stepsB"));   // not carried: back to the default
+            expectEquals(p.actual("r0_hitsB"), defaultOf("r0_hitsB"));
+        }
+
+        beginTest("A Lite session with no keys returns every parameter to its default");
+        {
+            tests::StubProcessor p;
+            p.setActual("r0_stepsA", 30.0f);
+            p.setActual("lite_midiNote", 100.0f);
+            p.setActual("lite_accentAmt", 80.0f);
+            p.setActual("mstrLoop", 7.0f);
+
+            juce::String error;
+            expect(session::restoreFromXmlString("<MuClidPreset/>", p.apvts, error), error);
+            for (const char* id : { "r0_stepsA", "lite_midiNote", "lite_accentAmt", "mstrLoop" })
+                expectEquals(p.actual(id), defaultOf(id), id);
+        }
+
+        beginTest("A parameter tree missing keys restores them to their defaults");
+        {
+            tests::StubProcessor a, b;
+            a.setActual("r0_hitsA", 7.0f);
+            auto tree = a.apvts.copyState();
+            for (int i = tree.getNumChildren(); --i >= 0;)
+                if (tree.getChild(i).getProperty("id").toString() == "r0_stepsB")
+                    tree.removeChild(i, nullptr);
+
+            b.setActual("r0_stepsB", 9.0f);
+            b.setActual("lite_midiNote", 100.0f);
+            juce::String error;
+            expect(session::restoreFromXmlString(tree.toXmlString(), b.apvts, error), error);
+            expectEquals(b.actual("r0_hitsA"), 7.0f);
+            expectEquals(b.actual("r0_stepsB"), defaultOf("r0_stepsB"));   // the tree lacked it
+        }
+
+        beginTest("Parameter nodes this product has no parameter for are dropped from the state");
+        {
+            tests::StubProcessor a, b;
+            auto tree = a.apvts.copyState();
+            juce::ValueTree stale("PARAM");
+            stale.setProperty("id", "ch0_lvl", nullptr);
+            stale.setProperty("value", 0.5f, nullptr);
+            tree.appendChild(stale, nullptr);
+
+            juce::String error;
+            expect(session::restoreFromXmlString(tree.toXmlString(), b.apvts, error), error);
+            for (int i = 0; i < b.apvts.state.getNumChildren(); ++i)
+                expect(b.apvts.state.getChild(i).getProperty("id").toString() != "ch0_lvl", "the old node was kept");
+        }
+
+        beginTest("An old state's rhythm name and colour are handed back");
+        {
+            tests::StubProcessor p;
+            auto lite = liteSession();
+            lite.setProperty("r0_name", "Snare", nullptr);
+            lite.setProperty("r0_colour", 5, nullptr);
+            session::Identity identity;
+            juce::String error;
+            expect(session::restoreFromXmlString(lite.toXmlString(), p.apvts, error, &identity), error);
+            expectEquals(identity.name, juce::String("Snare"));
+            expectEquals(identity.colourIndex, 5);
+
+            auto dump = p.apvts.copyState();
+            dump.setProperty("r0_name", "Hat", nullptr);
+            session::Identity fromDump;
+            expect(session::restoreFromXmlString(dump.toXmlString(), p.apvts, error, &fromDump), error);
+            expectEquals(fromDump.name, juce::String("Hat"));
+            expectEquals(fromDump.colourIndex, -1);   // none carried
         }
 
         beginTest("Unreadable state is refused with a message");

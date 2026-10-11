@@ -56,7 +56,28 @@ void applyLegacySession(const juce::ValueTree& root, juce::AudioProcessorValueTr
     }
 }
 
-bool restoreFromXmlString(const juce::String& xml, juce::AudioProcessorValueTreeState& apvts, juce::String& error)
+// The rhythm name (the preset name over the older r0_name) and colour a state's root carries.
+static Identity readIdentity(const juce::ValueTree& root)
+{
+    Identity id;
+    const auto presetName = root.getProperty("presetName");
+    const auto rhythmName = root.getProperty("r0_name");
+    if (presetName.isString() && presetName.toString().isNotEmpty())      id.name = presetName.toString();
+    else if (rhythmName.isString() && rhythmName.toString().isNotEmpty()) id.name = rhythmName.toString();
+    if (root.hasProperty("r0_colour"))
+        id.colourIndex = juce::jlimit(0, 255, (int) root.getProperty("r0_colour"));
+    return id;
+}
+
+void resetToDefaults(juce::AudioProcessorValueTreeState& apvts)
+{
+    for (auto* param : apvts.processor.getParameters())
+        if (auto* p = dynamic_cast<juce::RangedAudioParameter*>(param))
+            p->setValueNotifyingHost(p->getDefaultValue());
+}
+
+bool restoreFromXmlString(const juce::String& xml, juce::AudioProcessorValueTreeState& apvts, juce::String& error,
+                          Identity* identity)
 {
     const auto parsed = juce::parseXML(xml);
     if (parsed == nullptr)
@@ -65,15 +86,28 @@ bool restoreFromXmlString(const juce::String& xml, juce::AudioProcessorValueTree
         return false;
     }
 
-    const auto tree = juce::ValueTree::fromXml(*parsed);
+    auto tree = juce::ValueTree::fromXml(*parsed);
     if (tree.hasType("MuClidPreset"))   // a session mu-Clid Lite saved
     {
+        resetToDefaults(apvts);
         applyLegacySession(tree, apvts);
+        if (identity != nullptr) *identity = readIdentity(tree);
         return true;
     }
     if (tree.isValid() && tree.hasType(apvts.state.getType()))
     {
+        // Drop parameter nodes this product has no parameter for (an older layout), so they are not
+        // carried in the state and written back out on every save.
+        for (int i = tree.getNumChildren(); --i >= 0;)
+        {
+            const auto child = tree.getChild(i);
+            if (child.hasType("PARAM") && apvts.getParameter(child.getProperty("id").toString()) == nullptr)
+                tree.removeChild(i, nullptr);
+        }
+
+        resetToDefaults(apvts);
         apvts.replaceState(tree);
+        if (identity != nullptr) *identity = readIdentity(tree);
         return true;
     }
 
