@@ -18,7 +18,7 @@ private:
     static juce::String displayName()
     {
        #if MUCLID_LITE_BUILD
-        return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Clid Lite"));
+        return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Clid MIDI"));
        #else
         return juce::String (juce::CharPointer_UTF8 ("\xce\xbc-Clid"));
        #endif

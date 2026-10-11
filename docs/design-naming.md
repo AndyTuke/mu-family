@@ -51,6 +51,10 @@ Notes on these names:
   patterns) become *members* of its `Pattern` layer, and mu-On's `StepPattern` belongs to a different
   product and namespace, so there is no clash; it just reads as "a Pattern holds Patterns". If that proves
   confusing, rename the members (`GateLane`, say) rather than the layer.
+- **The MIDI-effect product (the former mu-Clid Lite, a separate product from 2026-10-11)** uses the
+  same `Rhythm` layer type and `.muRhythm` extension as mu-Clid, because both use one shared class in
+  `mu-core`. This is the single named exception to "layer type names are unique"; see
+  [design-plugin-family.md](design-plugin-family.md#the-midi-effect-product-the-former-mu-clid-lite--ruled-2026-10-11).
 - **mu-On is `Track`** (owner); its extension is already `.muTrack`. The code mixes lane / channel /
   track today and collapses to Track.
 
@@ -166,6 +170,19 @@ Parameter-id prefixes (`r0_`, `v0_`, `k_ b_ h_ s_ r_`), preset extensions (`.muR
 the combined instance is scheduled** — the layer-type registry should own prefixes then. The composed
 slot state already stores ids without their prefix, so layer data is prefix-agnostic on disk.
 
+**Product renames are display-only.** A product's name, slug, folder and namespace may change; its plugin
+code, manufacturer code, bundle id, CLAP id and state identifier may not (existing DAW projects find the
+plugin by them). The MIDI-effect product keeps `MCLt`, `com.transwarp.mu-clid-lite` and `MuClidState`
+under its name, **mu-Clid MIDI** (owner, 2026-10-11).
+
+**Product naming pattern.** `mu-<Name>` in prose and artefacts (`mu-Clid`, `mu-Tant`), slug `mu-<name>` in
+folders and targets, namespace `mu_<name>`. A descriptive suffix (`mu-Clid MIDI`) is allowed only for a
+product that is a deliberate sibling of another; a standalone product takes a one-word pun like the rest.
+The one use today is **mu-Clid MIDI**: slug `mu-clid-midi`, namespace `mu_clid_midi`, docs `docs/mu-clid-midi/`
+(hyphens in the slug, underscores in the namespace, as for every product). Its layer type is `Rhythm` and
+its preset extension `.muRhythm`, shared with mu-Clid: the named exception to "layer type names are
+unique", legitimate because the type is one `mu-core` class (§1).
+
 ---
 
 ## 4. Audit — where the code differs from §3 (2026-10-09)
@@ -185,6 +202,7 @@ slot state already stores ids without their prefix, so layer data is prefix-agno
 | Members | Trailing `_` in seven classes (mu-Clid helpers, `MidiClockSync`, `VocoderInsert`). |
 | Enums | plain `enum` in mu-Toni (3), mu-On (3), mu-Tant (2). |
 | Folders | Done at build 1187: mu-Clid now has all eight (`SamplePreview` + `SampleLibrary` in `Audio/`, `RhythmManager` in `Sequencer/`, `PresetIO` + `PresetIO_HostState` in `Persistence/`, `ModulationSkew` in `Modulation/`, `LiteEditor` in `UI/`; `HotSwapStager` / `HotSwapBoundary` stay in `Plugin/` like mu-Tant's stager). Still open: mu-On has no `License` or `Persistence`; mu-Tant and mu-Toni `Persistence/` hold only `.gitkeep`. |
+| Products | mu-Clid Lite is still a second target in `mu-clid/` (`MUCLID_LITE_BUILD`, about 60 `#if` sites, `LiteEditor` in mu-Clid's `UI/`, namespace `mu_clid`). Owner made it a separate product on 2026-10-11: it is named mu-Clid MIDI (2026-10-11) and gets `mu-clid-midi/` and `mu_clid_midi` by the staged plan in the family doc (stage 1 identity first; stage 2 moves only the pure generators to `mu-core/Sequencer/`). |
 | Saved data | Four param-id schemes; layer-preset extension and folder nouns disagree (mu-Tant: `.muPattern` in `Voices/`); mu-Tant's `.muPattern` already matches its `Pattern` layer type. |
 
 ---
@@ -230,6 +248,10 @@ C++ identifier changes never touch saved files; the data renames at the end do.
    `captureComposedState` / `applyComposedState` / `toComposedState` ("composed" is not "slot"; the plain
    names `captureState` / `applyState` are taken by the products' own wrappers, and renaming onto them makes
    mu-Toni and mu-On recurse into themselves).
+   Related and interlocking: the **MIDI-effect product split** (family doc, "The MIDI-effect product")
+   extracts mu-Clid's Euclidean generators and, after stage 7 above, `Rhythm` / `SequencerEngine` into
+   `mu-core/Sequencer/`. Do the pure-generator move any time; do the `Rhythm` / `SequencerEngine` move
+   with or after stage 7 so the code moves once.
 6. **Saved-data names** — only with the combined instance, with migrations. Backlog #1263 (On Hold).
 
 Separately, the **standard `Source/` layout** (eight folders in every instrument product): folders created

@@ -4,7 +4,7 @@ Product-specific guidance for working in `mu-clid/`. Read alongside the family-w
 
 ## Project overview
 
-**μ-Clid** is a JUCE/C++ Euclidean rhythm sequencer and sample trigger plugin (VST3 + CLAP + Standalone, plus a Lite MIDI-effect variant) by Transwarp Development Project. Up to 8 polyrhythmic rhythm slots, each with two euclidean hit generators, sample playback, voice chain (ADSR + filter), up to 8 drawable LFO/step modulators, and a shared FX chain (Effect/Delay/Reverb) with mixer.
+**μ-Clid** is a JUCE/C++ Euclidean rhythm sequencer and sample trigger plugin (VST3 + CLAP + Standalone; the MIDI-effect sibling is the separate product mu-Clid MIDI) by Transwarp Development Project. Up to 8 polyrhythmic rhythm slots, each with two euclidean hit generators, sample playback, voice chain (ADSR + filter), up to 8 drawable LFO/step modulators, and a shared FX chain (Effect/Delay/Reverb) with mixer.
 
 ## Build targets
 

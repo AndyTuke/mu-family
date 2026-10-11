@@ -7,7 +7,8 @@ Family-shared guidance for Claude Code working in this monorepo. **Product-speci
 ```
 mu-core/        Shared audio + FX + modulation + mixer UI + ProcessorBase + EditorShellBase (INTERFACE library)
 mu-control/     (planned, created with the first controller work) Controller drivers, mapping and surface model; depends on mu-core, never the reverse
-mu-clid/        Euclidean rhythm sequencer + sample trigger plugin (VST3 + CLAP + Standalone + Lite)
+mu-clid/        Euclidean rhythm sequencer + sample trigger plugin (VST3 + CLAP + Standalone)
+mu-clid-midi/   (planned) Euclidean MIDI effect, the former mu-Clid Lite, shown as mu-Clid MIDI — no audio, free, VST3 + CLAP; shares Rhythm / .muRhythm with mu-Clid. Today it is still built from mu-clid/
 mu-tant/        Wavetable drone synth — 8 voices, mixer, modulators, gate-pattern grid (VST3 + CLAP + Standalone)
 mu-toni/        Generative arpeggiator mono-synth — scale/chord note pool, skewed-triangle scan, freeware (VST3 + CLAP + Standalone)
 mu-on/          909-style groove sequencer — Kick/Bass/Hat/Snare lanes, step grid, bass↔kick sidechain

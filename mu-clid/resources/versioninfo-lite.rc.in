@@ -1,4 +1,4 @@
-// Custom VERSIONINFO for μ-Clid Lite.
+// Custom VERSIONINFO for μ-Clid MIDI.
 // Included via JUCE_USER_DEFINED_RC_FILE — replaces JUCE's auto-generated block.
 
 #undef  WIN32_LEAN_AND_MEAN
@@ -14,9 +14,9 @@ BEGIN
     BEGIN
       VALUE "CompanyName",    "Transwarp Development Project\0"
       VALUE "LegalCopyright", "@MUFAMILY_COPYRIGHT@\0"
-      VALUE "FileDescription","μ-Clid Lite\0"
+      VALUE "FileDescription","μ-Clid MIDI\0"
       VALUE "FileVersion",    "@MUFAMILY_PLUGIN_VERSION@\0"
-      VALUE "ProductName",    "μ-Clid Lite\0"
+      VALUE "ProductName",    "μ-Clid MIDI\0"
       VALUE "ProductVersion", "@MUFAMILY_PLUGIN_VERSION@\0"
     END
   END

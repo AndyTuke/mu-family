@@ -14,7 +14,7 @@
 
 namespace mu_clid {
 
-// Simplified editor for the mu-Clid Lite MIDI-effect build.
+// Simplified editor for the mu-Clid MIDI MIDI-effect build.
 // Shows TransportBar + RhythmCircle + EuclideanPanel; no sidebar, voice section, or mixer.
 class LiteEditor : public juce::AudioProcessorEditor,
                    public juce::AudioProcessorValueTreeState::Listener

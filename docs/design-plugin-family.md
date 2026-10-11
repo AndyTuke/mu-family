@@ -688,7 +688,7 @@ product only has to override/​wire those.
 
 ## Licensing and the support prompt — family standard (ruled 2026-10-11)
 
-**Owner decision.** The source is GPLv3. The apps are free, pay-what-you-want on Lemon Squeezy (minimum £0, suggested £20). An unlicensed copy is **fully functional**: no track, step, save or preset limits, no demo banner, no Lite build. Instead it shows one polite support dialog per session. A licence key still exists and still activates (a key marks a supporter, and unlocks nothing). mu-Toni (freeware) and mu-On (no licensing) never call `initLicensing`, so they never show the dialog.
+**Owner decision.** The source is GPLv3. The apps are free, pay-what-you-want on Lemon Squeezy (minimum £0, suggested £20). An unlicensed copy is **fully functional**: no track, step, save or preset limits, no demo banner, and no "Lite" free tier (the former mu-Clid Lite is now a separate MIDI-effect product, see "The MIDI-effect product" below). Instead it shows one polite support dialog per session. A licence key still exists and still activates (a key marks a supporter, and unlocks nothing). mu-Toni (freeware) and mu-On (no licensing) never call `initLicensing`, so they never show the dialog.
 
 ### What is deleted, what is kept
 
@@ -698,7 +698,7 @@ product only has to override/​wire those.
 | `EditorShellBase::demoBanner`, `kDemoBannerH`, the banner click route, the banner layout rows | `upgradeBanner` and the version check |
 | The save gate in `transportBar.onSavePreset`, `setSaveEnabled(licensed)` calls | The `StatusBar` is no longer given "Demo limited ..." messages (delete those two) |
 | `MUFAMILY_REQUIRE_LICENSE` as a feature gate (see below) | |
-| mu-Clid Lite: `MUCLID_LITE_BUILD` and every `#if` on it, `LiteEditor`, the `mu-clid-lite` target, `BuildInstallerLite.cmake`, `DeployReleaseLite.cmake`, Lite lines in `PackageRelease.cmake` and `release.yml` | |
+| The mu-Clid *demo-limit* paths. mu-Clid Lite is **not** deleted: as of 2026-10-11 it is a product in its own right and leaves mu-Clid by the staged plan in "The MIDI-effect product" below, not by deletion. | |
 
 `isLicensed()` goes too. It is replaced by `bool isSupporter() const` (offline `.lic` valid OR online-activated), which is true or false identically in Debug and Release. Nothing in the audio or editor path may branch on it except the support prompt and the About/Activation text.
 
@@ -728,10 +728,70 @@ It no longer gates features, so its Debug-bypass meaning disappears. Remove it f
 2. **SupportOverlay and shell wiring.** The overlay, `showSupport`, first-show trigger, About buttons, "Get a key" link. The old demo banner and caps still exist, so this stage is visible but harmless. `ux-controller` rules the card first.
 3. **Remove caps.** Delete the `ProcessorBase` cap API and every caller listed above, the demo status messages, the save gate, the preset-load clamps, the tant demo `limitToCells`; replace `isLicensed()` calls with nothing (or `isSupporter()` in About). Update tests. This is the one large edit, still product by product if wanted: mu-Tant, then mu-Clid.
 4. **Remove the banner and the macro.** `demoBanner`, its layout, click route; `MUFAMILY_REQUIRE_LICENSE`; header comments.
-5. **Retire mu-Clid Lite.** Last because it is the widest change: every `MUCLID_LITE_BUILD` guard and file above, installer and deploy scripts, `release.yml`, the site download list, `design-naming.md` audit mention of `LiteEditor`. Owner confirmed in the list of things to retire; note it also removes the only MIDI-effect variant, so say so in the release notes.
+5. **(Superseded 2026-10-11: Lite is not retired.)** The owner made mu-Clid Lite a separate MIDI-effect product. Its split from mu-Clid follows "The MIDI-effect product" below and is independent of stages 1 to 4 (it needs none of them).
 6. **Docs and site.** Rewrite the licensing lines of both manuals (`user-documentation-author`), `/notes`, the site buy buttons and pricing (separate site task), and the CLAUDE.md wording below.
 
-Each stage ends in a Debug build and the unit tests; stages 3 to 5 also run the round-trip listening tests and pluginval on the build PC.
+Each stage ends in a Debug build and the unit tests; stages 3 and 4 also run the round-trip listening tests and pluginval on the build PC.
+
+---
+
+## The MIDI-effect product (the former mu-Clid Lite) — ruled 2026-10-11
+
+**Owner decision (2026-10-11).** mu-Clid Lite is a separate product: a Euclidean MIDI effect (no audio, no samples, no Standalone), not a variant or free tier of mu-Clid. The product is named **mu-Clid MIDI** (owner, 2026-10-11; decisions under Owner decisions below), slug `mu-clid-midi`, namespace `mu_clid_midi`; "the MIDI product" below means this product, and `mu-<slug>` / `<slug>` read as `mu-clid-midi`.
+
+### Ruling: a product, reached in stages (not a target forever)
+
+Today it is a second `juce_add_plugin` target inside `mu-clid/`, compiling about seventeen of mu-Clid's files a second time under `MUCLID_LITE_BUILD=1`, with roughly sixty `#if` sites in `PluginProcessor.{h,cpp}`, `_APVTS`, `_Modulation`, `PresetIO` and `StandaloneApp`. That breaks the family shape (one product, one folder, one namespace, eight `Source/` folders) and the "no per-product copy of shared behaviour" rule in both directions: mu-Clid carries MIDI-only branches, and a standalone MIDI product would otherwise need its own copy of the Euclidean sequencer. It therefore gets its own folder, namespace, docs and CLAUDE.md. It must **not** be done as a fork: the Euclidean sequencing both products share moves to `mu-core` first (the "second product needing a behaviour" rule).
+
+Stages (each ends in a Debug build and the unit tests; stages 2 and 3 also run the round-trip listening tests and pluginval on the build PC):
+
+1. **Identity, no code move (cheap, do first).** Rename every user-visible and release-facing name to the final name while keeping the CMake target, `MUCLID_LITE_BUILD` and every plugin ID untouched: `PRODUCT_NAME` / `PLUGIN_NAME`, `getName()`, the `.iss` and installer filename, `PackageRelease.cmake` slug, `DeployReleaseLite.cmake` filenames, `release.yml` staging and zip names, `mu_build_artifacts.ps1`, `check-build-artifacts.ps1`, `run-pluginval.ps1`, the site. Add the Windows `[InstallDelete]` and the uninstall of the old `mu-Clid Lite` bundle (below). Docs: a product CLAUDE.md stub and `docs/<slug>/`.
+2. **Extract the shared sequencing into `mu-core/Sequencer/`.** The files that Lite and mu-Clid both compile (`EuclideanGenerator`, `HitGenerator`, and whatever of `Rhythm` / `SequencerEngine` is free of sample, voice and sidechain concepts) move to `mu-core` under neutral names and the `mu_core` namespace, mu-Clid being the second consumer that makes it shared. The `Rhythm`-into-`Layer` container work (design-naming §5 step 5.7) rewrites the same classes; **sequence this stage after that one**, or hand the extraction to it, so the code moves once. **Owner chose the earlier split (2026-10-11):** extract only the pure generators (`EuclideanGenerator`, `HitGenerator`) now and leave `Rhythm` / `SequencerEngine` for step 5.7; the MIDI product carries a thin `Rhythm` of its own until then, recorded as a known exception.
+3. **Create `mu-<slug>/`.** Own `CMakeLists.txt`, own thin `PluginProcessor` (a `ProcessorBase` subclass, MIDI-effect bus layout, `lite_midiNote`-style parameters renamed in the product only through a migration), own editor (`LiteEditor` becomes `<Product>Editor`, in `UI/`), the eight `Source/` folders with `.gitkeep` in the empty ones (`License`, `Modulation`, `Audio` are expected empty). `mu-clid` loses all `MUCLID_LITE_BUILD` code, the `mu-clid-lite` target, `LiteEditor.*` and the Lite members of `PluginProcessor`. Add the new directory to the root list in `check-core-boundary.ps1` and `check-mod-targets.ps1`.
+4. **Retire the old paths.** Remove `BuildInstallerLite.cmake` / `DeployReleaseLite.cmake` in favour of the shared product-parameterised scripts (or renamed copies), the Lite lines in `PackageRelease.cmake`, and the `mu-clid/installer/mu-Clid-Lite.iss` (moves to `mu-<slug>/installer/`).
+
+### Rules for the MIDI product
+
+- **Plugin IDs never change** (see the warning below): `PLUGIN_CODE MCLt`, `PLUGIN_MANUFACTURER_CODE TDP1`, `BUNDLE_ID com.transwarp.mu-clid-lite`, `CLAP_ID com.transwarp.mu-clid-lite`, and the processor state id `MuClidState`. They are saved data (design-naming §3); the product name is display only. The bundle's visible name changes, the identity does not.
+- **Layer type stays `Rhythm`** and the layer-preset extension stays `.muRhythm` (shared with mu-Clid so a rhythm made in either loads in the other; mu-Clid's sample binding is ignored by the MIDI product). This is the one named exception to "each product's layer type name is unique" (design-naming §1), because the type is one shared class in `mu-core`, not two.
+- **No licensing glue**, like mu-On: it never calls `initLicensing`, never shows the support prompt, and `License/` holds a `.gitkeep`. (Owner decided 2026-10-11: no prompt.)
+- **No modulation targets**: it has no `ModulationMatrix` use today, so there is no `mu_mod::ModTarget` table and `Modulation/` is a `.gitkeep`; if it later gains modulation it adds one table like every product.
+- **Formats:** VST3 + CLAP only (owner, 2026-10-11; no AU, no Standalone), `IS_MIDI_EFFECT TRUE`. Free. Linux is built by `release.yml` as for mu-Clid today.
+
+### WARNING: changing plugin IDs breaks existing DAW projects
+
+DAWs find a plugin in a saved project by its identity (VST3 class ID, CLAP id, AU type / subtype / manufacturer), and hand the saved state blob back to it. Change `PLUGIN_CODE`, `PLUGIN_MANUFACTURER_CODE`, `BUNDLE_ID`, `CLAP_ID`, the company name, or `MuClidState` and every existing project shows the Lite instance as missing, with its settings lost. Changing the display name alone is safe. The two traps in the rename:
+
+- **Stale duplicate.** The old `mu-Clid Lite.vst3` (and `.clap`) stays on disk after an upgrade, so a DAW sees two plugins with the same ID and picks one unpredictably. The new installer must delete the old bundles: Inno `[InstallDelete]` for `{commoncf64}\VST3\mu-Clid Lite.vst3` and `{commoncf64}\CLAP\mu-Clid Lite.clap`, and the old Start-menu group. Keep the `AppId` GUID of the Lite `.iss` so the upgrade is recognised as an upgrade, not a second install.
+- **Name-keyed hosts.** Some hosts (preset databases, Reaper FX names, Bitwig favourites) remember the *display name*. A project still loads (the ID matches), but favourites and saved FX chain presets named "mu-Clid Lite" may need re-picking. Note it in the release notes.
+
+If the owner wants brand-new IDs anyway (a clean break), do it as its own decision with a version note, and expect all existing Lite sessions to need the plugin re-inserted.
+
+### What the migration touches
+
+| Area | Files | Stage |
+|---|---|---|
+| Installer | `mu-clid/installer/mu-Clid-Lite.iss` (rename, new output filename, `[InstallDelete]`, keep `AppId`), `cmake/BuildInstallerLite.cmake` | 1, 4 |
+| Release workflow | `.github/workflows/release.yml` staging dirs, copy paths and the three zip names (Windows, macOS on hold, Linux): `mu-Clid-Lite-*.zip` | 1, 3 (paths) |
+| Packaging and deploy | `cmake/PackageRelease.cmake` (`-DPRODUCT=`), `cmake/DeployReleaseLite.cmake`, the `MUFAMILY_DEPLOY_TESTERS` blocks in `mu-clid/CMakeLists.txt`, the OneDrive tester folder name | 1, 3, 4 |
+| Build tooling and hooks | `scripts/mu_build_artifacts.ps1` (artefact list that the post-build hook prints), `tests/scripts/check-build-artifacts.ps1`, `tests/scripts/run-pluginval.ps1`, `tests/scripts/check-core-boundary.ps1`, `check-mod-targets.ps1` (product root list), `/build` and `/release` skills | 1, 3 |
+| CMake | root `CMakeLists.txt` `add_subdirectory`, `mu-clid/CMakeLists.txt` Lite block, new `mu-<slug>/CMakeLists.txt`, `increment_build_number` dependency, `versioninfo-lite.rc.in`, `resources/` icon and the shared `mu-clid-resources` target | 3 |
+| Source | `MUCLID_LITE_BUILD` sites, `LiteEditor`, `computeLiteTransport` and the Lite processBlock helpers, `lite_midiNote` parameters | 3 |
+| Website | `site/download.html` (card, file names, the analytics label `μ-clid LITE download`), a product page, a release-notes page, the `/notes` command's product list, `web-designer` brief | 1 |
+| Manuals | a short `docs/<slug>/create_manual.ps1` and `.docx` (`user-documentation-author`); the mu-Clid manual drops any Lite mention and copy to the OneDrive root | 3 |
+| Tests | a `<slug>-tests` target (the generator and processor tests move with the code); `tests.md` rows; pluginval path | 3 |
+| Presets and extension | none: `.muRhythm` and `MuClidState` are unchanged; a new full-preset extension only if the product ever gains full presets | none |
+| Docs | this section, design-naming §3 / §4 / §5, `CLAUDE.md` monorepo layout and product list, a `mu-<slug>/CLAUDE.md` | 1, 3 |
+
+### Owner decisions (settled 2026-10-11)
+
+1. **Name:** display name **mu-Clid MIDI** (the descriptive-suffix exception for a deliberate sibling, design-naming §3). Slug **`mu-clid-midi`**, namespace **`mu_clid_midi`**, source folder `mu-clid-midi/`, docs folder `docs/mu-clid-midi/`, test target `mu-clid-midi-tests`, installer/zip names `mu-Clid-MIDI-*`. The names are display and layout only; the next item does not change.
+2. **Plugin IDs kept:** `MCLt`, `TDP1`, `com.transwarp.mu-clid-lite`, `MuClidState` all stay (the CMake target may be renamed in stage 3; the IDs inside it may not).
+3. **`.muRhythm` / `Rhythm` shared with mu-Clid:** yes (rule above).
+4. **Licensing:** no support prompt and no licensing glue. It is free.
+5. **Formats:** VST3 + CLAP only (no AU, no Standalone). Free, no price on the site.
+6. **Identity:** it keeps its own icon and its own site product page and release-notes page.
+7. **Extraction timing (stage 2):** extract the pure generators now (`EuclideanGenerator`, `HitGenerator` into `mu-core/Sequencer/`, namespace `mu_core`); `Rhythm` and `SequencerEngine` follow with the layer-container stage (design-naming §5 step 5.7). Until then mu-Clid MIDI carries a thin `Rhythm` of its own, a recorded known exception, not to be extended.
 
 ---
 

@@ -225,15 +225,15 @@ add_custom_command(TARGET mu-clid_Standalone POST_BUILD
 )
 
 
-# ── mu-Clid Lite — single-rhythm MIDI-effect VST3/CLAP ──────────────────────
+# ── mu-Clid MIDI — single-rhythm MIDI-effect VST3/CLAP ──────────────────────
 juce_add_plugin(mu-clid-lite
     COMPANY_NAME "Transwarp Development Project"
     BUNDLE_ID "com.transwarp.mu-clid-lite"
     PLUGIN_MANUFACTURER_CODE TDP1
     PLUGIN_CODE MCLt
     FORMATS VST3 ${MUFAMILY_AU_FORMAT}   # AU on macOS only (family rule); Lite has no Standalone
-    PRODUCT_NAME "mu-Clid Lite"
-    PLUGIN_NAME  "μ-Clid Lite"
+    PRODUCT_NAME "mu-Clid MIDI"
+    PLUGIN_NAME  "μ-Clid MIDI"
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT FALSE
     NEEDS_MIDI_OUTPUT TRUE
@@ -323,7 +323,7 @@ if(ISCC_EXE)
                 "-DBUILD_DIR=${CMAKE_BINARY_DIR}"
                 "-DCMAKE_COMMAND=${CMAKE_COMMAND}"
                 -P "${CMAKE_SOURCE_DIR}/cmake/BuildInstallerLite.cmake"
-        COMMENT "Building mu-Clid Lite installer"
+        COMMENT "Building mu-Clid MIDI installer"
         VERBATIM
     )
     add_dependencies(mu-clid-lite_installer mu-clid-lite mu-clid-lite_VST3 mu-clid-lite_CLAP)
@@ -333,42 +333,42 @@ clap_juce_extensions_plugin(TARGET mu-clid-lite
     CLAP_ID "com.transwarp.mu-clid-lite"
     CLAP_FEATURES midi-effect)
 
-# mu-Clid Lite tester deploys — guarded by MUFAMILY_DEPLOY_TESTERS (OFF default).
+# mu-Clid MIDI tester deploys — guarded by MUFAMILY_DEPLOY_TESTERS (OFF default).
 if(MUFAMILY_DEPLOY_TESTERS)
 add_custom_command(TARGET mu-clid-lite_VST3 POST_BUILD
     COMMAND "${CMAKE_COMMAND}"
             "-DCONFIG=$<CONFIG>"
-            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/VST3/mu-Clid Lite.vst3"
-            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/CLAP/mu-Clid Lite.clap"
+            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/VST3/mu-Clid MIDI.vst3"
+            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/CLAP/mu-Clid MIDI.clap"
             "-DDIST_WIN=${MUFAMILY_WIN_DIST}"
             -P "${CMAKE_SOURCE_DIR}/cmake/DeployReleaseLite.cmake"
-    COMMENT "Deploying mu-Clid Lite VST3 to OneDrive (Debug skipped)"
+    COMMENT "Deploying mu-Clid MIDI VST3 to OneDrive (Debug skipped)"
     VERBATIM
 )
 add_custom_command(TARGET mu-clid-lite_CLAP POST_BUILD
     COMMAND "${CMAKE_COMMAND}"
             "-DCONFIG=$<CONFIG>"
-            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/VST3/mu-Clid Lite.vst3"
-            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/CLAP/mu-Clid Lite.clap"
+            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/VST3/mu-Clid MIDI.vst3"
+            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/CLAP/mu-Clid MIDI.clap"
             "-DDIST_WIN=${MUFAMILY_WIN_DIST}"
             -P "${CMAKE_SOURCE_DIR}/cmake/DeployReleaseLite.cmake"
-    COMMENT "Deploying mu-Clid Lite CLAP to OneDrive (Debug skipped)"
+    COMMENT "Deploying mu-Clid MIDI CLAP to OneDrive (Debug skipped)"
     VERBATIM
 )
 endif()
 
-# Package mu-Clid Lite Release zip (VST3 + CLAP, no Standalone). A dedicated custom
+# Package mu-Clid MIDI Release zip (VST3 + CLAP, no Standalone). A dedicated custom
 # target (rather than POST_BUILD) lets us declare explicit deps on both format targets.
 add_custom_target(mu-clid-lite-zip ALL
     COMMAND "${CMAKE_COMMAND}"
             "-DCONFIG=$<CONFIG>"
-            "-DPRODUCT=mu-Clid-Lite"
-            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/VST3/mu-Clid Lite.vst3"
-            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/CLAP/mu-Clid Lite.clap"
+            "-DPRODUCT=mu-Clid-MIDI"
+            "-DVST3_BUNDLE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/VST3/mu-Clid MIDI.vst3"
+            "-DCLAP_FILE=${CMAKE_BINARY_DIR}/mu-clid/mu-clid-lite_artefacts/$<CONFIG>/CLAP/mu-Clid MIDI.clap"
             "-DDIST_DIR=${CMAKE_BINARY_DIR}/dist"
             "-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_SOURCE_DIR}/cmake/PackageRelease.cmake"
-    COMMENT "Packaging mu-Clid Lite Release zip"
+    COMMENT "Packaging mu-Clid MIDI Release zip"
     VERBATIM
 )
 add_dependencies(mu-clid-lite-zip mu-clid-lite_VST3 mu-clid-lite_CLAP increment_build_number)

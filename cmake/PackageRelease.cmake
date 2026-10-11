@@ -4,7 +4,7 @@
 #
 # Required parameters (pass via cmake -D):
 #   CONFIG        — $<CONFIG> from the calling build rule
-#   PRODUCT       — slug used in the zip filename, e.g. "mu-Clid", "mu-Clid-Lite", "mu-Tant"
+#   PRODUCT       — slug used in the zip filename, e.g. "mu-Clid", "mu-Clid-MIDI", "mu-Tant"
 #   VST3_BUNDLE   — path to the built .vst3 directory
 #   CLAP_FILE     — path to the built .clap file
 #   DIST_DIR      — output directory (typically <build>/dist)

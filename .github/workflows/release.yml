@@ -89,12 +89,12 @@ jobs:
           Copy-Item "$r\mu-clid\mu-clid_artefacts\Release\Standalone\mu-Clid.exe" staging\mu-Clid\
           Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Clid\"
           Compress-Archive -Path staging\mu-Clid\* -DestinationPath dist\mu-Clid-Windows.zip
-          # mu-Clid Lite (VST3 + CLAP)
-          New-Item -ItemType Directory -Path "staging\mu-Clid Lite" -Force | Out-Null
-          Copy-Item "$r\mu-clid\mu-clid-lite_artefacts\Release\VST3\mu-Clid Lite.vst3" "staging\mu-Clid Lite\" -Recurse
-          Copy-Item "$r\mu-clid\mu-clid-lite_artefacts\Release\CLAP\mu-Clid Lite.clap" "staging\mu-Clid Lite\"
-          Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Clid Lite\"
-          Compress-Archive -Path "staging\mu-Clid Lite\*" -DestinationPath dist\mu-Clid-Lite-Windows.zip
+          # mu-Clid MIDI (VST3 + CLAP)
+          New-Item -ItemType Directory -Path "staging\mu-Clid MIDI" -Force | Out-Null
+          Copy-Item "$r\mu-clid\mu-clid-lite_artefacts\Release\VST3\mu-Clid MIDI.vst3" "staging\mu-Clid MIDI\" -Recurse
+          Copy-Item "$r\mu-clid\mu-clid-lite_artefacts\Release\CLAP\mu-Clid MIDI.clap" "staging\mu-Clid MIDI\"
+          Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Clid MIDI\"
+          Compress-Archive -Path "staging\mu-Clid MIDI\*" -DestinationPath dist\mu-Clid-MIDI-Windows.zip
           # mu-Tant (VST3 + CLAP + Standalone)
           New-Item -ItemType Directory -Path staging\mu-Tant -Force | Out-Null
           Copy-Item "$r\mu-tant\mu-tant_artefacts\Release\VST3\mu-Tant.vst3" staging\mu-Tant\ -Recurse
@@ -120,13 +120,13 @@ jobs:
           cp -R "$R/mu-clid/mu-clid_artefacts/Release/Standalone/mu-Clid.app"   "staging/mu-Clid/" 2>/dev/null || true
           cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Clid/"
           pack "mu-Clid" "mu-Clid-macOS.zip"
-          # mu-Clid Lite (VST3 + CLAP + AU)
-          mkdir -p "staging/mu-Clid Lite"
-          cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/VST3/mu-Clid Lite.vst3"    "staging/mu-Clid Lite/"
-          cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/CLAP/mu-Clid Lite.clap"    "staging/mu-Clid Lite/"
-          cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/AU/mu-Clid Lite.component" "staging/mu-Clid Lite/" 2>/dev/null || true
-          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Clid Lite/"
-          pack "mu-Clid Lite" "mu-Clid-Lite-macOS.zip"
+          # mu-Clid MIDI (VST3 + CLAP + AU)
+          mkdir -p "staging/mu-Clid MIDI"
+          cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/VST3/mu-Clid MIDI.vst3"    "staging/mu-Clid MIDI/"
+          cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/CLAP/mu-Clid MIDI.clap"    "staging/mu-Clid MIDI/"
+          cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/AU/mu-Clid MIDI.component" "staging/mu-Clid MIDI/" 2>/dev/null || true
+          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Clid MIDI/"
+          pack "mu-Clid MIDI" "mu-Clid-MIDI-macOS.zip"
           # mu-Tant (VST3 + CLAP + AU + Standalone.app)
           mkdir -p "staging/mu-Tant"
           cp -R "$R/mu-tant/mu-tant_artefacts/Release/VST3/mu-Tant.vst3"        "staging/mu-Tant/"
@@ -149,12 +149,12 @@ jobs:
           cp -R "$R/mu-clid/mu-clid_artefacts/Release/Standalone/mu-Clid"     "staging/mu-Clid/" 2>/dev/null || true
           cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Clid/"
           ( cd staging && zip -r -y "../dist/mu-Clid-Linux.zip" "mu-Clid" )
-          # mu-Clid Lite (VST3 + CLAP)
-          mkdir -p "staging/mu-Clid Lite"
-          cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/VST3/mu-Clid Lite.vst3" "staging/mu-Clid Lite/"
-          cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/CLAP/mu-Clid Lite.clap" "staging/mu-Clid Lite/"
-          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Clid Lite/"
-          ( cd staging && zip -r -y "../dist/mu-Clid-Lite-Linux.zip" "mu-Clid Lite" )
+          # mu-Clid MIDI (VST3 + CLAP)
+          mkdir -p "staging/mu-Clid MIDI"
+          cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/VST3/mu-Clid MIDI.vst3" "staging/mu-Clid MIDI/"
+          cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/CLAP/mu-Clid MIDI.clap" "staging/mu-Clid MIDI/"
+          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Clid MIDI/"
+          ( cd staging && zip -r -y "../dist/mu-Clid-MIDI-Linux.zip" "mu-Clid MIDI" )
           # mu-Tant (VST3 + CLAP + Standalone)
           mkdir -p "staging/mu-Tant"
           cp -R "$R/mu-tant/mu-tant_artefacts/Release/VST3/mu-Tant.vst3"      "staging/mu-Tant/"

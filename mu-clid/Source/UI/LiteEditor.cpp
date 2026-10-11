@@ -16,7 +16,7 @@ LiteEditor::LiteEditor(PluginProcessor& p)
 
     // Lite build: keep the master-loop section but drop the preset / mixer
     // chrome (MIDI-effect, no preset library + no mixer overlay).
-    transportBar.setLogoText(juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid Lite")));
+    transportBar.setLogoText(juce::String(juce::CharPointer_UTF8("\xce\xbc-Clid MIDI")));
     transportBar.setLoopSection(&masterLoop, MasterLoopSection::kWidth);
     transportBar.setShowPresetControls(false);
     transportBar.setShowMixerToggle(false);
@@ -28,7 +28,7 @@ LiteEditor::LiteEditor(PluginProcessor& p)
     addAndMakeVisible(statusBar);
 
     aboutOverlay.setProductInfo(
-        juce::String(juce::CharPointer_UTF8("\xce\xbc")) + "-Clid Lite",
+        juce::String(juce::CharPointer_UTF8("\xce\xbc")) + "-Clid MIDI",
         juce::StringArray {
             juce::String(juce::CharPointer_UTF8("JUCE \xe2\x80\x94 AGPLv3")),
             juce::String(juce::CharPointer_UTF8("Monocypher \xe2\x80\x94 BSD-2-Clause")),
