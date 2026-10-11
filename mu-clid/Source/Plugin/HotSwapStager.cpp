@@ -151,11 +151,13 @@ void HotSwapStager::processSwaps()
 
     if (readyCount > 0)
     {
+        // Which slots consume actually applied: a swap cancelled between the scan and here is skipped.
+        std::array<bool, SequencerEngine::MaxRhythms> applied {};
         proc.suspendProcessing(true);
         for (int idx = 0; idx < readyCount; ++idx)
         {
             const int r = readyRhythms[(size_t)idx];
-            stager.consume(r, [&](PendingRhythm& sw)
+            applied[(size_t)r] = stager.consume(r, [&](PendingRhythm& sw)
             {
                 installRhythm(r, std::move(sw.rhythm), std::move(sw.voice), sw.samplePath);
             });
@@ -168,6 +170,7 @@ void HotSwapStager::processSwaps()
         for (int idx = 0; idx < readyCount; ++idx)
         {
             const int r = readyRhythms[(size_t)idx];
+            if (! applied[(size_t)r]) continue;
             proc.pushRhythmToApvts(r);
             if (proc.onLayerPresetCommitted)
                 proc.onLayerPresetCommitted(r);
