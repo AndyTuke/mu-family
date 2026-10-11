@@ -146,6 +146,28 @@ namespace mu_seam_test
         std::atomic<int>  blocks { 0 }, audible { 0 };
     };
 
+    // A host playhead that is always playing and moves on by one block each time it is read (the
+    // processor reads it once per block), so a plugin-mode processor sees a running host transport.
+    struct RunningPlayHead : juce::AudioPlayHead
+    {
+        RunningPlayHead(double sampleRateHz, int blockSize, double bpm = 120.0)
+            : ppqPerBlock(bpm / 60.0 * (double) blockSize / sampleRateHz) {}
+
+        juce::Optional<PositionInfo> getPosition() const override
+        {
+            PositionInfo info;
+            info.setIsPlaying(true);
+            info.setBpm(120.0);
+            info.setPpqPosition(ppq);
+            info.setTimeSignature(TimeSignature { 4, 4 });
+            ppq += ppqPerBlock;
+            return info;
+        }
+
+        double ppqPerBlock;
+        mutable double ppq = 0.0;
+    };
+
     // The block sizes every threaded test sweeps: tiny, odd, typical and large.
     inline const int* blockSizes(int& count)
     {
