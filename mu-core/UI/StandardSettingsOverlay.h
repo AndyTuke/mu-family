@@ -87,7 +87,7 @@ private:
     std::vector<GroupSection> extraGroups;
 
     // Filled by layoutContent, drawn by paintContent.
-    struct Heading { int y; juce::String title; bool group; };
+    struct Heading { int x, w, y; juce::String title; bool group; };
     std::vector<Heading> headings;
     std::vector<std::pair<const Section*, Rows>> placed;
 

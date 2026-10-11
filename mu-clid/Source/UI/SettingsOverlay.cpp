@@ -14,7 +14,7 @@ SettingsOverlay::SettingsOverlay(PluginProcessor& p)
         [this](const Rows& r) { multiBusToggle.setBounds(r.ctrlX, r.area.getY(), r.ctrlW, r.rowH); },
         [this](juce::Graphics& g, const Rows& r) {
             const int hintX = r.ctrlX + r.ctrlW + mu_ui::s(kLabelCtrlGap);
-            drawHint(g, r.area.getY() + r.rowH / 2, "(host rescan required after toggling)",
+            drawHint(g, r.area.getY() + r.rowH / 2, "(rescan host to apply)",
                      hintX, r.area.getRight() - hintX); } });
 
     // ── Hot-swap timing ────────────────────────────────────────────────────────

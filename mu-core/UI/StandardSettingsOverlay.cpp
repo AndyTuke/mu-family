@@ -183,25 +183,33 @@ void StandardSettingsOverlay::layoutContent()
     headings.clear();
     placed.clear();
 
-    const Rows base { {}, rowLabelX(), rowControlX(), s(kLabelW), s(kControlW), s(kRowH) };
-    int  y = contentTop();
-    bool firstGroup = true;
+    // Per-column running y; each group goes in the column that is currently shorter.
+    int colY[2] = { contentTop(), contentTop() };
+    bool colUsed[2] = { false, false };
+    const int nCols = columnCount();
 
-    // Stack one group: its heading (if named), then each section — heading + rows — with the
-    // standard gaps between sections and between groups.
+    // Stack one group into a column: its heading (if named), then each section — heading + rows —
+    // with the standard gaps between sections and between groups.
     auto emitGroup = [&](const juce::String& name, const std::vector<const Section*>& sections)
     {
         if (sections.empty()) return;
-        if (! firstGroup) y += s(kGroupGap);
-        firstGroup = false;
-        if (name.isNotEmpty()) { headings.push_back({ y, name, true }); y += s(kGroupHeadH); }
+        const int c = (nCols == 2 && colY[1] < colY[0]) ? 1 : 0;
+        const int cx = columnX(c), cw = columnW();
+        int& y = colY[c];
+        if (colUsed[c]) y += s(kGroupGap);
+        colUsed[c] = true;
+        if (name.isNotEmpty()) { headings.push_back({ cx, cw, y, name, true }); y += s(kGroupHeadH); }
+
+        const Rows base { {}, cx + s(kRowIndent), cx + s(kRowIndent) + s(kLabelW) + s(kLabelCtrlGap),
+                          s(kLabelW), juce::jmin(s(kControlW), cw - s(kRowIndent) - s(kLabelW) - s(kLabelCtrlGap)),
+                          s(kRowH) };
         for (size_t i = 0; i < sections.size(); ++i)
         {
             const auto* sec = sections[i];
             if (i > 0) y += s(kSectionGap);
-            if (sec->title.isNotEmpty()) { headings.push_back({ y, sec->title, false }); y += s(kSectionHeadH); }
+            if (sec->title.isNotEmpty()) { headings.push_back({ cx, cw, y, sec->title, false }); y += s(kSectionHeadH); }
             Rows rows = base;
-            rows.area = { contentX(), y, contentW(), s(sec->heightPx) };
+            rows.area = { cx, y, cw, s(sec->heightPx) };
             if (sec->place) sec->place(rows);
             placed.push_back({ sec, rows });
             y += s(sec->heightPx);
@@ -230,14 +238,17 @@ void StandardSettingsOverlay::layoutContent()
         for (const auto& gs : extraGroups) if (gs.group == name) secs.push_back(&gs.section);
         emitGroup(name, secs);
     }
+
+    // Everything must fit the overlay without scrolling (design-ui-family §5).
+    jassert(juce::jmax(colY[0], colY[1]) <= getHeight() - s(kPad) - s(20));
 }
 
 void StandardSettingsOverlay::paintContent(juce::Graphics& g)
 {
     for (const auto& h : headings)
     {
-        if (h.group) drawGroupHeader  (g, h.y, h.title);
-        else         drawSectionHeader(g, h.y, h.title);
+        if (h.group) drawGroupHeader  (g, h.y, h.title, h.x, h.w);
+        else         drawSectionHeader(g, h.y, h.title, h.x, h.w);
     }
     for (const auto& [sec, rows] : placed)
         if (sec->paint) sec->paint(g, rows);

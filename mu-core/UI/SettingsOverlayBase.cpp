@@ -23,6 +23,12 @@ void SettingsOverlayBase::computeColumn()
     const int w = getWidth();
     colW = juce::jmin(s(kContentMaxW), w - s(kPad) * 2);
     colX = (w - colW) / 2;
+
+    // Two equal columns when there is room.
+    cols = w >= s(kTwoColMinW) ? 2 : 1;
+    const int total = juce::jmin(s(kTwoColMaxW), w - s(kPad) * 2);
+    twoColW = (total - s(kColumnGap)) / 2;
+    twoColX = (w - total) / 2;
 }
 
 int SettingsOverlayBase::contentTop() const noexcept
@@ -42,7 +48,7 @@ void SettingsOverlayBase::resized()
 
     // "Contact Support" footer — bottom-left, aligned under the section headings.
     const int linkH = s(20);
-    supportLink.setBounds(colX, getHeight() - s(kPad) - linkH, s(160), linkH);
+    supportLink.setBounds(columnX(0), getHeight() - s(kPad) - linkH, s(160), linkH);
 
     layoutContent();
 }
@@ -67,28 +73,32 @@ void SettingsOverlayBase::paint(juce::Graphics& g)
     paintContent(g);
 }
 
-void SettingsOverlayBase::drawGroupHeader(juce::Graphics& g, int headerY, const juce::String& title) const
+void SettingsOverlayBase::drawGroupHeader(juce::Graphics& g, int headerY, const juce::String& title, int x, int w) const
 {
+    if (x < 0) x = colX;
+    if (w < 0) w = colW;
     using Id = MuLookAndFeel::ColourIds;
     g.setColour(MuLookAndFeel::colour(Id::headingText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(15.0f))));
-    g.drawText(title, colX, headerY, colW, s(20), juce::Justification::centredLeft, false);
+    g.drawText(title, x, headerY, w, s(20), juce::Justification::centredLeft, false);
 
     g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     const float lineY = (float) (headerY + s(22));
-    g.drawLine((float) colX, lineY, (float) (colX + colW), lineY, 1.0f);
+    g.drawLine((float) x, lineY, (float) (x + w), lineY, 1.0f);
 }
 
-void SettingsOverlayBase::drawSectionHeader(juce::Graphics& g, int headerY, const juce::String& title) const
+void SettingsOverlayBase::drawSectionHeader(juce::Graphics& g, int headerY, const juce::String& title, int x, int w) const
 {
+    if (x < 0) x = colX;
+    if (w < 0) w = colW;
     using Id = MuLookAndFeel::ColourIds;
     g.setColour(MuLookAndFeel::colour(Id::headingText));
     g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(12.0f))));
-    g.drawText(title, colX, headerY, colW, s(16), juce::Justification::centredLeft, false);
+    g.drawText(title, x, headerY, w, s(16), juce::Justification::centredLeft, false);
 
     g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder));
     const float lineY = (float) (headerY + s(17));
-    g.drawLine((float) colX, lineY, (float) (colX + colW), lineY, 0.5f);
+    g.drawLine((float) x, lineY, (float) (x + w), lineY, 0.5f);
 }
 
 void SettingsOverlayBase::drawHint(juce::Graphics& g, int yCentre, const juce::String& text,
