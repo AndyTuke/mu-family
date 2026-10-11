@@ -322,16 +322,68 @@ public:
             audio.join();
 
             expectEquals(with.core.sequencer.getMasterLoopSteps(), 32);
-            expectEquals(with.core.sequencer.getRhythm(0).genA.steps, 9);   // the field is written at once
+            expectEquals(with.core.sequencer.getRhythm(0).genA.steps, 16);   // the fields wait for the timer too
             r.step();
-            expectEquals(with.core.sequencer.getPatternLength(0), stepsBefore);   // but the pattern waits
+            expectEquals(with.core.sequencer.getPatternLength(0), stepsBefore);   // and so does the pattern
 
             with.core.servicePendingRebuild();   // the message thread's timer
+            expectEquals(with.core.sequencer.getRhythm(0).genA.steps, 9);
             r.step();
             expect(with.core.sequencer.getPatternLength(0) != stepsBefore, "the pattern was rebuilt");
 
             // The setter's own notification work is the same with or without our listener; ours adds none.
             expect(coreAllocs <= bareAllocs, "our listener allocated: " + juce::String(coreAllocs) + " vs " + juce::String(bareAllocs));
+        }
+
+        beginTest("Audio-thread automation of steps and hits against the timer drain keeps the pattern valid");
+        {
+            RenderStub stub;
+            stub.playing = true;
+            juce::AudioBuffer<float> buf(0, 256);
+            juce::MidiBuffer midi;
+
+            // "Audio thread": automates steps and hits and renders blocks, a fixed number of times.
+            constexpr int kIterations = 20000;
+            std::atomic<int> minLen { 1 << 20 }, maxLen { 0 };
+            std::atomic<bool> audioDone { false };
+            std::thread audio([&]
+            {
+                for (int i = 0; i < kIterations; ++i)
+                {
+                    stub.setActual("r0_stepsA", (float) (1 + (i * 7) % 64));
+                    stub.setActual("r0_hitsA",  (float) ((i * 13) % 65));
+                    midi.clear();
+                    stub.processBlock(buf, midi);
+                    const int len = stub.core.sequencer.getPatternLength(0);
+                    if (len == 0) continue;   // no snapshot yet: the first block was skipped by the message thread
+                    if (len < minLen.load()) minLen.store(len);
+                    if (len > maxLen.load()) maxLen.store(len);
+                }
+                audioDone.store(true);
+            });
+
+            // Message thread: services the timer drain, and checks the rhythm under the rhythm lock.
+            int badPatterns = 0, services = 0;
+            do
+            {
+                stub.core.servicePendingRebuild();
+                ++services;
+                const juce::ScopedLock sl(stub.core.getRhythmLock());
+                const auto& g = stub.core.sequencer.getRhythm(0).genA;
+                const auto pat = stub.core.sequencer.getRhythm(0).getCombinedPattern();
+                int hits = 0;
+                for (bool b : pat) hits += b ? 1 : 0;
+                if (pat.empty() || pat.size() > 256 || g.steps < 1 || g.steps > 64 || hits > (int) pat.size())
+                    ++badPatterns;
+            } while (! audioDone.load());
+            audio.join();
+
+            stub.core.servicePendingRebuild();
+            expectEquals(badPatterns, 0);
+            expect(services > 0);
+            expect(minLen.load() >= 1 && maxLen.load() <= 256,
+                   "pattern length range " + juce::String(minLen.load()) + ".." + juce::String(maxLen.load()));
+            expectEquals(stub.core.sequencer.getRhythm(0).genA.steps, 1 + ((kIterations - 1) * 7) % 64);
         }
     }
 };

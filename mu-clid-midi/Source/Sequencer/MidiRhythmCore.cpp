@@ -11,14 +11,6 @@
 
 namespace mu_clid_midi {
 
-// True on the message thread, and when no message manager exists (a headless run), where nothing
-// else can be the audio thread.
-static bool onMessageThread()
-{
-    const auto* mm = juce::MessageManager::getInstanceWithoutCreating();
-    return mm == nullptr || mm->isThisTheMessageThread();
-}
-
 // Suffix lookup on raw characters: parameterChanged can run on the audio thread, where building a
 // juce::String for the suffix would allocate.
 static const mu_clid::RhythmParamDef* findDef(const char* suffix) noexcept
@@ -30,7 +22,7 @@ static const mu_clid::RhythmParamDef* findDef(const char* suffix) noexcept
 }
 
 MidiRhythmCore::MidiRhythmCore(juce::AudioProcessorValueTreeState& apvtsToUse)
-    : apvts(apvtsToUse)
+    : apvts(apvtsToUse), ownerThread(std::this_thread::get_id())
 {
     sequencer.setStepCap(mu_core::HitGenerator::kMaxSteps);
 
@@ -152,40 +144,85 @@ void MidiRhythmCore::parameterChanged(const juce::String& id, float v)
         sequencer.setMasterLoopSteps(juce::jmin((int) v * 16, 256));   // 0 = free
 }
 
+// True on the message thread. With no MessageManager (a headless run) it is the thread that built
+// the core, so a test cannot silently take the message-thread path from its "audio" thread.
+bool MidiRhythmCore::isMessageThread() const
+{
+    const auto* mm = juce::MessageManager::getInstanceWithoutCreating();
+    return mm != nullptr ? mm->isThisTheMessageThread() : std::this_thread::get_id() == ownerThread;
+}
+
+// Queues the change in its suffix slot; on the message thread it is applied at once.
 void MidiRhythmCore::syncRhythmParam(const char* suffix, float v)
 {
     const auto* def = findDef(suffix);
     if (def == nullptr) return;
 
+    auto& slot = pendingParams[(size_t) (def - mu_clid::kRhythmParamDefs)];
+    slot.value.store(v, std::memory_order_relaxed);
+    slot.dirty.store(true, std::memory_order_release);
+
+    if (isMessageThread())
+        drainPendingParams();
+}
+
+// Message thread. Applies every queued change and the pattern rebuild together, so the generator
+// fields never change under a rebuild. Lock order: rhythmsLock, voiceParamsLock, pattern lock.
+void MidiRhythmCore::drainPendingParams()
+{
+    bool any = false;
+    for (auto& slot : pendingParams)
+        if (slot.dirty.load(std::memory_order_relaxed)) { any = true; break; }
+    if (! any) return;
+
+    // The audio thread only try-locks this, so it skips a block rather than reading a half-edit.
+    const juce::ScopedLock sl(rhythmsLock);
     Rhythm& r = sequencer.getRhythm(0);
     bool patternDirty = false;
     bool voiceDirty   = false;
 
-    // Hold the voice-params lock for the field write so the audio thread cannot see a torn value.
     mu_core::spinLock(r.voiceParamsLock);
-    def->apply(v, r, patternDirty, voiceDirty);
-    mu_core::spinUnlock(r.voiceParamsLock);
+    for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
+        if (pendingParams[(size_t) i].dirty.exchange(false, std::memory_order_acquire))
+            mu_clid::kRhythmParamDefs[i].apply(pendingParams[(size_t) i].value.load(std::memory_order_relaxed),
+                                               r, patternDirty, voiceDirty);
 
-    if (patternDirty && ! apvtsLoading.load(std::memory_order_acquire))
+    // The rebuild reads the fields just written, so it stays inside the same voiceParamsLock hold.
+    if (patternDirty)
     {
-        // updatePattern allocates and takes a spin lock, so only the message thread may run it.
-        if (onMessageThread())
-            sequencer.updatePattern(0);
-        else
+        if (apvtsLoading.load(std::memory_order_acquire))
             patternRebuildPending.store(true, std::memory_order_release);
+        else
+            sequencer.updatePattern(0);
     }
+    mu_core::spinUnlock(r.voiceParamsLock);
 }
 
 void MidiRhythmCore::servicePendingRebuild()
 {
-    if (patternRebuildPending.exchange(false, std::memory_order_acq_rel)
-        && ! apvtsLoading.load(std::memory_order_acquire))
+    drainPendingParams();
+
+    if (! apvtsLoading.load(std::memory_order_acquire)
+        && patternRebuildPending.exchange(false, std::memory_order_acq_rel))
+    {
+        const juce::ScopedLock sl(rhythmsLock);
+        Rhythm& r = sequencer.getRhythm(0);
+        mu_core::spinLock(r.voiceParamsLock);
         sequencer.updatePattern(0);
+        mu_core::spinUnlock(r.voiceParamsLock);
+    }
 }
 
 // Rebuilds the rhythm from the current parameter values, whether or not parameterChanged fired.
 void MidiRhythmCore::syncRhythmFromApvts()
 {
+    // The parameters are the truth now: drop queued changes (they would apply stale values), and clear
+    // the rebuild request first so a change that lands during this rebuild survives for the next one.
+    patternRebuildPending.store(false, std::memory_order_release);
+    for (auto& slot : pendingParams)
+        slot.dirty.store(false, std::memory_order_release);
+
+    const juce::ScopedLock sl(rhythmsLock);
     Rhythm& r = sequencer.getRhythm(0);
     const juce::String prefix(kRhythmIdPrefix);
     bool patternDirty = false;
@@ -202,7 +239,6 @@ void MidiRhythmCore::syncRhythmFromApvts()
 
     sequencer.updatePattern(0);
     sequencer.setMasterLoopSteps(juce::jmin((int) apvts.getRawParameterValue(kMasterLoopId)->load() * 16, 256));
-    patternRebuildPending.store(false, std::memory_order_release);   // this rebuild covers any pending one
 }
 
 // Mirrors the Rhythm's values into the parameters (used once, for the default rhythm).

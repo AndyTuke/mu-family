@@ -3,9 +3,12 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Audio/MidiOutputEngine.h"
 #include "Sequencer/SequencerEngine.h"    // mu-Clid's, shared until Rhythm / SequencerEngine move to mu-core
+#include "Persistence/RhythmParamTable.h"   // mu-Clid: kRhythmParamCount for the pending slots
 #include "Sequencer/RhythmPlayState.h"    // mu-Clid's, shared with RhythmCircle
 
+#include <array>
 #include <atomic>
+#include <thread>
 
 namespace mu_clid_midi {
 
@@ -37,7 +40,8 @@ public:
     // parameters; the caller suspends processing around it. False with `error` set if unreadable.
     bool restoreSession(const juce::String& xml, juce::String& error);
 
-    // Message thread. Rebuilds the pattern if an off-thread parameter change asked for it.
+    // Message thread (the 30 Hz timer). Applies the rhythm parameter changes that arrived off the
+    // message thread, then rebuilds the pattern if any of them needs it.
     void servicePendingRebuild();
 
     bool isApvtsLoading() const noexcept { return apvtsLoading.load(std::memory_order_acquire); }
@@ -57,6 +61,8 @@ public:
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
     void syncRhythmParam(const char* suffix, float value);
+    void drainPendingParams();
+    bool isMessageThread() const;
     void syncRhythmFromApvts();
     void pushRhythmToApvts();
     void advanceSequencer(bool playing, double beatPos, juce::MidiBuffer& midi, int numSamples);
@@ -71,9 +77,25 @@ private:
     // Raised for the whole of a bulk push or restore so parameterChanged skips the pattern rebuild.
     std::atomic<bool> apvtsLoading { false };
 
-    // Set when a parameter changed off the message thread (VST3 automation runs on the audio
-    // thread), where a pattern rebuild would allocate; the message thread rebuilds it.
+    // Rhythm parameter changes from off the message thread (VST3 automation runs on the audio
+    // thread), one slot per suffix of kRhythmParamDefs. A producer stores the value, then raises the
+    // flag; the message thread clears the flag, then reads the value. Several producers are safe, and a
+    // burst of changes to one suffix coalesces to the latest value, so the queue cannot overflow and
+    // never allocates or waits. A change that races the drain is at worst applied twice with the same
+    // value. Only the message thread writes the Rhythm fields (under rhythmsLock, then voiceParamsLock,
+    // then the sequencer's pattern lock), so the audio thread never writes them.
+    struct PendingParam
+    {
+        std::atomic<float> value { 0.0f };
+        std::atomic<bool>  dirty { false };
+    };
+    std::array<PendingParam, mu_clid::kRhythmParamCount> pendingParams;
+
+    // Set when a drain wanted a pattern rebuild but a bulk load was running; the next service does it.
     std::atomic<bool> patternRebuildPending { false };
+
+    // Where a MessageManager does not exist (a headless test), the thread that built the core.
+    std::thread::id ownerThread;
 
     // Cached parameter pointers, so processBlock pays no per-block id lookup.
     std::atomic<float>* midiNotePtr  = nullptr;
