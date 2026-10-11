@@ -42,8 +42,8 @@ function Get-RepoRelativePath([string]$full) {
     return $full.Replace('\', '/')
 }
 
-$includePlugin  = [regex]'#\s*include\s*[<"][^">]*\bmu-(clid|tant|toni|on)\b'
-$pluginNs       = [regex]'\bmu_(clid|tant|toni|on)::'
+$includePlugin  = [regex]'#\s*include\s*[<"][^">]*\bmu-(clid-midi|clid|tant|toni|on)\b'
+$pluginNs       = [regex]'\bmu_(clid_midi|clid|tant|toni|on)::'
 $includeControl = [regex]'#\s*include\s*[<"][^">]*\bmu-control\b'
 $blockComment   = [regex]'(?s)/\*.*?\*/'
 

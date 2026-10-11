@@ -1,5 +1,5 @@
 # Deploys mu-Clid MIDI Release artifacts to the OneDrive tester folder.
-# Called from CMakeLists.txt POST_BUILD on mu-clid-lite_VST3.
+# Called from CMakeLists.txt POST_BUILD on mu-clid-midi_VST3.
 # Skips silently for Debug builds — Debug binaries must NOT reach the tester folder.
 
 if(NOT CONFIG STREQUAL "Release")

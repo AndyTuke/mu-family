@@ -45,15 +45,12 @@ function Get-RepoRelativePath([string]$full) {
     return $full.Replace('\', '/')
 }
 
-# Every built mu-Clid binary across both targets and all three formats. VST3 is a bundle
+# Every built mu-Clid and mu-Clid MIDI binary across all three formats. VST3 is a bundle
 # directory on Windows, so its payload is found by recursing rather than globbing one level.
 function Get-Binaries([string]$config) {
-    $base  = Join-Path $repoRoot (Join-Path 'build' 'mu-clid')
-    if (-not (Test-Path -LiteralPath $base -PathType Container)) { return @() }
-
     $found = [System.Collections.Generic.List[string]]::new()
-    foreach ($target in 'mu-clid_artefacts', 'mu-clid-lite_artefacts') {
-        $root = Join-Path $base (Join-Path $target $config)
+    foreach ($product in 'mu-clid', 'mu-clid-midi') {
+        $root = Join-Path $repoRoot (Join-Path 'build' (Join-Path $product (Join-Path "$($product)_artefacts" $config)))
         if (-not (Test-Path -LiteralPath $root -PathType Container)) { continue }
 
         foreach ($flat in @(@{ Dir = 'Standalone'; Ext = '*.exe' }, @{ Dir = 'CLAP'; Ext = '*.clap' })) {

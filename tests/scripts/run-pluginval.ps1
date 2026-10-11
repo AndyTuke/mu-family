@@ -33,10 +33,10 @@ $repo = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $build = Join-Path $repo "build"
 
 # The product VST3 artefact folders (each holds one <Name>.vst3 bundle). Mirrors the paths
-# in check-build-artifacts.py. Absent ones are skipped — CI builds a subset (no lite/toni).
+# in check-build-artifacts.py. Absent ones are skipped — CI builds a subset (no mu-Clid MIDI/toni).
 $vst3Dirs = @(
     "mu-clid/mu-clid_artefacts/$Config/VST3",
-    "mu-clid/mu-clid-lite_artefacts/$Config/VST3",
+    "mu-clid-midi/mu-clid-midi_artefacts/$Config/VST3",
     "mu-tant/mu-tant_artefacts/$Config/VST3",
     "mu-toni/mu-toni_artefacts/$Config/VST3",
     "mu-on/mu-on_artefacts/$Config/VST3"

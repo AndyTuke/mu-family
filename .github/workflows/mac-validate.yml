@@ -71,7 +71,7 @@ jobs:
           set -o pipefail
           cmake --build build --config Release --target \
             mu-clid_VST3 mu-clid_CLAP mu-clid_Standalone mu-clid_AU \
-            mu-clid-lite_VST3 mu-clid-lite_CLAP mu-clid-lite_AU \
+            mu-clid-midi_VST3 mu-clid-midi_CLAP mu-clid-midi_AU \
             mu-tant_VST3 mu-tant_CLAP mu-tant_Standalone mu-tant_AU \
             mu-on_VST3 mu-on_CLAP mu-on_Standalone mu-on_AU 2>&1 | tee report/build.txt
 
@@ -126,7 +126,7 @@ jobs:
         run: |
           comp="$HOME/Library/Audio/Plug-Ins/Components"; mkdir -p "$comp"
           cp -R build/mu-clid/mu-clid_artefacts/Release/AU/*.component "$comp/" || true
-          cp -R build/mu-clid/mu-clid-lite_artefacts/Release/AU/*.component "$comp/" || true
+          cp -R build/mu-clid-midi/mu-clid-midi_artefacts/Release/AU/*.component "$comp/" || true
           cp -R build/mu-tant/mu-tant_artefacts/Release/AU/*.component "$comp/" || true
           cp -R build/mu-on/mu-on_artefacts/Release/AU/*.component "$comp/" || true
           killall -9 AudioComponentRegistrar 2>/dev/null || true

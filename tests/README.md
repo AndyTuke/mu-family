@@ -273,7 +273,7 @@ non-zero on any failure.
 pwsh tests/scripts/check-build-artifacts.ps1 -Config Release
 ```
 
-It scans the built VST3/CLAP/Standalone binaries (mu-clid + Lite) for the UTF-8
+It scans the built VST3/CLAP/Standalone binaries (mu-clid + mu-Clid MIDI) for the UTF-8
 `µ-Clid` display name + absence of the mangled `?-Clid` (#654), and checks
 `build_number.txt` against `BuildNumber.h`. Run it after a Release build before
 trusting the OneDrive deploy.

@@ -9,7 +9,7 @@ Ship a complete release of the mu-family. **Only run when the owner explicitly a
    - Run builds through the **Bash tool** so the artifact/warning/deploy hooks fire. Heavy build → run in background.
    - Release ≤ last Debug always; a higher Release aborts with FATAL_ERROR — surface it, don't work around.
    - If exe versions look stale, build the explicit format targets (see `/build`).
-3. Read the final number from `mu-core/BuildNumber.h`. Verify the Windows artefacts landed in the OneDrive share (mu-clid + Lite, mu-tant, mu-on, mu-toni, mu-link).
+3. Read the final number from `mu-core/BuildNumber.h`. Verify the Windows artefacts landed in the OneDrive share (mu-clid + mu-Clid MIDI, mu-tant, mu-on, mu-toni, mu-link).
 
 ## 2. Pin the build number for CI
 

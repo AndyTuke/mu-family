@@ -1,6 +1,6 @@
 ﻿; mu-Clid MIDI Inno Setup installer script
 ; Build with: iscc /DBuildNum=<N> mu-Clid-MIDI.iss
-; Or via CMake: cmake --build build --target mu-clid-lite_installer --config Release
+; Or via CMake: cmake --build build --target mu-clid-midi_installer --config Release
 ; NOTE: file names + installer text are ASCII "mu-Clid" — Inno Setup mangles the
 ; Greek mu (μ) in paths under Windows codepages. The plugin's DAW display name is
 ; still "μ-Clid MIDI" (set via PLUGIN_NAME in CMake, built with /utf-8).
@@ -15,8 +15,8 @@
 #endif
 #define MyAppVersion   VersionBase + "." + BuildNum
 #define MyAppPublisher "Transwarp Development Project"
-; Paths relative to mu-clid/installer/. Build output lives at family root.
-#define SourceDir      "..\..\build\mu-clid\mu-clid-lite_artefacts\Release"
+; Paths relative to mu-clid-midi/installer/. Build output lives at family root.
+#define SourceDir      "..\..\build\mu-clid-midi\mu-clid-midi_artefacts\Release"
 
 [Setup]
 AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}

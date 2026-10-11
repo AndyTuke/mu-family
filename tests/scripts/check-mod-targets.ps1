@@ -24,7 +24,9 @@ $ErrorActionPreference = 'Stop'
 try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { }
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$products = @('mu-clid', 'mu-tant', 'mu-toni', 'mu-on')
+$products = @('mu-clid', 'mu-clid-midi', 'mu-tant', 'mu-toni', 'mu-on')
+# Products with no modulation (no ModulationMatrix use): they get the scale-API and own-row checks but need no table.
+$noModulation = @('mu-clid-midi')
 
 $scaleApi   = [regex]'\b(registerDepthScale|depthScaleFor|depthScaleRegistry)\b'
 $ownRow     = [regex]'\bstruct\s+(ModDest|ModDestEntry|Dest|ModTargetRow)\s*\{'
@@ -95,7 +97,7 @@ foreach ($product in $products) {
         }
     }
 
-    if (-not $hasTable) {
+    if (-not $hasTable -and $noModulation -notcontains $product) {
         if (-not $Quiet) { Write-Host "  [FAIL] $product - no modulation target table of mu_mod::ModTarget rows found" }
         $fails++
     }
