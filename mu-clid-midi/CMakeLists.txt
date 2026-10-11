@@ -51,7 +51,6 @@ target_sources(mu-clid-midi
         Source/Plugin/PluginEditor.cpp
         Source/Persistence/SessionState.cpp
         # Shared with mu-Clid until Rhythm / SequencerEngine move to mu-core.
-        "${MU_CLID_SOURCE}/Sequencer/Rhythm.cpp"
         "${MU_CLID_SOURCE}/Sequencer/SequencerEngine.cpp"
         "${MU_CLID_SOURCE}/UI/EuclideanPanel.cpp"
         "${MU_CLID_SOURCE}/UI/RhythmCircle.cpp"
@@ -169,7 +168,7 @@ target_sources(mu-clid-midi-tests PRIVATE
     Source/Persistence/SessionState.cpp
     # The audio path under test, as the plugin compiles it.
     Source/Sequencer/MidiRhythmCore.cpp
-    "${MU_CLID_SOURCE}/Sequencer/Rhythm.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/Rhythm.cpp"
     "${MU_CLID_SOURCE}/Sequencer/SequencerEngine.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/MidiOutputEngine.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/HitGenerator.cpp"

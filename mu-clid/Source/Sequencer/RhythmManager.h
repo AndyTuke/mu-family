@@ -1,11 +1,11 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include "Sequencer/GeneratorAliases.h"   // Rhythm
 
 namespace mu_clid {
 
 class PluginProcessor;
-class Rhythm;
 
 // mu-Clid's rhythm-slot management (message thread): add, remove, swap, reset and rename.
 // Each operation keeps the processor's parallel per-rhythm state in step — sequencer

@@ -55,7 +55,6 @@ target_sources(mu-clid
         Source/Audio/SamplePreview.cpp
         Source/Audio/SampleLibrary.cpp
         Source/Plugin/PluginEditor.cpp
-        Source/Sequencer/Rhythm.cpp
         Source/Sequencer/SequencerEngine.cpp
         Source/UI/RhythmCircle.cpp
         Source/UI/RhythmMiniVisual.cpp
@@ -247,8 +246,8 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/SequencerEngineWrapTests.cpp  # master-loop wrap detection
     Source/Tests/SwapCommitTimingTests.cpp     # a delayed swap commit still starts the new pattern on the next step
     Source/Sequencer/SequencerEngine.cpp       # under test by the wrap tests
-    Source/Sequencer/Rhythm.cpp                # SequencerEngine builds patterns through it
     Source/Persistence/PresetMigrations.cpp    # under test by C1/C2
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/Rhythm.cpp"                 # SequencerEngine builds patterns through it
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/HitGenerator.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/EuclideanGenerator.cpp"
     # Pull in mu-core .cpp's the tests need (they can't link mu-core directly

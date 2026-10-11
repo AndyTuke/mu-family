@@ -24,6 +24,7 @@
 // this single table.
 
 #include <juce_core/juce_core.h>
+#include "Sequencer/GeneratorAliases.h"
 #include "Sequencer/Rhythm.h"
 #include "Audio/AlgorithmNames.h"   // Stage 35: kInsertAlgorithmNames / kFilterTypeNames
 

@@ -2,7 +2,7 @@
 
 #include <atomic>
 
-namespace mu_clid {
+namespace mu_core {
 
 // One rhythm's live play state: written by the audio thread, read by the UI at 30 Hz. Its own
 // header so the rhythm circle can show it without knowing which processor owns it.
@@ -17,4 +17,4 @@ struct RhythmPlayState
     std::atomic<int>  hitCount      { 0 }; // monotonic counter - audio thread increments per hit, UI tracks lastSeen (avoids one-shot-flag race between RhythmCircle + SidebarItem)
 };
 
-} // namespace mu_clid
+} // namespace mu_core

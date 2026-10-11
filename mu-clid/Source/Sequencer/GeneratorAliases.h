@@ -4,6 +4,8 @@
 // their names into mu_clid so existing code reads unchanged.
 #include "Sequencer/EuclideanGenerator.h"
 #include "Sequencer/HitGenerator.h"
+#include "Sequencer/Rhythm.h"
+#include "Sequencer/RhythmPlayState.h"
 
 namespace mu_clid {
 
@@ -12,5 +14,9 @@ using mu_core::HitGenerator;
 using mu_core::EuclidGenOverrides;
 using mu_core::InsertMode;
 using mu_core::StepType;
+using mu_core::Rhythm;
+using mu_core::Logic;
+using mu_core::EuclidOverrides;
+using mu_core::RhythmPlayState;
 
 } // namespace mu_clid

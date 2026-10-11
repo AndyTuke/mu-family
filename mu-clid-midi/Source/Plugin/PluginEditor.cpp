@@ -235,7 +235,7 @@ void PluginEditor::resized()
 
 void PluginEditor::refreshCircle()
 {
-    const mu_clid::Rhythm& r = proc.getRhythm();
+    const mu_core::Rhythm& r = proc.getRhythm();
     rhythmCircle.setPatterns(r.genA.getStepTypes(),
                              r.genB.getStepTypes(),
                              r.genC.getStepTypes());

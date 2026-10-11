@@ -12,8 +12,8 @@
 
 namespace mu_clid_midi {
 
-using mu_clid::Rhythm;
-using mu_clid::RhythmPlayState;
+using mu_core::Rhythm;
+using mu_core::RhythmPlayState;
 using mu_clid::SequencerEngine;
 
 // Everything mu-Clid MIDI does between the host block and its MIDI output, with no AudioProcessor

@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Rhythm.h"
+#include "GeneratorAliases.h"
+#include "Sequencer/Rhythm.h"
 #include "MuLimits.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <algorithm>

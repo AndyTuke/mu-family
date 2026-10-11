@@ -1,9 +1,9 @@
-#include "Rhythm.h"
+#include "Sequencer/Rhythm.h"
 
 #include <algorithm>
 #include <numeric>
 
-namespace mu_clid {
+namespace mu_core {
 
 std::vector<bool> Rhythm::getCombinedPattern() const
 {
@@ -85,4 +85,4 @@ void Rhythm::getCombinedPattern(const EuclidOverrides& ov,
     }
 }
 
-} // namespace mu_clid
+} // namespace mu_core

@@ -1,11 +1,12 @@
 #pragma once
 
 #include "Sequencer/Layer.h"
-#include "GeneratorAliases.h"
+#include "Sequencer/EuclideanGenerator.h"
+#include "Sequencer/HitGenerator.h"
 
 #include <optional>
 
-namespace mu_clid {
+namespace mu_core {
 
 enum class Logic { OR, AND, XOR, AOnly, BOnly };
 
@@ -47,4 +48,4 @@ public:
                             std::vector<bool>& euclidScratch) const;
 };
 
-} // namespace mu_clid
+} // namespace mu_core

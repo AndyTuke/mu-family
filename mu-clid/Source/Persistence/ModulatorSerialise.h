@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Modulation/ModulatorSerialise.h"      // mu-core generic (Layer-based, namespace mu_pp)
-#include "Sequencer/Rhythm.h"
+#include "Sequencer/GeneratorAliases.h"
 #include "Modulation/ModulationDestinations.h"
 
 // μ-Clid adapter over the shared mu-core modulator (de)serialise. The generic
