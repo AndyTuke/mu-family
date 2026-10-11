@@ -8,6 +8,8 @@ target_sources(mu-core-tests PRIVATE
     HostTransportPublishTests.cpp
     LayerAccessTests.cpp
     LayerOwnershipTests.cpp
+    ProductLayerSetupTests.cpp
+    ChannelStateResetTests.cpp
     SupportPromptPolicyTests.cpp
     SettingsOverlayFitTests.cpp
     AlgorithmNameTableTests.cpp

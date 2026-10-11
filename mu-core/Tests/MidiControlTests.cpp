@@ -123,7 +123,7 @@ public:
 
         beginTest("map: save / load round trip");
         {
-            const auto file = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("muControlMapTest.json");
+            const auto file = juce::File::createTempFile(".json");   // unique per run, so parallel runs do not share it
             file.deleteFile();
             {
                 MidiControlMap map;
@@ -490,21 +490,8 @@ public:
         {
             MidiControlMap map;
             MidiControlRouter router(map);
-            std::atomic<bool> stop { false };
 
-            // The editor: constantly adds and removes parameter mappings named after their CC number.
-            std::thread editor([&]
-            {
-                juce::Random rng(7);
-                while (! stop.load())
-                {
-                    const int n = 1 + rng.nextInt(8);
-                    if (rng.nextBool()) map.add(cc(1, n, param(("cc" + juce::String(n)).toRawUTF8())));
-                    else                map.remove(rng.nextInt(juce::jmax(1, map.size())));
-                }
-            });
-
-            // The audio thread and the message thread: feed CC 1..8, drain, check every action.
+            // The drain's sink: counts every action and flags any that is not a well-formed "cc1".."cc8".
             int wrong = 0, performed = 0;
             struct Check : ControlSink
             {
@@ -519,19 +506,51 @@ public:
                 }
             } check(wrong, performed);
 
-            const auto until = juce::Time::getMillisecondCounter() + 500;
-            while (juce::Time::getMillisecondCounter() < until)
+            // One audio-block-and-drain round: CC 1..8 in, then the message thread drains.
+            auto round = [&]
             {
                 juce::MidiBuffer midi;
                 for (int n = 1; n <= 8; ++n) midi.addEvent(juce::MidiMessage::controllerEvent(1, n, 77), n);
                 router.noteBlock(playingBlock(0.0, 0.1), 4.0);
                 router.process(midi);
                 router.drain(check);
-            }
+            };
+
+            // Phase 1 (no concurrency): a settled table performs all eight, so the pipeline is proven
+            // to work before the race is run. A drain that overlaps an edit drops its action by design,
+            // so the concurrent phase below cannot promise any particular count.
+            for (int n = 1; n <= 8; ++n) map.add(cc(1, n, param(("cc" + juce::String(n)).toRawUTF8())));
+            round();
+            expectEquals(performed, 8);
+            expectEquals(wrong, 0);
+
+            // Phase 2: an editor thread keeps adding and removing mappings (named after their CC number)
+            // while this thread runs a fixed number of rounds. The editor signals once it is running and
+            // the rounds do not start until it has, and it only stops when told to, so the overlap needs
+            // no sleeps or time windows.
+            std::atomic<bool> editorRunning { false }, stop { false };
+            std::atomic<int>  edits { 0 };
+            std::thread editor([&]
+            {
+                juce::Random rng(7);
+                while (! stop.load())
+                {
+                    const int n = 1 + rng.nextInt(8);
+                    if (rng.nextBool()) map.add(cc(1, n, param(("cc" + juce::String(n)).toRawUTF8())));
+                    else                map.remove(rng.nextInt(juce::jmax(1, map.size())));
+                    edits.fetch_add(1);
+                    editorRunning.store(true);
+                }
+            });
+            while (! editorRunning.load()) std::this_thread::yield();
+
+            const int editsBefore = edits.load();
+            for (int i = 0; i < 20000; ++i) round();
+            // Keep the editor going until it has made more edits while the rounds ran, then stop it.
+            while (edits.load() < editsBefore + 100) std::this_thread::yield();
             stop = true;
             editor.join();
             expectEquals(wrong, 0);
-            expect(performed > 0, "nothing was performed at all");
         }
 
         beginTest("action names round trip and unknown names are none");

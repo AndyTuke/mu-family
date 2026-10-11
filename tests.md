@@ -125,9 +125,13 @@ cmake --build build --target mu-core-tests --config Debug && build/mu-core/Tests
 | Family transport rule (shared mu-core): host / no-position host / the three MIDI-clock Messages modes / own transport, Start from bar 1, mid-play mode switch | `mu-core/Tests/TransportResolverTests.cpp` | Pass (moved from mu-clid, Debug) |
 | Send-FX DSP smoke | `mu-core/Tests/SendFXSmokeTests.cpp` | Pass (moved from mu-clid, Debug) |
 | Host meter + bar start to bar.beat.sixteenth | `mu-core/Tests/BarPositionTests.cpp` | Pass (moved from mu-clid, Debug) |
-| MIDI control map: learn, quantise, hand-off | `mu-core/Tests/MidiControlTests.cpp` | Pass (moved from mu-clid, Debug) |
+| MIDI control map: learn, quantise, hand-off. The edit-while-messages-arrive race test is deterministic: a single-threaded phase proves all 8 actions perform, then a fixed 20000 rounds race a gated editor thread and assert no wrong action (no time window; a drain overlapping an edit drops its action by design, so no count is asserted). The save / load test uses a unique temp file so parallel runs cannot collide | `mu-core/Tests/MidiControlTests.cpp` | Pass (96 parallel runs under load, 0 failures, build 1271) |
 | Sidechain sources follow their layer through remove / swap | `mu-core/Tests/SidechainRemapTests.cpp` | Pass (moved from mu-clid, Debug) |
+
+Note: no product `PluginProcessor` can be constructed in a unit target. `createEditor()` drags the whole editor / UI tree into the link, and none of the product test targets link `PluginProcessor.cpp`. The processor-level layer checks (mu-On `laneOf(voiceSlot(i)) == i`, mu-Toni `getArp(i) == getLayer(i)`) therefore stay unrun until a product exposes a headless processor core (see the report on the two layer-setup tests).
 | MP3 samples open and decode | `mu-core/Tests/Mp3FormatTests.cpp` | Pass (moved from mu-clid, Debug) |
+| Product layer setup: the fixed-count constructor pattern of mu-On (5 allocated, 5 live: every `getLayer(i)` non-null, `layerAs` matches, index 5 and -1 null) and mu-Toni (8 allocated, 4 live: `getNumChannels() == 4`, live slots read through `getLayer`, spares null). Uses a fake `ProcessorCore`; the real processors cannot be built in a unit target (see note below) | `mu-core/Tests/ProductLayerSetupTests.cpp` | Pass (2 tests, build 1271) |
+| `ChannelState::reset()` equals the APVTS default of every `ch{N}_` parameter from the shared strip layout (`addChannelStripParams`), for all `kMaxLayers` strips, with default options and with mu-Clid's options; also fails if the strip gains a parameter the test does not know. mu-On's Bass / Rumble sidechain defaults are product options and are not covered (they differ from `reset()` by design; `resetLayerParams` follows with the real defaults) | `mu-core/Tests/ChannelStateResetTests.cpp` | Pass (2 tests, build 1271) |
 
 ---
 
