@@ -114,6 +114,7 @@ endif()
 
 # ── mu-on-tests — console UnitTests ─────────────────────────────────────────
 # Built as part of ALL_BUILD (mirrors mu-tant-tests / mu-toni-tests: small + local).
+include("${CMAKE_SOURCE_DIR}/mu-core/cmake/ProcessorTestSources.cmake")
 juce_add_console_app(mu-on-tests PRODUCT_NAME "mu-on-tests")
 
 target_sources(mu-on-tests PRIVATE
@@ -125,9 +126,12 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/PresetTests.cpp
     Source/Tests/SlotStateTests.cpp
     Source/Sequencer/GrooveSequencer.cpp
-    "${CMAKE_SOURCE_DIR}/mu-core/Audio/SamplePlayer.cpp"            # SampleChannel dependency
-    "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"   # modulation tests
-    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"     # modulation tests
+    Source/Tests/ProcessorSeamTests.cpp  # the real PluginProcessor, headless (layer ownership)
+    # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
+    Source/Plugin/PluginProcessor.cpp
+    Source/Plugin/PluginProcessor_Preset.cpp
+    # The mu-core .cpps behind ProcessorBase (the console target can't link mu-core directly).
+    ${MU_CORE_PROCESSOR_TEST_SOURCES}
 )
 
 target_compile_features(mu-on-tests PRIVATE cxx_std_17)
@@ -135,6 +139,9 @@ target_compile_features(mu-on-tests PRIVATE cxx_std_17)
 target_include_directories(mu-on-tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source"
     "${CMAKE_SOURCE_DIR}/mu-core"
+    SYSTEM
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"   # ReverbSlot
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
 )
 
 target_link_libraries(mu-on-tests PRIVATE
@@ -146,6 +153,7 @@ target_link_libraries(mu-on-tests PRIVATE
     juce::juce_graphics
     juce::juce_gui_basics
     juce::juce_dsp
+    juce::juce_audio_formats   # SamplePlayer
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags
 )

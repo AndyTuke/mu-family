@@ -5,10 +5,11 @@
 // Run:    build/mu-toni/mu-toni-tests_artefacts/Debug/mu-toni-tests.exe
 // Scope:  the arp engine (pool derivation + scan determinism), the PolyBLEP
 //         oscillator, and the shared global-FX APVTS layout the mixer binds to.
-//         The full PluginProcessor is not linked (its createEditor() drags the
-//         editor/UI tree in - see the backlog).
+//         The real PluginProcessor is built headless too (createEditor lives in
+//         PluginEditor.cpp, which is not linked).
 
 #include <juce_core/juce_core.h>
+#include <juce_gui_basics/juce_gui_basics.h>
 #include <cstdio>
 #include <iostream>
 
@@ -18,14 +19,18 @@ public:
     void logMessage(const juce::String& msg) override { std::cout << msg << std::endl; }
 };
 
-int main(int, char**)
+int main(int argc, char** argv)
 {
+    // ProcessorBase starts a message-thread poll timer, which needs a message manager.
+    juce::ScopedJuceInitialiser_GUI juceInit;
+
     StdoutLogger logger;
     juce::Logger::setCurrentLogger(&logger);
 
     juce::UnitTestRunner runner;
     runner.setAssertOnFailure(false);
-    runner.runAllTests();
+    if (argc > 1) runner.runTestsInCategory(argv[1]);   // optional: run only one category
+    else          runner.runAllTests();
 
     int totalFailures = 0;
     for (int i = 0; i < runner.getNumResults(); ++i)

@@ -113,6 +113,7 @@ endif()
 # Built as part of ALL_BUILD (mirrors mu-tant-tests: small + local, not a tester
 # deploy, so building every build is cheap — the speed concession that keeps
 # mu-clid-tests EXCLUDE_FROM_ALL doesn't apply here).
+include("${CMAKE_SOURCE_DIR}/mu-core/cmake/ProcessorTestSources.cmake")
 juce_add_console_app(mu-toni-tests PRODUCT_NAME "mu-toni-tests")
 
 target_sources(mu-toni-tests PRIVATE
@@ -121,8 +122,13 @@ target_sources(mu-toni-tests PRIVATE
     Source/Tests/ArpeggiatorTests.cpp   # T1 — arp engine (Sequencer/Arpeggiator.h)
     Source/Tests/ToniVoiceTests.cpp     # T2 — wavetable voice + X-Mod render
     Source/Tests/ArpRunnerTests.cpp     # T3 — arp step timing (beat grid / MIDI trigger)
+    Source/Tests/ProcessorSeamTests.cpp  # the real PluginProcessor, headless (layer ownership)
+    # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
+    Source/Plugin/PluginProcessor.cpp
+    Source/Plugin/PluginProcessor_Preset.cpp
     "${CMAKE_SOURCE_DIR}/mu-core/Audio/Wavetable/WavetableBank.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/Audio/MultiModeFilter.cpp"
+    # The mu-core .cpps behind ProcessorBase (the console target can't link mu-core directly).
+    ${MU_CORE_PROCESSOR_TEST_SOURCES}
 )
 
 target_compile_features(mu-toni-tests PRIVATE cxx_std_17)
@@ -130,6 +136,9 @@ target_compile_features(mu-toni-tests PRIVATE cxx_std_17)
 target_include_directories(mu-toni-tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source"
     "${CMAKE_SOURCE_DIR}/mu-core"
+    SYSTEM
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"   # ReverbSlot
+        "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
 )
 
 target_link_libraries(mu-toni-tests PRIVATE
