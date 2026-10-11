@@ -313,36 +313,26 @@ void MixerChannel::layoutInsertPanel(int stripW, int insW, int nameBottom)
         const int s2W = s(MuLookAndFeel::kKnobSize2W);
         const int s2H = s(MuLookAndFeel::kKnobSize2H);
 
-        if (charBox.getSelectedId() == 7) // EQ: stacked top→bottom = P4 / P2 / P3 / P1
-        {
-            const int knobX = ipX + (ipW - s2W) / 2;  // centre horizontally
-            // Frequency-descending: P4(High dB) / P2(Mid dB) / P3(Mid Hz) / P1(Low dB)
-            KnobWithLabel* const eqOrder[] = { &p4, &p2, &p3, &p1 };
-            for (int i = 0; i < 4; ++i)
-                eqOrder[i]->setBounds(knobX, ky + i * s2H, s2W, s2H);
-        }
-        else
-        {
-            // Pack the visible slots into a 2×2 grid; centre any odd last knob.
-            KnobWithLabel* vis[4];
-            int nVis = 0;
-            for (auto* k : { &p1, &p2, &p3, &p4 })
-                if (k->isVisible()) vis[nVis++] = k;
+        // Every algorithm, EQ included, packs into the same 2x2 grid; an odd last knob is centred.
+        KnobWithLabel* vis[4];
+        int nVis = 0;
+        for (auto* k : { &p1, &p2, &p3, &p4 })
+            if (k->isVisible()) vis[nVis++] = k;
 
-            if (nVis > 0)
+        if (nVis > 0)
+        {
+            const int halfW = ipW / 2;
+            const int halfKnobX = (halfW - s2W) / 2;
+            for (int i = 0; i < nVis; ++i)
             {
-                const int halfW = ipW / 2;
-                const int halfKnobX = (halfW - s2W) / 2;
-                for (int i = 0; i < nVis; ++i)
-                {
-                    const bool isLastOdd = (i == nVis - 1) && (nVis % 2 == 1);
-                    const int kx = isLastOdd
-                                   ? ipX + (ipW - s2W) / 2
-                                   : ipX + (i % 2) * halfW + halfKnobX;
-                    vis[i]->setBounds(kx, ky + (i / 2) * s2H, s2W, s2H);
-                }
+                const bool isLastOdd = (i == nVis - 1) && (nVis % 2 == 1);
+                const int kx = isLastOdd
+                               ? ipX + (ipW - s2W) / 2
+                               : ipX + (i % 2) * halfW + halfKnobX;
+                vis[i]->setBounds(kx, ky + (i / 2) * s2H, s2W, s2H);
             }
         }
+
     };
 
     layoutSlot(slot1CharY, insertMidY,  insCharBox,  insParam1,   insParam2,   insParam3,   insParam4);

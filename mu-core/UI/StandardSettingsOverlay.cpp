@@ -112,7 +112,7 @@ StandardSettingsOverlay::StandardSettingsOverlay(ProcessorBase& p, Options optio
 
         // Sync offset: positive = the app plays earlier than the clock says (enter the audio output
         // latency, about 20-40 ms on WASAPI). Arrows step 1 ms, Shift+click 10.
-        makeFieldLabel(syncOffsetLabel, "Sync offset (ms)");
+        makeFieldLabel(syncOffsetLabel, "Sync offset");
         syncOffsetInput.setShowSign(true);
         syncOffsetInput.setStep(1.0);
         syncOffsetInput.setFineStep(10.0);

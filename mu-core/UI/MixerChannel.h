@@ -22,7 +22,7 @@ public:
 
     // Width of the insert panel drawn to the right of the Master strip.
     // Both inserts share this width, stacked vertically (top = INS 1, bottom = INS 2).
-    static constexpr int kInsertPanelW = 130;
+    static constexpr int kInsertPanelW = 136;
 
     MixerChannel(Type type, const juce::String& name, juce::Colour colour);
 
@@ -182,7 +182,7 @@ private:
     static constexpr int kScSrcH       = 20;
     static constexpr int kScAmtH       = 47;   // was max(44, scRemain*0.55) → 47 at default
     static constexpr int kScEnvH       = 39;   // was scH - kScSrcH - kScAmtH → 39 at default
-    static constexpr int kSidechainH   = 106;  // was max(104, h*0.20) → 106 at default
+    static constexpr int kSidechainH   = 112;  // clears the Attack/Release knob labels
 
     // Sends + pan area at Medium baseline. Previously the area was
     // max(144, h*0.35) of strip height, divided 4-up. Now fixed.

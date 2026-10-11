@@ -41,12 +41,12 @@ void MidiPresetListPanel::paintListBoxItem(int row, juce::Graphics& g, int width
 
     // Index column (0-127, zero-padded = program number).
     g.setColour(MuLookAndFeel::colour(Id::mutedText));
-    g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-    g.drawText(juce::String(row).paddedLeft('0', 3), kPad, 0, kIndexW, height,
+    g.setFont(juce::Font(juce::FontOptions{}.withHeight(mu_ui::sf(11.0f))));
+    g.drawText(juce::String(row).paddedLeft('0', 3), mu_ui::s(kPad), 0, mu_ui::s(kIndexW), height,
                juce::Justification::centredLeft, false);
 
-    const int browseX = width - kPad - kClearBtnW - kBrowseBtnW - 4;
-    const int clearX  = width - kPad - kClearBtnW;
+    const int browseX = width - mu_ui::s(kPad) - mu_ui::s(kClearBtnW) - mu_ui::s(kBrowseBtnW) - 4;
+    const int clearX  = width - mu_ui::s(kPad) - mu_ui::s(kClearBtnW);
 
     // Filename (an em dash when the slot is empty).
     const auto path = slotPath(row);
@@ -54,8 +54,8 @@ void MidiPresetListPanel::paintListBoxItem(int row, juce::Graphics& g, int width
                                  ? juce::String::charToString(0x2014)
                                  : juce::File(path).getFileName();
     g.setColour(MuLookAndFeel::colour(path.isEmpty() ? Id::mutedText : Id::valueText));
-    g.drawText(label, kPad + kIndexW + 4, 0,
-               browseX - (kPad + kIndexW + 4) - 4, height,
+    g.drawText(label, mu_ui::s(kPad) + mu_ui::s(kIndexW) + 4, 0,
+               browseX - (mu_ui::s(kPad) + mu_ui::s(kIndexW) + 4) - 4, height,
                juce::Justification::centredLeft, true);
 
     // A row button: outline + centred label.
@@ -66,9 +66,9 @@ void MidiPresetListPanel::paintListBoxItem(int row, juce::Graphics& g, int width
         g.setColour(MuLookAndFeel::colour(Id::labelText));
         g.drawText(text, x, 0, w, height, juce::Justification::centred, false);
     };
-    rowButton(browseX, kBrowseBtnW, "Browse");
+    rowButton(browseX, mu_ui::s(kBrowseBtnW), "Browse");
     if (! path.isEmpty())
-        rowButton(clearX, kClearBtnW, "Clear");   // only when the slot has an assignment
+        rowButton(clearX, mu_ui::s(kClearBtnW), "Clear");   // only when the slot has an assignment
 
     // Bottom separator.
     g.setColour(MuLookAndFeel::colour(Id::segmentInactiveBorder).withAlpha(0.3f));
@@ -82,15 +82,15 @@ void MidiPresetListPanel::listBoxItemClicked(int row, const juce::MouseEvent& e)
         if (vp->getVerticalScrollBar().isVisible())
             width -= vp->getScrollBarThickness();
 
-    const int browseX = width - kPad - kClearBtnW - kBrowseBtnW - 4;
-    const int clearX  = width - kPad - kClearBtnW;
+    const int browseX = width - mu_ui::s(kPad) - mu_ui::s(kClearBtnW) - mu_ui::s(kBrowseBtnW) - 4;
+    const int clearX  = width - mu_ui::s(kPad) - mu_ui::s(kClearBtnW);
 
-    if (e.x >= clearX && e.x < clearX + kClearBtnW && slotPath(row).isNotEmpty())
+    if (e.x >= clearX && e.x < clearX + mu_ui::s(kClearBtnW) && slotPath(row).isNotEmpty())
     {
         clearSlot(row);
         listBox.repaintRow(row);
     }
-    else if (e.x >= browseX && e.x < browseX + kBrowseBtnW)
+    else if (e.x >= browseX && e.x < browseX + mu_ui::s(kBrowseBtnW))
     {
         browseForRow(row);
     }
@@ -115,7 +115,7 @@ void MidiPresetListPanel::resized()
     const int topRowH = s(kTopRowH);
 
     // Right edge aligned with the top row / list (inset by pad).
-    closeBtn.setBounds(w - pad - s(60), pad, s(60), s(28));
+    closeBtn.setBounds(w - pad - s(60), (headerH - s(26)) / 2, s(60), s(26));
 
     const int topRowY = headerH + pad;
     layoutTopRow({ pad, topRowY, w - pad * 2, topRowH });

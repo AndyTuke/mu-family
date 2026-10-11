@@ -446,12 +446,12 @@ public:
     static constexpr int kMixerChanGap     = 3;
     static constexpr int kMixerMasterW     = 80;
     static constexpr int kMixerLabelPanelW = 38;
-    static constexpr int kMixerInsertPanelW = 130;   // mirrored from MixerChannel::kInsertPanelW
+    static constexpr int kMixerInsertPanelW = 136;   // mirrored from MixerChannel::kInsertPanelW
     // Derived heights/widths at the Medium baseline.
     static constexpr int kMixerFXAreaH     = 261;   // jmax(220, round(814 * 0.32)) = 261
     static constexpr int kMixerFXRowH      = (kMixerFXAreaH - kMixerFXGap * 2 - kMixerFXPad * 2) / 3;   // 79
     static constexpr int kMixerStripH      = kMixerOverlayH - kMixerFXAreaH - kMixerHeaderH;   // 531
-    static constexpr int kMixerMasterTotalW = kMixerMasterW + kMixerInsertPanelW;              // 210
+    static constexpr int kMixerMasterTotalW = kMixerMasterW + kMixerInsertPanelW;              // 216
     static constexpr int kMixerNumChans    = 8 + 3;                                            // 8 rhythm + 3 returns
     static constexpr int kMixerChanW       = (kMixerOverlayW - kMixerLabelPanelW
                                               - 2 * kMixerDivW - kMixerMasterTotalW

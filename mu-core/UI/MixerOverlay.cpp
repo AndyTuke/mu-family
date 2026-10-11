@@ -559,7 +559,11 @@ void MixerOverlay::resized()
     const int w        = getWidth();
     const int fxAreaH  = s(MuLookAndFeel::kMixerFXAreaH);
     const int fxRowH   = s(MuLookAndFeel::kMixerFXRowH);
-    const int stripH   = s(MuLookAndFeel::kMixerStripH);
+    // Strip height takes whatever the overlay has left under the header and FX rows, so banners that
+    // shorten the overlay never push the Reverb row off the bottom (fader absorbs the difference).
+    const int hdrH0    = s(kHeaderH);
+    const int stripH   = juce::jmin(s(MuLookAndFeel::kMixerStripH),
+                                    juce::jmax(s(MuLookAndFeel::kMixerStripH) / 2, getHeight() - hdrH0 - fxAreaH));
     const int chanW    = s(MuLookAndFeel::kMixerChanW);
     const int masterTotalW = s(MuLookAndFeel::kMixerMasterTotalW);
     const int hdrH     = s(kHeaderH);
