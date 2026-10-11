@@ -9,6 +9,19 @@ target_sources(mu-core-tests PRIVATE
     LayerAccessTests.cpp
     SupportPromptPolicyTests.cpp
     SettingsOverlayFitTests.cpp
+    AlgorithmNameTableTests.cpp
+    BarPositionTests.cpp
+    FilterDSPSmokeTests.cpp
+    InsertDSPSmokeTests.cpp
+    MidiClockSyncTests.cpp
+    MidiControlTests.cpp
+    ModulationMatrixTests.cpp
+    Mp3FormatTests.cpp
+    SendFXSmokeTests.cpp
+    SidechainRemapTests.cpp
+    TransportResolverTests.cpp
+    UIScalingConsistencyTests.cpp
+    MidiFullPresetMapTests.cpp
     # Sources behind ProcessorBase + the settings page (linked individually: mu-core is a source set).
     "${CMAKE_CURRENT_SOURCE_DIR}/../Plugin/ProcessorBase.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../Audio/VoiceEngine.cpp"
@@ -50,6 +63,7 @@ target_link_libraries(mu-core-tests PRIVATE
     juce::juce_core
     juce::juce_audio_basics
     juce::juce_audio_processors
+    juce::juce_audio_formats
     juce::juce_data_structures
     juce::juce_events
     juce::juce_graphics
@@ -59,4 +73,4 @@ target_link_libraries(mu-core-tests PRIVATE
     juce::juce_recommended_warning_flags
 )
 
-target_compile_definitions(mu-core-tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+target_compile_definitions(mu-core-tests PRIVATE JUCE_USE_MP3AUDIOFORMAT=1 JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)

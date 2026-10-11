@@ -57,22 +57,13 @@ cmake --build build --target mu-clid-tests --config Release && build/mu-clid/mu-
 | Global preset param defs | `GlobalParamDefsTests.cpp` |
 | Kinded property serialisation | `KindedPropertyRoundTripTests.cpp` |
 | Modulator (CS + assignment) round-trip | `ModulatorSerialiseTests.cpp` |
-| Algorithm name table invariants (sizes, ASCII names) | `AlgorithmNameTableTests.cpp` |
 | Insert slot config table invariants | `InsertAlgoTableTests.cpp` |
 | HitGenerator pattern correctness | `HitGeneratorTests.cpp` |
-| ModulationMatrix process semantics | `ModulationMatrixTests.cpp` |
 | APVTS layout sanity (every ID + range + default) | `ApvtsLayoutTests.cpp` |
-| UI ↔ APVTS scaling consistency | `UIScalingConsistencyTests.cpp` |
-| Insert DSP smoke (no NaN, sensible output range) | `InsertDSPSmokeTests.cpp` |
-| Filter DSP smoke | `FilterDSPSmokeTests.cpp` |
-| Send-FX DSP smoke | `SendFXSmokeTests.cpp` |
 | Preset XML round-trip | `PresetXMLRoundTripTests.cpp` |
 | Preset migration (v0/v1 → v2 gate) | `PresetMigrationTests.cpp` |
-| MIDI full-preset map | `MidiFullPresetMapTests.cpp` |
 | Hot-swap boundary timing | `HotSwapBoundaryTests.cpp` |
 | Modulation skew (proportion ↔ display) | `ModulationSkewTests.cpp` |
-| MIDI clock slave (shared mu-core): tempo estimate, block-start beat vs ground truth (steady + jitter), step-exact 16ths | `MidiClockSyncTests.cpp` |
-| Family transport rule (shared mu-core): host / no-position host / the three MIDI-clock Messages modes / own transport, Start from bar 1, mid-play mode switch | `TransportResolverTests.cpp` |
 | No demo caps (unlicensed is fully functional): 8 layers, 64-step rhythms and 8-rhythm full-preset / per-layer files survive save/load as XML text; limits stay 8 / 64. Data-layer only; the processor-level numRhythms clamp is not reachable from this target. **Pass (build 1255)** | `NoDemoCapsTests.cpp` |
 
 **Current status:** 140/140 tests pass at v1.0.708.
@@ -124,6 +115,19 @@ cmake --build build --target mu-core-tests --config Debug && build/mu-core/Tests
 | Layer access: valid index, out of range → nullptr, const overload, name + colour via the base accessors | `mu-core/Tests/LayerAccessTests.cpp` | Pass (build 1243) |
 | Support prompt policy: supporter rules, when the prompt shows, once per process, "Don't show again" saved-flag round trip | `mu-core/Tests/SupportPromptPolicyTests.cpp` | Pass (14 results, 0 failures, build 1245) |
 | Settings page fit (`StandardSettingsOverlay`, two-column): at 1088x814 and 1088x774 (banner allowance), UI scale 1.0 and 1.25, standalone and plugin wrapper, with and without a mu-Clid-style Locations group (two 2-row sections) and with MIDI-sync rows shown: every visible child inside the overlay, no two children overlap, everything above the footer (height - pad - 20). Uses a fake `ProcessorBase` (`TestProcessorBase.h`); links ProcessorBase and the settings-page sources individually | `mu-core/Tests/SettingsOverlayFitTests.cpp` | Pass (24 configurations, 0 failures; deepest control 542 px vs footer 734 px at worst case; checked against a 300 px window, which fails as it should) |
+| Algorithm name table invariants (sizes, ASCII names) | `mu-core/Tests/AlgorithmNameTableTests.cpp` | Pass (moved from mu-clid, Debug) |
+| ModulationMatrix process semantics | `mu-core/Tests/ModulationMatrixTests.cpp` | Pass (moved from mu-clid, Debug) |
+| UI ↔ APVTS scaling consistency | `mu-core/Tests/UIScalingConsistencyTests.cpp` | Pass (moved from mu-clid, Debug) |
+| Insert DSP smoke (no NaN, sensible output range) | `mu-core/Tests/InsertDSPSmokeTests.cpp` | Pass (moved from mu-clid, Debug) |
+| Filter DSP smoke | `mu-core/Tests/FilterDSPSmokeTests.cpp` | Pass (moved from mu-clid, Debug) |
+| MIDI full-preset map | `mu-core/Tests/MidiFullPresetMapTests.cpp` | Pass (moved from mu-clid, Debug) |
+| MIDI clock slave (shared mu-core): tempo estimate, block-start beat vs ground truth (steady + jitter), step-exact 16ths | `mu-core/Tests/MidiClockSyncTests.cpp` | Pass (moved from mu-clid, Debug) |
+| Family transport rule (shared mu-core): host / no-position host / the three MIDI-clock Messages modes / own transport, Start from bar 1, mid-play mode switch | `mu-core/Tests/TransportResolverTests.cpp` | Pass (moved from mu-clid, Debug) |
+| Send-FX DSP smoke | `mu-core/Tests/SendFXSmokeTests.cpp` | Pass (moved from mu-clid, Debug) |
+| Host meter + bar start to bar.beat.sixteenth | `mu-core/Tests/BarPositionTests.cpp` | Pass (moved from mu-clid, Debug) |
+| MIDI control map: learn, quantise, hand-off | `mu-core/Tests/MidiControlTests.cpp` | Pass (moved from mu-clid, Debug) |
+| Sidechain sources follow their layer through remove / swap | `mu-core/Tests/SidechainRemapTests.cpp` | Pass (moved from mu-clid, Debug) |
+| MP3 samples open and decode | `mu-core/Tests/Mp3FormatTests.cpp` | Pass (moved from mu-clid, Debug) |
 
 ---
 

@@ -382,29 +382,16 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/KindedPropertyRoundTripTests.cpp
     Source/Tests/GlobalParamDefsTests.cpp
     Source/Tests/ModulatorSerialiseTests.cpp
-    Source/Tests/AlgorithmNameTableTests.cpp
-    Source/Tests/HitGeneratorTests.cpp
-    Source/Tests/ModulationMatrixTests.cpp
-    Source/Tests/ApvtsLayoutTests.cpp
-    Source/Tests/InsertDSPSmokeTests.cpp
-    Source/Tests/FilterDSPSmokeTests.cpp
-    Source/Tests/RhythmParamBoundaryTests.cpp
-    Source/Tests/UIScalingConsistencyTests.cpp
-    Source/Tests/SendFXSmokeTests.cpp
-    Source/Tests/PresetXMLRoundTripTests.cpp
     Source/Tests/InsertAlgoTableTests.cpp
+    Source/Tests/HitGeneratorTests.cpp
+    Source/Tests/ApvtsLayoutTests.cpp
+    Source/Tests/RhythmParamBoundaryTests.cpp
+    Source/Tests/PresetXMLRoundTripTests.cpp
     Source/Tests/PresetMigrationTests.cpp      # C1 + C2 (format migrations)
     Source/Tests/HotSwapBoundaryTests.cpp      # C3 (swap loop-boundary predicates)
-    Source/Tests/MidiFullPresetMapTests.cpp    # C4 (ch-9 map round-trip)
     Source/Tests/ModulationSkewTests.cpp       # C5 (proportion-space skew round-trips)
     Source/Tests/NoDemoCapsTests.cpp          # unlicensed is fully functional: 8 layers, 64 steps, saves
-    Source/Tests/MidiClockSyncTests.cpp      # shared MIDI-clock slave (tempo estimate, step-exact beat)
-    Source/Tests/TransportResolverTests.cpp    # family transport rule: host / MIDI-clock modes / own
-    Source/Tests/MidiControlTests.cpp          # MIDI control map: learn, quantise, hand-off
-    Source/Tests/SidechainRemapTests.cpp       # sidechain sources follow their layer through remove / swap
-    Source/Tests/BarPositionTests.cpp          # host meter + bar start → bar.beat.sixteenth
     Source/Tests/EmbeddedSampleTests.cpp       # preset samples: FLAC round trip is sample-identical
-    Source/Tests/Mp3FormatTests.cpp            # MP3 samples open and decode (same define as the plugin)
     Source/Persistence/PresetMigrations.cpp    # under test by C1/C2
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/HitGenerator.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/EuclideanGenerator.cpp"
