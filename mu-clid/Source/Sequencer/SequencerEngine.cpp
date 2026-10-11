@@ -208,13 +208,16 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
     // summed tempo maths) from flooring to the previous step and firing a block late.
     constexpr double kStepEpsilon = 1e-9;
     const auto globalStep    = std::max(0, static_cast<int>(beatPosition / StepLengthBeats + kStepEpsilon));
-    const int  effectiveStep = (masterLoopSteps > 0) ? (globalStep % masterLoopSteps) : globalStep;
-    masterLoopCurrentStep.store(masterLoopSteps > 0 ? effectiveStep : 0, std::memory_order_relaxed);
+    // One read of the loop length for the whole block, so a concurrent change cannot split it.
+    const int  loopSteps     = masterLoopSteps.load(std::memory_order_relaxed);
+    const int  effectiveStep = (loopSteps > 0) ? (globalStep % loopSteps) : globalStep;
+    masterLoopCurrentStep.store(loopSteps > 0 ? effectiveStep : 0, std::memory_order_relaxed);
 
     // Detect master loop wrap: effectiveStep decreased relative to the previous block.
-    if (masterLoopSteps > 0 && lastEffectiveStep >= 0 && effectiveStep < lastEffectiveStep)
+    const int prevEffectiveStep = lastEffectiveStep.load(std::memory_order_relaxed);
+    if (loopSteps > 0 && prevEffectiveStep >= 0 && effectiveStep < prevEffectiveStep)
         result.masterLoopWrapped = true;
-    lastEffectiveStep = effectiveStep;
+    lastEffectiveStep.store(effectiveStep, std::memory_order_relaxed);
 
     // Non-blocking snapshot: copy any updated patterns into the audio-thread-safe buffers.
     // If patternLock is held by the message thread, skip this block's snapshot — safePatterns

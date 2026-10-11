@@ -21,9 +21,9 @@ Artefacts are `mu-Clid MIDI.vst3` / `.clap` in `build/mu-clid-midi/mu-clid-midi_
 
 ```
 mu-clid-midi/Source/
-├── Plugin/        PluginProcessor (+ _APVTS: listener and rhythm sync), PluginEditor, ParameterLayout.h
+├── Plugin/        PluginProcessor (host glue: transport, state), PluginEditor, ParameterLayout.h
 ├── Persistence/   SessionState (host session text, plus the Lite-era session reader)
-├── Sequencer/     AccentVelocity.h (the Accent knob's two velocities)
+├── Sequencer/     MidiRhythmCore (the audio path: rhythm, note engine, parameter sync, rhythm lock; no AudioProcessor), AccentVelocity.h
 ├── Tests/         juce::UnitTest suite (layout, session state, accent velocities)
 └── Audio/ License/ Modulation/ UI/    empty (.gitkeep): no audio, no licensing, no modulation yet
 ```
@@ -39,5 +39,6 @@ All code is in namespace `mu_clid_midi`; only `createPluginFilter` is global.
 - **Layer type stays `Rhythm`, extension `.muRhythm`**, shared with mu-Clid (the one named exception to unique layer-type names).
 - **No licensing glue** (never `initLicensing`), **no modulation targets** (so no `mu_mod::ModTarget` table; `check-mod-targets.ps1` lists the product as modulation-free).
 - **One rhythm, slot 0.** The processor owns a `SequencerEngine` with exactly one `Rhythm`; there is no sidebar, voice section, mixer or preset browser.
-- **Audio-thread rules** as everywhere: `processBlock` allocates nothing, try-locks `rhythmsLock`, and reads the two MIDI parameters through cached pointers.
+- **Audio-thread rules** as everywhere: `processBlock` allocates nothing, try-locks `rhythmsLock` (a skipped or bypassed block still flushes a pending note-off), and reads the two MIDI parameters through cached pointers. `parameterChanged` can run on the audio thread (VST3 automation): it writes the rhythm fields but defers the pattern rebuild to the message thread (a 30 Hz timer in `PluginProcessor`).
+- **New audio-path code goes in `MidiRhythmCore`**, not `PluginProcessor`, so the render tests cover it.
 - The host-session and state-restore code runs on the message thread under `suspendProcessing` + `rhythmsLock`.

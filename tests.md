@@ -156,6 +156,29 @@ cmake --build build --target mu-on-tests --config Debug && build/mu-on/mu-on-tes
 
 ---
 
+## C++ unit tests — μ-Clid MIDI
+
+Built on demand only (`EXCLUDE_FROM_ALL`, like mu-clid-tests):
+
+```
+cmake --build build --target mu-clid-midi-tests --config Debug && build/mu-clid-midi/mu-clid-midi-tests_artefacts/Debug/mu-clid-midi-tests.exe
+```
+
+The render tests drive `MidiRhythmCore` (the audio path `PluginProcessor` delegates to) from a bare processor, so they test the shipped code without the editor. `PluginProcessor` itself (transport derivation, the `processBlockBypassed` override, the rebuild timer) is still not linked; the bypass override is one call into the core and is not unit-tested directly.
+
+| Coverage | File |
+|---|---|
+| Parameter layout: saved ids, old defaults, no voice / mixer / FX ids | `ParameterLayoutTests.cpp` |
+| Accent knob velocities | `AccentVelocityTests.cpp` |
+| Session state: own round trip, mu-Clid Lite session, older parameter-tree dump, unreadable state; restore onto a non-default instance resets what the state lacks (Lite session, empty Lite session, tree missing a key); unknown parameter nodes dropped; old rhythm name and colour handed back | `SessionStateTests.cpp` |
+| Render matrix (44.1 kHz and 192 kHz, blocks 1 / 64 / 512 / 2048): plain playback, transport stop mid-note, MIDI note change mid-note, bypassed block, block skipped on lock contention (lock held from a second thread), `setStateInformation` mid-play. Asserts matched note-on / note-off pairs, none left active, no note longer than 20 ms plus one block | `MidiRenderTests.cpp` |
+| Old state's rhythm name and colour land on the Rhythm after a restore | `MidiRenderTests.cpp` |
+| Parameter change off the message thread: the listener allocates nothing (operator new counted on that thread against the host-notification baseline), the field is written at once, the pattern rebuild waits for the message thread, `mstrLoop` set | `MidiRenderTests.cpp` |
+
+**Current status:** Pass, 67 results, 0 failures (Debug, build 1284). Mutation check: removing the lock-skip flush, or rebuilding the pattern on the calling thread, makes the render tests fail.
+
+---
+
 ## Manual smoke test plan
 
 See [docs/mu-clid/TestPlan.md](docs/mu-clid/TestPlan.md) — 25 atomic UI tests, ordered so each builds on the previous. Run end-to-end against a Release build. Investigate any deviation before proceeding.

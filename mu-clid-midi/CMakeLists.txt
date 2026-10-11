@@ -47,7 +47,7 @@ endif()
 target_sources(mu-clid-midi
     PRIVATE
         Source/Plugin/PluginProcessor.cpp
-        Source/Plugin/PluginProcessor_APVTS.cpp
+        Source/Sequencer/MidiRhythmCore.cpp
         Source/Plugin/PluginEditor.cpp
         Source/Persistence/SessionState.cpp
         # Shared with mu-Clid until Rhythm / SequencerEngine move to mu-core.
@@ -165,7 +165,17 @@ target_sources(mu-clid-midi-tests PRIVATE
     Source/Tests/AccentVelocityTests.cpp
     Source/Tests/ParameterLayoutTests.cpp
     Source/Tests/SessionStateTests.cpp
+    Source/Tests/MidiRenderTests.cpp
     Source/Persistence/SessionState.cpp
+    # The audio path under test, as the plugin compiles it.
+    Source/Sequencer/MidiRhythmCore.cpp
+    "${MU_CLID_SOURCE}/Sequencer/Rhythm.cpp"
+    "${MU_CLID_SOURCE}/Sequencer/SequencerEngine.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Audio/MidiOutputEngine.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/HitGenerator.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/EuclideanGenerator.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"   # pulled in by Layer.h
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"     # pulled in by Layer.h
 )
 
 target_compile_features(mu-clid-midi-tests PRIVATE cxx_std_17)

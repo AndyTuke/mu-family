@@ -2,9 +2,7 @@
 #include "Plugin/ParameterLayout.h"
 #include "Plugin/PluginEditor.h"
 #include "Plugin/TransportResolver.h"            // mu-core: the family transport rule
-#include "Persistence/ScopedApvtsLoading.h"      // mu-core: raises apvtsLoading for a bulk push
 #include "Persistence/SessionState.h"
-#include "Sequencer/AccentVelocity.h"
 
 #include <cmath>
 
@@ -12,35 +10,22 @@ namespace mu_clid_midi {
 
 // A MIDI effect: no audio buses at all.
 PluginProcessor::PluginProcessor()
-    : ProcessorBase(BusesProperties(), createParameterLayout(), juce::Identifier("MuClidState"))
+    : ProcessorBase(BusesProperties(), createParameterLayout(), juce::Identifier("MuClidState")),
+      core(apvts),
+      rhythmPlayState(core.rhythmPlayState),
+      beatFraction(core.beatFraction),
+      sequencerPlaying(core.sequencerPlaying),
+      lastBeatPos(core.lastBeatPos)
 {
     initAppSettings("muClid");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
-    sequencer.setStepCap(mu_core::HitGenerator::kMaxSteps);
-
-    // Listen to every parameter: rhythm values rebuild the pattern, the master loop sets the loop.
-    for (auto* param : getParameters())
-        if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
-            apvts.addParameterListener(p->getParameterID(), this);
-
-    // The one rhythm: 16 steps, 4 hits, and its values mirrored into the parameters.
-    Rhythm defaultRhythm;
-    defaultRhythm.name       = "<unnamed>";
-    defaultRhythm.genA.steps = 16;
-    defaultRhythm.genA.hits  = 4;
-    sequencer.addRhythm(defaultRhythm);
-
-    midiNotePtr  = apvts.getRawParameterValue(kMidiNoteId);
-    accentAmtPtr = apvts.getRawParameterValue(kAccentAmtId);
-
-    pushRhythmToApvts();
+    // Automation can change a parameter on the audio thread; the pattern rebuild it needs runs here.
+    startTimerHz(30);
 }
 
 PluginProcessor::~PluginProcessor()
 {
-    for (auto* param : getParameters())
-        if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
-            apvts.removeParameterListener(p->getParameterID(), this);
+    stopTimer();
 }
 
 //==============================================================================
@@ -53,7 +38,7 @@ const juce::String PluginProcessor::getName() const
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     currentSampleRate = sampleRate;
-    midiEngine.prepare(sampleRate, samplesPerBlock);
+    core.prepare(sampleRate, samplesPerBlock);
 }
 
 bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -75,11 +60,14 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     const int numSamples = buffer.getNumSamples();
     const auto transport = deriveTransport(numSamples);
 
-    // The message thread holds this while it edits the rhythm; skip the block rather than wait.
-    const juce::ScopedTryLock lock(rhythmsLock);
-    if (! lock.isLocked()) return;
+    core.processBlock(transport.playing, transport.beatPos, midiMessages, numSamples);
+}
 
-    advanceSequencer(transport.playing, transport.beatPos, midiMessages, numSamples);
+void PluginProcessor::processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+{
+    // Keep publishing the host transport (ProcessorCore), then let a pending note-off out.
+    ProcessorBase::processBlockBypassed(buffer, midiMessages);
+    core.flushPendingNoteOff(midiMessages, buffer.getNumSamples());
 }
 
 PluginProcessor::BlockTransport PluginProcessor::deriveTransport(int numSamples)
@@ -96,35 +84,6 @@ PluginProcessor::BlockTransport PluginProcessor::deriveTransport(int numSamples)
     return { t.playing, t.startBeat };
 }
 
-void PluginProcessor::advanceSequencer(bool playing, double beatPos, juce::MidiBuffer& midi, int numSamples)
-{
-    if (playing)
-    {
-        const auto blockResult = sequencer.processBlock(beatPos);
-
-        // Phase 1: a fired hit becomes one note-on, louder when the hit is accented.
-        if (blockResult.firedMask & 1)
-        {
-            const int  midiNote = (int) midiNotePtr->load();
-            const auto vel      = accentVelocities(accentAmtPtr->load());
-            const bool accented = (blockResult.accentMask & 1) != 0;
-            midiEngine.trigger(midi, 0, midiNote, 1, accented ? vel.accented : vel.normal);
-            rhythmPlayState.hitCount.store(rhythmPlayState.hitCount.load() + 1);
-        }
-
-        // Phase 2: publish the play position for the editor's circle.
-        beatFraction.store(static_cast<float>(std::fmod(beatPos / SequencerEngine::StepLengthBeats, 1.0)));
-        rhythmPlayState.currentStep  .store(sequencer.getLastStepIndex(0));
-        rhythmPlayState.currentStepC .store(sequencer.getLastAccentStepIndex(0));
-        rhythmPlayState.patternLength.store(sequencer.getPatternLength(0));
-        const Rhythm& rhy = sequencer.getRhythm(0);
-        rhythmPlayState.stepsA.store(juce::jmax(1, rhy.genA.steps));
-        rhythmPlayState.stepsB.store(juce::jmax(1, rhy.genB.steps));
-        rhythmPlayState.stepsC.store(juce::jmax(1, rhy.genC.steps));
-    }
-    midiEngine.processBlock(midi, juce::jmax(1, numSamples));
-}
-
 //==============================================================================
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
@@ -135,20 +94,11 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     const auto xml = juce::String::fromUTF8((const char*) data, sizeInBytes);
 
-    // The edit runs under suspendProcessing + rhythmsLock: suspend alone does not stop a running
-    // block, the lock does (the audio thread's try-lock bails while it is held).
+    // The edit runs under suspendProcessing + the core's rhythm lock: suspend alone does not stop a
+    // running block, the lock does (the audio thread's try-lock bails while it is held).
     suspendProcessing(true);
     juce::String error;
-    bool ok = false;
-    {
-        const juce::ScopedLock sl(rhythmsLock);
-        {
-            mu_core::ScopedApvtsLoading guard(apvtsLoading);
-            ok = session::restoreFromXmlString(xml, apvts, error);
-        }
-        // JUCE skips listener callbacks for unchanged values, so rebuild the rhythm from the parameters.
-        syncRhythmFromApvts();
-    }
+    const bool ok = core.restoreSession(xml, error);
     suspendProcessing(false);
 
     if (! ok && onLoadError)

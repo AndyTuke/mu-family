@@ -64,18 +64,18 @@ public:
 
     void setMasterLoopSteps(int steps)
     {
-        masterLoopSteps = juce::jlimit(0, 256, steps);
+        masterLoopSteps.store(juce::jlimit(0, 256, steps), std::memory_order_relaxed);
         // reset the wrap detector so a loop-length change mid-playback can't
         // emit a false `masterLoopWrapped` event from stale `lastEffectiveStep`
         // (false wraps gate hot-swap commits → premature staged swap).
-        lastEffectiveStep = -1;
+        lastEffectiveStep.store(-1, std::memory_order_relaxed);
     }
-    int  getMasterLoopSteps() const    { return masterLoopSteps; }
+    int  getMasterLoopSteps() const    { return masterLoopSteps.load(std::memory_order_relaxed); }
 
     // call from PluginProcessor::processBlock on a transport stop→start edge
     // so the first block after restart doesn't see a false wrap from a stale
     // pre-stop `lastEffectiveStep`.
-    void resetWrapDetector() { lastEffectiveStep = -1; }
+    void resetWrapDetector() { lastEffectiveStep.store(-1, std::memory_order_relaxed); }
 
     // call from PluginProcessor::handleAsyncUpdate immediately after a hot-
     // swap commit (under suspendProcessing, so the audio thread is paused — no
@@ -130,9 +130,10 @@ private:
     // removeRhythm shift).
     std::array<bool, MaxRhythms> wasLastStepHit { };
     std::vector<bool> patternUpdated;
-    int masterLoopSteps = 0;
+    // Atomic because host automation can set the loop length off the audio thread.
+    std::atomic<int> masterLoopSteps { 0 };
     std::atomic<int> masterLoopCurrentStep { 0 };
-    int lastEffectiveStep = -1;  // previous block's effectiveStep, for master-loop wrap detection
+    std::atomic<int> lastEffectiveStep { -1 };  // previous block effectiveStep, for master-loop wrap detection (reset by setMasterLoopSteps)
 
     // Stage B: audio-thread scratch buffers for tryUpdatePatternFromModulation.
     // Pre-reserved to 256 in ctor so the non-allocating pattern overloads never alloc.
