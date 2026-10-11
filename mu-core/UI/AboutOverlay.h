@@ -15,12 +15,23 @@ public:
     void setProductInfo(const juce::String& displayName,
                         const juce::StringArray& credits);
 
+    // Support entry points. An unlicensed copy shows "Support" (opens the pay-what-you-want
+    // prompt) and "Enter a key"; a supporter sees a thank-you line instead; a product with no
+    // licensing shows neither. Set each time the panel opens.
+    enum class SupportState { None, Unlicensed, Supporter };
+    void setSupportState(SupportState state);
+    std::function<void()> onSupport;
+    std::function<void()> onEnterKey;
+
     void paint(juce::Graphics& g) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent& e) override;
 
 private:
-    juce::TextButton closeBtn { "Close" };
+    juce::TextButton closeBtn   { "Close" };
+    juce::TextButton supportBtn { "Support" };
+    juce::TextButton keyBtn     { "Enter a key" };
+    SupportState     supportState = SupportState::None;
 
     juce::String      productName;
     juce::StringArray productCredits;

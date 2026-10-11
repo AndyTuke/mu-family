@@ -266,15 +266,7 @@ Replaces rhythm panel when mixer button active. Sidebar stays visible. Transport
 
 ## Settings Overlay (Stage 10)
 
-Single scrollable page, sections:
-- **Visual**: hit pulse style, ring expansion size, sidebar pulse, centre hub pulse, step dot size
-- **Sequencer**: sync behaviour (host sync / reset on play), show ms alongside musical divisions
-- **Performance**: default interpolation quality, oversampling quality (2x/4x per category)
-- **Voice**: default overlap fade length (1–10ms, default 2ms)
-- **Gain**: default fader (-12 to 0dB, default -6dB), default master volume
-- **Presets**: default preset, restore factory presets
-- **Standalone**: audio device
-- **General**: master volume, hot-swap timing (`On master loop` / `On rhythm loop`), content folder path
+The family-standard two-column settings page ([design-ui-family.md section 5](../design-ui-family.md#settings-page-layout-standardsettingsoverlay)); no scrolling, everything fits at Medium and Large. Groups, in order: **General** (Audio master volume, Display size, Output multi-bus), **MIDI** (Hot-swap timing, MIDI Clock in standalone, MIDI Mode in the plugin, Program Change tables), **Locations** (Sample Library, Content Folder). With the shorter-column rule General is left, MIDI right, Locations right under MIDI (standalone: Locations also right, as MIDI is shorter than General there by 4 px only; if it flips, the rule decides). mu-Clid's tempo lives in the transport bar, so there is no Transport section.
 
 ## About Panel (Stage 10)
 

@@ -75,6 +75,17 @@ P "On first launch mu-Tant creates a content folder at %USERPROFILE%\Documents\T
 H2 "Demo Version"
 P "A free save-disabled demo of mu-Tant is available from transwarp.me. It is limited to a single voice; all other features are fully functional. If you are running the demo, all documentation in this manual applies — only the eight-voice capability is not available. The demo cannot save presets or voice files."
 
+H2 "Supporting mu-Tant"
+P "mu-Tant is free to use, and you can pay what you like to support it. If you have not entered a licence key, a polite 'Support mu-Tant' window appears once per session, the first time you open mu-Tant after starting your DAW or the app. It has three buttons:"
+Bullet "Maybe later  —  closes the window and carries on."
+Bullet "Enter licence key  —  opens the About panel so you can type in your key."
+Bullet "Pay what you like  —  opens the checkout page in your web browser. The suggested amount is £20, but £0 is fine. You receive a licence key either way."
+P "Tick 'Don't show this again' to stop the window appearing. You can still support mu-Tant at any time from the Support link at the right of the status bar, or from the Support button in the About panel."
+P "To enter a licence key, click the mu-Tant logo to open the About panel, click Enter a key, and paste in your key. Once a key is accepted, the About panel shows 'Thank you for your support' and the Support prompt no longer appears."
+
+Pic "Support mu-Tant window with its three buttons and the Don't show this again tick box."
+Pic "About panel showing the Support and Enter a key buttons."
+
 # ── 4. Interface Overview ─────────────────────────────────────────────────────
 H1 "4. Interface Overview"
 P "The mu-Tant window is divided into four regions:"
@@ -89,7 +100,7 @@ Pic "Annotated full-window view showing the voice editor regions."
 # ── 5. Transport Bar ──────────────────────────────────────────────────────────
 H1 "5. Transport Bar"
 P "Controls from left to right:"
-Bullet "mu-Tant logo  —  click to open the About panel"
+Bullet "mu-Tant logo  —  click to open the About panel, where you can also support mu-Tant or enter a licence key"
 Bullet "Play / Stop  —  in DAW mode follows the host transport and BPM, even while the plug-in is bypassed; in standalone starts and stops playback. Locked while an external MIDI clock controls play (see MIDI Clock Sync). While stopped, the gate is closed (silent); press Play to hear the gated drone, or use the gate Bypass to audition the raw tone."
 Bullet "BPM display  —  read-only in DAW mode; editable in standalone. Tempo runs from 20.0 to 300.0 BPM with one decimal (for example 127.5; whole tempos show .0). Click the up or down arrow to step one whole BPM and keep the fraction (127.5 becomes 128.5); Shift+click steps a tenth. Double-click to type a value such as 127.5 or 127,5; a value outside the range is clamped to it. The same field appears in Settings. Locked, and showing the clock's tempo to a tenth, while an external MIDI clock sets the tempo. The clock drives both the gate patterns and the modulators."
 Bullet "Clock lamp  —  standalone only. Replaces the Tap button and sits between the BPM display and the Position readout, and appears only while MIDI clock sync is on with Messages set to Clock only or Clock + Transport (it is hidden with Transport only, and when Source is Internal). Dim amber means waiting for clock, green means locked to the clock, red means the clock was lost and the transport has stopped. The lamp stays steady; it never blinks. Hover over it to read its state in the status bar. See MIDI Clock Sync."

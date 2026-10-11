@@ -81,6 +81,11 @@ public:
     void showMidiFullPresets(bool show);
     void hideAllOverlays();
 
+    // The polite pay-what-you-want prompt for an unlicensed copy (docs/design-ui-family.md).
+    // `userRequested` is true from the About panel / status-bar link, which always show it
+    // (without the "Don't show again" tick); false for the once-per-session auto-show.
+    void showSupportPrompt(bool userRequested);
+
     bool isMixerVisible() const noexcept { return mixerVisible; }
 
     void paint(juce::Graphics& g) override;
@@ -147,6 +152,14 @@ protected:
     void showUpgradeAvailable(const juce::String& latestTag);
     // The page opened when the upgrade banner is clicked.
     static constexpr const char* kDownloadUrl = "https://transwarp.me/download";
+
+    // Support prompt state. The first-show check runs once per editor, when it first shows.
+    juce::String productDisplayName;
+    bool supportDialogOpen    = false;
+    bool supportPromptChecked = false;
+    // Shows the status-bar Support link for an unlicensed copy and hides it for a supporter.
+    void refreshSupportAffordances();
+    void maybeShowSupportPromptOnStart();
 
     bool mixerVisible           = false;
     bool aboutVisible           = false;

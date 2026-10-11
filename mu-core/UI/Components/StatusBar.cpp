@@ -14,6 +14,53 @@ void StatusBar::showParam(const juce::String& paramName,
     repaint();
 }
 
+void StatusBar::setSupportLinkVisible(bool visible)
+{
+    if (supportLinkVisible == visible) return;
+    supportLinkVisible = visible;
+    supportLinkHover   = false;
+    setMouseCursor(juce::MouseCursor::NormalCursor);
+    repaint();
+}
+
+// The link sits at the bar's right edge, vertically centred; sized from the label text.
+juce::Rectangle<int> StatusBar::supportLinkBounds() const
+{
+    using mu_ui::s;
+    using mu_ui::sf;
+    const juce::Font font(juce::FontOptions{}.withHeight(sf(11.0f)));
+    juce::GlyphArrangement ga;
+    ga.addLineOfText(font, "Support", 0.0f, 0.0f);
+    const int textW = (int) std::ceil(ga.getBoundingBox(0, ga.getNumGlyphs(), true).getWidth());
+    const int w = textW + s(16);   // padding either side keeps the click target forgiving
+    return { getWidth() - w - s(4), 0, w, getHeight() };
+}
+
+void StatusBar::mouseMove(const juce::MouseEvent& e)
+{
+    const bool over = supportLinkVisible && supportLinkBounds().contains(e.getPosition());
+    if (over != supportLinkHover)
+    {
+        supportLinkHover = over;
+        setMouseCursor(over ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+        repaint();
+    }
+}
+
+void StatusBar::mouseExit(const juce::MouseEvent&)
+{
+    if (! supportLinkHover) return;
+    supportLinkHover = false;
+    setMouseCursor(juce::MouseCursor::NormalCursor);
+    repaint();
+}
+
+void StatusBar::mouseDown(const juce::MouseEvent& e)
+{
+    if (supportLinkVisible && supportLinkBounds().contains(e.getPosition()) && onSupportClicked)
+        onSupportClicked();
+}
+
 void StatusBar::paint(juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
@@ -22,6 +69,15 @@ void StatusBar::paint(juce::Graphics& g)
 
     g.setColour(MuLookAndFeel::colour(Id::statusBarBackground));
     g.fillAll();
+
+    // Support link at the right edge (unlicensed only); drawn first so the parameter text,
+    // which is centred, never needs to know about it.
+    if (supportLinkVisible)
+    {
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
+        g.setColour(MuLookAndFeel::colour(supportLinkHover ? Id::statusBarValue : Id::statusBarText));
+        g.drawText("Support", supportLinkBounds(), juce::Justification::centred, false);
+    }
 
     const int h = getHeight();
     int textX = s(8);

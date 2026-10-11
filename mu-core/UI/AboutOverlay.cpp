@@ -4,8 +4,20 @@
 
 AboutOverlay::AboutOverlay()
 {
-    closeBtn.onClick = [this] { if (onDismiss) onDismiss(); };
+    closeBtn.onClick   = [this] { if (onDismiss) onDismiss(); };
+    supportBtn.onClick = [this] { if (onSupport)  onSupport(); };
+    keyBtn.onClick     = [this] { if (onEnterKey) onEnterKey(); };
     addAndMakeVisible(closeBtn);
+    addChildComponent(supportBtn);
+    addChildComponent(keyBtn);
+}
+
+void AboutOverlay::setSupportState(SupportState state)
+{
+    supportState = state;
+    supportBtn.setVisible(state == SupportState::Unlicensed);
+    keyBtn.setVisible(state == SupportState::Unlicensed);
+    repaint();
 }
 
 void AboutOverlay::setProductInfo(const juce::String& displayName,
@@ -41,7 +53,12 @@ void AboutOverlay::resized()
     const int cardX = (w - cardW) / 2;
     const int cardY = (h - cardH) / 2;
 
-    closeBtn.setBounds(cardX + cardW / 2 - s(36), cardY + cardH - s(40), s(72), s(28));
+    // One bottom row. Close is centred as before; the two support buttons sit either side of
+    // it (inside the 400 px card: 24 margin + 100 + 8 + 72 + 8 + 80 + 24 fits with room).
+    const int rowY = cardY + cardH - s(40);
+    closeBtn.setBounds(cardX + cardW / 2 - s(36), rowY, s(72), s(28));
+    supportBtn.setBounds(closeBtn.getRight() + s(8), rowY, s(80), s(28));
+    keyBtn.setBounds(closeBtn.getX() - s(8) - s(100), rowY, s(100), s(28));
 }
 
 void AboutOverlay::paint(juce::Graphics& g)
@@ -89,5 +106,14 @@ void AboutOverlay::paint(juce::Graphics& g)
     {
         g.drawText(line, tx, ty, textW, s(16), juce::Justification::centredLeft, false);
         ty += s(17);
+    }
+
+    // A supporter gets a thank-you in the bottom row, left of Close.
+    if (supportState == SupportState::Supporter)
+    {
+        g.setColour(MuLookAndFeel::colour(Id::headingText));
+        g.setFont(juce::Font(juce::FontOptions{}.withHeight(sf(11.0f))));
+        g.drawText("Thank you for your support", cardX + s(24), cardY + cardH - s(40),
+                   cardW / 2 - s(36) - s(32), s(28), juce::Justification::centredLeft, false);
     }
 }

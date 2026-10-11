@@ -174,6 +174,19 @@ bug — this is the family standard that prevents it.
 
 All layout constants live as `static constexpr int k…` in the component that owns them. No magic numbers in `resized()` or `paint()`.
 
+### Everything fits (mandatory, owner rule 2026-10-11)
+
+Every control and UI item must fit inside the panel space available to it: nothing clipped, overflowing, overlapping a sibling or the footer, or unreachable, at the standard window (`kWindowWidth` x `kWindowHeight` = 1170 x 870) and at Large (1.25x). Because every size goes through `mu_ui::s()`, Large fits exactly when Medium fits, so **verify at Medium by arithmetic from the tokens**; a Medium layout with no spare room is a fail (leave at least `kPad` spare).
+
+- **Budget first.** A spec states the space it lives in and the sum of what it puts there. Shared budgets: overlay / main area = `kWindowWidth - kSidebarW` x `kChannelPanelH` = 1088 x 814 (the DEMO banner no longer takes 20 px; overlays and panels get the full 814); settings column = 1088 - 2 x `kPad`; `ModalDialog` card, About and the StatusBar (20 px high, full width) are fixed shared spaces: a new item must fit them without changing them.
+- **Never fix overflow by shrinking a control below its standard size or by a per-product constant.** Fix it by layout: regroup, flow into columns, move the item, or (last resort, only for open-ended content such as lists) scroll. Fixed-content pages (settings, dialogs) never scroll.
+- **Text that can be long** (paths, preset names) is ellipsised in a fixed width; a hint is either given the room it needs on its own line or shortened.
+- **Review checklist item.** Every UI ruling and every UI review checks: (1) the budget is stated, (2) the sum fits with `kPad` spare, (3) it still fits for the worst-case product / mode (standalone vs plugin, every optional section present), (4) hidden-but-reserved rows are counted. A ruling that fails this is not issued.
+
+### Settings page layout (`StandardSettingsOverlay`)
+
+The page is **two columns** in the 1088 wide overlay: column width `(w - 2 x kPad - kColumnGap) / 2` (504 at Medium), gap `kColumnGap` = 2 x `kPad` (new token in `SettingsOverlayBase`). Groups (General, MIDI, each extra group) are never split; each group goes, in the order added, into the **shorter column so far** (ties go left). Both columns start at `contentTop()`; the "Contact Support" footer sits bottom-left under the left column. A column's bottom must stay above the footer (`height - kPad - 20 - kPad`). Rows keep the standard label/control geometry; a hint that does not fit right of its control goes on its own line from `rowLabelX()`, or is shortened (Output hint reads "(rescan host to apply)"). Full-width path rows ellipsise.
+
 ---
 
 ## 6. Standard Controls
@@ -402,6 +415,8 @@ setMetalStyle(true, MuLookAndFeel::colour(MuLookAndFeel::appYellow));   // mu-On
 ---
 
 ## Design rulings
+
+- 2026-10-11 — Settings screen overflows; standing fit rule? Everything must fit its panel at Medium and Large (new §5 "Everything fits", incl. review checklist). mu-Clid settings, single column, needed y=760 (plugin) / 828 (standalone) against a 770 limit (footer) in the 814 area, 750 with the old banner; standalone clipped the Locations buttons. Ruled: two-column shorter-column flow in `StandardSettingsOverlay` (all products), no scroll, no per-product constants. Changed §5, `docs/mu-clid/design-ui.md` Settings section.
 
 - 2026-10-11 — Pay-what-you-want support prompt for unlicensed (fully functional) users? A shell-owned `ModalDialog` (400 wide, Info icon, once per session, "Don't show this again" checkbox; buttons Maybe later / Enter licence key / Pay what you like (primary)), reopenable from a small "Support" link in the StatusBar that replaces the DEMO banner strip (`kDemoBannerH` to be removed). Changed §9 table (Support prompt row).
 - 2026-10-10 — mu-On: one lane at a time or all five at once? My Lane Rack ruling (no sidebar, five strips, MOD toggle, `Lighting::laneMutedDim`) is SUPERSEDED by the owner: keep the lane sidebar (selection chooses the step row / Rumble envelope, Groove box, modulators); all five ENGINE boxes shown at once in one metal panel, each at `ParamKnobGrid::getPreferredWidth`, flowed in sidebar order and wrapped (3 rows at 1088 wide); selected lane's box outlined in its lane colour; clicking a box selects the lane. No new tokens. See [mu-on/design-ui.md](mu-on/design-ui.md) section 1.

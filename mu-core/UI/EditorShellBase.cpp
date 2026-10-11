@@ -110,6 +110,9 @@ void EditorShellBase::wireOverlays()
 {
     // ── About panel ─────────────────────────────────────────────────────────
     aboutOverlay.onDismiss = [this] { showAbout(false); };
+    aboutOverlay.onSupport  = [this] { showAbout(false); showSupportPrompt(true); };
+    aboutOverlay.onEnterKey = [this] { showAbout(false); showActivation(true); };
+    statusBar.onSupportClicked = [this] { showSupportPrompt(true); };
 
     // ── Activation overlay (non-blocking — Demo until activated) ──────────────
     activationOverlay.onDismiss   = [this] { showActivation(false); };
@@ -121,6 +124,7 @@ void EditorShellBase::wireOverlays()
         const bool licensed = processorRef.isLicensed();
         transportBar.setSaveEnabled(licensed);
         demoBanner.setVisible(!licensed);
+        refreshSupportAffordances();
         resized();
         repaint();
     };
@@ -183,6 +187,8 @@ void EditorShellBase::wireOverlays()
 // version check finds a newer release; click to download).
 void EditorShellBase::setupBanners()
 {
+    refreshSupportAffordances();
+
     // ── Demo banner ─────────────────────────────────────────────────────────
     {
         using Id = MuLookAndFeel::ColourIds;
@@ -410,6 +416,7 @@ void EditorShellBase::setProductIdentity(const juce::String& displayName, const 
     credits.add(credit("clap-juce-extensions \xe2\x80\x94 MIT"));
     credits.addArray(extraCredits);
 
+    productDisplayName = displayName;
     aboutOverlay.setProductInfo(displayName, credits);
     transportBar.setLogoText(displayName);
     if (processorRef.hasLicensing())
@@ -500,6 +507,96 @@ void EditorShellBase::parentHierarchyChanged()
         needsFocusGrab = false;
         grabKeyboardFocus();
     }
+
+    // Offer the support prompt once the editor is first on screen.
+    if (! supportPromptChecked && isShowing())
+        maybeShowSupportPromptOnStart();
+}
+
+void EditorShellBase::refreshSupportAffordances()
+{
+    statusBar.setSupportLinkVisible(processorRef.hasLicensing() && ! processorRef.isSupporter());
+}
+
+// Policy: an unlicensed, un-hidden copy asks once per process (mu_core::support_prompt). A short
+// delay lets the editor settle first, and the prompt waits if another overlay is already open.
+void EditorShellBase::maybeShowSupportPromptOnStart()
+{
+    supportPromptChecked = true;
+    namespace sp = mu_core::support_prompt;
+    if (! sp::shouldShowNow(processorRef.hasLicensing(), processorRef.isSupporter(),
+                            processorRef.isSupportPromptHidden()))
+        return;
+
+    juce::Component::SafePointer<EditorShellBase> safe(this);
+    juce::Timer::callAfterDelay(1500, [safe]
+    {
+        if (auto* shell = safe.getComponent())
+            if (shell->isShowing())
+                shell->showSupportPrompt(false);
+    });
+}
+
+void EditorShellBase::showSupportPrompt(bool userRequested)
+{
+    namespace sp = mu_core::support_prompt;
+    if (supportDialogOpen || ! processorRef.hasLicensing() || processorRef.isSupporter())
+        return;
+
+    // The automatic prompt never interrupts: skip it if an overlay is up or it has already
+    // been shown or switched off meanwhile.
+    if (! userRequested)
+    {
+        const bool anyOverlay = mixerVisible || aboutVisible || activationVisible || saveVisible
+                             || browserVisible || settingsVisible || midiPresetsVisible
+                             || midiFullPresetsVisible;
+        if (anyOverlay
+            || ! sp::shouldShowNow(true, false, processorRef.isSupportPromptHidden()))
+            return;
+        sp::markShown();
+    }
+
+    supportDialogOpen = true;
+
+    // "Don't show this again" row: only on the automatic prompt. A user-requested reopen
+    // omits it, since they came here on purpose.
+    enum { maybeLater = 0, enterKey = 1, pay = 2 };
+    auto* dlg = new mu_ui::ModalDialog();
+    juce::ToggleButton* hideTick = nullptr;
+    dlg->width(400)
+        .title("Support " + productDisplayName)
+        .message(productDisplayName + " is free to use, with every feature. If it's useful to you, "
+                 "you can pay what you like (suggested \xC2\xA3" "20, \xC2\xA3" "0 is fine). You'll get "
+                 "a licence key, and it helps me keep building these.")
+        .icon(mu_ui::ModalDialog::Icon::Info);
+    if (! userRequested)
+    {
+        auto tick = std::make_unique<juce::ToggleButton>("Don't show this again");
+        hideTick = tick.get();
+        dlg->content(std::move(tick), 20);
+    }
+    dlg->button("Maybe later", maybeLater).button("Enter licence key", enterKey)
+        .button("Pay what you like", pay, true).cancelResult(maybeLater);
+
+    juce::Component::SafePointer<EditorShellBase> safe(this);
+    juce::Component::SafePointer<juce::ToggleButton> safeTick(hideTick);
+    dlg->onResult = [safe, safeTick](int result)
+    {
+        auto* shell = safe.getComponent();
+        if (shell == nullptr) return;
+        shell->supportDialogOpen = false;
+        if (safeTick != nullptr && safeTick->getToggleState())
+            shell->processorRef.setSupportPromptHidden(true);   // on any button, per the ruling
+        if (result == enterKey)
+            shell->showActivation(true);
+        else if (result == pay)
+        {
+            const auto url = shell->processorRef.getCheckoutUrl();
+            if (url.isNotEmpty())
+                juce::URL(url).launchInDefaultBrowser();
+        }
+    };
+    dlg->show(this);
 }
 
 void EditorShellBase::hideAllOverlays()
@@ -585,6 +682,10 @@ void EditorShellBase::showMixer(bool show)
 void EditorShellBase::showAbout(bool show)
 {
     aboutVisible = show;
+    if (show)
+        aboutOverlay.setSupportState(! processorRef.hasLicensing() ? AboutOverlay::SupportState::None
+                                     : processorRef.isSupporter()   ? AboutOverlay::SupportState::Supporter
+                                                                    : AboutOverlay::SupportState::Unlicensed);
     aboutOverlay.setVisible(show);
     aboutOverlay.toFront(false);
 }
