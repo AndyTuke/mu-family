@@ -62,9 +62,7 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;
 
     // ── ProcessorBase channel metadata (drives sidebar + mixer) ───────────────
-    int          getNumChannels()              const override { return kNumChannels; }
-    Layer*       getLayer(int i) override { return (i >= 0 && i < kNumChannels) ? &voiceSlots[(size_t) i] : nullptr; }
-    using ProcessorBase::getLayer;
+    // getNumChannels / getLayer are the base defaults over the owned layer storage.
     int          getMaxChannels()              const override { return kNumChannels; }
     juce::String getChannelName(int idx)       const override
     {
@@ -91,12 +89,12 @@ public:
     // Per-lane modulation slot (ControlSequences + ModulationMatrix) — the editor's
     // shared ModulatorPanel binds to the selected lane's slot; the audio thread reads
     // it via GrooveVoices each block.
-    mu_on::Track& voiceSlot(int lane) noexcept { return voiceSlots[(size_t) juce::jlimit(0, kNumChannels - 1, lane)]; }
+    mu_on::Track& voiceSlot(int lane) noexcept { return layerAs<mu_on::Track>(juce::jlimit(0, kNumChannels - 1, lane)); }
     // Per-channel trigger counter — bumped on the audio thread when the sequencer fires
     // that lane; the editor polls it to pulse the sidebar lane. Read-only for the editor.
     int triggerCount(int ch) const noexcept
     {
-        return (ch >= 0 && ch < kNumChannels) ? voiceSlots[(size_t) ch].triggers.load(std::memory_order_relaxed) : 0;
+        return (ch >= 0 && ch < kNumChannels) ? layerAs<mu_on::Track>(ch).triggers.load(std::memory_order_relaxed) : 0;
     }
 
     // ── Preset directories / extensions (per family file-format rule) ─────────
@@ -160,7 +158,6 @@ private:
     StepPattern     stepPattern;
     GrooveSequencer sequencer { stepPattern };
     GrooveVoices    grooveVoices;                              // the four instrument engines
-    std::array<mu_on::Track, kNumChannels> voiceSlots;           // per-lane modulation (ControlSequences + matrix)
     ControlSequence  rumbleEnv;                                // Rumble lane drawable bar-volume envelope
     CopyableSpinLock rumbleEnvLock;                            // guards rumbleEnv (msg edit ↔ audio eval)
 

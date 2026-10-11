@@ -66,7 +66,12 @@ void PluginProcessor::restoreRumbleEnv(const juce::ValueTree& env)
     mu_core::spinUnlock(rumbleEnvLock);
 }
 
-int PluginProcessor::laneOf(const Track& t) const noexcept { return (int) (&t - voiceSlots.data()); }
+int PluginProcessor::laneOf(const Track& t) const noexcept
+{
+    for (int v = 0; v < kNumChannels; ++v)
+        if (&layerAs<Track>(v) == &t) return v;
+    return 0;
+}
 
 void Track::writeExtras(juce::ValueTree& node) const
 {
@@ -216,7 +221,7 @@ void PluginProcessor::resetSlot(int lane)
     if (lane < 0 || lane >= kNumChannels) return;
     hotSwap.cancel(lane);   // a staged swap would re-fill what we're resetting
     layerLayout.applyParams({}, lane);
-    mu_pp::clearModulators(voiceSlots[(size_t) lane]);
+    mu_pp::clearModulators(voiceSlot(lane));
 }
 
 } // namespace mu_on

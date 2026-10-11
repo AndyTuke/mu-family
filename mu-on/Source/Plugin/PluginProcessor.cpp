@@ -92,6 +92,11 @@ PluginProcessor::PluginProcessor()
                     createParameterLayout(),
                     juce::Identifier("MuOnState"))
 {
+    // All Tracks exist for the processor's lifetime (capacity is fixed, only the count is runtime);
+    // mu-On's count is fixed at kNumChannels for now.
+    for (int v = 0; v < kNumChannels; ++v) layers[(size_t) v] = std::make_unique<Track>();
+    numLayers.store(kNumChannels, std::memory_order_relaxed);
+
     // Each channel renders its instrument engine; the shared mixer then applies the strip,
     // the bass→kick sidechain, and the master mix.
     renderChannelCb = [this](int ch, juce::AudioBuffer<float>& buf, int n) { grooveVoices.render(ch, buf, n); };
@@ -112,18 +117,20 @@ PluginProcessor::PluginProcessor()
     // Tag each modulation slot with its lane identity (name + palette colour).
     for (int v = 0; v < kNumChannels; ++v)
     {
-        voiceSlots[(size_t) v].name        = getChannelName(v).toStdString();
-        voiceSlots[(size_t) v].colourIndex = getChannelColourIndex(v);
+        voiceSlot(v).name        = getChannelName(v).toStdString();
+        voiceSlot(v).colourIndex = getChannelColourIndex(v);
     }
 
     seqSwingParam  = apvts.getRawParameterValue("seq_swing");
     seqAccentParam = apvts.getRawParameterValue("seq_accent");
-    grooveVoices.setSlots(&voiceSlots);
+    std::array<Layer*, kNumChannels> laneLayers {};
+    for (int v = 0; v < kNumChannels; ++v) laneLayers[(size_t) v] = &voiceSlot(v);
+    grooveVoices.setSlots(laneLayers);
     grooveVoices.cacheParams(apvts);
 
     initAppSettings("muOn");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
-    for (auto& t : voiceSlots) t.owner.ptr = this;
+    for (int v = 0; v < kNumChannels; ++v) voiceSlot(v).owner.ptr = this;
     initLaneState();        // the lane layout every preset / session save and load uses
     hotSwap.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },
                         [this](int i, juce::ValueTree& t) { applyTrackTree(i, t); });
@@ -182,7 +189,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
                           {
                               grooveVoices.trigger(track, vel, off);
                               if (track >= 0 && track < kNumChannels)
-                                  voiceSlots[(size_t) track].triggers.fetch_add(1, std::memory_order_relaxed);
+                                  voiceSlot(track).triggers.fetch_add(1, std::memory_order_relaxed);
                           });
     }
 
