@@ -235,7 +235,7 @@ public:
                     expectEquals(r.pairProblem(), juce::String());
                 }
 
-                beginTest("A block skipped on lock contention lets the note-off out (" + where + ")");
+                beginTest("A message-thread edit holding the rhythm lock does not skip blocks or hang a note (" + where + ")");
                 {
                     RenderStub p; Renderer r(p, sr, block);
                     p.playing = true;
@@ -254,6 +254,7 @@ public:
                     release = true;
                     holder.join();
 
+                    expectEquals(p.core.getSkippedBlockCount(), 0);
                     expectEquals(r.count(true), r.count(false));
                     expectEquals(r.pairProblem(), juce::String());
                     expect(r.longestNote() <= noteLimit(sr, block), "the note-off came late");
@@ -355,7 +356,7 @@ public:
                     midi.clear();
                     stub.processBlock(buf, midi);
                     const int len = stub.core.sequencer.getPatternLength(0);
-                    if (len == 0) continue;   // no snapshot yet: the first block was skipped by the message thread
+                    if (len == 0) continue;   // no snapshot yet (the pattern lock was busy on the first block)
                     if (len < minLen.load()) minLen.store(len);
                     if (len > maxLen.load()) maxLen.store(len);
                 }
@@ -384,6 +385,64 @@ public:
             expect(minLen.load() >= 1 && maxLen.load() <= 256,
                    "pattern length range " + juce::String(minLen.load()) + ".." + juce::String(maxLen.load()));
             expectEquals(stub.core.sequencer.getRhythm(0).genA.steps, 1 + ((kIterations - 1) * 7) % 64);
+        }
+
+        beginTest("Two threads setting one parameter to opposite values leave the Rhythm equal to the parameter");
+        {
+            for (int round = 0; round < 20; ++round)
+            {
+                RenderStub stub;
+                std::atomic<bool> go { false };
+                const auto setter = [&](float a, float b)
+                {
+                    while (! go.load()) std::this_thread::yield();
+                    for (int i = 0; i < 2000; ++i)
+                        stub.setActual("r0_stepsA", (i & 1) ? a : b);
+                };
+                std::thread t1(setter, 5.0f, 9.0f), t2(setter, 9.0f, 5.0f);
+                go = true;
+                t1.join(); t2.join();
+
+                stub.core.servicePendingRebuild();
+                expectEquals(stub.core.sequencer.getRhythm(0).genA.steps, (int) stub.actual("r0_stepsA"),
+                             "round " + juce::String(round));
+                expectEquals(stub.core.rhythmPlayState.stepsA.load(), (int) stub.actual("r0_stepsA"));
+            }
+        }
+
+        beginTest("A 30 Hz stream of dirty parameters never makes the audio thread skip a block");
+        {
+            RenderStub stub;
+            stub.playing = true;
+            juce::AudioBuffer<float> buf(0, 256);
+            std::atomic<bool> stop { false };
+            std::atomic<int> blocks { 0 };
+
+            std::thread audio([&]
+            {
+                juce::MidiBuffer midi;
+                while (! stop.load())
+                {
+                    midi.clear();
+                    stub.processBlock(buf, midi);
+                    ++blocks;
+                }
+            });
+
+            // The message thread: a changed parameter every 33 ms, each followed by its drain.
+            for (int i = 0; i < 15; ++i)
+            {
+                std::thread automation([&] { stub.setActual("r0_stepsA", (float) (8 + i)); });
+                automation.join();
+                stub.core.servicePendingRebuild();
+                juce::Thread::sleep(33);
+            }
+            stop = true;
+            audio.join();
+
+            expect(blocks.load() > 0, "the audio thread ran");
+            expectEquals(stub.core.getSkippedBlockCount(), 0);
+            expectEquals(stub.core.sequencer.getRhythm(0).genA.steps, 22);
         }
     }
 };

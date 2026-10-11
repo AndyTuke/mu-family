@@ -28,8 +28,9 @@ public:
 
     void prepare(double sampleRate, int samplesPerBlock);
 
-    // Audio thread. Steps the sequencer and emits this block's MIDI; when the message thread holds
-    // the rhythm lock the block is skipped, but a pending note-off is still flushed.
+    // Audio thread. Steps the sequencer and emits this block's MIDI. Takes no lock: it reads only the
+    // sequencer's own pattern snapshot and atomics. A block that starts during a session restore is
+    // skipped, but a pending note-off is still flushed.
     void processBlock(bool playing, double beatPos, juce::MidiBuffer& midi, int numSamples);
 
     // Audio thread. Emits the note-off of the last note once its 20 ms are up, without triggering
@@ -46,8 +47,12 @@ public:
 
     bool isApvtsLoading() const noexcept { return apvtsLoading.load(std::memory_order_acquire); }
 
-    // The lock the message thread holds around rhythm edits; exposed so a test can hold it from a
-    // second thread and see the audio thread skip a block.
+    // Blocks the audio thread skipped (only a restore does that); a test checks that parameter
+    // drains never add to it.
+    int getSkippedBlockCount() const noexcept { return skippedBlocks.load(std::memory_order_relaxed); }
+
+    // The lock that serialises the message-thread writers of the rhythm (drain, restore). The audio
+    // thread never takes it; exposed so a test can hold it from a second thread and see no block skip.
     juce::CriticalSection& getRhythmLock() noexcept { return rhythmsLock; }
 
     SequencerEngine sequencer;
@@ -60,8 +65,10 @@ public:
 
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
-    void syncRhythmParam(const char* suffix, float value);
+    void syncRhythmParam(const char* suffix);
     void drainPendingParams();
+    void publishStepCounts();
+    int  findParamIndex(const char* suffix) const noexcept;
     bool isMessageThread() const;
     void syncRhythmFromApvts();
     void pushRhythmToApvts();
@@ -70,26 +77,39 @@ private:
     juce::AudioProcessorValueTreeState& apvts;
     MidiOutputEngine midiEngine;
 
-    // suspendProcessing() does not wait for a running block, so the message thread takes this
-    // around any edit to the rhythm and the audio thread try-locks it.
+    // Serialises the message-thread writers of the Rhythm (the drain, a restore). The audio thread
+    // never takes it: it reads no Rhythm field (the pattern comes through the sequencer's own
+    // snapshot under its pattern lock, the step counts for the UI are published from here), so there
+    // is nothing for it to protect on that side. Nothing here takes Rhythm::voiceParamsLock for the
+    // same reason; it guards voice-engine fields this product does not have. Lock order: this, then
+    // the sequencer's pattern lock.
     juce::CriticalSection rhythmsLock;
+
+    // Raised for the whole of a restore so the audio thread skips blocks while the parameters, the
+    // loop length and the pattern are replaced as a set instead of seeing them half applied.
+    std::atomic<bool> restoreInProgress { false };
+    std::atomic<int>  skippedBlocks     { 0 };
 
     // Raised for the whole of a bulk push or restore so parameterChanged skips the pattern rebuild.
     std::atomic<bool> apvtsLoading { false };
 
     // Rhythm parameter changes from off the message thread (VST3 automation runs on the audio
-    // thread), one slot per suffix of kRhythmParamDefs. A producer stores the value, then raises the
-    // flag; the message thread clears the flag, then reads the value. Several producers are safe, and a
-    // burst of changes to one suffix coalesces to the latest value, so the queue cannot overflow and
-    // never allocates or waits. A change that races the drain is at worst applied twice with the same
-    // value. Only the message thread writes the Rhythm fields (under rhythmsLock, then voiceParamsLock,
-    // then the sequencer's pattern lock), so the audio thread never writes them.
-    struct PendingParam
-    {
-        std::atomic<float> value { 0.0f };
-        std::atomic<bool>  dirty { false };
-    };
-    std::array<PendingParam, mu_clid::kRhythmParamCount> pendingParams;
+    // thread), one dirty flag per suffix of kRhythmParamDefs. The value is not queued: the drain reads
+    // the parameter's own atomic, so it can never apply something older than the parameter. A burst of
+    // changes to one suffix coalesces into one apply, and the producer never allocates or waits. Only
+    // the message thread writes the Rhythm fields (under rhythmsLock, then the sequencer's pattern
+    // lock), so the audio thread never writes them.
+    std::array<std::atomic<bool>, mu_clid::kRhythmParamCount> pendingDirty {};
+
+    // Per kRhythmParamDefs entry, the parameter's raw value (null if this product has no such
+    // parameter); built once in the constructor so no lookup by id happens afterwards.
+    std::array<std::atomic<float>*, mu_clid::kRhythmParamCount> rawParams {};
+
+    // Suffix to index in kRhythmParamDefs, sorted by suffix, for the audio thread's lookup by binary
+    // search instead of a scan. Built in the constructor and never changed.
+    struct SuffixIndex { const char* suffix; int index; };
+    std::array<SuffixIndex, mu_clid::kRhythmParamCount> suffixIndex {};
+    int suffixIndexCount = 0;
 
     // Set when a drain wanted a pattern rebuild but a bulk load was running; the next service does it.
     std::atomic<bool> patternRebuildPending { false };

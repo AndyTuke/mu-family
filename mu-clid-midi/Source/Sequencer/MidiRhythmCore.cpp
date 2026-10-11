@@ -6,20 +6,11 @@
 #include "Persistence/SessionState.h"
 #include "Sequencer/AccentVelocity.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
 namespace mu_clid_midi {
-
-// Suffix lookup on raw characters: parameterChanged can run on the audio thread, where building a
-// juce::String for the suffix would allocate.
-static const mu_clid::RhythmParamDef* findDef(const char* suffix) noexcept
-{
-    for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
-        if (std::strcmp(suffix, mu_clid::kRhythmParamDefs[i].suffix) == 0)
-            return &mu_clid::kRhythmParamDefs[i];
-    return nullptr;
-}
 
 MidiRhythmCore::MidiRhythmCore(juce::AudioProcessorValueTreeState& apvtsToUse)
     : apvts(apvtsToUse), ownerThread(std::this_thread::get_id())
@@ -41,7 +32,20 @@ MidiRhythmCore::MidiRhythmCore(juce::AudioProcessorValueTreeState& apvtsToUse)
     midiNotePtr  = apvts.getRawParameterValue(kMidiNoteId);
     accentAmtPtr = apvts.getRawParameterValue(kAccentAmtId);
 
+    // Resolve each rhythm parameter once: its raw value pointer for the drain, and a sorted
+    // suffix table so parameterChanged finds its slot without scanning the whole definition list.
+    const juce::String prefix(kRhythmIdPrefix);
+    for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
+    {
+        rawParams[(size_t) i] = apvts.getRawParameterValue(prefix + mu_clid::kRhythmParamDefs[i].suffix);
+        if (rawParams[(size_t) i] != nullptr)
+            suffixIndex[(size_t) suffixIndexCount++] = { mu_clid::kRhythmParamDefs[i].suffix, i };
+    }
+    std::sort(suffixIndex.begin(), suffixIndex.begin() + suffixIndexCount,
+              [](const SuffixIndex& a, const SuffixIndex& b) { return std::strcmp(a.suffix, b.suffix) < 0; });
+
     pushRhythmToApvts();
+    publishStepCounts();
 }
 
 MidiRhythmCore::~MidiRhythmCore()
@@ -59,11 +63,11 @@ void MidiRhythmCore::prepare(double sampleRate, int samplesPerBlock)
 //==============================================================================
 void MidiRhythmCore::processBlock(bool playing, double beatPos, juce::MidiBuffer& midi, int numSamples)
 {
-    // The message thread holds this while it edits the rhythm; skip the block rather than wait,
-    // but still let a pending note-off out.
-    const juce::ScopedTryLock lock(rhythmsLock);
-    if (! lock.isLocked())
+    // A restore replaces the parameters, loop length and pattern as a set: skip the block rather than
+    // play half of it, but still let a pending note-off out.
+    if (restoreInProgress.load(std::memory_order_acquire))
     {
+        skippedBlocks.fetch_add(1, std::memory_order_relaxed);
         flushPendingNoteOff(midi, numSamples);
         return;
     }
@@ -97,10 +101,7 @@ void MidiRhythmCore::advanceSequencer(bool playing, double beatPos, juce::MidiBu
         rhythmPlayState.currentStep  .store(sequencer.getLastStepIndex(0));
         rhythmPlayState.currentStepC .store(sequencer.getLastAccentStepIndex(0));
         rhythmPlayState.patternLength.store(sequencer.getPatternLength(0));
-        const Rhythm& rhy = sequencer.getRhythm(0);
-        rhythmPlayState.stepsA.store(juce::jmax(1, rhy.genA.steps));
-        rhythmPlayState.stepsB.store(juce::jmax(1, rhy.genB.steps));
-        rhythmPlayState.stepsC.store(juce::jmax(1, rhy.genC.steps));
+        // The ring step counts are published by the message thread after each apply (publishStepCounts).
     }
     flushPendingNoteOff(midi, numSamples);
 }
@@ -110,6 +111,14 @@ bool MidiRhythmCore::restoreSession(const juce::String& xml, juce::String& error
 {
     bool ok = false;
     const juce::ScopedLock sl(rhythmsLock);
+
+    // Down again on every exit, including after the final rebuild below.
+    struct RestoreFlag
+    {
+        explicit RestoreFlag(std::atomic<bool>& f) : flag(f) { flag.store(true, std::memory_order_release); }
+        ~RestoreFlag() { flag.store(false, std::memory_order_release); }
+        std::atomic<bool>& flag;
+    } restoreFlag(restoreInProgress);
     {
         mu_core::ScopedApvtsLoading guard(apvtsLoading);
         session::Identity identity;
@@ -137,7 +146,7 @@ void MidiRhythmCore::parameterChanged(const juce::String& id, float v)
 
     if (std::strncmp(raw, kRhythmIdPrefix, prefixLen) == 0)
     {
-        syncRhythmParam(raw + prefixLen, v);
+        syncRhythmParam(raw + prefixLen);
         return;
     }
     if (id == kMasterLoopId)
@@ -152,42 +161,61 @@ bool MidiRhythmCore::isMessageThread() const
     return mm != nullptr ? mm->isThisTheMessageThread() : std::this_thread::get_id() == ownerThread;
 }
 
-// Queues the change in its suffix slot; on the message thread it is applied at once.
-void MidiRhythmCore::syncRhythmParam(const char* suffix, float v)
+// Binary search on raw characters: parameterChanged can run on the audio thread, where building a
+// juce::String for the suffix or scanning the whole definition list is not wanted. -1 if unknown.
+int MidiRhythmCore::findParamIndex(const char* suffix) const noexcept
 {
-    const auto* def = findDef(suffix);
-    if (def == nullptr) return;
+    const auto* begin = suffixIndex.data();
+    const auto* end   = begin + suffixIndexCount;
+    const auto* it = std::lower_bound(begin, end, suffix,
+                                      [](const SuffixIndex& e, const char* s) { return std::strcmp(e.suffix, s) < 0; });
+    return (it != end && std::strcmp(it->suffix, suffix) == 0) ? it->index : -1;
+}
 
-    auto& slot = pendingParams[(size_t) (def - mu_clid::kRhythmParamDefs)];
-    slot.value.store(v, std::memory_order_relaxed);
-    slot.dirty.store(true, std::memory_order_release);
+// Marks the suffix's slot dirty; on the message thread it is applied at once.
+void MidiRhythmCore::syncRhythmParam(const char* suffix)
+{
+    const int index = findParamIndex(suffix);
+    if (index < 0) return;
+
+    pendingDirty[(size_t) index].store(true, std::memory_order_release);
 
     if (isMessageThread())
         drainPendingParams();
 }
 
+// Copies the ring step counts the circle shows out of the Rhythm for the UI, so the audio thread
+// never reads the Rhythm. Caller holds rhythmsLock (or is the constructor).
+void MidiRhythmCore::publishStepCounts()
+{
+    const Rhythm& r = sequencer.getRhythm(0);
+    rhythmPlayState.stepsA.store(juce::jmax(1, r.genA.steps), std::memory_order_relaxed);
+    rhythmPlayState.stepsB.store(juce::jmax(1, r.genB.steps), std::memory_order_relaxed);
+    rhythmPlayState.stepsC.store(juce::jmax(1, r.genC.steps), std::memory_order_relaxed);
+}
+
 // Message thread. Applies every queued change and the pattern rebuild together, so the generator
-// fields never change under a rebuild. Lock order: rhythmsLock, voiceParamsLock, pattern lock.
+// fields never change under a rebuild. Lock order: rhythmsLock, then the sequencer's pattern lock.
 void MidiRhythmCore::drainPendingParams()
 {
     bool any = false;
-    for (auto& slot : pendingParams)
-        if (slot.dirty.load(std::memory_order_relaxed)) { any = true; break; }
+    for (auto& dirty : pendingDirty)
+        if (dirty.load(std::memory_order_relaxed)) { any = true; break; }
     if (! any) return;
 
-    // The audio thread only try-locks this, so it skips a block rather than reading a half-edit.
+    // Serialises against a restore or another drain; the audio thread does not take this lock.
     const juce::ScopedLock sl(rhythmsLock);
     Rhythm& r = sequencer.getRhythm(0);
     bool patternDirty = false;
     bool voiceDirty   = false;
 
-    mu_core::spinLock(r.voiceParamsLock);
+    // Clear the flag first, then read the parameter: a change that lands after the clear re-raises it.
     for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
-        if (pendingParams[(size_t) i].dirty.exchange(false, std::memory_order_acquire))
-            mu_clid::kRhythmParamDefs[i].apply(pendingParams[(size_t) i].value.load(std::memory_order_relaxed),
-                                               r, patternDirty, voiceDirty);
+        if (pendingDirty[(size_t) i].exchange(false, std::memory_order_acq_rel) && rawParams[(size_t) i] != nullptr)
+            mu_clid::kRhythmParamDefs[i].apply(rawParams[(size_t) i]->load(), r, patternDirty, voiceDirty);
 
-    // The rebuild reads the fields just written, so it stays inside the same voiceParamsLock hold.
+    publishStepCounts();
+
     if (patternDirty)
     {
         if (apvtsLoading.load(std::memory_order_acquire))
@@ -195,7 +223,6 @@ void MidiRhythmCore::drainPendingParams()
         else
             sequencer.updatePattern(0);
     }
-    mu_core::spinUnlock(r.voiceParamsLock);
 }
 
 void MidiRhythmCore::servicePendingRebuild()
@@ -206,10 +233,7 @@ void MidiRhythmCore::servicePendingRebuild()
         && patternRebuildPending.exchange(false, std::memory_order_acq_rel))
     {
         const juce::ScopedLock sl(rhythmsLock);
-        Rhythm& r = sequencer.getRhythm(0);
-        mu_core::spinLock(r.voiceParamsLock);
         sequencer.updatePattern(0);
-        mu_core::spinUnlock(r.voiceParamsLock);
     }
 }
 
@@ -219,24 +243,19 @@ void MidiRhythmCore::syncRhythmFromApvts()
     // The parameters are the truth now: drop queued changes (they would apply stale values), and clear
     // the rebuild request first so a change that lands during this rebuild survives for the next one.
     patternRebuildPending.store(false, std::memory_order_release);
-    for (auto& slot : pendingParams)
-        slot.dirty.store(false, std::memory_order_release);
+    for (auto& dirty : pendingDirty)
+        dirty.store(false, std::memory_order_release);
 
     const juce::ScopedLock sl(rhythmsLock);
     Rhythm& r = sequencer.getRhythm(0);
-    const juce::String prefix(kRhythmIdPrefix);
     bool patternDirty = false;
     bool voiceDirty   = false;
 
-    // One suffix at a time, so the audio thread can take its brief lock between the writes.
     for (int j = 0; j < mu_clid::kRhythmParamCount; ++j)
-        if (auto* raw = apvts.getRawParameterValue(prefix + mu_clid::kRhythmParamDefs[j].suffix))
-        {
-            mu_core::spinLock(r.voiceParamsLock);
-            mu_clid::kRhythmParamDefs[j].apply(raw->load(), r, patternDirty, voiceDirty);
-            mu_core::spinUnlock(r.voiceParamsLock);
-        }
+        if (rawParams[(size_t) j] != nullptr)
+            mu_clid::kRhythmParamDefs[j].apply(rawParams[(size_t) j]->load(), r, patternDirty, voiceDirty);
 
+    publishStepCounts();
     sequencer.updatePattern(0);
     sequencer.setMasterLoopSteps(juce::jmin((int) apvts.getRawParameterValue(kMasterLoopId)->load() * 16, 256));
 }
