@@ -141,13 +141,14 @@ juce::File& storageRootOverride()
 }
 
 ProcessorBase::ScopedStorageRoot::ScopedStorageRoot(const juce::File& root)
+    : previous(storageRootOverride())
 {
     storageRootOverride() = root;
 }
 
 ProcessorBase::ScopedStorageRoot::~ScopedStorageRoot()
 {
-    storageRootOverride() = juce::File();
+    storageRootOverride() = previous;
 }
 
 void ProcessorBase::initAppSettings(const juce::String& name)

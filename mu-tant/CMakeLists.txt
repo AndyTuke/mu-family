@@ -164,6 +164,7 @@ add_custom_command(TARGET mu-tant_Standalone POST_BUILD
 # ── mu-tant-tests — console UnitTests over the new synth DSP ─────────────────
 # Tests only mu-tant's self-contained DSP (Scales + WavetableOscillator +
 # WavetableBank) — no mu-core deps needed. EXCLUDE_FROM_ALL like mu-clid-tests.
+include("${CMAKE_SOURCE_DIR}/mu-core/cmake/ProcessorTestSources.cmake")
 juce_add_console_app(mu-tant-tests PRODUCT_NAME "mu-tant-tests")
 
 target_sources(mu-tant-tests PRIVATE
@@ -185,6 +186,7 @@ target_sources(mu-tant-tests PRIVATE
     Source/Tests/PluginTransportTests.cpp  # host-playhead→gate contract (gate follows host transport)
     Source/Tests/HotSwapBoundaryTests.cpp  # hot-swap boundary predicates + stager handshake
     Source/Tests/NoDemoCapsTests.cpp      # unlicensed is fully functional: 8 voices, long gates, saves
+    Source/Tests/ProcessorSeamTests.cpp    # the real PluginProcessor, headless (ScopedStorageRoot, worker-thread processBlock)
     Source/Tests/NudgeInputTests.cpp       # shared mu-core NudgeInput: whole numbers and the BPM decimals mode
     Source/UI/GatingDesigner.cpp
     Source/Sequencer/GatePattern.cpp
@@ -193,20 +195,16 @@ target_sources(mu-tant-tests PRIVATE
     # Editor-free APVTS layout factory — lets the ApvtsLayout test exercise the
     # real createParameterLayout() without pulling in PluginEditor/UI.
     Source/Plugin/PluginProcessor_APVTS.cpp
-    # mu-core .cpps the modulator + gating + insert + voice + layout/FX tests depend
-    # on (the console-app target doesn't share JUCE-plugin context, so it can't link
-    # mu-core directly).
-    "${CMAKE_SOURCE_DIR}/mu-core/Modulation/ModulationMatrix.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/ControlSequence.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/Audio/InsertProcessor.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/Audio/MultiModeFilter.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/EffectSlot.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/DelaySlot.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/Audio/FX/Slots/ReverbSlot.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/DropdownSelect.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/NudgeInput.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/MuLookAndFeel.cpp"
-    "${CMAKE_SOURCE_DIR}/mu-core/UI/Components/MuTheme.cpp"
+    # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked) and
+    # its licence glue, so tests construct the product class itself (see ProcessorTestSources.cmake).
+    Source/Plugin/PluginProcessor.cpp
+    Source/Plugin/PluginProcessor_Preset.cpp
+    "${CMAKE_SOURCE_DIR}/mu-core/License/LicenseManager.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/License/LemonSqueezyClient.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/License/OnlineActivation.cpp"
+    "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher/monocypher.c"
+    # The mu-core .cpps behind ProcessorBase (the console target can't link mu-core directly).
+    ${MU_CORE_PROCESSOR_TEST_SOURCES}
 )
 
 target_compile_features(mu-tant-tests PRIVATE cxx_std_17)
@@ -217,6 +215,7 @@ target_include_directories(mu-tant-tests PRIVATE
     SYSTEM
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
+        "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"   # LicenseManager
 )
 
 target_link_libraries(mu-tant-tests PRIVATE

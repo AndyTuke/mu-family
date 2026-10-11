@@ -258,7 +258,7 @@ public:
     // Tests only (message thread): while one is alive, initAppSettings puts the settings file and the
     // *_midiControl.json map under <root>/settings/ and getContentDir() defaults to
     // <root>/content/<appName>, so building a processor never touches the user's real TDP folders.
-    // Production code never creates one. Not nestable: the destructor clears the override.
+    // Production code never creates one. Nestable: the destructor restores the previous root.
     class ScopedStorageRoot
     {
     public:
@@ -266,6 +266,8 @@ public:
         ~ScopedStorageRoot();
         ScopedStorageRoot(const ScopedStorageRoot&) = delete;
         ScopedStorageRoot& operator=(const ScopedStorageRoot&) = delete;
+    private:
+        juce::File previous;
     };
 
     // Licence state. A product with no licensing model (it never calls initLicensing) always counts as

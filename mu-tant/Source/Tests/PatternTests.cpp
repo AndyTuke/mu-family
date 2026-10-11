@@ -5,10 +5,6 @@
 #include "Sequencer/Pattern.h"
 #include <memory>
 
-// Pattern's persistence hooks belong to the processor; the test target does not link it.
-void mu_tant::Pattern::writeExtras(juce::ValueTree&) const {}
-void mu_tant::Pattern::applyExtras(const juce::ValueTree&) {}
-
 class PatternTest : public juce::UnitTest
 {
 public:

@@ -1,6 +1,7 @@
 # mu-core-tests — console UnitTests for shared mu-core behaviour that needs no product
 # (ProcessorCore host transport + layer access). Built as part of ALL_BUILD like the
 # per-product test targets. Tests of shared mu-core code live here, not in a product.
+include("${CMAKE_CURRENT_SOURCE_DIR}/../cmake/ProcessorTestSources.cmake")
 juce_add_console_app(mu-core-tests PRODUCT_NAME "mu-core-tests")
 
 target_sources(mu-core-tests PRIVATE
@@ -28,32 +29,8 @@ target_sources(mu-core-tests PRIVATE
     TransportResolverTests.cpp
     UIScalingConsistencyTests.cpp
     MidiFullPresetMapTests.cpp
-    # Sources behind ProcessorBase + the settings page (linked individually: mu-core is a source set).
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Plugin/ProcessorBase.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Audio/VoiceEngine.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Audio/InsertProcessor.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Audio/MultiModeFilter.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Audio/SamplePlayer.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Audio/MixerEngine.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Audio/MidiOutputEngine.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Audio/FX/Slots/EffectSlot.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Audio/FX/Slots/DelaySlot.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Audio/FX/Slots/ReverbSlot.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Audio/FX/Slots/FXChain.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Persistence/MidiPresetMap.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Persistence/MidiFullPresetMap.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Control/MidiControlMap.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Control/MidiControlRouter.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../UI/SettingsOverlayBase.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../UI/StandardSettingsOverlay.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Components/MuLookAndFeel.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Components/MuTheme.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Components/KnobWithLabel.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Components/SegmentControl.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Components/NudgeInput.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../UI/Components/DropdownSelect.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Modulation/ModulationMatrix.cpp"   # pulled in by Layer.h
-    "${CMAKE_CURRENT_SOURCE_DIR}/../Sequencer/ControlSequence.cpp"     # pulled in by Layer.h
+    # Sources behind ProcessorBase + the settings page (shared list, see ProcessorTestSources.cmake).
+    ${MU_CORE_PROCESSOR_TEST_SOURCES}
 )
 
 target_compile_features(mu-core-tests PRIVATE cxx_std_17)
