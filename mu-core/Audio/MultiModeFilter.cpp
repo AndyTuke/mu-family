@@ -64,6 +64,12 @@ void MultiModeFilter::reset()
     lowCutFilter.reset();
 }
 
+void MultiModeFilter::resetSmoothers() noexcept
+{
+    smoothedDrive.setCurrentAndTargetValue(0.0f);
+    smoothedLowCutHz.setCurrentAndTargetValue(0.0f);
+}
+
 void MultiModeFilter::process(juce::AudioBuffer<float>& buffer,
                               int numSamples, int numChannels)
 {

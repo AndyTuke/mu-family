@@ -85,6 +85,53 @@ public:
             expectEquals((int) fresh->controlSequences[2].stepValues.size(), 3);   // the old data left with `fresh`
         }
 
+        beginTest("a reset hands the old envelopes and paths to the discarded default, with no copy");
+        {
+            Pattern live;
+            for (int c = 0; c < 3; ++c)
+            {
+                live.gate.addEnvelope({ c * 4, 3, 0.0f, 0.0f, 0.0f, false });
+                live.filterGate.addEnvelope({ c * 4, 3, 0.0f, 0.0f, 0.0f, false });
+                live.pitchGate.addEnvelope({ c * 4, 3, 0.0f, 0.0f, 0.0f, false });
+            }
+            live.gate.subdivision = GatePattern::Subdivision::ThirtySecond;
+            live.osc1UserPath  = "C:/tables/a-long-path-that-needs-heap/a.wav";
+            live.osc1UserIndex = 4;
+            const GateEnvelope* gateBuf   = live.gate.envelopes.data();
+            const GateEnvelope* filterBuf = live.filterGate.envelopes.data();
+            const GateEnvelope* pitchBuf  = live.pitchGate.envelopes.data();
+            const juce::String::CharPointerType pathBuf = live.osc1UserPath.getCharPointer();
+
+            auto fresh = std::make_unique<Pattern>();
+            live.adoptDefaults(*fresh);
+
+            expect(live.gate.envelopes.empty() && live.filterGate.envelopes.empty() && live.pitchGate.envelopes.empty(),
+                   "the live voice should hold the default (empty) envelopes");
+            expect(! live.gate.hasEnvelopes.load(), "the lock-free flag must follow the exchange");
+            expect(live.gate.subdivision == GatePattern::Subdivision::Sixteenth, "the grid should be the default");
+            expect(live.osc1UserPath.isEmpty());
+            expectEquals(live.osc1UserIndex.load(), -1);
+            expectEquals((int) fresh->gate.envelopes.size(), 3);
+            expect(fresh->gate.hasEnvelopes.load());
+            expect(fresh->gate.envelopes.data() == gateBuf && fresh->filterGate.envelopes.data() == filterBuf
+                   && fresh->pitchGate.envelopes.data() == pitchBuf,
+                   "the envelope buffers should move to the discarded default, not be copied");
+            expect(fresh->osc1UserPath.getCharPointer() == pathBuf, "the path string should move, not be copied");
+        }
+
+        beginTest("copyDataFrom holds the destination's lock and skips the copy when it stays busy");
+        {
+            GatePattern src, dst;
+            src.addEnvelope({ 1, 2, 0.0f, 0.0f, 0.0f, false });
+            dst.editLock.store(true);                        // an edit in progress on the destination
+            expect(! dst.copyDataFrom(src), "a busy destination lock should fail the copy");
+            expect(dst.envelopes.empty(), "a failed copy must not touch the destination");
+            expect(! src.editLock.load(), "a failed copy must release the source lock");
+            dst.editLock.store(false);
+            expect(dst.copyDataFrom(src) && dst.envelopes.size() == 1);
+            expect(! dst.editLock.load() && ! src.editLock.load(), "both locks should be released");
+        }
+
         beginTest("a swap through a temporary exchanges the voices' data");
         {
             Pattern a, b;

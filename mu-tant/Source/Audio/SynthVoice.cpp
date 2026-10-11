@@ -21,6 +21,11 @@ void VoiceEngine::reset()
     oscs.reset();
     filter1.reset();
     filter2.reset();
+    filter1.resetSmoothers();   // the next tenant's drive / low-cut ramp from 0, as on a fresh engine
+    filter2.resetSmoothers();
+    noise.reset();
+    mono.clear();               // work buffers: cleared in place, never resized
+    mono2.clear();
 }
 
 void VoiceEngine::setBank(const WavetableBank* b) noexcept

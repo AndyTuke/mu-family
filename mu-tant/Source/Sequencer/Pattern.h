@@ -18,7 +18,7 @@ class PluginProcessor;
 // A structural edit (add / remove / reorder) moves whole Patterns by pointer, so everything here
 // travels with its voice. Copying one carries the voice's DATA — modulation, envelopes, user
 // wavetable choice — and leaves the destination's own state alone (level tap, the stepped-pitch
-// flags, the processor link); a reset copies a default Pattern in this way, in place.
+// flags, the processor link); a reset takes a default Pattern's data in place (adoptDefaults).
 struct Pattern : Layer
 {
     Pattern() = default;
@@ -49,12 +49,23 @@ struct Pattern : Layer
     void applyExtras(const juce::ValueTree& node) override;
 
     // Takes a default voice's data (built before the structural edit locked), keeping name and
-    // colour; in place, so the editor's pointers into this Pattern stay valid.
+    // colour; in place, so the editor's pointers into this Pattern stay valid. Exchanges rather than
+    // copies, so it allocates and frees nothing under the layers lock: the old envelopes and
+    // wavetable paths leave in `fresh`, which the caller destroys after unlocking.
     void adoptDefaults(Layer& fresh) override
     {
         Layer::adoptDefaults(fresh);
         jassert(dynamic_cast<Pattern*>(&fresh) != nullptr);
-        copyVoiceData(static_cast<const Pattern&>(fresh));
+        auto& f = static_cast<Pattern&>(fresh);
+        // A skipped exchange (the envelope's lock stayed busy) would leave stale data.
+        [[maybe_unused]] const bool adopted = gate.adoptDataFrom(f.gate)
+                                            & filterGate.adoptDataFrom(f.filterGate)
+                                            & pitchGate.adoptDataFrom(f.pitchGate);
+        jassert(adopted);
+        osc1UserPath.swapWith(f.osc1UserPath);
+        osc2UserPath.swapWith(f.osc2UserPath);
+        osc1UserIndex.store(f.osc1UserIndex.load());
+        osc2UserIndex.store(f.osc2UserIndex.load());
         osc1SemiStepped.store(false, std::memory_order_relaxed);   // the modulators are cleared
         osc2SemiStepped.store(false, std::memory_order_relaxed);
     }

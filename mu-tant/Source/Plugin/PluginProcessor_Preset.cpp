@@ -289,6 +289,10 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
     // for the whole commit (the hot-swap glitch). Without it, a concurrent block sees
     // old-or-new per structure (≤1 block, inaudible) instead.
 
+    // Message thread only, which serialises it against every structural edit (add / remove / swap /
+    // reset): hosts restore state on their main thread (VST3 IComponent::setState, the CLAP state
+    // extension's load, the standalone's own message loop), and the staged commit runs there too.
+    // That is also why the retire-tail setup below may arm retiring[] without layersLock.
     const int oldN = numLayers.load(std::memory_order_relaxed);
     int nv = juce::jlimit(1, mu_limits::kMaxLayers, (int) state.getProperty("numVoices", 1));
 

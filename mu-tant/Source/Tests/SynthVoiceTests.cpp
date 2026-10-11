@@ -65,6 +65,41 @@ public:
             expect(ok, "pink noise finite + bounded");
         }
 
+        beginTest("NoiseGen reset clears the pink filter memory");
+        {
+            NoiseGen used(7);
+            for (int i = 0; i < 64; ++i) used.render(NoiseGen::Pink);
+            used.reset();
+            const float after = used.render(NoiseGen::Pink);
+
+            // The same stream's 65th white sample through a filter that starts from zero.
+            juce::Random r(7);
+            for (int i = 0; i < 64; ++i) r.nextFloat();
+            const float white = r.nextFloat() * 2.0f - 1.0f;
+            const float expected = (white * 0.0990460f + white * 0.2965164f + white * 1.0526913f + white * 0.1848f) * 0.2f;
+            expectWithinAbsoluteError(after, expected, 1.0e-6f);
+        }
+
+        beginTest("VoiceEngine reset leaves a silent voice silent");
+        {
+            VoiceEngine eng;
+            eng.setBank(&bank);
+            eng.prepare(sr, N);
+            VoiceConfig loud;
+            loud.filterDrive = 1.0f; loud.filterLowCutHz = 400.0f; loud.filterRes = 0.9f;
+            eng.setConfig(loud);
+            juce::AudioBuffer<float> out(2, N);
+            for (int b = 0; b < 6; ++b) { out.clear(); eng.process(out, N); }
+
+            eng.reset();
+            VoiceConfig quiet;
+            quiet.osc1LevelDb = -60.0f; quiet.osc2LevelDb = -60.0f; quiet.noiseLevelDb = -60.0f;
+            eng.setConfig(quiet);
+            out.clear();
+            eng.process(out, N);
+            expectEquals(peakOf(out, N), 0.0f);
+        }
+
         beginTest("voice renders finite, non-silent output");
         {
             VoiceEngine v; v.setBank(&bank); v.prepare(sr, N);

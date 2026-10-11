@@ -91,6 +91,8 @@ struct VoiceConfig
 class NoiseGen
 {
 public:
+    NoiseGen() = default;
+    explicit NoiseGen(juce::int64 seed) : rng(seed) {}   // fixed stream, for tests
     enum Type { White = 0, Pink = 1 };
 
     float render(Type type) noexcept
@@ -106,6 +108,9 @@ public:
         return pink * 0.2f;   // scale to roughly ±1
     }
 
+    // Clears the pink filter's memory (the random stream runs on).
+    void reset() noexcept { b0 = b1 = b2 = 0.0f; }
+
 private:
     juce::Random rng;
     float b0 = 0.0f, b1 = 0.0f, b2 = 0.0f;
@@ -117,7 +122,7 @@ public:
 
     void prepare(double sampleRate, int blockSize);
     void setBank(const WavetableBank* b) noexcept;
-    void reset();   // clears filter and cross-modulation memory without allocating (oscillator phase runs on)
+    void reset();   // clears filter, smoother, noise and cross-modulation memory without allocating (oscillator phase runs on)
     void setConfig(const VoiceConfig& c);   // recomputes osc frequencies + filter
 
     // Renders the voice and ADDS it into `out` (stereo). numSamples <= prepared block size.

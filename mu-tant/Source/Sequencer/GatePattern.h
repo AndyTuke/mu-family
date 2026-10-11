@@ -145,17 +145,51 @@ public:
     // editLock.
     bool copyDataFrom(const GatePattern& other) noexcept
     {
-        // Capped spin matching GatingDesigner::withLock. The UI holds editLock
-        // only briefly around single-envelope mutations; 1000 yields covers any
-        // contention comfortably. If not acquired by the cap, skip the copy and
-        // return false — the source pattern remains unchanged and the caller can retry.
+        if (this == &other) return true;
+
+        // Both editLocks, source first, each a capped spin matching GatingDesigner::withLock. The UI
+        // holds editLock only briefly around single-envelope mutations; 1000 yields covers any
+        // contention comfortably. If either is not acquired by the cap, skip the copy and return
+        // false: this pattern is unchanged and the caller can retry. The destination lock keeps the
+        // audio thread's gate read and a UI edit on the destination out of the envelope assignment.
         if (! mu_core::spinLockFor(other.editLock, 1000)) return false;
+        if (! mu_core::spinLockFor(editLock, 1000))
+        {
+            mu_core::spinUnlock(other.editLock);
+            return false;
+        }
         subdivision       = other.subdivision;
         patternLengthBars.store(other.patternLengthBars.load());
         envelopes         = other.envelopes;
+        hasEnvelopes.store(!envelopes.empty(), std::memory_order_relaxed);
+        mu_core::spinUnlock(editLock);
         mu_core::spinUnlock(other.editLock);
 
+        gateLevel   = 0.0f;
+        filterLevel = 1.0f;
+        resetGateCache();
+        return true;
+    }
+
+    // Takes the pattern content of `fresh` by exchange, so nothing is copied, allocated or freed
+    // here: the envelopes this pattern held leave in `fresh` and die when the caller destroys it
+    // after unlocking. For a reset, where `fresh` is a private default nobody else sees. Takes this
+    // pattern's editLock (capped spin); false if it stayed busy, with both patterns unchanged.
+    bool adoptDataFrom(GatePattern& fresh) noexcept
+    {
+        if (this == &fresh) return true;
+        if (! mu_core::spinLockFor(editLock, 1000)) return false;
+        const auto sub = subdivision;
+        subdivision    = fresh.subdivision;
+        fresh.subdivision = sub;
+        const int bars = patternLengthBars.load();
+        patternLengthBars.store(fresh.patternLengthBars.load());
+        fresh.patternLengthBars.store(bars);
+        envelopes.swap(fresh.envelopes);
         hasEnvelopes.store(!envelopes.empty(), std::memory_order_relaxed);
+        fresh.hasEnvelopes.store(!fresh.envelopes.empty(), std::memory_order_relaxed);
+        mu_core::spinUnlock(editLock);
+
         gateLevel   = 0.0f;
         filterLevel = 1.0f;
         resetGateCache();

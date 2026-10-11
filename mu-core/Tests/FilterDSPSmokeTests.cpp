@@ -24,6 +24,7 @@
 #include "Audio/Filters/LowShelfFilter.h"
 #include "Audio/Filters/HighShelfFilter.h"
 #include "Audio/Filters/CombMinusFilter.h"
+#include "Audio/MultiModeFilter.h"
 class FilterDSPSmokeTest : public juce::UnitTest
 {
 public:
@@ -114,6 +115,41 @@ public:
         { Bp12Filter f; smokeFilter(f, "Bp12Filter-HiRes", 2000.0f, 0.99f); }
 
         // ── Extreme cutoff frequencies ────────────────────────────────────────
+        beginTest ("MultiModeFilter: resetSmoothers makes a reused filter render like a fresh one");
+        {
+            const double sr = 48000.0; const int ns = 512;
+            juce::Random rng(11);
+            juce::AudioBuffer<float> in(1, ns);
+            for (int i = 0; i < ns; ++i) in.setSample(0, i, rng.nextFloat() * 0.8f - 0.4f);
+
+            auto configure = [](MultiModeFilter& f, float drive, float lowCut)
+            {
+                f.setType(0); f.setCutoff(2000.0f); f.setResonance(0.2f);
+                f.setDrive(drive); f.setLowCut(lowCut);
+            };
+
+            // The previous tenant: full drive and a high low-cut, run until the smoothers settle there.
+            MultiModeFilter used;  used.prepare(sr, ns, 1);
+            configure(used, 1.0f, 800.0f);
+            for (int b = 0; b < 8; ++b) { juce::AudioBuffer<float> t(in); used.process(t, ns, 1); }
+
+            used.reset();
+            used.resetSmoothers();
+
+            // The new tenant's settings (low-cut off: the low-cut ladder keeps its own internal smoothing,
+            // which this does not reset); the fresh filter starts from the prepared state.
+            MultiModeFilter fresh; fresh.prepare(sr, ns, 1);
+            configure(used, 0.3f, 0.0f);
+            configure(fresh, 0.3f, 0.0f);
+
+            juce::AudioBuffer<float> a(in), b(in);
+            used.process(a, ns, 1);
+            fresh.process(b, ns, 1);
+            float maxDiff = 0.0f;
+            for (int i = 0; i < ns; ++i) maxDiff = juce::jmax(maxDiff, std::abs(a.getSample(0, i) - b.getSample(0, i)));
+            expectLessThan(maxDiff, 1.0e-6f, "a reused filter must not carry the old drive / low-cut ramp");
+        }
+
         beginTest ("Lp12Filter: low cutoff (20 Hz) - no crash, no NaN");
         { Lp12Filter f; smokeFilter(f, "Lp12Filter-LowCut", 20.0f, 0.3f); }
 
