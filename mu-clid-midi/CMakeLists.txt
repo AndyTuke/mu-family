@@ -25,8 +25,8 @@ juce_add_plugin(mu-clid-midi
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     VERSION         "${MUFAMILY_PLUGIN_VERSION}"
     COMPANY_COPYRIGHT "${MUFAMILY_COPYRIGHT}"
-    ICON_BIG   "${CMAKE_CURRENT_SOURCE_DIR}/resources/Icon.png"
-    ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/Icon.png"
+    ICON_BIG   "${CMAKE_CURRENT_SOURCE_DIR}/resources/IconLite.png"
+    ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/IconLite.png"
 )
 
 # Custom VERSIONINFO with the Greek mu. Windows-only: the .rc and the JUCE `<target>_rc_lib` target
