@@ -130,6 +130,26 @@ bool ProcessorBase::perform(const mu_core::ControlAction& a)
     }
 }
 
+namespace
+{
+// The test storage root (empty when unset). A function-local so there is no static-init order issue.
+juce::File& storageRootOverride()
+{
+    static juce::File root;
+    return root;
+}
+}
+
+ProcessorBase::ScopedStorageRoot::ScopedStorageRoot(const juce::File& root)
+{
+    storageRootOverride() = root;
+}
+
+ProcessorBase::ScopedStorageRoot::~ScopedStorageRoot()
+{
+    storageRootOverride() = juce::File();
+}
+
 void ProcessorBase::initAppSettings(const juce::String& name)
 {
     appName = name;
@@ -138,7 +158,10 @@ void ProcessorBase::initAppSettings(const juce::String& name)
     opts.filenameSuffix      = "xml";
     opts.folderName          = "TDP";
     opts.osxLibrarySubFolder = "Application Support";
-    auto settingsFile = opts.getDefaultFile();
+    const auto& testRoot = storageRootOverride();
+    auto settingsFile = testRoot != juce::File()
+                          ? testRoot.getChildFile("settings").getChildFile(name + ".xml")
+                          : opts.getDefaultFile();
     settingsFile.getParentDirectory().createDirectory();
     appSettings = std::make_unique<juce::PropertiesFile>(settingsFile, opts);
 
@@ -161,6 +184,8 @@ juce::File ProcessorBase::getContentDir() const
         if (const auto stored = appSettings->getValue("contentDir"); stored.isNotEmpty())
             return juce::File(stored);
     if (appName.isEmpty()) return {};
+    if (const auto& testRoot = storageRootOverride(); testRoot != juce::File())
+        return testRoot.getChildFile("content").getChildFile(appName);
     return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
                .getChildFile("TDP").getChildFile(appName);
 }

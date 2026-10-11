@@ -255,6 +255,19 @@ public:
     // picked (saved as "contentDir"). Invalid before initAppSettings; the shell tolerates that.
     virtual juce::File getContentDir() const;
 
+    // Tests only (message thread): while one is alive, initAppSettings puts the settings file and the
+    // *_midiControl.json map under <root>/settings/ and getContentDir() defaults to
+    // <root>/content/<appName>, so building a processor never touches the user's real TDP folders.
+    // Production code never creates one. Not nestable: the destructor clears the override.
+    class ScopedStorageRoot
+    {
+    public:
+        explicit ScopedStorageRoot(const juce::File& root);
+        ~ScopedStorageRoot();
+        ScopedStorageRoot(const ScopedStorageRoot&) = delete;
+        ScopedStorageRoot& operator=(const ScopedStorageRoot&) = delete;
+    };
+
     // Licence state. A product with no licensing model (it never calls initLicensing) always counts as
     // licensed; otherwise licensed means the offline signed .lic verifies OR the machine is
     // online-activated. Nothing is gated on it: it only marks a supporter (see isSupporter).

@@ -9,6 +9,7 @@ target_sources(mu-core-tests PRIVATE
     LayerAccessTests.cpp
     LayerOwnershipTests.cpp
     ProductLayerSetupTests.cpp
+    ScopedStorageRootTests.cpp
     ChannelStateResetTests.cpp
     SupportPromptPolicyTests.cpp
     SettingsOverlayFitTests.cpp
