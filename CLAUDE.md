@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Family-shared guidance for Claude Code working in this monorepo. **Product-specific rules live under each plugin's own CLAUDE.md** ([mu-clid/CLAUDE.md](mu-clid/CLAUDE.md), [mu-tant/CLAUDE.md](mu-tant/CLAUDE.md), [mu-toni/CLAUDE.md](mu-toni/CLAUDE.md), [mu-on/CLAUDE.md](mu-on/CLAUDE.md)) — read the one matching the product you're working on, in addition to this file.
+Family-shared guidance for Claude Code working in this monorepo. **Product-specific rules live under each plugin's own CLAUDE.md** ([mu-clid/CLAUDE.md](mu-clid/CLAUDE.md), [mu-clid-midi/CLAUDE.md](mu-clid-midi/CLAUDE.md), [mu-tant/CLAUDE.md](mu-tant/CLAUDE.md), [mu-toni/CLAUDE.md](mu-toni/CLAUDE.md), [mu-on/CLAUDE.md](mu-on/CLAUDE.md)) — read the one matching the product you're working on, in addition to this file.
 
 ## Monorepo layout
 
@@ -8,7 +8,7 @@ Family-shared guidance for Claude Code working in this monorepo. **Product-speci
 mu-core/        Shared audio + FX + modulation + mixer UI + ProcessorBase + EditorShellBase (INTERFACE library)
 mu-control/     (planned, created with the first controller work) Controller drivers, mapping and surface model; depends on mu-core, never the reverse
 mu-clid/        Euclidean rhythm sequencer + sample trigger plugin (VST3 + CLAP + Standalone)
-mu-clid-midi/   (planned) Euclidean MIDI effect, the former mu-Clid Lite, shown as mu-Clid MIDI — no audio, free, VST3 + CLAP; shares Rhythm / .muRhythm with mu-Clid. Today it is still built from mu-clid/
+mu-clid-midi/   mu-Clid MIDI: Euclidean MIDI effect, the former mu-Clid Lite — no audio, free, VST3 + CLAP; shares Rhythm / .muRhythm with mu-Clid (see mu-clid-midi/CLAUDE.md)
 mu-tant/        Wavetable drone synth — 8 voices, mixer, modulators, gate-pattern grid (VST3 + CLAP + Standalone)
 mu-toni/        Generative arpeggiator mono-synth — scale/chord note pool, skewed-triangle scan, freeware (VST3 + CLAP + Standalone)
 mu-on/          909-style groove sequencer — Kick/Bass/Hat/Snare lanes, step grid, bass↔kick sidechain

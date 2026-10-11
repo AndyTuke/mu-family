@@ -9,10 +9,9 @@ Product-specific guidance for working in `mu-clid/`. Read alongside the family-w
 ## Build targets
 
 - `mu-clid` — full plugin (VST3 + CLAP + Standalone)
-- `mu-clid-lite` — single-rhythm MIDI-effect variant (VST3 + CLAP)
 - `mu-clid-tests` — console UnitTest runner; **`EXCLUDE_FROM_ALL TRUE`**, built on demand via `cmake --build build --target mu-clid-tests`. **Deliberate divergence from mu-tant-tests** (which builds every default build): mu-clid's Release build deploys to testers via OneDrive, and compiling the heavy 140-test suite (links `juce_audio_processors` + many cpps) on every tester-deploy build costs time for no deploy benefit. mu-tant is small + Debug-only/local, so building its tests every time is cheap. This is a build-speed concession, not family-consistency drift — keep the split unless the deploy-build cost stops mattering.
 
-Release build of `mu-clid_Standalone` triggers the OneDrive post-build deploy to `MUFAMILY_WIN_DIST`. Debug skips deploy. Lite installer requires Inno Setup.
+Release build of `mu-clid_Standalone` triggers the OneDrive post-build deploy to `MUFAMILY_WIN_DIST`. Debug skips deploy. The installer requires Inno Setup.
 
 ## Source layout
 
@@ -28,7 +27,7 @@ mu-clid/Source/
 │                     subsections; the Insert subsection + the ModulatorPanel /
 │                     ModMatrixPanel / ModulatorEditor / MixerOverlay are shared
 │                     from mu-core), RhythmCircle, RhythmMiniVisual, RhythmSidebar,
-│                     RhythmPanel, SampleBrowser, SettingsOverlay, MasterLoopSection, LiteEditor
+│                     RhythmPanel, SampleBrowser, SettingsOverlay, MasterLoopSection
 ├── Persistence/      PresetIO + PresetIO_HostState, PresetMigrations, RhythmParamTable + helpers
 ├── License/          LicenseChecker
 └── Tests/            juce::UnitTest suite
@@ -37,6 +36,8 @@ mu-clid/Source/
 All mu-Clid code is in namespace `mu_clid` (migrations in `mu_clid::migrate`); only `createPluginFilter` and `StandaloneApp.cpp` glue are global. `ScopedApvtsLoading` lives in `mu-core/Persistence` (`mu_core`).
 
 The editor shell (TransportBar, About, Save, PresetBrowser, MIDI-preset panels, StatusBar, overlay state machine, layout, keybindings) lives in `mu-core/UI/EditorShellBase.h` — `PluginEditor` extends it and supplies sidebar (`RhythmSidebar`) + main panel (`RhythmPanel`) + mixer overlay + settings overlay.
+
+**Shared with mu-Clid MIDI.** `Sequencer/Rhythm`, `Sequencer/SequencerEngine`, `Sequencer/RhythmPlayState.h`, `Persistence/RhythmParamTable.h`, `Persistence/PresetHelpers.h`, `UI/EuclideanPanel` and `UI/RhythmCircle` are also compiled into [mu-clid-midi](../mu-clid-midi/CLAUDE.md) (a recorded exception until they move to mu-core). They must not include `Plugin/PluginProcessor.h`; `EuclideanPanel` takes a `ProcessorBase&`, and the live modulation arcs reach it through its `modulationSnapshot` callback.
 
 ## Design documents
 

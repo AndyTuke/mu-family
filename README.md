@@ -5,7 +5,7 @@ Audio plugins and tools for Windows (Linux in beta; macOS on hold).
 | Product | Description | Format |
 |---|---|---|
 | **μ-Clid** | Euclidean rhythm sequencer + sample trigger | VST3 · CLAP · Standalone |
-| **μ-Clid Lite** | Single-track euclidean MIDI sequencer — free | VST3 · CLAP |
+| **μ-Clid MIDI** | Single-rhythm euclidean MIDI effect (the former μ-Clid Lite) — free | VST3 · CLAP |
 | **μ-Tant** | Wavetable drone synth with envelope gate sequencer | VST3 · CLAP · Standalone |
 | **μ-link** | BPM + transport sync hub for the μ-series standalone apps | Standalone |
 
@@ -17,7 +17,7 @@ Website: [transwarp.me](https://transwarp.me)
 
 Up to 8 independent polyrhythmic Euclidean rhythm slots, each with two hit generators (independent step count, hits, rotation, offset) combined through boolean logic gates (AND / OR / XOR / A Only / B Only). Each slot plays a sample through a full voice chain — pitch, filter, amp ADSR envelopes, insert effect — with sends to a shared Effect / Delay / Reverb bus. Up to 8 LFO/step modulators per rhythm. Hot-swap presets while playing.
 
-**μ-Clid Lite** is a free, permanently unlicensed single-track variant: one rhythm slot, full euclidean engine, MIDI note output only (no sample engine), save enabled, no time limit.
+**μ-Clid MIDI** is a separate, free product (the former μ-Clid Lite): one rhythm, the full euclidean engine, MIDI note output only (no sample engine). It shares the rhythm preset format with μ-Clid.
 
 ## μ-Tant
 
@@ -33,7 +33,8 @@ A lightweight standalone sync hub. Connects μ-Clid and μ-Tant standalone apps 
 
 ```
 mu-core/        Shared audio engine, FX, modulation, mixer UI (INTERFACE library)
-mu-clid/        μ-Clid + μ-Clid Lite source
+mu-clid/        μ-Clid source
+mu-clid-midi/   μ-Clid MIDI source — the Euclidean MIDI effect
 mu-tant/        μ-Tant source
 mu-link/        μ-link sync hub
 mu-on/          909-style groove sequencer — alpha, in development
