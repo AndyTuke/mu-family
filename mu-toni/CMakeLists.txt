@@ -18,7 +18,7 @@ juce_add_plugin(mu-toni
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
-    VERSION         "${MUFAMILY_PLUGIN_VERSION}"
+    VERSION         "${MUFAMILY_PRE_PLUGIN_VERSION}"   # pre-release 0.1 line
     COMPANY_COPYRIGHT "${MUFAMILY_COPYRIGHT}"
     ICON_BIG   "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
     ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
@@ -46,6 +46,7 @@ target_compile_definitions(mu-toni
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
+        "MU_VERSION_BASE=\"${MUFAMILY_PRE_VERSION_BASE}\""   # pre-release 0.1 line shown in About
 )
 
 target_link_libraries(mu-toni

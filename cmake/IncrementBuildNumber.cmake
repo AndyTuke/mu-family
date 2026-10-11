@@ -13,6 +13,9 @@ file(READ "${COUNTER_FILE}" BUILD_NUMBER)
 string(STRIP "${BUILD_NUMBER}" BUILD_NUMBER)
 file(READ "${ROOT_DIR}/version.txt" VERSION_BASE)   # family major.minor, e.g. 1.1
 string(STRIP "${VERSION_BASE}" VERSION_BASE)
+# Pre-release products (mu-On, mu-Toni) use their own major.minor (0.1), same shared build number.
+file(READ "${ROOT_DIR}/version-pre.txt" PRE_VERSION_BASE)
+string(STRIP "${PRE_VERSION_BASE}" PRE_VERSION_BASE)
 
 # Versioning policy (owner rules):
 #   Debug   — EVERY Debug build increments by exactly 1. No time/session throttle:
@@ -46,7 +49,11 @@ endif()
 
 # Runtime number + full version string for the About panel and update banner.
 file(WRITE "${HEADER_FILE}"
-    "#pragma once\n#define BUILD_NUMBER ${BUILD_NUMBER}\n#define MU_VERSION_STRING \"${VERSION_BASE}.0.${BUILD_NUMBER}\"\n")
+    "#pragma once\n#define BUILD_NUMBER ${BUILD_NUMBER}\n"
+    "// Live products use this base; pre-release products override MU_VERSION_BASE per target.\n"
+    "#ifndef MU_VERSION_BASE\n#define MU_VERSION_BASE \"${VERSION_BASE}\"\n#endif\n"
+    "#define MU_STR_(x) #x\n#define MU_STR(x) MU_STR_(x)\n"
+    "#define MU_VERSION_STRING MU_VERSION_BASE \".0.\" MU_STR(BUILD_NUMBER)\n")
 
 # ── Regenerate the Windows version resources from THIS (post-increment) number ──
 # The .rc is otherwise baked at configure time (before the build-time bump), which
@@ -61,6 +68,13 @@ if(NOT DEFINED MUFAMILY_COPYRIGHT)
 endif()
 foreach(_n 1 2 3 4 5 6)
     if(DEFINED RC${_n}_IN AND DEFINED RC${_n}_OUT AND EXISTS "${RC${_n}_IN}")
+        # Pre-release products (RC4 mu-Toni, RC5 mu-On) carry the 0.1 base in their file version.
+        if(_n EQUAL 4 OR _n EQUAL 5)
+            set(MUFAMILY_PLUGIN_VERSION "${PRE_VERSION_BASE}.0.${BUILD_NUMBER}")
+        else()
+            set(MUFAMILY_PLUGIN_VERSION "${VERSION_BASE}.0.${BUILD_NUMBER}")
+        endif()
+        string(REPLACE "." "," MUFAMILY_FILEVERSION "${MUFAMILY_PLUGIN_VERSION}")
         configure_file("${RC${_n}_IN}" "${RC${_n}_OUT}" @ONLY NEWLINE_STYLE CRLF)
     endif()
 endforeach()

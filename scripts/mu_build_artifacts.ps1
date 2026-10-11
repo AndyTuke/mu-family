@@ -31,7 +31,7 @@ $items = @(
     [pscustomobject]@{ Name='mu-Toni Standalone'; Path="$buildRoot\mu-toni\mu-toni_artefacts\{0}\Standalone\mu-Toni.exe"         }
 )
 
-$verBase    = (Get-Content -Raw (Join-Path $PSScriptRoot '..\version.txt')).Trim()   # family major.minor
+$verBase    = (Get-Content -Raw (Join-Path $PSScriptRoot '..\version.txt')).Trim()   # live products' major.minor (mu-On / mu-Toni show version-pre.txt)
 $debugVer   = if ($debugNum)   { "v$verBase.$debugNum" }   else { $null }
 $releaseVer = if ($releaseNum) { "v$verBase.$releaseNum" } else { $null }
 

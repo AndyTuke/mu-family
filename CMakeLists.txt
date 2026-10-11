@@ -79,7 +79,12 @@ set(MUFAMILY_COPYRIGHT "Copyright (c) ${MUFAMILY_YEAR} Transwarp Development Pro
 # string is already 4-part so a straight replace gives the right quad.
 string(REPLACE "." "," MUFAMILY_FILEVERSION "${MUFAMILY_PLUGIN_VERSION}")
 
-message(STATUS "mu-family version: ${MUFAMILY_PLUGIN_VERSION}")
+# Pre-release products (mu-On, mu-Toni) version as <version-pre.txt>.0.<shared build number>.
+file(READ "${CMAKE_SOURCE_DIR}/version-pre.txt" MUFAMILY_PRE_VERSION_BASE)
+string(STRIP "${MUFAMILY_PRE_VERSION_BASE}" MUFAMILY_PRE_VERSION_BASE)
+set(MUFAMILY_PRE_PLUGIN_VERSION "${MUFAMILY_PRE_VERSION_BASE}.0.${MUFAMILY_BUILD_NUMBER}")
+
+message(STATUS "mu-family version: ${MUFAMILY_PLUGIN_VERSION} (pre-release products: ${MUFAMILY_PRE_PLUGIN_VERSION})")
 
 # Distribution paths the plugin subdirs reference for installer + deploy hooks.
 # Cached so cmake/IncrementBuildNumber.cmake and per-plugin installers can find them.
