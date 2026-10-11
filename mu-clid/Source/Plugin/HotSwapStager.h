@@ -64,7 +64,7 @@ public:
     bool hasPendingFullPreset() const;
 
     // Audio-thread: scan all pending swaps and flag any that have reached a loop boundary.
-    // Returns true if triggerAsyncUpdate() should be called.
+    // Returns true if a swap commit should be requested (requestSwapCommit).
     bool checkBoundaries(int numRhythms, bool masterLoopWrapped, int rhythmLoopWrapMask);
 
     // Install a prepared rhythm into slot `r`: the outgoing engine retires (it keeps rendering its

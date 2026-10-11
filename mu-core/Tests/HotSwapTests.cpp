@@ -320,6 +320,51 @@ struct HotSwapTests : juce::UnitTest
             expect(! st.consume(0, [](int&) {}));
         }
 
+        beginTest("CommitMailbox: the drain commits flagged swaps, and does nothing without a request");
+        {
+            Log log; Swapper sw; wire(log, sw);
+            CommitMailbox mailbox;
+            int drains = 0;
+            auto drain = [&] { return mailbox.drain([&] { ++drains; sw.commit(); }); };
+
+            sw.flagBoundaries(true, 0.0, 0.5);
+            sw.useSlot(1, 3);
+            expect(! drain() && drains == 0 && log.events.empty(), "no request: the drain does nothing");
+
+            // The audio thread's side: flag at the bar line, then ask for the commit.
+            if (sw.flagBoundaries(true, 3.9, 0.2)) mailbox.request();
+            expect(mailbox.isPending());
+            expect(drain() && drains == 1, "a request runs the commit once");
+            expect(log.events.size() == 1 && log.events[0] == "slot1 3", "the flagged swap landed");
+            expect(! mailbox.isPending() && ! drain() && drains == 1, "the request is consumed");
+
+            // A request with nothing flagged (e.g. the swap was cancelled) commits nothing.
+            sw.useSlot(2, 4);
+            mailbox.request();
+            expect(drain() && log.events.size() == 1, "an unflagged swap is not committed by a stray request");
+            expect(sw.hasPending(2));
+        }
+
+        beginTest("Stager: a stage made inside apply survives and the applied payload is intact");
+        {
+            Stager<int, int, 2> st;
+            st.stage(0, 1);
+            st.flagIfReady(0, true);
+            int seen = 0;
+            expect(st.consume(0, [&](int& v) { seen = v; st.stage(0, 2); expect(v == 1, "payload unchanged by the re-stage"); }));
+            expect(seen == 1);
+            expect(st.hasPending(0), "the re-staged payload is pending");
+            expect(st.flagIfReady(0, true));
+            int got = 0;
+            expect(st.consume(0, [&got](int& v) { got = v; }) && got == 2, "and commits on its own boundary");
+
+            st.stageFull(5);
+            st.flagFullIfReady(true);
+            expect(st.consumeFull([&](int&) { st.stageFull(6); }));
+            int full = 0;
+            expect(st.hasFullPending() && st.consumeFullNow([&full](int& v) { full = v; }) && full == 6);
+        }
+
         beginTest("Stager threaded stress: no commit without a boundary, no lost payload, no double apply");
         {
             runStagerStress(false);

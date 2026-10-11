@@ -215,10 +215,14 @@ public:
     // Default: the standard wrapped preset; false (after onLoadError) when it can't be written.
     virtual bool               saveFullPresetTo(const juce::File& file);
 
-    // Headless render: the render loop never returns to the message loop, so triggerAsyncUpdate()
-    // is never serviced. Call after each processBlock so deferred work (hot-swap commits, MIDI
+    // Headless render: the render loop never returns to the message loop, so neither the swap poll
+    // timer nor triggerAsyncUpdate() is serviced. Call after each processBlock so deferred work (hot-swap commits, MIDI
     // program changes) runs on the calling thread. No-op when nothing is pending.
-    void flushPendingAsyncUpdates() { handleUpdateNowIfNeeded(); }
+    void flushPendingAsyncUpdates()
+    {
+        drainSwapCommits();
+        handleUpdateNowIfNeeded();
+    }
 
     // Default preset: <presets>/_default.<ext>, written by the shell's "Save as Default". Each
     // product calls loadStartupDefault() at the end of its constructor so a saved default is
@@ -403,6 +407,10 @@ protected:
 
     // pollHostTransport() (publishes the host playhead for the UI) lives in ProcessorCore.
 
+    // Message thread: run the deferred work now if the audio thread asked for a swap commit.
+    // Returns true when it ran.
+    bool drainSwapCommits() { return swapMailbox.drain([this] { handleAsyncUpdate(); }); }
+
     // Deferred message-thread work first (product hot-swap commits), then program changes.
     void handleAsyncUpdate() final
     {
@@ -413,8 +421,8 @@ protected:
         midiControlRouter.drain(*this);
     }
 
-    // Message-thread work the audio thread asked for with triggerAsyncUpdate()
-    // (e.g. hot-swap commits at a loop boundary). Runs before queued program
+    // Message-thread work the audio thread asked for (hot-swap commits at a loop boundary, via
+    // the swap poll; MIDI program changes, via triggerAsyncUpdate()). Runs before queued program
     // changes are loaded. Default: nothing.
     virtual void commitDeferredWork() {}
 
@@ -425,6 +433,17 @@ protected:
     // Audio-thread flagging uses atomics only; the appliers run on the message thread.
     mu_hotswap::LayerSwapper<juce::ValueTree, mu_limits::kMaxLayers> layerSwapper;
 
+    // The audio thread's commit request and the 30 Hz message-thread timer that drains it. The
+    // timer does nothing but check the flag.
+    mu_hotswap::CommitMailbox swapMailbox;
+    struct SwapPoll final : private juce::Timer
+    {
+        explicit SwapPoll(ProcessorBase& o) : owner(o) { startTimerHz(30); }
+        ~SwapPoll() override { stopTimer(); }
+        void timerCallback() override { owner.drainSwapCommits(); }
+        ProcessorBase& owner;
+    } swapPoll { *this };
+
     // Audio thread, once per block after the transport resolved: flag the staged swaps whose
     // boundary passed (`loopBeatsFor(slot)`, see LayerSwapper::flagBoundaries) and schedule the commit.
     template <typename LoopBeatsFor>
@@ -432,7 +451,7 @@ protected:
                             LoopBeatsFor&& loopBeatsFor) noexcept
     {
         if (layerSwapper.flagBoundaries(isPlaying, blockStartBeat, blockBeats, loopBeatsFor))
-            triggerAsyncUpdate();
+            requestSwapCommit();
     }
 
     // Products call this from prepareToPlay and releaseResources: the host is not driving
@@ -443,8 +462,12 @@ protected:
     void flagSwapBoundaries(bool isPlaying, double blockStartBeat, double blockBeats) noexcept
     {
         if (layerSwapper.flagBoundaries(isPlaying, blockStartBeat, blockBeats))
-            triggerAsyncUpdate();
+            requestSwapCommit();
     }
+
+    // Audio thread: ask the message thread to commit the swaps just flagged. An atomic flag, not
+    // triggerAsyncUpdate() (which allocates); the swap poll timer drains it within ~33 ms.
+    void requestSwapCommit() noexcept { swapMailbox.request(); }
 
     // A new default layer for slot `slot`, fully built and prepared (it is published as is, under
     // the lock, so nothing may be left to allocate). Null when the product's layer count is fixed.

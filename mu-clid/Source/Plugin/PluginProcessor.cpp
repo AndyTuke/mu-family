@@ -336,7 +336,7 @@ void PluginProcessor::advanceSequencer(int numRhythms, double beatPos)
     // Hot-swap: check if any staged rhythm preset should be committed at this boundary.
     if (hotSwapStager.checkBoundaries(numRhythms, blockResult.masterLoopWrapped,
                                       blockResult.rhythmLoopWrapMask))
-        triggerAsyncUpdate();
+        requestSwapCommit();
 
     // Update UI play-state atomics.
     const float frac = static_cast<float>(

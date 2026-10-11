@@ -6,6 +6,7 @@
 #include <cmath>
 #include <functional>
 #include <utility>
+#include <juce_events/juce_events.h>
 
 // Loop-boundary preset hot-swap, shared by every product. While the transport plays, a loaded
 // preset is staged (parsed and pre-loaded off the audio thread) and committed when its loop point
@@ -36,6 +37,39 @@ inline bool boundaryReached(bool playing, bool wasPlaying,
     if (wasPlaying && ! playing) return true;
     if (playing)                 return loopWrapped(oldPos, newPos, loopBeats);
     return false;
+}
+
+// The audio thread's "a swap was flagged, commit it" note to the message thread. A plain atomic
+// instead of AsyncUpdater::triggerAsyncUpdate(), which allocates a message and so must not be
+// called from the audio thread; the message thread polls it on a short timer and drains it.
+class CommitMailbox
+{
+public:
+    // Audio thread: lock-free and allocation-free. Release so the flagged word is visible to the drain.
+    void request() noexcept { pending.store(true, std::memory_order_release); }
+
+    // Message thread: runs `commit` once if a request is waiting. The flag is cleared BEFORE the
+    // commit, so a request that lands during the commit is kept for the next drain.
+    template <typename Fn>
+    bool drain(Fn&& commit)
+    {
+        if (! pending.exchange(false, std::memory_order_acq_rel)) return false;
+        commit();
+        return true;
+    }
+
+    bool isPending() const noexcept { return pending.load(std::memory_order_acquire); }
+
+private:
+    std::atomic<bool> pending { false };
+};
+
+// Staging touches payloads without a lock, which is only sound on the message thread. Headless
+// tests with no MessageManager skip the check.
+inline void assertMessageThread() noexcept
+{
+    if (auto* mm = juce::MessageManager::getInstanceWithoutCreating())
+        jassert (mm->isThisTheMessageThread());
 }
 
 // The staging state: N per-slot pending payloads (a channel / voice / layer / lane preset) plus
@@ -180,6 +214,7 @@ private:
     template <typename P, typename V>
     static void put(Slot<P>& s, V&& payload)
     {
+        assertMessageThread();
         const uint32_t gen = (s.word.load(std::memory_order_relaxed) & ~kStateMask) + kGenStep;
         s.word.store(gen | kEmpty, std::memory_order_release);   // invalidates any token / flag in flight
         s.payload = std::move(payload);
@@ -191,6 +226,7 @@ private:
     template <typename P>
     static void clear(Slot<P>& s)
     {
+        assertMessageThread();
         const uint32_t gen = (s.word.load(std::memory_order_relaxed) & ~kStateMask) + kGenStep;
         s.word.exchange(gen | kEmpty, std::memory_order_acq_rel);
         s.payload = P {};
@@ -198,10 +234,12 @@ private:
 
     // Message thread: take the payload when the word is in the wanted state. The word is emptied
     // (new generation) BEFORE the payload is read, so after it nothing on the audio side can touch
-    // the slot, and a later stage() simply starts a new generation.
+    // the slot, and a later stage() simply starts a new generation. The payload is applied from a
+    // local, so a stage() made inside `apply` is safe.
     template <typename P, typename Fn>
     static bool take(Slot<P>& s, uint32_t want, Fn&& apply)
     {
+        assertMessageThread();
         uint32_t w = s.word.load(std::memory_order_acquire);
         for (;;)
         {
@@ -213,8 +251,11 @@ private:
                                              std::memory_order_acq_rel, std::memory_order_acquire))
                 break;
         }
-        apply(s.payload);
+        // Move the payload out first: an apply that stages onto this same slot again must not have
+        // its new payload wiped (or the one being applied overwritten) by this call's clean-up.
+        P local = std::move(s.payload);
         s.payload = P {};
+        apply(local);
         return true;
     }
 
