@@ -36,7 +36,7 @@ mu-clid/Source/
 
 All mu-Clid code is in namespace `mu_clid` (migrations in `mu_clid::migrate`); only `createPluginFilter` and `StandaloneApp.cpp` glue are global. `ScopedApvtsLoading` lives in `mu-core/Persistence` (`mu_core`).
 
-The editor shell (TransportBar, About, Save, PresetBrowser, MIDI-preset panels, StatusBar, demo banner, overlay state machine, layout, keybindings) lives in `mu-core/UI/EditorShellBase.h` — `PluginEditor` extends it and supplies sidebar (`RhythmSidebar`) + main panel (`RhythmPanel`) + mixer overlay + settings overlay.
+The editor shell (TransportBar, About, Save, PresetBrowser, MIDI-preset panels, StatusBar, overlay state machine, layout, keybindings) lives in `mu-core/UI/EditorShellBase.h` — `PluginEditor` extends it and supplies sidebar (`RhythmSidebar`) + main panel (`RhythmPanel`) + mixer overlay + settings overlay.
 
 ## Design documents
 

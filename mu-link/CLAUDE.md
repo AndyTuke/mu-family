@@ -13,7 +13,7 @@ It is **not** a system-wide Windows audio driver. Because we own every client, i
 - **Transport:** shared-memory local bus, mu-products only.
 - **Hardware backend:** runtime-selectable WASAPI/ASIO via JUCE `AudioDeviceManager`.
 - **Coupling:** async double-buffered rings — underrun fills silence + logs, never clicks the master.
-- **Clock:** internal sample-accurate transport (the hardware word clock is the master) + MIDI-clock OUT to outboard gear. **No Ableton Link** (GPL/proprietary — avoided).
+- **Clock:** internal sample-accurate transport (the hardware word clock is the master) + MIDI-clock OUT to outboard gear. **No Ableton Link yet** (the family is GPLv3, so a Link peer under its GPL option is the chosen route — see docs/design-ableton-link.md).
 - **Clock source (L7):** mu-link is master **or** slaves to **external MIDI clock** (manual GUI toggle). When slaving, a tempo **PLL** (`MidiClockEstimator`) smooths the incoming F8 stream and sets only the transport *tempo* — the frame counter stays the timebase, so the bus never inherits MIDI jitter. The estimator is pure/headless-tested; `MidiClockInput` is the JUCE adapter; never let raw MIDI clock become the timebase.
 - **Tempo:** **mu-link is always tempo master** — clients follow the shared `TransportBlock`; a connected client surrenders its own tempo. No client-as-master feedback path.
 - **Summing:** **plain sum first** (Stage L2); per-client level/pan/mute/solo via mu-core `MixerEngine` later (Stage L6).
