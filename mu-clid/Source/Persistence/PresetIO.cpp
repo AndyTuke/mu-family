@@ -407,11 +407,13 @@ bool PresetIO::applyRhythmPreset(const juce::File& file, int targetIndex, bool k
     if (! prepared.voice) return false;
 
     proc.hotSwapStager.cancelPendingIfAny(targetIndex);
+    // Declared before the lock so a force-cut engine destructs after suspend and the lock are released.
+    std::unique_ptr<VoiceEngine> cutVictim;
     proc.suspendProcessing(true);
     {
         const juce::ScopedLock sl(proc.rhythmsLock);
         proc.hotSwapStager.installRhythm(targetIndex, std::move(prepared.rhythm), std::move(prepared.voice),
-                                          prepared.samplePath);
+                                          prepared.samplePath, 0, SequencerEngine::kAnyFrameEpoch, &cutVictim);
     }
     proc.suspendProcessing(false);
 
@@ -829,6 +831,9 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     // in-memory (no parse, no disk I/O — done at stage time), so the lock is held for
     // microseconds and the swap stays glitch-free. The lock is released before the
     // APVTS finalize below so that (post-resume) work doesn't bail the audio thread.
+    // Engines that must not destruct under the lock (force-cut victims, shrunk slots) land here and
+    // free after it is released.
+    std::array<std::unique_ptr<VoiceEngine>, SequencerEngine::MaxRhythms> cutVictims, shrunkEngines;
     proc.suspendProcessing(true);
     {
         const juce::ScopedLock sl(proc.rhythmsLock);
@@ -844,7 +849,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
         // new preset plays, instead of being hard-cut. Grown slots have no old engine.
         proc.hotSwapStager.installRhythm(i, std::move(prepared.rhythms[(size_t) i]),
                                           std::move(prepared.voices[(size_t) i]), prepared.samplePaths[(size_t) i],
-                                          originEff, frameEpoch);
+                                          originEff, frameEpoch, &cutVictims[(size_t) i]);
         // Prepare MIDI engines for freshly-grown slots; existing slots keep theirs.
         if (i >= oldN && proc.currentSampleRate > 0 && proc.currentBlockSize > 0)
             proc.midiEngines[(size_t) i].prepare(proc.currentSampleRate, proc.currentBlockSize);
@@ -853,7 +858,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     // Tear down slots that are no longer active (shrink case).
     for (int i = n; i < oldN; ++i)
     {
-        proc.voiceEngines[(size_t) i].reset();
+        shrunkEngines[(size_t) i] = std::move(proc.voiceEngines[(size_t) i]);
         proc.midiEngines[(size_t) i] = MidiOutputEngine{};
         proc.mixerEngine.channels[(size_t) i].reset();
         proc.samples.setPath(i, juce::String());

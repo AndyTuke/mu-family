@@ -10,6 +10,7 @@ SequencerEngine::SequencerEngine()
     lastStepIndex.fill(-1);
     lastAccentStepIndex.fill(0);
     wasLastStepHit.fill(false);
+    stepSounded.fill(false);
     rhythms.reserve(MaxRhythms);
     cachedPatterns.reserve(MaxRhythms);
     cachedCPatterns.reserve(MaxRhythms);
@@ -65,6 +66,7 @@ void SequencerEngine::removeRhythm(int index)
         lastStepIndex[i]       = lastStepIndex[i + 1];
         lastAccentStepIndex[i] = lastAccentStepIndex[i + 1];
         wasLastStepHit[i]      = wasLastStepHit[i + 1];
+        stepSounded[i]         = stepSounded[i + 1];
         phaseOrigin[i]         = phaseOrigin[i + 1];
         pendingKind[i]         = pendingKind[i + 1];
         cachedOrigin[i]        = cachedOrigin[i + 1];
@@ -76,9 +78,19 @@ void SequencerEngine::removeRhythm(int index)
     lastStepIndex[newN]       = -1;
     lastAccentStepIndex[newN] = 0;
     wasLastStepHit[newN]      = false;
+    stepSounded[newN]         = false;
     phaseOrigin[newN]         = 0;
     pendingKind[newN]         = kNone;
     boundaryEff[(size_t) newN].store(0, std::memory_order_relaxed);
+
+    // A pending reorder holds its partner's slot index in cachedOrigin; slots after the removed one
+    // moved down, so renumber it, and drop the request if the partner itself was removed.
+    for (int i = 0; i < newN; ++i)
+    {
+        if (pendingKind[i] != kAdoptFrom) continue;
+        if (cachedOrigin[i] == index)     pendingKind[i] = kNone;
+        else if (cachedOrigin[i] > index) --cachedOrigin[i];
+    }
 
     mu_core::spinUnlock(patternLock);
 }
@@ -125,6 +137,7 @@ void SequencerEngine::setNumRhythms(int n)
             lastStepIndex[i]       = -1;
             lastAccentStepIndex[i] = 0;
             wasLastStepHit[i]      = false;
+            stepSounded[i]         = false;
             phaseOrigin[i]         = 0;
             pendingKind[i]         = kNone;
             boundaryEff[(size_t) i].store(0, std::memory_order_relaxed);
@@ -295,9 +308,15 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
             {
                 lastStepIndex[r]  = -1;
                 wasLastStepHit[r] = false;
+                stepSounded[r]    = false;
             }
             else if (lastStepIndex[r] != -1)
-                lastStepIndex[r] = floorMod(effectiveStep - 1, len);
+            {
+                lastStepIndex[r]  = floorMod(effectiveStep - 1, len);
+                // The tie flag describes the step the position now sits on, so a hit right after the
+                // wrap is tied only if that step really was one (matters when the length does not divide the loop).
+                wasLastStepHit[r] = safePatterns[r][(size_t) lastStepIndex[r]];
+            }
         }
         phaseOrigin.fill(0);
         for (auto& b : boundaryEff) b.store(0, std::memory_order_relaxed);
@@ -330,7 +349,8 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                     // (the new pattern starts on the next one, no double hit); a commit before the
                     // step was reached fires it at once. -1 is the "fire the current step" sentinel;
                     // the cold-start fill(-1) uses the same one.
-                    if (pendingKind[r] == kStart)
+                    const bool isSwapStart = (pendingKind[r] == kStart);
+                    if (isSwapStart)
                     {
                         phaseOrigin[r] = (cachedEpoch[r] == kAnyFrameEpoch
                                           || cachedEpoch[r] == frameEpoch.load(std::memory_order_relaxed))
@@ -338,10 +358,10 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                         lastAccentStepIndex[r] = 0;
                         // Absorb the boundary step only when the old pattern actually sounded it: if it was
                         // a rest, absorbing would leave the new pattern without its downbeat, so it fires
-                        // late instead (wasLastStepHit still describes the step the old pattern is on).
+                        // late instead (stepSounded still describes the step the old pattern is on).
                         // "Sounded" means the pattern bit: mute and solo act downstream in the mixer while the
                         // voice still triggers, so a muted step is inaudible either way and needs no special case.
-                        const bool oldSoundedThisStep = prevGlobalStep >= 0 && globalStep == prevGlobalStep && wasLastStepHit[r];
+                        const bool oldSoundedThisStep = prevGlobalStep >= 0 && globalStep == prevGlobalStep && stepSounded[r];
                         wasLastStepHit[r]      = false;   // the first new hit must not be "tied" to the old pattern
                         lastStepIndex[r]       = oldSoundedThisStep ? 0 : -1;
                     }
@@ -358,9 +378,11 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                     if (!safePatterns[r].empty() && lastStepIndex[r] != -1)
                     {
                         lastStepIndex[r] = floorMod(effectiveStep - phaseOrigin[r], (int) safePatterns[r].size());
-                        // The step now counts as played, so a later commit in it must judge the new
-                        // pattern's bit there, not the previous pattern's.
-                        wasLastStepHit[r] = safePatterns[r][(size_t) lastStepIndex[r]];
+                        // The tie flag now describes the new pattern's bit for this step, but not for a swap
+                        // start: that voice is fresh, so its first hit must not be tied (flag stays false).
+                        // stepSounded is untouched: this step was not walked, so what sounded is unchanged.
+                        if (! isSwapStart)
+                            wasLastStepHit[r] = safePatterns[r][(size_t) lastStepIndex[r]];
                     }
                     if (!safeCPatterns[r].empty() && lastStepIndex[r] != -1)
                         lastAccentStepIndex[r] = floorMod(effectiveStep - phaseOrigin[r], (int) safeCPatterns[r].size());
@@ -403,6 +425,7 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                     result.accentMask |= (1 << r);
             }
             wasLastStepHit[r] = pattern[stepIndex];
+            stepSounded[r]    = pattern[stepIndex];
         }
         else
         {
@@ -441,6 +464,7 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                         result.tiedMask &= ~(1 << r);
                 }
                 wasLastStepHit[r] = isHit;   // roll forward per-step
+                stepSounded[r]    = isHit;
             }
         }
 

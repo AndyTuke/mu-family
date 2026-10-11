@@ -151,6 +151,10 @@ private:
     // wherever lastStepIndex is reset to -1 (cold start, hot-swap commit,
     // removeRhythm shift).
     std::array<bool, MaxRhythms> wasLastStepHit { };
+    // per-rhythm "did the step the position sits on sound?": set only by the step walk (a hit fired
+    // = true, a rest = false), cleared on a transport restart. Absorbing a changed pattern or a
+    // modulated length does not touch it, so the hot-swap commit rule sees what actually played.
+    std::array<bool, MaxRhythms> stepSounded { };
     std::vector<bool> patternUpdated;
 
     // Hand-over from the message thread to the audio thread, guarded by patternLock with

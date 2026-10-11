@@ -234,16 +234,67 @@ public:
             expect((e.processBlock(beat(0)).rhythmLoopWrapMask & 1) != 0, "step 0 on a cold start is a loop boundary");
         }
 
-        beginTest("A knob change in the boundary step, then a commit in the same step, still fires the new downbeat");
+        beginTest("A knob change in the boundary step, then a commit in the same step, does not double hit");
         {
             SequencerEngine e;
             e.addRhythm(rhythmOf(8));                      // old: every step hits
-            for (int s = 0; s <= 8; ++s) e.processBlock(beat(s));
+            for (int s = 0; s <= 8; ++s) e.processBlock(beat(s));   // the old pattern sounded step 8
             e.getRhythm(0) = restOnZero(3, 8);             // the Euclid knob: step 0 is now a rest
             e.updatePattern(0);
             expect(! fired(e.processBlock(beat(8) + 0.05)), "the knob change absorbs the step, nothing plays");
             commit(e, rhythmOf(4, 8), 8);                  // new: a hit on step 0
-            expect(fired(e.processBlock(beat(8) + 0.10)), "the step was a rest, so the new downbeat must sound");
+            expect(! fired(e.processBlock(beat(8) + 0.10)), "the step already sounded once: no second hit");
+            expect(fired(e.processBlock(beat(9))) || fired(e.processBlock(beat(10))), "the new pattern plays on");
+        }
+
+        beginTest("An absorbed, never-walked step still fires exactly once when a commit follows");
+        {
+            SequencerEngine e;
+            e.addRhythm(restOnZero(3, 8));                 // old: step 8 (its step 0) is a rest
+            for (int s = 0; s <= 8; ++s) e.processBlock(beat(s));
+            e.getRhythm(0) = rhythmOf(8);                  // the knob makes step 0 a hit, absorbed unwalked
+            e.updatePattern(0);
+            int n = fired(e.processBlock(beat(8) + 0.05)) ? 1 : 0;
+            commit(e, rhythmOf(4, 8), 8);                  // new: a hit on step 0
+            for (double off = 0.10; off < 0.24; off += 0.05)
+                n += fired(e.processBlock(beat(8) + off)) ? 1 : 0;
+            expectEquals(n, 1, "nothing sounded in step 8 until the commit: the new downbeat plays once");
+        }
+
+        beginTest("A swap start with legato: the new pattern's first hit is not tied to the old pattern");
+        {
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(8));                      // old: every step hits
+            for (int s = 0; s <= 8; ++s) e.processBlock(beat(s));
+            commit(e, rhythmOf(8), 8);                     // new: hits on 0 and 1, landing mid step 8
+            expect(! fired(e.processBlock(beat(8) + 0.05)), "the boundary step is absorbed");
+            const auto r = e.processBlock(beat(9));
+            expect(fired(r), "step 1 of the new pattern fires");
+            expect((r.tiedMask & 1) == 0, "a fresh voice's first hit must not be tied");
+        }
+
+        beginTest("A master wrap re-seeds the tie flag from the step the position lands on");
+        {
+            // 7 steps in a 16-step loop: step 15 is pattern step 1, but the wrap realigns to step 0
+            // whose predecessor is pattern step 6. Pick a pattern whose steps 0 and 1 hit and 6 rests.
+            Rhythm pat;
+            bool found = false;
+            for (int hits = 2; hits < 7 && ! found; ++hits)
+                for (int rot = 0; rot < 7 && ! found; ++rot)
+                {
+                    Rhythm c = rhythmOf(hits, 7);
+                    c.genA.rotate = rot;
+                    const auto p = c.getCombinedPattern();
+                    if (p[0] && p[1] && ! p[6]) { pat = c; found = true; }
+                }
+            expect(found, "test pattern exists");
+            SequencerEngine e;
+            e.addRhythm(pat);
+            e.setMasterLoopSteps(16);
+            for (int s = 0; s < 16; ++s) e.processBlock(beat(s));
+            const auto r = e.processBlock(beat(16));       // the wrap: pattern step 0 is a hit after a rest
+            expect(fired(r), "pattern step 0 fires at the wrap");
+            expect((r.tiedMask & 1) == 0, "step 6 was a rest, so the hit after the wrap is not tied");
         }
 
         beginTest("A loop-length change and a boundary-step commit in one block do not double hit");
@@ -299,21 +350,40 @@ public:
             expectEquals(commits, 1, "the staged swap commits once");
         }
 
-        beginTest("A modulated length change keeps the pattern's phase");
+        beginTest("A length change seen by the modulation recompute keeps the pattern's phase");
+        {
+            // The Steps knob moved the live rhythm from 5 to 7 steps before the snapshot landed; the
+            // modulation recompute is the first to build the longer pattern.
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(1, 5));                   // one hit on step 0
+            for (int s = 0; s <= 7; ++s) e.processBlock(beat(s));   // old position 2
+            auto& live = e.getRhythm(0);
+            live.genA.steps = 7;
+            live.genB.steps = 7;
+            EuclidOverrides ov;
+            ov.a.hits = 1; ov.b.hits = 0; ov.c.hits = 0;
+            expect(e.tryUpdatePatternFromModulation(0, ov));
+            expectEquals(e.getPatternLength(0), 7, "the recompute built the longer pattern");
+            // The position is re-derived to 0, so step 8 (position 1, a rest) is one step on. Left at the
+            // old 2, the walk would cross the hit on position 0 and fire.
+            const auto r = e.processBlock(beat(8));
+            expect(! fired(r), "no steps replayed after a length change");
+            expect((r.rhythmLoopWrapMask & 1) == 0, "and no false pass start");
+        }
+
+        beginTest("Removing a slot while a reorder is pending renumbers the partner it adopts from");
         {
             SequencerEngine e;
-            e.addRhythm(rhythmOf(8));
-            for (int s = 0; s < 11; ++s) e.processBlock(beat(s));
-            EuclidOverrides ov;
-            ov.a.hits = 8; ov.b.hits = 0; ov.c.hits = 0;
-            ov.a.prePad = 4;
-            const bool ok = e.tryUpdatePatternFromModulation(0, ov);
-            expect(ok);
-            if (e.getPatternLength(0) != 8)                // padding grew the pattern: next step is one step on
-            {
-                const auto r = e.processBlock(beat(11));
-                expect((r.rhythmLoopWrapMask & 1) == 0, "no false pass start from a re-clamped position");
-            }
+            e.addRhythm(rhythmOf(0, 8));                   // slot 0: silent, removed below
+            e.addRhythm(rhythmOf(0, 8));                   // slot 1
+            e.addRhythm(singleHitAt(0, 8));                // slot 2: one hit on its step 0
+            for (int s = 0; s < 10; ++s) e.processBlock(beat(s));
+            e.requestSwapStart(2, 3);                      // its step 0 now falls on effective steps 3, 11, ...
+            e.processBlock(beat(10));
+            e.swapRhythmSlots(1, 2);                       // the hit pattern moves to slot 1, adopting slot 2's phase
+            e.removeRhythm(0);                             // ... and shifts to slot 0 before the audio thread sees it
+            e.processBlock(beat(10) + 0.05);
+            expect(fired(e.processBlock(beat(11))), "the moved pattern keeps its phase: its step 0 is effective step 11");
         }
 
         beginTest("A backward transport jump mid-loop is not a master wrap; the real wrap still is");
