@@ -91,11 +91,19 @@ public:
     }
 
 protected:
-    // Layer storage: fixed capacity, runtime count. The audio thread takes a ScopedTryLock on
-    // `layersLock` once per block and reads layers only inside it; the message thread holds it only
-    // to change the count or move layers, and constructs and destroys layers outside it.
+    // Layer storage: fixed capacity, runtime count. A product whose count or layer order changes at
+    // runtime must have its audio thread take a ScopedTryLock on `layersLock` once per block and read
+    // layers only inside it (mu-Tant does); the message thread holds it only to change the count or
+    // move layers, and constructs and destroys layers outside it. A fixed-count product (mu-Toni,
+    // mu-On) never edits layers after construction and so reads them lock-free by design.
     std::array<std::unique_ptr<Layer>, mu_limits::kMaxLayers> layers;
     std::atomic<int>      numLayers { 0 };
+public:
+    // True for the whole of a structural layer edit (pointer moves and the parameter moves after
+    // them). A product's audio thread skips rendering while it is set, so hosts whose wrapper does
+    // not honour suspendProcessing (CLAP) never play a moved layer with half-shifted parameters.
+    std::atomic<bool>     layerEditInFlight { false };
+protected:
     juce::CriticalSection layersLock;
 
     // True when the product keeps every slot up to kMaxLayers filled for the processor's lifetime

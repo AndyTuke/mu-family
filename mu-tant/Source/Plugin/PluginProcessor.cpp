@@ -293,7 +293,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         // reads the bank, so it must exclude an append too.
         const juce::ScopedTryLock layersTryLock(layersLock);
         const juce::ScopedTryLock bankTryLock(bankLock);
-        if (layersTryLock.isLocked() && bankTryLock.isLocked())
+        if (layersTryLock.isLocked() && bankTryLock.isLocked()
+            && ! layerEditInFlight.load(std::memory_order_acquire))   // a structural edit is still moving parameters
         {
             const int numActiveVoices = numLayers.load(std::memory_order_relaxed);
 
@@ -680,7 +681,10 @@ void PluginProcessor::commitDeferredWork()
 int PluginProcessor::bankIndexFor(const juce::File& file)
 {
     const juce::String path = file.getFullPathName();
-    if (const int found = bank.findByPath(path); found >= 0) return found;
+    {
+        const juce::ScopedLock sl(bankLock);   // the lookup walks the table list an append may reallocate
+        if (const int found = bank.findByPath(path); found >= 0) return found;
+    }
 
     auto wt = bank.decodeFile(file);
     if (wt.frames <= 0) return -1;

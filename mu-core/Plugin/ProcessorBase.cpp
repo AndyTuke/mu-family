@@ -479,19 +479,28 @@ juce::StringArray ProcessorBase::loadCategoryList() const
 namespace
 {
     // Suspends audio processing for the life of one structural edit and restores the earlier state.
-    // JUCE's suspendProcessing is not a barrier against a block already running; layersLock is.
+    // suspendProcessing waits out a running block in the wrappers that hold the callback lock
+    // (VST3, VST2, AU, AAX, LV2, standalone) but not in CLAP, which reads the flag unsynchronised;
+    // layersLock protects the pointer moves in every host. layerEditInFlight additionally tells a
+    // product's audio thread to skip rendering until the parameter moves have finished, so no
+    // block plays a moved layer with half-shifted parameters.
     struct ScopedSuspend
     {
-        explicit ScopedSuspend(juce::AudioProcessor& p) : proc(p), wasSuspended(p.isSuspended())
+        explicit ScopedSuspend(ProcessorBase& p) : proc(p), wasSuspended(p.isSuspended())
         {
+            proc.layerEditInFlight.store(true, std::memory_order_release);
             proc.suspendProcessing(true);
         }
-        ~ScopedSuspend() { proc.suspendProcessing(wasSuspended); }
+        ~ScopedSuspend()
+        {
+            proc.suspendProcessing(wasSuspended);
+            proc.layerEditInFlight.store(false, std::memory_order_release);
+        }
         ScopedSuspend(const ScopedSuspend&)            = delete;
         ScopedSuspend& operator=(const ScopedSuspend&) = delete;
 
-        juce::AudioProcessor& proc;
-        const bool            wasSuspended;
+        ProcessorBase& proc;
+        const bool     wasSuspended;
     };
 
     // Calls fn(param, idSuffix) for every ranged parameter whose id starts with `prefix`.

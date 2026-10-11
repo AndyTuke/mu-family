@@ -43,6 +43,9 @@ public:
 
     // The processor's layer storage owns the per-lane Tracks; we keep a pointer to each (fixed for
     // the processor's lifetime) and read them on the audio thread.
+    // The slot pointers are set once at construction and read on the audio thread without
+    // layersLock: that is safe only while mu-On's layer count and storage never change at runtime.
+    // If layers become editable, take the layer try-lock around resolve() as mu-Tant does.
     void setSlots(const std::array<Layer*, kNumChannels>& s) noexcept { slots = s; }
 
     // The Rumble lane's drawable bar-volume envelope (owned by the processor). Evaluated each

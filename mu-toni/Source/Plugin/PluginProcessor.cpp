@@ -175,13 +175,13 @@ PluginProcessor::PluginProcessor()
     // All eight Arps exist for the processor's lifetime (capacity is fixed, only the count is
     // runtime); mu-Toni's count is fixed at kNumChannels for now.
     for (auto& l : layers) l = std::make_unique<Arp>();
-    numLayers.store(kNumChannels, std::memory_order_relaxed);
+    numLayers.store(kNumChannels, std::memory_order_relaxed);   // fixed for now, so layers are read lock-free
 
     // Per-channel render: each channel runs its own arpeggiator voice into the
     // buffer; the shared mixer applies the strip + master mix downstream.
     renderChannelCb = [this](int ch, juce::AudioBuffer<float>& buf, int n)
     {
-        if (ch >= 0 && ch < mu_limits::kMaxLayers)
+        if (ch >= 0 && ch < kNumChannels)   // only these channels are prepared
         {
             getArp(ch).runner.render(buf, n, arpCtx);
             getArp(ch).insert.process(buf, n, buf.getNumChannels(), getArp(ch).insertCfg);   // engine → insert → mixer

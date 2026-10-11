@@ -98,7 +98,7 @@ public:
     // ─── Structural layer edits (message thread only) ─────────────────────────
     // The one routine every product's add / delete / reorder / reset goes through, in the order
     // the layer-ownership contract fixes (design-plugin-family.md, "Layer ownership and structural
-    // edits"): cancel the affected staged swaps; suspend processing (not a barrier, layersLock is);
+    // edits"): cancel the affected staged swaps; suspend processing and raise layerEditInFlight (suspend is no barrier in every host; layersLock protects the moves);
     // build the new layer before locking; under layersLock move the layer pointers and the mixer
     // strip state and re-point the sidechain sources; unlock, then move the parameter values with
     // processing still suspended; resume; destroy any removed layer last, outside every lock.

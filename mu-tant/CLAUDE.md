@@ -11,7 +11,7 @@ The editor inherits `mu-core/UI/EditorShellBase.h` — same TransportBar, About,
 ## Current scope
 
 **What's implemented**
-- **Dynamic 1–8 voices** (default 1) — `PluginProcessor` tracks `numVoices` with `addVoice`/`removeVoice`/`swapVoices`/`resetVoice` (message-thread, guarded by `voicesLock`; `processBlock` tryLocks). Each voice has 2 wavetable oscillators (`Source/Audio/SynthVoice.{h,cpp}`, `WavetableOscillator.h`, `WavetableBank.{h,cpp}`)
+- **Dynamic 1–8 voices** (default 1) — `PluginProcessor` supplies `createLayer` and the central `ProcessorBase::addLayer`/`removeLayer`/`swapLayers`/`resetLayer` do the edits (message-thread, guarded by the layers lock; `processBlock` tryLocks). Each voice has 2 wavetable oscillators (`Source/Audio/SynthVoice.{h,cpp}`, `WavetableOscillator.h`, `WavetableBank.{h,cpp}`)
 - 12-scale + 12-root tonal centre (`Source/Audio/Scales.h`), shared across voices
 - mu-core multimode filter per voice
 - Per-voice APVTS subtrees (`v{N}_*` for N=0..7) — osc1/osc2/xmod/levels/filter/level/gate/insert; per-voice palette colour allocated on add and following the voice through delete/reorder

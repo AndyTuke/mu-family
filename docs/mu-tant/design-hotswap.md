@@ -193,8 +193,9 @@ Shared, automatic — mu-tant only wires them:
 
 ## 10. Interaction with structural voice edits
 
-`addVoice` / `removeVoice` / `swapVoices` / `resetVoice` shift/swap/reset per-voice
-data by **index**, so they **cancel pending per-voice staged swaps** that the renumber
+The central `ProcessorBase::addLayer` / `removeLayer` / `swapLayers` / `resetLayer` (formerly mu-Tant's
+`addVoice` / `removeVoice` / `swapVoices` / `resetVoice`) shift/swap/reset per-voice
+data by **index**, so they **cancel pending per-voice staged swaps** (through `cancelPendingSwap`) that the renumber
 would misdirect:
 - `removeVoice` / (down-shift renumbers everything from `idx`) → cancel **all** voice swaps.
 - `swapVoices(a,b)` → cancel `a` + `b`.

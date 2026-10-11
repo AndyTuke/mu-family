@@ -242,8 +242,8 @@ C++ identifier changes never touch saved files; the data renames at the end do.
    strings `"Slot"`, `"Slots"`, `"idx"` stay), `saveSlotPreset` / `loadSlotPreset` → `saveLayerPreset` /
    `loadLayerPreset`, `onSlotPresetCommitted` → `onLayerPresetCommitted`, `getPerSlotPresetDir` /
    `Extension` → `getLayerPresetDir` / `Extension`, `applyMidiPresetSlot` → `applyMidiPresetLayer`, the
-   product-local `kMaxChannels` / `kMaxVoices` → `mu_limits::kMaxLayers`. Defer: `resetSlot` (becomes the
-   central `resetLayer` in stage 5), `slotLayer` (disappears with stage 4 ownership), `voiceSlots` and the
+   product-local `kMaxChannels` / `kMaxVoices` → `mu_limits::kMaxLayers`. `resetSlot` → `resetLayer` is done
+   (stage 5 part 1, central in `ProcessorBase`; mu-Clid still has its own until stage 7). Defer: `slotLayer` (disappears with stage 4 ownership), `voiceSlots` and the
    `voiceSlot(i)` accessors (replaced by the derived-type members in stage 1). Keep:
    `captureComposedState` / `applyComposedState` / `toComposedState` ("composed" is not "slot"; the plain
    names `captureState` / `applyState` are taken by the products' own wrappers, and renaming onto them makes
