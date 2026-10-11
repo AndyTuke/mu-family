@@ -55,7 +55,7 @@ short `suspendProcessing` window.
 | [mu-clid/Source/Plugin/HotSwapStager.h/.cpp](../../mu-clid/Source/Plugin/HotSwapStager.h) | The staging state machine: per-rhythm pending slots + one full-preset pending slot, the store-release/load-acquire handshake, `checkBoundaries` (audio thread) and `processSwaps` (message thread). |
 | [mu-clid/Source/Plugin/HotSwapBoundary.h](../../mu-clid/Source/Plugin/HotSwapBoundary.h) | **Pure** loop-boundary predicates (no processor dependency) so the defer decision is unit-testable. |
 | [mu-clid/Source/Persistence/PresetIO.cpp](../../mu-clid/Source/Persistence/PresetIO.cpp) | `stageRhythmPreset`, `loadPreset`, `buildPreparedFullPreset`, `commitStagedFullPreset` — the build + apply bodies. |
-| [mu-clid/Source/Plugin/PluginProcessor.cpp](../../mu-clid/Source/Plugin/PluginProcessor.cpp) | Boundary detection in `advanceSequencer` → `checkBoundaries` → `triggerAsyncUpdate`; `handleAsyncUpdate` → `processSwaps`. |
+| [mu-clid/Source/Plugin/PluginProcessor.cpp](../../mu-clid/Source/Plugin/PluginProcessor.cpp) | Boundary detection in `advanceSequencer` → `checkBoundaries` → `requestDeferredWork()`; `runDeferredWork` (100 Hz message-thread poll) → `processSwaps`. |
 | [mu-clid/Source/Sequencer/SequencerEngine.h](../../mu-clid/Source/Sequencer/SequencerEngine.h) | Emits `BlockResult { rhythmLoopWrapMask, masterLoopWrapped }` and owns the wrap detector. |
 | [mu-core/Audio/MixerEngine.cpp](../../mu-core/Audio/MixerEngine.cpp) | Renders **retired** voice engines (the swap tail) + flags them drained. |
 
@@ -74,8 +74,8 @@ stage() / stageFullPreset()
                                           + loop wrapped this block?
                                             boundaryReached.store(true, release)
                                             return true
-                              ◄───────── triggerAsyncUpdate()
-handleAsyncUpdate()
+                              ◄───────── requestDeferredWork()  (atomic mailbox flag only)
+SwapPoll timer (100 Hz) → runDeferredWork()
   processSwaps()
     suspendProcessing(true) + rhythmsLock
     std::move pending → live slots
@@ -115,9 +115,10 @@ handleAsyncUpdate()
 which consults the **pure predicates** in `HotSwapBoundary.h`:
 
 ```cpp
-// Per-rhythm swap. swapMode 0 (master mode) → every rhythm defers to the master
-// loop point; otherwise each rhythm defers to its OWN loop wrap (bit r).
-perRhythmBoundaryReached(swapMode, r, masterLoopWrapped, rhythmLoopWrapMask)
+// Per-rhythm swap. swapMode 0 (master mode) WITH a master loop set → every rhythm defers
+// to the master loop point; otherwise (own-loop mode, or no master loop to wait for, the
+// free-running default) each rhythm defers to its OWN loop wrap (bit r).
+perRhythmBoundaryReached(swapMode, hasMasterLoop, r, masterLoopWrapped, rhythmLoopWrapMask)
 
 // Full preset. Defers to the master loop when one is defined (a preset spans every
 // rhythm, so the master loop is the musical boundary). FREE-RUNNING (mstrLoop = 0,
@@ -202,7 +203,9 @@ the swap point.** Instead:
 
 ---
 
-## 9. `processSwaps()` (runs in `handleAsyncUpdate`)
+## 9. `processSwaps()` (runs in `runDeferredWork`)
+
+Open design issue (2026-10-11, being fixed): the commit waits for the next ~10 ms poll, so the new pattern starts at the wrong phase relative to the boundary the audio thread flagged. See the Hot-swap section of design-plugin-family.md.
 
 1. **Drain retired-engine cleanup.** Empty-fast-path: scan the cleanup flags; only if
    any is set, `suspendProcessing` once, move out every flagged engine into a local
@@ -236,10 +239,10 @@ the swap point.** Instead:
 
 ## 11. Offline render (the shared `--render`)
 
-The offline render loop never yields to JUCE's message loop, so `triggerAsyncUpdate`
-would never be serviced. The shared render (mu-core `ProductRender.h`) calls
+The offline render loop never yields to JUCE's message loop, so `requestDeferredWork`
+would never be serviced (the 100 Hz `SwapPoll` timer cannot fire). The shared render (mu-core `ProductRender.h`) calls
 `ProcessorBase::flushPendingAsyncUpdates()`
-(`handleUpdateNowIfNeeded`) after each `processBlock` so a staged swap commits
+(drains the deferred-work mailbox) after each `processBlock` so a staged swap commits
 synchronously on the render thread. (Live standalone/plugin pump the message loop
 normally, so they don't need this.)
 
@@ -258,6 +261,7 @@ normally, so they don't need this.)
 - **Full supersedes per-rhythm:** `stageFullPreset` cancels all pending per-rhythm
   swaps so they can't commit onto slots the preset is about to overwrite.
 - **Free-running** (no master loop): the full-preset swap falls back to rhythm 0's
-  loop so it doesn't hang (#653).
+  loop so it doesn't hang (#653), and a per-rhythm swap under "On master loop" timing
+  falls back to that rhythm's own loop (its new step 0 is the rhythm's own boundary).
 - **Spam-swap:** retired slots full → force-cut slot 0.
 - **v2-only presets:** legacy versions are refused at the stage entry point.

@@ -303,8 +303,9 @@ virtual void process(juce::AudioBuffer\<float\>& buffer) = 0;
 
   juce::ApplicationProperties    Stores plugin preferences on disk
 
-  juce::AsyncUpdater             Posts work from audio thread to message
-                                 thread safely
+  (deferred-work mailbox)        Audio thread sets an atomic flag via
+                                 requestDeferredWork(); a 100 Hz timer runs
+                                 runDeferredWork() on the message thread
 
   juce::AbstractFifo             Lock-free FIFO for audio/message thread
                                  communication

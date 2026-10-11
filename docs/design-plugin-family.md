@@ -99,7 +99,7 @@ The standard mu platform is everything in `mu-core/`. New products link `mu-core
 - `Persistence/PresetFiles.h` (`mu_pp`) — shared preset-file handling: safe file names, atomic writes, listing preset files, the category list, and write / read a full preset (the state tree wrapped in `<Mu…Preset name description category>`). The state inside — layer nodes, globals, the composed state — is `Persistence/LayerState.h`.
 - `Persistence/LayerState.h` (`mu_pp`) — the composed slot state every product saves and loads (see [Slot state](#slot-state-presets--sessions--family-standard)): `LayerLayout`, `LayerExtras`, `captureSlot` / `applySlot`, `captureState` / `applyState`, `composeLegacyState`; wrapped by `ProcessorBase::initLayerState` and its capture / apply helpers.
 - `Persistence/PresetMeta.h` (`mu_pp::readPresetMeta`) — a preset's root tag + root attributes (category, description, embed flag, e.g. mu-On's `lane`) read from the opening tag only, never the body. It understands both file shapes (the wrapper's `category` / `description` attributes and mu-Clid's `presetCategory` / `presetDescription`). Every preset list reads files through it — never `parseXML` a whole folder.
-- `UI/StandardSettingsOverlay::addProgramChangeSection(layerTable, fullTable)` — the shared MIDI Program Change section (buttons opening the shared program-change tables). Every product with presets calls it; MIDI program changes are queued on the audio thread (`scanMidiProgramChanges` → `triggerAsyncUpdate`) and loaded in `handleAsyncUpdate` (`drainPendingMidiProgramChanges`).
+- `UI/StandardSettingsOverlay::addProgramChangeSection(layerTable, fullTable)` — the shared MIDI Program Change section (buttons opening the shared program-change tables). Every product with presets calls it; MIDI program changes are queued on the audio thread (`scanMidiProgramChanges` → `requestDeferredWork()`) and loaded in `runDeferredWork` on the message thread (`drainPendingMidiProgramChanges`).
 - `UI/Voice/VoiceBand` — the shared voice band (mu-Clid's layout): Pitch | Filter | Amp | Effects in raised boxes, the FX sends right-aligned in the Effects box beside a narrowed insert dropdown. Products supply the four section components (binding stays product-side); `VoiceBandSection` builds a section from controls a product already owns (two Size-2 rows, `place(control, row, col, span, dropdown)`). Used by mu-Clid (`VoiceSection` subclasses it) and mu-Toni (`EnginePanel`); mu-Tant's voice panel is a different structure and stays product-side.
 - `UI/Voice/InsertSubsection` — the shared insert-effect voice subsection (algorithm dropdown + 4 generic slot knobs), bound to a channel via a constructor prefix (`"r"` / `"v"`); optional product hooks for mod-arc indicators, the Comp/Limiter GR meter, and the algo-switch bulk-write wrapper. Part of the voice section (engine → insert → mixer).
 
@@ -162,6 +162,45 @@ The `mu-core` INTERFACE library (introduced in Stage 33) holds everything shared
 | Standard full presets | `ProcessorBase` (`getFullPresetTag` / `captureFullPreset` / `useLoadedFullPreset`) | Save / load / category list for any product naming its preset tag; mu-Clid keeps PresetIO |
 | Controller-input engine | `mu-core/Control/` (`ControlAction.h`, `ControlSink.h`, `MidiControlMap.{h,cpp}`, `MidiControlRouter.{h,cpp}`, `ParamGestureHold.h`; built, build 1228) | The device-independent half of controller support, namespace `mu_core`. `ControlAction` is the family's control vocabulary (set a parameter, transport, mute / solo a layer, …); `ControlSink` is what performs one (`ProcessorBase` implements it, message thread). `MidiControlMap` is the saved CC / note to action table with MIDI learn (one per processor, stored per user, not per preset). `MidiControlRouter` is the audio-thread to message-thread hand-off: claims mapped messages out of the MIDI buffer, coalesces knob sweeps, quantises mute / solo / stop to the next beat or bar of the resolved transport. `ParamGestureHold` writes a controller sweep as one host gesture (closes after 300 ms quiet). No device bytes, no product names; device drivers, surface layouts and Launchpad mapping stay in `mu-control` (see [design-launchpad.md](design-launchpad.md)) and produce `ControlAction`s the same way |
 | `ModalDialog` + `ConfirmDialog` | `mu-core/UI/ModalDialog.{h,cpp}` + `ConfirmDialog.h` | Themed in-editor modal dialog (replaces `juce::AlertWindow`) + the `mu_ui::messageAsync`/`confirmAsync`/`promptTextAsync`/`confirmQuitAsync` builders (each takes an editor-anchor `Component*`). One shared implementation so every prompt matches; extensible via an injected content component. |
+
+### Headless product processors (the test seam) — ruled 2026-10-11
+
+`ProcessorCore` lets `mu-core-tests` drive a fake. A *real* `PluginProcessor` (mu-Tant, mu-Toni, mu-On,
+mu-Clid) must also be constructible in a console unit target, so layer ownership after construction, the
+structural-edit locks and `processBlock` under a second thread are tested on the real class, not a mirror
+of its constructor. Today they cannot be, for one reason only: `PluginProcessor::createEditor()` is
+defined in `PluginProcessor.cpp` and names `PluginEditor`, which drags the whole UI tree into the link.
+The processor headers and the other processor `.cpp`s already include no UI (mu-Tant's
+`PluginProcessor_APVTS.cpp` is already linked into its tests for this reason). The seam is therefore
+three small rules, no new class and no `ProcessorBase` split:
+
+1. **`createEditor()` is defined in `PluginEditor.cpp`, never in a `PluginProcessor*.cpp`.** Every product
+   (mu-Clid, mu-Tant, mu-Toni, mu-On, mu-Clid MIDI) does the same: `PluginEditor.cpp` ends with
+   `juce::AudioProcessorEditor* PluginProcessor::createEditor() { return new PluginEditor(*this); }`.
+   No new file and no new `PluginProcessor_<Aspect>` (the aspect set in
+   [design-naming.md §3](design-naming.md#files-and-folders) stays `APVTS, Preset, Modulation, Content`).
+   Rule for new code: a processor `.cpp` includes no header from `UI/` and no `PluginEditor.h`.
+2. **`ProcessorBase::ScopedStorageRoot`** (a small RAII type in `ProcessorBase.h`, message thread, tests
+   only). While one is alive, `initAppSettings(name)` puts the settings file and the `*_midi*.json` maps
+   under `<root>/settings/` and `getContentDir()` defaults to `<root>/content/<name>`, so constructing a
+   processor never reads or writes the user's real `TDP` settings, presets or licence folder. The override
+   is a process-wide function-local `juce::File`; production code never sets it.
+3. **Product test targets build the real processor from a shared source list.** A console target cannot
+   link the INTERFACE `mu-core`, so the list of `mu-core` `.cpp`s behind `ProcessorBase` (today the block
+   under "Sources behind ProcessorBase" in `mu-core/Tests/CMakeLists.txt`) moves to one file,
+   `mu-core/cmake/ProcessorTestSources.cmake`, defining `MU_CORE_PROCESSOR_TEST_SOURCES`, included by
+   `mu-core-tests` and by each product's tests. A product adds its own `PluginProcessor*.cpp`, engine and
+   sequencer `.cpp`s and the three licence `.cpp`s (licensed products), and its test `TestMain` creates a
+   `juce::ScopedJuceInitialiser_GUI` (the base starts a message-thread poll timer).
+
+What tests do with it: construct `ExposedXxx : mu_xxx::PluginProcessor` (a test subclass that `using`-exposes
+the protected `layers` / `numLayers` / `layersLock`), call `prepareToPlay(48000, n)` and then
+`processBlock` from a worker thread while the test thread calls `addLayer` / `removeLayer` / `swapLayers` /
+`resetLayer` / `loadUserWavetable` / the swap commit. No audio device, host or editor is involved.
+`ProductLayerSetupTests.cpp` (the constructor mirrors on `TestProcessorCore`) is deleted once the real
+processors are covered (mu-Tant first, then mu-Toni and mu-On, mu-Clid last). Not chosen: a
+`ProcessorBase` split into engine and UI halves (nothing else needs it; `createEditor` is the only UI edge)
+and a test-only constructor on each product (it would be a second construction path to keep in step).
 
 ### Product-specific components (under `<product>/Source/`)
 
@@ -442,7 +481,7 @@ on the build PC), O = needs the owner.
 | 4 | S | Ownership moves to `ProcessorBase` | The `layers` array, `numLayers`, `layersLock`, `createLayer`, `layerAs<T>`; Tant first (its `numVoices` / `voicesLock` become these, `bankLock` split out), then Toni and On at a constant count (4 / 5) with the try-lock added so a later edit is safe; the product's `addVoice` etc. still exist and now move pointers instead of copying data. | as stage 3, plus a new `LayerOwnershipTests` (construct, publish, destroy off-lock) and a listening render with structural edits scripted mid-play |
 | 5 | S | Central edits and the generic stager. **Part 1 done (commit a41c5fd):** `addLayer` / `removeLayer` / `swapLayers` / `resetLayer` in `ProcessorBase` with the hooks `createLayer`, `canEditLayers`, `cancelPendingSwap`, `Layer::onMoved`; mu-Tant adopted (its `addVoice` / `removeVoice` / `swapVoices` / `resetVoice` are gone). Deviations: mu-Tant keeps all 8 `Pattern`s allocated (add / remove reset and re-use a slot rather than creating / destroying one); no `typeId` yet (stage 8); no `onLayersChanged` hook; mu-Clid adopts with stage 7 (`RhythmManager` stays until then). **Part 2 done (commit 8a8be28, ruled 2026-10-11):** the stager storage `mu_hotswap::Stager` stays a template in `mu-core/Plugin/HotSwap.h`; the generic piece is `mu_hotswap::LayerSwapper<Payload, N>` (the old `BarLineSwapper` generalised: the boundary rule is a callable giving the loop length in beats per slot), held by `ProcessorBase` as `layerSwapper` (a `ValueTree` instance, `N = kMaxLayers = 8`) with default `hasPendingSwap` / `hasPendingFullPreset` / `cancelPendingSwap` over it and `flagSwapBoundaries` for the audio thread. mu-Tant's `VoiceHotSwapStager` is deleted and the Toni / On `BarLineSwapper` members are dropped (they now call `flagSwapBoundaries` with the default bar rule); mu-Tant's boundary rule is `mu_tant::swapLoopBeats`; mu-Clid keeps its `PendingRhythm` stager until stage 7. Deviations: (a) N is 8 in Toni and On too (was 4 / 5), so the stager is one size family-wide; (b) `onPresetSwapCommitted` now fires once, after all applies in a commit, rather than between them; (c) mu-Tant decided stage-or-apply itself on `isInternalPlaying()` at first; it now follows the family rule through `useFull` / `useSlot` (see the Hot-swap section). || new `LayerStructureTests`: fill to 8, remove the middle, swap ends, reset; assert parameter values, colour, mixer channel, sidechain source and pending-swap cancel all follow; a two-thread stress test (message thread edits while a loop calls `processBlock`, no allocation, no crash); every `*_roundtrip` and the hot-swap listening tests (`swap`, `slot swap`) |
 | 6 | O | Variable layers in mu-Toni (#1240) and mu-On (#1241); the clip bank (#1277) | See owner decisions below. The clip bank is `Layer::clips`: a clip is a composed slot node (Stage 3 makes a layer loadable from one), launching it is a staged layer swap (Stage 5), and a pad never writes a preset. | tests per feature, written with the decisions |
-| 7 | S | mu-Clid into the container | `Rhythm` gains `VoiceEngine`, `MidiOutputEngine`, play state, retired engines, sample path, modulated-euclid overrides and the modulation previous-state flags (replacing the `std::array`s indexed by rhythm in `PluginProcessor` and `SequencerEngine`); `SequencerEngine` takes `Rhythm&` from the base instead of a `std::vector<Rhythm>`; `Rhythm` becomes non-copyable, with `resetToDefaults()` replacing `r = Rhythm{}` and `add(const Rhythm&)` taking a built `unique_ptr<Rhythm>`; `rhythmsLock` becomes `layersLock`. Highest risk of the plan (about 1580 uses, the Lite build, the retire-tail). | `mu-clid-tests` (build the target explicitly, it is not in ALL), `CLID_roundtrip`, the retire-tail and hot-swap listening tests, Lite build |
+| 7 | S | mu-Clid into the container | (After Stage 2b of "The MIDI-effect product": `mu_core::Rhythm` and `SequencerEngine` are already in mu-core and stay free of engine members.) A `mu_clid::Rhythm : mu_core::Rhythm` gains `VoiceEngine`, `MidiOutputEngine`, play state, retired engines, sample path, modulated-euclid overrides and the modulation previous-state flags (replacing the `std::array`s indexed by rhythm in `PluginProcessor` and `SequencerEngine`); `SequencerEngine` takes `Rhythm&` from the base instead of a `std::vector<Rhythm>`; `Rhythm` becomes non-copyable, with `resetToDefaults()` replacing `r = Rhythm{}` and `add(const Rhythm&)` taking a built `unique_ptr<Rhythm>`; `rhythmsLock` becomes `layersLock`. Highest risk of the plan (about 1580 uses, the Lite build, the retire-tail). | `mu-clid-tests` (build the target explicitly, it is not in ALL), `CLID_roundtrip`, the retire-tail and hot-swap listening tests, Lite build |
 | 8 | O | Registry and `Layer::render` | With the combined instance and the saved-data renames (#1263). Until then the mixer's `RenderChannelFn` stays product-side. | with that work |
 
 Stages 1-3 are order-independent between products (any product can go first). From stage 4 on, do Tant first
@@ -568,8 +607,8 @@ thread only (a) looks the message up in a fixed `std::array<std::atomic<int16_t>
 number → mapping index, or -1; the message thread rewrites it on every edit), (b) for a **knob** mapping stores the
 latest value in `std::atomic<float> latest[kMaxMappings]` and sets a dirty bit (a 127-step sweep coalesces to one write
 and cannot overflow a queue), (c) for an **action** mapping pushes `{mapping, value, dueSample}` into a
-`juce::AbstractFifo` (exactly `pcFifo`'s pattern), then `triggerAsyncUpdate()`. The message-thread drain
-(`handleAsyncUpdate`, beside `drainPendingMidiProgramChanges`) resolves `apvts.getParameter(paramId)` and performs.
+`juce::AbstractFifo` (exactly `pcFifo`'s pattern), then `requestDeferredWork()`. The message-thread drain
+(`runDeferredWork`, beside `drainPendingMidiProgramChanges`) resolves `apvts.getParameter(paramId)` and performs.
 Mapped messages are **removed from the block's `MidiBuffer`** (the scan takes it non-const and runs before the engine
 reads notes), so a mapped pad does not also play a note. `kMaxMappings = 512`; MIDI learn is one packed
 `std::atomic<uint32_t>` the audio thread fills with the first message seen while learn is armed.
@@ -621,6 +660,18 @@ the playing→stopped edge); `kBarBeats` is one 4/4 bar. A load while stopped ap
 
 **Product-side:** the payload (what is pre-built at stage time), which loop is the
 boundary, and the apply.
+
+**Deferred-work mailbox (family rule, 2026-10-11): the audio thread never posts messages.** `ProcessorBase` is no longer a
+`juce::AsyncUpdater` (no `triggerAsyncUpdate` / `handleAsyncUpdate`). The audio thread calls `requestDeferredWork()`, which only
+sets an atomic mailbox flag. A 100 Hz `SwapPoll` timer on the message thread sees the flag and runs `runDeferredWork()`: the
+layer-swap commit (`commitDeferredWork`), MIDI program changes and the control router. `flushPendingAsyncUpdates()` (offline
+render) drains the mailbox synchronously. Any new audio-to-message hand-off uses this mailbox; never `AsyncUpdater`,
+`MessageManager::callAsync` or a `Timer` start from the audio thread. Each destructor stops the poll first.
+
+**Open design issue (2026-10-11, being fixed):** the commit is polled, so it lands up to about 10 ms after the boundary the audio
+thread flagged. The new pattern then starts from its own step 0 at the wrong phase relative to the loop that just wrapped.
+The fix must make the commit phase-correct (carry the elapsed offset into the new state, or commit on the audio thread's
+boundary); until then a swap can start late by up to one poll interval.
 
 | | mu-clid | mu-tant | mu-toni | mu-on |
 |---|---|---|---|---|
@@ -757,7 +808,49 @@ Today it is a second `juce_add_plugin` target inside `mu-clid/`, compiling about
 Stages (each ends in a Debug build and the unit tests; stages 2 and 3 also run the round-trip listening tests and pluginval on the build PC):
 
 1. **Identity, no code move (cheap, do first).** Rename every user-visible and release-facing name to the final name while keeping the CMake target, `MUCLID_LITE_BUILD` and every plugin ID untouched: `PRODUCT_NAME` / `PLUGIN_NAME`, `getName()`, the `.iss` and installer filename, `PackageRelease.cmake` slug, `DeployReleaseLite.cmake` filenames, `release.yml` staging and zip names, `mu_build_artifacts.ps1`, `check-build-artifacts.ps1`, `run-pluginval.ps1`, the site. Add the Windows `[InstallDelete]` and the uninstall of the old `mu-Clid Lite` bundle (below). Docs: a product CLAUDE.md stub and `docs/<slug>/`.
-2. **Extract the shared sequencing into `mu-core/Sequencer/`.** The files that Lite and mu-Clid both compile (`EuclideanGenerator`, `HitGenerator`, and whatever of `Rhythm` / `SequencerEngine` is free of sample, voice and sidechain concepts) move to `mu-core` under neutral names and the `mu_core` namespace, mu-Clid being the second consumer that makes it shared. The `Rhythm`-into-`Layer` container work (design-naming §5 step 5.7) rewrites the same classes; **sequence this stage after that one**, or hand the extraction to it, so the code moves once. **Owner chose the earlier split (2026-10-11):** extract only the pure generators (`EuclideanGenerator`, `HitGenerator`) now and leave `Rhythm` / `SequencerEngine` for step 5.7; the MIDI product carries a thin `Rhythm` of its own until then, recorded as a known exception.
+2. **Extract the shared sequencing into `mu-core/Sequencer/`.** The files that Lite and mu-Clid both compile (`EuclideanGenerator`, `HitGenerator`, and whatever of `Rhythm` / `SequencerEngine` is free of sample, voice and sidechain concepts) move to `mu-core` under neutral names and the `mu_core` namespace, mu-Clid being the second consumer that makes it shared. The `Rhythm`-into-`Layer` container work (design-naming §5 step 5.7) rewrites the same classes; **sequence this stage after that one**, or hand the extraction to it, so the code moves once. **Owner chose the earlier split (2026-10-11):** extract only the pure generators (`EuclideanGenerator`, `HitGenerator`) now and leave `Rhythm` / `SequencerEngine` for step 5.7; the MIDI product carries a thin `Rhythm` of its own until then, recorded as a known exception. **Superseded 2026-10-11 (architecture-steward, on the as-built tree):** the MIDI product does not carry a `Rhythm` of its own; it compiles mu-Clid's `Rhythm.cpp`, `SequencerEngine.cpp`, `EuclideanPanel.cpp` and `RhythmCircle.cpp` from `mu-clid/Source` with that folder on its include path, which is the per-product copy and the product-to-product dependency this section forbids. The `Rhythm` that exists today is already pure (generators, logic, reset steps, legato, a `Layer`; no sample, voice or sidechain member), so it moves **now**, before stage 7, in the stages under "Stage 2b" below; stage 7 then no longer adds engine members to the shared class.
+
+### Stage 2b: the shared Euclidean sequencer moves to mu-core (ruled 2026-10-11; done 2026-10-12, stages 1 to 5)
+
+The shared pieces and their destination (the moves are `git mv`; a header keeps its `Folder/Name.h` include path, so `#include "Sequencer/Rhythm.h"` in mu-Clid and the MIDI product resolves unchanged through the `mu-core` include root):
+
+| From `mu-clid/Source/` | To `mu-core/` | Namespace |
+|---|---|---|
+| `Sequencer/Rhythm.{h,cpp}` | `Sequencer/Rhythm.{h,cpp}` | `mu_core` (`Rhythm`, `Logic`, `EuclidOverrides`) |
+| `Sequencer/SequencerEngine.{h,cpp}` | `Sequencer/SequencerEngine.{h,cpp}` | `mu_core` |
+| `Sequencer/RhythmPlayState.h` | `Sequencer/RhythmPlayState.h` | `mu_core` |
+| `Persistence/RhythmParamTable.h` | `Persistence/RhythmParamTable.h` | `mu_core` (`ParamKind`, `RhythmParamDef`, `kRhythmParamDefs`, `kRhythmParamCount`) |
+| `Persistence/PresetHelpers.h` | `Persistence/RhythmPresetHelpers.h` (renamed: it is the kinded-property reader/writer for that table, not a product's preset I/O) | `mu_core` |
+| `UI/EuclideanPanel.{h,cpp}` | `UI/EuclideanPanel.{h,cpp}` | `mu_ui` |
+| `UI/RhythmCircle.{h,cpp}` | `UI/RhythmCircle.{h,cpp}` | `mu_ui` |
+
+`Sequencer/GeneratorAliases.h` stays in mu-Clid and becomes the alias header for the sequencer and persistence set
+(`using mu_core::Rhythm;` and so on inside `mu_clid`; the two panels get their own UI alias header, see the stage rules below), the pattern it already uses for the generators, so
+mu-Clid's roughly 1580 uses need no edit. Rules for the moved code: **no sample, voice-engine, sidechain,
+licence or APVTS-id knowledge in `mu_core::Rhythm`**; the euclid modulation-snapshot indices that
+`EuclideanPanel` reads become a panel-local enum in `EuclideanPanel.h` (`EuclidSnap`; mu-Clid's `kSnapEuc*`
+values are pinned to it by a `static_assert`, see the stage rules below), so the panel no longer includes
+`Modulation/ModulationSnapshot.h`. **Stage 7 of the layer plan** (mu-Clid into the container) puts the
+engine, retired engines, MIDI-out engine, sample path and mod-previous-state flags in a `mu_clid::Rhythm`
+that **derives from `mu_core::Rhythm`** (replacing the alias with a class of the same name); the MIDI
+product keeps using `mu_core::Rhythm` directly. After stage 2b (done) the MIDI product's CMake has no
+`${MU_CLID_SOURCE}` include path and compiles nothing from `mu-clid/`.
+
+**The five stages (ruled 2026-10-11; supersedes an earlier split that created the `EuclidSnap` mapping first and moved Rhythm, RhythmPlayState, SequencerEngine, RhythmParamTable and PresetHelpers in one step).** The backlog split is the correct one, backlog rows 1489 to 1493 (umbrella 1411), because it follows the include graph so each stage leaves both products building:
+
+- `Rhythm.h` includes `Layer.h` (already mu-core) and `GeneratorAliases.h` (a `mu_clid` alias header, so it must be replaced by direct `Sequencer/EuclideanGenerator.h` / `HitGenerator.h` includes and `mu_core::` names when the file moves). `RhythmPlayState.h` includes only `<atomic>`. Both are leaves: **stage 1**.
+- `SequencerEngine.h` includes `Rhythm.h` (relative; must become `Sequencer/Rhythm.h`), `MuLimits.h` and `Audio/SpinLock.h` (both mu-core). It needs stage 1 only: **stage 2**.
+- `RhythmParamTable.h` includes `Sequencer/Rhythm.h` and mu-core `Audio/AlgorithmNames.h`; `PresetHelpers.h` includes only `RhythmParamTable.h` and `AlgorithmNames.h`. Neither touches the engine, so they need stage 1 only, and they move together because the helper cannot compile without the table: **stage 3**.
+- `RhythmCircle.h` includes `RhythmPlayState.h` (stage 1) and `GeneratorAliases.h`; `EuclideanPanel.h` includes `Rhythm.h` (stage 1), `GeneratorAliases.h`, mu-core components and `Plugin/ProcessorBase.h`, and its `.cpp` includes `Modulation/ModulationSnapshot.h` (mu-Clid) for the `kSnapEuc*` indices. Only that one include blocks the move, so the panel-local enum is part of the panel's own stage, not a stage of its own: **stage 4**.
+- The MIDI product's include path and compile-ins can only go once all of the above has moved: **stage 5**.
+
+Stages 2, 3 and 4 are independent of each other once stage 1 is in; run them in the backlog order. Rules that apply to every stage:
+
+- **Each stage moves its own users.** Moving a file out of `mu-clid/Source` breaks the relative includes of what is left behind and the `mu_clid::` qualified uses in the MIDI product. Stage 1 therefore also: makes `GeneratorAliases.h` include `Sequencer/Rhythm.h` and `Sequencer/RhythmPlayState.h` and add `using mu_core::Rhythm; using mu_core::Logic; using mu_core::EuclidOverrides; using mu_core::RhythmPlayState;`; adds `#include "GeneratorAliases.h"` to the not-yet-moved `SequencerEngine.h`, `RhythmParamTable.h`, `EuclideanPanel.h` and `RhythmCircle.h` (and changes `SequencerEngine.h`'s `"Rhythm.h"` to `"Sequencer/Rhythm.h"`) so their unqualified `Rhythm` still resolves inside `mu_clid`; and in the MIDI product changes `using mu_clid::Rhythm; using mu_clid::RhythmPlayState;` in `MidiRhythmCore.h` and `mu_clid::Rhythm` in `PluginEditor.cpp` to `mu_core::`. Each later stage does the same for its own files (stage 2: `MidiRhythmCore.h` `SequencerEngine`; stage 3: `mu_clid::kRhythmParamCount` / `kRhythmParamDefs` / `readKindedPropertyAsActualV2` in `MidiRhythmCore.{h,cpp}`, `SessionState.cpp`, `SessionStateTests.cpp`; stage 4: `mu_clid::EuclideanPanel` / `RhythmCircle` in the MIDI `PluginEditor.{h,cpp}`).
+- **Alias headers.** `GeneratorAliases.h` carries the sequencer and persistence aliases. The two panels are GUI classes and must not be pulled into audio translation units through it, so stage 4 adds a small `mu-clid/Source/UI/EuclidPanelAliases.h` (`using mu_ui::EuclideanPanel; using mu_ui::RhythmCircle;`) included by the mu-Clid editor files. Stage 3 adds `using mu_core::ParamKind; ...` for the table to `GeneratorAliases.h` (or the files that use it name `mu_core::` directly where there are few).
+- **CMake.** The moved `.cpp` files go into `mu-core/CMakeLists.txt` (the library source list; the headless test targets that list mu-core sources individually, `mu-clid/CMakeLists.txt` near `Source/Sequencer/Rhythm.cpp` and `mu-clid-midi/CMakeLists.txt` near its `HitGenerator.cpp` block, get the same line and lose the `${MU_CLID_SOURCE}` or `Source/` one). A header-only move changes no CMake list.
+- **Panel mod snapshots (stage 4).** The panel-local enum is `EuclidSnap` in `EuclideanPanel.h` (`kEucAHits ... kEucCInsLen`, 18 entries, same order as the `kSnapEuc*` run in `ModulationSnapshot.h`); mu-Clid's `ModulationSnapshot.h` keeps its names and adds `static_assert(kSnapEucAHits + n == EuclidSnap::...)` for the first and last entry so the order is pinned. The MIDI product passes no `modulationSnapshot` callback (it has no modulation), so it needs nothing.
+- Each stage ends with the checks named in its backlog row, and `check-core-boundary.ps1` clean.
 3. **Create `mu-<slug>/`.** Own `CMakeLists.txt`, own thin `PluginProcessor` (a `ProcessorBase` subclass, MIDI-effect bus layout, `lite_midiNote`-style parameters renamed in the product only through a migration), own editor (`LiteEditor` becomes `<Product>Editor`, in `UI/`), the eight `Source/` folders with `.gitkeep` in the empty ones (`License`, `Modulation`, `Audio` are expected empty). `mu-clid` loses all `MUCLID_LITE_BUILD` code, the `mu-clid-lite` target, `LiteEditor.*` and the Lite members of `PluginProcessor`. Add the new directory to the root list in `check-core-boundary.ps1` and `check-mod-targets.ps1`.
 4. **Retire the old paths.** Remove `BuildInstallerLite.cmake` / `DeployReleaseLite.cmake` in favour of the shared product-parameterised scripts (or renamed copies), the Lite lines in `PackageRelease.cmake`, and the `mu-clid/installer/mu-Clid-Lite.iss` (moves to `mu-<slug>/installer/`).
 
@@ -802,7 +895,7 @@ If the owner wants brand-new IDs anyway (a clean break), do it as its own decisi
 4. **Licensing:** no support prompt and no licensing glue. It is free.
 5. **Formats:** VST3 + CLAP only (no AU, no Standalone). Free, no price on the site.
 6. **Identity:** it keeps its own icon and its own site product page and release-notes page.
-7. **Extraction timing (stage 2):** extract the pure generators now (`EuclideanGenerator`, `HitGenerator` into `mu-core/Sequencer/`, namespace `mu_core`); `Rhythm` and `SequencerEngine` follow with the layer-container stage (design-naming §5 step 5.7). Until then mu-Clid MIDI carries a thin `Rhythm` of its own, a recorded known exception, not to be extended.
+7. **Extraction timing (stage 2):** extract the pure generators now (`EuclideanGenerator`, `HitGenerator` into `mu-core/Sequencer/`, namespace `mu_core`); `Rhythm` and `SequencerEngine` follow with the layer-container stage (design-naming §5 step 5.7). Until then mu-Clid MIDI carries a thin `Rhythm` of its own, a recorded known exception, not to be extended. **Resequenced 2026-10-11:** they move now, as Stage 2b above, because the class is already pure and stage 7 is the last and riskiest of the plan; the owner is asked to confirm the new order.
 
 ---
 

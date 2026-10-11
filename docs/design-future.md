@@ -54,6 +54,15 @@ More than three generators per rhythm (currently `genA`, `genB`, `genC`). Useful
 
 Step counts above 64 per ring. The sequencer engine is not the bottleneck — `SequencerEngine` uses `std::vector<bool>` patterns with no hard cap. Only constraint is the UI range in `EuclideanPanel` (1–64), trivially widened.
 
+### 🟡 Sample-accurate MIDI timing (mu-Clid MIDI)
+
+Today MIDI timing is block-quantised. Every note-on is emitted at sample offset 0 of the block, and several sequencer steps inside one block collapse into one note because there is one `firedMask` bit per rhythm. Jitter is up to one buffer (about 46 ms at 2048 samples / 44.1 kHz), and steps are dropped at fast tempos with large buffers.
+
+- **Idea:** carry the in-block step offset from the sequencer into `trigger`, so each note lands at its true sample offset and nothing collapses (the per-rhythm fired state would need to hold several offsets per block, not one bit).
+- **Why 🟡:** the sequencer's step-fired result and the trigger path both change shape (`firedMask` becomes a small per-block list of offsets). Keep it allocation-free on the audio thread.
+- **Fit with the other ideas:** the same offset-carrying path would serve the other products, and Ableton Link would expose the current jitter, so do this before or with the MIDI sync groundwork.
+- **Feature, not a fix:** ask Andy before implementing.
+
 ### 🟡 MIDI CC remote control of knobs
 
 Generic CC → APVTS-parameter mapping so a hardware controller can drive any plugin knob. Distinct from MIDI program change → preset (already done family-wide via the shared `MidiPresetMap`).

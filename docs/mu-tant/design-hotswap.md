@@ -58,13 +58,14 @@ across a swap, mu-clid's retire-then-swap (see its doc §8) is the pattern to po
 | File | Role |
 |---|---|
 | [mu-core/Plugin/HotSwap.h](../../mu-core/Plugin/HotSwap.h) | The shared `Stager` (per-slot pending payloads + one full-preset slot, the store-release/load-acquire handshake), `LayerSwapper` (stage / commit / `flagBoundaries`) and the pure predicates (`loopWrapped` / `boundaryReached`) — unit-testable without a processor. `ProcessorBase` holds one as `layerSwapper` (`ValueTree` payload, 8 slots) and calls it through `flagSwapBoundaries` and `commitDeferredWork`. |
-| [Source/Plugin/PluginProcessor.cpp](../../mu-tant/Source/Plugin/PluginProcessor.cpp) | `swapLoopBeats` (the mu-tant boundary rule), `layerSwapper.setAppliers` (commit bodies `applyFullPresetTree` / `applyVoicePresetTree`), `handleAsyncUpdate` (commit drain), boundary flagging in `processBlock`. |
+| [Source/Plugin/PluginProcessor.cpp](../../mu-tant/Source/Plugin/PluginProcessor.cpp) | `swapLoopBeats` (the mu-tant boundary rule), `layerSwapper.setAppliers` (commit bodies `applyFullPresetTree` / `applyVoicePresetTree`), `runDeferredWork` (commit drain), boundary flagging in `processBlock`. |
 | [Source/Plugin/PluginProcessor_Preset.cpp](../../mu-tant/Source/Plugin/PluginProcessor_Preset.cpp) | `loadPreset` / `loadLayerPreset` (`layerSwapper.useFull` / `useSlot` make the stage-or-apply call on the resolved transport; `layerSwapper.isRunning()` gates the wavetable preload), `preloadWavetablesFrom*`. |
 | [Source/Audio/WavetableBank.{h,cpp}](../../mu-core/Audio/Wavetable/WavetableBank.h) | `findByPath` (lock-free resolve), `decodeFile` (off-lock decode) + `appendTable` (locked append) — the two-phase load that keeps the swap real-time-safe. |
 | [Source/Tests/HotSwapBoundaryTests.cpp](../../mu-tant/Source/Tests/HotSwapBoundaryTests.cpp) | Predicate + stager handshake tests. |
 
-`PluginProcessor` is a `juce::AsyncUpdater`; the audio thread `triggerAsyncUpdate()`s
-and `handleAsyncUpdate()` commits on the message thread.
+The audio thread calls `requestDeferredWork()` (an atomic mailbox flag; `ProcessorBase` is no longer a
+`juce::AsyncUpdater`) and the 100 Hz `SwapPoll` timer runs `runDeferredWork()`, which commits on the message thread.
+Open design issue (2026-10-11, being fixed): the polled commit lands up to ~10 ms late, so the new pattern starts at the wrong phase.
 
 ---
 
@@ -163,7 +164,7 @@ microseconds at *stage*, never at commit.
 > "Playing" is the resolved transport the audio thread last saw (host, MIDI clock, mu-link or internal), the
 > same rule as mu-Toni and mu-On. With the host playing and mu-Tant's own Play off, a load waits for the loop wrap.
 
-**Commit** (`handleAsyncUpdate` → shared `ProcessorBase::commitDeferredWork` → `layerSwapper.commit()`, message thread, triggered from `processBlock`):
+**Commit** (`runDeferredWork` → shared `ProcessorBase::commitDeferredWork` → `layerSwapper.commit()`, message thread, requested from `processBlock` via `requestDeferredWork()`):
 1. The full preset first: `applyFullPresetTree` (`applyComposedState` — globals + every voice node —
    then `numVoices` + colours + `syncAllFxParams`). The staged
    tree was already rebuilt in the composed shape (and X-Mod-migrated) by `toVoiceState` at load.
@@ -220,7 +221,7 @@ see its doc.)
 - **Readiness gate** (§4): no half-built commit; not-ready-at-boundary waits for the next loop.
 - **Stop-mid-stage:** the playing→stopped edge commits all ready swaps (gate closed → glitch-free).
 - **Supersede:** re-staging a voice overwrites its slot; a full preset supersedes all pending voice swaps.
-- **MIDI PC while stopped:** drained in `handleAsyncUpdate`, the resolved play state re-checked by `useFull` / `useSlot` → applied immediately.
+- **MIDI PC while stopped:** drained in `runDeferredWork`, the resolved play state re-checked by `useFull` / `useSlot` → applied immediately.
 - **No editor:** commit callbacks are null-checked.
 - **Wavetable bank reads vs append:** audio reads by index under the render `voicesLock`; `appendTable` pushes under `voicesLock`; `findByPath` is a read-only scan (no concurrent append during a commit — all appends are message-thread). 
 

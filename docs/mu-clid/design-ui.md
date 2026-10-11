@@ -222,7 +222,14 @@ Row 2 (envelope):          Row 2 (envelope):            Row 2 (envelope):    Row
 - Character = None passes audio through unity.
 - Character switch is message-thread only (same constraint as `EffectSlot::setAlgorithm`).
 
-**Sample/MIDI mode** was previously in the Amp config row. It has moved to a `DropdownSelect` in the RhythmPanel header bar (right-aligned, 80px wide) so it is visible at all times without occupying voice section space.
+**Output mode (Sample / MIDI), ruled 2026-10-11.** The earlier idea of a header-bar dropdown is dropped: the header bar is the shared `ChannelHeaderBar` (dot, name, reset, delete, preset, Save), identical in every product, and has no room or place for a product control. The selector lives in mu-Clid's own content band, in the **sample bar** strip (32 px, the first row under the header strip):
+
+- **Selector:** a `SegmentControl`, `DrawStyle::Lcd`, `ActiveStyle::General`, items **Sample** and **MIDI**, at the right end of the sample bar, fitted to its content (about 2 x 56 px), vertically centred, clear of the corner screw by `kScrewedPanelInset`. The sample LCD takes the rest of the strip. Per rhythm; param `r{N}_outMode` (0 Sample, 1 MIDI), default Sample. Status bar: `Output` / `Sample (plays the loaded sample)` or `MIDI (sends notes, no audio from this rhythm)`.
+- **Sample mode:** unchanged.
+- **MIDI mode:** the sample LCD shows ghost lettering "MIDI output" and its browse mark is hidden; the 144 px voice band is replaced by **one raised section "MIDI Out"** (`drawSections`, name plate) of the same 144 px, holding, left to right: **Note** (`DropdownSelect` of note names, the same list as mu-Clid MIDI's note selector, default 36), **Channel** (`DropdownSelect` 1 to 16, default 1), **Velocity** (`KnobWithLabel`, `knobLevel`, 1 to 100 %, default 100), **Accent** (`KnobWithLabel`, `knobLevel`, 0 to 100 %, default 0; adds to the velocity of accented hits, as mu-Clid MIDI's Accent knob does). Param ids `r{N}_midiNote`, `r{N}_midiChan`, `r{N}_midiVel`, `r{N}_midiAccent`; none is a modulation target in this first version (a target would be one appended `ModTarget` row later).
+- **Mixer:** a MIDI-mode rhythm's strip is drawn inactive (`MixerChannel::setActive(false)`) and its sends and voice controls are ignored; it makes no audio.
+- **Sidebar and header:** unchanged (the mini-circle still pulses on hits; a small "MIDI" tag is not added).
+- **Fit:** the section is 144 px in the 144 px band (same as the voice band), its four controls are far inside 1088 px.
 
 ### ModulatorPanel (Stage 7)
 
