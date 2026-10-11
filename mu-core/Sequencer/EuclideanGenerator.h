@@ -2,7 +2,7 @@
 
 #include <vector>
 
-namespace mu_clid {
+namespace mu_core {
 
 class EuclideanGenerator
 {
@@ -17,4 +17,4 @@ public:
     static void generate(int steps, int hits, std::vector<bool>& out);
 };
 
-} // namespace mu_clid
+} // namespace mu_core

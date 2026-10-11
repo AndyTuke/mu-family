@@ -1,7 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "UI/Components/MuLookAndFeel.h"
-#include "Sequencer/HitGenerator.h"
+#include "Sequencer/GeneratorAliases.h"
 #include "Plugin/PluginProcessor.h"
 #include <array>
 

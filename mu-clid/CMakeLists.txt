@@ -56,8 +56,6 @@ target_sources(mu-clid
         Source/Audio/SamplePreview.cpp
         Source/Audio/SampleLibrary.cpp
         Source/Plugin/PluginEditor.cpp
-        Source/Sequencer/EuclideanGenerator.cpp
-        Source/Sequencer/HitGenerator.cpp
         Source/Sequencer/Rhythm.cpp
         Source/Sequencer/SequencerEngine.cpp
         Source/UI/RhythmCircle.cpp
@@ -272,8 +270,6 @@ target_sources(mu-clid-lite
         Source/Audio/SamplePreview.cpp
         Source/Audio/SampleLibrary.cpp
         Source/UI/LiteEditor.cpp
-        Source/Sequencer/EuclideanGenerator.cpp
-        Source/Sequencer/HitGenerator.cpp
         Source/Sequencer/Rhythm.cpp
         Source/Sequencer/SequencerEngine.cpp
         Source/UI/RhythmCircle.cpp
@@ -410,8 +406,8 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/EmbeddedSampleTests.cpp       # preset samples: FLAC round trip is sample-identical
     Source/Tests/Mp3FormatTests.cpp            # MP3 samples open and decode (same define as the plugin)
     Source/Persistence/PresetMigrations.cpp    # under test by C1/C2
-    Source/Sequencer/HitGenerator.cpp
-    Source/Sequencer/EuclideanGenerator.cpp
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/HitGenerator.cpp"
+    "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/EuclideanGenerator.cpp"
     # Pull in mu-core .cpp's the tests need (they can't link mu-core directly
     # because the INTERFACE library propagates sources via target_sources, and
     # the console-app target doesn't share JUCE-plugin context).

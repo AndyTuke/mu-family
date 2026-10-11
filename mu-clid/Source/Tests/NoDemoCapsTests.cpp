@@ -11,7 +11,7 @@
 #include <juce_core/juce_core.h>
 #include <juce_data_structures/juce_data_structures.h>
 #include "MuLimits.h"
-#include "Sequencer/HitGenerator.h"
+#include "Sequencer/GeneratorAliases.h"
 #include "Sequencer/SequencerEngine.h"
 #include "Persistence/RhythmParamTable.h"
 #include "Persistence/PresetHelpers.h"

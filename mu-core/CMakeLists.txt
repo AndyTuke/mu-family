@@ -22,6 +22,8 @@ target_sources(mu-core INTERFACE
     # Modulation
     "${CMAKE_CURRENT_SOURCE_DIR}/Modulation/ModulationMatrix.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Sequencer/ControlSequence.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Sequencer/EuclideanGenerator.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Sequencer/HitGenerator.cpp"
     # Audio
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/VoiceEngine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/InsertProcessor.cpp"

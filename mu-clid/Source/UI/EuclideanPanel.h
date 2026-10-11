@@ -7,7 +7,7 @@
 #include "UI/Components/SlideSwitch.h"
 #include "UI/Components/DropdownSelect.h"
 #include "UI/Components/MuLookAndFeel.h"
-#include "Sequencer/HitGenerator.h"
+#include "Sequencer/GeneratorAliases.h"
 
 
 namespace juce { class RangedAudioParameter; }

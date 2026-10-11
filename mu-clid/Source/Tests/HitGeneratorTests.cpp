@@ -4,7 +4,7 @@
 // regression here would silently produce wrong rhythms for all users.
 
 #include <juce_core/juce_core.h>
-#include "Sequencer/HitGenerator.h"
+#include "Sequencer/GeneratorAliases.h"
 
 using namespace mu_clid;
 

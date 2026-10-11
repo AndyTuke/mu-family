@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <numeric>
 
-namespace mu_clid {
+namespace mu_core {
 
 std::vector<bool> HitGenerator::getPattern() const
 {
@@ -176,4 +176,4 @@ std::vector<StepType> HitGenerator::getStepTypes(const EuclidGenOverrides& reque
     return result;
 }
 
-} // namespace mu_clid
+} // namespace mu_core

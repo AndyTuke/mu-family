@@ -6,7 +6,7 @@
 #include <utility>
 #include <vector>
 
-namespace mu_clid {
+namespace mu_core {
 
 enum class InsertMode { Pad, Mute };
 
@@ -142,4 +142,4 @@ public:
                     std::vector<bool>& scratch) const;
 };
 
-} // namespace mu_clid
+} // namespace mu_core

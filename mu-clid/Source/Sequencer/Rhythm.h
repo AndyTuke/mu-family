@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Sequencer/Layer.h"
-#include "HitGenerator.h"
+#include "GeneratorAliases.h"
 
 #include <optional>
 
