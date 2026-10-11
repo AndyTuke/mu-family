@@ -401,6 +401,7 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/HotSwapBoundaryTests.cpp      # C3 (swap loop-boundary predicates)
     Source/Tests/MidiFullPresetMapTests.cpp    # C4 (ch-9 map round-trip)
     Source/Tests/ModulationSkewTests.cpp       # C5 (proportion-space skew round-trips)
+    Source/Tests/NoDemoCapsTests.cpp          # unlicensed is fully functional: 8 layers, 64 steps, saves
     Source/Tests/MidiClockSyncTests.cpp      # shared MIDI-clock slave (tempo estimate, step-exact beat)
     Source/Tests/TransportResolverTests.cpp    # family transport rule: host / MIDI-clock modes / own
     Source/Tests/MidiControlTests.cpp          # MIDI control map: learn, quantise, hand-off

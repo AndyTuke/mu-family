@@ -73,6 +73,7 @@ cmake --build build --target mu-clid-tests --config Release && build/mu-clid/mu-
 | Modulation skew (proportion ↔ display) | `ModulationSkewTests.cpp` |
 | MIDI clock slave (shared mu-core): tempo estimate, block-start beat vs ground truth (steady + jitter), step-exact 16ths | `MidiClockSyncTests.cpp` |
 | Family transport rule (shared mu-core): host / no-position host / the three MIDI-clock Messages modes / own transport, Start from bar 1, mid-play mode switch | `TransportResolverTests.cpp` |
+| No demo caps (unlicensed is fully functional): 8 layers, 64-step rhythms and 8-rhythm full-preset / per-layer files survive save/load as XML text; limits stay 8 / 64. Data-layer only; the processor-level numRhythms clamp is not reachable from this target. **Pass (build 1255)** | `NoDemoCapsTests.cpp` |
 
 **Current status:** 140/140 tests pass at v1.0.708.
 
@@ -103,6 +104,7 @@ cmake --build build --target mu-tant-tests --config Debug && build/mu-tant/mu-ta
 | APVTS layout sanity (every `v{N}_*` / `ch{N}_*` param) | `ApvtsLayoutTests.cpp` |
 | Send-FX DSP smoke | `SendFXSmokeTests.cpp` |
 | Preset serialisation round-trip (envelopes, filter/pitch gate, copyDataFrom) | `PresetRoundTripTests.cpp` |
+| No demo caps (unlicensed is fully functional): gates longer than 16 cells, 8 voices x 3 long gates and full-preset / per-layer files survive save/load as XML text; limit stays 8. Data-layer only; the processor-level numVoices clamp is not reachable from this target. **Pass (build 1255)** | `NoDemoCapsTests.cpp` |
 
 **Current status:** 112/112 tests pass at v1.0.723.
 
