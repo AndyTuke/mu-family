@@ -60,9 +60,7 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;
 
     // ── ProcessorBase channel metadata (drives sidebar + mixer) ───────────────
-    int          getNumChannels()              const override { return kNumChannels; }
-    Layer*       getLayer(int i) override { return (i >= 0 && i < kNumChannels) ? &layers[(size_t) i] : nullptr; }
-    using ProcessorBase::getLayer;
+    // getNumChannels / getLayer are the base defaults over the owned layer storage.
     int          getMaxChannels()              const override { return kNumChannels; }
     juce::String getChannelName(int idx)       const override
     {
@@ -138,10 +136,11 @@ private:
     std::atomic<float>*         midiInChParam = nullptr;     // MIDI In channel (0 = Omni)
     std::array<std::array<std::atomic<float>*, kNumVoiceParams>, mu_limits::kMaxLayers>    vp {};
 
-    // The layers: each is a mu-core Layer (name, colour, modulation) with its arp voice and insert
-    // effect. Public so the UI ModulatorPanel can bind to the active layer.
 public:
-    std::array<Arp, mu_limits::kMaxLayers> layers;
+    // Layer `i` as its mu-Toni Arp (name, colour, modulation, arp voice, insert effect). The layers
+    // live in ProcessorCore; the UI ModulatorPanel binds to the active one through this.
+    Arp&       getArp(int i) noexcept       { return layerAs<Arp>(i); }
+    const Arp& getArp(int i) const noexcept { return layerAs<Arp>(i); }
 private:
     // Modulation-resolve inputs: parallel arrays for mu_mod::resolveLane.
     std::array<const char*, kNumModDests>                                         modDestIds {};

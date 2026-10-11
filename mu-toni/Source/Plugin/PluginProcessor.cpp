@@ -172,14 +172,19 @@ PluginProcessor::PluginProcessor()
                     createParameterLayout(),
                     juce::Identifier("MuToniState"))
 {
+    // All eight Arps exist for the processor's lifetime (capacity is fixed, only the count is
+    // runtime); mu-Toni's count is fixed at kNumChannels for now.
+    for (auto& l : layers) l = std::make_unique<Arp>();
+    numLayers.store(kNumChannels, std::memory_order_relaxed);
+
     // Per-channel render: each channel runs its own arpeggiator voice into the
     // buffer; the shared mixer applies the strip + master mix downstream.
     renderChannelCb = [this](int ch, juce::AudioBuffer<float>& buf, int n)
     {
         if (ch >= 0 && ch < mu_limits::kMaxLayers)
         {
-            layers[(size_t) ch].runner.render(buf, n, arpCtx);
-            layers[(size_t) ch].insert.process(buf, n, buf.getNumChannels(), layers[(size_t) ch].insertCfg);   // engine → insert → mixer
+            getArp(ch).runner.render(buf, n, arpCtx);
+            getArp(ch).insert.process(buf, n, buf.getNumChannels(), getArp(ch).insertCfg);   // engine → insert → mixer
         }
         else buf.clear();
     };
@@ -188,7 +193,7 @@ PluginProcessor::PluginProcessor()
 
     // The shared wavetable bank (procedural factory set), read by every voice's oscillators.
     bank.loadFactoryBank();
-    for (auto& l : layers) l.runner.setBank(&bank);
+    for (auto& l : layers) static_cast<Arp&>(*l).runner.setBank(&bank);
     midiInChParam = apvts.getRawParameterValue("midiInCh");
 
     cacheVoiceParamPointers();
@@ -241,7 +246,7 @@ void PluginProcessor::readVoice(int v, ArpParams& ap, ToniVoiceParams& tv,
     // Resolve this voice's modulation matrix over its control sequences → out[] (param units).
     // Modulated destinations come from out[]; everything else reads the raw param.
     float out[kNumModDests];
-    mu_mod::resolveLane(&layers[(size_t) v], modBeat, kNumModDests,
+    mu_mod::resolveLane(&getArp(v), modBeat, kNumModDests,
                         modDestIds.data(), modDestAtoms[(size_t) v].data(),
                         modDestRanges.data(), modParamValues, out);
 
@@ -288,7 +293,7 @@ void PluginProcessor::readVoice(int v, ArpParams& ap, ToniVoiceParams& tv,
     accent.pattern = (unsigned) juce::jmax(0, (int) g(vpi::accPat));
 
     // Insert config (applied post-VCA in the render callback).
-    auto& ic = layers[(size_t) v].insertCfg;
+    auto& ic = getArp(v).insertCfg;
     ic.insertAlgo     = (int) g(vpi::drvChar);
     ic.insertParam[0] = g(vpi::insP1);
     ic.insertParam[1] = g(vpi::insP2);
@@ -334,8 +339,8 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     fxChain.prepare(sampleRate, samplesPerBlock);
     for (int i = 0; i < kNumChannels; ++i)
     {
-        layers[(size_t) i].runner.prepare(sampleRate, samplesPerBlock);
-        layers[(size_t) i].insert.prepare(sampleRate, samplesPerBlock);
+        getArp(i).runner.prepare(sampleRate, samplesPerBlock);
+        getArp(i).insert.prepare(sampleRate, samplesPerBlock);
     }
 }
 
@@ -388,10 +393,10 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         ArpParams ap; ToniVoiceParams tv; int rateIdx = 6; float gate01 = 0.5f; bool midiTrig = false;
         ArpAccent accent;
         readVoice(i, ap, tv, rateIdx, gate01, midiTrig, accent);
-        layers[(size_t) i].runner.setAccent(accent);
-        layers[(size_t) i].runner.setArp(ap);
-        layers[(size_t) i].runner.setVoiceParams(tv);
-        layers[(size_t) i].runner.setStep(rateIdx, gate01, midiTrig);
+        getArp(i).runner.setAccent(accent);
+        getArp(i).runner.setArp(ap);
+        getArp(i).runner.setVoiceParams(tv);
+        getArp(i).runner.setStep(rateIdx, gate01, midiTrig);
     }
 
     // Render each arp voice → mixer through the shared path (engine → insert →
