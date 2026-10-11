@@ -214,10 +214,14 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
     masterLoopCurrentStep.store(loopSteps > 0 ? effectiveStep : 0, std::memory_order_relaxed);
 
     // Detect master loop wrap: effectiveStep decreased relative to the previous block.
-    const int prevEffectiveStep = lastEffectiveStep.load(std::memory_order_relaxed);
+    // No history after a reset request or a loop-length change: the step count restarts, not wraps.
+    int prevEffectiveStep = lastEffectiveStep;
+    if (wrapResetRequested.exchange(false, std::memory_order_acq_rel) || loopSteps != lastLoopSteps)
+        prevEffectiveStep = -1;
+    lastLoopSteps = loopSteps;
     if (loopSteps > 0 && prevEffectiveStep >= 0 && effectiveStep < prevEffectiveStep)
         result.masterLoopWrapped = true;
-    lastEffectiveStep.store(effectiveStep, std::memory_order_relaxed);
+    lastEffectiveStep = effectiveStep;
 
     // Non-blocking snapshot: copy any updated patterns into the audio-thread-safe buffers.
     // If patternLock is held by the message thread, skip this block's snapshot — safePatterns

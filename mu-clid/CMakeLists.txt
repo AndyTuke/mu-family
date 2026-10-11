@@ -243,6 +243,9 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/ModulationSkewTests.cpp       # C5 (proportion-space skew round-trips)
     Source/Tests/NoDemoCapsTests.cpp          # unlicensed is fully functional: 8 layers, 64 steps, saves
     Source/Tests/EmbeddedSampleTests.cpp       # preset samples: FLAC round trip is sample-identical
+    Source/Tests/SequencerEngineWrapTests.cpp  # master-loop wrap detection
+    Source/Sequencer/SequencerEngine.cpp       # under test by the wrap tests
+    Source/Sequencer/Rhythm.cpp                # SequencerEngine builds patterns through it
     Source/Persistence/PresetMigrations.cpp    # under test by C1/C2
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/HitGenerator.cpp"
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/EuclideanGenerator.cpp"

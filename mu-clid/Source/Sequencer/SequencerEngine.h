@@ -62,20 +62,18 @@ public:
     // updatePattern clamps each generator to it, so presets / automation can't exceed it.
     void setStepCap(int cap) noexcept { stepCap.store(juce::jlimit(1, 64, cap), std::memory_order_relaxed); }
 
+    // Only stores the length: the audio thread notices the change in processBlock and drops its wrap
+    // history itself, so a change between blocks cannot produce a false `masterLoopWrapped` (which
+    // would commit a staged hot-swap early) and no other thread writes the audio-private history.
     void setMasterLoopSteps(int steps)
     {
         masterLoopSteps.store(juce::jlimit(0, 256, steps), std::memory_order_relaxed);
-        // reset the wrap detector so a loop-length change mid-playback can't
-        // emit a false `masterLoopWrapped` event from stale `lastEffectiveStep`
-        // (false wraps gate hot-swap commits → premature staged swap).
-        lastEffectiveStep.store(-1, std::memory_order_relaxed);
     }
     int  getMasterLoopSteps() const    { return masterLoopSteps.load(std::memory_order_relaxed); }
 
-    // call from PluginProcessor::processBlock on a transport stop→start edge
-    // so the first block after restart doesn't see a false wrap from a stale
-    // pre-stop `lastEffectiveStep`.
-    void resetWrapDetector() { lastEffectiveStep.store(-1, std::memory_order_relaxed); }
+    // Asks the audio thread to forget its previous step before the next block, so the first block
+    // after a transport restart cannot see a false wrap. A request flag, safe from any thread.
+    void resetWrapDetector() { wrapResetRequested.store(true, std::memory_order_release); }
 
     // call from PluginProcessor::handleAsyncUpdate immediately after a hot-
     // swap commit (under suspendProcessing, so the audio thread is paused — no
@@ -133,7 +131,11 @@ private:
     // Atomic because host automation can set the loop length off the audio thread.
     std::atomic<int> masterLoopSteps { 0 };
     std::atomic<int> masterLoopCurrentStep { 0 };
-    std::atomic<int> lastEffectiveStep { -1 };  // previous block effectiveStep, for master-loop wrap detection (reset by setMasterLoopSteps)
+    // Audio-thread private (never touched by another thread): the previous block's effective step and
+    // loop length, for master-loop wrap detection. -1 = no history.
+    int lastEffectiveStep = -1;
+    int lastLoopSteps     = 0;
+    std::atomic<bool> wrapResetRequested { false };
 
     // Stage B: audio-thread scratch buffers for tryUpdatePatternFromModulation.
     // Pre-reserved to 256 in ctor so the non-allocating pattern overloads never alloc.
