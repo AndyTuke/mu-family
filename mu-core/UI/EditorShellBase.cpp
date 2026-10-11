@@ -76,7 +76,6 @@ void EditorShellBase::wireTransportBar()
 
     transportBar.onSavePreset = [this]
     {
-        if (!processorRef.isLicensed()) return;
         showSaveDialog(true);
     };
 
@@ -122,7 +121,6 @@ void EditorShellBase::wireOverlays()
         // Demo-cap affordances (add button etc.) re-sync via their own refresh timers.
         showActivation(false);
         const bool licensed = processorRef.isLicensed();
-        transportBar.setSaveEnabled(licensed);
         demoBanner.setVisible(!licensed);
         refreshSupportAffordances();
         resized();
@@ -193,7 +191,6 @@ void EditorShellBase::setupBanners()
     {
         using Id = MuLookAndFeel::ColourIds;
         const bool licensed = processorRef.isLicensed();
-        transportBar.setSaveEnabled(licensed);
 
         demoBanner.setText(juce::String::fromUTF8("DEMO  \xe2\x80\x94  1 track, 16 steps, save disabled  \xe2\x80\x94  Click here to activate and unlock all features"),
                            juce::dontSendNotification);

@@ -68,7 +68,7 @@ PluginProcessor::PluginProcessor()
     initLicensing({ mu_clid::kLicenseProductId, mu_clid::kLicenseFilename,
                     mu_clid::kLicensePublicKey, "muclid.activation", mu_clid::kCheckoutUrl });
    #endif
-    sequencer.setStepCap(maxSteps(HitGenerator::kMaxSteps));   // 16 in demo
+    sequencer.setStepCap(HitGenerator::kMaxSteps);
 
     // Listen to the product parameters (rhythm + mstrLoop); mixer / FX ids are synced by ProcessorBase.
     for (auto* param : getParameters())

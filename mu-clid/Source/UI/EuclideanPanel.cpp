@@ -27,7 +27,7 @@ EuclideanPanel::EuclideanPanel(PluginProcessor& p) : proc(p)
     for (int i = 0; i < kNumLogicModes; ++i)
         logicCtrl.addItem(juce::String(juce::CharPointer_UTF8(kLogicSymbols[i])), i + 1);
 
-    const int maxSteps = proc.maxSteps(HitGenerator::kMaxSteps);   // 16 in demo
+    const int maxSteps = HitGenerator::kMaxSteps;
     stepsA.setRange(1, maxSteps, 1);      hitsA.setRange(0, 64, 1);   rotA.setRange(0, 63, 1);
     prePadA.setRange(0, 12, 1);     postPadA.setRange(0, 12, 1);
     insertStA.setRange(0, 63, 1);   insertLenA.setRange(0, 8, 1);

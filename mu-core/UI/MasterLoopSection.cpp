@@ -11,7 +11,7 @@ MasterLoopSection::MasterLoopSection(ProcessorBase& p)
 
     loopDropdown.addItem(juce::String::charToString(0x221E), 1); // ∞ = pattern reset length disabled
     // Loop lengths in 16-step units, up to the step cap (16 in demo, 256 otherwise).
-    for (int i = 1; i <= 16 && i * 16 <= proc.maxSteps(256); ++i)
+    for (int i = 1; i <= 16 && i * 16 <= 256; ++i)
         loopDropdown.addItem(juce::String(i * 16) + " steps", i + 1);
     loopDropdown.setSelectedId(1, false); // default: off
     loopDropdown.onChange = [this](int id)

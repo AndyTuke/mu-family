@@ -53,10 +53,9 @@ inline void wireSlotPresetHeader(ChannelHeaderBar& header, juce::Component& owne
         hdr->showPresetFile(f);
     };
 
-    header.setSaveEnabled(proc.canSaveLayerPreset());   // demo: per-layer save disabled
     header.onSave = [safe, hdr, p, cfg]
     {
-        if (safe == nullptr || ! p->canSaveLayerPreset()) return;
+        if (safe == nullptr) return;
         const int slot = cfg.currentSlot();
         promptTextAsync(safe.getComponent(), "Save " + cfg.noun + " Preset", "Preset name:",
                         cfg.defaultName ? cfg.defaultName(slot) : p->getChannelName(slot), "Save",

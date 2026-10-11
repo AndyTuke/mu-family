@@ -778,7 +778,7 @@ HotSwapStager::PreparedFullPreset PresetIO::prepareFullPreset(const juce::ValueT
 {
     return buildPreparedFullPreset(root, proc.currentSampleRate, proc.currentBlockSize, proc.getSamplesDir(),
                                    proc.onLoadError,
-                                   proc.isLicensed() ? (int) SequencerEngine::MaxRhythms : proc.demoMaxChannels());
+                                   (int) SequencerEngine::MaxRhythms);
 }
 
 void PresetIO::loadPreset(const juce::File& file)

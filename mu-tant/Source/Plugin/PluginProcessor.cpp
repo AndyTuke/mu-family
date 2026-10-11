@@ -72,12 +72,6 @@ PluginProcessor::PluginProcessor()
     // Offline licence + online activation (shared; after initAppSettings for getContentDir).
     initLicensing({ kLicenseProductId, kLicenseFilename, kLicensePublicKey, "mutant.activation", kCheckoutUrl });
 
-    // Demo: the default patterns (2 bars of 1/16) are shrunk to the 16-step cap too.
-    if (! isLicensed())
-        for (auto& slot : voiceSlots)
-            for (auto* pat : { &slot.gate, &slot.filterGate, &slot.pitchGate })
-                pat->limitToCells(demoMaxSteps());
-
     // MIDI program-change preset maps (Ch 1-8 → per-voice .muPattern, Ch 9 →
     // full .muTant preset). The scan/drain machinery + the editor panels live in
     // mu-core; we only point the maps at the plugin's settings dir + load them.
@@ -321,7 +315,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     //   • per-voice swap: OnMasterLoop (+ a loop set) → master loop; else the voice's
     //     own gate-pattern boundary (so a swap can't hang when no master loop exists).
     //   • full preset: master loop when one is defined, else voice 0's gate boundary.
-    const int    mlSteps         = mstrLoopPtr ? juce::jmin((int) mstrLoopPtr->load() * 16, maxSteps(256)) : 0;
+    const int    mlSteps         = mstrLoopPtr ? juce::jmin((int) mstrLoopPtr->load() * 16, 256) : 0;
     const double masterLoopBeats = mlSteps > 0 ? (double) mlSteps / 4.0 : 0.0;
     const bool   onMasterLoop    = (swapModeAtomic.load(std::memory_order_relaxed) == 0)
                                    && masterLoopBeats > 0.0;
@@ -856,15 +850,6 @@ void PluginProcessor::resetVoiceSlot(int idx)
     resetPrefix("v"  + juce::String(idx) + "_");
     resetPrefix("ch" + juce::String(idx) + "_");
     voiceSlots[(size_t) idx] = Pattern{};   // modulators, the three envelopes and the user wavetables back to defaults
-
-    // The demo's step cap applies to a fresh voice's envelopes too (the constructor capped only the first eight).
-    if (! isLicensed())
-        for (auto* pat : { &voiceSlots[(size_t) idx].gate, &voiceSlots[(size_t) idx].filterGate, &voiceSlots[(size_t) idx].pitchGate })
-            if (mu_core::spinLockFor(pat->editLock, 1000))
-            {
-                pat->limitToCells(demoMaxSteps());
-                mu_core::spinUnlock(pat->editLock);
-            }
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────

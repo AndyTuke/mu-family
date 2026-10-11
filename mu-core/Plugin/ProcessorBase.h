@@ -236,23 +236,8 @@ public:
        #endif
     }
 
-    // ─── Demo-mode caps (consulted ONLY when !isLicensed()) ──────────────────
-    // Max "channels" (rhythms / voices / layers) the unlicensed editor allows.
-    // Default: no limit, so a licensed build — or a product with no demo tier —
-    // is unrestricted. A product with a demo tier overrides this (e.g. 1).
-    virtual int demoMaxChannels() const { return std::numeric_limits<int>::max(); }
-    // Max sequencer steps a pattern may have in demo (e.g. 16). Default: no limit.
-    virtual int demoMaxSteps() const { return std::numeric_limits<int>::max(); }
-
-    // Single source for the shell/product UI to gate demo-restricted affordances:
-    //   - canAddChannel:      is the add-rhythm/voice control allowed right now?
-    //   - canSaveLayerPreset: may a per-layer preset (.muRhythm/.muPattern) be saved?
-    // Full-preset save + the demo banner are already gated on isLicensed() directly
-    // in EditorShellBase; per-layer save is blocked in demo to match.
-    bool canAddChannel()      const { return isLicensed() || getNumChannels() < demoMaxChannels(); }
-    bool canSaveLayerPreset() const { return isLicensed(); }
-    //   - maxSteps:           a step-count limit of `fullMax`, cut to demoMaxSteps() in demo.
-    int  maxSteps(int fullMax) const  { return isLicensed() ? fullMax : juce::jmin(fullMax, demoMaxSteps()); }
+    // There are no feature limits: an unlicensed copy is fully functional (it only shows the
+    // support prompt), so nothing here gates channels, steps or saving.
 
     // ─── Supporter state + the support prompt ────────────────────────────────
     // A supporter holds a valid key (offline .lic or online activation). Unlike isLicensed() this

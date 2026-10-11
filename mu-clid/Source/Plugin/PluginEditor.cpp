@@ -47,12 +47,6 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     sidebar.onAddRhythm = [this]
     {
-        if (!proc.canAddChannel())
-        {
-            getStatusBar().showParam("Demo", juce::String::fromUTF8(u8"Demo limited to 1 rhythm — purchase a license to unlock all 8"),
-                                     MuLookAndFeel::colour(MuLookAndFeel::knobLevel));
-            return;
-        }
         if (proc.getNumRhythms() >= SequencerEngine::MaxRhythms) return;
         Rhythm r;
         r.name        = ("Rhythm " + juce::String(proc.getNumRhythms() + 1)).toStdString();   // the slot keeps it through the default-rhythm load

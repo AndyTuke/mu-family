@@ -142,12 +142,6 @@ public:
    #if MUCLID_LITE_BUILD
     bool isLicensed() const override { return true; }
    #endif
-    // Activation lifts the 16-step demo cap straight away.
-    void onActivated() override { sequencer.setStepCap(HitGenerator::kMaxSteps); }
-    // Demo limits the unlicensed editor to a single rhythm of at most 16 steps.
-    int demoMaxChannels() const override { return 1; }
-    int demoMaxSteps()    const override { return 16; }
-
     void savePreset(const juce::String& n, const juce::String& d,
                     const juce::String& c, bool e = false) override { presetIO.savePreset(n, d, c, e); }
     void loadPreset(const juce::File& f) override { presetIO.loadPreset(f); publishPresetName(f.getFileNameWithoutExtension()); }

@@ -180,10 +180,6 @@ public:
     bool hasPendingSwap(int voice) const override { return hotSwapStager.hasVoicePending(voice); }
     void cancelStagedSwap(int voice)           { hotSwapStager.cancelVoice(voice); }
 
-    // Demo limits the unlicensed editor to a single voice whose patterns have at most 16 steps.
-    int demoMaxChannels() const override { return 1; }
-    int demoMaxSteps()    const override { return 16; }
-
     // ── Per-voice param IDs (used by VoicePanel for SliderAttachment binding) ──
     // Family rule: per-voice params are subtree-scoped via `v{N}_` prefix so a
     // ValueTree restore round-trips cleanly + presets can target a specific

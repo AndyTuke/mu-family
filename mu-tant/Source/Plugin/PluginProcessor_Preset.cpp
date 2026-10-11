@@ -130,7 +130,7 @@ void PluginProcessor::applyVoiceExtras(int v, const juce::ValueTree& node)
     mu_pp::deserialiseModulators(node.getChildWithName("Modulators"), voiceSlots[(size_t) v], {}, isValidModDest);
     refreshPitchQuantFlags(v);   // assignments changed → refresh stepped-pitch flags
 
-    const int maxCells = maxSteps(std::numeric_limits<int>::max());   // 16 in demo
+    const int maxCells = std::numeric_limits<int>::max();
     deserialiseGate(node.getChildWithName("Gate"),       voiceSlots[(size_t) v].gate,   maxCells);
     deserialiseGate(node.getChildWithName("FilterGate"), voiceSlots[(size_t) v].filterGate, maxCells);
     deserialiseGate(node.getChildWithName("PitchGate"),  voiceSlots[(size_t) v].pitchGate,  maxCells);
@@ -308,12 +308,8 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
     // for the whole commit (the hot-swap glitch). Without it, a concurrent block sees
     // old-or-new per structure (≤1 block, inaudible) instead.
 
-    // Demo cap: an unlicensed build activates at most demoMaxChannels() voices. The other
-    // voices' params/data still load but stay inactive (getNumChannels() == numVoices).
     const int oldN = numVoices.load(std::memory_order_relaxed);
     int nv = juce::jlimit(1, mu_limits::kMaxLayers, (int) state.getProperty("numVoices", 1));
-    if (! isLicensed())
-        nv = juce::jmin(nv, demoMaxChannels());
 
     // Retire-tail: when this preset drops voices while playing, snapshot each dropped
     // voice's OLD engine + insert config NOW (before the new params land)
