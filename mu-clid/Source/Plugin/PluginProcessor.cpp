@@ -311,8 +311,10 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     {
         const bool wasPlaying = sequencerPlaying.load();
         // A backward jump of a running transport (host loop, locate) would otherwise read as a
-        // master-loop wrap and commit a staged hot-swap before the real boundary.
-        if (playing && (!wasPlaying || SequencerEngine::isBackwardBeatJump(lastBeatPos.load(), beatPos)))
+        // master-loop wrap and commit a staged hot-swap before the real boundary; one that lands on a
+        // master-loop boundary is a real wrap and is left for the detector to report.
+        if (playing && (!wasPlaying || SequencerEngine::isBackwardBeatJump(lastBeatPos.load(), beatPos,
+                                                                   sequencer.getMasterLoopSteps())))
             sequencer.resetWrapDetector();
     }
     sequencerPlaying.store(playing);

@@ -214,8 +214,6 @@ void MidiRhythmCore::drainPendingParams()
         if (pendingDirty[(size_t) i].exchange(false, std::memory_order_acq_rel) && rawParams[(size_t) i] != nullptr)
             mu_clid::kRhythmParamDefs[i].apply(rawParams[(size_t) i]->load(), r, patternDirty, voiceDirty);
 
-    publishStepCounts();
-
     if (patternDirty)
     {
         if (apvtsLoading.load(std::memory_order_acquire))
@@ -223,6 +221,9 @@ void MidiRhythmCore::drainPendingParams()
         else
             sequencer.updatePattern(0);
     }
+
+    // After the rebuild, which clamps the step counts to the cap: the ring must show the clamped value.
+    publishStepCounts();
 }
 
 void MidiRhythmCore::servicePendingRebuild()
@@ -234,6 +235,7 @@ void MidiRhythmCore::servicePendingRebuild()
     {
         const juce::ScopedLock sl(rhythmsLock);
         sequencer.updatePattern(0);
+        publishStepCounts();
     }
 }
 
@@ -255,8 +257,8 @@ void MidiRhythmCore::syncRhythmFromApvts()
         if (rawParams[(size_t) j] != nullptr)
             mu_clid::kRhythmParamDefs[j].apply(rawParams[(size_t) j]->load(), r, patternDirty, voiceDirty);
 
-    publishStepCounts();
     sequencer.updatePattern(0);
+    publishStepCounts();   // after the rebuild, which clamps the step counts to the cap
     sequencer.setMasterLoopSteps(juce::jmin((int) apvts.getRawParameterValue(kMasterLoopId)->load() * 16, 256));
 }
 

@@ -326,7 +326,7 @@ public:
             int wraps = 0;
             const auto play = [&](double b)
             {
-                if (guarded && SequencerEngine::isBackwardBeatJump(prev, b)) e.resetWrapDetector();
+                if (guarded && SequencerEngine::isBackwardBeatJump(prev, b, e.getMasterLoopSteps())) e.resetWrapDetector();
                 prev = b;
                 if (e.processBlock(b).masterLoopWrapped) ++wraps;
             };
@@ -346,10 +346,57 @@ public:
                 expectEquals(afterJump, 1, "without the reset the jump is mistaken for a wrap");
         }
 
-        beginTest("Small backward beat moves are not jumps");
+        beginTest("A host loop that lands on a master-loop boundary is still a wrap");
+        for (int from : { 12, 28 })
         {
-            expect(! SequencerEngine::isBackwardBeatJump(4.0, 3.9), "tempo jitter");
+            // 12 -> 0 (the loop start) and 28 -> 16 (a later pass): both land on a boundary.
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(4, 16));
+            e.setMasterLoopSteps(16);
+            const int landing = from == 12 ? 0 : 16;
+            double prev = 0.0;
+            int wraps = 0;
+            const auto play = [&](double b)
+            {
+                if (SequencerEngine::isBackwardBeatJump(prev, b, e.getMasterLoopSteps())) e.resetWrapDetector();
+                prev = b;
+                if (e.processBlock(b).masterLoopWrapped) ++wraps;
+            };
+            for (int s = from == 12 ? 0 : 16; s <= from; ++s) play(beat(s));
+            expectEquals(wraps, 0, "no wrap on the way up");
+            play(beat(landing));
+            expectEquals(wraps, 1, "the jump to the boundary is reported as one wrap");
+        }
+
+        beginTest("Backward moves are compared by step");
+        {
+            expect(! SequencerEngine::isBackwardBeatJump(4.1, 4.05), "a dip inside one step");
+            expect(  SequencerEngine::isBackwardBeatJump(4.05, 3.95), "a sub-step dip across a step line");
             expect(  SequencerEngine::isBackwardBeatJump(4.0, 1.0), "a locate back");
+            expect(! SequencerEngine::isBackwardBeatJump(4.0, 4.5), "forward");
+            expect(! SequencerEngine::isBackwardBeatJump(3.0, 0.0, 16), "a jump onto a loop boundary is a real wrap");
+            expect(  SequencerEngine::isBackwardBeatJump(4.0, 1.0, 16), "a mid-loop landing still resets");
+            expect(  SequencerEngine::isBackwardBeatJump(4.01, 3.99, 4), "a sub-step dip onto a boundary still resets");
+        }
+
+        beginTest("A sub-step dip across a step line is not a master wrap");
+        {
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(4, 16));
+            e.setMasterLoopSteps(16);
+            double prev = 0.0;
+            int wraps = 0;
+            const auto play = [&](double b)
+            {
+                if (SequencerEngine::isBackwardBeatJump(prev, b, e.getMasterLoopSteps())) e.resetWrapDetector();
+                prev = b;
+                if (e.processBlock(b).masterLoopWrapped) ++wraps;
+            };
+            for (int s = 0; s < 6; ++s) play(beat(s));
+            play(beat(6) + 0.01);
+            play(beat(6) - 0.04);                          // a nudge dips back across the step line
+            play(beat(7));
+            expectEquals(wraps, 0, "the dip must not report a wrap");
         }
 
         beginTest("Swap requests racing the audio thread are safe");

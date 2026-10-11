@@ -3,6 +3,7 @@
 #include "Rhythm.h"
 #include "MuLimits.h"
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cstdint>
@@ -78,12 +79,21 @@ public:
     // after a transport restart cannot see a false wrap. A request flag, safe from any thread.
     void resetWrapDetector() { wrapResetRequested.store(true, std::memory_order_release); }
 
-    // True when the playhead moved back by more than a step between two blocks of a running
-    // transport (a host loop jump or locate): to the wrap detector that looks like a master-loop
-    // wrap, so the caller resets it. Smaller backward moves are tempo / nudge jitter, not a jump.
-    static bool isBackwardBeatJump(double previousBeat, double beat) noexcept
+    // True when the playhead moved back to an earlier step between two blocks of a running
+    // transport (a host loop jump, a locate, or a nudge dipping across a step line): to the wrap
+    // detector a lower step looks like a master-loop wrap, so the caller resets it. Steps are
+    // compared, not raw beats, so a sub-step dip that crosses a step line counts too while one that
+    // stays inside a step does not. A real jump (more than a step back) that lands exactly on a
+    // master-loop boundary is left alone: that is a genuine wrap, which a staged swap needs to see.
+    static bool isBackwardBeatJump(double previousBeat, double beat, int loopSteps = 0) noexcept
     {
-        return beat < previousBeat - StepLengthBeats;
+        constexpr double kStepEpsilon = 1e-9;
+        const int prevStep = std::max(0, static_cast<int>(previousBeat / StepLengthBeats + kStepEpsilon));
+        const int landing  = std::max(0, static_cast<int>(beat / StepLengthBeats + kStepEpsilon));
+        if (landing >= prevStep)
+            return false;
+        const bool realJump = beat < previousBeat - StepLengthBeats;
+        return ! (realJump && loopSteps > 0 && landing % loopSteps == 0);
     }
 
     // Message thread, after a hot-swap commit (and on loading a preset at once): rebuild slot r's

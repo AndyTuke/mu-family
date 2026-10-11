@@ -410,6 +410,21 @@ public:
             }
         }
 
+        beginTest("The ring step count shows the capped value when a step cap is active");
+        {
+            RenderStub stub;
+            stub.core.sequencer.setStepCap(8);
+            stub.setActual("r0_stepsA", 16.0f);
+            stub.core.servicePendingRebuild();
+            expectEquals(stub.core.rhythmPlayState.stepsA.load(), 8, "after a parameter change");
+
+            RenderStub source;
+            source.setActual("r0_stepsA", 20.0f);
+            const auto state = session::toXmlString(source.apvts).toStdString();
+            stub.setStateInformation(state.data(), (int) state.size());
+            expectEquals(stub.core.rhythmPlayState.stepsA.load(), 8, "after a restore");
+        }
+
         beginTest("A 30 Hz stream of dirty parameters never makes the audio thread skip a block");
         {
             RenderStub stub;
