@@ -28,7 +28,9 @@ replace it: MIDI clock stays for outboard hardware.
   added to the system time before it is passed in. The same latency number is what the sync-offset item
   (backlog #1253) needs, so they share one source.
 
-## 3. The gating decision — licence (owner)
+## 3. The gating decision — licence (owner) — **decided: route B (GPL), 2026-10-11**
+
+The family source is now GPLv3 and JUCE is used under AGPLv3, so route B applies; routes A and C are kept below for the record.
 
 Link is **dual-licensed: GPLv2 or later, or a proprietary licence** from Ableton (contact
 `link-devs@ableton.com`). Options:
@@ -36,7 +38,7 @@ Link is **dual-licensed: GPLv2 or later, or a proprietary licence** from Ableton
 | Route | What it means | Cost to us |
 |---|---|---|
 | **A. Proprietary licence** | Ask Ableton for terms to embed Link in closed-source apps. | Unknown fee / terms; owner-only conversation. |
-| **B. GPL** | Ship the apps (or the part that contains Link) under GPL-compatible terms with source. | The mu-family repo has **no LICENSE file** today and the apps were sold with licence keys; #1164 (free apps) may make open source acceptable. JUCE has its own licence choice (AGPLv3 or its commercial tiers) that must be compatible — the tier in use should be written down. |
+| **B. GPL** | Ship the apps (or the part that contains Link) under GPL-compatible terms with source. | The repo is now GPLv3 and the apps are free / pay-what-you-want, so this route is open. JUCE has its own licence choice (AGPLv3 or its commercial tiers) that must be compatible — the tier in use should be written down. |
 | **C. Keep Link out of the apps** | A separate GPL helper process hosts Link and talks to mu-link over IPC, so no GPL code is linked into the apps. | Extra process; whether this is enough to keep the apps separate is a legal question — **get advice before relying on it**. |
 
 Until this is decided the plan is **build-time optional**: Link sits behind a CMake option

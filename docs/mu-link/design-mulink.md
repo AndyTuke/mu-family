@@ -48,7 +48,7 @@ When you own the clients, the proven model is a **local audio server with a shar
 - Each block, mu-link writes a **`TransportBlock`** to shared memory: absolute sample position, current tempo (BPM), bar/beat phase, and play/stop state.
 - Clients **read** that block and render exactly the sample range mu-link is about to consume. Because the position comes from the master and the clients are pulled in lockstep with it, sync is **sample-accurate with ±0 drift**.
 - We deliberately **do not** use MIDI clock internally. MIDI clock (24 ppqn) is jitter-prone — it shares a serial wire with other data and its timing is tied to buffer boundaries, giving milliseconds of jitter ([E-RM jitter report](https://www.e-rm.de/data/E-RM_report_Jitter_02_14_EN.pdf)). A sample-accurate audio-derived clock is the known fix (±1 sample).
-- **Outward bridges (optional, later):** mu-link *can* emit real MIDI-clock OUT to sync outboard hardware, and/or be an [Ableton Link](https://ableton.github.io/link/) peer so third-party apps can sync to us. These are *outputs* derived from the master clock, never the internal mechanism. (Ableton Link is GPLv2+/proprietary — a closed product needs the paid licence, so it's opt-in only.)
+- **Outward bridges (optional, later):** mu-link *can* emit real MIDI-clock OUT to sync outboard hardware, and/or be an [Ableton Link](https://ableton.github.io/link/) peer so third-party apps can sync to us. These are *outputs* derived from the master clock, never the internal mechanism. (Ableton Link is GPLv2+/proprietary — the family is GPLv3, so Link under its GPL option is the chosen route; it stays opt-in.)
 
 ### 3.2 The audio path (low latency, no clicks)
 
@@ -134,7 +134,7 @@ Numbered like mu-clid's v1 roadmap. Each stage ends green (tests + build) before
 ## 7. Licensing notes
 
 - **ASIO SDK** — free but under a Steinberg licence agreement; the SDK cannot be redistributed. Only relevant if we pick the ASIO backend.
-- **Ableton Link** — dual GPLv2+ / proprietary. A closed-source product needs the paid licence. Avoided unless we choose to be a Link peer; the internal clock is custom and licence-free.
+- **Ableton Link** — dual GPLv2+ / proprietary. The family is GPLv3 (owner decision 2026-10-11), so route B (GPL) applies if we become a Link peer; the internal clock is custom and licence-free.
 
 ## Sources
 - JACK architecture / lock-free ring buffer — <https://jackaudio.org/api/> , <https://jackaudio.org/api/ringbuffer_8h.html>
