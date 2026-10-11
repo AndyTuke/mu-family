@@ -241,11 +241,26 @@ public:
             stager.stage(i, std::move(p));
             std::atomic_thread_fence(std::memory_order_seq_cst);
             if (! isRunning())
+            {
+                // A full preset still pending predates this slot load: land it first so the async
+                // commit cannot overwrite the newer slot afterwards.
+                applyPendingFullNow();
                 stager.consumeNow(i, [this, i](Payload& staged) { if (applySlot) applySlot(i, staged); });
+            }
             return;
         }
+        applyPendingFullNow();   // same ordering: the older staged full preset goes first
         stager.cancel(i);
         if (applySlot) applySlot(i, p);
+    }
+
+    // The host stopped calling processBlock (prepareToPlay / releaseResources): forget the last
+    // resolved play state so the next load applies at once instead of staging for a boundary no
+    // audio block will ever flag. Call with the audio thread suspended (it owns wasPlaying).
+    void resetPlayState() noexcept
+    {
+        running.store(false, std::memory_order_relaxed);
+        wasPlaying = false;
     }
 
     // The audio thread's last resolved play state: what a product consults when it must act on the
@@ -275,7 +290,7 @@ public:
     // Record the play state and flag staged swaps whose loop point passed in this block (or the
     // transport just stopped). `loopBeatsFor(slot)` gives the loop length in beats that ends the
     // swap pending on `slot` (kFullPreset for the full preset); 0 means no wrap, only the stop
-    // edge, and a negative value means the slot is not eligible. It is asked only for pending
+    // edge, and a negative value means the slot is not eligible (it too commits on the stop edge). It is asked only for pending
     // swaps, so it may be a cheap lookup of audio-thread state. Returns true when something was
     // flagged: trigger the async commit.
     template <typename LoopBeatsFor>
@@ -288,7 +303,10 @@ public:
         auto reached = [&](int slot)
         {
             const double loop = loopBeatsFor(slot);
-            return loop >= 0.0 && boundaryReached(isPlaying, wasPlaying, blockStartBeat, endBeat, loop);
+            // An ineligible slot has no loop to wait for, but once the transport stops nothing is
+            // sounding it, so the stop edge still commits it rather than stranding it.
+            if (loop < 0.0) return wasPlaying && ! isPlaying;
+            return boundaryReached(isPlaying, wasPlaying, blockStartBeat, endBeat, loop);
         };
 
         bool flagged = false;
@@ -308,6 +326,11 @@ public:
     }
 
 private:
+    void applyPendingFullNow()
+    {
+        stager.consumeFullNow([this](Payload& staged) { if (applyFull) applyFull(staged); });
+    }
+
     Stager<Payload, Payload, N> stager;
     ApplyFull                   applyFull;
     ApplySlot                   applySlot;

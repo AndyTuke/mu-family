@@ -135,6 +135,7 @@ PluginProcessor::PluginProcessor()
 
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
+    resetSwapPlayState();   // no processBlock is running yet: loads apply at once, not staged
     currentSampleRate = sampleRate;
     for (auto& v : voices)
         if (v) v->prepare(sampleRate, samplesPerBlock);

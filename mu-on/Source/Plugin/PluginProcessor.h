@@ -39,7 +39,7 @@ public:
 
     // ── AudioProcessor ───────────────────────────────────────────────────────
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
-    void releaseResources() override {}
+    void releaseResources() override { resetSwapPlayState(); }
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;

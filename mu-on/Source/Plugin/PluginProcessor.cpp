@@ -140,6 +140,7 @@ PluginProcessor::PluginProcessor()
 
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
+    resetSwapPlayState();   // no processBlock is running yet: loads apply at once, not staged
     currentSampleRate = sampleRate;
     sequencer.prepare(sampleRate);
     grooveVoices.prepare(sampleRate, samplesPerBlock);

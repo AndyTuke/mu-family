@@ -301,7 +301,9 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
         for (int v = nv; v < oldN; ++v)
         {
             auto& r = retiring[(size_t) v];
-            r.samplesLeft.store(0, std::memory_order_release);   // pause any in-flight read of `config`
+            // A tail still ringing is being read by the audio thread, so its config must not be
+            // rewritten; back-to-back swaps that drop the same voice miss the second tail by design.
+            if (r.samplesLeft.load(std::memory_order_acquire) > 0) continue;
             r.config   = readConfig(v);                          // OLD osc + filter
             const auto& vp = voicePtrs[(size_t) v];
             r.insAlgo  = (int) vp.drvChar->load();

@@ -435,6 +435,10 @@ protected:
             triggerAsyncUpdate();
     }
 
+    // Products call this from prepareToPlay and releaseResources: the host is not driving
+    // processBlock, so the swapper must not believe the transport still runs (loads apply at once).
+    void resetSwapPlayState() noexcept { layerSwapper.resetPlayState(); }
+
     // The 4/4 bar-line rule (mu-Toni, mu-On).
     void flagSwapBoundaries(bool isPlaying, double blockStartBeat, double blockBeats) noexcept
     {

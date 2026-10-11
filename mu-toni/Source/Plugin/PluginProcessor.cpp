@@ -334,6 +334,7 @@ void PluginProcessor::updateHeldNotes(const juce::MidiBuffer& midi, bool& noteOn
 
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
+    resetSwapPlayState();   // no processBlock is running yet: loads apply at once, not staged
     currentSampleRate = sampleRate;
     mixerEngine.prepare(sampleRate, samplesPerBlock);
     fxChain.prepare(sampleRate, samplesPerBlock);

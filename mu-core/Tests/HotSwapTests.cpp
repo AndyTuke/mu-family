@@ -140,14 +140,15 @@ struct HotSwapTests : juce::UnitTest
             sw.stageSlot(2, 6);
             expect(! sw.isRunning());
             sw.useSlot(2, 7);
-            expect(log.events.size() == 1 && log.events[0] == "slot2 7", "applied now");
+            expect(log.events.size() == 2 && log.events[0] == "full 5" && log.events[1] == "slot2 7",
+                   "the older staged full preset lands first, then the slot, applied now");
             expect(! sw.hasPending(2), "the staged slot was dropped, not left to overwrite later");
             sw.useFull(8);
             expect(! sw.hasFullPending() && ! sw.hasPending(1), "a stopped full load drops the staged full and slots");
             expect(log.events.back() == "full 8");
             sw.flagBoundaries(false, 0.0, 0.5);
             expect(! sw.commit(), "nothing is left to land later");
-            expect(log.events.size() == 2);
+            expect(log.events.size() == 3);
         }
 
         beginTest("MIDI-clock-lost: a load with the transport stopped applies at once, nothing pending");
@@ -196,6 +197,57 @@ struct HotSwapTests : juce::UnitTest
             sw.useFull(Hooked { 6 });
             expect(! sw.hasFullPending() && ev.size() == 2 && ev[1] == "full 6", "same for a full preset");
             Hooked::onMove = nullptr;
+        }
+
+        beginTest("a slot load after the stop edge lands after the older staged full preset");
+        {
+            Log log; Swapper sw; wire(log, sw);
+            sw.flagBoundaries(true, 0.0, 0.5);
+            sw.useFull(5);
+            expect(sw.flagBoundaries(false, 0.5, 0.5), "the stop edge flags the full preset");
+            sw.useSlot(1, 7);
+            sw.commit();
+            expect(log.events.size() == 2 && log.events[0] == "full 5" && log.events[1] == "slot1 7",
+                   "the slot load is applied last and the async commit finds nothing to overwrite it");
+        }
+
+        beginTest("take-back path: a stop during slot staging applies the older full preset first");
+        {
+            using HSwapper = LayerSwapper<Hooked, 4>;
+            std::vector<juce::String> ev;
+            HSwapper sw;
+            sw.setAppliers([&ev](Hooked& h)        { ev.push_back("full " + juce::String(h.v)); },
+                           [&ev](int i, Hooked& h) { ev.push_back("slot" + juce::String(i) + " " + juce::String(h.v)); });
+            sw.flagBoundaries(true, 0.0, 0.5);
+            sw.useFull(Hooked { 5 });
+            Hooked::onMove = [&sw] { sw.flagBoundaries(false, 0.5, 0.5); Hooked::onMove = nullptr; };
+            sw.useSlot(2, Hooked { 8 });
+            Hooked::onMove = nullptr;
+            sw.commit();
+            expect(ev.size() == 2 && ev[0] == "full 5" && ev[1] == "slot2 8");
+        }
+
+        beginTest("prepareToPlay reset: after resetPlayState a full load applies at once");
+        {
+            Log log; Swapper sw; wire(log, sw);
+            sw.flagBoundaries(true, 0.0, 0.5);          // the host was playing, then stopped calling processBlock
+            expect(sw.isRunning());
+            sw.resetPlayState();
+            expect(! sw.isRunning());
+            sw.useFull(4);
+            expect(! sw.hasFullPending() && log.events.size() == 1 && log.events[0] == "full 4");
+        }
+
+        beginTest("the stop edge commits an ineligible (negative length) staged slot");
+        {
+            Log log; Swapper sw; wire(log, sw);
+            sw.flagBoundaries(true, 0.0, 0.5);
+            sw.useSlot(3, 8);
+            auto rule = [](int) { return -1.0; };
+            expect(! sw.flagBoundaries(true, 7.9, 0.2, rule), "still ineligible while playing");
+            expect(sw.flagBoundaries(false, 8.1, 0.5, rule), "the stop edge overrides");
+            sw.commit();
+            expect(log.events.size() == 1 && log.events[0] == "slot3 8");
         }
 
         beginTest("stageSlot and stageFull stage whatever the play state");
