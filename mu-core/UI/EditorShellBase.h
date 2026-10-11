@@ -132,7 +132,6 @@ protected:
     MidiPresetsOverlay     midiPresetsOverlay;
     MidiFullPresetsOverlay midiFullPresetsOverlay;
     StatusBar            statusBar;
-    juce::Label          demoBanner;
     juce::Label          upgradeBanner;   // shown when a newer release is available online
 
     juce::Component* sidebar         = nullptr;
@@ -140,7 +139,6 @@ protected:
     juce::Component* mixerOverlay    = nullptr;
     juce::Component* settingsOverlay = nullptr;
 
-    static constexpr int kDemoBannerH    = 20;
     static constexpr int kUpgradeBannerH = 20;
 
     // Set true (message thread) once an online version check finds a newer release.

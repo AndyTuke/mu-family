@@ -2,14 +2,8 @@
 #include <juce_core/juce_core.h>
 #include <cstdint>
 
-// Release builds require a valid license (no license → Demo); Debug builds are the
-// tester/beta builds that run fully unlocked. The flag is set by the build config in
-// the root CMakeLists ($<CONFIG:Release> → 1), never hand-edited — so a build can't
-// ship with the wrong gate. This header defines the OFF default so a TU that never
-// saw the define still compiles (and defaults to "no license required").
-#ifndef MUFAMILY_REQUIRE_LICENSE
- #define MUFAMILY_REQUIRE_LICENSE 0
-#endif
+// Offline licence-file verification (Ed25519) and machine fingerprint. Licensing no longer gates any
+// feature: an unlicensed copy is fully functional and a key only marks a supporter.
 
 namespace mu_core
 {

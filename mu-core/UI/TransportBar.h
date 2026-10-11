@@ -58,7 +58,6 @@ public:
     // (equals editor x since TransportBar is always at x=0).
     int getPresetDropdownLeft() const noexcept;
     void setMixerActive(bool active);
-    void setSaveEnabled(bool enabled);
 
     void paint(juce::Graphics& g) override;
     void resized() override;

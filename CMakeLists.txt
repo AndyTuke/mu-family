@@ -120,14 +120,6 @@ else()
     set(MUFAMILY_AU_FORMAT "")
 endif()
 
-# ── License gate (config-driven, family-wide) ───────────────────────────────
-# Release builds REQUIRE a valid license (no license → Demo mode); Debug builds are
-# the tester/beta builds that run fully unlocked. Tying the gate to the build config
-# (not a hand-edited constant) means a build can never ship with the wrong gate, and
-# the rule is uniform across every product. Each licensed product's isLicensed() reads
-# this macro (default 0 when undefined — see mu-core/License/LicenseManager.h). Placed
-# before the subdirectories so every target inherits it.
-add_compile_definitions($<$<CONFIG:Release>:MUFAMILY_REQUIRE_LICENSE=1>)
 
 # ── Subdirectories ──────────────────────────────────────────────────────────
 add_subdirectory(mu-core)

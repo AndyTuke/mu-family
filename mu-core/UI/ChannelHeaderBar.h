@@ -31,7 +31,6 @@ public:
     void setShowReset(bool show);                     // some products may hide reset
     void setShowDelete(bool show);                    // products with fixed layers hide delete
     void setNameEditable(bool editable);              // fixed-name layers can't be renamed
-    void setSaveEnabled(bool enabled);                // demo: per-layer save disabled when unlicensed
     void commitNameEdit();                            // commit any in-progress rename (call before switching layer)
 
     DropdownSelect& getPresetDropdown() noexcept { return presetDD; }

@@ -117,11 +117,8 @@ void EditorShellBase::wireOverlays()
     activationOverlay.onDismiss   = [this] { showActivation(false); };
     activationOverlay.onActivated = [this]
     {
-        // License state just flipped (online-activated) — drop the demo banner + relayout.
-        // Demo-cap affordances (add button etc.) re-sync via their own refresh timers.
+        // A key was just activated — show the supporter affordances and relayout.
         showActivation(false);
-        const bool licensed = processorRef.isLicensed();
-        demoBanner.setVisible(!licensed);
         refreshSupportAffordances();
         resized();
         repaint();
@@ -186,27 +183,6 @@ void EditorShellBase::wireOverlays()
 void EditorShellBase::setupBanners()
 {
     refreshSupportAffordances();
-
-    // ── Demo banner ─────────────────────────────────────────────────────────
-    {
-        using Id = MuLookAndFeel::ColourIds;
-        const bool licensed = processorRef.isLicensed();
-
-        demoBanner.setText(juce::String::fromUTF8("DEMO  \xe2\x80\x94  1 track, 16 steps, save disabled  \xe2\x80\x94  Click here to activate and unlock all features"),
-                           juce::dontSendNotification);
-        demoBanner.setJustificationType(juce::Justification::centred);
-        demoBanner.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-        demoBanner.setColour(juce::Label::backgroundColourId,
-                             MuLookAndFeel::colour(Id::segmentWarningBg));
-        demoBanner.setColour(juce::Label::textColourId,
-                             MuLookAndFeel::colour(Id::segmentWarningBorder));
-        addChildComponent(demoBanner);
-        demoBanner.setVisible(!licensed);
-        // Whole banner is a click target → opens the activation overlay.
-        demoBanner.setInterceptsMouseClicks(true, false);
-        demoBanner.addMouseListener(this, false);
-        demoBanner.setMouseCursor(juce::MouseCursor::PointingHandCursor);
-    }
 
     // ── Upgrade banner ──────────────────────────────────────────────────────
     // Hidden until the async version check finds a newer release online.
@@ -696,10 +672,8 @@ void EditorShellBase::showActivation(bool show)
 
 void EditorShellBase::mouseDown(const juce::MouseEvent& e)
 {
-    // Clicking the demo banner opens activation; the upgrade banner opens the download page.
-    if (e.eventComponent == &demoBanner && !processorRef.isLicensed())
-        showActivation(true);
-    else if (e.eventComponent == &upgradeBanner)
+    // Clicking the upgrade banner opens the download page.
+    if (e.eventComponent == &upgradeBanner)
         juce::URL(kDownloadUrl).launchInDefaultBrowser();
 }
 
@@ -859,9 +833,8 @@ void EditorShellBase::resized()
     const int statusH    = s(MuLookAndFeel::kStatusBarH);
     const int transportH = s(MuLookAndFeel::kTransportBarH);
     const int sidebarW   = (sidebar != nullptr) ? s(MuLookAndFeel::kSidebarW) : 0;
-    const int demoH      = processorRef.isLicensed()      ? 0 : s(kDemoBannerH);
     const int upgradeH   = upgradeAvailable.load()        ? s(kUpgradeBannerH) : 0;
-    const int bannerH    = demoH + upgradeH;
+    const int bannerH    = upgradeH;
     const int contentH   = h - transportH - statusH - bannerH;
 
     const juce::Rectangle<int> mainArea { sidebarW, transportH,
@@ -881,10 +854,9 @@ void EditorShellBase::resized()
     activationOverlay.setBounds(getLocalBounds());
     saveDialog.setBounds(getLocalBounds());
 
-    // Stack the banners just above the status bar (upgrade on top, demo below).
+    // The upgrade banner sits just above the status bar.
     int by = h - statusH - bannerH;
-    if (upgradeH > 0) { upgradeBanner.setBounds(0, by, w, upgradeH); by += upgradeH; }
-    if (demoH    > 0) { demoBanner   .setBounds(0, by, w, demoH); }
+    if (upgradeH > 0) upgradeBanner.setBounds(0, by, w, upgradeH);
 
     statusBar.setBounds(0, h - statusH, w, statusH);
 }

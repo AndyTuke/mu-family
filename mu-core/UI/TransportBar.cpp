@@ -358,12 +358,6 @@ void TransportBar::setMixerActive(bool active)
 
 int TransportBar::getPresetDropdownLeft() const noexcept { return presetDropdown.getX(); }
 
-void TransportBar::setSaveEnabled(bool enabled)
-{
-    saveBtn.setEnabled(enabled);
-    saveBtn.setAlpha(enabled ? 1.0f : 0.35f);
-}
-
 void TransportBar::mouseDown(const juce::MouseEvent& e)
 {
     if (e.x < mu_ui::s(kLogoW) && onLogoClicked)

@@ -222,18 +222,13 @@ public:
     // picked (saved as "contentDir"). Invalid before initAppSettings; the shell tolerates that.
     virtual juce::File getContentDir() const;
 
-    // License gate. A product with no licensing model (it never calls initLicensing) is always
-    // licensed, so it gets the full editor and no demo banner. A licensed product calls
-    // initLicensing; then a Release build is licensed when the offline signed .lic verifies OR
-    // the machine is online-activated, and a Debug / tester build always runs unlocked.
+    // Licence state. A product with no licensing model (it never calls initLicensing) always counts as
+    // licensed; otherwise licensed means the offline signed .lic verifies OR the machine is
+    // online-activated. Nothing is gated on it: it only marks a supporter (see isSupporter).
     bool hasLicensing() const noexcept { return licensingEnabled; }   // initLicensing was called
     virtual bool isLicensed() const
     {
-       #if MUFAMILY_REQUIRE_LICENSE
         return ! licensingEnabled || offlineLicensed || isOnlineActivated();
-       #else
-        return true;
-       #endif
     }
 
     // There are no feature limits: an unlicensed copy is fully functional (it only shows the

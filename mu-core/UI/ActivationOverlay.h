@@ -3,7 +3,7 @@
 #include "Plugin/ProcessorBase.h"
 
 // Non-blocking activation overlay (shared, family-wide). Opened from the About overlay or an
-// Activate affordance — the plugin keeps running in Demo until the user activates. Online
+// Activate affordance. The plugin is fully functional either way; a key marks a supporter. Online
 // path: paste the Lemon Squeezy key → activate against this machine's fingerprint (off the
 // message thread). Offline path: shows the machine "challenge" code to send the owner for a
 // signed `.lic`. Click outside the card → dismiss.
