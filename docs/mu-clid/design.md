@@ -2007,8 +2007,14 @@ for that rhythm.
 
 **15.6 Copy Protection**
 
+- Current model (owner decision 2026-10-11): the apps are free and fully
+  functional, pay what you like (suggested £20) through Lemon Squeezy. A key
+  (online activation or a signed offline licence file) only marks a
+  supporter; unlicensed copies show a polite once-per-session support prompt.
+  Source is GPLv3. The text below is the original market analysis.
+
 - Serial key validation via Polar (free tier available, no hardware
-  dongle)
+  dongle) --- superseded by Lemon Squeezy
 
 - No iLok --- adds friction, puts buyers off, not appropriate for indie
   at this scale
