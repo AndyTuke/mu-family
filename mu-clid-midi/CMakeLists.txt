@@ -4,10 +4,8 @@
 # BUNDLE_ID / CLAP_ID com.transwarp.mu-clid-lite, state id MuClidState) so existing DAW projects keep
 # finding it; only the folder, target and display name are new.
 #
-# Nothing is compiled from mu-clid/ any more (the shared sequencer and Euclid panels live in mu-core);
-# the mu-clid/Source include path below goes in the next stage. See CLAUDE.md.
-
-set(MU_CLID_SOURCE "${CMAKE_SOURCE_DIR}/mu-clid/Source")
+# Nothing is compiled from mu-clid/ and its Source/ is not on the include path: the shared sequencer
+# and Euclid panels live in mu-core. See CLAUDE.md.
 
 # ── mu-Clid MIDI — VST3 + CLAP (+ AU on macOS) ──────────────────────────────
 juce_add_plugin(mu-clid-midi
@@ -52,12 +50,9 @@ target_sources(mu-clid-midi
         Source/Persistence/SessionState.cpp
 )
 
-# This product's Source/ first, so its own Plugin/PluginProcessor.h wins over mu-Clid's of the same
-# name; mu-Clid's Source/ is on the path only for the shared headers above.
 target_include_directories(mu-clid-midi
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/Source"
-        "${MU_CLID_SOURCE}"
     SYSTEM PRIVATE
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-basics/include"
         "${CMAKE_SOURCE_DIR}/ThirdParty/signalsmith-dsp/include"
@@ -177,7 +172,6 @@ target_compile_features(mu-clid-midi-tests PRIVATE cxx_std_17)
 
 target_include_directories(mu-clid-midi-tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/Source"
-    "${MU_CLID_SOURCE}"
     "${CMAKE_SOURCE_DIR}/mu-core"
 )
 

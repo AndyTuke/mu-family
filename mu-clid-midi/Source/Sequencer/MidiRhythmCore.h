@@ -4,7 +4,7 @@
 #include "Audio/MidiOutputEngine.h"
 #include "Sequencer/SequencerEngine.h"
 #include "Persistence/RhythmParamTable.h"   // kRhythmParamCount for the pending slots
-#include "Sequencer/RhythmPlayState.h"    // mu-Clid's, shared with RhythmCircle
+#include "Sequencer/RhythmPlayState.h"    // shared with RhythmCircle (mu-core)
 
 #include <array>
 #include <atomic>

@@ -30,9 +30,9 @@ mu-clid-midi/Source/
 
 All code is in namespace `mu_clid_midi`; only `createPluginFilter` is global.
 
-## Known exception: code compiled from mu-clid/
+## Shared sequencer code (no longer an exception)
 
-`Rhythm`, `SequencerEngine`, `RhythmPlayState`, `RhythmParamTable` / `PresetHelpers` (header-only), `EuclideanPanel` and `RhythmCircle` still live in `mu-clid/Source` and are compiled into this target from there (see `CMakeLists.txt`). They move to `mu-core` with the layer container (design-naming §5 step 5.7); until then **do not extend them from this product**, and keep them free of `Plugin/PluginProcessor.h` (the include path holds both products' `Source/`, this one first). The Euclidean generators and the Euclid parameter set (`mu_core::addEuclidParams`) are already in `mu-core`.
+`Rhythm`, `SequencerEngine`, `RhythmPlayState`, `RhythmParamTable` / `RhythmPresetHelpers`, `EuclideanPanel` and `RhythmCircle` live in `mu-core` (Stage 2b, done). This product compiles nothing from `mu-clid/` and `mu-clid/Source` is not on its include path, so its own `Plugin/PluginProcessor.h` is the only one in scope. Do not add a `mu-clid/` include or compile-in; if mu-Clid has code this product needs, it moves to `mu-core` first.
 
 ## Product rules
 
