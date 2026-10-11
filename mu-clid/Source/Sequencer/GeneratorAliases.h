@@ -6,6 +6,7 @@
 #include "Sequencer/HitGenerator.h"
 #include "Sequencer/Rhythm.h"
 #include "Sequencer/RhythmPlayState.h"
+#include "Sequencer/SequencerEngine.h"
 
 namespace mu_clid {
 
@@ -18,5 +19,7 @@ using mu_core::Rhythm;
 using mu_core::Logic;
 using mu_core::EuclidOverrides;
 using mu_core::RhythmPlayState;
+using mu_core::SequencerEngine;
+using mu_core::BlockResult;
 
 } // namespace mu_clid

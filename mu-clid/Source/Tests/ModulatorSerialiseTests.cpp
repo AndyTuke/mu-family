@@ -11,7 +11,7 @@
 
 #include <juce_core/juce_core.h>
 #include <juce_data_structures/juce_data_structures.h>
-#include "Sequencer/Rhythm.h"
+#include "Sequencer/GeneratorAliases.h"
 #include "../Persistence/ModulatorSerialise.h"
 #include <map>
 

@@ -4,7 +4,7 @@
 #include <array>
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "Plugin/ProcessorBase.h"
-#include "Sequencer/SequencerEngine.h"
+#include "Sequencer/GeneratorAliases.h"
 #include "Audio/VoiceEngine.h"
 #include "Audio/MidiOutputEngine.h"
 #include "Audio/FX/Slots/FXChain.h"

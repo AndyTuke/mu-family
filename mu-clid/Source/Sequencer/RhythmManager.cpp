@@ -3,7 +3,7 @@
 #include "RhythmManager.h"
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/PluginProcessor_Internal.h"   // mu_core::ScopedApvtsLoading
-#include "Sequencer/Rhythm.h"
+#include "Sequencer/GeneratorAliases.h"
 
 namespace mu_clid {
 

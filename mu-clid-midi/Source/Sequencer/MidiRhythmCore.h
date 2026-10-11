@@ -2,7 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Audio/MidiOutputEngine.h"
-#include "Sequencer/SequencerEngine.h"    // mu-Clid's, shared until Rhythm / SequencerEngine move to mu-core
+#include "Sequencer/SequencerEngine.h"
 #include "Persistence/RhythmParamTable.h"   // mu-Clid: kRhythmParamCount for the pending slots
 #include "Sequencer/RhythmPlayState.h"    // mu-Clid's, shared with RhythmCircle
 
@@ -14,7 +14,7 @@ namespace mu_clid_midi {
 
 using mu_core::Rhythm;
 using mu_core::RhythmPlayState;
-using mu_clid::SequencerEngine;
+using mu_core::SequencerEngine;
 
 // Everything mu-Clid MIDI does between the host block and its MIDI output, with no AudioProcessor
 // around it: the one rhythm, the note engine, the parameter sync and the lock that keeps the message

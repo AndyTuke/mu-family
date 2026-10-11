@@ -6,7 +6,7 @@
 // Private to the PluginProcessor implementation — do not include from other code.
 
 #include <juce_core/juce_core.h>
-#include "Sequencer/Rhythm.h"
+#include "Sequencer/GeneratorAliases.h"
 #include "Persistence/ScopedApvtsLoading.h"   // lifted to mu-core — reuse from there.
 #include "Persistence/RhythmParamTable.h"     // declarative per-rhythm param def table.
 #include "Audio/AlgorithmNames.h" // kEffectAlgorithmNames / kReverbAlgorithmNames / kInsertAlgorithmNames

@@ -8,7 +8,7 @@
 #include "Audio/InsertSlotConfig.h"
 #include "Modulation/ModulationSkew.h"     // proportion-space skew helpers (shared with test C5)
 #include "Modulation/MuClidModDest.h"  // mu-clid modulation targets
-#include "Sequencer/Rhythm.h"
+#include "Sequencer/GeneratorAliases.h"
 
 namespace mu_clid {
 

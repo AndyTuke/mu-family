@@ -1,10 +1,10 @@
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
-#include "SequencerEngine.h"
+#include "Sequencer/SequencerEngine.h"
 
 #include <algorithm>
 #include <cmath>
 
-namespace mu_clid {
+namespace mu_core {
 
 SequencerEngine::SequencerEngine()
 {
@@ -512,4 +512,4 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
     return result;
 }
 
-} // namespace mu_clid
+} // namespace mu_core

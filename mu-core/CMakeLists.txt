@@ -25,6 +25,7 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Sequencer/EuclideanGenerator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Sequencer/HitGenerator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Sequencer/Rhythm.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Sequencer/SequencerEngine.cpp"
     # Audio
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/VoiceEngine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Audio/InsertProcessor.cpp"

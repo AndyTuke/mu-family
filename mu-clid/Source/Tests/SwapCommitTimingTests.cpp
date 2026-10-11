@@ -8,7 +8,7 @@
 #include <limits>
 #include <thread>
 #include <vector>
-#include "Sequencer/SequencerEngine.h"
+#include "Sequencer/GeneratorAliases.h"
 #include "Plugin/HotSwap.h"
 #include "Plugin/HotSwapBoundary.h"
 

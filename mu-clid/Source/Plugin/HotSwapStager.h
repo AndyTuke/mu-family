@@ -1,9 +1,9 @@
 #pragma once
 
 #include <juce_audio_utils/juce_audio_utils.h>
-#include "Sequencer/Rhythm.h"
+#include "Sequencer/GeneratorAliases.h"
 #include "Audio/VoiceEngine.h"
-#include "Sequencer/SequencerEngine.h"
+#include "Sequencer/GeneratorAliases.h"
 #include "Plugin/HotSwap.h"   // mu-core: the shared staging state
 #include <array>
 #include <atomic>

@@ -2,7 +2,7 @@
 // as a wrap, because a false wrap commits a staged hot-swap early.
 
 #include <juce_core/juce_core.h>
-#include "Sequencer/SequencerEngine.h"
+#include "Sequencer/GeneratorAliases.h"
 
 using namespace mu_clid;
 

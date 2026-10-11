@@ -3,7 +3,7 @@
 #include "PluginProcessor.h"
 #include "Persistence/ScopedApvtsLoading.h"
 #include "MuLimits.h"
-#include "Sequencer/SequencerEngine.h"
+#include "Sequencer/GeneratorAliases.h"
 
 namespace mu_clid {
 

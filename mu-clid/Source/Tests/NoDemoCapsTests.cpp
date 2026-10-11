@@ -12,7 +12,7 @@
 #include <juce_data_structures/juce_data_structures.h>
 #include "MuLimits.h"
 #include "Sequencer/GeneratorAliases.h"
-#include "Sequencer/SequencerEngine.h"
+#include "Sequencer/GeneratorAliases.h"
 #include "Persistence/RhythmParamTable.h"
 #include "Persistence/PresetHelpers.h"
 

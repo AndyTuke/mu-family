@@ -1,6 +1,5 @@
 #pragma once
 
-#include "GeneratorAliases.h"
 #include "Sequencer/Rhythm.h"
 #include "MuLimits.h"
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -11,7 +10,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace mu_clid {
+namespace mu_core {
 
 struct BlockResult
 {
@@ -241,4 +240,4 @@ private:
     std::vector<bool> scratchPatA, scratchPatB, scratchEuclid, scratchEuclidC;
 };
 
-} // namespace mu_clid
+} // namespace mu_core
