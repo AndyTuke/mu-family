@@ -88,7 +88,7 @@ public:
     // (loadable into any layer), and a reset back to defaults.
     void saveLayerPreset(int layer, const juce::String& name) override;
     void loadLayerPreset(int layer, const juce::File& file) override;
-    void resetSlot(int layer) override;
+    void resetLayer(int layer) override;
 
     // Hot-swap: a preset loaded while the transport runs is staged and applied at the next bar
     // line (or at once when playback stops); loaded while stopped, it applies at once.

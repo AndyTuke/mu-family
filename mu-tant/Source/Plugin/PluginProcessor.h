@@ -117,23 +117,19 @@ public:
     }
     // Each voice carries an allocated palette-colour index (mu-clid's rule:
     // assigned first-unused on add, follows the voice through delete/reorder),
-    // so layers are distinctly + stably coloured.
+    // so layers are distinctly + stably coloured. It lives on the Layer, so it moves with the voice.
     int          getChannelColourIndex(int idx) const override
     {
-        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? voiceColourIndex[(size_t) idx] : 0;
+        return (idx >= 0 && idx < mu_limits::kMaxLayers) ? layers[(size_t) idx]->colourIndex : 0;
     }
 
-    // ── Dynamic voice management (message-thread; mirrors mu-clid add/delete) ──
-    // addVoice appends a fresh default voice (returns its index, or -1 if full).
-    // removeVoice deletes a voice, shifting every higher voice's APVTS values +
-    // gate/modulator data down so the set stays contiguous. The last voice can't
-    // be removed. Both hold `layersLock`; processBlock tryLocks it.
+    // ── Dynamic voice management (message-thread) ──
+    // Adding, deleting, reordering and resetting a voice are ProcessorBase::addLayer / removeLayer /
+    // swapLayers / resetLayer; this product supplies createLayer and cancelPendingSwap. The edits
+    // move the Pattern pointers under `layersLock`, which processBlock tryLocks.
     int  getNumVoices() const noexcept { return numLayers.load(std::memory_order_relaxed); }
-    int  addVoice();
-    void removeVoice(int idx);
-    void swapVoices(int a, int b);   // reorder (drag in the sidebar)
-    void remapSidechainSources(const std::function<int(int)>& remap);   // re-point scSrc after a renumbering
-    void resetSlot(int idx) override;   // reset a voice to defaults (keeps its colour)
+    bool canEditLayers() const override { return true; }
+    void cancelPendingSwap(int voice) override { hotSwapStager.cancelVoice(voice); }
     // Recompute the cached stepped-pitch flags for one voice / all voices. Call on the
     // message thread whenever a voice's modulators change (editor edit, preset load,
     // voice add/remove/swap/reset); the audio thread reads the flags lock-free.
@@ -176,7 +172,6 @@ public:
     // Mirrors mu-clid. Polled by the UI timers.
     bool hasPendingFullPreset() const override { return hotSwapStager.hasFullPending(); }
     bool hasPendingSwap(int voice) const override { return hotSwapStager.hasVoicePending(voice); }
-    void cancelStagedSwap(int voice)           { hotSwapStager.cancelVoice(voice); }
 
     // ── Per-voice param IDs (used by VoicePanel for SliderAttachment binding) ──
     // Family rule: per-voice params are subtree-scoped via `v{N}_` prefix so a
@@ -213,6 +208,9 @@ protected:
     // points hot-swap (stage at the loop boundary when playing, apply immediately
     // when stopped).
     void applyFullMidiPreset(const juce::File& f)           override { loadPreset(f); }
+
+    // A default voice for slot `slot`, built before a structural edit takes the lock.
+    std::unique_ptr<Layer> createLayer(int slot) override;
 
 private:
     VoiceConfig readConfig(int voiceIndex) const;
@@ -257,6 +255,10 @@ private:
     bool   blkPlaying        = false;
     double blkBeatStart      = 0.0;
     double blkBeatsPerSample = 0.0;
+    // Each voice's gate-pattern length in beats (the hot-swap boundary reference). Read from the
+    // patterns inside the layers try-lock, then kept for a block that misses the lock so the
+    // boundary detection still advances. Audio thread only.
+    std::array<double, mu_limits::kMaxLayers> blkPatternBeats { 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0 };
 
     WavetableBank                                          bank;
     std::array<std::unique_ptr<VoiceEngine>, mu_limits::kMaxLayers>   voices;
@@ -349,10 +351,6 @@ private:
     // Written in prepareToPlay (host suspends the audio thread first) — no atomic needed.
     double currentSampleRate = 44100.0;
 
-    // Per-voice palette-colour index (0..7). Default identity; addVoice assigns
-    // the first-unused colour, remove/swap shift it so colour follows the voice.
-    std::array<int, mu_limits::kMaxLayers> voiceColourIndex { { 0, 1, 2, 3, 4, 5, 6, 7 } };
-    int firstUnusedColourIndex() const;   // lowest palette index not used by an active voice
     // The voice count (ProcessorCore::numLayers) and the per-voice data shift during add/remove
     // are guarded against the audio thread by ProcessorCore::layersLock; processBlock takes a
     // ScopedTryLock and silences the block on contention (a sub-millisecond gap while a voice is
@@ -360,12 +358,6 @@ private:
     // Guards the wavetable bank append against the audio render (which reads the bank), kept apart
     // from layersLock so an import never blocks a layer edit and the reverse.
     juce::CriticalSection bankLock;
-
-    // Copy every `v{src}_*` and `ch{src}_*` APVTS parameter value to the matching
-    // `v{dst}_*` / `ch{dst}_*` parameter (used by removeVoice's down-shift).
-    void copyVoiceParams(int src, int dst);
-    // Reset one voice slot to defaults — APVTS params + gate pattern + modulators.
-    void resetVoiceSlot(int idx);
 
     // Per-voice colour allocation persistence (stored on the APVTS state tree
     // alongside the voice count, so colours round-trip with full + per-... presets).
@@ -406,6 +398,9 @@ private:
     // audio thread (bank append under bankLock).
     void preloadWavetablesFromState(const juce::ValueTree& state);     // full: walk the voice <Slot>s
     void preloadWavetablesFromVoiceTree(const juce::ValueTree& voiceTree); // per-voice: o1/o2WtPath
+    // The bank index of a wavetable file: found by path, else decoded OFF bankLock and appended under
+    // it (microseconds), so an import never silences the render for the decode. -1 when unreadable.
+    int  bankIndexFor(const juce::File& file);
 
     // Register mixer/FX param listeners + run an initial engine sync (JUCE
     // doesn't fire parameterChanged on construction or for unchanged values, so

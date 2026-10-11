@@ -128,7 +128,7 @@ public:
     // ProcessorBase slot-preset API: a rhythm preset into rhythm `ri`.
     void saveLayerPreset(int ri, const juce::String& name) override;
     void loadLayerPreset(int ri, const juce::File& f) override { stageRhythmPreset(ri, f); }
-    void resetSlot(int ri) override                           { rhythms.reset(ri); }
+    void resetLayer(int ri) override                          { rhythms.reset(ri); }
     void setSwapMode(SwapMode m) { swapModeAtomic.store((int)m, std::memory_order_relaxed); }
     SwapMode getSwapMode() const { return static_cast<SwapMode>(swapModeAtomic.load(std::memory_order_relaxed)); }
 

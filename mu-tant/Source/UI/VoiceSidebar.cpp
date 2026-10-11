@@ -156,12 +156,12 @@ VoiceSidebar::VoiceSidebar(PluginProcessor& p)
         glyph->onPulse = [this, i] { pulseItem(i); };
         return glyph;
     };
-    onSwapChannels = [&p](int a, int b) { p.swapVoices(a, b); };
+    onSwapChannels = [&p](int a, int b) { p.swapLayers(a, b); };
 
     // Per-voice hot-swap badge: the shared ChannelSidebar polls isPendingSwap at
     // 5 Hz to show the staging pill, and lets the user cancel a staged voice swap.
     isPendingSwap       = [&p](int i) { return p.hasPendingSwap(i); };
-    onCancelPendingSwap = [&p](int i) { p.cancelStagedSwap(i); };
+    onCancelPendingSwap = [&p](int i) { p.cancelPendingSwap(i); };
 
     refreshItems();
 }

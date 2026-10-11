@@ -95,6 +95,27 @@ public:
     virtual juce::File   getFullPresetDir()          const { return getPresetsDir(); }
     virtual juce::String getFullPresetExtension()    const = 0;
 
+    // ─── Structural layer edits (message thread only) ─────────────────────────
+    // The one routine every product's add / delete / reorder / reset goes through, in the order
+    // the layer-ownership contract fixes (design-plugin-family.md, "Layer ownership and structural
+    // edits"): cancel the affected staged swaps; suspend processing (not a barrier, layersLock is);
+    // build the new layer before locking; under layersLock move the layer pointers and the mixer
+    // strip state and re-point the sidechain sources; unlock, then move the parameter values with
+    // processing still suspended; resume; destroy any removed layer last, outside every lock.
+    // They need createLayer(); a product with a fixed count does not supply it and these refuse.
+    //   addLayer     appends a default layer; returns its index, or -1 when full or unsupported
+    //   removeLayer  deletes a layer, the ones above shift down; the last layer cannot be removed
+    //   swapLayers   exchanges two layers (reorder)
+    //   resetLayer   puts one layer back to defaults, keeping its name and colour. Virtual because
+    //                the products that have not moved their layers into the container reset their own.
+    // True when the product has moved its layers into the container and supplies createLayer, so
+    // the three edits above work. Products with a fixed count leave it false.
+    virtual bool canEditLayers() const { return false; }
+    int          addLayer();
+    bool         removeLayer(int idx);
+    bool         swapLayers(int a, int b);
+    virtual void resetLayer(int layer);
+
     // ─── Shell-facing API (overridden by each plugin) ────────────────────────
     // These are the surfaces the family's editor shell + TransportBar consume.
     // Defaults are no-ops returning sensible values so a young plugin (no
@@ -207,8 +228,11 @@ public:
     virtual juce::Array<juce::File> slotPresetFiles(int slot) const;   // default: every file in the per-slot dir
     virtual void saveLayerPreset(int /*slot*/, const juce::String& /*name*/) {}
     virtual void loadLayerPreset(int /*slot*/, const juce::File& /*file*/)   {}
-    virtual void resetSlot(int /*slot*/)                                    {}
     virtual bool hasPendingSwap(int /*slot*/) const                         { return false; }
+    // Drops the staged (not yet committed) per-layer swap for `slot`, if any. A structural edit
+    // calls it for every layer it renumbers or clears, because a staged swap is keyed by index and
+    // would otherwise land on the wrong layer. A staged full preset is left to win.
+    virtual void cancelPendingSwap(int /*slot*/)                            {}
     std::function<void(int slot)> onLayerPresetCommitted;
 
     // Set by the standalone (mu-link bridge) so the product can publish its current full-preset
@@ -350,6 +374,11 @@ protected:
     mu_pp::LayerLayout layerLayout;
     mu_pp::LayerExtras layerExtras;
 
+    // Re-points every sidechain source parameter (the channel strips' ch{N}_scSrc and the three return
+    // strips) through `remap(paramValue)`. The parameter is 0 = off, 1..8 = channel 0..7, 9 = the
+    // external bus; a structural edit renumbers the layers, so a strip must follow its source's new slot.
+    void remapSidechainSources(const std::function<int(int)>& remap);
+
 protected:
     // Internal transport state. Written by the UI (play / BPM) and the audio thread (beat
     // advance); relaxed atomics — each is a lone published value.
@@ -376,6 +405,10 @@ protected:
     // (e.g. hot-swap commits at a loop boundary). Runs before queued program
     // changes are loaded. Default: nothing.
     virtual void commitDeferredWork() {}
+
+    // A new default layer for slot `slot`, fully built and prepared (it is published as is, under
+    // the lock, so nothing may be left to allocate). Null when the product's layer count is fixed.
+    virtual std::unique_ptr<Layer> createLayer(int /*slot*/) { return nullptr; }
 
     virtual void applyMidiPresetLayer(int slot, const juce::File& f) { loadLayerPreset(slot, f); }
     virtual void applyFullMidiPreset(const juce::File& f)            = 0;
@@ -500,6 +533,14 @@ public:
 #endif
 
 private:
+    // Parameter values of one layer slot, which sit under two prefixes: the product's own (from the
+    // layer layout, e.g. v3_) and the mixer strip's (ch3_). Moving them is what makes the audible
+    // strip and the knobs follow a moved layer; message thread only.
+    void copyLayerParams (int from, int to);
+    void swapLayerParams (int a, int b);
+    void resetLayerParams(int slot);
+    int  firstUnusedColourIndex() const;   // lowest palette index no live layer uses
+
     // syncGlobalFxParam dispatch helpers — one per ID family, so the public
     // entry point is a short prefix router rather than a ~100-line if/else chain.
     // syncMaster returns true when it handled the id. The channel/return helpers

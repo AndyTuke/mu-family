@@ -473,3 +473,228 @@ juce::StringArray ProcessorBase::loadCategoryList() const
     return tag != nullptr ? mu_pp::readPresetCategories(getPresetsDir(), getFullPresetExtension(), tag)
                           : juce::StringArray();
 }
+
+// ─── Structural layer edits ──────────────────────────────────────────────────
+
+namespace
+{
+    // Suspends audio processing for the life of one structural edit and restores the earlier state.
+    // JUCE's suspendProcessing is not a barrier against a block already running; layersLock is.
+    struct ScopedSuspend
+    {
+        explicit ScopedSuspend(juce::AudioProcessor& p) : proc(p), wasSuspended(p.isSuspended())
+        {
+            proc.suspendProcessing(true);
+        }
+        ~ScopedSuspend() { proc.suspendProcessing(wasSuspended); }
+        ScopedSuspend(const ScopedSuspend&)            = delete;
+        ScopedSuspend& operator=(const ScopedSuspend&) = delete;
+
+        juce::AudioProcessor& proc;
+        const bool            wasSuspended;
+    };
+
+    // Calls fn(param, idSuffix) for every ranged parameter whose id starts with `prefix`.
+    template <class Fn>
+    void forEachPrefixed(juce::AudioProcessor& proc, const juce::String& prefix, Fn&& fn)
+    {
+        for (auto* p : proc.getParameters())
+            if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
+            {
+                const juce::String id = rp->getParameterID();
+                if (id.startsWith(prefix)) fn(*rp, id.substring(prefix.length()));
+            }
+    }
+
+    // The two id prefixes a layer slot's parameters sit under: the product's own (v3_) and the mixer strip's (ch3_).
+    juce::StringArray layerParamPrefixes(const mu_pp::LayerLayout& layout, int slot)
+    {
+        juce::StringArray out;
+        if (const auto own = layout.prefix(slot); own.isNotEmpty()) out.add(own);
+        out.add("ch" + juce::String(slot) + "_");
+        return out;
+    }
+}
+
+void ProcessorBase::copyLayerParams(int from, int to)
+{
+    const auto src = layerParamPrefixes(layerLayout, from), dst = layerParamPrefixes(layerLayout, to);
+    for (int k = 0; k < src.size(); ++k)
+        forEachPrefixed(*this, src[k], [&](juce::RangedAudioParameter& rp, const juce::String& suffix)
+        {
+            if (auto* dp = apvts.getParameter(dst[k] + suffix)) dp->setValueNotifyingHost(rp.getValue());
+        });
+}
+
+void ProcessorBase::swapLayerParams(int a, int b)
+{
+    const auto pa = layerParamPrefixes(layerLayout, a), pb = layerParamPrefixes(layerLayout, b);
+    for (int k = 0; k < pa.size(); ++k)
+        forEachPrefixed(*this, pa[k], [&](juce::RangedAudioParameter& rp, const juce::String& suffix)
+        {
+            if (auto* bp = apvts.getParameter(pb[k] + suffix))
+            {
+                const float va = rp.getValue(), vb = bp->getValue();
+                rp.setValueNotifyingHost(vb);
+                bp->setValueNotifyingHost(va);
+            }
+        });
+}
+
+void ProcessorBase::resetLayerParams(int slot)
+{
+    for (const auto& prefix : layerParamPrefixes(layerLayout, slot))
+        forEachPrefixed(*this, prefix, [](juce::RangedAudioParameter& rp, const juce::String&)
+        {
+            rp.setValueNotifyingHost(rp.getDefaultValue());
+        });
+}
+
+void ProcessorBase::remapSidechainSources(const std::function<int(int)>& remap)
+{
+    auto remapOne = [this, &remap](const juce::String& id)
+    {
+        if (auto* p = apvts.getParameter(id))
+        {
+            const int v  = juce::roundToInt(p->convertFrom0to1(p->getValue()));
+            const int nv = juce::jlimit(0, 9, remap(v));
+            if (nv != v) p->setValueNotifyingHost(p->convertTo0to1((float) nv));
+        }
+    };
+    for (int c = 0; c < mu_limits::kMaxLayers; ++c)
+        remapOne("ch" + juce::String(c) + "_scSrc");
+    for (const char* ret : { "ret_eff_scSrc", "ret_dly_scSrc", "ret_rev_scSrc" })
+        remapOne(ret);
+}
+
+int ProcessorBase::firstUnusedColourIndex() const
+{
+    std::array<bool, mu_limits::kMaxLayers> used {};
+    const int n = numLayers.load(std::memory_order_relaxed);
+    for (int i = 0; i < n; ++i)
+        if (layers[(size_t) i] != nullptr)
+        {
+            const int c = layers[(size_t) i]->colourIndex;
+            if (c >= 0 && c < mu_limits::kMaxLayers) used[(size_t) c] = true;
+        }
+    for (int c = 0; c < mu_limits::kMaxLayers; ++c)
+        if (! used[(size_t) c]) return c;
+    return 0;
+}
+
+int ProcessorBase::addLayer()
+{
+    const int n = numLayers.load(std::memory_order_relaxed);
+    if (! canEditLayers() || n >= mu_limits::kMaxLayers) return -1;
+
+    // Phase 1: build and prepare the new layer before anything is locked.
+    auto fresh = createLayer(n);
+    if (fresh == nullptr) return -1;
+    cancelPendingSwap(n);                       // the new slot must carry no stale staged swap
+    fresh->colourIndex = firstUnusedColourIndex();
+
+    // Declared before the suspend guard so a replaced spare is released after processing resumes.
+    std::unique_ptr<Layer> retired;
+    ScopedSuspend suspend(*this);
+
+    // Phase 2: publish under layersLock (pointer move, count, a clean mixer strip), microseconds.
+    {
+        const juce::ScopedLock sl(layersLock);
+        retired = publishLayerLocked(std::move(fresh));
+        mixerEngine.channels[(size_t) n].reset();
+        mixerEngine.resetSidechainEnv(n);
+    }
+
+    // Phase 3: the slot's parameters back to defaults, still suspended so no block sees stale values.
+    resetLayerParams(n);
+    return n;
+}
+
+bool ProcessorBase::removeLayer(int idx)
+{
+    const int n = numLayers.load(std::memory_order_relaxed);
+    if (! canEditLayers() || n <= 1 || idx < 0 || idx >= n) return false;   // the last layer stays
+
+    // Phase 1: the down-shift renumbers every layer from idx upward, so every staged per-layer swap
+    // (keyed by index) would land on the wrong slot. A staged full preset replaces all slots and wins.
+    for (int s = 0; s < mu_limits::kMaxLayers; ++s) cancelPendingSwap(s);
+
+    // The slot the shift vacates stays filled when the product keeps spares; built before locking.
+    std::unique_ptr<Layer> spare;
+    if (keepSpareLayers)
+    {
+        spare = createLayer(n - 1);
+        if (spare == nullptr) return false;
+        spare->colourIndex = layers[(size_t) (n - 1)]->colourIndex;   // the spare keeps the slot's saved colour
+    }
+
+    std::unique_ptr<Layer> retired;             // released last, after processing resumes
+    ScopedSuspend suspend(*this);
+
+    // Phase 2: pointer shift, strip state shift and sidechain re-pointing under layersLock.
+    {
+        const juce::ScopedLock sl(layersLock);
+        mixerEngine.renumberSidechainsAfterRemove(idx);   // before the strips shift down
+        retired = unpublishLayerLocked(idx, std::move(spare));
+        for (int d = idx; d < n - 1; ++d)
+        {
+            mixerEngine.channels[(size_t) d].copyFrom(mixerEngine.channels[(size_t) (d + 1)]);
+            mixerEngine.resetSidechainEnv(d);
+            layers[(size_t) d]->onMoved(d);
+        }
+        mixerEngine.channels[(size_t) (n - 1)].reset();
+        mixerEngine.resetSidechainEnv(n - 1);
+    }
+
+    // Phase 3: parameter values. Strips that ducked from the removed layer now duck from nothing and
+    // the others follow their layer down (translated before the values shift).
+    remapSidechainSources([idx](int v) { return mu_mix::sidechainParamAfterRemove(v, idx, mu_limits::kMaxLayers); });
+    for (int d = idx; d < n - 1; ++d) copyLayerParams(d + 1, d);
+    resetLayerParams(n - 1);                    // the vacated top slot
+    return true;
+}
+
+bool ProcessorBase::swapLayers(int a, int b)
+{
+    const int n = numLayers.load(std::memory_order_relaxed);
+    if (! canEditLayers() || a < 0 || b < 0 || a >= n || b >= n || a == b) return false;
+
+    // Phase 1: staged swaps are keyed by index, so swapping the two slots would misdirect them.
+    cancelPendingSwap(a);
+    cancelPendingSwap(b);
+
+    ScopedSuspend suspend(*this);
+
+    // Phase 2: pointers and strip state exchanged under layersLock; sidechain sources re-pointed first.
+    {
+        const juce::ScopedLock sl(layersLock);
+        mixerEngine.renumberSidechainsAfterSwap(a, b);
+        swapLayersLocked(a, b);
+        mixerEngine.swapChannelState(a, b);
+        mixerEngine.resetSidechainEnv(a);   // the previous tenant's ducking envelope must not bleed in
+        mixerEngine.resetSidechainEnv(b);
+        layers[(size_t) a]->onMoved(a);
+        layers[(size_t) b]->onMoved(b);
+    }
+
+    // Phase 3: parameter values. A strip that ducked from one swapped layer now ducks from the other
+    // (translated before the values swap, so each strip's own source moves with it).
+    remapSidechainSources([a, b](int v) { return mu_mix::sidechainParamAfterSwap(v, a, b, mu_limits::kMaxLayers); });
+    swapLayerParams(a, b);
+    return true;
+}
+
+void ProcessorBase::resetLayer(int idx)
+{
+    if (idx < 0 || idx >= numLayers.load(std::memory_order_relaxed) || layers[(size_t) idx] == nullptr) return;
+    cancelPendingSwap(idx);                     // a staged swap would re-fill what we are clearing
+
+    ScopedSuspend suspend(*this);
+    {
+        const juce::ScopedLock sl(layersLock);
+        layers[(size_t) idx]->resetToDefaults();   // in place, so the editor's pointers into the layer stay valid
+        mixerEngine.channels[(size_t) idx].reset();
+        mixerEngine.resetSidechainEnv(idx);
+    }
+    resetLayerParams(idx);
+}

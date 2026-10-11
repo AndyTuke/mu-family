@@ -99,6 +99,8 @@ public:
     }
 
     int numLayers() const noexcept { return prefixes.size(); }
+    // The parameter-id prefix of `slot` (empty when the layout has no such slot).
+    juce::String prefix(int slot) const { return slot >= 0 && slot < prefixes.size() ? prefixes[slot] : juce::String(); }
     int numParams(int slot) const { return (int) group(slot).size(); }
 
     // The slot whose prefix `id` carries (-1 = a global), and `id` without it.

@@ -55,7 +55,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     voiceSidebar.onAddChannel = [this]
     {
-        const int idx = proc.addVoice();
+        const int idx = proc.addLayer();
         if (idx < 0) return;                       // already at the 8-voice max
         voiceSidebar.refreshItems();
         voiceSidebar.setSelectedIndex(idx);
@@ -71,11 +71,13 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     {
         if (proc.getNumVoices() <= 1) return;      // never delete the last voice
         const int idx = voicePanel.getVoice();
-        // Null out modulator panel pointer before the slot data is shifted so no
-        // timer or paint callback can dereference a stale slot during the window.
+        // Unbind everything that points into the voice's Pattern before it is destroyed (the edit
+        // moves the Pattern pointers and frees the removed one), so no timer or paint callback can
+        // dereference it in the window before setVoice rebinds.
         voicePanel.clearModulatorSlot();
         voicePanel.clearAllModBindings();
-        proc.removeVoice(idx);
+        voicePanel.clearPatternBindings();
+        proc.removeLayer(idx);
         const int newIndex = juce::jlimit(0, proc.getNumVoices() - 1, idx);
         voiceSidebar.refreshItems();
         voiceSidebar.setSelectedIndex(newIndex);

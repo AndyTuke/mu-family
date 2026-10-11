@@ -97,7 +97,7 @@ void PluginProcessor::commitDeferredWork()
 }
 
 // Reset a layer: an empty node puts its params back to their defaults and clears its modulators.
-void PluginProcessor::resetSlot(int layer)
+void PluginProcessor::resetLayer(int layer)
 {
     if (layer < 0 || layer >= kNumChannels) return;
     hotSwap.cancel(layer);   // a staged swap would re-fill what we're resetting

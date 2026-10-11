@@ -63,11 +63,12 @@ PluginProcessor::PluginProcessor()
 {
     // All eight Patterns exist for the processor's lifetime (capacity is fixed, only the count is
     // runtime), so a preset can fill a slot above the live count before the count grows.
-    for (auto& l : layers)
+    keepSpareLayers = true;
+    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
     {
-        auto p = std::make_unique<Pattern>();
-        p->owner.ptr = this;
-        l = std::move(p);
+        layers[(size_t) i] = createLayer(i);
+        layers[(size_t) i]->colourIndex = i;   // each voice starts on its own palette colour
+        jassert(dynamic_cast<Pattern*>(layers[(size_t) i].get()) != nullptr);   // the one type check; layerAs only casts
     }
     numLayers.store(1, std::memory_order_relaxed);
 
@@ -306,6 +307,12 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
             // (Sidechain already captured at the top of processBlock, before the clear.)
             processCoreBlock(buffer, nullptr, renderCount, numSamples, bpm,
                              nullptr, nullptr, nullptr, &renderVoiceCb);
+
+            // The hot-swap boundary reference: each voice's gate-pattern length. Read here, under the
+            // lock, because a structural edit moves the Pattern pointers; a block that misses the lock
+            // reuses these values, so the boundary detection below still advances.
+            for (int v = 0; v < mu_limits::kMaxLayers; ++v)
+                blkPatternBeats[(size_t) v] = (double) getPattern(v).gate.patternLengthBars.load(std::memory_order_relaxed) * 4.0;
         }
     }
 
@@ -334,13 +341,8 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 
     std::array<double, mu_limits::kMaxLayers> voicePatBeats {};
     for (int v = 0; v < mu_limits::kMaxLayers; ++v)
-    {
-        const double gateBeats = (double) getPattern(v).gate.patternLengthBars * 4.0;
-        voicePatBeats[(size_t) v] = onMasterLoop ? masterLoopBeats : gateBeats;
-    }
-    const double fullPatBeats = masterLoopBeats > 0.0
-                                ? masterLoopBeats
-                                : (double) getPattern(0).gate.patternLengthBars * 4.0;
+        voicePatBeats[(size_t) v] = onMasterLoop ? masterLoopBeats : blkPatternBeats[(size_t) v];
+    const double fullPatBeats = masterLoopBeats > 0.0 ? masterLoopBeats : blkPatternBeats[0];
     if (hotSwapStager.checkBoundaries(numLayers.load(std::memory_order_relaxed),
                                       blkPlaying, wasPlaying,
                                       oldPos, newPosRaw, voicePatBeats, fullPatBeats))
@@ -645,135 +647,13 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 }
 
 // ── Dynamic voice management ─────────────────────────────────────────────────
-int PluginProcessor::firstUnusedColourIndex() const
+// A fresh default Pattern, linked to this processor. Built before a structural edit locks, so the
+// edit under the lock only moves pointers.
+std::unique_ptr<Layer> PluginProcessor::createLayer(int)
 {
-    const int n = numLayers.load();
-    std::array<bool, mu_limits::kMaxLayers> used { };
-    for (int i = 0; i < n; ++i)
-    {
-        const int c = voiceColourIndex[(size_t) i];
-        if (c >= 0 && c < mu_limits::kMaxLayers) used[(size_t) c] = true;
-    }
-    for (int c = 0; c < mu_limits::kMaxLayers; ++c)
-        if (! used[(size_t) c]) return c;
-    return 0;
-}
-
-int PluginProcessor::addVoice()
-{
-    const juce::ScopedLock sl(layersLock);
-    const int n = numLayers.load();
-    if (n >= mu_limits::kMaxLayers) return -1;
-    hotSwapStager.cancelVoice(n);                   // the new slot must carry no stale staged swap
-    resetVoiceSlot(n);                              // fresh defaults for the new slot
-    voiceColourIndex[(size_t) n] = firstUnusedColourIndex();   // allocate its palette colour
-    numLayers.store(n + 1);
-    apvts.state.setProperty("numVoices", n + 1, nullptr);
-    refreshPitchQuantFlags(n);   // fresh slot has no modulators → flags off
-    return n;
-}
-
-// Re-point every sidechain source parameter (the channel strips' ch{N}_scSrc and the three return
-// strips) through `remap(paramValue)`. The parameter is 0 = off, 1..8 = channel 0..7, 9 = the
-// external bus; a structural edit renumbers the voices, so a strip must follow its source's new slot.
-void PluginProcessor::remapSidechainSources(const std::function<int(int)>& remap)
-{
-    auto remapOne = [this, &remap](const juce::String& id)
-    {
-        if (auto* p = apvts.getParameter(id))
-        {
-            const int v  = juce::roundToInt(p->convertFrom0to1(p->getValue()));
-            const int nv = juce::jlimit(0, 9, remap(v));
-            if (nv != v) p->setValueNotifyingHost(p->convertTo0to1((float) nv));
-        }
-    };
-    for (int c = 0; c < mu_limits::kMaxLayers; ++c)
-        remapOne("ch" + juce::String(c) + "_scSrc");
-    for (const char* ret : { "ret_eff_scSrc", "ret_dly_scSrc", "ret_rev_scSrc" })
-        remapOne(ret);
-}
-
-void PluginProcessor::removeVoice(int idx)
-{
-    const juce::ScopedLock sl(layersLock);
-    const int n = numLayers.load();
-    if (n <= 1 || idx < 0 || idx >= n) return;     // never remove the last voice
-
-    // The down-shift renumbers every voice from idx upward, so any pending per-voice
-    // hot-swap (keyed by index) would land on the wrong slot — drop them all. (A
-    // staged FULL preset is index-independent: it replaces the whole state at commit,
-    // so it stays and simply wins.)
-    for (int v = 0; v < mu_limits::kMaxLayers; ++v) hotSwapStager.cancelVoice(v);
-
-    // Strips that ducked from the removed voice now duck from nothing; the others follow their
-    // voice down (translated BEFORE the shift copies the strips' parameters).
-    remapSidechainSources([idx](int v) { return mu_mix::sidechainParamAfterRemove(v, idx, mu_limits::kMaxLayers); });
-
-    // Shift every higher voice down one slot — APVTS values + gate + modulators.
-    for (int d = idx; d < n - 1; ++d)
-    {
-        copyVoiceParams(d + 1, d);
-        voiceColourIndex[(size_t) d] = voiceColourIndex[(size_t) (d + 1)];   // colour follows the voice
-        getPattern(d) = getPattern((d + 1));          // modulators + envelopes + user wavetables follow the voice
-    }
-    resetVoiceSlot(n - 1);                          // clear the vacated top slot
-    numLayers.store(n - 1);
-    apvts.state.setProperty("numVoices", n - 1, nullptr);
-    refreshAllPitchQuantFlags();                    // the down-shift renumbered every voice
-}
-
-void PluginProcessor::swapVoices(int a, int b)
-{
-    const juce::ScopedLock sl(layersLock);
-    const int n = numLayers.load();
-    if (a < 0 || b < 0 || a >= n || b >= n || a == b) return;
-
-    // Pending per-voice swaps are keyed by index; swapping the two slots would
-    // misdirect them, so drop both.
-    hotSwapStager.cancelVoice(a);
-    hotSwapStager.cancelVoice(b);
-
-    // A strip that ducked from one swapped voice now ducks from the other (translated BEFORE the
-    // strips' parameters swap, so each strip's own source moves with it).
-    remapSidechainSources([a, b](int v) { return mu_mix::sidechainParamAfterSwap(v, a, b, mu_limits::kMaxLayers); });
-
-    auto swapPrefix = [this](const juce::String& pa, const juce::String& pb)
-    {
-        for (auto* p : getParameters())
-            if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-            {
-                const juce::String id = rp->getParameterID();
-                if (id.startsWith(pa))
-                    if (auto* bp = apvts.getParameter(pb + id.substring(pa.length())))
-                    {
-                        const float va = rp->getValue();
-                        const float vb = bp->getValue();
-                        rp->setValueNotifyingHost(vb);
-                        bp->setValueNotifyingHost(va);
-                    }
-            }
-    };
-    swapPrefix("v"  + juce::String(a) + "_", "v"  + juce::String(b) + "_");
-    swapPrefix("ch" + juce::String(a) + "_", "ch" + juce::String(b) + "_");
-
-    std::swap(voiceColourIndex[(size_t) a], voiceColourIndex[(size_t) b]);   // colour follows the voice
-    // Modulators, envelopes and the user-wavetable choice swap with the voice.
-    const Pattern tmpSlot = getPattern(a);
-    getPattern(a) = getPattern(b);
-    getPattern(b) = tmpSlot;
-    refreshPitchQuantFlags(a);   // the two slots' modulators swapped
-    refreshPitchQuantFlags(b);
-}
-
-void PluginProcessor::resetSlot(int idx)
-{
-    const juce::ScopedLock sl(layersLock);
-    if (idx < 0 || idx >= numLayers.load()) return;
-    hotSwapStager.cancelVoice(idx);            // a staged swap would re-fill what we're clearing
-    const int keepColour = voiceColourIndex[(size_t) idx];
-    resetVoiceSlot(idx);                       // params + gate + modulators → defaults
-    voiceColourIndex[(size_t) idx] = keepColour;   // identity colour stays
-    refreshPitchQuantFlags(idx);               // modulators cleared → flags off
+    auto p = std::make_unique<Pattern>();
+    p->owner.ptr = this;
+    return p;
 }
 
 void PluginProcessor::commitDeferredWork()
@@ -794,14 +674,26 @@ void PluginProcessor::commitDeferredWork()
         }
 }
 
+// The bank index for a wavetable file: found by path, else decoded OFF bankLock (file read, WAV decode
+// and FFT mip build are the slow part) and appended under it for microseconds. Holding bankLock across
+// the decode would silence the audio render for the whole import.
+int PluginProcessor::bankIndexFor(const juce::File& file)
+{
+    const juce::String path = file.getFullPathName();
+    if (const int found = bank.findByPath(path); found >= 0) return found;
+
+    auto wt = bank.decodeFile(file);
+    if (wt.frames <= 0) return -1;
+
+    const juce::ScopedLock sl(bankLock);   // the bank append must exclude the audio thread
+    if (const int found = bank.findByPath(path); found >= 0) return found;   // loaded meanwhile
+    return bank.appendTable(std::move(wt));
+}
+
 void PluginProcessor::loadUserWavetable(int voice, int oscIndex, const juce::File& file)
 {
     if (voice < 0 || voice >= mu_limits::kMaxLayers || ! file.existsAsFile()) return;
-    int idx;
-    {
-        const juce::ScopedLock sl(bankLock);   // bank append must exclude the audio thread
-        idx = bank.addOrLoadFile(file);
-    }
+    const int idx = bankIndexFor(file);
     if (idx < 0) { if (onLoadError) onLoadError("Could not load wavetable \"" + file.getFileName() + "\""); return; }
     const juce::String path = file.getFullPathName();
     if (oscIndex == 0) { getPattern(voice).osc1UserPath = path; getPattern(voice).osc1UserIndex.store(idx); }
@@ -825,43 +717,6 @@ bool PluginProcessor::userWavetableMissing(int voice, int oscIndex) const
 {
     const auto p = userWavetablePath(voice, oscIndex);
     return p.isNotEmpty() && ! juce::File(p).existsAsFile();
-}
-
-void PluginProcessor::copyVoiceParams(int src, int dst)
-{
-    auto shift = [this](const juce::String& srcPrefix, const juce::String& dstPrefix)
-    {
-        for (auto* p : getParameters())
-            if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-            {
-                const juce::String id = rp->getParameterID();
-                if (id.startsWith(srcPrefix))
-                    if (auto* dp = apvts.getParameter(dstPrefix + id.substring(srcPrefix.length())))
-                        dp->setValueNotifyingHost(rp->getValue());
-            }
-    };
-    shift("v"  + juce::String(src) + "_", "v"  + juce::String(dst) + "_");
-    shift("ch" + juce::String(src) + "_", "ch" + juce::String(dst) + "_");
-    // User-wavetable selection copies with the voice (same bank index, already loaded).
-    getPattern(dst).osc1UserPath = getPattern(src).osc1UserPath; getPattern(dst).osc1UserIndex.store(getPattern(src).osc1UserIndex.load());
-    getPattern(dst).osc2UserPath = getPattern(src).osc2UserPath; getPattern(dst).osc2UserIndex.store(getPattern(src).osc2UserIndex.load());
-}
-
-void PluginProcessor::resetVoiceSlot(int idx)
-{
-    auto resetPrefix = [this](const juce::String& prefix)
-    {
-        for (auto* p : getParameters())
-            if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
-            {
-                const juce::String id = rp->getParameterID();
-                if (id.startsWith(prefix))
-                    rp->setValueNotifyingHost(rp->getDefaultValue());
-            }
-    };
-    resetPrefix("v"  + juce::String(idx) + "_");
-    resetPrefix("ch" + juce::String(idx) + "_");
-    getPattern(idx) = Pattern{};   // modulators, the three envelopes and the user wavetables back to defaults
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────

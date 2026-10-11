@@ -216,7 +216,7 @@ juce::Array<juce::File> PluginProcessor::slotPresetFiles(int lane) const
 
 // Reset a lane: its engine params back to defaults and its modulators cleared. The step row
 // and the Rumble envelope are kept — a reset is a sound reset, not a pattern wipe.
-void PluginProcessor::resetSlot(int lane)
+void PluginProcessor::resetLayer(int lane)
 {
     if (lane < 0 || lane >= kNumChannels) return;
     hotSwap.cancel(lane);   // a staged swap would re-fill what we're resetting

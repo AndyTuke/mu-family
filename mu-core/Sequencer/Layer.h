@@ -90,6 +90,21 @@ struct Layer
     virtual void writeExtras(juce::ValueTree& node) const;
     virtual void applyExtras(const juce::ValueTree& node);
     virtual bool isValidDest(const std::string& id) const { juce::ignoreUnused(id); return true; }
+
+    // Structural-edit hooks, called by ProcessorBase::addLayer / removeLayer / swapLayers /
+    // resetLayer on the message thread with layersLock held, so each must stay cheap and never block.
+    // resetToDefaults puts the layer back to a freshly built one but keeps its identity (name and
+    // colour); a product extends it to clear its own data. onMoved tells a layer its slot index
+    // changed, so state tied to the slot (not the data) can be reset.
+    virtual void resetToDefaults()
+    {
+        const auto keepName   = name;
+        const int  keepColour = colourIndex;
+        *this = Layer{};
+        name        = keepName;
+        colourIndex = keepColour;
+    }
+    virtual void onMoved(int newIndex) { juce::ignoreUnused(newIndex); }
 };
 
 // The base persistence hooks need the modulator (de)serialiser, which itself takes a Layer.

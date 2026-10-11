@@ -69,8 +69,16 @@ public:
     // dereference it during the voice-remove → setVoice rebind window.
     void clearModulatorSlot() { modulatorPanel.setVoiceSlot(nullptr); }
 
+    // Same for the gate editor's three envelope patterns, which belong to the voice's Pattern.
+    void clearPatternBindings()
+    {
+        gatingDesigner.setPattern(nullptr);
+        gatingDesigner.setFilterPattern(nullptr);
+        gatingDesigner.setPitchPattern(nullptr);
+    }
+
     // Clear raw ModulationMatrix pointers from all KnobWithLabel mod-binding arcs.
-    // Call before resetVoiceSlot / removeVoice destroys the Layer so the
+    // Call before removeLayer destroys the Layer so the
     // 30 Hz timer cannot dereference freed matrix memory.
     void clearAllModBindings();
 

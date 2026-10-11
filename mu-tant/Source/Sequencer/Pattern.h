@@ -15,9 +15,10 @@ class PluginProcessor;
 // that belongs to this voice alone — its three drawable envelopes, its user wavetables and the
 // audio-to-UI level tap. The sound's parameters live in the APVTS (v{N}_*).
 //
-// Copying a Pattern (voice remove / swap) carries the voice's DATA — modulation, envelopes,
-// user wavetable choice — and leaves the destination's own engine state alone (level tap, the
-// stepped-pitch flags, the processor link), as the arrays it replaces were moved piecemeal.
+// A structural edit (add / remove / reorder) moves whole Patterns by pointer, so everything here
+// travels with its voice. Copying one carries the voice's DATA — modulation, envelopes, user
+// wavetable choice — and leaves the destination's own state alone (level tap, the stepped-pitch
+// flags, the processor link); a reset copies a default Pattern in this way, in place.
 struct Pattern : Layer
 {
     Pattern() = default;
@@ -46,6 +47,17 @@ struct Pattern : Layer
     OwnerLink<PluginProcessor> owner;
     void writeExtras(juce::ValueTree& node) const override;
     void applyExtras(const juce::ValueTree& node) override;
+
+    // Back to a new voice's data, keeping name and colour; in place, so the editor's pointers into
+    // this Pattern stay valid.
+    void resetToDefaults() override
+    {
+        Layer::resetToDefaults();
+        const Pattern fresh;
+        copyVoiceData(fresh);
+        osc1SemiStepped.store(false, std::memory_order_relaxed);   // the modulators are cleared
+        osc2SemiStepped.store(false, std::memory_order_relaxed);
+    }
 
 private:
     void copyVoiceData(const Pattern& o)

@@ -117,7 +117,7 @@ public:
     void                    saveLayerPreset(int lane, const juce::String& name) override;
     void                    loadLayerPreset(int lane, const juce::File& file) override;
     juce::Array<juce::File> slotPresetFiles(int lane) const override;   // the presets for that lane
-    void                    resetSlot(int lane) override;                // engine params → defaults, modulators cleared
+    void                    resetLayer(int lane) override;               // engine params → defaults, modulators cleared
 
     // Hot-swap: a preset loaded while the transport runs is staged and applied when the 16-step
     // pattern wraps (every bar, or at once when playback stops); loaded while stopped, at once.

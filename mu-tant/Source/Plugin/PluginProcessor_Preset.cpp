@@ -154,7 +154,7 @@ void PluginProcessor::resolveUserWavetable(const juce::String& path, juce::Strin
         if (idx < 0)
         {
             juce::File f(path);
-            if (f.existsAsFile()) { const juce::ScopedLock sl(bankLock); idx = bank.addOrLoadFile(f); }
+            if (f.existsAsFile()) idx = bankIndexFor(f);
         }
     }
     index.store(idx);
@@ -225,17 +225,9 @@ void PluginProcessor::preloadWavetablesFromVoiceTree(const juce::ValueTree& voic
     auto warm = [this](const juce::String& path)
     {
         if (path.isEmpty()) return;
-        if (bank.findByPath(path) >= 0) return;       // already in the bank — nothing to do
         juce::File f(path);
         if (! f.existsAsFile()) return;
-        // Decode (file read + WAV decode + FFT mip build) OFF the lock — this is the
-        // slow part. Only the brief append takes bankLock, so the audio render is
-        // excluded for microseconds, not for the whole decode (the residual swap
-        // pause: decoding under the lock silenced the render for the decode duration).
-        auto wt = bank.decodeFile(f);
-        if (wt.frames <= 0) return;
-        const juce::ScopedLock sl(bankLock);
-        if (bank.findByPath(path) < 0) bank.appendTable(std::move(wt));   // defensive re-check
+        bankIndexFor(f);   // decodes off the lock, appends under it for microseconds
     };
     warm(voiceTree.getProperty("o1WtPath").toString());
     warm(voiceTree.getProperty("o2WtPath").toString());
@@ -253,7 +245,7 @@ juce::String PluginProcessor::serialiseVoiceColours() const
 {
     juce::String s;
     for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-        s += (i ? "," : "") + juce::String(voiceColourIndex[(size_t) i]);
+        s += (i ? "," : "") + juce::String(layers[(size_t) i]->colourIndex);
     return s;
 }
 
@@ -262,7 +254,7 @@ void PluginProcessor::restoreVoiceColours(const juce::String& csv)
     if (csv.isEmpty()) return;
     const auto toks = juce::StringArray::fromTokens(csv, ",", "");
     for (int i = 0; i < mu_limits::kMaxLayers && i < toks.size(); ++i)
-        voiceColourIndex[(size_t) i] = juce::jlimit(0, mu_limits::kMaxLayers - 1, toks[i].getIntValue());
+        layers[(size_t) i]->colourIndex = juce::jlimit(0, mu_limits::kMaxLayers - 1, toks[i].getIntValue());
 }
 
 juce::File PluginProcessor::getLayerPresetDir() const { return getContentDir().getChildFile("Voices"); }

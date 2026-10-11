@@ -10,6 +10,7 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <utility>
 
 // The slim parent of ProcessorBase: the layer storage and accessors and the published host transport.
 // It depends on nothing but JUCE, Layer and HostTransport, so a unit test can derive a small
@@ -77,9 +78,11 @@ public:
 
     // Layer `i` as the product's concrete type, for any slot 0..kMaxLayers-1 whether or not it is
     // live yet (a preset can load data into a slot above the current count). The slot must be filled.
+    // Only bounds and non-null are asserted: a dynamic_cast here would run on the audio thread in
+    // every Debug block, so the product checks the type once when it builds its layers.
     template <class T> T& layerAs(int i) noexcept
     {
-        jassert(i >= 0 && i < mu_limits::kMaxLayers && dynamic_cast<T*>(layers[(size_t) i].get()) != nullptr);
+        jassert(i >= 0 && i < mu_limits::kMaxLayers && layers[(size_t) i] != nullptr);
         return static_cast<T&>(*layers[(size_t) i]);
     }
     template <class T> const T& layerAs(int i) const noexcept
@@ -94,6 +97,46 @@ protected:
     std::array<std::unique_ptr<Layer>, mu_limits::kMaxLayers> layers;
     std::atomic<int>      numLayers { 0 };
     juce::CriticalSection layersLock;
+
+    // True when the product keeps every slot up to kMaxLayers filled for the processor's lifetime
+    // (a preset can load data into a slot above the count). Structural edits then refill the slot
+    // they vacate. Set once in the product's constructor.
+    bool keepSpareLayers = false;
+
+    // Pointer moves for the structural edits (ProcessorBase::addLayer and the rest). Message thread
+    // only, and the caller holds layersLock: they only move pointers and publish the count, so
+    // they take microseconds and neither allocate nor destroy. A layer that falls out is returned
+    // so the caller releases it after unlocking.
+    //   publishLayerLocked   puts `fresh` in slot `numLayers` and grows the count; returns the
+    //                        spare it replaced (null when the slot was empty)
+    //   unpublishLayerLocked takes layer `idx` out, shifts the ones above it down, shrinks the
+    //                        count and puts `spare` (which may be null) in the vacated top slot
+    //   swapLayersLocked     exchanges two live layers
+    std::unique_ptr<Layer> publishLayerLocked(std::unique_ptr<Layer> fresh)
+    {
+        const int n = numLayers.load(std::memory_order_relaxed);
+        jassert(n < mu_limits::kMaxLayers);
+        auto replaced = std::move(layers[(size_t) n]);
+        layers[(size_t) n] = std::move(fresh);
+        numLayers.store(n + 1, std::memory_order_release);
+        return replaced;
+    }
+    std::unique_ptr<Layer> unpublishLayerLocked(int idx, std::unique_ptr<Layer> spare)
+    {
+        const int n = numLayers.load(std::memory_order_relaxed);
+        jassert(idx >= 0 && idx < n);
+        auto removed = std::move(layers[(size_t) idx]);
+        for (int d = idx; d < n - 1; ++d)
+            layers[(size_t) d] = std::move(layers[(size_t) (d + 1)]);
+        layers[(size_t) (n - 1)] = std::move(spare);
+        numLayers.store(n - 1, std::memory_order_release);
+        return removed;
+    }
+    void swapLayersLocked(int a, int b) noexcept
+    {
+        jassert(a >= 0 && b >= 0 && a < numLayers.load() && b < numLayers.load());
+        std::swap(layers[(size_t) a], layers[(size_t) b]);
+    }
 
     // Reads the host playhead for this block and publishes it for the UI. Call it from
     // processBlock in place of mu_core::readHostTransport(getPlayHead()) — audio thread only.

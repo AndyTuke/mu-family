@@ -44,6 +44,10 @@ struct TestProcessorCore : ProcessorCore
     using ProcessorCore::layers;
     using ProcessorCore::numLayers;
     using ProcessorCore::layersLock;
+    using ProcessorCore::keepSpareLayers;
+    using ProcessorCore::publishLayerLocked;
+    using ProcessorCore::unpublishLayerLocked;
+    using ProcessorCore::swapLayersLocked;
     juce::String getChannelName(int i) const override
     {
         const auto* l = getLayer(i);
