@@ -25,16 +25,23 @@ public:
         {
             // swapMode 0 = master-loop mode: every rhythm defers to the master wrap,
             // ignoring its own loop mask.
-            expect (  perRhythmBoundaryReached (0, 3, /*master*/ true,  /*mask*/ 0x00), "fires on master wrap");
-            expect (! perRhythmBoundaryReached (0, 3, /*master*/ false, /*mask*/ 0xFF), "ignores rhythm mask when in master mode");
+            expect (  perRhythmBoundaryReached (0, /*hasMaster*/ true, 3, /*master*/ true,  /*mask*/ 0x00), "fires on master wrap");
+            expect (! perRhythmBoundaryReached (0, /*hasMaster*/ true, 3, /*master*/ false, /*mask*/ 0xFF), "ignores rhythm mask when in master mode");
         }
 
         beginTest ("C3: per-rhythm swap in per-rhythm mode follows that rhythm's bit");
         {
             // swapMode != 0 = per-rhythm mode: rhythm r defers to bit r of the mask.
-            expect (! perRhythmBoundaryReached (1, 3, /*master*/ true,  /*mask*/ 0x00), "ignores master wrap in per-rhythm mode");
-            expect (  perRhythmBoundaryReached (1, 3, /*master*/ false, /*mask*/ 1 << 3), "fires when rhythm 3's bit is set");
-            expect (! perRhythmBoundaryReached (1, 3, /*master*/ false, /*mask*/ 1 << 2), "does not fire on another rhythm's bit");
+            expect (! perRhythmBoundaryReached (1, /*hasMaster*/ true, 3, /*master*/ true,  /*mask*/ 0x00), "ignores master wrap in per-rhythm mode");
+            expect (  perRhythmBoundaryReached (1, /*hasMaster*/ true, 3, /*master*/ false, /*mask*/ 1 << 3), "fires when rhythm 3's bit is set");
+            expect (! perRhythmBoundaryReached (1, /*hasMaster*/ true, 3, /*master*/ false, /*mask*/ 1 << 2), "does not fire on another rhythm's bit");
+        }
+
+        beginTest ("C3: per-rhythm swap in master-loop mode with no master loop falls back to the rhythm's own loop");
+        {
+            expect (  perRhythmBoundaryReached (0, /*hasMaster*/ false, 3, /*master*/ false, /*mask*/ 1 << 3), "fires on the rhythm's own wrap");
+            expect (! perRhythmBoundaryReached (0, /*hasMaster*/ false, 3, /*master*/ false, /*mask*/ 1 << 2), "does not fire on another rhythm's wrap");
+            expect (! perRhythmBoundaryReached (0, /*hasMaster*/ false, 3, /*master*/ true,  /*mask*/ 0x00), "ignores masterLoopWrapped without a master loop");
         }
 
         beginTest ("C3: full-preset swap WITH a master loop waits for the master wrap");

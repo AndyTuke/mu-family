@@ -7,8 +7,10 @@
 #include <atomic>
 #include <limits>
 #include <thread>
+#include <vector>
 #include "Sequencer/SequencerEngine.h"
 #include "Plugin/HotSwap.h"
+#include "Plugin/HotSwapBoundary.h"
 
 using namespace mu_clid;
 
@@ -104,8 +106,60 @@ public:
         }
     }
 
+    // Plays steps 0..lastStep with a swap staged in step 3, deciding the boundary the way
+    // HotSwapStager::checkBoundaries does for the given Timing mode and master loop. Returns the
+    // steps at which the swap committed (one entry per commit) and the boundary step it recorded.
+    std::vector<int> runStagedSwap(int swapMode, int masterLoop, int lastStep, int* originOut = nullptr)
+    {
+        SequencerEngine e;
+        e.addRhythm(rhythmOf(4, 8));
+        if (masterLoop > 0) e.setMasterLoopSteps(masterLoop);
+        mu_hotswap::Stager<int, int, 1> stager;
+        std::vector<int> commits;
+        for (int s = 0; s <= lastStep; ++s)
+        {
+            if (s == 3) stager.stage(0, 7);
+            const auto r = e.processBlock(beat(s));
+            const bool atBoundary = mu_clid::hotswap::perRhythmBoundaryReached(
+                swapMode, e.getMasterLoopSteps() > 0, 0, r.masterLoopWrapped, r.rhythmLoopWrapMask);
+            const int origin = mu_clid::hotswap::perRhythmUsesMasterLoop(swapMode, e.getMasterLoopSteps() > 0)
+                                   ? 0 : e.getBoundaryEff(0);
+            stager.flagIfReady(0, stager.pendingToken(0), atBoundary);
+            if (stager.consume(0, [&](int&) { commits.push_back(s); if (originOut != nullptr) *originOut = origin; })) {}
+        }
+        return commits;
+    }
+
     void runTest() override
     {
+        beginTest("Default timing, no master loop: a staged per-rhythm swap commits once at the rhythm's own loop boundary");
+        {
+            int origin = -1;
+            const auto commits = runStagedSwap(/*OnMasterLoop*/ 0, /*masterLoop*/ 0, 30, &origin);
+            expectEquals((int) commits.size(), 1, "the swap commits exactly once");
+            if (! commits.empty()) expectEquals(commits[0], 8, "at the end of the 8-step pass");
+            expectEquals(origin, 8, "the new pattern's step 0 is the rhythm's own boundary");
+        }
+
+        beginTest("With a master loop set, 'on master loop' timing still waits for the master wrap");
+        {
+            int origin = -1;
+            const auto commits = runStagedSwap(0, 16, 40, &origin);
+            expectEquals((int) commits.size(), 1, "the swap commits exactly once");
+            if (! commits.empty()) expectEquals(commits[0], 16, "at the master loop point, not the rhythm's earlier wrap at step 8");
+            expectEquals(origin, 0, "the new pattern starts on the master loop point");
+        }
+
+        beginTest("'On rhythm loop' timing is unchanged, with or without a master loop");
+        {
+            const auto free = runStagedSwap(1, 0, 30);
+            const auto looped = runStagedSwap(1, 16, 40);
+            expectEquals((int) free.size(), 1, "free-running commits once");
+            expectEquals((int) looped.size(), 1, "with a master loop commits once");
+            if (! free.empty())   expectEquals(free[0], 8, "free-running: at the rhythm's wrap");
+            if (! looped.empty()) expectEquals(looped[0], 8, "with a master loop: still at the rhythm's wrap");
+        }
+
         beginTest("A swap committed on the boundary step fires the new pattern at once");
         {
             SequencerEngine e;

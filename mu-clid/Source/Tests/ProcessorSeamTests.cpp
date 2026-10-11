@@ -126,9 +126,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         const int expectedHits[2] = { 3, 7 };
         expect(files[0].existsAsFile() && files[1].existsAsFile(), "both presets were written under the temp root");
 
-        // Each rhythm commits at its own loop wrap. (With the default "on master loop" timing and no
-        // master loop set, a staged per-rhythm swap has no boundary to wait for and stays pending.)
-        p.setSwapMode(mu_clid::PluginProcessor::SwapMode::OnRhythmLoop);
+        // Default Timing ("on master loop") with no master loop set: each rhythm commits at its own loop wrap.
 
         const int sizes[] = { 64, 480, 1024 };
         for (int n : sizes)

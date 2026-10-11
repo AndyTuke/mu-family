@@ -48,23 +48,26 @@ bool HotSwapStager::hasPendingFullPreset() const
 bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
                                     int rhythmLoopWrapMask)
 {
-    // Per-rhythm swaps: the master loop point, or each rhythm's own loop (Hot-swap timing).
+    // Per-rhythm swaps: the master loop point, or each rhythm's own loop (Hot-swap timing). With no
+    // master loop set there is no master wrap, so the own loop is used whatever the timing says.
     const int mode = proc.swapModeAtomic.load(std::memory_order_relaxed);
+    const bool hasMasterLoop = proc.sequencer.getMasterLoopSteps() > 0;
+    const bool onMasterLoop  = mu_clid::hotswap::perRhythmUsesMasterLoop(mode, hasMasterLoop);
     const uint32_t epoch = proc.sequencer.getFrameEpoch();
     bool needAsync = false;
     for (int r = 0; r < numRhythms; ++r)
     {
         // Read the token first so the flag lands only on the swap this boundary was judged for.
         const auto token = stager.pendingToken(r);
-        const bool atBoundary = mu_clid::hotswap::perRhythmBoundaryReached(mode, r, masterLoopWrapped,
-                                                                          rhythmLoopWrapMask);
+        const bool atBoundary = mu_clid::hotswap::perRhythmBoundaryReached(mode, hasMasterLoop, r,
+                                                                          masterLoopWrapped, rhythmLoopWrapMask);
         // A non-zero token is a ready, not yet flagged swap. Record where its boundary fell before
         // flagging: the flag's release publishes it to the committing thread, which starts the new
         // pattern's step 0 there (the master loop point is step 0 of the loop; a rhythm's own loop
         // is wherever that rhythm last wrapped).
         if (token != 0 && atBoundary)
         {
-            flaggedOrigin[(size_t) r].store(mode == 0 ? 0 : proc.sequencer.getBoundaryEff(r), std::memory_order_relaxed);
+            flaggedOrigin[(size_t) r].store(onMasterLoop ? 0 : proc.sequencer.getBoundaryEff(r), std::memory_order_relaxed);
             flaggedEpoch [(size_t) r].store(epoch, std::memory_order_relaxed);
         }
         needAsync |= stager.flagIfReady(r, token, atBoundary);
@@ -75,7 +78,6 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
     // boundary). When free-running (mstrLoop=0, the default), there is no master
     // loop to wrap, so fall back to rhythm 0's loop — otherwise the swap would
     // hang forever waiting for a boundary that never comes.
-    const bool hasMasterLoop = proc.sequencer.getMasterLoopSteps() > 0;
     const auto fullToken = stager.fullToken();
     const bool fullAtBoundary = mu_clid::hotswap::fullPresetBoundaryReached(hasMasterLoop, masterLoopWrapped,
                                                                            rhythmLoopWrapMask);

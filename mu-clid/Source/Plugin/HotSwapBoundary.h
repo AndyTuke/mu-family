@@ -8,14 +8,24 @@
 namespace mu_clid::hotswap
 {
 
-// Per-rhythm staged swap. In master-loop mode (swapMode == 0) every rhythm
-// defers to the master loop point; otherwise each rhythm defers to its own
-// loop wrap (bit `rhythmIndex` of the mask).
-inline bool perRhythmBoundaryReached(int swapMode, int rhythmIndex,
+// True when a per-rhythm swap waits on the master loop point: the Timing setting is "On master
+// loop" (swapMode 0) AND a master loop is actually set. With no master loop (free-running, the
+// default) there is no master wrap to wait for, so the swap uses the rhythm's own loop instead.
+inline bool perRhythmUsesMasterLoop(int swapMode, bool hasMasterLoop) noexcept
+{
+    return swapMode == 0 && hasMasterLoop;
+}
+
+// Per-rhythm staged swap. In master-loop mode (swapMode == 0) with a master loop set, every rhythm
+// defers to the master loop point; otherwise (own-loop mode, or no master loop to wait for) each
+// rhythm defers to its own loop wrap (bit `rhythmIndex` of the mask) - without that fallback the
+// default settings would wait forever for a master wrap that never comes.
+inline bool perRhythmBoundaryReached(int swapMode, bool hasMasterLoop, int rhythmIndex,
                                      bool masterLoopWrapped, int rhythmLoopWrapMask) noexcept
 {
-    return (swapMode == 0) ? masterLoopWrapped
-                           : ((rhythmLoopWrapMask & (1 << rhythmIndex)) != 0);
+    return perRhythmUsesMasterLoop(swapMode, hasMasterLoop)
+               ? masterLoopWrapped
+               : ((rhythmLoopWrapMask & (1 << rhythmIndex)) != 0);
 }
 
 // Full-preset swap. Defers to the master loop point when a master loop is
