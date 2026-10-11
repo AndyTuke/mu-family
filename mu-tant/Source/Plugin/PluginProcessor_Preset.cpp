@@ -198,10 +198,10 @@ void PluginProcessor::loadLayerPreset(int voice, const juce::File& file)
 
     // Hot-swap: while the resolved transport plays (host, MIDI clock or internal), stage and commit
     // at THIS voice's own loop boundary (handleAsyncUpdate); while stopped, apply immediately. The
-    // swapper makes that call; referenced wavetables are pre-loaded into the bank now so a boundary
-    // commit does no disk I/O.
-    if (layerSwapper.isRunning())
-        preloadWavetablesFromVoiceTree(tree);
+    // swapper makes that call. Referenced wavetables are pre-loaded into the bank whatever the play
+    // state is now (dedup-by-path makes a repeat free), because the transport can start between
+    // this and the staging, and a boundary commit must never do disk I/O.
+    preloadWavetablesFromVoiceTree(tree);
     layerSwapper.useSlot(voice, std::move(tree));
 }
 
@@ -272,8 +272,8 @@ juce::ValueTree PluginProcessor::captureFullPreset()
 void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 {
     auto composed = toVoiceState(state);
-    if (layerSwapper.isRunning())
-        preloadWavetablesFromState(composed);
+    // Pre-load whatever the play state: the transport may start before the swapper stages it.
+    preloadWavetablesFromState(composed);
     layerSwapper.useFull(std::move(composed));
 }
 
