@@ -2,6 +2,7 @@
 
 #include <array>
 #include <atomic>
+#include <cstdint>
 #include <cmath>
 #include <functional>
 #include <utility>
@@ -41,152 +42,179 @@ inline bool boundaryReached(bool playing, bool wasPlaying,
 // one full-preset payload. A full preset replaces every slot, so staging one drops any pending
 // per-slot swaps.
 //
+// Each payload has ONE atomic word: the low two bits are the state (0 empty, 1 ready, 2 flagged)
+// and the rest a generation the message thread bumps on every stage / cancel / consume.
+//
 // Threading contract:
 //   - Payloads are only touched on the MESSAGE thread (stage / cancel / consume), which the
 //     message loop serialises, so they need no lock.
-//   - The audio thread touches ONLY the flags: flagIfReady() reads `isReady` (acquire) and sets
-//     `boundaryReached` (release); consume() then sees both on the message thread.
+//   - The audio thread only ever moves a word from ready to flagged, with one compare-exchange
+//     against a word it read earlier (a token). Because the message thread changes the generation
+//     whenever a payload is replaced or removed, a flag decision made about an old payload can
+//     never land on a freshly staged one, however long the audio thread was descheduled between
+//     reading the token and flagging.
+//   - The message thread sets a word to ready only after the payload is fully written, and to
+//     empty only through an exchange / compare-exchange, so it never reads a half-written payload.
 template <typename SlotPayload, typename FullPayload, int N>
 class Stager
 {
 public:
     static constexpr int kSlots = N;
 
+    // What the audio thread read about a slot: non-zero only for a ready, not-yet-flagged swap.
+    using Token = uint32_t;
+
     // ── Message thread: staging ──────────────────────────────────────────────
-    // Stage a per-slot payload, superseding any swap already pending on that slot. `isReady`
-    // drops first so a concurrent flagIfReady() can't observe a half-written slot.
+    // Stage a per-slot payload, superseding any swap already pending on that slot. The word goes
+    // empty (under a new generation) first so a concurrent flag cannot see a half-written slot.
     void stage(int i, SlotPayload&& payload)
     {
         if (! valid(i)) return;
-        auto& s = slots[(size_t) i];
-        s.isReady.store(false, std::memory_order_release);
-        s.boundaryReached.store(false, std::memory_order_relaxed);
-        s.payload = std::move(payload);
-        s.isReady.store(true, std::memory_order_release);
+        put(slots[(size_t) i], std::move(payload));
     }
 
     void stageFull(FullPayload&& payload)
     {
         for (int i = 0; i < N; ++i) cancel(i);
-        full.isReady.store(false, std::memory_order_release);
-        full.boundaryReached.store(false, std::memory_order_relaxed);
-        full.payload = std::move(payload);
-        full.isReady.store(true, std::memory_order_release);
+        put(full, std::move(payload));
     }
 
     void cancel(int i)
     {
         if (! valid(i)) return;
-        auto& s = slots[(size_t) i];
-        s.isReady.store(false, std::memory_order_release);
-        s.boundaryReached.store(false, std::memory_order_relaxed);
-        s.payload = SlotPayload {};
+        clear(slots[(size_t) i]);
     }
 
-    void cancelFull()
-    {
-        full.isReady.store(false, std::memory_order_release);
-        full.boundaryReached.store(false, std::memory_order_relaxed);
-        full.payload = FullPayload {};
-    }
+    void cancelFull() { clear(full); }
 
+    // Staged and not yet taken: ready or flagged.
     bool hasPending(int i) const noexcept
     {
-        return valid(i) && slots[(size_t) i].isReady.load(std::memory_order_acquire);
+        return valid(i) && stateOf(slots[(size_t) i].word.load(std::memory_order_acquire)) != kEmpty;
     }
-    bool hasFullPending() const noexcept { return full.isReady.load(std::memory_order_acquire); }
+    bool hasFullPending() const noexcept { return stateOf(full.word.load(std::memory_order_acquire)) != kEmpty; }
 
     // ── Audio thread: boundary detection ─────────────────────────────────────
-    // Flag a ready, not-yet-flagged swap whose boundary was reached this block. Returns true when
-    // newly flagged (the caller then triggers its async commit).
-    bool flagIfReady(int i, bool atBoundary) noexcept
+    // Read the slot BEFORE deciding whether its boundary was reached, then pass the token to
+    // flagIfReady: the flag only lands on the very payload the decision was made about.
+    Token pendingToken(int i) const noexcept
     {
-        return valid(i) && atBoundary && flag(slots[(size_t) i]);
+        return valid(i) ? tokenOf(slots[(size_t) i]) : 0;
     }
-    bool flagFullIfReady(bool atBoundary) noexcept { return atBoundary && flag(full); }
+    Token fullToken() const noexcept { return tokenOf(full); }
+
+    // Flag a ready swap whose boundary was reached this block. Returns true when newly flagged
+    // (the caller then triggers its async commit). The token overloads are the race-free form.
+    bool flagIfReady(int i, Token token, bool atBoundary) noexcept
+    {
+        return valid(i) && atBoundary && flag(slots[(size_t) i], token);
+    }
+    bool flagFullIfReady(Token token, bool atBoundary) noexcept { return atBoundary && flag(full, token); }
+
+    // Convenience forms that read the token at the call, after `atBoundary` was computed: only for
+    // callers where a swap staged during that gap committing at this boundary is acceptable.
+    bool flagIfReady(int i, bool atBoundary) noexcept     { return flagIfReady(i, pendingToken(i), atBoundary); }
+    bool flagFullIfReady(bool atBoundary) noexcept        { return flagFullIfReady(fullToken(), atBoundary); }
 
     // ── Message thread: commit ───────────────────────────────────────────────
-    // True when slot i's swap is flagged and still staged. A swap cancelled after the audio thread
-    // flagged it has its stale flag cleared here.
+    // True when slot i's swap is flagged. (A swap cancelled or replaced after the audio thread
+    // flagged it is empty or ready again, so it reads false here.)
     bool isFlagged(int i) noexcept
     {
-        if (! valid(i)) return false;
-        auto& s = slots[(size_t) i];
-        if (! s.boundaryReached.load(std::memory_order_acquire)) return false;
-        if (! s.isReady.load(std::memory_order_acquire))
-        {
-            s.boundaryReached.store(false, std::memory_order_relaxed);
-            return false;
-        }
-        return true;
+        return valid(i) && stateOf(slots[(size_t) i].word.load(std::memory_order_acquire)) == kFlagged;
     }
 
     // If slot i is flagged, hand its payload to `apply`, then clear the slot. Returns whether it ran.
     template <typename Fn>
     bool consume(int i, Fn&& apply)
     {
-        if (! isFlagged(i)) return false;
-        auto& s = slots[(size_t) i];
-        apply(s.payload);
-        s.payload = SlotPayload {};
-        s.boundaryReached.store(false, std::memory_order_relaxed);
-        s.isReady.store(false, std::memory_order_release);
-        return true;
+        return valid(i) && take(slots[(size_t) i], kFlagged, std::forward<Fn>(apply));
     }
 
     // Hand a staged payload to `apply` at once, flagged or not, then clear it. Used when the
-    // transport stopped just as the load staged, so no future boundary would ever flag it.
+    // transport stopped just as the load staged, so no future boundary would ever flag it. The
+    // exchange that empties the word also stops the audio thread flagging it from then on.
     template <typename Fn>
     bool consumeNow(int i, Fn&& apply)
     {
-        if (! hasPending(i)) return false;
-        auto& s = slots[(size_t) i];
-        apply(s.payload);
-        s.payload = SlotPayload {};
-        s.boundaryReached.store(false, std::memory_order_relaxed);
-        s.isReady.store(false, std::memory_order_release);
-        return true;
+        return valid(i) && take(slots[(size_t) i], kAnyStaged, std::forward<Fn>(apply));
     }
 
     template <typename Fn>
-    bool consumeFullNow(Fn&& apply)
-    {
-        if (! hasFullPending()) return false;
-        apply(full.payload);
-        full.payload = FullPayload {};
-        full.boundaryReached.store(false, std::memory_order_relaxed);
-        full.isReady.store(false, std::memory_order_release);
-        return true;
-    }
+    bool consumeFullNow(Fn&& apply) { return take(full, kAnyStaged, std::forward<Fn>(apply)); }
 
     template <typename Fn>
-    bool consumeFull(Fn&& apply)
-    {
-        if (! (full.isReady.load(std::memory_order_acquire)
-               && full.boundaryReached.load(std::memory_order_acquire)))
-            return false;
-        apply(full.payload);
-        full.payload = FullPayload {};
-        full.boundaryReached.store(false, std::memory_order_relaxed);
-        full.isReady.store(false, std::memory_order_release);
-        return true;
-    }
+    bool consumeFull(Fn&& apply) { return take(full, kFlagged, std::forward<Fn>(apply)); }
 
 private:
+    static constexpr uint32_t kEmpty = 0, kReady = 1, kFlagged = 2, kStateMask = 3, kGenStep = 4;
+    static constexpr uint32_t kAnyStaged = 0xff;   // `take` selector: ready or flagged
+
     template <typename P>
     struct Slot
     {
-        P                 payload {};
-        std::atomic<bool> isReady         { false };
-        std::atomic<bool> boundaryReached { false };
+        P                     payload {};
+        std::atomic<uint32_t> word { 0 };   // generation << 2 | state
     };
 
+    static constexpr uint32_t stateOf(uint32_t w) noexcept { return w & kStateMask; }
+
     template <typename P>
-    static bool flag(Slot<P>& s) noexcept
+    static Token tokenOf(const Slot<P>& s) noexcept
     {
-        if (! s.isReady.load(std::memory_order_acquire) || s.boundaryReached.load(std::memory_order_relaxed))
-            return false;
-        s.boundaryReached.store(true, std::memory_order_release);
+        const uint32_t w = s.word.load(std::memory_order_acquire);
+        return stateOf(w) == kReady ? w : 0;
+    }
+
+    // Audio thread: ready -> flagged, only if the word is still exactly what the caller read.
+    template <typename P>
+    static bool flag(Slot<P>& s, Token token) noexcept
+    {
+        if (token == 0) return false;
+        uint32_t expected = token;
+        return s.word.compare_exchange_strong(expected, (token & ~kStateMask) | kFlagged,
+                                              std::memory_order_acq_rel, std::memory_order_relaxed);
+    }
+
+    // Message thread: write the payload under an empty word of a new generation, then publish ready.
+    template <typename P, typename V>
+    static void put(Slot<P>& s, V&& payload)
+    {
+        const uint32_t gen = (s.word.load(std::memory_order_relaxed) & ~kStateMask) + kGenStep;
+        s.word.store(gen | kEmpty, std::memory_order_release);   // invalidates any token / flag in flight
+        s.payload = std::move(payload);
+        s.word.store(gen | kReady, std::memory_order_release);
+    }
+
+    // Message thread: drop whatever is staged. The exchange (not a plain store) is a full
+    // read-modify-write, so an audio-thread flag either lands before it or fails against it.
+    template <typename P>
+    static void clear(Slot<P>& s)
+    {
+        const uint32_t gen = (s.word.load(std::memory_order_relaxed) & ~kStateMask) + kGenStep;
+        s.word.exchange(gen | kEmpty, std::memory_order_acq_rel);
+        s.payload = P {};
+    }
+
+    // Message thread: take the payload when the word is in the wanted state. The word is emptied
+    // (new generation) BEFORE the payload is read, so after it nothing on the audio side can touch
+    // the slot, and a later stage() simply starts a new generation.
+    template <typename P, typename Fn>
+    static bool take(Slot<P>& s, uint32_t want, Fn&& apply)
+    {
+        uint32_t w = s.word.load(std::memory_order_acquire);
+        for (;;)
+        {
+            const uint32_t st = stateOf(w);
+            const bool ok = want == kAnyStaged ? st != kEmpty : st == want;
+            if (! ok) return false;
+            // A failed exchange means the audio thread just flagged it (ready -> flagged): re-check.
+            if (s.word.compare_exchange_weak(w, ((w & ~kStateMask) + kGenStep) | kEmpty,
+                                             std::memory_order_acq_rel, std::memory_order_acquire))
+                break;
+        }
+        apply(s.payload);
+        s.payload = P {};
         return true;
     }
 
@@ -309,12 +337,14 @@ public:
             return boundaryReached(isPlaying, wasPlaying, blockStartBeat, endBeat, loop);
         };
 
+        // Tokens are read before the boundary rule runs, so a flag can only land on the payload
+        // the rule was asked about (see Stager).
         bool flagged = false;
-        if (stager.hasFullPending())
-            flagged |= stager.flagFullIfReady(reached(kFullPreset));
+        if (const auto token = stager.fullToken())
+            flagged |= stager.flagFullIfReady(token, reached(kFullPreset));
         for (int i = 0; i < N; ++i)
-            if (stager.hasPending(i))
-                flagged |= stager.flagIfReady(i, reached(i));
+            if (const auto token = stager.pendingToken(i))
+                flagged |= stager.flagIfReady(i, token, reached(i));
         wasPlaying = isPlaying;
         return flagged;
     }

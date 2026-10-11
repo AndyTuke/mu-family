@@ -52,8 +52,12 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
     const int mode = proc.swapModeAtomic.load(std::memory_order_relaxed);
     bool needAsync = false;
     for (int r = 0; r < numRhythms; ++r)
-        needAsync |= stager.flagIfReady(r, mu_clid::hotswap::perRhythmBoundaryReached(mode, r, masterLoopWrapped,
-                                                                                    rhythmLoopWrapMask));
+    {
+        // Read the token first so the flag lands only on the swap this boundary was judged for.
+        const auto token = stager.pendingToken(r);
+        needAsync |= stager.flagIfReady(r, token, mu_clid::hotswap::perRhythmBoundaryReached(mode, r, masterLoopWrapped,
+                                                                                          rhythmLoopWrapMask));
+    }
 
     // Full-preset swaps wait for the MASTER loop point when a master loop is
     // defined (a preset spans every rhythm, so the master loop is the musical
@@ -61,8 +65,9 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
     // loop to wrap, so fall back to rhythm 0's loop — otherwise the swap would
     // hang forever waiting for a boundary that never comes.
     const bool hasMasterLoop = proc.sequencer.getMasterLoopSteps() > 0;
-    needAsync |= stager.flagFullIfReady(mu_clid::hotswap::fullPresetBoundaryReached(hasMasterLoop, masterLoopWrapped,
-                                                                                   rhythmLoopWrapMask));
+    const auto fullToken = stager.fullToken();
+    needAsync |= stager.flagFullIfReady(fullToken, mu_clid::hotswap::fullPresetBoundaryReached(hasMasterLoop, masterLoopWrapped,
+                                                                                             rhythmLoopWrapMask));
     return needAsync;
 }
 
