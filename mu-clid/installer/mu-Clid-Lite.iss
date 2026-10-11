@@ -55,6 +55,10 @@ Name: "vst3"; Description: "VST3 Plugin  →  %ProgramFiles%\Common Files\VST3\"
 Name: "clap"; Description: "CLAP Plugin   →  %ProgramFiles%\Common Files\CLAP\"; Types: full
 
 [Files]
+; Licence, third-party notices and source pointer travel with the binaries (GPLv3).
+Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\THIRD_PARTY_NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\SOURCE.txt"; DestDir: "{app}"; Flags: ignoreversion
 ; VST3 — copy the entire .vst3 bundle folder recursively.
 Source: "{#SourceDir}\VST3\mu-Clid Lite.vst3\*"; \
     DestDir: "{commoncf64}\VST3\mu-Clid Lite.vst3"; \

@@ -1,0 +1,10 @@
+mu-family source code
+=====================
+
+These plugins are free software under the GNU General Public License v3 (see LICENSE).
+Third-party components and their licences are listed in THIRD_PARTY_NOTICES.txt.
+
+The complete corresponding source code for this build is public:
+https://github.com/AndyTuke/mu-family
+
+If that address changes, the current one is on the site: https://transwarp.me

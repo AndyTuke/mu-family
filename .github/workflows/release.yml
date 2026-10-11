@@ -87,17 +87,20 @@ jobs:
           Copy-Item "$r\mu-clid\mu-clid_artefacts\Release\VST3\mu-Clid.vst3" staging\mu-Clid\ -Recurse
           Copy-Item "$r\mu-clid\mu-clid_artefacts\Release\CLAP\mu-Clid.clap" staging\mu-Clid\
           Copy-Item "$r\mu-clid\mu-clid_artefacts\Release\Standalone\mu-Clid.exe" staging\mu-Clid\
+          Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Clid\"
           Compress-Archive -Path staging\mu-Clid\* -DestinationPath dist\mu-Clid-Windows.zip
           # mu-Clid Lite (VST3 + CLAP)
           New-Item -ItemType Directory -Path "staging\mu-Clid Lite" -Force | Out-Null
           Copy-Item "$r\mu-clid\mu-clid-lite_artefacts\Release\VST3\mu-Clid Lite.vst3" "staging\mu-Clid Lite\" -Recurse
           Copy-Item "$r\mu-clid\mu-clid-lite_artefacts\Release\CLAP\mu-Clid Lite.clap" "staging\mu-Clid Lite\"
+          Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Clid Lite\"
           Compress-Archive -Path "staging\mu-Clid Lite\*" -DestinationPath dist\mu-Clid-Lite-Windows.zip
           # mu-Tant (VST3 + CLAP + Standalone)
           New-Item -ItemType Directory -Path staging\mu-Tant -Force | Out-Null
           Copy-Item "$r\mu-tant\mu-tant_artefacts\Release\VST3\mu-Tant.vst3" staging\mu-Tant\ -Recurse
           Copy-Item "$r\mu-tant\mu-tant_artefacts\Release\CLAP\mu-Tant.clap" staging\mu-Tant\
           Copy-Item "$r\mu-tant\mu-tant_artefacts\Release\Standalone\mu-Tant.exe" staging\mu-Tant\
+          Copy-Item LICENSE,THIRD_PARTY_NOTICES.txt,SOURCE.txt "staging\mu-Tant\"
           Compress-Archive -Path staging\mu-Tant\* -DestinationPath dist\mu-Tant-Windows.zip
 
       - name: Package demo zips (macOS — ditto preserves perms/signature)
@@ -115,12 +118,14 @@ jobs:
           cp -R "$R/mu-clid/mu-clid_artefacts/Release/CLAP/mu-Clid.clap"        "staging/mu-Clid/"
           cp -R "$R/mu-clid/mu-clid_artefacts/Release/AU/mu-Clid.component"     "staging/mu-Clid/" 2>/dev/null || true
           cp -R "$R/mu-clid/mu-clid_artefacts/Release/Standalone/mu-Clid.app"   "staging/mu-Clid/" 2>/dev/null || true
+          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Clid/"
           pack "mu-Clid" "mu-Clid-macOS.zip"
           # mu-Clid Lite (VST3 + CLAP + AU)
           mkdir -p "staging/mu-Clid Lite"
           cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/VST3/mu-Clid Lite.vst3"    "staging/mu-Clid Lite/"
           cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/CLAP/mu-Clid Lite.clap"    "staging/mu-Clid Lite/"
           cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/AU/mu-Clid Lite.component" "staging/mu-Clid Lite/" 2>/dev/null || true
+          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Clid Lite/"
           pack "mu-Clid Lite" "mu-Clid-Lite-macOS.zip"
           # mu-Tant (VST3 + CLAP + AU + Standalone.app)
           mkdir -p "staging/mu-Tant"
@@ -128,6 +133,7 @@ jobs:
           cp -R "$R/mu-tant/mu-tant_artefacts/Release/CLAP/mu-Tant.clap"        "staging/mu-Tant/"
           cp -R "$R/mu-tant/mu-tant_artefacts/Release/AU/mu-Tant.component"     "staging/mu-Tant/" 2>/dev/null || true
           cp -R "$R/mu-tant/mu-tant_artefacts/Release/Standalone/mu-Tant.app"   "staging/mu-Tant/" 2>/dev/null || true
+          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Tant/"
           pack "mu-Tant" "mu-Tant-macOS.zip"
 
       - name: Package demo zips (Linux)
@@ -141,17 +147,20 @@ jobs:
           cp -R "$R/mu-clid/mu-clid_artefacts/Release/VST3/mu-Clid.vst3"      "staging/mu-Clid/"
           cp -R "$R/mu-clid/mu-clid_artefacts/Release/CLAP/mu-Clid.clap"      "staging/mu-Clid/"
           cp -R "$R/mu-clid/mu-clid_artefacts/Release/Standalone/mu-Clid"     "staging/mu-Clid/" 2>/dev/null || true
+          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Clid/"
           ( cd staging && zip -r -y "../dist/mu-Clid-Linux.zip" "mu-Clid" )
           # mu-Clid Lite (VST3 + CLAP)
           mkdir -p "staging/mu-Clid Lite"
           cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/VST3/mu-Clid Lite.vst3" "staging/mu-Clid Lite/"
           cp -R "$R/mu-clid/mu-clid-lite_artefacts/Release/CLAP/mu-Clid Lite.clap" "staging/mu-Clid Lite/"
+          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Clid Lite/"
           ( cd staging && zip -r -y "../dist/mu-Clid-Lite-Linux.zip" "mu-Clid Lite" )
           # mu-Tant (VST3 + CLAP + Standalone)
           mkdir -p "staging/mu-Tant"
           cp -R "$R/mu-tant/mu-tant_artefacts/Release/VST3/mu-Tant.vst3"      "staging/mu-Tant/"
           cp -R "$R/mu-tant/mu-tant_artefacts/Release/CLAP/mu-Tant.clap"      "staging/mu-Tant/"
           cp -R "$R/mu-tant/mu-tant_artefacts/Release/Standalone/mu-Tant"     "staging/mu-Tant/" 2>/dev/null || true
+          cp LICENSE THIRD_PARTY_NOTICES.txt SOURCE.txt "staging/mu-Tant/"
           ( cd staging && zip -r -y "../dist/mu-Tant-Linux.zip" "mu-Tant" )
 
       - name: Upload platform release zips
