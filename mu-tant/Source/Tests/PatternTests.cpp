@@ -3,6 +3,7 @@
 
 #include <juce_core/juce_core.h>
 #include "Sequencer/Pattern.h"
+#include <memory>
 
 // Pattern's persistence hooks belong to the processor; the test target does not link it.
 void mu_tant::Pattern::writeExtras(juce::ValueTree&) const {}
@@ -63,6 +64,25 @@ public:
             expect(p.gate.envelopes.empty(), "the gate should clear");
             expect(p.osc2UserPath.isEmpty(), "the user wavetable path should clear");
             expectEquals(p.osc2UserIndex.load(), -1);
+        }
+
+        beginTest("a reset keeps the addresses the editor holds into the modulators");
+        {
+            Pattern live;
+            live.controlSequences[2].stepValues = { 10.0f, 20.0f, 30.0f };
+            ControlSequence* before[8];
+            for (int i = 0; i < 8; ++i) before[i] = &live.controlSequences[(size_t) i];
+            const auto* matrixBefore = &live.modulationMatrix;
+
+            auto fresh = std::make_unique<Pattern>();
+            live.adoptDefaults(*fresh);
+
+            bool sameAddresses = true;
+            for (int i = 0; i < 8; ++i) sameAddresses = sameAddresses && before[i] == &live.controlSequences[(size_t) i];
+            expect(sameAddresses, "a modulator editor's ControlSequence pointers must survive a reset");
+            expect(matrixBefore == &live.modulationMatrix, "the matrix address must survive a reset");
+            expect(live.controlSequences[2].stepValues.size() != 3, "the live modulator should hold the default data");
+            expectEquals((int) fresh->controlSequences[2].stepValues.size(), 3);   // the old data left with `fresh`
         }
 
         beginTest("a swap through a temporary exchanges the voices' data");

@@ -33,10 +33,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // Basic settings page (master vol + UI size + BPM) behind the gear button.
     setSettingsOverlay(&settingsOverlay);
 
-    // Hot-swap commit refresh. A staged preset is applied on the message thread
-    // at the loop boundary (after the shell's synchronous onPresetLoaded has
-    // already run against the pre-swap state), so re-run the refresh here.
-    proc.onPresetSwapCommitted = [this] { onPresetLoaded({}); };
+    // Hot-swap commit refresh. A staged full preset lands at the loop boundary and the shell's
+    // onPresetSwapCommitted handler (set in EditorShellBase) calls onPresetLoaded once every apply
+    // is done; a staged per-voice preset refreshes through this callback.
     proc.onLayerPresetCommitted = [this](int v)
     {
         voiceSidebar.refreshItems();              // glyph / colour may have changed
@@ -103,7 +102,6 @@ PluginEditor::~PluginEditor()
 {
     // The processor can outlive the editor (DAW close-window-keep-plugin); clear
     // the hot-swap callbacks so a boundary commit can't fire into a dead editor.
-    proc.onPresetSwapCommitted   = nullptr;
     proc.onLayerPresetCommitted = nullptr;
 }
 

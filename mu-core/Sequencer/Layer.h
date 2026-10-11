@@ -102,7 +102,10 @@ struct Layer
     virtual void adoptDefaults(Layer& fresh)
     {
         voiceParams = fresh.voiceParams;
-        controlSequences.swap(fresh.controlSequences);
+        // Exchange the sequences one by one, not the vector: an editor holds pointers to these
+        // elements, and a vector swap would leave them pointing into `fresh`, which dies after unlock.
+        for (size_t i = 0; i < controlSequences.size() && i < fresh.controlSequences.size(); ++i)
+            std::swap(controlSequences[i], fresh.controlSequences[i]);
         std::swap(modulationMatrix, fresh.modulationMatrix);
     }
     virtual void onMoved(int newIndex) { juce::ignoreUnused(newIndex); }
