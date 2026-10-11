@@ -48,13 +48,13 @@ struct Pattern : Layer
     void writeExtras(juce::ValueTree& node) const override;
     void applyExtras(const juce::ValueTree& node) override;
 
-    // Back to a new voice's data, keeping name and colour; in place, so the editor's pointers into
-    // this Pattern stay valid.
-    void resetToDefaults() override
+    // Takes a default voice's data (built before the structural edit locked), keeping name and
+    // colour; in place, so the editor's pointers into this Pattern stay valid.
+    void adoptDefaults(Layer& fresh) override
     {
-        Layer::resetToDefaults();
-        const Pattern fresh;
-        copyVoiceData(fresh);
+        Layer::adoptDefaults(fresh);
+        jassert(dynamic_cast<Pattern*>(&fresh) != nullptr);
+        copyVoiceData(static_cast<const Pattern&>(fresh));
         osc1SemiStepped.store(false, std::memory_order_relaxed);   // the modulators are cleared
         osc2SemiStepped.store(false, std::memory_order_relaxed);
     }

@@ -130,6 +130,9 @@ public:
     int  getNumVoices() const noexcept { return numLayers.load(std::memory_order_relaxed); }
     bool canEditLayers() const override { return true; }
     void cancelPendingSwap(int voice) override { hotSwapStager.cancelVoice(voice); }
+    // The engine state of a slot stays put while its Pattern moves, so the slot is cleared for the
+    // new tenant (called under layersLock; the render only runs under it).
+    void layersMoved(int firstIndex, int lastIndex) override;
     // Recompute the cached stepped-pitch flags for one voice / all voices. Call on the
     // message thread whenever a voice's modulators change (editor edit, preset load,
     // voice add/remove/swap/reset); the audio thread reads the flags lock-free.

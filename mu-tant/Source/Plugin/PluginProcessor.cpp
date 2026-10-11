@@ -657,6 +657,20 @@ std::unique_ptr<Layer> PluginProcessor::createLayer(int)
     return p;
 }
 
+// Slots whose Pattern changed lose the previous tenant's filter, oscillator-modulation and insert
+// memory, any fade-out tail and the live-arc snapshot; the mixer strip and its ducking envelope are
+// reset by the edit itself. Allocation-free resets only.
+void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
+{
+    for (int d = juce::jmax(0, firstIndex); d <= juce::jmin(lastIndex, mu_limits::kMaxLayers - 1); ++d)
+    {
+        if (voices[(size_t) d] != nullptr) voices[(size_t) d]->reset();
+        inserts[(size_t) d].reset();
+        retiring[(size_t) d].samplesLeft.store(0, std::memory_order_relaxed);
+        for (auto& v : voiceSnap[d]) v.store(0.0f, std::memory_order_relaxed);
+    }
+}
+
 void PluginProcessor::commitDeferredWork()
 {
     // Commit any hot-swap that reached its loop boundary. The full preset commits

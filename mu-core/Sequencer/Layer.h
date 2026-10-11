@@ -9,6 +9,7 @@
 
 #include <atomic>
 #include <string>
+#include <utility>
 #include <vector>
 
 // Spin-lock backed by std::atomic<bool> with copy-safe semantics.
@@ -92,17 +93,17 @@ struct Layer
     virtual bool isValidDest(const std::string& id) const { juce::ignoreUnused(id); return true; }
 
     // Structural-edit hooks, called by ProcessorBase::addLayer / removeLayer / swapLayers /
-    // resetLayer on the message thread with layersLock held, so each must stay cheap and never block.
-    // resetToDefaults puts the layer back to a freshly built one but keeps its identity (name and
-    // colour); a product extends it to clear its own data. onMoved tells a layer its slot index
-    // changed, so state tied to the slot (not the data) can be reset.
-    virtual void resetToDefaults()
+    // resetLayer on the message thread with layersLock held, so each must stay short, never block and
+    // never allocate. adoptDefaults takes the data of `fresh` (a default layer the caller built before
+    // locking) into this layer by swap or plain copy, keeping this layer's identity (name, colour and
+    // address); whatever `fresh` is left holding is destroyed by the caller after the lock is dropped.
+    // A product extends it to take its own data. onMoved tells a layer its slot index changed, so
+    // state tied to the slot (not the data) can be reset.
+    virtual void adoptDefaults(Layer& fresh)
     {
-        const auto keepName   = name;
-        const int  keepColour = colourIndex;
-        *this = Layer{};
-        name        = keepName;
-        colourIndex = keepColour;
+        voiceParams = fresh.voiceParams;
+        controlSequences.swap(fresh.controlSequences);
+        std::swap(modulationMatrix, fresh.modulationMatrix);
     }
     virtual void onMoved(int newIndex) { juce::ignoreUnused(newIndex); }
 };

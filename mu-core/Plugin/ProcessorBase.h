@@ -116,6 +116,15 @@ public:
     bool         swapLayers(int a, int b);
     virtual void resetLayer(int layer);
 
+    // Called by the four edits above, on the message thread with layersLock held and processing
+    // suspended, once the layers, strip state and onMoved calls are done: the slots firstIndex..lastIndex
+    // (inclusive) now hold a different layer than before (added, shifted down, exchanged or reset;
+    // a swap calls it once per exchanged slot). A product resets the audio state it keeps per slot
+    // (filter and effect memory, tails) here. The audio thread cannot be rendering a slot meanwhile
+    // (a product that edits layers try-locks layersLock per block), so it must only reset, not
+    // allocate or wait.
+    virtual void layersMoved(int firstIndex, int lastIndex) { juce::ignoreUnused(firstIndex, lastIndex); }
+
     // ─── Shell-facing API (overridden by each plugin) ────────────────────────
     // These are the surfaces the family's editor shell + TransportBar consume.
     // Defaults are no-ops returning sensible values so a young plugin (no

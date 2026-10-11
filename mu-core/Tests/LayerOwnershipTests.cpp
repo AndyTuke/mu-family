@@ -3,6 +3,7 @@
 #include "Plugin/MixerFxParams.h"
 
 #include <thread>
+#include <utility>
 #include <vector>
 
 namespace
@@ -23,7 +24,7 @@ namespace
             probe.join();
             if (! acquired) ++underLock;
         }
-        void resetToDefaults() override { ++resets; Layer::resetToDefaults(); }
+        void adoptDefaults(Layer& fresh) override { ++resets; Layer::adoptDefaults(fresh); }
         void onMoved(int i) override    { movedTo = i; }
 
         juce::CriticalSection& lock;
@@ -75,6 +76,19 @@ namespace
             return std::make_unique<ProbeLayer>(layersLock, destroyed, underLock, resets);
         }
         void cancelPendingSwap(int slot) override { cancelled.push_back(slot); }
+        void layersMoved(int first, int last) override
+        {
+            moved.push_back({ first, last });
+            movedHoldingLock.push_back(lockHeldByOtherThread() ? 1 : 0);
+        }
+        // A critical section is re-entrant for its owner, so only a second thread can tell it is held.
+        bool lockHeldByOtherThread()
+        {
+            bool acquired = false;
+            std::thread probeThread([&] { acquired = layersLock.tryEnter(); if (acquired) layersLock.exit(); });
+            probeThread.join();
+            return ! acquired;
+        }
 
         float param(const juce::String& id) const
         {
@@ -90,6 +104,8 @@ namespace
 
         int destroyed = 0, underLock = 0, resets = 0;
         std::vector<int> cancelled;
+        std::vector<std::pair<int, int>> moved;   // layersMoved(first, last) calls, in order
+        std::vector<int> movedHoldingLock;        // 1 when the call came with layersLock held
 
         juce::String getChannelName(int) const override { return {}; }
         int getChannelColourIndex(int i) const override { return layers[(size_t) i] ? layers[(size_t) i]->colourIndex : 0; }
@@ -303,6 +319,10 @@ struct LayerOwnershipTests : juce::UnitTest
             for (int i = 0; i < mu_limits::kMaxLayers; ++i) seen[(size_t) p.getLayer(i)->colourIndex] = true;
             for (bool b : seen) expect(b, "all eight palette colours used once");
             expectEquals(p.destroyed, 0, "nothing was replaced, so nothing was destroyed");
+            expectEquals((int) p.moved.size(), mu_limits::kMaxLayers - 1, "one layersMoved per add");
+            expect(p.moved.front() == std::make_pair(1, 1) && p.moved.back() == std::make_pair(mu_limits::kMaxLayers - 1, mu_limits::kMaxLayers - 1),
+                   "the new slot only");
+            for (int h : p.movedHoldingLock) expectEquals(h, 1, "called under layersLock");
         }
 
         beginTest("addLayer replaces a spare, destroys it outside the lock, and gives the slot default values");
@@ -357,6 +377,9 @@ struct LayerOwnershipTests : juce::UnitTest
             expectEquals(p.destroyed, 1, "only the removed layer is destroyed");
             expectEquals(p.underLock, 0, "and after layersLock was dropped");
             expectEquals((int) p.cancelled.size(), mu_limits::kMaxLayers, "every staged swap cancelled");
+            expectEquals((int) p.moved.size(), 3 + 1, "three adds, then the removal");
+            expect(p.moved.back() == std::make_pair(1, 3), "the shifted slots and the vacated top one");
+            expectEquals(p.movedHoldingLock.back(), 1, "called under layersLock");
 
             expectNear(p.param("v1_a"), 0.2f); expectNear(p.param("v2_a"), 0.3f); expectNear(p.param("v3_a"), 0.25f);
             expectNear(p.param("ch1_pan"), 0.5f);
@@ -413,6 +436,8 @@ struct LayerOwnershipTests : juce::UnitTest
             expectEquals(p.probe(2)->movedTo, 2);
             expectEquals(p.destroyed, 0, "a swap destroys nothing");
             expectEquals((int) p.cancelled.size(), 2);
+            expectEquals((int) p.moved.size(), 2 + 2, "two adds, then one call per exchanged slot");
+            expect(p.moved[2] == std::make_pair(0, 0) && p.moved[3] == std::make_pair(2, 2), "not the slot between");
             expectNear(p.param("v0_a"), 0.8f); expectNear(p.param("v2_a"), 0.1f);
             expectNear(p.mixerEngine.channels[0].level.load(), 0.6f);
             expectNear(p.mixerEngine.channels[2].level.load(), 0.3f);
@@ -432,12 +457,17 @@ struct LayerOwnershipTests : juce::UnitTest
             p.mixerEngine.channels[1].level.store(0.2f);
             p.cancelled.clear();
             p.resets = p.destroyed = 0;
+            p.moved.clear();
 
             p.resetLayer(1);
 
             expect(p.getLayer(1) == l, "reset is in place, so the editor's pointers into the layer stay valid");
             expectEquals(p.resets, 1);
-            expectEquals(p.destroyed, 0);
+            expectEquals(p.destroyed, 1, "the default layer built before the lock is released afterwards");
+            expectEquals(p.underLock, 0, "outside layersLock");
+            expectEquals((int) p.moved.size(), 1);
+            expect(p.moved[0] == std::make_pair(1, 1));
+            expectEquals(p.movedHoldingLock[p.movedHoldingLock.size() - 1], 1, "called under layersLock");
             expectEquals(l->name, std::string("Keep"));
             expectEquals(l->colourIndex, 5);
             expectNear(p.param("v1_a"), 0.25f);
@@ -447,6 +477,7 @@ struct LayerOwnershipTests : juce::UnitTest
             expectEquals(p.cancelled[0], 1);
             p.resetLayer(5);   // out of range: ignored
             expectEquals(p.resets, 1);
+            expectEquals((int) p.moved.size(), 1);
         }
     }
 };

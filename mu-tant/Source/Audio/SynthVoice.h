@@ -117,6 +117,7 @@ public:
 
     void prepare(double sampleRate, int blockSize);
     void setBank(const WavetableBank* b) noexcept;
+    void reset();   // clears filter and cross-modulation memory without allocating (oscillator phase runs on)
     void setConfig(const VoiceConfig& c);   // recomputes osc frequencies + filter
 
     // Renders the voice and ADDS it into `out` (stereo). numSamples <= prepared block size.

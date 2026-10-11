@@ -612,6 +612,7 @@ int ProcessorBase::addLayer()
         retired = publishLayerLocked(std::move(fresh));
         mixerEngine.channels[(size_t) n].reset();
         mixerEngine.resetSidechainEnv(n);
+        layersMoved(n, n);
     }
 
     // Phase 3: the slot's parameters back to defaults, still suspended so no block sees stale values.
@@ -653,6 +654,7 @@ bool ProcessorBase::removeLayer(int idx)
         }
         mixerEngine.channels[(size_t) (n - 1)].reset();
         mixerEngine.resetSidechainEnv(n - 1);
+        layersMoved(idx, n - 1);                // the shifted slots and the vacated top one
     }
 
     // Phase 3: parameter values. Strips that ducked from the removed layer now duck from nothing and
@@ -684,6 +686,8 @@ bool ProcessorBase::swapLayers(int a, int b)
         mixerEngine.resetSidechainEnv(b);
         layers[(size_t) a]->onMoved(a);
         layers[(size_t) b]->onMoved(b);
+        layersMoved(a, a);                      // only the two exchanged slots, not those between
+        layersMoved(b, b);
     }
 
     // Phase 3: parameter values. A strip that ducked from one swapped layer now ducks from the other
@@ -698,12 +702,19 @@ void ProcessorBase::resetLayer(int idx)
     if (idx < 0 || idx >= numLayers.load(std::memory_order_relaxed) || layers[(size_t) idx] == nullptr) return;
     cancelPendingSwap(idx);                     // a staged swap would re-fill what we are clearing
 
+    // Phase 1: build the default data before anything is locked (constructing allocates).
+    auto fresh = createLayer(idx);
+    if (fresh == nullptr) return;               // a product without createLayer overrides resetLayer
+
     ScopedSuspend suspend(*this);
     {
+        // Phase 2: take the default data in place under layersLock, so the editor's pointers into the
+        // layer stay valid; `fresh` leaves holding the old data and is destroyed after unlocking.
         const juce::ScopedLock sl(layersLock);
-        layers[(size_t) idx]->resetToDefaults();   // in place, so the editor's pointers into the layer stay valid
+        layers[(size_t) idx]->adoptDefaults(*fresh);
         mixerEngine.channels[(size_t) idx].reset();
         mixerEngine.resetSidechainEnv(idx);
+        layersMoved(idx, idx);
     }
     resetLayerParams(idx);
 }

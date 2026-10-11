@@ -16,6 +16,13 @@ void VoiceEngine::prepare(double sampleRate, int blockSize)
     mono2.setSize(1, blockSize, false, false, true);  mono2.clear();
 }
 
+void VoiceEngine::reset()
+{
+    oscs.reset();
+    filter1.reset();
+    filter2.reset();
+}
+
 void VoiceEngine::setBank(const WavetableBank* b) noexcept
 {
     oscs.setBank(b);
