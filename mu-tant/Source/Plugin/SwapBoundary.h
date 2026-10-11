@@ -13,6 +13,8 @@ namespace mu_tant
 inline double swapLoopBeats(int slot, int numActive, bool onMasterLoop, double masterLoopBeats,
                             const double* patternBeats) noexcept
 {
+    // A voice's pattern length is 0 until the first block has locked it, so a swap staged before then
+    // (patternBeats[] still 0) can commit only on the stop edge.
     if (slot == mu_hotswap::kFullPreset) return masterLoopBeats > 0.0 ? masterLoopBeats : patternBeats[0];
     if (slot < 0 || slot >= numActive)   return -1.0;
     return onMasterLoop ? masterLoopBeats : patternBeats[slot];

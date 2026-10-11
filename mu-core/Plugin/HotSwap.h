@@ -134,6 +134,31 @@ public:
         return true;
     }
 
+    // Hand a staged payload to `apply` at once, flagged or not, then clear it. Used when the
+    // transport stopped just as the load staged, so no future boundary would ever flag it.
+    template <typename Fn>
+    bool consumeNow(int i, Fn&& apply)
+    {
+        if (! hasPending(i)) return false;
+        auto& s = slots[(size_t) i];
+        apply(s.payload);
+        s.payload = SlotPayload {};
+        s.boundaryReached.store(false, std::memory_order_relaxed);
+        s.isReady.store(false, std::memory_order_release);
+        return true;
+    }
+
+    template <typename Fn>
+    bool consumeFullNow(Fn&& apply)
+    {
+        if (! hasFullPending()) return false;
+        apply(full.payload);
+        full.payload = FullPayload {};
+        full.boundaryReached.store(false, std::memory_order_relaxed);
+        full.isReady.store(false, std::memory_order_release);
+        return true;
+    }
+
     template <typename Fn>
     bool consumeFull(Fn&& apply)
     {
@@ -191,10 +216,19 @@ public:
     // ── Message thread ───────────────────────────────────────────────────────
     // While the transport runs, stage for the next boundary; while stopped, apply now (dropping
     // anything still staged that would otherwise land on top). "Runs" is the play state the audio
-    // thread last resolved.
+    // thread last resolved. The play state is re-read after staging: if the transport stopped in
+    // between, the stop edge may already have passed and nothing would ever flag the payload, so it
+    // is taken back and applied here.
     void useFull(Payload&& p)
     {
-        if (running.load(std::memory_order_relaxed)) { stager.stageFull(std::move(p)); return; }
+        if (isRunning())
+        {
+            stager.stageFull(std::move(p));
+            std::atomic_thread_fence(std::memory_order_seq_cst);   // order the staging before the re-read
+            if (! isRunning())
+                stager.consumeFullNow([this](Payload& staged) { if (applyFull) applyFull(staged); });
+            return;
+        }
         stager.cancelFull();
         for (int i = 0; i < N; ++i) stager.cancel(i);
         if (applyFull) applyFull(p);
@@ -202,15 +236,27 @@ public:
 
     void useSlot(int i, Payload&& p)
     {
-        if (running.load(std::memory_order_relaxed)) { stager.stage(i, std::move(p)); return; }
+        if (isRunning())
+        {
+            stager.stage(i, std::move(p));
+            std::atomic_thread_fence(std::memory_order_seq_cst);
+            if (! isRunning())
+                stager.consumeNow(i, [this, i](Payload& staged) { if (applySlot) applySlot(i, staged); });
+            return;
+        }
         stager.cancel(i);
         if (applySlot) applySlot(i, p);
     }
 
-    // For a product that decides stage-or-apply itself (it keeps its own play-state rule).
+    // The audio thread's last resolved play state: what a product consults when it must act on the
+    // same stage-or-apply decision (e.g. pre-loading assets only for a load that will be staged).
+    bool isRunning() const noexcept       { return running.load(std::memory_order_relaxed); }
+
+    // For tests and a product that decides stage-or-apply itself.
     void stageFull(Payload&& p)           { stager.stageFull(std::move(p)); }
     void stageSlot(int i, Payload&& p)    { stager.stage(i, std::move(p)); }
 
+    void cancelFull()                     { stager.cancelFull(); }
     void cancel(int i)                    { stager.cancel(i); }
     bool hasPending(int i) const noexcept { return stager.hasPending(i); }
     bool hasFullPending() const noexcept  { return stager.hasFullPending(); }
@@ -237,6 +283,7 @@ public:
                         LoopBeatsFor&& loopBeatsFor) noexcept
     {
         running.store(isPlaying, std::memory_order_relaxed);
+        std::atomic_thread_fence(std::memory_order_seq_cst);   // pairs with the re-read fence in useFull / useSlot
         const double endBeat = blockStartBeat + (isPlaying ? blockBeats : 0.0);
         auto reached = [&](int slot)
         {

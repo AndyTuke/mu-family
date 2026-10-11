@@ -196,18 +196,13 @@ void PluginProcessor::loadLayerPreset(int voice, const juce::File& file)
     auto tree = juce::ValueTree::fromXml(*xml);
     migrateXModVoice(tree);
 
-    // Hot-swap: while playing, stage and commit at THIS voice's own loop boundary
-    // (handleAsyncUpdate); while stopped, apply immediately. Referenced wavetables
-    // are pre-loaded into the bank now so the boundary commit does no disk I/O.
-    if (isInternalPlaying())
-    {
+    // Hot-swap: while the resolved transport plays (host, MIDI clock or internal), stage and commit
+    // at THIS voice's own loop boundary (handleAsyncUpdate); while stopped, apply immediately. The
+    // swapper makes that call; referenced wavetables are pre-loaded into the bank now so a boundary
+    // commit does no disk I/O.
+    if (layerSwapper.isRunning())
         preloadWavetablesFromVoiceTree(tree);
-        layerSwapper.stageSlot(voice, std::move(tree));
-    }
-    else
-    {
-        applyVoicePresetTree(voice, tree);
-    }
+    layerSwapper.useSlot(voice, std::move(tree));
 }
 
 // Apply a voice node (the stopped load and the boundary commit). A parameter the node lacks goes
@@ -270,22 +265,16 @@ juce::ValueTree PluginProcessor::captureFullPreset()
     return state;
 }
 
-// Hot-swap: while the transport is playing, stage the parsed state and commit it at voice 0's
+// Hot-swap: while the resolved transport is playing, stage the parsed state and commit it at the
 // next loop boundary (handleAsyncUpdate) so the switch is musically seamless; while stopped,
 // apply immediately. Converted (and migrated) here, and the wavetables it references pre-loaded
 // into the bank, so the boundary commit does no parsing or disk I/O.
 void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 {
     auto composed = toVoiceState(state);
-    if (isInternalPlaying())
-    {
+    if (layerSwapper.isRunning())
         preloadWavetablesFromState(composed);
-        layerSwapper.stageFull(std::move(composed));
-    }
-    else
-    {
-        applyFullPresetTree(composed);
-    }
+    layerSwapper.useFull(std::move(composed));
 }
 
 // Apply a composed full state immediately (the shared commit path for the stopped load, the
@@ -306,7 +295,7 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
     // Retire-tail: when this preset drops voices while playing, snapshot each dropped
     // voice's OLD engine + insert config NOW (before the new params land)
     // and arm a short fade so its comb-filter / insert tail rings out.
-    if (isInternalPlaying() && nv < oldN)
+    if (layerSwapper.isRunning() && nv < oldN)
     {
         const int ramp = retireRampSamples();
         for (int v = nv; v < oldN; ++v)

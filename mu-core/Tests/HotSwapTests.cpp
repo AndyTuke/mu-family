@@ -17,6 +17,20 @@ namespace
         sw.setAppliers([&log](int& v)         { log.events.push_back("full " + juce::String(v)); },
                        [&log](int i, int& v)  { log.events.push_back("slot" + juce::String(i) + " " + juce::String(v)); });
     }
+
+    // A payload whose move-assignment runs a hook, so a test can stop the transport "on the audio
+    // thread" at the exact point between a load's play-state read and its re-check.
+    struct Hooked
+    {
+        int v = 0;
+        static inline std::function<void()> onMove;
+        Hooked() = default;
+        Hooked(int x) : v(x) {}
+        Hooked(const Hooked&) = default;
+        Hooked(Hooked&&) = default;
+        Hooked& operator=(const Hooked&) = default;
+        Hooked& operator=(Hooked&& o) { v = o.v; if (onMove) onMove(); return *this; }
+    };
 }
 
 struct HotSwapTests : juce::UnitTest
@@ -116,6 +130,72 @@ struct HotSwapTests : juce::UnitTest
             sw.cancel(0);
             sw.commit();
             expect(log.events.empty());
+        }
+
+        beginTest("a stopped load applies at once and cancels anything staged for its scope");
+        {
+            Log log; Swapper sw; wire(log, sw);
+            sw.stageSlot(1, 4);
+            sw.stageFull(5);
+            sw.stageSlot(2, 6);
+            expect(! sw.isRunning());
+            sw.useSlot(2, 7);
+            expect(log.events.size() == 1 && log.events[0] == "slot2 7", "applied now");
+            expect(! sw.hasPending(2), "the staged slot was dropped, not left to overwrite later");
+            sw.useFull(8);
+            expect(! sw.hasFullPending() && ! sw.hasPending(1), "a stopped full load drops the staged full and slots");
+            expect(log.events.back() == "full 8");
+            sw.flagBoundaries(false, 0.0, 0.5);
+            expect(! sw.commit(), "nothing is left to land later");
+            expect(log.events.size() == 2);
+        }
+
+        beginTest("MIDI-clock-lost: a load with the transport stopped applies at once, nothing pending");
+        {
+            Log log; Swapper sw; wire(log, sw);
+            sw.flagBoundaries(true, 0.0, 0.5);
+            sw.flagBoundaries(false, 0.5, 0.5);    // the clock stopped
+            expect(! sw.isRunning());
+            sw.useFull(3);
+            sw.useSlot(0, 4);
+            expect(! sw.hasFullPending() && ! sw.hasPending(0));
+            expect(log.events.size() == 2 && log.events[0] == "full 3" && log.events[1] == "slot0 4");
+            expect(! sw.flagBoundaries(false, 0.5, 0.5) && ! sw.commit());
+        }
+
+        beginTest("stage then stop edge commits");
+        {
+            Log log; Swapper sw; wire(log, sw);
+            sw.flagBoundaries(true, 0.0, 0.5);
+            expect(sw.isRunning());
+            sw.useSlot(1, 9);
+            expect(sw.hasPending(1) && log.events.empty());
+            expect(sw.flagBoundaries(false, 0.5, 0.5), "the stop edge flags the staged load");
+            sw.commit();
+            expect(log.events.size() == 1 && log.events[0] == "slot1 9");
+        }
+
+        beginTest("race: the transport stops while a load is staging -> applied, not stranded");
+        {
+            using HSwapper = LayerSwapper<Hooked, 4>;
+            std::vector<juce::String> ev;
+            HSwapper sw;
+            sw.setAppliers([&ev](Hooked& h)        { ev.push_back("full " + juce::String(h.v)); },
+                           [&ev](int i, Hooked& h) { ev.push_back("slot" + juce::String(i) + " " + juce::String(h.v)); });
+            sw.flagBoundaries(true, 0.0, 0.5);
+            // The stop lands (and its edge passes with nothing flagged) during the staging.
+            Hooked::onMove = [&sw] { sw.flagBoundaries(false, 0.5, 0.5); Hooked::onMove = nullptr; };
+            sw.useSlot(2, Hooked { 5 });
+            expect(! sw.hasPending(2), "not left staged with no future boundary");
+            expect(ev.size() == 1 && ev[0] == "slot2 5", "applied by the re-check");
+            sw.commit();
+            expect(ev.size() == 1, "and not applied twice");
+
+            sw.flagBoundaries(true, 0.0, 0.5);
+            Hooked::onMove = [&sw] { sw.flagBoundaries(false, 0.5, 0.5); Hooked::onMove = nullptr; };
+            sw.useFull(Hooked { 6 });
+            expect(! sw.hasFullPending() && ev.size() == 2 && ev[1] == "full 6", "same for a full preset");
+            Hooked::onMove = nullptr;
         }
 
         beginTest("stageSlot and stageFull stage whatever the play state");

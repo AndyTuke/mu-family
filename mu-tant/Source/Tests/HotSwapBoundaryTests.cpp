@@ -123,6 +123,24 @@ public:
             expect(got.slots.size() == 1 && got.slots[0].second == 7, "committed on stop");
         }
 
+        beginTest("Swapper: host play with no internal Play stages; a stopped transport applies at once");
+        {
+            Swapper sw; Applied got; wire(sw, got);
+            flag(sw, 1, true, 0.0, 0.5, false, 0.0, eight);    // the resolved transport (host) plays
+            juce::ValueTree v("Voice"); v.setProperty("id", 3, nullptr);
+            sw.useSlot(0, std::move(v));
+            expect(sw.hasPending(0) && got.slots.empty(), "staged until the voice's loop wraps");
+            expect(flag(sw, 1, true, 7.9, 0.2, false, 0.0, eight));
+            sw.commit();
+            expect(got.slots.size() == 1 && got.slots[0].second == 3);
+
+            flag(sw, 1, false, 8.0, 0.5, false, 0.0, eight);   // stopped (edge consumed)
+            flag(sw, 1, false, 8.0, 0.5, false, 0.0, eight);
+            juce::ValueTree f("Full"); f.setProperty("id", 4, nullptr);
+            sw.useFull(std::move(f));
+            expect(got.fullId == 4 && ! sw.hasFullPending(), "applied at once, nothing pending");
+        }
+
         beginTest("swapLoopBeats: the mu-tant boundary rule");
         {
             std::array<double, mu_limits::kMaxLayers> pat {}; pat.fill(8.0); pat[0] = 12.0; pat[1] = 4.0;
@@ -131,6 +149,8 @@ public:
             expectEquals(swapLoopBeats(1, 2, false, 16.0, pat.data()), 4.0, "voice: its own length");
             expectEquals(swapLoopBeats(1, 2, true, 16.0, pat.data()), 16.0, "voice: the master loop when OnMasterLoop");
             expect(swapLoopBeats(2, 2, false, 0.0, pat.data()) < 0.0, "an inactive voice never commits");
+            std::array<double, mu_limits::kMaxLayers> unlocked {};
+            expectEquals(swapLoopBeats(0, 1, false, 0.0, unlocked.data()), 0.0, "length 0 before the first locked block: stop edge only");
         }
     }
 };

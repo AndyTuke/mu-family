@@ -2,7 +2,7 @@
 
 How μ-Tant loads a preset *while playing* and switches it at a musical loop
 boundary with no audible glitch (no transport hitch, no silence gap). Read this
-before touching `VoiceHotSwapStager`, the staging/commit paths in
+before touching `swapLoopBeats`, `ProcessorBase::layerSwapper`, the staging/commit paths in
 `PluginProcessor`, or the wavetable bank load path.
 
 This is the **product-side** sibling of mu-clid's hot-swap. The shared *pattern*
@@ -57,9 +57,9 @@ across a swap, mu-clid's retire-then-swap (see its doc §8) is the pattern to po
 
 | File | Role |
 |---|---|
-| [mu-core/Plugin/HotSwap.h](../../mu-core/Plugin/HotSwap.h) | The shared pure boundary predicates (`mu_hotswap::loopWrapped` / `boundaryReached`) — unit-testable without a processor. |
-| [Source/Plugin/VoiceHotSwapStager.h](../../mu-tant/Source/Plugin/VoiceHotSwapStager.h) | Header-only staging state machine: per-voice pending slots + one full-preset slot, the store-release/load-acquire handshake, `checkBoundaries` (audio) + `take*` (message). `ValueTree` payload, **no `PluginProcessor` coupling**. |
-| [Source/Plugin/PluginProcessor.cpp](../../mu-tant/Source/Plugin/PluginProcessor.cpp) | `loadPreset`/`loadLayerPreset` (stage-or-apply), `applyFullPresetTree`/`applyVoicePresetTree` (commit bodies), `preloadWavetablesFrom*`, `handleAsyncUpdate` (commit drain), boundary check in `processBlock`. |
+| [mu-core/Plugin/HotSwap.h](../../mu-core/Plugin/HotSwap.h) | The shared `Stager` (per-slot pending payloads + one full-preset slot, the store-release/load-acquire handshake), `LayerSwapper` (stage / commit / `flagBoundaries`) and the pure predicates (`loopWrapped` / `boundaryReached`) — unit-testable without a processor. `ProcessorBase` holds one as `layerSwapper` (`ValueTree` payload, 8 slots) and calls it through `flagSwapBoundaries` and `commitDeferredWork`. |
+| [Source/Plugin/PluginProcessor.cpp](../../mu-tant/Source/Plugin/PluginProcessor.cpp) | `swapLoopBeats` (the mu-tant boundary rule), `layerSwapper.setAppliers` (commit bodies `applyFullPresetTree` / `applyVoicePresetTree`), `handleAsyncUpdate` (commit drain), boundary flagging in `processBlock`. |
+| [Source/Plugin/PluginProcessor_Preset.cpp](../../mu-tant/Source/Plugin/PluginProcessor_Preset.cpp) | `loadPreset` / `loadLayerPreset` (`layerSwapper.useFull` / `useSlot` make the stage-or-apply call on the resolved transport; `layerSwapper.isRunning()` gates the wavetable preload), `preloadWavetablesFrom*`. |
 | [Source/Audio/WavetableBank.{h,cpp}](../../mu-core/Audio/Wavetable/WavetableBank.h) | `findByPath` (lock-free resolve), `decodeFile` (off-lock decode) + `appendTable` (locked append) — the two-phase load that keeps the swap real-time-safe. |
 | [Source/Tests/HotSwapBoundaryTests.cpp](../../mu-tant/Source/Tests/HotSwapBoundaryTests.cpp) | Predicate + stager handshake tests. |
 
@@ -73,16 +73,15 @@ and `handleAsyncUpdate()` commits on the message thread.
 Identical handshake to mu-clid: the payload `ValueTree` is touched **only on the
 message thread** (stage writes it, `take*` moves it out — the message loop
 serialises those); the audio thread touches **only the two atomic flags**
-(`isReady`, `boundaryReached`) in `checkBoundaries`.
+(`isReady`, `boundaryReached`) in `flagBoundaries`.
 
-- `stage*()` sets `isReady` store-release **last**, after the payload is fully built
-  (parse + wavetable decode/append). `checkBoundaries` only flags `isReady` swaps.
+- `stageFull` / `stageSlot` set `isReady` store-release **last**, after the payload is fully built
+  (parse + wavetable decode/append). `flagBoundaries` only flags `isReady` swaps.
   → **Readiness gate:** if a loop boundary arrives before the build finishes, it is
   skipped and the swap commits at the *next* loop point. A half-built payload can
   never commit, and the commit never blocks the audio thread waiting on a build.
-- Per-voice payload writes (`stageVoice` / `takeVoice` / `cancelVoice`) and the
-  full payload (`stageFull` / `takeFull`) are all message-thread; no lock needed on
-  the payload itself.
+- Per-voice payload writes (`stageSlot` / `cancel`) and the full payload (`stageFull`,
+  consumed by `commit`) are all message-thread; no lock needed on the payload itself.
 
 ---
 
@@ -107,8 +106,11 @@ boundaryReached(playing, wasPlaying, oldPos, newPos, patBeats)
 //   stopped (no edge)  → never (a stopped stage is applied immediately at stage time)
 ```
 
-`checkBoundaries` is given each voice's `patBeats` (`gatePatterns[v].patternLengthBars*4`)
-and uses voice *v*'s own length for a per-voice swap, voice 0's for the full preset.
+The loop length that ends each pending swap comes from `mu_tant::swapLoopBeats(slot, numActive,
+onMasterLoop, masterLoopBeats, patBeats)`, passed to `flagSwapBoundaries` as the boundary callable: voice *v*'s own
+gate-pattern length (`gatePatterns[v].patternLengthBars*4`) for a per-voice swap, voice 0's for the full preset, the
+master loop when one is set (and, for a per-voice swap, when the swap timing is OnMasterLoop); a negative result
+(inactive voice) never commits. "Playing" in the flagging is the **resolved** transport (`blkPlaying`).
 
 ---
 
@@ -150,19 +152,25 @@ microseconds at *stage*, never at commit.
 
 **Stage** (`loadPreset`, message thread):
 1. Parse XML → `ValueTree` (accept a `MuTantPreset` wrapper or a bare state element).
-2. If `isInternalPlaying()`: `preloadWavetablesFromState` (decode off-lock + append)
-   then `hotSwapStager.stageFull(move(tree))`. Else `applyFullPresetTree(tree)` now.
+2. If `layerSwapper.isRunning()`: `preloadWavetablesFromState` (decode off-lock + append).
+   Then `layerSwapper.useFull(move(tree))`: stages while the resolved transport plays, else cancels
+   anything staged and runs `applyFullPresetTree(tree)` now. A re-check after staging applies the
+   payload at once if the transport stopped meanwhile (no stranded stage).
 
 `loadLayerPreset` is the same shape for one voice (`preloadWavetablesFromVoiceTree`
-+ `stageVoice`, else `applyVoicePresetTree`).
++ `layerSwapper.useSlot`, else `applyVoicePresetTree`).
 
-**Commit** (`handleAsyncUpdate`, message thread, triggered from `processBlock`):
-1. `takeFull` → `applyFullPresetTree` (`applyComposedState` — globals + every voice node —
-   then `numVoices` + colours + `syncAllFxParams`) → fire `onPresetSwapCommitted`. The staged
+> "Playing" is the resolved transport the audio thread last saw (host, MIDI clock, mu-link or internal), the
+> same rule as mu-Toni and mu-On. With the host playing and mu-Tant's own Play off, a load waits for the loop wrap.
+
+**Commit** (`handleAsyncUpdate` → shared `ProcessorBase::commitDeferredWork` → `layerSwapper.commit()`, message thread, triggered from `processBlock`):
+1. The full preset first: `applyFullPresetTree` (`applyComposedState` — globals + every voice node —
+   then `numVoices` + colours + `syncAllFxParams`). The staged
    tree was already rebuilt in the composed shape (and X-Mod-migrated) by `toVoiceState` at load.
-2. `takeVoice(v)` for each flagged voice → `applyVoicePresetTree` → fire
-   `onLayerPresetCommitted(v)`.
-3. `drainPendingMidiProgramChanges()` (ch 1-8 → `loadLayerPreset`, ch 9 →
+2. Each flagged voice → `applyVoicePresetTree` → fire `onLayerPresetCommitted(v)`.
+3. Then, once all applies are done, `onPresetSwapCommitted` fires if a full preset was committed (it used to fire
+   straight after the full apply, before the per-voice ones).
+4. `drainPendingMidiProgramChanges()` (ch 1-8 → `loadLayerPreset`, ch 9 →
    `loadPreset` — themselves stage-or-apply).
 
 `stageFull` cancels all pending per-voice swaps (a full preset replaces every voice).
@@ -185,9 +193,9 @@ clears both callbacks in its destructor** — the processor can outlive the edit
 ## 9. Staging badges
 
 Shared, automatic — mu-tant only wires them:
-- `TransportBar` "SWP" pill ← `hasPendingFullPreset()` → `hotSwapStager.hasFullPending()`.
+- `TransportBar` "SWP" pill ← `hasPendingFullPreset()` → `layerSwapper.hasFullPending()`.
 - `ChannelSidebar` per-voice badge ← `isPendingSwap(v)` → `hasPendingSwap(v)`; cancel
-  via `onCancelPendingSwap(v)` → `cancelStagedSwap(v)` → `hotSwapStager.cancelVoice(v)`.
+  via `onCancelPendingSwap(v)` → `cancelPendingSwap(v)` → `layerSwapper.cancel(v)` (shared `ProcessorBase` defaults).
 
 ---
 
@@ -212,7 +220,7 @@ see its doc.)
 - **Readiness gate** (§4): no half-built commit; not-ready-at-boundary waits for the next loop.
 - **Stop-mid-stage:** the playing→stopped edge commits all ready swaps (gate closed → glitch-free).
 - **Supersede:** re-staging a voice overwrites its slot; a full preset supersedes all pending voice swaps.
-- **MIDI PC while stopped:** drained in `handleAsyncUpdate`, `isInternalPlaying()` re-checked → applied immediately.
+- **MIDI PC while stopped:** drained in `handleAsyncUpdate`, the resolved play state re-checked by `useFull` / `useSlot` → applied immediately.
 - **No editor:** commit callbacks are null-checked.
 - **Wavetable bank reads vs append:** audio reads by index under the render `voicesLock`; `appendTable` pushes under `voicesLock`; `findByPath` is a read-only scan (no concurrent append during a commit — all appends are message-thread). 
 
