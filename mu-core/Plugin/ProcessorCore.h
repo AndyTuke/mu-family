@@ -6,10 +6,12 @@
 #include "Sequencer/Layer.h"
 
 #include <atomic>
+#include <array>
 #include <cmath>
 #include <limits>
+#include <memory>
 
-// The slim parent of ProcessorBase: the layer accessors and the published host transport.
+// The slim parent of ProcessorBase: the layer storage and accessors and the published host transport.
 // It depends on nothing but JUCE, Layer and HostTransport, so a unit test can derive a small
 // fake from it (mu-core/Tests) without linking the mixer, FX, voice or licensing sources.
 class ProcessorCore : public juce::AudioProcessor
@@ -23,9 +25,14 @@ public:
     // name and a palette colour index. The shared MixerOverlay / MixerChannel
     // UI calls these to label channel strips, populate sidechain-source
     // dropdowns, etc., without needing to know what a channel actually IS.
-    virtual int         getNumChannels()              const = 0;
+    // Defaults read the owned layer storage below; a product that has not moved its layers
+    // into it yet overrides both.
+    virtual int         getNumChannels()              const { return numLayers.load(std::memory_order_relaxed); }
     // Layer `i` (name, colour, modulation) or nullptr when `i` is out of range. Message thread only.
-    virtual Layer*       getLayer(int i) = 0;
+    virtual Layer*       getLayer(int i)
+    {
+        return (i >= 0 && i < getNumChannels()) ? layers[(size_t) i].get() : nullptr;
+    }
     const Layer*         getLayer(int i) const { return const_cast<ProcessorCore*>(this)->getLayer(i); }
     // The most channels the product can ever have (1..8) — sizes the program-change
     // channel table. Products with a fixed layer count return that count.
@@ -68,7 +75,26 @@ public:
         juce::AudioProcessor::processBlockBypassed(buffer, midi);
     }
 
+    // Layer `i` as the product's concrete type, for any slot 0..kMaxLayers-1 whether or not it is
+    // live yet (a preset can load data into a slot above the current count). The slot must be filled.
+    template <class T> T& layerAs(int i) noexcept
+    {
+        jassert(i >= 0 && i < mu_limits::kMaxLayers && dynamic_cast<T*>(layers[(size_t) i].get()) != nullptr);
+        return static_cast<T&>(*layers[(size_t) i]);
+    }
+    template <class T> const T& layerAs(int i) const noexcept
+    {
+        return const_cast<ProcessorCore*>(this)->layerAs<T>(i);
+    }
+
 protected:
+    // Layer storage: fixed capacity, runtime count. The audio thread takes a ScopedTryLock on
+    // `layersLock` once per block and reads layers only inside it; the message thread holds it only
+    // to change the count or move layers, and constructs and destroys layers outside it.
+    std::array<std::unique_ptr<Layer>, mu_limits::kMaxLayers> layers;
+    std::atomic<int>      numLayers { 0 };
+    juce::CriticalSection layersLock;
+
     // Reads the host playhead for this block and publishes it for the UI. Call it from
     // processBlock in place of mu_core::readHostTransport(getPlayHead()) — audio thread only.
     mu_core::HostTransport pollHostTransport()

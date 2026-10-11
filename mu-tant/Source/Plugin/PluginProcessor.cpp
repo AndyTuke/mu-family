@@ -61,6 +61,16 @@ PluginProcessor::PluginProcessor()
                     createParameterLayout(),
                     juce::Identifier("MuTantState"))
 {
+    // All eight Patterns exist for the processor's lifetime (capacity is fixed, only the count is
+    // runtime), so a preset can fill a slot above the live count before the count grows.
+    for (auto& l : layers)
+    {
+        auto p = std::make_unique<Pattern>();
+        p->owner.ptr = this;
+        l = std::move(p);
+    }
+    numLayers.store(1, std::memory_order_relaxed);
+
     initAppSettings("muTant");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
     // Restore persisted MIDI Note mode (0 = Free, 1 = Note). Seed the audio-thread
@@ -92,7 +102,6 @@ PluginProcessor::PluginProcessor()
     }
 
     cacheParamPointers();        // resolve all APVTS atomics once (audio thread reads these)
-    for (auto& p : voiceSlots) p.owner.ptr = this;
     initVoiceState();            // the voice layout every preset / session save and load uses
     refreshAllPitchQuantFlags(); // seed the stepped-pitch flags (default state has no modulators)
 
@@ -104,7 +113,7 @@ PluginProcessor::PluginProcessor()
     {
         // Active voices render normally; a voice past the active count that is still
         // retiring (count-reducing swap) fades its old tail; anything else is silent.
-        if (v < numVoices.load(std::memory_order_relaxed))
+        if (v < numLayers.load(std::memory_order_relaxed))
             renderVoice(v, buf, n);
         else if (retiring[(size_t) v].samplesLeft.load(std::memory_order_acquire) > 0)
             renderRetiringVoice(v, buf, n);
@@ -196,8 +205,8 @@ VoiceConfig PluginProcessor::readConfig(int voiceIndex) const
     // Wavetable: a loaded user table (resolved bank index) overrides the factory
     // o{1,2}_wt selection; -1 → use the factory index.
     {
-        const int u1 = voiceSlots[(size_t) voiceIndex].osc1UserIndex.load();
-        const int u2 = voiceSlots[(size_t) voiceIndex].osc2UserIndex.load();
+        const int u1 = getPattern(voiceIndex).osc1UserIndex.load();
+        const int u2 = getPattern(voiceIndex).osc2UserIndex.load();
         c.osc1Wavetable = (u1 >= 0) ? u1 : (int) p.o1Wt->load();
         c.osc2Wavetable = (u2 >= 0) ? u2 : (int) p.o2Wt->load();
     }
@@ -274,15 +283,18 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 
     // Render → gate → insert → mixer through the shared path (engine→insert→mixer).
     // Guarded by a try-lock ONLY against a voice add/remove data shift (the message
-    // thread holds voicesLock for those). On contention, leave the buffer silent for
+    // thread holds layersLock for those). On contention, leave the buffer silent for
     // this block — a sub-ms gap during a structural edit. A preset hot-swap does NOT
     // take this lock (its data lands through the per-structure editLock / modLock +
     // atomic params), so a swap commit never silences the render here.
     {
-        const juce::ScopedTryLock voicesTryLock(voicesLock);
-        if (voicesTryLock.isLocked())
+        // The bank lock is separate so a wavetable import never blocks a layer edit; the render
+        // reads the bank, so it must exclude an append too.
+        const juce::ScopedTryLock layersTryLock(layersLock);
+        const juce::ScopedTryLock bankTryLock(bankLock);
+        if (layersTryLock.isLocked() && bankTryLock.isLocked())
         {
-            const int numActiveVoices = numVoices.load(std::memory_order_relaxed);
+            const int numActiveVoices = numLayers.load(std::memory_order_relaxed);
 
             // Extend the rendered channel count to cover any voices still fading out
             // from a count-reducing swap, so the mixer keeps mixing their tail.
@@ -323,13 +335,13 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     std::array<double, mu_limits::kMaxLayers> voicePatBeats {};
     for (int v = 0; v < mu_limits::kMaxLayers; ++v)
     {
-        const double gateBeats = (double) voiceSlots[(size_t) v].gate.patternLengthBars * 4.0;
+        const double gateBeats = (double) getPattern(v).gate.patternLengthBars * 4.0;
         voicePatBeats[(size_t) v] = onMasterLoop ? masterLoopBeats : gateBeats;
     }
     const double fullPatBeats = masterLoopBeats > 0.0
                                 ? masterLoopBeats
-                                : (double) voiceSlots[0].gate.patternLengthBars * 4.0;
-    if (hotSwapStager.checkBoundaries(numVoices.load(std::memory_order_relaxed),
+                                : (double) getPattern(0).gate.patternLengthBars * 4.0;
+    if (hotSwapStager.checkBoundaries(numLayers.load(std::memory_order_relaxed),
                                       blkPlaying, wasPlaying,
                                       oldPos, newPosRaw, voicePatBeats, fullPatBeats))
         triggerAsyncUpdate();
@@ -346,7 +358,7 @@ void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
     // The dests are now proportion-clamped (scale 1.0) — a full-depth mod sweeps the whole
     // range and clamps at the rails, instead of overflowing it as the old display-unit path did.
     float out[kNumModDests];
-    mu_mod::resolveLane(&voiceSlots[(size_t) v], blkBeatStart, kNumModDests,
+    mu_mod::resolveLane(&getPattern(v), blkBeatStart, kNumModDests,
                         modDestIds.data(), modDestAtoms[(size_t) v].data(),
                         modDestRanges.data(), modParamValues, out);
 
@@ -365,8 +377,8 @@ void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
     {
         const float o1Base = (float) voicePtrs[(size_t) v].o1Semi->load();
         const float o2Base = (float) voicePtrs[(size_t) v].o2Semi->load();
-        const bool  o1Stepped = voiceSlots[(size_t) v].osc1SemiStepped.load(std::memory_order_relaxed);
-        const bool  o2Stepped = voiceSlots[(size_t) v].osc2SemiStepped.load(std::memory_order_relaxed);
+        const bool  o1Stepped = getPattern(v).osc1SemiStepped.load(std::memory_order_relaxed);
+        const bool  o2Stepped = getPattern(v).osc2SemiStepped.load(std::memory_order_relaxed);
         if (o1Stepped) { cfg.osc1Semi = juce::roundToInt(out[D_o1Semi]); cfg.osc1SemiMod = 0.0f; }
         else           { cfg.osc1Semi = juce::roundToInt(o1Base);        cfg.osc1SemiMod = out[D_o1Semi] - o1Base; }
         if (o2Stepped) { cfg.osc2Semi = juce::roundToInt(out[D_o2Semi]); cfg.osc2SemiMod = 0.0f; }
@@ -425,7 +437,7 @@ void PluginProcessor::applyFilterEnvelope(int v, VoiceConfig& cfg, int numSample
     // envelope value 0 → no change from base; 1 at depth=1 → fully open.
     // Apply the same kMinAttackMs rise-limiting as the gate to prevent clicks
     // when gate and filter envelopes are out of sync.
-    auto& fPat = voiceSlots[(size_t) v].filterGate;
+    auto& fPat = getPattern(v).filterGate;
     if (blkPlaying && fPat.hasEnvelopes.load(std::memory_order_relaxed))
     {
         // The filter cutoff is a per-BLOCK value, so the de-click slew (a per-sample
@@ -473,7 +485,7 @@ void PluginProcessor::applyPitchEnvelope(int v, VoiceConfig& cfg)
 {
     // Pitch pattern envelope value (0..1) × depth (±24 semitones) shifts
     // osc1/osc2 pitch before VoiceEngine processes it this block.
-    auto& pPat = voiceSlots[(size_t) v].pitchGate;
+    auto& pPat = getPattern(v).pitchGate;
     if (blkPlaying && pPat.hasEnvelopes.load(std::memory_order_relaxed))
     {
         if (mu_core::trySpinLock(pPat.editLock))
@@ -519,9 +531,9 @@ void PluginProcessor::refreshPitchQuantFlags(int v)
     // Message-thread only (after any modulator mutation); the audio thread reads the
     // resulting atomics lock-free. Reading the assignments here is safe: the message
     // thread is the sole writer and the mutation has already completed.
-    const auto& slot = voiceSlots[(size_t) v];
-    voiceSlots[(size_t) v].osc1SemiStepped.store(pitchDestHasSteppedSource(slot, "osc1.semi"), std::memory_order_relaxed);
-    voiceSlots[(size_t) v].osc2SemiStepped.store(pitchDestHasSteppedSource(slot, "osc2.semi"), std::memory_order_relaxed);
+    const auto& slot = getPattern(v);
+    getPattern(v).osc1SemiStepped.store(pitchDestHasSteppedSource(slot, "osc1.semi"), std::memory_order_relaxed);
+    getPattern(v).osc2SemiStepped.store(pitchDestHasSteppedSource(slot, "osc2.semi"), std::memory_order_relaxed);
 }
 
 void PluginProcessor::refreshAllPitchQuantFlags()
@@ -561,7 +573,7 @@ void PluginProcessor::renderVoice(int v, juce::AudioBuffer<float>& buf, int numS
     const bool  gateBypass = vp.gateBypass->load() > 0.5f;
     float* gl = buf.getWritePointer(0);
     float* gr = buf.getNumChannels() > 1 ? buf.getWritePointer(1) : nullptr;
-    applyGateBlock(voiceSlots[(size_t) v].gate, gl, gr, numSamples, gateGap, gateBypass,
+    applyGateBlock(getPattern(v).gate, gl, gr, numSamples, gateGap, gateBypass,
                    blkPlaying, blkBeatStart, blkBeatsPerSample, currentSampleRate);
 
     // Use modulated insert param values (modulation may have adjusted them).
@@ -574,7 +586,7 @@ void PluginProcessor::renderVoice(int v, juce::AudioBuffer<float>& buf, int numS
     inserts[(size_t) v].process(buf, numSamples, buf.getNumChannels(), ip);
 
     // Feed the sidebar spectrum glyph — capture post-insert audio on the audio thread.
-    voiceSlots[(size_t) v].ring.write(buf, numSamples);
+    getPattern(v).ring.write(buf, numSamples);
 }
 
 void PluginProcessor::renderRetiringVoice(int v, juce::AudioBuffer<float>& buf, int numSamples)
@@ -635,7 +647,7 @@ void PluginProcessor::setStateInformation(const void* data, int sizeInBytes)
 // ── Dynamic voice management ─────────────────────────────────────────────────
 int PluginProcessor::firstUnusedColourIndex() const
 {
-    const int n = numVoices.load();
+    const int n = numLayers.load();
     std::array<bool, mu_limits::kMaxLayers> used { };
     for (int i = 0; i < n; ++i)
     {
@@ -649,13 +661,13 @@ int PluginProcessor::firstUnusedColourIndex() const
 
 int PluginProcessor::addVoice()
 {
-    const juce::ScopedLock sl(voicesLock);
-    const int n = numVoices.load();
+    const juce::ScopedLock sl(layersLock);
+    const int n = numLayers.load();
     if (n >= mu_limits::kMaxLayers) return -1;
     hotSwapStager.cancelVoice(n);                   // the new slot must carry no stale staged swap
     resetVoiceSlot(n);                              // fresh defaults for the new slot
     voiceColourIndex[(size_t) n] = firstUnusedColourIndex();   // allocate its palette colour
-    numVoices.store(n + 1);
+    numLayers.store(n + 1);
     apvts.state.setProperty("numVoices", n + 1, nullptr);
     refreshPitchQuantFlags(n);   // fresh slot has no modulators → flags off
     return n;
@@ -683,8 +695,8 @@ void PluginProcessor::remapSidechainSources(const std::function<int(int)>& remap
 
 void PluginProcessor::removeVoice(int idx)
 {
-    const juce::ScopedLock sl(voicesLock);
-    const int n = numVoices.load();
+    const juce::ScopedLock sl(layersLock);
+    const int n = numLayers.load();
     if (n <= 1 || idx < 0 || idx >= n) return;     // never remove the last voice
 
     // The down-shift renumbers every voice from idx upward, so any pending per-voice
@@ -702,18 +714,18 @@ void PluginProcessor::removeVoice(int idx)
     {
         copyVoiceParams(d + 1, d);
         voiceColourIndex[(size_t) d] = voiceColourIndex[(size_t) (d + 1)];   // colour follows the voice
-        voiceSlots[(size_t) d] = voiceSlots[(size_t) (d + 1)];          // modulators + envelopes + user wavetables follow the voice
+        getPattern(d) = getPattern((d + 1));          // modulators + envelopes + user wavetables follow the voice
     }
     resetVoiceSlot(n - 1);                          // clear the vacated top slot
-    numVoices.store(n - 1);
+    numLayers.store(n - 1);
     apvts.state.setProperty("numVoices", n - 1, nullptr);
     refreshAllPitchQuantFlags();                    // the down-shift renumbered every voice
 }
 
 void PluginProcessor::swapVoices(int a, int b)
 {
-    const juce::ScopedLock sl(voicesLock);
-    const int n = numVoices.load();
+    const juce::ScopedLock sl(layersLock);
+    const int n = numLayers.load();
     if (a < 0 || b < 0 || a >= n || b >= n || a == b) return;
 
     // Pending per-voice swaps are keyed by index; swapping the two slots would
@@ -746,17 +758,17 @@ void PluginProcessor::swapVoices(int a, int b)
 
     std::swap(voiceColourIndex[(size_t) a], voiceColourIndex[(size_t) b]);   // colour follows the voice
     // Modulators, envelopes and the user-wavetable choice swap with the voice.
-    const Pattern tmpSlot = voiceSlots[(size_t) a];
-    voiceSlots[(size_t) a] = voiceSlots[(size_t) b];
-    voiceSlots[(size_t) b] = tmpSlot;
+    const Pattern tmpSlot = getPattern(a);
+    getPattern(a) = getPattern(b);
+    getPattern(b) = tmpSlot;
     refreshPitchQuantFlags(a);   // the two slots' modulators swapped
     refreshPitchQuantFlags(b);
 }
 
 void PluginProcessor::resetSlot(int idx)
 {
-    const juce::ScopedLock sl(voicesLock);
-    if (idx < 0 || idx >= numVoices.load()) return;
+    const juce::ScopedLock sl(layersLock);
+    if (idx < 0 || idx >= numLayers.load()) return;
     hotSwapStager.cancelVoice(idx);            // a staged swap would re-fill what we're clearing
     const int keepColour = voiceColourIndex[(size_t) idx];
     resetVoiceSlot(idx);                       // params + gate + modulators → defaults
@@ -787,26 +799,26 @@ void PluginProcessor::loadUserWavetable(int voice, int oscIndex, const juce::Fil
     if (voice < 0 || voice >= mu_limits::kMaxLayers || ! file.existsAsFile()) return;
     int idx;
     {
-        const juce::ScopedLock sl(voicesLock);   // bank append must exclude the audio thread
+        const juce::ScopedLock sl(bankLock);   // bank append must exclude the audio thread
         idx = bank.addOrLoadFile(file);
     }
     if (idx < 0) { if (onLoadError) onLoadError("Could not load wavetable \"" + file.getFileName() + "\""); return; }
     const juce::String path = file.getFullPathName();
-    if (oscIndex == 0) { voiceSlots[(size_t) voice].osc1UserPath = path; voiceSlots[(size_t) voice].osc1UserIndex.store(idx); }
-    else             { voiceSlots[(size_t) voice].osc2UserPath = path; voiceSlots[(size_t) voice].osc2UserIndex.store(idx); }
+    if (oscIndex == 0) { getPattern(voice).osc1UserPath = path; getPattern(voice).osc1UserIndex.store(idx); }
+    else             { getPattern(voice).osc2UserPath = path; getPattern(voice).osc2UserIndex.store(idx); }
 }
 
 void PluginProcessor::clearUserWavetable(int voice, int oscIndex)
 {
     if (voice < 0 || voice >= mu_limits::kMaxLayers) return;
-    if (oscIndex == 0) { voiceSlots[(size_t) voice].osc1UserPath.clear(); voiceSlots[(size_t) voice].osc1UserIndex.store(-1); }
-    else             { voiceSlots[(size_t) voice].osc2UserPath.clear(); voiceSlots[(size_t) voice].osc2UserIndex.store(-1); }
+    if (oscIndex == 0) { getPattern(voice).osc1UserPath.clear(); getPattern(voice).osc1UserIndex.store(-1); }
+    else             { getPattern(voice).osc2UserPath.clear(); getPattern(voice).osc2UserIndex.store(-1); }
 }
 
 juce::String PluginProcessor::userWavetablePath(int voice, int oscIndex) const
 {
     if (voice < 0 || voice >= mu_limits::kMaxLayers) return {};
-    return (oscIndex == 0) ? voiceSlots[(size_t) voice].osc1UserPath : voiceSlots[(size_t) voice].osc2UserPath;
+    return (oscIndex == 0) ? getPattern(voice).osc1UserPath : getPattern(voice).osc2UserPath;
 }
 
 bool PluginProcessor::userWavetableMissing(int voice, int oscIndex) const
@@ -831,8 +843,8 @@ void PluginProcessor::copyVoiceParams(int src, int dst)
     shift("v"  + juce::String(src) + "_", "v"  + juce::String(dst) + "_");
     shift("ch" + juce::String(src) + "_", "ch" + juce::String(dst) + "_");
     // User-wavetable selection copies with the voice (same bank index, already loaded).
-    voiceSlots[(size_t) dst].osc1UserPath = voiceSlots[(size_t) src].osc1UserPath; voiceSlots[(size_t) dst].osc1UserIndex.store(voiceSlots[(size_t) src].osc1UserIndex.load());
-    voiceSlots[(size_t) dst].osc2UserPath = voiceSlots[(size_t) src].osc2UserPath; voiceSlots[(size_t) dst].osc2UserIndex.store(voiceSlots[(size_t) src].osc2UserIndex.load());
+    getPattern(dst).osc1UserPath = getPattern(src).osc1UserPath; getPattern(dst).osc1UserIndex.store(getPattern(src).osc1UserIndex.load());
+    getPattern(dst).osc2UserPath = getPattern(src).osc2UserPath; getPattern(dst).osc2UserIndex.store(getPattern(src).osc2UserIndex.load());
 }
 
 void PluginProcessor::resetVoiceSlot(int idx)
@@ -849,7 +861,7 @@ void PluginProcessor::resetVoiceSlot(int idx)
     };
     resetPrefix("v"  + juce::String(idx) + "_");
     resetPrefix("ch" + juce::String(idx) + "_");
-    voiceSlots[(size_t) idx] = Pattern{};   // modulators, the three envelopes and the user wavetables back to defaults
+    getPattern(idx) = Pattern{};   // modulators, the three envelopes and the user wavetables back to defaults
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────

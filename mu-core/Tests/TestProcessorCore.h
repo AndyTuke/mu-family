@@ -8,9 +8,6 @@
 // and a hook to call the protected pollHostTransport().
 struct TestProcessorCore : ProcessorCore
 {
-    TestProcessorCore()
-        : ProcessorCore(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo())) {}
-
     // Mock DAW playhead; each field maps onto one published transport value.
     struct MockPlayHead : juce::AudioPlayHead
     {
@@ -35,12 +32,18 @@ struct TestProcessorCore : ProcessorCore
         }
     };
 
+    // Three live layers in the base-owned storage; getNumChannels / getLayer are the base defaults.
     static constexpr int kLayers = 3;
-    std::array<Layer, kLayers> layers;
-
-    int getNumChannels() const override { return kLayers; }
-    using ProcessorCore::getLayer;   // keep the const overload visible past the override
-    Layer* getLayer(int i) override { return (i >= 0 && i < kLayers) ? &layers[(size_t) i] : nullptr; }
+    TestProcessorCore() : TestProcessorCore(kLayers) {}
+    explicit TestProcessorCore(int liveLayers)
+        : ProcessorCore(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()))
+    {
+        for (int i = 0; i < liveLayers; ++i) layers[(size_t) i] = std::make_unique<Layer>();
+        numLayers.store(liveLayers);
+    }
+    using ProcessorCore::layers;
+    using ProcessorCore::numLayers;
+    using ProcessorCore::layersLock;
     juce::String getChannelName(int i) const override
     {
         const auto* l = getLayer(i);

@@ -108,10 +108,8 @@ public:
     // ── ProcessorBase channel metadata ───────────────────────────────────────
     // mu-tant manages a dynamic set of voices ("layers") exactly like mu-clid's
     // rhythms — there are no inactive voices, only the ones that exist. The
-    // count is `numVoices` (1..mu_limits::kMaxLayers); add/delete adjust it.
-    int          getNumChannels()              const override { return numVoices.load(std::memory_order_relaxed); }
-    Layer*       getLayer(int i) override { return (i >= 0 && i < getNumChannels()) ? &voiceSlots[(size_t) i] : nullptr; }
-    using ProcessorBase::getLayer;
+    // count is `numLayers` (1..mu_limits::kMaxLayers, owned by ProcessorCore, which also supplies
+    // getNumChannels / getLayer over its layer storage); add/delete adjust it.
     juce::String getChannelName(int idx)       const override
     {
         return (idx >= 0 && idx < mu_limits::kMaxLayers) ? juce::String("Voice ") + juce::String(idx + 1)
@@ -129,8 +127,8 @@ public:
     // addVoice appends a fresh default voice (returns its index, or -1 if full).
     // removeVoice deletes a voice, shifting every higher voice's APVTS values +
     // gate/modulator data down so the set stays contiguous. The last voice can't
-    // be removed. Both hold `voicesLock`; processBlock tryLocks it.
-    int  getNumVoices() const noexcept { return numVoices.load(std::memory_order_relaxed); }
+    // be removed. Both hold `layersLock`; processBlock tryLocks it.
+    int  getNumVoices() const noexcept { return numLayers.load(std::memory_order_relaxed); }
     int  addVoice();
     void removeVoice(int idx);
     void swapVoices(int a, int b);   // reorder (drag in the sidebar)
@@ -287,11 +285,11 @@ private:
     int retireRampSamples() const { return juce::jmax(1, (int) (currentSampleRate * 0.025)); }
 
 public:
-    // Per-voice modulator data — 8 ControlSequences + ModulationMatrix + modLock
-    // per voice. Public so the UI (ModulatorPanel) can pass a pointer to the
-    // currently-edited voice's slot.
-    std::array<Pattern, mu_limits::kMaxLayers> voiceSlots;
-    // (each voice's gate / filter / pitch envelopes, user wavetables and level tap live in its Pattern)
+    // Voice `i`'s Pattern (modulators, gate / filter / pitch envelopes, user wavetables, level tap),
+    // valid for every slot 0..kMaxLayers-1. Public so the UI (ModulatorPanel, VoicePanel) can point
+    // at the currently-edited voice.
+    Pattern&       getPattern(int i) noexcept       { return layerAs<Pattern>(i); }
+    const Pattern& getPattern(int i) const noexcept { return layerAs<Pattern>(i); }
 
 private:
     // Per-voice modulated-value snapshots — written by the audio thread in
@@ -351,17 +349,17 @@ private:
     // Written in prepareToPlay (host suspends the audio thread first) — no atomic needed.
     double currentSampleRate = 44100.0;
 
-    // Number of existing voices (layers), 1..mu_limits::kMaxLayers. Audio thread reads it
-    // atomically; add/removeVoice mutate it on the message thread under voicesLock.
-    std::atomic<int> numVoices { 1 };
     // Per-voice palette-colour index (0..7). Default identity; addVoice assigns
     // the first-unused colour, remove/swap shift it so colour follows the voice.
     std::array<int, mu_limits::kMaxLayers> voiceColourIndex { { 0, 1, 2, 3, 4, 5, 6, 7 } };
     int firstUnusedColourIndex() const;   // lowest palette index not used by an active voice
-    // Guards the voice count + the per-voice data shift during add/remove against
-    // the audio thread. processBlock takes a ScopedTryLock and silences the block
-    // on contention (a sub-millisecond gap while a voice is added/removed).
-    juce::CriticalSection voicesLock;
+    // The voice count (ProcessorCore::numLayers) and the per-voice data shift during add/remove
+    // are guarded against the audio thread by ProcessorCore::layersLock; processBlock takes a
+    // ScopedTryLock and silences the block on contention (a sub-millisecond gap while a voice is
+    // added/removed).
+    // Guards the wavetable bank append against the audio render (which reads the bank), kept apart
+    // from layersLock so an import never blocks a layer edit and the reverse.
+    juce::CriticalSection bankLock;
 
     // Copy every `v{src}_*` and `ch{src}_*` APVTS parameter value to the matching
     // `v{dst}_*` / `ch{dst}_*` parameter (used by removeVoice's down-shift).
@@ -370,11 +368,12 @@ private:
     void resetVoiceSlot(int idx);
 
     // Per-voice colour allocation persistence (stored on the APVTS state tree
-    // alongside numVoices, so colours round-trip with full + per-... presets).
+    // alongside the voice count, so colours round-trip with full + per-... presets).
     juce::String serialiseVoiceColours() const;
     void         restoreVoiceColours(const juce::String& csv);
 
-    Layer* slotLayer(int i) override { return (i >= 0 && i < mu_limits::kMaxLayers) ? &voiceSlots[(size_t) i] : nullptr; }
+    // Any of the eight slots, live or not, so a preset's data for a voice above the count is kept.
+    Layer* slotLayer(int i) override { return (i >= 0 && i < mu_limits::kMaxLayers) ? &getPattern(i) : nullptr; }
     friend struct Pattern;   // its persistence hooks hand over to the voice-extras members below
     // Composed state (mu-core LayerState): the voice layout every save / load uses, a voice's
     // non-parameter data (modulators, gates, user wavetables — they live outside APVTS) from its
@@ -382,7 +381,12 @@ private:
     void            initVoiceState();
     void            writeVoiceExtras(int v, juce::ValueTree& node) const;
     void            applyVoiceExtras(int v, const juce::ValueTree& node);
-    int             voiceOf(const Pattern& p) const noexcept { return (int) (&p - voiceSlots.data()); }
+    int             voiceOf(const Pattern& p) const noexcept
+    {
+        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            if (layers[(size_t) i].get() == &p) return i;
+        return -1;
+    }
     void            resolveUserWavetable(const juce::String& path, juce::String& storedPath, std::atomic<int>& index);
     juce::ValueTree toVoiceState(const juce::ValueTree& tree) const;
 
@@ -399,7 +403,7 @@ private:
     void applyVoicePresetTree(int voice, const juce::ValueTree& tree); // one voice node (.muPattern body)
     // Warm the wavetable bank (dedup-by-path) for every user wavetable referenced
     // by a staged tree, so the boundary commit does no disk I/O. Lock-safe vs the
-    // audio thread (bank append under voicesLock).
+    // audio thread (bank append under bankLock).
     void preloadWavetablesFromState(const juce::ValueTree& state);     // full: walk the voice <Slot>s
     void preloadWavetablesFromVoiceTree(const juce::ValueTree& voiceTree); // per-voice: o1/o2WtPath
 

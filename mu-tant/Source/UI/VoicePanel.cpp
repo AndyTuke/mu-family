@@ -274,7 +274,7 @@ void VoicePanel::timerCallback()
     // for the gating-grid playhead. Pattern length may be 1..16 bars.
     const bool   playing = proc.isInternalPlaying();
     const double beat    = proc.getInternalBeatPos();
-    const auto* gPat = &proc.voiceSlots[(size_t) currentVoice].gate;
+    const auto* gPat = &proc.getPattern(currentVoice).gate;
     const double patBeats = (double) gPat->patternLengthBars * 4.0;
     const double beat01  = (patBeats > 0.0) ? std::fmod(beat, patBeats) / patBeats : 0.0;
     gatingDesigner.setPlayhead(beat01, playing);
@@ -333,10 +333,10 @@ void VoicePanel::setVoice(int voiceIndex)
     // knob arc bindings unset for voice 0 unless we re-bind here every time.
     bindModulationIndicators();
 
-    modulatorPanel.setVoiceSlot(&proc.voiceSlots[(size_t) currentVoice]);
-    gatingDesigner.setPattern(&proc.voiceSlots[(size_t) currentVoice].gate);
-    gatingDesigner.setFilterPattern(&proc.voiceSlots[(size_t) currentVoice].filterGate);
-    gatingDesigner.setPitchPattern(&proc.voiceSlots[(size_t) currentVoice].pitchGate);
+    modulatorPanel.setVoiceSlot(&proc.getPattern(currentVoice));
+    gatingDesigner.setPattern(&proc.getPattern(currentVoice).gate);
+    gatingDesigner.setFilterPattern(&proc.getPattern(currentVoice).filterGate);
+    gatingDesigner.setPitchPattern(&proc.getPattern(currentVoice).pitchGate);
     insertSub.setChannel(currentVoice);   // reloads algo + slot knobs from APVTS
     // setChannel → configureInsertAlgorithm fires insertSub.onInsertAlgorithmChanged,
     // which re-labels the modulator insert destinations for this voice's algo.
@@ -476,7 +476,7 @@ void VoicePanel::bindAmpDepthKnob(bool ssbMode)
 void VoicePanel::bindModulationIndicators()
 {
     const int vi = currentVoice;
-    const auto* mx = &proc.voiceSlots[(size_t) vi].modulationMatrix;
+    const auto* mx = &proc.getPattern(vi).modulationMatrix;
     static const float kNaN = std::numeric_limits<float>::quiet_NaN();
 
     auto bind = [&](KnobWithLabel& k, const char* destId, mu_tant::ModSnapIdx snap)

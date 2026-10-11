@@ -138,7 +138,7 @@ public:
     // leaving this pattern's editLock untouched and resetting the gate cache.
     // Used when voices are added/removed and the per-voice patterns shift slots.
     // Call on the message thread while the audio thread is excluded (the
-    // processor holds its voicesLock during the shift). Acquires other.editLock
+    // processor holds its layersLock during the shift). Acquires other.editLock
     // to guard against a concurrent GatingDesigner edit on the source pattern
     // (e.g. user drawing on voice N while voice N is being removed). GatePattern
     // can't be copy/move-assigned directly because of the embedded std::atomic

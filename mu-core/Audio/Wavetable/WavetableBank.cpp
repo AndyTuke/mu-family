@@ -289,7 +289,7 @@ Wavetable WavetableBank::decodeFile(const juce::File& file)
     return wt;
 }
 
-// Install a pre-decoded table. Caller holds the bank lock (voicesLock) for the brief
+// Install a pre-decoded table. Caller holds the bank lock (the product's bankLock) for the brief
 // push; returns the new index, or -1 for an empty/failed decode.
 int WavetableBank::appendTable(Wavetable&& wt)
 {

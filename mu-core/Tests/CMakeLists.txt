@@ -7,6 +7,7 @@ target_sources(mu-core-tests PRIVATE
     TestMain.cpp
     HostTransportPublishTests.cpp
     LayerAccessTests.cpp
+    LayerOwnershipTests.cpp
     SupportPromptPolicyTests.cpp
     SettingsOverlayFitTests.cpp
     AlgorithmNameTableTests.cpp

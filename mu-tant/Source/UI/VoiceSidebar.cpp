@@ -152,7 +152,7 @@ VoiceSidebar::VoiceSidebar(PluginProcessor& p)
     {
         const auto col = MuLookAndFeel::channelPalette[
             (size_t) (p.getChannelColourIndex(i) % MuLookAndFeel::kChannelPaletteSize)];
-        auto glyph = std::make_unique<VoiceSpectrumGlyph>(col, &p.voiceSlots[(size_t) i].ring);
+        auto glyph = std::make_unique<VoiceSpectrumGlyph>(col, &p.getPattern(i).ring);
         glyph->onPulse = [this, i] { pulseItem(i); };
         return glyph;
     };

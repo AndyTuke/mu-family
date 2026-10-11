@@ -11,7 +11,7 @@ struct LayerAccessTests : juce::UnitTest
         {
             TestProcessorCore p;
             for (int i = 0; i < p.getNumChannels(); ++i)
-                expect(p.getLayer(i) == &p.layers[(size_t) i]);
+                expect(p.getLayer(i) == p.layers[(size_t) i].get());
         }
 
         beginTest("out-of-range indices return nullptr");

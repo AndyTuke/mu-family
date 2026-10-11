@@ -110,12 +110,12 @@ void PluginProcessor::initVoiceState()
 // A voice's non-parameter data onto its node.
 void PluginProcessor::writeVoiceExtras(int v, juce::ValueTree& node) const
 {
-    if (voiceSlots[(size_t) v].osc1UserPath.isNotEmpty()) node.setProperty("o1WtPath", voiceSlots[(size_t) v].osc1UserPath, nullptr);
-    if (voiceSlots[(size_t) v].osc2UserPath.isNotEmpty()) node.setProperty("o2WtPath", voiceSlots[(size_t) v].osc2UserPath, nullptr);
-    node.appendChild(mu_pp::serialiseModulators(voiceSlots[(size_t) v]),                 nullptr);
-    node.appendChild(serialiseGate(voiceSlots[(size_t) v].gate),                 nullptr);
-    node.appendChild(serialiseGate(voiceSlots[(size_t) v].filterGate, "FilterGate"), nullptr);
-    node.appendChild(serialiseGate(voiceSlots[(size_t) v].pitchGate,  "PitchGate"),  nullptr);
+    if (getPattern(v).osc1UserPath.isNotEmpty()) node.setProperty("o1WtPath", getPattern(v).osc1UserPath, nullptr);
+    if (getPattern(v).osc2UserPath.isNotEmpty()) node.setProperty("o2WtPath", getPattern(v).osc2UserPath, nullptr);
+    node.appendChild(mu_pp::serialiseModulators(getPattern(v)),                 nullptr);
+    node.appendChild(serialiseGate(getPattern(v).gate),                 nullptr);
+    node.appendChild(serialiseGate(getPattern(v).filterGate, "FilterGate"), nullptr);
+    node.appendChild(serialiseGate(getPattern(v).pitchGate,  "PitchGate"),  nullptr);
 }
 
 void Pattern::writeExtras(juce::ValueTree& node) const { owner.ptr->writeVoiceExtras(owner.ptr->voiceOf(*this), node); }
@@ -123,25 +123,25 @@ void Pattern::applyExtras(const juce::ValueTree& node) { owner.ptr->applyVoiceEx
 
 // A voice's non-parameter data from its node. Absent children clear (an invalid tree empties a
 // gate / the modulators); per-pattern spinlocks and modLock guard the audio thread, so no
-// voicesLock is needed.
+// layersLock is needed.
 void PluginProcessor::applyVoiceExtras(int v, const juce::ValueTree& node)
 {
-    mu_pp::clearModulators(voiceSlots[(size_t) v]);
-    mu_pp::deserialiseModulators(node.getChildWithName("Modulators"), voiceSlots[(size_t) v], {}, isValidModDest);
+    mu_pp::clearModulators(getPattern(v));
+    mu_pp::deserialiseModulators(node.getChildWithName("Modulators"), getPattern(v), {}, isValidModDest);
     refreshPitchQuantFlags(v);   // assignments changed → refresh stepped-pitch flags
 
     const int maxCells = std::numeric_limits<int>::max();
-    deserialiseGate(node.getChildWithName("Gate"),       voiceSlots[(size_t) v].gate,   maxCells);
-    deserialiseGate(node.getChildWithName("FilterGate"), voiceSlots[(size_t) v].filterGate, maxCells);
-    deserialiseGate(node.getChildWithName("PitchGate"),  voiceSlots[(size_t) v].pitchGate,  maxCells);
+    deserialiseGate(node.getChildWithName("Gate"),       getPattern(v).gate,   maxCells);
+    deserialiseGate(node.getChildWithName("FilterGate"), getPattern(v).filterGate, maxCells);
+    deserialiseGate(node.getChildWithName("PitchGate"),  getPattern(v).pitchGate,  maxCells);
 
-    resolveUserWavetable(node.getProperty("o1WtPath").toString(), voiceSlots[(size_t) v].osc1UserPath, voiceSlots[(size_t) v].osc1UserIndex);
-    resolveUserWavetable(node.getProperty("o2WtPath").toString(), voiceSlots[(size_t) v].osc2UserPath, voiceSlots[(size_t) v].osc2UserIndex);
+    resolveUserWavetable(node.getProperty("o1WtPath").toString(), getPattern(v).osc1UserPath, getPattern(v).osc1UserIndex);
+    resolveUserWavetable(node.getProperty("o2WtPath").toString(), getPattern(v).osc2UserPath, getPattern(v).osc2UserIndex);
 }
 
 // A user wavetable path → its bank index. A missing file keeps the path (the UI shows "missing")
 // but resolves to -1, so the oscillator falls back to its factory selection. Lock-free resolve
-// first: a hot-swap stage pre-loaded the table, so the boundary commit never takes voicesLock
+// first: a hot-swap stage pre-loaded the table, so the boundary commit never takes bankLock
 // (taking it would bail the audio render to silence for that block). Only a load that wasn't
 // pre-loaded (stopped / host restore — audio silent then) takes the locked disk path.
 void PluginProcessor::resolveUserWavetable(const juce::String& path, juce::String& storedPath, std::atomic<int>& index)
@@ -154,7 +154,7 @@ void PluginProcessor::resolveUserWavetable(const juce::String& path, juce::Strin
         if (idx < 0)
         {
             juce::File f(path);
-            if (f.existsAsFile()) { const juce::ScopedLock sl(voicesLock); idx = bank.addOrLoadFile(f); }
+            if (f.existsAsFile()) { const juce::ScopedLock sl(bankLock); idx = bank.addOrLoadFile(f); }
         }
     }
     index.store(idx);
@@ -218,7 +218,7 @@ void PluginProcessor::applyVoicePresetTree(int voice, const juce::ValueTree& tre
     applyLayerNode(voice, tree);
 }
 
-// Warm the wavetable bank (dedup-by-path, append under voicesLock) for the user
+// Warm the wavetable bank (dedup-by-path, append under bankLock) for the user
 // wavetables a staged voice tree references, so the boundary commit is disk-free.
 void PluginProcessor::preloadWavetablesFromVoiceTree(const juce::ValueTree& voiceTree)
 {
@@ -229,12 +229,12 @@ void PluginProcessor::preloadWavetablesFromVoiceTree(const juce::ValueTree& voic
         juce::File f(path);
         if (! f.existsAsFile()) return;
         // Decode (file read + WAV decode + FFT mip build) OFF the lock — this is the
-        // slow part. Only the brief append takes voicesLock, so the audio render is
+        // slow part. Only the brief append takes bankLock, so the audio render is
         // excluded for microseconds, not for the whole decode (the residual swap
         // pause: decoding under the lock silenced the render for the decode duration).
         auto wt = bank.decodeFile(f);
         if (wt.frames <= 0) return;
-        const juce::ScopedLock sl(voicesLock);
+        const juce::ScopedLock sl(bankLock);
         if (bank.findByPath(path) < 0) bank.appendTable(std::move(wt));   // defensive re-check
     };
     warm(voiceTree.getProperty("o1WtPath").toString());
@@ -273,7 +273,7 @@ juce::File PluginProcessor::getWavetablesDir()  const { return getContentDir().g
 juce::ValueTree PluginProcessor::captureFullPreset()
 {
     auto state = captureComposedState();
-    state.setProperty("numVoices", numVoices.load(), nullptr);
+    state.setProperty("numVoices", numLayers.load(), nullptr);
     state.setProperty("voiceColours", serialiseVoiceColours(), nullptr);
     return state;
 }
@@ -300,7 +300,7 @@ void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 // boundary commit and host state restore).
 void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
 {
-    // No blanket voicesLock here: every structure this touches is already guarded by
+    // No blanket layersLock here: every structure this touches is already guarded by
     // its own fine-grained lock that the audio render respects — APVTS params are
     // atomic, gate patterns use editLock (deserialiseGate), modulator slots use modLock
     // (deserialise/clearModulators), and the wavetable bank append self-locks. Holding a
@@ -308,7 +308,7 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
     // for the whole commit (the hot-swap glitch). Without it, a concurrent block sees
     // old-or-new per structure (≤1 block, inaudible) instead.
 
-    const int oldN = numVoices.load(std::memory_order_relaxed);
+    const int oldN = numLayers.load(std::memory_order_relaxed);
     int nv = juce::jlimit(1, mu_limits::kMaxLayers, (int) state.getProperty("numVoices", 1));
 
     // Retire-tail: when this preset drops voices while playing, snapshot each dropped
@@ -334,7 +334,7 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
     }
 
     applyComposedState(state);
-    numVoices.store(nv);
+    numLayers.store(nv);
     restoreVoiceColours(state.getProperty("voiceColours", "").toString());
     syncAllFxParams();   // re-seed mixer/FX engine state (unchanged values skip listeners)
 }
