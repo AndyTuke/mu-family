@@ -1,0 +1,5 @@
+# Only deploy when the website (or this file) changed; plugin/code-only pushes are skipped.
+# Netlify skips the build when the ignore command exits 0 (no changes under site/).
+# Publish directory and other settings stay as configured in the Netlify dashboard.
+[build]
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- site/ netlify.toml"
