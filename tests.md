@@ -112,7 +112,7 @@ cmake --build build --target mu-tant-tests --config Debug && build/mu-tant/mu-ta
 
 ## C++ unit tests — mu-core (shared)
 
-Tests of shared mu-core behaviour live in `mu-core/Tests` and are built once as `mu-core-tests` (part of **ALL_BUILD**). They link no product: a fake `ProcessorCore` stands in for a processor. Build command:
+Tests of shared mu-core behaviour live in `mu-core/Tests` and are built once as `mu-core-tests` (part of **ALL_BUILD**). They link no product: a fake `ProcessorCore` (or, for UI pages, a fake `ProcessorBase`) stands in for a processor. Build command:
 
 ```
 cmake --build build --target mu-core-tests --config Debug && build/mu-core/Tests/mu-core-tests_artefacts/Debug/mu-core-tests.exe
@@ -123,6 +123,7 @@ cmake --build build --target mu-core-tests --config Debug && build/mu-core/Tests
 | Host transport publishing: defaults, play + ppq, no ppq, meter + bar start (clamped to 255), null playhead reset, bypassed block still publishes | `mu-core/Tests/HostTransportPublishTests.cpp` | Pass (10 results, 0 failures, build 1243) |
 | Layer access: valid index, out of range → nullptr, const overload, name + colour via the base accessors | `mu-core/Tests/LayerAccessTests.cpp` | Pass (build 1243) |
 | Support prompt policy: supporter rules, when the prompt shows, once per process, "Don't show again" saved-flag round trip | `mu-core/Tests/SupportPromptPolicyTests.cpp` | Pass (14 results, 0 failures, build 1245) |
+| Settings page fit (`StandardSettingsOverlay`, two-column): at 1088x814 and 1088x774 (banner allowance), UI scale 1.0 and 1.25, standalone and plugin wrapper, with and without a mu-Clid-style Locations group (two 2-row sections) and with MIDI-sync rows shown: every visible child inside the overlay, no two children overlap, everything above the footer (height - pad - 20). Uses a fake `ProcessorBase` (`TestProcessorBase.h`); links ProcessorBase and the settings-page sources individually | `mu-core/Tests/SettingsOverlayFitTests.cpp` | Pass (24 configurations, 0 failures; deepest control 542 px vs footer 734 px at worst case; checked against a 300 px window, which fails as it should) |
 
 ---
 
