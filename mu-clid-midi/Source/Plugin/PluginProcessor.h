@@ -35,7 +35,8 @@ public:
     bool acceptsMidi() const override { return true; }
     bool producesMidi() const override { return true; }
     bool isMidiEffect() const override { return true; }
-    double getTailLengthSeconds() const override { return 10.0; }
+    // A MIDI effect makes no audio, so there is no tail for the host to keep rendering.
+    double getTailLengthSeconds() const override { return 0.0; }
 
     int getNumPrograms() override { return 1; }
     int getCurrentProgram() override { return 0; }
@@ -64,6 +65,8 @@ public:
     // has no preset browser yet, so these only satisfy the shared base.
     juce::File   getLayerPresetDir() const override       { return getContentDir().getChildFile("Rhythms"); }
     juce::String getLayerPresetExtension() const override { return "muRhythm"; }
+    // Empty on purpose: this product has no full-preset format (its state is the host session and
+    // the .muRhythm layer preset), and the preset controls are hidden, so nothing reads this.
     juce::String getFullPresetExtension() const override  { return {}; }
 
     // UI play state: written by the audio thread, read by the editor at 30 Hz.
