@@ -2,7 +2,7 @@
 #include "Plugin/ParameterLayout.h"
 #include "Audio/SpinLock.h"                      // mu-core: spin lock helpers
 #include "Persistence/ScopedApvtsLoading.h"      // mu-core: raises apvtsLoading for a bulk push
-#include "Persistence/RhythmParamTable.h"        // mu-Clid: kRhythmParamDefs, the shared suffix table
+#include "Persistence/RhythmParamTable.h"        // kRhythmParamDefs, the shared suffix table
 #include "Persistence/SessionState.h"
 #include "Sequencer/AccentVelocity.h"
 
@@ -35,11 +35,11 @@ MidiRhythmCore::MidiRhythmCore(juce::AudioProcessorValueTreeState& apvtsToUse)
     // Resolve each rhythm parameter once: its raw value pointer for the drain, and a sorted
     // suffix table so parameterChanged finds its slot without scanning the whole definition list.
     const juce::String prefix(kRhythmIdPrefix);
-    for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
+    for (int i = 0; i < mu_core::kRhythmParamCount; ++i)
     {
-        rawParams[(size_t) i] = apvts.getRawParameterValue(prefix + mu_clid::kRhythmParamDefs[i].suffix);
+        rawParams[(size_t) i] = apvts.getRawParameterValue(prefix + mu_core::kRhythmParamDefs[i].suffix);
         if (rawParams[(size_t) i] != nullptr)
-            suffixIndex[(size_t) suffixIndexCount++] = { mu_clid::kRhythmParamDefs[i].suffix, i };
+            suffixIndex[(size_t) suffixIndexCount++] = { mu_core::kRhythmParamDefs[i].suffix, i };
     }
     std::sort(suffixIndex.begin(), suffixIndex.begin() + suffixIndexCount,
               [](const SuffixIndex& a, const SuffixIndex& b) { return std::strcmp(a.suffix, b.suffix) < 0; });
@@ -210,9 +210,9 @@ void MidiRhythmCore::drainPendingParams()
     bool voiceDirty   = false;
 
     // Clear the flag first, then read the parameter: a change that lands after the clear re-raises it.
-    for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
+    for (int i = 0; i < mu_core::kRhythmParamCount; ++i)
         if (pendingDirty[(size_t) i].exchange(false, std::memory_order_acq_rel) && rawParams[(size_t) i] != nullptr)
-            mu_clid::kRhythmParamDefs[i].apply(rawParams[(size_t) i]->load(), r, patternDirty, voiceDirty);
+            mu_core::kRhythmParamDefs[i].apply(rawParams[(size_t) i]->load(), r, patternDirty, voiceDirty);
 
     if (patternDirty)
     {
@@ -253,9 +253,9 @@ void MidiRhythmCore::syncRhythmFromApvts()
     bool patternDirty = false;
     bool voiceDirty   = false;
 
-    for (int j = 0; j < mu_clid::kRhythmParamCount; ++j)
+    for (int j = 0; j < mu_core::kRhythmParamCount; ++j)
         if (rawParams[(size_t) j] != nullptr)
-            mu_clid::kRhythmParamDefs[j].apply(rawParams[(size_t) j]->load(), r, patternDirty, voiceDirty);
+            mu_core::kRhythmParamDefs[j].apply(rawParams[(size_t) j]->load(), r, patternDirty, voiceDirty);
 
     sequencer.updatePattern(0);
     publishStepCounts();   // after the rebuild, which clamps the step counts to the cap
@@ -269,9 +269,9 @@ void MidiRhythmCore::pushRhythmToApvts()
     const Rhythm& r = sequencer.getRhythm(0);
     const juce::String prefix(kRhythmIdPrefix);
 
-    for (int i = 0; i < mu_clid::kRhythmParamCount; ++i)
+    for (int i = 0; i < mu_core::kRhythmParamCount; ++i)
     {
-        const auto& def = mu_clid::kRhythmParamDefs[i];
+        const auto& def = mu_core::kRhythmParamDefs[i];
         if (auto* p = apvts.getParameter(prefix + def.suffix))
             p->setValueNotifyingHost(p->convertTo0to1(def.push(r)));
     }

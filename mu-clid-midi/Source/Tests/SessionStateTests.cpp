@@ -4,7 +4,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Tests/StubProcessor.h"
 #include "Persistence/SessionState.h"
-#include "Persistence/PresetHelpers.h"   // mu-Clid: writeKindedProperty, to build a Lite-shaped tree
+#include "Persistence/RhythmPresetHelpers.h"   // writeKindedProperty, to build a Lite-shaped tree
 
 using namespace mu_clid_midi;
 
@@ -19,9 +19,9 @@ public:
         juce::ValueTree root("MuClidPreset");
 
         juce::ValueTree rhythm("Rhythm");
-        for (int j = 0; j < mu_clid::kRhythmParamCount; ++j)
+        for (int j = 0; j < mu_core::kRhythmParamCount; ++j)
         {
-            const auto& def = mu_clid::kRhythmParamDefs[j];
+            const auto& def = mu_core::kRhythmParamDefs[j];
             const juce::String s(def.suffix);
             float v;
             if (s == "stepsA")  v = 12.0f;
@@ -31,7 +31,7 @@ public:
             else if (s == "patLeg")  v = 1.0f;
             else if (s == "insModeB") v = 1.0f;
             else continue;
-            mu_clid::writeKindedProperty(rhythm, s, v, def.kind, def.algorithmNames);
+            mu_core::writeKindedProperty(rhythm, s, v, def.kind, def.algorithmNames);
         }
         root.addChild(rhythm, -1, nullptr);
 

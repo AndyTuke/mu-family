@@ -7,6 +7,8 @@
 #include "Sequencer/Rhythm.h"
 #include "Sequencer/RhythmPlayState.h"
 #include "Sequencer/SequencerEngine.h"
+#include "Persistence/RhythmParamTable.h"
+#include "Persistence/RhythmPresetHelpers.h"
 
 namespace mu_clid {
 
@@ -21,5 +23,12 @@ using mu_core::EuclidOverrides;
 using mu_core::RhythmPlayState;
 using mu_core::SequencerEngine;
 using mu_core::BlockResult;
+using mu_core::ParamKind;
+using mu_core::RhythmParamDef;
+using mu_core::kRhythmParamDefs;
+using mu_core::kRhythmParamCount;
+using mu_core::findRhythmParamDef;
+using mu_core::writeKindedProperty;
+using mu_core::readKindedPropertyAsActualV2;
 
 } // namespace mu_clid

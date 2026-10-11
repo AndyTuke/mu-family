@@ -17,7 +17,8 @@
 // proves the shared code is correct.
 
 #include <juce_core/juce_core.h>
-#include "../Persistence/RhythmParamTable.h"
+#include "Sequencer/GeneratorAliases.h"
+#include "Persistence/RhythmParamTable.h"
 
 using namespace mu_clid;
 

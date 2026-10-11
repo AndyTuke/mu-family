@@ -12,7 +12,8 @@
 //   - patternDirty / voiceDirty are set by the correct param families
 
 #include <juce_core/juce_core.h>
-#include "../Persistence/RhythmParamTable.h"
+#include "Sequencer/GeneratorAliases.h"
+#include "Persistence/RhythmParamTable.h"
 #include "Audio/AlgorithmNames.h"
 
 using namespace mu_clid;

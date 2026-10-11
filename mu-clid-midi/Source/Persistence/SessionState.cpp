@@ -1,7 +1,7 @@
 #include "Persistence/SessionState.h"
 #include "Persistence/LayerState.h"         // mu-core: mu_pp::readRowValue
-#include "Persistence/PresetHelpers.h"      // mu-Clid: readKindedPropertyAsActualV2 (shared until Rhythm moves to mu-core)
-#include "Persistence/RhythmParamTable.h"   // mu-Clid: kRhythmParamDefs
+#include "Persistence/RhythmPresetHelpers.h"   // readKindedPropertyAsActualV2
+#include "Persistence/RhythmParamTable.h"   // kRhythmParamDefs
 #include "Plugin/ParameterLayout.h"
 
 namespace mu_clid_midi::session {
@@ -24,13 +24,13 @@ void applyLegacySession(const juce::ValueTree& root, juce::AudioProcessorValueTr
     const auto rhythm = root.getChildWithName("Rhythm");
     if (rhythm.isValid())
     {
-        for (int j = 0; j < mu_clid::kRhythmParamCount; ++j)
+        for (int j = 0; j < mu_core::kRhythmParamCount; ++j)
         {
-            const auto& def = mu_clid::kRhythmParamDefs[j];
+            const auto& def = mu_core::kRhythmParamDefs[j];
             const juce::String id = juce::String(kRhythmIdPrefix) + def.suffix;
             if (apvts.getParameter(id) == nullptr || ! rhythm.hasProperty(def.suffix)) continue;
 
-            const float v = mu_clid::readKindedPropertyAsActualV2(rhythm, def.suffix, def.kind, def.algorithmNames);
+            const float v = mu_core::readKindedPropertyAsActualV2(rhythm, def.suffix, def.kind, def.algorithmNames);
             if (! std::isnan(v))
                 setActual(apvts, id, v);
         }

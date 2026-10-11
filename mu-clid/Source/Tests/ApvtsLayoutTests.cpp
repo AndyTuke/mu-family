@@ -8,8 +8,8 @@
 
 #include <juce_core/juce_core.h>
 #include <unordered_map>
-#include "../Persistence/RhythmParamTable.h"
-#include "../Persistence/PresetHelpers.h"
+#include "Persistence/RhythmParamTable.h"
+#include "Persistence/PresetHelpers.h"
 #include "Modulation/ModulationDestinations.h"
 
 using namespace mu_clid;

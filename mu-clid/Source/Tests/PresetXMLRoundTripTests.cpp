@@ -24,8 +24,8 @@
 
 #include <juce_core/juce_core.h>
 #include <juce_data_structures/juce_data_structures.h>
-#include "../Persistence/RhythmParamTable.h"
-#include "../Persistence/PresetHelpers.h"
+#include "Persistence/RhythmParamTable.h"
+#include "Persistence/PresetHelpers.h"
 
 using namespace mu_clid;
 

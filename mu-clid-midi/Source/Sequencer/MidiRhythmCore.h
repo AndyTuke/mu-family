@@ -3,7 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Audio/MidiOutputEngine.h"
 #include "Sequencer/SequencerEngine.h"
-#include "Persistence/RhythmParamTable.h"   // mu-Clid: kRhythmParamCount for the pending slots
+#include "Persistence/RhythmParamTable.h"   // kRhythmParamCount for the pending slots
 #include "Sequencer/RhythmPlayState.h"    // mu-Clid's, shared with RhythmCircle
 
 #include <array>
@@ -99,16 +99,16 @@ private:
     // changes to one suffix coalesces into one apply, and the producer never allocates or waits. Only
     // the message thread writes the Rhythm fields (under rhythmsLock, then the sequencer's pattern
     // lock), so the audio thread never writes them.
-    std::array<std::atomic<bool>, mu_clid::kRhythmParamCount> pendingDirty {};
+    std::array<std::atomic<bool>, mu_core::kRhythmParamCount> pendingDirty {};
 
     // Per kRhythmParamDefs entry, the parameter's raw value (null if this product has no such
     // parameter); built once in the constructor so no lookup by id happens afterwards.
-    std::array<std::atomic<float>*, mu_clid::kRhythmParamCount> rawParams {};
+    std::array<std::atomic<float>*, mu_core::kRhythmParamCount> rawParams {};
 
     // Suffix to index in kRhythmParamDefs, sorted by suffix, for the audio thread's lookup by binary
     // search instead of a scan. Built in the constructor and never changed.
     struct SuffixIndex { const char* suffix; int index; };
-    std::array<SuffixIndex, mu_clid::kRhythmParamCount> suffixIndex {};
+    std::array<SuffixIndex, mu_core::kRhythmParamCount> suffixIndex {};
     int suffixIndexCount = 0;
 
     // Set when a drain wanted a pattern rebuild but a bulk load was running; the next service does it.
