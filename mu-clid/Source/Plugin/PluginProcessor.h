@@ -137,11 +137,8 @@ public:
     void setContentDir(const juce::File& dir);
     void ensureContentFoldersExist();
 
-    // Licensing is shared (ProcessorBase::initLicensing). Lite is always licensed — no
-    // activation, no demo caps.
-   #if MUCLID_LITE_BUILD
-    bool isLicensed() const override { return true; }
-   #endif
+    // Licensing is shared (ProcessorBase::initLicensing); the Lite build never calls it, so it has
+    // no licence state and shows no support prompt.
     void savePreset(const juce::String& n, const juce::String& d,
                     const juce::String& c, bool e = false) override { presetIO.savePreset(n, d, c, e); }
     void loadPreset(const juce::File& f) override { presetIO.loadPreset(f); publishPresetName(f.getFileNameWithoutExtension()); }

@@ -84,7 +84,7 @@ Bullet "Maybe later  —  closes the window and carries on."
 Bullet "Enter licence key  —  opens the About panel so you can type in your key."
 Bullet "Pay what you like  —  opens the checkout page in your web browser. The suggested amount is £20, but £0 is fine. You receive a licence key either way."
 P "Tick 'Don't show this again' to stop the window appearing. You can still support mu-Clid at any time from the Support link at the right of the Status Bar, or from the Support button in the About panel."
-P "To enter a licence key, click the mu-CLID logo to open the About panel, click Enter a key, and paste in your key. Once a key is accepted, the About panel shows 'Thank you for your support' and the Support prompt no longer appears."
+P "To enter a licence key, click the mu-CLID logo to open the About panel, click Enter a key, and paste in your key, then click Activate. If you do not have a key yet, click Get a key beside Activate to open the pay-what-you-like page in your web browser. Once a key is accepted, the About panel shows 'Thank you for your support' and the Support prompt no longer appears."
 
 Pic "Support mu-Clid window with its three buttons and the Don't show this again tick box."
 Pic "About panel showing the Support and Enter a key buttons."
@@ -369,7 +369,7 @@ Bullet "Dim amber  —  Waiting for clock. Sync is on, but no clock pulses have 
 Bullet "Green  —  Locked. mu-Clid is following the clock. Hover over the lamp and the status bar shows the tempo, for example `"Locked at 120 BPM`"."
 Bullet "Red  —  Lost. The clock pulses stopped arriving for about a quarter of a second while the master was playing, for example because a cable came loose or the master device was switched off. mu-Clid stops the transport, and the status bar shows `"MIDI Clock: Lost, transport stopped`" once, without you having to hover. When the pulses come back, mu-Clid carries on by itself."
 P "The lamp is hidden with Transport only, because the clock's ticks are not used, and whenever Source is Internal. The BPM display works as before: it is locked and shows the clock's tempo while the clock sets the tempo."
-P "Sync Offset  —  with Source set to MIDI In, a Sync Offset field appears in the MIDI Clock section of Settings. It runs from −50 to +250 ms and defaults to 0. The value is shown with a sign, for example +25. The arrows step 1 ms; Shift+click steps 10 ms. A positive value makes mu-Clid play earlier than the clock says. Enter your audio output latency here (about 20 to 40 ms on Windows WASAPI) so the sound lands on the beat of a hardware master. mu-Clid remembers the setting between sessions."
+P "Sync Offset  —  with Source set to MIDI In, a Sync Offset field appears in the MIDI Clock section of Settings. It runs from −50 to +250 ms (the label reads simply Sync offset) and defaults to 0. The value is shown with a sign, for example +25. The arrows step 1 ms; Shift+click steps 10 ms. A positive value makes mu-Clid play earlier than the clock says. Enter your audio output latency here (about 20 to 40 ms on Windows WASAPI) so the sound lands on the beat of a hardware master. mu-Clid remembers the setting between sessions."
 Pic "Transport bar with the Clock lamp lit green (locked) between the BPM display and the Position readout."
 
 H2 "MIDI Program Change to Preset (DAW)"
@@ -377,16 +377,16 @@ P "When running as a VST3 or CLAP plugin, incoming program change messages on MI
 
 # ── 16. Settings ──────────────────────────────────────────────────────────────
 H1 "16. Settings"
-P "Click the gear icon in the Transport Bar to open the Settings overlay. Sections include:"
+P "Click the gear icon in the Transport Bar to open the Settings overlay. Settings are arranged in two columns. Sections include:"
 Bullet "Visual — hit pulse style, ring expansion size, sidebar and centre hub pulse, step dot size"
 Bullet "Sequencer — host sync behaviour, hot-swap timing"
 Bullet "Performance — interpolation quality (Lo-fi / Linear / Clean), oversampling quality"
 Bullet "Voice — overlap fade length for voice transitions"
 Bullet "Gain — default channel and master fader levels"
 Bullet "Presets — content folder location, default preset"
-Bullet "MIDI — clock source, message filtering and sync offset (standalone), MIDI Presets panel (DAW)"
+Bullet "MIDI — clock source, message filtering and Sync Offset (standalone), MIDI Presets panel (DAW)"
 Bullet "Time Signature (standalone) — in Settings under General, Transport: 2/4, 3/4, 4/4, 5/4, 6/4, 7/4, 5/8, 6/8, 7/8, 9/8 or 12/8; default 4/4. It changes how the bar.beat.sixteenth Position readout counts (a beat is a quarter note in x/4 and an eighth note in x/8). Patterns still run in four-beat bars."
-Bullet "Multi-bus — enable or disable multi-bus output (DAW); host rescan required after toggling"
+Bullet "Output — enable or disable multi-bus output (DAW); the hint beside it reads '(rescan host to apply)', so rescan plugins in your host after toggling"
 Bullet "Standalone — audio device selection"
 
 Pic "Settings overlay open over the main window."

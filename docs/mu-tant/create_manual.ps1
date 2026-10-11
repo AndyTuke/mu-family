@@ -72,16 +72,13 @@ Bullet "Standalone  —  run mu-Tant.exe from any location"
 H2 "Content Folder"
 P "On first launch mu-Tant creates a content folder at %USERPROFILE%\Documents\TDP\muTant\ with two sub-folders: Presets (full preset files, .muTant) and Voices (single-voice preset files, .muPattern)."
 
-H2 "Demo Version"
-P "A free save-disabled demo of mu-Tant is available from transwarp.me. It is limited to a single voice; all other features are fully functional. If you are running the demo, all documentation in this manual applies — only the eight-voice capability is not available. The demo cannot save presets or voice files."
-
 H2 "Supporting mu-Tant"
 P "mu-Tant is free to use, and you can pay what you like to support it. If you have not entered a licence key, a polite 'Support mu-Tant' window appears once per session, the first time you open mu-Tant after starting your DAW or the app. It has three buttons:"
 Bullet "Maybe later  —  closes the window and carries on."
 Bullet "Enter licence key  —  opens the About panel so you can type in your key."
 Bullet "Pay what you like  —  opens the checkout page in your web browser. The suggested amount is £20, but £0 is fine. You receive a licence key either way."
 P "Tick 'Don't show this again' to stop the window appearing. You can still support mu-Tant at any time from the Support link at the right of the status bar, or from the Support button in the About panel."
-P "To enter a licence key, click the mu-Tant logo to open the About panel, click Enter a key, and paste in your key. Once a key is accepted, the About panel shows 'Thank you for your support' and the Support prompt no longer appears."
+P "To enter a licence key, click the mu-Tant logo to open the About panel, click Enter a key, and paste in your key, then click Activate. If you do not have a key yet, click Get a key beside Activate to open the pay-what-you-like page in your web browser. Once a key is accepted, the About panel shows 'Thank you for your support' and the Support prompt no longer appears."
 
 Pic "Support mu-Tant window with its three buttons and the Don't show this again tick box."
 Pic "About panel showing the Support and Enter a key buttons."
@@ -267,7 +264,7 @@ P "Each voice can be saved and loaded independently to Documents\TDP\muTant\Voic
 
 # ── 17. Settings ──────────────────────────────────────────────────────────────
 H1 "17. Settings"
-P "Click the gear icon to open the Settings overlay:"
+P "Click the gear icon to open the Settings overlay. Settings are arranged in two columns:"
 Bullet "Master Volume — overall output level"
 Bullet "UI Size — Medium or Large window"
 Bullet "Tempo (BPM) — internal clock, 20.0 to 300.0 with one decimal, also editable from the transport BPM field"
@@ -286,7 +283,7 @@ Bullet "Dim amber  —  Waiting for clock. Sync is on, but no clock pulses have 
 Bullet "Green  —  Locked. mu-Tant is following the clock. Hover over the lamp and the status bar shows the tempo, for example `"Locked at 120 BPM`"."
 Bullet "Red  —  Lost. The clock pulses stopped arriving for about a quarter of a second while the master was playing, for example because a cable came loose or the master device was switched off. mu-Tant stops the transport, and the status bar shows `"MIDI Clock: Lost, transport stopped`" once, without you having to hover. When the pulses come back, mu-Tant carries on by itself."
 P "The lamp is hidden with Transport only, because the clock's ticks are not used, and whenever Source is Internal. The BPM display works as before: it is locked and shows the clock's tempo while the clock sets the tempo."
-P "Sync Offset  —  with Source set to MIDI In, a Sync Offset field appears in the MIDI Clock section of Settings. It runs from −50 to +250 ms and defaults to 0. The value is shown with a sign, for example +25. The arrows step 1 ms; Shift+click steps 10 ms. A positive value makes mu-Tant play earlier than the clock says. Enter your audio output latency here (about 20 to 40 ms on Windows WASAPI) so the sound lands on the beat of a hardware master. mu-Tant remembers the setting between sessions."
+P "Sync Offset  —  with Source set to MIDI In, a Sync Offset field appears in the MIDI Clock section of Settings. It runs from −50 to +250 ms (the label reads simply Sync offset) and defaults to 0. The value is shown with a sign, for example +25. The arrows step 1 ms; Shift+click steps 10 ms. A positive value makes mu-Tant play earlier than the clock says. Enter your audio output latency here (about 20 to 40 ms on Windows WASAPI) so the sound lands on the beat of a hardware master. mu-Tant remembers the setting between sessions."
 Pic "Transport bar with the Clock lamp lit green (locked) between the BPM display and the Position readout."
 
 H2 "MIDI Program Change to Preset"
