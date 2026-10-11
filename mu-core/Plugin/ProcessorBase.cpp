@@ -23,11 +23,11 @@ bool ProcessorBase::scanMidiProgramChanges(const juce::MidiBuffer& midi)
     if (chMask == 0 && ! fullPresetEnabled) return false;
 
     bool needPC = false;
-    for (const auto& msgRef : midi)
+    for (const auto meta : midi)
     {
-        const auto& m = msgRef.getMessage();
-        if (! m.isProgramChange()) continue;
-        const int ch = m.getChannel();      // 1-based, 1..16
+        // Raw bytes, not a juce::MidiMessage: constructing one allocates for messages over 8 bytes (SysEx).
+        if (meta.numBytes < 2 || meta.numBytes > 3 || (meta.data[0] & 0xf0) != 0xc0) continue;
+        const int ch = (meta.data[0] & 0x0f) + 1;      // 1-based, 1..16
 
         int  slot   = -1;
         bool isFull = false;
@@ -51,7 +51,7 @@ bool ProcessorBase::scanMidiProgramChanges(const juce::MidiBuffer& midi)
         if (size1 + size2 > 0)
         {
             const int dst = (size1 > 0) ? start1 : start2;
-            pcQueue[(size_t) dst] = { slot, m.getProgramChangeNumber(), isFull };
+            pcQueue[(size_t) dst] = { slot, meta.data[1] & 0x7f, isFull };
             pcFifo.finishedWrite(1);
             needPC = true;
         }

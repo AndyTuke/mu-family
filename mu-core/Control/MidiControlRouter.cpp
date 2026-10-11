@@ -38,7 +38,9 @@ bool MidiControlRouter::push(int mapping, float value, uint32_t epoch) noexcept
 bool MidiControlRouter::releaseDue(uint32_t epoch) noexcept
 {
     bool any = false;
-    const double upcomingEnd = last.startBeat + 2.0 * last.blockBeats;
+    // The block about to be resolved ends here, plus the poll interval: a released action still
+    // waits for the message thread's next tick, so it is handed over early enough to land on the beat.
+    const double upcomingEnd = last.startBeat + 2.0 * last.blockBeats + pollLeadBeats();
     for (int i = 0; i < numPending;)
     {
         const auto p = pending[(size_t) i];
@@ -71,7 +73,7 @@ bool MidiControlRouter::queueAction(int mapping, float value, uint32_t epoch) no
     const double step     = q == Quantise::Beat ? 1.0 : barBeats;
     const double now      = last.startBeat + last.blockBeats;
     const double boundary = std::ceil(now / step - 1.0e-9) * step;
-    if (boundary - now <= last.blockBeats || numPending >= kMaxPending)
+    if (boundary - now <= last.blockBeats + pollLeadBeats() || numPending >= kMaxPending)
         return push(mapping, value, epoch);
 
     pending[(size_t) numPending++] = { (int16_t) mapping, value, epoch, boundary };
@@ -88,18 +90,28 @@ bool MidiControlRouter::process(juce::MidiBuffer& midi) noexcept
 
     const bool learning = map.isLearning();
 
-    // The CC / note a message carries, if it is one the map or MIDI learn may claim.
+    // With nothing mapped and no learn in progress there is nothing to claim: leave the block be.
+    if (! learning && map.isEmptyRealtime()) return wake;
+
+    // The CC / note a message carries, if it is one the map or MIDI learn may claim. Read straight
+    // from the raw bytes: building a juce::MidiMessage allocates for anything over 8 bytes (SysEx).
     struct Source { bool valid = false, isNote = false; int channel = 0, number = 0; float value = 0.0f; bool press = false; };
-    auto sourceOf = [](const juce::MidiMessage& m) noexcept
+    auto sourceOf = [](const juce::MidiMessageMetadata& meta) noexcept
     {
         Source s;
-        if (m.isController())
-            s = { true, false, m.getChannel(), m.getControllerNumber(), (float) m.getControllerValue() / 127.0f,
-                  m.getControllerValue() > 0 };
-        else if (m.isNoteOn())
-            s = { true, true, m.getChannel(), m.getNoteNumber(), 1.0f, true };
-        else if (m.isNoteOff())
-            s = { true, true, m.getChannel(), m.getNoteNumber(), 0.0f, false };
+        if (meta.numBytes != 3) return s;   // CC and note messages are three bytes; anything else passes through
+        const int status  = meta.data[0];
+        const int channel = (status & 0x0f) + 1;
+        const int number  = meta.data[1] & 0x7f;
+        const int value   = meta.data[2] & 0x7f;
+        switch (status & 0xf0)
+        {
+            case 0xb0: s = { true, false, channel, number, (float) value / 127.0f, value > 0 }; break;
+            case 0x90: s = value > 0 ? Source { true, true, channel, number, 1.0f, true }
+                                     : Source { true, true, channel, number, 0.0f, false }; break;   // velocity 0 = note off
+            case 0x80: s = { true, true, channel, number, 0.0f, false }; break;
+            default: break;
+        }
         return s;
     };
 
@@ -114,8 +126,7 @@ bool MidiControlRouter::process(juce::MidiBuffer& midi) noexcept
     if (canStrip) scratch.clear();
     for (const auto meta : midi)
     {
-        const auto msg = meta.getMessage();
-        const auto s   = sourceOf(msg);
+        const auto s = sourceOf(meta);
         bool taken = false;
 
         if (s.valid && learning)
@@ -143,7 +154,7 @@ bool MidiControlRouter::process(juce::MidiBuffer& midi) noexcept
         }
 
         if (taken) ++claimed;
-        else if (canStrip) scratch.addEvent(msg, meta.samplePosition);
+        else if (canStrip) scratch.addEvent(meta.data, meta.numBytes, meta.samplePosition);
     }
 
     // Replace the block with what is left. `midi` held a superset of these bytes, so refilling
@@ -156,10 +167,10 @@ bool MidiControlRouter::process(juce::MidiBuffer& midi) noexcept
     return wake;
 }
 
-void MidiControlRouter::drain(ControlSink& sink)
+bool MidiControlRouter::drain(ControlSink& sink)
 {
     const uint32_t epoch = map.epoch();
-    if ((epoch & 1u) != 0) return;   // mid-edit: leave it queued for the next drain
+    if ((epoch & 1u) != 0) return true;   // mid-edit: leave it queued; the caller asks for another drain
 
     // Knobs: the latest value of each mapping that moved since the last drain.
     for (int i = 0, n = map.size(); i < n; ++i)
@@ -174,7 +185,7 @@ void MidiControlRouter::drain(ControlSink& sink)
 
     // Buttons: the queued actions, oldest first; any queued before an edit are dropped.
     const int ready = fifo.getNumReady();
-    if (ready <= 0) return;
+    if (ready <= 0) return false;
     int start1, size1, start2, size2;
     fifo.prepareToRead(ready, start1, size1, start2, size2);
     auto handle = [&](const Event& e)
@@ -189,6 +200,7 @@ void MidiControlRouter::drain(ControlSink& sink)
     for (int i = 0; i < size1; ++i) handle(queue[(size_t) (start1 + i)]);
     for (int i = 0; i < size2; ++i) handle(queue[(size_t) (start2 + i)]);
     fifo.finishedRead(ready);
+    return false;
 }
 
 } // namespace mu_core

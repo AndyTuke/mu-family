@@ -418,7 +418,9 @@ protected:
             onPresetSwapCommitted();
         commitDeferredWork();
         drainPendingMidiProgramChanges();
-        midiControlRouter.drain(*this);
+        // Left queued by a table edit in progress: ask for another pass so it is not stranded.
+        if (midiControlRouter.drain(*this))
+            requestDeferredWork();
     }
 
     // Message-thread work the audio thread asked for (hot-swap commits at a loop boundary, via
@@ -433,14 +435,14 @@ protected:
     // Audio-thread flagging uses atomics only; the appliers run on the message thread.
     mu_hotswap::LayerSwapper<juce::ValueTree, mu_limits::kMaxLayers> layerSwapper;
 
-    // The audio thread's deferred-work request and the 30 Hz message-thread timer that drains it.
+    // The audio thread's deferred-work request and the message-thread timer (100 Hz, one relaxed exchange per tick) that drains it.
     // The timer does nothing but check the flag. Nothing here uses AsyncUpdater: its trigger
     // allocates and takes a lock, so it must never run on the audio thread. Every destructor stops
     // the timer first so a tick cannot reach the virtual commitDeferredWork of a half-destroyed object.
     mu_hotswap::CommitMailbox swapMailbox;
     struct SwapPoll final : private juce::Timer
     {
-        explicit SwapPoll(ProcessorBase& o) : owner(o) { startTimerHz(30); }
+        explicit SwapPoll(ProcessorBase& o) : owner(o) { startTimerHz(mu_core::MidiControlRouter::kDeferredWorkPollHz); }
         ~SwapPoll() override { stopTimer(); }
         void stop() { stopTimer(); }
         void timerCallback() override { owner.drainDeferredWork(); }
@@ -470,7 +472,7 @@ protected:
 
     // Audio thread: ask the message thread to run the deferred work (swap commits, program changes,
     // control actions). An atomic flag, never an allocating message post; the swap poll timer drains
-    // it within ~33 ms.
+    // it within ~10 ms.
     void requestDeferredWork() noexcept { swapMailbox.request(); }
 
     // A new default layer for slot `slot`, fully built and prepared (it is published as is, under

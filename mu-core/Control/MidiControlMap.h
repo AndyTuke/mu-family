@@ -61,6 +61,8 @@ public:
         if (channel < 1 || channel > 16 || number < 0 || number > 127) return -1;
         return lookup[slot(isNote, channel, number)].load(std::memory_order_relaxed);
     }
+    // Whether any mapping exists (the locking size() is for the message thread only).
+    bool isEmptyRealtime() const noexcept { return mappingCount.load(std::memory_order_relaxed) == 0; }
     ControlActionType typeOf(int index)     const noexcept { return (ControlActionType) (flags[(size_t) index].load(std::memory_order_relaxed) & 0xFF); }
     Quantise          quantiseOf(int index) const noexcept { return (Quantise) ((flags[(size_t) index].load(std::memory_order_relaxed) >> 8) & 0xFF); }
     void offerLearn(bool isNote, int channel, int number) noexcept;
@@ -85,6 +87,7 @@ private:
 
     std::array<std::atomic<int16_t>, 2 * 16 * 128> lookup {};
     std::array<std::atomic<uint32_t>, kMaxMappings> flags {};
+    std::atomic<int>      mappingCount { 0 };
     std::atomic<uint32_t> epochCounter { 0 };
     std::atomic<int>      globalQuantise { (int) Quantise::Bar };
     std::atomic<bool>     learning { false };

@@ -27,6 +27,7 @@ void MidiControlMap::republish()
         lookup[slot(m.isNote, m.channel, m.number)].store((int16_t) i, std::memory_order_relaxed);
         flags[i].store((uint32_t) m.action.type | ((uint32_t) m.action.quantise << 8), std::memory_order_relaxed);
     }
+    mappingCount.store((int) mappings.size(), std::memory_order_relaxed);
     epochCounter.fetch_add(1, std::memory_order_acq_rel);   // even: settled
 }
 

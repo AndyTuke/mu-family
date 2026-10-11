@@ -17,8 +17,8 @@
 // (`noteBlock` hands the router the block's transport after the product resolves it).
 // Message thread (`drain`): performs what is waiting through a ControlSink.
 //
-// Timing is block-granular plus one message-thread hop: an action lands within a block of its
-// boundary, not on the sample. Queued events carry the map's epoch, so one queued before the
+// Timing is block-granular plus one message-thread hop (the poll interval, which the quantise lead
+// makes up): an action lands within a block of its boundary, not on the sample. Queued events carry the map's epoch, so one queued before the
 // table was edited (indices shift) is dropped rather than performed as the wrong mapping.
 namespace mu_core
 {
@@ -40,7 +40,13 @@ public:
     bool playIsOutside() const noexcept { return playOutside.load(std::memory_order_relaxed); }
 
     // ---- message thread ----
-    void drain(ControlSink& sink);
+    // Returns true when it had to leave work queued because the table was mid-edit: the caller
+    // asks for another drain, or nothing would wake the mailbox for it again.
+    bool drain(ControlSink& sink);
+
+    // How often the message thread polls for deferred work. A quantised action is handed over one
+    // interval early so it is performed on the beat rather than up to one interval after it.
+    static constexpr int kDeferredWorkPollHz = 100;
 
 private:
     struct Event   { int16_t mapping = -1; float value = 0.0f; uint32_t epoch = 0; };
@@ -53,6 +59,7 @@ private:
     bool push(int mapping, float value, uint32_t epoch) noexcept;
     bool releaseDue(uint32_t epoch) noexcept;
     bool queueAction(int mapping, float value, uint32_t epoch) noexcept;
+    double pollLeadBeats() const noexcept { return last.bpm / 60.0 / (double) kDeferredWorkPollHz; }
 
     MidiControlMap& map;
 

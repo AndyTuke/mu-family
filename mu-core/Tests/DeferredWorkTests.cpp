@@ -6,6 +6,9 @@
 #include "TestProcessorBase.h"
 #include <type_traits>
 
+// The allocation counter lives with the global operator new in MidiControlTests.cpp.
+namespace mu_test_alloc { extern thread_local bool counting; extern thread_local std::size_t count; }
+
 // An AsyncUpdater base would bring back an audio-thread-callable triggerAsyncUpdate().
 static_assert(! std::is_base_of_v<juce::AsyncUpdater, ProcessorBase>,
               "ProcessorBase must not be an AsyncUpdater: the audio thread uses the deferred-work mailbox");
@@ -105,6 +108,35 @@ struct DeferredWorkTests : juce::UnitTest
             p.queueMidiProgramChanges(midi);
             expect(! p.mailboxPending());
             expectEquals(midi.getNumEvents(), 1);
+        }
+
+        beginTest("a long SysEx is skipped by the program change scan without allocating");
+        {
+            DeferredProcessor p;
+            p.midiPresetMap.setChannelMask(0x01);
+            p.midiFullPresetMap.setEnabled(true);
+            p.getMidiControlMap().add([]
+            {
+                mu_core::MidiMapping m;
+                m.isNote = false; m.channel = 1; m.number = 21;
+                m.action.type = mu_core::ControlActionType::Parameter;
+                m.action.paramId = "p";
+                return m;
+            }());
+
+            std::vector<juce::uint8> payload(20, 0x22);
+            juce::MidiBuffer midi;
+            midi.ensureSize(2048);
+            midi.addEvent(juce::MidiMessage::createSysExMessage(payload.data(), (int) payload.size()), 0);
+            midi.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8) 100), 1);
+
+            mu_test_alloc::count = 0; mu_test_alloc::counting = true;
+            p.queueMidiProgramChanges(midi);
+            mu_test_alloc::counting = false;
+
+            expectEquals((int) mu_test_alloc::count, 0);
+            expect(! p.mailboxPending());
+            expectEquals(midi.getNumEvents(), 2);
         }
     }
 };

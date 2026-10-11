@@ -15,15 +15,15 @@
 // Counts heap allocations made by a thread that has switched counting on, so a test can prove
 // that a call allocates nothing. Replacing the global operator new affects the whole test binary,
 // but only the counting thread's allocations are recorded.
-namespace
+namespace mu_test_alloc
 {
-    thread_local bool         gCountAllocations = false;
-    thread_local std::size_t  gAllocations      = 0;
+    thread_local bool         counting = false;
+    thread_local std::size_t  count    = 0;
 }
 
 void* operator new(std::size_t n)
 {
-    if (gCountAllocations) ++gAllocations;
+    if (mu_test_alloc::counting) ++mu_test_alloc::count;
     if (void* p = std::malloc(n == 0 ? 1 : n)) return p;
     throw std::bad_alloc();
 }
@@ -433,10 +433,10 @@ public:
             {
                 auto block = makeBlock();
                 router.noteBlock(playingBlock(rep * 0.1, 0.1), 4.0);
-                gAllocations = 0; gCountAllocations = true;
+                mu_test_alloc::count = 0; mu_test_alloc::counting = true;
                 router.process(block);
-                gCountAllocations = false;
-                total += gAllocations;
+                mu_test_alloc::counting = false;
+                total += mu_test_alloc::count;
                 // The unclaimed notes (60) and odd CCs stay; the claimed ones are gone.
                 bool leftover = false;
                 for (const auto meta : block)
@@ -449,6 +449,68 @@ public:
                 Recorder rec; router.drain(rec);
             }
             expectEquals((int) total, 0);
+        }
+
+        beginTest("router: a long SysEx passes through untouched and allocates nothing");
+        {
+            MidiControlMap map;
+            map.add(cc(1, 1, param("p")));
+            MidiControlRouter router(map);
+            router.noteBlock(playingBlock(0.0, 0.1), 4.0);
+
+            std::vector<juce::uint8> payload(20, 0x11);
+            auto makeBlock = [&]
+            {
+                juce::MidiBuffer b;
+                b.ensureSize(4096);
+                b.addEvent(juce::MidiMessage::createSysExMessage(payload.data(), (int) payload.size()), 0);
+                b.addEvent(juce::MidiMessage::controllerEvent(1, 1, 90), 1);   // claimed
+                b.addEvent(juce::MidiMessage::controllerEvent(1, 2, 90), 2);   // not mapped: stays
+                return b;
+            };
+            auto block = makeBlock();
+
+            mu_test_alloc::count = 0; mu_test_alloc::counting = true;
+            router.process(block);
+            mu_test_alloc::counting = false;
+            expectEquals((int) mu_test_alloc::count, 0);
+
+            int sysex = 0, ccs = 0;
+            for (const auto meta : block)
+            {
+                if (meta.numBytes > 3) { ++sysex; expectEquals(meta.numBytes, 22); }
+                else ++ccs;
+            }
+            expectEquals(sysex, 1);
+            expectEquals(ccs, 1);                                       // only the unmapped CC remains
+        }
+
+        beginTest("router: an empty map leaves the block alone");
+        {
+            MidiControlMap map;
+            MidiControlRouter router(map);
+            router.noteBlock(playingBlock(0.0, 0.1), 4.0);
+            auto block = pressOf(7);
+            router.process(block);
+            expectEquals(block.getNumEvents(), 1);
+        }
+
+        beginTest("router: a quantised action is handed over one poll interval early");
+        {
+            MidiControlMap map;
+            map.setQuantise(Quantise::Bar);
+            map.add(cc(1, 1, act(ControlActionType::MuteLayer, 0)));
+            MidiControlRouter router(map);
+            Recorder rec;
+
+            // 120 BPM and a 100 Hz poll: the lead is 0.02 beats. Blocks of 0.1 beats starting at x.x9
+            // reach the bar at 8 from 7.79 (7.79 + 0.2 + 0.02 > 8) instead of 7.89 without the lead.
+            router.noteBlock(playingBlock(5.89, 0.1), 4.0);
+            auto press = pressOf(1);
+            router.process(press); router.drain(rec);
+            expectEquals((int) rec.got.size(), 0);
+            const double at = firstFire(router, rec, 5.99, 12.0, 0.1);
+            expect(at > 7.785 && at < 7.795, "handed over at beat " + juce::String(at) + ", expected 7.79");
         }
 
         beginTest("router: quantise timing holds for every block size");
@@ -479,8 +541,9 @@ public:
                         juce::MidiBuffer none; router.process(none); router.drain(rec);
                         if (! rec.got.empty()) firedStart = start;
                     }
-                    // Never more than two blocks early (the upcoming block leads into it), never after it.
-                    const bool ok = firedStart >= boundary - 2.0 * len - 1.0e-6 && firedStart <= boundary + 1.0e-6;
+                    // Never more than two blocks plus the poll lead early, never after the boundary.
+                    const double lead = 120.0 / 60.0 / MidiControlRouter::kDeferredWorkPollHz;
+                    const bool ok = firedStart >= boundary - 2.0 * len - lead - 1.0e-6 && firedStart <= boundary + 1.0e-6;
                     expect(ok, "block " + juce::String(len) + ", press at " + juce::String(pressAt)
                                + ": handed over at " + juce::String(firedStart) + ", boundary " + juce::String(boundary));
                 }
