@@ -64,7 +64,7 @@ public:
     bool hasPendingFullPreset() const;
 
     // Audio-thread: scan all pending swaps and flag any that have reached a loop boundary.
-    // Returns true if a swap commit should be requested (requestSwapCommit).
+    // Returns true if a swap commit should be requested (requestDeferredWork).
     bool checkBoundaries(int numRhythms, bool masterLoopWrapped, int rhythmLoopWrapMask);
 
     // Install a prepared rhythm into slot `r`: the outgoing engine retires (it keeps rendering its
@@ -75,7 +75,7 @@ public:
     void installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceEngine>&& voice, const juce::String& samplePath);
 
     // Message-thread: drain retired-engine cleanup + commit all flagged swaps.
-    // Called from PluginProcessor::handleAsyncUpdate.
+    // Called from PluginProcessor::runDeferredWork.
     void processSwaps();
 
 private:

@@ -29,7 +29,7 @@ public:
     explicit MidiControlRouter(MidiControlMap& mapToUse);
 
     // ---- audio thread (no allocation, no locks) ----
-    // Returns true when something is waiting for the message thread (call triggerAsyncUpdate).
+    // Returns true when something is waiting for the message thread (request the deferred-work drain).
     bool process(juce::MidiBuffer& midi) noexcept;
 
     // This block's resolved transport, used to time the next block's quantised actions.

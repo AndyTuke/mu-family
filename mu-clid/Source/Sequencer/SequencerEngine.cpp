@@ -247,7 +247,7 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                     //   (a) the ctor's fill(-1) — cold start, never-played rhythm
                     //       (first hit lands in the first audio block
                     //       instead of being delayed by one step).
-                    //   (b) PluginProcessor::handleAsyncUpdate's swap commit
+                    //   (b) PluginProcessor::runDeferredWork's swap commit
                     //       (hot-swapped rhythm fires its first hit at the
                     //       commit step instead of dropping it).
                     // Mid-play knob changes leave lastStepIndex>=0 so they still

@@ -164,7 +164,7 @@ public:
     // populating the slots, so behaviour is unchanged. Step 3 wires retire-on-
     // swap, which is what actually populates these. When an engine reports
     // isFullyDrained(), the audio thread store-releases retiredReadyForCleanup;
-    // the message thread (handleAsyncUpdate) polls + clears the flag under
+    // the message thread (runDeferredWork) polls + clears the flag under
     // suspendProcessing and destroys the engine off the RT thread.
     static constexpr int kMaxRetiredEngines = mu_limits::kMaxRetiredVoiceEngines;
     std::array<std::array<std::unique_ptr<VoiceEngine>, kMaxRetiredEngines>,

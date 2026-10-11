@@ -133,6 +133,11 @@ PluginProcessor::PluginProcessor()
     loadStartupDefault();   // restore a saved _default preset (skipped by render mode)
 }
 
+PluginProcessor::~PluginProcessor()
+{
+    swapPoll.stop();   // first: no deferred-work tick may reach this half-destroyed object
+}
+
 void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     resetSwapPlayState();   // no processBlock is running yet: loads apply at once, not staged
@@ -261,7 +266,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     captureSidechainAndClear(buffer);
 
     // MIDI program-change → preset load. Enqueue matching PCs (Ch 1-8 per-voice,
-    // Ch 9 full) into the lock-free FIFO; handleAsyncUpdate drains them. Done
+    // Ch 9 full) into the lock-free FIFO; runDeferredWork drains them. Done
     // before the voicesTryLock so PCs aren't dropped during a voice add/remove.
     queueMidiProgramChanges(midiMessages);
 

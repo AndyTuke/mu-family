@@ -35,7 +35,7 @@ namespace mu_limits
     inline constexpr int kMaxRetiredVoiceEngines = 4;
 
     // MIDI program-change FIFO depth. Audio thread enqueues incoming PCs;
-    // handleAsyncUpdate drains on the message thread.
+    // runDeferredWork drains on the message thread.
     inline constexpr int kProgramChangeFifoSize = 32;
 
     // First N channels expose full "<Layer> N " APVTS parameter names so DAW

@@ -31,6 +31,7 @@ public:
     static constexpr int kNumChannels = 4;   // placeholder layers shown in the shell
 
     PluginProcessor();
+    ~PluginProcessor() override;
 
     // Mixer / FX params (channel strips + global FX) drive mixerEngine + fxChain
     // via the shared ProcessorBase::syncGlobalFxParam, kept in sync by this listener.

@@ -122,6 +122,7 @@ PluginProcessor::PluginProcessor()
 
 PluginProcessor::~PluginProcessor()
 {
+    swapPoll.stop();   // first: no deferred-work tick may reach this half-destroyed object
     for (auto* param : getParameters())
         if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
             if (! isFxParamId(p->getParameterID()))
@@ -336,7 +337,7 @@ void PluginProcessor::advanceSequencer(int numRhythms, double beatPos)
     // Hot-swap: check if any staged rhythm preset should be committed at this boundary.
     if (hotSwapStager.checkBoundaries(numRhythms, blockResult.masterLoopWrapped,
                                       blockResult.rhythmLoopWrapMask))
-        requestSwapCommit();
+        requestDeferredWork();
 
     // Update UI play-state atomics.
     const float frac = static_cast<float>(

@@ -55,8 +55,7 @@
 // plugin's concrete `PluginProcessor` type — eliminates the layering
 // violation that previously had mu-core including mu-clid headers.
 class ProcessorBase : public ProcessorCore,
-                      public mu_core::ControlSink,   // performs the family control actions (MIDI map, surfaces)
-                      protected juce::AsyncUpdater   // audio thread → message thread hand-off
+                      public mu_core::ControlSink    // performs the family control actions (MIDI map, surfaces)
 #if MU_CORE_HAS_CLAP
                     , public clap_juce_extensions::clap_juce_audio_processor_capabilities
 #endif
@@ -216,13 +215,9 @@ public:
     virtual bool               saveFullPresetTo(const juce::File& file);
 
     // Headless render: the render loop never returns to the message loop, so neither the swap poll
-    // timer nor triggerAsyncUpdate() is serviced. Call after each processBlock so deferred work (hot-swap commits, MIDI
-    // program changes) runs on the calling thread. No-op when nothing is pending.
-    void flushPendingAsyncUpdates()
-    {
-        drainSwapCommits();
-        handleUpdateNowIfNeeded();
-    }
+    // swap poll timer is serviced. Call after each processBlock so deferred work (hot-swap commits, MIDI
+    // program changes, control actions) runs on the calling thread. No-op when nothing is pending.
+    void flushPendingAsyncUpdates() { drainDeferredWork(); }
 
     // Default preset: <presets>/_default.<ext>, written by the shell's "Save as Default". Each
     // product calls loadStartupDefault() at the end of its constructor so a saved default is
@@ -319,14 +314,14 @@ public:
 
     // Audio-thread: call once per processBlock, before the engine reads the MIDI. Queues the
     // block's program changes (scanMidiProgramChanges) and the CC / notes the control map claims
-    // (those are taken out of `midi`), and schedules the message-thread drain that loads / performs
-    // them via applyMidiPresetLayer / applyFullMidiPreset / perform.
+    // (those are taken out of `midi`), and asks the message thread (mailbox flag, drained by the swap
+    // poll) to load / perform them via applyMidiPresetLayer / applyFullMidiPreset / perform.
     void queueMidiProgramChanges(juce::MidiBuffer& midi)
     {
         const bool presets = scanMidiProgramChanges(midi);
         const bool control = midiControlRouter.process(midi);
         if (presets || control)
-            triggerAsyncUpdate();
+            requestDeferredWork();
     }
 
     // Audio-thread: call right after the block's transport is resolved, so the next block's
@@ -350,7 +345,7 @@ public:
     bool scanMidiProgramChanges(const juce::MidiBuffer& midi);
 
     // Message-thread: drains the FIFO and dispatches each event via the
-    // applyMidiPresetLayer / applyFullMidiPreset virtuals. Run by handleAsyncUpdate.
+    // applyMidiPresetLayer / applyFullMidiPreset virtuals. Run by runDeferredWork.
     void drainPendingMidiProgramChanges();
 
     // Maps a shared global-FX / return / master / channel-strip APVTS parameter
@@ -407,12 +402,17 @@ protected:
 
     // pollHostTransport() (publishes the host playhead for the UI) lives in ProcessorCore.
 
-    // Message thread: run the deferred work now if the audio thread asked for a swap commit.
-    // Returns true when it ran.
-    bool drainSwapCommits() { return swapMailbox.drain([this] { handleAsyncUpdate(); }); }
+    // Message thread (or the headless render loop's own thread): run the deferred work now if the
+    // audio thread asked for it. Returns true when it ran.
+    bool drainDeferredWork()
+    {
+        mu_hotswap::assertMessageThread();
+        return swapMailbox.drain([this] { runDeferredWork(); });
+    }
 
-    // Deferred message-thread work first (product hot-swap commits), then program changes.
-    void handleAsyncUpdate() final
+    // Deferred message-thread work first (product hot-swap commits), then program changes and
+    // control actions.
+    void runDeferredWork()
     {
         if (layerSwapper.commit() && onPresetSwapCommitted)
             onPresetSwapCommitted();
@@ -422,25 +422,28 @@ protected:
     }
 
     // Message-thread work the audio thread asked for (hot-swap commits at a loop boundary, via
-    // the swap poll; MIDI program changes, via triggerAsyncUpdate()). Runs before queued program
-    // changes are loaded. Default: nothing.
+    // the swap poll; MIDI program changes and control actions, via the same mailbox). Runs before
+    // queued program changes are loaded. Default: nothing.
     virtual void commitDeferredWork() {}
 
     // The staged preset swaps (a parsed state tree per layer plus one full preset), shared by every
     // product that does not need a richer payload. A product sets its appliers once in its
     // constructor and calls flagSwapBoundaries from processBlock; the commit runs in
-    // handleAsyncUpdate. A product with its own stager (mu-Clid) overrides the three swap queries.
+    // runDeferredWork. A product with its own stager (mu-Clid) overrides the three swap queries.
     // Audio-thread flagging uses atomics only; the appliers run on the message thread.
     mu_hotswap::LayerSwapper<juce::ValueTree, mu_limits::kMaxLayers> layerSwapper;
 
-    // The audio thread's commit request and the 30 Hz message-thread timer that drains it. The
-    // timer does nothing but check the flag.
+    // The audio thread's deferred-work request and the 30 Hz message-thread timer that drains it.
+    // The timer does nothing but check the flag. Nothing here uses AsyncUpdater: its trigger
+    // allocates and takes a lock, so it must never run on the audio thread. Every destructor stops
+    // the timer first so a tick cannot reach the virtual commitDeferredWork of a half-destroyed object.
     mu_hotswap::CommitMailbox swapMailbox;
     struct SwapPoll final : private juce::Timer
     {
         explicit SwapPoll(ProcessorBase& o) : owner(o) { startTimerHz(30); }
         ~SwapPoll() override { stopTimer(); }
-        void timerCallback() override { owner.drainSwapCommits(); }
+        void stop() { stopTimer(); }
+        void timerCallback() override { owner.drainDeferredWork(); }
         ProcessorBase& owner;
     } swapPoll { *this };
 
@@ -451,7 +454,7 @@ protected:
                             LoopBeatsFor&& loopBeatsFor) noexcept
     {
         if (layerSwapper.flagBoundaries(isPlaying, blockStartBeat, blockBeats, loopBeatsFor))
-            requestSwapCommit();
+            requestDeferredWork();
     }
 
     // Products call this from prepareToPlay and releaseResources: the host is not driving
@@ -462,12 +465,13 @@ protected:
     void flagSwapBoundaries(bool isPlaying, double blockStartBeat, double blockBeats) noexcept
     {
         if (layerSwapper.flagBoundaries(isPlaying, blockStartBeat, blockBeats))
-            requestSwapCommit();
+            requestDeferredWork();
     }
 
-    // Audio thread: ask the message thread to commit the swaps just flagged. An atomic flag, not
-    // triggerAsyncUpdate() (which allocates); the swap poll timer drains it within ~33 ms.
-    void requestSwapCommit() noexcept { swapMailbox.request(); }
+    // Audio thread: ask the message thread to run the deferred work (swap commits, program changes,
+    // control actions). An atomic flag, never an allocating message post; the swap poll timer drains
+    // it within ~33 ms.
+    void requestDeferredWork() noexcept { swapMailbox.request(); }
 
     // A new default layer for slot `slot`, fully built and prepared (it is published as is, under
     // the lock, so nothing may be left to allocate). Null when the product's layer count is fixed.

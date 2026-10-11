@@ -53,7 +53,7 @@ bool RhythmManager::swap(int i, int j)
     // suspendProcessing only sets a flag — it does NOT block the in-flight
     // processBlock callback (see rhythmsLock in PluginProcessor.h). Take rhythmsLock to
     // serialise with the audio thread, the same way remove() and
-    // handleAsyncUpdate do. The audio thread's ScopedTryLock in processBlock will
+    // runDeferredWork do. The audio thread's ScopedTryLock in processBlock will
     // bail (silent block) while we hold the lock — clean atomic swap.
     proc.suspendProcessing(true);
     {

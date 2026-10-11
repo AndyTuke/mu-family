@@ -197,7 +197,7 @@ void PluginProcessor::loadLayerPreset(int voice, const juce::File& file)
     migrateXModVoice(tree);
 
     // Hot-swap: while the resolved transport plays (host, MIDI clock or internal), stage and commit
-    // at THIS voice's own loop boundary (handleAsyncUpdate); while stopped, apply immediately. The
+    // at THIS voice's own loop boundary (runDeferredWork); while stopped, apply immediately. The
     // swapper makes that call. Referenced wavetables are pre-loaded into the bank whatever the play
     // state is now (dedup-by-path makes a repeat free), because the transport can start between
     // this and the staging, and a boundary commit must never do disk I/O.
@@ -266,7 +266,7 @@ juce::ValueTree PluginProcessor::captureFullPreset()
 }
 
 // Hot-swap: while the resolved transport is playing, stage the parsed state and commit it at the
-// next loop boundary (handleAsyncUpdate) so the switch is musically seamless; while stopped,
+// next loop boundary (runDeferredWork) so the switch is musically seamless; while stopped,
 // apply immediately. Converted (and migrated) here, and the wavetables it references pre-loaded
 // into the bank, so the boundary commit does no parsing or disk I/O.
 void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)

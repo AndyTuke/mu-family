@@ -75,7 +75,7 @@ public:
     // after a transport restart cannot see a false wrap. A request flag, safe from any thread.
     void resetWrapDetector() { wrapResetRequested.store(true, std::memory_order_release); }
 
-    // call from PluginProcessor::handleAsyncUpdate immediately after a hot-
+    // call from PluginProcessor::runDeferredWork immediately after a hot-
     // swap commit (under suspendProcessing, so the audio thread is paused — no
     // synchronisation needed). Sentinel -1 tells processBlock's snapshot pass to
     // skip the absorb-current-step behaviour for this rhythm, so the new pattern

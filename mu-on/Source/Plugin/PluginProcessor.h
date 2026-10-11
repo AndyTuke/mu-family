@@ -33,6 +33,7 @@ class PluginProcessor : public ProcessorBase
 public:
 
     PluginProcessor();
+    ~PluginProcessor() override;
 
     // Mixer / FX params (channel strips + global FX) drive mixerEngine + fxChain via
     // the shared ProcessorBase::syncGlobalFxParam, kept in sync by this listener.

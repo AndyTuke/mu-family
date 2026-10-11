@@ -34,6 +34,7 @@ class PluginProcessor : public ProcessorBase
 public:
 
     PluginProcessor();
+    ~PluginProcessor() override;
 
     // Mixer / FX params (channel strips + global FX) drive mixerEngine + fxChain
     // via the shared ProcessorBase::syncGlobalFxParam, kept in sync by this
@@ -377,7 +378,7 @@ private:
     // ── Preset hot-swap (full / per-voice) ─────────────────────────
     // loadPreset / loadLayerPreset stage the parsed tree when the transport is
     // playing (commit at the loop boundary) and apply immediately when stopped.
-    // The apply bodies are factored out so the boundary commit (handleAsyncUpdate)
+    // The apply bodies are factored out so the boundary commit (runDeferredWork)
     // and the immediate path share one code path.
     void applyFullPresetTree (const juce::ValueTree& state);          // composed state + voice count / colours + FX
     void applyVoicePresetTree(int voice, const juce::ValueTree& tree); // one voice node (.muPattern body)

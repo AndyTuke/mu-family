@@ -204,6 +204,11 @@ PluginProcessor::PluginProcessor()
     loadStartupDefault();   // restore a saved _default preset (skipped by render mode)
 }
 
+PluginProcessor::~PluginProcessor()
+{
+    swapPoll.stop();   // first: no deferred-work tick may reach this half-destroyed object
+}
+
 namespace
 {
     // The per-voice slot (vpi::*) a modulation target drives, found from its table param name.
@@ -355,7 +360,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     captureSidechainAndClear(buffer);
 
     // MIDI program change → preset load: queue matching PCs (Ch 1-4 layer, Ch 9 full) for
-    // handleAsyncUpdate to load on the message thread.
+    // runDeferredWork to load on the message thread.
     queueMidiProgramChanges(midiMessages);
 
     // This block's transport — the family rule (mu-core TransportResolver): the host / mu-link

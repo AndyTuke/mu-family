@@ -15,6 +15,7 @@ target_sources(mu-core-tests PRIVATE
     AlgorithmNameTableTests.cpp
     BarPositionTests.cpp
     HotSwapTests.cpp
+    DeferredWorkTests.cpp
     FilterDSPSmokeTests.cpp
     InsertDSPSmokeTests.cpp
     MidiClockSyncTests.cpp

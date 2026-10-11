@@ -10,6 +10,11 @@ struct TestProcessorBase : ProcessorBase
         : ProcessorBase(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()),
                         layoutFor(wrapper)) {}
 
+    // With a parameter layout, for tests that drive a parameter through the control map.
+    TestProcessorBase(WrapperType wrapper, juce::AudioProcessorValueTreeState::ParameterLayout layout)
+        : ProcessorBase(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo()),
+                        (setTypeOfNextNewPlugin(wrapper), std::move(layout))) {}
+
     // wrapperType is const and read from a thread-local at construction, so set it first.
     static juce::AudioProcessorValueTreeState::ParameterLayout layoutFor(WrapperType wrapper)
     {

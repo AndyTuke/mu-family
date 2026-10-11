@@ -243,7 +243,7 @@ bool VoiceEngine::hasSample() const
 
 void VoiceEngine::markRetired() noexcept
 {
-    // Caller (handleAsyncUpdate retire path) holds suspendProcessing — the
+    // Caller (runDeferredWork retire path) holds suspendProcessing — the
     // audio thread cannot be mid-process() on this engine, so direct state
     // mutation is safe.
 
