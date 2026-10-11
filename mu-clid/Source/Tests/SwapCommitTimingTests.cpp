@@ -35,6 +35,73 @@ public:
     static double beat(int step) { return step * SequencerEngine::StepLengthBeats; }
     static bool   fired(const BlockResult& r) { return (r.firedMask & 1) != 0; }
 
+    // A `steps`-step rhythm with one hit, rotated so that hit sits on `pos` (pos 0 = a downbeat).
+    static Rhythm singleHitAt(int pos, int steps)
+    {
+        for (int rot = 0; rot < steps; ++rot)
+        {
+            Rhythm r = rhythmOf(1, steps);
+            r.genA.rotate = rot;
+            const auto pat = r.getCombinedPattern();
+            if ((int) pat.size() == steps && pat[(size_t) pos]) return r;
+        }
+        return rhythmOf(1, steps);
+    }
+
+    // `hits` hits in `steps` steps whose step 0 is a rest.
+    static Rhythm restOnZero(int hits, int steps)
+    {
+        for (int rot = 0; rot < steps; ++rot)
+        {
+            Rhythm r = rhythmOf(hits, steps);
+            r.genA.rotate = rot;
+            const auto pat = r.getCombinedPattern();
+            if (! pat[0]) return r;
+        }
+        return rhythmOf(hits, steps);
+    }
+
+    // Plays the blocks of step `step` (the block at its start, then one commit delay in): returns
+    // how many of them fired. The commit lands between the two when `commitNext` is given.
+    int fireCount(SequencerEngine& e, int step, double delayBeats, const Rhythm* commitNext, int boundaryStep)
+    {
+        int n = fired(e.processBlock(beat(step))) ? 1 : 0;
+        if (commitNext != nullptr) commit(e, *commitNext, boundaryStep);
+        for (double off = delayBeats; off < 0.24; off += 0.05)
+            n += fired(e.processBlock(beat(step) + off)) ? 1 : 0;
+        return n;
+    }
+
+    void runBoundaryCommit(int masterLoop, double bpm)
+    {
+        // A commit lands about 10 ms after the boundary; in beats that depends on the tempo.
+        const double delayBeats = 0.010 * bpm / 60.0;
+        const int boundary = masterLoop > 0 ? 0 : 8;
+        const int firstStep = 8;
+
+        const auto setup = [&](SequencerEngine& e, const Rhythm& old)
+        {
+            e.addRhythm(old);
+            if (masterLoop > 0) e.setMasterLoopSteps(masterLoop);
+            for (int s = 0; s < firstStep; ++s) e.processBlock(beat(s));
+        };
+
+        {   // old rest, new hit on step 0: the new downbeat must sound exactly once
+            SequencerEngine e;
+            setup(e, restOnZero(3, 8));
+            const auto next = rhythmOf(4, 8);
+            expectEquals(fireCount(e, firstStep, delayBeats, &next, boundary), 1,
+                         "old rest / new hit on step 0 at " + juce::String(bpm) + " bpm loop " + juce::String(masterLoop));
+        }
+        {   // old hit, new hit on step 0: absorbed, so the step sounds once (no flam)
+            SequencerEngine e;
+            setup(e, rhythmOf(4, 8));
+            const auto next = rhythmOf(2, 8);
+            expectEquals(fireCount(e, firstStep, delayBeats, &next, boundary), 1,
+                         "old hit / new hit on step 0 at " + juce::String(bpm) + " bpm loop " + juce::String(masterLoop));
+        }
+    }
+
     void runTest() override
     {
         beginTest("A swap committed on the boundary step fires the new pattern at once");
@@ -130,6 +197,57 @@ public:
             for (int s = 1; s < 40 && firstFire < 0; ++s)
                 if (fired(e.processBlock(beat(s)))) firstFire = s;
             expectEquals(firstFire, 12);
+        }
+
+        beginTest("A commit in the boundary step: new downbeat sounds exactly once whether the old step was a rest or a hit");
+        for (int loop : { 0, 8 })
+            for (double bpm : { 120.0, 200.0 })
+                runBoundaryCommit(loop, bpm);
+
+        beginTest("A load while stopped cold-starts: step 0 sounds on play");
+        {
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(1));
+            expect(fired(e.processBlock(beat(0))), "old pattern plays step 0");   // then the transport stops
+            commit(e, rhythmOf(8), 0);                     // pattern loaded while stopped
+            e.resetWrapDetector();                         // play pressed
+            expect(fired(e.processBlock(beat(0))), "step 0 must sound after the load");
+        }
+
+        beginTest("A master wrap after an off-phase own-loop swap adds no extra hit");
+        {
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(8));
+            e.setMasterLoopSteps(16);
+            for (int s = 0; s < 10; ++s) e.processBlock(beat(s));
+            commit(e, singleHitAt(8, 12), 8);              // 12 steps starting at step 8, hit on its step 8
+            for (int s = 10; s < 16; ++s) e.processBlock(beat(s));
+            // The wrap realigns the pattern to step 0 (a rest); the hit on its step 8 is not crossed.
+            expect(! fired(e.processBlock(beat(16))), "the wrap block must not replay the skipped steps");
+        }
+
+        beginTest("The first call at step 0 reports a pattern pass start");
+        {
+            SequencerEngine e;
+            e.addRhythm(restOnZero(3, 8));
+            expect((e.processBlock(beat(0)).rhythmLoopWrapMask & 1) != 0, "step 0 on a cold start is a loop boundary");
+        }
+
+        beginTest("A modulated length change keeps the pattern's phase");
+        {
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(8));
+            for (int s = 0; s < 11; ++s) e.processBlock(beat(s));
+            EuclidOverrides ov;
+            ov.a.hits = 8; ov.b.hits = 0; ov.c.hits = 0;
+            ov.a.prePad = 4;
+            const bool ok = e.tryUpdatePatternFromModulation(0, ov);
+            expect(ok);
+            if (e.getPatternLength(0) != 8)                // padding grew the pattern: next step is one step on
+            {
+                const auto r = e.processBlock(beat(11));
+                expect((r.rhythmLoopWrapMask & 1) == 0, "no false pass start from a re-clamped position");
+            }
         }
 
         beginTest("Swap requests racing the audio thread are safe");

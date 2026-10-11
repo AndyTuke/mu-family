@@ -171,15 +171,21 @@ void HotSwapStager::processSwaps()
         // Which slots consume actually applied: a swap cancelled between the scan and here is skipped.
         std::array<bool, SequencerEngine::MaxRhythms> applied {};
         proc.suspendProcessing(true);
-        for (int idx = 0; idx < readyCount; ++idx)
         {
-            const int r = readyRhythms[(size_t)idx];
-            applied[(size_t)r] = stager.consume(r, [&](PendingRhythm& sw)
+            // suspendProcessing alone does not stop an in-flight callback in hosts that ignore it
+            // (CLAP); rhythmsLock is what the audio thread try-locks, so the engine and sample moves
+            // below cannot overlap a block. Released before the APVTS push.
+            const juce::ScopedLock sl(proc.rhythmsLock);
+            for (int idx = 0; idx < readyCount; ++idx)
             {
-                installRhythm(r, std::move(sw.rhythm), std::move(sw.voice), sw.samplePath,
-                              flaggedOrigin[(size_t) r].load(std::memory_order_relaxed),
-                              flaggedEpoch [(size_t) r].load(std::memory_order_relaxed));
-            });
+                const int r = readyRhythms[(size_t)idx];
+                applied[(size_t)r] = stager.consume(r, [&](PendingRhythm& sw)
+                {
+                    installRhythm(r, std::move(sw.rhythm), std::move(sw.voice), sw.samplePath,
+                                  flaggedOrigin[(size_t) r].load(std::memory_order_relaxed),
+                                  flaggedEpoch [(size_t) r].load(std::memory_order_relaxed));
+                });
+            }
         }
         proc.suspendProcessing(false);
 

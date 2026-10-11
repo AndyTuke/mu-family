@@ -210,6 +210,8 @@ bool SequencerEngine::tryUpdatePatternFromModulation(int index, const EuclidOver
         return false;   // message thread holds the lock — retry next block
 
     const Rhythm& rhy = rhythms[index];
+    const int oldLen  = (int) safePatterns[index].size();
+    const int oldCLen = (int) safeCPatterns[index].size();
     rhy.getCombinedPattern(ov, safePatterns[index], scratchPatA, scratchPatB, scratchEuclid);
     rhy.genC.getPattern(ov.c, safeCPatterns[index], scratchEuclidC);
 
@@ -218,6 +220,12 @@ bool SequencerEngine::tryUpdatePatternFromModulation(int index, const EuclidOver
     // next step-walk.
     const int newLen  = (int) safePatterns[index].size();
     const int newCLen = (int) safeCPatterns[index].size();
+    // A length change keeps the pattern's phase: the previous block's position is re-derived under the
+    // new length from the step counter, so the next walk advances one step rather than jumping.
+    if (newLen > 0 && lastStepIndex[index] >= 0 && lastEffectiveStep >= 0 && newLen != oldLen)
+        lastStepIndex[index] = floorMod(lastEffectiveStep - phaseOrigin[index], newLen);
+    if (newCLen > 0 && lastAccentStepIndex[index] >= 0 && lastEffectiveStep >= 0 && newCLen != oldCLen)
+        lastAccentStepIndex[index] = floorMod(lastEffectiveStep - phaseOrigin[index], newCLen);
     if (newLen  > 0 && lastStepIndex[index]       >= newLen)  lastStepIndex[index]       %= newLen;
     if (newCLen > 0 && lastAccentStepIndex[index] >= newCLen) lastAccentStepIndex[index] %= newCLen;
 
@@ -250,9 +258,15 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
     // Detect master loop wrap: effectiveStep decreased relative to the previous block.
     // No history after a reset request or a loop-length change: the step count restarts, not wraps.
     int prevEffectiveStep = lastEffectiveStep;
-    const bool historyDropped = wrapResetRequested.exchange(false, std::memory_order_acq_rel) || loopSteps != lastLoopSteps;
+    const bool restartRequested = wrapResetRequested.exchange(false, std::memory_order_acq_rel);
+    const bool historyDropped   = restartRequested || loopSteps != lastLoopSteps;
     if (historyDropped)
+    {
         prevEffectiveStep = -1;
+        // Without this a stopped load leaves the last step before the stop looking like a step
+        // already played, so the commit rule would absorb the first step after play.
+        prevGlobalStep = -1;
+    }
     lastLoopSteps = loopSteps;
     if (loopSteps > 0 && prevEffectiveStep >= 0 && effectiveStep < prevEffectiveStep)
         result.masterLoopWrapped = true;
@@ -262,6 +276,18 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
     // the counter again and a swap flagged in the old run starts from 0.
     if (historyDropped || (lastEffectiveStep >= 0 && effectiveStep < lastEffectiveStep))
     {
+        // A pattern running off-phase would otherwise walk up to a whole pass in the next block
+        // (an extra trigger, a false loop-wrap bit): re-seed it to just before the realigned step,
+        // or to the cold-start sentinel on a transport restart.
+        for (int r = 0; r < numRhythms; ++r)
+        {
+            const int len = (int) safePatterns[r].size();
+            if (phaseOrigin[r] != 0 && len > 0)
+            {
+                lastStepIndex[r] = restartRequested ? -1 : floorMod(effectiveStep - 1, len);
+                if (restartRequested) wasLastStepHit[r] = false;
+            }
+        }
         phaseOrigin.fill(0);
         for (auto& b : boundaryEff) b.store(0, std::memory_order_relaxed);
         frameEpoch.store(frameEpoch.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
@@ -299,8 +325,12 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                                           || cachedEpoch[r] == frameEpoch.load(std::memory_order_relaxed))
                                              ? cachedOrigin[r] : 0;
                         lastAccentStepIndex[r] = 0;
+                        // Absorb the boundary step only when the old pattern actually sounded it: if it was
+                        // a rest, absorbing would leave the new pattern without its downbeat, so it fires
+                        // late instead (wasLastStepHit still describes the step the old pattern is on).
+                        const bool oldSoundedThisStep = prevGlobalStep >= 0 && globalStep == prevGlobalStep && wasLastStepHit[r];
                         wasLastStepHit[r]      = false;   // the first new hit must not be "tied" to the old pattern
-                        lastStepIndex[r]       = (prevGlobalStep >= 0 && globalStep == prevGlobalStep) ? 0 : -1;
+                        lastStepIndex[r]       = oldSoundedThisStep ? 0 : -1;
                     }
                     else if (pendingKind[r] == kAdoptFrom)
                     {
@@ -346,6 +376,8 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
             // First call: just check the current step. No back-walk possible —
             // and no temporal predecessor to be tied to, so tiedMask
             // stays clear regardless of pattern[stepIndex-1].
+            if (stepIndex == 0)
+                result.rhythmLoopWrapMask |= (1 << r);   // a pass starts here, so a swap staged now is flagged at it
             if (pattern[stepIndex])
             {
                 result.firedMask |= (1 << r);
