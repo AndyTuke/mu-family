@@ -16,6 +16,10 @@ ActivationOverlay::ActivationOverlay (ProcessorBase& proc)
     activateBtn.onClick = [this] { activatePressed(); };
     addAndMakeVisible (activateBtn);
 
+    getKeyBtn.onClick = [this] { juce::URL (processorRef.getCheckoutUrl()).launchInDefaultBrowser(); };
+    getKeyBtn.setVisible (processorRef.getCheckoutUrl().isNotEmpty());
+    addChildComponent (getKeyBtn);
+
     closeBtn.onClick = [this] { if (onDismiss) onDismiss(); };
     addAndMakeVisible (closeBtn);
 
@@ -84,6 +88,7 @@ void ActivationOverlay::resized()
     keyLabel.setBounds (x, y, w, s (18));   y += s (20);
     keyEditor.setBounds (x, y, w, s (28));  y += s (38);
     activateBtn.setBounds (x, y, s (110), s (28));
+    getKeyBtn.setBounds (x + s (120), y, s (110), s (28));
     y += s (40);
     statusLabel.setBounds (x, y, w, s (54));
 

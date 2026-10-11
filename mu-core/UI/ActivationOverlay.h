@@ -2,7 +2,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Plugin/ProcessorBase.h"
 
-// Non-blocking activation overlay (shared, family-wide). Opened from the demo banner / an
+// Non-blocking activation overlay (shared, family-wide). Opened from the About overlay or an
 // Activate affordance — the plugin keeps running in Demo until the user activates. Online
 // path: paste the Lemon Squeezy key → activate against this machine's fingerprint (off the
 // message thread). Offline path: shows the machine "challenge" code to send the owner for a
@@ -32,6 +32,7 @@ private:
     juce::Label      keyLabel;
     juce::TextEditor keyEditor;
     juce::TextButton activateBtn { "Activate" };
+    juce::TextButton getKeyBtn   { "Get a key" };   // opens the checkout page (hidden when none)
     juce::TextButton closeBtn    { "Close" };
     juce::Label      statusLabel;
 
