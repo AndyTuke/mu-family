@@ -78,6 +78,14 @@ public:
     // after a transport restart cannot see a false wrap. A request flag, safe from any thread.
     void resetWrapDetector() { wrapResetRequested.store(true, std::memory_order_release); }
 
+    // True when the playhead moved back by more than a step between two blocks of a running
+    // transport (a host loop jump or locate): to the wrap detector that looks like a master-loop
+    // wrap, so the caller resets it. Smaller backward moves are tempo / nudge jitter, not a jump.
+    static bool isBackwardBeatJump(double previousBeat, double beat) noexcept
+    {
+        return beat < previousBeat - StepLengthBeats;
+    }
+
     // Message thread, after a hot-swap commit (and on loading a preset at once): rebuild slot r's
     // pattern and ask the audio thread to start it at its own step 0 on `originEff`, the effective
     // step where the swap's loop boundary fell, instead of the absolute step modulo its length.

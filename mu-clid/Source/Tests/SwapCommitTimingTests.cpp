@@ -250,6 +250,42 @@ public:
             }
         }
 
+        beginTest("A backward transport jump mid-loop is not a master wrap; the real wrap still is");
+        for (bool guarded : { false, true })
+        {
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(4, 16));
+            e.setMasterLoopSteps(16);
+            double prev = 0.0;
+            int wraps = 0;
+            const auto play = [&](double b)
+            {
+                if (guarded && SequencerEngine::isBackwardBeatJump(prev, b)) e.resetWrapDetector();
+                prev = b;
+                if (e.processBlock(b).masterLoopWrapped) ++wraps;
+            };
+            for (int s = 0; s < 12; ++s) play(beat(s));
+            play(beat(3));                                 // the host loop jumps back mid-loop
+            const int afterJump = wraps;
+            for (int s = 4; s < 16; ++s) play(beat(s));
+            const int beforeRealWrap = wraps;
+            play(beat(16));                                // the real wrap
+            if (guarded)
+            {
+                expectEquals(afterJump, 0, "the jump must not report a wrap");
+                expectEquals(beforeRealWrap, 0, "no wrap before the real boundary");
+                expectEquals(wraps, 1, "the real wrap is still reported once");
+            }
+            else
+                expectEquals(afterJump, 1, "without the reset the jump is mistaken for a wrap");
+        }
+
+        beginTest("Small backward beat moves are not jumps");
+        {
+            expect(! SequencerEngine::isBackwardBeatJump(4.0, 3.9), "tempo jitter");
+            expect(  SequencerEngine::isBackwardBeatJump(4.0, 1.0), "a locate back");
+        }
+
         beginTest("Swap requests racing the audio thread are safe");
         {
             // The audio thread runs a fixed number of blocks while this thread requests swaps

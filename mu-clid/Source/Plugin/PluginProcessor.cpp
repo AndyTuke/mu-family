@@ -310,7 +310,9 @@ PluginProcessor::deriveTransport(juce::AudioBuffer<float>& buffer, juce::MidiBuf
     // a stale lastEffectiveStep.
     {
         const bool wasPlaying = sequencerPlaying.load();
-        if (playing && !wasPlaying)
+        // A backward jump of a running transport (host loop, locate) would otherwise read as a
+        // master-loop wrap and commit a staged hot-swap before the real boundary.
+        if (playing && (!wasPlaying || SequencerEngine::isBackwardBeatJump(lastBeatPos.load(), beatPos)))
             sequencer.resetWrapDetector();
     }
     sequencerPlaying.store(playing);
