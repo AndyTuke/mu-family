@@ -222,12 +222,17 @@ bool SequencerEngine::tryUpdatePatternFromModulation(int index, const EuclidOver
     const int newCLen = (int) safeCPatterns[index].size();
     // A length change keeps the pattern's phase: the previous block's position is re-derived under the
     // new length from the step counter, so the next walk advances one step rather than jumping.
+    const int stepBefore = lastStepIndex[index];
     if (newLen > 0 && lastStepIndex[index] >= 0 && lastEffectiveStep >= 0 && newLen != oldLen)
         lastStepIndex[index] = floorMod(lastEffectiveStep - phaseOrigin[index], newLen);
     if (newCLen > 0 && lastAccentStepIndex[index] >= 0 && lastEffectiveStep >= 0 && newCLen != oldCLen)
         lastAccentStepIndex[index] = floorMod(lastEffectiveStep - phaseOrigin[index], newCLen);
     if (newLen  > 0 && lastStepIndex[index]       >= newLen)  lastStepIndex[index]       %= newLen;
     if (newCLen > 0 && lastAccentStepIndex[index] >= newCLen) lastAccentStepIndex[index] %= newCLen;
+
+    // The position moved onto a step of the new pattern, so "did this step sound" describes that step.
+    if (newLen > 0 && lastStepIndex[index] >= 0 && lastStepIndex[index] != stepBefore)
+        wasLastStepHit[index] = safePatterns[index][(size_t) lastStepIndex[index]];
 
     mu_core::spinUnlock(patternLock);
     return true;
@@ -264,8 +269,10 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
     {
         prevEffectiveStep = -1;
         // Without this a stopped load leaves the last step before the stop looking like a step
-        // already played, so the commit rule would absorb the first step after play.
-        prevGlobalStep = -1;
+        // already played, so the commit rule would absorb the first step after play. A loop-length
+        // change keeps playing, so the step it lands in may genuinely have been played already.
+        if (restartRequested)
+            prevGlobalStep = -1;
     }
     lastLoopSteps = loopSteps;
     if (loopSteps > 0 && prevEffectiveStep >= 0 && effectiveStep < prevEffectiveStep)
@@ -276,17 +283,21 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
     // the counter again and a swap flagged in the old run starts from 0.
     if (historyDropped || (lastEffectiveStep >= 0 && effectiveStep < lastEffectiveStep))
     {
-        // A pattern running off-phase would otherwise walk up to a whole pass in the next block
-        // (an extra trigger, a false loop-wrap bit): re-seed it to just before the realigned step,
-        // or to the cold-start sentinel on a transport restart.
+        // A pattern whose length does not divide the loop (or that runs off-phase) would otherwise
+        // walk up to a whole pass in the next block (an extra trigger, a false loop-wrap bit):
+        // re-seed it to just before the realigned step, or to the cold-start sentinel on a transport
+        // restart. A pattern still waiting on its first step (-1) keeps that sentinel.
         for (int r = 0; r < numRhythms; ++r)
         {
             const int len = (int) safePatterns[r].size();
-            if (phaseOrigin[r] != 0 && len > 0)
+            if (len <= 0) continue;
+            if (restartRequested)
             {
-                lastStepIndex[r] = restartRequested ? -1 : floorMod(effectiveStep - 1, len);
-                if (restartRequested) wasLastStepHit[r] = false;
+                lastStepIndex[r]  = -1;
+                wasLastStepHit[r] = false;
             }
+            else if (lastStepIndex[r] != -1)
+                lastStepIndex[r] = floorMod(effectiveStep - 1, len);
         }
         phaseOrigin.fill(0);
         for (auto& b : boundaryEff) b.store(0, std::memory_order_relaxed);
@@ -328,6 +339,8 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                         // Absorb the boundary step only when the old pattern actually sounded it: if it was
                         // a rest, absorbing would leave the new pattern without its downbeat, so it fires
                         // late instead (wasLastStepHit still describes the step the old pattern is on).
+                        // "Sounded" means the pattern bit: mute and solo act downstream in the mixer while the
+                        // voice still triggers, so a muted step is inaudible either way and needs no special case.
                         const bool oldSoundedThisStep = prevGlobalStep >= 0 && globalStep == prevGlobalStep && wasLastStepHit[r];
                         wasLastStepHit[r]      = false;   // the first new hit must not be "tied" to the old pattern
                         lastStepIndex[r]       = oldSoundedThisStep ? 0 : -1;
@@ -343,7 +356,12 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                     // Mid-play knob changes leave lastStepIndex>=0 so they still absorb,
                     // preventing retroactive triggers. lastAccentStepIndex gates on the same sentinel.
                     if (!safePatterns[r].empty() && lastStepIndex[r] != -1)
+                    {
                         lastStepIndex[r] = floorMod(effectiveStep - phaseOrigin[r], (int) safePatterns[r].size());
+                        // The step now counts as played, so a later commit in it must judge the new
+                        // pattern's bit there, not the previous pattern's.
+                        wasLastStepHit[r] = safePatterns[r][(size_t) lastStepIndex[r]];
+                    }
                     if (!safeCPatterns[r].empty() && lastStepIndex[r] != -1)
                         lastAccentStepIndex[r] = floorMod(effectiveStep - phaseOrigin[r], (int) safeCPatterns[r].size());
                 }

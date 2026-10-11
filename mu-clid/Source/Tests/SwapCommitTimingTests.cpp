@@ -7,6 +7,7 @@
 #include <atomic>
 #include <thread>
 #include "Sequencer/SequencerEngine.h"
+#include "Plugin/HotSwap.h"
 
 using namespace mu_clid;
 
@@ -231,6 +232,71 @@ public:
             SequencerEngine e;
             e.addRhythm(restOnZero(3, 8));
             expect((e.processBlock(beat(0)).rhythmLoopWrapMask & 1) != 0, "step 0 on a cold start is a loop boundary");
+        }
+
+        beginTest("A knob change in the boundary step, then a commit in the same step, still fires the new downbeat");
+        {
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(8));                      // old: every step hits
+            for (int s = 0; s <= 8; ++s) e.processBlock(beat(s));
+            e.getRhythm(0) = restOnZero(3, 8);             // the Euclid knob: step 0 is now a rest
+            e.updatePattern(0);
+            expect(! fired(e.processBlock(beat(8) + 0.05)), "the knob change absorbs the step, nothing plays");
+            commit(e, rhythmOf(4, 8), 8);                  // new: a hit on step 0
+            expect(fired(e.processBlock(beat(8) + 0.10)), "the step was a rest, so the new downbeat must sound");
+        }
+
+        beginTest("A loop-length change and a boundary-step commit in one block do not double hit");
+        {
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(8));
+            for (int s = 0; s <= 8; ++s) e.processBlock(beat(s));   // the old pattern sounded step 8
+            e.setMasterLoopSteps(16);
+            commit(e, rhythmOf(8), 8);
+            expect(! fired(e.processBlock(beat(8) + 0.05)), "the step already sounded, the new one starts on the next");
+            expect(fired(e.processBlock(beat(9))), "and it keeps going");
+        }
+
+        beginTest("A pattern whose length does not divide the loop neither collapses a block nor flags a false pass start");
+        {
+            SequencerEngine e;
+            e.addRhythm(singleHitAt(3, 7));
+            e.setMasterLoopSteps(16);
+            int fires = 0, passStarts = 0;
+            for (int s = 0; s < 48; ++s)
+            {
+                const auto r = e.processBlock(beat(s));
+                if (fired(r)) ++fires;
+                if (r.rhythmLoopWrapMask & 1) ++passStarts;
+            }
+            expectEquals(fires, 6, "steps 3 and 10 of every loop, nothing replayed at the wrap");
+            expectEquals(passStarts, 9, "steps 0, 7 and 14 of every loop");
+        }
+
+        beginTest("A swap staged and the transport started at step 0: one trigger, one commit");
+        {
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(4, 8));                   // old pattern, loaded while stopped
+            mu_hotswap::Stager<int, int, 1> stager;
+            stager.stage(0, 7);
+            e.resetWrapDetector();                         // play pressed
+            int triggers = 0, commits = 0;
+            const auto first = e.processBlock(beat(0));    // the cold start is a pass start: flags the swap
+            if (fired(first)) ++triggers;
+            const auto token = stager.pendingToken(0);
+            stager.flagIfReady(0, token, (first.rhythmLoopWrapMask & 1) != 0);
+            // The commit lands a poll later, in the same step.
+            if (stager.consume(0, [&](int&) { commit(e, rhythmOf(4, 8), 0); ++commits; })) {}
+            for (double off = 0.05; off < 0.24; off += 0.05)
+                if (fired(e.processBlock(beat(0) + off))) ++triggers;
+            for (int s = 1; s < 8; ++s)
+            {
+                const auto r = e.processBlock(beat(s));
+                stager.flagIfReady(0, stager.pendingToken(0), (r.rhythmLoopWrapMask & 1) != 0);
+                if (stager.consume(0, [&](int&) { ++commits; })) {}
+            }
+            expectEquals(triggers, 1, "step 0 sounds once");
+            expectEquals(commits, 1, "the staged swap commits once");
         }
 
         beginTest("A modulated length change keeps the pattern's phase");

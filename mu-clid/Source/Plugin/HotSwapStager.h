@@ -75,8 +75,11 @@ public:
     // APVTS push follows outside the suspend.
     // originEff / frameEpoch say where the new pattern's step 0 falls (see SequencerEngine::requestSwapStart);
     // the defaults start it on the step counter's own phase, for a load that has no boundary.
+    // `rhythm` comes back holding the outgoing rhythm, and a force-cut retired engine goes to
+    // *cutVictim when given, so the caller can let both destruct after it drops its locks.
     void installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceEngine>&& voice, const juce::String& samplePath,
-                       int originEff = 0, uint32_t frameEpoch = SequencerEngine::kAnyFrameEpoch);
+                       int originEff = 0, uint32_t frameEpoch = SequencerEngine::kAnyFrameEpoch,
+                       std::unique_ptr<VoiceEngine>* cutVictim = nullptr);
 
     // Message-thread: drain retired-engine cleanup + commit all flagged swaps.
     // Called from PluginProcessor::runDeferredWork.
