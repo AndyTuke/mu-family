@@ -6,7 +6,6 @@
 #include "Audio/InsertSlotConfig.h"
 #include "Modulation/ModulationSkew.h"  // proportion-space skew helpers (shared with test C5)
 #include "Modulation/MuClidModDest.h"  // mu-clid modulation targets
-#include "PluginEditor.h"
 #include "Sequencer/Rhythm.h"
 #include "Audio/FX/Slots/FXAlgorithmDef.h"
 
@@ -424,11 +423,6 @@ void PluginProcessor::renderAudioBuses(juce::AudioBuffer<float>& buffer, juce::M
 
 //==============================================================================
 bool PluginProcessor::hasEditor() const { return true; }
-
-juce::AudioProcessorEditor* PluginProcessor::createEditor()
-{
-    return new PluginEditor(*this);
-}
 
 //==============================================================================
 void PluginProcessor::setMultiBusEnabled(bool on)

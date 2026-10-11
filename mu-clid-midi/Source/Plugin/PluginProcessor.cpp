@@ -1,6 +1,5 @@
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/ParameterLayout.h"
-#include "Plugin/PluginEditor.h"
 #include "Plugin/TransportResolver.h"            // mu-core: the family transport rule
 #include "Persistence/SessionState.h"
 
@@ -46,11 +45,6 @@ bool PluginProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
     return layouts.getMainInputChannelSet()  == juce::AudioChannelSet::disabled()
         && layouts.getMainOutputChannelSet() == juce::AudioChannelSet::disabled();
-}
-
-juce::AudioProcessorEditor* PluginProcessor::createEditor()
-{
-    return new PluginEditor(*this);
 }
 
 //==============================================================================

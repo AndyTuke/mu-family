@@ -121,4 +121,9 @@ void PluginEditor::onPresetNew()
     mixerOverlay.loadFromApvts();
 }
 
+juce::AudioProcessorEditor* PluginProcessor::createEditor()
+{
+    return new PluginEditor(*this);
+}
+
 } // namespace mu_tant

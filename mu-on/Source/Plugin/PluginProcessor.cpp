@@ -1,6 +1,5 @@
 #include "Plugin/PluginProcessor.h"
 #include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
-#include "Plugin/PluginEditor.h"
 #include "Plugin/HostTransport.h"          // mu-core: DAW / mu-link transport read
 #include "Modulation/MuOnModDest.h"
 #include "Modulation/ModulatorSerialise.h"   // mu-core: shared modulator (de)serialise
@@ -209,11 +208,6 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // transport stopped. When the beat comes from outside, the next block's start stands in for
     // this block's end, so the block's own span is estimated from the tempo.
     flagSwapBoundaries(isPlaying, beatStart, transport.beatsPerSample * (double) numSamples);
-}
-
-juce::AudioProcessorEditor* PluginProcessor::createEditor()
-{
-    return new PluginEditor(*this);
 }
 
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)

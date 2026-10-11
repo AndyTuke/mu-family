@@ -218,4 +218,9 @@ void PluginEditor::syncVoiceEffectSendLabel()
     rhythmPanel.setVoiceEffectSendLabel(name);
 }
 
+juce::AudioProcessorEditor* PluginProcessor::createEditor()
+{
+    return new PluginEditor(*this);
+}
+
 } // namespace mu_clid

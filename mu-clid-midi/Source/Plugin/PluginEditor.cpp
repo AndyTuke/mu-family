@@ -247,4 +247,9 @@ juce::String PluginEditor::midiNoteName(int note)
     return juce::String(names[note % 12]) + juce::String(note / 12 - 1);
 }
 
+juce::AudioProcessorEditor* PluginProcessor::createEditor()
+{
+    return new PluginEditor(*this);
+}
+
 } // namespace mu_clid_midi

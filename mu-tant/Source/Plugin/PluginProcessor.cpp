@@ -3,7 +3,6 @@
 #include "Plugin/SwapBoundary.h"   // mu-tant: the hot-swap boundary rule
 #include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
-#include "Plugin/PluginEditor.h"
 #include "Audio/Scales.h"
 #include "Modulation/MuTantModDest.h"
 #include "Modulation/ModulatorSerialise.h"   // mu-core: shared modulator (de)serialise
@@ -634,11 +633,6 @@ void PluginProcessor::renderRetiringVoice(int v, juce::AudioBuffer<float>& buf, 
     inserts[(size_t) v].process(buf, numSamples, buf.getNumChannels(), ip);
 
     r.samplesLeft.store(juce::jmax(0, left - numSamples), std::memory_order_release);
-}
-
-juce::AudioProcessorEditor* PluginProcessor::createEditor()
-{
-    return new PluginEditor(*this);
 }
 
 void PluginProcessor::getStateInformation(juce::MemoryBlock& destData)

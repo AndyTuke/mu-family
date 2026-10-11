@@ -106,4 +106,9 @@ void PluginEditor::onPresetNew()
     onPresetLoaded({});
 }
 
+juce::AudioProcessorEditor* PluginProcessor::createEditor()
+{
+    return new PluginEditor(*this);
+}
+
 } // namespace mu_toni
