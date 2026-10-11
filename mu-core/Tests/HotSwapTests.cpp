@@ -365,90 +365,181 @@ struct HotSwapTests : juce::UnitTest
             expect(st.hasFullPending() && st.consumeFullNow([&full](int& v) { full = v; }) && full == 6);
         }
 
-        beginTest("Stager threaded stress: no commit without a boundary, no lost payload, no double apply");
+        beginTest("Stager: flagged, then taken back, then consumed applies exactly once");
+        for (bool useFull : { false, true })
         {
-            runStagerStress(false);
-            runStagerStress(true);
+            Stager<int, int, 1> st;
+            int applies = 0, got = 0;
+            auto apply = [&](int& v) { ++applies; got = v; };
+            const auto stageIt = [&](int v) { if (useFull) st.stageFull(std::move(v)); else st.stage(0, std::move(v)); };
+            const auto token   = [&] { return useFull ? st.fullToken() : st.pendingToken(0); };
+            const auto flagIt  = [&](Stager<int, int, 1>::Token t) { return useFull ? st.flagFullIfReady(t, true) : st.flagIfReady(0, t, true); };
+
+            stageIt(41);
+            const auto t = token();
+            expect(flagIt(t), "the boundary flags the staged payload");
+            expect(useFull ? st.consumeFullNow(apply) : st.consumeNow(0, apply), "the take-back still gets a flagged payload");
+            expect(! (useFull ? st.consumeFull(apply) : st.consume(0, apply)), "the commit that was already on its way finds nothing");
+            expectEquals(applies, 1, "applied exactly once");
+            expectEquals(got, 41);
+            expect(! flagIt(t), "the dead token cannot flag again");
+            expect(! (useFull ? st.hasFullPending() : st.hasPending(0)), "nothing is left staged");
+
+            // A new payload staged afterwards is untouched by the earlier take-back and commit.
+            stageIt(42);
+            expect(flagIt(token()));
+            expect(useFull ? st.consumeFull(apply) : st.consume(0, apply));
+            expectEquals(applies, 2);
+            expectEquals(got, 42);
+        }
+
+        beginTest("Stager threaded stress: no commit without a boundary, no lost payload, no double apply");
+        for (bool useFull : { false, true })
+        {
+            const auto plain  = runStagerStress(useFull, StressMode::correct, false);
+            const auto jitter = runStagerStress(useFull, StressMode::correct, true);
+            for (const auto* r : { &plain, &jitter })
+            {
+                const juce::String which = juce::String(useFull ? "full" : "slot") + (r == &jitter ? " with jitter" : "");
+                expectEquals(r->unboundaried, 0, which + ": a commit happened without a boundary or left a payload behind");
+                expectEquals(r->lost,         0, which + ": a staged payload was lost or never committed");
+                expectEquals(r->stale,        0, which + ": a payload was applied twice or out of order");
+                expectEquals(r->wrongPayload, 0, which + ": a payload committed under a gate opened for a different payload");
+                // The expected count comes from the round pattern (the rounds with a boundary that commits),
+                // not from the test's own bookkeeping, so it cannot agree by construction.
+                expectEquals(r->applied, kStressRounds * 2 / 5, which + ": applied count");
+            }
+        }
+
+        beginTest("Stager stress has teeth: seeding the old bug (a flag that ignores the generation) is caught");
+        for (bool useFull : { false, true })
+        {
+            // The old bug: the boundary decision is made about one payload, then the flag re-reads the
+            // slot and lands on whatever is staged by then. The stress test must see that.
+            int caught = 0;
+            for (int attempt = 0; attempt < 5 && caught == 0; ++attempt)
+            {
+                const auto r = runStagerStress(useFull, StressMode::seededOldBug, true);
+                caught = r.unboundaried + r.wrongPayload + r.stale + r.lost;
+            }
+            expect(caught > 0, juce::String(useFull ? "full" : "slot") + ": the seeded old bug went undetected by the stress test");
         }
     }
 
-    // One audio-like thread keeps trying to flag the staged payload, but only while `gate` is open;
-    // the message thread stages, opens the gate, and commits / takes back / cancels in a fixed
-    // cycle. Fixed round count (no wall clock); each wait is capped so a bug fails instead of hanging.
-    void runStagerStress(bool useFull)
+    static constexpr int kStressRounds = 20000;
+
+    // correct: the audio thread reads the token, then the gate, then flags with that token.
+    // seededOldBug: the flag ignores the generation of the decision (the convenience form re-reads the slot).
+    enum class StressMode { correct, seededOldBug };
+
+    struct StressResult { int unboundaried = 0, lost = 0, stale = 0, wrongPayload = 0, applied = 0; };
+
+    // One audio-like thread keeps trying to flag the staged payload, but only while `gate` is open. The
+    // gate carries the id of the payload its boundary belongs to (0 = closed), and apply checks the
+    // payload it receives against it. The message thread stages, opens the gate, and commits / takes
+    // back / cancels in a fixed cycle. With `jitter` the audio thread idles a pseudo-random time between
+    // its decision and its compare-exchange, the window a descheduled thread would have. Fixed round
+    // count (no wall clock); each wait is capped so a bug fails instead of hanging.
+    StressResult runStagerStress(bool useFull, StressMode mode, bool jitter)
     {
         mu_hotswap::Stager<int, int, 1> st;
-        std::atomic<bool> gate { false }, stop { false };
+        std::atomic<int>  gate { 0 };
+        std::atomic<bool> stop { false };
 
         std::thread audio([&]
         {
+            uint32_t rng = 2463534242u;
             while (! stop.load(std::memory_order_acquire))
             {
                 // Token first, boundary decision second: the order the audio path uses.
                 const auto token = useFull ? st.fullToken() : st.pendingToken(0);
-                const bool at    = gate.load(std::memory_order_acquire);
-                if (useFull) st.flagFullIfReady(token, at);
-                else         st.flagIfReady(0, token, at);
+                const bool at    = gate.load(std::memory_order_acquire) != 0;
+                if (jitter)
+                {
+                    rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;     // xorshift32
+                    for (uint32_t k = rng % 512; k > 0; --k)
+                        std::atomic_signal_fence(std::memory_order_seq_cst);  // idle without being optimised away
+                }
+                if (mode == StressMode::seededOldBug)
+                {
+                    if (useFull) st.flagFullIfReady(at);
+                    else         st.flagIfReady(0, at);
+                }
+                else
+                {
+                    if (useFull) st.flagFullIfReady(token, at);
+                    else         st.flagIfReady(0, token, at);
+                }
             }
         });
 
-        constexpr int kRounds = 20000;
         constexpr int kWaitCap = 20000000;
         auto stageIt  = [&](int v) { if (useFull) st.stageFull(std::move(v)); else st.stage(0, std::move(v)); };
 
-        int lastApplied = 0, applied = 0, expectedApplied = 0, badWithoutGate = 0, lost = 0, stale = 0;
-        auto apply = [&](int& v) { if (v <= lastApplied) ++stale; lastApplied = v; ++applied; };
+        StressResult res;
+        int lastApplied = 0;
+        auto apply = [&](int& v)
+        {
+            if (v <= lastApplied) ++res.stale;
+            if (gate.load(std::memory_order_acquire) != v) ++res.wrongPayload;
+            lastApplied = v;
+            ++res.applied;
+        };
         auto commit   = [&] { return useFull ? st.consumeFull(apply) : st.consume(0, apply); };
         auto takeBack = [&] { return useFull ? st.consumeFullNow(apply) : st.consumeNow(0, apply); };
         auto cancelIt = [&] { if (useFull) st.cancelFull(); else st.cancel(0); };
         auto pending  = [&] { return useFull ? st.hasFullPending() : st.hasPending(0); };
 
-        for (int round = 1; round <= kRounds; ++round)
+        for (int round = 1; round <= kStressRounds; ++round)
         {
+            const int first = round * 2, second = round * 2 + 1;   // unique, increasing payload ids
             switch (round % 5)
             {
                 case 0:   // no boundary: nothing may commit, then a superseding stage replaces the payload
-                    stageIt(round);
-                    for (int k = 0; k < 200; ++k) if (commit()) ++badWithoutGate;
-                    stageIt(round);   // supersede: the same value, must still apply at most once later
+                    stageIt(first);
+                    for (int k = 0; k < 200; ++k) if (commit()) ++res.unboundaried;
+                    stageIt(second);
                     cancelIt();
-                    if (pending()) ++lost;
+                    if (pending()) ++res.lost;
                     break;
                 case 1:   // boundary: the flag must arrive and commit exactly the staged payload
                 {
-                    stageIt(round);
-                    gate.store(true, std::memory_order_release);
+                    stageIt(first);
+                    gate.store(first, std::memory_order_release);
                     bool done = false;
                     for (int k = 0; k < kWaitCap && ! done; ++k)
                     {
                         done = commit();
                         if (! done) std::this_thread::yield();
                     }
-                    gate.store(false, std::memory_order_release);
-                    if (done) ++expectedApplied; else ++lost;
+                    gate.store(0, std::memory_order_release);
+                    if (! done) ++res.lost;
                     break;
                 }
                 case 2:   // take-back while the audio thread may be flagging it: always yields the payload
-                    stageIt(round);
-                    gate.store(true, std::memory_order_release);
-                    if (takeBack()) ++expectedApplied; else ++lost;
-                    gate.store(false, std::memory_order_release);
-                    if (commit() || pending()) ++badWithoutGate;   // nothing may be left to commit
+                    stageIt(first);
+                    gate.store(first, std::memory_order_release);
+                    if (! takeBack()) ++res.lost;
+                    gate.store(0, std::memory_order_release);
+                    if (commit() || pending()) ++res.unboundaried;   // nothing may be left to commit
                     break;
                 case 3:   // cancel while flagging: the payload must vanish and never commit
-                    stageIt(round);
-                    gate.store(true, std::memory_order_release);
+                    stageIt(first);
+                    gate.store(first, std::memory_order_release);
                     cancelIt();
-                    gate.store(false, std::memory_order_release);
-                    for (int k = 0; k < 200; ++k) if (commit()) ++badWithoutGate;
+                    gate.store(0, std::memory_order_release);
+                    for (int k = 0; k < 200; ++k) if (commit()) ++res.unboundaried;
                     break;
-                default:  // re-stage while flagging: only the newer payload may commit, and only at a boundary
-                    stageIt(round);
-                    gate.store(true, std::memory_order_release);
-                    stageIt(round);
-                    gate.store(false, std::memory_order_release);
-                    // The gate was open for both stages, so one legitimate commit of the newer payload is allowed.
-                    for (int k = 0; k < 200; ++k) if (commit()) ++expectedApplied;
+                default:  // the boundary passed for one payload, then a newer one is staged with the gate shut
+                    stageIt(first);
+                    gate.store(first, std::memory_order_release);
+                    // Alternate passes: wait so the audio thread flags the first payload, or shut the gate at once so a
+                    // decision about it may still be in flight (token read, compare-exchange not yet made).
+                    for (int k = 0, waits = ((round / 5) % 2 != 0) ? 20 : 0; k < waits; ++k) std::this_thread::yield();
+                    gate.store(0, std::memory_order_release);
+                    stageIt(second);
+                    // A decision made about the first payload must not flag the second: no boundary was seen for it.
+                    for (int k = 0; k < 200; ++k) if (commit()) ++res.unboundaried;
                     cancelIt();
                     break;
             }
@@ -456,12 +547,7 @@ struct HotSwapTests : juce::UnitTest
 
         stop.store(true, std::memory_order_release);
         audio.join();
-
-        const juce::String which = useFull ? "full" : "slot";
-        expect(badWithoutGate == 0, which + ": a commit happened without a boundary or left a payload behind");
-        expect(lost == 0,           which + ": a staged payload was lost or never committed");
-        expect(stale == 0,          which + ": a payload was applied twice or out of order");
-        expect(applied == expectedApplied, which + ": applied count matches the rounds that should apply");
+        return res;
     }
 };
 

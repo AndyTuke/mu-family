@@ -7,6 +7,8 @@
 #include "Tests/StubProcessor.h"
 #include "Sequencer/MidiRhythmCore.h"
 #include "Persistence/SessionState.h"
+#include "Sequencer/AccentVelocity.h"
+#include "Sequencer/HitGenerator.h"
 
 #include <atomic>
 #include <cstdlib>
@@ -69,7 +71,7 @@ struct RenderStub : tests::StubProcessor
     double beatAt(juce::int64 sample) const { return (double) sample / sampleRate * bpm / 60.0; }
 };
 
-struct NoteEvent { bool on; int note; juce::int64 time; };
+struct NoteEvent { bool on; int note; juce::int64 time; int velocity; };
 
 enum class Kind { normal, bypassed };
 
@@ -93,8 +95,8 @@ struct Renderer
         for (const auto meta : midi)
         {
             const auto m = meta.getMessage();
-            if (m.isNoteOn())       { events.push_back({ true,  m.getNoteNumber(), clock + meta.samplePosition }); sawOn = true; }
-            else if (m.isNoteOff()) { events.push_back({ false, m.getNoteNumber(), clock + meta.samplePosition }); }
+            if (m.isNoteOn())       { events.push_back({ true,  m.getNoteNumber(), clock + meta.samplePosition, (int) m.getVelocity() }); sawOn = true; }
+            else if (m.isNoteOff()) { events.push_back({ false, m.getNoteNumber(), clock + meta.samplePosition, 0 }); }
         }
         clock += block;
         return sawOn;
@@ -463,3 +465,179 @@ public:
 };
 
 static MidiRenderTest midiRenderTest;
+
+//==============================================================================
+// What the shipped path plays: the Euclidean generators' patterns on the step grid, the accent
+// velocities, and where the host transport puts the pattern.
+class MidiPlaybackContentTest : public juce::UnitTest
+{
+public:
+    MidiPlaybackContentTest() : juce::UnitTest("mu-Clid MIDI playback content", "MidiProduct") {}
+
+    static constexpr double kRate  = 44100.0;
+    static constexpr int    kBlock = 64;
+
+    // At 120 BPM one 1/16 step is 0.125 s.
+    static double stepSamples() { return kRate * 0.125; }
+
+    // The step each note-on landed on: the engine emits it in the first block that starts at or after the step start.
+    static std::vector<int> noteSteps(const Renderer& r)
+    {
+        std::vector<int> steps;
+        for (const auto& e : r.events)
+            if (e.on) steps.push_back((int) std::floor((double) e.time / stepSamples() + 1.0e-9));
+        return steps;
+    }
+
+    // Plays steps 0 to 15 of the rhythm as configured by `setup` and returns the steps that sounded.
+    template <typename Setup>
+    std::vector<int> play(Setup&& setup, std::vector<int>* velocities = nullptr)
+    {
+        RenderStub p;
+        setup(p);
+        Renderer r(p, kRate, kBlock);
+        p.playing = true;
+        r.run(1.99);
+        if (velocities != nullptr)
+            for (const auto& e : r.events) if (e.on) velocities->push_back(e.velocity);
+        expectEquals(r.pairProblem(), juce::String());
+        return noteSteps(r);
+    }
+
+    static std::vector<int> stepsOf(const std::vector<bool>& pattern, int totalSteps)
+    {
+        std::vector<int> out;
+        for (int s = 0; s < totalSteps; ++s)
+            if (pattern[(size_t) s % pattern.size()]) out.push_back(s);
+        return out;
+    }
+
+    static juce::String describe(const std::vector<int>& v)
+    {
+        juce::String out;
+        for (int x : v) out << x << " ";
+        return out;
+    }
+
+    void runTest() override
+    {
+        const juce::ScopedJuceInitialiser_GUI initialiser;
+
+        beginTest("The Euclidean generators hits land on the 1/16 grid as written");
+        {
+            const auto e48 = play([](RenderStub& p) { p.setActual("r0_stepsA", 8.0f); p.setActual("r0_hitsA", 4.0f); });
+            expect(e48 == (std::vector<int> { 0, 2, 4, 6, 8, 10, 12, 14 }), "E(4,8) over two passes: " + describe(e48));
+
+            const auto all = play([](RenderStub& p) { p.setActual("r0_stepsA", 8.0f); p.setActual("r0_hitsA", 8.0f); });
+            expectEquals((int) all.size(), 16, "E(8,8) sounds every step");
+
+            const auto none = play([](RenderStub& p) { p.setActual("r0_stepsA", 8.0f); p.setActual("r0_hitsA", 0.0f); });
+            expect(none.empty(), "E(0,8) is silent");
+        }
+
+        beginTest("Hits, steps and rotation reach the shared generator (the played steps equal its pattern)");
+        for (const int rot : { 0, 1, 3, -2 })
+            for (const int hits : { 3, 5 })
+            {
+                const auto played = play([&](RenderStub& p)
+                {
+                    p.setActual("r0_stepsA", 8.0f); p.setActual("r0_hitsA", (float) hits); p.setActual("r0_rotA", (float) rot);
+                });
+                mu_core::HitGenerator g;
+                g.steps = 8; g.hits = hits; g.rotate = rot;
+                expect(played == stepsOf(g.getPattern(), 16),
+                       "hits " + juce::String(hits) + " rotation " + juce::String(rot));
+                expectEquals((int) played.size(), hits * 2);
+            }
+
+        beginTest("A step count other than the master loop repeats on its own length");
+        {
+            const auto played = play([](RenderStub& p) { p.setActual("r0_stepsA", 5.0f); p.setActual("r0_hitsA", 2.0f); });
+            mu_core::HitGenerator g;
+            g.steps = 5; g.hits = 2;
+            expect(played == stepsOf(g.getPattern(), 16));
+        }
+
+        beginTest("Accent amount sets the accented and plain velocities");
+        for (const float amount : { 0.0f, 50.0f, 100.0f })
+        {
+            std::vector<int> vel;
+            const auto played = play([&](RenderStub& p)
+            {
+                p.setActual("r0_stepsA", 8.0f); p.setActual("r0_hitsA", 8.0f);     // every step sounds
+                p.setActual("r0_stepsC", 8.0f); p.setActual("r0_hitsC", 2.0f);     // accent on steps 0 and 4
+                p.setActual("lite_accentAmt", amount);
+            }, &vel);
+            expectEquals((int) vel.size(), 16);
+            if (vel.size() != 16) continue;
+            const auto v = accentVelocities(amount);
+            const int accented = (int) std::lround(v.accented * 127.0f), plain = (int) std::lround(v.normal * 127.0f);
+            for (size_t i = 0; i < vel.size(); ++i)
+            {
+                const bool isAccent = (played[i] % 8) == 0 || (played[i] % 8) == 4;
+                expect(std::abs(vel[i] - (isAccent ? accented : plain)) <= 1,
+                       "accent " + juce::String(amount) + " step " + juce::String(played[i]) + " velocity " + juce::String(vel[i]));
+            }
+        }
+
+        beginTest("Stopped transport plays nothing; a restart from beat 0 starts on step 0");
+        {
+            RenderStub p;
+            p.setActual("r0_stepsA", 8.0f); p.setActual("r0_hitsA", 4.0f);
+            Renderer r(p, kRate, kBlock);
+            r.run(0.5);
+            expect(r.events.empty(), "a stopped transport emits nothing");
+
+            p.playing = true;
+            r.run(0.6);
+            expect(! r.events.empty(), "playing emits notes");
+            p.playing = false;
+            r.run(0.5);
+            const auto afterStop = r.events.size();
+
+            p.hostSample = 0;                    // the host rewinds and presses play
+            p.playing = true;
+            expect(r.step(), "the first block after a restart from the top sounds step 0");
+            expect(r.events.size() > afterStop);
+            r.run(0.05);                         // let the note end
+            expectEquals(r.pairProblem(), juce::String());
+        }
+
+        beginTest("Starting mid-pattern plays from that position, not from the top");
+        {
+            RenderStub p;
+            p.setActual("r0_stepsA", 8.0f); p.setActual("r0_hitsA", 4.0f);       // hits on 0, 2, 4, 6
+            Renderer r(p, kRate, kBlock);
+            p.hostSample = (juce::int64) (3.5 * stepSamples());                  // the host starts half way through step 3 (a rest)
+            p.playing = true;
+            expect(! r.step(), "step 3 is a rest, and the pattern is not restarted from its first hit");
+            r.run(0.3);
+            expect(! r.events.empty());
+            if (! r.events.empty())
+            {
+                const double firstOn = (double) r.events.front().time;
+                expect(std::abs(firstOn - 0.5 * stepSamples()) <= kBlock, "the first note is step 4, half a step after the start");
+            }
+        }
+
+        beginTest("The host tempo sets the step length");
+        for (const double bpm : { 90.0, 140.0 })
+        {
+            RenderStub p;
+            p.bpm = bpm;
+            p.setActual("r0_stepsA", 4.0f); p.setActual("r0_hitsA", 4.0f);   // every step
+            Renderer r(p, kRate, kBlock);
+            p.playing = true;
+            r.run(2.0);
+            const double expectedGap = kRate * 60.0 / bpm / 4.0;
+            std::vector<juce::int64> ons;
+            for (const auto& e : r.events) if (e.on) ons.push_back(e.time);
+            expect(ons.size() > 8);
+            for (size_t i = 1; i < ons.size(); ++i)
+                expect(std::abs((double) (ons[i] - ons[i - 1]) - expectedGap) <= kBlock,
+                       juce::String(bpm) + " BPM gap " + juce::String(ons[i] - ons[i - 1]));
+        }
+    }
+};
+
+static MidiPlaybackContentTest midiPlaybackContentTest;

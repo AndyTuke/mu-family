@@ -597,6 +597,106 @@ public:
             expectEquals(qf, 5, "a one-step Reset Steps cycle sounds every step");
         }
 
+        beginTest("A host creeping backward is held for under a step, then followed; the phase does not drift");
+        {
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(3, 8));
+            const auto pat = e.getRhythm(0).getCombinedPattern();
+            double last = 0.0;
+            bool   was  = false;
+            const auto play = [&](double hostBeat)
+            {
+                const auto r = SequencerEngine::resolveBlockBeat(last, hostBeat, true, was, e.getMasterLoopSteps());
+                if (r.resetWrap) e.resetWrapDetector();
+                last = r.beat;
+                was  = true;
+                return std::make_pair(r, e.processBlock(r.beat));
+            };
+
+            // Forward to just past step 6, then the host reverses slowly: 0.002 beat per block for 1.2 beats.
+            double host = 0.0;
+            for (; host < beat(6) + 0.01; host += 0.05) play(host);
+            const double anchor = last;
+            int heldRun = 0, longestRun = 0;
+            double heldAt = anchor, lowest = anchor;
+            for (int i = 1; i <= 600; ++i)
+            {
+                const double hostBeat = anchor - 0.002 * i;
+                const auto both = play(hostBeat);
+                if (both.first.beat == heldAt) longestRun = std::max(longestRun, ++heldRun);
+                else                           { heldRun = 1; heldAt = both.first.beat; }
+                expect(both.first.beat <= hostBeat + SequencerEngine::StepLengthBeats + 1e-9,
+                       "the held position is never more than a step ahead of the host");
+                expect(both.first.beat <= lowest + 1e-9, "the engine position never moves forward while the host reverses");
+                lowest = std::min(lowest, both.first.beat);
+            }
+            // 0.25 / 0.002 = 125 blocks of dip fit inside one step; the hold must give way after that.
+            expect(longestRun <= 127, "the hold is bounded: it does not stall the step while the host keeps reversing (longest "
+                                       + juce::String(longestRun) + " blocks)");
+            expect(last < anchor - 0.9, "the engine position follows the host down (" + juce::String(last) + ")");
+
+            // The host then plays forward again from where the reversal ended: every step sounds exactly its pattern.
+            host = last;
+            for (int i = 0; i < 8; ++i, host += 0.05) play(host);       // let the position settle, one step or so
+            const int firstStep = SequencerEngine::beatToStep(host) + 1;
+            int mismatches = 0;
+            for (int s = firstStep; s < firstStep + 24; ++s)
+            {
+                const auto both = play(beat(s));
+                if (fired(both.second) != (bool) pat[(size_t) (s % 8)]) ++mismatches;
+                for (double off = 0.05; off < 0.24; off += 0.05)
+                    if (fired(play(beat(s) + off).second)) ++mismatches;   // nothing re-fires mid-step
+            }
+            expectEquals(mismatches, 0, "after the reversal each step plays its own pattern slot: no drift, no repeats");
+        }
+
+        beginTest("A jittery host position holds each step once and keeps advancing");
+        {
+            SequencerEngine e;
+            e.addRhythm(rhythmOf(8, 8));                   // every step is a hit
+            double last = 0.0;
+            bool   was  = false;
+            int fires = 0, resets = 0;
+            double previousHeld = 0.0;
+            bool monotonic = true;
+            // A forward ramp of 0.05 beat per block with a deterministic jitter of up to 0.04 either way.
+            const double jitter[] = { -0.04, 0.03, -0.02, 0.04, -0.03, 0.0, 0.02, -0.04 };
+            constexpr int blocks = 400;
+            for (int i = 0; i < blocks; ++i)
+            {
+                const double hostBeat = std::max(0.0, i * 0.05 + jitter[i % 8]);
+                const auto r = SequencerEngine::resolveBlockBeat(last, hostBeat, true, was, e.getMasterLoopSteps());
+                if (r.resetWrap) { e.resetWrapDetector(); ++resets; }
+                monotonic = monotonic && r.beat >= previousHeld;
+                previousHeld = last = r.beat;
+                was = true;
+                if (fired(e.processBlock(r.beat))) ++fires;
+            }
+            expect(monotonic, "the engine position never goes backward under jitter");
+            expectEquals(resets, 1, "only the transport start resets the wrap detector; jitter under a step never does");
+            expect(last >= (blocks - 1) * 0.05 - 0.04 - 1e-9, "the position keeps advancing with the ramp");
+            expectEquals(fires, SequencerEngine::beatToStep(last) + 1, "one trigger per step reached, none repeated, none lost");
+        }
+
+        beginTest("The modulation recompute pads every short result to at least two steps");
+        for (int steps : { 1, 2 })
+            for (int hits : { 0, 1 })
+            {
+                SequencerEngine e;
+                e.addRhythm(rhythmOf(4, 8));
+                for (int s = 0; s < 3; ++s) e.processBlock(beat(s));
+                auto& live = e.getRhythm(0);
+                live.genA.steps = steps; live.genB.steps = steps; live.genC.steps = steps;
+                EuclidOverrides ov;
+                ov.a.hits = hits; ov.b.hits = 0; ov.c.hits = 0;
+                expect(e.tryUpdatePatternFromModulation(0, ov));
+                expect(e.getPatternLength(0) >= 2, "steps " + juce::String(steps) + " hits " + juce::String(hits)
+                                                   + " gives a pattern of at least two steps (got "
+                                                   + juce::String(e.getPatternLength(0)) + ")");
+                // The walk still advances over the padded pattern without a crash or an index error.
+                for (int s = 3; s < 9; ++s) e.processBlock(beat(s));
+            }
+
         beginTest("A non-finite or enormous host position is handled without a bad cast");
         {
             const double nan = std::numeric_limits<double>::quiet_NaN();
