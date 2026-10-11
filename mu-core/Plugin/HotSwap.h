@@ -171,12 +171,15 @@ private:
     Slot<FullPayload>                         full;
 };
 
-// The whole bar-line hot-swap for a product whose presets are one payload type for both full
-// presets and slot presets (a parsed state tree) and whose swap point is a fixed loop length
-// (mu-Toni's arp bar, mu-On's pattern wrap). The product supplies how to apply each; this owns
-// the stage-or-apply decision, the commit order and the audio thread's boundary flagging.
+// Slot argument the boundary callable receives when asked about the full preset rather than a layer.
+inline constexpr int kFullPreset = -1;
+
+// The whole loop-boundary hot-swap for a product whose presets are one payload type for both full
+// presets and layer presets (a parsed state tree). The product supplies how to apply each and, per
+// block, the loop length that ends each pending swap (its boundary rule); this owns the
+// stage-or-apply decision, the commit order and the audio thread's boundary flagging.
 template <typename Payload, int N>
-class BarLineSwapper
+class LayerSwapper
 {
 public:
     using ApplyFull = std::function<void(Payload&)>;
@@ -187,21 +190,26 @@ public:
 
     // ── Message thread ───────────────────────────────────────────────────────
     // While the transport runs, stage for the next boundary; while stopped, apply now (dropping
-    // anything still staged that would otherwise land on top).
+    // anything still staged that would otherwise land on top). "Runs" is the play state the audio
+    // thread last resolved.
     void useFull(Payload&& p)
     {
         if (running.load(std::memory_order_relaxed)) { stager.stageFull(std::move(p)); return; }
         stager.cancelFull();
         for (int i = 0; i < N; ++i) stager.cancel(i);
-        applyFull(p);
+        if (applyFull) applyFull(p);
     }
 
     void useSlot(int i, Payload&& p)
     {
         if (running.load(std::memory_order_relaxed)) { stager.stage(i, std::move(p)); return; }
         stager.cancel(i);
-        applySlot(i, p);
+        if (applySlot) applySlot(i, p);
     }
+
+    // For a product that decides stage-or-apply itself (it keeps its own play-state rule).
+    void stageFull(Payload&& p)           { stager.stageFull(std::move(p)); }
+    void stageSlot(int i, Payload&& p)    { stager.stage(i, std::move(p)); }
 
     void cancel(int i)                    { stager.cancel(i); }
     bool hasPending(int i) const noexcept { return stager.hasPending(i); }
@@ -211,25 +219,45 @@ public:
     // each flagged slot. Returns true when a full preset was committed.
     bool commit()
     {
-        const bool full = stager.consumeFull([this](Payload& p) { applyFull(p); });
+        const bool full = stager.consumeFull([this](Payload& p) { if (applyFull) applyFull(p); });
         for (int i = 0; i < N; ++i)
-            stager.consume(i, [this, i](Payload& p) { applySlot(i, p); });
+            stager.consume(i, [this, i](Payload& p) { if (applySlot) applySlot(i, p); });
         return full;
     }
 
     // ── Audio thread ─────────────────────────────────────────────────────────
     // Record the play state and flag staged swaps whose loop point passed in this block (or the
-    // transport just stopped). Returns true when something was flagged: trigger the async commit.
+    // transport just stopped). `loopBeatsFor(slot)` gives the loop length in beats that ends the
+    // swap pending on `slot` (kFullPreset for the full preset); 0 means no wrap, only the stop
+    // edge, and a negative value means the slot is not eligible. It is asked only for pending
+    // swaps, so it may be a cheap lookup of audio-thread state. Returns true when something was
+    // flagged: trigger the async commit.
+    template <typename LoopBeatsFor>
     bool flagBoundaries(bool isPlaying, double blockStartBeat, double blockBeats,
-                        double loopBeats = kBarBeats) noexcept
+                        LoopBeatsFor&& loopBeatsFor) noexcept
     {
         running.store(isPlaying, std::memory_order_relaxed);
-        const bool atLoop = boundaryReached(isPlaying, wasPlaying, blockStartBeat,
-                                            blockStartBeat + (isPlaying ? blockBeats : 0.0), loopBeats);
+        const double endBeat = blockStartBeat + (isPlaying ? blockBeats : 0.0);
+        auto reached = [&](int slot)
+        {
+            const double loop = loopBeatsFor(slot);
+            return loop >= 0.0 && boundaryReached(isPlaying, wasPlaying, blockStartBeat, endBeat, loop);
+        };
+
+        bool flagged = false;
+        if (stager.hasFullPending())
+            flagged |= stager.flagFullIfReady(reached(kFullPreset));
+        for (int i = 0; i < N; ++i)
+            if (stager.hasPending(i))
+                flagged |= stager.flagIfReady(i, reached(i));
         wasPlaying = isPlaying;
-        bool flagged = stager.flagFullIfReady(atLoop);
-        for (int i = 0; i < N; ++i) flagged |= stager.flagIfReady(i, atLoop);
         return flagged;
+    }
+
+    // The common rule: every swap lands on the 4/4 bar line.
+    bool flagBoundaries(bool isPlaying, double blockStartBeat, double blockBeats) noexcept
+    {
+        return flagBoundaries(isPlaying, blockStartBeat, blockBeats, [](int) noexcept { return kBarBeats; });
     }
 
 private:

@@ -51,11 +51,11 @@ void PluginProcessor::applyStateTree(const juce::ValueTree& state)
     syncAllFxParams();   // re-seed mixer/FX (unchanged values skip listeners)
 }
 
-// While playing, stage a loaded full preset for the next bar line (commitDeferredWork); while
+// While playing, stage a loaded full preset for the next bar line (the shared swapper commit); while
 // stopped, apply it now. Converted to the composed shape here, so the commit does no parsing.
 void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 {
-    hotSwap.useFull(toLayerState(state));
+    layerSwapper.useFull(toLayerState(state));
 }
 
 // A layer preset: the layer's node (prefix-free param rows + modulators), so it loads into any layer.
@@ -77,8 +77,8 @@ void PluginProcessor::loadLayerPreset(int layer, const juce::File& file)
         if (onLoadError) onLoadError("Could not read \"" + file.getFileName() + "\"");
         return;
     }
-    // While playing, stage it for the next bar line (commitDeferredWork); while stopped, apply now.
-    hotSwap.useSlot(layer, juce::ValueTree::fromXml(*xml));
+    // While playing, stage it for the next bar line (the shared swapper commit); while stopped, apply now.
+    layerSwapper.useSlot(layer, juce::ValueTree::fromXml(*xml));
 }
 
 // Apply a layer node (the stopped load and the bar-line commit), then tell the editor.
@@ -88,19 +88,11 @@ void PluginProcessor::applyLayerTree(int layer, const juce::ValueTree& tree)
     if (onLayerPresetCommitted) onLayerPresetCommitted(layer);
 }
 
-// Commit the hot-swaps that reached their bar line: the full preset first (it supersedes the
-// per-layer swaps), then each flagged layer.
-void PluginProcessor::commitDeferredWork()
-{
-    if (hotSwap.commit() && onPresetSwapCommitted)
-        onPresetSwapCommitted();
-}
-
 // Reset a layer: an empty node puts its params back to their defaults and clears its modulators.
 void PluginProcessor::resetLayer(int layer)
 {
     if (layer < 0 || layer >= kNumChannels) return;
-    hotSwap.cancel(layer);   // a staged swap would re-fill what we're resetting
+    cancelPendingSwap(layer);   // a staged swap would re-fill what we're resetting
     applyLayerNode(layer, {});
 }
 

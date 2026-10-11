@@ -198,7 +198,7 @@ PluginProcessor::PluginProcessor()
 
     cacheVoiceParamPointers();
     setupLayerState();       // the layer layout every preset / session save and load uses
-    hotSwap.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },
+    layerSwapper.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },
                         [this](int i, juce::ValueTree& t) { applyLayerTree(i, t); });
     startFxParamSync();     // mixer / FX params → mixerEngine + fxChain (ProcessorBase)
     loadStartupDefault();   // restore a saved _default preset (skipped by render mode)
@@ -405,8 +405,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
                      nullptr, nullptr, nullptr, &renderChannelCb);
 
     // Hot-swap: flag staged presets whose bar line passed in this block (or the transport stopped).
-    if (hotSwap.flagBoundaries(isPlaying, transport.startBeat, transport.beatsPerSample * (double) numSamples))
-        triggerAsyncUpdate();
+    flagSwapBoundaries(isPlaying, transport.startBeat, transport.beatsPerSample * (double) numSamples);
 }
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()

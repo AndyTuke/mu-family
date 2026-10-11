@@ -132,7 +132,7 @@ PluginProcessor::PluginProcessor()
 
     for (int v = 0; v < kNumChannels; ++v) voiceSlot(v).owner.ptr = this;
     initLaneState();        // the lane layout every preset / session save and load uses
-    hotSwap.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },
+    layerSwapper.setAppliers([this](juce::ValueTree& t) { applyStateTree(t); },
                         [this](int i, juce::ValueTree& t) { applyTrackTree(i, t); });
     startFxParamSync();     // mixer / FX params → mixerEngine + fxChain (ProcessorBase)
     loadStartupDefault();   // restore a saved _default preset (skipped by render mode)
@@ -202,8 +202,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // Hot-swap: flag staged presets whose pattern wrap (one bar) passed in this block, or the
     // transport stopped. When the beat comes from outside, the next block's start stands in for
     // this block's end, so the block's own span is estimated from the tempo.
-    if (hotSwap.flagBoundaries(isPlaying, beatStart, transport.beatsPerSample * (double) numSamples))
-        triggerAsyncUpdate();
+    flagSwapBoundaries(isPlaying, beatStart, transport.beatsPerSample * (double) numSamples);
 }
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()

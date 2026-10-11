@@ -202,7 +202,7 @@ void PluginProcessor::loadLayerPreset(int voice, const juce::File& file)
     if (isInternalPlaying())
     {
         preloadWavetablesFromVoiceTree(tree);
-        hotSwapStager.stageVoice(voice, std::move(tree));
+        layerSwapper.stageSlot(voice, std::move(tree));
     }
     else
     {
@@ -280,7 +280,7 @@ void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
     if (isInternalPlaying())
     {
         preloadWavetablesFromState(composed);
-        hotSwapStager.stageFull(std::move(composed));
+        layerSwapper.stageFull(std::move(composed));
     }
     else
     {

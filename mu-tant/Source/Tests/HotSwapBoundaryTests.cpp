@@ -1,13 +1,14 @@
 // mu-tant hot-swap staging tests - the pure loop-boundary predicates
-// (mu-core HotSwap.h, as mu-tant uses them) and the VoiceHotSwapStager store-release/load-acquire
-// handshake. No PluginProcessor needed: this is the regression guard for the
+// (mu-core HotSwap.h, as mu-tant uses them) and mu_hotswap::LayerSwapper driven by mu-tant's boundary rule. No PluginProcessor needed: this is the regression guard for the
 // swap-defer decision (wrap detection incl. non-divisor pattern lengths,
 // apply-on-stop, supersede, and per-voice vs full-preset boundaries).
 
 #include <juce_data_structures/juce_data_structures.h>
 #include <array>
 #include "Plugin/HotSwap.h"   // mu-core: the shared loop-wrap predicates
-#include "Plugin/VoiceHotSwapStager.h"
+#include "Plugin/SwapBoundary.h"   // mu-tant: the boundary rule
+#include "MuLimits.h"
+#include <vector>
 
 class HotSwapBoundaryTest : public juce::UnitTest
 {
@@ -50,84 +51,86 @@ public:
             expect(! boundaryReached(false, false, 0.0, 0.0, 8.0),  "stopped, no edge -> never");
         }
 
-        beginTest("Stager: full-preset swap commits at voice-0 boundary");
+        // The swapper as mu-tant drives it: the boundary rule is swapLoopBeats over the per-voice
+        // gate-pattern lengths. Payload = ValueTree, as in the processor.
+        using Swapper = LayerSwapper<juce::ValueTree, mu_limits::kMaxLayers>;
+        struct Applied { int fullId = -1; std::vector<std::pair<int, int>> slots; };   // slot, id
+        auto wire = [](Swapper& sw, Applied& a)
         {
-            VoiceHotSwapStager st;
+            sw.setAppliers([&a](juce::ValueTree& t) { a.fullId = (int) t.getProperty("id"); },
+                           [&a](int v, juce::ValueTree& t) { a.slots.push_back({ v, (int) t.getProperty("id") }); });
+        };
+        auto flag = [](Swapper& sw, int numActive, bool playing, double start, double beats,
+                       bool onMaster, double master, const std::array<double, mu_limits::kMaxLayers>& pat)
+        {
+            return sw.flagBoundaries(playing, start, beats, [&](int slot) noexcept
+                                     { return swapLoopBeats(slot, numActive, onMaster, master, pat.data()); });
+        };
+        std::array<double, mu_limits::kMaxLayers> eight {}; eight.fill(8.0);
+
+        beginTest("Swapper: full-preset swap commits at voice-0 boundary");
+        {
+            Swapper sw; Applied got; wire(sw, got);
             juce::ValueTree tree("Full"); tree.setProperty("id", 42, nullptr);
-            st.stageFull(std::move(tree));
-            expect(st.hasFullPending(), "full preset staged");
-
-            std::array<double, mu_limits::kMaxLayers> patBeats {};
-            patBeats.fill(8.0);
-            const double fullPat = 8.0; // voice 0's pattern
-
-            // Mid-loop: not yet.
-            expect(! st.checkBoundaries(2, true, true, 0.0, 1.0, patBeats, fullPat),
-                   "no boundary mid-loop");
-            // Cross voice-0's wrap -> flagged.
-            expect(st.checkBoundaries(2, true, true, 7.9, 8.1, patBeats, fullPat),
-                   "voice-0 wrap flags the full swap");
-
-            juce::ValueTree out;
-            expect(st.takeFull(out), "full swap is takeable after boundary");
-            expect((int) out.getProperty("id") == 42, "the staged tree is what comes out");
-            expect(! st.hasFullPending(), "slot cleared after take");
-            expect(! st.takeFull(out),    "nothing left to take");
+            sw.stageFull(std::move(tree));
+            expect(sw.hasFullPending(), "full preset staged");
+            flag(sw, 2, true, 0.0, 0.5, false, 0.0, eight);   // establish playing
+            expect(! flag(sw, 2, true, 0.0, 1.0, false, 0.0, eight), "no boundary mid-loop");
+            expect(flag(sw, 2, true, 7.9, 0.2, false, 0.0, eight), "voice-0 wrap flags the full swap");
+            expect(sw.commit(), "committed");
+            expectEquals(got.fullId, 42);
+            expect(! sw.hasFullPending(), "slot cleared after commit");
+            expect(! sw.commit(), "nothing left to commit");
         }
 
-        beginTest("Stager: per-voice swap fires on the voice's OWN length, not voice 0");
+        beginTest("Swapper: per-voice swap fires on the voice's OWN length, not voice 0");
         {
-            VoiceHotSwapStager st;
-            juce::ValueTree v1("Voice"); v1.setProperty("idx", 1, nullptr);
-            st.stageVoice(1, std::move(v1));
-
-            // Voice 0 has an 8-beat pattern; voice 1 has a 4-beat pattern.
-            std::array<double, mu_limits::kMaxLayers> patBeats {};
-            patBeats.fill(8.0);
-            patBeats[1] = 4.0;
-
-            // Crossing 4.0 wraps voice 1 (its own length) but not voice 0.
-            expect(st.checkBoundaries(2, true, true, 3.9, 4.1, patBeats, /*fullPat*/8.0),
-                   "voice 1 commits at its own 4-beat loop");
-            juce::ValueTree out;
-            expect(st.takeVoice(1, out), "voice 1 swap takeable");
-            expect((int) out.getProperty("idx") == 1, "correct voice tree");
-            expect(! st.takeVoice(0, out), "voice 0 untouched");
+            Swapper sw; Applied got; wire(sw, got);
+            juce::ValueTree v1("Voice"); v1.setProperty("id", 1, nullptr);
+            sw.stageSlot(1, std::move(v1));
+            auto pat = eight; pat[1] = 4.0;   // voice 1 has a 4-beat pattern
+            expect(flag(sw, 2, true, 3.9, 0.2, false, 0.0, pat), "voice 1 commits at its own 4-beat loop");
+            sw.commit();
+            expect(got.slots.size() == 1 && got.slots[0].first == 1, "voice 1 only");
         }
 
-        beginTest("Stager: re-stage supersedes; full supersedes pending voice swaps");
+        beginTest("Swapper: re-stage supersedes; full supersedes pending voice swaps");
         {
-            VoiceHotSwapStager st;
-            juce::ValueTree a("Voice"); a.setProperty("gen", 1, nullptr);
-            st.stageVoice(0, std::move(a));
-            juce::ValueTree b("Voice"); b.setProperty("gen", 2, nullptr);
-            st.stageVoice(0, std::move(b));     // supersedes a
+            Swapper sw; Applied got; wire(sw, got);
+            juce::ValueTree a("Voice"); a.setProperty("id", 1, nullptr);
+            sw.stageSlot(0, std::move(a));
+            juce::ValueTree b("Voice"); b.setProperty("id", 2, nullptr);
+            sw.stageSlot(0, std::move(b));     // supersedes a
+            flag(sw, 1, true, 7.9, 0.2, false, 0.0, eight);
+            sw.commit();
+            expect(got.slots.size() == 1 && got.slots[0].second == 2, "latest stage wins");
 
-            std::array<double, mu_limits::kMaxLayers> patBeats {}; patBeats.fill(8.0);
-            st.checkBoundaries(1, true, true, 7.9, 8.1, patBeats, 8.0);
-            juce::ValueTree out;
-            expect(st.takeVoice(0, out), "voice swap takeable");
-            expect((int) out.getProperty("gen") == 2, "latest stage wins");
-
-            // A full preset cancels a pending voice swap.
-            juce::ValueTree v("Voice"); st.stageVoice(2, std::move(v));
-            expect(st.hasVoicePending(2), "voice 2 pending");
-            juce::ValueTree full("Full"); st.stageFull(std::move(full));
-            expect(! st.hasVoicePending(2), "full preset supersedes the pending voice swap");
-            expect(st.hasFullPending(), "full now pending");
+            juce::ValueTree v("Voice"); sw.stageSlot(2, std::move(v));
+            expect(sw.hasPending(2), "voice 2 pending");
+            juce::ValueTree full("Full"); sw.stageFull(std::move(full));
+            expect(! sw.hasPending(2), "full preset supersedes the pending voice swap");
+            expect(sw.hasFullPending(), "full now pending");
         }
 
-        beginTest("Stager: stop-edge commits a staged swap immediately");
+        beginTest("Swapper: stop-edge commits a staged swap immediately");
         {
-            VoiceHotSwapStager st;
-            juce::ValueTree v("Voice"); st.stageVoice(0, std::move(v));
-            std::array<double, mu_limits::kMaxLayers> patBeats {}; patBeats.fill(8.0);
-            // playing->stopped with no wrap: still flagged via the stop edge.
-            expect(st.checkBoundaries(1, /*playing*/false, /*wasPlaying*/true,
-                                      2.0, 2.0, patBeats, 8.0),
-                   "stop edge commits the staged voice swap");
-            juce::ValueTree out;
-            expect(st.takeVoice(0, out), "committed on stop");
+            Swapper sw; Applied got; wire(sw, got);
+            flag(sw, 1, true, 0.0, 0.5, false, 0.0, eight);
+            juce::ValueTree v("Voice"); v.setProperty("id", 7, nullptr);
+            sw.stageSlot(0, std::move(v));
+            expect(flag(sw, 1, false, 2.0, 0.5, false, 0.0, eight), "stop edge flags the staged voice swap");
+            sw.commit();
+            expect(got.slots.size() == 1 && got.slots[0].second == 7, "committed on stop");
+        }
+
+        beginTest("swapLoopBeats: the mu-tant boundary rule");
+        {
+            std::array<double, mu_limits::kMaxLayers> pat {}; pat.fill(8.0); pat[0] = 12.0; pat[1] = 4.0;
+            expectEquals(swapLoopBeats(kFullPreset, 2, false, 0.0, pat.data()), 12.0, "full: voice 0 with no master loop");
+            expectEquals(swapLoopBeats(kFullPreset, 2, false, 16.0, pat.data()), 16.0, "full: the master loop when one is set");
+            expectEquals(swapLoopBeats(1, 2, false, 16.0, pat.data()), 4.0, "voice: its own length");
+            expectEquals(swapLoopBeats(1, 2, true, 16.0, pat.data()), 16.0, "voice: the master loop when OnMasterLoop");
+            expect(swapLoopBeats(2, 2, false, 0.0, pat.data()) < 0.0, "an inactive voice never commits");
         }
     }
 };

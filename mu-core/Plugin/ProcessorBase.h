@@ -25,6 +25,7 @@
 #include "Control/ParamGestureHold.h"
 #include "Persistence/LayerState.h"   // composed slot / full / host state (format 2)
 #include "MuLimits.h"
+#include "Plugin/HotSwap.h"   // the shared loop-boundary swapper every layer preset hot-swap uses
 #include "Sequencer/Layer.h"
 #include "Plugin/ProcessorCore.h"   // layer accessors + published host transport
 #include "Plugin/MidiClockSync.h"
@@ -209,7 +210,7 @@ public:
     virtual juce::ValueTree    captureFullPreset()                                       { return apvts.copyState(); }
     virtual void               useLoadedFullPreset(juce::ValueTree /*state*/)            {}
     virtual void               ensureCategoryInList(const juce::String& /*cat*/)         {}
-    virtual bool               hasPendingFullPreset()                              const { return false; }
+    virtual bool               hasPendingFullPreset()                              const { return layerSwapper.hasFullPending(); }
     // Write the current state as a full preset at exactly `file` (headless render --save-preset).
     // Default: the standard wrapped preset; false (after onLoadError) when it can't be written.
     virtual bool               saveFullPresetTo(const juce::File& file);
@@ -237,11 +238,11 @@ public:
     virtual juce::Array<juce::File> slotPresetFiles(int slot) const;   // default: every file in the per-slot dir
     virtual void saveLayerPreset(int /*slot*/, const juce::String& /*name*/) {}
     virtual void loadLayerPreset(int /*slot*/, const juce::File& /*file*/)   {}
-    virtual bool hasPendingSwap(int /*slot*/) const                         { return false; }
+    virtual bool hasPendingSwap(int slot) const                             { return layerSwapper.hasPending(slot); }
     // Drops the staged (not yet committed) per-layer swap for `slot`, if any. A structural edit
     // calls it for every layer it renumbers or clears, because a staged swap is keyed by index and
     // would otherwise land on the wrong layer. A staged full preset is left to win.
-    virtual void cancelPendingSwap(int /*slot*/)                            {}
+    virtual void cancelPendingSwap(int slot)                                { layerSwapper.cancel(slot); }
     std::function<void(int slot)> onLayerPresetCommitted;
 
     // Set by the standalone (mu-link bridge) so the product can publish its current full-preset
@@ -405,6 +406,8 @@ protected:
     // Deferred message-thread work first (product hot-swap commits), then program changes.
     void handleAsyncUpdate() final
     {
+        if (layerSwapper.commit() && onPresetSwapCommitted)
+            onPresetSwapCommitted();
         commitDeferredWork();
         drainPendingMidiProgramChanges();
         midiControlRouter.drain(*this);
@@ -414,6 +417,30 @@ protected:
     // (e.g. hot-swap commits at a loop boundary). Runs before queued program
     // changes are loaded. Default: nothing.
     virtual void commitDeferredWork() {}
+
+    // The staged preset swaps (a parsed state tree per layer plus one full preset), shared by every
+    // product that does not need a richer payload. A product sets its appliers once in its
+    // constructor and calls flagSwapBoundaries from processBlock; the commit runs in
+    // handleAsyncUpdate. A product with its own stager (mu-Clid) overrides the three swap queries.
+    // Audio-thread flagging uses atomics only; the appliers run on the message thread.
+    mu_hotswap::LayerSwapper<juce::ValueTree, mu_limits::kMaxLayers> layerSwapper;
+
+    // Audio thread, once per block after the transport resolved: flag the staged swaps whose
+    // boundary passed (`loopBeatsFor(slot)`, see LayerSwapper::flagBoundaries) and schedule the commit.
+    template <typename LoopBeatsFor>
+    void flagSwapBoundaries(bool isPlaying, double blockStartBeat, double blockBeats,
+                            LoopBeatsFor&& loopBeatsFor) noexcept
+    {
+        if (layerSwapper.flagBoundaries(isPlaying, blockStartBeat, blockBeats, loopBeatsFor))
+            triggerAsyncUpdate();
+    }
+
+    // The 4/4 bar-line rule (mu-Toni, mu-On).
+    void flagSwapBoundaries(bool isPlaying, double blockStartBeat, double blockBeats) noexcept
+    {
+        if (layerSwapper.flagBoundaries(isPlaying, blockStartBeat, blockBeats))
+            triggerAsyncUpdate();
+    }
 
     // A new default layer for slot `slot`, fully built and prepared (it is published as is, under
     // the lock, so nothing may be left to allocate). Null when the product's layer count is fixed.

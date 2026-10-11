@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Plugin/HotSwap.h"   // mu-core: preset hot-swap staging
 #include "Plugin/ProcessorBase.h"        // mu-core base
 #include "Plugin/MixerFxParams.h"         // mu-core: shared global-FX / mixer APVTS layout
 #include "Plugin/MidiClockSync.h"         // mu-core: shared MIDI-clock slave
@@ -92,8 +91,7 @@ public:
 
     // Hot-swap: a preset loaded while the transport runs is staged and applied at the next bar
     // line (or at once when playback stops); loaded while stopped, it applies at once.
-    bool hasPendingFullPreset() const override  { return hotSwap.hasFullPending(); }
-    bool hasPendingSwap(int layer) const override { return hotSwap.hasPending(layer); }
+    // (The staging itself is ProcessorBase::layerSwapper.)
 
 protected:
     // MIDI program change (drained on the message thread): Ch 1-4 → that layer's preset,
@@ -101,10 +99,8 @@ protected:
     void applyFullMidiPreset(const juce::File& f) override
     {
         loadPreset(f);
-        if (! hotSwap.hasFullPending() && onPresetSwapCommitted) onPresetSwapCommitted();
+        if (! layerSwapper.hasFullPending() && onPresetSwapCommitted) onPresetSwapCommitted();
     }
-    // Commit the staged swaps that reached their bar line (message thread).
-    void commitDeferredWork() override;
 
     // ── Arp/voice parameter cache (index into vp[voice][slot]) ────────────────
     // Enum + suffix table live in the .cpp; count is needed here for the array.
@@ -160,7 +156,6 @@ private:
 
     // Hot-swap: parsed preset trees per layer + one full preset, committed at the bar line.
     void applyLayerTree(int layer, const juce::ValueTree& tree);
-    mu_hotswap::BarLineSwapper<juce::ValueTree, kNumChannels> hotSwap;
     double currentSampleRate = 44100.0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)

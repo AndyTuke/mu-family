@@ -14,6 +14,7 @@ target_sources(mu-core-tests PRIVATE
     SettingsOverlayFitTests.cpp
     AlgorithmNameTableTests.cpp
     BarPositionTests.cpp
+    HotSwapTests.cpp
     FilterDSPSmokeTests.cpp
     InsertDSPSmokeTests.cpp
     MidiClockSyncTests.cpp

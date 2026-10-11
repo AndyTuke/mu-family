@@ -146,11 +146,11 @@ void PluginProcessor::applyStateTree(const juce::ValueTree& state)
     syncAllFxParams();   // re-seed mixer/FX (unchanged values skip listeners)
 }
 
-// While playing, stage a loaded full preset for the pattern's wrap (commitDeferredWork); while
+// While playing, stage a loaded full preset for the pattern's wrap (the shared swapper commit); while
 // stopped, apply it now. Converted to the composed shape here, so the commit does no parsing.
 void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 {
-    hotSwap.useFull(toLaneState(state));
+    layerSwapper.useFull(toLaneState(state));
 }
 
 // A track preset: the lane's node (engine param rows, step row or envelope, modulators). It
@@ -182,8 +182,8 @@ void PluginProcessor::loadLayerPreset(int lane, const juce::File& file)
         return;
     }
 
-    // While playing, stage it for the pattern's wrap (commitDeferredWork); while stopped, apply now.
-    hotSwap.useSlot(lane, juce::ValueTree::fromXml(*xml));
+    // While playing, stage it for the pattern's wrap (the shared swapper commit); while stopped, apply now.
+    layerSwapper.useSlot(lane, juce::ValueTree::fromXml(*xml));
 }
 
 // Apply a lane node (the stopped load and the pattern-wrap commit), then tell the editor.
@@ -191,14 +191,6 @@ void PluginProcessor::applyTrackTree(int lane, const juce::ValueTree& tree)
 {
     applyLayerNode(lane, tree);
     if (onLayerPresetCommitted) onLayerPresetCommitted(lane);
-}
-
-// Commit the hot-swaps that reached the pattern wrap: the full preset first (it supersedes the
-// per-lane swaps), then each flagged lane.
-void PluginProcessor::commitDeferredWork()
-{
-    if (hotSwap.commit() && onPresetSwapCommitted)
-        onPresetSwapCommitted();
 }
 
 // The track presets saved from `lane` (a preset belongs to the instrument it was saved from).
@@ -219,7 +211,7 @@ juce::Array<juce::File> PluginProcessor::slotPresetFiles(int lane) const
 void PluginProcessor::resetLayer(int lane)
 {
     if (lane < 0 || lane >= kNumChannels) return;
-    hotSwap.cancel(lane);   // a staged swap would re-fill what we're resetting
+    cancelPendingSwap(lane);   // a staged swap would re-fill what we're resetting
     layerLayout.applyParams({}, lane);
     mu_pp::clearModulators(voiceSlot(lane));
 }

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Plugin/HotSwap.h"   // mu-core: preset hot-swap staging
 #include "Plugin/ProcessorBase.h"        // mu-core base
 #include "Plugin/MixerFxParams.h"         // mu-core: shared global-FX / mixer APVTS layout
 #include "Plugin/MidiClockSync.h"         // mu-core: shared MIDI-clock slave
@@ -121,8 +120,7 @@ public:
 
     // Hot-swap: a preset loaded while the transport runs is staged and applied when the 16-step
     // pattern wraps (every bar, or at once when playback stops); loaded while stopped, at once.
-    bool hasPendingFullPreset() const override   { return hotSwap.hasFullPending(); }
-    bool hasPendingSwap(int lane) const override { return hotSwap.hasPending(lane); }
+    // (The staging itself is ProcessorBase::layerSwapper.)
 
 protected:
     // MIDI program change (drained on the message thread): Ch 1-5 → that lane's track preset,
@@ -130,10 +128,8 @@ protected:
     void applyFullMidiPreset(const juce::File& f) override
     {
         loadPreset(f);
-        if (! hotSwap.hasFullPending() && onPresetSwapCommitted) onPresetSwapCommitted();
+        if (! layerSwapper.hasFullPending() && onPresetSwapCommitted) onPresetSwapCommitted();
     }
-    // Commit the staged swaps that reached the pattern wrap (message thread).
-    void commitDeferredWork() override;
 
 private:
     friend struct Track;   // its persistence hooks read the step row and Rumble envelope
@@ -170,7 +166,6 @@ private:
 
     // Hot-swap: parsed preset trees per lane + one full preset, committed at the pattern wrap.
     void applyTrackTree(int lane, const juce::ValueTree& tree);
-    mu_hotswap::BarLineSwapper<juce::ValueTree, kNumChannels> hotSwap;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginProcessor)
 };

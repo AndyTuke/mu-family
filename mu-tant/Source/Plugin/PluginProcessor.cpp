@@ -1,5 +1,6 @@
 #include "Audio/SpinLock.h"   // mu-core: spin lock helpers
 #include "Plugin/PluginProcessor.h"
+#include "Plugin/SwapBoundary.h"   // mu-tant: the hot-swap boundary rule
 #include "Plugin/TransportResolver.h"   // mu-core: the family transport rule
 #include "License/ProductLicensing.h"   // mu-core: ProcessorBase::initLicensing (licensed products only)
 #include "Plugin/PluginEditor.h"
@@ -122,6 +123,12 @@ PluginProcessor::PluginProcessor()
             buf.clear();
     };
 
+    layerSwapper.setAppliers([this](juce::ValueTree& t) { applyFullPresetTree(t); },
+                             [this](int v, juce::ValueTree& t)
+                             {
+                                 applyVoicePresetTree(v, t);
+                                 if (onLayerPresetCommitted) onLayerPresetCommitted(v);
+                             });
     startFxParamSync();     // mixer / FX params → mixerEngine + fxChain (ProcessorBase)
     loadStartupDefault();   // restore a saved _default preset (skipped by render mode)
 }
@@ -322,10 +329,10 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     // the ramp still tracks). No-op in Free mode.
     applyNoteModeGate(buffer, numSamples);
 
-    // The block's beat span for the boundary test: the RAW (pre-wrap) end, so the loop-index test
-    // holds for pattern lengths that don't divide 64. (The resolver already advanced the counter.)
-    const double oldPos    = blkBeatStart;
-    const double newPosRaw = oldPos + transport.blockBeats;
+    // The block's beat span for the boundary test starts at the block start and runs the RAW
+    // (pre-wrap) block length, so the loop-index test holds for pattern lengths that don't divide 64.
+    // (The resolver already advanced the counter.)
+    const double oldPos = blkBeatStart;
 
     // Hot-swap boundary check: a staged preset commits when its reference loop wraps
     // (or on the playing→stopped edge). Uses the RAW pre-ceiling position so the
@@ -340,15 +347,12 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     const bool   onMasterLoop    = (swapModeAtomic.load(std::memory_order_relaxed) == 0)
                                    && masterLoopBeats > 0.0;
 
-    std::array<double, mu_limits::kMaxLayers> voicePatBeats {};
-    for (int v = 0; v < mu_limits::kMaxLayers; ++v)
-        voicePatBeats[(size_t) v] = onMasterLoop ? masterLoopBeats : blkPatternBeats[(size_t) v];
-    const double fullPatBeats = masterLoopBeats > 0.0 ? masterLoopBeats : blkPatternBeats[0];
-    if (hotSwapStager.checkBoundaries(numLayers.load(std::memory_order_relaxed),
-                                      blkPlaying, wasPlaying,
-                                      oldPos, newPosRaw, voicePatBeats, fullPatBeats))
-        triggerAsyncUpdate();
-    wasPlaying = blkPlaying;
+    const int numActive = numLayers.load(std::memory_order_relaxed);
+    flagSwapBoundaries(blkPlaying, oldPos, transport.blockBeats,
+                       [&](int slot) noexcept
+                       {
+                           return swapLoopBeats(slot, numActive, onMasterLoop, masterLoopBeats, blkPatternBeats.data());
+                       });
 }
 
 void PluginProcessor::applyModulation(int v, VoiceConfig& cfg)
@@ -669,24 +673,6 @@ void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
         retiring[(size_t) d].samplesLeft.store(0, std::memory_order_relaxed);
         for (auto& v : voiceSnap[d]) v.store(0.0f, std::memory_order_relaxed);
     }
-}
-
-void PluginProcessor::commitDeferredWork()
-{
-    // Commit any hot-swap that reached its loop boundary. The full preset commits
-    // first (it supersedes per-voice swaps), then each flagged per-voice swap.
-    juce::ValueTree tree;
-    if (hotSwapStager.takeFull(tree))
-    {
-        applyFullPresetTree(tree);
-        if (onPresetSwapCommitted) onPresetSwapCommitted();
-    }
-    for (int v = 0; v < mu_limits::kMaxLayers; ++v)
-        if (hotSwapStager.takeVoice(v, tree))
-        {
-            applyVoicePresetTree(v, tree);
-            if (onLayerPresetCommitted) onLayerPresetCommitted(v);
-        }
 }
 
 // The bank index for a wavetable file: found by path, else decoded OFF bankLock (file read, WAV decode

@@ -10,7 +10,6 @@
 #include "Audio/InsertProcessor.h"           // mu-core: shared per-voice insert FX
 
 #include "Modulation/MuTantModSnap.h"
-#include "Plugin/VoiceHotSwapStager.h"       // mu-tant: preset hot-swap staging
 #include "Plugin/MidiClockSync.h"            // mu-core: shared MIDI-clock slave
 #include "License/LicenseKey.h"              // product: mu-Tant id + filename + public key
 
@@ -63,11 +62,6 @@ public:
 
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
-
-    // Message-thread: commit any hot-swap that reached its loop boundary (ProcessorBase
-    // then drains the MIDI program-change queue). Triggered from processBlock via
-    // triggerAsyncUpdate() when the audio thread flags a boundary.
-    void commitDeferredWork() override;
 
     // ── Internal transport (drives the gate engine + the gating timeline) ─────
     // mu-tant has no host-sync sequencer; the transport bar's play button starts
@@ -129,7 +123,6 @@ public:
     // move the Pattern pointers under `layersLock`, which processBlock tryLocks.
     int  getNumVoices() const noexcept { return numLayers.load(std::memory_order_relaxed); }
     bool canEditLayers() const override { return true; }
-    void cancelPendingSwap(int voice) override { hotSwapStager.cancelVoice(voice); }
     // The engine state of a slot stays put while its Pattern moves, so the slot is cleared for the
     // new tenant (called under layersLock; the render only runs under it).
     void layersMoved(int firstIndex, int lastIndex) override;
@@ -170,11 +163,7 @@ public:
     // A per-voice hot-swap commit fires ProcessorBase::onLayerPresetCommitted (the editor refreshes
     // that voice's panel, sidebar and wavetable dropdowns); full presets fire onPresetSwapCommitted.
 
-    // Hot-swap staging queries — drive the shared "SWP" badges (TransportBar for a
-    // pending full preset, ChannelSidebar for a pending per-voice swap) + cancel.
-    // Mirrors mu-clid. Polled by the UI timers.
-    bool hasPendingFullPreset() const override { return hotSwapStager.hasFullPending(); }
-    bool hasPendingSwap(int voice) const override { return hotSwapStager.hasVoicePending(voice); }
+    // The "SWP" badges and the cancel read the shared ProcessorBase::layerSwapper.
 
     // ── Per-voice param IDs (used by VoicePanel for SliderAttachment binding) ──
     // Family rule: per-voice params are subtree-scoped via `v{N}_` prefix so a
@@ -390,10 +379,6 @@ private:
     // playing (commit at the loop boundary) and apply immediately when stopped.
     // The apply bodies are factored out so the boundary commit (handleAsyncUpdate)
     // and the immediate path share one code path.
-    VoiceHotSwapStager hotSwapStager;
-    // Previous block's play state (audio-thread only) — drives the playing→stopped
-    // edge that commits a staged swap on stop.
-    bool wasPlaying = false;
     void applyFullPresetTree (const juce::ValueTree& state);          // composed state + voice count / colours + FX
     void applyVoicePresetTree(int voice, const juce::ValueTree& tree); // one voice node (.muPattern body)
     // Warm the wavetable bank (dedup-by-path) for every user wavetable referenced

@@ -70,12 +70,13 @@ namespace
 
         using ProcessorCore::layers;
         using ProcessorCore::layersLock;
+        using ProcessorBase::layerSwapper;
         bool canEditLayers() const override { return true; }
         std::unique_ptr<Layer> createLayer(int) override
         {
             return std::make_unique<ProbeLayer>(layersLock, destroyed, underLock, resets);
         }
-        void cancelPendingSwap(int slot) override { cancelled.push_back(slot); }
+        void cancelPendingSwap(int slot) override { cancelled.push_back(slot); ProcessorBase::cancelPendingSwap(slot); }
         void layersMoved(int first, int last) override
         {
             moved.push_back({ first, last });
@@ -478,6 +479,45 @@ struct LayerOwnershipTests : juce::UnitTest
             p.resetLayer(5);   // out of range: ignored
             expectEquals(p.resets, 1);
             expectEquals((int) p.moved.size(), 1);
+        }
+
+        beginTest("structural edits cancel exactly the staged swaps they would misdirect");
+        {
+            auto stage = [](EditableProcessor& p, std::initializer_list<int> slots, bool full)
+            {
+                for (int s : slots) p.layerSwapper.stageSlot(s, juce::ValueTree("Layer"));
+                if (full) p.layerSwapper.stageFull(juce::ValueTree("Full"));
+            };
+
+            EditableProcessor add(true);
+            stage(add, { 0, 1 }, false);
+            add.addLayer();   // the new slot is 1
+            expect(add.hasPendingSwap(0), "an existing layer's swap is kept");
+            expect(! add.hasPendingSwap(1), "the new slot carries no stale swap");
+
+            EditableProcessor rem(true);
+            rem.addLayer(); rem.addLayer();
+            rem.layerSwapper.stageFull(juce::ValueTree("Full"));
+            stage(rem, { 0, 2 }, false);        // slot swaps staged after the full preset
+            rem.removeLayer(1);   // the down-shift renumbers slot 2
+            expect(! rem.hasPendingSwap(0) && ! rem.hasPendingSwap(2), "removal cancels every per-layer swap");
+            expect(rem.hasPendingFullPreset(), "a staged full preset is left to win");
+
+            EditableProcessor swp(true);
+            swp.addLayer(); swp.addLayer();
+            stage(swp, { 0, 1, 2 }, false);
+            swp.swapLayers(0, 2);
+            expect(! swp.hasPendingSwap(0) && ! swp.hasPendingSwap(2), "both swapped slots are cancelled");
+            expect(swp.hasPendingSwap(1), "the slot between is untouched");
+
+            EditableProcessor rst(true);
+            rst.addLayer();
+            rst.layerSwapper.stageFull(juce::ValueTree("Full"));
+            stage(rst, { 0, 1 }, false);        // slot swaps staged after the full preset
+            rst.resetLayer(1);
+            expect(rst.hasPendingSwap(0), "another layer's swap is kept");
+            expect(! rst.hasPendingSwap(1), "the reset slot's swap would re-fill it, so it is cancelled");
+            expect(rst.hasPendingFullPreset(), "the full preset is left to win");
         }
     }
 };
