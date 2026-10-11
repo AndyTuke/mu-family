@@ -220,22 +220,6 @@ void GatingDesigner::rebuildBarsDropdown()
         barsDropdown.addItem(juce::String(b), b);
 }
 
-void GatingDesigner::setMaxCells(int cells)
-{
-    maxCells = juce::jmax(1, cells);
-
-    // Grids finer than the cap are not offered (ids stay tied to kSubdivOptions).
-    subdivDropdown.clear();
-    for (int i = 0; i < kSubdivCount; ++i)
-        if (kSubdivOptions[i].denom <= maxCells)
-            subdivDropdown.addItem(kSubdivOptions[i].label, i + 1);
-    subdivDropdown.setSelectedId(idForDenom(subdivisionDenom), false);
-
-    rebuildBarsDropdown();
-    if (auto* pat = getActivePattern())
-        barsDropdown.setSelectedId(juce::jmin(pat->patternLengthBars.load(), maxBarsFor(subdivisionDenom)), false);
-}
-
 void GatingDesigner::setPatternBars(int bars)
 {
     bars = juce::jlimit(1, maxBarsFor(subdivisionDenom), bars);

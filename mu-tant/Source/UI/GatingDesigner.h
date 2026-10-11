@@ -48,8 +48,6 @@ public:
     void setLayer(GateLayer layer);
     void setPatternBars(int bars);
 
-    // Demo step cap: only grids and lengths of at most `cells` cells are offered.
-    void setMaxCells(int cells);
     GateLayer getLayer()     const noexcept { return currentLayer; }
     GateTool  selectedTool() const noexcept { return currentTool; }
     void setPlayhead(double beat01, bool visible);
