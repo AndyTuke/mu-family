@@ -818,7 +818,7 @@ void PresetIO::loadPreset(const juce::File& file)
 }
 
 //==============================================================================
-void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepared)
+void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepared, int originEff, uint32_t frameEpoch)
 {
     const int n    = prepared.numRhythms;
     const int oldN = proc.numActiveRhythms.load(std::memory_order_acquire);
@@ -843,7 +843,8 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
         // The shared install: the outgoing engine retires and keeps rendering its tail while the
         // new preset plays, instead of being hard-cut. Grown slots have no old engine.
         proc.hotSwapStager.installRhythm(i, std::move(prepared.rhythms[(size_t) i]),
-                                          std::move(prepared.voices[(size_t) i]), prepared.samplePaths[(size_t) i]);
+                                          std::move(prepared.voices[(size_t) i]), prepared.samplePaths[(size_t) i],
+                                          originEff, frameEpoch);
         // Prepare MIDI engines for freshly-grown slots; existing slots keep theirs.
         if (i >= oldN && proc.currentSampleRate > 0 && proc.currentBlockSize > 0)
             proc.midiEngines[(size_t) i].prepare(proc.currentSampleRate, proc.currentBlockSize);

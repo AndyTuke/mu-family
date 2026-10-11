@@ -50,13 +50,24 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
 {
     // Per-rhythm swaps: the master loop point, or each rhythm's own loop (Hot-swap timing).
     const int mode = proc.swapModeAtomic.load(std::memory_order_relaxed);
+    const uint32_t epoch = proc.sequencer.getFrameEpoch();
     bool needAsync = false;
     for (int r = 0; r < numRhythms; ++r)
     {
         // Read the token first so the flag lands only on the swap this boundary was judged for.
         const auto token = stager.pendingToken(r);
-        needAsync |= stager.flagIfReady(r, token, mu_clid::hotswap::perRhythmBoundaryReached(mode, r, masterLoopWrapped,
-                                                                                          rhythmLoopWrapMask));
+        const bool atBoundary = mu_clid::hotswap::perRhythmBoundaryReached(mode, r, masterLoopWrapped,
+                                                                          rhythmLoopWrapMask);
+        // A non-zero token is a ready, not yet flagged swap. Record where its boundary fell before
+        // flagging: the flag's release publishes it to the committing thread, which starts the new
+        // pattern's step 0 there (the master loop point is step 0 of the loop; a rhythm's own loop
+        // is wherever that rhythm last wrapped).
+        if (token != 0 && atBoundary)
+        {
+            flaggedOrigin[(size_t) r].store(mode == 0 ? 0 : proc.sequencer.getBoundaryEff(r), std::memory_order_relaxed);
+            flaggedEpoch [(size_t) r].store(epoch, std::memory_order_relaxed);
+        }
+        needAsync |= stager.flagIfReady(r, token, atBoundary);
     }
 
     // Full-preset swaps wait for the MASTER loop point when a master loop is
@@ -66,14 +77,20 @@ bool HotSwapStager::checkBoundaries(int numRhythms, bool masterLoopWrapped,
     // hang forever waiting for a boundary that never comes.
     const bool hasMasterLoop = proc.sequencer.getMasterLoopSteps() > 0;
     const auto fullToken = stager.fullToken();
-    needAsync |= stager.flagFullIfReady(fullToken, mu_clid::hotswap::fullPresetBoundaryReached(hasMasterLoop, masterLoopWrapped,
-                                                                                             rhythmLoopWrapMask));
+    const bool fullAtBoundary = mu_clid::hotswap::fullPresetBoundaryReached(hasMasterLoop, masterLoopWrapped,
+                                                                           rhythmLoopWrapMask);
+    if (fullToken != 0 && fullAtBoundary)
+    {
+        fullFlaggedOrigin.store(hasMasterLoop ? 0 : proc.sequencer.getBoundaryEff(0), std::memory_order_relaxed);
+        fullFlaggedEpoch .store(epoch, std::memory_order_relaxed);
+    }
+    needAsync |= stager.flagFullIfReady(fullToken, fullAtBoundary);
     return needAsync;
 }
 
 //==============================================================================
 void HotSwapStager::installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceEngine>&& voice,
-                                  const juce::String& samplePath)
+                                  const juce::String& samplePath, int originEff, uint32_t frameEpoch)
 {
     // Retire-then-swap: the old engine continues rendering its in-flight tail from a retired slot.
     auto oldEngine = std::move(proc.voiceEngines[(size_t) r]);
@@ -98,8 +115,8 @@ void HotSwapStager::installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceE
 
     proc.sequencer.getRhythm(r) = std::move(rhythm);
     proc.samples.setPath(r, samplePath);
-    proc.sequencer.updatePattern(r);
-    proc.sequencer.resetStepTrackingForSwap(r);
+    // Rebuilds the pattern and hands the audio thread its start position in one step.
+    proc.sequencer.requestSwapStart(r, originEff, frameEpoch);
 }
 
 void HotSwapStager::processSwaps()
@@ -159,7 +176,9 @@ void HotSwapStager::processSwaps()
             const int r = readyRhythms[(size_t)idx];
             applied[(size_t)r] = stager.consume(r, [&](PendingRhythm& sw)
             {
-                installRhythm(r, std::move(sw.rhythm), std::move(sw.voice), sw.samplePath);
+                installRhythm(r, std::move(sw.rhythm), std::move(sw.voice), sw.samplePath,
+                              flaggedOrigin[(size_t) r].load(std::memory_order_relaxed),
+                              flaggedEpoch [(size_t) r].load(std::memory_order_relaxed));
             });
         }
         proc.suspendProcessing(false);
@@ -183,7 +202,11 @@ void HotSwapStager::processSwaps()
     // lifting (parse, voice build, sample load) happened at stage time, so the
     // commit is just fast in-memory moves under suspend + an APVTS finalize.
     // (consumeFull releases the pre-built voices + tree afterwards.)
-    if (stager.consumeFull([this](PreparedFullPreset& p) { proc.presetIO.commitStagedFullPreset(p); })
+    if (stager.consumeFull([this](PreparedFullPreset& p)
+        {
+            proc.presetIO.commitStagedFullPreset(p, fullFlaggedOrigin.load(std::memory_order_relaxed),
+                                                 fullFlaggedEpoch.load(std::memory_order_relaxed));
+        })
         && proc.onPresetSwapCommitted)
         proc.onPresetSwapCommitted();
 }

@@ -3,6 +3,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "Sequencer/Rhythm.h"
 #include "Audio/VoiceEngine.h"
+#include "Sequencer/SequencerEngine.h"
 #include "Plugin/HotSwap.h"   // mu-core: the shared staging state
 #include <array>
 #include <atomic>
@@ -72,7 +73,10 @@ public:
     // the pattern rebuilds. The one swap behind the loop-boundary commit, the stopped load and the
     // full-preset commit. Caller holds suspendProcessing (and rhythmsLock where needed); the
     // APVTS push follows outside the suspend.
-    void installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceEngine>&& voice, const juce::String& samplePath);
+    // originEff / frameEpoch say where the new pattern's step 0 falls (see SequencerEngine::requestSwapStart);
+    // the defaults start it on the step counter's own phase, for a load that has no boundary.
+    void installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceEngine>&& voice, const juce::String& samplePath,
+                       int originEff = 0, uint32_t frameEpoch = SequencerEngine::kAnyFrameEpoch);
 
     // Message-thread: drain retired-engine cleanup + commit all flagged swaps.
     // Called from PluginProcessor::runDeferredWork.
@@ -90,6 +94,14 @@ private:
     mu_hotswap::Stager<PendingRhythm, PreparedFullPreset, mu_limits::kMaxLayers> stager;
 
     PluginProcessor& proc;
+
+    // Where each staged swap's loop boundary fell, written by the audio thread just before it flags
+    // the swap (the flag's release publishes them) and read by the committing thread after it
+    // takes the flag. Meaningless for a swap that is not flagged.
+    std::array<std::atomic<int>,      mu_limits::kMaxLayers> flaggedOrigin {};
+    std::array<std::atomic<uint32_t>, mu_limits::kMaxLayers> flaggedEpoch  {};
+    std::atomic<int>      fullFlaggedOrigin { 0 };
+    std::atomic<uint32_t> fullFlaggedEpoch  { 0 };
 };
 
 } // namespace mu_clid

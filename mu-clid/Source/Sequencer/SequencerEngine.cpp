@@ -65,12 +65,20 @@ void SequencerEngine::removeRhythm(int index)
         lastStepIndex[i]       = lastStepIndex[i + 1];
         lastAccentStepIndex[i] = lastAccentStepIndex[i + 1];
         wasLastStepHit[i]      = wasLastStepHit[i + 1];
+        phaseOrigin[i]         = phaseOrigin[i + 1];
+        pendingKind[i]         = pendingKind[i + 1];
+        cachedOrigin[i]        = cachedOrigin[i + 1];
+        cachedEpoch[i]         = cachedEpoch[i + 1];
+        boundaryEff[(size_t) i].store(boundaryEff[(size_t) i + 1].load(std::memory_order_relaxed), std::memory_order_relaxed);
     }
     safePatterns[newN].clear();
     safeCPatterns[newN].clear();
     lastStepIndex[newN]       = -1;
     lastAccentStepIndex[newN] = 0;
     wasLastStepHit[newN]      = false;
+    phaseOrigin[newN]         = 0;
+    pendingKind[newN]         = kNone;
+    boundaryEff[(size_t) newN].store(0, std::memory_order_relaxed);
 
     mu_core::spinUnlock(patternLock);
 }
@@ -117,6 +125,9 @@ void SequencerEngine::setNumRhythms(int n)
             lastStepIndex[i]       = -1;
             lastAccentStepIndex[i] = 0;
             wasLastStepHit[i]      = false;
+            phaseOrigin[i]         = 0;
+            pendingKind[i]         = kNone;
+            boundaryEff[(size_t) i].store(0, std::memory_order_relaxed);
         }
     }
 }
@@ -142,13 +153,20 @@ void SequencerEngine::swapRhythmSlots(int i, int j)
     patternUpdated[i] = true;
     patternUpdated[j] = true;
 
+    // The patterns moved, so each one's phase goes with it. The audio thread owns phaseOrigin, so
+    // it copies the partner's value itself on its next snapshot pass (cachedOrigin holds the partner
+    // index for this kind); a hot-swap start still waiting travels with its pattern.
+    std::swap(pendingKind[i],  pendingKind[j]);
+    std::swap(cachedOrigin[i], cachedOrigin[j]);
+    std::swap(cachedEpoch[i],  cachedEpoch[j]);
+    if (pendingKind[i] == kNone) { pendingKind[i] = kAdoptFrom; cachedOrigin[i] = j; }
+    if (pendingKind[j] == kNone) { pendingKind[j] = kAdoptFrom; cachedOrigin[j] = i; }
+
     mu_core::spinUnlock(patternLock);
 }
 
-void SequencerEngine::updatePattern(int index)
+void SequencerEngine::rebuildCachedLocked(int index)
 {
-    mu_core::spinLock(patternLock);
-
     // Demo cap: no generator is built with more steps than the cap allows.
     const int cap = stepCap.load(std::memory_order_relaxed);
     for (auto* gen : { &rhythms[index].genA, &rhythms[index].genB, &rhythms[index].genC })
@@ -157,8 +175,24 @@ void SequencerEngine::updatePattern(int index)
     cachedPatterns[index]  = rhythms[index].getCombinedPattern();
     cachedCPatterns[index] = rhythms[index].genC.getPattern();
     patternUpdated[index]  = true;
-    // lastStepIndex preserved — processBlock will absorb the current step without firing
+}
 
+void SequencerEngine::updatePattern(int index)
+{
+    mu_core::spinLock(patternLock);
+    rebuildCachedLocked(index);   // lastStepIndex preserved: processBlock absorbs the current step without firing
+    mu_core::spinUnlock(patternLock);
+}
+
+void SequencerEngine::requestSwapStart(int r, int originEff, uint32_t epoch)
+{
+    if (r < 0 || r >= (int) rhythms.size()) return;
+
+    mu_core::spinLock(patternLock);
+    rebuildCachedLocked(r);
+    cachedOrigin[(size_t) r] = originEff;
+    cachedEpoch [(size_t) r] = epoch;
+    pendingKind [(size_t) r] = kStart;
     mu_core::spinUnlock(patternLock);
 }
 
@@ -216,11 +250,22 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
     // Detect master loop wrap: effectiveStep decreased relative to the previous block.
     // No history after a reset request or a loop-length change: the step count restarts, not wraps.
     int prevEffectiveStep = lastEffectiveStep;
-    if (wrapResetRequested.exchange(false, std::memory_order_acq_rel) || loopSteps != lastLoopSteps)
+    const bool historyDropped = wrapResetRequested.exchange(false, std::memory_order_acq_rel) || loopSteps != lastLoopSteps;
+    if (historyDropped)
         prevEffectiveStep = -1;
     lastLoopSteps = loopSteps;
     if (loopSteps > 0 && prevEffectiveStep >= 0 && effectiveStep < prevEffectiveStep)
         result.masterLoopWrapped = true;
+
+    // The step counter restarted (transport restart, loop change, master wrap, host jump back):
+    // every pattern phase and recorded boundary belonged to the old run, so patterns realign to
+    // the counter again and a swap flagged in the old run starts from 0.
+    if (historyDropped || (lastEffectiveStep >= 0 && effectiveStep < lastEffectiveStep))
+    {
+        phaseOrigin.fill(0);
+        for (auto& b : boundaryEff) b.store(0, std::memory_order_relaxed);
+        frameEpoch.store(frameEpoch.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
+    }
     lastEffectiveStep = effectiveStep;
 
     // Non-blocking snapshot: copy any updated patterns into the audio-thread-safe buffers.
@@ -229,6 +274,8 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
     {
         if (mu_core::trySpinLock(patternLock))
         {
+            // Phases as they stood before this pass, for slots that adopt a partner's after a reorder.
+            const auto adoptedOrigins = phaseOrigin;
             for (int r = 0; r < numRhythms; ++r)
             {
                 if (patternUpdated[r])
@@ -240,23 +287,35 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
                     safePatterns[r].assign(cachedPatterns[r].begin(),  cachedPatterns[r].end());
                     safeCPatterns[r].assign(cachedCPatterns[r].begin(), cachedCPatterns[r].end());
                     patternUpdated[r] = false;
-                    // Absorb the current step so we don't retroactively fire a hit —
-                    // EXCEPT when lastStepIndex == -1, which means "this is a step-
-                    // aligned (re)start, fire the current step." That sentinel is
-                    // set by:
-                    //   (a) the ctor's fill(-1) — cold start, never-played rhythm
-                    //       (first hit lands in the first audio block
-                    //       instead of being delayed by one step).
-                    //   (b) PluginProcessor::runDeferredWork's swap commit
-                    //       (hot-swapped rhythm fires its first hit at the
-                    //       commit step instead of dropping it).
-                    // Mid-play knob changes leave lastStepIndex>=0 so they still
-                    // absorb, preventing retroactive triggers. lastAccentStepIndex
-                    // gates on the same sentinel for the same reason.
+
+                    // A hot-swap start: the new pattern's step 0 sits on the swap's loop boundary.
+                    // A commit landing in a step the old pattern already played absorbs that step
+                    // (the new pattern starts on the next one, no double hit); a commit before the
+                    // step was reached fires it at once. -1 is the "fire the current step" sentinel;
+                    // the cold-start fill(-1) uses the same one.
+                    if (pendingKind[r] == kStart)
+                    {
+                        phaseOrigin[r] = (cachedEpoch[r] == kAnyFrameEpoch
+                                          || cachedEpoch[r] == frameEpoch.load(std::memory_order_relaxed))
+                                             ? cachedOrigin[r] : 0;
+                        lastAccentStepIndex[r] = 0;
+                        wasLastStepHit[r]      = false;   // the first new hit must not be "tied" to the old pattern
+                        lastStepIndex[r]       = (prevGlobalStep >= 0 && globalStep == prevGlobalStep) ? 0 : -1;
+                    }
+                    else if (pendingKind[r] == kAdoptFrom)
+                    {
+                        phaseOrigin[r] = adoptedOrigins[(size_t) cachedOrigin[r]];
+                    }
+                    pendingKind[r] = kNone;
+
+                    // Absorb the current step so we don't retroactively fire a hit, except when
+                    // lastStepIndex == -1 (cold start or a swap start ahead of its step): fire it.
+                    // Mid-play knob changes leave lastStepIndex>=0 so they still absorb,
+                    // preventing retroactive triggers. lastAccentStepIndex gates on the same sentinel.
                     if (!safePatterns[r].empty() && lastStepIndex[r] != -1)
-                        lastStepIndex[r] = effectiveStep % (int)safePatterns[r].size();
+                        lastStepIndex[r] = floorMod(effectiveStep - phaseOrigin[r], (int) safePatterns[r].size());
                     if (!safeCPatterns[r].empty() && lastStepIndex[r] != -1)
-                        lastAccentStepIndex[r] = effectiveStep % (int)safeCPatterns[r].size();
+                        lastAccentStepIndex[r] = floorMod(effectiveStep - phaseOrigin[r], (int) safeCPatterns[r].size());
                 }
             }
             mu_core::spinUnlock(patternLock);
@@ -269,7 +328,7 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
         if (pattern.empty()) continue;
 
         const int patLen    = static_cast<int>(pattern.size());
-        const int stepIndex = effectiveStep % patLen;
+        const int stepIndex = floorMod(effectiveStep - phaseOrigin[r], patLen);
         const int prevStep  = lastStepIndex[r];
 
         if (stepIndex == prevStep) continue;   // no advance this block
@@ -335,9 +394,15 @@ BlockResult SequencerEngine::processBlock(double beatPosition)
             }
         }
 
+        // A pass of this pattern started in this block: remember where, for a swap flagged now.
+        if (result.rhythmLoopWrapMask & (1 << r))
+            boundaryEff[(size_t) r].store(effectiveStep - stepIndex, std::memory_order_relaxed);
+
         lastStepIndex[r]       = stepIndex;
-        lastAccentStepIndex[r] = (cLen > 0) ? (effectiveStep % cLen) : 0;
+        lastAccentStepIndex[r] = (cLen > 0) ? floorMod(effectiveStep - phaseOrigin[r], cLen) : 0;
     }
+
+    prevGlobalStep = globalStep;
 
     return result;
 }

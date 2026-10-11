@@ -3,6 +3,9 @@
 #include "Rhythm.h"
 #include "MuLimits.h"
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <array>
+#include <atomic>
+#include <cstdint>
 #include <vector>
 
 namespace mu_clid {
@@ -75,22 +78,20 @@ public:
     // after a transport restart cannot see a false wrap. A request flag, safe from any thread.
     void resetWrapDetector() { wrapResetRequested.store(true, std::memory_order_release); }
 
-    // call from PluginProcessor::runDeferredWork immediately after a hot-
-    // swap commit (under suspendProcessing, so the audio thread is paused — no
-    // synchronisation needed). Sentinel -1 tells processBlock's snapshot pass to
-    // skip the absorb-current-step behaviour for this rhythm, so the new pattern
-    // fires its first hit at the commit step instead of dropping it.
-    void resetStepTrackingForSwap(int r)
-    {
-        if (r >= 0 && r < MaxRhythms)
-        {
-            lastStepIndex[r]       = -1;
-            lastAccentStepIndex[r] = 0;
-            // post-swap, the first hit of the new pattern must not be
-            // marked "tied" to whatever step the old pattern had under us.
-            wasLastStepHit[r] = false;
-        }
-    }
+    // Message thread, after a hot-swap commit (and on loading a preset at once): rebuild slot r's
+    // pattern and ask the audio thread to start it at its own step 0 on `originEff`, the effective
+    // step where the swap's loop boundary fell, instead of the absolute step modulo its length.
+    // `frameEpoch` is getFrameEpoch() when that boundary was recorded: if the step counter has
+    // restarted since (master loop wrap, transport restart), the origin no longer applies and the
+    // audio thread falls back to 0. The pattern rebuild and the request share one lock hold, so
+    // the audio thread can never see the new pattern without its start.
+    static constexpr uint32_t kAnyFrameEpoch = 0xffffffffu;
+    void requestSwapStart(int r, int originEff, uint32_t frameEpoch = kAnyFrameEpoch);
+
+    // Audio thread (HotSwapStager::checkBoundaries): the effective step where slot r's pattern
+    // last started a pass, and the id of the current step counter run.
+    int      getBoundaryEff(int r) const noexcept { return boundaryEff[(size_t) r].load(std::memory_order_relaxed); }
+    uint32_t getFrameEpoch() const noexcept       { return frameEpoch.load(std::memory_order_relaxed); }
 
     // Current step within the master loop (0-based). 0 when loop is free-running.
     // Written by the audio thread each block; safe to read from the message thread at 10 Hz.
@@ -119,8 +120,13 @@ private:
     // Message thread: spin-wait to acquire. Audio thread: try-lock only (non-blocking).
     std::atomic<bool>            patternLock { false };
 
+    // Audio-thread private (no other thread reads or writes these).
     std::array<int, MaxRhythms> lastStepIndex;
     std::array<int, MaxRhythms> lastAccentStepIndex;
+    // Effective step at which each slot's pattern position is 0: position = (step - phaseOrigin)
+    // modulo length. Moves only when a hot-swap starts a new pattern on its loop boundary.
+    std::array<int, MaxRhythms> phaseOrigin { };
+    int prevGlobalStep = -1;   // previous block's step, to tell a mid-step commit from a new step
     // per-rhythm "was the most recent step we walked a hit?" — used to
     // compute BlockResult::tiedMask on the next hit. Defaults to false; set
     // to false in the constructor's `fill(...)` initialisation block and
@@ -128,6 +134,22 @@ private:
     // removeRhythm shift).
     std::array<bool, MaxRhythms> wasLastStepHit { };
     std::vector<bool> patternUpdated;
+
+    // Hand-over from the message thread to the audio thread, guarded by patternLock with
+    // patternUpdated. kStart = a hot-swap start (adopt the origin and apply the no-flam rule);
+    // kAdoptFrom = a slot reorder (copy the partner slot's phase; cachedOrigin holds its index).
+    enum PendingKind : uint8_t { kNone = 0, kStart, kAdoptFrom };
+    std::array<uint8_t,  MaxRhythms> pendingKind  { };
+    std::array<int,      MaxRhythms> cachedOrigin { };
+    std::array<uint32_t, MaxRhythms> cachedEpoch  { };
+
+    // Audio thread writes (relaxed): the effective step where each slot's pattern last wrapped to
+    // its step 0, and the id of the step counter run (bumped whenever the counter restarts or wraps).
+    std::array<std::atomic<int>, MaxRhythms> boundaryEff { };
+    std::atomic<uint32_t> frameEpoch { 0 };
+
+    void rebuildCachedLocked(int index);
+    static int floorMod(int a, int n) noexcept { const int m = a % n; return m < 0 ? m + n : m; }
     // Atomic because host automation can set the loop length off the audio thread.
     std::atomic<int> masterLoopSteps { 0 };
     std::atomic<int> masterLoopCurrentStep { 0 };
