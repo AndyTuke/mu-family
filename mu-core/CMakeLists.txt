@@ -121,3 +121,6 @@ target_include_directories(mu-core INTERFACE
 target_include_directories(mu-core SYSTEM INTERFACE
     "${CMAKE_SOURCE_DIR}/ThirdParty/monocypher"
 )
+
+# Unit tests for shared mu-core code (no product linked).
+add_subdirectory(Tests)

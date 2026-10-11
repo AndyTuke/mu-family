@@ -108,6 +108,21 @@ cmake --build build --target mu-tant-tests --config Debug && build/mu-tant/mu-ta
 
 ---
 
+## C++ unit tests — mu-core (shared)
+
+Tests of shared mu-core behaviour live in `mu-core/Tests` and are built once as `mu-core-tests` (part of **ALL_BUILD**). They link no product: a fake `ProcessorCore` stands in for a processor. Build command:
+
+```
+cmake --build build --target mu-core-tests --config Debug && build/mu-core/Tests/mu-core-tests_artefacts/Debug/mu-core-tests.exe
+```
+
+| Coverage | File | Status |
+|---|---|---|
+| Host transport publishing: defaults, play + ppq, no ppq, meter + bar start (clamped to 255), null playhead reset, bypassed block still publishes | `mu-core/Tests/HostTransportPublishTests.cpp` | Pass (10 results, 0 failures, build 1243) |
+| Layer access: valid index, out of range → nullptr, const overload, name + colour via the base accessors | `mu-core/Tests/LayerAccessTests.cpp` | Pass (build 1243) |
+
+---
+
 ## C++ unit tests — μ-On
 
 Built as part of **ALL_BUILD** every build (mirrors mu-tant-tests — local-only product, small suite). Build command:

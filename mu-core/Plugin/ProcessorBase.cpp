@@ -12,7 +12,7 @@
 ProcessorBase::ProcessorBase(const BusesProperties& props,
                              juce::AudioProcessorValueTreeState::ParameterLayout layout,
                              const juce::Identifier& stateTreeType)
-    : juce::AudioProcessor(props),
+    : ProcessorCore(props),
       apvts(*this, nullptr, stateTreeType, std::move(layout))
 {}
 
