@@ -4,6 +4,7 @@
 // thin shell over this and is exercised by the runnable mu-link-server app, not here.
 
 #include <juce_core/juce_core.h>
+#include <memory>
 #include <vector>
 #include "../Server/ServerEngine.h"
 #include "../Ipc/MuLinkServerMemory.h"
@@ -223,6 +224,25 @@ public:
                 expectWithinAbsoluteError(sentAt[2] - sentAt[1], 10.0, 1.0e-6);
                 expectWithinAbsoluteError(sentAt[3], 100.0 + 1023 * 1000.0 / 48000.0, 1.0e-6, "overflow pulse at the block's last frame");
             }
+        }
+
+        beginTest("MIDI clock out queue fills to capacity and drains in order, then the sender is destroyed cleanly");
+        {
+            // Many pushes then destruction: guards the sender's layout (a stale object file once
+            // made the queue overwrite the thread base and crash in the destructor).
+            auto clockOut = std::make_unique<MidiClockOut>(false);
+            clockOut->armForTest();
+            const int offsets[] = { 0 };
+            for (int i = 0; i < 600; ++i)
+                clockOut->emit(1000.0 + i * 10.0, nullptr, 0, offsets, 1, 2, 64, 48000.0);   // 1200 pushes, the queue holds 1023
+
+            int sent = 0;
+            double last = -1.0;
+            bool ordered = true;
+            clockOut->sendDue(1.0e12, [&](const juce::MidiMessage&, double due) { ordered = ordered && due >= last; last = due; ++sent; });
+            expectEquals(sent, 1023, "a full queue drops the overflow and keeps the rest");
+            expect(ordered, "pulses leave in the order they were queued");
+            clockOut.reset();   // must not crash
         }
 
         beginTest("MIDI transport out: Start + beat-0 pulse, Stop, Song Position + Continue, rewind");
