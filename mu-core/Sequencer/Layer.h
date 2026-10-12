@@ -45,6 +45,24 @@ struct OwnerLink
     OwnerLink& operator=(const OwnerLink&) noexcept { return *this; }
 };
 
+// A member that belongs to the layer's SLOT (its running DSP state: an insert effect and its delay
+// lines), not to the layer's data. Copying or assigning a layer over another leaves the destination's
+// own member untouched, so nothing heavy is copied or allocated; a copy starts with a default one.
+template <class T>
+struct SlotBound
+{
+    T value {};
+
+    SlotBound() = default;
+    SlotBound(const SlotBound&) {}
+    SlotBound& operator=(const SlotBound&) noexcept { return *this; }
+
+    T*       operator->() noexcept       { return &value; }
+    const T* operator->() const noexcept { return &value; }
+    T&       operator*() noexcept        { return value; }
+    const T& operator*() const noexcept  { return value; }
+};
+
 // Base struct shared by all mu-family voice slots.
 // Rhythm (mu-clid) extends this with Euclidean hit generators.
 // Future mu-tant voice types extend it with their own trigger data.
@@ -109,6 +127,11 @@ struct Layer
         std::swap(modulationMatrix, fresh.modulationMatrix);
     }
     virtual void onMoved(int newIndex) { juce::ignoreUnused(newIndex); }
+
+    // The insert effect's gain-reduction meter (0..1, written by the audio thread, read by the UI), or
+    // null when the layer has no insert or the algorithm shows none. Message thread only: the pointer
+    // is into this layer, so a caller drops it before the layer is removed.
+    virtual const std::atomic<float>* insertGainReduction() const { return nullptr; }
 };
 
 // The base persistence hooks need the modulator (de)serialiser, which itself takes a Layer.

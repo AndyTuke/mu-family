@@ -37,6 +37,25 @@ struct LayerAccessTests : juce::UnitTest
             expectEquals(p.getChannelName(2), juce::String("Snare"));
             expectEquals(p.getChannelColourIndex(2), 5);
         }
+
+        beginTest("a layer reports no insert gain-reduction meter unless it overrides it");
+        {
+            TestProcessorCore p;
+            expect(p.getLayer(0)->insertGainReduction() == nullptr);
+        }
+
+        beginTest("a SlotBound member is never copied or assigned between layers");
+        {
+            SlotBound<int> a, b;
+            a.value = 7;
+            b.value = 3;
+            a = b;                                  // assignment leaves the destination alone
+            expectEquals(a.value, 7);
+            SlotBound<int> c(a);                    // a copy starts with a default member
+            expectEquals(c.value, 0);
+            *c = 5;
+            expectEquals(c.value, 5);
+        }
     }
 };
 

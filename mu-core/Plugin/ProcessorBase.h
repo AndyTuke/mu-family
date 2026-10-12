@@ -79,6 +79,14 @@ public:
     // Channel metadata for the shared mixer UI (getNumChannels, getLayer, getChannelName, ...)
     // is declared in ProcessorCore.
 
+    // The gain-reduction meter of layer `i`'s insert effect (null when it has none or `i` is out of
+    // range), for the shared insert panel's compressor / limiter meter. Message thread only.
+    const std::atomic<float>* getInsertGR(int i) const
+    {
+        const auto* layer = getLayer(i);
+        return layer != nullptr ? layer->insertGainReduction() : nullptr;
+    }
+
     // ─── MIDI program-change → preset loading ────────────────────────────────
     // The maps + FIFO + audio-thread scan + message-thread drain live here so
     // every mu-family plugin gets the same MIDI PC behaviour without
