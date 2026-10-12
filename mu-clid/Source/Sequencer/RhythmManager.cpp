@@ -18,7 +18,9 @@ void RhythmManager::add(const Rhythm& r)
     proc.midiEngines[ri].prepare(proc.currentSampleRate, proc.currentBlockSize);
     {
         const juce::ScopedLock sl(proc.rhythmsLock);
-        proc.sequencer.addRhythm(r);
+        proc.rhythmStore[(size_t) ri] = r;
+        proc.sequencer.setNumRhythms(ri + 1);
+        proc.sequencer.updatePattern(ri);
         proc.numActiveRhythms.store(proc.sequencer.getNumRhythms(), std::memory_order_release);
     }
     proc.samples.clearPath(ri);
@@ -60,7 +62,8 @@ bool RhythmManager::swap(int i, int j)
     {
         const juce::ScopedLock sl(proc.rhythmsLock);
 
-        proc.sequencer.swapRhythmSlots(i, j);
+        std::swap(proc.rhythmStore[(size_t) i], proc.rhythmStore[(size_t) j]);
+        proc.sequencer.swapSlotState(i, j);
         std::swap(proc.voiceEngines[i], proc.voiceEngines[j]);
         std::swap(proc.midiEngines[i],  proc.midiEngines[j]);
         resetPlayState(i);
@@ -106,7 +109,12 @@ void RhythmManager::remove(int index)
     {
         const juce::ScopedLock sl(proc.rhythmsLock);
         proc.numActiveRhythms.store(newN, std::memory_order_release);
-        proc.sequencer.removeRhythm(index);
+        // Shift the rhythms down over the gap and leave the vacated top slot at its default.
+        for (int i = index; i < newN; ++i)
+            proc.rhythmStore[(size_t) i] = std::move(proc.rhythmStore[(size_t) i + 1]);
+        proc.rhythmStore[(size_t) newN] = Rhythm{};
+        proc.sequencer.removeSlotState(index);
+        proc.sequencer.setNumRhythms(newN);
         proc.parkPendingMidiOff(index);   // the removed slot's engine is overwritten below; keep its owed note-off
         // The strips above shift down, so re-point every sidechain source first: a strip that ducked
         // from the deleted rhythm now ducks from nothing; the rest follow their rhythm down.

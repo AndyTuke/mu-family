@@ -94,7 +94,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     const juce::ScopedLock sl(proc.rhythmsLock);
 
     // Expand to MaxRhythms so parameterChanged can write to all 8 rhythm slots.
-    proc.sequencer.setNumRhythms(RhythmSequencer::MaxRhythms);
+    proc.setRhythmCount(RhythmSequencer::MaxRhythms);
 
     // migrate legacy state in-place before pushing it into APVTS so the
     // new 0..10 s ADSR ranges don't clamp old 0..100 values to absurd attacks.
@@ -107,7 +107,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
     }
 
     // Trim to actual active count.
-    proc.sequencer.setNumRhythms(n);
+    proc.setRhythmCount(n);
 
     // restore per-rhythm modulator state from the Modulators children.
     // Each child carries a rhythmIndex property so we apply to the right slot

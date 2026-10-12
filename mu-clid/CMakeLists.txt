@@ -243,6 +243,7 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/EmbeddedSampleTests.cpp       # preset samples: FLAC round trip is sample-identical
     Source/Tests/RhythmSequencerWrapTests.cpp  # master-loop wrap detection
     Source/Tests/SwapCommitTimingTests.cpp     # a delayed swap commit still starts the new pattern on the next step
+    Source/Tests/RhythmSequencerSlotTests.cpp  # slot binding and per-slot state moves
     Source/Tests/MidiOutputModeTests.cpp       # per-rhythm Sample / MIDI output: table, presets, render through the real processor
     "${CMAKE_SOURCE_DIR}/mu-core/Sequencer/RhythmSequencer.cpp"        # under test by the wrap tests
     Source/Persistence/PresetMigrations.cpp    # under test by C1/C2

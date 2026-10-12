@@ -3,6 +3,7 @@
 
 #include <juce_core/juce_core.h>
 #include "Sequencer/GeneratorAliases.h"
+#include "SequencerTestHarness.h"
 
 using namespace mu_clid;
 
@@ -18,7 +19,7 @@ public:
 
         beginTest("A genuine wrap is reported once");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(Rhythm{});
             e.setMasterLoopSteps(16);
             expect(! e.processBlock(beat(14)).masterLoopWrapped);
@@ -29,7 +30,7 @@ public:
 
         beginTest("Changing the loop length between blocks gives no false wrap");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(Rhythm{});
             e.setMasterLoopSteps(32);
             e.processBlock(beat(20));                        // effective step 20
@@ -41,7 +42,7 @@ public:
 
         beginTest("Setting the same loop length keeps the wrap history");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(Rhythm{});
             e.setMasterLoopSteps(16);
             e.processBlock(beat(15));
@@ -51,7 +52,7 @@ public:
 
         beginTest("A reset request drops the history for the next block only");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(Rhythm{});
             e.setMasterLoopSteps(16);
             e.processBlock(beat(15));

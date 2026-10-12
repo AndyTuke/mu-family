@@ -108,11 +108,14 @@ PluginProcessor::PluginProcessor()
             modSlot[(size_t) i] = &value;
 
     // Add default rhythm (16 steps, 4 hits) and sync its state to APVTS.
-    Rhythm defaultRhythm;
+    for (int ri = 0; ri < RhythmSequencer::MaxRhythms; ++ri)
+        sequencer.bindRhythm(ri, &rhythmStore[(size_t) ri]);
+    Rhythm& defaultRhythm = rhythmStore[0];
     defaultRhythm.name       = "<unnamed>";
     defaultRhythm.genA.steps = 16;
     defaultRhythm.genA.hits  = 4;
-    sequencer.addRhythm(defaultRhythm);
+    sequencer.setNumRhythms(1);
+    sequencer.updatePattern(0);
     voiceEngines[0] = std::make_unique<VoiceEngine>();
     voiceEngines[0]->insertProc.setSlotIndex(0);   // per-slot noise seed: layers do not share one sequence
     // Stage 34 Step 2: C++17 std::atomic<bool> default ctor leaves the value
@@ -132,6 +135,14 @@ PluginProcessor::PluginProcessor()
     // Ensure user content folders exist and restore the saved default preset (skipped by render mode).
     ensureContentFoldersExist();
     loadStartupDefault();
+}
+
+void PluginProcessor::setRhythmCount(int n)
+{
+    n = juce::jlimit(0, RhythmSequencer::MaxRhythms, n);
+    for (int i = n; i < sequencer.getNumRhythms(); ++i)
+        rhythmStore[(size_t) i] = Rhythm{};
+    sequencer.setNumRhythms(n);
 }
 
 PluginProcessor::~PluginProcessor()

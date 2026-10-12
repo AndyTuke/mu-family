@@ -55,6 +55,8 @@ public:
     // thread never takes it; exposed so a test can hold it from a second thread and see no block skip.
     juce::CriticalSection& getRhythmLock() noexcept { return rhythmsLock; }
 
+    // The one rhythm, owned here and bound to the sequencer's slot 0 (the sequencer does not own rhythms).
+    Rhythm          rhythm;
     RhythmSequencer sequencer;
 
     // UI play state: written by the audio thread, read by the editor at 30 Hz.

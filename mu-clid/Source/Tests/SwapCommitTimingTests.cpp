@@ -9,6 +9,7 @@
 #include <thread>
 #include <vector>
 #include "Sequencer/GeneratorAliases.h"
+#include "SequencerTestHarness.h"
 #include "Plugin/HotSwap.h"
 #include "Plugin/HotSwapBoundary.h"
 
@@ -83,7 +84,7 @@ public:
         const int boundary = masterLoop > 0 ? 0 : 8;
         const int firstStep = 8;
 
-        const auto setup = [&](RhythmSequencer& e, const Rhythm& old)
+        const auto setup = [&](TestSequencer& e, const Rhythm& old)
         {
             e.addRhythm(old);
             if (masterLoop > 0) e.setMasterLoopSteps(masterLoop);
@@ -91,14 +92,14 @@ public:
         };
 
         {   // old rest, new hit on step 0: the new downbeat must sound exactly once
-            RhythmSequencer e;
+            TestSequencer e;
             setup(e, restOnZero(3, 8));
             const auto next = rhythmOf(4, 8);
             expectEquals(fireCount(e, firstStep, delayBeats, &next, boundary), 1,
                          "old rest / new hit on step 0 at " + juce::String(bpm) + " bpm loop " + juce::String(masterLoop));
         }
         {   // old hit, new hit on step 0: absorbed, so the step sounds once (no flam)
-            RhythmSequencer e;
+            TestSequencer e;
             setup(e, rhythmOf(4, 8));
             const auto next = rhythmOf(2, 8);
             expectEquals(fireCount(e, firstStep, delayBeats, &next, boundary), 1,
@@ -111,7 +112,7 @@ public:
     // steps at which the swap committed (one entry per commit) and the boundary step it recorded.
     std::vector<int> runStagedSwap(int swapMode, int masterLoop, int lastStep, int* originOut = nullptr)
     {
-        RhythmSequencer e;
+        TestSequencer e;
         e.addRhythm(rhythmOf(4, 8));
         if (masterLoop > 0) e.setMasterLoopSteps(masterLoop);
         mu_hotswap::Stager<int, int, 1> stager;
@@ -162,7 +163,7 @@ public:
 
         beginTest("A swap committed on the boundary step fires the new pattern at once");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(1));                      // old: a hit on step 0 only
             for (int s = 0; s < 8; ++s) e.processBlock(beat(s));
             commit(e, rhythmOf(8), 8);                     // new: every step hits
@@ -171,7 +172,7 @@ public:
 
         beginTest("A swap committed one step late: the old pattern plays the extra step, the new one starts next");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(1));
             for (int s = 0; s < 8; ++s) e.processBlock(beat(s));
             expect(fired(e.processBlock(beat(8))), "old pattern's step 0 plays before the commit lands");
@@ -182,7 +183,7 @@ public:
 
         beginTest("The old pattern is silent from the commit on");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(8));                      // old: every step hits
             for (int s = 0; s < 8; ++s) e.processBlock(beat(s));
             commit(e, rhythmOf(0), 8);                     // new: silent
@@ -192,7 +193,7 @@ public:
 
         beginTest("A late commit keeps the new pattern aligned to the boundary: its step 0 comes a pass later");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(8));
             for (int s = 0; s < 8; ++s) e.processBlock(beat(s));
             e.processBlock(beat(8));
@@ -206,7 +207,7 @@ public:
 
         beginTest("A different pattern length starts its step 0 on the boundary step");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(1, 16));                  // old: 16 steps, a hit on step 0
             for (int s = 0; s < 16; ++s) e.processBlock(beat(s));
             commit(e, rhythmOf(1, 12), 16);                // new: 12 steps, a hit on step 0
@@ -219,7 +220,7 @@ public:
 
         beginTest("A commit landing in a step already played adds no extra hit");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(8));                      // old: every step hits
             for (int s = 0; s <= 8; ++s) e.processBlock(beat(s));
             commit(e, rhythmOf(8), 8);                     // new: every step hits, landing mid step 8
@@ -229,7 +230,7 @@ public:
 
         beginTest("A commit delayed more than a whole loop still lines up with the boundary");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(8));
             for (int s = 0; s < 8 + 20; ++s) e.processBlock(beat(s));   // 20 extra old steps
             commit(e, rhythmOf(1, 12), 8);                 // new: 12 steps, a hit on step 0
@@ -241,7 +242,7 @@ public:
 
         beginTest("A swap flagged before the step counter restarted starts from step 0");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(1, 16));
             for (int s = 0; s < 10; ++s) e.processBlock(beat(s));
             const auto staleEpoch = e.getFrameEpoch();
@@ -262,7 +263,7 @@ public:
 
         beginTest("A load while stopped cold-starts: step 0 sounds on play");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(1));
             expect(fired(e.processBlock(beat(0))), "old pattern plays step 0");   // then the transport stops
             commit(e, rhythmOf(8), 0);                     // pattern loaded while stopped
@@ -272,7 +273,7 @@ public:
 
         beginTest("A master wrap after an off-phase own-loop swap adds no extra hit");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(8));
             e.setMasterLoopSteps(16);
             for (int s = 0; s < 10; ++s) e.processBlock(beat(s));
@@ -284,14 +285,14 @@ public:
 
         beginTest("The first call at step 0 reports a pattern pass start");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(restOnZero(3, 8));
             expect((e.processBlock(beat(0)).rhythmLoopWrapMask & 1) != 0, "step 0 on a cold start is a loop boundary");
         }
 
         beginTest("A knob change in the boundary step, then a commit in the same step, does not double hit");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(8));                      // old: every step hits
             for (int s = 0; s <= 8; ++s) e.processBlock(beat(s));   // the old pattern sounded step 8
             e.getRhythm(0) = restOnZero(3, 8);             // the Euclid knob: step 0 is now a rest
@@ -304,7 +305,7 @@ public:
 
         beginTest("An absorbed, never-walked step still fires exactly once when a commit follows");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(restOnZero(3, 8));                 // old: step 8 (its step 0) is a rest
             for (int s = 0; s <= 8; ++s) e.processBlock(beat(s));
             e.getRhythm(0) = rhythmOf(8);                  // the knob makes step 0 a hit, absorbed unwalked
@@ -318,7 +319,7 @@ public:
 
         beginTest("A swap start with legato: the new pattern's first hit is not tied to the old pattern");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(8));                      // old: every step hits
             for (int s = 0; s <= 8; ++s) e.processBlock(beat(s));
             commit(e, rhythmOf(8), 8);                     // new: hits on 0 and 1, landing mid step 8
@@ -343,7 +344,7 @@ public:
                     if (p[0] && p[1] && ! p[6]) { pat = c; found = true; }
                 }
             expect(found, "test pattern exists");
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(pat);
             e.setMasterLoopSteps(16);
             for (int s = 0; s < 16; ++s) e.processBlock(beat(s));
@@ -354,7 +355,7 @@ public:
 
         beginTest("A loop-length change and a boundary-step commit in one block do not double hit");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(8));
             for (int s = 0; s <= 8; ++s) e.processBlock(beat(s));   // the old pattern sounded step 8
             e.setMasterLoopSteps(16);
@@ -365,7 +366,7 @@ public:
 
         beginTest("A pattern whose length does not divide the loop neither collapses a block nor flags a false pass start");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(singleHitAt(3, 7));
             e.setMasterLoopSteps(16);
             int fires = 0, passStarts = 0;
@@ -381,7 +382,7 @@ public:
 
         beginTest("A swap staged and the transport started at step 0: one trigger, one commit");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(4, 8));                   // old pattern, loaded while stopped
             mu_hotswap::Stager<int, int, 1> stager;
             stager.stage(0, 7);
@@ -409,7 +410,7 @@ public:
         {
             // The Steps knob moved the live rhythm from 5 to 7 steps before the snapshot landed; the
             // modulation recompute is the first to build the longer pattern.
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(1, 5));                   // one hit on step 0
             for (int s = 0; s <= 7; ++s) e.processBlock(beat(s));   // old position 2
             auto& live = e.getRhythm(0);
@@ -428,7 +429,7 @@ public:
 
         beginTest("Removing a slot while a reorder is pending renumbers the partner it adopts from");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(0, 8));                   // slot 0: silent, removed below
             e.addRhythm(rhythmOf(0, 8));                   // slot 1
             e.addRhythm(singleHitAt(0, 8));                // slot 2: one hit on its step 0
@@ -444,7 +445,7 @@ public:
         beginTest("A backward transport jump mid-loop is not a master wrap; the real wrap still is");
         for (bool guarded : { false, true })
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(4, 16));
             e.setMasterLoopSteps(16);
             double prev = 0.0;
@@ -475,7 +476,7 @@ public:
         for (int from : { 12, 28 })
         {
             // 12 -> 0 (the loop start) and 28 -> 16 (a later pass): both land on a boundary.
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(4, 16));
             e.setMasterLoopSteps(16);
             const int landing = from == 12 ? 0 : 16;
@@ -506,7 +507,7 @@ public:
 
         beginTest("A sub-step dip is held in place: no reset, no wrap, a real jump still resets");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(4, 16));
             e.setMasterLoopSteps(16);
             double last = 0.0;
@@ -536,7 +537,7 @@ public:
         for (int loop : { 0, 16 })
             for (bool dipAcrossStep : { false, true })
             {
-                RhythmSequencer e;
+                TestSequencer e;
                 e.addRhythm(rhythmOf(8, 8));               // every step is a hit
                 e.setMasterLoopSteps(loop);
                 double last = 0.0;
@@ -567,7 +568,7 @@ public:
         beginTest("A reorder then a same-step swap-start commit reads the moved pattern's stepSounded");
         for (bool commitBeforeAudioSeesSwap : { false, true })
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(8, 8));                   // slot 0: sounds on every step
             e.addRhythm(restOnZero(3, 8));                 // slot 1: step 0 (effective step 8) is a rest
             for (int s = 0; s <= 8; ++s) e.processBlock(beat(s));
@@ -585,7 +586,7 @@ public:
 
         beginTest("Swapping a pair twice leaves each pattern with its own phase and sounded flag");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(8, 8));
             e.addRhythm(restOnZero(3, 8));
             for (int s = 0; s <= 8; ++s) e.processBlock(beat(s));
@@ -601,7 +602,7 @@ public:
 
         beginTest("Three slots reordered in a chain each keep their own phase");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(0, 8));                   // A: silent
             e.addRhythm(rhythmOf(0, 8));                   // B: silent
             e.addRhythm(singleHitAt(0, 8));                // C: one hit on its step 0
@@ -618,7 +619,7 @@ public:
 
         beginTest("A one-step pattern still sounds on every step");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(1, 1));
             expectEquals((int) e.getRhythm(0).getCombinedPattern().size(), 1, "the generators really build one step");
             int fires = 0;
@@ -628,7 +629,7 @@ public:
             expectEquals(e.getPatternLength(0), 2, "the walk is given two steps to advance over");
 
             // The modulation recompute builds the one-step pattern too.
-            RhythmSequencer m;
+            TestSequencer m;
             m.addRhythm(rhythmOf(1, 1));
             for (int s = 0; s < 3; ++s) m.processBlock(beat(s));
             EuclidOverrides ov;
@@ -641,7 +642,7 @@ public:
             expectEquals(mf, 5, "and it keeps sounding");
 
             // Reset Steps of 1 is the other way to a one-step cycle.
-            RhythmSequencer q;
+            TestSequencer q;
             Rhythm r = rhythmOf(8, 8);
             r.resetSteps = 1;
             q.addRhythm(r);
@@ -653,7 +654,7 @@ public:
 
         beginTest("A host creeping backward is held for under a step, then followed; the phase does not drift");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(3, 8));
             const auto pat = e.getRhythm(0).getCombinedPattern();
             double last = 0.0;
@@ -706,7 +707,7 @@ public:
 
         beginTest("A jittery host position holds each step once and keeps advancing");
         {
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(8, 8));                   // every step is a hit
             double last = 0.0;
             bool   was  = false;
@@ -736,7 +737,7 @@ public:
         for (int steps : { 1, 2 })
             for (int hits : { 0, 1 })
             {
-                RhythmSequencer e;
+                TestSequencer e;
                 e.addRhythm(rhythmOf(4, 8));
                 for (int s = 0; s < 3; ++s) e.processBlock(beat(s));
                 auto& live = e.getRhythm(0);
@@ -766,7 +767,7 @@ public:
             expectEquals(RhythmSequencer::resolveBlockBeat(3.0, nan, true, true, 0).beat, 3.0, "the last good position is kept");
             expectEquals(RhythmSequencer::resolveBlockBeat(nan, inf, false, false, 0).beat, 0.0, "no history at all falls back to 0");
 
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(8, 8));
             for (int s = 0; s <= 5; ++s) e.processBlock(beat(s));
             expect(! fired(e.processBlock(nan)), "a NaN block holds the last position: nothing replays");
@@ -778,7 +779,7 @@ public:
         {
             // The audio thread runs a fixed number of blocks while this thread requests swaps
             // until it is done; the lock-free hand-over must neither crash nor corrupt a pattern.
-            RhythmSequencer e;
+            TestSequencer e;
             e.addRhythm(rhythmOf(4, 16));
             std::atomic<bool> done { false };
             int fires = 0;

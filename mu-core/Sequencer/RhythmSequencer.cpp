@@ -13,10 +13,6 @@ RhythmSequencer::RhythmSequencer()
     wasLastStepHit.fill(false);
     stepSounded.fill(false);
     soundedFrom.fill(-1);
-    rhythms.reserve(MaxRhythms);
-    cachedPatterns.reserve(MaxRhythms);
-    cachedCPatterns.reserve(MaxRhythms);
-    patternUpdated.reserve(MaxRhythms);
 
     // pre-size every safePatterns / safeCPatterns slot to the worst-case
     // step count (256 — matches the resetSteps cap and getCombinedPattern's LCM
@@ -37,35 +33,49 @@ RhythmSequencer::RhythmSequencer()
 }
 
 //==============================================================================
-void RhythmSequencer::addRhythm(const Rhythm& r)
+void RhythmSequencer::bindRhythm(int slot, Rhythm* r)
 {
-    if ((int)rhythms.size() >= MaxRhythms) return;
-    rhythms.push_back(r);
-    cachedPatterns.emplace_back();
-    cachedCPatterns.emplace_back();
-    patternUpdated.push_back(false);
-    // safePatterns/safeCPatterns/lastStepIndex are fixed arrays — slot already exists.
-    updatePattern((int)rhythms.size() - 1);
+    if (slot < 0 || slot >= MaxRhythms) return;
+    slotRhythm[(size_t) slot] = r;
 }
 
-// Lock contract: the caller holds the processor's rhythmsLock with processing suspended. The audio-owned
+// Returns slot i to its never-used state. Caller holds patternLock or is single-threaded (constructor-time
+// and message-thread-with-audio-excluded paths).
+void RhythmSequencer::clearSlotState(int i)
+{
+    cachedPatterns [(size_t) i].clear();
+    cachedCPatterns[(size_t) i].clear();
+    patternUpdated [(size_t) i] = false;
+    safePatterns   [(size_t) i].clear();
+    safeCPatterns  [(size_t) i].clear();
+    lastStepIndex      [(size_t) i] = -1;
+    lastAccentStepIndex[(size_t) i] = 0;
+    wasLastStepHit     [(size_t) i] = false;
+    stepSounded        [(size_t) i] = false;
+    phaseOrigin        [(size_t) i] = 0;
+    pendingKind        [(size_t) i] = kNone;
+    soundedFrom        [(size_t) i] = -1;
+    boundaryEff        [(size_t) i].store(0, std::memory_order_relaxed);
+}
+
+// Lock contract: the caller holds the processor's layer lock with processing suspended. The audio-owned
 // arrays below are written under patternLock only, which the audio thread merely try-locks, so without
 // that outer exclusion they would race processBlock.
-void RhythmSequencer::removeRhythm(int index)
+void RhythmSequencer::removeSlotState(int index)
 {
-    if (index < 0 || index >= (int)rhythms.size()) return;
+    const int n = getNumRhythms();
+    if (index < 0 || index >= n) return;
 
     mu_core::spinLock(patternLock);
 
-    rhythms.erase        (rhythms.begin()         + index);
-    cachedPatterns.erase (cachedPatterns.begin()  + index);
-    cachedCPatterns.erase(cachedCPatterns.begin() + index);
-    patternUpdated.erase (patternUpdated.begin()  + index);
+    const int newN = n - 1;
 
     // Fixed arrays: shift elements left to fill the gap, clear the vacated tail slot.
-    const int newN = (int)rhythms.size();
     for (int i = index; i < newN; ++i)
     {
+        cachedPatterns[(size_t) i]  = std::move(cachedPatterns[(size_t) i + 1]);
+        cachedCPatterns[(size_t) i] = std::move(cachedCPatterns[(size_t) i + 1]);
+        patternUpdated[(size_t) i]  = patternUpdated[(size_t) i + 1];
         safePatterns[i]        = std::move(safePatterns[i + 1]);
         safeCPatterns[i]       = std::move(safeCPatterns[i + 1]);
         lastStepIndex[i]       = lastStepIndex[i + 1];
@@ -79,16 +89,7 @@ void RhythmSequencer::removeRhythm(int index)
         soundedFrom[i]         = soundedFrom[i + 1];
         boundaryEff[(size_t) i].store(boundaryEff[(size_t) i + 1].load(std::memory_order_relaxed), std::memory_order_relaxed);
     }
-    safePatterns[newN].clear();
-    safeCPatterns[newN].clear();
-    lastStepIndex[newN]       = -1;
-    lastAccentStepIndex[newN] = 0;
-    wasLastStepHit[newN]      = false;
-    stepSounded[newN]         = false;
-    phaseOrigin[newN]         = 0;
-    pendingKind[newN]         = kNone;
-    soundedFrom[newN]         = -1;
-    boundaryEff[(size_t) newN].store(0, std::memory_order_relaxed);
+    clearSlotState(newN);
 
     // A pending reorder holds its partner's slot index in cachedOrigin; slots after the removed one
     // moved down, so renumber it, and drop the request if the partner itself was removed.
@@ -109,67 +110,39 @@ void RhythmSequencer::removeRhythm(int index)
 
 Rhythm& RhythmSequencer::getRhythm(int index)
 {
-    jassert(index >= 0 && index < (int)rhythms.size());
-    return rhythms[index];
+    jassert(index >= 0 && index < getNumRhythms() && slotRhythm[(size_t) index] != nullptr);
+    return *slotRhythm[(size_t) index];
 }
 
 const Rhythm& RhythmSequencer::getRhythm(int index) const
 {
-    jassert(index >= 0 && index < (int)rhythms.size());
-    return rhythms[index];
+    jassert(index >= 0 && index < getNumRhythms() && slotRhythm[(size_t) index] != nullptr);
+    return *slotRhythm[(size_t) index];
 }
 
 void RhythmSequencer::setNumRhythms(int n)
 {
     n = juce::jlimit(0, MaxRhythms, n);
-    const int current = (int)rhythms.size();
+    const int current = getNumRhythms();
 
-    if (n > current)
-    {
-        for (int i = current; i < n; ++i)
-        {
-            rhythms.emplace_back();
-            cachedPatterns.emplace_back();
-            cachedCPatterns.emplace_back();
-            patternUpdated.push_back(false);
-            // safePatterns/safeCPatterns/lastStepIndex: fixed arrays, slots already exist.
-        }
-    }
-    else if (n < current)
-    {
-        rhythms.resize(n);
-        cachedPatterns.resize(n);
-        cachedCPatterns.resize(n);
-        patternUpdated.resize(n);
-        // Clear the fixed array slots that are no longer active.
-        for (int i = n; i < current; ++i)
-        {
-            safePatterns[i].clear();
-            safeCPatterns[i].clear();
-            lastStepIndex[i]       = -1;
-            lastAccentStepIndex[i] = 0;
-            wasLastStepHit[i]      = false;
-            stepSounded[i]         = false;
-            phaseOrigin[i]         = 0;
-            pendingKind[i]         = kNone;
-            soundedFrom[i]         = -1;
-            boundaryEff[(size_t) i].store(0, std::memory_order_relaxed);
-        }
-    }
+    // Slots that become live start clean, and slots that stop being live are cleared.
+    for (int i = std::min(n, current); i < std::max(n, current); ++i)
+        clearSlotState(i);
+
+    numLive.store(n, std::memory_order_relaxed);
 }
 
-// Lock contract as removeRhythm: callers hold rhythmsLock with processing suspended.
-void RhythmSequencer::swapRhythmSlots(int i, int j)
+// Lock contract as removeSlotState: callers hold the layer lock with processing suspended.
+void RhythmSequencer::swapSlotState(int i, int j)
 {
     if (i == j) return;
-    const int n = (int)rhythms.size();
+    const int n = getNumRhythms();
     if (i < 0 || j < 0 || i >= n || j >= n) return;
 
     mu_core::spinLock(patternLock);
 
-    std::swap(rhythms[i],         rhythms[j]);
-    std::swap(cachedPatterns[i],  cachedPatterns[j]);
-    std::swap(cachedCPatterns[i], cachedCPatterns[j]);
+    std::swap(cachedPatterns[(size_t) i],  cachedPatterns[(size_t) j]);
+    std::swap(cachedCPatterns[(size_t) i], cachedCPatterns[(size_t) j]);
     std::swap(safePatterns[i],    safePatterns[j]);
     std::swap(safeCPatterns[i],   safeCPatterns[j]);
 
@@ -199,17 +172,20 @@ void RhythmSequencer::rebuildCachedLocked(int index)
 {
     // Demo cap: no generator is built with more steps than the cap allows.
     const int cap = stepCap.load(std::memory_order_relaxed);
-    for (auto* gen : { &rhythms[index].genA, &rhythms[index].genB, &rhythms[index].genC })
+    Rhythm& rhy = *slotRhythm[(size_t) index];
+    for (auto* gen : { &rhy.genA, &rhy.genB, &rhy.genC })
         gen->steps = juce::jmin(gen->steps, cap);
 
-    cachedPatterns[index]  = rhythms[index].getCombinedPattern();
+    cachedPatterns[index]  = rhy.getCombinedPattern();
     ensureMinPatternLength(cachedPatterns[index]);
-    cachedCPatterns[index] = rhythms[index].genC.getPattern();
+    cachedCPatterns[index] = rhy.genC.getPattern();
     patternUpdated[index]  = true;
 }
 
 void RhythmSequencer::updatePattern(int index)
 {
+    if (index < 0 || index >= MaxRhythms || slotRhythm[(size_t) index] == nullptr) return;
+
     mu_core::spinLock(patternLock);
     rebuildCachedLocked(index);   // lastStepIndex preserved: processBlock absorbs the current step without firing
     mu_core::spinUnlock(patternLock);
@@ -217,7 +193,7 @@ void RhythmSequencer::updatePattern(int index)
 
 void RhythmSequencer::requestSwapStart(int r, int originEff, uint32_t epoch)
 {
-    if (r < 0 || r >= (int) rhythms.size()) return;
+    if (r < 0 || r >= getNumRhythms() || slotRhythm[(size_t) r] == nullptr) return;
 
     mu_core::spinLock(patternLock);
     rebuildCachedLocked(r);
@@ -235,12 +211,12 @@ bool RhythmSequencer::tryUpdatePatternFromModulation(int index, const EuclidOver
     // clobber the modulated pattern this block. The next snapshot pass (after a real
     // knob change sets patternUpdated[index]=true) will overwrite safePatterns with the
     // freshly-cached base, and the next modulation tick will re-modulate from there.
-    if (index < 0 || index >= (int) rhythms.size()) return false;
+    if (index < 0 || index >= getNumRhythms() || slotRhythm[(size_t) index] == nullptr) return false;
 
     if (!mu_core::trySpinLock(patternLock))
         return false;   // message thread holds the lock — retry next block
 
-    const Rhythm& rhy = rhythms[index];
+    const Rhythm& rhy = *slotRhythm[(size_t) index];
     const int oldLen  = (int) safePatterns[index].size();
     const int oldCLen = (int) safeCPatterns[index].size();
     rhy.getCombinedPattern(ov, safePatterns[index], scratchPatA, scratchPatB, scratchEuclid);
@@ -273,7 +249,7 @@ bool RhythmSequencer::tryUpdatePatternFromModulation(int index, const EuclidOver
 //==============================================================================
 BlockResult RhythmSequencer::processBlock(double beatPosition)
 {
-    const int numRhythms = (int)rhythms.size();
+    const int numRhythms = getNumRhythms();
     if (numRhythms == 0)
         return {};
 

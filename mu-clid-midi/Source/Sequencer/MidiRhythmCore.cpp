@@ -22,12 +22,14 @@ MidiRhythmCore::MidiRhythmCore(juce::AudioProcessorValueTreeState& apvtsToUse)
         if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
             apvts.addParameterListener(p->getParameterID(), this);
 
-    // The one rhythm: 16 steps, 4 hits, and its values mirrored into the parameters.
-    Rhythm defaultRhythm;
-    defaultRhythm.name       = "<unnamed>";
-    defaultRhythm.genA.steps = 16;
-    defaultRhythm.genA.hits  = 4;
-    sequencer.addRhythm(defaultRhythm);
+    // The one rhythm: 16 steps, 4 hits, bound to the sequencer's only slot; its values are mirrored
+    // into the parameters below.
+    rhythm.name       = "<unnamed>";
+    rhythm.genA.steps = 16;
+    rhythm.genA.hits  = 4;
+    sequencer.bindRhythm(0, &rhythm);
+    sequencer.setNumRhythms(1);
+    sequencer.updatePattern(0);
 
     midiNotePtr  = apvts.getRawParameterValue(kMidiNoteId);
     accentAmtPtr = apvts.getRawParameterValue(kAccentAmtId);

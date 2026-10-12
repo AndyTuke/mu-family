@@ -154,6 +154,9 @@ public:
     void loadDefaultPreset() override            { presetIO.loadDefaultPreset(); }
 
 
+    // Temporary scaffold: the rhythms live here and the sequencer binds to them, until the layer
+    // container owns them. Slots at or above the live count always hold a default Rhythm.
+    std::array<Rhythm, RhythmSequencer::MaxRhythms> rhythmStore;
     RhythmSequencer sequencer;
     // Fixed-size arrays so the audio thread never races with a vector reallocation
     // caused by RhythmManager add / remove on the message thread.  numActiveRhythms is
@@ -416,6 +419,8 @@ private:
     // apvtsLoading-guarded multi-writes.
     void pushMixerChannelToApvts(int idx);
     void swapApvtsForRhythms(int i, int j);
+    // Sets the sequencer's live rhythm count; a dropped rhythm is reset so a later grow starts from a default one.
+    void setRhythmCount(int n);
     void restoreStateFromTree(const juce::ValueTree& s) { presetIO.restoreStateFromTree(s); }
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

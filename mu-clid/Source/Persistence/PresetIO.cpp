@@ -838,7 +838,7 @@ void PresetIO::commitStagedFullPreset(HotSwapStager::PreparedFullPreset& prepare
     {
         const juce::ScopedLock sl(proc.rhythmsLock);
 
-    proc.sequencer.setNumRhythms(n);
+    proc.setRhythmCount(n);
 
     if (n < oldN)
         proc.numActiveRhythms.store(n, std::memory_order_release);  // shrink: drop count first

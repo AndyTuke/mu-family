@@ -35,15 +35,22 @@ public:
 
     RhythmSequencer();
 
-    // Rhythm management — call from the message thread only.
-    // removeRhythm and swapRhythmSlots write audio-owned per-slot state (phase, step history) under
-    // patternLock alone: the caller must hold the processor's rhythmsLock (so processBlock is not
-    // running) and have processing suspended, or those writes race the audio thread.
-    void    addRhythm    (const Rhythm& r);
-    void    removeRhythm (int index);
+    // The sequencer does not own the rhythms: the product owns them and binds each live slot to its
+    // Rhythm (null = unbound). Bind at construction or under the processor's layer lock, and rebind
+    // whenever the product moves a Rhythm to another address.
+    void    bindRhythm   (int slot, Rhythm* r);
     Rhythm& getRhythm    (int index);
     const Rhythm& getRhythm (int index) const;
-    int     getNumRhythms() const { return (int)rhythms.size(); }
+    int     getNumRhythms() const { return numLive.load(std::memory_order_relaxed); }
+
+    // Per-slot state moves — call from the message thread only. These move the sequencer's own
+    // per-slot state (cached patterns, phase, step history, pending hand-overs); the Rhythm data
+    // itself is moved by the product. They write audio-owned state under patternLock alone, so the
+    // caller must hold the processor's layer lock (so processBlock is not running) and have
+    // processing suspended, or those writes race the audio thread. removeSlotState does not change
+    // the live count: the caller follows it with setNumRhythms(n - 1).
+    void    removeSlotState (int index);
+    void    swapSlotState   (int i, int j);
 
     // Call after changing any rhythm parameter to refresh its cached pattern.
     void updatePattern(int index);
@@ -54,12 +61,9 @@ public:
     // on the next block (the override values are sticky in PluginProcessor).
     bool tryUpdatePatternFromModulation(int index, const EuclidOverrides& ov);
 
-    // Resize all rhythm vectors to n — used during state loading to pre-expand or trim.
+    // Sets the live slot count (state loading pre-expands or trims). The state of every slot that
+    // becomes live or stops being live is cleared; nothing is created or destroyed.
     void setNumRhythms(int n);
-
-    // Swap two rhythm slots atomically with respect to the audio thread. Same lock contract as
-    // removeRhythm: callers hold rhythmsLock with processing suspended.
-    void swapRhythmSlots(int i, int j);
 
     // UI read-only accessors (safe to call from message thread after processBlock).
     int getLastStepIndex       (int r) const { return lastStepIndex[r]; }
@@ -163,11 +167,14 @@ public:
 private:
     std::atomic<int> stepCap { 64 };
 
-    std::vector<Rhythm>            rhythms;
+    // The live rhythm count and the product-owned Rhythm bound to each slot. The count is written
+    // under the product's layer lock; the audio thread reads both only inside it.
+    std::atomic<int>                 numLive { 0 };
+    std::array<Rhythm*, MaxRhythms>  slotRhythm { };
 
     // Message-thread authoritative copies. Written under patternLock.
-    std::vector<std::vector<bool>> cachedPatterns;
-    std::vector<std::vector<bool>> cachedCPatterns;
+    std::array<std::vector<bool>, MaxRhythms> cachedPatterns;
+    std::array<std::vector<bool>, MaxRhythms> cachedCPatterns;
 
     // Audio-thread read buffers. Fixed-size arrays — never reallocated, so the audio
     // thread can safely read them after releasing patternLock without OOB risk.
@@ -190,13 +197,13 @@ private:
     // compute BlockResult::tiedMask on the next hit. Defaults to false; set
     // to false in the constructor's `fill(...)` initialisation block and
     // wherever lastStepIndex is reset to -1 (cold start, hot-swap commit,
-    // removeRhythm shift).
+    // removeSlotState shift).
     std::array<bool, MaxRhythms> wasLastStepHit { };
     // per-rhythm "did the step the position sits on sound?": set only by the step walk (a hit fired
     // = true, a rest = false), cleared on a transport restart. Absorbing a changed pattern or a
     // modulated length does not touch it, so the hot-swap commit rule sees what actually played.
     std::array<bool, MaxRhythms> stepSounded { };
-    std::vector<bool> patternUpdated;
+    std::array<bool, MaxRhythms> patternUpdated { };
 
     // Hand-over from the message thread to the audio thread, guarded by patternLock with
     // patternUpdated. kStart = a hot-swap start (adopt the origin and apply the no-flam rule);
@@ -215,6 +222,8 @@ private:
     std::atomic<uint32_t> frameEpoch { 0 };
 
     void rebuildCachedLocked(int index);
+    // Returns slot i to its never-used state (patterns, phase, step history, pending hand-overs).
+    void clearSlotState(int i);
 
     // The step walk advances only when the step index changes, so a one-step pattern would sound once
     // and never again. Tiling [x] to [x, x] keeps the same rhythm and gives the walk a step to advance.
