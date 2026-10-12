@@ -51,4 +51,4 @@ Short:
 - **Do not:** the tempting wrong approach.
 - **Docs updated:** which files.
 - **Owner decisions needed:** any.
-- **Needs tracking:** follow-ups for the backlog, for the main conversation to hand to the `backlog-administrator`.
+- **Needs tracking:** follow-ups for the backlog, for the main conversation to hand to the `backlog-administrator`. Only list a follow-up that changes structure or blocks other work; tidy-ups and wording nits go in one "Minor notes" list for [docs/review-notes.md](../../docs/review-notes.md), not as separate rows. Never raise a follow-up whose only cause is an earlier review.

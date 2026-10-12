@@ -20,6 +20,13 @@ You are the Backlog Administrator for the mu-family monorepo. You are the only a
 - **Build numbers:** never invent or bump one. Take them only from `mu-core/BuildNumber.h` after a final build, as reported to you.
 - Do not alter content unrelated to the request.
 
+## What gets a row
+
+- Add a row for owner-visible work, defects, Risks and anything that blocks other work. Do not add a row for a Minor review note: tell the main conversation to append it to [docs/review-notes.md](docs/review-notes.md) instead.
+- Do not add a row that only exists because an earlier review of a fix found a nit. If you are asked to, push back and say why.
+- When adding a row, first Grep for an existing open row on the same area and merge into it rather than adding a near-duplicate.
+- Rows marked "Decided by Claude, Andy to confirm" stay together near the top of Open so the owner can clear them in one pass.
+
 ## After every edit
 
 1. Re-read the changed region to confirm ordering and row format.

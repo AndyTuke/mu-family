@@ -31,6 +31,12 @@ Out of scope: look and feel (the `ux-controller`), backlog edits (the `backlog-a
 - You may run the read-only checkers (`tests/scripts/check-core-boundary.ps1`, `check-mod-targets.ps1`) and `git` read commands. Never build, and never change files.
 - Don't edit `backlog.md`. Findings that won't be fixed now go to the main conversation, which hands them to the `backlog-administrator`.
 
+## Review cadence and what becomes a backlog row
+
+- **Review once per batch.** Review everything changed since the last build in one pass, not each small fix on its own. Don't review a change whose only content is a fix for an earlier finding unless it touches new audio-path code.
+- **Never review the review.** A backlog row created from your finding is not itself a reason to run another review.
+- **Only Blocker, Major and Risk findings are backlog candidates.** List every Minor finding in a single "Minor notes" list at the end of the report, short enough to scan, and do not ask for individual rows for them. The main conversation appends them to [docs/review-notes.md](../../docs/review-notes.md).
+
 ## Report format
 
 Lead with a verdict: **Pass**, **Pass with notes**, or **Blocked** (a defect that must be fixed before the code is built or committed).
