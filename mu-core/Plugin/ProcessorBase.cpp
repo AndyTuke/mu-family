@@ -240,7 +240,7 @@ bool ProcessorBase::isFxParamId(const juce::String& id)
 
 ProcessorBase::~ProcessorBase()
 {
-    swapPoll.stop();   // first: no tick may run once derived members start to go
+    prepareForDestruction();   // backstop: the product destructors already ran it first
     if (fxParamListener != nullptr)
         for (auto* p : getParameters())
             if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))

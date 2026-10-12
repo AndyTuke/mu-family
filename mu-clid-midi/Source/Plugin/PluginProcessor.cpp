@@ -24,7 +24,7 @@ PluginProcessor::PluginProcessor()
 
 PluginProcessor::~PluginProcessor()
 {
-    swapPoll.stop();   // first: no deferred-work tick may reach this half-destroyed object
+    prepareForDestruction();   // first: no deferred-work tick may reach this half-destroyed object
     stopTimer();
 }
 

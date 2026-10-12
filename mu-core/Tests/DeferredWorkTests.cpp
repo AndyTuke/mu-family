@@ -142,3 +142,69 @@ struct DeferredWorkTests : juce::UnitTest
 };
 
 static DeferredWorkTests deferredWorkTests;
+
+// Teardown: the swap poll must be stopped before a product's members go, or a tick could run the
+// product's virtual overrides on a half-destroyed object (a pure virtual call in the worst case).
+namespace
+{
+    // Stands in for a product: its commitDeferredWork override counts into `*commits`, and its
+    // destructor asks for deferred work and lets the message loop run, as a slow teardown would.
+    struct TeardownProcessor : TestProcessorBase
+    {
+        TeardownProcessor(int* commitCounter, bool stopFirst)
+            : TestProcessorBase(WrapperType::wrapperType_Undefined), commits(commitCounter), stopPollFirst(stopFirst) {}
+
+        ~TeardownProcessor() override
+        {
+            if (stopPollFirst) prepareForDestruction();
+            requestDeferredWork();
+            juce::MessageManager::getInstance()->runDispatchLoopUntil(150);   // timers would fire here
+            commits = nullptr;   // from here on the override must not be reached
+        }
+
+        using ProcessorBase::prepareForDestruction;
+        void requestDeferredWorkForTest() { requestDeferredWork(); }
+
+        void commitDeferredWork() override { if (commits != nullptr) ++*commits; else ++lateCalls; }
+
+        int* commits;
+        bool stopPollFirst;
+        static inline int lateCalls = 0;
+    };
+}
+
+struct ProcessorTeardownTests : juce::UnitTest
+{
+    ProcessorTeardownTests() : juce::UnitTest("ProcessorBase teardown stops the swap poll", "mu-core") {}
+
+    void runTest() override
+    {
+        beginTest("control: while the processor lives, the poll runs the deferred work");
+        {
+            int commits = 0;
+            TeardownProcessor p(&commits, false);
+            p.requestDeferredWorkForTest();
+            juce::MessageManager::getInstance()->runDispatchLoopUntil(150);
+            expect(commits > 0, "the swap poll ran commitDeferredWork");
+        }
+
+        beginTest("prepareForDestruction first: no tick reaches the override while the destructor runs");
+        {
+            int commits = 0;
+            TeardownProcessor::lateCalls = 0;
+            { TeardownProcessor p(&commits, true); }
+            expectEquals(commits, 0);
+            expectEquals(TeardownProcessor::lateCalls, 0);
+        }
+
+        beginTest("prepareForDestruction is safe to call twice");
+        {
+            int commits = 0;
+            TeardownProcessor p(&commits, true);
+            p.prepareForDestruction();
+            p.prepareForDestruction();
+        }
+    }
+};
+
+static ProcessorTeardownTests processorTeardownTests;

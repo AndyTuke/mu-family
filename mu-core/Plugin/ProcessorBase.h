@@ -485,6 +485,12 @@ protected:
         ProcessorBase& owner;
     } swapPoll { *this };
 
+    // Stops the message-thread work this base owns (the swap poll), so nothing can call back into
+    // a half-destroyed processor through a virtual (commitDeferredWork, getFullPresetExtension, ...).
+    // Every product destructor calls it first, before any of its own members go; the base destructor
+    // calls it again as a backstop. Safe to call more than once.
+    void prepareForDestruction() noexcept { swapPoll.stop(); }
+
     // Audio thread, once per block after the transport resolved: flag the staged swaps whose
     // boundary passed (`loopBeatsFor(slot)`, see LayerSwapper::flagBoundaries) and schedule the commit.
     template <typename LoopBeatsFor>

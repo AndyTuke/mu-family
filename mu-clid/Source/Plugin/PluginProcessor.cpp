@@ -136,7 +136,7 @@ PluginProcessor::PluginProcessor()
 
 PluginProcessor::~PluginProcessor()
 {
-    swapPoll.stop();   // first: no deferred-work tick may reach this half-destroyed object
+    prepareForDestruction();   // first: no deferred-work tick may reach this half-destroyed object
     for (auto* param : getParameters())
         if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param))
             if (! isFxParamId(p->getParameterID()))
