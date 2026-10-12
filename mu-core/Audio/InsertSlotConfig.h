@@ -60,6 +60,9 @@ struct SlotConfig
     // becomes the LOW-range unit, and the formatter picks the HIGH unit
     // beyond the threshold (Hz→kHz at 1000; ms→s at 1000).
     bool               dynamicUnit  = false;
+    // Greyed out (disabled, dimmed) while slot 1's actual value is at or above this; 0 = always
+    // enabled. The Vocoder's Unison / Octave / Note only apply to the pitched waves (Saw, Square).
+    int                disabledFromP1 = 0;
 };
 
 // Bespoke name tables used by Karplus / Vocoder / VocoderSt slots.
@@ -151,16 +154,28 @@ inline const SlotConfig kInsertAlgoSlots[kInsertAlgoCount][kInsertSlotCount] = {
 
     // ── 12 Vocoder ── Wave / Unison / Octave / Note ───────────────────
     { { "Wave",   0.0f, 3.0f,  SkewMode::IntStep, "",  kWaveNames,   0 },
-      { "Unison", 0.0f, 6.0f,  SkewMode::IntStep, "",  kUnisonNames, 0 },
-      { "Octave", 1.0f, 5.0f,  SkewMode::IntStep, "" },
-      { "Note",   1.0f, 12.0f, SkewMode::IntStep, "",  kNoteNames,   1 } },
+      { "Unison", 0.0f, 6.0f,  SkewMode::IntStep, "",  kUnisonNames, 0, false, 2 },
+      { "Octave", 1.0f, 5.0f,  SkewMode::IntStep, "",  nullptr,      0, false, 2 },
+      { "Note",   1.0f, 12.0f, SkewMode::IntStep, "",  kNoteNames,   1, false, 2 } },
 
     // ── 13 VocoderSt ── same as Vocoder ───────────────────────────────
     { { "Wave",   0.0f, 3.0f,  SkewMode::IntStep, "",  kWaveNames,   0 },
-      { "Unison", 0.0f, 6.0f,  SkewMode::IntStep, "",  kUnisonNames, 0 },
-      { "Octave", 1.0f, 5.0f,  SkewMode::IntStep, "" },
-      { "Note",   1.0f, 12.0f, SkewMode::IntStep, "",  kNoteNames,   1 } },
+      { "Unison", 0.0f, 6.0f,  SkewMode::IntStep, "",  kUnisonNames, 0, false, 2 },
+      { "Octave", 1.0f, 5.0f,  SkewMode::IntStep, "",  nullptr,      0, false, 2 },
+      { "Note",   1.0f, 12.0f, SkewMode::IntStep, "",  kNoteNames,   1, false, 2 } },
 };
+
+// Whether a slot's knob is live, given slot 1's actual value (see SlotConfig::disabledFromP1).
+inline bool insertSlotEnabled(int algoIndex, int slot, float p1Actual) noexcept
+{
+    if (algoIndex < 0 || algoIndex >= kInsertAlgoCount || slot < 0 || slot >= kInsertSlotCount)
+        return true;
+    const int from = kInsertAlgoSlots[algoIndex][slot].disabledFromP1;
+    return from == 0 || std::round(p1Actual) < (float) from;
+}
+
+// The Compressor (7) and Limiter (8) show their gain reduction on slot 2 (Output).
+inline bool insertAlgoShowsGainReduction(int algoIndex) noexcept { return algoIndex == 7 || algoIndex == 8; }
 
 // First-visit / cold-restore defaults per algorithm. Indexed [algo][slot],
 // stored as ACTUAL (not normalised) values so they read naturally. The init

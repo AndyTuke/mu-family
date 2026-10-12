@@ -2,6 +2,8 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "MixerChannel.h"
 #include "UI/FXAlgoDefaults.h"
+#include "MasterInsertPanel.h"
+#include "MasterInsertBinding.h"
 #include "FXRow.h"
 #include "DelayRow.h"
 #include "UI/Components/SegmentControl.h"
@@ -54,6 +56,9 @@ private:
     MixerChannel delayReturn   { MixerChannel::Type::DelayReturn,  "Delay",   juce::Colour(0xffD85A30) };
     MixerChannel reverbReturn  { MixerChannel::Type::ReverbReturn, "Reverb",  juce::Colour(0xff378ADD) };
     MixerChannel masterChannel { MixerChannel::Type::Master,       "Master",  juce::Colours::white    };
+    // The master insert column sits right of the Master strip (strip, then panel, as in mu-link).
+    mu_ui::MasterInsertPanel   masterInsertPanel;
+    mu_ui::MasterInsertBinding masterInsertBinding { proc, masterInsertPanel };
 
     FXRow    effectRow;
     DelayRow echoRow;    // shown when effectRow algo == Echo

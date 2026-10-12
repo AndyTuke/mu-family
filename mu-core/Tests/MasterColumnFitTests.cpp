@@ -187,6 +187,58 @@ struct MasterColumnFitTests : juce::UnitTest
             panel.getAlgorithmSelect(0).getComboBox().setSelectedId(7, juce::sendNotificationSync);      // and back to the EQ
             expectWithinAbsoluteError(panel.getParam(0, 0), 0.8f, 0.01f);
         }
+
+        beginTest("insert panel greys out the Vocoder's P2 to P4 for the noise waves");
+        {
+            mu_ui::MasterInsertPanel panel;
+            panel.setBounds(0, 0, mu_ui::s(MuLookAndFeel::kMixerInsertPanelW), mu_ui::s(kColumnH));
+            auto live = [&](int slot, int p) { return panel.getKnob(slot, p).isEnabled() && panel.getKnob(slot, p).getAlpha() == 1.0f; };
+
+            for (int vocoder : { 12, 13 })
+            {
+                panel.setAlgorithm(0, vocoder);
+                for (int wave = 0; wave < 4; ++wave)
+                {
+                    panel.setParam(0, 0, mu_ui::actualToNorm((float) wave, vocoder, 0));
+                    expect(live(0, 0), "the Wave knob itself is always live");
+                    for (int p = 1; p < 4; ++p)
+                        expect(live(0, p) == (wave < 2), "Saw and Square are pitched; White and Pink grey P2 to P4");
+                }
+            }
+
+            // A knob move does the same, and the other slot and other algorithms are untouched.
+            panel.setAlgorithm(0, 12);
+            panel.setParam(0, 0, mu_ui::actualToNorm(0.0f, 12, 0));
+            panel.getKnob(0, 0).getSlider().setValue(2.0, juce::sendNotificationSync);
+            for (int p = 1; p < 4; ++p)
+                expect(! live(0, p), "moving Wave to White greys P2 to P4");
+            panel.getKnob(0, 0).getSlider().setValue(1.0, juce::sendNotificationSync);
+            for (int p = 1; p < 4; ++p)
+                expect(live(0, p), "moving Wave back to Square restores them");
+            panel.setParam(0, 0, mu_ui::actualToNorm(3.0f, 12, 0));
+            panel.setAlgorithm(0, 6);                // EQ: every knob live whatever P1 holds
+            for (int p = 0; p < 4; ++p)
+                expect(live(0, p), "other algorithms never grey out");
+            panel.setAlgorithm(1, 12);
+            for (int p = 0; p < 4; ++p)
+                expect(live(1, p), "slot 2 has its own state (Wave starts at Saw)");
+        }
+
+        beginTest("insert panel shows the gain reduction on P2 for the Compressor and Limiter only");
+        {
+            mu_ui::MasterInsertPanel panel;
+            std::atomic<float> gr { 0.0f };
+            panel.setGainReductionSource(0, &gr);
+            // The meter is a private detail of the knob, so the check is that switching algorithms
+            // with a source set neither crashes nor leaves the knobs disabled.
+            for (int algo : { 7, 8, 6, 7, 0, 8 })
+            {
+                panel.setAlgorithm(0, algo);
+                if (algo != 0) expect(panel.getKnob(0, 1).isEnabled());
+            }
+            panel.setGainReductionSource(0, nullptr);
+            panel.setGainReductionSource(5, &gr);    // out of range: ignored
+        }
     }
 };
 

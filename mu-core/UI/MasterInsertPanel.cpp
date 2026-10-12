@@ -43,9 +43,38 @@ void MasterInsertPanel::configureKnobs(int slot)
             [this, slot, p](float n)
             {
                 slots[(size_t) slot].norm[p] = n;
+                if (p == 0) applyDependencies(slot);
                 if (onParam) onParam(slot, p, n);
             });
+    applyDependencies(slot);
     resized();
+}
+
+// What depends on the algorithm and on P1: which knobs are live (from the algorithm table) and where
+// the gain-reduction meter sits.
+void MasterInsertPanel::applyDependencies(int slot)
+{
+    auto& sl = slots[(size_t) slot];
+    const float p1 = normToActual(sl.norm[0], sl.algorithm, 0);
+    for (int p = 0; p < kParams; ++p)
+    {
+        const bool live = insertSlotEnabled(sl.algorithm, p, p1);
+        sl.knobs[(size_t) p].setEnabled(live);
+        sl.knobs[(size_t) p].setAlpha(live ? 1.0f : 0.45f);
+    }
+    const auto* gr = insertAlgoShowsGainReduction(sl.algorithm) ? sl.gainReduction : nullptr;
+    if (gr != sl.shownGainReduction)   // setGRSource restarts the meter, so only on a change
+    {
+        sl.knobs[1].setGRSource(gr);
+        sl.shownGainReduction = gr;
+    }
+}
+
+void MasterInsertPanel::setGainReductionSource(int slot, const std::atomic<float>* source)
+{
+    if (slot < 0 || slot >= kSlots) return;
+    slots[(size_t) slot].gainReduction = source;
+    applyDependencies(slot);
 }
 
 void MasterInsertPanel::setAlgorithm(int slot, int algorithm)
@@ -64,6 +93,7 @@ void MasterInsertPanel::setParam(int slot, int param, float normalised)
     sl.norm[param] = normalised;
     sl.knobs[(size_t) param].setValue((double) normToActual(normalised, sl.algorithm, param),
                                       juce::dontSendNotification);
+    if (param == 0) applyDependencies(slot);
 }
 
 int MasterInsertPanel::getAlgorithm(int slot) const { return slots[(size_t) slot].algorithm; }

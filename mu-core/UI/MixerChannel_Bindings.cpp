@@ -195,7 +195,7 @@ void MixerChannel::bindMaster(MixerEngine& engine, ProcessorBase* proc)
     vuMeter.getLevel = [&engine] { return engine.masterPeak.load(); };
     updateDbLabel(engine.masterLevel.load(std::memory_order_relaxed));
 
-    if (hasInsert())
+    if (insertShown())
     {
         auto wireInsertSlot = [this, &engine, proc](int slot)
         {
@@ -328,6 +328,8 @@ void MixerChannel::loadFromApvts(juce::AudioProcessorValueTreeState& apvts,
         }
         if (auto* p = apvts.getRawParameterValue("mstr_pan"))
             panKnob.setValue(*p, juce::dontSendNotification);
+
+        if (! insertShown()) return;   // the insert column is a separate panel (MasterInsertPanel)
 
         if (auto* p = apvts.getRawParameterValue("mst_insChar"))
         {

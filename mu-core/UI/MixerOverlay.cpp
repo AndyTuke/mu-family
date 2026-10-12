@@ -54,6 +54,7 @@ MixerOverlay::MixerOverlay(ProcessorBase& p, MixerEngine& m)
       effectRow("Effect", FXAlgorithmRegistry::effectAlgorithms(), MuLookAndFeel::knobFxSend),
       reverbRow("Reverb", FXAlgorithmRegistry::reverbAlgorithms(), MuLookAndFeel::knobReverb)
 {
+    masterChannel.setShowInsertPanel(false);   // the insert column is masterInsertPanel, beside the strip
     buildChannels();
     wireReturns();
     wireFXRows();
@@ -62,6 +63,7 @@ MixerOverlay::MixerOverlay(ProcessorBase& p, MixerEngine& m)
     addAndMakeVisible(delayReturn);
     addAndMakeVisible(reverbReturn);
     addAndMakeVisible(masterChannel);
+    addAndMakeVisible(masterInsertPanel);
     addAndMakeVisible(effectRow);
     addChildComponent(echoRow);   // hidden by default; shown when effect algo == Echo
     addAndMakeVisible(delayRow);
@@ -464,6 +466,7 @@ void MixerOverlay::loadFromApvts()
     delayReturn  .loadFromApvts(apvts, "ret_dly_");
     reverbReturn .loadFromApvts(apvts, "ret_rev_");
     masterChannel.loadFromApvts(apvts, "mstr_");
+    masterInsertBinding.refresh();
 
     // Intra-FX routing sends (eff2dly, eff2rev, dly2rev) are stored outside the
     // ret_*_ prefix scheme so loadFromApvts can't find them via the prefix. Refresh
@@ -599,7 +602,9 @@ void MixerOverlay::resized()
     lastDivX2 = x;
     x += divW;
     const int masterActualW = juce::jmax(masterTotalW, w - x);
-    masterChannel.setBounds(x, hdrH, masterActualW, stripH);
+    const int insertW       = s(MuLookAndFeel::kMixerInsertPanelW);
+    masterChannel.setBounds(x, hdrH, masterActualW - insertW, stripH);
+    masterInsertPanel.setBounds(x + masterActualW - insertW, hdrH, insertW, stripH);
 
     // FX rows below the channel strips. Metal style: each row in a raised box inset clear of
     // the rack panel's corner screws, the row's own content moved in clear of the box's screws.
