@@ -522,93 +522,43 @@ void RhythmContent::paint(juce::Graphics& g)
     // Sample bar — content inset from panel outline
     const juce::String sampleName = proc.samples.getSampleName(currentRhythmIndex);
     const bool         missing    = proc.samples.isSampleMissing(currentRhythmIndex);
-    if (MuLookAndFeel::isMetal(*this))
+    // Metal: an LCD — the file name in lit lettering, a missing sample lit in amber,
+    // the empty-slot hint as faint unlit lettering, then the glass's glare + bezel.
+    const auto& L    = MuLookAndFeel::lighting();
+    const auto inner = sampleDisplayRect().toFloat();
+    const auto lit   = MuLookAndFeel::lcdLitColour(*this);
+    MuLookAndFeel::drawLcdGlass(g, inner, lit, false);
+    g.setFont(MuLookAndFeel::lcdFont(mu_ui::sf((float) MuLookAndFeel::kLcdTextH)));
+    const auto textR = inner.toNearestInt().withTrimmedLeft(s(MuLookAndFeel::kLcdTextPadX))
+                                                .withTrimmedRight(s(MuLookAndFeel::kLcdBrowseW + MuLookAndFeel::kSpaceXS));
+    if (isMidiOutputMode())
     {
-        // Metal: an LCD — the file name in lit lettering, a missing sample lit in amber,
-        // the empty-slot hint as faint unlit lettering, then the glass's glare + bezel.
-        const auto& L    = MuLookAndFeel::lighting();
-        const auto inner = sampleDisplayRect().toFloat();
-        const auto lit   = MuLookAndFeel::lcdLitColour(*this);
-        MuLookAndFeel::drawLcdGlass(g, inner, lit, false);
-        g.setFont(MuLookAndFeel::lcdFont(mu_ui::sf((float) MuLookAndFeel::kLcdTextH)));
-        const auto textR = inner.toNearestInt().withTrimmedLeft(s(MuLookAndFeel::kLcdTextPadX))
-                                                    .withTrimmedRight(s(MuLookAndFeel::kLcdBrowseW + MuLookAndFeel::kSpaceXS));
-        if (isMidiOutputMode())
-        {
-            // MIDI output: no sample to show, so the LCD only names the mode, unlit, with no browse mark.
-            g.setColour(lit.withAlpha(L.lcdGhost));
-            g.drawText("MIDI output", textR, juce::Justification::centredLeft, true);
-            MuLookAndFeel::drawLcdFront(g, inner);
-            return;
-        }
-        if (missing)
-        {
-            g.setColour(MuLookAndFeel::colour(MuLookAndFeel::sampleBarMissingWarning));
-            g.drawText("Missing: " + sampleName + juce::String::fromUTF8("  \xe2\x80\x94  click to find"),
-                       textR, juce::Justification::centredLeft, true);
-        }
-        else if (sampleName.isNotEmpty())
-        {
-            g.setColour(lit);
-            g.drawText(sampleName, textR, juce::Justification::centredLeft, true);
-        }
-        else
-        {
-            g.setColour(lit.withAlpha(L.lcdGhost));
-            g.drawText("drop sample here or click to browse", textR, juce::Justification::centredLeft, true);
-        }
-        g.setColour(lit);
-        g.drawText("...", inner.toNearestInt().removeFromRight(s(MuLookAndFeel::kLcdBrowseW)),   // browse
-                   juce::Justification::centred, false);
+        // MIDI output: no sample to show, so the LCD only names the mode, unlit, with no browse mark.
+        g.setColour(lit.withAlpha(L.lcdGhost));
+        g.drawText("MIDI output", textR, juce::Justification::centredLeft, true);
         MuLookAndFeel::drawLcdFront(g, inner);
         return;
     }
+    if (missing)
     {
-        const auto inner = sampleDisplayRect();
-        g.setColour(MuLookAndFeel::colour(Id::sampleBarBackground));
-        g.fillRect(inner);
-
-        if (isMidiOutputMode())
-        {
-            g.setColour(MuLookAndFeel::colour(Id::sampleBarNoSample));
-            g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f).withStyle("Italic")));
-            g.drawText("MIDI output", inner.getX() + 5, inner.getY(), inner.getWidth() - 10, inner.getHeight(),
-                       juce::Justification::centredLeft, true);
-            return;
-        }
-        if (missing)
-        {
-            // Linked sample referenced by a preset could not be found at its recorded
-            // path nor in the user Samples folder. Show the filename in amber with a
-            // "missing — click to find" hint so the user knows what to look for.
-            g.setColour(MuLookAndFeel::colour(MuLookAndFeel::sampleBarMissingWarning));
-            g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
-            g.drawText("Missing: " + sampleName + juce::String::fromUTF8("  \xe2\x80\x94  click to find"),
-                       inner.getX() + 5, inner.getY(), inner.getWidth() - 28, inner.getHeight(),
-                       juce::Justification::centredLeft, true);
-        }
-        else if (sampleName.isNotEmpty())
-        {
-            g.setColour(MuLookAndFeel::colour(Id::labelText));
-            g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f)));
-            g.drawText(sampleName,
-                       inner.getX() + 5, inner.getY(), inner.getWidth() - 28, inner.getHeight(),
-                       juce::Justification::centredLeft, true);
-        }
-        else
-        {
-            g.setColour(MuLookAndFeel::colour(Id::sampleBarNoSample));
-            g.setFont(juce::Font(juce::FontOptions{}.withHeight(10.0f).withStyle("Italic")));
-            g.drawText("drop sample here or click to browse",
-                       inner.getX() + 5, inner.getY(), inner.getWidth() - 28, inner.getHeight(),
-                       juce::Justification::centredLeft, true);
-        }
-
-        g.setColour(MuLookAndFeel::colour(Id::labelText));
-        g.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-        g.drawText("...", inner.getRight() - 24, inner.getY(), 24, inner.getHeight(),
-                   juce::Justification::centred, false);
+        g.setColour(MuLookAndFeel::colour(MuLookAndFeel::sampleBarMissingWarning));
+        g.drawText("Missing: " + sampleName + juce::String::fromUTF8("  \xe2\x80\x94  click to find"),
+                   textR, juce::Justification::centredLeft, true);
     }
+    else if (sampleName.isNotEmpty())
+    {
+        g.setColour(lit);
+        g.drawText(sampleName, textR, juce::Justification::centredLeft, true);
+    }
+    else
+    {
+        g.setColour(lit.withAlpha(L.lcdGhost));
+        g.drawText("drop sample here or click to browse", textR, juce::Justification::centredLeft, true);
+    }
+    g.setColour(lit);
+    g.drawText("...", inner.toNearestInt().removeFromRight(s(MuLookAndFeel::kLcdBrowseW)),   // browse
+               juce::Justification::centred, false);
+    MuLookAndFeel::drawLcdFront(g, inner);
 }
 
 void RhythmContent::resized()

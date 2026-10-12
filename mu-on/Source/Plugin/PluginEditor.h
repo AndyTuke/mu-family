@@ -2,6 +2,7 @@
 
 #include "UI/EditorShellBase.h"
 #include "UI/LayerSidebar.h"     // mu-core shared sidebar
+#include "UI/TrackMiniVisual.h"
 #include "UI/MixerOverlay.h"       // mu-core shared mixer
 #include "Plugin/PluginProcessor.h"
 #include "UI/GroovePanel.h"

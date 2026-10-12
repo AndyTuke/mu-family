@@ -309,6 +309,12 @@ struct MuTheme
         float grooveShade        = 0.45f;   // the dark line
         float grooveLight        = 0.09f;   // the light line
 
+        // Round routing toggle (mu-Tant's filter Series / Parallel button)
+        float routingFill        = 0.90f;   // disc fill, as a fraction of the app colour
+        float routingHover       = 0.25f;   // brighter disc while hovered
+        float routingRim         = 0.40f;   // brighter rim ring
+        float routingGlyph       = 0.95f;   // the two-line glyph
+
         // Step ring (mu-Clid's RhythmCircle)
         float ringTrack          = 0.45f;   // recessed track under each ring
         float ringHitGlow        = 0.22f;   // halo round hit steps (playhead × 1.8)

@@ -50,9 +50,10 @@ void FilterRoutingButton::paintButton(juce::Graphics& g, bool highlighted, bool)
     const auto r = getLocalBounds().toFloat().reduced(1.5f);
     // The app colour — rendered at all times regardless of Series/Parallel state.
     const auto accent = MuLookAndFeel::appAccent(*this);
-    g.setColour(highlighted ? accent.brighter(0.25f) : accent.withAlpha(0.9f));
+    const auto& L = MuLookAndFeel::lighting();
+    g.setColour(highlighted ? accent.brighter(L.routingHover) : accent.withAlpha(L.routingFill));
     g.fillEllipse(r);
-    g.setColour(accent.brighter(0.4f));
+    g.setColour(accent.brighter(L.routingRim));
     g.drawEllipse(r, 1.2f);
 
     const auto  b     = r.reduced(r.getWidth() * 0.20f);
@@ -62,7 +63,7 @@ void FilterRoutingButton::paintButton(juce::Graphics& g, bool highlighted, bool)
     const float cx    = b.getCentreX(), cy = b.getCentreY();
     const float rad   = animAngle * juce::MathConstants<float>::pi / 180.0f;
     const float cosA  = std::cos(rad), sinA = std::sin(rad);
-    g.setColour(juce::Colours::white.withAlpha(0.95f));
+    g.setColour(juce::Colours::white.withAlpha(L.routingGlyph));
     for (int sign : { -1, 1 })
     {
         const float ox = -sinA * sep * (float) sign;
@@ -518,7 +519,6 @@ PatternContent::Grid PatternContent::layoutGrid() const
     using mu_ui::s;
     using LF = MuLookAndFeel;
     Grid g;
-    g.metal    = true;
     g.screwed  = LF::hasScrews(*this);
     g.w        = getWidth();
     g.h        = getHeight();
@@ -556,13 +556,14 @@ void PatternContent::resized()
 int PatternContent::layoutTonal(const Grid& g)
 {
     using mu_ui::s;
+    using LF = MuLookAndFeel;
     const int tonalY = g.inset;
-    const int labelW = s(44);
+    const int labelW = s(LF::kTonalLabelW);
     int x = g.pad;
     rootLabel    .setBounds(x, tonalY, labelW, g.ddH);   x += labelW + s(4);
-    rootDropdown .setBounds(x, tonalY, s(56),   g.ddH);  x += s(56)  + s(12);
+    rootDropdown .setBounds(x, tonalY, s(LF::kTonalRootW),  g.ddH);  x += s(LF::kTonalRootW)  + s(LF::kTonalGap);
     scaleLabel   .setBounds(x, tonalY, labelW, g.ddH);   x += labelW + s(4);
-    scaleDropdown.setBounds(x, tonalY, s(100),  g.ddH);
+    scaleDropdown.setBounds(x, tonalY, s(LF::kTonalScaleW), g.ddH);
     return tonalY + g.ddH + g.plateH;
 }
 
@@ -580,7 +581,7 @@ void PatternContent::layoutSourceRow(const Grid& g, int top, int rowH)
     const int rowY     = top + s(4);
     const int waveY    = rowY + (s2H - ddH) / 2;
     const int knobsW   = 6 * s2W + 5 * s(2);
-    const int wtInset  = s(8);   // keep the dropdown clear of the panel border + knobs
+    const int wtInset  = s(5);   // keep the dropdown clear of the panel border + knobs
 
     // One oscillator box at x: selector, then the knobs right-aligned.
     auto layoutOsc = [&](int x0, juce::Rectangle<int>& panelR, DropdownSelect& wave,
@@ -619,11 +620,9 @@ void PatternContent::layoutShapingRow(const Grid& g, int top, int rowH)
     const int filterX = g.pad + xmodW + g.gap;
     layoutFilter(g, { filterX, top, insColX - g.gap - filterX, rowH });
 
-    // Insert, centred in its box (flat style leaves room for the title drawn inside).
+    // Insert, centred in its box.
     insertPanelR = { insColX, top, insColW, rowH };
-    const int insTitleH = g.metal ? 0 : s(14);
-    insertSub.setBounds(insColX + (insColW - insSubW) / 2,
-                        top + insTitleH + (rowH - insTitleH - insSubH) / 2, insSubW, insSubH);
+    insertSub.setBounds(insColX + (insColW - insSubW) / 2, top + (rowH - insSubH) / 2, insSubW, insSubH);
 }
 
 // X-Mod: two lanes, one per row — Lane A: Index knob, phase mode, Sync + Feedback; Lane B: Depth
@@ -632,9 +631,8 @@ void PatternContent::layoutXMod(const Grid& g, juce::Rectangle<int> box)
 {
     using mu_ui::s;
     modNoisePanelR = box;
-    const int titleH = g.metal ? 0 : s(14);           // flat: room for the "X-MOD" title drawn inside
-    const int rowH   = (box.getHeight() - titleH) / 2;
-    const int row1Y  = box.getY() + titleH;
+    const int rowH   = box.getHeight() / 2;
+    const int row1Y  = box.getY();
     const int row2Y  = row1Y + rowH;
     const int innerX = box.getX() + g.boxClear;
     const int segW   = s(96);                         // 3-segment mode switch
@@ -672,7 +670,7 @@ void PatternContent::layoutFilter(const Grid& g, juce::Rectangle<int> box)
 
     const int xStart  = serBtnX + serBtnD + s(8);
     const int knobGap = s(2);
-    const int typeW   = (box.getRight() - (g.metal ? g.boxClear : 0)) - xStart - 5 * g.s2W - 4 * knobGap;
+    const int typeW   = (box.getRight() - g.boxClear) - xStart - 5 * g.s2W - 4 * knobGap;
 
     // Type labels hidden — the dropdown content is self-explanatory.
     fltTypeLabel .setBounds(0, 0, 0, 0);

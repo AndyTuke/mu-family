@@ -234,7 +234,7 @@ private:
     juce::Rectangle<int> voiceR, gateR;
 
     // resized() in parts: the shared measures, then each band top to bottom.
-    struct Grid { bool metal, screwed; int w, h, pad, inset, plateH, boxClear, gap, ddH, s2W, s2H, right; };
+    struct Grid { bool screwed; int w, h, pad, inset, plateH, boxClear, gap, ddH, s2W, s2H, right; };
     Grid layoutGrid() const;
     int  layoutTonal(const Grid& g);                                   // Root / Scale; returns the section boxes' top
     void layoutSourceRow(const Grid& g, int top, int rowH);            // Osc 1 | Osc 2 | Noise

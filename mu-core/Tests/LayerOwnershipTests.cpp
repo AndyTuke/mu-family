@@ -301,6 +301,13 @@ struct LayerOwnershipTests : juce::UnitTest
             expectEquals(p.addLayer(), -1);
             expect(! p.removeLayer(0));
             expect(! p.swapLayers(0, 1));
+            expect(! p.canReorderLayers());   // the sidebar offers no drag-reorder without layer editing
+        }
+
+        beginTest("a product with editable layers lets the sidebar reorder by default");
+        {
+            EditableProcessor p(false);
+            expect(p.canReorderLayers());
         }
 
         beginTest("addLayer fills the slots in order, each with a distinct colour, and refuses past the maximum");

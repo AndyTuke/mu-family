@@ -6,6 +6,7 @@
 #include "Plugin/PluginProcessor.h"
 #include "UI/LayerPanel.h"        // mu-core shared per-layer panel shell
 #include "UI/ArpContent.h"
+#include "UI/ArpMiniVisual.h"
 #include "Modulation/MuToniModDest.h"
 #include "UI/SettingsOverlay.h"
 
