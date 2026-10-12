@@ -122,6 +122,16 @@ void RhythmManager::remove(int index)
 
     // The rhythms and strips above `index` moved down a slot: bring their APVTS values with them, or
     // the parameters keep the old tenant's numbers and the next APVTS-driven resync would restore them.
+    //
+    // These pushes stay OUTSIDE the suspended section and rhythmsLock on purpose, like every other
+    // commit path (swap, hot-swap, preset load). pushRhythmToApvts / pushMixerChannelToApvts call
+    // setValueNotifyingHost about 80 times per slot (up to 7 slots), and each call runs the host's own
+    // parameter-change code on this thread. Inside the lock that would turn every audio block into a
+    // silent try-lock miss for the whole push, tens of milliseconds, and let host code run while the
+    // lock is held. Outside, the stale window is only those pushes on the message thread: the audio
+    // thread never reads these APVTS values (the engine and the Rhythm are already correct and
+    // apvtsLoading mutes the listeners), so the only exposure is a host or UI read of a shifted
+    // slot's parameter in that window, which sees the old tenant's number until its push lands.
     {
         mu_core::ScopedApvtsLoading guard(proc.apvtsLoading);
         for (int i = index; i < newN; ++i)
