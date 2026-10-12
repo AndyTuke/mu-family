@@ -1,6 +1,5 @@
 // partial-class TU split from MixerChannel.cpp. Contains the four bind* methods
 // plus helpers that only run during binding (setSidechainSources, loadFromApvts).
-// MixerChannel_Insert.cpp holds configureInsertAlgorithm.
 
 #include "MixerChannel.h"
 #include "Plugin/ProcessorBase.h"
@@ -165,7 +164,6 @@ void MixerChannel::bindReturn(MixerEngine::ReturnState& state, std::atomic<float
 
 void MixerChannel::bindMaster(MixerEngine& engine, ProcessorBase* proc)
 {
-    masterInsertProc = proc;   // keep knob lambdas alive across loadFromApvts rebinds
     fader.setValue(engine.masterLevel.load(std::memory_order_relaxed), juce::dontSendNotification);
     panKnob.setValue(engine.masterPan.load(std::memory_order_relaxed), juce::dontSendNotification);
 
@@ -194,77 +192,6 @@ void MixerChannel::bindMaster(MixerEngine& engine, ProcessorBase* proc)
 
     vuMeter.getLevel = [&engine] { return engine.masterPeak.load(); };
     updateDbLabel(engine.masterLevel.load(std::memory_order_relaxed));
-
-    if (insertShown())
-    {
-        auto wireInsertSlot = [this, &engine, proc](int slot)
-        {
-            const VoiceParams ip = engine.getMasterInsertParams(slot);
-            juce::ComboBox& charBox = slot == 0 ? insCharBox : insCharBox2;
-            // Pointer-to-array — ternary across two different array members
-            // gives us a decayed pointer, not a reference; capturing as
-            // pointer keeps the type system happy.
-            float (* const snaps    )[mu_ui::kInsertSlotCount] =
-                slot == 0 ? insertSnapshots     : insertSnapshots2;
-            bool  * const snapValid =
-                slot == 0 ? insertSnapshotValid : insertSnapshotValid2;
-            const juce::String pSlot[4] = {
-                slot == 0 ? juce::String("mst_insP1") : juce::String("mst_ins2P1"),
-                slot == 0 ? juce::String("mst_insP2") : juce::String("mst_ins2P2"),
-                slot == 0 ? juce::String("mst_insP3") : juce::String("mst_ins2P3"),
-                slot == 0 ? juce::String("mst_insP4") : juce::String("mst_ins2P4"),
-            };
-
-            charBox.setSelectedId(ip.insertAlgo + 1, juce::dontSendNotification);
-            configureInsertAlgorithm(ip.insertAlgo, slot, proc);
-
-            // Capture `snaps` and `snapValid` by VALUE — both are pointers into
-            // the MixerChannel member arrays, so a copy is just the address. A
-            // by-reference capture would dangle once `wireInsertSlot` returns
-            // (the locals live in this lambda's stack frame, not on the heap),
-            // and dereferencing the dangle inside `onChange` crashes the host.
-            charBox.onChange = [this, proc, slot, snaps, snapValid, pSlot]()
-            {
-                juce::ComboBox& cb = slot == 0 ? insCharBox : insCharBox2;
-                const int newChar = cb.getSelectedId() - 1;
-                if (proc)
-                {
-                    const VoiceParams cur = proc->mixerEngine.getMasterInsertParams(slot);
-                    const int oldChar = cur.insertAlgo;
-                    auto set = [proc](const juce::String& id, float v)
-                    {
-                        if (auto* p = proc->apvts.getParameter(id))
-                            p->setValueNotifyingHost(p->convertTo0to1(v));
-                    };
-
-                    if (oldChar >= 0 && oldChar < InsertProcessor::kNumInsertAlgos)
-                    {
-                        for (int s = 0; s < mu_ui::kInsertSlotCount; ++s)
-                            snaps[oldChar][s] = mu_ui::normToActual(cur.insertParam[s], oldChar, s);
-                        snapValid[oldChar] = true;
-                    }
-
-                    // Master insert doesn't ride the same RhythmPanel
-                    // inline-refresh path as the per-channel insert —
-                    // MixerOverlay's listener is a deferred apvtsDirty flag
-                    // flushed by its 30 Hz timer, so the multi-write doesn't
-                    // produce intermediate stale-algo UI states. drvChar is
-                    // set inside configureInsertAlgorithm below.
-                    for (int s = 0; s < mu_ui::kInsertSlotCount; ++s)
-                    {
-                        const float actual = snapValid[newChar]
-                            ? snaps[newChar][s]
-                            : mu_ui::kInsertAlgoDefaults[newChar][s];
-                        set(pSlot[s], mu_ui::actualToNorm(actual, newChar, s));
-                    }
-                }
-                configureInsertAlgorithm(newChar, slot, proc);
-            };
-        };
-
-        wireInsertSlot(0);
-        wireInsertSlot(1);
-    }
 }
 
 void MixerChannel::bindReturnSends(juce::AudioProcessorValueTreeState& apvts,
@@ -318,9 +245,9 @@ void MixerChannel::setSidechainSources(int ownIndex, const juce::StringArray& na
 void MixerChannel::loadFromApvts(juce::AudioProcessorValueTreeState& apvts,
                                   const juce::String& prefix)
 {
-    if (hasInsert())
+    if (isMaster())
     {
-        // Master insert — uses dedicated mst_ins* params, not a prefix.
+        // The master strip's own level and pan; its insert column is a separate panel.
         if (auto* p = apvts.getRawParameterValue("mstr_lvl"))
         {
             fader.setValue(*p, juce::dontSendNotification);
@@ -328,21 +255,6 @@ void MixerChannel::loadFromApvts(juce::AudioProcessorValueTreeState& apvts,
         }
         if (auto* p = apvts.getRawParameterValue("mstr_pan"))
             panKnob.setValue(*p, juce::dontSendNotification);
-
-        if (! insertShown()) return;   // the insert column is a separate panel (MasterInsertPanel)
-
-        if (auto* p = apvts.getRawParameterValue("mst_insChar"))
-        {
-            const int charId = juce::jlimit(0, InsertProcessor::kNumInsertAlgos - 1, juce::roundToInt((float)*p));
-            insCharBox.setSelectedId(charId + 1, juce::dontSendNotification);
-            configureInsertAlgorithm(charId, 0, nullptr);
-        }
-        if (auto* p = apvts.getRawParameterValue("mst_ins2Char"))
-        {
-            const int charId = juce::jlimit(0, InsertProcessor::kNumInsertAlgos - 1, juce::roundToInt((float)*p));
-            insCharBox2.setSelectedId(charId + 1, juce::dontSendNotification);
-            configureInsertAlgorithm(charId, 1, nullptr);
-        }
         return;
     }
 

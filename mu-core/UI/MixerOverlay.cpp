@@ -54,7 +54,6 @@ MixerOverlay::MixerOverlay(ProcessorBase& p, MixerEngine& m)
       effectRow("Effect", FXAlgorithmRegistry::effectAlgorithms(), MuLookAndFeel::knobFxSend),
       reverbRow("Reverb", FXAlgorithmRegistry::reverbAlgorithms(), MuLookAndFeel::knobReverb)
 {
-    masterChannel.setShowInsertPanel(false);   // the insert column is masterInsertPanel, beside the strip
     buildChannels();
     wireReturns();
     wireFXRows();

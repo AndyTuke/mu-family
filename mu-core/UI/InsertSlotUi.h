@@ -7,7 +7,7 @@
 #include <functional>
 
 // Shared UI driver for the 4 generic insert-slot knobs. Eliminates duplication
-// between the per-channel InsertSubsection and the master MixerChannel_Insert —
+// between the per-channel InsertSubsection and the master MasterInsertPanel —
 // both call this once per slot to configure label,
 // range, skew, display formatter, value, and onValueChanged write-back from
 // the same per-algo config table (mu_ui::kInsertAlgoSlots).

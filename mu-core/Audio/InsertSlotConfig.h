@@ -9,7 +9,7 @@
 //   • DSP   — each InsertAlgorithm::process reads `p.insertParam[slot]` (a
 //     normalised 0..1 value) and calls `normToActual(norm, algo, slot)` to
 //     get the real-world value with the right range + skew applied.
-//   • UI    — the per-channel InsertSubsection + the master MixerChannel_Insert
+//   • UI    — the per-channel InsertSubsection + the master MasterInsertPanel
 //     iterate the 4 slots, read label/range/skew/unit from here, and wire the
 //     knob's `setValue` / `onValueChanged` to convert between the displayed
 //     actual range and the normalised APVTS storage via the same helpers.

@@ -15,7 +15,7 @@ class ProcessorBase;
 
 // One vertical channel strip.
 // Layout (top→bottom): colour bar | name | [sidechain] | sends+pan | fader+VU+GR | [outBus] | dB | [mute/solo]
-// Master channel: strip occupies left (getWidth()-kInsertPanelW) pixels; insert panel on the right.
+// Master channel: the strip alone; its insert column is mu_ui::MasterInsertPanel, placed beside it by the owner.
 class MixerChannel : public juce::Component
 {
 public:
@@ -23,10 +23,6 @@ public:
     // product's layer is a rhythm in mu-clid, a voice in mu-tant.
     // Client is an external-app strip (mu-link): name LCD, four-knob EQ, fader, no sends or sidechain.
     enum class Type { Channel, EffectReturn, DelayReturn, ReverbReturn, Master, Client };
-
-    // Width of the insert panel drawn to the right of the Master strip.
-    // Both inserts share this width, stacked vertically (top = INS 1, bottom = INS 2).
-    static constexpr int kInsertPanelW = 136;
 
     MixerChannel(Type type, const juce::String& name, juce::Colour colour);
 
@@ -100,13 +96,11 @@ public:
     // ─── Callback-driven Master (Type::Master only; no processor) ───────────
     // mu-link's master column: the 80 px strip alone (name, fader, VU, dB readout; no pan, mute or
     // solo). The owner wires onMasterLevel and pushes state in with setMasterLevel, which never
-    // fires it. The plugins' mixer keeps bindMaster and the built-in insert panel.
+    // fires it. The plugins' mixer uses bindMaster instead; both put a MasterInsertPanel beside it.
     std::function<void(float linearLevel)> onMasterLevel;   // 0 .. kClientFaderMax, unity 1
     void useCallbackMaster();                               // switch this Master to callback mode
     void setMasterLevel(float linear);
     void bindMasterMeter(const std::atomic<float>& peak) { bindClientMeter(peak); }
-    // Show or hide the built-in insert panel (Master only; default shown, as the plugins use it).
-    void setShowInsertPanel(bool show);
     // Top of the fader, in this strip's pixels, so the master fader lines up with the Client faders.
     // A negative value (the default) puts it just under the name.
     void setFaderTop(int topPx) { faderTopPx = topPx; resized(); }
@@ -119,11 +113,9 @@ public:
 private:
     // Construction and layout in parts (constructor / resized()).
     void addSidechainControls();
-    void addInsertControls();
     int  layoutSidechain(int stripW, int nameBottom);    // returns the section's height
     int  layoutSends(int stripW, int sendY);             // returns the fader's top
     void layoutFaderAndButtons(int stripW, int faderY);
-    void layoutInsertPanel(int stripW, int insW, int nameBottom);
     void layoutClient();
     void layoutCallbackMaster();
     void addClientControls();
@@ -152,7 +144,6 @@ private:
                                             KnobWithLabel("Low",    Id::knobInsertPad) };
     bool clientMuted = false, clientSoloed = false;
     bool callbackMaster  = false;   // Master driven by onMasterLevel, not bindMaster
-    bool showInsertPanel = true;    // Master: the built-in insert column
     int  faderTopPx      = -1;      // callback Master: fader top, -1 = under the name
 
     juce::Slider      fader;
@@ -171,39 +162,6 @@ private:
     KnobWithLabel     scAttack  { "/",   Id::knobFxSend };
     KnobWithLabel     scRelease { "\\",  Id::knobFxSend };
 
-    // Per-algorithm slot snapshots for master inserts — A/B-style: cycling
-    // back to a previously-edited algo restores its slot values. Stored as
-    // ACTUAL (denormalised) per slot so the restore path normalises back via
-    // mu_ui::actualToNorm. kInsertSlotCount slots per algo, kInsertAlgoCount algos, 2 master slots.
-    float insertSnapshots     [mu_ui::kInsertAlgoCount][mu_ui::kInsertSlotCount] = {{0.0f}};
-    bool  insertSnapshotValid [mu_ui::kInsertAlgoCount]    = {};
-    float insertSnapshots2    [mu_ui::kInsertAlgoCount][mu_ui::kInsertSlotCount] = {{0.0f}};
-    bool  insertSnapshotValid2[mu_ui::kInsertAlgoCount]    = {};
-
-    // Master insert: 4 generic Param knobs per slot. Labels / ranges /
-    // formatters are driven each algo switch by mu_ui::configureKnobFromSlot.
-    juce::ComboBox    insCharBox;
-    KnobWithLabel     insParam1  { "P1", Id::knobInsertPad };
-    KnobWithLabel     insParam2  { "P2", Id::knobInsertPad };
-    KnobWithLabel     insParam3  { "P3", Id::knobInsertPad };
-    KnobWithLabel     insParam4  { "P4", Id::knobInsertPad };
-
-    juce::ComboBox    insCharBox2;
-    KnobWithLabel     insParam1_2 { "P1", Id::knobInsertPad };
-    KnobWithLabel     insParam2_2 { "P2", Id::knobInsertPad };
-    KnobWithLabel     insParam3_2 { "P3", Id::knobInsertPad };
-    KnobWithLabel     insParam4_2 { "P4", Id::knobInsertPad };
-    KnobWithLabel     insExtra2  { "Mid Hz", Id::knobInsertPad };
-
-    // Configure knob labels/ranges/callbacks for the selected algorithm on one insert slot.
-    // slot=0 → first insert (mst_ins*), slot=1 → second insert (mst_ins2*).
-    // proc non-null = write char param to APVTS; null = skip (called from loadFromApvts).
-    void configureInsertAlgorithm(int charId, int slot, ProcessorBase* proc);
-
-    // Captured by bindMaster so configureInsertAlgorithm's knob callbacks can
-    // write to APVTS even when re-invoked from loadFromApvts with proc=nullptr.
-    ProcessorBase* masterInsertProc = nullptr;
-
     bool hasSends()            const { return channelType == Type::Channel
                                              || channelType == Type::EffectReturn
                                              || channelType == Type::DelayReturn; }
@@ -214,8 +172,7 @@ private:
                                              || channelType == Type::DelayReturn
                                              || channelType == Type::ReverbReturn; }
     bool hasOutputBus()        const { return channelType == Type::Channel; }
-    bool hasInsert()           const { return channelType == Type::Master; }
-    bool insertShown()         const { return hasInsert() && showInsertPanel; }
+    bool isMaster()            const { return channelType == Type::Master; }
 
     void updateDbLabel(float level);
 
@@ -246,17 +203,8 @@ private:
     static constexpr int kSendKnobH    = 46;   // was kSendsAreaH / 4
     static constexpr int kPanKnobH     = 48;   // was kSendsAreaH - 3 * kSendKnobH
 
-    // Insert section (Master channel only)
-    static constexpr int kInsCharH      = 20;
-    static constexpr int kInsKnobH      = 44;
-    static constexpr int kInsertH       = kInsCharH + kInsKnobH;          // 64px
-    static constexpr int kInsertLabelW  = 18;   // rotated "Main Insert N" label strip on the left of each slot
-
     // Section pane bounds — computed in resized(), drawn as rounded rects in paint().
     juce::Rectangle<int> sidechainPaneBounds;
     juce::Rectangle<int> sendsPaneBounds;
     juce::Rectangle<int> faderPaneBounds;
-
-    // Y coordinate of the horizontal divider between INS 1 and INS 2 (Master only).
-    int insertMidY = 0;
 };

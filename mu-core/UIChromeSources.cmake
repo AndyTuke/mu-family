@@ -22,7 +22,7 @@ set(MU_CORE_CHROME_SOURCES
     "${_mu_core_dir}/UI/Components/AddButton.cpp"
     "${_mu_core_dir}/UI/Components/StatusBar.cpp"
     "${_mu_core_dir}/UI/Components/VUMeter.cpp"
-    # Mixer strips: the callback-driven half (MixerChannel_Bindings.cpp and MixerChannel_Insert.cpp bind to ProcessorBase and stay out)
+    # Mixer strips: the callback-driven half (MixerChannel_Bindings.cpp and MasterInsertBinding.cpp bind to ProcessorBase and stay out)
     "${_mu_core_dir}/UI/MixerChannel.cpp"
     "${_mu_core_dir}/UI/MasterInsertPanel.cpp"
     # Shared chrome over ShellBackend

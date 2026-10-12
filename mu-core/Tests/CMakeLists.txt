@@ -39,7 +39,6 @@ target_sources(mu-core-tests PRIVATE
     MasterColumnFitTests.cpp
     MasterInsertBindingTests.cpp
     ../UI/MixerChannel_Bindings.cpp
-    ../UI/MixerChannel_Insert.cpp
     ../UI/MasterInsertBinding.cpp
     # Sources behind ProcessorBase + the settings page (shared list, see ProcessorTestSources.cmake).
     ${MU_CORE_PROCESSOR_TEST_SOURCES}
