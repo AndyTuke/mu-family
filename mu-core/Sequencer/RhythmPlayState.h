@@ -14,7 +14,7 @@ struct RhythmPlayState
     std::atomic<int>  stepsA        { 1 }; // individual ring step counts for per-ring rotation
     std::atomic<int>  stepsB        { 1 };
     std::atomic<int>  stepsC        { 1 };
-    std::atomic<int>  hitCount      { 0 }; // monotonic counter - audio thread increments per hit, UI tracks lastSeen (avoids one-shot-flag race between RhythmCircle + SidebarItem)
+    std::atomic<int>  hitCount      { 0 }; // monotonic counter - audio thread increments per hit, UI tracks lastSeen (avoids a one-shot-flag race between UI readers)
 };
 
 } // namespace mu_core

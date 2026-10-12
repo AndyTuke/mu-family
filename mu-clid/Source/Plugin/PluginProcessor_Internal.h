@@ -17,8 +17,8 @@ namespace mu_clid {
 // ── ADSR display-scale converters ────────────────────────────────────────────
 // Convert 0–100 UI scale → 0..3 s for ADSR time params.
 inline float adsrTime(float v) noexcept { return juce::jmax(0.001f, v * 0.03f); }
-// Convert 0–100 UI scale → 0–1 amplitude for ADSR Sustain.
-inline float adsrSus (float v) noexcept { return juce::jlimit(0.0f, 1.0f, v / 100.0f); }
+// Convert 0–100 UI scale → 0–1 amplitude for ADSR Sustain (the mu-core definition).
+inline float adsrSus (float v) noexcept { return mu_core::adsrSusLocal(v); }
 
 // per-rhythm suffix list lives in kRhythmParamDefs (RhythmParamTable.h).
 // Iterate that directly instead of a parallel string array. Callers that need

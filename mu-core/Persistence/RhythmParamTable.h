@@ -25,16 +25,15 @@
 
 #include <juce_core/juce_core.h>
 #include "Sequencer/Rhythm.h"
-#include "Audio/AlgorithmNames.h"   // Stage 35: kInsertAlgorithmNames / kFilterTypeNames
+#include "Audio/AlgorithmNames.h"   // kInsertAlgorithmNames / kFilterTypeNames
 
 namespace mu_core {
 
-// Convert 0–100 UI scale → 0–1 amplitude for ADSR Sustain. Mirrors the helper
-// declared at the top of PluginProcessor_Internal.h; duplicated here so this
-// header is self-contained.
+// Convert 0–100 UI scale → 0–1 amplitude for ADSR Sustain. The one definition:
+// products that need the same conversion call this rather than keep a copy.
 inline float adsrSusLocal(float v) noexcept { return juce::jlimit(0.0f, 1.0f, v / 100.0f); }
 
-// Stage 35 Step 1: per-param type tag drives the v2 preset format. Apply / push
+// Per-param type tag drives the v2 preset format. Apply / push
 // always operate in display-scale float — this just controls how the value is
 // serialised to / parsed from XML and (for AlgorithmIndex kinds) which name
 // table is used to map back and forth to a stable string ID.
@@ -57,7 +56,7 @@ struct RhythmParamDef
     // pushRhythmToApvts to mirror the in-memory state to APVTS after a
     // hot-swap commit / preset load.
     float (*push)(const Rhythm& r);
-    // Stage 35: param type + algorithm name table (for AlgorithmIndex kinds).
+    // Param type + algorithm name table (for AlgorithmIndex kinds).
     // Default Float/nullptr keeps existing entries working until we backfill
     // the right kind below.
     ParamKind          kind            = ParamKind::Float;
@@ -67,7 +66,7 @@ struct RhythmParamDef
 // Expand all nine HitGen suffixes for one letter (A / B / C). Suffixes:
 // stepsX, hitsX, rotX, prePadX, postPadX, insStX, insLenX, insModeX,
 // prePadModeX, postPadModeX. Insert / pad MODE bools encode Mute=1 / Pad=0.
-// Stage 35: kind tags drive the v2 preset format — integer counts become
+// Kind tags drive the v2 preset format — integer counts become
 // `<r0_stepsA value="16"/>`, mode bools become `value="true"/"false"`.
 #define MU_HITGEN_ENTRIES(L)                                                                                                                                                       \
     { "steps" #L,       [](float v, Rhythm& r, bool& pd, bool&) { r.gen##L.steps        = juce::jlimit(1, 64, (int)v); pd = true; },                                                \
@@ -143,7 +142,7 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
                    [](const Rhythm& r) -> float { return r.voiceParams.pitchEnvDepth; } },
 
     // ── Filter + filter envelope ─────────────────────────────────────────────
-    // Stage 35: fltType is an algorithm selector → string name in v2 preset XML.
+    // fltType is an algorithm selector → string name in v2 preset XML.
     { "fltType",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.filterType   = juce::jlimit(0, 15, (int)v); vd = true; },
                    [](const Rhythm& r) -> float { return (float) r.voiceParams.filterType; },
                    ParamKind::AlgorithmIndex, mu_audio::kFilterTypeNames },
@@ -185,8 +184,8 @@ inline const RhythmParamDef kRhythmParamDefs[] = {
                    [](const Rhythm& r) -> float { return r.voiceParams.accentDb; } },
 
     // ── Insert ────────────────────────────────────────────────────────────────
-    // Stage 36: 4 generic slots (insP1..insP4) replace the prior 9 named insert
-    // fields. APVTS storage + VoiceParams storage are both NORMALISED 0..1;
+    // 4 generic slots (insP1..insP4) hold the insert's parameters, whatever the
+    // algorithm. APVTS storage + VoiceParams storage are both NORMALISED 0..1;
     // algorithms denormalise per-slot via mu_ui::normToActual at process time.
     { "drvChar",   [](float v, Rhythm& r, bool&, bool& vd)  { r.voiceParams.insertAlgo  = juce::jlimit(0, mu_audio::kInsertAlgorithmCount - 1, (int)v); vd = true; },
                    [](const Rhythm& r) -> float { return (float) r.voiceParams.insertAlgo; },

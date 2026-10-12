@@ -10,7 +10,7 @@ namespace mu_core {
 
 enum class Logic { OR, AND, XOR, AOnly, BOnly };
 
-// per-rhythm bundle of modulated euclid overrides for genA / genB / genC.
+// One layer's bundle of modulated euclid overrides for genA / genB / genC.
 struct EuclidOverrides
 {
     EuclidGenOverrides a, b, c;
@@ -37,7 +37,7 @@ public:
     // Length is resetSteps if set, otherwise the LCM of A and B step counts.
     std::vector<bool> getCombinedPattern() const;
 
-    // Stage B: non-allocating override-aware variant. Writes combined pattern
+    // Non-allocating override-aware variant. Writes combined pattern
     // into `out`, using three scratches (genA pattern, genB pattern, plus internal
     // euclidean scratch shared by the HitGenerator overload). All buffers must be
     // pre-reserved to capacity ≥ 256 for fully allocation-free operation.
