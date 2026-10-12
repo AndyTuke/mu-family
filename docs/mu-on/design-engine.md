@@ -14,8 +14,8 @@ pointers each block (no per-block string lookups, no audio-thread allocation).
 
 ### Kick — `KickEngine` (synthesis)
 Sine body + an **exponential pitch envelope** (start tune → base) for the thump, an exponential
-**amp envelope**, and a `tanh` **drive** for click/punch. Params: `k_tune`, `k_ptch` (pitch amount),
-`k_pdec` (pitch decay), `k_adec` (amp decay), `k_drive`.
+**amp envelope**, and a `tanh` **drive** for click/punch. Params: `t0_tune`, `t0_ptch` (pitch amount),
+`t0_pdec` (pitch decay), `t0_adec` (amp decay), `t0_drive`.
 
 ### Bass — `BassEngine` (the focus)
 The deepest, most flexible lane. Main oscillator (**Sine / Saw / Square**) + a **sub osc** one
@@ -25,8 +25,8 @@ octave down, an **A/D/S amp envelope**, and a low-pass **mu-core `MultiModeFilte
 - **Rumble** — sub up, drive up, resonance up, slower filter-env decay; the valve drive adds the
   harmonic grit that reads as "rumble".
 
-Params: `b_wave`, `b_sub`, `b_tune` (root), `b_cut`, `b_res`, `b_env` (filter-env depth),
-`b_edec` (filter-env decay), `b_atk`, `b_dec`, `b_sus`, `b_drive`. The filter cutoff is updated
+Params: `t1_wave`, `t1_sub`, `t1_tune` (root), `t1_cut`, `t1_res`, `t1_env` (filter-env depth),
+`t1_edec` (filter-env decay), `t1_atk`, `t1_dec`, `t1_sus`, `t1_drive`. The filter cutoff is updated
 at **block rate** from the current envelope value (per-sample cutoff modulation is a refinement).
 
 **Deliberately not yet exposed (would be inert):** per-step **pitch**, **glide**, and an amp
@@ -54,7 +54,7 @@ and runs it through, in order: input **drive** (the `MultiModeFilter` valve), th
 low-pass, with size + dry/wet mix), a per-bar **volume envelope** (a drawable smooth curve — the
 shared `LFOEditor` — that sits in the Rumble lane's otherwise-empty step-grid slot, persisted in
 state, evaluated audio-side under a try-lock), and a final **multimode filter**. Params:
-`r_drive`, `r_d1`/`r_d2`/`r_d3`, `r_size`, `r_revmix`, `r_revlp`, `r_cut`, `r_res`. The mixer strip
+`t4_drive`, `t4_d1`/`t4_d2`/`t4_d3`, `t4_size`, `t4_revmix`, `t4_revlp`, `t4_cut`, `t4_res`. The mixer strip
 pre-wires Rumble's sidechain source to the Kick (amount 0 by default → optional kick-pumping).
 The reverb tone + the block-rate envelope are deliberately basic for now (framework stage). *(Note:
 distinct from the Bass lane's "rumble" voicing above, which is a tonal character of `BassEngine`,

@@ -34,53 +34,69 @@ constexpr ModDestEntry makeTarget(const char* id, const char* param, const char*
 
 // Kick — order matches KickEngine::setParams(baseHz, pitchAmtHz, pitchDecMs, ampDecMs, drv).
 inline constexpr ModDestEntry kKickDests[] = {
-    makeTarget("k.tune.prop", "k_tune", "Tune"),
-    makeTarget("k.ptch.prop", "k_ptch", "Pitch Amt"),
-    makeTarget("k.pdec.prop", "k_pdec", "Pitch Decay"),
-    makeTarget("k.adec.prop", "k_adec", "Decay"),
-    makeTarget("k.drive.prop", "k_drive", "Drive"),
+    makeTarget("k.tune.prop", "t0_tune", "Tune"),
+    makeTarget("k.ptch.prop", "t0_ptch", "Pitch Amt"),
+    makeTarget("k.pdec.prop", "t0_pdec", "Pitch Decay"),
+    makeTarget("k.adec.prop", "t0_adec", "Decay"),
+    makeTarget("k.drive.prop", "t0_drive", "Drive"),
 };
 
 // Bass — order matches BassEngine::setParams(rootHz, [wave], sub, cutHz, res, env,
 // edecMs, atkMs, decMs, sus, drv). Wave is a choice param — not modulatable, omitted.
 inline constexpr ModDestEntry kBassDests[] = {
-    makeTarget("b.tune.prop", "b_tune", "Tune"),
-    makeTarget("b.sub.prop", "b_sub", "Sub"),
-    makeTarget("b.cut.prop", "b_cut", "Cutoff"),
-    makeTarget("b.res.prop", "b_res", "Resonance"),
-    makeTarget("b.env.prop", "b_env", "Filter Env"),
-    makeTarget("b.edec.prop", "b_edec", "Env Decay"),
-    makeTarget("b.atk.prop", "b_atk", "Attack"),
-    makeTarget("b.dec.prop", "b_dec", "Decay"),
-    makeTarget("b.sus.prop", "b_sus", "Sustain"),
-    makeTarget("b.drive.prop", "b_drive", "Drive"),
+    makeTarget("b.tune.prop", "t1_tune", "Tune"),
+    makeTarget("b.sub.prop", "t1_sub", "Sub"),
+    makeTarget("b.cut.prop", "t1_cut", "Cutoff"),
+    makeTarget("b.res.prop", "t1_res", "Resonance"),
+    makeTarget("b.env.prop", "t1_env", "Filter Env"),
+    makeTarget("b.edec.prop", "t1_edec", "Env Decay"),
+    makeTarget("b.atk.prop", "t1_atk", "Attack"),
+    makeTarget("b.dec.prop", "t1_dec", "Decay"),
+    makeTarget("b.sus.prop", "t1_sus", "Sustain"),
+    makeTarget("b.drive.prop", "t1_drive", "Drive"),
 };
 
 // Hat — order matches SampleChannel::setParams(tuneSemitones, decayMs).
 inline constexpr ModDestEntry kHatDests[] = {
-    makeTarget("h.tune.prop", "h_tune", "Tune"),
-    makeTarget("h.dec.prop", "h_dec", "Decay"),
+    makeTarget("h.tune.prop", "t2_tune", "Tune"),
+    makeTarget("h.dec.prop", "t2_dec", "Decay"),
 };
 
 // Snare — same SampleChannel::setParams order.
 inline constexpr ModDestEntry kSnareDests[] = {
-    makeTarget("s.tune.prop", "s_tune", "Tune"),
-    makeTarget("s.dec.prop", "s_dec", "Decay"),
+    makeTarget("s.tune.prop", "t3_tune", "Tune"),
+    makeTarget("s.dec.prop", "t3_dec", "Decay"),
 };
 
 // Rumble — order matches RumbleEngine::setParams(bpm, drive, d1, d2, d3, revSize, revMix, revLpHz, cutHz, res)
 // (bpm is the transport, not a dest — the 9 entries below are the modulatable args in order).
 inline constexpr ModDestEntry kRumbleDests[] = {
-    makeTarget("r.drive.prop", "r_drive", "Drive"),
-    makeTarget("r.d1.prop", "r_d1", "1/16"),
-    makeTarget("r.d2.prop", "r_d2", "2/16"),
-    makeTarget("r.d3.prop", "r_d3", "3/16"),
-    makeTarget("r.size.prop", "r_size", "Rev Size"),
-    makeTarget("r.revmix.prop", "r_revmix", "Rev Mix"),
-    makeTarget("r.revlp.prop", "r_revlp", "Rev LP"),
-    makeTarget("r.cut.prop", "r_cut", "Cutoff"),
-    makeTarget("r.res.prop", "r_res", "Resonance"),
+    makeTarget("r.drive.prop", "t4_drive", "Drive"),
+    makeTarget("r.d1.prop", "t4_d1", "1/16"),
+    makeTarget("r.d2.prop", "t4_d2", "2/16"),
+    makeTarget("r.d3.prop", "t4_d3", "3/16"),
+    makeTarget("r.size.prop", "t4_size", "Rev Size"),
+    makeTarget("r.revmix.prop", "t4_revmix", "Rev Mix"),
+    makeTarget("r.revlp.prop", "t4_revlp", "Rev LP"),
+    makeTarget("r.cut.prop", "t4_cut", "Cutoff"),
+    makeTarget("r.res.prop", "t4_res", "Resonance"),
 };
+
+// Compile-time guard: every row of a lane's table names a parameter under that lane's layerParamPrefix,
+// so a prefix change that misses a literal above fails the build instead of silencing a destination.
+template <std::size_t N>
+constexpr bool allUnderPrefix(const ModDestEntry (&table)[N], const char* prefix) noexcept
+{
+    for (const auto& row : table)
+        for (std::size_t c = 0; prefix[c] != '\0'; ++c)
+            if (row.param[c] != prefix[c]) return false;   // a shorter param also stops here, at its terminator
+    return true;
+}
+static_assert(allUnderPrefix(kKickDests,   layerParamPrefix(Kick)),   "Kick targets must use the Kick prefix");
+static_assert(allUnderPrefix(kBassDests,   layerParamPrefix(Bass)),   "Bass targets must use the Bass prefix");
+static_assert(allUnderPrefix(kHatDests,    layerParamPrefix(Hat)),    "Hat targets must use the Hat prefix");
+static_assert(allUnderPrefix(kSnareDests,  layerParamPrefix(Snare)),  "Snare targets must use the Snare prefix");
+static_assert(allUnderPrefix(kRumbleDests, layerParamPrefix(Rumble)), "Rumble targets must use the Rumble prefix");
 
 // The destination table for a lane (Channel enum), plus its entry count.
 inline const ModDestEntry* destsForLane(int lane, int& count) noexcept

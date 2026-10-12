@@ -127,6 +127,8 @@ PluginProcessor::PluginProcessor()
     grooveVoices.setSlots(laneLayers);
     grooveVoices.cacheParams(apvts);
 
+    // A saved MIDI map written under the old "k_ b_ h_ s_ r_" ids is renamed as it loads (set before initAppSettings loads it).
+    getMidiControlMap().setIdPrefixRenames(layerParamPrefixRenames());
     initAppSettings("muOn");   // settings file + saved UI size / MIDI clock (ProcessorBase)
 
     for (int v = 0; v < kNumChannels; ++v) voiceSlot(v).owner.ptr = this;

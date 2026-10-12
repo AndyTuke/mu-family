@@ -90,7 +90,7 @@ void PluginProcessor::initLaneState()
 {
     juce::StringArray prefixes;
     for (int l = 0; l < kNumChannels; ++l) prefixes.add(layerParamPrefix(l));
-    initLayerState(prefixes);
+    initLayerState(prefixes, legacyLayerParamPrefixes());   // older APVTS dumps used "k_ b_ h_ s_ r_"
 }
 
 // Any saved state (host session or full preset, either format) in the composed shape. Older

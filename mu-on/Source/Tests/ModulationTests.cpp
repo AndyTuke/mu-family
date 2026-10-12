@@ -62,12 +62,12 @@ public:
 
         beginTest("per-lane destination tables are lane-scoped");
         {
-            // b.cut is the 3rd Bass destination (index 2) and backs the b_cut param.
+            // b.cut is the 3rd Bass destination (index 2) and backs the t1_cut param.
             int n = 0;
             const ModDestEntry* bassT = destsForLane(Bass, n);
             expect(n >= 3);
             expect(std::string(bassT[2].id) == "b.cut.prop");
-            expect(std::string(bassT[2].param) == "b_cut");
+            expect(std::string(bassT[2].param) == "t1_cut");
 
             // A Kick destination is not valid for the Bass lane, and vice-versa.
             expect(isValidLaneDest(Bass, "b.cut.prop"));

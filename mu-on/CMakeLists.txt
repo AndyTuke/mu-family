@@ -127,6 +127,7 @@ target_sources(mu-on-tests PRIVATE
     Source/Tests/SlotStateTests.cpp
     Source/Sequencer/GrooveSequencer.cpp
     Source/Tests/ProcessorSeamTests.cpp  # the real PluginProcessor, headless (layer ownership)
+    Source/Tests/PrefixMigrationTests.cpp   # data saved before the k/b/h/s/r -> t{N} id-prefix rename still loads
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp
