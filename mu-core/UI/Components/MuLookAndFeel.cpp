@@ -493,10 +493,16 @@ void MuLookAndFeel::drawSlideSwitch(juce::Graphics& g, juce::Rectangle<float> bo
 // Brushed-metal grain: fine horizontal streaks with a per-scanline tone, generated once
 // per size from a fixed seed (same grain every run) and cached — panels behind animated
 // components repaint every frame, so the texture must not be rebuilt each time.
+// The cache is heap-allocated and never destroyed: its images are GPU-backed (Direct2D), and
+// destroying them from a static destructor at plugin-DLL unload releases the Direct3D device
+// under the loader lock, which hangs inside the graphics driver.
 static const juce::Image& brushedGrain(int w, int h)
 {
-    static std::map<std::pair<int, int>, juce::Image> cache;
-    auto& img = cache[{ w, h }];
+    static auto* const cache = new std::map<std::pair<int, int>, juce::Image>();
+    constexpr size_t kMaxSizes = 64;   // panels resize freely; bound the cache so it cannot grow forever
+    if (cache->size() >= kMaxSizes && cache->find({ w, h }) == cache->end())
+        cache->clear();
+    auto& img = (*cache)[{ w, h }];
     if (img.isNull() && w > 0 && h > 0)
     {
         img = juce::Image(juce::Image::ARGB, w, h, true);
