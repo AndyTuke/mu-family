@@ -100,8 +100,10 @@ protected:
     std::atomic<int>      numLayers { 0 };
 public:
     // True for the whole of a structural layer edit (pointer moves and the parameter moves after
-    // them). A product's audio thread skips rendering while it is set, so hosts whose wrapper does
-    // not honour suspendProcessing (CLAP) never play a moved layer with half-shifted parameters.
+    // them); a product whose layer data is the parameter truth (layerHoldsParamTruth) gets it lowered
+    // before the parameter push. A product's audio thread skips rendering while it is set, so hosts
+    // whose wrapper does not honour suspendProcessing (CLAP) never play a moved layer with
+    // half-shifted parameters. A flag, not a counter: edits never nest.
     std::atomic<bool>     layerEditInFlight { false };
 protected:
     juce::CriticalSection layersLock;

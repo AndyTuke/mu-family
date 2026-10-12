@@ -510,23 +510,33 @@ namespace
     // layersLock protects the pointer moves in every host. layerEditInFlight additionally tells a
     // product's audio thread to skip rendering until the parameter moves have finished, so no
     // block plays a moved layer with half-shifted parameters.
+    // layerEditInFlight is a flag, not a counter: edits never nest (all run on the message thread,
+    // one at a time), and a nested guard would lower the flag early. release() ends the guard
+    // early for a product whose audio never reads the moved parameters (layerHoldsParamTruth).
     struct ScopedSuspend
     {
         explicit ScopedSuspend(ProcessorBase& p) : proc(p), wasSuspended(p.isSuspended())
         {
+            jassert(! proc.layerEditInFlight.load(std::memory_order_relaxed));   // edits do not nest
             proc.layerEditInFlight.store(true, std::memory_order_release);
             proc.suspendProcessing(true);
         }
-        ~ScopedSuspend()
-        {
-            proc.suspendProcessing(wasSuspended);
-            proc.layerEditInFlight.store(false, std::memory_order_release);
-        }
+        ~ScopedSuspend() { release(); }
         ScopedSuspend(const ScopedSuspend&)            = delete;
         ScopedSuspend& operator=(const ScopedSuspend&) = delete;
 
+        // Resumes processing and lowers the flag; a second call does nothing.
+        void release()
+        {
+            if (released) return;
+            released = true;
+            proc.suspendProcessing(wasSuspended);
+            proc.layerEditInFlight.store(false, std::memory_order_release);
+        }
+
         ProcessorBase& proc;
         const bool     wasSuspended;
+        bool           released = false;
     };
 
     // Calls fn(param, idSuffix) for every ranged parameter whose id starts with `prefix`.
@@ -674,10 +684,19 @@ int ProcessorBase::addLayer()
         layersMoved(n, n);
     }
 
-    // Phase 3: the slot's parameters back to defaults (or, where the layer data is the truth, the
-    // product pushes the fresh layer into them), still suspended so no block sees stale values.
-    if (layerHoldsParamTruth()) syncSlotParams(n);
-    else                        resetLayerParams(n);
+    // Phase 3: the slot's parameters back to defaults, still suspended so no block sees stale values.
+    // Where the layer data is the truth the audio never reads these parameters, so processing resumes
+    // first: the product's push runs beside live audio, as any edit of its own parameters does, and
+    // layerAdded (which may read files) runs outside the edit's scope too.
+    if (layerHoldsParamTruth())
+    {
+        suspend.release();
+        syncSlotParams(n);
+    }
+    else
+    {
+        resetLayerParams(n);
+    }
     layerAdded(n);
     return n;
 }
@@ -726,6 +745,7 @@ bool ProcessorBase::removeLayer(int idx)
     remapLayerReferences([idx](int i) { return mu_mix::sidechainAfterRemove(i, idx, mu_limits::kMaxLayers); });
     if (layerHoldsParamTruth())
     {
+        suspend.release();                                 // the audio never reads these parameters: resume first
         for (int d = idx; d < n; ++d) syncSlotParams(d);   // the shifted slots and the vacated top one
     }
     else
@@ -768,6 +788,7 @@ bool ProcessorBase::swapLayers(int a, int b)
     remapLayerReferences([a, b](int i) { return mu_mix::sidechainAfterSwap(i, a, b, mu_limits::kMaxLayers); });
     if (layerHoldsParamTruth())
     {
+        suspend.release();                                 // the audio never reads these parameters: resume first
         syncSlotParams(a);
         syncSlotParams(b);
     }
@@ -795,6 +816,13 @@ void ProcessorBase::resetLayer(int idx)
         mixerEngine.resetSidechainEnv(idx);
         layersMoved(idx, idx);
     }
-    if (layerHoldsParamTruth()) syncSlotParams(idx);
-    else                        resetLayerParams(idx);
+    if (layerHoldsParamTruth())
+    {
+        suspend.release();                                 // the audio never reads these parameters: resume first
+        syncSlotParams(idx);
+    }
+    else
+    {
+        resetLayerParams(idx);
+    }
 }

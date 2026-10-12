@@ -157,14 +157,17 @@ public:
     // and its mixer strip state, into the parameters.
     virtual bool layerHoldsParamTruth() const { return false; }
 
-    // Message thread, processing suspended and layerEditInFlight raised, not under layersLock, after
-    // the pointer moves and before the edit resumes processing. Only called when
-    // layerHoldsParamTruth() is true. A product also frees here whatever it parked under the lock.
+    // Message thread, not under layersLock, after the pointer moves. Only called when
+    // layerHoldsParamTruth() is true, and then processing has already resumed and layerEditInFlight is
+    // down (the audio never reads these parameters, so the push must not silence the mix); a slot
+    // that is live meanwhile must therefore already be safe to render. A product also frees here
+    // whatever it parked under the lock.
     virtual void syncSlotParams(int slot) { juce::ignoreUnused(slot); }
 
-    // Called by addLayer last, on the message thread with processing still suspended and the new
-    // layer's parameters at their defaults, so a product can give the new layer its own starting
-    // point (a product with per-layer engine types picks the engine). Not called under layersLock.
+    // Called by addLayer last, on the message thread, not under layersLock, with the new layer's
+    // parameters at their defaults, so a product can give the new layer its own starting point (a
+    // product with per-layer engine types picks the engine). Processing is still suspended unless
+    // layerHoldsParamTruth() is true, where it has resumed: that product may do file work here.
     virtual void layerAdded(int index) { juce::ignoreUnused(index); }
 
     // ─── Shell-facing API (overridden by each plugin) ────────────────────────

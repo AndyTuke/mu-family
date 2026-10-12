@@ -106,6 +106,8 @@ namespace
         void syncSlotParams(int slot) override
         {
             synced.push_back(slot);
+            syncedFlagUp.push_back(layerEditInFlight.load() ? 1 : 0);
+            syncedSuspended.push_back(isSuspended() ? 1 : 0);
             syncedHoldingLock.push_back(lockHeldByOtherThread() ? 1 : 0);
             order.push_back("synced");
         }
@@ -116,10 +118,10 @@ namespace
             reorderedHoldingLock.push_back(lockHeldByOtherThread() ? 1 : 0);
             order.push_back("reordered");
         }
-        std::vector<int> synced, syncedHoldingLock, reorderedHoldingLock;
+        std::vector<int> synced, syncedHoldingLock, reorderedHoldingLock, syncedFlagUp, syncedSuspended, addedFlagUp;
         std::vector<Reorder> reordered;
         std::vector<juce::String> order;          // layersReordered / layersMoved / syncSlotParams, in call order
-        void clearLogs() { synced.clear(); syncedHoldingLock.clear(); reordered.clear(); reorderedHoldingLock.clear(); order.clear(); }
+        void clearLogs() { syncedFlagUp.clear(); syncedSuspended.clear(); addedFlagUp.clear(); synced.clear(); syncedHoldingLock.clear(); reordered.clear(); reorderedHoldingLock.clear(); order.clear(); }
         // A critical section is re-entrant for its owner, so only a second thread can tell it is held.
         bool lockHeldByOtherThread()
         {
@@ -130,7 +132,7 @@ namespace
         }
 
         // layerAdded(index): the new layer's own starting point, after its parameters are at defaults.
-        void layerAdded(int index) override { added.push_back(index); addedHoldingLock.push_back(lockHeldByOtherThread() ? 1 : 0); }
+        void layerAdded(int index) override { added.push_back(index); addedFlagUp.push_back(layerEditInFlight.load() ? 1 : 0); addedHoldingLock.push_back(lockHeldByOtherThread() ? 1 : 0); }
 
         float param(const juce::String& id) const
         {
@@ -678,6 +680,30 @@ struct LayerOwnershipTests : juce::UnitTest
             expectNear(p.param("v1_a"), 0.1f); expectNear(p.param("v2_a"), 0.2f); expectNear(p.param("v3_a"), 0.3f);
             expectNear(p.param("ch2_pan"), 0.5f);   // the product's sync moves values; the base leaves the tree alone
             expectEquals(p.layerEditInFlight.load() ? 1 : 0, 0, "the edit flag is down again");
+            for (int f : p.syncedFlagUp)    expectEquals(f, 0, "the sync runs with the in-flight flag already down, so the mix is not silenced");
+            for (int s : p.syncedSuspended) expectEquals(s, 0, "and with processing already resumed");
+        }
+
+        beginTest("layerHoldsParamTruth: swap, reset and add also push with the flag down; layerAdded runs outside the flag");
+        {
+            EditableProcessor p(true);
+            p.truth = true;
+            p.addLayer(); p.addLayer();
+            p.clearLogs();
+            p.swapLayers(0, 1); p.resetLayer(1); p.addLayer();
+            expect(p.syncedFlagUp.size() == 4);
+            for (int f : p.syncedFlagUp)    expectEquals(f, 0);
+            for (int s : p.syncedSuspended) expectEquals(s, 0);
+            expect(p.addedFlagUp.size() == 1 && p.addedFlagUp[0] == 0, "layerAdded (file work in mu-Clid) is outside the flag");
+        }
+
+        beginTest("without layerHoldsParamTruth the flag stays up through layerAdded");
+        {
+            EditableProcessor p(true);
+            p.addLayer();
+            p.clearLogs();
+            p.addLayer();
+            expect(p.addedFlagUp.size() == 1 && p.addedFlagUp[0] == 1, "products whose audio reads the parameters keep the flag through the edit");
         }
 
         beginTest("layerHoldsParamTruth: swapLayers, resetLayer and addLayer sync exactly the touched slots");
