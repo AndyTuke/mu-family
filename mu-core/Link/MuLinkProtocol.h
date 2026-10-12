@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -20,7 +21,8 @@ namespace mu_link
 // Bump whenever the shared-memory layout changes incompatibly. A client whose version
 // doesn't match the server's refuses to attach (and falls back to its own audio device)
 // rather than reading a mismatched struct.
-inline constexpr std::uint32_t kProtocolVersion = 3;   // v3: client publishes its current preset name
+inline constexpr std::uint32_t kProtocolVersion = 4;   // v4: transport carries the output latency; client slots carry a requested depth and an underrun counter
+                                                       // v3: client publishes its current preset name
 
 inline constexpr int kMaxClients     = 8;     // family is ≤8 products in practice
 inline constexpr int kMaxChannels    = 2;     // stereo per client for now (see design §"channel layout")
@@ -69,6 +71,7 @@ struct TransportBlock
     std::atomic<std::uint32_t> sampleRate  { 0 };
     std::atomic<std::uint32_t> playing     { 0 };   // 0 = stopped, 1 = playing
     std::atomic<std::uint32_t> blockSize   { 0 };   // frames the server consumes per callback
+    std::atomic<std::uint32_t> outputLatencyFrames { 0 };   // the hardware device's output latency (0 = unknown)
 };
 
 // A consistent copy of the transport for a client to render against.
@@ -80,6 +83,7 @@ struct TransportSnapshot
     std::uint32_t sampleRate  = 0;
     std::uint32_t playing     = 0;
     std::uint32_t blockSize   = 0;
+    std::uint32_t outputLatencyFrames = 0;   // device output latency: audio is heard this long after the callback
 };
 
 // Server side: publish a snapshot under the seqlock. Bump to odd (write in progress),
@@ -96,6 +100,7 @@ inline void writeTransport(TransportBlock& t, const TransportSnapshot& s) noexce
     t.sampleRate .store(s.sampleRate,  std::memory_order_relaxed);
     t.playing    .store(s.playing,     std::memory_order_relaxed);
     t.blockSize  .store(s.blockSize,   std::memory_order_relaxed);
+    t.outputLatencyFrames.store(s.outputLatencyFrames, std::memory_order_relaxed);
     t.generation.store(g + 2, std::memory_order_release);          // even: stable
 }
 
@@ -122,6 +127,7 @@ inline TransportSnapshot readTransport(const TransportBlock& t) noexcept
         s.sampleRate  = t.sampleRate .load(std::memory_order_relaxed);
         s.playing     = t.playing    .load(std::memory_order_relaxed);
         s.blockSize   = t.blockSize  .load(std::memory_order_relaxed);
+        s.outputLatencyFrames = t.outputLatencyFrames.load(std::memory_order_relaxed);
         std::atomic_thread_fence(std::memory_order_acquire);
         if (t.generation.load(std::memory_order_acquire) == g1)
             return s;                                             // stable across the read
@@ -153,7 +159,22 @@ struct ClientSlot
     // extension), set by the client on each preset load. Display-only — mu-link's UI reads it
     // on its message-thread timer; a rare torn read just shows a stale frame, never unsafe.
     char                       presetName[kMaxNameChars] { };
+
+    // Server → client: how far ahead (frames) the client should keep its ring filled; 0 = the
+    // client's own default. The client reads it each fill pass and clamps it to what its ring allows.
+    std::atomic<std::uint32_t> requestedDepthFrames { 0 };
+
+    // Server → client/UI: cumulative frames this client's ring was short by (underruns). Reset when
+    // the slot is claimed. A rising count means the depth is too low for this machine.
+    std::atomic<std::uint64_t> underrunFrames { 0 };
 };
+
+// The shared layout is read by other processes: a cross-process atomic must be lock-free, the 64-bit
+// counter naturally aligned, and the transport block must not change size without a version bump.
+static_assert(std::atomic<std::uint64_t>::is_always_lock_free, "shared 64-bit atomics must be lock-free");
+static_assert(std::atomic<std::uint32_t>::is_always_lock_free, "shared 32-bit atomics must be lock-free");
+static_assert(sizeof(TransportBlock) == 48, "TransportBlock layout changed: bump kProtocolVersion");
+static_assert(offsetof(ClientSlot, underrunFrames) % 8 == 0, "underrunFrames must be 8-byte aligned");
 
 struct ClientRegistry
 {

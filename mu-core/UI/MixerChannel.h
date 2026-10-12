@@ -8,6 +8,7 @@
 #include "UI/Components/VUMeter.h"
 #include "UI/Components/GRMeter.h"
 #include "UI/Components/MuLookAndFeel.h"
+#include "UI/Components/StatusLamp.h"
 #include "Audio/MixerEngine.h"
 #include "Audio/InsertSlotConfig.h"
 
@@ -93,6 +94,13 @@ public:
     static juce::String formatClientDb(float linearLevel);
     void setMeterMode(VUMeter::MeterMode m) { vuMeter.setMode(m); }
 
+    // The Dropouts lamp (mu-link): off while clean, red while a dropout is happening, amber once it has
+    // stopped (latched until the user clicks the lamp). The owner decides the state; clicking asks to clear.
+    enum class Dropout { Clean, Active, Latched };
+    void setClientDropout(Dropout state);
+    std::function<void()> onClientDropoutClear;
+    StatusLamp& getDropoutLamp() { return dropoutLamp; }
+
     // ─── Callback-driven Master (Type::Master only; no processor) ───────────
     // mu-link's master column: the 80 px strip alone (name, fader, VU, dB readout; no pan, mute or
     // solo). The owner wires onMasterLevel and pushes state in with setMasterLevel, which never
@@ -152,6 +160,7 @@ private:
     juce::Label       dbLabel;
     juce::TextButton  muteBtn { "M" };
     juce::TextButton  soloBtn { "S" };
+    StatusLamp        dropoutLamp;   // client strips: a dropout (underrun) indicator
 
     // Output bus dropdown (layer channels only): M = Master, 1..8 = direct out.
     juce::ComboBox    outBusBox;

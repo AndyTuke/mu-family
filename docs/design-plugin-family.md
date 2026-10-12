@@ -430,9 +430,11 @@ throughout; the stages marked **O** also wait for owner decisions on behaviour o
    the wrapper would carry nothing the two users share. What is shared is the virtual
    `Layer::insertGainReduction()` (default `nullptr`; `Pattern` / `Arp` return `&insert.grReduction`; `Rhythm`
    returns its engine's at stage 7), which replaces `getInsertGRPtr` / `getInsertGRReductionPtr`. A member that
-   belongs to the *slot* and not to the layer's data (the insert's delay lines, a voice engine, the retire
-   tail) is wrapped in `SlotBound<T>` (next to `OwnerLink` in `Layer.h`: copy and assignment do nothing), so
-   a layer copy, swap or `adoptDefaults` never moves or clobbers it. Anything a layer owns *as data* moves with it when the pointer moves.
+   belongs to the *slot* and not to the layer's data (the insert's delay lines) is wrapped in `SlotBound<T>`
+   (next to `OwnerLink` in `Layer.h`: copy and assignment do nothing), so a layer copy or `adoptDefaults` never
+   moves or clobbers it. It still travels with the object on a pointer move; state that must stay at the slot
+   index or outlive the layer (a voice engine, the retire tail, the UI snapshot) lives processor-side, see
+   "Slot-keyed audio state stays processor-side". Anything a layer owns *as data* moves with it when the pointer moves.
 5. **Audio-thread rules.**
    - The audio thread takes `ScopedTryLock(layersLock)` once per block. On failure it renders silence for
      that block but **still advances the transport and boundary detection** (hot-swap principle 4). It reads
@@ -529,8 +531,11 @@ State of the tree: stages 1 to 3 and 5 are done for mu-Tant, mu-Toni and mu-On, 
    Not in scope, by ruling: `typeId` and `Layer::render` (stage 8, #1319), `resetToDefaults` (the shipped
    `adoptDefaults` does this job), the clip bank (#1277), hot-swap staging state (done: `LayerSwapper`), the mixer
    binding (slot index is the binding; nothing to hoist).
-2. **#1264 closes after:** mu-Tant's remaining per-slot arrays (`voices`, `voiceSnap`, `retiring`) become
-   `SlotBound` members of `Pattern` (`blkPatternBeats` is a per-block audio-thread cache and stays in the
+2. **#1264 closes after:** mu-Tant's remaining per-slot arrays (`voices`, `voiceSnap`, `retiring`) are **not**
+   moved into `Pattern` (ruled 2026-10-12; "part A as written" is dropped, see "Slot-keyed audio state stays
+   processor-side" below). They are gathered into one processor-side `std::array<SlotState, kMaxLayers>`
+   (`engine`, `retiring`, `snap`), a tidy-up that is optional and needs no review beyond the DSP check
+   (`blkPatternBeats` is a per-block audio-thread cache and stays in the
    processor); the sequencer role names `Arpeggiator` to `ArpSequencer` (4 uses) now, and `SequencerEngine` to
    `RhythmSequencer` **with stage 7** (144 uses, same lines the stage touches, so the code moves once);
    `GrooveSequencer` already conforms and mu-Tant has no sequencer class to rename (`GatePattern` is data and stays);
@@ -541,6 +546,28 @@ State of the tree: stages 1 to 3 and 5 are done for mu-Tant, mu-Toni and mu-On, 
    not done on its own. The step grid and `GrooveVoices` stay in the processor until #1241 decides the per-layer engine selector.
 3. Stage 6 still waits on Andy for mu-Toni's default layer count (recommended: 1 for a fresh instance, as mu-Tant and
    mu-Clid, with old 4-layer states loading as 4; no demo cap, as mu-Toni is freeware and the demo cap is retired).
+
+#### Slot-keyed audio state stays processor-side (ruled 2026-10-12)
+
+`SlotBound<T>` only means "a layer copy, assignment or `adoptDefaults` does not carry it". It does **not** pin the
+member to a slot index: `removeLayer` / `swapLayers` move the `unique_ptr<Layer>`, so a `SlotBound` member travels
+with its `Pattern`. That is right for the insert's delay lines (they follow the layer's sound) and wrong for state
+that must stay at the slot index or outlive the layer. mu-Tant's three arrays are of the second kind:
+
+- `retiring[v]` must outlive the layer: a count-reducing full-preset swap fades the old tail of slots past the new
+  live count, and the removed layer's `unique_ptr` is released after unlocking. `voices[v]` (one `VoiceEngine` per
+  slot, built once in the constructor, rendered and reset past the live count) is what the tail is rendered through.
+- `voiceSnap[v]` is read by the UI at 30 Hz by index (`getModSnapshot`) for slots that may be gone; the atomics must
+  keep a stable address.
+
+So they stay keyed by slot index in the processor, as one `SlotState { unique_ptr<VoiceEngine> engine;
+RetiringVoice retiring; std::array<std::atomic<float>, kTantSnapCount> snap; }` array if the owner of the code wants
+the three arrays tidied. Constraints for it, all existing behaviour that must not change: allocate every `engine`
+in the constructor and never resize or reassign the array (the audio thread never allocates, the UI never sees a
+dangling atomic); the retire tail is armed on the message thread under `suspendProcessing` before the new count is
+published, with `config` written before the `samplesLeft` release store and read after its acquire load; the tail
+is found by slot index, never through a `Pattern`. mu-Clid (stage 7) keeps its retired engines in
+the same way (a per-slot record that survives `Rhythm`); mu-Toni's `ArpVoiceRunner` stays in `Arp` because it has no tail.
 
 For the combined instance (design-future): none of the above blocks it, and nothing here closes it off. The
 registry adds `typeId` -> `LayerTypeInfo`; the saved `Slot` node gains a `type` attribute (absent = the

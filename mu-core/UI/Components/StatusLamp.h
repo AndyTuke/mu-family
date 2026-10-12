@@ -19,8 +19,12 @@ public:
     void setStatus(const juce::String& name, const juce::String& status) { statusName = name; statusText = status; }
     std::function<void(const juce::String& name, const juce::String& status)> onStatusUpdate;
 
+    // Optional: the whole lamp is a click target (e.g. to clear a latched fault).
+    std::function<void()> onClick;
+
     void paint(juce::Graphics&) override;
     void mouseEnter(const juce::MouseEvent&) override;
+    void mouseDown(const juce::MouseEvent&) override { if (onClick) onClick(); }
 
 private:
     juce::String label, statusName, statusText;

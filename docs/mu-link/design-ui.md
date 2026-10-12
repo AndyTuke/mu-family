@@ -52,8 +52,19 @@ One metal panel. Contents, top to bottom, using the strip anatomy of the family 
 | Fader + VU | the family fader and `VUMeter` (10 px, right-adjacent, no gap). **The fader takes all the height left in the strip** (the 200 px cap belongs to overlay strips that also carry sends and sidechain; a Client strip has neither, so it does not apply; minimum `kClientFaderMinH` 40). Range 0 to `kClientFaderMax` (1.5) linear, unity `kClientFaderUnity` (1.0), double-click returns to unity |
 | dB readout | 9 pt `labelText` under the fader, one decimal (`0.0`, `-6.0`, `+3.5`); the status bar shows `Client 3 level` / `-6.0 dB` |
 | Mute, Solo | the family M / S buttons (`vuMeterClip` red when muted, `knobLevel` amber when soloed, as in the mixer overlay) |
+| Dropout lamp | the shared `StatusLamp` (`kStatusLampD`) with the engraved caption "Dropouts", one row at the very bottom of the strip (`kClientLampH` 14 + `kClientGap` 4, taken from the flexible fader). States below. Hidden never; ghosted (unlit) on an empty slot |
 
-Budget, per strip, Medium: inner height 662 - 2 x `kChannelInset`(7) - header 22 - plate/gap 4 = 622. Parts: name `kClientNameH` 18 + `kClientGap` 6 + EQ 4 x 46 = 184 + `kClientGap` 6 + dB `kClientDbH` 18 + `kClientDbGap` 4 + mute/solo `kClientButtonH` 24 + `kClientBottomGap` 6 = 266. Fader = 622 - 266 = **356** (the minimum is 40). Fits with the knob grid and the strips' widths.
+**Dropout lamp (per-client underruns).** Driven by the per-client cumulative underrun frame count (`ServerEngine::clientUnderrunFrames(slot)`), polled by the window's existing timer; a rise since the last poll is a dropout.
+
+| State | When | Lamp | Status bar (hover "Client 3 dropouts") |
+|---|---|---|---|
+| Clean | connected, no dropout since connect or since cleared | off (unlit lamp) | `No dropouts` |
+| Active | count rose in the last 2 s | red `indicatorFault`, `lampOn + lampPlayhead` | `Dropouts: raise Latency in Settings` |
+| Latched | a dropout happened earlier, none for 2 s | amber `segmentWarningBorder`, `lampDim` | `Dropped out earlier: raise Latency in Settings (click to clear)` |
+
+Clicking the lamp clears Latched back to Clean. A slot disconnecting or reconnecting clears it; changing the Latency choice clears every lamp. The first dropout of each client also posts the Active text to the status bar once. States differ by lamp strength and status text, never colour alone. The 2 s hold-off is a named constant (`kDropoutHoldMs`) in the lamp's owner, not in drawing.
+
+Budget, per strip, Medium: inner height 662 - 2 x `kChannelInset`(7) - header 22 - plate/gap 4 = 622. Parts: name `kClientNameH` 18 + `kClientGap` 6 + EQ 4 x 46 = 184 + `kClientGap` 6 + dB `kClientDbH` 18 + `kClientDbGap` 4 + mute/solo `kClientButtonH` 24 + `kClientBottomGap` 6 = 266. Fader = 622 - 266 - 18 (dropout lamp row) = **338** (the minimum is 40). Fits with the knob grid and the strips' widths.
 
 An **empty slot** is drawn inactive (`MixerChannel::setActive(false)`: dimmed) but stays operable, so a level or EQ can be set before the app connects. A slot's mute / solo / EQ state is kept as today.
 
@@ -84,6 +95,7 @@ The gear opens the shared two-column settings page, with these groups only (ever
 | Group | Rows |
 |---|---|
 | General | **Display size** (Medium / Large, as every product; the hint under it reads "(reopen the app for label fonts to fully rescale)" because `isStandaloneApp()` is true); **Audio / MIDI devices** as a single button row "Choose devices..." that opens the existing native `AudioDeviceSelectorComponent` dialog unchanged (the device list is open-ended and the JUCE selector already does it) |
+| Clients | **Latency**: one global `SegmentControl`, Bar style, `ActiveStyle::General`, items **Low**, **Normal**, **High**, default **Normal**. Applies to all eight slots, including clients that connect later, by `requestClientDepth(slot, frames)` on change and on each connect; saved with the mu-link settings (not in presets). Frames at the server rate (48k shown): Low 2048 (about 43 ms), Normal 0 = the client default 4096 (about 85 ms), High 8192 (about 170 ms). Hint under the row, which restates the ms for the current sample rate: "Render-ahead per app. Low is fastest; raise it if the Dropouts lamps light." Status bar on hover: `Latency` / `Normal, about 85 ms` |
 | MIDI Clock | **Sync offset**: `NudgeInput` integer, range -50 to +250 ms, step 1, Shift+click 10, default 0, signed (`+25`), exactly as [family section 6.5](../design-ui-family.md#65-transport-timing-controls-standalone) (mu-link always shows it). Row label "Sync offset" |
 
 This supersedes the 2026-10-11 audit note that mu-link has no settings overlay: that was true of the old bespoke window. Source and Messages are not repeated here (Source is on the bar; mu-link takes Clock and Transport from the master).

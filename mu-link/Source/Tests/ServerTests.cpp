@@ -152,6 +152,44 @@ public:
                 }
             expect(headOk, "available frames not summed");
             expect(tailSilent, "underrun tail was not silent - would click the master");
+
+            // The shortfall is also counted per client, for the UI, and reset when a slot is claimed.
+            expectEquals((int) engine.clientUnderrunFrames(0), 64 - 10);
+            expectEquals((int) mem.registry().slots[0].underrunFrames.load(), 64 - 10);
+            engine.renderBlock(out.data(), 2, 64);
+            expectEquals((int) engine.clientUnderrunFrames(0), (64 - 10) + 64);   // cumulative: the ring is now empty, so a whole block is short
+            a.releaseSlot();
+            MuLinkClientMemory again;
+            expect(again.open(), "client failed to re-attach");
+            expectEquals(again.claimSlot("fresh", 2), 0);
+            expectEquals((int) engine.clientUnderrunFrames(0), 0);                // a new client starts clean
+        }
+
+        beginTest("the output latency is published in the transport; a depth request reaches the client slot");
+        {
+            MuLinkServerMemory mem;
+            expect(mem.create(), "server memory failed");
+            ServerEngine engine;
+            engine.attachMemory(&mem);
+            engine.prepare(48000.0, 64, 120.0);
+            engine.setOutputLatencyFrames(480);
+            MuLinkClientMemory a;
+            expect(a.open(), "client failed to attach");
+            expectEquals(a.claimSlot("lat", 2), 0);
+
+            OutputBuffers out(2, 64);
+            engine.renderBlock(out.data(), 2, 64);
+            expectEquals((int) readTransport(a.transport()).outputLatencyFrames, 480);
+
+            engine.setOutputLatencyFrames(-5);   // nonsense never goes out negative
+            engine.renderBlock(out.data(), 2, 64);
+            expectEquals((int) readTransport(a.transport()).outputLatencyFrames, 0);
+
+            engine.requestClientDepth(0, 2048);
+            expectEquals((int) a.registry().slots[0].requestedDepthFrames.load(), 2048);
+            engine.requestClientDepth(0, -3);    // clamped to "no request"
+            expectEquals((int) a.registry().slots[0].requestedDepthFrames.load(), 0);
+            engine.requestClientDepth(99, 4096); // an out-of-range slot is ignored
         }
 
         beginTest("MIDI-clock pulses track the clock at 24 ppqn");

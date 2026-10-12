@@ -39,6 +39,7 @@ public:
     mu_link::MixerPanel&      getMixer()   { return page.mixer; }
     mu_link::ScenesPanel&     getScenes()  { return page.scenes; }
     SegmentControl&           getClockSourceControl() { return clockSource.segment; }
+    SegmentControl&           getLatencyControl()     { return latencyChoice; }
 
     // The "Choose devices..." button on the settings page; the default opens the native audio / MIDI
     // device dialog. A test replaces it.
@@ -79,6 +80,7 @@ private:
     void wireTransportBar();
     void wirePresets();
     void wireSettings();
+    void applyLatency(int index, bool announce);
     void showDeviceDialog();
     void showClockSourceStatus();
     juce::String clockSourceText() const;
@@ -97,6 +99,8 @@ private:
     // The settings page: the family page without the rows mu-link takes from its master clock.
     mu_ui::StandardSettingsOverlay settings;
     juce::TextButton chooseDevicesButton { "Choose devices..." };
+    juce::Label      latencyLabel;
+    SegmentControl   latencyChoice { { "Low", "Normal", "High" }, SegmentControl::ActiveStyle::General, SegmentControl::DrawStyle::Bar };
 
     ClockSourceSection clockSource;
     MainPage           page;

@@ -125,6 +125,7 @@ public:
 
     const TransportBlock& transport() const noexcept { return *reinterpret_cast<const TransportBlock*>(transportRegion.data()); }
     ClientRegistry&       registry()        noexcept { return *reinterpret_cast<ClientRegistry*>(registryRegion.data()); }
+    const ClientRegistry& registry()  const noexcept { return *reinterpret_cast<const ClientRegistry*>(registryRegion.data()); }
 
     // Claim the first free registry slot (atomic compare-exchange on `active`) and open
     // that slot's ring as the producer. Returns the slot index, or -1 if all are taken.
@@ -143,6 +144,9 @@ public:
                 reg.slots[slot].pcEpoch.store(0, std::memory_order_relaxed);    // start clean: no stale scene PC
                 reg.slots[slot].pcProgram.store(0, std::memory_order_relaxed);
                 reg.slots[slot].pcChannel.store(9, std::memory_order_relaxed);
+                // requestedDepthFrames is the server's: a claim must not erase a request made as the slot went
+                // active, so it is left alone (the server re-sends its choice while the slot is active).
+                reg.slots[slot].underrunFrames.store(0, std::memory_order_relaxed);   // a new client starts clean
                 std::memset(reg.slots[slot].name, 0, sizeof(reg.slots[slot].name));
                 for (int i = 0; displayName != nullptr && displayName[i] != '\0' && i < kMaxNameChars - 1; ++i)
                     reg.slots[slot].name[i] = displayName[i];   // bounded copy, always NUL-terminated

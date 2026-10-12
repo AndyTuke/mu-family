@@ -628,6 +628,7 @@ public:
     static constexpr int kClientDbH       = 18;   // dB readout under the fader
     static constexpr int kClientDbGap     = 4;    // dB readout to the mute / solo row
     static constexpr int kClientButtonH   = 24;   // mute / solo row
+    static constexpr int kClientLampH     = 14;   // the Dropouts lamp row under mute / solo (plus kClientDbGap above it)
     static constexpr int kClientBottomGap = 6;    // keeps the mute / solo row off the panel border
     static constexpr int kClientFaderMinH = 40;
     static constexpr float kClientFaderMax   = 1.5f;   // linear gain at the top of the travel
