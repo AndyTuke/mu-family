@@ -37,6 +37,14 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://transwarp.me/mu-toni-releases</loc>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://transwarp.me/mu-on-releases</loc>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://transwarp.me/contact</loc>
     <priority>0.6</priority>
   </url>
