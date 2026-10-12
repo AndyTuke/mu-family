@@ -39,9 +39,12 @@ public:
     // The base params the audio thread last applied (audio thread, or a test with no audio running).
     const VoiceParams& getAppliedParams() const noexcept { return params; }
 
-    // Test seam: called by setParams while it holds the pending-params lock, so a test can hold the
-    // lock open and check the audio thread neither blocks nor loses the update. Null in production.
+#if MU_VOICE_ENGINE_TEST_SEAM
+    // Test seam, compiled only into targets that define MU_VOICE_ENGINE_TEST_SEAM (mu-core-tests):
+    // called by setParams while it holds the pending-params lock, so a test can hold the lock open and
+    // check the audio thread neither blocks nor loses the update. Absent from every shipping target.
     static inline std::atomic<void (*)()> setParamsHoldHook { nullptr };
+#endif
 
     // Called from audio thread only (PluginProcessor::processBlock).
     // Applies a fully-computed modulated VoiceParams for this block, bypassing the
