@@ -12,10 +12,16 @@
 #   pwsh tests/scripts/check-core-boundary.ps1            # check mu-core at the repo root
 #   pwsh tests/scripts/check-core-boundary.ps1 -Quiet     # summary line only
 #
+# It also guards the shared chrome list (mu-core/UIChromeSources.cmake, MU_CORE_CHROME_SOURCES): a file
+# on that list, or its header, must not include ProcessorBase.h, ProcessorCore.h or EditorShellBase.h,
+# because mu-link compiles the list without a processor. -ChromeList points at another list file (the
+# self-test uses it); with -Path alone the chrome check is skipped.
+#
 # Exit code 0 = clean, 1 = one or more violations, 2 = setup error (mu-core missing).
 
 param(
     [string]$Path,
+    [string]$ChromeList,
     [switch]$Quiet
 )
 
@@ -93,6 +99,50 @@ foreach ($root in $roots) {
             if ($root.ForbidControl -and $includeControl.IsMatch($line)) {
                 if (-not $Quiet) { Write-Host "  [FAIL] ${rel}:${lineNo} — mu-core includes mu-control (the dependency must be mu-control -> mu-core): $snippet" }
                 $fails++
+            }
+        }
+    }
+}
+
+# Chrome list: parse the cmake list, then check each listed .cpp and its sibling header for processor includes.
+if ($ChromeList -or $PSBoundParameters.ContainsKey('Path') -eq $false) {
+    if (-not $ChromeList) { $ChromeList = Join-Path $Path 'UIChromeSources.cmake' }
+    if (-not (Test-Path -LiteralPath $ChromeList -PathType Leaf)) {
+        Write-Host "check-core-boundary: SETUP ERROR - chrome list not found at $ChromeList"
+        exit 2
+    }
+    $listDir   = Split-Path -Parent (Resolve-Path -LiteralPath $ChromeList).Path
+    $processor = [regex]'#\s*include\s*[<"][^">]*\b(ProcessorBase|ProcessorCore|EditorShellBase)\.h'
+    $listed    = @()
+    foreach ($entry in ((Get-Content -LiteralPath $ChromeList) -replace '#.*', '')) {
+        if ($entry -match '"\$\{_mu_core_dir\}/([^"]+\.cpp)"') { $listed += $Matches[1] }
+    }
+    if ($listed.Count -eq 0) {
+        Write-Host "check-core-boundary: SETUP ERROR - no .cpp entries parsed from $ChromeList"
+        exit 2
+    }
+    foreach ($relCpp in $listed) {
+        foreach ($rel in @($relCpp, ($relCpp -replace '\.cpp$', '.h'))) {
+            $full = Join-Path $listDir $rel
+            if (-not (Test-Path -LiteralPath $full -PathType Leaf)) {
+                # A listed .cpp must exist; a missing sibling header is fine.
+                if ($rel -eq $relCpp) {
+                    if (-not $Quiet) { Write-Host "  [FAIL] ${rel} — listed in the chrome list but missing" }
+                    $fails++
+                }
+                continue
+            }
+            $total++
+            $text    = [System.IO.File]::ReadAllText($full)
+            $cleaned = $blockComment.Replace($text, $blankBlock) -replace '//.*', ''
+            $lineNo  = 0
+            foreach ($line in ($cleaned -split "?
+")) {
+                $lineNo++
+                if ($processor.IsMatch($line)) {
+                    if (-not $Quiet) { Write-Host "  [FAIL] ${rel}:${lineNo} — chrome-list file includes a processor header: $($line.Trim())" }
+                    $fails++
+                }
             }
         }
     }
