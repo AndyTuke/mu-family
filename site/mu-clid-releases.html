@@ -165,7 +165,6 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
             <li>The pattern logic selector now shows the standard logic symbols (A ∨ B, A ∧ B, A ⊕ B, A∧¬B, B∧¬A); the status bar spells each one out. <span class="ref">(1153)</span></li>
             <li>The panels are now held on with small cross-head screws, and the Pitch, Filter, Amp and Effects sections each sit in their own raised box. <span class="ref">(1148, 1149, 1150, 1151, 1161)</span></li>
             <li>New colours: the panels look like purple paint on brushed metal (darker and less glowing), and each rhythm has its own colour that lights its sidebar icon, its name and its preset selector. <span class="ref">(1147)</span></li>
-            <li>The demo now plays a single rhythm with patterns of up to 16 steps (saving stays disabled); a licence key unlocks everything. <span class="ref">(1119)</span></li>
             <li>Modulation targets are shown one at a time, stepped through with up/down arrows; the effects section is now labelled "Effects". <span class="ref">(1117)</span></li>
             <li>Every dropdown now has the LCD look, labels are engraved into the metal, and the Pitch / Filter / Amp / Insert headings are name plates. <span class="ref">(1116)</span></li>
             <li>The modulation dropdowns now match the LCD tabs, and the redundant "Mod A" name is gone from the modulation header. <span class="ref">(1115)</span></li>
@@ -188,6 +187,7 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group fixed">
           <h3>Fixed</h3>
           <ul>
+            <li>Fixed a hang when the plugin was unloaded, and a knob whose range shrank to nothing (for example an insert with no room to move) no longer trips a warning in test builds. <span class="ref">(1322)</span></li>
             <li>Deleting or re-ordering rhythms (mu-Clid) or voices (mu-Tant) no longer leaves a channel ducking from the wrong one: sidechain sources now follow their rhythm / voice, and a channel that ducked from a deleted one stops ducking. <span class="ref">(1308)</span></li>
             <li>MIDI clock sync in the standalone: with Messages set to &ldquo;Clock only&rdquo; the Play button now starts the app (it used to stay stopped), and with &ldquo;Transport only&rdquo; the app now plays at its own BPM instead of sitting on the first step. <span class="ref">(1261)</span></li>
             <li>Under MIDI clock, many steps used to play a fraction late (one clock tick, about 20 ms at 120 BPM); they now land exactly on time. <span class="ref">(1260)</span></li>
