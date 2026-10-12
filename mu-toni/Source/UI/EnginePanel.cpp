@@ -176,6 +176,7 @@ void EnginePanel::buildVoiceBand()
     voiceBand.setSections(pitchBox, filterBox, ampBox, insertSub,
                           { findKnob("sendEff"), findKnob("sendDly"), findKnob("sendRev") });
     addAndMakeVisible(voiceBand);
+    insertSub.getInsertGR = [this] { return proc.getInsertGR(currentLayer); };
     insertSub.onStatusUpdate = [this](const juce::String& n, const juce::String& val)
     { if (onStatusUpdate) onStatusUpdate(n, val); };
 

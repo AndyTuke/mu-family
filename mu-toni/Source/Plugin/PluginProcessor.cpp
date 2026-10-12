@@ -175,7 +175,7 @@ PluginProcessor::PluginProcessor()
     // runtime); mu-Toni's count is fixed at kNumChannels for now.
     for (auto& l : layers) l = std::make_unique<Arp>();
     for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-        getArp(i).insert.setSlotIndex(i);   // per-slot noise seed: layers do not share one sequence
+        getArp(i).insert->setSlotIndex(i);   // per-slot noise seed: layers do not share one sequence
     numLayers.store(kNumChannels, std::memory_order_relaxed);   // fixed for now, so layers are read lock-free
 
     // Per-channel render: each channel runs its own arpeggiator voice into the
@@ -185,7 +185,7 @@ PluginProcessor::PluginProcessor()
         if (ch >= 0 && ch < kNumChannels)   // only these channels are prepared
         {
             getArp(ch).runner.render(buf, n, arpCtx);
-            getArp(ch).insert.process(buf, n, buf.getNumChannels(), getArp(ch).insertCfg);   // engine → insert → mixer
+            getArp(ch).insert->process(buf, n, buf.getNumChannels(), getArp(ch).insertCfg);   // engine → insert → mixer
         }
         else buf.clear();
     };
@@ -349,7 +349,7 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     for (int i = 0; i < kNumChannels; ++i)
     {
         getArp(i).runner.prepare(sampleRate, samplesPerBlock);
-        getArp(i).insert.prepare(sampleRate, samplesPerBlock);
+        getArp(i).insert->prepare(sampleRate, samplesPerBlock);
     }
 }
 

@@ -13,8 +13,11 @@ namespace mu_toni
 struct Arp : Layer
 {
     ArpVoiceRunner  runner;
-    InsertProcessor insert;
+    SlotBound<InsertProcessor> insert;   // belongs to the slot: a layer copy never carries its delay lines
     VoiceParams     insertCfg;
+
+    // The compressor / limiter meter of this layer's insert.
+    const std::atomic<float>* insertGainReduction() const override { return &insert->grReduction; }
 
     // Saved modulators keep only destinations mu-Toni has.
     bool isValidDest(const std::string& id) const override { return isValidModDest(id); }
