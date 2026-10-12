@@ -96,7 +96,30 @@ namespace
         {
             moved.push_back({ first, last });
             movedHoldingLock.push_back(lockHeldByOtherThread() ? 1 : 0);
+            order.push_back("moved");
         }
+
+        // A product whose layer data is the parameters' truth (mu-Clid's Rhythm): the edits hand it the slots
+        // to push instead of copying values in the tree. layersReordered tells it where data came from.
+        bool truth = false;
+        bool layerHoldsParamTruth() const override { return truth; }
+        void syncSlotParams(int slot) override
+        {
+            synced.push_back(slot);
+            syncedHoldingLock.push_back(lockHeldByOtherThread() ? 1 : 0);
+            order.push_back("synced");
+        }
+        struct Reorder { LayerEdit kind; int a, b; };
+        void layersReordered(LayerEdit kind, int a, int b) override
+        {
+            reordered.push_back({ kind, a, b });
+            reorderedHoldingLock.push_back(lockHeldByOtherThread() ? 1 : 0);
+            order.push_back("reordered");
+        }
+        std::vector<int> synced, syncedHoldingLock, reorderedHoldingLock;
+        std::vector<Reorder> reordered;
+        std::vector<juce::String> order;          // layersReordered / layersMoved / syncSlotParams, in call order
+        void clearLogs() { synced.clear(); syncedHoldingLock.clear(); reordered.clear(); reorderedHoldingLock.clear(); order.clear(); }
         // A critical section is re-entrant for its owner, so only a second thread can tell it is held.
         bool lockHeldByOtherThread()
         {
@@ -223,6 +246,7 @@ struct LayerOwnershipTests : juce::UnitTest
 
         runStoragePrimitiveTests();
         runStructuralEditTests();
+        runParamTruthTests();
     }
 
     // Parameter values go through a normalised round trip, so compare to a tolerance, not exactly.
@@ -606,6 +630,94 @@ struct LayerOwnershipTests : juce::UnitTest
             expect(rst.hasPendingSwap(0), "another layer's swap is kept");
             expect(! rst.hasPendingSwap(1), "the reset slot's swap would re-fill it, so it is cancelled");
             expect(rst.hasPendingFullPreset(), "the full preset is left to win");
+        }
+    }
+
+    // layersReordered and the param-truth hooks (layerHoldsParamTruth / syncSlotParams), driven by a fake product.
+    void runParamTruthTests()
+    {
+        beginTest("layersReordered fires once per remove or swap, under the lock, before layersMoved");
+        {
+            EditableProcessor p(true);
+            p.addLayer(); p.addLayer(); p.addLayer();
+            p.clearLogs(); p.moved.clear();
+
+            expect(p.removeLayer(1));
+            expectEquals((int) p.reordered.size(), 1);
+            expect(p.reordered[0].kind == ProcessorBase::LayerEdit::Remove && p.reordered[0].a == 1 && p.reordered[0].b == -1);
+            expectEquals(p.reorderedHoldingLock[0], 1, "called under layersLock");
+            expect(p.order.size() >= 2 && p.order[0] == "reordered" && p.order[1] == "moved", "before layersMoved");
+            expect(p.synced.empty(), "a product whose parameters are the truth is not asked to sync");
+
+            p.clearLogs();
+            expect(p.swapLayers(0, 2));
+            expectEquals((int) p.reordered.size(), 1, "one call for the swap, not one per slot");
+            expect(p.reordered[0].kind == ProcessorBase::LayerEdit::Swap && p.reordered[0].a == 0 && p.reordered[0].b == 2);
+            expectEquals(p.reorderedHoldingLock[0], 1);
+            expect(p.order.size() == 3 && p.order[0] == "reordered" && p.order[1] == "moved" && p.order[2] == "moved",
+                   "before both layersMoved calls");
+
+            p.clearLogs();
+            p.resetLayer(1); p.addLayer();
+            expect(p.reordered.empty(), "reset and add reorder nothing");
+        }
+
+        beginTest("layerHoldsParamTruth: removeLayer syncs the shifted and the vacated slots instead of copying values");
+        {
+            EditableProcessor p(true);
+            p.truth = true;
+            p.addLayer(); p.addLayer(); p.addLayer();
+            p.setParam("v1_a", 0.1f); p.setParam("v2_a", 0.2f); p.setParam("v3_a", 0.3f);
+            p.setParam("ch2_pan", 0.5f);
+            p.clearLogs();
+
+            expect(p.removeLayer(1));
+            expect((p.synced == std::vector<int> { 1, 2, 3 }), "the removed index and every slot above it, the vacated top one included");
+            for (int h : p.syncedHoldingLock) expectEquals(h, 0, "outside layersLock");
+            expect(p.order.back() == "synced", "after the pointer moves");
+            expectNear(p.param("v1_a"), 0.1f); expectNear(p.param("v2_a"), 0.2f); expectNear(p.param("v3_a"), 0.3f);
+            expectNear(p.param("ch2_pan"), 0.5f);   // the product's sync moves values; the base leaves the tree alone
+            expectEquals(p.layerEditInFlight.load() ? 1 : 0, 0, "the edit flag is down again");
+        }
+
+        beginTest("layerHoldsParamTruth: swapLayers, resetLayer and addLayer sync exactly the touched slots");
+        {
+            EditableProcessor p(true);
+            p.truth = true;
+            p.addLayer(); p.addLayer();
+            p.setParam("v0_a", 0.8f); p.setParam("v2_a", 0.9f);
+            p.clearLogs();
+
+            expect(p.swapLayers(0, 2));
+            expect((p.synced == std::vector<int> { 0, 2 }), "both exchanged slots and not the one between");
+            expectNear(p.param("v0_a"), 0.8f); expectNear(p.param("v2_a"), 0.9f);
+
+            p.clearLogs();
+            p.resetLayer(1);
+            expect((p.synced == std::vector<int> { 1 }));
+
+            p.clearLogs();
+            p.setParam("v3_a", 0.7f);                 // a stale value in the spare slot the add is about to use
+            expectEquals(p.addLayer(), 3);
+            expect((p.synced == std::vector<int> { 3 }), "the new slot");
+            expectNear(p.param("v3_a"), 0.7f);
+            expect(p.order.back() == "synced", "the sync is the last hook before layerAdded");
+            for (int h : p.syncedHoldingLock) expectEquals(h, 0);
+        }
+
+        beginTest("without layerHoldsParamTruth the edits move the values themselves and never call syncSlotParams");
+        {
+            EditableProcessor p(true);
+            p.addLayer(); p.addLayer();
+            p.setParam("v1_a", 0.4f); p.setParam("v2_a", 0.6f);
+            p.clearLogs();
+            expect(p.removeLayer(1));
+            expect(p.synced.empty());
+            expectNear(p.param("v1_a"), 0.6f);
+            expectNear(p.param("v2_a"), 0.25f);
+            expect(p.swapLayers(0, 1));
+            p.resetLayer(0);
+            expect(p.synced.empty());
         }
     }
 };

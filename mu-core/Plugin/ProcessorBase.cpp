@@ -674,8 +674,10 @@ int ProcessorBase::addLayer()
         layersMoved(n, n);
     }
 
-    // Phase 3: the slot's parameters back to defaults, still suspended so no block sees stale values.
-    resetLayerParams(n);
+    // Phase 3: the slot's parameters back to defaults (or, where the layer data is the truth, the
+    // product pushes the fresh layer into them), still suspended so no block sees stale values.
+    if (layerHoldsParamTruth()) syncSlotParams(n);
+    else                        resetLayerParams(n);
     layerAdded(n);
     return n;
 }
@@ -714,6 +716,7 @@ bool ProcessorBase::removeLayer(int idx)
         }
         mixerEngine.channels[(size_t) (n - 1)].reset();
         mixerEngine.resetSidechainEnv(n - 1);
+        layersReordered(LayerEdit::Remove, idx, -1);
         layersMoved(idx, n - 1);                // the shifted slots and the vacated top one
     }
 
@@ -721,8 +724,15 @@ bool ProcessorBase::removeLayer(int idx)
     // the others follow their layer down (translated before the values shift).
     remapSidechainSources([idx](int v) { return mu_mix::sidechainParamAfterRemove(v, idx, mu_limits::kMaxLayers); });
     remapLayerReferences([idx](int i) { return mu_mix::sidechainAfterRemove(i, idx, mu_limits::kMaxLayers); });
-    for (int d = idx; d < n - 1; ++d) copyLayerParams(d + 1, d);
-    resetLayerParams(n - 1);                    // the vacated top slot
+    if (layerHoldsParamTruth())
+    {
+        for (int d = idx; d < n; ++d) syncSlotParams(d);   // the shifted slots and the vacated top one
+    }
+    else
+    {
+        for (int d = idx; d < n - 1; ++d) copyLayerParams(d + 1, d);
+        resetLayerParams(n - 1);                // the vacated top slot
+    }
     return true;
 }
 
@@ -747,6 +757,7 @@ bool ProcessorBase::swapLayers(int a, int b)
         mixerEngine.resetSidechainEnv(b);
         layers[(size_t) a]->onMoved(a);
         layers[(size_t) b]->onMoved(b);
+        layersReordered(LayerEdit::Swap, a, b);
         layersMoved(a, a);                      // only the two exchanged slots, not those between
         layersMoved(b, b);
     }
@@ -755,7 +766,13 @@ bool ProcessorBase::swapLayers(int a, int b)
     // (translated before the values swap, so each strip's own source moves with it).
     remapSidechainSources([a, b](int v) { return mu_mix::sidechainParamAfterSwap(v, a, b, mu_limits::kMaxLayers); });
     remapLayerReferences([a, b](int i) { return mu_mix::sidechainAfterSwap(i, a, b, mu_limits::kMaxLayers); });
-    swapLayerParams(a, b);
+    if (layerHoldsParamTruth())
+    {
+        syncSlotParams(a);
+        syncSlotParams(b);
+    }
+    else
+        swapLayerParams(a, b);
     return true;
 }
 
@@ -778,5 +795,6 @@ void ProcessorBase::resetLayer(int idx)
         mixerEngine.resetSidechainEnv(idx);
         layersMoved(idx, idx);
     }
-    resetLayerParams(idx);
+    if (layerHoldsParamTruth()) syncSlotParams(idx);
+    else                        resetLayerParams(idx);
 }

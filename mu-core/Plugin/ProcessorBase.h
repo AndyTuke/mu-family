@@ -138,6 +138,30 @@ public:
     // allocate or wait.
     virtual void layersMoved(int firstIndex, int lastIndex) { juce::ignoreUnused(firstIndex, lastIndex); }
 
+    // Which structural edit is reordering layers, for layersReordered.
+    enum class LayerEdit { Remove, Swap };
+
+    // Called by removeLayer and swapLayers, immediately before layersMoved, under layersLock with
+    // processing suspended, after the layer pointers, strip state and onMoved calls are done. It tells
+    // a product what layersMoved(first, last) cannot: where the data at a slot came from. Remove: `a`
+    // is the index removed (every slot above it moved down one, and `b` is -1). Swap: slots `a` and
+    // `b` exchanged. A product that keeps per-slot state of its own (engines, tails, play state)
+    // moves it here; like layersMoved it must only move and reset, never allocate or wait.
+    virtual void layersReordered(LayerEdit kind, int a, int b) { juce::ignoreUnused(kind, a, b); }
+
+    // True when the product's own layer data, not the parameter tree, is the truth for the slot's
+    // sound (mu-Clid's Rhythm, where the parameters mirror it). The edits then do not copy parameter
+    // values between slots in the tree: they call syncSlotParams for every slot the edit touched
+    // (add: the new slot; remove: the removed index and every slot above it, the vacated top one
+    // included; swap: both slots; reset: that slot), and the product pushes that slot's layer data,
+    // and its mixer strip state, into the parameters.
+    virtual bool layerHoldsParamTruth() const { return false; }
+
+    // Message thread, processing suspended and layerEditInFlight raised, not under layersLock, after
+    // the pointer moves and before the edit resumes processing. Only called when
+    // layerHoldsParamTruth() is true. A product also frees here whatever it parked under the lock.
+    virtual void syncSlotParams(int slot) { juce::ignoreUnused(slot); }
+
     // Called by addLayer last, on the message thread with processing still suspended and the new
     // layer's parameters at their defaults, so a product can give the new layer its own starting
     // point (a product with per-layer engine types picks the engine). Not called under layersLock.
