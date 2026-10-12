@@ -141,7 +141,7 @@ The `mu-core` INTERFACE library (introduced in Stage 33) holds everything shared
 | `MasterInsertBinding` | `mu-core/UI/MasterInsertBinding.{h,cpp}` | **Plugin-only** (takes `ProcessorBase&` and `MasterInsertPanel&`; not on the chrome list). Writes the `mst_ins*` / `mst_ins2*` APVTS parameters from the panel's callbacks and refreshes the panel from `mixerEngine` on `MixerOverlay`'s deferred apvts-dirty flush |
 | `HoverStatus` | `mu-core/UI/Components/HoverStatus.h` | Header-only `mu_ui` mouse listener that reports a name and value to the status bar; not on the chrome `.cpp` list |
 | `LayerSidebar` + `SidebarItem` | `mu-core/UI/` | Shared layers sidebar (product injects the mini-graphic; was `ChannelSidebar`, renamed per the 2026-10-12 ruling below) |
-| `LayerPanel` | `mu-core/UI/` | Planned (#1506): the per-layer stack (preset strip, product content band, `ModulatorPanel`); see "Shared layer sidebar and layer panel" |
+| `LayerPanel` | `mu-core/UI/` | Built (#1506): the per-layer stack (preset strip, product content band, `ModulatorPanel`); see "Shared layer sidebar and layer panel" |
 | `ChannelHeaderBar` | `mu-core/UI/` | Shared per-layer header (name / reset / delete / preset / save) |
 | `VoiceBand` / `VoiceBandSection` | `mu-core/UI/Voice/` | Shared voice band layout + drawing (Pitch / Filter / Amp / Effects) |
 | `InsertSubsection` | `mu-core/UI/Voice/` | Shared insert-effect voice subsection (channel-prefix bound) |
@@ -567,7 +567,8 @@ rename these to `getNumLayers` etc. with the "Slot in layer APIs" sweep, not her
 product hook is `createMiniVisual(int index, std::function<void()> pulse)` (the visual calls `pulse` on its
 hit edge, so a lambda never captures the sidebar). User-action callbacks stay the editor's:
 `onLayerSelected`, `onAddLayer`, `onLayersReordered`. Drag-reorder is enabled iff `proc.canReorderLayers()`.
-`onSwapChannels`, `isPendingSwap`, `onCancelPendingSwap` and the `onAnimationTick` hook (unused) go.
+`onSwapChannels`, `isPendingSwap` and `onCancelPendingSwap` went. `onAnimationTick` (optional, 5 Hz) is
+**kept**: mu-On pulses its sidebar items from it (corrected 2026-10-12; the earlier "unused" was wrong).
 Two small `ProcessorBase` changes make this dependency-free: (1) `virtual bool canReorderLayers() const
 { return canEditLayers(); }` and `swapLayers` becomes virtual (same pattern, and same reason, as the
 virtual `resetLayer`: mu-Clid has not moved its rhythms into the container); mu-Clid overrides both
@@ -581,8 +582,11 @@ modulator 318). It owns the preset strip (`ChannelHeaderBar` in its metal strip 
 `ModulatorPanel`, the band layout, the 30 Hz playhead and pending-swap badge refresh, and the header wiring
 that already exists generically on the processor: name and colour from `Layer` (`name`, `colourIndex`),
 preset list/load/save through `slotPresetFiles` / `loadLayerPreset` / `saveLayerPreset` / `getLayerPresetDir`
-/ `getLayerPresetExtension`, reset through `resetLayer`, delete through `removeLayer` (shown iff
-`canEditLayers()`), rename into `Layer::name`. Product input is exactly: `setContent(juce::Component*)` (the
+/ `getLayerPresetExtension`, reset through `resetLayer`. **As built (2026-10-12):** delete (`removeLayer`) and
+rename are wired by the product on `getHeader().onDelete` / `onNameChanged`, not by the panel, and there is no
+`onLayerRemoved` / `onStatusUpdate` on the panel. Extras that exist: `setBeatSource`, `setDefaultPresetName`,
+`setOwnsPresetList` (mu-Clid keeps its categorised list and save card), `addOverlay`, `setFixedLayers`,
+`refreshPresetList`, `refreshHeader`. Product input is: `setContent(juce::Component*)` (the
 464 band, as one component, may be called again so a combined instance can swap content by layer type),
 `setDestProvider(const ModDestProvider*)` (the product's modulation destinations), and callbacks
 `onLayerChanged(int)` (rebind the content's APVTS attachments), `onLayerRemoved(int)`,

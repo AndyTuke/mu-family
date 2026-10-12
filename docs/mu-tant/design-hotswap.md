@@ -195,7 +195,7 @@ clears both callbacks in its destructor** — the processor can outlive the edit
 
 Shared, automatic — mu-tant only wires them:
 - `TransportBar` "SWP" pill ← `hasPendingFullPreset()` → `layerSwapper.hasFullPending()`.
-- `ChannelSidebar` per-voice badge ← `isPendingSwap(v)` → `hasPendingSwap(v)`; cancel
+- `LayerSidebar` per-voice badge ← `isPendingSwap(v)` → `hasPendingSwap(v)`; cancel
   via `onCancelPendingSwap(v)` → `cancelPendingSwap(v)` → `layerSwapper.cancel(v)` (shared `ProcessorBase` defaults).
 
 ---

@@ -26,8 +26,8 @@ mu-clid/Source/
 ├── UI/               Euclidean panels + VoiceSection (Pitch/Filter/Amp
 │                     subsections; the Insert subsection + the ModulatorPanel /
 │                     ModMatrixPanel / ModulatorEditor / MixerOverlay are shared
-│                     from mu-core), RhythmCircle, RhythmMiniVisual, RhythmSidebar,
-│                     RhythmPanel, SampleBrowser, SettingsOverlay, MasterLoopSection
+│                     from mu-core), RhythmCircle, RhythmMiniVisual,
+│                     RhythmContent, SampleBrowser, SettingsOverlay, MasterLoopSection
 ├── Persistence/      PresetIO + PresetIO_HostState, PresetMigrations, RhythmParamTable + helpers
 ├── License/          LicenseChecker
 └── Tests/            juce::UnitTest suite
@@ -35,7 +35,7 @@ mu-clid/Source/
 
 All mu-Clid code is in namespace `mu_clid` (migrations in `mu_clid::migrate`); only `createPluginFilter` and `StandaloneApp.cpp` glue are global. `ScopedApvtsLoading` lives in `mu-core/Persistence` (`mu_core`).
 
-The editor shell (TransportBar, About, Save, PresetBrowser, MIDI-preset panels, StatusBar, overlay state machine, layout, keybindings) lives in `mu-core/UI/EditorShellBase.h` — `PluginEditor` extends it and supplies sidebar (`RhythmSidebar`) + main panel (`RhythmPanel`) + mixer overlay + settings overlay.
+The editor shell (TransportBar, About, Save, PresetBrowser, MIDI-preset panels, StatusBar, overlay state machine, layout, keybindings) lives in `mu-core/UI/EditorShellBase.h` — `PluginEditor` extends it and supplies the shared sidebar (`LayerSidebar`) + main panel (the shared `LayerPanel` holding `RhythmContent`) + mixer overlay + settings overlay.
 
 **Shared with mu-Clid MIDI.** `Sequencer/Rhythm`, `Sequencer/SequencerEngine`, `Sequencer/RhythmPlayState.h`, `Persistence/RhythmParamTable.h`, `Persistence/PresetHelpers.h`, `UI/EuclideanPanel` and `UI/RhythmCircle` are also compiled into [mu-clid-midi](../mu-clid-midi/CLAUDE.md) (a recorded exception until they move to mu-core). They must not include `Plugin/PluginProcessor.h`; `EuclideanPanel` takes a `ProcessorBase&`, and the live modulation arcs reach it through its `modulationSnapshot` callback.
 
@@ -64,7 +64,7 @@ No stages are scheduled — mu-clid is feature-complete through Stage 34. New wo
 
 - **Each rhythm is its own APVTS subtree** — preset save/load + per-rhythm hot-swap rely on the subtree structure.
 - **Hot-swap uses `suspendProcessing` + `std::move`** — new `Rhythm` + `VoiceEngine` are staged on the message thread (`stageRhythmPreset`), committed atomically at the next loop boundary under a single suspend per `runDeferredWork` call (multi-rhythm bursts batch into one suspend). The "atomic pointer hot-swap" pattern (lock-free pointer exchange + message-thread cleanup queue for the old engine) is a v2 candidate if perceptible suspend-gap clicks become a complaint — current single-block silence gap (~1.33 ms at 48k/64) is short enough to be inaudible on percussive material, occasionally audible on sustained pads.
-- **RhythmSidebar item order supports variable ordering from day one** — required for v2 drag-to-reorder.
+- **LayerSidebar item order supports variable ordering from day one** — required for v2 drag-to-reorder.
 - **mu-link integration is STANDALONE-ONLY** — the bridge is the **shared header-only `mu-core/Link/MuLinkBridge.h`** (promoted from mu-clid in #902), `#include`d only by `StandaloneApp.cpp`, so VST3/CLAP never compile it and a plugin can never attach (the host owns the clock + device). It slaves the sequencer by handing the processor a `mu_link::MuLinkPlayHead`, so the existing `deriveTransport()`/`getPlayHead()` path follows mu-link with **no `processBlock` change**; when attached it detaches the processor from the local `AudioProcessorPlayer` and lets `MuLinkClient` drive it; on mu-link quit it reattaches the local device. Never add mu-link hooks to the shared `PluginProcessor` — keep them in the standalone TU. See [docs/mu-link/design-mulink.md](../docs/mu-link/design-mulink.md) §3.3.
 
 ## Key mu-clid patterns

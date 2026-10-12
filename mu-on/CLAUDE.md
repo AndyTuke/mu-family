@@ -10,7 +10,7 @@ Product-specific guidance for working in `mu-on/`. Read alongside the family-wid
 rather than stepping) — the first four sequenced on a 16-step grid. Builds Standalone + VST3 + CLAP
 (+ AU on macOS via the family rule). Ships to the OneDrive tester share on Release (guarded by `MUFAMILY_DEPLOY_TESTERS`), alongside the rest of the family.
 
-The editor inherits `mu-core/UI/EditorShellBase.h` and uses the shared `ChannelSidebar` +
+The editor inherits `mu-core/UI/EditorShellBase.h` and uses the shared `LayerSidebar` +
 `MixerOverlay`, so the TransportBar / StatusBar / About / window sizing / `MuLookAndFeel` and the
 whole mixer/FX rack come for free. The product supplies the five engines, the 909 sequencer, and
 the grid UI.

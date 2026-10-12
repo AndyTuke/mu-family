@@ -4,7 +4,7 @@
 
 ```
 TransportBar     36px  (top) — Stage 10
-RhythmSidebar   82px  (left, always visible)
+LayerSidebar   82px  (left, always visible)
 RhythmPanel or MixerOverlay  (remaining area)
 StatusBar        20px  (bottom, full width)
 ```
@@ -44,7 +44,7 @@ kAddBtnH = 34;   // add button at bottom
 - Hit pulse: sidebar item circle pulses with rhythm colour on each hit
 - Add rhythm button at bottom: dashed border, "+" prefix, always visible, disabled at 8 rhythms
 - Scrollable via `juce::Viewport` if more items than fit (unlikely with max 8)
-- Drag-to-reorder: fully implemented. `RhythmSidebar` supports variable item order.
+- Drag-to-reorder: fully implemented. `LayerSidebar` supports variable item order.
 - Deleted rhythm: item removed immediately, no placeholders
 - Right border line drawn in `paint()` to visually separate from main panel
 

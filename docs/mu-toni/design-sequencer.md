@@ -578,7 +578,7 @@ Per the family rule "never build a one-off version of a standard control":
 | **Inversion** (bipolar ±n) | **`BipolarSliderRow`** | `knobEuclidean` |
 | Modulator section | `ModulatorPanel` / `ModMatrixPanel` | (shared) |
 | Per-slot header (preset save/load) | `ChannelHeaderBar` | (shared) |
-| Sidebar (voice select/add/reorder) | `ChannelSidebar` (subclass, as mu-tant's `VoiceSidebar`) | (shared) |
+| Sidebar (voice select/add/reorder) | `LayerSidebar` (subclass, as mu-tant's `LayerSidebar`) | (shared) |
 
 Layout follows the mu-tant `VoicePanel` band structure: Osc row · Filter+Insert
 row · **arp/envelope controls** (where mu-tant's gate grid sat) · Modulators.
@@ -590,7 +590,7 @@ words** ("Attack", not "ATK").
 
 `Source/Sequencer/` — `Arpeggiator.{h,cpp}` (pool/walk/step→note) + note-gate
 logic. `Source/Audio/` — `Chords.h` (library) + `Scales.h`. `Source/UI/` — the
-arp/envelope panel (replaces the blank `EnginePanel`) + a `ChannelSidebar`
+arp/envelope panel (replaces the blank `EnginePanel`) + a `LayerSidebar`
 subclass. `Source/Modulation/` — `MuToniModDest.h` (mirrors `MuTantModDest.h`).
 `Source/Plugin/` — note-on/off + ADSR wiring in the render hook. Mixer, shell,
 modulator UI, filter, insert = **mu-core, untouched**.

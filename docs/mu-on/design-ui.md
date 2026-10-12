@@ -8,7 +8,7 @@ The earlier **Lane Rack** proposal (all five lanes' strips with no sidebar, a MO
 
 ### Shell
 
-- Standard family shell: lane `ChannelSidebar` on the left, `GroovePanel` as the main panel. Mixer and Settings overlays unchanged.
+- Standard family shell: lane `LayerSidebar` on the left, `GroovePanel` as the main panel. Mixer and Settings overlays unchanged.
 - The **selected lane** (sidebar) chooses what is shown in the per-lane areas: its step row (Rumble: its envelope), the Groove box, and the modulators. The header bar and `ModulatorPanel` act on the selected lane, as in the other products.
 
 ### ENGINE area

@@ -55,7 +55,7 @@ It's the "engine swap-point" pattern: same UX, same mixer, same modulation.
 | **Wavetable bank + oscillator** | mu-tant `WavetableBank` / `WavetableOscillator` | Same tables, same mip-mapping. |
 | **Modulation section** — LFOs + control sequences + `ModulationMatrix` | `mu-core` | Unchanged. The arp + envelope + portamento parameters register as **new destinations** (the mu-toni-specific modulation addition). |
 | **Mixer / FX rack** — channel strips, sends, sidechain, Effect/Delay/Reverb slots, master inserts, VU | `mu-core` `MixerEngine` + `MixerOverlay` + `mu_mixfx::addGlobalFxParams` | Standard mu mixer, unchanged. |
-| **Editor shell** — TransportBar, StatusBar, About, overlays, window sizing, `MuLookAndFeel`, `ChannelSidebar` | `mu-core` `EditorShellBase` | Inherited unchanged — no bespoke shell code. |
+| **Editor shell** — TransportBar, StatusBar, About, overlays, window sizing, `MuLookAndFeel`, `LayerSidebar` | `mu-core` `EditorShellBase` | Inherited unchanged — no bespoke shell code. |
 | **Preset system + MIDI program-change** | `mu-core` (`ProcessorBase` virtuals) | Standard, **same MIDI settings as mu-tant**. Extensions renamed to the arp's real noun — see below. μ-Toni **adds played-note input** on top (root + trigger) — the one MIDI departure, in [design-sequencer.md](design-sequencer.md) §"MIDI control". |
 
 **Net new code** lives under `mu-toni/Source/`: the arpeggiator engine
@@ -99,7 +99,7 @@ stand, so DAW state via the APVTS is currently the only persistence route.
 ## Slots / voices
 
 Inherits mu-tant's **dynamic 1–8 voice slots, default 1**, via the shared
-`ChannelSidebar`. Each slot is an **independent monophonic arp** — its own timbre,
+`LayerSidebar`. Each slot is an **independent monophonic arp** — its own timbre,
 arp settings, envelopes, and (per the self-contained-channels rule) its own
 chord/root. Stacking slots = layered/detuned/interlocking arps over one shared
 transport. A fresh preset opens with **1 voice** so it stays a "simple mono
@@ -210,7 +210,7 @@ and the [UI design system](../design-ui-family.md):
 | **mu-core never depends on a plugin** | All new code under `mu_toni::`; mu-core untouched. New envelopes reuse mu-core `VoiceParams`/`juce::ADSR` without modifying mu-core. ✓ |
 | **ModulationMatrix is the single reader** | The arp reads post-modulation values from the matrix, not raw APVTS. ✓ |
 | **Channels self-contained** (no cross-voice mod) | Each voice's arp + modulators target only its own params — consistent with why a *shared* chord progression isn't a modulator feature (it'd be cross-voice). ✓ |
-| **All UI uses the shared component library** | Direction/Filter-Env-Depth → `BipolarSliderRow`; dropdowns → `DropdownSelect`; modes → `SegmentControl`; knobs → `KnobWithLabel`; sidebar → `ChannelSidebar`. No one-offs. ✓ (reuse map) |
+| **All UI uses the shared component library** | Direction/Filter-Env-Depth → `BipolarSliderRow`; dropdowns → `DropdownSelect`; modes → `SegmentControl`; knobs → `KnobWithLabel`; sidebar → `LayerSidebar`. No one-offs. ✓ (reuse map) |
 | **Colours/sizes only in `MuLookAndFeel`** | Knob colours mapped to family tokens (amber `knobLevel` for ADSR, teal `knobPostPad` for filter, purple `knobEuclidean` for arp/seq). Sizes via `mu_ui::s()`. ✓ |
 | **StatusBar-first, full words, no tooltips** | All knobs report to the StatusBar; labels are full words ("Attack" not "ATK"). ✓ |
 | **Family consistency** (Source layout, naming, preset nouns) | `{Plugin,Sequencer,UI,Audio,Modulation,…}` mirrors mu-tant; per-slot preset noun = camelCase (`.muArp`), full = `.muToni`. ✓ |

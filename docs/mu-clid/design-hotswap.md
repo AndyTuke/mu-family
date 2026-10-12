@@ -18,7 +18,7 @@ Two flavours, both "switch at the next musical boundary, seamlessly":
 
 | Flavour | Trigger | Scope | Entry point |
 |---|---|---|---|
-| **Per-rhythm swap** | load a `.muRhythm` into one slot (dropdown / MIDI PC ch 1-8 / `RhythmSidebar`) | one rhythm slot | `PresetIO::stageRhythmPreset(r, file)` |
+| **Per-rhythm swap** | load a `.muRhythm` into one slot (dropdown / MIDI PC ch 1-8 / `LayerSidebar`) | one rhythm slot | `PresetIO::stageRhythmPreset(r, file)` |
 | **Full-preset swap** | load a `.muClid` (dropdown / MIDI PC ch 9) | every slot + mixer + globals | `PresetIO::loadPreset(file)` |
 
 **Stopped vs playing — one unified path (#666).** When the sequencer is *stopped*
@@ -226,7 +226,7 @@ Open design issue (2026-10-11, being fixed): the commit waits for the next ~10 m
 
 - **`TransportBar`** shows an orange **"SWP"** pill on the preset dropdown while a
   full-preset swap is queued — it polls `ProcessorBase::hasPendingFullPreset()` (5 Hz).
-- **`ChannelSidebar`** shows a per-slot staging badge — it polls the product's
+- **`LayerSidebar`** shows a per-slot staging badge — it polls the product's
   `isPendingSwap(r)` (→ `hasPendingSwap(r)`) and offers cancel via
   `onCancelPendingSwap(r)` (→ `cancelStagedSwap(r)`).
 - After a commit, `onLayerPresetCommitted(r)` / `onPresetSwapCommitted()` fire on
