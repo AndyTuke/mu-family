@@ -40,6 +40,9 @@ public:
     void setShowPresetControls(bool show);
     // When false, hides the mixer-toggle button. Default true.
     void setShowMixerToggle(bool show);
+    // When false, hides the Tap button and the two Nudge buttons (a product with no tempo of its own
+    // to tap or bend). The clock-lamp slot stays, so the lamp still shows under a MIDI clock. Default true.
+    void setShowTapAndNudge(bool show);
     // When false, hides the gear/settings button. Default true.
     void setShowSettingsButton(bool show);
     // Embed a product-specific component (e.g. mu-clid's master-loop section)
@@ -71,6 +74,7 @@ private:
     bool             showPresetControls  = true;
     bool             showMixerToggle     = true;
     bool             showSettingsButton  = true;
+    bool             showTapAndNudge     = true;
     juce::Component* loopSection        = nullptr;
     int              loopSectionWidth   = 0;
 

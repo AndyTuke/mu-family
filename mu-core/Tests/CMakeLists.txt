@@ -30,6 +30,9 @@ target_sources(mu-core-tests PRIVATE
     MidiFullPresetMapTests.cpp
     LegacyPrefixTests.cpp
     SegmentControlTests.cpp
+    TransportBarTests.cpp
+    ../UI/TransportBar.cpp
+    ../UI/Components/StatusLamp.cpp
     # Sources behind ProcessorBase + the settings page (shared list, see ProcessorTestSources.cmake).
     ${MU_CORE_PROCESSOR_TEST_SOURCES}
 )

@@ -148,6 +148,15 @@ void TransportBar::setShowMixerToggle(bool show)
     resized();
 }
 
+void TransportBar::setShowTapAndNudge(bool show)
+{
+    showTapAndNudge = show;
+    tapBtn      .setVisible(show && ! clockShown);   // the timer keeps this in step with the clock lamp
+    nudgeSlowBtn.setVisible(show);
+    nudgeFastBtn.setVisible(show);
+    resized();
+}
+
 void TransportBar::setShowSettingsButton(bool show)
 {
     showSettingsButton = show;
@@ -185,7 +194,7 @@ void TransportBar::timerCallback()
         // The shared slot: the clock lamp while the clock's ticks drive the transport, else Tap.
         clockShown = midiClockBpm;
         clockLamp.setVisible(clockShown);
-        tapBtn.setVisible(! clockShown);
+        tapBtn.setVisible(showTapAndNudge && ! clockShown);
         if (clockShown) refreshClockLamp();
     }
 
@@ -415,7 +424,7 @@ void TransportBar::resized()
 
     posLabel.setBounds(x, btnY, s(kPosW), btnH);
     x += s(kPosW);
-    if (isStandalone)
+    if (isStandalone && showTapAndNudge)
     {
         x += gap;
         nudgeSlowBtn.setBounds(x, btnY, s(kNudgeW), btnH);
