@@ -207,6 +207,65 @@ public:
             root.deleteRecursively();
         }
 
+        beginTest("the sync offset shifts the external clock's pulse alignment by its milliseconds (positive = earlier)");
+        {
+            // Runs a synthetic 120 BPM external clock (a pulse every 1000 frames at 48 kHz, fed ahead of the
+            // block that holds it) through a headless server, and returns the frame at which the master clock
+            // reached its 300th pulse, plus the master beat after a long run.
+            struct Run { double pulseFrame = 0.0; double beats = 0.0; };
+            constexpr int blockFrames = 250;
+            constexpr double targetBeat = 300.0 / 24.0;   // the master's 300th clock pulse
+            auto runWithOffset = [&](int offsetMs, bool external)
+            {
+                AudioServer server;
+                expect(server.startHeadless(48000.0, blockFrames, 120.0), "bus failed");
+                server.setSyncOffsetMs(offsetMs);
+                Renderer r(server, blockFrames);
+                auto& est = server.midiClockEstimator();
+                if (external)
+                {
+                    server.setClockSource(ClockSource::ExternalMidi);
+                    est.onStart();
+                }
+                else
+                    server.setPlaying(true);
+                Run run;
+                double tm = 0.0;
+                std::uint64_t frame = 0;
+                for (int pulse = 0; pulse < 400; ++pulse)
+                {
+                    if (external) { est.onClockPulse(tm); tm += 0.5 / 24.0; }
+                    for (int b = 0; b < 4; ++b)
+                    {
+                        const double before = server.serverEngine().transportClock().beats();
+                        server.renderBlockHeadless(r.ptrs, 2, blockFrames);
+                        const double after = server.serverEngine().transportClock().beats();
+                        if (before < targetBeat && after >= targetBeat)   // interpolate the crossing inside the block
+                            run.pulseFrame = (double) frame + (targetBeat - before) / (after - before) * blockFrames;
+                        frame += blockFrames;
+                    }
+                }
+                run.beats = server.serverEngine().transportClock().beats();
+                return run;
+            };
+
+            const auto base  = runWithOffset(0, true);
+            const auto late  = runWithOffset(-40, true);
+            const auto early = runWithOffset(40, true);
+            const auto max   = runWithOffset(mu_core::ShellBackend::kSyncOffsetMaxMs, true);
+
+            // 40 ms at 120 BPM is 0.08 beat = 1920 frames; positive = the master plays earlier.
+            expectWithinAbsoluteError(base.pulseFrame - early.pulseFrame, 1920.0, 12.0, "+40 ms puts pulses 1920 frames earlier");
+            expectWithinAbsoluteError(late.pulseFrame - base.pulseFrame,  1920.0, 12.0, "-40 ms puts pulses 1920 frames later");
+            expectWithinAbsoluteError(early.beats - base.beats, 0.08, 0.001, "the master beat leads by the offset");
+            expectWithinAbsoluteError(max.beats - base.beats, 0.5, 0.002, "250 ms is half a beat at 120 BPM");
+
+            // The offset is for the external clock only: the internal master ignores it.
+            const auto internalZero   = runWithOffset(0, false);
+            const auto internalOffset = runWithOffset(40, false);
+            expectWithinAbsoluteError(internalOffset.beats, internalZero.beats, 1.0e-9, "internal clock unaffected");
+        }
+
         beginTest("the sync offset reaches the server, is clamped and survives a restart");
         {
             const auto root = freshRoot();

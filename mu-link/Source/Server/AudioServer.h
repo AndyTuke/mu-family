@@ -121,9 +121,9 @@ public:
     void rewind() noexcept                       { engine.rewind(); }   // back to the top at the next block
 
     // Sync offset (ms the app plays earlier than the external clock says, to cancel output latency).
-    // Held for the shell here; the external-clock phase servo does not apply it yet.
-    void setSyncOffsetMs(int ms) noexcept        { syncOffset.store(ms, std::memory_order_relaxed); }
-    int  syncOffsetMs()    const noexcept        { return syncOffset.load(std::memory_order_relaxed); }
+    // The engine's external-clock phase servo applies it.
+    void setSyncOffsetMs(int ms) noexcept        { engine.setSyncOffsetMs(ms); }
+    int  syncOffsetMs()    const noexcept        { return engine.syncOffsetMs(); }
 
     // Clock source (L7): Internal (master) or ExternalMidi (slave to incoming MIDI clock).
     void        setClockSource(ClockSource s) noexcept { engine.setClockSource(s); }
@@ -175,7 +175,6 @@ private:
     double                   deviceSampleRate = 48000.0;
     bool                     started     = false;
     bool                     busCreated  = false;
-    std::atomic<int>         syncOffset  { 0 };
 };
 
 } // namespace mu_link

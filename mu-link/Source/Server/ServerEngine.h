@@ -203,6 +203,11 @@ public:
     void        attachMidiClock(MidiClockEstimator* e) noexcept { midiClock = e; }
 
 
+    // Sync offset in ms (message thread sets, audio thread reads): the master plays this much earlier
+    // than the external clock says. Applied by the phase servo.
+    void setSyncOffsetMs(int ms) noexcept { syncOffset.store(ms, std::memory_order_relaxed); }
+    int  syncOffsetMs()    const noexcept { return syncOffset.load(std::memory_order_relaxed); }
+
     // The servo's remaining phase error in beats (absolute) and whether it counts as drifting, for
     // the clock lamp. Written by the audio thread each block; 0 / false while not servoing.
     float externalPhaseErrorBeats() const noexcept { return phaseErrorBeats.load(std::memory_order_relaxed); }
@@ -274,7 +279,11 @@ public:
             if (extRunning && extAlive && extBpm > 0.0 && songPulse >= 0 && clock.isPlaying() && ! rewoundInBlock)
             {
                 servoed = true;
-                const double target = ((double) songPulse + 0.5) / 24.0;
+                // The sync offset moves the grid the master aims at: it plays that many ms earlier than
+                // the incoming clock says (positive = earlier), as the plugins' transport does. The
+                // servo slews to the shifted grid, so a change never jumps the beat.
+                const double offsetBeats = (double) syncOffset.load(std::memory_order_relaxed) * clock.tempo() / 60000.0;
+                const double target = ((double) songPulse + 0.5) / 24.0 + offsetBeats;
                 const double err    = target - clock.beats();
                 const double gain = 1.0 - std::exp(-(double) numFrames / (kPhaseServoSeconds * sr));
                 // The error for the lamp: the clock count arrives in whole pulses, so the raw error
@@ -539,6 +548,7 @@ private:
     int                 maxBlockFrames = 0;   // de-interleave scratch capacity (frames)
     std::vector<float>  scratch;   // de-interleave buffer, allocated in prepare()
 
+    std::atomic<int>           syncOffset      { 0 };      // UI → audio thread (external clock), ms
     std::atomic<float>         phaseErrorBeats { 0.0f };   // audio thread → UI: servo error (abs, beats)
     std::atomic<std::uint32_t> clockDrifting   { 0u };     // audio thread → UI: 1 = drifting
     bool                       servoDrifting   = false;    // audio thread only: the hysteresis state
