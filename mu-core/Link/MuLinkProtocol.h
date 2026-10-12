@@ -58,6 +58,10 @@ inline std::string ringMapName(std::uint32_t clientId)
 // needs these + AudioRingView::bytesFor().
 inline constexpr int kRingCapacityFrames = 8192;   // ≈ 170 ms @ 48 kHz; ample run-ahead
 
+// How far ahead a client keeps its ring filled unless the server asks for another depth (frames, ≈ 85 ms
+// @ 48 kHz). Measured: 1024 fails a 30 ms render stall, 2048 a 60 ms one, 4096 survives both.
+inline constexpr int kDefaultClientDepthFrames = 4096;
+
 // Master transport, published by the server once per audio block and read by every
 // client. Fields are individually atomic; `generation` is the seqlock guard — the
 // server bumps it to odd before writing and to even after, so a reader takes a snapshot

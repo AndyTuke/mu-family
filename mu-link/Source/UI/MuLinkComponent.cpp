@@ -176,7 +176,7 @@ void MuLinkComponent::applyLatency(int index, bool announce)
     page.mixer.setLatencyFrames(kDepthFrames[index]);
     if (announce)
     {
-        const int frames = kDepthFrames[index] != 0 ? kDepthFrames[index] : 4096;
+        const int frames = kDepthFrames[index] != 0 ? kDepthFrames[index] : mu_link::kDefaultClientDepthFrames;
         const double sr = server.sampleRate() > 0.0 ? server.sampleRate() : 48000.0;
         chrome.getStatusBar().showParam("Latency", juce::String(kNames[index]) + ", about "
                                         + juce::String(juce::roundToInt(frames * 1000.0 / sr)) + " ms");

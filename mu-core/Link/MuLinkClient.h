@@ -55,7 +55,7 @@ public:
     // Measured (ClientTests, MU_LATENCY_MEASURE=1): a depth rides out a render stall about as long as
     // itself — 1024 fails a 30 ms stall, 2048 a 60 ms one, 4096 survives both. 4096 (≈ 85 ms at 48 kHz,
     // half the old full-ring lead) is the safe default until mu-link offers a Latency choice.
-    static constexpr int kDefaultTargetDepthFrames = 4096;
+    static constexpr int kDefaultTargetDepthFrames = kDefaultClientDepthFrames;
     void setTargetDepthFrames(int frames) noexcept
     {
         targetDepth.store(juce::jlimit(kRenderChunk, kRingCapacityFrames - kRenderChunk, frames), std::memory_order_relaxed);

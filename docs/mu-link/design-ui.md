@@ -52,7 +52,7 @@ One metal panel. Contents, top to bottom, using the strip anatomy of the family 
 | Fader + VU | the family fader and `VUMeter` (10 px, right-adjacent, no gap). **The fader takes all the height left in the strip** (the 200 px cap belongs to overlay strips that also carry sends and sidechain; a Client strip has neither, so it does not apply; minimum `kClientFaderMinH` 40). Range 0 to `kClientFaderMax` (1.5) linear, unity `kClientFaderUnity` (1.0), double-click returns to unity |
 | dB readout | 9 pt `labelText` under the fader, one decimal (`0.0`, `-6.0`, `+3.5`); the status bar shows `Client 3 level` / `-6.0 dB` |
 | Mute, Solo | the family M / S buttons (`vuMeterClip` red when muted, `knobLevel` amber when soloed, as in the mixer overlay) |
-| Dropout lamp | the shared `StatusLamp` (`kStatusLampD`) with the engraved caption "Dropouts", one row at the very bottom of the strip (`kClientLampH` 14 + `kClientGap` 4, taken from the flexible fader). States below. Hidden never; ghosted (unlit) on an empty slot |
+| Dropout lamp | the shared `StatusLamp` (`kStatusLampD`) with the engraved caption "Dropouts", one row at the very bottom of the strip (`kClientLampH` 14 + `kClientDbGap` 4 above it, taken from the flexible fader). States below. Hidden never; ghosted (unlit) on an empty slot |
 
 **Dropout lamp (per-client underruns).** Driven by the per-client cumulative underrun frame count (`ServerEngine::clientUnderrunFrames(slot)`), polled by the window's existing timer; a rise since the last poll is a dropout.
 
@@ -62,7 +62,7 @@ One metal panel. Contents, top to bottom, using the strip anatomy of the family 
 | Active | count rose in the last 2 s | red `indicatorFault`, `lampOn + lampPlayhead` | `Dropouts: raise Latency in Settings` |
 | Latched | a dropout happened earlier, none for 2 s | amber `segmentWarningBorder`, `lampDim` | `Dropped out earlier: raise Latency in Settings (click to clear)` |
 
-Clicking the lamp clears Latched back to Clean. A slot disconnecting or reconnecting clears it; changing the Latency choice clears every lamp. The first dropout of each client also posts the Active text to the status bar once. States differ by lamp strength and status text, never colour alone. The 2 s hold-off is a named constant (`kDropoutHoldMs`) in the lamp's owner, not in drawing.
+Clicking the lamp clears Latched back to Clean. A slot disconnecting or reconnecting clears it; changing the Latency choice clears every lamp. The first dropout of each client also posts the Active text to the status bar once. States differ by lamp strength and status text, never colour alone. The 2 s hold-off is a named constant (`kDropoutHoldMs`) in the lamp's owner, not in drawing. The first `kDropoutWarmupMs` (1000) after a client connects is ignored, because the empty ring filling is not a dropout.
 
 Budget, per strip, Medium: inner height 662 - 2 x `kChannelInset`(7) - header 22 - plate/gap 4 = 622. Parts: name `kClientNameH` 18 + `kClientGap` 6 + EQ 4 x 46 = 184 + `kClientGap` 6 + dB `kClientDbH` 18 + `kClientDbGap` 4 + mute/solo `kClientButtonH` 24 + `kClientBottomGap` 6 = 266. Fader = 622 - 266 - 18 (dropout lamp row) = **338** (the minimum is 40). Fits with the knob grid and the strips' widths.
 
