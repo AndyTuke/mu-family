@@ -37,6 +37,9 @@ void PluginProcessor::prepareSlotEngines(int slot)
 // are for slots that are already live and keep their engines.
 std::unique_ptr<Layer> PluginProcessor::createLayer(int slot)
 {
+    // Every edit that parks engines under the lock builds a layer first, so anything an earlier edit
+    // left parked is freed here, and layersReordered never frees one under the lock.
+    releaseParkedEngines();
     if (slot >= numLayers.load(std::memory_order_relaxed))
         prepareSlotEngines(slot);
     return makeRhythm(slot);
@@ -80,8 +83,6 @@ void PluginProcessor::renameRhythm(int index, const juce::String& newName)
 // the layer set. Nothing is built or freed here.
 void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
 {
-    juce::ignoreUnused(lastIndex);
-
     // An edit that did not reorder (add, reset) rebuilds the new rhythm's pattern after the unlock.
     if (reorderLastSlot < 0)
         rebuildSlot = firstIndex;
@@ -89,6 +90,15 @@ void PluginProcessor::layersMoved(int firstIndex, int lastIndex)
     sequencer.setNumRhythms(numLayers.load(std::memory_order_relaxed));
     for (int i = 0; i < RhythmSequencer::MaxRhythms; ++i)
         sequencer.bindRhythm(i, static_cast<Rhythm*>(layers[(size_t) i].get()));
+
+    // A slot's tenant changed, so the modulation change-detection starts clean: the next block re-runs a
+    // modulated tenant's pass and pattern recompute instead of trusting the previous tenant's memory.
+    for (int i = firstIndex; i <= lastIndex && i < RhythmSequencer::MaxRhythms; ++i)
+    {
+        prevMatrixHadAssignments[(size_t) i] = false;
+        prevEuclidOverrides[(size_t) i] = EuclidOverrides{};
+        lastEuclidOverrides[(size_t) i] = EuclidOverrides{};
+    }
 }
 
 // Called under layersLock, after the base moved the layer pointers and strip state and before

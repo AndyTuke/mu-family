@@ -19,6 +19,9 @@ void SampleLibrary::load(int rhythmIndex, const juce::File& file)
 
 void SampleLibrary::swapPaths(int i, int j)
 {
+    // Called under layersLock: never grow the array there (the constructor sized it to every slot).
+    jassert(i >= 0 && j >= 0 && i < samplePaths.size() && j < samplePaths.size());
+    if (i < 0 || j < 0 || i >= samplePaths.size() || j >= samplePaths.size()) return;
     const juce::String tmp = samplePaths[i];
     samplePaths.set(i, samplePaths[j]);
     samplePaths.set(j, tmp);

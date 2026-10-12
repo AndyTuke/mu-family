@@ -258,6 +258,7 @@ target_sources(mu-clid-tests PRIVATE
     Source/Tests/ProcessorSeamTests.cpp
     Source/Tests/ClidScriptedEditRenderTests.cpp
     Source/Tests/ClidLayerStructureTests.cpp
+    Source/Tests/ClidEditContinuityTests.cpp
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_APVTS.cpp
     Source/Plugin/PluginProcessor_Modulation.cpp

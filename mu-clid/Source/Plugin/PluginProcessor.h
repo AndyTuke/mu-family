@@ -446,6 +446,7 @@ private:
     friend class PresetIO;
     friend class HotSwapStager;
     friend class SampleLibrary;
+    friend struct ModulationMemoryProbe;   // tests read the per-slot modulation change-detection state
 
     // atomic for safe cross-thread access (audio writes, UI reads + clears).
     // Written in prepareToPlay; read in processBlock. JUCE calls prepareToPlay
