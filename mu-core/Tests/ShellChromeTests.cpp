@@ -1,4 +1,5 @@
 #include "TestShellBackend.h"
+#include "TestProcessorBase.h"
 #include "UI/ShellChrome.h"
 #include "UI/Components/KnobWithLabel.h"
 #include "UI/ModalDialog.h"
@@ -439,3 +440,71 @@ struct ShellChromeTests : juce::UnitTest
 };
 
 static ShellChromeTests shellChromeTests;
+
+// An editor (the chrome inside it) is destroyed while the backend lives on, as a DAW does when it
+// closes the plugin window. The transport bar's timer and the backend callbacks must go with it:
+// nothing may reach a destroyed object afterwards.
+struct ShellChromeTeardownTests : juce::UnitTest
+{
+    ShellChromeTeardownTests() : juce::UnitTest("ShellChrome teardown while the backend lives", "mu-core") {}
+
+    // Lets the message thread run timers for `ms`.
+    static void pump(int ms) { juce::MessageManager::getInstance()->runDispatchLoopUntil(ms); }
+
+    struct ExposedProcessor : TestProcessorBase
+    {
+        explicit ExposedProcessor(WrapperType w) : TestProcessorBase(w) {}
+        using ProcessorBase::drainDeferredWork;
+    };
+
+    void runTest() override
+    {
+        ScaleGuard guard;
+        mu_ui::scale = 1.0f;
+
+        beginTest("fake backend: the bar's timer polls it while the chrome lives and stops with the chrome");
+        {
+            TestShellBackend backend(true);
+            Host host;
+            auto chrome = std::make_unique<mu_ui::ShellChrome>(host, backend);
+            host.chrome = chrome.get();
+
+            pump(250);
+            expect(backend.reads.load() > 0, "the transport bar's timer read the backend");
+
+            host.chrome = nullptr;
+            chrome.reset();
+            expect(! backend.onLoadError && ! backend.onUiScaleChanged && ! backend.onSaveAndQuit
+                       && ! backend.onPresetSwapCommitted, "every shell callback is cleared");
+
+            const int atDestroy = backend.reads.load();
+            pump(400);   // several timer periods
+            expectEquals(backend.reads.load(), atDestroy);
+
+            // The backend still works with nobody listening.
+            backend.setUiScale(1.25f);
+            backend.setUiScale(1.0f);
+        }
+
+        beginTest("processor backend: destroying the chrome, then running the swap poll and deferred work, touches nothing stale");
+        {
+            ExposedProcessor proc(juce::AudioProcessor::wrapperType_Standalone);
+            int committed = 0;
+            {
+                Host host;
+                auto chrome = std::make_unique<mu_ui::ShellChrome>(host, proc);
+                host.chrome = chrome.get();
+                proc.onPresetSwapCommitted = [&committed] { ++committed; };   // overwritten by the chrome's own
+                pump(150);
+                host.chrome = nullptr;
+            }
+            expect(! proc.onLoadError && ! proc.onUiScaleChanged && ! proc.onSaveAndQuit
+                       && ! proc.onPresetSwapCommitted, "every shell callback is cleared on the processor");
+            pump(300);                   // the bar's timer is gone; the processor's own poll keeps running
+            proc.drainDeferredWork();    // nothing may call into the destroyed chrome
+            expectEquals(committed, 0);
+        }
+    }
+};
+
+static ShellChromeTeardownTests shellChromeTeardownTests;

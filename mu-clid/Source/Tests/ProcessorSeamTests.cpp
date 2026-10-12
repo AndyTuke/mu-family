@@ -244,14 +244,19 @@ struct MuClidProcessorSeamTests : juce::UnitTest
 
             // The set calls differ from the current values so each one fires the listener. Warm-up
             // first, uncounted, so one-off statics in the host's notification path do not count.
-            const char* ids[]   = { "r0_stepsA", "r0_hitsA", "r0_fltType", "r0_fltCut", "r0_drvChar", "mstrLoop" };
+            // The id strings are built here, outside the counted regions, so only the host's
+            // notification path and our listener are measured.
+            const juce::String ids[]       = { "r0_stepsA", "r0_hitsA", "r0_fltType", "r0_fltCut", "r0_drvChar", "mstrLoop" };
+            const juce::String bareIds[]   = { "p0", "p1", "p2", "p3", "p4", "p5" };
             const float first[] = { 9.0f, 5.0f, 3.0f, 4000.0f, 2.0f, 2.0f };
             int bareAllocs = 0, coreAllocs = 0;
             std::thread audio([&]
             {
                 setParam(bare.apvts, "p5", 1.0f);
+                setParam(p.apvts, ids[5], 1.0f);   // the same one-off warm-up for the real processor
+                setParam(p.apvts, ids[0], 11.0f);
                 alloc_count::count = 0; alloc_count::counting = true;
-                for (int i = 0; i < 6; ++i) setParam(bare.apvts, "p" + juce::String(i), 10.0f + (float) i);
+                for (int i = 0; i < 6; ++i) setParam(bare.apvts, bareIds[i], 10.0f + (float) i);
                 alloc_count::counting = false; bareAllocs = alloc_count::count;
 
                 alloc_count::count = 0; alloc_count::counting = true;
@@ -279,7 +284,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
             expect(p.sequencer.getPatternLength(0) != lengthBefore, "the pattern was rebuilt on the message thread");
 
             // The host's own notification work is the same with or without our listener; ours adds none.
-            expect(coreAllocs <= bareAllocs, "our listener allocated: " + juce::String(coreAllocs) + " vs " + juce::String(bareAllocs));
+            expect(coreAllocs == bareAllocs, "our listener allocated: " + juce::String(coreAllocs) + " vs " + juce::String(bareAllocs));
         }
 
         beginTest("Queued values coalesce: the last value set from another thread is the one applied");

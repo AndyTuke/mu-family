@@ -2,6 +2,8 @@
 
 #include "Plugin/ShellBackend.h"
 
+#include <atomic>
+
 // A ShellBackend with no processor behind it: plain fields the tests set and read, so the shared
 // chrome (TransportBar, the settings page) is exercised over the interface alone, the way an app
 // without an AudioProcessor drives it.
@@ -32,12 +34,16 @@ struct TestShellBackend : mu_core::ShellBackend
     double hostPpq = 0.0;
     bool   hostHasPpq = false;
 
+    // How many times the audio-visible readers (transport, host and sync getters) were called, so a
+    // test can see whether something is still polling the backend.
+    mutable std::atomic<int> reads { 0 };
+
     bool   isStandaloneApp() const noexcept override { return standalone; }
-    bool   isInternalPlaying() const noexcept override { return playing; }
+    bool   isInternalPlaying() const noexcept override { ++reads; return playing; }
     void   toggleInternalPlay() override { playing = ! playing; if (! playing) beat = 0.0; }
     double getInternalBpm() const noexcept override { return bpm; }
     void   setInternalBpm(double b) override { bpm = b; }
-    double getInternalBeatPos() const noexcept override { return beat; }
+    double getInternalBeatPos() const noexcept override { ++reads; return beat; }
     void   getTimeSignature(int& n, int& d) const noexcept override { n = sigNum; d = sigDen; }
     void   setTimeSignature(int n, int d) override { sigNum = n; sigDen = d; }
     void   setNudgeDirection(int dir) override { nudge = dir; ++nudgeSets; }
@@ -49,12 +55,12 @@ struct TestShellBackend : mu_core::ShellBackend
     MidiClockSync::ClockState getMidiClockState() const noexcept override { return clockState; }
     void   setMidiSyncEnabled(bool on) override { syncEnabled = on; }
     void   setMidiSyncMessages(int mode) override { syncMessages = mode; }
-    int    getSyncOffsetMs() const noexcept override { return syncOffset; }
+    int    getSyncOffsetMs() const noexcept override { ++reads; return syncOffset; }
     void   setSyncOffsetMs(int ms) override { syncOffset = ms; }
 
     // Host reads: overridden only so a test can play a host; the defaults are "no host".
-    bool   isHostPlaying() const noexcept override { return hostPlay; }
-    bool   getHostPpqPosition(double& ppq) const noexcept override { if (! hostHasPpq) return false; ppq = hostPpq; return true; }
+    bool   isHostPlaying() const noexcept override { ++reads; return hostPlay; }
+    bool   getHostPpqPosition(double& ppq) const noexcept override { ++reads; if (! hostHasPpq) return false; ppq = hostPpq; return true; }
 
     float  getUiScale() const override { return uiScale; }
     void   setUiScale(float s) override { uiScale = s; ++uiScaleSets; if (onUiScaleChanged) onUiScaleChanged(s); }
