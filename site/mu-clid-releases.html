@@ -45,7 +45,7 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 0 32px;
 .rn-hero h1 { font-family: var(--ff-disp); font-size: clamp(30px,4vw,46px); font-weight: 800; line-height: 1.0; letter-spacing: -0.03em; margin-bottom: 14px; }
 .rn-hero h1 .mu { color: var(--accent-b); }
 .rn-hero p { font-size: 16px; font-weight: 300; color: var(--text2); max-width: 620px; }
-.rn-hero .rn-links { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.06em; }
+.rn-hero .rn-links { margin-top: 18px; display: flex; gap: 18px; font-family: var(--ff-mono); font-size: 11px; letter-spacing: 0.06em; }
 .rn-hero .rn-links a { color: var(--accent-b); }
 
 .release { padding: 38px 0; border-top: 1px solid var(--border); }
@@ -89,11 +89,10 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
     <div class="nav-links">
       <a href="mu-clid.html" class="nav-clid active"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid</a>
       <a href="mu-tant.html" class="nav-tant"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-tant</a>
-      <a href="mu-clid-midi.html" class="nav-clid"><span style="font-family:var(--ff-disp);text-transform:none">μ</span>-clid MIDI</a>
-      <a href="free.html" class="nav-free">μ-link</a>
+      <a href="free.html" class="nav-free">Free</a>
       <a href="download.html">Download</a>
       <a href="index.html#community">Community</a>
-      <a href="index.html#pricing" class="nav-cta">Pay what you like</a>
+      <a href="index.html#pricing" class="nav-cta">Shop</a>
     </div>
   </nav>
 
@@ -106,11 +105,6 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-links">
           <a href="download.html">Download ↓</a>
           <a href="mu-tant-releases.html">μ-tant release notes →</a>
-          <a href="mu-toni-releases.html">μ-toni release notes →</a>
-          <a href="mu-on-releases.html">μ-on release notes →</a>
-          <a href="mu-clid-midi-releases.html">μ-clid MIDI release notes →</a>
-          <a href="mu-toni-releases.html">μ-toni release notes →</a>
-          <a href="mu-on-releases.html">μ-on release notes →</a>
         </div>
       </div>
     </section>
@@ -193,8 +187,6 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
         <div class="rn-group fixed">
           <h3>Fixed</h3>
           <ul>
-            <li>A staged per-rhythm hot-swap now commits at the end of the rhythm's own loop when no Master Loop is set (it previously never took effect with the default settings). <span class="ref">(1510)</span></li>
-            <li>A one-step rhythm now keeps sounding instead of playing once and going silent. <span class="ref">(1475)</span></li>
             <li>Deleting or re-ordering rhythms (mu-Clid) or voices (mu-Tant) no longer leaves a channel ducking from the wrong one: sidechain sources now follow their rhythm / voice, and a channel that ducked from a deleted one stops ducking. <span class="ref">(1308)</span></li>
             <li>MIDI clock sync in the standalone: with Messages set to &ldquo;Clock only&rdquo; the Play button now starts the app (it used to stay stopped), and with &ldquo;Transport only&rdquo; the app now plays at its own BPM instead of sitting on the first step. <span class="ref">(1261)</span></li>
             <li>Under MIDI clock, many steps used to play a fraction late (one clock tick, about 20 ms at 120 BPM); they now land exactly on time. <span class="ref">(1260)</span></li>
@@ -329,7 +321,7 @@ footer { border-top: 1px solid var(--border); padding: 44px 0 36px; margin-top: 
     <div class="container">
       <div class="footer-bottom">
         <span class="copy">© 2026 Transwarp Development Project · transwarp.me · Bath, UK</span>
-        <div class="footer-social"><a href="download.html">Download</a><a href="mu-tant-releases.html">μ-tant notes</a><a href="mu-toni-releases.html">μ-toni notes</a><a href="mu-on-releases.html">μ-on notes</a><a href="contact.html">Contact</a><a href="https://github.com/AndyTuke/mu-family">GitHub</a></div>
+        <div class="footer-social"><a href="download.html">Download</a><a href="mu-tant-releases.html">μ-tant notes</a><a href="contact.html">Contact</a><a href="https://github.com/AndyTuke/mu-family">GitHub</a></div>
       </div>
     </div>
   </footer>
