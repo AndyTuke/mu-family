@@ -351,33 +351,26 @@ public:
     static constexpr int kStatusBarH    = 20;
     static constexpr int kSidebarW      = 82;   // the shared LayerSidebar width
 
-    // ── RhythmPanel regions (derived from the window minus chrome) ────────
-    // Main area: 1088 × 814 at default. RhythmPanel internal headers consume
-    // 28 (rhythm header) + 22 (sample bar) + 144 (voice section row) = 194
-    // px of vertical space before the dynamic top half / mod half split.
+    // ── Layer panel bands (derived from the window minus chrome) ──────────
+    // Main area: 1088 × 814 at default, tiled by the shared LayerPanel into three bands:
+    // a 32 px preset strip, a 464 px product content band, and the 318 px modulator panel.
     static constexpr int kChannelPanelW    = kWindowWidth - kSidebarW;                          // 1088
     static constexpr int kChannelPanelH    = kWindowHeight - kTransportBarH - kStatusBarH;      // 814
-    static constexpr int kChannelHeaderH   = 28;
-    static constexpr int kSampleBarH      = 22;
-    static constexpr int kVoiceSectionH   = 144;
-    // contentH = 814 - 28 - 22 - 144 = 620. Top half locks to 288 because
-    // the modulator minimum of 332 px takes the rest (avail = contentH - 332 = 288;
-    // raw 0.55 × contentH = 341 → clamped to avail).
-    static constexpr int kChannelTopH      = 288;
-    static constexpr int kCircleSize      = kChannelTopH;                                       // square
-    static constexpr int kEuclidPanelW    = kChannelPanelW - kCircleSize;                       // 800
-    static constexpr int kEuclidPanelH    = kChannelTopH;                                       // 288
-    static constexpr int kVoiceSectionW   = kChannelPanelW;                                     // 1088
-    static constexpr int kModulatorPanelW = kChannelPanelW;                                     // 1088
-    static constexpr int kModulatorPanelH = kChannelPanelH - kChannelHeaderH
-                                          - kSampleBarH - kChannelTopH - kVoiceSectionH;        // 332
-
-    // ── Shared per-layer panel bands (LayerPanel): header strip + product content + modulator ──
     static constexpr int kLayerHeaderStripH = 32;    // preset strip holding the 28 px ChannelHeaderBar
     static constexpr int kLayerModulatorH   = 318;   // the shared ModulatorPanel
     static constexpr int kLayerContentH     = kChannelPanelH - kLayerHeaderStripH - kLayerModulatorH;   // 464
     static_assert(kLayerHeaderStripH + kLayerContentH + kLayerModulatorH == kChannelPanelH,
                   "layer panel bands must fill the channel panel");
+
+    // mu-Clid's content band: sample bar (the strip height) + circle row + voice band = 464.
+    static constexpr int kVoiceSectionH   = 144;
+    static constexpr int kChannelTopH      = kLayerContentH - kLayerHeaderStripH - kVoiceSectionH;   // 288
+    static constexpr int kCircleSize      = kChannelTopH;                                       // square
+    static constexpr int kEuclidPanelW    = kChannelPanelW - kCircleSize;                       // 800
+    static constexpr int kEuclidPanelH    = kChannelTopH;                                       // 288
+    static constexpr int kVoiceSectionW   = kChannelPanelW;                                     // 1088
+    static constexpr int kModulatorPanelW = kChannelPanelW;                                     // 1088
+    static constexpr int kModulatorPanelH = kLayerModulatorH;                                   // 318
 
     // ── Spacing scale ─────────────────────────────────────────────────────
     // Gaps and padding belong to the design system rather than to whichever panel
@@ -406,7 +399,7 @@ public:
     static constexpr int kVoiceInnerW     = kVoiceSectionW  - 2 * kChannelInset;                // 1074
     static constexpr int kVoiceInnerH     = kVoiceSectionH  - 2 * kChannelInset;                // 130
     static constexpr int kModulatorInnerW = kModulatorPanelW - 2 * kChannelInset;               // 1074
-    static constexpr int kModulatorInnerH = kModulatorPanelH - 2 * kChannelInset;               // 318
+    static constexpr int kModulatorInnerH = kModulatorPanelH - 2 * kChannelInset;               // 304
 
     // ── VoiceSection sub-panel widths ─────────────────────────────────────
     // mu-Clid's VoiceSection lays out its own variant (see VoiceSection.h); these are the

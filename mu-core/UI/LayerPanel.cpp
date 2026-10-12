@@ -61,7 +61,14 @@ void LayerPanel::refreshHeader()
 
 void LayerPanel::refreshPresetList()
 {
-    mu_ui::refreshSlotPresetList(header, proc, currentLayer);
+    if (ownsPresetList) mu_ui::refreshSlotPresetList(header, proc, currentLayer);
+}
+
+void LayerPanel::addOverlay(juce::Component& overlay)
+{
+    addChildComponent(overlay);
+    overlays.add(&overlay);
+    overlay.setBounds(getLocalBounds());
 }
 
 juce::Colour LayerPanel::layerColour() const
@@ -110,4 +117,6 @@ void LayerPanel::resized()
     // Band 3: the modulators take whatever is left, so lost height (banners) comes off this band only.
     modR = { 0, contentR.getBottom(), w, juce::jmax(0, h - contentR.getBottom()) };
     modulatorPanel.setBounds(modR.reduced(padX, padY));
+
+    for (auto* o : overlays) o->setBounds(getLocalBounds());
 }

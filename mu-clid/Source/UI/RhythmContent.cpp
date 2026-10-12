@@ -1,5 +1,5 @@
 #include "UI/PresetDropdown.h"   // mu-core: shared preset scan + selector fill
-#include "RhythmPanel.h"
+#include "RhythmContent.h"
 #include "SampleBrowser.h"
 #include "UI/ConfirmDialog.h"   // shared themed confirm dialogs (mu_ui::confirmAsync)
 #include "UI/OverlayHost.h"     // shared dimmed in-editor overlay host (sample browser)
@@ -64,9 +64,8 @@ const char* const kSendSuffixes[] = { "sendEff", "sendDly", "sendRev", "pan" };
 } // namespace
 
 //==============================================================================
-RhythmPanel::RhythmPanel(PluginProcessor& p)
-    : proc(p), euclidPanel(p), voiceSection(p), midiOutSection(p),
-      modDestProvider(mu_clid::makeModDestProvider([this] { return effectSendName; }))
+RhythmContent::RhythmContent(PluginProcessor& p)
+    : proc(p), euclidPanel(p), voiceSection(p), midiOutSection(p)
 {
     startTimerHz(mu_ui::kUiRefreshHz);
     addAndMakeVisible(circle);
@@ -76,51 +75,16 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
     addAndMakeVisible(voiceSection);
     addChildComponent(midiOutSection);   // shown instead of the voice band in MIDI output mode
     addAndMakeVisible(outputCtrl);
-    addAndMakeVisible(modulatorPanel);
-    modulatorPanel.setDestProvider(&modDestProvider);
 
     // juce::Label provides bulletproof inline editing: handles single-click to edit,
     // Enter to commit, Escape to cancel, click-off to commit, focus management — all
     // natively. Our previous TextEditor + onFocusLost setup was fragile because
     // onFocusLost only fires when another component grabs keyboard focus, which most
     // child components in this UI don't do.
-    // Shared per-layer header bar (name / reset / delete / preset / save).
-    headerBar.setPresetPlaceholder(juce::String::fromUTF8("rhythm preset\xe2\x80\xa6"));
-    headerBar.onReset       = [this] { confirmReset();  };
-    headerBar.onDelete      = [this] { confirmDelete(); };
-    headerBar.onSave        = [this] { saveRhythmPreset(); };
-    headerBar.onNameChanged = [this](juce::String n) { commitNameFromLabel(n); };
-    headerBar.onPresetSelected = [this](int id)
-    {
-        const int idx = id - 1;
-        if (idx >= 0 && idx < (int)rhythmPresetFiles.size() && currentRhythmIndex >= 0)
-        {
-            const juce::File presetFile = rhythmPresetFiles[idx];
-            proc.stageRhythmPreset(currentRhythmIndex, presetFile);
-            loadedRhythmPresetFile = presetFile;
-            if (!proc.sequencerPlaying.load())
-            {
-                setRhythm(currentRhythmIndex);   // refreshes rhythmPresetFiles, clears dropdown
-                repaint();
-                // Re-select the just-loaded preset (refreshRhythmPresets cleared the selection).
-                for (int i = 0; i < (int)rhythmPresetFiles.size(); ++i)
-                {
-                    if (rhythmPresetFiles[i].getFullPathName() == presetFile.getFullPathName())
-                    {
-                        rhythmPresetDropdown.setSelectedId(i + 1, juce::dontSendNotification);
-                        break;
-                    }
-                }
-            }
-        }
-    };
-    addAndMakeVisible(headerBar);
-
     // The shared save card, worded for a rhythm preset (no logo → the compact card).
     saveDialog.setTitle("Save Rhythm Preset");
     saveDialog.setEmbedLabel("Embed sample in file");
-    addAndMakeVisible(saveDialog);
-    saveDialog.setVisible(false);
+    saveDialog.setVisible(false);   // hosted over the whole panel by the LayerPanel (addOverlay)
     saveDialog.onCancel = [this] { saveDialog.setVisible(false); };
     saveDialog.onSave = [this](const juce::String& name,
                                       const juce::String& desc,
@@ -147,7 +111,7 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
 
         if (destFile.existsAsFile())
         {
-            juce::Component::SafePointer<RhythmPanel> safeThis(this);
+            juce::Component::SafePointer<RhythmContent> safeThis(this);
             mu_ui::confirmAsync(this, "Overwrite Rhythm Preset", "Overwrite \"" + name + "\"?", "Overwrite",
                 [safeThis, destFile, name, desc, category, embed]
                 {
@@ -163,7 +127,7 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
                         if (safeThis->rhythmPresetFiles[i].getFullPathName()
                                 == destFile.getFullPathName())
                         {
-                            safeThis->rhythmPresetDropdown.setSelectedId(
+                            safeThis->rhythmPresetDropdown().setSelectedId(
                                 i + 1, juce::dontSendNotification);
                             break;
                         }
@@ -181,7 +145,7 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
         {
             if (rhythmPresetFiles[i].getFullPathName() == destFile.getFullPathName())
             {
-                rhythmPresetDropdown.setSelectedId(i + 1, juce::dontSendNotification);
+                rhythmPresetDropdown().setSelectedId(i + 1, juce::dontSendNotification);
                 break;
             }
         }
@@ -227,17 +191,53 @@ RhythmPanel::RhythmPanel(PluginProcessor& p)
 
     voiceSection.onInsertAlgorithmChanged = [this](int charId)
     {
-        modulatorPanel.setInsertAlgorithm(charId);
+        if (onInsertAlgorithmChanged) onInsertAlgorithmChanged(charId);
     };
 }
 
-RhythmPanel::~RhythmPanel()
+// Wire the shared header bar to this band's rhythm-specific behaviour.
+void RhythmContent::attachHeader(ChannelHeaderBar& bar)
+{
+    headerBar = &bar;
+    bar.setPresetPlaceholder(juce::String::fromUTF8("rhythm preset\xe2\x80\xa6"));
+    bar.onReset       = [this] { confirmReset();  };
+    bar.onDelete      = [this] { confirmDelete(); };
+    bar.onSave        = [this] { saveRhythmPreset(); };
+    bar.onNameChanged = [this](juce::String n) { commitNameFromLabel(n); };
+    bar.onPresetSelected = [this](int id)
+    {
+        const int idx = id - 1;
+        if (idx >= 0 && idx < (int)rhythmPresetFiles.size() && currentRhythmIndex >= 0)
+        {
+            const juce::File presetFile = rhythmPresetFiles[idx];
+            proc.stageRhythmPreset(currentRhythmIndex, presetFile);
+            loadedRhythmPresetFile = presetFile;
+            if (!proc.sequencerPlaying.load())
+            {
+                if (requestRebind) requestRebind(currentRhythmIndex);   // refreshes rhythmPresetFiles, clears dropdown
+                repaint();
+                // Re-select the just-loaded preset (refreshRhythmPresets cleared the selection).
+                for (int i = 0; i < (int)rhythmPresetFiles.size(); ++i)
+                {
+                    if (rhythmPresetFiles[i].getFullPathName() == presetFile.getFullPathName())
+                    {
+                        rhythmPresetDropdown().setSelectedId(i + 1, juce::dontSendNotification);
+                        break;
+                    }
+                }
+            }
+        }
+    };
+
+}
+
+RhythmContent::~RhythmContent()
 {
     stopTimer();
     deregisterRhythmListeners(currentRhythmIndex);
 }
 
-void RhythmPanel::registerRhythmListeners(int ri)
+void RhythmContent::registerRhythmListeners(int ri)
 {
     if (ri < 0) return;
     const auto rPfx  = "r"  + juce::String(ri) + "_";
@@ -252,7 +252,7 @@ void RhythmPanel::registerRhythmListeners(int ri)
         proc.apvts.addParameterListener(chPfx + s, this);
 }
 
-void RhythmPanel::deregisterRhythmListeners(int ri)
+void RhythmContent::deregisterRhythmListeners(int ri)
 {
     if (ri < 0) return;
     const auto rPfx  = "r"  + juce::String(ri) + "_";
@@ -267,7 +267,7 @@ void RhythmPanel::deregisterRhythmListeners(int ri)
         proc.apvts.removeParameterListener(chPfx + s, this);
 }
 
-void RhythmPanel::parameterChanged(const juce::String& parameterID, float /*newValue*/)
+void RhythmContent::parameterChanged(const juce::String& parameterID, float /*newValue*/)
 {
     // JUCE invokes parameterChanged on whatever thread called setValueNotifyingHost.
     // Some DAWs run host automation on the audio thread — and the refresh below mutates
@@ -281,7 +281,7 @@ void RhythmPanel::parameterChanged(const juce::String& parameterID, float /*newV
     // sliders. Net cost was ~30 redundant refreshSuffix calls per swap commit.
     if (proc.isApvtsLoading()) return;
 
-    juce::Component::SafePointer<RhythmPanel> safeThis(this);
+    juce::Component::SafePointer<RhythmContent> safeThis(this);
     const juce::String suffix = parameterID.fromFirstOccurrenceOf("_", false, false);
 
     auto refresh = [safeThis, suffix]
@@ -314,13 +314,8 @@ void RhythmPanel::parameterChanged(const juce::String& parameterID, float /*newV
         juce::MessageManager::callAsync(std::move(refresh));
 }
 
-void RhythmPanel::setRhythm(int index)
+void RhythmContent::setLayer(int index)
 {
-    // Commit any in-progress edit (Label::hideEditor with discardChanges=false saves
-    // current text and fires onTextChange synchronously, which writes the rename to
-    // the OLD currentRhythmIndex before we update it).
-    headerBar.commitNameEdit();   // commit any in-progress rename to the OLD rhythm first
-
     if (currentRhythmIndex != index)
         loadedRhythmPresetFile = juce::File();   // explicit: '= {}' is ambiguous on GCC/Clang
     deregisterRhythmListeners(currentRhythmIndex);
@@ -328,34 +323,20 @@ void RhythmPanel::setRhythm(int index)
     registerRhythmListeners(currentRhythmIndex);
     if (index >= 0 && index < proc.getNumRhythms())
     {
-        headerBar.setLayerName(juce::String(proc.getRhythm(index).name));
-        headerBar.setColour(currentColour());
-        repaint();   // the preset-bar panel behind the header is drawn in the rhythm colour
         refreshRhythmPresets();
         euclidPanel.setRhythm(index);
         euclidPanel.setRhythmColour(currentColour());
-        // modulatorPanel must be re-pointed BEFORE voiceSection — voiceSection.setRhythm
-        // triggers onInsertAlgorithmChanged → modulatorPanel.setInsertAlgorithm →
-        // ModulatorEditor::rebuildRows(), which reads cs->id. If cs still points at a
-        // just-destroyed Rhythm (e.g. after delete-last), cs->id is garbage and string
-        // concat throws std::bad_alloc.
-        modulatorPanel.setVoiceSlot(&proc.getRhythm(index));
+        // The LayerPanel has already re-pointed the modulators at this rhythm: voiceSection.setRhythm
+        // triggers onInsertAlgorithmChanged, which rebuilds the modulator rows from the bound layer.
         voiceSection.setRhythm(index);
         midiOutSection.setRhythm(index);
         updateOutputModeUi();
         refreshCircle();
     }
-    else
-    {
-        headerBar.setLayerName("No Rhythm");
-        // Null out all child-panel rhythm pointers so they don't dereference stale memory
-        // if a vector erase invalidated the previous rhythm before re-binding.
-        modulatorPanel.setVoiceSlot(nullptr);
-    }
     repaint();
 }
 
-void RhythmPanel::refreshCircle()
+void RhythmContent::refreshCircle()
 {
     if (currentRhythmIndex < 0 || currentRhythmIndex >= proc.getNumRhythms()) return;
     const Rhythm& r = proc.getRhythm(currentRhythmIndex);
@@ -371,7 +352,7 @@ void RhythmPanel::refreshCircle()
                         currentColour());
 }
 
-juce::Colour RhythmPanel::currentColour() const
+juce::Colour RhythmContent::currentColour() const
 {
     if (currentRhythmIndex >= 0 && currentRhythmIndex < proc.getNumRhythms())
     {
@@ -383,7 +364,7 @@ juce::Colour RhythmPanel::currentColour() const
 
 // True when the shown rhythm sends MIDI notes instead of playing its sample. Reads the parameter itself
 // (not the Rhythm) so it is right the moment the parameter changes, whichever listener runs first.
-bool RhythmPanel::isMidiOutputMode() const
+bool RhythmContent::isMidiOutputMode() const
 {
     if (currentRhythmIndex < 0) return false;
     if (auto* raw = proc.apvts.getRawParameterValue("r" + juce::String(currentRhythmIndex) + "_outMode"))
@@ -393,7 +374,7 @@ bool RhythmPanel::isMidiOutputMode() const
 
 // Output mode for the shown rhythm: the selector, which of the voice band / MIDI Out section is
 // visible, and the sample LCD's wording. Message thread.
-void RhythmPanel::updateOutputModeUi()
+void RhythmContent::updateOutputModeUi()
 {
     const bool midi = isMidiOutputMode();
     outputCtrl.setSelectedIndex(midi ? 1 : 0, false);
@@ -403,7 +384,7 @@ void RhythmPanel::updateOutputModeUi()
     if (onOutputModeChanged) onOutputModeChanged();
 }
 
-bool RhythmPanel::isInterestedInFileDrag(const juce::StringArray& files)
+bool RhythmContent::isInterestedInFileDrag(const juce::StringArray& files)
 {
     if (isMidiOutputMode()) return false;   // a MIDI rhythm has no sample to load
     for (auto& f : files)
@@ -416,7 +397,7 @@ bool RhythmPanel::isInterestedInFileDrag(const juce::StringArray& files)
     return false;
 }
 
-void RhythmPanel::filesDropped(const juce::StringArray& files, int, int)
+void RhythmContent::filesDropped(const juce::StringArray& files, int, int)
 {
     for (auto& f : files)
     {
@@ -430,7 +411,7 @@ void RhythmPanel::filesDropped(const juce::StringArray& files, int, int)
     }
 }
 
-void RhythmPanel::loadSample()
+void RhythmContent::loadSample()
 {
     if (currentRhythmIndex < 0) return;
 
@@ -447,7 +428,7 @@ void RhythmPanel::loadSample()
                                            ? primaryLib
                                            : juce::File::getSpecialLocation(juce::File::userMusicDirectory));
 
-    juce::Component::SafePointer<RhythmPanel> safeThis(this);
+    juce::Component::SafePointer<RhythmContent> safeThis(this);
     const int rhythmIndex = currentRhythmIndex;
 
     // Host the sample browser as a dimmed in-editor overlay (consistent with the other modals)
@@ -468,10 +449,11 @@ void RhythmPanel::loadSample()
     overlay->show(this, std::move(content));
 }
 
-void RhythmPanel::refreshRhythmPresets()
+void RhythmContent::refreshRhythmPresets()
 {
     const auto entries = mu_pp::listPresetsByCategory(proc.getRhythmsDir(), "muRhythm");
-    mu_ui::fillPresetDropdown(rhythmPresetDropdown, rhythmPresetFiles, entries);
+    if (headerBar != nullptr)
+        mu_ui::fillPresetDropdown(rhythmPresetDropdown(), rhythmPresetFiles, entries);
 
     // The named categories in use, for getKnownCategories().
     knownRhythmCategories.clear();
@@ -481,12 +463,12 @@ void RhythmPanel::refreshRhythmPresets()
     knownRhythmCategories.sort(false);
 }
 
-void RhythmPanel::setKnownCategories(const juce::StringArray& cats)
+void RhythmContent::setKnownCategories(const juce::StringArray& cats)
 {
     saveDialog.setKnownCategories(cats);
 }
 
-void RhythmPanel::saveRhythmPreset()
+void RhythmContent::saveRhythmPreset()
 {
     if (currentRhythmIndex < 0) return;
 
@@ -516,7 +498,7 @@ void RhythmPanel::saveRhythmPreset()
     saveDialog.toFront(true);
 }
 
-void RhythmPanel::mouseDown(const juce::MouseEvent& e)
+void RhythmContent::mouseDown(const juce::MouseEvent& e)
 {
     // Name editing is handled by nameLabel (a child component); we no longer need
     // the manual nameRect hit-test here.
@@ -524,19 +506,17 @@ void RhythmPanel::mouseDown(const juce::MouseEvent& e)
         loadSample();
 }
 
-void RhythmPanel::paint(juce::Graphics& g)
+void RhythmContent::paint(juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
 
     g.setColour(MuLookAndFeel::colour(Id::panelBackground));
     g.fillAll();
 
-    // Every panel, the preset bar included, is painted in the app colour; the shared
-    // ChannelHeaderBar lights its name + preset displays in the rhythm's own colour.
+    // Every panel is painted in the app colour.
     using mu_ui::s;
     const juce::Colour appCol = MuLookAndFeel::appAccent(*this);
-    MuLookAndFeel::drawAccentPanel(g, juce::Rectangle<int>(0, 0, getWidth(), s(kHeaderH)).reduced(2).toFloat(), appCol);
-    for (auto r : { sampleRect, circleRect, euclidRect, voiceRect, modRect })
+    for (auto r : { sampleRect, circleRect, euclidRect, voiceRect })
         MuLookAndFeel::drawAccentPanel(g, r.reduced(2).toFloat(), appCol);
 
     // Sample bar — content inset from panel outline
@@ -631,33 +611,24 @@ void RhythmPanel::paint(juce::Graphics& g)
     }
 }
 
-void RhythmPanel::resized()
+void RhythmContent::resized()
 {
     // Fixed Medium-baseline layout — see MuLookAndFeel for the constants.
     // Every dimension wrapped in s() so scale toggles propagate.
     using mu_ui::s;
     const int w = getWidth();
-    const int h = getHeight();
 
     topH    = s(MuLookAndFeel::kChannelTopH);
     circleW = s(MuLookAndFeel::kCircleSize);
 
-    const int hdrH = s(kHeaderH);
     const int sbH  = s(kSampleBarH);
     const int voiH = s(kVoiceH);
-    const int topY = hdrH + sbH;
-    const int modY = topY + topH + voiH;
+    const int topY = sbH;
 
-    sampleRect = { 0,       hdrH,        w,           sbH                     };
-    circleRect = { 0,       topY,        circleW,     topH                    };
-    euclidRect = { circleW, topY,        w - circleW, topH                    };
-    voiceRect  = { 0,       topY + topH, w,           voiH                    };
-    modRect    = { 0,       modY,        w,           juce::jmax(0, h - modY) };
-
-    // Shared header bar sits just inside its rhythm-colour panel outline (lays out its own controls).
-    // With screws the bar is narrower, leaving a screw at each end of its strip.
-    const int hdrInsetX = MuLookAndFeel::hasScrews(*this) ? s(MuLookAndFeel::kScrewedPanelInset) : s(kHeaderInsetX);
-    headerBar.setBounds(juce::Rectangle<int>(0, 0, w, hdrH).reduced(hdrInsetX, s(kHeaderInsetY)));
+    sampleRect = { 0,       0,           w,           sbH  };
+    circleRect = { 0,       topY,        circleW,     topH };
+    euclidRect = { circleW, topY,        w - circleW, topH };
+    voiceRect  = { 0,       topY + topH, w,           voiH };
 
     const int rhythmInset = s(kPanelPad + 1);
     circle.setBounds        (circleRect.reduced(rhythmInset));
@@ -678,17 +649,12 @@ void RhythmPanel::resized()
     voiceSection.setBounds  (voiceRect.reduced(rhythmInset));
     midiOutSection.setBounds(voiceRect.reduced(rhythmInset));   // the same band, shown instead in MIDI output mode
     outputCtrl.setBounds(outputSelectorRect());
-    // With screws the modulator section is a little narrower, so its tabs and boxes clear
-    // the panel's corner screws.
-    const int modInsetX = MuLookAndFeel::hasScrews(*this) ? s(MuLookAndFeel::kScrewedPanelInset) : rhythmInset;
-    modulatorPanel.setBounds(modRect.reduced(modInsetX, rhythmInset));
-    saveDialog.setBounds(getLocalBounds());
 }
 
 //==============================================================================
 // Called by juce::Label when the user finishes editing (Enter, click-off, etc.)
 // Writes the Label's text into the current rhythm and notifies listeners.
-void RhythmPanel::commitNameFromLabel(const juce::String& rawName)
+void RhythmContent::commitNameFromLabel(const juce::String& rawName)
 {
     if (currentRhythmIndex < 0 || currentRhythmIndex >= proc.getNumRhythms()) return;
 
@@ -696,7 +662,7 @@ void RhythmPanel::commitNameFromLabel(const juce::String& rawName)
     if (newName.isEmpty())
     {
         newName = "<unnamed>";
-        headerBar.setLayerName(newName);
+        if (headerBar != nullptr) headerBar->setLayerName(newName);
     }
 
     // route through RhythmManager::rename so the write happens under
@@ -705,13 +671,13 @@ void RhythmPanel::commitNameFromLabel(const juce::String& rawName)
     if (onRhythmRenamed) onRhythmRenamed();
 }
 
-void RhythmPanel::confirmReset()
+void RhythmContent::confirmReset()
 {
     if (currentRhythmIndex < 0 || currentRhythmIndex >= proc.getNumRhythms()) return;
     const int idx = currentRhythmIndex;
     const juce::String name(proc.getRhythm(idx).name);
 
-    juce::Component::SafePointer<RhythmPanel> safeThis(this);
+    juce::Component::SafePointer<RhythmContent> safeThis(this);
     mu_ui::confirmAsync(this, "Reset Rhythm",
                         "Reset \"" + name + "\" to defaults?\nThis cannot be undone.", "Reset",
         [safeThis, idx]
@@ -721,19 +687,19 @@ void RhythmPanel::confirmReset()
                 // RhythmManager::reset owns the concurrency dance
                 // (suspendProcessing + rhythmsLock). No more UI-thread spin on modLock.
                 safeThis->proc.rhythms.reset(idx);
-                safeThis->setRhythm(idx);
+                if (safeThis->requestRebind) safeThis->requestRebind(idx);
             }
         });
 }
 
-void RhythmPanel::confirmDelete()
+void RhythmContent::confirmDelete()
 {
     if (currentRhythmIndex < 0 || currentRhythmIndex >= proc.getNumRhythms()) return;
     if (proc.getNumRhythms() <= 1) return; // cannot delete last rhythm
     const int idx = currentRhythmIndex;
     const juce::String name(proc.getRhythm(idx).name);
 
-    juce::Component::SafePointer<RhythmPanel> safeThis(this);
+    juce::Component::SafePointer<RhythmContent> safeThis(this);
     mu_ui::confirmAsync(this, "Delete Rhythm",
                         "Delete \"" + name + "\"?\nThis cannot be undone.", "Delete",
         [safeThis, idx]
@@ -743,12 +709,9 @@ void RhythmPanel::confirmDelete()
         });
 }
 
-void RhythmPanel::timerCallback()
+void RhythmContent::timerCallback()
 {
     const bool playing = proc.sequencerPlaying.load();
-
-    if (playing)
-        modulatorPanel.setPlayheadBeat(proc.lastBeatPos.load());
 
     // Re-render the RhythmCircle when euclid modulation changes the pattern
     // (hits/rotate/prePad/etc.). Audio thread writes lastEuclidOverrides per block;
@@ -763,24 +726,18 @@ void RhythmPanel::timerCallback()
 
 // Screws in the corners of the full-height panels, set into the painted border over any
 // content that reaches the corner (the thin header + sample strips have no room for them).
-void RhythmPanel::paintOverChildren(juce::Graphics& g)
+void RhythmContent::paintOverChildren(juce::Graphics& g)
 {
     if (! MuLookAndFeel::hasScrews(*this)) return;
-    for (auto r : { circleRect, euclidRect, voiceRect, modRect })
+    for (auto r : { circleRect, euclidRect, voiceRect })
         MuLookAndFeel::drawPanelScrews(g, r.reduced(2).toFloat());
-    // The thin header + sample strips: one screw at each end.
-    for (auto r : { headerRect(), sampleRect })
-        MuLookAndFeel::drawStripScrews(g, r.reduced(2).toFloat());
-}
-
-juce::Rectangle<int> RhythmPanel::headerRect() const
-{
-    return { 0, 0, getWidth(), mu_ui::s(kHeaderH) };
+    // The thin sample strip: one screw at each end.
+    MuLookAndFeel::drawStripScrews(g, sampleRect.reduced(2).toFloat());
 }
 
 // The sample display inside its strip: with screws, narrower so a screw fits at each end; the
 // Sample / MIDI selector takes the right end, so the display stops short of it.
-juce::Rectangle<int> RhythmPanel::sampleDisplayRect() const
+juce::Rectangle<int> RhythmContent::sampleDisplayRect() const
 {
     using mu_ui::s;
     const int insetX = MuLookAndFeel::hasScrews(*this) ? s(MuLookAndFeel::kScrewedPanelInset + MuLookAndFeel::kSpaceXS) : 3;
@@ -791,7 +748,7 @@ juce::Rectangle<int> RhythmPanel::sampleDisplayRect() const
 }
 
 // The strip's right-end inset for the selector: clear of the corner screw (screws style).
-int RhythmPanel::outputInsetX() const
+int RhythmContent::outputInsetX() const
 {
     using mu_ui::s;
     return MuLookAndFeel::hasScrews(*this) ? s(MuLookAndFeel::kScrewedPanelInset) : s(kHeaderInsetX);
@@ -799,7 +756,7 @@ int RhythmPanel::outputInsetX() const
 
 // The Sample / MIDI selector: at the right end of the sample strip, as tall as the strip's displays,
 // centred, and kept clear of the corner screw.
-juce::Rectangle<int> RhythmPanel::outputSelectorRect() const
+juce::Rectangle<int> RhythmContent::outputSelectorRect() const
 {
     using mu_ui::s;
     const int w = s(kOutputSelectorW);
@@ -807,14 +764,9 @@ juce::Rectangle<int> RhythmPanel::outputSelectorRect() const
     return { sampleRect.getRight() - outputInsetX() - w, sampleRect.getY() + (sampleRect.getHeight() - h) / 2, w, h };
 }
 
-void RhythmPanel::setVoiceEffectSendLabel(const juce::String& name)
+void RhythmContent::setVoiceEffectSendLabel(const juce::String& name)
 {
     voiceSection.setEffectSendLabel(name);
-    if (name == effectSendName) return;
-
-    // Rebuild the destination dropdowns so the effect-send target carries the new name.
-    effectSendName = name;
-    modulatorPanel.setDestProvider(&modDestProvider);
 }
 
 } // namespace mu_clid

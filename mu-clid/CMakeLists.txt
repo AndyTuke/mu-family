@@ -60,7 +60,7 @@ target_sources(mu-clid
         Source/UI/Voice/PitchSubsection.cpp
         Source/UI/Voice/FilterSubsection.cpp
         Source/UI/Voice/AmpSubsection.cpp
-        Source/UI/RhythmPanel.cpp
+        Source/UI/RhythmContent.cpp
         Source/UI/MidiOutSection.cpp
         Source/UI/SampleBrowser.cpp
         Source/UI/SettingsOverlay.cpp

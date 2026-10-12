@@ -32,7 +32,7 @@ public:
     juce::String getSampleName(int rhythmIndex) const;
 
     // True when the rhythm has a sample path recorded but the voice engine couldn't
-    // load it (e.g. a linked sample later moved or deleted). The RhythmPanel sample bar
+    // load it (e.g. a linked sample later moved or deleted). The RhythmContent sample bar
     // shows a "missing — click to find" affordance instead of silently leaving it empty.
     bool isSampleMissing(int rhythmIndex) const;
 

@@ -290,7 +290,7 @@ PresetIO::PreparedRhythm PresetIO::prepareRhythmPreset(const juce::File& file, i
 
 //==============================================================================
 // PluginProcessor::saveRhythmPreset deleted — was dead code. The only call
-// site (RhythmPanel::saveRhythmPreset) routes through saveRhythmPresetToFile
+// site (RhythmContent::saveRhythmPreset) routes through saveRhythmPresetToFile
 // instead, and the dead function had already drifted from its sibling (missing
 // the modulator-child write). Removing it also fixes the ch_* mixer-
 // channel write that this function emitted was never read back by any load path

@@ -33,6 +33,13 @@ public:
     // Suggested name in the Save dialog (default: the layer's own name).
     void setDefaultPresetName(std::function<juce::String(int)> fn) { presetNameFn = std::move(fn); }
 
+    // A product that keeps its own preset list in the header (mu-Clid: categorised, with its own
+    // save dialog) turns the shell's list off and fills the dropdown itself.
+    void setOwnsPresetList(bool owns) { ownsPresetList = owns; }
+
+    // A product overlay (a dialog) hosted over the whole panel, above every band.
+    void addOverlay(juce::Component& overlay);
+
     // Products whose layer set is fixed show neither delete nor rename on the header.
     void setFixedLayers(bool fixed);
 
@@ -69,6 +76,8 @@ private:
     juce::Component* content = nullptr;
     std::function<double()> beatSource;
     std::function<juce::String(int)> presetNameFn;
+    bool ownsPresetList = true;
+    juce::Array<juce::Component*> overlays;
 
     juce::Rectangle<int> headerR, modR;   // the two panels the shell paints (the content paints its own)
 

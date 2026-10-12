@@ -8,7 +8,7 @@ namespace mu_clid {
 
 // Custom file browser used for sample loading so the user can audition files
 // before committing to a slot. Launched inside a DialogWindow (modal) from
-// RhythmPanel::loadSample(). Self-contained — no access to RhythmPanel internals.
+// RhythmContent::loadSample(). Self-contained — no access to RhythmContent internals.
 class SampleBrowserContent : public juce::Component,
                               public juce::FileBrowserListener
 {

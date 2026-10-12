@@ -205,7 +205,7 @@ public:
         return modSnapshot[rhythmIndex][snapIndex].load();
     }
 
-    // UI accessor for the per-rhythm modulated euclid overrides — read by RhythmPanel +
+    // UI accessor for the per-rhythm modulated euclid overrides — read by RhythmContent +
     // SidebarItem on a timer so the visual circles reflect modulation of hits/rotate/etc.
     //. Returns a struct copy; fields are integer-rounded by the audio thread so
     // torn reads are benign for visual display. Pre-fix the audio thread only
@@ -290,7 +290,7 @@ public:
 
     // Reference accessor for UI orchestrators that want to wrap their own
     // multi-write sequence in a `mu_core::ScopedApvtsLoading` guard so the
-    // intermediate APVTS state stays invisible to listeners (RhythmPanel's
+    // intermediate APVTS state stays invisible to listeners (RhythmContent's
     // refreshSuffix in particular). Caller is responsible for any post-guard
     // engine resync — see `forceSyncRhythmFromApvts` for the canonical pattern.
     std::atomic<bool>& getApvtsLoadingFlag() noexcept { return apvtsLoading; }
