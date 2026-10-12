@@ -56,7 +56,6 @@ target_sources(mu-clid
         Source/Audio/SampleLibrary.cpp
         Source/Plugin/PluginEditor.cpp
         Source/UI/RhythmMiniVisual.cpp
-        Source/UI/RhythmSidebar.cpp
         Source/UI/VoiceSection.cpp
         Source/UI/Voice/PitchSubsection.cpp
         Source/UI/Voice/FilterSubsection.cpp

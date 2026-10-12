@@ -8,7 +8,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     : EditorShellBase(p),
       proc(p),
       masterLoop(p),
-      sidebar(p),
+      sidebar(p, "Rhythm"),
       rhythmPanel(p),
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p)
@@ -30,7 +30,16 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     setSettingsOverlay(&settingsOverlay);
 
     // ── Sidebar callbacks ───────────────────────────────────────────────────
-    sidebar.onRhythmSelected = [this](int idx)
+    // Per-rhythm mini-graphic: a RhythmCircle whose step hit flashes the sidebar item.
+    sidebar.createMiniVisual = [this](int i, std::function<void()> pulse) -> std::unique_ptr<juce::Component>
+    {
+        auto mv = std::make_unique<RhythmMiniVisual>(proc, i);
+        mv->onHit = std::move(pulse);
+        return mv;
+    };
+    sidebar.refreshItems();
+
+    sidebar.onLayerSelected = [this](int idx)
     {
         rhythmPanel.setRhythm(idx);
         if (!isMixerVisible())
@@ -40,12 +49,12 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         }
     };
 
-    sidebar.onRhythmsReordered = [this](int newSelected)
+    sidebar.onLayersReordered = [this](int newSelected)
     {
         selectRhythmAndRefresh(newSelected, /*fullSidebarRefresh=*/false, MixerRefresh::FullReload);
     };
 
-    sidebar.onAddRhythm = [this]
+    sidebar.onAddLayer = [this]
     {
         if (proc.getNumRhythms() >= SequencerEngine::MaxRhythms) return;
         Rhythm r;

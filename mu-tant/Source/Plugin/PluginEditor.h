@@ -6,7 +6,8 @@
 #include "UI/MasterLoopSection.h"
 #include "Plugin/PluginProcessor.h"
 #include "UI/VoicePanel.h"
-#include "UI/VoiceSidebar.h"
+#include "UI/LayerSidebar.h"
+#include "UI/PatternMiniVisual.h"
 #include "UI/SettingsOverlay.h"
 
 namespace mu_tant
@@ -27,7 +28,7 @@ public:
 
 private:
     PluginProcessor&  proc;
-    VoiceSidebar      voiceSidebar;
+    LayerSidebar      sidebar;
     VoicePanel        voicePanel;
     MixerOverlay      mixerOverlay;
     SettingsOverlay   settingsOverlay;

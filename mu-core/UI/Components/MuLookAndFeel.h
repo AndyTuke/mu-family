@@ -349,7 +349,7 @@ public:
     // ── Top-level chrome ──────────────────────────────────────────────────
     static constexpr int kTransportBarH = 36;
     static constexpr int kStatusBarH    = 20;
-    static constexpr int kSidebarW      = 82;   // mirrored from RhythmSidebar::kWidth
+    static constexpr int kSidebarW      = 82;   // the shared LayerSidebar width
 
     // ── RhythmPanel regions (derived from the window minus chrome) ────────
     // Main area: 1088 × 814 at default. RhythmPanel internal headers consume
@@ -371,6 +371,13 @@ public:
     static constexpr int kModulatorPanelW = kChannelPanelW;                                     // 1088
     static constexpr int kModulatorPanelH = kChannelPanelH - kChannelHeaderH
                                           - kSampleBarH - kChannelTopH - kVoiceSectionH;        // 332
+
+    // ── Shared per-layer panel bands (LayerPanel): header strip + product content + modulator ──
+    static constexpr int kLayerHeaderStripH = 32;    // preset strip holding the 28 px ChannelHeaderBar
+    static constexpr int kLayerModulatorH   = 318;   // the shared ModulatorPanel
+    static constexpr int kLayerContentH     = kChannelPanelH - kLayerHeaderStripH - kLayerModulatorH;   // 464
+    static_assert(kLayerHeaderStripH + kLayerContentH + kLayerModulatorH == kChannelPanelH,
+                  "layer panel bands must fill the channel panel");
 
     // ── Spacing scale ─────────────────────────────────────────────────────
     // Gaps and padding belong to the design system rather than to whichever panel

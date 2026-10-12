@@ -52,7 +52,6 @@ target_sources(mu-tant
         Source/Plugin/PluginProcessor_Preset.cpp
         Source/Plugin/PluginEditor.cpp
         Source/UI/VoicePanel.cpp
-        Source/UI/VoiceSidebar.cpp
         Source/UI/GatingDesigner.cpp
         Source/UI/SettingsOverlay.cpp
         Source/Sequencer/GatePattern.cpp

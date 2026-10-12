@@ -3,7 +3,8 @@
 #include "PluginProcessor.h"
 #include "UI/EditorShellBase.h"
 #include "UI/MasterLoopSection.h"
-#include "UI/RhythmSidebar.h"
+#include "UI/LayerSidebar.h"
+#include "UI/RhythmMiniVisual.h"
 #include "UI/RhythmPanel.h"
 #include "UI/MixerOverlay.h"
 #include "UI/SettingsOverlay.h"
@@ -33,7 +34,7 @@ private:
     // mu-clid-specific product components — registered with the shell via
     // setMainArea / setMixerOverlay / setSettingsOverlay in the ctor.
     MasterLoopSection  masterLoop;
-    RhythmSidebar      sidebar;
+    LayerSidebar       sidebar;
     RhythmPanel        rhythmPanel;
     MixerOverlay       mixerOverlay;
     SettingsOverlay    settingsOverlay;

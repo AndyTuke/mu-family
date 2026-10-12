@@ -41,14 +41,14 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     setProductIdentity(juce::String(juce::CharPointer_UTF8("\xce\xbc-On")));
 
     // Per-channel sidebar glyph (Kick/Bass/Hat/Snare initial in the lane colour).
-    sidebar.createMiniVisual = [&p](int i) -> std::unique_ptr<juce::Component>
+    sidebar.createMiniVisual = [&p](int i, std::function<void()>) -> std::unique_ptr<juce::Component>
     {
         const auto col = MuLookAndFeel::channelPalette[
             (size_t) (p.getChannelColourIndex(i) % MuLookAndFeel::kChannelPaletteSize)];
         const juce::String name = p.getChannelName(i);
         return std::make_unique<ChannelGlyph>(col, name.substring(0, 1));
     };
-    sidebar.onChannelSelected = [this](int idx) { groovePanel.setChannel(idx); };
+    sidebar.onLayerSelected = [this](int idx) { groovePanel.setChannel(idx); };
     groovePanel.onLaneClicked = [this](int lane) { sidebar.setSelectedIndex(lane); groovePanel.setChannel(lane); };
     // Pulse a lane in the sidebar when the sequencer fires it (polled ~5 Hz; the grid's
     // own 30 Hz playhead is the primary timing feedback).

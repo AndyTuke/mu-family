@@ -6,7 +6,7 @@ namespace mu_tant
 PluginEditor::PluginEditor(PluginProcessor& p)
     : EditorShellBase(p),
       proc(p),
-      voiceSidebar(p),
+      sidebar(p, "Voice"),
       voicePanel(p),
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p),
@@ -38,7 +38,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // is done; a staged per-voice preset refreshes through this callback.
     proc.onLayerPresetCommitted = [this](int v)
     {
-        voiceSidebar.refreshItems();              // glyph / colour may have changed
+        sidebar.refreshItems();              // glyph / colour may have changed
         if (voicePanel.getVoice() == v)
             voicePanel.setVoice(v);               // re-read knobs + wavetable dropdowns
     };
@@ -46,22 +46,33 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     // Main area + mixer overlay (Stage A3 — channel strip lvl/pan/mute/solo
     // bound via apvts; FX send / sidechain knobs are visible but inert until
     // MixerEngine accepts a per-voice render callback).
-    setMainArea(&voiceSidebar, &voicePanel);
+    setMainArea(&sidebar, &voicePanel);
     setMixerOverlay(&mixerOverlay);
 
-    // Sidebar select / add / delete / reorder — same UX as mu-clid's rhythms.
-    voiceSidebar.onChannelSelected = [this](int idx) { voicePanel.setVoice(idx); };
+    // Per-voice spectrum glyph; its level pulse flashes the sidebar item.
+    sidebar.createMiniVisual = [this](int i, std::function<void()> pulse) -> std::unique_ptr<juce::Component>
+    {
+        const auto col = MuLookAndFeel::channelPalette[
+            (size_t) (proc.getChannelColourIndex(i) % MuLookAndFeel::kChannelPaletteSize)];
+        auto glyph = std::make_unique<PatternMiniVisual>(col, &proc.getPattern(i).ring);
+        glyph->onPulse = std::move(pulse);
+        return glyph;
+    };
+    sidebar.refreshItems();
 
-    voiceSidebar.onAddChannel = [this]
+    // Sidebar select / add / delete / reorder — same UX as mu-clid's rhythms.
+    sidebar.onLayerSelected = [this](int idx) { voicePanel.setVoice(idx); };
+
+    sidebar.onAddLayer = [this]
     {
         const int idx = proc.addLayer();
         if (idx < 0) return;                       // already at the 8-voice max
-        voiceSidebar.refreshItems();
-        voiceSidebar.setSelectedIndex(idx);
+        sidebar.refreshItems();
+        sidebar.setSelectedIndex(idx);
         voicePanel.setVoice(idx);
     };
 
-    voiceSidebar.onChannelsReordered = [this](int newSelected)
+    sidebar.onLayersReordered = [this](int newSelected)
     {
         voicePanel.setVoice(newSelected);
     };
@@ -78,14 +89,14 @@ PluginEditor::PluginEditor(PluginProcessor& p)
         voicePanel.clearPatternBindings();
         proc.removeLayer(idx);
         const int newIndex = juce::jlimit(0, proc.getNumVoices() - 1, idx);
-        voiceSidebar.refreshItems();
-        voiceSidebar.setSelectedIndex(newIndex);
+        sidebar.refreshItems();
+        sidebar.setSelectedIndex(newIndex);
         voicePanel.setVoice(newIndex);
     };
 
     // Forward mixer status updates to the shared StatusBar.
 
-    voiceSidebar.setSelectedIndex(0);
+    sidebar.setSelectedIndex(0);
     voicePanel.setVoice(0);
     mixerOverlay.loadFromApvts();
     clearPresetDirty();
@@ -107,16 +118,16 @@ PluginEditor::~PluginEditor()
 
 void PluginEditor::onPresetLoaded(const juce::File&)
 {
-    voiceSidebar.refreshItems();
-    voiceSidebar.setSelectedIndex(0);
+    sidebar.refreshItems();
+    sidebar.setSelectedIndex(0);
     voicePanel.setVoice(0);         // re-reads insert algo + slot knobs from APVTS
     mixerOverlay.loadFromApvts();
 }
 
 void PluginEditor::onPresetNew()
 {
-    voiceSidebar.refreshItems();
-    voiceSidebar.setSelectedIndex(0);
+    sidebar.refreshItems();
+    sidebar.setSelectedIndex(0);
     voicePanel.setVoice(0);
     mixerOverlay.loadFromApvts();
 }

@@ -2,7 +2,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "UI/Components/MuLookAndFeel.h"
 
-// One entry in a ChannelSidebar — a single "layer" (rhythm in mu-clid, voice in
+// One entry in a LayerSidebar — a single "layer" (rhythm in mu-clid, voice in
 // mu-tant). Product-agnostic: the per-layer mini-graphic is a Component the
 // product injects (mu-clid → a RhythmCircle wrapper; mu-tant → its own voice
 // graphic). The item itself owns the shared chrome: selected background + tab
@@ -23,7 +23,7 @@ public:
     void setPendingSwap(bool p);
 
     // Metal style: no fill of its own; the item's box (metalBox) is drawn raised by the
-    // ChannelSidebar behind it, and selection is the box outlined in the layer colour.
+    // LayerSidebar behind it, and selection is the box outlined in the layer colour.
     void setMetalStyle(bool m) { metal = m; resized(); repaint(); }
     static juce::Rectangle<float> metalBox(juce::Rectangle<int> itemBounds);
 

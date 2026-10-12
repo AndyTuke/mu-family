@@ -115,15 +115,18 @@ public:
     // They need createLayer(); a product with a fixed count does not supply it and these refuse.
     //   addLayer     appends a default layer; returns its index, or -1 when full or unsupported
     //   removeLayer  deletes a layer, the ones above shift down; the last layer cannot be removed
-    //   swapLayers   exchanges two layers (reorder)
+    //   swapLayers   exchanges two layers (reorder). Virtual, like resetLayer, for the same reason.
     //   resetLayer   puts one layer back to defaults, keeping its name and colour. Virtual because
     //                the products that have not moved their layers into the container reset their own.
     // True when the product has moved its layers into the container and supplies createLayer, so
     // the three edits above work. Products with a fixed count leave it false.
     virtual bool canEditLayers() const { return false; }
+    // True when the layer sidebar may offer drag-to-reorder (swapLayers works). Normally the same
+    // as canEditLayers; a product that reorders its layers some other way overrides both.
+    virtual bool canReorderLayers() const { return canEditLayers(); }
     int          addLayer();
     bool         removeLayer(int idx);
-    bool         swapLayers(int a, int b);
+    virtual bool swapLayers(int a, int b);
     virtual void resetLayer(int layer);
 
     // Called by the four edits above, on the message thread with layersLock held and processing

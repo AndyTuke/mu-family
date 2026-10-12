@@ -112,8 +112,11 @@ public:
     // Hot-swap staging: stages a rhythm preset for atomic commit at the next loop boundary.
     // If the sequencer is not playing, applies the preset immediately instead.
     void stageRhythmPreset(int ri, const juce::File& f, bool keepIdentity = false)  { presetIO.stageRhythmPreset(ri, f, keepIdentity); }
-    void cancelStagedSwap (int ri)                        { hotSwapStager.cancelStagedSwap(ri); }
-    bool hasPendingSwap   (int ri) const override         { return hotSwapStager.hasPendingSwap(ri); }
+    void cancelPendingSwap(int ri) override               { hotSwapStager.cancelStagedSwap(ri); }
+    // The rhythms are not in the layer container yet, so reorder goes through RhythmManager.
+    bool canReorderLayers() const override                { return true; }
+    bool swapLayers(int a, int b) override                { return rhythms.swap(a, b); }
+    bool hasPendingSwap  (int ri) const override         { return hotSwapStager.hasPendingSwap(ri); }
     bool hasPendingFullPreset() const override            { return hotSwapStager.hasPendingFullPreset(); }
     int  getMasterLoopSteps() const override              { return sequencer.getMasterLoopSteps(); }
     int  getMasterLoopCurrentStep() const override        { return sequencer.getMasterLoopCurrentStep(); }

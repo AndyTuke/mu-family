@@ -140,7 +140,8 @@ The `mu-core` INTERFACE library (introduced in Stage 33) holds everything shared
 | `MasterInsertPanel`, `InsertSlotConfig.h` | `mu-core/UI/` | The one master insert layout in the family (callback-only; used by the plugins and mu-link). `SlotConfig::disabledFromP1` plus `insertSlotEnabled()` give the Vocoder / VocoderSt grey-out (P2 to P4 off when P1, the Wave, is 2 or more) inside the panel; `setGainReductionSource(slot, const std::atomic<float>*)` feeds the Compressor / Limiter GR meter |
 | `MasterInsertBinding` | `mu-core/UI/MasterInsertBinding.{h,cpp}` | **Plugin-only** (takes `ProcessorBase&` and `MasterInsertPanel&`; not on the chrome list). Writes the `mst_ins*` / `mst_ins2*` APVTS parameters from the panel's callbacks and refreshes the panel from `mixerEngine` on `MixerOverlay`'s deferred apvts-dirty flush |
 | `HoverStatus` | `mu-core/UI/Components/HoverStatus.h` | Header-only `mu_ui` mouse listener that reports a name and value to the status bar; not on the chrome `.cpp` list |
-| `ChannelSidebar` + `SidebarItem` | `mu-core/UI/` | Shared layers sidebar (product injects the mini-graphic) |
+| `LayerSidebar` + `SidebarItem` | `mu-core/UI/` | Shared layers sidebar (product injects the mini-graphic; was `ChannelSidebar`, renamed per the 2026-10-12 ruling below) |
+| `LayerPanel` | `mu-core/UI/` | Planned (#1506): the per-layer stack (preset strip, product content band, `ModulatorPanel`); see "Shared layer sidebar and layer panel" |
 | `ChannelHeaderBar` | `mu-core/UI/` | Shared per-layer header (name / reset / delete / preset / save) |
 | `VoiceBand` / `VoiceBandSection` | `mu-core/UI/Voice/` | Shared voice band layout + drawing (Pitch / Filter / Amp / Effects) |
 | `InsertSubsection` | `mu-core/UI/Voice/` | Shared insert-effect voice subsection (channel-prefix bound) |
@@ -534,8 +535,8 @@ State of the tree: stages 1 to 3 and 5 are done for mu-Tant, mu-Toni and mu-On, 
    `RhythmSequencer` **with stage 7** (144 uses, same lines the stage touches, so the code moves once);
    `GrooveSequencer` already conforms and mu-Tant has no sequencer class to rename (`GatePattern` is data and stays);
    the Tant `voice` vocabulary: non-UI identifiers (`currentVoice`, `numVoices`, locals) now, `VoicePanel` /
-   `VoiceSidebar` with the shared `LayerSidebar` / `EnginePanel` work in #1266 (the family name for the per-layer
-   sound panel is `EnginePanel`, as in mu-Toni and mu-On; the `ux-controller` confirms mu-Clid's `VoiceSection`);
+   `VoiceSidebar` with the shared `LayerSidebar` / `LayerPanel` work (#1505 / #1506; the per-layer sound panel is
+   now `<Type>Content` inside `LayerPanel`, superseding the earlier `EnginePanel` choice; see the ruling below);
    mu-On's lane / channel wording to `Track` is **folded into #1241**, which rewrites the same code (233 uses),
    not done on its own. The step grid and `GrooveVoices` stay in the processor until #1241 decides the per-layer engine selector.
 3. Stage 6 still waits on Andy for mu-Toni's default layer count (recommended: 1 for a fresh instance, as mu-Tant and
@@ -544,6 +545,81 @@ State of the tree: stages 1 to 3 and 5 are done for mu-Tant, mu-Toni and mu-On, 
 For the combined instance (design-future): none of the above blocks it, and nothing here closes it off. The
 registry adds `typeId` -> `LayerTypeInfo`; the saved `Slot` node gains a `type` attribute (absent = the
 product's own type); the prefix lists become per-type; `layerAs<T>` already asserts the type.
+
+### Shared layer sidebar and layer panel (ruled 2026-10-12, #1505 / #1506)
+
+**Files and names.** `mu-core/UI/LayerSidebar.{h,cpp}` is `ChannelSidebar` renamed (git mv; no alias, no
+second name; the four editors change in the same step). `SidebarItem` keeps its name and file (neutral, role
+suffix correct). `mu-core/UI/LayerPanel.{h,cpp}` is new. `VoiceBand` / `VoiceBandSection` stay in
+`mu-core/UI/Voice/`: they are a content section *inside* the panel's content band (used by mu-Clid's
+`VoiceSection` and mu-Toni), not something `LayerPanel` replaces. `ChannelHeaderBar` is renamed
+`LayerHeaderBar` in a later tidy (it is held by `LayerPanel`, so products stop naming it); not part of this batch.
+No product subclass of either class. Product pieces keep the layer-type noun, in the product's `UI/`:
+`RhythmMiniVisual` (mu-Clid, exists), `PatternMiniVisual` (mu-Tant; the spectrum glyph moves out of
+`VoiceSidebar.cpp`), `ArpMiniVisual` (mu-Toni, replaces the placeholder `LayerGlyph`), `TrackMiniVisual`
+(mu-On). The content band's component is named `<Type>Content` (`RhythmContent`, `PatternContent`,
+`ArpContent`, `TrackContent`) in the product's `UI/`.
+
+**`LayerSidebar` contract.** Constructor `(ProcessorBase&, addLabel)`. Everything it can read comes from
+`ProcessorBase`: count, name, colour index (`getNumChannels` / `getChannelName` / `getChannelColourIndex`;
+rename these to `getNumLayers` etc. with the "Slot in layer APIs" sweep, not here), pending badge
+`proc.hasPendingSwap(i)`, cancel `proc.cancelPendingSwap(i)`, reorder `proc.swapLayers(a, b)`. The only
+product hook is `createMiniVisual(int index, std::function<void()> pulse)` (the visual calls `pulse` on its
+hit edge, so a lambda never captures the sidebar). User-action callbacks stay the editor's:
+`onLayerSelected`, `onAddLayer`, `onLayersReordered`. Drag-reorder is enabled iff `proc.canReorderLayers()`.
+`onSwapChannels`, `isPendingSwap`, `onCancelPendingSwap` and the `onAnimationTick` hook (unused) go.
+Two small `ProcessorBase` changes make this dependency-free: (1) `virtual bool canReorderLayers() const
+{ return canEditLayers(); }` and `swapLayers` becomes virtual (same pattern, and same reason, as the
+virtual `resetLayer`: mu-Clid has not moved its rhythms into the container); mu-Clid overrides both
+(`rhythms.swap`) until its layers move in (layer stage 7), then deletes the overrides. (2) mu-Clid overrides
+`cancelPendingSwap(int)` to forward to `hotSwapStager.cancelStagedSwap`, and its public `cancelStagedSwap`
+wrapper goes. mu-Toni and mu-On (fixed count) inherit `false` and get no drag, as today. Visible behaviour of
+the sidebar does not change in any product; the Add button's visibility rule is not touched here.
+
+**`LayerPanel` contract** (the per-layer stack of design-ui-family §5: header strip 32 / content 464 /
+modulator 318). It owns the preset strip (`ChannelHeaderBar` in its metal strip with end screws), the shared
+`ModulatorPanel`, the band layout, the 30 Hz playhead and pending-swap badge refresh, and the header wiring
+that already exists generically on the processor: name and colour from `Layer` (`name`, `colourIndex`),
+preset list/load/save through `slotPresetFiles` / `loadLayerPreset` / `saveLayerPreset` / `getLayerPresetDir`
+/ `getLayerPresetExtension`, reset through `resetLayer`, delete through `removeLayer` (shown iff
+`canEditLayers()`), rename into `Layer::name`. Product input is exactly: `setContent(juce::Component*)` (the
+464 band, as one component, may be called again so a combined instance can swap content by layer type),
+`setDestProvider(const ModDestProvider*)` (the product's modulation destinations), and callbacks
+`onLayerChanged(int)` (rebind the content's APVTS attachments), `onLayerRemoved(int)`,
+`onStatusUpdate(name, value, colour)`. `setLayer(int)` commits any pending rename, refreshes the header,
+points the modulator panel at `proc.getLayer(i)` and then fires `onLayerChanged`. Because it only calls the
+`ProcessorBase` API, it needs no product header; `mu-core/UI` stays inside the boundary check. Heights come
+from three new `MuLookAndFeel` tokens (`kLayerHeaderStripH` 32, `kLayerModulatorH` 318,
+`kLayerContentH = kChannelPanelH - kLayerHeaderStripH - kLayerModulatorH`, with a `static_assert` that the
+sum is `kChannelPanelH`); `kSidebarW` is the width (fix its stale "mirrored from RhythmSidebar" comment).
+mu-Clid and mu-Tant carry product-only chrome in the old header area (mu-Clid's sample bar and output
+selector, mu-Tant's Root / Scale row): both go *inside* the content component, per the content-band rule.
+
+**Migration order (smallest blast radius first; each numbered step builds on its own).**
+1. Tokens in `MuLookAndFeel` plus the two `ProcessorBase` changes above, with mu-Clid's overrides. No UI
+   change. Unit test: `swapLayers` virtual default still gated by `canEditLayers`.
+2. Sidebar: `git mv` `ChannelSidebar` to `LayerSidebar`, new hook signature, fix the four `PluginEditor`s and
+   `mu-core`, `mu-clid`, `mu-tant` CMake lists (full Debug build, `mu-core` touched). Then drop the subclasses:
+   mu-Toni (placeholder visual; `ArpMiniVisual`), mu-On, mu-Tant (delete `VoiceSidebar.*`, new
+   `PatternMiniVisual`), mu-Clid last (delete `RhythmSidebar.*`; the editor uses `onLayerSelected` etc. in
+   place of the `onRhythm*` aliases). The 30 Hz glyph timers must keep their `stopTimer()` in the destructor.
+   Verify drag-reorder and the staged-swap badge in mu-Clid and mu-Tant by hand.
+3. `LayerPanel` built and adopted in mu-Toni first (smallest `EnginePanel`: it already has header, modulator
+   and `VoiceBand`), then mu-Tant (`VoicePanel` becomes `PatternContent` inside `LayerPanel`, which also
+   delivers the `EnginePanel` family name through `LayerPanel` plus a content class, so the separate rename
+   is not done), then mu-Clid (`RhythmPanel` keeps its drag-and-drop target and circle refresh as the content
+   component; `VoiceSection` stays as the content's voice band). UI only: no `dsp-controller` pass or listening
+   tests; run the unit tests and get the `ux-controller` sign-off on the three bands.
+4. mu-On: sidebar only now. Its per-lane `GroovePanel` shows all lanes at once and is rewritten by the
+   per-layer engine selector work (#1241); it adopts `LayerPanel` there, not before.
+
+**Design-future check.** Easier: this is the one-framework direction (per-product sidebar and panel copies
+become one class; product input is a mini-visual factory, a content component and a destination provider,
+all keyed by layer index, so a combined instance can answer them per layer type without a change to either
+class). Nothing here closes off Link, the controller work (`mu-control` reads the same `ProcessorBase`
+layer API) or the standard UI sizing (the three tokens are that standard). Risk to name: step 2 touches
+`mu-core` and all four products at once, so it is one mechanical commit with no behaviour change; do not mix
+the `getNumChannels` family rename into it.
 
 ## Transport rule — family standard
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "UI/EditorShellBase.h"
-#include "UI/ChannelSidebar.h"     // mu-core shared sidebar
+#include "UI/LayerSidebar.h"     // mu-core shared sidebar
 #include "UI/MixerOverlay.h"       // mu-core shared mixer
 #include "Plugin/PluginProcessor.h"
 #include "UI/GroovePanel.h"
@@ -13,7 +13,7 @@ namespace mu_on
 {
 
 // mu-On editor: the shared mu-core shell (TransportBar / StatusBar / About / overlays /
-// window sizing / MuLookAndFeel) + the shared ChannelSidebar (the four instrument lanes)
+// window sizing / MuLookAndFeel) + the shared LayerSidebar (the four instrument lanes)
 // + shared MixerOverlay, around the GroovePanel (909 grid + per-channel engine controls).
 class PluginEditor : public EditorShellBase
 {
@@ -28,7 +28,7 @@ protected:
 
 private:
     PluginProcessor& proc;
-    ChannelSidebar   sidebar;
+    LayerSidebar   sidebar;
     GroovePanel      groovePanel;
     MixerOverlay     mixerOverlay;
     SettingsOverlay  settingsOverlay;

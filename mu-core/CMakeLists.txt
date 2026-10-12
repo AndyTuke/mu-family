@@ -81,7 +81,7 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/ModMatrixPanel.cpp"
     # Shared left sidebar — product injects the per-layer mini-graphic.
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/SidebarItem.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/ChannelSidebar.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/LayerSidebar.cpp"
     # Shared per-layer header bar (name / reset / delete / preset / save).
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/ChannelHeaderBar.cpp"
     # Shared insert-effect voice subsection (algo dropdown + 4 slot knobs).

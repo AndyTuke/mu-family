@@ -1,7 +1,7 @@
 #pragma once
 
 #include "UI/EditorShellBase.h"
-#include "UI/ChannelSidebar.h"     // mu-core shared sidebar (select/add/delete/reorder)
+#include "UI/LayerSidebar.h"     // mu-core shared sidebar (select/add/delete/reorder)
 #include "UI/MixerOverlay.h"       // mu-core shared mixer
 #include "Plugin/PluginProcessor.h"
 #include "UI/EnginePanel.h"
@@ -11,7 +11,7 @@ namespace mu_toni
 {
 
 // mu-Toni editor: the shared mu-core shell (TransportBar / StatusBar / About /
-// overlays / window sizing / MuLookAndFeel) + the shared ChannelSidebar + shared
+// overlays / window sizing / MuLookAndFeel) + the shared LayerSidebar + shared
 // MixerOverlay, around the EnginePanel carrying the arp / osc / filter / env /
 // insert controls and the modulation band. No bespoke shell or mixer code — the
 // product supplies only the sidebar visual and the engine panel.
@@ -28,7 +28,7 @@ protected:
 
 private:
     PluginProcessor& proc;
-    ChannelSidebar   sidebar;
+    LayerSidebar   sidebar;
     EnginePanel      enginePanel;
     MixerOverlay     mixerOverlay;
     SettingsOverlay  settingsOverlay;

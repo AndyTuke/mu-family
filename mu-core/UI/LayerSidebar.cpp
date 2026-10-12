@@ -1,6 +1,6 @@
-#include "ChannelSidebar.h"
+#include "LayerSidebar.h"
 
-ChannelSidebar::ChannelSidebar(ProcessorBase& processor, const juce::String& addButtonLabel)
+LayerSidebar::LayerSidebar(ProcessorBase& processor, const juce::String& addButtonLabel)
     : proc(processor), addButton(addButtonLabel)
 {
     viewport.setViewedComponent(&itemContainer, false);
@@ -8,7 +8,7 @@ ChannelSidebar::ChannelSidebar(ProcessorBase& processor, const juce::String& add
     addAndMakeVisible(viewport);
     addAndMakeVisible(addButton);
 
-    addButton.onClick = [this] { if (onAddChannel) onAddChannel(); };
+    addButton.onClick = [this] { if (onAddLayer) onAddLayer(); };
 
     // Metal style: every visible item's raised box, all shadows first, then the faces.
     itemContainer.onPaint = [this](juce::Graphics& g)
@@ -29,13 +29,13 @@ ChannelSidebar::ChannelSidebar(ProcessorBase& processor, const juce::String& add
     startTimerHz(5);   // re-sync count + poll pending-swap + product animation tick
 }
 
-juce::Colour ChannelSidebar::colourFor(int i) const
+juce::Colour LayerSidebar::colourFor(int i) const
 {
     const int idx = proc.getChannelColourIndex(i);
     return MuLookAndFeel::channelPalette[(size_t) (idx % MuLookAndFeel::kChannelPaletteSize)];
 }
 
-void ChannelSidebar::refreshItems()
+void LayerSidebar::refreshItems()
 {
     const int prevCount = (int) items.size();
 
@@ -51,17 +51,17 @@ void ChannelSidebar::refreshItems()
         item->setColour(colourFor(i));
         item->setSelected(i == selectedIndex);
         item->setMetalStyle(metal);
-        if (createMiniVisual) item->setMiniVisual(createMiniVisual(i));
+        if (createMiniVisual) item->setMiniVisual(createMiniVisual(i, [this, i] { pulseItem(i); }));
 
         item->onSelected = [this](int idx)
         {
             setSelectedIndex(idx);
-            if (onChannelSelected) onChannelSelected(idx);
+            if (onLayerSelected) onLayerSelected(idx);
         };
         item->onDragStart = [this](int idx, const juce::MouseEvent& e) { onItemDragStart(idx, e); };
         item->onDragMove  = [this](int idx, const juce::MouseEvent& e) { onItemDragMove (idx, e); };
         item->onDragEnd   = [this](int idx, const juce::MouseEvent& e) { onItemDragEnd  (idx, e); };
-        item->onCancelPendingSwap = [this](int idx) { if (onCancelPendingSwap) onCancelPendingSwap(idx); };
+        item->onCancelPendingSwap = [this](int idx) { proc.cancelPendingSwap(idx); };
 
         itemContainer.addAndMakeVisible(item.get());
         items.push_back(std::move(item));
@@ -77,7 +77,7 @@ void ChannelSidebar::refreshItems()
         layoutItems(true, n - 1);
 }
 
-void ChannelSidebar::layoutItems(bool animate, int newItemIndex)
+void LayerSidebar::layoutItems(bool animate, int newItemIndex)
 {
     using mu_ui::s;
     for (int i = 0; i < (int) items.size(); ++i)
@@ -100,27 +100,27 @@ void ChannelSidebar::layoutItems(bool animate, int newItemIndex)
     }
 }
 
-void ChannelSidebar::repaintItems()
+void LayerSidebar::repaintItems()
 {
     for (auto& item : items) item->repaint();
     itemContainer.repaint();
     repaint();
 }
 
-void ChannelSidebar::setSelectedIndex(int i)
+void LayerSidebar::setSelectedIndex(int i)
 {
     selectedIndex = i;
     for (int j = 0; j < (int) items.size(); ++j)
         items[(size_t) j]->setSelected(j == i);
 }
 
-void ChannelSidebar::pulseItem(int idx)
+void LayerSidebar::pulseItem(int idx)
 {
     if (idx >= 0 && idx < (int) items.size())
         items[(size_t) idx]->pulse();
 }
 
-void ChannelSidebar::setMetalStyle(bool m)
+void LayerSidebar::setMetalStyle(bool m)
 {
     metal = m;
     for (auto& item : items) item->setMetalStyle(m);
@@ -129,7 +129,7 @@ void ChannelSidebar::setMetalStyle(bool m)
     itemContainer.repaint();
 }
 
-void ChannelSidebar::paint(juce::Graphics& g)
+void LayerSidebar::paint(juce::Graphics& g)
 {
     using Id = MuLookAndFeel::ColourIds;
     g.setColour(MuLookAndFeel::colour(Id::sidebarBackground));
@@ -144,7 +144,7 @@ void ChannelSidebar::paint(juce::Graphics& g)
     g.drawLine((float) (getWidth() - 1), 0.0f, (float) (getWidth() - 1), (float) getHeight(), 1.0f);
 }
 
-void ChannelSidebar::paintOverChildren(juce::Graphics& g)
+void LayerSidebar::paintOverChildren(juce::Graphics& g)
 {
     // Panel screws over the items, set into the painted border.
     if (metal && MuLookAndFeel::hasScrews(*this))
@@ -176,9 +176,9 @@ void ChannelSidebar::paintOverChildren(juce::Graphics& g)
     }
 }
 
-void ChannelSidebar::onItemDragStart(int sourceIndex, const juce::MouseEvent& e)
+void LayerSidebar::onItemDragStart(int sourceIndex, const juce::MouseEvent& e)
 {
-    if (! onSwapChannels) return;   // reordering disabled for this product
+    if (! proc.canReorderLayers()) return;   // reordering disabled for this product
     if (sourceIndex < 0 || sourceIndex >= (int) items.size()) return;
 
     dragPhase = DragPhase::Dragging;
@@ -193,7 +193,7 @@ void ChannelSidebar::onItemDragStart(int sourceIndex, const juce::MouseEvent& e)
     repaint();
 }
 
-void ChannelSidebar::onItemDragMove(int sourceIndex, const juce::MouseEvent& e)
+void LayerSidebar::onItemDragMove(int sourceIndex, const juce::MouseEvent& e)
 {
     if (dragPhase != DragPhase::Dragging) return;
     auto* src = (sourceIndex >= 0 && sourceIndex < (int) items.size())
@@ -206,7 +206,7 @@ void ChannelSidebar::onItemDragMove(int sourceIndex, const juce::MouseEvent& e)
     repaint();
 }
 
-void ChannelSidebar::onItemDragEnd(int sourceIndex, const juce::MouseEvent&)
+void LayerSidebar::onItemDragEnd(int sourceIndex, const juce::MouseEvent&)
 {
     if (dragPhase != DragPhase::Dragging) { cancelDrag(); return; }
 
@@ -216,14 +216,14 @@ void ChannelSidebar::onItemDragEnd(int sourceIndex, const juce::MouseEvent&)
         cancelDrag();
 }
 
-int ChannelSidebar::computeTargetIndex(int containerLocalY) const
+int LayerSidebar::computeTargetIndex(int containerLocalY) const
 {
     if (items.empty()) return 0;
     const int pitch = itemBounds(1).getY() - itemBounds(0).getY();
     return juce::jlimit(0, (int) items.size() - 1, (containerLocalY - itemGap / 2) / juce::jmax(1, pitch));
 }
 
-void ChannelSidebar::commitDrag()
+void LayerSidebar::commitDrag()
 {
     const int src = dragSourceIndex;
     const int dst = dragTargetIndex;
@@ -233,7 +233,7 @@ void ChannelSidebar::commitDrag()
     {
         for (int i = src; i < dst; ++i)
         {
-            if (onSwapChannels) onSwapChannels(i, i + 1);
+            proc.swapLayers(i, i + 1);
             if (newSelected == i)          newSelected = i + 1;
             else if (newSelected == i + 1) newSelected = i;
         }
@@ -242,7 +242,7 @@ void ChannelSidebar::commitDrag()
     {
         for (int i = src; i > dst; --i)
         {
-            if (onSwapChannels) onSwapChannels(i - 1, i);
+            proc.swapLayers(i - 1, i);
             if (newSelected == i)          newSelected = i - 1;
             else if (newSelected == i - 1) newSelected = i;
         }
@@ -255,11 +255,11 @@ void ChannelSidebar::commitDrag()
 
     refreshItems();
     setSelectedIndex(newSelected);
-    if (onChannelsReordered) onChannelsReordered(newSelected);
+    if (onLayersReordered) onLayersReordered(newSelected);
     repaint();
 }
 
-void ChannelSidebar::cancelDrag()
+void LayerSidebar::cancelDrag()
 {
     dragPhase = DragPhase::Idle;
     dragSourceIndex = -1;
@@ -268,7 +268,7 @@ void ChannelSidebar::cancelDrag()
     repaint();
 }
 
-void ChannelSidebar::resized()
+void LayerSidebar::resized()
 {
     using mu_ui::s;
     const int w  = getWidth();
@@ -277,9 +277,9 @@ void ChannelSidebar::resized()
     const int ah = s(kAddBtnH);
 
     // Hide the Add button (and expand the viewport to fill) when the product
-    // hasn't wired onAddChannel — avoids a visible, interactive control that
+    // hasn't wired onAddLayer — avoids a visible, interactive control that
     // does nothing (e.g. mu-toni with no engine yet defined).
-    const bool showAdd = static_cast<bool>(onAddChannel);
+    const bool showAdd = static_cast<bool>(onAddLayer);
     addButton.setVisible(showAdd);
 
     // Metal style keeps the items and the Add button clear of the painted border, and
@@ -313,14 +313,14 @@ void ChannelSidebar::resized()
         items[(size_t) i]->setBounds(itemBounds(i));
 }
 
-juce::Rectangle<int> ChannelSidebar::itemBounds(int i) const
+juce::Rectangle<int> LayerSidebar::itemBounds(int i) const
 {
     using mu_ui::s;
     const int ih = s(kItemH);
     return { itemInsetX, itemGap + i * (ih + itemGap), itemContainer.getWidth() - 2 * itemInsetX, ih };
 }
 
-void ChannelSidebar::timerCallback()
+void LayerSidebar::timerCallback()
 {
     // Re-sync if the channel count changed outside the editor (e.g. host
     // setStateInformation after the editor opened).
@@ -330,14 +330,14 @@ void ChannelSidebar::timerCallback()
     // Keep the Add button's demo-cap state current even when the count didn't
     // change through us (host state restore can flip licensing-relevant state).
 
-    // Sync Add button visibility in case onAddChannel was wired (or cleared)
+    // Sync Add button visibility in case onAddLayer was wired (or cleared)
     // after the last resized() call.
-    if (addButton.isVisible() != static_cast<bool>(onAddChannel))
+    if (addButton.isVisible() != static_cast<bool>(onAddLayer))
         resized();
 
-    if (isPendingSwap)
-        for (int i = 0; i < (int) items.size(); ++i)
-            items[(size_t) i]->setPendingSwap(isPendingSwap(i));
+    // Show the staging badge on every layer whose preset swap is waiting for its boundary.
+    for (int i = 0; i < (int) items.size(); ++i)
+        items[(size_t) i]->setPendingSwap(proc.hasPendingSwap(i));
 
     if (onAnimationTick) onAnimationTick();
 }

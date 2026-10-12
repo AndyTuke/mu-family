@@ -45,13 +45,13 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     // Per-layer mini-graphic for the shared sidebar (placeholder until a real arp
     // visual is designed). Reorder/add stay unwired — the layer set is fixed.
-    sidebar.createMiniVisual = [&p](int i) -> std::unique_ptr<juce::Component>
+    sidebar.createMiniVisual = [&p](int i, std::function<void()>) -> std::unique_ptr<juce::Component>
     {
         const auto col = MuLookAndFeel::channelPalette[
             (size_t) (p.getChannelColourIndex(i) % MuLookAndFeel::kChannelPaletteSize)];
         return std::make_unique<LayerGlyph>(col, i);
     };
-    sidebar.onChannelSelected = [this](int idx) { enginePanel.setLayer(idx); };
+    sidebar.onLayerSelected = [this](int idx) { enginePanel.setLayer(idx); };
     sidebar.refreshItems();
 
     // Engine-panel knob hovers/changes → shared StatusBar.
