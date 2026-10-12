@@ -6,6 +6,7 @@
 #include "Tests/ProcessorSeamHelpers.h"
 #include "Audio/InsertSlotConfig.h"
 
+#include <array>
 #include <cstdlib>
 #include <new>
 #include <random>
@@ -104,6 +105,7 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         parameterChangedFromAudioThread();
         rhythmEditsKeepApvtsInStep();
         removeShiftsRetiredTails();
+        removeVersusProcessBlockWithTails();
         removeReseedsShiftedEngines();
     }
 
@@ -193,6 +195,63 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         p.rhythms.remove(1);
         expect(p.retiredVoiceEngines[0][0].get() == t1a, "the lower slot keeps its tail");
         expect(p.retiredVoiceEngines[1][0] == nullptr && ! p.retiredReadyForCleanup[1][0].load(), "the removed last slot holds no tail and no flag");
+    }
+
+    // remove() shifts tails, drained flags and channel strips under rhythmsLock while processBlock renders
+    // those tails under its try-lock; each slot's tail identity and raised flag must land on the slot below.
+    void removeVersusProcessBlockWithTails()
+    {
+        beginTest("remove vs processBlock with populated tails and raised flags: no half-shifted or misattributed tail");
+        TempStorage storage;
+        ExposedPluginProcessor p;
+        constexpr int kBlock = 128;
+        constexpr int kTails = 2;
+        p.prepareToPlay(48000.0, kBlock);
+        RunningPlayHead host(48000.0, kBlock);
+
+        for (int round = 0; round < 3; ++round)
+        {
+            // Fill the slots (stopped, so the test is the only writer): two prepared tails per slot, slot s's first flagged.
+            while (p.getNumRhythms() < 4) p.rhythms.add(mu_clid::Rhythm());
+            const int n = p.getNumRhythms();
+            std::vector<std::array<VoiceEngine*, kTails>> expected((size_t) n);
+            for (int s = 0; s < n; ++s)
+                for (int i = 0; i < kTails; ++i)
+                {
+                    auto& slot = p.retiredVoiceEngines[(size_t) s][(size_t) i];
+                    slot = std::make_unique<VoiceEngine>();
+                    slot->prepareToPlay(48000.0, kBlock);
+                    expected[(size_t) s][(size_t) i] = slot.get();
+                    p.retiredReadyForCleanup[(size_t) s][(size_t) i].store(i == 0);
+                }
+
+            p.setPlayHead(&host);
+            BlockRenderer renderer(p, kBlock);
+            renderer.start();
+            expect(renderer.waitForBlocks(2), "the audio thread renders before the removes");
+
+            // Remove the bottom slot while it runs; the tails of every later slot must shift down one.
+            while (p.getNumRhythms() > 1)
+            {
+                p.rhythms.remove(0);
+                expect(renderer.waitForBlocks(1), "the audio thread was not stalled by the remove");
+                expected.erase(expected.begin());
+            }
+            renderer.stop();
+            p.setPlayHead(nullptr);
+            expect(! renderer.sawInsaneOutput(), "output stayed finite and bounded");
+
+            for (size_t s = 0; s < expected.size(); ++s)
+                for (size_t i = 0; i < (size_t) kTails; ++i)
+                {
+                    expect(p.retiredVoiceEngines[s][i].get() == expected[s][i], "each tail sits on the slot its rhythm moved to");
+                    expect(i != 0 || p.retiredReadyForCleanup[s][i].load(), "a raised flag moved with its engine");
+                }
+            for (size_t s = 1; s < (size_t) mu_limits::kMaxLayers; ++s)
+                for (size_t i = 0; i < (size_t) kTails; ++i)
+                    expect(p.retiredVoiceEngines[s][i] == nullptr && ! p.retiredReadyForCleanup[s][i].load(),
+                           "vacated slots hold no tail and no flag");
+        }
     }
 
     // The noise inserts seed from the slot index, so a rhythm shifted down by remove() must sound as a
