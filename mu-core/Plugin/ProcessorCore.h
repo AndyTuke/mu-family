@@ -43,15 +43,15 @@ public:
 
     // Host transport as last seen by processBlock, for the UI (TransportBar). The UI must never
     // call getPlayHead() itself: the playhead is only valid on the audio thread during a block.
-    bool isHostPlaying() const { return hostPlaying.load(std::memory_order_relaxed); }
+    bool isHostPlaying() const noexcept { return hostPlaying.load(std::memory_order_relaxed); }
     // Host meter (4/4 when the host gives none) and current bar start; false = no bar start.
-    void getHostTimeSignature(int& numerator, int& denominator) const
+    void getHostTimeSignature(int& numerator, int& denominator) const noexcept
     {
         const int packed = hostTimeSig.load(std::memory_order_relaxed);
         numerator   = packed >> 8;
         denominator = packed & 0xFF;
     }
-    bool getHostBarStartPpq(double& ppq) const
+    bool getHostBarStartPpq(double& ppq) const noexcept
     {
         const double v = hostBarStart.load(std::memory_order_relaxed);
         if (std::isnan(v)) return false;
@@ -59,7 +59,7 @@ public:
         return true;
     }
     // Host beat position in quarter notes; false when the host supplied none.
-    bool getHostPpqPosition(double& ppq) const
+    bool getHostPpqPosition(double& ppq) const noexcept
     {
         const double v = hostPpq.load(std::memory_order_relaxed);
         if (std::isnan(v)) return false;

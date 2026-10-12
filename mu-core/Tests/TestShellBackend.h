@@ -32,29 +32,29 @@ struct TestShellBackend : mu_core::ShellBackend
     double hostPpq = 0.0;
     bool   hostHasPpq = false;
 
-    bool   isStandaloneApp() const override { return standalone; }
-    bool   isInternalPlaying() const override { return playing; }
+    bool   isStandaloneApp() const noexcept override { return standalone; }
+    bool   isInternalPlaying() const noexcept override { return playing; }
     void   toggleInternalPlay() override { playing = ! playing; if (! playing) beat = 0.0; }
-    double getInternalBpm() const override { return bpm; }
+    double getInternalBpm() const noexcept override { return bpm; }
     void   setInternalBpm(double b) override { bpm = b; }
-    double getInternalBeatPos() const override { return beat; }
-    void   getTimeSignature(int& n, int& d) const override { n = sigNum; d = sigDen; }
+    double getInternalBeatPos() const noexcept override { return beat; }
+    void   getTimeSignature(int& n, int& d) const noexcept override { n = sigNum; d = sigDen; }
     void   setTimeSignature(int n, int d) override { sigNum = n; sigDen = d; }
     void   setNudgeDirection(int dir) override { nudge = dir; ++nudgeSets; }
 
-    bool   getMidiSyncEnabled() const override { return syncEnabled; }
-    int    getMidiSyncMessages() const override { return syncMessages; }
-    double getMidiClockBpm() const override { return clockBpm; }
-    bool   isMidiClockPlaying() const override { return clockPlaying; }
-    MidiClockSync::ClockState getMidiClockState() const override { return clockState; }
+    bool   getMidiSyncEnabled() const noexcept override { return syncEnabled; }
+    int    getMidiSyncMessages() const noexcept override { return syncMessages; }
+    double getMidiClockBpm() const noexcept override { return clockBpm; }
+    bool   isMidiClockPlaying() const noexcept override { return clockPlaying; }
+    MidiClockSync::ClockState getMidiClockState() const noexcept override { return clockState; }
     void   setMidiSyncEnabled(bool on) override { syncEnabled = on; }
     void   setMidiSyncMessages(int mode) override { syncMessages = mode; }
-    int    getSyncOffsetMs() const override { return syncOffset; }
+    int    getSyncOffsetMs() const noexcept override { return syncOffset; }
     void   setSyncOffsetMs(int ms) override { syncOffset = ms; }
 
     // Host reads: overridden only so a test can play a host; the defaults are "no host".
-    bool   isHostPlaying() const override { return hostPlay; }
-    bool   getHostPpqPosition(double& ppq) const override { if (! hostHasPpq) return false; ppq = hostPpq; return true; }
+    bool   isHostPlaying() const noexcept override { return hostPlay; }
+    bool   getHostPpqPosition(double& ppq) const noexcept override { if (! hostHasPpq) return false; ppq = hostPpq; return true; }
 
     float  getUiScale() const override { return uiScale; }
     void   setUiScale(float s) override { uiScale = s; ++uiScaleSets; if (onUiScaleChanged) onUiScaleChanged(s); }
@@ -84,6 +84,6 @@ struct TestShellBackend : mu_core::ShellBackend
 struct MinimalShellBackend : TestShellBackend
 {
     using TestShellBackend::TestShellBackend;
-    bool isHostPlaying() const override { return mu_core::ShellBackend::isHostPlaying(); }
-    bool getHostPpqPosition(double& ppq) const override { return mu_core::ShellBackend::getHostPpqPosition(ppq); }
+    bool isHostPlaying() const noexcept override { return mu_core::ShellBackend::isHostPlaying(); }
+    bool getHostPpqPosition(double& ppq) const noexcept override { return mu_core::ShellBackend::getHostPpqPosition(ppq); }
 };

@@ -52,10 +52,10 @@ public:
     static constexpr double kClockLostMs = 500.0;
 
     //==========================================================================
-    bool isStandaloneApp() const override { return true; }
+    bool isStandaloneApp() const noexcept override { return true; }
 
     // ─── Transport: the master clock ─────────────────────────────────────────
-    bool isInternalPlaying() const override
+    bool isInternalPlaying() const noexcept override
     {
         return external() ? server.externalRunning() : playRequested;
     }
@@ -69,7 +69,7 @@ public:
             server.rewind();
     }
 
-    double getInternalBpm() const override { return bpmRequested; }
+    double getInternalBpm() const noexcept override { return bpmRequested; }
 
     void setInternalBpm(double bpm) override
     {
@@ -78,13 +78,13 @@ public:
     }
 
     // The beat at the start of the last rendered block; 0 until the bus is up.
-    double getInternalBeatPos() const override
+    double getInternalBeatPos() const noexcept override
     {
         if (! server.hasBus()) return 0.0;
         return readTransport(server.sharedMemory().transport()).ppqPosition;
     }
 
-    void getTimeSignature(int& numerator, int& denominator) const override { numerator = 4; denominator = 4; }
+    void getTimeSignature(int& numerator, int& denominator) const noexcept override { numerator = 4; denominator = 4; }
     void setTimeSignature(int, int) override {}   // fixed 4/4
 
     // While a nudge button is held the master tempo bends, as the products' internal transport does.
@@ -95,7 +95,7 @@ public:
     }
 
     // ─── Clock sync: Internal / MIDI In ──────────────────────────────────────
-    bool getMidiSyncEnabled() const override { return external(); }
+    bool getMidiSyncEnabled() const noexcept override { return external(); }
     void setMidiSyncEnabled(bool on) override
     {
         server.setClockSource(on ? ClockSource::ExternalMidi : ClockSource::Internal);
@@ -104,15 +104,15 @@ public:
     }
 
     // Under MIDI In the master follows the incoming clock and transport, so the mode is fixed.
-    int  getMidiSyncMessages() const override { return 2; }   // Clock + Transport
+    int  getMidiSyncMessages() const noexcept override { return 2; }   // Clock + Transport
     void setMidiSyncMessages(int) override {}
 
-    double getMidiClockBpm()    const override { return server.externalBpm(); }
-    bool   isMidiClockPlaying() const override { return server.externalRunning(); }
+    double getMidiClockBpm()    const noexcept override { return server.externalBpm(); }
+    bool   isMidiClockPlaying() const noexcept override { return server.externalRunning(); }
 
     // Waiting until a pulse is heard, Locked while pulses arrive, Lost once they stop. (Drifting needs
     // the server's phase error, which the server does not publish yet.)
-    MidiClockSync::ClockState getMidiClockState() const override
+    MidiClockSync::ClockState getMidiClockState() const noexcept override
     {
         using S = MidiClockSync::ClockState;
         if (! external()) return S::Off;
@@ -124,7 +124,7 @@ public:
         return (now - lastPulseMs > kClockLostMs) ? S::Lost : S::Locked;
     }
 
-    int  getSyncOffsetMs() const override { return server.syncOffsetMs(); }
+    int  getSyncOffsetMs() const noexcept override { return server.syncOffsetMs(); }
     void setSyncOffsetMs(int ms) override
     {
         server.setSyncOffsetMs(std::clamp(ms, kSyncOffsetMinMs, kSyncOffsetMaxMs));

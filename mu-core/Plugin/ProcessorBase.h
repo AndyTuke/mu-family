@@ -137,26 +137,26 @@ public:
 
     // Internal transport (TransportBar play / BPM controls): a free-running clock each product
     // advances in processBlock while no host / MIDI clock drives it. Stopping resets the beat.
-    bool   isInternalPlaying()      const override { return internalPlaying.load(std::memory_order_relaxed); }
+    bool   isInternalPlaying()      const noexcept override { return internalPlaying.load(std::memory_order_relaxed); }
     void   toggleInternalPlay() override
     {
         const bool now = ! internalPlaying.load(std::memory_order_relaxed);
         internalPlaying.store(now, std::memory_order_relaxed);
         if (! now) internalBeatPos.store(0.0, std::memory_order_relaxed);   // restart patterns cleanly
     }
-    double getInternalBpm()         const override { return internalBpm.load(std::memory_order_relaxed); }
+    double getInternalBpm()         const noexcept override { return internalBpm.load(std::memory_order_relaxed); }
     void   setInternalBpm(double bpm) override     { internalBpm.store(juce::jlimit(20.0, 300.0, bpm), std::memory_order_relaxed); }
-    double getInternalBeatPos()     const override { return internalBeatPos.load(std::memory_order_relaxed); }
+    double getInternalBeatPos()     const noexcept override { return internalBeatPos.load(std::memory_order_relaxed); }
 
     // The standalone wrapper owns the transport; a plugin mirrors the host's.
-    bool isStandaloneApp() const override { return wrapperType == wrapperType_Standalone; }
+    bool isStandaloneApp() const noexcept override { return wrapperType == wrapperType_Standalone; }
 
     // The host transport readers live in ProcessorCore (non-virtual there); these forward to them so
     // the shell chrome reads them through the ShellBackend interface.
-    bool isHostPlaying() const override { return ProcessorCore::isHostPlaying(); }
-    void getHostTimeSignature(int& numerator, int& denominator) const override { ProcessorCore::getHostTimeSignature(numerator, denominator); }
-    bool getHostBarStartPpq(double& ppq) const override { return ProcessorCore::getHostBarStartPpq(ppq); }
-    bool getHostPpqPosition(double& ppq) const override { return ProcessorCore::getHostPpqPosition(ppq); }
+    bool isHostPlaying() const noexcept override { return ProcessorCore::isHostPlaying(); }
+    void getHostTimeSignature(int& numerator, int& denominator) const noexcept override { ProcessorCore::getHostTimeSignature(numerator, denominator); }
+    bool getHostBarStartPpq(double& ppq) const noexcept override { return ProcessorCore::getHostBarStartPpq(ppq); }
+    bool getHostPpqPosition(double& ppq) const noexcept override { return ProcessorCore::getHostPpqPosition(ppq); }
 
     // The family bus layout: at most one sidechain input (stereo or disabled) and a stereo
     // main output. Products with extra output buses (mu-Clid's multi-out) override it.
@@ -172,23 +172,23 @@ public:
 
     // MIDI clock sync (standalone) — shared by every product; the enable / messages choices
     // are saved in the app settings file.
-    bool   getMidiSyncEnabled()  const override { return midiClockSync.isEnabled(); }
-    int    getMidiSyncMessages() const override { return midiClockSync.getMessages(); }
-    double getMidiClockBpm()     const override { return midiClockSync.getBpm(); }
-    bool   isMidiClockPlaying()  const override { return midiClockSync.isPlaying(); }
-    MidiClockSync::ClockState getMidiClockState() const override { return midiClockSync.getClockState(); }
+    bool   getMidiSyncEnabled()  const noexcept override { return midiClockSync.isEnabled(); }
+    int    getMidiSyncMessages() const noexcept override { return midiClockSync.getMessages(); }
+    double getMidiClockBpm()     const noexcept override { return midiClockSync.getBpm(); }
+    bool   isMidiClockPlaying()  const noexcept override { return midiClockSync.isPlaying(); }
+    MidiClockSync::ClockState getMidiClockState() const noexcept override { return midiClockSync.getClockState(); }
     void   setMidiSyncEnabled(bool on) override;
     void   setMidiSyncMessages(int mode) override;
 
     // Sync offset (standalone, saved in the app settings): how many ms the app plays EARLIER than the
     // external clock says, to cancel the audio output latency. Applied to the resolved beat under MIDI clock.
     // The range (kSyncOffsetMinMs / MaxMs) is declared on ShellBackend.
-    int    getSyncOffsetMs() const override { return syncOffsetMs.load(std::memory_order_relaxed); }
+    int    getSyncOffsetMs() const noexcept override { return syncOffsetMs.load(std::memory_order_relaxed); }
     void   setSyncOffsetMs(int ms) override;
 
     // The standalone transport's meter (saved): changes the displayed bar.beat.sixteenth only, patterns
     // stay four beats a bar. A plugin reads the host's meter instead.
-    void   getTimeSignature(int& numerator, int& denominator) const override
+    void   getTimeSignature(int& numerator, int& denominator) const noexcept override
     {
         const int packed = timeSignature.load(std::memory_order_relaxed);
         numerator = packed >> 8;  denominator = packed & 0xFF;

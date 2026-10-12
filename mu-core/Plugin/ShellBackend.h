@@ -22,45 +22,47 @@ public:
     // True for a standalone app: the bar then shows the internal transport (BPM, Play, Tap,
     // Nudge) and the position of the internal clock. False for a plugin, whose host owns the
     // transport (the bar then mirrors the host).
-    virtual bool isStandaloneApp() const = 0;
+    virtual bool isStandaloneApp() const noexcept = 0;
 
+    // The getters marked noexcept are the ones the audio thread reads (the block's transport and
+    // sync reads), so an override must not throw or allocate.
     // ─── Transport ───────────────────────────────────────────────────────────
     // Internal transport: a free-running clock the app advances while no host / MIDI clock
     // drives it. Stopping resets the beat.
-    virtual bool   isInternalPlaying()  const = 0;
+    virtual bool   isInternalPlaying()  const noexcept = 0;
     virtual void   toggleInternalPlay()       = 0;
-    virtual double getInternalBpm()     const = 0;
+    virtual double getInternalBpm()     const noexcept = 0;
     virtual void   setInternalBpm(double bpm) = 0;
-    virtual double getInternalBeatPos() const = 0;
+    virtual double getInternalBeatPos() const noexcept = 0;
 
     // The standalone transport's meter: changes the displayed bar.beat.sixteenth only.
-    virtual void   getTimeSignature(int& numerator, int& denominator) const = 0;
+    virtual void   getTimeSignature(int& numerator, int& denominator) const noexcept = 0;
     virtual void   setTimeSignature(int numerator, int denominator)         = 0;
 
     // Nudge buttons (standalone): -1 slower, +1 faster while held, 0 released.
     virtual void   setNudgeDirection(int direction) = 0;
 
     // ─── Clock sync (standalone) ─────────────────────────────────────────────
-    virtual bool   getMidiSyncEnabled()  const = 0;
-    virtual int    getMidiSyncMessages() const = 0;   // 0 = clock only, 1 = transport only, 2 = both
-    virtual double getMidiClockBpm()     const = 0;
-    virtual bool   isMidiClockPlaying()  const = 0;
-    virtual MidiClockSync::ClockState getMidiClockState() const = 0;
+    virtual bool   getMidiSyncEnabled()  const noexcept = 0;
+    virtual int    getMidiSyncMessages() const noexcept = 0;   // 0 = clock only, 1 = transport only, 2 = both
+    virtual double getMidiClockBpm()     const noexcept = 0;
+    virtual bool   isMidiClockPlaying()  const noexcept = 0;
+    virtual MidiClockSync::ClockState getMidiClockState() const noexcept = 0;
     virtual void   setMidiSyncEnabled(bool on)    = 0;
     virtual void   setMidiSyncMessages(int mode)  = 0;
 
     // Sync offset: how many ms the app plays EARLIER than the external clock says, to cancel
     // the audio output latency.
     static constexpr int kSyncOffsetMinMs = -50, kSyncOffsetMaxMs = 250;
-    virtual int    getSyncOffsetMs() const = 0;
+    virtual int    getSyncOffsetMs() const noexcept = 0;
     virtual void   setSyncOffsetMs(int ms) = 0;
 
     // ─── Host transport (plugins) ────────────────────────────────────────────
     // Defaulted to "no host": an app without one never overrides them.
-    virtual bool   isHostPlaying() const { return false; }
-    virtual void   getHostTimeSignature(int& numerator, int& denominator) const { numerator = 4; denominator = 4; }
-    virtual bool   getHostBarStartPpq(double& ppq) const { juce::ignoreUnused(ppq); return false; }
-    virtual bool   getHostPpqPosition(double& ppq) const { juce::ignoreUnused(ppq); return false; }
+    virtual bool   isHostPlaying() const noexcept { return false; }
+    virtual void   getHostTimeSignature(int& numerator, int& denominator) const noexcept { numerator = 4; denominator = 4; }
+    virtual bool   getHostBarStartPpq(double& ppq) const noexcept { juce::ignoreUnused(ppq); return false; }
+    virtual bool   getHostPpqPosition(double& ppq) const noexcept { juce::ignoreUnused(ppq); return false; }
 
     // ─── Display ─────────────────────────────────────────────────────────────
     static constexpr float kUiScaleMedium = 1.0f;
