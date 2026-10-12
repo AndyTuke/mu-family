@@ -84,6 +84,10 @@ struct ClidScriptedEditRenderTests : juce::UnitTest
         setParam(p.apvts, "ch1_pan", 0.6f);
         setParam(p.apvts, "ch2_lvl", 0.7f);
         setParam(p.apvts, "ch2_scSrc", 1.0f);   // strip 2 ducks from layer 0
+        // MU_SCRIPTED_EDIT_SC=1 makes the ducking audible, to compare how an edit treats the envelope of a moved strip.
+        const bool duck = juce::SystemStats::getEnvironmentVariable("MU_SCRIPTED_EDIT_SC", {}).isNotEmpty();
+        if (duck)
+            setParam(p.apvts, "ch2_scAmt", 1.0f);
 
         std::vector<float> out;
         out.reserve((size_t) kBlocks * kBlock * 2);
@@ -93,7 +97,15 @@ struct ClidScriptedEditRenderTests : juce::UnitTest
         {
             switch (b)
             {
-                case  60: editAdd(p); p.applyRhythmPreset(presets.getChildFile("T12.muRhythm"), 3); break;
+                case  60:
+                    editAdd(p);
+                    p.applyRhythmPreset(presets.getChildFile("T12.muRhythm"), 3);
+                    if (duck)
+                    {
+                        setParam(p.apvts, "ch3_scSrc", 2.0f);   // strip 3 ducks from layer 1, which later edits move and reset
+                        setParam(p.apvts, "ch3_scAmt", 1.0f);
+                    }
+                    break;
                 case 110: editSwap(p, 0, 2); break;
                 case 150: editReset(p, 1); setParam(p.apvts, "ch1_pan", 0.6f); break;   // a reset also returns the strip to its defaults
                 case 190: p.applyRhythmPreset(presets.getChildFile("T13.muRhythm"), 1); break;   // retires slot 1's engine into a tail
@@ -118,8 +130,62 @@ struct ClidScriptedEditRenderTests : juce::UnitTest
         return out;
     }
 
+    // Two strips duck from layer 0; the middle layer is deleted mid-play, so the second ducked strip lands in the
+    // slot of the first (whose follower state is its own, not the strip's). Returns the samples either side of the edit.
+    static std::vector<float> renderDuckedMove(const juce::File& presets)
+    {
+        TempStorage storage;
+        ScriptedProcessor p;
+        constexpr int kBlock = 512;
+        constexpr int kBlocks = 140;
+        p.prepareToPlay(48000.0, kBlock);
+        RunningPlayHead host(48000.0, kBlock);
+        p.setPlayHead(&host);
+        p.getSamplesDir().createDirectory();
+        writeSample(p, "Hat 01.wav", 5200.0);
+        writeSample(p, "Kick 01.wav", 70.0);
+        writeSample(p, "Synth C 01.wav", 261.6);
+        p.loadPreset(presets.getChildFile("A3_filter.muClid"));
+        editAdd(p);
+        editAdd(p);
+        p.applyRhythmPreset(presets.getChildFile("T11.muRhythm"), 1);
+        p.applyRhythmPreset(presets.getChildFile("T13.muRhythm"), 2);
+        for (const char* ch : { "ch1", "ch2" })
+        {
+            setParam(p.apvts, juce::String(ch) + "_scSrc", 1.0f);   // ducks from layer 0
+            setParam(p.apvts, juce::String(ch) + "_scAmt", 1.0f);
+        }
+
+        std::vector<float> out;
+        juce::AudioBuffer<float> buf(2, kBlock);
+        juce::MidiBuffer midi;
+        for (int b = 0; b < kBlocks; ++b)
+        {
+            if (b == 70) editRemove(p, 1);
+            buf.clear();
+            midi.clear();
+            p.processBlock(buf, midi);
+            p.drainDeferredWork();
+            for (int i = 0; i < kBlock; ++i) { out.push_back(buf.getSample(0, i)); out.push_back(buf.getSample(1, i)); }
+        }
+        p.setPlayHead(nullptr);
+        p.releaseResources();
+        return out;
+    }
+
     void runTest() override
     {
+        if (auto out = juce::SystemStats::getEnvironmentVariable("MU_DUCKED_MOVE_OUT", {}); out.isNotEmpty())
+        {
+            const auto presets = presetsDir();
+            const auto d = renderDuckedMove(presets);
+            juce::File f(out);
+            f.deleteFile();
+            if (auto os = f.createOutputStream())
+                os->write(d.data(), d.size() * sizeof(float));
+            logMessage("wrote ducked-move render " + f.getFullPathName());
+        }
+
         beginTest("the scripted add / reorder / reset / delete render is audible, sane and repeatable");
         const auto presets = presetsDir();
         expect(presets.isDirectory(), "tests/presets found");
