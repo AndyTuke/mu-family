@@ -68,6 +68,13 @@ public:
     virtual float  getUiScale() const = 0;
     virtual void   setUiScale(float scale) = 0;
 
+    // ─── Master level (the settings page's Audio row) ────────────────────────
+    // Linear gain 0..1. A backend with no master level leaves hasMasterLevel false and the page
+    // shows no master-volume row.
+    virtual bool   hasMasterLevel() const { return false; }
+    virtual float  getMasterLevel() const { return 1.0f; }
+    virtual void   setMasterLevel(float level) { juce::ignoreUnused(level); }
+
     // ─── Presets (what the transport bar's preset dropdown reads) ────────────
     virtual juce::File   getPresetsDir()          const = 0;
     virtual juce::String getFullPresetExtension() const = 0;

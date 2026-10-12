@@ -3,49 +3,51 @@
 namespace mu_ui
 {
 
-StandardSettingsOverlay::StandardSettingsOverlay(ProcessorBase& p, Options options)
-    : proc(p),
-      isStandalone(p.wrapperType == juce::AudioProcessor::wrapperType_Standalone)
+StandardSettingsOverlay::StandardSettingsOverlay(mu_core::ShellBackend& backend, Options options)
+    : proc(backend),
+      isStandalone(backend.isStandaloneApp()),
+      opts(options)
 {
-    // ── Audio — master volume. Reads / writes mstr_lvl directly: a SliderAttachment would
-    //    replace the dB readout with the parameter's raw formatter. Midpoint skew at 0.5
-    //    (-6 dB) gives fader-like resolution.
-    masterVolKnob.setRange(0.0, 1.0, 0.001);
-    masterVolKnob.getSlider().setSkewFactorFromMidPoint(0.5);
-    masterVolKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
-        if (v <= 0.0) return "-inf dB";
-        return juce::String(20.0 * std::log10(v), 1) + " dB";
-    };
-    if (auto* raw = proc.apvts.getRawParameterValue("mstr_lvl"))
-        masterVolKnob.setValue(*raw, juce::dontSendNotification);
-    masterVolKnob.onValueChanged = [this](double v) {
-        if (auto* param = proc.apvts.getParameter("mstr_lvl"))
-            param->setValueNotifyingHost(param->convertTo0to1((float) v));
-    };
-    addAndMakeVisible(masterVolKnob);
-    general.push_back({ "Audio", 64, [this](const Rows& r) {
-        masterVolKnob.setBounds(r.labelX, r.area.getY(),
-                                s(MuLookAndFeel::kKnobSize2W), s(MuLookAndFeel::kKnobSize2H)); } });
+    // ── Audio — master volume, only when the backend has a master level. The backend reads and
+    //    writes the level itself: a SliderAttachment would replace the dB readout with the
+    //    parameter's raw formatter. Midpoint skew at 0.5 (-6 dB) gives fader-like resolution.
+    if (proc.hasMasterLevel())
+    {
+        masterVolKnob.setRange(0.0, 1.0, 0.001);
+        masterVolKnob.getSlider().setSkewFactorFromMidPoint(0.5);
+        masterVolKnob.getSlider().textFromValueFunction = [](double v) -> juce::String {
+            if (v <= 0.0) return "-inf dB";
+            return juce::String(20.0 * std::log10(v), 1) + " dB";
+        };
+        masterVolKnob.setValue(proc.getMasterLevel(), juce::dontSendNotification);
+        masterVolKnob.onValueChanged = [this](double v) { proc.setMasterLevel((float) v); };
+        addAndMakeVisible(masterVolKnob);
+        general.push_back({ "Audio", 64, [this](const Rows& r) {
+            masterVolKnob.setBounds(r.labelX, r.area.getY(),
+                                    s(MuLookAndFeel::kKnobSize2W), s(MuLookAndFeel::kKnobSize2H)); } });
+    }
 
     // ── Display — UI size.
     makeFieldLabel(uiSizeLabel, "Size");
-    uiSizeCtrl.setSelectedIndex(proc.getUiScale() >= ProcessorBase::kUiScaleLarge ? 1 : 0, false);
+    uiSizeCtrl.setSelectedIndex(proc.getUiScale() >= mu_core::ShellBackend::kUiScaleLarge ? 1 : 0, false);
     uiSizeCtrl.onChange = [this](int idx)
-    { proc.setUiScale(idx == 1 ? ProcessorBase::kUiScaleLarge : ProcessorBase::kUiScaleMedium); };
+    { proc.setUiScale(idx == 1 ? mu_core::ShellBackend::kUiScaleLarge : mu_core::ShellBackend::kUiScaleMedium); };
     addAndMakeVisible(uiSizeCtrl);
     // The window resizes live, but text labels pick their font size when created — so a
-    // hint below the picker says the plugin needs reopening for those to fully rescale.
+    // hint below the picker says the app or plugin needs reopening for those to fully rescale.
+    const juce::String rescaleHint = isStandalone ? "(reopen the app for label fonts to fully rescale)"
+                                                  : "(reopen the plugin for label fonts to fully rescale)";
     general.push_back({ "Display", 2 * kRowH + kRowGap, [this](const Rows& r) {
         uiSizeLabel.setBounds(r.labelX, r.area.getY(), r.labelW, r.rowH);
         uiSizeCtrl .setBounds(r.ctrlX,  r.area.getY(), r.ctrlW,  r.rowH); },
-        [this](juce::Graphics& g, const Rows& r) {
+        [this, rescaleHint](juce::Graphics& g, const Rows& r) {
         drawHint(g, r.area.getY() + r.rowH + s(kRowGap) / 2 + r.rowH / 2,
-                 "(reopen the plugin for label fonts to fully rescale)",
+                 rescaleHint,
                  r.ctrlX, r.area.getRight() - r.ctrlX); } });
 
     // ── Transport — internal free-running BPM (where a product shows it here) and, in the
     //    standalone, the meter the bar.beat display counts in. Pattern lengths stay four beats a bar.
-    const bool showMeter = isStandalone;
+    const bool showMeter = isStandalone && options.showMeter;
     if (options.showTransport || showMeter)
     {
         if (options.showTransport)
@@ -92,23 +94,27 @@ StandardSettingsOverlay::StandardSettingsOverlay(ProcessorBase& p, Options optio
             } } });
     }
 
-    // ── MIDI Clock (standalone only) — slave the beat / tempo to external MIDI clock.
-    if (isStandalone)
+    // ── MIDI Clock (standalone only) — slave the beat / tempo to external MIDI clock. Without the
+    //    Source and Messages rows (showClockSource off) only the Sync offset row remains.
+    if (isStandalone && (opts.showClockSource || opts.syncOffsetAlways))
     {
-        makeFieldLabel(clockSourceLabel, "Source");
-        clockSourceDropdown.addItem("Internal", 1);
-        clockSourceDropdown.addItem("MIDI In",  2);
-        clockSourceDropdown.setSelectedId(proc.getMidiSyncEnabled() ? 2 : 1, false);
-        clockSourceDropdown.onChange = [this](int id) { proc.setMidiSyncEnabled(id == 2); updateMidiSyncVisibility(); };
-        addAndMakeVisible(clockSourceDropdown);
+        if (opts.showClockSource)
+        {
+            makeFieldLabel(clockSourceLabel, "Source");
+            clockSourceDropdown.addItem("Internal", 1);
+            clockSourceDropdown.addItem("MIDI In",  2);
+            clockSourceDropdown.setSelectedId(proc.getMidiSyncEnabled() ? 2 : 1, false);
+            clockSourceDropdown.onChange = [this](int id) { proc.setMidiSyncEnabled(id == 2); updateMidiSyncVisibility(); };
+            addAndMakeVisible(clockSourceDropdown);
 
-        makeFieldLabel(midiMessagesLabel, "Messages");
-        midiMessagesDropdown.addItem("Clock only",        1);
-        midiMessagesDropdown.addItem("Transport only",    2);
-        midiMessagesDropdown.addItem("Clock + Transport", 3);
-        midiMessagesDropdown.setSelectedId(proc.getMidiSyncMessages() + 1, false);
-        midiMessagesDropdown.onChange = [this](int id) { proc.setMidiSyncMessages(id - 1); };
-        addAndMakeVisible(midiMessagesDropdown);
+            makeFieldLabel(midiMessagesLabel, "Messages");
+            midiMessagesDropdown.addItem("Clock only",        1);
+            midiMessagesDropdown.addItem("Transport only",    2);
+            midiMessagesDropdown.addItem("Clock + Transport", 3);
+            midiMessagesDropdown.setSelectedId(proc.getMidiSyncMessages() + 1, false);
+            midiMessagesDropdown.onChange = [this](int id) { proc.setMidiSyncMessages(id - 1); };
+            addAndMakeVisible(midiMessagesDropdown);
+        }
 
         // Sync offset: positive = the app plays earlier than the clock says (enter the audio output
         // latency, about 20-40 ms on WASAPI). Arrows step 1 ms, Shift+click 10.
@@ -121,13 +127,17 @@ StandardSettingsOverlay::StandardSettingsOverlay(ProcessorBase& p, Options optio
         addAndMakeVisible(syncOffsetInput);
         updateMidiSyncVisibility();
 
-        midiClock.push_back({ "MIDI Clock", 3 * kRowH + 2 * kRowGap, [this](const Rows& r) {
+        const bool sourceRows = opts.showClockSource;
+        midiClock.push_back({ "MIDI Clock", sourceRows ? 3 * kRowH + 2 * kRowGap : kRowH, [this, sourceRows](const Rows& r) {
             const int y2 = r.area.getY() + r.rowH + s(kRowGap);
-            const int y3 = y2 + r.rowH + s(kRowGap);
-            clockSourceLabel    .setBounds(r.labelX, r.area.getY(), r.labelW, r.rowH);
-            clockSourceDropdown .setBounds(r.ctrlX,  r.area.getY(), r.ctrlW,  r.rowH);
-            midiMessagesLabel   .setBounds(r.labelX, y2,            r.labelW, r.rowH);
-            midiMessagesDropdown.setBounds(r.ctrlX,  y2,            r.ctrlW,  r.rowH);
+            const int y3 = sourceRows ? y2 + r.rowH + s(kRowGap) : r.area.getY();
+            if (sourceRows)
+            {
+                clockSourceLabel    .setBounds(r.labelX, r.area.getY(), r.labelW, r.rowH);
+                clockSourceDropdown .setBounds(r.ctrlX,  r.area.getY(), r.ctrlW,  r.rowH);
+                midiMessagesLabel   .setBounds(r.labelX, y2,            r.labelW, r.rowH);
+                midiMessagesDropdown.setBounds(r.ctrlX,  y2,            r.ctrlW,  r.rowH);
+            }
             syncOffsetLabel     .setBounds(r.labelX, y3,            r.labelW, r.rowH);
             syncOffsetInput     .setBounds(r.ctrlX,  y3,            s(90),    r.rowH); } });
     }
@@ -170,12 +180,15 @@ void StandardSettingsOverlay::addSection(Where where, Section section, const juc
 
 void StandardSettingsOverlay::updateMidiSyncVisibility()
 {
-    // The Messages and Sync offset rows only matter when MIDI-clock input is selected.
+    // The Messages and Sync offset rows only matter when MIDI-clock input is selected; Sync offset
+    // can be kept on always, for a backend whose clock is not chosen on this page.
     const bool on = proc.getMidiSyncEnabled();
-    midiMessagesLabel   .setVisible(on);
-    midiMessagesDropdown.setVisible(on);
-    syncOffsetLabel     .setVisible(on);
-    syncOffsetInput     .setVisible(on);
+    const bool messages = on && opts.showClockSource;
+    const bool offset = on || opts.syncOffsetAlways;
+    midiMessagesLabel   .setVisible(messages);
+    midiMessagesDropdown.setVisible(messages);
+    syncOffsetLabel     .setVisible(offset);
+    syncOffsetInput     .setVisible(offset);
 }
 
 void StandardSettingsOverlay::layoutContent()

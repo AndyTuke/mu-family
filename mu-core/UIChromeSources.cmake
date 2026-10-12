@@ -25,6 +25,7 @@ set(MU_CORE_CHROME_SOURCES
     # Shared chrome over ShellBackend
     "${_mu_core_dir}/UI/TransportBar.cpp"
     "${_mu_core_dir}/UI/SettingsOverlayBase.cpp"
+    "${_mu_core_dir}/UI/StandardSettingsOverlay.cpp"
     "${_mu_core_dir}/UI/AboutOverlay.cpp"
     "${_mu_core_dir}/UI/SaveDialog.cpp"
     "${_mu_core_dir}/UI/ModalDialog.cpp"

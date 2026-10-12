@@ -6,7 +6,7 @@
 #include "UI/Components/SegmentControl.h"
 #include "UI/Components/NudgeInput.h"
 #include "UI/Components/DropdownSelect.h"
-#include "Plugin/ProcessorBase.h"
+#include "Plugin/ShellBackend.h"
 
 #include <vector>
 
@@ -14,7 +14,8 @@ namespace mu_ui
 {
 
 // The family-standard settings page. Provides the sections every product has —
-//   General: Audio (master volume), Display (UI size), Transport (internal BPM, optional)
+//   General: Audio (master volume, when the backend has one), Display (UI size), Transport
+//            (internal BPM and meter, each optional)
 //   MIDI:    MIDI Clock (standalone only)
 // — laid out with the shared group / section styling. A product adds its own sections at
 // named places (extra General sections, MIDI sections before / after MIDI Clock, or whole
@@ -24,10 +25,17 @@ namespace mu_ui
 class StandardSettingsOverlay : public SettingsOverlayBase
 {
 public:
-    struct Options { bool showTransport = true; };   // mu-Clid sets its tempo in the transport bar
+    // Row switches; the defaults give the page every product has today.
+    struct Options
+    {
+        bool showTransport    = true;    // the Tempo row (mu-Clid sets its tempo in the transport bar)
+        bool showMeter        = true;    // the Time signature row (standalone only)
+        bool showClockSource  = true;    // the MIDI Clock Source and Messages rows (standalone only)
+        bool syncOffsetAlways = false;   // show Sync offset even while Source is Internal
+    };
 
-    explicit StandardSettingsOverlay(ProcessorBase& proc, Options options);
-    explicit StandardSettingsOverlay(ProcessorBase& proc) : StandardSettingsOverlay(proc, Options{}) {}
+    explicit StandardSettingsOverlay(mu_core::ShellBackend& backend, Options options);
+    explicit StandardSettingsOverlay(mu_core::ShellBackend& backend) : StandardSettingsOverlay(backend, Options{}) {}
 
     void layoutContent() override;
     void paintContent(juce::Graphics& g) override;
@@ -65,8 +73,9 @@ public:
     std::function<void()> onFullPresetsClicked;   // the editor opens showMidiFullPresets
 
 protected:
-    ProcessorBase& proc;
+    mu_core::ShellBackend& proc;
     const bool isStandalone;
+    const Options opts;
 
 private:
     // Standard controls.
@@ -76,7 +85,7 @@ private:
     juce::Label    bpmLabel;
     NudgeInput     bpmInput { "BPM", 20, 300, 120 };
     juce::Label    clockSourceLabel, midiMessagesLabel, syncOffsetLabel, timeSigLabel;
-    NudgeInput     syncOffsetInput { "ms", ProcessorBase::kSyncOffsetMinMs, ProcessorBase::kSyncOffsetMaxMs, 0 };
+    NudgeInput     syncOffsetInput { "ms", mu_core::ShellBackend::kSyncOffsetMinMs, mu_core::ShellBackend::kSyncOffsetMaxMs, 0 };
     DropdownSelect timeSigDropdown;
     DropdownSelect clockSourceDropdown, midiMessagesDropdown;
     void updateMidiSyncVisibility();

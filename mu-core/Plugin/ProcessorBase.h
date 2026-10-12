@@ -327,6 +327,20 @@ public:
     float getUiScale() const noexcept override { return uiScale; }
     void  setUiScale(float scale) override;
 
+    // Master level (the settings page's Audio row): the mstr_lvl parameter, written through the
+    // parameter so the host sees the change.
+    bool  hasMasterLevel() const override { return apvts.getParameter("mstr_lvl") != nullptr; }
+    float getMasterLevel() const override
+    {
+        if (auto* raw = apvts.getRawParameterValue("mstr_lvl")) return raw->load();
+        return 1.0f;
+    }
+    void  setMasterLevel(float level) override
+    {
+        if (auto* param = apvts.getParameter("mstr_lvl"))
+            param->setValueNotifyingHost(param->convertTo0to1(level));
+    }
+
     // The shell callbacks (onSaveAndQuit, onLoadError, onPresetSwapCommitted, onUiScaleChanged) are
     // members of ShellBackend. The editor MUST clear them in its dtor: the processor can outlive
     // the editor when a DAW keeps the plugin loaded after closing the window.

@@ -13,6 +13,7 @@ target_sources(mu-core-tests PRIVATE
     ChannelStateResetTests.cpp
     SupportPromptPolicyTests.cpp
     SettingsOverlayFitTests.cpp
+    SettingsOverlayBackendTests.cpp
     AlgorithmNameTableTests.cpp
     BarPositionTests.cpp
     HotSwapTests.cpp

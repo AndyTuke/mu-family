@@ -1,5 +1,6 @@
 #pragma once
 
+#include <juce_audio_processors/juce_audio_processors.h>   // APVTS attachments
 #include "UI/StandardSettingsOverlay.h"   // mu-core: the family-standard settings page
 
 namespace mu_toni
