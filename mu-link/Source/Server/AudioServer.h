@@ -1,5 +1,8 @@
 #pragma once
 
+#include <atomic>
+#include <cstdint>
+
 #include "ServerEngine.h"
 #include "../Ipc/MuLinkServerMemory.h"
 #include "../Clock/MidiClockOut.h"
@@ -43,6 +46,7 @@ public:
         if (! mem.create())
             return false;
 
+        busCreated  = true;
         engineTempo = preferredTempo;
         deviceManager.initialiseWithDefaultDevices(0, 2);   // selector can repair/change later
         deviceManager.addAudioCallback(this);
@@ -62,6 +66,26 @@ public:
     }
 
     bool isRunning() const noexcept { return started; }
+
+    // Headless operation (tests and tools): create the bus and prepare the engine without opening a
+    // device, then render blocks by hand exactly as the device callback would. Not for use with start().
+    bool startHeadless(double sampleRate, int blockSize, double tempo = 120.0)
+    {
+        if (busCreated || ! mem.create())
+            return false;
+        busCreated  = true;
+        engineTempo = tempo;
+        deviceSampleRate = sampleRate;
+        engine.prepare(sampleRate, blockSize, tempo);
+        return true;
+    }
+    BlockStats renderBlockHeadless(float* const* output, int numChannels, int numFrames) noexcept
+    {
+        return engine.renderBlock(output, numChannels, numFrames);
+    }
+
+    // True once the shared-memory bus exists, so the transport it publishes can be read.
+    bool hasBus() const noexcept { return busCreated; }
 
     // Device picker / metering host for the GUI (L3).
     juce::AudioDeviceManager& audioDeviceManager() noexcept { return deviceManager; }
@@ -92,12 +116,21 @@ public:
 
     void setTempo(double bpm) noexcept           { engineTempo = bpm; engine.setTempo(bpm); }   // kept for a re-prepare
     void setPlaying(bool shouldPlay) noexcept    { engine.setPlaying(shouldPlay); }
+    void rewind() noexcept                       { engine.rewind(); }   // back to the top at the next block
+
+    // Sync offset (ms the app plays earlier than the external clock says, to cancel output latency).
+    // Held for the shell here; the external-clock phase servo does not apply it yet.
+    void setSyncOffsetMs(int ms) noexcept        { syncOffset.store(ms, std::memory_order_relaxed); }
+    int  syncOffsetMs()    const noexcept        { return syncOffset.load(std::memory_order_relaxed); }
 
     // Clock source (L7): Internal (master) or ExternalMidi (slave to incoming MIDI clock).
     void        setClockSource(ClockSource s) noexcept { engine.setClockSource(s); }
     ClockSource clockSourceMode()       const noexcept { return engine.clockSourceMode(); }
     double      externalBpm()           const noexcept { return midiClockInput.estimator().bpm(); }
     bool        externalRunning()       const noexcept { return midiClockInput.estimator().isRunning(); }
+    std::uint64_t externalPulseCount()  const noexcept { return midiClockInput.estimator().pulseCount(); }
+    // The estimator the MIDI input feeds; a test feeds it pulses directly.
+    MidiClockEstimator& midiClockEstimator() noexcept { return midiClockInput.estimator(); }
 
 private:
     void audioDeviceAboutToStart(juce::AudioIODevice* device) override
@@ -136,6 +169,8 @@ private:
     double                   engineTempo = 120.0;
     double                   deviceSampleRate = 48000.0;
     bool                     started     = false;
+    bool                     busCreated  = false;
+    std::atomic<int>         syncOffset  { 0 };
 };
 
 } // namespace mu_link

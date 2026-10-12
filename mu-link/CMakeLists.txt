@@ -4,7 +4,7 @@
 # standalone shares it; mu-link adds the SERVER half + the GUI. Every target therefore
 # puts mu-core on its include path so `#include "Link/..."` resolves. mu-link still does
 # NOT link the mu-core INTERFACE library (that pulls the whole plugin stack) — it includes
-# only the headers it needs and, for the GUI, compiles the 3 shared UI sources directly.
+# only the headers it needs and, for the GUI, compiles the shared processor-free UI list directly.
 #
 # Targets (see docs/mu-link/design-mulink.md §6 build stages):
 #   • mu-link-tests  — console UnitTests: IPC foundation + ServerEngine + MuLinkClient.
@@ -24,6 +24,7 @@ target_sources(mu-link-tests PRIVATE
     Source/Tests/SharedMemoryTests.cpp
     Source/Tests/ServerTests.cpp
     Source/Tests/ClientTests.cpp
+    Source/Tests/LinkShellBackendTests.cpp
     "${MU_CORE_DIR}/Audio/InsertProcessor.cpp"   # ServerEngine embeds two master-bus inserts
 )
 
@@ -38,6 +39,7 @@ target_link_libraries(mu-link-tests PRIVATE
     juce::juce_core
     juce::juce_audio_basics   # ServerEngine now embeds the mu-core EqInsert (AudioBuffer/SmoothedValue)
     juce::juce_audio_devices  # MidiClockOut (the sample-accurate MIDI clock sender)
+    juce::juce_graphics       # the shell seam headers pull juce_audio_processors, which needs Colour
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags
 )
@@ -120,24 +122,22 @@ target_compile_definitions(mu-link-harness PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROW
 
 # ── mu-link — the GUI app (device picker, client meters, master transport) ────
 # Not a plugin, so it does NOT link the mu-core INTERFACE library (that pulls the whole
-# plugin stack: ProcessorBase, EditorShellBase, …). Instead it compiles just the shared
-# design-system sources it needs for family visual parity — MuLookAndFeel + MuTheme +
-# VUMeter — alongside its own window. See docs/mu-link/design-mulink.md §3.3.
+# plugin stack: ProcessorBase, EditorShellBase, …). Instead it compiles the shared
+# processor-free UI list (MU_CORE_CHROME_SOURCES) alongside its own window.
+# See docs/mu-link/design-mulink.md §3.3.
 juce_add_gui_app(mu-link PRODUCT_NAME "mu-link"
     VERSION    "${MUFAMILY_PLUGIN_VERSION}"   # family version, same as the plugins
     ICON_BIG   "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
     ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png")
 
+# The processor-free mu-core UI: one shared list (also used by the plugins and mu-core-tests). Never
+# add a hand-picked mu-core UI .cpp here; if a file needs ProcessorBase it does not belong in the list.
+include("${MU_CORE_DIR}/UIChromeSources.cmake")
+
 target_sources(mu-link PRIVATE
     Source/Plugin/Main.cpp
     Source/UI/MuLinkComponent.cpp
-    "${MU_CORE_DIR}/UI/Components/MuLookAndFeel.cpp"
-    "${MU_CORE_DIR}/UI/Components/MuTheme.cpp"
-    "${MU_CORE_DIR}/UI/Components/VUMeter.cpp"
-    "${MU_CORE_DIR}/UI/Components/KnobWithLabel.cpp"   # master-insert knobs
-    "${MU_CORE_DIR}/UI/Components/DropdownSelect.cpp"  # master-insert algo dropdowns
-    "${MU_CORE_DIR}/UI/SaveDialog.cpp"                 # shared preset save dialog
-    "${MU_CORE_DIR}/UI/PresetBrowser.cpp"              # shared preset browser
+    ${MU_CORE_CHROME_SOURCES}
     "${MU_CORE_DIR}/Audio/InsertProcessor.cpp"         # ServerEngine master-bus inserts
 )
 
