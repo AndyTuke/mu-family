@@ -206,6 +206,39 @@ the word. No code type called `Clip` exists today (the only hits are the clipper
 are unrelated); the `Layer` and `Clip` names should be settled together when #1265 is done. A *clip* is a stored state
 of one layer, so it is not an audio clip.
 
+### 3.2c The Performance file (architecture ruling, 2026-10-12; backlog #1279)
+
+The architecture half. The look of the browser is for the `ux-controller` (list at the end).
+
+- **Name and extension:** `.muPerformance` (not product-specific: the extension convention is `.mu<LayerType>` for a
+  layer and `.mu<Product>` for a full preset, and a performance belongs to neither). Content folder `Performances/`
+  in the product's content root, like `Rhythms/`; it moves to a family root when the one-instance rig exists, and
+  nothing in the file changes when it does.
+- **Shape (XML, one `PerformanceFile` format version):**
+  `<MuPerformance format="1" name="" description=""> <Item idx="0..7" product="MuTantState" path="" name=""/> ... </MuPerformance>`.
+  At most `mu_limits::kMaxPerformanceItems` (8) items; an absent `idx` is an empty item. `product` is the state
+  identifier of the preset's product (already unique per product), so a mixed-engine list needs no format change.
+  `path` is relative to the product's preset folder when the file lies under it, absolute otherwise; `name` is a cached
+  display name. Pointers only: the file never embeds a preset, and a preset never references a performance.
+- **A missing or foreign file is shown, never dropped:** its item stays in the list marked missing (or "other
+  product" until the one-instance rig), the switch action skips it, and nothing is rewritten silently.
+- **Code:** `mu-core/Persistence/PerformanceFile.{h,cpp}`, `mu_pp::PerformanceFile` (plain data, load / save / resolve, no
+  processor dependency, unit-tested in `mu-core-tests`: round trip, relative and absolute paths, missing file, more than 8
+  items, unknown format version, empty list). The current performance (path and item index) is per-user processor
+  state saved in the host session as a root property of the product state, not in a preset.
+- **Switching:** item `n` is "stage the full preset at that pointer" through the existing full-preset path
+  (`stageFullPreset`, #1278), so the boundary rule and audio-thread contract are unchanged. The `ControlAction` vocabulary in
+  `mu-core/Control/` gains `PerformanceItem(n)` and `PerformancePrev / Next`; the driver mapping (top row = items 1-8)
+  lives in `mu-control`. A product loads only items of its own `product`.
+- **Readiness:** the file type with its tests can be built at any time. The browser waits on the `ux-controller`; the
+  actions and pad mapping wait on #1276 (mu-control), #1278 and the clip bank (#1277); nothing consumes the file earlier.
+- **For the `ux-controller` to rule:** where the performance is chosen (a tab in the preset browser, or its own
+  `OverlayHost` screen); the 8-item editor (add from the preset list, drag to reorder, remove, rename, a missing-file
+  state); how the current item and a queued item show on screen to match the pad lights (current bright, queued
+  pulsing); whether the item colours come from the layer palette or a neutral set; how a performance is saved (the shared
+  `SaveDialog`, name and description only); the keyboard binding and any status-bar text; and the touch / standard sizing
+  (no per-product layout constants).
+
 ### 3.2a Where the code lives: a separate `mu-control` library (owner deferred to this recommendation, 2026-10-09)
 
 Controller code goes in a new **`mu-control`** library, a sibling of `mu-core` (a library, not a product). It is created

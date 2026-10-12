@@ -26,7 +26,7 @@ Related: the family consistency rule in [CLAUDE.md](../CLAUDE.md), and the platf
 | **Voice** | One polyphonic voice *inside* an engine (`ToniVoice`, `SynthVoice`). | a layer |
 | **Preset** | A saved full state of one product: up to 8 layers with their mixer, FX and modulation (`.muClid`, `.muTant`, ...). | a layer preset |
 | **Layer preset** | One layer's saved state (`.muRhythm`, `.muPattern`, ...). | a full preset |
-| **Performance** (proposed) | A list of up to 8 pointers to presets for a gig; the new top level (backlog #1279). ✔ owner | a preset |
+| **Performance** (proposed) | A list of up to 8 pointers to presets for a gig; the new top level (backlog #1279). ✔ owner. File `.muPerformance`, folder `Performances/`, type `mu_pp::PerformanceFile` (ruled 2026-10-12, [design-launchpad.md §3.2c](design-launchpad.md)). | a preset |
 | **Clip** ✔ owner | One of 8 stored states of a layer that a controller pad launches, as in Ableton Live and Bitwig; plays until another is chosen; pads never write presets (backlog #1277). "Slot" stays for FX / insert slots only. | an audio clip, an FX slot |
 
 ### Derived layer types ✔ owner (2026-10-09)
@@ -252,7 +252,7 @@ unique", legitimate because the type is one `mu-core` class (§1).
 | Namespaces | Done at build 1190: mu-Clid is entirely in `mu_clid` (the Rhythm modulator adapters, preset and param tables and `PluginProcessor_Internal` helpers left `mu_pp`; `mu_pp_migrate` is `mu_clid::migrate`; `md` and `ModDest` nest in `mu_clid`). Only `createPluginFilter` and `StandaloneApp.cpp` stay global. |
 | Overlay vs Panel | Done at build 1172: `AboutOverlay`, `ActivationOverlay`, `MidiPresetsOverlay`, `MidiFullPresetsOverlay` (were `…Panel`). **`SaveDialog` and `PresetBrowser` stay as named exceptions ✔ owner (2026-10-10):** they are modal pop-ups owned by the shell, not `OverlayHost` screens, and their names are already stable across the family; do not rename them. Still open: the shared `LayerPanel` / `LayerSidebar` (waits on the layer-plan stages 4-5). |
 | Main sound panel | `VoiceSection` (mu-Clid), `VoicePanel` (mu-Tant), `EnginePanel` (mu-Toni, mu-On), `VoiceBand` (core). |
-| Sequencer names | `SequencerEngine`, `GatePattern`, `Arpeggiator` + `ArpVoiceRunner`, `GrooveSequencer` — no shared role. |
+| Sequencer names | `SequencerEngine`, `GatePattern`, `Arpeggiator` + `ArpVoiceRunner`, `GrooveSequencer` — no shared role. **Ruled 2026-10-12:** `Arpeggiator` to `ArpSequencer` now; `SequencerEngine` to `RhythmSequencer` with layer stage 7; `GrooveSequencer` conforms; `GatePattern` is data and stays. Main sound panel: `EnginePanel` family-wide, done with #1266 (see the family doc, "What is left under #1265 and #1264"). |
 | Capacity constants | mu-Clid's `kMaxRhythms` alias is gone (build 1195). mu-Tant's two `kMaxVoices` and mu-Toni / mu-On's `kMaxChannels` read `mu_limits::kMaxLayers` (build 1171) but are still redeclared product-side; replace with `mu_limits::kMaxLayers` directly (mu-On's is unused, delete it). The `kMaxChannels` in `mu-core/Link/` is the stereo ring width, an unrelated constant: leave it. |
 | `Slot` in layer APIs | `ProcessorBase` and `mu_pp` use "slot" for a layer (`initSlotState`, `slotLayer`, `saveSlotPreset`, `voiceSlots`, ...). Rename to `Layer` per §1; the XML tags `Slots` / `Slot` and `idx` are saved data and stay. Plan: see the rename list under migration step 5. |
 | Acronyms | `…APVTS` function names in mu-Clid vs `…Apvts` elsewhere. |

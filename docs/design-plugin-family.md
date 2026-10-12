@@ -423,9 +423,15 @@ throughout; the stages marked **O** also wait for owner decisions on behaviour o
    clip bank (`std::array<juce::ValueTree, 8>`, one composed slot node each, never read by the audio
    thread; the clip-launch design is #1277). It does **not** hold `InsertProcessor`: `Rhythm` is copied by
    value today and mu-Clid's insert lives in its `VoiceEngine` so a retired engine keeps its tail. mu-Tant
-   and mu-Toni compose a `mu_core::InsertStage { InsertProcessor proc; VoiceParams cfg; }` member
-   into `Pattern` / `Arp` (replacing the `inserts` and `insCfg` arrays); `Rhythm` overrides
-   `insertGainReduction()` to return its engine's. Anything a layer owns moves with it when the pointer moves.
+   and mu-Toni hold the insert as a plain member of `Pattern` / `Arp` (`InsertProcessor insert`, as `Arp`
+   already does; replacing the `inserts` array). **Amended 2026-10-12:** the planned `mu_core::InsertStage`
+   wrapper is dropped: mu-Toni's `insCfg` is already gone, mu-Tant builds its insert parameters per block, so
+   the wrapper would carry nothing the two users share. What is shared is the virtual
+   `Layer::insertGainReduction()` (default `nullptr`; `Pattern` / `Arp` return `&insert.grReduction`; `Rhythm`
+   returns its engine's at stage 7), which replaces `getInsertGRPtr` / `getInsertGRReductionPtr`. A member that
+   belongs to the *slot* and not to the layer's data (the insert's delay lines, a voice engine, the retire
+   tail) is wrapped in `SlotBound<T>` (next to `OwnerLink` in `Layer.h`: copy and assignment do nothing), so
+   a layer copy, swap or `adoptDefaults` never moves or clobbers it. Anything a layer owns *as data* moves with it when the pointer moves.
 5. **Audio-thread rules.**
    - The audio thread takes `ScopedTryLock(layersLock)` once per block. On failure it renders silence for
      that block but **still advances the transport and boundary detection** (hot-swap principle 4). It reads
@@ -498,14 +504,42 @@ Stages 1-3 are order-independent between products (any product can go first). Fr
 
 - **mu-On (#1241):** its parameters were prefixed by *lane type* (`k_ b_ h_ s_ r_`); since 2026-10-12 they are
   index-based (`t0_` ... `t4_`, #1263 step 2, with legacy-state and MIDI-map migration), which a variable
-  count with a per-layer engine selector needs. The remaining choice: (a) mu-On stays five fixed lanes and only
-  gains `Track` and the clip bank; (b) variable lane count on the index prefixes. The stage 5 edit code works
-  for both.
+  count with a per-layer engine selector needs. **Settled by Andy 2026-10-11: (b), a variable lane count on the
+  index prefixes** (the alternative, five fixed lanes, is dropped). Open sub-points from #1241 that need a
+  design before the work: which kick a Rumble layer processes (Andy 2026-10-08: a Source selector, default the first
+  Kick), per-layer params (each layer keeps every engine's settings), step rows per layer, and how 5-lane
+  presets map to layers (they load as their 5 layers).
 - **mu-Toni (#1240):** `kNumChannels` is 4 today. Going to 8 adds layers 5-8 parameters (additive, old sessions
   load with the new layers at defaults) and changes the host's automation list; confirm the default count for a
   fresh instance and the demo cap (mu-Toni is freeware, so likely none).
 - **Both:** the add / delete / reorder UI (it is the shared `ChannelSidebar`, so it is a visible change for the
   freeware and licensed products alike) and whether delete fades or cuts (item 7 says cut).
+
+### What is left under #1265 and #1264 (ruled 2026-10-12)
+
+State of the tree: stages 1 to 3 and 5 are done for mu-Tant, mu-Toni and mu-On, stage 4 for those three; the
+`Slot` to `Layer` renames are done (`voiceSlots`, `kMaxChannels`, `kMaxVoices` no longer exist). Open:
+
+1. **#1265 closes after three small steps** (it is the hoisting umbrella): (a) `SlotBound<T>` and
+   `Layer::insertGainReduction()` in `Layer.h`; (b) mu-Tant's `inserts` array becomes `Pattern::insert`
+   (`SlotBound<InsertProcessor>`), mu-Toni's `Arp::insert` is wrapped the same way and both override
+   `insertGainReduction()`, the editors reach the meter through one `ProcessorBase::getInsertGR(i)`; (c) `slotLayer`
+   is replaced by the base default (`keepSpareLayers ? layers[i].get() : getLayer(i)`) and mu-Tant's override goes.
+   Not in scope, by ruling: `typeId` and `Layer::render` (stage 8, #1319), `resetToDefaults` (the shipped
+   `adoptDefaults` does this job), the clip bank (#1277), hot-swap staging state (done: `LayerSwapper`), the mixer
+   binding (slot index is the binding; nothing to hoist).
+2. **#1264 closes after:** mu-Tant's remaining per-slot arrays (`voices`, `voiceSnap`, `retiring`) become
+   `SlotBound` members of `Pattern` (`blkPatternBeats` is a per-block audio-thread cache and stays in the
+   processor); the sequencer role names `Arpeggiator` to `ArpSequencer` (4 uses) now, and `SequencerEngine` to
+   `RhythmSequencer` **with stage 7** (144 uses, same lines the stage touches, so the code moves once);
+   `GrooveSequencer` already conforms and mu-Tant has no sequencer class to rename (`GatePattern` is data and stays);
+   the Tant `voice` vocabulary: non-UI identifiers (`currentVoice`, `numVoices`, locals) now, `VoicePanel` /
+   `VoiceSidebar` with the shared `LayerSidebar` / `EnginePanel` work in #1266 (the family name for the per-layer
+   sound panel is `EnginePanel`, as in mu-Toni and mu-On; the `ux-controller` confirms mu-Clid's `VoiceSection`);
+   mu-On's lane / channel wording to `Track` is **folded into #1241**, which rewrites the same code (233 uses),
+   not done on its own. The step grid and `GrooveVoices` stay in the processor until #1241 decides the per-layer engine selector.
+3. Stage 6 still waits on Andy for mu-Toni's default layer count (recommended: 1 for a fresh instance, as mu-Tant and
+   mu-Clid, with old 4-layer states loading as 4; no demo cap, as mu-Toni is freeware and the demo cap is retired).
 
 For the combined instance (design-future): none of the above blocks it, and nothing here closes it off. The
 registry adds `typeId` -> `LayerTypeInfo`; the saved `Slot` node gains a `type` attribute (absent = the
