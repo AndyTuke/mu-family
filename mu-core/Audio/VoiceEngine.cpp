@@ -312,7 +312,7 @@ void VoiceEngine::setParams(const VoiceParams& p)
     {
         juce::SpinLock::ScopedLockType sl(pendingLock);
         pendingParams = p;
-#if MU_VOICE_ENGINE_TEST_SEAM
+#if defined(MU_VOICE_ENGINE_TEST_SEAM) && MU_VOICE_ENGINE_TEST_SEAM
         if (auto* hook = setParamsHoldHook.load(std::memory_order_relaxed)) hook();   // test seam, mu-core-tests only
 #endif
     }

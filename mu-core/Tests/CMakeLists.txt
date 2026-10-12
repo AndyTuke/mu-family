@@ -84,5 +84,5 @@ target_link_libraries(mu-core-tests PRIVATE
 )
 
 target_compile_definitions(mu-core-tests PRIVATE JUCE_USE_MP3AUDIOFORMAT=1 JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0
-    JUCE_MODAL_LOOPS_PERMITTED=1
-    MU_VOICE_ENGINE_TEST_SEAM=1)   # exposes VoiceEngine::setParamsHoldHook to VoiceEngineParamsTests only   # the teardown tests pump the message loop to let timers run
+    JUCE_MODAL_LOOPS_PERMITTED=1   # the teardown tests pump the message loop to let timers run
+    MU_VOICE_ENGINE_TEST_SEAM=1)   # exposes VoiceEngine::setParamsHoldHook to VoiceEngineParamsTests only
