@@ -119,6 +119,17 @@ void RhythmManager::remove(int index)
         proc.mixerEngine.channels[newN].reset();
     }
     proc.suspendProcessing(false);
+
+    // The rhythms and strips above `index` moved down a slot: bring their APVTS values with them, or
+    // the parameters keep the old tenant's numbers and the next APVTS-driven resync would restore them.
+    {
+        mu_core::ScopedApvtsLoading guard(proc.apvtsLoading);
+        for (int i = index; i < newN; ++i)
+        {
+            proc.pushRhythmToApvts(i);
+            proc.pushMixerChannelToApvts(i);
+        }
+    }
 }
 
 void RhythmManager::reset(int index)
@@ -143,6 +154,12 @@ void RhythmManager::reset(int index)
     proc.suspendProcessing(false);
 
     proc.sequencer.updatePattern(index);
+
+    // The reset Rhythm is the truth: hand its voice parameters to the engine and its values to APVTS,
+    // otherwise the engine keeps the old sound and the parameters keep the old numbers.
+    if (proc.voiceEngines[index]) proc.voiceEngines[index]->setParams(proc.sequencer.getRhythm(index).voiceParams);
+    mu_core::ScopedApvtsLoading guard(proc.apvtsLoading);
+    proc.pushRhythmToApvts(index);
 }
 
 void RhythmManager::rename(int index, const juce::String& newName)

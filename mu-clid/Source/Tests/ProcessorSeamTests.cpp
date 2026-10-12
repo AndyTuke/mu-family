@@ -100,6 +100,56 @@ struct MuClidProcessorSeamTests : juce::UnitTest
         rhythmEditsVersusProcessBlock();
         swapCommitVersusProcessBlock();
         parameterChangedFromAudioThread();
+        rhythmEditsKeepApvtsInStep();
+    }
+
+    // Reads a parameter's plain value.
+    static float plain(juce::AudioProcessorValueTreeState& apvts, const char* id)
+    {
+        auto* raw = apvts.getRawParameterValue(id);
+        return raw != nullptr ? raw->load() : -1.0f;
+    }
+
+    // Removing or resetting a rhythm changes the Rhythm structs; APVTS must follow, or a later
+    // APVTS-driven resync (forceSyncRhythmFromApvts) would bring the old values back.
+    void rhythmEditsKeepApvtsInStep()
+    {
+        beginTest("remove shifts the later rhythms' parameters down with them; reset restores the defaults in APVTS");
+        TempStorage storage;
+        ExposedPluginProcessor p;
+        p.prepareToPlay(48000.0, 256);
+        p.rhythms.add(mu_clid::Rhythm());
+        p.rhythms.add(mu_clid::Rhythm());
+        expectEquals(p.getNumRhythms(), 3);
+
+        setParam(p.apvts, "r0_stepsA", 9.0f);
+        setParam(p.apvts, "r1_stepsA", 12.0f);
+        setParam(p.apvts, "r2_stepsA", 7.0f);
+        setParam(p.apvts, "ch1_lvl", 0.25f);
+        expectEquals(p.getRhythm(1).genA.steps, 12);
+
+        p.rhythms.remove(0);
+        expectEquals(p.getNumRhythms(), 2);
+        expectEquals(p.getRhythm(0).genA.steps, 12);
+        expectEquals(p.getRhythm(1).genA.steps, 7);
+        expectEquals((int) plain(p.apvts, "r0_stepsA"), 12);
+        expectEquals((int) plain(p.apvts, "r1_stepsA"), 7);
+        expect(std::abs(plain(p.apvts, "ch0_lvl") - 0.25f) < 1.0e-3f, "the strip's level moved down with its rhythm");
+
+        // A resync from APVTS leaves the shifted rhythm as it is.
+        p.forceSyncRhythmFromApvts(0);
+        expectEquals(p.getRhythm(0).genA.steps, 12);
+
+        const int defaultSteps = mu_clid::Rhythm().genA.steps;
+        const int defaultFilter = (int) mu_clid::Rhythm().voiceParams.filterType;
+        setParam(p.apvts, "r0_fltType", 3.0f);
+        expectEquals((int) p.getRhythm(0).voiceParams.filterType, 3);
+        p.rhythms.reset(0);
+        expectEquals(p.getRhythm(0).genA.steps, defaultSteps);
+        expectEquals((int) plain(p.apvts, "r0_stepsA"), defaultSteps);
+        expectEquals((int) plain(p.apvts, "r0_fltType"), defaultFilter);
+        p.forceSyncRhythmFromApvts(0);
+        expectEquals((int) p.getRhythm(0).voiceParams.filterType, defaultFilter);
     }
 
     void constructsAndOwnsItsRhythm()
