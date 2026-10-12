@@ -129,7 +129,7 @@ The installer `.exe`, standalone `.exe`, VST3 `.vst3`, and CLAP `.clap` must be 
 
 ### 🔵 Ship mu-tant factory wavetables with the installer
 
-The mu-tant wavetable **system** is shipped (Serum/Vital mono-WAV loader + FFT mip-mapping, oscillator/voice/APVTS wiring, user `.wav` disk import, the in-repo `tools/wavetable-gen` generator, `clm ` chunk parsing, and dropdown sub-folder categories — all landed across **v1.0.764–769**). What remains is **distribution**: bundle the 25 generated factory `.wav` tables *with the installer* so testers/users get the library out of the box, instead of generating them into the user's own `…/muTant/Wavetables` content folder on first run.
+The mu-tant wavetable **system** is shipped (Serum/Vital mono-WAV loader + FFT mip-mapping, oscillator/voice/APVTS wiring, user `.wav` disk import, the in-repo `tools/wavetable-gen` generator, `clm ` chunk parsing, and dropdown sub-folder categories — all landed across **v1.0.764–769**). What remains is **distribution**: bundle the 25 generated factory `.wav` tables *with the installer* so users get the library out of the box, instead of generating them into the user's own `…/muTant/Wavetables` content folder on first run.
 
 - Blocked on the code-signing item above — the owner wants the installer + artefacts signed before shipping bundled content.
 - Implementation when unblocked: add the generated `.wav` set to the installer payload (or embed via `juce_add_binary_data` + unpack on first run), pointing the loader's content-folder scan at the installed copy.

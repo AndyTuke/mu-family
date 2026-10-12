@@ -8,7 +8,7 @@ Product-specific guidance for working in `mu-on/`. Read alongside the family-wid
 **fixed** instrument lanes — **Kick** (synthesis), **Bass** (deep synth — the focus), **Hat**
 (sample), **Snare** (sample), and **Rumble** (a techno "rumble" that processes the Kick's audio
 rather than stepping) — the first four sequenced on a 16-step grid. Builds Standalone + VST3 + CLAP
-(+ AU on macOS via the family rule). Ships to the OneDrive tester share on Release (guarded by `MUFAMILY_DEPLOY_TESTERS`), alongside the rest of the family.
+(+ AU on macOS via the family rule). Release builds stay local, like the rest of the family.
 
 The editor inherits `mu-core/UI/EditorShellBase.h` and uses the shared `LayerSidebar` +
 `MixerOverlay`, so the TransportBar / StatusBar / About / window sizing / `MuLookAndFeel` and the

@@ -44,7 +44,7 @@ See [tests/README.md](tests/README.md) for the full pipeline overview — render
 
 ## C++ unit tests — μ-Clid
 
-Console executable that runs every `juce::UnitTest` defined in [mu-clid/Source/Tests/](mu-clid/Source/Tests/). **Excluded from ALL build** (deliberate: Release builds deploy to testers and the 140-test suite linking `juce_audio_processors` adds significant compile time). Build on demand:
+Console executable that runs every `juce::UnitTest` defined in [mu-clid/Source/Tests/](mu-clid/Source/Tests/). **Excluded from ALL build** (deliberate: the 140-test suite linking `juce_audio_processors` adds significant compile time). Build on demand:
 
 ```
 cmake --build build --target mu-clid-tests --config Release && build/mu-clid/mu-clid-tests_artefacts/Release/mu-clid-tests.exe

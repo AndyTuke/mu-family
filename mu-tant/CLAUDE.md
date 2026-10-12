@@ -4,7 +4,7 @@ Product-specific guidance for working in `mu-tant/`. Read alongside the family-w
 
 ## Project overview
 
-**μ-Tant** is a JUCE/C++ wavetable drone synth by Transwarp Development Project. Engine: a dynamic set of **1–8 free-running voices** (default 1), each with two wavetable oscillators, a **2-lane X-Mod** section (Lane A phase/index: FM/PM/TZFM + Sync + Feedback; Lane B amplitude: AM / RM / SSB frequency-shift — see [docs/mu-tant/mu-tant-xmod-design.md](../docs/mu-tant/mu-tant-xmod-design.md)), shared scale-quantised pitch, mu-core filter, a per-voice drawable **gater**, and a shared insert effect. Builds Standalone + VST3 + CLAP (Debug + Release; Release deploys to the OneDrive tester share via `MUFAMILY_DEPLOY_TESTERS=ON`, matching mu-clid).
+**μ-Tant** is a JUCE/C++ wavetable drone synth by Transwarp Development Project. Engine: a dynamic set of **1–8 free-running voices** (default 1), each with two wavetable oscillators, a **2-lane X-Mod** section (Lane A phase/index: FM/PM/TZFM + Sync + Feedback; Lane B amplitude: AM / RM / SSB frequency-shift — see [docs/mu-tant/mu-tant-xmod-design.md](../docs/mu-tant/mu-tant-xmod-design.md)), shared scale-quantised pitch, mu-core filter, a per-voice drawable **gater**, and a shared insert effect. Builds Standalone + VST3 + CLAP (Debug + Release; both stay local).
 
 The editor inherits `mu-core/UI/EditorShellBase.h` — same TransportBar, About, StatusBar, window sizing, and `MuLookAndFeel` knob style as mu-Clid by construction. The differences vs mu-Clid are the voice engine and (eventually) the sequencer model.
 
@@ -40,8 +40,8 @@ The editor inherits `mu-core/UI/EditorShellBase.h` — same TransportBar, About,
 
 ## Build targets
 
-- `mu-tant` — wavetable drone synth, **Standalone + VST3 + CLAP** (VST3 via `FORMATS`, CLAP via `clap_juce_extensions_plugin`; built local, not shipped to testers)
-- `mu-tant-tests` — DSP UnitTest runner; **builds as part of `ALL_BUILD`** (dropped EXCLUDE_FROM_ALL — every mu-tant build builds the tests). Intentionally differs from `mu-clid-tests` (`EXCLUDE_FROM_ALL`): mu-tant is small + Debug-only/local so building its tests every build is cheap, whereas mu-clid's heavy suite would slow its tester-deploy Release build. Documented as a deliberate split in [mu-clid/CLAUDE.md](../mu-clid/CLAUDE.md).
+- `mu-tant` — wavetable drone synth, **Standalone + VST3 + CLAP** (VST3 via `FORMATS`, CLAP via `clap_juce_extensions_plugin`; built local)
+- `mu-tant-tests` — DSP UnitTest runner; **builds as part of `ALL_BUILD`** (dropped EXCLUDE_FROM_ALL — every mu-tant build builds the tests). Intentionally differs from `mu-clid-tests` (`EXCLUDE_FROM_ALL`): mu-tant is small + Debug-only/local so building its tests every build is cheap, whereas mu-clid's heavy suite would slow its Release build. Documented as a deliberate split in [mu-clid/CLAUDE.md](../mu-clid/CLAUDE.md).
 
 ## Source layout
 

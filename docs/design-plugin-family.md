@@ -1055,7 +1055,7 @@ It no longer gates features, so its Debug-bypass meaning disappears. Remove it f
 ### Testing
 
 - **Unit (mu-core-tests):** `SupportPromptPolicyTests.cpp` covers every input combination of `shouldShow` and the once-per-process flag (the flag is reset through a test-only `resetForTests()`). A second test builds `TestProcessorCore` over a temp `PropertiesFile` and checks `setSupportPromptHidden` round-trips through the settings file, and that `isSupporter()` is true after `onlineActivated` is set and false otherwise.
-- **Manual / Debug:** with no key a Debug build now shows the prompt on first open (the Debug bypass is gone), so it is exercised on every tester run. To see it again after "don't show again", delete the `supportPromptHidden` line from `%APPDATA%\TDP\<app>.xml`, or run with the env var `MU_SUPPORT_PROMPT=reset` (read once in `initLicensing`, Debug-only, clears the key). To see the supporter path, activate with the verified £0 key.
+- **Manual / Debug:** with no key a Debug build now shows the prompt on first open (the Debug bypass is gone), so it is exercised on every test run. To see it again after "don't show again", delete the `supportPromptHidden` line from `%APPDATA%\TDP\<app>.xml`, or run with the env var `MU_SUPPORT_PROMPT=reset` (read once in `initLicensing`, Debug-only, clears the key). To see the supporter path, activate with the verified £0 key.
 - **Regression:** the existing unit and round-trip tests must show no behavioural change in a licensed state; the full-preset save and an 8-track, 64-step preset must work with no key present (add one such case to each of mu-clid-tests and mu-tant-tests, replacing any test that asserts the demo clamp, for example `limitToCells`, which can stay as a pure `GatePattern` function test or go with the feature).
 
 ### Staged order (each stage buildable and independently shippable)
@@ -1151,7 +1151,7 @@ If the owner wants brand-new IDs anyway (a clean break), do it as its own decisi
 |---|---|---|
 | Installer | `mu-clid/installer/mu-Clid-Lite.iss` (rename, new output filename, `[InstallDelete]`, keep `AppId`), `cmake/BuildInstallerLite.cmake` | 1, 4 |
 | Release workflow | `.github/workflows/release.yml` staging dirs, copy paths and the three zip names (Windows, macOS on hold, Linux): `mu-Clid-Lite-*.zip` | 1, 3 (paths) |
-| Packaging and deploy | `cmake/PackageRelease.cmake` (`-DPRODUCT=`), `cmake/DeployReleaseLite.cmake`, the `MUFAMILY_DEPLOY_TESTERS` blocks in `mu-clid/CMakeLists.txt`, the OneDrive tester folder name | 1, 3, 4 |
+| Packaging and deploy | `cmake/PackageRelease.cmake` (`-DPRODUCT=`), `cmake/DeployReleaseLite.cmake`, the deploy blocks in `mu-clid/CMakeLists.txt` | 1, 3, 4 |
 | Build tooling and hooks | `scripts/mu_build_artifacts.ps1` (artefact list that the post-build hook prints), `tests/scripts/check-build-artifacts.ps1`, `tests/scripts/run-pluginval.ps1`, `tests/scripts/check-core-boundary.ps1`, `check-mod-targets.ps1` (product root list), `/build` and `/release` skills | 1, 3 |
 | CMake | root `CMakeLists.txt` `add_subdirectory`, `mu-clid/CMakeLists.txt` Lite block, new `mu-<slug>/CMakeLists.txt`, `increment_build_number` dependency, `versioninfo-lite.rc.in`, `resources/` icon and the shared `mu-clid-resources` target | 3 |
 | Source | `MUCLID_LITE_BUILD` sites, `LiteEditor`, `computeLiteTransport` and the Lite processBlock helpers, `lite_midiNote` parameters | 3 |
@@ -1214,13 +1214,10 @@ Owner rule, 2026-10-09. The family tracks the latest stable JUCE release rather 
 
 The live products (mu-Clid, mu-Tant, mu-link, mu-Clid MIDI) use [version.txt](version.txt), currently 1.1 (the UI rework, build 972). The pre-release products (mu-On, mu-Toni) use [version-pre.txt](version-pre.txt), currently 0.1 (the .1 marks the metal-panel design upgrade, Andy 2026-10-11). Plugins show `v1.1.0.NNN` / `v0.1.0.NNN`, commits `v1.1.NNN`. The build number never resets on a major/minor change (the Release ≤ Debug guard and the in-plugin update check rely on it). Change a base **only** by editing its file, and only when Andy says so.
 
-### Shipping a Release (three ways, every time)
+### Shipping a Release (two ways, every time)
 
-(a) artefacts copied to the OneDrive tester share (Release configured with
-`-DMUFAMILY_DEPLOY_TESTERS=ON`, OFF by default — deploys mu-clid + Lite, mu-tant, mu-on,
-mu-toni, mu-link's exe via guarded POST_BUILDs; a plain Release stays local; Debug never
-deploys); (b) a zip built and uploaded to the GitHub "latest release" so website download
-links resolve; (c) **release notes promoted** — move accumulated "Next release · In
+Release builds stay local (nothing is deployed). (a) a zip built and uploaded to the GitHub "latest release" so website download
+links resolve; (b) **release notes promoted** — move accumulated "Next release · In
 testing" items into a new dated `v1.1.NNN` section in each affected product's notes
 (`site/mu-clid-releases.html`, `site/mu-tant-releases.html`), clear the In-Testing section,
 and bump the hardcoded version default in `site/download.html`.

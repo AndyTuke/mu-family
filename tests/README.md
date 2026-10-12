@@ -38,7 +38,7 @@ presets live under each product's content folder (e.g. `$MUCLID_CONTENT_DIR/Rhyt
 ## Running
 
 ```bash
-# Make sure the standalones are built (Debug is faster to iterate, Release is what testers see)
+# Make sure the standalones are built (Debug is faster to iterate, Release is what users see)
 cmake --build build --config Debug
 
 # `--config` is required (a stale build is never rendered silently); a render that hangs for
@@ -276,11 +276,10 @@ pwsh tests/scripts/check-build-artifacts.ps1 -Config Release
 It scans the built VST3/CLAP/Standalone binaries (mu-clid + mu-Clid MIDI) for the UTF-8
 `µ-Clid` display name + absence of the mangled `?-Clid` (#654), and checks
 `build_number.txt` against `BuildNumber.h`. Run it after a Release build before
-trusting the OneDrive deploy.
+trusting a Release build.
 
 ## CI integration (future)
 
 The pipeline exits with non-zero status when any assertion fails, so
 `run-listening-tests.py` plugs into CI as a build step. Builds where the test
-suite goes red should be blocked from auto-deploying to the OneDrive tester
-folder.
+suite goes red should be blocked from shipping.

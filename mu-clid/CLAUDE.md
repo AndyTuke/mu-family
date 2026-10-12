@@ -9,9 +9,9 @@ Product-specific guidance for working in `mu-clid/`. Read alongside the family-w
 ## Build targets
 
 - `mu-clid` — full plugin (VST3 + CLAP + Standalone)
-- `mu-clid-tests` — console UnitTest runner; **`EXCLUDE_FROM_ALL TRUE`**, built on demand via `cmake --build build --target mu-clid-tests`. **Deliberate divergence from mu-tant-tests** (which builds every default build): mu-clid's Release build deploys to testers via OneDrive, and compiling the heavy 140-test suite (links `juce_audio_processors` + many cpps) on every tester-deploy build costs time for no deploy benefit. mu-tant is small + Debug-only/local, so building its tests every time is cheap. This is a build-speed concession, not family-consistency drift — keep the split unless the deploy-build cost stops mattering.
+- `mu-clid-tests` — console UnitTest runner; **`EXCLUDE_FROM_ALL TRUE`**, built on demand via `cmake --build build --target mu-clid-tests`. **Deliberate divergence from mu-tant-tests** (which builds every default build): compiling the heavy 140-test suite (links `juce_audio_processors` + many cpps) on every Release build costs time for no benefit. mu-tant is small + Debug-only/local, so building its tests every time is cheap. This is a build-speed concession, not family-consistency drift — keep the split unless the deploy-build cost stops mattering.
 
-Release build of `mu-clid_Standalone` triggers the OneDrive post-build deploy to `MUFAMILY_WIN_DIST`. Debug skips deploy. The installer requires Inno Setup.
+Release builds stay local. The installer requires Inno Setup.
 
 ## Source layout
 

@@ -171,7 +171,7 @@ demo/limited mode** — the full plugin is freely distributed.
 - **About panel** shows the normal product/version/credits but **no licence
   status / activate button**.
 - Everything else is standard: still builds Standalone + VST3 + CLAP, still ships
-  via the installer + the cross-platform GitHub release, still deploys to testers.
+  via the installer + the cross-platform GitHub release.
   It just skips the paywall.
 
 This is the family's first freeware product — a deliberate difference from

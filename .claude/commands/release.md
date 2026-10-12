@@ -1,15 +1,14 @@
 Ship a complete release of the mu-family. **Only run when the owner explicitly asks for a release.** Run the whole pipeline beginning to end — do not stop after the local build. A Release reuses the last Debug number (never increments).
 
-## 1. Build + deploy (local Windows)
+## 1. Build (local Windows)
 
-1. Reconfigure with tester deploy on: `cmake -B build -DMUFAMILY_DEPLOY_TESTERS=ON`
-   (`MUFAMILY_DEPLOY_TESTERS` is OFF by default; ON copies every product to the OneDrive tester share via POST_BUILD.)
-2. Build Debug (bumps the number), then Release (reuses it, deploys):
+1. Reconfigure: `cmake -B build` (Release builds stay local; nothing is deployed).
+2. Build Debug (bumps the number), then Release (reuses it):
    `cmake --build build --config Debug && cmake --build build --config Release`
    - Run builds through the **Bash tool** so the artifact/warning/deploy hooks fire. Heavy build → run in background.
    - Release ≤ last Debug always; a higher Release aborts with FATAL_ERROR — surface it, don't work around.
    - If exe versions look stale, build the explicit format targets (see `/build`).
-3. Read the final number from `mu-core/BuildNumber.h`. Verify the Windows artefacts landed in the OneDrive share (mu-clid + mu-Clid MIDI, mu-tant, mu-on, mu-toni, mu-link).
+3. Read the final number from `mu-core/BuildNumber.h`.
 
 ## 2. Pin the build number for CI
 
@@ -34,4 +33,4 @@ For each affected product (`site/mu-clid-releases.html`, `site/mu-tant-releases.
 
 ## 5. Report
 
-Report the build number (from `BuildNumber.h`), the OneDrive deploy, the dispatched CI run URL, and the site push. End with the `## Release builds` artefact list. Note that the GitHub release assets appear once CI finishes (Linux takes a few minutes).
+Report the build number (from `BuildNumber.h`), the dispatched CI run URL, and the site push. End with the `## Release builds` artefact list. Note that the GitHub release assets appear once CI finishes (Linux takes a few minutes).
