@@ -3,7 +3,7 @@
 #include <cmath>
 
 #include "Audio/ToniVoice.h"
-#include "Sequencer/Arpeggiator.h"
+#include "Sequencer/ArpSequencer.h"
 #include <climits>
 
 // Per-voice arpeggiator runner: an arp clock driving one ToniVoice.

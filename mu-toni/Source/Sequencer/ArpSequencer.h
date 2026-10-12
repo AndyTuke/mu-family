@@ -4,7 +4,7 @@
 #include "Audio/Scales.h"
 #include <cmath>
 
-// mu-toni arpeggiator — the deterministic note-generation core.
+// mu-toni ArpSequencer — the deterministic note-generation core.
 // See docs/mu-toni/design-sequencer.md. Pure functions (no state, no allocation),
 // so the whole arp is a modulation target and identical every loop.
 //

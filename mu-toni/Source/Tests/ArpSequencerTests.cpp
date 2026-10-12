@@ -3,7 +3,7 @@
 // Direction scan at its anchor points, step→MIDI mapping, and determinism.
 
 #include <juce_core/juce_core.h>
-#include "Sequencer/Arpeggiator.h"
+#include "Sequencer/ArpSequencer.h"
 
 using namespace mu_toni;
 
@@ -30,10 +30,10 @@ bool scanEquals(int poolLen, float dir, std::initializer_list<int> expected)
 }
 } // namespace
 
-class ArpeggiatorTest : public juce::UnitTest
+class ArpSequencerTest : public juce::UnitTest
 {
 public:
-    ArpeggiatorTest() : juce::UnitTest("Arpeggiator engine", "mu-toni") {}
+    ArpSequencerTest() : juce::UnitTest("ArpSequencer engine", "mu-toni") {}
 
     void runTest() override
     {
@@ -116,4 +116,4 @@ public:
     }
 };
 
-static ArpeggiatorTest arpeggiatorTest;
+static ArpSequencerTest arpSequencerTest;

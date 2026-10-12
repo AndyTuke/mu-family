@@ -59,7 +59,7 @@ It's the "engine swap-point" pattern: same UX, same mixer, same modulation.
 | **Preset system + MIDI program-change** | `mu-core` (`ProcessorBase` virtuals) | Standard, **same MIDI settings as mu-tant**. Extensions renamed to the arp's real noun — see below. μ-Toni **adds played-note input** on top (root + trigger) — the one MIDI departure, in [design-sequencer.md](design-sequencer.md) §"MIDI control". |
 
 **Net new code** lives under `mu-toni/Source/`: the arpeggiator engine
-(`Sequencer/Arpeggiator.h` + `ArpVoiceRunner.h`), the note-on/off + ADSR wiring
+(`Sequencer/ArpSequencer.h` + `ArpVoiceRunner.h`), the note-on/off + ADSR wiring
 into the voice (`Audio/ToniVoice.h`), its editor panel (`UI/EnginePanel.h`), the
 scale/chord tables (`Audio/Scales.h`, `Audio/Chords.h`), and the arp
 modulation-destination provider (`Modulation/MuToniModDest.h`).

@@ -119,7 +119,7 @@ juce_add_console_app(mu-toni-tests PRODUCT_NAME "mu-toni-tests")
 target_sources(mu-toni-tests PRIVATE
     Source/Tests/TestMain.cpp
     Source/Tests/ApvtsLayoutTests.cpp
-    Source/Tests/ArpeggiatorTests.cpp   # T1 — arp engine (Sequencer/Arpeggiator.h)
+    Source/Tests/ArpSequencerTests.cpp   # T1 — arp engine (Sequencer/ArpSequencer.h)
     Source/Tests/ToniVoiceTests.cpp     # T2 — wavetable voice + X-Mod render
     Source/Tests/ArpRunnerTests.cpp     # T3 — arp step timing (beat grid / MIDI trigger)
     Source/Tests/ProcessorSeamTests.cpp  # the real PluginProcessor, headless (layer ownership)
