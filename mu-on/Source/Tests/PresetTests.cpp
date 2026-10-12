@@ -150,7 +150,7 @@ public:
             a.clear();
             a.setOn(0, 0, true); a.setOn(0, 5, true); a.setAccent(0, 5, true);
             StepPattern b;
-            b.loadDefaultGroove();
+            b.loadDefaultGroove(0, EngineType::Kick);
             b.deserialiseTrack(2, a.serialiseTrack(0));
             for (int s = 0; s < StepPattern::kNumSteps; ++s)
             {

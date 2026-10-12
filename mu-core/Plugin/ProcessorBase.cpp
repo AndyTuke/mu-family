@@ -602,6 +602,39 @@ void ProcessorBase::remapSidechainSources(const std::function<int(int)>& remap)
         remapOne(ret);
 }
 
+juce::ValueTree ProcessorBase::captureComposedState()
+{
+    auto state = mu_pp::captureState(apvts.state.getType(), layerLayout, layerExtras);
+    if (canEditLayers())
+    {
+        // The colour is a slot's identity, not part of its sound, so it lives on the full state, not in a layer node.
+        juce::StringArray colours;
+        for (int i = 0; i < mu_limits::kMaxLayers; ++i)
+            colours.add(juce::String(layers[(size_t) i] != nullptr ? layers[(size_t) i]->colourIndex : i));
+        state.setProperty("numVoices", numLayers.load(std::memory_order_relaxed), nullptr);
+        state.setProperty("voiceColours", colours.joinIntoString(","), nullptr);
+    }
+    return state;
+}
+
+void ProcessorBase::applyComposedState(const juce::ValueTree& state)
+{
+    mu_pp::applyState(state, layerLayout, layerExtras);
+    if (! canEditLayers()) return;
+
+    // Count last, so the audio thread never sees a count ahead of the data; then the colours (a state without colours keeps the current ones).
+    numLayers.store(savedLayerCount(state));
+    const auto toks = juce::StringArray::fromTokens(state.getProperty("voiceColours", "").toString(), ",", "");
+    for (int i = 0; i < mu_limits::kMaxLayers && i < toks.size(); ++i)
+        if (layers[(size_t) i] != nullptr)
+            layers[(size_t) i]->colourIndex = juce::jlimit(0, mu_limits::kMaxLayers - 1, toks[i].getIntValue());
+}
+
+int ProcessorBase::savedLayerCount(const juce::ValueTree& state) const
+{
+    return juce::jlimit(1, mu_limits::kMaxLayers, (int) state.getProperty("numVoices", unsavedLayerCount));
+}
+
 int ProcessorBase::firstUnusedColourIndex() const
 {
     std::array<bool, mu_limits::kMaxLayers> used {};
@@ -643,6 +676,7 @@ int ProcessorBase::addLayer()
 
     // Phase 3: the slot's parameters back to defaults, still suspended so no block sees stale values.
     resetLayerParams(n);
+    layerAdded(n);
     return n;
 }
 
@@ -686,6 +720,7 @@ bool ProcessorBase::removeLayer(int idx)
     // Phase 3: parameter values. Strips that ducked from the removed layer now duck from nothing and
     // the others follow their layer down (translated before the values shift).
     remapSidechainSources([idx](int v) { return mu_mix::sidechainParamAfterRemove(v, idx, mu_limits::kMaxLayers); });
+    remapLayerReferences([idx](int i) { return mu_mix::sidechainAfterRemove(i, idx, mu_limits::kMaxLayers); });
     for (int d = idx; d < n - 1; ++d) copyLayerParams(d + 1, d);
     resetLayerParams(n - 1);                    // the vacated top slot
     return true;
@@ -719,6 +754,7 @@ bool ProcessorBase::swapLayers(int a, int b)
     // Phase 3: parameter values. A strip that ducked from one swapped layer now ducks from the other
     // (translated before the values swap, so each strip's own source moves with it).
     remapSidechainSources([a, b](int v) { return mu_mix::sidechainParamAfterSwap(v, a, b, mu_limits::kMaxLayers); });
+    remapLayerReferences([a, b](int i) { return mu_mix::sidechainAfterSwap(i, a, b, mu_limits::kMaxLayers); });
     swapLayerParams(a, b);
     return true;
 }

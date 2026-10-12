@@ -351,55 +351,11 @@ struct MuTantProcessorSeamTests : juce::UnitTest
 
     void structuralEditsVersusProcessBlock()
     {
-        beginTest("addLayer / removeLayer / swapLayers on the message thread vs processBlock on a worker, across block sizes");
         TempStorage storage;
         ExposedPluginProcessor p;
-        int count = 0;
-        const int* sizes = blockSizes(count);
-        for (int k = 0; k < count; ++k)
-        {
-            const int n = sizes[k];
-            p.prepareToPlay(48000.0, n);
-            bypassGate(p.apvts, 0);
-
-            BlockRenderer renderer(p, n);
-            renderer.start();
-            expect(renderer.waitForAudible(), "the worker is rendering before the edits start");
-
-            std::mt19937 rng(12345u + (unsigned) k);
-            const int rounds = 6;
-            for (int r = 0; r < rounds; ++r)
-            {
-                // Grow to eight voices, shuffling as we go.
-                while (p.numLayers.load() < mu_limits::kMaxLayers)
-                {
-                    const int idx = p.addLayer();
-                    expect(idx >= 0, "addLayer succeeds below the limit");
-                    if (idx < 0) break;
-                    bypassGate(p.apvts, idx);
-                    const int live = p.numLayers.load();
-                    if (live > 1) p.swapLayers((int) (rng() % (unsigned) live), (int) (rng() % (unsigned) live));
-                }
-                expectLayerInvariants(p, "grown, block size " + juce::String(n));
-
-                // Shrink back to one, removing from random positions.
-                while (p.numLayers.load() > 1)
-                {
-                    const bool removed = p.removeLayer((int) (rng() % (unsigned) p.numLayers.load()));
-                    expect(removed, "removeLayer succeeds above one voice");
-                    if (! removed) break;
-                    const int live = p.numLayers.load();
-                    if (live > 1) p.swapLayers(0, live - 1);
-                }
-                expectLayerInvariants(p, "shrunk, block size " + juce::String(n));
-                expect(! p.removeLayer(0), "the last voice cannot be removed");
-            }
-
-            expect(renderer.waitForBlocks(2) && renderer.audibleBlocksRendered() > 0, "the audio thread was not stalled by the edits");
-            renderer.stop();
-            expect(! renderer.sawInsaneOutput(), "block size " + juce::String(n) + ": output stayed finite and bounded");
-            expect(! p.layerEditInFlight.load(), "no edit left the in-flight flag set");
-        }
+        runStructuralEditStress(*this, p,
+            [&](int layer) { bypassGate(p.apvts, layer); },
+            [&](const juce::String& where) { expectLayerInvariants(p, where); });
     }
 
     void wavetableImportVersusProcessBlock()

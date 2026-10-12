@@ -48,6 +48,8 @@ public:
 
 private:
     ProcessorBase& proc;
+    juce::String   noun;
+    void updateAddEnabled();   // Add is greyed (not hidden) at kMaxLayers, so the sidebar never reflows
 
     // Holds the items; in metal style it paints their raised boxes behind them, so each
     // box's shadow falls across the gap below it rather than being clipped by its item.

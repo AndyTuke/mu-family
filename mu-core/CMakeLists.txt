@@ -86,6 +86,8 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/ChannelHeaderBar.cpp"
     # Shared per-layer panel shell (header strip + product content + modulators).
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/LayerPanel.cpp"
+    # Shared add / delete / reorder editor glue for products with variable layers.
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/LayerEditController.cpp"
     # Shared insert-effect voice subsection (algo dropdown + 4 slot knobs).
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/Voice/InsertSubsection.cpp"
     # Shared voice band (Pitch / Filter / Amp / Effects layout + drawing) and its cell-grid section.

@@ -20,8 +20,8 @@ namespace
 void PluginProcessor::setupLayerState()
 {
     juce::StringArray prefixes;
-    for (int l = 0; l < kNumChannels; ++l) prefixes.add(layerParamPrefix(l));
-    initLayerState(prefixes, legacyLayerParamPrefixes(kNumChannels));   // older APVTS dumps used "v{N}_"
+    for (int l = 0; l < mu_limits::kMaxLayers; ++l) prefixes.add(layerParamPrefix(l));
+    initLayerState(prefixes, legacyLayerParamPrefixes(mu_limits::kMaxLayers));   // older APVTS dumps used "v{N}_"
 }
 
 // Any saved state (host session or full preset, either format) in the composed shape. Sessions
@@ -60,7 +60,7 @@ void PluginProcessor::useLoadedFullPreset(juce::ValueTree state)
 // A layer preset: the layer's node (prefix-free param rows + modulators), so it loads into any layer.
 void PluginProcessor::saveLayerPreset(int layer, const juce::String& name)
 {
-    if (layer < 0 || layer >= kNumChannels) return;
+    if (layer < 0 || layer >= mu_limits::kMaxLayers) return;
     if (auto xml = captureLayerNode(layer, kLayerPresetTag).createXml())
         mu_pp::writeXmlAtomically(*xml, getLayerPresetDir().getChildFile(mu_pp::safePresetFileName(name, "Layer")
                                                                            + "." + getLayerPresetExtension()),
@@ -69,7 +69,7 @@ void PluginProcessor::saveLayerPreset(int layer, const juce::String& name)
 
 void PluginProcessor::loadLayerPreset(int layer, const juce::File& file)
 {
-    if (layer < 0 || layer >= kNumChannels || ! file.existsAsFile()) return;
+    if (layer < 0 || layer >= mu_limits::kMaxLayers || ! file.existsAsFile()) return;
     auto xml = juce::XmlDocument::parse(file);
     if (xml == nullptr || ! xml->hasTagName(kLayerPresetTag))
     {
@@ -85,14 +85,6 @@ void PluginProcessor::applyLayerTree(int layer, const juce::ValueTree& tree)
 {
     applyLayerNode(layer, tree);
     if (onLayerPresetCommitted) onLayerPresetCommitted(layer);
-}
-
-// Reset a layer: an empty node puts its params back to their defaults and clears its modulators.
-void PluginProcessor::resetLayer(int layer)
-{
-    if (layer < 0 || layer >= kNumChannels) return;
-    cancelPendingSwap(layer);   // a staged swap would re-fill what we're resetting
-    applyLayerNode(layer, {});
 }
 
 juce::File PluginProcessor::getLayerPresetDir() const { return getContentDir().getChildFile("Arps"); }

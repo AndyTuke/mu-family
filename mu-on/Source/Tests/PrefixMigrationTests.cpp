@@ -1,7 +1,8 @@
-// The lane parameter-id prefixes moved from "k_ b_ h_ s_ r_" (by lane type) to "t0_".."t4_" (by slot).
-// These tests load data captured from the build BEFORE the rename (the XML and JSON below are verbatim
-// lines of that build's output) into the real, headless PluginProcessor and check that every value lands
-// on its renamed parameter, and that the modulation tables follow the new prefixes.
+// The lane parameter-id prefixes moved from "k_ b_ h_ s_ r_" (by lane type) to "t0_".."t4_" (by slot),
+// then to engine-qualified ids ("t0_kick_tune") when the lanes became variable layers with an engine.
+// These tests load data captured from the builds BEFORE those renames (the XML and JSON below are
+// verbatim lines of that output) into the real, headless PluginProcessor and check that every value lands
+// on its renamed parameter, and that the modulation tables follow the new ids.
 
 #include "Plugin/PluginProcessor.h"
 #include "Modulation/MuOnModDest.h"
@@ -21,7 +22,7 @@ namespace
   <PARAM id="s_tune" value="3.5"/>
 </MuOnState>)";
 
-    // A format-2 state from the same build: rows carry the id without any prefix.
+    // A format-2 state from the build before the engine-qualified ids: rows carry the id without any prefix.
     const char* const kFormat2State = R"(<MuOnState format="2">
   <Slots>
     <Slot idx="0">
@@ -71,17 +72,22 @@ struct MuOnPrefixMigrationTests : juce::UnitTest
         juce::AudioProcessor::copyXmlToBinary(*juce::XmlDocument::parse(xml), block);
         p.setStateInformation(block.getData(), (int) block.getSize());
 
-        expectWithinAbsoluteError(getParam(p.apvts, "t0_tune"), 60.0f, 0.05f);
-        expectWithinAbsoluteError(getParam(p.apvts, "t0_drive"), 0.7f, 0.002f);
-        expectEquals((int) getParam(p.apvts, "t1_wave"), 2);
-        expectWithinAbsoluteError(getParam(p.apvts, "t1_cut"), 1200.0f, 0.5f);
-        expectWithinAbsoluteError(getParam(p.apvts, "t2_dec"), 100.0f, 0.5f);
-        expectWithinAbsoluteError(getParam(p.apvts, "t3_tune"), 3.5f, 0.05f);
-        expectWithinAbsoluteError(getParam(p.apvts, "t4_d1"), 0.1f, 0.002f);
-        expectWithinAbsoluteError(getParam(p.apvts, "t4_size"), 0.9f, 0.002f);
-        expectWithinAbsoluteError(getParam(p.apvts, "t1_tune"), 41.2f, 0.05f);   // untouched params stay at their default
-        for (const char* old : { "k_tune", "b_cut", "h_dec", "s_tune", "r_size" })
+        expectWithinAbsoluteError(getParam(p.apvts, "t0_kick_tune"), 60.0f, 0.05f);
+        expectWithinAbsoluteError(getParam(p.apvts, "t0_kick_drive"), 0.7f, 0.002f);
+        expectEquals((int) getParam(p.apvts, "t1_bass_wave"), 2);
+        expectWithinAbsoluteError(getParam(p.apvts, "t1_bass_cut"), 1200.0f, 0.5f);
+        expectWithinAbsoluteError(getParam(p.apvts, "t2_hat_dec"), 100.0f, 0.5f);
+        expectWithinAbsoluteError(getParam(p.apvts, "t3_snare_tune"), 3.5f, 0.05f);
+        expectWithinAbsoluteError(getParam(p.apvts, "t4_rumble_d1"), 0.1f, 0.002f);
+        expectWithinAbsoluteError(getParam(p.apvts, "t4_rumble_size"), 0.9f, 0.002f);
+        expectWithinAbsoluteError(getParam(p.apvts, "t1_bass_tune"), 41.2f, 0.05f);   // untouched params stay at their default
+        for (const char* old : { "k_tune", "b_cut", "h_dec", "s_tune", "r_size", "t0_tune", "t1_cut", "t4_size" })
             expect(p.apvts.getParameter(old) == nullptr, juce::String("the old id no longer exists: ") + old);
+
+        // Five lanes become five layers, layer i running engine i.
+        expectEquals(p.getNumChannels(), 5);
+        for (int i = 0; i < 5; ++i)
+            expectEquals((int) getParam(p.apvts, "t" + juce::String(i) + "_eng"), i);
     }
 
     void runTest() override
@@ -91,13 +97,14 @@ struct MuOnPrefixMigrationTests : juce::UnitTest
         beginTest("an APVTS dump written before the rename (k_ b_ h_ s_ r_ ids) still loads");
         loadAndCheck(kLegacyDump);
 
-        beginTest("a format-2 state written before the rename still loads, steps included");
+        beginTest("a format-2 state written before the engine-qualified ids still loads, steps included");
         {
             loadAndCheck(kFormat2State);
 
             TempStorage storage;
             mu_on::PluginProcessor p;
             for (int s = 0; s < 16; ++s) p.pattern().setOn(0, s, false);   // wipe the Kick row, then load it back
+            expect(! p.pattern().isOn(0, 4), "the row is wiped");
             juce::MemoryBlock block;
             juce::AudioProcessor::copyXmlToBinary(*juce::XmlDocument::parse(kFormat2State), block);
             p.setStateInformation(block.getData(), (int) block.getSize());
@@ -114,7 +121,7 @@ struct MuOnPrefixMigrationTests : juce::UnitTest
             mu_on::PluginProcessor p;
             auto& map = p.getMidiControlMap();
             expectEquals(map.size(), 6);
-            const char* expected[] = { "t0_tune", "t1_cut", "t2_dec", "t3_tune", "t4_size", "ch1_lvl" };
+            const char* expected[] = { "t0_kick_tune", "t1_bass_cut", "t2_hat_dec", "t3_snare_tune", "t4_rumble_size", "ch1_lvl" };
             for (int i = 0; i < 6; ++i)
             {
                 const auto id = map.get(map.find(false, 1, 21 + i)).action.paramId;
@@ -122,26 +129,29 @@ struct MuOnPrefixMigrationTests : juce::UnitTest
                 expect(p.apvts.getParameter(id) != nullptr, "mapped id " + id + " is a live parameter");
             }
             const auto saved = mapFile.loadFileAsString();
-            expect(saved.contains("t4_size") && ! saved.contains("r_size") && ! saved.contains("\"k_tune"),
+            expect(saved.contains("t4_rumble_size") && ! saved.contains("r_size") && ! saved.contains("\"k_tune"),
                    "the file on disk holds the new ids");
         }
 
-        beginTest("modulation targets name live parameters under their lane's prefix; ids are unchanged");
+        beginTest("modulation targets name live parameters on every track; ids are unchanged");
         {
             TempStorage storage;
             mu_on::PluginProcessor p;
-            for (int lane = 0; lane < mu_on::kNumChannels; ++lane)
-            {
-                int n = 0;
-                const auto* t = mu_on::destsForLane(lane, n);
-                expect(n > 0, "lane " + juce::String(lane) + " has targets");
-                for (int i = 0; i < n; ++i)
+            for (int track = 0; track < mu_limits::kMaxLayers; ++track)
+                for (int e = 0; e < mu_on::kNumEngineTypes; ++e)
                 {
-                    expect(p.apvts.getParameter(t[i].param) != nullptr, juce::String("live parameter: ") + t[i].param);
-                    expect(juce::String(t[i].param).startsWith(mu_on::layerParamPrefix(lane)), juce::String(t[i].param));
+                    const auto engine = mu_on::engineFromIndex(e);
+                    int n = 0;
+                    const auto* t = mu_on::destsForEngine(engine, n);
+                    expect(n > 0, juce::String(mu_on::engineName(engine)) + " has targets");
+                    for (int i = 0; i < n; ++i)
+                    {
+                        const auto id = mu_on::layerParamPrefix(track) + t[i].param;
+                        expect(p.apvts.getParameter(id) != nullptr, "live parameter: " + id);
+                    }
                 }
-            }
-            expect(mu_on::isValidLaneDest(mu_on::Kick, "k.tune.prop") && mu_on::isValidLaneDest(mu_on::Rumble, "r.size.prop"),
+            expect(mu_on::isValidEngineDest(mu_on::EngineType::Kick, "k.tune.prop")
+                   && mu_on::isValidEngineDest(mu_on::EngineType::Rumble, "r.size.prop"),
                    "mod-target ids kept their letters");
         }
     }

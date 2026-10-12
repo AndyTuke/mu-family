@@ -1,9 +1,9 @@
-// Unit tests for mu-On's per-lane modulation wiring:
+// Unit tests for mu-On's per-engine modulation wiring:
 //   • depth is a percentage of the knob's range: a full-depth mod moves the whole 0..1
 //     proportion (the family standard, mu-core Modulation/ModTarget.h),
-//   • the per-lane MuOnModDest provider resolves dropdown ids <-> destination strings and
-//     rejects another lane's destinations,
-//   • a lane's modulators serialise/deserialise round-trip, dropping foreign destinations.
+//   • the per-engine MuOnModDest tables resolve dropdown ids <-> destination strings and
+//     reject another engine's destinations,
+//   • a track's modulators serialise/deserialise round-trip, dropping foreign destinations.
 
 #include <juce_data_structures/juce_data_structures.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -49,7 +49,7 @@ public:
             expectWithinAbsoluteError(pv["k.tune.prop"], 1.25f, 0.001f);
         }
 
-        beginTest("every lane's targets: depth is a percentage of the knob's range");
+        beginTest("every engine's targets: depth is a percentage of the knob's range");
         {
             juce::StringArray wrong;
             wrong.addArray(mu_mod::checks::depthNotProportional(kKickDests));
@@ -60,52 +60,52 @@ public:
             expect(wrong.isEmpty(), "targets whose depth isn't a % of range: " + wrong.joinIntoString(", "));
         }
 
-        beginTest("per-lane destination tables are lane-scoped");
+        beginTest("per-engine destination tables are engine-scoped");
         {
-            // b.cut is the 3rd Bass destination (index 2) and backs the t1_cut param.
+            // b.cut is the 3rd Bass destination (index 2) and backs the bass_cut param of any track.
             int n = 0;
-            const ModDestEntry* bassT = destsForLane(Bass, n);
+            const ModDestEntry* bassT = destsForEngine(EngineType::Bass, n);
             expect(n >= 3);
             expect(std::string(bassT[2].id) == "b.cut.prop");
-            expect(std::string(bassT[2].param) == "t1_cut");
+            expect(std::string(bassT[2].param) == "bass_cut");
 
-            // A Kick destination is not valid for the Bass lane, and vice-versa.
-            expect(isValidLaneDest(Bass, "b.cut.prop"));
-            expect(! isValidLaneDest(Bass, "k.tune.prop"));
-            expect(isValidLaneDest(Kick, "k.tune.prop"));
+            // A Kick destination is not valid for a Bass track, and vice-versa.
+            expect(isValidEngineDest(EngineType::Bass, "b.cut.prop"));
+            expect(! isValidEngineDest(EngineType::Bass, "k.tune.prop"));
+            expect(isValidEngineDest(EngineType::Kick, "k.tune.prop"));
         }
 
-        beginTest("per-lane dest tables are pinned to the engine setParams order (integrity guard)");
+        beginTest("per-engine dest tables are pinned to the engine setParams order (integrity guard)");
         {
-            // Each lane table's ROW ORDER is silently coupled to three things at once: the
+            // Each engine table's ROW ORDER is silently coupled to three things at once: the
             // 1-based dropdown id (addItem(alias, i+1)), the resolved out[] index, and the
-            // positional argument order of that lane's Engine::setParams() (the GrooveVoices
+            // positional argument order of that engine's setParams() (the GrooveVoices
             // dispatch). An insert/reorder/delete in any one would re-route modulation to the
             // wrong engine param with no other failure - so pin the full ordered id list per
-            // lane here. If a dest is added, update BOTH this list and the engine dispatch.
+            // engine here. If a dest is added, update BOTH this list and the engine dispatch.
             // Counts equal each engine's modulatable arity: Kick 5, Bass 10 (wave choice
             // omitted), Hat/Snare 2, Rumble 9 (bpm transport excluded).
-            auto pinLane = [this](int lane, const std::vector<std::string>& expected)
+            auto pinLane = [this](EngineType engine, const std::vector<std::string>& expected)
             {
                 int n = 0;
-                const ModDestEntry* t = destsForLane(lane, n);
+                const ModDestEntry* t = destsForEngine(engine, n);
                 expectEquals(n, (int) expected.size(),
-                             "lane " + juce::String(lane) + " dest count");
+                             juce::String(engineName(engine)) + " dest count");
                 for (int i = 0; i < n && i < (int) expected.size(); ++i)
                     expect(std::string(t[i].id) == expected[(size_t) i],
-                           "lane " + juce::String(lane) + " dest[" + juce::String(i)
+                           juce::String(engineName(engine)) + " dest[" + juce::String(i)
                                + "] == " + juce::String(expected[(size_t) i]));
             };
-            pinLane(Kick,   { "k.tune.prop", "k.ptch.prop", "k.pdec.prop", "k.adec.prop", "k.drive.prop" });
-            pinLane(Bass,   { "b.tune.prop", "b.sub.prop", "b.cut.prop", "b.res.prop", "b.env.prop",
+            pinLane(EngineType::Kick,   { "k.tune.prop", "k.ptch.prop", "k.pdec.prop", "k.adec.prop", "k.drive.prop" });
+            pinLane(EngineType::Bass,   { "b.tune.prop", "b.sub.prop", "b.cut.prop", "b.res.prop", "b.env.prop",
                               "b.edec.prop", "b.atk.prop", "b.dec.prop", "b.sus.prop", "b.drive.prop" });
-            pinLane(Hat,    { "h.tune.prop", "h.dec.prop" });
-            pinLane(Snare,  { "s.tune.prop", "s.dec.prop" });
-            pinLane(Rumble, { "r.drive.prop", "r.d1.prop", "r.d2.prop", "r.d3.prop", "r.size.prop",
+            pinLane(EngineType::Hat,    { "h.tune.prop", "h.dec.prop" });
+            pinLane(EngineType::Snare,  { "s.tune.prop", "s.dec.prop" });
+            pinLane(EngineType::Rumble, { "r.drive.prop", "r.d1.prop", "r.d2.prop", "r.d3.prop", "r.size.prop",
                               "r.revmix.prop", "r.revlp.prop", "r.cut.prop", "r.res.prop" });
         }
 
-        beginTest("modulator serialise round-trip drops foreign-lane destinations");
+        beginTest("modulator serialise round-trip drops foreign-engine destinations");
         {
             Layer src;
             ModulationAssignment good;  good.id = "g"; good.sourceId = "cs0_output"; good.destinationId = "s.dec.prop";  good.depth = 50.0f;
@@ -117,7 +117,7 @@ public:
 
             Layer dst;
             mu_pp::deserialiseModulators(tree, dst, {},
-                                         [](const std::string& id) { return isValidLaneDest(Snare, id); });
+                                         [](const std::string& id) { return isValidEngineDest(EngineType::Snare, id); });
 
             // Only the Snare-valid destination survives.
             expectEquals((int) dst.modulationMatrix.getAssignments().size(), 1);

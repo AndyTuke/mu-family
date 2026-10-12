@@ -10,6 +10,9 @@ PluginEditor::PluginEditor(PluginProcessor& p)
       sidebar(p, "Layer"),
       arpContent(p),
       layerPanel(p, "Layer"),
+      // ArpContent binds only APVTS parameters, never a layer's own data, so there is nothing to
+      // release before a removal.
+      layerEdit(p, sidebar, layerPanel, { {}, [this](int idx) { layerPanel.setLayer(idx); } }),
       mixerOverlay(p, p.mixerEngine),
       settingsOverlay(p)
 {
@@ -27,9 +30,11 @@ PluginEditor::PluginEditor(PluginProcessor& p)
     sidebar.onLayerSelected = [this](int idx) { layerPanel.setLayer(idx); };
     sidebar.refreshItems();
 
-    // The shared layer panel: fixed layers, the arp content band in the middle, mu-Toni's
-    // modulation destinations; a layer change rebinds the content's controls.
-    layerPanel.setFixedLayers(true);
+    // The shared layer panel: the arp content band in the middle, mu-Toni's modulation destinations;
+    // a layer change rebinds the content's controls. The layer count is variable (1 to 8): the
+    // controller wires the sidebar Add button, reorder and the header's delete.
+    layerEdit.setFixedLayers(false);
+    layerPanel.getHeader().setNameEditable(false);   // a layer is named after its index
     layerPanel.setContent(&arpContent);
     layerPanel.setDestProvider(&modDestProvider);
     layerPanel.onLayerChanged = [this](int layer) { arpContent.setLayer(layer); };
@@ -76,8 +81,7 @@ PluginEditor::~PluginEditor()
 
 void PluginEditor::onPresetLoaded(const juce::File&)
 {
-    sidebar.refreshItems();
-    layerPanel.setLayer(layerPanel.getLayer());   // rebind knobs + modulators to the loaded state
+    layerEdit.refreshAfterPresetLoad();   // rebuild the sidebar (the count may have changed), rebind knobs + modulators
     mixerOverlay.loadFromApvts();
 }
 

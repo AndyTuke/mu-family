@@ -18,6 +18,9 @@ public:
     void prepare(double sampleRate, int blockSize) override;
     void process(juce::AudioBuffer<float>&) override;
 
+    // Silence the tail: the reverb network and the pre-delay line. Audio thread; no allocation.
+    void reset();
+
     juce::String getName()     override { return "Reverb"; }
     juce::String getCategory() override { return "Send"; }
     juce::Component* createEditor() override { return nullptr; }

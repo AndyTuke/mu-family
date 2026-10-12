@@ -99,7 +99,7 @@ namespace
 // Describe the voices once (ctor): each voice's v{N}_ param prefix; its user wavetable paths, gate /
 // filter / pitch envelopes and modulators save through Pattern.
 // Every .muPattern, .muTant and host session builds and applies a voice from this. A voice's colour is its slot's identity, not part of its sound, so it stays
-// with the full state (voiceColours) rather than the voice node.
+// with the full state (the base saves it) rather than the voice node.
 void PluginProcessor::initVoiceState()
 {
     juce::StringArray prefixes;
@@ -236,22 +236,6 @@ void PluginProcessor::preloadWavetablesFromState(const juce::ValueTree& state)
         preloadWavetablesFromVoiceTree(slots.getChild(i));
 }
 
-juce::String PluginProcessor::serialiseVoiceColours() const
-{
-    juce::String s;
-    for (int i = 0; i < mu_limits::kMaxLayers; ++i)
-        s += (i ? "," : "") + juce::String(layers[(size_t) i]->colourIndex);
-    return s;
-}
-
-void PluginProcessor::restoreVoiceColours(const juce::String& csv)
-{
-    if (csv.isEmpty()) return;
-    const auto toks = juce::StringArray::fromTokens(csv, ",", "");
-    for (int i = 0; i < mu_limits::kMaxLayers && i < toks.size(); ++i)
-        layers[(size_t) i]->colourIndex = juce::jlimit(0, mu_limits::kMaxLayers - 1, toks[i].getIntValue());
-}
-
 juce::File PluginProcessor::getLayerPresetDir() const { return getContentDir().getChildFile("Voices"); }
 juce::File PluginProcessor::getWavetablesDir()  const { return getContentDir().getChildFile("Wavetables"); }
 
@@ -259,10 +243,7 @@ juce::File PluginProcessor::getWavetablesDir()  const { return getContentDir().g
 // count and colours. Built fresh, so a host save never touches the live tree.
 juce::ValueTree PluginProcessor::captureFullPreset()
 {
-    auto state = captureComposedState();
-    state.setProperty("numVoices", numLayers.load(), nullptr);
-    state.setProperty("voiceColours", serialiseVoiceColours(), nullptr);
-    return state;
+    return captureComposedState();
 }
 
 // Hot-swap: while the resolved transport is playing, stage the parsed state and commit it at the
@@ -294,7 +275,7 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
     // extension's load, the standalone's own message loop), and the staged commit runs there too.
     // That is also why the retire-tail setup below may arm retiring[] without layersLock.
     const int oldN = numLayers.load(std::memory_order_relaxed);
-    int nv = juce::jlimit(1, mu_limits::kMaxLayers, (int) state.getProperty("numVoices", 1));
+    const int nv = savedLayerCount(state);
 
     // Retire-tail: when this preset drops voices while playing, snapshot each dropped
     // voice's OLD engine + insert config NOW (before the new params land)
@@ -320,9 +301,7 @@ void PluginProcessor::applyFullPresetTree(const juce::ValueTree& state)
         }
     }
 
-    applyComposedState(state);
-    numLayers.store(nv);
-    restoreVoiceColours(state.getProperty("voiceColours", "").toString());
+    applyComposedState(state);   // also stores the count and restores the colours
     syncAllFxParams();   // re-seed mixer/FX engine state (unchanged values skip listeners)
 }
 

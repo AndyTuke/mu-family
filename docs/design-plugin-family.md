@@ -462,12 +462,17 @@ throughout; the stages marked **O** also wait for owner decisions on behaviour o
       move (`swapChannelState` / `copyFrom` / `reset`), the **sidechain-source re-translation on every
       structural edit** (today only `RhythmManager::swap` does it; check that `remove` and the other
       products do), `resetSidechainEnv` for moved slots, `numLayers`, then `Layer::onMoved` for each moved layer.
+   `layersMoved(first, last)` fires here, under the lock.
    5. Unlock, then move the **parameter values** by slot, inside the `ScopedApvtsLoading` guard and still
       suspended, so no block ever pairs a moved layer with unmoved parameters. For products where the APVTS
       is the truth (Tant, Toni, On): `LayerLayout::writeParams(node, from)` then `applyParams(node, to)`
       (the rows carry no prefix, so a slot loads into any slot; a missing row = default, which is how a new or
       vacated slot is cleared). mu-Clid, whose `Rhythm` is the truth for the Euclidean params, keeps pushing
       from the layer (`pushRhythmToApvts`) through a `syncSlotParams(slot)` hook. This is the one allowed difference.
+   Between 5 and 6, `addLayer` alone calls `layerAdded(index)` (added 2026-10-12 with mu-On: message thread,
+   still suspended, parameters at defaults, not under `layersLock`) so a product can give the new layer its own
+   starting point; mu-On picks the first engine not in use and seeds that engine's groove there. Only `addLayer`
+   calls it; `resetLayer` does not (a reset keeps the track's identity).
    6. `suspendProcessing(false)`; destroy any removed layer; set `colourIndex` (first unused palette entry,
       the mu-Clid / mu-Tant rule, hoisted into the base); fire `onLayersChanged` for the shell.
    The last layer cannot be removed; there is no demo cap any more (retired 2026-10-11; see "Licensing and the support prompt").
@@ -491,7 +496,7 @@ on the build PC), O = needs the owner.
 
 | # | Kind | What | Exact content | Guard |
 |---|---|---|---|---|
-| 1 | M | Derived types as value members, no behaviour change | **Tant**: `Pattern : Layer` holds `gate`, `filter`, `pitch` (`GatePattern`), `ring` (`VoiceRingBuffer`), `snap[]`, `InsertStage`, the retiring state, the user-wavetable path / index per oscillator, the voice engine pointer; `std::array<Pattern, 8> patterns` replaces `voiceSlots`, `gatePatterns`, `filterPatterns`, `pitchPatterns`, `voiceRingBuffers`, `voiceSnap`, `inserts`, `retiring`, `voiceColourIndex`, `osc*User*`. `Pattern::copyFrom(const Pattern&)` replaces the `copyDataFrom` calls. **Toni**: `Arp : Layer` holds `ArpVoiceRunner`, `InsertStage`, `vp` pointers, `modDestAtoms`; replaces `runners`, `inserts`, `insCfg`, `vp`, `modDestAtoms`, `voiceSlots`. **On**: `Track : Layer` holds the trigger counter and the lane id; the shared `StepPattern` grid, `GrooveVoices` and the Rumble envelope stay in the processor for now (they are one object across lanes, not four). **Clid**: nothing; `Rhythm` already derives. | Each product's unit tests; its `*_roundtrip` (sample-identical); `check-core-boundary` |
+| 1 | M | Derived types as value members, no behaviour change | **Tant**: `Pattern : Layer` holds `gate`, `filter`, `pitch` (`GatePattern`), `ring` (`VoiceRingBuffer`), `snap[]`, `InsertStage`, the retiring state, the user-wavetable path / index per oscillator, the voice engine pointer; `std::array<Pattern, 8> patterns` replaces `voiceSlots`, `gatePatterns`, `filterPatterns`, `pitchPatterns`, `voiceRingBuffers`, `voiceSnap`, `inserts`, `retiring`, `voiceColourIndex`, `osc*User*`. `Pattern::copyFrom(const Pattern&)` replaces the `copyDataFrom` calls. **Toni**: `Arp : Layer` holds `ArpVoiceRunner`, `InsertStage`, `vp` pointers, `modDestAtoms`; replaces `runners`, `inserts`, `insCfg`, `vp`, `modDestAtoms`, `voiceSlots`. **On** (built 2026-10-12): `Track : Layer` holds the trigger counter, its `StepRow` and its Rumble envelope (data the layer owns, so it moves with the pointer; `StepPattern` only binds each slot to the track's row, rebound in `layersMoved`); `GrooveVoices` (engines per slot, one object, heap-allocated) stays in the processor. **Clid**: nothing; `Rhythm` already derives. | Each product's unit tests; its `*_roundtrip` (sample-identical); `check-core-boundary` |
 | 2 | M | `ProcessorBase::getLayer(int)` accessor (virtual, returns the product's value-array slot) | Default `getChannelName` / `getChannelColourIndex` come from `Layer::name` / `colourIndex`, built with the names the products show today ("Voice N" for mu-Tant, "Layer N" for mu-Toni, lane names for mu-On, the rhythm name for mu-Clid), so nothing visible changes; the editors' `voiceSlots[sel]` / `voiceSlot(lane)` become `getLayer(sel)`; the GR-meter pointer helpers (`getInsertGRPtr`, `getInsertGRReductionPtr`) become `getLayer(i)->insertGainReduction()` | unit tests; boundary check; build all four |
 | 3 | M | Persistence virtuals | `Layer::writeExtras` / `applyExtras` (base: modulators); each product's `LayerExtras` lambdas become the virtual overrides on `Pattern` / `Arp` / `Track`; `initLayerState(prefixes)` builds the `LayerExtras` that calls `getLayer(slot)`. mu-Clid keeps `PresetIO` shapes and gains nothing here. | `MuTantPersistTests`, `ModulatorSerialiseTests`, `PresetRoundTripTests`, `PresetXMLRoundTripTests`, `TONI_roundtrip`, `ON_roundtrip`, `TANT_roundtrip` |
 | 4 | S | Ownership moves to `ProcessorBase` | The `layers` array, `numLayers`, `layersLock`, `createLayer`, `layerAs<T>`; Tant first (its `numVoices` / `voicesLock` become these, `bankLock` split out), then Toni and On at a constant count (4 / 5) with the try-lock added so a later edit is safe; the product's `addVoice` etc. still exist and now move pointers instead of copying data. | as stage 3, plus a new `LayerOwnershipTests` (construct, publish, destroy off-lock) and a listening render with structural edits scripted mid-play |
@@ -513,10 +518,117 @@ Stages 1-3 are order-independent between products (any product can go first). Fr
   Kick), per-layer params (each layer keeps every engine's settings), step rows per layer, and how 5-lane
   presets map to layers (they load as their 5 layers).
 - **mu-Toni (#1240):** `kNumChannels` is 4 today. Going to 8 adds layers 5-8 parameters (additive, old sessions
-  load with the new layers at defaults) and changes the host's automation list; confirm the default count for a
-  fresh instance and the demo cap (mu-Toni is freeware, so likely none).
+  load with the new layers at defaults) and changes the host's automation list. Default count and demo cap
+  **confirmed by Andy 2026-10-12:** fresh instance 1 layer, no cap.
 - **Both:** the add / delete / reorder UI (it is the shared `ChannelSidebar`, so it is a visible change for the
   freeware and licensed products alike) and whether delete fades or cuts (item 7 says cut).
+
+### Stage 6 build rulings (2026-10-12, UX Controller)
+
+- **The structural edit is not re-implemented.** `addLayer` / `removeLayer` / `swapLayers` / `resetLayer` (stage 5) are the one
+  central implementation (the processor-side logic was lifted from mu-Clid / mu-Tant when mu-Tant adopted it; it
+  lives in `ProcessorBase` with the pointer moves in `ProcessorCore`, and a separate "composed slot-state class" is
+  **not** needed: the per-layer parameter and extras state is already `LayerLayout` + `Layer::writeExtras`).
+  Two small additions, both hoisting what mu-Tant does alone today (ruled 2026-10-12, Architecture Steward; see
+  "Count and colour persistence" and "Layer references" below). mu-Toni and mu-On adopt the edits as mu-Tant did: all 8 layers' parameters and `Layer` objects
+  allocated at construction (spare slots re-used, `keepSpareLayers`), `canEditLayers()` true, the product's
+  per-slot caches (`vp`, `modDestAtoms`, runners) indexed by slot. What is still duplicated is the **editor glue**
+  (mu-Tant `PluginEditor::onAddLayer`, `onDelete` + confirm, `deleteShownVoice`, `onPresetLoaded` / `onPresetNew`
+  refresh). It lifts to `mu-core/UI/LayerEditController.{h,cpp}`, `mu_ui::LayerEditController`, constructed with
+  `(ProcessorBase&, LayerSidebar&, LayerPanel&, Hooks{ unbindAll(), showLayer(int) })`; the product supplies only the
+  two hooks (mu-Tant's `clearAllModBindings` / `clearPatternBindings` and its `setLayer`). Behaviour: [design-ui-family.md](design-ui-family.md#layer-add--delete--reorder-family-standard-ruled-2026-10-12).
+  mu-Tant moves onto it in the same step; mu-Clid when it adopts stage 7.
+- **mu-Toni:** the layer count is persisted with the state; absent (old file) = 4. Fresh = 1. No cap. No
+  parameter migration (additive).
+- **mu-On as built, decisions confirmed 2026-10-12 (Architecture Steward):** a track's name derives from its engine and is
+  neither saved nor editable (`setNameEditable(false)`). mu-Toni and mu-Tant are also non-editable now (a layer is named after its index); only mu-Clid saves
+  user layer names. A product with fixed or derived names calls `setNameEditable(false)`; `LayerPanel` does the same for fixed layers; `.muTrack` presets carry their engine and every track lists all of them; Reset is a sound reset and keeps the
+  engine, Rumble source, step row and envelope; a saved MIDI map is migrated only for the five original `k_ b_ h_ s_ r_` ids
+  (the only ones that ever existed); an engine change never prunes modulation assignments, on any route (UI, automation, preset): the old engine's assignments stay in place, inert while another engine runs (the destination tables are per engine and the audio side reads only the running engine's) and live again on switching back; selecting Rumble on a track re-points every Rumble that processed it to the first Kick (else the first non-Rumble track).
+- **mu-On saved data (extends #1263):** each layer's block is `t{N}_eng` (choice: Kick, Bass, Hat, Snare, Rumble;
+  the existing five engines, Hat and Snare being the sample engine with different defaults), `t{N}_src` (Rumble
+  source, a layer index), then every engine's parameters **engine-qualified**: `t{N}_kick_*`, `t{N}_bass_*`,
+  `t{N}_hat_*`, `t{N}_snare_*`, `t{N}_rumble_*` (the unqualified names collide: both Kick and Bass have `tune` and
+  `drive`, Bass and the samplers `dec`). Legacy migration, through the existing mechanism: old `t{i}_x` becomes
+  `t{i}_<engine of lane i>_x`, `t{i}_eng` = i, `numLayers` = 5, `t{i}_src` = 0 for the Rumble layer, layer names
+  Kick / Bass / Hat / Snare / Rumble. The mixer sidechain values are carried as saved (they are mixer params); the Bass
+  Duck / D.Atk / D.Rel knobs and the pre-wired default go (owner 2026-10-08). Layer-order dependent state remaps on every
+  structural edit like the mixer sidechain source: `t{N}_src` follows its layer.
+- **mu-On step data (as built, 2026-10-12):** `kMaxLayers` rows x 16 (on / accent), one row per layer, kept when the
+  engine changes (a Rumble layer ignores its row). Ruling amended: the row (`StepRow`) and the Rumble envelope are members
+  of `Track`, not processor arrays, because they are data the layer owns and must move with it ("Slot-keyed audio state
+  stays processor-side" is only for state that must outlive the layer or keep a stable address); `StepPattern` holds
+  per-slot pointers to the rows, rebound under `layersLock` in `layersMoved`, and the envelope persists only when non-default.
+  `GrooveVoices` owns one engine of each type per slot (or lazily, DSP's call) and renders the selected `eng`.
+  **Render order: all non-Rumble layers first, then Rumble layers**, so a Rumble source is always rendered this
+  block regardless of layer order (to `dsp-controller` for review); a Rumble whose source is itself a Rumble or is out of range
+  processes silence.
+
+#### Count and colour persistence (ruled 2026-10-12, Architecture Steward)
+
+Today only mu-Tant saves the live layer count and the palette colours, as two root properties of its composed state
+(`numVoices`, an int, and `voiceColours`, 8 comma-separated palette indices), written in its `captureFullPreset` and
+applied in `applyFullPresetTree`. They move into `ProcessorBase` so a second and third product do not copy them:
+
+- **Saved names do not change:** `numVoices` and `voiceColours` stay as written, in every product (the "voice" word is
+  legacy saved data; see design-naming §3). A layer preset (`.muPattern`, `.muArp`, `.muTrack`) never carries them.
+  Layer names are not saved (the product's `getChannelName` derives "Voice N" / "Layer N" / "Track N" from the index).
+- **`captureComposedState()`** adds both properties when `canEditLayers()`; **`applyComposedState()`** applies the
+  parameters and extras as now and then stores the count and restores the colours (the order mu-Tant has: count last).
+  A new `int savedLayerCount(const juce::ValueTree&) const` returns the clamped count a state carries, so a product that
+  must act on the old and new count before the apply (mu-Tant's retire-tail) reads it from there, not from the property.
+- **A state without `numVoices` loads with the product's legacy count**, a protected `int unsavedLayerCount` set in the
+  constructor: mu-Tant 1 (as today), mu-Toni 4, mu-On 5. A state without `voiceColours` leaves the constructor colours
+  (slot `i` = palette entry `i`, as mu-Tant) unless the product's `to…State` step writes the property: mu-On's legacy
+  migration writes `0,2,1,3,4,5,6,7` so Kick / Bass / Hat / Snare / Rumble keep their red / orange / cyan / magenta / lime.
+- **Fresh instance = 1 layer** in all three (`numLayers.store(1)` after construction), per the UI family standard.
+- The audio thread still never reads these properties; the count is the `numLayers` atomic, stored on the message
+  thread (host restore, preset load, the staged commit), exactly as mu-Tant does.
+
+#### Layer references (ruled 2026-10-12, Architecture Steward)
+
+A parameter whose value names another layer (mu-On's Rumble `t{N}_src`) must follow its layer through a structural
+edit, as the mixer's sidechain source does. `ProcessorBase` gets `virtual void remapLayerReferences(const
+std::function<int(int)>& oldToNew)` (default empty), called from phase 3 of `removeLayer` and `swapLayers` immediately
+beside `remapSidechainSources`, before the parameter values shift. `oldToNew` is built from
+`mu_mix::sidechainAfterRemove` / `sidechainAfterSwap` (`mu-core/Audio/SidechainRemap.h`, already tested) and returns
+-1 when the referenced layer is gone; the product rewrites its own parameters through it (a gone source becomes its
+default, the first Kick). `resetLayer` and `addLayer` do not call it. Only mu-On overrides it today; it is in the base
+because the remap has to sit inside the same suspended, ordered edit as the sidechain one, which a product cannot do
+from outside.
+
+#### Order of work for #1240 and #1241 (ruled 2026-10-12)
+
+Each step ends with a Debug build, that product's unit suites, `mu-core` suites, and the `*_roundtrip` listening
+tests; mu-Clid is not edited (its `canEditLayers()` stays false and it does not call `captureComposedState`), but
+`mu-clid-tests` is built and run after steps 1 and 2 because they touch `ProcessorBase`.
+
+1. **`mu-core` + mu-Tant (no behaviour change):** the count / colour persistence above, mu-Tant switched over (its
+   `numVoices` / `voiceColours` lines go; `NoDemoCapsTests`, `PresetRoundTripTests`, `TANT_roundtrip` unchanged and
+   green is the proof); `remapLayerReferences` with a `LayerOwnershipTests` case (fake product, three layers, remove the
+   middle, assert the references follow and the gone one maps to -1); `unsavedLayerCount` default 1.
+2. **`LayerEditController`** (the editor glue, above), mu-Tant moved onto it. Owned by the UX ruling; mu-Toni and mu-On
+   cannot ship the add / delete UI without it.
+3. **mu-Toni (#1240)**, then **4.** **mu-On (#1241)**. mu-Toni first: it has no engine change, so it proves the adoption
+   path (8 layers of parameters, try-lock in `processBlock`, `layersMoved`, count persistence) alone. mu-On then adds
+   only what is its own (engine selector, engine-qualified parameters, per-slot step rows, Rumble source).
+
+**mu-Toni recipe (the same eight points mu-Tant satisfies; nothing else is new):**
+(a) `kNumChannels` is deleted; parameters (`a{N}_*`, `ch{N}_*`), `vp` / `modDestAtoms` pointers and mixer strips are
+declared and cached for all `mu_limits::kMaxLayers` slots; the `aud = (i == 0)` default (layers 2 and up silent) goes,
+because a layer added by the user must be audible at its defaults (to `ux-controller` if it objects);
+(b) `keepSpareLayers = true`, all 8 `Arp`s built by `createLayer(slot)` (which sets the shared `bank` on the runner,
+`insert->setSlotIndex(slot)` and prepares it), `canEditLayers()` true, `numLayers` 1, `unsavedLayerCount` 4, colour
+`i` for slot `i`; `getChannelColourIndex` is the base default over `Layer::colourIndex`; `getMaxChannels` override goes;
+(c) `processBlock` takes `ScopedTryLock(layersLock)` once, skips the render while `layerEditInFlight`, loops
+`readVoice` / `render` over `numLayers` only, and still runs `flagSwapBoundaries` when the lock misses (mu-Tant's shape);
+(d) `layersMoved(first, last)` resets the runner, insert and any held-note or accent state of each moved slot, no
+allocation; (e) `prepareToPlay` prepares all 8 runners and inserts under `layersLock`; (f) `setupLayerState` uses
+`kMaxLayers` prefixes and `legacyLayerParamPrefixes(kMaxLayers)`; (g) the editor wires `onAddLayer` / delete through
+`LayerEditController` and calls `layerPanel.setFixedLayers(false)`; (h) tests: Toni `ProcessorSeamTests` (count now 1 fresh),
+a `LayerStructureTests`-style case (fill to 8, remove middle, swap, parameters / colour / mixer strip follow), the
+two-thread stress test copied from mu-Tant's seam tests into the shared `ProcessorSeamHelpers.h` rather than a second
+copy, an old 4-layer composed state and an old APVTS dump both loading as 4 layers, a state with `numVoices` 6 round trip.
 
 ### What is left under #1265 and #1264 (ruled 2026-10-12)
 
@@ -544,8 +656,8 @@ State of the tree: stages 1 to 3 and 5 are done for mu-Tant, mu-Toni and mu-On, 
    now `<Type>Content` inside `LayerPanel`, superseding the earlier `EnginePanel` choice; see the ruling below);
    mu-On's lane / channel wording to `Track` is **folded into #1241**, which rewrites the same code (233 uses),
    not done on its own. The step grid and `GrooveVoices` stay in the processor until #1241 decides the per-layer engine selector.
-3. Stage 6 still waits on Andy for mu-Toni's default layer count (recommended: 1 for a fresh instance, as mu-Tant and
-   mu-Clid, with old 4-layer states loading as 4; no demo cap, as mu-Toni is freeware and the demo cap is retired).
+3. Stage 6 no longer waits on Andy: confirmed 2026-10-12, a fresh mu-Toni instance has 1 layer, old 4-layer states load
+   as 4, no demo cap (mu-Toni is freeware and the demo cap is retired). Order of work: "Order of work for #1240 and #1241" above.
 
 #### Slot-keyed audio state stays processor-side (ruled 2026-10-12)
 

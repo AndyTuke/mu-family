@@ -2,6 +2,7 @@
 
 #include "UI/EditorShellBase.h"
 #include "UI/LayerSidebar.h"     // mu-core shared sidebar (select/add/delete/reorder)
+#include "UI/LayerEditController.h"   // mu-core: add / delete / reorder glue
 #include "UI/MixerOverlay.h"       // mu-core shared mixer
 #include "Plugin/PluginProcessor.h"
 #include "UI/LayerPanel.h"        // mu-core shared per-layer panel shell
@@ -35,6 +36,7 @@ private:
     ModDestProvider  modDestProvider = makeModDestProvider();
     ArpContent       arpContent;
     LayerPanel       layerPanel;
+    mu_ui::LayerEditController layerEdit;   // add / delete / reorder glue; after the sidebar and panel
     MixerOverlay     mixerOverlay;
     SettingsOverlay  settingsOverlay;
 

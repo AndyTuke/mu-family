@@ -138,6 +138,11 @@ public:
     // allocate or wait.
     virtual void layersMoved(int firstIndex, int lastIndex) { juce::ignoreUnused(firstIndex, lastIndex); }
 
+    // Called by addLayer last, on the message thread with processing still suspended and the new
+    // layer's parameters at their defaults, so a product can give the new layer its own starting
+    // point (a product with per-layer engine types picks the engine). Not called under layersLock.
+    virtual void layerAdded(int index) { juce::ignoreUnused(index); }
+
     // ─── Shell-facing API (overridden by each plugin) ────────────────────────
     // These are the surfaces the family's editor shell + TransportBar consume.
     // Defaults are no-ops returning sensible values so a young plugin (no
@@ -421,8 +426,20 @@ protected:
         layerExtras = { [this](int slot, juce::ValueTree& node)       { if (auto* l = slotLayer(slot)) l->writeExtras(node); },
                        [this](int slot, const juce::ValueTree& node) { if (auto* l = slotLayer(slot)) l->applyExtras(node); } };
     }
-    juce::ValueTree captureComposedState()           { return mu_pp::captureState(apvts.state.getType(), layerLayout, layerExtras); }
-    void            applyComposedState(const juce::ValueTree& state) { mu_pp::applyState(state, layerLayout, layerExtras); }
+    // A product whose canEditLayers() is true also saves the live layer count (`numVoices`) and the
+    // palette colour of each slot (`voiceColours`, 8 comma-separated indices) as root properties; the
+    // names are legacy saved data and do not change. A layer preset never carries them.
+    juce::ValueTree captureComposedState();
+    // Applies the parameters and extras, then (canEditLayers only) stores the count last and restores
+    // the colours, so the audio thread never sees a count ahead of the data.
+    void            applyComposedState(const juce::ValueTree& state);
+    // The live layer count a composed state carries, clamped to 1..kMaxLayers; `unsavedLayerCount`
+    // when the state has none (an older file). A product that must act on the old and the new count
+    // before the apply reads it here.
+    int             savedLayerCount(const juce::ValueTree& state) const;
+    // The count a state without `numVoices` loads with: the product's count before layers were
+    // editable. Set once in the product's constructor.
+    int unsavedLayerCount = 1;
     juce::ValueTree captureLayerNode(int slot, const juce::Identifier& type) { return mu_pp::captureLayer(layerLayout, layerExtras, slot, type); }
     void            applyLayerNode(int slot, const juce::ValueTree& node)    { mu_pp::applyLayer(layerLayout, layerExtras, slot, node); }
     // A state in the composed shape: an older APVTS-dump state is rebuilt (`otherChild` receives
@@ -439,6 +456,13 @@ protected:
     // strips) through `remap(paramValue)`. The parameter is 0 = off, 1..8 = channel 0..7, 9 = the
     // external bus; a structural edit renumbers the layers, so a strip must follow its source's new slot.
     void remapSidechainSources(const std::function<int(int)>& remap);
+
+    // A parameter whose value names another layer (such as a processing layer's source layer) must follow its layer
+    // through removeLayer and swapLayers, like the sidechain sources. Called in phase 3 of both, with
+    // processing suspended and before the parameter values shift; `oldToNew` maps a layer index as it
+    // was to the index it has now, or -1 when that layer is gone. The product rewrites its own
+    // parameters through it. Default: nothing to rewrite. addLayer and resetLayer do not call it.
+    virtual void remapLayerReferences(const std::function<int(int)>& oldToNew) { juce::ignoreUnused(oldToNew); }
 
 protected:
     // Internal transport state. Written by the UI (play / BPM) and the audio thread (beat
@@ -521,7 +545,7 @@ protected:
     // processBlock, so the swapper must not believe the transport still runs (loads apply at once).
     void resetSwapPlayState() noexcept { layerSwapper.resetPlayState(); }
 
-    // The 4/4 bar-line rule (mu-Toni, mu-On).
+    // The 4/4 bar-line rule shared by the products that step through layer presets.
     void flagSwapBoundaries(bool isPlaying, double blockStartBeat, double blockBeats) noexcept
     {
         if (layerSwapper.flagBoundaries(isPlaying, blockStartBeat, blockBeats))

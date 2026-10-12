@@ -343,11 +343,6 @@ private:
     // from layersLock so an import never blocks a layer edit and the reverse.
     juce::CriticalSection bankLock;
 
-    // Per-voice colour allocation persistence (stored on the APVTS state tree
-    // alongside the voice count, so colours round-trip with full + per-... presets).
-    juce::String serialiseVoiceColours() const;
-    void         restoreVoiceColours(const juce::String& csv);
-
     friend struct Pattern;   // its persistence hooks hand over to the voice-extras members below
     // Composed state (mu-core LayerState): the voice layout every save / load uses, a voice's
     // non-parameter data (modulators, gates, user wavetables — they live outside APVTS) from its

@@ -9,8 +9,7 @@ ChannelHeaderBar::ChannelHeaderBar()
     nameLabel.onTextChange = [this] { if (onNameChanged) onNameChanged(nameLabel.getText()); };
     addAndMakeVisible(nameLabel);
 
-    resetBtn .setTooltip("Reset this layer to defaults");
-    deleteBtn.setTooltip("Delete this layer");
+    setNoun(noun);
     resetBtn .onClick = [this] { if (onReset)  onReset();  };
     deleteBtn.onClick = [this] { if (onDelete) onDelete(); };
     saveBtn  .onClick = [this] { if (onSave)   onSave();   };
@@ -25,6 +24,13 @@ ChannelHeaderBar::ChannelHeaderBar()
         if (onPresetFileChosen && id >= 1 && id <= presetFiles.size()) onPresetFileChosen(presetFiles[id - 1]);
     };
     addAndMakeVisible(presetDD);
+}
+
+void ChannelHeaderBar::setNoun(const juce::String& n)
+{
+    noun = n.toLowerCase();
+    resetBtn.setTooltip("Reset this " + noun + " to defaults");
+    deleteBtn.setTooltip(deleteBtn.isEnabled() ? "Delete this " + noun : "The last " + noun + " cannot be deleted");
 }
 
 void ChannelHeaderBar::setLayerName(const juce::String& n) { nameLabel.setText(n, juce::dontSendNotification); }
@@ -85,6 +91,13 @@ void ChannelHeaderBar::setShowDelete(bool show)
     showDelete = show;
     deleteBtn.setVisible(show);
     resized();
+}
+
+void ChannelHeaderBar::setDeleteEnabled(bool enabled)
+{
+    if (deleteBtn.isEnabled() == enabled) return;
+    deleteBtn.setEnabled(enabled);
+    deleteBtn.setTooltip(enabled ? "Delete this " + noun : "The last " + noun + " cannot be deleted");
 }
 
 void ChannelHeaderBar::commitNameEdit()

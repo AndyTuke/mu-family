@@ -1,17 +1,18 @@
 #include "LayerPanel.h"
 #include "UI/LayerPresetHeader.h"
 
-LayerPanel::LayerPanel(ProcessorBase& processor, const juce::String& noun)
-    : proc(processor)
+LayerPanel::LayerPanel(ProcessorBase& processor, const juce::String& layerNoun)
+    : proc(processor), noun(layerNoun)
 {
     beatSource = [this] { return proc.getInternalBeatPos(); };
 
     // Reset / preset load / save: the shared per-slot wiring.
     mu_ui::wireSlotPresetHeader(header, *this, proc,
-        { noun,
+        { layerNoun,
           [this] { return currentLayer; },
           [this] { setLayer(currentLayer); },   // rebind so the content and modulators show the new state
           [this](int slot) { return presetNameFn ? presetNameFn(slot) : proc.getChannelName(slot); } });
+    header.setNoun(noun);
     addAndMakeVisible(header);
     addAndMakeVisible(modulatorPanel);
 
@@ -80,6 +81,7 @@ juce::Colour LayerPanel::layerColour() const
 void LayerPanel::timerCallback()
 {
     modulatorPanel.setPlayheadBeat(beatSource());
+    header.setDeleteEnabled(proc.getNumChannels() > 1);   // the last layer cannot be deleted: grey, not a silent no-op
     header.setStagingBadge(proc.hasPendingSwap(currentLayer));   // "SWP" while a layer preset waits for its boundary
 }
 

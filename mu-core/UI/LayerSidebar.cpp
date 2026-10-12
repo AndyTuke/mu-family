@@ -1,7 +1,7 @@
 #include "LayerSidebar.h"
 
 LayerSidebar::LayerSidebar(ProcessorBase& processor, const juce::String& addButtonLabel)
-    : proc(processor), addButton(addButtonLabel)
+    : proc(processor), noun(addButtonLabel), addButton(addButtonLabel)
 {
     viewport.setViewedComponent(&itemContainer, false);
     viewport.setScrollBarsShown(true, false);
@@ -67,7 +67,7 @@ void LayerSidebar::refreshItems()
         items.push_back(std::move(item));
     }
 
-    // Demo cap: disable Add once the unlicensed channel limit is reached.
+    updateAddEnabled();
 
     itemContainer.setSize(kWidth, (int) items.size() * kItemH);
     resized();
@@ -75,6 +75,14 @@ void LayerSidebar::refreshItems()
     // Animate a freshly-added item sliding in (skip on initial construction).
     if (n > prevCount && prevCount > 0)
         layoutItems(true, n - 1);
+}
+
+void LayerSidebar::updateAddEnabled()
+{
+    const bool room = proc.getNumChannels() < mu_limits::kMaxLayers;
+    if (addButton.isEnabled() == room) return;
+    addButton.setEnabled(room);
+    addButton.setTooltip(room ? juce::String() : "Maximum of " + juce::String(mu_limits::kMaxLayers) + " " + noun + "s");
 }
 
 void LayerSidebar::layoutItems(bool animate, int newItemIndex)
@@ -327,8 +335,7 @@ void LayerSidebar::timerCallback()
     if (proc.getNumChannels() != (int) items.size())
         refreshItems();
 
-    // Keep the Add button's demo-cap state current even when the count didn't
-    // change through us (host state restore can flip licensing-relevant state).
+    updateAddEnabled();   // the count can change outside the editor (host state restore)
 
     // Sync Add button visibility in case onAddLayer was wired (or cleared)
     // after the last resized() call.

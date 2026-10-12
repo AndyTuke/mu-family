@@ -1,16 +1,24 @@
 # μ-On — Engine design
 
-μ-On is a 909-style groove sequencer with **five fixed instrument lanes**: Kick (synthesis),
-Bass (deep synth — the focus), Hat (sample), Snare (sample), and Rumble (processes the Kick's
-audio rather than stepping). The first four are sequenced on the step grid; Rumble has no steps.
-Each lane is an independent engine rendered into its mixer channel via the shared
+μ-On is a 909-style groove sequencer with one to eight **tracks** (layers), each running one of five
+**engines**: Kick (synthesis), Bass (deep synth — the focus), Hat (sample), Snare (sample), and Rumble
+(processes another track's audio rather than stepping). Every track has a step row; a Rumble track
+ignores its row. Each track renders into its mixer channel via the shared
 `MixerEngine::RenderChannelFn` hook; the shared mixer then applies the per-channel strip, the
-**bass→kick sidechain**, sends, and master. `GrooveVoices`
-([mu-on/Source/Audio/GrooveVoices.h](../../mu-on/Source/Audio/GrooveVoices.h)) owns the five
-engines, routes the sequencer's triggers, and pulls engine params from cached APVTS atomic
-pointers each block (no per-block string lookups, no audio-thread allocation).
+sidechain (set up in the mixer, e.g. bass ducking the kick), sends, and master. `GrooveVoices`
+([mu-on/Source/Audio/GrooveVoices.h](../../mu-on/Source/Audio/GrooveVoices.h)) owns one engine of
+each type for every track slot, routes the sequencer's triggers to the engine the track has selected,
+and pulls engine params from cached APVTS atomic pointers each block (no per-block string lookups, no
+audio-thread allocation). Render order: every non-Rumble track first, then the Rumble tracks, so a
+Rumble's source has been rendered this block whatever the track order; a Rumble whose source is out
+of range, not live or itself a Rumble processes silence. The `Track` pointers are re-read under the
+layer lock every block and never kept across blocks.
 
-## Lanes
+Parameters: every engine's parameters exist on every track, engine-qualified (`t{N}_kick_*`,
+`t{N}_bass_*`, `t{N}_hat_*`, `t{N}_snare_*`, `t{N}_rumble_*`), plus `t{N}_eng` (the engine) and
+`t{N}_src` (the Rumble's source layer). Switching a track's engine keeps the others' settings.
+
+## Engines
 
 ### Kick — `KickEngine` (synthesis)
 Sine body + an **exponential pitch envelope** (start tune → base) for the thump, an exponential
@@ -41,21 +49,19 @@ filter-env; an optional drive *insert* via the shared `InsertProcessor`.
 ### Hat / Snare — `SampleChannel` (sample-based)
 Built on the shared mu-core **`SamplePlayer`**: each lane owns a sample buffer and plays it
 one-shot per trigger with **tune** (playback ratio) and a **decay gate** (`h_tune`/`h_dec`,
-`s_tune`/`s_dec`). The default buffer is **generated procedurally** (bright high-passed noise hat;
+`t{N}_snare_tune`/`_dec`). The default buffer is **generated procedurally** (bright high-passed noise hat;
 noise + 180 Hz body tone snare) so the product makes sound with no shipped assets. **The only seam
 to change is the buffer** — "Load .wav…" (a file chooser) + factory `.wav` content (shipped via
 `juce_add_binary_data`, gated on code-signing like #99) is the next step, reusing the same player.
 
-### Rumble — `RumbleEngine` (processes the kick feed)
-Not sequenced — the classic techno **rumble**. It takes the **Kick's rendered audio** (stashed by
-`GrooveVoices` after the Kick renders, since channels render in index order and Rumble is lane 4)
-and runs it through, in order: input **drive** (the `MultiModeFilter` valve), three tempo-synced
+### Rumble — `RumbleEngine` (processes another track)
+Not sequenced — the classic techno **rumble**. It takes the **rendered audio of its source track**
+(the Source dropdown; the first Kick by default) and runs it through, in order: input **drive** (the `MultiModeFilter` valve), three tempo-synced
 **delay taps** (1/16·2/16·3/16, each with a level), a **dark reverb** (mu-core `ReverbSlot` + a
 low-pass, with size + dry/wet mix), a per-bar **volume envelope** (a drawable smooth curve — the
-shared `LFOEditor` — that sits in the Rumble lane's otherwise-empty step-grid slot, persisted in
-state, evaluated audio-side under a try-lock), and a final **multimode filter**. Params:
-`t4_drive`, `t4_d1`/`t4_d2`/`t4_d3`, `t4_size`, `t4_revmix`, `t4_revlp`, `t4_cut`, `t4_res`. The mixer strip
-pre-wires Rumble's sidechain source to the Kick (amount 0 by default → optional kick-pumping).
+shared `LFOEditor` — held per track, persisted only when it is not the default flat curve, evaluated
+audio-side under a try-lock), and a final **multimode filter**. Params:
+`t{N}_rumble_drive`, `_d1`/`_d2`/`_d3`, `_size`, `_revmix`, `_revlp`, `_cut`, `_res`.
 The reverb tone + the block-rate envelope are deliberately basic for now (framework stage). *(Note:
 distinct from the Bass lane's "rumble" voicing above, which is a tonal character of `BassEngine`,
 not this lane.)*
@@ -63,11 +69,11 @@ not this lane.)*
 ## Bass↔Kick sidechain (the key interaction)
 This is **not new DSP** — the shared `MixerEngine` already supports **channel-to-channel
 sidechain** (`sidechainSource` can point at another channel, with amount + attack/release + an
-envelope follower + `sidechainGR` metering). μ-On pre-wires the **Bass channel's** sidechain
-source to the **Kick channel** by default (`ch1_scSrc`→Kick, `ch1_scAmt≈0.4`, release ≈120 ms) in
-the parameter layout, so the bass ducks under the kick out of the box. The Bass `EnginePanel`
-surfaces **Duck / D.Atk / D.Rel** (= `ch1_scAmt`/`ch1_scAtk`/`ch1_scRel`) so the player dials
-**smooth ↔ pumping** without opening the mixer; the same controls also live in the MixerOverlay.
+envelope follower + `sidechainGR` metering). Since the layers became variable (Andy's 2026-10-08
+decision) the sidechain lives in the **mixer** only: there is no pre-wired Bass→Kick default and the
+engine panel has no Duck / D.Atk / D.Rel knobs. A state saved by the five-lane build carries its
+mixer sidechain values, which load as saved. The strips' sources follow their layer through a delete
+or reorder (`remapSidechainSources`), as does a Rumble's source.
 
 ## Threading / RT safety
 All engine state is audio-thread-only. Buffers (sample one-shots, filter scratch, de-interleave)

@@ -10,6 +10,7 @@
 #include "UI/PatternContent.h"
 #include "Modulation/MuTantModDest.h"
 #include "UI/LayerSidebar.h"
+#include "UI/LayerEditController.h"
 #include "UI/PatternMiniVisual.h"
 #include "UI/SettingsOverlay.h"
 
@@ -30,12 +31,12 @@ public:
     void onPresetNew()                     override;
 
 private:
-    void deleteShownVoice();
     PluginProcessor&  proc;
     LayerSidebar      sidebar;
     ModDestProvider   modDestProvider = makeModDestProvider();
     PatternContent    patternContent;
     LayerPanel        layerPanel;
+    mu_ui::LayerEditController layerEdit;   // add / delete / reorder glue; after the sidebar and panel
     MixerOverlay      mixerOverlay;
     SettingsOverlay   settingsOverlay;
     MasterLoopSection masterLoop;

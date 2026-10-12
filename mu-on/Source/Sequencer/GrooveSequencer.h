@@ -23,6 +23,9 @@ public:
     void setSwing(float swing01)     noexcept { swing = juce::jlimit(0.0f, 0.9f, swing01); }
     void setAccentVelocity(float v)  noexcept { accentVel = juce::jlimit(0.0f, 1.0f, v); }
 
+    // How many rows (from the top) take part: the live layer count. Rows above it are spare slots.
+    void setActiveTracks(int n)      noexcept { activeTracks = juce::jlimit(0, StepPattern::kNumTracks, n); }
+
     // Realign to the top of the pattern (call when the transport (re)starts from 0).
     void reset() noexcept { nextGlobalStep = 0; }
 
@@ -59,6 +62,7 @@ private:
     float     swing         = 0.0f;
     float     accentVel     = 1.0f;
     float     normalVel     = 0.72f;
+    int       activeTracks  = StepPattern::kNumTracks;
     long long nextGlobalStep = 0;
 };
 

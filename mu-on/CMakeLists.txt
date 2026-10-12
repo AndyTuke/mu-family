@@ -32,8 +32,8 @@ target_sources(mu-on
         Source/Plugin/PluginProcessor_Preset.cpp
         Source/Plugin/PluginEditor.cpp
         Source/Sequencer/GrooveSequencer.cpp
-        Source/UI/GrooveGrid.cpp
-        Source/UI/EnginePanel.cpp
+        Source/UI/StepRows.cpp
+        Source/UI/TrackContent.cpp
 )
 
 target_include_directories(mu-on
@@ -128,6 +128,8 @@ target_sources(mu-on-tests PRIVATE
     Source/Sequencer/GrooveSequencer.cpp
     Source/Tests/ProcessorSeamTests.cpp  # the real PluginProcessor, headless (layer ownership)
     Source/Tests/PrefixMigrationTests.cpp   # data saved before the k/b/h/s/r -> t{N} id-prefix rename still loads
+    Source/Tests/GrooveVoicesTests.cpp   # renderAll block sizes, the Rumble's tail handling
+    Source/Tests/EngineMigrationTests.cpp   # five-lane states and track presets load as engine-qualified layers
     # The real PluginProcessor, built headless (createEditor lives in PluginEditor.cpp, not linked).
     Source/Plugin/PluginProcessor.cpp
     Source/Plugin/PluginProcessor_Preset.cpp

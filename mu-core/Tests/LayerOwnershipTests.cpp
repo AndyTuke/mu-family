@@ -71,7 +71,22 @@ namespace
         using ProcessorCore::layers;
         using ProcessorCore::layersLock;
         using ProcessorBase::layerSwapper;
-        bool canEditLayers() const override { return true; }
+        using ProcessorBase::captureComposedState;
+        using ProcessorBase::applyComposedState;
+        using ProcessorBase::savedLayerCount;
+        using ProcessorBase::unsavedLayerCount;
+        bool editable = true;
+        bool canEditLayers() const override { return editable; }
+
+        // A fake product's layer references (like mu-On's Rumble source): refs[k] names a layer.
+        std::vector<int> refs;
+        void remapLayerReferences(const std::function<int(int)>& oldToNew) override
+        {
+            ++remapCalls;
+            for (auto& r : refs) r = oldToNew(r);
+        }
+        int remapCalls = 0;
+
         std::unique_ptr<Layer> createLayer(int) override
         {
             return std::make_unique<ProbeLayer>(layersLock, destroyed, underLock, resets);
@@ -91,6 +106,9 @@ namespace
             return ! acquired;
         }
 
+        // layerAdded(index): the new layer's own starting point, after its parameters are at defaults.
+        void layerAdded(int index) override { added.push_back(index); addedHoldingLock.push_back(lockHeldByOtherThread() ? 1 : 0); }
+
         float param(const juce::String& id) const
         {
             auto* p = apvts.getParameter(id);
@@ -107,6 +125,7 @@ namespace
         std::vector<int> cancelled;
         std::vector<std::pair<int, int>> moved;   // layersMoved(first, last) calls, in order
         std::vector<int> movedHoldingLock;        // 1 when the call came with layersLock held
+        std::vector<int> added, addedHoldingLock; // layerAdded(index) calls; 1 when layersLock was held
 
         juce::String getChannelName(int) const override { return {}; }
         int getChannelColourIndex(int i) const override { return layers[(size_t) i] ? layers[(size_t) i]->colourIndex : 0; }
@@ -331,6 +350,12 @@ struct LayerOwnershipTests : juce::UnitTest
             expect(p.moved.front() == std::make_pair(1, 1) && p.moved.back() == std::make_pair(mu_limits::kMaxLayers - 1, mu_limits::kMaxLayers - 1),
                    "the new slot only");
             for (int h : p.movedHoldingLock) expectEquals(h, 1, "called under layersLock");
+            expectEquals((int) p.added.size(), mu_limits::kMaxLayers - 1, "one layerAdded per add");
+            expectEquals(p.added.front(), 1);
+            expectEquals(p.added.back(), mu_limits::kMaxLayers - 1);
+            for (int h : p.addedHoldingLock) expectEquals(h, 0, "layerAdded runs outside layersLock");
+            p.removeLayer(0); p.swapLayers(0, 1); p.resetLayer(0);
+            expectEquals((int) p.added.size(), mu_limits::kMaxLayers - 1, "delete, reorder and reset do not call layerAdded");
         }
 
         beginTest("addLayer replaces a spare, destroys it outside the lock, and gives the slot default values");
@@ -486,6 +511,62 @@ struct LayerOwnershipTests : juce::UnitTest
             p.resetLayer(5);   // out of range: ignored
             expectEquals(p.resets, 1);
             expectEquals((int) p.moved.size(), 1);
+        }
+
+        beginTest("layer references follow their layer through removeLayer and swapLayers; a gone layer maps to -1");
+        {
+            EditableProcessor p(true);
+            p.addLayer(); p.addLayer();   // three layers
+            p.refs = { 0, 1, 2 };         // reference k names layer k
+            expect(p.removeLayer(1));
+            expectEquals(p.remapCalls, 1);
+            expectEquals(p.refs[0], 0, "a reference below the removed layer is unchanged");
+            expectEquals(p.refs[1], -1, "a reference to the removed layer maps to -1");
+            expectEquals(p.refs[2], 1, "a reference above the removed layer follows it down");
+
+            p.refs = { 0, 1 };
+            expect(p.swapLayers(0, 1));
+            expectEquals(p.remapCalls, 2);
+            expectEquals(p.refs[0], 1, "a reference follows its layer to the swapped slot");
+            expectEquals(p.refs[1], 0);
+
+            p.addLayer(); p.resetLayer(0);
+            expectEquals(p.remapCalls, 2, "addLayer and resetLayer do not remap references");
+        }
+
+        beginTest("the layer count and colours save with the composed state and a missing count uses unsavedLayerCount");
+        {
+            EditableProcessor src(true);
+            src.addLayer(); src.addLayer();
+            src.layers[1]->colourIndex = 5;
+            auto state = src.captureComposedState();
+            expectEquals((int) state.getProperty("numVoices"), 3);
+            expect(state.getProperty("voiceColours").toString().startsWith("0,5,"), "colours are saved per slot");
+
+            EditableProcessor dst(true);
+            expectEquals(dst.savedLayerCount(state), 3);
+            dst.applyComposedState(state);
+            expectEquals(dst.getNumChannels(), 3, "the count is restored");
+            expectEquals(dst.layers[1]->colourIndex, 5, "the colours are restored");
+
+            state.removeProperty("numVoices", nullptr);
+            state.removeProperty("voiceColours", nullptr);
+            expectEquals(dst.savedLayerCount(state), 1, "unsavedLayerCount defaults to 1");
+            dst.unsavedLayerCount = 4;
+            dst.applyComposedState(state);
+            expectEquals(dst.getNumChannels(), 4, "a state without a count loads with the product's legacy count");
+            expectEquals(dst.layers[1]->colourIndex, 5, "a state without colours keeps the current ones");
+
+            state.setProperty("numVoices", 99, nullptr);
+            expectEquals(dst.savedLayerCount(state), mu_limits::kMaxLayers, "the count is clamped");
+            state.setProperty("numVoices", 0, nullptr);
+            expectEquals(dst.savedLayerCount(state), 1);
+
+            EditableProcessor fixed(false);
+            fixed.editable = false;
+            auto fixedState = fixed.captureComposedState();
+            expect(! fixedState.hasProperty("numVoices") && ! fixedState.hasProperty("voiceColours"),
+                   "a fixed-count product saves neither");
         }
 
         beginTest("structural edits cancel exactly the staged swaps they would misdirect");

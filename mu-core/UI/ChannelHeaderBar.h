@@ -30,6 +30,8 @@ public:
     void setStagingBadge(bool show);                  // optional hot-swap "SWP" pill
     void setShowReset(bool show);                     // some products may hide reset
     void setShowDelete(bool show);                    // products with fixed layers hide delete
+    void setDeleteEnabled(bool enabled);              // greyed when only one layer remains
+    void setNoun(const juce::String& n);              // the product's word for a layer (tooltips); lower-cased
     void setNameEditable(bool editable);              // fixed-name layers can't be renamed
     void commitNameEdit();                            // commit any in-progress rename (call before switching layer)
 
@@ -63,6 +65,7 @@ private:
     bool         staging   = false;
     bool         showReset = true;
     bool         showDelete = true;
+    juce::String noun { "layer" };
 
     static constexpr int kIconBtnW   = 22;
     static constexpr int kPresetBtnW = 38;

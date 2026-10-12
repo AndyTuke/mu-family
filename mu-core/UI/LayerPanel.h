@@ -25,6 +25,9 @@ public:
     // swap the content (a combined instance can answer per layer type). Not owned.
     void setContent(juce::Component* content);
 
+    // The product's word for a layer ("Rhythm", "Voice", ...), for dialog titles.
+    const juce::String& getNoun() const noexcept { return noun; }
+
     void setDestProvider(const ModDestProvider* provider) { modulatorPanel.setDestProvider(provider); }
 
     // Where the modulator playhead reads the song beat from (default: the internal beat).
@@ -69,6 +72,7 @@ private:
     juce::Colour layerColour() const;
 
     ProcessorBase& proc;
+    juce::String   noun;
     int currentLayer = 0;
 
     ChannelHeaderBar header;
