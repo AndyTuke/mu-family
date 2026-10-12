@@ -783,6 +783,93 @@ public:
             expect(! engine.externalDrifting(), "not drifting while stopped");
             expectEquals(engine.externalPhaseErrorBeats(), 0.0f);
         }
+
+        // A synthetic external clock at `bpm` (a pulse every 120000 / bpm frames at 48 kHz) feeding a headless
+        // engine in blocks of any size: every pulse that has already happened is fed before the next block.
+        struct ExtRig
+        {
+            ExtRig(double bpmIn, int blockFramesIn, int offsetMs) : bpm(bpmIn), frames(blockFramesIn), out(2, blockFramesIn)
+            {
+                mem.create();
+                engine.attachMemory(&mem);
+                engine.attachMidiClock(&est);
+                engine.setClockSource(ClockSource::ExternalMidi);
+                engine.setSyncOffsetMs(offsetMs);
+                engine.prepare(48000.0, blockFramesIn, bpmIn);
+                est.onStart();
+            }
+            // Renders blocks until `untilFrame`; returns the largest one-block beat advance over the expected one.
+            double run(long long untilFrame, bool* sawDrifting = nullptr)
+            {
+                double worst = 0.0;
+                const double pulseFrames = 120000.0 / bpm;
+                while (pos < untilFrame)
+                {
+                    while (nextPulse <= (double) pos) { est.onClockPulse((nextPulse + shift) / 48000.0); nextPulse += pulseFrames; }
+                    const double before = engine.transportClock().beats();
+                    engine.renderBlock(out.data(), 2, frames);
+                    const double adv = engine.transportClock().beats() - before;
+                    worst = std::max(worst, adv / (bpm / 60.0 * frames / 48000.0));
+                    if (sawDrifting != nullptr && engine.externalDrifting()) *sawDrifting = true;
+                    pos += frames;
+                }
+                return worst;
+            }
+            // The source jumps ahead: `n` extra pulses arrive at once, and its timeline moves on by as many.
+            void jumpAhead(int n)
+            {
+                const double pulseFrames = 120000.0 / bpm;
+                for (int i = 0; i < n; ++i) { est.onClockPulse((nextPulse + shift) / 48000.0); shift += pulseFrames; }
+            }
+            double bpm; int frames; double shift = 0.0;
+            MuLinkServerMemory mem; ServerEngine engine; MidiClockEstimator est; OutputBuffers out;
+            long long pos = 0; double nextPulse = 0.0;
+        };
+
+        beginTest("external clock: a steady clock stays Locked at small and large block sizes");
+        for (const int blockFrames : { 64, 512, 2048, 4096 })
+        {
+            auto rig = std::make_unique<ExtRig>(120.0, blockFrames, 0);
+            rig->run(96000);                                   // two seconds: the grid settles
+            bool sawDrifting = false;
+            rig->run(96000 + 192000, &sawDrifting);            // four more seconds of a steady clock
+            expect(! sawDrifting, "block " + juce::String(blockFrames) + ": no Drifting on a steady clock");
+            expect(! rig->engine.externalDrifting(), "block " + juce::String(blockFrames) + ": Locked");
+        }
+
+        beginTest("external clock: a two-beat jump of the source re-aligns by a locate and is Locked within a few blocks");
+        {
+            auto rig = std::make_unique<ExtRig>(120.0, 250, 0);
+            rig->run(96000);
+            rig->jumpAhead(48);                                // the source jumps 2 beats ahead
+            bool sawDrifting = false;
+            rig->run(rig->pos + 250 * 3, &sawDrifting);        // the jump block flashes at most; then the average restarts
+            bool laterDrifting = false;
+            rig->run(rig->pos + 250 * 8, &laterDrifting);
+            expect(! laterDrifting && ! rig->engine.externalDrifting(), "Locked a few blocks after the jump");
+        }
+
+        beginTest("external clock: +250 ms leads the beat by half a beat two beats after Start, and a mid-play change slews");
+        {
+            auto base = std::make_unique<ExtRig>(120.0, 250, 0);
+            auto lead = std::make_unique<ExtRig>(120.0, 250, 250);
+            base->run(48000);
+            lead->run(48000);                                  // two beats after Start
+            expectWithinAbsoluteError(lead->engine.transportClock().beats() - base->engine.transportClock().beats(), 0.5, 0.02,
+                                      "the offset is applied from the first servoed block, not closed at 10% per block");
+
+            // A mid-play change at 240 BPM moves the target by a whole beat: it slews (no jump, no over-long block).
+            auto ref  = std::make_unique<ExtRig>(240.0, 250, 0);
+            auto step = std::make_unique<ExtRig>(240.0, 250, 0);
+            ref->run(96000);
+            step->run(96000);
+            step->engine.setSyncOffsetMs(250);
+            const double worst = step->run(96000 + 6 * 48000);
+            ref->run(96000 + 6 * 48000);
+            expect(worst < 1.15, "no block advanced by more than its own length plus the slew cap (no jump)");
+            expectWithinAbsoluteError(step->engine.transportClock().beats() - ref->engine.transportClock().beats(), 1.0, 0.03,
+                                      "the whole beat is applied by the slew");
+        }
     }
 };
 

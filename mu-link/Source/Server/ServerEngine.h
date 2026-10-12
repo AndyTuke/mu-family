@@ -286,33 +286,58 @@ public:
                 const double target = ((double) songPulse + 0.5) / 24.0 + offsetBeats;
                 const double err    = target - clock.beats();
                 const double gain = 1.0 - std::exp(-(double) numFrames / (kPhaseServoSeconds * sr));
+                // The first servoed block after a Start applies the offset in one locate (as the plugins
+                // do) instead of closing it at the slew's 10% per block. Any later offset change slews.
+                const bool firstBlock = ! servoActive;
+                const bool applyOffsetNow = firstBlock && offsetBeats != 0.0;
+                // The error against the grid the servo was already on: a newly applied offset moves the
+                // target by up to a beat (250 ms at 240 BPM), which must slew, not trip the missed-locate
+                // jump. The part of an offset change the slew has not yet closed stays in offsetPendingBeats.
+                if (! firstBlock) offsetPendingBeats += offsetBeats - lastOffsetBeats;
+                const double errBeforeOffset = err - (firstBlock ? offsetBeats : offsetPendingBeats);
                 // The error for the lamp: the clock count arrives in whole pulses, so the raw error
                 // saws through about +/- half a pulse even on a perfect lock. A one-pole average at
                 // the servo's own time constant keeps what is really off the grid and drops that saw.
-                const bool jump = std::abs(err) > 1.0;
-                errorAverage = jump ? err : errorAverage + gain * (err - errorAverage);
+                // An offset applied by the first-block locate is intended, so it does not flash the lamp.
+                const bool missedLocate = std::abs(errBeforeOffset) > 1.0;
+                const bool jump = missedLocate || applyOffsetNow;
+                const double lampErr = firstBlock ? errBeforeOffset : err;
+                errorAverage = jump ? lampErr : errorAverage + gain * (lampErr - errorAverage);
                 servoDrifting = nextDriftingState(servoDrifting, std::abs(errorAverage));
                 phaseErrorBeats.store((float) std::abs(errorAverage), std::memory_order_relaxed);
                 clockDrifting.store(servoDrifting ? 1u : 0u, std::memory_order_relaxed);
                 if (jump)
-                    clock.locate(target);                           // far off (a missed locate): jump
+                {
+                    // Far off (a missed locate) or applying the offset: jump. The lamp state just published
+                    // keeps its flash for this block; the average restarts so it does not stay Drifting for
+                    // seconds after a jump that already re-aligned the grid. Pulses the jump crosses are not
+                    // counted in BlockStats or MIDI clock out (a deliberate choice, same as the slew's).
+                    clock.locate(target);
+                    errorAverage       = 0.0;
+                    offsetPendingBeats = 0.0;
+                }
                 else
                 {
                     const double blockBeats = clock.tempo() / 60.0 * (double) numFrames / sr;
-                    clock.nudge(std::clamp(gain * err, -0.1 * blockBeats, 0.1 * blockBeats));
+                    const double step = std::clamp(gain * err, -0.1 * blockBeats, 0.1 * blockBeats);
+                    clock.nudge(step);
+                    // The slew closes the pending offset change from whichever side it came.
+                    if (offsetPendingBeats > 0.0 && step > 0.0)      offsetPendingBeats = std::max(0.0, offsetPendingBeats - step);
+                    else if (offsetPendingBeats < 0.0 && step < 0.0) offsetPendingBeats = std::min(0.0, offsetPendingBeats - step);
                 }
+                lastOffsetBeats = offsetBeats;
+                servoActive     = true;
             }
             if (! servoed)
             {
                 // Not servoing (stopped, waiting for the first clock, or lost): nothing is off its grid.
-                servoDrifting = false;
-                errorAverage  = 0.0;
-                phaseErrorBeats.store(0.0f, std::memory_order_relaxed);
-                clockDrifting.store(0u, std::memory_order_relaxed);
+                clearServoState();
             }
         }
         else
         {
+            // Not following an external clock (the source was switched away): drop its servo state and the lamp.
+            clearServoState();
             // Internal master: the UI's play / tempo requests, applied once per block so the whole
             // block (snapshot, transport out, advance) sees one state.
             clock.setTempo(tempoRequest.load(std::memory_order_relaxed));
@@ -542,6 +567,17 @@ private:
         return s;
     }
 
+    // Resets the external-clock servo and publishes a quiet lamp (audio thread).
+    void clearServoState() noexcept
+    {
+        servoActive        = false;
+        offsetPendingBeats = 0.0;
+        servoDrifting      = false;
+        errorAverage  = 0.0;
+        phaseErrorBeats.store(0.0f, std::memory_order_relaxed);
+        clockDrifting.store(0u, std::memory_order_relaxed);
+    }
+
     MuLinkServerMemory* mem = nullptr;
     TransportClock      clock;
     double              sr = 48000.0;
@@ -553,6 +589,9 @@ private:
     std::atomic<std::uint32_t> clockDrifting   { 0u };     // audio thread → UI: 1 = drifting
     bool                       servoDrifting   = false;    // audio thread only: the hysteresis state
     double                     errorAverage    = 0.0;      // audio thread only: averaged signed servo error (beats)
+    bool                       servoActive     = false;    // audio thread only: the previous block was servoed
+    double                     lastOffsetBeats = 0.0;      // audio thread only: the offset the previous servoed block aimed at
+    double                     offsetPendingBeats = 0.0;   // audio thread only: offset change the slew has not closed yet (beats)
 
     std::atomic<ClockSource> clockSource { ClockSource::Internal };
     MidiClockEstimator*      midiClock = nullptr;   // not owned (lives in AudioServer)
