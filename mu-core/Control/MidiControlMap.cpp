@@ -121,27 +121,46 @@ void MidiControlMap::load()
     auto* obj = json.getDynamicObject();
     if (obj == nullptr) return;
 
-    const juce::ScopedLock sl(lock);
-    mappings.clear();
+    bool renamed = false;
+    {
+        const juce::ScopedLock sl(lock);
+        mappings.clear();
 
-    const auto q = quantiseFromName(obj->getProperty("quantise").toString());
-    globalQuantise.store((int) (q == Quantise::Default ? Quantise::Bar : q), std::memory_order_relaxed);
+        const auto q = quantiseFromName(obj->getProperty("quantise").toString());
+        globalQuantise.store((int) (q == Quantise::Default ? Quantise::Bar : q), std::memory_order_relaxed);
 
-    if (auto* arr = obj->getProperty("mappings").getArray())
-        for (const auto& v : *arr)
-        {
-            MidiMapping m;
-            m.isNote          = v.getProperty("type", "cc").toString() == "note";
-            m.channel         = juce::jlimit(1, 16, (int) v.getProperty("channel", 1));
-            m.number          = juce::jlimit(0, 127, (int) v.getProperty("number", 0));
-            m.action.type     = actionFromName(v.getProperty("action", "").toString());
-            m.action.layer    = (int) v.getProperty("layer", 0);
-            m.action.paramId  = v.getProperty("param", "").toString();
-            m.action.quantise = quantiseFromName(v.getProperty("quantise", "default").toString());
-            if (m.action.type != ControlActionType::None && (int) mappings.size() < kMaxMappings)
-                mappings.push_back(m);
-        }
-    republish();
+        if (auto* arr = obj->getProperty("mappings").getArray())
+            for (const auto& v : *arr)
+            {
+                MidiMapping m;
+                m.isNote          = v.getProperty("type", "cc").toString() == "note";
+                m.channel         = juce::jlimit(1, 16, (int) v.getProperty("channel", 1));
+                m.number          = juce::jlimit(0, 127, (int) v.getProperty("number", 0));
+                m.action.type     = actionFromName(v.getProperty("action", "").toString());
+                m.action.layer    = (int) v.getProperty("layer", 0);
+                m.action.paramId  = v.getProperty("param", "").toString();
+                m.action.quantise = quantiseFromName(v.getProperty("quantise", "default").toString());
+
+                // A parameter id saved under a renamed prefix moves to the new one (first matching pair).
+                for (const auto& [oldPrefix, newPrefix] : idPrefixRenames)
+                    if (oldPrefix.isNotEmpty() && m.action.paramId.startsWith(oldPrefix))
+                    {
+                        m.action.paramId = newPrefix + m.action.paramId.substring(oldPrefix.length());
+                        renamed = true;
+                        break;
+                    }
+
+                if (m.action.type != ControlActionType::None && (int) mappings.size() < kMaxMappings)
+                    mappings.push_back(m);
+            }
+        republish();
+    }
+    if (renamed) save();   // once, so the file keeps the new ids
+}
+
+void MidiControlMap::setIdPrefixRenames(std::vector<std::pair<juce::String, juce::String>> renames)
+{
+    idPrefixRenames = std::move(renames);
 }
 
 void MidiControlMap::save() const

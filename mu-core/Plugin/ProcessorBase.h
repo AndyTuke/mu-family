@@ -378,9 +378,12 @@ protected:
     // The layer behind persistence slot `i`: every declared slot, active or not, so a state with
     // more layers than are live still loads (and saves) their data. Defaults to getLayer.
     virtual Layer* slotLayer(int i) { return getLayer(i); }
-    void initLayerState(const juce::StringArray& layerPrefixes)
+    // `legacyPrefixes` (same slot order) are the prefixes a renamed product used before; only the
+    // rebuild of an older APVTS-dump state reads them (toComposedState), never a live id.
+    void initLayerState(const juce::StringArray& layerPrefixes, const juce::StringArray& legacyPrefixes = {})
     {
         layerLayout = mu_pp::LayerLayout(*this, layerPrefixes);
+        layerLayout.addLegacyPrefixes(legacyPrefixes);
         layerExtras = { [this](int slot, juce::ValueTree& node)       { if (auto* l = slotLayer(slot)) l->writeExtras(node); },
                        [this](int slot, const juce::ValueTree& node) { if (auto* l = slotLayer(slot)) l->applyExtras(node); } };
     }

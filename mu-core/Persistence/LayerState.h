@@ -98,6 +98,22 @@ public:
             }
     }
 
+    // Earlier parameter-id prefixes of the slots, in slot order (entry i belongs to slot i). Only
+    // composeLegacyState consults them, for ids the current prefixes do not match; live ids never do.
+    void addLegacyPrefixes(const juce::StringArray& oldPrefixes) { legacyPrefixes = oldPrefixes; }
+
+    // The slot whose earlier prefix `id` carries (-1 = none), and `id` without that prefix.
+    int legacySlotOf(const juce::String& id) const
+    {
+        for (int s = 0; s < legacyPrefixes.size() && s < prefixes.size(); ++s)
+            if (legacyPrefixes[s].isNotEmpty() && id.startsWith(legacyPrefixes[s])) return s;
+        return -1;
+    }
+    juce::String legacyRowIdFor(const juce::String& id, int slot) const
+    {
+        return id.substring(legacyPrefixes[slot].length());
+    }
+
     int numLayers() const noexcept { return prefixes.size(); }
     // The parameter-id prefix of `slot` (empty when the layout has no such slot).
     juce::String prefix(int slot) const { return slot >= 0 && slot < prefixes.size() ? prefixes[slot] : juce::String(); }
@@ -149,6 +165,7 @@ private:
     }
 
     juce::StringArray                prefixes;
+    juce::StringArray                legacyPrefixes;
     std::vector<std::vector<Entry>>  slots;
     std::vector<Entry>               globals;
 };
@@ -251,9 +268,16 @@ inline juce::ValueTree composeLegacyState(const juce::ValueTree& legacy, const L
             // default, as replaceState read it — leave it out so the apply defaults it.
             if (! child.hasProperty("value")) continue;
             const auto id = child.getProperty("id").toString();
-            const int s = layout.slotOf(id);
+            int s = layout.slotOf(id);
+            auto rowId = layout.rowIdFor(id, s);
+            if (s < 0)   // no current prefix matches: try the prefixes the product used before a rename
+                if (const int old = layout.legacySlotOf(id); old >= 0)
+                {
+                    s = old;
+                    rowId = layout.legacyRowIdFor(id, old);
+                }
             juce::ValueTree row(kRowTag);
-            row.setProperty("id", layout.rowIdFor(id, s), nullptr);
+            row.setProperty("id", rowId, nullptr);
             row.setProperty("x", child.getProperty("value"), nullptr);
             (s < 0 ? globals : slotNodes[(size_t) s]).appendChild(row, nullptr);
         }

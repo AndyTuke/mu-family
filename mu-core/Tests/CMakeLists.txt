@@ -28,6 +28,7 @@ target_sources(mu-core-tests PRIVATE
     TransportResolverTests.cpp
     UIScalingConsistencyTests.cpp
     MidiFullPresetMapTests.cpp
+    LegacyPrefixTests.cpp
     # Sources behind ProcessorBase + the settings page (shared list, see ProcessorTestSources.cmake).
     ${MU_CORE_PROCESSOR_TEST_SOURCES}
 )

@@ -5,6 +5,7 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 // The saved table that maps a MIDI CC or note (on a channel) to a ControlAction, plus MIDI learn.
@@ -36,6 +37,11 @@ public:
     void setStorageFile(juce::File f);
     void load();
     void save() const;
+
+    // Parameter-id prefixes a product renamed ({old, new}): set before load(). A loaded mapping whose
+    // parameter id starts with an old prefix is rewritten, and the file is saved once so it stays
+    // renamed. Only load() uses them; ids added afterwards are never touched.
+    void setIdPrefixRenames(std::vector<std::pair<juce::String, juce::String>> renames);
 
     // Message-thread edits. add() replaces a mapping from the same source; returns its index (-1 if full).
     int     add(const MidiMapping& m);
@@ -84,6 +90,7 @@ private:
     juce::File                    storageFile;
     mutable juce::CriticalSection lock;
     std::vector<MidiMapping>          mappings;
+    std::vector<std::pair<juce::String, juce::String>> idPrefixRenames;
 
     std::array<std::atomic<int16_t>, 2 * 16 * 128> lookup {};
     std::array<std::atomic<uint32_t>, kMaxMappings> flags {};
