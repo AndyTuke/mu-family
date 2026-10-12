@@ -1134,6 +1134,8 @@ mu-clid-lite both use `build/mu-clid/...` because they share a CMakeLists.
 
 ---
 
+Time stretching sits behind `TimeStretcherBase` (currently a stub; SoundTouch in v1 or RubberBand in v2 slots in without refactoring). The time-stretch library ships as a separate DLL, required for LGPL/GPL compliance, when it is implemented.
+
 ## Related design documents
 
 - [mu-clid/design-voice.md](mu-clid/design-voice.md) — μ-Clid voice chain, ADSR, filter, InsertProcessor details (mu-tant's voice doc lives at [mu-tant/design-voice.md](mu-tant/design-voice.md))

@@ -46,8 +46,8 @@ $env:JUCE_PATH = "D:\JUCE"
 - **Release builds only when the owner says so** — reuses the last Debug number, never increments; **Release ≤ last Debug** (a higher Release aborts with FATAL_ERROR — surface it, don't work around).
 - **Report the number read from `mu-core/BuildNumber.h` *after* the final build** — never an intermediate log value.
 - **Version = `<major>.<minor>` + the shared build number.** Live products use [version.txt](version.txt), pre-release products (mu-On, mu-Toni) use [version-pre.txt](version-pre.txt); change a base only by editing its file and only when Andy says so, and the build number never resets. Details: [docs/design-plugin-family.md](docs/design-plugin-family.md#version-numbering).
-- **No GitHub Actions workflow runs on push — ever.** All workflows are `workflow_dispatch`-only; never re-add `push:`/`pull_request:` triggers, and nothing runs as a side-effect of a plain build/commit/push. **`release.yml` is the exception that IS dispatched as a standard step of every release** (`/release` step b) — the repo is public so Linux CI minutes are free, so a release always publishes a full cross-platform (Windows + Linux) GitHub release. `ci.yml` + `mac-validate.yml` still run only on explicit owner request.
-- **macOS is on hold for the foreseeable future** (owner decision, 2026-10-02) — without an Apple code-signing certificate the builds can't be notarized, so nothing ships for Mac. Keep the existing `APPLE`/AU code paths compiling-in-principle (don't delete them), but don't build, ship, advertise or spend effort on macOS until the owner lifts the hold.
+- **No GitHub Actions workflow runs on push — ever.** All workflows are `workflow_dispatch`-only; never re-add `push:`/`pull_request:` triggers. `release.yml` is dispatched as a standard step of every release (`/release` step b); `ci.yml` and `mac-validate.yml` run only on explicit owner request.
+- **macOS is on hold** (owner, 2026-10-02): no Apple signing certificate, so nothing ships for Mac. Keep the `APPLE`/AU code paths compiling-in-principle; don't build, ship or advertise macOS until the owner lifts the hold.
 
 **Release notes per batch of user-facing changes:** whenever the work since the last `/notes` fixes or improves anything **user-facing**, run `/notes` once for the whole batch ([.claude/commands/notes.md](.claude/commands/notes.md)) to add a plain-English one-liner to the **"Next release · In testing"** section of each affected product's release-notes page, then commit + push the site. The In-Testing section is public and must always be current so users can see what's coming in the next version.
 
@@ -60,10 +60,6 @@ When issues in `backlog.md` change status or new ones are needed, hand the chang
 New feature ideas live in [docs/design-future.md](docs/design-future.md) under **Unscheduled Ideas**. Ask the user before implementing any of them.
 
 **Standing check on ALL work (owner rule):** before and while making any change — code, design, docs, backlog — read [docs/design-future.md](docs/design-future.md) (once per session or batch of related work, and again whenever the change is structural) and ask *"am I making these ideas easier or harder?"* — in particular the one-framework / one-instance direction (shared `mu-core`, only the sound engine and sequencer differ per product) and the standard UI sizing. Prefer the change that moves toward them (generic code in `mu-core`, no new per-product copies of shared behaviour, no new per-product layout constants); if a change must make one harder, say so and why before doing it.
-
-**The `user-documentation-author` agent ([.claude/agents/user-documentation-author.md](.claude/agents/user-documentation-author.md)) owns the user manuals** (`docs/<product>/create_manual.ps1` and the `.docx` it generates) and keeps them current (owner rule, 2026-10-09). After any user-facing change, hand it what changed so the manual is updated in the same commit as the code. It is separate from `/notes`, which owns the release-notes pages.
-
-**The `test-steward` agent ([.claude/agents/test-steward.md](.claude/agents/test-steward.md)) owns testing** — unit tests, the listening-test pipeline, [tests.md](tests.md) and pass/fail status — and writes the tests for fixes and for DSP findings; it never changes product source. **The `architecture-steward` agent ([.claude/agents/architecture-steward.md](.claude/agents/architecture-steward.md)) owns platform structure** — what goes in `mu-core` vs a product vs `mu-control`, naming, folder layout, the family docs and the standing `design-future` check — and rules before structural or cross-plugin work (owner rule, 2026-10-09).
 
 ### Agent precedence
 
@@ -82,13 +78,7 @@ Seven agents each own one area and are the final word in it; none edits another'
 
 **Call the agents without asking** (owner rule, 2026-10-09). The main conversation invokes them on its own whenever their trigger applies, and does not ask the owner for permission first:
 
-- `backlog-administrator`: any backlog change, any task hand-over, after every build and response (batch the changes into one call).
-- `ux-controller`: once before a batch of related UI work, and for any design question the docs don't settle.
-- `architecture-steward`: once before a batch of structural, cross-plugin or naming work.
-- `dsp-controller`: once per batch of new or changed audio-path code, before the build or commit that covers it. Only Blocker, Major and Risk findings become backlog rows; Minor findings become P3 one-liners (or updates on the item they came from) in the backlog; there is no separate review list. A review never triggers another review (owner rule, 2026-10-12).
-- `test-steward`: when a fix, feature or DSP finding needs a test, and before a release.
-- `user-documentation-author`: after a batch of user-facing changes.
-- `web-designer`: when the site, pricing or licensing wording, or a release-notes page needs a change.
+Each agent's file says when to use it. Calls are once per batch of related work, not per small change; `dsp-controller` reviews before the build or commit that covers a batch, and a **Blocked** verdict is fixed first. `backlog-administrator` gets one batched call at the end of a round.
 
 **Reviews update the item, they don't spawn new ones** (owner rule, 2026-10-12), for all reviewers (`dsp-controller`, `architecture-steward`, `test-steward`, `ux-controller`, `user-documentation-author`): when a change belongs to a backlog issue, the main conversation passes each reviewer's findings to the `backlog-administrator`, who records them on that row; the fixes are made; each reviewer re-checks and answers Pass; and only when every applicable reviewer has passed does the main conversation ask the `backlog-administrator` to close the row. A genuinely separate defect still gets its own row. A review never triggers another review.
 
@@ -123,9 +113,9 @@ The single resolved status is **`✅ Closed`** — never `Fixed` / `Audited` / `
 |---|---|
 | [docs/design-plugin-family.md](docs/design-plugin-family.md) | **Shared plugin architecture** — `mu-core`, `ProcessorBase`, `EditorShellBase`, `VoiceSlot`, the platform contract / engine swap-point pattern. Read before structural / cross-plugin work. |
 | [docs/design-ui-family.md](docs/design-ui-family.md) | **Shared design system** — colour tokens, typography, control sizes, interaction patterns, shared module plan. Read this before any UI work. |
-| [docs/design-ableton-link.md](docs/design-ableton-link.md) | **Ableton Link plan** — why, the licence decision that gates it, where it fits (mu-link as the peer, a resolver source), staged work, and the sync groundwork that must come first. |
-| [docs/design-launchpad.md](docs/design-launchpad.md) | **Launchpad X controller plan** and where the controller code lives (`mu-control`) — the device's MIDI implementation (read from Novation's manual), a proposed live layout, the risks to check on hardware, and the order of work. Read before any MIDI-input mapping or controller-output work. |
-| [docs/design-naming.md](docs/design-naming.md) | **Naming conventions** — the Layer vocabulary and parent class, namespaces, class-name roles, folders, identifier style, and what is still out of line. Read before naming a class, file, folder or parameter. |
+| [docs/design-ableton-link.md](docs/design-ableton-link.md) | **Ableton Link plan** — the licence decision that gates it, where it fits, staged work. |
+| [docs/design-launchpad.md](docs/design-launchpad.md) | **Launchpad X controller plan** and `mu-control` — read before any MIDI-input mapping or controller-output work. |
+| [docs/design-naming.md](docs/design-naming.md) | **Naming conventions** — Layer vocabulary, namespaces, folders, identifiers. Read before naming a class, file, folder or parameter. |
 | [docs/design-fx.md](docs/design-fx.md) | FX algorithms, delay, reverb, intra-FX routing, FXSlotBase interface. Lives in `mu-core/Audio/FX/`, used by all products. |
 | [docs/design-future.md](docs/design-future.md) | Unscheduled future ideas — read to avoid closing off options during current stages. |
 | [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) | Family-wide stage log (build numbers are shared across products). |
@@ -141,8 +131,6 @@ The single resolved status is **`✅ Closed`** — never `Fixed` / `Audited` / `
 
 ## Critical architectural rules (family-wide)
 
-**The `dsp-controller` agent ([.claude/agents/dsp-controller.md](.claude/agents/dsp-controller.md)) reviews every DSP / audio-thread implementation** (owner rule, 2026-10-09) for efficiency, real-time safety, race conditions and other errors. Run it on any new or changed DSP code before it is built or committed; a **Blocked** verdict must be fixed first. It is read-only: it reports, the main conversation fixes.
-
 These hold for everything in `mu-core` and every product that links it. Product-specific rules live in each product's CLAUDE.md.
 
 - **Everything in APVTS** — if a parameter isn't in the ValueTree it won't save. All parameters wire through APVTS.
@@ -155,10 +143,8 @@ These hold for everything in `mu-core` and every product that links it. Product-
 - **ControlSequence lengths are independent** — never couple loop lengths or rates to channel step counts.
 - **ModulationMatrix processes in dependency order** — detects and rejects circular dependencies at assignment creation time.
 - **FXSlotBase interface for all FX** — enables VST3 plugin hosting in v3 without refactoring.
-- **TimeStretcherBase wraps the time-stretch engine** — currently a stub; SoundTouch (v1) or RubberBand (v2) slots in without refactoring.
-- **Time-stretch DLL (SoundTouch/RubberBand) ships separately** — required for LGPL/GPL compliance when implemented.
 - **All colours and sizes in MuLookAndFeel only** — no hardcoded values in component drawing code.
-- **All UI uses the shared component library** — never build a one-off version of a standard control. The editor shell ([mu-core/UI/EditorShellBase.h](mu-core/UI/EditorShellBase.h)) supplies LookAndFeel, TransportBar, StatusBar, About / Save / Preset Browser / MIDI preset overlays, overlay state machine, layout, keybindings — products supply only the sidebar + main panel + optional mixer / settings overlays.
+- **All UI uses the shared component library** — never build a one-off version of a standard control. The editor shell ([mu-core/UI/EditorShellBase.h](mu-core/UI/EditorShellBase.h)) supplies LookAndFeel, TransportBar, StatusBar, About / Save / Preset Browser / MIDI preset overlays, overlay state machine, layout, keybindings — products supply only the sidebar + main panel + optional mixer / settings overlays. `KnobWithLabel`: bind data with `onValueChanged` or an attachment, never by overriding `getSlider().onValueChange` ([docs/design-ui-family.md](docs/design-ui-family.md#knobwithlabel-callbacks)).
 - **Family consistency rule** — all project structuring (Source/ folder layout, docs/ topology, file extensions, naming conventions, ProcessorBase virtual hooks, backlog handling) must mirror across the mu-family (mu-clid / mu-tant / mu-toni / future siblings). Before adding a folder, naming a file, picking a convention for a new plugin, **mirror what the existing product does**. Before introducing a new convention for one product, **propagate it to the others**. Concrete current conventions: per-layer preset = camelCase noun (`.muRhythm`, `.muPattern`; layer types are `Rhythm` / `Pattern` / `Arp` / `Track` for mu-Clid / mu-Tant / mu-Toni / mu-On); full preset = plugin-name camelCase (`.muClid`, `.muTant`); Source subfolders = **the same eight in every instrument product, empty ones kept with a `.gitkeep`**: `{Audio, License, Modulation, Persistence, Plugin, Sequencer, Tests, UI}` (see [docs/design-naming.md](docs/design-naming.md)); product docs at `docs/<product>/` mirroring mu-clid's set as topics get decided.
 
 ## Code style (mandatory)
@@ -170,25 +156,7 @@ These hold for everything in `mu-core` and every product that links it. Product-
   - **Section headers** — when a function contains clearly separate phases, put a one-line comment at the top of each phase naming its purpose and result (`// Phase 1: gather analysis frames → spectrum[]`).
 - One sentence per comment is almost always enough. If you need more, the code probably wants to be split into named helpers instead.
 
-## Key family-wide patterns
-
-### KnobWithLabel callbacks
-[KnobWithLabel](mu-core/UI/Components/KnobWithLabel.h) has **two** separate callbacks:
-- `onStatusUpdate(name, valueString)` — called automatically from the internal `slider.onValueChange` for status bar display.
-- `onValueChanged(double)` — also called from the same `slider.onValueChange` lambda; use this for data mutation.
-
-Never override `getSlider().onValueChange` directly — it replaces both callbacks. Always use `onValueChanged` for data binding, or attach via `juce::AudioProcessorValueTreeState::SliderAttachment`.
-
-## Third-party libraries
-
-JUCE (via `JUCE_PATH`), Signalsmith Reverb, Monocypher, clap-juce-extensions, and the planned SoundTouch/RubberBand time-stretch engines — full table with licences in [docs/design-plugin-family.md](docs/design-plugin-family.md#third-party-libraries).
-
 ## UI values
-
-**The `ux-controller` agent ([.claude/agents/ux-controller.md](.claude/agents/ux-controller.md)) owns look, feel and design and all the design documentation** (owner rule, 2026-10-09). It arbitrates every design choice the coding needs: before UI work, or when a design question comes up that the docs don't settle, ask it for a ruling (it returns the tokens, sizes, components and states to use, and records the decision in the docs). Design docs ([docs/design-ui-family.md](docs/design-ui-family.md), `docs/<product>/design-ui.md`) are edited by it, not ad hoc. It does not write code or edit the backlog.
 
 Knob colour coding, window sizing, and all layout constants are defined in [mu-core/UI/Components/MuLookAndFeel.h](mu-core/UI/Components/MuLookAndFeel.h). **Every shadow, highlight and tint strength lives in `MuTheme::Lighting`** ([mu-core/UI/Components/MuTheme.h](mu-core/UI/Components/MuTheme.h)) — with master `shadowAmount` / `highlightAmount` that scale them all for every product. Never hard-code an alpha for depth in drawing code; add a field there. **The metal style is the family-standard look** — every app turns it on with one `setMetalStyle(true[, appAccent])` call at the end of its editor constructor; the elements (metal panels, raised boxes, name plates, LCD selectors, lamps, engraved labels) and their rules are in [docs/design-ui-family.md §11](docs/design-ui-family.md#11-metal-style-family-standard). Build new UI from those mu-core helpers, never one-off drawing. Family-wide design notes in [docs/design-ui-family.md](docs/design-ui-family.md); product-specific layouts in `docs/<product>/design-ui.md`.
 
-## Development history
-
-mu-clid Stages 1–34 are complete; see [docs/DevelopmentHistory.md](docs/DevelopmentHistory.md) for the stage-by-stage log. Post-Stage-34 work (the mu-core shell lift, the mu-tant build-out) is tracked as numbered [backlog.md](backlog.md) issues rather than staged — the "stage" framework was mu-clid's v1 roadmap and isn't used for cross-family / mu-tant work. Log every code change as a backlog entry (see Backlog handling).
