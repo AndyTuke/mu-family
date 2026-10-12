@@ -28,6 +28,15 @@ $env:JUCE_PATH = "D:\JUCE"
 
 **JUCE is kept up to date (owner rule, 2026-10-09).** The family tracks the latest stable JUCE release rather than staying on an old one. The version is pinned in **one place**, [juce-version.txt](juce-version.txt): every CI workflow checks out that tag and configure fails if the local `JUCE_PATH` checkout differs, so a bump is a one-line edit and local builds cannot drift from CI. To bump: read JUCE's `BREAKING_CHANGES.md` between the old and new version, grep the tree for each affected API, bump the pin, then run the unit tests, the round-trip listening tests and pluginval on the build PC. When writing code, use current JUCE APIs and do not build on deprecated ones. Version in use: JUCE 9.0.3 today. `pwsh tests/scripts/check-juce-version.ps1` reports how far the pin is behind the latest release.
 
+## How a round works
+
+1. **Take work.** Ask the `backlog-administrator` for the next task(s) from the top of Open; it returns a brief.
+2. **Prepare.** Once per batch of related work, get rulings from `ux-controller` / `architecture-steward` where the docs don't settle it, and do the `design-future` standing check.
+3. **Code.** Make the changes; run the static checks (`tests/scripts/check-*.ps1`).
+4. **Review the batch.** `dsp-controller` and any other applicable reviewer review the whole batch once. Their findings go onto the existing backlog row (via the `backlog-administrator`); fix them; each reviewer re-checks and answers Pass.
+5. **Build when it is worth it** (see "Keep working until a build is worth it"), say in one line why, and report the number read from `mu-core/BuildNumber.h`.
+6. **Follow up.** `test-steward` for tests, `user-documentation-author` for the manuals, `/notes` for release notes: each once for the batch.
+7. **Close and commit.** Items with every applicable sign-off and build evidence are closed by the `backlog-administrator`; commit with `Closes` (signed off) or `Refs` (not yet) and push. Then back to step 1.
 ## Build workflow
 
 **Procedure lives in the `/build` and `/release` skills** ([.claude/commands/build.md](.claude/commands/build.md), [.claude/commands/release.md](.claude/commands/release.md)); full reference detail (plugin formats, deploy, artefact paths, three-way ship) is in [docs/design-plugin-family.md](docs/design-plugin-family.md#build--packaging-reference). The invariants that hold on every build:
@@ -104,7 +113,7 @@ Version: v1.1.972
 
 The backlog in `backlog.md` must always be grouped: **Open → On Hold → Closed**. Within **On Hold** and **Closed**, items are ordered by issue number **descending** (highest first). **Open is in recommended development order** (owner rule, 2026-10-09): work from the top; a new item goes on the top until it is ranked into its place, and the note under the Open heading names the stages. Every backlog update must preserve this ordering. A backlog row is for owner-visible work, defects and Risks; a small change that belongs to an open item is recorded on that item's row, and a trivial internal tidy-up needs only its commit message (the git log is the full development history).
 
-**Open rows carry a few fields, kept short** (owner rule, 2026-10-12). The backlog keeps its four columns (`check-backlog.ps1` enforces them); inside the Description cell an Open row reads: `**[area] Title.** P1/P2/P3 · logged by <who> · Details (one to three sentences) · Updates: dated one-liners, newest last · Needs: reviewers still to sign off, or the blocker`. The Status cell carries the status. **P1** = blocks work or breaks something users hit, **P2** = normal, **P3** = minor, one line, merged with same-area P3s; P3 rows sit at the bottom of Open. Review findings on an item are added to its Updates, not to new rows. The `backlog-administrator` maintains these fields and trims rows that grow past a few lines. Existing rows are converted as they are touched, not in one sweep.
+**Open rows are short and carry a few fixed fields** (priority P1/P2/P3, who logged it, details, dated updates, who still has to sign off); the exact format and rules are in [.claude/agents/backlog-administrator.md](.claude/agents/backlog-administrator.md). Review findings go on the item's row, not into new rows.
 
 The single resolved status is **`✅ Closed`** — never `Fixed` / `Audited` / `Verified` / `Done` or any other variant, whether the item was fixed, verified as already correct, or resolved by design. Structure is enforced by [tests/scripts/check-backlog.ps1](tests/scripts/check-backlog.ps1); run it after editing the backlog.
 

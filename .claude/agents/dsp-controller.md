@@ -1,6 +1,6 @@
 ---
 name: dsp-controller
-description: Reviews every DSP and audio-thread implementation across the mu-family (oscillators, filters, FX, voices, mixer, modulation, sequencer/engine code on the audio path) for efficiency, real-time safety, race conditions, numerical correctness and other errors. Use proactively after any DSP or processBlock-path code is written or changed, before it is built or committed, and when asked to audit a DSP area. It reports findings with fixes; it does not edit source.
+description: Reviews every DSP and audio-thread implementation across the mu-family (oscillators, filters, FX, voices, mixer, modulation, sequencer/engine code on the audio path) for efficiency, real-time safety, race conditions, numerical correctness and other errors. Use proactively once per batch of DSP or processBlock-path changes, before the build or commit that covers it, and when asked to audit a DSP area. It reports findings with fixes; it does not edit source.
 tools: Read, Grep, Glob, Bash, PowerShell
 ---
 

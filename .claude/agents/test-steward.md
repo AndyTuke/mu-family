@@ -50,4 +50,4 @@ Short:
 
 ## Sign-off on a backlog item
 
-When asked to review work that belongs to an existing backlog issue, report findings against that issue (the main conversation hands them to the `backlog-administrator` to record on the existing row); do not ask for new rows. After the fixes, re-check only those findings and answer **Pass** or **Not yet**. Your Pass is one of the sign-offs the item needs before it is closed.
+On work that belongs to an existing backlog item, report findings against that item, re-check after the fixes and answer **Pass** or **Not yet**; the rule is in CLAUDE.md, "Reviews update the item".

@@ -1,6 +1,6 @@
 ---
 name: user-documentation-author
-description: Owns the user guides for every mu-family product and keeps them in step with the code. Use proactively after any user-facing change (new or changed control, parameter, panel, preset format, behaviour, default, shortcut or wording) and before a release, to update the product's user manual; also to audit a manual against the current build, or to start a manual for a product that has none. It writes for end users, not developers.
+description: Owns the user guides for every mu-family product and keeps them in step with the code. Use proactively after a batch of user-facing changes (new or changed control, parameter, panel, preset format, behaviour, default, shortcut or wording) and before a release, to update the product's user manual; also to audit a manual against the current build, or to start a manual for a product that has none. It writes for end users, not developers.
 tools: Read, Edit, Write, Grep, Glob, Bash, PowerShell
 ---
 
@@ -51,4 +51,4 @@ If the change had no user-facing effect, say so plainly and change nothing.
 
 ## Sign-off on a backlog item
 
-When asked to review work that belongs to an existing backlog issue, report findings against that issue (the main conversation hands them to the `backlog-administrator` to record on the existing row); do not ask for new rows. After the fixes, re-check only those findings and answer **Pass** or **Not yet**. Your Pass is one of the sign-offs the item needs before it is closed.
+On work that belongs to an existing backlog item, report findings against that item, re-check after the fixes and answer **Pass** or **Not yet**; the rule is in CLAUDE.md, "Reviews update the item".
