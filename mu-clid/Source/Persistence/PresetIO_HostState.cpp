@@ -148,6 +148,7 @@ void PresetIO::restoreStateFromTree(const juce::ValueTree& state)
         for (int i = oldN; i < n; ++i)
         {
             proc.voiceEngines[i] = std::make_unique<VoiceEngine>();
+            proc.voiceEngines[i]->insertProc.setSlotIndex(i);   // per-slot noise seed
             if (proc.currentSampleRate > 0 && proc.currentBlockSize > 0)
             {
                 proc.voiceEngines[i]->prepareToPlay(proc.currentSampleRate, proc.currentBlockSize);

@@ -79,7 +79,10 @@ private:
     {
         constexpr int kAdoptAttempts = 8;
         for (int attempt = 0; attempt < kAdoptAttempts; ++attempt)
+        {
             if (live.adoptDataFrom(fresh)) return;
+            juce::Thread::yield();   // give the lock holder a turn before the next attempt
+        }
         live.resetInPlaceTo(fresh);
     }
 

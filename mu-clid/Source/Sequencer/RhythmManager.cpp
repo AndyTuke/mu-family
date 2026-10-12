@@ -13,6 +13,7 @@ void RhythmManager::add(const Rhythm& r)
     if (ri >= SequencerEngine::MaxRhythms) return;
     proc.hotSwapStager.cancelPendingIfAny(ri);          // the new slot must carry no stale staged swap
     proc.voiceEngines[ri] = std::make_unique<VoiceEngine>();
+    proc.voiceEngines[ri]->insertProc.setSlotIndex(ri);   // per-slot noise seed
     proc.voiceEngines[ri]->prepareToPlay(proc.currentSampleRate, proc.currentBlockSize);
     proc.midiEngines[ri].prepare(proc.currentSampleRate, proc.currentBlockSize);
     {
@@ -109,6 +110,7 @@ void RhythmManager::remove(int index)
         for (int i = index; i < newN; ++i)
         {
             proc.voiceEngines[i] = std::move(proc.voiceEngines[i + 1]);
+            if (proc.voiceEngines[i]) proc.voiceEngines[i]->insertProc.setSlotIndex(i);   // the moved engine takes its new slot's noise seed
             proc.midiEngines[i]  = std::move(proc.midiEngines[i + 1]);
             proc.mixerEngine.channels[i].copyFrom(proc.mixerEngine.channels[i + 1]);
         }

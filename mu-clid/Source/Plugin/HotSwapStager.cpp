@@ -95,6 +95,9 @@ void HotSwapStager::installRhythm(int r, Rhythm&& rhythm, std::unique_ptr<VoiceE
                                   const juce::String& samplePath, int originEff, uint32_t frameEpoch,
                                   std::unique_ptr<VoiceEngine>* cutVictim)
 {
+    // The incoming engine is not yet visible to the audio thread, so its noise seed can be set here.
+    if (voice) voice->insertProc.setSlotIndex(r);
+
     // Retire-then-swap: the old engine continues rendering its in-flight tail from a retired slot.
     auto oldEngine = std::move(proc.voiceEngines[(size_t) r]);
     proc.voiceEngines[(size_t) r] = std::move(voice);

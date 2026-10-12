@@ -114,6 +114,7 @@ PluginProcessor::PluginProcessor()
     defaultRhythm.genA.hits  = 4;
     sequencer.addRhythm(defaultRhythm);
     voiceEngines[0] = std::make_unique<VoiceEngine>();
+    voiceEngines[0]->insertProc.setSlotIndex(0);   // per-slot noise seed: layers do not share one sequence
     // Stage 34 Step 2: C++17 std::atomic<bool> default ctor leaves the value
     // indeterminate. Initialise every retired-cleanup flag to false so the
     // audio thread + drain block never observe a spurious "ready" state on an

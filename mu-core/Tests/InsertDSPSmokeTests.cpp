@@ -199,6 +199,56 @@ public:
             expect (s0 == s0b, "two slots of the same index must render identically");
             expect (s0 == s0r, "a reset slot must render like a fresh slot of the same index");
         }
+
+        // ── Bitcrusher dither is seeded per slot ─────────────────────────────
+        beginTest ("Bitcrusher dither: slots 0 and 1 decorrelate, equal indices match, reset equals fresh");
+        {
+            constexpr int kLen = 8192;
+            VoiceParams p;
+            p.insertAlgo = 4;
+            setSlot(p, 0, 2.0f);     // 2 bits: a step of 0.5
+            setSlot(p, 1, 48000.0f); // full rate: every sample is quantised
+            setSlot(p, 2, 100.0f);   // full dither
+
+            // A DC input on the quantiser's decision threshold, so the dither alone picks each output level.
+            auto render = [&](BitcrusherInsert& b, int slot, bool resetFirst)
+            {
+                b.prepare(kSR, kLen);
+                b.setSlotIndex(slot);
+                if (resetFirst) { juce::AudioBuffer<float> junk(2, 256); junk.clear(); float g = 0.0f; b.process(junk, 256, 2, p, g); b.reset(); }
+                juce::AudioBuffer<float> buf(2, kLen);
+                for (int ch = 0; ch < 2; ++ch)
+                    for (int i = 0; i < kLen; ++i)
+                        buf.setSample(ch, i, 0.25f);
+                float gr = 0.0f;
+                b.process(buf, kLen, 2, p, gr);
+                std::vector<float> out((size_t) kLen);
+                for (int i = 0; i < kLen; ++i) out[(size_t) i] = buf.getSample(0, i);
+                return out;
+            };
+
+            BitcrusherInsert a, b, c, d;
+            const auto s0  = render(a, 0, false);
+            const auto s1  = render(b, 1, false);
+            const auto s0b = render(c, 0, false);
+            const auto s0r = render(d, 0, true);
+
+            // Correlation of the zero-mean parts: the shared DC level would otherwise read as similarity.
+            double m0 = 0.0, m1 = 0.0;
+            for (int i = 0; i < kLen; ++i) { m0 += s0[(size_t) i]; m1 += s1[(size_t) i]; }
+            m0 /= kLen; m1 /= kLen;
+            double dot = 0.0, na = 0.0, nb = 0.0;
+            for (int i = 0; i < kLen; ++i)
+            {
+                const double x = s0[(size_t) i] - m0, y = s1[(size_t) i] - m1;
+                dot += x * y; na += x * x; nb += y * y;
+            }
+            const double corr = dot / std::sqrt(juce::jmax(1.0e-30, na * nb));
+            expect (na > 1.0e-6 && nb > 1.0e-6, "the dither did not move the output");
+            expect (std::abs(corr) < 0.2, "slots 0 and 1 produce correlated dither (corr=" + juce::String(corr) + ")");
+            expect (s0 == s0b, "two slots of the same index must render identically");
+            expect (s0 == s0r, "a reset slot must render like a fresh slot of the same index");
+        }
     }
 };
 
