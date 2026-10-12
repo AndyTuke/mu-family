@@ -348,8 +348,6 @@ private:
     juce::String serialiseVoiceColours() const;
     void         restoreVoiceColours(const juce::String& csv);
 
-    // Any of the eight slots, live or not, so a preset's data for a voice above the count is kept.
-    Layer* slotLayer(int i) override { return (i >= 0 && i < mu_limits::kMaxLayers) ? &getPattern(i) : nullptr; }
     friend struct Pattern;   // its persistence hooks hand over to the voice-extras members below
     // Composed state (mu-core LayerState): the voice layout every save / load uses, a voice's
     // non-parameter data (modulators, gates, user wavetables — they live outside APVTS) from its

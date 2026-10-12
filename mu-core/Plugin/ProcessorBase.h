@@ -402,8 +402,13 @@ protected:
     // non-parameter data, which each Layer saves and loads through its writeExtras / applyExtras), then layer presets, full presets and host sessions all go through these,
     // so a slot is written and applied by the same code wherever it appears.
     // The layer behind persistence slot `i`: every declared slot, active or not, so a state with
-    // more layers than are live still loads (and saves) their data. Defaults to getLayer.
-    virtual Layer* slotLayer(int i) { return getLayer(i); }
+    // more layers than are live still loads (and saves) their data. A product that keeps every slot
+    // filled (keepSpareLayers) reaches the spares too; any other reaches the live layers.
+    Layer* slotLayer(int i)
+    {
+        if (keepSpareLayers) return (i >= 0 && i < mu_limits::kMaxLayers) ? layers[(size_t) i].get() : nullptr;
+        return getLayer(i);
+    }
     // `legacyPrefixes` (same slot order) are the prefixes a renamed product used before; only the
     // rebuild of an older APVTS-dump state reads them (toComposedState), never a live id.
     void initLayerState(const juce::StringArray& layerPrefixes, const juce::StringArray& legacyPrefixes = {})
