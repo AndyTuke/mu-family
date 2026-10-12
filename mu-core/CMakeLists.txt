@@ -63,8 +63,7 @@ target_sources(mu-core INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/Control/MidiControlMap.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Control/MidiControlRouter.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Persistence/MidiFullPresetMap.cpp"
-    # Shared preset browser + MIDI PC editor panels.
-    "${CMAKE_CURRENT_SOURCE_DIR}/UI/PresetBrowser.cpp"
+    # Shared MIDI PC editor panels (the preset browser is in the chrome list).
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiPresetListPanel.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiPresetsOverlay.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/MidiFullPresetsOverlay.cpp"

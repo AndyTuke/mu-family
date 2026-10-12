@@ -9,36 +9,29 @@
 #include "Persistence/PresetFiles.h" // mu_pp::safePresetFileName (the processors' name rule), readPresetMeta
 
 EditorShellBase::EditorShellBase(ProcessorBase& proc)
-    // Apply the stored UI scale BEFORE any child component is constructed.
-    // Comma expression evaluates as part of the base-class init arg; the C++
-    // standard guarantees the base class is fully constructed before member
-    // ctors run. So `mu_ui::scale` is correct when `transportBar(proc)` and
-    // the other members below construct, which is the only way ctor-time
-    // `sf(...)` font assignments pick up the right size.
-    : AudioProcessorEditor((mu_ui::scale = juce::jlimit(ProcessorBase::kUiScaleMedium,
-                                                        ProcessorBase::kUiScaleLarge,
-                                                        proc.getUiScale()), &proc)),
+    : AudioProcessorEditor(&proc),
       processorRef(proc),
-      transportBar(proc),
+      // The chrome applies the stored UI scale first, before any child it owns is built.
+      chrome(*this, proc),
+      lookAndFeel(chrome.getLookAndFeel()),
+      transportBar(chrome.getTransportBar()),
+      aboutOverlay(chrome.getAboutOverlay()),
+      saveDialog(chrome.getSaveDialog()),
+      presetBrowser(chrome.getPresetBrowser()),
+      statusBar(chrome.getStatusBar()),
       activationOverlay(proc),
       midiPresetsOverlay(proc),
       midiFullPresetsOverlay(proc)
 {
-    setLookAndFeel(&lookAndFeel);
-
-    addAndMakeVisible(transportBar);
-    addChildComponent(aboutOverlay);
-    addChildComponent(activationOverlay);
-    addChildComponent(saveDialog);
-    addChildComponent(presetBrowser);
-    addChildComponent(midiPresetsOverlay);
-    addChildComponent(midiFullPresetsOverlay);
-    addAndMakeVisible(statusBar);
+    // The plugin-only screens join the chrome's state machine and layout, at their original z-order.
+    chrome.addExtraScreen(activationOverlay,      mu_ui::ShellChrome::ExtraKind::Modal, &saveDialog);
+    chrome.addExtraScreen(midiPresetsOverlay,     mu_ui::ShellChrome::ExtraKind::Page,  &statusBar);
+    chrome.addExtraScreen(midiFullPresetsOverlay, mu_ui::ShellChrome::ExtraKind::Page,  &statusBar);
 
     wireTransportBar();
     wireOverlays();
     setupBanners();
-    setupWindowSize();
+    chrome.applyWindowSize();
 
     isStandalone = processorRef.wrapperType == juce::AudioProcessor::wrapperType_Standalone;
     loadKeybindings();
@@ -52,7 +45,7 @@ EditorShellBase::EditorShellBase(ProcessorBase& proc)
     processorRef.apvts.state.addListener(this);
     presetDirty = false;
 
-    startVersionCheck();
+    chrome.startVersionCheck();
 }
 
 // A full preset chosen in the transport selector or the preset browser: load it and show it.
@@ -67,11 +60,7 @@ void EditorShellBase::loadPresetFromUi(const juce::File& f)
 // Transport bar: mixer / settings / about toggles, preset select / save / new, status.
 void EditorShellBase::wireTransportBar()
 {
-    // ── TransportBar callbacks ──────────────────────────────────────────────
-    transportBar.onMixerToggle  = [this] { showMixer(!mixerVisible); };
-    transportBar.onLogoClicked  = [this] { showAbout(true); };
-    transportBar.onSettingsToggle = [this] { showSettings(!settingsVisible); };
-
+    // ── TransportBar callbacks (mixer / settings / about / status are the chrome's) ──
     transportBar.onPresetSelected = [this](const juce::File& f) { loadPresetFromUi(f); };
 
     transportBar.onSavePreset = [this]
@@ -91,11 +80,6 @@ void EditorShellBase::wireTransportBar()
         doNewPreset();
     };
 
-    transportBar.onStatusUpdate = [this](const juce::String& name, const juce::String& val)
-    {
-        statusBar.showParam(name, val);
-    };
-
     processorRef.onSaveAndQuit = [this](std::function<void()> quitCallback)
     {
         pendingQuitCallback = std::move(quitCallback);
@@ -108,7 +92,12 @@ void EditorShellBase::wireTransportBar()
 void EditorShellBase::wireOverlays()
 {
     // ── About panel ─────────────────────────────────────────────────────────
-    aboutOverlay.onDismiss = [this] { showAbout(false); };
+    chrome.onAboutOpening = [this]
+    {
+        aboutOverlay.setSupportState(! processorRef.hasLicensing() ? AboutOverlay::SupportState::None
+                                     : processorRef.isSupporter()   ? AboutOverlay::SupportState::Supporter
+                                                                    : AboutOverlay::SupportState::Unlicensed);
+    };
     aboutOverlay.onSupport  = [this] { showAbout(false); showSupportPrompt(true); };
     aboutOverlay.onEnterKey = [this] { showAbout(false); showActivation(true); };
     statusBar.onSupportClicked = [this] { showSupportPrompt(true); };
@@ -156,19 +145,11 @@ void EditorShellBase::wireOverlays()
     };
 
     // ── Preset browser ──────────────────────────────────────────────────────
-    presetBrowser.setFileExtension(processorRef.getFullPresetExtension());
+    chrome.onSaveDialogOpening = [this] { fillSaveDialog(); };
     presetBrowser.onLoadPreset = [this](const juce::File& f) { loadPresetFromUi(f); };
-    presetBrowser.onClose = [this] { showPresetBrowser(false); };
 
     midiPresetsOverlay.onClose     = [this] { showMidiPresets(false);     showSettings(true); };
     midiFullPresetsOverlay.onClose = [this] { showMidiFullPresets(false); showSettings(true); };
-
-    // Surface preset / state-load failures to the user.
-    processorRef.onLoadError = [this](const juce::String& msg)
-    {
-        statusBar.showParam("Load failed", msg,
-                            MuLookAndFeel::colour(MuLookAndFeel::knobLevel));
-    };
 
     // Deferred full-preset swaps commit at the loop boundary — refresh chrome
     // once they land. Product overrides onPresetLoaded to refresh its panels.
@@ -178,204 +159,62 @@ void EditorShellBase::wireOverlays()
     };
 }
 
-// The demo banner (unlicensed; click to activate) and the upgrade banner (shown when the
-// version check finds a newer release; click to download).
+// The status-bar Support link (unlicensed copies only).
 void EditorShellBase::setupBanners()
 {
     refreshSupportAffordances();
-
-    // ── Upgrade banner ──────────────────────────────────────────────────────
-    // Hidden until the async version check finds a newer release online.
-    {
-        using Id = MuLookAndFeel::ColourIds;
-        upgradeBanner.setJustificationType(juce::Justification::centred);
-        upgradeBanner.setFont(juce::Font(juce::FontOptions{}.withHeight(11.0f)));
-        upgradeBanner.setColour(juce::Label::backgroundColourId,
-                                MuLookAndFeel::colour(Id::segmentActiveBg));
-        upgradeBanner.setColour(juce::Label::textColourId,
-                                MuLookAndFeel::colour(Id::headingText));
-        addChildComponent(upgradeBanner);
-        upgradeBanner.setVisible(false);
-        // Whole banner is a click target → opens the download page.
-        upgradeBanner.setInterceptsMouseClicks(true, false);
-        upgradeBanner.addMouseListener(this, false);
-        upgradeBanner.setMouseCursor(juce::MouseCursor::PointingHandCursor);
-    }
-}
-
-// Fixed window size from the UI scale, re-applied when the scale changes in settings.
-void EditorShellBase::setupWindowSize()
-{
-    // ── Window sizing ───────────────────────────────────────────────────────
-    setResizable(false, false);
-    setSize(mu_ui::s(MuLookAndFeel::kWindowWidth), mu_ui::s(MuLookAndFeel::kWindowHeight));
-
-    // React to runtime scale changes from the settings overlay.
-    juce::Component::SafePointer<EditorShellBase> safeThis(this);
-    processorRef.onUiScaleChanged = [safeThis](float scale)
-    {
-        if (auto* self = safeThis.getComponent())
-        {
-            mu_ui::scale = scale;
-            self->setSize(mu_ui::s(MuLookAndFeel::kWindowWidth),
-                          mu_ui::s(MuLookAndFeel::kWindowHeight));
-            self->sendLookAndFeelChange();
-            self->resized();
-            self->repaint();
-        }
-    };
-}
-
-void EditorShellBase::showUpgradeAvailable(const juce::String& latestTag)
-{
-    const juce::String current   = "v" + juce::String(MU_VERSION_STRING);
-    const juce::String available = latestTag;   // the release's own tag, e.g. v1.1.0.972
-    upgradeBanner.setText(
-        juce::String::fromUTF8("Update available  \xe2\x80\x94  you have ") + current
-            + juce::String::fromUTF8("  \xe2\x80\x94  ") + available
-            + juce::String::fromUTF8(" is out  \xe2\x80\x94  click here to download"),
-        juce::dontSendNotification);
-    upgradeAvailable.store(true);
-    upgradeBanner.setVisible(true);
-    resized();
-    repaint();
-}
-
-void EditorShellBase::startVersionCheck()
-{
-    // Ask GitHub for the "latest release" — the same endpoint the website's download
-    // page uses — parse the build number out of its tag (vX.Y.0.NNN), and raise the
-    // upgrade banner if it beats our local BUILD_NUMBER. Only the build number is
-    // compared: it never resets across major/minor bumps, so it alone orders releases.
-    //
-    // The result is cached PROCESS-WIDE so we fetch at most once per process: reopening
-    // the editor, or running many plugin instances in one DAW session, all share the
-    // single result instead of each hammering GitHub's unauthenticated API (60 req/hr/IP,
-    // after which the call would just fail). Fetch runs on a throwaway thread (it blocks
-    // on the network) and fails silently offline.
-    //   -1 = not yet checked   0 = checked, nothing newer   >BUILD_NUMBER = newer build
-    static std::atomic<int>  s_latestBuild  { -1 };
-    static std::atomic<bool> s_fetchStarted { false };
-    static juce::String      s_latestTag;   // written before s_latestBuild's release-store
-
-    const int cached = s_latestBuild.load(std::memory_order_acquire);
-    if (cached > BUILD_NUMBER) { showUpgradeAvailable(s_latestTag); return; }  // already known
-    if (cached >= 0)           return;                                    // already checked, none newer
-    if (s_fetchStarted.exchange(true)) return;                           // a fetch is already in flight
-
-    juce::Component::SafePointer<EditorShellBase> safe(this);
-    juce::Thread::launch([safe]
-    {
-        const juce::URL url("https://api.github.com/repos/AndyTuke/mu-family/releases/latest");
-        const auto opts = juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)
-                              .withConnectionTimeoutMs(5000);
-        std::unique_ptr<juce::InputStream> stream(url.createInputStream(opts));
-
-        int latestBuild = 0;   // 0 = nothing newer / fetch failed
-        juce::String tag;
-        if (stream != nullptr)
-        {
-            const juce::var json = juce::JSON::parse(stream->readEntireStreamAsString());
-            tag = json.getProperty("tag_name", {}).toString();   // e.g. "v1.1.0.972"
-            if (tag.isNotEmpty())   // build number = final dot-separated segment
-                latestBuild = tag.fromLastOccurrenceOf(".", false, false).getIntValue();
-        }
-
-        // Cache the verdict for this process (clamp to 0 when nothing newer / failed).
-        if (latestBuild > BUILD_NUMBER) s_latestTag = tag;
-        s_latestBuild.store(latestBuild > BUILD_NUMBER ? latestBuild : 0, std::memory_order_release);
-        if (latestBuild <= BUILD_NUMBER) return;
-
-        juce::MessageManager::callAsync([safe, tag]
-        {
-            if (safe == nullptr) return;   // editor closed mid-check
-            safe->showUpgradeAvailable(tag);
-        });
-    });
 }
 
 EditorShellBase::~EditorShellBase()
 {
     // Clear every processor callback before teardown — processor outlives the
     // editor in DAW close-window-keep-plugin scenarios; any deferred invocation
-    // into a destroyed editor is a UAF. All lambdas captured raw [this].
+    // into a destroyed editor is a UAF. All lambdas captured raw [this]. (The chrome clears
+    // the ones it owns, and releases the look and feel, in its own destructor.)
     processorRef.apvts.state.removeListener(this);
     processorRef.onPresetSwapCommitted = nullptr;
     processorRef.onSaveAndQuit         = nullptr;
-    processorRef.onLoadError           = nullptr;
-    processorRef.onUiScaleChanged      = nullptr;
 
     if (isStandalone)
         removeKeyListener(this);
-    setLookAndFeel(nullptr);
 }
 
 void EditorShellBase::setMainArea(juce::Component* newSidebar, juce::Component* newMainPanel)
 {
-    if (sidebar != nullptr)   removeChildComponent(sidebar);
-    if (mainPanel != nullptr) removeChildComponent(mainPanel);
-    sidebar   = newSidebar;
-    mainPanel = newMainPanel;
-    if (sidebar != nullptr)   addAndMakeVisible(*sidebar);
-    if (mainPanel != nullptr) addAndMakeVisible(*mainPanel);
-    // The main page's knobs take the app colour (the mixer and other overlays keep theirs).
-    if (mainPanel != nullptr) MuLookAndFeel::useAppColourKnobs(*mainPanel);
-    resized();
+    chrome.setMainArea(newSidebar, newMainPanel);
 }
 
 void EditorShellBase::forwardKnobStatus(juce::Component& root)
 {
-    auto show = [this](const juce::String& name, const juce::String& val) { statusBar.showParam(name, val); };
-    // Walk the panel's tree; a component that reports its own status needn't be searched inside.
-    for (auto* c : root.getChildren())
+    // The chrome knows the plain knobs; these two panel types are plugin-side.
+    chrome.forwardKnobStatus(root, [](juce::Component& c, const mu_ui::ShellChrome::StatusFn& show)
     {
-        if (auto* k = dynamic_cast<KnobWithLabel*>(c))
-        {
-            if (! k->onStatusUpdate) k->onStatusUpdate = show;
-        }
-        else if (auto* ins = dynamic_cast<InsertSubsection*>(c))
+        if (auto* ins = dynamic_cast<InsertSubsection*>(&c))
         {
             if (! ins->onStatusUpdate) ins->onStatusUpdate = show;
+            return true;
         }
-        else if (auto* grid = dynamic_cast<mu_ui::ParamKnobGrid*>(c))
+        if (auto* grid = dynamic_cast<mu_ui::ParamKnobGrid*>(&c))
         {
             if (! grid->onStatusUpdate) grid->onStatusUpdate = show;
+            return true;
         }
-        else
-            forwardKnobStatus(*c);
-    }
+        return false;
+    });
 }
 
 void EditorShellBase::setMixerOverlay(juce::Component* overlay)
 {
-    if (mixerOverlay != nullptr) removeChildComponent(mixerOverlay);
-    mixerOverlay = overlay;
-    if (mixerOverlay != nullptr)
-    {
-        addChildComponent(*mixerOverlay);
-        transportBar.setShowMixerToggle(true);
-        if (auto* mixer = dynamic_cast<MixerOverlay*>(overlay))
-            mixer->onStatusUpdate = [this](const juce::String& name, const juce::String& val, juce::Colour col)
-            { statusBar.showParam(name, val, col); };
-    }
-    else
-    {
-        transportBar.setShowMixerToggle(false);
-    }
-    resized();
+    chrome.setMixerOverlay(overlay);
+    // A mu-core MixerOverlay also reports its status messages to the status bar.
+    if (auto* mixer = dynamic_cast<MixerOverlay*>(overlay))
+        mixer->onStatusUpdate = [this](const juce::String& name, const juce::String& val, juce::Colour col)
+        { statusBar.showParam(name, val, col); };
 }
 
 void EditorShellBase::setMetalStyle(bool metal, juce::Colour appAccent)
 {
-    lookAndFeel.setMetalStyle(metal);
-    if (! appAccent.isTransparent())
-    {
-        lookAndFeel.setAppAccent(appAccent);
-        upgradeBanner.setColour(juce::Label::backgroundColourId,   // set before the app colour existed
-                                MuLookAndFeel::colour(MuLookAndFeel::segmentActiveBg));
-    }
-    sendLookAndFeelChange();   // shared components re-read the style in lookAndFeelChanged()
-    repaint();
+    chrome.setMetalStyle(metal, appAccent);
 }
 
 void EditorShellBase::setProductIdentity(const juce::String& displayName, const juce::StringArray& extraCredits)
@@ -398,33 +237,19 @@ void EditorShellBase::setProductIdentity(const juce::String& displayName, const 
 
 void EditorShellBase::setScrews(bool on)
 {
-    lookAndFeel.setScrews(on);
-    sendLookAndFeelChange();
-    repaint();
+    chrome.setScrews(on);
 }
 
 void EditorShellBase::setSettingsOverlay(juce::Component* overlay)
 {
-    if (settingsOverlay != nullptr) removeChildComponent(settingsOverlay);
-    settingsOverlay = overlay;
-    if (settingsOverlay != nullptr)
-        addChildComponent(*settingsOverlay);
+    chrome.setSettingsOverlay(overlay);
 
-    // Standard overlay chrome: close returns to the main view; the program-change
-    // buttons swap the settings page for the matching program-change table.
-    if (auto* base = dynamic_cast<mu_ui::SettingsOverlayBase*>(overlay))
-        base->onClose = [this] { showSettings(false); };
+    // The standard page's program-change buttons swap it for the matching program-change table.
     if (auto* standard = dynamic_cast<mu_ui::StandardSettingsOverlay*>(overlay))
     {
         standard->onMidiPresetsClicked = [this] { showSettings(false); showMidiPresets(true); };
         standard->onFullPresetsClicked = [this] { showSettings(false); showMidiFullPresets(true); };
     }
-    // TransportBar's gear button stays visible regardless — if there's no
-    // settings overlay, clicking it is a no-op (onSettingsToggle does nothing
-    // useful). Products that want to hide the gear entirely can call
-    // transportBar.setShowSettingsButton(false) once that setter exists; for
-    // now mu-tant simply doesn't register and the click flickers nothing.
-    resized();
 }
 
 void EditorShellBase::loadKeybindings()
@@ -520,10 +345,7 @@ void EditorShellBase::showSupportPrompt(bool userRequested)
     // been shown or switched off meanwhile.
     if (! userRequested)
     {
-        const bool anyOverlay = mixerVisible || aboutVisible || activationVisible || saveVisible
-                             || browserVisible || settingsVisible || midiPresetsVisible
-                             || midiFullPresetsVisible;
-        if (anyOverlay
+        if (chrome.anyOverlayVisible()
             || ! sp::shouldShowNow(true, false, processorRef.isSupportPromptHidden()))
             return;
         sp::markShown();
@@ -572,139 +394,40 @@ void EditorShellBase::showSupportPrompt(bool userRequested)
     dlg->show(this);
 }
 
-void EditorShellBase::hideAllOverlays()
+void EditorShellBase::hideAllOverlays()            { chrome.hideAllOverlays(); }
+void EditorShellBase::showMixer(bool show)         { chrome.showMixer(show); }
+void EditorShellBase::showAbout(bool show)         { chrome.showAbout(show); }
+void EditorShellBase::showActivation(bool show)    { chrome.showExtraScreen(activationOverlay, show); }
+void EditorShellBase::showSaveDialog(bool show)    { chrome.showSaveDialog(show); }
+void EditorShellBase::showPresetBrowser(bool show) { chrome.showPresetBrowser(show); }
+void EditorShellBase::showSettings(bool show)      { chrome.showSettings(show); }
+void EditorShellBase::showMidiPresets(bool show)   { chrome.showExtraScreen(midiPresetsOverlay, show); }
+void EditorShellBase::showMidiFullPresets(bool show) { chrome.showExtraScreen(midiFullPresetsOverlay, show); }
+
+// Fills the save card as it opens: the known categories (browser + shared list + product panels)
+// and the name / category / embed of the currently loaded preset.
+void EditorShellBase::fillSaveDialog()
 {
-    // Cancel any in-progress fade animations before forcing visibility states.
-    if (mainPanel)         animator.cancelAnimation(mainPanel, true);
-    if (mixerOverlay)      animator.cancelAnimation(mixerOverlay, true);
-    if (settingsOverlay)   animator.cancelAnimation(settingsOverlay, true);
-    animator.cancelAnimation(&presetBrowser, true);
-    animator.cancelAnimation(&midiPresetsOverlay, true);
-    animator.cancelAnimation(&midiFullPresetsOverlay, true);
+    presetBrowser.refresh(processorRef.getPresetsDir());
+    // Merge categories from the browser + shared category list + product panels.
+    juce::StringArray merged = presetBrowser.getCategories();
+    for (const auto& c : processorRef.loadCategoryList())
+        if (!merged.contains(c, false)) merged.add(c);
+    for (const auto& c : getProductKnownCategories())
+        if (!merged.contains(c, false)) merged.add(c);
+    merged.sort(false);
+    saveDialog.setKnownCategories(merged);
+    onCategoriesRefreshed(merged);
 
-    auto setOne = [](juce::Component* c) { if (c) { c->setAlpha(1.0f); c->setVisible(false); } };
-    setOne(mixerOverlay);
-    setOne(settingsOverlay);
-    aboutOverlay.setVisible(false);
-    activationOverlay.setVisible(false);
-    saveDialog.setVisible(false);
-    presetBrowser.setVisible(false);
-    midiPresetsOverlay.setVisible(false);
-    midiFullPresetsOverlay.setVisible(false);
-
-    mixerVisible           = false;
-    transportBar.setMixerActive(false);
-    aboutVisible           = false;
-    activationVisible      = false;
-    saveVisible            = false;
-    browserVisible         = false;
-    settingsVisible        = false;
-    midiPresetsVisible     = false;
-    midiFullPresetsVisible = false;
-
-    if (mainPanel)
+    // Pre-fill name, category, and embed from the currently loaded preset.
+    const juce::File loaded = transportBar.getLoadedPresetFile();
+    if (loaded.existsAsFile())
     {
-        mainPanel->setAlpha(1.0f);
-        mainPanel->setVisible(true);
+        saveDialog.setDefaultName(loaded.getFileNameWithoutExtension());
+        const auto meta = mu_pp::readPresetMeta(loaded);
+        saveDialog.setDefaultCategory(meta.category);
+        saveDialog.setDefaultEmbed   (meta.embedSamples);
     }
-}
-
-void EditorShellBase::fadeSwitch(juce::Component* outgoing, juce::Component* incoming, int durationMs)
-{
-    if (incoming)
-    {
-        incoming->setAlpha(0.0f);
-        incoming->setVisible(true);
-    }
-    if (outgoing)
-        animator.animateComponent(outgoing, outgoing->getBounds(), 0.0f, durationMs, false, 1.0, 1.0);
-    if (incoming)
-        animator.animateComponent(incoming, incoming->getBounds(), 1.0f, durationMs, false, 1.0, 1.0);
-
-    if (outgoing)
-    {
-        juce::Component::SafePointer<juce::Component> safeOut(outgoing);
-        juce::Timer::callAfterDelay(durationMs + 10, [safeOut]
-        {
-            if (auto* out = safeOut.getComponent())
-            {
-                out->setVisible(false);
-                out->setAlpha(1.0f);
-            }
-        });
-    }
-}
-
-void EditorShellBase::showMixer(bool show)
-{
-    if (mixerOverlay == nullptr) return;
-    if (show) hideAllOverlays();
-    mixerVisible = show;
-    transportBar.setMixerActive(show);
-    if (show)
-    {
-        if (mainPanel) mixerOverlay->setBounds(mainPanel->getBounds());
-        fadeSwitch(mainPanel, mixerOverlay);
-    }
-    else
-    {
-        fadeSwitch(mixerOverlay, mainPanel);
-    }
-}
-
-void EditorShellBase::showAbout(bool show)
-{
-    aboutVisible = show;
-    if (show)
-        aboutOverlay.setSupportState(! processorRef.hasLicensing() ? AboutOverlay::SupportState::None
-                                     : processorRef.isSupporter()   ? AboutOverlay::SupportState::Supporter
-                                                                    : AboutOverlay::SupportState::Unlicensed);
-    aboutOverlay.setVisible(show);
-    aboutOverlay.toFront(false);
-}
-
-void EditorShellBase::showActivation(bool show)
-{
-    activationVisible = show;
-    activationOverlay.setVisible(show);
-    activationOverlay.toFront(true);
-}
-
-void EditorShellBase::mouseDown(const juce::MouseEvent& e)
-{
-    // Clicking the upgrade banner opens the download page.
-    if (e.eventComponent == &upgradeBanner)
-        juce::URL(kDownloadUrl).launchInDefaultBrowser();
-}
-
-void EditorShellBase::showSaveDialog(bool show)
-{
-    saveVisible = show;
-    if (show)
-    {
-        presetBrowser.refresh(processorRef.getPresetsDir());
-        // Merge categories from the browser + shared category list + product panels.
-        juce::StringArray merged = presetBrowser.getCategories();
-        for (const auto& c : processorRef.loadCategoryList())
-            if (!merged.contains(c, false)) merged.add(c);
-        for (const auto& c : getProductKnownCategories())
-            if (!merged.contains(c, false)) merged.add(c);
-        merged.sort(false);
-        saveDialog.setKnownCategories(merged);
-        onCategoriesRefreshed(merged);
-
-        // Pre-fill name, category, and embed from the currently loaded preset.
-        const juce::File loaded = transportBar.getLoadedPresetFile();
-        if (loaded.existsAsFile())
-        {
-            saveDialog.setDefaultName(loaded.getFileNameWithoutExtension());
-            const auto meta = mu_pp::readPresetMeta(loaded);
-            saveDialog.setDefaultCategory(meta.category);
-            saveDialog.setDefaultEmbed   (meta.embedSamples);
-        }
-    }
-    saveDialog.setVisible(show);
-    saveDialog.toFront(false);
 }
 
 juce::File EditorShellBase::fullPresetFileFor(const juce::String& name) const
@@ -750,113 +473,12 @@ void EditorShellBase::doNewPreset()
     onPresetNew();
 }
 
-void EditorShellBase::showPresetBrowser(bool show)
-{
-    if (show)
-    {
-        hideAllOverlays();
-        presetBrowser.refresh(processorRef.getPresetsDir());
-        browserVisible = true;
-        if (mainPanel) mainPanel->setVisible(false);
-        presetBrowser.setVisible(true);
-    }
-    else
-    {
-        browserVisible = false;
-        presetBrowser.setVisible(false);
-        if (mainPanel) mainPanel->setVisible(true);   // opening any overlay cleared the mixer (hideAllOverlays) → always return to main
-    }
-}
-
-void EditorShellBase::showSettings(bool show)
-{
-    if (settingsOverlay == nullptr) return;
-    if (show)
-    {
-        hideAllOverlays();
-        settingsVisible = true;
-        if (mainPanel) mainPanel->setVisible(false);
-        settingsOverlay->setVisible(true);
-    }
-    else
-    {
-        settingsVisible = false;
-        settingsOverlay->setVisible(false);
-        if (mainPanel) mainPanel->setVisible(true);   // opening any overlay cleared the mixer (hideAllOverlays) → always return to main
-    }
-}
-
-void EditorShellBase::showMidiPresets(bool show)
-{
-    if (show)
-    {
-        hideAllOverlays();
-        midiPresetsVisible = true;
-        if (mainPanel) mainPanel->setVisible(false);
-        midiPresetsOverlay.setVisible(true);
-    }
-    else
-    {
-        midiPresetsVisible = false;
-        midiPresetsOverlay.setVisible(false);
-        if (mainPanel) mainPanel->setVisible(true);   // opening any overlay cleared the mixer (hideAllOverlays) → always return to main
-    }
-}
-
-void EditorShellBase::showMidiFullPresets(bool show)
-{
-    if (show)
-    {
-        hideAllOverlays();
-        midiFullPresetsVisible = true;
-        if (mainPanel) mainPanel->setVisible(false);
-        midiFullPresetsOverlay.setVisible(true);
-    }
-    else
-    {
-        midiFullPresetsVisible = false;
-        midiFullPresetsOverlay.setVisible(false);
-        if (mainPanel) mainPanel->setVisible(true);   // opening any overlay cleared the mixer (hideAllOverlays) → always return to main
-    }
-}
-
 void EditorShellBase::paint(juce::Graphics& g)
 {
-    g.fillAll(MuLookAndFeel::colour(MuLookAndFeel::windowBackground));
+    chrome.paintBackground(g);
 }
 
 void EditorShellBase::resized()
 {
-    using mu_ui::s;
-    const int w          = getWidth();
-    const int h          = getHeight();
-    const int statusH    = s(MuLookAndFeel::kStatusBarH);
-    const int transportH = s(MuLookAndFeel::kTransportBarH);
-    const int sidebarW   = (sidebar != nullptr) ? s(MuLookAndFeel::kSidebarW) : 0;
-    const int upgradeH   = upgradeAvailable.load()        ? s(kUpgradeBannerH) : 0;
-    const int bannerH    = upgradeH;
-    const int contentH   = h - transportH - statusH - bannerH;
-
-    const juce::Rectangle<int> mainArea { sidebarW, transportH,
-                                          w - sidebarW, contentH };
-
-    transportBar.setBounds(0, 0, w, transportH);
-    if (sidebar)   sidebar  ->setBounds(0, transportH, sidebarW, contentH);
-    if (mainPanel) mainPanel->setBounds(mainArea);
-    if (mixerOverlay)    mixerOverlay   ->setBounds(mainArea);
-    if (settingsOverlay) settingsOverlay->setBounds(mainArea);
-    presetBrowser   .setBounds(mainArea);
-    midiPresetsOverlay.setBounds(mainArea);
-    midiFullPresetsOverlay.setBounds(mainArea);
-
-    // Modal overlays span the full editor area
-    aboutOverlay.setBounds(getLocalBounds());
-    activationOverlay.setBounds(getLocalBounds());
-    saveDialog.setBounds(getLocalBounds());
-
-    // The upgrade banner sits just above the status bar.
-    int by = h - statusH - bannerH;
-    if (upgradeH > 0) upgradeBanner.setBounds(0, by, w, upgradeH);
-
-    statusBar.setBounds(0, h - statusH, w, statusH);
+    chrome.resized();
 }

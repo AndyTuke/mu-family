@@ -32,6 +32,7 @@ target_sources(mu-core-tests PRIVATE
     LegacyPrefixTests.cpp
     SegmentControlTests.cpp
     TransportBarTests.cpp
+    ShellChromeTests.cpp
     TestShellBackend.h
     ClientStripFitTests.cpp
     ../UI/MixerChannel.cpp

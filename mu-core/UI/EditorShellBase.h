@@ -12,13 +12,15 @@
 #include "UI/PresetBrowser.h"
 #include "UI/MidiPresetsOverlay.h"
 #include "UI/MidiFullPresetsOverlay.h"
+#include "UI/ShellChrome.h"
 
 // EditorShellBase — shared editor shell for every mu-family plugin.
 //
-// Owns the chrome (LookAndFeel, TransportBar, StatusBar, About / Save / Preset
-// Browser / MIDI-Preset overlays, demo banner), the overlay state machine, the
-// main-area layout (transport / sidebar / main / status / banner), key
-// handling, and the UI-scale change plumbing.
+// The processor-free chrome (LookAndFeel, TransportBar, StatusBar, About / Save / Preset
+// Browser, overlay state machine, main-area layout, upgrade banner, UI-scale plumbing) is a
+// mu_ui::ShellChrome helper parented to this editor; this class adds what needs a processor:
+// the activation panel, the MIDI program-change overlays, the support prompt, the preset
+// flow and the dirty tracking.
 //
 // The product derives from this and supplies its own sidebar + main panel via
 // setMainArea(), plus an optional mixer overlay + settings overlay. When no
@@ -60,12 +62,12 @@ public:
 
     // Direct access for the product to wire chrome (logo, About credits, etc.)
     // and additional callbacks.
-    TransportBar&         getTransportBar()         { return transportBar; }
-    StatusBar&            getStatusBar()            { return statusBar; }
-    AboutOverlay&           getAboutPanel()           { return aboutOverlay; }
+    TransportBar&         getTransportBar()         { return chrome.getTransportBar(); }
+    StatusBar&            getStatusBar()            { return chrome.getStatusBar(); }
+    AboutOverlay&           getAboutPanel()           { return chrome.getAboutOverlay(); }
     ActivationOverlay&      getActivationPanel()      { return activationOverlay; }
-    SaveDialog&           getSaveDialog()           { return saveDialog; }
-    PresetBrowser&        getPresetBrowser()        { return presetBrowser; }
+    SaveDialog&           getSaveDialog()           { return chrome.getSaveDialog(); }
+    PresetBrowser&        getPresetBrowser()        { return chrome.getPresetBrowser(); }
     MidiPresetsOverlay&     getMidiPresetsPanel()     { return midiPresetsOverlay; }
     MidiFullPresetsOverlay& getMidiFullPresetsPanel() { return midiFullPresetsOverlay; }
 
@@ -86,11 +88,10 @@ public:
     // (without the "Don't show again" tick); false for the once-per-session auto-show.
     void showSupportPrompt(bool userRequested);
 
-    bool isMixerVisible() const noexcept { return mixerVisible; }
+    bool isMixerVisible() const noexcept { return chrome.isMixerVisible(); }
 
     void paint(juce::Graphics& g) override;
     void resized() override;
-    void mouseDown(const juce::MouseEvent& e) override;
 
     // juce::KeyListener — receives key events in standalone mode.
     bool keyPressed(const juce::KeyPress& key, juce::Component* originator) override;
@@ -123,33 +124,20 @@ public:
 protected:
     ProcessorBase& processorRef;
 
-    MuLookAndFeel        lookAndFeel;
-    TransportBar         transportBar;
-    AboutOverlay           aboutOverlay;
+    // The processor-free half of the shell, and reference aliases to its pieces under the names
+    // the products have always used.
+    mu_ui::ShellChrome chrome;
+    MuLookAndFeel&  lookAndFeel;
+    TransportBar&   transportBar;
+    AboutOverlay&   aboutOverlay;
+    SaveDialog&     saveDialog;
+    PresetBrowser&  presetBrowser;
+    StatusBar&      statusBar;
+
+    // The plugin-only screens, registered with the chrome as extra screens.
     ActivationOverlay      activationOverlay;
-    SaveDialog           saveDialog;
-    PresetBrowser        presetBrowser;
     MidiPresetsOverlay     midiPresetsOverlay;
     MidiFullPresetsOverlay midiFullPresetsOverlay;
-    StatusBar            statusBar;
-    juce::Label          upgradeBanner;   // shown when a newer release is available online
-
-    juce::Component* sidebar         = nullptr;
-    juce::Component* mainPanel       = nullptr;
-    juce::Component* mixerOverlay    = nullptr;
-    juce::Component* settingsOverlay = nullptr;
-
-    static constexpr int kUpgradeBannerH = 20;
-
-    // Set true (message thread) once an online version check finds a newer release.
-    std::atomic<bool> upgradeAvailable { false };
-    // Kicks off the async GitHub "latest release" check; fail-silent + off-thread.
-    // Result is cached process-wide so it fetches at most once per process.
-    void startVersionCheck();
-    // Raises the upgrade banner for the given available build number (message thread).
-    void showUpgradeAvailable(const juce::String& latestTag);
-    // The page opened when the upgrade banner is clicked.
-    static constexpr const char* kDownloadUrl = "https://transwarp.me/download";
 
     // Support prompt state. The first-show check runs once per editor, when it first shows.
     juce::String productDisplayName;
@@ -158,20 +146,6 @@ protected:
     // Shows the status-bar Support link for an unlicensed copy and hides it for a supporter.
     void refreshSupportAffordances();
     void maybeShowSupportPromptOnStart();
-
-    bool mixerVisible           = false;
-    bool aboutVisible           = false;
-    bool activationVisible      = false;
-    bool saveVisible            = false;
-    bool browserVisible         = false;
-    bool settingsVisible        = false;
-    bool midiPresetsVisible     = false;
-    bool midiFullPresetsVisible = false;
-
-    juce::ComponentAnimator animator;
-    void fadeSwitch(juce::Component* outgoing, juce::Component* incoming, int durationMs = 80);
-
-    juce::TooltipWindow tooltipWindow { this, 700 };
 
     bool isStandalone   = false;
     bool needsFocusGrab = false;
@@ -190,7 +164,7 @@ private:
     void wireTransportBar();
     void wireOverlays();
     void setupBanners();
-    void setupWindowSize();
+    void fillSaveDialog();
     void loadPresetFromUi(const juce::File& f);
 
     // Internal: actually run the save against the processor + refresh chrome.

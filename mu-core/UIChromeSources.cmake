@@ -29,5 +29,7 @@ set(MU_CORE_CHROME_SOURCES
     "${_mu_core_dir}/UI/AboutOverlay.cpp"
     "${_mu_core_dir}/UI/SaveDialog.cpp"
     "${_mu_core_dir}/UI/ModalDialog.cpp"
+    "${_mu_core_dir}/UI/PresetBrowser.cpp"
+    "${_mu_core_dir}/UI/ShellChrome.cpp"
 )
 unset(_mu_core_dir)
