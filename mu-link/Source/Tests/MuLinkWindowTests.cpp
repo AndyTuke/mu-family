@@ -269,6 +269,73 @@ public:
             expect(bpm->isEnabled(), "BPM field live again");
         }
 
+        beginTest("the gear opens the shared settings page with only mu-link's rows");
+        {
+            ScaleGuard guard;
+            Rig rig;
+            expect(rig.ok, "bus failed");
+            auto& w = *rig.window;
+            auto& chrome = w.getChrome();
+            auto& settings = w.getSettings();
+            chrome.getTransportBar().onSettingsToggle();
+            expect(chrome.isSettingsVisible() && settings.isVisible(), "gear opens the page");
+            expect(! w.getMixer().getParentComponent()->isVisible(), "the page replaces the main area");
+
+            // Visible controls: Display size, the sync offset, the devices button; no tempo, meter or source rows.
+            int nudges = 0, dropdowns = 0, segments = 0;
+            NudgeInput* offset = nullptr;
+            SegmentControl* size = nullptr;
+            for (auto* c : settings.getChildren())
+            {
+                if (! c->isVisible()) continue;
+                if (auto* n = dynamic_cast<NudgeInput*>(c)) { ++nudges; offset = n; }
+                if (dynamic_cast<DropdownSelect*>(c) != nullptr) ++dropdowns;
+                if (auto* sc = dynamic_cast<SegmentControl*>(c)) { ++segments; size = sc; }
+            }
+            expectEquals(nudges, 1);
+            expectEquals(dropdowns, 0);
+            expectEquals(segments, 1);
+            expect(w.getChooseDevicesButton().isVisible(), "Choose devices button shown");
+            expect(w.getChooseDevicesButton().getButtonText() == "Choose devices...", "its wording");
+
+            int opened = 0;
+            w.onChooseDevices = [&opened] { ++opened; };
+            w.getChooseDevicesButton().onClick();
+            expectEquals(opened, 1);
+
+            // Sync offset: -50 to +250 ms, reaches the server.
+            if (offset != nullptr)
+            {
+                offset->setValue(25, true);
+                expectEquals(rig.server.syncOffsetMs(), 25);
+                offset->setValue(1000, true);
+                expectEquals(rig.server.syncOffsetMs(), 250);
+                offset->setValue(-1000, true);
+                expectEquals(rig.server.syncOffsetMs(), -50);
+            }
+
+            // Every child of the page sits inside it, at Medium and at Large (Display size).
+            auto checkInside = [&](const juce::String& tag)
+            {
+                for (auto* c : settings.getChildren())
+                    if (c->isVisible())
+                        expect(settings.getLocalBounds().contains(c->getBounds()), tag + ": a settings child leaves the page");
+            };
+            checkInside("medium");
+            if (size != nullptr)
+            {
+                size->setSelectedIndex(1, true);   // Large
+                expectEquals(w.getBackend().getUiScale(), mu_core::ShellBackend::kUiScaleLarge);
+                expectEquals(w.getWidth(), mu_ui::s(MuLookAndFeel::kWindowWidth));
+                expect(w.getWidth() > 1170, "the window grew with the display size");
+                checkInside("large");
+            }
+
+            chrome.getTransportBar().onSettingsToggle();
+            expect(! chrome.isSettingsVisible(), "gear closes it");
+            mu_ui::scale = 1.0f;
+        }
+
         beginTest("the bar keeps Tap, Nudge and the Mixer button out");
         {
             Rig rig;

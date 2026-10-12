@@ -4,6 +4,17 @@
 namespace
 {
 const juce::String kProductName = juce::String(juce::CharPointer_UTF8("\xce\xbc-link"));
+// Rows mu-link leaves out: its tempo and meter are on the bar and fixed, its clock source is on the bar,
+// and its sync offset is always shown.
+mu_ui::StandardSettingsOverlay::Options settingsOptions()
+{
+    mu_ui::StandardSettingsOverlay::Options o;
+    o.showTransport = false;
+    o.showMeter = false;
+    o.showClockSource = false;
+    o.syncOffsetAlways = true;
+    return o;
+}
 constexpr int kClockSectionW = 150;   // the clock source switch's slot in the transport bar (unscaled)
 }
 
@@ -32,6 +43,7 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow, juce::File 
     : server(serverToShow),
       backend(serverToShow, std::move(dataRoot)),
       chrome(*this, backend),
+      settings(backend, settingsOptions()),
       page(serverToShow)
 {
     chrome.getTransportBar().setLogoText(kProductName);
@@ -41,6 +53,7 @@ MuLinkComponent::MuLinkComponent(mu_link::AudioServer& serverToShow, juce::File 
     chrome.setMainArea(nullptr, &page);
     wireTransportBar();
     wirePresets();
+    wireSettings();
 
     // Unpainted brushed steel, LCD lettering in the global accent, until an app colour is chosen.
     chrome.setMetalStyle(true);
@@ -107,6 +120,49 @@ juce::String MuLinkComponent::clockSourceText() const
 void MuLinkComponent::showClockSourceStatus()
 {
     chrome.getStatusBar().showParam("Clock source", clockSourceText());
+}
+
+// The gear opens the shared settings page; mu-link adds one General section: the device dialog.
+void MuLinkComponent::wireSettings()
+{
+    chooseDevicesButton.onClick = [this]
+    {
+        if (onChooseDevices) onChooseDevices();
+        else showDeviceDialog();
+    };
+    settings.addAndMakeVisible(chooseDevicesButton);
+
+    mu_ui::StandardSettingsOverlay::Section devices;
+    devices.title = "Audio / MIDI devices";
+    devices.place = [this](const mu_ui::StandardSettingsOverlay::Rows& r)
+    {
+        chooseDevicesButton.setBounds(r.labelX, r.area.getY(), mu_ui::s(180), r.rowH);
+    };
+    settings.addSection(mu_ui::StandardSettingsOverlay::Where::General, std::move(devices));
+    chrome.setSettingsOverlay(&settings);
+}
+
+// The audio / MIDI device picker in a dialog; it binds to the live device manager, so changes apply at once.
+void MuLinkComponent::showDeviceDialog()
+{
+    auto selector = std::make_unique<juce::AudioDeviceSelectorComponent>(
+        server.audioDeviceManager(),
+        0, 0,        // no audio inputs
+        2, 2,        // stereo output
+        true,        // MIDI input (external clock source)
+        true,        // MIDI output (MIDI-clock-out port)
+        true,        // channels as stereo pairs
+        false);      // no advanced options
+    selector->setSize(380, 460);
+
+    juce::DialogWindow::LaunchOptions opts;
+    opts.content.setOwned(selector.release());
+    opts.dialogTitle                  = kProductName + juce::String(juce::CharPointer_UTF8(" â Audio / MIDI Options"));
+    opts.dialogBackgroundColour       = MuLookAndFeel::colour(MuLookAndFeel::windowBackground);
+    opts.escapeKeyTriggersCloseButton = true;
+    opts.useNativeTitleBar            = true;
+    opts.resizable                    = false;
+    opts.launchAsync();
 }
 
 // Presets: the backend asks this window to apply or capture its state.

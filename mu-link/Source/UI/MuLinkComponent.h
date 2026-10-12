@@ -6,6 +6,7 @@
 
 #include "Server/AudioServer.h"
 #include "UI/ShellChrome.h"
+#include "UI/StandardSettingsOverlay.h"
 #include "UI/Components/SegmentControl.h"
 #include "LinkShellBackend.h"
 #include "MixerPanel.h"
@@ -39,6 +40,12 @@ public:
     mu_link::ScenesPanel&     getScenes()  { return page.scenes; }
     SegmentControl&           getClockSourceControl() { return clockSource.segment; }
 
+    // The "Choose devices..." button on the settings page; the default opens the native audio / MIDI
+    // device dialog. A test replaces it.
+    std::function<void()> onChooseDevices;
+    juce::TextButton& getChooseDevicesButton() { return chooseDevicesButton; }
+    mu_ui::StandardSettingsOverlay& getSettings() { return settings; }
+
     // Recall scene `scene`: each enabled, connected client is sent its program change.
     void triggerScene(int scene);
 
@@ -71,6 +78,8 @@ private:
 
     void wireTransportBar();
     void wirePresets();
+    void wireSettings();
+    void showDeviceDialog();
     void showClockSourceStatus();
     juce::String clockSourceText() const;
 
@@ -84,6 +93,10 @@ private:
     mu_link::AudioServer&     server;
     mu_link::LinkShellBackend backend;
     mu_ui::ShellChrome        chrome;   // declared first among the children: destroyed last
+
+    // The settings page: the family page without the rows mu-link takes from its master clock.
+    mu_ui::StandardSettingsOverlay settings;
+    juce::TextButton chooseDevicesButton { "Choose devices..." };
 
     ClockSourceSection clockSource;
     MainPage           page;
