@@ -128,6 +128,8 @@ edits](design-plugin-family.md#layer-ownership-and-structural-edits--family-stan
 | `Overlay` | a full-editor screen shown through `OverlayHost` (`SettingsOverlay`, `MixerOverlay`) |
 | `Sidebar` / `Section` / `Subsection` / `Row` / `Bar` | as their names say |
 | `Engine` / `Sequencer` | the two halves of a layer |
+| `Backend` | the interface an app implements for the shared chrome (`mu_core::ShellBackend`; `ProcessorBase` and mu-link's `LinkShellBackend` implement it). Not `Surface`: that word is the controller surface of `mu-control` |
+| `Chrome` | a processor-free helper that owns the shared window furniture for a host component (`mu_ui::ShellChrome`) |
 
 New layer UI is `LayerPanel` / `LayerSidebar` in `mu-core`; a product supplies content, not a copy of the
 class.

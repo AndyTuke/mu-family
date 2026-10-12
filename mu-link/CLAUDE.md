@@ -73,17 +73,23 @@ auto-attaches), or none (just capture for N seconds — launch an app by hand ag
 To capture **mu-Clid through the bus**: run `mu-link-harness --seconds 10 --out muclid.wav`,
 then launch mu-Clid standalone and load a sound — its audio is summed into the capture.
 
-### Why mu-link does NOT use EditorShellBase (documented deviation)
+### How mu-link shares the family chrome (ruled 2026-10-12; replaces the old "documented deviation")
 
-The family design rule is "share ONE UX via mu-core." mu-link honours the *visual* half —
-it reuses `MuLookAndFeel` (palette/sizes) and `VUMeter` from mu-core for family parity.
-But it deliberately does **not** derive its window from `EditorShellBase`: that shell is a
-`juce::AudioProcessorEditor` bound to a `ProcessorBase` (APVTS, presets, plugin formats),
-and mu-link is a **server app, not a plugin** — there is no `AudioProcessor`. Forcing it
-through the plugin shell would mean faking a processor. So mu-link composes a bespoke
-`DocumentWindow` + `MuLinkComponent`, and the GUI target compiles just the three shared UI
-sources it needs (`MuLookAndFeel`/`MuTheme`/`VUMeter`) rather than linking the whole
-mu-core INTERFACE library (which would drag in the entire plugin stack).
+mu-link is a server app, not a plugin: there is no `AudioProcessor`, so it does not derive from
+`EditorShellBase` (a `juce::AudioProcessorEditor`). It still uses the **same chrome** as the products,
+through the seam in [docs/design-plugin-family.md](../docs/design-plugin-family.md#shell-chrome-and-the-app-seam--family-standard-ruled-2026-10-12):
+the shared `TransportBar`, `StandardSettingsOverlay`, `SaveDialog`, `PresetBrowser`, `StatusBar` and the
+`ShellChrome` helper take a `mu_core::ShellBackend`, which `ProcessorBase` implements for the plugins and
+`mu_link::LinkShellBackend` (`Source/UI/`) implements over the `AudioServer`. `isStandaloneApp()` is true, so the
+bar shows the master transport; mu-link has no host transport (the host reads keep their "no host" defaults and
+are never called). `MuLinkComponent` holds a `ShellChrome`, the Mixer panel and the Scenes panel; the layout is
+[docs/mu-link/design-ui.md](../docs/mu-link/design-ui.md).
+
+The GUI target still does **not** link the mu-core INTERFACE library (which would drag in the plugin stack). It adds
+`${MU_CORE_CHROME_SOURCES}` from `mu-core/UIChromeSources.cmake`, the one list of mu-core `.cpp` files that need no
+processor (the INTERFACE library includes the same list), plus `Audio/InsertProcessor.cpp`. Never add a hand-picked
+mu-core UI `.cpp` to mu-link's CMake; if it needs `ProcessorBase` it does not belong in the chrome list. Until stages S1
+to S7 land, the current `MuLinkComponent` and its hand-picked list stay as they are.
 
 Client-side bus glue (attach / push audio / read transport / fallback) now lives in **`mu-core/Link/MuLinkClient`** (L4), shared by every product. The IPC contract (`mu-core/Link/MuLinkProtocol.h`) is the single source of truth for both sides. L5 wires the first product (mu-clid **standalone only**) onto `MuLinkClient`.
 

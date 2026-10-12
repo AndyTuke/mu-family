@@ -13,7 +13,7 @@ mu-link has no layers, so it has no sidebar and no per-layer panel. It is one wi
 | StatusBar | bottom, `kStatusBarH` 20, full width |
 | Main area | 1170 x 814 (`kWindowWidth` x `kChannelPanelH`), no sidebar so the full width. mu-link has no licence, so no support link and no banner: the 774 worst case of the family doc does not apply |
 | Panels | two metal panels edge to edge, each drawn `reduced(2)`, screws on (`setMetalStyle(true)` then `setScrews(true)`): Mixer panel above, Scenes panel below |
-| Display size | follows the family Small / Medium / Large scale (`mu_ui::scale`); set in Settings (section 5) |
+| Display size | follows the family display size, Medium (1.0) or Large (1.25) (`mu_ui::scale`); there is no Small (family section 1); set in Settings (section 5) |
 
 Vertical budget of the main area: Mixer panel `814 - kScenesPanelH` = 662, Scenes panel `kScenesPanelH` = 152.
 
@@ -59,8 +59,8 @@ An **empty slot** is drawn inactive (`MixerChannel::setActive(false)`: dimmed) b
 
 **Master column** (`kMixerMasterW` 80 + insert panel `kMixerInsertPanelW` 136 = 216), the same as the family mixer's master:
 
-- Master strip: name plate "Master", the fader (also uncapped), `VUMeter`, dB readout. No mute / solo. Its fader top aligns with the client faders.
-- Insert panel: two stacked boxes **Insert 1** and **Insert 2** (name plates), each a `DropdownSelect` of the shared algorithm list (`populateInsertAlgoDropdown`, alphabetised like the products' `InsertSubsection`) over a **2 x 2 grid** of `knobInsertPad` `KnobWithLabel`s configured by `configureKnobFromSlot` (family section 5, "Overlay and dialog fit rules": 2 x 2 for every algorithm, EQ included). Each box needs dropdown 24 + 2 x 46 knob rows + plate and padding, about 150 of the 622 available, two of them 300: fits with 300+ spare.
+- Master strip: `MixerChannel::Type::Master`, callback-driven (`onMasterLevel` out, `setMasterLevel` in, which never fires the callback), with `setShowInsertPanel(false)` so the strip is the 80 px column only: name plate "Master", the fader (also uncapped), `VUMeter`, dB readout. No mute / solo. Its fader top aligns with the client faders, so the strip takes a fader-top y (`setFaderTop(int)`, the client strips' fader top) and leaves the space above it empty. This matches the family mixer's master strip.
+- Insert panel: **not part of the strip.** It is a separate shared, callback-driven mu-core component (suggested name `MasterInsertPanel`, name and file for the `architecture-steward`), `kMixerInsertPanelW` 136 wide, placed directly right of the Master strip, top aligned with the Mixer panel's strip area, so the column is still 80 + 136 = 216. The plugins' `MixerChannel` keeps its built-in panel until it is switched to this same component (follow-up: one insert panel for the family, no second copy of the layout). Contents: two stacked boxes **Insert 1** and **Insert 2** (name plates), each a `DropdownSelect` of the shared algorithm list (`populateInsertAlgoDropdown`, alphabetised like the products' `InsertSubsection`) over a **2 x 2 grid** of `knobInsertPad` `KnobWithLabel`s configured by `configureKnobFromSlot` (family section 5, "Overlay and dialog fit rules": 2 x 2 for every algorithm, EQ included). Each box needs dropdown 24 + 2 x 46 knob rows + plate and padding, about 150 of the 622 available, two of them 300: fits with 300+ spare.
 
 Knob colours: **the category colours, not the app colour.** mu-link's main area is a mixer, and the metal-style rule is that a mixer looks the same in every app (family section 11): do not call `useAppColourKnobs` over it.
 
@@ -83,7 +83,7 @@ The gear opens the shared two-column settings page, with these groups only (ever
 
 | Group | Rows |
 |---|---|
-| General | **Display size** (Small / Medium / Large, as every product); **Audio / MIDI devices** as a single button row "Choose devices..." that opens the existing native `AudioDeviceSelectorComponent` dialog unchanged (the device list is open-ended and the JUCE selector already does it) |
+| General | **Display size** (Medium / Large, as every product; the hint under it reads "(reopen the app for label fonts to fully rescale)" because `isStandaloneApp()` is true); **Audio / MIDI devices** as a single button row "Choose devices..." that opens the existing native `AudioDeviceSelectorComponent` dialog unchanged (the device list is open-ended and the JUCE selector already does it) |
 | MIDI Clock | **Sync offset**: `NudgeInput` integer, range -50 to +250 ms, step 1, Shift+click 10, default 0, signed (`+25`), exactly as [family section 6.5](../design-ui-family.md#65-transport-timing-controls-standalone) (mu-link always shows it). Row label "Sync offset" |
 
 This supersedes the 2026-10-11 audit note that mu-link has no settings overlay: that was true of the old bespoke window. Source and Messages are not repeated here (Source is on the bar; mu-link takes Clock and Transport from the master).

@@ -127,6 +127,7 @@ The `mu-core` INTERFACE library (introduced in Stage 33) holds everything shared
 |---|---|---|
 | `ProcessorBase` | `mu-core/Plugin/ProcessorBase.{h,cpp}` | Abstract base; owns apvts + fxChain + mixerEngine + `processCoreBlock()` + MIDI-PC preset plumbing + `syncGlobalFxParam()` (maps a mixer/FX/return/master/`ch{N}_` APVTS id → fxChain/mixerEngine state; prefix-routes to per-family helpers); also the internal transport (`internalPlaying` / `internalBpm` / `internalBeatPos` + the play / BPM overrides) and the family bus layout (`isBusesLayoutSupported`: one optional stereo sidechain in, stereo out) |
 | `ProcessorCore` | `mu-core/Plugin/ProcessorCore.h` (header-only; ruled 2026-10-11) | The slim parent of `ProcessorBase` and the **test seam**: `juce::AudioProcessor` + the channel / layer accessors (`getNumChannels`, `getLayer` + const wrapper, `getMaxChannels`, `getChannelName`, `getChannelColourIndex`) + the published host transport (`isHostPlaying`, `getHostTimeSignature`, `getHostBarStartPpq`, `getHostPpqPosition`, `pollHostTransport`, the `processBlockBypassed` override). It depends only on JUCE, `Plugin/HostTransport.h` and `Sequencer/Layer.h`: no mixer, FX, voice, licensing, persistence or MIDI-control code, so `mu-core-tests` can construct a derived fake. `ProcessorBase : ProcessorCore` keeps everything else; no product or UI code changes (they keep taking `ProcessorBase*`). Rule: new state or behaviour that a unit test must reach without the engine goes in `ProcessorCore`; anything that needs `fxChain`, `mixerEngine`, licensing or presets stays in `ProcessorBase`. When layer ownership moves into the base (Layer ownership stage 4), the layer array, count and lock land in `ProcessorCore`. |
+| `ShellBackend`, `ShellChrome` | `mu-core/Plugin/ShellBackend.h`, `mu-core/UI/ShellChrome.{h,cpp}` (ruled 2026-10-12, not yet built; stages S1 to S4) | The processor-free seam under the shared chrome: `ShellBackend` is what `TransportBar`, `StandardSettingsOverlay` and the preset flow read from the app (`ProcessorBase` implements it; so does mu-link's `LinkShellBackend`); `ShellChrome` is the helper that owns the bar, overlays and layout for a host component. See [Shell chrome and the app seam](#shell-chrome-and-the-app-seam--family-standard-ruled-2026-10-12) |
 | `MixerFxParams` | `mu-core/Plugin/MixerFxParams.h` | `mu_mixfx::addGlobalFxParams(layout)` declares the shared global-FX / return / master param set (`eff_`/`dly_`/`rev_`/`eff2*`/`echo_`/`ret_*`/`mstr_lvl`/`mstr_pan`/`mst_ins*`) the MixerOverlay/FXRow/DelayRow bind to. **Strips:** `mu_mixfx::addChannelStripParams(layout, "ch{N}_", name, options)` declares each channel strip's 12 params (options: version hint / continuous ranges for mu-clid's legacy ids, per-product sidechain defaults); the product adds only its own globals (e.g. mu-clid `mstrLoop`). **Sync contract:** each product calls `ProcessorBase::startFxParamSync()` once at the end of its constructor — the base listens to every mixer / FX id, routes changes to `syncGlobalFxParam` and seeds the engines; a product's own listener (mu-clid's rhythm params) skips those ids |
 | `VoiceEngine` | `mu-core/Audio/VoiceEngine.{h,cpp}` | Per-slot voice chain; no PluginProcessor dependency |
 | `MixerEngine` | `mu-core/Audio/MixerEngine.{h,cpp}` | Channel strips / sends / sidechain / returns / master; optional per-channel render hook (`RenderChannelFn`) |
@@ -525,6 +526,81 @@ own Play button does nothing — the host is in charge. A product may bound its 
 (mu-Tant wraps at its longest gate pattern, 64 beats). Product-specific play modes that aren't a
 transport — mu-Clid's and mu-Tant's MIDI Note mode, mu-Toni's MIDI-trigger arp — sit on top. The
 headless render's `--host-start-beat` simulates rule 1 (`TONI_host_lock`).
+
+## Shell chrome and the app seam — family standard (ruled 2026-10-12)
+
+**Problem.** The shared chrome (`TransportBar`, `StandardSettingsOverlay`, the overlay and layout logic in `EditorShellBase`, the
+preset flow) took `ProcessorBase&`, so mu-link, which is an app with no `AudioProcessor`, could not use it. mu-link's old
+"documented deviation" (a bespoke window) is **withdrawn**: mu-link uses the same chrome as the products. The rule is the one
+`ControlSink` already follows: the shared UI depends on a small interface, and the app implements it.
+
+**Three pieces, smallest first.**
+
+| Piece | Where | What it is |
+|---|---|---|
+| `mu_core::ShellBackend` | `mu-core/Plugin/ShellBackend.h` (header-only; namespace `mu_core`) | An abstract class: **everything the chrome reads from or tells the app**, taken verbatim from the "Shell-facing API" block of `ProcessorBase`. Groups: **transport** (`isStandaloneApp`, `isInternalPlaying`, `toggleInternalPlay`, `getInternalBpm` / `setInternalBpm`, `getInternalBeatPos`, `getTimeSignature` / `setTimeSignature`, `setNudgeDirection`); **clock sync** (`getMidiSyncEnabled` / `setMidiSyncEnabled`, `getMidiSyncMessages` / `setMidiSyncMessages`, `getMidiClockBpm`, `isMidiClockPlaying`, `getMidiClockState`, `getSyncOffsetMs` / `setSyncOffsetMs`, `kSyncOffsetMinMs` / `MaxMs`); **host reads** (`isHostPlaying`, `getHostPpqPosition`, `getHostTimeSignature`, `getHostBarStartPpq`), defaulted to "no host"; **display** (`getUiScale` / `setUiScale`, `kUiScaleMedium` / `Large`); **presets** (`getPresetsDir`, `getFullPresetExtension`, `hasPendingFullPreset` defaulted false, `loadPreset`, `savePreset`, `loadCategoryList`, `ensureCategoryInList`, `getDefaultPresetFile`); **master level** (`hasMasterLevel` defaulted false, `getMasterLevel` / `setMasterLevel`); `getContentDir`; and the four callbacks the shell sets (`onLoadError`, `onUiScaleChanged`, `onSaveAndQuit`, `onPresetSwapCommitted`) as public `std::function` members. |
+| `mu_ui::ShellChrome` | `mu-core/UI/ShellChrome.{h,cpp}` | The processor-free half of `EditorShellBase`, as a **helper object, not a base class**: constructed with the host `juce::Component&` and a `ShellBackend&`, it owns and parents to the host the `MuLookAndFeel`, `TransportBar`, `StatusBar`, `AboutOverlay`, `SaveDialog`, `PresetBrowser`, the mixer / settings overlay slots and the upgrade banner; it holds the overlay state machine (`hideAllOverlays`, `fadeSwitch`, `show*`), the layout (transport / optional sidebar / main / status), `setMetalStyle`, `setScrews`, `forwardKnobStatus`, the version check, the play / stop key, and the preset flow (load, save with overwrite confirm, new with discard confirm, dirty flag). |
+| `EditorShellBase` | unchanged name and public / protected API | `juce::AudioProcessorEditor` + a `ShellChrome` (passing itself and the `ProcessorBase`) + what genuinely needs a processor: the APVTS dirty listener (calls the chrome's `markDirty`), `ActivationOverlay`, the MIDI program-change overlays, the support prompt, licensing affordances and the `processorRef` cleanup in the destructor. |
+
+**Why a helper and not a sibling shell class.** `AudioProcessorEditor` is itself a `Component`, so a processor-free
+`ShellBase : Component` cannot be inserted under it, and a template over the base class would turn the whole shell header-only
+for no gain. A helper parented to the host keeps the component tree exactly as today (children directly under the editor, the
+bar at x = 0, `OverlayHost` still finds the editor), so the four plugins stay visually and behaviourally unchanged. mu-link's
+content component holds the same helper over its own `ShellBackend`.
+
+**`ProcessorBase` implements `ShellBackend`** (`class ProcessorBase : public ProcessorCore, public mu_core::ShellBackend`), like
+`ControlSink`. The interface uses `ProcessorBase`'s existing signatures, so the existing members become overrides (add
+`override`), the four host reads forward to `ProcessorCore`, `isStandaloneApp()` is `wrapperType == wrapperType_Standalone`, and
+the master level reads and writes `mstr_lvl` through the APVTS parameter (not a `SliderAttachment`, as today). `kUiScale*` and
+the four callbacks move to `ShellBackend`; the names stay, so `ProcessorBase::kUiScaleLarge` and `proc.onLoadError` still
+compile. Every current call site `TransportBar(proc)`, `StandardSettingsOverlay(proc)`, `EditorShellBase(proc)` keeps compiling
+(`ProcessorBase&` converts to `ShellBackend&`), as do the `TestProcessorBase` tests. **Do not** add a convenience constructor that
+takes `ProcessorBase&` to a shared-chrome class: it brings the `ProcessorBase.h` include back and the seam is lost.
+
+**What stays plugin-only** (takes `ProcessorBase&` on purpose): `ActivationOverlay`, `MidiPresetsOverlay`,
+`MidiFullPresetsOverlay`, `MixerOverlay`, `ChannelSidebar`, `LayerPresetHeader`, `ParamKnobGrid`, the master-insert and APVTS
+binding half of `MixerChannel` (`MixerChannel_Bindings.cpp`, `MixerChannel_Insert.cpp`), `InsertSubsection`. **Rule:** a file in the
+shared chrome list below never includes `Plugin/ProcessorBase.h`, `Plugin/ProcessorCore.h` or `UI/EditorShellBase.h`
+(checked by `check-core-boundary.ps1`).
+
+**The chrome source list: one definition.** `mu-core/UIChromeSources.cmake` sets `MU_CORE_CHROME_SOURCES` (absolute paths to
+the `.cpp` files that need no processor: `MuLookAndFeel`, `MuTheme`, the components, `TransportBar`, `StandardSettingsOverlay`,
+`SettingsOverlayBase`, `ShellChrome`, `AboutOverlay`, `SaveDialog`, `PresetBrowser`, `ModalDialog`, `MixerChannel.cpp`,
+`InsertProcessor`, and so on). `mu-core/CMakeLists.txt` includes it into the INTERFACE source list (the plugins build exactly as
+today) and `mu-link` and `mu-core-tests` add the same variable to their own targets. This keeps "mu-link does not link the
+INTERFACE library" true without a hand-kept second list that drifts. mu-link adds only what is genuinely its own.
+
+**mu-link's adapter and window.** `mu_link::LinkShellBackend` (`mu-link/Source/UI/LinkShellBackend.h`) implements `ShellBackend`
+over the `AudioServer`: `isStandaloneApp()` is **true** (so the bar uses the internal transport and shows the BPM field and
+Play), play and BPM drive the master `TransportClock`, the beat is the clock's beat, the clock source is Internal / MIDI In,
+`getMidiSyncMessages()` is "Clock + Transport" while MIDI In is chosen, the sync offset goes to the server, the meter is a
+constant 4/4, presets are `Documents/TDP/muLink/Presets` with extension `muLink`, the display scale is kept in mu-link's own
+settings file. **Host transport is simply not there:** the host reads keep their "no host" defaults and the bar never calls
+them because `isStandaloneApp()` is true. mu-link's standalone window is therefore never "idle"; it is the master. The
+`MuLinkComponent` holds a `ShellChrome` over the adapter, the Mixer and Scenes panels, and nothing else of its own chrome; the
+`DocumentWindow` stays a native-title-bar, non-resizable window at the family size.
+
+**`MidiClockSync::ClockState` gains `Drifting`** (the shared lamp draws it as in [mu-link design-ui §4](mu-link/design-ui.md));
+`MidiClockSync` itself never reports it, only mu-link's adapter does.
+
+**Staged migration (each stage ends with a Debug build of all products and the unit tests; the four plugins look and behave
+identically after every stage):**
+
+| Stage | Change | Plugins visually unchanged because |
+|---|---|---|
+| S1 | `Plugin/ShellBackend.h` (transport, clock sync, host reads, display, `Drifting`); `ProcessorBase` implements it; `TransportBar` takes `ShellBackend&`; `UIChromeSources.cmake` created with the files already free of `ProcessorBase` | same values flow through the same methods |
+| S2 | `ShellBackend` gains master level; `StandardSettingsOverlay` takes `ShellBackend&`; its `Options` gain row switches (below) with today's values as defaults | defaults reproduce today's page |
+| S3 | `ShellChrome` part A: look and feel, bar, status bar, About, Save, browser, slots, overlay state machine, layout, banner, version check; `EditorShellBase` delegates | same children, same parent, same order |
+| S4 | `ShellChrome` part B: preset flow (load / save / new, dirty) over `ShellBackend`, the play key; `ShellBackend` gains the preset operations | `EditorShellBase` keeps its `onPreset*` hooks and calls them at the same moments |
+| S5 | `MixerChannel.cpp` free of `ProcessorBase` (client and master strips callback-driven; binding stays in the two `.cpp` files); chrome list completed; boundary check extended | binding code moves nowhere |
+| S6 | mu-link: `LinkShellBackend`, its CMake switched to `MU_CORE_CHROME_SOURCES`, tests for the adapter | mu-link window unchanged (no UI change yet) |
+| S7 | mu-link window rewritten on `ShellChrome` (the "mu-link UI 4" row) | n/a, this is the visible change, to [mu-link design-ui](mu-link/design-ui.md) |
+| S8 | mu-link Settings on `StandardSettingsOverlay` (the "mu-link UI 5" row) | n/a |
+
+`StandardSettingsOverlay::Options` (S2): `showTransport` (exists), `showMeter` (time-signature row; default true, standalone
+only as today), `showClockSource` (the Source and Messages rows; default true), `syncOffsetAlways` (show Sync offset even when
+Source is Internal; default false). The master-volume row appears when `hasMasterLevel()`. mu-link sets `showTransport = false`,
+`showMeter = false`, `showClockSource = false`, `syncOffsetAlways = true`.
 
 ## Device MIDI output — family standard
 
